@@ -6,6 +6,7 @@
 - [ ] Save/load named slots
 - [ ] Multiplayer lobby (Socket.io rooms ready)
 - [ ] New game / character creation flow
+- [ ] Non-combat classes feel useless — find ways to incorporate class abilities into narrative and game mechanics (e.g. Rogue stealth bonuses, Bard persuasion, Cleric healing, etc.)
 
 ## Rules Engine (D&D 5e gaps)
 - [ ] Class-based skill proficiencies (e.g. Rogue gets Stealth)
