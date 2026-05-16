@@ -1,0 +1,14 @@
+{
+  "name": "pansori",
+  "version": "0.1.0",
+  "description": "A dynamic browser RPG platform with switchable themes, built on D&D 5e rules.",
+  "private": true,
+  "scripts": {
+    "lint":   "npm run lint   --workspace=src/frontend --workspace=src/backend",
+    "format": "npm run format --workspace=src/frontend --workspace=src/backend"
+  },
+  "workspaces": [
+    "src/frontend",
+    "src/backend"
+  ]
+}
