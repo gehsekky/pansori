@@ -46,11 +46,25 @@ export function generateShipSeed(context: Context): Seed {
     }
   }
 
+  // BFS from start to determine each room's distance for CR scaling
+  const dist: Record<string, number> = { [startId]: 0 };
+  const queue = [startId];
+  while (queue.length) {
+    const curr = queue.shift()!;
+    for (const next of connections[curr] ?? []) {
+      if (dist[next] === undefined) { dist[next] = dist[curr] + 1; queue.push(next); }
+    }
+  }
+  const maxDist = Math.max(1, ...Object.values(dist));
+
   const enemies: Seed['enemies'] = {};
   const loot: Seed['loot']       = {};
   rooms.forEach(r => {
     if (r.id !== startId && Math.random() < 0.6) {
-      const template  = pick(context.enemyTemplates);
+      const normalized = (dist[r.id] ?? 0) / maxDist;
+      const maxCr      = normalized < 0.34 ? 1 : normalized < 0.67 ? 5 : Infinity;
+      const pool       = context.enemyTemplates.filter(t => t.cr <= maxCr);
+      const template   = pick(pool.length ? pool : context.enemyTemplates);
       enemies[r.id] = {
         name:   template.name,
         hp:     template.hp,
@@ -59,6 +73,7 @@ export function generateShipSeed(context: Context): Seed {
         toHit:  template.toHit,
         xp:     template.xp,
         dex:    template.dex,
+        wis:    template.wis,
       };
     }
     if (Math.random() < 0.5) {

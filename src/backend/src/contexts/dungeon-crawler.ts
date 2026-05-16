@@ -2,6 +2,7 @@ import type { Context } from '../types.js';
 
 export const context: Context = {
   id: 'dungeon-crawler',
+  mapType: 'roguelike',
   worldNoun: 'dungeon',
   startRoomId: 'crypt',
   escapeRoomId: 'exit_shaft',
@@ -13,6 +14,14 @@ export const context: Context = {
     'Ossuary of the Fallen King', 'The Wretched Depths', 'Catacombs of Neth',
     'The Bone Labyrinth',
   ],
+
+  classSkills: {
+    Warrior: ['athletics', 'intimidation'],
+    Mage:    ['arcana', 'investigation'],
+    Rogue:   ['stealth', 'sleight_of_hand', 'deception'],
+    Cleric:  ['medicine', 'religion'],
+    Ranger:  ['stealth', 'perception', 'nature'],
+  },
 
   enemyTemplates: [
     // CR 1/4 — starter threats
