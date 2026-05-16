@@ -23,11 +23,24 @@ export interface Room {
   desc: string;
 }
 
+export interface EnemyTemplate {
+  name:   string;
+  cr:     number;
+  hp:     number;
+  ac:     number;
+  damage: string;
+  toHit:  number;
+  xp:     number;
+  dex?:   number;
+}
+
 export interface Enemy {
   name:   string;
   hp:     number;
   ac:     number;
   damage: string;
+  toHit:  number;
+  xp:     number;
   dex?:   number;
 }
 
@@ -115,7 +128,7 @@ export interface Context {
   escapeTriggers:   string[];
   escapeChoiceText: string;
   worldNames:       string[];
-  enemyTypes:       string[];
+  enemyTemplates:   EnemyTemplate[];
   introTexts:       string[];
   roomPool:         RoomPoolEntry[];
   lootTable:        LootItem[];

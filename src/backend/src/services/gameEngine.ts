@@ -455,7 +455,7 @@ export async function takeAction({ action, history = [], state, seed, context }:
         narrative += ` (d20 ${atk.roll}+${atk.strMod} STR+${atk.prof} prof = ${atk.total} vs AC ${enemy.ac})`;
 
         if (newEnemyHp <= 0) {
-          const xpGain = 10 + (enemy.hp || 8);
+          const xpGain = enemy.xp ?? (10 + (enemy.hp || 8));
           newState.xp             = (newState.xp || 0) + xpGain;
           newState.enemies_killed = [...newState.enemies_killed, roomId];
           newState.enemy_hp       = { ...newState.enemy_hp, [roomId]: 0 };

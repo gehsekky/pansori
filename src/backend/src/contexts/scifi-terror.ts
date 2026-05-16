@@ -14,9 +14,19 @@ export const context: Context = {
     'NSEA Protector',
   ],
 
-  enemyTypes: [
-    'Glob-Beast', 'Brain-Leech', 'Chrome-Crawler',
-    'Void-Slug', 'Zap-Moth', 'Slime-Wraith', 'Pod-Spawn',
+  enemyTemplates: [
+    // CR 1/4 — starter threats (zombie / skeleton equivalent)
+    { name: 'Infected Crewmate', cr: 0.25, hp:  22, ac:  8, damage: '1d6+1',  toHit: 3, xp:    50 },
+    { name: 'Pod-Spawn',         cr: 0.25, hp:  13, ac: 12, damage: '1d6+2',  toHit: 4, xp:    50, dex: 14 },
+    // CR 1 — early ship sections
+    { name: 'Brain-Leech',       cr:    1, hp:  22, ac: 13, damage: '2d6+2',  toHit: 4, xp:   200, dex: 15 },
+    { name: 'Chrome-Crawler',    cr:    1, hp:  26, ac: 14, damage: '1d8+3',  toHit: 4, xp:   200 },
+    // CR 3–5 — mid ship
+    { name: 'Corrupted Android', cr:    3, hp:  52, ac: 15, damage: '2d8+3',  toHit: 5, xp:   700 },
+    { name: 'Alien Warrior',     cr:    5, hp:  67, ac: 13, damage: '2d8+4',  toHit: 6, xp:  1100, dex: 16 },
+    { name: 'Xenomorph Brute',   cr:    5, hp:  84, ac: 14, damage: '3d6+4',  toHit: 7, xp:  1800 },
+    // CR 6+ — boss-tier
+    { name: 'Hive Empress',      cr:   13, hp: 127, ac: 17, damage: '3d8+6',  toHit: 9, xp: 10000, dex: 18 },
   ],
 
   introTexts: [

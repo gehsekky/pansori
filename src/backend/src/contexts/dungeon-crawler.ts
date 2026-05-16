@@ -14,9 +14,20 @@ export const context: Context = {
     'The Bone Labyrinth',
   ],
 
-  enemyTypes: [
-    'Skeleton Warrior', 'Necromancer', 'Death Knight',
-    'Bone Golem', 'Wraith', 'Cursed Revenant', 'Tomb Guardian',
+  enemyTemplates: [
+    // CR 1/4 — starter threats
+    { name: 'Skeleton',     cr: 0.25, hp:  13, ac: 13, damage: '1d6+2',  toHit: 4, xp:    50 },
+    { name: 'Zombie',       cr: 0.25, hp:  22, ac:  8, damage: '1d6+1',  toHit: 3, xp:    50 },
+    // CR 1 — early rooms
+    { name: 'Ghoul',        cr:    1, hp:  22, ac: 12, damage: '2d6+2',  toHit: 4, xp:   200, dex: 15 },
+    { name: 'Shadow',       cr:    1, hp:  16, ac: 12, damage: '2d6+2',  toHit: 4, xp:   200, dex: 14 },
+    // CR 3–5 — mid dungeon
+    { name: 'Wight',        cr:    3, hp:  45, ac: 14, damage: '2d8+3',  toHit: 4, xp:   700 },
+    { name: 'Wraith',       cr:    5, hp:  67, ac: 13, damage: '4d8+3',  toHit: 6, xp:  1100, dex: 16 },
+    { name: 'Flesh Golem',  cr:    5, hp:  93, ac:  9, damage: '2d8+5',  toHit: 7, xp:  1800 },
+    // CR 6+ — boss-tier
+    { name: 'Necromancer',  cr:    6, hp:  66, ac: 12, damage: '4d6',    toHit: 5, xp:  2300, dex: 14 },
+    { name: 'Death Knight', cr:   17, hp: 110, ac: 20, damage: '2d8+6',  toHit: 9, xp:  5900 },
   ],
 
   introTexts: [
