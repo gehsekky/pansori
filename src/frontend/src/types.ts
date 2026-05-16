@@ -61,6 +61,7 @@ export interface GameState {
   enemy_hp:        Record<string, number>;
   run_log:         Array<{ action: string; narrative: string }>;
   last_choices?:   string[];
+  flags:           Record<string, boolean | string | number>;
   combat_active:   boolean;
   dead:            boolean;
   stable:          boolean;
