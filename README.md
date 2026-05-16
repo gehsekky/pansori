@@ -9,9 +9,8 @@ engine weaves an epic adventure that you star in.
 ## Quick start
 
 ```bash
-# 1. Copy env and add your Anthropic API key
+# 1. Copy env
 cp .env.example .env
-# Edit .env → set ANTHROPIC_API_KEY
 
 # 2. Start everything
 npm run dev
@@ -40,7 +39,7 @@ open http://localhost:5173
 |----------|------------------------|--------------------|
 | Frontend | http://localhost:5173  | React + Vite       |
 | Backend  | http://localhost:3001  | Express + Socket.io|
-| Postgres | localhost:5432         | rpguser / rpgpass  |
+| Postgres | localhost:5432         | pansori / pansori  |
 | pgAdmin  | http://localhost:5050  | --profile tools    |
 
 ## Project structure
