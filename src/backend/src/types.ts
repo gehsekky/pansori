@@ -6,8 +6,9 @@ export interface LootItem {
   desc:         string;
   weight:       number;
   type:         'weapon' | 'armor' | 'consumable' | 'misc';
-  slot:         'weapon' | 'armor' | null;
+  slot:         'weapon' | 'armor' | 'shield' | null;
   damage:       string | null;
+  finesse?:     boolean;
   ac_bonus:     number | null;
   heal:         string | null;
   effect:       string | null;
@@ -32,6 +33,7 @@ export interface EnemyTemplate {
   toHit:  number;
   xp:     number;
   dex?:   number;
+  wis?:   number;
 }
 
 export interface Enemy {
@@ -42,6 +44,7 @@ export interface Enemy {
   toHit:  number;
   xp:     number;
   dex?:   number;
+  wis?:   number;
 }
 
 export interface Seed {
@@ -93,6 +96,7 @@ export interface GameState {
   inventory:       InventoryItem[];
   equipped_weapon: string | null;
   equipped_armor:  string | null;
+  equipped_shield: string | null;
   current_room:    string;
   visited_rooms:   string[];
   enemies_killed:  string[];

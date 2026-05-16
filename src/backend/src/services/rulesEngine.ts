@@ -83,21 +83,25 @@ interface AttackResult {
   roll:     number;
   total:    number;
   damage:   number;
-  strMod:   number;
+  atkMod:   number;
+  atkStat:  'STR' | 'DEX';
   prof:     number;
 }
 
-// Player attacks an enemy. Assumes melee (STR-based); finesse weapons could use DEX — future enhancement.
-export function resolvePlayerAttack(player: PlayerStats, weaponDamage: string | null, targetAC: number): AttackResult {
-  const strMod = abilityMod(player.str);
-  const prof   = profBonus(player.level);
-  const roll   = d(20);
-  const total  = roll + strMod + prof;
+// Player attacks an enemy. Finesse weapons use whichever of STR/DEX is higher.
+export function resolvePlayerAttack(player: PlayerStats, weaponDamage: string | null, targetAC: number, finesse = false): AttackResult {
+  const strMod  = abilityMod(player.str);
+  const dexMod  = abilityMod(player.dex);
+  const atkMod  = finesse ? Math.max(strMod, dexMod) : strMod;
+  const atkStat = (finesse && dexMod > strMod) ? 'DEX' : 'STR';
+  const prof    = profBonus(player.level);
+  const roll    = d(20);
+  const total   = roll + atkMod + prof;
 
-  if (roll === 1)  return { hit: false, fumble: true,  critical: false, roll, total, damage: 0, strMod, prof };
-  if (roll === 20) return { hit: true,  fumble: false, critical: true,  roll, total, damage: Math.max(1, rollCritical(weaponDamage) + strMod), strMod, prof };
-  if (total >= targetAC) return { hit: true, fumble: false, critical: false, roll, total, damage: Math.max(1, rollDice(weaponDamage) + strMod), strMod, prof };
-  return { hit: false, fumble: false, critical: false, roll, total, damage: 0, strMod, prof };
+  if (roll === 1)  return { hit: false, fumble: true,  critical: false, roll, total, damage: 0, atkMod, atkStat, prof };
+  if (roll === 20) return { hit: true,  fumble: false, critical: true,  roll, total, damage: Math.max(1, rollCritical(weaponDamage) + atkMod), atkMod, atkStat, prof };
+  if (total >= targetAC) return { hit: true, fumble: false, critical: false, roll, total, damage: Math.max(1, rollDice(weaponDamage) + atkMod), atkMod, atkStat, prof };
+  return { hit: false, fumble: false, critical: false, roll, total, damage: 0, atkMod, atkStat, prof };
 }
 
 interface EnemyStats {
@@ -127,8 +131,14 @@ export function canEquipWeapon(combatActive: boolean, turnActions?: TurnActions)
   return { allowed: false, reason: 'You have already used your free object interaction this turn.' } as const;
 }
 
+// Shields cost 1 action to don/doff (PHB). We block in combat for simplicity.
+export function canDonShield(combatActive: boolean) {
+  if (!combatActive) return { allowed: true } as const;
+  return { allowed: false, reason: 'Donning or doffing a shield takes 1 action — you cannot do it mid-combat.' } as const;
+}
+
 // Don/doff times per 5e PHB: light 1 min, medium 5 min, heavy 10 min.
-// None of these can be done in combat (shields not yet implemented).
+// None of these can be done in combat.
 const ARMOR_CATEGORY: Record<string, string> = {
   leather_armor:    'light',
   hazmat_suit:      'light',

@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { pool } from '../db/pool.js';
 import { generateShipSeed } from '../services/procgen.js';
 import { takeAction, generateChoices } from '../services/gameEngine.js';
-import { FRESH_TURN, canEquipWeapon, canDonArmor, computeAcAfterArmorChange } from '../services/rulesEngine.js';
+import { FRESH_TURN, canEquipWeapon, canDonArmor, canDonShield, computeAcAfterArmorChange } from '../services/rulesEngine.js';
 import { context as scifiContext }   from '../contexts/scifi-terror.js';
 import { context as dungeonContext } from '../contexts/dungeon-crawler.js';
 import type { GameState, Context } from '../types.js';
@@ -52,6 +52,7 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
       inventory:       [],
       equipped_weapon: null,
       equipped_armor:  null,
+      equipped_shield: null,
       current_room:    ctx.startRoomId,
       visited_rooms:   [ctx.startRoomId],
       enemies_killed:  [],
@@ -100,18 +101,18 @@ gameRouter.post('/session/:id/equip', async (req: Request, res: Response) => {
     const loot         = ctx.lootTable.find(l => l.id === item_id);
     if (!loot) { res.status(400).json({ error: 'Unknown item' }); return; }
 
-    if (loot.ac_bonus) {
-      if (state.equipped_armor === item_id) {
-        const check = canDonArmor(combatActive, item_id!);
-        if (!check.allowed) { res.status(409).json({ error: check.reason }); return; }
-        state.ac             = computeAcAfterArmorChange(state.ac, item_id!, null, ctx.lootTable);
-        state.equipped_armor = null;
-      } else {
-        const check = canDonArmor(combatActive, item_id!);
-        if (!check.allowed) { res.status(409).json({ error: check.reason }); return; }
-        state.ac             = computeAcAfterArmorChange(state.ac, state.equipped_armor, item_id!, ctx.lootTable);
-        state.equipped_armor = item_id!;
-      }
+    if (loot.slot === 'shield') {
+      const check = canDonShield(combatActive);
+      if (!check.allowed) { res.status(409).json({ error: check.reason }); return; }
+      const toggling = state.equipped_shield === item_id;
+      state.ac             = computeAcAfterArmorChange(state.ac, toggling ? item_id! : state.equipped_shield, toggling ? null : item_id!, ctx.lootTable);
+      state.equipped_shield = toggling ? null : item_id!;
+    } else if (loot.slot === 'armor') {
+      const toggling = state.equipped_armor === item_id;
+      const check    = canDonArmor(combatActive, item_id!);
+      if (!check.allowed) { res.status(409).json({ error: check.reason }); return; }
+      state.ac             = computeAcAfterArmorChange(state.ac, toggling ? item_id! : state.equipped_armor, toggling ? null : item_id!, ctx.lootTable);
+      state.equipped_armor = toggling ? null : item_id!;
     } else if (loot.damage) {
       const toggling = state.equipped_weapon === item_id;
       const check    = canEquipWeapon(combatActive, turnActions);
