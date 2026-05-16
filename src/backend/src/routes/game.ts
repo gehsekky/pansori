@@ -58,6 +58,7 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
       loot_taken:      [],
       enemy_hp:        {},
       run_log:         [],
+      flags:           {},
       combat_active:   false,
       initiative:      null,
       player_first:    true,
