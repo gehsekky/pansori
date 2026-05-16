@@ -2,8 +2,9 @@ import {
   FirstAidKit, Crosshair, Lightning, ShieldStar,
   ForkKnife, Wine, Egg, Sword, Belt, Scroll, CreditCard, Flask,
 } from '@phosphor-icons/react';
+import type { FrontendContext } from '../types.js';
 
-export const context = {
+export const context: FrontendContext = {
   id: 'scifi-terror',
 
   displayName: 'Sci-Fi Terror',
@@ -25,23 +26,19 @@ export const context = {
   ],
 
   theme: {
-    // structural
     pageBg:    '#0a0a0a',
     cardBg:    '#060f06',
     font:      '"Courier New", monospace',
-    // color tiers
-    primary:   '#00ff41',   // bright text, glow, active elements
-    mid:       '#00cc33',   // stats, art tint
-    dim:       '#005f18',   // labels, quiet text
-    dimDark:   '#003d0f',   // footer chrome, dark buttons
-    border:    '#00551a',   // card/input borders
-    separator: '#001a06',   // inline separators, log dividers
-    itemColor: '#00661a',   // unequipped inventory items
-    // hp bar
+    primary:   '#00ff41',
+    mid:       '#00cc33',
+    dim:       '#005f18',
+    dimDark:   '#003d0f',
+    border:    '#00551a',
+    separator: '#001a06',
+    itemColor: '#00661a',
     hpHigh:    '#00ff41',
     hpMid:     '#ffaa00',
     hpLow:     '#ff4444',
-    // title
     title:     'ESCAPE FROM THE STARS',
     worldLabel: 'ABOARD',
   },

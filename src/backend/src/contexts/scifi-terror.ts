@@ -1,4 +1,6 @@
-export const context = {
+import type { Context } from '../types.js';
+
+export const context: Context = {
   id: 'scifi-terror',
   worldNoun: 'ship',
   startRoomId: 'cryo_bay',
