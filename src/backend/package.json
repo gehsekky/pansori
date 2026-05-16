@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "Backend for Pansori — a dynamic browser RPG platform.",
   "private": true,
+  "license": "GPL-3.0-only",
   "type": "module",
   "scripts": {
     "dev": "nodemon --exec tsx src/index.ts",
