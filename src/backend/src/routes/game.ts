@@ -18,9 +18,7 @@ export const gameRouter = Router();
 gameRouter.get('/session/:id', async (req: Request, res: Response) => {
   try {
     const { rows } = await pool.query(
-      `SELECT s.*, gs.state FROM game_sessions s
-       JOIN game_state gs ON gs.session_id = s.id
-       WHERE s.id = $1`,
+      'SELECT * FROM game_sessions WHERE id = $1',
       [req.params.id]
     );
     res.json(rows[0] || null);
@@ -46,11 +44,6 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const { rows: [session] } = await client.query(
-      `INSERT INTO game_sessions (character_name, character_class, seed)
-       VALUES ($1, $2, $3) RETURNING *`,
-      [character_name, character_class, JSON.stringify(seed)]
-    );
     const initialState: GameState = {
       hp: 20, max_hp: 20, ac: 10,
       str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10,
@@ -74,9 +67,10 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
       dead:            false,
     };
     initialState.last_choices = generateChoices(initialState, seed, ctx);
-    await client.query(
-      'INSERT INTO game_state (session_id, state) VALUES ($1, $2)',
-      [session.id, JSON.stringify(initialState)]
+    const { rows: [session] } = await client.query(
+      `INSERT INTO game_sessions (character_name, character_class, seed, state)
+       VALUES ($1, $2, $3, $4) RETURNING *`,
+      [character_name, character_class, JSON.stringify(seed), JSON.stringify(initialState)]
     );
     await client.query('COMMIT');
     res.json({ session, state: initialState, seed });
@@ -93,9 +87,7 @@ gameRouter.post('/session/:id/equip', async (req: Request, res: Response) => {
   const { item_id } = req.body as { item_id?: string };
   try {
     const { rows: [row] } = await pool.query(
-      `SELECT s.*, gs.state FROM game_sessions s
-       JOIN game_state gs ON gs.session_id = s.id
-       WHERE s.id = $1`,
+      'SELECT * FROM game_sessions WHERE id = $1',
       [req.params.id]
     );
     if (!row) { res.status(404).json({ error: 'Session not found' }); return; }
@@ -133,7 +125,7 @@ gameRouter.post('/session/:id/equip', async (req: Request, res: Response) => {
     }
 
     await pool.query(
-      'UPDATE game_state SET state = $1, updated_at = NOW() WHERE session_id = $2',
+      'UPDATE game_sessions SET state = $1, updated_at = NOW() WHERE id = $2',
       [JSON.stringify(state), row.id]
     );
     res.json({ newState: state });
@@ -147,9 +139,7 @@ gameRouter.post('/session/:id/action', async (req: Request, res: Response) => {
   const { action, history } = req.body as { action?: string; history?: string[] };
   try {
     const { rows: [row] } = await pool.query(
-      `SELECT s.*, gs.state FROM game_sessions s
-       JOIN game_state gs ON gs.session_id = s.id
-       WHERE s.id = $1`,
+      'SELECT * FROM game_sessions WHERE id = $1',
       [req.params.id]
     );
     if (!row) { res.status(404).json({ error: 'Session not found' }); return; }
@@ -161,17 +151,11 @@ gameRouter.post('/session/:id/action', async (req: Request, res: Response) => {
       action: action ?? '', history: history ?? [], state: row.state, seed: row.seed, context: ctx
     });
 
+    const newStatus = result.dead ? 'dead' : result.escaped ? 'escaped' : row.status;
     await pool.query(
-      'UPDATE game_state SET state = $1, updated_at = NOW() WHERE session_id = $2',
-      [JSON.stringify(result.newState), row.id]
+      'UPDATE game_sessions SET state = $1, status = $2, updated_at = NOW() WHERE id = $3',
+      [JSON.stringify(result.newState), newStatus, row.id]
     );
-
-    if (result.dead) {
-      await pool.query(`UPDATE game_sessions SET status = 'dead' WHERE id = $1`, [row.id]);
-    }
-    if (result.escaped) {
-      await pool.query(`UPDATE game_sessions SET status = 'escaped' WHERE id = $1`, [row.id]);
-    }
 
     res.json(result);
   } catch (err) {
