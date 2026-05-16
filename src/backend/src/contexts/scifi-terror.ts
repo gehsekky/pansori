@@ -2,6 +2,7 @@ import type { Context } from '../types.js';
 
 export const context: Context = {
   id: 'scifi-terror',
+  mapType: 'roguelike',
   worldNoun: 'ship',
   startRoomId: 'cryo_bay',
   escapeRoomId: 'escape_pods',
@@ -13,6 +14,14 @@ export const context: Context = {
     'GSV Iron Fist', 'MV Red Dwarf', 'USCSS Derelict',
     'NSEA Protector',
   ],
+
+  classSkills: {
+    Soldier:   ['athletics', 'intimidation'],
+    Scientist: ['investigation', 'medicine'],
+    Pilot:     ['acrobatics', 'perception', 'stealth'],
+    Engineer:  ['athletics', 'investigation'],
+    Medic:     ['medicine', 'survival'],
+  },
 
   enemyTemplates: [
     // CR 1/4 — starter threats (zombie / skeleton equivalent)
@@ -108,7 +117,7 @@ export const context: Context = {
   ],
 
   lootTable: [
-    { id: 'ray_gun',          name: 'Ray Gun',              desc: '2d6 damage, ranged weapon',                          weight: 18, type: 'weapon',     slot: 'weapon', damage: '2d6',  ac_bonus: null, heal: null,    effect: null,            aliases: ['ray gun', 'raygun'] },
+    { id: 'ray_gun',          name: 'Ray Gun',              desc: '2d6 damage, ranged weapon',                          weight: 18, type: 'weapon',     slot: 'weapon', damage: '2d6',  range: 'ranged', ac_bonus: null, heal: null,    effect: null,            aliases: ['ray gun', 'raygun'] },
     { id: 'med_kit',          name: 'Med Kit',              desc: 'Heals 2d4+2 HP, one use',                            weight: 28, type: 'consumable',  slot: null,     damage: null,   ac_bonus: null, heal: '2d4+2', effect: null,            aliases: ['med kit', 'medkit', 'med'] },
     { id: 'space_rations',    name: 'Space Rations',        desc: 'Restore 1 HP, one use',                              weight: 22, type: 'consumable',  slot: null,     damage: null,   ac_bonus: null, heal: '1',     effect: null,            aliases: ['space rations', 'rations'] },
     { id: 'stun_baton',       name: 'Stun Baton',           desc: '1d8 damage, finesse, melee weapon',                  weight: 14, type: 'weapon',     slot: 'weapon', damage: '1d8',  finesse: true, ac_bonus: null, heal: null,    effect: null,            aliases: ['stun baton', 'stun', 'baton'] },

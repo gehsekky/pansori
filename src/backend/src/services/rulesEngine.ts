@@ -89,13 +89,15 @@ interface AttackResult {
 }
 
 // Player attacks an enemy. Finesse weapons use whichever of STR/DEX is higher.
-export function resolvePlayerAttack(player: PlayerStats, weaponDamage: string | null, targetAC: number, finesse = false): AttackResult {
+// Disadvantage (e.g. ranged weapon in melee) rolls 2d20 and keeps the lower.
+export function resolvePlayerAttack(player: PlayerStats, weaponDamage: string | null, targetAC: number, finesse = false, disadvantage = false): AttackResult {
   const strMod  = abilityMod(player.str);
   const dexMod  = abilityMod(player.dex);
   const atkMod  = finesse ? Math.max(strMod, dexMod) : strMod;
   const atkStat = (finesse && dexMod > strMod) ? 'DEX' : 'STR';
   const prof    = profBonus(player.level);
-  const roll    = d(20);
+  const roll1   = d(20);
+  const roll    = disadvantage ? Math.min(roll1, d(20)) : roll1;
   const total   = roll + atkMod + prof;
 
   if (roll === 1)  return { hit: false, fumble: true,  critical: false, roll, total, damage: 0, atkMod, atkStat, prof };

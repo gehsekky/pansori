@@ -9,6 +9,7 @@ export interface LootItem {
   slot:         'weapon' | 'armor' | 'shield' | null;
   damage:       string | null;
   finesse?:     boolean;
+  range?:       'melee' | 'ranged';
   ac_bonus:     number | null;
   heal:         string | null;
   effect:       string | null;
@@ -132,6 +133,8 @@ export interface Context {
   escapeTriggers:   string[];
   escapeChoiceText: string;
   worldNames:       string[];
+  mapType:          'roguelike' | 'campaign';
+  classSkills:      Record<string, string[]>;
   enemyTemplates:   EnemyTemplate[];
   introTexts:       string[];
   roomPool:         RoomPoolEntry[];
