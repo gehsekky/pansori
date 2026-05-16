@@ -55,7 +55,6 @@ export function generateShipSeed(context: Context): Seed {
         hp:     4 + roll(8),
         ac:     10 + roll(4),
         damage: `${roll(2)}d${pick([4, 6, 8])}`,
-        alive:  true,
       };
     }
     if (Math.random() < 0.5) {

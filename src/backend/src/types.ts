@@ -28,7 +28,6 @@ export interface Enemy {
   hp:     number;
   ac:     number;
   damage: string;
-  alive:  boolean;
   dex?:   number;
 }
 
