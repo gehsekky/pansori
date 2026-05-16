@@ -14,15 +14,26 @@ cp .env.example .env
 # Edit .env → set ANTHROPIC_API_KEY
 
 # 2. Start everything
-docker compose up --build
+npm run dev
 
 # 3. Open the game
 open http://localhost:5173
-
-# Optional: open pgAdmin DB browser
-docker compose --profile tools up -d
-open http://localhost:5050
 ```
+
+## NPM scripts
+
+| Command | Description |
+|---|---|
+| `npm run dev` | Build and start all containers (detached) |
+| `npm run stop` | Stop all containers |
+| `npm run restart` | Restart all containers |
+| `npm run logs` | Tail logs for all containers |
+| `npm run logs:be` | Tail backend logs only |
+| `npm run logs:fe` | Tail frontend logs only |
+| `npm run db` | Start pgAdmin (http://localhost:5050) |
+| `npm run fresh` | Destroy volumes and rebuild from scratch |
+| `npm run lint` | Lint frontend and backend |
+| `npm run format` | Format frontend and backend |
 
 ## Services
 | Service  | URL                    | Notes              |
@@ -49,9 +60,3 @@ open http://localhost:5050
             ├── lib/api.js   ← typed API client
             └── App.jsx      ← game UI shell
 ```
-
-## Next steps
-- [ ] Add world map visualization
-- [ ] Sound effects
-- [ ] Save/load named slots
-- [ ] Multiplayer lobby (Socket.io rooms ready)
