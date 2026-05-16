@@ -2,8 +2,9 @@ import {
   Drop, Sword, Axe, ShieldStar, ShieldChevron,
   ForkKnife, Scroll, Diamond, Key, Flask, Wine, Sparkle,
 } from '@phosphor-icons/react';
+import type { FrontendContext } from '../types.js';
 
-export const context = {
+export const context: FrontendContext = {
   id: 'dungeon-crawler',
 
   displayName: 'Dungeon Crawler',
@@ -26,23 +27,19 @@ export const context = {
   ],
 
   theme: {
-    // structural
     pageBg:    '#0d0a08',
     cardBg:    '#130e0a',
     font:      '"Courier New", monospace',
-    // color tiers
-    primary:   '#c8a96e',   // warm amber — text, glow, active
-    mid:       '#a07848',   // medium amber — stats, art tint
-    dim:       '#5c3d20',   // dark brown — labels, quiet text
-    dimDark:   '#3d2810',   // very dark brown — footer, buttons
-    border:    '#6b4520',   // brown — card/input borders
-    separator: '#2a1508',   // very dark — separators, log dividers
-    itemColor: '#7a5030',   // unequipped inventory items
-    // hp bar
-    hpHigh:    '#c8a96e',   // amber at full health
-    hpMid:     '#d4822a',   // orange when hurt
-    hpLow:     '#cc3333',   // red when critical
-    // title
+    primary:   '#c8a96e',
+    mid:       '#a07848',
+    dim:       '#5c3d20',
+    dimDark:   '#3d2810',
+    border:    '#6b4520',
+    separator: '#2a1508',
+    itemColor: '#7a5030',
+    hpHigh:    '#c8a96e',
+    hpMid:     '#d4822a',
+    hpLow:     '#cc3333',
     title:      'DUNGEON CRAWLER',
     worldLabel: 'DELVING INTO',
   },
@@ -126,7 +123,7 @@ export const context = {
    _____________________
   |- TORTURE CHAMBER -  |
   |=====================|
-  | /o\  /o\  /o\  /o\ |
+  | /o\\  /o\\  /o\\  /o\\ |
   |  |    |    |    |   |
   | hooks from ceiling  |
   |                     |
@@ -212,10 +209,10 @@ export const context = {
   |=====================|
   |  *       *       *  |
   |      _________      |
-  |     / SUMMON  \     |
+  |     / SUMMON  \\     |
   |    |  CIRCLE   |    |
   |    | ~ glow ~  |    |
-  |     \_________/     |
+  |     \\_________/     |
   |  *       *       *  |
   |                     |
   | [ALTAR: STILL WARM] |
@@ -296,8 +293,8 @@ export const context = {
   |    - GUARD POST -   |
   |=====================|
   |  X    X    X    X   |
-  | /|\  /|\  /|\  /|\  |
-  | / \  / \  / \  / \  |
+  | /|\\  /|\\  /|\\  /|\\  |
+  | / \\  / \\  / \\  / \\  |
   |  SKELETAL GUARDS    |
   |  perfect formation  |
   |                     |

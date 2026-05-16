@@ -1,4 +1,6 @@
-export const context = {
+import type { Context } from '../types.js';
+
+export const context: Context = {
   id: 'dungeon-crawler',
   worldNoun: 'dungeon',
   startRoomId: 'crypt',

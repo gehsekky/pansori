@@ -6,7 +6,7 @@ import cors from 'cors';
 import { gameRouter } from './routes/game.js';
 import { pool } from './db/pool.js';
 
-const app = express();
+const app        = express();
 const httpServer = createServer(app);
 
 const io = new Server(httpServer, {
@@ -18,7 +18,7 @@ app.use(express.json());
 
 app.use('/api/game', gameRouter);
 
-app.get('/api/health', async (req, res) => {
+app.get('/api/health', async (_req, res) => {
   try {
     await pool.query('SELECT 1');
     res.json({ status: 'ok', db: 'connected' });
@@ -30,7 +30,7 @@ app.get('/api/health', async (req, res) => {
 // Socket.io — multiplayer-ready: each session gets its own room
 io.on('connection', (socket) => {
   console.log('Socket connected:', socket.id);
-  socket.on('join-session', (sessionId) => {
+  socket.on('join-session', (sessionId: string) => {
     socket.join(`session:${sessionId}`);
     console.log(`Socket ${socket.id} joined session:${sessionId}`);
   });

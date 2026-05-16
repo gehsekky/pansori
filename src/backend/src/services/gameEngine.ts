@@ -5,26 +5,34 @@ import {
   canEquipWeapon, canDonArmor, computeAcAfterArmorChange,
   skillCheck, rollDeathSave,
 } from './rulesEngine.js';
+import type { GameState, Seed, Context, Enemy, LootItem, InventoryItem } from '../types.js';
 
-function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+function pick<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)]; }
 
-function hpTier(state) {
+function hpTier(state: GameState): 'healthy' | 'hurt' | 'critical' {
   const pct = (state.hp ?? 0) / (state.max_hp || 1);
   if (pct > 0.66) return 'healthy';
   if (pct > 0.33) return 'hurt';
   return 'critical';
 }
 
-function pickTiered(template, tier) {
+function pickTiered(template: string[] | Record<string, string[]> | undefined, tier: string): string {
   if (!template) return '';
   if (Array.isArray(template)) return pick(template);
-  return pick(template[tier] || template.healthy || template[Object.keys(template)[0]] || ['']);
+  return pick(template[tier] || template['healthy'] || template[Object.keys(template)[0]] || ['']);
 }
 
-function buildCombatHitNarrative(enemy, weaponItem, damage, critical, state, context) {
+function buildCombatHitNarrative(
+  enemy: Enemy,
+  weaponItem: LootItem | null,
+  damage: number,
+  critical: boolean,
+  state: GameState,
+  context: Context,
+): string {
   const tier         = hpTier(state);
   const opening      = pickTiered(context.narratives.combatHit, tier).replace(/{enemy}/g, enemy.name);
-  const verbPool     = context.narratives.weaponVerbs?.[weaponItem?.id] ?? context.narratives.weaponVerbs?.unarmed ?? ['connects with'];
+  const verbPool     = context.narratives.weaponVerbs?.[weaponItem?.id ?? ''] ?? context.narratives.weaponVerbs?.['unarmed'] ?? ['connects with'];
   const verb         = pick(verbPool);
   const stylePool    = context.narratives.classStyle?.[state.character_class];
   const style        = stylePool ? `, ${pick(stylePool)},` : '';
@@ -37,17 +45,17 @@ function buildCombatHitNarrative(enemy, weaponItem, damage, critical, state, con
 
 const MAX_CHOICES = 10;
 
-function getItemData(item, context) {
-  if (!item) return {};
-  const tableEntry = context.lootTable.find(i => i.id === item.id) || {};
+function getItemData(item: InventoryItem | undefined, context: Context): LootItem & InventoryItem {
+  if (!item) return {} as LootItem & InventoryItem;
+  const tableEntry = context.lootTable.find(i => i.id === item.id) ?? {} as LootItem;
   return { ...tableEntry, ...item };
 }
 
-function getWorldName(seed) {
+function getWorldName(seed: Seed): string {
   return seed.world_name || seed.ship_name || 'the world';
 }
 
-function getEnemyHp(state, roomId, seed) {
+function getEnemyHp(state: GameState, roomId: string, seed: Seed): number {
   if (state.enemy_hp?.[roomId] !== undefined) return state.enemy_hp[roomId];
   return seed.enemies?.[roomId]?.hp ?? 0;
 }
@@ -55,7 +63,13 @@ function getEnemyHp(state, roomId, seed) {
 // ─── Enemy attack helper ──────────────────────────────────────────────────────
 // Resolves an enemy attack against the player. Returns { narrative, hpLost }.
 // Does NOT mutate state — caller applies hpLost.
-function applyEnemyAttackNarrative(enemy, playerAC, inventory, equippedArmorId, context) {
+function applyEnemyAttackNarrative(
+  enemy: Enemy,
+  playerAC: number,
+  inventory: InventoryItem[] | undefined,
+  equippedArmorId: string | null,
+  context: Context,
+): { hpLost: number; narrative: string } {
   const result    = resolveEnemyAttack(enemy, playerAC);
   const armorItem = equippedArmorId ? inventory?.find(i => i.id === equippedArmorId) : null;
 
@@ -64,7 +78,7 @@ function applyEnemyAttackNarrative(enemy, playerAC, inventory, equippedArmorId, 
       hpLost:    result.damage,
       narrative: pick(context.narratives.enemyAttacks)
         .replace('{enemy}', enemy.name)
-        .replace('{dmg}',   result.damage),
+        .replace('{dmg}',   String(result.damage)),
     };
   }
   if (armorItem) {
@@ -80,7 +94,12 @@ function applyEnemyAttackNarrative(enemy, playerAC, inventory, equippedArmorId, 
 
 // ─── Death save handler ───────────────────────────────────────────────────────
 // Called when player HP is 0. Returns { narrative, newState, died }.
-function processDeathSave(st, enemy, context, worldName) {
+function processDeathSave(
+  st: GameState,
+  enemy: Enemy | null | undefined,
+  context: Context,
+  worldName: string,
+): { narrative: string; newState: GameState; died: boolean } {
   const save     = rollDeathSave(st.death_saves);
   const newState = { ...st, death_saves: save.saves };
   let narrative  = '';
@@ -100,21 +119,21 @@ function processDeathSave(st, enemy, context, worldName) {
       break;
 
     case 'success': {
-      const pool = context.narratives.deathSaveStatus?.[save.saves.failures];
+      const pool   = context.narratives.deathSaveStatus?.[save.saves.failures];
       const flavor = pool ? pick(pool) : 'Clinging to life...';
       narrative = `Death Save — ${save.roll} (${save.saves.successes}/3 successes, ${save.saves.failures}/3 failures). ${flavor}`;
       break;
     }
 
     case 'double_failure': {
-      const pool = context.narratives.deathSaveStatus?.[save.saves.failures];
+      const pool   = context.narratives.deathSaveStatus?.[save.saves.failures];
       const flavor = pool ? pick(pool) : 'The darkness presses in...';
       narrative = `Death Save — Natural 1! Two failures (${save.saves.failures}/3). ${flavor}`;
       break;
     }
 
     case 'failure': {
-      const pool = context.narratives.deathSaveStatus?.[save.saves.failures];
+      const pool   = context.narratives.deathSaveStatus?.[save.saves.failures];
       const flavor = pool ? pick(pool) : 'Fading...';
       narrative = `Death Save — ${save.roll} (${save.saves.successes}/3 successes, ${save.saves.failures}/3 failures). ${flavor}`;
       break;
@@ -149,7 +168,7 @@ function processDeathSave(st, enemy, context, worldName) {
 }
 
 // ─── Arrival narrative ────────────────────────────────────────────────────────
-function buildArrivalNarrative(targetId, newState, seed, context) {
+function buildArrivalNarrative(targetId: string, newState: GameState, seed: Seed, context: Context): string {
   const templates  = context.narratives.roomArrival[targetId] || context.narratives.genericArrival;
   let text         = pick(templates).replace(/{world}/g, getWorldName(seed));
   const newEnemy   = seed.enemies?.[targetId];
@@ -167,11 +186,11 @@ function buildArrivalNarrative(targetId, newState, seed, context) {
 }
 
 // ─── Choice generation ────────────────────────────────────────────────────────
-export function generateChoices(state, seed, context) {
+export function generateChoices(state: GameState, seed: Seed, context: Context): string[] {
   if (state.dead) return [];
   if (state.hp <= 0 && !state.stable) return ['Roll death saving throw'];
   if (state.hp <= 0 && state.stable)  return ['Use healing item'];
-  const choices    = [];
+  const choices: string[] = [];
   const roomId     = state.current_room;
   const enemy      = seed.enemies?.[roomId];
   const loot       = seed.loot?.[roomId];
@@ -179,7 +198,7 @@ export function generateChoices(state, seed, context) {
   const lootAvail  = loot  && !state.loot_taken?.includes(roomId);
   const adjacent   = (seed.connections[roomId] || [])
     .map(id => seed.rooms.find(r => r.id === id))
-    .filter(Boolean);
+    .filter((r): r is NonNullable<typeof r> => r != null);
 
   choices.push('Examine surroundings');
 
@@ -209,11 +228,21 @@ export function generateChoices(state, seed, context) {
 }
 
 // ─── Intent parser ────────────────────────────────────────────────────────────
-function parseIntent(action, state, seed, context) {
+type Intent =
+  | { type: 'move';   roomId: string }
+  | { type: 'attack' }
+  | { type: 'loot' }
+  | { type: 'use';    item: string }
+  | { type: 'equip';  item: string | null }
+  | { type: 'sneak' }
+  | { type: 'escape' }
+  | { type: 'examine' };
+
+function parseIntent(action: string, state: GameState, seed: Seed, context: Context): Intent {
   const a        = action.toLowerCase();
   const adjacent = (seed.connections[state.current_room] || [])
     .map(id => seed.rooms.find(r => r.id === id))
-    .filter(Boolean);
+    .filter((r): r is NonNullable<typeof r> => r != null);
 
   for (const room of adjacent) {
     if (a.includes(room.name.toLowerCase()) || a.includes(room.id.replace(/_/g, ' '))) {
@@ -251,9 +280,15 @@ function parseIntent(action, state, seed, context) {
 }
 
 // ─── Main action handler ──────────────────────────────────────────────────────
-export async function takeAction({ action, history = [], state, seed, context }) {
+export async function takeAction({ action, history = [], state, seed, context }: {
+  action:  string;
+  history: string[];
+  state:   GameState;
+  seed:    Seed;
+  context: Context;
+}) {
   // Normalise state — handles saves created before new fields were added
-  const st = {
+  const st: GameState = {
     ...state,
     enemies_killed:  state.enemies_killed  || [],
     loot_taken:      state.loot_taken      || [],
@@ -269,6 +304,8 @@ export async function takeAction({ action, history = [], state, seed, context })
     dead:            state.dead            ?? false,
   };
 
+  void history; // reserved for future LLM narrative use
+
   const worldName  = getWorldName(seed);
   const roomId     = st.current_room;
   const room       = seed.rooms.find(r => r.id === roomId);
@@ -278,7 +315,7 @@ export async function takeAction({ action, history = [], state, seed, context })
   const lootAvail  = loot  && !st.loot_taken.includes(roomId);
   const adjacent   = (seed.connections[roomId] || [])
     .map(id => seed.rooms.find(r => r.id === id))
-    .filter(Boolean);
+    .filter((r): r is NonNullable<typeof r> => r != null);
 
   let narrative = '';
   let newState  = { ...st };
@@ -369,7 +406,7 @@ export async function takeAction({ action, history = [], state, seed, context })
 
       const currentEnemyHp = getEnemyHp(st, roomId, seed);
       const weaponItem     = st.equipped_weapon
-        ? getItemData(st.inventory?.find(i => i.id === st.equipped_weapon), context)
+        ? getItemData(st.inventory?.find(i => i.id === st.equipped_weapon) as InventoryItem, context)
         : null;
       const weaponDamage = weaponItem?.damage ?? null;
       const weaponLabel  = weaponItem ? `Your ${weaponItem.name}` : 'Your fists';
@@ -402,7 +439,7 @@ export async function takeAction({ action, history = [], state, seed, context })
       // Player's attack roll
       const atk = resolvePlayerAttack(
         { str: newState.str, dex: newState.dex, level: newState.level },
-        weaponDamage ?? '1',
+        weaponDamage,
         enemy.ac
       );
       const finalDamage = weaponDamage ? atk.damage : Math.max(1, unarmedDamage(newState.str));
@@ -425,7 +462,7 @@ export async function takeAction({ action, history = [], state, seed, context })
           Object.assign(newState, endCombat());
           narrative += ' ' + pick(context.narratives.killShot)
             .replace('{enemy}', enemy.name)
-            .replace('{xp}',    xpGain);
+            .replace('{xp}',    String(xpGain));
           if (newState.xp >= newState.level * 100) {
             newState.level  += 1;
             newState.max_hp += 4;
@@ -532,7 +569,7 @@ export async function takeAction({ action, history = [], state, seed, context })
         const check = canEquipWeapon(st.combat_active, st.turn_actions);
         if (!check.allowed) { narrative = check.reason; break; }
         newState.equipped_weapon = itemId;
-        if (check.cost === 'free_interaction') {
+        if ('cost' in check && check.cost === 'free_interaction') {
           newState.turn_actions = { ...newState.turn_actions, free_interaction_used: true };
         }
         narrative = `You ready the ${inInventory.name} (${itemData.damage || '1d4'} damage).`;
@@ -561,7 +598,7 @@ export async function takeAction({ action, history = [], state, seed, context })
         newState.hp = Math.max(0, st.hp - counter.hpLost);
         narrative = pick(context.narratives.sneakFail)
           .replace('{enemy}', enemy.name)
-          .replace('{dmg}',   counter.hpLost);
+          .replace('{dmg}',   String(counter.hpLost));
         narrative += ` (Stealth: ${check.roll}+${abilityMod(st.dex)}=${check.total} vs DC 12)`;
         if (newState.hp <= 0) {
           const { narrative: dsNarr, newState: dsState, died } = processDeathSave(
@@ -599,7 +636,7 @@ export async function takeAction({ action, history = [], state, seed, context })
     }
   }
 
-  newState.run_log = [...(st.run_log || []).slice(-50), { action, narrative }];
+  newState.run_log      = [...(st.run_log || []).slice(-50), { action, narrative }];
   newState.last_choices = generateChoices(newState, seed, context);
 
   return {

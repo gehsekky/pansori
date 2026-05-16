@@ -1,16 +1,19 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, ReactNode } from 'react';
 import { api } from './lib/api.js';
-import { context as scifiContext }    from './contexts/scifi-terror.jsx';
-import { context as dungeonContext } from './contexts/dungeon-crawler.jsx';
+import { context as scifiContext }   from './contexts/scifi-terror.js';
+import { context as dungeonContext } from './contexts/dungeon-crawler.js';
+import type { FrontendContext, GameState, Seed, Session } from './types.js';
 
-const CONTEXTS = {
+const CONTEXTS: Record<string, FrontendContext> = {
   'scifi-terror':    scifiContext,
   'dungeon-crawler': dungeonContext,
 };
-function getCtx(seed) { return CONTEXTS[seed?.context_id] || scifiContext; }
+function getCtx(seed: Seed | null): FrontendContext {
+  return (seed?.context_id ? CONTEXTS[seed.context_id] : null) ?? scifiContext;
+}
 
 // ─── Static styles (colors via CSS custom properties) ────────────────────────
-const S = {
+const S: Record<string, React.CSSProperties> = {
   page:     { minHeight: '100vh', background: 'var(--t-bg)', color: 'var(--t-primary)', fontFamily: 'var(--t-font)', padding: '1.5rem' },
   header:   { borderBottom: '1px solid var(--t-primary)', paddingBottom: '0.75rem', marginBottom: '1rem' },
   title:    { fontSize: '1.4rem', letterSpacing: '0.2em', margin: 0, textShadow: '0 0 8px var(--t-primary)' },
@@ -31,7 +34,6 @@ const S = {
               padding: '0.5rem 1rem', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.875rem', whiteSpace: 'nowrap' },
   scanTxt:  { color: 'var(--t-dim)', fontStyle: 'italic', animation: 'blink 1s step-end infinite' },
   logEntry: { fontSize: '0.72rem', color: 'var(--t-dim-dark)', borderBottom: '1px solid var(--t-separator)', padding: '3px 0' },
-  formBox:  { maxWidth: 380, margin: '4rem auto' },
   formLbl:  { display: 'block', fontSize: '0.7rem', letterSpacing: '0.15em', color: 'var(--t-dim)', marginBottom: 4, marginTop: 12 },
   formInp:  { display: 'block', width: '100%', background: 'var(--t-card)', color: 'var(--t-primary)',
               border: '1px solid var(--t-border)', padding: '0.5rem 0.75rem', fontFamily: 'inherit',
@@ -42,9 +44,9 @@ const S = {
   err:      { color: 'var(--t-hp-low)', fontSize: '0.8rem', marginTop: 8 },
 };
 
-// Injects :root CSS custom properties from a theme object.
-// Called once on mount and whenever ctx changes.
-function applyTheme(theme) {
+interface Theme { pageBg: string; cardBg: string; font: string; primary: string; mid: string; dim: string; dimDark: string; border: string; separator: string; itemColor: string; hpHigh: string; hpMid: string; hpLow: string; title: string; worldLabel: string; }
+
+function applyTheme(theme: Theme) {
   const r = document.documentElement.style;
   r.setProperty('--t-bg',        theme.pageBg);
   r.setProperty('--t-card',      theme.cardBg);
@@ -61,28 +63,29 @@ function applyTheme(theme) {
   r.setProperty('--t-hp-low',    theme.hpLow);
 }
 
-// Seed the default theme immediately (before first React render) so there's no flash.
 applyTheme(scifiContext.theme);
+
+type View = 'loading' | 'char' | 'game';
+type HistoryEntry = { role: 'user' | 'assistant'; content: string };
 
 // ─── App shell ───────────────────────────────────────────────────────────────
 export default function App() {
-  const [view, setView]           = useState('loading');
-  const [session, setSession]     = useState(null);
-  const [gameState, setGameState] = useState(null);
-  const [seed, setSeed]           = useState(null);
-  const [choices, setChoices]     = useState([]);
-  const [history, setHistory]     = useState([]);
+  const [view, setView]           = useState<View>('loading');
+  const [session, setSession]     = useState<Session | null>(null);
+  const [gameState, setGameState] = useState<GameState | null>(null);
+  const [seed, setSeed]           = useState<Seed | null>(null);
+  const [choices, setChoices]     = useState<string[]>([]);
+  const [history, setHistory]     = useState<HistoryEntry[]>([]);
   const [loading, setLoading]     = useState(false);
   const [escaped, setEscaped]     = useState(false);
   const [customAction, setCustomAction] = useState('');
-  const [roomLog, setRoomLog]     = useState([]);
-  const logRef       = useRef(null);
-  const narrativeRef = useRef(null);
+  const [roomLog, setRoomLog]     = useState<string[]>([]);
+  const logRef       = useRef<HTMLDivElement>(null);
+  const narrativeRef = useRef<HTMLDivElement>(null);
 
   const ctx       = getCtx(seed);
   const worldName = seed?.world_name || seed?.ship_name || '???';
 
-  // Apply theme whenever the active context changes
   useEffect(() => { applyTheme(ctx.theme); }, [ctx]);
 
   useEffect(() => {
@@ -109,7 +112,7 @@ export default function App() {
     }
   }, []);
 
-  async function handleNewGame(charName, charClass, contextId) {
+  async function handleNewGame(charName: string, charClass: string, contextId: string) {
     setLoading(true);
     try {
       const result = await api.newSession(charName, charClass, contextId);
@@ -122,15 +125,15 @@ export default function App() {
     setLoading(false);
   }
 
-  async function act(action, currentHistory, sessionId, currentState, currentSeed) {
-    const sid     = sessionId    ?? session?.id;
-    const state   = currentState ?? gameState;
+  async function act(action: string, currentHistory: HistoryEntry[]) {
+    const sid     = session?.id;
+    const state   = gameState;
     const preRoom = state?.current_room;
     if (!sid) return;
     setLoading(true);
     try {
       const result = await api.takeAction(sid, action, currentHistory);
-      const newHistory = [
+      const newHistory: HistoryEntry[] = [
         ...currentHistory,
         { role: 'user',      content: action },
         { role: 'assistant', content: result.narrative },
@@ -142,7 +145,7 @@ export default function App() {
       if (logRef.current) logRef.current.scrollTop = 0;
       const movedRoom = result.newState.current_room !== preRoom;
       setRoomLog(prev => (movedRoom || prev.length === 0) ? [result.narrative] : [...prev, result.narrative]);
-    } catch (e) {
+    } catch {
       setRoomLog(prev => [...prev, 'Communications array offline... (error contacting server)']);
     }
     setLoading(false);
@@ -152,16 +155,18 @@ export default function App() {
     if (narrativeRef.current) narrativeRef.current.scrollTop = narrativeRef.current.scrollHeight;
   }, [roomLog]);
 
-  async function handleEquip(itemId) {
+  async function handleEquip(itemId: string) {
+    if (!session) return;
     try {
       const result = await api.equipItem(session.id, itemId);
       setGameState(result.newState);
     } catch (e) {
-      if (e?.error) setRoomLog(prev => [...prev, `⚠ ${e.error}`]);
+      const err = e as { error?: string };
+      if (err?.error) setRoomLog(prev => [...prev, `⚠ ${err.error}`]);
     }
   }
 
-  function handleChoice(c) { act(c, history); }
+  function handleChoice(c: string) { act(c, history); }
   function handleCustom() {
     const v = customAction.trim();
     if (!v) return;
@@ -169,7 +174,6 @@ export default function App() {
     act(v, history);
   }
 
-  // Single return — theme <style> is always present, view is conditional
   return (
     <>
       <style>{`
@@ -197,7 +201,6 @@ export default function App() {
             inCombat={!!gameState?.combat_active} />
 
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'stretch' }}>
-            {/* ── Left column ── */}
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ ...S.card, maxHeight: 320, overflowY: 'auto' }} ref={narrativeRef}>
                 {loading && roomLog.length === 0
@@ -205,10 +208,9 @@ export default function App() {
                   : roomLog.map((text, i) => (
                       <p key={i} style={{
                         ...S.narrative,
-                        minHeight: 0,
-                        margin: 0,
+                        minHeight: 0, margin: 0,
                         paddingBottom: i < roomLog.length - 1 ? '0.75rem' : 0,
-                        borderBottom: i < roomLog.length - 1 ? '1px solid var(--t-separator)' : 'none',
+                        borderBottom:  i < roomLog.length - 1 ? '1px solid var(--t-separator)' : 'none',
                         marginBottom:  i < roomLog.length - 1 ? '0.75rem' : 0,
                         opacity: 0.4 + 0.6 * ((i + 1) / roomLog.length),
                       }}>{text}</p>
@@ -252,7 +254,6 @@ export default function App() {
                       </button>
                     ))}
                   </div>
-
                   <div style={{ display: 'flex', gap: 8, marginTop: '1rem' }}>
                     <input
                       style={S.input}
@@ -284,8 +285,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* ── Right column: room art ── */}
-            <RoomArtPanel roomId={gameState?.current_room} ctx={ctx} />
+            <RoomArtPanel roomId={gameState?.current_room ?? null} ctx={ctx} />
           </div>
         </div>
       )}
@@ -294,8 +294,14 @@ export default function App() {
 }
 
 // ─── Stats bar ───────────────────────────────────────────────────────────────
-function StatsBar({ state, ctx, seed, onEquip, inCombat }) {
-  const [activeItemIdx, setActiveItemIdx] = useState(null);
+function StatsBar({ state, ctx, seed, onEquip, inCombat }: {
+  state:    GameState | null;
+  ctx:      FrontendContext;
+  seed:     Seed | null;
+  onEquip:  (id: string) => void;
+  inCombat: boolean;
+}) {
+  const [activeItemIdx, setActiveItemIdx] = useState<number | null>(null);
 
   useEffect(() => {
     if (activeItemIdx === null) return;
@@ -363,7 +369,6 @@ function StatsBar({ state, ctx, seed, onEquip, inCombat }) {
                         }}
                       >
                         {ctx.itemIcons[item.id] ?? null}{item.name}
-
                         {popoverOpen && (
                           <span
                             onMouseDown={e => e.stopPropagation()}
@@ -400,9 +405,9 @@ function StatsBar({ state, ctx, seed, onEquip, inCombat }) {
 // ─── Room art panel ──────────────────────────────────────────────────────────
 const IMG_EXTS = ['webp', 'png', 'jpg', 'jpeg'];
 
-function RoomArtPanel({ roomId, ctx }) {
+function RoomArtPanel({ roomId, ctx }: { roomId: string | null; ctx: FrontendContext }) {
   const [extIdx, setExtIdx] = useState(0);
-  const art = ctx.art[roomId];
+  const art = roomId ? ctx.art[roomId] : null;
 
   useEffect(() => { setExtIdx(0); }, [roomId, ctx.id]);
 
@@ -414,7 +419,7 @@ function RoomArtPanel({ roomId, ctx }) {
       {!allFailed
         ? <img
             src={`/art/${ctx.id}/${roomId}.${IMG_EXTS[extIdx]}`}
-            alt={roomId}
+            alt={roomId ?? ''}
             onError={() => setExtIdx(i => i + 1)}
             style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block' }}
           />
@@ -429,9 +434,9 @@ function RoomArtPanel({ roomId, ctx }) {
 }
 
 // ─── Tooltip ─────────────────────────────────────────────────────────────────
-function Tooltip({ text, children }) {
+function Tooltip({ text, children }: { text: string | null | undefined; children: ReactNode }) {
   const [visible, setVisible] = useState(false);
-  if (!text) return children;
+  if (!text) return <>{children}</>;
   return (
     <span
       style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}
@@ -454,10 +459,14 @@ function Tooltip({ text, children }) {
 }
 
 // ─── Character select ────────────────────────────────────────────────────────
-function CharScreen({ onStart, loading, availableContexts }) {
+function CharScreen({ onStart, loading, availableContexts }: {
+  onStart:           (name: string, cls: string, contextId: string) => Promise<void>;
+  loading:           boolean;
+  availableContexts: FrontendContext[];
+}) {
   const [name, setName]       = useState(() => localStorage.getItem('operative_name') || '');
   const [contextId, setContextId] = useState(
-    () => localStorage.getItem('last_context_id') ?? availableContexts[0]?.id
+    () => localStorage.getItem('last_context_id') ?? availableContexts[0]?.id ?? ''
   );
   const [cls, setCls]         = useState(availableContexts[0]?.classes[0]?.id ?? '');
   const [error, setError]     = useState('');
@@ -469,7 +478,7 @@ function CharScreen({ onStart, loading, availableContexts }) {
       setCls(c.classes[0]?.id ?? '');
       localStorage.setItem('last_context_id', contextId);
     }
-  }, [contextId]);
+  }, [contextId, availableContexts]);
 
   const selectedCtx = availableContexts.find(c => c.id === contextId);
   const classes = selectedCtx?.classes ?? [];
@@ -479,14 +488,13 @@ function CharScreen({ onStart, loading, availableContexts }) {
     setError('');
     localStorage.setItem('operative_name', name.trim());
     try { await onStart(name.trim(), cls, contextId); }
-    catch (e) { setError(e.error || 'Failed to start mission'); }
+    catch (e) { setError((e as { error?: string })?.error || 'Failed to start mission'); }
   }
 
   return (
     <div style={{ ...S.page, display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}>
       <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start', width: '100%', maxWidth: 820, margin: '4rem auto' }}>
 
-        {/* ── Left: operative form ── */}
         <div style={{ flex: '0 0 340px' }}>
           <p style={{ ...S.title, fontSize: '1.1rem', marginBottom: 4 }}>HERO REGISTRY</p>
           <p style={{ ...S.sub, marginBottom: '2rem' }}>REGISTER YOUR HERO PROFILE</p>
@@ -511,7 +519,6 @@ function CharScreen({ onStart, loading, availableContexts }) {
           </button>
         </div>
 
-        {/* ── Right: context picker ── */}
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ ...S.title, fontSize: '1.1rem', marginBottom: 4 }}>WORLD TYPE</p>
           <p style={{ ...S.sub, marginBottom: '2rem' }}>SELECT YOUR GAME WORLD</p>
@@ -538,30 +545,17 @@ function CharScreen({ onStart, loading, availableContexts }) {
                     boxShadow:    selected ? '0 0 8px var(--t-border)' : 'none',
                   }}
                 >
-                  {/* Mini art preview */}
                   <pre style={{
                     margin: 0, flexShrink: 0,
                     fontSize: '0.6rem', lineHeight: 1.35,
                     color: selected ? 'var(--t-primary)' : 'var(--t-dim)',
-                    fontFamily: 'inherit',
-                    userSelect: 'none',
+                    fontFamily: 'inherit', userSelect: 'none',
                     transition: 'color 0.15s',
                   }}>{c.previewArt}</pre>
-
-                  {/* Text block */}
                   <div>
-                    <p style={{
-                      fontSize: '0.85rem', letterSpacing: '0.12em', fontWeight: 'bold',
-                      marginBottom: 4, color: selected ? 'var(--t-primary)' : 'var(--t-mid)',
-                    }}>{c.displayName}</p>
-                    <p style={{
-                      fontSize: '0.7rem', color: 'var(--t-dim)', lineHeight: 1.5,
-                    }}>{c.tagline}</p>
-                    {selected && (
-                      <p style={{ marginTop: 6, fontSize: '0.65rem', color: 'var(--t-primary)', letterSpacing: '0.1em' }}>
-                        ▶ SELECTED
-                      </p>
-                    )}
+                    <p style={{ fontSize: '0.85rem', letterSpacing: '0.12em', fontWeight: 'bold', marginBottom: 4, color: selected ? 'var(--t-primary)' : 'var(--t-mid)' }}>{c.displayName}</p>
+                    <p style={{ fontSize: '0.7rem', color: 'var(--t-dim)', lineHeight: 1.5 }}>{c.tagline}</p>
+                    {selected && <p style={{ marginTop: 6, fontSize: '0.65rem', color: 'var(--t-primary)', letterSpacing: '0.1em' }}>▶ SELECTED</p>}
                   </div>
                 </button>
               );
