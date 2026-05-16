@@ -50,11 +50,15 @@ export function generateShipSeed(context: Context): Seed {
   const loot: Seed['loot']       = {};
   rooms.forEach(r => {
     if (r.id !== startId && Math.random() < 0.6) {
+      const template  = pick(context.enemyTemplates);
       enemies[r.id] = {
-        name:   pick(context.enemyTypes),
-        hp:     4 + roll(8),
-        ac:     10 + roll(4),
-        damage: `${roll(2)}d${pick([4, 6, 8])}`,
+        name:   template.name,
+        hp:     template.hp,
+        ac:     template.ac,
+        damage: template.damage,
+        toHit:  template.toHit,
+        xp:     template.xp,
+        dex:    template.dex,
       };
     }
     if (Math.random() < 0.5) {

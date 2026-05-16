@@ -101,17 +101,15 @@ export function resolvePlayerAttack(player: PlayerStats, weaponDamage: string | 
 }
 
 interface EnemyStats {
-  hp?:    number;
   damage: string;
+  toHit:  number;
 }
 
 // Enemy attacks the player. Returns hit/miss and damage.
 export function resolveEnemyAttack(enemy: EnemyStats, playerAC: number) {
-  // Enemies use an approximate CR-based attack modifier rather than full stat blocks
-  const atkMod = Math.floor((enemy.hp ?? 8) / 4);
-  const roll   = d(20);
-  const total  = roll + atkMod;
-  const hit    = roll !== 1 && (roll === 20 || total >= playerAC);
+  const roll  = d(20);
+  const total = roll + enemy.toHit;
+  const hit   = roll !== 1 && (roll === 20 || total >= playerAC);
   return { hit, roll, total, damage: hit ? rollDice(enemy.damage) : 0 };
 }
 
