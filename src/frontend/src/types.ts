@@ -54,6 +54,7 @@ export interface GameState {
   inventory:       Array<{ id: string; name: string; desc?: string; [key: string]: unknown }>;
   equipped_weapon: string | null;
   equipped_armor:  string | null;
+  equipped_shield: string | null;
   current_room:    string;
   visited_rooms:   string[];
   enemies_killed:  string[];

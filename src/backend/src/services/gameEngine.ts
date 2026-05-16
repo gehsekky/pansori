@@ -2,7 +2,7 @@ import {
   d, rollDice, abilityMod,
   FRESH_TURN, startCombat, endCombat,
   resolvePlayerAttack, resolveEnemyAttack, unarmedDamage,
-  canEquipWeapon, canDonArmor, computeAcAfterArmorChange,
+  canEquipWeapon, canDonArmor, canDonShield, computeAcAfterArmorChange,
   skillCheck, rollDeathSave,
 } from './rulesEngine.js';
 import type { GameState, Seed, Context, Enemy, LootItem, InventoryItem } from '../types.js';
@@ -295,6 +295,7 @@ export async function takeAction({ action, history = [], state, seed, context }:
     enemy_hp:        state.enemy_hp        || {},
     equipped_weapon: state.equipped_weapon ?? null,
     equipped_armor:  state.equipped_armor  ?? null,
+    equipped_shield: state.equipped_shield ?? null,
     combat_active:   state.combat_active   ?? false,
     initiative:      state.initiative      ?? null,
     player_first:    state.player_first    ?? true,
@@ -440,7 +441,8 @@ export async function takeAction({ action, history = [], state, seed, context }:
       const atk = resolvePlayerAttack(
         { str: newState.str, dex: newState.dex, level: newState.level },
         weaponDamage,
-        enemy.ac
+        enemy.ac,
+        weaponItem?.finesse ?? false
       );
       const finalDamage = weaponDamage ? atk.damage : Math.max(1, unarmedDamage(newState.str));
 
@@ -452,7 +454,7 @@ export async function takeAction({ action, history = [], state, seed, context }:
       } else if (atk.hit) {
         const newEnemyHp = currentEnemyHp - finalDamage;
         narrative += buildCombatHitNarrative(enemy, weaponItem, finalDamage, atk.critical, newState, context);
-        narrative += ` (d20 ${atk.roll}+${atk.strMod} STR+${atk.prof} prof = ${atk.total} vs AC ${enemy.ac})`;
+        narrative += ` (d20 ${atk.roll}+${atk.atkMod} ${atk.atkStat}+${atk.prof} prof = ${atk.total} vs AC ${enemy.ac})`;
 
         if (newEnemyHp <= 0) {
           const xpGain = enemy.xp ?? (10 + (enemy.hp || 8));
@@ -478,7 +480,7 @@ export async function takeAction({ action, history = [], state, seed, context }:
         }
       } else {
         narrative += pickTiered(context.narratives.combatMiss, hpTier(newState)).replace(/{enemy}/g, enemy.name);
-        narrative += ` (d20 ${atk.roll}+${atk.strMod} STR+${atk.prof} prof = ${atk.total} vs AC ${enemy.ac})`;
+        narrative += ` (d20 ${atk.roll}+${atk.atkMod} ${atk.atkStat}+${atk.prof} prof = ${atk.total} vs AC ${enemy.ac})`;
         const counter = applyEnemyAttackNarrative(enemy, newState.ac, newState.inventory, newState.equipped_armor, context);
         newState.hp = Math.max(0, newState.hp - counter.hpLost);
         narrative += ' ' + counter.narrative;
@@ -559,7 +561,16 @@ export async function takeAction({ action, history = [], state, seed, context }:
       const itemData = getItemData(inInventory, context);
       if (!itemData.slot) { narrative = `The ${inInventory.name} can't be equipped.`; break; }
 
-      if (itemData.slot === 'armor') {
+      if (itemData.slot === 'shield') {
+        const check = canDonShield(st.combat_active);
+        if (!check.allowed) { narrative = check.reason; break; }
+        const toggling = st.equipped_shield === itemId;
+        newState.ac             = computeAcAfterArmorChange(st.ac, toggling ? itemId : st.equipped_shield, toggling ? null : itemId, context.lootTable);
+        newState.equipped_shield = toggling ? null : itemId;
+        narrative = toggling
+          ? `You lower the ${inInventory.name}. AC is now ${newState.ac}.`
+          : `You raise the ${inInventory.name}. AC is now ${newState.ac}.`;
+      } else if (itemData.slot === 'armor') {
         const check = canDonArmor(st.combat_active, itemId);
         if (!check.allowed) { narrative = check.reason; break; }
         newState.ac             = computeAcAfterArmorChange(st.ac, st.equipped_armor, itemId, context.lootTable);
@@ -579,11 +590,12 @@ export async function takeAction({ action, history = [], state, seed, context }:
 
     case 'sneak': {
       if (!enemyAlive) { narrative = 'Nothing to sneak past. You move freely.'; break; }
-      // Dexterity (Stealth) vs DC 12 (approximates enemy passive Perception of 10+1)
-      const check = skillCheck(st.dex, 12, false, st.level);
+      // Dexterity (Stealth) vs enemy passive Perception (10 + WIS modifier)
+      const sneakDC = 10 + abilityMod(enemy.wis ?? 10);
+      const check   = skillCheck(st.dex, sneakDC, false, st.level);
       if (check.success) {
         narrative = pick(context.narratives.sneakSuccess).replace('{enemy}', enemy.name);
-        narrative += ` (Stealth: ${check.roll}+${abilityMod(st.dex)}=${check.total} vs DC 12)`;
+        narrative += ` (Stealth: ${check.roll}+${abilityMod(st.dex)}=${check.total} vs DC ${sneakDC})`;
         if (adjacent.length > 0) {
           const target = adjacent[0];
           if (st.combat_active) Object.assign(newState, endCombat());
@@ -599,7 +611,7 @@ export async function takeAction({ action, history = [], state, seed, context }:
         narrative = pick(context.narratives.sneakFail)
           .replace('{enemy}', enemy.name)
           .replace('{dmg}',   String(counter.hpLost));
-        narrative += ` (Stealth: ${check.roll}+${abilityMod(st.dex)}=${check.total} vs DC 12)`;
+        narrative += ` (Stealth: ${check.roll}+${abilityMod(st.dex)}=${check.total} vs DC ${sneakDC})`;
         if (newState.hp <= 0) {
           const { narrative: dsNarr, newState: dsState, died } = processDeathSave(
             { ...newState, death_saves: { successes: 0, failures: 0 } }, enemy, context, worldName

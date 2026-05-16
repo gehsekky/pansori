@@ -1,5 +1,5 @@
 import {
-  FirstAidKit, Crosshair, Lightning, ShieldStar,
+  FirstAidKit, Crosshair, Lightning, ShieldStar, Shield,
   ForkKnife, Wine, Egg, Sword, Belt, Scroll, CreditCard, Flask,
 } from '@phosphor-icons/react';
 import type { FrontendContext } from '../types.js';
@@ -51,7 +51,8 @@ export const context: FrontendContext = {
     space_rations:    <ForkKnife   size={14} weight="bold" />,
     space_whiskey:    <Wine        size={14} weight="bold" />,
     alien_egg:        <Egg         size={14} weight="bold" />,
-    laser_sword:      <Sword       size={14} weight="bold" />,
+    laser_sword:      <Sword        size={14} weight="bold" />,
+    ballistic_shield: <Shield       size={14} weight="bold" />,
     force_field_belt: <Belt        size={14} weight="bold" />,
     autopsy_manual:   <Scroll      size={14} weight="bold" />,
     insurance_card:   <CreditCard  size={14} weight="bold" />,
@@ -66,7 +67,8 @@ export const context: FrontendContext = {
     hazmat_suit:      '+2 AC while equipped',
     alien_egg:        'Pulsing. Warm. Why did you take this?',
     space_whiskey:    'Advantage on next CON save, one use',
-    laser_sword:      '2d8 damage, melee weapon',
+    laser_sword:      '2d8 damage, finesse, melee weapon',
+    ballistic_shield: '+2 AC while equipped',
     force_field_belt: '+3 AC while equipped',
     autopsy_manual:   'Reading it raises more questions than answers',
     insurance_card:   'Coverage void in alien encounters',

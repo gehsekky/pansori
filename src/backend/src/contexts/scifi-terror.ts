@@ -16,17 +16,17 @@ export const context: Context = {
 
   enemyTemplates: [
     // CR 1/4 — starter threats (zombie / skeleton equivalent)
-    { name: 'Infected Crewmate', cr: 0.25, hp:  22, ac:  8, damage: '1d6+1',  toHit: 3, xp:    50 },
-    { name: 'Pod-Spawn',         cr: 0.25, hp:  13, ac: 12, damage: '1d6+2',  toHit: 4, xp:    50, dex: 14 },
+    { name: 'Infected Crewmate', cr: 0.25, hp:  22, ac:  8, damage: '1d6+1',  toHit: 3, xp:    50, wis:  6 },
+    { name: 'Pod-Spawn',         cr: 0.25, hp:  13, ac: 12, damage: '1d6+2',  toHit: 4, xp:    50, dex: 14, wis:  8 },
     // CR 1 — early ship sections
-    { name: 'Brain-Leech',       cr:    1, hp:  22, ac: 13, damage: '2d6+2',  toHit: 4, xp:   200, dex: 15 },
-    { name: 'Chrome-Crawler',    cr:    1, hp:  26, ac: 14, damage: '1d8+3',  toHit: 4, xp:   200 },
+    { name: 'Brain-Leech',       cr:    1, hp:  22, ac: 13, damage: '2d6+2',  toHit: 4, xp:   200, dex: 15, wis: 14 },
+    { name: 'Chrome-Crawler',    cr:    1, hp:  26, ac: 14, damage: '1d8+3',  toHit: 4, xp:   200,          wis: 10 },
     // CR 3–5 — mid ship
-    { name: 'Corrupted Android', cr:    3, hp:  52, ac: 15, damage: '2d8+3',  toHit: 5, xp:   700 },
-    { name: 'Alien Warrior',     cr:    5, hp:  67, ac: 13, damage: '2d8+4',  toHit: 6, xp:  1100, dex: 16 },
-    { name: 'Xenomorph Brute',   cr:    5, hp:  84, ac: 14, damage: '3d6+4',  toHit: 7, xp:  1800 },
+    { name: 'Corrupted Android', cr:    3, hp:  52, ac: 15, damage: '2d8+3',  toHit: 5, xp:   700,          wis: 10 },
+    { name: 'Alien Warrior',     cr:    5, hp:  67, ac: 13, damage: '2d8+4',  toHit: 6, xp:  1100, dex: 16, wis: 12 },
+    { name: 'Xenomorph Brute',   cr:    5, hp:  84, ac: 14, damage: '3d6+4',  toHit: 7, xp:  1800,          wis: 12 },
     // CR 6+ — boss-tier
-    { name: 'Hive Empress',      cr:   13, hp: 127, ac: 17, damage: '3d8+6',  toHit: 9, xp: 10000, dex: 18 },
+    { name: 'Hive Empress',      cr:   13, hp: 127, ac: 17, damage: '3d8+6',  toHit: 9, xp: 10000, dex: 18, wis: 18 },
   ],
 
   introTexts: [
@@ -111,11 +111,12 @@ export const context: Context = {
     { id: 'ray_gun',          name: 'Ray Gun',              desc: '2d6 damage, ranged weapon',                          weight: 18, type: 'weapon',     slot: 'weapon', damage: '2d6',  ac_bonus: null, heal: null,    effect: null,            aliases: ['ray gun', 'raygun'] },
     { id: 'med_kit',          name: 'Med Kit',              desc: 'Heals 2d4+2 HP, one use',                            weight: 28, type: 'consumable',  slot: null,     damage: null,   ac_bonus: null, heal: '2d4+2', effect: null,            aliases: ['med kit', 'medkit', 'med'] },
     { id: 'space_rations',    name: 'Space Rations',        desc: 'Restore 1 HP, one use',                              weight: 22, type: 'consumable',  slot: null,     damage: null,   ac_bonus: null, heal: '1',     effect: null,            aliases: ['space rations', 'rations'] },
-    { id: 'stun_baton',       name: 'Stun Baton',           desc: '1d8 damage, melee weapon',                           weight: 14, type: 'weapon',     slot: 'weapon', damage: '1d8',  ac_bonus: null, heal: null,    effect: null,            aliases: ['stun baton', 'stun', 'baton'] },
+    { id: 'stun_baton',       name: 'Stun Baton',           desc: '1d8 damage, finesse, melee weapon',                  weight: 14, type: 'weapon',     slot: 'weapon', damage: '1d8',  finesse: true, ac_bonus: null, heal: null,    effect: null,            aliases: ['stun baton', 'stun', 'baton'] },
     { id: 'hazmat_suit',      name: 'Hazmat Suit',          desc: '+2 AC while equipped',                               weight: 10, type: 'armor',      slot: 'armor',  damage: null,   ac_bonus: 2,    heal: null,    effect: null,            aliases: ['hazmat suit', 'hazmat'] },
     { id: 'alien_egg',        name: 'Alien Egg',            desc: 'Pulsing. Warm. Why did you take this?',              weight: 4,  type: 'misc',       slot: null,     damage: null,   ac_bonus: null, heal: null,    effect: null,            aliases: ['alien egg', 'egg'], useNarrative: 'You hold up the Alien Egg. It pulses warmly in your hand. You set it back down very carefully.' },
     { id: 'space_whiskey',    name: 'Space Whiskey',        desc: 'Advantage on next CON save, one use',                weight: 4,  type: 'consumable',  slot: null,     damage: null,   ac_bonus: null, heal: null,    effect: 'con_advantage', aliases: ['space whiskey', 'whiskey'] },
-    { id: 'laser_sword',      name: 'Laser Sword',          desc: '2d8 damage, melee weapon',                           weight: 10, type: 'weapon',     slot: 'weapon', damage: '2d8',  ac_bonus: null, heal: null,    effect: null,            aliases: ['laser sword', 'lightsaber', 'laser'] },
+    { id: 'laser_sword',      name: 'Laser Sword',          desc: '2d8 damage, finesse, melee weapon',                  weight: 10, type: 'weapon',     slot: 'weapon', damage: '2d8',  finesse: true, ac_bonus: null, heal: null,    effect: null,            aliases: ['laser sword', 'lightsaber', 'laser'] },
+    { id: 'ballistic_shield', name: 'Ballistic Shield',     desc: '+2 AC while equipped',                               weight: 12, type: 'armor',      slot: 'shield', damage: null,   ac_bonus: 2,    heal: null,    effect: null,            aliases: ['ballistic shield', 'shield'] },
     { id: 'force_field_belt', name: 'Force Field Belt',     desc: '+3 AC while equipped',                               weight: 8,  type: 'armor',      slot: 'armor',  damage: null,   ac_bonus: 3,    heal: null,    effect: null,            aliases: ['force field belt', 'force field', 'belt'] },
     { id: 'autopsy_manual',   name: 'Alien Autopsy Manual', desc: 'Reading it raises more questions than answers',      weight: 5,  type: 'misc',       slot: null,     damage: null,   ac_bonus: null, heal: null,    effect: null,            aliases: ['autopsy manual', 'autopsy', 'manual'], useNarrative: 'You flip through the Alien Autopsy Manual. Page 47 raises a question you will never be able to un-think. You close it.' },
     { id: 'insurance_card',   name: 'Space Insurance Card', desc: 'Coverage void in alien encounters',                  weight: 5,  type: 'misc',       slot: null,     damage: null,   ac_bonus: null, heal: null,    effect: null,            aliases: ['space insurance card', 'insurance card', 'insurance', 'card'], useNarrative: 'You read the fine print. Section 12, Subsection F: "Coverage void in the event of alien encounter, dimensional anomaly, or acts of cosmic horror." Helpful.' },

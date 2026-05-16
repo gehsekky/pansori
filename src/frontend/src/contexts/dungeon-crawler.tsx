@@ -1,5 +1,5 @@
 import {
-  Drop, Sword, Axe, ShieldStar, ShieldChevron,
+  Drop, Sword, Axe, ShieldStar, ShieldChevron, Shield,
   ForkKnife, Scroll, Diamond, Key, Flask, Wine, Sparkle,
 } from '@phosphor-icons/react';
 import type { FrontendContext } from '../types.js';
@@ -49,6 +49,7 @@ export const context: FrontendContext = {
     iron_sword:      <Sword         size={14} weight="bold" />,
     battle_axe:      <Axe           size={14} weight="bold" />,
     enchanted_blade: <Sparkle       size={14} weight="bold" />,
+    wooden_shield:   <Shield        size={14} weight="bold" />,
     leather_armor:   <ShieldStar    size={14} weight="bold" />,
     plate_armor:     <ShieldChevron size={14} weight="bold" />,
     rations:         <ForkKnife     size={14} weight="bold" />,
@@ -63,7 +64,8 @@ export const context: FrontendContext = {
     health_potion:   'Restores 2d4+2 HP, one use',
     iron_sword:      '1d8 damage, melee weapon',
     battle_axe:      '2d6 damage, melee weapon',
-    enchanted_blade: '2d8 damage, glows with arcane light',
+    enchanted_blade: '2d8 damage, finesse, glows with arcane light',
+    wooden_shield:   '+2 AC while equipped',
     leather_armor:   '+2 AC while equipped',
     plate_armor:     '+3 AC while equipped',
     rations:         'Restore 1 HP, one use',
