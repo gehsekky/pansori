@@ -30,7 +30,7 @@ function RoomArtPanel({ roomId, ctx }: { roomId: string | null; ctx: FrontendCon
           src={`/art/${ctx.id}/${roomId}.${IMG_EXTS[extIdx]}`}
           alt={roomId ?? ''}
           onError={() => setExtIdx(i => i + 1)}
-          style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block' }}
+          style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block', imageRendering: 'pixelated' }}
         />
       ) : (
         <pre
