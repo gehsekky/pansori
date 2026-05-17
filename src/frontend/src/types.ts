@@ -6,7 +6,7 @@ export type StructuredAction =
   | { type: 'move';      roomId: string }
   | { type: 'attack' }
   | { type: 'loot' }
-  | { type: 'use';       itemId: string }
+  | { type: 'use';       itemId: string; targetCharId?: string }
   | { type: 'sneak' }
   | { type: 'escape' }
   | { type: 'examine' }

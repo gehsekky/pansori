@@ -408,8 +408,24 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   if (lootAvail) {
     choices.push({ label: `Pick up the ${loot.name}`, action: { type: 'loot' } });
   }
-  if (char.hp < char.max_hp && healItem && (!MAX_CHOICES || choices.length < MAX_CHOICES)) {
-    choices.push({ label: `Use ${healItem.name}`, action: { type: 'use', itemId: healItem.id } });
+  if (healItem && (!MAX_CHOICES || choices.length < MAX_CHOICES)) {
+    const injured = state.characters.filter(c => !c.dead && c.hp < c.max_hp);
+    if (injured.length > 0) {
+      if (state.characters.filter(c => !c.dead).length === 1) {
+        // Solo party: simple label, no target needed
+        choices.push({ label: `Use ${healItem.name}`, action: { type: 'use', itemId: healItem.id } });
+      } else {
+        // Multi-character: one choice per injured party member
+        for (const member of injured) {
+          if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+          const selfNote = member.id === char.id ? ' (self)' : '';
+          choices.push({
+            label:  `Use ${healItem.name} on ${member.name}${selfNote} (HP ${member.hp}/${member.max_hp})`,
+            action: { type: 'use', itemId: healItem.id, targetCharId: member.id },
+          });
+        }
+      }
+    }
   }
   for (const adj of adjacent) {
     if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
@@ -745,10 +761,24 @@ export async function takeAction({ action, history = [], state, seed, context }:
           const hasMedicine = context.classSkills[char.character_class]?.includes('medicine') ?? false;
           const healBonus   = hasMedicine ? profBonus(char.level) : 0;
           const healed      = rollDice(itemData.heal) + healBonus;
-          char.hp        = Math.min(char.max_hp, char.hp + healed);
-          char.inventory = char.inventory.filter((_, i) => i !== firstIdx);
-          const bonusNote = healBonus > 0 ? ` (+${healBonus} medicine)` : '';
-          narrative = `You use the ${held.name} and recover ${healed} HP${bonusNote} (now ${char.hp}/${char.max_hp}).`;
+          const bonusNote   = healBonus > 0 ? ` (+${healBonus} medicine)` : '';
+
+          // Resolve heal target — may be a different party member
+          const targetId    = 'targetCharId' in action ? action.targetCharId : undefined;
+          const targetIdx   = targetId ? st.characters.findIndex(c => c.id === targetId) : safeIdx;
+          const isSelf      = !targetId || targetIdx === safeIdx;
+
+          if (!isSelf && targetIdx >= 0) {
+            const target   = st.characters[targetIdx];
+            const newHp    = Math.min(target.max_hp, target.hp + healed);
+            st = { ...st, characters: st.characters.map((c, i) => i === targetIdx ? { ...c, hp: newHp } : c) };
+            char.inventory = char.inventory.filter((_, i) => i !== firstIdx);
+            narrative = `${char.name} uses the ${held.name} on ${target.name} — ${healed} HP restored${bonusNote} (now ${newHp}/${target.max_hp}).`;
+          } else {
+            char.hp        = Math.min(char.max_hp, char.hp + healed);
+            char.inventory = char.inventory.filter((_, i) => i !== firstIdx);
+            narrative = `You use the ${held.name} and recover ${healed} HP${bonusNote} (now ${char.hp}/${char.max_hp}).`;
+          }
         } else if (itemData.effect === 'con_advantage') {
           char.inventory = char.inventory.filter((_, i) => i !== firstIdx);
           const { roll1, roll2, best } = resolveSaveWithAdvantage(char.con);
