@@ -1,12 +1,18 @@
 import { useState, useEffect, useRef, ReactNode } from 'react';
-import { api } from './lib/api.js';
+import { api, type AuthUser } from './lib/api.js';
+import type { SessionSummary } from './types.js';
 import { context as scifiContext }   from './contexts/scifi-terror.js';
 import { context as dungeonContext } from './contexts/dungeon-crawler.js';
-import type { FrontendContext, GameState, Seed, Session } from './types.js';
+import { context as zombieContext }  from './contexts/high-school-zombie.js';
+import { context as sunkenContext }  from './contexts/sunken-below.js';
+import WorldMap from './components/WorldMap.js';
+import type { FrontendContext, GameState, Seed, Session, StructuredAction, GameChoice } from './types.js';
 
 const CONTEXTS: Record<string, FrontendContext> = {
-  'scifi-terror':    scifiContext,
-  'dungeon-crawler': dungeonContext,
+  'scifi-terror':       scifiContext,
+  'dungeon-crawler':    dungeonContext,
+  'high-school-zombie': zombieContext,
+  'sunken-below':       sunkenContext,
 };
 function getCtx(seed: Seed | null): FrontendContext {
   return (seed?.context_id ? CONTEXTS[seed.context_id] : null) ?? scifiContext;
@@ -17,24 +23,22 @@ const S: Record<string, React.CSSProperties> = {
   page:     { minHeight: '100vh', background: 'var(--t-bg)', color: 'var(--t-primary)', fontFamily: 'var(--t-font)', padding: '1.5rem' },
   header:   { borderBottom: '1px solid var(--t-primary)', paddingBottom: '0.75rem', marginBottom: '1rem' },
   title:    { fontSize: '1.4rem', letterSpacing: '0.2em', margin: 0, textShadow: '0 0 8px var(--t-primary)' },
-  sub:      { fontSize: '0.7rem', color: 'var(--t-dim)', letterSpacing: '0.15em', marginTop: 4 },
+  sub:      { fontSize: '0.8rem', color: 'var(--t-dim)', letterSpacing: '0.15em', marginTop: 4 },
   card:     { border: '1px solid var(--t-border)', background: 'var(--t-card)', padding: '1rem', borderRadius: 2, marginBottom: '1rem' },
-  statsRow: { display: 'flex', gap: '1.5rem', fontSize: '0.75rem', flexWrap: 'wrap', color: 'var(--t-mid)' },
+  statsRow: { display: 'flex', gap: '1.5rem', fontSize: '0.8rem', flexWrap: 'wrap', color: 'var(--t-mid)' },
   stat:     { display: 'flex', flexDirection: 'column', gap: 2 },
-  statLbl:  { color: 'var(--t-dim)', fontSize: '0.65rem', letterSpacing: '0.1em' },
+  statLbl:  { color: 'var(--t-dim)', fontSize: '0.75rem', letterSpacing: '0.1em' },
   statVal:  { fontWeight: 'bold' },
   narrative:{ fontSize: '0.95rem', lineHeight: 1.75, minHeight: 90, color: 'var(--t-primary)', fontStyle: 'italic' },
   choices:  { display: 'flex', flexDirection: 'column', gap: 8, marginTop: '1rem' },
   choiceBtn:{ background: 'transparent', color: 'var(--t-primary)', border: '1px solid var(--t-border)',
               padding: '0.5rem 0.875rem', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
               fontSize: '0.875rem', letterSpacing: '0.03em', transition: 'border-color 0.15s, background 0.15s' },
-  input:    { background: 'var(--t-card)', color: 'var(--t-primary)', border: '1px solid var(--t-border)',
-              padding: '0.5rem 0.75rem', fontFamily: 'inherit', fontSize: '0.875rem', flex: 1, outline: 'none' },
   sendBtn:  { background: 'var(--t-dim-dark)', color: 'var(--t-primary)', border: '1px solid var(--t-border)',
               padding: '0.5rem 1rem', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.875rem', whiteSpace: 'nowrap' },
   scanTxt:  { color: 'var(--t-dim)', fontStyle: 'italic', animation: 'blink 1s step-end infinite' },
-  logEntry: { fontSize: '0.72rem', color: 'var(--t-dim-dark)', borderBottom: '1px solid var(--t-separator)', padding: '3px 0' },
-  formLbl:  { display: 'block', fontSize: '0.7rem', letterSpacing: '0.15em', color: 'var(--t-dim)', marginBottom: 4, marginTop: 12 },
+  logEntry: { fontSize: '0.8rem', color: 'var(--t-dim)', borderBottom: '1px solid var(--t-separator)', padding: '3px 0' },
+  formLbl:  { display: 'block', fontSize: '0.8rem', letterSpacing: '0.15em', color: 'var(--t-dim)', marginBottom: 4, marginTop: 12 },
   formInp:  { display: 'block', width: '100%', background: 'var(--t-card)', color: 'var(--t-primary)',
               border: '1px solid var(--t-border)', padding: '0.5rem 0.75rem', fontFamily: 'inherit',
               fontSize: '0.875rem', boxSizing: 'border-box', outline: 'none' },
@@ -65,21 +69,23 @@ function applyTheme(theme: Theme) {
 
 applyTheme(scifiContext.theme);
 
-type View = 'loading' | 'char' | 'game';
+type View = 'login' | 'loading' | 'sessions' | 'char' | 'game';
 type HistoryEntry = { role: 'user' | 'assistant'; content: string };
 
 // ─── App shell ───────────────────────────────────────────────────────────────
 export default function App() {
   const [view, setView]           = useState<View>('loading');
+  const [user, setUser]           = useState<AuthUser | null>(null);
+  const [sessions, setSessions]   = useState<SessionSummary[]>([]);
   const [session, setSession]     = useState<Session | null>(null);
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [seed, setSeed]           = useState<Seed | null>(null);
-  const [choices, setChoices]     = useState<string[]>([]);
+  const [choices, setChoices]     = useState<GameChoice[]>([]);
   const [history, setHistory]     = useState<HistoryEntry[]>([]);
   const [loading, setLoading]     = useState(false);
   const [escaped, setEscaped]     = useState(false);
-  const [customAction, setCustomAction] = useState('');
   const [roomLog, setRoomLog]     = useState<string[]>([]);
+  const [mapOpen, setMapOpen]     = useState(false);
   const logRef       = useRef<HTMLDivElement>(null);
   const narrativeRef = useRef<HTMLDivElement>(null);
 
@@ -88,63 +94,112 @@ export default function App() {
 
   useEffect(() => { applyTheme(ctx.theme); }, [ctx]);
 
+  // Check auth first; if logged in, then try to restore a session from the URL
   useEffect(() => {
-    const uuidInPath = window.location.pathname.match(/^\/([0-9a-f-]{36})$/i)?.[1];
-    if (uuidInPath) {
-      api.getSessionById(uuidInPath)
-        .then(s => {
-          if (s) {
-            setSession(s); setGameState(s.state); setSeed(s.seed);
-            const log = s.state.run_log || [];
-            if (log.length > 0) {
-              setRoomLog([log[log.length - 1].narrative]);
-              setChoices((s.state.last_choices || []).filter(c => !/^(equip|unequip)\b/i.test(c)));
-            }
-            setView('game');
-          } else {
-            window.history.replaceState(null, '', '/');
-            setView('char');
-          }
-        })
-        .catch(() => setView('char'));
-    } else {
-      setView('char');
-    }
+    api.getMe()
+      .then(me => {
+        setUser(me);
+        const uuidInPath = window.location.pathname.match(/^\/([0-9a-f-]{36})$/i)?.[1];
+        if (uuidInPath) {
+          return api.getSessionById(uuidInPath)
+            .then(s => {
+              if (s) {
+                setSession(s); setGameState(s.state); setSeed(s.seed);
+                setRoomLog(s.state.room_log || []);
+                setEscaped(s.status === 'escaped');
+                setChoices((s.state.last_choices || []));
+                setView('game');
+              } else {
+                window.history.replaceState(null, '', '/');
+                return loadSessions();
+              }
+            })
+            .catch(() => loadSessions());
+        } else {
+          return loadSessions();
+        }
+      })
+      .catch(() => setView('login'));
   }, []);
 
-  async function handleNewGame(charName: string, charClass: string, contextId: string) {
+  async function loadSessions() {
+    const list = await api.listSessions();
+    setSessions(list);
+    setView('sessions');
+  }
+
+  async function handleDeleteSession(id: string) {
+    await api.deleteSession(id);
+    await loadSessions();
+  }
+
+  async function handleClearCompleted() {
+    await api.clearCompleted();
+    await loadSessions();
+  }
+
+  async function handleLogout() {
+    await api.logout();
+    setUser(null);
+    setSession(null); setGameState(null); setSeed(null);
+    window.history.replaceState(null, '', '/');
+    setView('login');
+  }
+
+  async function handleResumeSession(id: string) {
     setLoading(true);
     try {
-      const result = await api.newSession(charName, charClass, contextId);
-      setSession(result.session); setGameState(result.state); setSeed(result.seed);
-      setHistory([]); setEscaped(false); setView('game');
-      window.history.pushState(null, '', `/${result.session.id}`);
-      if (result.seed.intro) setRoomLog([result.seed.intro]);
-      setChoices((result.state.last_choices || []).filter(c => !/^(equip|unequip)\b/i.test(c)));
+      const s = await api.getSessionById(id);
+      setSession(s); setGameState(s.state); setSeed(s.seed);
+      setRoomLog(s.state.room_log || []);
+      setEscaped(s.status === 'escaped');
+      setChoices((s.state.last_choices || []));
+      window.history.pushState(null, '', `/${id}`);
+      setView('game');
     } catch (e) { console.error(e); }
     setLoading(false);
   }
 
-  async function act(action: string, currentHistory: HistoryEntry[]) {
-    const sid     = session?.id;
-    const state   = gameState;
-    const preRoom = state?.current_room;
+  async function handleNewGame(
+    charName: string,
+    charClass: string,
+    contextId: string,
+    stats?: { str: number; dex: number; con: number; int: number; wis: number; cha: number },
+    portraitUrl?: string,
+  ) {
+    setLoading(true);
+    try {
+      const result = await api.newSession(charName, charClass, contextId, stats, portraitUrl);
+      setSession(result.session); setGameState(result.state); setSeed(result.seed);
+      setHistory([]); setEscaped(false); setView('game');
+      window.history.pushState(null, '', `/${result.session.id}`);
+      setRoomLog(result.state.room_log || []);
+      setChoices((result.state.last_choices || []));
+    } catch (e) {
+      console.error(e);
+      throw e;
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function act(action: StructuredAction, label: string, currentHistory: HistoryEntry[]) {
+    const sid = session?.id;
     if (!sid) return;
     setLoading(true);
     try {
       const result = await api.takeAction(sid, action, currentHistory);
       const newHistory: HistoryEntry[] = [
         ...currentHistory,
-        { role: 'user',      content: action },
+        { role: 'user',      content: label },
         { role: 'assistant', content: result.narrative },
       ];
       setHistory(newHistory);
-      setChoices((result.choices || []).filter(c => !/^(equip|unequip)\b/i.test(c)));
+      setChoices((result.choices || []));
       setGameState(result.newState);
       if (result.escaped) setEscaped(true);
       if (logRef.current) logRef.current.scrollTop = 0;
-      const movedRoom = result.newState.current_room !== preRoom;
-      setRoomLog(prev => (movedRoom || prev.length === 0) ? [result.narrative] : [...prev, result.narrative]);
+      setRoomLog(result.newState.room_log || []);
     } catch {
       setRoomLog(prev => [...prev, 'Communications array offline... (error contacting server)']);
     }
@@ -166,13 +221,21 @@ export default function App() {
     }
   }
 
-  function handleChoice(c: string) { act(c, history); }
-  function handleCustom() {
-    const v = customAction.trim();
-    if (!v) return;
-    setCustomAction('');
-    act(v, history);
-  }
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (view !== 'game' || loading || escaped || gameState?.dead) return;
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      const idx = parseInt(e.key, 10);
+      if (!isNaN(idx) && idx >= 1 && idx <= choices.length) {
+        const c = choices[idx - 1];
+        act(c.action, c.label, history);
+      }
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [view, loading, escaped, gameState?.dead, choices]);
+
+  function handleChoice(c: GameChoice) { act(c.action, c.label, history); }
 
   return (
     <>
@@ -188,17 +251,60 @@ export default function App() {
         </div>
       )}
 
-      {view === 'char' && <CharScreen onStart={handleNewGame} loading={loading} availableContexts={Object.values(CONTEXTS)} />}
+      {view === 'login' && (
+        <LoginScreen />
+      )}
+
+      {view === 'sessions' && (
+        <SessionsScreen
+          sessions={sessions}
+          user={user}
+          loading={loading}
+          onResume={handleResumeSession}
+          onNewGame={() => setView('char')}
+          onLogout={handleLogout}
+          onDelete={handleDeleteSession}
+          onClearCompleted={handleClearCompleted}
+          contexts={CONTEXTS}
+        />
+      )}
+
+      {view === 'char' && <CharScreen onStart={handleNewGame} loading={loading} availableContexts={Object.values(CONTEXTS)} user={user} />}
 
       {view === 'game' && (
         <div style={S.page}>
           <header style={S.header}>
-            <p style={S.title}>{ctx.theme.title}</p>
-            <p style={S.sub}>{ctx.theme.worldLabel}: {worldName}  ·  HERO: {session?.character_name}  [{session?.character_class}]</p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                {session?.portrait_url && (
+                  <img src={session.portrait_url} alt="" style={{ width: 36, height: 36, borderRadius: '50%', border: '1px solid var(--t-border)', objectFit: 'cover' }} />
+                )}
+                <div>
+                  <p style={S.title}>{ctx.theme.title}</p>
+                  <p style={S.sub}>{ctx.theme.worldLabel}: {worldName}  ·  HERO: {session?.character_name}  [{session?.character_class}]</p>
+                </div>
+              </div>
+              {user && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.75rem', color: 'var(--t-dim)', letterSpacing: '0.1em' }}>
+                  {user.avatar_url && (
+                    <img src={user.avatar_url} alt="" style={{ width: 22, height: 22, borderRadius: '50%', opacity: 0.7 }} />
+                  )}
+                  <span>{user.display_name.toUpperCase()}</span>
+                  <button
+                    onClick={handleLogout}
+                    style={{ background: 'transparent', border: 'none', color: 'var(--t-dim)', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.75rem', letterSpacing: '0.1em', padding: 0 }}
+                  >SIGN OUT</button>
+                </div>
+              )}
+            </div>
           </header>
 
           <StatsBar state={gameState} ctx={ctx} seed={seed} onEquip={handleEquip}
-            inCombat={!!gameState?.combat_active} />
+            inCombat={!!gameState?.combat_active} onOpenMap={() => setMapOpen(true)} />
+
+          {mapOpen && seed && gameState && (
+            <WorldMap seed={seed} state={gameState} onClose={() => setMapOpen(false)} />
+          )}
 
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'stretch' }}>
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -228,7 +334,7 @@ export default function App() {
                     You escaped the {worldName}. Well done, hero.
                   </p>
                   <button style={{ ...S.submit, width: 'auto', padding: '0.6rem 2rem' }}
-                    onClick={() => { setEscaped(false); setView('char'); setHistory([]); }}>
+                    onClick={() => { setEscaped(false); setHistory([]); window.history.replaceState(null, '', '/'); loadSessions(); }}>
                     START NEW MISSION
                   </button>
                 </div>
@@ -241,7 +347,7 @@ export default function App() {
                     The {worldName} has claimed another victim.
                   </p>
                   <button style={{ ...S.submit, width: 'auto', padding: '0.6rem 2rem' }}
-                    onClick={() => { setView('char'); setHistory([]); }}>
+                    onClick={() => { setHistory([]); window.history.replaceState(null, '', '/'); loadSessions(); }}>
                     START NEW MISSION
                   </button>
                 </div>
@@ -250,36 +356,25 @@ export default function App() {
                   <div style={S.choices}>
                     {!loading && choices.map((c, i) => (
                       <button key={i} style={S.choiceBtn} onClick={() => handleChoice(c)}>
-                        [{i + 1}] {c}
+                        [{i + 1}] {c.label}
                       </button>
                     ))}
-                  </div>
-                  <div style={{ display: 'flex', gap: 8, marginTop: '1rem' }}>
-                    <input
-                      style={S.input}
-                      value={customAction}
-                      onChange={e => setCustomAction(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && handleCustom()}
-                      placeholder="Type your own action..."
-                      disabled={loading}
-                    />
-                    <button style={S.sendBtn} onClick={handleCustom} disabled={loading}>TRANSMIT</button>
                   </div>
                 </>
               )}
 
               {history.length > 0 && (
                 <div style={{ ...S.card, marginTop: '1.5rem', maxHeight: 160, overflowY: 'auto' }} ref={logRef}>
-                  <p style={{ fontSize: '0.65rem', letterSpacing: '0.1em', color: 'var(--t-dim-dark)', marginBottom: 6 }}>MISSION LOG</p>
+                  <p style={{ fontSize: '0.75rem', letterSpacing: '0.1em', color: 'var(--t-dim)', marginBottom: 6 }}>MISSION LOG</p>
                   {[...history].reverse().filter((_, i) => i % 2 === 0).slice(0, 20).map((m, i) => (
                     <p key={i} style={S.logEntry}>› {m.content}</p>
                   ))}
                 </div>
               )}
 
-              <div style={{ marginTop: '1rem', fontSize: '0.7rem', color: 'var(--t-dim-dark)', display: 'flex', gap: '1.5rem' }}>
-                <button style={{ ...S.sendBtn, padding: '0.3rem 0.75rem', fontSize: '0.7rem' }}
-                  onClick={() => { if (confirm('Abandon current run and start over?')) { setView('char'); setHistory([]); window.history.pushState(null, '', '/'); } }}>
+              <div style={{ marginTop: '1rem', fontSize: '0.75rem', color: 'var(--t-dim)', display: 'flex', gap: '1.5rem' }}>
+                <button style={{ ...S.sendBtn, padding: '0.3rem 0.75rem', fontSize: '0.75rem' }}
+                  onClick={() => { if (confirm('Abandon current run and start over?')) { setHistory([]); window.history.replaceState(null, '', '/'); loadSessions(); } }}>
                   ABORT MISSION
                 </button>
               </div>
@@ -293,13 +388,143 @@ export default function App() {
   );
 }
 
+// ─── Login screen ────────────────────────────────────────────────────────────
+function LoginScreen() {
+  const BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+  return (
+    <div style={{ ...S.page, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+      <div style={{ textAlign: 'center', maxWidth: 360 }}>
+        <p style={{ ...S.title, marginBottom: '0.5rem' }}>PANSORI</p>
+        <p style={{ fontSize: '0.75rem', color: 'var(--t-dim)', letterSpacing: '0.15em', marginBottom: '2.5rem' }}>
+          SIGN IN TO CONTINUE YOUR MISSION
+        </p>
+        <a
+          href={`${BASE}/api/auth/google`}
+          style={{
+            display: 'inline-block',
+            background: 'var(--t-dim-dark)', color: 'var(--t-primary)',
+            border: '1px solid var(--t-primary)',
+            padding: '0.65rem 1.75rem',
+            fontFamily: 'inherit', fontSize: '0.8rem',
+            letterSpacing: '0.12em', textDecoration: 'none',
+          }}
+        >
+          SIGN IN WITH GOOGLE
+        </a>
+      </div>
+    </div>
+  );
+}
+
+// ─── Sessions screen ─────────────────────────────────────────────────────────
+function SessionsScreen({ sessions, user, loading, onResume, onNewGame, onLogout, onDelete, onClearCompleted, contexts }: {
+  sessions:          SessionSummary[];
+  user:              AuthUser | null;
+  loading:           boolean;
+  onResume:          (id: string) => void;
+  onNewGame:         () => void;
+  onLogout:          () => void;
+  onDelete:          (id: string) => void;
+  onClearCompleted:  () => void;
+  contexts:          Record<string, FrontendContext>;
+}) {
+  const statusColor = (s: string) =>
+    s === 'escaped' ? 'var(--t-hp-high)' : s === 'dead' ? 'var(--t-hp-low)' : 'var(--t-mid)';
+  const hasCompleted = sessions.some(s => s.status !== 'active');
+
+  return (
+    <div style={{ ...S.page, display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}>
+      <div style={{ width: '100%', maxWidth: 620, margin: '4rem auto' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '2rem' }}>
+          <div>
+            <p style={{ ...S.title, fontSize: '1.1rem', marginBottom: 4 }}>PANSORI</p>
+            {user && <p style={S.sub}>{user.display_name.toUpperCase()}</p>}
+          </div>
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+            {hasCompleted && (
+              <button
+                onClick={() => { if (confirm('Delete all completed and failed runs?')) onClearCompleted(); }}
+                style={{ background: 'transparent', border: '1px solid var(--t-border)', color: 'var(--t-dim)', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.75rem', letterSpacing: '0.1em', padding: '0.5rem 1rem' }}
+              >CLEAR OLD</button>
+            )}
+            <button style={{ ...S.submit, marginTop: 0, width: 'auto', padding: '0.5rem 1.25rem' }} onClick={onNewGame}>
+              + NEW MISSION
+            </button>
+            <button
+              onClick={onLogout}
+              style={{ background: 'transparent', border: '1px solid var(--t-border)', color: 'var(--t-dim)', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.75rem', letterSpacing: '0.1em', padding: '0.5rem 1rem' }}
+            >SIGN OUT</button>
+          </div>
+        </div>
+
+        {sessions.length === 0 ? (
+          <div style={{ ...S.card, textAlign: 'center', padding: '2.5rem', color: 'var(--t-dim)' }}>
+            <p style={{ fontSize: '0.8rem', letterSpacing: '0.12em', marginBottom: '1.25rem' }}>NO MISSIONS ON RECORD</p>
+            <button style={{ ...S.submit, marginTop: 0, width: 'auto', padding: '0.5rem 1.5rem' }} onClick={onNewGame}>
+              BEGIN FIRST MISSION
+            </button>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {sessions.map(s => {
+              const ctx = contexts[s.context_id];
+              const isActive = s.status === 'active';
+              return (
+                <div key={s.id} style={{ ...S.card, display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: 0, opacity: isActive ? 1 : 0.6 }}>
+                  {s.portrait_url
+                    ? <img src={s.portrait_url} alt="" style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--t-border)', flexShrink: 0 }} />
+                    : <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'var(--t-separator)', border: '1px solid var(--t-border)', flexShrink: 0 }} />
+                  }
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontWeight: 'bold', fontSize: '0.85rem', letterSpacing: '0.06em', color: 'var(--t-primary)' }}>
+                      {s.character_name}
+                    </p>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--t-dim)', letterSpacing: '0.08em', marginTop: 2 }}>
+                      {s.character_class.toUpperCase()} · {ctx?.displayName ?? s.context_id}
+                    </p>
+                  </div>
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    <p style={{ fontSize: '0.8rem', color: statusColor(s.status), letterSpacing: '0.1em', marginBottom: 4 }}>
+                      {s.status.toUpperCase()}
+                    </p>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--t-dim)' }}>
+                      {new Date(s.updated_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                  {isActive && (
+                    <button
+                      style={{ ...S.sendBtn, flexShrink: 0 }}
+                      onClick={() => onResume(s.id)}
+                      disabled={loading}
+                    >RESUME</button>
+                  )}
+                  <button
+                    onClick={() => {
+                      const msg = isActive
+                        ? `Delete active run "${s.character_name}"? This cannot be undone.`
+                        : `Delete "${s.character_name}"?`;
+                      if (confirm(msg)) onDelete(s.id);
+                    }}
+                    style={{ background: 'transparent', border: '1px solid var(--t-border)', color: 'var(--t-dim)', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.75rem', letterSpacing: '0.08em', padding: '0.3rem 0.6rem', flexShrink: 0 }}
+                  >✕</button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Stats bar ───────────────────────────────────────────────────────────────
-function StatsBar({ state, ctx, seed, onEquip, inCombat }: {
-  state:    GameState | null;
-  ctx:      FrontendContext;
-  seed:     Seed | null;
-  onEquip:  (id: string) => void;
-  inCombat: boolean;
+function StatsBar({ state, ctx, seed, onEquip, inCombat, onOpenMap }: {
+  state:      GameState | null;
+  ctx:        FrontendContext;
+  seed:       Seed | null;
+  onEquip:    (id: string) => void;
+  inCombat:   boolean;
+  onOpenMap:  () => void;
 }) {
   const [activeItemIdx, setActiveItemIdx] = useState<number | null>(null);
 
@@ -311,8 +536,10 @@ function StatsBar({ state, ctx, seed, onEquip, inCombat }: {
   }, [activeItemIdx]);
 
   if (!state) return null;
-  const hpPct   = Math.round((state.hp / state.max_hp) * 100);
-  const hpColor = hpPct > 50 ? 'var(--t-hp-high)' : hpPct > 25 ? 'var(--t-hp-mid)' : 'var(--t-hp-low)';
+  const hpPct         = Math.round((state.hp / state.max_hp) * 100);
+  const hpColor       = hpPct > 50 ? 'var(--t-hp-high)' : hpPct > 25 ? 'var(--t-hp-mid)' : 'var(--t-hp-low)';
+  const equippedWeapon = state.inventory?.find(i => i.instance_id === state.equipped_weapon) ?? null;
+  const equippedArmor  = state.inventory?.find(i => i.instance_id === state.equipped_armor)  ?? null;
 
   return (
     <div style={{ ...S.card, marginBottom: '0.75rem' }}>
@@ -328,18 +555,29 @@ function StatsBar({ state, ctx, seed, onEquip, inCombat }: {
         </div>
         <div style={S.stat}><span style={S.statLbl}>VISITED</span><span style={S.statVal}>{state.visited_rooms?.length ?? 0}</span></div>
         <div style={S.stat}>
+          <span style={S.statLbl}>&nbsp;</span>
+          <button
+            onClick={onOpenMap}
+            style={{
+              background: 'transparent', border: '1px solid var(--t-border)',
+              color: 'var(--t-dim)', cursor: 'pointer', fontFamily: 'inherit',
+              fontSize: '0.75rem', letterSpacing: '0.12em', padding: '2px 8px',
+            }}
+          >MAP</button>
+        </div>
+        <div style={S.stat}>
           <span style={S.statLbl}>WEAPON</span>
           <span style={{ ...S.statVal, display: 'flex', alignItems: 'center', gap: 3 }}>
-            {state.equipped_weapon
-              ? <>{ctx.itemIcons[state.equipped_weapon] ?? null}{ctx.weaponNames[state.equipped_weapon] || state.equipped_weapon}</>
+            {equippedWeapon
+              ? <>{ctx.itemIcons[equippedWeapon.id] ?? null}{equippedWeapon.name}</>
               : <span style={{ color: 'var(--t-dim)' }}>unarmed</span>}
           </span>
         </div>
         <div style={S.stat}>
           <span style={S.statLbl}>ARMOR</span>
           <span style={{ ...S.statVal, display: 'flex', alignItems: 'center', gap: 3 }}>
-            {state.equipped_armor
-              ? <>{ctx.itemIcons[state.equipped_armor] ?? null}{ctx.armorNames[state.equipped_armor] || state.equipped_armor}</>
+            {equippedArmor
+              ? <>{ctx.itemIcons[equippedArmor.id] ?? null}{equippedArmor.name}</>
               : <span style={{ color: 'var(--t-dim)' }}>none</span>}
           </span>
         </div>
@@ -348,11 +586,11 @@ function StatsBar({ state, ctx, seed, onEquip, inCombat }: {
           <span style={{ ...S.statVal, display: 'flex', flexWrap: 'wrap', gap: '0.6rem', alignItems: 'center' }}>
             {state.inventory?.length
               ? state.inventory.map((item, idx) => {
-                  const equipped    = item.id === state.equipped_weapon || item.id === state.equipped_armor;
-                  const equippable  = !!(ctx.weaponNames[item.id] || ctx.armorNames[item.id]) && !inCombat;
+                  const equipped    = item.instance_id === state.equipped_weapon || item.instance_id === state.equipped_armor || item.instance_id === state.equipped_shield;
+                  const equippable  = !!(item.damage || item.slot === 'armor' || item.slot === 'shield') && !inCombat;
                   const popoverOpen = activeItemIdx === idx;
                   return (
-                    <Tooltip key={idx} text={equippable ? null : (item.desc ?? ctx.itemDescs[item.id])}>
+                    <Tooltip key={item.instance_id} text={equippable ? null : (item.desc ?? ctx.itemDescs[item.id])}>
                       <span
                         onMouseDown={e => {
                           if (!equippable) return;
@@ -379,12 +617,12 @@ function StatsBar({ state, ctx, seed, onEquip, inCombat }: {
                               display: 'flex', flexDirection: 'column', gap: 4,
                             }}
                           >
-                            <span style={{ fontSize: '0.6rem', color: 'var(--t-dim)', letterSpacing: '0.1em', marginBottom: 2 }}>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--t-dim)', letterSpacing: '0.1em', marginBottom: 2 }}>
                               {item.desc ?? ctx.itemDescs[item.id]}
                             </span>
                             <button
-                              style={{ ...S.choiceBtn, padding: '0.2rem 0.5rem', fontSize: '0.65rem' }}
-                              onClick={() => { onEquip(item.id); setActiveItemIdx(null); }}
+                              style={{ ...S.choiceBtn, padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}
+                              onClick={() => { onEquip(item.instance_id); setActiveItemIdx(null); }}
                             >
                               {equipped ? 'UNEQUIP' : 'EQUIP'}
                             </button>
@@ -448,7 +686,7 @@ function Tooltip({ text, children }: { text: string | null | undefined; children
         <span style={{
           position: 'absolute', bottom: 'calc(100% + 6px)', left: '50%', transform: 'translateX(-50%)',
           background: 'var(--t-card)', border: '1px solid var(--t-border)', color: 'var(--t-mid)',
-          fontSize: '0.65rem', lineHeight: 1.5, letterSpacing: '0.03em',
+          fontSize: '0.75rem', lineHeight: 1.5, letterSpacing: '0.03em',
           padding: '0.3rem 0.5rem', whiteSpace: 'nowrap', zIndex: 10, pointerEvents: 'none',
         }}>
           {text}
@@ -459,10 +697,28 @@ function Tooltip({ text, children }: { text: string | null | undefined; children
 }
 
 // ─── Character select ────────────────────────────────────────────────────────
-function CharScreen({ onStart, loading, availableContexts }: {
-  onStart:           (name: string, cls: string, contextId: string) => Promise<void>;
+type StatBlock = { str: number; dex: number; con: number; int: number; wis: number; cha: number };
+const STAT_KEYS: (keyof StatBlock)[] = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
+const STAT_LABEL: Record<keyof StatBlock, string> = { str: 'STR', dex: 'DEX', con: 'CON', int: 'INT', wis: 'WIS', cha: 'CHA' };
+const mod = (s: number) => Math.floor((s - 10) / 2);
+const fmtMod = (s: number) => { const m = mod(s); return m >= 0 ? `+${m}` : `${m}`; };
+
+function roll4d6DropLowest(): number {
+  const rolls = Array.from({ length: 4 }, () => Math.floor(Math.random() * 6) + 1);
+  rolls.sort((a, b) => a - b);
+  return rolls.slice(1).reduce((a, b) => a + b, 0);
+}
+
+function rollStatBlock(): StatBlock {
+  return { str: roll4d6DropLowest(), dex: roll4d6DropLowest(), con: roll4d6DropLowest(),
+           int: roll4d6DropLowest(), wis: roll4d6DropLowest(), cha: roll4d6DropLowest() };
+}
+
+function CharScreen({ onStart, loading, availableContexts, user }: {
+  onStart:           (name: string, cls: string, contextId: string, stats?: StatBlock, portraitUrl?: string) => Promise<void>;
   loading:           boolean;
   availableContexts: FrontendContext[];
+  user:              AuthUser | null;
 }) {
   const [name, setName]       = useState(() => localStorage.getItem('operative_name') || '');
   const [contextId, setContextId] = useState(
@@ -470,6 +726,9 @@ function CharScreen({ onStart, loading, availableContexts }: {
   );
   const [cls, setCls]         = useState(availableContexts[0]?.classes[0]?.id ?? '');
   const [error, setError]     = useState('');
+  const [rolledStats, setRolledStats] = useState<StatBlock>(() => rollStatBlock());
+  const [rollCount, setRollCount]     = useState(1);
+  const [portrait, setPortrait]       = useState<string | null>(user?.avatar_url ?? null);
 
   useEffect(() => {
     const c = availableContexts.find(c => c.id === contextId);
@@ -477,17 +736,26 @@ function CharScreen({ onStart, loading, availableContexts }: {
       applyTheme(c.theme);
       setCls(c.classes[0]?.id ?? '');
       localStorage.setItem('last_context_id', contextId);
+      setRolledStats(rollStatBlock());
+      setRollCount(1);
     }
   }, [contextId, availableContexts]);
 
-  const selectedCtx = availableContexts.find(c => c.id === contextId);
-  const classes = selectedCtx?.classes ?? [];
+  const selectedCtx   = availableContexts.find(c => c.id === contextId);
+  const classes        = selectedCtx?.classes ?? [];
+  const primaryStat    = selectedCtx?.classPrimaryStats[cls]?.toLowerCase() as keyof StatBlock | undefined;
+  const skills         = selectedCtx?.classSkills[cls] ?? [];
+
+  function handleRoll() {
+    setRolledStats(rollStatBlock());
+    setRollCount(c => c + 1);
+  }
 
   async function handle() {
     if (!name.trim()) return setError('Enter your hero name');
     setError('');
     localStorage.setItem('operative_name', name.trim());
-    try { await onStart(name.trim(), cls, contextId); }
+    try { await onStart(name.trim(), cls, contextId, rolledStats, portrait ?? undefined); }
     catch (e) { setError((e as { error?: string })?.error || 'Failed to start mission'); }
   }
 
@@ -508,8 +776,94 @@ function CharScreen({ onStart, loading, availableContexts }: {
             {classes.map(c => <option key={c.id} value={c.id}>{c.id}</option>)}
           </select>
 
-          <div style={{ marginTop: 12, fontSize: '0.72rem', color: 'var(--t-dim-dark)', lineHeight: 1.6 }}>
-            {classes.find(c => c.id === cls)?.desc}
+          {/* Class ability preview */}
+          <div style={{ marginTop: 8, fontSize: '0.75rem', color: 'var(--t-dim)', lineHeight: 1.7 }}>
+            <span style={{ color: 'var(--t-mid)' }}>
+              {classes.find(c => c.id === cls)?.desc}
+            </span>
+            {primaryStat && (
+              <div style={{ marginTop: 4 }}>
+                <span style={{ color: 'var(--t-dim)', letterSpacing: '0.08em' }}>PRIMARY STAT: </span>
+                <span style={{ color: 'var(--t-primary)' }}>{primaryStat.toUpperCase()}</span>
+                {skills.length > 0 && (
+                  <>
+                    <span style={{ color: 'var(--t-dim)', letterSpacing: '0.08em' }}> · PROFICIENT: </span>
+                    <span style={{ color: 'var(--t-mid)' }}>{skills.join(', ')}</span>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Portrait picker */}
+          <label style={{ ...S.formLbl, marginTop: 16 }}>PORTRAIT</label>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            {([
+              ...(user?.avatar_url ? [user.avatar_url] : []),
+              `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><rect width="40" height="40" fill="#1a1a2e"/><circle cx="20" cy="14" r="7" fill="#4a9eff"/><ellipse cx="20" cy="34" rx="10" ry="7" fill="#4a9eff"/></svg>')}`,
+              `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><rect width="40" height="40" fill="#1a1a2e"/><circle cx="20" cy="14" r="7" fill="#ff6b6b"/><ellipse cx="20" cy="34" rx="10" ry="7" fill="#ff6b6b"/></svg>')}`,
+              `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><rect width="40" height="40" fill="#1a1a2e"/><circle cx="20" cy="14" r="7" fill="#ffd93d"/><ellipse cx="20" cy="34" rx="10" ry="7" fill="#ffd93d"/></svg>')}`,
+              `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><rect width="40" height="40" fill="#1a1a2e"/><circle cx="20" cy="14" r="7" fill="#6bcb77"/><ellipse cx="20" cy="34" rx="10" ry="7" fill="#6bcb77"/></svg>')}`,
+            ] as string[]).map((src, i) => {
+              const sel = portrait === src;
+              return (
+                <button
+                  key={i}
+                  onClick={() => setPortrait(src)}
+                  style={{
+                    padding: 0, border: `2px solid ${sel ? 'var(--t-primary)' : 'var(--t-border)'}`,
+                    background: 'none', cursor: 'pointer', borderRadius: '50%',
+                    boxShadow: sel ? '0 0 6px var(--t-primary)' : 'none',
+                  }}
+                >
+                  <img src={src} alt="" style={{ width: 36, height: 36, borderRadius: '50%', display: 'block', objectFit: 'cover' }} />
+                </button>
+              );
+            })}
+            <button
+              onClick={() => setPortrait(null)}
+              style={{
+                width: 40, height: 40, borderRadius: '50%', border: `2px solid ${portrait === null ? 'var(--t-primary)' : 'var(--t-border)'}`,
+                background: 'var(--t-separator)', cursor: 'pointer', color: 'var(--t-dim)',
+                fontSize: '0.75rem', letterSpacing: '0.05em', fontFamily: 'inherit',
+              }}
+            >NONE</button>
+          </div>
+
+          {/* Ability score roller */}
+          <label style={{ ...S.formLbl, marginTop: 16 }}>ABILITY SCORES</label>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+            {STAT_KEYS.map(key => {
+              const val       = rolledStats[key];
+              const isPrimary = key === primaryStat;
+              return (
+                <div key={key} style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center',
+                  padding: '4px 8px',
+                  border: `1px solid ${isPrimary ? 'var(--t-primary)' : 'var(--t-border)'}`,
+                  background: isPrimary ? 'var(--t-separator)' : 'transparent',
+                  minWidth: 42,
+                }}>
+                  <span style={{ fontSize: '0.75rem', color: isPrimary ? 'var(--t-primary)' : 'var(--t-dim)', letterSpacing: '0.1em' }}>
+                    {STAT_LABEL[key]}
+                  </span>
+                  <span style={{ fontSize: '0.95rem', fontWeight: 'bold', color: isPrimary ? 'var(--t-primary)' : 'var(--t-mid)' }}>
+                    {val}
+                  </span>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--t-dim)' }}>
+                    {fmtMod(val)}
+                  </span>
+                </div>
+              );
+            })}
+            {rollCount < 2 && (
+              <button
+                style={{ ...S.sendBtn, fontSize: '0.75rem', padding: '0.3rem 0.6rem', alignSelf: 'center' }}
+                onClick={handleRoll}
+              >
+                REROLL
+              </button>
+            )}
           </div>
 
           {error && <p style={S.err}>{error}</p>}
@@ -554,8 +908,8 @@ function CharScreen({ onStart, loading, availableContexts }: {
                   }}>{c.previewArt}</pre>
                   <div>
                     <p style={{ fontSize: '0.85rem', letterSpacing: '0.12em', fontWeight: 'bold', marginBottom: 4, color: selected ? 'var(--t-primary)' : 'var(--t-mid)' }}>{c.displayName}</p>
-                    <p style={{ fontSize: '0.7rem', color: 'var(--t-dim)', lineHeight: 1.5 }}>{c.tagline}</p>
-                    {selected && <p style={{ marginTop: 6, fontSize: '0.65rem', color: 'var(--t-primary)', letterSpacing: '0.1em' }}>▶ SELECTED</p>}
+                    <p style={{ fontSize: '0.75rem', color: 'var(--t-dim)', lineHeight: 1.5 }}>{c.tagline}</p>
+                    {selected && <p style={{ marginTop: 6, fontSize: '0.75rem', color: 'var(--t-primary)', letterSpacing: '0.1em' }}>▶ SELECTED</p>}
                   </div>
                 </button>
               );

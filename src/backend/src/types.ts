@@ -25,27 +25,35 @@ export interface Room {
   desc: string;
 }
 
+export interface OnHitEffect {
+  condition: 'paralyzed' | 'stunned' | 'poisoned' | 'prone' | 'frightened';
+  ability:   'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha';
+  dc:        number;
+}
+
 export interface EnemyTemplate {
-  name:   string;
-  cr:     number;
-  hp:     number;
-  ac:     number;
-  damage: string;
-  toHit:  number;
-  xp:     number;
-  dex?:   number;
-  wis?:   number;
+  name:        string;
+  cr:          number;
+  hp:          number;
+  ac:          number;
+  damage:      string;
+  toHit:       number;
+  xp:          number;
+  dex?:        number;
+  wis?:        number;
+  onHitEffect?: OnHitEffect;
 }
 
 export interface Enemy {
-  name:   string;
-  hp:     number;
-  ac:     number;
-  damage: string;
-  toHit:  number;
-  xp:     number;
-  dex?:   number;
-  wis?:   number;
+  name:        string;
+  hp:          number;
+  ac:          number;
+  damage:      string;
+  toHit:       number;
+  xp:          number;
+  dex?:        number;
+  wis?:        number;
+  onHitEffect?: OnHitEffect;
 }
 
 export interface Seed {
@@ -74,9 +82,27 @@ export interface DeathSaves {
   failures:  number;
 }
 
+// ─── Structured actions ───────────────────────────────────────────────────────
+
+export type StructuredAction =
+  | { type: 'move';      roomId: string }
+  | { type: 'attack' }
+  | { type: 'loot' }
+  | { type: 'use';       itemId: string }
+  | { type: 'sneak' }
+  | { type: 'escape' }
+  | { type: 'examine' }
+  | { type: 'death_save' };
+
+export interface GameChoice {
+  label:  string;
+  action: StructuredAction;
+}
+
 export interface InventoryItem {
-  id:   string;
-  name: string;
+  instance_id: string;
+  id:          string;
+  name:        string;
   [key: string]: unknown;
 }
 
@@ -104,7 +130,9 @@ export interface GameState {
   loot_taken:      string[];
   enemy_hp:        Record<string, number>;
   run_log:         Array<{ action: string; narrative: string }>;
-  last_choices?:   string[];
+  room_log:        string[];
+  last_choices?:   GameChoice[];
+  conditions:      string[];
   flags:           Record<string, boolean | string | number>;
   combat_active:   boolean;
   initiative:      { player: number; enemy: number } | null;
@@ -123,6 +151,16 @@ export interface RoomPoolEntry {
   descs: string[];
 }
 
+export interface CampaignData {
+  world_name:    string;
+  intro:         string;
+  rooms:         Room[];
+  connections:   Record<string, string[]>;
+  enemies?:      Record<string, Enemy>;
+  loot?:         Record<string, LootItem>;
+  startingLoot?: string[];
+}
+
 export type TieredNarrative = string[] | Record<string, string[]>;
 
 export interface Context {
@@ -133,8 +171,10 @@ export interface Context {
   escapeTriggers:   string[];
   escapeChoiceText: string;
   worldNames:       string[];
-  mapType:          'roguelike' | 'campaign';
-  classSkills:      Record<string, string[]>;
+  mapType:            'roguelike' | 'campaign';
+  campaign?:          CampaignData;
+  classPrimaryStats:  Record<string, 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha'>;
+  classSkills:        Record<string, string[]>;
   enemyTemplates:   EnemyTemplate[];
   introTexts:       string[];
   roomPool:         RoomPoolEntry[];
@@ -155,7 +195,6 @@ export interface Context {
     alreadyLooted:   string[];
     noEnemy:         string[];
     alreadyDead:     string[];
-    examineTemplates:string[];
     sneakSuccess:    string[];
     sneakFail:       string[];
     deathLines:      string[];
