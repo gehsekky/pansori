@@ -718,6 +718,111 @@ describe('runRules', () => {
   });
 });
 
+// ─── turn_actions lifecycle ───────────────────────────────────────────────────
+
+describe('turn_actions lifecycle', () => {
+  it('generateChoices includes end_turn when combat_active and action already used', () => {
+    const state = makeState(
+      { turn_actions: { action_used: true, bonus_action_used: false, reaction_used: false, free_interaction_used: false } },
+      {
+        current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+        combat_active: true,
+        initiative_order: [
+          { id: 'char-1', roll: 15, is_enemy: false },
+          { id: CORRIDOR_ID, roll: 5, is_enemy: true },
+        ],
+        initiative_idx: 0,
+      },
+    );
+    const choices = generateChoices(state, seedWithEnemy, ctx);
+    expect(choices.some(c => c.action.type === 'end_turn')).toBe(true);
+  });
+
+  it('generateChoices does not include end_turn outside combat', () => {
+    const choices = generateChoices(makeState(), seed, ctx);
+    expect(choices.every(c => c.action.type !== 'end_turn')).toBe(true);
+  });
+
+  it('attack action marks action_used on the attacking character (2-char party, enemy survives)', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0); // d20 → 1, always misses
+    const char1 = makeChar({ id: 'c1', name: 'Alice' });
+    const char2 = makeChar({ id: 'c2', name: 'Bob' });
+    const state: GameState = {
+      characters: [char1, char2],
+      active_character_id: 'c1',
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [], loot_taken: [], enemy_hp: {},
+      combat_active: true,
+      initiative_order: [
+        { id: 'c1', roll: 20, is_enemy: false },
+        { id: CORRIDOR_ID, roll: 10, is_enemy: true },
+        { id: 'c2', roll: 5, is_enemy: false },
+      ],
+      initiative_idx: 0,
+      run_log: [], room_log: [], last_choices: [], flags: {},
+      short_rested_rooms: [], long_rested: false,
+      npc_attitudes: {}, npc_talked: [],
+    };
+    const result = await takeAction({ action: { type: 'attack' }, history: [], state, seed: seedWithEnemy, context: ctx });
+    // c1 misses → auto-advance → enemy attacks → c2's turn begins (c1 not yet reset)
+    const c1 = result.newState.characters.find(c => c.id === 'c1')!;
+    expect(c1.turn_actions.action_used).toBe(true);
+  });
+
+  it('turn_actions reset when initiative advances to a character\'s slot', async () => {
+    const char1 = makeChar({ id: 'c1', name: 'Alice', turn_actions: { action_used: true, bonus_action_used: true, reaction_used: false, free_interaction_used: false } });
+    const char2 = makeChar({ id: 'c2', name: 'Bob' });
+    // c2 ends turn; order wraps back to c1 (enemy is killed so no counter-attack)
+    const state: GameState = {
+      characters: [char1, char2],
+      active_character_id: 'c2',
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [CORRIDOR_ID], loot_taken: [], enemy_hp: {},
+      combat_active: true,
+      initiative_order: [
+        { id: 'c1', roll: 20, is_enemy: false },
+        { id: CORRIDOR_ID, roll: 10, is_enemy: true },
+        { id: 'c2', roll: 5, is_enemy: false },
+      ],
+      initiative_idx: 2,
+      run_log: [], room_log: [], last_choices: [], flags: {},
+      short_rested_rooms: [], long_rested: false,
+      npc_attitudes: {}, npc_talked: [],
+    };
+    const result = await takeAction({ action: { type: 'end_turn' }, history: [], state, seed: seedWithEnemy, context: ctx });
+    const c1 = result.newState.characters.find(c => c.id === 'c1')!;
+    expect(c1.turn_actions.action_used).toBe(false);
+    expect(c1.turn_actions.bonus_action_used).toBe(false);
+    expect(result.newState.active_character_id).toBe('c1');
+  });
+
+  it('end_turn narrative mentions the character and advances active character', async () => {
+    const char1 = makeChar({ id: 'c1', name: 'Alice' });
+    const char2 = makeChar({ id: 'c2', name: 'Bob' });
+    const state: GameState = {
+      characters: [char1, char2],
+      active_character_id: 'c1',
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [CORRIDOR_ID], loot_taken: [], enemy_hp: {},
+      combat_active: true,
+      initiative_order: [
+        { id: 'c1', roll: 20, is_enemy: false },
+        { id: 'c2', roll: 5, is_enemy: false },
+      ],
+      initiative_idx: 0,
+      run_log: [], room_log: [], last_choices: [], flags: {},
+      short_rested_rooms: [], long_rested: false,
+      npc_attitudes: {}, npc_talked: [],
+    };
+    const result = await takeAction({ action: { type: 'end_turn' }, history: [], state, seed: seedWithEnemy, context: ctx });
+    expect(result.narrative).toMatch(/alice.*ends their turn/i);
+    expect(result.newState.active_character_id).toBe('c2');
+  });
+});
+
 // ─── NPC actions ──────────────────────────────────────────────────────────────
 
 import type { PlacedNpc, NpcTemplate } from '../types.js';

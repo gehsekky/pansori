@@ -508,6 +508,11 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       }
     }
   }
+  // End turn: available in combat after the character's action is used
+  // (auto-advance fires when no bonus choices exist, but this allows explicit forfeiture)
+  if (state.combat_active && char.turn_actions.action_used) {
+    choices.push({ label: 'End turn', action: { type: 'end_turn' } });
+  }
   for (const adj of adjacent) {
     if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
     const label = enemyAlive ? `Dash past the ${enemy.name} → ${adj.name}` : `Move to ${adj.name}`;
@@ -775,11 +780,6 @@ export async function takeAction({ action, history = [], state, seed, context }:
     return { narrative, choices: st.last_choices, newState: st, escaped: false, dead: false };
   }
 
-  // ── Reset character turn actions at the start of each combat round ─────────
-  if (st.combat_active) {
-    char.turn_actions = { ...FRESH_TURN };
-  }
-
   switch (action.type) {
 
     case 'move': {
@@ -951,10 +951,11 @@ export async function takeAction({ action, history = [], state, seed, context }:
         // Miss
         narrative += pickTiered(context.narratives.combatMiss, hpTier(char)).replace(/{enemy}/g, enemy.name);
         narrative += ` (d20 ${atk.roll}+${atk.atkMod} ${atk.atkStat}+${atk.prof} prof = ${atk.total} vs AC ${enemy.ac}${disadvNote})`;
-        // Enemy counter-attack will auto-resolve via initiative advancement below
       }
 
-      usedInitiative = true;
+      // Action consumed. Initiative advances unless a bonus-action choice is available
+      // (checked after commitChar — see auto-advance block below the switch).
+      char.turn_actions = { ...char.turn_actions, action_used: true };
       break;
     }
 
@@ -1031,6 +1032,8 @@ export async function takeAction({ action, history = [], state, seed, context }:
       } else {
         narrative = itemData.useNarrative || `You examine the ${held.name}. Might come in handy.`;
       }
+      // Using a consumable or activating an item is an action in combat
+      if (st.combat_active) char.turn_actions = { ...char.turn_actions, action_used: true };
       break;
     }
 
@@ -1077,6 +1080,9 @@ export async function takeAction({ action, history = [], state, seed, context }:
           narrative += ' ' + dsNarr;
         }
       }
+      // Sneak always consumes the action and ends the combat turn
+      char.turn_actions = { ...char.turn_actions, action_used: true };
+      if (st.combat_active) usedInitiative = true;
       break;
     }
 
@@ -1093,6 +1099,13 @@ export async function takeAction({ action, history = [], state, seed, context }:
       narrative = cond
         ? `${char.name} is ${cond} and cannot act. Turn passed.`
         : `${char.name} passes their turn.`;
+      char.turn_actions = { ...char.turn_actions, action_used: true, bonus_action_used: true };
+      usedInitiative = true;
+      break;
+    }
+
+    case 'end_turn': {
+      narrative = `${char.name} ends their turn.`;
       usedInitiative = true;
       break;
     }
@@ -1168,6 +1181,7 @@ export async function takeAction({ action, history = [], state, seed, context }:
       if (npc.responses.length > 0) {
         narrative += ' [' + npc.responses.map((r, i) => `${i + 1}. ${r.label}`).join(' | ') + ']';
       }
+      if (st.combat_active) char.turn_actions = { ...char.turn_actions, action_used: true };
       break;
     }
 
@@ -1256,6 +1270,7 @@ export async function takeAction({ action, history = [], state, seed, context }:
         char = { ...char, hp: Math.max(0, char.hp - retaliation.hpLost), conditions: retaliation.newConditions, condition_durations: retaliation.newDurations };
         narrative += ' ' + retaliation.narrative;
       }
+      char.turn_actions = { ...char.turn_actions, action_used: true };
       break;
     }
 
@@ -1270,6 +1285,14 @@ export async function takeAction({ action, history = [], state, seed, context }:
 
   // ── Write char back into state ─────────────────────────────────────────────
   commitChar();
+
+  // ── Auto-advance initiative when action is used and no bonus choices remain ─
+  // When class features add bonus-action choices (requiresBonusAction: true),
+  // this block will stay false and the player gets another pick before advancing.
+  if (st.combat_active && !usedInitiative && st.characters[safeIdx].turn_actions.action_used) {
+    const hasBonusChoices = generateChoices(st, seed, context).some(c => c.requiresBonusAction);
+    if (!hasBonusChoices) usedInitiative = true;
+  }
 
   // ── Advance initiative / active character ──────────────────────────────────
   if (usedInitiative && st.combat_active && st.initiative_order.length > 0) {
@@ -1322,12 +1345,13 @@ export async function takeAction({ action, history = [], state, seed, context }:
     st.initiative_idx = advIdx;
 
     // Set active character to whoever's turn it is in the order;
-    // tick their conditions now that their new turn is starting
+    // reset their turn_actions and tick conditions as their new turn begins.
     const currentEntry = st.initiative_order[advIdx];
     if (currentEntry && !currentEntry.is_enemy) {
       const nextCharIdx = st.characters.findIndex(c => c.id === currentEntry.id && !c.dead);
       if (nextCharIdx >= 0) {
-        const ticked = tickConditions(st.characters[nextCharIdx]);
+        const withFreshTurn = { ...st.characters[nextCharIdx], turn_actions: { ...FRESH_TURN } };
+        const ticked = tickConditions(withFreshTurn);
         if (ticked.conditions.length !== st.characters[nextCharIdx].conditions.length) {
           const expired = st.characters[nextCharIdx].conditions.filter(c => !ticked.conditions.includes(c));
           narrative += ` [${ticked.name}] Condition${expired.length > 1 ? 's' : ''} cleared: ${expired.join(', ')}.`;
