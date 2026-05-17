@@ -139,6 +139,9 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
         class_resource_uses: {},
         asi_pending:         false,
         exhaustion_level:    0,
+        spell_slots_max:     ctx.classSpellSlots?.[c.character_class]?.[0] ?? {},
+        spell_slots_used:    {},
+        spells_known:        ctx.classSpells?.[c.character_class] ?? [],
       };
     });
 

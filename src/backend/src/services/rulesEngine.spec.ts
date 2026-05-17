@@ -7,6 +7,7 @@ import {
   skillCheck, rollDeathSave, rollConditionSave,
   sneakAttackDice, extraAttackCount, rageDamageBonus, rageUsesMax,
   ADVANTAGE_CONDITIONS, DISADV_CONDITIONS, PLAYER_ADV_CONDITIONS, ENEMY_DISADV_CONDITIONS,
+  spellAttackBonus, spellSaveDC, resolveSpellAttack,
 } from './rulesEngine.js';
 import type { LootItem } from '../types.js';
 
@@ -536,13 +537,77 @@ describe('rageUsesMax(level)', () => {
   });
 });
 
+// ─── Spell helpers ────────────────────────────────────────────────────────────
+
+describe('spellAttackBonus(level, castingAbilityScore)', () => {
+  // Level 1 → prof +2; INT 16 → mod +3 → bonus = 5
+  it('level 1, INT 16 → bonus 5', () => {
+    expect(spellAttackBonus(1, 16)).toBe(5);
+  });
+  // Level 5 → prof +3; WIS 14 → mod +2 → bonus = 5
+  it('level 5, WIS 14 → bonus 5', () => {
+    expect(spellAttackBonus(5, 14)).toBe(5);
+  });
+  // Level 1 → prof +2; INT 10 → mod 0 → bonus = 2
+  it('level 1, INT 10 → bonus 2', () => {
+    expect(spellAttackBonus(1, 10)).toBe(2);
+  });
+});
+
+describe('spellSaveDC(level, castingAbilityScore)', () => {
+  // DC = 8 + prof + mod; level 1 → prof +2; INT 16 → +3 → DC 13
+  it('level 1, INT 16 → DC 13', () => {
+    expect(spellSaveDC(1, 16)).toBe(13);
+  });
+  // level 5 → prof +3; WIS 14 → +2 → DC 13
+  it('level 5, WIS 14 → DC 13', () => {
+    expect(spellSaveDC(5, 14)).toBe(13);
+  });
+  // level 1 → prof +2; INT 10 → +0 → DC 10
+  it('level 1, INT 10 → DC 10', () => {
+    expect(spellSaveDC(1, 10)).toBe(10);
+  });
+});
+
+describe('resolveSpellAttack(level, castingAbilityScore, enemyAc)', () => {
+  // Level 1, INT 16 → bonus 5; nat 20 → critical, always hits
+  it('nat 20 → critical hit regardless of AC', () => {
+    mockRandom(0.999); // d20 → 20
+    const result = resolveSpellAttack(1, 16, 30);
+    expect(result.hit).toBe(true);
+    expect(result.critical).toBe(true);
+  });
+
+  // nat 1 → always miss
+  it('nat 1 → miss regardless of bonus', () => {
+    mockRandom(0); // d20 → 1
+    const result = resolveSpellAttack(1, 16, 5);
+    expect(result.hit).toBe(false);
+  });
+
+  // total >= AC → hit
+  it('hits when roll + bonus >= AC', () => {
+    // d20 → 8; bonus = 2 (level 1, INT 10); total = 10 vs AC 10
+    mockRandom(0.35); // 0.35*20+1 = 8
+    const result = resolveSpellAttack(1, 10, 10);
+    expect(result.hit).toBe(true);
+    expect(result.critical).toBe(false);
+  });
+
+  // total < AC → miss
+  it('misses when roll + bonus < AC', () => {
+    // d20 → 5; bonus = 2; total = 7 vs AC 15
+    mockRandom(0.2); // 0.2*20+1 = 5
+    const result = resolveSpellAttack(1, 10, 15);
+    expect(result.hit).toBe(false);
+  });
+});
+
 // ─── Future systems (not yet implemented) ────────────────────────────────────
 
 describe('future systems', () => {
   it.todo('[Case A] movement point tracking: 30ft speed, use 20ft, 10ft remains');
   it.todo('[Case B] bonus-action spell + action spell → invalid under 5e casting rules');
   it.todo('[Case C] two-handed weapon held → spellcasting requires free hand');
-  it.todo('[Case G] spell slot consumption and per-long-rest limits');
   it.todo('[Case H] concentration: damage triggers CON save or drop concentration');
-  it.todo('[Case J] long rest resets spell slots, hit dice, and conditions');
 });

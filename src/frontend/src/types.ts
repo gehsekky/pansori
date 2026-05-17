@@ -22,7 +22,8 @@ export type StructuredAction =
   | { type: 'buy';               itemId: string; price: number }
   | { type: 'attack_npc' }
   | { type: 'use_class_feature'; featureId: string }
-  | { type: 'apply_asi';         stat: AbilityKey };
+  | { type: 'apply_asi';         stat: AbilityKey }
+  | { type: 'cast_spell';        spellId: string; slotLevel: number };
 
 export interface GameChoice {
   label:               string;
@@ -114,6 +115,9 @@ export interface Character {
   class_resource_uses: Record<string, number>;
   asi_pending:         boolean;
   exhaustion_level:    number;
+  spell_slots_max:     Record<number, number>;
+  spell_slots_used:    Record<number, number>;
+  spells_known:        string[];
 }
 
 // ─── NPC system ───────────────────────────────────────────────────────────────
