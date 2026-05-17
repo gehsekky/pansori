@@ -1,34 +1,17 @@
 # TODO
 
 ## Script Engine (core goal)
-- [x] Event/trigger system — use a JSON rules engine (`json-rules-engine`) rather than pre-declared TypeScript hooks. Rules evaluate conditions against GameState facts after every StructuredAction; consequences use a finite action vocabulary (`add_narrative`, `set_flag`, `give_item`, `modify_hp`, `unlock_room`, `spawn_enemy`, `set_escape`). Solves unknown-hook extensibility without a scripting runtime and unblocks user-authored campaigns. Known 5e hooks (onEnterRoom, onKillEnemy, etc.) become rules with fact conditions rather than named callsites. Procedural logic (dice-dependent branching) should write outcomes to flags before rule evaluation so rules only check state facts.
-- [x] Dynamic script discovery — scan a scripts/ directory at startup instead of hardcoded imports
-- [x] Multiple win conditions — scripts define custom victory conditions beyond "reach escape room"
-- [x] NPC system — non-enemy characters with scripted dialogue trees. How can we also have NPCs in the roguelike campaigns? Should NPCs have inventory? Does the D&D 5e ruleset have an NPC specification?
 - [ ] Campaign persistence — world state that survives across multiple sessions (separate from per-session GameState)
 
 ## Rules Engine (D&D 5e gaps)
-- [x] Class features — Sneak Attack (Rogue/Pilot: ⌈level/2⌉d6 on hit with advantage or ally in combat; dice doubled on crit), Extra Attack (Warrior/Soldier level 5+: 2 attacks; level 11+: 3 attacks), Rage (Warrior: bonus action, +rage-damage-bonus on STR melee, halve incoming physical damage, uses tracked in class_resource_uses, restored on long rest, clears on combat end). Divine Smite and Bardic Inspiration deferred — require spell slot system.
-- [x] Multiple attacks — Extra Attack at level 5 (2 attacks) and level 11 (3 attacks) via resolveOneAttack loop.
-- [x] Saving throw proficiencies — classSavingThrows on Context (2 abilities per class); rollConditionSave adds profBonus when proficient.
-- [x] Rules engine spec-conformance tests — anchored tests for profBonus exact values per level; attack roll formula; death save nat-1/nat-20 edge cases; advantage/disadvantage two-roll mechanics; new tests for sneakAttackDice, extraAttackCount, rageDamageBonus, rageUsesMax, rollConditionSave with/without proficiency.
-- [x] Bonus action enforcement — turn_actions lifecycle (action_used, bonus_action_used); auto-advance fires only when no requiresBonusAction choices remain; end_turn action for explicit forfeiture.
-- [x] Short rest / long rest — short rest spends a hit die (d{class-die} + CON mod) once per room; long rest restores full HP + clears conditions + recovers half-level hit dice + restores class resource uses (rage_uses etc.), once per session; both blocked while enemy is alive; room canRest flag lets campaign authors disable resting in specific rooms.
-- [x] Hit dice — per-class die size in Context.classHitDie; hit_die and hit_dice_remaining on Character; displayed in stats bar; recovered on long rest (max(1, floor(level/2))).
-- [x] Spell system — spell slots (levels 1–3 implemented, recovery on long rest), spell attack rolls (prof + spellcasting ability), spell save DCs (8 + prof + mod), cantrips. Mage/Cleric (dungeon-crawler) and Scientist/Medic (scifi-terror) fully playable. Concentration and upcasting deferred.
-- [x] Full conditions list — blinded, restrained (adv/disadv both directions), incapacitated (no actions), grappled (speed 0, move blocked), invisible (player adv on attacks, enemy disadv against player), exhaustion (level tracked; level 3+ = attack disadv; long rest reduces by 1). Remaining: charmed, petrified (complex NPC interactions; deferred).
 - [ ] Traps — core dungeon element entirely absent. Investigation/Perception to detect (vs trap DC), Thieves' Tools proficiency check to disarm, damage/condition on trigger. Defined in room data.
 - [ ] Armor/weapon proficiency enforcement — currently any class can wear any armor with no penalty; heavy armor without proficiency should impose disadvantage on STR/DEX checks and prevent spellcasting
 - [ ] Two-weapon fighting — bonus action attack with light off-hand weapon when wielding two light weapons; no ability mod to damage unless feat
 - [ ] Grapple / Shove — contested Athletics checks: grapple sets target speed 0, shove knocks prone or pushes 5ft
-- [x] Ability Score Improvements — at levels 4, 8, 12, 16, 19: +2 to chosen stat; CON retroactively adjusts max HP. +1/+1 split deferred.
 - [ ] Backgrounds — grant 2 skill proficiencies + 1 tool proficiency + a narrative feature; add to character creation
 - [ ] Magic item attunement — max 3 attuned items per character; some items require attunement to function
 
 ## Party System
-- [x] Initiative-based turn order — `buildInitiativeOrder` rolls d20+DEX for all participants; post-action loop auto-resolves consecutive enemy turns; `InitiativeStrip` UI shows turn sequence; conditions tick at turn start. Reactions deferred to class features milestone.
-- [x] Party UI improvements — initiative strip, active-turn glow on character tab, condition badges, greyed-out "waiting" state, multi-target heal choices per injured party member. Reactions deferred to class features milestone.
-- [x] Enemy HP scaling by party size — `Math.round(baseHp * (0.5 + partySize * 0.5))` applied at seed generation; 1×solo, 1.5×two, 2×three, 2.5×four; baked into Seed at session creation.
 - [ ] Starting loot distribution — currently all campaign starting items are duplicated to every party member; should distribute items across characters instead (e.g. round-robin or defined per-character in context).
 
 ## Features
