@@ -16,19 +16,19 @@
 - [x] Short rest / long rest — short rest spends a hit die (d{class-die} + CON mod) once per room; long rest restores full HP + clears conditions + recovers half-level hit dice + restores class resource uses (rage_uses etc.), once per session; both blocked while enemy is alive; room canRest flag lets campaign authors disable resting in specific rooms.
 - [x] Hit dice — per-class die size in Context.classHitDie; hit_die and hit_dice_remaining on Character; displayed in stats bar; recovered on long rest (max(1, floor(level/2))).
 - [ ] Spell system — spell slots (levels 1–9, recovery on long rest), spell attack rolls (8 + prof + spellcasting ability), spell save DCs, cantrips, concentration (CON save on damage to maintain). Prerequisite for Divine Smite and Bardic Inspiration.
-- [ ] Full conditions list — missing: blinded (attacks have disadv, attackers have adv), charmed (can't attack charmer), exhaustion (6 levels, cumulative penalties), invisible (adv on attacks, disadv against), restrained (speed 0, disadv on attacks, adv against), incapacitated (no actions/reactions), grappled (speed 0), petrified
+- [x] Full conditions list — blinded, restrained (adv/disadv both directions), incapacitated (no actions), grappled (speed 0, move blocked), invisible (player adv on attacks, enemy disadv against player), exhaustion (level tracked; level 3+ = attack disadv; long rest reduces by 1). Remaining: charmed, petrified (complex NPC interactions; deferred).
 - [ ] Traps — core dungeon element entirely absent. Investigation/Perception to detect (vs trap DC), Thieves' Tools proficiency check to disarm, damage/condition on trigger. Defined in room data.
 - [ ] Armor/weapon proficiency enforcement — currently any class can wear any armor with no penalty; heavy armor without proficiency should impose disadvantage on STR/DEX checks and prevent spellcasting
 - [ ] Two-weapon fighting — bonus action attack with light off-hand weapon when wielding two light weapons; no ability mod to damage unless feat
 - [ ] Grapple / Shove — contested Athletics checks: grapple sets target speed 0, shove knocks prone or pushes 5ft
-- [ ] Ability Score Improvements — at levels 4, 8, 12, 16, 19: +2 to one stat or +1 to two. Currently leveling only adds max HP.
+- [x] Ability Score Improvements — at levels 4, 8, 12, 16, 19: +2 to chosen stat; CON retroactively adjusts max HP. +1/+1 split deferred.
 - [ ] Backgrounds — grant 2 skill proficiencies + 1 tool proficiency + a narrative feature; add to character creation
 - [ ] Magic item attunement — max 3 attuned items per character; some items require attunement to function
 
 ## Party System
 - [x] Initiative-based turn order — `buildInitiativeOrder` rolls d20+DEX for all participants; post-action loop auto-resolves consecutive enemy turns; `InitiativeStrip` UI shows turn sequence; conditions tick at turn start. Reactions deferred to class features milestone.
 - [x] Party UI improvements — initiative strip, active-turn glow on character tab, condition badges, greyed-out "waiting" state, multi-target heal choices per injured party member. Reactions deferred to class features milestone.
-- [ ] Enemy HP scaling by party size — multiply enemy HP by `0.5 + (partySize * 0.5)` at seed generation time (1× solo, 1.5× two-person, 2× three, 2.5× four); baked into Seed so difficulty is fixed for the run; pass `partySize` into `generateSeed`.
+- [x] Enemy HP scaling by party size — `Math.round(baseHp * (0.5 + partySize * 0.5))` applied at seed generation; 1×solo, 1.5×two, 2×three, 2.5×four; baked into Seed at session creation.
 - [ ] Starting loot distribution — currently all campaign starting items are duplicated to every party member; should distribute items across characters instead (e.g. round-robin or defined per-character in context).
 
 ## Features
