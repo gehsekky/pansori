@@ -22,6 +22,14 @@ export const context: Context = {
     Medic:     'wis',
   },
 
+  classHitDie: {
+    Biologist:  8,
+    Diver:     10,
+    Salvager:  10,
+    Engineer:   8,
+    Medic:      8,
+  },
+
   classSkills: {
     Biologist: ['medicine', 'perception'],
     Diver:     ['athletics', 'survival'],

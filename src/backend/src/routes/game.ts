@@ -121,12 +121,15 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
         equipped_weapon: null,
         equipped_armor:  null,
         equipped_shield: null,
-        conditions:      [],
-        death_saves:     { successes: 0, failures: 0 },
-        stable:          false,
-        dead:            false,
-        turn_actions:    { ...FRESH_TURN },
-        initiative_roll: null,
+        conditions:          [],
+        condition_durations: {},
+        death_saves:         { successes: 0, failures: 0 },
+        stable:              false,
+        dead:                false,
+        turn_actions:        { ...FRESH_TURN },
+        initiative_roll:     null,
+        hit_die:             ctx.classHitDie[c.character_class] ?? 8,
+        hit_dice_remaining:  1,
       };
     });
 
@@ -145,6 +148,8 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
       run_log:             [],
       room_log:            [],
       last_choices:        [],
+      short_rested_rooms:  [],
+      long_rested:         false,
       flags:               {},
     };
 

@@ -20,9 +20,10 @@ export interface LootItem {
 // ─── Seed (procedurally generated world state) ────────────────────────────────
 
 export interface Room {
-  id:   string;
-  name: string;
-  desc: string;
+  id:      string;
+  name:    string;
+  desc:    string;
+  canRest?: boolean;
 }
 
 export interface OnHitEffect {
@@ -85,15 +86,17 @@ export interface DeathSaves {
 // ─── Structured actions ───────────────────────────────────────────────────────
 
 export type StructuredAction =
-  | { type: 'move';      roomId: string }
+  | { type: 'move';       roomId: string }
   | { type: 'attack' }
   | { type: 'loot' }
-  | { type: 'use';       itemId: string; targetCharId?: string }
+  | { type: 'use';        itemId: string; targetCharId?: string }
   | { type: 'sneak' }
   | { type: 'escape' }
   | { type: 'examine' }
   | { type: 'death_save' }
-  | { type: 'pass' };
+  | { type: 'pass' }
+  | { type: 'short_rest' }
+  | { type: 'long_rest' };
 
 export interface GameChoice {
   label:  string;
@@ -137,6 +140,8 @@ export interface Character {
   dead:                boolean;
   turn_actions:        TurnActions;
   initiative_roll:     number | null;
+  hit_die:             number;
+  hit_dice_remaining:  number;
 }
 
 // ─── Game state (world/party container) ──────────────────────────────────────
@@ -162,6 +167,10 @@ export interface GameState {
   run_log:       Array<{ character_id: string; action: string; narrative: string }>;
   room_log:      string[];
   last_choices?: GameChoice[];
+
+  // Rest tracking
+  short_rested_rooms: string[];
+  long_rested:        boolean;
 
   // Script engine flags
   flags: Record<string, boolean | string | number>;
@@ -199,6 +208,7 @@ export interface Context {
   campaign?:          CampaignData;
   classPrimaryStats:  Record<string, 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha'>;
   classSkills:        Record<string, string[]>;
+  classHitDie:        Record<string, number>;
   enemyTemplates:   EnemyTemplate[];
   introTexts:       string[];
   roomPool:         RoomPoolEntry[];
