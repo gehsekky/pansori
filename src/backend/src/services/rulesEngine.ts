@@ -70,15 +70,18 @@ interface AttackResult {
 }
 
 // Player attacks an enemy. Finesse weapons use whichever of STR/DEX is higher.
-// Disadvantage (e.g. ranged weapon in melee) rolls 2d20 and keeps the lower.
-export function resolvePlayerAttack(player: PlayerStats, weaponDamage: string | null, targetAC: number, finesse = false, disadvantage = false): AttackResult {
+// Advantage and disadvantage both present → they cancel out (5e PHB p.173).
+export function resolvePlayerAttack(player: PlayerStats, weaponDamage: string | null, targetAC: number, finesse = false, disadvantage = false, advantage = false): AttackResult {
   const strMod  = abilityMod(player.str);
   const dexMod  = abilityMod(player.dex);
   const atkMod  = finesse ? Math.max(strMod, dexMod) : strMod;
   const atkStat = (finesse && dexMod > strMod) ? 'DEX' : 'STR';
   const prof    = profBonus(player.level);
   const roll1   = d(20);
-  const roll    = disadvantage ? Math.min(roll1, d(20)) : roll1;
+  // Advantage + disadvantage cancel; net advantage rolls 2d20 keep higher; net disadv keeps lower
+  const netAdv  = advantage && !disadvantage;
+  const netDisadv = disadvantage && !advantage;
+  const roll    = netDisadv ? Math.min(roll1, d(20)) : netAdv ? Math.max(roll1, d(20)) : roll1;
   const total   = roll + atkMod + prof;
 
   if (roll === 1)  return { hit: false, fumble: true,  critical: false, roll, total, damage: 0, atkMod, atkStat, prof };
@@ -92,10 +95,13 @@ interface EnemyStats {
   toHit:  number;
 }
 
-// Enemy attacks the player. Advantage rolls 2d20 and keeps the higher (e.g. vs paralyzed/stunned/prone).
-export function resolveEnemyAttack(enemy: EnemyStats, playerAC: number, advantage = false) {
-  const roll1 = d(20);
-  const roll  = advantage ? Math.max(roll1, d(20)) : roll1;
+// Enemy attacks the player. Advantage rolls 2d20 keep higher; disadvantage keeps lower.
+// Advantage + disadvantage cancel per 5e PHB p.173.
+export function resolveEnemyAttack(enemy: EnemyStats, playerAC: number, advantage = false, disadvantage = false) {
+  const roll1    = d(20);
+  const netAdv   = advantage && !disadvantage;
+  const netDisadv = disadvantage && !advantage;
+  const roll  = netDisadv ? Math.min(roll1, d(20)) : netAdv ? Math.max(roll1, d(20)) : roll1;
   const total = roll + enemy.toHit;
   const hit   = roll !== 1 && (roll === 20 || total >= playerAC);
   return { hit, roll, total, damage: hit ? rollDice(enemy.damage) : 0 };
@@ -154,10 +160,14 @@ export function computeAcAfterArmorChange(
 
 // ─── Conditions ───────────────────────────────────────────────────────────────
 
-// Which conditions grant the enemy advantage on attacks against the player
-export const ADVANTAGE_CONDITIONS = new Set(['paralyzed', 'stunned', 'prone']);
-// Which conditions impose disadvantage on the player's attacks
-export const DISADV_CONDITIONS    = new Set(['poisoned', 'prone', 'frightened']);
+// Enemy gets advantage on attacks against the player when player has these conditions
+export const ADVANTAGE_CONDITIONS = new Set(['paralyzed', 'stunned', 'prone', 'blinded', 'restrained']);
+// Player attacks with disadvantage when they have these conditions
+export const DISADV_CONDITIONS    = new Set(['poisoned', 'prone', 'frightened', 'blinded', 'restrained']);
+// Player attacks with advantage when they have these conditions (invisible enemy = player can't see)
+export const PLAYER_ADV_CONDITIONS  = new Set(['invisible']);
+// Enemy attacks the player with disadvantage when the player has these conditions
+export const ENEMY_DISADV_CONDITIONS = new Set(['invisible']);
 
 // On-hit saving throw: returns true if the save FAILS (condition is applied).
 // Pass proficient=true when the character has saving throw proficiency in this ability.

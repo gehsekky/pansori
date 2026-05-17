@@ -4,12 +4,12 @@ import {
   FRESH_TURN,
   resolvePlayerAttack, resolveEnemyAttack, unarmedDamage,
   skillCheck, rollDeathSave, profBonus,
-  ADVANTAGE_CONDITIONS, DISADV_CONDITIONS,
+  ADVANTAGE_CONDITIONS, DISADV_CONDITIONS, PLAYER_ADV_CONDITIONS, ENEMY_DISADV_CONDITIONS,
   rollConditionSave, rollCritical, resolveSaveWithAdvantage, resolveMysteryConsumable, passivePerceptionDC,
   sneakAttackDice, extraAttackCount, rageDamageBonus, rageUsesMax,
 } from './rulesEngine.js';
 import { Engine } from 'json-rules-engine';
-import type { GameState, Character, Seed, Context, Enemy, LootItem, InventoryItem, OnHitEffect, StructuredAction, GameChoice, DeathSaves, TurnActions, GameConsequence, RuleFacts, PlacedNpc, NpcAttitude } from '../types.js';
+import type { GameState, Character, Seed, Context, Enemy, LootItem, InventoryItem, OnHitEffect, StructuredAction, GameChoice, DeathSaves, TurnActions, GameConsequence, RuleFacts, PlacedNpc, NpcAttitude, AbilityKey } from '../types.js';
 
 function pick<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)]; }
 
@@ -82,8 +82,9 @@ function applyEnemyAttackNarrative(
   char: Character,
   context: Context,
 ): { hpLost: number; narrative: string; newConditions: string[]; newDurations: Record<string, number> } {
-  const hasAdvantage = char.conditions.some(c => ADVANTAGE_CONDITIONS.has(c));
-  const result       = resolveEnemyAttack(enemy, char.ac, hasAdvantage);
+  const hasAdvantage    = char.conditions.some(c => ADVANTAGE_CONDITIONS.has(c));
+  const hasDisadvantage = char.conditions.some(c => ENEMY_DISADV_CONDITIONS.has(c));
+  const result          = resolveEnemyAttack(enemy, char.ac, hasAdvantage, hasDisadvantage);
   const armorItem    = char.equipped_armor ? char.inventory?.find(i => i.id === char.equipped_armor) : null;
 
   if (result.hit) {
@@ -206,13 +207,19 @@ function processDeathSave(
 
 // ─── Condition duration helpers ───────────────────────────────────────────────
 
-// How many rounds each on-hit condition lasts (cleared at start of victim's next turn)
+// How many rounds each on-hit condition lasts (cleared at start of victim's next turn).
+// Conditions with no entry (exhaustion) are permanent until explicitly cleared.
 const CONDITION_DURATION: Record<string, number> = {
-  stunned:    1,
-  paralyzed:  1,
-  poisoned:   2,
-  prone:      1,
-  frightened: 2,
+  stunned:       1,
+  paralyzed:     1,
+  poisoned:      2,
+  prone:         1,
+  frightened:    2,
+  blinded:       1,
+  restrained:    1,
+  incapacitated: 1,
+  grappled:      1,
+  invisible:     2,
 };
 
 function inflictCondition(char: Character, condition: string): Character {
@@ -330,6 +337,8 @@ export function normalizeState(
         hit_dice_remaining:  c.hit_dice_remaining  ?? (c.level ?? 1),
         condition_durations: c.condition_durations ?? {},
         class_resource_uses: c.class_resource_uses ?? {},
+        asi_pending:         c.asi_pending         ?? false,
+        exhaustion_level:    c.exhaustion_level    ?? 0,
       })),
     };
   }
@@ -367,6 +376,8 @@ export function normalizeState(
     hit_die:             8,
     hit_dice_remaining:  level,
     class_resource_uses: {},
+    asi_pending:         false,
+    exhaustion_level:    0,
   };
   const oldRunLog = (raw.run_log as Array<{ action: string; narrative: string }>) ?? [];
   return {
@@ -435,16 +446,25 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
 
   if (char.dead) return [];
 
+  // Pending ASI: only show stat-boost choices until resolved
+  if (char.asi_pending) {
+    const statLabels: Record<string, string> = { str: 'STR', dex: 'DEX', con: 'CON', int: 'INT', wis: 'WIS', cha: 'CHA' };
+    return (Object.keys(statLabels) as AbilityKey[]).map(stat => ({
+      label:  `Ability Score Improvement: +2 ${statLabels[stat]} (currently ${char[stat]})`,
+      action: { type: 'apply_asi' as const, stat },
+    }));
+  }
+
   const healItems = context.lootTable.filter(i => i.heal);
   const healItem  = char.inventory?.find(i => healItems.find(h => h.id === i.id));
 
   if (char.hp <= 0 && !char.stable) return [{ label: 'Roll death saving throw', action: { type: 'death_save' } }];
   if (char.hp <= 0 && char.stable)  return [{ label: 'Use healing item', action: { type: 'use', itemId: healItem?.id ?? '' } }];
 
-  // Stunned / paralyzed: cannot take actions, bonus actions, reactions, or move
-  const isIncapacitated = char.conditions.includes('stunned') || char.conditions.includes('paralyzed');
+  // Stunned / paralyzed / incapacitated: cannot take actions, bonus actions, reactions, or move
+  const isIncapacitated = char.conditions.some(c => ['stunned', 'paralyzed', 'incapacitated'].includes(c));
   if (isIncapacitated) {
-    const cond = char.conditions.includes('stunned') ? 'STUNNED' : 'PARALYZED';
+    const cond = (char.conditions.find(c => ['stunned', 'paralyzed', 'incapacitated'].includes(c)) ?? 'stunned').toUpperCase();
     return [{ label: `${cond} — cannot act this turn (pass)`, action: { type: 'pass' } }];
   }
 
@@ -547,10 +567,16 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   if (state.combat_active && char.turn_actions.action_used) {
     choices.push({ label: 'End turn', action: { type: 'end_turn' } });
   }
-  for (const adj of adjacent) {
-    if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
-    const label = enemyAlive ? `Dash past the ${enemy.name} → ${adj.name}` : `Move to ${adj.name}`;
-    choices.push({ label, action: { type: 'move', roomId: adj.id } });
+  const isImmobilized = char.conditions.some(c => ['grappled', 'restrained'].includes(c));
+  if (!isImmobilized) {
+    for (const adj of adjacent) {
+      if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+      const label = enemyAlive ? `Dash past the ${enemy.name} → ${adj.name}` : `Move to ${adj.name}`;
+      choices.push({ label, action: { type: 'move', roomId: adj.id } });
+    }
+  } else {
+    const blocker = char.conditions.find(c => ['grappled', 'restrained'].includes(c))!;
+    choices.push({ label: `${blocker.toUpperCase()} — cannot move`, action: { type: 'pass' } });
   }
   return MAX_CHOICES ? choices.slice(0, MAX_CHOICES) : choices;
 }
@@ -744,6 +770,8 @@ export async function takeAction({ action, history = [], state, seed, context }:
     hit_die:             char.hit_die             ?? 8,
     hit_dice_remaining:  char.hit_dice_remaining  ?? (char.level ?? 1),
     class_resource_uses: char.class_resource_uses ?? {},
+    asi_pending:         char.asi_pending         ?? false,
+    exhaustion_level:    char.exhaustion_level    ?? 0,
   };
 
   const worldName  = getWorldName(seed);
@@ -821,6 +849,12 @@ export async function takeAction({ action, history = [], state, seed, context }:
       const target = seed.rooms.find(r => r.id === action.roomId);
       if (!target || !adjacent.find(r => r.id === target.id)) {
         narrative = 'The path loops back on itself. You cannot get there from here.';
+        break;
+      }
+      // Grappled / restrained: speed reduced to 0 — cannot move
+      const immobilizer = char.conditions.find(c => ['grappled', 'restrained'].includes(c));
+      if (immobilizer) {
+        narrative = `You are ${immobilizer} and cannot move.`;
         break;
       }
       // Opportunity attack when leaving a room with a living enemy (5e PHB p.195)
@@ -931,14 +965,18 @@ export async function takeAction({ action, history = [], state, seed, context }:
       }
 
       // ── Resolve the player's attack ────────────────────────────────────────
-      const rangedInMelee   = (weaponItem?.range === 'ranged');
-      const conditionDisadv = char.conditions.some(c => DISADV_CONDITIONS.has(c));
-      const disadvantage    = rangedInMelee || conditionDisadv;
-      const disadvReasons   = [
-        rangedInMelee   ? 'ranged in melee' : '',
-        conditionDisadv ? char.conditions.filter(c => DISADV_CONDITIONS.has(c)).join(', ') : '',
+      const rangedInMelee    = (weaponItem?.range === 'ranged');
+      const conditionDisadv  = char.conditions.some(c => DISADV_CONDITIONS.has(c));
+      const exhaustionDisadv = (char.exhaustion_level ?? 0) >= 3; // exhaustion 3+: disadv on attack rolls
+      const conditionAdv     = char.conditions.some(c => PLAYER_ADV_CONDITIONS.has(c));
+      const disadvantage     = rangedInMelee || conditionDisadv || exhaustionDisadv;
+      const advantage        = conditionAdv;
+      const disadvReasons    = [
+        rangedInMelee    ? 'ranged in melee' : '',
+        conditionDisadv  ? char.conditions.filter(c => DISADV_CONDITIONS.has(c)).join(', ') : '',
+        exhaustionDisadv ? 'exhaustion' : '',
       ].filter(Boolean).join(', ');
-      const disadvNote = disadvReasons ? ` (disadvantage — ${disadvReasons})` : '';
+      const disadvNote = disadvReasons ? ` (disadvantage — ${disadvReasons})` : (advantage && !disadvantage) ? ' (advantage)' : '';
 
       const features  = context.classFeatures?.[char.character_class] ?? [];
       const isRaging  = char.conditions.includes('raging');
@@ -952,6 +990,7 @@ export async function takeAction({ action, history = [], state, seed, context }:
           enemy.ac,
           weaponItem?.finesse ?? false,
           disadvantage,
+          advantage,
         );
         const baseHit  = weaponDamage ? atk.damage : Math.max(1, unarmedDamage(char.str));
         const atkNote  = ` (${label}d20 ${atk.roll}+${atk.atkMod} ${atk.atkStat}+${atk.prof} prof = ${atk.total} vs AC ${enemy.ac}${disadvNote})`;
@@ -1006,6 +1045,10 @@ export async function takeAction({ action, history = [], state, seed, context }:
             char.max_hp += 4;
             char.hp      = Math.min(char.hp + 4, char.max_hp);
             narrative += ' ' + context.narratives.levelUp;
+            if ([4, 8, 12, 16, 19].includes(char.level)) {
+              char.asi_pending = true;
+              narrative += ` Level ${char.level}: choose an Ability Score Improvement!`;
+            }
           }
           usedInitiative = true;
           return true;
@@ -1215,7 +1258,9 @@ export async function takeAction({ action, history = [], state, seed, context }:
         const charFeatures    = context.classFeatures?.[c.character_class] ?? [];
         const restoredUses: Record<string, number> = { ...(c.class_resource_uses ?? {}) };
         if (charFeatures.includes('rage')) restoredUses.rage_uses = rageUsesMax(c.level);
-        return { ...c, hp: c.max_hp, hit_dice_remaining: newHd, conditions: [], condition_durations: {}, class_resource_uses: restoredUses };
+        // Long rest reduces exhaustion by 1 level (PHB p.291); full rest clears all other conditions
+        const newExhaustion = Math.max(0, (c.exhaustion_level ?? 0) - 1);
+        return { ...c, hp: c.max_hp, hit_dice_remaining: newHd, conditions: [], condition_durations: {}, class_resource_uses: restoredUses, exhaustion_level: newExhaustion };
       });
       st   = { ...st, characters: restedChars, long_rested: true };
       char = { ...restedChars[safeIdx] };
@@ -1348,6 +1393,23 @@ export async function takeAction({ action, history = [], state, seed, context }:
         narrative += ' ' + retaliation.narrative;
       }
       char.turn_actions = { ...char.turn_actions, action_used: true };
+      break;
+    }
+
+    case 'apply_asi': {
+      if (!char.asi_pending) { narrative = 'No Ability Score Improvement pending.'; break; }
+      const stat = action.stat as AbilityKey;
+      char[stat]       = (char[stat] ?? 10) + 2;
+      char.asi_pending = false;
+      const statName   = { str: 'STR', dex: 'DEX', con: 'CON', int: 'INT', wis: 'WIS', cha: 'CHA' }[stat];
+      narrative = `${char.name} increases ${statName} by 2 (now ${char[stat]})!`;
+      // CON increase retroactively raises max HP (per 5e PHB: apply to all existing levels)
+      if (stat === 'con') {
+        const bonus = Math.floor((char.con - 10) / 2) - Math.floor((char.con - 2 - 10) / 2);
+        char.max_hp = Math.max(1, char.max_hp + bonus * char.level);
+        char.hp     = Math.min(char.max_hp, char.hp + bonus * char.level);
+        if (bonus > 0) narrative += ` Max HP increased by ${bonus * char.level} (${bonus}/level × ${char.level} levels).`;
+      }
       break;
     }
 

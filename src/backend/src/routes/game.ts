@@ -103,7 +103,7 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
   }
 
   const ctx  = CONTEXTS[context_id ?? ''] ?? DEFAULT_CONTEXT;
-  const seed = generateSeed(ctx);
+  const seed = generateSeed(ctx, characters.length);
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -136,6 +136,9 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
         initiative_roll:     null,
         hit_die:             ctx.classHitDie[c.character_class] ?? 8,
         hit_dice_remaining:  1,
+        class_resource_uses: {},
+        asi_pending:         false,
+        exhaustion_level:    0,
       };
     });
 

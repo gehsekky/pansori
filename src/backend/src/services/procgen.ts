@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import type { Context, Seed, LootItem, PlacedNpc } from '../types.js';
+import type { Context, Seed, LootItem, PlacedNpc, Enemy } from '../types.js';
 
 function roll(sides: number): number { return Math.floor(Math.random() * sides) + 1; }
 function pick<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)]; }
@@ -11,9 +11,14 @@ function weightedPick(table: LootItem[]): LootItem {
   return { ...table[0] };
 }
 
-export function generateSeed(context: Context): Seed {
+export function generateSeed(context: Context, partySize = 1): Seed {
   if (context.mapType === 'campaign' && context.campaign) {
     const c = context.campaign;
+    // Scale campaign enemy HP by party size
+    const scaledEnemies: Record<string, Enemy> = {};
+    for (const [roomId, enemy] of Object.entries(c.enemies ?? {})) {
+      scaledEnemies[roomId] = { ...enemy, hp: scaleEnemyHp(enemy.hp, partySize) };
+    }
     return {
       context_id:  context.id,
       world_name:  c.world_name,
@@ -21,16 +26,21 @@ export function generateSeed(context: Context): Seed {
       intro:       c.intro,
       rooms:       c.rooms,
       connections: c.connections,
-      enemies:     c.enemies ?? {},
-      loot:        c.loot    ?? {},
+      enemies:     scaledEnemies,
+      loot:        c.loot ?? {},
       npcs:        {},
       seed_id:     randomUUID(),
     };
   }
-  return generateRoguelikeSeed(context);
+  return generateRoguelikeSeed(context, partySize);
 }
 
-export function generateRoguelikeSeed(context: Context): Seed {
+// HP scaling formula: 1× solo, 1.5× 2-player, 2× 3-player, 2.5× 4-player
+function scaleEnemyHp(baseHp: number, partySize: number): number {
+  return Math.max(1, Math.round(baseHp * (0.5 + partySize * 0.5)));
+}
+
+export function generateRoguelikeSeed(context: Context, partySize = 1): Seed {
   const roomCount  = 5 + roll(4); // 6–9 rooms per run
   const escapeId   = context.escapeRoomId;
   const startId    = context.startRoomId;
@@ -87,7 +97,7 @@ export function generateRoguelikeSeed(context: Context): Seed {
       const template   = pick(pool.length ? pool : context.enemyTemplates);
       enemies[r.id] = {
         name:        template.name,
-        hp:          template.hp,
+        hp:          scaleEnemyHp(template.hp, partySize),
         ac:          template.ac,
         damage:      template.damage,
         toHit:       template.toHit,
