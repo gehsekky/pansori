@@ -85,6 +85,11 @@ function makeChar(overrides: Partial<Character> = {}): Character {
     hit_die:             8,
     hit_dice_remaining:  1,
     class_resource_uses: {},
+    asi_pending:         false,
+    exhaustion_level:    0,
+    spell_slots_max:     {},
+    spell_slots_used:    {},
+    spells_known:        [],
     ...overrides,
   };
 }
@@ -1279,5 +1284,272 @@ describe('NPC actions', () => {
     const state = makeNpcState({ hp: 10, max_hp: 10 });
     const result = await takeAction({ action: { type: 'attack_npc' }, history: [], state, seed: seedWeak, context: ctx });
     expect(result.newState.enemies_killed).toContain(`npc:${npcRoomId}`);
+  });
+});
+
+// ─── Spell system ─────────────────────────────────────────────────────────────
+
+// dungeonCtx and dungeonSeedWithEnemy already declared above (rage tests)
+// Spell tests use CORRIDOR_ID (same room as existing dungeonSeedWithEnemy enemy)
+const spellSeed: Seed = {
+  context_id:  dungeonCtx.id,
+  world_name:  'Test Dungeon',
+  ship_name:   'Test Dungeon',
+  intro:       'Test.',
+  seed_id:     'spell-seed-id',
+  rooms: [
+    { id: dungeonCtx.startRoomId,  name: 'Crypt',      desc: 'Cold stone.' },
+    { id: CORRIDOR_ID,             name: 'Burial',     desc: 'A chamber.' },
+    { id: dungeonCtx.escapeRoomId, name: 'Exit Shaft', desc: 'A shaft of light.' },
+  ],
+  connections: {
+    [dungeonCtx.startRoomId]:  [CORRIDOR_ID],
+    [CORRIDOR_ID]:              [dungeonCtx.startRoomId, dungeonCtx.escapeRoomId],
+    [dungeonCtx.escapeRoomId]: [CORRIDOR_ID],
+  },
+  enemies: {
+    [CORRIDOR_ID]: { name: 'Skeleton', hp: 10, ac: 12, damage: '1d6', toHit: 4, xp: 50 },
+  },
+  loot: {},
+};
+
+function makeMageState(charOverrides: Partial<Character> = {}): GameState {
+  const char = makeChar({
+    character_class: 'Mage',
+    int:             16,            // +3 mod → spell attack +5, DC 13
+    spell_slots_max: { 1: 2, 2: 1, 3: 1 },
+    spell_slots_used: {},
+    spells_known:    ['fire_bolt', 'magic_missile', 'thunderwave', 'misty_step', 'fireball'],
+    ...charOverrides,
+  });
+  return {
+    characters:          [char],
+    active_character_id: char.id,
+    current_room:        CORRIDOR_ID,
+    visited_rooms:       [dungeonCtx.startRoomId, CORRIDOR_ID],
+    enemies_killed:      [],
+    loot_taken:          [],
+    enemy_hp:            {},
+    combat_active:       false,
+    initiative_order:    [],
+    initiative_idx:      0,
+    run_log:             [],
+    room_log:            [],
+    last_choices:        [],
+    short_rested_rooms:  [],
+    long_rested:         false,
+    npc_attitudes:       {},
+    npc_talked:          [],
+    flags:               {},
+  };
+}
+
+function makeClericState(charOverrides: Partial<Character> = {}): GameState {
+  const char = makeChar({
+    character_class: 'Cleric',
+    wis:             14,
+    spell_slots_max: { 1: 2 },
+    spell_slots_used: {},
+    spells_known:    ['sacred_flame', 'cure_wounds', 'guiding_bolt', 'hold_person'],
+    ...charOverrides,
+  });
+  return {
+    characters:          [char],
+    active_character_id: char.id,
+    current_room:        CORRIDOR_ID,
+    visited_rooms:       [dungeonCtx.startRoomId, CORRIDOR_ID],
+    enemies_killed:      [],
+    loot_taken:          [],
+    enemy_hp:            {},
+    combat_active:       false,
+    initiative_order:    [],
+    initiative_idx:      0,
+    run_log:             [],
+    room_log:            [],
+    last_choices:        [],
+    short_rested_rooms:  [],
+    long_rested:         false,
+    npc_attitudes:       {},
+    npc_talked:          [],
+    flags:               {},
+  };
+}
+
+describe('cast_spell — Fire Bolt (cantrip, spell attack)', () => {
+  it('hits and deals 1d10 fire damage on a successful spell attack', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.7); // d20 → 15; bonus=5; total=20 vs AC 12 → hit
+    const state = makeMageState();
+    const result = await takeAction({
+      action: { type: 'cast_spell', spellId: 'fire_bolt', slotLevel: 0 },
+      history: [], state, seed: spellSeed, context: dungeonCtx,
+    });
+    expect(result.narrative).toMatch(/fire bolt/i);
+    expect(result.narrative).toMatch(/damage/i);
+    // No slot consumed for cantrip
+    expect(result.newState.characters[0].spell_slots_used[1]).toBeFalsy();
+  });
+
+  it('misses on a nat-1 spell attack roll', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0); // d20 → 1 → miss
+    const state = makeMageState();
+    const result = await takeAction({
+      action: { type: 'cast_spell', spellId: 'fire_bolt', slotLevel: 0 },
+      history: [], state, seed: spellSeed, context: dungeonCtx,
+    });
+    expect(result.narrative).toMatch(/miss/i);
+  });
+});
+
+describe('cast_spell — Magic Missile (level 1, auto-hit)', () => {
+  it('expends a level-1 slot and deals force damage without a roll', async () => {
+    const state = makeMageState();
+    const result = await takeAction({
+      action: { type: 'cast_spell', spellId: 'magic_missile', slotLevel: 1 },
+      history: [], state, seed: spellSeed, context: dungeonCtx,
+    });
+    expect(result.narrative).toMatch(/magic missile/i);
+    expect(result.narrative).toMatch(/force/i);
+    expect(result.newState.characters[0].spell_slots_used[1]).toBe(1);
+  });
+
+  it('refuses to cast when no level-1 slots remain', async () => {
+    const state = makeMageState({ spell_slots_used: { 1: 2 } });
+    const result = await takeAction({
+      action: { type: 'cast_spell', spellId: 'magic_missile', slotLevel: 1 },
+      history: [], state, seed: spellSeed, context: dungeonCtx,
+    });
+    expect(result.narrative).toMatch(/no level-1 spell slots/i);
+    expect(result.newState.characters[0].spell_slots_used[1]).toBe(2); // unchanged
+  });
+});
+
+describe('cast_spell — Thunderwave (level 1, CON save)', () => {
+  it('deals thunder damage when enemy fails CON save', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0); // d20 → 1 → save fails; then damage roll
+    const state = makeMageState();
+    const result = await takeAction({
+      action: { type: 'cast_spell', spellId: 'thunderwave', slotLevel: 1 },
+      history: [], state, seed: spellSeed, context: dungeonCtx,
+    });
+    expect(result.narrative).toMatch(/thunderwave/i);
+    expect(result.narrative).toMatch(/fails|damage/i);
+    expect(result.newState.characters[0].spell_slots_used[1]).toBe(1);
+  });
+
+  it('deals no damage when enemy succeeds CON save (negates)', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.999); // d20 → 20 → save succeeds
+    const state = makeMageState();
+    const result = await takeAction({
+      action: { type: 'cast_spell', spellId: 'thunderwave', slotLevel: 1 },
+      history: [], state, seed: spellSeed, context: dungeonCtx,
+    });
+    expect(result.narrative).toMatch(/thunderwave/i);
+    expect(result.narrative).toMatch(/succeeds|no damage/i);
+  });
+});
+
+describe('cast_spell — Fireball (level 3, DEX save, half on save)', () => {
+  it('deals half damage when enemy succeeds DEX save', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.999); // d20 save → 20 → success; then 8d6 damage all max
+    const state = makeMageState({ spell_slots_max: { 3: 1 }, spell_slots_used: {} });
+    const result = await takeAction({
+      action: { type: 'cast_spell', spellId: 'fireball', slotLevel: 3 },
+      history: [], state, seed: spellSeed, context: dungeonCtx,
+    });
+    expect(result.narrative).toMatch(/fireball/i);
+    expect(result.narrative).toMatch(/half damage|succeeds/i);
+  });
+
+  it('expends a level-3 slot', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const state = makeMageState({ spell_slots_max: { 3: 1 }, spell_slots_used: {} });
+    const result = await takeAction({
+      action: { type: 'cast_spell', spellId: 'fireball', slotLevel: 3 },
+      history: [], state, seed: spellSeed, context: dungeonCtx,
+    });
+    expect(result.newState.characters[0].spell_slots_used[3]).toBe(1);
+  });
+});
+
+describe('cast_spell — Cure Wounds (level 1, heal)', () => {
+  it('restores HP to the caster when at lower HP', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.999); // 1d8 → 8; WIS 14 → +2 → 10 healed
+    const state = makeClericState({ hp: 3, max_hp: 10 });
+    const result = await takeAction({
+      action: { type: 'cast_spell', spellId: 'cure_wounds', slotLevel: 1 },
+      history: [], state, seed: spellSeed, context: dungeonCtx,
+    });
+    expect(result.narrative).toMatch(/cure wounds/i);
+    expect(result.newState.characters[0].hp).toBeGreaterThan(3);
+    expect(result.newState.characters[0].spell_slots_used[1]).toBe(1);
+  });
+});
+
+describe('cast_spell — Misty Step (level 2, bonus action, utility)', () => {
+  it('produces a narrative and consumes a level-2 slot without touching enemy HP', async () => {
+    const state = makeClericState({
+      character_class: 'Mage',
+      spell_slots_max: { 2: 1 },
+      spell_slots_used: {},
+      spells_known: ['misty_step'],
+    });
+    const result = await takeAction({
+      action: { type: 'cast_spell', spellId: 'misty_step', slotLevel: 2 },
+      history: [], state, seed: spellSeed, context: dungeonCtx,
+    });
+    expect(result.narrative).toMatch(/misty step|silver mist/i);
+    expect(result.newState.characters[0].spell_slots_used[2]).toBe(1);
+    // Enemy HP should be unmodified (no damage from utility spell)
+    expect(result.newState.enemy_hp[CORRIDOR_ID]).toBeFalsy();
+  });
+});
+
+describe('spell slots — long rest resets used slots', () => {
+  it('spell_slots_used is reset to {} after long rest', async () => {
+    // Must be in a room with no living enemy to rest; use startRoomId
+    const state = { ...makeMageState({ spell_slots_used: { 1: 2, 2: 1 } }), current_room: dungeonCtx.startRoomId };
+    const result = await takeAction({
+      action: { type: 'long_rest' },
+      history: [], state, seed: spellSeed, context: dungeonCtx,
+    });
+    expect(result.newState.characters[0].spell_slots_used).toEqual({});
+  });
+});
+
+describe('generateChoices — spell choices', () => {
+  it('includes cast_spell choices for Mage cantrip and leveled spells when enemy present', () => {
+    const state = makeMageState();
+    const choices = generateChoices(state, spellSeed, dungeonCtx);
+    const spellChoices = choices.filter(c => c.action.type === 'cast_spell');
+    expect(spellChoices.length).toBeGreaterThan(0);
+  });
+
+  it('does not include offensive spell choices when no enemy present', () => {
+    const state = { ...makeMageState(), current_room: dungeonCtx.startRoomId };
+    const choices = generateChoices(state, spellSeed, dungeonCtx);
+    const offensiveSpells = choices.filter(c =>
+      c.action.type === 'cast_spell' &&
+      ['fire_bolt', 'magic_missile', 'thunderwave', 'fireball'].includes((c.action as { spellId: string }).spellId)
+    );
+    expect(offensiveSpells.length).toBe(0);
+  });
+
+  it('does not include spell choices when all slots for that level are used', () => {
+    const state = makeMageState({ spell_slots_used: { 1: 2 } });
+    const choices = generateChoices(state, spellSeed, dungeonCtx);
+    const missileChoice = choices.find(c =>
+      c.action.type === 'cast_spell' && (c.action as { spellId: string }).spellId === 'magic_missile'
+    );
+    expect(missileChoice).toBeUndefined();
+  });
+
+  it('includes Misty Step as a bonus-action choice', () => {
+    const state = makeMageState();
+    const choices = generateChoices(state, spellSeed, dungeonCtx);
+    const mistyStep = choices.find(c =>
+      c.action.type === 'cast_spell' && (c.action as { spellId: string }).spellId === 'misty_step'
+    );
+    expect(mistyStep).toBeDefined();
+    expect(mistyStep?.requiresBonusAction).toBe(true);
   });
 });

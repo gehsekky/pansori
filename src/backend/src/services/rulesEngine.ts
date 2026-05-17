@@ -246,6 +246,32 @@ export function rageUsesMax(level: number): number {
   return 2; // levels 1–5
 }
 
+// ─── Spell helpers ────────────────────────────────────────────────────────────
+
+// Spell attack bonus = proficiency + spellcasting ability modifier (PHB p.205)
+export function spellAttackBonus(level: number, castingAbilityScore: number): number {
+  return profBonus(level) + abilityMod(castingAbilityScore);
+}
+
+// Spell save DC = 8 + proficiency + spellcasting ability modifier (PHB p.205)
+export function spellSaveDC(level: number, castingAbilityScore: number): number {
+  return 8 + profBonus(level) + abilityMod(castingAbilityScore);
+}
+
+// Spell attack roll against an enemy. Crits (nat 20) double damage dice; nat 1 always misses.
+export function resolveSpellAttack(
+  level:               number,
+  castingAbilityScore: number,
+  enemyAc:             number,
+): { hit: boolean; critical: boolean; roll: number; bonus: number; total: number } {
+  const bonus = spellAttackBonus(level, castingAbilityScore);
+  const roll  = d(20);
+  if (roll === 1)  return { hit: false, critical: false, roll, bonus, total: roll + bonus };
+  if (roll === 20) return { hit: true,  critical: true,  roll, bonus, total: roll + bonus };
+  const total = roll + bonus;
+  return { hit: total >= enemyAc, critical: false, roll, bonus, total };
+}
+
 // ─── Death saves ──────────────────────────────────────────────────────────────
 
 // Per 5e PHB: d20, 10+ = success, 1-9 = failure, nat 20 = regain 1 HP, nat 1 = 2 failures.

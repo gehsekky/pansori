@@ -57,6 +57,110 @@ export const context: Context = {
     Ranger:  [],
   },
 
+  // ─── Spell system ──────────────────────────────────────────────────────────
+
+  spellcastingAbility: { Mage: 'int', Cleric: 'wis' },
+
+  classSpells: {
+    Warrior: [],
+    Rogue:   [],
+    Ranger:  [],
+    Mage:    ['fire_bolt', 'magic_missile', 'thunderwave', 'misty_step', 'fireball'],
+    Cleric:  ['sacred_flame', 'cure_wounds', 'guiding_bolt', 'hold_person', 'spirit_guardians'],
+  },
+
+  // Full-caster slot progression (levels 1–10). Non-casters get empty tables.
+  classSpellSlots: {
+    Warrior: Array(10).fill({}),
+    Rogue:   Array(10).fill({}),
+    Ranger:  Array(10).fill({}),
+    Mage: [
+      { 1: 2 },             // level 1
+      { 1: 3 },             // level 2
+      { 1: 4, 2: 2 },       // level 3
+      { 1: 4, 2: 3 },       // level 4
+      { 1: 4, 2: 3, 3: 2 }, // level 5
+      { 1: 4, 2: 3, 3: 3 }, // level 6
+      { 1: 4, 2: 3, 3: 3 }, // level 7
+      { 1: 4, 2: 3, 3: 3 }, // level 8
+      { 1: 4, 2: 3, 3: 3 }, // level 9
+      { 1: 4, 2: 3, 3: 3 }, // level 10
+    ],
+    Cleric: [
+      { 1: 2 },
+      { 1: 3 },
+      { 1: 4, 2: 2 },
+      { 1: 4, 2: 3 },
+      { 1: 4, 2: 3, 3: 2 },
+      { 1: 4, 2: 3, 3: 3 },
+      { 1: 4, 2: 3, 3: 3 },
+      { 1: 4, 2: 3, 3: 3 },
+      { 1: 4, 2: 3, 3: 3 },
+      { 1: 4, 2: 3, 3: 3 },
+    ],
+  },
+
+  spellTable: {
+    // ── Mage cantrip ────────────────────────────────────────────────────────
+    fire_bolt: {
+      id: 'fire_bolt', name: 'Fire Bolt', level: 0, castTime: 'action',
+      desc: 'Hurl a mote of fire at a creature. Make a spell attack. On a hit, the target takes 1d10 fire damage.',
+      attackRoll: true, damage: '1d10', damageType: 'fire',
+    },
+    // ── Mage level-1 spells ─────────────────────────────────────────────────
+    magic_missile: {
+      id: 'magic_missile', name: 'Magic Missile', level: 1, castTime: 'action',
+      desc: 'Create three glowing darts of magical force. Each dart unerringly hits a target for 1d4+1 force damage (3d4+3 total).',
+      damage: '3d4+3', damageType: 'force',
+    },
+    thunderwave: {
+      id: 'thunderwave', name: 'Thunderwave', level: 1, castTime: 'action',
+      desc: 'A wave of thunderous force sweeps out. Each creature in a 15-ft cube must succeed on a CON save or take 2d8 thunder damage.',
+      savingThrow: 'con', saveEffect: 'negates', damage: '2d8', damageType: 'thunder',
+    },
+    // ── Mage level-2 spells ─────────────────────────────────────────────────
+    misty_step: {
+      id: 'misty_step', name: 'Misty Step', level: 2, castTime: 'bonus_action',
+      desc: 'Briefly surrounded by silvery mist, you teleport up to 30 feet to an unoccupied space you can see.',
+      narrative: '{name} whispers a word and vanishes in a puff of silver mist — reappearing at a tactically superior position.',
+    },
+    // ── Mage level-3 spells ─────────────────────────────────────────────────
+    fireball: {
+      id: 'fireball', name: 'Fireball', level: 3, castTime: 'action',
+      desc: 'A bright streak flashes from your pointing finger and explodes with a roar. Each creature in a 20-ft radius must make a DEX save or take 8d6 fire damage (half on success).',
+      savingThrow: 'dex', saveEffect: 'half', damage: '8d6', damageType: 'fire',
+    },
+    // ── Cleric cantrip ──────────────────────────────────────────────────────
+    sacred_flame: {
+      id: 'sacred_flame', name: 'Sacred Flame', level: 0, castTime: 'action',
+      desc: 'Flame-like radiance descends on a creature within range. The target must succeed on a DEX save or take 1d8 radiant damage.',
+      savingThrow: 'dex', saveEffect: 'negates', damage: '1d8', damageType: 'radiant',
+    },
+    // ── Cleric level-1 spells ────────────────────────────────────────────────
+    cure_wounds: {
+      id: 'cure_wounds', name: 'Cure Wounds', level: 1, castTime: 'action',
+      desc: 'A creature you touch regains a number of hit points equal to 1d8 + your spellcasting ability modifier.',
+      heal: '1d8',
+    },
+    guiding_bolt: {
+      id: 'guiding_bolt', name: 'Guiding Bolt', level: 1, castTime: 'action',
+      desc: 'A flash of light streaks toward a creature. Make a spell attack. On a hit, the target takes 4d6 radiant damage.',
+      attackRoll: true, damage: '4d6', damageType: 'radiant',
+    },
+    // ── Cleric level-2 spells ────────────────────────────────────────────────
+    hold_person: {
+      id: 'hold_person', name: 'Hold Person', level: 2, castTime: 'action',
+      desc: 'Choose a humanoid. It must succeed on a WIS save or be paralyzed for the duration.',
+      savingThrow: 'wis', saveEffect: 'negates', condition: 'paralyzed', conditionDuration: 2,
+    },
+    // ── Cleric level-3 spells ────────────────────────────────────────────────
+    spirit_guardians: {
+      id: 'spirit_guardians', name: 'Spirit Guardians', level: 3, castTime: 'action',
+      desc: 'Spirits surround you. Each creature in a 15-ft radius must make a WIS save or take 3d8 radiant damage (half on success).',
+      savingThrow: 'wis', saveEffect: 'half', damage: '3d8', damageType: 'radiant',
+    },
+  },
+
   enemyTemplates: [
     // CR 1/4 — starter threats
     { name: 'Skeleton',     cr: 0.25, hp:  13, ac: 13, damage: '1d6+2',  toHit: 4, xp:    50, wis:  8 },

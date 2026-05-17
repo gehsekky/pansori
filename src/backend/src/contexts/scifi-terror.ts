@@ -57,6 +57,109 @@ export const context: Context = {
     Medic:     [],
   },
 
+  // ─── Spell system (sci-fi reskin) ──────────────────────────────────────────
+
+  spellcastingAbility: { Scientist: 'int', Medic: 'wis' },
+
+  classSpells: {
+    Soldier:   [],
+    Pilot:     [],
+    Engineer:  [],
+    Scientist: ['emp_surge', 'neural_disruptor', 'nanite_missile', 'phase_step', 'resonance_bomb'],
+    Medic:     ['bio_scan', 'stim_pack', 'targeting_laser', 'neural_hold', 'healing_aura'],
+  },
+
+  classSpellSlots: {
+    Soldier:   Array(10).fill({}),
+    Pilot:     Array(10).fill({}),
+    Engineer:  Array(10).fill({}),
+    Scientist: [
+      { 1: 2 },
+      { 1: 3 },
+      { 1: 4, 2: 2 },
+      { 1: 4, 2: 3 },
+      { 1: 4, 2: 3, 3: 2 },
+      { 1: 4, 2: 3, 3: 3 },
+      { 1: 4, 2: 3, 3: 3 },
+      { 1: 4, 2: 3, 3: 3 },
+      { 1: 4, 2: 3, 3: 3 },
+      { 1: 4, 2: 3, 3: 3 },
+    ],
+    Medic: [
+      { 1: 2 },
+      { 1: 3 },
+      { 1: 4, 2: 2 },
+      { 1: 4, 2: 3 },
+      { 1: 4, 2: 3, 3: 2 },
+      { 1: 4, 2: 3, 3: 3 },
+      { 1: 4, 2: 3, 3: 3 },
+      { 1: 4, 2: 3, 3: 3 },
+      { 1: 4, 2: 3, 3: 3 },
+      { 1: 4, 2: 3, 3: 3 },
+    ],
+  },
+
+  spellTable: {
+    // ── Scientist cantrip ────────────────────────────────────────────────────
+    emp_surge: {
+      id: 'emp_surge', name: 'EMP Surge', level: 0, castTime: 'action',
+      desc: 'You emit a targeted electromagnetic pulse. Make a spell attack. On a hit, the target takes 1d10 lightning damage.',
+      attackRoll: true, damage: '1d10', damageType: 'lightning',
+    },
+    // ── Scientist level-1 spells ─────────────────────────────────────────────
+    nanite_missile: {
+      id: 'nanite_missile', name: 'Nanite Missile', level: 1, castTime: 'action',
+      desc: 'You launch three self-guided nanite swarms that unerringly strike for 1d4+1 force damage each (3d4+3 total).',
+      damage: '3d4+3', damageType: 'force',
+    },
+    neural_disruptor: {
+      id: 'neural_disruptor', name: 'Neural Disruptor', level: 1, castTime: 'action',
+      desc: 'You fire a wave of neural interference. The target must succeed on a CON save or take 2d8 psychic damage.',
+      savingThrow: 'con', saveEffect: 'negates', damage: '2d8', damageType: 'psychic',
+    },
+    // ── Scientist level-2 spells ─────────────────────────────────────────────
+    phase_step: {
+      id: 'phase_step', name: 'Phase Step', level: 2, castTime: 'bonus_action',
+      desc: 'You briefly shift into a parallel phase, teleporting up to 30 feet to an unoccupied space you can see.',
+      narrative: '{name} activates a phase-shift module and blinks out of existence — reappearing at a tactical advantage.',
+    },
+    // ── Scientist level-3 spells ─────────────────────────────────────────────
+    resonance_bomb: {
+      id: 'resonance_bomb', name: 'Resonance Bomb', level: 3, castTime: 'action',
+      desc: 'You detonate a resonance device. Each creature in range must make a DEX save or take 8d6 sonic damage (half on success).',
+      savingThrow: 'dex', saveEffect: 'half', damage: '8d6', damageType: 'sonic',
+    },
+    // ── Medic cantrip ────────────────────────────────────────────────────────
+    bio_scan: {
+      id: 'bio_scan', name: 'Bio-Scan Pulse', level: 0, castTime: 'action',
+      desc: 'You emit a targeted bio-scan pulse that disrupts organic tissue. The target must succeed on a DEX save or take 1d8 radiant damage.',
+      savingThrow: 'dex', saveEffect: 'negates', damage: '1d8', damageType: 'radiant',
+    },
+    // ── Medic level-1 spells ─────────────────────────────────────────────────
+    stim_pack: {
+      id: 'stim_pack', name: 'Stim Pack', level: 1, castTime: 'action',
+      desc: 'You inject a fast-acting stimulant. A creature regains 1d8 HP plus your spellcasting ability modifier.',
+      heal: '1d8',
+    },
+    targeting_laser: {
+      id: 'targeting_laser', name: 'Targeting Laser', level: 1, castTime: 'action',
+      desc: 'You paint a target with a high-intensity laser. Make a spell attack. On a hit, the target takes 4d6 radiant damage.',
+      attackRoll: true, damage: '4d6', damageType: 'radiant',
+    },
+    // ── Medic level-2 spells ─────────────────────────────────────────────────
+    neural_hold: {
+      id: 'neural_hold', name: 'Neural Hold', level: 2, castTime: 'action',
+      desc: 'You broadcast a neural inhibitor frequency. A humanoid must succeed on a WIS save or be paralyzed.',
+      savingThrow: 'wis', saveEffect: 'negates', condition: 'paralyzed', conditionDuration: 2,
+    },
+    // ── Medic level-3 spells ─────────────────────────────────────────────────
+    healing_aura: {
+      id: 'healing_aura', name: 'Healing Aura', level: 3, castTime: 'action',
+      desc: 'You project a restorative energy field. Hostile creatures in range must make a WIS save or take 3d8 radiant damage.',
+      savingThrow: 'wis', saveEffect: 'half', damage: '3d8', damageType: 'radiant',
+    },
+  },
+
   enemyTemplates: [
     // CR 1/4 — starter threats (zombie / skeleton equivalent)
     { name: 'Infected Crewmate', cr: 0.25, hp:  22, ac:  8, damage: '1d6+1',  toHit: 3, xp:    50, wis:  6 },

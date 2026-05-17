@@ -7,6 +7,7 @@ import {
   ADVANTAGE_CONDITIONS, DISADV_CONDITIONS, PLAYER_ADV_CONDITIONS, ENEMY_DISADV_CONDITIONS,
   rollConditionSave, rollCritical, resolveSaveWithAdvantage, resolveMysteryConsumable, passivePerceptionDC,
   sneakAttackDice, extraAttackCount, rageDamageBonus, rageUsesMax,
+  spellSaveDC, resolveSpellAttack,
 } from './rulesEngine.js';
 import { Engine } from 'json-rules-engine';
 import type { GameState, Character, Seed, Context, Enemy, LootItem, InventoryItem, OnHitEffect, StructuredAction, GameChoice, DeathSaves, TurnActions, GameConsequence, RuleFacts, PlacedNpc, NpcAttitude, AbilityKey } from '../types.js';
@@ -316,6 +317,12 @@ function canRestInRoom(state: GameState, seed: Seed): boolean {
   return !(enemy && !state.enemies_killed.includes(state.current_room));
 }
 
+// ─── Spell helpers ────────────────────────────────────────────────────────────
+
+function getSpellSlotsForLevel(className: string, level: number, context: Context): Record<number, number> {
+  return context.classSpellSlots?.[className]?.[level - 1] ?? {};
+}
+
 // ─── Backward-compatibility normalizer ───────────────────────────────────────
 
 export function normalizeState(
@@ -339,6 +346,9 @@ export function normalizeState(
         class_resource_uses: c.class_resource_uses ?? {},
         asi_pending:         c.asi_pending         ?? false,
         exhaustion_level:    c.exhaustion_level    ?? 0,
+        spell_slots_max:     c.spell_slots_max     ?? {},
+        spell_slots_used:    c.spell_slots_used    ?? {},
+        spells_known:        c.spells_known        ?? [],
       })),
     };
   }
@@ -378,6 +388,9 @@ export function normalizeState(
     class_resource_uses: {},
     asi_pending:         false,
     exhaustion_level:    0,
+    spell_slots_max:     {},
+    spell_slots_used:    {},
+    spells_known:        [],
   };
   const oldRunLog = (raw.run_log as Array<{ action: string; narrative: string }>) ?? [];
   return {
@@ -557,6 +570,51 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
           label:              `Rage — bonus action (${rageUses} use${rageUses === 1 ? '' : 's'} left)`,
           action:             { type: 'use_class_feature', featureId: 'rage' },
           requiresBonusAction: true,
+        });
+      }
+    }
+  }
+
+  // Spell choices
+  if (context.spellTable && (char.spells_known ?? []).length > 0) {
+    const slots     = char.spell_slots_max  ?? {};
+    const slotsUsed = char.spell_slots_used ?? {};
+    for (const spellId of char.spells_known) {
+      if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+      const spell = context.spellTable[spellId];
+      if (!spell) continue;
+
+      const isBonusAction = spell.castTime === 'bonus_action';
+      const actionBlocked = !isBonusAction && char.turn_actions.action_used;
+      const bonusBlocked  = isBonusAction  && char.turn_actions.bonus_action_used;
+      if (actionBlocked || bonusBlocked) continue;
+
+      // Restrict offensive/condition spells to when an enemy is alive; heal spells when injured
+      const isOffensive = !!(spell.damage || spell.condition);
+      const isHeal      = !!spell.heal;
+      if (isOffensive && !enemyAlive) continue;
+      if (isHeal) {
+        const injured = state.characters.filter(c => !c.dead && c.hp < c.max_hp);
+        if (injured.length === 0) continue;
+      }
+
+      if (spell.level === 0) {
+        // Cantrip: no slot needed
+        const slotNote = isBonusAction ? ', bonus action' : '';
+        choices.push({
+          label:               `Cast ${spell.name} (cantrip${slotNote})`,
+          action:              { type: 'cast_spell', spellId, slotLevel: 0 },
+          requiresBonusAction: isBonusAction || undefined,
+        });
+      } else {
+        // Leveled spell: need a slot at or above spell level
+        const available = (slots[spell.level] ?? 0) - (slotsUsed[spell.level] ?? 0);
+        if (available <= 0) continue;
+        const slotNote = isBonusAction ? ', bonus action' : '';
+        choices.push({
+          label:               `Cast ${spell.name} (Lvl ${spell.level}${slotNote} — ${available} slot${available === 1 ? '' : 's'} left)`,
+          action:              { type: 'cast_spell', spellId, slotLevel: spell.level },
+          requiresBonusAction: isBonusAction || undefined,
         });
       }
     }
@@ -772,6 +830,9 @@ export async function takeAction({ action, history = [], state, seed, context }:
     class_resource_uses: char.class_resource_uses ?? {},
     asi_pending:         char.asi_pending         ?? false,
     exhaustion_level:    char.exhaustion_level    ?? 0,
+    spell_slots_max:     char.spell_slots_max     ?? {},
+    spell_slots_used:    char.spell_slots_used    ?? {},
+    spells_known:        char.spells_known        ?? [],
   };
 
   const worldName  = getWorldName(seed);
@@ -1044,6 +1105,7 @@ export async function takeAction({ action, history = [], state, seed, context }:
             char.level  += 1;
             char.max_hp += 4;
             char.hp      = Math.min(char.hp + 4, char.max_hp);
+            char.spell_slots_max = getSpellSlotsForLevel(char.character_class, char.level, context);
             narrative += ' ' + context.narratives.levelUp;
             if ([4, 8, 12, 16, 19].includes(char.level)) {
               char.asi_pending = true;
@@ -1260,7 +1322,7 @@ export async function takeAction({ action, history = [], state, seed, context }:
         if (charFeatures.includes('rage')) restoredUses.rage_uses = rageUsesMax(c.level);
         // Long rest reduces exhaustion by 1 level (PHB p.291); full rest clears all other conditions
         const newExhaustion = Math.max(0, (c.exhaustion_level ?? 0) - 1);
-        return { ...c, hp: c.max_hp, hit_dice_remaining: newHd, conditions: [], condition_durations: {}, class_resource_uses: restoredUses, exhaustion_level: newExhaustion };
+        return { ...c, hp: c.max_hp, hit_dice_remaining: newHd, conditions: [], condition_durations: {}, class_resource_uses: restoredUses, exhaustion_level: newExhaustion, spell_slots_used: {} };
       });
       st   = { ...st, characters: restedChars, long_rested: true };
       char = { ...restedChars[safeIdx] };
@@ -1410,6 +1472,160 @@ export async function takeAction({ action, history = [], state, seed, context }:
         char.hp     = Math.min(char.max_hp, char.hp + bonus * char.level);
         if (bonus > 0) narrative += ` Max HP increased by ${bonus * char.level} (${bonus}/level × ${char.level} levels).`;
       }
+      break;
+    }
+
+    case 'cast_spell': {
+      const { spellId, slotLevel } = action;
+      const spell = context.spellTable?.[spellId];
+      if (!spell) { narrative = `Unknown spell: ${spellId}.`; break; }
+
+      // Expend a slot for non-cantrips
+      if (spell.level > 0) {
+        if (slotLevel < spell.level) {
+          narrative = `${spell.name} requires at least a level-${spell.level} slot.`;
+          break;
+        }
+        const slotsMax  = (char.spell_slots_max  ?? {})[slotLevel] ?? 0;
+        const slotsUsed = (char.spell_slots_used ?? {})[slotLevel] ?? 0;
+        if (slotsUsed >= slotsMax) {
+          narrative = `No level-${slotLevel} spell slots remaining (recovered on long rest).`;
+          break;
+        }
+        char.spell_slots_used = { ...(char.spell_slots_used ?? {}), [slotLevel]: slotsUsed + 1 };
+      }
+
+      // Mark action economy
+      if (spell.castTime === 'bonus_action') {
+        char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
+      } else {
+        char.turn_actions = { ...char.turn_actions, action_used: true };
+      }
+
+      const castingAbility      = (context.spellcastingAbility?.[char.character_class] ?? context.classPrimaryStats[char.character_class] ?? 'int') as AbilityKey;
+      const castingScore        = char[castingAbility] ?? 10;
+      const slotNote            = spell.level > 0 ? ` (level-${slotLevel} slot)` : ' (cantrip)';
+
+      // ── Heal spells ────────────────────────────────────────────────────────
+      if (spell.heal) {
+        const healMod     = Math.max(0, Math.floor((castingScore - 10) / 2));
+        const healed      = rollDice(spell.heal) + healMod;
+        // Target the most injured party member (excluding the caster, unless only one)
+        const injured     = st.characters.filter(c => !c.dead && c.hp < c.max_hp && c.id !== char.id);
+        const target      = injured.length > 0 ? injured.reduce((a, b) => (a.hp < b.hp ? a : b)) : char;
+        const isSelf      = target.id === char.id;
+        if (isSelf) {
+          char.hp = Math.min(char.max_hp, char.hp + healed);
+          narrative = `${char.name} casts ${spell.name}${slotNote} — restores ${healed} HP to self (now ${char.hp}/${char.max_hp}).`;
+        } else {
+          const newHp = Math.min(target.max_hp, target.hp + healed);
+          st = { ...st, characters: st.characters.map(c => c.id === target.id ? { ...c, hp: newHp } : c) };
+          narrative = `${char.name} casts ${spell.name}${slotNote} — restores ${healed} HP to ${target.name} (now ${newHp}/${target.max_hp}).`;
+        }
+        break;
+      }
+
+      // ── Utility spells (no damage, no save, no heal) ───────────────────────
+      if (!spell.damage && !spell.savingThrow && !spell.attackRoll && !spell.condition) {
+        narrative = spell.narrative
+          ? spell.narrative.replace('{name}', char.name)
+          : `${char.name} casts ${spell.name}${slotNote}.`;
+        break;
+      }
+
+      // ── Offensive spells — need a living enemy ─────────────────────────────
+      if (!enemy || !enemyAlive) { narrative = pick(context.narratives.noEnemy); break; }
+
+      const dc       = spellSaveDC(char.level, castingScore);
+      let   spellDmg = 0;
+      let   spellHit = true;
+
+      if (spell.attackRoll) {
+        // ── Spell attack roll ──────────────────────────────────────────────
+        const atk  = resolveSpellAttack(char.level, castingScore, enemy.ac);
+        spellHit   = atk.hit;
+        const atkNote = ` (spell attack ${atk.roll}+${atk.bonus}=${atk.total} vs AC ${enemy.ac})`;
+        if (!spellHit) {
+          narrative = `${char.name} casts ${spell.name}${slotNote} — MISS!${atkNote}`;
+          break;
+        }
+        spellDmg  = atk.critical ? rollCritical(spell.damage ?? null) : rollDice(spell.damage ?? '1d4');
+        narrative = `${char.name} casts ${spell.name}${slotNote}!${atkNote} `;
+        if (atk.critical) narrative += 'Critical spell hit! ';
+        narrative += `${spellDmg} ${spell.damageType ?? ''} damage!`;
+      } else if (spell.savingThrow) {
+        // ── Saving throw spell ─────────────────────────────────────────────
+        const saveAbility    = spell.savingThrow;
+        const enemyScore     = (enemy as Record<string, number>)[saveAbility] ?? 10;
+        const saveFailed     = rollConditionSave(saveAbility, enemyScore, dc);
+        const saveLabel      = saveAbility.toUpperCase();
+
+        if (spell.damage) {
+          const fullDmg = rollDice(spell.damage);
+          spellDmg = saveFailed ? fullDmg
+            : spell.saveEffect === 'half' ? Math.floor(fullDmg / 2) : 0;
+          const saveVerb = saveFailed ? 'fails' : 'succeeds';
+          narrative = `${char.name} casts ${spell.name}${slotNote}! (DC ${dc} ${saveLabel} save — ${enemy.name} ${saveVerb}.) `;
+          narrative += spellDmg > 0 ? `${spellDmg} ${spell.damageType ?? ''} damage!` : 'No damage.';
+          if (!saveFailed && spell.saveEffect === 'half') narrative += ' (half damage)';
+        } else {
+          narrative = `${char.name} casts ${spell.name}${slotNote}! (DC ${dc} ${saveLabel} save — `;
+          narrative += saveFailed ? `${enemy.name} fails.)` : `${enemy.name} succeeds.)`;
+        }
+
+        if (spell.condition && saveFailed) {
+          const dur = spell.conditionDuration ?? CONDITION_DURATION[spell.condition] ?? 1;
+          const newEnemyHp = getEnemyHp(st, roomId, seed) - spellDmg;
+          st.enemy_hp = { ...st.enemy_hp, [roomId]: Math.max(0, newEnemyHp) };
+          narrative += ` The ${enemy.name} is ${spell.condition}!`;
+          // Conditions on enemies are tracked via flags (no character object for enemies)
+          st = { ...st, flags: { ...st.flags, [`enemy_condition_${roomId}`]: spell.condition, [`enemy_condition_${roomId}_dur`]: dur } };
+          if (newEnemyHp <= 0) {
+            const xpGain = enemy.xp ?? 10;
+            char.xp = (char.xp || 0) + xpGain;
+            st.enemies_killed = [...st.enemies_killed, roomId];
+            st.enemy_hp = { ...st.enemy_hp, [roomId]: 0 };
+            st = endCombatState(st);
+            narrative += ' ' + pick(context.narratives.killShot).replace('{enemy}', enemy.name).replace('{xp}', String(xpGain));
+          }
+          usedInitiative = true;
+          break;
+        }
+      } else if (spell.damage && !spell.savingThrow && !spell.attackRoll) {
+        // ── Auto-hit (Magic Missile style) ─────────────────────────────────
+        spellDmg  = rollDice(spell.damage);
+        narrative = `${char.name} casts ${spell.name}${slotNote}! Auto-hit — ${spellDmg} ${spell.damageType ?? ''} damage!`;
+      }
+
+      // Apply damage to enemy
+      if (spellDmg > 0 || spellHit) {
+        const currentHp = getEnemyHp(st, roomId, seed);
+        const newHp     = currentHp - spellDmg;
+        if (newHp <= 0) {
+          const xpGain = enemy.xp ?? 10;
+          char.xp           = (char.xp || 0) + xpGain;
+          st.enemies_killed = [...st.enemies_killed, roomId];
+          st.enemy_hp       = { ...st.enemy_hp, [roomId]: 0 };
+          st = endCombatState(st);
+          narrative += ' ' + pick(context.narratives.killShot).replace('{enemy}', enemy.name).replace('{xp}', String(xpGain));
+          if (char.xp >= char.level * 100) {
+            char.level  += 1;
+            char.max_hp += 4;
+            char.hp      = Math.min(char.hp + 4, char.max_hp);
+            char.spell_slots_max = getSpellSlotsForLevel(char.character_class, char.level, context);
+            narrative += ' ' + context.narratives.levelUp;
+            if ([4, 8, 12, 16, 19].includes(char.level)) {
+              char.asi_pending = true;
+              narrative += ` Level ${char.level}: choose an Ability Score Improvement!`;
+            }
+          }
+        } else {
+          st.enemy_hp = { ...st.enemy_hp, [roomId]: newHp };
+          narrative += ` The ${enemy.name} has ${newHp} HP remaining.`;
+        }
+      }
+
+      usedInitiative = true;
       break;
     }
 

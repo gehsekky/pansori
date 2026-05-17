@@ -126,6 +126,25 @@ export interface PlacedNpc extends NpcTemplate {
   roomId: string;
 }
 
+// ─── Spell system ─────────────────────────────────────────────────────────────
+
+export interface Spell {
+  id:                  string;
+  name:                string;
+  desc:                string;
+  level:               number;          // 0 = cantrip
+  castTime:            'action' | 'bonus_action';
+  damage?:             string;          // dice expr, e.g. '8d6'
+  damageType?:         string;
+  savingThrow?:        AbilityKey;
+  saveEffect?:         'half' | 'negates';
+  attackRoll?:         boolean;         // true = uses spell attack roll vs enemy AC
+  heal?:               string;          // dice expr for healing
+  condition?:          ConditionName;
+  conditionDuration?:  number;          // rounds; undefined = permanent until cleared
+  narrative?:          string;          // override text for utility spells
+}
+
 // ─── Structured actions ───────────────────────────────────────────────────────
 
 export type AbilityKey = 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha';
@@ -148,7 +167,8 @@ export type StructuredAction =
   | { type: 'buy';               itemId: string; price: number }
   | { type: 'attack_npc' }
   | { type: 'use_class_feature'; featureId: string }
-  | { type: 'apply_asi';         stat: AbilityKey };
+  | { type: 'apply_asi';         stat: AbilityKey }
+  | { type: 'cast_spell';        spellId: string; slotLevel: number };
 
 export interface GameChoice {
   label:              string;
@@ -201,6 +221,10 @@ export interface Character {
   asi_pending:         boolean;
   // 0 = none; 1–6 = exhaustion level per 5e PHB (cumulative penalties)
   exhaustion_level:    number;
+  // Spell system — slots keyed by spell level (1 = 1st-level, etc.)
+  spell_slots_max:     Record<number, number>;
+  spell_slots_used:    Record<number, number>;
+  spells_known:        string[];   // spell IDs from context.spellTable
 }
 
 // ─── Game state (world/party container) ──────────────────────────────────────
@@ -313,6 +337,12 @@ export interface Context {
   classSavingThrows?: Record<string, Array<'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha'>>;
   // Class features that activate during play (sneak_attack, extra_attack, rage, …)
   classFeatures?:     Record<string, string[]>;
+  // Spell system — optional; only present for contexts with spellcasting classes
+  spellTable?:          Record<string, Spell>;
+  classSpells?:         Record<string, string[]>;        // class → spell IDs
+  // classSpellSlots[class][level-1] → Record<spellLevel, maxSlots>
+  classSpellSlots?:     Record<string, Array<Record<number, number>>>;
+  spellcastingAbility?: Record<string, AbilityKey>;      // class → casting ability
   enemyTemplates:   EnemyTemplate[];
   introTexts:       string[];
   roomPool:         RoomPoolEntry[];
