@@ -17,11 +17,13 @@
 ## Party System
 - [x] Initiative-based turn order — `buildInitiativeOrder` rolls d20+DEX for all participants; post-action loop auto-resolves consecutive enemy turns; `InitiativeStrip` UI shows turn sequence; conditions tick at turn start. Reactions deferred to class features milestone.
 - [x] Party UI improvements — initiative strip, active-turn glow on character tab, condition badges, greyed-out "waiting" state, multi-target heal choices per injured party member. Reactions deferred to class features milestone.
+- [ ] Enemy HP scaling by party size — multiply enemy HP by `0.5 + (partySize * 0.5)` at seed generation time (1× solo, 1.5× two-person, 2× three, 2.5× four); baked into Seed so difficulty is fixed for the run; pass `partySize` into `generateSeed`.
+- [ ] Starting loot distribution — currently all campaign starting items are duplicated to every party member; should distribute items across characters instead (e.g. round-robin or defined per-character in context).
 
 ## Rules Engine (D&D 5e gaps)
 - [ ] Spell system — spell slots (levels 1–9, recovery on long rest), spell attack rolls (8 + prof + spellcasting ability), spell save DCs, cantrips, concentration (CON save on damage to maintain)
-- [ ] Short rest / long rest — short rest: available anywhere with no active enemy in current room, spend one hit die (roll + CON mod) to recover HP, max once per room visit; long rest: designated safe room only, fully restores HP but may alert/respawn enemies to increase run difficulty. Long rest recovers half max hit dice (rounded down) and all spell slots. Only one long rest per 24 hours benefits you.
-- [ ] Hit dice — per-class die (d6 Wizard, d8 Cleric/Rogue, d10 Fighter/Ranger, d12 Barbarian), tracked per level, spent on short rest; add `hit_dice_remaining` to Character; recovered on long rest (half max, rounded down)
+- [x] Short rest / long rest — short rest spends a hit die (d{class-die} + CON mod) once per room; long rest restores full HP + clears conditions + recovers half-level hit dice, once per session; both blocked while enemy is alive; room canRest flag lets campaign authors disable resting in specific rooms.
+- [x] Hit dice — per-class die size in Context.classHitDie; hit_die and hit_dice_remaining on Character; displayed in stats bar; recovered on long rest (max(1, floor(level/2))).
 - [ ] Saving throw proficiencies — each class has 2 save proficiencies (e.g. Fighter: STR+CON, Rogue: DEX+INT). Currently all saves are flat ability checks. Add to classSavingThrows in Context and apply proficiency bonus.
 - [ ] Ability Score Improvements — at levels 4, 8, 12, 16, 19: +2 to one stat or +1 to two. Currently leveling only adds max HP.
 - [ ] Multiple attacks — Extra Attack at level 5 for Fighter/Barbarian/Paladin/Ranger; level 11 for Fighter (3 attacks), level 20 (4). Significant combat shift.
