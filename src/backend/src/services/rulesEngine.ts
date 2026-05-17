@@ -17,7 +17,8 @@ export function rollDice(expr: string | number | null | undefined): number {
   return total;
 }
 
-function rollCritical(expr: string | null | undefined): number {
+// Exported so bonus dice (sneak attack, divine smite) can also be doubled on crits
+export function rollCritical(expr: string | null | undefined): number {
   // Critical hit: damage dice rolled twice, modifier added once
   if (!expr) return d(4) + d(4);
   const m = String(expr).match(/(\d+)d(\d+)(?:\+(\d+))?/);
@@ -158,13 +159,17 @@ export const ADVANTAGE_CONDITIONS = new Set(['paralyzed', 'stunned', 'prone']);
 // Which conditions impose disadvantage on the player's attacks
 export const DISADV_CONDITIONS    = new Set(['poisoned', 'prone', 'frightened']);
 
-// On-hit saving throw: returns true if the save FAILS (condition is applied)
+// On-hit saving throw: returns true if the save FAILS (condition is applied).
+// Pass proficient=true when the character has saving throw proficiency in this ability.
 export function rollConditionSave(
-  ability: 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha',
-  score:   number,
-  dc:      number,
+  ability:    'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha',
+  score:      number,
+  dc:         number,
+  proficient = false,
+  level      = 1,
 ): boolean {
-  return d(20) + abilityMod(score) < dc;
+  const prof = proficient ? profBonus(level) : 0;
+  return d(20) + abilityMod(score) + prof < dc;
 }
 
 // ─── Consumable effects ───────────────────────────────────────────────────────
@@ -196,6 +201,39 @@ export function skillCheck(abilityScore: number, dc: number, proficient = false,
   const roll  = d(20);
   const total = roll + abilityMod(abilityScore) + (proficient ? profBonus(level) : 0);
   return { roll, total, success: total >= dc };
+}
+
+// ─── Death saves ──────────────────────────────────────────────────────────────
+
+// ─── Class features ───────────────────────────────────────────────────────────
+
+// Sneak Attack dice expression (Rogue PHB p.96): ⌈level/2⌉ d6
+export function sneakAttackDice(level: number): string {
+  return `${Math.ceil(level / 2)}d6`;
+}
+
+// Extra Attack (Fighter/Warrior PHB p.72): additional attacks per Attack action
+// Returns number of EXTRA attacks (0 = 1 total, 1 = 2 total, 2 = 3 total)
+export function extraAttackCount(level: number): number {
+  if (level >= 11) return 2; // 3 attacks total (Fighter level 11)
+  if (level >= 5)  return 1; // 2 attacks total (Fighter level 5)
+  return 0;
+}
+
+// Barbarian Rage damage bonus (PHB p.48) — applies to STR-based melee attacks
+export function rageDamageBonus(level: number): number {
+  if (level >= 16) return 4;
+  if (level >= 9)  return 3;
+  return 2;
+}
+
+// Rage uses per long rest (PHB p.48)
+export function rageUsesMax(level: number): number {
+  if (level >= 17) return 6;
+  if (level >= 13) return 5;
+  if (level >= 10) return 4;
+  if (level >= 6)  return 3;
+  return 2; // levels 1–5
 }
 
 // ─── Death saves ──────────────────────────────────────────────────────────────

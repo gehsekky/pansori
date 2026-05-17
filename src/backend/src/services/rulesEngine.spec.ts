@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
-  d, rollDice, abilityMod, profBonus,
+  d, rollDice, rollCritical, abilityMod, profBonus,
   FRESH_TURN,
   resolvePlayerAttack, resolveEnemyAttack, unarmedDamage,
   canEquipWeapon, canDonShield, canDonArmor, computeAcAfterArmorChange,
-  skillCheck, rollDeathSave,
+  skillCheck, rollDeathSave, rollConditionSave,
+  sneakAttackDice, extraAttackCount, rageDamageBonus, rageUsesMax,
 } from './rulesEngine.js';
 import type { LootItem } from '../types.js';
 
@@ -377,6 +378,101 @@ describe('rollDeathSave', () => {
     mockRandom(0.2); // d20 → 5
     const result = rollDeathSave({ successes: 0, failures: 2 });
     expect(result.result).toBe('dead');
+  });
+});
+
+// ─── rollCritical ─────────────────────────────────────────────────────────────
+
+describe('rollCritical(expr)', () => {
+  it('rolls twice as many dice as the base expression (2d8 instead of 1d8)', () => {
+    mockRandom(0.999, 0.999); // two d8 rolls → 8, 8; total = 16
+    expect(rollCritical('1d8')).toBe(16);
+  });
+
+  it('preserves the flat modifier once (not doubled): 1d6+3 crit = 2d6+3', () => {
+    mockRandom(0, 0); // two d6 → 1, 1; +3 = 5
+    expect(rollCritical('1d6+3')).toBe(5);
+  });
+
+  it('falls back to 2d4 when expr is null', () => {
+    mockRandom(0.999, 0.999); // two d4 → 4, 4 = 8
+    expect(rollCritical(null)).toBe(8);
+  });
+});
+
+// ─── rollConditionSave ────────────────────────────────────────────────────────
+
+describe('rollConditionSave', () => {
+  // Returns true if save FAILS (condition is applied)
+
+  it('fails (returns true) when roll + mod < DC', () => {
+    mockRandom(0); // d20 → 1; 1 + 0 = 1 < 15
+    expect(rollConditionSave('str', 10, 15)).toBe(true);
+  });
+
+  it('succeeds (returns false) when roll + mod >= DC', () => {
+    mockRandom(0.999); // d20 → 20; 20 + 0 = 20 >= 15
+    expect(rollConditionSave('str', 10, 15)).toBe(false);
+  });
+
+  it('proficiency bonus added when proficient (level 1 → +2): roll=5, mod=0, prof=2 → total=7 vs DC 7 → succeed', () => {
+    mockRandom(0.2); // d20 → 5
+    expect(rollConditionSave('str', 10, 7, true, 1)).toBe(false); // 5 + 0 + 2 = 7 >= 7 → passes → returns false
+  });
+
+  it('without proficiency, same roll fails DC 7 (5 + 0 = 5 < 7)', () => {
+    mockRandom(0.2); // d20 → 5
+    expect(rollConditionSave('str', 10, 7, false, 1)).toBe(true); // 5 + 0 = 5 < 7 → fails → returns true
+  });
+});
+
+// ─── Class feature helpers ────────────────────────────────────────────────────
+
+describe('sneakAttackDice(level)', () => {
+  it.each([
+    [1, '1d6'],
+    [2, '1d6'],
+    [3, '2d6'],
+    [5, '3d6'],
+    [10, '5d6'],
+    [20, '10d6'],
+  ])('level %i → %s', (level, expr) => {
+    expect(sneakAttackDice(level)).toBe(expr);
+  });
+});
+
+describe('extraAttackCount(level)', () => {
+  it.each([
+    [1,  0],
+    [4,  0],
+    [5,  1],
+    [10, 1],
+    [11, 2],
+    [20, 2],
+  ])('level %i → %i extra attacks', (level, count) => {
+    expect(extraAttackCount(level)).toBe(count);
+  });
+});
+
+describe('rageDamageBonus(level)', () => {
+  it.each([
+    [1, 2], [8,  2],
+    [9, 3], [15, 3],
+    [16, 4], [20, 4],
+  ])('level %i → +%i rage damage', (level, bonus) => {
+    expect(rageDamageBonus(level)).toBe(bonus);
+  });
+});
+
+describe('rageUsesMax(level)', () => {
+  it.each([
+    [1,  2], [5,  2],
+    [6,  3], [9,  3],
+    [10, 4], [12, 4],
+    [13, 5], [16, 5],
+    [17, 6], [20, 6],
+  ])('level %i → %i rage uses per long rest', (level, uses) => {
+    expect(rageUsesMax(level)).toBe(uses);
   });
 });
 

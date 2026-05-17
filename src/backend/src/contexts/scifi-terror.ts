@@ -39,6 +39,24 @@ export const context: Context = {
     Medic:     ['medicine', 'survival'],
   },
 
+  // PHB saving throw proficiencies: 2 per class
+  classSavingThrows: {
+    Soldier:   ['str', 'con'],
+    Scientist: ['int', 'wis'],
+    Pilot:     ['dex', 'int'],
+    Engineer:  ['con', 'str'],
+    Medic:     ['wis', 'cha'],
+  },
+
+  // Active class features that fire during combat
+  classFeatures: {
+    Soldier:   ['extra_attack'],   // Fighter analog
+    Scientist: [],
+    Pilot:     ['sneak_attack'],   // Rogue analog — precise, opportunistic
+    Engineer:  [],
+    Medic:     [],
+  },
+
   enemyTemplates: [
     // CR 1/4 — starter threats (zombie / skeleton equivalent)
     { name: 'Infected Crewmate', cr: 0.25, hp:  22, ac:  8, damage: '1d6+1',  toHit: 3, xp:    50, wis:  6 },
