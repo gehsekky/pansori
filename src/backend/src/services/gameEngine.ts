@@ -1,11 +1,13 @@
+import { randomUUID } from 'crypto';
 import {
   d, rollDice, abilityMod,
   FRESH_TURN, startCombat, endCombat,
   resolvePlayerAttack, resolveEnemyAttack, unarmedDamage,
-  canEquipWeapon, canDonArmor, canDonShield, computeAcAfterArmorChange,
-  skillCheck, rollDeathSave,
+  skillCheck, rollDeathSave, profBonus,
+  ADVANTAGE_CONDITIONS, DISADV_CONDITIONS,
+  rollConditionSave, resolveSaveWithAdvantage, resolveMysteryConsumable, passivePerceptionDC,
 } from './rulesEngine.js';
-import type { GameState, Seed, Context, Enemy, LootItem, InventoryItem } from '../types.js';
+import type { GameState, Seed, Context, Enemy, LootItem, InventoryItem, OnHitEffect, StructuredAction, GameChoice } from '../types.js';
 
 function pick<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)]; }
 
@@ -60,36 +62,56 @@ function getEnemyHp(state: GameState, roomId: string, seed: Seed): number {
   return seed.enemies?.[roomId]?.hp ?? 0;
 }
 
+// ─── Condition helpers ────────────────────────────────────────────────────────
+
+function conditionSavingThrow(
+  effect: OnHitEffect,
+  player: Pick<GameState, 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha' | 'level'>,
+): boolean {
+  return rollConditionSave(effect.ability, player[effect.ability] ?? 10, effect.dc);
+}
+
 // ─── Enemy attack helper ──────────────────────────────────────────────────────
-// Resolves an enemy attack against the player. Returns { narrative, hpLost }.
-// Does NOT mutate state — caller applies hpLost.
+// Resolves an enemy attack against the player. Returns { narrative, hpLost, newConditions }.
+// Does NOT mutate state — caller applies hpLost and updates conditions.
 function applyEnemyAttackNarrative(
   enemy: Enemy,
-  playerAC: number,
-  inventory: InventoryItem[] | undefined,
-  equippedArmorId: string | null,
+  player: Pick<GameState, 'ac' | 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha' | 'level' | 'inventory' | 'equipped_armor' | 'conditions'>,
   context: Context,
-): { hpLost: number; narrative: string } {
-  const result    = resolveEnemyAttack(enemy, playerAC);
-  const armorItem = equippedArmorId ? inventory?.find(i => i.id === equippedArmorId) : null;
+): { hpLost: number; narrative: string; newConditions: string[] } {
+  const hasAdvantage = player.conditions.some(c => ADVANTAGE_CONDITIONS.has(c));
+  const result       = resolveEnemyAttack(enemy, player.ac, hasAdvantage);
+  const armorItem    = player.equipped_armor ? player.inventory?.find(i => i.id === player.equipped_armor) : null;
 
   if (result.hit) {
-    return {
-      hpLost:    result.damage,
-      narrative: pick(context.narratives.enemyAttacks)
-        .replace('{enemy}', enemy.name)
-        .replace('{dmg}',   String(result.damage)),
-    };
+    let narrative = pick(context.narratives.enemyAttacks)
+      .replace('{enemy}', enemy.name)
+      .replace('{dmg}',   String(result.damage));
+    let newConditions = [...player.conditions];
+
+    if (enemy.onHitEffect) {
+      const conditionApplied = conditionSavingThrow(enemy.onHitEffect, player);
+      if (conditionApplied && !newConditions.includes(enemy.onHitEffect.condition)) {
+        newConditions.push(enemy.onHitEffect.condition);
+        narrative += ` You are ${enemy.onHitEffect.condition}!`;
+      }
+    }
+    return { hpLost: result.damage, narrative, newConditions };
   }
   if (armorItem) {
     return {
-      hpLost:    0,
-      narrative: pick(context.narratives.enemyDeflected)
+      hpLost:        0,
+      narrative:     pick(context.narratives.enemyDeflected)
         .replace('{enemy}', enemy.name)
         .replace('{armor}', armorItem.name),
+      newConditions: [...player.conditions],
     };
   }
-  return { hpLost: 0, narrative: `The ${enemy.name} lunges — but you dodge at the last second!` };
+  return {
+    hpLost:        0,
+    narrative:     `The ${enemy.name} lunges — but you dodge at the last second!`,
+    newConditions: [...player.conditions],
+  };
 }
 
 // ─── Death save handler ───────────────────────────────────────────────────────
@@ -109,6 +131,7 @@ function processDeathSave(
       newState.hp          = 1;
       newState.death_saves = { successes: 0, failures: 0 };
       newState.stable      = false;
+      newState.conditions  = [];
       Object.assign(newState, endCombat());
       narrative = `Death Save — Natural 20! You surge back to 1 HP, gasping but alive.`;
       return { narrative, newState, died: false };
@@ -168,9 +191,16 @@ function processDeathSave(
 }
 
 // ─── Arrival narrative ────────────────────────────────────────────────────────
-function buildArrivalNarrative(targetId: string, newState: GameState, seed: Seed, context: Context): string {
+export function buildArrivalNarrative(targetId: string, newState: GameState, seed: Seed, context: Context): string {
   const templates  = context.narratives.roomArrival[targetId] || context.narratives.genericArrival;
   let text         = pick(templates).replace(/{world}/g, getWorldName(seed));
+
+  const exitNames = (seed.connections[targetId] ?? [])
+    .map(id => seed.rooms.find(r => r.id === id)?.name)
+    .filter((n): n is string => Boolean(n))
+    .join(', ');
+  if (exitNames) text += ` Exits: ${exitNames}.`;
+
   const newEnemy   = seed.enemies?.[targetId];
   const newEnemyHp = getEnemyHp(newState, targetId, seed);
   if (newEnemy && !newState.enemies_killed.includes(targetId) && newEnemyHp > 0) {
@@ -186,11 +216,14 @@ function buildArrivalNarrative(targetId: string, newState: GameState, seed: Seed
 }
 
 // ─── Choice generation ────────────────────────────────────────────────────────
-export function generateChoices(state: GameState, seed: Seed, context: Context): string[] {
+export function generateChoices(state: GameState, seed: Seed, context: Context): GameChoice[] {
   if (state.dead) return [];
-  if (state.hp <= 0 && !state.stable) return ['Roll death saving throw'];
-  if (state.hp <= 0 && state.stable)  return ['Use healing item'];
-  const choices: string[] = [];
+  const healItems = context.lootTable.filter(i => i.heal);
+  const healItem  = state.inventory?.find(i => healItems.find(h => h.id === i.id));
+  if (state.hp <= 0 && !state.stable) return [{ label: 'Roll death saving throw', action: { type: 'death_save' } }];
+  if (state.hp <= 0 && state.stable)  return [{ label: 'Use healing item', action: { type: 'use', itemId: healItem?.id ?? '' } }];
+
+  const choices: GameChoice[] = [];
   const roomId     = state.current_room;
   const enemy      = seed.enemies?.[roomId];
   const loot       = seed.loot?.[roomId];
@@ -200,89 +233,32 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     .map(id => seed.rooms.find(r => r.id === id))
     .filter((r): r is NonNullable<typeof r> => r != null);
 
-  choices.push('Examine surroundings');
-
   if (state.current_room === context.escapeRoomId && !enemyAlive) {
-    choices.push(context.escapeChoiceText);
+    choices.push({ label: context.escapeChoiceText, action: { type: 'escape' } });
   }
   if (enemyAlive) {
-    choices.push(`Attack the ${enemy.name}`);
     const sneakDest = adjacent[0];
-    choices.push(`Try to sneak past the ${enemy.name}${sneakDest ? ` → ${sneakDest.name}` : ''}`);
+    choices.push({ label: `Attack the ${enemy.name}`, action: { type: 'attack' } });
+    choices.push({ label: `Try to sneak past the ${enemy.name}${sneakDest ? ` → ${sneakDest.name}` : ''}`, action: { type: 'sneak' } });
   }
   if (lootAvail) {
-    choices.push(`Pick up the ${loot.name}`);
+    choices.push({ label: `Pick up the ${loot.name}`, action: { type: 'loot' } });
   }
-  if (state.hp < state.max_hp) {
-    const healItems = context.lootTable.filter(i => i.heal);
-    const healItem  = state.inventory?.find(i => healItems.find(h => h.id === i.id));
-    if (healItem && (!MAX_CHOICES || choices.length < MAX_CHOICES)) {
-      choices.push(`Use ${healItem.name}`);
-    }
+  if (state.hp < state.max_hp && healItem && (!MAX_CHOICES || choices.length < MAX_CHOICES)) {
+    choices.push({ label: `Use ${healItem.name}`, action: { type: 'use', itemId: healItem.id } });
   }
   for (const adj of adjacent) {
     if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
-    choices.push(enemyAlive ? `Dash past the ${enemy.name} → ${adj.name}` : `Move to ${adj.name}`);
+    const label = enemyAlive ? `Dash past the ${enemy.name} → ${adj.name}` : `Move to ${adj.name}`;
+    choices.push({ label, action: { type: 'move', roomId: adj.id } });
   }
   return MAX_CHOICES ? choices.slice(0, MAX_CHOICES) : choices;
 }
 
-// ─── Intent parser ────────────────────────────────────────────────────────────
-type Intent =
-  | { type: 'move';   roomId: string }
-  | { type: 'attack' }
-  | { type: 'loot' }
-  | { type: 'use';    item: string }
-  | { type: 'equip';  item: string | null }
-  | { type: 'sneak' }
-  | { type: 'escape' }
-  | { type: 'examine' };
-
-function parseIntent(action: string, state: GameState, seed: Seed, context: Context): Intent {
-  const a        = action.toLowerCase();
-  const adjacent = (seed.connections[state.current_room] || [])
-    .map(id => seed.rooms.find(r => r.id === id))
-    .filter((r): r is NonNullable<typeof r> => r != null);
-
-  for (const room of adjacent) {
-    if (a.includes(room.name.toLowerCase()) || a.includes(room.id.replace(/_/g, ' '))) {
-      return { type: 'move', roomId: room.id };
-    }
-  }
-  if (a.match(/\b(move|go|head|enter|proceed)\b/) && adjacent.length > 0) {
-    return { type: 'move', roomId: adjacent[0].id };
-  }
-  if (context.escapeTriggers.some(t => a.includes(t))) return { type: 'escape' };
-  if (a.match(/\b(attack|fight|shoot|hit|strike|kill|blast|stab|zap|slash|swing|smite)\b/)) {
-    return { type: 'attack' };
-  }
-  if (a.match(/\b(pick up|take|grab|loot|collect|snatch|retrieve)\b/)) {
-    return { type: 'loot' };
-  }
-  if (a.match(/\b(equip|wield|draw|ready|wear|don)\b/)) {
-    for (const entry of context.lootTable) {
-      if (!entry.slot) continue;
-      if (entry.aliases.some(alias => a.includes(alias))) {
-        return { type: 'equip', item: entry.id };
-      }
-    }
-    return { type: 'equip', item: null };
-  }
-  for (const entry of context.lootTable) {
-    if (entry.aliases.some(alias => a.includes(alias))) {
-      if (a.match(/\b(use|drink|eat|read|open|apply|consume)\b/) || entry.type === 'consumable') {
-        return { type: 'use', item: entry.id };
-      }
-    }
-  }
-  if (a.match(/\b(sneak|stealth|hide|slip|creep|past)\b/)) return { type: 'sneak' };
-  return { type: 'examine' };
-}
-
 // ─── Main action handler ──────────────────────────────────────────────────────
 export async function takeAction({ action, history = [], state, seed, context }: {
-  action:  string;
-  history: string[];
+  action:  StructuredAction;
+  history: unknown[];
   state:   GameState;
   seed:    Seed;
   context: Context;
@@ -296,6 +272,8 @@ export async function takeAction({ action, history = [], state, seed, context }:
     equipped_weapon: state.equipped_weapon ?? null,
     equipped_armor:  state.equipped_armor  ?? null,
     equipped_shield: state.equipped_shield ?? null,
+    conditions:      state.conditions      ?? [],
+    room_log:        state.room_log        ?? [],
     combat_active:   state.combat_active   ?? false,
     initiative:      state.initiative      ?? null,
     player_first:    state.player_first    ?? true,
@@ -305,7 +283,7 @@ export async function takeAction({ action, history = [], state, seed, context }:
     dead:            state.dead            ?? false,
   };
 
-  void history; // reserved for future LLM narrative use
+  void history;
 
   const worldName  = getWorldName(seed);
   const roomId     = st.current_room;
@@ -325,9 +303,8 @@ export async function takeAction({ action, history = [], state, seed, context }:
   // ── Death saves override all actions when HP = 0 ───────────────────────────
   if (st.hp <= 0 && !st.dead) {
     if (st.stable) {
-      const intent = parseIntent(action, st, seed, context);
-      if (intent.type === 'use') {
-        const held = st.inventory?.find(i => i.id === intent.item);
+      if (action.type === 'use') {
+        const held = st.inventory?.find(i => i.id === action.itemId);
         if (held) {
           const itemData = getItemData(held, context);
           if (itemData.heal) {
@@ -353,11 +330,11 @@ export async function takeAction({ action, history = [], state, seed, context }:
       narrative = dsNarr;
       newState  = dsState;
       if (died) {
-        newState.run_log = [...(st.run_log || []).slice(-50), { action, narrative }];
+        newState.run_log = [...(st.run_log || []), { action: action.type, narrative }];
         return { narrative, choices: [], newState, escaped: false, dead: true };
       }
     }
-    newState.run_log = [...(st.run_log || []).slice(-50), { action, narrative }];
+    newState.run_log = [...(st.run_log || []), { action: action.type, narrative }];
     return { narrative, choices: generateChoices(newState, seed, context), newState, escaped: false, dead: false };
   }
 
@@ -366,20 +343,19 @@ export async function takeAction({ action, history = [], state, seed, context }:
     newState.turn_actions = { ...FRESH_TURN };
   }
 
-  const intent = parseIntent(action, st, seed, context);
-
-  switch (intent.type) {
+  switch (action.type) {
 
     case 'move': {
-      const target = seed.rooms.find(r => r.id === intent.roomId);
+      const target = seed.rooms.find(r => r.id === action.roomId);
       if (!target || !adjacent.find(r => r.id === target.id)) {
         narrative = 'The path loops back on itself. You cannot get there from here.';
         break;
       }
       // Opportunity attack when leaving a room with a living enemy (5e PHB p.195)
       if (enemyAlive) {
-        const opp = applyEnemyAttackNarrative(enemy, st.ac, st.inventory, st.equipped_armor, context);
-        newState.hp = Math.max(0, st.hp - opp.hpLost);
+        const opp = applyEnemyAttackNarrative(enemy, newState, context);
+        newState.hp         = Math.max(0, st.hp - opp.hpLost);
+        newState.conditions = opp.newConditions;
         narrative = opp.hpLost > 0
           ? `You try to flee — the ${enemy.name} strikes as you go! ${opp.narrative} `
           : `You dodge past the ${enemy.name} in a desperate sprint! `;
@@ -392,7 +368,7 @@ export async function takeAction({ action, history = [], state, seed, context }:
           if (died) break;
         }
       }
-      if (st.combat_active) Object.assign(newState, endCombat());
+      if (st.combat_active) { Object.assign(newState, endCombat()); newState.conditions = []; }
       newState.current_room = target.id;
       if (!newState.visited_rooms.includes(target.id)) {
         newState.visited_rooms = [...newState.visited_rooms, target.id];
@@ -405,9 +381,13 @@ export async function takeAction({ action, history = [], state, seed, context }:
       if (!enemy)      { narrative = pick(context.narratives.noEnemy);     break; }
       if (!enemyAlive) { narrative = pick(context.narratives.alreadyDead); break; }
 
+      // Conditions that prevent acting
+      if (newState.conditions.includes('paralyzed')) { narrative = `You are paralyzed and cannot act!`; break; }
+      if (newState.conditions.includes('stunned'))   { narrative = `You are stunned and cannot attack!`; break; }
+
       const currentEnemyHp = getEnemyHp(st, roomId, seed);
       const weaponItem     = st.equipped_weapon
-        ? getItemData(st.inventory?.find(i => i.id === st.equipped_weapon) as InventoryItem, context)
+        ? getItemData(st.inventory?.find(i => i.instance_id === st.equipped_weapon) as InventoryItem, context)
         : null;
       const weaponDamage = weaponItem?.damage ?? null;
       const weaponLabel  = weaponItem ? `Your ${weaponItem.name}` : 'Your fists';
@@ -420,8 +400,9 @@ export async function takeAction({ action, history = [], state, seed, context }:
 
         if (!combatStart.player_first) {
           // Enemy wins initiative and strikes first
-          const firstStrike = applyEnemyAttackNarrative(enemy, st.ac, st.inventory, st.equipped_armor, context);
-          newState.hp = Math.max(0, st.hp - firstStrike.hpLost);
+          const firstStrike = applyEnemyAttackNarrative(enemy, newState, context);
+          newState.hp         = Math.max(0, st.hp - firstStrike.hpLost);
+          newState.conditions = firstStrike.newConditions;
           narrative += initLine + `The ${enemy.name} moves first! ${firstStrike.narrative} `;
           if (newState.hp <= 0) {
             const { narrative: dsNarr, newState: dsState, died } = processDeathSave(
@@ -437,25 +418,33 @@ export async function takeAction({ action, history = [], state, seed, context }:
         }
       }
 
-      // Player's attack roll
-      const rangedInMelee = (weaponItem?.range === 'ranged');
+      // Player's attack roll — disadvantage from ranged-in-melee or conditions
+      const rangedInMelee  = (weaponItem?.range === 'ranged');
+      const conditionDisadv = newState.conditions.some(c => DISADV_CONDITIONS.has(c));
+      const disadvantage    = rangedInMelee || conditionDisadv;
+      const disadvReasons   = [
+        rangedInMelee    ? 'ranged in melee' : '',
+        conditionDisadv  ? newState.conditions.filter(c => DISADV_CONDITIONS.has(c)).join(', ') : '',
+      ].filter(Boolean).join(', ');
+      const disadvNote = disadvReasons ? ` (disadvantage — ${disadvReasons})` : '';
+
       const atk = resolvePlayerAttack(
         { str: newState.str, dex: newState.dex, level: newState.level },
         weaponDamage,
         enemy.ac,
         weaponItem?.finesse ?? false,
-        rangedInMelee,
+        disadvantage,
       );
       const finalDamage = weaponDamage ? atk.damage : Math.max(1, unarmedDamage(newState.str));
 
       if (atk.fumble) {
         narrative += `Natural 1 — a fumble! ${weaponLabel} goes completely wide. `;
-        const counter = applyEnemyAttackNarrative(enemy, newState.ac, newState.inventory, newState.equipped_armor, context);
-        newState.hp = Math.max(0, newState.hp - counter.hpLost);
+        const counter = applyEnemyAttackNarrative(enemy, newState, context);
+        newState.hp         = Math.max(0, newState.hp - counter.hpLost);
+        newState.conditions = counter.newConditions;
         narrative += counter.narrative;
       } else if (atk.hit) {
         const newEnemyHp = currentEnemyHp - finalDamage;
-        const disadvNote = rangedInMelee ? ' (disadvantage — ranged in melee)' : '';
         narrative += buildCombatHitNarrative(enemy, weaponItem, finalDamage, atk.critical, newState, context);
         narrative += ` (d20 ${atk.roll}+${atk.atkMod} ${atk.atkStat}+${atk.prof} prof = ${atk.total} vs AC ${enemy.ac}${disadvNote})`;
 
@@ -465,6 +454,7 @@ export async function takeAction({ action, history = [], state, seed, context }:
           newState.enemies_killed = [...newState.enemies_killed, roomId];
           newState.enemy_hp       = { ...newState.enemy_hp, [roomId]: 0 };
           Object.assign(newState, endCombat());
+          newState.conditions = [];
           narrative += ' ' + pick(context.narratives.killShot)
             .replace('{enemy}', enemy.name)
             .replace('{xp}',    String(xpGain));
@@ -477,15 +467,17 @@ export async function takeAction({ action, history = [], state, seed, context }:
         } else {
           newState.enemy_hp = { ...newState.enemy_hp, [roomId]: newEnemyHp };
           narrative += ` The ${enemy.name} has ${newEnemyHp} HP remaining.`;
-          const counter = applyEnemyAttackNarrative(enemy, newState.ac, newState.inventory, newState.equipped_armor, context);
-          newState.hp = Math.max(0, newState.hp - counter.hpLost);
+          const counter = applyEnemyAttackNarrative(enemy, newState, context);
+          newState.hp         = Math.max(0, newState.hp - counter.hpLost);
+          newState.conditions = counter.newConditions;
           narrative += ' ' + counter.narrative;
         }
       } else {
         narrative += pickTiered(context.narratives.combatMiss, hpTier(newState)).replace(/{enemy}/g, enemy.name);
         narrative += ` (d20 ${atk.roll}+${atk.atkMod} ${atk.atkStat}+${atk.prof} prof = ${atk.total} vs AC ${enemy.ac}${disadvNote})`;
-        const counter = applyEnemyAttackNarrative(enemy, newState.ac, newState.inventory, newState.equipped_armor, context);
-        newState.hp = Math.max(0, newState.hp - counter.hpLost);
+        const counter = applyEnemyAttackNarrative(enemy, newState, context);
+        newState.hp         = Math.max(0, newState.hp - counter.hpLost);
+        newState.conditions = counter.newConditions;
         narrative += ' ' + counter.narrative;
       }
 
@@ -504,15 +496,23 @@ export async function takeAction({ action, history = [], state, seed, context }:
     case 'loot': {
       if (!loot)      { narrative = pick(context.narratives.noLoot);        break; }
       if (!lootAvail) { narrative = pick(context.narratives.alreadyLooted); break; }
-      newState.inventory  = [...(st.inventory || []), { ...loot }];
+      newState.inventory  = [...(st.inventory || []), { ...loot, instance_id: randomUUID() }];
       newState.loot_taken = [...newState.loot_taken, roomId];
       narrative = pick(context.narratives.lootPickedUp).replace(/{item}/g, loot.name);
-      narrative += ` [${loot.name}: ${loot.desc}]`;
+      const hasIdentify = context.classSkills[st.character_class]?.some(s => ['arcana', 'investigation'].includes(s)) ?? false;
+      if (loot.type === 'misc' && !hasIdentify) {
+        narrative += ` [${loot.name}: unidentified]`;
+      } else {
+        narrative += ` [${loot.name}: ${loot.desc}]`;
+        if (hasIdentify && loot.type === 'misc') {
+          narrative += ' Your expertise lets you identify it immediately.';
+        }
+      }
       break;
     }
 
     case 'use': {
-      const held = st.inventory?.find(i => i.id === intent.item);
+      const held = st.inventory?.find(i => i.id === action.itemId);
       if (!held) { narrative = "You search your pack — you don't have that."; break; }
       const itemData = getItemData(held, context);
       const firstIdx = st.inventory.findIndex(i => i.id === held.id);
@@ -523,27 +523,26 @@ export async function takeAction({ action, history = [], state, seed, context }:
         narrative = `The ${held.name} offers protection. Use "equip" to don it for a +${itemData.ac_bonus || 0} AC bonus.`;
       } else if (itemData.type === 'consumable') {
         if (itemData.heal) {
-          const healed = rollDice(itemData.heal);
+          const hasMedicine = context.classSkills[st.character_class]?.includes('medicine') ?? false;
+          const healBonus   = hasMedicine ? profBonus(st.level) : 0;
+          const healed      = rollDice(itemData.heal) + healBonus;
           newState.hp        = Math.min(st.max_hp, st.hp + healed);
           newState.inventory = st.inventory.filter((_, i) => i !== firstIdx);
-          narrative = `You use the ${held.name} and recover ${healed} HP (now ${newState.hp}/${newState.max_hp}).`;
+          const bonusNote    = healBonus > 0 ? ` (+${healBonus} medicine)` : '';
+          narrative = `You use the ${held.name} and recover ${healed} HP${bonusNote} (now ${newState.hp}/${newState.max_hp}).`;
         } else if (itemData.effect === 'con_advantage') {
           newState.inventory = st.inventory.filter((_, i) => i !== firstIdx);
-          const roll1 = d(20) + abilityMod(st.con);
-          const roll2 = d(20) + abilityMod(st.con);
-          const best  = Math.max(roll1, roll2);
+          const { roll1, roll2, best } = resolveSaveWithAdvantage(st.con);
           narrative = `You use the ${held.name}. CON save with advantage: rolled ${roll1} and ${roll2} — keeping the ${best}. You feel steadier.`;
         } else if (itemData.effect === 'mystery') {
           newState.inventory = st.inventory.filter((_, i) => i !== firstIdx);
-          const eff = d(3);
-          if (eff === 1) {
-            const gained = rollDice('1d4');
-            newState.hp = Math.min(st.max_hp, st.hp + gained);
-            narrative = `You use the ${held.name}. It tastes of regret and eucalyptus — but you feel better? +${gained} HP.`;
-          } else if (eff === 2) {
-            const lost = rollDice('1d4');
-            newState.hp = Math.max(1, st.hp - lost);
-            narrative = `You use the ${held.name}. Immediate. Searing. Regret. -${lost} HP.`;
+          const { result, value } = resolveMysteryConsumable();
+          if (result === 'heal') {
+            newState.hp = Math.min(st.max_hp, st.hp + value);
+            narrative = `You use the ${held.name}. It tastes of regret and eucalyptus — but you feel better? +${value} HP.`;
+          } else if (result === 'hurt') {
+            newState.hp = Math.max(1, st.hp - value);
+            narrative = `You use the ${held.name}. Immediate. Searing. Regret. -${value} HP.`;
           } else {
             narrative = `You use the ${held.name}. Nothing happens. You stand there feeling foolish.`;
           }
@@ -556,45 +555,16 @@ export async function takeAction({ action, history = [], state, seed, context }:
       break;
     }
 
-    case 'equip': {
-      const itemId = intent.item;
-      if (!itemId) { narrative = 'Equip what? Specify a weapon or piece of armour.'; break; }
-      const inInventory = st.inventory?.find(i => i.id === itemId);
-      if (!inInventory) { narrative = `You don't have that.`; break; }
-      const itemData = getItemData(inInventory, context);
-      if (!itemData.slot) { narrative = `The ${inInventory.name} can't be equipped.`; break; }
-
-      if (itemData.slot === 'shield') {
-        const check = canDonShield(st.combat_active);
-        if (!check.allowed) { narrative = check.reason; break; }
-        const toggling = st.equipped_shield === itemId;
-        newState.ac             = computeAcAfterArmorChange(st.ac, toggling ? itemId : st.equipped_shield, toggling ? null : itemId, context.lootTable);
-        newState.equipped_shield = toggling ? null : itemId;
-        narrative = toggling
-          ? `You lower the ${inInventory.name}. AC is now ${newState.ac}.`
-          : `You raise the ${inInventory.name}. AC is now ${newState.ac}.`;
-      } else if (itemData.slot === 'armor') {
-        const check = canDonArmor(st.combat_active, itemId);
-        if (!check.allowed) { narrative = check.reason; break; }
-        newState.ac             = computeAcAfterArmorChange(st.ac, st.equipped_armor, itemId, context.lootTable);
-        newState.equipped_armor = itemId;
-        narrative = `You don the ${inInventory.name}. AC is now ${newState.ac}.`;
-      } else {
-        const check = canEquipWeapon(st.combat_active, st.turn_actions);
-        if (!check.allowed) { narrative = check.reason; break; }
-        newState.equipped_weapon = itemId;
-        if ('cost' in check && check.cost === 'free_interaction') {
-          newState.turn_actions = { ...newState.turn_actions, free_interaction_used: true };
-        }
-        narrative = `You ready the ${inInventory.name} (${itemData.damage || '1d4'} damage).`;
-      }
+    case 'death_save': {
+      // HP <= 0 guard above handles this when HP is actually 0; treat as examine otherwise
+      narrative = buildArrivalNarrative(roomId, newState, seed, context);
       break;
     }
 
     case 'sneak': {
       if (!enemyAlive) { narrative = 'Nothing to sneak past. You move freely.'; break; }
       // Dexterity (Stealth) vs enemy passive Perception (10 + WIS modifier)
-      const sneakDC    = 10 + abilityMod(enemy.wis ?? 10);
+      const sneakDC    = passivePerceptionDC(enemy.wis ?? 10);
       const proficient = context.classSkills[st.character_class]?.includes('stealth') ?? false;
       const check      = skillCheck(st.dex, sneakDC, proficient, st.level);
       if (check.success) {
@@ -602,7 +572,7 @@ export async function takeAction({ action, history = [], state, seed, context }:
         narrative += ` (Stealth: ${check.roll}+${abilityMod(st.dex)}=${check.total} vs DC ${sneakDC})`;
         if (adjacent.length > 0) {
           const target = adjacent[0];
-          if (st.combat_active) Object.assign(newState, endCombat());
+          if (st.combat_active) { Object.assign(newState, endCombat()); newState.conditions = []; }
           newState.current_room = target.id;
           if (!newState.visited_rooms.includes(target.id)) {
             newState.visited_rooms = [...newState.visited_rooms, target.id];
@@ -610,8 +580,9 @@ export async function takeAction({ action, history = [], state, seed, context }:
           narrative += ' ' + buildArrivalNarrative(target.id, newState, seed, context);
         }
       } else {
-        const counter = applyEnemyAttackNarrative(enemy, st.ac, st.inventory, st.equipped_armor, context);
-        newState.hp = Math.max(0, st.hp - counter.hpLost);
+        const counter = applyEnemyAttackNarrative(enemy, newState, context);
+        newState.hp         = Math.max(0, st.hp - counter.hpLost);
+        newState.conditions = counter.newConditions;
         narrative = pick(context.narratives.sneakFail)
           .replace('{enemy}', enemy.name)
           .replace('{dmg}',   String(counter.hpLost));
@@ -637,22 +608,16 @@ export async function takeAction({ action, history = [], state, seed, context }:
 
     case 'examine':
     default: {
-      const exitNames = adjacent.map(r => r.name).join(', ') || 'none visible';
-      narrative = pick(context.narratives.examineTemplates)
-        .replace('{room}',  room?.name || 'chamber')
-        .replace('{desc}',  room?.desc || '')
-        .replace('{exits}', exitNames);
-      if (enemyAlive) {
-        const ehp = getEnemyHp(st, roomId, seed);
-        narrative += ` A ${enemy.name} is here (HP: ${ehp}, AC: ${enemy.ac}).`;
-        if (st.combat_active) narrative += ` You are in combat!`;
-      }
-      if (lootAvail) narrative += ` You notice a ${loot.name} on the ground.`;
+      narrative = buildArrivalNarrative(roomId, newState, seed, context);
+      if (st.combat_active) narrative += ` You are in combat!`;
+      if (newState.conditions.length > 0) narrative += ` [Conditions: ${newState.conditions.join(', ')}]`;
       break;
     }
   }
 
-  newState.run_log      = [...(st.run_log || []).slice(-50), { action, narrative }];
+  const roomChanged     = newState.current_room !== st.current_room;
+  newState.run_log      = [...(st.run_log || []), { action: action.type, narrative }];
+  newState.room_log     = roomChanged ? [narrative] : [...(st.room_log ?? []), narrative];
   newState.last_choices = generateChoices(newState, seed, context);
 
   return {

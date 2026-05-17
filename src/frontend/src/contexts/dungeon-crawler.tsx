@@ -19,12 +19,28 @@ export const context: FrontendContext = {
   * dark * below`,
 
   classes: [
-    { id: 'Warrior',  desc: '+2 STR. Heavy armour proficiency. Extra attack at level 3.' },
-    { id: 'Mage',     desc: '+2 INT. Cast arcane spells. Identify magical items.' },
-    { id: 'Rogue',    desc: '+2 DEX. Sneak attack. Lockpicking and trap disarming.' },
-    { id: 'Cleric',   desc: '+2 WIS. Channel divinity. Heal allies and smite undead.' },
-    { id: 'Ranger',   desc: '+2 DEX. Track enemies. Advantage in natural environments.' },
+    { id: 'Warrior',  desc: 'Heavy armour proficiency. Extra attack at level 3.' },
+    { id: 'Mage',     desc: 'Cast arcane spells. Identify magical items.' },
+    { id: 'Rogue',    desc: 'Sneak attack. Lockpicking and trap disarming.' },
+    { id: 'Cleric',   desc: 'Channel divinity. Heal allies and smite undead.' },
+    { id: 'Ranger',   desc: 'Track enemies. Advantage in natural environments.' },
   ],
+
+  classPrimaryStats: {
+    Warrior: 'STR',
+    Mage:    'INT',
+    Rogue:   'DEX',
+    Cleric:  'WIS',
+    Ranger:  'DEX',
+  },
+
+  classSkills: {
+    Warrior: ['Athletics', 'Intimidation'],
+    Mage:    ['Arcana', 'Investigation'],
+    Rogue:   ['Stealth', 'Sleight of Hand', 'Deception'],
+    Cleric:  ['Medicine', 'Religion'],
+    Ranger:  ['Stealth', 'Perception', 'Nature'],
+  },
 
   theme: {
     pageBg:    '#0d0a08',
@@ -32,7 +48,7 @@ export const context: FrontendContext = {
     font:      '"Courier New", monospace',
     primary:   '#c8a96e',
     mid:       '#a07848',
-    dim:       '#5c3d20',
+    dim:       '#b06820',
     dimDark:   '#3d2810',
     border:    '#6b4520',
     separator: '#2a1508',
@@ -63,28 +79,17 @@ export const context: FrontendContext = {
   itemDescs: {
     health_potion:   'Restores 2d4+2 HP, one use',
     iron_sword:      '1d8 damage, melee weapon',
-    battle_axe:      '2d6 damage, melee weapon',
-    enchanted_blade: '2d8 damage, finesse, glows with arcane light',
+    battle_axe:      '1d8 damage, melee weapon',
+    enchanted_blade: '2d6 damage, finesse, glows with arcane light',
     wooden_shield:   '+2 AC while equipped',
     leather_armor:   '+2 AC while equipped',
-    plate_armor:     '+3 AC while equipped',
+    plate_armor:     '+6 AC while equipped',
     rations:         'Restore 1 HP, one use',
     undead_tome:     'Forbidden necromantic knowledge. Probably cursed.',
     cursed_gem:      'Pulses with malevolent purple light. Worth a fortune — if you survive.',
     skeleton_key:    'Opens any lock. Made from an actual skeleton finger.',
     dark_potion:     'Unknown effect. Smells of sulphur and regret.',
     mead_flask:      'Advantage on next CON save, one use',
-  },
-
-  weaponNames: {
-    iron_sword:      'Iron Sword',
-    battle_axe:      'Battle Axe',
-    enchanted_blade: 'Enchanted Blade',
-  },
-
-  armorNames: {
-    leather_armor: 'Leather Armour',
-    plate_armor:   'Plate Armour',
   },
 
   art: {

@@ -18,12 +18,28 @@ export const context: FrontendContext = {
   * . * . * . * .`,
 
   classes: [
-    { id: 'Soldier',    desc: '+2 STR. Proficient with all weapons. Extra attack at level 3.' },
-    { id: 'Scientist',  desc: '+2 INT. Can identify alien specimens. Lab equipment bonus.' },
-    { id: 'Pilot',      desc: '+2 DEX. Advantage on vehicle checks. Fast escape pod launch.' },
-    { id: 'Engineer',   desc: '+2 CON. Can repair ship systems. Improvised weapons.' },
-    { id: 'Medic',      desc: '+2 WIS. Heal action bonus. Advantage on poison saves.' },
+    { id: 'Soldier',    desc: 'Proficient with all weapons. Extra attack at level 3.' },
+    { id: 'Scientist',  desc: 'Can identify alien specimens. Lab equipment bonus.' },
+    { id: 'Pilot',      desc: 'Advantage on vehicle checks. Fast escape pod launch.' },
+    { id: 'Engineer',   desc: 'Can repair ship systems. Improvised weapons.' },
+    { id: 'Medic',      desc: 'Heal action bonus. Advantage on poison saves.' },
   ],
+
+  classPrimaryStats: {
+    Soldier:   'STR',
+    Scientist: 'INT',
+    Pilot:     'DEX',
+    Engineer:  'CON',
+    Medic:     'WIS',
+  },
+
+  classSkills: {
+    Soldier:   ['Athletics', 'Intimidation'],
+    Scientist: ['Investigation', 'Medicine'],
+    Pilot:     ['Acrobatics', 'Perception', 'Stealth'],
+    Engineer:  ['Athletics', 'Investigation'],
+    Medic:     ['Medicine', 'Survival'],
+  },
 
   theme: {
     pageBg:    '#0a0a0a',
@@ -31,7 +47,7 @@ export const context: FrontendContext = {
     font:      '"Courier New", monospace',
     primary:   '#00ff41',
     mid:       '#00cc33',
-    dim:       '#005f18',
+    dim:       '#3d9941',
     dimDark:   '#003d0f',
     border:    '#00551a',
     separator: '#001a06',
@@ -67,23 +83,12 @@ export const context: FrontendContext = {
     hazmat_suit:      '+2 AC while equipped',
     alien_egg:        'Pulsing. Warm. Why did you take this?',
     space_whiskey:    'Advantage on next CON save, one use',
-    laser_sword:      '2d8 damage, finesse, melee weapon',
+    laser_sword:      '2d6 damage, finesse, melee weapon',
     ballistic_shield: '+2 AC while equipped',
-    force_field_belt: '+3 AC while equipped',
+    force_field_belt: '+5 AC while equipped',
     autopsy_manual:   'Reading it raises more questions than answers',
     insurance_card:   'Coverage void in alien encounters',
     mystery_goo:      'Unknown effect. Smells like eucalyptus and regret.',
-  },
-
-  weaponNames: {
-    laser_sword: 'Laser Sword',
-    ray_gun:     'Ray Gun',
-    stun_baton:  'Stun Baton',
-  },
-
-  armorNames: {
-    hazmat_suit:      'Hazmat Suit',
-    force_field_belt: 'Force Field Belt',
   },
 
   art: {
