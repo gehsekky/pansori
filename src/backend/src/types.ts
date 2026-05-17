@@ -125,10 +125,10 @@ export interface PlacedNpc extends NpcTemplate {
 // ─── Structured actions ───────────────────────────────────────────────────────
 
 export type StructuredAction =
-  | { type: 'move';          roomId: string }
+  | { type: 'move';              roomId: string }
   | { type: 'attack' }
   | { type: 'loot' }
-  | { type: 'use';           itemId: string; targetCharId?: string }
+  | { type: 'use';               itemId: string; targetCharId?: string }
   | { type: 'sneak' }
   | { type: 'escape' }
   | { type: 'examine' }
@@ -138,9 +138,10 @@ export type StructuredAction =
   | { type: 'short_rest' }
   | { type: 'long_rest' }
   | { type: 'talk' }
-  | { type: 'talk_response'; responseIdx: number }
-  | { type: 'buy';           itemId: string; price: number }
-  | { type: 'attack_npc' };
+  | { type: 'talk_response';     responseIdx: number }
+  | { type: 'buy';               itemId: string; price: number }
+  | { type: 'attack_npc' }
+  | { type: 'use_class_feature'; featureId: string };
 
 export interface GameChoice {
   label:              string;
@@ -187,6 +188,8 @@ export interface Character {
   initiative_roll:     number | null;
   hit_die:             number;
   hit_dice_remaining:  number;
+  // Per-rest class resource pools (e.g. rage_uses, action_surge)
+  class_resource_uses: Record<string, number>;
 }
 
 // ─── Game state (world/party container) ──────────────────────────────────────
@@ -295,6 +298,10 @@ export interface Context {
   classPrimaryStats:  Record<string, 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha'>;
   classSkills:        Record<string, string[]>;
   classHitDie:        Record<string, number>;
+  // 5e saving throw proficiencies per class (2 abilities each)
+  classSavingThrows?: Record<string, Array<'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha'>>;
+  // Class features that activate during play (sneak_attack, extra_attack, rage, …)
+  classFeatures?:     Record<string, string[]>;
   enemyTemplates:   EnemyTemplate[];
   introTexts:       string[];
   roomPool:         RoomPoolEntry[];

@@ -3,10 +3,10 @@ import type { ReactNode } from 'react';
 // ─── Structured actions ───────────────────────────────────────────────────────
 
 export type StructuredAction =
-  | { type: 'move';          roomId: string }
+  | { type: 'move';              roomId: string }
   | { type: 'attack' }
   | { type: 'loot' }
-  | { type: 'use';           itemId: string; targetCharId?: string }
+  | { type: 'use';               itemId: string; targetCharId?: string }
   | { type: 'sneak' }
   | { type: 'escape' }
   | { type: 'examine' }
@@ -16,9 +16,10 @@ export type StructuredAction =
   | { type: 'short_rest' }
   | { type: 'long_rest' }
   | { type: 'talk' }
-  | { type: 'talk_response'; responseIdx: number }
-  | { type: 'buy';           itemId: string; price: number }
-  | { type: 'attack_npc' };
+  | { type: 'talk_response';     responseIdx: number }
+  | { type: 'buy';               itemId: string; price: number }
+  | { type: 'attack_npc' }
+  | { type: 'use_class_feature'; featureId: string };
 
 export interface GameChoice {
   label:               string;
@@ -61,6 +62,7 @@ export interface FrontendContext {
   art: Record<string, string>;
   classPrimaryStats: Record<string, string>;
   classSkills: Record<string, string[]>;
+  classFeatures?: Record<string, string[]>;
 }
 
 // ─── Character (per-character state) ─────────────────────────────────────────
@@ -106,6 +108,7 @@ export interface Character {
   initiative_roll: number | null;
   hit_die: number;
   hit_dice_remaining: number;
+  class_resource_uses: Record<string, number>;
 }
 
 // ─── NPC system ───────────────────────────────────────────────────────────────

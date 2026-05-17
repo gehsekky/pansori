@@ -5,7 +5,8 @@ import {
   resolvePlayerAttack, resolveEnemyAttack, unarmedDamage,
   skillCheck, rollDeathSave, profBonus,
   ADVANTAGE_CONDITIONS, DISADV_CONDITIONS,
-  rollConditionSave, resolveSaveWithAdvantage, resolveMysteryConsumable, passivePerceptionDC,
+  rollConditionSave, rollCritical, resolveSaveWithAdvantage, resolveMysteryConsumable, passivePerceptionDC,
+  sneakAttackDice, extraAttackCount, rageDamageBonus, rageUsesMax,
 } from './rulesEngine.js';
 import { Engine } from 'json-rules-engine';
 import type { GameState, Character, Seed, Context, Enemy, LootItem, InventoryItem, OnHitEffect, StructuredAction, GameChoice, DeathSaves, TurnActions, GameConsequence, RuleFacts, PlacedNpc, NpcAttitude } from '../types.js';
@@ -66,10 +67,12 @@ function getEnemyHp(state: GameState, roomId: string, seed: Seed): number {
 // ─── Condition helpers ────────────────────────────────────────────────────────
 
 function conditionSavingThrow(
-  effect: OnHitEffect,
-  char: Pick<Character, 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha' | 'level'>,
+  effect:  OnHitEffect,
+  char:    Pick<Character, 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha' | 'level' | 'character_class'>,
+  context: Context,
 ): boolean {
-  return rollConditionSave(effect.ability, char[effect.ability] ?? 10, effect.dc);
+  const proficient = context.classSavingThrows?.[char.character_class]?.includes(effect.ability) ?? false;
+  return rollConditionSave(effect.ability, char[effect.ability] ?? 10, effect.dc, proficient, char.level);
 }
 
 // ─── Enemy attack helper ──────────────────────────────────────────────────────
@@ -84,13 +87,19 @@ function applyEnemyAttackNarrative(
   const armorItem    = char.equipped_armor ? char.inventory?.find(i => i.id === char.equipped_armor) : null;
 
   if (result.hit) {
+    // Rage resistance: halve physical damage while raging (PHB p.48)
+    const isRaging = char.conditions.includes('raging');
+    const hpLost   = isRaging ? Math.ceil(result.damage / 2) : result.damage;
+    const rageNote = isRaging ? ` (Rage resistance: ${result.damage}→${hpLost})` : '';
+
     let narrative = pick(context.narratives.enemyAttacks)
       .replace('{enemy}', enemy.name)
-      .replace('{dmg}',   String(result.damage));
+      .replace('{dmg}',   String(hpLost));
+    narrative += rageNote;
     let updatedChar = { ...char };
 
     if (enemy.onHitEffect) {
-      const conditionApplied = conditionSavingThrow(enemy.onHitEffect, char);
+      const conditionApplied = conditionSavingThrow(enemy.onHitEffect, char, context);
       if (conditionApplied) {
         updatedChar = inflictCondition(updatedChar, enemy.onHitEffect.condition);
         if (updatedChar.conditions.length > char.conditions.length) {
@@ -98,7 +107,7 @@ function applyEnemyAttackNarrative(
         }
       }
     }
-    return { hpLost: result.damage, narrative, newConditions: updatedChar.conditions, newDurations: updatedChar.condition_durations };
+    return { hpLost, narrative, newConditions: updatedChar.conditions, newDurations: updatedChar.condition_durations };
   }
   if (armorItem) {
     return {
@@ -269,7 +278,15 @@ function endCombatState(st: GameState): GameState {
     combat_active:    false,
     initiative_order: [],
     initiative_idx:   0,
-    characters: st.characters.map(c => ({ ...c, turn_actions: { ...FRESH_TURN } })),
+    characters: st.characters.map(c => ({
+      ...c,
+      turn_actions: { ...FRESH_TURN },
+      // Rage ends when combat ends (PHB p.48)
+      conditions:          c.conditions.filter(cond => cond !== 'raging'),
+      condition_durations: Object.fromEntries(
+        Object.entries(c.condition_durations ?? {}).filter(([k]) => k !== 'raging'),
+      ),
+    })),
   };
 }
 
@@ -312,6 +329,7 @@ export function normalizeState(
         hit_die:             c.hit_die             ?? 8,
         hit_dice_remaining:  c.hit_dice_remaining  ?? (c.level ?? 1),
         condition_durations: c.condition_durations ?? {},
+        class_resource_uses: c.class_resource_uses ?? {},
       })),
     };
   }
@@ -345,9 +363,10 @@ export function normalizeState(
     stable:          Boolean(raw.stable),
     dead:            Boolean(raw.dead),
     turn_actions:    (raw.turn_actions as TurnActions) ?? { ...FRESH_TURN },
-    initiative_roll: null,
-    hit_die:            8,
-    hit_dice_remaining: level,
+    initiative_roll:     null,
+    hit_die:             8,
+    hit_dice_remaining:  level,
+    class_resource_uses: {},
   };
   const oldRunLog = (raw.run_log as Array<{ action: string; narrative: string }>) ?? [];
   return {
@@ -508,6 +527,21 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       }
     }
   }
+  // Class feature bonus actions — shown only during combat while bonus action is still available
+  if (state.combat_active && !char.turn_actions.bonus_action_used) {
+    const features = context.classFeatures?.[char.character_class] ?? [];
+    if (features.includes('rage') && !char.conditions.includes('raging')) {
+      const rageUses = char.class_resource_uses?.rage_uses ?? rageUsesMax(char.level);
+      if (rageUses > 0) {
+        choices.push({
+          label:              `Rage — bonus action (${rageUses} use${rageUses === 1 ? '' : 's'} left)`,
+          action:             { type: 'use_class_feature', featureId: 'rage' },
+          requiresBonusAction: true,
+        });
+      }
+    }
+  }
+
   // End turn: available in combat after the character's action is used
   // (auto-advance fires when no bonus choices exist, but this allows explicit forfeiture)
   if (state.combat_active && char.turn_actions.action_used) {
@@ -562,7 +596,7 @@ export async function runRules(
     active_conditions: activeChar.conditions,
   };
 
-  const engine = new Engine();
+  const engine = new Engine([], { allowUndefinedFacts: true });
   for (const rule of eligibleRules) {
     engine.addRule({
       name:       rule.name,
@@ -709,6 +743,7 @@ export async function takeAction({ action, history = [], state, seed, context }:
     inventory:           char.inventory           ?? [],
     hit_die:             char.hit_die             ?? 8,
     hit_dice_remaining:  char.hit_dice_remaining  ?? (char.level ?? 1),
+    class_resource_uses: char.class_resource_uses ?? {},
   };
 
   const worldName  = getWorldName(seed);
@@ -905,31 +940,64 @@ export async function takeAction({ action, history = [], state, seed, context }:
       ].filter(Boolean).join(', ');
       const disadvNote = disadvReasons ? ` (disadvantage — ${disadvReasons})` : '';
 
-      const atk = resolvePlayerAttack(
-        { str: char.str, dex: char.dex, level: char.level },
-        weaponDamage,
-        enemy.ac,
-        weaponItem?.finesse ?? false,
-        disadvantage,
-      );
-      const finalDamage = weaponDamage ? atk.damage : Math.max(1, unarmedDamage(char.str));
+      const features  = context.classFeatures?.[char.character_class] ?? [];
+      const isRaging  = char.conditions.includes('raging');
 
-      if (atk.fumble) {
-        narrative += `Natural 1 — a fumble! ${weaponLabel} goes completely wide. `;
-        // Enemy counter-attack will auto-resolve via initiative advancement below
-      } else if (atk.hit) {
-        const newEnemyHp = currentEnemyHp - finalDamage;
-        narrative += buildCombatHitNarrative(enemy, weaponItem, finalDamage, atk.critical, char, context);
-        narrative += ` (d20 ${atk.roll}+${atk.atkMod} ${atk.atkStat}+${atk.prof} prof = ${atk.total} vs AC ${enemy.ac}${disadvNote})`;
+      // Helper that resolves one attack roll and applies it to enemy HP / narrative.
+      // Returns true if the enemy was killed (so the caller can break early).
+      const resolveOneAttack = (label: string): boolean => {
+        const atk = resolvePlayerAttack(
+          { str: char.str, dex: char.dex, level: char.level },
+          weaponDamage,
+          enemy.ac,
+          weaponItem?.finesse ?? false,
+          disadvantage,
+        );
+        const baseHit  = weaponDamage ? atk.damage : Math.max(1, unarmedDamage(char.str));
+        const atkNote  = ` (${label}d20 ${atk.roll}+${atk.atkMod} ${atk.atkStat}+${atk.prof} prof = ${atk.total} vs AC ${enemy.ac}${disadvNote})`;
+
+        if (atk.fumble) {
+          narrative += `Natural 1 — a fumble! ${weaponLabel} goes completely wide.${atkNote} `;
+          return false;
+        }
+        if (!atk.hit) {
+          narrative += pickTiered(context.narratives.combatMiss, hpTier(char)).replace(/{enemy}/g, enemy.name);
+          narrative += atkNote + ' ';
+          return false;
+        }
+
+        // ── Hit ──────────────────────────────────────────────────────────────
+        // Sneak Attack: once per turn, on hit, with advantage or an ally in combat
+        let sneakDmg = 0;
+        if (features.includes('sneak_attack')) {
+          const hasAdv  = char.conditions.some(c => ADVANTAGE_CONDITIONS.has(c));
+          const allies  = st.characters.filter(c => !c.dead && c.id !== char.id).length;
+          if (hasAdv || allies > 0) {
+            const saExpr = sneakAttackDice(char.level);
+            sneakDmg     = atk.critical ? rollCritical(saExpr) : rollDice(saExpr);
+          }
+        }
+
+        // Rage damage bonus: STR-based attacks only (PHB p.48)
+        const rageBonus = (features.includes('rage') && isRaging && atk.atkStat === 'STR')
+          ? rageDamageBonus(char.level) : 0;
+
+        const finalDmg  = baseHit + sneakDmg + rageBonus;
+        const curEnemyHp = getEnemyHp(st, roomId, seed);
+        const newEnemyHp = curEnemyHp - finalDmg;
+
+        narrative += buildCombatHitNarrative(enemy, weaponItem, finalDmg, atk.critical, char, context);
+        narrative += atkNote;
+        if (sneakDmg > 0) narrative += ` [Sneak Attack ${sneakAttackDice(char.level)}: +${sneakDmg}]`;
+        if (rageBonus > 0) narrative += ` [Rage: +${rageBonus}]`;
 
         if (newEnemyHp <= 0) {
-          // Enemy killed — end combat immediately
           const xpGain = enemy.xp ?? (10 + (enemy.hp || 8));
           char.xp           = (char.xp || 0) + xpGain;
           st.enemies_killed = [...st.enemies_killed, roomId];
           st.enemy_hp       = { ...st.enemy_hp, [roomId]: 0 };
           st = endCombatState(st);
-          char.conditions   = [];
+          char.conditions   = char.conditions.filter(c => c !== 'raging');
           narrative += ' ' + pick(context.narratives.killShot)
             .replace('{enemy}', enemy.name)
             .replace('{xp}',    String(xpGain));
@@ -939,18 +1007,24 @@ export async function takeAction({ action, history = [], state, seed, context }:
             char.hp      = Math.min(char.hp + 4, char.max_hp);
             narrative += ' ' + context.narratives.levelUp;
           }
-          // No enemy turns to resolve — combat is over
           usedInitiative = true;
-          break;
-        } else {
-          st.enemy_hp = { ...st.enemy_hp, [roomId]: newEnemyHp };
-          narrative += ` The ${enemy.name} has ${newEnemyHp} HP remaining.`;
-          // Enemy counter-attack will auto-resolve via initiative advancement below
+          return true;
         }
-      } else {
-        // Miss
-        narrative += pickTiered(context.narratives.combatMiss, hpTier(char)).replace(/{enemy}/g, enemy.name);
-        narrative += ` (d20 ${atk.roll}+${atk.atkMod} ${atk.atkStat}+${atk.prof} prof = ${atk.total} vs AC ${enemy.ac}${disadvNote})`;
+        st.enemy_hp = { ...st.enemy_hp, [roomId]: newEnemyHp };
+        narrative += ` The ${enemy.name} has ${newEnemyHp} HP remaining. `;
+        return false;
+      };
+
+      // ── First attack ─────────────────────────────────────────────────────
+      const killed = resolveOneAttack('');
+      if (!killed) {
+        // ── Extra Attack (Fighter/Warrior level 5+) ───────────────────────
+        const extraCount = features.includes('extra_attack') ? extraAttackCount(char.level) : 0;
+        for (let ei = 0; ei < extraCount; ei++) {
+          if (getEnemyHp(st, roomId, seed) <= 0) break;
+          const killedExtra = resolveOneAttack(`Attack ${ei + 2} — `);
+          if (killedExtra) break;
+        }
       }
 
       // Action consumed. Initiative advances unless a bonus-action choice is available
@@ -1135,10 +1209,13 @@ export async function takeAction({ action, history = [], state, seed, context }:
       const restLines: string[] = [];
       const restedChars = st.characters.map(c => {
         if (c.dead) return c;
-        const recovered = Math.max(1, Math.floor(c.level / 2));
-        const newHd     = Math.min(c.level, (c.hit_dice_remaining ?? 0) + recovered);
+        const recovered   = Math.max(1, Math.floor(c.level / 2));
+        const newHd       = Math.min(c.level, (c.hit_dice_remaining ?? 0) + recovered);
         restLines.push(`${c.name}: HP ${c.hp}→${c.max_hp}, HD ${c.hit_dice_remaining ?? 0}→${newHd}`);
-        return { ...c, hp: c.max_hp, hit_dice_remaining: newHd, conditions: [], condition_durations: {} };
+        const charFeatures    = context.classFeatures?.[c.character_class] ?? [];
+        const restoredUses: Record<string, number> = { ...(c.class_resource_uses ?? {}) };
+        if (charFeatures.includes('rage')) restoredUses.rage_uses = rageUsesMax(c.level);
+        return { ...c, hp: c.max_hp, hit_dice_remaining: newHd, conditions: [], condition_durations: {}, class_resource_uses: restoredUses };
       });
       st   = { ...st, characters: restedChars, long_rested: true };
       char = { ...restedChars[safeIdx] };
@@ -1271,6 +1348,23 @@ export async function takeAction({ action, history = [], state, seed, context }:
         narrative += ' ' + retaliation.narrative;
       }
       char.turn_actions = { ...char.turn_actions, action_used: true };
+      break;
+    }
+
+    case 'use_class_feature': {
+      const features = context.classFeatures?.[char.character_class] ?? [];
+      if (action.featureId === 'rage') {
+        if (!features.includes('rage'))             { narrative = `${char.character_class} does not have Rage.`; break; }
+        if (char.conditions.includes('raging'))     { narrative = 'You are already raging!'; break; }
+        const rageUses = char.class_resource_uses?.rage_uses ?? rageUsesMax(char.level);
+        if (rageUses <= 0)                          { narrative = 'No rage uses remaining. They recover on a long rest.'; break; }
+        char.conditions          = [...char.conditions, 'raging'];
+        char.class_resource_uses = { ...(char.class_resource_uses ?? {}), rage_uses: rageUses - 1 };
+        char.turn_actions        = { ...char.turn_actions, bonus_action_used: true };
+        narrative = `${char.name} RAGES! +${rageDamageBonus(char.level)} bonus STR melee damage, resistance to physical attacks. (${rageUses - 1} use${rageUses - 1 === 1 ? '' : 's'} remaining)`;
+      } else {
+        narrative = `Unknown class feature: ${action.featureId}.`;
+      }
       break;
     }
 

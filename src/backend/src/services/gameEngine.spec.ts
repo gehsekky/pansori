@@ -81,9 +81,10 @@ function makeChar(overrides: Partial<Character> = {}): Character {
     stable:          false,
     dead:            false,
     turn_actions:       { action_used: false, bonus_action_used: false, reaction_used: false, free_interaction_used: false },
-    initiative_roll:    null,
-    hit_die:            8,
-    hit_dice_remaining: 1,
+    initiative_roll:     null,
+    hit_die:             8,
+    hit_dice_remaining:  1,
+    class_resource_uses: {},
     ...overrides,
   };
 }
@@ -824,6 +825,224 @@ describe('turn_actions lifecycle', () => {
 });
 
 // ─── NPC actions ──────────────────────────────────────────────────────────────
+
+import { context as dungeonCtx } from '../contexts/dungeon-crawler.js';
+
+// ─── Class features ───────────────────────────────────────────────────────────
+
+const dungeonSeedWithEnemy: Seed = {
+  context_id: dungeonCtx.id,
+  world_name: 'Dungeon Test',
+  ship_name:  '',
+  intro:      'Test.',
+  seed_id:    'dungeon-test-seed',
+  rooms: [
+    { id: dungeonCtx.startRoomId,  name: 'Entrance', desc: 'Entry.' },
+    { id: CORRIDOR_ID,             name: 'Corridor',  desc: 'Dark.' },
+    { id: dungeonCtx.escapeRoomId, name: 'Exit',      desc: 'Exit.' },
+  ],
+  connections: {
+    [dungeonCtx.startRoomId]:  [CORRIDOR_ID],
+    [CORRIDOR_ID]:             [dungeonCtx.startRoomId, dungeonCtx.escapeRoomId],
+    [dungeonCtx.escapeRoomId]: [CORRIDOR_ID],
+  },
+  enemies: {
+    [CORRIDOR_ID]: { name: 'Goblin', hp: 10, ac: 12, damage: '1d4', toHit: 2, xp: 20 },
+  },
+  loot: {},
+};
+
+describe('class features', () => {
+  // ── Sneak Attack (Pilot in scifi-terror) ────────────────────────────────────
+
+  it('Pilot sneak attack adds bonus damage on hit', async () => {
+    // Force a hit (roll 20 = critical) so we can check sneak damage applied
+    vi.spyOn(Math, 'random').mockReturnValue(0.999); // d20 → 20 always
+    const pilot  = makeChar({ id: 'p1', character_class: 'Pilot', level: 3 });
+    const ally   = makeChar({ id: 'p2', character_class: 'Soldier' }); // ally triggers sneak attack
+    const state: GameState = {
+      characters: [pilot, ally],
+      active_character_id: 'p1',
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [], loot_taken: [], enemy_hp: {},
+      combat_active: false, initiative_order: [], initiative_idx: 0,
+      run_log: [], room_log: [], last_choices: [], flags: {},
+      short_rested_rooms: [], long_rested: false,
+      npc_attitudes: {}, npc_talked: [],
+    };
+    const result = await takeAction({ action: { type: 'attack' }, history: [], state, seed: seedWithEnemy, context: ctx });
+    // Sneak Attack [2d6] should appear in narrative at level 3 (ceil(3/2)=2 dice)
+    expect(result.narrative).toMatch(/Sneak Attack/i);
+  });
+
+  it('Soldier does not get sneak attack', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.999);
+    const state = makeState(
+      { character_class: 'Soldier' },
+      { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] },
+    );
+    const result = await takeAction({ action: { type: 'attack' }, history: [], state, seed: seedWithEnemy, context: ctx });
+    expect(result.narrative).not.toMatch(/Sneak Attack/i);
+  });
+
+  // ── Extra Attack (Soldier level 5+ in scifi-terror) ─────────────────────────
+
+  it('Soldier at level 5 makes 2 attacks on Attack action (both show in narrative)', async () => {
+    // Roll just above miss threshold: roll=1 (fumble) then roll=20 (hit) — ensures at least 2 roll events
+    vi.spyOn(Math, 'random')
+      .mockReturnValueOnce(0)    // initiative d20 for Soldier
+      .mockReturnValueOnce(0)    // initiative d20 for enemy
+      .mockReturnValueOnce(0)    // first attack d20 → 1 (fumble)
+      .mockReturnValueOnce(0.999) // second attack d20 → 20 (hit)
+      .mockReturnValue(0.999);   // damage dice
+
+    const state = makeState(
+      { character_class: 'Soldier', level: 5 },
+      { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] },
+    );
+    const result = await takeAction({ action: { type: 'attack' }, history: [], state, seed: seedWithEnemy, context: ctx });
+    // Should see both fumble text and a subsequent hit — "Attack 2" label in narrative
+    expect(result.narrative).toMatch(/fumble|Attack 2/i);
+  });
+
+  it('Soldier at level 4 only makes 1 attack (no Attack 2 label)', async () => {
+    vi.spyOn(Math, 'random')
+      .mockReturnValueOnce(0)
+      .mockReturnValueOnce(0)
+      .mockReturnValueOnce(0)   // first attack d20 → 1 (fumble)
+      .mockReturnValue(0);
+
+    const state = makeState(
+      { character_class: 'Soldier', level: 4 },
+      { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] },
+    );
+    const result = await takeAction({ action: { type: 'attack' }, history: [], state, seed: seedWithEnemy, context: ctx });
+    expect(result.narrative).not.toMatch(/Attack 2/i);
+  });
+
+  // ── Rage (Warrior in dungeon-crawler) ────────────────────────────────────────
+
+  it('use_class_feature rage activates raging condition and spends a use', async () => {
+    const state = {
+      ...makeState({ character_class: 'Warrior', level: 1 }, {
+        current_room:   CORRIDOR_ID,
+        visited_rooms:  [dungeonCtx.startRoomId, CORRIDOR_ID],
+        combat_active:  true,
+        initiative_order: [{ id: 'char-1', roll: 15, is_enemy: false }, { id: CORRIDOR_ID, roll: 5, is_enemy: true }],
+        initiative_idx: 0,
+      }),
+    };
+    const result = await takeAction({
+      action:  { type: 'use_class_feature', featureId: 'rage' },
+      history: [],
+      state,
+      seed:    dungeonSeedWithEnemy,
+      context: dungeonCtx,
+    });
+    const char = result.newState.characters[0];
+    expect(char.conditions).toContain('raging');
+    // rage_uses should be initialized to rageUsesMax(1)-1 = 1
+    expect(char.class_resource_uses.rage_uses).toBe(1);
+    expect(char.turn_actions.bonus_action_used).toBe(true);
+    expect(result.narrative).toMatch(/RAGES/i);
+  });
+
+  it('use_class_feature rage cannot be activated twice', async () => {
+    const state = {
+      ...makeState({ character_class: 'Warrior', conditions: ['raging'] }, {
+        current_room:  CORRIDOR_ID,
+        visited_rooms: [dungeonCtx.startRoomId, CORRIDOR_ID],
+        combat_active: true,
+        initiative_order: [{ id: 'char-1', roll: 15, is_enemy: false }],
+        initiative_idx: 0,
+      }),
+    };
+    const result = await takeAction({
+      action:  { type: 'use_class_feature', featureId: 'rage' },
+      history: [],
+      state,
+      seed:    dungeonSeedWithEnemy,
+      context: dungeonCtx,
+    });
+    expect(result.narrative).toMatch(/already raging/i);
+  });
+
+  it('raging condition clears when combat ends', async () => {
+    // Kill the enemy while raging → combat ends → raging cleared
+    // Use a 1 HP enemy so any hit kills it and combat ends deterministically
+    const fragileSeed: Seed = {
+      ...dungeonSeedWithEnemy,
+      enemies: { [CORRIDOR_ID]: { name: 'Goblin', hp: 1, ac: 1, damage: '1d4', toHit: 2, xp: 20 } },
+    };
+    vi.spyOn(Math, 'random').mockReturnValue(0.999); // always hit/crit
+    const state = makeState(
+      { character_class: 'Warrior', conditions: ['raging'] },
+      { current_room: CORRIDOR_ID, visited_rooms: [dungeonCtx.startRoomId, CORRIDOR_ID] },
+    );
+    const result = await takeAction({
+      action:  { type: 'attack' },
+      history: [],
+      state,
+      seed:    fragileSeed,
+      context: dungeonCtx,
+    });
+    expect(result.newState.combat_active).toBe(false);
+    expect(result.newState.characters[0].conditions).not.toContain('raging');
+  });
+
+  it('long rest restores rage uses for Warrior', async () => {
+    const state = makeState(
+      {
+        character_class:     'Warrior',
+        level:               6,
+        class_resource_uses: { rage_uses: 0 },
+      },
+      {},
+    );
+    const result = await takeAction({
+      action:  { type: 'long_rest' },
+      history: [],
+      state,
+      seed:    dungeonSeedWithEnemy,
+      context: dungeonCtx,
+    });
+    // rageUsesMax(6) = 3
+    expect(result.newState.characters[0].class_resource_uses.rage_uses).toBe(3);
+  });
+
+  it('generateChoices shows rage bonus action for Warrior in combat with uses remaining', () => {
+    const state = makeState(
+      { character_class: 'Warrior', level: 1, class_resource_uses: { rage_uses: 2 } },
+      {
+        current_room:  CORRIDOR_ID,
+        visited_rooms: [dungeonCtx.startRoomId, CORRIDOR_ID],
+        combat_active: true,
+        initiative_order: [{ id: 'char-1', roll: 15, is_enemy: false }, { id: CORRIDOR_ID, roll: 5, is_enemy: true }],
+        initiative_idx: 0,
+      },
+    );
+    const choices = generateChoices(state, dungeonSeedWithEnemy, dungeonCtx);
+    const rageChoice = choices.find(c => c.action.type === 'use_class_feature');
+    expect(rageChoice).toBeDefined();
+    expect(rageChoice?.requiresBonusAction).toBe(true);
+  });
+
+  it('generateChoices hides rage when already raging', () => {
+    const state = makeState(
+      { character_class: 'Warrior', conditions: ['raging'] },
+      {
+        current_room:  CORRIDOR_ID,
+        visited_rooms: [dungeonCtx.startRoomId, CORRIDOR_ID],
+        combat_active: true,
+        initiative_order: [{ id: 'char-1', roll: 15, is_enemy: false }, { id: CORRIDOR_ID, roll: 5, is_enemy: true }],
+        initiative_idx: 0,
+      },
+    );
+    const choices = generateChoices(state, dungeonSeedWithEnemy, dungeonCtx);
+    expect(choices.every(c => c.action.type !== 'use_class_feature')).toBe(true);
+  });
+});
 
 import type { PlacedNpc, NpcTemplate } from '../types.js';
 

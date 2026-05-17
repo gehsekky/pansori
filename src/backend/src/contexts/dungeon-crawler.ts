@@ -39,6 +39,24 @@ export const context: Context = {
     Ranger:  ['stealth', 'perception', 'nature'],
   },
 
+  // PHB saving throw proficiencies: 2 per class
+  classSavingThrows: {
+    Warrior: ['str', 'con'],
+    Mage:    ['int', 'wis'],
+    Rogue:   ['dex', 'int'],
+    Cleric:  ['wis', 'cha'],
+    Ranger:  ['str', 'dex'],
+  },
+
+  // Active class features that fire during combat
+  classFeatures: {
+    Warrior: ['extra_attack', 'rage'],   // Fighter/Barbarian hybrid
+    Mage:    [],
+    Rogue:   ['sneak_attack'],
+    Cleric:  [],
+    Ranger:  [],
+  },
+
   enemyTemplates: [
     // CR 1/4 — starter threats
     { name: 'Skeleton',     cr: 0.25, hp:  13, ac: 13, damage: '1d6+2',  toHit: 4, xp:    50, wis:  8 },
