@@ -48,26 +48,6 @@ export const FRESH_TURN: TurnActions = {
   free_interaction_used: false,
 };
 
-export function startCombat(playerDex?: number, enemyDex?: number) {
-  const playerInit = d(20) + abilityMod(playerDex ?? 10);
-  const enemyInit  = d(20) + abilityMod(enemyDex  ?? 10);
-  return {
-    combat_active: true,
-    initiative:    { player: playerInit, enemy: enemyInit },
-    player_first:  playerInit >= enemyInit,
-    turn_actions:  { ...FRESH_TURN },
-  };
-}
-
-export function endCombat() {
-  return {
-    combat_active: false,
-    initiative:    null,
-    player_first:  true,
-    turn_actions:  { ...FRESH_TURN },
-  };
-}
-
 // ─── Attack resolution ────────────────────────────────────────────────────────
 
 interface PlayerStats {

@@ -108,6 +108,39 @@ function validateSeed(ctx: Context, seed: Seed) {
   it('enemies are not placed in the start room', () => {
     expect(seed.enemies[ctx.startRoomId]).toBeUndefined();
   });
+
+  it('seed has an npcs record', () => {
+    expect(typeof seed.npcs).toBe('object');
+    expect(seed.npcs).not.toBeNull();
+  });
+
+  it('NPCs are not placed in the start room', () => {
+    expect(seed.npcs[ctx.startRoomId]).toBeUndefined();
+  });
+
+  it('NPCs are not placed in the escape room', () => {
+    expect(seed.npcs[ctx.escapeRoomId]).toBeUndefined();
+  });
+
+  it('NPCs are not placed in rooms that already have enemies', () => {
+    for (const roomId of Object.keys(seed.npcs)) {
+      expect(seed.enemies[roomId]).toBeUndefined();
+    }
+  });
+
+  it('placed NPCs have IDs from npcTemplates (if context defines any)', () => {
+    if (!ctx.npcTemplates?.length) return;
+    const validIds = new Set(ctx.npcTemplates.map(t => t.id));
+    for (const [roomId, npc] of Object.entries(seed.npcs)) {
+      expect(validIds.has(npc.id), `NPC in room "${roomId}" has unknown id "${npc.id}"`).toBe(true);
+    }
+  });
+
+  it('placed NPCs record the correct roomId', () => {
+    for (const [roomId, npc] of Object.entries(seed.npcs)) {
+      expect(npc.roomId).toBe(roomId);
+    }
+  });
 }
 
 describe('generateRoguelikeSeed — dungeon-crawler', () => {

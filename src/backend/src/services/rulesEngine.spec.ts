@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   d, rollDice, abilityMod, profBonus,
-  FRESH_TURN, startCombat, endCombat,
+  FRESH_TURN,
   resolvePlayerAttack, resolveEnemyAttack, unarmedDamage,
   canEquipWeapon, canDonShield, canDonArmor, computeAcAfterArmorChange,
   skillCheck, rollDeathSave,
@@ -102,35 +102,6 @@ describe('profBonus(level)', () => {
     [17, 6], [20, 6],
   ])('level %i → profBonus %i', (level, bonus) => {
     expect(profBonus(level)).toBe(bonus);
-  });
-});
-
-// ─── startCombat / endCombat ─────────────────────────────────────────────────
-
-describe('startCombat / endCombat', () => {
-  it('startCombat returns combat_active=true with a fresh turn', () => {
-    const result = startCombat();
-    expect(result.combat_active).toBe(true);
-    expect(result.turn_actions).toEqual(FRESH_TURN);
-    expect(result.initiative.player).toBeGreaterThanOrEqual(1);
-    expect(result.initiative.enemy).toBeGreaterThanOrEqual(1);
-  });
-
-  it('player_first is true when player initiative >= enemy', () => {
-    mockRandom(0.999, 0); // player d20=20, enemy d20=1
-    expect(startCombat(10, 10).player_first).toBe(true);
-  });
-
-  it('player_first is false when enemy initiative is higher', () => {
-    mockRandom(0, 0.999); // player d20=1, enemy d20=20
-    expect(startCombat(10, 10).player_first).toBe(false);
-  });
-
-  it('endCombat returns combat_active=false with null initiative', () => {
-    const result = endCombat();
-    expect(result.combat_active).toBe(false);
-    expect(result.initiative).toBeNull();
-    expect(result.turn_actions).toEqual(FRESH_TURN);
   });
 });
 
