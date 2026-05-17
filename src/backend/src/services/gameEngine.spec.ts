@@ -80,8 +80,10 @@ function makeChar(overrides: Partial<Character> = {}): Character {
     death_saves:         { successes: 0, failures: 0 },
     stable:          false,
     dead:            false,
-    turn_actions:    { action_used: false, bonus_action_used: false, reaction_used: false, free_interaction_used: false },
-    initiative_roll: null,
+    turn_actions:       { action_used: false, bonus_action_used: false, reaction_used: false, free_interaction_used: false },
+    initiative_roll:    null,
+    hit_die:            8,
+    hit_dice_remaining: 1,
     ...overrides,
   };
 }
@@ -102,6 +104,8 @@ function makeState(charOverrides: Partial<Character> = {}, stateOverrides: Parti
     run_log:             [],
     room_log:            [],
     last_choices:        [],
+    short_rested_rooms:  [],
+    long_rested:         false,
     flags:               {},
     ...stateOverrides,
   };
@@ -411,9 +415,98 @@ describe('takeAction', () => {
       visited_rooms: [ctx.startRoomId],
       enemies_killed: [], loot_taken: [], enemy_hp: {},
       combat_active: false, initiative_order: [], initiative_idx: 0,
-      run_log: [], room_log: [], last_choices: [], flags: {},
+      run_log: [], room_log: [], last_choices: [], short_rested_rooms: [], long_rested: false, flags: {},
     };
     const result = await takeAction({ action: { type: 'examine' }, history: [], state, seed, context: ctx });
     expect(result.dead).toBe(false);
+  });
+});
+
+// ─── Short rest / Long rest ───────────────────────────────────────────────────
+
+describe('short_rest', () => {
+  it('restores HP and spends a hit die', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99); // d8 → 8, +CON mod 0 = 8 healed
+    const state = makeState({ hp: 3, max_hp: 10, hit_die: 8, hit_dice_remaining: 2 });
+    const result = await takeAction({ action: { type: 'short_rest' }, history: [], state, seed, context: ctx });
+    const char = result.newState.characters[0];
+    expect(char.hp).toBeGreaterThan(3);
+    expect(char.hp).toBeLessThanOrEqual(10);
+    expect(char.hit_dice_remaining).toBe(1);
+    expect(result.newState.short_rested_rooms).toContain(ctx.startRoomId);
+  });
+
+  it('cannot short rest twice in the same room', async () => {
+    const state = makeState(
+      { hp: 3, max_hp: 10, hit_die: 8, hit_dice_remaining: 2 },
+      { short_rested_rooms: [ctx.startRoomId] },
+    );
+    const result = await takeAction({ action: { type: 'short_rest' }, history: [], state, seed, context: ctx });
+    const char = result.newState.characters[0];
+    expect(char.hp).toBe(3); // no healing
+    expect(result.narrative).toMatch(/already rested/i);
+  });
+
+  it('cannot short rest with no hit dice remaining', async () => {
+    const state = makeState({ hp: 3, max_hp: 10, hit_die: 8, hit_dice_remaining: 0 });
+    const result = await takeAction({ action: { type: 'short_rest' }, history: [], state, seed, context: ctx });
+    expect(result.narrative).toMatch(/no hit dice/i);
+  });
+
+  it('cannot short rest when at full HP', async () => {
+    const state = makeState({ hp: 10, max_hp: 10, hit_die: 8, hit_dice_remaining: 2 });
+    const result = await takeAction({ action: { type: 'short_rest' }, history: [], state, seed, context: ctx });
+    expect(result.narrative).toMatch(/already at full/i);
+  });
+
+  it('cannot short rest while an enemy is alive in the room', async () => {
+    const state = makeState(
+      { hp: 3, max_hp: 10, hit_die: 8, hit_dice_remaining: 2 },
+      { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] },
+    );
+    const result = await takeAction({ action: { type: 'short_rest' }, history: [], state, seed: seedWithEnemy, context: ctx });
+    expect(result.narrative).toMatch(/cannot rest here/i);
+  });
+});
+
+describe('long_rest', () => {
+  it('restores all characters to full HP and recovers half-level hit dice', async () => {
+    const state = makeState({ hp: 2, max_hp: 10, level: 4, hit_die: 10, hit_dice_remaining: 0 });
+    const result = await takeAction({ action: { type: 'long_rest' }, history: [], state, seed, context: ctx });
+    const char = result.newState.characters[0];
+    expect(char.hp).toBe(10);
+    expect(char.hit_dice_remaining).toBe(2); // Math.max(1, Math.floor(4/2)) = 2
+    expect(result.newState.long_rested).toBe(true);
+  });
+
+  it('recovers at least 1 hit die even at level 1', async () => {
+    const state = makeState({ hp: 1, max_hp: 8, level: 1, hit_die: 8, hit_dice_remaining: 0 });
+    const result = await takeAction({ action: { type: 'long_rest' }, history: [], state, seed, context: ctx });
+    expect(result.newState.characters[0].hit_dice_remaining).toBe(1);
+  });
+
+  it('cannot long rest twice in a session', async () => {
+    const state = makeState({ hp: 1, max_hp: 10 }, { long_rested: true });
+    const result = await takeAction({ action: { type: 'long_rest' }, history: [], state, seed, context: ctx });
+    expect(result.narrative).toMatch(/already taken a long rest/i);
+  });
+
+  it('cannot long rest while an enemy is alive in the room', async () => {
+    const state = makeState(
+      { hp: 3, max_hp: 10 },
+      { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] },
+    );
+    const result = await takeAction({ action: { type: 'long_rest' }, history: [], state, seed: seedWithEnemy, context: ctx });
+    expect(result.narrative).toMatch(/cannot rest here/i);
+  });
+
+  it('clears conditions on long rest', async () => {
+    const state = makeState({
+      hp: 5, max_hp: 10,
+      conditions: ['poisoned'],
+      condition_durations: { poisoned: 1 },
+    });
+    const result = await takeAction({ action: { type: 'long_rest' }, history: [], state, seed, context: ctx });
+    expect(result.newState.characters[0].conditions).toHaveLength(0);
   });
 });

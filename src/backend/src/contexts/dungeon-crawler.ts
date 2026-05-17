@@ -23,6 +23,14 @@ export const context: Context = {
     Ranger:  'dex',
   },
 
+  classHitDie: {
+    Warrior: 10,
+    Mage:     6,
+    Rogue:    8,
+    Cleric:   8,
+    Ranger:  10,
+  },
+
   classSkills: {
     Warrior: ['athletics', 'intimidation'],
     Mage:    ['arcana', 'investigation'],

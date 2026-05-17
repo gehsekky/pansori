@@ -547,6 +547,7 @@ function CharStatsCard({ char, state, ctx, seed, onEquip, inCombat, onOpenMap }:
       <div style={S.stat}><span style={S.statLbl}>HP</span><span style={{ ...S.statVal, color: hpColor }}>{char.hp}/{char.max_hp}</span></div>
       <div style={S.stat}><span style={S.statLbl}>AC</span><span style={S.statVal}>{char.ac}</span></div>
       <div style={S.stat}><span style={S.statLbl}>LVL</span><span style={S.statVal}>{char.level}</span></div>
+      <div style={S.stat}><span style={S.statLbl}>HIT DICE</span><span style={{ ...S.statVal, color: (char.hit_dice_remaining ?? 0) > 0 ? 'var(--t-primary)' : 'var(--t-dim)' }}>{char.hit_dice_remaining ?? 0}/{char.level} (d{char.hit_die ?? 8})</span></div>
       <div style={S.stat}><span style={S.statLbl}>XP</span><span style={S.statVal}>{char.xp}</span></div>
       <div style={S.stat}><span style={S.statLbl}>GOLD</span><span style={S.statVal}>{char.gold}cr</span></div>
       <div style={S.stat}>

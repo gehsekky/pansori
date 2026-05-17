@@ -22,6 +22,14 @@ export const context: Context = {
     Teacher:     'wis',
   },
 
+  classHitDie: {
+    Jock:        10,
+    Nerd:         6,
+    Cheerleader:  8,
+    Goth:         8,
+    Teacher:      8,
+  },
+
   classSkills: {
     Jock:        ['athletics', 'intimidation'],
     Nerd:        ['arcana', 'investigation'],

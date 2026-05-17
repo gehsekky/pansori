@@ -282,16 +282,39 @@ function advanceActiveCharacter(characters: Character[], currentId: string): str
   return next.id;
 }
 
+// ─── Rest helper ──────────────────────────────────────────────────────────────
+
+function canRestInRoom(state: GameState, seed: Seed): boolean {
+  const room = seed.rooms.find(r => r.id === state.current_room);
+  if (room?.canRest === false) return false;
+  const enemy = seed.enemies?.[state.current_room];
+  return !(enemy && !state.enemies_killed.includes(state.current_room));
+}
+
 // ─── Backward-compatibility normalizer ───────────────────────────────────────
 
 export function normalizeState(
   raw: Record<string, unknown>,
   sessionMeta?: { character_name?: string; portrait_url?: string },
 ): GameState {
-  // Already new format
-  if (Array.isArray((raw as unknown as GameState).characters)) return raw as unknown as GameState;
+  // Already new format — patch any fields added after initial rollout
+  if (Array.isArray((raw as unknown as GameState).characters)) {
+    const gs = raw as unknown as GameState;
+    return {
+      ...gs,
+      short_rested_rooms: gs.short_rested_rooms ?? [],
+      long_rested:        gs.long_rested        ?? false,
+      characters: gs.characters.map(c => ({
+        ...c,
+        hit_die:             c.hit_die             ?? 8,
+        hit_dice_remaining:  c.hit_dice_remaining  ?? (c.level ?? 1),
+        condition_durations: c.condition_durations ?? {},
+      })),
+    };
+  }
 
   const charId = randomUUID();
+  const level  = Number(raw.level ?? 1);
   const char: Character = {
     id:              charId,
     name:            sessionMeta?.character_name ?? 'Hero',
@@ -307,7 +330,7 @@ export function normalizeState(
     wis:             Number(raw.wis ?? 10),
     cha:             Number(raw.cha ?? 10),
     xp:              Number(raw.xp ?? 0),
-    level:           Number(raw.level ?? 1),
+    level,
     gold:            Number(raw.gold ?? 5),
     inventory:       (raw.inventory as InventoryItem[]) ?? [],
     equipped_weapon: (raw.equipped_weapon as string | null) ?? null,
@@ -320,6 +343,8 @@ export function normalizeState(
     dead:            Boolean(raw.dead),
     turn_actions:    (raw.turn_actions as TurnActions) ?? { ...FRESH_TURN },
     initiative_roll: null,
+    hit_die:            8,
+    hit_dice_remaining: level,
   };
   const oldRunLog = (raw.run_log as Array<{ action: string; narrative: string }>) ?? [];
   return {
@@ -336,6 +361,8 @@ export function normalizeState(
     run_log:             oldRunLog.map(e => ({ character_id: charId, action: e.action, narrative: e.narrative })),
     room_log:            (raw.room_log as string[]) ?? [],
     last_choices:        undefined,
+    short_rested_rooms:  [],
+    long_rested:         false,
     flags:               (raw.flags as Record<string, boolean | string | number>) ?? {},
   };
 }
@@ -427,6 +454,19 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       }
     }
   }
+  // Rest choices — only when no alive enemy in room and room allows it
+  if (!state.combat_active && canRestInRoom(state, seed)) {
+    const alreadyShortRested = (state.short_rested_rooms ?? []).includes(roomId);
+    if (!alreadyShortRested && char.hit_dice_remaining > 0 && char.hp < char.max_hp) {
+      choices.push({
+        label:  `Short Rest — spend a hit die (d${char.hit_die ?? 8}), ${char.hit_dice_remaining} remaining`,
+        action: { type: 'short_rest' },
+      });
+    }
+    if (!(state.long_rested ?? false)) {
+      choices.push({ label: 'Long Rest — full recovery (once per session)', action: { type: 'long_rest' } });
+    }
+  }
   for (const adj of adjacent) {
     if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
     const label = enemyAlive ? `Dash past the ${enemy.name} → ${adj.name}` : `Move to ${adj.name}`;
@@ -454,14 +494,16 @@ export async function takeAction({ action, history = [], state, seed, context }:
   // Clone world state
   let st: GameState = {
     ...state,
-    enemies_killed:   state.enemies_killed  || [],
-    loot_taken:       state.loot_taken      || [],
-    enemy_hp:         state.enemy_hp        || {},
-    combat_active:    state.combat_active   ?? false,
-    initiative_order: state.initiative_order ?? [],
-    initiative_idx:   state.initiative_idx  ?? 0,
-    room_log:         state.room_log        ?? [],
-    flags:            state.flags           ?? {},
+    enemies_killed:     state.enemies_killed     || [],
+    loot_taken:         state.loot_taken         || [],
+    enemy_hp:           state.enemy_hp           || {},
+    combat_active:      state.combat_active      ?? false,
+    initiative_order:   state.initiative_order   ?? [],
+    initiative_idx:     state.initiative_idx     ?? 0,
+    room_log:           state.room_log           ?? [],
+    short_rested_rooms: state.short_rested_rooms ?? [],
+    long_rested:        state.long_rested        ?? false,
+    flags:              state.flags              ?? {},
   };
 
   // Ensure character fields have safe defaults
@@ -474,6 +516,8 @@ export async function takeAction({ action, history = [], state, seed, context }:
     dead:                char.dead                ?? false,
     turn_actions:        char.turn_actions        ?? { ...FRESH_TURN },
     inventory:           char.inventory           ?? [],
+    hit_die:             char.hit_die             ?? 8,
+    hit_dice_remaining:  char.hit_dice_remaining  ?? (char.level ?? 1),
   };
 
   const worldName  = getWorldName(seed);
@@ -864,6 +908,42 @@ export async function takeAction({ action, history = [], state, seed, context }:
         ? `${char.name} is ${cond} and cannot act. Turn passed.`
         : `${char.name} passes their turn.`;
       usedInitiative = true;
+      break;
+    }
+
+    case 'short_rest': {
+      if (st.combat_active)                                    { narrative = 'You cannot rest while in combat.'; break; }
+      if (!canRestInRoom(st, seed))                            { narrative = 'You cannot rest here — an enemy is present.'; break; }
+      if ((st.short_rested_rooms ?? []).includes(roomId))     { narrative = 'You have already rested in this room.'; break; }
+      if ((char.hit_dice_remaining ?? 0) <= 0)                { narrative = 'You have no hit dice remaining.'; break; }
+      if (char.hp >= char.max_hp)                             { narrative = 'You are already at full health.'; break; }
+
+      const hdRoll    = rollDice(`1d${char.hit_die ?? 8}`) + abilityMod(char.con);
+      const hdHealed  = Math.max(1, hdRoll);
+      char.hp                 = Math.min(char.max_hp, char.hp + hdHealed);
+      char.hit_dice_remaining = Math.max(0, (char.hit_dice_remaining ?? 1) - 1);
+      st.short_rested_rooms   = [...(st.short_rested_rooms ?? []), roomId];
+      const hdRemain = char.hit_dice_remaining;
+      narrative = `${char.name} takes a short rest, spending a d${char.hit_die ?? 8} — ${hdHealed} HP recovered (${hdRemain} hit ${hdRemain === 1 ? 'die' : 'dice'} remaining, now ${char.hp}/${char.max_hp}).`;
+      break;
+    }
+
+    case 'long_rest': {
+      if (st.combat_active)     { narrative = 'You cannot rest while in combat.'; break; }
+      if (!canRestInRoom(st, seed)) { narrative = 'You cannot rest here — an enemy is present.'; break; }
+      if (st.long_rested ?? false) { narrative = 'You have already taken a long rest this session.'; break; }
+
+      const restLines: string[] = [];
+      const restedChars = st.characters.map(c => {
+        if (c.dead) return c;
+        const recovered = Math.max(1, Math.floor(c.level / 2));
+        const newHd     = Math.min(c.level, (c.hit_dice_remaining ?? 0) + recovered);
+        restLines.push(`${c.name}: HP ${c.hp}→${c.max_hp}, HD ${c.hit_dice_remaining ?? 0}→${newHd}`);
+        return { ...c, hp: c.max_hp, hit_dice_remaining: newHd, conditions: [], condition_durations: {} };
+      });
+      st   = { ...st, characters: restedChars, long_rested: true };
+      char = { ...restedChars[safeIdx] };
+      narrative = `The party takes a long rest. ${restLines.join('; ')}.`;
       break;
     }
 
