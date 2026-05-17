@@ -3,8 +3,14 @@ import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
-import { gameRouter } from './routes/game.js';
+import session from 'express-session';
+import connectPgSimple from 'connect-pg-simple';
+import passport from 'passport';
 import { pool } from './db/pool.js';
+import { gameRouter } from './routes/game.js';
+import { authRouter } from './routes/auth.js';
+import { requireAuth } from './auth/middleware.js';
+import './auth/passport.js';
 
 const app        = express();
 const httpServer = createServer(app);
@@ -16,7 +22,32 @@ const io = new Server(httpServer, {
 app.use(cors({ origin: process.env.FRONTEND_URL, credentials: true }));
 app.use(express.json());
 
-app.use('/api/game', gameRouter);
+// ─── Session store ────────────────────────────────────────────────────────────
+const PgSession = connectPgSimple(session);
+app.use(session({
+  store: new PgSession({
+    pool,
+    tableName: 'session',
+    createTableIfMissing: false,
+  }),
+  secret:            process.env.SESSION_SECRET ?? 'change-me-in-production',
+  resave:            false,
+  saveUninitialized: false,
+  cookie: {
+    secure:   process.env.NODE_ENV === 'production',
+    httpOnly: true,
+    maxAge:   30 * 24 * 60 * 60 * 1000, // 30 days
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+  },
+}));
+
+// ─── Passport ─────────────────────────────────────────────────────────────────
+app.use(passport.initialize());
+app.use(passport.session());
+
+// ─── Routes ───────────────────────────────────────────────────────────────────
+app.use('/api/auth', authRouter);
+app.use('/api/game', requireAuth, gameRouter);
 
 app.get('/api/health', async (_req, res) => {
   try {

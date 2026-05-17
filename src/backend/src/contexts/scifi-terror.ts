@@ -15,6 +15,14 @@ export const context: Context = {
     'NSEA Protector',
   ],
 
+  classPrimaryStats: {
+    Soldier:   'str',
+    Scientist: 'int',
+    Pilot:     'dex',
+    Engineer:  'con',
+    Medic:     'wis',
+  },
+
   classSkills: {
     Soldier:   ['athletics', 'intimidation'],
     Scientist: ['investigation', 'medicine'],
@@ -28,10 +36,14 @@ export const context: Context = {
     { name: 'Infected Crewmate', cr: 0.25, hp:  22, ac:  8, damage: '1d6+1',  toHit: 3, xp:    50, wis:  6 },
     { name: 'Pod-Spawn',         cr: 0.25, hp:  13, ac: 12, damage: '1d6+2',  toHit: 4, xp:    50, dex: 14, wis:  8 },
     // CR 1 — early ship sections
-    { name: 'Brain-Leech',       cr:    1, hp:  22, ac: 13, damage: '2d6+2',  toHit: 4, xp:   200, dex: 15, wis: 14 },
+    { name: 'Brain-Leech',       cr:    1, hp:  22, ac: 13, damage: '2d6+2',  toHit: 4, xp:   200, dex: 15, wis: 14, onHitEffect: { condition: 'stunned',    ability: 'wis', dc: 12 } },
     { name: 'Chrome-Crawler',    cr:    1, hp:  26, ac: 14, damage: '1d8+3',  toHit: 4, xp:   200,          wis: 10 },
-    // CR 3–5 — mid ship
+    { name: 'Face-Hugger',       cr:    1, hp:  18, ac: 13, damage: '1d6+2',  toHit: 4, xp:   200, dex: 18, wis: 10, onHitEffect: { condition: 'poisoned',   ability: 'con', dc: 13 } },
+    // CR 2–5 — mid ship
+    { name: 'Space Pirate',      cr:    2, hp:  32, ac: 13, damage: '2d6+2',  toHit: 4, xp:   450, dex: 14, wis: 12 },
     { name: 'Corrupted Android', cr:    3, hp:  52, ac: 15, damage: '2d8+3',  toHit: 5, xp:   700,          wis: 10 },
+    { name: 'Mutant Horror',     cr:    3, hp:  52, ac: 12, damage: '2d8+4',  toHit: 5, xp:   700,          wis: 10, onHitEffect: { condition: 'frightened', ability: 'wis', dc: 13 } },
+    { name: 'Security Mech',     cr:    4, hp:  68, ac: 18, damage: '2d8+4',  toHit: 7, xp:  1100,          wis: 10 },
     { name: 'Alien Warrior',     cr:    5, hp:  67, ac: 13, damage: '2d8+4',  toHit: 6, xp:  1100, dex: 16, wis: 12 },
     { name: 'Xenomorph Brute',   cr:    5, hp:  84, ac: 14, damage: '3d6+4',  toHit: 7, xp:  1800,          wis: 12 },
     // CR 6+ — boss-tier
@@ -124,9 +136,9 @@ export const context: Context = {
     { id: 'hazmat_suit',      name: 'Hazmat Suit',          desc: '+2 AC while equipped',                               weight: 10, type: 'armor',      slot: 'armor',  damage: null,   ac_bonus: 2,    heal: null,    effect: null,            aliases: ['hazmat suit', 'hazmat'] },
     { id: 'alien_egg',        name: 'Alien Egg',            desc: 'Pulsing. Warm. Why did you take this?',              weight: 4,  type: 'misc',       slot: null,     damage: null,   ac_bonus: null, heal: null,    effect: null,            aliases: ['alien egg', 'egg'], useNarrative: 'You hold up the Alien Egg. It pulses warmly in your hand. You set it back down very carefully.' },
     { id: 'space_whiskey',    name: 'Space Whiskey',        desc: 'Advantage on next CON save, one use',                weight: 4,  type: 'consumable',  slot: null,     damage: null,   ac_bonus: null, heal: null,    effect: 'con_advantage', aliases: ['space whiskey', 'whiskey'] },
-    { id: 'laser_sword',      name: 'Laser Sword',          desc: '2d8 damage, finesse, melee weapon',                  weight: 10, type: 'weapon',     slot: 'weapon', damage: '2d8',  finesse: true, ac_bonus: null, heal: null,    effect: null,            aliases: ['laser sword', 'lightsaber', 'laser'] },
+    { id: 'laser_sword',      name: 'Laser Sword',          desc: '2d6 damage, finesse, melee weapon',                  weight: 10, type: 'weapon',     slot: 'weapon', damage: '2d6',  finesse: true, ac_bonus: null, heal: null,    effect: null,            aliases: ['laser sword', 'lightsaber', 'laser'] },
     { id: 'ballistic_shield', name: 'Ballistic Shield',     desc: '+2 AC while equipped',                               weight: 12, type: 'armor',      slot: 'shield', damage: null,   ac_bonus: 2,    heal: null,    effect: null,            aliases: ['ballistic shield', 'shield'] },
-    { id: 'force_field_belt', name: 'Force Field Belt',     desc: '+3 AC while equipped',                               weight: 8,  type: 'armor',      slot: 'armor',  damage: null,   ac_bonus: 3,    heal: null,    effect: null,            aliases: ['force field belt', 'force field', 'belt'] },
+    { id: 'force_field_belt', name: 'Force Field Belt',     desc: '+5 AC while equipped',                               weight: 8,  type: 'armor',      slot: 'armor',  damage: null,   ac_bonus: 5,    heal: null,    effect: null,            aliases: ['force field belt', 'force field', 'belt'] },
     { id: 'autopsy_manual',   name: 'Alien Autopsy Manual', desc: 'Reading it raises more questions than answers',      weight: 5,  type: 'misc',       slot: null,     damage: null,   ac_bonus: null, heal: null,    effect: null,            aliases: ['autopsy manual', 'autopsy', 'manual'], useNarrative: 'You flip through the Alien Autopsy Manual. Page 47 raises a question you will never be able to un-think. You close it.' },
     { id: 'insurance_card',   name: 'Space Insurance Card', desc: 'Coverage void in alien encounters',                  weight: 5,  type: 'misc',       slot: null,     damage: null,   ac_bonus: null, heal: null,    effect: null,            aliases: ['space insurance card', 'insurance card', 'insurance', 'card'], useNarrative: 'You read the fine print. Section 12, Subsection F: "Coverage void in the event of alien encounter, dimensional anomaly, or acts of cosmic horror." Helpful.' },
     { id: 'mystery_goo',      name: 'Mystery Goo',          desc: 'Unknown effect. Smells like eucalyptus and regret.', weight: 5,  type: 'consumable',  slot: null,     damage: null,   ac_bonus: null, heal: null,    effect: 'mystery',       aliases: ['mystery goo', 'goo', 'mystery'] },
@@ -309,12 +321,6 @@ export const context: Context = {
     alreadyDead: [
       'The creature\'s corpse is right where you left it. Still dead. Good.',
       'The alien remains lie still on the deck. You give it a cautious kick. Very dead.',
-    ],
-
-    examineTemplates: [
-      'You scan the {room} carefully. {desc} Exits lead to: {exits}.',
-      'Taking stock of the {room}: {desc} You could move toward: {exits}.',
-      'You survey the {room}. {desc} Pathways open to: {exits}.',
     ],
 
     sneakSuccess: [
