@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generateShipSeed } from './procgen.js';
+import { generateRoguelikeSeed } from './procgen.js';
 import { context as dungeonCtx } from '../contexts/dungeon-crawler.js';
 import { context as scifiCtx }   from '../contexts/scifi-terror.js';
 import type { Context, Seed } from '../types.js';
@@ -110,12 +110,12 @@ function validateSeed(ctx: Context, seed: Seed) {
   });
 }
 
-describe('generateShipSeed — dungeon-crawler', () => {
-  const seed = generateShipSeed(dungeonCtx);
+describe('generateRoguelikeSeed — dungeon-crawler', () => {
+  const seed = generateRoguelikeSeed(dungeonCtx);
   validateSeed(dungeonCtx, seed);
 });
 
-describe('generateShipSeed — scifi-terror', () => {
-  const seed = generateShipSeed(scifiCtx);
+describe('generateRoguelikeSeed — scifi-terror', () => {
+  const seed = generateRoguelikeSeed(scifiCtx);
   validateSeed(scifiCtx, seed);
 });

@@ -34,6 +34,18 @@ export interface NewSessionResult {
   seed:    Seed;
 }
 
+export type StatBlock = {
+  str: number; dex: number; con: number;
+  int: number; wis: number; cha: number;
+};
+
+export type CharacterInput = {
+  name:            string;
+  character_class: string;
+  stats?:          StatBlock;
+  portrait_url?:   string;
+};
+
 export const api = {
   getMe: () =>
     req<AuthUser>('/auth/me'),
@@ -47,16 +59,10 @@ export const api = {
   getSessionById: (id: string) =>
     req<Session & { state: GameState; seed: Seed }>(`/game/session/${id}`),
 
-  newSession: (
-    character_name: string,
-    character_class: string,
-    context_id: string,
-    stats?: { str: number; dex: number; con: number; int: number; wis: number; cha: number },
-    portrait_url?: string,
-  ) =>
+  newSession: (characters: CharacterInput[], context_id: string) =>
     req<NewSessionResult>('/game/session/new', {
       method: 'POST',
-      body: JSON.stringify({ character_name, character_class, context_id, stats, portrait_url }),
+      body: JSON.stringify({ characters, context_id }),
     }),
 
   takeAction: (sessionId: string, action: StructuredAction, history: unknown[]) =>
@@ -65,10 +71,10 @@ export const api = {
       body: JSON.stringify({ action, history }),
     }),
 
-  equipItem: (sessionId: string, item_id: string) =>
+  equipItem: (sessionId: string, item_id: string, character_id: string) =>
     req<{ newState: GameState }>(`/game/session/${sessionId}/equip`, {
       method: 'POST',
-      body: JSON.stringify({ item_id }),
+      body: JSON.stringify({ item_id, character_id }),
     }),
 
   deleteSession: (id: string) =>

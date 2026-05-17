@@ -29,7 +29,7 @@ export function generateSeed(context: Context): Seed {
   return generateRoguelikeSeed(context);
 }
 
-function generateRoguelikeSeed(context: Context): Seed {
+export function generateRoguelikeSeed(context: Context): Seed {
   const roomCount  = 5 + roll(4); // 6–9 rooms per run
   const escapeId   = context.escapeRoomId;
   const startId    = context.startRoomId;

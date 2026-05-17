@@ -10,7 +10,8 @@ export type StructuredAction =
   | { type: 'sneak' }
   | { type: 'escape' }
   | { type: 'examine' }
-  | { type: 'death_save' };
+  | { type: 'death_save' }
+  | { type: 'pass' };
 
 export interface GameChoice {
   label:  string;
@@ -54,7 +55,13 @@ export interface FrontendContext {
   classSkills:      Record<string, string[]>;
 }
 
-export interface GameState {
+// ─── Character (per-character state) ─────────────────────────────────────────
+
+export interface Character {
+  id:              string;
+  name:            string;
+  character_class: string;
+  portrait_url:    string | null;
   hp:              number;
   max_hp:          number;
   ac:              number;
@@ -64,27 +71,48 @@ export interface GameState {
   int:             number;
   wis:             number;
   cha:             number;
-  gold:            number;
   xp:              number;
   level:           number;
-  character_class: string;
+  gold:            number;
   inventory:       Array<{ instance_id: string; id: string; name: string; desc?: string; [key: string]: unknown }>;
   equipped_weapon: string | null;
   equipped_armor:  string | null;
   equipped_shield: string | null;
-  current_room:    string;
-  visited_rooms:   string[];
-  enemies_killed:  string[];
-  loot_taken:      string[];
-  enemy_hp:        Record<string, number>;
-  run_log:         Array<{ action: string; narrative: string }>;
-  room_log:        string[];
-  last_choices?:   GameChoice[];
-  conditions:      string[];
-  flags:           Record<string, boolean | string | number>;
-  combat_active:   boolean;
-  dead:            boolean;
-  stable:          boolean;
+  conditions:          string[];
+  condition_durations: Record<string, number>;
+  death_saves:         { successes: number; failures: number };
+  stable:              boolean;
+  dead:                boolean;
+  turn_actions:        { action_used: boolean; bonus_action_used: boolean; reaction_used: boolean; free_interaction_used: boolean };
+  initiative_roll:     number | null;
+}
+
+// ─── Game state (world/party container) ──────────────────────────────────────
+
+export interface GameState {
+  // Party
+  characters:          Character[];
+  active_character_id: string;
+
+  // World
+  current_room:   string;
+  visited_rooms:  string[];
+  enemies_killed: string[];
+  loot_taken:     string[];
+  enemy_hp:       Record<string, number>;
+
+  // Combat (party-level)
+  combat_active:    boolean;
+  initiative_order: Array<{ id: string; roll: number; is_enemy: boolean }>;
+  initiative_idx:   number;
+
+  // Logging
+  run_log:       Array<{ character_id: string; action: string; narrative: string }>;
+  room_log:      string[];
+  last_choices?: GameChoice[];
+
+  // Script engine flags
+  flags: Record<string, boolean | string | number>;
 }
 
 export interface Seed {
