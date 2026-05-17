@@ -38,10 +38,18 @@ export default function WorldMap({ seed, state, onClose }: Props) {
   }
 
   // Node state helpers
-  const visited = (id: string) => state.visited_rooms.includes(id);
-  const current = (id: string) => state.current_room === id;
-  const enemy   = (id: string) => !!seed.enemies?.[id] && !state.enemies_killed.includes(id);
-  const loot    = (id: string) => !!seed.loot?.[id]    && !state.loot_taken.includes(id);
+  const visited  = (id: string) => state.visited_rooms.includes(id);
+  const current  = (id: string) => state.current_room === id;
+  const enemy    = (id: string) => !!seed.enemies?.[id] && !state.enemies_killed.includes(id);
+  const loot     = (id: string) => !!seed.loot?.[id]    && !state.loot_taken.includes(id);
+
+  // Fog of war: a room is revealed if visited OR adjacent to a visited room
+  const visitedSet = new Set(state.visited_rooms);
+  const revealed = (id: string) => {
+    if (visitedSet.has(id)) return true;
+    return (seed.connections[id] ?? []).some(adj => visitedSet.has(adj)) ||
+      Object.entries(seed.connections).some(([from, targets]) => visitedSet.has(from) && targets.includes(id));
+  };
 
   useEffect(() => {
     const fn = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -84,8 +92,8 @@ export default function WorldMap({ seed, state, onClose }: Props) {
         {/* SVG map */}
         <svg width={svgW} height={svgH} style={{ display: 'block', overflow: 'visible' }}>
 
-          {/* Edges */}
-          {edges.map(({ a, b, cross }) => {
+          {/* Edges — only draw if both endpoints are revealed */}
+          {edges.filter(({ a, b }) => revealed(rooms[a].id) && revealed(rooms[b].id)).map(({ a, b, cross }) => {
             const x1 = cx(a), x2 = cx(b);
             if (cross) {
               const mx  = (x1 + x2) / 2;
@@ -110,13 +118,15 @@ export default function WorldMap({ seed, state, onClose }: Props) {
             );
           })}
 
-          {/* Nodes */}
-          {rooms.map((room, i) => {
+          {/* Nodes — only draw if revealed */}
+          {rooms.filter(room => revealed(room.id)).map((room, _i) => {
+            const i        = idxOf[room.id];
             const x        = cx(i);
             const isCur    = current(room.id);
             const isVis    = visited(room.id);
-            const hasEnemy = enemy(room.id);
-            const hasLoot  = loot(room.id);
+            // Enemy/loot dots only appear after you've visited (can't scout from outside)
+            const hasEnemy = isVis && enemy(room.id);
+            const hasLoot  = isVis && loot(room.id);
 
             const stroke = isCur ? 'var(--t-primary)' : isVis ? 'var(--t-mid)' : 'var(--t-border)';
             const fill   = isCur ? 'var(--t-separator)' : 'var(--t-card)';

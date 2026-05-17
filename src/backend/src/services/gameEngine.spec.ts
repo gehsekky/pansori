@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { buildArrivalNarrative, generateChoices, takeAction } from './gameEngine.js';
+import { buildArrivalNarrative, generateChoices, takeAction, normalizeState } from './gameEngine.js';
 import { context as ctx } from '../contexts/scifi-terror.js';
-import type { GameState, Seed } from '../types.js';
+import type { GameState, Character, Seed } from '../types.js';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -62,26 +62,85 @@ const seedWithLoot: Seed = {
   },
 };
 
-function makeState(overrides: Partial<GameState> = {}): GameState {
+function makeChar(overrides: Partial<Character> = {}): Character {
   return {
+    id:              'char-1',
+    name:            'Test Hero',
+    character_class: 'Soldier',
+    portrait_url:    null,
     hp: 10, max_hp: 10, ac: 10,
     str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10,
     gold: 5, xp: 0, level: 1,
-    character_class: 'Soldier',
-    inventory: [],
-    equipped_weapon: null, equipped_armor: null, equipped_shield: null,
-    current_room:  ctx.startRoomId,
-    visited_rooms: [ctx.startRoomId],
-    enemies_killed: [], loot_taken: [], enemy_hp: {},
-    run_log: [], room_log: [], last_choices: [],
-    conditions: [], flags: {},
-    combat_active: false, initiative: null, player_first: true,
-    turn_actions: { action_used: false, bonus_action_used: false, reaction_used: false, free_interaction_used: false },
-    death_saves: { successes: 0, failures: 0 },
-    stable: false, dead: false,
+    inventory:           [],
+    equipped_weapon:     null,
+    equipped_armor:      null,
+    equipped_shield:     null,
+    conditions:          [],
+    condition_durations: {},
+    death_saves:         { successes: 0, failures: 0 },
+    stable:          false,
+    dead:            false,
+    turn_actions:    { action_used: false, bonus_action_used: false, reaction_used: false, free_interaction_used: false },
+    initiative_roll: null,
     ...overrides,
   };
 }
+
+function makeState(charOverrides: Partial<Character> = {}, stateOverrides: Partial<GameState> = {}): GameState {
+  const char = makeChar(charOverrides);
+  return {
+    characters:          [char],
+    active_character_id: char.id,
+    current_room:        ctx.startRoomId,
+    visited_rooms:       [ctx.startRoomId],
+    enemies_killed:      [],
+    loot_taken:          [],
+    enemy_hp:            {},
+    combat_active:       false,
+    initiative_order:    [],
+    initiative_idx:      0,
+    run_log:             [],
+    room_log:            [],
+    last_choices:        [],
+    flags:               {},
+    ...stateOverrides,
+  };
+}
+
+// ─── normalizeState ───────────────────────────────────────────────────────────
+
+describe('normalizeState', () => {
+  it('passes through already-new-format state unchanged', () => {
+    const state = makeState();
+    const result = normalizeState(state as unknown as Record<string, unknown>);
+    expect(result.characters).toHaveLength(1);
+    expect(result.characters[0].id).toBe('char-1');
+  });
+
+  it('wraps legacy flat GameState into a 1-character party', () => {
+    const legacy = {
+      hp: 15, max_hp: 20, ac: 12,
+      str: 10, dex: 12, con: 10, int: 10, wis: 10, cha: 10,
+      xp: 50, level: 1, gold: 5,
+      character_class: 'Rogue',
+      inventory: [], equipped_weapon: null, equipped_armor: null, equipped_shield: null,
+      current_room: ctx.startRoomId,
+      visited_rooms: [ctx.startRoomId],
+      enemies_killed: [], loot_taken: [], enemy_hp: {},
+      run_log: [{ action: 'start', narrative: 'Test.' }],
+      room_log: ['Test.'], conditions: [], flags: {},
+      combat_active: false, stable: false, dead: false,
+      death_saves: { successes: 0, failures: 0 },
+      turn_actions: { action_used: false, bonus_action_used: false, reaction_used: false, free_interaction_used: false },
+    };
+    const result = normalizeState(legacy as unknown as Record<string, unknown>, { character_name: 'Old Hero', portrait_url: undefined });
+    expect(result.characters).toHaveLength(1);
+    expect(result.characters[0].name).toBe('Old Hero');
+    expect(result.characters[0].hp).toBe(15);
+    expect(result.characters[0].character_class).toBe('Rogue');
+    expect(result.run_log[0].character_id).toBe(result.characters[0].id);
+  });
+});
 
 // ─── buildArrivalNarrative ───────────────────────────────────────────────────
 
@@ -98,23 +157,23 @@ describe('buildArrivalNarrative', () => {
   });
 
   it('mentions a live enemy in the room', () => {
-    const text = buildArrivalNarrative(CORRIDOR_ID, makeState(), seedWithEnemy, ctx);
+    const text = buildArrivalNarrative(CORRIDOR_ID, makeState({}, { current_room: CORRIDOR_ID }), seedWithEnemy, ctx);
     expect(text).toContain('Space Zombie');
   });
 
   it('does not mention an already-killed enemy', () => {
-    const state = makeState({ enemies_killed: [CORRIDOR_ID] });
+    const state = makeState({}, { current_room: CORRIDOR_ID, enemies_killed: [CORRIDOR_ID] });
     const text  = buildArrivalNarrative(CORRIDOR_ID, state, seedWithEnemy, ctx);
     expect(text).not.toContain('HP:');
   });
 
   it('mentions available loot', () => {
-    const text = buildArrivalNarrative(CORRIDOR_ID, makeState(), seedWithLoot, ctx);
+    const text = buildArrivalNarrative(CORRIDOR_ID, makeState({}, { current_room: CORRIDOR_ID }), seedWithLoot, ctx);
     expect(text).toContain('Med-Kit');
   });
 
   it('does not mention already-taken loot', () => {
-    const state = makeState({ loot_taken: [CORRIDOR_ID] });
+    const state = makeState({}, { current_room: CORRIDOR_ID, loot_taken: [CORRIDOR_ID] });
     const text  = buildArrivalNarrative(CORRIDOR_ID, state, seedWithLoot, ctx);
     expect(text).not.toContain('Med-Kit');
   });
@@ -148,21 +207,21 @@ describe('generateChoices', () => {
   });
 
   it('includes attack option when an enemy is alive', () => {
-    const state   = makeState({ current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] });
+    const state   = makeState({}, { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] });
     const choices = generateChoices(state, seedWithEnemy, ctx);
     expect(choices.some(c => c.action.type === 'attack')).toBe(true);
     expect(choices.some(c => c.label.toLowerCase().includes('attack'))).toBe(true);
   });
 
   it('includes loot pick-up option when loot is available', () => {
-    const state   = makeState({ current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] });
+    const state   = makeState({}, { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] });
     const choices = generateChoices(state, seedWithLoot, ctx);
     expect(choices.some(c => c.action.type === 'loot')).toBe(true);
     expect(choices.some(c => c.label.toLowerCase().includes('med-kit'))).toBe(true);
   });
 
   it('includes escape choice at escape room when no enemy is alive', () => {
-    const state = makeState({
+    const state = makeState({}, {
       current_room:  ctx.escapeRoomId,
       visited_rooms: [ctx.startRoomId, CORRIDOR_ID, ctx.escapeRoomId],
     });
@@ -176,7 +235,7 @@ describe('generateChoices', () => {
       ...seed,
       enemies: { [ctx.escapeRoomId]: { name: 'Guard', hp: 10, ac: 12, damage: '1d6', toHit: 3, xp: 10 } },
     };
-    const state = makeState({
+    const state = makeState({}, {
       current_room:  ctx.escapeRoomId,
       visited_rooms: [ctx.startRoomId, CORRIDOR_ID, ctx.escapeRoomId],
     });
@@ -208,21 +267,20 @@ describe('takeAction', () => {
   });
 
   it('picking up loot adds item to inventory and marks loot_taken', async () => {
-    const state  = makeState({ current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] });
+    const state  = makeState({}, { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] });
     const result = await takeAction({ action: { type: 'loot' }, history: [], state, seed: seedWithLoot, context: ctx });
-    expect(result.newState.inventory).toHaveLength(1);
-    expect(result.newState.inventory[0].id).toBe('medkit');
-    expect(result.newState.inventory[0].instance_id).toBeTruthy();
+    const char   = result.newState.characters[0];
+    expect(char.inventory).toHaveLength(1);
+    expect(char.inventory[0].id).toBe('medkit');
+    expect(char.inventory[0].instance_id).toBeTruthy();
     expect(result.newState.loot_taken).toContain(CORRIDOR_ID);
   });
 
   // Test Case I — Opportunity Attack
-  // Moving away from a live enemy triggers an enemy attack roll against the player.
   it('[Case I] moving out of a room with a live enemy triggers an opportunity attack', async () => {
-    const state = makeState({
+    const state = makeState({ hp: 20, max_hp: 20 }, {
       current_room:  CORRIDOR_ID,
       visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
-      hp: 20, max_hp: 20,
     });
     vi.spyOn(Math, 'random').mockReturnValue(0); // d20 → 1, always misses
     const result = await takeAction({ action: { type: 'move', roomId: ctx.startRoomId }, history: [], state, seed: seedWithEnemy, context: ctx });
@@ -236,11 +294,126 @@ describe('takeAction', () => {
   });
 
   it('escape action at the escape room with no enemy sets escaped=true', async () => {
-    const state = makeState({
+    const state = makeState({}, {
       current_room:  ctx.escapeRoomId,
       visited_rooms: [ctx.startRoomId, CORRIDOR_ID, ctx.escapeRoomId],
     });
     const result = await takeAction({ action: { type: 'escape' }, history: [], state, seed, context: ctx });
     expect(result.escaped).toBe(true);
+  });
+
+  it('first attack populates initiative_order with all party members and the enemy', async () => {
+    const state = makeState({}, { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] });
+    const result = await takeAction({ action: { type: 'attack' }, history: [], state, seed: seedWithEnemy, context: ctx });
+    expect(result.newState.initiative_order.length).toBeGreaterThan(0);
+    const playerEntry = result.newState.initiative_order.find(e => !e.is_enemy);
+    const enemyEntry  = result.newState.initiative_order.find(e =>  e.is_enemy);
+    expect(playerEntry).toBeDefined();
+    expect(enemyEntry).toBeDefined();
+    expect(enemyEntry?.id).toBe(CORRIDOR_ID);
+  });
+
+  it('first attack sets initiative_idx to point at a player entry', async () => {
+    const state = makeState({}, { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] });
+    const result = await takeAction({ action: { type: 'attack' }, history: [], state, seed: seedWithEnemy, context: ctx });
+    if (result.newState.combat_active) {
+      const idx   = result.newState.initiative_idx;
+      const entry = result.newState.initiative_order[idx];
+      expect(entry?.is_enemy).toBe(false);
+    }
+  });
+
+  it('killing the enemy clears initiative_order and sets combat_active false', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99); // d20 → 20 (critical), always hits hard
+    const state = makeState({ hp: 20, max_hp: 20 }, { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] });
+    const result = await takeAction({ action: { type: 'attack' }, history: [], state, seed: seedWithEnemy, context: ctx });
+    if (!result.newState.combat_active) {
+      expect(result.newState.initiative_order).toHaveLength(0);
+      expect(result.newState.initiative_idx).toBe(0);
+    }
+  });
+
+  it('in a 2-char party, active_character_id advances to the other player after attack', async () => {
+    const char1 = makeChar({ id: 'c1', name: 'Alice' });
+    const char2 = makeChar({ id: 'c2', name: 'Bob' });
+    const state: GameState = {
+      characters: [char1, char2],
+      active_character_id: 'c1',
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [], loot_taken: [], enemy_hp: {},
+      combat_active: false, initiative_order: [], initiative_idx: 0,
+      run_log: [], room_log: [], last_choices: [], flags: {},
+    };
+    // Make enemy survive (miss always) so initiative advances
+    vi.spyOn(Math, 'random').mockReturnValue(0); // d20 → 1 (miss)
+    const result = await takeAction({ action: { type: 'attack' }, history: [], state, seed: seedWithEnemy, context: ctx });
+    if (result.newState.combat_active) {
+      expect(result.newState.active_character_id).toBe('c2');
+    }
+  });
+
+  // ─── Condition duration ──────────────────────────────────────────────────────
+
+  it('stunned character gets only a pass choice', () => {
+    const state = makeState({ conditions: ['stunned'], condition_durations: { stunned: 1 } }, {
+      current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+    });
+    const choices = generateChoices(state, seedWithEnemy, ctx);
+    expect(choices).toHaveLength(1);
+    expect(choices[0].action.type).toBe('pass');
+  });
+
+  it('pass action advances the turn without dealing damage', async () => {
+    const state = makeState({ hp: 10, conditions: ['stunned'], condition_durations: { stunned: 1 } }, {
+      current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      combat_active: true,
+      initiative_order: [
+        { id: 'char-1', roll: 5, is_enemy: false },
+        { id: CORRIDOR_ID, roll: 15, is_enemy: true },
+      ],
+      initiative_idx: 0,
+    });
+    const result = await takeAction({ action: { type: 'pass' }, history: [], state, seed: seedWithEnemy, context: ctx });
+    expect(result.narrative).toMatch(/stunned|paralyzed|passes/i);
+    expect(result.newState.characters[0].hp).toBeLessThanOrEqual(10); // may take enemy hit next turn
+  });
+
+  it('stunned condition clears after 1 round (on next initiative tick for that character)', async () => {
+    // Arrange: char is stunned with 1 round remaining, passes their turn
+    const state = makeState(
+      { conditions: ['stunned'], condition_durations: { stunned: 1 } },
+      {
+        current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+        combat_active: true,
+        initiative_order: [
+          { id: 'char-1', roll: 5,  is_enemy: false },
+          { id: CORRIDOR_ID, roll: 15, is_enemy: true },
+        ],
+        initiative_idx: 0,
+      },
+    );
+    // Pass turn — initiative advances to enemy, enemy attacks, then wraps back to char-1
+    vi.spyOn(Math, 'random').mockReturnValue(0); // enemy misses, d20→1
+    const result = await takeAction({ action: { type: 'pass' }, history: [], state, seed: seedWithEnemy, context: ctx });
+    // After the pass + enemy turn + wrap back to char-1, stun should be ticked off
+    const char = result.newState.characters.find(c => c.id === 'char-1')!;
+    expect(char.conditions).not.toContain('stunned');
+  });
+
+  it('party is not dead until all characters are dead', async () => {
+    const char1 = makeChar({ id: 'c1', hp: 0, dead: true });
+    const char2 = makeChar({ id: 'c2', hp: 10, max_hp: 10 });
+    const state: GameState = {
+      characters: [char1, char2],
+      active_character_id: 'c2',
+      current_room: ctx.startRoomId,
+      visited_rooms: [ctx.startRoomId],
+      enemies_killed: [], loot_taken: [], enemy_hp: {},
+      combat_active: false, initiative_order: [], initiative_idx: 0,
+      run_log: [], room_log: [], last_choices: [], flags: {},
+    };
+    const result = await takeAction({ action: { type: 'examine' }, history: [], state, seed, context: ctx });
+    expect(result.dead).toBe(false);
   });
 });

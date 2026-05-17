@@ -18,8 +18,5 @@
   "workspaces": [
     "src/frontend",
     "src/backend"
-  ],
-  "devDependencies": {
-    "vitest": "^4.1.6"
-  }
+  ]
 }
