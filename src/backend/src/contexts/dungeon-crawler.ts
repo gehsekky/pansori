@@ -365,4 +365,134 @@ export const context: Context = {
 
     escapeBlocked: 'blocks the exit shaft! Deal with it first!',
   },
+
+  npcSpawnChance: 0.25,
+
+  npcTemplates: [
+    {
+      id:       'wandering_merchant',
+      name:     'Wandering Merchant',
+      attitude: 'indifferent',
+      hp:       12,
+      ac:       11,
+      damage:   '1d4',
+      toHit:    2,
+      xp:       50,
+      dex:      12,
+      greeting: 'A haggard merchant clutches his pack, eyes darting between you and the shadows. "You… you\'re alive. Thank the gods. I\'ve been trapped in here for three days. Perhaps we can help each other."',
+      persuasionDC: 10,
+      responses: [
+        {
+          label:  'Ask how he got here',
+          reply:  'I followed a map — forged, as it turns out. Sold to me by a man who didn\'t survive to spend the coin. I know a back route toward the surface, but I\'m not brave enough to use it alone.',
+        },
+        {
+          label:  'Ask about the dungeon',
+          reply:  'The throne room — don\'t go there. Whatever sits on that throne, it isn\'t dead. I heard it moving on the second night. I haven\'t slept since.',
+          consequences: [{ type: 'set_flag', key: 'heard_throne_warning', value: true }],
+        },
+        {
+          label:  'Buy supplies',
+          reply:  'I still have a few things — take your pick, but I\'m not giving them away.',
+        },
+      ],
+      shop: [
+        { itemId: 'health_potion', price: 8  },
+        { itemId: 'rations',       price: 3  },
+        { itemId: 'mead_flask',    price: 5  },
+      ],
+    },
+    {
+      id:       'ghost_scholar',
+      name:     'Ghost Scholar',
+      attitude: 'friendly',
+      hp:       1,
+      ac:       8,
+      damage:   '1d2',
+      toHit:    0,
+      xp:       10,
+      greeting: 'A translucent figure in scholar\'s robes flickers into view — a ghost, but seemingly a peaceful one. "Ah, a living soul! Please, do not flee. I have been bound here since my research went… poorly. I can share what I learned before the end."',
+      responses: [
+        {
+          label:  'Ask what he was researching',
+          reply:  'The lich that rules this dungeon. I came to study it. It came to study me — briefly. What I found: it fears the light of the surface. The exit shaft is its one weakness. Reach it and you will be safe.',
+          consequences: [{ type: 'set_flag', key: 'knows_lich_weakness', value: true }],
+        },
+        {
+          label:  'Ask if he has anything useful',
+          reply:  'Knowledge, mostly. But I did hide one thing before the end — a health potion, behind the loose stone near the ritual chamber. Perhaps it still waits.',
+          consequences: [{ type: 'add_narrative', text: 'The ghost scholar\'s form shimmers. He seems to mean it.' }],
+        },
+      ],
+    },
+  ],
+
+  // ─── Script engine rules ─────────────────────────────────────────────────────
+  // Rules are evaluated after every action. Conditions use json-rules-engine
+  // syntax (all/any/not with fact/operator/value leaves).
+  // once:true rules fire exactly once per session (guarded by flags.rule_fired_<name>).
+
+  rules: [
+    {
+      // Fires the first time the player enters the Throne Room.
+      name:     'throne_room_first_entry',
+      priority: 10,
+      once:     true,
+      conditions: {
+        all: [
+          { fact: 'action',  operator: 'equal', value: 'move' },
+          { fact: 'room_id', operator: 'equal', value: 'throne_room' },
+        ],
+      },
+      consequences: [
+        {
+          type: 'add_narrative',
+          text: 'A cold dread settles over you as you cross the threshold. The candles on the altar flare violet, then die. Whatever power consecrated this room has turned.',
+        },
+        { type: 'set_flag', key: 'entered_throne_room', value: true },
+      ],
+    },
+
+    {
+      // When the party loots the Throne Room (having previously entered it),
+      // grant a hidden Cursed Gem that wasn't in the original loot table entry.
+      name:     'throne_hidden_gem',
+      priority: 5,
+      once:     true,
+      conditions: {
+        all: [
+          { fact: 'action',                 operator: 'equal', value: 'loot' },
+          { fact: 'room_id',                operator: 'equal', value: 'throne_room' },
+          { fact: 'entered_throne_room',    operator: 'equal', value: true },
+        ],
+      },
+      consequences: [
+        {
+          type: 'add_narrative',
+          text: 'Behind the toppled throne your fingers find a loose stone. Inside: a gem that pulses with cold purple light.',
+        },
+        { type: 'give_item', itemId: 'cursed_gem' },
+      ],
+    },
+
+    {
+      // If the player reaches the Exit Shaft at critically low HP (≤ 25%),
+      // add a dramatic near-death escape note.
+      name:     'narrow_escape',
+      priority: 3,
+      once:     true,
+      conditions: {
+        all: [
+          { fact: 'action',           operator: 'equal',            value: 'escape' },
+          { fact: 'active_hp',        operator: 'lessThanInclusive', value: 5 },
+        ],
+      },
+      consequences: [
+        {
+          type: 'add_narrative',
+          text: 'You barely make it out — blood streaming, vision tunnelling. One more hit and you would never have seen daylight again.',
+        },
+      ],
+    },
+  ],
 };

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { buildArrivalNarrative, generateChoices, takeAction, normalizeState } from './gameEngine.js';
+import { buildArrivalNarrative, generateChoices, takeAction, normalizeState, runRules } from './gameEngine.js';
 import { context as ctx } from '../contexts/scifi-terror.js';
-import type { GameState, Character, Seed } from '../types.js';
+import type { GameState, Character, Context, Seed, GameRule } from '../types.js';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -348,6 +348,7 @@ describe('takeAction', () => {
       enemies_killed: [], loot_taken: [], enemy_hp: {},
       combat_active: false, initiative_order: [], initiative_idx: 0,
       run_log: [], room_log: [], last_choices: [], flags: {},
+      short_rested_rooms: [], long_rested: false,
     };
     // Make enemy survive (miss always) so initiative advances
     vi.spyOn(Math, 'random').mockReturnValue(0); // d20 → 1 (miss)
@@ -508,5 +509,332 @@ describe('long_rest', () => {
     });
     const result = await takeAction({ action: { type: 'long_rest' }, history: [], state, seed, context: ctx });
     expect(result.newState.characters[0].conditions).toHaveLength(0);
+  });
+});
+
+// ─── runRules ─────────────────────────────────────────────────────────────────
+
+function makeCtxWithRules(rules: GameRule[]): Context {
+  return { ...ctx, rules };
+}
+
+const rulesSeed: Seed = {
+  ...seed,
+  loot: {
+    medkit: {
+      id: 'medkit', name: 'Med-Kit', desc: 'Heals wounds.',
+      weight: 1, type: 'consumable', slot: null, damage: null,
+      ac_bonus: null, heal: '1d6+1', effect: null, aliases: ['medkit'],
+    },
+  },
+};
+
+describe('runRules', () => {
+  it('returns state unchanged when context has no rules', async () => {
+    const state = makeState();
+    const result = await runRules(state, ctx, { type: 'examine' }, ctx.startRoomId, seed);
+    expect(result.extraNarrative).toBe('');
+    expect(result.state).toEqual(state);
+  });
+
+  it('returns state unchanged when no rules match', async () => {
+    const rule: GameRule = {
+      name: 'never_fires',
+      conditions: { all: [{ fact: 'action', operator: 'equal', value: 'loot' }] },
+      consequences: [{ type: 'set_flag', key: 'triggered', value: true }],
+    };
+    const state = makeState();
+    const result = await runRules(state, makeCtxWithRules([rule]), { type: 'examine' }, ctx.startRoomId, seed);
+    expect(result.state.flags['triggered']).toBeUndefined();
+  });
+
+  it('set_flag consequence writes to state.flags', async () => {
+    const rule: GameRule = {
+      name: 'flag_test',
+      conditions: { all: [{ fact: 'action', operator: 'equal', value: 'examine' }] },
+      consequences: [{ type: 'set_flag', key: 'boss_defeated', value: true }],
+    };
+    const state = makeState();
+    const result = await runRules(state, makeCtxWithRules([rule]), { type: 'examine' }, ctx.startRoomId, seed);
+    expect(result.state.flags['boss_defeated']).toBe(true);
+  });
+
+  it('add_narrative consequence populates extraNarrative', async () => {
+    const rule: GameRule = {
+      name: 'narrative_test',
+      conditions: { all: [{ fact: 'action', operator: 'equal', value: 'examine' }] },
+      consequences: [{ type: 'add_narrative', text: 'You sense danger.' }],
+    };
+    const state = makeState();
+    const result = await runRules(state, makeCtxWithRules([rule]), { type: 'examine' }, ctx.startRoomId, seed);
+    expect(result.extraNarrative).toContain('You sense danger.');
+  });
+
+  it('give_item consequence adds item to active character inventory', async () => {
+    const rule: GameRule = {
+      name: 'give_item_test',
+      conditions: { all: [{ fact: 'action', operator: 'equal', value: 'examine' }] },
+      consequences: [{ type: 'give_item', itemId: 'medkit' }],
+    };
+    const state = makeState();
+    const result = await runRules(state, makeCtxWithRules([rule]), { type: 'examine' }, ctx.startRoomId, rulesSeed);
+    expect(result.state.characters[0].inventory).toHaveLength(1);
+    expect(result.state.characters[0].inventory[0].id).toBe('medkit');
+  });
+
+  it('give_item with unknown itemId does not crash and leaves inventory unchanged', async () => {
+    const rule: GameRule = {
+      name: 'give_unknown',
+      conditions: { all: [{ fact: 'action', operator: 'equal', value: 'examine' }] },
+      consequences: [{ type: 'give_item', itemId: 'does_not_exist' }],
+    };
+    const state = makeState();
+    const result = await runRules(state, makeCtxWithRules([rule]), { type: 'examine' }, ctx.startRoomId, seed);
+    expect(result.state.characters[0].inventory).toHaveLength(0);
+  });
+
+  it('modify_hp consequence adjusts active character HP', async () => {
+    const rule: GameRule = {
+      name: 'hp_test',
+      conditions: { all: [{ fact: 'action', operator: 'equal', value: 'examine' }] },
+      consequences: [{ type: 'modify_hp', amount: -3 }],
+    };
+    const state = makeState({ hp: 10, max_hp: 10 });
+    const result = await runRules(state, makeCtxWithRules([rule]), { type: 'examine' }, ctx.startRoomId, seed);
+    expect(result.state.characters[0].hp).toBe(7);
+  });
+
+  it('modify_hp does not exceed max_hp', async () => {
+    const rule: GameRule = {
+      name: 'overheal_test',
+      conditions: { all: [{ fact: 'action', operator: 'equal', value: 'examine' }] },
+      consequences: [{ type: 'modify_hp', amount: 50 }],
+    };
+    const state = makeState({ hp: 8, max_hp: 10 });
+    const result = await runRules(state, makeCtxWithRules([rule]), { type: 'examine' }, ctx.startRoomId, seed);
+    expect(result.state.characters[0].hp).toBe(10);
+  });
+
+  it('modify_hp does not go below 0', async () => {
+    const rule: GameRule = {
+      name: 'overkill_test',
+      conditions: { all: [{ fact: 'action', operator: 'equal', value: 'examine' }] },
+      consequences: [{ type: 'modify_hp', amount: -999 }],
+    };
+    const state = makeState({ hp: 5, max_hp: 10 });
+    const result = await runRules(state, makeCtxWithRules([rule]), { type: 'examine' }, ctx.startRoomId, seed);
+    expect(result.state.characters[0].hp).toBe(0);
+  });
+
+  it('set_escape consequence sets _rule_escape flag for takeAction to consume', async () => {
+    const rule: GameRule = {
+      name: 'escape_test',
+      conditions: { all: [{ fact: 'action', operator: 'equal', value: 'examine' }] },
+      consequences: [{ type: 'set_escape' }],
+    };
+    const state = makeState();
+    const result = await runRules(state, makeCtxWithRules([rule]), { type: 'examine' }, ctx.startRoomId, seed);
+    expect(result.state.flags['_rule_escape']).toBe(true);
+  });
+
+  it('once:true rule fires exactly once — rule_fired_ guard is set afterward', async () => {
+    const rule: GameRule = {
+      name: 'once_narrative',
+      once: true,
+      conditions: { all: [{ fact: 'action', operator: 'equal', value: 'examine' }] },
+      consequences: [{ type: 'add_narrative', text: 'First time!' }],
+    };
+    const ctxWithRule = makeCtxWithRules([rule]);
+    const state = makeState();
+
+    const first  = await runRules(state, ctxWithRule, { type: 'examine' }, ctx.startRoomId, seed);
+    const second = await runRules(first.state, ctxWithRule, { type: 'examine' }, ctx.startRoomId, seed);
+
+    expect(first.extraNarrative).toContain('First time!');
+    expect(first.state.flags['rule_fired_once_narrative']).toBe(true);
+    expect(second.extraNarrative).toBe('');
+  });
+
+  it('rule conditions can check room_id', async () => {
+    const rule: GameRule = {
+      name: 'room_check',
+      conditions: {
+        all: [
+          { fact: 'action',  operator: 'equal', value: 'move' },
+          { fact: 'room_id', operator: 'equal', value: CORRIDOR_ID },
+        ],
+      },
+      consequences: [{ type: 'set_flag', key: 'entered_corridor', value: true }],
+    };
+    const state = makeState({}, { current_room: CORRIDOR_ID });
+    const result = await runRules(state, makeCtxWithRules([rule]), { type: 'move', roomId: CORRIDOR_ID }, ctx.startRoomId, seed);
+    expect(result.state.flags['entered_corridor']).toBe(true);
+  });
+
+  it('flags spread as top-level facts so rules can condition on them directly', async () => {
+    const rule: GameRule = {
+      name: 'flag_fact_check',
+      conditions: { all: [{ fact: 'boss_defeated', operator: 'equal', value: true }] },
+      consequences: [{ type: 'add_narrative', text: 'Boss is dead!' }],
+    };
+    const state = makeState({}, { flags: { boss_defeated: true } });
+    const result = await runRules(state, makeCtxWithRules([rule]), { type: 'examine' }, ctx.startRoomId, seed);
+    expect(result.extraNarrative).toContain('Boss is dead!');
+  });
+
+  it('takeAction integrates rule extraNarrative into final narrative', async () => {
+    const rule: GameRule = {
+      name: 'action_narrative',
+      conditions: { all: [{ fact: 'action', operator: 'equal', value: 'examine' }] },
+      consequences: [{ type: 'add_narrative', text: 'A whisper echoes.' }],
+    };
+    const state = makeState();
+    const result = await takeAction({
+      action: { type: 'examine' },
+      history: [],
+      state,
+      seed,
+      context: makeCtxWithRules([rule]),
+    });
+    expect(result.narrative).toContain('A whisper echoes.');
+  });
+
+  it('takeAction with set_escape rule sets escaped=true and removes _rule_escape from flags', async () => {
+    const rule: GameRule = {
+      name: 'force_escape',
+      conditions: { all: [{ fact: 'action', operator: 'equal', value: 'examine' }] },
+      consequences: [{ type: 'set_escape' }],
+    };
+    const state = makeState();
+    const result = await takeAction({
+      action: { type: 'examine' },
+      history: [],
+      state,
+      seed,
+      context: makeCtxWithRules([rule]),
+    });
+    expect(result.escaped).toBe(true);
+    expect(result.newState.flags['_rule_escape']).toBeUndefined();
+  });
+});
+
+// ─── NPC actions ──────────────────────────────────────────────────────────────
+
+import type { PlacedNpc, NpcTemplate } from '../types.js';
+
+const npcTemplate: NpcTemplate = {
+  id:       'test_npc',
+  name:     'Friendly Guide',
+  attitude: 'friendly',
+  hp:       10,
+  ac:       10,
+  damage:   '1d4',
+  toHit:    2,
+  xp:       25,
+  greeting: 'Greetings, traveller!',
+  responses: [
+    { label: 'Ask about the area', reply: 'Dangerous around here.' },
+    { label: 'Ask for help', reply: 'Gladly!', consequences: [{ type: 'set_flag', key: 'guide_helped', value: true }] },
+  ],
+  shop: [
+    { itemId: 'med_kit', price: 5 },
+  ],
+};
+
+const npcRoomId = CORRIDOR_ID;
+const placedNpc: PlacedNpc = { ...npcTemplate, roomId: npcRoomId };
+
+const seedWithNpc: Seed = {
+  ...seedWithLoot,
+  npcs: { [npcRoomId]: placedNpc },
+};
+
+function makeNpcState(charOverrides: Partial<Character> = {}, npcAttitude = placedNpc.attitude) {
+  return makeState(charOverrides, {
+    current_room:  npcRoomId,
+    visited_rooms: [ctx.startRoomId, npcRoomId],
+    npc_attitudes: npcAttitude !== placedNpc.attitude ? { [npcRoomId]: npcAttitude } : {},
+    npc_talked:    [],
+  });
+}
+
+describe('NPC actions', () => {
+  it('talk to friendly NPC shows greeting and marks room as talked', async () => {
+    const result = await takeAction({ action: { type: 'talk' }, history: [], state: makeNpcState(), seed: seedWithNpc, context: ctx });
+    expect(result.narrative).toContain('Greetings, traveller!');
+    expect(result.newState.npc_talked).toContain(npcRoomId);
+  });
+
+  it('talk to indifferent NPC succeeds on high CHA roll', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99); // d20 → 20, passes DC
+    const state = makeNpcState({}, 'indifferent');
+    const result = await takeAction({ action: { type: 'talk' }, history: [], state, seed: seedWithNpc, context: ctx });
+    expect(result.narrative).toMatch(/success/i);
+    expect(result.newState.npc_attitudes[npcRoomId]).toBe('friendly');
+  });
+
+  it('talk to indifferent NPC fails on low CHA roll', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0); // d20 → 1, fails DC
+    const state = makeNpcState({}, 'indifferent');
+    const result = await takeAction({ action: { type: 'talk' }, history: [], state, seed: seedWithNpc, context: ctx });
+    expect(result.narrative).toMatch(/fail/i);
+    expect(result.newState.npc_attitudes[npcRoomId]).not.toBe('friendly'); // attitude not changed to friendly
+  });
+
+  it('generateChoices shows talk choice for friendly NPC', () => {
+    const state = makeNpcState();
+    const choices = generateChoices(state, seedWithNpc, ctx);
+    expect(choices.some(c => c.action.type === 'talk')).toBe(true);
+  });
+
+  it('generateChoices shows buy choice for friendly NPC with shop', () => {
+    const state = makeNpcState();
+    const choices = generateChoices(state, seedWithNpc, ctx);
+    expect(choices.some(c => c.action.type === 'buy')).toBe(true);
+  });
+
+  it('generateChoices shows attack_npc for hostile NPC', () => {
+    const state = makeNpcState({}, 'hostile');
+    const choices = generateChoices(state, seedWithNpc, ctx);
+    const attackNpc = choices.filter(c => c.action.type === 'attack_npc');
+    expect(attackNpc.length).toBeGreaterThan(0);
+  });
+
+  it('talk_response applies consequences and shows NPC reply', async () => {
+    const state = { ...makeNpcState(), npc_talked: [npcRoomId] };
+    const result = await takeAction({ action: { type: 'talk_response', responseIdx: 1 }, history: [], state, seed: seedWithNpc, context: ctx });
+    expect(result.narrative).toContain('Gladly!');
+    expect(result.newState.flags['guide_helped']).toBe(true);
+  });
+
+  it('buy deducts gold and adds item to inventory', async () => {
+    const state = makeNpcState({ gold: 10 });
+    const result = await takeAction({ action: { type: 'buy', itemId: 'med_kit', price: 5 }, history: [], state, seed: seedWithNpc, context: ctx });
+    expect(result.newState.characters[0].gold).toBe(5);
+    expect(result.newState.characters[0].inventory.some(i => i.id === 'med_kit')).toBe(true);
+  });
+
+  it('buy fails when insufficient gold', async () => {
+    const state = makeNpcState({ gold: 2 });
+    const result = await takeAction({ action: { type: 'buy', itemId: 'med_kit', price: 5 }, history: [], state, seed: seedWithNpc, context: ctx });
+    expect(result.narrative).toMatch(/can't afford/i);
+    expect(result.newState.characters[0].gold).toBe(2);
+  });
+
+  it('attack_npc flips attitude to hostile and deals damage on hit', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99); // d20 → 20, always hits
+    const state = makeNpcState({ hp: 10, max_hp: 10 });
+    const result = await takeAction({ action: { type: 'attack_npc' }, history: [], state, seed: seedWithNpc, context: ctx });
+    expect(result.newState.npc_attitudes[npcRoomId]).toBe('hostile');
+    expect(result.narrative).toMatch(/strike|falls/i);
+  });
+
+  it('attack_npc when NPC is killed marks enemies_killed', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99); // critical, high damage
+    const weakNpc: PlacedNpc = { ...placedNpc, hp: 1 };
+    const seedWeak: Seed = { ...seedWithNpc, npcs: { [npcRoomId]: weakNpc } };
+    const state = makeNpcState({ hp: 10, max_hp: 10 });
+    const result = await takeAction({ action: { type: 'attack_npc' }, history: [], state, seed: seedWeak, context: ctx });
+    expect(result.newState.enemies_killed).toContain(`npc:${npcRoomId}`);
   });
 });

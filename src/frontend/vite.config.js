@@ -8,7 +8,13 @@ export default defineConfig({
     port: 5173,
     watch: { usePolling: true },
     proxy: {
-      '/api': { target: 'http://backend:3001', changeOrigin: true }
-    }
-  }
+      '/api': { target: 'http://backend:3001', changeOrigin: true },
+    },
+  },
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: ['./src/test-setup.ts'],
+    include: ['src/**/*.spec.{ts,tsx}'],
+  },
 });

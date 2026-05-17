@@ -7,7 +7,8 @@ import {
   ADVANTAGE_CONDITIONS, DISADV_CONDITIONS,
   rollConditionSave, resolveSaveWithAdvantage, resolveMysteryConsumable, passivePerceptionDC,
 } from './rulesEngine.js';
-import type { GameState, Character, Seed, Context, Enemy, LootItem, InventoryItem, OnHitEffect, StructuredAction, GameChoice, DeathSaves, TurnActions } from '../types.js';
+import { Engine } from 'json-rules-engine';
+import type { GameState, Character, Seed, Context, Enemy, LootItem, InventoryItem, OnHitEffect, StructuredAction, GameChoice, DeathSaves, TurnActions, GameConsequence, RuleFacts, PlacedNpc, NpcAttitude } from '../types.js';
 
 function pick<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)]; }
 
@@ -304,6 +305,8 @@ export function normalizeState(
       ...gs,
       short_rested_rooms: gs.short_rested_rooms ?? [],
       long_rested:        gs.long_rested        ?? false,
+      npc_attitudes:      gs.npc_attitudes      ?? {},
+      npc_talked:         gs.npc_talked         ?? [],
       characters: gs.characters.map(c => ({
         ...c,
         hit_die:             c.hit_die             ?? 8,
@@ -363,6 +366,8 @@ export function normalizeState(
     last_choices:        undefined,
     short_rested_rooms:  [],
     long_rested:         false,
+    npc_attitudes:       {},
+    npc_talked:          [],
     flags:               (raw.flags as Record<string, boolean | string | number>) ?? {},
   };
 }
@@ -391,6 +396,16 @@ export function buildArrivalNarrative(targetId: string, state: GameState, seed: 
     text += ` You spot a ${newLoot.name} on the ground.`;
   }
   return text;
+}
+
+// ─── NPC helpers ─────────────────────────────────────────────────────────────
+
+function getNpcAttitude(state: GameState, npc: PlacedNpc): NpcAttitude {
+  return state.npc_attitudes?.[npc.roomId] ?? npc.attitude;
+}
+
+function npcIsKilled(state: GameState, roomId: string): boolean {
+  return !!(state.npc_attitudes?.[roomId] === 'hostile' && state.enemies_killed?.includes(`npc:${roomId}`));
 }
 
 // ─── Choice generation ────────────────────────────────────────────────────────
@@ -467,12 +482,179 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       choices.push({ label: 'Long Rest — full recovery (once per session)', action: { type: 'long_rest' } });
     }
   }
+  // NPC choices
+  const npc = seed.npcs?.[roomId];
+  if (npc && !npcIsKilled(state, roomId) && !enemyAlive) {
+    const attitude = getNpcAttitude(state, npc);
+    if (attitude === 'hostile') {
+      choices.push({ label: `Attack the ${npc.name}`, action: { type: 'attack_npc' } });
+    } else {
+      const dcNote = attitude === 'indifferent' ? ` (CHA check DC ${npc.persuasionDC ?? 12})` : '';
+      choices.push({ label: `Talk to ${npc.name}${dcNote}`, action: { type: 'talk' } });
+      if (npc.shop?.length && attitude === 'friendly') {
+        for (const entry of npc.shop) {
+          if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+          const item = context.lootTable.find(l => l.id === entry.itemId);
+          if (item) {
+            choices.push({
+              label:  `Buy ${item.name} — ${entry.price}cr`,
+              action: { type: 'buy', itemId: entry.itemId, price: entry.price },
+            });
+          }
+        }
+      }
+      if (attitude !== 'hostile') {
+        choices.push({ label: `Attack ${npc.name} (makes hostile)`, action: { type: 'attack_npc' } });
+      }
+    }
+  }
   for (const adj of adjacent) {
     if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
     const label = enemyAlive ? `Dash past the ${enemy.name} → ${adj.name}` : `Move to ${adj.name}`;
     choices.push({ label, action: { type: 'move', roomId: adj.id } });
   }
   return MAX_CHOICES ? choices.slice(0, MAX_CHOICES) : choices;
+}
+
+// ─── Script engine: rule evaluation ──────────────────────────────────────────
+
+export async function runRules(
+  state:       GameState,
+  context:     Context,
+  action:      StructuredAction,
+  prevRoomId:  string,
+  seed:        Seed,
+): Promise<{ state: GameState; extraNarrative: string }> {
+  const rules = context.rules;
+  if (!rules?.length) return { state, extraNarrative: '' };
+
+  const activeChar = state.characters.find(c => c.id === state.active_character_id) ?? state.characters[0];
+  if (!activeChar) return { state, extraNarrative: '' };
+
+  // Filter out once-rules that have already fired
+  const eligibleRules = rules.filter(r =>
+    !r.once || !state.flags[`rule_fired_${r.name}`]
+  );
+  if (!eligibleRules.length) return { state, extraNarrative: '' };
+
+  // Flags are spread as top-level facts so rules can reference them directly
+  // (e.g. { fact: 'boss_defeated', operator: 'equal', value: true }).
+  // Named facts below take precedence over any same-named flag.
+  const facts: Record<string, unknown> = {
+    ...state.flags,
+    action:            action.type,
+    room_id:           state.current_room,
+    prev_room_id:      prevRoomId,
+    visited_rooms:     state.visited_rooms,
+    enemies_killed:    state.enemies_killed,
+    loot_taken:        state.loot_taken,
+    combat_active:     state.combat_active,
+    flags:             state.flags,
+    active_hp:         activeChar.hp,
+    active_max_hp:     activeChar.max_hp,
+    active_level:      activeChar.level,
+    active_class:      activeChar.character_class,
+    active_conditions: activeChar.conditions,
+  };
+
+  const engine = new Engine();
+  for (const rule of eligibleRules) {
+    engine.addRule({
+      name:       rule.name,
+      priority:   rule.priority ?? 1,
+      conditions: rule.conditions as Parameters<typeof engine.addRule>[0]['conditions'],
+      event:      { type: rule.name },
+    });
+  }
+
+  const { events } = await engine.run(facts as Parameters<typeof engine.run>[0]);
+  const firedNames = new Set(events.map(e => e.type));
+
+  if (!firedNames.size) return { state, extraNarrative: '' };
+
+  // Apply consequences for each fired rule in declaration order
+  let st = state;
+  const narrativeParts: string[] = [];
+
+  for (const rule of eligibleRules) {
+    if (!firedNames.has(rule.name)) continue;
+
+    for (const c of rule.consequences) {
+      st = applyConsequence(c, st, seed, activeChar.id, narrativeParts);
+    }
+
+    if (rule.once) {
+      st = { ...st, flags: { ...st.flags, [`rule_fired_${rule.name}`]: true } };
+    }
+  }
+
+  return { state: st, extraNarrative: narrativeParts.join(' ') };
+}
+
+function applyConsequence(
+  c:           GameConsequence,
+  st:          GameState,
+  seed:        Seed,
+  activeCharId: string,
+  narrativeParts: string[],
+): GameState {
+  switch (c.type) {
+    case 'add_narrative':
+      narrativeParts.push(c.text);
+      return st;
+
+    case 'set_flag':
+      return { ...st, flags: { ...st.flags, [c.key]: c.value } };
+
+    case 'give_item': {
+      const targetId   = c.characterId ?? activeCharId;
+      const lootEntry  = seed.loot?.[c.itemId] ?? null;
+      if (!lootEntry) return st;
+      const newItem    = { ...lootEntry, instance_id: randomUUID() };
+      const characters = st.characters.map(ch =>
+        ch.id === targetId
+          ? { ...ch, inventory: [...ch.inventory, newItem] }
+          : ch
+      );
+      return { ...st, characters };
+    }
+
+    case 'modify_hp': {
+      const targetId   = c.characterId ?? activeCharId;
+      const characters = st.characters.map(ch => {
+        if (ch.id !== targetId) return ch;
+        const newHp = Math.max(0, Math.min(ch.max_hp, ch.hp + c.amount));
+        return { ...ch, hp: newHp };
+      });
+      return { ...st, characters };
+    }
+
+    case 'unlock_room': {
+      // Mark the room as already visited so it appears on the map without being locked
+      if (st.visited_rooms.includes(c.roomId)) return st;
+      return { ...st, visited_rooms: [...st.visited_rooms, c.roomId] };
+    }
+
+    case 'spawn_enemy': {
+      // Only spawn if room has no living enemy already
+      const alreadyKilled = st.enemies_killed.includes(c.roomId);
+      const alreadyPresent = seed.enemies?.[c.roomId];
+      if (alreadyKilled || alreadyPresent) return st;
+      // Spawning modifies the seed-side data; we record it in enemy_hp instead
+      // so the engine recognises a live enemy in that room next evaluation.
+      const template = seed.enemies?.[c.enemyId];
+      if (!template) return st;
+      return { ...st, enemy_hp: { ...st.enemy_hp, [c.roomId]: template.hp } };
+    }
+
+    case 'set_escape':
+      // Handled by takeAction's escaped flag; we signal via a flag that
+      // the route can check after runRules returns.
+      return { ...st, flags: { ...st.flags, _rule_escape: true } };
+
+    default:
+      return st;
+  }
 }
 
 // ─── Main action handler ──────────────────────────────────────────────────────
@@ -485,6 +667,8 @@ export async function takeAction({ action, history = [], state, seed, context }:
   context: Context;
 }) {
   void history;
+
+  const prevRoomId = state.current_room;
 
   // Resolve and clone the active character
   const charIdx = state.characters.findIndex(c => c.id === state.active_character_id);
@@ -503,6 +687,8 @@ export async function takeAction({ action, history = [], state, seed, context }:
     room_log:           state.room_log           ?? [],
     short_rested_rooms: state.short_rested_rooms ?? [],
     long_rested:        state.long_rested        ?? false,
+    npc_attitudes:      state.npc_attitudes      ?? {},
+    npc_talked:         state.npc_talked         ?? [],
     flags:              state.flags              ?? {},
   };
 
@@ -947,6 +1133,132 @@ export async function takeAction({ action, history = [], state, seed, context }:
       break;
     }
 
+    // ── NPC: talk ────────────────────────────────────────────────────────────
+    case 'talk': {
+      const npc = seed.npcs?.[roomId];
+      if (!npc) { narrative = 'There is no one to talk to here.'; break; }
+      if (npcIsKilled(st, roomId)) { narrative = 'They are dead.'; break; }
+
+      const attitude = getNpcAttitude(st, npc);
+      if (attitude === 'hostile') { narrative = `${npc.name} snarls at you and attacks!`; break; }
+
+      // Indifferent: require CHA (Persuasion) check
+      if (attitude === 'indifferent') {
+        const dc      = npc.persuasionDC ?? 12;
+        const chaMod  = abilityMod(char.cha);
+        const roll    = rollDice('1d20') + chaMod + profBonus(char.level);
+        const success = roll >= dc;
+        if (success) {
+          st = { ...st, npc_attitudes: { ...st.npc_attitudes, [roomId]: 'friendly' } };
+          narrative = `You approach ${npc.name} with care (CHA check ${roll} vs DC ${dc} — success). ${npc.greeting}`;
+        } else {
+          narrative = `${npc.name} eyes you warily (CHA check ${roll} vs DC ${dc} — fail). They're not ready to talk yet.`;
+          break;
+        }
+      } else {
+        narrative = npc.greeting;
+      }
+
+      // Mark room as talked — responses become choices
+      if (!st.npc_talked.includes(roomId)) {
+        st = { ...st, npc_talked: [...st.npc_talked, roomId] };
+      }
+
+      // Append responses as inline choice hints in narrative
+      if (npc.responses.length > 0) {
+        narrative += ' [' + npc.responses.map((r, i) => `${i + 1}. ${r.label}`).join(' | ') + ']';
+      }
+      break;
+    }
+
+    // ── NPC: talk_response ───────────────────────────────────────────────────
+    case 'talk_response': {
+      const npc = seed.npcs?.[roomId];
+      if (!npc) { narrative = 'There is no one here.'; break; }
+
+      const idx = action.responseIdx;
+      const response = npc.responses[idx];
+      if (!response) { narrative = 'Invalid response.'; break; }
+
+      narrative = response.reply ? `${npc.name}: "${response.reply}"` : `${npc.name} nods.`;
+
+      // Apply any consequences attached to this response
+      if (response.consequences?.length) {
+        const narrativeParts: string[] = [];
+        for (const c of response.consequences) {
+          st = applyConsequence(c, st, seed, char.id, narrativeParts);
+        }
+        if (narrativeParts.length) narrative += ' ' + narrativeParts.join(' ');
+      }
+      break;
+    }
+
+    // ── NPC: buy ─────────────────────────────────────────────────────────────
+    case 'buy': {
+      const npc = seed.npcs?.[roomId];
+      if (!npc) { narrative = 'There is no one to buy from.'; break; }
+      if (getNpcAttitude(st, npc) !== 'friendly') { narrative = `${npc.name} won't trade with you right now.`; break; }
+
+      if (char.gold < action.price) {
+        narrative = `You can't afford that — you only have ${char.gold}cr.`;
+        break;
+      }
+      const lootEntry = context.lootTable.find(l => l.id === action.itemId);
+      if (!lootEntry) { narrative = 'That item is not available.'; break; }
+
+      char = { ...char, gold: char.gold - action.price, inventory: [...char.inventory, { ...lootEntry, instance_id: randomUUID() }] };
+      narrative = `You hand over ${action.price}cr and receive ${lootEntry.name}. ${npc.name} pockets the credits with a nod.`;
+      break;
+    }
+
+    // ── NPC: attack_npc ──────────────────────────────────────────────────────
+    case 'attack_npc': {
+      const npc = seed.npcs?.[roomId];
+      if (!npc) { narrative = 'There is no one to attack here.'; break; }
+      if (npcIsKilled(st, roomId)) { narrative = 'Already dead.'; break; }
+
+      // Flip to hostile if not already
+      st = { ...st, npc_attitudes: { ...st.npc_attitudes, [roomId]: 'hostile' } };
+
+      // Resolve attack using NPC stat block as an enemy proxy
+      const npcAsEnemy: Enemy = { name: npc.name, hp: npc.hp, ac: npc.ac, damage: npc.damage, toHit: npc.toHit, xp: npc.xp, dex: npc.dex };
+      const currentNpcHp = st.enemy_hp?.[`npc:${roomId}`] ?? npc.hp;
+      const equippedWeaponItem = char.equipped_weapon
+        ? context.lootTable.find(l => l.id === char.equipped_weapon) ?? null
+        : null;
+      const weaponDamageNpc  = equippedWeaponItem?.damage ?? null;
+      const hasDisadvantage  = char.conditions.some(c => DISADV_CONDITIONS.has(c));
+      const attackResult = resolvePlayerAttack(
+        { str: char.str, dex: char.dex, level: char.level },
+        weaponDamageNpc,
+        npcAsEnemy.ac,
+        equippedWeaponItem?.finesse ?? false,
+        hasDisadvantage,
+      );
+
+      if (attackResult.hit) {
+        const newHp = Math.max(0, currentNpcHp - attackResult.damage);
+        st = { ...st, enemy_hp: { ...st.enemy_hp, [`npc:${roomId}`]: newHp } };
+        if (newHp <= 0) {
+          st = { ...st, enemies_killed: [...st.enemies_killed, `npc:${roomId}`] };
+          char = { ...char, xp: char.xp + npcAsEnemy.xp };
+          narrative = `${npcAsEnemy.name} falls. You earned ${npcAsEnemy.xp} XP — but at what cost?`;
+        } else {
+          narrative = `You strike ${npcAsEnemy.name} for ${attackResult.damage} damage (${newHp} HP remaining).`;
+        }
+      } else {
+        narrative = `Your attack misses ${npcAsEnemy.name}.`;
+      }
+
+      // NPC retaliates
+      if (!npcIsKilled(st, roomId)) {
+        const retaliation = applyEnemyAttackNarrative(npcAsEnemy, char, context);
+        char = { ...char, hp: Math.max(0, char.hp - retaliation.hpLost), conditions: retaliation.newConditions, condition_durations: retaliation.newDurations };
+        narrative += ' ' + retaliation.narrative;
+      }
+      break;
+    }
+
     case 'examine':
     default: {
       narrative = buildArrivalNarrative(roomId, st, seed, context);
@@ -1034,15 +1346,28 @@ export async function takeAction({ action, history = [], state, seed, context }:
     }
   }
 
+  // Run script-engine rules against the post-action state
+  const { state: afterRules, extraNarrative } = await runRules(st, context, action, prevRoomId, seed);
+  st = afterRules;
+
+  // set_escape consequence signals via flag
+  if (st.flags._rule_escape) {
+    escaped = true;
+    const { _rule_escape: _, ...restFlags } = st.flags;
+    st = { ...st, flags: restFlags };
+  }
+
+  const finalNarrative = extraNarrative ? `${narrative}\n\n${extraNarrative}` : narrative;
+
   const roomChanged = st.current_room !== state.current_room;
-  st.run_log        = [...(st.run_log || []), { character_id: char.id, action: action.type, narrative }];
-  st.room_log       = roomChanged ? [narrative] : [...(st.room_log ?? []), narrative];
+  st.run_log        = [...(st.run_log || []), { character_id: char.id, action: action.type, narrative: finalNarrative }];
+  st.room_log       = roomChanged ? [finalNarrative] : [...(st.room_log ?? []), finalNarrative];
   st.last_choices   = generateChoices(st, seed, context);
 
   const allDead = st.characters.every(c => c.dead);
 
   return {
-    narrative,
+    narrative: finalNarrative,
     choices: st.last_choices,
     newState: st,
     escaped,

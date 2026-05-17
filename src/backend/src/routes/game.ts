@@ -4,20 +4,26 @@ import { pool } from '../db/pool.js';
 import { generateSeed } from '../services/procgen.js';
 import { takeAction, generateChoices, buildArrivalNarrative, normalizeState } from '../services/gameEngine.js';
 import { FRESH_TURN, canEquipWeapon, canDonArmor, canDonShield, computeAcAfterArmorChange } from '../services/rulesEngine.js';
-import { context as scifiContext }   from '../contexts/scifi-terror.js';
-import { context as dungeonContext } from '../contexts/dungeon-crawler.js';
-import { context as zombieContext }  from '../contexts/high-school-zombie.js';
-import { context as sunkenContext }  from '../contexts/sunken-below.js';
+import { loadContexts } from '../services/contextLoader.js';
 import type { GameState, Character, Context, StructuredAction } from '../types.js';
 
-const CONTEXTS: Record<string, Context> = {
-  'scifi-terror':       scifiContext,
-  'dungeon-crawler':    dungeonContext,
-  'high-school-zombie': zombieContext,
-  'sunken-below':       sunkenContext,
-};
+// Contexts are loaded once at startup by scanning the contexts/ directory.
+// Adding a new campaign only requires dropping a .ts file there.
+const CONTEXTS: Record<string, Context> = await loadContexts();
+const DEFAULT_CONTEXT = Object.values(CONTEXTS)[0] ?? ({ id: 'none' } as Context);
 
 export const gameRouter = Router();
+
+// List all available game contexts (id + display metadata only — no rules/loot)
+gameRouter.get('/contexts', (_req, res) => {
+  const list = Object.values(CONTEXTS).map(c => ({
+    id:          c.id,
+    displayName: c.worldNoun,
+    mapType:     c.mapType,
+    classes:     Object.keys(c.classPrimaryStats),
+  }));
+  res.json(list);
+});
 
 // Get a specific session by ID (must belong to the requesting user)
 gameRouter.get('/session/:id', async (req: Request, res: Response) => {
@@ -96,7 +102,7 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
     return;
   }
 
-  const ctx  = CONTEXTS[context_id ?? ''] ?? scifiContext;
+  const ctx  = CONTEXTS[context_id ?? ''] ?? DEFAULT_CONTEXT;
   const seed = generateSeed(ctx);
   const client = await pool.connect();
   try {
@@ -190,7 +196,7 @@ gameRouter.post('/session/:id/equip', async (req: Request, res: Response) => {
     );
     if (!row) { res.status(404).json({ error: 'Session not found' }); return; }
 
-    const ctx   = CONTEXTS[row.seed.context_id] ?? scifiContext;
+    const ctx   = CONTEXTS[row.seed.context_id] ?? DEFAULT_CONTEXT;
     const state = normalizeState(row.state, { character_name: row.character_name, portrait_url: row.portrait_url });
 
     // Resolve target character
@@ -262,7 +268,7 @@ gameRouter.post('/session/:id/action', async (req: Request, res: Response) => {
     if (row.status === 'dead')    { res.status(410).json({ error: 'Hero deceased.' }); return; }
     if (row.status === 'escaped') { res.status(410).json({ error: 'Mission already complete.' }); return; }
 
-    const ctx    = CONTEXTS[row.seed.context_id] ?? scifiContext;
+    const ctx    = CONTEXTS[row.seed.context_id] ?? DEFAULT_CONTEXT;
     const state  = normalizeState(row.state, { character_name: row.character_name, portrait_url: row.portrait_url });
     const result = await takeAction({
       action, history: history ?? [], state, seed: row.seed, context: ctx

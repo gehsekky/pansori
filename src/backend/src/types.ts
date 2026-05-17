@@ -66,6 +66,7 @@ export interface Seed {
   connections: Record<string, string[]>;
   enemies:     Record<string, Enemy>;
   loot:        Record<string, LootItem>;
+  npcs:        Record<string, PlacedNpc>;
   seed_id:     string;
 }
 
@@ -83,20 +84,62 @@ export interface DeathSaves {
   failures:  number;
 }
 
+// ─── NPC system ───────────────────────────────────────────────────────────────
+
+export type NpcAttitude = 'friendly' | 'indifferent' | 'hostile';
+
+export interface NpcShopEntry {
+  itemId: string;
+  price:  number;
+}
+
+export interface NpcDialogueResponse {
+  label:        string;
+  reply?:       string;           // NPC's follow-up text after player picks this
+  consequences?: GameConsequence[]; // applied when this response is chosen
+}
+
+export interface NpcTemplate {
+  id:            string;
+  name:          string;
+  attitude:      NpcAttitude;
+  // Stat block — used when attitude becomes hostile or player attacks
+  hp:            number;
+  ac:            number;
+  damage:        string;
+  toHit:         number;
+  xp:            number;
+  dex?:          number;
+  // Social
+  greeting:      string;
+  responses:     NpcDialogueResponse[];
+  persuasionDC?: number;          // CHA check DC when indifferent (default 12)
+  // Trade
+  shop?:         NpcShopEntry[];
+}
+
+export interface PlacedNpc extends NpcTemplate {
+  roomId: string;
+}
+
 // ─── Structured actions ───────────────────────────────────────────────────────
 
 export type StructuredAction =
-  | { type: 'move';       roomId: string }
+  | { type: 'move';          roomId: string }
   | { type: 'attack' }
   | { type: 'loot' }
-  | { type: 'use';        itemId: string; targetCharId?: string }
+  | { type: 'use';           itemId: string; targetCharId?: string }
   | { type: 'sneak' }
   | { type: 'escape' }
   | { type: 'examine' }
   | { type: 'death_save' }
   | { type: 'pass' }
   | { type: 'short_rest' }
-  | { type: 'long_rest' };
+  | { type: 'long_rest' }
+  | { type: 'talk' }
+  | { type: 'talk_response'; responseIdx: number }
+  | { type: 'buy';           itemId: string; price: number }
+  | { type: 'attack_npc' };
 
 export interface GameChoice {
   label:  string;
@@ -172,8 +215,49 @@ export interface GameState {
   short_rested_rooms: string[];
   long_rested:        boolean;
 
+  // NPC state
+  npc_attitudes: Record<string, NpcAttitude>;  // roomId → current attitude
+  npc_talked:    string[];                      // roomIds where player has talked
+
   // Script engine flags
   flags: Record<string, boolean | string | number>;
+}
+
+// ─── Script engine rules ──────────────────────────────────────────────────────
+
+export type GameConsequence =
+  | { type: 'add_narrative'; text: string }
+  | { type: 'set_flag';      key: string; value: boolean | string | number }
+  | { type: 'give_item';     itemId: string; characterId?: string }
+  | { type: 'modify_hp';     amount: number; characterId?: string }
+  | { type: 'unlock_room';   roomId: string }
+  | { type: 'spawn_enemy';   roomId: string; enemyId: string }
+  | { type: 'set_escape' };
+
+export interface GameRule {
+  name:         string;
+  priority?:    number;      // higher = evaluated first; default 1
+  conditions:   object;      // json-rules-engine TopLevelCondition
+  consequences: GameConsequence[];
+  once?:        boolean;     // auto-sets flags.rule_fired_<name> so it never fires again
+}
+
+// ─── Script engine facts ──────────────────────────────────────────────────────
+
+export interface RuleFacts {
+  action:            string;
+  room_id:           string;
+  prev_room_id:      string;
+  visited_rooms:     string[];
+  enemies_killed:    string[];
+  loot_taken:        string[];
+  combat_active:     boolean;
+  flags:             Record<string, boolean | string | number>;
+  active_hp:         number;
+  active_max_hp:     number;
+  active_level:      number;
+  active_class:      string;
+  active_conditions: string[];
 }
 
 // ─── Context (game theme/setting) ─────────────────────────────────────────────
@@ -213,6 +297,9 @@ export interface Context {
   introTexts:       string[];
   roomPool:         RoomPoolEntry[];
   lootTable:        LootItem[];
+  rules?:           GameRule[];
+  npcTemplates?:    NpcTemplate[];
+  npcSpawnChance?:  number;        // 0–1 chance per room in roguelike mode (default 0)
   narratives: {
     roomArrival:     Record<string, string[]>;
     genericArrival:  string[];
