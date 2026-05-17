@@ -4,19 +4,22 @@
   "description": "A dynamic browser RPG platform with switchable themes, built on D&D 5e rules.",
   "private": true,
   "scripts": {
-    "lint":      "npm run lint   --workspace=src/frontend --workspace=src/backend",
-    "format":    "npm run format --workspace=src/frontend --workspace=src/backend",
-    "dev":       "docker compose up --build -d",
-    "stop":      "docker compose down",
-    "logs":      "docker compose logs -f",
-    "logs:be":   "docker compose logs -f backend",
-    "logs:fe":   "docker compose logs -f frontend",
-    "restart":   "docker compose restart",
-    "db":        "docker compose --profile tools up -d",
-    "fresh":     "docker compose down -v && docker compose up --build -d"
+    "lint": "npm run lint   --workspace=src/frontend --workspace=src/backend",
+    "format": "npm run format --workspace=src/frontend --workspace=src/backend",
+    "dev": "docker compose up --build -d",
+    "stop": "docker compose down",
+    "logs": "docker compose logs -f",
+    "logs:be": "docker compose logs -f backend",
+    "logs:fe": "docker compose logs -f frontend",
+    "restart": "docker compose restart",
+    "db": "docker compose --profile tools up -d",
+    "fresh": "docker compose down -v && docker compose up --build -d"
   },
   "workspaces": [
     "src/frontend",
     "src/backend"
-  ]
+  ],
+  "devDependencies": {
+    "vitest": "^4.1.6"
+  }
 }

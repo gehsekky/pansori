@@ -33,7 +33,11 @@ services:
       NODE_ENV: development
       PORT: 3001
       DATABASE_URL: postgres://${POSTGRES_USER:-pansori}:${POSTGRES_PASSWORD:-pansori}@postgres:5432/${POSTGRES_DB:-pansori_db}
-      FRONTEND_URL: http://localhost:5173
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      GOOGLE_CALLBACK_URL: ${GOOGLE_CALLBACK_URL:-http://localhost:3001/api/auth/google/callback}
+      SESSION_SECRET: ${SESSION_SECRET:-change-me}
     ports:
       - "3001:3001"
     volumes:

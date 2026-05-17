@@ -15,6 +15,14 @@ export const context: Context = {
     'The Bone Labyrinth',
   ],
 
+  classPrimaryStats: {
+    Warrior: 'str',
+    Mage:    'int',
+    Rogue:   'dex',
+    Cleric:  'wis',
+    Ranger:  'dex',
+  },
+
   classSkills: {
     Warrior: ['athletics', 'intimidation'],
     Mage:    ['arcana', 'investigation'],
@@ -28,15 +36,19 @@ export const context: Context = {
     { name: 'Skeleton',     cr: 0.25, hp:  13, ac: 13, damage: '1d6+2',  toHit: 4, xp:    50, wis:  8 },
     { name: 'Zombie',       cr: 0.25, hp:  22, ac:  8, damage: '1d6+1',  toHit: 3, xp:    50, wis:  6 },
     // CR 1 — early rooms
-    { name: 'Ghoul',        cr:    1, hp:  22, ac: 12, damage: '2d6+2',  toHit: 4, xp:   200, dex: 15, wis: 10 },
-    { name: 'Shadow',       cr:    1, hp:  16, ac: 12, damage: '2d6+2',  toHit: 4, xp:   200, dex: 14, wis: 10 },
+    { name: 'Ghoul',          cr:    1, hp:  22, ac: 12, damage: '2d6+2',  toHit: 4, xp:   200, dex: 15, wis: 10, onHitEffect: { condition: 'paralyzed', ability: 'con', dc: 10 } },
+    { name: 'Shadow',         cr:    1, hp:  16, ac: 12, damage: '2d6+2',  toHit: 4, xp:   200, dex: 14, wis: 10 },
     // CR 3–5 — mid dungeon
-    { name: 'Wight',        cr:    3, hp:  45, ac: 14, damage: '2d8+3',  toHit: 4, xp:   700, wis: 13 },
-    { name: 'Wraith',       cr:    5, hp:  67, ac: 13, damage: '4d8+3',  toHit: 6, xp:  1100, dex: 16, wis: 14 },
-    { name: 'Flesh Golem',  cr:    5, hp:  93, ac:  9, damage: '2d8+5',  toHit: 7, xp:  1800, wis:  7 },
+    { name: 'Wight',          cr:    3, hp:  45, ac: 14, damage: '2d8+3',  toHit: 4, xp:   700, wis: 13 },
+    { name: 'Mummy',          cr:    3, hp:  58, ac: 11, damage: '2d6+4',  toHit: 5, xp:   700, wis: 12, onHitEffect: { condition: 'frightened', ability: 'wis', dc: 11 } },
+    { name: 'Banshee',        cr:    4, hp:  58, ac: 12, damage: '3d6',    toHit: 4, xp:  1100, dex: 14, wis: 14, onHitEffect: { condition: 'frightened', ability: 'wis', dc: 13 } },
+    { name: 'Wraith',         cr:    5, hp:  67, ac: 13, damage: '4d8+3',  toHit: 6, xp:  1100, dex: 16, wis: 14 },
+    { name: 'Vampire Spawn',  cr:    5, hp:  82, ac: 15, damage: '2d6+4',  toHit: 6, xp:  1800, dex: 18, wis: 15, onHitEffect: { condition: 'poisoned', ability: 'con', dc: 13 } },
+    { name: 'Flesh Golem',    cr:    5, hp:  93, ac:  9, damage: '2d8+5',  toHit: 7, xp:  1800, wis:  7 },
     // CR 6+ — boss-tier
-    { name: 'Necromancer',  cr:    6, hp:  66, ac: 12, damage: '4d6',    toHit: 5, xp:  2300, dex: 14, wis: 15 },
-    { name: 'Death Knight', cr:   17, hp: 110, ac: 20, damage: '2d8+6',  toHit: 9, xp:  5900, wis: 15 },
+    { name: 'Necromancer',    cr:    6, hp:  66, ac: 12, damage: '4d6',    toHit: 5, xp:  2300, dex: 14, wis: 15 },
+    { name: 'Death Knight',   cr:   17, hp: 110, ac: 20, damage: '2d8+6',  toHit: 9, xp:  5900, wis: 15 },
+    { name: 'Lich',           cr:   21, hp: 135, ac: 17, damage: '4d6+4',  toHit: 12, xp: 18000, dex: 16, wis: 18, onHitEffect: { condition: 'paralyzed', ability: 'con', dc: 18 } },
   ],
 
   introTexts: [
@@ -120,11 +132,11 @@ export const context: Context = {
   lootTable: [
     { id: 'health_potion',   name: 'Health Potion',    desc: 'Restores 2d4+2 HP, one use',                                        weight: 28, type: 'consumable', slot: null,     damage: null,   ac_bonus: null, heal: '2d4+2', effect: null,            aliases: ['health potion', 'potion', 'red potion'] },
     { id: 'iron_sword',      name: 'Iron Sword',        desc: '1d8 damage, melee weapon',                                          weight: 16, type: 'weapon',     slot: 'weapon', damage: '1d8',  ac_bonus: null, heal: null,    effect: null,            aliases: ['iron sword', 'sword'] },
-    { id: 'battle_axe',      name: 'Battle Axe',        desc: '2d6 damage, melee weapon',                                          weight: 12, type: 'weapon',     slot: 'weapon', damage: '2d6',  ac_bonus: null, heal: null,    effect: null,            aliases: ['battle axe', 'axe', 'battleaxe'] },
-    { id: 'enchanted_blade', name: 'Enchanted Blade',   desc: '2d8 damage, finesse, glows with arcane light',                      weight: 8,  type: 'weapon',     slot: 'weapon', damage: '2d8',  finesse: true, ac_bonus: null, heal: null,    effect: null,            aliases: ['enchanted blade', 'enchanted sword', 'magic sword', 'blade'] },
+    { id: 'battle_axe',      name: 'Battle Axe',        desc: '1d8 damage, melee weapon',                                          weight: 12, type: 'weapon',     slot: 'weapon', damage: '1d8',  ac_bonus: null, heal: null,    effect: null,            aliases: ['battle axe', 'axe', 'battleaxe'] },
+    { id: 'enchanted_blade', name: 'Enchanted Blade',   desc: '2d6 damage, finesse, glows with arcane light',                      weight: 8,  type: 'weapon',     slot: 'weapon', damage: '2d6',  finesse: true, ac_bonus: null, heal: null,    effect: null,            aliases: ['enchanted blade', 'enchanted sword', 'magic sword', 'blade'] },
     { id: 'wooden_shield',   name: 'Wooden Shield',     desc: '+2 AC while equipped',                                              weight: 10, type: 'armor',      slot: 'shield', damage: null,   ac_bonus: 2,    heal: null,    effect: null,            aliases: ['wooden shield', 'shield'] },
     { id: 'leather_armor',   name: 'Leather Armour',    desc: '+2 AC while equipped',                                              weight: 12, type: 'armor',      slot: 'armor',  damage: null,   ac_bonus: 2,    heal: null,    effect: null,            aliases: ['leather armour', 'leather armor', 'leather'] },
-    { id: 'plate_armor',     name: 'Plate Armour',      desc: '+3 AC while equipped',                                              weight: 7,  type: 'armor',      slot: 'armor',  damage: null,   ac_bonus: 3,    heal: null,    effect: null,            aliases: ['plate armour', 'plate armor', 'plate'] },
+    { id: 'plate_armor',     name: 'Plate Armour',      desc: '+6 AC while equipped',                                              weight: 7,  type: 'armor',      slot: 'armor',  damage: null,   ac_bonus: 6,    heal: null,    effect: null,            aliases: ['plate armour', 'plate armor', 'plate'] },
     { id: 'rations',         name: 'Trail Rations',     desc: 'Restore 1 HP, one use',                                             weight: 20, type: 'consumable', slot: null,     damage: null,   ac_bonus: null, heal: '1',     effect: null,            aliases: ['trail rations', 'rations', 'food'] },
     { id: 'undead_tome',     name: 'Undead Tome',        desc: 'Forbidden necromantic knowledge. Probably cursed.',                 weight: 5,  type: 'misc',       slot: null,     damage: null,   ac_bonus: null, heal: null,    effect: null,            aliases: ['undead tome', 'tome', 'book'], useNarrative: 'You open the Undead Tome to a random page. The illustration moves. You close it immediately. Some knowledge is not worth having.' },
     { id: 'cursed_gem',      name: 'Cursed Gem',         desc: 'Pulses with malevolent purple light. Worth a fortune — if you survive.',  weight: 4,  type: 'misc', slot: null,  damage: null,   ac_bonus: null, heal: null,    effect: null,            aliases: ['cursed gem', 'gem', 'jewel'], useNarrative: 'You hold up the Cursed Gem. It pulses. The shadows in the room shift toward you. You pocket it quickly.' },
@@ -310,12 +322,6 @@ export const context: Context = {
     alreadyDead: [
       'The creature\'s bones lie where it fell. Still crumbled. Still very defeated.',
       'The remains of your fallen foe lie on the cold stone. You give them a cautious kick. Thoroughly dead.',
-    ],
-
-    examineTemplates: [
-      'You study the {room} carefully. {desc} Passages lead to: {exits}.',
-      'Taking stock of the {room}: {desc} You could proceed toward: {exits}.',
-      'You survey the {room}. {desc} Exits open to: {exits}.',
     ],
 
     sneakSuccess: [

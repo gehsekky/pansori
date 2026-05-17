@@ -111,9 +111,10 @@ interface EnemyStats {
   toHit:  number;
 }
 
-// Enemy attacks the player. Returns hit/miss and damage.
-export function resolveEnemyAttack(enemy: EnemyStats, playerAC: number) {
-  const roll  = d(20);
+// Enemy attacks the player. Advantage rolls 2d20 and keeps the higher (e.g. vs paralyzed/stunned/prone).
+export function resolveEnemyAttack(enemy: EnemyStats, playerAC: number, advantage = false) {
+  const roll1 = d(20);
+  const roll  = advantage ? Math.max(roll1, d(20)) : roll1;
   const total = roll + enemy.toHit;
   const hit   = roll !== 1 && (roll === 20 || total >= playerAC);
   return { hit, roll, total, damage: hit ? rollDice(enemy.damage) : 0 };
@@ -170,6 +171,44 @@ export function computeAcAfterArmorChange(
   return currentAc - oldBonus + newBonus;
 }
 
+// ─── Conditions ───────────────────────────────────────────────────────────────
+
+// Which conditions grant the enemy advantage on attacks against the player
+export const ADVANTAGE_CONDITIONS = new Set(['paralyzed', 'stunned', 'prone']);
+// Which conditions impose disadvantage on the player's attacks
+export const DISADV_CONDITIONS    = new Set(['poisoned', 'prone', 'frightened']);
+
+// On-hit saving throw: returns true if the save FAILS (condition is applied)
+export function rollConditionSave(
+  ability: 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha',
+  score:   number,
+  dc:      number,
+): boolean {
+  return d(20) + abilityMod(score) < dc;
+}
+
+// ─── Consumable effects ───────────────────────────────────────────────────────
+
+export function resolveSaveWithAdvantage(abilityScore: number) {
+  const roll1 = d(20) + abilityMod(abilityScore);
+  const roll2 = d(20) + abilityMod(abilityScore);
+  return { roll1, roll2, best: Math.max(roll1, roll2) };
+}
+
+export function resolveMysteryConsumable(): { result: 'heal' | 'hurt' | 'none'; value: number } {
+  const eff = d(3);
+  if (eff === 1) return { result: 'heal', value: rollDice('1d4') };
+  if (eff === 2) return { result: 'hurt', value: rollDice('1d4') };
+  return { result: 'none', value: 0 };
+}
+
+// ─── Passive checks ───────────────────────────────────────────────────────────
+
+// Passive Perception DC an enemy presents: 10 + WIS modifier (PHB p.175)
+export function passivePerceptionDC(enemyWisdom: number): number {
+  return 10 + abilityMod(enemyWisdom);
+}
+
 // ─── Skill checks ─────────────────────────────────────────────────────────────
 
 // proficient = whether the character has proficiency in this skill
@@ -187,13 +226,16 @@ export function rollDeathSave(current: DeathSaves = { successes: 0, failures: 0 
   const roll = d(20);
   if (roll === 20) return { roll, result: 'regain_hp' as const, saves: { successes: 0, failures: 0 } };
   if (roll === 1) {
-    const saves = { ...current, failures: current.failures + 2 };
-    return { roll, result: (saves.failures >= 3 ? 'dead' : 'double_failure') as const, saves };
+    const saves  = { ...current, failures: current.failures + 2 };
+    const result = saves.failures >= 3 ? 'dead' as const : 'double_failure' as const;
+    return { roll, result, saves };
   }
   if (roll >= 10) {
-    const saves = { ...current, successes: current.successes + 1 };
-    return { roll, result: (saves.successes >= 3 ? 'stable' : 'success') as const, saves };
+    const saves  = { ...current, successes: current.successes + 1 };
+    const result = saves.successes >= 3 ? 'stable' as const : 'success' as const;
+    return { roll, result, saves };
   }
-  const saves = { ...current, failures: current.failures + 1 };
-  return { roll, result: (saves.failures >= 3 ? 'dead' : 'failure') as const, saves };
+  const saves  = { ...current, failures: current.failures + 1 };
+  const result = saves.failures >= 3 ? 'dead' as const : 'failure' as const;
+  return { roll, result, saves };
 }

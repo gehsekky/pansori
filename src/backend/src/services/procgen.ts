@@ -11,7 +11,25 @@ function weightedPick(table: LootItem[]): LootItem {
   return { ...table[0] };
 }
 
-export function generateShipSeed(context: Context): Seed {
+export function generateSeed(context: Context): Seed {
+  if (context.mapType === 'campaign' && context.campaign) {
+    const c = context.campaign;
+    return {
+      context_id:  context.id,
+      world_name:  c.world_name,
+      ship_name:   c.world_name,
+      intro:       c.intro,
+      rooms:       c.rooms,
+      connections: c.connections,
+      enemies:     c.enemies ?? {},
+      loot:        c.loot    ?? {},
+      seed_id:     randomUUID(),
+    };
+  }
+  return generateRoguelikeSeed(context);
+}
+
+function generateRoguelikeSeed(context: Context): Seed {
   const roomCount  = 5 + roll(4); // 6–9 rooms per run
   const escapeId   = context.escapeRoomId;
   const startId    = context.startRoomId;
@@ -66,14 +84,15 @@ export function generateShipSeed(context: Context): Seed {
       const pool       = context.enemyTemplates.filter(t => t.cr <= maxCr);
       const template   = pick(pool.length ? pool : context.enemyTemplates);
       enemies[r.id] = {
-        name:   template.name,
-        hp:     template.hp,
-        ac:     template.ac,
-        damage: template.damage,
-        toHit:  template.toHit,
-        xp:     template.xp,
-        dex:    template.dex,
-        wis:    template.wis,
+        name:        template.name,
+        hp:          template.hp,
+        ac:          template.ac,
+        damage:      template.damage,
+        toHit:       template.toHit,
+        xp:          template.xp,
+        dex:         template.dex,
+        wis:         template.wis,
+        onHitEffect: template.onHitEffect,
       };
     }
     if (Math.random() < 0.5) {
