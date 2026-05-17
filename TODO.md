@@ -44,3 +44,17 @@
 - [ ] Dynamic image generation for rooms and encounters using Google Nano Banana 2 api. Pros - Great experience. Cons - increased cost. Put behind env var flag so we can quickly turn it on and off.
 - [ ] Sound effects
 - [ ] CSS Modules — replace repeated inline style objects with CSS Modules (`.module.css`) for style organization; keep CSS custom properties for theming; low priority since the current approach works
+
+## Deployment (AWS — t4g.micro EC2 + db.t4g.micro RDS)
+- [ ] Production Dockerfiles — multi-stage builds for backend (compile TS → copy dist + node_modules to slim alpine image) and frontend (Vite build → nginx static serving); replace `Dockerfile.dev` in each package; build target is `linux/arm64` for Graviton2.
+- [ ] `docker-compose.prod.yml` — production compose without dev volumes, hot-reload, or exposed dev ports; backend reads env vars from host; no postgres service (points at RDS instead).
+- [ ] Environment variable strategy — document all required vars (`DATABASE_URL`, `ANTHROPIC_API_KEY`, `JWT_SECRET`, `NODE_ENV`, `CORS_ORIGIN`); store secrets in AWS SSM Parameter Store or Secrets Manager; inject into EC2 via instance profile + startup script (or ECS task definition secrets if containerised with ECS).
+- [ ] Health check endpoint — add `GET /health` to the Express app returning `{ ok: true, uptime }` with no auth required; used by ALB target group health checks and basic uptime monitoring.
+- [ ] RDS provisioning — `db.t4g.micro` PostgreSQL 16 in the same VPC as EC2; security group allows inbound 5432 only from the EC2 security group; enable automated backups (7-day retention); store connection string in SSM.
+- [ ] Database schema migration on deploy — run `psql` or a migration script against RDS during the deployment step before the new container starts; ensure idempotent (`CREATE TABLE IF NOT EXISTS`, etc.); document the initial schema SQL.
+- [ ] Nginx reverse proxy config — single nginx container (or host install) terminates SSL, serves frontend static files from `/`, and proxies `/api` to the backend container; config to live in `infra/nginx/nginx.conf`.
+- [ ] SSL/TLS — use Let's Encrypt (Certbot + auto-renew cron) for a custom domain, or ACM + Application Load Balancer if budget allows; bare EC2 HTTP-only is not acceptable for production (JWT cookies, API keys in transit).
+- [ ] ECR repository — create one repo each for `pansori-backend` and `pansori-frontend`; tag images with git SHA; push from CI.
+- [ ] CI/CD pipeline (GitHub Actions) — on push to `main`: run tests, build `linux/arm64` images, push to ECR, SSH to EC2 and run `docker compose -f docker-compose.prod.yml pull && docker compose up -d --remove-orphans`.
+- [ ] Security groups & VPC — EC2 inbound: 80 (redirect), 443 (HTTPS), 22 (SSH from your IP only); RDS inbound: 5432 from EC2 SG only; no public RDS endpoint.
+- [ ] CloudWatch log groups — route Docker container stdout/stderr to CloudWatch via `awslogs` log driver; set 30-day retention; enables basic alerting without a full observability stack.
