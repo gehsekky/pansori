@@ -8,22 +8,22 @@
 - [ ] Campaign persistence — world state that survives across multiple sessions (separate from per-session GameState)
 
 ## Rules Engine (D&D 5e gaps)
-- [ ] Class features — at minimum: Sneak Attack (Rogue, +Xd6 on advantage or ally adjacent), Rage (Barbarian, bonus damage + resistance), Divine Smite (Paladin, expend spell slot for bonus radiant damage), Bardic Inspiration (d6 bonus to ally roll)
+- [x] Class features — Sneak Attack (Rogue/Pilot: ⌈level/2⌉d6 on hit with advantage or ally in combat; dice doubled on crit), Extra Attack (Warrior/Soldier level 5+: 2 attacks; level 11+: 3 attacks), Rage (Warrior: bonus action, +rage-damage-bonus on STR melee, halve incoming physical damage, uses tracked in class_resource_uses, restored on long rest, clears on combat end). Divine Smite and Bardic Inspiration deferred — require spell slot system.
+- [x] Multiple attacks — Extra Attack at level 5 (2 attacks) and level 11 (3 attacks) via resolveOneAttack loop.
+- [x] Saving throw proficiencies — classSavingThrows on Context (2 abilities per class); rollConditionSave adds profBonus when proficient.
+- [x] Rules engine spec-conformance tests — anchored tests for profBonus exact values per level; attack roll formula; death save nat-1/nat-20 edge cases; advantage/disadvantage two-roll mechanics; new tests for sneakAttackDice, extraAttackCount, rageDamageBonus, rageUsesMax, rollConditionSave with/without proficiency.
+- [x] Bonus action enforcement — turn_actions lifecycle (action_used, bonus_action_used); auto-advance fires only when no requiresBonusAction choices remain; end_turn action for explicit forfeiture.
+- [x] Short rest / long rest — short rest spends a hit die (d{class-die} + CON mod) once per room; long rest restores full HP + clears conditions + recovers half-level hit dice + restores class resource uses (rage_uses etc.), once per session; both blocked while enemy is alive; room canRest flag lets campaign authors disable resting in specific rooms.
+- [x] Hit dice — per-class die size in Context.classHitDie; hit_die and hit_dice_remaining on Character; displayed in stats bar; recovered on long rest (max(1, floor(level/2))).
+- [ ] Spell system — spell slots (levels 1–9, recovery on long rest), spell attack rolls (8 + prof + spellcasting ability), spell save DCs, cantrips, concentration (CON save on damage to maintain). Prerequisite for Divine Smite and Bardic Inspiration.
 - [ ] Full conditions list — missing: blinded (attacks have disadv, attackers have adv), charmed (can't attack charmer), exhaustion (6 levels, cumulative penalties), invisible (adv on attacks, disadv against), restrained (speed 0, disadv on attacks, adv against), incapacitated (no actions/reactions), grappled (speed 0), petrified
-- [ ] Multiple attacks — Extra Attack at level 5 for Fighter/Barbarian/Paladin/Ranger; level 11 for Fighter (3 attacks), level 20 (4). Significant combat shift.
-- [ ] Spell system — spell slots (levels 1–9, recovery on long rest), spell attack rolls (8 + prof + spellcasting ability), spell save DCs, cantrips, concentration (CON save on damage to maintain)
-- [ ] Rules engine spec-conformance tests — current tests verify function behavior/shapes but not 5e spec values. Add anchored tests: `profBonus` exact values per level (2 at 1–4, 3 at 5–8, etc.); attack roll formula `d20 + ability mod + profBonus vs AC`; death save nat-1 counts as two failures, nat-20 restores 1 HP; advantage/disadvantage rolls exactly two d20s and takes max/min; spell save DC formula `8 + profBonus + spellcasting mod`.
 - [ ] Traps — core dungeon element entirely absent. Investigation/Perception to detect (vs trap DC), Thieves' Tools proficiency check to disarm, damage/condition on trigger. Defined in room data.
-- [ ] Saving throw proficiencies — each class has 2 save proficiencies (e.g. Fighter: STR+CON, Rogue: DEX+INT). Currently all saves are flat ability checks. Add to classSavingThrows in Context and apply proficiency bonus.
 - [ ] Armor/weapon proficiency enforcement — currently any class can wear any armor with no penalty; heavy armor without proficiency should impose disadvantage on STR/DEX checks and prevent spellcasting
 - [ ] Two-weapon fighting — bonus action attack with light off-hand weapon when wielding two light weapons; no ability mod to damage unless feat
 - [ ] Grapple / Shove — contested Athletics checks: grapple sets target speed 0, shove knocks prone or pushes 5ft
-- [ ] Bonus action enforcement — partial via turn_actions but not enforced for all sources (two-weapon fighting, class features, some spells)
 - [ ] Ability Score Improvements — at levels 4, 8, 12, 16, 19: +2 to one stat or +1 to two. Currently leveling only adds max HP.
 - [ ] Backgrounds — grant 2 skill proficiencies + 1 tool proficiency + a narrative feature; add to character creation
 - [ ] Magic item attunement — max 3 attuned items per character; some items require attunement to function
-- [x] Short rest / long rest — short rest spends a hit die (d{class-die} + CON mod) once per room; long rest restores full HP + clears conditions + recovers half-level hit dice, once per session; both blocked while enemy is alive; room canRest flag lets campaign authors disable resting in specific rooms.
-- [x] Hit dice — per-class die size in Context.classHitDie; hit_die and hit_dice_remaining on Character; displayed in stats bar; recovered on long rest (max(1, floor(level/2))).
 
 ## Party System
 - [x] Initiative-based turn order — `buildInitiativeOrder` rolls d20+DEX for all participants; post-action loop auto-resolves consecutive enemy turns; `InitiativeStrip` UI shows turn sequence; conditions tick at turn start. Reactions deferred to class features milestone.
