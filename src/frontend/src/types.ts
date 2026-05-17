@@ -12,6 +12,7 @@ export type StructuredAction =
   | { type: 'examine' }
   | { type: 'death_save' }
   | { type: 'pass' }
+  | { type: 'end_turn' }
   | { type: 'short_rest' }
   | { type: 'long_rest' }
   | { type: 'talk' }
@@ -20,8 +21,9 @@ export type StructuredAction =
   | { type: 'attack_npc' };
 
 export interface GameChoice {
-  label: string;
-  action: StructuredAction;
+  label:               string;
+  action:              StructuredAction;
+  requiresBonusAction?: boolean;
 }
 
 export interface Theme {
