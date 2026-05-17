@@ -26,8 +26,12 @@ export interface Room {
   canRest?: boolean;
 }
 
+export type ConditionName =
+  | 'paralyzed' | 'stunned' | 'poisoned' | 'prone' | 'frightened'
+  | 'blinded' | 'restrained' | 'incapacitated' | 'grappled' | 'invisible' | 'exhaustion';
+
 export interface OnHitEffect {
-  condition: 'paralyzed' | 'stunned' | 'poisoned' | 'prone' | 'frightened';
+  condition: ConditionName;
   ability:   'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha';
   dc:        number;
 }
@@ -124,6 +128,8 @@ export interface PlacedNpc extends NpcTemplate {
 
 // ─── Structured actions ───────────────────────────────────────────────────────
 
+export type AbilityKey = 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha';
+
 export type StructuredAction =
   | { type: 'move';              roomId: string }
   | { type: 'attack' }
@@ -141,7 +147,8 @@ export type StructuredAction =
   | { type: 'talk_response';     responseIdx: number }
   | { type: 'buy';               itemId: string; price: number }
   | { type: 'attack_npc' }
-  | { type: 'use_class_feature'; featureId: string };
+  | { type: 'use_class_feature'; featureId: string }
+  | { type: 'apply_asi';         stat: AbilityKey };
 
 export interface GameChoice {
   label:              string;
@@ -190,6 +197,10 @@ export interface Character {
   hit_dice_remaining:  number;
   // Per-rest class resource pools (e.g. rage_uses, action_surge)
   class_resource_uses: Record<string, number>;
+  // True when the character has levelled up to an ASI level and hasn't chosen their improvement yet
+  asi_pending:         boolean;
+  // 0 = none; 1–6 = exhaustion level per 5e PHB (cumulative penalties)
+  exhaustion_level:    number;
 }
 
 // ─── Game state (world/party container) ──────────────────────────────────────

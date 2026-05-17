@@ -6,6 +6,7 @@ import {
   canEquipWeapon, canDonShield, canDonArmor, computeAcAfterArmorChange,
   skillCheck, rollDeathSave, rollConditionSave,
   sneakAttackDice, extraAttackCount, rageDamageBonus, rageUsesMax,
+  ADVANTAGE_CONDITIONS, DISADV_CONDITIONS, PLAYER_ADV_CONDITIONS, ENEMY_DISADV_CONDITIONS,
 } from './rulesEngine.js';
 import type { LootItem } from '../types.js';
 
@@ -378,6 +379,65 @@ describe('rollDeathSave', () => {
     mockRandom(0.2); // d20 → 5
     const result = rollDeathSave({ successes: 0, failures: 2 });
     expect(result.result).toBe('dead');
+  });
+});
+
+// ─── Condition sets ───────────────────────────────────────────────────────────
+
+describe('condition sets', () => {
+  it('ADVANTAGE_CONDITIONS includes blinded and restrained', () => {
+    expect(ADVANTAGE_CONDITIONS.has('blinded')).toBe(true);
+    expect(ADVANTAGE_CONDITIONS.has('restrained')).toBe(true);
+  });
+
+  it('DISADV_CONDITIONS includes blinded and restrained', () => {
+    expect(DISADV_CONDITIONS.has('blinded')).toBe(true);
+    expect(DISADV_CONDITIONS.has('restrained')).toBe(true);
+  });
+
+  it('PLAYER_ADV_CONDITIONS includes invisible', () => {
+    expect(PLAYER_ADV_CONDITIONS.has('invisible')).toBe(true);
+  });
+
+  it('ENEMY_DISADV_CONDITIONS includes invisible', () => {
+    expect(ENEMY_DISADV_CONDITIONS.has('invisible')).toBe(true);
+  });
+});
+
+// ─── resolvePlayerAttack advantage ───────────────────────────────────────────
+
+describe('resolvePlayerAttack — advantage', () => {
+  const player = { str: 10, dex: 10, level: 1 }; // mod=0, prof=+2
+
+  it('advantage picks higher of two d20 rolls (nat-1 then nat-20 → hit at high AC)', () => {
+    mockRandom(0, 0.999); // roll1=1, roll2=20 → max=20 → hits even AC 30
+    const result = resolvePlayerAttack(player, '1d6', 30, false, false, true);
+    expect(result.critical).toBe(true);
+  });
+
+  it('advantage + disadvantage cancel out — uses single d20 roll', () => {
+    // With cancellation, only one d20 is consumed; second mock value should not be needed
+    mockRandom(0.45); // single d20 → 10; total=10+0+2=12 vs AC 10 → hit
+    const result = resolvePlayerAttack(player, '1d6', 10, false, true, true);
+    expect(result.hit).toBe(true);
+  });
+});
+
+// ─── resolveEnemyAttack disadvantage ─────────────────────────────────────────
+
+describe('resolveEnemyAttack — disadvantage', () => {
+  const enemy = { damage: '1d6', toHit: 4 };
+
+  it('disadvantage picks lower roll (nat-20 then nat-1 → miss)', () => {
+    mockRandom(0.999, 0); // roll1=20, roll2=1 → min=1 → miss
+    const result = resolveEnemyAttack(enemy, 5, false, true);
+    expect(result.hit).toBe(false);
+  });
+
+  it('advantage + disadvantage cancel — uses single roll', () => {
+    mockRandom(0.35); // single d20 → 8; total=8+4=12 vs AC 10 → hit
+    const result = resolveEnemyAttack(enemy, 10, true, true);
+    expect(result.hit).toBe(true);
   });
 });
 

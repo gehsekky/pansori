@@ -2,6 +2,8 @@ import type { ReactNode } from 'react';
 
 // ─── Structured actions ───────────────────────────────────────────────────────
 
+export type AbilityKey = 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha';
+
 export type StructuredAction =
   | { type: 'move';              roomId: string }
   | { type: 'attack' }
@@ -19,7 +21,8 @@ export type StructuredAction =
   | { type: 'talk_response';     responseIdx: number }
   | { type: 'buy';               itemId: string; price: number }
   | { type: 'attack_npc' }
-  | { type: 'use_class_feature'; featureId: string };
+  | { type: 'use_class_feature'; featureId: string }
+  | { type: 'apply_asi';         stat: AbilityKey };
 
 export interface GameChoice {
   label:               string;
@@ -109,6 +112,8 @@ export interface Character {
   hit_die: number;
   hit_dice_remaining: number;
   class_resource_uses: Record<string, number>;
+  asi_pending:         boolean;
+  exhaustion_level:    number;
 }
 
 // ─── NPC system ───────────────────────────────────────────────────────────────
