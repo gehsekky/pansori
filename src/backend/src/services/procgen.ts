@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import type { Context, Seed, LootItem } from '../types.js';
+import type { Context, Seed, LootItem, PlacedNpc } from '../types.js';
 
 function roll(sides: number): number { return Math.floor(Math.random() * sides) + 1; }
 function pick<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)]; }
@@ -23,6 +23,7 @@ export function generateSeed(context: Context): Seed {
       connections: c.connections,
       enemies:     c.enemies ?? {},
       loot:        c.loot    ?? {},
+      npcs:        {},
       seed_id:     randomUUID(),
     };
   }
@@ -77,6 +78,7 @@ export function generateRoguelikeSeed(context: Context): Seed {
 
   const enemies: Seed['enemies'] = {};
   const loot: Seed['loot']       = {};
+  const npcs: Seed['npcs']       = {};
   rooms.forEach(r => {
     if (r.id !== startId && Math.random() < 0.6) {
       const normalized = (dist[r.id] ?? 0) / maxDist;
@@ -98,6 +100,20 @@ export function generateRoguelikeSeed(context: Context): Seed {
     if (Math.random() < 0.5) {
       loot[r.id] = weightedPick(context.lootTable);
     }
+    // NPC placement: only in rooms without an enemy, excluding start/escape
+    const spawnChance = context.npcSpawnChance ?? 0;
+    if (
+      spawnChance > 0 &&
+      context.npcTemplates?.length &&
+      !enemies[r.id] &&
+      r.id !== startId &&
+      r.id !== context.escapeRoomId &&
+      Math.random() < spawnChance
+    ) {
+      const template = pick(context.npcTemplates);
+      const placed: PlacedNpc = { ...template, roomId: r.id };
+      npcs[r.id] = placed;
+    }
   });
 
   const worldName = pick(context.worldNames);
@@ -111,6 +127,7 @@ export function generateRoguelikeSeed(context: Context): Seed {
     connections,
     enemies,
     loot,
+    npcs,
     seed_id:    randomUUID(),
   };
 }
