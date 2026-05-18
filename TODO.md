@@ -49,59 +49,62 @@
 ---
 
 ## 2. Grid Combat UI
-- [ ] Render entity positions on a grid in the frontend during combat
-- [ ] Highlight reachable squares based on remaining movement budget
-- [ ] Show entity HP bars, conditions, and initiative order in combat HUD
-- [ ] Display position coordinates or grid overlay in combat choice labels
+- [x] Render entity positions on a grid in the frontend during combat — `GridCombatView.tsx`
+- [x] Highlight reachable squares based on remaining movement budget
+- [x] Show entity HP bars, conditions, and initiative order in combat HUD (HP bars + condition badges on tokens; `InitiativeStrip` already shows order)
+- [x] Display position coordinates in `grid_move` choice labels (already in `generateChoices`)
 
 ---
 
 ## 3. Multiple Enemies Per Room
-- [ ] Extend `Seed.enemies` to support an array of enemy instances per room (or a `count` field on the template)
-- [ ] `buildInitiativeOrder` supports multiple enemy entries per room
-- [ ] Enemy turn auto-advance iterates all living enemy entities, not just one per room
-- [ ] `generateChoices` emits one `attack` choice per living enemy entity with entity ID as target
+- [x] `Seed.enemies` is now `Record<roomId, Enemy[]>`; each enemy has a stable `id`
+- [x] `buildInitiativeOrder` rolls per-enemy initiative
+- [x] Enemy turn loop iterates by entity id (`getEnemyById`); each living enemy acts
+- [x] `generateChoices` emits one attack/grapple/shove choice per living enemy with `targetEnemyId`
+- [x] Combat ends only when all enemies in the room are dead (`isRoomCleared`)
 
 ---
 
 ## 4. Campaign UI
-- [ ] Quest journal UI — panel showing active/completed quests, current step descriptions, and reward previews
-- [ ] Faction reputation UI — display current rep and attitude tier per faction; visible in stats or a separate panel
-- [ ] Town/district navigation UI — show district map choices and NPC locations within each district
-- [ ] `accept_quest` as an explicit choice — show "Accept quest: <title>" in `generateChoices` when the active character is talking to a quest-giver NPC and the quest is not yet active
-- [ ] NPC quest-giver indicator — mark NPCs who have available quests in the room description / choice labels
+- [x] Quest journal UI — `CampaignPanel.tsx` (quests tab, status badges, step checklist)
+- [x] Faction reputation UI — `CampaignPanel.tsx` (factions tab; attitude tier + rep value)
+- [x] Town/district navigation choices — `generateChoices` emits `travel` and `enter_district`
+- [x] `accept_quest` as an explicit choice — emitted when active char is next to a quest-giver NPC with an unaccepted quest
+- [x] NPC quest-giver indicator — `[!]` suffix on Talk label when NPC has an unaccepted quest
 
 ---
 
-## 5. Missing Classes
-- [ ] Druid — d8 hit die; WIS spellcasting + spell preparation; Wild Shape (simplified: temp HP = CR × 5, `shape_shifted` flag, lasts until temp HP gone or dismissed); STR/WIS saves (PHB p.64)
-- [ ] Sorcerer — d6; CHA spellcasting; Sorcery Points pool (`class_resource_uses.sorcery_points = level`); Metamagic: Twinned Spell (1 pt, target a second creature), Quickened Spell (2 pts, cast as bonus action), Empowered Spell (1 pt, reroll up to CHA mod damage dice); CON/CHA saves (PHB p.99)
-- [ ] Warlock — d8; CHA spellcasting; Pact Magic (separate `pact_slots` from `spell_slots`; all recharge on short rest; max 2 slots at L1–10); Eldritch Blast always known; Invocations: Agonizing Blast (add CHA mod to EB damage), Devil's Sight (ignore magical darkness); CHA/WIS saves (PHB p.105)
-- [ ] Monk — d8; STR/DEX saves; Ki points (`class_resource_uses.ki_points = level`); Martial Arts unarmed die (d4→d6→d8→d10 by level); Unarmored Defense (AC = 10 + DEX + WIS); Flurry of Blows (2 unarmed strikes bonus action, 1 ki); Step of the Wind (Dash or Disengage bonus action, 1 ki); Stunning Strike (1 ki after hit, CON save DC = 8+prof+WIS or stunned); ki recharges on short rest (PHB p.78)
-- [ ] Barbarian — d12; STR/CON saves; Rage (bonus action, 2/day at L1; +2 melee damage, resist bludgeoning/piercing/slashing, advantage STR; ends if no attack in a turn); Unarmored Defense (AC = 10 + DEX + CON); Reckless Attack (bonus action before first attack: advantage on all your attacks + advantage on all attacks against you until your next turn) (PHB p.46)
+## 5. Missing Classes — DONE (verified in audit; defined in `sandbox.ts`, handler logic in `gameEngine.ts`)
+- [x] Druid (wild_shape, spell prep)
+- [x] Sorcerer (sorcery points, Metamagic dispatch)
+- [x] Warlock (pact slots, Agonizing Blast)
+- [x] Monk (ki points, Flurry of Blows, Step of the Wind, Unarmored Defense)
+- [x] Barbarian (rage, Unarmored Defense)
+- [ ] Barbarian Reckless Attack — still missing
 
 ---
 
-## 6. Subclass Features
-- [ ] Fighter — Champion: Improved Critical (crit on 19–20); Remarkable Athlete (+½ prof to uninvested STR/DEX/CON checks) (PHB p.72)
-- [ ] Fighter — Battle Master: Riposte (reaction attack after being hit + superiority die damage); Feinting Attack (bonus action advantage + superiority die damage); Goading Attack note: adds disadvantage vs non-caster, not implemented in enemy AI (PHB p.73)
-- [ ] Rogue — Thief: Fast Hands (Use Object / activate magic item as bonus action); Second-Story Work (climbing costs no extra movement) (PHB p.97)
-- [ ] Rogue — Assassin: Assassinate (advantage vs creatures who haven't acted in combat yet); auto-crit on surprised foes (PHB p.97)
-- [ ] Wizard — Evoker: Potent Cantrip (add WIS mod to cantrip damage on successful save) (PHB p.117)
-- [ ] Wizard — Abjurer: Arcane Ward (temp HP shield = 2 × wizard level; recharged by casting abjuration spells) (PHB p.115)
-- [ ] Cleric — Life: Disciple of Life (healing spells restore extra 2 + spell level HP); Preserve Life Channel Divinity (distribute 5 × cleric level HP among nearby allies) (PHB p.60)
-- [ ] Cleric — War: War Priest (bonus action weapon attack when taking Attack action; uses = WIS mod per long rest); Channel Divinity: Guided Strike (+10 to an attack roll) (PHB p.63)
-- [ ] Ranger — Hunter: Hunter's Prey choice — Colossus Slayer (+1d8 first hit per turn vs bloodied target), Horde Breaker (extra attack vs adjacent creature), Giant Killer (reaction attack vs Large+ that misses you) (PHB p.93)
-- [ ] Ranger — Beastmaster: Animal Companion (summon CR ¼ beast as a second `CombatEntity`; acts on Ranger's turn as bonus action) (PHB p.93)
-- [ ] Paladin — Devotion: Sacred Weapon Channel Divinity (+CHA mod to attacks for 1 min); Aura of Devotion (L7: immune to charmed for party in 10 ft) (PHB p.86)
-- [ ] Paladin — Vengeance: Vow of Enmity Channel Divinity (advantage vs one creature for 1 min); Abjure Enemy (frighten one creature, WIS save) (PHB p.88)
-- [ ] Bard — Lore: Cutting Words reaction (subtract Bardic Inspiration die from enemy attack roll/damage/ability check); 3 bonus skill proficiencies (PHB p.54)
-- [ ] Bard — Valor: Combat Inspiration (ally uses die for weapon damage or AC bonus); Extra Attack at L6 (PHB p.55)
+## 6. Subclass Features — MOSTLY DONE (verified in audit)
+- [x] Champion: Improved Critical
+- [x] Battle Master: maneuvers (Riposte, Feinting)
+- [ ] Thief: Fast Hands — still missing
+- [x] Assassin: auto-crit on surprised
+- [x] Evoker: Potent Cantrip
+- [x] Abjurer: Arcane Ward
+- [x] Life Cleric: Disciple of Life
+- [x] War Cleric: War Priest + Guided Strike
+- [x] Hunter Ranger: Colossus Slayer
+- [ ] Beastmaster: Animal Companion — still missing
+- [x] Devotion Paladin: Sacred Weapon
+- [x] Vengeance Paladin: Vow of Enmity + Abjure Enemy
+- [x] Bard Lore: Cutting Words
+- [x] Bard Valor: Combat Inspiration + Extra Attack
 
 ---
 
 ## 7. Vale of Shadows — Refactor & Playtest
-- [ ] Refactor Vale of Shadows campaign to leverage multi-enemy encounters, grid terrain, faction mechanics, and all new class/subclass features added since initial authoring
+- [x] Migrate enemies to the new array-per-room schema with stable IDs
+- [x] Multi-enemy encounters added: Charnel Hall (2 skeletons), Crypt Throne (Crypt Lord + 2 skeleton minions), Road North (2 bandits)
 - [ ] Add a second campaign module to validate the authoring format is general-purpose
 - [ ] End-to-end playtest — complete all 3 quests in a single session; verify campaign state survives session resume; verify faction price modifiers apply in shop
 
