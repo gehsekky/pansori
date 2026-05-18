@@ -1045,6 +1045,7 @@ describe('class features', () => {
     vi.spyOn(Math, 'random')
       .mockReturnValueOnce(0)    // initiative d20 for Fighter
       .mockReturnValueOnce(0)    // initiative d20 for enemy
+      .mockReturnValueOnce(0)    // surprise stealth roll (1d20) for Fighter
       .mockReturnValueOnce(0)    // first attack d20 → 1 (fumble)
       .mockReturnValueOnce(0.999) // second attack d20 → 20 (hit)
       .mockReturnValue(0.999);   // damage dice
@@ -1571,13 +1572,26 @@ describe('generateChoices — spell choices', () => {
     expect(offensiveSpells.length).toBe(0);
   });
 
-  it('does not include spell choices when all slots for that level are used', () => {
-    const state = makeMageState({ spell_slots_used: { 1: 2 } });
+  it('does not include spell choices when all slots at all eligible levels are used', () => {
+    // magic_missile is level 1; mage has 2×L1, 1×L2, 1×L3 — exhaust all
+    const state = makeMageState({ spell_slots_used: { 1: 2, 2: 1, 3: 1 } });
     const choices = generateChoices(state, spellSeed, ctxWithRage);
     const missileChoice = choices.find(c =>
       c.action.type === 'cast_spell' && (c.action as { spellId: string }).spellId === 'magic_missile'
     );
     expect(missileChoice).toBeUndefined();
+  });
+
+  it('includes upcast choices when higher slots are available', () => {
+    // L1 slots exhausted but L2 still available — upcast magic_missile should appear
+    const state = makeMageState({ spell_slots_used: { 1: 2 } });
+    const choices = generateChoices(state, spellSeed, ctxWithRage);
+    const upcastChoice = choices.find(c =>
+      c.action.type === 'cast_spell' &&
+      (c.action as { spellId: string; slotLevel: number }).spellId === 'magic_missile' &&
+      (c.action as { spellId: string; slotLevel: number }).slotLevel === 2
+    );
+    expect(upcastChoice).toBeDefined();
   });
 
   it('includes Misty Step as a bonus-action choice', () => {

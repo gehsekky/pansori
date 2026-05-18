@@ -15,7 +15,7 @@ import {
 } from './rulesEngine.js';
 import { Engine } from 'json-rules-engine';
 import type { GameState, Character, Seed, Context, Enemy, LootItem, InventoryItem, OnHitEffect, StructuredAction, GameChoice, DeathSaves, TurnActions, GameConsequence, RuleFacts, PlacedNpc, NpcAttitude, AbilityKey, Trap, RoomObject, CombatEntity } from '../types.js';
-import { inRange, findPath, pathCostFeet, opportunityAttackTriggers, DEFAULT_SPEED_FEET, coverBonus, isFlankingPosition, posEqual, SQUARE_SIZE } from './gridEngine.js';
+import { inRange, findPath, pathCostFeet, opportunityAttackTriggers, DEFAULT_SPEED_FEET, coverBonus, isFlankingPosition, posEqual, SQUARE_SIZE, distanceFeet, entitiesInBlast } from './gridEngine.js';
 import { llmProvider } from './llmProvider.js';
 
 function pick<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)]; }
@@ -139,9 +139,12 @@ function applyEnemyAttackNarrative(
 
   if (result.hit) {
     // Rage resistance: halve physical damage while raging (PHB p.48)
-    const isRaging = char.conditions.includes('raging');
-    let hpLost   = isRaging ? Math.ceil(result.damage / 2) : result.damage;
-    const rageNote = isRaging ? ` (Rage resistance: ${result.damage}→${hpLost})` : '';
+    const isRaging    = char.conditions.includes('raging');
+    // Petrified: resistance to all damage (PHB p.291)
+    const isPetrified = char.conditions.includes('petrified');
+    let hpLost   = (isRaging || isPetrified) ? Math.ceil(result.damage / 2) : result.damage;
+    const rageNote = isRaging    ? ` (Rage resistance: ${result.damage}→${hpLost})`      : '';
+    const petrNote = isPetrified ? ` (Petrified resistance: ${result.damage}→${hpLost})` : '';
     // Exhaustion 4: effective max HP is halved — clamp current HP after taking damage
     const newHpAfterDmg = clampHpForExhaustion(Math.max(0, char.hp - hpLost), char.max_hp, char.exhaustion_level ?? 0);
     hpLost = char.hp - newHpAfterDmg; // recalculate actual HP lost after clamp
@@ -149,7 +152,7 @@ function applyEnemyAttackNarrative(
     let narrative = pick(context.narratives.enemyAttacks)
       .replace('{enemy}', enemy.name)
       .replace('{dmg}',   String(hpLost));
-    narrative += rageNote;
+    narrative += rageNote + petrNote;
     let updatedChar = { ...char };
 
     if (enemy.onHitEffect) {
@@ -419,24 +422,30 @@ export function normalizeState(
       traps_disarmed:     gs.traps_disarmed     ?? [],
       objects_searched:   gs.objects_searched   ?? [],
       enemy_conditions:   gs.enemy_conditions   ?? [],
-      characters: gs.characters.map(c => ({
-        ...c,
-        hit_die:              c.hit_die              ?? 8,
-        hit_dice_remaining:   c.hit_dice_remaining   ?? (c.level ?? 1),
-        condition_durations:  c.condition_durations  ?? {},
-        class_resource_uses:  c.class_resource_uses  ?? {},
-        asi_pending:          c.asi_pending          ?? false,
-        exhaustion_level:     c.exhaustion_level     ?? 0,
-        spell_slots_max:      c.spell_slots_max      ?? {},
-        spell_slots_used:     c.spell_slots_used     ?? {},
-        spells_known:         c.spells_known         ?? [],
-        background_id:        c.background_id        ?? null,
-        skill_proficiencies:  c.skill_proficiencies  ?? [],
-        tool_proficiencies:   c.tool_proficiencies   ?? [],
-        armor_proficiencies:  c.armor_proficiencies  ?? [],
-        weapon_proficiencies: c.weapon_proficiencies ?? [],
-        attuned_items:        c.attuned_items        ?? [] as string[],
-      })),
+      characters: gs.characters.map(c => {
+        const existingSlots = c.spell_slots_max ?? {};
+        const slotsMax = Object.keys(existingSlots).length > 0
+          ? existingSlots
+          : spellSlotsForClassLevel(c.character_class, c.level ?? 1);
+        return {
+          ...c,
+          hit_die:              c.hit_die              ?? 8,
+          hit_dice_remaining:   c.hit_dice_remaining   ?? (c.level ?? 1),
+          condition_durations:  c.condition_durations  ?? {},
+          class_resource_uses:  c.class_resource_uses  ?? {},
+          asi_pending:          c.asi_pending          ?? false,
+          exhaustion_level:     c.exhaustion_level     ?? 0,
+          spell_slots_max:      slotsMax,
+          spell_slots_used:     c.spell_slots_used     ?? {},
+          spells_known:         c.spells_known         ?? [],
+          background_id:        c.background_id        ?? null,
+          skill_proficiencies:  c.skill_proficiencies  ?? [],
+          tool_proficiencies:   c.tool_proficiencies   ?? [],
+          armor_proficiencies:  c.armor_proficiencies  ?? [],
+          weapon_proficiencies: c.weapon_proficiencies ?? [],
+          attuned_items:        c.attuned_items        ?? [] as string[],
+        };
+      }),
     };
   }
 
@@ -581,10 +590,15 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   if (char.hp <= 0 && !char.stable) return [{ label: 'Roll death saving throw', action: { type: 'death_save' } }];
   if (char.hp <= 0 && char.stable)  return [{ label: 'Use healing item', action: { type: 'use', itemId: healItem?.id ?? '' } }];
 
-  // Stunned / paralyzed / incapacitated: cannot take actions, bonus actions, reactions, or move
-  const isIncapacitated = char.conditions.some(c => ['stunned', 'paralyzed', 'incapacitated'].includes(c));
+  // Surprised on round 1: entity cannot act (PHB p.189)
+  if (state.combat_active && (state.surprised ?? []).includes(char.id)) {
+    return [{ label: 'SURPRISED — cannot act this round (pass)', action: { type: 'pass' } }];
+  }
+
+  // Stunned / paralyzed / incapacitated / petrified: cannot take actions, bonus actions, reactions, or move
+  const isIncapacitated = char.conditions.some(c => ['stunned', 'paralyzed', 'incapacitated', 'petrified'].includes(c));
   if (isIncapacitated) {
-    const cond = (char.conditions.find(c => ['stunned', 'paralyzed', 'incapacitated'].includes(c)) ?? 'stunned').toUpperCase();
+    const cond = (char.conditions.find(c => ['stunned', 'paralyzed', 'incapacitated', 'petrified'].includes(c)) ?? 'stunned').toUpperCase();
     return [{ label: `${cond} — cannot act this turn (pass)`, action: { type: 'pass' } }];
   }
 
@@ -809,15 +823,24 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
           requiresBonusAction: isBonusAction || undefined,
         });
       } else {
-        // Leveled spell: need a slot at or above spell level
-        const available = (slots[spell.level] ?? 0) - (slotsUsed[spell.level] ?? 0);
-        if (available <= 0) continue;
-        const slotNote = isBonusAction ? ', bonus action' : '';
-        choices.push({
-          label:               `Cast ${spell.name} (Lvl ${spell.level}${slotNote} — ${available} slot${available === 1 ? '' : 's'} left)`,
-          action:              { type: 'cast_spell', spellId, slotLevel: spell.level },
-          requiresBonusAction: isBonusAction || undefined,
-        });
+        // Leveled spell: emit one choice per available slot level (base + upcasts)
+        const baseLevel = spell.level ?? 1;
+        const maxSlotLevel = Math.max(...Object.keys(slots).map(Number).filter(l => l >= baseLevel));
+        let emittedAny = false;
+        for (let sl = baseLevel; sl <= maxSlotLevel; sl++) {
+          const avail = (slots[sl] ?? 0) - (slotsUsed[sl] ?? 0);
+          if (avail <= 0) continue;
+          emittedAny = true;
+          const isUpcast = sl > baseLevel;
+          const upcastPart = isUpcast && spell.upcastBonus ? ` — upcast +${(sl - baseLevel)}${spell.upcastBonus}` : '';
+          const slotNote = isBonusAction ? ', bonus action' : '';
+          choices.push({
+            label:               `Cast ${spell.name} (${sl === baseLevel ? `Lvl ${sl}` : `${sl}th slot`}${slotNote}${upcastPart} — ${avail} slot${avail === 1 ? '' : 's'} left)`,
+            action:              { type: 'cast_spell', spellId, slotLevel: sl },
+            requiresBonusAction: isBonusAction || undefined,
+          });
+        }
+        if (!emittedAny) continue;
       }
     }
   }
@@ -1331,6 +1354,32 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
       }
       const weaponLabel  = weaponItem ? `Your ${weaponItem.name}` : 'Your fists';
 
+      // ── Ammunition check (PHB p.146) ──────────────────────────────────────
+      if (weaponItem?.range === 'ranged' && !weaponItem.thrown) {
+        // Determine ammo type — convention: arrows for bows, bolts for crossbows, bullets for slings
+        const ammoTypes: Record<string, string[]> = {
+          bow:       ['arrow', 'arrows'],
+          crossbow:  ['bolt', 'bolts'],
+          sling:     ['bullet', 'bullets', 'sling_bullet'],
+        };
+        const wepKey = Object.keys(ammoTypes).find(k => weaponItem.id.includes(k)) ?? 'arrow';
+        const ammoIds = ammoTypes[wepKey] ?? ['arrow', 'arrows'];
+        const ammoIdx = char.inventory.findIndex(i => ammoIds.some(a => i.id.includes(a)));
+        if (ammoIdx === -1) {
+          narrative = `You have no ammunition for your ${weaponItem.name}.`;
+          break;
+        }
+        const ammoItem = char.inventory[ammoIdx];
+        const ammoCount = (ammoItem.count as number | undefined) ?? 1;
+        if (ammoCount <= 1) {
+          char.inventory = char.inventory.filter((_, i) => i !== ammoIdx);
+        } else {
+          char.inventory = char.inventory.map((item, i) =>
+            i === ammoIdx ? { ...item, count: ammoCount - 1 } : item
+          );
+        }
+      }
+
       // ── Start combat on first attack — roll initiative for all ─────────────
       if (!st.combat_active) {
         const order = buildInitiativeOrder(st.characters, enemy, roomId);
@@ -1373,16 +1422,33 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
           st = { ...st, entities: [...pcEntities, enemyEntity], movement_used: {} };
         }
 
+        // ── Surprise check (PHB p.189) ────────────────────────────────────
+        // If the party averages a higher Stealth than the enemy's passive Perception,
+        // the enemy is surprised for round 1 (cannot act).
+        const partyAvgStealth = Math.round(
+          st.characters
+            .filter(c => !c.dead)
+            .reduce((sum, c) => {
+              const prof = c.skill_proficiencies?.includes('Stealth') ?? false;
+              return sum + rollDice('1d20') + abilityMod(c.dex) + (prof ? profBonus(c.level) : 0);
+            }, 0) / Math.max(1, st.characters.filter(c => !c.dead).length)
+        );
+        const enemyPassivePerc = 10 + abilityMod(enemy.wis ?? 10);
+        if (partyAvgStealth > enemyPassivePerc) {
+          st = { ...st, surprised: [roomId] };
+        }
+
         const orderText = order
           .map(e => {
             const name = e.is_enemy ? enemy.name : (st.characters.find(c => c.id === e.id)?.name ?? 'Hero');
             return `${name}(${e.roll})`;
           })
           .join(' → ');
+        const surpriseNote = st.surprised?.length ? ` The ${enemy.name} is SURPRISED!` : '';
         const combatPrefix = context.narratives.combatStart
           ? pick(context.narratives.combatStart).replace(/{enemy}/g, enemy.name) + ' '
           : 'Combat begins! ';
-        narrative = `${combatPrefix}Initiative: ${orderText}. `;
+        narrative = `${combatPrefix}Initiative: ${orderText}.${surpriseNote} `;
 
         // Find this character's position in the initiative order
         const myInitIdx = order.findIndex(e => e.id === char.id);
@@ -1440,6 +1506,16 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
       // Prone: melee attacks have advantage, ranged attacks have disadvantage
       const proneAdv        = enemyProne && weaponItem?.range !== 'ranged';
       const proneDisadv     = enemyProne && weaponItem?.range === 'ranged';
+      // Thrown weapon beyond normal range: disadvantage (PHB p.147)
+      let thrownLongRangeDisadv = false;
+      if (weaponItem?.thrown && st.entities) {
+        const charEnt  = st.entities.find(e => e.id === char.id);
+        const enemyEnt = st.entities.find(e => e.id === roomId && e.isEnemy);
+        if (charEnt && enemyEnt) {
+          const dist = distanceFeet(charEnt.pos, enemyEnt.pos);
+          if (dist > weaponItem.thrown.normalRange) thrownLongRangeDisadv = true;
+        }
+      }
 
       // Cover bonus: raise enemy's effective AC from obstacles between attacker and target
       let coverAcBonus = 0;
@@ -1464,14 +1540,15 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
       const helpAdv = st.help_target_id === char.id;
       if (helpAdv) st = { ...st, help_target_id: undefined };
 
-      const disadvantage     = rangedInMelee || conditionDisadv || exhaustionDisadv || !armorProficient || proneDisadv;
+      const disadvantage     = rangedInMelee || conditionDisadv || exhaustionDisadv || !armorProficient || proneDisadv || thrownLongRangeDisadv;
       const advantage        = conditionAdv || enemyGrappled || proneAdv || enemyParalyzed || flankingAdv || helpAdv;
       const disadvReasons    = [
-        rangedInMelee    ? 'ranged in melee' : '',
-        conditionDisadv  ? char.conditions.filter(c => DISADV_CONDITIONS.has(c)).join(', ') : '',
-        exhaustionDisadv ? 'exhaustion' : '',
-        !armorProficient ? `not proficient with ${equippedArmorLootItem?.name ?? 'armor'}` : '',
-        proneDisadv      ? 'prone (ranged)' : '',
+        rangedInMelee          ? 'ranged in melee' : '',
+        conditionDisadv        ? char.conditions.filter(c => DISADV_CONDITIONS.has(c)).join(', ') : '',
+        exhaustionDisadv       ? 'exhaustion' : '',
+        !armorProficient       ? `not proficient with ${equippedArmorLootItem?.name ?? 'armor'}` : '',
+        proneDisadv            ? 'prone (ranged)' : '',
+        thrownLongRangeDisadv  ? 'thrown beyond normal range' : '',
       ].filter(Boolean).join(', ');
       const disadvNote = disadvReasons ? ` (disadvantage — ${disadvReasons})` : (advantage && !disadvantage) ? ' (advantage)' : '';
       const noProfNote = !weaponProficient ? ` [no weapon proficiency — prof bonus omitted]` : '';
@@ -1557,10 +1634,11 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
             .replace('{xp}',    String(xpGain));
           if (char.xp >= char.level * 100) {
             char.level  += 1;
-            char.max_hp += 4;
-            char.hp      = Math.min(char.hp + 4, char.max_hp);
+            const hpRoll = Math.max(1, rollDice(`1d${char.hit_die ?? 8}`) + abilityMod(char.con));
+            char.max_hp += hpRoll;
+            char.hp      = Math.min(char.hp + hpRoll, char.max_hp);
             char.spell_slots_max = getSpellSlotsForLevel(char.character_class, char.level, context);
-            narrative += ' ' + pick(context.narratives.levelUp);
+            narrative += ' ' + pick(context.narratives.levelUp) + ` (+${hpRoll} HP)`;
             if ([4, 8, 12, 16, 19].includes(char.level)) {
               char.asi_pending = true;
               narrative += ` Level ${char.level}: choose an Ability Score Improvement!`;
@@ -2181,7 +2259,62 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
         narrative = `${char.name} casts ${spell.name}${slotNote}! Auto-hit — ${spellDmg} ${spell.damageType ?? ''} damage!`;
       }
 
-      // Apply damage to enemy
+      // ── AOE spells on grid ────────────────────────────────────────────────
+      // If the spell has a blastRadius and grid entities exist, resolve against all
+      // entities in the blast instead of the single-target path.
+      const aoeBR = (spell as { blastRadius?: number }).blastRadius;
+      if (aoeBR && st.entities && spell.savingThrow && spellDmg >= 0) {
+        const epicenter = st.entities.find(e => e.id === roomId && e.isEnemy)?.pos
+          ?? st.entities.find(e => e.isEnemy)?.pos;
+        if (epicenter) {
+          const blastTargets = entitiesInBlast(epicenter, aoeBR, st.entities);
+          const isEvoker = char.subclass === 'evoker';
+          narrative += ` [AOE ${aoeBR}ft blast]`;
+          for (const target of blastTargets) {
+            if (target.id === char.id) continue;
+            const targetEnemy = target.isEnemy ? seed.enemies?.[target.id] : null;
+            const targetChar  = !target.isEnemy ? st.characters.find(c => c.id === target.id) : null;
+
+            if (target.isEnemy && targetEnemy) {
+              const tScore    = (targetEnemy as unknown as Record<string, number>)[spell.savingThrow] ?? 10;
+              const tFailed   = rollConditionSave(spell.savingThrow, tScore, dc);
+              const baseDmg   = rollDice((upcastDamage(spell, slotLevel)) || (spell.damage ?? '0'));
+              const effDmg    = tFailed ? baseDmg : spell.saveEffect === 'half' ? Math.floor(baseDmg / 2) : 0;
+              const { damage: resDmg } = applyDamageMultiplier(effDmg, spell.damageType, targetEnemy);
+              const curHp = getEnemyHp(st, target.id, seed);
+              const newHp = curHp - resDmg;
+              st = setEnemyHp(st, target.id, Math.max(0, newHp));
+              narrative += ` ${targetEnemy.name}: ${tFailed ? 'fails' : 'succeeds'} save — ${resDmg} dmg${newHp <= 0 ? ' (killed)' : ''}.`;
+              if (newHp <= 0) {
+                char.xp = (char.xp || 0) + (targetEnemy.xp ?? 10);
+                st.enemies_killed = [...st.enemies_killed, target.id];
+                st.enemy_conditions = [];
+                st = endCombatState(st);
+              }
+            } else if (targetChar && !target.isEnemy) {
+              // Allies in blast: Evoker Sculpt Spells lets them auto-succeed (PHB p.117)
+              const autoSucceed = isEvoker;
+              if (!autoSucceed && spell.saveEffect !== 'negates') {
+                const allyScore  = targetChar[spell.savingThrow as keyof Character] as number ?? 10;
+                const allyFailed = rollConditionSave(spell.savingThrow, allyScore, dc);
+                const baseDmg   = rollDice((upcastDamage(spell, slotLevel)) || (spell.damage ?? '0'));
+                const effDmg    = allyFailed ? baseDmg : spell.saveEffect === 'half' ? Math.floor(baseDmg / 2) : 0;
+                if (effDmg > 0) {
+                  const newAllyHp = Math.max(0, targetChar.hp - effDmg);
+                  st = { ...st, characters: st.characters.map(c => c.id === targetChar.id ? { ...c, hp: newAllyHp } : c) };
+                  narrative += ` ${targetChar.name}: ${allyFailed ? 'fails' : 'succeeds'} save — ${effDmg} dmg.`;
+                }
+              } else if (autoSucceed) {
+                narrative += ` ${targetChar.name}: auto-succeeds (Sculpt Spells).`;
+              }
+            }
+          }
+          usedInitiative = true;
+          break;
+        }
+      }
+
+      // Apply damage to single enemy target
       if (spellDmg > 0 || spellHit) {
         const { damage: effSpellDmg, note: spellDmgNote } = applyDamageMultiplier(spellDmg, spell.damageType, enemy);
         if (spellDmgNote) narrative += spellDmgNote;
@@ -2197,10 +2330,11 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
           narrative += ' ' + pick(context.narratives.killShot).replace('{enemy}', enemy.name).replace('{xp}', String(xpGain));
           if (char.xp >= char.level * 100) {
             char.level  += 1;
-            char.max_hp += 4;
-            char.hp      = Math.min(char.hp + 4, char.max_hp);
+            const hpRollSpell = Math.max(1, rollDice(`1d${char.hit_die ?? 8}`) + abilityMod(char.con));
+            char.max_hp += hpRollSpell;
+            char.hp      = Math.min(char.hp + hpRollSpell, char.max_hp);
             char.spell_slots_max = getSpellSlotsForLevel(char.character_class, char.level, context);
-            narrative += ' ' + pick(context.narratives.levelUp);
+            narrative += ' ' + pick(context.narratives.levelUp) + ` (+${hpRollSpell} HP)`;
             if ([4, 8, 12, 16, 19].includes(char.level)) {
               char.asi_pending = true;
               narrative += ` Level ${char.level}: choose an Ability Score Improvement!`;
@@ -2861,10 +2995,11 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
     }
 
     if (roundWrapped) {
-      // New round: reset all characters' turn_actions and movement budgets
+      // New round: reset turn_actions, movement budgets, and clear surprise (PHB p.189)
       st = {
         ...st,
         movement_used: {},
+        surprised:     [],
         characters: st.characters.map(c => ({ ...c, turn_actions: { ...FRESH_TURN } })),
       };
     }
