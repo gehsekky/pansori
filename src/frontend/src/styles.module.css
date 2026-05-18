@@ -602,7 +602,9 @@
 .gridLegendPC,
 .gridLegendCompanion,
 .gridLegendEnemy,
-.gridLegendReach {
+.gridLegendReach,
+.gridLegendDim,
+.gridLegendDark {
   display: inline-block;
   width: 10px;
   height: 10px;
@@ -619,6 +621,18 @@
 
 .gridLegendEnemy {
   background: rgba(220, 70, 70, 0.85);
+}
+
+.gridLegendDim {
+  border-radius: 0;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--t-border);
+}
+
+.gridLegendDark {
+  border-radius: 0;
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid var(--t-border);
 }
 
 .gridLegendReach {

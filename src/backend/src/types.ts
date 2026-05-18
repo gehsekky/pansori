@@ -64,6 +64,12 @@ export interface Room {
   objects?: RoomObject[];
   difficultTerrain?: GridPos[]; // squares costing 2× movement to enter
   coverPositions?: GridPos[]; // squares granting half cover (+2 AC) to occupant
+  // Ambient lighting per SRD 5.2.1 p.11 "Vision and Light". Default 'bright'
+  // (the room is well-lit; tactical fog-of-war is disabled). 'dim' makes the
+  // whole room Lightly Obscured (Disadvantage on sight-based Perception).
+  // 'dark' makes squares outside a PC's lit radius Heavily Obscured
+  // (Blinded for sight), enabling true fog-of-war on the combat grid.
+  lighting?: 'bright' | 'dim' | 'dark';
 }
 
 export type ConditionName =
@@ -368,6 +374,10 @@ export interface Character {
   expertise_skills?: string[]; // skills with double proficiency bonus (Rogue/Bard)
   prepared_spells?: string[]; // spell ids currently prepared (Cleric/Paladin/Druid)
   charmer_id?: string; // entity id of the charmer when charmed
+  // SRD 5.2.1 p.11: Darkvision treats Darkness as Dim Light within this radius
+  // (typically 60 ft for elves/dwarves/halflings/etc.). Default 0 = no
+  // darkvision (typical human).
+  darkvision_ft?: number;
 }
 
 // ─── Game state (world/party container) ──────────────────────────────────────

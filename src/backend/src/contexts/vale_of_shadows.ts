@@ -795,36 +795,43 @@ export const context: Context = {
         name: 'Crypt Entrance',
         desc: 'Crumbling stone steps lead down. Crude graffiti warns: "Abandon hope." Torch brackets line the walls.',
         canRest: false,
+        lighting: 'dim',
       },
       {
         id: 'dungeon_antechamber',
         name: 'Antechamber',
         desc: 'A vaulted chamber of black stone. Funeral urns line the alcoves, some shattered. Bones litter the floor.',
+        lighting: 'dark',
       },
       {
         id: 'dungeon_charnel_hall',
         name: 'Charnel Hall',
         desc: 'A long corridor flanked by sealed burial niches. The seals on several niches have been broken from within.',
+        lighting: 'dark',
       },
       {
         id: 'dungeon_offering_chamber',
         name: 'Chamber of Offerings',
         desc: 'An altar to a forgotten death deity stands at the center. Coins and grave goods have been disturbed.',
+        lighting: 'dark',
       },
       {
         id: 'dungeon_shadow_gallery',
         name: 'Shadow Gallery',
         desc: 'Torchlight barely penetrates here. Paintings on the wall shift when you look away.',
+        lighting: 'dark',
       },
       {
         id: 'dungeon_ossuary',
         name: 'Ossuary',
         desc: 'Bones are stacked floor to ceiling in ornate patterns. The artistry is almost beautiful.',
+        lighting: 'dark',
       },
       {
         id: 'dungeon_crypt_throne',
         name: 'Throne of the Dead',
         desc: 'A massive chamber with a raised dais. An ancient throne of black stone dominates the room. Something powerful waits here.',
+        lighting: 'dim',
       },
       {
         id: 'dungeon_crypt_exit',
