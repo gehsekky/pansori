@@ -41,11 +41,40 @@
 - [ ] Dynamic room/encounter image generation — Google Imagen or similar behind `IMAGE_PROVIDER` env var flag; especially valuable for campaign locations (town square, dungeon rooms); off by default
 - [ ] Sound effects — ambient audio per location type (town, dungeon, wilderness); combat sound cues
 
-## Deployment (AWS — t4g.micro EC2 + db.t4g.micro RDS)
+## Deployment (AWS — t4g.small EC2 + db.t4g.micro RDS)
+
+### AWS Console (one-time)
+- [ ] ECR repositories — create `pansori-backend` and `pansori-frontend` repos in ECR; note the registry URL
+- [ ] RDS provisioning — `db.t4g.micro` PostgreSQL 16 in same VPC as EC2; SG allows inbound 5432 from EC2 SG only; enable automated backups (7-day retention); no public endpoint
+- [ ] Security groups — EC2 inbound: 22 (your IP only), 80, 443; RDS inbound: 5432 from EC2 SG only
+- [ ] IAM instance profile — attach role with `CloudWatchLogsFullAccess` (or scoped policy) to EC2 so the `awslogs` Docker log driver can write
+- [ ] CloudWatch log groups — create `/pansori/backend`, `/pansori/frontend`, `/pansori/nginx` with 30-day retention
+
+### EC2 bootstrap (SSH in once)
+- [ ] Install Docker, Docker Compose plugin, and AWS CLI on the instance; add `ec2-user` to the `docker` group
+- [ ] Create `/opt/pansori/` directory; copy `docker-compose.prod.yml` and `infra/nginx/nginx.conf` there
+- [ ] Create `/opt/pansori/.env` with all required vars (see list below) — or wire SSM injection into the startup script
+
+### Domain & TLS
+- [ ] Point domain A record at EC2 public IP
+- [ ] Replace `YOUR_DOMAIN` in `infra/nginx/nginx.conf` with the real domain (4 occurrences)
+- [ ] Run Certbot on EC2: `certbot certonly --webroot -w /var/www/certbot -d yourdomain.com`
+- [ ] Add auto-renew cron: `0 3 * * * root certbot renew --quiet`
+
+### GitHub Actions wiring
+- [ ] Add repo secrets: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `EC2_SSH_KEY`
+- [ ] Fill in the three TODOs at the top of `.github/workflows/deploy.yml`: `AWS_REGION`, `ECR_REGISTRY`, `EC2_HOST`
+
+### Database
+- [ ] Run `psql $DATABASE_URL -f infra/db/schema.sql` once on first deploy to initialize the schema
 - [ ] Run DB migration 006 — `006_campaign_state.sql` adds `campaign_states` table and `campaign_state_id` FK on `game_sessions`; must be applied before any campaign session is started
-- [ ] Environment variable strategy — document all required vars; store secrets in AWS SSM Parameter Store; inject into EC2 via startup script; write a `scripts/ssm-push.sh` helper
-- [ ] ECR repositories — create `pansori-backend` and `pansori-frontend` repos; update `deploy.yml` placeholders with real ARNs
-- [ ] RDS provisioning — `db.t4g.micro` PostgreSQL 16 in the same VPC; SG allows inbound 5432 from EC2 SG only; automated backups (7-day); connection string in SSM
-- [ ] SSL/TLS — Certbot + Let's Encrypt on EC2 with auto-renew cron; bare HTTP is not acceptable for production (cookies, API keys in transit)
-- [ ] Security groups & VPC — EC2 inbound: 80 (redirect), 443, 22 (your IP only); RDS inbound: 5432 from EC2 SG only; no public RDS endpoint
-- [ ] CloudWatch log groups — already wired via `awslogs` driver in `docker-compose.prod.yml`; just needs log groups created and 30-day retention policy set
+
+### Required environment variables
+- `DATABASE_URL` — PostgreSQL connection string to RDS instance
+- `SESSION_SECRET` — random 64-character string
+- `ANTHROPIC_API_KEY` — `sk-ant-...`
+- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — OAuth app credentials
+- `GOOGLE_CALLBACK_URL` — `https://yourdomain.com/api/auth/google/callback`
+- `FRONTEND_URL` — `https://yourdomain.com`
+- `ECR_REGISTRY` — registry URL (e.g. `123456789.dkr.ecr.us-east-1.amazonaws.com`)
+- `AWS_REGION` — e.g. `us-east-1`
