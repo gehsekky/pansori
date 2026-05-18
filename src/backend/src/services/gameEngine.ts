@@ -5264,8 +5264,17 @@ export async function takeAction({
     let advIdx = (currentIdx + 1) % orderLen;
     let roundWrapped = advIdx === 0;
 
-    // Auto-resolve consecutive enemy turns
-    while (st.combat_active && st.initiative_order[advIdx]?.is_enemy) {
+    // Auto-resolve enemy turns AND skip dead-PC slots. The loop ends when we
+    // land on a living PC's slot — that's whose turn the player gets next.
+    // Dead PCs (separate from unconscious-at-0-HP — they get a death-save
+    // turn) have no action to take and would leave generateChoices returning
+    // [] if left as the active char.
+    while (
+      st.combat_active &&
+      st.initiative_order[advIdx] &&
+      (st.initiative_order[advIdx].is_enemy ||
+        (st.characters.find((c) => c.id === st.initiative_order[advIdx].id)?.dead ?? false))
+    ) {
       const eEntry = st.initiative_order[advIdx];
       const rm = getEnemyById(seed, eEntry.id);
       if (rm && !st.enemies_killed.includes(eEntry.id)) {
