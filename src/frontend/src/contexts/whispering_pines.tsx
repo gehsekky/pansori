@@ -18,14 +18,19 @@ export const context: FrontendContext = {
   classes: [
     { id: 'Fighter', desc: 'Martial combatant. Extra attack at L5. Second Wind. Heavy armor.' },
     { id: 'Rogue', desc: 'Sneak Attack. Cunning Action. Finesse weapons. Light armor.' },
-    {
-      id: 'Wizard',
-      desc: 'Arcane spellcaster. INT-based. Fire Bolt, Burning Hands, Magic Missile.',
-    },
+    { id: 'Wizard', desc: 'Arcane spellcaster. INT-based. Fire Bolt + Fireball burns the cult.' },
     { id: 'Cleric', desc: 'Divine spellcaster. Channel Divinity. Medium armor + shield.' },
     { id: 'Ranger', desc: 'Favored Enemy. Extra Attack at L5. Longbow + medium armor.' },
     { id: 'Paladin', desc: 'Divine Smite on hit. Lay on Hands healing. Heavy armor + shield.' },
-    { id: 'Bard', desc: 'Bardic Inspiration. CHA spellcaster. Persuasion expert. Light armor.' },
+    { id: 'Bard', desc: 'Bardic Inspiration. CHA spellcaster. Charm Person, Sleep, Healing Word.' },
+    { id: 'Druid', desc: 'Wild Shape. WIS spellcaster. Shillelagh, Entangle. Medium armor.' },
+    { id: 'Sorcerer', desc: 'Innate magic. Sorcery Points + Metamagic. Fire-bolt focus.' },
+    {
+      id: 'Warlock',
+      desc: 'Pact Magic (short-rest slots). Eldritch Blast + Hex + Hunger of Hadar.',
+    },
+    { id: 'Monk', desc: 'Ki points, Martial Arts, Unarmored Defense. Shortsword + darts.' },
+    { id: 'Barbarian', desc: 'Rage. Greataxe damage. Extra Attack at L5. Unarmored Defense.' },
   ],
 
   classPrimaryStats: {
@@ -36,6 +41,11 @@ export const context: FrontendContext = {
     Ranger: 'DEX',
     Paladin: 'STR',
     Bard: 'CHA',
+    Druid: 'WIS',
+    Sorcerer: 'CHA',
+    Warlock: 'CHA',
+    Monk: 'WIS',
+    Barbarian: 'STR',
   },
 
   classSkills: {
@@ -46,6 +56,11 @@ export const context: FrontendContext = {
     Ranger: ['Perception', 'Stealth', 'Nature', 'Survival'],
     Paladin: ['Athletics', 'Persuasion', 'Insight'],
     Bard: ['Persuasion', 'Deception', 'Performance', 'Perception'],
+    Druid: ['Nature', 'Survival', 'Animal Handling'],
+    Sorcerer: ['Arcana', 'Persuasion'],
+    Warlock: ['Arcana', 'Deception', 'Intimidation'],
+    Monk: ['Athletics', 'Stealth', 'Acrobatics'],
+    Barbarian: ['Athletics', 'Intimidation', 'Survival'],
   },
 
   classFeatures: {
@@ -56,9 +71,51 @@ export const context: FrontendContext = {
     Ranger: ['extra_attack', 'favored_enemy'],
     Paladin: ['divine_smite', 'lay_on_hands'],
     Bard: ['spellcasting', 'bardic_inspiration'],
+    Druid: ['wild_shape', 'channel_divinity', 'spellcasting'],
+    Sorcerer: ['sorcery_points', 'metamagic', 'spellcasting'],
+    Warlock: ['eldritch_blast', 'pact_magic', 'spellcasting'],
+    Monk: ['ki', 'unarmored_defense', 'martial_arts'],
+    Barbarian: ['rage', 'extra_attack', 'unarmored_defense'],
   },
 
-  backgrounds: [],
+  backgrounds: [
+    {
+      id: 'soldier',
+      name: 'Soldier',
+      desc: 'You served with the Pine Wardens or another mountain garrison.',
+      skillProficiencies: ['Athletics', 'Intimidation'],
+      toolProficiency: null,
+      feature: 'Military Rank',
+      featureDesc: 'Wardens and ex-soldiers recognise your authority.',
+    },
+    {
+      id: 'criminal',
+      name: 'Criminal',
+      desc: 'You have a history of breaking the law — smuggling, perhaps, in the high passes.',
+      skillProficiencies: ['Stealth', 'Deception'],
+      toolProficiency: "Thieves' Tools",
+      feature: 'Criminal Contact',
+      featureDesc: 'A reliable contact across the snow line handles rumour and fenced goods.',
+    },
+    {
+      id: 'sage',
+      name: 'Sage',
+      desc: 'You spent years studying lore — particularly cold-weather magic and ancient cults.',
+      skillProficiencies: ['Arcana', 'History'],
+      toolProficiency: null,
+      feature: 'Researcher',
+      featureDesc: 'If you do not know information, you know where to find it.',
+    },
+    {
+      id: 'acolyte',
+      name: 'Acolyte',
+      desc: 'You once served at a Selûnite shrine before taking up the pass road.',
+      skillProficiencies: ['Religion', 'Insight'],
+      toolProficiency: null,
+      feature: 'Shelter of the Faithful',
+      featureDesc: 'You and your companions receive healing and care at temples.',
+    },
+  ],
 
   // Icy blue/grey palette — distinct from Vale's amber/brown.
   theme: {
