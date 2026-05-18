@@ -12,9 +12,11 @@ import WorldMap from './components/WorldMap.tsx';
 import { context as sandboxContext } from './contexts/sandbox.tsx';
 import styles from './styles.module.css';
 import { useGame } from './hooks/useGame.ts';
+import { context as valeContext } from './contexts/vale_of_shadows.tsx';
 
 const CONTEXTS: Record<string, FrontendContext> = {
   sandbox: sandboxContext,
+  vale_of_shadows: valeContext,
 };
 function getCtx(seed: Seed | null): FrontendContext {
   return (seed?.context_id ? CONTEXTS[seed.context_id] : null) ?? sandboxContext;
