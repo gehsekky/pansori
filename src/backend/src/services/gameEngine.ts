@@ -5365,6 +5365,50 @@ export async function takeAction({
     roomName: activeRoom?.name ?? st.current_room,
   });
 
+  // SRD 5.2.1 p.184 — Invisible: attacking reveals location. The condition
+  // ends after the attack; the character must re-Hide to regain it.
+  {
+    const attackActions = new Set(['attack', 'attack_npc', 'two_weapon_attack', 'cast_spell']);
+    if (attackActions.has(action.type)) {
+      st = {
+        ...st,
+        characters: st.characters.map((c) =>
+          c.id === char.id && c.conditions.includes('invisible')
+            ? { ...c, conditions: c.conditions.filter((cc) => cc !== 'invisible') }
+            : c
+        ),
+      };
+    }
+  }
+
+  // SRD 5.2.1 p.203 — Concentration ends when the caster is incapacitated or
+  // dies. We don't catch every state transition mid-handler, so sweep here.
+  {
+    const incapCond = new Set([
+      'incapacitated',
+      'paralyzed',
+      'stunned',
+      'unconscious',
+      'petrified',
+    ]);
+    let anyBroken = false;
+    let updated = st;
+    for (let i = 0; i < updated.characters.length; i++) {
+      const c = updated.characters[i];
+      if (!c.concentrating_on) continue;
+      const isIncap = c.dead || c.hp <= 0 || c.conditions.some((cc) => incapCond.has(cc));
+      if (isIncap) {
+        const r = breakConcentration(c, updated);
+        anyBroken = true;
+        updated = {
+          ...r.st,
+          characters: r.st.characters.map((cc) => (cc.id === c.id ? r.char : cc)),
+        };
+      }
+    }
+    if (anyBroken) st = updated;
+  }
+
   // SRD 5.2.1 p.16 — Grappled ends if the grappler is incapacitated. Sweep here
   // so deaths/conditions applied this turn drop their grapples for the next turn.
   if (st.entities && st.entities.some((e) => e.grappled_by)) {
