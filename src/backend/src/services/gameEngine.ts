@@ -205,8 +205,7 @@ function applyEnemyAttackNarrative(
 } {
   const isDodging = char.turn_actions?.dodging ?? false;
   const isReckless = char.turn_actions?.reckless ?? false;
-  const hasAdvantage =
-    char.conditions.some((c) => ADVANTAGE_CONDITIONS.has(c)) || isReckless;
+  const hasAdvantage = char.conditions.some((c) => ADVANTAGE_CONDITIONS.has(c)) || isReckless;
   const hasDisadvantage = char.conditions.some((c) => ENEMY_DISADV_CONDITIONS.has(c)) || isDodging;
   const result = resolveEnemyAttack(enemy, char.ac, hasAdvantage, hasDisadvantage);
   const armorItem = char.equipped_armor
@@ -858,9 +857,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   // In combat: only Thief Rogue L3+ via Fast Hands (consumes bonus action).
   const currentRoom = seed.rooms.find((r) => r.id === roomId);
   const isThiefFastHands =
-    char.character_class.toLowerCase() === 'rogue' &&
-    char.subclass === 'thief' &&
-    char.level >= 3;
+    char.character_class.toLowerCase() === 'rogue' && char.subclass === 'thief' && char.level >= 3;
   const canInteractObjects =
     currentRoom?.objects?.length &&
     (!enemyAlive ||
