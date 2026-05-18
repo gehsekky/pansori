@@ -251,13 +251,12 @@ export default function App() {
                 <WorldMap seed={seed} state={gameState} onClose={() => setMapOpen(false)} />
               )}
 
-              {gameState?.combat_active && gameState.entities && gameState.entities.length > 0 && seed && (
-                <GridCombatView state={gameState} seed={seed} />
-              )}
+              {gameState?.combat_active &&
+                gameState.entities &&
+                gameState.entities.length > 0 &&
+                seed && <GridCombatView state={gameState} seed={seed} />}
 
-              {campaignMeta && gameState && (
-                <CampaignPanel state={gameState} meta={campaignMeta} />
-              )}
+              {campaignMeta && gameState && <CampaignPanel state={gameState} meta={campaignMeta} />}
 
               <div className={styles.contentRow}>
                 <div className={styles.contentMain}>

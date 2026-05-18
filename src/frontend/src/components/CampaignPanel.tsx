@@ -61,11 +61,7 @@ function QuestRow({
               <li
                 key={step.id}
                 style={{
-                  color: done
-                    ? 'var(--t-hp-high)'
-                    : current
-                      ? 'var(--t-primary)'
-                      : 'var(--t-dim)',
+                  color: done ? 'var(--t-hp-high)' : current ? 'var(--t-primary)' : 'var(--t-dim)',
                   textDecoration: done ? 'line-through' : 'none',
                   fontWeight: current ? 600 : 400,
                 }}
@@ -86,9 +82,7 @@ function CampaignPanel({ state, meta }: Props) {
 
   if (!meta || (meta.quests.length === 0 && meta.factions.length === 0)) return null;
 
-  const progressById = new Map(
-    (state.quest_progress ?? []).map((p) => [p.questId, p] as const)
-  );
+  const progressById = new Map((state.quest_progress ?? []).map((p) => [p.questId, p] as const));
 
   // Categorize quests: active first, then available, then completed/failed
   const sortedQuests = [...meta.quests].sort((a, b) => {

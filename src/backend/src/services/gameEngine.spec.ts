@@ -1417,8 +1417,12 @@ describe('enemy HP scaling by party size', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
     const s1 = generateRoguelikeSeed(ctx, 1);
     const s2 = generateRoguelikeSeed(ctx, 2);
-    const hps1 = Object.values(s1.enemies).flat().map((e) => e.hp);
-    const hps2 = Object.values(s2.enemies).flat().map((e) => e.hp);
+    const hps1 = Object.values(s1.enemies)
+      .flat()
+      .map((e) => e.hp);
+    const hps2 = Object.values(s2.enemies)
+      .flat()
+      .map((e) => e.hp);
     if (hps1.length > 0 && hps2.length > 0) {
       // Average HP in 2-player seed should be higher than 1-player seed
       const avg1 = hps1.reduce((a, b) => a + b, 0) / hps1.length;
