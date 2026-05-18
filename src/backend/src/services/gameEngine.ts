@@ -3009,8 +3009,7 @@ export async function takeAction({
       // Resolve targeted enemy: explicit targetEnemyId wins; fallback to first living
       const spellTargetId: string =
         (action as { type: 'cast_spell'; targetEnemyId?: string }).targetEnemyId ?? enemy.id;
-      const spellTarget: Enemy =
-        livingEnemiesInRoom.find((e) => e.id === spellTargetId) ?? enemy;
+      const spellTarget: Enemy = livingEnemiesInRoom.find((e) => e.id === spellTargetId) ?? enemy;
 
       const dc = spellSaveDC(char.level, castingScore);
       let spellDmg = 0;
@@ -3063,7 +3062,9 @@ export async function takeAction({
           if (!saveFailed && spell.saveEffect === 'half') narrative += ' (half damage)';
         } else {
           narrative = `${char.name} casts ${spell.name}${slotNote}! (DC ${dc} ${saveLabel} save — `;
-          narrative += saveFailed ? `${spellTarget.name} fails.)` : `${spellTarget.name} succeeds.)`;
+          narrative += saveFailed
+            ? `${spellTarget.name} fails.)`
+            : `${spellTarget.name} succeeds.)`;
         }
 
         if (spell.condition && saveFailed) {

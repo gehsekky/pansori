@@ -101,9 +101,7 @@ function GridCombatView({ state, seed, gridWidth = 10, gridHeight = 10 }: Props)
           style={{
             background: ent.isEnemy ? 'rgba(220, 70, 70, 0.85)' : 'rgba(70, 140, 220, 0.85)',
             boxShadow: isActive ? '0 0 6px 2px var(--t-primary)' : 'none',
-            border: isActive
-              ? '1px solid var(--t-primary)'
-              : '1px solid rgba(255, 255, 255, 0.25)',
+            border: isActive ? '1px solid var(--t-primary)' : '1px solid rgba(255, 255, 255, 0.25)',
           }}
         >
           <span className={styles.gridTokenLetter}>
