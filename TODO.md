@@ -163,7 +163,7 @@
 
 Still open under §9:
 
-- [ ] Encumbrance speed penalties (currently informational only)
+- [x] Encumbrance speed penalties — `effectiveSpeed()` now drops base speed by 10/20 ft at >5×STR / >10×STR carried weight, and to 0 above 15×STR. Wired through all 7 char.speed sites (dash, grid move budget, stand-up cost, Step of the Wind, etc.). Skill-check disadvantage from heavy encumbrance is still TODO.
 - [~] Multi-target spells (Magic Missile's 3 darts, Eldritch Blast's multiple beams at higher levels) — Magic Missile now does the full `3d4+3` (+1 dart per upcast) on the target; Eldritch Blast scales correctly via `cantripDamageDice`. Still missing: the optional dart/beam allocation UX so players can split across multiple targets.
 - [ ] AoE shapes beyond sphere (cone, line, cube) — needs geometry + per-spell shape tagging
 - [ ] Inspiration (Heroic Inspiration in 2024) — needs UX for grant/spend
