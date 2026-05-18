@@ -165,7 +165,7 @@ Still open under §9:
 
 - [x] Encumbrance speed penalties — `effectiveSpeed()` now drops base speed by 10/20 ft at >5×STR / >10×STR carried weight, and to 0 above 15×STR. Wired through all 7 char.speed sites (dash, grid move budget, stand-up cost, Step of the Wind, etc.). Skill-check disadvantage from heavy encumbrance is still TODO.
 - [~] Multi-target spells (Magic Missile's 3 darts, Eldritch Blast's multiple beams at higher levels) — Magic Missile now does the full `3d4+3` (+1 dart per upcast) on the target; Eldritch Blast scales correctly via `cantripDamageDice`. Still missing: the optional dart/beam allocation UX so players can split across multiple targets.
-- [ ] AoE shapes beyond sphere (cone, line, cube) — needs geometry + per-spell shape tagging
+- [x] AoE shapes beyond sphere (cone, line, cube) — `aoeShape?: 'sphere' | 'cone' | 'cube' | 'line'` on `Spell`; geometry helpers in `gridEngine` (`entitiesInCone/Cube/Line`); cast_spell handler dispatches to the correct shape. Thunderwave is now a 15-ft cube, Burning Hands a 15-ft cone. Fireball stays a sphere. Tests in `gridEngine.spec.ts`.
 - [ ] Inspiration (Heroic Inspiration in 2024) — needs UX for grant/spend
 - [ ] Reactive spells as interrupts (Counterspell, Shield) — architectural: requires interrupt support in the turn engine
 - [ ] Costly material component consumption (e.g. Identify's 100 gp pearl)

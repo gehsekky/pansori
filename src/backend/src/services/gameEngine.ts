@@ -61,6 +61,9 @@ import {
   coverBonus,
   distanceFeet,
   entitiesInBlast,
+  entitiesInCone,
+  entitiesInCube,
+  entitiesInLine,
   findPath,
   inRange,
   isFlankingPosition,
@@ -3424,16 +3427,30 @@ export async function takeAction({
 
       // ── AOE spells on grid ────────────────────────────────────────────────
       // If the spell has a blastRadius and grid entities exist, resolve against all
-      // entities in the blast instead of the single-target path.
+      // entities in the blast instead of the single-target path. Default shape is
+      // sphere (radius from target square); cone/cube/line emanate from caster
+      // toward the target square per SRD 5.2.1 p.193.
       const aoeBR = (spell as { blastRadius?: number }).blastRadius;
+      const aoeShape =
+        (spell as { aoeShape?: 'sphere' | 'cone' | 'cube' | 'line' }).aoeShape ?? 'sphere';
       if (aoeBR && st.entities && spell.savingThrow && spellDmg >= 0) {
         const epicenter =
           st.entities.find((e) => e.id === enemy.id && e.isEnemy)?.pos ??
           st.entities.find((e) => e.isEnemy)?.pos;
+        const casterPos = st.entities.find((e) => e.id === char.id)?.pos;
         if (epicenter) {
-          const blastTargets = entitiesInBlast(epicenter, aoeBR, st.entities);
+          const blastTargets =
+            aoeShape === 'sphere'
+              ? entitiesInBlast(epicenter, aoeBR, st.entities)
+              : aoeShape === 'cone' && casterPos
+                ? entitiesInCone(casterPos, epicenter, aoeBR, st.entities)
+                : aoeShape === 'cube' && casterPos
+                  ? entitiesInCube(casterPos, epicenter, aoeBR, st.entities)
+                  : aoeShape === 'line' && casterPos
+                    ? entitiesInLine(casterPos, epicenter, aoeBR, st.entities)
+                    : entitiesInBlast(epicenter, aoeBR, st.entities);
           const isEvoker = char.subclass === 'evoker';
-          narrative += ` [AOE ${aoeBR}ft blast]`;
+          narrative += ` [AOE ${aoeBR}ft ${aoeShape}]`;
           for (const target of blastTargets) {
             if (target.id === char.id) continue;
             const targetEnemy = target.isEnemy ? getEnemyById(seed, target.id) : null;

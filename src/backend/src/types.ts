@@ -263,6 +263,12 @@ export interface Spell {
   concentration?: boolean; // true = breaks if caster takes damage and fails CON save
   upcastBonus?: string; // extra dice per slot above base level, e.g. '1d6'
   blastRadius?: number; // AOE radius in feet; undefined = single target
+  // SRD 5.2.1 p.193 — Areas of Effect. Default is 'sphere' (radius from a point).
+  //   sphere: blastRadius = radius
+  //   cone:   blastRadius = length of the cone, originating from caster
+  //   cube:   blastRadius = side length of cube emanating from caster
+  //   line:   blastRadius = length (5 ft wide), from caster outward
+  aoeShape?: 'sphere' | 'cone' | 'cube' | 'line';
   ritualCasting?: boolean; // castable as ritual (no slot cost, only out of combat)
   verbal?: boolean; // has verbal component (blocked when deafened)
   // SRD 5.2.1: spell range. 'self' = no external target; 'touch' = adjacent

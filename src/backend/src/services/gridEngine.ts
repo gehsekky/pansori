@@ -80,6 +80,78 @@ export function entitiesInBlast(
   return entities.filter((e) => distanceFeet(epicenter, e.pos) <= blastRadius);
 }
 
+// Entities in a cone of given length (feet), originating from caster pointing
+// toward target. The cone widens at 45° per side from caster. SRD 5.2.1 p.193:
+// "A cone's width at a given point equals the distance from the point of origin".
+export function entitiesInCone(
+  caster: GridPos,
+  toward: GridPos,
+  lengthFt: number,
+  entities: CombatEntity[]
+): CombatEntity[] {
+  const lengthSq = Math.floor(lengthFt / SQUARE_SIZE);
+  const dx = Math.sign(toward.x - caster.x);
+  const dy = Math.sign(toward.y - caster.y);
+  if (dx === 0 && dy === 0) return [];
+  return entities.filter((e) => {
+    // Project the entity position onto the cone axis. The cone is symmetric
+    // about the caster→toward direction; distance along that direction must
+    // be ≤ length, and perpendicular distance must be ≤ along-axis distance.
+    const rx = e.pos.x - caster.x;
+    const ry = e.pos.y - caster.y;
+    // Same-direction component (positive if entity is in the cone's half-plane)
+    const along = rx * dx + ry * dy;
+    if (along <= 0 || along > lengthSq) return false;
+    // Perpendicular component magnitude (with diagonal direction we treat
+    // perp ≤ along for a 45° spread).
+    const perp =
+      dx !== 0 && dy !== 0 ? Math.abs(rx * dy - ry * dx) / 2 : Math.abs(rx * dy - ry * dx);
+    return perp <= along;
+  });
+}
+
+// Entities in a cube of given side length emanating from caster toward target.
+// The cube has its near face adjacent to caster; the entire 3D cube is modelled
+// as a 2D square on the grid for simplicity.
+export function entitiesInCube(
+  caster: GridPos,
+  toward: GridPos,
+  sideFt: number,
+  entities: CombatEntity[]
+): CombatEntity[] {
+  const side = Math.floor(sideFt / SQUARE_SIZE);
+  // Determine cube's anchor: the square adjacent to caster in the toward direction
+  const dx = Math.sign(toward.x - caster.x);
+  const dy = Math.sign(toward.y - caster.y);
+  // Position the cube so it spans `side` squares in caster's facing direction,
+  // and is centred perpendicular to that direction.
+  const minX = dx >= 0 ? caster.x + (dx === 0 ? -Math.floor(side / 2) : 1) : caster.x - side;
+  const maxX = minX + side - 1;
+  const minY = dy >= 0 ? caster.y + (dy === 0 ? -Math.floor(side / 2) : 1) : caster.y - side;
+  const maxY = minY + side - 1;
+  return entities.filter(
+    (e) => e.pos.x >= minX && e.pos.x <= maxX && e.pos.y >= minY && e.pos.y <= maxY
+  );
+}
+
+// Entities along a line of given length, 5-ft wide, from caster toward target.
+export function entitiesInLine(
+  caster: GridPos,
+  toward: GridPos,
+  lengthFt: number,
+  entities: CombatEntity[]
+): CombatEntity[] {
+  const length = Math.floor(lengthFt / SQUARE_SIZE);
+  const dx = Math.sign(toward.x - caster.x);
+  const dy = Math.sign(toward.y - caster.y);
+  if (dx === 0 && dy === 0) return [];
+  const linePositions: GridPos[] = [];
+  for (let i = 1; i <= length; i++) {
+    linePositions.push({ x: caster.x + dx * i, y: caster.y + dy * i });
+  }
+  return entities.filter((e) => linePositions.some((p) => posEqual(p, e.pos)));
+}
+
 // BFS pathfinding on a gridW × gridH grid, avoiding blocked squares
 // Returns the sequence of squares to move through (not including `from`),
 // or null if no path exists.
