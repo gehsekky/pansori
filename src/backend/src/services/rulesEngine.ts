@@ -397,15 +397,20 @@ export const ENEMY_DISADV_CONDITIONS = new Set(['invisible']);
 
 // On-hit saving throw: returns true if the save FAILS (condition is applied).
 // Pass proficient=true when the character has saving throw proficiency in this ability.
+// coverDexBonus (SRD 5.2.1 p.15): half cover +2 to DEX saves, three-quarters
+// cover +5 — applied only for DEX saves. AC use of the same bonus happens
+// separately in resolvePlayerAttack / resolveEnemyAttack.
 export function rollConditionSave(
   ability: 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha',
   score: number,
   dc: number,
   proficient = false,
-  level = 1
+  level = 1,
+  coverDexBonus = 0
 ): boolean {
   const prof = proficient ? profBonus(level) : 0;
-  return d(20) + abilityMod(score) + prof < dc;
+  const cover = ability === 'dex' ? coverDexBonus : 0;
+  return d(20) + abilityMod(score) + prof + cover < dc;
 }
 
 // ─── Consumable effects ───────────────────────────────────────────────────────

@@ -211,6 +211,7 @@ function applyEnemyAttackNarrative(
   newConditions: string[];
   newDurations: Record<string, number>;
   updatedResourceUses?: Record<string, number>;
+  newTempHp?: number;
 } {
   const isDodging = char.turn_actions?.dodging ?? false;
   const isReckless = char.turn_actions?.reckless ?? false;
@@ -244,6 +245,18 @@ function applyEnemyAttackNarrative(
       };
       wardNote = ` (Arcane Ward absorbed ${absorbed} — ward HP: ${wardHp - absorbed})`;
     }
+    // Temporary HP (SRD 5.2.1 p.17–18): absorb damage before regular HP.
+    // Temp HP doesn't stack with itself; it decrements with damage and is
+    // tracked on the character. Once depleted, remaining damage hits HP.
+    let tempHpAbsorbed = 0;
+    let newTempHp = char.temp_hp ?? 0;
+    if (newTempHp > 0 && hpLost > 0) {
+      tempHpAbsorbed = Math.min(newTempHp, hpLost);
+      hpLost -= tempHpAbsorbed;
+      newTempHp -= tempHpAbsorbed;
+    }
+    const tempHpNote =
+      tempHpAbsorbed > 0 ? ` (Temp HP absorbed ${tempHpAbsorbed} — temp HP: ${newTempHp})` : '';
     // Exhaustion 4: effective max HP is halved — clamp current HP after taking damage
     const newHpAfterDmg = clampHpForExhaustion(
       Math.max(0, char.hp - hpLost),
@@ -255,7 +268,7 @@ function applyEnemyAttackNarrative(
     let narrative = pick(context.narratives.enemyAttacks)
       .replace('{enemy}', enemy.name)
       .replace('{dmg}', String(hpLost));
-    narrative += rageNote + petrNote + wardNote;
+    narrative += rageNote + petrNote + wardNote + tempHpNote;
     let updatedChar = { ...char };
 
     if (enemy.onHitEffect) {
@@ -270,6 +283,7 @@ function applyEnemyAttackNarrative(
     return {
       hpLost,
       narrative,
+      newTempHp,
       newConditions: updatedChar.conditions,
       newDurations: updatedChar.condition_durations,
       updatedResourceUses: char.class_resource_uses,
@@ -2432,9 +2446,13 @@ export async function takeAction({
       const killed = resolveOneAttack('');
       if (!killed) {
         // ── Extra Attack (Fighter/Warrior level 5+) ───────────────────────
-        const extraCount = features.includes('extra_attack')
-          ? extraAttackCount(char.character_class, char.level)
-          : 0;
+        // SRD 5.2.1 p.90 "Loading": a Loading weapon fires only once per
+        // Action/Bonus/Reaction regardless of Extra Attack — so Fighter L5
+        // with a hand crossbow still gets just one shot per action.
+        const extraCount =
+          features.includes('extra_attack') && !weaponItem?.loading
+            ? extraAttackCount(char.character_class, char.level)
+            : 0;
         for (let ei = 0; ei < extraCount; ei++) {
           if ((st.entities?.find((e) => e.id === targetId && e.isEnemy)?.hp ?? 0) <= 0) break;
           const killedExtra = resolveOneAttack(`Attack ${ei + 2} — `);
@@ -2738,6 +2756,8 @@ export async function takeAction({
         return {
           ...c,
           hp: c.max_hp,
+          // Temp HP expires on a Long Rest (SRD 5.2.1 p.18)
+          temp_hp: 0,
           hit_dice_remaining: newHd,
           conditions: [],
           condition_durations: {},
@@ -2923,6 +2943,7 @@ export async function takeAction({
         char = {
           ...char,
           hp: Math.max(0, char.hp - retaliation.hpLost),
+          temp_hp: retaliation.newTempHp ?? char.temp_hp,
           conditions: retaliation.newConditions,
           condition_durations: retaliation.newDurations,
           class_resource_uses: retaliation.updatedResourceUses ?? char.class_resource_uses,
@@ -3236,7 +3257,29 @@ export async function takeAction({
         // ── Saving throw spell ─────────────────────────────────────────────
         const saveAbility = spell.savingThrow;
         const enemyScore = (spellTarget as unknown as Record<string, number>)[saveAbility] ?? 10;
-        const saveFailed = rollConditionSave(saveAbility, enemyScore, dc);
+        // Cover bonus to DEX saves (SRD 5.2.1 p.15): the spell originates from
+        // the caster, so half/three-quarters cover between caster→target
+        // applies to the target's DEX save against the spell. Other abilities
+        // are unaffected.
+        let saveCoverDexBonus = 0;
+        if (saveAbility === 'dex' && st.entities) {
+          const casterEntSave = st.entities.find((e) => e.id === char.id);
+          const targetEntSave = st.entities.find((e) => e.id === spellTargetId && e.isEnemy);
+          if (casterEntSave && targetEntSave) {
+            const obstaclesSave = st.entities
+              .filter((e) => e.id !== char.id && e.id !== spellTargetId)
+              .map((e) => e.pos);
+            saveCoverDexBonus = coverBonus(casterEntSave.pos, targetEntSave.pos, obstaclesSave);
+          }
+        }
+        const saveFailed = rollConditionSave(
+          saveAbility,
+          enemyScore,
+          dc,
+          false,
+          char.level,
+          saveCoverDexBonus
+        );
         const saveLabel = saveAbility.toUpperCase();
 
         if (spell.damage) {
@@ -3351,7 +3394,24 @@ export async function takeAction({
             if (target.isEnemy && targetEnemy) {
               const tScore =
                 (targetEnemy as unknown as Record<string, number>)[spell.savingThrow] ?? 10;
-              const tFailed = rollConditionSave(spell.savingThrow, tScore, dc);
+              // Cover bonus on DEX saves (SRD 5.2.1 p.15): obstacles between
+              // the blast epicenter and this target give +2 (half) / +5
+              // (three-quarters) to the DEX save.
+              let tCover = 0;
+              if (spell.savingThrow === 'dex' && st.entities) {
+                const obstaclesAoe = st.entities
+                  .filter((e) => e.id !== target.id && !posEqual(e.pos, epicenter))
+                  .map((e) => e.pos);
+                tCover = coverBonus(epicenter, target.pos, obstaclesAoe);
+              }
+              const tFailed = rollConditionSave(
+                spell.savingThrow,
+                tScore,
+                dc,
+                false,
+                char.level,
+                tCover
+              );
               const baseDmg = rollDice(upcastDamage(spell, slotLevel) || (spell.damage ?? '0'));
               const effDmg = tFailed
                 ? baseDmg
@@ -3391,7 +3451,21 @@ export async function takeAction({
               if (!autoSucceed && spell.saveEffect !== 'negates') {
                 const allyScore =
                   (targetChar[spell.savingThrow as keyof Character] as number) ?? 10;
-                const allyFailed = rollConditionSave(spell.savingThrow, allyScore, dc);
+                let allyCover = 0;
+                if (spell.savingThrow === 'dex' && st.entities) {
+                  const obstaclesAllyAoe = st.entities
+                    .filter((e) => e.id !== target.id && !posEqual(e.pos, epicenter))
+                    .map((e) => e.pos);
+                  allyCover = coverBonus(epicenter, target.pos, obstaclesAllyAoe);
+                }
+                const allyFailed = rollConditionSave(
+                  spell.savingThrow,
+                  allyScore,
+                  dc,
+                  false,
+                  char.level,
+                  allyCover
+                );
                 const baseDmg = rollDice(upcastDamage(spell, slotLevel) || (spell.damage ?? '0'));
                 const effDmg = allyFailed
                   ? baseDmg
@@ -5037,6 +5111,7 @@ export async function takeAction({
               target = {
                 ...target,
                 hp: Math.max(0, target.hp - atkResult.hpLost),
+                temp_hp: atkResult.newTempHp ?? target.temp_hp,
                 conditions: atkResult.newConditions,
                 condition_durations: atkResult.newDurations,
                 class_resource_uses: atkResult.updatedResourceUses ?? target.class_resource_uses,

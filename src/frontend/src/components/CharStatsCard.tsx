@@ -44,6 +44,9 @@ function CharStatsCard({
         <span className={styles.statLbl}>HP</span>
         <span className={styles.statVal} style={{ color: hpColor }}>
           {char.hp}/{char.max_hp}
+          {(char.temp_hp ?? 0) > 0 && (
+            <span style={{ color: 'var(--t-primary)', marginLeft: 4 }}>+{char.temp_hp}</span>
+          )}
         </span>
       </div>
       <div className={styles.stat}>

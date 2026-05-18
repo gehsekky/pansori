@@ -30,15 +30,17 @@ export function posEqual(a: GridPos, b: GridPos): boolean {
 
 // True if attacker can reach target given the equipped weapon.
 // Thrown melee weapons (weapon.thrown) extend reach to their long range.
+// Reach weapons (SRD 5.2.1 p.90: glaive, halberd, etc.) get +5 ft melee.
 export function inRange(
   attacker: GridPos,
   target: GridPos,
-  weapon: Pick<LootItem, 'range' | 'thrown'> | null
+  weapon: Pick<LootItem, 'range' | 'thrown' | 'reach'> | null
 ): boolean {
   const dist = distanceFeet(attacker, target);
   if (weapon?.range === 'ranged') return dist <= DEFAULT_RANGED_RANGE;
   if (weapon?.thrown) return dist <= weapon.thrown.longRange;
-  return dist <= DEFAULT_MELEE_REACH;
+  const reachFt = weapon?.reach ? DEFAULT_MELEE_REACH + SQUARE_SIZE : DEFAULT_MELEE_REACH;
+  return dist <= reachFt;
 }
 
 // Returns +2 (half) or +5 (three-quarters) cover bonus for the target.
