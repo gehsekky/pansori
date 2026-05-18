@@ -329,11 +329,13 @@ function processDeathSave(
 
   switch (save.result) {
     case 'regain_hp':
+      // SRD 5.2.1 p.197 — rolling a 20 on a death save regains 1 HP and ends
+      // the unconscious condition. It does NOT end the combat encounter;
+      // remaining enemies keep fighting.
       newChar.hp = 1;
       newChar.death_saves = { successes: 0, failures: 0 };
       newChar.stable = false;
       newChar.conditions = [];
-      endedCombat = true;
       narrative = `Death Save — Natural 20! You surge back to 1 HP, gasping but alive.`;
       return { narrative, newChar, died: false, endedCombat };
 
