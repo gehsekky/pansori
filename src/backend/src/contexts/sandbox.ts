@@ -190,6 +190,8 @@ export const context: Context = {
       damage: '1d10',
       damageType: 'fire',
       attackRoll: true,
+      rangeKind: 'ranged',
+      rangeFt: 120,
     },
     sacred_flame: {
       id: 'sacred_flame',
@@ -201,6 +203,8 @@ export const context: Context = {
       damageType: 'radiant',
       savingThrow: 'dex',
       saveEffect: 'negates',
+      rangeKind: 'ranged',
+      rangeFt: 60,
     },
     cure_wounds: {
       id: 'cure_wounds',
@@ -209,6 +213,7 @@ export const context: Context = {
       level: 1,
       castTime: 'action',
       heal: '1d8',
+      rangeKind: 'touch',
     },
     magic_missile: {
       id: 'magic_missile',
@@ -218,6 +223,8 @@ export const context: Context = {
       castTime: 'action',
       damage: '3d4',
       damageType: 'force',
+      rangeKind: 'ranged',
+      rangeFt: 120,
     },
     thunderwave: {
       id: 'thunderwave',
@@ -229,6 +236,7 @@ export const context: Context = {
       damageType: 'thunder',
       savingThrow: 'con',
       saveEffect: 'half',
+      rangeKind: 'self',
     },
     misty_step: {
       id: 'misty_step',
@@ -237,6 +245,7 @@ export const context: Context = {
       level: 2,
       castTime: 'bonus_action',
       narrative: 'You vanish in a puff of silver mist and reappear nearby.',
+      rangeKind: 'self',
     },
     fireball: {
       id: 'fireball',
@@ -250,6 +259,8 @@ export const context: Context = {
       saveEffect: 'half',
       upcastBonus: '1d6',
       blastRadius: 20,
+      rangeKind: 'ranged',
+      rangeFt: 150,
     },
     guiding_bolt: {
       id: 'guiding_bolt',
@@ -261,6 +272,8 @@ export const context: Context = {
       damageType: 'radiant',
       attackRoll: true,
       upcastBonus: '1d6',
+      rangeKind: 'ranged',
+      rangeFt: 120,
     },
     hold_person: {
       id: 'hold_person',
@@ -273,6 +286,8 @@ export const context: Context = {
       condition: 'paralyzed',
       conditionDuration: 3,
       concentration: true,
+      rangeKind: 'ranged',
+      rangeFt: 60,
     },
     eldritch_blast: {
       id: 'eldritch_blast',
@@ -284,6 +299,8 @@ export const context: Context = {
       damageType: 'force',
       attackRoll: true,
       upcastBonus: '1d10',
+      rangeKind: 'ranged',
+      rangeFt: 120,
     },
     healing_word: {
       id: 'healing_word',
@@ -293,6 +310,8 @@ export const context: Context = {
       castTime: 'bonus_action',
       heal: '1d4',
       upcastBonus: '1d4',
+      rangeKind: 'ranged',
+      rangeFt: 60,
     },
     shillelagh: {
       id: 'shillelagh',
@@ -301,6 +320,7 @@ export const context: Context = {
       level: 0,
       castTime: 'bonus_action',
       narrative: 'Your staff glows with natural energy.',
+      rangeKind: 'self',
     },
     entangle: {
       id: 'entangle',
@@ -316,6 +336,8 @@ export const context: Context = {
       conditionDuration: 3,
       concentration: true,
       blastRadius: 20,
+      rangeKind: 'ranged',
+      rangeFt: 90,
     },
     charm_person: {
       id: 'charm_person',
@@ -327,6 +349,8 @@ export const context: Context = {
       saveEffect: 'negates',
       condition: 'charmed',
       conditionDuration: 6,
+      rangeKind: 'ranged',
+      rangeFt: 30,
     },
     sleep: {
       id: 'sleep',
@@ -341,6 +365,8 @@ export const context: Context = {
       condition: 'unconscious',
       conditionDuration: 3,
       upcastBonus: '2d8',
+      rangeKind: 'ranged',
+      rangeFt: 90,
     },
     burning_hands: {
       id: 'burning_hands',
@@ -354,6 +380,7 @@ export const context: Context = {
       saveEffect: 'half',
       upcastBonus: '1d6',
       blastRadius: 15,
+      rangeKind: 'self',
     },
     bless: {
       id: 'bless',
@@ -363,6 +390,8 @@ export const context: Context = {
       castTime: 'action',
       narrative: 'Divine blessing radiates over your allies.',
       concentration: true,
+      rangeKind: 'ranged',
+      rangeFt: 30,
     },
     spiritual_weapon: {
       id: 'spiritual_weapon',
@@ -373,6 +402,8 @@ export const context: Context = {
       damage: '1d8',
       damageType: 'force',
       upcastBonus: '1d8',
+      rangeKind: 'ranged',
+      rangeFt: 60,
     },
     hex: {
       id: 'hex',
@@ -382,6 +413,8 @@ export const context: Context = {
       castTime: 'bonus_action',
       narrative: 'A dark curse settles on your target.',
       concentration: true,
+      rangeKind: 'ranged',
+      rangeFt: 90,
     },
     hunger_of_hadar: {
       id: 'hunger_of_hadar',
@@ -395,6 +428,8 @@ export const context: Context = {
       saveEffect: 'half',
       concentration: true,
       blastRadius: 20,
+      rangeKind: 'ranged',
+      rangeFt: 150,
     },
   },
 

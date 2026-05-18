@@ -1323,6 +1323,8 @@ export const context: Context = {
       savingThrow: 'dex',
       saveEffect: 'negates',
       desc: 'Radiant flame descends on a target. DEX save or take 1d8 radiant damage.',
+      rangeKind: 'ranged',
+      rangeFt: 60,
     },
     cure_wounds: {
       id: 'cure_wounds',
@@ -1331,6 +1333,7 @@ export const context: Context = {
       castTime: 'action',
       heal: '1d8+3',
       desc: 'You heal a creature you touch for 1d8 + spell modifier HP.',
+      rangeKind: 'touch',
     },
     guiding_bolt: {
       id: 'guiding_bolt',
@@ -1341,6 +1344,8 @@ export const context: Context = {
       damage: '4d6',
       attackRoll: true,
       desc: 'A flash of light streaks toward a target. Spell attack roll, 4d6 radiant on hit.',
+      rangeKind: 'ranged',
+      rangeFt: 120,
     },
     magic_missile: {
       id: 'magic_missile',
@@ -1350,6 +1355,8 @@ export const context: Context = {
       damageType: 'force',
       damage: '1d4+1',
       desc: 'Three magical darts each deal 1d4+1 force damage, automatically hitting.',
+      rangeKind: 'ranged',
+      rangeFt: 120,
     },
     hold_person: {
       id: 'hold_person',
@@ -1362,6 +1369,8 @@ export const context: Context = {
       savingThrow: 'wis',
       saveEffect: 'negates',
       desc: 'Target must make a WIS save or be paralyzed for up to 3 rounds (Concentration).',
+      rangeKind: 'ranged',
+      rangeFt: 60,
     },
     bless: {
       id: 'bless',
@@ -1371,6 +1380,8 @@ export const context: Context = {
       concentration: true,
       narrative: 'You bless your allies — they gain +1d4 to attack rolls and saving throws.',
       desc: 'Concentration. Allies gain +1d4 to attack rolls and saving throws.',
+      rangeKind: 'ranged',
+      rangeFt: 30,
     },
     thunderwave: {
       id: 'thunderwave',
@@ -1382,6 +1393,7 @@ export const context: Context = {
       savingThrow: 'con',
       saveEffect: 'half',
       desc: 'A wave of thunderous force erupts from you. CON save or take 2d8 thunder, half on success.',
+      rangeKind: 'self',
     },
     bardic_inspiration_spell: {
       id: 'bardic_inspiration_spell',
@@ -1390,6 +1402,8 @@ export const context: Context = {
       castTime: 'bonus_action',
       narrative: 'Your stirring words inspire an ally, granting them +1d6 on their next roll.',
       desc: 'Bonus action. One ally gains a Bardic Inspiration die (1d6) to add to one roll.',
+      rangeKind: 'ranged',
+      rangeFt: 60,
     },
     divine_smite_spell: {
       id: 'divine_smite_spell',
@@ -1399,6 +1413,7 @@ export const context: Context = {
       damageType: 'radiant',
       damage: '2d8',
       desc: 'When you hit with a melee attack, you may expend a spell slot to deal +2d8 radiant damage.',
+      rangeKind: 'self',
     },
   },
 

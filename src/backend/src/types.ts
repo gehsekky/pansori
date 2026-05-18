@@ -256,6 +256,11 @@ export interface Spell {
   blastRadius?: number; // AOE radius in feet; undefined = single target
   ritualCasting?: boolean; // castable as ritual (no slot cost, only out of combat)
   verbal?: boolean; // has verbal component (blocked when deafened)
+  // SRD 5.2.1: spell range. 'self' = no external target; 'touch' = adjacent
+  // only (≤ 5 ft / 1 grid square); 'ranged' uses rangeFt for the max distance.
+  // When unspecified, the engine treats the spell as untargeted/utility.
+  rangeKind?: 'self' | 'touch' | 'ranged';
+  rangeFt?: number;
 }
 
 // ─── Structured actions ───────────────────────────────────────────────────────
