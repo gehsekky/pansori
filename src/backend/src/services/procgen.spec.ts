@@ -4,7 +4,7 @@ import { context as sandboxCtx } from '../contexts/sandbox.js';
 import type { Context, Seed } from '../types.js';
 
 function validateSeed(ctx: Context, seed: Seed) {
-  const roomIds = new Set(seed.rooms.map(r => r.id));
+  const roomIds = new Set(seed.rooms.map((r) => r.id));
 
   it('has the correct context_id', () => {
     expect(seed.context_id).toBe(ctx.id);
@@ -40,7 +40,7 @@ function validateSeed(ctx: Context, seed: Seed) {
   });
 
   it('all room IDs are from the context roomPool', () => {
-    const poolIds = new Set(ctx.roomPool.map(r => r.id));
+    const poolIds = new Set(ctx.roomPool.map((r) => r.id));
     for (const room of seed.rooms) {
       expect(poolIds.has(room.id)).toBe(true);
     }
@@ -84,9 +84,12 @@ function validateSeed(ctx: Context, seed: Seed) {
   });
 
   it('enemies reference valid templates', () => {
-    const templateNames = new Set(ctx.enemyTemplates.map(t => t.name));
+    const templateNames = new Set(ctx.enemyTemplates.map((t) => t.name));
     for (const [roomId, enemy] of Object.entries(seed.enemies)) {
-      expect(templateNames.has(enemy.name), `enemy in room "${roomId}" has unknown name "${enemy.name}"`).toBe(true);
+      expect(
+        templateNames.has(enemy.name),
+        `enemy in room "${roomId}" has unknown name "${enemy.name}"`
+      ).toBe(true);
     }
   });
 
@@ -98,9 +101,11 @@ function validateSeed(ctx: Context, seed: Seed) {
   });
 
   it('loot items reference valid loot table entries', () => {
-    const lootIds = new Set(ctx.lootTable.map(l => l.id));
+    const lootIds = new Set(ctx.lootTable.map((l) => l.id));
     for (const [roomId, item] of Object.entries(seed.loot)) {
-      expect(lootIds.has(item.id), `loot in room "${roomId}" has unknown id "${item.id}"`).toBe(true);
+      expect(lootIds.has(item.id), `loot in room "${roomId}" has unknown id "${item.id}"`).toBe(
+        true
+      );
     }
   });
 
@@ -129,7 +134,7 @@ function validateSeed(ctx: Context, seed: Seed) {
 
   it('placed NPCs have IDs from npcTemplates (if context defines any)', () => {
     if (!ctx.npcTemplates?.length) return;
-    const validIds = new Set(ctx.npcTemplates.map(t => t.id));
+    const validIds = new Set(ctx.npcTemplates.map((t) => t.id));
     for (const [roomId, npc] of Object.entries(seed.npcs)) {
       expect(validIds.has(npc.id), `NPC in room "${roomId}" has unknown id "${npc.id}"`).toBe(true);
     }

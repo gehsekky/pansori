@@ -4,7 +4,7 @@ import { dirname, join } from 'path';
 import type { Context } from '../types.js';
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname  = dirname(__filename);
+const __dirname = dirname(__filename);
 const CONTEXTS_DIR = join(__dirname, '../contexts');
 
 // Exported shape exposed by each context file
@@ -25,7 +25,7 @@ export async function loadContexts(): Promise<Record<string, Context>> {
   let files: string[];
   try {
     files = readdirSync(CONTEXTS_DIR).filter(
-      f => (f.endsWith('.ts') || f.endsWith('.js')) && !f.endsWith('.spec.ts')
+      (f) => (f.endsWith('.ts') || f.endsWith('.js')) && !f.endsWith('.spec.ts')
     );
   } catch (err) {
     console.error('[contextLoader] Cannot read contexts directory:', err);
@@ -38,7 +38,7 @@ export async function loadContexts(): Promise<Record<string, Context>> {
     // tsx resolves .js imports to their .ts sources at runtime
     const specifier = `../contexts/${file.replace(/\.ts$/, '.js')}`;
     try {
-      const mod = await import(specifier) as unknown;
+      const mod = (await import(specifier)) as unknown;
       if (!isContextModule(mod)) {
         console.warn(`[contextLoader] ${file} does not export a valid context — skipping`);
         continue;

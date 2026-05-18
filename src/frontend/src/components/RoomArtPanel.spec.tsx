@@ -38,7 +38,7 @@ describe('RoomArtPanel', () => {
 
   it('prefers manifest image over ASCII art when both are available', () => {
     // Without a manifest entry the ASCII art is shown, confirming the fallback chain.
-    const ctxWithArt = { ...mockCtx, art: { 'entry_hall': '### ASCII ###' } };
+    const ctxWithArt = { ...mockCtx, art: { entry_hall: '### ASCII ###' } };
     render(<RoomArtPanel roomId="entry_hall" ctx={ctxWithArt} />);
     expect(screen.getByText('### ASCII ###')).toBeTruthy();
   });

@@ -4,7 +4,14 @@ import { describe, it, expect, vi } from 'vitest';
 
 import CharStatsCard from './CharStatsCard';
 import { makeChar, makeState, mockCtx, mockSeed } from './test-fixtures';
-type InventoryItem = { instance_id: string; id: string; name: string; damage?: string; slot?: string; desc?: string };
+type InventoryItem = {
+  instance_id: string;
+  id: string;
+  name: string;
+  damage?: string;
+  slot?: string;
+  desc?: string;
+};
 
 const defaultProps = {
   state: makeState(),

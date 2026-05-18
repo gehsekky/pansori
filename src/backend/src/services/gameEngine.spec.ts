@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { buildArrivalNarrative, generateChoices, takeAction, normalizeState, runRules } from './gameEngine.js';
+import {
+  buildArrivalNarrative,
+  generateChoices,
+  takeAction,
+  normalizeState,
+  runRules,
+} from './gameEngine.js';
 import { context as ctx } from '../contexts/sandbox.js';
 import type { GameState, Character, Context, Seed, GameRule } from '../types.js';
 
@@ -10,36 +16,36 @@ afterEach(() => vi.restoreAllMocks());
 const CORRIDOR_ID = 'guard_post';
 
 const seed: Seed = {
-  context_id:  ctx.id,
-  world_name:  'The Testing Grounds',
-  ship_name:   'The Testing Grounds',
-  intro:       'Test intro.',
-  seed_id:     'test-seed-id',
+  context_id: ctx.id,
+  world_name: 'The Testing Grounds',
+  ship_name: 'The Testing Grounds',
+  intro: 'Test intro.',
+  seed_id: 'test-seed-id',
   rooms: [
-    { id: ctx.startRoomId,  name: 'Entry Hall',  desc: 'The entry hall.' },
-    { id: CORRIDOR_ID,      name: 'Guard Post',  desc: 'A guard post.' },
-    { id: ctx.escapeRoomId, name: 'Exit Gate',   desc: 'The exit gate.' },
+    { id: ctx.startRoomId, name: 'Entry Hall', desc: 'The entry hall.' },
+    { id: CORRIDOR_ID, name: 'Guard Post', desc: 'A guard post.' },
+    { id: ctx.escapeRoomId, name: 'Exit Gate', desc: 'The exit gate.' },
   ],
   connections: {
-    [ctx.startRoomId]:  [CORRIDOR_ID],
-    [CORRIDOR_ID]:      [ctx.startRoomId, ctx.escapeRoomId],
+    [ctx.startRoomId]: [CORRIDOR_ID],
+    [CORRIDOR_ID]: [ctx.startRoomId, ctx.escapeRoomId],
     [ctx.escapeRoomId]: [CORRIDOR_ID],
   },
   enemies: {},
-  loot:    {},
-  npcs:    {},
+  loot: {},
+  npcs: {},
 };
 
 const seedWithEnemy: Seed = {
   ...seed,
   enemies: {
     [CORRIDOR_ID]: {
-      name:   'Goblin',
-      hp:     10,
-      ac:     12,
+      name: 'Goblin',
+      hp: 10,
+      ac: 12,
       damage: '1d6',
-      toHit:  3,
-      xp:     20,
+      toHit: 3,
+      xp: 20,
     },
   },
 };
@@ -48,16 +54,16 @@ const seedWithLoot: Seed = {
   ...seed,
   loot: {
     [CORRIDOR_ID]: {
-      id:      'medkit',
-      name:    'Med-Kit',
-      desc:    'Heals wounds.',
-      weight:  1,
-      type:    'consumable',
-      slot:    null,
-      damage:  null,
+      id: 'medkit',
+      name: 'Med-Kit',
+      desc: 'Heals wounds.',
+      weight: 1,
+      type: 'consumable',
+      slot: null,
+      damage: null,
       ac_bonus: null,
-      heal:    '1d6+1',
-      effect:  null,
+      heal: '1d6+1',
+      effect: null,
       aliases: ['medkit', 'med-kit', 'med kit'],
     },
   },
@@ -65,66 +71,83 @@ const seedWithLoot: Seed = {
 
 function makeChar(overrides: Partial<Character> = {}): Character {
   return {
-    id:              'char-1',
-    name:            'Test Hero',
+    id: 'char-1',
+    name: 'Test Hero',
     character_class: 'Soldier',
-    portrait_url:    null,
-    hp: 10, max_hp: 10, ac: 10,
-    str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10,
-    gold: 5, xp: 0, level: 1,
-    inventory:           [],
-    equipped_weapon:     null,
-    equipped_armor:      null,
-    equipped_shield:     null,
-    conditions:          [],
+    portrait_url: null,
+    hp: 10,
+    max_hp: 10,
+    ac: 10,
+    str: 10,
+    dex: 10,
+    con: 10,
+    int: 10,
+    wis: 10,
+    cha: 10,
+    gold: 5,
+    xp: 0,
+    level: 1,
+    inventory: [],
+    equipped_weapon: null,
+    equipped_armor: null,
+    equipped_shield: null,
+    conditions: [],
     condition_durations: {},
-    death_saves:         { successes: 0, failures: 0 },
-    stable:          false,
-    dead:            false,
-    turn_actions:       { action_used: false, bonus_action_used: false, reaction_used: false, free_interaction_used: false },
-    initiative_roll:     null,
-    hit_die:             8,
-    hit_dice_remaining:  1,
-    class_resource_uses:  {},
-    asi_pending:          false,
-    exhaustion_level:     0,
-    background_id:        null,
-    skill_proficiencies:  [],
-    tool_proficiencies:   [],
-    spell_slots_max:      {},
-    spell_slots_used:     {},
-    spells_known:         [],
-    armor_proficiencies:  [],
+    death_saves: { successes: 0, failures: 0 },
+    stable: false,
+    dead: false,
+    turn_actions: {
+      action_used: false,
+      bonus_action_used: false,
+      reaction_used: false,
+      free_interaction_used: false,
+    },
+    initiative_roll: null,
+    hit_die: 8,
+    hit_dice_remaining: 1,
+    class_resource_uses: {},
+    asi_pending: false,
+    exhaustion_level: 0,
+    background_id: null,
+    skill_proficiencies: [],
+    tool_proficiencies: [],
+    spell_slots_max: {},
+    spell_slots_used: {},
+    spells_known: [],
+    armor_proficiencies: [],
     weapon_proficiencies: [],
-    attuned_items:        [],
-    concentrating_on:     null,
+    attuned_items: [],
+    concentrating_on: null,
     ...overrides,
   };
 }
 
-function makeState(charOverrides: Partial<Character> = {}, stateOverrides: Partial<GameState> = {}): GameState {
+function makeState(
+  charOverrides: Partial<Character> = {},
+  stateOverrides: Partial<GameState> = {}
+): GameState {
   const char = makeChar(charOverrides);
   return {
-    characters:          [char],
+    characters: [char],
     active_character_id: char.id,
-    current_room:        ctx.startRoomId,
-    visited_rooms:       [ctx.startRoomId],
-    enemies_killed:      [],
-    loot_taken:          [],
-    combat_active:       false,
-    initiative_order:    [],
-    initiative_idx:      0,
-    run_log:             [],
-    room_log:            [],
-    last_choices:        [],
-    short_rested_rooms:  [],
-    long_rested:         false,
-    npc_attitudes:       {},
-    npc_talked:          [],
-    traps_triggered:     [],
-    traps_disarmed:      [],
-    objects_searched:    [],
-    flags:               {},
+    current_room: ctx.startRoomId,
+    visited_rooms: [ctx.startRoomId],
+    enemies_killed: [],
+    loot_taken: [],
+    combat_active: false,
+    initiative_order: [],
+    initiative_idx: 0,
+    run_log: [],
+    room_log: [],
+    last_choices: [],
+    short_rested_rooms: [],
+    long_rested: false,
+    npc_attitudes: {},
+    npc_talked: [],
+    traps_triggered: [],
+    traps_disarmed: [],
+    objects_searched: [],
+    flags: {},
     ...stateOverrides,
   };
 }
@@ -141,21 +164,47 @@ describe('normalizeState', () => {
 
   it('wraps legacy flat GameState into a 1-character party', () => {
     const legacy = {
-      hp: 15, max_hp: 20, ac: 12,
-      str: 10, dex: 12, con: 10, int: 10, wis: 10, cha: 10,
-      xp: 50, level: 1, gold: 5,
+      hp: 15,
+      max_hp: 20,
+      ac: 12,
+      str: 10,
+      dex: 12,
+      con: 10,
+      int: 10,
+      wis: 10,
+      cha: 10,
+      xp: 50,
+      level: 1,
+      gold: 5,
       character_class: 'Rogue',
-      inventory: [], equipped_weapon: null, equipped_armor: null, equipped_shield: null,
+      inventory: [],
+      equipped_weapon: null,
+      equipped_armor: null,
+      equipped_shield: null,
       current_room: ctx.startRoomId,
       visited_rooms: [ctx.startRoomId],
-      enemies_killed: [], loot_taken: [], enemy_hp: {},
+      enemies_killed: [],
+      loot_taken: [],
+      enemy_hp: {},
       run_log: [{ action: 'start', narrative: 'Test.' }],
-      room_log: ['Test.'], conditions: [], flags: {},
-      combat_active: false, stable: false, dead: false,
+      room_log: ['Test.'],
+      conditions: [],
+      flags: {},
+      combat_active: false,
+      stable: false,
+      dead: false,
       death_saves: { successes: 0, failures: 0 },
-      turn_actions: { action_used: false, bonus_action_used: false, reaction_used: false, free_interaction_used: false },
+      turn_actions: {
+        action_used: false,
+        bonus_action_used: false,
+        reaction_used: false,
+        free_interaction_used: false,
+      },
     };
-    const result = normalizeState(legacy as unknown as Record<string, unknown>, { character_name: 'Old Hero', portrait_url: undefined });
+    const result = normalizeState(legacy as unknown as Record<string, unknown>, {
+      character_name: 'Old Hero',
+      portrait_url: undefined,
+    });
     expect(result.characters).toHaveLength(1);
     expect(result.characters[0].name).toBe('Old Hero');
     expect(result.characters[0].hp).toBe(15);
@@ -179,24 +228,34 @@ describe('buildArrivalNarrative', () => {
   });
 
   it('mentions a live enemy in the room', () => {
-    const text = buildArrivalNarrative(CORRIDOR_ID, makeState({}, { current_room: CORRIDOR_ID }), seedWithEnemy, ctx);
+    const text = buildArrivalNarrative(
+      CORRIDOR_ID,
+      makeState({}, { current_room: CORRIDOR_ID }),
+      seedWithEnemy,
+      ctx
+    );
     expect(text).toContain('Goblin');
   });
 
   it('does not mention an already-killed enemy', () => {
     const state = makeState({}, { current_room: CORRIDOR_ID, enemies_killed: [CORRIDOR_ID] });
-    const text  = buildArrivalNarrative(CORRIDOR_ID, state, seedWithEnemy, ctx);
+    const text = buildArrivalNarrative(CORRIDOR_ID, state, seedWithEnemy, ctx);
     expect(text).not.toContain('HP:');
   });
 
   it('mentions available loot', () => {
-    const text = buildArrivalNarrative(CORRIDOR_ID, makeState({}, { current_room: CORRIDOR_ID }), seedWithLoot, ctx);
+    const text = buildArrivalNarrative(
+      CORRIDOR_ID,
+      makeState({}, { current_room: CORRIDOR_ID }),
+      seedWithLoot,
+      ctx
+    );
     expect(text).toContain('Med-Kit');
   });
 
   it('does not mention already-taken loot', () => {
     const state = makeState({}, { current_room: CORRIDOR_ID, loot_taken: [CORRIDOR_ID] });
-    const text  = buildArrivalNarrative(CORRIDOR_ID, state, seedWithLoot, ctx);
+    const text = buildArrivalNarrative(CORRIDOR_ID, state, seedWithLoot, ctx);
     expect(text).not.toContain('Med-Kit');
   });
 });
@@ -224,45 +283,59 @@ describe('generateChoices', () => {
 
   it('includes a move option for each adjacent room', () => {
     const choices = generateChoices(makeState(), seed, ctx);
-    expect(choices.some(c => c.label.includes('Guard Post'))).toBe(true);
-    expect(choices.some(c => c.action.type === 'move')).toBe(true);
+    expect(choices.some((c) => c.label.includes('Guard Post'))).toBe(true);
+    expect(choices.some((c) => c.action.type === 'move')).toBe(true);
   });
 
   it('includes attack option when an enemy is alive', () => {
-    const state   = makeState({}, { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] });
+    const state = makeState(
+      {},
+      { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] }
+    );
     const choices = generateChoices(state, seedWithEnemy, ctx);
-    expect(choices.some(c => c.action.type === 'attack')).toBe(true);
-    expect(choices.some(c => c.label.toLowerCase().includes('attack'))).toBe(true);
+    expect(choices.some((c) => c.action.type === 'attack')).toBe(true);
+    expect(choices.some((c) => c.label.toLowerCase().includes('attack'))).toBe(true);
   });
 
   it('includes loot pick-up option when loot is available', () => {
-    const state   = makeState({}, { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] });
+    const state = makeState(
+      {},
+      { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] }
+    );
     const choices = generateChoices(state, seedWithLoot, ctx);
-    expect(choices.some(c => c.action.type === 'loot')).toBe(true);
-    expect(choices.some(c => c.label.toLowerCase().includes('med-kit'))).toBe(true);
+    expect(choices.some((c) => c.action.type === 'loot')).toBe(true);
+    expect(choices.some((c) => c.label.toLowerCase().includes('med-kit'))).toBe(true);
   });
 
   it('includes escape choice at escape room when no enemy is alive', () => {
-    const state = makeState({}, {
-      current_room:  ctx.escapeRoomId,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID, ctx.escapeRoomId],
-    });
+    const state = makeState(
+      {},
+      {
+        current_room: ctx.escapeRoomId,
+        visited_rooms: [ctx.startRoomId, CORRIDOR_ID, ctx.escapeRoomId],
+      }
+    );
     const choices = generateChoices(state, seed, ctx);
-    expect(choices.some(c => c.action.type === 'escape')).toBe(true);
-    expect(choices.some(c => c.label === ctx.escapeChoiceText)).toBe(true);
+    expect(choices.some((c) => c.action.type === 'escape')).toBe(true);
+    expect(choices.some((c) => c.label === ctx.escapeChoiceText)).toBe(true);
   });
 
   it('does not include escape choice when an enemy blocks the escape room', () => {
     const blockedSeed: Seed = {
       ...seed,
-      enemies: { [ctx.escapeRoomId]: { name: 'Guard', hp: 10, ac: 12, damage: '1d6', toHit: 3, xp: 10 } },
+      enemies: {
+        [ctx.escapeRoomId]: { name: 'Guard', hp: 10, ac: 12, damage: '1d6', toHit: 3, xp: 10 },
+      },
     };
-    const state = makeState({}, {
-      current_room:  ctx.escapeRoomId,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID, ctx.escapeRoomId],
-    });
+    const state = makeState(
+      {},
+      {
+        current_room: ctx.escapeRoomId,
+        visited_rooms: [ctx.startRoomId, CORRIDOR_ID, ctx.escapeRoomId],
+      }
+    );
     const choices = generateChoices(state, blockedSeed, ctx);
-    expect(choices.every(c => c.action.type !== 'escape')).toBe(true);
+    expect(choices.every((c) => c.action.type !== 'escape')).toBe(true);
   });
 });
 
@@ -270,7 +343,13 @@ describe('generateChoices', () => {
 
 describe('takeAction', () => {
   it('examine action returns narrative, choices, and updated newState', async () => {
-    const result = await takeAction({ action: { type: 'examine' }, history: [], state: makeState(), seed, context: ctx });
+    const result = await takeAction({
+      action: { type: 'examine' },
+      history: [],
+      state: makeState(),
+      seed,
+      context: ctx,
+    });
     expect(typeof result.narrative).toBe('string');
     expect(result.narrative.length).toBeGreaterThan(0);
     expect(Array.isArray(result.choices)).toBe(true);
@@ -280,7 +359,13 @@ describe('takeAction', () => {
   });
 
   it('moving to an adjacent room updates current_room and room_log', async () => {
-    const result = await takeAction({ action: { type: 'move', roomId: CORRIDOR_ID }, history: [], state: makeState(), seed, context: ctx });
+    const result = await takeAction({
+      action: { type: 'move', roomId: CORRIDOR_ID },
+      history: [],
+      state: makeState(),
+      seed,
+      context: ctx,
+    });
     expect(result.newState.current_room).toBe(CORRIDOR_ID);
     expect(result.newState.visited_rooms).toContain(CORRIDOR_ID);
     expect(result.newState.room_log).toHaveLength(1);
@@ -289,9 +374,18 @@ describe('takeAction', () => {
   });
 
   it('picking up loot adds item to inventory and marks loot_taken', async () => {
-    const state  = makeState({}, { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] });
-    const result = await takeAction({ action: { type: 'loot' }, history: [], state, seed: seedWithLoot, context: ctx });
-    const char   = result.newState.characters[0];
+    const state = makeState(
+      {},
+      { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] }
+    );
+    const result = await takeAction({
+      action: { type: 'loot' },
+      history: [],
+      state,
+      seed: seedWithLoot,
+      context: ctx,
+    });
+    const char = result.newState.characters[0];
     expect(char.inventory).toHaveLength(1);
     expect(char.inventory[0].id).toBe('medkit');
     expect(char.inventory[0].instance_id).toBeTruthy();
@@ -300,49 +394,94 @@ describe('takeAction', () => {
 
   // Test Case I — Grid combat blocks room movement
   it('[Case I] moving out of a room during grid combat is blocked (use Disengage + grid_move)', async () => {
-    const state = makeState({ hp: 20, max_hp: 20 }, {
-      current_room:  CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
-      combat_active: true,
-      initiative_order: [{ id: 'char-1', roll: 15, is_enemy: false }, { id: CORRIDOR_ID, roll: 10, is_enemy: true }],
-      initiative_idx: 0,
+    const state = makeState(
+      { hp: 20, max_hp: 20 },
+      {
+        current_room: CORRIDOR_ID,
+        visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+        combat_active: true,
+        initiative_order: [
+          { id: 'char-1', roll: 15, is_enemy: false },
+          { id: CORRIDOR_ID, roll: 10, is_enemy: true },
+        ],
+        initiative_idx: 0,
+      }
+    );
+    const result = await takeAction({
+      action: { type: 'move', roomId: ctx.startRoomId },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
     });
-    const result = await takeAction({ action: { type: 'move', roomId: ctx.startRoomId }, history: [], state, seed: seedWithEnemy, context: ctx });
     // Move is blocked; player stays in room
     expect(result.newState.current_room).toBe(CORRIDOR_ID);
     expect(result.narrative.toLowerCase()).toMatch(/cannot flee|grid combat|disengage/);
   });
 
   it('[Case I] moving without an enemy present triggers no opportunity attack', async () => {
-    const result = await takeAction({ action: { type: 'move', roomId: CORRIDOR_ID }, history: [], state: makeState(), seed, context: ctx });
+    const result = await takeAction({
+      action: { type: 'move', roomId: CORRIDOR_ID },
+      history: [],
+      state: makeState(),
+      seed,
+      context: ctx,
+    });
     expect(result.narrative.toLowerCase()).not.toMatch(/strikes as you go|opportunity/);
   });
 
   it('escape action at the escape room with no enemy sets escaped=true', async () => {
-    const state = makeState({}, {
-      current_room:  ctx.escapeRoomId,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID, ctx.escapeRoomId],
+    const state = makeState(
+      {},
+      {
+        current_room: ctx.escapeRoomId,
+        visited_rooms: [ctx.startRoomId, CORRIDOR_ID, ctx.escapeRoomId],
+      }
+    );
+    const result = await takeAction({
+      action: { type: 'escape' },
+      history: [],
+      state,
+      seed,
+      context: ctx,
     });
-    const result = await takeAction({ action: { type: 'escape' }, history: [], state, seed, context: ctx });
     expect(result.escaped).toBe(true);
   });
 
   it('first attack populates initiative_order with all party members and the enemy', async () => {
-    const state = makeState({}, { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] });
-    const result = await takeAction({ action: { type: 'attack' }, history: [], state, seed: seedWithEnemy, context: ctx });
+    const state = makeState(
+      {},
+      { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] }
+    );
+    const result = await takeAction({
+      action: { type: 'attack' },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
     expect(result.newState.initiative_order.length).toBeGreaterThan(0);
-    const playerEntry = result.newState.initiative_order.find(e => !e.is_enemy);
-    const enemyEntry  = result.newState.initiative_order.find(e =>  e.is_enemy);
+    const playerEntry = result.newState.initiative_order.find((e) => !e.is_enemy);
+    const enemyEntry = result.newState.initiative_order.find((e) => e.is_enemy);
     expect(playerEntry).toBeDefined();
     expect(enemyEntry).toBeDefined();
     expect(enemyEntry?.id).toBe(CORRIDOR_ID);
   });
 
   it('first attack sets initiative_idx to point at a player entry', async () => {
-    const state = makeState({}, { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] });
-    const result = await takeAction({ action: { type: 'attack' }, history: [], state, seed: seedWithEnemy, context: ctx });
+    const state = makeState(
+      {},
+      { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] }
+    );
+    const result = await takeAction({
+      action: { type: 'attack' },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
     if (result.newState.combat_active) {
-      const idx   = result.newState.initiative_idx;
+      const idx = result.newState.initiative_idx;
       const entry = result.newState.initiative_order[idx];
       expect(entry?.is_enemy).toBe(false);
     }
@@ -350,8 +489,17 @@ describe('takeAction', () => {
 
   it('killing the enemy clears initiative_order and sets combat_active false', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.99); // d20 → 20 (critical), always hits hard
-    const state = makeState({ hp: 20, max_hp: 20 }, { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] });
-    const result = await takeAction({ action: { type: 'attack' }, history: [], state, seed: seedWithEnemy, context: ctx });
+    const state = makeState(
+      { hp: 20, max_hp: 20 },
+      { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] }
+    );
+    const result = await takeAction({
+      action: { type: 'attack' },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
     if (!result.newState.combat_active) {
       expect(result.newState.initiative_order).toHaveLength(0);
       expect(result.newState.initiative_idx).toBe(0);
@@ -366,15 +514,32 @@ describe('takeAction', () => {
       active_character_id: 'c1',
       current_room: CORRIDOR_ID,
       visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
-      enemies_killed: [], loot_taken: [],
-      combat_active: false, initiative_order: [], initiative_idx: 0,
-      run_log: [], room_log: [], last_choices: [], flags: {},
-      short_rested_rooms: [], long_rested: false,
-      npc_attitudes: {}, npc_talked: [], traps_triggered: [], traps_disarmed: [], objects_searched: [],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: false,
+      initiative_order: [],
+      initiative_idx: 0,
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      flags: {},
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
     };
     // Make enemy survive (miss always) so initiative advances
     vi.spyOn(Math, 'random').mockReturnValue(0); // d20 → 1 (miss)
-    const result = await takeAction({ action: { type: 'attack' }, history: [], state, seed: seedWithEnemy, context: ctx });
+    const result = await takeAction({
+      action: { type: 'attack' },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
     if (result.newState.combat_active) {
       expect(result.newState.active_character_id).toBe('c2');
     }
@@ -383,25 +548,39 @@ describe('takeAction', () => {
   // ─── Condition duration ──────────────────────────────────────────────────────
 
   it('stunned character gets only a pass choice', () => {
-    const state = makeState({ conditions: ['stunned'], condition_durations: { stunned: 1 } }, {
-      current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
-    });
+    const state = makeState(
+      { conditions: ['stunned'], condition_durations: { stunned: 1 } },
+      {
+        current_room: CORRIDOR_ID,
+        visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      }
+    );
     const choices = generateChoices(state, seedWithEnemy, ctx);
     expect(choices).toHaveLength(1);
     expect(choices[0].action.type).toBe('pass');
   });
 
   it('pass action advances the turn without dealing damage', async () => {
-    const state = makeState({ hp: 10, conditions: ['stunned'], condition_durations: { stunned: 1 } }, {
-      current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
-      combat_active: true,
-      initiative_order: [
-        { id: 'char-1', roll: 5, is_enemy: false },
-        { id: CORRIDOR_ID, roll: 15, is_enemy: true },
-      ],
-      initiative_idx: 0,
+    const state = makeState(
+      { hp: 10, conditions: ['stunned'], condition_durations: { stunned: 1 } },
+      {
+        current_room: CORRIDOR_ID,
+        visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+        combat_active: true,
+        initiative_order: [
+          { id: 'char-1', roll: 5, is_enemy: false },
+          { id: CORRIDOR_ID, roll: 15, is_enemy: true },
+        ],
+        initiative_idx: 0,
+      }
+    );
+    const result = await takeAction({
+      action: { type: 'pass' },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
     });
-    const result = await takeAction({ action: { type: 'pass' }, history: [], state, seed: seedWithEnemy, context: ctx });
     expect(result.narrative).toMatch(/stunned|paralyzed|passes/i);
     expect(result.newState.characters[0].hp).toBeLessThanOrEqual(10); // may take enemy hit next turn
   });
@@ -411,20 +590,27 @@ describe('takeAction', () => {
     const state = makeState(
       { conditions: ['stunned'], condition_durations: { stunned: 1 } },
       {
-        current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+        current_room: CORRIDOR_ID,
+        visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
         combat_active: true,
         initiative_order: [
-          { id: 'char-1', roll: 5,  is_enemy: false },
+          { id: 'char-1', roll: 5, is_enemy: false },
           { id: CORRIDOR_ID, roll: 15, is_enemy: true },
         ],
         initiative_idx: 0,
-      },
+      }
     );
     // Pass turn — initiative advances to enemy, enemy attacks, then wraps back to char-1
     vi.spyOn(Math, 'random').mockReturnValue(0); // enemy misses, d20→1
-    const result = await takeAction({ action: { type: 'pass' }, history: [], state, seed: seedWithEnemy, context: ctx });
+    const result = await takeAction({
+      action: { type: 'pass' },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
     // After the pass + enemy turn + wrap back to char-1, stun should be ticked off
-    const char = result.newState.characters.find(c => c.id === 'char-1')!;
+    const char = result.newState.characters.find((c) => c.id === 'char-1')!;
     expect(char.conditions).not.toContain('stunned');
   });
 
@@ -436,12 +622,30 @@ describe('takeAction', () => {
       active_character_id: 'c2',
       current_room: ctx.startRoomId,
       visited_rooms: [ctx.startRoomId],
-      enemies_killed: [], loot_taken: [],
-      combat_active: false, initiative_order: [], initiative_idx: 0,
-      run_log: [], room_log: [], last_choices: [], short_rested_rooms: [], long_rested: false, flags: {},
-      npc_attitudes: {}, npc_talked: [], traps_triggered: [], traps_disarmed: [], objects_searched: [],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: false,
+      initiative_order: [],
+      initiative_idx: 0,
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      short_rested_rooms: [],
+      long_rested: false,
+      flags: {},
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
     };
-    const result = await takeAction({ action: { type: 'examine' }, history: [], state, seed, context: ctx });
+    const result = await takeAction({
+      action: { type: 'examine' },
+      history: [],
+      state,
+      seed,
+      context: ctx,
+    });
     expect(result.dead).toBe(false);
   });
 });
@@ -452,7 +656,13 @@ describe('short_rest', () => {
   it('restores HP and spends a hit die', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.99); // d8 → 8, +CON mod 0 = 8 healed
     const state = makeState({ hp: 3, max_hp: 10, hit_die: 8, hit_dice_remaining: 2 });
-    const result = await takeAction({ action: { type: 'short_rest' }, history: [], state, seed, context: ctx });
+    const result = await takeAction({
+      action: { type: 'short_rest' },
+      history: [],
+      state,
+      seed,
+      context: ctx,
+    });
     const char = result.newState.characters[0];
     expect(char.hp).toBeGreaterThan(3);
     expect(char.hp).toBeLessThanOrEqual(10);
@@ -463,9 +673,15 @@ describe('short_rest', () => {
   it('cannot short rest twice in the same room', async () => {
     const state = makeState(
       { hp: 3, max_hp: 10, hit_die: 8, hit_dice_remaining: 2 },
-      { short_rested_rooms: [ctx.startRoomId] },
+      { short_rested_rooms: [ctx.startRoomId] }
     );
-    const result = await takeAction({ action: { type: 'short_rest' }, history: [], state, seed, context: ctx });
+    const result = await takeAction({
+      action: { type: 'short_rest' },
+      history: [],
+      state,
+      seed,
+      context: ctx,
+    });
     const char = result.newState.characters[0];
     expect(char.hp).toBe(3); // no healing
     expect(result.narrative).toMatch(/already rested/i);
@@ -473,22 +689,40 @@ describe('short_rest', () => {
 
   it('cannot short rest with no hit dice remaining', async () => {
     const state = makeState({ hp: 3, max_hp: 10, hit_die: 8, hit_dice_remaining: 0 });
-    const result = await takeAction({ action: { type: 'short_rest' }, history: [], state, seed, context: ctx });
+    const result = await takeAction({
+      action: { type: 'short_rest' },
+      history: [],
+      state,
+      seed,
+      context: ctx,
+    });
     expect(result.narrative).toMatch(/no hit dice/i);
   });
 
   it('cannot short rest when at full HP', async () => {
     const state = makeState({ hp: 10, max_hp: 10, hit_die: 8, hit_dice_remaining: 2 });
-    const result = await takeAction({ action: { type: 'short_rest' }, history: [], state, seed, context: ctx });
+    const result = await takeAction({
+      action: { type: 'short_rest' },
+      history: [],
+      state,
+      seed,
+      context: ctx,
+    });
     expect(result.narrative).toMatch(/already at full/i);
   });
 
   it('cannot short rest while an enemy is alive in the room', async () => {
     const state = makeState(
       { hp: 3, max_hp: 10, hit_die: 8, hit_dice_remaining: 2 },
-      { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] },
+      { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] }
     );
-    const result = await takeAction({ action: { type: 'short_rest' }, history: [], state, seed: seedWithEnemy, context: ctx });
+    const result = await takeAction({
+      action: { type: 'short_rest' },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
     expect(result.narrative).toMatch(/cannot rest here/i);
   });
 });
@@ -496,7 +730,13 @@ describe('short_rest', () => {
 describe('long_rest', () => {
   it('restores all characters to full HP and recovers half-level hit dice', async () => {
     const state = makeState({ hp: 2, max_hp: 10, level: 4, hit_die: 10, hit_dice_remaining: 0 });
-    const result = await takeAction({ action: { type: 'long_rest' }, history: [], state, seed, context: ctx });
+    const result = await takeAction({
+      action: { type: 'long_rest' },
+      history: [],
+      state,
+      seed,
+      context: ctx,
+    });
     const char = result.newState.characters[0];
     expect(char.hp).toBe(10);
     expect(char.hit_dice_remaining).toBe(2); // Math.max(1, Math.floor(4/2)) = 2
@@ -505,32 +745,57 @@ describe('long_rest', () => {
 
   it('recovers at least 1 hit die even at level 1', async () => {
     const state = makeState({ hp: 1, max_hp: 8, level: 1, hit_die: 8, hit_dice_remaining: 0 });
-    const result = await takeAction({ action: { type: 'long_rest' }, history: [], state, seed, context: ctx });
+    const result = await takeAction({
+      action: { type: 'long_rest' },
+      history: [],
+      state,
+      seed,
+      context: ctx,
+    });
     expect(result.newState.characters[0].hit_dice_remaining).toBe(1);
   });
 
   it('cannot long rest twice in a session', async () => {
     const state = makeState({ hp: 1, max_hp: 10 }, { long_rested: true });
-    const result = await takeAction({ action: { type: 'long_rest' }, history: [], state, seed, context: ctx });
+    const result = await takeAction({
+      action: { type: 'long_rest' },
+      history: [],
+      state,
+      seed,
+      context: ctx,
+    });
     expect(result.narrative).toMatch(/already taken a long rest/i);
   });
 
   it('cannot long rest while an enemy is alive in the room', async () => {
     const state = makeState(
       { hp: 3, max_hp: 10 },
-      { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] },
+      { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] }
     );
-    const result = await takeAction({ action: { type: 'long_rest' }, history: [], state, seed: seedWithEnemy, context: ctx });
+    const result = await takeAction({
+      action: { type: 'long_rest' },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
     expect(result.narrative).toMatch(/cannot rest here/i);
   });
 
   it('clears conditions on long rest', async () => {
     const state = makeState({
-      hp: 5, max_hp: 10,
+      hp: 5,
+      max_hp: 10,
       conditions: ['poisoned'],
       condition_durations: { poisoned: 1 },
     });
-    const result = await takeAction({ action: { type: 'long_rest' }, history: [], state, seed, context: ctx });
+    const result = await takeAction({
+      action: { type: 'long_rest' },
+      history: [],
+      state,
+      seed,
+      context: ctx,
+    });
     expect(result.newState.characters[0].conditions).toHaveLength(0);
   });
 });
@@ -545,9 +810,17 @@ const rulesSeed: Seed = {
   ...seed,
   loot: {
     medkit: {
-      id: 'medkit', name: 'Med-Kit', desc: 'Heals wounds.',
-      weight: 1, type: 'consumable', slot: null, damage: null,
-      ac_bonus: null, heal: '1d6+1', effect: null, aliases: ['medkit'],
+      id: 'medkit',
+      name: 'Med-Kit',
+      desc: 'Heals wounds.',
+      weight: 1,
+      type: 'consumable',
+      slot: null,
+      damage: null,
+      ac_bonus: null,
+      heal: '1d6+1',
+      effect: null,
+      aliases: ['medkit'],
     },
   },
 };
@@ -567,7 +840,13 @@ describe('runRules', () => {
       consequences: [{ type: 'set_flag', key: 'triggered', value: true }],
     };
     const state = makeState();
-    const result = await runRules(state, makeCtxWithRules([rule]), { type: 'examine' }, ctx.startRoomId, seed);
+    const result = await runRules(
+      state,
+      makeCtxWithRules([rule]),
+      { type: 'examine' },
+      ctx.startRoomId,
+      seed
+    );
     expect(result.state.flags['triggered']).toBeUndefined();
   });
 
@@ -578,7 +857,13 @@ describe('runRules', () => {
       consequences: [{ type: 'set_flag', key: 'boss_defeated', value: true }],
     };
     const state = makeState();
-    const result = await runRules(state, makeCtxWithRules([rule]), { type: 'examine' }, ctx.startRoomId, seed);
+    const result = await runRules(
+      state,
+      makeCtxWithRules([rule]),
+      { type: 'examine' },
+      ctx.startRoomId,
+      seed
+    );
     expect(result.state.flags['boss_defeated']).toBe(true);
   });
 
@@ -589,7 +874,13 @@ describe('runRules', () => {
       consequences: [{ type: 'add_narrative', text: 'You sense danger.' }],
     };
     const state = makeState();
-    const result = await runRules(state, makeCtxWithRules([rule]), { type: 'examine' }, ctx.startRoomId, seed);
+    const result = await runRules(
+      state,
+      makeCtxWithRules([rule]),
+      { type: 'examine' },
+      ctx.startRoomId,
+      seed
+    );
     expect(result.extraNarrative).toContain('You sense danger.');
   });
 
@@ -600,7 +891,13 @@ describe('runRules', () => {
       consequences: [{ type: 'give_item', itemId: 'medkit' }],
     };
     const state = makeState();
-    const result = await runRules(state, makeCtxWithRules([rule]), { type: 'examine' }, ctx.startRoomId, rulesSeed);
+    const result = await runRules(
+      state,
+      makeCtxWithRules([rule]),
+      { type: 'examine' },
+      ctx.startRoomId,
+      rulesSeed
+    );
     expect(result.state.characters[0].inventory).toHaveLength(1);
     expect(result.state.characters[0].inventory[0].id).toBe('medkit');
   });
@@ -612,7 +909,13 @@ describe('runRules', () => {
       consequences: [{ type: 'give_item', itemId: 'does_not_exist' }],
     };
     const state = makeState();
-    const result = await runRules(state, makeCtxWithRules([rule]), { type: 'examine' }, ctx.startRoomId, seed);
+    const result = await runRules(
+      state,
+      makeCtxWithRules([rule]),
+      { type: 'examine' },
+      ctx.startRoomId,
+      seed
+    );
     expect(result.state.characters[0].inventory).toHaveLength(0);
   });
 
@@ -623,7 +926,13 @@ describe('runRules', () => {
       consequences: [{ type: 'modify_hp', amount: -3 }],
     };
     const state = makeState({ hp: 10, max_hp: 10 });
-    const result = await runRules(state, makeCtxWithRules([rule]), { type: 'examine' }, ctx.startRoomId, seed);
+    const result = await runRules(
+      state,
+      makeCtxWithRules([rule]),
+      { type: 'examine' },
+      ctx.startRoomId,
+      seed
+    );
     expect(result.state.characters[0].hp).toBe(7);
   });
 
@@ -634,7 +943,13 @@ describe('runRules', () => {
       consequences: [{ type: 'modify_hp', amount: 50 }],
     };
     const state = makeState({ hp: 8, max_hp: 10 });
-    const result = await runRules(state, makeCtxWithRules([rule]), { type: 'examine' }, ctx.startRoomId, seed);
+    const result = await runRules(
+      state,
+      makeCtxWithRules([rule]),
+      { type: 'examine' },
+      ctx.startRoomId,
+      seed
+    );
     expect(result.state.characters[0].hp).toBe(10);
   });
 
@@ -645,7 +960,13 @@ describe('runRules', () => {
       consequences: [{ type: 'modify_hp', amount: -999 }],
     };
     const state = makeState({ hp: 5, max_hp: 10 });
-    const result = await runRules(state, makeCtxWithRules([rule]), { type: 'examine' }, ctx.startRoomId, seed);
+    const result = await runRules(
+      state,
+      makeCtxWithRules([rule]),
+      { type: 'examine' },
+      ctx.startRoomId,
+      seed
+    );
     expect(result.state.characters[0].hp).toBe(0);
   });
 
@@ -656,7 +977,13 @@ describe('runRules', () => {
       consequences: [{ type: 'set_escape' }],
     };
     const state = makeState();
-    const result = await runRules(state, makeCtxWithRules([rule]), { type: 'examine' }, ctx.startRoomId, seed);
+    const result = await runRules(
+      state,
+      makeCtxWithRules([rule]),
+      { type: 'examine' },
+      ctx.startRoomId,
+      seed
+    );
     expect(result.state.flags['_rule_escape']).toBe(true);
   });
 
@@ -670,8 +997,14 @@ describe('runRules', () => {
     const ctxWithRule = makeCtxWithRules([rule]);
     const state = makeState();
 
-    const first  = await runRules(state, ctxWithRule, { type: 'examine' }, ctx.startRoomId, seed);
-    const second = await runRules(first.state, ctxWithRule, { type: 'examine' }, ctx.startRoomId, seed);
+    const first = await runRules(state, ctxWithRule, { type: 'examine' }, ctx.startRoomId, seed);
+    const second = await runRules(
+      first.state,
+      ctxWithRule,
+      { type: 'examine' },
+      ctx.startRoomId,
+      seed
+    );
 
     expect(first.extraNarrative).toContain('First time!');
     expect(first.state.flags['rule_fired_once_narrative']).toBe(true);
@@ -683,14 +1016,20 @@ describe('runRules', () => {
       name: 'room_check',
       conditions: {
         all: [
-          { fact: 'action',  operator: 'equal', value: 'move' },
+          { fact: 'action', operator: 'equal', value: 'move' },
           { fact: 'room_id', operator: 'equal', value: CORRIDOR_ID },
         ],
       },
       consequences: [{ type: 'set_flag', key: 'entered_corridor', value: true }],
     };
     const state = makeState({}, { current_room: CORRIDOR_ID });
-    const result = await runRules(state, makeCtxWithRules([rule]), { type: 'move', roomId: CORRIDOR_ID }, ctx.startRoomId, seed);
+    const result = await runRules(
+      state,
+      makeCtxWithRules([rule]),
+      { type: 'move', roomId: CORRIDOR_ID },
+      ctx.startRoomId,
+      seed
+    );
     expect(result.state.flags['entered_corridor']).toBe(true);
   });
 
@@ -701,7 +1040,13 @@ describe('runRules', () => {
       consequences: [{ type: 'add_narrative', text: 'Boss is dead!' }],
     };
     const state = makeState({}, { flags: { boss_defeated: true } });
-    const result = await runRules(state, makeCtxWithRules([rule]), { type: 'examine' }, ctx.startRoomId, seed);
+    const result = await runRules(
+      state,
+      makeCtxWithRules([rule]),
+      { type: 'examine' },
+      ctx.startRoomId,
+      seed
+    );
     expect(result.extraNarrative).toContain('Boss is dead!');
   });
 
@@ -746,24 +1091,32 @@ describe('runRules', () => {
 describe('turn_actions lifecycle', () => {
   it('generateChoices includes end_turn when combat_active and action already used', () => {
     const state = makeState(
-      { turn_actions: { action_used: true, bonus_action_used: false, reaction_used: false, free_interaction_used: false } },
       {
-        current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+        turn_actions: {
+          action_used: true,
+          bonus_action_used: false,
+          reaction_used: false,
+          free_interaction_used: false,
+        },
+      },
+      {
+        current_room: CORRIDOR_ID,
+        visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
         combat_active: true,
         initiative_order: [
           { id: 'char-1', roll: 15, is_enemy: false },
           { id: CORRIDOR_ID, roll: 5, is_enemy: true },
         ],
         initiative_idx: 0,
-      },
+      }
     );
     const choices = generateChoices(state, seedWithEnemy, ctx);
-    expect(choices.some(c => c.action.type === 'end_turn')).toBe(true);
+    expect(choices.some((c) => c.action.type === 'end_turn')).toBe(true);
   });
 
   it('generateChoices does not include end_turn outside combat', () => {
     const choices = generateChoices(makeState(), seed, ctx);
-    expect(choices.every(c => c.action.type !== 'end_turn')).toBe(true);
+    expect(choices.every((c) => c.action.type !== 'end_turn')).toBe(true);
   });
 
   it('attack action marks action_used on the attacking character (2-char party, enemy survives)', async () => {
@@ -775,7 +1128,8 @@ describe('turn_actions lifecycle', () => {
       active_character_id: 'c1',
       current_room: CORRIDOR_ID,
       visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
-      enemies_killed: [], loot_taken: [],
+      enemies_killed: [],
+      loot_taken: [],
       combat_active: true,
       initiative_order: [
         { id: 'c1', roll: 20, is_enemy: false },
@@ -783,18 +1137,41 @@ describe('turn_actions lifecycle', () => {
         { id: 'c2', roll: 5, is_enemy: false },
       ],
       initiative_idx: 0,
-      run_log: [], room_log: [], last_choices: [], flags: {},
-      short_rested_rooms: [], long_rested: false,
-      npc_attitudes: {}, npc_talked: [], traps_triggered: [], traps_disarmed: [], objects_searched: [],
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      flags: {},
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
     };
-    const result = await takeAction({ action: { type: 'attack' }, history: [], state, seed: seedWithEnemy, context: ctx });
+    const result = await takeAction({
+      action: { type: 'attack' },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
     // c1 misses → auto-advance → enemy attacks → c2's turn begins (c1 not yet reset)
-    const c1 = result.newState.characters.find(c => c.id === 'c1')!;
+    const c1 = result.newState.characters.find((c) => c.id === 'c1')!;
     expect(c1.turn_actions.action_used).toBe(true);
   });
 
-  it('turn_actions reset when initiative advances to a character\'s slot', async () => {
-    const char1 = makeChar({ id: 'c1', name: 'Alice', turn_actions: { action_used: true, bonus_action_used: true, reaction_used: false, free_interaction_used: false } });
+  it("turn_actions reset when initiative advances to a character's slot", async () => {
+    const char1 = makeChar({
+      id: 'c1',
+      name: 'Alice',
+      turn_actions: {
+        action_used: true,
+        bonus_action_used: true,
+        reaction_used: false,
+        free_interaction_used: false,
+      },
+    });
     const char2 = makeChar({ id: 'c2', name: 'Bob' });
     // c2 ends turn; order wraps back to c1 (enemy is killed so no counter-attack)
     const state: GameState = {
@@ -802,7 +1179,8 @@ describe('turn_actions lifecycle', () => {
       active_character_id: 'c2',
       current_room: CORRIDOR_ID,
       visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
-      enemies_killed: [CORRIDOR_ID], loot_taken: [],
+      enemies_killed: [CORRIDOR_ID],
+      loot_taken: [],
       combat_active: true,
       initiative_order: [
         { id: 'c1', roll: 20, is_enemy: false },
@@ -810,12 +1188,26 @@ describe('turn_actions lifecycle', () => {
         { id: 'c2', roll: 5, is_enemy: false },
       ],
       initiative_idx: 2,
-      run_log: [], room_log: [], last_choices: [], flags: {},
-      short_rested_rooms: [], long_rested: false,
-      npc_attitudes: {}, npc_talked: [], traps_triggered: [], traps_disarmed: [], objects_searched: [],
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      flags: {},
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
     };
-    const result = await takeAction({ action: { type: 'end_turn' }, history: [], state, seed: seedWithEnemy, context: ctx });
-    const c1 = result.newState.characters.find(c => c.id === 'c1')!;
+    const result = await takeAction({
+      action: { type: 'end_turn' },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    const c1 = result.newState.characters.find((c) => c.id === 'c1')!;
     expect(c1.turn_actions.action_used).toBe(false);
     expect(c1.turn_actions.bonus_action_used).toBe(false);
     expect(result.newState.active_character_id).toBe('c1');
@@ -829,18 +1221,33 @@ describe('turn_actions lifecycle', () => {
       active_character_id: 'c1',
       current_room: CORRIDOR_ID,
       visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
-      enemies_killed: [CORRIDOR_ID], loot_taken: [],
+      enemies_killed: [CORRIDOR_ID],
+      loot_taken: [],
       combat_active: true,
       initiative_order: [
         { id: 'c1', roll: 20, is_enemy: false },
         { id: 'c2', roll: 5, is_enemy: false },
       ],
       initiative_idx: 0,
-      run_log: [], room_log: [], last_choices: [], flags: {},
-      short_rested_rooms: [], long_rested: false,
-      npc_attitudes: {}, npc_talked: [], traps_triggered: [], traps_disarmed: [], objects_searched: [],
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      flags: {},
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
     };
-    const result = await takeAction({ action: { type: 'end_turn' }, history: [], state, seed: seedWithEnemy, context: ctx });
+    const result = await takeAction({
+      action: { type: 'end_turn' },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
     expect(result.narrative).toMatch(/alice.*ends their turn/i);
     expect(result.newState.active_character_id).toBe('c2');
   });
@@ -857,12 +1264,18 @@ describe('Ability Score Improvements', () => {
     const state = makeState({ asi_pending: true });
     const choices = generateChoices(state, seed, ctx);
     expect(choices).toHaveLength(6);
-    expect(choices.every(c => c.action.type === 'apply_asi')).toBe(true);
+    expect(choices.every((c) => c.action.type === 'apply_asi')).toBe(true);
   });
 
   it('apply_asi adds +2 to the chosen stat and clears asi_pending', async () => {
     const state = makeState({ str: 10, asi_pending: true });
-    const result = await takeAction({ action: { type: 'apply_asi', stat: 'str' }, history: [], state, seed, context: ctx });
+    const result = await takeAction({
+      action: { type: 'apply_asi', stat: 'str' },
+      history: [],
+      state,
+      seed,
+      context: ctx,
+    });
     const char = result.newState.characters[0];
     expect(char.str).toBe(12);
     expect(char.asi_pending).toBe(false);
@@ -870,7 +1283,13 @@ describe('Ability Score Improvements', () => {
 
   it('apply_asi on CON also increases max_hp retroactively', async () => {
     const state = makeState({ con: 10, level: 4, max_hp: 20, hp: 20, asi_pending: true });
-    const result = await takeAction({ action: { type: 'apply_asi', stat: 'con' }, history: [], state, seed, context: ctx });
+    const result = await takeAction({
+      action: { type: 'apply_asi', stat: 'con' },
+      history: [],
+      state,
+      seed,
+      context: ctx,
+    });
     const char = result.newState.characters[0];
     expect(char.con).toBe(12); // +2 CON
     // CON 12 → mod +1; was CON 10 → mod 0; delta = +1/level × 4 levels = +4 max HP
@@ -879,7 +1298,13 @@ describe('Ability Score Improvements', () => {
 
   it('apply_asi does nothing when asi_pending is false', async () => {
     const state = makeState({ str: 10, asi_pending: false });
-    const result = await takeAction({ action: { type: 'apply_asi', stat: 'str' }, history: [], state, seed, context: ctx });
+    const result = await takeAction({
+      action: { type: 'apply_asi', stat: 'str' },
+      history: [],
+      state,
+      seed,
+      context: ctx,
+    });
     expect(result.newState.characters[0].str).toBe(10);
     expect(result.narrative).toMatch(/no ability score improvement/i);
   });
@@ -889,9 +1314,13 @@ describe('Ability Score Improvements', () => {
 
 describe('conditions — new types', () => {
   it('incapacitated character gets only a pass choice', () => {
-    const state = makeState({ conditions: ['incapacitated'], condition_durations: { incapacitated: 1 } }, {
-      current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
-    });
+    const state = makeState(
+      { conditions: ['incapacitated'], condition_durations: { incapacitated: 1 } },
+      {
+        current_room: CORRIDOR_ID,
+        visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      }
+    );
     const choices = generateChoices(state, seedWithEnemy, ctx);
     expect(choices).toHaveLength(1);
     expect(choices[0].action.type).toBe('pass');
@@ -901,32 +1330,50 @@ describe('conditions — new types', () => {
   it('grappled character cannot move — gets a pass choice instead of move', () => {
     const state = makeState({ conditions: ['grappled'], condition_durations: { grappled: 1 } });
     const choices = generateChoices(state, seed, ctx);
-    expect(choices.every(c => c.action.type !== 'move')).toBe(true);
-    expect(choices.some(c => c.label.match(/GRAPPLED/))).toBe(true);
+    expect(choices.every((c) => c.action.type !== 'move')).toBe(true);
+    expect(choices.some((c) => c.label.match(/GRAPPLED/))).toBe(true);
   });
 
   it('restrained character cannot move', () => {
     const state = makeState({ conditions: ['restrained'], condition_durations: { restrained: 1 } });
     const choices = generateChoices(state, seed, ctx);
-    expect(choices.every(c => c.action.type !== 'move')).toBe(true);
+    expect(choices.every((c) => c.action.type !== 'move')).toBe(true);
   });
 
   it('move action is blocked in takeAction when grappled', async () => {
     const state = makeState({ conditions: ['grappled'], condition_durations: { grappled: 1 } });
-    const result = await takeAction({ action: { type: 'move', roomId: CORRIDOR_ID }, history: [], state, seed, context: ctx });
+    const result = await takeAction({
+      action: { type: 'move', roomId: CORRIDOR_ID },
+      history: [],
+      state,
+      seed,
+      context: ctx,
+    });
     expect(result.newState.current_room).toBe(ctx.startRoomId); // did not move
     expect(result.narrative).toMatch(/grappled/i);
   });
 
   it('long rest reduces exhaustion level by 1', async () => {
     const state = makeState({ exhaustion_level: 2, hp: 5, max_hp: 10 });
-    const result = await takeAction({ action: { type: 'long_rest' }, history: [], state, seed, context: ctx });
+    const result = await takeAction({
+      action: { type: 'long_rest' },
+      history: [],
+      state,
+      seed,
+      context: ctx,
+    });
     expect(result.newState.characters[0].exhaustion_level).toBe(1);
   });
 
   it('long rest does not drop exhaustion below 0', async () => {
     const state = makeState({ exhaustion_level: 0, hp: 5, max_hp: 10 });
-    const result = await takeAction({ action: { type: 'long_rest' }, history: [], state, seed, context: ctx });
+    const result = await takeAction({
+      action: { type: 'long_rest' },
+      history: [],
+      state,
+      seed,
+      context: ctx,
+    });
     expect(result.newState.characters[0].exhaustion_level).toBe(0);
   });
 });
@@ -947,8 +1394,8 @@ describe('enemy HP scaling by party size', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
     const s1 = generateRoguelikeSeed(ctx, 1);
     const s2 = generateRoguelikeSeed(ctx, 2);
-    const hps1 = Object.values(s1.enemies).map(e => e.hp);
-    const hps2 = Object.values(s2.enemies).map(e => e.hp);
+    const hps1 = Object.values(s1.enemies).map((e) => e.hp);
+    const hps2 = Object.values(s2.enemies).map((e) => e.hp);
     if (hps1.length > 0 && hps2.length > 0) {
       // Average HP in 2-player seed should be higher than 1-player seed
       const avg1 = hps1.reduce((a, b) => a + b, 0) / hps1.length;
@@ -979,17 +1426,17 @@ const ctxWithRage: Context = {
 const dungeonSeedWithEnemy: Seed = {
   context_id: ctx.id,
   world_name: 'The Testing Grounds',
-  ship_name:  '',
-  intro:      'Test.',
-  seed_id:    'dungeon-test-seed',
+  ship_name: '',
+  intro: 'Test.',
+  seed_id: 'dungeon-test-seed',
   rooms: [
-    { id: ctx.startRoomId,  name: 'Entry Hall', desc: 'Entry.' },
-    { id: CORRIDOR_ID,      name: 'Guard Post',  desc: 'Dark.' },
-    { id: ctx.escapeRoomId, name: 'Exit Gate',   desc: 'Exit.' },
+    { id: ctx.startRoomId, name: 'Entry Hall', desc: 'Entry.' },
+    { id: CORRIDOR_ID, name: 'Guard Post', desc: 'Dark.' },
+    { id: ctx.escapeRoomId, name: 'Exit Gate', desc: 'Exit.' },
   ],
   connections: {
-    [ctx.startRoomId]:  [CORRIDOR_ID],
-    [CORRIDOR_ID]:      [ctx.startRoomId, ctx.escapeRoomId],
+    [ctx.startRoomId]: [CORRIDOR_ID],
+    [CORRIDOR_ID]: [ctx.startRoomId, ctx.escapeRoomId],
     [ctx.escapeRoomId]: [CORRIDOR_ID],
   },
   enemies: {
@@ -1005,20 +1452,37 @@ describe('class features', () => {
   it('Rogue sneak attack adds bonus damage on hit', async () => {
     // Force a hit (roll 20 = critical) so we can check sneak damage applied
     vi.spyOn(Math, 'random').mockReturnValue(0.999); // d20 → 20 always
-    const pilot  = makeChar({ id: 'p1', character_class: 'Rogue', level: 3 });
-    const ally   = makeChar({ id: 'p2', character_class: 'Fighter' }); // ally triggers sneak attack
+    const pilot = makeChar({ id: 'p1', character_class: 'Rogue', level: 3 });
+    const ally = makeChar({ id: 'p2', character_class: 'Fighter' }); // ally triggers sneak attack
     const state: GameState = {
       characters: [pilot, ally],
       active_character_id: 'p1',
       current_room: CORRIDOR_ID,
       visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
-      enemies_killed: [], loot_taken: [],
-      combat_active: false, initiative_order: [], initiative_idx: 0,
-      run_log: [], room_log: [], last_choices: [], flags: {},
-      short_rested_rooms: [], long_rested: false,
-      npc_attitudes: {}, npc_talked: [], traps_triggered: [], traps_disarmed: [], objects_searched: [],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: false,
+      initiative_order: [],
+      initiative_idx: 0,
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      flags: {},
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
     };
-    const result = await takeAction({ action: { type: 'attack' }, history: [], state, seed: seedWithEnemy, context: ctx });
+    const result = await takeAction({
+      action: { type: 'attack' },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
     // Sneak Attack [2d6] should appear in narrative at level 3 (ceil(3/2)=2 dice)
     expect(result.narrative).toMatch(/Sneak Attack/i);
   });
@@ -1027,9 +1491,15 @@ describe('class features', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.999);
     const state = makeState(
       { character_class: 'Fighter' },
-      { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] },
+      { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] }
     );
-    const result = await takeAction({ action: { type: 'attack' }, history: [], state, seed: seedWithEnemy, context: ctx });
+    const result = await takeAction({
+      action: { type: 'attack' },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
     expect(result.narrative).not.toMatch(/Sneak Attack/i);
   });
 
@@ -1038,18 +1508,24 @@ describe('class features', () => {
   it('Fighter at level 5 makes 2 attacks on Attack action (both show in narrative)', async () => {
     // Roll just above miss threshold: roll=1 (fumble) then roll=20 (hit) — ensures at least 2 roll events
     vi.spyOn(Math, 'random')
-      .mockReturnValueOnce(0)    // initiative d20 for Fighter
-      .mockReturnValueOnce(0)    // initiative d20 for enemy
-      .mockReturnValueOnce(0)    // surprise stealth roll (1d20) for Fighter
-      .mockReturnValueOnce(0)    // first attack d20 → 1 (fumble)
+      .mockReturnValueOnce(0) // initiative d20 for Fighter
+      .mockReturnValueOnce(0) // initiative d20 for enemy
+      .mockReturnValueOnce(0) // surprise stealth roll (1d20) for Fighter
+      .mockReturnValueOnce(0) // first attack d20 → 1 (fumble)
       .mockReturnValueOnce(0.999) // second attack d20 → 20 (hit)
-      .mockReturnValue(0.999);   // damage dice
+      .mockReturnValue(0.999); // damage dice
 
     const state = makeState(
       { character_class: 'Fighter', level: 5 },
-      { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] },
+      { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] }
     );
-    const result = await takeAction({ action: { type: 'attack' }, history: [], state, seed: seedWithEnemy, context: ctx });
+    const result = await takeAction({
+      action: { type: 'attack' },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
     // Should see both fumble text and a subsequent hit — "Attack 2" label in narrative
     expect(result.narrative).toMatch(/fumble|Attack 2/i);
   });
@@ -1058,14 +1534,20 @@ describe('class features', () => {
     vi.spyOn(Math, 'random')
       .mockReturnValueOnce(0)
       .mockReturnValueOnce(0)
-      .mockReturnValueOnce(0)   // first attack d20 → 1 (fumble)
+      .mockReturnValueOnce(0) // first attack d20 → 1 (fumble)
       .mockReturnValue(0);
 
     const state = makeState(
       { character_class: 'Fighter', level: 4 },
-      { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] },
+      { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] }
     );
-    const result = await takeAction({ action: { type: 'attack' }, history: [], state, seed: seedWithEnemy, context: ctx });
+    const result = await takeAction({
+      action: { type: 'attack' },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
     expect(result.narrative).not.toMatch(/Attack 2/i);
   });
 
@@ -1073,19 +1555,25 @@ describe('class features', () => {
 
   it('use_class_feature rage activates raging condition and spends a use', async () => {
     const state = {
-      ...makeState({ character_class: 'Warrior', level: 1 }, {
-        current_room:   CORRIDOR_ID,
-        visited_rooms:  [ctx.startRoomId, CORRIDOR_ID],
-        combat_active:  true,
-        initiative_order: [{ id: 'char-1', roll: 15, is_enemy: false }, { id: CORRIDOR_ID, roll: 5, is_enemy: true }],
-        initiative_idx: 0,
-      }),
+      ...makeState(
+        { character_class: 'Warrior', level: 1 },
+        {
+          current_room: CORRIDOR_ID,
+          visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+          combat_active: true,
+          initiative_order: [
+            { id: 'char-1', roll: 15, is_enemy: false },
+            { id: CORRIDOR_ID, roll: 5, is_enemy: true },
+          ],
+          initiative_idx: 0,
+        }
+      ),
     };
     const result = await takeAction({
-      action:  { type: 'use_class_feature', featureId: 'rage' },
+      action: { type: 'use_class_feature', featureId: 'rage' },
       history: [],
       state,
-      seed:    dungeonSeedWithEnemy,
+      seed: dungeonSeedWithEnemy,
       context: ctxWithRage,
     });
     const char = result.newState.characters[0];
@@ -1098,19 +1586,22 @@ describe('class features', () => {
 
   it('use_class_feature rage cannot be activated twice', async () => {
     const state = {
-      ...makeState({ character_class: 'Warrior', conditions: ['raging'] }, {
-        current_room:  CORRIDOR_ID,
-        visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
-        combat_active: true,
-        initiative_order: [{ id: 'char-1', roll: 15, is_enemy: false }],
-        initiative_idx: 0,
-      }),
+      ...makeState(
+        { character_class: 'Warrior', conditions: ['raging'] },
+        {
+          current_room: CORRIDOR_ID,
+          visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+          combat_active: true,
+          initiative_order: [{ id: 'char-1', roll: 15, is_enemy: false }],
+          initiative_idx: 0,
+        }
+      ),
     };
     const result = await takeAction({
-      action:  { type: 'use_class_feature', featureId: 'rage' },
+      action: { type: 'use_class_feature', featureId: 'rage' },
       history: [],
       state,
-      seed:    dungeonSeedWithEnemy,
+      seed: dungeonSeedWithEnemy,
       context: ctxWithRage,
     });
     expect(result.narrative).toMatch(/already raging/i);
@@ -1126,13 +1617,13 @@ describe('class features', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.999); // always hit/crit
     const state = makeState(
       { character_class: 'Warrior', conditions: ['raging'] },
-      { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] },
+      { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] }
     );
     const result = await takeAction({
-      action:  { type: 'attack' },
+      action: { type: 'attack' },
       history: [],
       state,
-      seed:    fragileSeed,
+      seed: fragileSeed,
       context: ctxWithRage,
     });
     expect(result.newState.combat_active).toBe(false);
@@ -1142,17 +1633,17 @@ describe('class features', () => {
   it('long rest restores rage uses for Warrior', async () => {
     const state = makeState(
       {
-        character_class:     'Warrior',
-        level:               6,
+        character_class: 'Warrior',
+        level: 6,
         class_resource_uses: { rage_uses: 0 },
       },
-      {},
+      {}
     );
     const result = await takeAction({
-      action:  { type: 'long_rest' },
+      action: { type: 'long_rest' },
       history: [],
       state,
-      seed:    dungeonSeedWithEnemy,
+      seed: dungeonSeedWithEnemy,
       context: ctxWithRage,
     });
     // rageUsesMax(6) = 3
@@ -1163,15 +1654,18 @@ describe('class features', () => {
     const state = makeState(
       { character_class: 'Warrior', level: 1, class_resource_uses: { rage_uses: 2 } },
       {
-        current_room:  CORRIDOR_ID,
+        current_room: CORRIDOR_ID,
         visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
         combat_active: true,
-        initiative_order: [{ id: 'char-1', roll: 15, is_enemy: false }, { id: CORRIDOR_ID, roll: 5, is_enemy: true }],
+        initiative_order: [
+          { id: 'char-1', roll: 15, is_enemy: false },
+          { id: CORRIDOR_ID, roll: 5, is_enemy: true },
+        ],
         initiative_idx: 0,
-      },
+      }
     );
     const choices = generateChoices(state, dungeonSeedWithEnemy, ctxWithRage);
-    const rageChoice = choices.find(c => c.action.type === 'use_class_feature');
+    const rageChoice = choices.find((c) => c.action.type === 'use_class_feature');
     expect(rageChoice).toBeDefined();
     expect(rageChoice?.requiresBonusAction).toBe(true);
   });
@@ -1180,37 +1674,42 @@ describe('class features', () => {
     const state = makeState(
       { character_class: 'Warrior', conditions: ['raging'] },
       {
-        current_room:  CORRIDOR_ID,
+        current_room: CORRIDOR_ID,
         visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
         combat_active: true,
-        initiative_order: [{ id: 'char-1', roll: 15, is_enemy: false }, { id: CORRIDOR_ID, roll: 5, is_enemy: true }],
+        initiative_order: [
+          { id: 'char-1', roll: 15, is_enemy: false },
+          { id: CORRIDOR_ID, roll: 5, is_enemy: true },
+        ],
         initiative_idx: 0,
-      },
+      }
     );
     const choices = generateChoices(state, dungeonSeedWithEnemy, ctxWithRage);
-    expect(choices.every(c => c.action.type !== 'use_class_feature')).toBe(true);
+    expect(choices.every((c) => c.action.type !== 'use_class_feature')).toBe(true);
   });
 });
 
 import type { PlacedNpc, NpcTemplate } from '../types.js';
 
 const npcTemplate: NpcTemplate = {
-  id:       'test_npc',
-  name:     'Friendly Guide',
+  id: 'test_npc',
+  name: 'Friendly Guide',
   attitude: 'friendly',
-  hp:       10,
-  ac:       10,
-  damage:   '1d4',
-  toHit:    2,
-  xp:       25,
+  hp: 10,
+  ac: 10,
+  damage: '1d4',
+  toHit: 2,
+  xp: 25,
   greeting: 'Greetings, traveller!',
   responses: [
     { label: 'Ask about the area', reply: 'Dangerous around here.' },
-    { label: 'Ask for help', reply: 'Gladly!', consequences: [{ type: 'set_flag', key: 'guide_helped', value: true }] },
+    {
+      label: 'Ask for help',
+      reply: 'Gladly!',
+      consequences: [{ type: 'set_flag', key: 'guide_helped', value: true }],
+    },
   ],
-  shop: [
-    { itemId: 'healing_potion', price: 5 },
-  ],
+  shop: [{ itemId: 'healing_potion', price: 5 }],
 };
 
 const npcRoomId = CORRIDOR_ID;
@@ -1223,16 +1722,22 @@ const seedWithNpc: Seed = {
 
 function makeNpcState(charOverrides: Partial<Character> = {}, npcAttitude = placedNpc.attitude) {
   return makeState(charOverrides, {
-    current_room:  npcRoomId,
+    current_room: npcRoomId,
     visited_rooms: [ctx.startRoomId, npcRoomId],
     npc_attitudes: npcAttitude !== placedNpc.attitude ? { [npcRoomId]: npcAttitude } : {},
-    npc_talked:    [],
+    npc_talked: [],
   });
 }
 
 describe('NPC actions', () => {
   it('talk to friendly NPC shows greeting and marks room as talked', async () => {
-    const result = await takeAction({ action: { type: 'talk' }, history: [], state: makeNpcState(), seed: seedWithNpc, context: ctx });
+    const result = await takeAction({
+      action: { type: 'talk' },
+      history: [],
+      state: makeNpcState(),
+      seed: seedWithNpc,
+      context: ctx,
+    });
     expect(result.narrative).toContain('Greetings, traveller!');
     expect(result.newState.npc_talked).toContain(npcRoomId);
   });
@@ -1240,7 +1745,13 @@ describe('NPC actions', () => {
   it('talk to indifferent NPC succeeds on high CHA roll', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.99); // d20 → 20, passes DC
     const state = makeNpcState({}, 'indifferent');
-    const result = await takeAction({ action: { type: 'talk' }, history: [], state, seed: seedWithNpc, context: ctx });
+    const result = await takeAction({
+      action: { type: 'talk' },
+      history: [],
+      state,
+      seed: seedWithNpc,
+      context: ctx,
+    });
     expect(result.narrative).toMatch(/success/i);
     expect(result.newState.npc_attitudes[npcRoomId]).toBe('friendly');
   });
@@ -1248,7 +1759,13 @@ describe('NPC actions', () => {
   it('talk to indifferent NPC fails on low CHA roll', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0); // d20 → 1, fails DC
     const state = makeNpcState({}, 'indifferent');
-    const result = await takeAction({ action: { type: 'talk' }, history: [], state, seed: seedWithNpc, context: ctx });
+    const result = await takeAction({
+      action: { type: 'talk' },
+      history: [],
+      state,
+      seed: seedWithNpc,
+      context: ctx,
+    });
     expect(result.narrative).toMatch(/fail/i);
     expect(result.newState.npc_attitudes[npcRoomId]).not.toBe('friendly'); // attitude not changed to friendly
   });
@@ -1256,39 +1773,59 @@ describe('NPC actions', () => {
   it('generateChoices shows talk choice for friendly NPC', () => {
     const state = makeNpcState();
     const choices = generateChoices(state, seedWithNpc, ctx);
-    expect(choices.some(c => c.action.type === 'talk')).toBe(true);
+    expect(choices.some((c) => c.action.type === 'talk')).toBe(true);
   });
 
   it('generateChoices shows buy choice for friendly NPC with shop', () => {
     const state = makeNpcState();
     const choices = generateChoices(state, seedWithNpc, ctx);
-    expect(choices.some(c => c.action.type === 'buy')).toBe(true);
+    expect(choices.some((c) => c.action.type === 'buy')).toBe(true);
   });
 
   it('generateChoices shows attack_npc for hostile NPC', () => {
     const state = makeNpcState({}, 'hostile');
     const choices = generateChoices(state, seedWithNpc, ctx);
-    const attackNpc = choices.filter(c => c.action.type === 'attack_npc');
+    const attackNpc = choices.filter((c) => c.action.type === 'attack_npc');
     expect(attackNpc.length).toBeGreaterThan(0);
   });
 
   it('talk_response applies consequences and shows NPC reply', async () => {
     const state = { ...makeNpcState(), npc_talked: [npcRoomId] };
-    const result = await takeAction({ action: { type: 'talk_response', responseIdx: 1 }, history: [], state, seed: seedWithNpc, context: ctx });
+    const result = await takeAction({
+      action: { type: 'talk_response', responseIdx: 1 },
+      history: [],
+      state,
+      seed: seedWithNpc,
+      context: ctx,
+    });
     expect(result.narrative).toContain('Gladly!');
     expect(result.newState.flags['guide_helped']).toBe(true);
   });
 
   it('buy deducts gold and adds item to inventory', async () => {
     const state = makeNpcState({ gold: 10 });
-    const result = await takeAction({ action: { type: 'buy', itemId: 'healing_potion', price: 5 }, history: [], state, seed: seedWithNpc, context: ctx });
+    const result = await takeAction({
+      action: { type: 'buy', itemId: 'healing_potion', price: 5 },
+      history: [],
+      state,
+      seed: seedWithNpc,
+      context: ctx,
+    });
     expect(result.newState.characters[0].gold).toBe(5);
-    expect(result.newState.characters[0].inventory.some(i => i.id === 'healing_potion')).toBe(true);
+    expect(result.newState.characters[0].inventory.some((i) => i.id === 'healing_potion')).toBe(
+      true
+    );
   });
 
   it('buy fails when insufficient gold', async () => {
     const state = makeNpcState({ gold: 2 });
-    const result = await takeAction({ action: { type: 'buy', itemId: 'healing_potion', price: 5 }, history: [], state, seed: seedWithNpc, context: ctx });
+    const result = await takeAction({
+      action: { type: 'buy', itemId: 'healing_potion', price: 5 },
+      history: [],
+      state,
+      seed: seedWithNpc,
+      context: ctx,
+    });
     expect(result.narrative).toMatch(/can't afford/i);
     expect(result.newState.characters[0].gold).toBe(2);
   });
@@ -1296,7 +1833,13 @@ describe('NPC actions', () => {
   it('attack_npc flips attitude to hostile and deals damage on hit', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.99); // d20 → 20, always hits
     const state = makeNpcState({ hp: 10, max_hp: 10 });
-    const result = await takeAction({ action: { type: 'attack_npc' }, history: [], state, seed: seedWithNpc, context: ctx });
+    const result = await takeAction({
+      action: { type: 'attack_npc' },
+      history: [],
+      state,
+      seed: seedWithNpc,
+      context: ctx,
+    });
     expect(result.newState.npc_attitudes[npcRoomId]).toBe('hostile');
     expect(result.narrative).toMatch(/strike|falls/i);
   });
@@ -1306,7 +1849,13 @@ describe('NPC actions', () => {
     const weakNpc: PlacedNpc = { ...placedNpc, hp: 1 };
     const seedWeak: Seed = { ...seedWithNpc, npcs: { [npcRoomId]: weakNpc } };
     const state = makeNpcState({ hp: 10, max_hp: 10 });
-    const result = await takeAction({ action: { type: 'attack_npc' }, history: [], state, seed: seedWeak, context: ctx });
+    const result = await takeAction({
+      action: { type: 'attack_npc' },
+      history: [],
+      state,
+      seed: seedWeak,
+      context: ctx,
+    });
     expect(result.newState.enemies_killed).toContain(`npc:${npcRoomId}`);
   });
 });
@@ -1316,19 +1865,19 @@ describe('NPC actions', () => {
 // ctxWithRage and dungeonSeedWithEnemy already declared above (rage tests)
 // Spell tests use CORRIDOR_ID (same room as existing dungeonSeedWithEnemy enemy)
 const spellSeed: Seed = {
-  context_id:  ctx.id,
-  world_name:  'Test Dungeon',
-  ship_name:   'Test Dungeon',
-  intro:       'Test.',
-  seed_id:     'spell-seed-id',
+  context_id: ctx.id,
+  world_name: 'Test Dungeon',
+  ship_name: 'Test Dungeon',
+  intro: 'Test.',
+  seed_id: 'spell-seed-id',
   rooms: [
-    { id: ctx.startRoomId,  name: 'Crypt',      desc: 'Cold stone.' },
-    { id: CORRIDOR_ID,             name: 'Burial',     desc: 'A chamber.' },
+    { id: ctx.startRoomId, name: 'Crypt', desc: 'Cold stone.' },
+    { id: CORRIDOR_ID, name: 'Burial', desc: 'A chamber.' },
     { id: ctx.escapeRoomId, name: 'Exit Shaft', desc: 'A shaft of light.' },
   ],
   connections: {
-    [ctx.startRoomId]:  [CORRIDOR_ID],
-    [CORRIDOR_ID]:              [ctx.startRoomId, ctx.escapeRoomId],
+    [ctx.startRoomId]: [CORRIDOR_ID],
+    [CORRIDOR_ID]: [ctx.startRoomId, ctx.escapeRoomId],
     [ctx.escapeRoomId]: [CORRIDOR_ID],
   },
   enemies: {
@@ -1341,66 +1890,66 @@ const spellSeed: Seed = {
 function makeMageState(charOverrides: Partial<Character> = {}): GameState {
   const char = makeChar({
     character_class: 'Mage',
-    int:             16,            // +3 mod → spell attack +5, DC 13
+    int: 16, // +3 mod → spell attack +5, DC 13
     spell_slots_max: { 1: 2, 2: 1, 3: 1 },
     spell_slots_used: {},
-    spells_known:    ['fire_bolt', 'magic_missile', 'thunderwave', 'misty_step', 'fireball'],
+    spells_known: ['fire_bolt', 'magic_missile', 'thunderwave', 'misty_step', 'fireball'],
     ...charOverrides,
   });
   return {
-    characters:          [char],
+    characters: [char],
     active_character_id: char.id,
-    current_room:        CORRIDOR_ID,
-    visited_rooms:       [ctx.startRoomId, CORRIDOR_ID],
-    enemies_killed:      [],
-    loot_taken:          [],
-    combat_active:       false,
-    initiative_order:    [],
-    initiative_idx:      0,
-    run_log:             [],
-    room_log:            [],
-    last_choices:        [],
-    short_rested_rooms:  [],
-    long_rested:         false,
-    npc_attitudes:       {},
-    npc_talked:          [],
-    traps_triggered:     [],
-    traps_disarmed:      [],
-    objects_searched:    [],
-    flags:               {},
+    current_room: CORRIDOR_ID,
+    visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+    enemies_killed: [],
+    loot_taken: [],
+    combat_active: false,
+    initiative_order: [],
+    initiative_idx: 0,
+    run_log: [],
+    room_log: [],
+    last_choices: [],
+    short_rested_rooms: [],
+    long_rested: false,
+    npc_attitudes: {},
+    npc_talked: [],
+    traps_triggered: [],
+    traps_disarmed: [],
+    objects_searched: [],
+    flags: {},
   };
 }
 
 function makeClericState(charOverrides: Partial<Character> = {}): GameState {
   const char = makeChar({
     character_class: 'Cleric',
-    wis:             14,
+    wis: 14,
     spell_slots_max: { 1: 2 },
     spell_slots_used: {},
-    spells_known:    ['sacred_flame', 'cure_wounds', 'guiding_bolt', 'hold_person'],
+    spells_known: ['sacred_flame', 'cure_wounds', 'guiding_bolt', 'hold_person'],
     ...charOverrides,
   });
   return {
-    characters:          [char],
+    characters: [char],
     active_character_id: char.id,
-    current_room:        CORRIDOR_ID,
-    visited_rooms:       [ctx.startRoomId, CORRIDOR_ID],
-    enemies_killed:      [],
-    loot_taken:          [],
-    combat_active:       false,
-    initiative_order:    [],
-    initiative_idx:      0,
-    run_log:             [],
-    room_log:            [],
-    last_choices:        [],
-    short_rested_rooms:  [],
-    long_rested:         false,
-    npc_attitudes:       {},
-    npc_talked:          [],
-    traps_triggered:     [],
-    traps_disarmed:      [],
-    objects_searched:    [],
-    flags:               {},
+    current_room: CORRIDOR_ID,
+    visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+    enemies_killed: [],
+    loot_taken: [],
+    combat_active: false,
+    initiative_order: [],
+    initiative_idx: 0,
+    run_log: [],
+    room_log: [],
+    last_choices: [],
+    short_rested_rooms: [],
+    long_rested: false,
+    npc_attitudes: {},
+    npc_talked: [],
+    traps_triggered: [],
+    traps_disarmed: [],
+    objects_searched: [],
+    flags: {},
   };
 }
 
@@ -1410,7 +1959,10 @@ describe('cast_spell — Fire Bolt (cantrip, spell attack)', () => {
     const state = makeMageState();
     const result = await takeAction({
       action: { type: 'cast_spell', spellId: 'fire_bolt', slotLevel: 0 },
-      history: [], state, seed: spellSeed, context: ctxWithRage,
+      history: [],
+      state,
+      seed: spellSeed,
+      context: ctxWithRage,
     });
     expect(result.narrative).toMatch(/fire bolt/i);
     expect(result.narrative).toMatch(/damage/i);
@@ -1423,7 +1975,10 @@ describe('cast_spell — Fire Bolt (cantrip, spell attack)', () => {
     const state = makeMageState();
     const result = await takeAction({
       action: { type: 'cast_spell', spellId: 'fire_bolt', slotLevel: 0 },
-      history: [], state, seed: spellSeed, context: ctxWithRage,
+      history: [],
+      state,
+      seed: spellSeed,
+      context: ctxWithRage,
     });
     expect(result.narrative).toMatch(/miss/i);
   });
@@ -1434,7 +1989,10 @@ describe('cast_spell — Magic Missile (level 1, auto-hit)', () => {
     const state = makeMageState();
     const result = await takeAction({
       action: { type: 'cast_spell', spellId: 'magic_missile', slotLevel: 1 },
-      history: [], state, seed: spellSeed, context: ctxWithRage,
+      history: [],
+      state,
+      seed: spellSeed,
+      context: ctxWithRage,
     });
     expect(result.narrative).toMatch(/magic missile/i);
     expect(result.narrative).toMatch(/force/i);
@@ -1445,7 +2003,10 @@ describe('cast_spell — Magic Missile (level 1, auto-hit)', () => {
     const state = makeMageState({ spell_slots_used: { 1: 2 } });
     const result = await takeAction({
       action: { type: 'cast_spell', spellId: 'magic_missile', slotLevel: 1 },
-      history: [], state, seed: spellSeed, context: ctxWithRage,
+      history: [],
+      state,
+      seed: spellSeed,
+      context: ctxWithRage,
     });
     expect(result.narrative).toMatch(/no level-1 spell slots/i);
     expect(result.newState.characters[0].spell_slots_used[1]).toBe(2); // unchanged
@@ -1458,7 +2019,10 @@ describe('cast_spell — Thunderwave (level 1, CON save)', () => {
     const state = makeMageState();
     const result = await takeAction({
       action: { type: 'cast_spell', spellId: 'thunderwave', slotLevel: 1 },
-      history: [], state, seed: spellSeed, context: ctxWithRage,
+      history: [],
+      state,
+      seed: spellSeed,
+      context: ctxWithRage,
     });
     expect(result.narrative).toMatch(/thunderwave/i);
     expect(result.narrative).toMatch(/fails|damage/i);
@@ -1470,7 +2034,10 @@ describe('cast_spell — Thunderwave (level 1, CON save)', () => {
     const state = makeMageState();
     const result = await takeAction({
       action: { type: 'cast_spell', spellId: 'thunderwave', slotLevel: 1 },
-      history: [], state, seed: spellSeed, context: ctxWithRage,
+      history: [],
+      state,
+      seed: spellSeed,
+      context: ctxWithRage,
     });
     expect(result.narrative).toMatch(/thunderwave/i);
     expect(result.narrative).toMatch(/succeeds|no damage/i);
@@ -1483,7 +2050,10 @@ describe('cast_spell — Fireball (level 3, DEX save, half on save)', () => {
     const state = makeMageState({ spell_slots_max: { 3: 1 }, spell_slots_used: {} });
     const result = await takeAction({
       action: { type: 'cast_spell', spellId: 'fireball', slotLevel: 3 },
-      history: [], state, seed: spellSeed, context: ctxWithRage,
+      history: [],
+      state,
+      seed: spellSeed,
+      context: ctxWithRage,
     });
     expect(result.narrative).toMatch(/fireball/i);
     expect(result.narrative).toMatch(/half damage|succeeds/i);
@@ -1494,7 +2064,10 @@ describe('cast_spell — Fireball (level 3, DEX save, half on save)', () => {
     const state = makeMageState({ spell_slots_max: { 3: 1 }, spell_slots_used: {} });
     const result = await takeAction({
       action: { type: 'cast_spell', spellId: 'fireball', slotLevel: 3 },
-      history: [], state, seed: spellSeed, context: ctxWithRage,
+      history: [],
+      state,
+      seed: spellSeed,
+      context: ctxWithRage,
     });
     expect(result.newState.characters[0].spell_slots_used[3]).toBe(1);
   });
@@ -1506,7 +2079,10 @@ describe('cast_spell — Cure Wounds (level 1, heal)', () => {
     const state = makeClericState({ hp: 3, max_hp: 10 });
     const result = await takeAction({
       action: { type: 'cast_spell', spellId: 'cure_wounds', slotLevel: 1 },
-      history: [], state, seed: spellSeed, context: ctxWithRage,
+      history: [],
+      state,
+      seed: spellSeed,
+      context: ctxWithRage,
     });
     expect(result.narrative).toMatch(/cure wounds/i);
     expect(result.newState.characters[0].hp).toBeGreaterThan(3);
@@ -1524,12 +2100,15 @@ describe('cast_spell — Misty Step (level 2, bonus action, utility)', () => {
     });
     const result = await takeAction({
       action: { type: 'cast_spell', spellId: 'misty_step', slotLevel: 2 },
-      history: [], state, seed: spellSeed, context: ctxWithRage,
+      history: [],
+      state,
+      seed: spellSeed,
+      context: ctxWithRage,
     });
     expect(result.narrative).toMatch(/misty step|silver mist/i);
     expect(result.newState.characters[0].spell_slots_used[2]).toBe(1);
     // Enemy HP should be unmodified (no damage from utility spell)
-    const enemyEntAfter = result.newState.entities?.find(e => e.id === CORRIDOR_ID && e.isEnemy);
+    const enemyEntAfter = result.newState.entities?.find((e) => e.id === CORRIDOR_ID && e.isEnemy);
     expect(enemyEntAfter?.hp).toBeFalsy();
   });
 });
@@ -1537,10 +2116,16 @@ describe('cast_spell — Misty Step (level 2, bonus action, utility)', () => {
 describe('spell slots — long rest resets used slots', () => {
   it('spell_slots_used is reset to {} after long rest', async () => {
     // Must be in a room with no living enemy to rest; use startRoomId
-    const state = { ...makeMageState({ spell_slots_used: { 1: 2, 2: 1 } }), current_room: ctx.startRoomId };
+    const state = {
+      ...makeMageState({ spell_slots_used: { 1: 2, 2: 1 } }),
+      current_room: ctx.startRoomId,
+    };
     const result = await takeAction({
       action: { type: 'long_rest' },
-      history: [], state, seed: spellSeed, context: ctxWithRage,
+      history: [],
+      state,
+      seed: spellSeed,
+      context: ctxWithRage,
     });
     expect(result.newState.characters[0].spell_slots_used).toEqual({});
   });
@@ -1550,16 +2135,19 @@ describe('generateChoices — spell choices', () => {
   it('includes cast_spell choices for Mage cantrip and leveled spells when enemy present', () => {
     const state = makeMageState();
     const choices = generateChoices(state, spellSeed, ctxWithRage);
-    const spellChoices = choices.filter(c => c.action.type === 'cast_spell');
+    const spellChoices = choices.filter((c) => c.action.type === 'cast_spell');
     expect(spellChoices.length).toBeGreaterThan(0);
   });
 
   it('does not include offensive spell choices when no enemy present', () => {
     const state = { ...makeMageState(), current_room: ctx.startRoomId };
     const choices = generateChoices(state, spellSeed, ctxWithRage);
-    const offensiveSpells = choices.filter(c =>
-      c.action.type === 'cast_spell' &&
-      ['fire_bolt', 'magic_missile', 'thunderwave', 'fireball'].includes((c.action as { spellId: string }).spellId)
+    const offensiveSpells = choices.filter(
+      (c) =>
+        c.action.type === 'cast_spell' &&
+        ['fire_bolt', 'magic_missile', 'thunderwave', 'fireball'].includes(
+          (c.action as { spellId: string }).spellId
+        )
     );
     expect(offensiveSpells.length).toBe(0);
   });
@@ -1568,8 +2156,10 @@ describe('generateChoices — spell choices', () => {
     // magic_missile is level 1; mage has 2×L1, 1×L2, 1×L3 — exhaust all
     const state = makeMageState({ spell_slots_used: { 1: 2, 2: 1, 3: 1 } });
     const choices = generateChoices(state, spellSeed, ctxWithRage);
-    const missileChoice = choices.find(c =>
-      c.action.type === 'cast_spell' && (c.action as { spellId: string }).spellId === 'magic_missile'
+    const missileChoice = choices.find(
+      (c) =>
+        c.action.type === 'cast_spell' &&
+        (c.action as { spellId: string }).spellId === 'magic_missile'
     );
     expect(missileChoice).toBeUndefined();
   });
@@ -1578,10 +2168,11 @@ describe('generateChoices — spell choices', () => {
     // L1 slots exhausted but L2 still available — upcast magic_missile should appear
     const state = makeMageState({ spell_slots_used: { 1: 2 } });
     const choices = generateChoices(state, spellSeed, ctxWithRage);
-    const upcastChoice = choices.find(c =>
-      c.action.type === 'cast_spell' &&
-      (c.action as { spellId: string; slotLevel: number }).spellId === 'magic_missile' &&
-      (c.action as { spellId: string; slotLevel: number }).slotLevel === 2
+    const upcastChoice = choices.find(
+      (c) =>
+        c.action.type === 'cast_spell' &&
+        (c.action as { spellId: string; slotLevel: number }).spellId === 'magic_missile' &&
+        (c.action as { spellId: string; slotLevel: number }).slotLevel === 2
     );
     expect(upcastChoice).toBeDefined();
   });
@@ -1589,8 +2180,9 @@ describe('generateChoices — spell choices', () => {
   it('includes Misty Step as a bonus-action choice', () => {
     const state = makeMageState();
     const choices = generateChoices(state, spellSeed, ctxWithRage);
-    const mistyStep = choices.find(c =>
-      c.action.type === 'cast_spell' && (c.action as { spellId: string }).spellId === 'misty_step'
+    const mistyStep = choices.find(
+      (c) =>
+        c.action.type === 'cast_spell' && (c.action as { spellId: string }).spellId === 'misty_step'
     );
     expect(mistyStep).toBeDefined();
     expect(mistyStep?.requiresBonusAction).toBe(true);

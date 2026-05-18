@@ -12,11 +12,11 @@ import { authRouter } from './routes/auth.js';
 import { requireAuth } from './auth/middleware.js';
 import './auth/passport.js';
 
-const app        = express();
+const app = express();
 const httpServer = createServer(app);
 
 const io = new Server(httpServer, {
-  cors: { origin: process.env.FRONTEND_URL, credentials: true }
+  cors: { origin: process.env.FRONTEND_URL, credentials: true },
 });
 
 app.use(cors({ origin: process.env.FRONTEND_URL, credentials: true }));
@@ -24,22 +24,24 @@ app.use(express.json());
 
 // ─── Session store ────────────────────────────────────────────────────────────
 const PgSession = connectPgSimple(session);
-app.use(session({
-  store: new PgSession({
-    pool,
-    tableName: 'session',
-    createTableIfMissing: false,
-  }),
-  secret:            process.env.SESSION_SECRET ?? 'change-me-in-production',
-  resave:            false,
-  saveUninitialized: false,
-  cookie: {
-    secure:   process.env.NODE_ENV === 'production',
-    httpOnly: true,
-    maxAge:   30 * 24 * 60 * 60 * 1000, // 30 days
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-  },
-}));
+app.use(
+  session({
+    store: new PgSession({
+      pool,
+      tableName: 'session',
+      createTableIfMissing: false,
+    }),
+    secret: process.env.SESSION_SECRET ?? 'change-me-in-production',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: process.env.NODE_ENV === 'production',
+      httpOnly: true,
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    },
+  })
+);
 
 // ─── Passport ─────────────────────────────────────────────────────────────────
 app.use(passport.initialize());

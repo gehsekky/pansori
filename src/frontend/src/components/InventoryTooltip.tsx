@@ -1,7 +1,13 @@
 import { useState, ReactNode } from 'react';
 import styles from '../styles.module.css';
 
-function InventoryTooltip({ text, children }: { text: string | null | undefined; children: ReactNode }) {
+function InventoryTooltip({
+  text,
+  children,
+}: {
+  text: string | null | undefined;
+  children: ReactNode;
+}) {
   const [visible, setVisible] = useState(false);
   if (!text) return <>{children}</>;
   return (
