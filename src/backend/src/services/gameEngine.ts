@@ -39,8 +39,8 @@ function breakConcentration(char: Character, st: GameState): { char: Character; 
   if (!char.concentrating_on) return { char, st };
   const condition = char.concentrating_on.condition;
   const newChar   = { ...char, concentrating_on: null };
-  const newSt     = condition
-    ? { ...st, enemy_conditions: (st.enemy_conditions ?? []).filter(c => c !== condition) }
+  const newSt     = condition && st.entities
+    ? { ...st, entities: st.entities.map(e => e.isEnemy ? { ...e, conditions: e.conditions.filter(c => c !== condition) } : e) }
     : st;
   return { char: newChar, st: newSt };
 }
@@ -96,21 +96,6 @@ function getItemData(item: InventoryItem | undefined, context: Context): LootIte
 
 function getWorldName(seed: Seed): string {
   return seed.world_name || seed.ship_name || 'the world';
-}
-
-function getEnemyHp(state: GameState, roomId: string, seed: Seed): number {
-  if (state.enemy_hp?.[roomId] !== undefined) return state.enemy_hp[roomId];
-  return seed.enemies?.[roomId]?.hp ?? 0;
-}
-
-function setEnemyHp(state: GameState, roomId: string, hp: number): GameState {
-  const updated = { ...state, enemy_hp: { ...state.enemy_hp, [roomId]: hp } };
-  if (updated.entities) {
-    updated.entities = updated.entities.map(e =>
-      e.id === roomId && e.isEnemy ? { ...e, hp } : e,
-    );
-  }
-  return updated;
 }
 
 // ─── Condition helpers ────────────────────────────────────────────────────────
@@ -421,7 +406,6 @@ export function normalizeState(
       traps_triggered:    gs.traps_triggered    ?? [],
       traps_disarmed:     gs.traps_disarmed     ?? [],
       objects_searched:   gs.objects_searched   ?? [],
-      enemy_conditions:   gs.enemy_conditions   ?? [],
       characters: gs.characters.map(c => {
         const existingSlots = c.spell_slots_max ?? {};
         const slotsMax = Object.keys(existingSlots).length > 0
@@ -502,7 +486,6 @@ export function normalizeState(
     visited_rooms:       (raw.visited_rooms as string[]) ?? [],
     enemies_killed:      (raw.enemies_killed as string[]) ?? [],
     loot_taken:          (raw.loot_taken as string[]) ?? [],
-    enemy_hp:            (raw.enemy_hp as Record<string, number>) ?? {},
     combat_active:       Boolean(raw.combat_active),
     initiative_order:    [],
     initiative_idx:      0,
@@ -517,7 +500,6 @@ export function normalizeState(
     traps_disarmed:      [],
     objects_searched:    [],
     flags:               (raw.flags as Record<string, boolean | string | number>) ?? {},
-    enemy_conditions:    [],
   };
 }
 
@@ -534,7 +516,7 @@ export function buildArrivalNarrative(targetId: string, state: GameState, seed: 
   if (exitNames) text += ` Exits: ${exitNames}.`;
 
   const newEnemy   = seed.enemies?.[targetId];
-  const newEnemyHp = getEnemyHp(state, targetId, seed);
+  const newEnemyHp = state.entities?.find(e => e.id === targetId && e.isEnemy)?.hp ?? newEnemy?.hp ?? 0;
   if (newEnemy && !state.enemies_killed.includes(targetId) && newEnemyHp > 0) {
     text += ` A ${newEnemy.name} is here — HP: ${newEnemyHp}, AC: ${newEnemy.ac}.`;
   } else if (newEnemy && state.enemies_killed.includes(targetId)) {
@@ -606,7 +588,8 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   const roomId     = state.current_room;
   const enemy      = seed.enemies?.[roomId];
   const loot       = seed.loot?.[roomId];
-  const enemyAlive = enemy && !state.enemies_killed?.includes(roomId);
+  const entityHpGC  = state.entities?.find(e => e.id === roomId && e.isEnemy)?.hp;
+  const enemyAlive  = !!enemy && !state.enemies_killed?.includes(roomId) && (entityHpGC !== undefined ? entityHpGC > 0 : true);
   const lootAvail  = loot  && !state.loot_taken?.includes(roomId);
   const adjacent   = (seed.connections[roomId] || [])
     .map(id => seed.rooms.find(r => r.id === id))
@@ -622,9 +605,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     choices.push({ label: context.escapeChoiceText, action: { type: 'escape' } });
   }
   if (enemyAlive) {
-    const sneakDest = adjacent[0];
     choices.push({ label: `Attack the ${enemy.name}`, action: { type: 'attack' } });
-    choices.push({ label: `Try to sneak past the ${enemy.name}${sneakDest ? ` → ${sneakDest.name}` : ''}`, action: { type: 'sneak' } });
   }
   if (lootAvail) {
     choices.push({ label: `Pick up the ${loot.name}`, action: { type: 'loot' } });
@@ -1075,11 +1056,22 @@ function applyConsequence(
       const alreadyKilled = st.enemies_killed.includes(c.roomId);
       const alreadyPresent = seed.enemies?.[c.roomId];
       if (alreadyKilled || alreadyPresent) return st;
-      // Spawning modifies the seed-side data; we record it in enemy_hp instead
-      // so the engine recognises a live enemy in that room next evaluation.
       const template = seed.enemies?.[c.enemyId];
       if (!template) return st;
-      return { ...st, enemy_hp: { ...st.enemy_hp, [c.roomId]: template.hp } };
+      // If combat is active with grid entities, add the spawned enemy to the grid
+      if (st.entities) {
+        const spawnedEntity: import('../types.js').CombatEntity = {
+          id:                  c.roomId,
+          isEnemy:             true,
+          pos:                 { x: 5, y: 5 },
+          hp:                  template.hp,
+          maxHp:               template.hp,
+          conditions:          [],
+          condition_durations: {},
+        };
+        return { ...st, entities: [...st.entities, spawnedEntity] };
+      }
+      return st;
     }
 
     case 'set_escape':
@@ -1117,7 +1109,6 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
     ...state,
     enemies_killed:     state.enemies_killed     || [],
     loot_taken:         state.loot_taken         || [],
-    enemy_hp:           state.enemy_hp           || {},
     combat_active:      state.combat_active      ?? false,
     initiative_order:   state.initiative_order   ?? [],
     initiative_idx:     state.initiative_idx     ?? 0,
@@ -1128,7 +1119,6 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
     npc_talked:         state.npc_talked         ?? [],
     objects_searched:   state.objects_searched   ?? [],
     flags:              state.flags              ?? {},
-    enemy_conditions:   state.enemy_conditions   ?? [],
   };
 
   // Ensure character fields have safe defaults
@@ -1161,7 +1151,8 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
   const roomId     = st.current_room;
   const enemy      = seed.enemies?.[roomId];
   const loot       = seed.loot?.[roomId];
-  const enemyAlive = enemy && !st.enemies_killed.includes(roomId);
+  const entityHp   = st.entities?.find(e => e.id === roomId && e.isEnemy)?.hp;
+  const enemyAlive = !!enemy && !st.enemies_killed.includes(roomId) && (entityHp !== undefined ? entityHp > 0 : true);
   const lootAvail  = loot  && !st.loot_taken.includes(roomId);
   const adjacent   = (seed.connections[roomId] || [])
     .map(id => seed.rooms.find(r => r.id === id))
@@ -1276,32 +1267,10 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
         narrative = `You are ${immobilizer} and cannot move.`;
         break;
       }
-      // Opportunity attack when leaving a room with a living enemy (5e PHB p.195)
-      if (enemyAlive && !(char.turn_actions?.disengaged ?? false)) {
-        const opp = applyEnemyAttackNarrative(enemy, char, context);
-        char.hp                  = Math.max(0, char.hp - opp.hpLost);
-        char.conditions          = opp.newConditions;
-        char.condition_durations = opp.newDurations;
-        const concOpp = checkConcentration(char, st, opp.hpLost);
-        char = concOpp.char; st = concOpp.st;
-        narrative = opp.hpLost > 0
-          ? `You try to flee — the ${enemy.name} strikes as you go! ${opp.narrative}${concOpp.note} `
-          : `You dodge past the ${enemy.name} in a desperate sprint! `;
-        if (char.hp <= 0) {
-          const { narrative: dsNarr, newChar, died, endedCombat } = processDeathSave(
-            { ...char, death_saves: { successes: 0, failures: 0 } }, enemy, context, worldName
-          );
-          char = newChar;
-          if (endedCombat) st = endCombatState(st);
-          narrative += dsNarr;
-          if (died) break;
-        }
-      }
       if (st.combat_active) {
-        st = endCombatState(st);
-        char.conditions = [];
+        narrative = `You cannot flee while in grid combat. Use Disengage and move on the grid.`;
+        break;
       }
-      st.enemy_conditions = [];
       st.current_room = target.id;
       if (!st.visited_rooms.includes(target.id)) {
         st.visited_rooms = [...st.visited_rooms, target.id];
@@ -1342,7 +1311,6 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
         break;
       }
 
-      const currentEnemyHp = getEnemyHp(st, roomId, seed);
       const weaponItem     = char.equipped_weapon
         ? getItemData(char.inventory?.find(i => i.instance_id === char.equipped_weapon) as InventoryItem, context)
         : null;
@@ -1397,8 +1365,8 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
         if (freshChar) char = { ...freshChar };
         char.turn_actions = { ...FRESH_TURN };
 
-        // ── Initialize grid entities if this context uses a grid ────────────
-        if (context.gridEnabled && !st.entities) {
+        // ── Initialize grid entities at combat start ────────────────────────
+        if (!st.entities) {
           const gw = context.gridWidth  ?? 8;
           const gh = context.gridHeight ?? 8;
           const pcEntities: CombatEntity[] = st.characters.map((c, ci) => ({
@@ -1454,35 +1422,8 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
         const myInitIdx = order.findIndex(e => e.id === char.id);
         st.initiative_idx = myInitIdx >= 0 ? myInitIdx : 0;
 
-        // If enemy wins initiative (enemy appears before this character in the order),
-        // auto-resolve the enemy's pre-emptive attack before the player acts
-        const enemyEntry = order.find(e => e.is_enemy);
-        const enemyInitIdx = order.indexOf(enemyEntry!);
-        if (enemyEntry && enemyInitIdx < (myInitIdx >= 0 ? myInitIdx : 0)) {
-          const preStrike = applyEnemyAttackNarrative(enemy, char, context);
-          char.hp                  = Math.max(0, char.hp - preStrike.hpLost);
-          char.conditions          = preStrike.newConditions;
-          char.condition_durations = preStrike.newDurations;
-          const concPre = checkConcentration(char, st, preStrike.hpLost);
-          char = concPre.char; st = concPre.st;
-          narrative += `The ${enemy.name} strikes first (${enemyEntry.roll})! ${preStrike.narrative}${concPre.note} `;
-          if (char.hp <= 0) {
-            const { narrative: dsNarr, newChar, died, endedCombat } = processDeathSave(
-              { ...char, death_saves: { successes: 0, failures: 0 } }, enemy, context, worldName
-            );
-            char = newChar;
-            if (endedCombat) st = endCombatState(st);
-            narrative += dsNarr;
-            if (died) {
-              usedInitiative = true;
-              break;
-            }
-          }
-          narrative += `Now ${char.name} attacks — `;
-        } else {
-          const myRoll = order.find(e => e.id === char.id)?.roll ?? 0;
-          narrative += `${char.name} has initiative (${myRoll})! `;
-        }
+        const myRoll = order.find(e => e.id === char.id)?.roll ?? 0;
+        narrative += `${char.name} acts (initiative ${myRoll})! `;
       }
 
       // ── Resolve the player's attack ────────────────────────────────────────
@@ -1498,11 +1439,12 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
       const conditionDisadv  = char.conditions.some(c => DISADV_CONDITIONS.has(c));
       const exhaustionDisadv = (char.exhaustion_level ?? 0) >= 3; // exhaustion 3+: disadv on attack rolls
       const conditionAdv     = char.conditions.some(c => PLAYER_ADV_CONDITIONS.has(c));
-      const enemyGrappled   = (st.enemy_conditions ?? []).includes('grappled');
-      const enemyProne      = (st.enemy_conditions ?? []).includes('prone');
-      const enemyParalyzed  = (st.enemy_conditions ?? []).includes('paralyzed');
+      const enemyEntity2    = st.entities?.find(e => e.id === roomId && e.isEnemy);
+      const enemyGrappled   = enemyEntity2?.conditions.includes('grappled') ?? false;
+      const enemyProne      = enemyEntity2?.conditions.includes('prone') ?? false;
+      const enemyParalyzed  = enemyEntity2?.conditions.includes('paralyzed') ?? false;
       // Unconscious: auto-crit when attacker is within 5ft
-      const enemyUnconscious = (st.enemy_conditions ?? []).includes('unconscious');
+      const enemyUnconscious = enemyEntity2?.conditions.includes('unconscious') ?? false;
       // Prone: melee attacks have advantage, ranged attacks have disadvantage
       const proneAdv        = enemyProne && weaponItem?.range !== 'ranged';
       const proneDisadv     = enemyProne && weaponItem?.range === 'ranged';
@@ -1612,7 +1554,8 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
 
         const rawDmg     = baseHit + sneakDmg + rageBonus;
         const { damage: finalDmg, note: dmgNote } = applyDamageMultiplier(rawDmg, weaponItem?.damageType, enemy);
-        const curEnemyHp = getEnemyHp(st, roomId, seed);
+        const enemyEnt   = st.entities?.find(e => e.id === roomId && e.isEnemy);
+        const curEnemyHp = enemyEnt?.hp ?? 0;
         const newEnemyHp = curEnemyHp - finalDmg;
 
         narrative += buildCombatHitNarrative(enemy, weaponItem, finalDmg, atk.critical, char, context);
@@ -1624,9 +1567,8 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
         if (newEnemyHp <= 0) {
           const xpGain = enemy.xp ?? (10 + (enemy.hp || 8));
           char.xp           = (char.xp || 0) + xpGain;
+          st = { ...st, entities: (st.entities ?? []).map(e => e.id === roomId && e.isEnemy ? { ...e, hp: 0 } : e) };
           st.enemies_killed = [...st.enemies_killed, roomId];
-          st.enemy_hp       = { ...st.enemy_hp, [roomId]: 0 };
-          st.enemy_conditions = [];
           st = endCombatState(st);
           char.conditions   = char.conditions.filter(c => c !== 'raging');
           narrative += ' ' + pick(context.narratives.killShot)
@@ -1647,7 +1589,7 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
           usedInitiative = true;
           return true;
         }
-        st.enemy_hp = { ...st.enemy_hp, [roomId]: newEnemyHp };
+        st = { ...st, entities: (st.entities ?? []).map(e => e.id === roomId && e.isEnemy ? { ...e, hp: newEnemyHp } : e) };
         narrative += ` The ${enemy.name} has ${newEnemyHp} HP remaining. `;
         return false;
       };
@@ -1658,7 +1600,7 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
         // ── Extra Attack (Fighter/Warrior level 5+) ───────────────────────
         const extraCount = features.includes('extra_attack') ? extraAttackCount(char.character_class, char.level) : 0;
         for (let ei = 0; ei < extraCount; ei++) {
-          if (getEnemyHp(st, roomId, seed) <= 0) break;
+          if ((st.entities?.find(e => e.id === roomId && e.isEnemy)?.hp ?? 0) <= 0) break;
           const killedExtra = resolveOneAttack(`Attack ${ei + 2} — `);
           if (killedExtra) break;
         }
@@ -1768,7 +1710,6 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
             st = endCombatState(st);
             char.conditions = [];
           }
-          st.enemy_conditions = [];
           st.current_room = target.id;
           if (!st.visited_rooms.includes(target.id)) {
             st.visited_rooms = [...st.visited_rooms, target.id];
@@ -1776,25 +1717,7 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
           narrative += ' ' + buildArrivalNarrative(target.id, { ...st, characters: st.characters.map((c, i) => i === safeIdx ? char : c) }, seed, context);
         }
       } else {
-        const counter = applyEnemyAttackNarrative(enemy, char, context);
-        char.hp                  = Math.max(0, char.hp - counter.hpLost);
-        char.conditions          = counter.newConditions;
-        char.condition_durations = counter.newDurations;
-        const concSnk = checkConcentration(char, st, counter.hpLost);
-        char = concSnk.char; st = concSnk.st;
-        narrative = pick(context.narratives.sneakFail)
-          .replace('{enemy}', enemy.name)
-          .replace('{dmg}',   String(counter.hpLost));
-        narrative += concSnk.note;
-        narrative += ` (Stealth: ${check.roll}+${abilityMod(char.dex)}=${check.total} vs DC ${sneakDC})`;
-        if (char.hp <= 0) {
-          const { narrative: dsNarr, newChar, died, endedCombat } = processDeathSave(
-            { ...char, death_saves: { successes: 0, failures: 0 } }, enemy, context, worldName
-          );
-          char = newChar;
-          if (endedCombat) st = endCombatState(st);
-          narrative += ' ' + dsNarr;
-        }
+        narrative = `You fail to slip past the ${enemy?.name ?? 'enemy'}. (Stealth: ${check.roll}+${abilityMod(char.dex)}=${check.total} vs DC ${sneakDC})`;
       }
       // Sneak always consumes the action and ends the combat turn
       char.turn_actions = { ...char.turn_actions, action_used: true };
@@ -1990,7 +1913,8 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
 
       // Resolve attack using NPC stat block as an enemy proxy
       const npcAsEnemy: Enemy = { name: npc.name, hp: npc.hp, ac: npc.ac, damage: npc.damage, toHit: npc.toHit, xp: npc.xp, dex: npc.dex };
-      const currentNpcHp = st.enemy_hp?.[`npc:${roomId}`] ?? npc.hp;
+      const npcHpFlagKey = `npc_hp_${roomId}`;
+      const currentNpcHp = (st.flags[npcHpFlagKey] as number | undefined) ?? npc.hp;
       const equippedWeaponItem = char.equipped_weapon
         ? context.lootTable.find(l => l.id === char.equipped_weapon) ?? null
         : null;
@@ -2006,7 +1930,7 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
 
       if (attackResult.hit) {
         const newHp = Math.max(0, currentNpcHp - attackResult.damage);
-        st = { ...st, enemy_hp: { ...st.enemy_hp, [`npc:${roomId}`]: newHp } };
+        st = { ...st, flags: { ...st.flags, [npcHpFlagKey]: newHp } };
         if (newHp <= 0) {
           st = { ...st, enemies_killed: [...st.enemies_killed, `npc:${roomId}`] };
           char = { ...char, xp: char.xp + npcAsEnemy.xp };
@@ -2229,22 +2153,24 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
           if (enemy.condition_immunities?.includes(spell.condition)) {
             narrative += ` [${enemy.name} is immune to ${spell.condition}]`;
           } else {
-            st = { ...st, enemy_conditions: [...(st.enemy_conditions ?? []).filter(c => c !== spell.condition), spell.condition] };
-            narrative += ` The ${enemy.name} is ${spell.condition}!`;
+            const condToApply = spell.condition!;
+            st = { ...st, entities: (st.entities ?? []).map(e => e.id === roomId && e.isEnemy ? { ...e, conditions: [...e.conditions.filter(c => c !== condToApply), condToApply] } : e) };
+            narrative += ` The ${enemy.name} is ${condToApply}!`;
             if (spell.concentration) {
-              char.concentrating_on = { spellId, condition: spell.condition };
+              char.concentrating_on = { spellId, condition: condToApply };
             }
           }
           const { damage: effCondDmg, note: condDmgNote } = applyDamageMultiplier(spellDmg, spell.damageType, enemy);
           if (condDmgNote) narrative += condDmgNote;
-          const newEnemyHp = getEnemyHp(st, roomId, seed) - effCondDmg;
-          st.enemy_hp = { ...st.enemy_hp, [roomId]: Math.max(0, newEnemyHp) };
+          const enemyEntCond = st.entities?.find(e => e.id === roomId && e.isEnemy);
+          const curHpCond    = enemyEntCond?.hp ?? 0;
+          const newEnemyHp   = curHpCond - effCondDmg;
+          st = { ...st, entities: (st.entities ?? []).map(e => e.id === roomId && e.isEnemy ? { ...e, hp: Math.max(0, newEnemyHp) } : e) };
           if (newEnemyHp <= 0) {
             const xpGain = enemy.xp ?? 10;
             char.xp = (char.xp || 0) + xpGain;
+            st = { ...st, entities: (st.entities ?? []).map(e => e.id === roomId && e.isEnemy ? { ...e, hp: 0 } : e) };
             st.enemies_killed = [...st.enemies_killed, roomId];
-            st.enemy_hp = { ...st.enemy_hp, [roomId]: 0 };
-            st.enemy_conditions = [];
             char.concentrating_on = null;
             st = endCombatState(st);
             narrative += ' ' + pick(context.narratives.killShot).replace('{enemy}', enemy.name).replace('{xp}', String(xpGain));
@@ -2281,14 +2207,14 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
               const baseDmg   = rollDice((upcastDamage(spell, slotLevel)) || (spell.damage ?? '0'));
               const effDmg    = tFailed ? baseDmg : spell.saveEffect === 'half' ? Math.floor(baseDmg / 2) : 0;
               const { damage: resDmg } = applyDamageMultiplier(effDmg, spell.damageType, targetEnemy);
-              const curHp = getEnemyHp(st, target.id, seed);
+              const curHp = st.entities?.find(e => e.id === target.id && e.isEnemy)?.hp ?? 0;
               const newHp = curHp - resDmg;
-              st = setEnemyHp(st, target.id, Math.max(0, newHp));
+              st = { ...st, entities: (st.entities ?? []).map(e => e.id === target.id && e.isEnemy ? { ...e, hp: Math.max(0, newHp) } : e) };
               narrative += ` ${targetEnemy.name}: ${tFailed ? 'fails' : 'succeeds'} save — ${resDmg} dmg${newHp <= 0 ? ' (killed)' : ''}.`;
               if (newHp <= 0) {
                 char.xp = (char.xp || 0) + (targetEnemy.xp ?? 10);
+                st = { ...st, entities: (st.entities ?? []).map(e => e.id === target.id && e.isEnemy ? { ...e, hp: 0 } : e) };
                 st.enemies_killed = [...st.enemies_killed, target.id];
-                st.enemy_conditions = [];
                 st = endCombatState(st);
               }
             } else if (targetChar && !target.isEnemy) {
@@ -2319,13 +2245,15 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
         const { damage: effSpellDmg, note: spellDmgNote } = applyDamageMultiplier(spellDmg, spell.damageType, enemy);
         if (spellDmgNote) narrative += spellDmgNote;
         spellDmg = effSpellDmg;
-        const currentHp = getEnemyHp(st, roomId, seed);
-        const newHp     = currentHp - spellDmg;
-        if (newHp <= 0) {
+        const enemyEntSpell   = st.entities?.find(e => e.id === roomId && e.isEnemy);
+        const curEnemyHpSpell = enemyEntSpell?.hp ?? 0;
+        const newEnemyHpSpell = curEnemyHpSpell - spellDmg;
+        st = { ...st, entities: (st.entities ?? []).map(e => e.id === roomId && e.isEnemy ? { ...e, hp: newEnemyHpSpell } : e) };
+        if (newEnemyHpSpell <= 0) {
           const xpGain = enemy.xp ?? 10;
           char.xp           = (char.xp || 0) + xpGain;
+          st = { ...st, entities: (st.entities ?? []).map(e => e.id === roomId && e.isEnemy ? { ...e, hp: 0 } : e) };
           st.enemies_killed = [...st.enemies_killed, roomId];
-          st.enemy_hp       = { ...st.enemy_hp, [roomId]: 0 };
           st = endCombatState(st);
           narrative += ' ' + pick(context.narratives.killShot).replace('{enemy}', enemy.name).replace('{xp}', String(xpGain));
           if (char.xp >= char.level * 100) {
@@ -2341,8 +2269,7 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
             }
           }
         } else {
-          st.enemy_hp = { ...st.enemy_hp, [roomId]: newHp };
-          narrative += ` The ${enemy.name} has ${newHp} HP remaining.`;
+          narrative += ` The ${enemy.name} has ${newEnemyHpSpell} HP remaining.`;
         }
       }
 
@@ -2448,7 +2375,7 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
           const tripSave = rollDice('1d20') + abilityMod((enemy as unknown as Record<string, number>)['str'] ?? 10);
           const tripDC   = 8 + profBonus(char.level) + abilityMod(char.str);
           if (tripSave < tripDC) {
-            st.enemy_conditions = [...(st.enemy_conditions ?? []).filter(c => c !== 'prone'), 'prone'];
+            st = { ...st, entities: (st.entities ?? []).map(e => e.id === roomId && e.isEnemy ? { ...e, conditions: [...e.conditions.filter(c => c !== 'prone'), 'prone'] } : e) };
             narrative = `Maneuver — Trip Attack: +${sdRoll} damage, ${enemy!.name} knocked prone! (STR save ${tripSave} vs DC ${tripDC})`;
           } else {
             narrative = `Maneuver — Trip Attack: +${sdRoll} damage, ${enemy!.name} resists the trip. (STR save ${tripSave} vs DC ${tripDC})`;
@@ -2457,7 +2384,7 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
           const goadSave = rollDice('1d20') + abilityMod((enemy as unknown as Record<string, number>)['wis'] ?? 10);
           const goadDC   = 8 + profBonus(char.level) + abilityMod(char.cha);
           if (goadSave < goadDC) {
-            st.enemy_conditions = [...(st.enemy_conditions ?? []).filter(c => c !== 'goaded'), 'goaded'];
+            st = { ...st, entities: (st.entities ?? []).map(e => e.id === roomId && e.isEnemy ? { ...e, conditions: [...e.conditions.filter(c => c !== 'goaded'), 'goaded'] } : e) };
             narrative = `Maneuver — Goading Attack: +${sdRoll} damage, ${enemy!.name} goaded (disadvantage vs others)! (WIS save ${goadSave} vs DC ${goadDC})`;
           } else {
             narrative = `Maneuver — Goading Attack: +${sdRoll} damage, ${enemy!.name} resists. (WIS save ${goadSave} vs DC ${goadDC})`;
@@ -2554,16 +2481,17 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
         narrative = `Off-hand attack with ${offhandLoot.name} misses. (${atk.roll}+${atk.atkMod}+${atk.prof}=${atk.total} vs AC ${enemyInRoom.ac})`;
         break;
       }
-      const curHpTwf = getEnemyHp(st, roomId, seed);
-      const newHpTwf = curHpTwf - atk.damage;
-      st = setEnemyHp(st, roomId, newHpTwf);
+      const entTwf    = st.entities?.find(e => e.id === roomId && e.isEnemy);
+      const curHpTwf  = entTwf?.hp ?? 0;
+      const newHpTwf  = curHpTwf - atk.damage;
+      st = { ...st, entities: (st.entities ?? []).map(e => e.id === roomId && e.isEnemy ? { ...e, hp: newHpTwf } : e) };
       narrative = `Off-hand strike with ${offhandLoot.name}! ${atk.damage} damage${atk.critical ? ' (CRITICAL!)' : ''} (${atk.roll}+${atk.atkMod}+${atk.prof}=${atk.total} vs AC ${enemyInRoom.ac}, no ability mod to damage).`;
       if (newHpTwf <= 0) {
         const xpGainTwf = enemyInRoom.xp ?? 10;
         char.xp = (char.xp || 0) + xpGainTwf;
         narrative += ` The ${enemyInRoom.name} falls!`;
+        st = { ...st, entities: (st.entities ?? []).map(e => e.id === roomId && e.isEnemy ? { ...e, hp: 0 } : e) };
         st.enemies_killed = [...(st.enemies_killed || []), roomId];
-        st.enemy_conditions = [];
         if (st.combat_active) st = endCombatState(st);
       }
       break;
@@ -2586,7 +2514,7 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
       char.turn_actions = { ...char.turn_actions, action_used: true };
       usedInitiative = true;
       if (playerRollGrapple > enemyRollGrapple) {
-        st.enemy_conditions = [...(st.enemy_conditions ?? []).filter(c => c !== 'grappled'), 'grappled'];
+        st = { ...st, entities: (st.entities ?? []).map(e => e.id === roomId && e.isEnemy ? { ...e, conditions: [...e.conditions.filter(c => c !== 'grappled'), 'grappled'] } : e) };
         narrative = `You grapple the ${enemy.name}! (${playerRollGrapple} vs ${enemyRollGrapple}) They are GRAPPLED — speed 0, your attacks have advantage.`;
       } else {
         narrative = `The ${enemy.name} breaks free of your grapple attempt. (${playerRollGrapple} vs ${enemyRollGrapple})`;
@@ -2610,7 +2538,7 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
       char.turn_actions = { ...char.turn_actions, action_used: true };
       usedInitiative = true;
       if (playerRollShove > enemyRollShove) {
-        st.enemy_conditions = [...(st.enemy_conditions ?? []).filter(c => c !== 'prone'), 'prone'];
+        st = { ...st, entities: (st.entities ?? []).map(e => e.id === roomId && e.isEnemy ? { ...e, conditions: [...e.conditions.filter(c => c !== 'prone'), 'prone'] } : e) };
         narrative = `You shove the ${enemy.name} to the ground! (${playerRollShove} vs ${enemyRollShove}) They are PRONE — melee attacks against them have advantage, ranged attacks have disadvantage.`;
       } else {
         narrative = `The ${enemy.name} resists your shove. (${playerRollShove} vs ${enemyRollShove})`;
@@ -2958,8 +2886,15 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
       const eEntry = st.initiative_order[advIdx];
       const rm     = seed.enemies?.[eEntry.id];
       if (rm && !st.enemies_killed.includes(eEntry.id)) {
-        // Target: the character who just acted
-        const targetCharIdx = st.characters.findIndex(c => c.id === char.id);
+        // Target: nearest living PC by grid distance from enemy entity
+        const eEnt = st.entities?.find(e => e.id === eEntry.id && e.isEnemy);
+        const nearestPcEntity = st.entities
+          ?.filter(e => !e.isEnemy && e.hp > 0)
+          .sort((a, b) => {
+            if (!eEnt) return 0;
+            return distanceFeet(eEnt.pos, a.pos) - distanceFeet(eEnt.pos, b.pos);
+          })[0];
+        const targetCharIdx = st.characters.findIndex(c => c.id === (nearestPcEntity?.id ?? char.id) && !c.dead);
         if (targetCharIdx >= 0) {
           let target = st.characters[targetCharIdx];
           if (!target.dead && target.hp > 0) {
@@ -2983,6 +2918,10 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
               if (endedCombat) st = endCombatState(st);
             }
             st = { ...st, characters: st.characters.map((c, i) => i === targetCharIdx ? target : c) };
+            // Sync PC entity HP after enemy attack
+            if (st.entities) {
+              st = { ...st, entities: st.entities.map(e => e.id === target.id && !e.isEnemy ? { ...e, hp: target.hp } : e) };
+            }
           }
         }
       }

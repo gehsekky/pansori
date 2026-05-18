@@ -92,7 +92,6 @@ function makeState(
     visited_rooms: ['room-1'],
     enemies_killed: [],
     loot_taken: [],
-    enemy_hp: {},
     combat_active: false,
     initiative_order: [],
     initiative_idx: 0,
@@ -107,7 +106,6 @@ function makeState(
     traps_disarmed: [],
     objects_searched: [],
     flags: {},
-    enemy_conditions: [],
     ...stateOverrides,
   };
 }

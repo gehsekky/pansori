@@ -111,7 +111,6 @@ function makeState(charOverrides: Partial<Character> = {}, stateOverrides: Parti
     visited_rooms:       [ctx.startRoomId],
     enemies_killed:      [],
     loot_taken:          [],
-    enemy_hp:            {},
     combat_active:       false,
     initiative_order:    [],
     initiative_idx:      0,
@@ -126,7 +125,6 @@ function makeState(charOverrides: Partial<Character> = {}, stateOverrides: Parti
     traps_disarmed:      [],
     objects_searched:    [],
     flags:               {},
-    enemy_conditions:    [],
     ...stateOverrides,
   };
 }
@@ -300,16 +298,19 @@ describe('takeAction', () => {
     expect(result.newState.loot_taken).toContain(CORRIDOR_ID);
   });
 
-  // Test Case I — Opportunity Attack
-  it('[Case I] moving out of a room with a live enemy triggers an opportunity attack', async () => {
+  // Test Case I — Grid combat blocks room movement
+  it('[Case I] moving out of a room during grid combat is blocked (use Disengage + grid_move)', async () => {
     const state = makeState({ hp: 20, max_hp: 20 }, {
       current_room:  CORRIDOR_ID,
       visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      combat_active: true,
+      initiative_order: [{ id: 'char-1', roll: 15, is_enemy: false }, { id: CORRIDOR_ID, roll: 10, is_enemy: true }],
+      initiative_idx: 0,
     });
-    vi.spyOn(Math, 'random').mockReturnValue(0); // d20 → 1, always misses
     const result = await takeAction({ action: { type: 'move', roomId: ctx.startRoomId }, history: [], state, seed: seedWithEnemy, context: ctx });
-    expect(result.newState.current_room).toBe(ctx.startRoomId);
-    expect(result.narrative.toLowerCase()).toMatch(/flee|dodge|sprint|strike/);
+    // Move is blocked; player stays in room
+    expect(result.newState.current_room).toBe(CORRIDOR_ID);
+    expect(result.narrative.toLowerCase()).toMatch(/cannot flee|grid combat|disengage/);
   });
 
   it('[Case I] moving without an enemy present triggers no opportunity attack', async () => {
@@ -365,12 +366,11 @@ describe('takeAction', () => {
       active_character_id: 'c1',
       current_room: CORRIDOR_ID,
       visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
-      enemies_killed: [], loot_taken: [], enemy_hp: {},
+      enemies_killed: [], loot_taken: [],
       combat_active: false, initiative_order: [], initiative_idx: 0,
       run_log: [], room_log: [], last_choices: [], flags: {},
       short_rested_rooms: [], long_rested: false,
       npc_attitudes: {}, npc_talked: [], traps_triggered: [], traps_disarmed: [], objects_searched: [],
-      enemy_conditions: [],
     };
     // Make enemy survive (miss always) so initiative advances
     vi.spyOn(Math, 'random').mockReturnValue(0); // d20 → 1 (miss)
@@ -436,11 +436,10 @@ describe('takeAction', () => {
       active_character_id: 'c2',
       current_room: ctx.startRoomId,
       visited_rooms: [ctx.startRoomId],
-      enemies_killed: [], loot_taken: [], enemy_hp: {},
+      enemies_killed: [], loot_taken: [],
       combat_active: false, initiative_order: [], initiative_idx: 0,
       run_log: [], room_log: [], last_choices: [], short_rested_rooms: [], long_rested: false, flags: {},
       npc_attitudes: {}, npc_talked: [], traps_triggered: [], traps_disarmed: [], objects_searched: [],
-      enemy_conditions: [],
     };
     const result = await takeAction({ action: { type: 'examine' }, history: [], state, seed, context: ctx });
     expect(result.dead).toBe(false);
@@ -776,7 +775,7 @@ describe('turn_actions lifecycle', () => {
       active_character_id: 'c1',
       current_room: CORRIDOR_ID,
       visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
-      enemies_killed: [], loot_taken: [], enemy_hp: {},
+      enemies_killed: [], loot_taken: [],
       combat_active: true,
       initiative_order: [
         { id: 'c1', roll: 20, is_enemy: false },
@@ -787,7 +786,6 @@ describe('turn_actions lifecycle', () => {
       run_log: [], room_log: [], last_choices: [], flags: {},
       short_rested_rooms: [], long_rested: false,
       npc_attitudes: {}, npc_talked: [], traps_triggered: [], traps_disarmed: [], objects_searched: [],
-      enemy_conditions: [],
     };
     const result = await takeAction({ action: { type: 'attack' }, history: [], state, seed: seedWithEnemy, context: ctx });
     // c1 misses → auto-advance → enemy attacks → c2's turn begins (c1 not yet reset)
@@ -804,7 +802,7 @@ describe('turn_actions lifecycle', () => {
       active_character_id: 'c2',
       current_room: CORRIDOR_ID,
       visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
-      enemies_killed: [CORRIDOR_ID], loot_taken: [], enemy_hp: {},
+      enemies_killed: [CORRIDOR_ID], loot_taken: [],
       combat_active: true,
       initiative_order: [
         { id: 'c1', roll: 20, is_enemy: false },
@@ -815,7 +813,6 @@ describe('turn_actions lifecycle', () => {
       run_log: [], room_log: [], last_choices: [], flags: {},
       short_rested_rooms: [], long_rested: false,
       npc_attitudes: {}, npc_talked: [], traps_triggered: [], traps_disarmed: [], objects_searched: [],
-      enemy_conditions: [],
     };
     const result = await takeAction({ action: { type: 'end_turn' }, history: [], state, seed: seedWithEnemy, context: ctx });
     const c1 = result.newState.characters.find(c => c.id === 'c1')!;
@@ -832,7 +829,7 @@ describe('turn_actions lifecycle', () => {
       active_character_id: 'c1',
       current_room: CORRIDOR_ID,
       visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
-      enemies_killed: [CORRIDOR_ID], loot_taken: [], enemy_hp: {},
+      enemies_killed: [CORRIDOR_ID], loot_taken: [],
       combat_active: true,
       initiative_order: [
         { id: 'c1', roll: 20, is_enemy: false },
@@ -842,7 +839,6 @@ describe('turn_actions lifecycle', () => {
       run_log: [], room_log: [], last_choices: [], flags: {},
       short_rested_rooms: [], long_rested: false,
       npc_attitudes: {}, npc_talked: [], traps_triggered: [], traps_disarmed: [], objects_searched: [],
-      enemy_conditions: [],
     };
     const result = await takeAction({ action: { type: 'end_turn' }, history: [], state, seed: seedWithEnemy, context: ctx });
     expect(result.narrative).toMatch(/alice.*ends their turn/i);
@@ -1016,12 +1012,11 @@ describe('class features', () => {
       active_character_id: 'p1',
       current_room: CORRIDOR_ID,
       visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
-      enemies_killed: [], loot_taken: [], enemy_hp: {},
+      enemies_killed: [], loot_taken: [],
       combat_active: false, initiative_order: [], initiative_idx: 0,
       run_log: [], room_log: [], last_choices: [], flags: {},
       short_rested_rooms: [], long_rested: false,
       npc_attitudes: {}, npc_talked: [], traps_triggered: [], traps_disarmed: [], objects_searched: [],
-      enemy_conditions: [],
     };
     const result = await takeAction({ action: { type: 'attack' }, history: [], state, seed: seedWithEnemy, context: ctx });
     // Sneak Attack [2d6] should appear in narrative at level 3 (ceil(3/2)=2 dice)
@@ -1359,7 +1354,6 @@ function makeMageState(charOverrides: Partial<Character> = {}): GameState {
     visited_rooms:       [ctx.startRoomId, CORRIDOR_ID],
     enemies_killed:      [],
     loot_taken:          [],
-    enemy_hp:            {},
     combat_active:       false,
     initiative_order:    [],
     initiative_idx:      0,
@@ -1374,7 +1368,6 @@ function makeMageState(charOverrides: Partial<Character> = {}): GameState {
     traps_disarmed:      [],
     objects_searched:    [],
     flags:               {},
-    enemy_conditions:    [],
   };
 }
 
@@ -1394,7 +1387,6 @@ function makeClericState(charOverrides: Partial<Character> = {}): GameState {
     visited_rooms:       [ctx.startRoomId, CORRIDOR_ID],
     enemies_killed:      [],
     loot_taken:          [],
-    enemy_hp:            {},
     combat_active:       false,
     initiative_order:    [],
     initiative_idx:      0,
@@ -1409,7 +1401,6 @@ function makeClericState(charOverrides: Partial<Character> = {}): GameState {
     traps_disarmed:      [],
     objects_searched:    [],
     flags:               {},
-    enemy_conditions:    [],
   };
 }
 
@@ -1538,7 +1529,8 @@ describe('cast_spell — Misty Step (level 2, bonus action, utility)', () => {
     expect(result.narrative).toMatch(/misty step|silver mist/i);
     expect(result.newState.characters[0].spell_slots_used[2]).toBe(1);
     // Enemy HP should be unmodified (no damage from utility spell)
-    expect(result.newState.enemy_hp[CORRIDOR_ID]).toBeFalsy();
+    const enemyEntAfter = result.newState.entities?.find(e => e.id === CORRIDOR_ID && e.isEnemy);
+    expect(enemyEntAfter?.hp).toBeFalsy();
   });
 });
 
