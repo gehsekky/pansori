@@ -442,6 +442,25 @@ function tickConditions(char: Character): Character {
   return { ...char, conditions: newConditions, condition_durations: newDurations };
 }
 
+// SRD 5.2.1 p.178 (Variant Encumbrance) — speed reductions tied to carried weight.
+// ≤ 5×STR: normal speed
+// > 5×STR, ≤ 10×STR: -10 ft (encumbered)
+// > 10×STR, ≤ 15×STR: -20 ft (heavily encumbered)
+// > 15×STR: speed 0 (overloaded)
+function effectiveSpeed(char: Character): number {
+  const base = char.speed ?? DEFAULT_SPEED_FEET;
+  const weight = (char.inventory ?? []).reduce((sum, i) => {
+    const w = (i as { weight?: number }).weight ?? 0;
+    const count = (i as { count?: number }).count ?? 1;
+    return sum + w * count;
+  }, 0);
+  const str = char.str;
+  if (weight > str * 15) return 0;
+  if (weight > str * 10) return Math.max(0, base - 20);
+  if (weight > str * 5) return Math.max(0, base - 10);
+  return base;
+}
+
 // ─── Enemy lookup helpers (multi-enemy per room) ──────────────────────────────
 
 function getRoomEnemies(seed: Seed, roomId: string): Enemy[] {
@@ -984,7 +1003,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   if (state.combat_active && !char.turn_actions.action_used) {
     // Dash
     choices.push({
-      label: `Dash — double movement this turn (${char.speed ?? 30} extra ft)`,
+      label: `Dash — double movement this turn (${effectiveSpeed(char)} extra ft)`,
       action: { type: 'dash' },
     });
     // Help — only when party has multiple members and an ally is alive
@@ -1456,7 +1475,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
 
   // Stand up from prone — SRD 5.2.1 p.187: costs half the creature's speed.
   if (state.combat_active && char.conditions.includes('prone')) {
-    const speedFt = char.speed ?? 30;
+    const speedFt = effectiveSpeed(char);
     const standCost = Math.floor(speedFt / 2);
     const usedFt = (state.movement_used ?? {})[char.id] ?? 0;
     if (speedFt - usedFt >= standCost) {
@@ -1529,7 +1548,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   if (state.entities && state.combat_active && !isImmobilized) {
     const charEntity = state.entities.find((e) => e.id === char.id);
     if (charEntity) {
-      const speedFt = char.speed ?? 30;
+      const speedFt = effectiveSpeed(char);
       const usedFt = (state.movement_used ?? {})[char.id] ?? 0;
       const remaining = speedFt - usedFt;
       const gw = context.gridWidth ?? 10;
@@ -3712,7 +3731,7 @@ export async function takeAction({
           narrative = 'Bonus action already used this turn.';
           break;
         }
-        const caSpeed = char.speed ?? DEFAULT_SPEED_FEET;
+        const caSpeed = effectiveSpeed(char);
         char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
         st = {
           ...st,
@@ -3901,7 +3920,7 @@ export async function takeAction({
         char.class_resource_uses = { ...(char.class_resource_uses ?? {}), ki_points: kiPool2 - 1 };
         char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
         if (fid === 'step_of_wind_dash') {
-          const stwSpeed = char.speed ?? DEFAULT_SPEED_FEET;
+          const stwSpeed = effectiveSpeed(char);
           st = {
             ...st,
             movement_used: {
@@ -4664,7 +4683,7 @@ export async function takeAction({
         narrative = 'You are not prone.';
         break;
       }
-      const speedFt = char.speed ?? 30;
+      const speedFt = effectiveSpeed(char);
       const standCost = Math.floor(speedFt / 2);
       const usedFt = (st.movement_used ?? {})[char.id] ?? 0;
       if (usedFt + standCost > speedFt) {
@@ -4833,7 +4852,7 @@ export async function takeAction({
         return acc + (isDifficult ? SQUARE_SIZE * 2 : SQUARE_SIZE);
       }, 0);
 
-      const speedFt = char.speed ?? DEFAULT_SPEED_FEET;
+      const speedFt = effectiveSpeed(char);
       const usedFt = st.movement_used?.[char.id] ?? 0;
       if (usedFt + costFeet > speedFt) {
         narrative = `Not enough movement. (${speedFt - usedFt} ft remaining, ${costFeet} ft needed${difficultTerrain.length ? ' — difficult terrain' : ''})`;
@@ -5058,7 +5077,7 @@ export async function takeAction({
         narrative = 'You have already used your action this turn.';
         break;
       }
-      const dashSpeed = char.speed ?? DEFAULT_SPEED_FEET;
+      const dashSpeed = effectiveSpeed(char);
       char.turn_actions = { ...char.turn_actions, action_used: true };
       // movement_used tracking: reduce remaining movement cap by speed (adds a full extra speed worth)
       st = {
