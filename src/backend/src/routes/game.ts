@@ -65,7 +65,10 @@ gameRouter.get('/session/:id', async (req: Request, res: Response) => {
       res.status(404).json({ error: 'Session not found' });
       return;
     }
-    res.json(rows[0]);
+    const row = rows[0];
+    const ctxId: string | undefined = row.seed?.context_id;
+    const ctx = ctxId ? CONTEXTS[ctxId] : undefined;
+    res.json({ ...row, campaignMeta: campaignMetaFor(ctx) });
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
   }
@@ -285,7 +288,7 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
       ]
     );
     await client.query('COMMIT');
-    res.json({ session, state: initialState, seed });
+    res.json({ session, state: initialState, seed, campaignMeta: campaignMetaFor(ctx) });
   } catch (err) {
     await client.query('ROLLBACK');
     res.status(500).json({ error: (err as Error).message });
@@ -293,6 +296,19 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
     client.release();
   }
 });
+
+// Campaign metadata helper — returns quests, factions, and locations for a context
+// (only meaningful when the context has campaign mode enabled). Used by the UI to
+// render the quest journal, faction rep display, and town/district navigation.
+function campaignMetaFor(ctx: Context | undefined) {
+  const cmp = ctx?.campaign;
+  if (!cmp) return null;
+  return {
+    quests: cmp.quests ?? [],
+    factions: cmp.factions ?? [],
+    locations: cmp.locations ?? [],
+  };
+}
 
 // Equip or unequip an item — enforces 5e equipment rules for the specified character
 gameRouter.post('/session/:id/equip', async (req: Request, res: Response) => {

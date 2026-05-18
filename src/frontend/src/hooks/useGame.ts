@@ -1,5 +1,12 @@
 import { type CharacterInput, api } from '../lib/api.ts';
-import type { GameChoice, GameState, Seed, Session, StructuredAction } from '../types.ts';
+import type {
+  CampaignMeta,
+  GameChoice,
+  GameState,
+  Seed,
+  Session,
+  StructuredAction,
+} from '../types.ts';
 import { useState } from 'react';
 
 type HistoryEntry = { role: 'user' | 'assistant'; content: string };
@@ -8,6 +15,7 @@ export interface UseGameReturn {
   session: Session | null;
   gameState: GameState | null;
   seed: Seed | null;
+  campaignMeta: CampaignMeta | null;
   choices: GameChoice[];
   history: HistoryEntry[];
   loading: boolean;
@@ -25,6 +33,7 @@ export function useGame(): UseGameReturn {
   const [session, setSession] = useState<Session | null>(null);
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [seed, setSeed] = useState<Seed | null>(null);
+  const [campaignMeta, setCampaignMeta] = useState<CampaignMeta | null>(null);
   const [choices, setChoices] = useState<GameChoice[]>([]);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [loading, setLoading] = useState(false);
@@ -38,6 +47,7 @@ export function useGame(): UseGameReturn {
       setSession(result.session);
       setGameState(result.state);
       setSeed(result.seed);
+      setCampaignMeta(result.campaignMeta ?? null);
       setHistory([]);
       setEscaped(false);
       setRoomLog(result.state.room_log || []);
@@ -55,6 +65,7 @@ export function useGame(): UseGameReturn {
       setSession(s);
       setGameState(s.state);
       setSeed(s.seed);
+      setCampaignMeta(s.campaignMeta ?? null);
       setRoomLog(s.state.room_log || []);
       setEscaped(s.status === 'escaped');
       setChoices(s.state.last_choices || []);
@@ -108,6 +119,7 @@ export function useGame(): UseGameReturn {
     setSession(null);
     setGameState(null);
     setSeed(null);
+    setCampaignMeta(null);
     setChoices([]);
     setHistory([]);
     setEscaped(false);
@@ -118,6 +130,7 @@ export function useGame(): UseGameReturn {
     session,
     gameState,
     seed,
+    campaignMeta,
     choices,
     history,
     loading,

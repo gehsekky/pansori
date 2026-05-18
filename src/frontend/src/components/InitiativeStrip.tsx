@@ -13,9 +13,15 @@ function InitiativeStrip({ state, seed }: { state: GameState; seed: Seed | null 
       {order.map((entry, idx) => {
         const isCurrent = idx === currentIdx;
         const isPast = idx < currentIdx;
-        const name = entry.is_enemy
-          ? ((seed?.enemies?.[state.current_room] as { name?: string } | undefined)?.name ??
+        const enemyName = entry.is_enemy
+          ? (Object.values(seed?.enemies ?? {})
+              .flat()
+              .find((e) => e.id === entry.id)?.name ??
+            seed?.enemies?.[state.current_room]?.[0]?.name ??
             'Enemy')
+          : null;
+        const name = entry.is_enemy
+          ? enemyName
           : (state.characters.find((c) => c.id === entry.id)?.name ?? 'Hero');
         return (
           <span

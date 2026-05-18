@@ -47,14 +47,17 @@ const seed: Seed = {
 const seedWithEnemy: Seed = {
   ...seed,
   enemies: {
-    [CORRIDOR_ID]: {
-      name: 'Goblin',
-      hp: 10,
-      ac: 12,
-      damage: '1d6',
-      toHit: 3,
-      xp: 20,
-    },
+    [CORRIDOR_ID]: [
+      {
+        id: `${CORRIDOR_ID}#0`,
+        name: 'Goblin',
+        hp: 10,
+        ac: 12,
+        damage: '1d6',
+        toHit: 3,
+        xp: 20,
+      },
+    ],
   },
 };
 
@@ -332,7 +335,17 @@ describe('generateChoices', () => {
     const blockedSeed: Seed = {
       ...seed,
       enemies: {
-        [ctx.escapeRoomId]: { name: 'Guard', hp: 10, ac: 12, damage: '1d6', toHit: 3, xp: 10 },
+        [ctx.escapeRoomId]: [
+          {
+            id: `${ctx.escapeRoomId}#0`,
+            name: 'Guard',
+            hp: 10,
+            ac: 12,
+            damage: '1d6',
+            toHit: 3,
+            xp: 10,
+          },
+        ],
       },
     };
     const state = makeState(
@@ -1391,9 +1404,11 @@ describe('conditions — new types', () => {
 describe('enemy HP scaling by party size', () => {
   it('1-player seed has unscaled enemy HP (1× base)', () => {
     const s = generateRoguelikeSeed(ctx, 1);
-    for (const enemy of Object.values(s.enemies)) {
-      // All enemies should have HP ≥ 1
-      expect(enemy.hp).toBeGreaterThanOrEqual(1);
+    for (const enemiesInRoom of Object.values(s.enemies)) {
+      for (const enemy of enemiesInRoom) {
+        // All enemies should have HP ≥ 1
+        expect(enemy.hp).toBeGreaterThanOrEqual(1);
+      }
     }
   });
 
@@ -1402,8 +1417,8 @@ describe('enemy HP scaling by party size', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
     const s1 = generateRoguelikeSeed(ctx, 1);
     const s2 = generateRoguelikeSeed(ctx, 2);
-    const hps1 = Object.values(s1.enemies).map((e) => e.hp);
-    const hps2 = Object.values(s2.enemies).map((e) => e.hp);
+    const hps1 = Object.values(s1.enemies).flat().map((e) => e.hp);
+    const hps2 = Object.values(s2.enemies).flat().map((e) => e.hp);
     if (hps1.length > 0 && hps2.length > 0) {
       // Average HP in 2-player seed should be higher than 1-player seed
       const avg1 = hps1.reduce((a, b) => a + b, 0) / hps1.length;
@@ -1448,7 +1463,17 @@ const dungeonSeedWithEnemy: Seed = {
     [ctx.escapeRoomId]: [CORRIDOR_ID],
   },
   enemies: {
-    [CORRIDOR_ID]: { name: 'Goblin', hp: 10, ac: 12, damage: '1d4', toHit: 2, xp: 20 },
+    [CORRIDOR_ID]: [
+      {
+        id: `${CORRIDOR_ID}#0`,
+        name: 'Goblin',
+        hp: 10,
+        ac: 12,
+        damage: '1d4',
+        toHit: 2,
+        xp: 20,
+      },
+    ],
   },
   loot: {},
   npcs: {},
@@ -1620,7 +1645,19 @@ describe('class features', () => {
     // Use a 1 HP enemy so any hit kills it and combat ends deterministically
     const fragileSeed: Seed = {
       ...dungeonSeedWithEnemy,
-      enemies: { [CORRIDOR_ID]: { name: 'Goblin', hp: 1, ac: 1, damage: '1d4', toHit: 2, xp: 20 } },
+      enemies: {
+        [CORRIDOR_ID]: [
+          {
+            id: `${CORRIDOR_ID}#0`,
+            name: 'Goblin',
+            hp: 1,
+            ac: 1,
+            damage: '1d4',
+            toHit: 2,
+            xp: 20,
+          },
+        ],
+      },
     };
     vi.spyOn(Math, 'random').mockReturnValue(0.999); // always hit/crit
     const state = makeState(
@@ -1887,7 +1924,17 @@ const spellSeed: Seed = {
     [ctx.escapeRoomId]: [CORRIDOR_ID],
   },
   enemies: {
-    [CORRIDOR_ID]: { name: 'Skeleton', hp: 10, ac: 12, damage: '1d6', toHit: 4, xp: 50 },
+    [CORRIDOR_ID]: [
+      {
+        id: `${CORRIDOR_ID}#0`,
+        name: 'Skeleton',
+        hp: 10,
+        ac: 12,
+        damage: '1d6',
+        toHit: 4,
+        xp: 50,
+      },
+    ],
   },
   loot: {},
   npcs: {},

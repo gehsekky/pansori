@@ -1,4 +1,5 @@
 import type {
+  CampaignMeta,
   GameChoice,
   GameState,
   Seed,
@@ -39,6 +40,7 @@ export interface NewSessionResult {
   session: Session;
   state: GameState;
   seed: Seed;
+  campaignMeta?: CampaignMeta | null;
 }
 
 export type StatBlock = {
@@ -76,7 +78,9 @@ export const api = {
   listSessions: () => req<SessionSummary[]>('/game/sessions'),
 
   getSessionById: (id: string) =>
-    req<Session & { state: GameState; seed: Seed }>(`/game/session/${id}`),
+    req<Session & { state: GameState; seed: Seed; campaignMeta?: CampaignMeta | null }>(
+      `/game/session/${id}`
+    ),
 
   newSession: (characters: CharacterInput[], context_id: string) =>
     req<NewSessionResult>('/game/session/new', {

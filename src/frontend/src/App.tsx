@@ -1,7 +1,9 @@
 import { type AuthUser, type CharacterInput, api } from './lib/api.ts';
 import type { FrontendContext, Seed, SessionSummary } from './types.ts';
 import { useEffect, useRef, useState } from 'react';
+import CampaignPanel from './components/CampaignPanel.tsx';
 import CharScreen from './components/CharScreen.tsx';
+import GridCombatView from './components/GridCombatView.tsx';
 import LoginScreen from './components/LoginScreen.tsx';
 import PartyPanel from './components/PartyPanel.tsx';
 import RoomArtPanel from './components/RoomArtPanel.tsx';
@@ -69,6 +71,7 @@ export default function App() {
   const {
     gameState,
     seed,
+    campaignMeta,
     choices,
     history,
     loading,
@@ -246,6 +249,14 @@ export default function App() {
 
               {mapOpen && seed && gameState && (
                 <WorldMap seed={seed} state={gameState} onClose={() => setMapOpen(false)} />
+              )}
+
+              {gameState?.combat_active && gameState.entities && gameState.entities.length > 0 && seed && (
+                <GridCombatView state={gameState} seed={seed} />
+              )}
+
+              {campaignMeta && gameState && (
+                <CampaignPanel state={gameState} meta={campaignMeta} />
               )}
 
               <div className={styles.contentRow}>
