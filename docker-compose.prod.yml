@@ -1,0 +1,60 @@
+name: pansori-prod
+
+services:
+  backend:
+    image: ${ECR_REGISTRY}/pansori-backend:${IMAGE_TAG:-latest}
+    container_name: pansori-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: ${DATABASE_URL}
+      FRONTEND_URL: ${FRONTEND_URL}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      GOOGLE_CALLBACK_URL: ${GOOGLE_CALLBACK_URL}
+      SESSION_SECRET: ${SESSION_SECRET}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      LLM_PROVIDER: ${LLM_PROVIDER:-none}
+    expose:
+      - "3001"
+    logging:
+      driver: awslogs
+      options:
+        awslogs-group: /pansori/backend
+        awslogs-region: ${AWS_REGION:-us-east-1}
+        awslogs-stream-prefix: backend
+
+  frontend:
+    image: ${ECR_REGISTRY}/pansori-frontend:${IMAGE_TAG:-latest}
+    container_name: pansori-frontend
+    restart: unless-stopped
+    expose:
+      - "80"
+    logging:
+      driver: awslogs
+      options:
+        awslogs-group: /pansori/frontend
+        awslogs-region: ${AWS_REGION:-us-east-1}
+        awslogs-stream-prefix: frontend
+
+  nginx:
+    image: nginx:alpine
+    container_name: pansori-nginx
+    restart: unless-stopped
+    depends_on:
+      - backend
+      - frontend
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot:ro
+    logging:
+      driver: awslogs
+      options:
+        awslogs-group: /pansori/nginx
+        awslogs-region: ${AWS_REGION:-us-east-1}
+        awslogs-stream-prefix: nginx

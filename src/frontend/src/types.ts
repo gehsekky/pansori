@@ -23,7 +23,26 @@ export type StructuredAction =
   | { type: 'attack_npc' }
   | { type: 'use_class_feature'; featureId: string }
   | { type: 'apply_asi';         stat: AbilityKey }
-  | { type: 'cast_spell';        spellId: string; slotLevel: number };
+  | { type: 'cast_spell';        spellId: string; slotLevel: number; ritual?: boolean }
+  | { type: 'disarm_trap' }
+  | { type: 'interact_object';   objectId: string }
+  | { type: 'two_weapon_attack' }
+  | { type: 'attune';            instanceId: string }
+  | { type: 'grapple' }
+  | { type: 'shove' }
+  | { type: 'dodge' }
+  | { type: 'disengage' }
+  | { type: 'grid_move';        entityId: string; to: GridPos }
+  | { type: 'travel';           locationId: string }
+  | { type: 'enter_district';   districtId: string }
+  | { type: 'accept_quest';     questId: string }
+  | { type: 'complete_quest';   questId: string }
+  | { type: 'dash' }
+  | { type: 'help';             targetId: string }
+  | { type: 'ready';            trigger: string; action: StructuredAction }
+  | { type: 'use_reaction' }
+  | { type: 'select_subclass';  subclass: string }
+  | { type: 'prepare_spells';   spellIds: string[] };
 
 export interface GameChoice {
   label:               string;
@@ -54,6 +73,41 @@ export interface CharClass {
   desc: string;
 }
 
+export interface Background {
+  id:                 string;
+  name:               string;
+  desc:               string;
+  skillProficiencies: string[];
+  toolProficiency:    string | null;
+  feature:            string;
+  featureDesc:        string;
+}
+
+export interface LootItem {
+  id:               string;
+  name:             string;
+  desc:             string;
+  weight:           number;
+  type:             'weapon' | 'armor' | 'consumable' | 'misc';
+  slot:             'weapon' | 'armor' | 'shield' | null;
+  damage:           string | null;
+  finesse?:         boolean;
+  range?:           'melee' | 'ranged';
+  ac_bonus:         number | null;
+  heal:             string | null;
+  effect:           string | null;
+  aliases:          string[];
+  armorCategory?:   'light' | 'medium' | 'heavy' | 'shield';
+  weaponType?:      'simple' | 'martial';
+  light?:           boolean;
+  requiresAttunement?: boolean;
+  armorAcBase?:     number;
+  dexCapToAc?:      number;
+  versatileDamage?: string;
+  damageType?:      string;
+  thrown?:          { normalRange: number; longRange: number };
+}
+
 export interface FrontendContext {
   id: string;
   displayName: string;
@@ -67,6 +121,7 @@ export interface FrontendContext {
   classPrimaryStats: Record<string, string>;
   classSkills: Record<string, string[]>;
   classFeatures?: Record<string, string[]>;
+  backgrounds?: Background[];
 }
 
 // ─── Character (per-character state) ─────────────────────────────────────────
@@ -108,6 +163,10 @@ export interface Character {
     bonus_action_used: boolean;
     reaction_used: boolean;
     free_interaction_used: boolean;
+    dodging?: boolean;
+    disengaged?: boolean;
+    movement_budget_remaining?: number;
+    readied_action?: { trigger: string; action: StructuredAction };
   };
   initiative_roll: number | null;
   hit_die: number;
@@ -115,9 +174,22 @@ export interface Character {
   class_resource_uses: Record<string, number>;
   asi_pending:         boolean;
   exhaustion_level:    number;
+  background_id:       string | null;
+  skill_proficiencies: string[];
+  tool_proficiencies:  string[];
   spell_slots_max:     Record<number, number>;
   spell_slots_used:    Record<number, number>;
   spells_known:        string[];
+  armor_proficiencies:  string[];
+  weapon_proficiencies: string[];
+  attuned_items: string[];  // instance_ids of attuned magic items (max 3)
+  concentrating_on?: { spellId: string; condition?: string } | null;
+  subclass?:         string;
+  speed?:            number;
+  feats?:            string[];
+  expertise_skills?: string[];
+  prepared_spells?:  string[];
+  charmer_id?:       string;
 }
 
 // ─── NPC system ───────────────────────────────────────────────────────────────
@@ -186,8 +258,44 @@ export interface GameState {
   npc_attitudes: Record<string, NpcAttitude>;
   npc_talked:    string[];
 
+  // Trap state
+  traps_triggered: string[];
+  traps_disarmed:  string[];
+
+  // Object interaction — keys are "roomId:objectId"
+  objects_searched: string[];
+
   // Script engine flags
   flags: Record<string, boolean | string | number>;
+
+  // Enemy conditions for current room (cleared on room change or enemy death)
+  enemy_conditions: string[];
+
+  // Grid combat (campaign dungeons only)
+  entities?:       CombatEntity[];
+  movement_used?:  Record<string, number>;
+  help_target_id?: string;
+  surprised?:      string[];
+
+  // Campaign overlay
+  current_location_id?: string;
+  current_district_id?: string;
+  campaign_flags?:      Record<string, boolean | string | number>;
+  quest_progress?:      QuestProgress[];
+  faction_rep?:         Record<string, number>;
+  world_day?:           number;
+}
+
+export interface RoomObject {
+  id:           string;
+  name:         string;
+  desc:         string;
+  interactText: string;
+  searchable?:  boolean;
+  searchDC?:    number;
+  lootIds?:     string[];
+  foundText?:   string;
+  emptyText?:   string;
 }
 
 export interface Seed {
@@ -195,7 +303,7 @@ export interface Seed {
   world_name:  string;
   ship_name:   string;
   intro:       string;
-  rooms:       Array<{ id: string; name: string; desc: string }>;
+  rooms:       Array<{ id: string; name: string; desc: string; objects?: RoomObject[] }>;
   connections: Record<string, string[]>;
   enemies?:    Record<string, unknown>;
   loot?:       Record<string, unknown>;
@@ -221,4 +329,104 @@ export interface SessionSummary {
   context_id: string;
   created_at: string;
   updated_at: string;
+}
+
+export type ConditionName =
+  | 'paralyzed' | 'stunned' | 'poisoned' | 'prone' | 'frightened'
+  | 'blinded' | 'restrained' | 'incapacitated' | 'grappled' | 'invisible' | 'exhaustion'
+  | 'charmed' | 'unconscious' | 'deafened' | 'petrified';
+
+export type CoverLevel = 'none' | 'half' | 'three_quarters' | 'full';
+
+// ─── Grid combat ─────────────────────────────────────────────────────────────
+
+export interface GridPos { x: number; y: number; }
+
+export interface CombatEntity {
+  id:                  string;
+  isEnemy:             boolean;
+  pos:                 GridPos;
+  hp:                  number;
+  maxHp:               number;
+  conditions:          string[];
+  condition_durations: Record<string, number>;
+}
+
+// ─── Quest system ─────────────────────────────────────────────────────────────
+
+export type QuestStatus = 'available' | 'active' | 'completed' | 'failed';
+
+export interface QuestStep {
+  id:        string;
+  desc:      string;
+  condition: object;
+}
+
+export interface Quest {
+  id:          string;
+  title:       string;
+  desc:        string;
+  giverNpcId?: string;
+  steps:       QuestStep[];
+  rewards:     unknown[];   // GameConsequence union (mirrored from backend)
+  factionId?:  string;
+  repGain?:    number;
+}
+
+export interface QuestProgress {
+  questId:        string;
+  status:         QuestStatus;
+  completedSteps: string[];
+}
+
+// ─── Faction system ───────────────────────────────────────────────────────────
+
+export interface FactionThresholds {
+  hostile:    number;
+  unfriendly: number;
+  neutral:    number;
+  friendly:   number;
+  exalted:    number;
+}
+
+export interface Faction {
+  id:                 string;
+  name:               string;
+  thresholds:         FactionThresholds;
+  shopPriceModifiers: Record<string, number>;
+}
+
+// ─── Campaign state ───────────────────────────────────────────────────────────
+
+export interface CampaignState {
+  campaign_id:      string;
+  user_id:          string;
+  world_day:        number;
+  current_location: string;
+  flags:            Record<string, boolean | string | number>;
+  quests:           QuestProgress[];
+  faction_rep:      Record<string, number>;
+  npc_attitudes:    Record<string, NpcAttitude>;
+}
+
+// ─── Locations ────────────────────────────────────────────────────────────────
+
+export type LocationType = 'town' | 'dungeon' | 'wilderness';
+
+export interface District {
+  id:     string;
+  name:   string;
+  desc:   string;
+  roomId: string;
+}
+
+export interface Location {
+  id:               string;
+  name:             string;
+  type:             LocationType;
+  desc:             string;
+  districts?:       District[];
+  gridWidth?:       number;
+  gridHeight?:      number;
+  connections?:     string[];
 }

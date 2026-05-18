@@ -1,51 +1,25 @@
-import { useState, useEffect } from 'react';
-import { S } from '../App';
 import type { FrontendContext } from '../types';
+import styles from '../styles.module.css';
+import manifest from '../art-manifest.json';
 
-const IMG_EXTS = ['webp', 'png', 'jpg', 'jpeg'];
+const artManifest = manifest as Record<string, Record<string, string>>;
 
 function RoomArtPanel({ roomId, ctx }: { roomId: string | null; ctx: FrontendContext }) {
-  const [extIdx, setExtIdx] = useState(0);
   const art = roomId ? ctx.art[roomId] : null;
+  const ext = roomId ? (artManifest[ctx.id]?.[roomId] ?? null) : null;
 
-  useEffect(() => { setExtIdx(0); }, [roomId, ctx.id]);
-
-  const allFailed = extIdx >= IMG_EXTS.length;
-  if (!art && allFailed) return null;
+  if (!ext && !art) return null;
 
   return (
-    <div
-      style={{
-        ...S.card,
-        flex: '0 0 20%',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '0.75rem',
-        overflow: 'hidden',
-      }}
-    >
-      {!allFailed ? (
+    <div className={styles.artPanel}>
+      {ext ? (
         <img
-          src={`/art/${ctx.id}/${roomId}.${IMG_EXTS[extIdx]}`}
+          src={`/art/${ctx.id}/${roomId}.${ext}`}
           alt={roomId ?? ''}
-          onError={() => setExtIdx(i => i + 1)}
-          style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block', imageRendering: 'pixelated' }}
+          className={styles.artImg}
         />
       ) : (
-        <pre
-          style={{
-            margin: 0,
-            fontSize: '0.78rem',
-            lineHeight: 1.4,
-            color: 'var(--t-mid)',
-            textShadow: '0 0 4px var(--t-border)',
-            fontFamily: 'var(--t-font)',
-            userSelect: 'none',
-          }}
-        >
-          {art}
-        </pre>
+        <pre className={styles.artAscii}>{art}</pre>
       )}
     </div>
   );

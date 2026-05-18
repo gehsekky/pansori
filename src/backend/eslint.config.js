@@ -12,8 +12,9 @@ export default [
     },
     rules: {
       ...js.configs.recommended.rules,
-      'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+      'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       'no-console': 'off',
+      'sort-imports': ['error'],
     },
   },
 ];

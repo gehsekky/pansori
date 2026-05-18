@@ -6,14 +6,15 @@ import SessionsScreen from './SessionScreen';
 import type { SessionSummary } from '../types';
 import { mockCtx } from './test-fixtures';
 
-const contexts = { 'scifi-terror': mockCtx };
+const contexts = { 'sandbox': mockCtx };
 
 const activeSession: SessionSummary = {
   id: 'session-1',
   character_name: 'Ripley',
   character_class: 'Soldier',
-  context_id: 'scifi-terror',
+  context_id: 'sandbox',
   status: 'active',
+  created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z',
   portrait_url: null,
 };
@@ -22,15 +23,16 @@ const escapedSession: SessionSummary = {
   id: 'session-2',
   character_name: 'Hicks',
   character_class: 'Soldier',
-  context_id: 'scifi-terror',
+  context_id: 'sandbox',
   status: 'escaped',
+  created_at: '2026-01-02T00:00:00Z',
   updated_at: '2026-01-02T00:00:00Z',
   portrait_url: null,
 };
 
 const defaultProps = {
   sessions: [],
-  user: { id: 'u1', email: 'test@test.com', display_name: 'Test User' },
+  user: { id: 'u1', email: 'test@test.com', display_name: 'Test User', avatar_url: null },
   loading: false,
   onResume: vi.fn(),
   onNewGame: vi.fn(),

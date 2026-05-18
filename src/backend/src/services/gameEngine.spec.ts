@@ -1,24 +1,24 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { buildArrivalNarrative, generateChoices, takeAction, normalizeState, runRules } from './gameEngine.js';
-import { context as ctx } from '../contexts/scifi-terror.js';
+import { context as ctx } from '../contexts/sandbox.js';
 import type { GameState, Character, Context, Seed, GameRule } from '../types.js';
 
 afterEach(() => vi.restoreAllMocks());
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
-const CORRIDOR_ID = 'corridor';
+const CORRIDOR_ID = 'guard_post';
 
 const seed: Seed = {
   context_id:  ctx.id,
-  world_name:  'USS Test',
-  ship_name:   'USS Test',
+  world_name:  'The Testing Grounds',
+  ship_name:   'The Testing Grounds',
   intro:       'Test intro.',
   seed_id:     'test-seed-id',
   rooms: [
-    { id: ctx.startRoomId,  name: 'Airlock',    desc: 'A cramped airlock.' },
-    { id: CORRIDOR_ID,      name: 'Corridor',   desc: 'A dim corridor.' },
-    { id: ctx.escapeRoomId, name: 'Escape Pod', desc: 'The escape pod.' },
+    { id: ctx.startRoomId,  name: 'Entry Hall',  desc: 'The entry hall.' },
+    { id: CORRIDOR_ID,      name: 'Guard Post',  desc: 'A guard post.' },
+    { id: ctx.escapeRoomId, name: 'Exit Gate',   desc: 'The exit gate.' },
   ],
   connections: {
     [ctx.startRoomId]:  [CORRIDOR_ID],
@@ -27,13 +27,14 @@ const seed: Seed = {
   },
   enemies: {},
   loot:    {},
+  npcs:    {},
 };
 
 const seedWithEnemy: Seed = {
   ...seed,
   enemies: {
     [CORRIDOR_ID]: {
-      name:   'Space Zombie',
+      name:   'Goblin',
       hp:     10,
       ac:     12,
       damage: '1d6',
@@ -84,12 +85,19 @@ function makeChar(overrides: Partial<Character> = {}): Character {
     initiative_roll:     null,
     hit_die:             8,
     hit_dice_remaining:  1,
-    class_resource_uses: {},
-    asi_pending:         false,
-    exhaustion_level:    0,
-    spell_slots_max:     {},
-    spell_slots_used:    {},
-    spells_known:        [],
+    class_resource_uses:  {},
+    asi_pending:          false,
+    exhaustion_level:     0,
+    background_id:        null,
+    skill_proficiencies:  [],
+    tool_proficiencies:   [],
+    spell_slots_max:      {},
+    spell_slots_used:     {},
+    spells_known:         [],
+    armor_proficiencies:  [],
+    weapon_proficiencies: [],
+    attuned_items:        [],
+    concentrating_on:     null,
     ...overrides,
   };
 }
@@ -112,7 +120,13 @@ function makeState(charOverrides: Partial<Character> = {}, stateOverrides: Parti
     last_choices:        [],
     short_rested_rooms:  [],
     long_rested:         false,
+    npc_attitudes:       {},
+    npc_talked:          [],
+    traps_triggered:     [],
+    traps_disarmed:      [],
+    objects_searched:    [],
     flags:               {},
+    enemy_conditions:    [],
     ...stateOverrides,
   };
 }
@@ -163,12 +177,12 @@ describe('buildArrivalNarrative', () => {
 
   it('includes the name of an adjacent room in the exits list', () => {
     const text = buildArrivalNarrative(ctx.startRoomId, makeState(), seed, ctx);
-    expect(text).toContain('Corridor');
+    expect(text).toContain('Guard Post');
   });
 
   it('mentions a live enemy in the room', () => {
     const text = buildArrivalNarrative(CORRIDOR_ID, makeState({}, { current_room: CORRIDOR_ID }), seedWithEnemy, ctx);
-    expect(text).toContain('Space Zombie');
+    expect(text).toContain('Goblin');
   });
 
   it('does not mention an already-killed enemy', () => {
@@ -212,7 +226,7 @@ describe('generateChoices', () => {
 
   it('includes a move option for each adjacent room', () => {
     const choices = generateChoices(makeState(), seed, ctx);
-    expect(choices.some(c => c.label.includes('Corridor'))).toBe(true);
+    expect(choices.some(c => c.label.includes('Guard Post'))).toBe(true);
     expect(choices.some(c => c.action.type === 'move')).toBe(true);
   });
 
@@ -273,7 +287,7 @@ describe('takeAction', () => {
     expect(result.newState.visited_rooms).toContain(CORRIDOR_ID);
     expect(result.newState.room_log).toHaveLength(1);
     expect(result.newState.room_log[0].length).toBeGreaterThan(0);
-    expect(result.newState.room_log[0]).toMatch(/airlock|escape pod/i);
+    expect(result.newState.room_log[0]).toMatch(/entry hall|exit gate|guard post/i);
   });
 
   it('picking up loot adds item to inventory and marks loot_taken', async () => {
@@ -355,6 +369,8 @@ describe('takeAction', () => {
       combat_active: false, initiative_order: [], initiative_idx: 0,
       run_log: [], room_log: [], last_choices: [], flags: {},
       short_rested_rooms: [], long_rested: false,
+      npc_attitudes: {}, npc_talked: [], traps_triggered: [], traps_disarmed: [], objects_searched: [],
+      enemy_conditions: [],
     };
     // Make enemy survive (miss always) so initiative advances
     vi.spyOn(Math, 'random').mockReturnValue(0); // d20 → 1 (miss)
@@ -423,6 +439,8 @@ describe('takeAction', () => {
       enemies_killed: [], loot_taken: [], enemy_hp: {},
       combat_active: false, initiative_order: [], initiative_idx: 0,
       run_log: [], room_log: [], last_choices: [], short_rested_rooms: [], long_rested: false, flags: {},
+      npc_attitudes: {}, npc_talked: [], traps_triggered: [], traps_disarmed: [], objects_searched: [],
+      enemy_conditions: [],
     };
     const result = await takeAction({ action: { type: 'examine' }, history: [], state, seed, context: ctx });
     expect(result.dead).toBe(false);
@@ -768,7 +786,8 @@ describe('turn_actions lifecycle', () => {
       initiative_idx: 0,
       run_log: [], room_log: [], last_choices: [], flags: {},
       short_rested_rooms: [], long_rested: false,
-      npc_attitudes: {}, npc_talked: [],
+      npc_attitudes: {}, npc_talked: [], traps_triggered: [], traps_disarmed: [], objects_searched: [],
+      enemy_conditions: [],
     };
     const result = await takeAction({ action: { type: 'attack' }, history: [], state, seed: seedWithEnemy, context: ctx });
     // c1 misses → auto-advance → enemy attacks → c2's turn begins (c1 not yet reset)
@@ -795,7 +814,8 @@ describe('turn_actions lifecycle', () => {
       initiative_idx: 2,
       run_log: [], room_log: [], last_choices: [], flags: {},
       short_rested_rooms: [], long_rested: false,
-      npc_attitudes: {}, npc_talked: [],
+      npc_attitudes: {}, npc_talked: [], traps_triggered: [], traps_disarmed: [], objects_searched: [],
+      enemy_conditions: [],
     };
     const result = await takeAction({ action: { type: 'end_turn' }, history: [], state, seed: seedWithEnemy, context: ctx });
     const c1 = result.newState.characters.find(c => c.id === 'c1')!;
@@ -821,7 +841,8 @@ describe('turn_actions lifecycle', () => {
       initiative_idx: 0,
       run_log: [], room_log: [], last_choices: [], flags: {},
       short_rested_rooms: [], long_rested: false,
-      npc_attitudes: {}, npc_talked: [],
+      npc_attitudes: {}, npc_talked: [], traps_triggered: [], traps_disarmed: [], objects_searched: [],
+      enemy_conditions: [],
     };
     const result = await takeAction({ action: { type: 'end_turn' }, history: [], state, seed: seedWithEnemy, context: ctx });
     expect(result.narrative).toMatch(/alice.*ends their turn/i);
@@ -832,7 +853,6 @@ describe('turn_actions lifecycle', () => {
 // ─── NPC actions ──────────────────────────────────────────────────────────────
 
 import { generateRoguelikeSeed } from './procgen.js';
-import { context as dungeonCtx } from '../contexts/dungeon-crawler.js';
 
 // ─── Ability Score Improvements ──────────────────────────────────────────────
 
@@ -954,36 +974,43 @@ describe('enemy HP scaling by party size', () => {
 
 // ─── Class features ───────────────────────────────────────────────────────────
 
+// Context with Warrior class that has rage feature, for rage-specific tests
+const ctxWithRage: Context = {
+  ...ctx,
+  classFeatures: { ...ctx.classFeatures, Warrior: ['rage'] },
+};
+
 const dungeonSeedWithEnemy: Seed = {
-  context_id: dungeonCtx.id,
-  world_name: 'Dungeon Test',
+  context_id: ctx.id,
+  world_name: 'The Testing Grounds',
   ship_name:  '',
   intro:      'Test.',
   seed_id:    'dungeon-test-seed',
   rooms: [
-    { id: dungeonCtx.startRoomId,  name: 'Entrance', desc: 'Entry.' },
-    { id: CORRIDOR_ID,             name: 'Corridor',  desc: 'Dark.' },
-    { id: dungeonCtx.escapeRoomId, name: 'Exit',      desc: 'Exit.' },
+    { id: ctx.startRoomId,  name: 'Entry Hall', desc: 'Entry.' },
+    { id: CORRIDOR_ID,      name: 'Guard Post',  desc: 'Dark.' },
+    { id: ctx.escapeRoomId, name: 'Exit Gate',   desc: 'Exit.' },
   ],
   connections: {
-    [dungeonCtx.startRoomId]:  [CORRIDOR_ID],
-    [CORRIDOR_ID]:             [dungeonCtx.startRoomId, dungeonCtx.escapeRoomId],
-    [dungeonCtx.escapeRoomId]: [CORRIDOR_ID],
+    [ctx.startRoomId]:  [CORRIDOR_ID],
+    [CORRIDOR_ID]:      [ctx.startRoomId, ctx.escapeRoomId],
+    [ctx.escapeRoomId]: [CORRIDOR_ID],
   },
   enemies: {
     [CORRIDOR_ID]: { name: 'Goblin', hp: 10, ac: 12, damage: '1d4', toHit: 2, xp: 20 },
   },
   loot: {},
+  npcs: {},
 };
 
 describe('class features', () => {
-  // ── Sneak Attack (Pilot in scifi-terror) ────────────────────────────────────
+  // ── Sneak Attack (Rogue in sandbox) ─────────────────────────────────────────
 
-  it('Pilot sneak attack adds bonus damage on hit', async () => {
+  it('Rogue sneak attack adds bonus damage on hit', async () => {
     // Force a hit (roll 20 = critical) so we can check sneak damage applied
     vi.spyOn(Math, 'random').mockReturnValue(0.999); // d20 → 20 always
-    const pilot  = makeChar({ id: 'p1', character_class: 'Pilot', level: 3 });
-    const ally   = makeChar({ id: 'p2', character_class: 'Soldier' }); // ally triggers sneak attack
+    const pilot  = makeChar({ id: 'p1', character_class: 'Rogue', level: 3 });
+    const ally   = makeChar({ id: 'p2', character_class: 'Fighter' }); // ally triggers sneak attack
     const state: GameState = {
       characters: [pilot, ally],
       active_character_id: 'p1',
@@ -993,36 +1020,37 @@ describe('class features', () => {
       combat_active: false, initiative_order: [], initiative_idx: 0,
       run_log: [], room_log: [], last_choices: [], flags: {},
       short_rested_rooms: [], long_rested: false,
-      npc_attitudes: {}, npc_talked: [],
+      npc_attitudes: {}, npc_talked: [], traps_triggered: [], traps_disarmed: [], objects_searched: [],
+      enemy_conditions: [],
     };
     const result = await takeAction({ action: { type: 'attack' }, history: [], state, seed: seedWithEnemy, context: ctx });
     // Sneak Attack [2d6] should appear in narrative at level 3 (ceil(3/2)=2 dice)
     expect(result.narrative).toMatch(/Sneak Attack/i);
   });
 
-  it('Soldier does not get sneak attack', async () => {
+  it('Fighter does not get sneak attack', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.999);
     const state = makeState(
-      { character_class: 'Soldier' },
+      { character_class: 'Fighter' },
       { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] },
     );
     const result = await takeAction({ action: { type: 'attack' }, history: [], state, seed: seedWithEnemy, context: ctx });
     expect(result.narrative).not.toMatch(/Sneak Attack/i);
   });
 
-  // ── Extra Attack (Soldier level 5+ in scifi-terror) ─────────────────────────
+  // ── Extra Attack (Fighter level 5+ in sandbox) ───────────────────────────────
 
-  it('Soldier at level 5 makes 2 attacks on Attack action (both show in narrative)', async () => {
+  it('Fighter at level 5 makes 2 attacks on Attack action (both show in narrative)', async () => {
     // Roll just above miss threshold: roll=1 (fumble) then roll=20 (hit) — ensures at least 2 roll events
     vi.spyOn(Math, 'random')
-      .mockReturnValueOnce(0)    // initiative d20 for Soldier
+      .mockReturnValueOnce(0)    // initiative d20 for Fighter
       .mockReturnValueOnce(0)    // initiative d20 for enemy
       .mockReturnValueOnce(0)    // first attack d20 → 1 (fumble)
       .mockReturnValueOnce(0.999) // second attack d20 → 20 (hit)
       .mockReturnValue(0.999);   // damage dice
 
     const state = makeState(
-      { character_class: 'Soldier', level: 5 },
+      { character_class: 'Fighter', level: 5 },
       { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] },
     );
     const result = await takeAction({ action: { type: 'attack' }, history: [], state, seed: seedWithEnemy, context: ctx });
@@ -1030,7 +1058,7 @@ describe('class features', () => {
     expect(result.narrative).toMatch(/fumble|Attack 2/i);
   });
 
-  it('Soldier at level 4 only makes 1 attack (no Attack 2 label)', async () => {
+  it('Fighter at level 4 only makes 1 attack (no Attack 2 label)', async () => {
     vi.spyOn(Math, 'random')
       .mockReturnValueOnce(0)
       .mockReturnValueOnce(0)
@@ -1038,20 +1066,20 @@ describe('class features', () => {
       .mockReturnValue(0);
 
     const state = makeState(
-      { character_class: 'Soldier', level: 4 },
+      { character_class: 'Fighter', level: 4 },
       { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] },
     );
     const result = await takeAction({ action: { type: 'attack' }, history: [], state, seed: seedWithEnemy, context: ctx });
     expect(result.narrative).not.toMatch(/Attack 2/i);
   });
 
-  // ── Rage (Warrior in dungeon-crawler) ────────────────────────────────────────
+  // ── Rage (Warrior — tested via ctxWithRage) ──────────────────────────────────
 
   it('use_class_feature rage activates raging condition and spends a use', async () => {
     const state = {
       ...makeState({ character_class: 'Warrior', level: 1 }, {
         current_room:   CORRIDOR_ID,
-        visited_rooms:  [dungeonCtx.startRoomId, CORRIDOR_ID],
+        visited_rooms:  [ctx.startRoomId, CORRIDOR_ID],
         combat_active:  true,
         initiative_order: [{ id: 'char-1', roll: 15, is_enemy: false }, { id: CORRIDOR_ID, roll: 5, is_enemy: true }],
         initiative_idx: 0,
@@ -1062,7 +1090,7 @@ describe('class features', () => {
       history: [],
       state,
       seed:    dungeonSeedWithEnemy,
-      context: dungeonCtx,
+      context: ctxWithRage,
     });
     const char = result.newState.characters[0];
     expect(char.conditions).toContain('raging');
@@ -1076,7 +1104,7 @@ describe('class features', () => {
     const state = {
       ...makeState({ character_class: 'Warrior', conditions: ['raging'] }, {
         current_room:  CORRIDOR_ID,
-        visited_rooms: [dungeonCtx.startRoomId, CORRIDOR_ID],
+        visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
         combat_active: true,
         initiative_order: [{ id: 'char-1', roll: 15, is_enemy: false }],
         initiative_idx: 0,
@@ -1087,7 +1115,7 @@ describe('class features', () => {
       history: [],
       state,
       seed:    dungeonSeedWithEnemy,
-      context: dungeonCtx,
+      context: ctxWithRage,
     });
     expect(result.narrative).toMatch(/already raging/i);
   });
@@ -1102,14 +1130,14 @@ describe('class features', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.999); // always hit/crit
     const state = makeState(
       { character_class: 'Warrior', conditions: ['raging'] },
-      { current_room: CORRIDOR_ID, visited_rooms: [dungeonCtx.startRoomId, CORRIDOR_ID] },
+      { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] },
     );
     const result = await takeAction({
       action:  { type: 'attack' },
       history: [],
       state,
       seed:    fragileSeed,
-      context: dungeonCtx,
+      context: ctxWithRage,
     });
     expect(result.newState.combat_active).toBe(false);
     expect(result.newState.characters[0].conditions).not.toContain('raging');
@@ -1129,7 +1157,7 @@ describe('class features', () => {
       history: [],
       state,
       seed:    dungeonSeedWithEnemy,
-      context: dungeonCtx,
+      context: ctxWithRage,
     });
     // rageUsesMax(6) = 3
     expect(result.newState.characters[0].class_resource_uses.rage_uses).toBe(3);
@@ -1140,13 +1168,13 @@ describe('class features', () => {
       { character_class: 'Warrior', level: 1, class_resource_uses: { rage_uses: 2 } },
       {
         current_room:  CORRIDOR_ID,
-        visited_rooms: [dungeonCtx.startRoomId, CORRIDOR_ID],
+        visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
         combat_active: true,
         initiative_order: [{ id: 'char-1', roll: 15, is_enemy: false }, { id: CORRIDOR_ID, roll: 5, is_enemy: true }],
         initiative_idx: 0,
       },
     );
-    const choices = generateChoices(state, dungeonSeedWithEnemy, dungeonCtx);
+    const choices = generateChoices(state, dungeonSeedWithEnemy, ctxWithRage);
     const rageChoice = choices.find(c => c.action.type === 'use_class_feature');
     expect(rageChoice).toBeDefined();
     expect(rageChoice?.requiresBonusAction).toBe(true);
@@ -1157,13 +1185,13 @@ describe('class features', () => {
       { character_class: 'Warrior', conditions: ['raging'] },
       {
         current_room:  CORRIDOR_ID,
-        visited_rooms: [dungeonCtx.startRoomId, CORRIDOR_ID],
+        visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
         combat_active: true,
         initiative_order: [{ id: 'char-1', roll: 15, is_enemy: false }, { id: CORRIDOR_ID, roll: 5, is_enemy: true }],
         initiative_idx: 0,
       },
     );
-    const choices = generateChoices(state, dungeonSeedWithEnemy, dungeonCtx);
+    const choices = generateChoices(state, dungeonSeedWithEnemy, ctxWithRage);
     expect(choices.every(c => c.action.type !== 'use_class_feature')).toBe(true);
   });
 });
@@ -1185,7 +1213,7 @@ const npcTemplate: NpcTemplate = {
     { label: 'Ask for help', reply: 'Gladly!', consequences: [{ type: 'set_flag', key: 'guide_helped', value: true }] },
   ],
   shop: [
-    { itemId: 'med_kit', price: 5 },
+    { itemId: 'healing_potion', price: 5 },
   ],
 };
 
@@ -1257,14 +1285,14 @@ describe('NPC actions', () => {
 
   it('buy deducts gold and adds item to inventory', async () => {
     const state = makeNpcState({ gold: 10 });
-    const result = await takeAction({ action: { type: 'buy', itemId: 'med_kit', price: 5 }, history: [], state, seed: seedWithNpc, context: ctx });
+    const result = await takeAction({ action: { type: 'buy', itemId: 'healing_potion', price: 5 }, history: [], state, seed: seedWithNpc, context: ctx });
     expect(result.newState.characters[0].gold).toBe(5);
-    expect(result.newState.characters[0].inventory.some(i => i.id === 'med_kit')).toBe(true);
+    expect(result.newState.characters[0].inventory.some(i => i.id === 'healing_potion')).toBe(true);
   });
 
   it('buy fails when insufficient gold', async () => {
     const state = makeNpcState({ gold: 2 });
-    const result = await takeAction({ action: { type: 'buy', itemId: 'med_kit', price: 5 }, history: [], state, seed: seedWithNpc, context: ctx });
+    const result = await takeAction({ action: { type: 'buy', itemId: 'healing_potion', price: 5 }, history: [], state, seed: seedWithNpc, context: ctx });
     expect(result.narrative).toMatch(/can't afford/i);
     expect(result.newState.characters[0].gold).toBe(2);
   });
@@ -1289,28 +1317,29 @@ describe('NPC actions', () => {
 
 // ─── Spell system ─────────────────────────────────────────────────────────────
 
-// dungeonCtx and dungeonSeedWithEnemy already declared above (rage tests)
+// ctxWithRage and dungeonSeedWithEnemy already declared above (rage tests)
 // Spell tests use CORRIDOR_ID (same room as existing dungeonSeedWithEnemy enemy)
 const spellSeed: Seed = {
-  context_id:  dungeonCtx.id,
+  context_id:  ctx.id,
   world_name:  'Test Dungeon',
   ship_name:   'Test Dungeon',
   intro:       'Test.',
   seed_id:     'spell-seed-id',
   rooms: [
-    { id: dungeonCtx.startRoomId,  name: 'Crypt',      desc: 'Cold stone.' },
+    { id: ctx.startRoomId,  name: 'Crypt',      desc: 'Cold stone.' },
     { id: CORRIDOR_ID,             name: 'Burial',     desc: 'A chamber.' },
-    { id: dungeonCtx.escapeRoomId, name: 'Exit Shaft', desc: 'A shaft of light.' },
+    { id: ctx.escapeRoomId, name: 'Exit Shaft', desc: 'A shaft of light.' },
   ],
   connections: {
-    [dungeonCtx.startRoomId]:  [CORRIDOR_ID],
-    [CORRIDOR_ID]:              [dungeonCtx.startRoomId, dungeonCtx.escapeRoomId],
-    [dungeonCtx.escapeRoomId]: [CORRIDOR_ID],
+    [ctx.startRoomId]:  [CORRIDOR_ID],
+    [CORRIDOR_ID]:              [ctx.startRoomId, ctx.escapeRoomId],
+    [ctx.escapeRoomId]: [CORRIDOR_ID],
   },
   enemies: {
     [CORRIDOR_ID]: { name: 'Skeleton', hp: 10, ac: 12, damage: '1d6', toHit: 4, xp: 50 },
   },
   loot: {},
+  npcs: {},
 };
 
 function makeMageState(charOverrides: Partial<Character> = {}): GameState {
@@ -1326,7 +1355,7 @@ function makeMageState(charOverrides: Partial<Character> = {}): GameState {
     characters:          [char],
     active_character_id: char.id,
     current_room:        CORRIDOR_ID,
-    visited_rooms:       [dungeonCtx.startRoomId, CORRIDOR_ID],
+    visited_rooms:       [ctx.startRoomId, CORRIDOR_ID],
     enemies_killed:      [],
     loot_taken:          [],
     enemy_hp:            {},
@@ -1340,7 +1369,11 @@ function makeMageState(charOverrides: Partial<Character> = {}): GameState {
     long_rested:         false,
     npc_attitudes:       {},
     npc_talked:          [],
+    traps_triggered:     [],
+    traps_disarmed:      [],
+    objects_searched:    [],
     flags:               {},
+    enemy_conditions:    [],
   };
 }
 
@@ -1357,7 +1390,7 @@ function makeClericState(charOverrides: Partial<Character> = {}): GameState {
     characters:          [char],
     active_character_id: char.id,
     current_room:        CORRIDOR_ID,
-    visited_rooms:       [dungeonCtx.startRoomId, CORRIDOR_ID],
+    visited_rooms:       [ctx.startRoomId, CORRIDOR_ID],
     enemies_killed:      [],
     loot_taken:          [],
     enemy_hp:            {},
@@ -1371,7 +1404,11 @@ function makeClericState(charOverrides: Partial<Character> = {}): GameState {
     long_rested:         false,
     npc_attitudes:       {},
     npc_talked:          [],
+    traps_triggered:     [],
+    traps_disarmed:      [],
+    objects_searched:    [],
     flags:               {},
+    enemy_conditions:    [],
   };
 }
 
@@ -1381,7 +1418,7 @@ describe('cast_spell — Fire Bolt (cantrip, spell attack)', () => {
     const state = makeMageState();
     const result = await takeAction({
       action: { type: 'cast_spell', spellId: 'fire_bolt', slotLevel: 0 },
-      history: [], state, seed: spellSeed, context: dungeonCtx,
+      history: [], state, seed: spellSeed, context: ctxWithRage,
     });
     expect(result.narrative).toMatch(/fire bolt/i);
     expect(result.narrative).toMatch(/damage/i);
@@ -1394,7 +1431,7 @@ describe('cast_spell — Fire Bolt (cantrip, spell attack)', () => {
     const state = makeMageState();
     const result = await takeAction({
       action: { type: 'cast_spell', spellId: 'fire_bolt', slotLevel: 0 },
-      history: [], state, seed: spellSeed, context: dungeonCtx,
+      history: [], state, seed: spellSeed, context: ctxWithRage,
     });
     expect(result.narrative).toMatch(/miss/i);
   });
@@ -1405,7 +1442,7 @@ describe('cast_spell — Magic Missile (level 1, auto-hit)', () => {
     const state = makeMageState();
     const result = await takeAction({
       action: { type: 'cast_spell', spellId: 'magic_missile', slotLevel: 1 },
-      history: [], state, seed: spellSeed, context: dungeonCtx,
+      history: [], state, seed: spellSeed, context: ctxWithRage,
     });
     expect(result.narrative).toMatch(/magic missile/i);
     expect(result.narrative).toMatch(/force/i);
@@ -1416,7 +1453,7 @@ describe('cast_spell — Magic Missile (level 1, auto-hit)', () => {
     const state = makeMageState({ spell_slots_used: { 1: 2 } });
     const result = await takeAction({
       action: { type: 'cast_spell', spellId: 'magic_missile', slotLevel: 1 },
-      history: [], state, seed: spellSeed, context: dungeonCtx,
+      history: [], state, seed: spellSeed, context: ctxWithRage,
     });
     expect(result.narrative).toMatch(/no level-1 spell slots/i);
     expect(result.newState.characters[0].spell_slots_used[1]).toBe(2); // unchanged
@@ -1429,7 +1466,7 @@ describe('cast_spell — Thunderwave (level 1, CON save)', () => {
     const state = makeMageState();
     const result = await takeAction({
       action: { type: 'cast_spell', spellId: 'thunderwave', slotLevel: 1 },
-      history: [], state, seed: spellSeed, context: dungeonCtx,
+      history: [], state, seed: spellSeed, context: ctxWithRage,
     });
     expect(result.narrative).toMatch(/thunderwave/i);
     expect(result.narrative).toMatch(/fails|damage/i);
@@ -1441,7 +1478,7 @@ describe('cast_spell — Thunderwave (level 1, CON save)', () => {
     const state = makeMageState();
     const result = await takeAction({
       action: { type: 'cast_spell', spellId: 'thunderwave', slotLevel: 1 },
-      history: [], state, seed: spellSeed, context: dungeonCtx,
+      history: [], state, seed: spellSeed, context: ctxWithRage,
     });
     expect(result.narrative).toMatch(/thunderwave/i);
     expect(result.narrative).toMatch(/succeeds|no damage/i);
@@ -1454,7 +1491,7 @@ describe('cast_spell — Fireball (level 3, DEX save, half on save)', () => {
     const state = makeMageState({ spell_slots_max: { 3: 1 }, spell_slots_used: {} });
     const result = await takeAction({
       action: { type: 'cast_spell', spellId: 'fireball', slotLevel: 3 },
-      history: [], state, seed: spellSeed, context: dungeonCtx,
+      history: [], state, seed: spellSeed, context: ctxWithRage,
     });
     expect(result.narrative).toMatch(/fireball/i);
     expect(result.narrative).toMatch(/half damage|succeeds/i);
@@ -1465,7 +1502,7 @@ describe('cast_spell — Fireball (level 3, DEX save, half on save)', () => {
     const state = makeMageState({ spell_slots_max: { 3: 1 }, spell_slots_used: {} });
     const result = await takeAction({
       action: { type: 'cast_spell', spellId: 'fireball', slotLevel: 3 },
-      history: [], state, seed: spellSeed, context: dungeonCtx,
+      history: [], state, seed: spellSeed, context: ctxWithRage,
     });
     expect(result.newState.characters[0].spell_slots_used[3]).toBe(1);
   });
@@ -1477,7 +1514,7 @@ describe('cast_spell — Cure Wounds (level 1, heal)', () => {
     const state = makeClericState({ hp: 3, max_hp: 10 });
     const result = await takeAction({
       action: { type: 'cast_spell', spellId: 'cure_wounds', slotLevel: 1 },
-      history: [], state, seed: spellSeed, context: dungeonCtx,
+      history: [], state, seed: spellSeed, context: ctxWithRage,
     });
     expect(result.narrative).toMatch(/cure wounds/i);
     expect(result.newState.characters[0].hp).toBeGreaterThan(3);
@@ -1495,7 +1532,7 @@ describe('cast_spell — Misty Step (level 2, bonus action, utility)', () => {
     });
     const result = await takeAction({
       action: { type: 'cast_spell', spellId: 'misty_step', slotLevel: 2 },
-      history: [], state, seed: spellSeed, context: dungeonCtx,
+      history: [], state, seed: spellSeed, context: ctxWithRage,
     });
     expect(result.narrative).toMatch(/misty step|silver mist/i);
     expect(result.newState.characters[0].spell_slots_used[2]).toBe(1);
@@ -1507,10 +1544,10 @@ describe('cast_spell — Misty Step (level 2, bonus action, utility)', () => {
 describe('spell slots — long rest resets used slots', () => {
   it('spell_slots_used is reset to {} after long rest', async () => {
     // Must be in a room with no living enemy to rest; use startRoomId
-    const state = { ...makeMageState({ spell_slots_used: { 1: 2, 2: 1 } }), current_room: dungeonCtx.startRoomId };
+    const state = { ...makeMageState({ spell_slots_used: { 1: 2, 2: 1 } }), current_room: ctx.startRoomId };
     const result = await takeAction({
       action: { type: 'long_rest' },
-      history: [], state, seed: spellSeed, context: dungeonCtx,
+      history: [], state, seed: spellSeed, context: ctxWithRage,
     });
     expect(result.newState.characters[0].spell_slots_used).toEqual({});
   });
@@ -1519,14 +1556,14 @@ describe('spell slots — long rest resets used slots', () => {
 describe('generateChoices — spell choices', () => {
   it('includes cast_spell choices for Mage cantrip and leveled spells when enemy present', () => {
     const state = makeMageState();
-    const choices = generateChoices(state, spellSeed, dungeonCtx);
+    const choices = generateChoices(state, spellSeed, ctxWithRage);
     const spellChoices = choices.filter(c => c.action.type === 'cast_spell');
     expect(spellChoices.length).toBeGreaterThan(0);
   });
 
   it('does not include offensive spell choices when no enemy present', () => {
-    const state = { ...makeMageState(), current_room: dungeonCtx.startRoomId };
-    const choices = generateChoices(state, spellSeed, dungeonCtx);
+    const state = { ...makeMageState(), current_room: ctx.startRoomId };
+    const choices = generateChoices(state, spellSeed, ctxWithRage);
     const offensiveSpells = choices.filter(c =>
       c.action.type === 'cast_spell' &&
       ['fire_bolt', 'magic_missile', 'thunderwave', 'fireball'].includes((c.action as { spellId: string }).spellId)
@@ -1536,7 +1573,7 @@ describe('generateChoices — spell choices', () => {
 
   it('does not include spell choices when all slots for that level are used', () => {
     const state = makeMageState({ spell_slots_used: { 1: 2 } });
-    const choices = generateChoices(state, spellSeed, dungeonCtx);
+    const choices = generateChoices(state, spellSeed, ctxWithRage);
     const missileChoice = choices.find(c =>
       c.action.type === 'cast_spell' && (c.action as { spellId: string }).spellId === 'magic_missile'
     );
@@ -1545,7 +1582,7 @@ describe('generateChoices — spell choices', () => {
 
   it('includes Misty Step as a bonus-action choice', () => {
     const state = makeMageState();
-    const choices = generateChoices(state, spellSeed, dungeonCtx);
+    const choices = generateChoices(state, spellSeed, ctxWithRage);
     const mistyStep = choices.find(c =>
       c.action.type === 'cast_spell' && (c.action as { spellId: string }).spellId === 'misty_step'
     );

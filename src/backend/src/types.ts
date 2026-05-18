@@ -15,20 +15,61 @@ export interface LootItem {
   effect:       string | null;
   aliases:      string[];
   useNarrative?: string;
+  armorCategory?: 'light' | 'medium' | 'heavy' | 'shield';
+  weaponType?:    'simple' | 'martial';
+  light?:              boolean;    // TWF: can be used in off-hand with another light weapon
+  requiresAttunement?: boolean;   // magic items requiring attunement
+  armorAcBase?:     number;       // base AC of armor when worn (e.g. leather=11, chain mail=16)
+  dexCapToAc?:      number;       // max DEX bonus added to AC (2=medium, 0=heavy; undefined=full DEX)
+  versatileDamage?: string;       // two-handed damage for versatile weapons (e.g. '1d8' for quarterstaff)
+  damageType?:      string;       // piercing / slashing / bludgeoning / fire / etc.
+  thrown?:          { normalRange: number; longRange: number };  // melee weapon usable as ranged
 }
 
 // ─── Seed (procedurally generated world state) ────────────────────────────────
 
+export interface Trap {
+  id:           string;
+  name:         string;
+  desc:         string;            // flavour description shown when detected
+  dc:           number;            // Perception DC to detect; Dexterity DC to disarm
+  damage:       string;            // dice expr on trigger (e.g. '2d6')
+  damageType:   string;
+  condition?:   ConditionName;     // optional condition applied on trigger
+  conditionDuration?: number;      // rounds; undefined = until cleared
+  triggerNarrative:  string;       // text when trap fires (use {name}, {dmg})
+  detectNarrative:   string;       // text when party spots the trap
+  disarmSuccess:     string;       // text on successful disarm
+  disarmFail:        string;       // text on failed disarm (trap fires)
+}
+
+export interface RoomObject {
+  id:           string;
+  name:         string;
+  desc:         string;
+  interactText: string;
+  searchable?:  boolean;
+  searchDC?:    number;
+  lootIds?:     string[];
+  foundText?:   string;
+  emptyText?:   string;
+}
+
 export interface Room {
-  id:      string;
-  name:    string;
-  desc:    string;
+  id:       string;
+  name:     string;
+  desc:     string;
   canRest?: boolean;
+  trap?:    Trap;                  // static trap defined in context; can be overridden per-room
+  objects?: RoomObject[];
+  difficultTerrain?: GridPos[];   // squares costing 2× movement to enter
+  coverPositions?:   GridPos[];   // squares granting half cover (+2 AC) to occupant
 }
 
 export type ConditionName =
   | 'paralyzed' | 'stunned' | 'poisoned' | 'prone' | 'frightened'
-  | 'blinded' | 'restrained' | 'incapacitated' | 'grappled' | 'invisible' | 'exhaustion';
+  | 'blinded' | 'restrained' | 'incapacitated' | 'grappled' | 'invisible' | 'exhaustion'
+  | 'charmed' | 'unconscious' | 'deafened' | 'petrified';
 
 export interface OnHitEffect {
   condition: ConditionName;
@@ -44,9 +85,19 @@ export interface EnemyTemplate {
   damage:      string;
   toHit:       number;
   xp:          number;
+  str?:        number;
   dex?:        number;
+  con?:        number;
+  int?:        number;
   wis?:        number;
+  cha?:        number;
   onHitEffect?: OnHitEffect;
+  multiattack?:         number;    // number of attacks per turn (default 1)
+  resistances?:         string[];  // damage types dealt at half damage
+  vulnerabilities?:     string[];  // damage types dealt at double damage
+  immunities?:          string[];  // damage types that deal no damage
+  condition_immunities?: string[]; // conditions that cannot be applied
+  damageType?:          string;    // primary damage type for this enemy's attack
 }
 
 export interface Enemy {
@@ -56,9 +107,18 @@ export interface Enemy {
   damage:      string;
   toHit:       number;
   xp:          number;
+  str?:        number;
   dex?:        number;
+  con?:        number;
+  int?:        number;
   wis?:        number;
+  cha?:        number;
   onHitEffect?: OnHitEffect;
+  multiattack?:         number;
+  resistances?:         string[];
+  vulnerabilities?:     string[];
+  immunities?:          string[];
+  condition_immunities?: string[];
 }
 
 export interface Seed {
@@ -76,11 +136,20 @@ export interface Seed {
 
 // ─── Game state ───────────────────────────────────────────────────────────────
 
+export type CoverLevel = 'none' | 'half' | 'three_quarters' | 'full';
+
 export interface TurnActions {
   action_used:           boolean;
   bonus_action_used:     boolean;
   reaction_used:         boolean;
   free_interaction_used: boolean;
+  dodging?:              boolean;   // Dodge action: enemy attacks have disadvantage until next turn
+  disengaged?:           boolean;   // Disengage action: no opportunity attacks this turn
+  movement_budget_remaining?: number;  // feet remaining this turn; initialized to speed at turn start
+  readied_action?: {
+    trigger: string;
+    action:  StructuredAction;
+  };
 }
 
 export interface DeathSaves {
@@ -126,6 +195,18 @@ export interface PlacedNpc extends NpcTemplate {
   roomId: string;
 }
 
+// ─── Backgrounds ──────────────────────────────────────────────────────────────
+
+export interface Background {
+  id:               string;
+  name:             string;
+  desc:             string;
+  skillProficiencies:   string[];          // 2 skill names (e.g. 'Perception', 'Stealth')
+  toolProficiency?:     string;            // 1 tool (e.g. "Thieves' Tools")
+  feature:              string;            // name of the narrative feature
+  featureDesc:          string;            // one-sentence description shown in UI
+}
+
 // ─── Spell system ─────────────────────────────────────────────────────────────
 
 export interface Spell {
@@ -143,6 +224,11 @@ export interface Spell {
   condition?:          ConditionName;
   conditionDuration?:  number;          // rounds; undefined = permanent until cleared
   narrative?:          string;          // override text for utility spells
+  concentration?:      boolean;         // true = breaks if caster takes damage and fails CON save
+  upcastBonus?:        string;          // extra dice per slot above base level, e.g. '1d6'
+  blastRadius?:        number;          // AOE radius in feet; undefined = single target
+  ritualCasting?:      boolean;         // castable as ritual (no slot cost, only out of combat)
+  verbal?:             boolean;         // has verbal component (blocked when deafened)
 }
 
 // ─── Structured actions ───────────────────────────────────────────────────────
@@ -168,7 +254,26 @@ export type StructuredAction =
   | { type: 'attack_npc' }
   | { type: 'use_class_feature'; featureId: string }
   | { type: 'apply_asi';         stat: AbilityKey }
-  | { type: 'cast_spell';        spellId: string; slotLevel: number };
+  | { type: 'cast_spell';        spellId: string; slotLevel: number; ritual?: boolean }
+  | { type: 'disarm_trap' }
+  | { type: 'interact_object';   objectId: string }
+  | { type: 'two_weapon_attack' }
+  | { type: 'attune';            instanceId: string }
+  | { type: 'grapple' }
+  | { type: 'shove' }
+  | { type: 'dodge' }
+  | { type: 'disengage' }
+  | { type: 'grid_move';        entityId: string; to: GridPos }
+  | { type: 'travel';           locationId: string }
+  | { type: 'enter_district';   districtId: string }
+  | { type: 'accept_quest';     questId: string }
+  | { type: 'complete_quest';   questId: string }
+  | { type: 'dash' }
+  | { type: 'help';             targetId: string }
+  | { type: 'ready';            trigger: string; action: StructuredAction }
+  | { type: 'use_reaction' }
+  | { type: 'select_subclass';  subclass: string }
+  | { type: 'prepare_spells';   spellIds: string[] };
 
 export interface GameChoice {
   label:              string;
@@ -221,10 +326,26 @@ export interface Character {
   asi_pending:         boolean;
   // 0 = none; 1–6 = exhaustion level per 5e PHB (cumulative penalties)
   exhaustion_level:    number;
+  // Background
+  background_id:       string | null;
+  skill_proficiencies: string[];   // from background + class (e.g. ['Perception', 'Stealth'])
+  tool_proficiencies:  string[];   // from background (e.g. ["Thieves' Tools"])
   // Spell system — slots keyed by spell level (1 = 1st-level, etc.)
   spell_slots_max:     Record<number, number>;
   spell_slots_used:    Record<number, number>;
   spells_known:        string[];   // spell IDs from context.spellTable
+  // 5e proficiencies (populated at session creation from context tables)
+  armor_proficiencies:  string[];  // e.g. ['light', 'medium', 'shield']
+  weapon_proficiencies: string[];  // e.g. ['simple', 'martial']
+  attuned_items: string[];  // instance_ids of attuned magic items (max 3)
+  concentrating_on?: { spellId: string; condition?: string } | null;
+  // Extended 5e fields
+  subclass?:         string;        // e.g. 'battle_master', 'thief', 'evoker'
+  speed?:            number;        // movement speed in feet; defaults to 30
+  feats?:            string[];
+  expertise_skills?: string[];      // skills with double proficiency bonus (Rogue/Bard)
+  prepared_spells?:  string[];      // spell ids currently prepared (Cleric/Paladin/Druid)
+  charmer_id?:       string;        // entity id of the charmer when charmed
 }
 
 // ─── Game state (world/party container) ──────────────────────────────────────
@@ -259,8 +380,32 @@ export interface GameState {
   npc_attitudes: Record<string, NpcAttitude>;  // roomId → current attitude
   npc_talked:    string[];                      // roomIds where player has talked
 
+  // Trap state — rooms where the trap has already fired or been disarmed
+  traps_triggered: string[];   // roomIds where trap fired
+  traps_disarmed:  string[];   // roomIds where trap was disarmed
+
+  // Object interaction — keys are "roomId:objectId"
+  objects_searched: string[];
+
   // Script engine flags
   flags: Record<string, boolean | string | number>;
+
+  // Enemy conditions for current room (cleared on room change or enemy death)
+  enemy_conditions: string[];
+
+  // Grid combat (campaign dungeons only)
+  entities?:       CombatEntity[];
+  movement_used?:  Record<string, number>;  // entityId → feet moved this turn
+  help_target_id?: string;                  // char id receiving Help action advantage
+  surprised?:      string[];                // entity ids surprised at combat start (skip first turn)
+
+  // Campaign overlay (merged from CampaignState at session load)
+  current_location_id?: string;
+  current_district_id?: string;
+  campaign_flags?:      Record<string, boolean | string | number>;
+  quest_progress?:      QuestProgress[];
+  faction_rep?:         Record<string, number>;   // factionId → numeric rep
+  world_day?:           number;
 }
 
 // ─── Script engine rules ──────────────────────────────────────────────────────
@@ -272,7 +417,12 @@ export type GameConsequence =
   | { type: 'modify_hp';     amount: number; characterId?: string }
   | { type: 'unlock_room';   roomId: string }
   | { type: 'spawn_enemy';   roomId: string; enemyId: string }
-  | { type: 'set_escape' };
+  | { type: 'set_escape' }
+  | { type: 'advance_quest';    questId: string; stepId: string }
+  | { type: 'set_faction_rep';  factionId: string; delta: number }
+  | { type: 'travel_to';        locationId: string }
+  | { type: 'give_gold';        amount: number }
+  | { type: 'set_npc_attitude'; npcId: string; attitude: NpcAttitude };
 
 export interface GameRule {
   name:         string;
@@ -303,9 +453,11 @@ export interface RuleFacts {
 // ─── Context (game theme/setting) ─────────────────────────────────────────────
 
 export interface RoomPoolEntry {
-  id:    string;
-  name:  string;
-  descs: string[];
+  id:      string;
+  name:    string;
+  descs:   string[];
+  trap?:   Trap;        // optional; if present, included in the generated Room for this entry
+  objects?: RoomObject[];
 }
 
 export interface CampaignData {
@@ -316,6 +468,9 @@ export interface CampaignData {
   enemies?:      Record<string, Enemy>;
   loot?:         Record<string, LootItem>;
   startingLoot?: string[];
+  locations?:    Location[];
+  quests?:       Quest[];
+  factions?:     Faction[];
 }
 
 export type TieredNarrative = string[] | Record<string, string[]>;
@@ -329,14 +484,23 @@ export interface Context {
   escapeChoiceText: string;
   worldNames:       string[];
   mapType:            'roguelike' | 'campaign';
+  gridEnabled?:       boolean;     // enable grid-based combat for this context
+  gridWidth?:         number;      // default combat grid width  (squares)
+  gridHeight?:        number;      // default combat grid height (squares)
   campaign?:          CampaignData;
-  classPrimaryStats:  Record<string, 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha'>;
-  classSkills:        Record<string, string[]>;
-  classHitDie:        Record<string, number>;
+  classPrimaryStats:        Record<string, 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha'>;
+  classSkills:              Record<string, string[]>;
+  classHitDie:              Record<string, number>;
+  classArmorProficiencies?: Record<string, string[]>;  // class → ['light','medium','heavy','shield']
+  classWeaponProficiencies?: Record<string, string[]>; // class → ['simple','martial']
   // 5e saving throw proficiencies per class (2 abilities each)
   classSavingThrows?: Record<string, Array<'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha'>>;
   // Class features that activate during play (sneak_attack, extra_attack, rage, …)
   classFeatures?:     Record<string, string[]>;
+  // Per-class starting gear — auto-equipped at session start
+  classStartingLoot?: Record<string, string[]>;  // class → item IDs given at session start
+  // Backgrounds — optional list; if present, player picks one at character creation
+  backgrounds?:         Background[];
   // Spell system — optional; only present for contexts with spellcasting classes
   spellTable?:          Record<string, Spell>;
   classSpells?:         Record<string, string[]>;        // class → spell IDs
@@ -371,8 +535,125 @@ export interface Context {
     deathLines:      string[];
     escapeLines:     string[];
     enemyDeflected:  string[];
-    levelUp:         string;
-    noEscapeNearby:  string;
-    escapeBlocked:   string;
+    levelUp:         string[];
+    noEscapeNearby:  string[];
+    escapeBlocked:   string[];
+    // Optional overrides for otherwise hard-coded engine text
+    combatStart?:    string[];   // prefix before "Initiative: X → Y"; {enemy} substituted
+    shortRest?:      string[];   // flavor before HP numbers; {name} {hpGained} {hpNow} {hpMax} substituted
+    longRest?:       string[];   // flavor before per-character HP summary; {party} substituted
   };
+}
+
+// ─── Grid combat ─────────────────────────────────────────────────────────────
+
+export interface GridPos { x: number; y: number; }
+
+export interface CombatEntity {
+  id:                  string;           // character.id for PCs, roomId for enemies
+  isEnemy:             boolean;
+  pos:                 GridPos;
+  hp:                  number;
+  maxHp:               number;
+  conditions:          string[];
+  condition_durations: Record<string, number>;
+}
+
+// ─── Quest system ─────────────────────────────────────────────────────────────
+
+export type QuestStatus = 'available' | 'active' | 'completed' | 'failed';
+
+export interface QuestStep {
+  id:        string;
+  desc:      string;
+  condition: object;   // json-rules-engine TopLevelCondition against CampaignFacts
+}
+
+export interface Quest {
+  id:          string;
+  title:       string;
+  desc:        string;
+  giverNpcId?: string;
+  steps:       QuestStep[];
+  rewards:     GameConsequence[];
+  factionId?:  string;
+  repGain?:    number;
+}
+
+export interface QuestProgress {
+  questId:        string;
+  status:         QuestStatus;
+  completedSteps: string[];
+}
+
+// ─── Faction system ───────────────────────────────────────────────────────────
+
+export interface FactionThresholds {
+  hostile:    number;
+  unfriendly: number;
+  neutral:    number;
+  friendly:   number;
+  exalted:    number;
+}
+
+export interface Faction {
+  id:                 string;
+  name:               string;
+  thresholds:         FactionThresholds;
+  shopPriceModifiers: Record<string, number>;  // attitude tier → price multiplier
+}
+
+// ─── Campaign state (persists across sessions) ────────────────────────────────
+
+export interface CampaignState {
+  campaign_id:      string;
+  user_id:          string;
+  world_day:        number;
+  current_location: string;
+  flags:            Record<string, boolean | string | number>;
+  quests:           QuestProgress[];
+  faction_rep:      Record<string, number>;
+  npc_attitudes:    Record<string, NpcAttitude>;
+}
+
+// ─── Campaign facts (evaluated against quest step conditions) ─────────────────
+
+export interface CampaignFacts {
+  action:          string;
+  room_id:         string;
+  location_id:     string;
+  enemies_killed:  string[];
+  loot_taken:      string[];
+  flags:           Record<string, boolean | string | number>;
+  campaign_flags:  Record<string, boolean | string | number>;
+  quest_progress:  QuestProgress[];
+  faction_rep:     Record<string, number>;
+  world_day:       number;
+  active_level:    number;
+  active_class:    string;
+}
+
+// ─── Locations ────────────────────────────────────────────────────────────────
+
+export type LocationType = 'town' | 'dungeon' | 'wilderness';
+
+export interface District {
+  id:     string;
+  name:   string;
+  desc:   string;
+  roomId: string;
+}
+
+export interface Location {
+  id:               string;
+  name:             string;
+  type:             LocationType;
+  desc:             string;
+  districts?:       District[];
+  rooms?:           Room[];
+  gridWidth?:       number;
+  gridHeight?:      number;
+  connections?:     string[];
+  encounterTable?:  string[];
+  encounterChance?: number;
 }

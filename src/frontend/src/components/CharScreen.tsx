@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { S, applyTheme } from '../App';
+import { applyTheme } from '../App';
 import type { FrontendContext } from '../types';
 import type { AuthUser, CharacterInput } from '../lib/api';
+import styles from '../styles.module.css';
 
 type StatBlock = { str: number; dex: number; con: number; int: number; wis: number; cha: number };
 const STAT_KEYS: (keyof StatBlock)[] = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
@@ -25,11 +26,12 @@ function rollStatBlock(): StatBlock {
 }
 
 interface CharDraft {
-  name:      string;
-  cls:       string;
-  stats:     StatBlock;
-  portrait:  string | null;
-  rollCount: number;
+  name:         string;
+  cls:          string;
+  backgroundId: string;
+  stats:        StatBlock;
+  portrait:     string | null;
+  rollCount:    number;
 }
 
 function CharScreen({
@@ -48,11 +50,12 @@ function CharScreen({
   );
   const selectedCtxForInit = availableContexts.find(c => c.id === contextId) ?? availableContexts[0];
   const [party, setParty] = useState<CharDraft[]>([{
-    name:      localStorage.getItem('operative_name') || '',
-    cls:       selectedCtxForInit?.classes[0]?.id ?? '',
-    stats:     rollStatBlock(),
-    portrait:  user?.avatar_url ?? null,
-    rollCount: 1,
+    name:         localStorage.getItem('operative_name') || '',
+    cls:          selectedCtxForInit?.classes[0]?.id ?? '',
+    backgroundId: selectedCtxForInit?.backgrounds?.[0]?.id ?? '',
+    stats:        rollStatBlock(),
+    portrait:     user?.avatar_url ?? null,
+    rollCount:    1,
   }]);
   const [error, setError] = useState('');
 
@@ -61,7 +64,13 @@ function CharScreen({
     if (c) {
       applyTheme(c.theme);
       localStorage.setItem('last_context_id', contextId);
-      setParty(prev => prev.map(d => ({ ...d, cls: c.classes[0]?.id ?? d.cls, stats: rollStatBlock(), rollCount: 1 })));
+      setParty(prev => prev.map(d => ({
+        ...d,
+        cls: c.classes[0]?.id ?? d.cls,
+        backgroundId: c.backgrounds?.[0]?.id ?? '',
+        stats: rollStatBlock(),
+        rollCount: 1,
+      })));
     }
   }, [contextId, availableContexts]);
 
@@ -74,7 +83,11 @@ function CharScreen({
 
   function addMember() {
     if (party.length >= 4) return;
-    setParty(prev => [...prev, { name: '', cls: classes[0]?.id ?? '', stats: rollStatBlock(), portrait: null, rollCount: 1 }]);
+    setParty(prev => [...prev, {
+      name: '', cls: classes[0]?.id ?? '',
+      backgroundId: selectedCtx?.backgrounds?.[0]?.id ?? '',
+      stats: rollStatBlock(), portrait: null, rollCount: 1,
+    }]);
   }
 
   function removeMember(idx: number) {
@@ -89,7 +102,13 @@ function CharScreen({
     localStorage.setItem('operative_name', leader.name.trim());
     try {
       await onStart(
-        party.map(d => ({ name: d.name.trim(), character_class: d.cls, stats: d.stats, portrait_url: d.portrait ?? undefined })),
+        party.map(d => ({
+          name: d.name.trim(),
+          character_class: d.cls,
+          background_id: d.backgroundId || undefined,
+          stats: d.stats,
+          portrait_url: d.portrait ?? undefined,
+        })),
         contextId,
       );
     } catch (e) {
@@ -98,15 +117,17 @@ function CharScreen({
   }
 
   return (
-    <div style={{ ...S.page, display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}>
-      <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start', width: '100%', maxWidth: 900, margin: '4rem auto' }}>
-        <div style={{ flex: '0 0 360px' }}>
-          <p style={{ ...S.title, fontSize: '1.1rem', marginBottom: 4 }}>HERO REGISTRY</p>
-          <p style={{ ...S.sub, marginBottom: '2rem' }}>REGISTER YOUR PARTY — UP TO 4 HEROES</p>
+    <div className={styles.pageFlex}>
+      <div className={styles.charInner}>
+        <div className={styles.charPartyCol}>
+          <p className={styles.title} style={{ fontSize: '1.1rem', marginBottom: 4 }}>HERO REGISTRY</p>
+          <p className={styles.sub} style={{ marginBottom: '2rem' }}>REGISTER YOUR PARTY — UP TO 4 HEROES</p>
 
           {party.map((draft, idx) => {
             const primaryStat = selectedCtx?.classPrimaryStats[draft.cls]?.toLowerCase() as keyof StatBlock | undefined;
             const skills      = selectedCtx?.classSkills[draft.cls] ?? [];
+            const backgrounds = selectedCtx?.backgrounds ?? [];
+            const selectedBg  = backgrounds.find(b => b.id === draft.backgroundId);
             const portraits   = [
               ...(idx === 0 && user?.avatar_url ? [user.avatar_url] : []),
               `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><rect width="40" height="40" fill="#1a1a2e"/><circle cx="20" cy="14" r="7" fill="#4a9eff"/><ellipse cx="20" cy="34" rx="10" ry="7" fill="#4a9eff"/></svg>')}`,
@@ -116,7 +137,7 @@ function CharScreen({
             ] as string[];
 
             return (
-              <div key={idx} style={{ ...S.card, marginBottom: '1rem', position: 'relative' }}>
+              <div key={idx} className={styles.card} style={{ marginBottom: '1rem', position: 'relative' }}>
                 {party.length > 1 && (
                   <button
                     onClick={() => removeMember(idx)}
@@ -130,25 +151,26 @@ function CharScreen({
                   {idx === 0 ? 'PARTY LEADER' : `HERO ${idx + 1}`}
                 </p>
 
-                <label style={S.formLbl}>HERO NAME</label>
+                <label className={styles.formLbl}>HERO NAME</label>
                 <input
-                  style={S.formInp}
+                  className={styles.formInp}
                   value={draft.name}
                   onChange={e => updateDraft(idx, { name: e.target.value })}
                   placeholder="e.g. Buck Starling"
                   autoFocus={idx === 0}
                 />
 
-                <label style={S.formLbl}>CLASS</label>
+                <label className={styles.formLbl}>CLASS</label>
                 <select
-                  style={{ ...S.formInp, cursor: 'pointer' }}
+                  className={styles.formInp}
+                  style={{ cursor: 'pointer' }}
                   value={draft.cls}
                   onChange={e => updateDraft(idx, { cls: e.target.value })}
                 >
                   {classes.map(c => <option key={c.id} value={c.id}>{c.id}</option>)}
                 </select>
 
-                <div style={{ marginTop: 8, fontSize: '0.75rem', color: 'var(--t-dim)', lineHeight: 1.7 }}>
+                <div className={styles.classDesc}>
                   <span style={{ color: 'var(--t-mid)' }}>{classes.find(c => c.id === draft.cls)?.desc}</span>
                   {primaryStat && (
                     <div style={{ marginTop: 4 }}>
@@ -164,7 +186,41 @@ function CharScreen({
                   )}
                 </div>
 
-                <label style={{ ...S.formLbl, marginTop: 12 }}>PORTRAIT</label>
+                {backgrounds.length > 0 && (
+                  <>
+                    <label className={styles.formLbl} style={{ marginTop: 12 }}>BACKGROUND</label>
+                    <select
+                      className={styles.formInp}
+                      style={{ cursor: 'pointer' }}
+                      value={draft.backgroundId}
+                      onChange={e => updateDraft(idx, { backgroundId: e.target.value })}
+                    >
+                      {backgrounds.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    </select>
+                    {selectedBg && (
+                      <div className={styles.classDesc}>
+                        <span style={{ color: 'var(--t-mid)' }}>{selectedBg.desc}</span>
+                        <div style={{ marginTop: 4 }}>
+                          <span style={{ color: 'var(--t-dim)', letterSpacing: '0.08em' }}>SKILLS: </span>
+                          <span style={{ color: 'var(--t-mid)' }}>{selectedBg.skillProficiencies.join(', ')}</span>
+                          {selectedBg.toolProficiency && (
+                            <>
+                              <span style={{ color: 'var(--t-dim)' }}> · </span>
+                              <span style={{ color: 'var(--t-mid)' }}>{selectedBg.toolProficiency}</span>
+                            </>
+                          )}
+                        </div>
+                        <div>
+                          <span style={{ color: 'var(--t-dim)', letterSpacing: '0.08em' }}>FEATURE: </span>
+                          <span style={{ color: 'var(--t-primary)' }}>{selectedBg.feature}</span>
+                          <span style={{ color: 'var(--t-dim)' }}> — {selectedBg.featureDesc}</span>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                <label className={styles.formLbl} style={{ marginTop: 12 }}>PORTRAIT</label>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                   {portraits.map((src, i) => {
                     const sel = draft.portrait === src;
@@ -186,7 +242,7 @@ function CharScreen({
                   </button>
                 </div>
 
-                <label style={{ ...S.formLbl, marginTop: 12 }}>ABILITY SCORES</label>
+                <label className={styles.formLbl} style={{ marginTop: 12 }}>ABILITY SCORES</label>
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                   {STAT_KEYS.map(key => {
                     const val       = draft.stats[key];
@@ -194,7 +250,12 @@ function CharScreen({
                     return (
                       <div
                         key={key}
-                        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '4px 8px', border: `1px solid ${isPrimary ? 'var(--t-primary)' : 'var(--t-border)'}`, background: isPrimary ? 'var(--t-separator)' : 'transparent', minWidth: 42 }}
+                        style={{
+                          display: 'flex', flexDirection: 'column', alignItems: 'center',
+                          padding: '4px 8px', minWidth: 42,
+                          border: `1px solid ${isPrimary ? 'var(--t-primary)' : 'var(--t-border)'}`,
+                          background: isPrimary ? 'var(--t-separator)' : 'transparent',
+                        }}
                       >
                         <span style={{ fontSize: '0.75rem', color: isPrimary ? 'var(--t-primary)' : 'var(--t-dim)', letterSpacing: '0.1em' }}>{STAT_LABEL[key]}</span>
                         <span style={{ fontSize: '0.95rem', fontWeight: 'bold', color: isPrimary ? 'var(--t-primary)' : 'var(--t-mid)' }}>{val}</span>
@@ -204,7 +265,8 @@ function CharScreen({
                   })}
                   {draft.rollCount < 2 && (
                     <button
-                      style={{ ...S.sendBtn, fontSize: '0.75rem', padding: '0.3rem 0.6rem', alignSelf: 'center' }}
+                      className={styles.sendBtn}
+                      style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem', alignSelf: 'center' }}
                       onClick={() => updateDraft(idx, { stats: rollStatBlock(), rollCount: draft.rollCount + 1 })}
                     >
                       REROLL
@@ -217,23 +279,24 @@ function CharScreen({
 
           {party.length < 4 && (
             <button
-              style={{ ...S.submit, marginTop: 0, marginBottom: '1rem', background: 'transparent', border: '1px dashed var(--t-border)', color: 'var(--t-dim)' }}
+              className={styles.submit}
+              style={{ marginTop: 0, marginBottom: '1rem', background: 'transparent', border: '1px dashed var(--t-border)', color: 'var(--t-dim)' }}
               onClick={addMember}
             >
               + ADD PARTY MEMBER
             </button>
           )}
 
-          {error && <p style={S.err}>{error}</p>}
+          {error && <p className={styles.err}>{error}</p>}
 
-          <button style={S.submit} onClick={handle} disabled={loading}>
+          <button className={styles.submit} onClick={handle} disabled={loading}>
             {loading ? 'LAUNCHING MISSION...' : 'BEGIN MISSION'}
           </button>
         </div>
 
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ ...S.title, fontSize: '1.1rem', marginBottom: 4 }}>WORLD TYPE</p>
-          <p style={{ ...S.sub, marginBottom: '2rem' }}>SELECT YOUR GAME WORLD</p>
+        <div className={styles.charWorldCol}>
+          <p className={styles.title} style={{ fontSize: '1.1rem', marginBottom: 4 }}>WORLD TYPE</p>
+          <p className={styles.sub} style={{ marginBottom: '2rem' }}>SELECT YOUR GAME WORLD</p>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             {availableContexts.map(c => {
@@ -242,7 +305,14 @@ function CharScreen({
                 <button
                   key={c.id}
                   onClick={() => setContextId(c.id)}
-                  style={{ background: selected ? 'var(--t-separator)' : 'var(--t-card)', border: `1px solid ${selected ? 'var(--t-primary)' : 'var(--t-border)'}`, color: 'var(--t-primary)', fontFamily: 'inherit', padding: '0.75rem 1rem', cursor: 'pointer', textAlign: 'left', display: 'flex', gap: '1rem', alignItems: 'flex-start', transition: 'border-color 0.15s, background 0.15s', boxShadow: selected ? '0 0 8px var(--t-border)' : 'none' }}
+                  style={{
+                    background: selected ? 'var(--t-separator)' : 'var(--t-card)',
+                    border: `1px solid ${selected ? 'var(--t-primary)' : 'var(--t-border)'}`,
+                    color: 'var(--t-primary)', fontFamily: 'inherit', padding: '0.75rem 1rem',
+                    cursor: 'pointer', textAlign: 'left', display: 'flex', gap: '1rem',
+                    alignItems: 'flex-start', transition: 'border-color 0.15s, background 0.15s',
+                    boxShadow: selected ? '0 0 8px var(--t-border)' : 'none',
+                  }}
                 >
                   <pre style={{ margin: 0, flexShrink: 0, fontSize: '0.6rem', lineHeight: 1.35, color: selected ? 'var(--t-primary)' : 'var(--t-dim)', fontFamily: 'inherit', userSelect: 'none', transition: 'color 0.15s' }}>
                     {c.previewArt}

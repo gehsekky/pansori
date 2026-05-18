@@ -50,9 +50,20 @@ export type StatBlock = {
   cha: number;
 };
 
+export type Background = {
+  id: string;
+  name: string;
+  desc: string;
+  skillProficiencies: string[];
+  toolProficiency: string | null;
+  feature: string;
+  featureDesc: string;
+};
+
 export type CharacterInput = {
   name: string;
   character_class: string;
+  background_id?: string;
   stats?: StatBlock;
   portrait_url?: string;
 };

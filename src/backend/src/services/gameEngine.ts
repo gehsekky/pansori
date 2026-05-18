@@ -2,15 +2,21 @@ import { randomUUID } from 'crypto';
 import {
   rollDice, abilityMod,
   FRESH_TURN,
-  resolvePlayerAttack, resolveEnemyAttack, unarmedDamage,
-  skillCheck, rollDeathSave, profBonus,
+  resolvePlayerAttack, resolveOffHandAttack, resolveEnemyAttack, unarmedDamage,
+  skillCheck, rollDeathSave, profBonus, d,
   ADVANTAGE_CONDITIONS, DISADV_CONDITIONS, PLAYER_ADV_CONDITIONS, ENEMY_DISADV_CONDITIONS,
   rollConditionSave, rollCritical, resolveSaveWithAdvantage, resolveMysteryConsumable, passivePerceptionDC,
   sneakAttackDice, extraAttackCount, rageDamageBonus, rageUsesMax,
   spellSaveDC, resolveSpellAttack,
+  passivePerception, disarmTrap,
+  hasArmorProficiency, hasWeaponProficiency,
+  applyDamageMultiplier,
+  upcastDamage, cantripDamageDice, spellSlotsForClassLevel,
 } from './rulesEngine.js';
 import { Engine } from 'json-rules-engine';
-import type { GameState, Character, Seed, Context, Enemy, LootItem, InventoryItem, OnHitEffect, StructuredAction, GameChoice, DeathSaves, TurnActions, GameConsequence, RuleFacts, PlacedNpc, NpcAttitude, AbilityKey } from '../types.js';
+import type { GameState, Character, Seed, Context, Enemy, LootItem, InventoryItem, OnHitEffect, StructuredAction, GameChoice, DeathSaves, TurnActions, GameConsequence, RuleFacts, PlacedNpc, NpcAttitude, AbilityKey, Trap, RoomObject, CombatEntity } from '../types.js';
+import { inRange, findPath, pathCostFeet, opportunityAttackTriggers, DEFAULT_SPEED_FEET, coverBonus, isFlankingPosition, posEqual, SQUARE_SIZE } from './gridEngine.js';
+import { llmProvider } from './llmProvider.js';
 
 function pick<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)]; }
 
@@ -19,6 +25,38 @@ function hpTier(char: Character): 'healthy' | 'hurt' | 'critical' {
   if (pct > 0.66) return 'healthy';
   if (pct > 0.33) return 'hurt';
   return 'critical';
+}
+
+// Exhaustion 4: effective max HP is halved (PHB p.291)
+function clampHpForExhaustion(hp: number, maxHp: number, exhaustionLevel: number): number {
+  if (exhaustionLevel >= 4) return Math.min(hp, Math.floor(maxHp / 2));
+  return hp;
+}
+
+// ─── Concentration helpers ────────────────────────────────────────────────────
+
+function breakConcentration(char: Character, st: GameState): { char: Character; st: GameState } {
+  if (!char.concentrating_on) return { char, st };
+  const condition = char.concentrating_on.condition;
+  const newChar   = { ...char, concentrating_on: null };
+  const newSt     = condition
+    ? { ...st, enemy_conditions: (st.enemy_conditions ?? []).filter(c => c !== condition) }
+    : st;
+  return { char: newChar, st: newSt };
+}
+
+function checkConcentration(
+  char: Character,
+  st: GameState,
+  dmgTaken: number,
+): { char: Character; st: GameState; note: string } {
+  if (!char.concentrating_on || dmgTaken <= 0) return { char, st, note: '' };
+  const dc   = Math.max(10, Math.floor(dmgTaken / 2));
+  const save = d(20) + abilityMod(char.con);
+  if (save >= dc) return { char, st, note: ` [Concentration hold: ${save} vs DC ${dc}]` };
+  const spellName = char.concentrating_on.spellId;
+  const { char: nc, st: ns } = breakConcentration(char, st);
+  return { char: nc, st: ns, note: ` [Concentration broken: ${save} vs DC ${dc} — ${spellName} ends!]` };
 }
 
 function pickTiered(template: string[] | Record<string, string[]> | undefined, tier: string): string {
@@ -65,6 +103,16 @@ function getEnemyHp(state: GameState, roomId: string, seed: Seed): number {
   return seed.enemies?.[roomId]?.hp ?? 0;
 }
 
+function setEnemyHp(state: GameState, roomId: string, hp: number): GameState {
+  const updated = { ...state, enemy_hp: { ...state.enemy_hp, [roomId]: hp } };
+  if (updated.entities) {
+    updated.entities = updated.entities.map(e =>
+      e.id === roomId && e.isEnemy ? { ...e, hp } : e,
+    );
+  }
+  return updated;
+}
+
 // ─── Condition helpers ────────────────────────────────────────────────────────
 
 function conditionSavingThrow(
@@ -83,16 +131,20 @@ function applyEnemyAttackNarrative(
   char: Character,
   context: Context,
 ): { hpLost: number; narrative: string; newConditions: string[]; newDurations: Record<string, number> } {
+  const isDodging       = char.turn_actions?.dodging ?? false;
   const hasAdvantage    = char.conditions.some(c => ADVANTAGE_CONDITIONS.has(c));
-  const hasDisadvantage = char.conditions.some(c => ENEMY_DISADV_CONDITIONS.has(c));
+  const hasDisadvantage = char.conditions.some(c => ENEMY_DISADV_CONDITIONS.has(c)) || isDodging;
   const result          = resolveEnemyAttack(enemy, char.ac, hasAdvantage, hasDisadvantage);
   const armorItem    = char.equipped_armor ? char.inventory?.find(i => i.id === char.equipped_armor) : null;
 
   if (result.hit) {
     // Rage resistance: halve physical damage while raging (PHB p.48)
     const isRaging = char.conditions.includes('raging');
-    const hpLost   = isRaging ? Math.ceil(result.damage / 2) : result.damage;
+    let hpLost   = isRaging ? Math.ceil(result.damage / 2) : result.damage;
     const rageNote = isRaging ? ` (Rage resistance: ${result.damage}→${hpLost})` : '';
+    // Exhaustion 4: effective max HP is halved — clamp current HP after taking damage
+    const newHpAfterDmg = clampHpForExhaustion(Math.max(0, char.hp - hpLost), char.max_hp, char.exhaustion_level ?? 0);
+    hpLost = char.hp - newHpAfterDmg; // recalculate actual HP lost after clamp
 
     let narrative = pick(context.narratives.enemyAttacks)
       .replace('{enemy}', enemy.name)
@@ -286,6 +338,8 @@ function endCombatState(st: GameState): GameState {
     combat_active:    false,
     initiative_order: [],
     initiative_idx:   0,
+    entities:         undefined,
+    movement_used:    undefined,
     characters: st.characters.map(c => ({
       ...c,
       turn_actions: { ...FRESH_TURN },
@@ -317,6 +371,29 @@ function canRestInRoom(state: GameState, seed: Seed): boolean {
   return !(enemy && !state.enemies_killed.includes(state.current_room));
 }
 
+// ─── Trap helpers ─────────────────────────────────────────────────────────────
+
+function getRoomTrap(roomId: string, seed: Seed, context: Context): Trap | null {
+  // Traps are defined on Room objects inside the campaign or room pool
+  const campaignRoom = context.campaign?.rooms?.find(r => r.id === roomId);
+  if (campaignRoom?.trap) return campaignRoom.trap;
+  const seedRoom = seed.rooms?.find(r => r.id === roomId);
+  if (seedRoom?.trap) return seedRoom.trap;
+  return null;
+}
+
+function trapSpent(state: GameState, roomId: string): boolean {
+  return (state.traps_triggered ?? []).includes(roomId) || (state.traps_disarmed ?? []).includes(roomId);
+}
+
+function partyDetectsTrap(characters: Character[], trap: Trap): boolean {
+  return characters.some(c => {
+    if (c.dead) return false;
+    const proficient = c.skill_proficiencies?.includes('Perception') ?? false;
+    return passivePerception(c.wis, c.level, proficient) >= trap.dc;
+  });
+}
+
 // ─── Spell helpers ────────────────────────────────────────────────────────────
 
 function getSpellSlotsForLevel(className: string, level: number, context: Context): Record<number, number> {
@@ -338,17 +415,27 @@ export function normalizeState(
       long_rested:        gs.long_rested        ?? false,
       npc_attitudes:      gs.npc_attitudes      ?? {},
       npc_talked:         gs.npc_talked         ?? [],
+      traps_triggered:    gs.traps_triggered    ?? [],
+      traps_disarmed:     gs.traps_disarmed     ?? [],
+      objects_searched:   gs.objects_searched   ?? [],
+      enemy_conditions:   gs.enemy_conditions   ?? [],
       characters: gs.characters.map(c => ({
         ...c,
-        hit_die:             c.hit_die             ?? 8,
-        hit_dice_remaining:  c.hit_dice_remaining  ?? (c.level ?? 1),
-        condition_durations: c.condition_durations ?? {},
-        class_resource_uses: c.class_resource_uses ?? {},
-        asi_pending:         c.asi_pending         ?? false,
-        exhaustion_level:    c.exhaustion_level    ?? 0,
-        spell_slots_max:     c.spell_slots_max     ?? {},
-        spell_slots_used:    c.spell_slots_used    ?? {},
-        spells_known:        c.spells_known        ?? [],
+        hit_die:              c.hit_die              ?? 8,
+        hit_dice_remaining:   c.hit_dice_remaining   ?? (c.level ?? 1),
+        condition_durations:  c.condition_durations  ?? {},
+        class_resource_uses:  c.class_resource_uses  ?? {},
+        asi_pending:          c.asi_pending          ?? false,
+        exhaustion_level:     c.exhaustion_level     ?? 0,
+        spell_slots_max:      c.spell_slots_max      ?? {},
+        spell_slots_used:     c.spell_slots_used     ?? {},
+        spells_known:         c.spells_known         ?? [],
+        background_id:        c.background_id        ?? null,
+        skill_proficiencies:  c.skill_proficiencies  ?? [],
+        tool_proficiencies:   c.tool_proficiencies   ?? [],
+        armor_proficiencies:  c.armor_proficiencies  ?? [],
+        weapon_proficiencies: c.weapon_proficiencies ?? [],
+        attuned_items:        c.attuned_items        ?? [] as string[],
       })),
     };
   }
@@ -391,6 +478,12 @@ export function normalizeState(
     spell_slots_max:     {},
     spell_slots_used:    {},
     spells_known:        [],
+    background_id:        null,
+    skill_proficiencies:  [],
+    tool_proficiencies:   [],
+    armor_proficiencies:  [],
+    weapon_proficiencies: [],
+    attuned_items:        [] as string[],
   };
   const oldRunLog = (raw.run_log as Array<{ action: string; narrative: string }>) ?? [];
   return {
@@ -411,7 +504,11 @@ export function normalizeState(
     long_rested:         false,
     npc_attitudes:       {},
     npc_talked:          [],
+    traps_triggered:     [],
+    traps_disarmed:      [],
+    objects_searched:    [],
     flags:               (raw.flags as Record<string, boolean | string | number>) ?? {},
+    enemy_conditions:    [],
   };
 }
 
@@ -438,6 +535,16 @@ export function buildArrivalNarrative(targetId: string, state: GameState, seed: 
   if (newLoot && !state.loot_taken.includes(targetId)) {
     text += ` You spot a ${newLoot.name} on the ground.`;
   }
+
+  // Passive trap detection (5e DMG ch.5)
+  const trap = getRoomTrap(targetId, seed, context);
+  if (trap && !trapSpent(state, targetId)) {
+    if (partyDetectsTrap(state.characters, trap)) {
+      text += ' ' + trap.detectNarrative;
+    }
+    // If not detected, trap fires silently on next action — handled in takeAction
+  }
+
   return text;
 }
 
@@ -491,6 +598,12 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     .map(id => seed.rooms.find(r => r.id === id))
     .filter((r): r is NonNullable<typeof r> => r != null);
 
+  // Trap: offer disarm if trap is detected (party passive Perception beat the DC) but not yet spent
+  const roomTrap = getRoomTrap(roomId, seed, context);
+  if (roomTrap && !trapSpent(state, roomId) && partyDetectsTrap(state.characters, roomTrap)) {
+    choices.push({ label: `Disarm Trap — DEX check (DC ${roomTrap.dc})`, action: { type: 'disarm_trap' } });
+  }
+
   if (state.current_room === context.escapeRoomId && !enemyAlive) {
     choices.push({ label: context.escapeChoiceText, action: { type: 'escape' } });
   }
@@ -534,6 +647,19 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       choices.push({ label: 'Long Rest — full recovery (once per session)', action: { type: 'long_rest' } });
     }
   }
+  // Interactive object choices — once per object, collapsed into a single Interact action
+  const currentRoom = seed.rooms.find(r => r.id === roomId);
+  if (currentRoom?.objects?.length && !enemyAlive) {
+    for (const obj of currentRoom.objects) {
+      if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+      const searchKey = `${roomId}:${obj.id}`;
+      const alreadySearched = (state.objects_searched ?? []).includes(searchKey);
+      if (!alreadySearched) {
+        choices.push({ label: `Interact with ${obj.name}`, action: { type: 'interact_object', objectId: obj.id } });
+      }
+    }
+  }
+
   // NPC choices
   const npc = seed.npcs?.[roomId];
   if (npc && !npcIsKilled(state, roomId) && !enemyAlive) {
@@ -555,11 +681,61 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
           }
         }
       }
-      if (attitude !== 'hostile') {
-        choices.push({ label: `Attack ${npc.name} (makes hostile)`, action: { type: 'attack_npc' } });
+      // Always show attack option for non-hostile NPCs (makes them hostile)
+      choices.push({ label: `Attack ${npc.name} (makes hostile)`, action: { type: 'attack_npc' } });
+    }
+  }
+  // ── Combat action economy choices ─────────────────────────────────────────
+  if (state.combat_active && !char.turn_actions.action_used) {
+    // Dash
+    choices.push({ label: `Dash — double movement this turn (${(char.speed ?? 30)} extra ft)`, action: { type: 'dash' } });
+    // Help — only when party has multiple members and an ally is alive
+    const aliveAllies = state.characters.filter(c => !c.dead && c.id !== char.id);
+    for (const ally of aliveAllies) {
+      if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+      choices.push({ label: `Help ${ally.name} — give advantage on their next attack`, action: { type: 'help', targetId: ally.id } });
+    }
+    // Ready
+    if (enemyAlive) {
+      choices.push({ label: `Ready an action — set trigger and action to store`, action: { type: 'ready', trigger: 'enemy attacks', action: { type: 'attack' } } });
+    }
+  }
+
+  // Use Reaction (trigger readied action) — shown when readied_action is set and reaction not yet used
+  if (state.combat_active && !char.turn_actions.reaction_used && char.turn_actions.readied_action) {
+    choices.push({ label: `Trigger readied action: "${char.turn_actions.readied_action.trigger}"`, action: { type: 'use_reaction' } });
+  }
+
+  // ── Subclass selection ─────────────────────────────────────────────────────
+  if (!char.subclass) {
+    const cls = char.character_class.toLowerCase();
+    const subclassLevels: Record<string, number> = { fighter: 3, rogue: 3, wizard: 2, cleric: 1, ranger: 3, paladin: 3, bard: 3, druid: 2, sorcerer: 1, warlock: 1, monk: 3, barbarian: 3 };
+    const subclassChoices: Record<string, string[]> = {
+      fighter:   ['champion', 'battle_master'],
+      rogue:     ['thief', 'assassin'],
+      wizard:    ['evoker', 'abjurer'],
+      cleric:    ['life', 'war'],
+      ranger:    ['hunter', 'beastmaster'],
+      paladin:   ['devotion', 'vengeance'],
+      bard:      ['lore', 'valor'],
+    };
+    const reqLevel = subclassLevels[cls] ?? 3;
+    if (char.level >= reqLevel && subclassChoices[cls]) {
+      for (const sc of subclassChoices[cls]) {
+        if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+        choices.push({ label: `Choose subclass: ${sc.replace(/_/g, ' ')}`, action: { type: 'select_subclass', subclass: sc } });
       }
     }
   }
+
+  // ── Prepare spells (out of combat, prep-class only) ────────────────────────
+  if (!state.combat_active) {
+    const prepClasses = ['cleric', 'paladin', 'druid'];
+    if (prepClasses.includes(char.character_class.toLowerCase()) && (char.spells_known ?? []).length > 0) {
+      choices.push({ label: `Prepare spells — choose spells for today (${char.level + Math.max(0, Math.floor(((char.wis ?? 10) - 10) / 2))} max)`, action: { type: 'prepare_spells', spellIds: char.spells_known ?? [] } });
+    }
+  }
+
   // Class feature bonus actions — shown only during combat while bonus action is still available
   if (state.combat_active && !char.turn_actions.bonus_action_used) {
     const features = context.classFeatures?.[char.character_class] ?? [];
@@ -573,6 +749,32 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         });
       }
     }
+
+    // Fighter: Second Wind (bonus action)
+    if (char.character_class.toLowerCase() === 'fighter' && !(char.class_resource_uses?.second_wind)) {
+      choices.push({ label: `Second Wind — bonus action: heal 1d10+${char.level} HP`, action: { type: 'use_class_feature', featureId: 'second_wind' }, requiresBonusAction: true });
+    }
+
+    // Rogue L2+: Cunning Action (bonus action options)
+    if (char.character_class.toLowerCase() === 'rogue' && char.level >= 2) {
+      choices.push({ label: 'Cunning Action: Dash — extra movement as bonus action', action: { type: 'use_class_feature', featureId: 'cunning_action_dash' }, requiresBonusAction: true });
+      choices.push({ label: 'Cunning Action: Disengage — no OA this turn as bonus action', action: { type: 'use_class_feature', featureId: 'cunning_action_disengage' }, requiresBonusAction: true });
+      choices.push({ label: 'Cunning Action: Hide — stealth check as bonus action', action: { type: 'use_class_feature', featureId: 'cunning_action_hide' }, requiresBonusAction: true });
+    }
+
+    // Bard: Bardic Inspiration (bonus action)
+    if (char.character_class.toLowerCase() === 'bard') {
+      const biUses = char.class_resource_uses?.bardic_inspiration ?? Math.max(1, Math.floor(((char.cha ?? 10) - 10) / 2));
+      const inspDie = char.level >= 15 ? 'd12' : char.level >= 10 ? 'd10' : char.level >= 5 ? 'd8' : 'd6';
+      if (biUses > 0) {
+        choices.push({ label: `Bardic Inspiration — give ally a ${inspDie} die (${biUses} left)`, action: { type: 'use_class_feature', featureId: 'bardic_inspiration' }, requiresBonusAction: true });
+      }
+    }
+  }
+
+  // Fighter: Action Surge — shown in combat when not yet used
+  if (state.combat_active && char.character_class.toLowerCase() === 'fighter' && char.level >= 2 && !(char.class_resource_uses?.action_surge)) {
+    choices.push({ label: `Action Surge — gain one extra action this turn`, action: { type: 'use_class_feature', featureId: 'action_surge' } });
   }
 
   // Spell choices
@@ -620,21 +822,108 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     }
   }
 
+  // Two-weapon fighting bonus action: both weapons must be light
+  if (state.combat_active && char.turn_actions.action_used && !char.turn_actions.bonus_action_used) {
+    const equippedWpnItem = char.equipped_weapon
+      ? context.lootTable.find(l => l.id === (char.inventory.find(i => i.instance_id === char.equipped_weapon)?.id))
+      : null;
+    if (equippedWpnItem?.light) {
+      const offhandItem = char.inventory
+        .filter(i => i.instance_id !== char.equipped_weapon)
+        .map(i => context.lootTable.find(l => l.id === i.id))
+        .find(l => l?.light && l.slot === 'weapon');
+      if (offhandItem) {
+        choices.push({ label: `Two-weapon attack — off-hand ${offhandItem.name} (no ability mod to damage)`, action: { type: 'two_weapon_attack' }, requiresBonusAction: true });
+      }
+    }
+  }
+
+  // Grapple/Shove choices — in the enemyAlive block, alongside attack
+  if (enemyAlive && !char.turn_actions.action_used) {
+    choices.push({ label: `Grapple the ${enemy.name} — STR vs STR/DEX contest`, action: { type: 'grapple' } });
+    choices.push({ label: `Shove the ${enemy.name} — STR vs STR/DEX contest (knocks prone)`, action: { type: 'shove' } });
+  }
+
+  // Dodge / Disengage — available in combat when action not yet used
+  if (state.combat_active && !char.turn_actions.action_used) {
+    choices.push({ label: 'Dodge — attacks against you have disadvantage until your next turn', action: { type: 'dodge' } });
+    choices.push({ label: 'Disengage — move without triggering opportunity attacks', action: { type: 'disengage' } });
+  }
+
+  // Attune choices — out of combat, for unnattuned items that require attunement
+  if (!state.combat_active) {
+    const attuned = char.attuned_items ?? [];
+    if (attuned.length < 3) {
+      for (const invItem of char.inventory) {
+        if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+        const lootItem = context.lootTable.find(l => l.id === invItem.id);
+        if (lootItem?.requiresAttunement && !attuned.includes(invItem.instance_id)) {
+          choices.push({ label: `Attune to ${invItem.name}`, action: { type: 'attune', instanceId: invItem.instance_id } });
+        }
+      }
+    }
+  }
+
   // End turn: available in combat after the character's action is used
   // (auto-advance fires when no bonus choices exist, but this allows explicit forfeiture)
   if (state.combat_active && char.turn_actions.action_used) {
     choices.push({ label: 'End turn', action: { type: 'end_turn' } });
   }
   const isImmobilized = char.conditions.some(c => ['grappled', 'restrained'].includes(c));
-  if (!isImmobilized) {
+
+  // Grid movement choices — shown in combat when entities are tracked on the grid
+  if (state.entities && state.combat_active && !isImmobilized) {
+    const charEntity = state.entities.find(e => e.id === char.id);
+    if (charEntity) {
+      const speedFt    = char.speed ?? 30;
+      const usedFt     = (state.movement_used ?? {})[char.id] ?? 0;
+      const remaining  = speedFt - usedFt;
+      const gw         = context.gridWidth  ?? 10;
+      const gh         = context.gridHeight ?? 10;
+      const occupied   = new Set(state.entities.filter(e => e.id !== char.id).map(e => `${e.pos.x},${e.pos.y}`));
+      const DIRS: Array<{ label: string; dx: number; dy: number }> = [
+        { label: 'N',  dx:  0, dy: -1 },
+        { label: 'NE', dx:  1, dy: -1 },
+        { label: 'E',  dx:  1, dy:  0 },
+        { label: 'SE', dx:  1, dy:  1 },
+        { label: 'S',  dx:  0, dy:  1 },
+        { label: 'SW', dx: -1, dy:  1 },
+        { label: 'W',  dx: -1, dy:  0 },
+        { label: 'NW', dx: -1, dy: -1 },
+      ];
+      if (remaining > 0) {
+        for (const dir of DIRS) {
+          if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+          const nx = charEntity.pos.x + dir.dx;
+          const ny = charEntity.pos.y + dir.dy;
+          if (nx < 0 || nx >= gw || ny < 0 || ny >= gh) continue;
+          if (occupied.has(`${nx},${ny}`)) continue;
+          choices.push({
+            label:  `Move ${dir.label} → (${nx},${ny}) [${remaining - 5}ft left]`,
+            action: { type: 'grid_move', entityId: char.id, to: { x: nx, y: ny } },
+          });
+        }
+      }
+    }
+  } else if (!state.entities) {
+    if (!isImmobilized) {
+      for (const adj of adjacent) {
+        if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+        const label = enemyAlive ? `Dash past the ${enemy.name} → ${adj.name}` : `Move to ${adj.name}`;
+        choices.push({ label, action: { type: 'move', roomId: adj.id } });
+      }
+    } else {
+      const blocker = char.conditions.find(c => ['grappled', 'restrained'].includes(c))!;
+      choices.push({ label: `${blocker.toUpperCase()} — cannot move`, action: { type: 'pass' } });
+    }
+  }
+
+  // Room exits are always available when not in active combat (grid or not)
+  if (!state.combat_active && !isImmobilized && state.entities) {
     for (const adj of adjacent) {
       if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
-      const label = enemyAlive ? `Dash past the ${enemy.name} → ${adj.name}` : `Move to ${adj.name}`;
-      choices.push({ label, action: { type: 'move', roomId: adj.id } });
+      choices.push({ label: `Move to ${adj.name}`, action: { type: 'move', roomId: adj.id } });
     }
-  } else {
-    const blocker = char.conditions.find(c => ['grappled', 'restrained'].includes(c))!;
-    choices.push({ label: `${blocker.toUpperCase()} — cannot move`, action: { type: 'pass' } });
   }
   return MAX_CHOICES ? choices.slice(0, MAX_CHOICES) : choices;
 }
@@ -782,7 +1071,7 @@ function applyConsequence(
 
 // ─── Main action handler ──────────────────────────────────────────────────────
 
-export async function takeAction({ action, history = [], state, seed, context }: {
+export async function takeAction({ action, history = [], state, seed: seedArg, context }: {
   action:  StructuredAction;
   history: unknown[];
   state:   GameState;
@@ -792,6 +1081,8 @@ export async function takeAction({ action, history = [], state, seed, context }:
   void history;
 
   const prevRoomId = state.current_room;
+  // Allow mutation in travel case (rebinding local variable only)
+  let seed = seedArg;
 
   // Resolve and clone the active character
   const charIdx = state.characters.findIndex(c => c.id === state.active_character_id);
@@ -812,7 +1103,9 @@ export async function takeAction({ action, history = [], state, seed, context }:
     long_rested:        state.long_rested        ?? false,
     npc_attitudes:      state.npc_attitudes      ?? {},
     npc_talked:         state.npc_talked         ?? [],
+    objects_searched:   state.objects_searched   ?? [],
     flags:              state.flags              ?? {},
+    enemy_conditions:   state.enemy_conditions   ?? [],
   };
 
   // Ensure character fields have safe defaults
@@ -830,9 +1123,15 @@ export async function takeAction({ action, history = [], state, seed, context }:
     class_resource_uses: char.class_resource_uses ?? {},
     asi_pending:         char.asi_pending         ?? false,
     exhaustion_level:    char.exhaustion_level    ?? 0,
-    spell_slots_max:     char.spell_slots_max     ?? {},
-    spell_slots_used:    char.spell_slots_used    ?? {},
-    spells_known:        char.spells_known        ?? [],
+    spell_slots_max:      char.spell_slots_max      ?? {},
+    spell_slots_used:     char.spell_slots_used     ?? {},
+    spells_known:         char.spells_known         ?? [],
+    background_id:        char.background_id        ?? null,
+    skill_proficiencies:  char.skill_proficiencies  ?? [],
+    tool_proficiencies:   char.tool_proficiencies   ?? [],
+    armor_proficiencies:  char.armor_proficiencies  ?? [],
+    weapon_proficiencies: char.weapon_proficiencies ?? [],
+    attuned_items:        char.attuned_items        ?? [],
   };
 
   const worldName  = getWorldName(seed);
@@ -850,9 +1149,34 @@ export async function takeAction({ action, history = [], state, seed, context }:
   // Track whether initiative was used this action (determines active_character advancement)
   let usedInitiative = false;
 
-  // Helper: write char back to st (does NOT advance active_character_id)
+  // ── Undetected trap fires on first action in room ─────────────────────────
+  // (Detected traps offer a 'disarm_trap' choice instead; this handles the case
+  //  where no character's passive Perception beat the trap DC.)
+  if (action.type !== 'disarm_trap' && action.type !== 'move') {
+    const hiddenTrap = getRoomTrap(roomId, seed, context);
+    if (hiddenTrap && !trapSpent(st, roomId) && !partyDetectsTrap(st.characters, hiddenTrap)) {
+      st.traps_triggered = [...(st.traps_triggered ?? []), roomId];
+      const trapDmg = rollDice(hiddenTrap.damage);
+      char.hp = Math.max(0, char.hp - trapDmg);
+      narrative += hiddenTrap.triggerNarrative.replace(/{name}/g, char.name).replace(/{dmg}/g, String(trapDmg)) + ' ';
+      if (hiddenTrap.condition && char.hp > 0) {
+        char.conditions = [...new Set([...char.conditions, hiddenTrap.condition])];
+        if (hiddenTrap.conditionDuration) char.condition_durations = { ...char.condition_durations, [hiddenTrap.condition]: hiddenTrap.conditionDuration };
+      }
+      commitChar();
+    }
+  }
+
+  // Helper: write char back to st, and sync HP into grid entity if present
   function commitChar() {
-    st = { ...st, characters: st.characters.map((c, i) => i === safeIdx ? char : c) };
+    const updatedChars = st.characters.map((c, i) => i === safeIdx ? char : c);
+    let updatedEntities = st.entities;
+    if (updatedEntities) {
+      updatedEntities = updatedEntities.map(e =>
+        e.id === char.id && !e.isEnemy ? { ...e, hp: char.hp, conditions: char.conditions } : e,
+      );
+    }
+    st = { ...st, characters: updatedChars, entities: updatedEntities };
   }
 
   // ── Death saves override all actions when HP = 0 ───────────────────────────
@@ -904,6 +1228,17 @@ export async function takeAction({ action, history = [], state, seed, context }:
     return { narrative, choices: st.last_choices, newState: st, escaped: false, dead: false };
   }
 
+  // Exhaustion level 6 = death (PHB p.291)
+  if ((char.exhaustion_level ?? 0) >= 6 && !char.dead) {
+    char.dead = true;
+    narrative = `${char.name} succumbs to exhaustion (level 6) and dies.`;
+    commitChar();
+    st.run_log = [...(st.run_log || []), { character_id: char.id, action: action.type, narrative }];
+    const allDeadExhaustion = st.characters.every(c => c.dead);
+    st.last_choices = generateChoices(st, seed, context);
+    return { narrative, choices: st.last_choices, newState: st, escaped: false, dead: allDeadExhaustion };
+  }
+
   switch (action.type) {
 
     case 'move': {
@@ -919,13 +1254,15 @@ export async function takeAction({ action, history = [], state, seed, context }:
         break;
       }
       // Opportunity attack when leaving a room with a living enemy (5e PHB p.195)
-      if (enemyAlive) {
+      if (enemyAlive && !(char.turn_actions?.disengaged ?? false)) {
         const opp = applyEnemyAttackNarrative(enemy, char, context);
         char.hp                  = Math.max(0, char.hp - opp.hpLost);
         char.conditions          = opp.newConditions;
         char.condition_durations = opp.newDurations;
+        const concOpp = checkConcentration(char, st, opp.hpLost);
+        char = concOpp.char; st = concOpp.st;
         narrative = opp.hpLost > 0
-          ? `You try to flee — the ${enemy.name} strikes as you go! ${opp.narrative} `
+          ? `You try to flee — the ${enemy.name} strikes as you go! ${opp.narrative}${concOpp.note} `
           : `You dodge past the ${enemy.name} in a desperate sprint! `;
         if (char.hp <= 0) {
           const { narrative: dsNarr, newChar, died, endedCombat } = processDeathSave(
@@ -941,6 +1278,7 @@ export async function takeAction({ action, history = [], state, seed, context }:
         st = endCombatState(st);
         char.conditions = [];
       }
+      st.enemy_conditions = [];
       st.current_room = target.id;
       if (!st.visited_rooms.includes(target.id)) {
         st.visited_rooms = [...st.visited_rooms, target.id];
@@ -953,6 +1291,27 @@ export async function takeAction({ action, history = [], state, seed, context }:
       if (!enemy)      { narrative = pick(context.narratives.noEnemy);     break; }
       if (!enemyAlive) { narrative = pick(context.narratives.alreadyDead); break; }
 
+      // Grid range check — only applies when combat entities are tracked on the grid
+      if (st.entities) {
+        const charEntity  = st.entities.find(e => e.id === char.id);
+        const enemyEntity = st.entities.find(e => e.id === roomId && e.isEnemy);
+        if (charEntity && enemyEntity) {
+          const equippedWeaponItem = char.equipped_weapon
+            ? getItemData(char.inventory?.find(i => i.instance_id === char.equipped_weapon) as InventoryItem, context)
+            : null;
+          if (!inRange(charEntity.pos, enemyEntity.pos, equippedWeaponItem)) {
+            narrative = `Out of range. Move closer before attacking.`;
+            break;
+          }
+        }
+      }
+
+      // Charmed: cannot attack the charmer
+      if (char.conditions.includes('charmed') && char.charmer_id && char.charmer_id === roomId) {
+        narrative = `You are charmed by the ${enemy.name} and cannot bring yourself to attack them.`;
+        break;
+      }
+
       // Incapacitation is handled upstream in generateChoices (pass action); guard here as a safety net
       if (char.conditions.includes('paralyzed') || char.conditions.includes('stunned')) {
         narrative = `You cannot act while ${char.conditions.find(c => c === 'stunned' || c === 'paralyzed')}.`;
@@ -964,7 +1323,12 @@ export async function takeAction({ action, history = [], state, seed, context }:
       const weaponItem     = char.equipped_weapon
         ? getItemData(char.inventory?.find(i => i.instance_id === char.equipped_weapon) as InventoryItem, context)
         : null;
-      const weaponDamage = weaponItem?.damage ?? null;
+      let weaponDamage = weaponItem?.damage ?? null;
+      // Versatile: use two-handed damage when no shield is equipped
+      const isVersatile = !!(weaponItem?.versatileDamage && !char.equipped_shield);
+      if (isVersatile) {
+        weaponDamage = weaponItem!.versatileDamage!;
+      }
       const weaponLabel  = weaponItem ? `Your ${weaponItem.name}` : 'Your fists';
 
       // ── Start combat on first attack — roll initiative for all ─────────────
@@ -984,13 +1348,41 @@ export async function takeAction({ action, history = [], state, seed, context }:
         if (freshChar) char = { ...freshChar };
         char.turn_actions = { ...FRESH_TURN };
 
+        // ── Initialize grid entities if this context uses a grid ────────────
+        if (context.gridEnabled && !st.entities) {
+          const gw = context.gridWidth  ?? 8;
+          const gh = context.gridHeight ?? 8;
+          const pcEntities: CombatEntity[] = st.characters.map((c, ci) => ({
+            id:                  c.id,
+            isEnemy:             false,
+            pos:                 { x: 1 + ci, y: 1 },
+            hp:                  c.hp,
+            maxHp:               c.max_hp,
+            conditions:          c.conditions,
+            condition_durations: c.condition_durations,
+          }));
+          const enemyEntity: CombatEntity = {
+            id:                  roomId,
+            isEnemy:             true,
+            pos:                 { x: gw - 2, y: gh - 2 },
+            hp:                  enemy.hp,
+            maxHp:               enemy.hp,
+            conditions:          [],
+            condition_durations: {},
+          };
+          st = { ...st, entities: [...pcEntities, enemyEntity], movement_used: {} };
+        }
+
         const orderText = order
           .map(e => {
             const name = e.is_enemy ? enemy.name : (st.characters.find(c => c.id === e.id)?.name ?? 'Hero');
             return `${name}(${e.roll})`;
           })
           .join(' → ');
-        narrative = `Combat begins! Initiative: ${orderText}. `;
+        const combatPrefix = context.narratives.combatStart
+          ? pick(context.narratives.combatStart).replace(/{enemy}/g, enemy.name) + ' '
+          : 'Combat begins! ';
+        narrative = `${combatPrefix}Initiative: ${orderText}. `;
 
         // Find this character's position in the initiative order
         const myInitIdx = order.findIndex(e => e.id === char.id);
@@ -1005,7 +1397,9 @@ export async function takeAction({ action, history = [], state, seed, context }:
           char.hp                  = Math.max(0, char.hp - preStrike.hpLost);
           char.conditions          = preStrike.newConditions;
           char.condition_durations = preStrike.newDurations;
-          narrative += `The ${enemy.name} strikes first (${enemyEntry.roll})! ${preStrike.narrative} `;
+          const concPre = checkConcentration(char, st, preStrike.hpLost);
+          char = concPre.char; st = concPre.st;
+          narrative += `The ${enemy.name} strikes first (${enemyEntry.roll})! ${preStrike.narrative}${concPre.note} `;
           if (char.hp <= 0) {
             const { narrative: dsNarr, newChar, died, endedCombat } = processDeathSave(
               { ...char, death_saves: { successes: 0, failures: 0 } }, enemy, context, worldName
@@ -1026,18 +1420,61 @@ export async function takeAction({ action, history = [], state, seed, context }:
       }
 
       // ── Resolve the player's attack ────────────────────────────────────────
+      // Armor proficiency check (PHB p.144): non-proficient armor → disadv on STR/DEX attack rolls
+      const equippedArmorLootItem = char.equipped_armor
+        ? context.lootTable.find(l => l.id === (char.inventory?.find(i => i.instance_id === char.equipped_armor)?.id))
+        : null;
+      const armorProficient   = hasArmorProficiency(char.armor_proficiencies ?? [], equippedArmorLootItem?.armorCategory);
+      // Weapon proficiency check (PHB p.147): non-proficient weapon → no profBonus (passed to resolvePlayerAttack)
+      const weaponProficient  = hasWeaponProficiency(char.weapon_proficiencies ?? [], weaponItem?.weaponType);
+
       const rangedInMelee    = (weaponItem?.range === 'ranged');
       const conditionDisadv  = char.conditions.some(c => DISADV_CONDITIONS.has(c));
       const exhaustionDisadv = (char.exhaustion_level ?? 0) >= 3; // exhaustion 3+: disadv on attack rolls
       const conditionAdv     = char.conditions.some(c => PLAYER_ADV_CONDITIONS.has(c));
-      const disadvantage     = rangedInMelee || conditionDisadv || exhaustionDisadv;
-      const advantage        = conditionAdv;
+      const enemyGrappled   = (st.enemy_conditions ?? []).includes('grappled');
+      const enemyProne      = (st.enemy_conditions ?? []).includes('prone');
+      const enemyParalyzed  = (st.enemy_conditions ?? []).includes('paralyzed');
+      // Unconscious: auto-crit when attacker is within 5ft
+      const enemyUnconscious = (st.enemy_conditions ?? []).includes('unconscious');
+      // Prone: melee attacks have advantage, ranged attacks have disadvantage
+      const proneAdv        = enemyProne && weaponItem?.range !== 'ranged';
+      const proneDisadv     = enemyProne && weaponItem?.range === 'ranged';
+
+      // Cover bonus: raise enemy's effective AC from obstacles between attacker and target
+      let coverAcBonus = 0;
+      let flankingAdv  = false;
+      if (st.entities) {
+        const charEntity  = st.entities.find(e => e.id === char.id);
+        const enemyEntity = st.entities.find(e => e.id === roomId && e.isEnemy);
+        if (charEntity && enemyEntity) {
+          const obstacles = st.entities
+            .filter(e => e.id !== char.id && e.id !== roomId)
+            .map(e => e.pos);
+          coverAcBonus = coverBonus(charEntity.pos, enemyEntity.pos, obstacles);
+          // Flanking (PHB optional): ally on opposite side of enemy grants advantage
+          const flankingAlly = st.entities.find(e =>
+            !e.isEnemy && e.id !== char.id && isFlankingPosition(charEntity.pos, e.pos, enemyEntity.pos),
+          );
+          if (flankingAlly) flankingAdv = true;
+        }
+      }
+
+      // Help action advantage: another character used Help targeting this one
+      const helpAdv = st.help_target_id === char.id;
+      if (helpAdv) st = { ...st, help_target_id: undefined };
+
+      const disadvantage     = rangedInMelee || conditionDisadv || exhaustionDisadv || !armorProficient || proneDisadv;
+      const advantage        = conditionAdv || enemyGrappled || proneAdv || enemyParalyzed || flankingAdv || helpAdv;
       const disadvReasons    = [
         rangedInMelee    ? 'ranged in melee' : '',
         conditionDisadv  ? char.conditions.filter(c => DISADV_CONDITIONS.has(c)).join(', ') : '',
         exhaustionDisadv ? 'exhaustion' : '',
+        !armorProficient ? `not proficient with ${equippedArmorLootItem?.name ?? 'armor'}` : '',
+        proneDisadv      ? 'prone (ranged)' : '',
       ].filter(Boolean).join(', ');
       const disadvNote = disadvReasons ? ` (disadvantage — ${disadvReasons})` : (advantage && !disadvantage) ? ' (advantage)' : '';
+      const noProfNote = !weaponProficient ? ` [no weapon proficiency — prof bonus omitted]` : '';
 
       const features  = context.classFeatures?.[char.character_class] ?? [];
       const isRaging  = char.conditions.includes('raging');
@@ -1045,16 +1482,30 @@ export async function takeAction({ action, history = [], state, seed, context }:
       // Helper that resolves one attack roll and applies it to enemy HP / narrative.
       // Returns true if the enemy was killed (so the caller can break early).
       const resolveOneAttack = (label: string): boolean => {
+        const effectiveEnemyAc = enemy.ac + coverAcBonus;
         const atk = resolvePlayerAttack(
           { str: char.str, dex: char.dex, level: char.level },
           weaponDamage,
-          enemy.ac,
+          effectiveEnemyAc,
           weaponItem?.finesse ?? false,
           disadvantage,
           advantage,
+          weaponProficient,
+          weaponItem?.range === 'ranged',
         );
+        // Unconscious enemy within melee range: auto-crit
+        const autoCritCheck = enemyUnconscious && (!st.entities || (() => {
+          const charEnt = st.entities?.find(e => e.id === char.id);
+          const enmEnt  = st.entities?.find(e => e.id === roomId);
+          return charEnt && enmEnt ? posEqual({ x: charEnt.pos.x, y: charEnt.pos.y }, { x: enmEnt.pos.x, y: enmEnt.pos.y }) || Math.max(Math.abs(charEnt.pos.x - enmEnt.pos.x), Math.abs(charEnt.pos.y - enmEnt.pos.y)) <= 1 : true;
+        })());
+        if (autoCritCheck && atk.hit && !atk.critical) {
+          // Force critical on hit
+        }
         const baseHit  = weaponDamage ? atk.damage : Math.max(1, unarmedDamage(char.str));
-        const atkNote  = ` (${label}d20 ${atk.roll}+${atk.atkMod} ${atk.atkStat}+${atk.prof} prof = ${atk.total} vs AC ${enemy.ac}${disadvNote})`;
+        const versatileNote = isVersatile ? ' (versatile)' : '';
+        const coverNote = coverAcBonus > 0 ? ` +${coverAcBonus} cover` : '';
+        const atkNote  = ` (${label}d20 ${atk.roll}+${atk.atkMod} ${atk.atkStat}+${atk.prof} prof = ${atk.total} vs AC ${effectiveEnemyAc}${coverNote}${disadvNote}${versatileNote})${noProfNote}`;
 
         if (atk.fumble) {
           narrative += `Natural 1 — a fumble! ${weaponLabel} goes completely wide.${atkNote} `;
@@ -1082,7 +1533,8 @@ export async function takeAction({ action, history = [], state, seed, context }:
         const rageBonus = (features.includes('rage') && isRaging && atk.atkStat === 'STR')
           ? rageDamageBonus(char.level) : 0;
 
-        const finalDmg  = baseHit + sneakDmg + rageBonus;
+        const rawDmg     = baseHit + sneakDmg + rageBonus;
+        const { damage: finalDmg, note: dmgNote } = applyDamageMultiplier(rawDmg, weaponItem?.damageType, enemy);
         const curEnemyHp = getEnemyHp(st, roomId, seed);
         const newEnemyHp = curEnemyHp - finalDmg;
 
@@ -1090,12 +1542,14 @@ export async function takeAction({ action, history = [], state, seed, context }:
         narrative += atkNote;
         if (sneakDmg > 0) narrative += ` [Sneak Attack ${sneakAttackDice(char.level)}: +${sneakDmg}]`;
         if (rageBonus > 0) narrative += ` [Rage: +${rageBonus}]`;
+        if (dmgNote) narrative += dmgNote;
 
         if (newEnemyHp <= 0) {
           const xpGain = enemy.xp ?? (10 + (enemy.hp || 8));
           char.xp           = (char.xp || 0) + xpGain;
           st.enemies_killed = [...st.enemies_killed, roomId];
           st.enemy_hp       = { ...st.enemy_hp, [roomId]: 0 };
+          st.enemy_conditions = [];
           st = endCombatState(st);
           char.conditions   = char.conditions.filter(c => c !== 'raging');
           narrative += ' ' + pick(context.narratives.killShot)
@@ -1106,7 +1560,7 @@ export async function takeAction({ action, history = [], state, seed, context }:
             char.max_hp += 4;
             char.hp      = Math.min(char.hp + 4, char.max_hp);
             char.spell_slots_max = getSpellSlotsForLevel(char.character_class, char.level, context);
-            narrative += ' ' + context.narratives.levelUp;
+            narrative += ' ' + pick(context.narratives.levelUp);
             if ([4, 8, 12, 16, 19].includes(char.level)) {
               char.asi_pending = true;
               narrative += ` Level ${char.level}: choose an Ability Score Improvement!`;
@@ -1124,7 +1578,7 @@ export async function takeAction({ action, history = [], state, seed, context }:
       const killed = resolveOneAttack('');
       if (!killed) {
         // ── Extra Attack (Fighter/Warrior level 5+) ───────────────────────
-        const extraCount = features.includes('extra_attack') ? extraAttackCount(char.level) : 0;
+        const extraCount = features.includes('extra_attack') ? extraAttackCount(char.character_class, char.level) : 0;
         for (let ei = 0; ei < extraCount; ei++) {
           if (getEnemyHp(st, roomId, seed) <= 0) break;
           const killedExtra = resolveOneAttack(`Attack ${ei + 2} — `);
@@ -1225,7 +1679,8 @@ export async function takeAction({ action, history = [], state, seed, context }:
       if (!enemyAlive) { narrative = 'Nothing to sneak past. You move freely.'; break; }
       const sneakDC    = passivePerceptionDC(enemy.wis ?? 10);
       const proficient = context.classSkills[char.character_class]?.includes('stealth') ?? false;
-      const check      = skillCheck(char.dex, sneakDC, proficient, char.level);
+      const exhaustionDisadv1 = (char.exhaustion_level ?? 0) >= 1;
+      const check      = skillCheck(char.dex, sneakDC, proficient, char.level, exhaustionDisadv1);
       if (check.success) {
         narrative = pick(context.narratives.sneakSuccess).replace('{enemy}', enemy.name);
         narrative += ` (Stealth: ${check.roll}+${abilityMod(char.dex)}=${check.total} vs DC ${sneakDC})`;
@@ -1235,6 +1690,7 @@ export async function takeAction({ action, history = [], state, seed, context }:
             st = endCombatState(st);
             char.conditions = [];
           }
+          st.enemy_conditions = [];
           st.current_room = target.id;
           if (!st.visited_rooms.includes(target.id)) {
             st.visited_rooms = [...st.visited_rooms, target.id];
@@ -1246,9 +1702,12 @@ export async function takeAction({ action, history = [], state, seed, context }:
         char.hp                  = Math.max(0, char.hp - counter.hpLost);
         char.conditions          = counter.newConditions;
         char.condition_durations = counter.newDurations;
+        const concSnk = checkConcentration(char, st, counter.hpLost);
+        char = concSnk.char; st = concSnk.st;
         narrative = pick(context.narratives.sneakFail)
           .replace('{enemy}', enemy.name)
           .replace('{dmg}',   String(counter.hpLost));
+        narrative += concSnk.note;
         narrative += ` (Stealth: ${check.roll}+${abilityMod(char.dex)}=${check.total} vs DC ${sneakDC})`;
         if (char.hp <= 0) {
           const { narrative: dsNarr, newChar, died, endedCombat } = processDeathSave(
@@ -1266,8 +1725,8 @@ export async function takeAction({ action, history = [], state, seed, context }:
     }
 
     case 'escape': {
-      if (roomId !== context.escapeRoomId) { narrative = context.narratives.noEscapeNearby; break; }
-      if (enemyAlive) { narrative = `The ${enemy.name} ${context.narratives.escapeBlocked}`; break; }
+      if (roomId !== context.escapeRoomId) { narrative = pick(context.narratives.noEscapeNearby); break; }
+      if (enemyAlive) { narrative = `The ${enemy.name} ${pick(context.narratives.escapeBlocked)}`; break; }
       escaped  = true;
       narrative = pick(context.narratives.escapeLines).replace(/{world}/g, worldName);
       break;
@@ -1301,8 +1760,38 @@ export async function takeAction({ action, history = [], state, seed, context }:
       char.hp                 = Math.min(char.max_hp, char.hp + hdHealed);
       char.hit_dice_remaining = Math.max(0, (char.hit_dice_remaining ?? 1) - 1);
       st.short_rested_rooms   = [...(st.short_rested_rooms ?? []), roomId];
+
+      // Short-rest class resource recharge
+      const srUses = { ...(char.class_resource_uses ?? {}) };
+      const cls = char.character_class.toLowerCase();
+      // Fighter: Second Wind + Action Surge recover on short rest
+      if (cls === 'fighter') {
+        delete srUses.second_wind;
+        delete srUses.action_surge;
+      }
+      // Bard L5+: Bardic Inspiration recharges on short rest; before L5 only on long rest
+      if (cls === 'bard' && char.level >= 5) delete srUses.bardic_inspiration;
+      // Monk: Ki points recharge on short rest
+      if (cls === 'monk') delete srUses.ki_points;
+      // Battle Master: Superiority Dice recharge on short rest
+      if (char.subclass === 'battle_master') delete srUses.superiority_dice;
+      // Warlock: Pact Magic slots recharge on short rest
+      if (cls === 'warlock') {
+        const warlockSlots = spellSlotsForClassLevel('warlock', char.level);
+        char.spell_slots_max  = warlockSlots;
+        char.spell_slots_used = {};
+      }
+      char.class_resource_uses = srUses;
+
       const hdRemain = char.hit_dice_remaining;
-      narrative = `${char.name} takes a short rest, spending a d${char.hit_die ?? 8} — ${hdHealed} HP recovered (${hdRemain} hit ${hdRemain === 1 ? 'die' : 'dice'} remaining, now ${char.hp}/${char.max_hp}).`;
+      const shortRestFlavor = context.narratives.shortRest
+        ? pick(context.narratives.shortRest)
+            .replace(/{name}/g, char.name)
+            .replace(/{hpGained}/g, String(hdHealed))
+            .replace(/{hpNow}/g,   String(char.hp))
+            .replace(/{hpMax}/g,   String(char.max_hp)) + ' '
+        : '';
+      narrative = `${shortRestFlavor}${char.name} takes a short rest, spending a d${char.hit_die ?? 8} — ${hdHealed} HP recovered (${hdRemain} hit ${hdRemain === 1 ? 'die' : 'dice'} remaining, now ${char.hp}/${char.max_hp}).`;
       break;
     }
 
@@ -1326,7 +1815,10 @@ export async function takeAction({ action, history = [], state, seed, context }:
       });
       st   = { ...st, characters: restedChars, long_rested: true };
       char = { ...restedChars[safeIdx] };
-      narrative = `The party takes a long rest. ${restLines.join('; ')}.`;
+      const longRestFlavor = context.narratives.longRest
+        ? pick(context.narratives.longRest).replace(/{party}/g, restLines.join('; ')) + ' '
+        : '';
+      narrative = `${longRestFlavor}The party takes a long rest. ${restLines.join('; ')}.`;
       break;
     }
 
@@ -1458,6 +1950,41 @@ export async function takeAction({ action, history = [], state, seed, context }:
       break;
     }
 
+    case 'disarm_trap': {
+      const trap = getRoomTrap(roomId, seed, context);
+      if (!trap || trapSpent(st, roomId)) { narrative = 'There is no trap here to disarm.'; break; }
+      // Must have detected it (passive Perception) to attempt disarm
+      if (!partyDetectsTrap(st.characters, trap)) { narrative = 'You have not located the trap.'; break; }
+      const hasToolProf = char.tool_proficiencies?.some(t =>
+        t.toLowerCase().includes('thieves') || t.toLowerCase().includes('hacking')
+      ) ?? false;
+      // Exhaustion 1+: disadvantage on ability checks (disarmTrap uses DEX)
+      // disarmTrap does not support disadvantage natively; apply by calling twice and taking lower
+      const exhaustionDisadv1Trap = (char.exhaustion_level ?? 0) >= 1;
+      const trapAttempt1 = disarmTrap(char.dex, char.level, hasToolProf);
+      const trapAttempt2 = exhaustionDisadv1Trap ? disarmTrap(char.dex, char.level, hasToolProf) : trapAttempt1;
+      const { roll, total } = trapAttempt1.total <= trapAttempt2.total ? trapAttempt1 : trapAttempt2;
+      const profNote = hasToolProf ? ` (tool proficiency)` : '';
+      if (total >= trap.dc) {
+        st.traps_disarmed = [...(st.traps_disarmed ?? []), roomId];
+        narrative = `${trap.disarmSuccess} (DEX ${roll} + ${total - roll}${profNote} = ${total} vs DC ${trap.dc})`;
+      } else {
+        // Disarm failure — trap triggers
+        st.traps_triggered = [...(st.traps_triggered ?? []), roomId];
+        const trapDmg = rollDice(trap.damage);
+        char.hp = Math.max(0, char.hp - trapDmg);
+        let failNarr = `${trap.disarmFail} (DEX ${roll} + ${total - roll}${profNote} = ${total} vs DC ${trap.dc}). `;
+        failNarr += trap.triggerNarrative.replace(/{name}/g, char.name).replace(/{dmg}/g, String(trapDmg));
+        narrative = failNarr;
+        if (trap.condition && char.hp > 0) {
+          char.conditions = [...new Set([...char.conditions, trap.condition])];
+          if (trap.conditionDuration) char.condition_durations = { ...char.condition_durations, [trap.condition]: trap.conditionDuration };
+        }
+      }
+      char.turn_actions = { ...char.turn_actions, action_used: true };
+      break;
+    }
+
     case 'apply_asi': {
       if (!char.asi_pending) { narrative = 'No Ability Score Improvement pending.'; break; }
       const stat = action.stat as AbilityKey;
@@ -1477,11 +2004,56 @@ export async function takeAction({ action, history = [], state, seed, context }:
 
     case 'cast_spell': {
       const { spellId, slotLevel } = action;
+      const isRitualCast = (action as { type: 'cast_spell'; spellId: string; slotLevel: number; ritual?: boolean }).ritual ?? false;
       const spell = context.spellTable?.[spellId];
       if (!spell) { narrative = `Unknown spell: ${spellId}.`; break; }
 
-      // Expend a slot for non-cantrips
-      if (spell.level > 0) {
+      // PHB p.144: cannot cast spells while wearing armor you are not proficient with
+      const spellArmorItem = char.equipped_armor
+        ? context.lootTable.find(l => l.id === (char.inventory?.find(i => i.instance_id === char.equipped_armor)?.id))
+        : null;
+      if (spellArmorItem && !hasArmorProficiency(char.armor_proficiencies ?? [], spellArmorItem.armorCategory)) {
+        narrative = `You cannot cast spells while wearing ${spellArmorItem.name} — you are not proficient with ${spellArmorItem.armorCategory ?? 'this'} armor.`;
+        break;
+      }
+
+      // Deafened: cannot cast spells with verbal components
+      if (char.conditions.includes('deafened') && (spell as { verbal?: boolean }).verbal) {
+        narrative = `You cannot cast ${spell.name} while deafened — it requires a verbal component.`;
+        break;
+      }
+
+      // Ritual casting: no slot cost, only out of combat
+      if (isRitualCast) {
+        if (!(spell as { ritualCasting?: boolean }).ritualCasting) {
+          narrative = `${spell.name} cannot be cast as a ritual.`;
+          break;
+        }
+        if (st.combat_active) {
+          narrative = `Ritual casting takes 10 minutes — not usable in combat.`;
+          break;
+        }
+        // No slot consumed for ritual casting
+      }
+
+      // Spell preparation check (Cleric, Paladin, Druid)
+      const prepClasses = ['cleric', 'paladin', 'druid'];
+      if (prepClasses.includes(char.character_class.toLowerCase()) && spell.level > 0 && !isRitualCast) {
+        const prepared = char.prepared_spells ?? [];
+        if (prepared.length > 0 && !prepared.includes(spellId)) {
+          narrative = `${spell.name} is not prepared. Use 'Prepare Spells' to change your prepared spell list.`;
+          break;
+        }
+      }
+
+      // Break existing concentration if this spell also requires concentration (PHB p.203)
+      if (spell.concentration && char.concentrating_on) {
+        const { char: nc, st: ns } = breakConcentration(char, st);
+        char = nc; st = ns;
+      }
+
+      // Expend a slot for non-cantrips (unless ritual)
+      if (spell.level > 0 && !isRitualCast) {
         if (slotLevel < spell.level) {
           narrative = `${spell.name} requires at least a level-${spell.level} slot.`;
           break;
@@ -1549,19 +2121,21 @@ export async function takeAction({ action, history = [], state, seed, context }:
           narrative = `${char.name} casts ${spell.name}${slotNote} — MISS!${atkNote}`;
           break;
         }
-        spellDmg  = atk.critical ? rollCritical(spell.damage ?? null) : rollDice(spell.damage ?? '1d4');
+        const atkDmgExpr = spell.level === 0 ? cantripDamageDice(spell, char.level) : upcastDamage(spell, slotLevel);
+        spellDmg  = atk.critical ? rollCritical(atkDmgExpr || null) : rollDice(atkDmgExpr || '1d4');
         narrative = `${char.name} casts ${spell.name}${slotNote}!${atkNote} `;
         if (atk.critical) narrative += 'Critical spell hit! ';
         narrative += `${spellDmg} ${spell.damageType ?? ''} damage!`;
       } else if (spell.savingThrow) {
         // ── Saving throw spell ─────────────────────────────────────────────
         const saveAbility    = spell.savingThrow;
-        const enemyScore     = (enemy as Record<string, number>)[saveAbility] ?? 10;
+        const enemyScore     = (enemy as unknown as Record<string, number>)[saveAbility] ?? 10;
         const saveFailed     = rollConditionSave(saveAbility, enemyScore, dc);
         const saveLabel      = saveAbility.toUpperCase();
 
         if (spell.damage) {
-          const fullDmg = rollDice(spell.damage);
+          const saveDmgExpr = spell.level === 0 ? cantripDamageDice(spell, char.level) : upcastDamage(spell, slotLevel);
+          const fullDmg = rollDice(saveDmgExpr || spell.damage);
           spellDmg = saveFailed ? fullDmg
             : spell.saveEffect === 'half' ? Math.floor(fullDmg / 2) : 0;
           const saveVerb = saveFailed ? 'fails' : 'succeeds';
@@ -1574,17 +2148,26 @@ export async function takeAction({ action, history = [], state, seed, context }:
         }
 
         if (spell.condition && saveFailed) {
-          const dur = spell.conditionDuration ?? CONDITION_DURATION[spell.condition] ?? 1;
-          const newEnemyHp = getEnemyHp(st, roomId, seed) - spellDmg;
+          if (enemy.condition_immunities?.includes(spell.condition)) {
+            narrative += ` [${enemy.name} is immune to ${spell.condition}]`;
+          } else {
+            st = { ...st, enemy_conditions: [...(st.enemy_conditions ?? []).filter(c => c !== spell.condition), spell.condition] };
+            narrative += ` The ${enemy.name} is ${spell.condition}!`;
+            if (spell.concentration) {
+              char.concentrating_on = { spellId, condition: spell.condition };
+            }
+          }
+          const { damage: effCondDmg, note: condDmgNote } = applyDamageMultiplier(spellDmg, spell.damageType, enemy);
+          if (condDmgNote) narrative += condDmgNote;
+          const newEnemyHp = getEnemyHp(st, roomId, seed) - effCondDmg;
           st.enemy_hp = { ...st.enemy_hp, [roomId]: Math.max(0, newEnemyHp) };
-          narrative += ` The ${enemy.name} is ${spell.condition}!`;
-          // Conditions on enemies are tracked via flags (no character object for enemies)
-          st = { ...st, flags: { ...st.flags, [`enemy_condition_${roomId}`]: spell.condition, [`enemy_condition_${roomId}_dur`]: dur } };
           if (newEnemyHp <= 0) {
             const xpGain = enemy.xp ?? 10;
             char.xp = (char.xp || 0) + xpGain;
             st.enemies_killed = [...st.enemies_killed, roomId];
             st.enemy_hp = { ...st.enemy_hp, [roomId]: 0 };
+            st.enemy_conditions = [];
+            char.concentrating_on = null;
             st = endCombatState(st);
             narrative += ' ' + pick(context.narratives.killShot).replace('{enemy}', enemy.name).replace('{xp}', String(xpGain));
           }
@@ -1593,12 +2176,16 @@ export async function takeAction({ action, history = [], state, seed, context }:
         }
       } else if (spell.damage && !spell.savingThrow && !spell.attackRoll) {
         // ── Auto-hit (Magic Missile style) ─────────────────────────────────
-        spellDmg  = rollDice(spell.damage);
+        const autoHitExpr = spell.level === 0 ? cantripDamageDice(spell, char.level) : upcastDamage(spell, slotLevel);
+        spellDmg  = rollDice(autoHitExpr || spell.damage);
         narrative = `${char.name} casts ${spell.name}${slotNote}! Auto-hit — ${spellDmg} ${spell.damageType ?? ''} damage!`;
       }
 
       // Apply damage to enemy
       if (spellDmg > 0 || spellHit) {
+        const { damage: effSpellDmg, note: spellDmgNote } = applyDamageMultiplier(spellDmg, spell.damageType, enemy);
+        if (spellDmgNote) narrative += spellDmgNote;
+        spellDmg = effSpellDmg;
         const currentHp = getEnemyHp(st, roomId, seed);
         const newHp     = currentHp - spellDmg;
         if (newHp <= 0) {
@@ -1613,7 +2200,7 @@ export async function takeAction({ action, history = [], state, seed, context }:
             char.max_hp += 4;
             char.hp      = Math.min(char.hp + 4, char.max_hp);
             char.spell_slots_max = getSpellSlotsForLevel(char.character_class, char.level, context);
-            narrative += ' ' + context.narratives.levelUp;
+            narrative += ' ' + pick(context.narratives.levelUp);
             if ([4, 8, 12, 16, 19].includes(char.level)) {
               char.asi_pending = true;
               narrative += ` Level ${char.level}: choose an Ability Score Improvement!`;
@@ -1631,7 +2218,11 @@ export async function takeAction({ action, history = [], state, seed, context }:
 
     case 'use_class_feature': {
       const features = context.classFeatures?.[char.character_class] ?? [];
-      if (action.featureId === 'rage') {
+      const fid = action.featureId;
+      const dispatchKey = [char.character_class, char.subclass, fid].filter(Boolean).join('_');
+
+      // ── Rage (Barbarian bonus action) ──────────────────────────────────────
+      if (fid === 'rage') {
         if (!features.includes('rage'))             { narrative = `${char.character_class} does not have Rage.`; break; }
         if (char.conditions.includes('raging'))     { narrative = 'You are already raging!'; break; }
         const rageUses = char.class_resource_uses?.rage_uses ?? rageUsesMax(char.level);
@@ -1640,9 +2231,563 @@ export async function takeAction({ action, history = [], state, seed, context }:
         char.class_resource_uses = { ...(char.class_resource_uses ?? {}), rage_uses: rageUses - 1 };
         char.turn_actions        = { ...char.turn_actions, bonus_action_used: true };
         narrative = `${char.name} RAGES! +${rageDamageBonus(char.level)} bonus STR melee damage, resistance to physical attacks. (${rageUses - 1} use${rageUses - 1 === 1 ? '' : 's'} remaining)`;
-      } else {
-        narrative = `Unknown class feature: ${action.featureId}.`;
       }
+
+      // ── Action Surge (Fighter) ─────────────────────────────────────────────
+      else if (fid === 'action_surge') {
+        if (char.character_class.toLowerCase() !== 'fighter') { narrative = 'Only Fighters have Action Surge.'; break; }
+        if (char.level < 2) { narrative = 'Action Surge requires Fighter level 2.'; break; }
+        if ((char.class_resource_uses?.action_surge ?? 0) >= 1) { narrative = 'Action Surge already used this rest.'; break; }
+        char.class_resource_uses = { ...(char.class_resource_uses ?? {}), action_surge: 1 };
+        char.turn_actions        = { ...char.turn_actions, action_used: false };
+        narrative = `${char.name} uses Action Surge — one additional action this turn!`;
+      }
+
+      // ── Second Wind (Fighter bonus action) ────────────────────────────────
+      else if (fid === 'second_wind') {
+        if (char.character_class.toLowerCase() !== 'fighter') { narrative = 'Only Fighters have Second Wind.'; break; }
+        if ((char.class_resource_uses?.second_wind ?? 0) >= 1) { narrative = 'Second Wind already used. Recovers on a short or long rest.'; break; }
+        if (char.turn_actions.bonus_action_used) { narrative = 'Bonus action already used this turn.'; break; }
+        const swHeal = rollDice('1d10') + char.level;
+        char.hp = Math.min(char.max_hp, char.hp + swHeal);
+        char.class_resource_uses = { ...(char.class_resource_uses ?? {}), second_wind: 1 };
+        char.turn_actions        = { ...char.turn_actions, bonus_action_used: true };
+        narrative = `${char.name} uses Second Wind — healed ${swHeal} HP (now ${char.hp}/${char.max_hp}).`;
+      }
+
+      // ── Bardic Inspiration (Bard bonus action) ────────────────────────────
+      else if (fid === 'bardic_inspiration') {
+        if (char.character_class.toLowerCase() !== 'bard') { narrative = 'Only Bards have Bardic Inspiration.'; break; }
+        const biUses = char.class_resource_uses?.bardic_inspiration ?? Math.max(1, Math.floor((char.cha - 10) / 2));
+        if (biUses <= 0) { narrative = 'No Bardic Inspiration uses remaining.'; break; }
+        if (char.turn_actions.bonus_action_used) { narrative = 'Bonus action already used this turn.'; break; }
+        char.class_resource_uses = { ...(char.class_resource_uses ?? {}), bardic_inspiration: biUses - 1 };
+        char.turn_actions        = { ...char.turn_actions, bonus_action_used: true };
+        const inspDie = char.level >= 15 ? 'd12' : char.level >= 10 ? 'd10' : char.level >= 5 ? 'd8' : 'd6';
+        narrative = `${char.name} grants Bardic Inspiration (d${inspDie}) to an ally! (${biUses - 1} use${biUses - 1 === 1 ? '' : 's'} remaining)`;
+      }
+
+      // ── Cunning Action: Dash (Rogue L2+ bonus action) ─────────────────────
+      else if (fid === 'cunning_action_dash') {
+        if (char.character_class.toLowerCase() !== 'rogue') { narrative = 'Only Rogues have Cunning Action.'; break; }
+        if (char.level < 2) { narrative = 'Cunning Action requires Rogue level 2.'; break; }
+        if (char.turn_actions.bonus_action_used) { narrative = 'Bonus action already used this turn.'; break; }
+        const caSpeed = char.speed ?? DEFAULT_SPEED_FEET;
+        char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
+        st = { ...st, movement_used: { ...(st.movement_used ?? {}), [char.id]: Math.max(0, (st.movement_used?.[char.id] ?? 0) - caSpeed) } };
+        narrative = `${char.name} uses Cunning Action: Dash — +${caSpeed} ft movement this turn.`;
+      }
+
+      // ── Cunning Action: Disengage (Rogue L2+ bonus action) ────────────────
+      else if (fid === 'cunning_action_disengage') {
+        if (char.character_class.toLowerCase() !== 'rogue') { narrative = 'Only Rogues have Cunning Action.'; break; }
+        if (char.level < 2) { narrative = 'Cunning Action requires Rogue level 2.'; break; }
+        if (char.turn_actions.bonus_action_used) { narrative = 'Bonus action already used this turn.'; break; }
+        char.turn_actions = { ...char.turn_actions, bonus_action_used: true, disengaged: true };
+        narrative = `${char.name} uses Cunning Action: Disengage — no opportunity attacks when moving this turn.`;
+      }
+
+      // ── Cunning Action: Hide (Rogue L2+ bonus action) ─────────────────────
+      else if (fid === 'cunning_action_hide') {
+        if (char.character_class.toLowerCase() !== 'rogue') { narrative = 'Only Rogues have Cunning Action.'; break; }
+        if (char.level < 2) { narrative = 'Cunning Action requires Rogue level 2.'; break; }
+        if (char.turn_actions.bonus_action_used) { narrative = 'Bonus action already used this turn.'; break; }
+        const sneakHideDC = enemyAlive ? passivePerceptionDC(enemy!.wis ?? 10) : 10;
+        const hideProf = char.skill_proficiencies?.includes('Stealth') ?? false;
+        const hideCheck = skillCheck(char.dex, sneakHideDC, hideProf, char.level, false);
+        char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
+        if (hideCheck.success) {
+          char = inflictCondition(char, 'invisible');
+          narrative = `${char.name} hides! (Stealth ${hideCheck.total} vs DC ${sneakHideDC} — success.) Next attack has advantage.`;
+        } else {
+          narrative = `${char.name} tries to hide but fails. (Stealth ${hideCheck.total} vs DC ${sneakHideDC})`;
+        }
+      }
+
+      // ── Battle Master: Maneuver (Fighter L3+ subclass) ────────────────────
+      else if (dispatchKey.includes('battle_master') && fid.startsWith('maneuver_')) {
+        const sdPool = char.class_resource_uses?.superiority_dice ?? 4;
+        if (sdPool <= 0) { narrative = 'No superiority dice remaining (recover on short rest).'; break; }
+        char.class_resource_uses = { ...(char.class_resource_uses ?? {}), superiority_dice: sdPool - 1 };
+        const sdRoll = rollDice('1d8');
+        if (fid === 'maneuver_trip') {
+          const tripSave = rollDice('1d20') + abilityMod((enemy as unknown as Record<string, number>)['str'] ?? 10);
+          const tripDC   = 8 + profBonus(char.level) + abilityMod(char.str);
+          if (tripSave < tripDC) {
+            st.enemy_conditions = [...(st.enemy_conditions ?? []).filter(c => c !== 'prone'), 'prone'];
+            narrative = `Maneuver — Trip Attack: +${sdRoll} damage, ${enemy!.name} knocked prone! (STR save ${tripSave} vs DC ${tripDC})`;
+          } else {
+            narrative = `Maneuver — Trip Attack: +${sdRoll} damage, ${enemy!.name} resists the trip. (STR save ${tripSave} vs DC ${tripDC})`;
+          }
+        } else if (fid === 'maneuver_goading') {
+          const goadSave = rollDice('1d20') + abilityMod((enemy as unknown as Record<string, number>)['wis'] ?? 10);
+          const goadDC   = 8 + profBonus(char.level) + abilityMod(char.cha);
+          if (goadSave < goadDC) {
+            st.enemy_conditions = [...(st.enemy_conditions ?? []).filter(c => c !== 'goaded'), 'goaded'];
+            narrative = `Maneuver — Goading Attack: +${sdRoll} damage, ${enemy!.name} goaded (disadvantage vs others)! (WIS save ${goadSave} vs DC ${goadDC})`;
+          } else {
+            narrative = `Maneuver — Goading Attack: +${sdRoll} damage, ${enemy!.name} resists. (WIS save ${goadSave} vs DC ${goadDC})`;
+          }
+        } else {
+          // Generic maneuver: deal extra die damage
+          narrative = `Maneuver — +${sdRoll} superiority die damage! (${sdPool - 1} dice remaining)`;
+        }
+      }
+
+      // ── Unknown feature fallthrough ────────────────────────────────────────
+      else {
+        narrative = `Unknown class feature: ${fid}.`;
+      }
+      break;
+    }
+
+    case 'interact_object': {
+      const currentSeedRoom = seed.rooms.find(r => r.id === roomId);
+      const obj: RoomObject | undefined = currentSeedRoom?.objects?.find(o => o.id === action.objectId);
+      if (!obj) { narrative = 'There is nothing like that here.'; break; }
+
+      const searchKey = `${roomId}:${obj.id}`;
+      if ((st.objects_searched ?? []).includes(searchKey)) {
+        narrative = `You have already searched the ${obj.name}.`;
+        break;
+      }
+
+      st = { ...st, objects_searched: [...(st.objects_searched ?? []), searchKey] };
+
+      if (!obj.searchable || !obj.lootIds?.length) {
+        narrative = obj.interactText;
+        break;
+      }
+
+      const proficient = char.skill_proficiencies?.some(s =>
+        s.toLowerCase() === 'investigation' || s.toLowerCase() === 'perception'
+      ) ?? false;
+      const exhaustionDisadv1 = (char.exhaustion_level ?? 0) >= 1;
+      const check = skillCheck(char.int, obj.searchDC ?? 12, proficient, char.level, exhaustionDisadv1);
+
+      if (check.success) {
+        const gained: string[] = [];
+        for (const lootId of obj.lootIds) {
+          const item = context.lootTable.find(l => l.id === lootId);
+          if (item) {
+            char.inventory = [...(char.inventory ?? []), { ...item, instance_id: randomUUID() }];
+            gained.push(item.name);
+          }
+        }
+        const foundDesc = obj.foundText ?? `You find: ${gained.join(', ')}.`;
+        narrative = `${obj.interactText} (Investigation: ${check.roll}+${abilityMod(char.int)}=${check.total} vs DC ${obj.searchDC ?? 12} — success!) ${foundDesc}`;
+      } else {
+        narrative = `${obj.interactText} (Investigation: ${check.roll}+${abilityMod(char.int)}=${check.total} vs DC ${obj.searchDC ?? 12} — fail.) ${obj.emptyText ?? 'You find nothing useful.'}`;
+      }
+      break;
+    }
+
+    case 'two_weapon_attack': {
+      if (!st.combat_active) { narrative = 'No enemy to attack.'; break; }
+      if (char.turn_actions.bonus_action_used) { narrative = 'Bonus action already used this turn.'; break; }
+      // Find the off-hand light weapon in inventory
+      const mainWpnInstanceId = char.equipped_weapon;
+      const offhandInvItem = char.inventory
+        .filter(i => i.instance_id !== mainWpnInstanceId)
+        .find(i => {
+          const l = context.lootTable.find(ll => ll.id === i.id);
+          return l?.light && l.slot === 'weapon';
+        });
+      if (!offhandInvItem) { narrative = 'No light off-hand weapon found.'; break; }
+      const offhandLoot = context.lootTable.find(l => l.id === offhandInvItem.id)!;
+      const offhandProficient = hasWeaponProficiency(char.weapon_proficiencies ?? [], offhandLoot.weaponType);
+      const enemyInRoom = seed.enemies?.[roomId];
+      if (!enemyInRoom || state.enemies_killed?.includes(roomId)) { narrative = 'No enemy here.'; break; }
+      const condDisadvTwf = char.conditions.some(c => DISADV_CONDITIONS.has(c));
+      const armorLootItemTwf = char.equipped_armor
+        ? context.lootTable.find(l => l.id === (char.inventory.find(i => i.instance_id === char.equipped_armor)?.id))
+        : null;
+      const armorProfTwf = hasArmorProficiency(char.armor_proficiencies ?? [], armorLootItemTwf?.armorCategory);
+      const disadvTwf = condDisadvTwf || !armorProfTwf;
+      const atk = resolveOffHandAttack(
+        { str: char.str, dex: char.dex, level: char.level },
+        offhandLoot.damage, enemyInRoom.ac,
+        offhandLoot.finesse ?? false, disadvTwf, false, offhandProficient,
+        offhandLoot.range === 'ranged',
+      );
+      char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
+      usedInitiative = true;
+      if (atk.fumble) {
+        narrative = `Off-hand fumble! The ${offhandLoot.name} slips from your grip. (d20: 1)`;
+        break;
+      }
+      if (!atk.hit) {
+        narrative = `Off-hand attack with ${offhandLoot.name} misses. (${atk.roll}+${atk.atkMod}+${atk.prof}=${atk.total} vs AC ${enemyInRoom.ac})`;
+        break;
+      }
+      const curHpTwf = getEnemyHp(st, roomId, seed);
+      const newHpTwf = curHpTwf - atk.damage;
+      st = setEnemyHp(st, roomId, newHpTwf);
+      narrative = `Off-hand strike with ${offhandLoot.name}! ${atk.damage} damage${atk.critical ? ' (CRITICAL!)' : ''} (${atk.roll}+${atk.atkMod}+${atk.prof}=${atk.total} vs AC ${enemyInRoom.ac}, no ability mod to damage).`;
+      if (newHpTwf <= 0) {
+        const xpGainTwf = enemyInRoom.xp ?? 10;
+        char.xp = (char.xp || 0) + xpGainTwf;
+        narrative += ` The ${enemyInRoom.name} falls!`;
+        st.enemies_killed = [...(st.enemies_killed || []), roomId];
+        st.enemy_conditions = [];
+        if (st.combat_active) st = endCombatState(st);
+      }
+      break;
+    }
+
+    case 'grapple': {
+      if (!enemyAlive) { narrative = 'No enemy to grapple.'; break; }
+      if (enemy.condition_immunities?.includes('grappled')) {
+        narrative = `The ${enemy.name} cannot be grappled (condition immunity).`;
+        char.turn_actions = { ...char.turn_actions, action_used: true };
+        usedInitiative = true;
+        break;
+      }
+      // Contested Athletics: player STR check vs enemy STR or DEX (whichever higher)
+      const athProfGrapple = (context.classSkills[char.character_class] ?? []).includes('athletics');
+      const playerRollGrapple = d(20) + abilityMod(char.str) + (athProfGrapple ? profBonus(char.level) : 0);
+      const enemyStrGrapple   = abilityMod(enemy.toHit); // toHit is a rough proxy for STR/DEX mod
+      const enemyDexGrapple   = abilityMod(enemy.dex ?? 10);
+      const enemyRollGrapple  = d(20) + Math.max(enemyStrGrapple, enemyDexGrapple);
+      char.turn_actions = { ...char.turn_actions, action_used: true };
+      usedInitiative = true;
+      if (playerRollGrapple > enemyRollGrapple) {
+        st.enemy_conditions = [...(st.enemy_conditions ?? []).filter(c => c !== 'grappled'), 'grappled'];
+        narrative = `You grapple the ${enemy.name}! (${playerRollGrapple} vs ${enemyRollGrapple}) They are GRAPPLED — speed 0, your attacks have advantage.`;
+      } else {
+        narrative = `The ${enemy.name} breaks free of your grapple attempt. (${playerRollGrapple} vs ${enemyRollGrapple})`;
+      }
+      break;
+    }
+
+    case 'shove': {
+      if (!enemyAlive) { narrative = 'No enemy to shove.'; break; }
+      if (enemy.condition_immunities?.includes('prone')) {
+        narrative = `The ${enemy.name} cannot be knocked prone (condition immunity).`;
+        char.turn_actions = { ...char.turn_actions, action_used: true };
+        usedInitiative = true;
+        break;
+      }
+      const athProfShove = (context.classSkills[char.character_class] ?? []).includes('athletics');
+      const playerRollShove = d(20) + abilityMod(char.str) + (athProfShove ? profBonus(char.level) : 0);
+      const enemyStrShove   = abilityMod(enemy.toHit);
+      const enemyDexShove   = abilityMod(enemy.dex ?? 10);
+      const enemyRollShove  = d(20) + Math.max(enemyStrShove, enemyDexShove);
+      char.turn_actions = { ...char.turn_actions, action_used: true };
+      usedInitiative = true;
+      if (playerRollShove > enemyRollShove) {
+        st.enemy_conditions = [...(st.enemy_conditions ?? []).filter(c => c !== 'prone'), 'prone'];
+        narrative = `You shove the ${enemy.name} to the ground! (${playerRollShove} vs ${enemyRollShove}) They are PRONE — melee attacks against them have advantage, ranged attacks have disadvantage.`;
+      } else {
+        narrative = `The ${enemy.name} resists your shove. (${playerRollShove} vs ${enemyRollShove})`;
+      }
+      break;
+    }
+
+    case 'dodge': {
+      if (!st.combat_active) { narrative = 'You can only dodge in combat.'; break; }
+      if (char.turn_actions.action_used) { narrative = 'You have already used your action this turn.'; break; }
+      char.turn_actions = { ...char.turn_actions, action_used: true, dodging: true };
+      usedInitiative = true;
+      narrative = `${char.name} takes the Dodge action — until your next turn, attacks against you have disadvantage.`;
+      break;
+    }
+
+    case 'disengage': {
+      if (!st.combat_active) { narrative = 'You can only disengage in combat.'; break; }
+      if (char.turn_actions.action_used) { narrative = 'You have already used your action this turn.'; break; }
+      char.turn_actions = { ...char.turn_actions, action_used: true, disengaged: true };
+      usedInitiative = true;
+      narrative = `${char.name} takes the Disengage action — your next movement this turn won't trigger opportunity attacks.`;
+      break;
+    }
+
+    case 'attune': {
+      if (st.combat_active) { narrative = 'You cannot attune to items during combat.'; break; }
+      const attuneInstanceId = 'instanceId' in action ? (action as { type: 'attune'; instanceId: string }).instanceId : '';
+      const attuneInvItem = char.inventory.find(i => i.instance_id === attuneInstanceId);
+      if (!attuneInvItem) { narrative = "You don't have that item."; break; }
+      const attuneLootItem = context.lootTable.find(l => l.id === attuneInvItem.id);
+      if (!attuneLootItem?.requiresAttunement) { narrative = `The ${attuneInvItem.name} doesn't require attunement.`; break; }
+      const attunedList = char.attuned_items ?? [];
+      if (attunedList.includes(attuneInstanceId)) { narrative = `You are already attuned to the ${attuneInvItem.name}.`; break; }
+      if (attunedList.length >= 3) { narrative = 'You can only be attuned to 3 items at a time (PHB p.138). De-attune one first.'; break; }
+      char.attuned_items = [...attunedList, attuneInstanceId];
+      narrative = `You spend a moment focusing on the ${attuneInvItem.name}, attuning yourself to its magic. (${attunedList.length + 1}/3 attuned items)`;
+      break;
+    }
+
+    // ── Grid movement ────────────────────────────────────────────────────────
+    case 'grid_move': {
+      if (!st.entities) { narrative = 'Grid combat is not active.'; break; }
+      const gridAction = action as { type: 'grid_move'; entityId: string; to: { x: number; y: number } };
+      if (gridAction.entityId !== char.id) { narrative = 'You can only move your own character.'; break; }
+
+      const charEntity = st.entities.find(e => e.id === char.id);
+      if (!charEntity) { narrative = 'Your character is not on the grid.'; break; }
+
+      const locationGrid = context.campaign?.locations?.find(l => l.rooms?.some(r => r.id === roomId));
+      const gridW = locationGrid?.gridWidth  ?? context.gridWidth  ?? 10;
+      const gridH = locationGrid?.gridHeight ?? context.gridHeight ?? 10;
+      const blocked = st.entities.filter(e => e.id !== char.id).map(e => e.pos);
+
+      const path = findPath(charEntity.pos, gridAction.to, blocked, gridW, gridH);
+      if (!path) { narrative = 'No path to that square.'; break; }
+
+      // Terrain-aware movement cost: difficult terrain squares cost 2× movement
+      const currentSeedRoomGrid = seed.rooms.find(r => r.id === roomId);
+      const difficultTerrain = currentSeedRoomGrid?.difficultTerrain ?? [];
+      const costFeet = path.reduce((acc, pos) => {
+        const isDifficult = difficultTerrain.some(dt => posEqual(dt, pos));
+        return acc + (isDifficult ? SQUARE_SIZE * 2 : SQUARE_SIZE);
+      }, 0);
+
+      const speedFt  = char.speed ?? DEFAULT_SPEED_FEET;
+      const usedFt   = st.movement_used?.[char.id] ?? 0;
+      if (usedFt + costFeet > speedFt) {
+        narrative = `Not enough movement. (${speedFt - usedFt} ft remaining, ${costFeet} ft needed${difficultTerrain.length ? ' — difficult terrain' : ''})`;
+        break;
+      }
+
+      // Check for opportunity attacks from enemies being left behind
+      const oaTargets = opportunityAttackTriggers(charEntity.pos, gridAction.to, st.entities, false);
+      let oaNarrative = '';
+      for (const oaEntity of oaTargets) {
+        const oaEnemy = seed.enemies?.[oaEntity.id];
+        if (oaEnemy && !st.enemies_killed.includes(oaEntity.id) && !(char.turn_actions?.disengaged)) {
+          const oaResult = resolveEnemyAttack(oaEnemy, char.ac);
+          if (oaResult.hit) {
+            const dmg = oaResult.damage;
+            char.hp = Math.max(0, char.hp - dmg);
+            const concResult = checkConcentration(char, st, dmg);
+            char = concResult.char; st = concResult.st;
+            oaNarrative += ` [Opportunity attack from ${oaEnemy.name}: ${dmg} damage!${concResult.note}]`;
+          } else {
+            oaNarrative += ` [Opportunity attack from ${oaEnemy.name}: missed!]`;
+          }
+        }
+      }
+
+      // Apply movement
+      const updatedEntities: CombatEntity[] = st.entities!.map(e =>
+        e.id === char.id ? { ...e, pos: gridAction.to } : e,
+      );
+      st = {
+        ...st,
+        entities:      updatedEntities,
+        movement_used: { ...st.movement_used, [char.id]: usedFt + costFeet },
+      };
+
+      narrative = `${char.name} moves to (${gridAction.to.x}, ${gridAction.to.y}).${oaNarrative}`;
+      break;
+    }
+
+    // ── Travel between locations ──────────────────────────────────────────────
+    case 'travel': {
+      const travelAction = action as { type: 'travel'; locationId: string };
+      const destLocation = context.campaign?.locations?.find(l => l.id === travelAction.locationId);
+      if (!destLocation) { narrative = 'Unknown destination.'; break; }
+
+      // Wilderness encounter check
+      let encounterNote = '';
+      if (destLocation.encounterTable?.length && destLocation.encounterChance && Math.random() < destLocation.encounterChance) {
+        const pick2 = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)];
+        const templateKey = pick2(destLocation.encounterTable);
+        const tpl = context.enemyTemplates.find(t => t.name === templateKey);
+        if (tpl) {
+          seed = { ...seed, enemies: { ...seed.enemies, [roomId]: { name: tpl.name, hp: tpl.hp, ac: tpl.ac, damage: tpl.damage, toHit: tpl.toHit, xp: tpl.xp } } };
+          encounterNote = ` A ${tpl.name} bars your path!`;
+        }
+      }
+
+      // Advance world day on travel
+      st = {
+        ...st,
+        current_location_id: travelAction.locationId,
+        current_district_id: undefined,
+        world_day:           (st.world_day ?? 1) + 1,
+        // Place entities at entrance of new location if it's a dungeon
+        entities:            undefined,
+        movement_used:       undefined,
+      };
+
+      narrative = `You travel to ${destLocation.name}.${encounterNote}`;
+      usedInitiative = false;
+      break;
+    }
+
+    // ── Enter a town district ─────────────────────────────────────────────────
+    case 'enter_district': {
+      const districtAction = action as { type: 'enter_district'; districtId: string };
+      const currentLoc = context.campaign?.locations?.find(l => l.id === st.current_location_id);
+      const district   = currentLoc?.districts?.find(d => d.id === districtAction.districtId);
+      if (!district) { narrative = 'Unknown district.'; break; }
+
+      st = { ...st, current_district_id: districtAction.districtId };
+      narrative = `You enter the ${district.name}. ${district.desc}`;
+      usedInitiative = false;
+      break;
+    }
+
+    // ── Accept quest ──────────────────────────────────────────────────────────
+    case 'accept_quest': {
+      const aqAction = action as { type: 'accept_quest'; questId: string };
+      const questDef = context.campaign?.quests?.find(q => q.id === aqAction.questId);
+      if (!questDef) { narrative = 'Unknown quest.'; break; }
+
+      const existingProgress = (st.quest_progress ?? []).find(qp => qp.questId === aqAction.questId);
+      if (existingProgress) {
+        narrative = `You have already accepted "${questDef.title}".`;
+        break;
+      }
+
+      st = {
+        ...st,
+        quest_progress: [
+          ...(st.quest_progress ?? []),
+          { questId: aqAction.questId, status: 'active', completedSteps: [] },
+        ],
+      };
+      narrative = `Quest accepted: "${questDef.title}" — ${questDef.desc}`;
+      usedInitiative = false;
+      break;
+    }
+
+    // ── Complete quest (manual trigger) ──────────────────────────────────────
+    case 'complete_quest': {
+      const cqAction = action as { type: 'complete_quest'; questId: string };
+      const cqDef    = context.campaign?.quests?.find(q => q.id === cqAction.questId);
+      if (!cqDef) { narrative = 'Unknown quest.'; break; }
+
+      const cqProgress = (st.quest_progress ?? []).find(qp => qp.questId === cqAction.questId);
+      if (!cqProgress || cqProgress.status !== 'active') {
+        narrative = `Quest "${cqDef.title}" is not active.`;
+        break;
+      }
+
+      // Check all steps are done
+      const allStepsDone = cqDef.steps.every(s => cqProgress.completedSteps.includes(s.id));
+      if (!allStepsDone) {
+        const remaining = cqDef.steps.filter(s => !cqProgress.completedSteps.includes(s.id));
+        narrative = `Quest "${cqDef.title}" is not yet complete. Remaining: ${remaining.map(s => s.desc).join('; ')}`;
+        break;
+      }
+
+      // Apply rewards
+      const rewardLines: string[] = [];
+      for (const reward of cqDef.rewards) {
+        if (reward.type === 'give_item') {
+          const item = context.lootTable.find(l => l.id === reward.itemId);
+          if (item) {
+            char.inventory = [...char.inventory, { instance_id: randomUUID(), ...item }];
+            rewardLines.push(`received ${item.name}`);
+          }
+        } else if (reward.type === 'give_gold') {
+          char.gold = (char.gold ?? 0) + reward.amount;
+          rewardLines.push(`${reward.amount} gold`);
+        } else if (reward.type === 'modify_hp') {
+          char.hp = Math.min(char.max_hp, char.hp + reward.amount);
+        } else if (reward.type === 'set_faction_rep') {
+          st = {
+            ...st,
+            faction_rep: {
+              ...(st.faction_rep ?? {}),
+              [reward.factionId]: ((st.faction_rep ?? {})[reward.factionId] ?? 0) + reward.delta,
+            },
+          };
+          rewardLines.push(`+${reward.delta} rep with faction`);
+        }
+      }
+
+      st = {
+        ...st,
+        quest_progress: (st.quest_progress ?? []).map(qp =>
+          qp.questId === cqAction.questId ? { ...qp, status: 'completed' } : qp,
+        ),
+        faction_rep: st.faction_rep,
+      };
+
+      const rewardStr = rewardLines.length ? ` Rewards: ${rewardLines.join(', ')}.` : '';
+      narrative = `Quest complete: "${cqDef.title}".${rewardStr}`;
+      usedInitiative = false;
+      break;
+    }
+
+    // ── Dash ──────────────────────────────────────────────────────────────────
+    case 'dash': {
+      if (!st.combat_active)            { narrative = 'Dash is a combat action.'; break; }
+      if (char.turn_actions.action_used) { narrative = 'You have already used your action this turn.'; break; }
+      const dashSpeed = char.speed ?? DEFAULT_SPEED_FEET;
+      char.turn_actions = { ...char.turn_actions, action_used: true };
+      // movement_used tracking: reduce remaining movement cap by speed (adds a full extra speed worth)
+      st = { ...st, movement_used: { ...(st.movement_used ?? {}), [char.id]: Math.max(0, (st.movement_used?.[char.id] ?? 0) - dashSpeed) } };
+      narrative = `${char.name} Dashes — gaining an extra ${dashSpeed} ft of movement this turn.`;
+      break;
+    }
+
+    // ── Help ──────────────────────────────────────────────────────────────────
+    case 'help': {
+      if (!st.combat_active)            { narrative = 'Help is a combat action.'; break; }
+      if (char.turn_actions.action_used) { narrative = 'You have already used your action this turn.'; break; }
+      const helpAction = action as { type: 'help'; targetId: string };
+      const helpTarget = st.characters.find(c => c.id === helpAction.targetId && !c.dead);
+      if (!helpTarget) { narrative = 'Target not found.'; break; }
+      char.turn_actions = { ...char.turn_actions, action_used: true };
+      st = { ...st, help_target_id: helpAction.targetId };
+      narrative = `${char.name} helps ${helpTarget.name} — they have advantage on their next attack roll this turn.`;
+      usedInitiative = true;
+      break;
+    }
+
+    // ── Ready ─────────────────────────────────────────────────────────────────
+    case 'ready': {
+      if (!st.combat_active)            { narrative = 'Ready is a combat action.'; break; }
+      if (char.turn_actions.action_used) { narrative = 'You have already used your action this turn.'; break; }
+      const readyAction = action as { type: 'ready'; trigger: string; action: StructuredAction };
+      char.turn_actions = { ...char.turn_actions, action_used: true, readied_action: { trigger: readyAction.trigger, action: readyAction.action } };
+      narrative = `${char.name} readies an action: "${readyAction.trigger}". Use 'Trigger readied action' when the trigger occurs.`;
+      usedInitiative = true;
+      break;
+    }
+
+    // ── Use Reaction (trigger readied action) ─────────────────────────────────
+    case 'use_reaction': {
+      if (char.turn_actions.reaction_used) { narrative = 'You have already used your reaction this turn.'; break; }
+      const readied = char.turn_actions.readied_action;
+      if (!readied) { narrative = 'You have no readied action.'; break; }
+      char.turn_actions = { ...char.turn_actions, reaction_used: true, readied_action: undefined };
+      narrative = `${char.name} triggers their readied action! `;
+      // Recursively resolve the stored action
+      const reactionResult = await takeAction({ action: readied.action, history: [], state: { ...st, characters: st.characters.map((c, i) => i === safeIdx ? char : c) }, seed, context });
+      narrative += reactionResult.narrative;
+      st = reactionResult.newState;
+      char = st.characters.find(c => c.id === char.id) ?? char;
+      break;
+    }
+
+    // ── Select subclass ───────────────────────────────────────────────────────
+    case 'select_subclass': {
+      const scAction = action as { type: 'select_subclass'; subclass: string };
+      if (char.subclass) { narrative = `You have already chosen the ${char.subclass} subclass.`; break; }
+      char.subclass = scAction.subclass;
+      narrative = `${char.name} follows the path of the ${scAction.subclass}!`;
+      break;
+    }
+
+    // ── Prepare spells ────────────────────────────────────────────────────────
+    case 'prepare_spells': {
+      if (st.combat_active) { narrative = 'You cannot prepare spells during combat.'; break; }
+      const prepAction = action as { type: 'prepare_spells'; spellIds: string[] };
+      const castingAbilityPrep = (context.spellcastingAbility?.[char.character_class] ?? context.classPrimaryStats[char.character_class] ?? 'int') as AbilityKey;
+      const castingScorePrep   = char[castingAbilityPrep] ?? 10;
+      const maxPrepared = char.level + Math.max(0, Math.floor((castingScorePrep - 10) / 2));
+      if (prepAction.spellIds.length > maxPrepared) {
+        narrative = `You can prepare at most ${maxPrepared} spells (your level + spellcasting modifier). You tried to prepare ${prepAction.spellIds.length}.`;
+        break;
+      }
+      char.prepared_spells = prepAction.spellIds;
+      const spellNames = prepAction.spellIds.map(id => context.spellTable?.[id]?.name ?? id).join(', ');
+      narrative = `${char.name} prepares their spells for the day: ${spellNames || '(none)'}.`;
       break;
     }
 
@@ -1684,9 +2829,15 @@ export async function takeAction({ action, history = [], state, seed, context }:
         if (targetCharIdx >= 0) {
           let target = st.characters[targetCharIdx];
           if (!target.dead && target.hp > 0) {
-            const atkResult = applyEnemyAttackNarrative(rm, target, context);
-            target = { ...target, hp: Math.max(0, target.hp - atkResult.hpLost), conditions: atkResult.newConditions, condition_durations: atkResult.newDurations };
-            narrative += ` [${rm.name}'s turn] ${atkResult.narrative}`;
+            const attackCount = rm.multiattack ?? 1;
+            narrative += ` [${rm.name}'s turn]`;
+            for (let mi = 0; mi < attackCount && target.hp > 0; mi++) {
+              const atkResult = applyEnemyAttackNarrative(rm, target, context);
+              target = { ...target, hp: Math.max(0, target.hp - atkResult.hpLost), conditions: atkResult.newConditions, condition_durations: atkResult.newDurations };
+              const concAtk = checkConcentration(target, st, atkResult.hpLost);
+              target = concAtk.char; st = concAtk.st;
+              narrative += ` ${atkResult.narrative}${concAtk.note}`;
+            }
 
             if (target.hp <= 0 && !target.dead) {
               const { narrative: dsNarr, newChar: newTarget, died, endedCombat } = processDeathSave(
@@ -1710,8 +2861,12 @@ export async function takeAction({ action, history = [], state, seed, context }:
     }
 
     if (roundWrapped) {
-      // New round: reset all characters' turn_actions
-      st = { ...st, characters: st.characters.map(c => ({ ...c, turn_actions: { ...FRESH_TURN } })) };
+      // New round: reset all characters' turn_actions and movement budgets
+      st = {
+        ...st,
+        movement_used: {},
+        characters: st.characters.map(c => ({ ...c, turn_actions: { ...FRESH_TURN } })),
+      };
     }
 
     st.initiative_idx = advIdx;
@@ -1722,6 +2877,8 @@ export async function takeAction({ action, history = [], state, seed, context }:
     if (currentEntry && !currentEntry.is_enemy) {
       const nextCharIdx = st.characters.findIndex(c => c.id === currentEntry.id && !c.dead);
       if (nextCharIdx >= 0) {
+        // Reset movement for this character's new turn
+        st = { ...st, movement_used: { ...(st.movement_used ?? {}), [currentEntry.id]: 0 } };
         const withFreshTurn = { ...st.characters[nextCharIdx], turn_actions: { ...FRESH_TURN } };
         const ticked = tickConditions(withFreshTurn);
         if (ticked.conditions.length !== st.characters[nextCharIdx].conditions.length) {
@@ -1753,7 +2910,15 @@ export async function takeAction({ action, history = [], state, seed, context }:
     st = { ...st, flags: restFlags };
   }
 
-  const finalNarrative = extraNarrative ? `${narrative}\n\n${extraNarrative}` : narrative;
+  const rawNarrative = extraNarrative ? `${narrative}\n\n${extraNarrative}` : narrative;
+
+  const activeRoom = seed.rooms.find(r => r.id === st.current_room);
+  const finalNarrative = await llmProvider.enhance(rawNarrative, {
+    worldName:  seed.world_name,
+    charName:   char.name,
+    charClass:  char.character_class,
+    roomName:   activeRoom?.name ?? st.current_room,
+  });
 
   const roomChanged = st.current_room !== state.current_room;
   st.run_log        = [...(st.run_log || []), { character_id: char.id, action: action.type, narrative: finalNarrative }];
