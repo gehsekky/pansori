@@ -1,4 +1,3 @@
-import { type CharacterInput, api } from '../lib/api.ts';
 import type {
   CampaignMeta,
   GameChoice,
@@ -7,6 +6,7 @@ import type {
   Session,
   StructuredAction,
 } from '../types.ts';
+import { type CharacterInput, api } from '../lib/api.ts';
 import { useState } from 'react';
 
 type HistoryEntry = { role: 'user' | 'assistant'; content: string };
