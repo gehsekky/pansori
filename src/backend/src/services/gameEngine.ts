@@ -823,14 +823,18 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   if (lootAvail) {
     choices.push({ label: `Pick up the ${loot.name}`, action: { type: 'loot' } });
   }
-  if (healItem && (!MAX_CHOICES || choices.length < MAX_CHOICES)) {
+  // SRD 5.2.1 p.204: drinking/administering a potion is a Bonus Action. In
+  // combat, suppress the choice if the bonus action is already spent.
+  const potionBonusAvailable = !state.combat_active || !char.turn_actions.bonus_action_used;
+  if (healItem && potionBonusAvailable && (!MAX_CHOICES || choices.length < MAX_CHOICES)) {
     const injured = state.characters.filter((c) => !c.dead && c.hp < c.max_hp);
     if (injured.length > 0) {
       if (state.characters.filter((c) => !c.dead).length === 1) {
         // Solo party: simple label, no target needed
         choices.push({
-          label: `Use ${healItem.name}`,
+          label: `Use ${healItem.name} (bonus action)`,
           action: { type: 'use', itemId: healItem.id },
+          requiresBonusAction: state.combat_active || undefined,
         });
       } else {
         // Multi-character: one choice per injured party member
@@ -838,8 +842,9 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
           if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
           const selfNote = member.id === char.id ? ' (self)' : '';
           choices.push({
-            label: `Use ${healItem.name} on ${member.name}${selfNote} (HP ${member.hp}/${member.max_hp})`,
+            label: `Use ${healItem.name} on ${member.name}${selfNote} (bonus action, HP ${member.hp}/${member.max_hp})`,
             action: { type: 'use', itemId: healItem.id, targetCharId: member.id },
+            requiresBonusAction: state.combat_active || undefined,
           });
         }
       }
@@ -2506,8 +2511,21 @@ export async function takeAction({
       } else {
         narrative = itemData.useNarrative || `You examine the ${held.name}. Might come in handy.`;
       }
-      // Using a consumable or activating an item is an action in combat
-      if (st.combat_active) char.turn_actions = { ...char.turn_actions, action_used: true };
+      // SRD 5.2.1 p.204 (Using a Potion): "Drinking a potion or administering
+      // it to another creature requires a Bonus Action." Other consumables
+      // (scrolls, food, etc.) and item examinations remain a full action.
+      if (st.combat_active) {
+        const isPotionLike =
+          itemData.type === 'consumable' &&
+          (itemData.heal != null ||
+            itemData.effect === 'con_advantage' ||
+            itemData.effect === 'mystery');
+        if (isPotionLike) {
+          char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
+        } else {
+          char.turn_actions = { ...char.turn_actions, action_used: true };
+        }
+      }
       break;
     }
 
