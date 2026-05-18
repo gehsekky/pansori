@@ -249,7 +249,10 @@ describe('buildArrivalNarrative', () => {
   });
 
   it('does not mention an already-killed enemy', () => {
-    const state = makeState({}, { current_room: CORRIDOR_ID, enemies_killed: [CORRIDOR_ID] });
+    const state = makeState(
+      {},
+      { current_room: CORRIDOR_ID, enemies_killed: [`${CORRIDOR_ID}#0`] }
+    );
     const text = buildArrivalNarrative(CORRIDOR_ID, state, seedWithEnemy, ctx);
     expect(text).not.toContain('HP:');
   });
@@ -486,7 +489,8 @@ describe('takeAction', () => {
     const enemyEntry = result.newState.initiative_order.find((e) => e.is_enemy);
     expect(playerEntry).toBeDefined();
     expect(enemyEntry).toBeDefined();
-    expect(enemyEntry?.id).toBe(CORRIDOR_ID);
+    // Initiative entries for enemies now use the enemy instance id (not the roomId)
+    expect(enemyEntry?.id).toBe(`${CORRIDOR_ID}#0`);
   });
 
   it('first attack sets initiative_idx to point at a player entry', async () => {
@@ -1200,12 +1204,12 @@ describe('turn_actions lifecycle', () => {
       active_character_id: 'c2',
       current_room: CORRIDOR_ID,
       visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
-      enemies_killed: [CORRIDOR_ID],
+      enemies_killed: [`${CORRIDOR_ID}#0`],
       loot_taken: [],
       combat_active: true,
       initiative_order: [
         { id: 'c1', roll: 20, is_enemy: false },
-        { id: CORRIDOR_ID, roll: 10, is_enemy: true },
+        { id: `${CORRIDOR_ID}#0`, roll: 10, is_enemy: true },
         { id: 'c2', roll: 5, is_enemy: false },
       ],
       initiative_idx: 2,
@@ -1242,7 +1246,7 @@ describe('turn_actions lifecycle', () => {
       active_character_id: 'c1',
       current_room: CORRIDOR_ID,
       visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
-      enemies_killed: [CORRIDOR_ID],
+      enemies_killed: [`${CORRIDOR_ID}#0`],
       loot_taken: [],
       combat_active: true,
       initiative_order: [
