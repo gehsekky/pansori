@@ -192,6 +192,15 @@ function conditionSavingThrow(
 
 // ─── Enemy attack helper ──────────────────────────────────────────────────────
 
+// SRD 5.2.1 p.17 — Massive Damage: when damage reduces a character to 0 HP
+// and the leftover damage equals or exceeds their HP maximum, the character
+// dies outright (no death saves).
+function isMassiveDamageDeath(prevHp: number, damage: number, maxHp: number): boolean {
+  if (prevHp <= 0) return false; // already at 0; further damage is just bookkeeping
+  const remainder = damage - prevHp;
+  return remainder >= maxHp;
+}
+
 function applyEnemyAttackNarrative(
   enemy: Enemy,
   char: Character,
@@ -3034,11 +3043,32 @@ export async function takeAction({
         char.spell_slots_used = { ...(char.spell_slots_used ?? {}), [slotLevel]: slotsUsed + 1 };
       }
 
+      // SRD 5.2.1 p.67 (Quickened Spell): after consuming Quickened, can't
+      // cast a level 1+ spell on the same turn EXCEPT the quickened cast
+      // itself (which is the spell that got "modified"). We detect the
+      // quickened cast via st.metamagic_active === 'quickened' being still
+      // active at the start of resolution.
+      const isQuickenedCast = st.metamagic_active === 'quickened';
+      if (
+        spell.level > 0 &&
+        !isRitualCast &&
+        char.turn_actions.quickened_used &&
+        !isQuickenedCast
+      ) {
+        narrative = 'You used Quickened Spell this turn — you cannot cast another level 1+ spell.';
+        break;
+      }
+
       // Mark action economy
       if (spell.castTime === 'bonus_action') {
         char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
       } else {
         char.turn_actions = { ...char.turn_actions, action_used: true };
+      }
+      // Track that a leveled spell was cast this turn (for the Quickened
+      // activation check on a subsequent metamagic invocation).
+      if (spell.level > 0 && !isRitualCast) {
+        char.turn_actions = { ...char.turn_actions, leveled_spell_cast: true };
       }
 
       const castingAbility = (context.spellcastingAbility?.[char.character_class] ??
@@ -3800,6 +3830,13 @@ export async function takeAction({
           narrative = 'Bonus action already used this turn.';
           break;
         }
+        // SRD 5.2.1 p.67: can't activate Quickened if you've already cast a
+        // level 1+ spell this turn.
+        if (char.turn_actions.leveled_spell_cast) {
+          narrative =
+            'You have already cast a level 1+ spell this turn — Quickened Spell cannot be used.';
+          break;
+        }
         const spPool2 = char.class_resource_uses?.sorcery_points ?? char.level;
         if (spPool2 < 2) {
           narrative = 'Not enough sorcery points (need 2).';
@@ -3809,7 +3846,12 @@ export async function takeAction({
           ...(char.class_resource_uses ?? {}),
           sorcery_points: spPool2 - 2,
         };
-        char.turn_actions = { ...char.turn_actions, bonus_action_used: true, action_used: false };
+        char.turn_actions = {
+          ...char.turn_actions,
+          bonus_action_used: true,
+          action_used: false,
+          quickened_used: true,
+        };
         st = { ...st, metamagic_active: 'quickened' };
         narrative = `${char.name} — Metamagic: Quickened Spell! Cast your next spell as a bonus action. (${spPool2 - 2} sorcery points remaining)`;
       }
@@ -4907,8 +4949,10 @@ export async function takeAction({
           if (!target.dead && target.hp > 0) {
             const attackCount = rm.multiattack ?? 1;
             narrative += ` [${rm.name}'s turn]`;
+            let massiveDeath = false;
             for (let mi = 0; mi < attackCount && target.hp > 0; mi++) {
               const atkResult = applyEnemyAttackNarrative(rm, target, context);
+              const prevHp = target.hp;
               target = {
                 ...target,
                 hp: Math.max(0, target.hp - atkResult.hpLost),
@@ -4920,9 +4964,17 @@ export async function takeAction({
               target = concAtk.char;
               st = concAtk.st;
               narrative += ` ${atkResult.narrative}${concAtk.note}`;
+              // Massive damage check (SRD 5.2.1 p.17): instant death, bypassing
+              // death saves, if a single hit's leftover damage ≥ max HP.
+              if (isMassiveDamageDeath(prevHp, atkResult.hpLost, target.max_hp)) {
+                target = { ...target, dead: true, stable: false };
+                narrative += ` MASSIVE DAMAGE — ${target.name} is killed outright!`;
+                massiveDeath = true;
+                break;
+              }
             }
 
-            if (target.hp <= 0 && !target.dead) {
+            if (target.hp <= 0 && !target.dead && !massiveDeath) {
               const {
                 narrative: dsNarr,
                 newChar: newTarget,
@@ -4936,6 +4988,10 @@ export async function takeAction({
               target = newTarget;
               narrative += ' ' + dsNarr;
               if (endedCombat) st = endCombatState(st);
+            } else if (massiveDeath) {
+              // End combat if every PC is now dead
+              const allDead = st.characters.every((c, i) => (i === targetCharIdx ? true : c.dead));
+              if (allDead) st = endCombatState(st);
             }
             st = {
               ...st,

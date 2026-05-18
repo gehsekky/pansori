@@ -166,6 +166,8 @@ export interface Character {
     dodging?: boolean;
     disengaged?: boolean;
     reckless?: boolean;
+    leveled_spell_cast?: boolean;
+    quickened_used?: boolean;
     movement_budget_remaining?: number;
     readied_action?: { trigger: string; action: StructuredAction };
   };
