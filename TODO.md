@@ -1,9 +1,11 @@
 # TODO
+
 <!-- Priority order: ship → UI → content → polish → playtest -->
 
 ## 1. Deployment (AWS — t4g.small EC2 + db.t4g.micro RDS)
 
 ### AWS Console (one-time)
+
 - [x] ECR repositories — `pansori-backend` and `pansori-frontend` created
 - [x] Security groups — EC2 inbound: 22 (your IP only), 80, 443; RDS SG created (pansori-rds)
 - [x] IAM instance profile — `pansori-ec2-role` with CloudWatchLogsFullAccess attached to instance
@@ -11,39 +13,46 @@
 - [x] IAM deploy user — `pansori-deploy` created with ECR push permissions
 
 ### EC2 bootstrap (SSH in once)
-- [X] Docker 25.0.14, Compose plugin v5.1.3, AWS CLI v2.33.15 installed; `ec2-user` in `docker` group
-- [X] Create `/opt/pansori/` directory; copy `docker-compose.prod.yml` and `infra/nginx/nginx.conf` there
-- [X] Create `/opt/pansori/.env` with all required vars (see list below)
-- [X] SSM Session Manager registered (instance role has `AmazonSSMManagedInstanceCore`) — no SSH allowlist needed for ops
+
+- [x] Docker 25.0.14, Compose plugin v5.1.3, AWS CLI v2.33.15 installed; `ec2-user` in `docker` group
+- [x] Create `/opt/pansori/` directory; copy `docker-compose.prod.yml` and `infra/nginx/nginx.conf` there
+- [x] Create `/opt/pansori/.env` with all required vars (see list below)
+- [x] SSM Session Manager registered (instance role has `AmazonSSMManagedInstanceCore`) — no SSH allowlist needed for ops
 
 ### Domain & TLS
-- [X] Point domain A record at EC2 public IP
-- [X] Replace `YOUR_DOMAIN` in `infra/nginx/nginx.conf` with the real domain (4 occurrences)
-- [X] Cert issued for `pansorirpg.com` + `www.pansorirpg.com` (Let's Encrypt ECDSA, expires 2026-08-16)
-- [X] Auto-renew via systemd `certbot-renew.timer` (daily 03:00 UTC + 1h jitter; webroot mode; deploy-hook reloads nginx)
-- [X] `/var/www/certbot/` directory exists for ACME webroot challenges
-- [X] Renewal config switched from `standalone` → `webroot` so nginx stays up during renew
+
+- [x] Point domain A record at EC2 public IP
+- [x] Replace `YOUR_DOMAIN` in `infra/nginx/nginx.conf` with the real domain (4 occurrences)
+- [x] Cert issued for `pansorirpg.com` + `www.pansorirpg.com` (Let's Encrypt ECDSA, expires 2026-08-16)
+- [x] Auto-renew via systemd `certbot-renew.timer` (daily 03:00 UTC + 1h jitter; webroot mode; deploy-hook reloads nginx)
+- [x] `/var/www/certbot/` directory exists for ACME webroot challenges
+- [x] Renewal config switched from `standalone` → `webroot` so nginx stays up during renew
 
 ### GitHub Actions wiring
-- [X] Add repo secrets: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (EC2_SSH_KEY no longer needed)
-- [X] Workflow env vars: `AWS_REGION`, `ECR_REGISTRY`, `EC2_INSTANCE_ID`
-- [X] Deploy step switched from `appleboy/ssh-action` to `aws ssm send-command` — no SSH allowlist, no key rotation, all commands audited in CloudTrail
-- [X] `pansori-deploy` IAM user has `ssm:SendCommand` scoped to the pansori instance + `AWS-RunShellScript` document
-- [X] `DEPLOY_ENABLED=true` repo variable is set — every push to `main` auto-deploys to prod after a successful build (verified end-to-end with image tag `733c3be7`)
+
+- [x] Add repo secrets: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (EC2_SSH_KEY no longer needed)
+- [x] Workflow env vars: `AWS_REGION`, `ECR_REGISTRY`, `EC2_INSTANCE_ID`
+- [x] Deploy step switched from `appleboy/ssh-action` to `aws ssm send-command` — no SSH allowlist, no key rotation, all commands audited in CloudTrail
+- [x] `pansori-deploy` IAM user has `ssm:SendCommand` scoped to the pansori instance + `AWS-RunShellScript` document
+- [x] `DEPLOY_ENABLED=true` repo variable is set — every push to `main` auto-deploys to prod after a successful build (verified end-to-end with image tag `733c3be7`)
 
 ### Google OAuth
-- [X] Create Google Cloud project; enable People API
-- [X] Configure OAuth consent screen (External); add `email` and `profile` scopes; add domain to Authorized Domains
-- [X] Create OAuth credential (Web application); set Authorized redirect URI to `https://yourdomain.com/api/auth/google/callback`; copy Client ID + Secret into env
-- [X] Publish the consent screen app when ready for real users
+
+- [x] Create Google Cloud project; enable People API
+- [x] Configure OAuth consent screen (External); add `email` and `profile` scopes; add domain to Authorized Domains
+- [x] Create OAuth credential (Web application); set Authorized redirect URI to `https://yourdomain.com/api/auth/google/callback`; copy Client ID + Secret into env
+- [x] Publish the consent screen app when ready for real users
 
 ### Database
-- [X] Schema/migrations auto-run on first `docker compose up` via `docker-entrypoint-initdb.d` (now mounted in `docker-compose.prod.yml`; 6 migrations applied on first init)
+
+- [x] Schema/migrations auto-run on first `docker compose up` via `docker-entrypoint-initdb.d` (now mounted in `docker-compose.prod.yml`; 6 migrations applied on first init)
 
 ### Production deployment
-- [X] First deploy successful (image tag `09b6e3f2`): postgres + backend + frontend + nginx all running, TLS terminating, API responding
+
+- [x] First deploy successful (image tag `09b6e3f2`): postgres + backend + frontend + nginx all running, TLS terminating, API responding
 
 ### Required environment variables (`/opt/pansori/.env` on EC2)
+
 - `POSTGRES_PASSWORD` — strong password for the containerized postgres instance
 - `POSTGRES_USER` — `pansori` (default)
 - `POSTGRES_DB` — `pansori_db` (default)
@@ -58,6 +67,7 @@
 ---
 
 ## 2. Grid Combat UI
+
 - [x] Render entity positions on a grid in the frontend during combat — `GridCombatView.tsx`
 - [x] Highlight reachable squares based on remaining movement budget
 - [x] Show entity HP bars, conditions, and initiative order in combat HUD (HP bars + condition badges on tokens; `InitiativeStrip` already shows order)
@@ -66,6 +76,7 @@
 ---
 
 ## 3. Multiple Enemies Per Room
+
 - [x] `Seed.enemies` is now `Record<roomId, Enemy[]>`; each enemy has a stable `id`
 - [x] `buildInitiativeOrder` rolls per-enemy initiative
 - [x] Enemy turn loop iterates by entity id (`getEnemyById`); each living enemy acts
@@ -75,6 +86,7 @@
 ---
 
 ## 4. Campaign UI
+
 - [x] Quest journal UI — `CampaignPanel.tsx` (quests tab, status badges, step checklist)
 - [x] Faction reputation UI — `CampaignPanel.tsx` (factions tab; attitude tier + rep value)
 - [x] Town/district navigation choices — `generateChoices` emits `travel` and `enter_district`
@@ -84,6 +96,7 @@
 ---
 
 ## 5. Missing Classes — DONE (verified in audit; defined in `sandbox.ts`, handler logic in `gameEngine.ts`)
+
 - [x] Druid (wild_shape, spell prep)
 - [x] Sorcerer (sorcery points, Metamagic dispatch)
 - [x] Warlock (pact slots, Agonizing Blast)
@@ -94,6 +107,7 @@
 ---
 
 ## 6. Subclass Features — DONE
+
 - [x] Champion: Improved Critical
 - [x] Battle Master: maneuvers (Riposte, Feinting)
 - [x] Thief: Fast Hands — Thief Rogue L3+ can `interact_object` as a bonus action in combat (extends out-of-combat free interaction)
@@ -112,6 +126,7 @@
 ---
 
 ## 7. Vale of Shadows — Refactor & Playtest
+
 - [x] Migrate enemies to the new array-per-room schema with stable IDs
 - [x] Multi-enemy encounters added: Charnel Hall (2 skeletons), Crypt Throne (Crypt Lord + 2 skeleton minions), Road North (2 bandits)
 - [x] Frontend context (`src/frontend/src/contexts/vale_of_shadows.tsx`) so Vale appears on the character creation screen — was previously backend-only and invisible
@@ -121,6 +136,7 @@
 ---
 
 ## Backlog (post-ship)
+
 - [ ] Narrative template format — separate mechanical metadata (dice rolls, damage numbers, HP changes) from prose so the UI can render them differently while keeping immersion
 - [ ] Dynamic room/encounter image generation — Google Imagen or similar behind `IMAGE_PROVIDER` env var flag; off by default
 - [ ] Sound effects — ambient audio per location type (town, dungeon, wilderness); combat sound cues
@@ -129,6 +145,7 @@
 ---
 
 ## 8. Inventory & UX
+
 - [x] Single inventory modal (`InventoryModal.tsx`) — party tabs, equipment slot summary, equip/unequip, give-to-party-member transfer, drop, encumbrance footer (STR × 15 lbs capacity; tier labels shown but not enforced as speed penalty). Triggered by `I` keypress or header button.
 - [ ] Multi-window inventory (deferred — single modal serves the core use case)
 - [ ] Inventory enforcement of encumbrance speed penalties (deferred — needs game-feel decision)
@@ -136,6 +153,7 @@
 ---
 
 ## 9. 5e SRD 5.2.1 rule completeness
+
 - [x] **Tactical fog of war** — per-cell lighting from PC torches + darkvision (SRD p.11 Vision and Light). Rooms can be `bright`/`dim`/`dark`. Vale dungeon rooms marked accordingly.
 - [x] **Spell range enforcement** — `Spell.rangeKind` ('self'/'touch'/'ranged') + `rangeFt`. Out-of-range casts refunded; all sandbox + Vale spells tagged with SRD ranges.
 - [x] **Quickened Spell restriction** (SRD p.67) — can't use Quickened if you've already cast a level 1+ spell this turn; can't cast a level 1+ spell after using Quickened.
@@ -144,6 +162,7 @@
 - [x] **Sneak Attack** tightened to RAW — requires finesse/ranged weapon; ally must be within 5 ft of target on the grid (or any living ally off-grid); no disadvantage.
 
 Still open under §9:
+
 - [ ] Encumbrance speed penalties (currently informational only)
 - [ ] Multi-target spells (Magic Missile's 3 darts, Eldritch Blast's multiple beams at higher levels) — needs UX for target allocation
 - [ ] AoE shapes beyond sphere (cone, line, cube) — needs geometry + per-spell shape tagging
@@ -153,19 +172,19 @@ Still open under §9:
 
 ### 9.1 SRD 5.2.1 audit findings — HIGH priority gameplay gaps
 
-- [ ] **Temporary HP** (SRD p.17–18). No `temp_hp` field on `Character`; spells like Aid, False Life, Heroism, Heroic Inspiration, and class features (e.g. fighter's *Second Wind* uses regular HP only) can't grant absorbing HP. Add `temp_hp` to Character, prefer it over regular HP for damage, doesn't stack with itself (replace if higher per RAW), expires on long rest.
-- [ ] **Grapple escape + speed-0 enforcement** (SRD p.182). On a grapple success we apply the `grappled` condition, but: (a) the grappled creature has no Action choice to attempt an escape (Athletics or Acrobatics vs grappler's STR/DEX, p.179); (b) speed isn't actually reduced to 0 — they can still grid-move; (c) the grapple doesn't end if the grappler becomes incapacitated. Wire a `grappled` movement check into `grid_move` and a `try_escape_grapple` action.
-- [ ] **Cover bonus on DEX saving throws** (SRD p.15). `coverBonus()` returns only AC bonus. Half cover is supposed to also give +2 on DEX saves; three-quarters cover +5. AoE spells (Fireball, Burning Hands, etc.) should honor this when targets are behind cover relative to the spell's origin. Apply alongside the existing cover lookup in spell save resolution.
-- [ ] **Loading weapon property** (SRD p.90). Hand crossbow / heavy crossbow / pistol / musket / blowgun are *Loading*: only one shot per Action/Bonus/Reaction regardless of Extra Attack. We don't model the `loading` property at all — a Fighter L5 with a hand crossbow currently gets two shots instead of one. Add `loading?: boolean` to `LootItem`, and gate the Extra Attack loop in the attack handler.
+- [x] **Temporary HP** (SRD p.17–18). Added `temp_hp` to Character; `applyEnemyAttackNarrative` absorbs damage from temp_hp before HP; long rest clears it; CharStatsCard displays `+N`. Spells/features that grant it aren't authored yet but infrastructure is ready.
+- [x] **Grapple escape + speed-0 enforcement** (SRD p.182). Added `try_escape_grapple` action (best of Athletics or Acrobatics vs grappler's STR Athletics). Grid-move server-side rejects when grappled/restrained. Grapples end when grappler is killed/incapacitated/unconscious via a sweep at end of takeAction. Grappler tracking lives on `CombatEntity.grappled_by`.
+- [x] **Cover bonus on DEX saving throws** (SRD p.15). `rollConditionSave` takes a `coverDexBonus` parameter; cast_spell handler computes cover caster→target (single) or epicenter→target (AoE) and applies +2/+5 to DEX saves only.
+- [x] **Loading weapon property** (SRD p.90). `loading?` field added to `LootItem`; Extra Attack loop gated when the equipped weapon has it. No current loot has Loading; infrastructure for future weapons.
 
 ### 9.2 SRD 5.2.1 audit findings — MEDIUM priority
 
-- [ ] **Reach weapon property** (SRD p.90). Glaive, halberd, lance, pike, whip have *Reach* (+5 ft melee range, also +5 ft for OAs with that weapon). Currently we hard-code 5 ft. Add `reach?: boolean` to `LootItem`, replace `DEFAULT_MELEE_REACH` lookups with per-weapon resolution.
-- [ ] **Prone — full mechanics** (SRD p.187). We apply advantage to melee attackers vs prone; we don't apply: (a) the prone attacker themselves has disadvantage on their own attacks; (b) standing up from prone costs *half your speed* (15 ft for most). Wire both into the attack handler and the grid movement cost.
+- [~] **Reach weapon property** (SRD p.90). `reach?` field added to `LootItem`; `inRange()` adds +5 ft to melee reach when set. **Still TODO**: opportunity-attack reach (currently uses fixed `DEFAULT_MELEE_REACH` in `opportunityAttackTriggers`), and no current loot has Reach yet.
+- [ ] **Prone — full mechanics** (SRD p.187). We apply advantage to melee attackers vs prone; we don't apply: (a) the prone attacker themselves has disadvantage on their own attacks; (b) standing up from prone costs _half your speed_ (15 ft for most). Wire both into the attack handler and the grid movement cost.
 - [ ] **Restrained — full mechanics** (SRD p.187). Speed-0 is enforced indirectly; missing: disadvantage on DEX saves, disadvantage on the restrained creature's own attacks. Apply alongside the existing condition handling in `resolvePlayerAttack` and the saving-throw resolver.
 - [ ] **Paralyzed / Stunned auto-fail STR & DEX saves** (SRD p.186 / p.189). Both conditions force automatic failure on STR/DEX saves; we don't short-circuit the save roll. Add a guard to the saving-throw resolver: if the target has paralyzed/stunned/unconscious, STR/DEX saves auto-fail.
-- [ ] **Frightened — movement restriction** (SRD p.182). Disadvantage on attacks/checks while source in sight (likely already covered by `DISADV_CONDITIONS`), but the frightened creature also *cannot willingly move closer to the source of its fear*. Track the fear source id; gate `grid_move` choices against it.
-- [ ] **Hide action — full DC tracking** (SRD p.11). On a successful Stealth check the creature gains the Invisible condition *and* records the check total as the DC for others to find them. Enemies on their turn should be able to make passive Perception (or active search action) against the DC to spot. Today we apply `invisible` for one attack's advantage; we don't track the DC or allow finding.
+- [ ] **Frightened — movement restriction** (SRD p.182). Disadvantage on attacks/checks while source in sight (likely already covered by `DISADV_CONDITIONS`), but the frightened creature also _cannot willingly move closer to the source of its fear_. Track the fear source id; gate `grid_move` choices against it.
+- [ ] **Hide action — full DC tracking** (SRD p.11). On a successful Stealth check the creature gains the Invisible condition _and_ records the check total as the DC for others to find them. Enemies on their turn should be able to make passive Perception (or active search action) against the DC to spot. Today we apply `invisible` for one attack's advantage; we don't track the DC or allow finding.
 - [ ] **Heavy weapon disadvantage for Small creatures** (SRD p.90). Small-sized PCs (halfling / gnome equivalents) using Heavy melee weapons should roll attacks with disadvantage. We don't model creature size on characters, and `heavy?` isn't on `LootItem`. Low impact since current contexts don't expose Small races, but worth flagging.
 
 ### 9.3 SRD 5.2.1 audit findings — LOW priority / niche
@@ -173,8 +192,8 @@ Still open under §9:
 - [ ] **Climbing & Crawling movement cost** (SRD glossary). Each foot of climbing/crawling costs an extra foot (or +2 ft in difficult terrain for crawling). Requires a "movement mode" concept the engine doesn't have. Skip unless we add verticality or prone-movement.
 - [ ] **Jumping** (SRD p.183). Long jump = STR ft from a running start (half if standing); high jump = 3 + STR mod ft. Requires verticality. Skip with the same blocker.
 - [ ] **Group ability checks** (SRD p.6). "If at least half the group succeeds, the group succeeds." Useful for stealth/sneak-as-a-party, exploration. Could fold into the existing sneak action.
-- [ ] **Charmed: charmer's social advantage** (SRD p.181). We block the charmed PC from attacking the charmer (when `charmer_id` is set), but no spell currently *sets* `charmer_id` on the target. Wire it from charm-effect spells; add advantage on the charmer's CHA checks vs the charmed.
+- [ ] **Charmed: charmer's social advantage** (SRD p.181). We block the charmed PC from attacking the charmer (when `charmer_id` is set), but no spell currently _sets_ `charmer_id` on the target. Wire it from charm-effect spells; add advantage on the charmer's CHA checks vs the charmed.
 - [ ] **Invisible: attack reveals location** (SRD p.184). After an attack while Invisible, the location is no longer hidden until the creature re-Hides. Today the `invisible` condition only lasts until the player-applied "until cleared" — we don't auto-clear it on a successful attack.
 - [ ] **Concentration breaks on Incapacitated / death** (SRD p.203). We break on damage and on starting a new concentration spell; we don't have explicit hooks when the caster becomes incapacitated or dies. Add concentration-break to `inflictCondition` and the death-save / massive-damage paths.
-- [ ] **Resistance/Vulnerability/Immunity application order** (SRD p.17). RAW order is *adjustments → resistance → vulnerability*; our `applyDamageMultiplier` currently does *immunity → vulnerability → resistance*. Functionally identical in almost all cases (immunity zeros out, vuln/resist are mutually exclusive RAW), but worth aligning for any edge case where a damage adjustment from a class feature stacks.
+- [ ] **Resistance/Vulnerability/Immunity application order** (SRD p.17). RAW order is _adjustments → resistance → vulnerability_; our `applyDamageMultiplier` currently does _immunity → vulnerability → resistance_. Functionally identical in almost all cases (immunity zeros out, vuln/resist are mutually exclusive RAW), but worth aligning for any edge case where a damage adjustment from a class feature stacks.
 - [ ] **Concentration DC cap of 30** (SRD p.203). We don't enforce the SRD's max-30 cap on the CON save DC. Never actually relevant at typical damage levels but flagged for completeness.

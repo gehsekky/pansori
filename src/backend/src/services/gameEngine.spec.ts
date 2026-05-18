@@ -1378,6 +1378,81 @@ describe('conditions — new types', () => {
     expect(result.narrative).toMatch(/grappled/i);
   });
 
+  it('grid_move is blocked when the moving character is grappled', async () => {
+    const state = makeState(
+      { conditions: ['grappled'], condition_durations: { grappled: 1 } },
+      {
+        combat_active: true,
+        entities: [
+          {
+            id: 'char-1',
+            isEnemy: false,
+            pos: { x: 0, y: 0 },
+            hp: 10,
+            maxHp: 10,
+            conditions: ['grappled'],
+            condition_durations: { grappled: 1 },
+            grappled_by: `${CORRIDOR_ID}#0`,
+          },
+        ],
+      }
+    );
+    const result = await takeAction({
+      action: { type: 'grid_move', entityId: 'char-1', to: { x: 1, y: 0 } },
+      history: [],
+      state,
+      seed,
+      context: ctx,
+    });
+    expect(result.narrative).toMatch(/GRAPPLED — your speed is 0/);
+    const ent = result.newState.entities?.find((e) => e.id === 'char-1');
+    expect(ent?.pos).toEqual({ x: 0, y: 0 });
+  });
+
+  it('surfaces a try_escape_grapple choice when grappled in combat', () => {
+    const state = makeState(
+      { conditions: ['grappled'], condition_durations: { grappled: 1 } },
+      { combat_active: true }
+    );
+    const choices = generateChoices(state, seed, ctx);
+    expect(choices.some((c) => c.action.type === 'try_escape_grapple')).toBe(true);
+  });
+
+  it('killing the grappler clears grapples on subsequent action', async () => {
+    const goblinId = `${CORRIDOR_ID}#0`;
+    const state = makeState(
+      { conditions: ['grappled'], condition_durations: { grappled: 1 } },
+      {
+        combat_active: true,
+        current_room: CORRIDOR_ID,
+        enemies_killed: [goblinId], // grappler already dead
+        entities: [
+          {
+            id: 'char-1',
+            isEnemy: false,
+            pos: { x: 0, y: 0 },
+            hp: 10,
+            maxHp: 10,
+            conditions: ['grappled'],
+            condition_durations: { grappled: 1 },
+            grappled_by: goblinId,
+          },
+        ],
+      }
+    );
+    const result = await takeAction({
+      action: { type: 'pass' },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    expect(result.newState.characters[0].conditions).not.toContain('grappled');
+    const ent = result.newState.entities?.find((e) => e.id === 'char-1');
+    expect(ent?.conditions).not.toContain('grappled');
+    expect(ent?.grappled_by).toBeUndefined();
+  });
+
   it('long rest reduces exhaustion level by 1', async () => {
     const state = makeState({ exhaustion_level: 2, hp: 5, max_hp: 10 });
     const result = await takeAction({

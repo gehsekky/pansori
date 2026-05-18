@@ -307,6 +307,7 @@ export type StructuredAction =
   | { type: 'two_weapon_attack'; targetEnemyId?: string }
   | { type: 'attune'; instanceId: string }
   | { type: 'grapple'; targetEnemyId?: string }
+  | { type: 'try_escape_grapple' }
   | { type: 'shove'; targetEnemyId?: string }
   | { type: 'dodge' }
   | { type: 'disengage' }
@@ -623,6 +624,10 @@ export interface CombatEntity {
   ac?: number; // companion AC (PCs use character.ac, enemies use Enemy.ac)
   toHit?: number; // companion attack bonus
   damage?: string; // companion damage dice expression (e.g. '2d4+2')
+  // SRD 5.2.1 — when grappled, records the id of the grappler so we can end the
+  // condition if the grappler dies/is incapacitated, and so the contested escape
+  // check has a target's mod to roll against.
+  grappled_by?: string;
 }
 
 // ─── Quest system ─────────────────────────────────────────────────────────────
