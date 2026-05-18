@@ -6,6 +6,7 @@ export const context: FrontendContext = {
   displayName: 'Whispering Pines',
   tagline:
     'A frozen mountain pass. A trapper gone missing. A cult above the snow line — and fire is your friend.',
+  recommendedPartySize: 3,
   previewArt: `
    ╔═ PINES ══════╗
    ║   ❄ ❄ ❄ ❄    ║

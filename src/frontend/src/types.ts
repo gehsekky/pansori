@@ -124,6 +124,9 @@ export interface FrontendContext {
   classSkills: Record<string, string[]>;
   classFeatures?: Record<string, string[]>;
   backgrounds?: Background[];
+  // Authoring hint mirrored from the backend context. Shown on the character
+  // creation screen so players know what the encounters are tuned for.
+  recommendedPartySize?: number;
 }
 
 // ─── Character (per-character state) ─────────────────────────────────────────

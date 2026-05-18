@@ -902,6 +902,8 @@ export const context: Context = {
 
   campaign: {
     world_name: 'Vale of Shadows',
+    // Three quests + 8-room crypt with a multi-attack lich boss — tuned for 3 PCs.
+    recommendedPartySize: 3,
     intro:
       'The Vale of Shadows stretches before you — a land of ancient tombs, suspicious merchants, and shadows that move against the light.',
 

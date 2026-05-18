@@ -538,6 +538,12 @@ export interface CampaignData {
   locations?: Location[];
   quests?: Quest[];
   factions?: Faction[];
+  // Authoring hint: the campaign is balanced for this many PCs. Enemy HP
+  // already scales linearly with party size via `scaleEnemyHp`, but the
+  // *quantity* of enemies per room is authored statically — so a party of 1
+  // facing the throne fight (Crypt Lord + 2 minions, balanced for 3 PCs) will
+  // have a hard time. Surfaced on the character creation screen.
+  recommendedPartySize?: number;
 }
 
 export type TieredNarrative = string[] | Record<string, string[]>;
