@@ -615,10 +615,7 @@ function getSpellSlotsForLevel(
 
 // ─── Backward-compatibility normalizer ───────────────────────────────────────
 
-export function normalizeState(
-  raw: Record<string, unknown>,
-  sessionMeta?: { character_name?: string; portrait_url?: string }
-): GameState {
+export function normalizeState(raw: Record<string, unknown>): GameState {
   // Already new format — patch any fields added after initial rollout
   if (Array.isArray((raw as unknown as GameState).characters)) {
     const gs = raw as unknown as GameState;
@@ -663,9 +660,9 @@ export function normalizeState(
   const level = Number(raw.level ?? 1);
   const char: Character = {
     id: charId,
-    name: sessionMeta?.character_name ?? 'Hero',
+    name: String(raw.character_name ?? 'Hero'),
     character_class: String(raw.character_class ?? 'Adventurer'),
-    portrait_url: sessionMeta?.portrait_url ?? null,
+    portrait_url: (raw.portrait_url as string | null | undefined) ?? null,
     hp: Number(raw.hp ?? 20),
     max_hp: Number(raw.max_hp ?? 20),
     ac: Number(raw.ac ?? 10),

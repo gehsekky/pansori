@@ -212,10 +212,12 @@ describe('normalizeState', () => {
         free_interaction_used: false,
       },
     };
-    const result = normalizeState(legacy as unknown as Record<string, unknown>, {
+    // Pre-party legacy state — character_name lives in the raw object itself
+    // (we used to denormalize it onto game_sessions; now we derive from state).
+    const result = normalizeState({
+      ...legacy,
       character_name: 'Old Hero',
-      portrait_url: undefined,
-    });
+    } as unknown as Record<string, unknown>);
     expect(result.characters).toHaveLength(1);
     expect(result.characters[0].name).toBe('Old Hero');
     expect(result.characters[0].hp).toBe(15);

@@ -109,6 +109,12 @@ function SessionsScreen({
                       }}
                     >
                       {s.character_name}
+                      {s.party_size > 1 && (
+                        <span style={{ color: 'var(--t-mid)', fontWeight: 'normal' }}>
+                          {' '}
+                          & {s.party_size - 1} companion{s.party_size > 2 ? 's' : ''}
+                        </span>
+                      )}
                     </p>
                     <p
                       style={{

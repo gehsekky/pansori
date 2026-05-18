@@ -74,12 +74,18 @@ gameRouter.get('/session/:id', async (req: Request, res: Response) => {
   }
 });
 
-// List all sessions for the current user
+// List all sessions for the current user. Leader display info + party size
+// are derived from the JSONB state at read time — no denormalized columns.
 gameRouter.get('/sessions', async (req: Request, res: Response) => {
   try {
     const { rows } = await pool.query(
-      `SELECT id, character_name, character_class, status, portrait_url,
+      `SELECT id,
+              status,
               seed->>'context_id' AS context_id,
+              state->'characters'->0->>'name' AS character_name,
+              state->'characters'->0->>'character_class' AS character_class,
+              state->'characters'->0->>'portrait_url' AS portrait_url,
+              jsonb_array_length(COALESCE(state->'characters', '[]'::jsonb)) AS party_size,
               created_at, updated_at
        FROM game_sessions
        WHERE user_id = $1
@@ -276,16 +282,9 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
     const {
       rows: [session],
     } = await client.query(
-      `INSERT INTO game_sessions (user_id, character_name, character_class, seed, state, portrait_url)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [
-        req.user!.id,
-        leader.name,
-        leader.character_class,
-        JSON.stringify(seed),
-        JSON.stringify(initialState),
-        leader.portrait_url ?? null,
-      ]
+      `INSERT INTO game_sessions (user_id, seed, state)
+       VALUES ($1, $2, $3) RETURNING *`,
+      [req.user!.id, JSON.stringify(seed), JSON.stringify(initialState)]
     );
     await client.query('COMMIT');
     res.json({ session, state: initialState, seed, campaignMeta: campaignMetaFor(ctx) });
@@ -326,10 +325,7 @@ gameRouter.post('/session/:id/equip', async (req: Request, res: Response) => {
     }
 
     const ctx = CONTEXTS[row.seed.context_id] ?? DEFAULT_CONTEXT;
-    const state = normalizeState(row.state, {
-      character_name: row.character_name,
-      portrait_url: row.portrait_url,
-    });
+    const state = normalizeState(row.state);
 
     // Resolve target character
     const targetId = character_id ?? state.active_character_id;
@@ -450,10 +446,7 @@ gameRouter.post('/session/:id/transfer', async (req: Request, res: Response) => 
       res.status(404).json({ error: 'Session not found' });
       return;
     }
-    const state = normalizeState(row.state, {
-      character_name: row.character_name,
-      portrait_url: row.portrait_url,
-    });
+    const state = normalizeState(row.state);
     const fromIdx = state.characters.findIndex((c) => c.id === from_character_id);
     const toIdx = state.characters.findIndex((c) => c.id === to_character_id);
     if (fromIdx < 0 || toIdx < 0) {
@@ -529,10 +522,7 @@ gameRouter.post('/session/:id/drop', async (req: Request, res: Response) => {
       res.status(404).json({ error: 'Session not found' });
       return;
     }
-    const state = normalizeState(row.state, {
-      character_name: row.character_name,
-      portrait_url: row.portrait_url,
-    });
+    const state = normalizeState(row.state);
     const charIdx = state.characters.findIndex((c) => c.id === character_id);
     if (charIdx < 0) {
       res.status(400).json({ error: 'Character not found in session' });
@@ -593,10 +583,7 @@ gameRouter.post('/session/:id/action', async (req: Request, res: Response) => {
     }
 
     const ctx = CONTEXTS[row.seed.context_id] ?? DEFAULT_CONTEXT;
-    let state = normalizeState(row.state, {
-      character_name: row.character_name,
-      portrait_url: row.portrait_url,
-    });
+    let state = normalizeState(row.state);
 
     // For campaign sessions, load and merge persisted campaign state
     let campaignState = null;
