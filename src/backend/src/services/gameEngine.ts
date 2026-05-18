@@ -1294,6 +1294,26 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       });
     }
 
+    // Beastmaster Ranger: Command Animal Companion (bonus action, PHB p.93).
+    // The companion bites the nearest living enemy from its grid position.
+    if (
+      char.subclass === 'beastmaster' &&
+      cls === 'ranger' &&
+      char.level >= 3 &&
+      !char.turn_actions.bonus_action_used
+    ) {
+      const companion = state.entities?.find(
+        (e) => e.isCompanion && e.companionOwnerId === char.id && e.hp > 0
+      );
+      if (companion) {
+        choices.push({
+          label: `Command ${companion.companionName ?? 'companion'} to attack (bonus action)`,
+          action: { type: 'use_class_feature', featureId: 'command_companion' },
+          requiresBonusAction: true,
+        });
+      }
+    }
+
     // Abjurer Wizard: Arcane Ward (create when not active)
     if (char.subclass === 'abjurer' && cls === 'wizard' && !char.class_resource_uses?.arcane_ward) {
       choices.push({
@@ -2006,6 +2026,31 @@ export async function takeAction({
             conditions: c.conditions,
             condition_durations: c.condition_durations,
           }));
+          // Beastmaster Ranger L3+ enters combat with an animal companion
+          // (Wolf, MM stats: HP 11, AC 13, +4 to hit, 2d4+2 bite). PHB p.93.
+          const companionEntities: CombatEntity[] = st.characters
+            .filter(
+              (c) =>
+                !c.dead &&
+                c.character_class.toLowerCase() === 'ranger' &&
+                c.subclass === 'beastmaster' &&
+                c.level >= 3
+            )
+            .map((c, ci) => ({
+              id: `${c.id}:companion`,
+              isEnemy: false,
+              isCompanion: true,
+              companionOwnerId: c.id,
+              companionName: 'Wolf',
+              pos: { x: 1 + ci, y: 2 },
+              hp: 11,
+              maxHp: 11,
+              ac: 13,
+              toHit: 4,
+              damage: '2d4+2',
+              conditions: [],
+              condition_durations: {},
+            }));
           // One grid entity per living enemy, spaced out along the far edge
           const enemyEntities: CombatEntity[] = enemiesForInit.map((en, ei) => ({
             id: en.id,
@@ -2016,7 +2061,11 @@ export async function takeAction({
             conditions: [],
             condition_durations: {},
           }));
-          st = { ...st, entities: [...pcEntities, ...enemyEntities], movement_used: {} };
+          st = {
+            ...st,
+            entities: [...pcEntities, ...companionEntities, ...enemyEntities],
+            movement_used: {},
+          };
         }
 
         // ── Surprise check (PHB p.189) ────────────────────────────────────
@@ -3925,6 +3974,77 @@ export async function takeAction({
         }
       }
 
+      // ── Beastmaster Ranger: command animal companion (bonus action, PHB p.93)
+      else if (fid === 'command_companion') {
+        if (char.subclass !== 'beastmaster' || char.character_class.toLowerCase() !== 'ranger') {
+          narrative = 'Only Beastmaster Rangers can command an animal companion.';
+          break;
+        }
+        if (char.level < 3) {
+          narrative = 'Animal Companion unlocks at Ranger level 3.';
+          break;
+        }
+        if (char.turn_actions.bonus_action_used) {
+          narrative = 'Bonus action already used this turn.';
+          break;
+        }
+        const comp = st.entities?.find(
+          (e) => e.isCompanion && e.companionOwnerId === char.id && e.hp > 0
+        );
+        if (!comp) {
+          narrative = 'Your animal companion is unavailable.';
+          break;
+        }
+        // Pick the nearest living enemy as the target
+        const targetEnt = (st.entities ?? [])
+          .filter((e) => e.isEnemy && e.hp > 0)
+          .sort((a, b) => distanceFeet(comp.pos, a.pos) - distanceFeet(comp.pos, b.pos))[0];
+        if (!targetEnt) {
+          narrative = 'No living enemy in sight for the companion.';
+          break;
+        }
+        const targetEnemy = getEnemyById(seed, targetEnt.id);
+        if (!targetEnemy) {
+          narrative = "Companion's target is unreachable.";
+          break;
+        }
+        char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
+        usedInitiative = true;
+        // Resolve the companion's bite attack against the target's AC
+        const toHit = comp.toHit ?? 4;
+        const dmgDice = comp.damage ?? '2d4+2';
+        const compName = comp.companionName ?? 'companion';
+        const attackRoll = rollDice('1d20');
+        const total = attackRoll + toHit;
+        if (attackRoll === 1) {
+          narrative = `${compName} lunges but misses wildly! (d20:1+${toHit}=${total} vs AC ${targetEnemy.ac})`;
+        } else if (attackRoll === 20 || total >= targetEnemy.ac) {
+          const isCrit = attackRoll === 20;
+          const dmg = isCrit ? rollCritical(dmgDice) : rollDice(dmgDice);
+          const { damage: finalDmg, note } = applyDamageMultiplier(dmg, 'piercing', targetEnemy);
+          const curHp = targetEnt.hp;
+          const newHp = Math.max(0, curHp - finalDmg);
+          st = {
+            ...st,
+            entities: (st.entities ?? []).map((e) =>
+              e.id === targetEnt.id && e.isEnemy ? { ...e, hp: newHp } : e
+            ),
+          };
+          narrative = `${compName} bites the ${targetEnemy.name}! ${finalDmg} piercing damage${isCrit ? ' (CRIT)' : ''} (d20:${attackRoll}+${toHit}=${total} vs AC ${targetEnemy.ac})${note}`;
+          if (newHp <= 0) {
+            st.enemies_killed = [...st.enemies_killed, targetEnt.id];
+            narrative += ` ${targetEnemy.name} falls!`;
+            const xpGain = targetEnemy.xp ?? 10;
+            char.xp = (char.xp || 0) + xpGain;
+            if (isRoomCleared(st, seed, roomId)) {
+              st = endCombatState(st);
+            }
+          }
+        } else {
+          narrative = `${compName} bites at the ${targetEnemy.name} but misses. (d20:${attackRoll}+${toHit}=${total} vs AC ${targetEnemy.ac})`;
+        }
+      }
+
       // ── Devotion Paladin: Sacred Weapon (Channel Divinity) ───────────────────
       else if (fid === 'sacred_weapon') {
         if (char.subclass !== 'devotion') {
@@ -4769,10 +4889,12 @@ export async function takeAction({
       const eEntry = st.initiative_order[advIdx];
       const rm = getEnemyById(seed, eEntry.id);
       if (rm && !st.enemies_killed.includes(eEntry.id)) {
-        // Target: nearest living PC by grid distance from enemy entity
+        // Target: nearest living PC by grid distance from enemy entity.
+        // Companions are excluded — enemies focus on the heroes (simpler than
+        // routing damage through both entity and character paths).
         const eEnt = st.entities?.find((e) => e.id === eEntry.id && e.isEnemy);
         const nearestPcEntity = st.entities
-          ?.filter((e) => !e.isEnemy && e.hp > 0)
+          ?.filter((e) => !e.isEnemy && !e.isCompanion && e.hp > 0)
           .sort((a, b) => {
             if (!eEnt) return 0;
             return distanceFeet(eEnt.pos, a.pos) - distanceFeet(eEnt.pos, b.pos);

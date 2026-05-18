@@ -367,6 +367,12 @@ export interface CombatEntity {
   maxHp: number;
   conditions: string[];
   condition_durations: Record<string, number>;
+  isCompanion?: boolean;
+  companionOwnerId?: string;
+  companionName?: string;
+  ac?: number;
+  toHit?: number;
+  damage?: string;
 }
 
 // ─── Quest system ─────────────────────────────────────────────────────────────

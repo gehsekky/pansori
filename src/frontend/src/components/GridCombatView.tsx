@@ -90,27 +90,36 @@ function GridCombatView({ state, seed, gridWidth = 10, gridHeight = 10 }: Props)
       let bg = 'transparent';
       if (reachable) bg = 'rgba(120, 200, 255, 0.10)';
 
+      const tokenBg = ent?.isEnemy
+        ? 'rgba(220, 70, 70, 0.85)'
+        : ent?.isCompanion
+          ? 'rgba(110, 190, 110, 0.85)'
+          : 'rgba(70, 140, 220, 0.85)';
+      const tokenLabelText = ent
+        ? ent.isEnemy
+          ? (enemyLookup.get(ent.id)?.name ?? 'E')
+          : ent.isCompanion
+            ? (ent.companionName ?? 'C')
+            : (state.characters.find((c) => c.id === ent.id)?.name ?? 'P')
+        : '';
+      const tokenTitle = ent
+        ? ent.isEnemy
+          ? `${enemyLookup.get(ent.id)?.name ?? 'Enemy'} — HP ${ent.hp}/${ent.maxHp}, AC ${enemyLookup.get(ent.id)?.ac ?? '?'}`
+          : ent.isCompanion
+            ? `${ent.companionName ?? 'Companion'} — HP ${ent.hp}/${ent.maxHp}, AC ${ent.ac ?? '?'}`
+            : `${state.characters.find((c) => c.id === ent.id)?.name ?? 'PC'} — HP ${ent.hp}/${ent.maxHp}`
+        : '';
       const token = ent ? (
         <div
           className={styles.gridToken}
-          title={
-            ent.isEnemy
-              ? `${enemyLookup.get(ent.id)?.name ?? 'Enemy'} — HP ${ent.hp}/${ent.maxHp}, AC ${enemyLookup.get(ent.id)?.ac ?? '?'}`
-              : `${state.characters.find((c) => c.id === ent.id)?.name ?? 'PC'} — HP ${ent.hp}/${ent.maxHp}`
-          }
+          title={tokenTitle}
           style={{
-            background: ent.isEnemy ? 'rgba(220, 70, 70, 0.85)' : 'rgba(70, 140, 220, 0.85)',
+            background: tokenBg,
             boxShadow: isActive ? '0 0 6px 2px var(--t-primary)' : 'none',
             border: isActive ? '1px solid var(--t-primary)' : '1px solid rgba(255, 255, 255, 0.25)',
           }}
         >
-          <span className={styles.gridTokenLetter}>
-            {tokenLabel(
-              ent.isEnemy
-                ? (enemyLookup.get(ent.id)?.name ?? 'E')
-                : (state.characters.find((c) => c.id === ent.id)?.name ?? 'P')
-            )}
-          </span>
+          <span className={styles.gridTokenLetter}>{tokenLabel(tokenLabelText)}</span>
           <div
             className={styles.gridHpBar}
             style={{
@@ -159,6 +168,9 @@ function GridCombatView({ state, seed, gridWidth = 10, gridHeight = 10 }: Props)
       <div className={styles.gridLegend}>
         <span>
           <span className={styles.gridLegendPC} /> party
+        </span>
+        <span>
+          <span className={styles.gridLegendCompanion} /> companion
         </span>
         <span>
           <span className={styles.gridLegendEnemy} /> hostile
