@@ -7,8 +7,7 @@ on:
 env:
   AWS_REGION:   us-east-1
   ECR_REGISTRY: 674162619498.dkr.ecr.us-east-1.amazonaws.com
-  EC2_HOST:     ec2-54-87-149-6.compute-1.amazonaws.com
-  EC2_USER:     ec2-user
+  EC2_INSTANCE_ID: i-0cafb33230af17b59
 
 jobs:
   test:
@@ -85,35 +84,84 @@ jobs:
           cache-to: type=gha,mode=max
 
       # Deploy is gated on the DEPLOY_ENABLED repo variable so CI stays green
-      # while the EC2 instance is still being bootstrapped (TODO §1). Flip the
-      # variable to 'true' under Settings → Variables → Actions once the host
-      # is reachable, security group is open to GitHub Actions, and the SSH
-      # key secret is set. Note: build + push to ECR still runs every push,
-      # so production deploys can also be done by SSHing in manually and
-      # running the script body below by hand.
-      - name: Deploy to EC2
+      # if the operator wants to roll new images by hand. The deploy runs over
+      # SSM Session Manager — no SSH allowlist, no EC2_SSH_KEY secret, all
+      # commands audited in CloudTrail. The instance role has
+      # AmazonSSMManagedInstanceCore + ECR read; nothing else needed.
+      - name: Deploy to EC2 (via SSM)
         if: vars.DEPLOY_ENABLED == 'true'
-        uses: appleboy/ssh-action@v1
-        with:
-          host:     ${{ env.EC2_HOST }}
-          username: ${{ env.EC2_USER }}
-          key:      ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            set -e
-            export ECR_REGISTRY=${{ env.ECR_REGISTRY }}
-            export IMAGE_TAG=${{ env.IMAGE_TAG }}
-            export AWS_REGION=${{ env.AWS_REGION }}
+        env:
+          INSTANCE_ID: ${{ env.EC2_INSTANCE_ID }}
+        run: |
+          set -euo pipefail
 
-            # Pull latest images from ECR
-            aws ecr get-login-password --region $AWS_REGION \
-              | docker login --username AWS --password-stdin $ECR_REGISTRY
+          # Build the script that SSM will execute on the host. The single-quoted
+          # heredoc delimiter ('DEPLOY') means nothing inside is expanded by this
+          # shell — all expansions happen on the EC2 host. We splice in the GH-
+          # Actions env values via simple sed substitution after writing.
+          cat > /tmp/deploy.sh <<'DEPLOY'
+          set -e
+          export ECR_REGISTRY="__ECR_REGISTRY__"
+          export IMAGE_TAG="__IMAGE_TAG__"
+          export AWS_REGION="__AWS_REGION__"
 
-            # Roll to new containers (postgres stays up via named volume).
-            # Migrations are run by the postgres entrypoint via
-            # docker-entrypoint-initdb.d on first init of the data volume.
-            # Future schema changes require a separate migration runner.
-            docker compose -f /opt/pansori/docker-compose.prod.yml pull backend frontend
-            docker compose -f /opt/pansori/docker-compose.prod.yml up -d --remove-orphans
+          aws ecr get-login-password --region "$AWS_REGION" \
+            | docker login --username AWS --password-stdin "$ECR_REGISTRY"
 
-            # Clean up old images
-            docker image prune -f
+          cd /opt/pansori
+          # Persist IMAGE_TAG to .env so a host reboot recovers on the right image
+          # (docker restart-policy keeps the containers, but a manual `compose up`
+          # without env would otherwise fall back to :latest which doesn't exist).
+          if grep -q "^IMAGE_TAG=" .env; then
+            sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=$IMAGE_TAG|" .env
+          else
+            echo "IMAGE_TAG=$IMAGE_TAG" >> .env
+          fi
+          docker compose -f docker-compose.prod.yml --env-file .env pull backend frontend
+          docker compose -f docker-compose.prod.yml --env-file .env up -d --remove-orphans
+          docker image prune -f
+          DEPLOY
+
+          sed -i "s|__ECR_REGISTRY__|${ECR_REGISTRY}|g; s|__IMAGE_TAG__|${IMAGE_TAG}|g; s|__AWS_REGION__|${AWS_REGION}|g" /tmp/deploy.sh
+
+          # JSON-encode the script for the SSM Parameters payload. python3 is on
+          # ubuntu-latest so no external tools needed.
+          PARAMS_FILE=$(mktemp)
+          INSTANCE_ID="$INSTANCE_ID" python3 - "$PARAMS_FILE" <<'PY'
+          import json, os, sys
+          with open("/tmp/deploy.sh") as f:
+              script = f.read()
+          with open(sys.argv[1], "w") as f:
+              json.dump({
+                  "DocumentName": "AWS-RunShellScript",
+                  "InstanceIds": [os.environ["INSTANCE_ID"]],
+                  "Parameters": {"commands": [script]},
+                  "TimeoutSeconds": 600,
+              }, f)
+          PY
+
+          CMD_ID=$(aws ssm send-command --cli-input-json "file://$PARAMS_FILE" \
+            --query 'Command.CommandId' --output text)
+          echo "SSM command id: $CMD_ID"
+
+          # Poll for completion (up to ~6 minutes).
+          STATUS="Pending"
+          for i in $(seq 1 72); do
+            STATUS=$(aws ssm get-command-invocation \
+              --command-id "$CMD_ID" --instance-id "$INSTANCE_ID" \
+              --query 'Status' --output text 2>/dev/null || echo "Pending")
+            case "$STATUS" in
+              Success|Failed|TimedOut|Cancelled) break ;;
+            esac
+            sleep 5
+          done
+
+          echo "Final SSM status: $STATUS"
+          echo "---stdout---"
+          aws ssm get-command-invocation --command-id "$CMD_ID" \
+            --instance-id "$INSTANCE_ID" --query 'StandardOutputContent' --output text
+          echo "---stderr---"
+          aws ssm get-command-invocation --command-id "$CMD_ID" \
+            --instance-id "$INSTANCE_ID" --query 'StandardErrorContent' --output text
+
+          [ "$STATUS" = "Success" ] || exit 1
