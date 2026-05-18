@@ -84,7 +84,15 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # Deploy is gated on the DEPLOY_ENABLED repo variable so CI stays green
+      # while the EC2 instance is still being bootstrapped (TODO §1). Flip the
+      # variable to 'true' under Settings → Variables → Actions once the host
+      # is reachable, security group is open to GitHub Actions, and the SSH
+      # key secret is set. Note: build + push to ECR still runs every push,
+      # so production deploys can also be done by SSHing in manually and
+      # running the script body below by hand.
       - name: Deploy to EC2
+        if: vars.DEPLOY_ENABLED == 'true'
         uses: appleboy/ssh-action@v1
         with:
           host:     ${{ env.EC2_HOST }}
