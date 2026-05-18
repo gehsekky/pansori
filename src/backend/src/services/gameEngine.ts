@@ -1598,8 +1598,11 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       const remaining = speedFt - usedFt;
       const gw = context.gridWidth ?? 10;
       const gh = context.gridHeight ?? 10;
+      // Dead entities (corpses) don't block movement — walk over them.
       const occupied = new Set(
-        state.entities.filter((e) => e.id !== char.id).map((e) => `${e.pos.x},${e.pos.y}`)
+        state.entities
+          .filter((e) => e.id !== char.id && e.hp > 0)
+          .map((e) => `${e.pos.x},${e.pos.y}`)
       );
       const DIRS: Array<{ label: string; dx: number; dy: number }> = [
         { label: 'N', dx: 0, dy: -1 },
@@ -4867,7 +4870,11 @@ export async function takeAction({
       );
       const gridW = locationGrid?.gridWidth ?? context.gridWidth ?? 10;
       const gridH = locationGrid?.gridHeight ?? context.gridHeight ?? 10;
-      const blocked = st.entities.filter((e) => e.id !== char.id).map((e) => e.pos);
+      // Dead entities (hp ≤ 0) still appear in state.entities for narrative
+      // continuity but don't block movement — you walk over the corpse. This
+      // also matches the frontend's `isReachable` (filters on hp > 0), so the
+      // click-to-move targets and the BFS pathfinder agree on what's blocked.
+      const blocked = st.entities.filter((e) => e.id !== char.id && e.hp > 0).map((e) => e.pos);
 
       const path = findPath(charEntity.pos, gridAction.to, blocked, gridW, gridH);
       if (!path) {
