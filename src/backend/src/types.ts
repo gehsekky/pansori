@@ -167,6 +167,11 @@ export interface TurnActions {
   // Barbarian Reckless Attack (PHB p.49): advantage on STR melee attacks this turn,
   // but enemies have advantage on attacks vs the Barbarian until their next turn.
   reckless?: boolean;
+  // SRD 5.2.1 p.67 Quickened Spell metamagic: you can't use Quickened if a
+  // level 1+ spell was already cast this turn, AND you can't cast a level 1+
+  // spell on the same turn that you used Quickened.
+  leveled_spell_cast?: boolean; // set after any non-cantrip spell resolves
+  quickened_used?: boolean; // set when Quickened Spell metamagic is consumed
   movement_budget_remaining?: number; // feet remaining this turn; initialized to speed at turn start
   readied_action?: {
     trigger: string;
