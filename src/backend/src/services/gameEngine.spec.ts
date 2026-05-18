@@ -1418,6 +1418,36 @@ describe('conditions — new types', () => {
     expect(choices.some((c) => c.action.type === 'try_escape_grapple')).toBe(true);
   });
 
+  it('stand_up costs half speed and removes prone', async () => {
+    const state = makeState(
+      { conditions: ['prone'], condition_durations: { prone: 1 } },
+      {
+        combat_active: true,
+        entities: [
+          {
+            id: 'char-1',
+            isEnemy: false,
+            pos: { x: 0, y: 0 },
+            hp: 10,
+            maxHp: 10,
+            conditions: ['prone'],
+            condition_durations: { prone: 1 },
+          },
+        ],
+        movement_used: {},
+      }
+    );
+    const result = await takeAction({
+      action: { type: 'stand_up' },
+      history: [],
+      state,
+      seed,
+      context: ctx,
+    });
+    expect(result.newState.characters[0].conditions).not.toContain('prone');
+    expect(result.newState.movement_used?.['char-1']).toBe(15);
+  });
+
   it('killing the grappler clears grapples on subsequent action', async () => {
     const goblinId = `${CORRIDOR_ID}#0`;
     const state = makeState(

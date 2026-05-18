@@ -175,7 +175,7 @@ function conditionSavingThrow(
   effect: OnHitEffect,
   char: Pick<
     Character,
-    'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha' | 'level' | 'character_class'
+    'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha' | 'level' | 'character_class' | 'conditions'
   >,
   context: Context
 ): boolean {
@@ -186,7 +186,9 @@ function conditionSavingThrow(
     char[effect.ability] ?? 10,
     effect.dc,
     proficient,
-    char.level
+    char.level,
+    0,
+    char.conditions ?? []
   );
 }
 
@@ -1448,6 +1450,19 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       label: 'Try to escape grapple — Athletics or Acrobatics vs grappler',
       action: { type: 'try_escape_grapple' },
     });
+  }
+
+  // Stand up from prone — SRD 5.2.1 p.187: costs half the creature's speed.
+  if (state.combat_active && char.conditions.includes('prone')) {
+    const speedFt = char.speed ?? 30;
+    const standCost = Math.floor(speedFt / 2);
+    const usedFt = (state.movement_used ?? {})[char.id] ?? 0;
+    if (speedFt - usedFt >= standCost) {
+      choices.push({
+        label: `Stand up — costs ${standCost} ft of movement`,
+        action: { type: 'stand_up' },
+      });
+    }
   }
 
   // Grapple/Shove choices — one per living enemy
@@ -3284,13 +3299,15 @@ export async function takeAction({
             saveCoverDexBonus = coverBonus(casterEntSave.pos, targetEntSave.pos, obstaclesSave);
           }
         }
+        const targetEntForCond = st.entities?.find((e) => e.id === spellTargetId && e.isEnemy);
         const saveFailed = rollConditionSave(
           saveAbility,
           enemyScore,
           dc,
           false,
           char.level,
-          saveCoverDexBonus
+          saveCoverDexBonus,
+          targetEntForCond?.conditions ?? []
         );
         const saveLabel = saveAbility.toUpperCase();
 
@@ -3416,13 +3433,16 @@ export async function takeAction({
                   .map((e) => e.pos);
                 tCover = coverBonus(epicenter, target.pos, obstaclesAoe);
               }
+              const targetEntCond =
+                st.entities?.find((e) => e.id === target.id && e.isEnemy)?.conditions ?? [];
               const tFailed = rollConditionSave(
                 spell.savingThrow,
                 tScore,
                 dc,
                 false,
                 char.level,
-                tCover
+                tCover,
+                targetEntCond
               );
               const baseDmg = rollDice(upcastDamage(spell, slotLevel) || (spell.damage ?? '0'));
               const effDmg = tFailed
@@ -3476,7 +3496,8 @@ export async function takeAction({
                   dc,
                   false,
                   char.level,
-                  allyCover
+                  allyCover,
+                  targetChar.conditions ?? []
                 );
                 const baseDmg = rollDice(upcastDamage(spell, slotLevel) || (spell.damage ?? '0'));
                 const effDmg = allyFailed
@@ -4632,6 +4653,31 @@ export async function takeAction({
       } else {
         narrative = `You strain against the grapple but cannot escape. (${skillUsed} ${myRoll} vs ${grapplerRoll})`;
       }
+      break;
+    }
+
+    // SRD 5.2.1 p.187 — standing up from prone costs half the creature's speed.
+    case 'stand_up': {
+      if (!char.conditions.includes('prone')) {
+        narrative = 'You are not prone.';
+        break;
+      }
+      const speedFt = char.speed ?? 30;
+      const standCost = Math.floor(speedFt / 2);
+      const usedFt = (st.movement_used ?? {})[char.id] ?? 0;
+      if (usedFt + standCost > speedFt) {
+        narrative = `Not enough movement to stand up. (${speedFt - usedFt} ft remaining, ${standCost} ft needed)`;
+        break;
+      }
+      char = { ...char, conditions: char.conditions.filter((c) => c !== 'prone') };
+      st = {
+        ...st,
+        movement_used: { ...st.movement_used, [char.id]: usedFt + standCost },
+        entities: (st.entities ?? []).map((e) =>
+          e.id === char.id ? { ...e, conditions: e.conditions.filter((c) => c !== 'prone') } : e
+        ),
+      };
+      narrative = `${char.name} stands up. (${standCost} ft of movement used)`;
       break;
     }
 

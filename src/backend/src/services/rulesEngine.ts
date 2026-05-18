@@ -395,21 +395,42 @@ export const PLAYER_ADV_CONDITIONS = new Set(['invisible']);
 // Enemy attacks the player with disadvantage when the player has these conditions
 export const ENEMY_DISADV_CONDITIONS = new Set(['invisible']);
 
+// Conditions that force STR/DEX saves to auto-fail (SRD 5.2.1 p.186/p.189).
+// Paralyzed, stunned, unconscious, petrified all share this rule.
+const STR_DEX_AUTO_FAIL = new Set(['paralyzed', 'stunned', 'unconscious', 'petrified']);
+
 // On-hit saving throw: returns true if the save FAILS (condition is applied).
 // Pass proficient=true when the character has saving throw proficiency in this ability.
 // coverDexBonus (SRD 5.2.1 p.15): half cover +2 to DEX saves, three-quarters
 // cover +5 — applied only for DEX saves. AC use of the same bonus happens
 // separately in resolvePlayerAttack / resolveEnemyAttack.
+// targetConditions: pass the target's current conditions to force auto-fail on
+// STR/DEX saves when paralyzed/stunned/unconscious/petrified. Restrained gives
+// disadvantage on DEX saves.
 export function rollConditionSave(
   ability: 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha',
   score: number,
   dc: number,
   proficient = false,
   level = 1,
-  coverDexBonus = 0
+  coverDexBonus = 0,
+  targetConditions: string[] = []
 ): boolean {
+  // Auto-fail STR/DEX saves while incapacitated by paralysis/stun/unconscious/petrified
+  if (
+    (ability === 'str' || ability === 'dex') &&
+    targetConditions.some((c) => STR_DEX_AUTO_FAIL.has(c))
+  ) {
+    return true;
+  }
   const prof = proficient ? profBonus(level) : 0;
   const cover = ability === 'dex' ? coverDexBonus : 0;
+  // Restrained: disadvantage on DEX saves (SRD p.187)
+  if (ability === 'dex' && targetConditions.includes('restrained')) {
+    const r1 = d(20);
+    const r2 = d(20);
+    return Math.min(r1, r2) + abilityMod(score) + prof + cover < dc;
+  }
   return d(20) + abilityMod(score) + prof + cover < dc;
 }
 
