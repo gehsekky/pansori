@@ -1,33 +1,30 @@
-import { Router, Request, Response } from 'express';
-import { randomUUID } from 'crypto';
-import { pool } from '../db/pool.js';
-import { generateSeed } from '../services/procgen.js';
-import {
-  takeAction,
-  generateChoices,
-  buildArrivalNarrative,
-  normalizeState,
-} from '../services/gameEngine.js';
+import type { CampaignFacts, Character, Context, GameState, StructuredAction } from '../types.js';
 import {
   FRESH_TURN,
-  canEquipWeapon,
   canDonArmor,
   canDonShield,
-  computeAcAfterArmorChange,
+  canEquipWeapon,
   computeTotalAc,
-  hasArmorProficiency,
-  hasWeaponProficiency,
 } from '../services/rulesEngine.js';
-import { loadContexts } from '../services/contextLoader.js';
+import { Request, Response, Router } from 'express';
 import {
-  loadCampaignState,
-  saveCampaignState,
-  mergeCampaignIntoGameState,
-  extractCampaignDelta,
-  evaluateQuestSteps,
   applyQuestCompletions,
+  evaluateQuestSteps,
+  extractCampaignDelta,
+  loadCampaignState,
+  mergeCampaignIntoGameState,
+  saveCampaignState,
 } from '../services/campaignEngine.js';
-import type { GameState, Character, Context, StructuredAction, CampaignFacts } from '../types.js';
+import {
+  buildArrivalNarrative,
+  generateChoices,
+  normalizeState,
+  takeAction,
+} from '../services/gameEngine.js';
+import { generateSeed } from '../services/procgen.js';
+import { loadContexts } from '../services/contextLoader.js';
+import { pool } from '../db/pool.js';
+import { randomUUID } from 'crypto';
 
 // Contexts are loaded once at startup by scanning the contexts/ directory.
 // Adding a new campaign only requires dropping a .ts file there.
@@ -146,7 +143,7 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
   try {
     await client.query('BEGIN');
 
-    const partyChars: Character[] = characters.map((c, charIdx) => {
+    const partyChars: Character[] = characters.map((c, _charIdx) => {
       const base = c.stats
         ? {
             str: c.stats.str,
@@ -346,9 +343,6 @@ gameRouter.post('/session/:id/equip', async (req: Request, res: Response) => {
         .json({ error: 'This item requires attunement. Attune to it first (out of combat).' });
       return;
     }
-    const resolveTypeId = (instanceId: string | null) =>
-      char.inventory.find((i) => i.instance_id === instanceId)?.id ?? null;
-
     if (loot.slot === 'shield') {
       const check = canDonShield(combatActive);
       if (!check.allowed) {

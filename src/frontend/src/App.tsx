@@ -1,15 +1,15 @@
-import { useState, useEffect, useRef } from 'react';
-import { api, type AuthUser, type CharacterInput } from './lib/api.ts';
-import { useGame } from './hooks/useGame.ts';
-import { context as sandboxContext } from './contexts/sandbox.tsx';
+import { type AuthUser, type CharacterInput, api } from './lib/api.ts';
+import type { FrontendContext, Seed, SessionSummary } from './types.ts';
+import { useEffect, useRef, useState } from 'react';
+import CharScreen from './components/CharScreen.tsx';
 import LoginScreen from './components/LoginScreen.tsx';
-import SessionsScreen from './components/SessionScreen.tsx';
-import WorldMap from './components/WorldMap.tsx';
 import PartyPanel from './components/PartyPanel.tsx';
 import RoomArtPanel from './components/RoomArtPanel.tsx';
-import CharScreen from './components/CharScreen.tsx';
-import type { FrontendContext, Seed, SessionSummary } from './types.ts';
+import SessionsScreen from './components/SessionScreen.tsx';
+import WorldMap from './components/WorldMap.tsx';
+import { context as sandboxContext } from './contexts/sandbox.tsx';
 import styles from './styles.module.css';
+import { useGame } from './hooks/useGame.ts';
 
 const CONTEXTS: Record<string, FrontendContext> = {
   sandbox: sandboxContext,
@@ -67,7 +67,6 @@ export default function App() {
   const narrativeRef = useRef<HTMLDivElement>(null);
 
   const {
-    session,
     gameState,
     seed,
     choices,

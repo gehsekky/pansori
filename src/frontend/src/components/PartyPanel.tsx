@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import type { FrontendContext, GameState, Seed } from '../types';
+import { useEffect, useState } from 'react';
 import CharStatsCard from './CharStatsCard';
 import InitiativeStrip from './InitiativeStrip';
-import type { FrontendContext, GameState, Seed } from '../types';
 import styles from '../styles.module.css';
 
 function PartyPanel({

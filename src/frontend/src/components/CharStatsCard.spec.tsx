@@ -1,9 +1,8 @@
-import { render, screen } from '@testing-library/react';
-import React from 'react';
-import { describe, it, expect, vi } from 'vitest';
-
-import CharStatsCard from './CharStatsCard';
+import { describe, expect, it, vi } from 'vitest';
 import { makeChar, makeState, mockCtx, mockSeed } from './test-fixtures';
+import { render, screen } from '@testing-library/react';
+import CharStatsCard from './CharStatsCard';
+import React from 'react';
 type InventoryItem = {
   instance_id: string;
   id: string;

@@ -1,5 +1,5 @@
-import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
+import passport from 'passport';
 import { pool } from '../db/pool.js';
 
 export interface AppUser {
@@ -11,7 +11,7 @@ export interface AppUser {
 }
 
 declare global {
-  // eslint-disable-next-line @typescript-eslint/no-namespace
+   
   namespace Express {
     interface User extends AppUser {}
   }

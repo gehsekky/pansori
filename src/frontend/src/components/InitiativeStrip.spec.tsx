@@ -1,9 +1,8 @@
-import { render, screen } from '@testing-library/react';
-import React from 'react';
-import { describe, it, expect } from 'vitest';
-
-import InitiativeStrip from './InitiativeStrip';
+import { describe, expect, it } from 'vitest';
 import { makeChar, makeState, mockSeed } from './test-fixtures';
+import { render, screen } from '@testing-library/react';
+import InitiativeStrip from './InitiativeStrip';
+import React from 'react';
 
 describe('InitiativeStrip', () => {
   it('renders nothing when initiative_order is empty', () => {

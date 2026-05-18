@@ -1,8 +1,7 @@
+import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import React from 'react';
-import { describe, it, expect } from 'vitest';
-
 import LoginScreen from './LoginScreen';
+import React from 'react';
 
 describe('LoginScreen', () => {
   it('renders the PANSORI title', () => {

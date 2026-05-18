@@ -1,9 +1,8 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
-import { describe, it, expect, vi } from 'vitest';
-
-import SessionsScreen from './SessionScreen';
 import type { SessionSummary } from '../types';
+import SessionsScreen from './SessionScreen';
 import { mockCtx } from './test-fixtures';
 
 const contexts = { sandbox: mockCtx };

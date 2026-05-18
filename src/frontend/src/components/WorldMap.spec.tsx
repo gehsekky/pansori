@@ -1,10 +1,9 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import type { Character, GameState, Seed } from '../types.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
-import { describe, it, expect, vi, afterEach } from 'vitest';
-
-import { context as sandboxCtx } from '../contexts/sandbox.js';
-import type { GameState, Character, Seed } from '../types.js';
 import WorldMap from './WorldMap';
+import { context as sandboxCtx } from '../contexts/sandbox.js';
 
 afterEach(() => vi.restoreAllMocks());
 

@@ -1,5 +1,5 @@
+import type { Context, Enemy, LootItem, PlacedNpc, Seed } from '../types.js';
 import { randomUUID } from 'crypto';
-import type { Context, Seed, LootItem, PlacedNpc, Enemy } from '../types.js';
 
 function roll(sides: number): number {
   return Math.floor(Math.random() * sides) + 1;

@@ -1,10 +1,10 @@
 import type {
+  GameChoice,
   GameState,
   Seed,
   Session,
   SessionSummary,
   StructuredAction,
-  GameChoice,
 } from '../types.js';
 
 const BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';

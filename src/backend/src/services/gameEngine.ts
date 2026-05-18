@@ -1,77 +1,75 @@
-import { randomUUID } from 'crypto';
 import {
-  rollDice,
-  abilityMod,
-  FRESH_TURN,
-  resolvePlayerAttack,
-  resolveOffHandAttack,
-  resolveEnemyAttack,
-  unarmedDamage,
-  skillCheck,
-  rollDeathSave,
-  profBonus,
-  d,
   ADVANTAGE_CONDITIONS,
   DISADV_CONDITIONS,
-  PLAYER_ADV_CONDITIONS,
   ENEMY_DISADV_CONDITIONS,
-  rollConditionSave,
-  rollCritical,
-  resolveSaveWithAdvantage,
-  resolveMysteryConsumable,
-  passivePerceptionDC,
-  sneakAttackDice,
-  extraAttackCount,
-  rageDamageBonus,
-  rageUsesMax,
-  spellSaveDC,
-  resolveSpellAttack,
-  passivePerception,
+  FRESH_TURN,
+  PLAYER_ADV_CONDITIONS,
+  abilityMod,
+  applyDamageMultiplier,
+  cantripDamageDice,
+  d,
   disarmTrap,
+  extraAttackCount,
   hasArmorProficiency,
   hasWeaponProficiency,
-  applyDamageMultiplier,
-  upcastDamage,
-  cantripDamageDice,
+  passivePerception,
+  passivePerceptionDC,
+  profBonus,
+  rageDamageBonus,
+  rageUsesMax,
+  resolveEnemyAttack,
+  resolveMysteryConsumable,
+  resolveOffHandAttack,
+  resolvePlayerAttack,
+  resolveSaveWithAdvantage,
+  resolveSpellAttack,
+  rollConditionSave,
+  rollCritical,
+  rollDeathSave,
+  rollDice,
+  skillCheck,
+  sneakAttackDice,
+  spellSaveDC,
   spellSlotsForClassLevel,
+  unarmedDamage,
+  upcastDamage,
 } from './rulesEngine.js';
-import { Engine } from 'json-rules-engine';
 import type {
-  GameState,
-  Character,
-  Seed,
-  Context,
-  Enemy,
-  LootItem,
-  InventoryItem,
-  OnHitEffect,
-  StructuredAction,
-  GameChoice,
-  DeathSaves,
-  TurnActions,
-  GameConsequence,
-  RuleFacts,
-  PlacedNpc,
-  NpcAttitude,
   AbilityKey,
-  Trap,
-  RoomObject,
+  Character,
   CombatEntity,
+  Context,
+  DeathSaves,
+  Enemy,
+  GameChoice,
+  GameConsequence,
+  GameState,
+  InventoryItem,
+  LootItem,
+  NpcAttitude,
+  OnHitEffect,
+  PlacedNpc,
+  RoomObject,
+  Seed,
+  StructuredAction,
+  Trap,
+  TurnActions,
 } from '../types.js';
 import {
-  inRange,
-  findPath,
-  pathCostFeet,
-  opportunityAttackTriggers,
   DEFAULT_SPEED_FEET,
-  coverBonus,
-  isFlankingPosition,
-  posEqual,
   SQUARE_SIZE,
+  coverBonus,
   distanceFeet,
   entitiesInBlast,
+  findPath,
+  inRange,
+  isFlankingPosition,
+  opportunityAttackTriggers,
+  posEqual,
 } from './gridEngine.js';
+import { Engine } from 'json-rules-engine';
 import { llmProvider } from './llmProvider.js';
+import { randomUUID } from 'crypto';
 
 function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
@@ -292,7 +290,7 @@ function processDeathSave(
   worldName: string
 ): { narrative: string; newChar: Character; died: boolean; endedCombat: boolean } {
   const save = rollDeathSave(char.death_saves);
-  let newChar = { ...char, death_saves: save.saves };
+  const newChar = { ...char, death_saves: save.saves };
   let narrative = '';
   let endedCombat = false;
 
@@ -452,16 +450,6 @@ function endCombatState(st: GameState): GameState {
       ),
     })),
   };
-}
-
-// ─── Turn advancement ─────────────────────────────────────────────────────────
-
-function advanceActiveCharacter(characters: Character[], currentId: string): string {
-  const living = characters.filter((c) => !c.dead);
-  if (living.length === 0) return currentId;
-  const idx = living.findIndex((c) => c.id === currentId);
-  const next = living[(idx + 1) % living.length];
-  return next.id;
 }
 
 // ─── Rest helper ──────────────────────────────────────────────────────────────
@@ -4580,7 +4568,6 @@ export async function takeAction({
               const {
                 narrative: dsNarr,
                 newChar: newTarget,
-                died,
                 endedCombat,
               } = processDeathSave(
                 { ...target, death_saves: target.death_saves ?? { successes: 0, failures: 0 } },

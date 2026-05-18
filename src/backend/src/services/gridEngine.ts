@@ -1,4 +1,4 @@
-import type { GridPos, CombatEntity, LootItem } from '../types.js';
+import type { CombatEntity, GridPos, LootItem } from '../types.js';
 
 export const SQUARE_SIZE = 5; // feet per square
 export const DEFAULT_MELEE_REACH = SQUARE_SIZE;

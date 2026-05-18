@@ -1,4 +1,4 @@
-import { useState, ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import styles from '../styles.module.css';
 
 function InventoryTooltip({

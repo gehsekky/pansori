@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import InventoryTooltip from './InventoryTooltip';
 import type { Character, FrontendContext, GameState, Seed } from '../types';
+import { useEffect, useState } from 'react';
+import InventoryTooltip from './InventoryTooltip';
 import styles from '../styles.module.css';
 
 function CharStatsCard({

@@ -1,7 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import type { Context, Seed } from '../types.js';
+import { describe, expect, it } from 'vitest';
 import { generateRoguelikeSeed } from './procgen.js';
 import { context as sandboxCtx } from '../contexts/sandbox.js';
-import type { Context, Seed } from '../types.js';
 
 function validateSeed(ctx: Context, seed: Seed) {
   const roomIds = new Set(seed.rooms.map((r) => r.id));
