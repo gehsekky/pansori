@@ -1520,7 +1520,11 @@ export const context: Context = {
             desc: 'Defeat the Crypt Lord in the Throne of the Dead.',
             condition: {
               all: [
-                { fact: 'enemies_killed', operator: 'contains', value: 'dungeon_crypt_throne' },
+                {
+                  fact: 'enemies_killed',
+                  operator: 'contains',
+                  value: 'dungeon_crypt_throne#0',
+                },
               ],
             },
           },
@@ -1946,7 +1950,7 @@ export const context: Context = {
       conditions: {
         all: [
           { fact: 'loot_taken', operator: 'contains', value: 'guild_ledger' },
-          { fact: 'flags', operator: 'notContain', value: 'rule_fired_guild_ledger_found' },
+          { fact: 'flags', operator: 'doesNotContain', value: 'rule_fired_guild_ledger_found' },
         ],
       },
       consequences: [

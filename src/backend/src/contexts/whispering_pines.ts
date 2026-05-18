@@ -1350,7 +1350,13 @@ export const context: Context = {
             id: 'step_kill_acolyte',
             desc: 'Defeat the Frost Acolyte at the Ritual Apex.',
             condition: {
-              all: [{ fact: 'enemies_killed', operator: 'contains', value: 'spire_ritual_apex' }],
+              all: [
+                {
+                  fact: 'enemies_killed',
+                  operator: 'contains',
+                  value: 'spire_ritual_apex#boss',
+                },
+              ],
             },
           },
           {
@@ -1739,7 +1745,7 @@ export const context: Context = {
       conditions: {
         all: [
           { fact: 'loot_taken', operator: 'contains', value: 'halden_locket' },
-          { fact: 'flags', operator: 'notContain', value: 'rule_fired_halden_locket_found' },
+          { fact: 'flags', operator: 'doesNotContain', value: 'rule_fired_halden_locket_found' },
         ],
       },
       consequences: [
@@ -1757,7 +1763,7 @@ export const context: Context = {
       conditions: {
         all: [
           { fact: 'loot_taken', operator: 'contains', value: 'cult_idol' },
-          { fact: 'flags', operator: 'notContain', value: 'rule_fired_cult_idol_recovered' },
+          { fact: 'flags', operator: 'doesNotContain', value: 'rule_fired_cult_idol_recovered' },
         ],
       },
       consequences: [
