@@ -431,13 +431,6 @@ function getEnemyById(seed: Seed, enemyId: string): Enemy | null {
   return null;
 }
 
-function findRoomForEnemy(seed: Seed, enemyId: string): string | null {
-  for (const [roomId, list] of Object.entries(seed.enemies ?? {})) {
-    if (list.some((e) => e.id === enemyId)) return roomId;
-  }
-  return null;
-}
-
 function hasLivingEnemy(state: GameState, seed: Seed, roomId: string): boolean {
   return getLivingRoomEnemies(state, seed, roomId).length > 0;
 }
@@ -447,10 +440,6 @@ function isRoomCleared(state: GameState, seed: Seed, roomId: string): boolean {
   if (all.length === 0) return true;
   const killed = state.enemies_killed ?? [];
   return all.every((e) => killed.includes(e.id));
-}
-
-function firstLivingEnemy(state: GameState, seed: Seed, roomId: string): Enemy | null {
-  return getLivingRoomEnemies(state, seed, roomId)[0] ?? null;
 }
 
 // ─── Initiative helpers ───────────────────────────────────────────────────────
