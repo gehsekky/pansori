@@ -43,12 +43,12 @@ export function profBonus(level: number | undefined): number {
 // ─── Combat state ─────────────────────────────────────────────────────────────
 
 export const FRESH_TURN: TurnActions = {
-  action_used:           false,
-  bonus_action_used:     false,
-  reaction_used:         false,
+  action_used: false,
+  bonus_action_used: false,
+  reaction_used: false,
   free_interaction_used: false,
-  dodging:               false,
-  disengaged:            false,
+  dodging: false,
+  disengaged: false,
 };
 
 // ─── Damage type multipliers ──────────────────────────────────────────────────
@@ -56,99 +56,211 @@ export const FRESH_TURN: TurnActions = {
 export function applyDamageMultiplier(
   raw: number,
   damageType: string | undefined,
-  enemy: { resistances?: string[]; vulnerabilities?: string[]; immunities?: string[] },
+  enemy: { resistances?: string[]; vulnerabilities?: string[]; immunities?: string[] }
 ): { damage: number; note: string } {
   if (!damageType) return { damage: raw, note: '' };
-  if (enemy.immunities?.includes(damageType))       return { damage: 0,                    note: ` [immune to ${damageType}]` };
-  if (enemy.vulnerabilities?.includes(damageType))  return { damage: raw * 2,              note: ` [vulnerable to ${damageType}: ×2]` };
-  if (enemy.resistances?.includes(damageType))      return { damage: Math.floor(raw / 2),  note: ` [resistant to ${damageType}: ×½]` };
+  if (enemy.immunities?.includes(damageType))
+    return { damage: 0, note: ` [immune to ${damageType}]` };
+  if (enemy.vulnerabilities?.includes(damageType))
+    return { damage: raw * 2, note: ` [vulnerable to ${damageType}: ×2]` };
+  if (enemy.resistances?.includes(damageType))
+    return { damage: Math.floor(raw / 2), note: ` [resistant to ${damageType}: ×½]` };
   return { damage: raw, note: '' };
 }
 
 // ─── Attack resolution ────────────────────────────────────────────────────────
 
 interface PlayerStats {
-  str:   number;
-  dex:   number;
+  str: number;
+  dex: number;
   level: number;
 }
 
 interface AttackResult {
-  hit:      boolean;
-  fumble:   boolean;
+  hit: boolean;
+  fumble: boolean;
   critical: boolean;
-  roll:     number;
-  total:    number;
-  damage:   number;
-  atkMod:   number;
-  atkStat:  'STR' | 'DEX';
-  prof:     number;
+  roll: number;
+  total: number;
+  damage: number;
+  atkMod: number;
+  atkStat: 'STR' | 'DEX';
+  prof: number;
 }
 
 // Player attacks an enemy. Finesse weapons use whichever of STR/DEX is higher.
 // Advantage and disadvantage both present → they cancel out (5e PHB p.173).
 // weaponProficient=false omits proficiency bonus (PHB p.147: no profBonus without proficiency).
 // ranged=true forces DEX for attack and damage (overrides finesse logic).
-export function resolvePlayerAttack(player: PlayerStats, weaponDamage: string | null, targetAC: number, finesse = false, disadvantage = false, advantage = false, weaponProficient = true, ranged = false, critThreshold = 20, attackBonus = 0): AttackResult {
-  const strMod  = abilityMod(player.str);
-  const dexMod  = abilityMod(player.dex);
-  const atkMod  = ranged ? dexMod : (finesse ? Math.max(strMod, dexMod) : strMod);
-  const atkStat: 'STR' | 'DEX' = ranged ? 'DEX' : ((finesse && dexMod > strMod) ? 'DEX' : 'STR');
-  const prof    = weaponProficient ? profBonus(player.level) : 0;
-  const roll1   = d(20);
+export function resolvePlayerAttack(
+  player: PlayerStats,
+  weaponDamage: string | null,
+  targetAC: number,
+  finesse = false,
+  disadvantage = false,
+  advantage = false,
+  weaponProficient = true,
+  ranged = false,
+  critThreshold = 20,
+  attackBonus = 0
+): AttackResult {
+  const strMod = abilityMod(player.str);
+  const dexMod = abilityMod(player.dex);
+  const atkMod = ranged ? dexMod : finesse ? Math.max(strMod, dexMod) : strMod;
+  const atkStat: 'STR' | 'DEX' = ranged ? 'DEX' : finesse && dexMod > strMod ? 'DEX' : 'STR';
+  const prof = weaponProficient ? profBonus(player.level) : 0;
+  const roll1 = d(20);
   // Advantage + disadvantage cancel; net advantage rolls 2d20 keep higher; net disadv keeps lower
-  const netAdv  = advantage && !disadvantage;
+  const netAdv = advantage && !disadvantage;
   const netDisadv = disadvantage && !advantage;
-  const roll    = netDisadv ? Math.min(roll1, d(20)) : netAdv ? Math.max(roll1, d(20)) : roll1;
-  const total   = roll + atkMod + prof + attackBonus;
+  const roll = netDisadv ? Math.min(roll1, d(20)) : netAdv ? Math.max(roll1, d(20)) : roll1;
+  const total = roll + atkMod + prof + attackBonus;
 
-  if (roll === 1)          return { hit: false, fumble: true,  critical: false, roll, total, damage: 0, atkMod, atkStat, prof };
-  if (roll >= critThreshold) return { hit: true, fumble: false, critical: true,  roll, total, damage: Math.max(1, rollCritical(weaponDamage) + atkMod), atkMod, atkStat, prof };
-  if (total >= targetAC)   return { hit: true,  fumble: false, critical: false, roll, total, damage: Math.max(1, rollDice(weaponDamage) + atkMod), atkMod, atkStat, prof };
-  return { hit: false, fumble: false, critical: false, roll, total, damage: 0, atkMod, atkStat, prof };
+  if (roll === 1)
+    return {
+      hit: false,
+      fumble: true,
+      critical: false,
+      roll,
+      total,
+      damage: 0,
+      atkMod,
+      atkStat,
+      prof,
+    };
+  if (roll >= critThreshold)
+    return {
+      hit: true,
+      fumble: false,
+      critical: true,
+      roll,
+      total,
+      damage: Math.max(1, rollCritical(weaponDamage) + atkMod),
+      atkMod,
+      atkStat,
+      prof,
+    };
+  if (total >= targetAC)
+    return {
+      hit: true,
+      fumble: false,
+      critical: false,
+      roll,
+      total,
+      damage: Math.max(1, rollDice(weaponDamage) + atkMod),
+      atkMod,
+      atkStat,
+      prof,
+    };
+  return {
+    hit: false,
+    fumble: false,
+    critical: false,
+    roll,
+    total,
+    damage: 0,
+    atkMod,
+    atkStat,
+    prof,
+  };
 }
 
 // Two-weapon fighting: off-hand attack gets no ability modifier to damage (PHB p.195)
-export function resolveOffHandAttack(player: PlayerStats, weaponDamage: string | null, targetAC: number, finesse = false, disadvantage = false, advantage = false, weaponProficient = true, ranged = false): AttackResult {
-  const strMod  = abilityMod(player.str);
-  const dexMod  = abilityMod(player.dex);
-  const atkMod  = ranged ? dexMod : (finesse ? Math.max(strMod, dexMod) : strMod);
-  const atkStat: 'STR' | 'DEX' = ranged ? 'DEX' : ((finesse && dexMod > strMod) ? 'DEX' : 'STR');
-  const prof    = weaponProficient ? profBonus(player.level) : 0;
-  const roll1   = d(20);
-  const netAdv    = advantage && !disadvantage;
+export function resolveOffHandAttack(
+  player: PlayerStats,
+  weaponDamage: string | null,
+  targetAC: number,
+  finesse = false,
+  disadvantage = false,
+  advantage = false,
+  weaponProficient = true,
+  ranged = false
+): AttackResult {
+  const strMod = abilityMod(player.str);
+  const dexMod = abilityMod(player.dex);
+  const atkMod = ranged ? dexMod : finesse ? Math.max(strMod, dexMod) : strMod;
+  const atkStat: 'STR' | 'DEX' = ranged ? 'DEX' : finesse && dexMod > strMod ? 'DEX' : 'STR';
+  const prof = weaponProficient ? profBonus(player.level) : 0;
+  const roll1 = d(20);
+  const netAdv = advantage && !disadvantage;
   const netDisadv = disadvantage && !advantage;
-  const roll    = netDisadv ? Math.min(roll1, d(20)) : netAdv ? Math.max(roll1, d(20)) : roll1;
-  const total   = roll + atkMod + prof;
+  const roll = netDisadv ? Math.min(roll1, d(20)) : netAdv ? Math.max(roll1, d(20)) : roll1;
+  const total = roll + atkMod + prof;
   // Off-hand damage: NO ability modifier added (PHB p.195)
-  if (roll === 1)  return { hit: false, fumble: true,  critical: false, roll, total, damage: 0, atkMod, atkStat, prof };
+  if (roll === 1)
+    return {
+      hit: false,
+      fumble: true,
+      critical: false,
+      roll,
+      total,
+      damage: 0,
+      atkMod,
+      atkStat,
+      prof,
+    };
   if (roll === 20) {
     // Critical: double dice, still no atkMod to damage
     const m = weaponDamage?.match(/(\d+)d(\d+)/);
-    const critDmg = m ? (parseInt(m[1]) * 2 * Math.ceil(parseInt(m[2]) / 2)) : 1; // simplified crit
-    return { hit: true, fumble: false, critical: true, roll, total, damage: Math.max(1, critDmg), atkMod, atkStat, prof };
+    const critDmg = m ? parseInt(m[1]) * 2 * Math.ceil(parseInt(m[2]) / 2) : 1; // simplified crit
+    return {
+      hit: true,
+      fumble: false,
+      critical: true,
+      roll,
+      total,
+      damage: Math.max(1, critDmg),
+      atkMod,
+      atkStat,
+      prof,
+    };
   }
   if (total >= targetAC) {
     const baseDmg = rollDice(weaponDamage); // NO +atkMod
-    return { hit: true, fumble: false, critical: false, roll, total, damage: Math.max(1, baseDmg), atkMod, atkStat, prof };
+    return {
+      hit: true,
+      fumble: false,
+      critical: false,
+      roll,
+      total,
+      damage: Math.max(1, baseDmg),
+      atkMod,
+      atkStat,
+      prof,
+    };
   }
-  return { hit: false, fumble: false, critical: false, roll, total, damage: 0, atkMod, atkStat, prof };
+  return {
+    hit: false,
+    fumble: false,
+    critical: false,
+    roll,
+    total,
+    damage: 0,
+    atkMod,
+    atkStat,
+    prof,
+  };
 }
 
 interface EnemyStats {
   damage: string;
-  toHit:  number;
+  toHit: number;
 }
 
 // Enemy attacks the player. Advantage rolls 2d20 keep higher; disadvantage keeps lower.
 // Advantage + disadvantage cancel per 5e PHB p.173.
-export function resolveEnemyAttack(enemy: EnemyStats, playerAC: number, advantage = false, disadvantage = false) {
-  const roll1    = d(20);
-  const netAdv   = advantage && !disadvantage;
+export function resolveEnemyAttack(
+  enemy: EnemyStats,
+  playerAC: number,
+  advantage = false,
+  disadvantage = false
+) {
+  const roll1 = d(20);
+  const netAdv = advantage && !disadvantage;
   const netDisadv = disadvantage && !advantage;
-  const roll  = netDisadv ? Math.min(roll1, d(20)) : netAdv ? Math.max(roll1, d(20)) : roll1;
+  const roll = netDisadv ? Math.min(roll1, d(20)) : netAdv ? Math.max(roll1, d(20)) : roll1;
   const total = roll + enemy.toHit;
-  const hit   = roll !== 1 && (roll === 20 || total >= playerAC);
+  const hit = roll !== 1 && (roll === 20 || total >= playerAC);
   return { hit, roll, total, damage: hit ? rollDice(enemy.damage) : 0 };
 }
 
@@ -162,19 +274,30 @@ export function unarmedDamage(str: number): number {
 // Weapon draw/stow costs a free object interaction (once per turn) in combat.
 export function canEquipWeapon(combatActive: boolean, turnActions?: TurnActions) {
   if (!combatActive) return { allowed: true } as const;
-  if (!turnActions?.free_interaction_used) return { allowed: true, cost: 'free_interaction' } as const;
-  return { allowed: false, reason: 'You have already used your free object interaction this turn.' } as const;
+  if (!turnActions?.free_interaction_used)
+    return { allowed: true, cost: 'free_interaction' } as const;
+  return {
+    allowed: false,
+    reason: 'You have already used your free object interaction this turn.',
+  } as const;
 }
 
 // Shields cost 1 action to don/doff (PHB). We block in combat for simplicity.
 export function canDonShield(combatActive: boolean) {
   if (!combatActive) return { allowed: true } as const;
-  return { allowed: false, reason: 'Donning or doffing a shield takes 1 action — you cannot do it mid-combat.' } as const;
+  return {
+    allowed: false,
+    reason: 'Donning or doffing a shield takes 1 action — you cannot do it mid-combat.',
+  } as const;
 }
 
 // Don/doff times per 5e PHB: light 1 min, medium 5 min, heavy 10 min.
 // None of these can be done in combat.
-const DON_TIME: Record<string, string> = { light: '1 minute', medium: '5 minutes', heavy: '10 minutes' };
+const DON_TIME: Record<string, string> = {
+  light: '1 minute',
+  medium: '5 minutes',
+  heavy: '10 minutes',
+};
 
 export function canDonArmor(combatActive: boolean, armorCategory: string) {
   if (!combatActive) return { allowed: true } as const;
@@ -186,13 +309,19 @@ export function canDonArmor(combatActive: boolean, armorCategory: string) {
 }
 
 // 5e PHB p.144: non-proficient armor → disadvantage on STR/DEX checks and attack rolls, cannot cast spells
-export function hasArmorProficiency(armorProficiencies: string[], armorCategory: string | undefined): boolean {
+export function hasArmorProficiency(
+  armorProficiencies: string[],
+  armorCategory: string | undefined
+): boolean {
   if (!armorCategory) return true;
   return armorProficiencies.includes(armorCategory);
 }
 
 // 5e PHB p.147: non-proficient weapon → no proficiency bonus added to attack rolls
-export function hasWeaponProficiency(weaponProficiencies: string[], weaponType: string | undefined): boolean {
+export function hasWeaponProficiency(
+  weaponProficiencies: string[],
+  weaponType: string | undefined
+): boolean {
   if (!weaponType) return true;
   return weaponProficiencies.includes(weaponType);
 }
@@ -208,13 +337,17 @@ export function computeTotalAc(
   equippedArmorInstanceId: string | null | undefined,
   equippedShieldInstanceId: string | null | undefined,
   inventory: Array<{ instance_id: string; id: string; [key: string]: unknown }>,
-  lootTable: LootItem[],
+  lootTable: LootItem[]
 ): number {
-  const dexMod  = abilityMod(dex);
-  const armorId  = equippedArmorInstanceId  ? inventory.find(i => i.instance_id === equippedArmorInstanceId)?.id  : null;
-  const shieldId = equippedShieldInstanceId ? inventory.find(i => i.instance_id === equippedShieldInstanceId)?.id : null;
-  const armor  = armorId  ? lootTable.find(l => l.id === armorId)  : null;
-  const shield = shieldId ? lootTable.find(l => l.id === shieldId) : null;
+  const dexMod = abilityMod(dex);
+  const armorId = equippedArmorInstanceId
+    ? inventory.find((i) => i.instance_id === equippedArmorInstanceId)?.id
+    : null;
+  const shieldId = equippedShieldInstanceId
+    ? inventory.find((i) => i.instance_id === equippedShieldInstanceId)?.id
+    : null;
+  const armor = armorId ? lootTable.find((l) => l.id === armorId) : null;
+  const shield = shieldId ? lootTable.find((l) => l.id === shieldId) : null;
 
   let ac: number;
   if (armor?.armorAcBase !== undefined) {
@@ -232,32 +365,44 @@ export function computeAcAfterArmorChange(
   currentAc: number,
   oldArmorId: string | null | undefined,
   newArmorId: string | null | undefined,
-  lootTable: LootItem[],
+  lootTable: LootItem[]
 ): number {
-  const oldBonus = oldArmorId ? (lootTable.find(l => l.id === oldArmorId)?.ac_bonus ?? 0) : 0;
-  const newBonus = newArmorId ? (lootTable.find(l => l.id === newArmorId)?.ac_bonus ?? 0) : 0;
+  const oldBonus = oldArmorId ? (lootTable.find((l) => l.id === oldArmorId)?.ac_bonus ?? 0) : 0;
+  const newBonus = newArmorId ? (lootTable.find((l) => l.id === newArmorId)?.ac_bonus ?? 0) : 0;
   return currentAc - oldBonus + newBonus;
 }
 
 // ─── Conditions ───────────────────────────────────────────────────────────────
 
 // Enemy gets advantage on attacks against the player when player has these conditions
-export const ADVANTAGE_CONDITIONS = new Set(['paralyzed', 'stunned', 'prone', 'blinded', 'restrained']);
+export const ADVANTAGE_CONDITIONS = new Set([
+  'paralyzed',
+  'stunned',
+  'prone',
+  'blinded',
+  'restrained',
+]);
 // Player attacks with disadvantage when they have these conditions
-export const DISADV_CONDITIONS    = new Set(['poisoned', 'prone', 'frightened', 'blinded', 'restrained']);
+export const DISADV_CONDITIONS = new Set([
+  'poisoned',
+  'prone',
+  'frightened',
+  'blinded',
+  'restrained',
+]);
 // Player attacks with advantage when they have these conditions (invisible enemy = player can't see)
-export const PLAYER_ADV_CONDITIONS  = new Set(['invisible']);
+export const PLAYER_ADV_CONDITIONS = new Set(['invisible']);
 // Enemy attacks the player with disadvantage when the player has these conditions
 export const ENEMY_DISADV_CONDITIONS = new Set(['invisible']);
 
 // On-hit saving throw: returns true if the save FAILS (condition is applied).
 // Pass proficient=true when the character has saving throw proficiency in this ability.
 export function rollConditionSave(
-  ability:    'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha',
-  score:      number,
-  dc:         number,
+  ability: 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha',
+  score: number,
+  dc: number,
   proficient = false,
-  level      = 1,
+  level = 1
 ): boolean {
   const prof = proficient ? profBonus(level) : 0;
   return d(20) + abilityMod(score) + prof < dc;
@@ -290,7 +435,7 @@ export function passivePerceptionDC(enemyWisdom: number): number {
 export function passivePerception(
   wisdom: number,
   level: number,
-  perceptionProficient: boolean,
+  perceptionProficient: boolean
 ): number {
   return 10 + abilityMod(wisdom) + (perceptionProficient ? profBonus(level) : 0);
 }
@@ -299,9 +444,9 @@ export function passivePerception(
 export function disarmTrap(
   dexterity: number,
   level: number,
-  toolProficient: boolean,
+  toolProficient: boolean
 ): { roll: number; total: number; success: boolean } {
-  const roll  = d(20);
+  const roll = d(20);
   const total = roll + abilityMod(dexterity) + (toolProficient ? profBonus(level) : 0);
   return { roll, total, success: false }; // dc compared at call site
 }
@@ -312,17 +457,17 @@ export function disarmTrap(
 // expertise = double proficiency bonus (Rogue/Bard Expertise).
 // jackOfAllTrades = add half prof when not proficient (Bard L2+).
 export function skillCheck(
-  abilityScore:    number,
-  dc:              number,
-  proficient      = false,
-  level           = 1,
-  disadvantage    = false,
-  expertise       = false,
+  abilityScore: number,
+  dc: number,
+  proficient = false,
+  level = 1,
+  disadvantage = false,
+  expertise = false,
   jackOfAllTrades = false,
-  advantage       = false,
+  advantage = false
 ) {
   const roll1 = d(20);
-  const netAdv   = advantage && !disadvantage;
+  const netAdv = advantage && !disadvantage;
   const netDisadv = disadvantage && !advantage;
   const roll = netDisadv ? Math.min(roll1, d(20)) : netAdv ? Math.max(roll1, d(20)) : roll1;
   const prof = profBonus(level);
@@ -349,7 +494,7 @@ export function extraAttackCount(cls: string, level: number): number {
   if (cls === 'fighter') {
     if (level >= 20) return 3; // 4 attacks total
     if (level >= 11) return 2; // 3 attacks total
-    if (level >= 5)  return 1; // 2 attacks total
+    if (level >= 5) return 1; // 2 attacks total
     return 0;
   }
   if (['ranger', 'paladin', 'barbarian', 'monk'].includes(cls)) {
@@ -361,7 +506,7 @@ export function extraAttackCount(cls: string, level: number): number {
 // Barbarian Rage damage bonus (PHB p.48) — applies to STR-based melee attacks
 export function rageDamageBonus(level: number): number {
   if (level >= 16) return 4;
-  if (level >= 9)  return 3;
+  if (level >= 9) return 3;
   return 2;
 }
 
@@ -370,7 +515,7 @@ export function rageUsesMax(level: number): number {
   if (level >= 17) return 6;
   if (level >= 13) return 5;
   if (level >= 10) return 4;
-  if (level >= 6)  return 3;
+  if (level >= 6) return 3;
   return 2; // levels 1–5
 }
 
@@ -429,10 +574,26 @@ export function spellSlotsForClassLevel(cls: string, level: number): Record<numb
   if (cls === 'warlock') {
     // Pact Magic: all slots are the same level, recharge on short rest
     const pactSlots: Record<number, Record<number, number>> = {
-      1:  { 1: 1 }, 2:  { 1: 2 }, 3:  { 2: 2 }, 4:  { 2: 2 }, 5:  { 3: 2 },
-      6:  { 3: 2 }, 7:  { 4: 2 }, 8:  { 4: 2 }, 9:  { 5: 2 }, 10: { 5: 2 },
-      11: { 5: 3 }, 12: { 5: 3 }, 13: { 5: 3 }, 14: { 5: 3 }, 15: { 5: 3 },
-      16: { 5: 3 }, 17: { 5: 4 }, 18: { 5: 4 }, 19: { 5: 4 }, 20: { 5: 4 },
+      1: { 1: 1 },
+      2: { 1: 2 },
+      3: { 2: 2 },
+      4: { 2: 2 },
+      5: { 3: 2 },
+      6: { 3: 2 },
+      7: { 4: 2 },
+      8: { 4: 2 },
+      9: { 5: 2 },
+      10: { 5: 2 },
+      11: { 5: 3 },
+      12: { 5: 3 },
+      13: { 5: 3 },
+      14: { 5: 3 },
+      15: { 5: 3 },
+      16: { 5: 3 },
+      17: { 5: 4 },
+      18: { 5: 4 },
+      19: { 5: 4 },
+      20: { 5: 4 },
     };
     return pactSlots[level] ?? {};
   }
@@ -442,15 +603,15 @@ export function spellSlotsForClassLevel(cls: string, level: number): Record<numb
   if (!fullCasters.includes(cls) && !halfCasters.includes(cls)) return {};
 
   const table: Record<number, Record<number, number>> = {
-    1:  { 1: 2 },
-    2:  { 1: 3 },
-    3:  { 1: 4, 2: 2 },
-    4:  { 1: 4, 2: 3 },
-    5:  { 1: 4, 2: 3, 3: 2 },
-    6:  { 1: 4, 2: 3, 3: 3 },
-    7:  { 1: 4, 2: 3, 3: 3, 4: 1 },
-    8:  { 1: 4, 2: 3, 3: 3, 4: 2 },
-    9:  { 1: 4, 2: 3, 3: 3, 4: 3, 5: 1 },
+    1: { 1: 2 },
+    2: { 1: 3 },
+    3: { 1: 4, 2: 2 },
+    4: { 1: 4, 2: 3 },
+    5: { 1: 4, 2: 3, 3: 2 },
+    6: { 1: 4, 2: 3, 3: 3 },
+    7: { 1: 4, 2: 3, 3: 3, 4: 1 },
+    8: { 1: 4, 2: 3, 3: 3, 4: 2 },
+    9: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 1 },
     10: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 2 },
     11: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 2, 6: 1 },
     12: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 2, 6: 1 },
@@ -480,14 +641,14 @@ export function spellSaveDC(level: number, castingAbilityScore: number): number 
 
 // Spell attack roll against an enemy. Crits (nat 20) double damage dice; nat 1 always misses.
 export function resolveSpellAttack(
-  level:               number,
+  level: number,
   castingAbilityScore: number,
-  enemyAc:             number,
+  enemyAc: number
 ): { hit: boolean; critical: boolean; roll: number; bonus: number; total: number } {
   const bonus = spellAttackBonus(level, castingAbilityScore);
-  const roll  = d(20);
-  if (roll === 1)  return { hit: false, critical: false, roll, bonus, total: roll + bonus };
-  if (roll === 20) return { hit: true,  critical: true,  roll, bonus, total: roll + bonus };
+  const roll = d(20);
+  if (roll === 1) return { hit: false, critical: false, roll, bonus, total: roll + bonus };
+  if (roll === 20) return { hit: true, critical: true, roll, bonus, total: roll + bonus };
   const total = roll + bonus;
   return { hit: total >= enemyAc, critical: false, roll, bonus, total };
 }
@@ -498,18 +659,19 @@ export function resolveSpellAttack(
 // 3 successes = stable, 3 failures = dead.
 export function rollDeathSave(current: DeathSaves = { successes: 0, failures: 0 }) {
   const roll = d(20);
-  if (roll === 20) return { roll, result: 'regain_hp' as const, saves: { successes: 0, failures: 0 } };
+  if (roll === 20)
+    return { roll, result: 'regain_hp' as const, saves: { successes: 0, failures: 0 } };
   if (roll === 1) {
-    const saves  = { ...current, failures: current.failures + 2 };
-    const result = saves.failures >= 3 ? 'dead' as const : 'double_failure' as const;
+    const saves = { ...current, failures: current.failures + 2 };
+    const result = saves.failures >= 3 ? ('dead' as const) : ('double_failure' as const);
     return { roll, result, saves };
   }
   if (roll >= 10) {
-    const saves  = { ...current, successes: current.successes + 1 };
-    const result = saves.successes >= 3 ? 'stable' as const : 'success' as const;
+    const saves = { ...current, successes: current.successes + 1 };
+    const result = saves.successes >= 3 ? ('stable' as const) : ('success' as const);
     return { roll, result, saves };
   }
-  const saves  = { ...current, failures: current.failures + 1 };
-  const result = saves.failures >= 3 ? 'dead' as const : 'failure' as const;
+  const saves = { ...current, failures: current.failures + 1 };
+  const result = saves.failures >= 3 ? ('dead' as const) : ('failure' as const);
   return { roll, result, saves };
 }

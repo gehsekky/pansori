@@ -5,31 +5,31 @@ import type { GameState, Seed, Session, StructuredAction, GameChoice } from '../
 type HistoryEntry = { role: 'user' | 'assistant'; content: string };
 
 export interface UseGameReturn {
-  session:    Session | null;
-  gameState:  GameState | null;
-  seed:       Seed | null;
-  choices:    GameChoice[];
-  history:    HistoryEntry[];
-  loading:    boolean;
-  escaped:    boolean;
-  roomLog:    string[];
+  session: Session | null;
+  gameState: GameState | null;
+  seed: Seed | null;
+  choices: GameChoice[];
+  history: HistoryEntry[];
+  loading: boolean;
+  escaped: boolean;
+  roomLog: string[];
 
-  handleNewGame:      (characters: CharacterInput[], contextId: string) => Promise<void>;
-  handleResumeSession:(id: string) => Promise<void>;
-  handleEquip:        (itemId: string, characterId: string) => Promise<void>;
-  handleChoice:       (c: GameChoice) => void;
-  resetGame:          () => void;
+  handleNewGame: (characters: CharacterInput[], contextId: string) => Promise<void>;
+  handleResumeSession: (id: string) => Promise<void>;
+  handleEquip: (itemId: string, characterId: string) => Promise<void>;
+  handleChoice: (c: GameChoice) => void;
+  resetGame: () => void;
 }
 
 export function useGame(): UseGameReturn {
-  const [session,   setSession]   = useState<Session | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [gameState, setGameState] = useState<GameState | null>(null);
-  const [seed,      setSeed]      = useState<Seed | null>(null);
-  const [choices,   setChoices]   = useState<GameChoice[]>([]);
-  const [history,   setHistory]   = useState<HistoryEntry[]>([]);
-  const [loading,   setLoading]   = useState(false);
-  const [escaped,   setEscaped]   = useState(false);
-  const [roomLog,   setRoomLog]   = useState<string[]>([]);
+  const [seed, setSeed] = useState<Seed | null>(null);
+  const [choices, setChoices] = useState<GameChoice[]>([]);
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [escaped, setEscaped] = useState(false);
+  const [roomLog, setRoomLog] = useState<string[]>([]);
 
   async function handleNewGame(characters: CharacterInput[], contextId: string) {
     setLoading(true);
@@ -74,7 +74,7 @@ export function useGame(): UseGameReturn {
       const result = await api.takeAction(sid, action, currentHistory);
       const newHistory: HistoryEntry[] = [
         ...currentHistory,
-        { role: 'user',      content: label },
+        { role: 'user', content: label },
         { role: 'assistant', content: result.narrative },
       ];
       setHistory(newHistory);
@@ -83,7 +83,7 @@ export function useGame(): UseGameReturn {
       setRoomLog(result.newState.room_log || []);
       if (result.escaped) setEscaped(true);
     } catch {
-      setRoomLog(prev => [...prev, 'Communications array offline... (error contacting server)']);
+      setRoomLog((prev) => [...prev, 'Communications array offline... (error contacting server)']);
     } finally {
       setLoading(false);
     }
@@ -96,7 +96,7 @@ export function useGame(): UseGameReturn {
       setGameState(result.newState);
     } catch (e) {
       const err = e as { error?: string };
-      if (err?.error) setRoomLog(prev => [...prev, `⚠ ${err.error}`]);
+      if (err?.error) setRoomLog((prev) => [...prev, `⚠ ${err.error}`]);
     }
   }
 
@@ -115,7 +115,18 @@ export function useGame(): UseGameReturn {
   }
 
   return {
-    session, gameState, seed, choices, history, loading, escaped, roomLog,
-    handleNewGame, handleResumeSession, handleEquip, handleChoice, resetGame,
+    session,
+    gameState,
+    seed,
+    choices,
+    history,
+    loading,
+    escaped,
+    roomLog,
+    handleNewGame,
+    handleResumeSession,
+    handleEquip,
+    handleChoice,
+    resetGame,
   };
 }

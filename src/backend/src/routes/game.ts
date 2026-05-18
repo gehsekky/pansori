@@ -2,10 +2,31 @@ import { Router, Request, Response } from 'express';
 import { randomUUID } from 'crypto';
 import { pool } from '../db/pool.js';
 import { generateSeed } from '../services/procgen.js';
-import { takeAction, generateChoices, buildArrivalNarrative, normalizeState } from '../services/gameEngine.js';
-import { FRESH_TURN, canEquipWeapon, canDonArmor, canDonShield, computeAcAfterArmorChange, computeTotalAc, hasArmorProficiency, hasWeaponProficiency } from '../services/rulesEngine.js';
+import {
+  takeAction,
+  generateChoices,
+  buildArrivalNarrative,
+  normalizeState,
+} from '../services/gameEngine.js';
+import {
+  FRESH_TURN,
+  canEquipWeapon,
+  canDonArmor,
+  canDonShield,
+  computeAcAfterArmorChange,
+  computeTotalAc,
+  hasArmorProficiency,
+  hasWeaponProficiency,
+} from '../services/rulesEngine.js';
 import { loadContexts } from '../services/contextLoader.js';
-import { loadCampaignState, saveCampaignState, mergeCampaignIntoGameState, extractCampaignDelta, evaluateQuestSteps, applyQuestCompletions } from '../services/campaignEngine.js';
+import {
+  loadCampaignState,
+  saveCampaignState,
+  mergeCampaignIntoGameState,
+  extractCampaignDelta,
+  evaluateQuestSteps,
+  applyQuestCompletions,
+} from '../services/campaignEngine.js';
 import type { GameState, Character, Context, StructuredAction, CampaignFacts } from '../types.js';
 
 // Contexts are loaded once at startup by scanning the contexts/ directory.
@@ -17,16 +38,18 @@ export const gameRouter = Router();
 
 // List all available game contexts (id + display metadata only — no rules/loot)
 gameRouter.get('/contexts', (_req, res) => {
-  const list = Object.values(CONTEXTS).map(c => ({
-    id:          c.id,
+  const list = Object.values(CONTEXTS).map((c) => ({
+    id: c.id,
     displayName: c.worldNoun,
-    mapType:     c.mapType,
-    classes:     Object.keys(c.classPrimaryStats),
-    backgrounds: (c.backgrounds ?? []).map(b => ({
-      id: b.id, name: b.name, desc: b.desc,
+    mapType: c.mapType,
+    classes: Object.keys(c.classPrimaryStats),
+    backgrounds: (c.backgrounds ?? []).map((b) => ({
+      id: b.id,
+      name: b.name,
+      desc: b.desc,
       skillProficiencies: b.skillProficiencies,
-      toolProficiency:    b.toolProficiency ?? null,
-      feature:     b.feature,
+      toolProficiency: b.toolProficiency ?? null,
+      feature: b.feature,
       featureDesc: b.featureDesc,
     })),
   }));
@@ -41,7 +64,10 @@ gameRouter.get('/session/:id', async (req: Request, res: Response) => {
       'SELECT * FROM game_sessions WHERE id = $1 AND user_id = $2',
       [req.params.id, userId]
     );
-    if (!rows[0]) { res.status(404).json({ error: 'Session not found' }); return; }
+    if (!rows[0]) {
+      res.status(404).json({ error: 'Session not found' });
+      return;
+    }
     res.json(rows[0]);
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
@@ -73,7 +99,10 @@ gameRouter.delete('/session/:id', async (req: Request, res: Response) => {
       'DELETE FROM game_sessions WHERE id = $1 AND user_id = $2',
       [req.params.id, req.user!.id]
     );
-    if (!rowCount) { res.status(404).json({ error: 'Session not found' }); return; }
+    if (!rowCount) {
+      res.status(404).json({ error: 'Session not found' });
+      return;
+    }
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
@@ -111,7 +140,7 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
     return;
   }
 
-  const ctx  = CONTEXTS[context_id ?? ''] ?? DEFAULT_CONTEXT;
+  const ctx = CONTEXTS[context_id ?? ''] ?? DEFAULT_CONTEXT;
   const seed = generateSeed(ctx, characters.length);
   const client = await pool.connect();
   try {
@@ -119,105 +148,134 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
 
     const partyChars: Character[] = characters.map((c, charIdx) => {
       const base = c.stats
-        ? { str: c.stats.str, dex: c.stats.dex, con: c.stats.con, int: c.stats.int, wis: c.stats.wis, cha: c.stats.cha }
+        ? {
+            str: c.stats.str,
+            dex: c.stats.dex,
+            con: c.stats.con,
+            int: c.stats.int,
+            wis: c.stats.wis,
+            cha: c.stats.cha,
+          }
         : { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 };
-      const bg               = ctx.backgrounds?.find(b => b.id === c.background_id) ?? null;
-      const classSkills      = ctx.classSkills?.[c.character_class] ?? [];
-      const skillProfs       = Array.from(new Set([...classSkills, ...(bg?.skillProficiencies ?? [])]));
-      const toolProfs        = bg?.toolProficiency ? [bg.toolProficiency] : [];
-      const armorProfs       = ctx.classArmorProficiencies?.[c.character_class] ?? [];
-      const weaponProfs      = ctx.classWeaponProficiencies?.[c.character_class] ?? [];
+      const bg = ctx.backgrounds?.find((b) => b.id === c.background_id) ?? null;
+      const classSkills = ctx.classSkills?.[c.character_class] ?? [];
+      const skillProfs = Array.from(new Set([...classSkills, ...(bg?.skillProficiencies ?? [])]));
+      const toolProfs = bg?.toolProficiency ? [bg.toolProficiency] : [];
+      const armorProfs = ctx.classArmorProficiencies?.[c.character_class] ?? [];
+      const weaponProfs = ctx.classWeaponProficiencies?.[c.character_class] ?? [];
 
       const hitDie = ctx.classHitDie[c.character_class] ?? 8;
       const conMod = Math.floor(((base.con ?? 10) - 10) / 2);
-      const maxHp  = Math.max(1, hitDie + conMod); // PHB: max hit die + CON mod at level 1
+      const maxHp = Math.max(1, hitDie + conMod); // PHB: max hit die + CON mod at level 1
 
       // Build starting inventory from classStartingLoot or campaign.startingLoot
-      const startingIds = ctx.classStartingLoot?.[c.character_class] ?? ctx.campaign?.startingLoot ?? [];
+      const startingIds =
+        ctx.classStartingLoot?.[c.character_class] ?? ctx.campaign?.startingLoot ?? [];
       const startingInventory = startingIds
-        .map(id => {
-          const item = ctx.lootTable.find(l => l.id === id);
+        .map((id) => {
+          const item = ctx.lootTable.find((l) => l.id === id);
           return item ? { ...item, instance_id: randomUUID() } : null;
         })
         .filter((i): i is NonNullable<typeof i> => i !== null);
 
       // Auto-equip: first weapon-slot item, first armor-slot item, first shield-slot item
-      const firstWeapon = startingInventory.find(i => ctx.lootTable.find(l => l.id === i.id)?.slot === 'weapon');
-      const firstArmor  = startingInventory.find(i => ctx.lootTable.find(l => l.id === i.id)?.slot === 'armor');
-      const firstShield = startingInventory.find(i => ctx.lootTable.find(l => l.id === i.id)?.slot === 'shield');
+      const firstWeapon = startingInventory.find(
+        (i) => ctx.lootTable.find((l) => l.id === i.id)?.slot === 'weapon'
+      );
+      const firstArmor = startingInventory.find(
+        (i) => ctx.lootTable.find((l) => l.id === i.id)?.slot === 'armor'
+      );
+      const firstShield = startingInventory.find(
+        (i) => ctx.lootTable.find((l) => l.id === i.id)?.slot === 'shield'
+      );
 
       const equippedWeapon = firstWeapon?.instance_id ?? null;
-      const equippedArmor  = firstArmor?.instance_id  ?? null;
+      const equippedArmor = firstArmor?.instance_id ?? null;
       const equippedShield = firstShield?.instance_id ?? null;
 
-      const initialAc = computeTotalAc(base.dex ?? 10, equippedArmor, equippedShield, startingInventory, ctx.lootTable);
+      const initialAc = computeTotalAc(
+        base.dex ?? 10,
+        equippedArmor,
+        equippedShield,
+        startingInventory,
+        ctx.lootTable
+      );
 
       return {
-        id:              randomUUID(),
-        name:            c.name,
+        id: randomUUID(),
+        name: c.name,
         character_class: c.character_class,
-        portrait_url:    c.portrait_url ?? null,
-        hp: maxHp, max_hp: maxHp, ac: initialAc,
+        portrait_url: c.portrait_url ?? null,
+        hp: maxHp,
+        max_hp: maxHp,
+        ac: initialAc,
         ...base,
-        xp: 0, level: 1, gold: 5,
-        inventory:       startingInventory,
+        xp: 0,
+        level: 1,
+        gold: 5,
+        inventory: startingInventory,
         equipped_weapon: equippedWeapon,
-        equipped_armor:  equippedArmor,
+        equipped_armor: equippedArmor,
         equipped_shield: equippedShield,
-        conditions:          [],
+        conditions: [],
         condition_durations: {},
-        death_saves:         { successes: 0, failures: 0 },
-        stable:              false,
-        dead:                false,
-        turn_actions:        { ...FRESH_TURN },
-        initiative_roll:     null,
-        hit_die:             ctx.classHitDie[c.character_class] ?? 8,
-        hit_dice_remaining:  1,
+        death_saves: { successes: 0, failures: 0 },
+        stable: false,
+        dead: false,
+        turn_actions: { ...FRESH_TURN },
+        initiative_roll: null,
+        hit_die: ctx.classHitDie[c.character_class] ?? 8,
+        hit_dice_remaining: 1,
         class_resource_uses: {},
-        asi_pending:         false,
-        exhaustion_level:    0,
-        background_id:        bg?.id ?? null,
-        skill_proficiencies:  skillProfs,
-        tool_proficiencies:   toolProfs,
-        spell_slots_max:      ctx.classSpellSlots?.[c.character_class]?.[0] ?? {},
-        spell_slots_used:     {},
-        spells_known:         ctx.classSpells?.[c.character_class] ?? [],
-        armor_proficiencies:  armorProfs,
+        asi_pending: false,
+        exhaustion_level: 0,
+        background_id: bg?.id ?? null,
+        skill_proficiencies: skillProfs,
+        tool_proficiencies: toolProfs,
+        spell_slots_max: ctx.classSpellSlots?.[c.character_class]?.[0] ?? {},
+        spell_slots_used: {},
+        spells_known: ctx.classSpells?.[c.character_class] ?? [],
+        armor_proficiencies: armorProfs,
         weapon_proficiencies: weaponProfs,
-        attuned_items:        [],
+        attuned_items: [],
       };
     });
 
     const leader = partyChars[0];
     const initialState: GameState = {
-      characters:          partyChars,
+      characters: partyChars,
       active_character_id: leader.id,
-      current_room:        ctx.startRoomId,
-      visited_rooms:       [ctx.startRoomId],
-      enemies_killed:      [],
-      loot_taken:          [],
-      combat_active:       false,
-      initiative_order:    [],
-      initiative_idx:      0,
-      run_log:             [],
-      room_log:            [],
-      last_choices:        [],
-      short_rested_rooms:  [],
-      long_rested:         false,
-      traps_triggered:     [],
-      traps_disarmed:      [],
-      objects_searched:    [],
-      flags:               {},
-      npc_attitudes:       {},
-      npc_talked:          [],
+      current_room: ctx.startRoomId,
+      visited_rooms: [ctx.startRoomId],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: false,
+      initiative_order: [],
+      initiative_idx: 0,
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      short_rested_rooms: [],
+      long_rested: false,
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+      flags: {},
+      npc_attitudes: {},
+      npc_talked: [],
     };
 
-    const startNarrative = seed.intro + ' ' + buildArrivalNarrative(ctx.startRoomId, initialState, seed, ctx);
-    initialState.run_log      = [{ character_id: leader.id, action: 'start', narrative: startNarrative }];
-    initialState.room_log     = [startNarrative];
+    const startNarrative =
+      seed.intro + ' ' + buildArrivalNarrative(ctx.startRoomId, initialState, seed, ctx);
+    initialState.run_log = [
+      { character_id: leader.id, action: 'start', narrative: startNarrative },
+    ];
+    initialState.room_log = [startNarrative];
     initialState.last_choices = generateChoices(initialState, seed, ctx);
 
-    const { rows: [session] } = await client.query(
+    const {
+      rows: [session],
+    } = await client.query(
       `INSERT INTO game_sessions (user_id, character_name, character_class, seed, state, portrait_url)
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
       [
@@ -243,54 +301,91 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
 gameRouter.post('/session/:id/equip', async (req: Request, res: Response) => {
   const { item_id, character_id } = req.body as { item_id?: string; character_id?: string };
   try {
-    const { rows: [row] } = await pool.query(
-      'SELECT * FROM game_sessions WHERE id = $1 AND user_id = $2',
-      [req.params.id, req.user!.id]
-    );
-    if (!row) { res.status(404).json({ error: 'Session not found' }); return; }
+    const {
+      rows: [row],
+    } = await pool.query('SELECT * FROM game_sessions WHERE id = $1 AND user_id = $2', [
+      req.params.id,
+      req.user!.id,
+    ]);
+    if (!row) {
+      res.status(404).json({ error: 'Session not found' });
+      return;
+    }
 
-    const ctx   = CONTEXTS[row.seed.context_id] ?? DEFAULT_CONTEXT;
-    const state = normalizeState(row.state, { character_name: row.character_name, portrait_url: row.portrait_url });
+    const ctx = CONTEXTS[row.seed.context_id] ?? DEFAULT_CONTEXT;
+    const state = normalizeState(row.state, {
+      character_name: row.character_name,
+      portrait_url: row.portrait_url,
+    });
 
     // Resolve target character
-    const targetId   = character_id ?? state.active_character_id;
-    const charIdx    = state.characters.findIndex(c => c.id === targetId);
-    if (charIdx < 0) { res.status(400).json({ error: 'Character not found in session' }); return; }
+    const targetId = character_id ?? state.active_character_id;
+    const charIdx = state.characters.findIndex((c) => c.id === targetId);
+    if (charIdx < 0) {
+      res.status(400).json({ error: 'Character not found in session' });
+      return;
+    }
 
-    let char         = { ...state.characters[charIdx] };
+    let char = { ...state.characters[charIdx] };
     char = { ...char, attuned_items: char.attuned_items ?? [] };
     const combatActive = state.combat_active ?? false;
-    const turnActions  = char.turn_actions  ?? { ...FRESH_TURN };
+    const turnActions = char.turn_actions ?? { ...FRESH_TURN };
 
-    const inventoryItem = char.inventory.find(i => i.instance_id === item_id);
-    const loot          = inventoryItem ? ctx.lootTable.find(l => l.id === inventoryItem.id) : undefined;
-    if (!loot || !inventoryItem) { res.status(400).json({ error: 'Unknown item' }); return; }
-    const iid           = item_id!;
+    const inventoryItem = char.inventory.find((i) => i.instance_id === item_id);
+    const loot = inventoryItem ? ctx.lootTable.find((l) => l.id === inventoryItem.id) : undefined;
+    if (!loot || !inventoryItem) {
+      res.status(400).json({ error: 'Unknown item' });
+      return;
+    }
+    const iid = item_id!;
 
     // Attunement check: magic items that require attunement cannot be equipped until attuned
     if (loot.requiresAttunement && !(char.attuned_items ?? []).includes(iid)) {
-      res.status(400).json({ error: 'This item requires attunement. Attune to it first (out of combat).' });
+      res
+        .status(400)
+        .json({ error: 'This item requires attunement. Attune to it first (out of combat).' });
       return;
-    };
+    }
     const resolveTypeId = (instanceId: string | null) =>
-      char.inventory.find(i => i.instance_id === instanceId)?.id ?? null;
+      char.inventory.find((i) => i.instance_id === instanceId)?.id ?? null;
 
     if (loot.slot === 'shield') {
       const check = canDonShield(combatActive);
-      if (!check.allowed) { res.status(409).json({ error: check.reason }); return; }
+      if (!check.allowed) {
+        res.status(409).json({ error: check.reason });
+        return;
+      }
       const toggling = char.equipped_shield === iid;
       char.equipped_shield = toggling ? null : iid;
-      char.ac = computeTotalAc(char.dex, char.equipped_armor, char.equipped_shield, char.inventory, ctx.lootTable);
+      char.ac = computeTotalAc(
+        char.dex,
+        char.equipped_armor,
+        char.equipped_shield,
+        char.inventory,
+        ctx.lootTable
+      );
     } else if (loot.slot === 'armor') {
       const toggling = char.equipped_armor === iid;
-      const check    = canDonArmor(combatActive, loot.armorCategory ?? 'light');
-      if (!check.allowed) { res.status(409).json({ error: check.reason }); return; }
+      const check = canDonArmor(combatActive, loot.armorCategory ?? 'light');
+      if (!check.allowed) {
+        res.status(409).json({ error: check.reason });
+        return;
+      }
       char.equipped_armor = toggling ? null : iid;
-      char.ac = computeTotalAc(char.dex, char.equipped_armor, char.equipped_shield, char.inventory, ctx.lootTable);
+      char.ac = computeTotalAc(
+        char.dex,
+        char.equipped_armor,
+        char.equipped_shield,
+        char.inventory,
+        ctx.lootTable
+      );
     } else if (loot.damage) {
       const toggling = char.equipped_weapon === iid;
-      const check    = canEquipWeapon(combatActive, turnActions);
-      if (!check.allowed) { res.status(409).json({ error: check.reason }); return; }
+      const check = canEquipWeapon(combatActive, turnActions);
+      if (!check.allowed) {
+        res.status(409).json({ error: check.reason });
+        return;
+      }
       char.equipped_weapon = toggling ? null : iid;
       if ('cost' in check && check.cost === 'free_interaction') {
         char.turn_actions = { ...turnActions, free_interaction_used: true };
@@ -302,13 +397,13 @@ gameRouter.post('/session/:id/equip', async (req: Request, res: Response) => {
 
     const newState: GameState = {
       ...state,
-      characters: state.characters.map((c, i) => i === charIdx ? char : c),
+      characters: state.characters.map((c, i) => (i === charIdx ? char : c)),
     };
 
-    await pool.query(
-      'UPDATE game_sessions SET state = $1, updated_at = NOW() WHERE id = $2',
-      [JSON.stringify(newState), row.id]
-    );
+    await pool.query('UPDATE game_sessions SET state = $1, updated_at = NOW() WHERE id = $2', [
+      JSON.stringify(newState),
+      row.id,
+    ]);
     res.json({ newState });
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
@@ -318,18 +413,35 @@ gameRouter.post('/session/:id/equip', async (req: Request, res: Response) => {
 // Take a game action
 gameRouter.post('/session/:id/action', async (req: Request, res: Response) => {
   const { action, history } = req.body as { action?: StructuredAction; history?: unknown[] };
-  if (!action?.type) { res.status(400).json({ error: 'Missing action' }); return; }
+  if (!action?.type) {
+    res.status(400).json({ error: 'Missing action' });
+    return;
+  }
   try {
-    const { rows: [row] } = await pool.query(
-      'SELECT * FROM game_sessions WHERE id = $1 AND user_id = $2',
-      [req.params.id, req.user!.id]
-    );
-    if (!row) { res.status(404).json({ error: 'Session not found' }); return; }
-    if (row.status === 'dead')    { res.status(410).json({ error: 'Hero deceased.' }); return; }
-    if (row.status === 'escaped') { res.status(410).json({ error: 'Mission already complete.' }); return; }
+    const {
+      rows: [row],
+    } = await pool.query('SELECT * FROM game_sessions WHERE id = $1 AND user_id = $2', [
+      req.params.id,
+      req.user!.id,
+    ]);
+    if (!row) {
+      res.status(404).json({ error: 'Session not found' });
+      return;
+    }
+    if (row.status === 'dead') {
+      res.status(410).json({ error: 'Hero deceased.' });
+      return;
+    }
+    if (row.status === 'escaped') {
+      res.status(410).json({ error: 'Mission already complete.' });
+      return;
+    }
 
-    const ctx   = CONTEXTS[row.seed.context_id] ?? DEFAULT_CONTEXT;
-    let   state = normalizeState(row.state, { character_name: row.character_name, portrait_url: row.portrait_url });
+    const ctx = CONTEXTS[row.seed.context_id] ?? DEFAULT_CONTEXT;
+    let state = normalizeState(row.state, {
+      character_name: row.character_name,
+      portrait_url: row.portrait_url,
+    });
 
     // For campaign sessions, load and merge persisted campaign state
     let campaignState = null;
@@ -339,41 +451,49 @@ gameRouter.post('/session/:id/action', async (req: Request, res: Response) => {
     }
 
     const result = await takeAction({
-      action, history: history ?? [], state, seed: row.seed, context: ctx
+      action,
+      history: history ?? [],
+      state,
+      seed: row.seed,
+      context: ctx,
     });
 
     // For campaign sessions, evaluate quest steps and save campaign state
     if (ctx.mapType === 'campaign' && ctx.campaign && campaignState) {
-      const activeChar = result.newState.characters.find(c => c.id === result.newState.active_character_id)
-        ?? result.newState.characters[0];
+      const activeChar =
+        result.newState.characters.find((c) => c.id === result.newState.active_character_id) ??
+        result.newState.characters[0];
       const facts: CampaignFacts = {
-        action:          action.type,
-        room_id:         result.newState.current_room,
-        location_id:     result.newState.current_location_id ?? '',
-        enemies_killed:  result.newState.enemies_killed,
-        loot_taken:      result.newState.loot_taken,
-        flags:           result.newState.flags,
-        campaign_flags:  result.newState.campaign_flags ?? {},
-        quest_progress:  result.newState.quest_progress ?? [],
-        faction_rep:     result.newState.faction_rep ?? {},
-        world_day:       result.newState.world_day ?? 1,
-        active_level:    activeChar?.level ?? 1,
-        active_class:    activeChar?.character_class ?? '',
+        action: action.type,
+        room_id: result.newState.current_room,
+        location_id: result.newState.current_location_id ?? '',
+        enemies_killed: result.newState.enemies_killed,
+        loot_taken: result.newState.loot_taken,
+        flags: result.newState.flags,
+        campaign_flags: result.newState.campaign_flags ?? {},
+        quest_progress: result.newState.quest_progress ?? [],
+        faction_rep: result.newState.faction_rep ?? {},
+        world_day: result.newState.world_day ?? 1,
+        active_level: activeChar?.level ?? 1,
+        active_class: activeChar?.character_class ?? '',
       };
       const completions = await evaluateQuestSteps(campaignState, ctx.campaign.quests ?? [], facts);
       if (completions.length) {
         const { cs: updatedCs, completedQuestIds } = applyQuestCompletions(
-          campaignState, ctx.campaign.quests ?? [], completions,
+          campaignState,
+          ctx.campaign.quests ?? [],
+          completions
         );
         campaignState = updatedCs;
         // Reflect completed quests back into the result state
         result.newState = {
           ...result.newState,
           quest_progress: updatedCs.quests,
-          faction_rep:    updatedCs.faction_rep,
+          faction_rep: updatedCs.faction_rep,
         };
         if (completedQuestIds.length) {
-          result.narrative = (result.narrative ?? '') +
+          result.narrative =
+            (result.narrative ?? '') +
             ` [Quest${completedQuestIds.length > 1 ? 's' : ''} completed: ${completedQuestIds.join(', ')}]`;
         }
       }

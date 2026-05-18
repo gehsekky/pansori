@@ -12,33 +12,39 @@ function CharStatsCard({
   inCombat,
   onOpenMap,
 }: {
-  char:      Character;
-  state:     GameState;
-  ctx:       FrontendContext;
-  seed:      Seed | null;
-  onEquip:   (instanceId: string) => void;
-  inCombat:  boolean;
+  char: Character;
+  state: GameState;
+  ctx: FrontendContext;
+  seed: Seed | null;
+  onEquip: (instanceId: string) => void;
+  inCombat: boolean;
   onOpenMap: () => void;
 }) {
   const [activeItemIdx, setActiveItemIdx] = useState<number | null>(null);
 
   useEffect(() => {
     if (activeItemIdx === null) return;
-    function close() { setActiveItemIdx(null); }
+    function close() {
+      setActiveItemIdx(null);
+    }
     document.addEventListener('mousedown', close);
     return () => document.removeEventListener('mousedown', close);
   }, [activeItemIdx]);
 
-  const hpPct          = Math.round((char.hp / char.max_hp) * 100);
-  const hpColor        = hpPct > 50 ? 'var(--t-hp-high)' : hpPct > 25 ? 'var(--t-hp-mid)' : 'var(--t-hp-low)';
-  const equippedWeapon = char.inventory?.find(i => i.instance_id === char.equipped_weapon) ?? null;
-  const equippedArmor  = char.inventory?.find(i => i.instance_id === char.equipped_armor)  ?? null;
+  const hpPct = Math.round((char.hp / char.max_hp) * 100);
+  const hpColor =
+    hpPct > 50 ? 'var(--t-hp-high)' : hpPct > 25 ? 'var(--t-hp-mid)' : 'var(--t-hp-low)';
+  const equippedWeapon =
+    char.inventory?.find((i) => i.instance_id === char.equipped_weapon) ?? null;
+  const equippedArmor = char.inventory?.find((i) => i.instance_id === char.equipped_armor) ?? null;
 
   return (
     <div className={styles.statsRow}>
       <div className={styles.stat}>
         <span className={styles.statLbl}>HP</span>
-        <span className={styles.statVal} style={{ color: hpColor }}>{char.hp}/{char.max_hp}</span>
+        <span className={styles.statVal} style={{ color: hpColor }}>
+          {char.hp}/{char.max_hp}
+        </span>
       </div>
       <div className={styles.stat}>
         <span className={styles.statLbl}>AC</span>
@@ -50,7 +56,12 @@ function CharStatsCard({
       </div>
       <div className={styles.stat}>
         <span className={styles.statLbl}>HIT DICE</span>
-        <span className={styles.statVal} style={{ color: (char.hit_dice_remaining ?? 0) > 0 ? 'var(--t-primary)' : 'var(--t-dim)' }}>
+        <span
+          className={styles.statVal}
+          style={{
+            color: (char.hit_dice_remaining ?? 0) > 0 ? 'var(--t-primary)' : 'var(--t-dim)',
+          }}
+        >
           {char.hit_dice_remaining ?? 0}/{char.level} (d{char.hit_die ?? 8})
         </span>
       </div>
@@ -65,7 +76,7 @@ function CharStatsCard({
       <div className={styles.stat}>
         <span className={styles.statLbl}>ROOM</span>
         <span className={styles.statVal}>
-          {seed?.rooms?.find(r => r.id === state.current_room)?.name ?? state.current_room}
+          {seed?.rooms?.find((r) => r.id === state.current_room)?.name ?? state.current_room}
         </span>
       </div>
       <div className={styles.stat}>
@@ -74,36 +85,58 @@ function CharStatsCard({
       </div>
       <div className={styles.stat}>
         <span className={styles.statLbl}>&nbsp;</span>
-        <button className={styles.mapBtn} onClick={onOpenMap}>MAP</button>
+        <button className={styles.mapBtn} onClick={onOpenMap}>
+          MAP
+        </button>
       </div>
       <div className={styles.stat}>
         <span className={styles.statLbl}>WEAPON</span>
         <span className={styles.statVal} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-          {equippedWeapon
-            ? <>{ctx.itemIcons[equippedWeapon.id] ?? null}{equippedWeapon.name}</>
-            : <span style={{ color: 'var(--t-dim)' }}>unarmed</span>}
+          {equippedWeapon ? (
+            <>
+              {ctx.itemIcons[equippedWeapon.id] ?? null}
+              {equippedWeapon.name}
+            </>
+          ) : (
+            <span style={{ color: 'var(--t-dim)' }}>unarmed</span>
+          )}
         </span>
       </div>
       <div className={styles.stat}>
         <span className={styles.statLbl}>ARMOR</span>
         <span className={styles.statVal} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-          {equippedArmor
-            ? <>{ctx.itemIcons[equippedArmor.id] ?? null}{equippedArmor.name}</>
-            : <span style={{ color: 'var(--t-dim)' }}>none</span>}
+          {equippedArmor ? (
+            <>
+              {ctx.itemIcons[equippedArmor.id] ?? null}
+              {equippedArmor.name}
+            </>
+          ) : (
+            <span style={{ color: 'var(--t-dim)' }}>none</span>
+          )}
         </span>
       </div>
       <div className={styles.stat}>
         <span className={styles.statLbl}>INVENTORY</span>
-        <span className={styles.statVal} style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem', alignItems: 'center' }}>
+        <span
+          className={styles.statVal}
+          style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem', alignItems: 'center' }}
+        >
           {char.inventory?.length
             ? char.inventory.map((item, idx) => {
-                const equipped   = item.instance_id === char.equipped_weapon || item.instance_id === char.equipped_armor || item.instance_id === char.equipped_shield;
-                const equippable = !!(item.damage || item.slot === 'armor' || item.slot === 'shield') && !inCombat;
+                const equipped =
+                  item.instance_id === char.equipped_weapon ||
+                  item.instance_id === char.equipped_armor ||
+                  item.instance_id === char.equipped_shield;
+                const equippable =
+                  !!(item.damage || item.slot === 'armor' || item.slot === 'shield') && !inCombat;
                 const popoverOpen = activeItemIdx === idx;
                 return (
-                  <InventoryTooltip key={item.instance_id} text={equippable ? null : (item.desc ?? ctx.itemDescs[item.id])}>
+                  <InventoryTooltip
+                    key={item.instance_id}
+                    text={equippable ? null : (item.desc ?? ctx.itemDescs[item.id])}
+                  >
                     <span
-                      onMouseDown={e => {
+                      onMouseDown={(e) => {
                         if (!equippable) return;
                         e.stopPropagation();
                         setActiveItemIdx(popoverOpen ? null : idx);
@@ -122,12 +155,20 @@ function CharStatsCard({
                       {ctx.itemIcons[item.id] ?? null}
                       {item.name}
                       {popoverOpen && (
-                        <span className={styles.itemPopover} onMouseDown={e => e.stopPropagation()}>
-                          <span className={styles.itemPopoverMeta}>{item.desc ?? ctx.itemDescs[item.id]}</span>
+                        <span
+                          className={styles.itemPopover}
+                          onMouseDown={(e) => e.stopPropagation()}
+                        >
+                          <span className={styles.itemPopoverMeta}>
+                            {item.desc ?? ctx.itemDescs[item.id]}
+                          </span>
                           <button
                             className={styles.choiceBtn}
                             style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}
-                            onClick={() => { onEquip(item.instance_id); setActiveItemIdx(null); }}
+                            onClick={() => {
+                              onEquip(item.instance_id);
+                              setActiveItemIdx(null);
+                            }}
                           >
                             {equipped ? 'UNEQUIP' : 'EQUIP'}
                           </button>

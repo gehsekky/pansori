@@ -1,11 +1,11 @@
 import Anthropic from '@anthropic-ai/sdk';
 
 export interface NarrativeMeta {
-  worldName:      string;
-  charName:       string;
-  charClass:      string;
-  roomName:       string;
-  contextTheme?:  string;
+  worldName: string;
+  charName: string;
+  charClass: string;
+  roomName: string;
+  contextTheme?: string;
 }
 
 export interface LLMProvider {
@@ -31,22 +31,22 @@ const SYSTEM_PROMPT = (meta: NarrativeMeta) =>
 
 class AnthropicProvider implements LLMProvider {
   private client: Anthropic;
-  private model:  string;
+  private model: string;
 
   constructor() {
     this.client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-    this.model  = process.env.ANTHROPIC_MODEL ?? 'claude-haiku-4-5-20251001';
+    this.model = process.env.ANTHROPIC_MODEL ?? 'claude-haiku-4-5-20251001';
   }
 
   async enhance(narrative: string, meta: NarrativeMeta): Promise<string> {
     try {
       const msg = await this.client.messages.create({
-        model:      this.model,
+        model: this.model,
         max_tokens: 512,
-        system:     SYSTEM_PROMPT(meta),
-        messages:   [{ role: 'user', content: narrative }],
+        system: SYSTEM_PROMPT(meta),
+        messages: [{ role: 'user', content: narrative }],
       });
-      const block = msg.content.find(b => b.type === 'text');
+      const block = msg.content.find((b) => b.type === 'text');
       return block && block.type === 'text' ? block.text.trim() : narrative;
     } catch (err) {
       console.error('[llmProvider] Anthropic error — falling back to template narrative:', err);

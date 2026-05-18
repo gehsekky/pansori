@@ -15,9 +15,7 @@ const defaultProps = {
 
 describe('PartyPanel', () => {
   it('renders null when state is null', () => {
-    const { container } = render(
-      <PartyPanel {...defaultProps} state={null} activeCharId="" />
-    );
+    const { container } = render(<PartyPanel {...defaultProps} state={null} activeCharId="" />);
     expect(container.firstChild).toBeNull();
   });
 
@@ -78,22 +76,28 @@ describe('PartyPanel', () => {
 
   it('renders InitiativeStrip during combat', () => {
     const char = makeChar();
-    const state = makeState({}, {
-      characters: [char],
-      combat_active: true,
-      initiative_order: [{ id: char.id, roll: 15, is_enemy: false }],
-      initiative_idx: 0,
-    });
+    const state = makeState(
+      {},
+      {
+        characters: [char],
+        combat_active: true,
+        initiative_order: [{ id: char.id, roll: 15, is_enemy: false }],
+        initiative_idx: 0,
+      }
+    );
     render(<PartyPanel {...defaultProps} state={state} activeCharId={char.id} inCombat={true} />);
     expect(screen.getByText(/INITIATIVE/i)).toBeTruthy();
   });
 
   it('does not render InitiativeStrip outside combat', () => {
     const char = makeChar();
-    const state = makeState({}, {
-      characters: [char],
-      initiative_order: [{ id: char.id, roll: 15, is_enemy: false }],
-    });
+    const state = makeState(
+      {},
+      {
+        characters: [char],
+        initiative_order: [{ id: char.id, roll: 15, is_enemy: false }],
+      }
+    );
     render(<PartyPanel {...defaultProps} state={state} activeCharId={char.id} inCombat={false} />);
     expect(screen.queryByText(/INITIATIVE/i)).toBeNull();
   });

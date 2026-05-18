@@ -4,12 +4,11 @@ import passport from 'passport';
 export const authRouter = Router();
 
 // Kick off Google OAuth flow
-authRouter.get('/google',
-  passport.authenticate('google', { scope: ['profile', 'email'] })
-);
+authRouter.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 
 // Google redirects here after user grants permission
-authRouter.get('/google/callback',
+authRouter.get(
+  '/google/callback',
   passport.authenticate('google', { failureRedirect: `${process.env.FRONTEND_URL}/?auth=failed` }),
   (_req: Request, res: Response) => {
     res.redirect(process.env.FRONTEND_URL ?? '/');
@@ -18,7 +17,10 @@ authRouter.get('/google/callback',
 
 // Current user info — frontend polls this to decide whether to show login screen
 authRouter.get('/me', (req: Request, res: Response) => {
-  if (!req.user) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  if (!req.user) {
+    res.status(401).json({ error: 'Not authenticated' });
+    return;
+  }
   res.json(req.user);
 });
 

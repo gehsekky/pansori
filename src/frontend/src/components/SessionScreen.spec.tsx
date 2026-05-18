@@ -6,7 +6,7 @@ import SessionsScreen from './SessionScreen';
 import type { SessionSummary } from '../types';
 import { mockCtx } from './test-fixtures';
 
-const contexts = { 'sandbox': mockCtx };
+const contexts = { sandbox: mockCtx };
 
 const activeSession: SessionSummary = {
   id: 'session-1',

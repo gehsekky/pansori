@@ -13,11 +13,7 @@ function RoomArtPanel({ roomId, ctx }: { roomId: string | null; ctx: FrontendCon
   return (
     <div className={styles.artPanel}>
       {ext ? (
-        <img
-          src={`/art/${ctx.id}/${roomId}.${ext}`}
-          alt={roomId ?? ''}
-          className={styles.artImg}
-        />
+        <img src={`/art/${ctx.id}/${roomId}.${ext}`} alt={roomId ?? ''} className={styles.artImg} />
       ) : (
         <pre className={styles.artAscii}>{art}</pre>
       )}

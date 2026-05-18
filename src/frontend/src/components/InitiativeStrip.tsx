@@ -12,10 +12,11 @@ function InitiativeStrip({ state, seed }: { state: GameState; seed: Seed | null 
       <span className={styles.initiativeLabel}>INITIATIVE:</span>
       {order.map((entry, idx) => {
         const isCurrent = idx === currentIdx;
-        const isPast    = idx < currentIdx;
-        const name      = entry.is_enemy
-          ? ((seed?.enemies?.[state.current_room] as { name?: string } | undefined)?.name ?? 'Enemy')
-          : (state.characters.find(c => c.id === entry.id)?.name ?? 'Hero');
+        const isPast = idx < currentIdx;
+        const name = entry.is_enemy
+          ? ((seed?.enemies?.[state.current_room] as { name?: string } | undefined)?.name ??
+            'Enemy')
+          : (state.characters.find((c) => c.id === entry.id)?.name ?? 'Hero');
         return (
           <span
             key={`${entry.id}-${idx}`}
@@ -31,7 +32,8 @@ function InitiativeStrip({ state, seed }: { state: GameState; seed: Seed | null 
               textShadow: isCurrent ? '0 0 4px var(--t-primary)' : 'none',
             }}
           >
-            {isCurrent ? '▶ ' : ''}{name} ({entry.roll})
+            {isCurrent ? '▶ ' : ''}
+            {name} ({entry.roll})
           </span>
         );
       })}

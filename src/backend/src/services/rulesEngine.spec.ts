@@ -1,13 +1,32 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
-  d, rollDice, rollCritical, abilityMod, profBonus,
+  d,
+  rollDice,
+  rollCritical,
+  abilityMod,
+  profBonus,
   FRESH_TURN,
-  resolvePlayerAttack, resolveEnemyAttack, unarmedDamage,
-  canEquipWeapon, canDonShield, canDonArmor, computeAcAfterArmorChange,
-  skillCheck, rollDeathSave, rollConditionSave,
-  sneakAttackDice, extraAttackCount, rageDamageBonus, rageUsesMax,
-  ADVANTAGE_CONDITIONS, DISADV_CONDITIONS, PLAYER_ADV_CONDITIONS, ENEMY_DISADV_CONDITIONS,
-  spellAttackBonus, spellSaveDC, resolveSpellAttack,
+  resolvePlayerAttack,
+  resolveEnemyAttack,
+  unarmedDamage,
+  canEquipWeapon,
+  canDonShield,
+  canDonArmor,
+  computeAcAfterArmorChange,
+  skillCheck,
+  rollDeathSave,
+  rollConditionSave,
+  sneakAttackDice,
+  extraAttackCount,
+  rageDamageBonus,
+  rageUsesMax,
+  ADVANTAGE_CONDITIONS,
+  DISADV_CONDITIONS,
+  PLAYER_ADV_CONDITIONS,
+  ENEMY_DISADV_CONDITIONS,
+  spellAttackBonus,
+  spellSaveDC,
+  resolveSpellAttack,
 } from './rulesEngine.js';
 import type { LootItem } from '../types.js';
 
@@ -15,7 +34,7 @@ afterEach(() => vi.restoreAllMocks());
 
 function mockRandom(...values: number[]) {
   const spy = vi.spyOn(Math, 'random');
-  values.forEach(v => spy.mockReturnValueOnce(v));
+  values.forEach((v) => spy.mockReturnValueOnce(v));
   return spy;
 }
 
@@ -79,12 +98,12 @@ describe('rollDice(expr)', () => {
 
 describe('abilityMod(score)', () => {
   it.each([
-    [10,  0],
-    [12,  1],
-    [8,  -1],
-    [20,  5],
-    [1,  -5],
-    [15,  2],
+    [10, 0],
+    [12, 1],
+    [8, -1],
+    [20, 5],
+    [1, -5],
+    [15, 2],
   ])('score %i → modifier %i', (score, mod) => {
     expect(abilityMod(score)).toBe(mod);
   });
@@ -98,11 +117,16 @@ describe('abilityMod(score)', () => {
 
 describe('profBonus(level)', () => {
   it.each([
-    [1, 2], [4, 2],
-    [5, 3], [8, 3],
-    [9, 4], [12, 4],
-    [13, 5], [16, 5],
-    [17, 6], [20, 6],
+    [1, 2],
+    [4, 2],
+    [5, 3],
+    [8, 3],
+    [9, 4],
+    [12, 4],
+    [13, 5],
+    [16, 5],
+    [17, 6],
+    [20, 6],
   ])('level %i → profBonus %i', (level, bonus) => {
     expect(profBonus(level)).toBe(bonus);
   });
@@ -143,11 +167,16 @@ describe('resolvePlayerAttack', () => {
   });
 
   it('[Case E] crit damage is higher on average than normal damage (100 trials)', () => {
-    let normalTotal = 0, critTotal = 0;
+    let normalTotal = 0,
+      critTotal = 0;
     for (let i = 0; i < 100; i++) {
       // Force hit roll (roll=15) for normal, and crit roll (roll=20) for crit
       const normal = resolvePlayerAttack({ str: 10, dex: 10, level: 1 }, '1d8', 1);
-      if (normal.critical) { critTotal += normal.damage; } else { normalTotal += normal.damage; }
+      if (normal.critical) {
+        critTotal += normal.damage;
+      } else {
+        normalTotal += normal.damage;
+      }
     }
     // At minimum, a crit rolls 2d8 vs 1d8 so expected values differ — just ensure crits deal damage
     expect(critTotal + normalTotal).toBeGreaterThan(0);
@@ -222,7 +251,7 @@ describe('unarmedDamage(str)', () => {
   it.each([
     [10, 1], // mod=0,  1+0=1
     [12, 2], // mod=1,  1+1=2
-    [8,  1], // mod=-1, max(1, 1-1)=1
+    [8, 1], // mod=-1, max(1, 1-1)=1
     [16, 4], // mod=3,  1+3=4
   ])('STR %i → %i damage', (str, expected) => {
     expect(unarmedDamage(str)).toBe(expected);
@@ -281,7 +310,7 @@ describe('canDonArmor', () => {
 describe('computeAcAfterArmorChange', () => {
   const lootTable = [
     { id: 'leather', ac_bonus: 2 },
-    { id: 'plate',   ac_bonus: 6 },
+    { id: 'plate', ac_bonus: 6 },
   ] as LootItem[];
 
   it('adds bonus when equipping from bare (AC 10 + leather → 12)', () => {
@@ -504,9 +533,9 @@ describe('sneakAttackDice(level)', () => {
 
 describe('extraAttackCount(cls, level)', () => {
   it.each([
-    [1,  0],
-    [4,  0],
-    [5,  1],
+    [1, 0],
+    [4, 0],
+    [5, 1],
     [10, 1],
     [11, 2],
     [20, 3],
@@ -517,9 +546,12 @@ describe('extraAttackCount(cls, level)', () => {
 
 describe('rageDamageBonus(level)', () => {
   it.each([
-    [1, 2], [8,  2],
-    [9, 3], [15, 3],
-    [16, 4], [20, 4],
+    [1, 2],
+    [8, 2],
+    [9, 3],
+    [15, 3],
+    [16, 4],
+    [20, 4],
   ])('level %i → +%i rage damage', (level, bonus) => {
     expect(rageDamageBonus(level)).toBe(bonus);
   });
@@ -527,11 +559,16 @@ describe('rageDamageBonus(level)', () => {
 
 describe('rageUsesMax(level)', () => {
   it.each([
-    [1,  2], [5,  2],
-    [6,  3], [9,  3],
-    [10, 4], [12, 4],
-    [13, 5], [16, 5],
-    [17, 6], [20, 6],
+    [1, 2],
+    [5, 2],
+    [6, 3],
+    [9, 3],
+    [10, 4],
+    [12, 4],
+    [13, 5],
+    [16, 5],
+    [17, 6],
+    [20, 6],
   ])('level %i → %i rage uses per long rest', (level, uses) => {
     expect(rageUsesMax(level)).toBe(uses);
   });
