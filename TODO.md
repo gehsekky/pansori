@@ -125,3 +125,28 @@
 - [ ] Dynamic room/encounter image generation — Google Imagen or similar behind `IMAGE_PROVIDER` env var flag; off by default
 - [ ] Sound effects — ambient audio per location type (town, dungeon, wilderness); combat sound cues
 - [x] Mobile UI support — `@media` breakpoints at 768 px and 480 px in `styles.module.css` stack two-column layouts vertically, enlarge tap targets on choice buttons, allow the combat grid to scroll horizontally, and tighten paddings. Desktop layout unchanged.
+
+---
+
+## 8. Inventory & UX
+- [x] Single inventory modal (`InventoryModal.tsx`) — party tabs, equipment slot summary, equip/unequip, give-to-party-member transfer, drop, encumbrance footer (STR × 15 lbs capacity; tier labels shown but not enforced as speed penalty). Triggered by `I` keypress or header button.
+- [ ] Multi-window inventory (deferred — single modal serves the core use case)
+- [ ] Inventory enforcement of encumbrance speed penalties (deferred — needs game-feel decision)
+
+---
+
+## 9. 5e SRD 5.2.1 rule completeness
+- [x] **Tactical fog of war** — per-cell lighting from PC torches + darkvision (SRD p.11 Vision and Light). Rooms can be `bright`/`dim`/`dark`. Vale dungeon rooms marked accordingly.
+- [x] **Spell range enforcement** — `Spell.rangeKind` ('self'/'touch'/'ranged') + `rangeFt`. Out-of-range casts refunded; all sandbox + Vale spells tagged with SRD ranges.
+- [x] **Quickened Spell restriction** (SRD p.67) — can't use Quickened if you've already cast a level 1+ spell this turn; can't cast a level 1+ spell after using Quickened.
+- [x] **Death by Massive Damage** (SRD p.17) — single hit with leftover ≥ max HP = instant death, bypassing death saves. Wired into the enemy-turn loop.
+- [x] **Drinking a potion is a Bonus Action** (SRD p.204) — `use` consumable consumes `bonus_action_used` instead of `action_used`; heal choices labelled and gated accordingly.
+- [x] **Sneak Attack** tightened to RAW — requires finesse/ranged weapon; ally must be within 5 ft of target on the grid (or any living ally off-grid); no disadvantage.
+
+Still open under §9:
+- [ ] Encumbrance speed penalties (currently informational only)
+- [ ] Multi-target spells (Magic Missile's 3 darts, Eldritch Blast's multiple beams at higher levels) — needs UX for target allocation
+- [ ] AoE shapes beyond sphere (cone, line, cube) — needs geometry + per-spell shape tagging
+- [ ] Inspiration (Heroic Inspiration in 2024) — needs UX for grant/spend
+- [ ] Reactive spells as interrupts (Counterspell, Shield) — architectural: requires interrupt support in the turn engine
+- [ ] Costly material component consumption (e.g. Identify's 100 gp pearl)
