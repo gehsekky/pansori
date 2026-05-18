@@ -1952,8 +1952,7 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
         delete restoredUses.sacred_weapon_active;
         // Long rest reduces exhaustion by 1 level (PHB p.291); full rest clears all other conditions
         const newExhaustion = Math.max(0, (c.exhaustion_level ?? 0) - 1);
-        const longRestedConditions = c.conditions.filter(cond => cond !== 'wild_shaped');
-        return { ...c, hp: c.max_hp, hit_dice_remaining: newHd, conditions: longRestedConditions, condition_durations: {}, class_resource_uses: restoredUses, exhaustion_level: newExhaustion, spell_slots_used: {} };
+        return { ...c, hp: c.max_hp, hit_dice_remaining: newHd, conditions: [], condition_durations: {}, class_resource_uses: restoredUses, exhaustion_level: newExhaustion, spell_slots_used: {} };
       });
       st   = { ...st, characters: restedChars, long_rested: true };
       char = { ...restedChars[safeIdx] };
