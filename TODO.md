@@ -11,28 +11,35 @@
 - [x] IAM deploy user — `pansori-deploy` created with ECR push permissions
 
 ### EC2 bootstrap (SSH in once)
-- [ ] Install Docker, Docker Compose plugin, and AWS CLI on the instance; add `ec2-user` to the `docker` group
-- [ ] Create `/opt/pansori/` directory; copy `docker-compose.prod.yml` and `infra/nginx/nginx.conf` there
-- [ ] Create `/opt/pansori/.env` with all required vars (see list below)
+- [X] Docker 25.0.14, Compose plugin v5.1.3, AWS CLI v2.33.15 installed; `ec2-user` in `docker` group
+- [X] Create `/opt/pansori/` directory; copy `docker-compose.prod.yml` and `infra/nginx/nginx.conf` there
+- [X] Create `/opt/pansori/.env` with all required vars (see list below)
+- [X] SSM Session Manager registered (instance role has `AmazonSSMManagedInstanceCore`) — no SSH allowlist needed for ops
 
 ### Domain & TLS
-- [ ] Point domain A record at EC2 public IP
-- [ ] Replace `YOUR_DOMAIN` in `infra/nginx/nginx.conf` with the real domain (4 occurrences)
-- [ ] Run Certbot on EC2: `certbot certonly --webroot -w /var/www/certbot -d yourdomain.com`
-- [ ] Add auto-renew cron: `0 3 * * * root certbot renew --quiet`
+- [X] Point domain A record at EC2 public IP
+- [X] Replace `YOUR_DOMAIN` in `infra/nginx/nginx.conf` with the real domain (4 occurrences)
+- [X] Cert issued for `pansorirpg.com` + `www.pansorirpg.com` (Let's Encrypt ECDSA, expires 2026-08-16)
+- [X] Auto-renew via systemd `certbot-renew.timer` (daily 03:00 UTC + 1h jitter; webroot mode; deploy-hook reloads nginx)
+- [X] `/var/www/certbot/` directory exists for ACME webroot challenges
+- [X] Renewal config switched from `standalone` → `webroot` so nginx stays up during renew
 
 ### GitHub Actions wiring
-- [ ] Add repo secrets: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `EC2_SSH_KEY`
-- [ ] Fill in the three TODOs at the top of `.github/workflows/deploy.yml`: `AWS_REGION`, `ECR_REGISTRY`, `EC2_HOST`
+- [X] Add repo secrets: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `EC2_SSH_KEY`
+- [X] Fill in the three TODOs at the top of `.github/workflows/deploy.yml`: `AWS_REGION`, `ECR_REGISTRY`, `EC2_HOST`
+- [ ] `DEPLOY_ENABLED=true` repo variable (currently gated off; flip after switching deploy to SSM)
 
 ### Google OAuth
-- [ ] Create Google Cloud project; enable People API
-- [ ] Configure OAuth consent screen (External); add `email` and `profile` scopes; add domain to Authorized Domains
-- [ ] Create OAuth credential (Web application); set Authorized redirect URI to `https://yourdomain.com/api/auth/google/callback`; copy Client ID + Secret into env
-- [ ] Publish the consent screen app when ready for real users
+- [X] Create Google Cloud project; enable People API
+- [X] Configure OAuth consent screen (External); add `email` and `profile` scopes; add domain to Authorized Domains
+- [X] Create OAuth credential (Web application); set Authorized redirect URI to `https://yourdomain.com/api/auth/google/callback`; copy Client ID + Secret into env
+- [X] Publish the consent screen app when ready for real users
 
 ### Database
-- [ ] Schema and migrations run automatically on first `docker compose up` via `docker-entrypoint-initdb.d`
+- [X] Schema/migrations auto-run on first `docker compose up` via `docker-entrypoint-initdb.d` (now mounted in `docker-compose.prod.yml`; 6 migrations applied on first init)
+
+### Production deployment
+- [X] First deploy successful (image tag `09b6e3f2`): postgres + backend + frontend + nginx all running, TLS terminating, API responding
 
 ### Required environment variables (`/opt/pansori/.env` on EC2)
 - `POSTGRES_PASSWORD` — strong password for the containerized postgres instance
@@ -114,3 +121,4 @@
 - [ ] Narrative template format — separate mechanical metadata (dice rolls, damage numbers, HP changes) from prose so the UI can render them differently while keeping immersion
 - [ ] Dynamic room/encounter image generation — Google Imagen or similar behind `IMAGE_PROVIDER` env var flag; off by default
 - [ ] Sound effects — ambient audio per location type (town, dungeon, wilderness); combat sound cues
+- [ ] Mobile UI support - mobile-friendly ui that isn't too confusing or tedious

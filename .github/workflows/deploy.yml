@@ -108,20 +108,12 @@ jobs:
             aws ecr get-login-password --region $AWS_REGION \
               | docker login --username AWS --password-stdin $ECR_REGISTRY
 
-            # Roll to new containers (postgres stays up via named volume)
+            # Roll to new containers (postgres stays up via named volume).
+            # Migrations are run by the postgres entrypoint via
+            # docker-entrypoint-initdb.d on first init of the data volume.
+            # Future schema changes require a separate migration runner.
             docker compose -f /opt/pansori/docker-compose.prod.yml pull backend frontend
             docker compose -f /opt/pansori/docker-compose.prod.yml up -d --remove-orphans
-
-            # Run DB migrations inside the backend container
-            docker exec pansori-backend node -e "
-              import('./dist/db/pool.js').then(async ({ pool }) => {
-                const fs = await import('fs/promises');
-                const sql = await fs.readFile('./dist/db/schema.sql', 'utf8');
-                await pool.query(sql);
-                await pool.end();
-                console.log('Migration done');
-              });
-            "
 
             # Clean up old images
             docker image prune -f
