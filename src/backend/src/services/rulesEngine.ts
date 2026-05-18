@@ -61,11 +61,22 @@ export function applyDamageMultiplier(
   if (!damageType) return { damage: raw, note: '' };
   if (enemy.immunities?.includes(damageType))
     return { damage: 0, note: ` [immune to ${damageType}]` };
-  if (enemy.vulnerabilities?.includes(damageType))
-    return { damage: raw * 2, note: ` [vulnerable to ${damageType}: ×2]` };
-  if (enemy.resistances?.includes(damageType))
-    return { damage: Math.floor(raw / 2), note: ` [resistant to ${damageType}: ×½]` };
-  return { damage: raw, note: '' };
+  // SRD 5.2.1 p.17 — order is: adjustments → resistance → vulnerability.
+  // If a creature has both (rare), resistance halves first then vulnerability
+  // doubles → net unchanged.
+  const hasResist = enemy.resistances?.includes(damageType) ?? false;
+  const hasVuln = enemy.vulnerabilities?.includes(damageType) ?? false;
+  let dmg = raw;
+  const notes: string[] = [];
+  if (hasResist) {
+    dmg = Math.floor(dmg / 2);
+    notes.push(`resistant to ${damageType}: ×½`);
+  }
+  if (hasVuln) {
+    dmg = dmg * 2;
+    notes.push(`vulnerable to ${damageType}: ×2`);
+  }
+  return { damage: dmg, note: notes.length ? ` [${notes.join(', ')}]` : '' };
 }
 
 // ─── Attack resolution ────────────────────────────────────────────────────────

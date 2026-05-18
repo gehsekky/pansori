@@ -112,7 +112,9 @@ function checkConcentration(
   dmgTaken: number
 ): { char: Character; st: GameState; note: string } {
   if (!char.concentrating_on || dmgTaken <= 0) return { char, st, note: '' };
-  const dc = Math.max(10, Math.floor(dmgTaken / 2));
+  // SRD 5.2.1 p.203 — Concentration DC is 10 or half damage taken, whichever
+  // is higher; capped at 30. The cap basically only matters at >60 dmg.
+  const dc = Math.min(30, Math.max(10, Math.floor(dmgTaken / 2)));
   const save = d(20) + abilityMod(char.con);
   if (save >= dc) return { char, st, note: ` [Concentration hold: ${save} vs DC ${dc}]` };
   const spellName = char.concentrating_on.spellId;
