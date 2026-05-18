@@ -3,23 +3,24 @@
  * Format: { [contextId]: { [roomId]: 'webp' | 'png' | ... } }
  * RoomArtPanel reads this instead of trial-and-error extension probing.
  */
-import { readdirSync, writeFileSync, existsSync } from 'fs';
-import { join, extname, basename, dirname } from 'path';
+import { existsSync, readdirSync, writeFileSync } from 'fs';
+import { basename, dirname, extname, join } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const artDir    = join(__dirname, '..', 'public', 'art');
-const outFile   = join(__dirname, '..', 'src', 'art-manifest.json');
+const artDir = join(__dirname, '..', 'public', 'art');
+const outFile = join(__dirname, '..', 'src', 'art-manifest.json');
 
-const manifest = {};
+const manifest: Record<string, Record<string, string>> = {};
 
 if (existsSync(artDir)) {
   for (const contextId of readdirSync(artDir, { withFileTypes: true })
-    .filter(d => d.isDirectory()).map(d => d.name)) {
+    .filter((d) => d.isDirectory())
+    .map((d) => d.name)) {
     manifest[contextId] = {};
     const ctxDir = join(artDir, contextId);
     for (const file of readdirSync(ctxDir)) {
-      const ext    = extname(file).slice(1).toLowerCase();
+      const ext = extname(file).slice(1).toLowerCase();
       const roomId = basename(file, '.' + ext);
       if (ext && roomId) manifest[contextId][roomId] = ext;
     }
