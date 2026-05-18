@@ -288,7 +288,19 @@ export default function App() {
               {gameState?.combat_active &&
                 gameState.entities &&
                 gameState.entities.length > 0 &&
-                seed && <GridCombatView state={gameState} seed={seed} />}
+                seed && (
+                  <GridCombatView
+                    state={gameState}
+                    seed={seed}
+                    onMove={(to) => {
+                      const activeId = gameState.active_character_id;
+                      handleChoice({
+                        label: `Move to (${to.x},${to.y})`,
+                        action: { type: 'grid_move', entityId: activeId, to },
+                      });
+                    }}
+                  />
+                )}
 
               {campaignMeta && gameState && <CampaignPanel state={gameState} meta={campaignMeta} />}
 
