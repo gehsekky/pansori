@@ -51,14 +51,16 @@ export function generateRoguelikeSeed(context: Context, partySize = 1): Seed {
     .filter(r => r.id !== startId && r.id !== escapeId)
     .sort(() => Math.random() - 0.5)
     .slice(0, roomCount - 2)
-    .map(r => ({ id: r.id, name: r.name, desc: pick(r.descs) }));
+    .map(r => ({ id: r.id, name: r.name, desc: pick(r.descs), ...(r.trap ? { trap: r.trap } : {}), ...(r.objects?.length ? { objects: r.objects } : {}) }));
 
-  const findDesc = (id: string) => pick(context.roomPool.find(r => r.id === id)!.descs);
+  const findDesc    = (id: string) => pick(context.roomPool.find(r => r.id === id)!.descs);
+  const findTrap    = (id: string) => context.roomPool.find(r => r.id === id)?.trap;
+  const findObjects = (id: string) => context.roomPool.find(r => r.id === id)?.objects;
 
   const rooms = [
-    { id: startId,  name: startRoom.name,  desc: findDesc(startId) },
+    { id: startId,  name: startRoom.name,  desc: findDesc(startId),  ...(findTrap(startId)  ? { trap: findTrap(startId)  } : {}), ...(findObjects(startId)?.length  ? { objects: findObjects(startId)  } : {}) },
     ...middle,
-    { id: escapeId, name: escapeRoom.name, desc: findDesc(escapeId) },
+    { id: escapeId, name: escapeRoom.name, desc: findDesc(escapeId), ...(findTrap(escapeId) ? { trap: findTrap(escapeId) } : {}), ...(findObjects(escapeId)?.length ? { objects: findObjects(escapeId) } : {}) },
   ];
 
   const connections: Record<string, string[]> = {};
@@ -102,9 +104,18 @@ export function generateRoguelikeSeed(context: Context, partySize = 1): Seed {
         damage:      template.damage,
         toHit:       template.toHit,
         xp:          template.xp,
+        str:         template.str,
         dex:         template.dex,
+        con:         template.con,
+        int:         template.int,
         wis:         template.wis,
-        onHitEffect: template.onHitEffect,
+        cha:         template.cha,
+        onHitEffect:          template.onHitEffect,
+        multiattack:          template.multiattack,
+        resistances:          template.resistances,
+        vulnerabilities:      template.vulnerabilities,
+        immunities:           template.immunities,
+        condition_immunities: template.condition_immunities,
       };
     }
     if (Math.random() < 0.5) {

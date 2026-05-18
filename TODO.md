@@ -1,43 +1,94 @@
 # TODO
 
-## Script Engine (core goal)
-- [ ] Campaign persistence — world state that survives across multiple sessions (separate from per-session GameState)
+## Campaign Engine
+- [x] Campaign persistence — `CampaignState` JSONB in `campaign_states` table; load/merge/save around every action; survives across sessions (migration `006_campaign_state.sql`)
+- [x] Grid combat — Chebyshev distance, BFS pathfinding, range-gated attacks, opportunity attacks, movement budget; `gridEngine.ts`; entity positions tracked in `GameState.entities`
+- [x] Quest system — `Quest` / `QuestStep` / `QuestProgress` types; `evaluateQuestSteps` via json-rules-engine; auto-advance on step completion; rewards (gold, items, faction rep)
+- [x] Faction reputation — numeric rep per faction; attitude tiers (hostile → exalted); shop price modifiers per tier; `factionAttitude` / `factionShopPrice` in `campaignEngine.ts`
+- [x] Location hierarchy — `Location` (town / dungeon / wilderness) with `District` sub-areas; `travel` and `enter_district` actions; wilderness encounter rolls on travel
+- [x] Vale of Shadows — first adventure module: Millhaven (3 districts, 5 NPCs), Shattered Crypt (8 rooms, 10×10 grid, 3 enemy types, Crypt Lord boss), 3 quests, 2 factions (`vale_of_shadows.ts`)
+- [ ] Grid combat UI — frontend needs to render entity positions on the grid, show movement range highlight, and display position in combat choices
+- [ ] Quest journal UI — panel showing active/completed quests, current step descriptions, and reward previews
+- [ ] Faction reputation UI — display current rep and attitude tier per faction; visible in stats or a separate panel
+- [ ] Town/district navigation UI — show district map choices and NPC locations within each district
+- [ ] `accept_quest` as an explicit choice — show "Accept quest: <title>" in `generateChoices` when the active character is talking to a quest-giver NPC and the quest is not yet active
+- [ ] NPC quest-giver indicator — mark NPCs who have available quests in the room description / choice labels
+- [ ] Vale of Shadows end-to-end playtest — complete all 3 quests in a single session; verify campaign state survives session resume; verify faction price modifiers apply in shop
+- [ ] Multiple campaign modules — second context beyond Vale of Shadows to validate the authoring format is general-purpose
 
 ## Rules Engine (D&D 5e gaps)
-- [ ] Traps — core dungeon element entirely absent. Investigation/Perception to detect (vs trap DC), Thieves' Tools proficiency check to disarm, damage/condition on trigger. Defined in room data.
-- [ ] Armor/weapon proficiency enforcement — currently any class can wear any armor with no penalty; heavy armor without proficiency should impose disadvantage on STR/DEX checks and prevent spellcasting
-- [ ] Two-weapon fighting — bonus action attack with light off-hand weapon when wielding two light weapons; no ability mod to damage unless feat
-- [ ] Grapple / Shove — contested Athletics checks: grapple sets target speed 0, shove knocks prone or pushes 5ft
-- [ ] Backgrounds — grant 2 skill proficiencies + 1 tool proficiency + a narrative feature; add to character creation
-- [ ] Magic item attunement — max 3 attuned items per character; some items require attunement to function
+- [x] Armor/weapon proficiency enforcement — disadvantage on STR/DEX attack rolls and checks when wearing non-proficient armor; no prof bonus for non-proficient weapons; spellcasting blocked in non-proficient armor (PHB p.144/147)
+- [x] Ranged weapons use DEX — `resolvePlayerAttack` now takes a `ranged` param; ranged weapons always use DEX for attack and damage (PHB p.194)
+- [x] Two-weapon fighting — bonus action off-hand attack when both weapons are `light`; no ability modifier to damage; `resolveOffHandAttack` in rulesEngine (PHB p.195)
+- [x] Grapple / Shove — contested STR Athletics check vs enemy STR/DEX; grapple applies `enemy_conditions: ['grappled']` (player advantage); shove applies `prone` (melee adv, ranged disadv); cleared on room change or kill (PHB p.195)
+- [x] Magic item attunement — `requiresAttunement` on LootItem; `attuned_items` on Character; `attune` out-of-combat action; max 3; equip route blocks un-attuned use (PHB p.136)
+- [x] Exhaustion full levels — level 1: skill check disadvantage; level 3: attack disadvantage (existing); level 4: max HP halved; level 6: instant death (PHB p.291)
+- [x] Concentration spells — `concentration: true` on SpellDefinition; track `concentrating_on: { spellId, duration } | null` on Character; taking damage requires CON save (DC = max(10, damage/2)) or lose concentration; casting a new concentration spell ends the old one (PHB p.203)
+- [x] Dodge / Disengage actions — Dodge: action, until next turn attacks against character have disadvantage; Disengage: action, no opportunity attacks triggered this turn; both cost `action_used`; add choices in non-bonus action pool (PHB p.192)
+- [x] Damage types + resistances / vulnerabilities / immunities — `damage_type` field on weapon/spell attacks; `resistances`, `vulnerabilities`, `immunities` string arrays on EnemyTemplate; apply ×0.5 / ×2 / ×0 multipliers before HP deduction (PHB p.197)
+- [x] Condition immunities — `condition_immunities: string[]` on EnemyTemplate; skip applying grappled/prone/poisoned/paralyzed/etc. to immune enemies (PHB p.290)
+- [x] Enemy multiattack — `multiattack: number` on EnemyTemplate (default 1); loop `resolveEnemyAttack` N times per enemy turn; each hit generates its own narrative line (PHB Monster Manual stat blocks)
+- [x] Action Surge (Fighter) — once per short rest; doubles available actions for one turn; tracked in `class_resource_uses.action_surge`; restored on short or long rest (PHB p.72)
+- [x] Rogue Cunning Action — bonus action Dash, Disengage, or Hide; `cunning_action_dash/disengage/hide` feature IDs; choices injected in `generateChoices` for Rogue L2+ (PHB p.96)
+- [x] Second Wind (Fighter) — bonus action heal 1d10+level; tracked in `class_resource_uses.second_wind`; recharges on short or long rest (PHB p.72)
+- [x] Action economy — Dash, Help, Ready, Use Reaction as first-class actions; `readied_action` stored on `turn_actions`; reaction fires the stored action recursively (PHB p.192–193)
+- [x] Spell upcasting / cantrip scaling — `upcastDamage(spell, slotLevel)` and `cantripDamageDice(spell, charLevel)` in rulesEngine; wired into `cast_spell` for all damage branches (PHB p.201, p.107)
+- [x] Spell preparation — Cleric/Paladin/Druid block casting unprepared leveled spells; `prepare_spells` action available out of combat; cap = level + spellcasting mod (PHB p.201)
+- [x] Ritual casting — no slot consumed; only out of combat; blocked if `spell.ritualCasting` is false (PHB p.202)
+- [x] Cover — `coverBonus()` adds 0/+2/+5 to enemy AC based on blocking entities; applied in `attack` case when grid entities are present (PHB p.196)
+- [x] Flanking — `isFlankingPosition()` grants advantage when attacker and ally are on opposite sides of target (PHB optional rule)
+- [x] Difficult terrain — `Room.difficultTerrain: GridPos[]`; `grid_move` uses terrain-aware path cost (2× per difficult square) instead of flat `pathCostFeet` (PHB p.182)
+- [x] Short-rest resource recharge — `short_rest` now clears second_wind, action_surge (Fighter), bardic_inspiration (Bard L5+), ki_points (Monk), superiority_dice (Battle Master), and restores Warlock pact slots (PHB p.186)
+- [x] Subclass selection — `select_subclass` action; `char.subclass` field; choices offered at appropriate level in `generateChoices`
+- [x] Thrown weapons — `LootItem.thrown: { normalRange, longRange }`; `inRange` uses longRange for out-of-hand melee weapons cast as ranged (PHB p.147)
+- [x] Charmed condition — `cast_spell` and `attack` case block targeting the charmer when `char.charmer_id` matches (PHB p.290)
+- [x] Deafened condition — blocks casting spells with `verbal: true` component (PHB p.290)
+- [x] Unconscious condition — `attack` case auto-crits within melee range of unconscious enemies (PHB p.198)
+- [ ] AOE spells on grid — `spell.blastRadius` typed; `entitiesInBlast` exists in gridEngine; wire into `cast_spell` so the spell hits all entities in radius with individual saves; Evoker Sculpt Spells lets allies auto-succeed (PHB p.202)
+- [ ] Thrown weapon disadvantage past normal range — `resolvePlayerAttack` in the `attack` case never applies disadvantage when a thrown weapon is used beyond its `normalRange`; need to detect this and set `disadvantage = true` (PHB p.147)
+- [ ] Upcasting choice generation — `generateChoices` emits one spell choice at base slot level; for spells with `upcastBonus`, emit one additional choice per available slot level above the base (e.g. "Cast Fireball (4th) — upcast +1d6") (PHB p.201)
+- [ ] Spell slot initialization at session load — `spellSlotsForClassLevel` exists but is never called at session start or `normalizeState`; sessions loaded from DB may have stale or missing slot counts; call it during `normalizeState` for any character whose `spell_slots_max` is empty (PHB class tables)
+- [ ] Petrified condition — typed but not enforced; should: incapacitate the entity (block actions), apply resistance to all damage types (`'*'` wildcard in `applyDamageMultiplier`), auto-fail STR/DEX saves (PHB p.291)
+- [ ] Surprise round — `GameState.surprised?: string[]` typed; on combat start, compare party average Stealth vs. enemy Perception; add surprised enemy IDs to the array; skip action generation for surprised entities in round 1; clear at start of round 2 (PHB p.189)
+- [ ] Ammunition tracking — `LootItem.ammo?: { type, count }` scoped; ranged attacks should find matching ammo in inventory, decrement count by 1, and block the attack if count is 0 (PHB p.146)
+- [ ] HP rolled on level-up — currently fixed +4 per level; should roll `hit_die` + CON mod, minimum 1; add option in level-up flow (PHB p.15)
+- [ ] Initiative-interleaved enemy turns on grid — enemies currently counter-attack within the player's action; true initiative order should give each entity a full independent turn (PHB p.189)
 
-## Party System
-- [ ] Starting loot distribution — currently all campaign starting items are duplicated to every party member; should distribute items across characters instead (e.g. round-robin or defined per-character in context).
+### Subclasses — wired but feature-incomplete
+- [ ] Fighter — Champion: Improved Critical (crit on 19–20); Remarkable Athlete (+½ prof to uninvested STR/DEX/CON checks) (PHB p.72)
+- [ ] Fighter — Battle Master: Riposte (reaction attack after being hit + superiority die damage); Feinting Attack (bonus action advantage + superiority die damage); Goading Attack note: adds disadvantage vs non-caster, not implemented in enemy AI (PHB p.73)
+- [ ] Rogue — Thief: Fast Hands (Use Object / activate magic item as bonus action); Second-Story Work (climbing costs no extra movement) (PHB p.97)
+- [ ] Rogue — Assassin: Assassinate (advantage vs creatures who haven't acted in combat yet); auto-crit on surprised foes (PHB p.97)
+- [ ] Wizard — Evoker: Sculpt Spells (chosen allies auto-succeed DEX saves vs your AOE spells); Potent Cantrip (add WIS mod to cantrip damage on successful save) (PHB p.117)
+- [ ] Wizard — Abjurer: Arcane Ward (temp HP shield = 2 × wizard level; recharged by casting abjuration spells) (PHB p.115)
+- [ ] Cleric — Life: Disciple of Life (healing spells restore extra 2 + spell level HP); Preserve Life Channel Divinity (distribute 5 × cleric level HP among nearby allies) (PHB p.60)
+- [ ] Cleric — War: War Priest (bonus action weapon attack when taking Attack action; uses = WIS mod per long rest); Channel Divinity: Guided Strike (+10 to an attack roll) (PHB p.63)
+- [ ] Ranger — Hunter: Hunter's Prey choice — Colossus Slayer (+1d8 first hit per turn vs bloodied target), Horde Breaker (extra attack vs adjacent creature), Giant Killer (reaction attack vs Large+ that misses you) (PHB p.93)
+- [ ] Ranger — Beastmaster: Animal Companion (summon CR ¼ beast as a second `CombatEntity`; acts on Ranger's turn as bonus action) (PHB p.93)
+- [ ] Paladin — Devotion: Sacred Weapon Channel Divinity (+CHA mod to attacks for 1 min); Aura of Devotion (L7: immune to charmed for party in 10 ft) (PHB p.86)
+- [ ] Paladin — Vengeance: Vow of Enmity Channel Divinity (advantage vs one creature for 1 min); Abjure Enemy (frighten one creature, WIS save) (PHB p.88)
+- [ ] Bard — Lore: Cutting Words reaction (subtract Bardic Inspiration die from enemy attack roll/damage/ability check); 3 bonus skill proficiencies (PHB p.54)
+- [ ] Bard — Valor: Combat Inspiration (ally uses die for weapon damage or AC bonus); Extra Attack at L6 (PHB p.55)
+
+### Missing classes entirely
+- [ ] Druid — d8 hit die; WIS spellcasting + spell preparation; Wild Shape (simplified: temp HP = CR × 5, `shape_shifted` flag, lasts until temp HP gone or dismissed); STR/WIS saves (PHB p.64)
+- [ ] Sorcerer — d6; CHA spellcasting; Sorcery Points pool (`class_resource_uses.sorcery_points = level`); Metamagic: Twinned Spell (1 pt, target a second creature), Quickened Spell (2 pts, cast as bonus action), Empowered Spell (1 pt, reroll up to CHA mod damage dice); CON/CHA saves (PHB p.99)
+- [ ] Warlock — d8; CHA spellcasting; Pact Magic (separate `pact_slots` from `spell_slots`; all recharge on short rest; max 2 slots at L1–10); Eldritch Blast always known; Invocations: Agonizing Blast (add CHA mod to EB damage), Devil's Sight (ignore magical darkness); CHA/WIS saves (PHB p.105)
+- [ ] Monk — d8; STR/DEX saves; Ki points (`class_resource_uses.ki_points = level`); Martial Arts unarmed die (d4→d6→d8→d10 by level); Unarmored Defense (AC = 10 + DEX + WIS); Flurry of Blows (2 unarmed strikes bonus action, 1 ki); Step of the Wind (Dash or Disengage bonus action, 1 ki); Stunning Strike (1 ki after hit, CON save DC = 8+prof+WIS or stunned); ki recharges on short rest (PHB p.78)
+- [ ] Barbarian — d12; STR/CON saves; Rage (bonus action, 2/day at L1; +2 melee damage, resist bludgeoning/piercing/slashing, advantage STR; ends if no attack in a turn); Unarmored Defense (AC = 10 + DEX + CON); Reckless Attack (bonus action before first attack: advantage on all your attacks + advantage on all attacks against you until your next turn) (PHB p.46)
 
 ## Features
-- [ ] LLM narrative provider abstraction — pluggable `LLMProvider` interface (`generate(prompt, systemPrompt): Promise<string>`) with two implementations: `AnthropicProvider` (Anthropic SDK) and `LocalProvider` (Ollama, OpenAI-compatible REST). Selected via `LLM_PROVIDER=anthropic|local|none` env var. `none` falls back to existing deterministic templates. LLM enhances (rewrites) the template output string rather than generating from raw game state — keeps game logic deterministic, limits prompt complexity. `history` param in `takeAction` already stubbed for this. Deployment note: local mode needs Ollama running alongside the backend (same EC2 or sidecar); minimum practical instance is t3.large (8 GB RAM) for a 3B Q4 model — CPU inference will be 15–60s per call.
-- [ ] Hard-coded text overrides - right now we use the same text template for certain actions like combat for all contexts. Maybe have the ability for a context to override these types of text for better immersion? Also, maybe these texts should support an array to further make each encounter feel unique.
-- [ ] Add a way for items to be interactive. Maybe each room has an "items" array and item objects can be examined on their own separate from the room. For example, say we have a desk in a room. The desk can be examined, or inspected, and can possibly contain items as well. Need to check D&D 5e rules to see if there are any rules for object interaction. Can we destroy any item? Can we use items as weapons (eg. pick up desk and throw it at enemy)?
-- [ ] Maybe templates for narrative generation so that the content can be displayed in a custom fashion? Right now we have meta game info (eg. dice roll outcomes, etc) in-line with narrative text. What if we could have a custom format to show that at the bottom somehow and keep the narrative text pure for immersion?
-- [ ] `useGame` hook — extract all game state, API calls, and history management out of `App.tsx` into a `useGame` custom hook; App becomes a pure view router; hook exposes `{ gameState, choices, loading, handleAction, handleEquip, handleNewGame, handleResumeSession, ... }`.
-- [ ] Checkpoint saves — store multiple state snapshots per session so players can rewind to before a bad decision
-- [ ] Better documentation for game engine API and context capabilities
-- [ ] Art asset manifest — generate a `public/art/manifest.json` at build time (or maintain manually) listing which image files exist per context; `RoomArtPanel` reads the manifest instead of trial-and-error extension probing, eliminating 404 waterfalls in the browser console.
-- [ ] Multiplayer lobby (Socket.io rooms ready)
-- [ ] Dynamic image generation for rooms and encounters using Google Nano Banana 2 api. Pros - Great experience. Cons - increased cost. Put behind env var flag so we can quickly turn it on and off.
-- [ ] Sound effects
-- [ ] CSS Modules — replace repeated inline style objects with CSS Modules (`.module.css`) for style organization; keep CSS custom properties for theming; low priority since the current approach works
+- [x] Art asset manifest — `scripts/gen-art-manifest.mjs` runs at `predev`/`prebuild` and writes `src/art-manifest.json`; `RoomArtPanel` does a single lookup instead of trial-and-error extension probing
+- [x] Interactive room objects — rooms define an `objects` array; `interact_object` action triggers an Investigation DC check; `lootIds[]` distributes found items; `objects_searched` tracks which have been opened
+- [ ] Narrative template format — separate mechanical metadata (dice rolls, damage numbers, HP changes) from prose so the UI can render them differently while keeping immersion
+- [ ] Dynamic room/encounter image generation — Google Imagen or similar behind `IMAGE_PROVIDER` env var flag; especially valuable for campaign locations (town square, dungeon rooms); off by default
+- [ ] Sound effects — ambient audio per location type (town, dungeon, wilderness); combat sound cues
 
 ## Deployment (AWS — t4g.micro EC2 + db.t4g.micro RDS)
-- [ ] Production Dockerfiles — multi-stage builds for backend (compile TS → copy dist + node_modules to slim alpine image) and frontend (Vite build → nginx static serving); replace `Dockerfile.dev` in each package; build target is `linux/arm64` for Graviton2.
-- [ ] `docker-compose.prod.yml` — production compose without dev volumes, hot-reload, or exposed dev ports; backend reads env vars from host; no postgres service (points at RDS instead).
-- [ ] Environment variable strategy — document all required vars (`DATABASE_URL`, `ANTHROPIC_API_KEY`, `JWT_SECRET`, `NODE_ENV`, `CORS_ORIGIN`); store secrets in AWS SSM Parameter Store or Secrets Manager; inject into EC2 via instance profile + startup script (or ECS task definition secrets if containerised with ECS).
-- [ ] Health check endpoint — add `GET /health` to the Express app returning `{ ok: true, uptime }` with no auth required; used by ALB target group health checks and basic uptime monitoring.
-- [ ] RDS provisioning — `db.t4g.micro` PostgreSQL 16 in the same VPC as EC2; security group allows inbound 5432 only from the EC2 security group; enable automated backups (7-day retention); store connection string in SSM.
-- [ ] Database schema migration on deploy — run `psql` or a migration script against RDS during the deployment step before the new container starts; ensure idempotent (`CREATE TABLE IF NOT EXISTS`, etc.); document the initial schema SQL.
-- [ ] Nginx reverse proxy config — single nginx container (or host install) terminates SSL, serves frontend static files from `/`, and proxies `/api` to the backend container; config to live in `infra/nginx/nginx.conf`.
-- [ ] SSL/TLS — use Let's Encrypt (Certbot + auto-renew cron) for a custom domain, or ACM + Application Load Balancer if budget allows; bare EC2 HTTP-only is not acceptable for production (JWT cookies, API keys in transit).
-- [ ] ECR repository — create one repo each for `pansori-backend` and `pansori-frontend`; tag images with git SHA; push from CI.
-- [ ] CI/CD pipeline (GitHub Actions) — on push to `main`: run tests, build `linux/arm64` images, push to ECR, SSH to EC2 and run `docker compose -f docker-compose.prod.yml pull && docker compose up -d --remove-orphans`.
-- [ ] Security groups & VPC — EC2 inbound: 80 (redirect), 443 (HTTPS), 22 (SSH from your IP only); RDS inbound: 5432 from EC2 SG only; no public RDS endpoint.
-- [ ] CloudWatch log groups — route Docker container stdout/stderr to CloudWatch via `awslogs` log driver; set 30-day retention; enables basic alerting without a full observability stack.
+- [ ] Run DB migration 006 — `006_campaign_state.sql` adds `campaign_states` table and `campaign_state_id` FK on `game_sessions`; must be applied before any campaign session is started
+- [ ] Environment variable strategy — document all required vars; store secrets in AWS SSM Parameter Store; inject into EC2 via startup script; write a `scripts/ssm-push.sh` helper
+- [ ] ECR repositories — create `pansori-backend` and `pansori-frontend` repos; update `deploy.yml` placeholders with real ARNs
+- [ ] RDS provisioning — `db.t4g.micro` PostgreSQL 16 in the same VPC; SG allows inbound 5432 from EC2 SG only; automated backups (7-day); connection string in SSM
+- [ ] SSL/TLS — Certbot + Let's Encrypt on EC2 with auto-renew cron; bare HTTP is not acceptable for production (cookies, API keys in transit)
+- [ ] Security groups & VPC — EC2 inbound: 80 (redirect), 443, 22 (your IP only); RDS inbound: 5432 from EC2 SG only; no public RDS endpoint
+- [ ] CloudWatch log groups — already wired via `awslogs` driver in `docker-compose.prod.yml`; just needs log groups created and 30-day retention policy set

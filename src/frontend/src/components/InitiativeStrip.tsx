@@ -1,4 +1,5 @@
 import type { GameState, Seed } from '../types';
+import styles from '../styles.module.css';
 
 function InitiativeStrip({ state, seed }: { state: GameState; seed: Seed | null }) {
   const order = state.initiative_order;
@@ -7,25 +8,8 @@ function InitiativeStrip({ state, seed }: { state: GameState; seed: Seed | null 
   const currentIdx = state.initiative_idx ?? 0;
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '0.25rem',
-        marginBottom: '0.5rem',
-        flexWrap: 'wrap',
-      }}
-    >
-      <span
-        style={{
-          fontSize: '0.7rem',
-          color: 'var(--t-dim)',
-          letterSpacing: '0.12em',
-          marginRight: 4,
-        }}
-      >
-        INITIATIVE:
-      </span>
+    <div className={styles.initiativeStrip}>
+      <span className={styles.initiativeLabel}>INITIATIVE:</span>
       {order.map((entry, idx) => {
         const isCurrent = idx === currentIdx;
         const isPast    = idx < currentIdx;
@@ -47,8 +31,7 @@ function InitiativeStrip({ state, seed }: { state: GameState; seed: Seed | null 
               textShadow: isCurrent ? '0 0 4px var(--t-primary)' : 'none',
             }}
           >
-            {isCurrent ? '▶ ' : ''}
-            {name} ({entry.roll})
+            {isCurrent ? '▶ ' : ''}{name} ({entry.roll})
           </span>
         );
       })}

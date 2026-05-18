@@ -2,7 +2,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import React from 'react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 
-import { context as scifiCtx } from '../contexts/scifi-terror.js';
+import { context as sandboxCtx } from '../contexts/sandbox.js';
 import type { GameState, Character, Seed } from '../types.js';
 import WorldMap from './WorldMap';
 
@@ -12,9 +12,9 @@ afterEach(() => vi.restoreAllMocks());
 // Following the pattern established in src/backend/src/services/gameEngine.spec.ts
 
 const mockSeed: Seed = {
-  context_id: scifiCtx.id,
-  world_name: 'USCSS Testing Ground',
-  ship_name: 'USCSS Testing Ground',
+  context_id: sandboxCtx.id,
+  world_name: 'The Testing Grounds',
+  ship_name: 'The Testing Grounds',
   intro: 'Unit test intro.',
   rooms: [
     { id: 'room-1', name: 'Start Room', desc: 'Initial room.' },
@@ -63,6 +63,18 @@ function makeChar(overrides: Partial<Character> = {}): Character {
     },
     hit_die: 8,
     hit_dice_remaining: 1,
+    class_resource_uses: {},
+    asi_pending: false,
+    exhaustion_level: 0,
+    background_id: null,
+    skill_proficiencies: [],
+    tool_proficiencies: [],
+    spell_slots_max: {},
+    spell_slots_used: {},
+    spells_known: [],
+    armor_proficiencies: [],
+    weapon_proficiencies: [],
+    attuned_items: [],
     initiative_roll: null,
     ...overrides,
   };
@@ -89,7 +101,13 @@ function makeState(
     last_choices: [],
     short_rested_rooms: [],
     long_rested: false,
+    npc_attitudes: {},
+    npc_talked: [],
+    traps_triggered: [],
+    traps_disarmed: [],
+    objects_searched: [],
     flags: {},
+    enemy_conditions: [],
     ...stateOverrides,
   };
 }
@@ -98,7 +116,7 @@ describe('WorldMap Component', () => {
   it('renders correctly and displays the world name from the seed', () => {
     render(<WorldMap seed={mockSeed} state={makeState()} onClose={() => {}} />);
     // Verify the world name is rendered in the UI
-    expect(screen.getByText(/USCSS Testing Ground/i)).toBeTruthy();
+    expect(screen.getByText(/The Testing Grounds/i)).toBeTruthy();
   });
 
   it('renders room names defined in the seed', () => {
@@ -127,6 +145,6 @@ describe('WorldMap Component', () => {
   it('renders safely even with an empty room list', () => {
     const emptySeed = { ...mockSeed, rooms: [] };
     render(<WorldMap seed={emptySeed} state={makeState()} onClose={() => {}} />);
-    expect(screen.getByText(/USCSS Testing Ground/i)).toBeTruthy();
+    expect(screen.getByText(/The Testing Grounds/i)).toBeTruthy();
   });
 });

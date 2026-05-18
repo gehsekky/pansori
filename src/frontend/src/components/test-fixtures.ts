@@ -30,6 +30,18 @@ export function makeChar(overrides: Partial<Character> = {}): Character {
     },
     hit_die: 8,
     hit_dice_remaining: 1,
+    class_resource_uses: {},
+    asi_pending: false,
+    exhaustion_level: 0,
+    background_id: null,
+    skill_proficiencies: [],
+    tool_proficiencies: [],
+    spell_slots_max: {},
+    spell_slots_used: {},
+    spells_known: [],
+    armor_proficiencies: [],
+    weapon_proficiencies: [],
+    attuned_items: [],
     initiative_roll: null,
     ...overrides,
   };
@@ -56,15 +68,21 @@ export function makeState(
     last_choices: [],
     short_rested_rooms: [],
     long_rested: false,
+    npc_attitudes: {},
+    npc_talked: [],
+    traps_triggered: [],
+    traps_disarmed: [],
+    objects_searched: [],
     flags: {},
+    enemy_conditions: [],
     ...stateOverrides,
   };
 }
 
 export const mockSeed: Seed = {
-  context_id: 'scifi-terror',
-  world_name: 'USCSS Testing Ground',
-  ship_name: 'USCSS Testing Ground',
+  context_id: 'sandbox',
+  world_name: 'The Testing Grounds',
+  ship_name: 'The Testing Grounds',
   intro: 'Unit test intro.',
   rooms: [
     { id: 'room-1', name: 'Start Room', desc: 'Initial room.' },
@@ -76,9 +94,9 @@ export const mockSeed: Seed = {
 };
 
 export const mockCtx: FrontendContext = {
-  id: 'scifi-terror',
-  displayName: 'Sci-Fi Terror',
-  tagline: 'Survive the horror.',
+  id: 'sandbox',
+  displayName: 'Sandbox',
+  tagline: 'A development dungeon.',
   previewArt: '',
   classes: [],
   theme: {

@@ -502,16 +502,16 @@ describe('sneakAttackDice(level)', () => {
   });
 });
 
-describe('extraAttackCount(level)', () => {
+describe('extraAttackCount(cls, level)', () => {
   it.each([
     [1,  0],
     [4,  0],
     [5,  1],
     [10, 1],
     [11, 2],
-    [20, 2],
-  ])('level %i → %i extra attacks', (level, count) => {
-    expect(extraAttackCount(level)).toBe(count);
+    [20, 3],
+  ])('fighter level %i → %i extra attacks', (level, count) => {
+    expect(extraAttackCount('fighter', level)).toBe(count);
   });
 });
 

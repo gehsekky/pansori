@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { generateRoguelikeSeed } from './procgen.js';
-import { context as dungeonCtx } from '../contexts/dungeon-crawler.js';
-import { context as scifiCtx }   from '../contexts/scifi-terror.js';
+import { context as sandboxCtx } from '../contexts/sandbox.js';
 import type { Context, Seed } from '../types.js';
 
 function validateSeed(ctx: Context, seed: Seed) {
@@ -143,12 +142,7 @@ function validateSeed(ctx: Context, seed: Seed) {
   });
 }
 
-describe('generateRoguelikeSeed — dungeon-crawler', () => {
-  const seed = generateRoguelikeSeed(dungeonCtx);
-  validateSeed(dungeonCtx, seed);
-});
-
-describe('generateRoguelikeSeed — scifi-terror', () => {
-  const seed = generateRoguelikeSeed(scifiCtx);
-  validateSeed(scifiCtx, seed);
+describe('generateRoguelikeSeed — sandbox', () => {
+  const seed = generateRoguelikeSeed(sandboxCtx);
+  validateSeed(sandboxCtx, seed);
 });

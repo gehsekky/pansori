@@ -1,0 +1,522 @@
+/* ─── Base classes (formerly the S object) ──────────────────────────────── */
+
+.page {
+  min-height: 100vh;
+  background: var(--t-bg);
+  color: var(--t-primary);
+  font-family: var(--t-font);
+  padding: 1.5rem;
+}
+
+.pageCenter {
+  composes: page;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pageFlex {
+  composes: page;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.header {
+  border-bottom: 1px solid var(--t-primary);
+  padding-bottom: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.title {
+  font-size: 1.4rem;
+  letter-spacing: 0.2em;
+  margin: 0;
+  text-shadow: 0 0 8px var(--t-primary);
+}
+
+.sub {
+  font-size: 0.8rem;
+  color: var(--t-dim);
+  letter-spacing: 0.15em;
+  margin-top: 4px;
+}
+
+.card {
+  border: 1px solid var(--t-border);
+  background: var(--t-card);
+  padding: 1rem;
+  border-radius: 2px;
+  margin-bottom: 1rem;
+}
+
+.statsRow {
+  display: flex;
+  gap: 1.5rem;
+  font-size: 0.8rem;
+  flex-wrap: wrap;
+  color: var(--t-mid);
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.statLbl {
+  color: var(--t-dim);
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+}
+
+.statVal {
+  font-weight: bold;
+}
+
+.narrative {
+  font-size: 0.95rem;
+  line-height: 1.75;
+  min-height: 90px;
+  color: var(--t-primary);
+  font-style: italic;
+}
+
+.choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 1rem;
+}
+
+.choiceBtn {
+  background: transparent;
+  color: var(--t-primary);
+  border: 1px solid var(--t-border);
+  padding: 0.5rem 0.875rem;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  font-size: 0.875rem;
+  letter-spacing: 0.03em;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.sendBtn {
+  background: var(--t-dim-dark);
+  color: var(--t-primary);
+  border: 1px solid var(--t-border);
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+
+.scanTxt {
+  color: var(--t-dim);
+  font-style: italic;
+  animation: blink 1s step-end infinite;
+}
+
+.logEntry {
+  font-size: 0.8rem;
+  color: var(--t-dim);
+  border-bottom: 1px solid var(--t-separator);
+  padding: 3px 0;
+}
+
+.formLbl {
+  display: block;
+  font-size: 0.8rem;
+  letter-spacing: 0.15em;
+  color: var(--t-dim);
+  margin-bottom: 4px;
+  margin-top: 12px;
+}
+
+.formInp {
+  display: block;
+  width: 100%;
+  background: var(--t-card);
+  color: var(--t-primary);
+  border: 1px solid var(--t-border);
+  padding: 0.5rem 0.75rem;
+  font-family: inherit;
+  font-size: 0.875rem;
+  box-sizing: border-box;
+  outline: none;
+}
+
+.submit {
+  margin-top: 16px;
+  background: var(--t-dim-dark);
+  color: var(--t-primary);
+  border: 1px solid var(--t-primary);
+  padding: 0.6rem 1.5rem;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.875rem;
+  letter-spacing: 0.1em;
+  width: 100%;
+}
+
+.err {
+  color: var(--t-hp-low);
+  font-size: 0.8rem;
+  margin-top: 8px;
+}
+
+/* ─── Shared utility ────────────────────────────────────────────────────── */
+
+.ghostBtn {
+  background: transparent;
+  border: 1px solid var(--t-border);
+  color: var(--t-dim);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  padding: 0.5rem 1rem;
+}
+
+/* ─── App — game view ───────────────────────────────────────────────────── */
+
+.headerRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.charPortrait {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--t-border);
+  object-fit: cover;
+}
+
+.userInfoRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.75rem;
+  color: var(--t-dim);
+  letter-spacing: 0.1em;
+}
+
+.userAvatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  opacity: 0.7;
+}
+
+.signOutBtn {
+  background: transparent;
+  border: none;
+  color: var(--t-dim);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  padding: 0;
+}
+
+.contentRow {
+  display: flex;
+  gap: 1rem;
+  align-items: stretch;
+}
+
+.contentMain {
+  flex: 1;
+  min-width: 0;
+}
+
+.missionLogLabel {
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  color: var(--t-dim);
+  margin-bottom: 6px;
+}
+
+.abortRow {
+  margin-top: 1rem;
+  font-size: 0.75rem;
+  color: var(--t-dim);
+  display: flex;
+  gap: 1.5rem;
+}
+
+/* ─── LoginScreen ───────────────────────────────────────────────────────── */
+
+.loginInner {
+  text-align: center;
+  max-width: 360px;
+}
+
+.loginSub {
+  font-size: 0.75rem;
+  color: var(--t-dim);
+  letter-spacing: 0.15em;
+  margin-bottom: 2.5rem;
+}
+
+.googleBtn {
+  display: inline-block;
+  background: var(--t-dim-dark);
+  color: var(--t-primary);
+  border: 1px solid var(--t-primary);
+  padding: 0.65rem 1.75rem;
+  font-family: inherit;
+  font-size: 0.8rem;
+  letter-spacing: 0.12em;
+  text-decoration: none;
+}
+
+/* ─── SessionScreen ─────────────────────────────────────────────────────── */
+
+.sessionsInner {
+  width: 100%;
+  max-width: 620px;
+  margin: 4rem auto;
+}
+
+.sessionsHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 2rem;
+}
+
+.sessionsActions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.sessionList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.sessionPortrait {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--t-border);
+  flex-shrink: 0;
+}
+
+.sessionPortraitPlaceholder {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--t-separator);
+  border: 1px solid var(--t-border);
+  flex-shrink: 0;
+}
+
+/* ─── CharScreen ────────────────────────────────────────────────────────── */
+
+.charInner {
+  display: flex;
+  gap: 2rem;
+  align-items: flex-start;
+  width: 100%;
+  max-width: 900px;
+  margin: 4rem auto;
+}
+
+.charPartyCol {
+  flex: 0 0 360px;
+}
+
+.charWorldCol {
+  flex: 1;
+  min-width: 0;
+}
+
+.classDesc {
+  margin-top: 8px;
+  font-size: 0.75rem;
+  color: var(--t-dim);
+  line-height: 1.7;
+}
+
+/* ─── CharStatsCard ─────────────────────────────────────────────────────── */
+
+.mapBtn {
+  background: transparent;
+  border: 1px solid var(--t-border);
+  color: var(--t-dim);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  padding: 2px 8px;
+}
+
+.itemPopover {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  background: var(--t-card);
+  border: 1px solid var(--t-border);
+  padding: 0.3rem 0.5rem;
+  z-index: 20;
+  white-space: nowrap;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.itemPopoverMeta {
+  font-size: 0.75rem;
+  color: var(--t-dim);
+  letter-spacing: 0.1em;
+  margin-bottom: 2px;
+}
+
+/* ─── PartyPanel ────────────────────────────────────────────────────────── */
+
+.condTag {
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border: 1px solid var(--t-hp-mid);
+  color: var(--t-hp-mid);
+  letter-spacing: 0.08em;
+}
+
+/* ─── RoomArtPanel ──────────────────────────────────────────────────────── */
+
+.artPanel {
+  composes: card;
+  flex: 0 0 20%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem;
+  overflow: hidden;
+  margin-bottom: 0;
+}
+
+.artImg {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
+  image-rendering: pixelated;
+}
+
+.artAscii {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--t-mid);
+  text-shadow: 0 0 4px var(--t-border);
+  font-family: var(--t-font);
+  user-select: none;
+}
+
+/* ─── WorldMap ───────────────────────────────────────────────────────────── */
+
+.mapOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.78);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+}
+
+.mapBox {
+  background: var(--t-card);
+  border: 1px solid var(--t-border);
+  padding: 1.25rem 1.5rem;
+}
+
+.mapHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.mapTitle {
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  color: var(--t-dim);
+  margin: 0;
+}
+
+.mapCloseBtn {
+  background: transparent;
+  border: none;
+  color: var(--t-dim);
+  cursor: pointer;
+  font-size: 1rem;
+  font-family: inherit;
+  line-height: 1;
+}
+
+.mapLegend {
+  display: flex;
+  gap: 1.25rem;
+  margin-top: 1rem;
+  font-size: 0.62rem;
+  color: var(--t-dim);
+  letter-spacing: 0.08em;
+}
+
+/* ─── InitiativeStrip ───────────────────────────────────────────────────── */
+
+.initiativeStrip {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.initiativeLabel {
+  font-size: 0.7rem;
+  color: var(--t-dim);
+  letter-spacing: 0.12em;
+  margin-right: 4px;
+}
+
+/* ─── InventoryTooltip ──────────────────────────────────────────────────── */
+
+.tooltipWrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.tooltip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--t-card);
+  border: 1px solid var(--t-border);
+  color: var(--t-mid);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  letter-spacing: 0.03em;
+  padding: 0.3rem 0.5rem;
+  white-space: nowrap;
+  z-index: 10;
+  pointer-events: none;
+}

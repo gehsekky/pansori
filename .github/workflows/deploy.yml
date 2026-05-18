@@ -1,0 +1,112 @@
+name: CI / Deploy
+
+on:
+  push:
+    branches: [main]
+
+env:
+  AWS_REGION: us-east-1           # TODO: set your AWS region
+  ECR_REGISTRY: TODO_ECR_REGISTRY # TODO: set your ECR registry URL (e.g. 123456789.dkr.ecr.us-east-1.amazonaws.com)
+  EC2_HOST: TODO_EC2_HOST         # TODO: set your EC2 public IP or domain
+  EC2_USER: ec2-user              # TODO: adjust if using ubuntu (ubuntu) or Amazon Linux (ec2-user)
+
+jobs:
+  test:
+    name: Run tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm test --workspace=src/backend
+
+  build-and-deploy:
+    name: Build → ECR → Deploy
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region:            ${{ env.AWS_REGION }}
+
+      - name: Log in to ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set image tag
+        run: echo "IMAGE_TAG=${GITHUB_SHA::8}" >> $GITHUB_ENV
+
+      - name: Set up QEMU (arm64 emulation)
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build & push backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./src/backend
+          file: ./src/backend/Dockerfile
+          platforms: linux/arm64
+          push: true
+          tags: ${{ env.ECR_REGISTRY }}/pansori-backend:${{ env.IMAGE_TAG }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build & push frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./src/frontend
+          file: ./src/frontend/Dockerfile
+          platforms: linux/arm64
+          push: true
+          tags: ${{ env.ECR_REGISTRY }}/pansori-frontend:${{ env.IMAGE_TAG }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1
+        with:
+          host:     ${{ env.EC2_HOST }}
+          username: ${{ env.EC2_USER }}
+          key:      ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e
+            export ECR_REGISTRY=${{ env.ECR_REGISTRY }}
+            export IMAGE_TAG=${{ env.IMAGE_TAG }}
+            export AWS_REGION=${{ env.AWS_REGION }}
+
+            # Pull latest images from ECR
+            aws ecr get-login-password --region $AWS_REGION \
+              | docker login --username AWS --password-stdin $ECR_REGISTRY
+
+            # Run DB migration before swapping containers
+            docker run --rm \
+              -e DATABASE_URL="$DATABASE_URL" \
+              $ECR_REGISTRY/pansori-backend:$IMAGE_TAG \
+              sh -c "cd /app && node -e \"
+                import('./dist/db/pool.js').then(async ({pool}) => {
+                  const fs = await import('fs/promises');
+                  const sql = await fs.readFile('infra/db/schema.sql','utf8');
+                  await pool.query(sql);
+                  await pool.end();
+                  console.log('Migration done');
+                });
+              \""
+
+            # Roll to new containers
+            docker compose -f /opt/pansori/docker-compose.prod.yml pull
+            docker compose -f /opt/pansori/docker-compose.prod.yml up -d --remove-orphans
+
+            # Clean up old images
+            docker image prune -f

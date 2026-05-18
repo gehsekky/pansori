@@ -1,4 +1,4 @@
-import type { LootItem, TurnActions, DeathSaves } from '../types.js';
+import type { LootItem, TurnActions, DeathSaves, Spell } from '../types.js';
 
 // ─── Dice ─────────────────────────────────────────────────────────────────────
 
@@ -47,7 +47,23 @@ export const FRESH_TURN: TurnActions = {
   bonus_action_used:     false,
   reaction_used:         false,
   free_interaction_used: false,
+  dodging:               false,
+  disengaged:            false,
 };
+
+// ─── Damage type multipliers ──────────────────────────────────────────────────
+
+export function applyDamageMultiplier(
+  raw: number,
+  damageType: string | undefined,
+  enemy: { resistances?: string[]; vulnerabilities?: string[]; immunities?: string[] },
+): { damage: number; note: string } {
+  if (!damageType) return { damage: raw, note: '' };
+  if (enemy.immunities?.includes(damageType))       return { damage: 0,                    note: ` [immune to ${damageType}]` };
+  if (enemy.vulnerabilities?.includes(damageType))  return { damage: raw * 2,              note: ` [vulnerable to ${damageType}: ×2]` };
+  if (enemy.resistances?.includes(damageType))      return { damage: Math.floor(raw / 2),  note: ` [resistant to ${damageType}: ×½]` };
+  return { damage: raw, note: '' };
+}
 
 // ─── Attack resolution ────────────────────────────────────────────────────────
 
@@ -71,12 +87,14 @@ interface AttackResult {
 
 // Player attacks an enemy. Finesse weapons use whichever of STR/DEX is higher.
 // Advantage and disadvantage both present → they cancel out (5e PHB p.173).
-export function resolvePlayerAttack(player: PlayerStats, weaponDamage: string | null, targetAC: number, finesse = false, disadvantage = false, advantage = false): AttackResult {
+// weaponProficient=false omits proficiency bonus (PHB p.147: no profBonus without proficiency).
+// ranged=true forces DEX for attack and damage (overrides finesse logic).
+export function resolvePlayerAttack(player: PlayerStats, weaponDamage: string | null, targetAC: number, finesse = false, disadvantage = false, advantage = false, weaponProficient = true, ranged = false): AttackResult {
   const strMod  = abilityMod(player.str);
   const dexMod  = abilityMod(player.dex);
-  const atkMod  = finesse ? Math.max(strMod, dexMod) : strMod;
-  const atkStat = (finesse && dexMod > strMod) ? 'DEX' : 'STR';
-  const prof    = profBonus(player.level);
+  const atkMod  = ranged ? dexMod : (finesse ? Math.max(strMod, dexMod) : strMod);
+  const atkStat: 'STR' | 'DEX' = ranged ? 'DEX' : ((finesse && dexMod > strMod) ? 'DEX' : 'STR');
+  const prof    = weaponProficient ? profBonus(player.level) : 0;
   const roll1   = d(20);
   // Advantage + disadvantage cancel; net advantage rolls 2d20 keep higher; net disadv keeps lower
   const netAdv  = advantage && !disadvantage;
@@ -87,6 +105,33 @@ export function resolvePlayerAttack(player: PlayerStats, weaponDamage: string | 
   if (roll === 1)  return { hit: false, fumble: true,  critical: false, roll, total, damage: 0, atkMod, atkStat, prof };
   if (roll === 20) return { hit: true,  fumble: false, critical: true,  roll, total, damage: Math.max(1, rollCritical(weaponDamage) + atkMod), atkMod, atkStat, prof };
   if (total >= targetAC) return { hit: true, fumble: false, critical: false, roll, total, damage: Math.max(1, rollDice(weaponDamage) + atkMod), atkMod, atkStat, prof };
+  return { hit: false, fumble: false, critical: false, roll, total, damage: 0, atkMod, atkStat, prof };
+}
+
+// Two-weapon fighting: off-hand attack gets no ability modifier to damage (PHB p.195)
+export function resolveOffHandAttack(player: PlayerStats, weaponDamage: string | null, targetAC: number, finesse = false, disadvantage = false, advantage = false, weaponProficient = true, ranged = false): AttackResult {
+  const strMod  = abilityMod(player.str);
+  const dexMod  = abilityMod(player.dex);
+  const atkMod  = ranged ? dexMod : (finesse ? Math.max(strMod, dexMod) : strMod);
+  const atkStat: 'STR' | 'DEX' = ranged ? 'DEX' : ((finesse && dexMod > strMod) ? 'DEX' : 'STR');
+  const prof    = weaponProficient ? profBonus(player.level) : 0;
+  const roll1   = d(20);
+  const netAdv    = advantage && !disadvantage;
+  const netDisadv = disadvantage && !advantage;
+  const roll    = netDisadv ? Math.min(roll1, d(20)) : netAdv ? Math.max(roll1, d(20)) : roll1;
+  const total   = roll + atkMod + prof;
+  // Off-hand damage: NO ability modifier added (PHB p.195)
+  if (roll === 1)  return { hit: false, fumble: true,  critical: false, roll, total, damage: 0, atkMod, atkStat, prof };
+  if (roll === 20) {
+    // Critical: double dice, still no atkMod to damage
+    const m = weaponDamage?.match(/(\d+)d(\d+)/);
+    const critDmg = m ? (parseInt(m[1]) * 2 * Math.ceil(parseInt(m[2]) / 2)) : 1; // simplified crit
+    return { hit: true, fumble: false, critical: true, roll, total, damage: Math.max(1, critDmg), atkMod, atkStat, prof };
+  }
+  if (total >= targetAC) {
+    const baseDmg = rollDice(weaponDamage); // NO +atkMod
+    return { hit: true, fumble: false, critical: false, roll, total, damage: Math.max(1, baseDmg), atkMod, atkStat, prof };
+  }
   return { hit: false, fumble: false, critical: false, roll, total, damage: 0, atkMod, atkStat, prof };
 }
 
@@ -129,21 +174,57 @@ export function canDonShield(combatActive: boolean) {
 
 // Don/doff times per 5e PHB: light 1 min, medium 5 min, heavy 10 min.
 // None of these can be done in combat.
-const ARMOR_CATEGORY: Record<string, string> = {
-  leather_armor:    'light',
-  hazmat_suit:      'light',
-  plate_armor:      'heavy',
-  force_field_belt: 'light',
-};
 const DON_TIME: Record<string, string> = { light: '1 minute', medium: '5 minutes', heavy: '10 minutes' };
 
-export function canDonArmor(combatActive: boolean, armorId: string) {
+export function canDonArmor(combatActive: boolean, armorCategory: string) {
   if (!combatActive) return { allowed: true } as const;
-  const cat = ARMOR_CATEGORY[armorId] ?? 'light';
+  const cat = armorCategory || 'light';
   return {
     allowed: false,
-    reason: `Donning ${cat} armour takes ${DON_TIME[cat]} — impossible mid-combat.`,
+    reason: `Donning ${cat} armour takes ${DON_TIME[cat] ?? '1 minute'} — impossible mid-combat.`,
   } as const;
+}
+
+// 5e PHB p.144: non-proficient armor → disadvantage on STR/DEX checks and attack rolls, cannot cast spells
+export function hasArmorProficiency(armorProficiencies: string[], armorCategory: string | undefined): boolean {
+  if (!armorCategory) return true;
+  return armorProficiencies.includes(armorCategory);
+}
+
+// 5e PHB p.147: non-proficient weapon → no proficiency bonus added to attack rolls
+export function hasWeaponProficiency(weaponProficiencies: string[], weaponType: string | undefined): boolean {
+  if (!weaponType) return true;
+  return weaponProficiencies.includes(weaponType);
+}
+
+// Compute AC from scratch given all equipped items.
+// Light armor: armorAcBase + full DEX mod
+// Medium armor: armorAcBase + min(DEX mod, 2) [dexCapToAc=2]
+// Heavy armor: armorAcBase only [dexCapToAc=0]
+// Shield: adds ac_bonus flat
+// Unarmored: 10 + DEX mod
+export function computeTotalAc(
+  dex: number,
+  equippedArmorInstanceId: string | null | undefined,
+  equippedShieldInstanceId: string | null | undefined,
+  inventory: Array<{ instance_id: string; id: string; [key: string]: unknown }>,
+  lootTable: LootItem[],
+): number {
+  const dexMod  = abilityMod(dex);
+  const armorId  = equippedArmorInstanceId  ? inventory.find(i => i.instance_id === equippedArmorInstanceId)?.id  : null;
+  const shieldId = equippedShieldInstanceId ? inventory.find(i => i.instance_id === equippedShieldInstanceId)?.id : null;
+  const armor  = armorId  ? lootTable.find(l => l.id === armorId)  : null;
+  const shield = shieldId ? lootTable.find(l => l.id === shieldId) : null;
+
+  let ac: number;
+  if (armor?.armorAcBase !== undefined) {
+    const cap = armor.dexCapToAc ?? Infinity;
+    ac = armor.armorAcBase + Math.min(dexMod, cap);
+  } else {
+    ac = 10 + dexMod; // unarmored
+  }
+  if (shield?.ac_bonus) ac += shield.ac_bonus;
+  return ac;
 }
 
 // Compute the new AC after swapping armor, given the loot table.
@@ -204,12 +285,51 @@ export function passivePerceptionDC(enemyWisdom: number): number {
   return 10 + abilityMod(enemyWisdom);
 }
 
+// Passive Perception score for trap detection: 10 + WIS mod + prof if proficient in Perception
+// 5e DMG ch.5: compare passive score to trap DC; meet/exceed = spotted before triggering
+export function passivePerception(
+  wisdom: number,
+  level: number,
+  perceptionProficient: boolean,
+): number {
+  return 10 + abilityMod(wisdom) + (perceptionProficient ? profBonus(level) : 0);
+}
+
+// Disarm trap: DEX check + profBonus if character has Thieves' Tools or Hacking Tools proficiency
+export function disarmTrap(
+  dexterity: number,
+  level: number,
+  toolProficient: boolean,
+): { roll: number; total: number; success: boolean } {
+  const roll  = d(20);
+  const total = roll + abilityMod(dexterity) + (toolProficient ? profBonus(level) : 0);
+  return { roll, total, success: false }; // dc compared at call site
+}
+
 // ─── Skill checks ─────────────────────────────────────────────────────────────
 
-// proficient = whether the character has proficiency in this skill
-export function skillCheck(abilityScore: number, dc: number, proficient = false, level = 1) {
-  const roll  = d(20);
-  const total = roll + abilityMod(abilityScore) + (proficient ? profBonus(level) : 0);
+// proficient = whether the character has proficiency in this skill.
+// expertise = double proficiency bonus (Rogue/Bard Expertise).
+// jackOfAllTrades = add half prof when not proficient (Bard L2+).
+export function skillCheck(
+  abilityScore:    number,
+  dc:              number,
+  proficient      = false,
+  level           = 1,
+  disadvantage    = false,
+  expertise       = false,
+  jackOfAllTrades = false,
+  advantage       = false,
+) {
+  const roll1 = d(20);
+  const netAdv   = advantage && !disadvantage;
+  const netDisadv = disadvantage && !advantage;
+  const roll = netDisadv ? Math.min(roll1, d(20)) : netAdv ? Math.max(roll1, d(20)) : roll1;
+  const prof = profBonus(level);
+  let profContrib = 0;
+  if (proficient) profContrib = expertise ? prof * 2 : prof;
+  else if (jackOfAllTrades) profContrib = Math.floor(prof / 2);
+  const total = roll + abilityMod(abilityScore) + profContrib;
   return { roll, total, success: total >= dc };
 }
 
@@ -222,11 +342,19 @@ export function sneakAttackDice(level: number): string {
   return `${Math.ceil(level / 2)}d6`;
 }
 
-// Extra Attack (Fighter/Warrior PHB p.72): additional attacks per Attack action
+// Extra Attack — additional attacks per Attack action.
+// Fighter: 2 at L5, 3 at L11, 4 at L20. Ranger/Paladin/Barbarian: 2 at L5 only.
 // Returns number of EXTRA attacks (0 = 1 total, 1 = 2 total, 2 = 3 total)
-export function extraAttackCount(level: number): number {
-  if (level >= 11) return 2; // 3 attacks total (Fighter level 11)
-  if (level >= 5)  return 1; // 2 attacks total (Fighter level 5)
+export function extraAttackCount(cls: string, level: number): number {
+  if (cls === 'fighter') {
+    if (level >= 20) return 3; // 4 attacks total
+    if (level >= 11) return 2; // 3 attacks total
+    if (level >= 5)  return 1; // 2 attacks total
+    return 0;
+  }
+  if (['ranger', 'paladin', 'barbarian', 'monk'].includes(cls)) {
+    return level >= 5 ? 1 : 0;
+  }
   return 0;
 }
 
@@ -244,6 +372,98 @@ export function rageUsesMax(level: number): number {
   if (level >= 10) return 4;
   if (level >= 6)  return 3;
   return 2; // levels 1–5
+}
+
+// ─── Dice manipulation ────────────────────────────────────────────────────────
+
+// Multiply a dice expression by a count: multiplyDice('1d6', 3) → '3d6'
+export function multiplyDice(expr: string, count: number): string {
+  if (count <= 0 || !expr) return '0';
+  const m = expr.match(/^(\d+)d(\d+)((?:[+-]\d+)?)$/);
+  if (!m) return expr;
+  const newCount = parseInt(m[1], 10) * count;
+  return `${newCount}d${m[2]}${m[3]}`;
+}
+
+// Add two same-die expressions: addDice('2d6', '1d6') → '3d6'.
+// If die sizes differ, falls back to rolling both and summing (no simplification).
+export function addDice(base: string, extra: string): string {
+  if (!extra || extra === '0') return base;
+  const mb = base.match(/^(\d+)d(\d+)((?:[+-]\d+)?)$/);
+  const me = extra.match(/^(\d+)d(\d+)((?:[+-]\d+)?)$/);
+  if (mb && me && mb[2] === me[2] && !mb[3] && !me[3]) {
+    return `${parseInt(mb[1], 10) + parseInt(me[1], 10)}d${mb[2]}`;
+  }
+  // Different die sizes — just concatenate; rollDice handles '+' chains too loosely,
+  // so we return a compound expression and let the caller handle it.
+  return `${base}+${extra}`;
+}
+
+// ─── Spell damage scaling ─────────────────────────────────────────────────────
+
+// Returns effective damage dice for an upcasted spell.
+export function upcastDamage(spell: Spell, slotLevel: number): string {
+  const extraLevels = Math.max(0, slotLevel - (spell.level ?? 1));
+  if (!spell.upcastBonus || extraLevels === 0) return spell.damage ?? '0';
+  return addDice(spell.damage ?? '0', multiplyDice(spell.upcastBonus, extraLevels));
+}
+
+// Returns cantrip damage dice scaled by character level (PHB cantrip progression).
+export function cantripDamageDice(spell: Spell, charLevel: number): string {
+  const bonus = charLevel >= 17 ? 3 : charLevel >= 11 ? 2 : charLevel >= 5 ? 1 : 0;
+  if (bonus === 0 || !spell.upcastBonus) return spell.damage ?? '0';
+  return addDice(spell.damage ?? '0', multiplyDice(spell.upcastBonus, bonus));
+}
+
+// ─── Spell slot tables (PHB) ─────────────────────────────────────────────────
+
+// Returns max slots per spell level for a given class and character level.
+// Full casters: Wizard, Cleric, Druid, Bard, Sorcerer.
+// Half casters (÷2 effective level): Ranger, Paladin.
+// Pact Magic (Warlock): separate table, all slots are the same level.
+// Returns a Record<spellLevel, maxSlots> — only present levels have entries.
+export function spellSlotsForClassLevel(cls: string, level: number): Record<number, number> {
+  const fullCasters = ['wizard', 'cleric', 'druid', 'bard', 'sorcerer'];
+  const halfCasters = ['ranger', 'paladin'];
+
+  if (cls === 'warlock') {
+    // Pact Magic: all slots are the same level, recharge on short rest
+    const pactSlots: Record<number, Record<number, number>> = {
+      1:  { 1: 1 }, 2:  { 1: 2 }, 3:  { 2: 2 }, 4:  { 2: 2 }, 5:  { 3: 2 },
+      6:  { 3: 2 }, 7:  { 4: 2 }, 8:  { 4: 2 }, 9:  { 5: 2 }, 10: { 5: 2 },
+      11: { 5: 3 }, 12: { 5: 3 }, 13: { 5: 3 }, 14: { 5: 3 }, 15: { 5: 3 },
+      16: { 5: 3 }, 17: { 5: 4 }, 18: { 5: 4 }, 19: { 5: 4 }, 20: { 5: 4 },
+    };
+    return pactSlots[level] ?? {};
+  }
+
+  // PHB multiclassing spell slot table (full casters; half casters use ⌊level/2⌋)
+  const effectiveLevel = halfCasters.includes(cls) ? Math.floor(level / 2) : level;
+  if (!fullCasters.includes(cls) && !halfCasters.includes(cls)) return {};
+
+  const table: Record<number, Record<number, number>> = {
+    1:  { 1: 2 },
+    2:  { 1: 3 },
+    3:  { 1: 4, 2: 2 },
+    4:  { 1: 4, 2: 3 },
+    5:  { 1: 4, 2: 3, 3: 2 },
+    6:  { 1: 4, 2: 3, 3: 3 },
+    7:  { 1: 4, 2: 3, 3: 3, 4: 1 },
+    8:  { 1: 4, 2: 3, 3: 3, 4: 2 },
+    9:  { 1: 4, 2: 3, 3: 3, 4: 3, 5: 1 },
+    10: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 2 },
+    11: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 2, 6: 1 },
+    12: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 2, 6: 1 },
+    13: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 2, 6: 1, 7: 1 },
+    14: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 2, 6: 1, 7: 1 },
+    15: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 2, 6: 1, 7: 1, 8: 1 },
+    16: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 2, 6: 1, 7: 1, 8: 1 },
+    17: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 2, 6: 1, 7: 1, 8: 1, 9: 1 },
+    18: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 3, 6: 1, 7: 1, 8: 1, 9: 1 },
+    19: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 3, 6: 2, 7: 1, 8: 1, 9: 1 },
+    20: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 3, 6: 2, 7: 2, 8: 1, 9: 1 },
+  };
+  return table[Math.min(effectiveLevel, 20)] ?? {};
 }
 
 // ─── Spell helpers ────────────────────────────────────────────────────────────

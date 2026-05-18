@@ -3,9 +3,10 @@ import { randomUUID } from 'crypto';
 import { pool } from '../db/pool.js';
 import { generateSeed } from '../services/procgen.js';
 import { takeAction, generateChoices, buildArrivalNarrative, normalizeState } from '../services/gameEngine.js';
-import { FRESH_TURN, canEquipWeapon, canDonArmor, canDonShield, computeAcAfterArmorChange } from '../services/rulesEngine.js';
+import { FRESH_TURN, canEquipWeapon, canDonArmor, canDonShield, computeAcAfterArmorChange, computeTotalAc, hasArmorProficiency, hasWeaponProficiency } from '../services/rulesEngine.js';
 import { loadContexts } from '../services/contextLoader.js';
-import type { GameState, Character, Context, StructuredAction } from '../types.js';
+import { loadCampaignState, saveCampaignState, mergeCampaignIntoGameState, extractCampaignDelta, evaluateQuestSteps, applyQuestCompletions } from '../services/campaignEngine.js';
+import type { GameState, Character, Context, StructuredAction, CampaignFacts } from '../types.js';
 
 // Contexts are loaded once at startup by scanning the contexts/ directory.
 // Adding a new campaign only requires dropping a .ts file there.
@@ -21,6 +22,13 @@ gameRouter.get('/contexts', (_req, res) => {
     displayName: c.worldNoun,
     mapType:     c.mapType,
     classes:     Object.keys(c.classPrimaryStats),
+    backgrounds: (c.backgrounds ?? []).map(b => ({
+      id: b.id, name: b.name, desc: b.desc,
+      skillProficiencies: b.skillProficiencies,
+      toolProficiency:    b.toolProficiency ?? null,
+      feature:     b.feature,
+      featureDesc: b.featureDesc,
+    })),
   }));
   res.json(list);
 });
@@ -91,6 +99,7 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
     characters?: Array<{
       name: string;
       character_class: string;
+      background_id?: string;
       stats?: { str: number; dex: number; con: number; int: number; wis: number; cha: number };
       portrait_url?: string;
     }>;
@@ -108,25 +117,53 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
   try {
     await client.query('BEGIN');
 
-    const partyChars: Character[] = characters.map(c => {
+    const partyChars: Character[] = characters.map((c, charIdx) => {
       const base = c.stats
         ? { str: c.stats.str, dex: c.stats.dex, con: c.stats.con, int: c.stats.int, wis: c.stats.wis, cha: c.stats.cha }
         : { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 };
+      const bg               = ctx.backgrounds?.find(b => b.id === c.background_id) ?? null;
+      const classSkills      = ctx.classSkills?.[c.character_class] ?? [];
+      const skillProfs       = Array.from(new Set([...classSkills, ...(bg?.skillProficiencies ?? [])]));
+      const toolProfs        = bg?.toolProficiency ? [bg.toolProficiency] : [];
+      const armorProfs       = ctx.classArmorProficiencies?.[c.character_class] ?? [];
+      const weaponProfs      = ctx.classWeaponProficiencies?.[c.character_class] ?? [];
+
+      const hitDie = ctx.classHitDie[c.character_class] ?? 8;
+      const conMod = Math.floor(((base.con ?? 10) - 10) / 2);
+      const maxHp  = Math.max(1, hitDie + conMod); // PHB: max hit die + CON mod at level 1
+
+      // Build starting inventory from classStartingLoot or campaign.startingLoot
+      const startingIds = ctx.classStartingLoot?.[c.character_class] ?? ctx.campaign?.startingLoot ?? [];
+      const startingInventory = startingIds
+        .map(id => {
+          const item = ctx.lootTable.find(l => l.id === id);
+          return item ? { ...item, instance_id: randomUUID() } : null;
+        })
+        .filter((i): i is NonNullable<typeof i> => i !== null);
+
+      // Auto-equip: first weapon-slot item, first armor-slot item, first shield-slot item
+      const firstWeapon = startingInventory.find(i => ctx.lootTable.find(l => l.id === i.id)?.slot === 'weapon');
+      const firstArmor  = startingInventory.find(i => ctx.lootTable.find(l => l.id === i.id)?.slot === 'armor');
+      const firstShield = startingInventory.find(i => ctx.lootTable.find(l => l.id === i.id)?.slot === 'shield');
+
+      const equippedWeapon = firstWeapon?.instance_id ?? null;
+      const equippedArmor  = firstArmor?.instance_id  ?? null;
+      const equippedShield = firstShield?.instance_id ?? null;
+
+      const initialAc = computeTotalAc(base.dex ?? 10, equippedArmor, equippedShield, startingInventory, ctx.lootTable);
+
       return {
         id:              randomUUID(),
         name:            c.name,
         character_class: c.character_class,
         portrait_url:    c.portrait_url ?? null,
-        hp: 20, max_hp: 20, ac: 10,
+        hp: maxHp, max_hp: maxHp, ac: initialAc,
         ...base,
         xp: 0, level: 1, gold: 5,
-        inventory: (ctx.campaign?.startingLoot ?? []).map(id => {
-          const item = ctx.lootTable.find(l => l.id === id);
-          return item ? { ...item, instance_id: randomUUID() } : null;
-        }).filter((i): i is NonNullable<typeof i> => i !== null),
-        equipped_weapon: null,
-        equipped_armor:  null,
-        equipped_shield: null,
+        inventory:       startingInventory,
+        equipped_weapon: equippedWeapon,
+        equipped_armor:  equippedArmor,
+        equipped_shield: equippedShield,
         conditions:          [],
         condition_durations: {},
         death_saves:         { successes: 0, failures: 0 },
@@ -139,9 +176,15 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
         class_resource_uses: {},
         asi_pending:         false,
         exhaustion_level:    0,
-        spell_slots_max:     ctx.classSpellSlots?.[c.character_class]?.[0] ?? {},
-        spell_slots_used:    {},
-        spells_known:        ctx.classSpells?.[c.character_class] ?? [],
+        background_id:        bg?.id ?? null,
+        skill_proficiencies:  skillProfs,
+        tool_proficiencies:   toolProfs,
+        spell_slots_max:      ctx.classSpellSlots?.[c.character_class]?.[0] ?? {},
+        spell_slots_used:     {},
+        spells_known:         ctx.classSpells?.[c.character_class] ?? [],
+        armor_proficiencies:  armorProfs,
+        weapon_proficiencies: weaponProfs,
+        attuned_items:        [],
       };
     });
 
@@ -162,7 +205,13 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
       last_choices:        [],
       short_rested_rooms:  [],
       long_rested:         false,
+      traps_triggered:     [],
+      traps_disarmed:      [],
+      objects_searched:    [],
       flags:               {},
+      npc_attitudes:       {},
+      npc_talked:          [],
+      enemy_conditions:    [],
     };
 
     const startNarrative = seed.intro + ' ' + buildArrivalNarrative(ctx.startRoomId, initialState, seed, ctx);
@@ -211,6 +260,7 @@ gameRouter.post('/session/:id/equip', async (req: Request, res: Response) => {
     if (charIdx < 0) { res.status(400).json({ error: 'Character not found in session' }); return; }
 
     let char         = { ...state.characters[charIdx] };
+    char = { ...char, attuned_items: char.attuned_items ?? [] };
     const combatActive = state.combat_active ?? false;
     const turnActions  = char.turn_actions  ?? { ...FRESH_TURN };
 
@@ -218,6 +268,12 @@ gameRouter.post('/session/:id/equip', async (req: Request, res: Response) => {
     const loot          = inventoryItem ? ctx.lootTable.find(l => l.id === inventoryItem.id) : undefined;
     if (!loot || !inventoryItem) { res.status(400).json({ error: 'Unknown item' }); return; }
     const iid           = item_id!;
+
+    // Attunement check: magic items that require attunement cannot be equipped until attuned
+    if (loot.requiresAttunement && !(char.attuned_items ?? []).includes(iid)) {
+      res.status(400).json({ error: 'This item requires attunement. Attune to it first (out of combat).' });
+      return;
+    };
     const resolveTypeId = (instanceId: string | null) =>
       char.inventory.find(i => i.instance_id === instanceId)?.id ?? null;
 
@@ -225,14 +281,14 @@ gameRouter.post('/session/:id/equip', async (req: Request, res: Response) => {
       const check = canDonShield(combatActive);
       if (!check.allowed) { res.status(409).json({ error: check.reason }); return; }
       const toggling = char.equipped_shield === iid;
-      char.ac              = computeAcAfterArmorChange(char.ac, toggling ? loot.id : resolveTypeId(char.equipped_shield), toggling ? null : loot.id, ctx.lootTable);
       char.equipped_shield = toggling ? null : iid;
+      char.ac = computeTotalAc(char.dex, char.equipped_armor, char.equipped_shield, char.inventory, ctx.lootTable);
     } else if (loot.slot === 'armor') {
       const toggling = char.equipped_armor === iid;
-      const check    = canDonArmor(combatActive, loot.id);
+      const check    = canDonArmor(combatActive, loot.armorCategory ?? 'light');
       if (!check.allowed) { res.status(409).json({ error: check.reason }); return; }
-      char.ac            = computeAcAfterArmorChange(char.ac, toggling ? loot.id : resolveTypeId(char.equipped_armor), toggling ? null : loot.id, ctx.lootTable);
       char.equipped_armor = toggling ? null : iid;
+      char.ac = computeTotalAc(char.dex, char.equipped_armor, char.equipped_shield, char.inventory, ctx.lootTable);
     } else if (loot.damage) {
       const toggling = char.equipped_weapon === iid;
       const check    = canEquipWeapon(combatActive, turnActions);
@@ -274,11 +330,58 @@ gameRouter.post('/session/:id/action', async (req: Request, res: Response) => {
     if (row.status === 'dead')    { res.status(410).json({ error: 'Hero deceased.' }); return; }
     if (row.status === 'escaped') { res.status(410).json({ error: 'Mission already complete.' }); return; }
 
-    const ctx    = CONTEXTS[row.seed.context_id] ?? DEFAULT_CONTEXT;
-    const state  = normalizeState(row.state, { character_name: row.character_name, portrait_url: row.portrait_url });
+    const ctx   = CONTEXTS[row.seed.context_id] ?? DEFAULT_CONTEXT;
+    let   state = normalizeState(row.state, { character_name: row.character_name, portrait_url: row.portrait_url });
+
+    // For campaign sessions, load and merge persisted campaign state
+    let campaignState = null;
+    if (ctx.mapType === 'campaign' && ctx.campaign) {
+      campaignState = await loadCampaignState(pool, req.user!.id, ctx.id);
+      state = mergeCampaignIntoGameState(state, campaignState);
+    }
+
     const result = await takeAction({
       action, history: history ?? [], state, seed: row.seed, context: ctx
     });
+
+    // For campaign sessions, evaluate quest steps and save campaign state
+    if (ctx.mapType === 'campaign' && ctx.campaign && campaignState) {
+      const activeChar = result.newState.characters.find(c => c.id === result.newState.active_character_id)
+        ?? result.newState.characters[0];
+      const facts: CampaignFacts = {
+        action:          action.type,
+        room_id:         result.newState.current_room,
+        location_id:     result.newState.current_location_id ?? '',
+        enemies_killed:  result.newState.enemies_killed,
+        loot_taken:      result.newState.loot_taken,
+        flags:           result.newState.flags,
+        campaign_flags:  result.newState.campaign_flags ?? {},
+        quest_progress:  result.newState.quest_progress ?? [],
+        faction_rep:     result.newState.faction_rep ?? {},
+        world_day:       result.newState.world_day ?? 1,
+        active_level:    activeChar?.level ?? 1,
+        active_class:    activeChar?.character_class ?? '',
+      };
+      const completions = await evaluateQuestSteps(campaignState, ctx.campaign.quests ?? [], facts);
+      if (completions.length) {
+        const { cs: updatedCs, completedQuestIds } = applyQuestCompletions(
+          campaignState, ctx.campaign.quests ?? [], completions,
+        );
+        campaignState = updatedCs;
+        // Reflect completed quests back into the result state
+        result.newState = {
+          ...result.newState,
+          quest_progress: updatedCs.quests,
+          faction_rep:    updatedCs.faction_rep,
+        };
+        if (completedQuestIds.length) {
+          result.narrative = (result.narrative ?? '') +
+            ` [Quest${completedQuestIds.length > 1 ? 's' : ''} completed: ${completedQuestIds.join(', ')}]`;
+        }
+      }
+      const updatedCs = extractCampaignDelta(campaignState, result.newState);
+      await saveCampaignState(pool, updatedCs);
+    }
 
     const newStatus = result.dead ? 'dead' : result.escaped ? 'escaped' : row.status;
     await pool.query(

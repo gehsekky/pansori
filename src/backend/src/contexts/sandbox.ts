@@ -1,0 +1,432 @@
+import type { Context } from '../types.js';
+
+export const context: Context = {
+  id:               'sandbox',
+  worldNoun:        'dungeon',
+  mapType:          'roguelike',
+  gridEnabled:      true,
+  gridWidth:        8,
+  gridHeight:       8,
+  startRoomId:      'entry_hall',
+  escapeRoomId:     'exit_gate',
+  escapeTriggers:   ['escape', 'leave', 'exit', 'open the gate', 'go through the gate'],
+  escapeChoiceText: 'Force open the gate — ESCAPE THE DUNGEON',
+
+  worldNames: [
+    'The Testing Grounds', 'Chamber of Mechanics', 'The Rules Dungeon',
+    'Vault of Combat', 'The Iron Gauntlet',
+  ],
+
+  // ─── Classes ──────────────────────────────────────────────────────────────────
+  classPrimaryStats: {
+    Fighter: 'str',
+    Rogue:   'dex',
+    Wizard:  'int',
+    Cleric:  'wis',
+    Ranger:  'dex',
+  },
+
+  classHitDie: {
+    Fighter: 10,
+    Rogue:    8,
+    Wizard:   6,
+    Cleric:   8,
+    Ranger:  10,
+  },
+
+  classSkills: {
+    Fighter: ['athletics', 'intimidation'],
+    Rogue:   ['stealth', 'sleight_of_hand', 'deception', 'perception'],
+    Wizard:  ['arcana', 'investigation', 'history'],
+    Cleric:  ['medicine', 'religion', 'insight'],
+    Ranger:  ['perception', 'stealth', 'nature', 'survival'],
+  },
+
+  classArmorProficiencies: {
+    Fighter: ['light', 'medium', 'heavy', 'shield'],
+    Rogue:   ['light'],
+    Wizard:  [],
+    Cleric:  ['light', 'medium', 'shield'],
+    Ranger:  ['light', 'medium', 'shield'],
+  },
+
+  classWeaponProficiencies: {
+    Fighter: ['simple', 'martial'],
+    Rogue:   ['simple', 'martial'],
+    Wizard:  ['simple'],
+    Cleric:  ['simple'],
+    Ranger:  ['simple', 'martial'],
+  },
+
+  classSavingThrows: {
+    Fighter: ['str', 'con'],
+    Rogue:   ['dex', 'int'],
+    Wizard:  ['int', 'wis'],
+    Cleric:  ['wis', 'cha'],
+    Ranger:  ['str', 'dex'],
+  },
+
+  classFeatures: {
+    Fighter: ['extra_attack'],
+    Rogue:   ['sneak_attack'],
+    Wizard:  [],
+    Cleric:  [],
+    Ranger:  ['extra_attack'],
+  },
+
+  // Per-class starting gear — auto-equipped at session start
+  classStartingLoot: {
+    Fighter: ['longsword', 'chain_mail', 'shield'],
+    Rogue:   ['shortsword', 'dagger', 'leather_armor'],
+    Wizard:  ['quarterstaff', 'healing_potion'],
+    Cleric:  ['mace', 'chain_shirt', 'shield'],
+    Ranger:  ['longbow', 'shortsword', 'studded_leather'],
+  },
+
+  // ─── Backgrounds ──────────────────────────────────────────────────────────────
+  backgrounds: [
+    {
+      id:   'soldier',
+      name: 'Soldier',
+      desc: 'You have served in an organized military force.',
+      skillProficiencies: ['athletics', 'intimidation'],
+      feature:     'Military Rank',
+      featureDesc: 'Soldiers and veterans recognize your authority.',
+    },
+    {
+      id:   'criminal',
+      name: 'Criminal',
+      desc: 'You have a history of breaking the law.',
+      skillProficiencies: ['stealth', 'deception'],
+      toolProficiency: "Thieves' Tools",
+      feature:     'Criminal Contact',
+      featureDesc: "You have a contact who can help you find information or fences stolen goods.",
+    },
+    {
+      id:   'sage',
+      name: 'Sage',
+      desc: 'You spent years learning the lore of the multiverse.',
+      skillProficiencies: ['arcana', 'history'],
+      feature:     'Researcher',
+      featureDesc: 'If you do not know information, you know where to find it.',
+    },
+    {
+      id:   'acolyte',
+      name: 'Acolyte',
+      desc: 'You have spent your life in service to a temple.',
+      skillProficiencies: ['religion', 'insight'],
+      feature:     'Shelter of the Faithful',
+      featureDesc: 'You and your companions can receive healing and care at temples.',
+    },
+  ],
+
+  // ─── Spell system ─────────────────────────────────────────────────────────────
+  spellTable: {
+    fire_bolt: {
+      id: 'fire_bolt', name: 'Fire Bolt', desc: 'Hurl a mote of fire at a target.',
+      level: 0, castTime: 'action', damage: '1d10', damageType: 'fire',
+      attackRoll: true,
+    },
+    sacred_flame: {
+      id: 'sacred_flame', name: 'Sacred Flame', desc: 'Flame-like radiance descends on a creature.',
+      level: 0, castTime: 'action', damage: '1d8', damageType: 'radiant',
+      savingThrow: 'dex', saveEffect: 'negates',
+    },
+    cure_wounds: {
+      id: 'cure_wounds', name: 'Cure Wounds', desc: 'A creature you touch regains hit points.',
+      level: 1, castTime: 'action', heal: '1d8',
+    },
+    magic_missile: {
+      id: 'magic_missile', name: 'Magic Missile', desc: 'Three darts of magical force, each dealing 1d4+1 force damage. Always hits.',
+      level: 1, castTime: 'action', damage: '3d4', damageType: 'force',
+    },
+    thunderwave: {
+      id: 'thunderwave', name: 'Thunderwave', desc: 'A wave of thunderous force sweeps out from you.',
+      level: 1, castTime: 'action', damage: '2d8', damageType: 'thunder',
+      savingThrow: 'con', saveEffect: 'half',
+    },
+    misty_step: {
+      id: 'misty_step', name: 'Misty Step', desc: 'Surrounded by silver mist, you teleport up to 30 feet.',
+      level: 2, castTime: 'bonus_action', narrative: 'You vanish in a puff of silver mist and reappear nearby.',
+    },
+    fireball: {
+      id: 'fireball', name: 'Fireball', desc: 'A bright streak erupts into a ball of flame.',
+      level: 3, castTime: 'action', damage: '8d6', damageType: 'fire',
+      savingThrow: 'dex', saveEffect: 'half',
+    },
+    guiding_bolt: {
+      id: 'guiding_bolt', name: 'Guiding Bolt', desc: 'A flash of light streaks toward a creature.',
+      level: 1, castTime: 'action', damage: '4d6', damageType: 'radiant',
+      attackRoll: true,
+    },
+    hold_person: {
+      id: 'hold_person', name: 'Hold Person', desc: 'Choose a humanoid — it must succeed on a WIS save or be paralyzed.',
+      level: 2, castTime: 'action',
+      savingThrow: 'wis', saveEffect: 'negates',
+      condition: 'paralyzed', conditionDuration: 3,
+      concentration: true,
+    },
+  },
+
+  classSpells: {
+    Wizard: ['fire_bolt', 'magic_missile', 'thunderwave', 'misty_step', 'fireball'],
+    Cleric: ['sacred_flame', 'cure_wounds', 'guiding_bolt', 'hold_person'],
+  },
+
+  classSpellSlots: {
+    Wizard: [{ 1: 2, 2: 1, 3: 1 }],
+    Cleric: [{ 1: 2, 2: 1 }],
+  },
+
+  spellcastingAbility: {
+    Wizard: 'int',
+    Cleric: 'wis',
+  },
+
+  // ─── Enemy templates ──────────────────────────────────────────────────────────
+  enemyTemplates: [
+    {
+      name: 'Goblin',   cr: 0.25, hp: 7,  ac: 15,
+      str: 8,  dex: 14, con: 10, int: 10, wis: 8,  cha: 8,
+      damage: '1d6+2', toHit: 4, xp: 50,
+    },
+    {
+      name: 'Skeleton',  cr: 0.25, hp: 13, ac: 13,
+      str: 10, dex: 14, con: 15, int: 6,  wis: 8,  cha: 5,
+      damage: '1d6+2', toHit: 4, xp: 50,
+      vulnerabilities:      ['bludgeoning'],
+      immunities:           ['poison'],
+      condition_immunities: ['poisoned', 'exhaustion'],
+    },
+    {
+      name: 'Orc',      cr: 0.5,  hp: 15, ac: 13,
+      str: 16, dex: 12, con: 16, int: 7,  wis: 11, cha: 10,
+      damage: '1d12+3', toHit: 5, xp: 100,
+    },
+    {
+      name: 'Cult Fanatic', cr: 2, hp: 33, ac: 13,
+      str: 9,  dex: 14, con: 11, int: 12, wis: 14, cha: 14,
+      damage: '1d4+2', toHit: 4, xp: 450,
+      onHitEffect: { condition: 'poisoned', ability: 'con', dc: 13 },
+    },
+    {
+      name: 'Ogre',     cr: 2,    hp: 59, ac: 11,
+      str: 19, dex: 8,  con: 16, int: 5,  wis: 7,  cha: 7,
+      damage: '2d8+4', toHit: 6, xp: 450,
+      multiattack: 2,
+    },
+  ],
+
+  // ─── Room pool ─────────────────────────────────────────────────────────────────
+  roomPool: [
+    {
+      id: 'entry_hall', name: 'Entry Hall',
+      descs: [
+        'A torchlit stone corridor. Crumbling archways lead deeper into the dungeon. A weapon rack on the wall holds a dusty blade.',
+        'Rough-hewn walls drip with moisture. The air smells of old stone and something worse. A rack of weapons stands near the entrance.',
+      ],
+      objects: [
+        {
+          id: 'weapon_rack', name: 'Weapon Rack',
+          desc: 'A rusted iron rack holding an assortment of old weapons.',
+          interactText: 'You examine the weapon rack.',
+          searchable: true, searchDC: 10,
+          lootIds: ['dagger'],
+          foundText: 'Beneath the rust, a serviceable dagger.',
+          emptyText: 'Nothing useful remains on the rack.',
+        },
+      ],
+    },
+    {
+      id: 'guard_post', name: 'Guard Post',
+      descs: [
+        'A crude goblin sentry post. Alarm bells hang from a string across the doorway. Crossbow bolts are scattered on the floor.',
+        'Bones and refuse mark this as a goblin lair. A watchtower of stacked crates overlooks the room.',
+      ],
+    },
+    {
+      id: 'archers_perch', name: "Archer's Perch",
+      descs: [
+        'A raised platform with arrow slits cut into the stone wall. The perfect spot for ranged ambushes.',
+        'Stone steps lead to a firing position. Spent arrows litter the ground below.',
+      ],
+    },
+    {
+      id: 'bone_crypt', name: 'Bone Crypt',
+      descs: [
+        'Shelves carved into the walls hold hundreds of bones. The air is deathly still.',
+        'Ancient burial niches line the walls. Something shifts in the shadows.',
+      ],
+      trap: {
+        id: 'pressure_plate', name: 'Pressure Plate',
+        desc: 'A subtle depression in the floor stone, connected to a spring-loaded spear mechanism.',
+        dc: 13, damage: '2d6', damageType: 'piercing',
+        triggerNarrative: 'A plate depresses underfoot — spears erupt from the walls! {name} takes {dmg} piercing damage.',
+        detectNarrative: 'You spot a slight discoloration in the floor stones — a pressure plate. Stepping on it would be bad.',
+        disarmSuccess: 'With careful hands, you jam the mechanism. The trap is disabled.',
+        disarmFail: 'Your attempt to jam the mechanism fails — it triggers! Spears slam from the walls.',
+      },
+    },
+    {
+      id: 'great_hall', name: 'Great Hall',
+      descs: [
+        'A cavernous chamber with a crumbling stone throne at one end. Something large patrols the center.',
+        'Pillars of cracked stone support a vaulted ceiling. The echo of heavy footsteps fills the room.',
+      ],
+    },
+    {
+      id: 'storage_room', name: 'Storage Room',
+      descs: [
+        'Barrels and crates are stacked against the walls. The room is quiet — a rare moment of safety.',
+        'Supply crates labeled in an unknown script line the room. Dusty but undisturbed.',
+      ],
+      objects: [
+        {
+          id: 'supply_crate', name: 'Supply Crate',
+          desc: 'A heavy wooden crate, sealed with iron bands.',
+          interactText: 'You pry open the crate.',
+          searchable: true, searchDC: 10,
+          lootIds: ['healing_potion'],
+          foundText: 'Inside: a vial of red liquid. A healing potion.',
+          emptyText: 'The crate is empty. Someone got here first.',
+        },
+      ],
+    },
+    {
+      id: 'cultist_chamber', name: 'Cultist Chamber',
+      descs: [
+        'Ritual candles surround a dark altar. A robed figure turns to face you, eyes wild with fervor.',
+        'Dark robes, arcane symbols scratched into the floor, and one very agitated fanatic.',
+      ],
+    },
+    {
+      id: 'exit_gate', name: 'Exit Gate',
+      descs: [
+        'Iron-banded doors stand at the far end of the chamber. Freedom — if you can reach it.',
+        'A massive gate of black iron bars the way out. Something large blocks the path.',
+      ],
+    },
+  ],
+
+  // ─── Loot table ───────────────────────────────────────────────────────────────
+  lootTable: [
+    // Simple melee weapons
+    { id: 'dagger',       name: 'Dagger',       desc: '1d4 piercing, finesse, light, thrown',         weight: 5,  type: 'weapon', slot: 'weapon', damage: '1d4',  finesse: true,  light: true,  range: 'melee', ac_bonus: null, heal: null, effect: null, aliases: ['dagger', 'knife'],                  weaponType: 'simple',  damageType: 'piercing' },
+    { id: 'handaxe',      name: 'Handaxe',      desc: '1d6 slashing, light, thrown',                  weight: 5,  type: 'weapon', slot: 'weapon', damage: '1d6',                  light: true,  range: 'melee', ac_bonus: null, heal: null, effect: null, aliases: ['handaxe', 'hand axe', 'hatchet'],   weaponType: 'simple',  damageType: 'slashing' },
+    { id: 'quarterstaff', name: 'Quarterstaff', desc: '1d6 bludgeoning one-handed (1d8 two-handed)',   weight: 4,  type: 'weapon', slot: 'weapon', damage: '1d6', versatileDamage: '1d8',             range: 'melee', ac_bonus: null, heal: null, effect: null, aliases: ['quarterstaff', 'staff', 'quarter staff'], weaponType: 'simple', damageType: 'bludgeoning' },
+    { id: 'mace',         name: 'Mace',         desc: '1d6 bludgeoning',                              weight: 8,  type: 'weapon', slot: 'weapon', damage: '1d6',                                range: 'melee', ac_bonus: null, heal: null, effect: null, aliases: ['mace'],                             weaponType: 'simple',  damageType: 'bludgeoning' },
+    { id: 'shortbow',     name: 'Shortbow',     desc: '1d6 piercing, ranged (80/320)',                weight: 4,  type: 'weapon', slot: 'weapon', damage: '1d6',                                range: 'ranged',ac_bonus: null, heal: null, effect: null, aliases: ['shortbow', 'short bow'],            weaponType: 'simple',  damageType: 'piercing' },
+
+    // Martial melee weapons
+    { id: 'shortsword',   name: 'Shortsword',   desc: '1d6 piercing, finesse, light',                 weight: 6,  type: 'weapon', slot: 'weapon', damage: '1d6',  finesse: true,  light: true,  range: 'melee', ac_bonus: null, heal: null, effect: null, aliases: ['shortsword', 'short sword'],        weaponType: 'martial', damageType: 'piercing' },
+    { id: 'rapier',       name: 'Rapier',       desc: '1d8 piercing, finesse',                        weight: 6,  type: 'weapon', slot: 'weapon', damage: '1d8',  finesse: true,                range: 'melee', ac_bonus: null, heal: null, effect: null, aliases: ['rapier'],                           weaponType: 'martial', damageType: 'piercing' },
+    { id: 'longsword',    name: 'Longsword',    desc: '1d8 slashing (1d10 two-handed), versatile',    weight: 6,  type: 'weapon', slot: 'weapon', damage: '1d8', versatileDamage: '1d10',            range: 'melee', ac_bonus: null, heal: null, effect: null, aliases: ['longsword', 'long sword', 'sword'], weaponType: 'martial', damageType: 'slashing' },
+    { id: 'greatsword',   name: 'Greatsword',   desc: '2d6 slashing, heavy, two-handed',              weight: 10, type: 'weapon', slot: 'weapon', damage: '2d6',                                range: 'melee', ac_bonus: null, heal: null, effect: null, aliases: ['greatsword', 'great sword'],        weaponType: 'martial', damageType: 'slashing' },
+    { id: 'longbow',      name: 'Longbow',      desc: '1d8 piercing, heavy, ranged (150/600)',        weight: 4,  type: 'weapon', slot: 'weapon', damage: '1d8',                                range: 'ranged',ac_bonus: null, heal: null, effect: null, aliases: ['longbow', 'long bow'],              weaponType: 'martial', damageType: 'piercing' },
+
+    // Magic weapon (requires attunement)
+    { id: 'plus1_longsword', name: '+1 Longsword', desc: '1d8+1 slashing (1d10+1 two-handed), magical', weight: 6, type: 'weapon', slot: 'weapon', damage: '1d8+1', versatileDamage: '1d10+1', finesse: false, range: 'melee', ac_bonus: null, heal: null, effect: null, aliases: ['+1 longsword', 'magic sword', 'enchanted longsword'], weaponType: 'martial', damageType: 'slashing', requiresAttunement: true },
+
+    // Armor
+    { id: 'leather_armor',    name: 'Leather Armor',    desc: 'AC 11 + DEX modifier, light armor',    weight: 10, type: 'armor', slot: 'armor',  damage: null, armorAcBase: 11, armorCategory: 'light',  ac_bonus: null, heal: null, effect: null, aliases: ['leather armor', 'leather'] },
+    { id: 'studded_leather',  name: 'Studded Leather',  desc: 'AC 12 + DEX modifier, light armor',    weight: 13, type: 'armor', slot: 'armor',  damage: null, armorAcBase: 12, armorCategory: 'light',  ac_bonus: null, heal: null, effect: null, aliases: ['studded leather', 'studded'] },
+    { id: 'chain_shirt',      name: 'Chain Shirt',      desc: 'AC 13 + DEX (max +2), medium armor',   weight: 20, type: 'armor', slot: 'armor',  damage: null, armorAcBase: 13, dexCapToAc: 2, armorCategory: 'medium', ac_bonus: null, heal: null, effect: null, aliases: ['chain shirt'] },
+    { id: 'chain_mail',       name: 'Chain Mail',       desc: 'AC 16, heavy armor (STR 13 required)', weight: 55, type: 'armor', slot: 'armor',  damage: null, armorAcBase: 16, dexCapToAc: 0, armorCategory: 'heavy',  ac_bonus: null, heal: null, effect: null, aliases: ['chain mail', 'chainmail'] },
+    { id: 'plate_armor',      name: 'Plate Armor',      desc: 'AC 18, heavy armor (STR 15 required)', weight: 65, type: 'armor', slot: 'armor',  damage: null, armorAcBase: 18, dexCapToAc: 0, armorCategory: 'heavy',  ac_bonus: null, heal: null, effect: null, aliases: ['plate armor', 'plate'] },
+    { id: 'shield',           name: 'Shield',           desc: '+2 AC while equipped',                 weight: 12, type: 'armor', slot: 'shield', damage: null, armorCategory: 'shield', ac_bonus: 2, heal: null, effect: null, aliases: ['shield'] },
+
+    // Consumable
+    { id: 'healing_potion', name: 'Healing Potion', desc: 'Restores 2d4+2 HP when consumed.', weight: 2, type: 'consumable', slot: null, damage: null, ac_bonus: null, heal: '2d4+2', effect: null, aliases: ['healing potion', 'potion', 'health potion'] },
+  ],
+
+  // ─── Intro texts ──────────────────────────────────────────────────────────────
+  introTexts: [
+    'The dungeon stretches before you. Every rule of combat, every mechanical interaction — tested here.',
+    'Stone walls, flickering torches, and enemies designed to stress-test the rules engine. Welcome to the sandbox.',
+    'This is a development environment. The dungeon is clinical, the enemies are statistical. Good luck.',
+  ],
+
+  // ─── Narratives (minimal/functional for dev context) ──────────────────────────
+  narratives: {
+    roomArrival: {
+      entry_hall:       ['You stand at the entrance. The dungeon awaits.'],
+      guard_post:       ['A goblin sentry spots you immediately.'],
+      archers_perch:    ['A goblin archer draws back an arrow.'],
+      bone_crypt:       ['The dead stir as you enter.'],
+      great_hall:       ['Something large moves in the shadows.'],
+      storage_room:     ['Quiet. You can rest here.'],
+      cultist_chamber:  ['Candlelight flickers across a robed figure.'],
+      exit_gate:        ['The gate. So close.'],
+    },
+    genericArrival: [
+      'You move into the room, senses alert.',
+      'The room opens before you.',
+      'You enter cautiously.',
+    ],
+    weaponVerbs: {
+      dagger:         ['stabs with', 'drives', 'flicks'],
+      handaxe:        ['hurls', 'chops with', 'swings'],
+      quarterstaff:   ['strikes with', 'sweeps', 'thrusts'],
+      mace:           ['bludgeons with', 'slams', 'swings'],
+      shortbow:       ['fires', 'looses an arrow with', 'shoots'],
+      shortsword:     ['slashes with', 'drives', 'cuts with'],
+      rapier:         ['thrusts with', 'lunges with', 'parries then drives'],
+      longsword:      ['swings', 'cleaves with', 'drives'],
+      greatsword:     ['cleaves with', 'brings down', 'sweeps'],
+      longbow:        ['fires', 'looses', 'shoots'],
+      plus1_longsword: ['swings the gleaming blade', 'drives the magical sword', 'cleaves with'],
+    },
+    classStyle: {
+      Fighter: ['with disciplined form', 'with martial precision', 'leveraging years of training'],
+      Rogue:   ['from the shadows', 'finding the gap in their guard', 'with practiced efficiency'],
+      Wizard:  ['channeling arcane energy', 'with calculated intent', 'augmented by magic'],
+      Cleric:  ['invoking divine power', 'with righteous force', 'guided by faith'],
+      Ranger:  ['with hunter\'s instinct', 'with practiced aim', 'reading the terrain'],
+    },
+    enemyReactions: {
+      Goblin:         ['shrieks', 'snarls', 'snaps its teeth', 'chatters angrily'],
+      Skeleton:       ['rattles its bones', 'clacks its jaw', 'advances silently'],
+      Orc:            ['roars', 'bellows', 'lets out a war cry'],
+      'Cult Fanatic': ['mutters a dark prayer', 'snarls with zealous fury', 'raises a dagger'],
+      Ogre:           ['bellows', 'slams its fists together', 'stomps the ground'],
+    },
+    deathSaveStatus: {
+      1: ['Clinging to life.'],
+      2: ['One foot in the grave.'],
+      3: ['Stable — but unconscious.'],
+    },
+    combatHit: {
+      high: ['A decisive strike — the enemy staggers.', 'Clean hit. The {enemy} reels.'],
+      mid:  ['Your attack connects. The {enemy} is hurt.', 'You land a solid blow on the {enemy}.'],
+      low:  ['A glancing blow, but it counts.', 'You scrape past the {enemy}\'s guard.'],
+    },
+    combatMiss: {
+      high: ['Your attack goes wide. The {enemy} is fast.', 'Near miss — the {enemy} dodges.'],
+      mid:  ['Attack misses.', 'The {enemy} deflects your strike.'],
+      low:  ['You swing wide.', 'The attack fails to connect.'],
+    },
+    enemyAttacks: [
+      'The {enemy} strikes back for {dmg} damage.',
+      'The {enemy} retaliates — {dmg} damage.',
+      '{enemy} attacks: {dmg} damage.',
+    ],
+    killShot: [
+      'The {enemy} falls. +{xp} XP.',
+      '{enemy} is defeated. +{xp} XP.',
+      'Down goes the {enemy}. +{xp} XP.',
+    ],
+    lootPickedUp:   ['You pick up the {item}.', 'You take the {item}.'],
+    noLoot:         ['Nothing here to take.'],
+    alreadyLooted:  ['Already taken.'],
+    noEnemy:        ['No enemy here.'],
+    alreadyDead:    ['The remains of your foe lie still.'],
+    sneakSuccess:   ['You slip past the {enemy} undetected.'],
+    sneakFail:      ['The {enemy} spots you and strikes — {dmg} damage.'],
+    deathLines:     ['Slain by {enemy}. The dungeon claims another soul.', 'The darkness of {world} takes you.'],
+    escapeLines:    ['You force the gate open and escape the dungeon. Mission complete.'],
+    enemyDeflected: ['The {enemy} swings — deflected by your {armor}!', 'Your {armor} turns the {enemy}\'s blow.'],
+    levelUp:        ['Level up! You grow stronger.', 'You feel a surge of power — level gained.'],
+    noEscapeNearby: ['The exit isn\'t here.'],
+    escapeBlocked:  ['blocks your escape.'],
+  },
+};
