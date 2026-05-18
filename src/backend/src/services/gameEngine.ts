@@ -155,7 +155,9 @@ function buildCombatHitNarrative(
   return `${opening} ${critNote}${weaponLabel} ${verb}${style}${reaction}! ${damage} damage.`;
 }
 
-const MAX_CHOICES = 10;
+// 0 = uncapped. Every cap site is gated with `MAX_CHOICES && …` so a falsy
+// value short-circuits the cap checks cleanly without dead-code cleanup.
+const MAX_CHOICES = 0;
 
 function getItemData(item: InventoryItem | undefined, context: Context): LootItem & InventoryItem {
   if (!item) return {} as LootItem & InventoryItem;
