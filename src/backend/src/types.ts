@@ -394,6 +394,10 @@ export interface GameState {
   movement_used?:  Record<string, number>;  // entityId → feet moved this turn
   help_target_id?: string;                  // char id receiving Help action advantage
   surprised?:      string[];                // entity ids surprised at combat start (skip first turn)
+  metamagic_active?:       string;          // active Metamagic modifier for Sorcerer
+  guided_strike_active?:   boolean;         // War Cleric Channel Divinity +10 attack pending
+  vow_of_enmity_target?:   string;          // Vengeance Paladin vow target entity id
+  cutting_words_penalty?:  number;          // Lore Bard Cutting Words penalty to apply
 
   // Campaign overlay (merged from CampaignState at session load)
   current_location_id?: string;

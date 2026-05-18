@@ -89,7 +89,7 @@ interface AttackResult {
 // Advantage and disadvantage both present → they cancel out (5e PHB p.173).
 // weaponProficient=false omits proficiency bonus (PHB p.147: no profBonus without proficiency).
 // ranged=true forces DEX for attack and damage (overrides finesse logic).
-export function resolvePlayerAttack(player: PlayerStats, weaponDamage: string | null, targetAC: number, finesse = false, disadvantage = false, advantage = false, weaponProficient = true, ranged = false): AttackResult {
+export function resolvePlayerAttack(player: PlayerStats, weaponDamage: string | null, targetAC: number, finesse = false, disadvantage = false, advantage = false, weaponProficient = true, ranged = false, critThreshold = 20, attackBonus = 0): AttackResult {
   const strMod  = abilityMod(player.str);
   const dexMod  = abilityMod(player.dex);
   const atkMod  = ranged ? dexMod : (finesse ? Math.max(strMod, dexMod) : strMod);
@@ -100,11 +100,11 @@ export function resolvePlayerAttack(player: PlayerStats, weaponDamage: string | 
   const netAdv  = advantage && !disadvantage;
   const netDisadv = disadvantage && !advantage;
   const roll    = netDisadv ? Math.min(roll1, d(20)) : netAdv ? Math.max(roll1, d(20)) : roll1;
-  const total   = roll + atkMod + prof;
+  const total   = roll + atkMod + prof + attackBonus;
 
-  if (roll === 1)  return { hit: false, fumble: true,  critical: false, roll, total, damage: 0, atkMod, atkStat, prof };
-  if (roll === 20) return { hit: true,  fumble: false, critical: true,  roll, total, damage: Math.max(1, rollCritical(weaponDamage) + atkMod), atkMod, atkStat, prof };
-  if (total >= targetAC) return { hit: true, fumble: false, critical: false, roll, total, damage: Math.max(1, rollDice(weaponDamage) + atkMod), atkMod, atkStat, prof };
+  if (roll === 1)          return { hit: false, fumble: true,  critical: false, roll, total, damage: 0, atkMod, atkStat, prof };
+  if (roll >= critThreshold) return { hit: true, fumble: false, critical: true,  roll, total, damage: Math.max(1, rollCritical(weaponDamage) + atkMod), atkMod, atkStat, prof };
+  if (total >= targetAC)   return { hit: true,  fumble: false, critical: false, roll, total, damage: Math.max(1, rollDice(weaponDamage) + atkMod), atkMod, atkStat, prof };
   return { hit: false, fumble: false, critical: false, roll, total, damage: 0, atkMod, atkStat, prof };
 }
 
