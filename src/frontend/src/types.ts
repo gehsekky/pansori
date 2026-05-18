@@ -306,7 +306,7 @@ export interface Seed {
   intro: string;
   rooms: Array<{ id: string; name: string; desc: string; objects?: RoomObject[] }>;
   connections: Record<string, string[]>;
-  enemies?: Record<string, unknown>;
+  enemies?: Record<string, Array<{ id: string; name: string; hp: number; ac: number }>>;
   loot?: Record<string, unknown>;
   npcs?: Record<string, PlacedNpc>;
 }
@@ -445,4 +445,12 @@ export interface Location {
   gridWidth?: number;
   gridHeight?: number;
   connections?: string[];
+}
+
+// ─── Campaign metadata (delivered alongside session payload) ─────────────────
+
+export interface CampaignMeta {
+  quests: Quest[];
+  factions: Faction[];
+  locations: Location[];
 }

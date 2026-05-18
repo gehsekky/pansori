@@ -37,7 +37,10 @@ export default function WorldMap({ seed, state, onClose }: Props) {
 
   const visited = (id: string) => state.visited_rooms.includes(id);
   const current = (id: string) => state.current_room === id;
-  const enemy = (id: string) => !!seed.enemies?.[id] && !state.enemies_killed.includes(id);
+  const enemy = (id: string) => {
+    const roomEnemies = seed.enemies?.[id] ?? [];
+    return roomEnemies.some((e) => !state.enemies_killed.includes(e.id));
+  };
   const loot = (id: string) => !!seed.loot?.[id] && !state.loot_taken.includes(id);
   const visitedSet = new Set(state.visited_rooms);
   const revealed = (id: string) =>

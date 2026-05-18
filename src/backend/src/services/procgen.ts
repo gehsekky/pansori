@@ -22,9 +22,12 @@ export function generateSeed(context: Context, partySize = 1): Seed {
   if (context.mapType === 'campaign' && context.campaign) {
     const c = context.campaign;
     // Scale campaign enemy HP by party size
-    const scaledEnemies: Record<string, Enemy> = {};
-    for (const [roomId, enemy] of Object.entries(c.enemies ?? {})) {
-      scaledEnemies[roomId] = { ...enemy, hp: scaleEnemyHp(enemy.hp, partySize) };
+    const scaledEnemies: Record<string, Enemy[]> = {};
+    for (const [roomId, enemiesInRoom] of Object.entries(c.enemies ?? {})) {
+      scaledEnemies[roomId] = enemiesInRoom.map((enemy) => ({
+        ...enemy,
+        hp: scaleEnemyHp(enemy.hp, partySize),
+      }));
     }
     return {
       context_id: context.id,
@@ -126,26 +129,29 @@ export function generateRoguelikeSeed(context: Context, partySize = 1): Seed {
       const maxCr = normalized < 0.34 ? 1 : normalized < 0.67 ? 5 : Infinity;
       const pool = context.enemyTemplates.filter((t) => t.cr <= maxCr);
       const template = pick(pool.length ? pool : context.enemyTemplates);
-      enemies[r.id] = {
-        name: template.name,
-        hp: scaleEnemyHp(template.hp, partySize),
-        ac: template.ac,
-        damage: template.damage,
-        toHit: template.toHit,
-        xp: template.xp,
-        str: template.str,
-        dex: template.dex,
-        con: template.con,
-        int: template.int,
-        wis: template.wis,
-        cha: template.cha,
-        onHitEffect: template.onHitEffect,
-        multiattack: template.multiattack,
-        resistances: template.resistances,
-        vulnerabilities: template.vulnerabilities,
-        immunities: template.immunities,
-        condition_immunities: template.condition_immunities,
-      };
+      enemies[r.id] = [
+        {
+          id: `${r.id}#0`,
+          name: template.name,
+          hp: scaleEnemyHp(template.hp, partySize),
+          ac: template.ac,
+          damage: template.damage,
+          toHit: template.toHit,
+          xp: template.xp,
+          str: template.str,
+          dex: template.dex,
+          con: template.con,
+          int: template.int,
+          wis: template.wis,
+          cha: template.cha,
+          onHitEffect: template.onHitEffect,
+          multiattack: template.multiattack,
+          resistances: template.resistances,
+          vulnerabilities: template.vulnerabilities,
+          immunities: template.immunities,
+          condition_immunities: template.condition_immunities,
+        },
+      ];
     }
     if (Math.random() < 0.5) {
       loot[r.id] = weightedPick(context.lootTable);

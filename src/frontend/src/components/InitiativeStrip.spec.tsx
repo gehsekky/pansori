@@ -45,14 +45,14 @@ describe('InitiativeStrip', () => {
   it('renders enemy name from seed when entry is_enemy', () => {
     const seedWithEnemy = {
       ...mockSeed,
-      enemies: { 'room-1': { name: 'Xenomorph', hp: 20, ac: 13, xp: 50, cr: 1 } },
+      enemies: { 'room-1': [{ id: 'room-1#0', name: 'Xenomorph', hp: 20, ac: 13 }] },
     };
     const state = makeState(
       {},
       {
         combat_active: true,
         current_room: 'room-1',
-        initiative_order: [{ id: 'room-1', roll: 12, is_enemy: true }],
+        initiative_order: [{ id: 'room-1#0', roll: 12, is_enemy: true }],
         initiative_idx: 0,
       }
     );

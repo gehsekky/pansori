@@ -85,18 +85,22 @@ function validateSeed(ctx: Context, seed: Seed) {
 
   it('enemies reference valid templates', () => {
     const templateNames = new Set(ctx.enemyTemplates.map((t) => t.name));
-    for (const [roomId, enemy] of Object.entries(seed.enemies)) {
-      expect(
-        templateNames.has(enemy.name),
-        `enemy in room "${roomId}" has unknown name "${enemy.name}"`
-      ).toBe(true);
+    for (const [roomId, enemiesInRoom] of Object.entries(seed.enemies)) {
+      for (const enemy of enemiesInRoom) {
+        expect(
+          templateNames.has(enemy.name),
+          `enemy in room "${roomId}" has unknown name "${enemy.name}"`
+        ).toBe(true);
+      }
     }
   });
 
   it('enemies have positive HP and AC', () => {
-    for (const enemy of Object.values(seed.enemies)) {
-      expect(enemy.hp).toBeGreaterThan(0);
-      expect(enemy.ac).toBeGreaterThan(0);
+    for (const enemiesInRoom of Object.values(seed.enemies)) {
+      for (const enemy of enemiesInRoom) {
+        expect(enemy.hp).toBeGreaterThan(0);
+        expect(enemy.ac).toBeGreaterThan(0);
+      }
     }
   });
 

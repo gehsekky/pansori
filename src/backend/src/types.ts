@@ -113,6 +113,7 @@ export interface EnemyTemplate {
 }
 
 export interface Enemy {
+  id: string; // stable per-instance id (distinct from roomId; multiple enemies share a room)
   name: string;
   hp: number;
   ac: number;
@@ -140,7 +141,7 @@ export interface Seed {
   intro: string;
   rooms: Room[];
   connections: Record<string, string[]>;
-  enemies: Record<string, Enemy>;
+  enemies: Record<string, Enemy[]>;
   loot: Record<string, LootItem>;
   npcs: Record<string, PlacedNpc>;
   seed_id: string;
@@ -249,7 +250,7 @@ export type AbilityKey = 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha';
 
 export type StructuredAction =
   | { type: 'move'; roomId: string }
-  | { type: 'attack' }
+  | { type: 'attack'; targetEnemyId?: string }
   | { type: 'loot' }
   | { type: 'use'; itemId: string; targetCharId?: string }
   | { type: 'sneak' }
@@ -264,15 +265,15 @@ export type StructuredAction =
   | { type: 'talk_response'; responseIdx: number }
   | { type: 'buy'; itemId: string; price: number }
   | { type: 'attack_npc' }
-  | { type: 'use_class_feature'; featureId: string }
+  | { type: 'use_class_feature'; featureId: string; targetEnemyId?: string }
   | { type: 'apply_asi'; stat: AbilityKey }
-  | { type: 'cast_spell'; spellId: string; slotLevel: number; ritual?: boolean }
+  | { type: 'cast_spell'; spellId: string; slotLevel: number; ritual?: boolean; targetEnemyId?: string }
   | { type: 'disarm_trap' }
   | { type: 'interact_object'; objectId: string }
-  | { type: 'two_weapon_attack' }
+  | { type: 'two_weapon_attack'; targetEnemyId?: string }
   | { type: 'attune'; instanceId: string }
-  | { type: 'grapple' }
-  | { type: 'shove' }
+  | { type: 'grapple'; targetEnemyId?: string }
+  | { type: 'shove'; targetEnemyId?: string }
   | { type: 'dodge' }
   | { type: 'disengage' }
   | { type: 'grid_move'; entityId: string; to: GridPos }
@@ -478,7 +479,7 @@ export interface CampaignData {
   intro: string;
   rooms: Room[];
   connections: Record<string, string[]>;
-  enemies?: Record<string, Enemy>;
+  enemies?: Record<string, Enemy[]>;
   loot?: Record<string, LootItem>;
   startingLoot?: string[];
   locations?: Location[];
