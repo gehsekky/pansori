@@ -3143,6 +3143,43 @@ export async function takeAction({
         (action as { type: 'cast_spell'; targetEnemyId?: string }).targetEnemyId ?? enemy.id;
       const spellTarget: Enemy = livingEnemiesInRoom.find((e) => e.id === spellTargetId) ?? enemy;
 
+      // SRD 5.2.1 — enforce spell range against the grid when entities exist.
+      // 'self' spells need no target check (they originate from the caster).
+      // 'touch' = adjacent only (≤ 1 grid square / 5 ft).
+      // 'ranged' = up to spell.rangeFt feet of grid distance.
+      if (st.entities && spell.rangeKind && spell.rangeKind !== 'self') {
+        const casterEnt = st.entities.find((e) => e.id === char.id);
+        const targetEnt = st.entities.find((e) => e.id === spellTargetId && e.isEnemy);
+        if (casterEnt && targetEnt) {
+          const distFt = distanceFeet(casterEnt.pos, targetEnt.pos);
+          const maxFt = spell.rangeKind === 'touch' ? 5 : (spell.rangeFt ?? 0);
+          if (distFt > maxFt) {
+            narrative =
+              spell.rangeKind === 'touch'
+                ? `${spell.name} requires a touch — the ${spellTarget.name} is ${distFt} ft away.`
+                : `${spell.name} is out of range (${distFt} ft to target, max ${maxFt} ft).`;
+            // Refund the slot we just spent
+            if (spell.level > 0 && !isRitualCast) {
+              const slotsUsedRefund = char.spell_slots_used?.[slotLevel] ?? 1;
+              char.spell_slots_used = {
+                ...(char.spell_slots_used ?? {}),
+                [slotLevel]: Math.max(0, slotsUsedRefund - 1),
+              };
+            }
+            // Refund the action economy too
+            if (spell.castTime === 'bonus_action') {
+              char.turn_actions = { ...char.turn_actions, bonus_action_used: false };
+            } else {
+              char.turn_actions = { ...char.turn_actions, action_used: false };
+            }
+            if (spell.level > 0 && !isRitualCast) {
+              char.turn_actions = { ...char.turn_actions, leveled_spell_cast: false };
+            }
+            break;
+          }
+        }
+      }
+
       const dc = spellSaveDC(char.level, castingScore);
       let spellDmg = 0;
       let spellHit = true;
