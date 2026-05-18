@@ -1103,6 +1103,118 @@ export const context: Context = {
       },
     },
 
+    // Author-placed NPCs. Templates above live in `npcTemplates`; these entries
+    // bind them to specific rooms in the campaign. Without this, the engine's
+    // seed.npcs[roomId] lookup would return undefined and nothing would talk
+    // to the player.
+    npcs: {
+      millhaven_market: {
+        roomId: 'millhaven_market',
+        id: 'npc_aldric',
+        name: 'Aldric the Merchant',
+        attitude: 'friendly',
+        hp: 4,
+        ac: 10,
+        damage: '1d4',
+        toHit: 0,
+        xp: 0,
+        greeting:
+          "Thank the gods — capable folk! Two of our supply wagons vanished on the Old Road three days past. I'll pay well for anyone who finds what happened to them and recovers the shipping ledger.",
+        responses: [
+          {
+            label: "I'll look into the missing shipment.",
+            reply:
+              'Wonderful! The ledger would prove our goods were never delivered — the Guild needs it to claim compensation.',
+            consequences: [
+              { type: 'advance_quest', questId: 'quest_shipment', stepId: 'step_talk_aldric' },
+            ],
+          },
+          {
+            label: 'What do you know about the crypt?',
+            reply:
+              'Nothing good. Locals avoid it. Word is, something stirs within — lights at night, groaning sounds.',
+          },
+          {
+            label: "I'll need supplies.",
+            reply: 'Of course. Browse what I have — Guild members get a fair price.',
+          },
+        ],
+        persuasionDC: 12,
+        shop: [{ itemId: 'healing_potion', price: 50 }],
+      },
+      millhaven_temple: {
+        roomId: 'millhaven_temple',
+        id: 'npc_sister_maren',
+        name: 'Sister Maren',
+        attitude: 'friendly',
+        hp: 8,
+        ac: 11,
+        damage: '1d4',
+        toHit: 2,
+        xp: 0,
+        greeting:
+          "Selûne's blessing upon you, traveler. The crypt to the north — something evil has taken root there. I need brave souls to descend and cleanse it.",
+        responses: [
+          {
+            label: 'Tell me about the crypt.',
+            reply:
+              'It is the Shattered Crypt. A lich was sealed within long ago. The Crypt Lord must be destroyed.',
+            consequences: [
+              { type: 'advance_quest', questId: 'quest_crypt', stepId: 'step_learn_crypt' },
+            ],
+          },
+          {
+            label: 'I will clear the crypt.',
+            reply: 'Bless you. The moonstone amulet within is sacred to Selûne — please return it.',
+            consequences: [
+              { type: 'advance_quest', questId: 'quest_crypt', stepId: 'step_learn_crypt' },
+            ],
+          },
+          {
+            label: 'Can you heal my wounds?',
+            reply: 'For a small donation to the temple, yes.',
+            consequences: [{ type: 'modify_hp', amount: 8 }],
+          },
+        ],
+        persuasionDC: 10,
+      },
+      millhaven_slums: {
+        roomId: 'millhaven_slums',
+        id: 'npc_dusk',
+        name: 'Dusk',
+        attitude: 'indifferent',
+        hp: 14,
+        ac: 13,
+        damage: '1d6+2',
+        toHit: 4,
+        xp: 0,
+        greeting:
+          "Eyes down, stranger. If it's trouble with the Watch, we might have common cause.",
+        responses: [
+          {
+            label: 'Tell me about the City Watch.',
+            reply:
+              "Captain Vane's rotten from the boots up. I have proof — or I will, if you can get into his office.",
+            consequences: [
+              { type: 'advance_quest', questId: 'quest_shadow', stepId: 'step_meet_dusk' },
+            ],
+          },
+          {
+            label: 'What do you need me to do?',
+            reply: 'Vane keeps a letter in his strongbox at the garrison. Bring it to me.',
+            consequences: [
+              { type: 'advance_quest', questId: 'quest_shadow', stepId: 'step_meet_dusk' },
+            ],
+          },
+          {
+            label: 'Not interested.',
+            reply: "Your loss. Don't say I didn't offer.",
+          },
+        ],
+        persuasionDC: 14,
+      },
+    },
+
     startingLoot: ['healing_potion'],
 
     // ─── Locations ──────────────────────────────────────────────────────────────

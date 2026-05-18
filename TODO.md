@@ -130,7 +130,7 @@
 - [x] Migrate enemies to the new array-per-room schema with stable IDs
 - [x] Multi-enemy encounters added: Charnel Hall (2 skeletons), Crypt Throne (Crypt Lord + 2 skeleton minions), Road North (2 bandits)
 - [x] Frontend context (`src/frontend/src/contexts/vale_of_shadows.tsx`) so Vale appears on the character creation screen — was previously backend-only and invisible
-- [ ] Add a second campaign module to validate the authoring format is general-purpose
+- [x] Add a second campaign module to validate the authoring format is general-purpose — **Whispering Pines** (frozen mountain pass, kidnap+cult plot, fire-vulnerable boss). Found and fixed a real gap during authoring: campaign mode never wired `npcs` into the seed, so Vale's Aldric/Maren/Dusk had been silently missing from their rooms. Added `CampaignData.npcs?: Record<string, PlacedNpc>` and `generateSeed` now copies through. Wired Vale's NPC placements in the same pass. 8 new procgen tests lock in both campaigns' shape.
 - [ ] End-to-end playtest — complete all 3 quests in a single session; verify campaign state survives session resume; verify faction price modifiers apply in shop
 
 ---

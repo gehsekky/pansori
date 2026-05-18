@@ -530,6 +530,10 @@ export interface CampaignData {
   connections: Record<string, string[]>;
   enemies?: Record<string, Enemy[]>;
   loot?: Record<string, LootItem>;
+  // Author-placed NPCs keyed by roomId. The engine's NPC lookup is
+  // seed.npcs[roomId]; generateSeed copies this field into the seed for
+  // campaign-mode runs. Roguelike NPCs are still placed by procgen.
+  npcs?: Record<string, PlacedNpc>;
   startingLoot?: string[];
   locations?: Location[];
   quests?: Quest[];

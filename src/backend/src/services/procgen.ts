@@ -38,7 +38,7 @@ export function generateSeed(context: Context, partySize = 1): Seed {
       connections: c.connections,
       enemies: scaledEnemies,
       loot: c.loot ?? {},
-      npcs: {},
+      npcs: c.npcs ?? {},
       seed_id: randomUUID(),
     };
   }

@@ -1,7 +1,9 @@
 import type { Context, Seed } from '../types.js';
 import { describe, expect, it } from 'vitest';
-import { generateRoguelikeSeed } from './procgen.js';
+import { generateRoguelikeSeed, generateSeed } from './procgen.js';
 import { context as sandboxCtx } from '../contexts/sandbox.js';
+import { context as valeCtx } from '../contexts/vale_of_shadows.js';
+import { context as whisperingCtx } from '../contexts/whispering_pines.js';
 
 function validateSeed(ctx: Context, seed: Seed) {
   const roomIds = new Set(seed.rooms.map((r) => r.id));
@@ -154,4 +156,62 @@ function validateSeed(ctx: Context, seed: Seed) {
 describe('generateRoguelikeSeed — sandbox', () => {
   const seed = generateRoguelikeSeed(sandboxCtx);
   validateSeed(sandboxCtx, seed);
+});
+
+// ─── Campaign seed validation ────────────────────────────────────────────────
+// Campaign contexts are authored content, not procedurally generated. The seed
+// should mirror the campaign rooms/connections verbatim and populate NPCs from
+// campaign.npcs (no longer always empty).
+
+describe('generateSeed — Vale of Shadows campaign', () => {
+  const seed = generateSeed(valeCtx, 1);
+
+  it('uses campaign rooms verbatim', () => {
+    expect(seed.rooms.map((r) => r.id)).toEqual(valeCtx.campaign!.rooms.map((r) => r.id));
+  });
+
+  it('places authored NPCs at their campaign-declared rooms', () => {
+    // Vale binds Aldric (market), Sister Maren (temple), Dusk (slums).
+    expect(seed.npcs?.millhaven_market?.id).toBe('npc_aldric');
+    expect(seed.npcs?.millhaven_temple?.id).toBe('npc_sister_maren');
+    expect(seed.npcs?.millhaven_slums?.id).toBe('npc_dusk');
+  });
+
+  it('rooms with placed NPCs are not enemy rooms', () => {
+    for (const roomId of Object.keys(seed.npcs ?? {})) {
+      expect(seed.enemies?.[roomId] ?? []).toEqual([]);
+    }
+  });
+});
+
+describe('generateSeed — Whispering Pines campaign', () => {
+  const seed = generateSeed(whisperingCtx, 1);
+
+  it('uses campaign rooms verbatim', () => {
+    expect(seed.rooms.map((r) => r.id)).toEqual(whisperingCtx.campaign!.rooms.map((r) => r.id));
+  });
+
+  it('places authored NPCs at their campaign-declared rooms', () => {
+    expect(seed.npcs?.pines_tavern?.id).toBe('npc_brann');
+    expect(seed.npcs?.pines_lodge?.id).toBe('npc_marta');
+    expect(seed.npcs?.pines_warden?.id).toBe('npc_riese');
+  });
+
+  it('boss enemy is placed at the ritual apex with multiattack and fire vulnerability', () => {
+    const boss = seed.enemies?.spire_ritual_apex?.[0];
+    expect(boss?.name).toBe('Frost Acolyte');
+    expect(boss?.multiattack).toBe(2);
+    expect(boss?.vulnerabilities).toContain('fire');
+  });
+
+  it('quest items live in the campaign loot table', () => {
+    expect(seed.loot?.spire_cult_chamber?.id).toBe('halden_locket');
+    expect(seed.loot?.spire_ritual_apex?.id).toBe('cult_idol');
+  });
+
+  it('wilderness encounter table is reachable through Frozen Pass connections', () => {
+    // pass_climb is the wilderness room sitting between town and the spire
+    expect(seed.connections?.pass_climb).toContain('spire_entrance');
+    expect(seed.connections?.pass_climb).toContain('pines_square');
+  });
 });

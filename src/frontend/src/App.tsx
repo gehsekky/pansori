@@ -14,10 +14,12 @@ import { context as sandboxContext } from './contexts/sandbox.tsx';
 import styles from './styles.module.css';
 import { useGame } from './hooks/useGame.ts';
 import { context as valeContext } from './contexts/vale_of_shadows.tsx';
+import { context as whisperingPinesContext } from './contexts/whispering_pines.tsx';
 
 const CONTEXTS: Record<string, FrontendContext> = {
   sandbox: sandboxContext,
   vale_of_shadows: valeContext,
+  whispering_pines: whisperingPinesContext,
 };
 function getCtx(seed: Seed | null): FrontendContext {
   return (seed?.context_id ? CONTEXTS[seed.context_id] : null) ?? sandboxContext;
