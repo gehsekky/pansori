@@ -4,11 +4,11 @@
 ## 1. Deployment (AWS — t4g.small EC2 + db.t4g.micro RDS)
 
 ### AWS Console (one-time)
-- [ ] ECR repositories — create `pansori-backend` and `pansori-frontend` repos in ECR; note the registry URL
-- [ ] RDS provisioning — `db.t4g.micro` PostgreSQL 16 in same VPC as EC2; SG allows inbound 5432 from EC2 SG only; enable automated backups (7-day retention); no public endpoint
-- [ ] Security groups — EC2 inbound: 22 (your IP only), 80, 443; RDS inbound: 5432 from EC2 SG only
-- [ ] IAM instance profile — attach role with `CloudWatchLogsFullAccess` (or scoped policy) to EC2 so the `awslogs` Docker log driver can write
-- [ ] CloudWatch log groups — create `/pansori/backend`, `/pansori/frontend`, `/pansori/nginx` with 30-day retention
+- [x] ECR repositories — `pansori-backend` and `pansori-frontend` created
+- [x] Security groups — EC2 inbound: 22 (your IP only), 80, 443; RDS SG created (pansori-rds)
+- [x] IAM instance profile — `pansori-ec2-role` with CloudWatchLogsFullAccess attached to instance
+- [x] CloudWatch log groups — `/pansori/backend`, `/pansori/frontend`, `/pansori/nginx`, `/pansori/postgres` with 30-day retention
+- [x] IAM deploy user — `pansori-deploy` created with ECR push permissions
 
 ### EC2 bootstrap (SSH in once)
 - [ ] Install Docker, Docker Compose plugin, and AWS CLI on the instance; add `ec2-user` to the `docker` group
@@ -32,18 +32,19 @@
 - [ ] Publish the consent screen app when ready for real users
 
 ### Database
-- [ ] Run `psql $DATABASE_URL -f infra/db/schema.sql` once on first deploy to initialize the schema
-- [ ] Run DB migration 006 — `006_campaign_state.sql` adds `campaign_states` table and `campaign_state_id` FK on `game_sessions`; must be applied before any campaign session is started
+- [ ] Schema and migrations run automatically on first `docker compose up` via `docker-entrypoint-initdb.d`
 
-### Required environment variables
-- `DATABASE_URL` — PostgreSQL connection string to RDS instance
+### Required environment variables (`/opt/pansori/.env` on EC2)
+- `POSTGRES_PASSWORD` — strong password for the containerized postgres instance
+- `POSTGRES_USER` — `pansori` (default)
+- `POSTGRES_DB` — `pansori_db` (default)
 - `SESSION_SECRET` — random 64-character string
 - `ANTHROPIC_API_KEY` — `sk-ant-...`
 - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — OAuth app credentials
 - `GOOGLE_CALLBACK_URL` — `https://yourdomain.com/api/auth/google/callback`
 - `FRONTEND_URL` — `https://yourdomain.com`
-- `ECR_REGISTRY` — registry URL (e.g. `123456789.dkr.ecr.us-east-1.amazonaws.com`)
-- `AWS_REGION` — e.g. `us-east-1`
+- `ECR_REGISTRY` — `674162619498.dkr.ecr.us-east-1.amazonaws.com`
+- `AWS_REGION` — `us-east-1`
 
 ---
 

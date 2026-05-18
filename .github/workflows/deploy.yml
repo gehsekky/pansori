@@ -5,10 +5,10 @@ on:
     branches: [main]
 
 env:
-  AWS_REGION: us-east-1           # TODO: set your AWS region
-  ECR_REGISTRY: TODO_ECR_REGISTRY # TODO: set your ECR registry URL (e.g. 123456789.dkr.ecr.us-east-1.amazonaws.com)
-  EC2_HOST: TODO_EC2_HOST         # TODO: set your EC2 public IP or domain
-  EC2_USER: ec2-user              # TODO: adjust if using ubuntu (ubuntu) or Amazon Linux (ec2-user)
+  AWS_REGION:   us-east-1
+  ECR_REGISTRY: 674162619498.dkr.ecr.us-east-1.amazonaws.com
+  EC2_HOST:     ec2-54-87-149-6.compute-1.amazonaws.com
+  EC2_USER:     ec2-user
 
 jobs:
   test:
@@ -90,23 +90,20 @@ jobs:
             aws ecr get-login-password --region $AWS_REGION \
               | docker login --username AWS --password-stdin $ECR_REGISTRY
 
-            # Run DB migration before swapping containers
-            docker run --rm \
-              -e DATABASE_URL="$DATABASE_URL" \
-              $ECR_REGISTRY/pansori-backend:$IMAGE_TAG \
-              sh -c "cd /app && node -e \"
-                import('./dist/db/pool.js').then(async ({pool}) => {
-                  const fs = await import('fs/promises');
-                  const sql = await fs.readFile('infra/db/schema.sql','utf8');
-                  await pool.query(sql);
-                  await pool.end();
-                  console.log('Migration done');
-                });
-              \""
-
-            # Roll to new containers
-            docker compose -f /opt/pansori/docker-compose.prod.yml pull
+            # Roll to new containers (postgres stays up via named volume)
+            docker compose -f /opt/pansori/docker-compose.prod.yml pull backend frontend
             docker compose -f /opt/pansori/docker-compose.prod.yml up -d --remove-orphans
+
+            # Run DB migrations inside the backend container
+            docker exec pansori-backend node -e "
+              import('./dist/db/pool.js').then(async ({ pool }) => {
+                const fs = await import('fs/promises');
+                const sql = await fs.readFile('./dist/db/schema.sql', 'utf8');
+                await pool.query(sql);
+                await pool.end();
+                console.log('Migration done');
+              });
+            "
 
             # Clean up old images
             docker image prune -f
