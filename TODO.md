@@ -146,13 +146,15 @@
 
 ## 8. Inventory & UX
 
-- [x] Single inventory modal (`InventoryModal.tsx`) — party tabs, equipment slot summary, equip/unequip, give-to-party-member transfer, drop, encumbrance footer (STR × 15 lbs capacity; tier labels shown but not enforced as speed penalty). Triggered by `I` keypress or header button.
+- [x] Single inventory modal (`InventoryModal.tsx`) — party tabs, equipment slot summary, equip/unequip, give-to-party-member transfer, drop, encumbrance footer (STR × 15 lbs capacity; tier labels shown). Triggered by `I` keypress or header button.
+- [x] Encumbrance speed penalties enforced server-side via `effectiveSpeed()` — see §9 for details. Modal tier labels now match server behaviour.
 - [ ] Multi-window inventory (deferred — single modal serves the core use case)
-- [ ] Inventory enforcement of encumbrance speed penalties (deferred — needs game-feel decision)
 
 ---
 
 ## 9. 5e SRD 5.2.1 rule completeness
+
+**Audit status** (after the 2026-05-18 SRD pass): all 4 HIGH items closed, 4 of 7 MEDIUM closed (+ 1 partial), 4 LOW closed, and several backlog items absorbed (encumbrance, AoE shapes, Magic Missile damage). Remaining open items are either no-current-content (no Small races, no enemy-side reach weapons, no PC fear sources) or architectural (Inspiration UX, reactive-spell interrupts). Test count 263 passing.
 
 - [x] **Tactical fog of war** — per-cell lighting from PC torches + darkvision (SRD p.11 Vision and Light). Rooms can be `bright`/`dim`/`dark`. Vale dungeon rooms marked accordingly.
 - [x] **Spell range enforcement** — `Spell.rangeKind` ('self'/'touch'/'ranged') + `rangeFt`. Out-of-range casts refunded; all sandbox + Vale spells tagged with SRD ranges.
