@@ -325,7 +325,9 @@ function processDeathSave(
   const save = rollDeathSave(char.death_saves);
   const newChar = { ...char, death_saves: save.saves };
   let narrative = '';
-  let endedCombat = false;
+  // No code path currently sets endedCombat = true. Kept as a return field for
+  // callers' convenience and future death-related combat-ending hooks.
+  const endedCombat = false;
 
   switch (save.result) {
     case 'regain_hp':

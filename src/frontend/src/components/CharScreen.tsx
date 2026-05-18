@@ -423,6 +423,26 @@ function CharScreen({
             </button>
           )}
 
+          {selectedCtxForInit?.recommendedPartySize !== undefined &&
+            party.length !== selectedCtxForInit.recommendedPartySize && (
+              <p
+                style={{
+                  fontSize: '0.75rem',
+                  color: 'var(--t-mid)',
+                  marginBottom: '1rem',
+                  letterSpacing: '0.05em',
+                }}
+              >
+                ⚠ {selectedCtxForInit.displayName} is tuned for a party of{' '}
+                {selectedCtxForInit.recommendedPartySize}. You can play with{' '}
+                {party.length}, but encounters may feel{' '}
+                {party.length < selectedCtxForInit.recommendedPartySize
+                  ? 'harder'
+                  : 'easier'}{' '}
+                than intended.
+              </p>
+            )}
+
           {error && <p className={styles.err}>{error}</p>}
 
           <button className={styles.submit} onClick={handle} disabled={loading}>
@@ -489,6 +509,18 @@ function CharScreen({
                     <p style={{ fontSize: '0.75rem', color: 'var(--t-dim)', lineHeight: 1.5 }}>
                       {c.tagline}
                     </p>
+                    {c.recommendedPartySize !== undefined && (
+                      <p
+                        style={{
+                          marginTop: 6,
+                          fontSize: '0.7rem',
+                          color: 'var(--t-mid)',
+                          letterSpacing: '0.08em',
+                        }}
+                      >
+                        TUNED FOR PARTY OF {c.recommendedPartySize}
+                      </p>
+                    )}
                     {selected && (
                       <p
                         style={{

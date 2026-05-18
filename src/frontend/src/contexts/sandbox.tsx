@@ -5,6 +5,7 @@ export const context: FrontendContext = {
 
   displayName: 'Sandbox',
   tagline: 'A development dungeon for testing mechanics. Every rule exercised.',
+  recommendedPartySize: 1,
   previewArt: `
   +---SANDBOX---+
   | [ Fighter ] |

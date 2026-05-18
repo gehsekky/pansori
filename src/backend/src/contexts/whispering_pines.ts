@@ -883,6 +883,9 @@ export const context: Context = {
 
   campaign: {
     world_name: 'Whispering Pines',
+    // Frost Acolyte boss (multiattack 2, paralyzing onHitEffect) plus mephit
+    // and cultist rooms — tuned for 3 PCs.
+    recommendedPartySize: 3,
     intro:
       'A frozen pass village where a missing trapper, a frost cult, and an ancient spire wait above the snow line.',
 
