@@ -115,7 +115,7 @@ function applyEnemyAttackNarrative(
   enemy: Enemy,
   char: Character,
   context: Context,
-): { hpLost: number; narrative: string; newConditions: string[]; newDurations: Record<string, number> } {
+): { hpLost: number; narrative: string; newConditions: string[]; newDurations: Record<string, number>; updatedResourceUses?: Record<string, number> } {
   const isDodging       = char.turn_actions?.dodging ?? false;
   const hasAdvantage    = char.conditions.some(c => ADVANTAGE_CONDITIONS.has(c));
   const hasDisadvantage = char.conditions.some(c => ENEMY_DISADV_CONDITIONS.has(c)) || isDodging;
@@ -130,6 +130,15 @@ function applyEnemyAttackNarrative(
     let hpLost   = (isRaging || isPetrified) ? Math.ceil(result.damage / 2) : result.damage;
     const rageNote = isRaging    ? ` (Rage resistance: ${result.damage}→${hpLost})`      : '';
     const petrNote = isPetrified ? ` (Petrified resistance: ${result.damage}→${hpLost})` : '';
+    // Arcane Ward: Abjurer Wizard — absorb damage into ward HP before character HP
+    let wardNote = '';
+    const wardHp = char.class_resource_uses?.arcane_ward ?? 0;
+    if (wardHp > 0 && char.subclass === 'abjurer') {
+      const absorbed = Math.min(wardHp, hpLost);
+      hpLost -= absorbed;
+      char = { ...char, class_resource_uses: { ...(char.class_resource_uses ?? {}), arcane_ward: wardHp - absorbed } };
+      wardNote = ` (Arcane Ward absorbed ${absorbed} — ward HP: ${wardHp - absorbed})`;
+    }
     // Exhaustion 4: effective max HP is halved — clamp current HP after taking damage
     const newHpAfterDmg = clampHpForExhaustion(Math.max(0, char.hp - hpLost), char.max_hp, char.exhaustion_level ?? 0);
     hpLost = char.hp - newHpAfterDmg; // recalculate actual HP lost after clamp
@@ -137,7 +146,7 @@ function applyEnemyAttackNarrative(
     let narrative = pick(context.narratives.enemyAttacks)
       .replace('{enemy}', enemy.name)
       .replace('{dmg}',   String(hpLost));
-    narrative += rageNote + petrNote;
+    narrative += rageNote + petrNote + wardNote;
     let updatedChar = { ...char };
 
     if (enemy.onHitEffect) {
@@ -149,7 +158,7 @@ function applyEnemyAttackNarrative(
         }
       }
     }
-    return { hpLost, narrative, newConditions: updatedChar.conditions, newDurations: updatedChar.condition_durations };
+    return { hpLost, narrative, newConditions: updatedChar.conditions, newDurations: updatedChar.condition_durations, updatedResourceUses: char.class_resource_uses };
   }
   if (armorItem) {
     return {
@@ -770,6 +779,100 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   // Fighter: Action Surge — shown in combat when not yet used
   if (state.combat_active && char.character_class.toLowerCase() === 'fighter' && char.level >= 2 && !(char.class_resource_uses?.action_surge)) {
     choices.push({ label: `Action Surge — gain one extra action this turn`, action: { type: 'use_class_feature', featureId: 'action_surge' } });
+  }
+
+  // ── Monk choices ────────────────────────────────────────────────────────────
+  if (char.character_class.toLowerCase() === 'monk') {
+    const kiLeft = char.class_resource_uses?.ki_points ?? char.level;
+    if (state.combat_active && char.level >= 2 && kiLeft > 0) {
+      if (char.turn_actions.action_used && !char.turn_actions.bonus_action_used) {
+        choices.push({ label: `Flurry of Blows — 2 unarmed strikes (1 ki, ${kiLeft} left)`, action: { type: 'use_class_feature', featureId: 'flurry_of_blows' }, requiresBonusAction: true });
+      }
+      if (!char.turn_actions.bonus_action_used) {
+        choices.push({ label: `Step of the Wind: Dash — extra movement (1 ki, ${kiLeft} left)`, action: { type: 'use_class_feature', featureId: 'step_of_wind_dash' }, requiresBonusAction: true });
+        choices.push({ label: `Step of the Wind: Disengage — no OA (1 ki, ${kiLeft} left)`, action: { type: 'use_class_feature', featureId: 'step_of_wind_disengage' }, requiresBonusAction: true });
+      }
+      if (state.combat_active && char.level >= 5 && enemyAlive) {
+        choices.push({ label: `Stunning Strike — spend 1 ki after a hit (CON save DC ${8 + profBonus(char.level) + abilityMod(char.wis ?? 10)}, ${kiLeft} left)`, action: { type: 'use_class_feature', featureId: 'stunning_strike' } });
+      }
+    }
+  }
+
+  // ── Druid: Wild Shape ───────────────────────────────────────────────────────
+  if (char.character_class.toLowerCase() === 'druid') {
+    const wsUses = char.class_resource_uses?.wild_shape ?? 2;
+    if (!char.conditions.includes('wild_shaped') && wsUses > 0) {
+      choices.push({ label: `Wild Shape — transform into beast (${wsUses} use${wsUses === 1 ? '' : 's'} left)`, action: { type: 'use_class_feature', featureId: 'wild_shape' } });
+    }
+    if (char.conditions.includes('wild_shaped')) {
+      choices.push({ label: `Dismiss Wild Shape — return to normal form`, action: { type: 'use_class_feature', featureId: 'dismiss_wild_shape' } });
+    }
+  }
+
+  // ── Sorcerer: Metamagic ─────────────────────────────────────────────────────
+  if (char.character_class.toLowerCase() === 'sorcerer' && char.level >= 3) {
+    const spLeft = char.class_resource_uses?.sorcery_points ?? char.level;
+    if (spLeft >= 1) choices.push({ label: `Metamagic: Twinned Spell — next spell hits 2 targets (1 SP, ${spLeft} left)`, action: { type: 'use_class_feature', featureId: 'metamagic_twinned' } });
+    if (spLeft >= 2 && !char.turn_actions.bonus_action_used) choices.push({ label: `Metamagic: Quickened Spell — cast as bonus action (2 SP, ${spLeft} left)`, action: { type: 'use_class_feature', featureId: 'metamagic_quickened' } });
+    if (spLeft >= 1) choices.push({ label: `Metamagic: Empowered Spell — reroll up to ${abilityMod(char.cha ?? 10)} damage dice (1 SP, ${spLeft} left)`, action: { type: 'use_class_feature', featureId: 'metamagic_empowered' } });
+  }
+
+  // ── Warlock: Invocations (learn once, then passive) ─────────────────────────
+  if (char.character_class.toLowerCase() === 'warlock' && char.level >= 2) {
+    if (!(char.feats ?? []).includes('agonizing_blast')) choices.push({ label: `Learn Invocation: Agonizing Blast — +CHA to Eldritch Blast`, action: { type: 'use_class_feature', featureId: 'agonizing_blast' } });
+    if (!(char.feats ?? []).includes('devils_sight')) choices.push({ label: `Learn Invocation: Devil's Sight — see in magical darkness`, action: { type: 'use_class_feature', featureId: 'devils_sight' } });
+  }
+
+  // ── Subclass active features ────────────────────────────────────────────────
+  if (state.combat_active && enemyAlive && char.subclass) {
+    const cls = char.character_class.toLowerCase();
+    const cdLeft = char.class_resource_uses?.channel_divinity ?? 1;
+
+    // Battle Master: maneuver choices (in combat, superiority dice remaining)
+    if (char.subclass === 'battle_master') {
+      const sdLeft = char.class_resource_uses?.superiority_dice ?? 4;
+      if (sdLeft > 0) {
+        choices.push({ label: `Maneuver: Trip Attack — +1d8 dmg, STR save or prone (${sdLeft} dice left)`, action: { type: 'use_class_feature', featureId: 'maneuver_trip' } });
+        choices.push({ label: `Maneuver: Goading Attack — +1d8 dmg, WIS save or disadvantage vs others (${sdLeft} dice left)`, action: { type: 'use_class_feature', featureId: 'maneuver_goading' } });
+      }
+    }
+
+    // Lore Bard: Cutting Words (reaction, costs Bardic Inspiration)
+    if (char.subclass === 'lore' && cls === 'bard' && !char.turn_actions.reaction_used) {
+      const biLeft2 = char.class_resource_uses?.bardic_inspiration ?? abilityMod(char.cha ?? 10);
+      if (biLeft2 > 0) choices.push({ label: `Cutting Words — subtract Inspiration die from enemy roll (reaction, ${biLeft2} left)`, action: { type: 'use_class_feature', featureId: 'cutting_words' } });
+    }
+
+    // Life Cleric: Preserve Life (Channel Divinity, out-of-combat heal)
+    if (char.subclass === 'life' && cls === 'cleric' && cdLeft > 0) {
+      choices.push({ label: `Preserve Life — distribute ${5 * char.level} HP among wounded allies (Channel Divinity, ${cdLeft} left)`, action: { type: 'use_class_feature', featureId: 'preserve_life' } });
+    }
+
+    // War Cleric: Guided Strike (Channel Divinity, +10 to next attack)
+    if (char.subclass === 'war' && cls === 'cleric' && cdLeft > 0) {
+      choices.push({ label: `Guided Strike — +10 to next attack roll (Channel Divinity, ${cdLeft} left)`, action: { type: 'use_class_feature', featureId: 'guided_strike' } });
+    }
+
+    // Devotion Paladin: Sacred Weapon (Channel Divinity)
+    if (char.subclass === 'devotion' && cls === 'paladin' && cdLeft > 0 && !(char.class_resource_uses?.sacred_weapon_active)) {
+      choices.push({ label: `Sacred Weapon — +${abilityMod(char.cha ?? 10)} to attack rolls for 10 rounds (Channel Divinity, ${cdLeft} left)`, action: { type: 'use_class_feature', featureId: 'sacred_weapon' } });
+    }
+
+    // Vengeance Paladin: Vow of Enmity & Abjure Enemy (Channel Divinity)
+    if (char.subclass === 'vengeance' && cls === 'paladin' && cdLeft > 0) {
+      choices.push({ label: `Vow of Enmity — advantage vs target for 1 min (Channel Divinity, ${cdLeft} left)`, action: { type: 'use_class_feature', featureId: 'vow_of_enmity' } });
+      choices.push({ label: `Abjure Enemy — frighten target, WIS save DC ${8 + profBonus(char.level) + abilityMod(char.cha ?? 10)} (Channel Divinity, ${cdLeft} left)`, action: { type: 'use_class_feature', featureId: 'abjure_enemy' } });
+    }
+
+    // Hunter Ranger: Colossus Slayer
+    if (char.subclass === 'hunter' && cls === 'ranger' && !(char.class_resource_uses?.colossus_slayer_used)) {
+      choices.push({ label: `Colossus Slayer — +1d8 on first hit vs bloodied target`, action: { type: 'use_class_feature', featureId: 'colossus_slayer' } });
+    }
+
+    // Abjurer Wizard: Arcane Ward (create when not active)
+    if (char.subclass === 'abjurer' && cls === 'wizard' && !(char.class_resource_uses?.arcane_ward)) {
+      choices.push({ label: `Arcane Ward — create ${2 * char.level} HP damage shield`, action: { type: 'use_class_feature', featureId: 'arcane_ward' } });
+    }
   }
 
   // Spell choices
@@ -1482,8 +1585,15 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
       const helpAdv = st.help_target_id === char.id;
       if (helpAdv) st = { ...st, help_target_id: undefined };
 
+      // Assassin: advantage vs creatures who haven't acted (surprised list or first round)
+      const assassinAdv = char.subclass === 'assassin' && char.character_class.toLowerCase() === 'rogue'
+        && ((st.surprised ?? []).includes(roomId) || (st.round ?? 1) === 1);
+
+      // Vow of Enmity: advantage vs the vow target
+      const vowAdv = (st as Record<string, unknown>).vow_of_enmity_target === roomId;
+
       const disadvantage     = rangedInMelee || conditionDisadv || exhaustionDisadv || !armorProficient || proneDisadv || thrownLongRangeDisadv;
-      const advantage        = conditionAdv || enemyGrappled || proneAdv || enemyParalyzed || flankingAdv || helpAdv;
+      const advantage        = conditionAdv || enemyGrappled || proneAdv || enemyParalyzed || flankingAdv || helpAdv || assassinAdv || vowAdv;
       const disadvReasons    = [
         rangedInMelee          ? 'ranged in melee' : '',
         conditionDisadv        ? char.conditions.filter(c => DISADV_CONDITIONS.has(c)).join(', ') : '',
@@ -1498,10 +1608,21 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
       const features  = context.classFeatures?.[char.character_class] ?? [];
       const isRaging  = char.conditions.includes('raging');
 
+      // Champion: Improved Critical — crit on 19–20 at level 3+
+      const critThresh = (char.subclass === 'champion' && char.character_class.toLowerCase() === 'fighter' && char.level >= 3) ? 19 : 20;
+      // Sacred Weapon: +CHA mod to attack rolls
+      const sacredWeaponBonus = (char.class_resource_uses?.sacred_weapon_active ?? 0) > 0 ? abilityMod(char.cha) : 0;
+      // Guided Strike: +10 to attack roll (War Cleric Channel Divinity)
+      const guidedStrikeBonus = (st as Record<string, unknown>).guided_strike_active ? 10 : 0;
+      const totalAttackBonus = sacredWeaponBonus + guidedStrikeBonus;
+      if (guidedStrikeBonus) st = { ...st, guided_strike_active: false } as typeof st;
+
       // Helper that resolves one attack roll and applies it to enemy HP / narrative.
       // Returns true if the enemy was killed (so the caller can break early).
       const resolveOneAttack = (label: string): boolean => {
         const effectiveEnemyAc = enemy.ac + coverAcBonus;
+        // Assassin auto-crit on surprised target (PHB p.97)
+        const assassinAutoCrit = char.subclass === 'assassin' && (st.surprised ?? []).includes(roomId);
         const atk = resolvePlayerAttack(
           { str: char.str, dex: char.dex, level: char.level },
           weaponDamage,
@@ -1511,20 +1632,23 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
           advantage,
           weaponProficient,
           weaponItem?.range === 'ranged',
+          critThresh,
+          totalAttackBonus,
         );
-        // Unconscious enemy within melee range: auto-crit
-        const autoCritCheck = enemyUnconscious && (!st.entities || (() => {
+        // Unconscious or Assassin-surprised: force crit on hit
+        const autoCritCheck = (enemyUnconscious && (!st.entities || (() => {
           const charEnt = st.entities?.find(e => e.id === char.id);
           const enmEnt  = st.entities?.find(e => e.id === roomId);
           return charEnt && enmEnt ? posEqual({ x: charEnt.pos.x, y: charEnt.pos.y }, { x: enmEnt.pos.x, y: enmEnt.pos.y }) || Math.max(Math.abs(charEnt.pos.x - enmEnt.pos.x), Math.abs(charEnt.pos.y - enmEnt.pos.y)) <= 1 : true;
-        })());
-        if (autoCritCheck && atk.hit && !atk.critical) {
-          // Force critical on hit
-        }
-        const baseHit  = weaponDamage ? atk.damage : Math.max(1, unarmedDamage(char.str));
+        })())) || assassinAutoCrit;
+        const isCrit = atk.critical || (autoCritCheck && atk.hit);
+        const baseHit  = weaponDamage
+          ? (isCrit && !atk.critical ? Math.max(1, rollCritical(weaponDamage) + atk.atkMod) : atk.damage)
+          : Math.max(1, unarmedDamage(char.str));
         const versatileNote = isVersatile ? ' (versatile)' : '';
         const coverNote = coverAcBonus > 0 ? ` +${coverAcBonus} cover` : '';
-        const atkNote  = ` (${label}d20 ${atk.roll}+${atk.atkMod} ${atk.atkStat}+${atk.prof} prof = ${atk.total} vs AC ${effectiveEnemyAc}${coverNote}${disadvNote}${versatileNote})${noProfNote}`;
+        const bonusNote = totalAttackBonus > 0 ? ` +${totalAttackBonus} bonus` : '';
+        const atkNote  = ` (${label}d20 ${atk.roll}+${atk.atkMod} ${atk.atkStat}+${atk.prof} prof${bonusNote} = ${atk.total} vs AC ${effectiveEnemyAc}${coverNote}${disadvNote}${versatileNote})${noProfNote}`;
 
         if (atk.fumble) {
           narrative += `Natural 1 — a fumble! ${weaponLabel} goes completely wide.${atkNote} `;
@@ -1544,7 +1668,7 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
           const allies  = st.characters.filter(c => !c.dead && c.id !== char.id).length;
           if (hasAdv || allies > 0) {
             const saExpr = sneakAttackDice(char.level);
-            sneakDmg     = atk.critical ? rollCritical(saExpr) : rollDice(saExpr);
+            sneakDmg     = isCrit ? rollCritical(saExpr) : rollDice(saExpr);
           }
         }
 
@@ -1558,8 +1682,10 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
         const curEnemyHp = enemyEnt?.hp ?? 0;
         const newEnemyHp = curEnemyHp - finalDmg;
 
-        narrative += buildCombatHitNarrative(enemy, weaponItem, finalDmg, atk.critical, char, context);
+        narrative += buildCombatHitNarrative(enemy, weaponItem, finalDmg, isCrit, char, context);
         narrative += atkNote;
+        if (isCrit && assassinAutoCrit) narrative += ` [Assassinate — auto-crit on surprised target!]`;
+        if (sacredWeaponBonus > 0) narrative += ` [Sacred Weapon: +${sacredWeaponBonus} to hit]`;
         if (sneakDmg > 0) narrative += ` [Sneak Attack ${sneakAttackDice(char.level)}: +${sneakDmg}]`;
         if (rageBonus > 0) narrative += ` [Rage: +${rageBonus}]`;
         if (dmgNote) narrative += dmgNote;
@@ -1774,8 +1900,14 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
       if (cls === 'bard' && char.level >= 5) delete srUses.bardic_inspiration;
       // Monk: Ki points recharge on short rest
       if (cls === 'monk') delete srUses.ki_points;
+      // Druid: Wild Shape recharges on short rest
+      if (cls === 'druid') srUses.wild_shape = 2;
+      // Cleric/Paladin: Channel Divinity recharges on short rest
+      if (cls === 'cleric' || cls === 'paladin') srUses.channel_divinity = char.level >= 6 ? 2 : 1;
       // Battle Master: Superiority Dice recharge on short rest
       if (char.subclass === 'battle_master') delete srUses.superiority_dice;
+      // Colossus Slayer resets each turn (already reset per-turn); clean up at rest
+      delete srUses.colossus_slayer_used;
       // Warlock: Pact Magic slots recharge on short rest
       if (cls === 'warlock') {
         const warlockSlots = spellSlotsForClassLevel('warlock', char.level);
@@ -1809,10 +1941,19 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
         restLines.push(`${c.name}: HP ${c.hp}→${c.max_hp}, HD ${c.hit_dice_remaining ?? 0}→${newHd}`);
         const charFeatures    = context.classFeatures?.[c.character_class] ?? [];
         const restoredUses: Record<string, number> = { ...(c.class_resource_uses ?? {}) };
-        if (charFeatures.includes('rage')) restoredUses.rage_uses = rageUsesMax(c.level);
+        if (charFeatures.includes('rage'))          restoredUses.rage_uses        = rageUsesMax(c.level);
+        if (charFeatures.includes('wild_shape'))     restoredUses.wild_shape       = 2;
+        if (charFeatures.includes('sorcery_points')) restoredUses.sorcery_points   = c.level;
+        if (charFeatures.includes('ki'))             restoredUses.ki_points        = c.level;
+        if (charFeatures.includes('channel_divinity')) restoredUses.channel_divinity = c.level >= 6 ? 2 : 1;
+        delete restoredUses.action_surge;
+        delete restoredUses.second_wind;
+        delete restoredUses.colossus_slayer_used;
+        delete restoredUses.sacred_weapon_active;
         // Long rest reduces exhaustion by 1 level (PHB p.291); full rest clears all other conditions
         const newExhaustion = Math.max(0, (c.exhaustion_level ?? 0) - 1);
-        return { ...c, hp: c.max_hp, hit_dice_remaining: newHd, conditions: [], condition_durations: {}, class_resource_uses: restoredUses, exhaustion_level: newExhaustion, spell_slots_used: {} };
+        const longRestedConditions = c.conditions.filter(cond => cond !== 'wild_shaped');
+        return { ...c, hp: c.max_hp, hit_dice_remaining: newHd, conditions: longRestedConditions, condition_durations: {}, class_resource_uses: restoredUses, exhaustion_level: newExhaustion, spell_slots_used: {} };
       });
       st   = { ...st, characters: restedChars, long_rested: true };
       char = { ...restedChars[safeIdx] };
@@ -1945,7 +2086,7 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
       // NPC retaliates
       if (!npcIsKilled(st, roomId)) {
         const retaliation = applyEnemyAttackNarrative(npcAsEnemy, char, context);
-        char = { ...char, hp: Math.max(0, char.hp - retaliation.hpLost), conditions: retaliation.newConditions, condition_durations: retaliation.newDurations };
+        char = { ...char, hp: Math.max(0, char.hp - retaliation.hpLost), conditions: retaliation.newConditions, condition_durations: retaliation.newDurations, class_resource_uses: retaliation.updatedResourceUses ?? char.class_resource_uses };
         narrative += ' ' + retaliation.narrative;
       }
       char.turn_actions = { ...char.turn_actions, action_used: true };
@@ -2083,18 +2224,23 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
       // ── Heal spells ────────────────────────────────────────────────────────
       if (spell.heal) {
         const healMod     = Math.max(0, Math.floor((castingScore - 10) / 2));
-        const healed      = rollDice(spell.heal) + healMod;
+        const baseHealed  = rollDice(spell.heal) + healMod;
+        // Life Cleric: Disciple of Life — healing spells restore extra 2 + spell level HP
+        const discipleBonus = (char.subclass === 'life' && char.character_class.toLowerCase() === 'cleric')
+          ? 2 + (spell.level ?? 1) : 0;
+        const healed = baseHealed + discipleBonus;
         // Target the most injured party member (excluding the caster, unless only one)
         const injured     = st.characters.filter(c => !c.dead && c.hp < c.max_hp && c.id !== char.id);
         const target      = injured.length > 0 ? injured.reduce((a, b) => (a.hp < b.hp ? a : b)) : char;
         const isSelf      = target.id === char.id;
+        const discipleNote = discipleBonus > 0 ? ` [Disciple of Life: +${discipleBonus}]` : '';
         if (isSelf) {
           char.hp = Math.min(char.max_hp, char.hp + healed);
-          narrative = `${char.name} casts ${spell.name}${slotNote} — restores ${healed} HP to self (now ${char.hp}/${char.max_hp}).`;
+          narrative = `${char.name} casts ${spell.name}${slotNote} — restores ${healed} HP to self (now ${char.hp}/${char.max_hp}).${discipleNote}`;
         } else {
           const newHp = Math.min(target.max_hp, target.hp + healed);
           st = { ...st, characters: st.characters.map(c => c.id === target.id ? { ...c, hp: newHp } : c) };
-          narrative = `${char.name} casts ${spell.name}${slotNote} — restores ${healed} HP to ${target.name} (now ${newHp}/${target.max_hp}).`;
+          narrative = `${char.name} casts ${spell.name}${slotNote} — restores ${healed} HP to ${target.name} (now ${newHp}/${target.max_hp}).${discipleNote}`;
         }
         break;
       }
@@ -2125,9 +2271,14 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
         }
         const atkDmgExpr = spell.level === 0 ? cantripDamageDice(spell, char.level) : upcastDamage(spell, slotLevel);
         spellDmg  = atk.critical ? rollCritical(atkDmgExpr || null) : rollDice(atkDmgExpr || '1d4');
+        // Agonizing Blast: Warlock invocation — add CHA mod to Eldritch Blast damage
+        const agonizingBonus = (spell.id === 'eldritch_blast' && (char.feats ?? []).includes('agonizing_blast'))
+          ? Math.max(0, abilityMod(char.cha)) : 0;
+        spellDmg += agonizingBonus;
         narrative = `${char.name} casts ${spell.name}${slotNote}!${atkNote} `;
         if (atk.critical) narrative += 'Critical spell hit! ';
         narrative += `${spellDmg} ${spell.damageType ?? ''} damage!`;
+        if (agonizingBonus > 0) narrative += ` [Agonizing Blast: +${agonizingBonus}]`;
       } else if (spell.savingThrow) {
         // ── Saving throw spell ─────────────────────────────────────────────
         const saveAbility    = spell.savingThrow;
@@ -2393,6 +2544,273 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
           // Generic maneuver: deal extra die damage
           narrative = `Maneuver — +${sdRoll} superiority die damage! (${sdPool - 1} dice remaining)`;
         }
+      }
+
+      // ── Monk: Flurry of Blows (2 unarmed strikes, 1 ki, bonus action) ────────
+      else if (fid === 'flurry_of_blows') {
+        const cls = char.character_class.toLowerCase();
+        if (cls !== 'monk') { narrative = 'Only Monks have Flurry of Blows.'; break; }
+        if (char.level < 2) { narrative = 'Flurry of Blows requires Monk level 2.'; break; }
+        if (char.turn_actions.bonus_action_used) { narrative = 'Bonus action already used this turn.'; break; }
+        if (!char.turn_actions.action_used) { narrative = 'You must use your Attack action before using Flurry of Blows.'; break; }
+        const kiPool = char.class_resource_uses?.ki_points ?? char.level;
+        if (kiPool <= 0) { narrative = 'No ki points remaining (recover on short rest).'; break; }
+        char.class_resource_uses = { ...(char.class_resource_uses ?? {}), ki_points: kiPool - 1 };
+        char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
+        const martialDie = char.level >= 17 ? 10 : char.level >= 11 ? 8 : char.level >= 5 ? 6 : 4;
+        let flurryNarrative = `${char.name} — Flurry of Blows (${kiPool - 1} ki remaining)!`;
+        for (let i = 0; i < 2; i++) {
+          if (!enemyAlive || !enemyEntity) break;
+          const toHit = rollDice('1d20') + abilityMod(char.dex) + profBonus(char.level);
+          if (toHit >= (enemyEntity ? (enemy?.ac ?? 10) : 10)) {
+            const dmg = Math.max(1, rollDice(`1d${martialDie}`) + abilityMod(char.dex));
+            const curHp = st.entities?.find(e => e.id === roomId && e.isEnemy)?.hp ?? 0;
+            const newHp = curHp - dmg;
+            st = { ...st, entities: (st.entities ?? []).map(e => e.id === roomId && e.isEnemy ? { ...e, hp: Math.max(0, newHp) } : e) };
+            flurryNarrative += ` Strike ${i + 1}: hit (${toHit}) — ${dmg} bludgeoning.${newHp <= 0 ? ' (killed)' : ''}`;
+            if (newHp <= 0) {
+              char.xp = (char.xp || 0) + (enemy?.xp ?? 10);
+              st.enemies_killed = [...st.enemies_killed, roomId];
+              st = endCombatState(st);
+              break;
+            }
+          } else {
+            flurryNarrative += ` Strike ${i + 1}: miss (${toHit}).`;
+          }
+        }
+        narrative = flurryNarrative;
+      }
+
+      // ── Monk: Step of the Wind (Dash or Disengage, 1 ki, bonus action) ───────
+      else if (fid === 'step_of_wind_dash' || fid === 'step_of_wind_disengage') {
+        const cls = char.character_class.toLowerCase();
+        if (cls !== 'monk') { narrative = 'Only Monks have Step of the Wind.'; break; }
+        if (char.level < 2) { narrative = 'Step of the Wind requires Monk level 2.'; break; }
+        if (char.turn_actions.bonus_action_used) { narrative = 'Bonus action already used this turn.'; break; }
+        const kiPool2 = char.class_resource_uses?.ki_points ?? char.level;
+        if (kiPool2 <= 0) { narrative = 'No ki points remaining (recover on short rest).'; break; }
+        char.class_resource_uses = { ...(char.class_resource_uses ?? {}), ki_points: kiPool2 - 1 };
+        char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
+        if (fid === 'step_of_wind_dash') {
+          const stwSpeed = char.speed ?? DEFAULT_SPEED_FEET;
+          st = { ...st, movement_used: { ...(st.movement_used ?? {}), [char.id]: Math.max(0, (st.movement_used?.[char.id] ?? 0) - stwSpeed) } };
+          narrative = `${char.name} — Step of the Wind: Dash! +${stwSpeed} ft movement. (${kiPool2 - 1} ki remaining)`;
+        } else {
+          char.turn_actions = { ...char.turn_actions, disengaged: true };
+          narrative = `${char.name} — Step of the Wind: Disengage! No opportunity attacks when moving. (${kiPool2 - 1} ki remaining)`;
+        }
+      }
+
+      // ── Monk: Stunning Strike (1 ki, after a hit) ────────────────────────────
+      else if (fid === 'stunning_strike') {
+        const cls = char.character_class.toLowerCase();
+        if (cls !== 'monk') { narrative = 'Only Monks have Stunning Strike.'; break; }
+        if (char.level < 5) { narrative = 'Stunning Strike requires Monk level 5.'; break; }
+        if (!enemyAlive || !enemy) { narrative = 'No living target.'; break; }
+        const kiPool3 = char.class_resource_uses?.ki_points ?? char.level;
+        if (kiPool3 <= 0) { narrative = 'No ki points remaining (recover on short rest).'; break; }
+        char.class_resource_uses = { ...(char.class_resource_uses ?? {}), ki_points: kiPool3 - 1 };
+        const stunDC = 8 + profBonus(char.level) + abilityMod(char.wis);
+        const conSave = rollDice('1d20') + abilityMod((enemy as unknown as Record<string, number>)['con'] ?? 10);
+        if (conSave < stunDC) {
+          st = { ...st, entities: (st.entities ?? []).map(e => e.id === roomId && e.isEnemy ? { ...e, conditions: [...e.conditions.filter(c => c !== 'stunned'), 'stunned'] } : e) };
+          narrative = `Stunning Strike! CON save ${conSave} vs DC ${stunDC} — ${enemy.name} is stunned until the end of your next turn! (${kiPool3 - 1} ki remaining)`;
+        } else {
+          narrative = `Stunning Strike! CON save ${conSave} vs DC ${stunDC} — ${enemy.name} resists. (${kiPool3 - 1} ki remaining)`;
+        }
+      }
+
+      // ── Druid: Wild Shape ────────────────────────────────────────────────────
+      else if (fid === 'wild_shape') {
+        const cls = char.character_class.toLowerCase();
+        if (cls !== 'druid') { narrative = 'Only Druids have Wild Shape.'; break; }
+        if (char.conditions.includes('wild_shaped')) { narrative = 'You are already in Wild Shape. Attack or use Dismiss Wild Shape to end it.'; break; }
+        const wsUses = char.class_resource_uses?.wild_shape ?? 2;
+        if (wsUses <= 0) { narrative = 'No Wild Shape uses remaining (recover on short rest).'; break; }
+        const maxCR = char.level >= 8 ? 1 : char.level >= 4 ? 0.5 : 0.25;
+        const tempHp = Math.max(5, Math.round(maxCR * 5) * char.level);
+        char.class_resource_uses = { ...(char.class_resource_uses ?? {}), wild_shape: wsUses - 1 };
+        char.conditions = [...char.conditions, 'wild_shaped'];
+        char.hp = char.hp + tempHp;
+        narrative = `${char.name} transforms into a beast! +${tempHp} temporary HP (max CR ${maxCR}). Wild Shape lasts until you are reduced to 0 HP or dismiss it. (${wsUses - 1} uses remaining)`;
+      }
+
+      // ── Druid: Dismiss Wild Shape ────────────────────────────────────────────
+      else if (fid === 'dismiss_wild_shape') {
+        if (!char.conditions.includes('wild_shaped')) { narrative = 'You are not in Wild Shape.'; break; }
+        char.conditions = char.conditions.filter(c => c !== 'wild_shaped');
+        narrative = `${char.name} reverts to their normal form.`;
+      }
+
+      // ── Sorcerer: Metamagic — Twinned Spell (1 sorcery point) ────────────────
+      else if (fid === 'metamagic_twinned') {
+        const cls = char.character_class.toLowerCase();
+        if (cls !== 'sorcerer') { narrative = 'Only Sorcerers have Metamagic.'; break; }
+        const spPool = char.class_resource_uses?.sorcery_points ?? char.level;
+        if (spPool < 1) { narrative = 'Not enough sorcery points (need 1).'; break; }
+        char.class_resource_uses = { ...(char.class_resource_uses ?? {}), sorcery_points: spPool - 1 };
+        st = { ...st, metamagic_active: 'twinned' };
+        narrative = `${char.name} — Metamagic: Twinned Spell! Your next spell will target a second creature. (${spPool - 1} sorcery points remaining)`;
+      }
+
+      // ── Sorcerer: Metamagic — Quickened Spell (2 sorcery points) ─────────────
+      else if (fid === 'metamagic_quickened') {
+        const cls = char.character_class.toLowerCase();
+        if (cls !== 'sorcerer') { narrative = 'Only Sorcerers have Metamagic.'; break; }
+        if (char.turn_actions.bonus_action_used) { narrative = 'Bonus action already used this turn.'; break; }
+        const spPool2 = char.class_resource_uses?.sorcery_points ?? char.level;
+        if (spPool2 < 2) { narrative = 'Not enough sorcery points (need 2).'; break; }
+        char.class_resource_uses = { ...(char.class_resource_uses ?? {}), sorcery_points: spPool2 - 2 };
+        char.turn_actions = { ...char.turn_actions, bonus_action_used: true, action_used: false };
+        st = { ...st, metamagic_active: 'quickened' };
+        narrative = `${char.name} — Metamagic: Quickened Spell! Cast your next spell as a bonus action. (${spPool2 - 2} sorcery points remaining)`;
+      }
+
+      // ── Sorcerer: Metamagic — Empowered Spell (1 sorcery point) ──────────────
+      else if (fid === 'metamagic_empowered') {
+        const cls = char.character_class.toLowerCase();
+        if (cls !== 'sorcerer') { narrative = 'Only Sorcerers have Metamagic.'; break; }
+        const spPool3 = char.class_resource_uses?.sorcery_points ?? char.level;
+        if (spPool3 < 1) { narrative = 'Not enough sorcery points (need 1).'; break; }
+        char.class_resource_uses = { ...(char.class_resource_uses ?? {}), sorcery_points: spPool3 - 1 };
+        st = { ...st, metamagic_active: 'empowered' };
+        narrative = `${char.name} — Metamagic: Empowered Spell! You may reroll up to ${abilityMod(char.cha)} damage dice on your next spell. (${spPool3 - 1} sorcery points remaining)`;
+      }
+
+      // ── Warlock: Agonizing Blast invocation (passive — toggled on/off) ────────
+      else if (fid === 'agonizing_blast') {
+        const cls = char.character_class.toLowerCase();
+        if (cls !== 'warlock') { narrative = 'Only Warlocks can take Agonizing Blast.'; break; }
+        const hasIt = char.feats?.includes('agonizing_blast') ?? false;
+        if (hasIt) { narrative = 'You already have the Agonizing Blast invocation.'; break; }
+        char.feats = [...(char.feats ?? []), 'agonizing_blast'];
+        narrative = `${char.name} gains the Agonizing Blast invocation — Eldritch Blast now adds +${abilityMod(char.cha)} force damage per beam.`;
+      }
+
+      // ── Warlock: Devil's Sight invocation ────────────────────────────────────
+      else if (fid === 'devils_sight') {
+        const cls = char.character_class.toLowerCase();
+        if (cls !== 'warlock') { narrative = 'Only Warlocks can take Devil\'s Sight.'; break; }
+        const hasIt2 = char.feats?.includes('devils_sight') ?? false;
+        if (hasIt2) { narrative = 'You already have the Devil\'s Sight invocation.'; break; }
+        char.feats = [...(char.feats ?? []), 'devils_sight'];
+        narrative = `${char.name} gains Devil's Sight — you can see normally in magical darkness.`;
+      }
+
+      // ── Champion Fighter: Remarkable Athlete ────────────────────────────────
+      else if (fid === 'remarkable_athlete') {
+        narrative = `${char.name} — Remarkable Athlete: add +${Math.ceil(profBonus(char.level) / 2)} to uninvested STR/DEX/CON checks (passive).`;
+      }
+
+      // ── Abjurer Wizard: Arcane Ward ──────────────────────────────────────────
+      else if (fid === 'arcane_ward') {
+        if (char.subclass !== 'abjurer') { narrative = 'Only Abjurer Wizards have Arcane Ward.'; break; }
+        const wardHp = 2 * char.level;
+        char.class_resource_uses = { ...(char.class_resource_uses ?? {}), arcane_ward: wardHp };
+        narrative = `${char.name} creates an Arcane Ward with ${wardHp} HP. It absorbs damage before your HP is reduced.`;
+      }
+
+      // ── Life Cleric: Preserve Life (Channel Divinity) ────────────────────────
+      else if (fid === 'preserve_life') {
+        if (char.subclass !== 'life') { narrative = 'Only Life Clerics have Preserve Life.'; break; }
+        const cdUses = char.class_resource_uses?.channel_divinity ?? 1;
+        if (cdUses <= 0) { narrative = 'No Channel Divinity uses remaining (recover on short rest).'; break; }
+        char.class_resource_uses = { ...(char.class_resource_uses ?? {}), channel_divinity: cdUses - 1 };
+        const poolHp = 5 * char.level;
+        const woundedAllies = st.characters.filter(c => !c.dead && c.hp < c.max_hp && c.id !== char.id);
+        let preserved = 0;
+        let remaining = poolHp;
+        const updatedChars = st.characters.map(c => {
+          if (!c.dead && c.hp < c.max_hp && c.id !== char.id && remaining > 0) {
+            const half = Math.floor(c.max_hp / 2);
+            if (c.hp >= half) return c;
+            const heal = Math.min(remaining, half - c.hp);
+            preserved += heal;
+            remaining -= heal;
+            return { ...c, hp: c.hp + heal };
+          }
+          return c;
+        });
+        st = { ...st, characters: updatedChars };
+        narrative = `${char.name} — Preserve Life! Distributed ${preserved} HP among ${woundedAllies.length} wounded allies (pool: ${poolHp}). (${cdUses - 1} Channel Divinity remaining)`;
+      }
+
+      // ── War Cleric: Guided Strike (Channel Divinity) ─────────────────────────
+      else if (fid === 'guided_strike') {
+        if (char.subclass !== 'war') { narrative = 'Only War Clerics have Guided Strike.'; break; }
+        const cdUsesWar = char.class_resource_uses?.channel_divinity ?? 1;
+        if (cdUsesWar <= 0) { narrative = 'No Channel Divinity uses remaining.'; break; }
+        char.class_resource_uses = { ...(char.class_resource_uses ?? {}), channel_divinity: cdUsesWar - 1 };
+        st = { ...st, guided_strike_active: true };
+        narrative = `${char.name} — Guided Strike! Your next attack roll gains +10. (${cdUsesWar - 1} Channel Divinity remaining)`;
+      }
+
+      // ── Hunter Ranger: Hunter's Prey — Colossus Slayer ───────────────────────
+      else if (fid === 'colossus_slayer') {
+        if (char.subclass !== 'hunter') { narrative = 'Only Hunter Rangers have Colossus Slayer.'; break; }
+        if (!enemyAlive || !enemyEntity) { narrative = 'No living target.'; break; }
+        const enemyMaxHp = (enemy as unknown as Record<string, number>)['max_hp'] ?? enemyEntity.hp * 2;
+        if (enemyEntity.hp >= enemyMaxHp) { narrative = 'Colossus Slayer only triggers on a bloodied (below max HP) target.'; break; }
+        if ((char.class_resource_uses?.colossus_slayer_used ?? 0) >= 1) { narrative = 'Colossus Slayer already triggered this turn.'; break; }
+        const csDmg = rollDice('1d8');
+        char.class_resource_uses = { ...(char.class_resource_uses ?? {}), colossus_slayer_used: 1 };
+        const csHp = (st.entities?.find(e => e.id === roomId && e.isEnemy)?.hp ?? 0) - csDmg;
+        st = { ...st, entities: (st.entities ?? []).map(e => e.id === roomId && e.isEnemy ? { ...e, hp: Math.max(0, csHp) } : e) };
+        narrative = `Colossus Slayer! +${csDmg} piercing damage on a bloodied foe (${csHp <= 0 ? 'killed' : `${Math.max(0, csHp)} HP remaining`}).`;
+        if (csHp <= 0) { st.enemies_killed = [...st.enemies_killed, roomId]; st = endCombatState(st); }
+      }
+
+      // ── Devotion Paladin: Sacred Weapon (Channel Divinity) ───────────────────
+      else if (fid === 'sacred_weapon') {
+        if (char.subclass !== 'devotion') { narrative = 'Only Devotion Paladins have Sacred Weapon.'; break; }
+        const cdUsesDev = char.class_resource_uses?.channel_divinity ?? 1;
+        if (cdUsesDev <= 0) { narrative = 'No Channel Divinity uses remaining.'; break; }
+        char.class_resource_uses = { ...(char.class_resource_uses ?? {}), channel_divinity: cdUsesDev - 1, sacred_weapon_active: 1 };
+        const chaMod = abilityMod(char.cha);
+        narrative = `${char.name} — Sacred Weapon! +${chaMod} to attack rolls for 1 minute (10 rounds). Your weapon gleams with divine light. (${cdUsesDev - 1} Channel Divinity remaining)`;
+      }
+
+      // ── Vengeance Paladin: Vow of Enmity (Channel Divinity) ──────────────────
+      else if (fid === 'vow_of_enmity') {
+        if (char.subclass !== 'vengeance') { narrative = 'Only Vengeance Paladins have Vow of Enmity.'; break; }
+        const cdUsesVen = char.class_resource_uses?.channel_divinity ?? 1;
+        if (cdUsesVen <= 0) { narrative = 'No Channel Divinity uses remaining.'; break; }
+        char.class_resource_uses = { ...(char.class_resource_uses ?? {}), channel_divinity: cdUsesVen - 1 };
+        st = { ...st, vow_of_enmity_target: roomId };
+        narrative = `${char.name} — Vow of Enmity! You have advantage on all attack rolls against ${enemy?.name ?? 'your target'} for 1 minute. (${cdUsesVen - 1} Channel Divinity remaining)`;
+      }
+
+      // ── Vengeance Paladin: Abjure Enemy (Channel Divinity) ───────────────────
+      else if (fid === 'abjure_enemy') {
+        if (char.subclass !== 'vengeance') { narrative = 'Only Vengeance Paladins have Abjure Enemy.'; break; }
+        if (!enemyAlive || !enemy) { narrative = 'No living target.'; break; }
+        const cdUsesVen2 = char.class_resource_uses?.channel_divinity ?? 1;
+        if (cdUsesVen2 <= 0) { narrative = 'No Channel Divinity uses remaining.'; break; }
+        char.class_resource_uses = { ...(char.class_resource_uses ?? {}), channel_divinity: cdUsesVen2 - 1 };
+        const wisSave = rollDice('1d20') + abilityMod((enemy as unknown as Record<string, number>)['wis'] ?? 10);
+        const frightenDC = 8 + profBonus(char.level) + abilityMod(char.cha);
+        if (wisSave < frightenDC) {
+          st = { ...st, entities: (st.entities ?? []).map(e => e.id === roomId && e.isEnemy ? { ...e, conditions: [...e.conditions.filter(c => c !== 'frightened'), 'frightened'] } : e) };
+          narrative = `Abjure Enemy! WIS save ${wisSave} vs DC ${frightenDC} — ${enemy.name} is frightened! (${cdUsesVen2 - 1} Channel Divinity remaining)`;
+        } else {
+          narrative = `Abjure Enemy! WIS save ${wisSave} vs DC ${frightenDC} — ${enemy.name} resists. (${cdUsesVen2 - 1} Channel Divinity remaining)`;
+        }
+        usedInitiative = true;
+      }
+
+      // ── Lore Bard: Cutting Words (reaction) ──────────────────────────────────
+      else if (fid === 'cutting_words') {
+        if (char.subclass !== 'lore') { narrative = 'Only Lore Bards have Cutting Words.'; break; }
+        if (char.turn_actions.reaction_used) { narrative = 'Reaction already used this turn.'; break; }
+        if (!enemyAlive || !enemy) { narrative = 'No living target.'; break; }
+        const biLeft = char.class_resource_uses?.bardic_inspiration ?? abilityMod(char.cha);
+        if (biLeft <= 0) { narrative = 'No Bardic Inspiration uses remaining.'; break; }
+        char.class_resource_uses = { ...(char.class_resource_uses ?? {}), bardic_inspiration: biLeft - 1 };
+        char.turn_actions = { ...char.turn_actions, reaction_used: true };
+        const cuttingDie = char.level >= 15 ? 12 : char.level >= 10 ? 10 : char.level >= 5 ? 8 : 6;
+        const cuttingRoll = rollDice(`1d${cuttingDie}`);
+        narrative = `${char.name} — Cutting Words! Subtract ${cuttingRoll} from ${enemy.name}'s next attack roll or ability check this round. (${biLeft - 1} Bardic Inspiration remaining)`;
+        st = { ...st, cutting_words_penalty: cuttingRoll };
       }
 
       // ── Unknown feature fallthrough ────────────────────────────────────────
@@ -2902,7 +3320,7 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
             narrative += ` [${rm.name}'s turn]`;
             for (let mi = 0; mi < attackCount && target.hp > 0; mi++) {
               const atkResult = applyEnemyAttackNarrative(rm, target, context);
-              target = { ...target, hp: Math.max(0, target.hp - atkResult.hpLost), conditions: atkResult.newConditions, condition_durations: atkResult.newDurations };
+              target = { ...target, hp: Math.max(0, target.hp - atkResult.hpLost), conditions: atkResult.newConditions, condition_durations: atkResult.newDurations, class_resource_uses: atkResult.updatedResourceUses ?? target.class_resource_uses };
               const concAtk = checkConcentration(target, st, atkResult.hpLost);
               target = concAtk.char; st = concAtk.st;
               narrative += ` ${atkResult.narrative}${concAtk.note}`;

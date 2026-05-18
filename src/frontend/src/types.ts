@@ -272,6 +272,10 @@ export interface GameState {
   movement_used?:  Record<string, number>;
   help_target_id?: string;
   surprised?:      string[];
+  metamagic_active?:       string;
+  guided_strike_active?:   boolean;
+  vow_of_enmity_target?:   string;
+  cutting_words_penalty?:  number;
 
   // Campaign overlay
   current_location_id?: string;
