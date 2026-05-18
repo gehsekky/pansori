@@ -342,10 +342,14 @@ export interface Session {
 
 export interface SessionSummary {
   id: string;
+  // Leader display fields derived from `state.characters[0]` on the server.
+  // Stay populated for backward compat with the session-list rendering.
   character_name: string;
   character_class: string;
-  status: string;
   portrait_url: string | null;
+  // Total party size (1-4). Used to render "& N companions" when > 1.
+  party_size: number;
+  status: string;
   context_id: string;
   created_at: string;
   updated_at: string;

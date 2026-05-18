@@ -16,18 +16,18 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 -- ─── Game sessions ────────────────────────────────────────────────────────────
+-- Party data (every character's name, class, portrait, HP, inventory) lives
+-- entirely in `state.characters`. The session list display derives leader
+-- info and party size from JSONB at read time.
 CREATE TABLE IF NOT EXISTS game_sessions (
-  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id         UUID REFERENCES users(id) ON DELETE CASCADE,
-  character_name  VARCHAR(100) NOT NULL,
-  character_class VARCHAR(50)  NOT NULL,
-  portrait_url    TEXT,
-  seed            JSONB        NOT NULL,
-  state           JSONB        NOT NULL DEFAULT '{}',
-  status          VARCHAR(20)  NOT NULL DEFAULT 'active',
+  id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id    UUID REFERENCES users(id) ON DELETE CASCADE,
+  seed       JSONB        NOT NULL,
+  state      JSONB        NOT NULL DEFAULT '{}',
+  status     VARCHAR(20)  NOT NULL DEFAULT 'active',
   -- status values: active | dead | escaped | abandoned
-  created_at      TIMESTAMPTZ DEFAULT NOW(),
-  updated_at      TIMESTAMPTZ DEFAULT NOW()
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_sessions_user_status ON game_sessions(user_id, status);
