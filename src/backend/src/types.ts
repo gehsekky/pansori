@@ -24,6 +24,15 @@ export interface LootItem {
   versatileDamage?: string; // two-handed damage for versatile weapons (e.g. '1d8' for quarterstaff)
   damageType?: string; // piercing / slashing / bludgeoning / fire / etc.
   thrown?: { normalRange: number; longRange: number }; // melee weapon usable as ranged
+  // SRD 5.2.1 p.90 "Loading": one shot per Action/Bonus/Reaction regardless of
+  // Extra Attack. Hand/heavy crossbows, muskets, pistols, blowguns all have it.
+  loading?: boolean;
+  // SRD 5.2.1 p.90 "Reach": adds 5 ft to melee reach (also for opportunity
+  // attacks made with this weapon). Glaive, halberd, lance, pike, whip.
+  reach?: boolean;
+  // SRD 5.2.1 p.90 "Heavy": disadv on attacks if STR < 13 (melee) / DEX < 13
+  // (ranged). Greataxe, greatsword, maul, heavy crossbow, longbow, etc.
+  heavy?: boolean;
 }
 
 // ─── Seed (procedurally generated world state) ────────────────────────────────
@@ -388,6 +397,9 @@ export interface Character {
   // (typically 60 ft for elves/dwarves/halflings/etc.). Default 0 = no
   // darkvision (typical human).
   darkvision_ft?: number;
+  // SRD 5.2.1 p.17–18: Temporary Hit Points. Absorb damage before HP. Don't
+  // stack with themselves (replace if higher); expire on a Long Rest.
+  temp_hp?: number;
 }
 
 // ─── Game state (world/party container) ──────────────────────────────────────

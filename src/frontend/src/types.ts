@@ -194,6 +194,7 @@ export interface Character {
   prepared_spells?: string[];
   charmer_id?: string;
   darkvision_ft?: number;
+  temp_hp?: number;
 }
 
 // ─── NPC system ───────────────────────────────────────────────────────────────
