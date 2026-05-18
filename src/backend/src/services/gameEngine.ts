@@ -2567,7 +2567,11 @@ export async function takeAction({
         break;
       }
       char.inventory = [...(char.inventory || []), { ...loot, instance_id: randomUUID() }];
-      st.loot_taken = [...st.loot_taken, roomId];
+      // Track BOTH the roomId (for the lootAvail "already looted" gate) and
+      // the item id (so quest conditions like `loot_taken contains 'guild_ledger'`
+      // resolve correctly regardless of which room or container the item came
+      // from).
+      st.loot_taken = [...st.loot_taken, roomId, loot.id];
       narrative = pick(context.narratives.lootPickedUp).replace(/{item}/g, loot.name);
       const hasIdentify =
         context.classSkills[char.character_class]?.some((s) =>
@@ -4484,12 +4488,20 @@ export async function takeAction({
 
       if (check.success) {
         const gained: string[] = [];
+        const gainedIds: string[] = [];
         for (const lootId of obj.lootIds) {
           const item = context.lootTable.find((l) => l.id === lootId);
           if (item) {
             char.inventory = [...(char.inventory ?? []), { ...item, instance_id: randomUUID() }];
             gained.push(item.name);
+            gainedIds.push(item.id);
           }
+        }
+        // Mirror the floor-loot flow: record item ids in loot_taken so quest
+        // conditions (`loot_taken contains 'shadow_evidence'`) fire whether
+        // the player picked it up from the floor or from a container.
+        if (gainedIds.length) {
+          st = { ...st, loot_taken: [...(st.loot_taken ?? []), ...gainedIds] };
         }
         const foundDesc = obj.foundText ?? `You find: ${gained.join(', ')}.`;
         narrative = `${obj.interactText} (Investigation: ${check.roll}+${abilityMod(char.int)}=${check.total} vs DC ${obj.searchDC ?? 12} — success!) ${foundDesc}`;
