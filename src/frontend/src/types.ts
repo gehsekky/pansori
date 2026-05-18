@@ -127,6 +127,9 @@ export interface FrontendContext {
   // Authoring hint mirrored from the backend context. Shown on the character
   // creation screen so players know what the encounters are tuned for.
   recommendedPartySize?: number;
+  // Per-campaign class composition the auto-fill button uses. Falls back to a
+  // generic size-based template when unset (Fighter/Cleric/Rogue for 3, etc.).
+  recommendedComposition?: string[];
 }
 
 // ─── Character (per-character state) ─────────────────────────────────────────

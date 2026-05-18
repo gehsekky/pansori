@@ -37,6 +37,16 @@ function rollStatBlock(): StatBlock {
   };
 }
 
+// Fallback compositions when a campaign doesn't override. Mirrors the 5e
+// "iconic four" — Fighter (tank), Cleric (heal), Wizard (magic), Rogue (utility).
+// Roles taken from DMG p.83: Defender / Healer / Controller / Striker.
+const DEFAULT_COMPOSITION_BY_SIZE: Record<number, string[]> = {
+  1: ['Paladin'],
+  2: ['Fighter', 'Cleric'],
+  3: ['Fighter', 'Cleric', 'Rogue'],
+  4: ['Fighter', 'Cleric', 'Wizard', 'Rogue'],
+};
+
 interface CharDraft {
   name: string;
   cls: string;
@@ -115,6 +125,32 @@ function CharScreen({
 
   function removeMember(idx: number) {
     setParty((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  // Build the campaign's recommended party. Uses the campaign's authored
+  // composition if present, else the size-based default (Fighter/Cleric/Rogue
+  // for 3, etc.). Falls back to the first available class if any recommended
+  // class isn't supported by the campaign.
+  function autoFillParty() {
+    if (!selectedCtxForInit) return;
+    const validClasses = new Set(selectedCtxForInit.classes.map((c) => c.id));
+    const size = selectedCtxForInit.recommendedPartySize ?? 1;
+    const desired =
+      selectedCtxForInit.recommendedComposition ?? DEFAULT_COMPOSITION_BY_SIZE[size] ?? [];
+    const fallbackClass = selectedCtxForInit.classes[0]?.id ?? '';
+    const composition = (desired.length ? desired : [fallbackClass])
+      .map((cls) => (validClasses.has(cls) ? cls : fallbackClass))
+      .slice(0, 4);
+    setParty(
+      composition.map((cls) => ({
+        name: cls,
+        cls,
+        backgroundId: selectedCtxForInit.backgrounds?.[0]?.id ?? '',
+        stats: rollStatBlock(),
+        portrait: null,
+        rollCount: 1,
+      }))
+    );
   }
 
   async function handle() {
@@ -412,7 +448,7 @@ function CharScreen({
               className={styles.submit}
               style={{
                 marginTop: 0,
-                marginBottom: '1rem',
+                marginBottom: '0.5rem',
                 background: 'transparent',
                 border: '1px dashed var(--t-border)',
                 color: 'var(--t-dim)',
@@ -420,6 +456,33 @@ function CharScreen({
               onClick={addMember}
             >
               + ADD PARTY MEMBER
+            </button>
+          )}
+
+          {selectedCtxForInit?.recommendedPartySize !== undefined && (
+            <button
+              className={styles.submit}
+              style={{
+                marginTop: 0,
+                marginBottom: '1rem',
+                background: 'transparent',
+                border: '1px dashed var(--t-primary)',
+                color: 'var(--t-primary)',
+              }}
+              onClick={autoFillParty}
+              title={(
+                selectedCtxForInit.recommendedComposition ??
+                DEFAULT_COMPOSITION_BY_SIZE[selectedCtxForInit.recommendedPartySize] ??
+                []
+              ).join(' / ')}
+            >
+              ★ AUTO-FILL RECOMMENDED PARTY (
+              {(
+                selectedCtxForInit.recommendedComposition ??
+                DEFAULT_COMPOSITION_BY_SIZE[selectedCtxForInit.recommendedPartySize] ??
+                []
+              ).join(' / ')}
+              )
             </button>
           )}
 
@@ -434,12 +497,10 @@ function CharScreen({
                 }}
               >
                 ⚠ {selectedCtxForInit.displayName} is tuned for a party of{' '}
-                {selectedCtxForInit.recommendedPartySize}. You can play with{' '}
-                {party.length}, but encounters may feel{' '}
-                {party.length < selectedCtxForInit.recommendedPartySize
-                  ? 'harder'
-                  : 'easier'}{' '}
-                than intended.
+                {selectedCtxForInit.recommendedPartySize}. You can play with {party.length}, but
+                encounters may feel{' '}
+                {party.length < selectedCtxForInit.recommendedPartySize ? 'harder' : 'easier'} than
+                intended.
               </p>
             )}
 

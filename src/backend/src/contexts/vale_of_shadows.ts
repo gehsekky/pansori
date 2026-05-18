@@ -904,6 +904,9 @@ export const context: Context = {
     world_name: 'Vale of Shadows',
     // Three quests + 8-room crypt with a multi-attack lich boss — tuned for 3 PCs.
     recommendedPartySize: 3,
+    // Charnel Hall blade trap + Garrison strongbox favor Rogue's Stealth /
+    // Investigation / Cunning Action over a Wizard's blast spells here.
+    recommendedComposition: ['Fighter', 'Cleric', 'Rogue'],
     intro:
       'The Vale of Shadows stretches before you — a land of ancient tombs, suspicious merchants, and shadows that move against the light.',
 

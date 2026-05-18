@@ -7,6 +7,7 @@ export const context: FrontendContext = {
   tagline:
     'A frozen mountain pass. A trapper gone missing. A cult above the snow line — and fire is your friend.',
   recommendedPartySize: 3,
+  recommendedComposition: ['Fighter', 'Cleric', 'Wizard'],
   previewArt: `
    ╔═ PINES ══════╗
    ║   ❄ ❄ ❄ ❄    ║
