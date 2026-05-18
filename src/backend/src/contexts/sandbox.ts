@@ -218,10 +218,12 @@ export const context: Context = {
     magic_missile: {
       id: 'magic_missile',
       name: 'Magic Missile',
-      desc: 'Three darts of magical force, each dealing 1d4+1 force damage. Always hits.',
+      desc: 'Three darts of magical force, each dealing 1d4+1 force damage. Always hits. +1 dart per slot above 1st.',
       level: 1,
       castTime: 'action',
-      damage: '3d4',
+      // SRD 5.2.1 p.282 — three darts at 1d4+1 each = 3d4+3 (+1d4+1 per upcast).
+      damage: '3d4+3',
+      upcastBonus: '1d4+1',
       damageType: 'force',
       rangeKind: 'ranged',
       rangeFt: 120,
