@@ -15,6 +15,10 @@ import session from 'express-session';
 const app = express();
 const httpServer = createServer(app);
 
+// Behind nginx in prod: trust X-Forwarded-Proto so cookie.secure works and
+// req.secure / req.ip reflect the original TLS-terminated connection.
+app.set('trust proxy', 1);
+
 const io = new Server(httpServer, {
   cors: { origin: process.env.FRONTEND_URL, credentials: true },
 });
