@@ -55,6 +55,7 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 ## UX & polish
 
 - [ ] **Combat narrative clarity** — see top-5 item 4. Related backlog: narrative template format separating mechanics from prose.
+- [ ] **Grid map detail pass** — surface more battlefield state on the grid. Dead bodies should render as a faded/greyed-out token (or a 💀 marker) so players can see where corpses lie even though they no longer block movement (fixed in commit `4a7f68f`). Other candidates: difficult-terrain squares (rocks/snow tile), obstacles, party line-of-sight indicators, last-attacker arrows, AoE preview when hovering a spell choice.
 - [ ] **Narrative template format** — separate dice rolls / damage numbers / HP changes from prose so the UI can render them differently while keeping immersion.
 - [ ] **Tutorial / onboarding** — the game drops new players into character creation with no introduction to the action choice loop, grid combat, or the inventory modal. A 2-room intro tutorial would help.
 - [ ] **Multi-window inventory** — deferred. Single modal serves the core use case.
