@@ -360,7 +360,6 @@ export interface GameState {
   visited_rooms:  string[];
   enemies_killed: string[];
   loot_taken:     string[];
-  enemy_hp:       Record<string, number>;
 
   // Combat (party-level)
   combat_active:    boolean;
@@ -389,9 +388,6 @@ export interface GameState {
 
   // Script engine flags
   flags: Record<string, boolean | string | number>;
-
-  // Enemy conditions for current room (cleared on room change or enemy death)
-  enemy_conditions: string[];
 
   // Grid combat (campaign dungeons only)
   entities?:       CombatEntity[];

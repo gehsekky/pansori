@@ -196,7 +196,6 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
       visited_rooms:       [ctx.startRoomId],
       enemies_killed:      [],
       loot_taken:          [],
-      enemy_hp:            {},
       combat_active:       false,
       initiative_order:    [],
       initiative_idx:      0,
@@ -211,7 +210,6 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
       flags:               {},
       npc_attitudes:       {},
       npc_talked:          [],
-      enemy_conditions:    [],
     };
 
     const startNarrative = seed.intro + ' ' + buildArrivalNarrative(ctx.startRoomId, initialState, seed, ctx);
