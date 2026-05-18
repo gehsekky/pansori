@@ -11,7 +11,6 @@ export interface AppUser {
 }
 
 declare global {
-   
   namespace Express {
     interface User extends AppUser {}
   }
