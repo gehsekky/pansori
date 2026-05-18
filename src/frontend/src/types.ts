@@ -191,6 +191,7 @@ export interface Character {
   expertise_skills?: string[];
   prepared_spells?: string[];
   charmer_id?: string;
+  darkvision_ft?: number;
 }
 
 // ─── NPC system ───────────────────────────────────────────────────────────────
@@ -305,7 +306,13 @@ export interface Seed {
   world_name: string;
   ship_name: string;
   intro: string;
-  rooms: Array<{ id: string; name: string; desc: string; objects?: RoomObject[] }>;
+  rooms: Array<{
+    id: string;
+    name: string;
+    desc: string;
+    objects?: RoomObject[];
+    lighting?: 'bright' | 'dim' | 'dark';
+  }>;
   connections: Record<string, string[]>;
   enemies?: Record<string, Array<{ id: string; name: string; hp: number; ac: number }>>;
   loot?: Record<string, unknown>;
