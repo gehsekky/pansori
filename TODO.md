@@ -80,14 +80,14 @@
 - [x] Warlock (pact slots, Agonizing Blast)
 - [x] Monk (ki points, Flurry of Blows, Step of the Wind, Unarmored Defense)
 - [x] Barbarian (rage, Unarmored Defense)
-- [ ] Barbarian Reckless Attack — still missing
+- [x] Barbarian Reckless Attack — `reckless_attack` class-feature toggle; advantage on STR melee, enemies get advantage vs you until your next turn
 
 ---
 
 ## 6. Subclass Features — MOSTLY DONE (verified in audit)
 - [x] Champion: Improved Critical
 - [x] Battle Master: maneuvers (Riposte, Feinting)
-- [ ] Thief: Fast Hands — still missing
+- [x] Thief: Fast Hands — Thief Rogue L3+ can `interact_object` as a bonus action in combat (extends out-of-combat free interaction)
 - [x] Assassin: auto-crit on surprised
 - [x] Evoker: Potent Cantrip
 - [x] Abjurer: Arcane Ward

@@ -158,6 +158,9 @@ export interface TurnActions {
   free_interaction_used: boolean;
   dodging?: boolean; // Dodge action: enemy attacks have disadvantage until next turn
   disengaged?: boolean; // Disengage action: no opportunity attacks this turn
+  // Barbarian Reckless Attack (PHB p.49): advantage on STR melee attacks this turn,
+  // but enemies have advantage on attacks vs the Barbarian until their next turn.
+  reckless?: boolean;
   movement_budget_remaining?: number; // feet remaining this turn; initialized to speed at turn start
   readied_action?: {
     trigger: string;

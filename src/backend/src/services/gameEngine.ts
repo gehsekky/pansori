@@ -204,7 +204,9 @@ function applyEnemyAttackNarrative(
   updatedResourceUses?: Record<string, number>;
 } {
   const isDodging = char.turn_actions?.dodging ?? false;
-  const hasAdvantage = char.conditions.some((c) => ADVANTAGE_CONDITIONS.has(c));
+  const isReckless = char.turn_actions?.reckless ?? false;
+  const hasAdvantage =
+    char.conditions.some((c) => ADVANTAGE_CONDITIONS.has(c)) || isReckless;
   const hasDisadvantage = char.conditions.some((c) => ENEMY_DISADV_CONDITIONS.has(c)) || isDodging;
   const result = resolveEnemyAttack(enemy, char.ac, hasAdvantage, hasDisadvantage);
   const armorItem = char.equipped_armor
@@ -851,17 +853,31 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       });
     }
   }
-  // Interactive object choices — once per object, collapsed into a single Interact action
+  // Interactive object choices — once per object, collapsed into a single Interact action.
+  // Out of combat: anyone can interact (consumes main action).
+  // In combat: only Thief Rogue L3+ via Fast Hands (consumes bonus action).
   const currentRoom = seed.rooms.find((r) => r.id === roomId);
-  if (currentRoom?.objects?.length && !enemyAlive) {
+  const isThiefFastHands =
+    char.character_class.toLowerCase() === 'rogue' &&
+    char.subclass === 'thief' &&
+    char.level >= 3;
+  const canInteractObjects =
+    currentRoom?.objects?.length &&
+    (!enemyAlive ||
+      (isThiefFastHands && state.combat_active && !char.turn_actions.bonus_action_used));
+  if (canInteractObjects && currentRoom?.objects) {
+    const useBonus = enemyAlive && isThiefFastHands;
     for (const obj of currentRoom.objects) {
       if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
       const searchKey = `${roomId}:${obj.id}`;
       const alreadySearched = (state.objects_searched ?? []).includes(searchKey);
       if (!alreadySearched) {
         choices.push({
-          label: `Interact with ${obj.name}`,
+          label: useBonus
+            ? `Fast Hands: Interact with ${obj.name} — bonus action`
+            : `Interact with ${obj.name}`,
           action: { type: 'interact_object', objectId: obj.id },
+          requiresBonusAction: useBonus || undefined,
         });
       }
     }
@@ -1036,6 +1052,22 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
           requiresBonusAction: true,
         });
       }
+    }
+
+    // Barbarian: Reckless Attack (PHB p.49) — free toggle on, declared before
+    // the first attack of the turn. Advantage on STR melee, but advantage to
+    // enemies attacking you until your next turn.
+    if (
+      char.character_class.toLowerCase() === 'barbarian' &&
+      char.level >= 2 &&
+      !char.turn_actions.reckless &&
+      !char.turn_actions.action_used
+    ) {
+      choices.push({
+        label:
+          'Reckless Attack — advantage on STR melee this turn (enemies get advantage vs you too)',
+        action: { type: 'use_class_feature', featureId: 'reckless_attack' },
+      });
     }
 
     // Fighter: Second Wind (bonus action)
@@ -2110,6 +2142,9 @@ export async function takeAction({
       // Vow of Enmity: advantage vs the vow target
       const vowAdv = st.vow_of_enmity_target === targetId;
 
+      // Reckless Attack (Barbarian L2+): advantage on melee weapon attacks
+      const recklessAdv = !!char.turn_actions.reckless && weaponItem?.range !== 'ranged';
+
       const disadvantage =
         rangedInMelee ||
         conditionDisadv ||
@@ -2125,7 +2160,8 @@ export async function takeAction({
         flankingAdv ||
         helpAdv ||
         assassinAdv ||
-        vowAdv;
+        vowAdv ||
+        recklessAdv;
       const disadvReasons = [
         rangedInMelee ? 'ranged in melee' : '',
         conditionDisadv ? char.conditions.filter((c) => DISADV_CONDITIONS.has(c)).join(', ') : '',
@@ -3378,6 +3414,24 @@ export async function takeAction({
         narrative = `${char.name} grants Bardic Inspiration (d${inspDie}) to an ally! (${biUses - 1} use${biUses - 1 === 1 ? '' : 's'} remaining)`;
       }
 
+      // ── Reckless Attack (Barbarian L2+) — free toggle, no action cost ──────
+      else if (fid === 'reckless_attack') {
+        if (char.character_class.toLowerCase() !== 'barbarian') {
+          narrative = 'Only Barbarians have Reckless Attack.';
+          break;
+        }
+        if (char.level < 2) {
+          narrative = 'Reckless Attack requires Barbarian level 2.';
+          break;
+        }
+        if (char.turn_actions.reckless) {
+          narrative = 'You are already attacking recklessly this turn.';
+          break;
+        }
+        char.turn_actions = { ...char.turn_actions, reckless: true };
+        narrative = `${char.name} attacks recklessly! Advantage on STR melee attacks this turn — but enemies have advantage against you until your next turn.`;
+      }
+
       // ── Cunning Action: Dash (Rogue L2+ bonus action) ─────────────────────
       else if (fid === 'cunning_action_dash') {
         if (char.character_class.toLowerCase() !== 'rogue') {
@@ -4005,6 +4059,24 @@ export async function takeAction({
       if ((st.objects_searched ?? []).includes(searchKey)) {
         narrative = `You have already searched the ${obj.name}.`;
         break;
+      }
+
+      // Thief Fast Hands (PHB p.97): in combat, interaction is a bonus action.
+      // Out of combat, it's a free interaction (existing behavior).
+      if (st.combat_active) {
+        const fastHandsEligible =
+          char.character_class.toLowerCase() === 'rogue' &&
+          char.subclass === 'thief' &&
+          char.level >= 3;
+        if (!fastHandsEligible) {
+          narrative = 'You cannot interact with objects during combat.';
+          break;
+        }
+        if (char.turn_actions.bonus_action_used) {
+          narrative = 'Bonus action already used this turn.';
+          break;
+        }
+        char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
       }
 
       st = { ...st, objects_searched: [...(st.objects_searched ?? []), searchKey] };
