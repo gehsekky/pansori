@@ -25,9 +25,11 @@
 - [X] Renewal config switched from `standalone` → `webroot` so nginx stays up during renew
 
 ### GitHub Actions wiring
-- [X] Add repo secrets: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `EC2_SSH_KEY`
-- [X] Fill in the three TODOs at the top of `.github/workflows/deploy.yml`: `AWS_REGION`, `ECR_REGISTRY`, `EC2_HOST`
-- [ ] `DEPLOY_ENABLED=true` repo variable (currently gated off; flip after switching deploy to SSM)
+- [X] Add repo secrets: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (EC2_SSH_KEY no longer needed)
+- [X] Workflow env vars: `AWS_REGION`, `ECR_REGISTRY`, `EC2_INSTANCE_ID`
+- [X] Deploy step switched from `appleboy/ssh-action` to `aws ssm send-command` — no SSH allowlist, no key rotation, all commands audited in CloudTrail
+- [X] `pansori-deploy` IAM user has `ssm:SendCommand` scoped to the pansori instance + `AWS-RunShellScript` document
+- [X] `DEPLOY_ENABLED=true` repo variable is set — every push to `main` auto-deploys to prod after a successful build (verified end-to-end with image tag `733c3be7`)
 
 ### Google OAuth
 - [X] Create Google Cloud project; enable People API
@@ -91,7 +93,7 @@
 
 ---
 
-## 6. Subclass Features — MOSTLY DONE (verified in audit)
+## 6. Subclass Features — DONE
 - [x] Champion: Improved Critical
 - [x] Battle Master: maneuvers (Riposte, Feinting)
 - [x] Thief: Fast Hands — Thief Rogue L3+ can `interact_object` as a bonus action in combat (extends out-of-combat free interaction)
@@ -101,7 +103,7 @@
 - [x] Life Cleric: Disciple of Life
 - [x] War Cleric: War Priest + Guided Strike
 - [x] Hunter Ranger: Colossus Slayer
-- [ ] Beastmaster: Animal Companion — still missing
+- [x] Beastmaster: Animal Companion — Wolf companion (HP 11 / AC 13 / +4 to hit / 2d4+2) summons at combat start for Ranger L3+ Beastmasters; commanded via bonus action; rendered as a green token on the combat grid
 - [x] Devotion Paladin: Sacred Weapon
 - [x] Vengeance Paladin: Vow of Enmity + Abjure Enemy
 - [x] Bard Lore: Cutting Words
@@ -112,6 +114,7 @@
 ## 7. Vale of Shadows — Refactor & Playtest
 - [x] Migrate enemies to the new array-per-room schema with stable IDs
 - [x] Multi-enemy encounters added: Charnel Hall (2 skeletons), Crypt Throne (Crypt Lord + 2 skeleton minions), Road North (2 bandits)
+- [x] Frontend context (`src/frontend/src/contexts/vale_of_shadows.tsx`) so Vale appears on the character creation screen — was previously backend-only and invisible
 - [ ] Add a second campaign module to validate the authoring format is general-purpose
 - [ ] End-to-end playtest — complete all 3 quests in a single session; verify campaign state survives session resume; verify faction price modifiers apply in shop
 
@@ -121,4 +124,4 @@
 - [ ] Narrative template format — separate mechanical metadata (dice rolls, damage numbers, HP changes) from prose so the UI can render them differently while keeping immersion
 - [ ] Dynamic room/encounter image generation — Google Imagen or similar behind `IMAGE_PROVIDER` env var flag; off by default
 - [ ] Sound effects — ambient audio per location type (town, dungeon, wilderness); combat sound cues
-- [ ] Mobile UI support - mobile-friendly ui that isn't too confusing or tedious
+- [x] Mobile UI support — `@media` breakpoints at 768 px and 480 px in `styles.module.css` stack two-column layouts vertically, enlarge tap targets on choice buttons, allow the combat grid to scroll horizontally, and tighten paddings. Desktop layout unchanged.
