@@ -99,7 +99,9 @@
   font-family: inherit;
   font-size: 0.875rem;
   letter-spacing: 0.03em;
-  transition: border-color 0.15s, background 0.15s;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
 }
 
 .sendBtn {
@@ -598,6 +600,7 @@
 }
 
 .gridLegendPC,
+.gridLegendCompanion,
 .gridLegendEnemy,
 .gridLegendReach {
   display: inline-block;
@@ -610,13 +613,17 @@
   background: rgba(70, 140, 220, 0.85);
 }
 
+.gridLegendCompanion {
+  background: rgba(110, 190, 110, 0.85);
+}
+
 .gridLegendEnemy {
   background: rgba(220, 70, 70, 0.85);
 }
 
 .gridLegendReach {
   border-radius: 0;
-  background: rgba(120, 200, 255, 0.10);
+  background: rgba(120, 200, 255, 0.1);
   border: 1px solid rgba(120, 200, 255, 0.4);
 }
 

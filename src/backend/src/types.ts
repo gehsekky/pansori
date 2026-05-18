@@ -576,13 +576,21 @@ export interface GridPos {
 }
 
 export interface CombatEntity {
-  id: string; // character.id for PCs, roomId for enemies
+  id: string; // character.id for PCs, enemy instance id for enemies, owner.id + ':companion' for animal companions
   isEnemy: boolean;
   pos: GridPos;
   hp: number;
   maxHp: number;
   conditions: string[];
   condition_durations: Record<string, number>;
+  // Beastmaster animal companion (PHB p.93) — a CR ¼ beast tied to a Ranger PC.
+  // Acts on the Ranger's bonus action; targetable by enemies separately.
+  isCompanion?: boolean;
+  companionOwnerId?: string; // character.id of the Ranger this companion belongs to
+  companionName?: string; // display name (e.g. 'Wolf')
+  ac?: number; // companion AC (PCs use character.ac, enemies use Enemy.ac)
+  toHit?: number; // companion attack bonus
+  damage?: string; // companion damage dice expression (e.g. '2d4+2')
 }
 
 // ─── Quest system ─────────────────────────────────────────────────────────────
