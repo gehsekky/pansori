@@ -231,7 +231,8 @@ export const context: Context = {
     thunderwave: {
       id: 'thunderwave',
       name: 'Thunderwave',
-      desc: 'A wave of thunderous force sweeps out from you.',
+      // SRD 5.2.1 p.305 — 15-foot cube emanating from caster
+      desc: 'A wave of thunderous force sweeps out in a 15-foot cube from you.',
       level: 1,
       castTime: 'action',
       damage: '2d8',
@@ -239,6 +240,9 @@ export const context: Context = {
       savingThrow: 'con',
       saveEffect: 'half',
       rangeKind: 'self',
+      blastRadius: 15,
+      aoeShape: 'cube',
+      upcastBonus: '1d8',
     },
     misty_step: {
       id: 'misty_step',
@@ -261,6 +265,7 @@ export const context: Context = {
       saveEffect: 'half',
       upcastBonus: '1d6',
       blastRadius: 20,
+      aoeShape: 'sphere',
       rangeKind: 'ranged',
       rangeFt: 150,
     },
@@ -373,7 +378,8 @@ export const context: Context = {
     burning_hands: {
       id: 'burning_hands',
       name: 'Burning Hands',
-      desc: 'A thin sheet of flame shoots from your hands.',
+      // SRD 5.2.1 p.247 — 15-foot cone from caster's hands
+      desc: 'A 15-foot cone of flame shoots from your hands.',
       level: 1,
       castTime: 'action',
       damage: '3d6',
@@ -382,6 +388,7 @@ export const context: Context = {
       saveEffect: 'half',
       upcastBonus: '1d6',
       blastRadius: 15,
+      aoeShape: 'cone',
       rangeKind: 'self',
     },
     bless: {
