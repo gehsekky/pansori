@@ -470,15 +470,43 @@ function getRoomEnemies(seed: Seed, roomId: string): Enemy[] {
   return seed.enemies?.[roomId] ?? [];
 }
 
+// A hostile NPC participates in combat as a regular enemy — same grid, same
+// initiative, same machinery. We surface it as an Enemy on the fly so the
+// combat path doesn't need a separate "duel" code branch.
+function npcAsEnemy(npc: PlacedNpc): Enemy {
+  return {
+    id: `npc:${npc.roomId}`,
+    name: npc.name,
+    hp: npc.hp,
+    ac: npc.ac,
+    damage: npc.damage,
+    toHit: npc.toHit,
+    xp: npc.xp,
+    dex: npc.dex,
+  };
+}
+
 function getLivingRoomEnemies(state: GameState, seed: Seed, roomId: string): Enemy[] {
   const killed = state.enemies_killed ?? [];
-  return getRoomEnemies(seed, roomId).filter((e) => !killed.includes(e.id));
+  const base = getRoomEnemies(seed, roomId).filter((e) => !killed.includes(e.id));
+  // Include a hostile-flipped NPC in this room as an enemy.
+  const npc = seed.npcs?.[roomId];
+  if (npc && state.npc_attitudes?.[roomId] === 'hostile' && !killed.includes(`npc:${roomId}`)) {
+    base.push(npcAsEnemy(npc));
+  }
+  return base;
 }
 
 function getEnemyById(seed: Seed, enemyId: string): Enemy | null {
   for (const list of Object.values(seed.enemies ?? {})) {
     const found = list.find((e) => e.id === enemyId);
     if (found) return found;
+  }
+  // NPC-as-enemy lookup: id is `npc:${roomId}`.
+  if (enemyId.startsWith('npc:')) {
+    const roomId = enemyId.slice('npc:'.length);
+    const npc = seed.npcs?.[roomId];
+    if (npc) return npcAsEnemy(npc);
   }
   return null;
 }
@@ -934,48 +962,45 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     }
   }
 
-  // NPC choices
+  // NPC choices — only for non-hostile NPCs. Hostile NPCs surface as enemies
+  // via getLivingRoomEnemies and use the regular Attack choice above.
   const npc = seed.npcs?.[roomId];
   if (npc && !npcIsKilled(state, roomId) && !enemyAlive) {
     const attitude = getNpcAttitude(state, npc);
-    if (attitude === 'hostile') {
-      choices.push({ label: `Attack the ${npc.name}`, action: { type: 'attack_npc' } });
-    } else {
-      // Quest-giver indicator: append an exclamation if this NPC has an unaccepted quest
-      const giverQuests = (context.campaign?.quests ?? []).filter((q) => q.giverNpcId === npc.id);
-      const progressById = new Map(
-        (state.quest_progress ?? []).map((p) => [p.questId, p] as const)
-      );
-      const availableQuests = giverQuests.filter((q) => !progressById.has(q.id));
-      const questNote = availableQuests.length > 0 ? ' [!]' : '';
-      const dcNote = attitude === 'indifferent' ? ` (CHA check DC ${npc.persuasionDC ?? 12})` : '';
+    // attitude is guaranteed non-hostile here (hostile NPCs would have set
+    // enemyAlive = true via getLivingRoomEnemies).
+    const giverQuests = (context.campaign?.quests ?? []).filter((q) => q.giverNpcId === npc.id);
+    const progressById = new Map((state.quest_progress ?? []).map((p) => [p.questId, p] as const));
+    const availableQuests = giverQuests.filter((q) => !progressById.has(q.id));
+    const questNote = availableQuests.length > 0 ? ' [!]' : '';
+    const dcNote = attitude === 'indifferent' ? ` (CHA check DC ${npc.persuasionDC ?? 12})` : '';
+    choices.push({
+      label: `Talk to ${npc.name}${dcNote}${questNote}`,
+      action: { type: 'talk' },
+    });
+    // Explicit "Accept quest" choice per unaccepted quest from this giver
+    for (const q of availableQuests) {
+      if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
       choices.push({
-        label: `Talk to ${npc.name}${dcNote}${questNote}`,
-        action: { type: 'talk' },
+        label: `Accept quest: ${q.title}`,
+        action: { type: 'accept_quest', questId: q.id },
       });
-      // Explicit "Accept quest" choice per unaccepted quest from this giver
-      for (const q of availableQuests) {
+    }
+    if (npc.shop?.length && attitude === 'friendly') {
+      for (const entry of npc.shop) {
         if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
-        choices.push({
-          label: `Accept quest: ${q.title}`,
-          action: { type: 'accept_quest', questId: q.id },
-        });
-      }
-      if (npc.shop?.length && attitude === 'friendly') {
-        for (const entry of npc.shop) {
-          if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
-          const item = context.lootTable.find((l) => l.id === entry.itemId);
-          if (item) {
-            choices.push({
-              label: `Buy ${item.name} — ${entry.price}cr`,
-              action: { type: 'buy', itemId: entry.itemId, price: entry.price },
-            });
-          }
+        const item = context.lootTable.find((l) => l.id === entry.itemId);
+        if (item) {
+          choices.push({
+            label: `Buy ${item.name} — ${entry.price}cr`,
+            action: { type: 'buy', itemId: entry.itemId, price: entry.price },
+          });
         }
       }
-      // Always show attack option for non-hostile NPCs (makes them hostile)
-      choices.push({ label: `Attack ${npc.name} (makes hostile)`, action: { type: 'attack_npc' } });
     }
+    // Initial attack triggers hostility + combat (handler flips attitude and
+    // dispatches a regular Attack against the NPC-as-enemy).
+    choices.push({ label: `Attack ${npc.name} (makes hostile)`, action: { type: 'attack_npc' } });
   }
 
   // ── Town/district navigation choices ──────────────────────────────────────
@@ -1009,14 +1034,23 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       label: `Dash — double movement this turn (${effectiveSpeed(char)} extra ft)`,
       action: { type: 'dash' },
     });
-    // Help — only when party has multiple members and an ally is alive
-    const aliveAllies = state.characters.filter((c) => !c.dead && c.id !== char.id);
-    for (const ally of aliveAllies) {
-      if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
-      choices.push({
-        label: `Help ${ally.name} — give advantage on their next attack`,
-        action: { type: 'help', targetId: ally.id },
-      });
+    // Help — RAW (PHB p.192): to grant advantage on an ally's attack, an enemy
+    // must be within 5 ft of the helper. Without grid entities this gate can't
+    // be enforced, so we conservatively only show the choice when the helper
+    // has an adjacent enemy.
+    const helperEnt = state.entities?.find((e) => e.id === char.id);
+    const hasAdjacentEnemy =
+      helperEnt &&
+      state.entities?.some((e) => e.isEnemy && e.hp > 0 && distanceFeet(helperEnt.pos, e.pos) <= 5);
+    if (hasAdjacentEnemy) {
+      const aliveAllies = state.characters.filter((c) => !c.dead && c.id !== char.id);
+      for (const ally of aliveAllies) {
+        if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+        choices.push({
+          label: `Help ${ally.name} — give advantage on their next attack`,
+          action: { type: 'help', targetId: ally.id },
+        });
+      }
     }
     // Ready
     if (enemyAlive) {
@@ -1105,22 +1139,6 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       }
     }
 
-    // Barbarian: Reckless Attack (PHB p.49) — free toggle on, declared before
-    // the first attack of the turn. Advantage on STR melee, but advantage to
-    // enemies attacking you until your next turn.
-    if (
-      char.character_class.toLowerCase() === 'barbarian' &&
-      char.level >= 2 &&
-      !char.turn_actions.reckless &&
-      !char.turn_actions.action_used
-    ) {
-      choices.push({
-        label:
-          'Reckless Attack — advantage on STR melee this turn (enemies get advantage vs you too)',
-        action: { type: 'use_class_feature', featureId: 'reckless_attack' },
-      });
-    }
-
     // Fighter: Second Wind (bonus action)
     if (
       char.character_class.toLowerCase() === 'fighter' &&
@@ -1179,6 +1197,24 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     choices.push({
       label: `Action Surge — gain one extra action this turn`,
       action: { type: 'use_class_feature', featureId: 'action_surge' },
+    });
+  }
+
+  // Barbarian: Reckless Attack (PHB p.49) — RAW costs nothing; it's a free
+  // declaration made before the first attack on your turn. Advantage on STR
+  // melee, but enemies have advantage attacking you until your next turn.
+  // Must be available regardless of bonus-action state.
+  if (
+    state.combat_active &&
+    char.character_class.toLowerCase() === 'barbarian' &&
+    char.level >= 2 &&
+    !char.turn_actions.reckless &&
+    !char.turn_actions.action_used
+  ) {
+    choices.push({
+      label:
+        'Reckless Attack — advantage on STR melee this turn (enemies get advantage vs you too)',
+      action: { type: 'use_class_feature', featureId: 'reckless_attack' },
     });
   }
 
@@ -1251,8 +1287,10 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       });
   }
 
-  // ── Warlock: Invocations (learn once, then passive) ─────────────────────────
-  if (char.character_class.toLowerCase() === 'warlock' && char.level >= 2) {
+  // ── Warlock: Invocations ─────────────────────────────────────────────────────
+  // RAW (PHB p.107): invocations are learned at level-up, not chosen mid-fight.
+  // Gate to out-of-combat so this surfaces as a downtime/level-up decision.
+  if (!state.combat_active && char.character_class.toLowerCase() === 'warlock' && char.level >= 2) {
     if (!(char.feats ?? []).includes('agonizing_blast'))
       choices.push({
         label: `Learn Invocation: Agonizing Blast — +CHA to Eldritch Blast`,
@@ -1585,12 +1623,14 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     }
   } else if (!state.entities) {
     if (!isImmobilized) {
-      for (const adj of adjacent) {
-        if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
-        const label = enemyAlive
-          ? `Dash past the ${livingEnemies[0].name} → ${adj.name}`
-          : `Move to ${adj.name}`;
-        choices.push({ label, action: { type: 'move', roomId: adj.id } });
+      // Out-of-combat room exits. SRD 5.2.1: there is no "Dash past" — a hostile
+      // creature in the room means engage (Attack) or evade (Sneak via Stealth);
+      // strolling past is not a RAW choice.
+      if (!enemyAlive) {
+        for (const adj of adjacent) {
+          if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+          choices.push({ label: `Move to ${adj.name}`, action: { type: 'move', roomId: adj.id } });
+        }
       }
     } else {
       const blocker = char.conditions.find((c) => ['grappled', 'restrained'].includes(c))!;
@@ -2934,6 +2974,12 @@ export async function takeAction({
     }
 
     // ── NPC: attack_npc ──────────────────────────────────────────────────────
+    // This action is the *trigger* that flips a non-hostile NPC hostile. After
+    // flipping, the NPC participates in grid combat as a regular enemy (via
+    // getLivingRoomEnemies + getEnemyById's npc: lookup). We immediately
+    // dispatch the regular Attack action against `npc:${roomId}` so the player
+    // doesn't waste a turn just changing attitude — the combat init runs and
+    // the attack resolves in the same response.
     case 'attack_npc': {
       const npc = seed.npcs?.[roomId];
       if (!npc) {
@@ -2944,65 +2990,17 @@ export async function takeAction({
         narrative = 'Already dead.';
         break;
       }
-
-      // Flip to hostile if not already
+      // Flip to hostile so getLivingRoomEnemies surfaces this NPC as an enemy.
       st = { ...st, npc_attitudes: { ...st.npc_attitudes, [roomId]: 'hostile' } };
-
-      // Resolve attack using NPC stat block as an enemy proxy
-      const npcAsEnemy: Enemy = {
-        id: `npc:${roomId}`,
-        name: npc.name,
-        hp: npc.hp,
-        ac: npc.ac,
-        damage: npc.damage,
-        toHit: npc.toHit,
-        xp: npc.xp,
-        dex: npc.dex,
-      };
-      const npcHpFlagKey = `npc_hp_${roomId}`;
-      const currentNpcHp = (st.flags[npcHpFlagKey] as number | undefined) ?? npc.hp;
-      const equippedWeaponItem = char.equipped_weapon
-        ? (context.lootTable.find((l) => l.id === char.equipped_weapon) ?? null)
-        : null;
-      const weaponDamageNpc = equippedWeaponItem?.damage ?? null;
-      const hasDisadvantage = char.conditions.some((c) => DISADV_CONDITIONS.has(c));
-      const attackResult = resolvePlayerAttack(
-        { str: char.str, dex: char.dex, level: char.level },
-        weaponDamageNpc,
-        npcAsEnemy.ac,
-        equippedWeaponItem?.finesse ?? false,
-        hasDisadvantage
-      );
-
-      if (attackResult.hit) {
-        const newHp = Math.max(0, currentNpcHp - attackResult.damage);
-        st = { ...st, flags: { ...st.flags, [npcHpFlagKey]: newHp } };
-        if (newHp <= 0) {
-          st = { ...st, enemies_killed: [...st.enemies_killed, `npc:${roomId}`] };
-          char = { ...char, xp: char.xp + npcAsEnemy.xp };
-          narrative = `${npcAsEnemy.name} falls. You earned ${npcAsEnemy.xp} XP — but at what cost?`;
-        } else {
-          narrative = `You strike ${npcAsEnemy.name} for ${attackResult.damage} damage (${newHp} HP remaining).`;
-        }
-      } else {
-        narrative = `Your attack misses ${npcAsEnemy.name}.`;
-      }
-
-      // NPC retaliates
-      if (!npcIsKilled(st, roomId)) {
-        const retaliation = applyEnemyAttackNarrative(npcAsEnemy, char, context);
-        char = {
-          ...char,
-          hp: Math.max(0, char.hp - retaliation.hpLost),
-          temp_hp: retaliation.newTempHp ?? char.temp_hp,
-          conditions: retaliation.newConditions,
-          condition_durations: retaliation.newDurations,
-          class_resource_uses: retaliation.updatedResourceUses ?? char.class_resource_uses,
-        };
-        narrative += ' ' + retaliation.narrative;
-      }
-      char.turn_actions = { ...char.turn_actions, action_used: true };
-      break;
+      // Commit char back into state before the recursive dispatch.
+      commitChar();
+      return await takeAction({
+        action: { type: 'attack', targetEnemyId: `npc:${roomId}` },
+        history,
+        state: st,
+        seed,
+        context,
+      });
     }
 
     case 'disarm_trap': {
