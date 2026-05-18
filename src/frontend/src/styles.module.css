@@ -770,3 +770,135 @@
   z-index: 10;
   pointer-events: none;
 }
+
+/* ─── Mobile / narrow viewport ──────────────────────────────────────────── */
+/* Conservative pass: stack the main two-column layouts vertically, shrink
+ * the page padding, let the combat grid scroll horizontally if it overflows,
+ * and prevent the header / sessions header from wrapping awkwardly. */
+
+@media (max-width: 768px) {
+  .page,
+  .pageCenter,
+  .pageFlex {
+    padding: 0.75rem;
+  }
+
+  .title {
+    font-size: 1.1rem;
+    letter-spacing: 0.15em;
+  }
+
+  .sub {
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+  }
+
+  /* Game view: [narrative + choices | RoomArt] → stack */
+  .contentRow {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  /* Header: [logo + title | user info] → stack with smaller gap */
+  .headerRow {
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: flex-start;
+  }
+
+  .userInfoRow {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  /* Char creation: [party col 360px | world col] → stack, full width */
+  .charInner {
+    flex-direction: column;
+    gap: 1.25rem;
+    margin: 1rem auto;
+    padding: 0 0.25rem;
+  }
+
+  .charPartyCol {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+
+  /* Sessions list header: [title | actions] → stack */
+  .sessionsInner {
+    margin: 1rem auto;
+  }
+
+  .sessionsHeader {
+    flex-direction: column;
+    gap: 0.75rem;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+  }
+
+  .sessionsActions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  /* Stats row: smaller, denser */
+  .statsRow {
+    gap: 0.75rem;
+    font-size: 0.75rem;
+  }
+
+  /* Combat grid: cell size doesn't change (positions stay legible), but the
+   * board may overflow on a 320–375 px viewport — allow horizontal scroll. */
+  .gridCombatCard {
+    overflow-x: auto;
+  }
+
+  /* Choice buttons: easier to tap (Apple/Android HIG ≥ 44 px) */
+  .choiceBtn {
+    padding: 0.75rem 0.875rem;
+    font-size: 0.9rem;
+  }
+
+  /* Narrative card: don't dwarf the viewport */
+  .narrative {
+    font-size: 0.9rem;
+    line-height: 1.6;
+    min-height: 0;
+  }
+
+  /* Initiative strip wraps already — just tighten gaps */
+  .initiativeStrip {
+    gap: 0.15rem;
+  }
+
+  /* Campaign panel body: cap height shorter so quests don't dominate phone */
+  .campaignBody {
+    max-height: 220px;
+  }
+
+  /* Map overlay box: full-bleed on phones */
+  .mapBox {
+    width: calc(100vw - 1.5rem);
+    max-width: none;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Truly tiny phones (< iPhone SE): collapse stat row to two-column grid */
+  .statsRow {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+  }
+
+  /* Form input padding tighter */
+  .formInp {
+    padding: 0.4rem 0.6rem;
+    font-size: 0.85rem;
+  }
+
+  .submit {
+    padding: 0.55rem 1rem;
+    letter-spacing: 0.08em;
+  }
+}
