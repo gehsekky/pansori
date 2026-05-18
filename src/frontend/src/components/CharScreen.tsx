@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
-import { applyTheme } from '../App';
-import type { FrontendContext } from '../types';
 import type { AuthUser, CharacterInput } from '../lib/api';
+import { useEffect, useState } from 'react';
+import type { FrontendContext } from '../types';
+import { applyTheme } from '../App';
 import styles from '../styles.module.css';
 
 type StatBlock = { str: number; dex: number; con: number; int: number; wis: number; cha: number };

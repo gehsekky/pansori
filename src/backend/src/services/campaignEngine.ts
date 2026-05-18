@@ -1,18 +1,17 @@
 import type {
-  CampaignState,
-  GameState,
-  Quest,
-  QuestProgress,
-  QuestStatus,
-  Faction,
   CampaignFacts,
+  CampaignState,
+  Faction,
+  GameState,
   NpcAttitude,
+  Quest,
+  QuestStatus,
 } from '../types.js';
 import { Engine, type TopLevelCondition } from 'json-rules-engine';
 
 // ─── DB helpers ───────────────────────────────────────────────────────────────
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 type DB = any;
 
 export async function loadCampaignState(

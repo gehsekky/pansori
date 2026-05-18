@@ -1,6 +1,6 @@
+import { type CharacterInput, api } from '../lib/api.ts';
+import type { GameChoice, GameState, Seed, Session, StructuredAction } from '../types.ts';
 import { useState } from 'react';
-import { api, type CharacterInput } from '../lib/api.ts';
-import type { GameState, Seed, Session, StructuredAction, GameChoice } from '../types.ts';
 
 type HistoryEntry = { role: 'user' | 'assistant'; content: string };
 

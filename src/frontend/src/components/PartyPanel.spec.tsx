@@ -1,9 +1,8 @@
-import { render, screen, fireEvent } from '@testing-library/react';
-import React from 'react';
-import { describe, it, expect, vi } from 'vitest';
-
-import PartyPanel from './PartyPanel';
+import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { makeChar, makeState, mockCtx, mockSeed } from './test-fixtures';
+import PartyPanel from './PartyPanel';
+import React from 'react';
 
 const defaultProps = {
   ctx: mockCtx,

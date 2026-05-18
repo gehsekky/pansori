@@ -1,4 +1,4 @@
-import { SessionSummary, FrontendContext } from '../types';
+import { FrontendContext, SessionSummary } from '../types';
 import { AuthUser } from '../lib/api';
 import styles from '../styles.module.css';
 

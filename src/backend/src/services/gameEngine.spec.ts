@@ -1,13 +1,21 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import type {
+  Character,
+  Context,
+  GameRule,
+  GameState,
+  NpcTemplate,
+  PlacedNpc,
+  Seed,
+} from '../types.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   buildArrivalNarrative,
   generateChoices,
-  takeAction,
   normalizeState,
   runRules,
+  takeAction,
 } from './gameEngine.js';
 import { context as ctx } from '../contexts/sandbox.js';
-import type { GameState, Character, Context, Seed, GameRule } from '../types.js';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -1688,8 +1696,6 @@ describe('class features', () => {
     expect(choices.every((c) => c.action.type !== 'use_class_feature')).toBe(true);
   });
 });
-
-import type { PlacedNpc, NpcTemplate } from '../types.js';
 
 const npcTemplate: NpcTemplate = {
   id: 'test_npc',

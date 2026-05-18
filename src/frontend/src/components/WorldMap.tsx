@@ -1,6 +1,6 @@
-import { useEffect } from 'react';
 import type { GameState, Seed } from '../types.js';
 import styles from '../styles.module.css';
+import { useEffect } from 'react';
 
 interface Props {
   seed: Seed;

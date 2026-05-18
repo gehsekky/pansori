@@ -1,16 +1,16 @@
 import 'dotenv/config';
-import express from 'express';
-import { createServer } from 'http';
+import './auth/passport.js';
 import { Server } from 'socket.io';
-import cors from 'cors';
-import session from 'express-session';
+import { authRouter } from './routes/auth.js';
 import connectPgSimple from 'connect-pg-simple';
+import cors from 'cors';
+import { createServer } from 'http';
+import express from 'express';
+import { gameRouter } from './routes/game.js';
 import passport from 'passport';
 import { pool } from './db/pool.js';
-import { gameRouter } from './routes/game.js';
-import { authRouter } from './routes/auth.js';
 import { requireAuth } from './auth/middleware.js';
-import './auth/passport.js';
+import session from 'express-session';
 
 const app = express();
 const httpServer = createServer(app);

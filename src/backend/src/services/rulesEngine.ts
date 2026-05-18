@@ -1,4 +1,4 @@
-import type { LootItem, TurnActions, DeathSaves, Spell } from '../types.js';
+import type { DeathSaves, LootItem, Spell, TurnActions } from '../types.js';
 
 // ─── Dice ─────────────────────────────────────────────────────────────────────
 
