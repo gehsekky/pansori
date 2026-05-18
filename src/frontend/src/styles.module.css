@@ -785,6 +785,194 @@
   pointer-events: none;
 }
 
+/* ─── InventoryModal ────────────────────────────────────────────────────── */
+
+.invTabs {
+  display: flex;
+  gap: 0.4rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--t-separator);
+  flex-wrap: wrap;
+}
+
+.invTab {
+  background: transparent;
+  border: 1px solid var(--t-border);
+  color: var(--t-mid);
+  font-family: inherit;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  padding: 0.3rem 0.65rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.invTab:hover:not(:disabled) {
+  color: var(--t-primary);
+  border-color: var(--t-primary);
+}
+
+.invTab:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  text-decoration: line-through;
+}
+
+.invTabActive {
+  color: var(--t-primary);
+  background: var(--t-separator);
+  border-color: var(--t-primary);
+}
+
+.invTabPortrait {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.invEquipRow {
+  display: flex;
+  gap: 1rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--t-separator);
+  flex-wrap: wrap;
+  font-size: 0.75rem;
+}
+
+.invEquipSlot {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 100px;
+}
+
+.invEquipLabel {
+  color: var(--t-dim);
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+}
+
+.invEquipValue {
+  color: var(--t-mid);
+}
+
+.invBody {
+  padding: 0.5rem 0.75rem;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.invItem {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--t-separator);
+}
+
+.invItem:last-child {
+  border-bottom: none;
+}
+
+.invItemHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 0.2rem;
+}
+
+.invItemName {
+  color: var(--t-mid);
+  font-size: 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.invItemMeta {
+  color: var(--t-dim);
+  font-size: 0.7rem;
+}
+
+.invItemDesc {
+  color: var(--t-dim);
+  font-size: 0.72rem;
+  line-height: 1.4;
+  margin-bottom: 0.35rem;
+}
+
+.invItemActions {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.invBtn {
+  background: transparent;
+  border: 1px solid var(--t-border);
+  color: var(--t-mid);
+  font-family: inherit;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  padding: 0.25rem 0.55rem;
+  cursor: pointer;
+}
+
+.invBtn:hover:not(:disabled) {
+  color: var(--t-primary);
+  border-color: var(--t-primary);
+}
+
+.invBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.invSelect {
+  background: var(--t-card);
+  color: var(--t-mid);
+  border: 1px solid var(--t-border);
+  padding: 0.2rem 0.4rem;
+  font-family: inherit;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.invBadge {
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  margin-left: 0.4rem;
+  border: 1px solid currentColor;
+  padding: 0 4px;
+}
+
+.invFooter {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.55rem 0.75rem;
+  border-top: 1px solid var(--t-separator);
+  font-size: 0.75rem;
+  color: var(--t-dim);
+}
+
+/* Header inventory button (App.tsx) */
+.invHeaderBtn {
+  background: transparent;
+  border: 1px solid var(--t-border);
+  color: var(--t-dim);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  padding: 4px 10px;
+}
+
+.invHeaderBtn:hover {
+  color: var(--t-primary);
+  border-color: var(--t-primary);
+}
+
 /* ─── Mobile / narrow viewport ──────────────────────────────────────────── */
 /* Conservative pass: stack the main two-column layouts vertically, shrink
  * the page padding, let the combat grid scroll horizontally if it overflows,

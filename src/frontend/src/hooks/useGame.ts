@@ -25,6 +25,8 @@ export interface UseGameReturn {
   handleNewGame: (characters: CharacterInput[], contextId: string) => Promise<void>;
   handleResumeSession: (id: string) => Promise<void>;
   handleEquip: (itemId: string, characterId: string) => Promise<void>;
+  handleTransfer: (itemInstanceId: string, fromCharId: string, toCharId: string) => Promise<void>;
+  handleDrop: (itemInstanceId: string, charId: string) => Promise<void>;
   handleChoice: (c: GameChoice) => void;
   resetGame: () => void;
 }
@@ -111,6 +113,28 @@ export function useGame(): UseGameReturn {
     }
   }
 
+  async function handleTransfer(itemInstanceId: string, fromCharId: string, toCharId: string) {
+    if (!session) return;
+    try {
+      const result = await api.transferItem(session.id, itemInstanceId, fromCharId, toCharId);
+      setGameState(result.newState);
+    } catch (e) {
+      const err = e as { error?: string };
+      if (err?.error) setRoomLog((prev) => [...prev, `⚠ ${err.error}`]);
+    }
+  }
+
+  async function handleDrop(itemInstanceId: string, charId: string) {
+    if (!session) return;
+    try {
+      const result = await api.dropItem(session.id, itemInstanceId, charId);
+      setGameState(result.newState);
+    } catch (e) {
+      const err = e as { error?: string };
+      if (err?.error) setRoomLog((prev) => [...prev, `⚠ ${err.error}`]);
+    }
+  }
+
   function handleChoice(c: GameChoice) {
     act(c.action, c.label, history);
   }
@@ -139,6 +163,8 @@ export function useGame(): UseGameReturn {
     handleNewGame,
     handleResumeSession,
     handleEquip,
+    handleTransfer,
+    handleDrop,
     handleChoice,
     resetGame,
   };
