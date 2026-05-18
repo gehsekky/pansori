@@ -29,6 +29,7 @@ export type StructuredAction =
   | { type: 'two_weapon_attack' }
   | { type: 'attune'; instanceId: string }
   | { type: 'grapple' }
+  | { type: 'try_escape_grapple' }
   | { type: 'shove' }
   | { type: 'dodge' }
   | { type: 'disengage' }
@@ -383,6 +384,7 @@ export interface CombatEntity {
   ac?: number;
   toHit?: number;
   damage?: string;
+  grappled_by?: string;
 }
 
 // ─── Quest system ─────────────────────────────────────────────────────────────

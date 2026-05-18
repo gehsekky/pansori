@@ -1438,6 +1438,18 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     }
   }
 
+  // Try to escape grapple — SRD 5.2.1 p.16, contested Athletics or Acrobatics
+  if (
+    state.combat_active &&
+    !char.turn_actions.action_used &&
+    char.conditions.includes('grappled')
+  ) {
+    choices.push({
+      label: 'Try to escape grapple — Athletics or Acrobatics vs grappler',
+      action: { type: 'try_escape_grapple' },
+    });
+  }
+
   // Grapple/Shove choices — one per living enemy
   if (enemyAlive && !char.turn_actions.action_used) {
     const nameCounts = livingEnemies.reduce<Record<string, number>>((acc, e) => {
@@ -4553,13 +4565,72 @@ export async function takeAction({
           ...st,
           entities: (st.entities ?? []).map((e) =>
             e.id === grappleTarget.id && e.isEnemy
-              ? { ...e, conditions: [...e.conditions.filter((c) => c !== 'grappled'), 'grappled'] }
+              ? {
+                  ...e,
+                  conditions: [...e.conditions.filter((c) => c !== 'grappled'), 'grappled'],
+                  grappled_by: char.id,
+                }
               : e
           ),
         };
         narrative = `You grapple the ${grappleTarget.name}! (${playerRollGrapple} vs ${enemyRollGrapple}) They are GRAPPLED — speed 0, your attacks have advantage.`;
       } else {
         narrative = `The ${grappleTarget.name} breaks free of your grapple attempt. (${playerRollGrapple} vs ${enemyRollGrapple})`;
+      }
+      break;
+    }
+
+    // SRD 5.2.1 p.16 — A grappled creature can use its action on its turn to make
+    // a Strength (Athletics) or Dexterity (Acrobatics) check contested by the
+    // grappler's Strength (Athletics) check; success ends the grappled condition.
+    case 'try_escape_grapple': {
+      const myEntity = st.entities?.find((e) => e.id === char.id);
+      const grapplerId = myEntity?.grappled_by;
+      if (!char.conditions.includes('grappled') && !myEntity?.conditions.includes('grappled')) {
+        narrative = 'You are not grappled.';
+        break;
+      }
+      if (!grapplerId) {
+        // No tracked grappler — just drop the condition (shouldn't happen, but be lenient)
+        char = { ...char, conditions: char.conditions.filter((c) => c !== 'grappled') };
+        narrative = 'You break free of the grapple.';
+        char.turn_actions = { ...char.turn_actions, action_used: true };
+        usedInitiative = true;
+        break;
+      }
+      const grappler = st.entities?.find((e) => e.id === grapplerId);
+      const grapplerEnemy = grappler?.isEnemy ? getEnemyById(seed, grapplerId) : null;
+      const grapplerStrMod = grapplerEnemy ? abilityMod(grapplerEnemy.toHit) : 0;
+      const grapplerRoll = d(20) + grapplerStrMod;
+
+      // Player picks the better of Athletics (STR) or Acrobatics (DEX)
+      const athProf = (context.classSkills[char.character_class] ?? []).includes('athletics');
+      const acrProf = (context.classSkills[char.character_class] ?? []).includes('acrobatics');
+      const athRoll = d(20) + abilityMod(char.str) + (athProf ? profBonus(char.level) : 0);
+      const acrRoll = d(20) + abilityMod(char.dex) + (acrProf ? profBonus(char.level) : 0);
+      const myRoll = Math.max(athRoll, acrRoll);
+      const skillUsed = athRoll >= acrRoll ? 'Athletics' : 'Acrobatics';
+
+      char.turn_actions = { ...char.turn_actions, action_used: true };
+      usedInitiative = true;
+
+      if (myRoll > grapplerRoll) {
+        char = { ...char, conditions: char.conditions.filter((c) => c !== 'grappled') };
+        st = {
+          ...st,
+          entities: (st.entities ?? []).map((e) =>
+            e.id === char.id
+              ? {
+                  ...e,
+                  conditions: e.conditions.filter((c) => c !== 'grappled'),
+                  grappled_by: undefined,
+                }
+              : e
+          ),
+        };
+        narrative = `You break free of the grapple! (${skillUsed} ${myRoll} vs ${grapplerRoll})`;
+      } else {
+        narrative = `You strain against the grapple but cannot escape. (${skillUsed} ${myRoll} vs ${grapplerRoll})`;
       }
       break;
     }
@@ -4683,6 +4754,13 @@ export async function takeAction({
       const charEntity = st.entities.find((e) => e.id === char.id);
       if (!charEntity) {
         narrative = 'Your character is not on the grid.';
+        break;
+      }
+
+      // SRD 5.2.1 p.16 — grappled and restrained reduce speed to 0.
+      if (char.conditions.some((c) => c === 'grappled' || c === 'restrained')) {
+        const which = char.conditions.includes('restrained') ? 'RESTRAINED' : 'GRAPPLED';
+        narrative = `You are ${which} — your speed is 0.`;
         break;
       }
 
@@ -5240,6 +5318,63 @@ export async function takeAction({
     charClass: char.character_class,
     roomName: activeRoom?.name ?? st.current_room,
   });
+
+  // SRD 5.2.1 p.16 — Grappled ends if the grappler is incapacitated. Sweep here
+  // so deaths/conditions applied this turn drop their grapples for the next turn.
+  if (st.entities && st.entities.some((e) => e.grappled_by)) {
+    const killed = new Set(st.enemies_killed ?? []);
+    const incapacitated = (id: string): boolean => {
+      if (killed.has(id)) return true;
+      const ent = st.entities!.find((x) => x.id === id);
+      if (
+        ent &&
+        (ent.hp <= 0 ||
+          ent.conditions.some((c) =>
+            ['incapacitated', 'paralyzed', 'stunned', 'unconscious', 'petrified'].includes(c)
+          ))
+      ) {
+        return true;
+      }
+      const pc = st.characters.find((x) => x.id === id);
+      if (
+        pc &&
+        (pc.dead ||
+          pc.hp <= 0 ||
+          pc.conditions.some((c) =>
+            ['incapacitated', 'paralyzed', 'stunned', 'unconscious', 'petrified'].includes(c)
+          ))
+      ) {
+        return true;
+      }
+      return false;
+    };
+    let touched = false;
+    const sweptEntities = st.entities.map((e) => {
+      if (e.grappled_by && incapacitated(e.grappled_by)) {
+        touched = true;
+        return {
+          ...e,
+          conditions: e.conditions.filter((c) => c !== 'grappled'),
+          grappled_by: undefined,
+        };
+      }
+      return e;
+    });
+    if (touched) {
+      st = { ...st, entities: sweptEntities };
+      // Also clear the grappled condition on any PC whose grappler is incapacitated.
+      st = {
+        ...st,
+        characters: st.characters.map((c) => {
+          const ent = st.entities!.find((e) => e.id === c.id);
+          if (ent && !ent.conditions.includes('grappled') && c.conditions.includes('grappled')) {
+            return { ...c, conditions: c.conditions.filter((cc) => cc !== 'grappled') };
+          }
+          return c;
+        }),
+      };
+    }
+  }
 
   const roomChanged = st.current_room !== state.current_room;
   st.run_log = [
