@@ -398,6 +398,7 @@ export interface GameState {
   guided_strike_active?:   boolean;         // War Cleric Channel Divinity +10 attack pending
   vow_of_enmity_target?:   string;          // Vengeance Paladin vow target entity id
   cutting_words_penalty?:  number;          // Lore Bard Cutting Words penalty to apply
+  round?:                  number;          // current combat round (1-indexed)
 
   // Campaign overlay (merged from CampaignState at session load)
   current_location_id?: string;

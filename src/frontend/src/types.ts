@@ -276,6 +276,7 @@ export interface GameState {
   guided_strike_active?:   boolean;
   vow_of_enmity_target?:   string;
   cutting_words_penalty?:  number;
+  round?:                  number;
 
   // Campaign overlay
   current_location_id?: string;
