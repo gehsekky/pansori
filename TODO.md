@@ -11,14 +11,6 @@
 - [ ] Multiple campaign modules — second context beyond Vale of Shadows to validate the authoring format is general-purpose
 
 ## Rules Engine (D&D 5e gaps)
-- [ ] AOE spells on grid — `spell.blastRadius` typed; `entitiesInBlast` exists in gridEngine; wire into `cast_spell` so the spell hits all entities in radius with individual saves; Evoker Sculpt Spells lets allies auto-succeed (PHB p.202)
-- [ ] Thrown weapon disadvantage past normal range — `resolvePlayerAttack` in the `attack` case never applies disadvantage when a thrown weapon is used beyond its `normalRange`; need to detect this and set `disadvantage = true` (PHB p.147)
-- [ ] Upcasting choice generation — `generateChoices` emits one spell choice at base slot level; for spells with `upcastBonus`, emit one additional choice per available slot level above the base (e.g. "Cast Fireball (4th) — upcast +1d6") (PHB p.201)
-- [ ] Spell slot initialization at session load — `spellSlotsForClassLevel` exists but is never called at session start or `normalizeState`; sessions loaded from DB may have stale or missing slot counts; call it during `normalizeState` for any character whose `spell_slots_max` is empty (PHB class tables)
-- [ ] Petrified condition — typed but not enforced; should: incapacitate the entity (block actions), apply resistance to all damage types (`'*'` wildcard in `applyDamageMultiplier`), auto-fail STR/DEX saves (PHB p.291)
-- [ ] Surprise round — `GameState.surprised?: string[]` typed; on combat start, compare party average Stealth vs. enemy Perception; add surprised enemy IDs to the array; skip action generation for surprised entities in round 1; clear at start of round 2 (PHB p.189)
-- [ ] Ammunition tracking — `LootItem.ammo?: { type, count }` scoped; ranged attacks should find matching ammo in inventory, decrement count by 1, and block the attack if count is 0 (PHB p.146)
-- [ ] HP rolled on level-up — currently fixed +4 per level; should roll `hit_die` + CON mod, minimum 1; add option in level-up flow (PHB p.15)
 - [ ] Initiative-interleaved enemy turns on grid — enemies currently counter-attack within the player's action; true initiative order should give each entity a full independent turn (PHB p.189)
 
 ### Subclasses — wired but feature-incomplete
