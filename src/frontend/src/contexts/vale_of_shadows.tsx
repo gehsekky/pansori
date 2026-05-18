@@ -7,6 +7,7 @@ export const context: FrontendContext = {
   tagline:
     'A market town on the edge of the Vale. The old crypt stirs at night, and the Guild needs adventurers.',
   recommendedPartySize: 3,
+  recommendedComposition: ['Fighter', 'Cleric', 'Rogue'],
   previewArt: `
    ╔═ VALE ═══════╗
    ║ Millhaven    ║

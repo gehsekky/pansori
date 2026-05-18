@@ -544,6 +544,11 @@ export interface CampaignData {
   // facing the throne fight (Crypt Lord + 2 minions, balanced for 3 PCs) will
   // have a hard time. Surfaced on the character creation screen.
   recommendedPartySize?: number;
+  // Class ids for the campaign's ideal party composition. Length should match
+  // `recommendedPartySize`. The character creation screen offers an auto-fill
+  // button that builds this composition. Falls back to a generic size-based
+  // template when unset.
+  recommendedComposition?: string[];
 }
 
 export type TieredNarrative = string[] | Record<string, string[]>;
