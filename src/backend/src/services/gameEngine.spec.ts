@@ -1491,10 +1491,21 @@ describe('class features', () => {
   // ── Sneak Attack (Rogue in sandbox) ─────────────────────────────────────────
 
   it('Rogue sneak attack adds bonus damage on hit', async () => {
-    // Force a hit (roll 20 = critical) so we can check sneak damage applied
+    // SRD 5.2.1: Sneak Attack needs (a) a finesse or ranged weapon, AND
+    // (b) advantage OR an ally within 5 ft of the target, AND (c) no
+    // disadvantage. We give the Rogue a dagger and place the Fighter
+    // adjacent to the goblin on the grid.
     vi.spyOn(Math, 'random').mockReturnValue(0.999); // d20 → 20 always
-    const pilot = makeChar({ id: 'p1', character_class: 'Rogue', level: 3 });
-    const ally = makeChar({ id: 'p2', character_class: 'Fighter' }); // ally triggers sneak attack
+    const daggerInst = 'rogue-dagger-1';
+    const pilot = makeChar({
+      id: 'p1',
+      character_class: 'Rogue',
+      level: 3,
+      equipped_weapon: daggerInst,
+      inventory: [{ instance_id: daggerInst, id: 'dagger', name: 'Dagger' }],
+    });
+    const ally = makeChar({ id: 'p2', character_class: 'Fighter' });
+    const goblinId = `${CORRIDOR_ID}#0`;
     const state: GameState = {
       characters: [pilot, ally],
       active_character_id: 'p1',
@@ -1502,9 +1513,44 @@ describe('class features', () => {
       visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
       enemies_killed: [],
       loot_taken: [],
-      combat_active: false,
-      initiative_order: [],
+      combat_active: true,
+      initiative_order: [
+        { id: 'p1', roll: 18, is_enemy: false },
+        { id: 'p2', roll: 12, is_enemy: false },
+        { id: goblinId, roll: 5, is_enemy: true },
+      ],
       initiative_idx: 0,
+      // Pre-place entities so the ally is within 5 ft of the goblin.
+      entities: [
+        {
+          id: 'p1',
+          isEnemy: false,
+          pos: { x: 4, y: 5 },
+          hp: 10,
+          maxHp: 10,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: 'p2',
+          isEnemy: false,
+          pos: { x: 6, y: 5 },
+          hp: 10,
+          maxHp: 10,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: goblinId,
+          isEnemy: true,
+          pos: { x: 5, y: 5 },
+          hp: 10,
+          maxHp: 10,
+          conditions: [],
+          condition_durations: {},
+        },
+      ],
+      movement_used: {},
       run_log: [],
       room_log: [],
       last_choices: [],
@@ -1518,7 +1564,7 @@ describe('class features', () => {
       objects_searched: [],
     };
     const result = await takeAction({
-      action: { type: 'attack' },
+      action: { type: 'attack', targetEnemyId: goblinId },
       history: [],
       state,
       seed: seedWithEnemy,

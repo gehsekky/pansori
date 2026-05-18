@@ -2320,12 +2320,38 @@ export async function takeAction({
         }
 
         // ── Hit ──────────────────────────────────────────────────────────────
-        // Sneak Attack: once per turn, on hit, with advantage or an ally in combat
+        // Sneak Attack (SRD 5.2.1 — Rogue): once per turn, on a hit, with
+        // either advantage on the attack OR an ally within 5 ft of the
+        // target (and you don't have disadvantage). Weapon must be Finesse
+        // or Ranged.
         let sneakDmg = 0;
         if (features.includes('sneak_attack')) {
-          const hasAdv = char.conditions.some((c) => ADVANTAGE_CONDITIONS.has(c));
-          const allies = st.characters.filter((c) => !c.dead && c.id !== char.id).length;
-          if (hasAdv || allies > 0) {
+          const isFinesseOrRanged =
+            (weaponItem?.finesse ?? false) || weaponItem?.range === 'ranged';
+          // "Ally within 5 ft of target" via grid (Chebyshev distance ≤ 1).
+          // When no grid is active, fall back to "any living ally" (the
+          // previous looser check).
+          let allyAdjacent = false;
+          if (st.entities) {
+            const targetEnt = st.entities.find((e) => e.id === targetId && e.isEnemy);
+            if (targetEnt) {
+              allyAdjacent = st.entities.some(
+                (e) =>
+                  !e.isEnemy &&
+                  e.id !== char.id &&
+                  e.hp > 0 &&
+                  Math.max(
+                    Math.abs(e.pos.x - targetEnt.pos.x),
+                    Math.abs(e.pos.y - targetEnt.pos.y)
+                  ) <= 1
+              );
+            }
+          } else {
+            allyAdjacent = st.characters.some((c) => !c.dead && c.id !== char.id);
+          }
+          const hasAdv = advantage && !disadvantage;
+          const triggers = (hasAdv || allyAdjacent) && !disadvantage;
+          if (isFinesseOrRanged && triggers) {
             const saExpr = sneakAttackDice(char.level);
             sneakDmg = isCrit ? rollCritical(saExpr) : rollDice(saExpr);
           }
