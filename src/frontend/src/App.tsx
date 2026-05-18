@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import CampaignPanel from './components/CampaignPanel.tsx';
 import CharScreen from './components/CharScreen.tsx';
 import GridCombatView from './components/GridCombatView.tsx';
+import InventoryModal from './components/InventoryModal.tsx';
 import LoginScreen from './components/LoginScreen.tsx';
 import PartyPanel from './components/PartyPanel.tsx';
 import RoomArtPanel from './components/RoomArtPanel.tsx';
@@ -67,6 +68,7 @@ export default function App() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [mapOpen, setMapOpen] = useState(false);
+  const [inventoryOpen, setInventoryOpen] = useState(false);
   const logRef = useRef<HTMLDivElement>(null);
   const narrativeRef = useRef<HTMLDivElement>(null);
 
@@ -82,6 +84,8 @@ export default function App() {
     handleNewGame,
     handleResumeSession,
     handleEquip,
+    handleTransfer,
+    handleDrop,
     handleChoice,
     resetGame,
   } = useGame();
@@ -146,12 +150,20 @@ export default function App() {
       const allDead = !!gameState && gameState.characters.every((c) => c.dead);
       if (view !== 'game' || loading || escaped || allDead) return;
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      // 'i' toggles inventory modal
+      if (e.key === 'i' || e.key === 'I') {
+        e.preventDefault();
+        setInventoryOpen((v) => !v);
+        return;
+      }
+      // Number keys pick choices when no modal blocks input
+      if (inventoryOpen || mapOpen) return;
       const idx = parseInt(e.key, 10);
       if (!isNaN(idx) && idx >= 1 && idx <= choices.length) handleChoice(choices[idx - 1]);
     }
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [view, loading, escaped, gameState, choices]);
+  }, [view, loading, escaped, gameState, choices, inventoryOpen, mapOpen]);
 
   async function wrappedResumeSession(id: string) {
     await handleResumeSession(id);
@@ -227,6 +239,13 @@ export default function App() {
                   </div>
                   {user && (
                     <div className={styles.userInfoRow}>
+                      <button
+                        className={styles.invHeaderBtn}
+                        onClick={() => setInventoryOpen(true)}
+                        title="Inventory (I)"
+                      >
+                        🎒 INVENTORY
+                      </button>
                       {user.avatar_url && (
                         <img src={user.avatar_url} alt="" className={styles.userAvatar} />
                       )}
@@ -251,6 +270,17 @@ export default function App() {
 
               {mapOpen && seed && gameState && (
                 <WorldMap seed={seed} state={gameState} onClose={() => setMapOpen(false)} />
+              )}
+
+              {inventoryOpen && gameState && (
+                <InventoryModal
+                  state={gameState}
+                  ctx={ctx}
+                  onClose={() => setInventoryOpen(false)}
+                  onEquip={handleEquip}
+                  onTransfer={handleTransfer}
+                  onDrop={handleDrop}
+                />
               )}
 
               {gameState?.combat_active &&

@@ -98,6 +98,23 @@ export const api = {
       body: JSON.stringify({ item_id, character_id }),
     }),
 
+  transferItem: (
+    sessionId: string,
+    item_instance_id: string,
+    from_character_id: string,
+    to_character_id: string
+  ) =>
+    req<{ newState: GameState }>(`/game/session/${sessionId}/transfer`, {
+      method: 'POST',
+      body: JSON.stringify({ item_instance_id, from_character_id, to_character_id }),
+    }),
+
+  dropItem: (sessionId: string, item_instance_id: string, character_id: string) =>
+    req<{ newState: GameState }>(`/game/session/${sessionId}/drop`, {
+      method: 'POST',
+      body: JSON.stringify({ item_instance_id, character_id }),
+    }),
+
   deleteSession: (id: string) => req<{ ok: boolean }>(`/game/session/${id}`, { method: 'DELETE' }),
 
   clearCompleted: () =>

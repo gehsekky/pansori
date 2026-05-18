@@ -420,6 +420,151 @@ gameRouter.post('/session/:id/equip', async (req: Request, res: Response) => {
   }
 });
 
+// Transfer an item from one party member to another. PHB p.190 lets you
+// interact with one object per turn free (move + give); we don't gate on
+// action economy here — the inventory UI treats transfers as fluid.
+gameRouter.post('/session/:id/transfer', async (req: Request, res: Response) => {
+  const { item_instance_id, from_character_id, to_character_id } = req.body as {
+    item_instance_id?: string;
+    from_character_id?: string;
+    to_character_id?: string;
+  };
+  if (!item_instance_id || !from_character_id || !to_character_id) {
+    res
+      .status(400)
+      .json({ error: 'Missing item_instance_id, from_character_id, or to_character_id' });
+    return;
+  }
+  if (from_character_id === to_character_id) {
+    res.status(400).json({ error: 'Cannot transfer to the same character' });
+    return;
+  }
+  try {
+    const {
+      rows: [row],
+    } = await pool.query('SELECT * FROM game_sessions WHERE id = $1 AND user_id = $2', [
+      req.params.id,
+      req.user!.id,
+    ]);
+    if (!row) {
+      res.status(404).json({ error: 'Session not found' });
+      return;
+    }
+    const state = normalizeState(row.state, {
+      character_name: row.character_name,
+      portrait_url: row.portrait_url,
+    });
+    const fromIdx = state.characters.findIndex((c) => c.id === from_character_id);
+    const toIdx = state.characters.findIndex((c) => c.id === to_character_id);
+    if (fromIdx < 0 || toIdx < 0) {
+      res.status(400).json({ error: 'Character not found in session' });
+      return;
+    }
+    const fromChar = state.characters[fromIdx];
+    const toChar = state.characters[toIdx];
+    if (fromChar.dead || toChar.dead) {
+      res.status(409).json({ error: 'Cannot transfer to or from a dead character' });
+      return;
+    }
+    const item = fromChar.inventory.find((i) => i.instance_id === item_instance_id);
+    if (!item) {
+      res.status(400).json({ error: 'Item not found on source character' });
+      return;
+    }
+    // Equipped items must be unequipped before transfer (5e: donning another
+    // person's armor takes an hour; we approximate with a hard block).
+    if (
+      fromChar.equipped_weapon === item_instance_id ||
+      fromChar.equipped_armor === item_instance_id ||
+      fromChar.equipped_shield === item_instance_id
+    ) {
+      res.status(409).json({ error: 'Unequip the item before transferring it.' });
+      return;
+    }
+
+    const newFrom = {
+      ...fromChar,
+      inventory: fromChar.inventory.filter((i) => i.instance_id !== item_instance_id),
+      attuned_items: (fromChar.attuned_items ?? []).filter((id) => id !== item_instance_id),
+    };
+    const newTo = { ...toChar, inventory: [...toChar.inventory, item] };
+    const newState: GameState = {
+      ...state,
+      characters: state.characters.map((c, i) => {
+        if (i === fromIdx) return newFrom;
+        if (i === toIdx) return newTo;
+        return c;
+      }),
+    };
+    await pool.query('UPDATE game_sessions SET state = $1, updated_at = NOW() WHERE id = $2', [
+      JSON.stringify(newState),
+      row.id,
+    ]);
+    res.json({ newState });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// Drop an item from a character's inventory. v1: the dropped item is lost
+// (not added back to room loot). Can extend later if "drop and pick up
+// again" is desired.
+gameRouter.post('/session/:id/drop', async (req: Request, res: Response) => {
+  const { item_instance_id, character_id } = req.body as {
+    item_instance_id?: string;
+    character_id?: string;
+  };
+  if (!item_instance_id || !character_id) {
+    res.status(400).json({ error: 'Missing item_instance_id or character_id' });
+    return;
+  }
+  try {
+    const {
+      rows: [row],
+    } = await pool.query('SELECT * FROM game_sessions WHERE id = $1 AND user_id = $2', [
+      req.params.id,
+      req.user!.id,
+    ]);
+    if (!row) {
+      res.status(404).json({ error: 'Session not found' });
+      return;
+    }
+    const state = normalizeState(row.state, {
+      character_name: row.character_name,
+      portrait_url: row.portrait_url,
+    });
+    const charIdx = state.characters.findIndex((c) => c.id === character_id);
+    if (charIdx < 0) {
+      res.status(400).json({ error: 'Character not found in session' });
+      return;
+    }
+    const char = state.characters[charIdx];
+    if (!char.inventory.find((i) => i.instance_id === item_instance_id)) {
+      res.status(400).json({ error: 'Item not found in character inventory' });
+      return;
+    }
+    const newChar = {
+      ...char,
+      inventory: char.inventory.filter((i) => i.instance_id !== item_instance_id),
+      equipped_weapon: char.equipped_weapon === item_instance_id ? null : char.equipped_weapon,
+      equipped_armor: char.equipped_armor === item_instance_id ? null : char.equipped_armor,
+      equipped_shield: char.equipped_shield === item_instance_id ? null : char.equipped_shield,
+      attuned_items: (char.attuned_items ?? []).filter((id) => id !== item_instance_id),
+    };
+    const newState: GameState = {
+      ...state,
+      characters: state.characters.map((c, i) => (i === charIdx ? newChar : c)),
+    };
+    await pool.query('UPDATE game_sessions SET state = $1, updated_at = NOW() WHERE id = $2', [
+      JSON.stringify(newState),
+      row.id,
+    ]);
+    res.json({ newState });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
 // Take a game action
 gameRouter.post('/session/:id/action', async (req: Request, res: Response) => {
   const { action, history } = req.body as { action?: StructuredAction; history?: unknown[] };
