@@ -308,6 +308,7 @@ export type StructuredAction =
   | { type: 'attune'; instanceId: string }
   | { type: 'grapple'; targetEnemyId?: string }
   | { type: 'try_escape_grapple' }
+  | { type: 'stand_up' }
   | { type: 'shove'; targetEnemyId?: string }
   | { type: 'dodge' }
   | { type: 'disengage' }
