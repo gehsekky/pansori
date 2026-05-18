@@ -1590,7 +1590,7 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
         && ((st.surprised ?? []).includes(roomId) || (st.round ?? 1) === 1);
 
       // Vow of Enmity: advantage vs the vow target
-      const vowAdv = (st as Record<string, unknown>).vow_of_enmity_target === roomId;
+      const vowAdv = st.vow_of_enmity_target === roomId;
 
       const disadvantage     = rangedInMelee || conditionDisadv || exhaustionDisadv || !armorProficient || proneDisadv || thrownLongRangeDisadv;
       const advantage        = conditionAdv || enemyGrappled || proneAdv || enemyParalyzed || flankingAdv || helpAdv || assassinAdv || vowAdv;
@@ -1613,9 +1613,9 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
       // Sacred Weapon: +CHA mod to attack rolls
       const sacredWeaponBonus = (char.class_resource_uses?.sacred_weapon_active ?? 0) > 0 ? abilityMod(char.cha) : 0;
       // Guided Strike: +10 to attack roll (War Cleric Channel Divinity)
-      const guidedStrikeBonus = (st as Record<string, unknown>).guided_strike_active ? 10 : 0;
+      const guidedStrikeBonus = st.guided_strike_active ? 10 : 0;
       const totalAttackBonus = sacredWeaponBonus + guidedStrikeBonus;
-      if (guidedStrikeBonus) st = { ...st, guided_strike_active: false } as typeof st;
+      if (guidedStrikeBonus) st = { ...st, guided_strike_active: false };
 
       // Helper that resolves one attack roll and applies it to enemy HP / narrative.
       // Returns true if the enemy was killed (so the caller can break early).
@@ -2559,9 +2559,10 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
         const martialDie = char.level >= 17 ? 10 : char.level >= 11 ? 8 : char.level >= 5 ? 6 : 4;
         let flurryNarrative = `${char.name} — Flurry of Blows (${kiPool - 1} ki remaining)!`;
         for (let i = 0; i < 2; i++) {
-          if (!enemyAlive || !enemyEntity) break;
+          const flurryTarget = st.entities?.find(e => e.id === roomId && e.isEnemy);
+          if (!enemyAlive || !flurryTarget) break;
           const toHit = rollDice('1d20') + abilityMod(char.dex) + profBonus(char.level);
-          if (toHit >= (enemyEntity ? (enemy?.ac ?? 10) : 10)) {
+          if (toHit >= (enemy?.ac ?? 10)) {
             const dmg = Math.max(1, rollDice(`1d${martialDie}`) + abilityMod(char.dex));
             const curHp = st.entities?.find(e => e.id === roomId && e.isEnemy)?.hp ?? 0;
             const newHp = curHp - dmg;
@@ -2747,9 +2748,10 @@ export async function takeAction({ action, history = [], state, seed: seedArg, c
       // ── Hunter Ranger: Hunter's Prey — Colossus Slayer ───────────────────────
       else if (fid === 'colossus_slayer') {
         if (char.subclass !== 'hunter') { narrative = 'Only Hunter Rangers have Colossus Slayer.'; break; }
-        if (!enemyAlive || !enemyEntity) { narrative = 'No living target.'; break; }
-        const enemyMaxHp = (enemy as unknown as Record<string, number>)['max_hp'] ?? enemyEntity.hp * 2;
-        if (enemyEntity.hp >= enemyMaxHp) { narrative = 'Colossus Slayer only triggers on a bloodied (below max HP) target.'; break; }
+        const csTarget = st.entities?.find(e => e.id === roomId && e.isEnemy);
+        if (!enemyAlive || !csTarget) { narrative = 'No living target.'; break; }
+        const enemyMaxHp = (enemy as unknown as Record<string, number>)['max_hp'] ?? csTarget.hp * 2;
+        if (csTarget.hp >= enemyMaxHp) { narrative = 'Colossus Slayer only triggers on a bloodied (below max HP) target.'; break; }
         if ((char.class_resource_uses?.colossus_slayer_used ?? 0) >= 1) { narrative = 'Colossus Slayer already triggered this turn.'; break; }
         const csDmg = rollDice('1d8');
         char.class_resource_uses = { ...(char.class_resource_uses ?? {}), colossus_slayer_used: 1 };
