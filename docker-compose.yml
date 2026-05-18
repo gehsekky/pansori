@@ -10,12 +10,15 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pansori}
       POSTGRES_DB: ${POSTGRES_DB:-pansori_db}
     ports:
-      - "5432:5432"
+      - '5432:5432'
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      - ./src/db/migrations:/docker-entrypoint-initdb.d
+      # Mount for fresh-init only (Docker entrypoint runs these once on an
+      # empty volume). The backend's migration runner re-uses the same files
+      # for incremental migrations on subsequent boots.
+      - ./src/backend/migrations:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pansori} -d ${POSTGRES_DB:-pansori_db}"]
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-pansori} -d ${POSTGRES_DB:-pansori_db}']
       interval: 5s
       timeout: 5s
       retries: 10
@@ -39,7 +42,7 @@ services:
       GOOGLE_CALLBACK_URL: ${GOOGLE_CALLBACK_URL:-http://localhost:3001/api/auth/google/callback}
       SESSION_SECRET: ${SESSION_SECRET:-change-me}
     ports:
-      - "3001:3001"
+      - '3001:3001'
     volumes:
       - ./src/backend:/app
       - /app/node_modules
@@ -54,7 +57,7 @@ services:
     depends_on:
       - backend
     ports:
-      - "5173:5173"
+      - '5173:5173'
     volumes:
       - ./src/frontend:/app
       - /app/node_modules
@@ -71,7 +74,7 @@ services:
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
       PGADMIN_CONFIG_SERVER_MODE: 'False'
     ports:
-      - "5050:80"
+      - '5050:80'
     profiles:
       - tools
 

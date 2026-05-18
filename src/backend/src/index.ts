@@ -10,6 +10,7 @@ import { gameRouter } from './routes/game.js';
 import passport from 'passport';
 import { pool } from './db/pool.js';
 import { requireAuth } from './auth/middleware.js';
+import { runMigrations } from './services/migrationRunner.js';
 import session from 'express-session';
 
 const app = express();
@@ -75,4 +76,14 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3001;
-httpServer.listen(PORT, () => console.log(`Backend running on :${PORT}`));
+
+// Run pending DB migrations before serving traffic. A failure here aborts
+// startup so we don't accept requests against a half-migrated schema.
+runMigrations(pool)
+  .then(() => {
+    httpServer.listen(PORT, () => console.log(`Backend running on :${PORT}`));
+  })
+  .catch((err) => {
+    console.error('[startup] Migration runner failed — aborting:', err);
+    process.exit(1);
+  });
