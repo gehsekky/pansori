@@ -165,6 +165,7 @@ export interface Character {
     free_interaction_used: boolean;
     dodging?: boolean;
     disengaged?: boolean;
+    reckless?: boolean;
     movement_budget_remaining?: number;
     readied_action?: { trigger: string; action: StructuredAction };
   };
