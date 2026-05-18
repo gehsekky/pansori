@@ -1,202 +1,83 @@
 # TODO
 
-<!-- Priority order: ship → UI → content → polish → playtest -->
+<!-- Sections without open items have been pruned. See git history for what's already shipped. -->
 
-## 1. Deployment (AWS — t4g.small EC2 + db.t4g.micro RDS)
+## End-goal target
 
-### AWS Console (one-time)
-
-- [x] ECR repositories — `pansori-backend` and `pansori-frontend` created
-- [x] Security groups — EC2 inbound: 22 (your IP only), 80, 443; RDS SG created (pansori-rds)
-- [x] IAM instance profile — `pansori-ec2-role` with CloudWatchLogsFullAccess attached to instance
-- [x] CloudWatch log groups — `/pansori/backend`, `/pansori/frontend`, `/pansori/nginx`, `/pansori/postgres` with 30-day retention
-- [x] IAM deploy user — `pansori-deploy` created with ECR push permissions
-
-### EC2 bootstrap (SSH in once)
-
-- [x] Docker 25.0.14, Compose plugin v5.1.3, AWS CLI v2.33.15 installed; `ec2-user` in `docker` group
-- [x] Create `/opt/pansori/` directory; copy `docker-compose.prod.yml` and `infra/nginx/nginx.conf` there
-- [x] Create `/opt/pansori/.env` with all required vars (see list below)
-- [x] SSM Session Manager registered (instance role has `AmazonSSMManagedInstanceCore`) — no SSH allowlist needed for ops
-
-### Domain & TLS
-
-- [x] Point domain A record at EC2 public IP
-- [x] Replace `YOUR_DOMAIN` in `infra/nginx/nginx.conf` with the real domain (4 occurrences)
-- [x] Cert issued for `pansorirpg.com` + `www.pansorirpg.com` (Let's Encrypt ECDSA, expires 2026-08-16)
-- [x] Auto-renew via systemd `certbot-renew.timer` (daily 03:00 UTC + 1h jitter; webroot mode; deploy-hook reloads nginx)
-- [x] `/var/www/certbot/` directory exists for ACME webroot challenges
-- [x] Renewal config switched from `standalone` → `webroot` so nginx stays up during renew
-
-### GitHub Actions wiring
-
-- [x] Add repo secrets: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (EC2_SSH_KEY no longer needed)
-- [x] Workflow env vars: `AWS_REGION`, `ECR_REGISTRY`, `EC2_INSTANCE_ID`
-- [x] Deploy step switched from `appleboy/ssh-action` to `aws ssm send-command` — no SSH allowlist, no key rotation, all commands audited in CloudTrail
-- [x] `pansori-deploy` IAM user has `ssm:SendCommand` scoped to the pansori instance + `AWS-RunShellScript` document
-- [x] `DEPLOY_ENABLED=true` repo variable is set — every push to `main` auto-deploys to prod after a successful build (verified end-to-end with image tag `733c3be7`)
-
-### Google OAuth
-
-- [x] Create Google Cloud project; enable People API
-- [x] Configure OAuth consent screen (External); add `email` and `profile` scopes; add domain to Authorized Domains
-- [x] Create OAuth credential (Web application); set Authorized redirect URI to `https://yourdomain.com/api/auth/google/callback`; copy Client ID + Secret into env
-- [x] Publish the consent screen app when ready for real users
-
-### Database
-
-- [x] Schema/migrations auto-run on first `docker compose up` via `docker-entrypoint-initdb.d` (now mounted in `docker-compose.prod.yml`; 6 migrations applied on first init)
-
-### Production deployment
-
-- [x] First deploy successful (image tag `09b6e3f2`): postgres + backend + frontend + nginx all running, TLS terminating, API responding
-
-### Required environment variables (`/opt/pansori/.env` on EC2)
-
-- `POSTGRES_PASSWORD` — strong password for the containerized postgres instance
-- `POSTGRES_USER` — `pansori` (default)
-- `POSTGRES_DB` — `pansori_db` (default)
-- `SESSION_SECRET` — random 64-character string
-- `ANTHROPIC_API_KEY` — `sk-ant-...`
-- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — OAuth app credentials
-- `GOOGLE_CALLBACK_URL` — `https://yourdomain.com/api/auth/google/callback`
-- `FRONTEND_URL` — `https://yourdomain.com`
-- `ECR_REGISTRY` — `674162619498.dkr.ecr.us-east-1.amazonaws.com`
-- `AWS_REGION` — `us-east-1`
+Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign scripts as a full RPG experience.
 
 ---
 
-## 2. Grid Combat UI
+## Top 5 items to push toward the end goal
 
-- [x] Render entity positions on a grid in the frontend during combat — `GridCombatView.tsx`
-- [x] Highlight reachable squares based on remaining movement budget
-- [x] Show entity HP bars, conditions, and initiative order in combat HUD (HP bars + condition badges on tokens; `InitiativeStrip` already shows order)
-- [x] Display position coordinates in `grid_move` choice labels (already in `generateChoices`)
-
----
-
-## 3. Multiple Enemies Per Room
-
-- [x] `Seed.enemies` is now `Record<roomId, Enemy[]>`; each enemy has a stable `id`
-- [x] `buildInitiativeOrder` rolls per-enemy initiative
-- [x] Enemy turn loop iterates by entity id (`getEnemyById`); each living enemy acts
-- [x] `generateChoices` emits one attack/grapple/shove choice per living enemy with `targetEnemyId`
-- [x] Combat ends only when all enemies in the room are dead (`isRoomCleared`)
+1. **End-to-end Vale of Shadows playtest** — complete all 3 quests in a single session, verify campaign state survives session resume, verify faction price modifiers apply in shop. This is the validation gate: until a campaign plays start-to-finish without engine bugs, every other rule addition is unverified.
+2. **Reactive spells / interrupt system** — Counterspell (PHB p.234), Shield (PHB p.275), Hellish Rebuke. Architectural: the turn engine needs a reaction-window hook so a defender can spend a reaction to interrupt the attacker's resolve. Without this, the iconic 5e arcane combat mechanics aren't representable.
+3. **Inspiration (Heroic Inspiration in 2024)** — RAW free reroll on attack/save/check. Needs UX: grant (quest completion, roleplay, level-up), display (token on character card), spend (button on the relevant choice).
+4. **Combat narrative clarity (UX)** — combat currently produces a long text log scroll mixing damage numbers, condition changes, save rolls, OA narrations. A "combat log panel" that separates **mechanical events** (rolls, damage, condition apply/remove) from **prose flavour** would dramatically improve readability and let new players follow what's happening. Hooks into the existing `narrative template format` backlog item.
+5. **Authoring documentation (`AUTHORING.md`)** — for the engine to actually be "capable of running complex campaign scripts" by third parties (or future-you), the campaign format needs a written reference: required vs optional fields on `Context`/`CampaignData`, quest condition shape, rule engine consequences, loot/room/NPC patterns, gotchas. Should reference Vale + Whispering Pines as worked examples.
 
 ---
 
-## 4. Campaign UI
+## 5e SRD remaining gaps
 
-- [x] Quest journal UI — `CampaignPanel.tsx` (quests tab, status badges, step checklist)
-- [x] Faction reputation UI — `CampaignPanel.tsx` (factions tab; attitude tier + rep value)
-- [x] Town/district navigation choices — `generateChoices` emits `travel` and `enter_district`
-- [x] `accept_quest` as an explicit choice — emitted when active char is next to a quest-giver NPC with an unaccepted quest
-- [x] NPC quest-giver indicator — `[!]` suffix on Talk label when NPC has an unaccepted quest
+### Real gameplay impact (worth doing)
 
----
+- [ ] **Inspiration UX** — see top-5 item 3.
+- [ ] **Reactive spells / interrupt system** — see top-5 item 2.
+- [ ] **Multi-target spell allocation UX** — Magic Missile dart split, Eldritch Blast multi-beam (L5+). Damage math is correct on single target; missing: the optional dart/beam-distribution UI so the player can spread across multiple enemies.
+- [ ] **Reach weapon OA range** — `inRange()` honours `weapon.reach`, but `opportunityAttackTriggers` still hard-codes 5 ft. A glaive-wielding fighter currently can't OA at 10 ft. Also: no current loot has Reach, so this is infrastructure-only until a Reach weapon is authored.
+- [ ] **Hide action — full DC tracking** (SRD p.11) — successful Stealth grants Invisible _and_ records the check total as the DC for others to find you. Enemies should be able to make passive Perception (or active Search) against that DC. Today we apply `invisible` for one attack's advantage; we don't track the DC or allow finding. Half-implemented (invisible reveals on attack already done).
+- [ ] **Heavy-encumbrance skill-check disadvantage** — speed penalties are wired (`effectiveSpeed`), but heavy encumbrance is also supposed to give disadvantage on STR/DEX/CON checks, saves, and attacks. Not yet enforced.
 
-## 5. Missing Classes — DONE (verified in audit; defined in `sandbox.ts`, handler logic in `gameEngine.ts`)
+### No-current-content (defer)
 
-- [x] Druid (wild_shape, spell prep)
-- [x] Sorcerer (sorcery points, Metamagic dispatch)
-- [x] Warlock (pact slots, Agonizing Blast)
-- [x] Monk (ki points, Flurry of Blows, Step of the Wind, Unarmored Defense)
-- [x] Barbarian (rage, Unarmored Defense)
-- [x] Barbarian Reckless Attack — `reckless_attack` class-feature toggle; advantage on STR melee, enemies get advantage vs you until your next turn
+- [ ] **Frightened — movement restriction** (SRD p.182) — the frightened creature cannot willingly move closer to the source of its fear. Needs a fear-source id on the condition. Currently only enemies become frightened (Vengeance Paladin's Abjure Enemy), and enemies don't grid-move, so this has no practical effect today.
+- [ ] **Heavy weapon disadvantage for Small creatures** (SRD p.90) — no Small races on either campaign's character sheet. Add when a Small race appears.
+- [ ] **Charmed: charmer's social advantage** (SRD p.181) — no spell currently sets `charmer_id`. Wire it from Charm Person when a charm-effect spell starts appearing in NPC dialogue.
+- [ ] **Costly material component consumption** — Identify's 100 gp pearl, Resurrection's 1000 gp diamond, etc. No spell currently consumes material components.
+- [ ] **Group ability checks** (SRD p.6) — half-the-party-succeeds = group succeeds. Could fold into the existing sneak action when a party rolls together.
 
----
+### Architectural blockers
 
-## 6. Subclass Features — DONE
-
-- [x] Champion: Improved Critical
-- [x] Battle Master: maneuvers (Riposte, Feinting)
-- [x] Thief: Fast Hands — Thief Rogue L3+ can `interact_object` as a bonus action in combat (extends out-of-combat free interaction)
-- [x] Assassin: auto-crit on surprised
-- [x] Evoker: Potent Cantrip
-- [x] Abjurer: Arcane Ward
-- [x] Life Cleric: Disciple of Life
-- [x] War Cleric: War Priest + Guided Strike
-- [x] Hunter Ranger: Colossus Slayer
-- [x] Beastmaster: Animal Companion — Wolf companion (HP 11 / AC 13 / +4 to hit / 2d4+2) summons at combat start for Ranger L3+ Beastmasters; commanded via bonus action; rendered as a green token on the combat grid
-- [x] Devotion Paladin: Sacred Weapon
-- [x] Vengeance Paladin: Vow of Enmity + Abjure Enemy
-- [x] Bard Lore: Cutting Words
-- [x] Bard Valor: Combat Inspiration + Extra Attack
+- [ ] **Climbing & Crawling movement cost** — needs a "movement mode" concept. Skip until verticality.
+- [ ] **Jumping** — Long jump = STR ft, high jump = 3 + STR mod ft. Same verticality blocker.
 
 ---
 
-## 7. Vale of Shadows — Refactor & Playtest
+## Content & playtest
 
-- [x] Migrate enemies to the new array-per-room schema with stable IDs
-- [x] Multi-enemy encounters added: Charnel Hall (2 skeletons), Crypt Throne (Crypt Lord + 2 skeleton minions), Road North (2 bandits)
-- [x] Frontend context (`src/frontend/src/contexts/vale_of_shadows.tsx`) so Vale appears on the character creation screen — was previously backend-only and invisible
-- [x] Add a second campaign module to validate the authoring format is general-purpose — **Whispering Pines** (frozen mountain pass, kidnap+cult plot, fire-vulnerable boss). Found and fixed a real gap during authoring: campaign mode never wired `npcs` into the seed, so Vale's Aldric/Maren/Dusk had been silently missing from their rooms. Added `CampaignData.npcs?: Record<string, PlacedNpc>` and `generateSeed` now copies through. Wired Vale's NPC placements in the same pass. 8 new procgen tests lock in both campaigns' shape.
-- [ ] End-to-end playtest — complete all 3 quests in a single session; verify campaign state survives session resume; verify faction price modifiers apply in shop
+- [ ] **End-to-end Vale of Shadows playtest** — see top-5 item 1.
+- [ ] **Third campaign module** — once Vale is verified, a third module would stress-test the format further. Possible themes: coastal pirate town, desert ruin, planar city. Lower priority than the playtest gate.
+- [ ] **Boss fight mechanics** — phase changes, lair actions, legendary actions (SRD p.221). The Crypt Lord and Frost Acolyte are currently stat-block bosses; bigger bosses would benefit from multi-phase scripts.
 
 ---
 
-## Backlog (post-ship)
+## UX & polish
 
-- [ ] Narrative template format — separate mechanical metadata (dice rolls, damage numbers, HP changes) from prose so the UI can render them differently while keeping immersion
-- [ ] Dynamic room/encounter image generation — Google Imagen or similar behind `IMAGE_PROVIDER` env var flag; off by default
-- [ ] Sound effects — ambient audio per location type (town, dungeon, wilderness); combat sound cues
-- [x] Mobile UI support — `@media` breakpoints at 768 px and 480 px in `styles.module.css` stack two-column layouts vertically, enlarge tap targets on choice buttons, allow the combat grid to scroll horizontally, and tighten paddings. Desktop layout unchanged.
-
----
-
-## 8. Inventory & UX
-
-- [x] Single inventory modal (`InventoryModal.tsx`) — party tabs, equipment slot summary, equip/unequip, give-to-party-member transfer, drop, encumbrance footer (STR × 15 lbs capacity; tier labels shown). Triggered by `I` keypress or header button.
-- [x] Encumbrance speed penalties enforced server-side via `effectiveSpeed()` — see §9 for details. Modal tier labels now match server behaviour.
-- [ ] Multi-window inventory (deferred — single modal serves the core use case)
+- [ ] **Combat narrative clarity** — see top-5 item 4. Related backlog: narrative template format separating mechanics from prose.
+- [ ] **Narrative template format** — separate dice rolls / damage numbers / HP changes from prose so the UI can render them differently while keeping immersion.
+- [ ] **Tutorial / onboarding** — the game drops new players into character creation with no introduction to the action choice loop, grid combat, or the inventory modal. A 2-room intro tutorial would help.
+- [ ] **Multi-window inventory** — deferred. Single modal serves the core use case.
+- [ ] **Dynamic room/encounter image generation** — Google Imagen behind `IMAGE_PROVIDER` flag, off by default.
+- [ ] **Sound effects** — ambient audio per location type; combat sound cues.
+- [ ] **LLM narrative quality audit** — `llmProvider` enhances narratives; quality has not been systematically reviewed against the engine's mechanical output.
 
 ---
 
-## 9. 5e SRD 5.2.1 rule completeness
+## Engine & infrastructure
 
-**Audit status** (after the 2026-05-18 SRD pass): all 4 HIGH items closed, 4 of 7 MEDIUM closed (+ 1 partial), 4 LOW closed, and several backlog items absorbed (encumbrance, AoE shapes, Magic Missile damage). Remaining open items are either no-current-content (no Small races, no enemy-side reach weapons, no PC fear sources) or architectural (Inspiration UX, reactive-spell interrupts). Test count 263 passing.
+- [ ] **Authoring documentation (`AUTHORING.md`)** — see top-5 item 5.
+- [ ] **Save/state persistence across redeploys** — verify a mid-campaign session survives a backend redeploy. The state migration path on schema changes is untested.
+- [ ] **Difficulty tuning from playtest data** — once playtests happen, capture damage/HP/encounter telemetry to inform tuning passes.
 
-- [x] **Tactical fog of war** — per-cell lighting from PC torches + darkvision (SRD p.11 Vision and Light). Rooms can be `bright`/`dim`/`dark`. Vale dungeon rooms marked accordingly.
-- [x] **Spell range enforcement** — `Spell.rangeKind` ('self'/'touch'/'ranged') + `rangeFt`. Out-of-range casts refunded; all sandbox + Vale spells tagged with SRD ranges.
-- [x] **Quickened Spell restriction** (SRD p.67) — can't use Quickened if you've already cast a level 1+ spell this turn; can't cast a level 1+ spell after using Quickened.
-- [x] **Death by Massive Damage** (SRD p.17) — single hit with leftover ≥ max HP = instant death, bypassing death saves. Wired into the enemy-turn loop.
-- [x] **Drinking a potion is a Bonus Action** (SRD p.204) — `use` consumable consumes `bonus_action_used` instead of `action_used`; heal choices labelled and gated accordingly.
-- [x] **Sneak Attack** tightened to RAW — requires finesse/ranged weapon; ally must be within 5 ft of target on the grid (or any living ally off-grid); no disadvantage.
-- [x] **`generateChoices` RAW audit** — removed non-RAW "Dash past the enemy" (no such option in 5e; engagement requires Sneak/Stealth or grid combat). Fixed Reckless Attack (PHB p.49 — free declaration, not a bonus action). Gated Warlock invocation learning to out-of-combat (PHB p.107 — chosen at level-up). Help action now checks the RAW 5-ft proximity-to-target requirement (PHB p.192). Unified `attack_npc` with grid combat — hostile NPCs surface via `getLivingRoomEnemies` and fight on the grid like any other enemy (no more non-grid duel).
+---
 
-Still open under §9:
+## Deployment reference
 
-- [x] Encumbrance speed penalties — `effectiveSpeed()` now drops base speed by 10/20 ft at >5×STR / >10×STR carried weight, and to 0 above 15×STR. Wired through all 7 char.speed sites (dash, grid move budget, stand-up cost, Step of the Wind, etc.). Skill-check disadvantage from heavy encumbrance is still TODO.
-- [~] Multi-target spells (Magic Missile's 3 darts, Eldritch Blast's multiple beams at higher levels) — Magic Missile now does the full `3d4+3` (+1 dart per upcast) on the target; Eldritch Blast scales correctly via `cantripDamageDice`. Still missing: the optional dart/beam allocation UX so players can split across multiple targets.
-- [x] AoE shapes beyond sphere (cone, line, cube) — `aoeShape?: 'sphere' | 'cone' | 'cube' | 'line'` on `Spell`; geometry helpers in `gridEngine` (`entitiesInCone/Cube/Line`); cast_spell handler dispatches to the correct shape. Thunderwave is now a 15-ft cube, Burning Hands a 15-ft cone. Fireball stays a sphere. Tests in `gridEngine.spec.ts`.
-- [ ] Inspiration (Heroic Inspiration in 2024) — needs UX for grant/spend
-- [ ] Reactive spells as interrupts (Counterspell, Shield) — architectural: requires interrupt support in the turn engine
-- [ ] Costly material component consumption (e.g. Identify's 100 gp pearl)
+Already shipped: ECR, EC2, RDS, ALB-less direct EC2 + nginx, Let's Encrypt with certbot webroot auto-renew, GitHub Actions → SSM SendCommand deploy, Google OAuth, Docker Compose prod. The required `/opt/pansori/.env` vars on EC2:
 
-### 9.1 SRD 5.2.1 audit findings — HIGH priority gameplay gaps
-
-- [x] **Temporary HP** (SRD p.17–18). Added `temp_hp` to Character; `applyEnemyAttackNarrative` absorbs damage from temp_hp before HP; long rest clears it; CharStatsCard displays `+N`. Spells/features that grant it aren't authored yet but infrastructure is ready.
-- [x] **Grapple escape + speed-0 enforcement** (SRD p.182). Added `try_escape_grapple` action (best of Athletics or Acrobatics vs grappler's STR Athletics). Grid-move server-side rejects when grappled/restrained. Grapples end when grappler is killed/incapacitated/unconscious via a sweep at end of takeAction. Grappler tracking lives on `CombatEntity.grappled_by`.
-- [x] **Cover bonus on DEX saving throws** (SRD p.15). `rollConditionSave` takes a `coverDexBonus` parameter; cast_spell handler computes cover caster→target (single) or epicenter→target (AoE) and applies +2/+5 to DEX saves only.
-- [x] **Loading weapon property** (SRD p.90). `loading?` field added to `LootItem`; Extra Attack loop gated when the equipped weapon has it. No current loot has Loading; infrastructure for future weapons.
-
-### 9.2 SRD 5.2.1 audit findings — MEDIUM priority
-
-- [~] **Reach weapon property** (SRD p.90). `reach?` field added to `LootItem`; `inRange()` adds +5 ft to melee reach when set. **Still TODO**: opportunity-attack reach (currently uses fixed `DEFAULT_MELEE_REACH` in `opportunityAttackTriggers`), and no current loot has Reach yet.
-- [x] **Prone — full mechanics** (SRD p.187). Prone attacker disadv was already wired via `DISADV_CONDITIONS`. Added `stand_up` action: costs half the creature's speed (15 ft for most) of movement and removes the prone condition. Surfaces as a choice in combat.
-- [x] **Restrained — full mechanics** (SRD p.187). DEX-save disadvantage added to `rollConditionSave` (rolls 2d20-low when `targetConditions` includes restrained). Own-attack disadv already covered by `DISADV_CONDITIONS`. Speed-0 already enforced via the same `grid_move` reject path as grappled.
-- [x] **Paralyzed / Stunned auto-fail STR & DEX saves** (SRD p.186 / p.189). `rollConditionSave` short-circuits to auto-fail when the target has paralyzed/stunned/unconscious/petrified and the save ability is STR or DEX. Wired through all 3 call sites in cast_spell (single-target, AoE enemy, AoE ally) plus on-hit effect saves.
-- [ ] **Frightened — movement restriction** (SRD p.182). Disadvantage on attacks/checks while source in sight (likely already covered by `DISADV_CONDITIONS`), but the frightened creature also _cannot willingly move closer to the source of its fear_. Track the fear source id; gate `grid_move` choices against it.
-- [ ] **Hide action — full DC tracking** (SRD p.11). On a successful Stealth check the creature gains the Invisible condition _and_ records the check total as the DC for others to find them. Enemies on their turn should be able to make passive Perception (or active search action) against the DC to spot. Today we apply `invisible` for one attack's advantage; we don't track the DC or allow finding.
-- [ ] **Heavy weapon disadvantage for Small creatures** (SRD p.90). Small-sized PCs (halfling / gnome equivalents) using Heavy melee weapons should roll attacks with disadvantage. We don't model creature size on characters, and `heavy?` isn't on `LootItem`. Low impact since current contexts don't expose Small races, but worth flagging.
-
-### 9.3 SRD 5.2.1 audit findings — LOW priority / niche
-
-- [ ] **Climbing & Crawling movement cost** (SRD glossary). Each foot of climbing/crawling costs an extra foot (or +2 ft in difficult terrain for crawling). Requires a "movement mode" concept the engine doesn't have. Skip unless we add verticality or prone-movement.
-- [ ] **Jumping** (SRD p.183). Long jump = STR ft from a running start (half if standing); high jump = 3 + STR mod ft. Requires verticality. Skip with the same blocker.
-- [ ] **Group ability checks** (SRD p.6). "If at least half the group succeeds, the group succeeds." Useful for stealth/sneak-as-a-party, exploration. Could fold into the existing sneak action.
-- [ ] **Charmed: charmer's social advantage** (SRD p.181). We block the charmed PC from attacking the charmer (when `charmer_id` is set), but no spell currently _sets_ `charmer_id` on the target. Wire it from charm-effect spells; add advantage on the charmer's CHA checks vs the charmed.
-- [x] **Invisible: attack reveals location** (SRD p.184). Active character's `invisible` condition is cleared at end of `takeAction` whenever the action is attack/attack_npc/two_weapon_attack/cast_spell.
-- [x] **Concentration breaks on Incapacitated / death** (SRD p.203). End-of-takeAction sweep calls `breakConcentration` on any character that's dead, at 0 HP, or has incapacitated/paralyzed/stunned/unconscious/petrified.
-- [x] **Resistance/Vulnerability/Immunity application order** (SRD p.17). `applyDamageMultiplier` now applies in SRD order: immunity → resistance → vulnerability. Both resist+vuln on the same type net to ×1 instead of ×2.
-- [x] **Concentration DC cap of 30** (SRD p.203). Now capped at 30 in `checkConcentration` (only relevant above 60 damage).
+- `POSTGRES_PASSWORD`, `POSTGRES_USER` (`pansori`), `POSTGRES_DB` (`pansori_db`)
+- `SESSION_SECRET` (64-char random)
+- `ANTHROPIC_API_KEY`
+- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALLBACK_URL`
+- `FRONTEND_URL`, `ECR_REGISTRY`, `AWS_REGION`
