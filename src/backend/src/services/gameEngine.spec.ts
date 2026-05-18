@@ -1984,11 +1984,21 @@ describe('NPC actions', () => {
     expect(choices.some((c) => c.action.type === 'buy')).toBe(true);
   });
 
-  it('generateChoices shows attack_npc for hostile NPC', () => {
+  it('generateChoices shows a regular Attack choice for a hostile NPC (unified with grid combat)', () => {
+    // Hostile NPCs surface as enemies via getLivingRoomEnemies — so they appear
+    // as a regular Attack target, not as a separate attack_npc duel.
     const state = makeNpcState({}, 'hostile');
     const choices = generateChoices(state, seedWithNpc, ctx);
-    const attackNpc = choices.filter((c) => c.action.type === 'attack_npc');
-    expect(attackNpc.length).toBeGreaterThan(0);
+    const attacksOnNpc = choices.filter(
+      (c) =>
+        c.action.type === 'attack' &&
+        (c.action as { type: 'attack'; targetEnemyId?: string }).targetEnemyId ===
+          `npc:${npcRoomId}`
+    );
+    expect(attacksOnNpc.length).toBeGreaterThan(0);
+    // attack_npc only shows for non-hostile NPCs (as the "first strike that
+    // flips them hostile").
+    expect(choices.filter((c) => c.action.type === 'attack_npc').length).toBe(0);
   });
 
   it('talk_response applies consequences and shows NPC reply', async () => {
@@ -2032,7 +2042,7 @@ describe('NPC actions', () => {
     expect(result.newState.characters[0].gold).toBe(2);
   });
 
-  it('attack_npc flips attitude to hostile and deals damage on hit', async () => {
+  it('attack_npc flips attitude to hostile and dispatches a regular Attack against the NPC-as-enemy', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.99); // d20 → 20, always hits
     const state = makeNpcState({ hp: 10, max_hp: 10 });
     const result = await takeAction({
@@ -2043,7 +2053,11 @@ describe('NPC actions', () => {
       context: ctx,
     });
     expect(result.newState.npc_attitudes[npcRoomId]).toBe('hostile');
-    expect(result.narrative).toMatch(/strike|falls/i);
+    // Combat should be live (initiative rolled, entities created).
+    expect(result.newState.combat_active).toBe(true);
+    expect(result.newState.entities?.some((e) => e.id === `npc:${npcRoomId}`)).toBe(true);
+    // Narrative reflects the unified combat path.
+    expect(result.narrative).toMatch(/damage|combat|initiative/i);
   });
 
   it('attack_npc when NPC is killed marks enemies_killed', async () => {

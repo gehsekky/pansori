@@ -162,6 +162,7 @@
 - [x] **Death by Massive Damage** (SRD p.17) — single hit with leftover ≥ max HP = instant death, bypassing death saves. Wired into the enemy-turn loop.
 - [x] **Drinking a potion is a Bonus Action** (SRD p.204) — `use` consumable consumes `bonus_action_used` instead of `action_used`; heal choices labelled and gated accordingly.
 - [x] **Sneak Attack** tightened to RAW — requires finesse/ranged weapon; ally must be within 5 ft of target on the grid (or any living ally off-grid); no disadvantage.
+- [x] **`generateChoices` RAW audit** — removed non-RAW "Dash past the enemy" (no such option in 5e; engagement requires Sneak/Stealth or grid combat). Fixed Reckless Attack (PHB p.49 — free declaration, not a bonus action). Gated Warlock invocation learning to out-of-combat (PHB p.107 — chosen at level-up). Help action now checks the RAW 5-ft proximity-to-target requirement (PHB p.192). Unified `attack_npc` with grid combat — hostile NPCs surface via `getLivingRoomEnemies` and fight on the grid like any other enemy (no more non-grid duel).
 
 Still open under §9:
 
