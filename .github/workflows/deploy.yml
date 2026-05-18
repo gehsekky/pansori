@@ -21,6 +21,16 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      - name: Type-check backend
+        run: npm run typecheck --workspace=pansori-backend
+      - name: Type-check frontend
+        run: npm run typecheck --workspace=pansori-frontend
+      - name: Lint backend
+        run: npm run lint --workspace=pansori-backend
+      - name: Lint frontend
+        run: npm run lint --workspace=pansori-frontend
+      - name: Prettier check
+        run: npx prettier --check "src/**/*.{ts,tsx,js,jsx}" --ignore-path .gitignore
       - run: npm test --workspace=src/backend
 
   build-and-deploy:
