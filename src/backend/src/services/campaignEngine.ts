@@ -11,7 +11,6 @@ import { Engine, type TopLevelCondition } from 'json-rules-engine';
 
 // ─── DB helpers ───────────────────────────────────────────────────────────────
 
- 
 type DB = any;
 
 export async function loadCampaignState(
