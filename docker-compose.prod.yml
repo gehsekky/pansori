@@ -1,28 +1,53 @@
 name: pansori-prod
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: pansori-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER:     ${POSTGRES_USER:-pansori}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB:       ${POSTGRES_DB:-pansori_db}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pansori} -d ${POSTGRES_DB:-pansori_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    logging:
+      driver: awslogs
+      options:
+        awslogs-group:         /pansori/postgres
+        awslogs-region:        ${AWS_REGION:-us-east-1}
+        awslogs-stream-prefix: postgres
+
   backend:
     image: ${ECR_REGISTRY}/pansori-backend:${IMAGE_TAG:-latest}
     container_name: pansori-backend
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
     environment:
-      NODE_ENV: production
-      PORT: 3001
-      DATABASE_URL: ${DATABASE_URL}
-      FRONTEND_URL: ${FRONTEND_URL}
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
-      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
-      GOOGLE_CALLBACK_URL: ${GOOGLE_CALLBACK_URL}
-      SESSION_SECRET: ${SESSION_SECRET}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
-      LLM_PROVIDER: ${LLM_PROVIDER:-none}
+      NODE_ENV:              production
+      PORT:                  3001
+      DATABASE_URL:          postgres://${POSTGRES_USER:-pansori}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-pansori_db}
+      FRONTEND_URL:          ${FRONTEND_URL}
+      GOOGLE_CLIENT_ID:      ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET:  ${GOOGLE_CLIENT_SECRET}
+      GOOGLE_CALLBACK_URL:   ${GOOGLE_CALLBACK_URL}
+      SESSION_SECRET:        ${SESSION_SECRET}
+      ANTHROPIC_API_KEY:     ${ANTHROPIC_API_KEY}
+      LLM_PROVIDER:          ${LLM_PROVIDER:-none}
     expose:
       - "3001"
     logging:
       driver: awslogs
       options:
-        awslogs-group: /pansori/backend
-        awslogs-region: ${AWS_REGION:-us-east-1}
+        awslogs-group:         /pansori/backend
+        awslogs-region:        ${AWS_REGION:-us-east-1}
         awslogs-stream-prefix: backend
 
   frontend:
@@ -34,8 +59,8 @@ services:
     logging:
       driver: awslogs
       options:
-        awslogs-group: /pansori/frontend
-        awslogs-region: ${AWS_REGION:-us-east-1}
+        awslogs-group:         /pansori/frontend
+        awslogs-region:        ${AWS_REGION:-us-east-1}
         awslogs-stream-prefix: frontend
 
   nginx:
@@ -55,6 +80,9 @@ services:
     logging:
       driver: awslogs
       options:
-        awslogs-group: /pansori/nginx
-        awslogs-region: ${AWS_REGION:-us-east-1}
+        awslogs-group:         /pansori/nginx
+        awslogs-region:        ${AWS_REGION:-us-east-1}
         awslogs-stream-prefix: nginx
+
+volumes:
+  postgres-data:
