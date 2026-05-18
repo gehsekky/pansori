@@ -23,6 +23,11 @@ interface Props {
   seed: Seed;
   gridWidth?: number;
   gridHeight?: number;
+  // Click-to-move: when the player clicks a reachable cell, the parent
+  // dispatches a single `grid_move` action targeting that cell. The backend
+  // already pathfinds (BFS) + computes terrain-aware cost + triggers OAs, so
+  // one HTTP round-trip handles the whole multi-square move.
+  onMove?: (to: GridPos) => void;
 }
 
 function chebyshev(a: GridPos, b: GridPos): number {
@@ -65,7 +70,7 @@ function conditionBadges(conditions: string[]): string {
     .join(' ');
 }
 
-function GridCombatView({ state, seed, gridWidth = 10, gridHeight = 10 }: Props) {
+function GridCombatView({ state, seed, gridWidth = 10, gridHeight = 10, onMove }: Props) {
   if (!state.combat_active || !state.entities?.length) return null;
 
   const entities = state.entities;
@@ -201,12 +206,39 @@ function GridCombatView({ state, seed, gridWidth = 10, gridHeight = 10 }: Props)
           </div>
         ) : null;
 
+      const clickable = reachable && !!onMove;
       cells.push(
         <div
           key={`${x},${y}`}
           className={styles.gridCell}
-          style={{ background: bg }}
+          style={{
+            background: bg,
+            cursor: clickable ? 'pointer' : 'default',
+          }}
           aria-label={`(${x},${y})`}
+          role={clickable ? 'button' : undefined}
+          tabIndex={clickable ? 0 : undefined}
+          onClick={clickable ? () => onMove?.({ x, y }) : undefined}
+          onMouseEnter={
+            clickable
+              ? (e) => {
+                  (e.currentTarget as HTMLDivElement).style.background =
+                    'rgba(120, 200, 255, 0.35)';
+                }
+              : undefined
+          }
+          onMouseLeave={
+            clickable
+              ? (e) => {
+                  (e.currentTarget as HTMLDivElement).style.background = bg;
+                }
+              : undefined
+          }
+          title={
+            clickable
+              ? `Move here (${chebyshev(activeEntity!.pos, { x, y }) * SQUARE_SIZE_FT} ft)`
+              : undefined
+          }
         >
           {token}
         </div>
