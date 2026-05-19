@@ -27,15 +27,15 @@ add them. Update Heroic Inspiration to the full 2024 spec.
 
 Listed by impact × tractability. Each item is its own PR.
 
-| #   | Feature                        | Effort | Status  | Notes                                                                              |
-| --- | ------------------------------ | ------ | ------- | ---------------------------------------------------------------------------------- |
-| 1   | Heroic Inspiration expansion   | ~1h    | DONE    | Additive — saves vs onHitEffect now consume inspiration too                        |
-| 2   | Bardic Inspiration spend rules | ~2h    | DONE    | Die now stored on ally + consumed on attack rolls and saves                        |
-| 3   | Weapon Masteries (framework)   | ~3h    | DONE    | Vex, Topple, Push, Sap, Slow wired; Nick/Cleave/Graze/Flex TODO                    |
-| 4   | Weapon Masteries (per-class)   | ~2h    | DONE    | Fighter (3), Paladin (2), Ranger (2), Barbarian (2), Rogue (2) granted at creation |
-| 5   | Wild Shape → Beast Forms       | ~4h    | pending | Replaces temp-HP-pool model                                                        |
-| 6   | Rage progression               | ~1h    | DONE    | Damage bonus identical; rage uses table rebalanced to 2024 progression             |
-| 7   | Class feature audit pass       | ~4h    | pending | Cleric CD, Fighter Second Wind, etc.                                               |
+| #   | Feature                        | Effort | Status   | Notes                                                                              |
+| --- | ------------------------------ | ------ | -------- | ---------------------------------------------------------------------------------- |
+| 1   | Heroic Inspiration expansion   | ~1h    | DONE     | Additive — saves vs onHitEffect now consume inspiration too                        |
+| 2   | Bardic Inspiration spend rules | ~2h    | DONE     | Die now stored on ally + consumed on attack rolls and saves                        |
+| 3   | Weapon Masteries (framework)   | ~3h    | DONE     | Vex, Topple, Push, Sap, Slow wired; Nick/Cleave/Graze/Flex TODO                    |
+| 4   | Weapon Masteries (per-class)   | ~2h    | DONE     | Fighter (3), Paladin (2), Ranger (2), Barbarian (2), Rogue (2) granted at creation |
+| 5   | Wild Shape → Beast Forms       | ~4h    | DEFERRED | Player-impact decision needed — see §5 note                                        |
+| 6   | Rage progression               | ~1h    | DONE     | Damage bonus identical; rage uses table rebalanced to 2024 progression             |
+| 7   | Class feature audit pass       | ~4h    | partial  | Most features identical; Rogue Cunning Strike + Monk ki→focus rename queued        |
 
 ---
 
@@ -177,6 +177,15 @@ Effectively a defensive buff.
 
 **Risks**: medium. Behavioral change for existing Druid players.
 
+**Status (deferred)**: Pansori's current temp-HP model uses
+`max_CR × 5 × level`, which mechanically overshoots the 2024 RAW
+`temp HP = druid level` formula. Porting to 2024 would be a **player-
+power nerf** that warrants user signoff before shipping. The form-
+specific abilities (Bear damage resistance, Wolf adv, etc.) are the
+2024 value-add but require a Beast Forms catalog Pansori doesn't
+have. Recommend revisiting after a playtest session reveals whether
+the current Wild Shape feels too strong or about right.
+
 ## 5. Rage — 2024 progression
 
 **2014**: Bonus action; +2 damage (scales); resistance to slashing/
@@ -217,6 +226,26 @@ Specific known diffs:
   scaled differently. Significant rename but mostly the same math.
 
 **Risks**: medium. Each class affects multiple downstream tests.
+
+**Status (partial)**: most class features that exist in Pansori are
+already implemented at 2014 PHB-parity which equals 2024 RAW for
+those features. The actual 2024-only additions worth queueing are:
+
+- **Rogue Cunning Strike** — new feature. Player can spend Sneak
+  Attack dice to apply effects (Poison, Trip, Withdraw, etc.).
+  Tractable to add as a `use_class_feature` on the Rogue's attack;
+  ~2-3h work.
+- **Monk Ki → Focus Points** — pure rename in Pansori. The
+  underlying mechanic (focus_points/ki_points field, regen on short
+  rest, costs per ability) is identical. ~30 min cosmetic refactor
+  with a backward-compat alias for existing sessions.
+- **Cleric Channel Divinity** — 2024 expanded options. Existing
+  Channel Divinity uses count is preserved; the 2024 additions
+  (Divine Spark variants) are net new content rather than diffs.
+  Defer until we're authoring new Cleric subclass content anyway.
+
+Other queued items (Paladin Lay on Hands, Fighter Second Wind, Action
+Surge) were already on the 2024 RAW formula. No action needed.
 
 ---
 
