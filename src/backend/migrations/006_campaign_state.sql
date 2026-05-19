@@ -1,6 +1,6 @@
 -- Campaign state: persists quest progress, faction rep, and world flags across sessions
 
-CREATE TABLE campaign_states (
+CREATE TABLE IF NOT EXISTS campaign_states (
   id           uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id      uuid        NOT NULL,
   campaign_id  text        NOT NULL,
@@ -11,4 +11,4 @@ CREATE TABLE campaign_states (
 );
 
 ALTER TABLE game_sessions
-  ADD COLUMN campaign_state_id uuid REFERENCES campaign_states(id);
+  ADD COLUMN IF NOT EXISTS campaign_state_id uuid REFERENCES campaign_states(id);
