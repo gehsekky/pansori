@@ -418,6 +418,10 @@ export type StructuredAction =
       slotLevel: number;
       ritual?: boolean;
       targetEnemyId?: string;
+      // 2024 PHB multi-target spells (Magic Missile darts, Eldritch Blast
+      // beams). One entry per dart/beam; duplicates = multiple darts on the
+      // same target. When omitted, falls back to focus-fire on `targetEnemyId`.
+      targetEnemyIds?: string[];
     }
   | { type: 'disarm_trap' }
   | { type: 'interact_object'; objectId: string }

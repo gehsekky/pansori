@@ -6007,3 +6007,142 @@ describe('Hide action — DC tracking (2024)', () => {
     expect(after.hide_dc).toBeUndefined();
   });
 });
+
+describe('Magic Missile / Eldritch Blast multi-target (2024)', () => {
+  const seedTwoEnemies: Seed = {
+    ...seed,
+    enemies: {
+      [CORRIDOR_ID]: [
+        {
+          id: `${CORRIDOR_ID}#0`,
+          name: 'Goblin A',
+          hp: 8,
+          ac: 12,
+          damage: '1d6',
+          toHit: 3,
+          xp: 20,
+        },
+        {
+          id: `${CORRIDOR_ID}#1`,
+          name: 'Goblin B',
+          hp: 8,
+          ac: 12,
+          damage: '1d6',
+          toHit: 3,
+          xp: 20,
+        },
+      ],
+    },
+  };
+
+  function makeMultiEnemyState(): GameState {
+    const wizard = makeChar({
+      id: 'w-mm',
+      character_class: 'Wizard',
+      int: 16,
+      level: 1,
+      spell_slots_max: { 1: 2 },
+      spell_slots_used: {},
+      spells_known: ['magic_missile', 'eldritch_blast'],
+      turn_actions: {
+        action_used: false,
+        bonus_action_used: false,
+        reaction_used: false,
+        free_interaction_used: false,
+      },
+    });
+    const enemyA = `${CORRIDOR_ID}#0`;
+    const enemyB = `${CORRIDOR_ID}#1`;
+    return {
+      characters: [wizard],
+      active_character_id: wizard.id,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: true,
+      initiative_order: [{ id: wizard.id, roll: 18, is_enemy: false }],
+      initiative_idx: 0,
+      entities: [
+        {
+          id: wizard.id,
+          isEnemy: false,
+          pos: { x: 0, y: 0 },
+          hp: 10,
+          maxHp: 10,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: enemyA,
+          isEnemy: true,
+          pos: { x: 2, y: 0 },
+          hp: 8,
+          maxHp: 8,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: enemyB,
+          isEnemy: true,
+          pos: { x: 4, y: 0 },
+          hp: 8,
+          maxHp: 8,
+          conditions: [],
+          condition_durations: {},
+        },
+      ],
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      flags: {},
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+      round: 1,
+      movement_used: {},
+    };
+  }
+
+  it('generateChoices emits focus-fire and spread variants for Magic Missile when 2+ enemies', () => {
+    const choices = generateChoices(makeMultiEnemyState(), seedTwoEnemies, ctx);
+    const mmChoices = choices.filter((c) => c.action.type === 'cast_spell');
+    const focus = mmChoices.filter((c) => c.label.includes('focus fire'));
+    const spread = mmChoices.filter((c) => c.label.includes('spread'));
+    // Magic Missile L1: 3 darts. Expect 2 focus-fire (one per enemy) +
+    // 1 spread variant.
+    expect(focus.length).toBeGreaterThanOrEqual(2);
+    expect(spread.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('Magic Missile with targetEnemyIds applies one dart per listed target', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.999); // max d4 = 4 (+1) = 5/dart
+    const state = makeMultiEnemyState();
+    const enemyA = state.entities!.filter((e) => e.isEnemy)[0].id;
+    const enemyB = state.entities!.filter((e) => e.isEnemy)[1].id;
+    const result = await takeAction({
+      action: {
+        type: 'cast_spell',
+        spellId: 'magic_missile',
+        slotLevel: 1,
+        targetEnemyIds: [enemyA, enemyB, enemyA],
+      },
+      history: [],
+      state,
+      seed: seedTwoEnemies,
+      context: ctx,
+    });
+    // Both enemies should have taken damage.
+    const afterA = result.newState.entities?.find((e) => e.id === enemyA);
+    const afterB = result.newState.entities?.find((e) => e.id === enemyB);
+    expect(afterA!.hp).toBeLessThan(8);
+    expect(afterB!.hp).toBeLessThan(8);
+    expect(result.narrative).toMatch(/dart 1/);
+    expect(result.narrative).toMatch(/dart 2/);
+    expect(result.narrative).toMatch(/dart 3/);
+  });
+});
