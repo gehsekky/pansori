@@ -37,6 +37,17 @@ function rollStatBlock(): StatBlock {
   };
 }
 
+// PHB p.13 — the deterministic alternative to rolling. Assign these six
+// values to whichever ability scores the player prefers.
+const STANDARD_ARRAY: StatBlock = {
+  str: 15,
+  dex: 14,
+  con: 13,
+  int: 12,
+  wis: 10,
+  cha: 8,
+};
+
 // Fallback compositions when a campaign doesn't override. Mirrors the 5e
 // "iconic four" — Fighter (tank), Cleric (heal), Wizard (magic), Rogue (utility).
 // Roles taken from DMG p.83: Defender / Healer / Controller / Striker.
@@ -52,6 +63,10 @@ interface CharDraft {
   cls: string;
   backgroundId: string;
   stats: StatBlock;
+  // PHB p.12-13 — 'roll' = 4d6-drop-lowest six times, 'array' = the
+  // 15/14/13/12/10/8 standard array assigned to abilities. Either way the
+  // player can swap values between ability slots.
+  statMethod: 'roll' | 'array';
   portrait: string | null;
   rollCount: number;
 }
@@ -80,9 +95,54 @@ function CharScreen({
       stats: rollStatBlock(),
       portrait: user?.avatar_url ?? null,
       rollCount: 1,
+      statMethod: 'roll',
     },
   ]);
   const [error, setError] = useState('');
+  // Two-click swap state — when the player clicks a stat box, we remember
+  // it; clicking another stat box swaps the two values; clicking the same
+  // box again cancels. Allows assigning rolled or array values to the right
+  // abilities (PHB p.13: "Standard Method" assignment).
+  const [swapFrom, setSwapFrom] = useState<{ partyIdx: number; key: keyof StatBlock } | null>(null);
+
+  function swapStats(partyIdx: number, a: keyof StatBlock, b: keyof StatBlock) {
+    if (a === b) return;
+    setParty((prev) =>
+      prev.map((d, i) =>
+        i === partyIdx ? { ...d, stats: { ...d.stats, [a]: d.stats[b], [b]: d.stats[a] } } : d
+      )
+    );
+  }
+
+  function handleStatClick(partyIdx: number, key: keyof StatBlock) {
+    if (!swapFrom) {
+      setSwapFrom({ partyIdx, key });
+      return;
+    }
+    if (swapFrom.partyIdx !== partyIdx || swapFrom.key === key) {
+      // Cancel — or same-stat double-click clears the highlight
+      setSwapFrom(null);
+      return;
+    }
+    swapStats(partyIdx, swapFrom.key, key);
+    setSwapFrom(null);
+  }
+
+  function setStatMethod(partyIdx: number, method: 'roll' | 'array') {
+    setSwapFrom(null);
+    setParty((prev) =>
+      prev.map((d, i) =>
+        i === partyIdx
+          ? {
+              ...d,
+              statMethod: method,
+              stats: method === 'array' ? { ...STANDARD_ARRAY } : rollStatBlock(),
+              rollCount: 1,
+            }
+          : d
+      )
+    );
+  }
 
   useEffect(() => {
     const c = availableContexts.find((c) => c.id === contextId);
@@ -96,6 +156,7 @@ function CharScreen({
           backgroundId: c.backgrounds?.[0]?.id ?? '',
           stats: rollStatBlock(),
           rollCount: 1,
+          statMethod: 'roll',
         }))
       );
     }
@@ -119,6 +180,7 @@ function CharScreen({
         stats: rollStatBlock(),
         portrait: null,
         rollCount: 1,
+        statMethod: 'roll',
       },
     ]);
   }
@@ -149,6 +211,7 @@ function CharScreen({
         stats: rollStatBlock(),
         portrait: null,
         rollCount: 1,
+        statMethod: 'roll',
       }))
     );
   }
@@ -386,21 +449,62 @@ function CharScreen({
                 <label className={styles.formLbl} style={{ marginTop: 12 }}>
                   ABILITY SCORES
                 </label>
+                {/* Method toggle: 4d6-drop-lowest (PHB p.12) vs the standard
+                    array 15/14/13/12/10/8 (PHB p.13). */}
+                <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                  {(['roll', 'array'] as const).map((m) => {
+                    const active = draft.statMethod === m;
+                    return (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setStatMethod(idx, m)}
+                        style={{
+                          fontSize: '0.7rem',
+                          padding: '0.25rem 0.6rem',
+                          letterSpacing: '0.08em',
+                          background: active ? 'var(--t-separator)' : 'transparent',
+                          border: `1px solid ${active ? 'var(--t-primary)' : 'var(--t-border)'}`,
+                          color: active ? 'var(--t-primary)' : 'var(--t-dim)',
+                          cursor: 'pointer',
+                          fontFamily: 'inherit',
+                        }}
+                      >
+                        {m === 'roll' ? 'ROLL 4d6' : 'STANDARD ARRAY'}
+                      </button>
+                    );
+                  })}
+                </div>
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                   {STAT_KEYS.map((key) => {
                     const val = draft.stats[key];
                     const isPrimary = key === primaryStat;
+                    const isSwapSelected = swapFrom?.partyIdx === idx && swapFrom?.key === key;
+                    const borderColor = isSwapSelected
+                      ? 'var(--t-hp-high)'
+                      : isPrimary
+                        ? 'var(--t-primary)'
+                        : 'var(--t-border)';
                     return (
-                      <div
+                      <button
                         key={key}
+                        type="button"
+                        onClick={() => handleStatClick(idx, key)}
+                        title={
+                          swapFrom?.partyIdx === idx && !isSwapSelected
+                            ? `Click to swap with ${STAT_LABEL[swapFrom.key]} (${draft.stats[swapFrom.key]})`
+                            : 'Click to swap with another ability'
+                        }
                         style={{
                           display: 'flex',
                           flexDirection: 'column',
                           alignItems: 'center',
                           padding: '4px 8px',
                           minWidth: 42,
-                          border: `1px solid ${isPrimary ? 'var(--t-primary)' : 'var(--t-border)'}`,
+                          border: `2px solid ${borderColor}`,
                           background: isPrimary ? 'var(--t-separator)' : 'transparent',
+                          cursor: 'pointer',
+                          fontFamily: 'inherit',
                         }}
                       >
                         <span
@@ -424,10 +528,10 @@ function CharScreen({
                         <span style={{ fontSize: '0.75rem', color: 'var(--t-dim)' }}>
                           {fmtMod(val)}
                         </span>
-                      </div>
+                      </button>
                     );
                   })}
-                  {draft.rollCount < 2 && (
+                  {draft.statMethod === 'roll' && (
                     <button
                       className={styles.sendBtn}
                       style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem', alignSelf: 'center' }}
@@ -439,6 +543,19 @@ function CharScreen({
                     </button>
                   )}
                 </div>
+                {swapFrom?.partyIdx === idx && (
+                  <p
+                    style={{
+                      fontSize: '0.7rem',
+                      color: 'var(--t-hp-high)',
+                      marginTop: 4,
+                      letterSpacing: '0.05em',
+                    }}
+                  >
+                    Click another ability to swap its value with {STAT_LABEL[swapFrom.key]} (
+                    {draft.stats[swapFrom.key]}). Click the highlighted box again to cancel.
+                  </p>
+                )}
               </div>
             );
           })}
