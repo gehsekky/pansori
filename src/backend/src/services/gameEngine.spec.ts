@@ -1420,6 +1420,60 @@ describe('conditions — new types', () => {
     expect(choices.some((c) => c.action.type === 'try_escape_grapple')).toBe(true);
   });
 
+  it('spend_inspiration queues advantage; clears char.inspiration after the attack resolves', async () => {
+    // Roll a 1 first to grant inspiration (mocked random forces d20=1)
+    vi.spyOn(Math, 'random').mockReturnValue(0); // floor(0*20)+1 = 1
+    const state0 = makeState(
+      { hp: 20, max_hp: 20, str: 14 },
+      {
+        combat_active: true,
+        current_room: CORRIDOR_ID,
+        initiative_order: [{ id: 'char-1', roll: 15, is_enemy: false }],
+        initiative_idx: 0,
+      }
+    );
+    const r1 = await takeAction({
+      action: { type: 'attack' },
+      history: [],
+      state: state0,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    expect(r1.newState.characters[0].inspiration).toBe(true);
+    expect(r1.narrative).toMatch(/Heroic Inspiration granted/);
+
+    // Spend it, then make an attack — flag should be cleared after
+    vi.restoreAllMocks();
+    vi.spyOn(Math, 'random').mockReturnValue(0.99); // hits everything
+    const stateSpend = {
+      ...r1.newState,
+      // Reset action so the spend → attack flow can happen this turn
+      characters: r1.newState.characters.map((c) => ({
+        ...c,
+        turn_actions: { ...c.turn_actions, action_used: false },
+      })),
+    };
+    const r2 = await takeAction({
+      action: { type: 'spend_inspiration' },
+      history: [],
+      state: stateSpend,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    expect(r2.newState.characters[0].turn_actions.inspiration_pending).toBe(true);
+    expect(r2.newState.characters[0].inspiration).toBe(true); // not consumed until the attack
+
+    const r3 = await takeAction({
+      action: { type: 'attack' },
+      history: [],
+      state: r2.newState,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    expect(r3.newState.characters[0].inspiration).toBe(false);
+    expect(r3.newState.characters[0].turn_actions.inspiration_pending).toBeFalsy();
+  });
+
   it('stand_up costs half speed and removes prone', async () => {
     const state = makeState(
       { conditions: ['prone'], condition_durations: { prone: 1 } },

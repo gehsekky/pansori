@@ -49,6 +49,24 @@ function CharStatsCard({
           )}
         </span>
       </div>
+      {char.inspiration && (
+        <div
+          className={styles.stat}
+          title="Heroic Inspiration — spend for advantage on your next attack"
+        >
+          <span className={styles.statLbl}>INSP</span>
+          <span
+            className={styles.statVal}
+            style={{
+              color: 'var(--t-primary)',
+              textShadow: '0 0 6px var(--t-primary)',
+              fontSize: '1.05rem',
+            }}
+          >
+            ✦
+          </span>
+        </div>
+      )}
       <div className={styles.stat}>
         <span className={styles.statLbl}>AC</span>
         <span className={styles.statVal}>{char.ac}</span>

@@ -31,6 +31,7 @@ export type StructuredAction =
   | { type: 'grapple' }
   | { type: 'try_escape_grapple' }
   | { type: 'stand_up' }
+  | { type: 'spend_inspiration' }
   | { type: 'shove' }
   | { type: 'dodge' }
   | { type: 'disengage' }
@@ -182,6 +183,7 @@ export interface Character {
     reckless?: boolean;
     leveled_spell_cast?: boolean;
     quickened_used?: boolean;
+    inspiration_pending?: boolean;
     movement_budget_remaining?: number;
     readied_action?: { trigger: string; action: StructuredAction };
   };
@@ -209,6 +211,7 @@ export interface Character {
   charmer_id?: string;
   darkvision_ft?: number;
   temp_hp?: number;
+  inspiration?: boolean;
 }
 
 // ─── NPC system ───────────────────────────────────────────────────────────────

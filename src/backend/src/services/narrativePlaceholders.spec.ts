@@ -8,10 +8,10 @@
 // possible but a missed substitution like "{level}" was — that one bug
 // motivated this test.
 
-import { dirname, join } from 'path';
 import { describe, expect, it } from 'vitest';
-import { context as pines } from '../contexts/whispering_pines.js';
+import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
+import { context as pines } from '../contexts/whispering_pines.js';
 import { readFileSync } from 'fs';
 import { context as sandbox } from '../contexts/sandbox.js';
 import { context as vale } from '../contexts/vale_of_shadows.js';
