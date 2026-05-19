@@ -2414,6 +2414,237 @@ describe('class features', () => {
     expect(result.narrative).toMatch(/adv/i);
   });
 
+  // ── Combat event log ────────────────────────────────────────────────────────
+
+  it('emits attack_hit + kill events on a successful PC attack', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.999); // d20 → 20, max damage
+    const charId = 'p1';
+    const dagger = 'p1-dag';
+    const fighter = makeChar({
+      id: charId,
+      character_class: 'Fighter',
+      level: 3,
+      str: 16,
+      equipped_weapon: dagger,
+      inventory: [{ instance_id: dagger, id: 'dagger', name: 'Dagger' }],
+    });
+    const goblinId = `${CORRIDOR_ID}#0`;
+    const state: GameState = {
+      characters: [fighter],
+      active_character_id: charId,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: true,
+      initiative_order: [
+        { id: charId, roll: 18, is_enemy: false },
+        { id: goblinId, roll: 5, is_enemy: true },
+      ],
+      initiative_idx: 0,
+      entities: [
+        {
+          id: charId,
+          isEnemy: false,
+          pos: { x: 4, y: 5 },
+          hp: 30,
+          maxHp: 30,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: goblinId,
+          isEnemy: true,
+          pos: { x: 5, y: 5 },
+          hp: 1, // any hit kills
+          maxHp: 10,
+          conditions: [],
+          condition_durations: {},
+        },
+      ],
+      movement_used: {},
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      flags: {},
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+      round: 1,
+    };
+    const result = await takeAction({
+      action: { type: 'attack', targetEnemyId: goblinId },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    const events = result.newState.combat_log ?? [];
+    expect(events.some((e) => e.kind === 'attack_hit')).toBe(true);
+    expect(events.some((e) => e.kind === 'kill')).toBe(true);
+    const killEvent = events.find((e) => e.kind === 'kill');
+    if (killEvent && killEvent.kind === 'kill') {
+      expect(killEvent.victimId).toBe(goblinId);
+      expect(killEvent.attackerId).toBe(charId);
+    }
+  });
+
+  it('emits attack_miss on a PC attack that fails to-hit', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0); // d20 → 1, fumble
+    const charId = 'p1-miss';
+    const fighter = makeChar({
+      id: charId,
+      character_class: 'Fighter',
+      level: 1,
+      equipped_weapon: 'wp',
+      inventory: [{ instance_id: 'wp', id: 'dagger', name: 'Dagger' }],
+    });
+    const goblinId = `${CORRIDOR_ID}#0`;
+    const state: GameState = {
+      characters: [fighter],
+      active_character_id: charId,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: true,
+      initiative_order: [
+        { id: charId, roll: 18, is_enemy: false },
+        { id: goblinId, roll: 5, is_enemy: true },
+      ],
+      initiative_idx: 0,
+      entities: [
+        {
+          id: charId,
+          isEnemy: false,
+          pos: { x: 4, y: 5 },
+          hp: 30,
+          maxHp: 30,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: goblinId,
+          isEnemy: true,
+          pos: { x: 5, y: 5 },
+          hp: 100,
+          maxHp: 100,
+          conditions: [],
+          condition_durations: {},
+        },
+      ],
+      movement_used: {},
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      flags: {},
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+      round: 1,
+    };
+    const result = await takeAction({
+      action: { type: 'attack', targetEnemyId: goblinId },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    const events = result.newState.combat_log ?? [];
+    expect(events.some((e) => e.kind === 'attack_miss')).toBe(true);
+  });
+
+  it('combat_log is capped at COMBAT_LOG_MAX entries', async () => {
+    // Pre-fill the log past the cap and confirm pushEvent trims.
+    vi.spyOn(Math, 'random').mockReturnValue(0.999);
+    const charId = 'p1-cap';
+    const fighter = makeChar({
+      id: charId,
+      character_class: 'Fighter',
+      level: 3,
+      equipped_weapon: 'wp',
+      inventory: [{ instance_id: 'wp', id: 'dagger', name: 'Dagger' }],
+    });
+    const goblinId = `${CORRIDOR_ID}#0`;
+    const fullLog = Array.from({ length: 35 }, (_, i) => ({
+      kind: 'attack_miss' as const,
+      attackerId: 'old',
+      attackerName: 'Past Hero',
+      targetId: 'foo',
+      targetName: 'Past Foe',
+      toHit: 5,
+      targetAc: 15,
+      round: i,
+    }));
+    const state: GameState = {
+      characters: [fighter],
+      active_character_id: charId,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: true,
+      initiative_order: [
+        { id: charId, roll: 18, is_enemy: false },
+        { id: goblinId, roll: 5, is_enemy: true },
+      ],
+      initiative_idx: 0,
+      entities: [
+        {
+          id: charId,
+          isEnemy: false,
+          pos: { x: 4, y: 5 },
+          hp: 30,
+          maxHp: 30,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: goblinId,
+          isEnemy: true,
+          pos: { x: 5, y: 5 },
+          hp: 50,
+          maxHp: 50,
+          conditions: [],
+          condition_durations: {},
+        },
+      ],
+      movement_used: {},
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      flags: {},
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+      round: 100,
+      combat_log: fullLog,
+    };
+    const result = await takeAction({
+      action: { type: 'attack', targetEnemyId: goblinId },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    const log = result.newState.combat_log ?? [];
+    expect(log.length).toBeLessThanOrEqual(30);
+    // Old entries should have been evicted from the front.
+    expect(log[0].round).toBeGreaterThan(0);
+  });
+
   // ── Shield (reactive spell, PHB p.275) ──────────────────────────────────────
 
   it('Shield reaction window opens when enemy hits within [AC, AC+4]', async () => {

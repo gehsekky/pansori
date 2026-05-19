@@ -38,6 +38,7 @@ import type {
   AbilityKey,
   Character,
   CombatEntity,
+  CombatEvent,
   Context,
   DeathSaves,
   Enemy,
@@ -70,10 +71,19 @@ import {
   opportunityAttackTriggers,
   posEqual,
 } from './gridEngine.js';
+import { COMBAT_LOG_MAX } from '../types.js';
 import { Engine } from 'json-rules-engine';
 import { factionShopPrice } from './campaignEngine.js';
 import { llmProvider } from './llmProvider.js';
 import { randomUUID } from 'crypto';
+
+// Append a CombatEvent to state.combat_log, trimming to COMBAT_LOG_MAX so the
+// buffer doesn't grow unbounded across long sessions. Pure function — returns
+// new state, doesn't mutate. Callers should reassign: `st = pushEvent(st, e)`.
+function pushEvent(st: GameState, event: CombatEvent): GameState {
+  const next = [...(st.combat_log ?? []), event];
+  return { ...st, combat_log: next.slice(-COMBAT_LOG_MAX) };
+}
 
 function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
@@ -2319,6 +2329,34 @@ function runEnemyTurns(args: {
             target = concAtk.char;
             st = concAtk.st;
             narrative += ` ${atkResult.narrative}${concAtk.note}`;
+            // Emit a structured event for the enemy's attack outcome so the
+            // frontend combat log can render it separately from the prose.
+            if (atkResult.hit) {
+              st = pushEvent(st, {
+                kind: 'attack_hit',
+                attackerId: eEntry.id,
+                attackerName: rm.name,
+                targetId: target.id,
+                targetName: target.name,
+                damage: atkResult.hpLost,
+                damageType: 'physical',
+                isCrit: false,
+                toHit: atkResult.atkTotal,
+                targetAc: target.ac,
+                round: st.round ?? 1,
+              });
+            } else {
+              st = pushEvent(st, {
+                kind: 'attack_miss',
+                attackerId: eEntry.id,
+                attackerName: rm.name,
+                targetId: target.id,
+                targetName: target.name,
+                toHit: atkResult.atkTotal,
+                targetAc: target.ac,
+                round: st.round ?? 1,
+              });
+            }
             if (isMassiveDamageDeath(prevHp, atkResult.hpLost, target.max_hp)) {
               target = { ...target, dead: true, stable: false };
               narrative += ` MASSIVE DAMAGE — ${target.name} is killed outright!`;
@@ -3061,6 +3099,16 @@ export async function takeAction({
             inspirationNote = ` ✦ Heroic Inspiration granted (${char.name}).`;
           }
           narrative += `Natural 1 — a fumble! ${weaponLabel} goes completely wide.${atkNote}${inspirationNote} `;
+          st = pushEvent(st, {
+            kind: 'attack_miss',
+            attackerId: char.id,
+            attackerName: char.name,
+            targetId,
+            targetName: target.name,
+            toHit: atk.total,
+            targetAc: target.ac,
+            round: st.round ?? 1,
+          });
           return false;
         }
         if (!atk.hit) {
@@ -3069,6 +3117,16 @@ export async function takeAction({
             target.name
           );
           narrative += atkNote + ' ';
+          st = pushEvent(st, {
+            kind: 'attack_miss',
+            attackerId: char.id,
+            attackerName: char.name,
+            targetId,
+            targetName: target.name,
+            toHit: atk.total,
+            targetAc: target.ac,
+            round: st.round ?? 1,
+          });
           return false;
         }
 
@@ -3136,6 +3194,20 @@ export async function takeAction({
         if (rageBonus > 0) narrative += ` [Rage: +${rageBonus}]`;
         if (dmgNote) narrative += dmgNote;
 
+        st = pushEvent(st, {
+          kind: 'attack_hit',
+          attackerId: char.id,
+          attackerName: char.name,
+          targetId,
+          targetName: target.name,
+          damage: finalDmg,
+          damageType: weaponItem?.damageType ?? 'physical',
+          isCrit,
+          toHit: atk.total,
+          targetAc: target.ac,
+          round: st.round ?? 1,
+        });
+
         if (newEnemyHp <= 0) {
           const xpGain = target.xp ?? 10 + (target.hp || 8);
           char.xp = (char.xp || 0) + xpGain;
@@ -3152,6 +3224,15 @@ export async function takeAction({
             st = endCombatState(st);
             char.conditions = char.conditions.filter((c) => c !== 'raging');
           }
+          st = pushEvent(st, {
+            kind: 'kill',
+            attackerId: char.id,
+            attackerName: char.name,
+            victimId: targetId,
+            victimName: target.name,
+            xp: xpGain,
+            round: st.round ?? 1,
+          });
           narrative +=
             ' ' +
             pick(context.narratives.killShot)

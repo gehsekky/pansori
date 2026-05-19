@@ -508,6 +508,72 @@ export type PendingReaction =
   | PendingHellishRebukeReaction
   | PendingCounterspellReaction;
 
+// ─── Combat event log ───────────────────────────────────────────────────────
+//
+// Structured events emitted in parallel to the narrative string. The
+// narrative continues to be the source of prose flavour (the "what does
+// this look like in fiction" channel). Events are the "mechanics" channel —
+// terse, scannable, structured. The frontend renders them in a dedicated
+// combat-log panel separate from the narrative.
+//
+// Kept as a circular buffer on state.combat_log; capped at COMBAT_LOG_MAX
+// so long sessions don't accumulate state.
+
+export const COMBAT_LOG_MAX = 30;
+
+export type CombatEvent =
+  | {
+      kind: 'attack_hit';
+      attackerId: string;
+      attackerName: string;
+      targetId: string;
+      targetName: string;
+      damage: number;
+      damageType: string;
+      isCrit: boolean;
+      toHit: number;
+      targetAc: number;
+      round: number;
+    }
+  | {
+      kind: 'attack_miss';
+      attackerId: string;
+      attackerName: string;
+      targetId: string;
+      targetName: string;
+      toHit: number;
+      targetAc: number;
+      round: number;
+    }
+  | {
+      kind: 'kill';
+      attackerId: string;
+      attackerName: string;
+      victimId: string;
+      victimName: string;
+      xp: number;
+      round: number;
+    }
+  | {
+      kind: 'condition_applied';
+      targetId: string;
+      targetName: string;
+      condition: string;
+      source: string;
+      round: number;
+    }
+  | {
+      kind: 'save';
+      characterId: string;
+      characterName: string;
+      ability: string;
+      roll: number;
+      dc: number;
+      success: boolean;
+      vs: string;
+      round: number;
+    };
+
 // ─── Game state (world/party container) ──────────────────────────────────────
 
 export interface GameState {
@@ -565,6 +631,11 @@ export interface GameState {
   // spend their reaction. While set, generateChoices offers only the
   // reaction choices; the player resolves with `resolve_reaction`.
   pending_reaction?: PendingReaction;
+
+  // Structured combat event log (circular buffer, capped at COMBAT_LOG_MAX).
+  // Emitted in parallel to the narrative string for UI rendering of
+  // mechanical events (hits, damage, conditions) separately from prose.
+  combat_log?: CombatEvent[];
 
   // Campaign overlay (merged from CampaignState at session load)
   current_location_id?: string;

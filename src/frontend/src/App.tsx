@@ -3,6 +3,7 @@ import type { FrontendContext, GameChoice, Seed, SessionSummary } from './types.
 import { useEffect, useRef, useState } from 'react';
 import CampaignPanel from './components/CampaignPanel.tsx';
 import CharScreen from './components/CharScreen.tsx';
+import CombatLogPanel from './components/CombatLogPanel.tsx';
 import GridCombatView from './components/GridCombatView.tsx';
 import InventoryModal from './components/InventoryModal.tsx';
 import LoginScreen from './components/LoginScreen.tsx';
@@ -435,6 +436,8 @@ export default function App() {
                         ))}
                     </div>
                   )}
+
+                  <CombatLogPanel events={gameState?.combat_log} />
 
                   {history.length > 0 && (
                     <div
