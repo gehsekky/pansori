@@ -25,7 +25,7 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 - [ ] **Inspiration UX** — see top-5 item 3.
 - [ ] **Reactive spells / interrupt system** — see top-5 item 2.
 - [ ] **Multi-target spell allocation UX** — Magic Missile dart split, Eldritch Blast multi-beam (L5+). Damage math is correct on single target; missing: the optional dart/beam-distribution UI so the player can spread across multiple enemies.
-- [ ] **Reach weapon OA range** — `inRange()` honours `weapon.reach`, but `opportunityAttackTriggers` still hard-codes 5 ft. A glaive-wielding fighter currently can't OA at 10 ft. Also: no current loot has Reach, so this is infrastructure-only until a Reach weapon is authored.
+- [x] **Reach weapon OA range** — `opportunityAttackTriggers` now takes an optional `attackerReachFt(entity)` lookup so callers can report 10-ft reach for Reach-weapon wielders. Default 5 ft preserved. Still no current loot has Reach, but infrastructure is ready (3 new tests in `gridEngine.spec.ts`).
 - [ ] **Hide action — full DC tracking** (SRD p.11) — successful Stealth grants Invisible _and_ records the check total as the DC for others to find you. Enemies should be able to make passive Perception (or active Search) against that DC. Today we apply `invisible` for one attack's advantage; we don't track the DC or allow finding. Half-implemented (invisible reveals on attack already done).
 - [ ] **Heavy-encumbrance skill-check disadvantage** — speed penalties are wired (`effectiveSpeed`), but heavy encumbrance is also supposed to give disadvantage on STR/DEX/CON checks, saves, and attacks. Not yet enforced.
 
@@ -55,7 +55,7 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 ## UX & polish
 
 - [ ] **Combat narrative clarity** — see top-5 item 4. Related backlog: narrative template format separating mechanics from prose.
-- [ ] **Grid map detail pass** — surface more battlefield state on the grid. Dead bodies should render as a faded/greyed-out token (or a 💀 marker) so players can see where corpses lie even though they no longer block movement (fixed in commit `4a7f68f`). Other candidates: difficult-terrain squares (rocks/snow tile), obstacles, party line-of-sight indicators, last-attacker arrows, AoE preview when hovering a spell choice.
+- [~] **Grid map detail pass** — dead bodies render as a faded 💀 marker; same-name enemies get `#N` disambiguation on tooltips + tokens (e.g., "B1"/"B2"). Still TODO: difficult-terrain squares (rocks/snow tile), obstacles, party line-of-sight indicators, last-attacker arrows, AoE preview when hovering a spell choice.
 - [ ] **Narrative template format** — separate dice rolls / damage numbers / HP changes from prose so the UI can render them differently while keeping immersion.
 - [ ] **Tutorial / onboarding** — the game drops new players into character creation with no introduction to the action choice loop, grid combat, or the inventory modal. A 2-room intro tutorial would help.
 - [ ] **Multi-window inventory** — deferred. Single modal serves the core use case.

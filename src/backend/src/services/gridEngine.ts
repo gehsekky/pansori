@@ -199,16 +199,22 @@ export function pathCostFeet(path: GridPos[]): number {
   return path.length * SQUARE_SIZE;
 }
 
-// Which entities in `before` were adjacent to `mover` but are no longer adjacent after the move?
-// These entities may take opportunity attacks.
+// Which entities in `before` were adjacent to `mover` but are no longer
+// adjacent after the move? These entities may take opportunity attacks.
+//
+// `attackerReachFt` (SRD 5.2.1 p.90) lets the caller report each potential
+// attacker's weapon reach — Reach weapons (glaive, halberd, pike, whip)
+// extend melee threat from 5 ft to 10 ft. Default is 5 ft for any attacker
+// without a reach lookup (most enemies don't expose weapon data, so they
+// default; PCs can be looked up via their equipped weapon).
 export function opportunityAttackTriggers(
   mover: GridPos,
   movedTo: GridPos,
   entities: CombatEntity[],
-  moverIsEnemy: boolean
+  moverIsEnemy: boolean,
+  attackerReachFt: (e: CombatEntity) => number = () => DEFAULT_MELEE_REACH
 ): CombatEntity[] {
-  const wasAdjacent = (e: CombatEntity) => distanceFeet(e.pos, mover) <= DEFAULT_MELEE_REACH;
-  const isAdjacent = (e: CombatEntity) => distanceFeet(e.pos, movedTo) <= DEFAULT_MELEE_REACH;
-  // Only opposite-side entities that were adjacent and are now not adjacent trigger
+  const wasAdjacent = (e: CombatEntity) => distanceFeet(e.pos, mover) <= attackerReachFt(e);
+  const isAdjacent = (e: CombatEntity) => distanceFeet(e.pos, movedTo) <= attackerReachFt(e);
   return entities.filter((e) => e.isEnemy !== moverIsEnemy && wasAdjacent(e) && !isAdjacent(e));
 }
