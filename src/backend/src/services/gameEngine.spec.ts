@@ -1760,7 +1760,7 @@ describe('class features', () => {
     expect(result.newState.characters[0].temp_hp).toBe(7);
   });
 
-  it('non-Fiend Warlock kill does NOT grant Dark One\'s Blessing', async () => {
+  it("non-Fiend Warlock kill does NOT grant Dark One's Blessing", async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.999);
     const warlockId = 'wl1';
     const goblinId = `${CORRIDOR_ID}#0`;
@@ -2051,7 +2051,7 @@ describe('class features', () => {
         pendingNarrative: 'The Goblin hits for 5 damage.',
         resumeFromInitiativeIdx: 1,
         resumeFromMultiattackIdx: 1, // multi-attack done; resume just advances past goblin
-        narrativeSoFar: '[Goblin\'s turn]',
+        narrativeSoFar: "[Goblin's turn]",
         eligibleCharIds: [wizId],
       },
       movement_used: {},
@@ -2148,7 +2148,7 @@ describe('class features', () => {
         pendingNarrative: 'The Goblin hits for 5 damage.',
         resumeFromInitiativeIdx: 1,
         resumeFromMultiattackIdx: 1,
-        narrativeSoFar: '[Goblin\'s turn]',
+        narrativeSoFar: "[Goblin's turn]",
         eligibleCharIds: [wizId],
       },
       movement_used: {},

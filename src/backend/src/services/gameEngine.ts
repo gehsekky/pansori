@@ -1980,9 +1980,7 @@ function runEnemyTurns(args: {
           if (!eEnt) return 0;
           return distanceFeet(eEnt.pos, a.pos) - distanceFeet(eEnt.pos, b.pos);
         })[0];
-      const targetCharIdx = st.characters.findIndex(
-        (c) => c.id === nearestPcEntity?.id && !c.dead
-      );
+      const targetCharIdx = st.characters.findIndex((c) => c.id === nearestPcEntity?.id && !c.dead);
       if (targetCharIdx >= 0) {
         let target = st.characters[targetCharIdx];
         if (!target.dead && target.hp > 0) {
@@ -5697,9 +5695,7 @@ export async function takeAction({
             };
             st = {
               ...st,
-              characters: st.characters.map((c) =>
-                c.id === char.id ? declinedTarget : c
-              ),
+              characters: st.characters.map((c) => (c.id === char.id ? declinedTarget : c)),
               pending_reaction: undefined,
             };
             char = declinedTarget;
@@ -5712,7 +5708,10 @@ export async function takeAction({
             narrative = `🛡️ ${char.name} casts SHIELD as a reaction (lvl ${lvl} slot)! +5 AC until the start of their next turn — ${rx.pendingNarrative.split('.')[0]} bounces off the shimmering barrier.`;
             // Track Shield active and bump AC by 5 for the duration. tickConditions
             // removes the bump when the condition expires (next turn start).
-            char.conditions = [...char.conditions.filter((c) => c !== 'shield_spell'), 'shield_spell'];
+            char.conditions = [
+              ...char.conditions.filter((c) => c !== 'shield_spell'),
+              'shield_spell',
+            ];
             char.condition_durations = {
               ...(char.condition_durations ?? {}),
               shield_spell: 1,
@@ -5769,9 +5768,7 @@ export async function takeAction({
           st.initiative_idx = resume.exitAdvIdx;
           const nextEntry = st.initiative_order[resume.exitAdvIdx];
           if (nextEntry && !nextEntry.is_enemy) {
-            const nextCharIdx = st.characters.findIndex(
-              (c) => c.id === nextEntry.id && !c.dead
-            );
+            const nextCharIdx = st.characters.findIndex((c) => c.id === nextEntry.id && !c.dead);
             if (nextCharIdx >= 0) {
               st = {
                 ...st,
