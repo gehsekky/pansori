@@ -2653,13 +2653,16 @@ function runEnemyTurns(args: {
       const targetCharIdx = st.characters.findIndex((c) => c.id === nearestPcEntity?.id && !c.dead);
       if (targetCharIdx >= 0) {
         let target = st.characters[targetCharIdx];
-        // 2024 PHB Hide DC tracking — if the target is invisible AND has a
-        // recorded hide_dc, the enemy makes a passive Perception check
-        // (10 + WIS mod) against it. If they meet/exceed it, the hider is
-        // spotted: invisible is removed, hide_dc cleared, attack proceeds
-        // as normal. If they fail, the PC stays hidden — for this engine
-        // simplification the attack still happens with the invisible-imposed
-        // disadvantage (existing `invisible` condition handling).
+        // 2024 PHB Hide DC tracking — when the target is invisible + has
+        // recorded hide_dc, the enemy first tries passive Perception. If
+        // that fails, they fall back to an active Search action (d20 + WIS
+        // mod) — which replaces this turn's attack. Result:
+        //   passive ≥ hide_dc       → spotted, attack proceeds normally
+        //   passive < dc, active ≥  → spotted next turn, no attack this round
+        //   passive < dc, active <  → PC stays hidden, no attack this round
+        // This makes Hide actually deny enemy attacks instead of just
+        // imposing disadvantage on a guaranteed swing.
+        let hideBlockedAttack = false;
         if (target.conditions?.includes('invisible') && (target.hide_dc ?? 0) > 0) {
           const enemyWis = (rm as unknown as Record<string, number>)?.wis ?? 10;
           const passivePer = 10 + abilityMod(enemyWis);
@@ -2674,7 +2677,33 @@ function runEnemyTurns(args: {
               ...st,
               characters: st.characters.map((c, i) => (i === targetCharIdx ? target : c)),
             };
+          } else {
+            // Active Search instead of attacking.
+            const activeSearch = rollDice('1d20') + abilityMod(enemyWis);
+            if (activeSearch >= target.hide_dc!) {
+              narrative += ` ${rm.name} actively searches and locates ${target.name}! (Search ${activeSearch} vs hide DC ${target.hide_dc}; attack forfeited this turn.)`;
+              target = {
+                ...target,
+                conditions: (target.conditions ?? []).filter((c) => c !== 'invisible'),
+                hide_dc: undefined,
+              };
+              st = {
+                ...st,
+                characters: st.characters.map((c, i) => (i === targetCharIdx ? target : c)),
+              };
+            } else {
+              narrative += ` ${rm.name} searches the room but cannot find ${target.name}. (Search ${activeSearch} vs hide DC ${target.hide_dc}; turn lost.)`;
+            }
+            hideBlockedAttack = true;
           }
+        }
+        if (hideBlockedAttack) {
+          // End this enemy's turn — they used their action to Search.
+          const prevAdvIdxHide = advIdx;
+          advIdx = (advIdx + 1) % orderLen;
+          if (advIdx === 0 && prevAdvIdxHide !== 0) roundWrapped = true;
+          if (advIdx === args.initialCurrentIdx) break;
+          continue;
         }
         if (!target.dead && target.hp > 0) {
           // ── Spell-cast intent ──────────────────────────────────────────────
