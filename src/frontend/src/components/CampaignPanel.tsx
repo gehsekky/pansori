@@ -9,6 +9,11 @@ interface Props {
   meta: CampaignMeta;
 }
 
+interface ViewProps {
+  state: GameState;
+  meta: CampaignMeta;
+}
+
 function attitudeTier(rep: number, f: Faction): { tier: string; color: string } {
   const t = f.thresholds;
   if (rep >= t.exalted) return { tier: 'Exalted', color: 'var(--t-primary)' };
@@ -74,6 +79,73 @@ function QuestRow({
         </ol>
       )}
     </div>
+  );
+}
+
+// QuestsView and FactionsView are the bodies of each campaign tab, exported
+// so ContextPanel can render them as tab content without dragging in
+// CampaignPanel's own tab switcher.
+
+function sortedQuestsForView(state: GameState, meta: CampaignMeta) {
+  const progressById = new Map((state.quest_progress ?? []).map((p) => [p.questId, p] as const));
+  const order: Record<QuestStatus, number> = {
+    active: 0,
+    available: 1,
+    completed: 2,
+    failed: 3,
+  };
+  const sorted = [...meta.quests].sort((a, b) => {
+    const sa = progressById.get(a.id)?.status ?? 'available';
+    const sb = progressById.get(b.id)?.status ?? 'available';
+    return order[sa] - order[sb];
+  });
+  return { sorted, progressById };
+}
+
+export function QuestsView({ state, meta }: ViewProps) {
+  const { sorted, progressById } = sortedQuestsForView(state, meta);
+  if (sorted.length === 0) {
+    return <p className={styles.campaignEmpty}>No quests defined for this campaign.</p>;
+  }
+  return (
+    <>
+      {sorted.map((q) => {
+        const prog = progressById.get(q.id);
+        return (
+          <QuestRow
+            key={q.id}
+            quest={q}
+            status={prog?.status ?? 'available'}
+            completedSteps={prog?.completedSteps ?? []}
+          />
+        );
+      })}
+    </>
+  );
+}
+
+export function FactionsView({ state, meta }: ViewProps) {
+  if (meta.factions.length === 0) {
+    return <p className={styles.campaignEmpty}>No factions in this campaign.</p>;
+  }
+  return (
+    <>
+      {meta.factions.map((f) => {
+        const rep = state.faction_rep?.[f.id] ?? 0;
+        const { tier, color } = attitudeTier(rep, f);
+        return (
+          <div key={f.id} className={styles.factionRow}>
+            <div className={styles.factionHead}>
+              <span className={styles.factionName}>{f.name}</span>
+              <span style={{ color }} className={styles.factionTier}>
+                {tier} ({rep >= 0 ? '+' : ''}
+                {rep})
+              </span>
+            </div>
+          </div>
+        );
+      })}
+    </>
   );
 }
 
