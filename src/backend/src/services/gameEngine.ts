@@ -1201,6 +1201,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       bard: ['lore', 'valor'],
       sorcerer: ['draconic', 'wild_magic'],
       warlock: ['fiend', 'archfey'],
+      druid: ['land', 'moon'],
     };
     const reqLevel = subclassLevels[cls] ?? 3;
     // RAW: subclass is acquired at level-up (a long-rest milestone), not as an
@@ -1360,10 +1361,20 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   // ── Druid: Wild Shape ───────────────────────────────────────────────────────
   if (char.character_class.toLowerCase() === 'druid') {
     const wsUses = char.class_resource_uses?.wild_shape ?? 2;
-    if (!char.conditions.includes('wild_shaped') && wsUses > 0) {
+    // Circle of the Moon (PHB p.69) — Combat Wild Shape: use as a bonus
+    // action instead of action.
+    const isMoon = char.subclass === 'moon';
+    const wsAvailable =
+      !char.conditions.includes('wild_shaped') &&
+      wsUses > 0 &&
+      (isMoon
+        ? !char.turn_actions.bonus_action_used
+        : !state.combat_active || !char.turn_actions.action_used);
+    if (wsAvailable) {
       choices.push({
-        label: `Wild Shape — transform into beast (${wsUses} use${wsUses === 1 ? '' : 's'} left)`,
+        label: `Wild Shape — transform into beast${isMoon ? ' (bonus action)' : ''} (${wsUses} use${wsUses === 1 ? '' : 's'} left)`,
         action: { type: 'use_class_feature', featureId: 'wild_shape' },
+        requiresBonusAction: isMoon || undefined,
       });
     }
     if (char.conditions.includes('wild_shaped')) {
@@ -1371,6 +1382,24 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         label: `Dismiss Wild Shape — return to normal form`,
         action: { type: 'use_class_feature', featureId: 'dismiss_wild_shape' },
       });
+      // Circle of the Moon — spend a spell slot while shifted to heal 1d8
+      // per slot level. Bonus action per PHB p.69 ("By spending a spell
+      // slot, ... You can choose to take this bonus action only while...").
+      if (isMoon && !char.turn_actions.bonus_action_used) {
+        const slotsMax = char.spell_slots_max ?? {};
+        const slotsUsed = char.spell_slots_used ?? {};
+        const hasSlot = Object.entries(slotsMax).some(([lvl, max]) => {
+          const lvlN = Number(lvl);
+          return lvlN >= 1 && (max ?? 0) > (slotsUsed[lvlN] ?? 0);
+        });
+        if (hasSlot && char.hp < char.max_hp) {
+          choices.push({
+            label: `Moon Healing — spend a spell slot to heal 1d8/slot level (bonus action)`,
+            action: { type: 'use_class_feature', featureId: 'moon_healing' },
+            requiresBonusAction: true,
+          });
+        }
+      }
     }
   }
 
@@ -3364,6 +3393,30 @@ export async function takeAction({
       if (cls === 'monk') delete srUses.ki_points;
       // Druid: Wild Shape recharges on short rest
       if (cls === 'druid') srUses.wild_shape = 2;
+      // Circle of the Land — Natural Recovery (PHB p.68): once per long rest,
+      // during a short rest, recover spell slots totaling ≤ ceil(level/2)
+      // slot levels. We auto-spend on the lowest slots first for impact.
+      let naturalRecoveryNarr = '';
+      if (cls === 'druid' && char.subclass === 'land' && !(srUses.natural_recovery_used ?? 0)) {
+        let budget = Math.ceil(char.level / 2);
+        const slotsMax = char.spell_slots_max ?? {};
+        const slotsUsedSr = { ...(char.spell_slots_used ?? {}) };
+        const recovered: number[] = [];
+        for (const lvlKey of Object.keys(slotsMax)
+          .map(Number)
+          .sort((a, b) => a - b)) {
+          while (budget >= lvlKey && (slotsUsedSr[lvlKey] ?? 0) > 0) {
+            slotsUsedSr[lvlKey] = (slotsUsedSr[lvlKey] ?? 0) - 1;
+            budget -= lvlKey;
+            recovered.push(lvlKey);
+          }
+        }
+        if (recovered.length > 0) {
+          char.spell_slots_used = slotsUsedSr;
+          srUses.natural_recovery_used = 1;
+          naturalRecoveryNarr = ` 🌿 Natural Recovery — restored ${recovered.length} slot(s) [${recovered.join(', ')}].`;
+        }
+      }
       // Cleric/Paladin: Channel Divinity recharges on short rest
       if (cls === 'cleric' || cls === 'paladin') srUses.channel_divinity = char.level >= 6 ? 2 : 1;
       // Battle Master: Superiority Dice recharge on short rest
@@ -3388,7 +3441,7 @@ export async function takeAction({
             .replace(/{hpNow}/g, String(char.hp))
             .replace(/{hpMax}/g, String(char.max_hp)) + ' '
         : '';
-      narrative = `${shortRestFlavor}${char.name} takes a short rest, spending a d${char.hit_die ?? 8} — ${hdHealed} HP recovered (${hdRemain} hit ${hdRemain === 1 ? 'die' : 'dice'} remaining, now ${char.hp}/${char.max_hp}).`;
+      narrative = `${shortRestFlavor}${char.name} takes a short rest, spending a d${char.hit_die ?? 8} — ${hdHealed} HP recovered (${hdRemain} hit ${hdRemain === 1 ? 'die' : 'dice'} remaining, now ${char.hp}/${char.max_hp}).${naturalRecoveryNarr}`;
       break;
     }
 
@@ -3418,6 +3471,8 @@ export async function takeAction({
         const restoredUses: Record<string, number> = { ...(c.class_resource_uses ?? {}) };
         if (charFeatures.includes('rage')) restoredUses.rage_uses = rageUsesMax(c.level);
         if (charFeatures.includes('wild_shape')) restoredUses.wild_shape = 2;
+        // Circle of the Land — Natural Recovery resets on long rest.
+        delete restoredUses.natural_recovery_used;
         if (charFeatures.includes('sorcery_points')) restoredUses.sorcery_points = c.level;
         if (charFeatures.includes('ki')) restoredUses.ki_points = c.level;
         if (charFeatures.includes('channel_divinity'))
@@ -4620,12 +4675,29 @@ export async function takeAction({
           narrative = 'No Wild Shape uses remaining (recover on short rest).';
           break;
         }
-        const maxCR = char.level >= 8 ? 1 : char.level >= 4 ? 0.5 : 0.25;
+        // Circle of the Moon (PHB p.69) — Circle Forms: beasts up to CR = druid
+        // level / 3 (min 1). Base druid: PHB p.66 progression (1/4, 1/2 at L4,
+        // 1 at L8). Combat Wild Shape: bonus action instead of action.
+        const isMoon = char.subclass === 'moon';
+        const maxCR = isMoon
+          ? Math.max(1, Math.floor(char.level / 3))
+          : char.level >= 8
+            ? 1
+            : char.level >= 4
+              ? 0.5
+              : 0.25;
         const tempHp = Math.max(5, Math.round(maxCR * 5) * char.level);
         char.class_resource_uses = { ...(char.class_resource_uses ?? {}), wild_shape: wsUses - 1 };
         char.conditions = [...char.conditions, 'wild_shaped'];
         char.hp = char.hp + tempHp;
-        narrative = `${char.name} transforms into a beast! +${tempHp} temporary HP (max CR ${maxCR}). Wild Shape lasts until you are reduced to 0 HP or dismiss it. (${wsUses - 1} uses remaining)`;
+        if (st.combat_active) {
+          char.turn_actions = isMoon
+            ? { ...char.turn_actions, bonus_action_used: true }
+            : { ...char.turn_actions, action_used: true };
+          if (isMoon) usedInitiative = false;
+          else usedInitiative = true;
+        }
+        narrative = `${char.name} transforms into a beast!${isMoon ? ' (bonus action)' : ''} +${tempHp} temporary HP (max CR ${maxCR}). Wild Shape lasts until you are reduced to 0 HP or dismiss it. (${wsUses - 1} uses remaining)`;
       }
 
       // ── Druid: Dismiss Wild Shape ────────────────────────────────────────────
@@ -4636,6 +4708,36 @@ export async function takeAction({
         }
         char.conditions = char.conditions.filter((c) => c !== 'wild_shaped');
         narrative = `${char.name} reverts to their normal form.`;
+      }
+
+      // ── Circle of the Moon: Moon Healing (PHB p.69) ──────────────────────────
+      // While shifted, spend a spell slot as a bonus action to heal 1d8 per
+      // slot level. Limited to combat-active scenarios in practice (it's a
+      // bonus action; outside combat the regular cure_wounds path is better).
+      else if (fid === 'moon_healing') {
+        if (char.subclass !== 'moon' || char.character_class.toLowerCase() !== 'druid') {
+          narrative = 'Only Circle of the Moon Druids have Moon Healing.';
+          break;
+        }
+        if (!char.conditions.includes('wild_shaped')) {
+          narrative = 'You must be in Wild Shape to use Moon Healing.';
+          break;
+        }
+        const mhSlotsMax = char.spell_slots_max ?? {};
+        const mhSlotsUsed = char.spell_slots_used ?? {};
+        const mhSlotLvl = Object.keys(mhSlotsMax)
+          .map(Number)
+          .filter((n) => n >= 1 && (mhSlotsMax[n] ?? 0) > (mhSlotsUsed[n] ?? 0))
+          .sort((a, b) => a - b)[0];
+        if (mhSlotLvl === undefined) {
+          narrative = 'No spell slot available for Moon Healing.';
+          break;
+        }
+        const heal = rollDice(`${mhSlotLvl}d8`);
+        char.spell_slots_used = { ...mhSlotsUsed, [mhSlotLvl]: (mhSlotsUsed[mhSlotLvl] ?? 0) + 1 };
+        char.hp = Math.min(char.max_hp, char.hp + heal);
+        char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
+        narrative = `🌙 ${char.name} channels lunar energy — heals ${heal} HP (now ${char.hp}/${char.max_hp}). Spent lvl ${mhSlotLvl} slot.`;
       }
 
       // ── Sorcerer: Metamagic — Twinned Spell (1 sorcery point) ────────────────
