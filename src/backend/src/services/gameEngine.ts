@@ -87,6 +87,18 @@ function pushEvent(st: GameState, event: CombatEvent): GameState {
   return { ...st, combat_log: next.slice(-COMBAT_LOG_MAX) };
 }
 
+// Cleric/Paladin/Druid prepared-spell cap: class level + spellcasting modifier
+// (minimum 1). The casting stat is class-dependent (Cleric/Druid = WIS,
+// Paladin = CHA); resolves through context.spellcastingAbility with a fall
+// back to the class's primary stat.
+function preparedSpellsCap(char: Character, context: Context): number {
+  const ability = (context.spellcastingAbility?.[char.character_class] ??
+    context.classPrimaryStats[char.character_class] ??
+    'wis') as AbilityKey;
+  const score = (char[ability] ?? 10) as number;
+  return Math.max(1, char.level + Math.max(0, Math.floor((score - 10) / 2)));
+}
+
 // ─── Boss-phase machinery ────────────────────────────────────────────────────
 //
 // Phase transitions modify the seed's runtime Enemy stats in-place. The seed
@@ -1462,9 +1474,14 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       prepClasses.includes(char.character_class.toLowerCase()) &&
       (char.spells_known ?? []).length > 0
     ) {
+      const cap = preparedSpellsCap(char, context);
+      const known = char.spells_known ?? [];
+      // Clamp to the cap so the action always succeeds — picking which N
+      // is a future UX, but auto-prep of the first N is far better than
+      // a choice that always errors out.
       choices.push({
-        label: `Prepare spells — choose spells for today (${char.level + Math.max(0, Math.floor(((char.wis ?? 10) - 10) / 2))} max)`,
-        action: { type: 'prepare_spells', spellIds: char.spells_known ?? [] },
+        label: `Prepare spells — ${Math.min(known.length, cap)} of ${known.length} known (max ${cap})`,
+        action: { type: 'prepare_spells', spellIds: known.slice(0, cap) },
       });
     }
   }
@@ -7268,11 +7285,7 @@ export async function takeAction({
         break;
       }
       const prepAction = action as { type: 'prepare_spells'; spellIds: string[] };
-      const castingAbilityPrep = (context.spellcastingAbility?.[char.character_class] ??
-        context.classPrimaryStats[char.character_class] ??
-        'int') as AbilityKey;
-      const castingScorePrep = char[castingAbilityPrep] ?? 10;
-      const maxPrepared = char.level + Math.max(0, Math.floor((castingScorePrep - 10) / 2));
+      const maxPrepared = preparedSpellsCap(char, context);
       if (prepAction.spellIds.length > maxPrepared) {
         narrative = `You can prepare at most ${maxPrepared} spells (your level + spellcasting modifier). You tried to prepare ${prepAction.spellIds.length}.`;
         break;

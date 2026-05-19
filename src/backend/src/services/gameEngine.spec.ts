@@ -5124,3 +5124,53 @@ describe('boss phase transitions', () => {
     expect(phaseEvents).toHaveLength(0);
   });
 });
+
+// ─── prepare_spells — cap calculation + clamping ─────────────────────────────
+
+describe('prepare_spells', () => {
+  it('Cleric L1 with WIS 14 (mod +2) can prepare 3 spells', async () => {
+    const state = makeClericState({ wis: 14, level: 1 });
+    const result = await takeAction({
+      action: {
+        type: 'prepare_spells',
+        spellIds: ['sacred_flame', 'cure_wounds', 'guiding_bolt'],
+      },
+      history: [],
+      state,
+      seed: spellSeed,
+      context: ctxWithRage,
+    });
+    expect(result.newState.characters[0].prepared_spells).toEqual([
+      'sacred_flame',
+      'cure_wounds',
+      'guiding_bolt',
+    ]);
+  });
+
+  it('Cleric L1 with WIS 10 (mod +0) caps at 1 prepared spell, rejects over-cap', async () => {
+    const state = makeClericState({ wis: 10, level: 1 });
+    const result = await takeAction({
+      action: {
+        type: 'prepare_spells',
+        spellIds: ['sacred_flame', 'cure_wounds'],
+      },
+      history: [],
+      state,
+      seed: spellSeed,
+      context: ctxWithRage,
+    });
+    expect(result.narrative).toMatch(/at most 1.*tried to prepare 2/);
+  });
+
+  it('generateChoices clamps spellIds to the cap so prep always succeeds', () => {
+    // Cleric knows 4 spells but has WIS 10 → cap 1. The choice should
+    // surface a single-spell prep, not all 4.
+    const state = makeClericState({ wis: 10, level: 1 });
+    const choices = generateChoices(state, spellSeed, ctxWithRage);
+    const prep = choices.find((c) => c.action.type === 'prepare_spells');
+    expect(prep).toBeDefined();
+    const spellIds = (prep!.action as { spellIds: string[] }).spellIds;
+    expect(spellIds).toHaveLength(1);
+    expect(prep!.label).toMatch(/1 of 4 known/);
+  });
+});

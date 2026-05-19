@@ -37,6 +37,28 @@ function rollStatBlock(): StatBlock {
   };
 }
 
+// Rearrange a rolled stat block so the highest score lands on the class's
+// primary ability and the second-highest on CON (the always-useful
+// secondary). The rest fill the remaining slots in descending order. This
+// mirrors what a player would normally do by hand after a roll — putting
+// 17s on the stat that actually matters.
+function assignStatsForClass(rolled: StatBlock, ctx: FrontendContext, cls: string): StatBlock {
+  const values = Object.values(rolled).sort((a, b) => b - a);
+  const primary = (ctx.classPrimaryStats[cls] ?? 'STR').toLowerCase() as keyof StatBlock;
+  // Assignment order: primary → con → everything else in the canonical
+  // STAT_KEYS order, skipping duplicates.
+  const targets: (keyof StatBlock)[] = [primary];
+  if (primary !== 'con') targets.push('con');
+  for (const s of STAT_KEYS) {
+    if (!targets.includes(s)) targets.push(s);
+  }
+  const out: StatBlock = { str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 };
+  targets.forEach((slot, i) => {
+    out[slot] = values[i];
+  });
+  return out;
+}
+
 // PHB p.13 — the deterministic alternative to rolling. Assign these six
 // values to whichever ability scores the player prefers.
 const STANDARD_ARRAY: StatBlock = {
@@ -231,7 +253,11 @@ function CharScreen({
         name: cls,
         cls,
         backgroundId: selectedCtxForInit.backgrounds?.[0]?.id ?? '',
-        stats: rollStatBlock(),
+        // Roll 4d6-drop-lowest x6, then assign the highest to the class's
+        // primary stat and the 2nd-highest to CON. The rest fill in any
+        // order. Without this, a Cleric auto-filled with rolls in raw
+        // order often ended up with WIS 10 and one prepared spell.
+        stats: assignStatsForClass(rollStatBlock(), selectedCtxForInit, cls),
         portrait: null,
         rollCount: 1,
         statMethod: 'roll',
