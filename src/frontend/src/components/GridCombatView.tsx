@@ -134,6 +134,13 @@ function GridCombatView({ state, seed, gridWidth = 10, gridHeight = 10, onMove }
     return entities.find((e) => e.pos.x === x && e.pos.y === y && e.hp > 0);
   }
 
+  // Dead body still occupying a cell (engine no longer treats this as
+  // blocking; rendered as a faded skull marker so the player can see where
+  // corpses are).
+  function corpseAt(x: number, y: number): CombatEntity | undefined {
+    return entities.find((e) => e.pos.x === x && e.pos.y === y && e.hp <= 0);
+  }
+
   function isReachable(x: number, y: number): boolean {
     if (!activeEntity || activeChar?.dead) return false;
     if (entityAt(x, y)) return false;
@@ -141,10 +148,32 @@ function GridCombatView({ state, seed, gridWidth = 10, gridHeight = 10, onMove }
     return dist > 0 && dist <= remainingSquares;
   }
 
+  // Disambiguate same-name enemies in the current room: when two or more
+  // share a name (e.g. 2× Bandit Ruffian), append #1, #2, ... so the grid
+  // tooltip matches the "Attack Bandit #2" choice the player sees.
+  const enemyDisplayName = (() => {
+    const map = new Map<string, string>();
+    const byName: Record<string, string[]> = {};
+    for (const e of entities) {
+      if (!e.isEnemy) continue;
+      const name = enemyLookup.get(e.id)?.name ?? 'Enemy';
+      (byName[name] ??= []).push(e.id);
+    }
+    for (const [name, ids] of Object.entries(byName)) {
+      if (ids.length === 1) {
+        map.set(ids[0], name);
+      } else {
+        ids.forEach((id, i) => map.set(id, `${name} #${i + 1}`));
+      }
+    }
+    return (id: string) => map.get(id) ?? enemyLookup.get(id)?.name ?? 'Enemy';
+  })();
+
   const cells: React.ReactNode[] = [];
   for (let y = 0; y < gridHeight; y++) {
     for (let x = 0; x < gridWidth; x++) {
       const ent = entityAt(x, y);
+      const corpse = ent ? undefined : corpseAt(x, y);
       const reachable = isReachable(x, y);
       const isActive = ent && ent.id === activeId && !ent.isEnemy;
       const illum = cellLight(x, y);
@@ -152,6 +181,7 @@ function GridCombatView({ state, seed, gridWidth = 10, gridHeight = 10, onMove }
       // Hide enemy tokens in cells the party can't see (heavily obscured).
       // Party + companion tokens always show — you know where your own side is.
       const hideEntity = ent?.isEnemy && illum === 'dark';
+      const hideCorpse = corpse?.isEnemy && illum === 'dark';
 
       let bg = 'transparent';
       if (illum === 'dim') bg = 'rgba(0, 0, 0, 0.30)';
@@ -163,19 +193,28 @@ function GridCombatView({ state, seed, gridWidth = 10, gridHeight = 10, onMove }
         : ent?.isCompanion
           ? 'rgba(110, 190, 110, 0.85)'
           : 'rgba(70, 140, 220, 0.85)';
-      const tokenLabelText = ent
-        ? ent.isEnemy
-          ? (enemyLookup.get(ent.id)?.name ?? 'E')
-          : ent.isCompanion
-            ? (ent.companionName ?? 'C')
-            : (state.characters.find((c) => c.id === ent.id)?.name ?? 'P')
-        : '';
+      const displayName = (e: CombatEntity): string =>
+        e.isEnemy
+          ? enemyDisplayName(e.id)
+          : e.isCompanion
+            ? (e.companionName ?? 'Companion')
+            : (state.characters.find((c) => c.id === e.id)?.name ?? 'PC');
+      // Token letter: for enemies in a same-name group, append the
+      // disambiguation digit (e.g., "B1", "B2") so duplicates aren't
+      // indistinguishable on the grid.
+      const tokenLetter = ((): string => {
+        if (!ent) return '';
+        const full = displayName(ent);
+        const base = tokenLabel(full);
+        const m = full.match(/#(\d+)$/);
+        return m ? `${base}${m[1]}` : base;
+      })();
       const tokenTitle = ent
         ? ent.isEnemy
-          ? `${enemyLookup.get(ent.id)?.name ?? 'Enemy'} — HP ${ent.hp}/${ent.maxHp}, AC ${enemyLookup.get(ent.id)?.ac ?? '?'}`
+          ? `${displayName(ent)} — HP ${ent.hp}/${ent.maxHp}, AC ${enemyLookup.get(ent.id)?.ac ?? '?'}`
           : ent.isCompanion
-            ? `${ent.companionName ?? 'Companion'} — HP ${ent.hp}/${ent.maxHp}, AC ${ent.ac ?? '?'}`
-            : `${state.characters.find((c) => c.id === ent.id)?.name ?? 'PC'} — HP ${ent.hp}/${ent.maxHp}`
+            ? `${displayName(ent)} — HP ${ent.hp}/${ent.maxHp}, AC ${ent.ac ?? '?'}`
+            : `${displayName(ent)} — HP ${ent.hp}/${ent.maxHp}`
         : '';
       const token =
         ent && !hideEntity ? (
@@ -190,7 +229,7 @@ function GridCombatView({ state, seed, gridWidth = 10, gridHeight = 10, onMove }
                 : '1px solid rgba(255, 255, 255, 0.25)',
             }}
           >
-            <span className={styles.gridTokenLetter}>{tokenLabel(tokenLabelText)}</span>
+            <span className={styles.gridTokenLetter}>{tokenLetter}</span>
             <div
               className={styles.gridHpBar}
               style={{
@@ -203,6 +242,22 @@ function GridCombatView({ state, seed, gridWidth = 10, gridHeight = 10, onMove }
                 {conditionBadges(ent.conditions)}
               </span>
             )}
+          </div>
+        ) : corpse && !hideCorpse ? (
+          // Faded corpse marker — engine no longer blocks movement here, but
+          // the player should know a body lies on this square.
+          <div
+            className={styles.gridToken}
+            title={`${displayName(corpse)} — dead`}
+            style={{
+              background: 'rgba(80, 80, 80, 0.35)',
+              border: '1px dashed rgba(255, 255, 255, 0.2)',
+              opacity: 0.7,
+            }}
+          >
+            <span className={styles.gridTokenLetter} style={{ fontSize: '0.9rem' }}>
+              💀
+            </span>
           </div>
         ) : null;
 
