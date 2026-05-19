@@ -311,6 +311,7 @@ export default function App() {
               <div className={styles.contentRow}>
                 <div className={styles.contentMain}>
                   <div
+                    data-testid="game-narrative-panel"
                     className={styles.card}
                     style={{ maxHeight: 320, overflowY: 'auto' }}
                     ref={narrativeRef}
