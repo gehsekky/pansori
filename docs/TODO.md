@@ -116,13 +116,13 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 Captured during the autonomous-mode audit. Items marked **autonomous** can be picked up without user input; **needs-input** requires a design call.
 
 - [ ] **Body validation gaps** (autonomous-ready) — route handlers use `req.body as { ... }` type assertions with no runtime validation. Low risk in single-player but a real best-practice gap. Add Zod schemas at the route boundary; failure path returns 400 with the validation message. ~2h.
-- [ ] **Security headers** (autonomous) — no helmet.js. Express defaults are weak (no CSP, no X-Frame-Options, etc.). Adding `helmet()` middleware in `src/backend/src/index.ts` is one line + npm install. ~10 min.
-- [ ] **Frontend error boundary** (autonomous) — uncaught errors in components produce a white screen. A top-level React `<ErrorBoundary>` with a recovery prompt would be a meaningful UX improvement. ~15 min.
+- [x] **Security headers** — `helmet({ contentSecurityPolicy: false })` middleware added to `src/backend/src/index.ts` (4bf73c1).
+- [x] **Frontend error boundary** — top-level `<ErrorBoundary>` wraps `<App>` in `src/frontend/src/main.tsx` with a recovery UI (4bf73c1).
 - [ ] **Strongly-typed req.user** (autonomous) — routes use `req.user!` non-null assertion (10 sites). A typed wrapper that narrows after the requireAuth middleware would remove the assertions cleanly. ~30 min.
-- [ ] **Update .env.example** (autonomous) — missing `DISCORD_CLIENT_ID/SECRET` (added last session) and `E2E_TEST_LOGIN_ENABLED` (added with E2E setup). Trivial documentation fix. ~5 min.
-- [ ] **Rate-limit auth endpoints** (autonomous) — `/api/auth/test-login` could be brute-forced. Even though it's gated to non-prod, adding `express-rate-limit` on `/api/auth/*` is a defense-in-depth win. ~15 min.
+- [x] **Update .env.example** — already current: Discord OAuth fields + `E2E_TEST_LOGIN_ENABLED` documented in `.env.example`.
+- [x] **Rate-limit auth endpoints** — `express-rate-limit` middleware on `/api/auth/*` caps at 30 req/min/IP. `RateLimit-Policy` + `RateLimit` headers exposed to clients (draft-7 spec). Confirmed via curl on `/api/auth/google`.
 - [ ] **Fix react-hooks/exhaustive-deps warnings** (autonomous, careful) — 5 lingering lint warnings in App.tsx, PartyPanel.tsx. Each marks a potential stale-closure bug. Need to check whether adding the dep would cause a re-render loop. ~30 min.
-- [ ] **Root-level `npm test`** (autonomous) — currently a no-op at the repo root. Should run backend + frontend unit suites in parallel. ~5 min.
+- [x] **Root-level `npm test`** — already wired: `package.json` `test` script runs `test:be && test:fe` (vitest in each workspace).
 - [ ] **Socket.IO frontend client** (needs-input) — the server-side Socket.IO scaffolding already exists in `src/backend/src/index.ts` (room-join handler + per-session rooms), but no frontend client is wired and no state broadcasts happen. The Multiplayer TODO under-estimated this — half of the WebSocket scaffolding is already done. Open question: do we wire the client now (as prep for multiplayer) or wait until the participants-table item lands?
 - [ ] **Frontend↔backend type drift** (needs-input) — types are duplicated by hand between `src/backend/src/types.ts` and `src/frontend/src/types.ts`. Could share via a single types package (workspace), or codegen, or just keep mirroring. Each approach has tradeoffs.
 - [ ] **Observability** (needs-input) — only `console.log` today. Sentry / structured logging / error tracking would surface prod issues. Requires choosing a service (paid SaaS or self-hosted).

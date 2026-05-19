@@ -10,6 +10,7 @@ import { gameRouter } from './routes/game.js';
 import helmet from 'helmet';
 import passport from 'passport';
 import { pool } from './db/pool.js';
+import { rateLimit } from 'express-rate-limit';
 import { requireAuth } from './auth/middleware.js';
 import { runMigrations } from './services/migrationRunner.js';
 import session from 'express-session';
@@ -60,8 +61,22 @@ app.use(
 app.use(passport.initialize());
 app.use(passport.session());
 
+// ─── Rate limiting ────────────────────────────────────────────────────────────
+// Defense in depth on /api/auth/*: the OAuth callback paths can't be brute-
+// forced (Google/Discord control the token) but /api/auth/test-login is a
+// password-equivalent endpoint in non-prod environments. Cap at 30 req/min
+// per IP across the whole namespace — comfortably above any legitimate login
+// flow but tight enough to throttle credential-stuffing.
+const authLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 30,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Too many auth requests, slow down.' },
+});
+
 // ─── Routes ───────────────────────────────────────────────────────────────────
-app.use('/api/auth', authRouter);
+app.use('/api/auth', authLimiter, authRouter);
 app.use('/api/game', requireAuth, gameRouter);
 
 app.get('/api/health', async (_req, res) => {
