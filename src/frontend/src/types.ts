@@ -285,6 +285,61 @@ export type PendingReaction =
   | PendingHellishRebukeReaction
   | PendingCounterspellReaction;
 
+// Structured combat events — see backend/types.ts for the canonical
+// definition + narrative-vs-mechanics rationale.
+export type CombatEvent =
+  | {
+      kind: 'attack_hit';
+      attackerId: string;
+      attackerName: string;
+      targetId: string;
+      targetName: string;
+      damage: number;
+      damageType: string;
+      isCrit: boolean;
+      toHit: number;
+      targetAc: number;
+      round: number;
+    }
+  | {
+      kind: 'attack_miss';
+      attackerId: string;
+      attackerName: string;
+      targetId: string;
+      targetName: string;
+      toHit: number;
+      targetAc: number;
+      round: number;
+    }
+  | {
+      kind: 'kill';
+      attackerId: string;
+      attackerName: string;
+      victimId: string;
+      victimName: string;
+      xp: number;
+      round: number;
+    }
+  | {
+      kind: 'condition_applied';
+      targetId: string;
+      targetName: string;
+      condition: string;
+      source: string;
+      round: number;
+    }
+  | {
+      kind: 'save';
+      characterId: string;
+      characterName: string;
+      ability: string;
+      roll: number;
+      dc: number;
+      success: boolean;
+      vs: string;
+      round: number;
+    };
+
 export interface GameState {
   // Party
   characters: Character[];
@@ -337,6 +392,9 @@ export interface GameState {
 
   // Reactive spell window — see backend PendingReaction.
   pending_reaction?: PendingReaction;
+
+  // Structured combat event log — see backend CombatEvent. Mirror of state.
+  combat_log?: CombatEvent[];
 
   // Campaign overlay
   current_location_id?: string;
