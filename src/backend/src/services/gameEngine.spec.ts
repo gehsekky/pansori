@@ -2209,6 +2209,211 @@ describe('class features', () => {
     expect(result.newState.characters[0].conditions).not.toContain('invisible');
   });
 
+  // ── Barbarian subclasses (PHB p.49-51) ──────────────────────────────────────
+
+  it('Path of the Berserker — Frenzy makes a bonus-action melee attack while raging', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.999); // d20 → 20, dmg max
+    const barbId = 'b-zerk';
+    const daggerInst = 'b-dagger';
+    const barb = makeChar({
+      id: barbId,
+      character_class: 'Barbarian',
+      subclass: 'berserker',
+      level: 3,
+      hp: 30,
+      max_hp: 30,
+      str: 16,
+      conditions: ['raging'],
+      equipped_weapon: daggerInst,
+      inventory: [{ instance_id: daggerInst, id: 'dagger', name: 'Dagger' }],
+      turn_actions: {
+        action_used: true, // attacked already this turn
+        bonus_action_used: false,
+        reaction_used: false,
+        free_interaction_used: false,
+      },
+    });
+    const goblinId = `${CORRIDOR_ID}#0`;
+    const state: GameState = {
+      characters: [barb],
+      active_character_id: barbId,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: true,
+      initiative_order: [
+        { id: barbId, roll: 18, is_enemy: false },
+        { id: goblinId, roll: 5, is_enemy: true },
+      ],
+      initiative_idx: 0,
+      entities: [
+        {
+          id: barbId,
+          isEnemy: false,
+          pos: { x: 4, y: 5 },
+          hp: 30,
+          maxHp: 30,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: goblinId,
+          isEnemy: true,
+          pos: { x: 5, y: 5 },
+          hp: 50,
+          maxHp: 50,
+          conditions: [],
+          condition_durations: {},
+        },
+      ],
+      movement_used: {},
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      flags: {},
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+    };
+    const result = await takeAction({
+      action: { type: 'use_class_feature', featureId: 'frenzy_attack' },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    expect(result.narrative).toMatch(/Frenzy/);
+    const newBarb = result.newState.characters[0];
+    expect(newBarb.turn_actions.bonus_action_used).toBe(true);
+    const goblinEnt = result.newState.entities?.find((e) => e.id === goblinId);
+    expect(goblinEnt?.hp).toBeLessThan(50); // damage applied
+  });
+
+  it('Path of the Berserker — Frenzy refused when not raging', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const barbId = 'b-no-rage';
+    const barb = makeChar({
+      id: barbId,
+      character_class: 'Barbarian',
+      subclass: 'berserker',
+      level: 3,
+      hp: 30,
+      max_hp: 30,
+      // not raging
+    });
+    const state = makeState({}, { characters: [barb], active_character_id: barbId });
+    state.characters = [barb];
+    state.active_character_id = barbId;
+    const result = await takeAction({
+      action: { type: 'use_class_feature', featureId: 'frenzy_attack' },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    expect(result.narrative).toMatch(/must be raging/i);
+  });
+
+  it('Totem Warrior (Wolf) — raging barb within 5 ft grants ally melee advantage', async () => {
+    // Two PCs: a wolf-totem raging Barbarian adjacent to the goblin, and a
+    // Fighter at range. The Fighter's melee attack should pick up advantage
+    // from the wolf adjacency.
+    vi.spyOn(Math, 'random').mockReturnValue(0.999);
+    const barbId = 'b-wolf';
+    const fighterId = 'f-ally';
+    const goblinId = `${CORRIDOR_ID}#0`;
+    const barb = makeChar({
+      id: barbId,
+      character_class: 'Barbarian',
+      subclass: 'totem_warrior',
+      level: 3,
+      hp: 30,
+      max_hp: 30,
+      conditions: ['raging'],
+    });
+    const fighter = makeChar({
+      id: fighterId,
+      character_class: 'Fighter',
+      level: 3,
+      hp: 30,
+      max_hp: 30,
+      str: 14,
+      equipped_weapon: 'f-sword',
+      inventory: [{ instance_id: 'f-sword', id: 'longsword', name: 'Longsword' }],
+    });
+    const state: GameState = {
+      characters: [barb, fighter],
+      active_character_id: fighterId,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: true,
+      initiative_order: [
+        { id: fighterId, roll: 18, is_enemy: false },
+        { id: barbId, roll: 14, is_enemy: false },
+        { id: goblinId, roll: 5, is_enemy: true },
+      ],
+      initiative_idx: 0,
+      entities: [
+        {
+          id: fighterId,
+          isEnemy: false,
+          pos: { x: 4, y: 5 },
+          hp: 30,
+          maxHp: 30,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: barbId,
+          isEnemy: false,
+          pos: { x: 6, y: 5 }, // adjacent to goblin
+          hp: 30,
+          maxHp: 30,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: goblinId,
+          isEnemy: true,
+          pos: { x: 5, y: 5 },
+          hp: 50,
+          maxHp: 50,
+          conditions: [],
+          condition_durations: {},
+        },
+      ],
+      movement_used: {},
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      flags: {},
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+    };
+    const result = await takeAction({
+      action: { type: 'attack', targetEnemyId: goblinId },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    // The Fighter's attack narrative should include the advantage indicator
+    // (the engine surfaces adv reasons in the d20 display when adv applies).
+    expect(result.narrative).toMatch(/adv/i);
+  });
+
   // ── Shield (reactive spell, PHB p.275) ──────────────────────────────────────
 
   it('Shield reaction window opens when enemy hits within [AC, AC+4]', async () => {
