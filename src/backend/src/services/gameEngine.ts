@@ -5476,9 +5476,18 @@ export async function takeAction({
   // ── Auto-advance initiative when action is used and no bonus choices remain ─
   // When class features add bonus-action choices (requiresBonusAction: true),
   // this block will stay false and the player gets another pick before advancing.
+  // PHB p.190: movement is its own resource on your turn, separate from the
+  // Action. Don't auto-advance while the character still has movement left —
+  // otherwise a click that was a no-op (e.g. a too-far grid_move that errored
+  // with "not enough movement") would end the turn. The player can always
+  // forfeit unused movement via the explicit "End turn" choice.
   if (st.combat_active && !usedInitiative && st.characters[safeIdx].turn_actions.action_used) {
+    const activeChar = st.characters[safeIdx];
     const hasBonusChoices = generateChoices(st, seed, context).some((c) => c.requiresBonusAction);
-    if (!hasBonusChoices) usedInitiative = true;
+    const speedFt = effectiveSpeed(activeChar);
+    const usedFt = st.movement_used?.[activeChar.id] ?? 0;
+    const hasMovementLeft = !!st.entities && usedFt < speedFt;
+    if (!hasBonusChoices && !hasMovementLeft) usedInitiative = true;
   }
 
   // ── Advance initiative / active character ──────────────────────────────────
