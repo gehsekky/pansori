@@ -1,0 +1,124 @@
+import type { NextFunction, Request, Response } from 'express';
+import { z } from 'zod';
+
+// Zod schemas for request bodies on the auth + game routes. Each handler
+// replaces a `req.body as { ... }` type assertion with `parse(req, schema)`.
+//
+// Philosophy: validate the *shape* at the boundary so malformed clients hit a
+// 400 instead of crashing into the engine. Don't try to enforce game rules
+// here (level caps, character class enums, etc.) — that's the engine's job.
+// Schemas should be as loose as the handler actually needs.
+
+// ─── Auth ────────────────────────────────────────────────────────────────────
+
+export const TestLoginSchema = z
+  .object({
+    email: z.string().email().optional(),
+    displayName: z.string().min(1).max(120).optional(),
+  })
+  .strict();
+
+// ─── Game ────────────────────────────────────────────────────────────────────
+
+const StatsSchema = z
+  .object({
+    str: z.number().int(),
+    dex: z.number().int(),
+    con: z.number().int(),
+    int: z.number().int(),
+    wis: z.number().int(),
+    cha: z.number().int(),
+  })
+  .strict();
+
+const CharacterInputSchema = z
+  .object({
+    name: z.string().min(1).max(80),
+    character_class: z.string().min(1).max(40),
+    background_id: z.string().min(1).max(40).optional(),
+    stats: StatsSchema.optional(),
+    portrait_url: z.string().max(2048).optional(),
+    subclass: z.string().min(1).max(40).optional(),
+  })
+  .strict();
+
+export const NewSessionSchema = z
+  .object({
+    characters: z.array(CharacterInputSchema).min(1).max(8),
+    context_id: z.string().min(1).max(80).optional(),
+  })
+  .strict();
+
+export const EquipSchema = z
+  .object({
+    item_id: z.string().min(1).max(80),
+    character_id: z.string().uuid().optional(),
+  })
+  .strict();
+
+export const TransferSchema = z
+  .object({
+    item_instance_id: z.string().min(1).max(80),
+    from_character_id: z.string().uuid(),
+    to_character_id: z.string().uuid(),
+  })
+  .strict();
+
+export const DropSchema = z
+  .object({
+    item_instance_id: z.string().min(1).max(80),
+    character_id: z.string().uuid(),
+  })
+  .strict();
+
+// StructuredAction is a wide discriminated union in `types.ts` (40+ variants).
+// Rather than mirror it in Zod (and have to keep two definitions in sync
+// forever), validate only that `action` is an object with a non-empty `type`
+// string — the handler's exhaustive switch handles dispatch, and unknown
+// types fall through to a default arm. `history` is an opaque array.
+export const ActionSchema = z
+  .object({
+    action: z
+      .object({
+        type: z.string().min(1).max(60),
+      })
+      .passthrough(),
+    history: z.array(z.unknown()).optional(),
+  })
+  .strict();
+
+// ─── Helper: validate or 400 ─────────────────────────────────────────────────
+
+// Used inline in handlers: `const parsed = parseBody(req, res, Schema); if
+// (!parsed) return;`. Returns the parsed body or `undefined` after writing
+// the 400 response. Consolidates the failure shape so clients get a stable
+// `{ error, issues }` payload regardless of which endpoint failed.
+export function parseBody<T extends z.ZodTypeAny>(
+  req: Request,
+  res: Response,
+  schema: T
+): z.infer<T> | undefined {
+  const result = schema.safeParse(req.body);
+  if (!result.success) {
+    res.status(400).json({
+      error: 'Invalid request body',
+      issues: result.error.issues.map((i) => ({
+        path: i.path.join('.'),
+        message: i.message,
+      })),
+    });
+    return undefined;
+  }
+  return result.data;
+}
+
+// Express middleware variant — useful for routes that don't need to early-
+// return inside an async handler. Unused today but exported for future use.
+export function validateBody<T extends z.ZodTypeAny>(schema: T) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const parsed = parseBody(req, res, schema);
+    if (!parsed) return;
+    req.body = parsed;
+    next();
+  };
+}

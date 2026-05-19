@@ -1,3 +1,11 @@
+import {
+  ActionSchema,
+  DropSchema,
+  EquipSchema,
+  NewSessionSchema,
+  TransferSchema,
+  parseBody,
+} from './schemas.js';
 import type { CampaignFacts, Character, Context, GameState, StructuredAction } from '../types.js';
 import {
   FRESH_TURN,
@@ -145,22 +153,9 @@ gameRouter.delete('/sessions/completed', async (req: Request, res: Response) => 
 
 // Start a new roguelike run — accepts a party of 1–4 characters
 gameRouter.post('/session/new', async (req: Request, res: Response) => {
-  const { characters, context_id } = req.body as {
-    characters?: Array<{
-      name: string;
-      character_class: string;
-      background_id?: string;
-      stats?: { str: number; dex: number; con: number; int: number; wis: number; cha: number };
-      portrait_url?: string;
-      subclass?: string;
-    }>;
-    context_id?: string;
-  };
-
-  if (!characters?.length) {
-    res.status(400).json({ error: 'Missing characters' });
-    return;
-  }
+  const parsed = parseBody(req, res, NewSessionSchema);
+  if (!parsed) return;
+  const { characters, context_id } = parsed;
 
   const ctx = CONTEXTS[context_id ?? ''] ?? DEFAULT_CONTEXT;
   const seed = generateSeed(ctx, characters.length);
@@ -336,7 +331,9 @@ function campaignMetaFor(ctx: Context | undefined) {
 
 // Equip or unequip an item — enforces 5e equipment rules for the specified character
 gameRouter.post('/session/:id/equip', async (req: Request, res: Response) => {
-  const { item_id, character_id } = req.body as { item_id?: string; character_id?: string };
+  const parsed = parseBody(req, res, EquipSchema);
+  if (!parsed) return;
+  const { item_id, character_id } = parsed;
   try {
     const {
       rows: [row],
@@ -445,17 +442,9 @@ gameRouter.post('/session/:id/equip', async (req: Request, res: Response) => {
 // interact with one object per turn free (move + give); we don't gate on
 // action economy here — the inventory UI treats transfers as fluid.
 gameRouter.post('/session/:id/transfer', async (req: Request, res: Response) => {
-  const { item_instance_id, from_character_id, to_character_id } = req.body as {
-    item_instance_id?: string;
-    from_character_id?: string;
-    to_character_id?: string;
-  };
-  if (!item_instance_id || !from_character_id || !to_character_id) {
-    res
-      .status(400)
-      .json({ error: 'Missing item_instance_id, from_character_id, or to_character_id' });
-    return;
-  }
+  const parsed = parseBody(req, res, TransferSchema);
+  if (!parsed) return;
+  const { item_instance_id, from_character_id, to_character_id } = parsed;
   if (from_character_id === to_character_id) {
     res.status(400).json({ error: 'Cannot transfer to the same character' });
     return;
@@ -528,14 +517,9 @@ gameRouter.post('/session/:id/transfer', async (req: Request, res: Response) => 
 // (not added back to room loot). Can extend later if "drop and pick up
 // again" is desired.
 gameRouter.post('/session/:id/drop', async (req: Request, res: Response) => {
-  const { item_instance_id, character_id } = req.body as {
-    item_instance_id?: string;
-    character_id?: string;
-  };
-  if (!item_instance_id || !character_id) {
-    res.status(400).json({ error: 'Missing item_instance_id or character_id' });
-    return;
-  }
+  const parsed = parseBody(req, res, DropSchema);
+  if (!parsed) return;
+  const { item_instance_id, character_id } = parsed;
   try {
     const {
       rows: [row],
@@ -582,11 +566,10 @@ gameRouter.post('/session/:id/drop', async (req: Request, res: Response) => {
 
 // Take a game action
 gameRouter.post('/session/:id/action', async (req: Request, res: Response) => {
-  const { action, history } = req.body as { action?: StructuredAction; history?: unknown[] };
-  if (!action?.type) {
-    res.status(400).json({ error: 'Missing action' });
-    return;
-  }
+  const parsed = parseBody(req, res, ActionSchema);
+  if (!parsed) return;
+  const action = parsed.action as StructuredAction;
+  const history = parsed.history;
   try {
     const {
       rows: [row],

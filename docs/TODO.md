@@ -115,7 +115,7 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 
 Captured during the autonomous-mode audit. Items marked **autonomous** can be picked up without user input; **needs-input** requires a design call.
 
-- [ ] **Body validation gaps** (autonomous-ready) — route handlers use `req.body as { ... }` type assertions with no runtime validation. Low risk in single-player but a real best-practice gap. Add Zod schemas at the route boundary; failure path returns 400 with the validation message. ~2h.
+- [x] **Body validation gaps** — Zod schemas now gate every POST body that takes JSON: `/api/auth/test-login`, `/api/game/session/new`, `/equip`, `/transfer`, `/drop`, `/action`. Schemas live in `src/backend/src/routes/schemas.ts`; failures return `{ error, issues: [{path, message}] }` with 400. `StructuredAction` is intentionally loose-typed at the route boundary (the engine's exhaustive switch covers depth).
 - [x] **Security headers** — `helmet({ contentSecurityPolicy: false })` middleware added to `src/backend/src/index.ts` (4bf73c1).
 - [x] **Frontend error boundary** — top-level `<ErrorBoundary>` wraps `<App>` in `src/frontend/src/main.tsx` with a recovery UI (4bf73c1).
 - [ ] **Strongly-typed req.user** (autonomous) — routes use `req.user!` non-null assertion (10 sites). A typed wrapper that narrows after the requireAuth middleware would remove the assertions cleanly. ~30 min.

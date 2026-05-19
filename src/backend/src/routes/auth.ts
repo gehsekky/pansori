@@ -1,4 +1,5 @@
 import { Request, Response, Router } from 'express';
+import { TestLoginSchema, parseBody } from './schemas.js';
 import { configuredProviders, findOrCreateUser } from '../auth/passport.js';
 import passport from 'passport';
 
@@ -57,8 +58,10 @@ authRouter.get('/me', (req: Request, res: Response) => {
 // instead of carving out a special-case write path.
 if (process.env.NODE_ENV !== 'production' && process.env.E2E_TEST_LOGIN_ENABLED === 'true') {
   authRouter.post('/test-login', async (req: Request, res: Response) => {
-    const email = (req.body?.email ?? 'e2e-test@pansori.local') as string;
-    const displayName = (req.body?.displayName ?? 'E2E Test User') as string;
+    const parsed = parseBody(req, res, TestLoginSchema);
+    if (!parsed) return;
+    const email = parsed.email ?? 'e2e-test@pansori.local';
+    const displayName = parsed.displayName ?? 'E2E Test User';
     try {
       const user = await findOrCreateUser({
         provider: 'e2e',
