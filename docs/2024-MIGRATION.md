@@ -35,7 +35,7 @@ Listed by impact × tractability. Each item is its own PR.
 | 4   | Weapon Masteries (per-class)   | ~2h    | DONE    | Fighter (3), Paladin (2), Ranger (2), Barbarian (2), Rogue (2) granted at creation |
 | 5   | Wild Shape → Beast Forms       | ~4h    | partial | Temp HP nerfed to RAW (2 × level / 3 × level Moon). Beast Forms catalog deferred.  |
 | 6   | Rage progression               | ~1h    | DONE    | Damage bonus identical; rage uses table rebalanced to 2024 progression             |
-| 7   | Class feature audit pass       | ~4h    | partial | Most features identical; Rogue Cunning Strike + Monk ki→focus rename queued        |
+| 7   | Class feature audit pass       | ~4h    | partial | Rogue Cunning Strike DONE; Monk ki→focus rename remains; rest at parity            |
 
 ---
 

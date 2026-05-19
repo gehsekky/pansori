@@ -214,6 +214,10 @@ export interface TurnActions {
   // Heroic Inspiration pending — when set, the next attack roll gets
   // advantage and both this flag + char.inspiration are cleared (one-shot).
   inspiration_pending?: boolean;
+  // 2024 PHB Rogue Cunning Strike (L5+) — when set, the next Sneak Attack
+  // spends 1 die for the chosen effect (trip, poison, withdraw, disarm)
+  // and one SA die is removed from the damage roll. Cleared after applied.
+  cunning_strike_pending?: 'trip' | 'poison' | 'withdraw' | 'disarm';
   movement_budget_remaining?: number; // feet remaining this turn; initialized to speed at turn start
   readied_action?: {
     trigger: string;

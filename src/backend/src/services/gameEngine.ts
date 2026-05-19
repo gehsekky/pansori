@@ -1369,6 +1369,35 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       });
     }
 
+    // 2024 PHB Rogue L5+: Cunning Strike. Pre-commit an effect that fires
+    // on the next Sneak Attack hit. Each effect costs 1 SA die (subtracted
+    // from the SA damage roll). Setting a Cunning Strike is free — no
+    // action cost.
+    if (
+      char.character_class.toLowerCase() === 'rogue' &&
+      char.level >= 5 &&
+      !char.turn_actions.action_used &&
+      !char.turn_actions.cunning_strike_pending &&
+      enemyAlive
+    ) {
+      choices.push({
+        label: 'Cunning Strike: Trip — DEX save or prone on Sneak Attack (costs 1 SA die)',
+        action: { type: 'use_class_feature', featureId: 'cunning_strike_trip' },
+      });
+      choices.push({
+        label: 'Cunning Strike: Poison — CON save or poisoned on Sneak Attack (costs 1 SA die)',
+        action: { type: 'use_class_feature', featureId: 'cunning_strike_poison' },
+      });
+      choices.push({
+        label: 'Cunning Strike: Withdraw — move half speed without OAs on hit (costs 1 SA die)',
+        action: { type: 'use_class_feature', featureId: 'cunning_strike_withdraw' },
+      });
+      choices.push({
+        label: 'Cunning Strike: Disarm — drop target damage by ~2 on Sneak Attack (costs 1 SA die)',
+        action: { type: 'use_class_feature', featureId: 'cunning_strike_disarm' },
+      });
+    }
+
     // Bard: Bardic Inspiration (bonus action)
     if (char.character_class.toLowerCase() === 'bard') {
       const biUses =
@@ -3271,6 +3300,13 @@ export async function takeAction({
           if (isFinesseOrRanged && triggers) {
             const saExpr = sneakAttackDice(char.level);
             sneakDmg = isCrit ? rollCritical(saExpr) : rollDice(saExpr);
+            // 2024 PHB Cunning Strike: if the player pre-committed an
+            // effect, subtract one die from the SA roll (average 3.5 on
+            // 1d6) and stage the effect for application after the hit
+            // resolves and damage is committed.
+            if (char.turn_actions.cunning_strike_pending) {
+              sneakDmg = Math.max(0, sneakDmg - rollDice('1d6'));
+            }
           }
         }
 
@@ -3313,6 +3349,98 @@ export async function takeAction({
           targetAc: target.ac,
           round: st.round ?? 1,
         });
+
+        // ── 2024 PHB Cunning Strike effect application ───────────────────────
+        // If the Rogue pre-committed an effect AND Sneak Attack damage
+        // was rolled (i.e. SA triggered on this hit), apply the effect.
+        if (char.turn_actions.cunning_strike_pending && sneakDmg > 0 && newEnemyHp > 0) {
+          const csEffect = char.turn_actions.cunning_strike_pending;
+          const csDc = 8 + profBonus(char.level) + abilityMod(char.dex);
+          char.turn_actions = { ...char.turn_actions, cunning_strike_pending: undefined };
+          if (csEffect === 'trip') {
+            const enemyDex = (target.dex ?? 10) as number;
+            const dexSave = rollDice('1d20') + abilityMod(enemyDex);
+            if (dexSave < csDc) {
+              st = {
+                ...st,
+                entities: (st.entities ?? []).map((e) =>
+                  e.id === targetId && e.isEnemy
+                    ? { ...e, conditions: [...e.conditions.filter((c) => c !== 'prone'), 'prone'] }
+                    : e
+                ),
+              };
+              st = pushEvent(st, {
+                kind: 'condition_applied',
+                targetId,
+                targetName: target.name,
+                condition: 'prone',
+                source: 'Cunning Strike: Trip',
+                round: st.round ?? 1,
+              });
+              narrative += ` [Cunning Strike — Trip: DEX ${dexSave} vs DC ${csDc} — ${target.name} is prone!]`;
+            } else {
+              narrative += ` [Cunning Strike — Trip: DEX ${dexSave} vs DC ${csDc} — resists]`;
+            }
+          } else if (csEffect === 'poison') {
+            const enemyCon = (target.con ?? 10) as number;
+            const conSave = rollDice('1d20') + abilityMod(enemyCon);
+            if (target.condition_immunities?.includes('poisoned')) {
+              narrative += ` [Cunning Strike — Poison: ${target.name} is immune]`;
+            } else if (conSave < csDc) {
+              st = {
+                ...st,
+                entities: (st.entities ?? []).map((e) =>
+                  e.id === targetId && e.isEnemy
+                    ? {
+                        ...e,
+                        conditions: [...e.conditions.filter((c) => c !== 'poisoned'), 'poisoned'],
+                      }
+                    : e
+                ),
+              };
+              st = pushEvent(st, {
+                kind: 'condition_applied',
+                targetId,
+                targetName: target.name,
+                condition: 'poisoned',
+                source: 'Cunning Strike: Poison',
+                round: st.round ?? 1,
+              });
+              narrative += ` [Cunning Strike — Poison: CON ${conSave} vs DC ${csDc} — ${target.name} is poisoned!]`;
+            } else {
+              narrative += ` [Cunning Strike — Poison: CON ${conSave} vs DC ${csDc} — resists]`;
+            }
+          } else if (csEffect === 'withdraw') {
+            // Move half speed without provoking OAs this turn — represented
+            // by the existing `disengaged` flag, which suppresses OAs.
+            char.turn_actions = { ...char.turn_actions, disengaged: true };
+            narrative += ` [Cunning Strike — Withdraw: ${char.name} disengages without provoking OAs]`;
+          } else if (csEffect === 'disarm') {
+            // Pansori enemies don't carry weapons as separate items — model
+            // disarm as a `disarmed` condition the damage handler will read
+            // later. For now just narrate + apply the condition.
+            st = {
+              ...st,
+              entities: (st.entities ?? []).map((e) =>
+                e.id === targetId && e.isEnemy
+                  ? {
+                      ...e,
+                      conditions: [...e.conditions.filter((c) => c !== 'disarmed'), 'disarmed'],
+                    }
+                  : e
+              ),
+            };
+            st = pushEvent(st, {
+              kind: 'condition_applied',
+              targetId,
+              targetName: target.name,
+              condition: 'disarmed',
+              source: 'Cunning Strike: Disarm',
+              round: st.round ?? 1,
+            });
+            narrative += ` [Cunning Strike — Disarm: ${target.name} drops their weapon!]`;
+          }
+        }
 
         // ── 2024 PHB Weapon Mastery on hit ────────────────────────────────────
         // Apply the weapon's mastery property IF the PC has mastered this
@@ -4820,6 +4948,27 @@ export async function takeAction({
         } else {
           narrative = `${char.name} tries to hide but fails. (Stealth ${hideCheck.total} vs DC ${sneakHideDC})`;
         }
+      }
+
+      // ── 2024 PHB Rogue Cunning Strike (L5+) ──────────────────────────────
+      // Pre-commits an effect that fires on the next Sneak Attack. No
+      // action cost; the SA-die cost is paid in the attack handler.
+      else if (fid.startsWith('cunning_strike_')) {
+        if (char.character_class.toLowerCase() !== 'rogue') {
+          narrative = 'Only Rogues have Cunning Strike.';
+          break;
+        }
+        if (char.level < 5) {
+          narrative = 'Cunning Strike requires Rogue level 5.';
+          break;
+        }
+        const effect = fid.replace('cunning_strike_', '') as
+          | 'trip'
+          | 'poison'
+          | 'withdraw'
+          | 'disarm';
+        char.turn_actions = { ...char.turn_actions, cunning_strike_pending: effect };
+        narrative = `${char.name} readies a Cunning Strike (${effect}) on the next Sneak Attack.`;
       }
 
       // ── Battle Master: Maneuver (Fighter L3+ subclass) ────────────────────
