@@ -1203,6 +1203,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       warlock: ['fiend', 'archfey'],
       druid: ['land', 'moon'],
       monk: ['open_hand', 'shadow'],
+      barbarian: ['berserker', 'totem_warrior'],
     };
     const reqLevel = subclassLevels[cls] ?? 3;
     // RAW: subclass is acquired at level-up (a long-rest milestone), not as an
@@ -1246,6 +1247,22 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
           requiresBonusAction: true,
         });
       }
+    }
+
+    // Path of the Berserker — Frenzy (PHB p.49): while raging, make a
+    // single melee weapon attack as a bonus action each turn. RAW also
+    // imposes exhaustion when the rage ends; deferred to keep MVP scope.
+    if (
+      char.subclass === 'berserker' &&
+      char.character_class.toLowerCase() === 'barbarian' &&
+      char.conditions.includes('raging') &&
+      enemyAlive
+    ) {
+      choices.push({
+        label: `Frenzy — bonus melee attack (Berserker)`,
+        action: { type: 'use_class_feature', featureId: 'frenzy_attack' },
+        requiresBonusAction: true,
+      });
     }
 
     // Fighter: Second Wind (bonus action)
@@ -2906,6 +2923,25 @@ export async function takeAction({
       // Reckless Attack (Barbarian L2+): advantage on melee weapon attacks
       const recklessAdv = !!char.turn_actions.reckless && weaponItem?.range !== 'ranged';
 
+      // Path of the Totem Warrior — Wolf (PHB p.51): "While raging, your
+      // allies have advantage on melee attack rolls against any creature
+      // within 5 feet of you that is hostile to you." Find any Wolf-totem
+      // barbarian in the party who's raging and adjacent to the target.
+      const wolfAdv =
+        weaponItem?.range !== 'ranged' &&
+        !!st.entities &&
+        st.characters.some((ally) => {
+          if (ally.id === char.id) return false;
+          if (ally.dead || ally.hp <= 0) return false;
+          if (ally.subclass !== 'totem_warrior') return false;
+          if (ally.character_class.toLowerCase() !== 'barbarian') return false;
+          if (!ally.conditions.includes('raging')) return false;
+          const allyEnt = st.entities?.find((e) => e.id === ally.id);
+          const targetEnt = st.entities?.find((e) => e.id === targetId && e.isEnemy);
+          if (!allyEnt || !targetEnt) return false;
+          return distanceFeet(allyEnt.pos, targetEnt.pos) <= 5;
+        });
+
       const disadvantage =
         rangedInMelee ||
         conditionDisadv ||
@@ -2930,7 +2966,8 @@ export async function takeAction({
         assassinAdv ||
         vowAdv ||
         recklessAdv ||
-        inspirationAdv;
+        inspirationAdv ||
+        wolfAdv;
       const disadvReasons = [
         rangedInMelee ? 'ranged in melee' : '',
         conditionDisadv ? char.conditions.filter((c) => DISADV_CONDITIONS.has(c)).join(', ') : '',
@@ -4729,6 +4766,70 @@ export async function takeAction({
         char.turn_actions = { ...char.turn_actions, action_used: true };
         usedInitiative = true;
         narrative = `🌑 ${char.name} weaves Shadow Arts — invisible for 3 rounds. (${kiSa - 2} ki remaining)`;
+      }
+
+      // ── Path of the Berserker — Frenzy (PHB p.49) ────────────────────────────
+      // While raging, make a single melee weapon attack as a bonus action.
+      // Damage uses the equipped weapon's die + STR mod + rage bonus, matching
+      // the regular attack handler's pattern but in a self-contained roll.
+      // RAW: when rage ends, you suffer one level of exhaustion. Deferred —
+      // tracking "rage ended after Frenzy used this round" needs more state.
+      else if (fid === 'frenzy_attack') {
+        if (char.subclass !== 'berserker' || char.character_class.toLowerCase() !== 'barbarian') {
+          narrative = 'Only Berserker Barbarians have Frenzy.';
+          break;
+        }
+        if (!char.conditions.includes('raging')) {
+          narrative = 'You must be raging to use Frenzy.';
+          break;
+        }
+        if (char.turn_actions.bonus_action_used) {
+          narrative = 'Bonus action already used this turn.';
+          break;
+        }
+        if (!enemyAlive || !enemy) {
+          narrative = 'No enemy to Frenzy attack.';
+          break;
+        }
+        const frWeapon = char.equipped_weapon
+          ? getItemData(
+              char.inventory?.find((i) => i.instance_id === char.equipped_weapon) as InventoryItem,
+              context
+            )
+          : null;
+        if (frWeapon?.range === 'ranged') {
+          narrative = 'Frenzy requires a melee weapon.';
+          break;
+        }
+        char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
+        const frTarget = livingEnemiesInRoom[0] ?? enemy;
+        const frToHit = rollDice('1d20') + abilityMod(char.str) + profBonus(char.level);
+        if (frToHit >= (frTarget.ac ?? 10)) {
+          const dmgDice = frWeapon?.damage ?? '1d4';
+          const frDmg = Math.max(
+            1,
+            rollDice(dmgDice) + abilityMod(char.str) + rageDamageBonus(char.level)
+          );
+          const curHp = st.entities?.find((e) => e.id === frTarget.id && e.isEnemy)?.hp ?? 0;
+          const newHp = Math.max(0, curHp - frDmg);
+          st = {
+            ...st,
+            entities: (st.entities ?? []).map((e) =>
+              e.id === frTarget.id && e.isEnemy ? { ...e, hp: newHp } : e
+            ),
+          };
+          narrative = `💢 ${char.name} — Frenzy! (${frToHit} hits AC ${frTarget.ac}) ${frDmg} ${frWeapon?.damageType ?? 'bludgeoning'}${newHp <= 0 ? ` — ${frTarget.name} falls!` : ''}`;
+          if (newHp <= 0) {
+            char.xp = (char.xp || 0) + (frTarget.xp ?? 10);
+            st.enemies_killed = [...st.enemies_killed, frTarget.id];
+            if (isRoomCleared(st, seed, roomId)) {
+              st = endCombatState(st);
+              char.conditions = char.conditions.filter((c) => c !== 'raging');
+            }
+          }
+        } else {
+          narrative = `💢 ${char.name} — Frenzy! (${frToHit} vs AC ${frTarget.ac}) — miss.`;
+        }
       }
 
       // ── Druid: Wild Shape ────────────────────────────────────────────────────

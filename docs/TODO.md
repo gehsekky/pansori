@@ -10,11 +10,11 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 
 ## Top 5 items to push toward the end goal
 
-1. **Subclass packs for the remaining 3 classes** — Druid (L2), Monk + Barbarian (L3). Cleric, Sorcerer, Warlock are shipped. Pattern is well-established; ~2-3h per pack. (Promoted from #2 after Reactive spells closed.)
-2. **Combat narrative clarity (UX)** — combat currently produces a long text log scroll mixing damage numbers, condition changes, save rolls, OA narrations. A "combat log panel" that separates **mechanical events** (rolls, damage, condition apply/remove) from **prose flavour** would dramatically improve readability and let new players follow what's happening. Hooks into the existing `narrative template format` backlog item.
-3. **Authoring documentation (`AUTHORING.md`)** — for the engine to actually be "capable of running complex campaign scripts" by third parties (or future-you), the campaign format needs a written reference: required vs optional fields on `Context`/`CampaignData`, quest condition shape, rule engine consequences, loot/room/NPC patterns, gotchas. Should reference Vale + Whispering Pines as worked examples.
-4. **Tutorial / onboarding** — the game drops new players into character creation with no introduction to the action choice loop, grid combat, or the inventory modal. A 2-room intro tutorial would help. Without this, new players can't actually pick the game up — gates "full RPG experience" from the end-goal sentence.
-5. **Boss fight mechanics** — phase changes, lair actions, legendary actions (SRD p.221). Bigger bosses (later campaign modules) would benefit from multi-phase scripts. The Crypt Lord and Frost Acolyte are currently stat-block bosses with no phasing.
+1. **Combat narrative clarity (UX)** — combat currently produces a long text log scroll mixing damage numbers, condition changes, save rolls, OA narrations. A "combat log panel" that separates **mechanical events** (rolls, damage, condition apply/remove) from **prose flavour** would dramatically improve readability and let new players follow what's happening. Hooks into the existing `narrative template format` backlog item. (Promoted from #2 after Subclass packs closed.)
+2. **Authoring documentation (`AUTHORING.md`)** — for the engine to actually be "capable of running complex campaign scripts" by third parties (or future-you), the campaign format needs a written reference: required vs optional fields on `Context`/`CampaignData`, quest condition shape, rule engine consequences, loot/room/NPC patterns, gotchas. Should reference Vale + Whispering Pines as worked examples.
+3. **Tutorial / onboarding** — the game drops new players into character creation with no introduction to the action choice loop, grid combat, or the inventory modal. A 2-room intro tutorial would help. Without this, new players can't actually pick the game up — gates "full RPG experience" from the end-goal sentence.
+4. **Boss fight mechanics** — phase changes, lair actions, legendary actions (SRD p.221). Bigger bosses (later campaign modules) would benefit from multi-phase scripts. The Crypt Lord and Frost Acolyte are currently stat-block bosses with no phasing.
+5. **Multiplayer + party chat** — see the engine/infra entry. Architectural audit confirmed the base is close; ~15-17h split across 4 PRs once we're ready to pick it up.
 
 ---
 
@@ -24,7 +24,7 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 
 - [x] **Heroic Inspiration (2024 PHB)** — granted automatically on a Nat-1 d20, spent via the `spend_inspiration` action for advantage on the next attack. CharStatsCard shows an ✦ INSP badge. Granted-on-Nat-1 model from the 2024 PHB; saves/ability-check advantage not yet wired (those rolls aren't player-mediated).
 - [x] **Reactive spells / interrupt system** — all three SRD reactive spells ship: **Shield** (PHB p.275, BEFORE-damage negation in [AC, AC+4] window), **Hellish Rebuke** (PHB p.252, AFTER-damage counter-attack, Warlock-only), **Counterspell** (PHB p.234, BEFORE-spell-cast interrupt with auto-counter for ≤3rd-level slots and ability check for higher). Architecture: `pending_reaction` discriminated union with shield/hellish_rebuke/counterspell variants, `runEnemyTurns` helper pauses + yields control to the eligible PC, `resolve_reaction` handler applies the chosen outcome and re-enters the loop. Enemy spell-casting added to Enemy type (`spells`, `castChance`, `spellSaveDC`, `spellAttackBonus`); Frost Acolyte (Pines boss) tagged as a caster of `fire_bolt` (40% per turn) to validate the Counterspell path in playtest.
-- [~] **Subclass packs for the remaining classes** (PHB Chapter 3). The L1 picker UI is in place. Shipped so far: Cleric (life, war), Sorcerer (draconic, wild_magic), Warlock (fiend, archfey). Still need:
+- [x] **Subclass packs for the remaining classes** (PHB Chapter 3). All 9 classes that had subclasses queued now ship at least one option each: Cleric (life, war), Sorcerer (draconic, wild_magic), Warlock (fiend, archfey), Druid (land, moon), Monk (open_hand, shadow), Barbarian (berserker, totem_warrior) — plus the originally-shipped Fighter (champion, battle_master), Rogue (thief, assassin), Wizard (evoker, abjurer), Ranger (hunter, beastmaster), Paladin (devotion, vengeance), Bard (lore, valor). Original entry follows:
   - **Druid** (L2) — Circle of the Land + Circle of the Moon
   - **Monk** (L3) — Way of the Open Hand + Way of Shadow
   - **Barbarian** (L3) — Path of the Berserker + Path of the Totem Warrior
@@ -61,7 +61,7 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 
 ## UX & polish
 
-- [ ] **Combat narrative clarity** — see top-5 item 4. Related backlog: narrative template format separating mechanics from prose.
+- [ ] **Combat narrative clarity** — see top-5 item 1. Related backlog: narrative template format separating mechanics from prose.
 - [~] **Grid map detail pass** — dead bodies render as a faded 💀 marker; same-name enemies get `#N` disambiguation on tooltips + tokens (e.g., "B1"/"B2"). Still TODO: difficult-terrain squares (rocks/snow tile), obstacles, party line-of-sight indicators, last-attacker arrows, AoE preview when hovering a spell choice.
 - [~] **Narrative speaker clarity** — single-point fix at the `rawNarrative` step prepends `[CharName] ` to any `"You ..."` narrative in a multi-PC party (skipped for solo). Enemy attacks now also name the target PC explicitly (`"${char.name} takes ${hp} damage. ${char.name} is paralyzed!"`). Mid-line ambiguity in stitched-together narratives still remains — full per-line decomposition is the longer-term "narrative template format" backlog item.
 - [x] **Placeholder lint** — `narrativePlaceholders.spec.ts` walks every `context.narratives` string for `{X}` tokens and confirms `gameEngine.ts` has a matching `.replace(...)` call. Three tests pass (sandbox / vale / pines).
@@ -83,7 +83,6 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 - [ ] **Pre-commit hook (Husky + lint-staged)** — auto-run eslint + prettier on staged files before commit. Catches the class of bug where prettier-dirty code reaches CI and fails the build (we've burned ~3 commits this week on this). Setup is ~30 min: install `husky` + `lint-staged` as dev deps in the repo root, configure `package.json` lint-staged entry for `*.ts`/`*.tsx` (eslint --fix + prettier --write), `npx husky init` to wire `.husky/pre-commit`. Bypassable with `--no-verify` so it doesn't block urgent fixes. CI lint stays in place as the actual gate.
 
 - [ ] **Multiplayer + party chat (online co-op)** — let friends share a session and chat in realtime. Architecture audit confirmed the base is close: `state.characters[]` already models a party, `state.current_room` is single-valued (no party split → players share one narrative), and the reactive-spell pause already routes prompts to the eligible PC. Four concrete gaps:
-
   1. **Ownership model**: `game_sessions.user_id` is single-tenant. Add `session_participants(session_id, user_id, character_id, role)`; authorization becomes "user is a participant." Original `user_id` stays as host (matters for delete/invite). ~3-4h.
   2. **Turn enforcement at the API boundary**: `takeAction` doesn't check `req.user.id === characters[active].owner_user_id`. Singleplayer doesn't care; multiplayer is exploitable. Add `Character.owner_user_id` + a single route-level guard. ~1h.
   3. **Realtime push (Socket.IO)**: one server room per session; `state` event after every takeAction broadcasts to all participants; `chat` event in both directions for messages. Keeps REST for writes (auth model unchanged, easy to reason about) and uses WS only for fanout. Needs sticky sessions if Pansori ever scales to >1 backend instance — today single EC2, no concern. ~7h server + frontend integration.
@@ -96,6 +95,7 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
   - Invite UX: shareable link, or invite-by-email through users table?
   - DM mode (one player runs encounters for others) or strict party-of-equals?
   - Voice — pipe Discord OAuth into a Discord-server-link feature, or leave voice out and let players use their own VC?
+
 - [x] **Playwright E2E test** — three tests in `tests/e2e/vale-smoke.spec.ts`: (a) Vale smoke covers login → BEGIN MISSION → narrative renders; (b) session resume reloads mid-session and verifies state rehydrates; (c) sandbox combat drives the choice loop until an Attack action surfaces. `data-testid` attrs on key UI elements + `data-action-type` on choice buttons. Auth bypass `/api/auth/test-login` double-gated. Combat test has `retries: 2` for procgen variance. Wired into CI: `e2e` job in `.github/workflows/deploy.yml` runs after the unit-test job and gates `build-and-deploy`. Failure uploads `playwright-report/` + `test-results/` as artifacts and dumps backend/frontend/postgres compose logs.
 
 ---
