@@ -71,6 +71,7 @@ import {
   posEqual,
 } from './gridEngine.js';
 import { Engine } from 'json-rules-engine';
+import { factionShopPrice } from './campaignEngine.js';
 import { llmProvider } from './llmProvider.js';
 import { randomUUID } from 'crypto';
 
@@ -1042,13 +1043,26 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       });
     }
     if (npc.shop?.length && attitude === 'friendly') {
+      // Faction-aware pricing — if the NPC is tagged with a factionId and the
+      // campaign defines that faction's shopPriceModifiers, the displayed and
+      // charged price scales with the party's current rep with that faction.
+      // (campaignEngine.factionShopPrice, PHB-style faction reputation.)
+      const faction = npc.factionId
+        ? context.campaign?.factions?.find((f) => f.id === npc.factionId)
+        : undefined;
+      const rep = npc.factionId ? (state.faction_rep?.[npc.factionId] ?? 0) : 0;
       for (const entry of npc.shop) {
         if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
         const item = context.lootTable.find((l) => l.id === entry.itemId);
         if (item) {
+          const price = faction ? factionShopPrice(entry.price, rep, faction) : entry.price;
+          const repNote =
+            faction && price !== entry.price
+              ? ` (${faction.name} ${price < entry.price ? 'discount' : 'markup'} from ${entry.price})`
+              : '';
           choices.push({
-            label: `Buy ${item.name} — ${entry.price}cr`,
-            action: { type: 'buy', itemId: entry.itemId, price: entry.price },
+            label: `Buy ${item.name} — ${price}cr${repNote}`,
+            action: { type: 'buy', itemId: entry.itemId, price },
           });
         }
       }

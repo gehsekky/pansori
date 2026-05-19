@@ -228,6 +228,10 @@ export interface NpcTemplate {
   persuasionDC?: number; // CHA check DC when indifferent (default 12)
   // Trade
   shop?: NpcShopEntry[];
+  // Associates the NPC's shop with a faction so price modifiers can apply
+  // (campaignEngine.factionShopPrice). Optional — NPCs without a faction
+  // tag charge their static shop entry price.
+  factionId?: string;
 }
 
 export interface PlacedNpc extends NpcTemplate {

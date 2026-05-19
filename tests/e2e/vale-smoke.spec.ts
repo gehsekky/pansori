@@ -164,6 +164,77 @@ async function driveCombatLoop(page: Page, maxIterations = 80): Promise<CombatLo
   return result;
 }
 
+test('session resume: state survives a page reload', async ({ page, request }) => {
+  // Validates the cross-request persistence path that the in-process backend
+  // tests can't reach: state is serialized to Postgres, the cookie session is
+  // restored on the new page load, and the resume API rehydrates the same
+  // game state.
+  const email = `e2e-resume-${Date.now()}@pansori.local`;
+  const loginRes = await request.post(`${BACKEND_URL}/api/auth/test-login`, {
+    data: { email, displayName: 'E2E Resume User' },
+  });
+  expect(loginRes.ok()).toBe(true);
+  const cookies = await request.storageState();
+  await page.context().addCookies(cookies.cookies);
+
+  // Start a fresh sandbox mission.
+  await page.goto('/');
+  await expect(page.getByText(/NO MISSIONS ON RECORD/i)).toBeVisible({ timeout: 10_000 });
+  await page.getByTestId('new-mission-btn').click();
+  await page.getByTestId('world-picker-sandbox').click();
+  await page.getByTestId('auto-fill-party-btn').click();
+  await page.getByTestId('begin-mission-btn').click();
+
+  const narrative = page.getByTestId('game-narrative-panel');
+  await expect(narrative).toBeVisible({ timeout: 15_000 });
+  const initialText = (await narrative.textContent()) ?? '';
+  expect(initialText.length).toBeGreaterThan(0);
+
+  // After session creation, the URL changes to /<sessionId>. We rely on this
+  // for the reload-resume path; capture it here.
+  await page.waitForFunction(() => /^\/[0-9a-f-]{36}$/i.test(window.location.pathname), null, {
+    timeout: 5_000,
+  });
+  const sessionUrl = page.url();
+  const sessionId = new URL(sessionUrl).pathname.slice(1);
+  expect(sessionId).toMatch(/^[0-9a-f-]{36}$/i);
+
+  // Take an action so the state differs from initial — pick any choice,
+  // preferring a Move/grid_move so the room or position changes.
+  await page.waitForTimeout(200);
+  const buttons = page.getByTestId('choice-btn');
+  const count = await buttons.count();
+  expect(count).toBeGreaterThan(0);
+  const types = await Promise.all(
+    Array.from({ length: count }, (_, j) => buttons.nth(j).getAttribute('data-action-type'))
+  );
+  const moveIdx = types.findIndex((t) => t === 'move' || t === 'grid_move');
+  await buttons.nth(moveIdx >= 0 ? moveIdx : 0).click();
+
+  // Grab the post-action narrative — this is what should survive the reload.
+  await page.waitForTimeout(500);
+  const afterActionText = (await narrative.textContent()) ?? '';
+  expect(afterActionText.length).toBeGreaterThan(0);
+
+  // Reload the page. The session cookie persists; the URL stays at /<sessionId>.
+  await page.reload();
+
+  // After reload the game view should rehydrate — narrative panel visible
+  // and populated with the same room state we left in.
+  await expect(narrative).toBeVisible({ timeout: 15_000 });
+  const resumedText = (await narrative.textContent()) ?? '';
+  expect(resumedText.length).toBeGreaterThan(0);
+
+  // The narrative panel renders the current room. After reload it should
+  // show the room we navigated to, not the initial start room. We don't
+  // assert exact equality of `afterActionText === resumedText` because the
+  // narrative panel only holds the *current* room's text, which doesn't
+  // include the action verb. But: it should not show the literal "Scanning
+  // sector..." loading text, and the URL must still be the session URL.
+  expect(resumedText).not.toMatch(/^Scanning sector/);
+  expect(page.url()).toBe(sessionUrl);
+});
+
 test('sandbox combat: enter a fight and resolve an attack', async ({ page, request }) => {
   // Re-login as a fresh test user so this test is independent of the smoke.
   const email = `e2e-combat-${Date.now()}@pansori.local`;
