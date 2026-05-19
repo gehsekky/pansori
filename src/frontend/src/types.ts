@@ -197,6 +197,7 @@ export interface Character {
     leveled_spell_cast?: boolean;
     quickened_used?: boolean;
     inspiration_pending?: boolean;
+    cunning_strike_pending?: 'trip' | 'poison' | 'withdraw' | 'disarm';
     movement_budget_remaining?: number;
     readied_action?: { trigger: string; action: StructuredAction };
   };
