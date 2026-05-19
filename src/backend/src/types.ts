@@ -366,6 +366,12 @@ export interface Spell {
   // When unspecified, the engine treats the spell as untargeted/utility.
   rangeKind?: 'self' | 'touch' | 'ranged';
   rangeFt?: number;
+  // 2024 PHB — some spells require a costly material component that's
+  // consumed on cast (Identify's 100 gp pearl, Revivify's 300 gp diamond,
+  // Resurrection's 1000 gp diamond, etc.). Engine deducts from char.gold
+  // on cast and blocks the cast if the caster can't afford it. Free
+  // material components (just listed in the description) don't set this.
+  materialCost?: number;
 }
 
 // ─── Beast Forms (2024 PHB Wild Shape) ───────────────────────────────────────
