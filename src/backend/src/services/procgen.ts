@@ -24,10 +24,10 @@ export function generateSeed(context: Context, partySize = 1): Seed {
     // Scale campaign enemy HP by party size
     const scaledEnemies: Record<string, Enemy[]> = {};
     for (const [roomId, enemiesInRoom] of Object.entries(c.enemies ?? {})) {
-      scaledEnemies[roomId] = enemiesInRoom.map((enemy) => ({
-        ...enemy,
-        hp: scaleEnemyHp(enemy.hp, partySize),
-      }));
+      scaledEnemies[roomId] = enemiesInRoom.map((enemy) => {
+        const scaled = scaleEnemyHp(enemy.hp, partySize);
+        return { ...enemy, hp: scaled, maxHp: scaled };
+      });
     }
     return {
       context_id: context.id,
@@ -129,11 +129,13 @@ export function generateRoguelikeSeed(context: Context, partySize = 1): Seed {
       const maxCr = normalized < 0.34 ? 1 : normalized < 0.67 ? 5 : Infinity;
       const pool = context.enemyTemplates.filter((t) => t.cr <= maxCr);
       const template = pick(pool.length ? pool : context.enemyTemplates);
+      const scaledHp = scaleEnemyHp(template.hp, partySize);
       enemies[r.id] = [
         {
           id: `${r.id}#0`,
           name: template.name,
-          hp: scaleEnemyHp(template.hp, partySize),
+          hp: scaledHp,
+          maxHp: scaledHp,
           ac: template.ac,
           damage: template.damage,
           toHit: template.toHit,
@@ -154,6 +156,7 @@ export function generateRoguelikeSeed(context: Context, partySize = 1): Seed {
           castChance: template.castChance,
           spellSaveDC: template.spellSaveDC,
           spellAttackBonus: template.spellAttackBonus,
+          phases: template.phases,
         },
       ];
     }

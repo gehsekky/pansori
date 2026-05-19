@@ -235,6 +235,36 @@ export const context: Context = {
       condition_immunities: ['charmed', 'exhaustion', 'frightened', 'paralyzed', 'poisoned'],
       onHitEffect: { condition: 'frightened', ability: 'wis', dc: 13 },
       damageType: 'necrotic',
+      // Two-phase fight. At 50% hp the lich shifts to a darker rage —
+      // higher to-hit, harder fear DC. At 25% hp it cracks open its
+      // phylactery for a one-shot heal + crit-grade damage.
+      phases: [
+        {
+          hpPct: 50,
+          name: 'Wrath of the Sealed Tomb',
+          narrative:
+            "Bone splinters erupt from the floor around the Crypt Lord — its eye-sockets blaze. 'You will not silence me again!'",
+          effects: [
+            { kind: 'set_to_hit', value: 9 },
+            { kind: 'set_damage', dice: '2d8+4' },
+            {
+              kind: 'set_on_hit_effect',
+              effect: { condition: 'frightened', ability: 'wis', dc: 15 },
+            },
+          ],
+        },
+        {
+          hpPct: 25,
+          name: 'Phylactery Crack',
+          narrative:
+            'A black gem in its breastplate fractures. Necrotic light pours into the Crypt Lord — its wounds knit closed and it lunges with renewed fury.',
+          effects: [
+            { kind: 'heal', amount: 25 },
+            { kind: 'set_damage', dice: '3d6+4' },
+            { kind: 'set_ac', value: 18 },
+          ],
+        },
+      ],
     },
   ],
 
@@ -1119,6 +1149,33 @@ export const context: Context = {
           immunities: ['poison', 'necrotic'],
           condition_immunities: ['charmed', 'exhaustion', 'frightened', 'paralyzed', 'poisoned'],
           onHitEffect: { condition: 'frightened', ability: 'wis', dc: 13 },
+          phases: [
+            {
+              hpPct: 50,
+              name: 'Wrath of the Sealed Tomb',
+              narrative:
+                "Bone splinters erupt from the floor around the Crypt Lord — its eye-sockets blaze. 'You will not silence me again!'",
+              effects: [
+                { kind: 'set_to_hit', value: 9 },
+                { kind: 'set_damage', dice: '2d8+4' },
+                {
+                  kind: 'set_on_hit_effect',
+                  effect: { condition: 'frightened', ability: 'wis', dc: 15 },
+                },
+              ],
+            },
+            {
+              hpPct: 25,
+              name: 'Phylactery Crack',
+              narrative:
+                'A black gem in its breastplate fractures. Necrotic light pours into the Crypt Lord — its wounds knit closed and it lunges with renewed fury.',
+              effects: [
+                { kind: 'heal', amount: 25 },
+                { kind: 'set_damage', dice: '3d6+4' },
+                { kind: 'set_ac', value: 18 },
+              ],
+            },
+          ],
         },
         // Boss room minions: two Skeleton Warriors flank the Crypt Lord
         {

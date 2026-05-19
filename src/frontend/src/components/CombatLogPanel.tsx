@@ -39,6 +39,11 @@ function formatEvent(e: CombatEvent): { label: string; color: string } {
         label: `${e.characterName}: ${e.ability.toUpperCase()} save ${e.roll} vs DC ${e.dc} — ${e.success ? 'SUCCESS' : 'FAIL'} (${e.vs})`,
         color: e.success ? 'var(--t-primary)' : 'var(--t-dim)',
       };
+    case 'phase_transition':
+      return {
+        label: `⚡ ${e.bossName} — ${e.phaseName.toUpperCase()}: ${e.narrative}`,
+        color: 'var(--t-warn, #ff9)',
+      };
   }
 }
 

@@ -218,6 +218,36 @@ export const context: Context = {
       castChance: 0.4,
       spellAttackBonus: 5,
       spellSaveDC: 13,
+      // Two-phase fight. At 60% the Acolyte buys time with an ice-armor +
+      // ramped damage. At 30% it strips its frost cloak and casts more
+      // aggressively — castChance can't be raised through effects, but the
+      // damage spike compensates.
+      phases: [
+        {
+          hpPct: 60,
+          name: 'Ice Armor',
+          narrative:
+            'The Acolyte hisses a hard syllable and frost rimes their robes — blows skid off. Around them the ritual flame burns colder.',
+          effects: [
+            { kind: 'set_ac', value: 17 },
+            { kind: 'set_damage', dice: '2d8+3' },
+          ],
+        },
+        {
+          hpPct: 30,
+          name: 'Frostbinding',
+          narrative:
+            'The Acolyte tears off their frost cloak. Black ice spreads beneath their feet. Their staff lashes with bone-cold speed.',
+          effects: [
+            { kind: 'set_to_hit', value: 8 },
+            { kind: 'set_multiattack', value: 3 },
+            {
+              kind: 'set_on_hit_effect',
+              effect: { condition: 'paralyzed', ability: 'con', dc: 15 },
+            },
+          ],
+        },
+      ],
     },
   ],
 
@@ -1037,6 +1067,32 @@ export const context: Context = {
           vulnerabilities: ['fire'],
           condition_immunities: ['frightened', 'paralyzed'],
           onHitEffect: { condition: 'paralyzed', ability: 'con', dc: 13 },
+          phases: [
+            {
+              hpPct: 60,
+              name: 'Ice Armor',
+              narrative:
+                'The Acolyte hisses a hard syllable and frost rimes their robes — blows skid off. Around them the ritual flame burns colder.',
+              effects: [
+                { kind: 'set_ac', value: 17 },
+                { kind: 'set_damage', dice: '2d8+3' },
+              ],
+            },
+            {
+              hpPct: 30,
+              name: 'Frostbinding',
+              narrative:
+                'The Acolyte tears off their frost cloak. Black ice spreads beneath their feet. Their staff lashes with bone-cold speed.',
+              effects: [
+                { kind: 'set_to_hit', value: 8 },
+                { kind: 'set_multiattack', value: 3 },
+                {
+                  kind: 'set_on_hit_effect',
+                  effect: { condition: 'paralyzed', ability: 'con', dc: 15 },
+                },
+              ],
+            },
+          ],
         },
       ],
     },

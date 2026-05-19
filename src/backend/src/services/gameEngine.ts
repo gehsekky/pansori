@@ -36,6 +36,7 @@ import {
 } from './rulesEngine.js';
 import type {
   AbilityKey,
+  BossPhase,
   Character,
   CombatEntity,
   CombatEvent,
@@ -84,6 +85,151 @@ import { randomUUID } from 'crypto';
 function pushEvent(st: GameState, event: CombatEvent): GameState {
   const next = [...(st.combat_log ?? []), event];
   return { ...st, combat_log: next.slice(-COMBAT_LOG_MAX) };
+}
+
+// ─── Boss-phase machinery ────────────────────────────────────────────────────
+//
+// Phase transitions modify the seed's runtime Enemy stats in-place. The seed
+// is fresh on every request, so on entry we re-apply effects for phases
+// 0..phase_index-1; on exit we check whether any boss's hp% has crossed a new
+// threshold, apply that phase's effects, and emit a `phase_transition` event.
+//
+// Phases sort descending by hpPct (100% → 1%). `phase_index` is "how many
+// phases have already fired", so phases[0..phase_index-1] are active and
+// phases[phase_index] is the next one waiting.
+
+function sortedPhases(phases: BossPhase[]): BossPhase[] {
+  return [...phases].sort((a, b) => b.hpPct - a.hpPct);
+}
+
+function applyPhaseEffect(enemy: Enemy, effect: BossPhase['effects'][number]): Enemy {
+  switch (effect.kind) {
+    case 'set_multiattack':
+      return { ...enemy, multiattack: effect.value };
+    case 'set_damage':
+      return { ...enemy, damage: effect.dice };
+    case 'set_to_hit':
+      return { ...enemy, toHit: effect.value };
+    case 'set_ac':
+      return { ...enemy, ac: effect.value };
+    case 'set_on_hit_effect':
+      return { ...enemy, onHitEffect: effect.effect };
+    case 'add_resistance': {
+      const prev = enemy.resistances ?? [];
+      if (prev.includes(effect.damageType)) return enemy;
+      return { ...enemy, resistances: [...prev, effect.damageType] };
+    }
+    case 'heal': {
+      const max = enemy.maxHp ?? enemy.hp;
+      return { ...enemy, hp: Math.min(max, enemy.hp + effect.amount) };
+    }
+  }
+}
+
+// Apply all effects up to `phaseIndex` (exclusive) onto the seed's enemy
+// in-place. Called on every request entry so a re-fetched seed reflects the
+// boss's accumulated phase changes.
+function rehydrateBossPhases(seed: Seed, st: GameState): void {
+  if (!st.entities) return;
+  for (const ent of st.entities) {
+    if (!ent.isEnemy) continue;
+    const phaseIdx = ent.phase_index ?? 0;
+    if (phaseIdx <= 0) continue;
+    for (const [roomId, list] of Object.entries(seed.enemies ?? {})) {
+      const idx = list.findIndex((e) => e.id === ent.id);
+      if (idx < 0) continue;
+      const enemy = list[idx];
+      if (!enemy.phases?.length) continue;
+      const phases = sortedPhases(enemy.phases);
+      let next = enemy;
+      for (let i = 0; i < Math.min(phaseIdx, phases.length); i++) {
+        for (const eff of phases[i].effects) {
+          next = applyPhaseEffect(next, eff);
+        }
+      }
+      // Mutate in place so subsequent reads in this request see the new
+      // stats. Other rooms' enemy arrays are untouched.
+      seed.enemies[roomId] = [...list.slice(0, idx), next, ...list.slice(idx + 1)];
+    }
+  }
+}
+
+// Scan entities for any boss whose hp has dropped below the next-pending
+// phase threshold; if so, increment phase_index, apply effects to the seed,
+// and emit a `phase_transition` event. Returns the new state (entities may be
+// updated to bump phase_index + reflect heal-effects that change hp).
+function processBossPhaseTransitions(st: GameState, seed: Seed): GameState {
+  if (!st.entities) return st;
+  let updated = st;
+  const newEntities = updated.entities!.map((ent) => ({ ...ent }));
+  let anyChange = false;
+
+  for (let i = 0; i < newEntities.length; i++) {
+    const ent = newEntities[i];
+    if (!ent.isEnemy || ent.hp <= 0) continue;
+
+    let enemy: Enemy | undefined;
+    let roomKey: string | undefined;
+    let enemyIdx = -1;
+    for (const [rk, list] of Object.entries(seed.enemies ?? {})) {
+      const idx = list.findIndex((e) => e.id === ent.id);
+      if (idx >= 0) {
+        enemy = list[idx];
+        roomKey = rk;
+        enemyIdx = idx;
+        break;
+      }
+    }
+    if (!enemy?.phases?.length || !roomKey || enemyIdx < 0) continue;
+
+    const phases = sortedPhases(enemy.phases);
+    const currentIdx = ent.phase_index ?? 0;
+    if (currentIdx >= phases.length) continue;
+
+    const maxHp = enemy.maxHp ?? ent.maxHp ?? ent.hp;
+    const hpPct = (ent.hp / maxHp) * 100;
+    const nextPhase = phases[currentIdx];
+    if (hpPct > nextPhase.hpPct) continue;
+
+    // Trigger the phase. Apply effects to the seed's enemy in place.
+    let nextEnemy = enemy;
+    for (const eff of nextPhase.effects) {
+      nextEnemy = applyPhaseEffect(nextEnemy, eff);
+    }
+    seed.enemies[roomKey] = [
+      ...seed.enemies[roomKey].slice(0, enemyIdx),
+      nextEnemy,
+      ...seed.enemies[roomKey].slice(enemyIdx + 1),
+    ];
+
+    // If the phase healed, mirror the hp back onto the entity so the UI
+    // sees it. (effects array runs in order; heal is captured via
+    // nextEnemy.hp - enemy.hp delta.)
+    const healDelta = nextEnemy.hp - enemy.hp;
+    if (healDelta > 0) {
+      newEntities[i] = { ...ent, hp: Math.min(maxHp, ent.hp + healDelta) };
+    }
+
+    newEntities[i] = {
+      ...newEntities[i],
+      phase_index: currentIdx + 1,
+    };
+    anyChange = true;
+
+    updated = pushEvent(
+      { ...updated, entities: newEntities },
+      {
+        kind: 'phase_transition',
+        bossId: ent.id,
+        bossName: enemy.name,
+        phaseName: nextPhase.name,
+        narrative: nextPhase.narrative,
+        round: updated.round ?? 1,
+      }
+    );
+  }
+
+  return anyChange ? { ...updated, entities: newEntities } : updated;
 }
 
 function pick<T>(arr: T[]): T {
@@ -2611,6 +2757,11 @@ export async function takeAction({
     objects_searched: state.objects_searched ?? [],
     flags: state.flags ?? {},
   };
+
+  // Re-apply boss phase effects to the seed (fresh from DB each request) so
+  // any boss whose phase_index > 0 has the current statline before resolving
+  // the player's action.
+  rehydrateBossPhases(seed, st);
 
   // Ensure character fields have safe defaults
   char = {
@@ -7372,6 +7523,13 @@ export async function takeAction({
       };
     }
   }
+
+  // Boss-phase transition check: if any enemy is a boss whose hp dropped
+  // below the next phase threshold during this action, increment its phase
+  // index, mutate the seed's stats accordingly, and emit a `phase_transition`
+  // event. Runs before final-narrative + choices so the new statline is the
+  // one rendered into the next round's prompts.
+  st = processBossPhaseTransitions(st, seed);
 
   const roomChanged = st.current_room !== state.current_room;
   st.run_log = [
