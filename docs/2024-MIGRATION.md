@@ -27,15 +27,15 @@ add them. Update Heroic Inspiration to the full 2024 spec.
 
 Listed by impact × tractability. Each item is its own PR.
 
-| #   | Feature                        | Effort | Status   | Notes                                                                              |
-| --- | ------------------------------ | ------ | -------- | ---------------------------------------------------------------------------------- |
-| 1   | Heroic Inspiration expansion   | ~1h    | DONE     | Additive — saves vs onHitEffect now consume inspiration too                        |
-| 2   | Bardic Inspiration spend rules | ~2h    | DONE     | Die now stored on ally + consumed on attack rolls and saves                        |
-| 3   | Weapon Masteries (framework)   | ~3h    | DONE     | Vex, Topple, Push, Sap, Slow wired; Nick/Cleave/Graze/Flex TODO                    |
-| 4   | Weapon Masteries (per-class)   | ~2h    | DONE     | Fighter (3), Paladin (2), Ranger (2), Barbarian (2), Rogue (2) granted at creation |
-| 5   | Wild Shape → Beast Forms       | ~4h    | DEFERRED | Player-impact decision needed — see §5 note                                        |
-| 6   | Rage progression               | ~1h    | DONE     | Damage bonus identical; rage uses table rebalanced to 2024 progression             |
-| 7   | Class feature audit pass       | ~4h    | partial  | Most features identical; Rogue Cunning Strike + Monk ki→focus rename queued        |
+| #   | Feature                        | Effort | Status  | Notes                                                                              |
+| --- | ------------------------------ | ------ | ------- | ---------------------------------------------------------------------------------- |
+| 1   | Heroic Inspiration expansion   | ~1h    | DONE    | Additive — saves vs onHitEffect now consume inspiration too                        |
+| 2   | Bardic Inspiration spend rules | ~2h    | DONE    | Die now stored on ally + consumed on attack rolls and saves                        |
+| 3   | Weapon Masteries (framework)   | ~3h    | DONE    | Vex, Topple, Push, Sap, Slow wired; Nick/Cleave/Graze/Flex TODO                    |
+| 4   | Weapon Masteries (per-class)   | ~2h    | DONE    | Fighter (3), Paladin (2), Ranger (2), Barbarian (2), Rogue (2) granted at creation |
+| 5   | Wild Shape → Beast Forms       | ~4h    | partial | Temp HP nerfed to RAW (2 × level / 3 × level Moon). Beast Forms catalog deferred.  |
+| 6   | Rage progression               | ~1h    | DONE    | Damage bonus identical; rage uses table rebalanced to 2024 progression             |
+| 7   | Class feature audit pass       | ~4h    | partial | Most features identical; Rogue Cunning Strike + Monk ki→focus rename queued        |
 
 ---
 
@@ -177,14 +177,15 @@ Effectively a defensive buff.
 
 **Risks**: medium. Behavioral change for existing Druid players.
 
-**Status (deferred)**: Pansori's current temp-HP model uses
-`max_CR × 5 × level`, which mechanically overshoots the 2024 RAW
-`temp HP = druid level` formula. Porting to 2024 would be a **player-
-power nerf** that warrants user signoff before shipping. The form-
-specific abilities (Bear damage resistance, Wolf adv, etc.) are the
-2024 value-add but require a Beast Forms catalog Pansori doesn't
-have. Recommend revisiting after a playtest session reveals whether
-the current Wild Shape feels too strong or about right.
+**Status (partial)**: Temp HP nerfed to RAW (2024 PHB). Base druid
+gets `2 × druid_level` temp HP (was `max_CR × 5 × level`); Circle of
+the Moon gets `3 × druid_level` (compensating for unmodeled form-
+specific abilities like Bear damage resistance until the Beast Forms
+catalog lands). At L8: base 16 (was 40); Moon 24 (was 80). Still
+deferred: Beast Forms catalog itself (3-5 forms with form-specific
+attack profiles, movement modes, senses) — meaningful content addition
+that pairs better with a Druid-flavored campaign module than a pure
+mechanics PR.
 
 ## 5. Rage — 2024 progression
 

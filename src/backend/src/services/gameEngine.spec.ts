@@ -2366,9 +2366,38 @@ describe('class features', () => {
     expect(newDruid.turn_actions.bonus_action_used).toBe(true);
     expect(newDruid.turn_actions.action_used).toBe(false);
     expect(newDruid.class_resource_uses?.wild_shape).toBe(1);
-    // CR 2 × 5 ft × level 6 = +60 temp HP added on top of 30 base → 90
-    expect(newDruid.hp).toBeGreaterThan(30);
+    // 2024 PHB: Moon temp HP = 3 × druid level. At L6 → 18 temp HP on top
+    // of 30 base → 48. (Base druid would give 2 × 6 = 12 → 42.)
+    expect(newDruid.hp).toBe(48);
     expect(result.narrative).toMatch(/bonus action/i);
+  });
+
+  it('Base Druid Wild Shape — temp HP = 2 × druid level (2024 PHB)', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const druidId = 'd-base';
+    const druid = makeChar({
+      id: druidId,
+      character_class: 'Druid',
+      subclass: 'land', // not Moon
+      level: 8,
+      hp: 40,
+      max_hp: 40,
+      class_resource_uses: { wild_shape: 2 },
+    });
+    const state = makeState({}, { characters: [druid], active_character_id: druidId });
+    state.characters = [druid];
+    state.active_character_id = druidId;
+    const result = await takeAction({
+      action: { type: 'use_class_feature', featureId: 'wild_shape' },
+      history: [],
+      state,
+      seed,
+      context: ctx,
+    });
+    const newDruid = result.newState.characters[0];
+    expect(newDruid.conditions).toContain('wild_shaped');
+    // 2024 base: 2 × level 8 = 16 temp HP on top of 40 → 56.
+    expect(newDruid.hp).toBe(56);
   });
 
   it('Circle of the Moon — Moon Healing while shifted spends a slot to heal', async () => {
