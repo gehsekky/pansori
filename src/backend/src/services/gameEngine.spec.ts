@@ -5491,3 +5491,183 @@ describe('prepare_spells', () => {
     expect(prep!.label).toMatch(/1 of 4 known/);
   });
 });
+
+// ─── 2024 PHB class feature audit ────────────────────────────────────────────
+
+describe('Fighter Second Wind (2024 multi-use)', () => {
+  function makeFighter(level: number, used = 0): GameState {
+    const fighter = makeChar({
+      id: 'f-sw',
+      character_class: 'Fighter',
+      level,
+      hp: 10,
+      max_hp: 30,
+      class_resource_uses: { second_wind: used },
+      turn_actions: {
+        action_used: false,
+        bonus_action_used: false,
+        reaction_used: false,
+        free_interaction_used: false,
+      },
+    });
+    return {
+      characters: [fighter],
+      active_character_id: fighter.id,
+      current_room: ctx.startRoomId,
+      visited_rooms: [ctx.startRoomId],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: true,
+      initiative_order: [{ id: fighter.id, roll: 18, is_enemy: false }],
+      initiative_idx: 0,
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      flags: {},
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+    };
+  }
+
+  it('L1 Fighter has 2 Second Wind uses', async () => {
+    const result = await takeAction({
+      action: { type: 'use_class_feature', featureId: 'second_wind' },
+      history: [],
+      state: makeFighter(1, 0),
+      seed,
+      context: ctx,
+    });
+    expect(result.newState.characters[0].class_resource_uses?.second_wind).toBe(1);
+    expect(result.narrative).toMatch(/1\/2 remaining/);
+  });
+
+  it('L4 Fighter has 3 Second Wind uses', () => {
+    const choices = generateChoices(makeFighter(4, 0), seed, ctx);
+    const sw = choices.find((c) => c.label.includes('Second Wind'));
+    expect(sw?.label).toMatch(/3\/3 left/);
+  });
+
+  it('L10 Fighter has 4 Second Wind uses', () => {
+    const choices = generateChoices(makeFighter(10, 0), seed, ctx);
+    const sw = choices.find((c) => c.label.includes('Second Wind'));
+    expect(sw?.label).toMatch(/4\/4 left/);
+  });
+
+  it('L1 Fighter at 2/2 used cannot Second Wind', async () => {
+    const result = await takeAction({
+      action: { type: 'use_class_feature', featureId: 'second_wind' },
+      history: [],
+      state: makeFighter(1, 2),
+      seed,
+      context: ctx,
+    });
+    expect(result.narrative).toMatch(/Second Wind exhausted/);
+  });
+});
+
+describe('Cleric universal Channel Divinity (2024)', () => {
+  function makeCleric(overrides: Partial<Character> = {}): GameState {
+    const cleric = makeChar({
+      id: 'c-cd',
+      character_class: 'Cleric',
+      level: 1,
+      wis: 16,
+      class_resource_uses: { channel_divinity: 1 },
+      turn_actions: {
+        action_used: false,
+        bonus_action_used: false,
+        reaction_used: false,
+        free_interaction_used: false,
+      },
+      ...overrides,
+    });
+    const enemyId = `${CORRIDOR_ID}#0`;
+    return {
+      characters: [cleric],
+      active_character_id: cleric.id,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: true,
+      initiative_order: [{ id: cleric.id, roll: 18, is_enemy: false }],
+      initiative_idx: 0,
+      entities: [
+        {
+          id: cleric.id,
+          isEnemy: false,
+          pos: { x: 4, y: 5 },
+          hp: 20,
+          maxHp: 20,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: enemyId,
+          isEnemy: true,
+          pos: { x: 5, y: 5 },
+          hp: 30,
+          maxHp: 30,
+          conditions: [],
+          condition_durations: {},
+        },
+      ],
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      flags: {},
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+      round: 1,
+      movement_used: {},
+    };
+  }
+
+  it('Divine Spark deals radiant damage and consumes a CD use', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.999); // max d8
+    const result = await takeAction({
+      action: { type: 'use_class_feature', featureId: 'divine_spark' },
+      history: [],
+      state: makeCleric(),
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    expect(result.narrative).toMatch(/Divine Spark/);
+    expect(result.newState.characters[0].class_resource_uses?.channel_divinity).toBe(0);
+    // 1d8 max + WIS +3 = 11 damage
+    const enemy = result.newState.entities?.find((e) => e.isEnemy);
+    expect(30 - (enemy?.hp ?? 30)).toBeGreaterThanOrEqual(11);
+  });
+
+  it('Divine Spark blocked when CD exhausted', async () => {
+    const result = await takeAction({
+      action: { type: 'use_class_feature', featureId: 'divine_spark' },
+      history: [],
+      state: makeCleric({ class_resource_uses: { channel_divinity: 0 } }),
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    expect(result.narrative).toMatch(/No Channel Divinity/);
+  });
+
+  it('Sear Undead requires Cleric L5', async () => {
+    const result = await takeAction({
+      action: { type: 'use_class_feature', featureId: 'sear_undead' },
+      history: [],
+      state: makeCleric({ level: 4 }),
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    expect(result.narrative).toMatch(/requires Cleric level 5/);
+  });
+});
