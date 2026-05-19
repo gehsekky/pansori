@@ -8,46 +8,40 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 
 ---
 
-## Top 5 items to push toward the end goal
+## Top 5 — completing the 5.5e engine
 
-1. **Tutorial / onboarding** — the game drops new players into character creation with no introduction to the action choice loop, grid combat, or the inventory modal. A 2-room intro tutorial would help. Without this, new players can't actually pick the game up — gates "full RPG experience" from the end-goal sentence. (Promoted from #3 after AUTHORING.md shipped.)
-2. **Combat narrative clarity (UX) — iterate** — foundation (CombatEvent + CombatLogPanel) shipped; condition+save event coverage now lands for Abjure Enemy, Fey Presence, Goading Attack (cfd120c+). Remaining work is visual polish (event grouping, color theming) and any further edge cases as new subclasses ship.
-3. **Boss fight mechanics — phases shipped (cfd120c+)** — HP-threshold phases now drive multi-phase boss fights. EnemyTemplate accepts a `phases: BossPhase[]` array (`set_multiattack`, `set_damage`, `set_to_hit`, `set_ac`, `set_on_hit_effect`, `add_resistance`, `heal` effect kinds). Crypt Lord (2 phases: 50% rage + 25% phylactery-heal) and Frost Acolyte (2 phases: 60% ice armor + 30% frostbinding) wired up. Frontend `phase_transition` event renders in CombatLogPanel. Remaining for this row: legendary actions + lair actions (separate system), and authoring docs for the phases API.
-4. **Multiplayer + party chat** — see the engine/infra entry. Architectural audit confirmed the base is close; ~15-17h split across 4 PRs once we're ready to pick it up.
-5. **Fourth campaign module** — once playtest data trickles in, a fourth themed campaign (coastal pirate town, desert ruin, planar city) would stress-test the format further now that Vale + Pines + Grove cover dungeon, mountain pass, and fey grove archetypes.
+> Goal: full 2024 PHB / SRD 5.2.1 mechanics coverage. Combat resolution
+> is already on 2024 (49 SRD citations); the gaps below are the
+> remaining 2024-specific class features and the unfinished mechanics
+> that block calling this a complete 5.5e engine.
+
+1. **Weapon Masteries — wire all 9 + per-class mastery slots.** Signature 2024 system. Topple / Push / Sap / Slow are implemented; **Vex / Nick / Cleave / Graze / Flex still missing**. Some 2024 weapons (greatsword: Graze; longbow: Slow; light crossbow: Slow; etc.) carry a mastery property but the engine ignores it on the unimplemented kinds. Also need the per-class mastery-slot pool (Fighter 3 / Barbarian-Paladin-Ranger 2 / Rogue 1) and the L1 mastery-pick UI. ~10-15h.
+2. **2024 class feature audit — Cleric / Fighter / Monk** (the biggest 2014→2024 deltas). Cleric: 2024 Channel Divinity (Divine Spark, Sear Undead L5, Turn Undead bonus action). Fighter: Second Wind multiple uses + scaling, Tactical Master, Studied Attacks L13. Monk: rename Ki → Discipline Points, free Patient Defense / Step of the Wind on bonus action, Martial Arts die upgrade per 2024 PHB. ~6-8h.
+3. **Heroic + Bardic Inspiration on any d20 test.** Heroic Inspiration today only fires `inspiration_pending` for the *next attack*; 2024 PHB says any d20 test (attack, save, or check). Same gap for Bard's Inspiration die — 2024 lets the recipient add it to any d20 within 10 min, not just attacks. Need a post-roll "spend?" prompt rather than the pre-commit toggle. ~4-5h.
+4. **Hide action — full DC tracking.** Half-implemented today (invisible applied on a successful Stealth check). Missing: record the check total as the hide DC, let enemies use passive Perception or a Search action against it. The Hide path is the SRD test case for "stealth as a system" — incomplete = several skill encounters fall flat. ~3-4h.
+5. **Multi-target spell allocation UX.** Magic Missile darts and Eldritch Blast beams (L5+) — damage math is RAW on a single target but no UI lets the player spread across multiple enemies. Both are signature 2024 cantrips/spells; not having a target-split UI means they functionally play as worse single-target spells. ~3-4h.
 
 ---
 
 ## 5e SRD remaining gaps
 
-> **Edition alignment** — Pansori is hybrid: core combat resolution follows the 2024 SRD 5.2.1 (49 citations); class/subclass features fill in from the 2014 PHB (52 page citations from 2014 pagination) because the 2024 SRD doesn't cover subclasses and those rules are paid-PHB-only. Going forward we want to **lean fully into 2024**: rework class features (Rage progression, Wild Shape Beast Forms, 2024 Bardic Inspiration spend rules, etc.) to the 2024 PHB versions where they differ, and align Heroic Inspiration usage to the full 2024 spec (currently only granted-on-Nat-1, not the broader uses).
->
-> **Scope of the 2024 lean** (deferred but tracked):
->
-> - **Wild Shape** → 2024 "Beast Forms" mechanic (player keeps own stats + adds the form's profile) instead of the 2014 temp-HP-pool simplification we have today.
-> - **Rage** → 2024 progression (improved damage bonus, fewer changes than expected — mostly the same).
-> - **Bardic Inspiration** → 2024 expanded spend rules (ability checks, saves) in addition to attack rolls.
-> - **Heroic Inspiration** → support spending on saves + ability checks (currently only attack-roll advantage).
-> - **Weapon Masteries** (entirely new in 2024) — Vex, Topple, Push, Sap, etc. Major new system. Defer to a focused PR.
-> - **Class feature changes per 2024 PHB** — Cleric Channel Divinity, Fighter Second Wind, Rogue Cunning Strike, etc. Each needs an audit pass.
->
-> Single document tracking the per-feature 2014→2024 diffs should land in `docs/2024-MIGRATION.md` before any code change so the seam is reviewable. Estimated overall effort: 15-25h spread across several PRs.
+> **Edition alignment** — Pansori targets 2024 PHB / SRD 5.2.1. Most of the lift is done: 2014→2024 migration shipped for Wild Shape (Beast Forms), Rage progression, Cunning Strike, and the reactive-spell window. Remaining 2024 work is captured in the Top 5 above (weapon masteries, class feature audit, inspiration spend rules) and the gameplay-impact items below.
 
 ### Real gameplay impact (worth doing)
 
-- [x] **Heroic Inspiration (2024 PHB)** — granted automatically on a Nat-1 d20, spent via the `spend_inspiration` action for advantage on the next attack. CharStatsCard shows an ✦ INSP badge. Granted-on-Nat-1 model from the 2024 PHB; saves/ability-check advantage not yet wired (those rolls aren't player-mediated).
-- [x] **Reactive spells / interrupt system** — all three SRD reactive spells ship: **Shield** (PHB p.275, BEFORE-damage negation in [AC, AC+4] window), **Hellish Rebuke** (PHB p.252, AFTER-damage counter-attack, Warlock-only), **Counterspell** (PHB p.234, BEFORE-spell-cast interrupt with auto-counter for ≤3rd-level slots and ability check for higher). Architecture: `pending_reaction` discriminated union with shield/hellish_rebuke/counterspell variants, `runEnemyTurns` helper pauses + yields control to the eligible PC, `resolve_reaction` handler applies the chosen outcome and re-enters the loop. Enemy spell-casting added to Enemy type (`spells`, `castChance`, `spellSaveDC`, `spellAttackBonus`); Frost Acolyte (Pines boss) tagged as a caster of `fire_bolt` (40% per turn) to validate the Counterspell path in playtest.
-- [x] **Subclass packs for the remaining classes** (PHB Chapter 3). All 9 classes that had subclasses queued now ship at least one option each: Cleric (life, war), Sorcerer (draconic, wild_magic), Warlock (fiend, archfey), Druid (land, moon), Monk (open_hand, shadow), Barbarian (berserker, totem_warrior) — plus the originally-shipped Fighter (champion, battle_master), Rogue (thief, assassin), Wizard (evoker, abjurer), Ranger (hunter, beastmaster), Paladin (devotion, vengeance), Bard (lore, valor). Original entry follows:
-  - **Druid** (L2) — Circle of the Land + Circle of the Moon
-  - **Monk** (L3) — Way of the Open Hand + Way of Shadow
-  - **Barbarian** (L3) — Path of the Berserker + Path of the Totem Warrior
-
-  Each pack: subclass id added to `subclassChoices` map (gameEngine line ~1097), feature handlers in the appropriate sites (use_class_feature dispatch + passive checks like `char.subclass === 'fiend'`), and frontend `L1_SUBCLASS_OPTIONS` for the L1-required ones. Roughly 2-3h per pack including tests.
-
-- [ ] **Multi-target spell allocation UX** — Magic Missile dart split, Eldritch Blast multi-beam (L5+). Damage math is correct on single target; missing: the optional dart/beam-distribution UI so the player can spread across multiple enemies.
-- [x] **Reach weapon OA range** — `opportunityAttackTriggers` now takes an optional `attackerReachFt(entity)` lookup so callers can report 10-ft reach for Reach-weapon wielders. Default 5 ft preserved. Still no current loot has Reach, but infrastructure is ready (3 new tests in `gridEngine.spec.ts`).
-- [ ] **Hide action — full DC tracking** (SRD p.11) — successful Stealth grants Invisible _and_ records the check total as the DC for others to find you. Enemies should be able to make passive Perception (or active Search) against that DC. Today we apply `invisible` for one attack's advantage; we don't track the DC or allow finding. Half-implemented (invisible reveals on attack already done).
-- [ ] **Heavy-encumbrance skill-check disadvantage** — speed penalties are wired (`effectiveSpeed`), but heavy encumbrance is also supposed to give disadvantage on STR/DEX/CON checks, saves, and attacks. Not yet enforced.
+- [x] **Heroic Inspiration (Nat-1 grant)** — auto-granted on a Nat-1 d20, spent via `spend_inspiration` for advantage on the *next attack*. Saves/ability-check spend is still missing (see top-5 #3).
+- [x] **Reactive spells / interrupt system** — Shield, Hellish Rebuke, Counterspell all ship. `pending_reaction` discriminated union pauses `runEnemyTurns` and yields control to the eligible PC. Enemy spell-casting wired (Frost Acolyte casts fire_bolt @ 40% to exercise Counterspell).
+- [x] **Subclass packs (all 12 classes)** — every class ships ≥1 subclass. Cleric (life, war), Fighter (champion, battle_master), Rogue (thief, assassin), Wizard (evoker, abjurer), Ranger (hunter, beastmaster), Paladin (devotion, vengeance), Bard (lore, valor), Sorcerer (draconic, wild_magic), Warlock (fiend, archfey), Druid (land, moon), Monk (open_hand, shadow), Barbarian (berserker, totem_warrior).
+- [x] **Wild Shape — 2024 Beast Forms** — replaced the 2014 temp-HP-pool. Beast Forms catalog (`contexts/srd/beast_forms.ts`) with 6 forms; Druid keeps own stats + adds the form's attack/AC/speed profile (5aa954b).
+- [x] **Rage — 2024 progression** — uses-per-rest table + 2024 damage scaling (97a22ad).
+- [x] **Cunning Strike (2024 Rogue L5)** — trip / poison / withdraw / disarm options (9ebcac4).
+- [x] **Reach weapon OA range** — `opportunityAttackTriggers` honours a 10-ft reach lookup; default 5 ft preserved.
+- [~] **Weapon Masteries (partial)** — 4 of 9 wired: **topple, push, sap, slow**. Still missing: **vex, nick, cleave, graze, flex** + per-class mastery-slot pool + L1 pick UI. See top-5 #1.
+- [ ] **Multi-target spell allocation UX** — top-5 #5. Magic Missile dart split + Eldritch Blast multi-beam.
+- [ ] **Hide action — full DC tracking** — top-5 #4. Half-implemented (invisible applied; DC unrecorded).
+- [ ] **Heavy-encumbrance skill-check disadvantage** — speed penalties wired via `effectiveSpeed`; STR/DEX/CON checks + saves + attacks still don't see disadvantage.
+- [ ] **2024 class feature audit — Cleric / Fighter / Monk** — top-5 #2.
+- [ ] **Inspiration spend on any d20** — top-5 #3.
 
 ### No-current-content (defer)
 
@@ -66,21 +60,23 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 
 ## Content & playtest
 
-- [x] **End-to-end Vale of Shadows playtest** — DONE at the validation-gate level. Coverage by layer: (a) all 3 quests in a single session — `src/backend/src/contexts/vale_of_shadows.spec.ts` drives takeAction through every quest step + final escape; (b) session resume — Playwright `session resume` test reloads mid-game and verifies state rehydrates; (c) faction price modifiers — wired into shop choice generation (gameEngine.ts ~line 1047) + 5 backend tests covering all rep tiers vs Aldric's 50 cr potion. Still loose-end: manual playtest of the polish layer (narrative variety, no-LLM mode UX), which is ongoing on prod.
-- [ ] **Third campaign module** — once Vale is verified, a third module would stress-test the format further. Possible themes: coastal pirate town, desert ruin, planar city. Lower priority than the playtest gate.
-- [ ] **Boss fight mechanics** — phase changes, lair actions, legendary actions (SRD p.221). The Crypt Lord and Frost Acolyte are currently stat-block bosses; bigger bosses would benefit from multi-phase scripts.
+- [x] **End-to-end Vale of Shadows playtest** — DONE at the validation-gate level. Coverage by layer: (a) all 3 quests in a single session — `src/backend/src/contexts/vale_of_shadows.spec.ts` drives takeAction through every quest step + final escape; (b) session resume — Playwright `session resume` test reloads mid-game and verifies state rehydrates; (c) faction price modifiers — wired into shop choice generation + 5 backend tests covering all rep tiers. Still loose-end: manual playtest of the polish layer (narrative variety, no-LLM mode UX), which is ongoing on prod.
+- [x] **Campaign modules — 3 shipped** — Vale of Shadows (dungeon/heist), Whispering Pines (mountain pass/cult), Grove of Thorns (fey/Druid showcase). A 4th would broaden archetypes but isn't blocking.
+- [x] **Boss fight phases** — HP-threshold phase transitions shipped (b330783). `EnemyTemplate.phases: BossPhase[]` with `set_multiattack`/`set_damage`/`set_to_hit`/`set_ac`/`set_on_hit_effect`/`add_resistance`/`heal` effects. Crypt Lord (50% rage, 25% phylactery-heal) and Frost Acolyte (60% ice armor, 30% frostbinding) wired up. Frontend renders `phase_transition` events.
+- [ ] **Boss fight follow-ups** — legendary actions + lair actions (SRD p.221) are still separate systems we haven't tackled. Defer until a campaign needs them.
+- [ ] **Fourth campaign module (opportunistic)** — coastal pirate town, desert ruin, planar city, etc. Stress-tests the format further. Not on the critical path.
 
 ---
 
 ## UX & polish
 
-- [ ] **Combat narrative clarity** — see top-5 item 1. Related backlog: narrative template format separating mechanics from prose.
-- [~] **Grid map detail pass** — dead bodies render as a faded 💀 marker; same-name enemies get `#N` disambiguation on tooltips + tokens (e.g., "B1"/"B2"). Still TODO: difficult-terrain squares (rocks/snow tile), obstacles, party line-of-sight indicators, last-attacker arrows, AoE preview when hovering a spell choice.
-- [~] **Narrative speaker clarity** — single-point fix at the `rawNarrative` step prepends `[CharName] ` to any `"You ..."` narrative in a multi-PC party (skipped for solo). Enemy attacks now also name the target PC explicitly (`"${char.name} takes ${hp} damage. ${char.name} is paralyzed!"`). Mid-line ambiguity in stitched-together narratives still remains — full per-line decomposition is the longer-term "narrative template format" backlog item.
-- [x] **Placeholder lint** — `narrativePlaceholders.spec.ts` walks every `context.narratives` string for `{X}` tokens and confirms `gameEngine.ts` has a matching `.replace(...)` call. Three tests pass (sandbox / vale / pines).
+- [x] **3-zone UI redesign + a11y baseline** — PartyRail (left) + narrative/choices (center) + tabbed ContextPanel (right). Dialog primitive with focus trap + ARIA; live regions on narrative + combat log; landmarks; heading hierarchy; focus-visible; theme contrast bumped to ≥4.5:1. Four commits (`9230516..0f6f52c`).
+- [x] **Combat narrative clarity foundation** — `CombatEvent` + CombatLogPanel ship; condition + save events for Abjure Enemy, Fey Presence, Goading Attack; `phase_transition` event for boss phases. Visual polish (event grouping, color theming) deferred until a playtest tells us it's needed.
+- [~] **Grid map detail pass** — dead bodies render as faded 💀; same-name enemies get `#N` disambiguation; AoE preview tints when hovering a spell choice; cells carry rich `aria-label`. Still TODO: difficult-terrain squares (rocks/snow tile), obstacles, party LoS indicators, last-attacker arrows.
+- [~] **Narrative speaker clarity** — single-point fix at the `rawNarrative` step prepends `[CharName] ` for multi-PC parties; enemy attacks name the target PC explicitly. Mid-line ambiguity in stitched narratives still remains — see narrative template format below.
+- [x] **Placeholder lint** — `narrativePlaceholders.spec.ts` walks every `context.narratives` string for `{X}` tokens and confirms a matching `.replace(...)` exists.
 - [ ] **Narrative template format** — separate dice rolls / damage numbers / HP changes from prose so the UI can render them differently while keeping immersion.
-- [ ] **Tutorial / onboarding** — the game drops new players into character creation with no introduction to the action choice loop, grid combat, or the inventory modal. A 2-room intro tutorial would help.
-- [ ] **Multi-window inventory** — deferred. Single modal serves the core use case.
+- [ ] **Tutorial / onboarding** — 2-room intro covering the action choice loop, grid combat, inventory modal. New players have nowhere to learn the controls today.
 - [ ] **Dynamic room/encounter image generation** — Google Imagen behind `IMAGE_PROVIDER` flag, off by default.
 - [ ] **Sound effects** — ambient audio per location type; combat sound cues.
 - [ ] **LLM narrative quality audit** — `llmProvider` enhances narratives; quality has not been systematically reviewed against the engine's mechanical output.
@@ -89,11 +85,11 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 
 ## Engine & infrastructure
 
-- [ ] **Authoring documentation (`AUTHORING.md`)** — see top-5 item 5.
+- [x] **Authoring documentation (`AUTHORING.md`)** — shipped (b2705fc). Covers the campaign context format end-to-end.
 - [ ] **Save/state persistence across redeploys** — verify a mid-campaign session survives a backend redeploy. The state migration path on schema changes is untested.
 - [ ] **Difficulty tuning from playtest data** — once playtests happen, capture damage/HP/encounter telemetry to inform tuning passes.
-- [ ] **gameEngine.ts class refactor (deferred)** — `takeAction` is ~3700 lines with three handlers that dominate (`use_class_feature` ~800, `cast_spell` ~544, `attack` ~532). Refactor into an `ActionContext` class that owns the per-call mutable state (`state`, `char`, `narrative`, `usedInitiative`, etc.) and dispatches to handler files: `services/actions/castSpell.ts`, `actions/attack.ts`, etc. Each handler becomes a small file taking the context; the trunk shrinks to ~3500 lines. Cost: 4-6 hours across multiple commits, moderate regression risk (the 286-test suite is decent but doesn't cover every code path). Triggers to revisit: (a) a specific big-handler edit keeps grinding into context budget; (b) we want to add a feature touching multiple handlers (e.g. reactive spells / Counterspell from top-5); (c) we have a quiet maintenance day with no playtest-driven priorities.
-- [ ] **Pre-commit hook (Husky + lint-staged)** — auto-run eslint + prettier on staged files before commit. Catches the class of bug where prettier-dirty code reaches CI and fails the build (we've burned ~3 commits this week on this). Setup is ~30 min: install `husky` + `lint-staged` as dev deps in the repo root, configure `package.json` lint-staged entry for `*.ts`/`*.tsx` (eslint --fix + prettier --write), `npx husky init` to wire `.husky/pre-commit`. Bypassable with `--no-verify` so it doesn't block urgent fixes. CI lint stays in place as the actual gate.
+- [ ] **gameEngine.ts class refactor (deferred)** — `takeAction` is ~3700 lines with three handlers that dominate (`use_class_feature` ~800, `cast_spell` ~544, `attack` ~532). Refactor into an `ActionContext` class that dispatches to handler files (`services/actions/castSpell.ts`, etc.). Moderate regression risk. Triggers to revisit: (a) big-handler edits grind into context budget; (b) a feature touches multiple handlers; (c) a quiet maintenance day.
+- [ ] **Pre-commit hook (Husky + lint-staged)** — auto-run eslint + prettier on staged files before commit. Catches the class of bug where prettier-dirty code reaches CI and fails the build. ~30 min setup; bypassable with `--no-verify`. CI lint stays as the gate.
 
 - [ ] **Multiplayer + party chat (online co-op)** — let friends share a session and chat in realtime. Architecture audit confirmed the base is close: `state.characters[]` already models a party, `state.current_room` is single-valued (no party split → players share one narrative), and the reactive-spell pause already routes prompts to the eligible PC. Four concrete gaps:
   1. **Ownership model**: `game_sessions.user_id` is single-tenant. Add `session_participants(session_id, user_id, character_id, role)`; authorization becomes "user is a participant." Original `user_id` stays as host (matters for delete/invite). ~3-4h.
@@ -121,7 +117,7 @@ Captured during the autonomous-mode audit. Items marked **autonomous** can be pi
 - [ ] **Strongly-typed req.user** (autonomous) — routes use `req.user!` non-null assertion (10 sites). A typed wrapper that narrows after the requireAuth middleware would remove the assertions cleanly. ~30 min.
 - [x] **Update .env.example** — already current: Discord OAuth fields + `E2E_TEST_LOGIN_ENABLED` documented in `.env.example`.
 - [x] **Rate-limit auth endpoints** — `express-rate-limit` middleware on `/api/auth/*` caps at 30 req/min/IP. `RateLimit-Policy` + `RateLimit` headers exposed to clients (draft-7 spec). Confirmed via curl on `/api/auth/google`.
-- [ ] **Fix react-hooks/exhaustive-deps warnings** (autonomous, careful) — 5 lingering lint warnings in App.tsx, PartyPanel.tsx. Each marks a potential stale-closure bug. Need to check whether adding the dep would cause a re-render loop. ~30 min.
+- [ ] **Fix react-hooks/exhaustive-deps warnings** (autonomous, careful) — 3 lingering lint warnings in App.tsx (PartyPanel was deleted in the UI redesign so that one's gone). Each marks a potential stale-closure bug. Need to check whether adding the dep would cause a re-render loop. ~30 min.
 - [x] **Root-level `npm test`** — already wired: `package.json` `test` script runs `test:be && test:fe` (vitest in each workspace).
 - [ ] **Socket.IO frontend client** (needs-input) — the server-side Socket.IO scaffolding already exists in `src/backend/src/index.ts` (room-join handler + per-session rooms), but no frontend client is wired and no state broadcasts happen. The Multiplayer TODO under-estimated this — half of the WebSocket scaffolding is already done. Open question: do we wire the client now (as prep for multiplayer) or wait until the participants-table item lands?
 - [ ] **Frontend↔backend type drift** (needs-input) — types are duplicated by hand between `src/backend/src/types.ts` and `src/frontend/src/types.ts`. Could share via a single types package (workspace), or codegen, or just keep mirroring. Each approach has tradeoffs.
