@@ -53,29 +53,46 @@ function makeMockPool(opts: { appliedMigrations?: string[]; gameSessionsExists?:
 }
 
 describe('migrationRunner', () => {
-  it('records all current migration files as applied on first run against a populated DB', async () => {
-    const mock = makeMockPool({ appliedMigrations: [], gameSessionsExists: true });
+  it('runs every pending migration transactionally when schema_migrations is empty', async () => {
+    const mock = makeMockPool({ appliedMigrations: [], gameSessionsExists: false });
     await runMigrations(mock.pool);
-    // Should mark all 001..007 as applied without running them
-    expect([...mock.applied]).toEqual(
-      expect.arrayContaining([
-        '001_init.sql',
-        '002_remove_user_auth.sql',
-        '003_merge_session_state.sql',
-        '004_google_auth.sql',
-        '005_portrait_url.sql',
-        '006_campaign_state.sql',
-        '007_drop_leader_columns.sql',
-      ])
-    );
-    // No transactional client.query for actual migration SQL — only INSERT marker rows
-    const ranInTransaction = (
+    // Every file in src/backend/migrations should be recorded
+    expect(mock.applied.size).toBeGreaterThanOrEqual(8);
+    expect([...mock.applied]).toContain('008_drop_leader_columns_recheck.sql');
+    // And each one was wrapped in BEGIN/COMMIT
+    const transactions = (
       mock.client.query as unknown as ReturnType<typeof vi.fn>
-    ).mock.calls.some(([sql]: unknown[]) => typeof sql === 'string' && sql.startsWith('BEGIN'));
-    expect(ranInTransaction).toBe(false);
+    ).mock.calls.filter(
+      ([sql]: unknown[]) => typeof sql === 'string' && sql.startsWith('BEGIN')
+    ).length;
+    expect(transactions).toBeGreaterThanOrEqual(8);
+  });
+
+  it('only runs migrations not already in schema_migrations', async () => {
+    // Pretend 001-007 are applied; only 008 should run.
+    const allButLast = [
+      '001_init.sql',
+      '002_remove_user_auth.sql',
+      '003_merge_session_state.sql',
+      '004_google_auth.sql',
+      '005_portrait_url.sql',
+      '006_campaign_state.sql',
+      '007_drop_leader_columns.sql',
+    ];
+    const mock = makeMockPool({ appliedMigrations: allButLast, gameSessionsExists: true });
+    await runMigrations(mock.pool);
+    const transactions = (
+      mock.client.query as unknown as ReturnType<typeof vi.fn>
+    ).mock.calls.filter(
+      ([sql]: unknown[]) => typeof sql === 'string' && sql.startsWith('BEGIN')
+    ).length;
+    expect(transactions).toBe(1); // just 008
+    expect([...mock.applied]).toContain('008_drop_leader_columns_recheck.sql');
   });
 
   it('is a no-op when DB is up to date', async () => {
+    // Pretend everything currently on disk is applied — runner should do nothing.
+    // We list a superset (anything currently in src/backend/migrations).
     const allApplied = [
       '001_init.sql',
       '002_remove_user_auth.sql',
@@ -84,6 +101,7 @@ describe('migrationRunner', () => {
       '005_portrait_url.sql',
       '006_campaign_state.sql',
       '007_drop_leader_columns.sql',
+      '008_drop_leader_columns_recheck.sql',
     ];
     const mock = makeMockPool({ appliedMigrations: allApplied, gameSessionsExists: true });
     await runMigrations(mock.pool);
@@ -100,8 +118,6 @@ describe('migrationRunner', () => {
   });
 
   it('aborts startup if a migration fails (rolls back the transaction)', async () => {
-    // Pretend we're on a fresh DB so all migrations are pending, and force the
-    // first one to throw.
     const mock = makeMockPool({ appliedMigrations: [], gameSessionsExists: false });
     (mock.client.query as unknown as ReturnType<typeof vi.fn>).mockImplementationOnce(
       async () => ({ rows: [], rowCount: 0 }) // BEGIN
@@ -110,7 +126,6 @@ describe('migrationRunner', () => {
       throw new Error('syntax error at line 1');
     }); // The actual migration SQL
     await expect(runMigrations(mock.pool)).rejects.toThrow(/Migration 001/);
-    // ROLLBACK should have been issued
     const rolledBack = (mock.client.query as unknown as ReturnType<typeof vi.fn>).mock.calls.some(
       ([sql]: unknown[]) => sql === 'ROLLBACK'
     );
