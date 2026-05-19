@@ -1530,6 +1530,21 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     });
   }
 
+  // Spend Heroic Inspiration on the next d20 (2024 PHB) — one-shot
+  // advantage. Available when the char has it stored and hasn't already
+  // queued it this turn.
+  if (
+    state.combat_active &&
+    char.inspiration &&
+    !char.turn_actions.inspiration_pending &&
+    !char.turn_actions.action_used
+  ) {
+    choices.push({
+      label: '✦ Spend Heroic Inspiration — advantage on your next attack',
+      action: { type: 'spend_inspiration' },
+    });
+  }
+
   // Stand up from prone — SRD 5.2.1 p.187: costs half the creature's speed.
   if (state.combat_active && char.conditions.includes('prone')) {
     const speedFt = effectiveSpeed(char);
@@ -2336,6 +2351,13 @@ export async function takeAction({
         !armorProficient ||
         proneDisadv ||
         thrownLongRangeDisadv;
+      // Heroic Inspiration spent this turn — grants advantage on the next
+      // attack roll, then both the pending flag and char.inspiration clear.
+      const inspirationAdv = !!char.turn_actions.inspiration_pending;
+      if (inspirationAdv) {
+        char.turn_actions = { ...char.turn_actions, inspiration_pending: false };
+        char.inspiration = false;
+      }
       const advantage =
         conditionAdv ||
         enemyGrappled ||
@@ -2345,7 +2367,8 @@ export async function takeAction({
         helpAdv ||
         assassinAdv ||
         vowAdv ||
-        recklessAdv;
+        recklessAdv ||
+        inspirationAdv;
       const disadvReasons = [
         rangedInMelee ? 'ranged in melee' : '',
         conditionDisadv ? char.conditions.filter((c) => DISADV_CONDITIONS.has(c)).join(', ') : '',
@@ -2431,7 +2454,14 @@ export async function takeAction({
         const atkNote = ` (${label}d20 ${atk.roll}+${atk.atkMod} ${atk.atkStat}+${atk.prof} prof${bonusNote} = ${atk.total} vs AC ${effectiveEnemyAc}${coverNote}${disadvNote}${versatileNote})${noProfNote}`;
 
         if (atk.fumble) {
-          narrative += `Natural 1 — a fumble! ${weaponLabel} goes completely wide.${atkNote} `;
+          // 2024 PHB — a Nat 1 on a d20 grants Heroic Inspiration. Failure
+          // becomes the seed of next turn's success.
+          let inspirationNote = '';
+          if (!char.inspiration) {
+            char.inspiration = true;
+            inspirationNote = ` ✦ Heroic Inspiration granted (${char.name}).`;
+          }
+          narrative += `Natural 1 — a fumble! ${weaponLabel} goes completely wide.${atkNote}${inspirationNote} `;
           return false;
         }
         if (!atk.hit) {
@@ -4737,6 +4767,23 @@ export async function takeAction({
     }
 
     // SRD 5.2.1 p.187 — standing up from prone costs half the creature's speed.
+    // 2024 PHB — declare you'll spend your Heroic Inspiration on the next
+    // attack this turn. Doesn't cost an action; the flag clears when the
+    // attack handler resolves the d20.
+    case 'spend_inspiration': {
+      if (!char.inspiration) {
+        narrative = 'You have no Heroic Inspiration to spend.';
+        break;
+      }
+      if (char.turn_actions.inspiration_pending) {
+        narrative = 'Inspiration already queued for your next attack.';
+        break;
+      }
+      char.turn_actions = { ...char.turn_actions, inspiration_pending: true };
+      narrative = `${char.name} steels themselves — Heroic Inspiration queued for the next attack (advantage).`;
+      break;
+    }
+
     case 'stand_up': {
       if (!char.conditions.includes('prone')) {
         narrative = 'You are not prone.';

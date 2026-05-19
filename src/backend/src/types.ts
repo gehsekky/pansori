@@ -181,6 +181,9 @@ export interface TurnActions {
   // spell on the same turn that you used Quickened.
   leveled_spell_cast?: boolean; // set after any non-cantrip spell resolves
   quickened_used?: boolean; // set when Quickened Spell metamagic is consumed
+  // Heroic Inspiration pending — when set, the next attack roll gets
+  // advantage and both this flag + char.inspiration are cleared (one-shot).
+  inspiration_pending?: boolean;
   movement_budget_remaining?: number; // feet remaining this turn; initialized to speed at turn start
   readied_action?: {
     trigger: string;
@@ -315,6 +318,7 @@ export type StructuredAction =
   | { type: 'grapple'; targetEnemyId?: string }
   | { type: 'try_escape_grapple' }
   | { type: 'stand_up' }
+  | { type: 'spend_inspiration' }
   | { type: 'shove'; targetEnemyId?: string }
   | { type: 'dodge' }
   | { type: 'disengage' }
@@ -417,6 +421,9 @@ export interface Character {
   // SRD 5.2.1 p.17–18: Temporary Hit Points. Absorb damage before HP. Don't
   // stack with themselves (replace if higher); expire on a Long Rest.
   temp_hp?: number;
+  // 2024 PHB Heroic Inspiration: granted automatically on a Nat 1 d20.
+  // Player can spend it on a later d20 to gain advantage (one-shot).
+  inspiration?: boolean;
 }
 
 // ─── Game state (world/party container) ──────────────────────────────────────
