@@ -547,6 +547,12 @@ export interface Character {
   // 2024 PHB Heroic Inspiration: granted automatically on a Nat 1 d20.
   // Player can spend it on a later d20 to gain advantage (one-shot).
   inspiration?: boolean;
+  // SRD 5.2.1 p.11 — Hide action stores the Stealth check total as the DC
+  // for anyone trying to find you. While the `invisible` condition is set
+  // and hide_dc > 0, enemies must beat hide_dc with a passive Perception
+  // (or active Search) to reveal you before they can target effectively.
+  // Cleared when invisible is cleared.
+  hide_dc?: number;
 }
 
 // ─── Reactive spell window ───────────────────────────────────────────────────

@@ -5857,3 +5857,153 @@ describe('Heroic Inspiration spend rules (2024 — any d20)', () => {
     expect(result.narrative).toMatch(/attack, save, or check/);
   });
 });
+
+describe('Hide action — DC tracking (2024)', () => {
+  it('successful Cunning Action Hide records hide_dc on the character', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.999); // max stealth roll
+    const rogue = makeChar({
+      id: 'r-hide',
+      character_class: 'Rogue',
+      level: 2,
+      dex: 16,
+      skill_proficiencies: ['Stealth'],
+      turn_actions: {
+        action_used: true,
+        bonus_action_used: false,
+        reaction_used: false,
+        free_interaction_used: false,
+      },
+    });
+    const enemyId = `${CORRIDOR_ID}#0`;
+    const state: GameState = {
+      characters: [rogue],
+      active_character_id: rogue.id,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: true,
+      initiative_order: [{ id: rogue.id, roll: 18, is_enemy: false }],
+      initiative_idx: 0,
+      entities: [
+        {
+          id: rogue.id,
+          isEnemy: false,
+          pos: { x: 4, y: 5 },
+          hp: 20,
+          maxHp: 20,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: enemyId,
+          isEnemy: true,
+          pos: { x: 5, y: 5 },
+          hp: 30,
+          maxHp: 30,
+          conditions: [],
+          condition_durations: {},
+        },
+      ],
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      flags: {},
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+      round: 1,
+      movement_used: {},
+    };
+    const result = await takeAction({
+      action: { type: 'use_class_feature', featureId: 'cunning_action_hide' },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    expect(result.narrative).toMatch(/Hide DC/);
+    const after = result.newState.characters[0];
+    expect(after.conditions).toContain('invisible');
+    expect(after.hide_dc).toBeGreaterThan(0);
+  });
+
+  it('attacking clears invisible AND hide_dc', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.999);
+    const rogue = makeChar({
+      id: 'r-attack',
+      character_class: 'Rogue',
+      level: 2,
+      dex: 16,
+      equipped_weapon: 'sword-inst',
+      inventory: [{ instance_id: 'sword-inst', id: 'shortsword', name: 'Shortsword' }],
+      conditions: ['invisible'],
+      hide_dc: 17,
+      turn_actions: {
+        action_used: false,
+        bonus_action_used: false,
+        reaction_used: false,
+        free_interaction_used: false,
+      },
+    });
+    const enemyId = `${CORRIDOR_ID}#0`;
+    const state: GameState = {
+      characters: [rogue],
+      active_character_id: rogue.id,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: true,
+      initiative_order: [{ id: rogue.id, roll: 18, is_enemy: false }],
+      initiative_idx: 0,
+      entities: [
+        {
+          id: rogue.id,
+          isEnemy: false,
+          pos: { x: 4, y: 5 },
+          hp: 20,
+          maxHp: 20,
+          conditions: ['invisible'],
+          condition_durations: {},
+        },
+        {
+          id: enemyId,
+          isEnemy: true,
+          pos: { x: 5, y: 5 },
+          hp: 30,
+          maxHp: 30,
+          conditions: [],
+          condition_durations: {},
+        },
+      ],
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      flags: {},
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+      round: 1,
+      movement_used: {},
+    };
+    const result = await takeAction({
+      action: { type: 'attack', targetEnemyId: enemyId },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    const after = result.newState.characters[0];
+    expect(after.conditions).not.toContain('invisible');
+    expect(after.hide_dc).toBeUndefined();
+  });
+});
