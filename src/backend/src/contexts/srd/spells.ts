@@ -74,6 +74,22 @@ export const SRD_SPELLS: Record<string, Spell> = {
     rangeKind: 'ranged',
     rangeFt: 60,
   },
+  vicious_mockery: {
+    id: 'vicious_mockery',
+    name: 'Vicious Mockery',
+    level: 0,
+    castTime: 'action',
+    // 2024 PHB Bard cantrip — psychic damage + WIS save or disadvantage on
+    // its next attack. Damage scales like a standard cantrip.
+    damage: '1d6',
+    upcastBonus: '1d6',
+    damageType: 'psychic',
+    savingThrow: 'wis',
+    saveEffect: 'negates',
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    desc: 'Hurl insults at a creature. WIS save or take 1d6 psychic damage (scales with level).',
+  },
 
   // ─── Level 1 ────────────────────────────────────────────────────────────────
   cure_wounds: {
@@ -347,5 +363,40 @@ export const SRD_SPELLS: Record<string, Spell> = {
     rangeKind: 'ranged',
     rangeFt: 150,
     desc: 'Open a gate to the void — creatures inside take 2d6 cold and DEX save or 2d6 acid.',
+  },
+  spirit_guardians: {
+    id: 'spirit_guardians',
+    name: 'Spirit Guardians',
+    level: 3,
+    castTime: 'action',
+    // 2024 PHB Cleric L3 — 15-ft radius aura around caster. Hostile creatures
+    // moving inside (or starting their turn in) the area take 3d8 radiant/
+    // necrotic; WIS save halves. Concentration, up to 10 min. Engine treats
+    // as an AoE sphere centered on caster — runs on cast and on any enemy
+    // turn-start tick is left as future scope.
+    damage: '3d8',
+    damageType: 'radiant',
+    savingThrow: 'wis',
+    saveEffect: 'half',
+    upcastBonus: '1d8',
+    concentration: true,
+    blastRadius: 15,
+    aoeShape: 'sphere',
+    rangeKind: 'self',
+    desc: 'Concentration. Spirits surround you in a 15-ft radius. Hostiles in the area make a WIS save or take 3d8 radiant damage (half on success).',
+  },
+  inflict_wounds: {
+    id: 'inflict_wounds',
+    name: 'Inflict Wounds',
+    level: 1,
+    castTime: 'action',
+    // 2024 PHB Cleric/Warlock L1 — touch spell, attack roll, big up-front
+    // necrotic damage.
+    damage: '2d10',
+    upcastBonus: '2d10',
+    damageType: 'necrotic',
+    attackRoll: true,
+    rangeKind: 'touch',
+    desc: 'A creature you touch takes 2d10 necrotic on a hit. +2d10 per slot above 1st.',
   },
 };
