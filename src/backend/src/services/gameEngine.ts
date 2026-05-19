@@ -5186,9 +5186,16 @@ export async function takeAction({
           narrative = 'No Wild Shape uses remaining (recover on short rest).';
           break;
         }
-        // Circle of the Moon (PHB p.69) — Circle Forms: beasts up to CR = druid
-        // level / 3 (min 1). Base druid: PHB p.66 progression (1/4, 1/2 at L4,
-        // 1 at L8). Combat Wild Shape: bonus action instead of action.
+        // 2024 PHB Wild Shape (p.66) — temp HP equal to 2 × druid level.
+        // Circle of the Moon (PHB p.69) — Combat Wild Shape: bonus action
+        // instead of action, and access to higher-CR Beast Forms (which
+        // Pansori doesn't model as separate stat blocks yet). Moon gets a
+        // 3 × level temp HP allowance as compensation for the unmodeled
+        // form-specific abilities (Bear resistance, Wolf adv, etc.) until
+        // a Beast Forms catalog lands.
+        // Migration note: 2014 PHB used `max_CR × 5 × level` which gave
+        // wildly more HP at higher levels (~40 at L8). The 2024 lean
+        // brings this in line with RAW; documented in docs/2024-MIGRATION.md.
         const isMoon = char.subclass === 'moon';
         const maxCR = isMoon
           ? Math.max(1, Math.floor(char.level / 3))
@@ -5197,7 +5204,7 @@ export async function takeAction({
             : char.level >= 4
               ? 0.5
               : 0.25;
-        const tempHp = Math.max(5, Math.round(maxCR * 5) * char.level);
+        const tempHp = (isMoon ? 3 : 2) * char.level;
         char.class_resource_uses = { ...(char.class_resource_uses ?? {}), wild_shape: wsUses - 1 };
         char.conditions = [...char.conditions, 'wild_shaped'];
         char.hp = char.hp + tempHp;
