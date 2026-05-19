@@ -209,6 +209,7 @@ export interface Character {
     readied_action?: { trigger: string; action: StructuredAction };
     monk_free_used?: boolean;
     monk_stunning_strike_used?: boolean;
+    tactical_master_mastery?: 'push' | 'sap' | 'slow';
   };
   initiative_roll: number | null;
   hit_die: number;

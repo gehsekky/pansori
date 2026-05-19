@@ -6263,6 +6263,86 @@ describe('Heavy encumbrance disadvantage (2024 variant)', () => {
     expect(result.newState.characters[0].bardic_inspiration_die).toBeUndefined();
   });
 
+  it('Tactical Master (L9 Fighter) swaps mastery to PUSH for the next attack', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.999);
+    const fighter = makeChar({
+      id: 'f-tm',
+      character_class: 'Fighter',
+      level: 9,
+      str: 16,
+      equipped_weapon: 'sword-inst',
+      inventory: [{ instance_id: 'sword-inst', id: 'longsword', name: 'Longsword' }],
+      weapon_masteries: ['longsword'],
+    });
+    const enemyId = `${CORRIDOR_ID}#0`;
+    const state: GameState = {
+      characters: [fighter],
+      active_character_id: fighter.id,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: true,
+      initiative_order: [{ id: fighter.id, roll: 18, is_enemy: false }],
+      initiative_idx: 0,
+      entities: [
+        {
+          id: fighter.id,
+          isEnemy: false,
+          pos: { x: 4, y: 5 },
+          hp: 30,
+          maxHp: 30,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: enemyId,
+          isEnemy: true,
+          pos: { x: 5, y: 5 },
+          hp: 80, // survives the hit
+          maxHp: 80,
+          conditions: [],
+          condition_durations: {},
+        },
+      ],
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      flags: {},
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+      round: 1,
+      movement_used: {},
+    };
+    // Arm Tactical Master.
+    const armed = await takeAction({
+      action: { type: 'use_class_feature', featureId: 'tactical_master_push' },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    expect(armed.newState.characters[0].turn_actions.tactical_master_mastery).toBe('push');
+
+    // Then attack — Push should apply instead of the longsword's Sap.
+    const attacked = await takeAction({
+      action: { type: 'attack', targetEnemyId: enemyId },
+      history: [],
+      state: armed.newState,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    expect(attacked.narrative).toMatch(/Tactical Master: applying PUSH/);
+    expect(attacked.narrative).toMatch(/\[Push:/);
+    // Flag cleared after the attack.
+    expect(attacked.newState.characters[0].turn_actions.tactical_master_mastery).toBeUndefined();
+  });
+
   it('Cunning Action Hide check fires with disadvantage when heavily encumbered', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0); // worst rolls — disadv intensifies
     const rogue = makeChar({
