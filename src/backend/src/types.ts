@@ -268,6 +268,10 @@ export interface TurnActions {
   // 2024 PHB Monk L5 — Stunning Strike is once per turn (was per-hit in
   // 2014). Set when the monk has already taken their stun shot this turn.
   monk_stunning_strike_used?: boolean;
+  // 2024 PHB Fighter L9 — Tactical Master. When attacking with any weapon
+  // whose mastery you've trained, the Fighter may swap in Push, Sap, or
+  // Slow for that attack. Cleared when the attack resolves.
+  tactical_master_mastery?: 'push' | 'sap' | 'slow';
 }
 
 export interface DeathSaves {

@@ -1560,6 +1560,24 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       });
     }
 
+    // Fighter L9 — Tactical Master (2024 PHB). Pre-arm a mastery swap so the
+    // next attack uses Push/Sap/Slow regardless of the weapon's actual
+    // mastery. Available once per attack; cleared when the attack resolves.
+    if (
+      char.character_class.toLowerCase() === 'fighter' &&
+      char.level >= 9 &&
+      state.combat_active &&
+      !char.turn_actions.tactical_master_mastery &&
+      enemyAlive
+    ) {
+      for (const m of ['push', 'sap', 'slow'] as const) {
+        choices.push({
+          label: `Tactical Master — swap next attack's mastery to ${m.toUpperCase()}`,
+          action: { type: 'use_class_feature', featureId: `tactical_master_${m}` },
+        });
+      }
+    }
+
     // Fighter: Second Wind (bonus action). 2024 PHB has multi-use scaling:
     // 2 uses at L1, 3 at L4, 4 at L10. All recover on a short or long rest.
     if (char.character_class.toLowerCase() === 'fighter') {
@@ -3509,6 +3527,23 @@ export async function takeAction({
         };
       }
 
+      // 2024 PHB Fighter L13 Studied Attacks — same shape as Vex but seeded
+      // by a *miss* on a prior turn (mark applied in the miss branch above).
+      const studyTag = `studied_by_${char.id}`;
+      const studyAdv = !!st.entities?.find(
+        (e) => e.id === targetId && e.isEnemy && e.conditions.includes(studyTag)
+      );
+      if (studyAdv) {
+        st = {
+          ...st,
+          entities: (st.entities ?? []).map((e) =>
+            e.id === targetId && e.isEnemy
+              ? { ...e, conditions: e.conditions.filter((c) => c !== studyTag) }
+              : e
+          ),
+        };
+      }
+
       // Path of the Totem Warrior — Wolf (PHB p.51): "While raging, your
       // allies have advantage on melee attack rolls against any creature
       // within 5 feet of you that is hostile to you." Find any Wolf-totem
@@ -3556,6 +3591,7 @@ export async function takeAction({
         inspirationAdv ||
         wolfAdv ||
         vexAdv ||
+        studyAdv ||
         packTacticsAdv;
       const disadvReasons = [
         rangedInMelee ? 'ranged in melee' : '',
@@ -3691,6 +3727,21 @@ export async function takeAction({
             targetAc: target.ac,
             round: st.round ?? 1,
           });
+          // 2024 PHB Fighter L13 — Studied Attacks. On miss, mark the target
+          // so this Fighter's next attack against them has advantage. Stored
+          // as a per-character tag so multiple Fighters can stack independently.
+          if (char.character_class.toLowerCase() === 'fighter' && char.level >= 13) {
+            const studyTag = `studied_by_${char.id}`;
+            st = {
+              ...st,
+              entities: (st.entities ?? []).map((e) =>
+                e.id === targetId && e.isEnemy
+                  ? { ...e, conditions: [...e.conditions.filter((c) => c !== studyTag), studyTag] }
+                  : e
+              ),
+            };
+            narrative += ` [Studied Attacks: advantage on next attack vs ${target.name}]`;
+          }
           // 2024 PHB Graze weapon mastery (greatsword, glaive) — even on a
           // miss, deal STR mod damage (DEX for Finesse weapons). Floor at 0.
           if (
@@ -3899,7 +3950,15 @@ export async function takeAction({
           newEnemyHp > 0 &&
           (char.weapon_masteries ?? []).includes(weaponItem.id)
         ) {
-          const mastery = weaponItem.mastery;
+          // 2024 PHB Fighter L9 Tactical Master — pre-armed swap wins over
+          // the weapon's printed mastery for this one attack. Clear the
+          // flag so it doesn't carry into the next swing.
+          let mastery = weaponItem.mastery;
+          if (char.turn_actions.tactical_master_mastery) {
+            mastery = char.turn_actions.tactical_master_mastery;
+            char.turn_actions = { ...char.turn_actions, tactical_master_mastery: undefined };
+            narrative += ` [Tactical Master: applying ${mastery.toUpperCase()}]`;
+          }
           const weaponDc = 8 + profBonus(char.level) + abilityMod(char.str);
           if (mastery === 'vex') {
             // Mark target so this PC's next attack against them has adv.
@@ -5390,7 +5449,31 @@ export async function takeAction({
 
       // ── Second Wind (Fighter bonus action) ────────────────────────────────
       // 2024 PHB: 2 uses at L1, 3 at L4, 4 at L10. Recovers on short rest.
-      else if (fid === 'second_wind') {
+      // 2024 PHB Fighter L9 — Tactical Master mastery swap. Pre-arms the next
+      // attack to apply the chosen mastery (Push/Sap/Slow) instead of the
+      // weapon's printed one. No action cost; consumes the slot in
+      // `turn_actions` so a Fighter can't stack multiple swaps in one turn.
+      else if (
+        fid === 'tactical_master_push' ||
+        fid === 'tactical_master_sap' ||
+        fid === 'tactical_master_slow'
+      ) {
+        if (char.character_class.toLowerCase() !== 'fighter') {
+          narrative = 'Only Fighters have Tactical Master.';
+          break;
+        }
+        if (char.level < 9) {
+          narrative = 'Tactical Master requires Fighter level 9.';
+          break;
+        }
+        if (char.turn_actions.tactical_master_mastery) {
+          narrative = 'Tactical Master already queued this turn.';
+          break;
+        }
+        const m = fid.replace('tactical_master_', '') as 'push' | 'sap' | 'slow';
+        char.turn_actions = { ...char.turn_actions, tactical_master_mastery: m };
+        narrative = `${char.name} — Tactical Master: next attack will use ${m.toUpperCase()} mastery.`;
+      } else if (fid === 'second_wind') {
         if (char.character_class.toLowerCase() !== 'fighter') {
           narrative = 'Only Fighters have Second Wind.';
           break;
