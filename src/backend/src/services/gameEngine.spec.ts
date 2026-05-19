@@ -6146,3 +6146,158 @@ describe('Magic Missile / Eldritch Blast multi-target (2024)', () => {
     expect(result.narrative).toMatch(/dart 3/);
   });
 });
+
+describe('Heavy encumbrance disadvantage (2024 variant)', () => {
+  // 10 weight × 11 items = 110 lb. STR 10 → cap 150 lb total; heavy
+  // encumbrance triggers at > 100 lb (STR × 10).
+  function heavyLoadInventory() {
+    return Array.from({ length: 11 }, (_, i) => ({
+      instance_id: `bag-${i}`,
+      id: 'bag',
+      name: 'Heavy Bag',
+      weight: 10,
+    }));
+  }
+
+  it('attack roll picks up "heavily encumbered" in disadvantage reasons', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.999);
+    const fighter = makeChar({
+      id: 'f-enc',
+      character_class: 'Fighter',
+      level: 1,
+      str: 10,
+      dex: 14,
+      equipped_weapon: 'sword-inst',
+      inventory: [
+        { instance_id: 'sword-inst', id: 'shortsword', name: 'Shortsword' },
+        ...heavyLoadInventory(),
+      ],
+    });
+    const enemyId = `${CORRIDOR_ID}#0`;
+    const state: GameState = {
+      characters: [fighter],
+      active_character_id: fighter.id,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: true,
+      initiative_order: [{ id: fighter.id, roll: 18, is_enemy: false }],
+      initiative_idx: 0,
+      entities: [
+        {
+          id: fighter.id,
+          isEnemy: false,
+          pos: { x: 4, y: 5 },
+          hp: 20,
+          maxHp: 20,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: enemyId,
+          isEnemy: true,
+          pos: { x: 5, y: 5 },
+          hp: 30,
+          maxHp: 30,
+          conditions: [],
+          condition_durations: {},
+        },
+      ],
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      flags: {},
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+      round: 1,
+      movement_used: {},
+    };
+    const result = await takeAction({
+      action: { type: 'attack', targetEnemyId: enemyId },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    expect(result.narrative).toMatch(/heavily encumbered/);
+  });
+
+  it('Cunning Action Hide check fires with disadvantage when heavily encumbered', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0); // worst rolls — disadv intensifies
+    const rogue = makeChar({
+      id: 'r-enc',
+      character_class: 'Rogue',
+      level: 2,
+      dex: 16,
+      str: 10,
+      skill_proficiencies: ['Stealth'],
+      inventory: heavyLoadInventory(),
+      turn_actions: {
+        action_used: true,
+        bonus_action_used: false,
+        reaction_used: false,
+        free_interaction_used: false,
+      },
+    });
+    const enemyId = `${CORRIDOR_ID}#0`;
+    const state: GameState = {
+      characters: [rogue],
+      active_character_id: rogue.id,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: true,
+      initiative_order: [{ id: rogue.id, roll: 18, is_enemy: false }],
+      initiative_idx: 0,
+      entities: [
+        {
+          id: rogue.id,
+          isEnemy: false,
+          pos: { x: 4, y: 5 },
+          hp: 20,
+          maxHp: 20,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: enemyId,
+          isEnemy: true,
+          pos: { x: 5, y: 5 },
+          hp: 30,
+          maxHp: 30,
+          conditions: [],
+          condition_durations: {},
+        },
+      ],
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      flags: {},
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+      round: 1,
+      movement_used: {},
+    };
+    const result = await takeAction({
+      action: { type: 'use_class_feature', featureId: 'cunning_action_hide' },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    // Hide check with disadv on worst-roll mock should fail.
+    expect(result.narrative).toMatch(/fails/);
+  });
+});
