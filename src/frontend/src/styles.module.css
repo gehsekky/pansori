@@ -1,5 +1,17 @@
 /* ─── Base classes (formerly the S object) ──────────────────────────────── */
 
+/* Global focus-visible — keyboard users need to see where focus lands. The
+ * default browser outline is suppressed on a few buttons via background
+ * tricks; this rule reasserts a visible ring whenever the focus is from a
+ * keyboard interaction (not a mouse click). */
+:global(*):focus {
+  outline: none;
+}
+:global(*):focus-visible {
+  outline: 2px solid var(--t-primary);
+  outline-offset: 2px;
+}
+
 .page {
   min-height: 100vh;
   background: var(--t-bg);

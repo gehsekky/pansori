@@ -1,6 +1,6 @@
 import type { GameState, Seed } from '../types.js';
+import Dialog from './Dialog.tsx';
 import styles from '../styles.module.css';
-import { useEffect } from 'react';
 
 interface Props {
   seed: Seed;
@@ -50,158 +50,154 @@ export default function WorldMap({ seed, state, onClose }: Props) {
       ([from, targets]) => visitedSet.has(from) && targets.includes(id)
     );
 
-  useEffect(() => {
-    const fn = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', fn);
-    return () => document.removeEventListener('keydown', fn);
-  }, [onClose]);
-
   return (
-    <div className={styles.mapOverlay} onClick={onClose}>
-      <div className={styles.mapBox} onClick={(e) => e.stopPropagation()}>
-        <div className={styles.mapHeader}>
-          <p className={styles.mapTitle}>
-            WORLD MAP — {(seed.world_name || seed.ship_name || '').toUpperCase()}
-          </p>
-          <button className={styles.mapCloseBtn} onClick={onClose}>
-            ✕
-          </button>
-        </div>
-
-        <svg width={svgW} height={svgH} style={{ display: 'block', overflow: 'visible' }}>
-          {edges
-            .filter(
-              ({ a, b }) => rooms[a] && rooms[b] && revealed(rooms[a].id) && revealed(rooms[b].id)
-            )
-            .map(({ a, b, cross }) => {
-              const x1 = cx(a),
-                x2 = cx(b);
-              if (cross) {
-                const mx = (x1 + x2) / 2;
-                const arc = nodeY - 52 - (b - a) * 6;
-                return (
-                  <path
-                    key={`e${a}-${b}`}
-                    d={`M ${x1} ${nodeY} Q ${mx} ${arc} ${x2} ${nodeY}`}
-                    fill="none"
-                    stroke="var(--t-border)"
-                    strokeWidth={1.5}
-                    strokeDasharray="4 3"
-                  />
-                );
-              }
+    <Dialog
+      title={`WORLD MAP — ${(seed.world_name || seed.ship_name || '').toUpperCase()}`}
+      onClose={onClose}
+      testId="world-map"
+    >
+      <svg width={svgW} height={svgH} style={{ display: 'block', overflow: 'visible' }}>
+        {edges
+          .filter(
+            ({ a, b }) => rooms[a] && rooms[b] && revealed(rooms[a].id) && revealed(rooms[b].id)
+          )
+          .map(({ a, b, cross }) => {
+            const x1 = cx(a),
+              x2 = cx(b);
+            if (cross) {
+              const mx = (x1 + x2) / 2;
+              const arc = nodeY - 52 - (b - a) * 6;
               return (
-                <line
+                <path
                   key={`e${a}-${b}`}
-                  x1={x1}
-                  y1={nodeY}
-                  x2={x2}
-                  y2={nodeY}
+                  d={`M ${x1} ${nodeY} Q ${mx} ${arc} ${x2} ${nodeY}`}
+                  fill="none"
                   stroke="var(--t-border)"
                   strokeWidth={1.5}
+                  strokeDasharray="4 3"
                 />
               );
-            })}
+            }
+            return (
+              <line
+                key={`e${a}-${b}`}
+                x1={x1}
+                y1={nodeY}
+                x2={x2}
+                y2={nodeY}
+                stroke="var(--t-border)"
+                strokeWidth={1.5}
+              />
+            );
+          })}
 
-          {rooms
-            .filter((room) => revealed(room.id))
-            .map((room) => {
-              const i = idxOf[room.id];
-              const x = cx(i);
-              const isCur = current(room.id);
-              const isVis = visited(room.id);
-              const hasEnemy = isVis && enemy(room.id);
-              const hasLoot = isVis && loot(room.id);
-              const stroke = isCur
-                ? 'var(--t-primary)'
-                : isVis
-                  ? 'var(--t-mid)'
-                  : 'var(--t-border)';
-              const fill = isCur ? 'var(--t-separator)' : 'var(--t-card)';
-              const tColor = isCur ? 'var(--t-primary)' : isVis ? 'var(--t-mid)' : 'var(--t-dim)';
-              const label =
-                isVis || isCur
-                  ? (room.name.length > 11 ? room.name.slice(0, 10) + '…' : room.name).toUpperCase()
-                  : '???';
+        {rooms
+          .filter((room) => revealed(room.id))
+          .map((room) => {
+            const i = idxOf[room.id];
+            const x = cx(i);
+            const isCur = current(room.id);
+            const isVis = visited(room.id);
+            const hasEnemy = isVis && enemy(room.id);
+            const hasLoot = isVis && loot(room.id);
+            const stroke = isCur ? 'var(--t-primary)' : isVis ? 'var(--t-mid)' : 'var(--t-border)';
+            const fill = isCur ? 'var(--t-separator)' : 'var(--t-card)';
+            const tColor = isCur ? 'var(--t-primary)' : isVis ? 'var(--t-mid)' : 'var(--t-dim)';
+            const label =
+              isVis || isCur
+                ? (room.name.length > 11 ? room.name.slice(0, 10) + '…' : room.name).toUpperCase()
+                : '???';
 
-              return (
-                <g key={room.id}>
-                  {isCur && (
-                    <circle
-                      cx={x}
-                      cy={nodeY}
-                      r={R + 6}
-                      fill="none"
-                      stroke="var(--t-primary)"
-                      strokeWidth={1}
-                      opacity={0.35}
-                      style={{ filter: 'blur(3px)' }}
-                    />
-                  )}
+            return (
+              <g key={room.id}>
+                {isCur && (
                   <circle
                     cx={x}
                     cy={nodeY}
-                    r={R}
-                    fill={fill}
-                    stroke={stroke}
-                    strokeWidth={isCur ? 2 : 1.5}
+                    r={R + 6}
+                    fill="none"
+                    stroke="var(--t-primary)"
+                    strokeWidth={1}
+                    opacity={0.35}
+                    style={{ filter: 'blur(3px)' }}
                   />
-                  {hasEnemy && (
-                    <circle
-                      cx={x + R - 4}
-                      cy={nodeY - R + 4}
-                      r={5}
-                      fill="var(--t-hp-low)"
-                      stroke="var(--t-card)"
-                      strokeWidth={1.5}
-                    />
-                  )}
-                  {hasLoot && (
-                    <circle
-                      cx={x - R + 4}
-                      cy={nodeY - R + 4}
-                      r={5}
-                      fill="var(--t-hp-high)"
-                      stroke="var(--t-card)"
-                      strokeWidth={1.5}
-                    />
-                  )}
-                  <text
-                    x={x}
-                    y={nodeY + R + 14}
-                    textAnchor="middle"
-                    fontSize={9}
-                    fill={tColor}
-                    fontFamily="var(--t-font)"
-                    letterSpacing="0.06em"
-                  >
-                    {label}
-                  </text>
-                </g>
-              );
-            })}
-        </svg>
+                )}
+                <circle
+                  cx={x}
+                  cy={nodeY}
+                  r={R}
+                  fill={fill}
+                  stroke={stroke}
+                  strokeWidth={isCur ? 2 : 1.5}
+                />
+                {hasEnemy && (
+                  <circle
+                    cx={x + R - 4}
+                    cy={nodeY - R + 4}
+                    r={5}
+                    fill="var(--t-hp-low)"
+                    stroke="var(--t-card)"
+                    strokeWidth={1.5}
+                  />
+                )}
+                {hasLoot && (
+                  <circle
+                    cx={x - R + 4}
+                    cy={nodeY - R + 4}
+                    r={5}
+                    fill="var(--t-hp-high)"
+                    stroke="var(--t-card)"
+                    strokeWidth={1.5}
+                  />
+                )}
+                <text
+                  x={x}
+                  y={nodeY + R + 14}
+                  textAnchor="middle"
+                  fontSize={9}
+                  fill={tColor}
+                  fontFamily="var(--t-font)"
+                  letterSpacing="0.06em"
+                >
+                  {label}
+                </text>
+              </g>
+            );
+          })}
+      </svg>
 
-        <div className={styles.mapLegend}>
-          <span>
-            <span style={{ color: 'var(--t-primary)' }}>●</span> YOU ARE HERE
-          </span>
-          <span>
-            <span style={{ color: 'var(--t-mid)' }}>●</span> VISITED
-          </span>
-          <span>
-            <span style={{ color: 'var(--t-border)' }}>●</span> UNKNOWN
-          </span>
-          <span>
-            <span style={{ color: 'var(--t-hp-low)' }}>●</span> ENEMY
-          </span>
-          <span>
-            <span style={{ color: 'var(--t-hp-high)' }}>●</span> LOOT
-          </span>
-        </div>
+      <div className={styles.mapLegend}>
+        <span>
+          <span aria-hidden="true" style={{ color: 'var(--t-primary)' }}>
+            ●
+          </span>{' '}
+          YOU ARE HERE
+        </span>
+        <span>
+          <span aria-hidden="true" style={{ color: 'var(--t-mid)' }}>
+            ●
+          </span>{' '}
+          VISITED
+        </span>
+        <span>
+          <span aria-hidden="true" style={{ color: 'var(--t-border)' }}>
+            ●
+          </span>{' '}
+          UNKNOWN
+        </span>
+        <span>
+          <span aria-hidden="true" style={{ color: 'var(--t-hp-low)' }}>
+            ●
+          </span>{' '}
+          ENEMY
+        </span>
+        <span>
+          <span aria-hidden="true" style={{ color: 'var(--t-hp-high)' }}>
+            ●
+          </span>{' '}
+          LOOT
+        </span>
       </div>
-    </div>
+    </Dialog>
   );
 }

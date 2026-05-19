@@ -238,7 +238,7 @@ export default function App() {
                       <img src={activeChar.portrait_url} alt="" className={styles.charPortrait} />
                     )}
                     <div>
-                      <p className={styles.title}>{ctx.theme.title}</p>
+                      <h1 className={styles.title}>{ctx.theme.title}</h1>
                       <p className={styles.sub}>
                         {ctx.theme.worldLabel}: {worldName} · ACTIVE: {activeChar?.name} [
                         {activeChar?.character_class}]
@@ -251,8 +251,10 @@ export default function App() {
                         className={styles.invHeaderBtn}
                         onClick={() => setInventoryOpen(true)}
                         title="Inventory (I)"
+                        aria-label="Open inventory"
+                        aria-keyshortcuts="i"
                       >
-                        🎒 INVENTORY
+                        <span aria-hidden="true">🎒 </span>INVENTORY
                       </button>
                       {user.avatar_url && (
                         <img src={user.avatar_url} alt="" className={styles.userAvatar} />
@@ -266,215 +268,229 @@ export default function App() {
                 </div>
               </header>
 
-              <PartyPanel
-                state={gameState}
-                activeCharId={gameState?.active_character_id ?? ''}
-                ctx={ctx}
-                seed={seed}
-                onEquip={handleEquip}
-                inCombat={!!gameState?.combat_active}
-                onOpenMap={() => setMapOpen(true)}
-              />
-
-              {mapOpen && seed && gameState && (
-                <WorldMap seed={seed} state={gameState} onClose={() => setMapOpen(false)} />
-              )}
-
-              {inventoryOpen && gameState && (
-                <InventoryModal
+              <main>
+                <PartyPanel
                   state={gameState}
+                  activeCharId={gameState?.active_character_id ?? ''}
                   ctx={ctx}
-                  onClose={() => setInventoryOpen(false)}
+                  seed={seed}
                   onEquip={handleEquip}
-                  onTransfer={handleTransfer}
-                  onDrop={handleDrop}
+                  inCombat={!!gameState?.combat_active}
+                  onOpenMap={() => setMapOpen(true)}
                 />
-              )}
 
-              {gameState?.combat_active &&
-                gameState.entities &&
-                gameState.entities.length > 0 &&
-                seed && (
-                  <GridCombatView
+                {mapOpen && seed && gameState && (
+                  <WorldMap seed={seed} state={gameState} onClose={() => setMapOpen(false)} />
+                )}
+
+                {inventoryOpen && gameState && (
+                  <InventoryModal
                     state={gameState}
-                    seed={seed}
-                    aoePreview={hoveredChoice?.aoePreview}
-                    onMove={(to) => {
-                      const activeId = gameState.active_character_id;
-                      handleChoice({
-                        label: `Move to (${to.x},${to.y})`,
-                        action: { type: 'grid_move', entityId: activeId, to },
-                      });
-                    }}
+                    ctx={ctx}
+                    onClose={() => setInventoryOpen(false)}
+                    onEquip={handleEquip}
+                    onTransfer={handleTransfer}
+                    onDrop={handleDrop}
                   />
                 )}
 
-              {campaignMeta && gameState && <CampaignPanel state={gameState} meta={campaignMeta} />}
+                {gameState?.combat_active &&
+                  gameState.entities &&
+                  gameState.entities.length > 0 &&
+                  seed && (
+                    <GridCombatView
+                      state={gameState}
+                      seed={seed}
+                      aoePreview={hoveredChoice?.aoePreview}
+                      onMove={(to) => {
+                        const activeId = gameState.active_character_id;
+                        handleChoice({
+                          label: `Move to (${to.x},${to.y})`,
+                          action: { type: 'grid_move', entityId: activeId, to },
+                        });
+                      }}
+                    />
+                  )}
 
-              <div className={styles.contentRow}>
-                <div className={styles.contentMain}>
-                  <div
-                    data-testid="game-narrative-panel"
-                    className={styles.card}
-                    style={{ maxHeight: 320, overflowY: 'auto' }}
-                    ref={narrativeRef}
-                  >
-                    {loading && roomLog.length === 0 ? (
-                      <p className={styles.scanTxt}>Scanning sector...</p>
-                    ) : (
-                      roomLog.map((text, i) => (
-                        <p
-                          key={i}
-                          className={styles.narrative}
+                {campaignMeta && gameState && (
+                  <CampaignPanel state={gameState} meta={campaignMeta} />
+                )}
+
+                <div className={styles.contentRow}>
+                  <div className={styles.contentMain}>
+                    <div
+                      data-testid="game-narrative-panel"
+                      className={styles.card}
+                      style={{ maxHeight: 320, overflowY: 'auto' }}
+                      ref={narrativeRef}
+                      role="log"
+                      aria-live="polite"
+                      aria-atomic="false"
+                      aria-label="Game narrative"
+                    >
+                      {loading && roomLog.length === 0 ? (
+                        <p className={styles.scanTxt}>Scanning sector...</p>
+                      ) : (
+                        roomLog.map((text, i) => (
+                          <p
+                            key={i}
+                            className={styles.narrative}
+                            style={{
+                              minHeight: 0,
+                              margin: 0,
+                              paddingBottom: i < roomLog.length - 1 ? '0.75rem' : 0,
+                              borderBottom:
+                                i < roomLog.length - 1 ? '1px solid var(--t-separator)' : 'none',
+                              marginBottom: i < roomLog.length - 1 ? '0.75rem' : 0,
+                              opacity: 0.4 + 0.6 * ((i + 1) / roomLog.length),
+                            }}
+                          >
+                            {text}
+                          </p>
+                        ))
+                      )}
+                      {loading && roomLog.length > 0 && (
+                        <p className={styles.scanTxt} style={{ marginTop: '0.5rem' }}>
+                          Scanning sector...
+                        </p>
+                      )}
+                    </div>
+
+                    {!loading && escaped ? (
+                      <div
+                        className={styles.card}
+                        style={{
+                          borderColor: 'var(--t-primary)',
+                          textAlign: 'center',
+                          padding: '1.5rem',
+                        }}
+                      >
+                        <h2
                           style={{
-                            minHeight: 0,
-                            margin: 0,
-                            paddingBottom: i < roomLog.length - 1 ? '0.75rem' : 0,
-                            borderBottom:
-                              i < roomLog.length - 1 ? '1px solid var(--t-separator)' : 'none',
-                            marginBottom: i < roomLog.length - 1 ? '0.75rem' : 0,
-                            opacity: 0.4 + 0.6 * ((i + 1) / roomLog.length),
+                            color: 'var(--t-primary)',
+                            fontSize: '1.1rem',
+                            letterSpacing: '0.2em',
+                            marginBottom: '0.5rem',
+                            marginTop: 0,
+                            textShadow: '0 0 8px var(--t-primary)',
+                            fontWeight: 'normal',
                           }}
                         >
-                          {text}
+                          <span aria-hidden="true">★ </span>MISSION COMPLETE
+                          <span aria-hidden="true"> ★</span>
+                        </h2>
+                        <p
+                          style={{
+                            color: 'var(--t-mid)',
+                            fontSize: '0.8rem',
+                            marginBottom: '1.25rem',
+                          }}
+                        >
+                          You escaped the {worldName}. Well done, hero.
                         </p>
-                      ))
+                        <button
+                          className={styles.submit}
+                          style={{ width: 'auto', padding: '0.6rem 2rem' }}
+                          onClick={startNewMission}
+                        >
+                          START NEW MISSION
+                        </button>
+                      </div>
+                    ) : !loading && allDead ? (
+                      <div
+                        className={styles.card}
+                        style={{
+                          borderColor: 'var(--t-hp-low)',
+                          textAlign: 'center',
+                          padding: '1.5rem',
+                        }}
+                      >
+                        <h2
+                          style={{
+                            color: 'var(--t-hp-low)',
+                            fontSize: '1.1rem',
+                            letterSpacing: '0.2em',
+                            marginBottom: '0.5rem',
+                            marginTop: 0,
+                            fontWeight: 'normal',
+                          }}
+                        >
+                          <span aria-hidden="true">✖ </span>HERO DECEASED
+                          <span aria-hidden="true"> ✖</span>
+                        </h2>
+                        <p
+                          style={{
+                            color: 'var(--t-dim)',
+                            fontSize: '0.8rem',
+                            marginBottom: '1.25rem',
+                          }}
+                        >
+                          The {worldName} has claimed another victim.
+                        </p>
+                        <button
+                          className={styles.submit}
+                          style={{ width: 'auto', padding: '0.6rem 2rem' }}
+                          onClick={startNewMission}
+                        >
+                          START NEW MISSION
+                        </button>
+                      </div>
+                    ) : (
+                      <div className={styles.choices} data-testid="choices-list">
+                        {!loading &&
+                          choices.map((c, i) => (
+                            <button
+                              key={i}
+                              data-testid="choice-btn"
+                              data-action-type={c.action.type}
+                              className={styles.choiceBtn}
+                              onClick={() => handleChoice(c)}
+                              onMouseEnter={() => c.aoePreview && setHoveredChoice(c)}
+                              onMouseLeave={() => setHoveredChoice(null)}
+                            >
+                              [{i + 1}] {c.label}
+                            </button>
+                          ))}
+                      </div>
                     )}
-                    {loading && roomLog.length > 0 && (
-                      <p className={styles.scanTxt} style={{ marginTop: '0.5rem' }}>
-                        Scanning sector...
-                      </p>
-                    )}
-                  </div>
 
-                  {!loading && escaped ? (
-                    <div
-                      className={styles.card}
-                      style={{
-                        borderColor: 'var(--t-primary)',
-                        textAlign: 'center',
-                        padding: '1.5rem',
-                      }}
-                    >
-                      <p
-                        style={{
-                          color: 'var(--t-primary)',
-                          fontSize: '1.1rem',
-                          letterSpacing: '0.2em',
-                          marginBottom: '0.5rem',
-                          textShadow: '0 0 8px var(--t-primary)',
-                        }}
+                    <CombatLogPanel events={gameState?.combat_log} />
+
+                    {history.length > 0 && (
+                      <div
+                        className={styles.card}
+                        style={{ marginTop: '1.5rem', maxHeight: 160, overflowY: 'auto' }}
+                        ref={logRef}
                       >
-                        ★ MISSION COMPLETE ★
-                      </p>
-                      <p
-                        style={{
-                          color: 'var(--t-mid)',
-                          fontSize: '0.8rem',
-                          marginBottom: '1.25rem',
-                        }}
-                      >
-                        You escaped the {worldName}. Well done, hero.
-                      </p>
+                        <p className={styles.missionLogLabel}>MISSION LOG</p>
+                        {[...history]
+                          .reverse()
+                          .filter((_, i) => i % 2 === 0)
+                          .slice(0, 20)
+                          .map((m, i) => (
+                            <p key={i} className={styles.logEntry}>
+                              › {m.content}
+                            </p>
+                          ))}
+                      </div>
+                    )}
+
+                    <div className={styles.abortRow}>
                       <button
-                        className={styles.submit}
-                        style={{ width: 'auto', padding: '0.6rem 2rem' }}
-                        onClick={startNewMission}
+                        className={styles.sendBtn}
+                        style={{ padding: '0.3rem 0.75rem', fontSize: '0.75rem' }}
+                        onClick={() => {
+                          if (confirm('Abandon current run and start over?')) startNewMission();
+                        }}
                       >
-                        START NEW MISSION
+                        ABORT MISSION
                       </button>
                     </div>
-                  ) : !loading && allDead ? (
-                    <div
-                      className={styles.card}
-                      style={{
-                        borderColor: 'var(--t-hp-low)',
-                        textAlign: 'center',
-                        padding: '1.5rem',
-                      }}
-                    >
-                      <p
-                        style={{
-                          color: 'var(--t-hp-low)',
-                          fontSize: '1.1rem',
-                          letterSpacing: '0.2em',
-                          marginBottom: '0.5rem',
-                        }}
-                      >
-                        ✖ HERO DECEASED ✖
-                      </p>
-                      <p
-                        style={{
-                          color: 'var(--t-dim)',
-                          fontSize: '0.8rem',
-                          marginBottom: '1.25rem',
-                        }}
-                      >
-                        The {worldName} has claimed another victim.
-                      </p>
-                      <button
-                        className={styles.submit}
-                        style={{ width: 'auto', padding: '0.6rem 2rem' }}
-                        onClick={startNewMission}
-                      >
-                        START NEW MISSION
-                      </button>
-                    </div>
-                  ) : (
-                    <div className={styles.choices} data-testid="choices-list">
-                      {!loading &&
-                        choices.map((c, i) => (
-                          <button
-                            key={i}
-                            data-testid="choice-btn"
-                            data-action-type={c.action.type}
-                            className={styles.choiceBtn}
-                            onClick={() => handleChoice(c)}
-                            onMouseEnter={() => c.aoePreview && setHoveredChoice(c)}
-                            onMouseLeave={() => setHoveredChoice(null)}
-                          >
-                            [{i + 1}] {c.label}
-                          </button>
-                        ))}
-                    </div>
-                  )}
-
-                  <CombatLogPanel events={gameState?.combat_log} />
-
-                  {history.length > 0 && (
-                    <div
-                      className={styles.card}
-                      style={{ marginTop: '1.5rem', maxHeight: 160, overflowY: 'auto' }}
-                      ref={logRef}
-                    >
-                      <p className={styles.missionLogLabel}>MISSION LOG</p>
-                      {[...history]
-                        .reverse()
-                        .filter((_, i) => i % 2 === 0)
-                        .slice(0, 20)
-                        .map((m, i) => (
-                          <p key={i} className={styles.logEntry}>
-                            › {m.content}
-                          </p>
-                        ))}
-                    </div>
-                  )}
-
-                  <div className={styles.abortRow}>
-                    <button
-                      className={styles.sendBtn}
-                      style={{ padding: '0.3rem 0.75rem', fontSize: '0.75rem' }}
-                      onClick={() => {
-                        if (confirm('Abandon current run and start over?')) startNewMission();
-                      }}
-                    >
-                      ABORT MISSION
-                    </button>
                   </div>
+
+                  <RoomArtPanel roomId={gameState?.current_room ?? null} ctx={ctx} />
                 </div>
-
-                <RoomArtPanel roomId={gameState?.current_room ?? null} ctx={ctx} />
-              </div>
+              </main>
             </div>
           );
         })()}
