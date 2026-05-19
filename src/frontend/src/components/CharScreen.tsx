@@ -277,9 +277,9 @@ function CharScreen({
     <div className={styles.pageFlex}>
       <div className={styles.charInner}>
         <div className={styles.charPartyCol}>
-          <p className={styles.title} style={{ fontSize: '1.1rem', marginBottom: 4 }}>
+          <h1 className={styles.title} style={{ fontSize: '1.1rem', marginBottom: 4 }}>
             HERO REGISTRY
-          </p>
+          </h1>
           <p className={styles.sub} style={{ marginBottom: '2rem' }}>
             REGISTER YOUR PARTY — UP TO 4 HEROES
           </p>
@@ -320,8 +320,9 @@ function CharScreen({
                       padding: 2,
                     }}
                     title="Remove this hero"
+                    aria-label="Remove this hero"
                   >
-                    ✕
+                    <span aria-hidden="true">✕</span>
                   </button>
                 )}
                 <p
@@ -655,7 +656,7 @@ function CharScreen({
                 []
               ).join(' / ')}
             >
-              ★ AUTO-FILL RECOMMENDED PARTY (
+              <span aria-hidden="true">★ </span>AUTO-FILL RECOMMENDED PARTY (
               {(
                 selectedCtxForInit.recommendedComposition ??
                 DEFAULT_COMPOSITION_BY_SIZE[selectedCtxForInit.recommendedPartySize] ??
@@ -696,9 +697,9 @@ function CharScreen({
         </div>
 
         <div className={styles.charWorldCol}>
-          <p className={styles.title} style={{ fontSize: '1.1rem', marginBottom: 4 }}>
+          <h2 className={styles.title} style={{ fontSize: '1.1rem', marginBottom: 4 }}>
             WORLD TYPE
-          </p>
+          </h2>
           <p className={styles.sub} style={{ marginBottom: '2rem' }}>
             SELECT YOUR GAME WORLD
           </p>
@@ -776,7 +777,7 @@ function CharScreen({
                           letterSpacing: '0.1em',
                         }}
                       >
-                        ▶ SELECTED
+                        <span aria-hidden="true">▶ </span>SELECTED
                       </p>
                     )}
                   </div>

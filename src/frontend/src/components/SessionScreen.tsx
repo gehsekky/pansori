@@ -32,9 +32,9 @@ function SessionsScreen({
       <div className={styles.sessionsInner}>
         <div className={styles.sessionsHeader}>
           <div>
-            <p className={styles.title} style={{ fontSize: '1.1rem', marginBottom: 4 }}>
+            <h1 className={styles.title} style={{ fontSize: '1.1rem', marginBottom: 4 }}>
               PANSORI
-            </p>
+            </h1>
             {user && <p className={styles.sub}>{user.display_name.toUpperCase()}</p>}
           </div>
           <div className={styles.sessionsActions}>
@@ -167,8 +167,9 @@ function SessionsScreen({
                         : `Delete "${s.character_name}"?`;
                       if (confirm(msg)) onDelete(s.id);
                     }}
+                    aria-label={`Delete session "${s.character_name}"`}
                   >
-                    ✕
+                    <span aria-hidden="true">✕</span>
                   </button>
                 </div>
               );
