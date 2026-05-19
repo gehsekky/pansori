@@ -137,6 +137,7 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
       background_id?: string;
       stats?: { str: number; dex: number; con: number; int: number; wis: number; cha: number };
       portrait_url?: string;
+      subclass?: string;
     }>;
     context_id?: string;
   };
@@ -244,6 +245,9 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
         armor_proficiencies: armorProfs,
         weapon_proficiencies: weaponProfs,
         attuned_items: [],
+        // PHB: Cleric/Sorcerer/Warlock pick subclass at L1 (creation).
+        // Other classes pick later via the in-game select_subclass choice.
+        subclass: c.subclass,
       };
     });
 

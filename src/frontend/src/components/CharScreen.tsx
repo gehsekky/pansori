@@ -48,6 +48,20 @@ const STANDARD_ARRAY: StatBlock = {
   cha: 8,
 };
 
+// PHB subclass timing: classes with the * here pick their subclass at L1
+// (required at character creation) so they don't miss class features keyed
+// on the subclass. The L2/L3 classes pick later via the in-game choice when
+// they hit the appropriate level. The subclass IDs mirror what gameEngine.ts
+// actually handles in its `case 'select_subclass'` dispatch + feature checks.
+const L1_SUBCLASS_OPTIONS: Record<string, { id: string; label: string }[]> = {
+  Cleric: [
+    { id: 'life', label: 'Life Domain (Disciple of Life — bonus healing)' },
+    { id: 'war', label: 'War Domain (War Priest + Guided Strike)' },
+  ],
+  // Sorcerer + Warlock are L1-required in 5e too, but no subclasses are
+  // authored yet in the engine. When they're added, list them here.
+};
+
 // Fallback compositions when a campaign doesn't override. Mirrors the 5e
 // "iconic four" — Fighter (tank), Cleric (heal), Wizard (magic), Rogue (utility).
 // Roles taken from DMG p.83: Defender / Healer / Controller / Striker.
@@ -69,6 +83,9 @@ interface CharDraft {
   statMethod: 'roll' | 'array';
   portrait: string | null;
   rollCount: number;
+  // Required for Cleric / Sorcerer / Warlock (when their subclasses are
+  // authored); ignored for other classes (they pick later at level 2/3).
+  subclass?: string;
 }
 
 function CharScreen({
@@ -212,6 +229,9 @@ function CharScreen({
         portrait: null,
         rollCount: 1,
         statMethod: 'roll',
+        // Auto-pick the first L1-required subclass option (player can change
+        // before starting). Without this, autofill creates an invalid Cleric.
+        subclass: L1_SUBCLASS_OPTIONS[cls]?.[0]?.id,
       }))
     );
   }
@@ -220,6 +240,14 @@ function CharScreen({
     const leader = party[0];
     if (!leader.name.trim()) return setError('Enter a name for your first hero');
     if (party.some((d) => !d.name.trim())) return setError('All party members must have a name');
+    // Cleric / Sorcerer / Warlock pick subclass at L1 (PHB). Block start
+    // until they've made a selection.
+    const missingSubclass = party.find((d) => L1_SUBCLASS_OPTIONS[d.cls]?.length && !d.subclass);
+    if (missingSubclass) {
+      return setError(
+        `${missingSubclass.name || missingSubclass.cls} must choose a ${missingSubclass.cls} subclass before starting`
+      );
+    }
     setError('');
     localStorage.setItem('operative_name', leader.name.trim());
     try {
@@ -230,6 +258,7 @@ function CharScreen({
           background_id: d.backgroundId || undefined,
           stats: d.stats,
           portrait_url: d.portrait ?? undefined,
+          subclass: d.subclass || undefined,
         })),
         contextId
       );
@@ -314,7 +343,12 @@ function CharScreen({
                   className={styles.formInp}
                   style={{ cursor: 'pointer' }}
                   value={draft.cls}
-                  onChange={(e) => updateDraft(idx, { cls: e.target.value })}
+                  onChange={(e) => {
+                    // Switching class clears any previously-chosen subclass —
+                    // it only applies to the old class. The user re-picks if
+                    // the new class is L1-required.
+                    updateDraft(idx, { cls: e.target.value, subclass: undefined });
+                  }}
                 >
                   {classes.map((c) => (
                     <option key={c.id} value={c.id}>
@@ -322,6 +356,27 @@ function CharScreen({
                     </option>
                   ))}
                 </select>
+
+                {L1_SUBCLASS_OPTIONS[draft.cls]?.length && (
+                  <>
+                    <label className={styles.formLbl} style={{ marginTop: 12 }}>
+                      SUBCLASS (required at level 1)
+                    </label>
+                    <select
+                      className={styles.formInp}
+                      style={{ cursor: 'pointer' }}
+                      value={draft.subclass ?? ''}
+                      onChange={(e) => updateDraft(idx, { subclass: e.target.value || undefined })}
+                    >
+                      <option value="">— pick a subclass —</option>
+                      {L1_SUBCLASS_OPTIONS[draft.cls].map((sc) => (
+                        <option key={sc.id} value={sc.id}>
+                          {sc.label}
+                        </option>
+                      ))}
+                    </select>
+                  </>
+                )}
 
                 <div className={styles.classDesc}>
                   <span style={{ color: 'var(--t-mid)' }}>
