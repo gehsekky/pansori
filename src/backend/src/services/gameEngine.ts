@@ -1442,6 +1442,16 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         if (injured.length === 0) continue;
       }
 
+      // Optional AoE preview metadata for the grid renderer.
+      const aoePreview = spell.blastRadius
+        ? {
+            shape: ((spell as { aoeShape?: 'sphere' | 'cone' | 'cube' | 'line' }).aoeShape ??
+              'sphere') as 'sphere' | 'cone' | 'cube' | 'line',
+            radiusFt: spell.blastRadius,
+            rangeKind: spell.rangeKind,
+          }
+        : undefined;
+
       if (spell.level === 0) {
         // Cantrip: no slot needed
         const slotNote = isBonusAction ? ', bonus action' : '';
@@ -1450,6 +1460,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
           label: `Cast ${spell.name} (cantrip${slotNote})`,
           action: { type: 'cast_spell', spellId, slotLevel: 0, targetEnemyId: targetId },
           requiresBonusAction: isBonusAction || undefined,
+          aoePreview: aoePreview ? { ...aoePreview, targetEnemyId: targetId } : undefined,
         });
       } else {
         // Leveled spell: emit one choice per available slot level (base + upcasts)
@@ -1473,6 +1484,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
             label: `Cast ${spell.name} (${sl === baseLevel ? `Lvl ${sl}` : `${sl}th slot`}${slotNote}${upcastPart} — ${avail} slot${avail === 1 ? '' : 's'} left)`,
             action: { type: 'cast_spell', spellId, slotLevel: sl, targetEnemyId: targetId },
             requiresBonusAction: isBonusAction || undefined,
+            aoePreview: aoePreview ? { ...aoePreview, targetEnemyId: targetId } : undefined,
           });
         }
         if (!emittedAny) continue;

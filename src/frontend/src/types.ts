@@ -50,6 +50,12 @@ export interface GameChoice {
   label: string;
   action: StructuredAction;
   requiresBonusAction?: boolean;
+  aoePreview?: {
+    shape: 'sphere' | 'cone' | 'cube' | 'line';
+    radiusFt: number;
+    targetEnemyId?: string;
+    rangeKind?: 'self' | 'touch' | 'ranged';
+  };
 }
 
 export interface Theme {

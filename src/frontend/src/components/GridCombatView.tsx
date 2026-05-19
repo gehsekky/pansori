@@ -18,6 +18,13 @@ function brighter(a: Illum, b: Illum): Illum {
   return 'dark';
 }
 
+interface AoePreview {
+  shape: 'sphere' | 'cone' | 'cube' | 'line';
+  radiusFt: number;
+  targetEnemyId?: string;
+  rangeKind?: 'self' | 'touch' | 'ranged';
+}
+
 interface Props {
   state: GameState;
   seed: Seed;
@@ -28,6 +35,10 @@ interface Props {
   // already pathfinds (BFS) + computes terrain-aware cost + triggers OAs, so
   // one HTTP round-trip handles the whole multi-square move.
   onMove?: (to: GridPos) => void;
+  // When the player hovers a cast_spell choice for an AoE, the grid tints
+  // the affected cells so they can preview the spell's footprint before
+  // committing. Mirror of the backend's geometry helpers in gridEngine.ts.
+  aoePreview?: AoePreview;
 }
 
 function chebyshev(a: GridPos, b: GridPos): number {
@@ -70,7 +81,14 @@ function conditionBadges(conditions: string[]): string {
     .join(' ');
 }
 
-function GridCombatView({ state, seed, gridWidth = 10, gridHeight = 10, onMove }: Props) {
+function GridCombatView({
+  state,
+  seed,
+  gridWidth = 10,
+  gridHeight = 10,
+  onMove,
+  aoePreview,
+}: Props) {
   if (!state.combat_active || !state.entities?.length) return null;
 
   const entities = state.entities;
@@ -148,6 +166,77 @@ function GridCombatView({ state, seed, gridWidth = 10, gridHeight = 10, onMove }
     return dist > 0 && dist <= remainingSquares;
   }
 
+  // AoE preview — when the player hovers a spell choice with an AoE shape,
+  // compute the affected cells. Mirrors the backend `entitiesInCone/Cube/
+  // Line/Blast` math from gridEngine.ts so the preview is RAW-accurate.
+  const aoeCells: Set<string> = (() => {
+    const empty = new Set<string>();
+    if (!aoePreview) return empty;
+    const casterEnt = entities.find((e) => e.id === activeId);
+    if (!casterEnt) return empty;
+    const targetEnt = aoePreview.targetEnemyId
+      ? entities.find((e) => e.id === aoePreview.targetEnemyId)
+      : undefined;
+    const epicenter = targetEnt?.pos ?? casterEnt.pos;
+    const sq = Math.floor(aoePreview.radiusFt / SQUARE_SIZE_FT);
+    const cells = new Set<string>();
+    switch (aoePreview.shape) {
+      case 'sphere':
+        for (let dx = -sq; dx <= sq; dx++) {
+          for (let dy = -sq; dy <= sq; dy++) {
+            if (Math.max(Math.abs(dx), Math.abs(dy)) > sq) continue;
+            cells.add(`${epicenter.x + dx},${epicenter.y + dy}`);
+          }
+        }
+        break;
+      case 'cone': {
+        const dx = Math.sign(epicenter.x - casterEnt.pos.x);
+        const dy = Math.sign(epicenter.y - casterEnt.pos.y);
+        if (dx === 0 && dy === 0) break;
+        for (let cx = 0; cx < gridWidth; cx++) {
+          for (let cy = 0; cy < gridHeight; cy++) {
+            const rx = cx - casterEnt.pos.x;
+            const ry = cy - casterEnt.pos.y;
+            const along = rx * dx + ry * dy;
+            if (along <= 0 || along > sq) continue;
+            const perp =
+              dx !== 0 && dy !== 0 ? Math.abs(rx * dy - ry * dx) / 2 : Math.abs(rx * dy - ry * dx);
+            if (perp <= along) cells.add(`${cx},${cy}`);
+          }
+        }
+        break;
+      }
+      case 'cube': {
+        const dx = Math.sign(epicenter.x - casterEnt.pos.x);
+        const dy = Math.sign(epicenter.y - casterEnt.pos.y);
+        const side = sq;
+        const minX =
+          dx >= 0
+            ? casterEnt.pos.x + (dx === 0 ? -Math.floor(side / 2) : 1)
+            : casterEnt.pos.x - side;
+        const maxX = minX + side - 1;
+        const minY =
+          dy >= 0
+            ? casterEnt.pos.y + (dy === 0 ? -Math.floor(side / 2) : 1)
+            : casterEnt.pos.y - side;
+        const maxY = minY + side - 1;
+        for (let cx = minX; cx <= maxX; cx++)
+          for (let cy = minY; cy <= maxY; cy++) cells.add(`${cx},${cy}`);
+        break;
+      }
+      case 'line': {
+        const dx = Math.sign(epicenter.x - casterEnt.pos.x);
+        const dy = Math.sign(epicenter.y - casterEnt.pos.y);
+        if (dx === 0 && dy === 0) break;
+        for (let i = 1; i <= sq; i++) {
+          cells.add(`${casterEnt.pos.x + dx * i},${casterEnt.pos.y + dy * i}`);
+        }
+        break;
+      }
+    }
+    return cells;
+  })();
+
   // Disambiguate same-name enemies in the current room: when two or more
   // share a name (e.g. 2× Bandit Ruffian), append #1, #2, ... so the grid
   // tooltip matches the "Attack Bandit #2" choice the player sees.
@@ -187,6 +276,8 @@ function GridCombatView({ state, seed, gridWidth = 10, gridHeight = 10, onMove }
       if (illum === 'dim') bg = 'rgba(0, 0, 0, 0.30)';
       else if (illum === 'dark') bg = 'rgba(0, 0, 0, 0.70)';
       if (reachable) bg = 'rgba(120, 200, 255, 0.10)';
+      // AoE preview tint wins over reachable highlight.
+      if (aoeCells.has(`${x},${y}`)) bg = 'rgba(255, 140, 50, 0.30)';
 
       const tokenBg = ent?.isEnemy
         ? 'rgba(220, 70, 70, 0.85)'
