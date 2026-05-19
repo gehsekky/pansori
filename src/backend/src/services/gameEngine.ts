@@ -1102,6 +1102,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       ranger: ['hunter', 'beastmaster'],
       paladin: ['devotion', 'vengeance'],
       bard: ['lore', 'valor'],
+      sorcerer: ['draconic', 'wild_magic'],
     };
     const reqLevel = subclassLevels[cls] ?? 3;
     if (char.level >= reqLevel && subclassChoices[cls]) {
@@ -3247,6 +3248,31 @@ export async function takeAction({
       if (spell.level > 0 && !isRitualCast) {
         char.turn_actions = { ...char.turn_actions, leveled_spell_cast: true };
       }
+      // Sorcerer · Wild Magic Surge (PHB p.103) — 1-in-20 chance after each
+      // leveled spell to trigger a chaotic effect. RAW rolls 1d20 and on a 1
+      // rolls a result on the Wild Magic table (d100). We use a small
+      // curated table appropriate to our engine's mechanics.
+      if (
+        spell.level > 0 &&
+        !isRitualCast &&
+        char.character_class.toLowerCase() === 'sorcerer' &&
+        char.subclass === 'wild_magic' &&
+        d(20) === 1
+      ) {
+        const surge = pick([
+          'You glow with a soft blue light for 1 minute (visible from 30 ft).',
+          'A poof of harmless multicolored smoke envelops you.',
+          `You regain 2d4 (${rollDice('2d4')}) hit points (Wild Magic Surge).`,
+          'Your hair (or scales, where applicable) turns vivid pink until your next long rest.',
+          'You feel a momentary disorientation — disadvantage on your next attack.',
+        ]);
+        // Apply mechanical effects where possible.
+        if (surge.startsWith('You regain')) {
+          const heal = rollDice('2d4');
+          char.hp = Math.min(char.max_hp, char.hp + heal);
+        }
+        narrative += ` 🌀 WILD MAGIC SURGE: ${surge}`;
+      }
 
       const castingAbility = (context.spellcastingAbility?.[char.character_class] ??
         context.classPrimaryStats[char.character_class] ??
@@ -5281,6 +5307,15 @@ export async function takeAction({
       }
       char.subclass = scAction.subclass;
       narrative = `${char.name} follows the path of the ${scAction.subclass}!`;
+      // Sorcerer · Draconic Bloodline · Draconic Resilience (PHB p.103):
+      // +1 HP per Sorcerer level. The L1 portion would have been granted at
+      // character creation if subclass was picked there; this catches any
+      // mid-game selection too.
+      if (scAction.subclass === 'draconic' && char.character_class.toLowerCase() === 'sorcerer') {
+        char.max_hp += char.level;
+        char.hp += char.level;
+        narrative += ` Draconic Resilience: +${char.level} max HP (now ${char.hp}/${char.max_hp}).`;
+      }
       break;
     }
 
