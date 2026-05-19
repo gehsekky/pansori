@@ -468,22 +468,30 @@ export default function App() {
                       </button>
                     </div>
                   ) : (
-                    <div className={styles.choices} data-testid="choices-list">
+                    <ul
+                      className={styles.choices}
+                      data-testid="choices-list"
+                      aria-label="Available actions"
+                      style={{ listStyle: 'none', margin: 0, padding: 0 }}
+                    >
                       {!loading &&
                         choices.map((c, i) => (
-                          <button
-                            key={i}
-                            data-testid="choice-btn"
-                            data-action-type={c.action.type}
-                            className={styles.choiceBtn}
-                            onClick={() => handleChoice(c)}
-                            onMouseEnter={() => c.aoePreview && setHoveredChoice(c)}
-                            onMouseLeave={() => setHoveredChoice(null)}
-                          >
-                            [{i + 1}] {c.label}
-                          </button>
+                          <li key={i} style={{ listStyle: 'none' }}>
+                            <button
+                              data-testid="choice-btn"
+                              data-action-type={c.action.type}
+                              className={styles.choiceBtn}
+                              onClick={() => handleChoice(c)}
+                              onMouseEnter={() => c.aoePreview && setHoveredChoice(c)}
+                              onMouseLeave={() => setHoveredChoice(null)}
+                              aria-keyshortcuts={i < 9 ? `${i + 1}` : undefined}
+                            >
+                              <span aria-hidden="true">[{i + 1}] </span>
+                              {c.label}
+                            </button>
+                          </li>
                         ))}
-                    </div>
+                    </ul>
                   )}
 
                   <div className={styles.abortRow}>

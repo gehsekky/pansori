@@ -17,10 +17,10 @@ function LoginScreen() {
 
   return (
     <div className={styles.pageCenter}>
-      <div className={styles.loginInner}>
-        <p className={styles.title} style={{ marginBottom: '0.5rem' }}>
+      <main className={styles.loginInner}>
+        <h1 className={styles.title} style={{ marginBottom: '0.5rem' }}>
           PANSORI
-        </p>
+        </h1>
         <p className={styles.loginSub}>SIGN IN TO CONTINUE YOUR MISSION</p>
         {providers === null ? (
           <p className={styles.loginSub} style={{ marginTop: '1rem' }}>
@@ -44,7 +44,7 @@ function LoginScreen() {
             ))}
           </div>
         )}
-      </div>
+      </main>
     </div>
   );
 }

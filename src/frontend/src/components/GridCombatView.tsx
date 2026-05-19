@@ -346,13 +346,43 @@ function GridCombatView({
               opacity: 0.7,
             }}
           >
-            <span className={styles.gridTokenLetter} style={{ fontSize: '0.9rem' }}>
+            <span
+              className={styles.gridTokenLetter}
+              style={{ fontSize: '0.9rem' }}
+              aria-hidden="true"
+            >
               💀
             </span>
           </div>
         ) : null;
 
       const clickable = reachable && !!onMove;
+      // Build a useful aria-label so a SR user can navigate the grid.
+      // Coordinates first, then content (occupant, lighting, reachability).
+      const ariaParts: string[] = [`Cell ${x}, ${y}`];
+      if (ent && !hideEntity) {
+        const occName = displayName(ent);
+        if (ent.isEnemy) {
+          ariaParts.push(`${occName}, enemy, HP ${ent.hp} of ${ent.maxHp}`);
+        } else if (ent.isCompanion) {
+          ariaParts.push(`${occName}, companion, HP ${ent.hp} of ${ent.maxHp}`);
+        } else {
+          ariaParts.push(`${occName}, party, HP ${ent.hp} of ${ent.maxHp}`);
+        }
+      } else if (corpse && !hideCorpse) {
+        ariaParts.push(`${displayName(corpse)}, corpse`);
+      } else if (illum === 'dark') {
+        ariaParts.push('heavily obscured');
+      } else if (illum === 'dim') {
+        ariaParts.push('dim light');
+      }
+      if (clickable) {
+        ariaParts.push(
+          `reachable, ${chebyshev(activeEntity!.pos, { x, y }) * SQUARE_SIZE_FT} feet`
+        );
+      }
+      const ariaLabel = ariaParts.join(', ');
+
       cells.push(
         <div
           key={`${x},${y}`}
@@ -361,10 +391,21 @@ function GridCombatView({
             background: bg,
             cursor: clickable ? 'pointer' : 'default',
           }}
-          aria-label={`(${x},${y})`}
-          role={clickable ? 'button' : undefined}
+          aria-label={ariaLabel}
+          aria-current={isActive ? 'location' : undefined}
+          role={clickable ? 'button' : 'gridcell'}
           tabIndex={clickable ? 0 : undefined}
           onClick={clickable ? () => onMove?.({ x, y }) : undefined}
+          onKeyDown={
+            clickable
+              ? (e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onMove?.({ x, y });
+                  }
+                }
+              : undefined
+          }
           onMouseEnter={
             clickable
               ? (e) => {

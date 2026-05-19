@@ -10,38 +10,51 @@ interface Props {
   events: CombatEvent[] | undefined;
 }
 
-function formatEvent(e: CombatEvent): { label: string; color: string } {
+// Decorative glyph + screen-reader text are returned separately so the glyph
+// can be marked aria-hidden — otherwise SR reads "skull" or "high voltage"
+// alongside the real event description.
+function formatEvent(e: CombatEvent): {
+  glyph: string | null;
+  label: string;
+  color: string;
+} {
   switch (e.kind) {
     case 'attack_hit': {
       const crit = e.isCrit ? ' CRIT' : '';
       return {
+        glyph: null,
         label: `${e.attackerName} → ${e.targetName}: HIT${crit} ${e.damage} ${e.damageType} (${e.toHit} vs AC ${e.targetAc})`,
         color: e.isCrit ? 'var(--t-warn, #ff9)' : 'var(--t-primary)',
       };
     }
     case 'attack_miss':
       return {
+        glyph: null,
         label: `${e.attackerName} → ${e.targetName}: MISS (${e.toHit} vs AC ${e.targetAc})`,
         color: 'var(--t-dim)',
       };
     case 'kill':
       return {
-        label: `💀 ${e.victimName} falls (${e.attackerName}) +${e.xp} XP`,
+        glyph: '💀',
+        label: `${e.victimName} falls (${e.attackerName}) +${e.xp} XP`,
         color: 'var(--t-warn, #ff9)',
       };
     case 'condition_applied':
       return {
+        glyph: null,
         label: `${e.targetName}: ${e.condition.toUpperCase()} (${e.source})`,
         color: 'var(--t-primary)',
       };
     case 'save':
       return {
+        glyph: null,
         label: `${e.characterName}: ${e.ability.toUpperCase()} save ${e.roll} vs DC ${e.dc} — ${e.success ? 'SUCCESS' : 'FAIL'} (${e.vs})`,
         color: e.success ? 'var(--t-primary)' : 'var(--t-dim)',
       };
     case 'phase_transition':
       return {
-        label: `⚡ ${e.bossName} — ${e.phaseName.toUpperCase()}: ${e.narrative}`,
+        glyph: '⚡',
+        label: `${e.bossName} — ${e.phaseName.toUpperCase()}: ${e.narrative}`,
         color: 'var(--t-warn, #ff9)',
       };
   }
@@ -57,10 +70,13 @@ function CombatLogPanel({ events }: Props) {
       data-testid="combat-log-panel"
       className={styles.card}
       style={{ marginTop: '1rem', maxHeight: 220, overflowY: 'auto' }}
+      role="log"
+      aria-live="polite"
+      aria-atomic="false"
+      aria-label="Combat log"
     >
-      <p className={styles.missionLogLabel}>COMBAT LOG</p>
       {recent.map((e, i) => {
-        const { label, color } = formatEvent(e);
+        const { glyph, label, color } = formatEvent(e);
         return (
           <p
             key={`${e.round}-${i}-${e.kind}`}
@@ -69,7 +85,8 @@ function CombatLogPanel({ events }: Props) {
             data-event-kind={e.kind}
             style={{ color, fontFamily: 'monospace', fontSize: '0.78rem' }}
           >
-            R{e.round}: {label}
+            R{e.round}: {glyph && <span aria-hidden="true">{glyph} </span>}
+            {label}
           </p>
         );
       })}

@@ -26,7 +26,7 @@ describe('InitiativeStrip', () => {
     expect(screen.getByText(/INITIATIVE/i)).toBeTruthy();
   });
 
-  it('renders the active character name with ▶ prefix', () => {
+  it('marks the active entry with ▶ prefix + aria-current', () => {
     const char = makeChar({ id: 'char-1', name: 'Ripley' });
     const state = makeState(
       {},
@@ -39,7 +39,12 @@ describe('InitiativeStrip', () => {
       }
     );
     render(<InitiativeStrip state={state} seed={mockSeed} />);
-    expect(screen.getByText(/▶.*Ripley/)).toBeTruthy();
+    // The ▶ glyph is wrapped in aria-hidden so it's a separate node from
+    // the name — check the parent <li> carries both the glyph and the name.
+    const item = screen.getByRole('listitem');
+    expect(item.getAttribute('aria-current')).toBe('true');
+    expect(item.textContent).toMatch(/▶/);
+    expect(item.textContent).toMatch(/Ripley/);
   });
 
   it('renders enemy name from seed when entry is_enemy', () => {
