@@ -443,28 +443,37 @@ export interface Character {
 //   - narrativeSoFar: text accumulated before the pause, prepended to the
 //     final narrative when combat resumes.
 //   - eligibleCharIds: which party member(s) may declare the reaction.
-export interface PendingReaction {
-  // Discriminant for follow-up reaction types (counterspell, hellish_rebuke).
-  // Today only 'shield' is wired.
-  kind: 'shield';
+// Fields shared by every reaction-window variant: who triggered it, who can
+// react, where to resume the enemy turn loop.
+interface PendingReactionBase {
   attackerEnemyId: string;
   targetCharId: string;
-  // The to-hit total that triggered the window. Shield retroactively adds +5
-  // AC; if the attack would still hit at AC+5 the engine wouldn't have opened
-  // the window in the first place, so accepting always negates.
-  atkTotal: number;
-  targetAcAtAttack: number;
-  // Damage and condition effects pre-rolled at trigger time. If the player
-  // declines, these get applied as if Shield was never offered. If accepted,
-  // they're discarded.
-  pendingDamage: number;
-  pendingNarrative: string; // the hit narrative the engine would have emitted
-  // Resume coordinates in the auto-resolve enemy-turn loop.
   resumeFromInitiativeIdx: number;
   resumeFromMultiattackIdx: number; // 0-indexed; how many sub-attacks already resolved
   narrativeSoFar: string;
   eligibleCharIds: string[];
 }
+
+// Shield (PHB p.275). Triggers BEFORE damage applies — accepting negates the
+// hit retroactively. pendingDamage/pendingNarrative are stashed so a decline
+// can apply them as if Shield was never offered.
+export interface PendingShieldReaction extends PendingReactionBase {
+  kind: 'shield';
+  atkTotal: number; // to-hit total that triggered the [AC, AC+4] window
+  targetAcAtAttack: number;
+  pendingDamage: number;
+  pendingNarrative: string;
+}
+
+// Hellish Rebuke (PHB p.252). Triggers AFTER damage applies — accepting deals
+// 2d10 fire damage back to the attacker (DEX save for half). No state to
+// stash: the damage that triggered Rebuke is already on the books, and a
+// decline just lets the loop continue.
+export interface PendingHellishRebukeReaction extends PendingReactionBase {
+  kind: 'hellish_rebuke';
+}
+
+export type PendingReaction = PendingShieldReaction | PendingHellishRebukeReaction;
 
 // ─── Game state (world/party container) ──────────────────────────────────────
 

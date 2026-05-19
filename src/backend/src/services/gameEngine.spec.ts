@@ -2181,6 +2181,184 @@ describe('class features', () => {
     expect(result.newState.pending_reaction).toBeUndefined();
   });
 
+  // ── Hellish Rebuke (reactive spell, PHB p.252) ──────────────────────────────
+
+  it('Accepting Hellish Rebuke consumes slot + reaction and damages attacker', async () => {
+    // Force d20 → max (20) for all rolls so the enemy fails the DEX save and
+    // damage rolls high. CHA 16 → spell save DC = 8 + 2 (prof) + 3 = 13.
+    vi.spyOn(Math, 'random').mockReturnValue(0.999);
+    const wlId = 'wl1';
+    const goblinId = `${CORRIDOR_ID}#0`;
+    const wl = makeChar({
+      id: wlId,
+      character_class: 'Warlock',
+      level: 3,
+      cha: 16,
+      hp: 10,
+      max_hp: 18,
+      spells_known: ['hellish_rebuke'],
+      prepared_spells: ['hellish_rebuke'],
+      spell_slots_max: { 1: 2 },
+      spell_slots_used: {},
+    });
+    const state: GameState = {
+      characters: [wl],
+      active_character_id: wlId,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: true,
+      initiative_order: [
+        { id: wlId, roll: 18, is_enemy: false },
+        { id: goblinId, roll: 5, is_enemy: true },
+      ],
+      initiative_idx: 1,
+      entities: [
+        {
+          id: wlId,
+          isEnemy: false,
+          pos: { x: 4, y: 5 },
+          hp: 10,
+          maxHp: 18,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: goblinId,
+          isEnemy: true,
+          pos: { x: 5, y: 5 },
+          hp: 30,
+          maxHp: 30,
+          conditions: [],
+          condition_durations: {},
+        },
+      ],
+      pending_reaction: {
+        kind: 'hellish_rebuke',
+        attackerEnemyId: goblinId,
+        targetCharId: wlId,
+        resumeFromInitiativeIdx: 1,
+        resumeFromMultiattackIdx: 1,
+        narrativeSoFar: "[Goblin's turn]",
+        eligibleCharIds: [wlId],
+      },
+      movement_used: {},
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      flags: {},
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+    };
+    const result = await takeAction({
+      action: { type: 'resolve_reaction', accept: true },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    expect(result.narrative).toMatch(/HELLISH REBUKE/);
+    const newWl = result.newState.characters[0];
+    expect(newWl.spell_slots_used?.[1]).toBe(1);
+    expect(newWl.turn_actions.reaction_used).toBe(true);
+    // 2d10 with Math.random ≈ 0.999 → ~10+10 = 20 damage to a 30-HP goblin.
+    const goblinEnt = result.newState.entities?.find((e) => e.id === goblinId);
+    expect(goblinEnt?.hp).toBeLessThan(30);
+    expect(result.newState.pending_reaction).toBeUndefined();
+  });
+
+  it('Declining Hellish Rebuke clears the pending reaction without spending resources', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const wlId = 'wl2';
+    const goblinId = `${CORRIDOR_ID}#0`;
+    const wl = makeChar({
+      id: wlId,
+      character_class: 'Warlock',
+      level: 3,
+      cha: 16,
+      hp: 10,
+      max_hp: 18,
+      spells_known: ['hellish_rebuke'],
+      prepared_spells: ['hellish_rebuke'],
+      spell_slots_max: { 1: 2 },
+      spell_slots_used: {},
+    });
+    const state: GameState = {
+      characters: [wl],
+      active_character_id: wlId,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: true,
+      initiative_order: [
+        { id: wlId, roll: 18, is_enemy: false },
+        { id: goblinId, roll: 5, is_enemy: true },
+      ],
+      initiative_idx: 1,
+      entities: [
+        {
+          id: wlId,
+          isEnemy: false,
+          pos: { x: 4, y: 5 },
+          hp: 10,
+          maxHp: 18,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: goblinId,
+          isEnemy: true,
+          pos: { x: 5, y: 5 },
+          hp: 30,
+          maxHp: 30,
+          conditions: [],
+          condition_durations: {},
+        },
+      ],
+      pending_reaction: {
+        kind: 'hellish_rebuke',
+        attackerEnemyId: goblinId,
+        targetCharId: wlId,
+        resumeFromInitiativeIdx: 1,
+        resumeFromMultiattackIdx: 1,
+        narrativeSoFar: "[Goblin's turn]",
+        eligibleCharIds: [wlId],
+      },
+      movement_used: {},
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      flags: {},
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+    };
+    const result = await takeAction({
+      action: { type: 'resolve_reaction', accept: false },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    const newWl = result.newState.characters[0];
+    expect(newWl.spell_slots_used?.[1] ?? 0).toBe(0);
+    expect(newWl.turn_actions.reaction_used).toBe(false);
+    const goblinEnt = result.newState.entities?.find((e) => e.id === goblinId);
+    expect(goblinEnt?.hp).toBe(30); // unchanged
+    expect(result.newState.pending_reaction).toBeUndefined();
+  });
+
   // ── Sneak Attack (Rogue in sandbox) ─────────────────────────────────────────
 
   it('Rogue sneak attack adds bonus damage on hit', async () => {

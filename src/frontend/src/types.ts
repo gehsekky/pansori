@@ -251,19 +251,28 @@ export interface PlacedNpc extends NpcTemplate {
 
 // ─── Game state (world/party container) ──────────────────────────────────────
 
-export interface PendingReaction {
-  kind: 'shield';
+interface PendingReactionBase {
   attackerEnemyId: string;
   targetCharId: string;
-  atkTotal: number;
-  targetAcAtAttack: number;
-  pendingDamage: number;
-  pendingNarrative: string;
   resumeFromInitiativeIdx: number;
   resumeFromMultiattackIdx: number;
   narrativeSoFar: string;
   eligibleCharIds: string[];
 }
+
+export interface PendingShieldReaction extends PendingReactionBase {
+  kind: 'shield';
+  atkTotal: number;
+  targetAcAtAttack: number;
+  pendingDamage: number;
+  pendingNarrative: string;
+}
+
+export interface PendingHellishRebukeReaction extends PendingReactionBase {
+  kind: 'hellish_rebuke';
+}
+
+export type PendingReaction = PendingShieldReaction | PendingHellishRebukeReaction;
 
 export interface GameState {
   // Party

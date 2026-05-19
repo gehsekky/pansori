@@ -845,6 +845,19 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         },
       ];
     }
+    if (pending.kind === 'hellish_rebuke') {
+      const dc = 8 + profBonus(char.level) + abilityMod(char.cha);
+      return [
+        {
+          label: `Cast Hellish Rebuke (reaction, 1st-level slot) — 2d10 fire on ${enemyForLabel} (DEX save DC ${dc} for half)`,
+          action: { type: 'resolve_reaction', accept: true },
+        },
+        {
+          label: `Decline — let the attack stand`,
+          action: { type: 'resolve_reaction', accept: false },
+        },
+      ];
+    }
   }
 
   // Pending ASI: only show stat-boost choices until resolved
@@ -1928,17 +1941,15 @@ function applyConsequence(
 //
 // Eligibility for Shield is checked at the per-sub-attack level. Multiattacks
 // pause mid-burst; remaining sub-attacks resume after the decision.
-function isShieldEligible(
-  target: Character,
-  atkTotal: number,
-  targetAc: number,
-  context: Context
-): boolean {
+// Shared eligibility check: target alive + has an unused reaction + knows
+// the spell + has a level-1+ slot + the spell exists in this campaign's
+// spell table. Each reaction adds its own trigger predicate on top.
+function knowsSpellWithSlot(target: Character, spellId: string, context: Context): boolean {
   if (target.dead || target.hp <= 0) return false;
   if (target.turn_actions?.reaction_used) return false;
   const knows =
-    (target.prepared_spells ?? []).includes('shield') ||
-    (target.spells_known ?? []).includes('shield');
+    (target.prepared_spells ?? []).includes(spellId) ||
+    (target.spells_known ?? []).includes(spellId);
   if (!knows) return false;
   const slotsMax = target.spell_slots_max ?? {};
   const slotsUsed = target.spell_slots_used ?? {};
@@ -1947,9 +1958,36 @@ function isShieldEligible(
     return lvlN >= 1 && (max ?? 0) > (slotsUsed[lvlN] ?? 0);
   });
   if (!hasL1Slot) return false;
+  if (!context.spellTable?.[spellId]) return false;
+  return true;
+}
+
+function isShieldEligible(
+  target: Character,
+  atkTotal: number,
+  targetAc: number,
+  context: Context
+): boolean {
+  if (!knowsSpellWithSlot(target, 'shield', context)) return false;
   // Outside the [AC, AC+4] window, +5 AC from Shield wouldn't change the result.
   if (atkTotal < targetAc || atkTotal > targetAc + 4) return false;
-  if (!context.spellTable?.shield) return false;
+  return true;
+}
+
+// Hellish Rebuke (PHB p.252) — triggers AFTER damage applies. Requires the
+// PC to be conscious (target.hp > 0 after the hit), within 60 ft of the
+// attacker (we have grid positions), and Warlock-only since that's the spell
+// list it appears on. Multi-class isn't modeled, so the class check is exact.
+function isHellishRebukeEligible(
+  target: Character,
+  targetPos: { x: number; y: number } | undefined,
+  attackerPos: { x: number; y: number } | undefined,
+  context: Context
+): boolean {
+  if (target.character_class.toLowerCase() !== 'warlock') return false;
+  if (!knowsSpellWithSlot(target, 'hellish_rebuke', context)) return false;
+  if (!targetPos || !attackerPos) return false;
+  if (distanceFeet(targetPos, attackerPos) > 60) return false;
   return true;
 }
 
@@ -2056,6 +2094,42 @@ function runEnemyTurns(args: {
               narrative += ` MASSIVE DAMAGE — ${target.name} is killed outright!`;
               massiveDeath = true;
               break;
+            }
+
+            // Hellish Rebuke (PHB p.252) — triggers AFTER damage applies.
+            // The damage is already on the books in `target`; if the player
+            // accepts, the resolve path deals damage back to the attacker.
+            // Commit the new target HP to state BEFORE pausing so the
+            // resumed run sees the correct HP.
+            if (atkResult.hit && atkResult.hpLost > 0 && target.hp > 0) {
+              const myPos = st.entities?.find((e) => e.id === target.id)?.pos;
+              if (isHellishRebukeEligible(target, myPos, eEnt?.pos, args.context)) {
+                st = {
+                  ...st,
+                  characters: st.characters.map((c, i) => (i === targetCharIdx ? target : c)),
+                  entities: st.entities?.map((e) =>
+                    e.id === target.id && !e.isEnemy ? { ...e, hp: target.hp } : e
+                  ),
+                  pending_reaction: {
+                    kind: 'hellish_rebuke',
+                    attackerEnemyId: eEntry.id,
+                    targetCharId: target.id,
+                    resumeFromInitiativeIdx: advIdx,
+                    resumeFromMultiattackIdx: mi + 1,
+                    narrativeSoFar: narrative,
+                    eligibleCharIds: [target.id],
+                  },
+                  active_character_id: target.id,
+                };
+                narrative += ` 🔥 ${target.name} could retaliate with Hellish Rebuke!`;
+                return {
+                  st,
+                  narrative,
+                  exitAdvIdx: advIdx,
+                  roundWrapped,
+                  paused: true,
+                };
+              }
             }
           }
 
@@ -5756,6 +5830,73 @@ export async function takeAction({
             };
           }
         }
+      } else if (rx.kind === 'hellish_rebuke') {
+        // Hellish Rebuke (PHB p.252) — counter-attack. Triggering damage
+        // already applied; this branch only handles what the reaction itself
+        // does. Accept: consume slot + reaction, deal 2d10 fire to attacker
+        // (DEX save halves). Decline: clear pending_reaction and continue.
+        if (rxAction.accept) {
+          const slotsMax = char.spell_slots_max ?? {};
+          const slotsUsed = char.spell_slots_used ?? {};
+          const slotLvl = Object.keys(slotsMax)
+            .map(Number)
+            .filter((n) => n >= 1 && (slotsMax[n] ?? 0) > (slotsUsed[n] ?? 0))
+            .sort((a, b) => a - b)[0];
+          if (slotLvl === undefined) {
+            narrative = 'No spell slot available — Hellish Rebuke fizzles.';
+            st = { ...st, pending_reaction: undefined };
+          } else {
+            char.spell_slots_used = {
+              ...slotsUsed,
+              [slotLvl]: (slotsUsed[slotLvl] ?? 0) + 1,
+            };
+            char.turn_actions = { ...char.turn_actions, reaction_used: true };
+            // Upcast: 2d10 base + 1d10 per slot above 1st.
+            const upcastDice = Math.max(0, slotLvl - 1);
+            const baseRoll = rollDice('2d10');
+            const upcastRoll = upcastDice > 0 ? rollDice(`${upcastDice}d10`) : 0;
+            const fullDmg = baseRoll + upcastRoll;
+            // Enemy DEX save vs caster's spell save DC. Half on success.
+            const enemyData = getEnemyById(seed, rx.attackerEnemyId);
+            const enemyDex = enemyData?.dex ?? 10;
+            const dc = 8 + profBonus(char.level) + abilityMod(char.cha);
+            const saveRoll = rollDice('1d20') + abilityMod(enemyDex);
+            const saved = saveRoll >= dc;
+            const finalDmg = saved ? Math.floor(fullDmg / 2) : fullDmg;
+            // Apply damage to the attacker entity.
+            const attackerEnt = st.entities?.find((e) => e.id === rx.attackerEnemyId && e.isEnemy);
+            const newEnemyHp = Math.max(0, (attackerEnt?.hp ?? 0) - finalDmg);
+            st = {
+              ...st,
+              entities: st.entities?.map((e) =>
+                e.id === rx.attackerEnemyId && e.isEnemy ? { ...e, hp: newEnemyHp } : e
+              ),
+              characters: st.characters.map((c) => (c.id === char.id ? char : c)),
+              pending_reaction: undefined,
+            };
+            const enemyName = enemyData?.name ?? 'the attacker';
+            narrative = `🔥 ${char.name} casts HELLISH REBUKE (lvl ${slotLvl} slot)! Hellish flames engulf ${enemyName}. DEX save ${saveRoll} vs DC ${dc} — ${saved ? 'half' : 'full'} damage: ${finalDmg} fire (${baseRoll}${upcastRoll > 0 ? ` + ${upcastRoll} upcast` : ''}).`;
+            if (newEnemyHp <= 0) {
+              const xpGain = enemyData?.xp ?? 10;
+              char.xp = (char.xp || 0) + xpGain;
+              st = {
+                ...st,
+                enemies_killed: [...(st.enemies_killed ?? []), rx.attackerEnemyId],
+                characters: st.characters.map((c) => (c.id === char.id ? char : c)),
+              };
+              narrative += ` ${enemyName} is consumed by the rebuke! (+${xpGain} XP)`;
+              const roomId = st.current_room;
+              if (isRoomCleared(st, seed, roomId)) {
+                st = endCombatState(st);
+              }
+            }
+          }
+        } else {
+          narrative = `${char.name} declines to retaliate.`;
+          st = { ...st, pending_reaction: undefined };
+        }
+      }
+      {
         // Resume the enemy turn loop from the saved coordinates.
         const resume = runEnemyTurns({
           st,
