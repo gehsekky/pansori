@@ -217,6 +217,7 @@ export interface Character {
   weapon_proficiencies: string[];
   weapon_masteries?: string[];
   bardic_inspiration_die?: string;
+  wild_shape_form?: string;
   attuned_items: string[]; // instance_ids of attuned magic items (max 3)
   concentrating_on?: { spellId: string; condition?: string } | null;
   subclass?: string;

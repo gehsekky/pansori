@@ -13,3 +13,4 @@ export {
   SRD_CLASS_FEATURES,
   SRD_CLASS_SKILLS,
 } from './classes.js';
+export { BEAST_FORMS, maxBeastCRForLevel, availableBeastForms } from './beast_forms.js';

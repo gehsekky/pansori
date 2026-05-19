@@ -319,6 +319,31 @@ export interface Spell {
   rangeFt?: number;
 }
 
+// ─── Beast Forms (2024 PHB Wild Shape) ───────────────────────────────────────
+// Each form is a curated beast stat block the druid can transform into.
+// Replaces equipped-weapon attacks while in form. Form-specific traits
+// (Bear's physical resistance, Wolf's pack tactics, Hawk's flying) apply
+// while the wild_shaped condition is active and char.wild_shape_form
+// matches this form's id.
+
+export interface BeastForm {
+  id: string;
+  name: string;
+  cr: number; // determines whether Moon (level/3) or base (1/4 → 1/2 → 1) Druids can access
+  // Attack profile while shifted. Replaces the druid's equipped weapon.
+  attackName: string;
+  attackToHit: number; // flat bonus added to d20 (form's natural attack bonus)
+  attackDamage: string; // dice expr e.g. '2d4+2'
+  attackDamageType: string;
+  // Optional traits:
+  flying?: boolean; // grants flying movement (no OAs from ground enemies)
+  climbing?: boolean; // grants climb speed
+  packTactics?: boolean; // advantage on attacks when any ally is within 5 ft
+  physicalResistance?: boolean; // resistance to non-magical bludgeoning/piercing/slashing
+  speedFt?: number; // movement speed override (default 30)
+  descriptor: string; // short flavor for narratives
+}
+
 // ─── Structured actions ───────────────────────────────────────────────────────
 
 export type AbilityKey = 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha';
@@ -455,6 +480,9 @@ export interface Character {
   // can apply to — Pansori applies it to attack-roll consumption today;
   // save consumption follows the Heroic Inspiration pattern.
   bardic_inspiration_die?: string;
+  // 2024 PHB Wild Shape — id of the active BeastForm while wild_shaped.
+  // Cleared on dismiss_wild_shape.
+  wild_shape_form?: string;
   attuned_items: string[]; // instance_ids of attuned magic items (max 3)
   concentrating_on?: { spellId: string; condition?: string } | null;
   // Extended 5e fields
