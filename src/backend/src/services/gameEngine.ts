@@ -2518,7 +2518,10 @@ export async function takeAction({
             char.max_hp += hpRoll;
             char.hp = Math.min(char.hp + hpRoll, char.max_hp);
             char.spell_slots_max = getSpellSlotsForLevel(char.character_class, char.level, context);
-            narrative += ' ' + pick(context.narratives.levelUp) + ` (+${hpRoll} HP)`;
+            const levelUpLine = pick(context.narratives.levelUp)
+              .replace(/{level}/g, String(char.level))
+              .replace(/{name}/g, char.name);
+            narrative += ` ${char.name}: ${levelUpLine} (+${hpRoll} HP)`;
             if ([4, 8, 12, 16, 19].includes(char.level)) {
               char.asi_pending = true;
               narrative += ` Level ${char.level}: choose an Ability Score Improvement!`;
@@ -3614,7 +3617,10 @@ export async function takeAction({
             char.max_hp += hpRollSpell;
             char.hp = Math.min(char.hp + hpRollSpell, char.max_hp);
             char.spell_slots_max = getSpellSlotsForLevel(char.character_class, char.level, context);
-            narrative += ' ' + pick(context.narratives.levelUp) + ` (+${hpRollSpell} HP)`;
+            const levelUpLineSpell = pick(context.narratives.levelUp)
+              .replace(/{level}/g, String(char.level))
+              .replace(/{name}/g, char.name);
+            narrative += ` ${char.name}: ${levelUpLineSpell} (+${hpRollSpell} HP)`;
             if ([4, 8, 12, 16, 19].includes(char.level)) {
               char.asi_pending = true;
               narrative += ` Level ${char.level}: choose an Ability Score Improvement!`;
