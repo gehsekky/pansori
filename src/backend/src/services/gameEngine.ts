@@ -191,21 +191,37 @@ function conditionSavingThrow(
   effect: OnHitEffect,
   char: Pick<
     Character,
-    'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha' | 'level' | 'character_class' | 'conditions'
+    | 'str'
+    | 'dex'
+    | 'con'
+    | 'int'
+    | 'wis'
+    | 'cha'
+    | 'level'
+    | 'character_class'
+    | 'conditions'
+    | 'turn_actions'
+    | 'inspiration'
   >,
   context: Context
-): boolean {
+): { applied: boolean; inspirationConsumed: boolean } {
   const proficient =
     context.classSavingThrows?.[char.character_class]?.includes(effect.ability) ?? false;
-  return rollConditionSave(
+  // 2024 PHB — Heroic Inspiration can be spent on any d20 test. If the
+  // player armed it via spend_inspiration, the save gets advantage and
+  // the flag is consumed (the caller updates char accordingly).
+  const inspirationActive = !!char.turn_actions?.inspiration_pending;
+  const applied = rollConditionSave(
     effect.ability,
     char[effect.ability] ?? 10,
     effect.dc,
     proficient,
     char.level,
     0,
-    char.conditions ?? []
+    char.conditions ?? [],
+    inspirationActive
   );
+  return { applied, inspirationConsumed: inspirationActive };
 }
 
 // ─── Enemy attack helper ──────────────────────────────────────────────────────
@@ -233,6 +249,9 @@ function applyEnemyAttackNarrative(
   // Exposed so callers can detect reaction windows (Shield: total in [AC, AC+4]).
   atkTotal: number;
   hit: boolean;
+  // True when the PC spent Heroic Inspiration on the save vs onHitEffect.
+  // Caller should clear inspiration flags on the resulting Character.
+  inspirationConsumed?: boolean;
 } {
   const isDodging = char.turn_actions?.dodging ?? false;
   const isReckless = char.turn_actions?.reckless ?? false;
@@ -294,14 +313,28 @@ function applyEnemyAttackNarrative(
     narrative += rageNote + petrNote + wardNote + tempHpNote;
     let updatedChar = { ...char };
 
+    let inspirationConsumed = false;
     if (enemy.onHitEffect) {
-      const conditionApplied = conditionSavingThrow(enemy.onHitEffect, char, context);
-      if (conditionApplied) {
+      const csResult = conditionSavingThrow(enemy.onHitEffect, char, context);
+      if (csResult.inspirationConsumed) {
+        inspirationConsumed = true;
+        narrative += ` ✦ Heroic Inspiration spent on the save!`;
+      }
+      if (csResult.applied) {
         updatedChar = inflictCondition(updatedChar, enemy.onHitEffect.condition);
         if (updatedChar.conditions.length > char.conditions.length) {
           narrative += ` ${char.name} is ${enemy.onHitEffect.condition}!`;
         }
       }
+    }
+    // Clear the inspiration flag on the char being returned so the caller
+    // doesn't double-spend it on a later roll this turn.
+    if (inspirationConsumed) {
+      updatedChar = {
+        ...updatedChar,
+        inspiration: false,
+        turn_actions: { ...updatedChar.turn_actions, inspiration_pending: false },
+      };
     }
     return {
       hpLost,
@@ -312,6 +345,7 @@ function applyEnemyAttackNarrative(
       updatedResourceUses: char.class_resource_uses,
       atkTotal: result.total,
       hit: true,
+      inspirationConsumed,
     };
   }
   if (armorItem) {
@@ -2324,6 +2358,12 @@ function runEnemyTurns(args: {
               conditions: atkResult.newConditions,
               condition_durations: atkResult.newDurations,
               class_resource_uses: atkResult.updatedResourceUses ?? target.class_resource_uses,
+              // 2024 PHB Heroic Inspiration: if the target spent it on the
+              // save vs onHitEffect, clear the flags so it can't be re-spent.
+              inspiration: atkResult.inspirationConsumed ? false : target.inspiration,
+              turn_actions: atkResult.inspirationConsumed
+                ? { ...target.turn_actions, inspiration_pending: false }
+                : target.turn_actions,
             };
             const concAtk = checkConcentration(target, st, atkResult.hpLost);
             target = concAtk.char;

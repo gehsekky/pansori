@@ -425,7 +425,8 @@ export function rollConditionSave(
   proficient = false,
   level = 1,
   coverDexBonus = 0,
-  targetConditions: string[] = []
+  targetConditions: string[] = [],
+  advantage = false
 ): boolean {
   // Auto-fail STR/DEX saves while incapacitated by paralysis/stun/unconscious/petrified
   if (
@@ -436,11 +437,20 @@ export function rollConditionSave(
   }
   const prof = proficient ? profBonus(level) : 0;
   const cover = ability === 'dex' ? coverDexBonus : 0;
-  // Restrained: disadvantage on DEX saves (SRD p.187)
-  if (ability === 'dex' && targetConditions.includes('restrained')) {
+  // Restrained: disadvantage on DEX saves (SRD p.187). Advantage and
+  // disadvantage cancel — see 2024 PHB advantage/disadvantage rules.
+  const disadv = ability === 'dex' && targetConditions.includes('restrained');
+  const netAdv = advantage && !disadv;
+  const netDisadv = disadv && !advantage;
+  if (netDisadv) {
     const r1 = d(20);
     const r2 = d(20);
     return Math.min(r1, r2) + abilityMod(score) + prof + cover < dc;
+  }
+  if (netAdv) {
+    const r1 = d(20);
+    const r2 = d(20);
+    return Math.max(r1, r2) + abilityMod(score) + prof + cover < dc;
   }
   return d(20) + abilityMod(score) + prof + cover < dc;
 }
