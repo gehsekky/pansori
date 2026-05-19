@@ -29,7 +29,7 @@ Listed by impact × tractability. Each item is its own PR.
 
 | #   | Feature                        | Effort | Status  | Notes                                                          |
 | --- | ------------------------------ | ------ | ------- | -------------------------------------------------------------- |
-| 1   | Heroic Inspiration expansion   | ~1h    | pending | Additive — currently attack-only                               |
+| 1   | Heroic Inspiration expansion   | ~1h    | DONE    | Additive — saves vs onHitEffect now consume inspiration too    |
 | 2   | Bardic Inspiration spend rules | ~2h    | pending | 2024 expands what the die can apply to                         |
 | 3   | Weapon Masteries (framework)   | ~3h    | pending | New 2024 system; 9 masteries to support                        |
 | 4   | Weapon Masteries (per-class)   | ~2h    | pending | Fighter (3), Paladin (2), Ranger (2), Barbarian (2), Rogue (2) |

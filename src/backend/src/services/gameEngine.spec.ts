@@ -1476,6 +1476,97 @@ describe('conditions — new types', () => {
     expect(r3.newState.characters[0].turn_actions.inspiration_pending).toBeFalsy();
   });
 
+  // ── Heroic Inspiration: 2024 PHB spend on saves ─────────────────────────────
+
+  it('spend_inspiration grants advantage on a save vs enemy onHitEffect', async () => {
+    // Build a seed where the enemy's attack ALWAYS hits + has an onHitEffect
+    // (paralyze on CON save). Pre-arm inspiration so the PC's save gets
+    // advantage. With d20=1 (one of the rolls), advantage picks the higher.
+    // Hard to verify the exact roll without deeper instrumentation, but we
+    // CAN verify the flag is consumed and a narrative note appears.
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const paralyzeSeed: Seed = {
+      ...seedWithEnemy,
+      enemies: {
+        [CORRIDOR_ID]: [
+          {
+            id: `${CORRIDOR_ID}#0`,
+            name: 'Frost Acolyte',
+            hp: 50,
+            ac: 10,
+            damage: '1d4',
+            toHit: 20, // forces hit
+            xp: 100,
+            con: 14,
+            onHitEffect: { condition: 'paralyzed', ability: 'con', dc: 13 },
+          },
+        ],
+      },
+    };
+    const pcId = 'char-1';
+    const goblinId = `${CORRIDOR_ID}#0`;
+    const state = makeState(
+      {
+        id: pcId,
+        hp: 20,
+        max_hp: 20,
+        con: 12,
+        inspiration: true,
+        turn_actions: {
+          action_used: false,
+          bonus_action_used: false,
+          reaction_used: false,
+          free_interaction_used: false,
+          inspiration_pending: true, // armed for the next d20 test
+        },
+      },
+      {
+        combat_active: true,
+        current_room: CORRIDOR_ID,
+        visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+        initiative_order: [
+          { id: pcId, roll: 5, is_enemy: false },
+          { id: goblinId, roll: 20, is_enemy: true },
+        ],
+        initiative_idx: 0,
+        entities: [
+          {
+            id: pcId,
+            isEnemy: false,
+            pos: { x: 4, y: 5 },
+            hp: 20,
+            maxHp: 20,
+            conditions: [],
+            condition_durations: {},
+          },
+          {
+            id: goblinId,
+            isEnemy: true,
+            pos: { x: 5, y: 5 },
+            hp: 50,
+            maxHp: 50,
+            conditions: [],
+            condition_durations: {},
+          },
+        ],
+      }
+    );
+    // End the PC's turn so the enemy attacks back next.
+    const result = await takeAction({
+      action: { type: 'end_turn' },
+      history: [],
+      state,
+      seed: paralyzeSeed,
+      context: ctx,
+    });
+    // Inspiration narrative should have fired during the save resolution.
+    expect(result.narrative).toMatch(/Heroic Inspiration spent on the save/);
+    // Inspiration flags must be cleared post-save.
+    const pc = result.newState.characters[0];
+    expect(pc.inspiration).toBe(false);
+    expect(pc.turn_actions.inspiration_pending).toBeFalsy();
+  });
+
   it('stand_up costs half speed and removes prone', async () => {
     const state = makeState(
       { conditions: ['prone'], condition_durations: { prone: 1 } },
