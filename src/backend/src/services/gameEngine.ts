@@ -4870,6 +4870,18 @@ export async function takeAction({
         char.spell_slots_used = { ...(char.spell_slots_used ?? {}), [slotLevel]: slotsUsed + 1 };
       }
 
+      // 2024 PHB / SRD 5.2.1 — costly material components (Identify's 100 gp
+      // pearl, Revivify's 300 gp diamond, etc.) are consumed on cast. Block
+      // the cast if the caster can't afford it; deduct from gold otherwise.
+      if (spell.materialCost && spell.materialCost > 0) {
+        if ((char.gold ?? 0) < spell.materialCost) {
+          narrative = `${spell.name} requires a ${spell.materialCost} gp material component you don't have.`;
+          break;
+        }
+        char.gold = (char.gold ?? 0) - spell.materialCost;
+        narrative = `${char.name} expends a ${spell.materialCost} gp component. `;
+      }
+
       // SRD 5.2.1 p.67 (Quickened Spell): after consuming Quickened, can't
       // cast a level 1+ spell on the same turn EXCEPT the quickened cast
       // itself (which is the spell that got "modified"). We detect the
