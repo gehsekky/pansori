@@ -2023,8 +2023,83 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
             requiresBonusAction: isBonusAction || undefined,
             aoePreview: aoePreview ? { ...aoePreview, targetEnemyId: targetId } : undefined,
           });
+          // 2024 PHB Magic Missile multi-target: when there are 2+ living
+          // enemies, emit a focus-fire choice per enemy + one "spread evenly"
+          // choice that distributes darts across all targets.
+          if (spellId === 'magic_missile' && livingEnemies.length >= 2) {
+            const dartCount = 2 + sl; // 3 at L1 slot, 4 at L2, etc.
+            for (const e of livingEnemies) {
+              choices.push({
+                label: `Cast ${spell.name} (${sl === baseLevel ? `Lvl ${sl}` : `${sl}th slot`}) — focus fire ${dartCount} darts → ${e.name}`,
+                action: {
+                  type: 'cast_spell',
+                  spellId,
+                  slotLevel: sl,
+                  targetEnemyId: e.id,
+                  targetEnemyIds: Array(dartCount).fill(e.id),
+                },
+              });
+            }
+            // Spread evenly across the first min(darts, enemies) targets,
+            // round-robin so extras pile on the earliest.
+            const spread: string[] = [];
+            for (let i = 0; i < dartCount; i++) {
+              spread.push(livingEnemies[i % livingEnemies.length].id);
+            }
+            const names = livingEnemies
+              .slice(0, Math.min(dartCount, livingEnemies.length))
+              .map((e) => e.name)
+              .join(', ');
+            choices.push({
+              label: `Cast ${spell.name} (${sl === baseLevel ? `Lvl ${sl}` : `${sl}th slot`}) — spread ${dartCount} darts across ${names}`,
+              action: {
+                type: 'cast_spell',
+                spellId,
+                slotLevel: sl,
+                targetEnemyId: livingEnemies[0].id,
+                targetEnemyIds: spread,
+              },
+            });
+          }
         }
         if (!emittedAny) continue;
+      }
+      // 2024 PHB Eldritch Blast multi-beam (L5+ — 2 beams; L11+ 3; L17+ 4).
+      // Emit per-target focus-fire + a spread variant when multiple enemies
+      // are alive. Cantrip path handled separately above (only adds extras
+      // when level + multi-enemy conditions are met).
+      if (spellId === 'eldritch_blast' && char.level >= 5 && livingEnemies.length >= 2) {
+        const beamCount = char.level >= 17 ? 4 : char.level >= 11 ? 3 : 2;
+        for (const e of livingEnemies) {
+          choices.push({
+            label: `Cast ${spell.name} (cantrip) — focus fire ${beamCount} beams → ${e.name}`,
+            action: {
+              type: 'cast_spell',
+              spellId,
+              slotLevel: 0,
+              targetEnemyId: e.id,
+              targetEnemyIds: Array(beamCount).fill(e.id),
+            },
+          });
+        }
+        const spread: string[] = [];
+        for (let i = 0; i < beamCount; i++) {
+          spread.push(livingEnemies[i % livingEnemies.length].id);
+        }
+        const names = livingEnemies
+          .slice(0, Math.min(beamCount, livingEnemies.length))
+          .map((e) => e.name)
+          .join(', ');
+        choices.push({
+          label: `Cast ${spell.name} (cantrip) — spread ${beamCount} beams across ${names}`,
+          action: {
+            type: 'cast_spell',
+            spellId,
+            slotLevel: 0,
+            targetEnemyId: livingEnemies[0].id,
+            targetEnemyIds: spread,
+          },
+        });
       }
     }
   }
@@ -4780,6 +4855,97 @@ export async function takeAction({
       const dc = spellSaveDC(char.level, castingScore);
       let spellDmg = 0;
       let spellHit = true;
+
+      // 2024 PHB Magic Missile / Eldritch Blast multi-target.
+      // Action payload `targetEnemyIds` lists one entry per dart/beam
+      // (duplicates = multiple on same target). Resolves each independently,
+      // then short-circuits the single-target damage path.
+      const castAction = action as { type: 'cast_spell'; targetEnemyIds?: string[] };
+      const multiTargets = castAction.targetEnemyIds;
+      if (
+        multiTargets &&
+        multiTargets.length > 1 &&
+        (spell.id === 'magic_missile' || spell.id === 'eldritch_blast')
+      ) {
+        const perShot = spell.id === 'magic_missile' ? '1d4+1' : '1d10';
+        const agonizingBonusPerBeam =
+          spell.id === 'eldritch_blast' && (char.feats ?? []).includes('agonizing_blast')
+            ? Math.max(0, abilityMod(char.cha))
+            : 0;
+        let totalDealt = 0;
+        const lines: string[] = [];
+        for (let i = 0; i < multiTargets.length; i++) {
+          const tid = multiTargets[i];
+          const tgtEnemy = livingEnemiesInRoom.find((e) => e.id === tid);
+          const tgtEnt = st.entities?.find((e) => e.id === tid && e.isEnemy);
+          if (!tgtEnemy || !tgtEnt || tgtEnt.hp <= 0) {
+            lines.push(`${i + 1}: ${tgtEnemy?.name ?? tid} — already down, fizzles.`);
+            continue;
+          }
+          if (spell.id === 'eldritch_blast') {
+            // Each beam rolls its own attack vs the target's AC.
+            const atkE = resolveSpellAttack(char.level, castingScore, tgtEnemy.ac);
+            if (!atkE.hit) {
+              lines.push(`${i + 1}: ${tgtEnemy.name} — MISS (${atkE.total} vs AC ${tgtEnemy.ac}).`);
+              continue;
+            }
+            const dmgRoll = atkE.critical
+              ? rollCritical(perShot) + agonizingBonusPerBeam
+              : rollDice(perShot) + agonizingBonusPerBeam;
+            const { damage: effDmg, note } = applyDamageMultiplier(
+              dmgRoll,
+              spell.damageType,
+              tgtEnemy
+            );
+            const newHp = Math.max(0, tgtEnt.hp - effDmg);
+            st = {
+              ...st,
+              entities: (st.entities ?? []).map((e) =>
+                e.id === tid && e.isEnemy ? { ...e, hp: newHp } : e
+              ),
+            };
+            totalDealt += effDmg;
+            lines.push(
+              `${i + 1}: ${tgtEnemy.name} — HIT ${effDmg}${atkE.critical ? ' CRIT' : ''}${note ?? ''}${newHp <= 0 ? ' (killed)' : ''}.`
+            );
+            if (newHp <= 0) {
+              char.xp = (char.xp || 0) + (tgtEnemy.xp ?? 0);
+              st.enemies_killed = [...(st.enemies_killed ?? []), tid];
+            }
+          } else {
+            // Magic Missile — auto-hit, no attack roll.
+            const dmgRoll = rollDice(perShot);
+            const { damage: effDmg, note } = applyDamageMultiplier(
+              dmgRoll,
+              spell.damageType,
+              tgtEnemy
+            );
+            const newHp = Math.max(0, tgtEnt.hp - effDmg);
+            st = {
+              ...st,
+              entities: (st.entities ?? []).map((e) =>
+                e.id === tid && e.isEnemy ? { ...e, hp: newHp } : e
+              ),
+            };
+            totalDealt += effDmg;
+            lines.push(
+              `dart ${i + 1} → ${tgtEnemy.name}: ${effDmg}${note ?? ''}${newHp <= 0 ? ' (killed)' : ''}.`
+            );
+            if (newHp <= 0) {
+              char.xp = (char.xp || 0) + (tgtEnemy.xp ?? 0);
+              st.enemies_killed = [...(st.enemies_killed ?? []), tid];
+            }
+          }
+        }
+        if (isRoomCleared(st, seed, roomId)) {
+          st = endCombatState(st);
+        }
+        narrative = `${char.name} casts ${spell.name}${slotNote}! ${lines.join(' ')} Total: ${totalDealt} ${spell.damageType ?? 'damage'}.`;
+        usedInitiative = true;
+        spellDmg = 0; // Already applied per-target; skip the single-target block below.
+        spellHit = false; // Suppress the single-target damage application.
+        break;
+      }
 
       if (spell.attackRoll) {
         // ── Spell attack roll ──────────────────────────────────────────────

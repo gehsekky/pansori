@@ -23,7 +23,14 @@ export type StructuredAction =
   | { type: 'attack_npc' }
   | { type: 'use_class_feature'; featureId: string }
   | { type: 'apply_asi'; stat: AbilityKey }
-  | { type: 'cast_spell'; spellId: string; slotLevel: number; ritual?: boolean }
+  | {
+      type: 'cast_spell';
+      spellId: string;
+      slotLevel: number;
+      ritual?: boolean;
+      targetEnemyId?: string;
+      targetEnemyIds?: string[];
+    }
   | { type: 'disarm_trap' }
   | { type: 'interact_object'; objectId: string }
   | { type: 'two_weapon_attack' }
