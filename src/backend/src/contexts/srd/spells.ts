@@ -1,4 +1,4 @@
-import type { Spell } from '../types.js';
+import type { Spell } from '../../types.js';
 
 // Shared SRD spell definitions.
 //

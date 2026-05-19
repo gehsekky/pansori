@@ -1,5 +1,15 @@
+import {
+  SRD_CLASS_ARMOR_PROFICIENCIES,
+  SRD_CLASS_FEATURES,
+  SRD_CLASS_HIT_DIE,
+  SRD_CLASS_PRIMARY_STATS,
+  SRD_CLASS_SAVING_THROWS,
+  SRD_CLASS_SKILLS,
+  SRD_CLASS_WEAPON_PROFICIENCIES,
+  SRD_SPELLCASTING_ABILITY,
+  SRD_SPELLS,
+} from './srd/index.js';
 import type { Context } from '../types.js';
-import { SRD_SPELLS } from './srd_spells.js';
 
 export const context: Context = {
   id: 'sandbox',
@@ -22,110 +32,19 @@ export const context: Context = {
   ],
 
   // ─── Classes ──────────────────────────────────────────────────────────────────
-  classPrimaryStats: {
-    Fighter: 'str',
-    Rogue: 'dex',
-    Wizard: 'int',
-    Cleric: 'wis',
-    Ranger: 'dex',
-    Paladin: 'cha',
-    Bard: 'cha',
-    Druid: 'wis',
-    Sorcerer: 'cha',
-    Warlock: 'cha',
-    Monk: 'wis',
-    Barbarian: 'str',
-  },
+  classPrimaryStats: { ...SRD_CLASS_PRIMARY_STATS },
 
-  classHitDie: {
-    Fighter: 10,
-    Rogue: 8,
-    Wizard: 6,
-    Cleric: 8,
-    Ranger: 10,
-    Paladin: 10,
-    Bard: 8,
-    Druid: 8,
-    Sorcerer: 6,
-    Warlock: 8,
-    Monk: 8,
-    Barbarian: 12,
-  },
+  classHitDie: { ...SRD_CLASS_HIT_DIE },
 
-  classSkills: {
-    Fighter: ['athletics', 'intimidation'],
-    Rogue: ['stealth', 'sleight_of_hand', 'deception', 'perception'],
-    Wizard: ['arcana', 'investigation', 'history'],
-    Cleric: ['medicine', 'religion', 'insight'],
-    Ranger: ['perception', 'stealth', 'nature', 'survival'],
-    Paladin: ['athletics', 'medicine', 'religion'],
-    Bard: ['performance', 'persuasion', 'perception'],
-    Druid: ['nature', 'survival', 'animal_handling'],
-    Sorcerer: ['arcana', 'persuasion'],
-    Warlock: ['arcana', 'deception', 'intimidation'],
-    Monk: ['athletics', 'stealth', 'acrobatics'],
-    Barbarian: ['athletics', 'intimidation', 'survival'],
-  },
+  classSkills: { ...SRD_CLASS_SKILLS },
 
-  classArmorProficiencies: {
-    Fighter: ['light', 'medium', 'heavy', 'shield'],
-    Rogue: ['light'],
-    Wizard: [],
-    Cleric: ['light', 'medium', 'shield'],
-    Ranger: ['light', 'medium', 'shield'],
-    Paladin: ['light', 'medium', 'heavy', 'shield'],
-    Bard: ['light'],
-    Druid: ['light', 'medium', 'shield'],
-    Sorcerer: [],
-    Warlock: ['light'],
-    Monk: [],
-    Barbarian: ['light', 'medium', 'shield'],
-  },
+  classArmorProficiencies: { ...SRD_CLASS_ARMOR_PROFICIENCIES },
 
-  classWeaponProficiencies: {
-    Fighter: ['simple', 'martial'],
-    Rogue: ['simple', 'martial'],
-    Wizard: ['simple'],
-    Cleric: ['simple'],
-    Ranger: ['simple', 'martial'],
-    Paladin: ['simple', 'martial'],
-    Bard: ['simple', 'martial'],
-    Druid: ['simple'],
-    Sorcerer: ['simple'],
-    Warlock: ['simple'],
-    Monk: ['simple', 'shortsword'],
-    Barbarian: ['simple', 'martial'],
-  },
+  classWeaponProficiencies: { ...SRD_CLASS_WEAPON_PROFICIENCIES },
 
-  classSavingThrows: {
-    Fighter: ['str', 'con'],
-    Rogue: ['dex', 'int'],
-    Wizard: ['int', 'wis'],
-    Cleric: ['wis', 'cha'],
-    Ranger: ['str', 'dex'],
-    Paladin: ['wis', 'cha'],
-    Bard: ['dex', 'cha'],
-    Druid: ['str', 'wis'],
-    Sorcerer: ['con', 'cha'],
-    Warlock: ['wis', 'cha'],
-    Monk: ['str', 'dex'],
-    Barbarian: ['str', 'con'],
-  },
+  classSavingThrows: { ...SRD_CLASS_SAVING_THROWS },
 
-  classFeatures: {
-    Fighter: ['extra_attack'],
-    Rogue: ['sneak_attack'],
-    Wizard: [],
-    Cleric: ['channel_divinity'],
-    Ranger: ['extra_attack', "hunter's_mark"],
-    Paladin: ['extra_attack', 'divine_smite', 'channel_divinity'],
-    Bard: ['bardic_inspiration'],
-    Druid: ['wild_shape', 'channel_divinity'],
-    Sorcerer: ['sorcery_points', 'metamagic'],
-    Warlock: ['eldritch_blast', 'pact_magic'],
-    Monk: ['ki', 'unarmored_defense', 'martial_arts'],
-    Barbarian: ['rage', 'extra_attack', 'unarmored_defense'],
-  },
+  classFeatures: { ...SRD_CLASS_FEATURES },
 
   // Per-class starting gear — auto-equipped at session start
   classStartingLoot: {
@@ -212,16 +131,7 @@ export const context: Context = {
     Ranger: [{ 1: 2 }],
   },
 
-  spellcastingAbility: {
-    Wizard: 'int',
-    Cleric: 'wis',
-    Druid: 'wis',
-    Sorcerer: 'cha',
-    Warlock: 'cha',
-    Bard: 'cha',
-    Paladin: 'cha',
-    Ranger: 'wis',
-  },
+  spellcastingAbility: { ...SRD_SPELLCASTING_ABILITY },
 
   // ─── Enemy templates ──────────────────────────────────────────────────────────
   enemyTemplates: [
