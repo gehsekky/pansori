@@ -16,6 +16,8 @@ import {
   takeAction,
 } from './gameEngine.js';
 import { context as ctx } from '../contexts/sandbox.js';
+import { generateRoguelikeSeed } from './procgen.js';
+import { context as valeCtx } from '../contexts/vale_of_shadows.js';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -1282,7 +1284,7 @@ describe('turn_actions lifecycle', () => {
 
 // ─── NPC actions ──────────────────────────────────────────────────────────────
 
-import { generateRoguelikeSeed } from './procgen.js';
+// (generateRoguelikeSeed is imported at the top of the file)
 
 // ─── Ability Score Improvements ──────────────────────────────────────────────
 
@@ -2998,5 +3000,122 @@ describe('generateChoices — spell choices', () => {
     );
     expect(mistyStep).toBeDefined();
     expect(mistyStep?.requiresBonusAction).toBe(true);
+  });
+});
+
+// ─── Faction-aware shop pricing ──────────────────────────────────────────────
+
+describe('faction shop price modifiers', () => {
+  // Aldric (Vale Merchant Guild) sells a healing potion at base 50 cr.
+  // factionShopPrice maps faction_guild attitude tiers as:
+  //   exalted (rep >= 60): 0.75x → 38 cr
+  //   friendly (rep >= 20): 0.9x → 45 cr
+  //   neutral (rep >= 0): 1.0x → 50 cr
+  //   unfriendly (rep >= -10): 1.2x → 60 cr
+  //   hostile (rep <  -50): 1.5x → 75 cr
+  // The shop choice surfaces only when the NPC attitude is 'friendly' (set
+  // statically on Aldric); faction rep modifies the price independently.
+
+  function makeValeStateInMarket(repWithGuild: number): GameState {
+    return {
+      characters: [makeChar({ id: 'p1', character_class: 'Fighter' })],
+      active_character_id: 'p1',
+      current_room: 'millhaven_market',
+      visited_rooms: [valeCtx.startRoomId, 'millhaven_market'],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: false,
+      initiative_order: [],
+      initiative_idx: 0,
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      flags: {},
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+      faction_rep: { faction_guild: repWithGuild },
+    };
+  }
+
+  // Vale's millhaven_market is in a campaign-driven seed; build a minimal one
+  // that mirrors the placed NPC for choice-generation purposes.
+  const valeMarketSeed: Seed = {
+    context_id: valeCtx.id,
+    world_name: 'Vale',
+    ship_name: 'Vale',
+    intro: '',
+    seed_id: 'vale-test-shop',
+    rooms: [
+      { id: valeCtx.startRoomId, name: 'Town', desc: '' },
+      { id: 'millhaven_market', name: 'Market', desc: '' },
+    ],
+    connections: {
+      [valeCtx.startRoomId]: ['millhaven_market'],
+      millhaven_market: [valeCtx.startRoomId],
+    },
+    enemies: {},
+    loot: {},
+    npcs: {
+      millhaven_market: {
+        roomId: 'millhaven_market',
+        id: 'npc_aldric',
+        name: 'Aldric the Merchant',
+        attitude: 'friendly',
+        factionId: 'faction_guild',
+        hp: 4,
+        ac: 10,
+        damage: '1d4',
+        toHit: 0,
+        xp: 0,
+        greeting: 'hi',
+        responses: [],
+        shop: [{ itemId: 'healing_potion', price: 50 }],
+      } as PlacedNpc,
+    },
+  };
+
+  it('neutral rep (0) charges base price', () => {
+    const choices = generateChoices(makeValeStateInMarket(0), valeMarketSeed, valeCtx);
+    const buy = choices.find((c) => c.action.type === 'buy');
+    expect(buy).toBeDefined();
+    expect((buy?.action as { price: number }).price).toBe(50);
+    expect(buy?.label).not.toMatch(/discount|markup/i);
+  });
+
+  it('friendly rep (25) gives a 10% discount → 45 cr', () => {
+    const choices = generateChoices(makeValeStateInMarket(25), valeMarketSeed, valeCtx);
+    const buy = choices.find((c) => c.action.type === 'buy');
+    expect((buy?.action as { price: number }).price).toBe(45);
+    expect(buy?.label).toMatch(/Merchant Guild discount/);
+  });
+
+  it('exalted rep (75) gives a 25% discount → 38 cr', () => {
+    const choices = generateChoices(makeValeStateInMarket(75), valeMarketSeed, valeCtx);
+    const buy = choices.find((c) => c.action.type === 'buy');
+    expect((buy?.action as { price: number }).price).toBe(38);
+    expect(buy?.label).toMatch(/Merchant Guild discount/);
+  });
+
+  it('unfriendly rep (-5) marks up by 20% → 60 cr', () => {
+    // Aldric is statically 'friendly' attitude, so the shop still surfaces;
+    // the faction rep just changes the price. This is the intentional design:
+    // attitude gates *whether* the shop is open, rep gates *the price*.
+    // Vale thresholds: unfriendly = -10 (i.e. rep >= -10 → unfriendly tier).
+    const choices = generateChoices(makeValeStateInMarket(-5), valeMarketSeed, valeCtx);
+    const buy = choices.find((c) => c.action.type === 'buy');
+    expect((buy?.action as { price: number }).price).toBe(60);
+    expect(buy?.label).toMatch(/Merchant Guild markup/);
+  });
+
+  it('hostile rep (-100) marks up by 50% → 75 cr', () => {
+    const choices = generateChoices(makeValeStateInMarket(-100), valeMarketSeed, valeCtx);
+    const buy = choices.find((c) => c.action.type === 'buy');
+    expect((buy?.action as { price: number }).price).toBe(75);
+    expect(buy?.label).toMatch(/Merchant Guild markup/);
   });
 });
