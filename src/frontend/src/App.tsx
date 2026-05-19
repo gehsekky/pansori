@@ -418,11 +418,13 @@ export default function App() {
                       </button>
                     </div>
                   ) : (
-                    <div className={styles.choices}>
+                    <div className={styles.choices} data-testid="choices-list">
                       {!loading &&
                         choices.map((c, i) => (
                           <button
                             key={i}
+                            data-testid="choice-btn"
+                            data-action-type={c.action.type}
                             className={styles.choiceBtn}
                             onClick={() => handleChoice(c)}
                             onMouseEnter={() => c.aoePreview && setHoveredChoice(c)}
