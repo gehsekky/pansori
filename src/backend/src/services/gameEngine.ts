@@ -2595,15 +2595,22 @@ export async function takeAction({
       // from).
       st.loot_taken = [...st.loot_taken, roomId, loot.id];
       narrative = pick(context.narratives.lootPickedUp).replace(/{item}/g, loot.name);
+      // SRD 5.2.1 p.136 — magic items are unidentified on pickup until you
+      // spend a short rest examining them, OR a character with Arcana /
+      // Investigation skill IDs them on sight. Mundane quest items (the
+      // Guild Ledger, the cult idol, a locket) aren't magical and should
+      // never be flagged "unidentified" — gate on `requiresAttunement` as
+      // the proxy for "this is a real magic item."
+      const isMagicMisc = loot.type === 'misc' && !!loot.requiresAttunement;
       const hasIdentify =
         context.classSkills[char.character_class]?.some((s) =>
           ['arcana', 'investigation'].includes(s)
         ) ?? false;
-      if (loot.type === 'misc' && !hasIdentify) {
+      if (isMagicMisc && !hasIdentify) {
         narrative += ` [${loot.name}: unidentified]`;
       } else {
         narrative += ` [${loot.name}: ${loot.desc}]`;
-        if (hasIdentify && loot.type === 'misc') {
+        if (hasIdentify && isMagicMisc) {
           narrative += ' Your expertise lets you identify it immediately.';
         }
       }
