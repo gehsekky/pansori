@@ -45,7 +45,8 @@ export type StructuredAction =
   | { type: 'ready'; trigger: string; action: StructuredAction }
   | { type: 'use_reaction' }
   | { type: 'select_subclass'; subclass: string }
-  | { type: 'prepare_spells'; spellIds: string[] };
+  | { type: 'prepare_spells'; spellIds: string[] }
+  | { type: 'resolve_reaction'; accept: boolean };
 
 export interface GameChoice {
   label: string;
@@ -250,6 +251,20 @@ export interface PlacedNpc extends NpcTemplate {
 
 // ─── Game state (world/party container) ──────────────────────────────────────
 
+export interface PendingReaction {
+  kind: 'shield';
+  attackerEnemyId: string;
+  targetCharId: string;
+  atkTotal: number;
+  targetAcAtAttack: number;
+  pendingDamage: number;
+  pendingNarrative: string;
+  resumeFromInitiativeIdx: number;
+  resumeFromMultiattackIdx: number;
+  narrativeSoFar: string;
+  eligibleCharIds: string[];
+}
+
 export interface GameState {
   // Party
   characters: Character[];
@@ -299,6 +314,9 @@ export interface GameState {
   vow_of_enmity_target?: string;
   cutting_words_penalty?: number;
   round?: number;
+
+  // Reactive spell window — see backend PendingReaction.
+  pending_reaction?: PendingReaction;
 
   // Campaign overlay
   current_location_id?: string;

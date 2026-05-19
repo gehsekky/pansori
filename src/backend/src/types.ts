@@ -253,7 +253,7 @@ export interface Spell {
   name: string;
   desc: string;
   level: number; // 0 = cantrip
-  castTime: 'action' | 'bonus_action';
+  castTime: 'action' | 'bonus_action' | 'reaction';
   damage?: string; // dice expr, e.g. '8d6'
   damageType?: string;
   savingThrow?: AbilityKey;
@@ -332,7 +332,8 @@ export type StructuredAction =
   | { type: 'ready'; trigger: string; action: StructuredAction }
   | { type: 'use_reaction' }
   | { type: 'select_subclass'; subclass: string }
-  | { type: 'prepare_spells'; spellIds: string[] };
+  | { type: 'prepare_spells'; spellIds: string[] }
+  | { type: 'resolve_reaction'; accept: boolean };
 
 export interface GameChoice {
   label: string;
@@ -426,6 +427,41 @@ export interface Character {
   inspiration?: boolean;
 }
 
+// ─── Reactive spell window ───────────────────────────────────────────────────
+
+// A `pending_reaction` snapshot pauses the enemy-turn loop mid-resolution
+// and gives an eligible PC the chance to spend their reaction (PHB p.190).
+// The engine stores enough state to resume after the player decides:
+//   - resumeFromInitiativeIdx / resumeFromMultiattackIdx: where in the
+//     auto-resolve loop to pick up.
+//   - trigger: the in-flight attack details (so the reaction can negate or
+//     respond to the specific hit when it lands).
+//   - narrativeSoFar: text accumulated before the pause, prepended to the
+//     final narrative when combat resumes.
+//   - eligibleCharIds: which party member(s) may declare the reaction.
+export interface PendingReaction {
+  // Discriminant for follow-up reaction types (counterspell, hellish_rebuke).
+  // Today only 'shield' is wired.
+  kind: 'shield';
+  attackerEnemyId: string;
+  targetCharId: string;
+  // The to-hit total that triggered the window. Shield retroactively adds +5
+  // AC; if the attack would still hit at AC+5 the engine wouldn't have opened
+  // the window in the first place, so accepting always negates.
+  atkTotal: number;
+  targetAcAtAttack: number;
+  // Damage and condition effects pre-rolled at trigger time. If the player
+  // declines, these get applied as if Shield was never offered. If accepted,
+  // they're discarded.
+  pendingDamage: number;
+  pendingNarrative: string; // the hit narrative the engine would have emitted
+  // Resume coordinates in the auto-resolve enemy-turn loop.
+  resumeFromInitiativeIdx: number;
+  resumeFromMultiattackIdx: number; // 0-indexed; how many sub-attacks already resolved
+  narrativeSoFar: string;
+  eligibleCharIds: string[];
+}
+
 // ─── Game state (world/party container) ──────────────────────────────────────
 
 export interface GameState {
@@ -477,6 +513,12 @@ export interface GameState {
   vow_of_enmity_target?: string; // Vengeance Paladin vow target entity id
   cutting_words_penalty?: number; // Lore Bard Cutting Words penalty to apply
   round?: number; // current combat round (1-indexed)
+
+  // Reactive spell window (PHB p.190 — reactions). When set, the engine is
+  // paused mid-enemy-turn waiting for an eligible PC to decide whether to
+  // spend their reaction. While set, generateChoices offers only the
+  // reaction choices; the player resolves with `resolve_reaction`.
+  pending_reaction?: PendingReaction;
 
   // Campaign overlay (merged from CampaignState at session load)
   current_location_id?: string;
