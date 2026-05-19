@@ -133,7 +133,7 @@ export const context: Context = {
     Fighter: ['longsword', 'chain_mail', 'shield'],
     Rogue: ['shortsword', 'leather_armor'],
     Wizard: ['quarterstaff', 'component_pouch'],
-    Cleric: ['mace', 'chain_mail', 'holy_symbol'],
+    Cleric: ['mace', 'scale_mail', 'shield', 'holy_symbol'],
     Ranger: ['shortsword', 'longbow', 'leather_armor'],
     Paladin: ['longsword', 'chain_mail', 'shield'],
     Bard: ['rapier', 'leather_armor'],
@@ -510,6 +510,25 @@ export const context: Context = {
       armorAcBase: 16,
       dexCapToAc: 0,
       aliases: ['mail', 'chainmail'],
+    },
+    {
+      // PHB p.144 — medium armor. AC 14 + DEX modifier (max +2). Cleric and
+      // Druid start in this by default; heavier classes (Fighter, Paladin)
+      // upgrade to chain_mail.
+      id: 'scale_mail',
+      name: 'Scale Mail',
+      weight: 6,
+      desc: 'Overlapping steel scales over a leather backing.',
+      type: 'armor',
+      slot: 'armor',
+      damage: null,
+      ac_bonus: null,
+      heal: null,
+      effect: null,
+      armorCategory: 'medium',
+      armorAcBase: 14,
+      dexCapToAc: 2,
+      aliases: ['scale', 'scalemail'],
     },
     {
       id: 'leather_armor',
