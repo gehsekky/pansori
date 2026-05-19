@@ -70,6 +70,7 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 - [ ] **Authoring documentation (`AUTHORING.md`)** — see top-5 item 5.
 - [ ] **Save/state persistence across redeploys** — verify a mid-campaign session survives a backend redeploy. The state migration path on schema changes is untested.
 - [ ] **Difficulty tuning from playtest data** — once playtests happen, capture damage/HP/encounter telemetry to inform tuning passes.
+- [ ] **gameEngine.ts class refactor (deferred)** — `takeAction` is ~3700 lines with three handlers that dominate (`use_class_feature` ~800, `cast_spell` ~544, `attack` ~532). Refactor into an `ActionContext` class that owns the per-call mutable state (`state`, `char`, `narrative`, `usedInitiative`, etc.) and dispatches to handler files: `services/actions/castSpell.ts`, `actions/attack.ts`, etc. Each handler becomes a small file taking the context; the trunk shrinks to ~3500 lines. Cost: 4-6 hours across multiple commits, moderate regression risk (the 286-test suite is decent but doesn't cover every code path). Triggers to revisit: (a) a specific big-handler edit keeps grinding into context budget; (b) we want to add a feature touching multiple handlers (e.g. reactive spells / Counterspell from top-5); (c) we have a quiet maintenance day with no playtest-driven priorities.
 
 ---
 
