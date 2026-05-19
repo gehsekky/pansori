@@ -33,7 +33,22 @@ export interface LootItem {
   // SRD 5.2.1 p.90 "Heavy": disadv on attacks if STR < 13 (melee) / DEX < 13
   // (ranged). Greataxe, greatsword, maul, heavy crossbow, longbow, etc.
   heavy?: boolean;
+  // 2024 PHB Weapon Mastery property. Each weapon has at most one mastery.
+  // Only applies when the wielder's class grants Weapon Mastery AND they
+  // have mastered this specific weapon (Character.weaponMasteries).
+  mastery?: WeaponMastery;
 }
+
+export type WeaponMastery =
+  | 'vex' // advantage on next attack vs target this turn/next
+  | 'topple' // CON save or prone on hit
+  | 'push' // push target 10 ft on hit
+  | 'sap' // disadvantage on target's next attack
+  | 'slow' // target's speed -10 ft until your next turn
+  | 'nick' // bonus-action TWF attack folded into Attack action
+  | 'cleave' // hit second target in 5 ft on a hit
+  | 'graze' // missed attack still deals ability-mod damage
+  | 'flex'; // versatile two-handed damage one-handed if no shield
 
 // ─── Seed (procedurally generated world state) ────────────────────────────────
 
@@ -425,6 +440,11 @@ export interface Character {
   // 5e proficiencies (populated at session creation from context tables)
   armor_proficiencies: string[]; // e.g. ['light', 'medium', 'shield']
   weapon_proficiencies: string[]; // e.g. ['simple', 'martial']
+  // 2024 PHB Weapon Mastery — weapon ids the PC has mastered. Class-based
+  // grant: Fighter/Paladin/Ranger get 2-3 at L1, Barbarian/Rogue get 2,
+  // Wizard/Druid/Bard get 0 by default. Wielding a weapon NOT in this list
+  // doesn't grant its mastery property even if the weapon has one.
+  weapon_masteries?: string[];
   attuned_items: string[]; // instance_ids of attuned magic items (max 3)
   concentrating_on?: { spellId: string; condition?: string } | null;
   // Extended 5e fields

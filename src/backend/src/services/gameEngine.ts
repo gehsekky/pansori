@@ -3001,6 +3001,26 @@ export async function takeAction({
       // Reckless Attack (Barbarian L2+): advantage on melee weapon attacks
       const recklessAdv = !!char.turn_actions.reckless && weaponItem?.range !== 'ranged';
 
+      // 2024 PHB Vex weapon mastery — previous hit with a Vex weapon by this
+      // char on this target grants advantage on the next attack. Consume the
+      // tag immediately (RAW: lasts until end of your next turn, but for our
+      // single-attack action model, one-shot is closer to what players
+      // expect).
+      const vexTag = `vexed_by_${char.id}`;
+      const vexAdv = !!st.entities?.find(
+        (e) => e.id === targetId && e.isEnemy && e.conditions.includes(vexTag)
+      );
+      if (vexAdv) {
+        st = {
+          ...st,
+          entities: (st.entities ?? []).map((e) =>
+            e.id === targetId && e.isEnemy
+              ? { ...e, conditions: e.conditions.filter((c) => c !== vexTag) }
+              : e
+          ),
+        };
+      }
+
       // Path of the Totem Warrior — Wolf (PHB p.51): "While raging, your
       // allies have advantage on melee attack rolls against any creature
       // within 5 feet of you that is hostile to you." Find any Wolf-totem
@@ -3045,7 +3065,8 @@ export async function takeAction({
         vowAdv ||
         recklessAdv ||
         inspirationAdv ||
-        wolfAdv;
+        wolfAdv ||
+        vexAdv;
       const disadvReasons = [
         rangedInMelee ? 'ranged in melee' : '',
         conditionDisadv ? char.conditions.filter((c) => DISADV_CONDITIONS.has(c)).join(', ') : '',
@@ -3247,6 +3268,96 @@ export async function takeAction({
           targetAc: target.ac,
           round: st.round ?? 1,
         });
+
+        // ── 2024 PHB Weapon Mastery on hit ────────────────────────────────────
+        // Apply the weapon's mastery property IF the PC has mastered this
+        // weapon. Mastery effects are post-damage so they don't change
+        // whether the hit lands.
+        if (
+          weaponItem?.mastery &&
+          newEnemyHp > 0 &&
+          (char.weapon_masteries ?? []).includes(weaponItem.id)
+        ) {
+          const mastery = weaponItem.mastery;
+          const weaponDc = 8 + profBonus(char.level) + abilityMod(char.str);
+          if (mastery === 'vex') {
+            // Mark target so this PC's next attack against them has adv.
+            // Stored as a condition with the char.id suffix so multiple PCs
+            // can vex independently.
+            const tag = `vexed_by_${char.id}`;
+            st = {
+              ...st,
+              entities: (st.entities ?? []).map((e) =>
+                e.id === targetId && e.isEnemy
+                  ? { ...e, conditions: [...e.conditions.filter((c) => c !== tag), tag] }
+                  : e
+              ),
+            };
+            narrative += ` [Vex: advantage on your next attack vs ${target.name}]`;
+          } else if (mastery === 'topple') {
+            const enemyCon = (target.con ?? 10) as number;
+            const conSave = rollDice('1d20') + abilityMod(enemyCon);
+            if (conSave < weaponDc) {
+              st = {
+                ...st,
+                entities: (st.entities ?? []).map((e) =>
+                  e.id === targetId && e.isEnemy
+                    ? { ...e, conditions: [...e.conditions.filter((c) => c !== 'prone'), 'prone'] }
+                    : e
+                ),
+              };
+              st = pushEvent(st, {
+                kind: 'condition_applied',
+                targetId,
+                targetName: target.name,
+                condition: 'prone',
+                source: 'Topple (weapon mastery)',
+                round: st.round ?? 1,
+              });
+              narrative += ` [Topple: CON ${conSave} vs DC ${weaponDc} — ${target.name} is prone!]`;
+            } else {
+              narrative += ` [Topple: CON ${conSave} vs DC ${weaponDc} — resists]`;
+            }
+          } else if (mastery === 'push') {
+            // Move target 10 ft (2 grid squares) directly away from the attacker.
+            const charEnt = st.entities?.find((e) => e.id === char.id);
+            const targetEnt = st.entities?.find((e) => e.id === targetId && e.isEnemy);
+            if (charEnt && targetEnt) {
+              const dx = Math.sign(targetEnt.pos.x - charEnt.pos.x);
+              const dy = Math.sign(targetEnt.pos.y - charEnt.pos.y);
+              const newPos = { x: targetEnt.pos.x + dx * 2, y: targetEnt.pos.y + dy * 2 };
+              st = {
+                ...st,
+                entities: (st.entities ?? []).map((e) =>
+                  e.id === targetId && e.isEnemy ? { ...e, pos: newPos } : e
+                ),
+              };
+              narrative += ` [Push: ${target.name} shoved 10 ft back]`;
+            }
+          } else if (mastery === 'sap') {
+            // Disadvantage on target's next attack — tag with sapped_<charId>
+            st = {
+              ...st,
+              entities: (st.entities ?? []).map((e) =>
+                e.id === targetId && e.isEnemy
+                  ? { ...e, conditions: [...e.conditions.filter((c) => c !== 'sapped'), 'sapped'] }
+                  : e
+              ),
+            };
+            narrative += ` [Sap: ${target.name} has disadvantage on its next attack]`;
+          } else if (mastery === 'slow') {
+            // Speed -10 ft until your next turn. Store as slowed_until_next_turn.
+            st = {
+              ...st,
+              entities: (st.entities ?? []).map((e) =>
+                e.id === targetId && e.isEnemy
+                  ? { ...e, conditions: [...e.conditions.filter((c) => c !== 'slowed'), 'slowed'] }
+                  : e
+              ),
+            };
+            narrative += ` [Slow: ${target.name}'s speed -10 ft]`;
+          }
+        }
 
         if (newEnemyHp <= 0) {
           const xpGain = target.xp ?? 10 + (target.hp || 8);

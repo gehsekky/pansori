@@ -436,6 +436,7 @@ export const context: Context = {
       aliases: ['dagger', 'knife'],
       weaponType: 'simple',
       damageType: 'piercing',
+      mastery: 'nick',
     },
     {
       id: 'handaxe',
@@ -453,6 +454,7 @@ export const context: Context = {
       aliases: ['handaxe', 'hand axe', 'hatchet'],
       weaponType: 'simple',
       damageType: 'slashing',
+      mastery: 'vex',
     },
     {
       id: 'quarterstaff',
@@ -470,6 +472,7 @@ export const context: Context = {
       aliases: ['quarterstaff', 'staff', 'quarter staff'],
       weaponType: 'simple',
       damageType: 'bludgeoning',
+      mastery: 'topple',
     },
     {
       id: 'mace',
@@ -486,6 +489,7 @@ export const context: Context = {
       aliases: ['mace'],
       weaponType: 'simple',
       damageType: 'bludgeoning',
+      mastery: 'sap',
     },
     {
       id: 'shortbow',
@@ -502,6 +506,7 @@ export const context: Context = {
       aliases: ['shortbow', 'short bow'],
       weaponType: 'simple',
       damageType: 'piercing',
+      mastery: 'vex',
     },
 
     // Martial melee weapons
@@ -522,6 +527,7 @@ export const context: Context = {
       aliases: ['shortsword', 'short sword'],
       weaponType: 'martial',
       damageType: 'piercing',
+      mastery: 'vex',
     },
     {
       id: 'rapier',
@@ -539,6 +545,7 @@ export const context: Context = {
       aliases: ['rapier'],
       weaponType: 'martial',
       damageType: 'piercing',
+      mastery: 'vex',
     },
     {
       id: 'longsword',
@@ -556,6 +563,7 @@ export const context: Context = {
       aliases: ['longsword', 'long sword', 'sword'],
       weaponType: 'martial',
       damageType: 'slashing',
+      mastery: 'sap',
     },
     {
       id: 'greatsword',
@@ -572,6 +580,7 @@ export const context: Context = {
       aliases: ['greatsword', 'great sword'],
       weaponType: 'martial',
       damageType: 'slashing',
+      mastery: 'graze',
     },
     {
       id: 'longbow',
@@ -588,6 +597,7 @@ export const context: Context = {
       aliases: ['longbow', 'long bow'],
       weaponType: 'martial',
       damageType: 'piercing',
+      mastery: 'slow',
     },
 
     // Magic weapon (requires attunement)
