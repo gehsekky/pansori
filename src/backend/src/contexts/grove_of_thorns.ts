@@ -20,6 +20,7 @@ import {
   SRD_CLASS_SAVING_THROWS,
   SRD_CLASS_SKILLS,
   SRD_CLASS_WEAPON_PROFICIENCIES,
+  SRD_MONSTERS,
   SRD_SPELLCASTING_ABILITY,
   SRD_SPELLS,
 } from './srd/index.js';
@@ -142,59 +143,17 @@ export const context: Context = {
   // ─── Enemy templates ────────────────────────────────────────────────────────
 
   enemyTemplates: [
+    // SRD wolf, magically awakened — int 10 (vs base 3) + stronger bite
+    // (2d4+2 vs 1d6+1). Reads as a wolf that thinks like a person.
     {
+      ...SRD_MONSTERS.wolf,
       name: 'Awakened Wolf',
-      cr: 0.25,
-      hp: 11,
-      ac: 13,
       damage: '2d4+2',
-      toHit: 4,
-      xp: 50,
-      str: 12,
-      dex: 15,
-      con: 12,
-      int: 10, // higher than normal — magical awakening
-      wis: 12,
-      cha: 8,
-      damageType: 'piercing',
+      int: 10,
     },
-    {
-      name: 'Giant Spider',
-      cr: 0.25,
-      hp: 13,
-      ac: 14,
-      damage: '1d8',
-      toHit: 5,
-      xp: 100,
-      str: 8,
-      dex: 16,
-      con: 11,
-      int: 2,
-      wis: 11,
-      cha: 4,
-      // Poison on-hit — DC 11 CON save or poisoned. Pansori models the
-      // condition; the spider's bite is meaningfully scary because
-      // poisoned imposes disadv on attacks + ability checks.
-      onHitEffect: { condition: 'poisoned', ability: 'con', dc: 11 },
-      damageType: 'piercing',
-    },
-    {
-      name: 'Brown Bear',
-      cr: 1,
-      hp: 34,
-      ac: 11,
-      damage: '2d6+4',
-      toHit: 5,
-      xp: 200,
-      str: 19,
-      dex: 10,
-      con: 16,
-      int: 2,
-      wis: 13,
-      cha: 7,
-      multiattack: 2, // claw + bite
-      damageType: 'slashing',
-    },
+    // Pure SRD entries — already themed for a fey grove.
+    SRD_MONSTERS.giant_spider,
+    SRD_MONSTERS.brown_bear,
     {
       name: 'Fey Trickster',
       cr: 4,
