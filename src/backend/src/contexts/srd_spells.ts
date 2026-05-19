@@ -297,6 +297,21 @@ export const SRD_SPELLS: Record<string, Spell> = {
   },
 
   // ─── Level 3 ────────────────────────────────────────────────────────────────
+  counterspell: {
+    id: 'counterspell',
+    name: 'Counterspell',
+    // PHB p.234 — abjuration, 3rd-level. "1 reaction, which you take when
+    // you see a creature within 60 feet of you casting a spell. The
+    // creature's spell fails and has no effect if it is of 3rd level or
+    // lower. If it is 4th level or higher, make an ability check using
+    // your spellcasting ability (DC = 10 + the spell's level). On a
+    // success, the creature's spell fails and has no effect."
+    desc: 'A reaction that interrupts a creature casting a spell. Auto-counters spells of 3rd level or lower (slot ≥ spell level); ability check (DC 10 + spell level) for higher.',
+    level: 3,
+    castTime: 'reaction',
+    rangeKind: 'ranged',
+    rangeFt: 60,
+  },
   fireball: {
     id: 'fireball',
     name: 'Fireball',

@@ -858,6 +858,25 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         },
       ];
     }
+    if (pending.kind === 'counterspell') {
+      // Auto-counter when the slot level ≥ the enemy spell's level (which
+      // for Counterspell-base means level ≤ 3). Higher-level enemy spells
+      // need an ability check; we surface both label variants for clarity.
+      const autoCounter = pending.enemySpellLevel <= 3;
+      const cs = autoCounter
+        ? `auto-counter`
+        : `ability check vs DC ${10 + pending.enemySpellLevel}`;
+      return [
+        {
+          label: `Cast Counterspell (reaction, 3rd-level slot) — interrupt ${enemyForLabel}'s ${pending.enemySpellName} (${cs})`,
+          action: { type: 'resolve_reaction', accept: true },
+        },
+        {
+          label: `Decline — let ${pending.enemySpellName} resolve`,
+          action: { type: 'resolve_reaction', accept: false },
+        },
+      ];
+    }
   }
 
   // Pending ASI: only show stat-boost choices until resolved
@@ -1991,6 +2010,66 @@ function isHellishRebukeEligible(
   return true;
 }
 
+// Resolve a pending enemy spell's damage on its intended target. Used by
+// the Counterspell decline path (and by counterspell-failed-check). Returns
+// undefined if there's nothing to apply (spell has no damage, target dead).
+function applyEnemySpellDamage(
+  st: GameState,
+  rx: { enemySpellId: string; intendedTargetPcId: string },
+  context: Context
+):
+  | { st: GameState; targetHp: number; targetName: string; dmgRoll: number; damageType: string }
+  | undefined {
+  const tgtIdx = st.characters.findIndex((c) => c.id === rx.intendedTargetPcId);
+  if (tgtIdx < 0) return undefined;
+  const spell = context.spellTable?.[rx.enemySpellId];
+  if (!spell?.damage) return undefined;
+  const dmgRoll = rollDice(spell.damage);
+  const tgt = st.characters[tgtIdx];
+  const newHp = Math.max(0, tgt.hp - dmgRoll);
+  const newSt: GameState = {
+    ...st,
+    characters: st.characters.map((c, i) => (i === tgtIdx ? { ...c, hp: newHp } : c)),
+    entities: st.entities?.map((e) => (e.id === tgt.id && !e.isEnemy ? { ...e, hp: newHp } : e)),
+  };
+  return {
+    st: newSt,
+    targetHp: newHp,
+    targetName: tgt.name,
+    dmgRoll,
+    damageType: spell.damageType ?? 'damage',
+  };
+}
+
+// Counterspell (PHB p.234) — triggers when a creature within 60 ft is
+// casting a spell. Requires Counterspell prepared/known + a 3rd-level slot
+// (since the spell itself is 3rd level — slots ≥ spell level only).
+function isCounterspellEligible(
+  reactor: Character,
+  reactorPos: { x: number; y: number } | undefined,
+  casterPos: { x: number; y: number } | undefined,
+  context: Context
+): boolean {
+  if (reactor.dead || reactor.hp <= 0) return false;
+  if (reactor.turn_actions?.reaction_used) return false;
+  const knows =
+    (reactor.prepared_spells ?? []).includes('counterspell') ||
+    (reactor.spells_known ?? []).includes('counterspell');
+  if (!knows) return false;
+  // Need a level-3+ slot to cast counterspell at its base level.
+  const slotsMax = reactor.spell_slots_max ?? {};
+  const slotsUsed = reactor.spell_slots_used ?? {};
+  const hasL3Slot = Object.entries(slotsMax).some(([lvl, max]) => {
+    const lvlN = Number(lvl);
+    return lvlN >= 3 && (max ?? 0) > (slotsUsed[lvlN] ?? 0);
+  });
+  if (!hasL3Slot) return false;
+  if (!context.spellTable?.counterspell) return false;
+  if (!reactorPos || !casterPos) return false;
+  if (distanceFeet(reactorPos, casterPos) > 60) return false;
+  return true;
+}
+
 interface EnemyTurnResult {
   st: GameState;
   narrative: string;
@@ -2036,6 +2115,96 @@ function runEnemyTurns(args: {
       if (targetCharIdx >= 0) {
         let target = st.characters[targetCharIdx];
         if (!target.dead && target.hp > 0) {
+          // ── Spell-cast intent ──────────────────────────────────────────────
+          // If this enemy has a spell list and rolls under castChance, they
+          // cast instead of melee-attacking this turn. resumeMi > 0 means we
+          // already started a multi-attack last time — skip the cast check
+          // on resume to avoid re-deciding mid-burst.
+          if (
+            resumeMi === 0 &&
+            rm.spells &&
+            rm.spells.length > 0 &&
+            (rm.castChance ?? 0) > 0 &&
+            Math.random() < (rm.castChance ?? 0)
+          ) {
+            const spellId = pick(rm.spells);
+            const spell = args.context.spellTable?.[spellId];
+            if (spell && spell.damage) {
+              // Counterspell eligibility — check all party PCs.
+              const reactor = st.characters.find((c) =>
+                isCounterspellEligible(
+                  c,
+                  st.entities?.find((e) => e.id === c.id)?.pos,
+                  eEnt?.pos,
+                  args.context
+                )
+              );
+              if (reactor) {
+                st = {
+                  ...st,
+                  pending_reaction: {
+                    kind: 'counterspell',
+                    attackerEnemyId: eEntry.id,
+                    targetCharId: reactor.id,
+                    intendedTargetPcId: target.id,
+                    enemySpellId: spellId,
+                    enemySpellLevel: spell.level,
+                    enemySpellName: spell.name,
+                    // Counterspell collapses the WHOLE enemy turn — there's
+                    // no further sub-attack to resume to. Point past this
+                    // enemy so the loop continues with the next initiative slot.
+                    resumeFromInitiativeIdx: (advIdx + 1) % orderLen,
+                    resumeFromMultiattackIdx: 0,
+                    narrativeSoFar: narrative,
+                    eligibleCharIds: [reactor.id],
+                  },
+                  active_character_id: reactor.id,
+                };
+                narrative += ` ✨ ${rm.name} begins casting ${spell.name}! Counterspell available.`;
+                return {
+                  st,
+                  narrative,
+                  exitAdvIdx: advIdx,
+                  roundWrapped,
+                  paused: true,
+                };
+              }
+              // No counterspeller — resolve the spell now and skip multi-attack.
+              const dmgRoll = rollDice(spell.damage);
+              if (spell.savingThrow) {
+                const saveScore = (target[spell.savingThrow] ?? 10) as number;
+                const dc = rm.spellSaveDC ?? 8 + Math.floor((rm.toHit + 5) / 2);
+                const save = rollDice('1d20') + abilityMod(saveScore);
+                const saved = save >= dc;
+                const dmg =
+                  saved && spell.saveEffect === 'half'
+                    ? Math.floor(dmgRoll / 2)
+                    : saved && spell.saveEffect === 'negates'
+                      ? 0
+                      : dmgRoll;
+                target = { ...target, hp: Math.max(0, target.hp - dmg) };
+                narrative += ` ${rm.name} casts ${spell.name}! ${target.name} ${spell.savingThrow.toUpperCase()} save ${save} vs DC ${dc} — ${saved ? 'saves' : 'fails'}, ${dmg} ${spell.damageType ?? 'damage'}.`;
+              } else {
+                target = { ...target, hp: Math.max(0, target.hp - dmgRoll) };
+                narrative += ` ${rm.name} casts ${spell.name}! ${target.name} takes ${dmgRoll} ${spell.damageType ?? 'damage'}.`;
+              }
+              st = {
+                ...st,
+                characters: st.characters.map((c, i) => (i === targetCharIdx ? target : c)),
+                entities: st.entities?.map((e) =>
+                  e.id === target.id && !e.isEnemy ? { ...e, hp: target.hp } : e
+                ),
+              };
+              // Skip the multi-attack — spell IS the action this turn.
+              resumeMi = 0;
+              const prevAdvIdx2 = advIdx;
+              advIdx = (advIdx + 1) % orderLen;
+              if (advIdx === 0 && prevAdvIdx2 !== 0) roundWrapped = true;
+              if (advIdx === args.initialCurrentIdx) break;
+              continue;
+            }
+          }
+
           const attackCount = rm.multiattack ?? 1;
           if (resumeMi === 0) narrative += ` [${rm.name}'s turn]`;
           let massiveDeath = false;
@@ -5893,6 +6062,79 @@ export async function takeAction({
           }
         } else {
           narrative = `${char.name} declines to retaliate.`;
+          st = { ...st, pending_reaction: undefined };
+        }
+      } else if (rx.kind === 'counterspell') {
+        // PHB p.234. Accept = burn a 3rd-level (or higher) slot to interrupt.
+        // Slots ≥ enemy spell level auto-counter; otherwise an ability check
+        // vs DC 10 + spell level. Decline = enemy spell resolves on the
+        // intended target.
+        if (rxAction.accept) {
+          const slotsMax = char.spell_slots_max ?? {};
+          const slotsUsed = char.spell_slots_used ?? {};
+          // Pick the lowest available slot ≥ 3 that's ≥ the enemy spell level.
+          // Falling back to the lowest ≥ 3 means we may need the ability check.
+          const slotLvl = Object.keys(slotsMax)
+            .map(Number)
+            .filter((n) => n >= 3 && (slotsMax[n] ?? 0) > (slotsUsed[n] ?? 0))
+            .sort((a, b) => a - b)[0];
+          if (slotLvl === undefined) {
+            narrative = 'No 3rd-level or higher slot — Counterspell fizzles.';
+            st = { ...st, pending_reaction: undefined };
+          } else {
+            char.spell_slots_used = {
+              ...slotsUsed,
+              [slotLvl]: (slotsUsed[slotLvl] ?? 0) + 1,
+            };
+            char.turn_actions = { ...char.turn_actions, reaction_used: true };
+            const autoCounter = slotLvl >= rx.enemySpellLevel;
+            let success = autoCounter;
+            let checkDetail = '';
+            if (!autoCounter) {
+              const castingAbility = (context.spellcastingAbility?.[char.character_class] ??
+                context.classPrimaryStats[char.character_class] ??
+                'int') as 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha';
+              const score = char[castingAbility] ?? 10;
+              const dc = 10 + rx.enemySpellLevel;
+              const checkRoll = rollDice('1d20') + abilityMod(score) + profBonus(char.level);
+              success = checkRoll >= dc;
+              checkDetail = ` ${castingAbility.toUpperCase()} check ${checkRoll} vs DC ${dc} — ${success ? 'success' : 'failed'}.`;
+            }
+            if (success) {
+              narrative = `⚡ ${char.name} casts COUNTERSPELL (lvl ${slotLvl} slot)!${checkDetail} ${rx.enemySpellName} is unraveled — no effect.`;
+            } else {
+              // Counterspell check failed — the enemy spell still resolves.
+              const damage = applyEnemySpellDamage(st, rx, context);
+              if (damage) {
+                st = damage.st;
+                // If the reactor IS the spell target, sync char so commitChar
+                // doesn't overwrite the damage at the end of takeAction.
+                if (rx.intendedTargetPcId === char.id) {
+                  char = { ...char, hp: damage.targetHp };
+                }
+                narrative = `⚡ ${char.name} casts COUNTERSPELL (lvl ${slotLvl} slot)!${checkDetail} ${rx.enemySpellName} bursts through — ${damage.targetName} takes ${damage.dmgRoll} ${damage.damageType}.`;
+              } else {
+                narrative = `${char.name} fails to counter ${rx.enemySpellName}. The spell resolves.`;
+              }
+            }
+            st = {
+              ...st,
+              characters: st.characters.map((c) => (c.id === char.id ? char : c)),
+              pending_reaction: undefined,
+            };
+          }
+        } else {
+          // Decline — enemy spell resolves on its intended target.
+          const damage = applyEnemySpellDamage(st, rx, context);
+          if (damage) {
+            st = damage.st;
+            if (rx.intendedTargetPcId === char.id) {
+              char = { ...char, hp: damage.targetHp };
+            }
+            narrative = `${char.name} declines to counter. ${rx.enemySpellName} resolves — ${damage.targetName} takes ${damage.dmgRoll} ${damage.damageType}.`;
+          } else {
+            narrative = `${char.name} declines to counter. ${rx.enemySpellName} resolves.`;
+          }
           st = { ...st, pending_reaction: undefined };
         }
       }

@@ -150,6 +150,10 @@ export function generateRoguelikeSeed(context: Context, partySize = 1): Seed {
           vulnerabilities: template.vulnerabilities,
           immunities: template.immunities,
           condition_immunities: template.condition_immunities,
+          spells: template.spells,
+          castChance: template.castChance,
+          spellSaveDC: template.spellSaveDC,
+          spellAttackBonus: template.spellAttackBonus,
         },
       ];
     }

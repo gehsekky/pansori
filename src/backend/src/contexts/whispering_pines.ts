@@ -301,6 +301,12 @@ export const context: Context = {
       condition_immunities: ['frightened', 'paralyzed'],
       onHitEffect: { condition: 'paralyzed', ability: 'con', dc: 13 },
       damageType: 'cold',
+      // Spell-caster — the Acolyte sometimes hurls fire_bolt instead of
+      // melee, opening a Counterspell window for any L5+ caster in the party.
+      spells: ['fire_bolt'],
+      castChance: 0.4,
+      spellAttackBonus: 5,
+      spellSaveDC: 13,
     },
   ],
 
