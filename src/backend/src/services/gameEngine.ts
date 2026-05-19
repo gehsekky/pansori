@@ -5060,7 +5060,19 @@ export async function takeAction({
             rollDice('1d20') +
             abilityMod((enemy as unknown as Record<string, number>)['wis'] ?? 10);
           const goadDC = 8 + profBonus(char.level) + abilityMod(char.cha);
-          if (goadSave < goadDC) {
+          const goadSuccess = goadSave >= goadDC;
+          st = pushEvent(st, {
+            kind: 'save',
+            characterId: enemy!.id,
+            characterName: enemy!.name,
+            ability: 'wis',
+            roll: goadSave,
+            dc: goadDC,
+            success: goadSuccess,
+            vs: 'Goading Attack',
+            round: st.round ?? 1,
+          });
+          if (!goadSuccess) {
             st = {
               ...st,
               entities: (st.entities ?? []).map((e) =>
@@ -5069,6 +5081,14 @@ export async function takeAction({
                   : e
               ),
             };
+            st = pushEvent(st, {
+              kind: 'condition_applied',
+              targetId: enemy!.id,
+              targetName: enemy!.name,
+              condition: 'goaded',
+              source: 'Goading Attack',
+              round: st.round ?? 1,
+            });
             narrative = `Maneuver — Goading Attack: +${sdRoll} damage, ${enemy!.name} goaded (disadvantage vs others)! (WIS save ${goadSave} vs DC ${goadDC})`;
           } else {
             narrative = `Maneuver — Goading Attack: +${sdRoll} damage, ${enemy!.name} resists. (WIS save ${goadSave} vs DC ${goadDC})`;
@@ -5830,7 +5850,19 @@ export async function takeAction({
         const wisSave =
           rollDice('1d20') + abilityMod((enemy as unknown as Record<string, number>)['wis'] ?? 10);
         const frightenDC = 8 + profBonus(char.level) + abilityMod(char.cha);
-        if (wisSave < frightenDC) {
+        const abjureSuccess = wisSave >= frightenDC;
+        st = pushEvent(st, {
+          kind: 'save',
+          characterId: enemy.id,
+          characterName: enemy.name,
+          ability: 'wis',
+          roll: wisSave,
+          dc: frightenDC,
+          success: abjureSuccess,
+          vs: 'Abjure Enemy',
+          round: st.round ?? 1,
+        });
+        if (!abjureSuccess) {
           st = {
             ...st,
             entities: (st.entities ?? []).map((e) =>
@@ -5842,6 +5874,14 @@ export async function takeAction({
                 : e
             ),
           };
+          st = pushEvent(st, {
+            kind: 'condition_applied',
+            targetId: enemy.id,
+            targetName: enemy.name,
+            condition: 'frightened',
+            source: 'Abjure Enemy',
+            round: st.round ?? 1,
+          });
           narrative = `Abjure Enemy! WIS save ${wisSave} vs DC ${frightenDC} — ${enemy.name} is frightened! (${cdUsesVen2 - 1} Channel Divinity remaining)`;
         } else {
           narrative = `Abjure Enemy! WIS save ${wisSave} vs DC ${frightenDC} — ${enemy.name} resists. (${cdUsesVen2 - 1} Channel Divinity remaining)`;
@@ -5910,13 +5950,34 @@ export async function takeAction({
         const frightenedIds = new Set<string>();
         for (const e of inRangeEnemies) {
           const enemyData = getEnemyById(seed, e.id);
+          const targetName = enemyData?.name ?? e.id;
           const wisScore = (enemyData as unknown as Record<string, number>)?.wis ?? 10;
           const save = rollDice('1d20') + abilityMod(wisScore);
-          if (save < dc) {
+          const feySuccess = save >= dc;
+          st = pushEvent(st, {
+            kind: 'save',
+            characterId: e.id,
+            characterName: targetName,
+            ability: 'wis',
+            roll: save,
+            dc,
+            success: feySuccess,
+            vs: 'Fey Presence',
+            round: st.round ?? 1,
+          });
+          if (!feySuccess) {
             frightenedIds.add(e.id);
-            lines.push(`${enemyData?.name ?? e.id}: WIS ${save} vs DC ${dc} — frightened!`);
+            lines.push(`${targetName}: WIS ${save} vs DC ${dc} — frightened!`);
+            st = pushEvent(st, {
+              kind: 'condition_applied',
+              targetId: e.id,
+              targetName,
+              condition: 'frightened',
+              source: 'Fey Presence',
+              round: st.round ?? 1,
+            });
           } else {
-            lines.push(`${enemyData?.name ?? e.id}: WIS ${save} vs DC ${dc} — resists.`);
+            lines.push(`${targetName}: WIS ${save} vs DC ${dc} — resists.`);
           }
         }
         if (frightenedIds.size > 0) {
