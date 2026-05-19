@@ -62,7 +62,10 @@ const L1_SUBCLASS_OPTIONS: Record<string, { id: string; label: string }[]> = {
     { id: 'draconic', label: 'Draconic Bloodline (Draconic Resilience — +1 HP/level)' },
     { id: 'wild_magic', label: 'Wild Magic (Wild Magic Surge — chaotic effects on cast)' },
   ],
-  // Warlock is L1-required too — pack still pending (Fiend + Archfey).
+  Warlock: [
+    { id: 'fiend', label: "The Fiend (Dark One's Blessing — temp HP on kill)" },
+    { id: 'archfey', label: 'The Archfey (Fey Presence — frighten enemies in 10 ft)' },
+  ],
 };
 
 // Fallback compositions when a campaign doesn't override. Mirrors the 5e

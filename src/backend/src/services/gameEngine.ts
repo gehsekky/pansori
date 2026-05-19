@@ -573,6 +573,16 @@ function endCombatState(st: GameState): GameState {
   };
 }
 
+// Fiend Warlock — Dark One's Blessing (PHB p.108): when you reduce a hostile
+// creature to 0 HP, gain temp HP = CHA mod + warlock level (min 1).
+function grantDarkOnesBlessing(char: Character): string {
+  if (char.character_class.toLowerCase() !== 'warlock' || char.subclass !== 'fiend') return '';
+  const grant = Math.max(1, char.level + abilityMod(char.cha));
+  const prev = char.temp_hp ?? 0;
+  if (grant > prev) char.temp_hp = grant;
+  return ` 🔥 Dark One's Blessing: ${char.name} gains ${grant} temp HP.`;
+}
+
 // ─── Rest helper ──────────────────────────────────────────────────────────────
 
 function canRestInRoom(state: GameState, seed: Seed): boolean {
@@ -1103,6 +1113,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       paladin: ['devotion', 'vengeance'],
       bard: ['lore', 'valor'],
       sorcerer: ['draconic', 'wild_magic'],
+      warlock: ['fiend', 'archfey'],
     };
     const reqLevel = subclassLevels[cls] ?? 3;
     if (char.level >= reqLevel && subclassChoices[cls]) {
@@ -1416,6 +1427,20 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       choices.push({
         label: `Arcane Ward — create ${2 * char.level} HP damage shield`,
         action: { type: 'use_class_feature', featureId: 'arcane_ward' },
+      });
+    }
+
+    // Archfey Warlock: Fey Presence (PHB p.109) — 1/short rest, all creatures
+    // in a 10-ft cube within 10 ft make a WIS save or are frightened until
+    // end of your next turn.
+    if (
+      char.subclass === 'archfey' &&
+      cls === 'warlock' &&
+      !char.class_resource_uses?.fey_presence_used
+    ) {
+      choices.push({
+        label: `Fey Presence — frighten enemies in 10 ft, WIS save DC ${8 + profBonus(char.level) + abilityMod(char.cha ?? 10)} (1/short rest)`,
+        action: { type: 'use_class_feature', featureId: 'fey_presence' },
       });
     }
   }
@@ -2548,6 +2573,7 @@ export async function takeAction({
             ),
           };
           st.enemies_killed = [...st.enemies_killed, targetId];
+          narrative += grantDarkOnesBlessing(char);
           // Only end combat once every enemy in the room is down
           if (isRoomCleared(st, seed, roomId)) {
             st = endCombatState(st);
@@ -2857,6 +2883,8 @@ export async function takeAction({
         const warlockSlots = spellSlotsForClassLevel('warlock', char.level);
         char.spell_slots_max = warlockSlots;
         char.spell_slots_used = {};
+        // Archfey: Fey Presence recharges on short rest (PHB p.109)
+        delete srUses.fey_presence_used;
       }
       char.class_resource_uses = srUses;
 
@@ -3492,6 +3520,7 @@ export async function takeAction({
             };
             st.enemies_killed = [...st.enemies_killed, spellTargetId];
             char.concentrating_on = null;
+            narrative += grantDarkOnesBlessing(char);
             if (isRoomCleared(st, seed, roomId)) {
               st = endCombatState(st);
             }
@@ -3598,6 +3627,7 @@ export async function takeAction({
                   ),
                 };
                 st.enemies_killed = [...st.enemies_killed, target.id];
+                narrative += grantDarkOnesBlessing(char);
                 if (isRoomCleared(st, seed, roomId)) {
                   st = endCombatState(st);
                 }
@@ -3678,6 +3708,7 @@ export async function takeAction({
             ),
           };
           st.enemies_killed = [...st.enemies_killed, spellTargetId];
+          narrative += grantDarkOnesBlessing(char);
           if (isRoomCleared(st, seed, roomId)) {
             st = endCombatState(st);
           }
@@ -4513,6 +4544,63 @@ export async function takeAction({
         st = { ...st, cutting_words_penalty: cuttingRoll };
       }
 
+      // ── Archfey Warlock: Fey Presence (PHB p.109) ────────────────────────────
+      else if (fid === 'fey_presence') {
+        if (char.subclass !== 'archfey' || char.character_class.toLowerCase() !== 'warlock') {
+          narrative = 'Only Archfey Warlocks have Fey Presence.';
+          break;
+        }
+        if (char.class_resource_uses?.fey_presence_used) {
+          narrative = 'Fey Presence already used — recovers on a short rest.';
+          break;
+        }
+        const selfEnt = st.entities?.find((e) => e.id === char.id);
+        if (!selfEnt) {
+          narrative = 'Fey Presence requires a grid position.';
+          break;
+        }
+        const dc = 8 + profBonus(char.level) + abilityMod(char.cha);
+        const inRangeEnemies = (st.entities ?? []).filter(
+          (e) => e.isEnemy && e.hp > 0 && distanceFeet(e.pos, selfEnt.pos) <= 10
+        );
+        if (inRangeEnemies.length === 0) {
+          narrative = 'No enemies within 10 ft to ensnare with Fey Presence.';
+          break;
+        }
+        char.class_resource_uses = {
+          ...(char.class_resource_uses ?? {}),
+          fey_presence_used: 1,
+        };
+        const lines: string[] = [];
+        const frightenedIds = new Set<string>();
+        for (const e of inRangeEnemies) {
+          const enemyData = getEnemyById(seed, e.id);
+          const wisScore = (enemyData as unknown as Record<string, number>)?.wis ?? 10;
+          const save = rollDice('1d20') + abilityMod(wisScore);
+          if (save < dc) {
+            frightenedIds.add(e.id);
+            lines.push(`${enemyData?.name ?? e.id}: WIS ${save} vs DC ${dc} — frightened!`);
+          } else {
+            lines.push(`${enemyData?.name ?? e.id}: WIS ${save} vs DC ${dc} — resists.`);
+          }
+        }
+        if (frightenedIds.size > 0) {
+          st = {
+            ...st,
+            entities: (st.entities ?? []).map((e) =>
+              frightenedIds.has(e.id)
+                ? {
+                    ...e,
+                    conditions: [...e.conditions.filter((c) => c !== 'frightened'), 'frightened'],
+                  }
+                : e
+            ),
+          };
+        }
+        narrative = `🌿 Fey Presence! ${char.name} radiates fey magic. ${lines.join(' ')}`;
+        usedInitiative = true;
+      }
+
       // ── Unknown feature fallthrough ────────────────────────────────────────
       else {
         narrative = `Unknown class feature: ${fid}.`;
@@ -4687,6 +4775,7 @@ export async function takeAction({
           ),
         };
         st.enemies_killed = [...(st.enemies_killed || []), twfTargetEntityId];
+        narrative += grantDarkOnesBlessing(char);
         if (st.combat_active && isRoomCleared(st, seed, roomId)) st = endCombatState(st);
       }
       break;

@@ -24,9 +24,7 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 
 - [x] **Heroic Inspiration (2024 PHB)** — granted automatically on a Nat-1 d20, spent via the `spend_inspiration` action for advantage on the next attack. CharStatsCard shows an ✦ INSP badge. Granted-on-Nat-1 model from the 2024 PHB; saves/ability-check advantage not yet wired (those rolls aren't player-mediated).
 - [ ] **Reactive spells / interrupt system** — see top-5 item 2.
-- [ ] **Subclass packs for the remaining classes** (PHB Chapter 3). The L1 picker UI is in place; only `cleric` (life, war) has options. To reach RAW completeness for all 12 classes we still need:
-  - **Sorcerer** (L1) — Draconic Bloodline + Wild Magic
-  - **Warlock** (L1) — Fiend + Archfey (or Great Old One)
+- [~] **Subclass packs for the remaining classes** (PHB Chapter 3). The L1 picker UI is in place. Shipped so far: Cleric (life, war), Sorcerer (draconic, wild_magic), Warlock (fiend, archfey). Still need:
   - **Druid** (L2) — Circle of the Land + Circle of the Moon
   - **Monk** (L3) — Way of the Open Hand + Way of Shadow
   - **Barbarian** (L3) — Path of the Berserker + Path of the Totem Warrior
