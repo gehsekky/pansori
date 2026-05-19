@@ -1516,16 +1516,19 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       });
     }
 
-    // Fighter: Second Wind (bonus action)
-    if (
-      char.character_class.toLowerCase() === 'fighter' &&
-      !char.class_resource_uses?.second_wind
-    ) {
-      choices.push({
-        label: `Second Wind — bonus action: heal 1d10+${char.level} HP`,
-        action: { type: 'use_class_feature', featureId: 'second_wind' },
-        requiresBonusAction: true,
-      });
+    // Fighter: Second Wind (bonus action). 2024 PHB has multi-use scaling:
+    // 2 uses at L1, 3 at L4, 4 at L10. All recover on a short or long rest.
+    if (char.character_class.toLowerCase() === 'fighter') {
+      const secondWindMax = char.level >= 10 ? 4 : char.level >= 4 ? 3 : 2;
+      const secondWindUsed = char.class_resource_uses?.second_wind ?? 0;
+      const secondWindLeft = secondWindMax - secondWindUsed;
+      if (secondWindLeft > 0) {
+        choices.push({
+          label: `Second Wind — bonus action: heal 1d10+${char.level} HP (${secondWindLeft}/${secondWindMax} left)`,
+          action: { type: 'use_class_feature', featureId: 'second_wind' },
+          requiresBonusAction: true,
+        });
+      }
     }
 
     // Rogue L2+: Cunning Action (bonus action options)
@@ -1785,6 +1788,28 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
           label: `Cutting Words — subtract Inspiration die from enemy roll (reaction, ${biLeft2} left)`,
           action: { type: 'use_class_feature', featureId: 'cutting_words' },
         });
+    }
+
+    // 2024 PHB Cleric universal Channel Divinity options — available to
+    // every Cleric regardless of subclass.
+    if (cls === 'cleric' && cdLeft > 0 && state.combat_active && enemyAlive) {
+      choices.push({
+        label: `Divine Spark — 1d8+${abilityMod(char.wis)} radiant damage or heal (Channel Divinity, ${cdLeft} left)`,
+        action: { type: 'use_class_feature', featureId: 'divine_spark' },
+      });
+      choices.push({
+        label: `Turn Undead — undead in 30 ft, WIS save or flee (bonus action, Channel Divinity, ${cdLeft} left)`,
+        action: { type: 'use_class_feature', featureId: 'turn_undead' },
+        requiresBonusAction: true,
+      });
+    }
+    // 2024 PHB Cleric L5: Sear Undead replaces Destroy Undead. AoE radiant
+    // damage to all undead in 30 ft, WIS save halves.
+    if (cls === 'cleric' && char.level >= 5 && cdLeft > 0 && state.combat_active && enemyAlive) {
+      choices.push({
+        label: `Sear Undead — all undead in 30 ft take ${char.level}d8 radiant, WIS save halves (Channel Divinity, ${cdLeft} left)`,
+        action: { type: 'use_class_feature', featureId: 'sear_undead' },
+      });
     }
 
     // Life Cleric: Preserve Life (Channel Divinity, out-of-combat heal)
@@ -5083,13 +5108,16 @@ export async function takeAction({
       }
 
       // ── Second Wind (Fighter bonus action) ────────────────────────────────
+      // 2024 PHB: 2 uses at L1, 3 at L4, 4 at L10. Recovers on short rest.
       else if (fid === 'second_wind') {
         if (char.character_class.toLowerCase() !== 'fighter') {
           narrative = 'Only Fighters have Second Wind.';
           break;
         }
-        if ((char.class_resource_uses?.second_wind ?? 0) >= 1) {
-          narrative = 'Second Wind already used. Recovers on a short or long rest.';
+        const swMax = char.level >= 10 ? 4 : char.level >= 4 ? 3 : 2;
+        const swUsed = char.class_resource_uses?.second_wind ?? 0;
+        if (swUsed >= swMax) {
+          narrative = `Second Wind exhausted (${swMax}/${swMax} used). Recovers on a short or long rest.`;
           break;
         }
         if (char.turn_actions.bonus_action_used) {
@@ -5098,9 +5126,9 @@ export async function takeAction({
         }
         const swHeal = rollDice('1d10') + char.level;
         char.hp = Math.min(char.max_hp, char.hp + swHeal);
-        char.class_resource_uses = { ...(char.class_resource_uses ?? {}), second_wind: 1 };
+        char.class_resource_uses = { ...(char.class_resource_uses ?? {}), second_wind: swUsed + 1 };
         char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
-        narrative = `${char.name} uses Second Wind — healed ${swHeal} HP (now ${char.hp}/${char.max_hp}).`;
+        narrative = `${char.name} uses Second Wind — healed ${swHeal} HP (now ${char.hp}/${char.max_hp}). (${swMax - swUsed - 1}/${swMax} remaining)`;
       }
 
       // ── Bardic Inspiration (Bard bonus action) ────────────────────────────
@@ -5851,6 +5879,185 @@ export async function takeAction({
         const wardHp = 2 * char.level;
         char.class_resource_uses = { ...(char.class_resource_uses ?? {}), arcane_ward: wardHp };
         narrative = `${char.name} creates an Arcane Ward with ${wardHp} HP. It absorbs damage before your HP is reduced.`;
+      }
+
+      // ── 2024 PHB Cleric: Divine Spark (universal Channel Divinity) ───────────
+      // Action. Spend CD to deal 1d8 + WIS mod radiant damage to a target OR
+      // heal a target ally the same amount. Default: damage the current enemy.
+      else if (fid === 'divine_spark') {
+        if (char.character_class.toLowerCase() !== 'cleric') {
+          narrative = 'Only Clerics have Divine Spark.';
+          break;
+        }
+        const cdUsesDS = char.class_resource_uses?.channel_divinity ?? 1;
+        if (cdUsesDS <= 0) {
+          narrative = 'No Channel Divinity uses remaining.';
+          break;
+        }
+        if (!enemyAlive || !enemy) {
+          narrative = 'No living target.';
+          break;
+        }
+        char.class_resource_uses = {
+          ...(char.class_resource_uses ?? {}),
+          channel_divinity: cdUsesDS - 1,
+        };
+        const dsRoll = rollDice('1d8') + abilityMod(char.wis);
+        const dsHp = Math.max(0, enemy.hp - dsRoll);
+        st = {
+          ...st,
+          entities: (st.entities ?? []).map((e) =>
+            e.id === enemy.id && e.isEnemy ? { ...e, hp: dsHp } : e
+          ),
+        };
+        st = pushEvent(st, {
+          kind: 'attack_hit',
+          attackerId: char.id,
+          attackerName: char.name,
+          targetId: enemy.id,
+          targetName: enemy.name,
+          damage: dsRoll,
+          damageType: 'radiant',
+          isCrit: false,
+          toHit: 0,
+          targetAc: enemy.ac,
+          round: st.round ?? 1,
+        });
+        narrative = `✦ Divine Spark! ${enemy.name} takes ${dsRoll} radiant damage. (${cdUsesDS - 1} Channel Divinity remaining)`;
+        if (dsHp <= 0) {
+          char.xp = (char.xp || 0) + (enemy.xp ?? 0);
+          narrative += ` ${enemy.name} is destroyed.`;
+        }
+        usedInitiative = true;
+      }
+
+      // ── 2024 PHB Cleric: Turn Undead (universal Channel Divinity) ────────────
+      // Bonus action (was an action in 2014). All undead within 30 ft must make
+      // a WIS save or be frightened of the cleric for 1 minute. They can't
+      // willingly move closer; if affected they must Dash away when possible.
+      // We model with the existing `frightened` condition.
+      else if (fid === 'turn_undead') {
+        if (char.character_class.toLowerCase() !== 'cleric') {
+          narrative = 'Only Clerics have Turn Undead.';
+          break;
+        }
+        const cdUsesTU = char.class_resource_uses?.channel_divinity ?? 1;
+        if (cdUsesTU <= 0) {
+          narrative = 'No Channel Divinity uses remaining.';
+          break;
+        }
+        if (char.turn_actions.bonus_action_used) {
+          narrative = 'Bonus action already used this turn.';
+          break;
+        }
+        char.class_resource_uses = {
+          ...(char.class_resource_uses ?? {}),
+          channel_divinity: cdUsesTU - 1,
+        };
+        char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
+        const tuDC = 8 + profBonus(char.level) + abilityMod(char.wis);
+        const selfEntTU = st.entities?.find((e) => e.id === char.id);
+        // Identify undead enemies. Convention: enemy name contains "skeleton",
+        // "ghoul", "shadow", "zombie", "lich", "wraith", "undead" — RAW would
+        // check creature type but our enemy templates don't carry that yet.
+        const undeadKeywords = /skeleton|ghoul|shadow|zombie|lich|wraith|undead|crypt/i;
+        const turnedIds: string[] = [];
+        const lines: string[] = [];
+        for (const e of st.entities ?? []) {
+          if (!e.isEnemy || e.hp <= 0) continue;
+          if (!selfEntTU) continue;
+          const dist = Math.max(
+            Math.abs(e.pos.x - selfEntTU.pos.x),
+            Math.abs(e.pos.y - selfEntTU.pos.y)
+          );
+          if (dist > 6) continue; // 30 ft = 6 squares
+          const enemyData = getEnemyById(seed, e.id);
+          if (!enemyData || !undeadKeywords.test(enemyData.name)) continue;
+          const wisScore = (enemyData as unknown as Record<string, number>)?.wis ?? 10;
+          const save = rollDice('1d20') + abilityMod(wisScore);
+          if (save < tuDC) {
+            turnedIds.push(e.id);
+            lines.push(`${enemyData.name}: WIS ${save} vs DC ${tuDC} — turned!`);
+            st = pushEvent(st, {
+              kind: 'condition_applied',
+              targetId: e.id,
+              targetName: enemyData.name,
+              condition: 'frightened',
+              source: 'Turn Undead',
+              round: st.round ?? 1,
+            });
+          } else {
+            lines.push(`${enemyData.name}: WIS ${save} vs DC ${tuDC} — resists.`);
+          }
+        }
+        if (turnedIds.length > 0) {
+          st = {
+            ...st,
+            entities: (st.entities ?? []).map((e) =>
+              turnedIds.includes(e.id)
+                ? {
+                    ...e,
+                    conditions: [...e.conditions.filter((c) => c !== 'frightened'), 'frightened'],
+                  }
+                : e
+            ),
+          };
+        }
+        narrative =
+          lines.length > 0
+            ? `✦ Turn Undead! ${lines.join(' ')} (${cdUsesTU - 1} Channel Divinity remaining)`
+            : `Turn Undead — no undead within 30 ft. (${cdUsesTU - 1} Channel Divinity remaining)`;
+      }
+
+      // ── 2024 PHB Cleric L5: Sear Undead ──────────────────────────────────────
+      // Action. Replaces 2014 Destroy Undead. AoE radiant: each undead in 30 ft
+      // takes Nd8 (N = cleric level) radiant damage; WIS save halves.
+      else if (fid === 'sear_undead') {
+        if (char.character_class.toLowerCase() !== 'cleric') {
+          narrative = 'Only Clerics have Sear Undead.';
+          break;
+        }
+        if (char.level < 5) {
+          narrative = 'Sear Undead requires Cleric level 5.';
+          break;
+        }
+        const cdUsesSU = char.class_resource_uses?.channel_divinity ?? 1;
+        if (cdUsesSU <= 0) {
+          narrative = 'No Channel Divinity uses remaining.';
+          break;
+        }
+        char.class_resource_uses = {
+          ...(char.class_resource_uses ?? {}),
+          channel_divinity: cdUsesSU - 1,
+        };
+        const suDC = 8 + profBonus(char.level) + abilityMod(char.wis);
+        const selfEntSU = st.entities?.find((e) => e.id === char.id);
+        const undeadRegex = /skeleton|ghoul|shadow|zombie|lich|wraith|undead|crypt/i;
+        const lines: string[] = [];
+        const newEntities = (st.entities ?? []).map((e) => {
+          if (!e.isEnemy || e.hp <= 0 || !selfEntSU) return e;
+          const dist = Math.max(
+            Math.abs(e.pos.x - selfEntSU.pos.x),
+            Math.abs(e.pos.y - selfEntSU.pos.y)
+          );
+          if (dist > 6) return e;
+          const enemyData = getEnemyById(seed, e.id);
+          if (!enemyData || !undeadRegex.test(enemyData.name)) return e;
+          const wisScore = (enemyData as unknown as Record<string, number>)?.wis ?? 10;
+          const save = rollDice('1d20') + abilityMod(wisScore);
+          const fullDmg = rollDice(`${char.level}d8`);
+          const dmg = save >= suDC ? Math.floor(fullDmg / 2) : fullDmg;
+          lines.push(
+            `${enemyData.name}: WIS ${save} vs DC ${suDC} — ${dmg} radiant${save >= suDC ? ' (half)' : ''}`
+          );
+          return { ...e, hp: Math.max(0, e.hp - dmg) };
+        });
+        st = { ...st, entities: newEntities };
+        narrative =
+          lines.length > 0
+            ? `☀️ Sear Undead! ${lines.join(' · ')} (${cdUsesSU - 1} Channel Divinity remaining)`
+            : `Sear Undead — no undead within 30 ft. (${cdUsesSU - 1} Channel Divinity remaining)`;
+        usedInitiative = true;
       }
 
       // ── Life Cleric: Preserve Life (Channel Divinity) ────────────────────────
