@@ -551,14 +551,21 @@ function applyEnemyAttackNarrative(
       }
       if (csResult.applied) {
         // For Frightened, record the source enemy so movement restrictions
-        // can check against it later.
+        // can check against it later. For Charmed, also stash the charmer
+        // on `charmer_id` so the existing "cannot attack your charmer"
+        // guard fires (gameEngine.ts ~3277).
+        const sourceCond = enemy.onHitEffect.condition;
+        const tracksSource = sourceCond === 'frightened' || sourceCond === 'charmed';
         updatedChar = inflictCondition(
           updatedChar,
-          enemy.onHitEffect.condition,
-          enemy.onHitEffect.condition === 'frightened' ? enemy.id : undefined
+          sourceCond,
+          tracksSource ? enemy.id : undefined
         );
+        if (sourceCond === 'charmed') {
+          updatedChar = { ...updatedChar, charmer_id: enemy.id };
+        }
         if (updatedChar.conditions.length > char.conditions.length) {
-          narrative += ` ${char.name} is ${enemy.onHitEffect.condition}!`;
+          narrative += ` ${char.name} is ${sourceCond}!`;
         }
       }
     }

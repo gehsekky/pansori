@@ -52,7 +52,7 @@ to the small-impact items below.
 
 - [x] **Frightened — movement restriction** (SRD p.182) — implemented. `Character.condition_sources` tracks the entity that caused each condition (currently only used for `frightened`). Enemy on-hit effects that frighten a PC record the enemy id; the grid_move handler rejects moves that would close distance to that source. `inflictCondition` accepts an optional `sourceId`; `tickConditions` clears sources on expiry. Useful in Vale (Crypt Lord's frighten-on-hit) and any campaign with frighten-rider attacks.
 - [ ] **Heavy weapon disadvantage for Small creatures** (SRD p.90) — no Small races on either campaign's character sheet. Add when a Small race appears.
-- [ ] **Charmed: charmer's social advantage** (SRD p.181) — no spell currently sets `charmer_id`. Wire it from Charm Person when a charm-effect spell starts appearing in NPC dialogue.
+- [x] **Charmed: charmer attribution** — `charmer_id` is set automatically when an enemy on-hit effect inflicts `charmed` (Fey Trickster path). Charmed PCs already can't attack their charmer (existing check at gameEngine.ts ~3277). Source-attribution shape mirrors the new `condition_sources` map for Frightened.
 - [ ] **Costly material component consumption** — Identify's 100 gp pearl, Resurrection's 1000 gp diamond, etc. No spell currently consumes material components.
 - [ ] **Group ability checks** (SRD p.6) — half-the-party-succeeds = group succeeds. Could fold into the existing sneak action when a party rolls together.
 
