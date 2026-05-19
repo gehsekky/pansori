@@ -6343,6 +6343,73 @@ describe('Heavy encumbrance disadvantage (2024 variant)', () => {
     expect(attacked.newState.characters[0].turn_actions.tactical_master_mastery).toBeUndefined();
   });
 
+  it('Frightened PC cannot move closer to the source of fear (2024)', async () => {
+    const enemyId = `${CORRIDOR_ID}#0`;
+    const pc = makeChar({
+      id: 'pc-fear',
+      character_class: 'Fighter',
+      conditions: ['frightened'],
+      condition_sources: { frightened: enemyId },
+      str: 14,
+      speed: 30,
+    });
+    const state: GameState = {
+      characters: [pc],
+      active_character_id: pc.id,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: true,
+      initiative_order: [{ id: pc.id, roll: 18, is_enemy: false }],
+      initiative_idx: 0,
+      entities: [
+        {
+          id: pc.id,
+          isEnemy: false,
+          pos: { x: 5, y: 5 },
+          hp: 20,
+          maxHp: 20,
+          conditions: ['frightened'],
+          condition_durations: { frightened: 3 },
+        },
+        {
+          id: enemyId,
+          isEnemy: true,
+          pos: { x: 8, y: 5 }, // 3 squares right of PC
+          hp: 30,
+          maxHp: 30,
+          conditions: [],
+          condition_durations: {},
+        },
+      ],
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      flags: {},
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+      round: 1,
+      movement_used: {},
+    };
+    // Try to move one step closer (6,5).
+    const result = await takeAction({
+      action: { type: 'grid_move', entityId: pc.id, to: { x: 6, y: 5 } },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    expect(result.narrative).toMatch(/FRIGHTENED.*can't willingly move closer/);
+    const pcEnt = result.newState.entities?.find((e) => e.id === pc.id);
+    expect(pcEnt?.pos).toEqual({ x: 5, y: 5 });
+  });
+
   it('Cunning Action Hide check fires with disadvantage when heavily encumbered', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0); // worst rolls — disadv intensifies
     const rogue = makeChar({
