@@ -43,10 +43,10 @@ to the small-impact items below.
 - [x] **Hide action — full DC tracking** (`4d10043`).
 - [x] **2024 class feature audit — Cleric / Fighter / Monk** (`d17f647`, `e36fb63`).
 - [x] **Inspiration spend on any d20** (`db312c7`).
-- [ ] **Heavy-encumbrance skill-check disadvantage** — speed penalties wired via `effectiveSpeed`; STR/DEX/CON checks + saves + attacks still don't see disadvantage.
-- [ ] **Bardic Inspiration spend on any d20** — saves already wired; ability-check path still skipped. Smaller scope than Heroic Inspiration since it only matters for Bard allies.
-- [ ] **Enemy Search action vs Hide DC** — passive Perception is checked on target-select today; a dedicated Search action would let enemies actively roll. Limited by enemy AI being "nearest PC = target" — useful when AI grows.
-- [ ] **Tactical Master + Studied Attacks (Fighter L9 / L13)** — left out of the L1-focused class audit. Wire when level-up actually reaches L9/L13.
+- [x] **Heavy-encumbrance disadvantage** (`850ee27`) — STR/DEX/CON checks + saves + attacks now see disadvantage when carried weight > 10×STR. `isHeavilyEncumbered` helper + `extraDisadvantage` param on `rollConditionSave`. Surfaced in attack narrative reasons.
+- [x] **Bardic Inspiration spend on any d20** (`ed93a5b`). `consumeBardicForCheck(char)` helper wired into Sneak, Hide, and Search ability-check sites. Saves were already wired through `conditionSavingThrow`.
+- [x] **Enemy Search action vs Hide DC** (`4fc3e55`). When passive Perception fails to spot a hidden PC, the enemy uses their action on an active d20 Search. Success = revealed + attack forfeited; failure = turn lost. Hide now genuinely denies attacks instead of just imposing disadvantage.
+- [x] **Tactical Master + Studied Attacks (Fighter L9 / L13)** (`e83eb30`). Tactical Master pre-arms a Push/Sap/Slow mastery swap for the next attack via `turn_actions.tactical_master_mastery`. Studied Attacks marks missed targets with `studied_by_${char.id}` for next-attack advantage.
 
 ### No-current-content (defer)
 

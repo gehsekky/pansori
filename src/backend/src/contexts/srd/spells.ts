@@ -81,8 +81,11 @@ export const SRD_SPELLS: Record<string, Spell> = {
     name: 'Cure Wounds',
     level: 1,
     castTime: 'action',
-    heal: '1d8+3',
-    desc: 'You heal a creature you touch for 1d8 + spell modifier HP.',
+    // 2024 PHB: 2d8 + spellcasting modifier (was 1d8 + mod in 2014). Engine
+    // adds the casting-stat mod on top of this roll.
+    heal: '2d8',
+    upcastBonus: '2d8',
+    desc: 'A creature you touch regains 2d8 + spell modifier HP. +2d8 per slot above 1st.',
     rangeKind: 'touch',
   },
   healing_word: {
@@ -90,8 +93,9 @@ export const SRD_SPELLS: Record<string, Spell> = {
     name: 'Healing Word',
     level: 1,
     castTime: 'bonus_action',
-    heal: '1d4',
-    upcastBonus: '1d4',
+    // 2024 PHB: 2d4 + spellcasting modifier (was 1d4 + mod in 2014).
+    heal: '2d4',
+    upcastBonus: '2d4',
     rangeKind: 'ranged',
     rangeFt: 60,
     desc: 'A creature of your choice regains HP. Bonus action.',
