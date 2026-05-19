@@ -373,6 +373,7 @@ function conditionSavingThrow(
     | 'turn_actions'
     | 'inspiration'
     | 'bardic_inspiration_die'
+    | 'inventory'
   >,
   context: Context
 ): {
@@ -393,6 +394,11 @@ function conditionSavingThrow(
   const biDie = char.bardic_inspiration_die;
   const bardicRoll = biDie ? rollDice(`1${biDie}`) : 0;
   const dcAdjusted = effect.dc - bardicRoll;
+  // 2024 PHB: heavy encumbrance imposes disadvantage on STR/DEX/CON saves
+  // (and checks, and attacks). Apply here so onHit-effect saves account for it.
+  const enc =
+    (effect.ability === 'str' || effect.ability === 'dex' || effect.ability === 'con') &&
+    isHeavilyEncumbered(char);
   const applied = rollConditionSave(
     effect.ability,
     char[effect.ability] ?? 10,
@@ -401,7 +407,8 @@ function conditionSavingThrow(
     char.level,
     0,
     char.conditions ?? [],
-    inspirationActive
+    inspirationActive,
+    enc
   );
   return {
     applied,
@@ -733,16 +740,29 @@ function tickConditions(char: Character): Character {
 // > 15×STR: speed 0 (overloaded)
 function effectiveSpeed(char: Character): number {
   const base = char.speed ?? DEFAULT_SPEED_FEET;
-  const weight = (char.inventory ?? []).reduce((sum, i) => {
-    const w = (i as { weight?: number }).weight ?? 0;
-    const count = (i as { count?: number }).count ?? 1;
-    return sum + w * count;
-  }, 0);
+  const weight = charCarriedWeight(char);
   const str = char.str;
   if (weight > str * 15) return 0;
   if (weight > str * 10) return Math.max(0, base - 20);
   if (weight > str * 5) return Math.max(0, base - 10);
   return base;
+}
+
+function charCarriedWeight(char: Pick<Character, 'inventory'>): number {
+  return (char.inventory ?? []).reduce((sum, i) => {
+    const w = (i as { weight?: number }).weight ?? 0;
+    const count = (i as { count?: number }).count ?? 1;
+    return sum + w * count;
+  }, 0);
+}
+
+// 2024 PHB Variant Encumbrance — Heavily Encumbered (>10×STR) gives
+// disadvantage on STR/DEX/CON ability checks, saving throws, AND attack
+// rolls. Encumbered (>5×STR) only reduces speed; we ignore it for
+// disadvantage purposes. Used in attack and skill/save resolution paths.
+function isHeavilyEncumbered(char: Pick<Character, 'inventory' | 'str'>): boolean {
+  const w = charCarriedWeight(char);
+  return w > char.str * 10;
 }
 
 // ─── Enemy lookup helpers (multi-enemy per room) ──────────────────────────────
@@ -3374,6 +3394,7 @@ export async function takeAction({
       const rangedInMelee = weaponItem?.range === 'ranged';
       const conditionDisadv = char.conditions.some((c) => DISADV_CONDITIONS.has(c));
       const exhaustionDisadv = (char.exhaustion_level ?? 0) >= 3; // exhaustion 3+: disadv on attack rolls
+      const heavyEncumberedDisadv = isHeavilyEncumbered(char); // 2024 PHB variant encumbrance
       const conditionAdv = char.conditions.some((c) => PLAYER_ADV_CONDITIONS.has(c));
       const enemyEntity2 = st.entities?.find((e) => e.id === targetId && e.isEnemy);
       const enemyGrappled = enemyEntity2?.conditions.includes('grappled') ?? false;
@@ -3498,6 +3519,7 @@ export async function takeAction({
         rangedInMelee ||
         conditionDisadv ||
         exhaustionDisadv ||
+        heavyEncumberedDisadv ||
         !armorProficient ||
         proneDisadv ||
         thrownLongRangeDisadv;
@@ -3526,6 +3548,7 @@ export async function takeAction({
         rangedInMelee ? 'ranged in melee' : '',
         conditionDisadv ? char.conditions.filter((c) => DISADV_CONDITIONS.has(c)).join(', ') : '',
         exhaustionDisadv ? 'exhaustion' : '',
+        heavyEncumberedDisadv ? 'heavily encumbered' : '',
         !armorProficient ? `not proficient with ${equippedArmorLootItem?.name ?? 'armor'}` : '',
         proneDisadv ? 'prone (ranged)' : '',
         thrownLongRangeDisadv ? 'thrown beyond normal range' : '',
@@ -4189,14 +4212,18 @@ export async function takeAction({
       }
       const sneakDC = passivePerceptionDC(enemy.wis ?? 10);
       const proficient = context.classSkills[char.character_class]?.includes('stealth') ?? false;
+      // Sneak is a DEX (Stealth) check — exhaustion 1+ AND heavy encumbrance
+      // both impose disadvantage. Either is enough; the check is single-roll
+      // disadvantage either way.
       const exhaustionDisadv1 = (char.exhaustion_level ?? 0) >= 1;
+      const checkDisadv = exhaustionDisadv1 || isHeavilyEncumbered(char);
       const inspAdvSneak = consumeInspirationForCheck(char);
       const check = skillCheck(
         char.dex,
         sneakDC,
         proficient,
         char.level,
-        exhaustionDisadv1,
+        checkDisadv,
         false,
         false,
         inspAdvSneak
@@ -5495,7 +5522,7 @@ export async function takeAction({
           sneakHideDC,
           hideProf,
           char.level,
-          false,
+          isHeavilyEncumbered(char), // 2024 PHB: heavy encumbrance → disadv on DEX checks
           false,
           false,
           inspAdvHide
@@ -6831,6 +6858,8 @@ export async function takeAction({
         char.skill_proficiencies?.some(
           (s) => s.toLowerCase() === 'investigation' || s.toLowerCase() === 'perception'
         ) ?? false;
+      // Search is INT (Investigation) — heavy encumbrance doesn't affect INT
+      // per 2024 RAW (only STR/DEX/CON), so we only honour exhaustion.
       const exhaustionDisadv1 = (char.exhaustion_level ?? 0) >= 1;
       const inspAdvSearch = consumeInspirationForCheck(char);
       const check = skillCheck(
