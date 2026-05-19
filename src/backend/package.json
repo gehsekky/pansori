@@ -33,6 +33,9 @@
     "socket.io": "^4.7.4",
     "zod": "^4.4.3"
   },
+  "overrides": {
+    "ws": "^8.20.1"
+  },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
     "@types/connect-pg-simple": "^7.0.3",
