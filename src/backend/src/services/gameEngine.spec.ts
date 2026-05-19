@@ -1707,6 +1707,107 @@ describe('conditions — new types', () => {
     expect(result.narrative).not.toMatch(/\[(Vex|Topple|Push|Sap|Slow):/);
   });
 
+  // ── Bardic Inspiration (2024 PHB) ──────────────────────────────────────────
+
+  it('Bard grants Bardic Inspiration — die is stashed on the target ally', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const bardId = 'b1';
+    const fighterId = 'f1';
+    const bard = makeChar({
+      id: bardId,
+      character_class: 'Bard',
+      level: 3,
+      cha: 16,
+      class_resource_uses: { bardic_inspiration: 3 },
+    });
+    const fighter = makeChar({ id: fighterId, character_class: 'Fighter', level: 3 });
+    const state: GameState = {
+      characters: [bard, fighter],
+      active_character_id: bardId,
+      current_room: ctx.startRoomId,
+      visited_rooms: [ctx.startRoomId],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: true,
+      initiative_order: [
+        { id: bardId, roll: 18, is_enemy: false },
+        { id: fighterId, roll: 14, is_enemy: false },
+      ],
+      initiative_idx: 0,
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      flags: {},
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+    };
+    const result = await takeAction({
+      action: { type: 'use_class_feature', featureId: 'bardic_inspiration' },
+      history: [],
+      state,
+      seed,
+      context: ctx,
+    });
+    // The Fighter should now carry a bardic_inspiration_die.
+    const newFighter = result.newState.characters.find((c) => c.id === fighterId);
+    expect(newFighter?.bardic_inspiration_die).toBe('d6');
+    expect(result.narrative).toMatch(/Bardic Inspiration/);
+  });
+
+  it('Bardic Inspiration die consumed on an ally attack roll, +bonus to hit', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.999); // d20=20, BI die rolls high
+    const fighterId = 'f-bi';
+    const swordInst = 'f-sw';
+    const fighter = makeChar({
+      id: fighterId,
+      character_class: 'Fighter',
+      level: 3,
+      str: 16,
+      equipped_weapon: swordInst,
+      inventory: [{ instance_id: swordInst, id: 'longsword', name: 'Longsword' }],
+      bardic_inspiration_die: 'd6',
+    });
+    const goblinId = `${CORRIDOR_ID}#0`;
+    const state: GameState = {
+      characters: [fighter],
+      active_character_id: fighterId,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: true,
+      initiative_order: [{ id: fighterId, roll: 18, is_enemy: false }],
+      initiative_idx: 0,
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      flags: {},
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+    };
+    const result = await takeAction({
+      action: { type: 'attack', targetEnemyId: goblinId },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    expect(result.narrative).toMatch(/Bardic Inspiration:/);
+    // Die consumed
+    const newFighter = result.newState.characters[0];
+    expect(newFighter.bardic_inspiration_die).toBeUndefined();
+  });
+
   // ── Heroic Inspiration: 2024 PHB spend on saves ─────────────────────────────
 
   it('spend_inspiration grants advantage on a save vs enemy onHitEffect', async () => {

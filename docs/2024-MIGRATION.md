@@ -27,15 +27,15 @@ add them. Update Heroic Inspiration to the full 2024 spec.
 
 Listed by impact × tractability. Each item is its own PR.
 
-| #   | Feature                        | Effort | Status  | Notes                                                          |
-| --- | ------------------------------ | ------ | ------- | -------------------------------------------------------------- |
-| 1   | Heroic Inspiration expansion   | ~1h    | DONE    | Additive — saves vs onHitEffect now consume inspiration too    |
-| 2   | Bardic Inspiration spend rules | ~2h    | pending | 2024 expands what the die can apply to                         |
-| 3   | Weapon Masteries (framework)   | ~3h    | DONE    | Vex, Topple, Push, Sap, Slow wired; Nick/Cleave/Graze/Flex TODO |
+| #   | Feature                        | Effort | Status  | Notes                                                                              |
+| --- | ------------------------------ | ------ | ------- | ---------------------------------------------------------------------------------- |
+| 1   | Heroic Inspiration expansion   | ~1h    | DONE    | Additive — saves vs onHitEffect now consume inspiration too                        |
+| 2   | Bardic Inspiration spend rules | ~2h    | DONE    | Die now stored on ally + consumed on attack rolls and saves                        |
+| 3   | Weapon Masteries (framework)   | ~3h    | DONE    | Vex, Topple, Push, Sap, Slow wired; Nick/Cleave/Graze/Flex TODO                    |
 | 4   | Weapon Masteries (per-class)   | ~2h    | DONE    | Fighter (3), Paladin (2), Ranger (2), Barbarian (2), Rogue (2) granted at creation |
-| 5   | Wild Shape → Beast Forms       | ~4h    | pending | Replaces temp-HP-pool model                                    |
-| 6   | Rage progression               | ~1h    | pending | Mostly the same — confirm diff                                 |
-| 7   | Class feature audit pass       | ~4h    | pending | Cleric CD, Fighter Second Wind, etc.                           |
+| 5   | Wild Shape → Beast Forms       | ~4h    | pending | Replaces temp-HP-pool model                                                        |
+| 6   | Rage progression               | ~1h    | pending | Mostly the same — confirm diff                                                     |
+| 7   | Class feature audit pass       | ~4h    | pending | Cleric CD, Fighter Second Wind, etc.                                               |
 
 ---
 
