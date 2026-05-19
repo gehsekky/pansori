@@ -11,6 +11,7 @@ import PartyPanel from './components/PartyPanel.tsx';
 import RoomArtPanel from './components/RoomArtPanel.tsx';
 import SessionsScreen from './components/SessionScreen.tsx';
 import WorldMap from './components/WorldMap.tsx';
+import { context as groveContext } from './contexts/grove_of_thorns.tsx';
 import { context as sandboxContext } from './contexts/sandbox.tsx';
 import styles from './styles.module.css';
 import { useGame } from './hooks/useGame.ts';
@@ -21,6 +22,7 @@ const CONTEXTS: Record<string, FrontendContext> = {
   sandbox: sandboxContext,
   vale_of_shadows: valeContext,
   whispering_pines: whisperingPinesContext,
+  grove_of_thorns: groveContext,
 };
 function getCtx(seed: Seed | null): FrontendContext {
   return (seed?.context_id ? CONTEXTS[seed.context_id] : null) ?? sandboxContext;
