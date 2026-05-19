@@ -1905,6 +1905,154 @@ describe('class features', () => {
     expect(result.newState.characters[0].class_resource_uses?.fey_presence_used).toBe(1);
   });
 
+  // ── Druid subclasses (PHB p.65-69) ──────────────────────────────────────────
+
+  it('Circle of the Moon — Wild Shape uses bonus action + CR scales by level/3', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const druidId = 'd1';
+    const druid = makeChar({
+      id: druidId,
+      character_class: 'Druid',
+      subclass: 'moon',
+      level: 6, // moon CR = 6/3 = 2
+      hp: 30,
+      max_hp: 30,
+      class_resource_uses: { wild_shape: 2 },
+    });
+    const state = makeState(
+      {},
+      {
+        characters: [druid],
+        active_character_id: druidId,
+        combat_active: true,
+        initiative_order: [{ id: druidId, roll: 18, is_enemy: false }],
+        initiative_idx: 0,
+      }
+    );
+    state.characters = [druid];
+    state.active_character_id = druidId;
+    const result = await takeAction({
+      action: { type: 'use_class_feature', featureId: 'wild_shape' },
+      history: [],
+      state,
+      seed,
+      context: ctx,
+    });
+    const newDruid = result.newState.characters[0];
+    expect(newDruid.conditions).toContain('wild_shaped');
+    expect(newDruid.turn_actions.bonus_action_used).toBe(true);
+    expect(newDruid.turn_actions.action_used).toBe(false);
+    expect(newDruid.class_resource_uses?.wild_shape).toBe(1);
+    // CR 2 × 5 ft × level 6 = +60 temp HP added on top of 30 base → 90
+    expect(newDruid.hp).toBeGreaterThan(30);
+    expect(result.narrative).toMatch(/bonus action/i);
+  });
+
+  it('Circle of the Moon — Moon Healing while shifted spends a slot to heal', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.999); // max d8 → 8
+    const druidId = 'd-moon-heal';
+    const druid = makeChar({
+      id: druidId,
+      character_class: 'Druid',
+      subclass: 'moon',
+      level: 4,
+      hp: 10,
+      max_hp: 30,
+      conditions: ['wild_shaped'],
+      spell_slots_max: { 1: 3, 2: 2 },
+      spell_slots_used: {},
+    });
+    const state = makeState(
+      {},
+      {
+        characters: [druid],
+        active_character_id: druidId,
+        combat_active: true,
+        initiative_order: [{ id: druidId, roll: 18, is_enemy: false }],
+        initiative_idx: 0,
+      }
+    );
+    state.characters = [druid];
+    state.active_character_id = druidId;
+    const result = await takeAction({
+      action: { type: 'use_class_feature', featureId: 'moon_healing' },
+      history: [],
+      state,
+      seed,
+      context: ctx,
+    });
+    const newDruid = result.newState.characters[0];
+    // Spent lowest slot (lvl 1) → 1d8 = 8 healed
+    expect(newDruid.spell_slots_used?.[1]).toBe(1);
+    expect(newDruid.hp).toBe(18); // 10 + 8
+    expect(newDruid.turn_actions.bonus_action_used).toBe(true);
+    expect(result.narrative).toMatch(/Moon|lunar/i);
+  });
+
+  it('Circle of the Land — Natural Recovery refunds slot levels on short rest', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const druidId = 'd-land';
+    const druid = makeChar({
+      id: druidId,
+      character_class: 'Druid',
+      subclass: 'land',
+      level: 4, // budget = ceil(4/2) = 2 slot levels
+      hp: 20,
+      max_hp: 30,
+      hit_dice_remaining: 4,
+      spell_slots_max: { 1: 4, 2: 3 },
+      // Use 2 L1s and 1 L2 — recovery prefers low levels, so 2× L1 = 2 levels
+      spell_slots_used: { 1: 2, 2: 1 },
+    });
+    const state = makeState({}, { characters: [druid], active_character_id: druidId });
+    state.characters = [druid];
+    state.active_character_id = druidId;
+    const result = await takeAction({
+      action: { type: 'short_rest' },
+      history: [],
+      state,
+      seed,
+      context: ctx,
+    });
+    const newDruid = result.newState.characters[0];
+    // L1 slots refunded back to 0 used; L2 untouched.
+    expect(newDruid.spell_slots_used?.[1] ?? 0).toBe(0);
+    expect(newDruid.spell_slots_used?.[2] ?? 0).toBe(1);
+    expect(newDruid.class_resource_uses?.natural_recovery_used).toBe(1);
+    expect(result.narrative).toMatch(/Natural Recovery/);
+  });
+
+  it('Circle of the Land — Natural Recovery only fires once per long rest', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const druidId = 'd-land-twice';
+    const druid = makeChar({
+      id: druidId,
+      character_class: 'Druid',
+      subclass: 'land',
+      level: 4,
+      hp: 20,
+      max_hp: 30,
+      hit_dice_remaining: 4,
+      spell_slots_max: { 1: 4 },
+      spell_slots_used: { 1: 3 },
+      class_resource_uses: { natural_recovery_used: 1 }, // already used today
+    });
+    const state = makeState({}, { characters: [druid], active_character_id: druidId });
+    state.characters = [druid];
+    state.active_character_id = druidId;
+    const result = await takeAction({
+      action: { type: 'short_rest' },
+      history: [],
+      state,
+      seed,
+      context: ctx,
+    });
+    const newDruid = result.newState.characters[0];
+    // Slots NOT refunded
+    expect(newDruid.spell_slots_used?.[1]).toBe(3);
+    expect(result.narrative).not.toMatch(/Natural Recovery/);
+  });
+
   // ── Shield (reactive spell, PHB p.275) ──────────────────────────────────────
 
   it('Shield reaction window opens when enemy hits within [AC, AC+4]', async () => {
