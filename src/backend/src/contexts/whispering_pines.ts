@@ -332,6 +332,7 @@ export const context: Context = {
       heal: null,
       effect: null,
       aliases: ['knife', 'dirk'],
+      mastery: 'nick',
     },
     {
       id: 'dart',
@@ -366,6 +367,7 @@ export const context: Context = {
       heal: null,
       effect: null,
       aliases: ['hand axe', 'hatchet'],
+      mastery: 'vex',
     },
     {
       id: 'greataxe',
@@ -383,6 +385,7 @@ export const context: Context = {
       heal: null,
       effect: null,
       aliases: ['great axe', 'battleaxe'],
+      mastery: 'cleave',
     },
     {
       id: 'longsword',
@@ -400,6 +403,7 @@ export const context: Context = {
       heal: null,
       effect: null,
       aliases: ['sword', 'blade'],
+      mastery: 'sap',
     },
     {
       id: 'shortsword',
@@ -418,6 +422,7 @@ export const context: Context = {
       heal: null,
       effect: null,
       aliases: ['short sword'],
+      mastery: 'vex',
     },
     {
       id: 'rapier',
@@ -435,6 +440,7 @@ export const context: Context = {
       heal: null,
       effect: null,
       aliases: ['dueling sword'],
+      mastery: 'vex',
     },
     {
       id: 'mace',
@@ -451,6 +457,7 @@ export const context: Context = {
       heal: null,
       effect: null,
       aliases: ['club', 'flanged mace'],
+      mastery: 'sap',
     },
     {
       id: 'warhammer',
@@ -468,6 +475,7 @@ export const context: Context = {
       heal: null,
       effect: null,
       aliases: ['hammer', 'maul'],
+      mastery: 'push',
     },
     {
       id: 'quarterstaff',
@@ -485,6 +493,7 @@ export const context: Context = {
       heal: null,
       effect: null,
       aliases: ['staff', 'oak staff'],
+      mastery: 'topple',
     },
     {
       id: 'longbow',
@@ -501,6 +510,7 @@ export const context: Context = {
       heal: null,
       effect: null,
       aliases: ['bow', 'yew bow'],
+      mastery: 'slow',
     },
     {
       id: 'chain_mail',

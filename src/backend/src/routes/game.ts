@@ -31,6 +31,21 @@ import { randomUUID } from 'crypto';
 const CONTEXTS: Record<string, Context> = await loadContexts();
 const DEFAULT_CONTEXT = Object.values(CONTEXTS)[0] ?? ({ id: 'none' } as Context);
 
+// 2024 PHB — initial weapon masteries by class. Each listed class starts
+// with these weapons mastered; non-listed classes don't get the feature.
+// Choices follow common 2024 PHB starting-class examples (Fighter has the
+// broadest list, Rogue gets 2 light/finesse picks, etc.).
+function defaultWeaponMasteriesFor(charClass: string): string[] {
+  const map: Record<string, string[]> = {
+    Fighter: ['longsword', 'shortbow', 'greataxe'],
+    Paladin: ['longsword', 'warhammer'],
+    Ranger: ['longbow', 'shortsword'],
+    Barbarian: ['greataxe', 'handaxe'],
+    Rogue: ['shortsword', 'dagger'],
+  };
+  return map[charClass] ?? [];
+}
+
 export const gameRouter = Router();
 
 // List all available game contexts (id + display metadata only — no rules/loot)
@@ -247,6 +262,9 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
         spells_known: ctx.classSpells?.[c.character_class] ?? [],
         armor_proficiencies: armorProfs,
         weapon_proficiencies: weaponProfs,
+        // 2024 PHB Weapon Mastery — classes that get the feature start with
+        // an initial mastered weapon list. Other classes get 0.
+        weapon_masteries: defaultWeaponMasteriesFor(c.character_class),
         attuned_items: [],
         // PHB: Cleric/Sorcerer/Warlock pick subclass at L1 (creation).
         // Other classes pick later via the in-game select_subclass choice.

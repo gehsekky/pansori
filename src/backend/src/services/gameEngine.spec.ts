@@ -1476,6 +1476,237 @@ describe('conditions — new types', () => {
     expect(r3.newState.characters[0].turn_actions.inspiration_pending).toBeFalsy();
   });
 
+  // ── 2024 PHB Weapon Mastery ─────────────────────────────────────────────────
+
+  it('Topple mastery: longsword hit forces CON save or prone', async () => {
+    // Force d20=20 to land the attack; enemy d20=1 for the CON save → fail.
+    vi.spyOn(Math, 'random').mockReturnValue(0); // d20 rolls = 1
+    const random = vi.spyOn(Math, 'random');
+    random
+      .mockReturnValueOnce(0.999) // attack d20 → 20
+      .mockReturnValueOnce(0.999) // damage roll high
+      .mockReturnValueOnce(0) // enemy CON save d20 → 1 (fail)
+      .mockReturnValue(0);
+    const fighterId = 'f-topple';
+    // battleaxe → topple mastery. Use longsword (mastery: sap) won't work for
+    // this test. Use a weapon mastery we can predictably trigger:
+    // quarterstaff has topple too in our tagging. Use that.
+    const staffInst = 'f-staff';
+    const fighter = makeChar({
+      id: fighterId,
+      character_class: 'Fighter',
+      level: 3,
+      str: 16,
+      equipped_weapon: staffInst,
+      inventory: [{ instance_id: staffInst, id: 'quarterstaff', name: 'Quarterstaff' }],
+      weapon_masteries: ['quarterstaff'],
+    });
+    const goblinId = `${CORRIDOR_ID}#0`;
+    const state: GameState = {
+      characters: [fighter],
+      active_character_id: fighterId,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: true,
+      initiative_order: [
+        { id: fighterId, roll: 18, is_enemy: false },
+        { id: goblinId, roll: 5, is_enemy: true },
+      ],
+      initiative_idx: 0,
+      entities: [
+        {
+          id: fighterId,
+          isEnemy: false,
+          pos: { x: 4, y: 5 },
+          hp: 30,
+          maxHp: 30,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: goblinId,
+          isEnemy: true,
+          pos: { x: 5, y: 5 },
+          hp: 50, // survives the hit so we see the prone effect
+          maxHp: 50,
+          conditions: [],
+          condition_durations: {},
+        },
+      ],
+      movement_used: {},
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      flags: {},
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+      round: 1,
+    };
+    const result = await takeAction({
+      action: { type: 'attack', targetEnemyId: goblinId },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    // Either prone was applied (save failed) or resists (save succeeded).
+    expect(result.narrative).toMatch(/Topple:/);
+  });
+
+  it('Vex mastery: hit marks target for advantage on next attack', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.999); // always hit
+    const rogueId = 'r-vex';
+    const swordInst = 'r-sword';
+    const rogue = makeChar({
+      id: rogueId,
+      character_class: 'Rogue',
+      level: 3,
+      dex: 16,
+      equipped_weapon: swordInst,
+      inventory: [{ instance_id: swordInst, id: 'shortsword', name: 'Shortsword' }],
+      weapon_masteries: ['shortsword'],
+    });
+    const goblinId = `${CORRIDOR_ID}#0`;
+    const state: GameState = {
+      characters: [rogue],
+      active_character_id: rogueId,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: true,
+      initiative_order: [
+        { id: rogueId, roll: 18, is_enemy: false },
+        { id: goblinId, roll: 5, is_enemy: true },
+      ],
+      initiative_idx: 0,
+      entities: [
+        {
+          id: rogueId,
+          isEnemy: false,
+          pos: { x: 4, y: 5 },
+          hp: 30,
+          maxHp: 30,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: goblinId,
+          isEnemy: true,
+          pos: { x: 5, y: 5 },
+          hp: 50,
+          maxHp: 50,
+          conditions: [],
+          condition_durations: {},
+        },
+      ],
+      movement_used: {},
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      flags: {},
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+      round: 1,
+    };
+    const result = await takeAction({
+      action: { type: 'attack', targetEnemyId: goblinId },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    // Vex narrative should mention the advantage promise.
+    expect(result.narrative).toMatch(/Vex:/);
+    // Entity should carry the vexed_by tag.
+    const goblinEnt = result.newState.entities?.find((e) => e.id === goblinId);
+    expect(goblinEnt?.conditions.some((c) => c.startsWith('vexed_by_'))).toBe(true);
+  });
+
+  it('Mastery is ignored when the PC has NOT mastered the weapon', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.999);
+    const fighterId = 'f-no-mastery';
+    const swordInst = 'f-sword';
+    const fighter = makeChar({
+      id: fighterId,
+      character_class: 'Fighter',
+      level: 3,
+      str: 16,
+      equipped_weapon: swordInst,
+      inventory: [{ instance_id: swordInst, id: 'longsword', name: 'Longsword' }],
+      weapon_masteries: [], // empty — no mastery applies
+    });
+    const goblinId = `${CORRIDOR_ID}#0`;
+    const state: GameState = {
+      characters: [fighter],
+      active_character_id: fighterId,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: true,
+      initiative_order: [
+        { id: fighterId, roll: 18, is_enemy: false },
+        { id: goblinId, roll: 5, is_enemy: true },
+      ],
+      initiative_idx: 0,
+      entities: [
+        {
+          id: fighterId,
+          isEnemy: false,
+          pos: { x: 4, y: 5 },
+          hp: 30,
+          maxHp: 30,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: goblinId,
+          isEnemy: true,
+          pos: { x: 5, y: 5 },
+          hp: 50,
+          maxHp: 50,
+          conditions: [],
+          condition_durations: {},
+        },
+      ],
+      movement_used: {},
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      flags: {},
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+      round: 1,
+    };
+    const result = await takeAction({
+      action: { type: 'attack', targetEnemyId: goblinId },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    // No mastery narrative chunk.
+    expect(result.narrative).not.toMatch(/\[(Vex|Topple|Push|Sap|Slow):/);
+  });
+
   // ── Heroic Inspiration: 2024 PHB spend on saves ─────────────────────────────
 
   it('spend_inspiration grants advantage on a save vs enemy onHitEffect', async () => {

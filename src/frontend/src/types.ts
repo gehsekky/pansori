@@ -116,7 +116,19 @@ export interface LootItem {
   versatileDamage?: string;
   damageType?: string;
   thrown?: { normalRange: number; longRange: number };
+  mastery?: WeaponMastery;
 }
+
+export type WeaponMastery =
+  | 'vex'
+  | 'topple'
+  | 'push'
+  | 'sap'
+  | 'slow'
+  | 'nick'
+  | 'cleave'
+  | 'graze'
+  | 'flex';
 
 export interface FrontendContext {
   id: string;
@@ -202,6 +214,7 @@ export interface Character {
   spells_known: string[];
   armor_proficiencies: string[];
   weapon_proficiencies: string[];
+  weapon_masteries?: string[];
   attuned_items: string[]; // instance_ids of attuned magic items (max 3)
   concentrating_on?: { spellId: string; condition?: string } | null;
   subclass?: string;
