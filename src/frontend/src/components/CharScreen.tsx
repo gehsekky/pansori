@@ -58,8 +58,11 @@ const L1_SUBCLASS_OPTIONS: Record<string, { id: string; label: string }[]> = {
     { id: 'life', label: 'Life Domain (Disciple of Life — bonus healing)' },
     { id: 'war', label: 'War Domain (War Priest + Guided Strike)' },
   ],
-  // Sorcerer + Warlock are L1-required in 5e too, but no subclasses are
-  // authored yet in the engine. When they're added, list them here.
+  Sorcerer: [
+    { id: 'draconic', label: 'Draconic Bloodline (Draconic Resilience — +1 HP/level)' },
+    { id: 'wild_magic', label: 'Wild Magic (Wild Magic Surge — chaotic effects on cast)' },
+  ],
+  // Warlock is L1-required too — pack still pending (Fiend + Archfey).
 };
 
 // Fallback compositions when a campaign doesn't override. Mirrors the 5e

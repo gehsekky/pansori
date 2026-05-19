@@ -1649,6 +1649,40 @@ const dungeonSeedWithEnemy: Seed = {
 };
 
 describe('class features', () => {
+  // ── Sorcerer subclasses (PHB Chapter 3) ─────────────────────────────────────
+
+  it('Sorcerer Draconic Bloodline grants +1 HP per level via select_subclass', async () => {
+    const state = makeState({
+      character_class: 'Sorcerer',
+      level: 3,
+      hp: 18,
+      max_hp: 18,
+    });
+    const result = await takeAction({
+      action: { type: 'select_subclass', subclass: 'draconic' },
+      history: [],
+      state,
+      seed,
+      context: ctx,
+    });
+    expect(result.newState.characters[0].subclass).toBe('draconic');
+    expect(result.newState.characters[0].max_hp).toBe(21); // 18 + 3 (level)
+    expect(result.newState.characters[0].hp).toBe(21);
+    expect(result.narrative).toMatch(/Draconic Resilience/);
+  });
+
+  it('non-Sorcerer Draconic select does NOT grant the HP bonus', async () => {
+    const state = makeState({ character_class: 'Fighter', level: 5, hp: 30, max_hp: 30 });
+    const result = await takeAction({
+      action: { type: 'select_subclass', subclass: 'draconic' },
+      history: [],
+      state,
+      seed,
+      context: ctx,
+    });
+    expect(result.newState.characters[0].max_hp).toBe(30); // unchanged
+  });
+
   // ── Sneak Attack (Rogue in sandbox) ─────────────────────────────────────────
 
   it('Rogue sneak attack adds bonus damage on hit', async () => {

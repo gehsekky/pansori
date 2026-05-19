@@ -173,7 +173,10 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
 
       const hitDie = ctx.classHitDie[c.character_class] ?? 8;
       const conMod = Math.floor(((base.con ?? 10) - 10) / 2);
-      const maxHp = Math.max(1, hitDie + conMod); // PHB: max hit die + CON mod at level 1
+      // PHB: max hit die + CON mod at level 1. Sorcerer Draconic Bloodline
+      // adds +1 HP per Sorcerer level (here, +1 at L1) via Draconic Resilience.
+      const draconicBonus = c.character_class === 'Sorcerer' && c.subclass === 'draconic' ? 1 : 0;
+      const maxHp = Math.max(1, hitDie + conMod + draconicBonus);
 
       // Build starting inventory from classStartingLoot or campaign.startingLoot
       const startingIds =
