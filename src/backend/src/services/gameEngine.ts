@@ -87,6 +87,17 @@ function pushEvent(st: GameState, event: CombatEvent): GameState {
   return { ...st, combat_log: next.slice(-COMBAT_LOG_MAX) };
 }
 
+// 2024 PHB Heroic Inspiration — read the pending flag and (if set) clear it
+// on `char`. Returns whether inspiration was active so the caller can pass
+// it as advantage to a d20 roll. Saves already integrate this through
+// applyConditionSave; this helper exists for ability/skill checks.
+function consumeInspirationForCheck(char: Character): boolean {
+  if (!char.turn_actions?.inspiration_pending) return false;
+  char.turn_actions = { ...char.turn_actions, inspiration_pending: false };
+  char.inspiration = false;
+  return true;
+}
+
 // Cleric/Paladin/Druid prepared-spell cap: class level + spellcasting modifier
 // (minimum 1). The casting stat is class-dependent (Cleric/Druid = WIS,
 // Paladin = CHA); resolves through context.spellcastingAbility with a fall
@@ -2057,16 +2068,12 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   }
 
   // Spend Heroic Inspiration on the next d20 (2024 PHB) — one-shot
-  // advantage. Available when the char has it stored and hasn't already
-  // queued it this turn.
-  if (
-    state.combat_active &&
-    char.inspiration &&
-    !char.turn_actions.inspiration_pending &&
-    !char.turn_actions.action_used
-  ) {
+  // advantage on any d20 test (attack, save, or ability check).
+  // Available in or out of combat once the char has it stored and hasn't
+  // already queued it this turn.
+  if (char.inspiration && !char.turn_actions.inspiration_pending) {
     choices.push({
-      label: '✦ Spend Heroic Inspiration — advantage on your next attack',
+      label: '✦ Spend Heroic Inspiration — advantage on your next d20 (attack, save, or check)',
       action: { type: 'spend_inspiration' },
     });
   }
@@ -4085,7 +4092,17 @@ export async function takeAction({
       const sneakDC = passivePerceptionDC(enemy.wis ?? 10);
       const proficient = context.classSkills[char.character_class]?.includes('stealth') ?? false;
       const exhaustionDisadv1 = (char.exhaustion_level ?? 0) >= 1;
-      const check = skillCheck(char.dex, sneakDC, proficient, char.level, exhaustionDisadv1);
+      const inspAdvSneak = consumeInspirationForCheck(char);
+      const check = skillCheck(
+        char.dex,
+        sneakDC,
+        proficient,
+        char.level,
+        exhaustionDisadv1,
+        false,
+        false,
+        inspAdvSneak
+      );
       if (check.success) {
         narrative = pick(context.narratives.sneakSuccess).replace('{enemy}', enemy.name);
         narrative += ` (Stealth: ${check.roll}+${abilityMod(char.dex)}=${check.total} vs DC ${sneakDC})`;
@@ -5283,7 +5300,17 @@ export async function takeAction({
         }
         const sneakHideDC = enemyAlive ? passivePerceptionDC(enemy!.wis ?? 10) : 10;
         const hideProf = char.skill_proficiencies?.includes('Stealth') ?? false;
-        const hideCheck = skillCheck(char.dex, sneakHideDC, hideProf, char.level, false);
+        const inspAdvHide = consumeInspirationForCheck(char);
+        const hideCheck = skillCheck(
+          char.dex,
+          sneakHideDC,
+          hideProf,
+          char.level,
+          false,
+          false,
+          false,
+          inspAdvHide
+        );
         char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
         if (hideCheck.success) {
           char = inflictCondition(char, 'invisible');
@@ -6611,12 +6638,16 @@ export async function takeAction({
           (s) => s.toLowerCase() === 'investigation' || s.toLowerCase() === 'perception'
         ) ?? false;
       const exhaustionDisadv1 = (char.exhaustion_level ?? 0) >= 1;
+      const inspAdvSearch = consumeInspirationForCheck(char);
       const check = skillCheck(
         char.int,
         obj.searchDC ?? 12,
         proficient,
         char.level,
-        exhaustionDisadv1
+        exhaustionDisadv1,
+        false,
+        false,
+        inspAdvSearch
       );
 
       if (check.success) {
@@ -6878,11 +6909,13 @@ export async function takeAction({
         break;
       }
       if (char.turn_actions.inspiration_pending) {
-        narrative = 'Inspiration already queued for your next attack.';
+        narrative = 'Inspiration already queued for your next d20 roll.';
         break;
       }
       char.turn_actions = { ...char.turn_actions, inspiration_pending: true };
-      narrative = `${char.name} steels themselves — Heroic Inspiration queued for the next attack (advantage).`;
+      // 2024 PHB: Heroic Inspiration grants advantage on any d20 test
+      // (attack, save, ability check) — not just attacks.
+      narrative = `${char.name} steels themselves — Heroic Inspiration queued: advantage on your next d20 (attack, save, or check).`;
       break;
     }
 

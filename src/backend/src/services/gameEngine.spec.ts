@@ -5806,3 +5806,54 @@ describe('Monk 2024 features', () => {
     expect(result.narrative).toMatch(/already used this turn/);
   });
 });
+
+describe('Heroic Inspiration spend rules (2024 — any d20)', () => {
+  it('spend_inspiration choice appears in and out of combat when inspiration is held', () => {
+    const baseChar = makeChar({
+      character_class: 'Rogue',
+      inspiration: true,
+      turn_actions: {
+        action_used: false,
+        bonus_action_used: false,
+        reaction_used: false,
+        free_interaction_used: false,
+      },
+    });
+    // Out of combat
+    const stateOOC: GameState = {
+      ...makeState(),
+      characters: [baseChar],
+      active_character_id: baseChar.id,
+      combat_active: false,
+    };
+    const oocChoices = generateChoices(stateOOC, seed, ctx);
+    expect(oocChoices.some((c) => c.action.type === 'spend_inspiration')).toBe(true);
+
+    // In combat
+    const stateIC: GameState = { ...stateOOC, combat_active: true };
+    const icChoices = generateChoices(stateIC, seed, ctx);
+    expect(icChoices.some((c) => c.action.type === 'spend_inspiration')).toBe(true);
+  });
+
+  it('spend_inspiration clears char.inspiration and sets the pending flag', async () => {
+    const char = makeChar({
+      character_class: 'Rogue',
+      inspiration: true,
+      turn_actions: {
+        action_used: false,
+        bonus_action_used: false,
+        reaction_used: false,
+        free_interaction_used: false,
+      },
+    });
+    const result = await takeAction({
+      action: { type: 'spend_inspiration' },
+      history: [],
+      state: { ...makeState(), characters: [char], active_character_id: char.id },
+      seed,
+      context: ctx,
+    });
+    expect(result.newState.characters[0].turn_actions.inspiration_pending).toBe(true);
+    expect(result.narrative).toMatch(/attack, save, or check/);
+  });
+});
