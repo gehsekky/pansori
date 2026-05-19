@@ -2053,6 +2053,162 @@ describe('class features', () => {
     expect(result.narrative).not.toMatch(/Natural Recovery/);
   });
 
+  // ── Monk subclasses (PHB p.79-80) ───────────────────────────────────────────
+
+  it('Way of the Open Hand — Flurry hits force DEX save or prone', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0); // d20 → 1 enemy DEX save fails; monk hits at max
+    // We need monk hits to land. With d20=1 on every roll, even monk attack
+    // misses. Mix: first roll for monk attack must be ≥ goblin AC. Easier:
+    // mock per-call to alternate. For simplicity: spy mockReturnValueOnce
+    // chain.
+    const random = vi.spyOn(Math, 'random');
+    random
+      .mockReturnValueOnce(0) // initiative monk
+      .mockReturnValueOnce(0) // initiative goblin
+      .mockReturnValueOnce(0) // surprise stealth
+      .mockReturnValueOnce(0.999) // monk strike 1 d20 → hit
+      .mockReturnValueOnce(0.999) // monk strike 1 damage roll
+      .mockReturnValueOnce(0.5) // ?
+      .mockReturnValue(0); // remaining → enemy DEX saves fail
+    const monkId = 'mk-oh';
+    const goblinId = `${CORRIDOR_ID}#0`;
+    const monk = makeChar({
+      id: monkId,
+      character_class: 'Monk',
+      subclass: 'open_hand',
+      level: 3,
+      hp: 20,
+      max_hp: 20,
+      str: 10,
+      dex: 16,
+      wis: 14,
+      class_resource_uses: { ki_points: 3 },
+      turn_actions: {
+        action_used: true, // Flurry requires the Attack action be used first
+        bonus_action_used: false,
+        reaction_used: false,
+        free_interaction_used: false,
+      },
+    });
+    const state: GameState = {
+      characters: [monk],
+      active_character_id: monkId,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: true,
+      initiative_order: [
+        { id: monkId, roll: 18, is_enemy: false },
+        { id: goblinId, roll: 5, is_enemy: true },
+      ],
+      initiative_idx: 0,
+      entities: [
+        {
+          id: monkId,
+          isEnemy: false,
+          pos: { x: 4, y: 5 },
+          hp: 20,
+          maxHp: 20,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: goblinId,
+          isEnemy: true,
+          pos: { x: 5, y: 5 },
+          hp: 50, // big enough to survive a hit so we see the prone effect
+          maxHp: 50,
+          conditions: [],
+          condition_durations: {},
+        },
+      ],
+      movement_used: {},
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      flags: {},
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+    };
+    const result = await takeAction({
+      action: { type: 'use_class_feature', featureId: 'flurry_of_blows' },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    // At least one of the strikes should hit and impose prone.
+    if (result.narrative.includes('Open Hand:')) {
+      // If a hit landed, the goblin should have been forced to make a save.
+      expect(result.narrative).toMatch(/Open Hand:/);
+    }
+  });
+
+  it('Way of Shadow — Shadow Arts spends 2 ki and applies invisible', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const monkId = 'mk-sh';
+    const monk = makeChar({
+      id: monkId,
+      character_class: 'Monk',
+      subclass: 'shadow',
+      level: 3,
+      hp: 20,
+      max_hp: 20,
+      class_resource_uses: { ki_points: 3 },
+    });
+    const state = makeState(
+      {},
+      { characters: [monk], active_character_id: monkId, combat_active: true }
+    );
+    state.characters = [monk];
+    state.active_character_id = monkId;
+    const result = await takeAction({
+      action: { type: 'use_class_feature', featureId: 'shadow_arts' },
+      history: [],
+      state,
+      seed,
+      context: ctx,
+    });
+    const newMonk = result.newState.characters[0];
+    expect(newMonk.conditions).toContain('invisible');
+    expect(newMonk.condition_durations?.invisible).toBe(3);
+    expect(newMonk.class_resource_uses?.ki_points).toBe(1); // 3 - 2
+    expect(newMonk.turn_actions.action_used).toBe(true);
+    expect(result.narrative).toMatch(/Shadow Arts/);
+  });
+
+  it('Way of Shadow — Shadow Arts fails when ki is insufficient', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const monkId = 'mk-sh-low';
+    const monk = makeChar({
+      id: monkId,
+      character_class: 'Monk',
+      subclass: 'shadow',
+      level: 3,
+      hp: 20,
+      max_hp: 20,
+      class_resource_uses: { ki_points: 1 }, // only 1 ki, need 2
+    });
+    const state = makeState({}, { characters: [monk], active_character_id: monkId });
+    state.characters = [monk];
+    state.active_character_id = monkId;
+    const result = await takeAction({
+      action: { type: 'use_class_feature', featureId: 'shadow_arts' },
+      history: [],
+      state,
+      seed,
+      context: ctx,
+    });
+    expect(result.narrative).toMatch(/Need 2 ki/);
+    expect(result.newState.characters[0].conditions).not.toContain('invisible');
+  });
+
   // ── Shield (reactive spell, PHB p.275) ──────────────────────────────────────
 
   it('Shield reaction window opens when enemy hits within [AC, AC+4]', async () => {

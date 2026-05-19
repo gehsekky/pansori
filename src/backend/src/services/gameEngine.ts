@@ -1202,6 +1202,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       sorcerer: ['draconic', 'wild_magic'],
       warlock: ['fiend', 'archfey'],
       druid: ['land', 'moon'],
+      monk: ['open_hand', 'shadow'],
     };
     const reqLevel = subclassLevels[cls] ?? 3;
     // RAW: subclass is acquired at level-up (a long-rest milestone), not as an
@@ -1353,6 +1354,20 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         choices.push({
           label: `Stunning Strike — spend 1 ki after a hit (CON save DC ${8 + profBonus(char.level) + abilityMod(char.wis ?? 10)}, ${kiLeft} left)`,
           action: { type: 'use_class_feature', featureId: 'stunning_strike' },
+        });
+      }
+      // Way of Shadow (PHB p.80) — Shadow Arts. Step into the dark and gain
+      // invisibility (attacks against you have disadvantage). Costs 2 ki and
+      // your action. Lasts 3 rounds via condition_durations.
+      if (
+        char.subclass === 'shadow' &&
+        kiLeft >= 2 &&
+        !char.turn_actions.action_used &&
+        !char.conditions.includes('invisible')
+      ) {
+        choices.push({
+          label: `Shadow Arts — vanish into shadows (2 ki, invisible for 3 rounds, ${kiLeft} ki left)`,
+          action: { type: 'use_class_feature', featureId: 'shadow_arts' },
         });
       }
     }
@@ -4553,6 +4568,8 @@ export async function takeAction({
         char.class_resource_uses = { ...(char.class_resource_uses ?? {}), ki_points: kiPool - 1 };
         char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
         const martialDie = char.level >= 17 ? 10 : char.level >= 11 ? 8 : char.level >= 5 ? 6 : 4;
+        const isOpenHand = char.subclass === 'open_hand';
+        const monkDc = 8 + profBonus(char.level) + abilityMod(char.wis);
         let flurryNarrative = `${char.name} — Flurry of Blows (${kiPool - 1} ki remaining)!`;
         for (let i = 0; i < 2; i++) {
           const flurryTarget = st.entities?.find((e) => e.id === roomId && e.isEnemy);
@@ -4569,6 +4586,31 @@ export async function takeAction({
               ),
             };
             flurryNarrative += ` Strike ${i + 1}: hit (${toHit}) — ${dmg} bludgeoning.${newHp <= 0 ? ' (killed)' : ''}`;
+            // Way of the Open Hand (PHB p.79) — Open Hand Technique. Each
+            // Flurry hit forces the target to make a DEX save (Monk DC) or
+            // be knocked prone. (RAW lets the player choose between prone /
+            // push 15 ft / no reactions; prone is the most universally
+            // valuable for the engine's combat model so we auto-pick it.)
+            if (isOpenHand && newHp > 0) {
+              const enemyDex = (enemy?.dex ?? 10) as number;
+              const dexSave = rollDice('1d20') + abilityMod(enemyDex);
+              if (dexSave < monkDc) {
+                st = {
+                  ...st,
+                  entities: (st.entities ?? []).map((e) =>
+                    e.id === roomId && e.isEnemy
+                      ? {
+                          ...e,
+                          conditions: [...e.conditions.filter((c) => c !== 'prone'), 'prone'],
+                        }
+                      : e
+                  ),
+                };
+                flurryNarrative += ` Open Hand: DEX ${dexSave} vs DC ${monkDc} — prone!`;
+              } else {
+                flurryNarrative += ` Open Hand: DEX ${dexSave} vs DC ${monkDc} — resists.`;
+              }
+            }
             if (newHp <= 0) {
               char.xp = (char.xp || 0) + (enemy?.xp ?? 10);
               st.enemies_killed = [...st.enemies_killed, roomId];
@@ -4657,6 +4699,36 @@ export async function takeAction({
         } else {
           narrative = `Stunning Strike! CON save ${conSave} vs DC ${stunDC} — ${enemy.name} resists. (${kiPool3 - 1} ki remaining)`;
         }
+      }
+
+      // ── Way of Shadow: Shadow Arts (PHB p.80) ────────────────────────────────
+      // The L3 Shadow Monk learns to cast shadow-aligned spells via ki. Our
+      // model collapses the cantrip/spell list into a single 2-ki action
+      // that grants the `invisible` condition for 3 rounds — represents
+      // "step into magical darkness" tactically.
+      else if (fid === 'shadow_arts') {
+        if (char.subclass !== 'shadow' || char.character_class.toLowerCase() !== 'monk') {
+          narrative = 'Only Way of Shadow Monks have Shadow Arts.';
+          break;
+        }
+        if (char.level < 3) {
+          narrative = 'Shadow Arts requires Monk level 3.';
+          break;
+        }
+        const kiSa = char.class_resource_uses?.ki_points ?? char.level;
+        if (kiSa < 2) {
+          narrative = 'Need 2 ki points for Shadow Arts.';
+          break;
+        }
+        char.class_resource_uses = { ...(char.class_resource_uses ?? {}), ki_points: kiSa - 2 };
+        char.conditions = [...char.conditions.filter((c) => c !== 'invisible'), 'invisible'];
+        char.condition_durations = {
+          ...(char.condition_durations ?? {}),
+          invisible: 3,
+        };
+        char.turn_actions = { ...char.turn_actions, action_used: true };
+        usedInitiative = true;
+        narrative = `🌑 ${char.name} weaves Shadow Arts — invisible for 3 rounds. (${kiSa - 2} ki remaining)`;
       }
 
       // ── Druid: Wild Shape ────────────────────────────────────────────────────
