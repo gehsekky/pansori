@@ -1,16 +1,20 @@
 import { type AuthUser, type CharacterInput, api } from './lib/api.ts';
+import { FactionsView, QuestsView } from './components/CampaignPanel.tsx';
 import type { FrontendContext, GameChoice, Seed, SessionSummary } from './types.ts';
 import { useEffect, useRef, useState } from 'react';
-import CampaignPanel from './components/CampaignPanel.tsx';
 import CharScreen from './components/CharScreen.tsx';
 import CombatLogPanel from './components/CombatLogPanel.tsx';
+import ContextPanel from './components/ContextPanel.tsx';
+import type { ContextTab } from './components/ContextPanel.tsx';
 import GridCombatView from './components/GridCombatView.tsx';
 import InventoryModal from './components/InventoryModal.tsx';
 import LoginScreen from './components/LoginScreen.tsx';
+import MissionLogPanel from './components/MissionLogPanel.tsx';
 import PartyPanel from './components/PartyPanel.tsx';
 import RoomArtPanel from './components/RoomArtPanel.tsx';
 import SessionsScreen from './components/SessionScreen.tsx';
 import WorldMap from './components/WorldMap.tsx';
+import artManifest from './art-manifest.json';
 import { context as groveContext } from './contexts/grove_of_thorns.tsx';
 import { context as sandboxContext } from './contexts/sandbox.tsx';
 import styles from './styles.module.css';
@@ -77,7 +81,6 @@ export default function App() {
   // Which choice is currently hovered — used by GridCombatView to render an
   // AoE preview tint over the cells a hovered spell would affect.
   const [hoveredChoice, setHoveredChoice] = useState<GameChoice | null>(null);
-  const logRef = useRef<HTMLDivElement>(null);
   const narrativeRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -229,6 +232,48 @@ export default function App() {
             gameState?.characters[0] ??
             null;
           const allDead = !!gameState && gameState.characters.every((c) => c.dead);
+          // Build the right-rail tab list from current game state. Tabs only
+          // appear when their data exists (e.g. quests + factions only with a
+          // campaign, combat log only with events).
+          const contextTabs: ContextTab[] = [];
+          const roomId = gameState?.current_room ?? null;
+          const artMap = artManifest as Record<string, Record<string, string>>;
+          const hasRoomArt = !!roomId && (!!ctx.art[roomId] || !!artMap[ctx.id]?.[roomId]);
+          if (hasRoomArt) {
+            contextTabs.push({
+              id: 'room',
+              label: 'ROOM',
+              render: () => <RoomArtPanel roomId={roomId} ctx={ctx} />,
+            });
+          }
+          if (campaignMeta && gameState && campaignMeta.quests.length > 0) {
+            contextTabs.push({
+              id: 'quests',
+              label: `QUESTS (${campaignMeta.quests.length})`,
+              render: () => <QuestsView state={gameState} meta={campaignMeta} />,
+            });
+          }
+          if (campaignMeta && gameState && campaignMeta.factions.length > 0) {
+            contextTabs.push({
+              id: 'factions',
+              label: `FACTIONS (${campaignMeta.factions.length})`,
+              render: () => <FactionsView state={gameState} meta={campaignMeta} />,
+            });
+          }
+          if (gameState?.combat_log && gameState.combat_log.length > 0) {
+            contextTabs.push({
+              id: 'combat-log',
+              label: 'COMBAT LOG',
+              render: () => <CombatLogPanel events={gameState.combat_log} />,
+            });
+          }
+          if (history.length > 0) {
+            contextTabs.push({
+              id: 'mission-log',
+              label: 'MISSION LOG',
+              render: () => <MissionLogPanel history={history} />,
+            });
+          }
           return (
             <div className={styles.page}>
               <header className={styles.header}>
@@ -311,10 +356,6 @@ export default function App() {
                       }}
                     />
                   )}
-
-                {campaignMeta && gameState && (
-                  <CampaignPanel state={gameState} meta={campaignMeta} />
-                )}
 
                 <div className={styles.contentRow}>
                   <div className={styles.contentMain}>
@@ -454,27 +495,6 @@ export default function App() {
                       </div>
                     )}
 
-                    <CombatLogPanel events={gameState?.combat_log} />
-
-                    {history.length > 0 && (
-                      <div
-                        className={styles.card}
-                        style={{ marginTop: '1.5rem', maxHeight: 160, overflowY: 'auto' }}
-                        ref={logRef}
-                      >
-                        <p className={styles.missionLogLabel}>MISSION LOG</p>
-                        {[...history]
-                          .reverse()
-                          .filter((_, i) => i % 2 === 0)
-                          .slice(0, 20)
-                          .map((m, i) => (
-                            <p key={i} className={styles.logEntry}>
-                              › {m.content}
-                            </p>
-                          ))}
-                      </div>
-                    )}
-
                     <div className={styles.abortRow}>
                       <button
                         className={styles.sendBtn}
@@ -488,7 +508,7 @@ export default function App() {
                     </div>
                   </div>
 
-                  <RoomArtPanel roomId={gameState?.current_room ?? null} ctx={ctx} />
+                  {contextTabs.length > 0 && <ContextPanel tabs={contextTabs} />}
                 </div>
               </main>
             </div>
