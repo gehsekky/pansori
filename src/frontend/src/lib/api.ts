@@ -66,6 +66,10 @@ export type CharacterInput = {
   background_id?: string;
   stats?: StatBlock;
   portrait_url?: string;
+  // PHB: Cleric/Sorcerer/Warlock pick subclass at level 1 — required at
+  // creation. Other classes pick later (L2 Wizard/Druid, L3 the rest) so
+  // this stays optional and is supplied via the in-game choice for them.
+  subclass?: string;
 };
 
 export const api = {
