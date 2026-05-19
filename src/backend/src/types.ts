@@ -334,6 +334,15 @@ export interface GameChoice {
   label: string;
   action: StructuredAction;
   requiresBonusAction?: boolean;
+  // Hint for the grid renderer: when this is a cast_spell choice for an AoE
+  // spell, lets the frontend tint the affected cells on hover without needing
+  // the spell catalog or per-shape geometry.
+  aoePreview?: {
+    shape: 'sphere' | 'cone' | 'cube' | 'line';
+    radiusFt: number;
+    targetEnemyId?: string;
+    rangeKind?: 'self' | 'touch' | 'ranged';
+  };
 }
 
 export interface InventoryItem {

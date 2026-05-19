@@ -1,5 +1,5 @@
 import { type AuthUser, type CharacterInput, api } from './lib/api.ts';
-import type { FrontendContext, Seed, SessionSummary } from './types.ts';
+import type { FrontendContext, GameChoice, Seed, SessionSummary } from './types.ts';
 import { useEffect, useRef, useState } from 'react';
 import CampaignPanel from './components/CampaignPanel.tsx';
 import CharScreen from './components/CharScreen.tsx';
@@ -71,6 +71,9 @@ export default function App() {
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [mapOpen, setMapOpen] = useState(false);
   const [inventoryOpen, setInventoryOpen] = useState(false);
+  // Which choice is currently hovered — used by GridCombatView to render an
+  // AoE preview tint over the cells a hovered spell would affect.
+  const [hoveredChoice, setHoveredChoice] = useState<GameChoice | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
   const narrativeRef = useRef<HTMLDivElement>(null);
 
@@ -292,6 +295,7 @@ export default function App() {
                   <GridCombatView
                     state={gameState}
                     seed={seed}
+                    aoePreview={hoveredChoice?.aoePreview}
                     onMove={(to) => {
                       const activeId = gameState.active_character_id;
                       handleChoice({
@@ -420,6 +424,8 @@ export default function App() {
                             key={i}
                             className={styles.choiceBtn}
                             onClick={() => handleChoice(c)}
+                            onMouseEnter={() => c.aoePreview && setHoveredChoice(c)}
+                            onMouseLeave={() => setHoveredChoice(null)}
                           >
                             [{i + 1}] {c.label}
                           </button>
