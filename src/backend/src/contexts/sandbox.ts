@@ -215,6 +215,17 @@ export const context: Context = {
       heal: '1d8',
       rangeKind: 'touch',
     },
+    shield: {
+      id: 'shield',
+      name: 'Shield',
+      // PHB p.275 — abjuration, 1st-level. "When you are hit by an attack or
+      // targeted by the magic missile spell, you can cast this spell as a
+      // reaction to gain +5 AC until the start of your next turn."
+      desc: 'A reaction that grants +5 AC until the start of your next turn against the triggering attack and any others.',
+      level: 1,
+      castTime: 'reaction',
+      rangeKind: 'self',
+    },
     magic_missile: {
       id: 'magic_missile',
       name: 'Magic Missile',

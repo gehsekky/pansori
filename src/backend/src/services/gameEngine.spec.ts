@@ -1903,6 +1903,282 @@ describe('class features', () => {
     expect(result.newState.characters[0].class_resource_uses?.fey_presence_used).toBe(1);
   });
 
+  // ── Shield (reactive spell, PHB p.275) ──────────────────────────────────────
+
+  it('Shield reaction window opens when enemy hits within [AC, AC+4]', async () => {
+    // Enemy attack roll: d20=15, toHit +3 → total 18. PC AC 16 → total in window (16-20).
+    // PC has Shield prepared + L1 slot → pending_reaction should be set.
+    vi.spyOn(Math, 'random')
+      .mockReturnValueOnce(0.74) // d20 → 15 (toHit total = 18 vs AC 16 → hit in window)
+      .mockReturnValue(0.5);
+    const wizId = 'wiz1';
+    const goblinId = `${CORRIDOR_ID}#0`;
+    const wiz = makeChar({
+      id: wizId,
+      character_class: 'Wizard',
+      level: 3,
+      ac: 16,
+      max_hp: 18,
+      hp: 18,
+      spells_known: ['shield'],
+      prepared_spells: ['shield'],
+      spell_slots_max: { 1: 4, 2: 2 },
+      spell_slots_used: {},
+    });
+    const state: GameState = {
+      characters: [wiz],
+      active_character_id: wizId,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: true,
+      // Enemy goes next so usedInitiative + advance triggers the enemy turn.
+      initiative_order: [
+        { id: wizId, roll: 18, is_enemy: false },
+        { id: goblinId, roll: 5, is_enemy: true },
+      ],
+      initiative_idx: 0,
+      entities: [
+        {
+          id: wizId,
+          isEnemy: false,
+          pos: { x: 4, y: 5 },
+          hp: 18,
+          maxHp: 18,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: goblinId,
+          isEnemy: true,
+          pos: { x: 5, y: 5 },
+          hp: 10,
+          maxHp: 10,
+          conditions: [],
+          condition_durations: {},
+        },
+      ],
+      movement_used: {},
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      flags: {},
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+    };
+    // PC ends their turn; goblin attacks; Shield window should fire.
+    const result = await takeAction({
+      action: { type: 'end_turn' },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    expect(result.newState.pending_reaction).toBeDefined();
+    expect(result.newState.pending_reaction?.kind).toBe('shield');
+    expect(result.newState.pending_reaction?.targetCharId).toBe(wizId);
+    expect(result.newState.active_character_id).toBe(wizId);
+  });
+
+  it('Accepting Shield consumes a slot + reaction, bumps AC by 5, attack misses', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const wizId = 'wiz2';
+    const goblinId = `${CORRIDOR_ID}#0`;
+    const wiz = makeChar({
+      id: wizId,
+      character_class: 'Wizard',
+      level: 3,
+      ac: 14,
+      max_hp: 18,
+      hp: 18,
+      spells_known: ['shield'],
+      prepared_spells: ['shield'],
+      spell_slots_max: { 1: 4 },
+      spell_slots_used: {},
+      turn_actions: {
+        action_used: true,
+        bonus_action_used: false,
+        reaction_used: false,
+        free_interaction_used: false,
+      },
+    });
+    const state: GameState = {
+      characters: [wiz],
+      active_character_id: wizId,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: true,
+      initiative_order: [
+        { id: wizId, roll: 18, is_enemy: false },
+        { id: goblinId, roll: 5, is_enemy: true },
+      ],
+      initiative_idx: 0,
+      entities: [
+        {
+          id: wizId,
+          isEnemy: false,
+          pos: { x: 4, y: 5 },
+          hp: 18,
+          maxHp: 18,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: goblinId,
+          isEnemy: true,
+          pos: { x: 5, y: 5 },
+          hp: 10,
+          maxHp: 10,
+          conditions: [],
+          condition_durations: {},
+        },
+      ],
+      pending_reaction: {
+        kind: 'shield',
+        attackerEnemyId: goblinId,
+        targetCharId: wizId,
+        atkTotal: 16,
+        targetAcAtAttack: 14,
+        pendingDamage: 5,
+        pendingNarrative: 'The Goblin hits for 5 damage.',
+        resumeFromInitiativeIdx: 1,
+        resumeFromMultiattackIdx: 1, // multi-attack done; resume just advances past goblin
+        narrativeSoFar: '[Goblin\'s turn]',
+        eligibleCharIds: [wizId],
+      },
+      movement_used: {},
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      flags: {},
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+    };
+    const result = await takeAction({
+      action: { type: 'resolve_reaction', accept: true },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    expect(result.narrative).toMatch(/SHIELD/);
+    const newWiz = result.newState.characters[0];
+    expect(newWiz.spell_slots_used?.[1]).toBe(1);
+    expect(newWiz.turn_actions.reaction_used).toBe(true);
+    expect(newWiz.ac).toBe(19); // 14 + 5
+    expect(newWiz.hp).toBe(18); // damage NOT applied
+    expect(result.newState.pending_reaction).toBeUndefined();
+  });
+
+  it('Declining Shield applies the pending damage', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const wizId = 'wiz3';
+    const goblinId = `${CORRIDOR_ID}#0`;
+    const wiz = makeChar({
+      id: wizId,
+      character_class: 'Wizard',
+      level: 3,
+      ac: 14,
+      max_hp: 18,
+      hp: 18,
+      spells_known: ['shield'],
+      prepared_spells: ['shield'],
+      spell_slots_max: { 1: 4 },
+      spell_slots_used: {},
+      turn_actions: {
+        action_used: true,
+        bonus_action_used: false,
+        reaction_used: false,
+        free_interaction_used: false,
+      },
+    });
+    const state: GameState = {
+      characters: [wiz],
+      active_character_id: wizId,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: true,
+      initiative_order: [
+        { id: wizId, roll: 18, is_enemy: false },
+        { id: goblinId, roll: 5, is_enemy: true },
+      ],
+      initiative_idx: 0,
+      entities: [
+        {
+          id: wizId,
+          isEnemy: false,
+          pos: { x: 4, y: 5 },
+          hp: 18,
+          maxHp: 18,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: goblinId,
+          isEnemy: true,
+          pos: { x: 5, y: 5 },
+          hp: 10,
+          maxHp: 10,
+          conditions: [],
+          condition_durations: {},
+        },
+      ],
+      pending_reaction: {
+        kind: 'shield',
+        attackerEnemyId: goblinId,
+        targetCharId: wizId,
+        atkTotal: 16,
+        targetAcAtAttack: 14,
+        pendingDamage: 5,
+        pendingNarrative: 'The Goblin hits for 5 damage.',
+        resumeFromInitiativeIdx: 1,
+        resumeFromMultiattackIdx: 1,
+        narrativeSoFar: '[Goblin\'s turn]',
+        eligibleCharIds: [wizId],
+      },
+      movement_used: {},
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      flags: {},
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+    };
+    const result = await takeAction({
+      action: { type: 'resolve_reaction', accept: false },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    const newWiz = result.newState.characters[0];
+    expect(newWiz.hp).toBe(13); // 18 - 5
+    expect(newWiz.ac).toBe(14); // unchanged
+    expect(newWiz.spell_slots_used?.[1] ?? 0).toBe(0);
+    expect(newWiz.turn_actions.reaction_used).toBe(false);
+    expect(result.newState.pending_reaction).toBeUndefined();
+  });
+
   // ── Sneak Attack (Rogue in sandbox) ─────────────────────────────────────────
 
   it('Rogue sneak attack adds bonus damage on hit', async () => {

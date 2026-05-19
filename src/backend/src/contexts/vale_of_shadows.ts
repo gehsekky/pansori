@@ -1659,6 +1659,14 @@ export const context: Context = {
       rangeKind: 'ranged',
       rangeFt: 120,
     },
+    shield: {
+      id: 'shield',
+      name: 'Shield',
+      desc: 'A reaction that grants +5 AC until the start of your next turn against the triggering attack and any others.',
+      level: 1,
+      castTime: 'reaction',
+      rangeKind: 'self',
+    },
     magic_missile: {
       id: 'magic_missile',
       name: 'Magic Missile',

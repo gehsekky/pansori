@@ -219,6 +219,9 @@ function applyEnemyAttackNarrative(
   newDurations: Record<string, number>;
   updatedResourceUses?: Record<string, number>;
   newTempHp?: number;
+  // Exposed so callers can detect reaction windows (Shield: total in [AC, AC+4]).
+  atkTotal: number;
+  hit: boolean;
 } {
   const isDodging = char.turn_actions?.dodging ?? false;
   const isReckless = char.turn_actions?.reckless ?? false;
@@ -296,6 +299,8 @@ function applyEnemyAttackNarrative(
       newConditions: updatedChar.conditions,
       newDurations: updatedChar.condition_durations,
       updatedResourceUses: char.class_resource_uses,
+      atkTotal: result.total,
+      hit: true,
     };
   }
   if (armorItem) {
@@ -307,6 +312,8 @@ function applyEnemyAttackNarrative(
         .replace('{armor}', armorItem.name),
       newConditions: [...char.conditions],
       newDurations: { ...(char.condition_durations ?? {}) },
+      atkTotal: result.total,
+      hit: false,
     };
   }
   return {
@@ -314,6 +321,8 @@ function applyEnemyAttackNarrative(
     narrative: `The ${enemy.name} lunges — but you dodge at the last second!`,
     newConditions: [...char.conditions],
     newDurations: { ...(char.condition_durations ?? {}) },
+    atkTotal: result.total,
+    hit: false,
   };
 }
 
@@ -449,7 +458,14 @@ function tickConditions(char: Character): Character {
   }
 
   const newConditions = char.conditions.filter((c) => !expired.includes(c));
-  return { ...char, conditions: newConditions, condition_durations: newDurations };
+  // Shield spell side-effect: AC bump applied on cast must be undone on expiry.
+  const acDelta = expired.includes('shield_spell') ? -5 : 0;
+  return {
+    ...char,
+    ac: char.ac + acDelta,
+    conditions: newConditions,
+    condition_durations: newDurations,
+  };
 }
 
 // SRD 5.2.1 p.178 (Variant Encumbrance) — speed reductions tied to carried weight.
@@ -808,6 +824,27 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   if (!char) return [];
 
   if (char.dead) return [];
+
+  // Reaction window — only offer reaction-resolution choices until the
+  // player decides. Suppresses everything else (attacks, movement, etc.).
+  const pending = state.pending_reaction;
+  if (pending && pending.eligibleCharIds.includes(char.id)) {
+    const enemyForLabel =
+      seed.enemies?.[state.current_room]?.find((e) => e.id === pending.attackerEnemyId)?.name ??
+      'attacker';
+    if (pending.kind === 'shield') {
+      return [
+        {
+          label: `Cast Shield (reaction, 1st-level slot) — +5 AC, ${enemyForLabel}'s attack (total ${pending.atkTotal} vs AC ${pending.targetAcAtAttack}) misses!`,
+          action: { type: 'resolve_reaction', accept: true },
+        },
+        {
+          label: `Decline — take the hit (${pending.pendingDamage} damage)`,
+          action: { type: 'resolve_reaction', accept: false },
+        },
+      ];
+    }
+  }
 
   // Pending ASI: only show stat-boost choices until resolved
   if (char.asi_pending) {
@@ -1462,6 +1499,9 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       const spell = context.spellTable[spellId];
       if (!spell) continue;
 
+      // Reaction-cast spells (e.g. Shield) only fire from a pending_reaction
+      // window — don't surface them in the regular cast menu.
+      if (spell.castTime === 'reaction') continue;
       const isBonusAction = spell.castTime === 'bonus_action';
       const actionBlocked = !isBonusAction && char.turn_actions.action_used;
       const bonusBlocked = isBonusAction && char.turn_actions.bonus_action_used;
@@ -1861,6 +1901,195 @@ function applyConsequence(
     default:
       return st;
   }
+}
+
+// ─── Enemy turn auto-resolve (with reaction-window support) ───────────────────
+
+// PHB p.190: reactions interrupt the attacker's resolve. When an enemy's
+// attack lands within Shield's window ([AC, AC+4]) on a defender who has
+// Shield prepared + a 1st-level slot + an unused reaction, this helper sets
+// `st.pending_reaction` and returns `paused: true` so the engine can yield
+// control to the player. Calling again from `resolve_reaction` resumes the
+// loop from the saved coordinates.
+//
+// Eligibility for Shield is checked at the per-sub-attack level. Multiattacks
+// pause mid-burst; remaining sub-attacks resume after the decision.
+function isShieldEligible(
+  target: Character,
+  atkTotal: number,
+  targetAc: number,
+  context: Context
+): boolean {
+  if (target.dead || target.hp <= 0) return false;
+  if (target.turn_actions?.reaction_used) return false;
+  const knows =
+    (target.prepared_spells ?? []).includes('shield') ||
+    (target.spells_known ?? []).includes('shield');
+  if (!knows) return false;
+  const slotsMax = target.spell_slots_max ?? {};
+  const slotsUsed = target.spell_slots_used ?? {};
+  const hasL1Slot = Object.entries(slotsMax).some(([lvl, max]) => {
+    const lvlN = Number(lvl);
+    return lvlN >= 1 && (max ?? 0) > (slotsUsed[lvlN] ?? 0);
+  });
+  if (!hasL1Slot) return false;
+  // Outside the [AC, AC+4] window, +5 AC from Shield wouldn't change the result.
+  if (atkTotal < targetAc || atkTotal > targetAc + 4) return false;
+  if (!context.spellTable?.shield) return false;
+  return true;
+}
+
+interface EnemyTurnResult {
+  st: GameState;
+  narrative: string;
+  exitAdvIdx: number;
+  roundWrapped: boolean;
+  paused: boolean;
+}
+
+function runEnemyTurns(args: {
+  st: GameState;
+  seed: Seed;
+  context: Context;
+  worldName: string;
+  startAdvIdx: number;
+  startMultiattackIdx: number; // 0 = haven't started; N = N sub-attacks already done
+  startRoundWrapped: boolean;
+  initialCurrentIdx: number; // anchor for the safety "loop back to start" break
+}): EnemyTurnResult {
+  let st = args.st;
+  let narrative = '';
+  let advIdx = args.startAdvIdx;
+  let roundWrapped = args.startRoundWrapped;
+  const orderLen = st.initiative_order.length;
+  let resumeMi = args.startMultiattackIdx;
+
+  while (
+    st.combat_active &&
+    st.initiative_order[advIdx] &&
+    (st.initiative_order[advIdx].is_enemy ||
+      (st.characters.find((c) => c.id === st.initiative_order[advIdx].id)?.dead ?? false))
+  ) {
+    const eEntry = st.initiative_order[advIdx];
+    const rm = getEnemyById(args.seed, eEntry.id);
+    if (rm && !st.enemies_killed.includes(eEntry.id)) {
+      const eEnt = st.entities?.find((e) => e.id === eEntry.id && e.isEnemy);
+      const nearestPcEntity = st.entities
+        ?.filter((e) => !e.isEnemy && !e.isCompanion && e.hp > 0)
+        .sort((a, b) => {
+          if (!eEnt) return 0;
+          return distanceFeet(eEnt.pos, a.pos) - distanceFeet(eEnt.pos, b.pos);
+        })[0];
+      const targetCharIdx = st.characters.findIndex(
+        (c) => c.id === nearestPcEntity?.id && !c.dead
+      );
+      if (targetCharIdx >= 0) {
+        let target = st.characters[targetCharIdx];
+        if (!target.dead && target.hp > 0) {
+          const attackCount = rm.multiattack ?? 1;
+          if (resumeMi === 0) narrative += ` [${rm.name}'s turn]`;
+          let massiveDeath = false;
+          for (let mi = resumeMi; mi < attackCount && target.hp > 0; mi++) {
+            const atkResult = applyEnemyAttackNarrative(rm, target, args.context);
+            // Shield reaction window — pause the loop if the defender can
+            // negate this hit. The d20 has already been rolled; on resume
+            // the saved damage/narrative either fires (decline) or is
+            // discarded (accept).
+            if (
+              atkResult.hit &&
+              isShieldEligible(target, atkResult.atkTotal, target.ac, args.context)
+            ) {
+              st = {
+                ...st,
+                pending_reaction: {
+                  kind: 'shield',
+                  attackerEnemyId: eEntry.id,
+                  targetCharId: target.id,
+                  atkTotal: atkResult.atkTotal,
+                  targetAcAtAttack: target.ac,
+                  pendingDamage: atkResult.hpLost,
+                  pendingNarrative: atkResult.narrative,
+                  resumeFromInitiativeIdx: advIdx,
+                  resumeFromMultiattackIdx: mi + 1,
+                  narrativeSoFar: narrative,
+                  eligibleCharIds: [target.id],
+                },
+                // Put the reactor in the driver's seat so the frontend prompts them.
+                active_character_id: target.id,
+              };
+              narrative += ` ⚡ ${rm.name} strikes ${target.name} — total ${atkResult.atkTotal} vs AC ${target.ac}. Shield available!`;
+              return {
+                st,
+                narrative,
+                exitAdvIdx: advIdx,
+                roundWrapped,
+                paused: true,
+              };
+            }
+            const prevHp = target.hp;
+            target = {
+              ...target,
+              hp: Math.max(0, target.hp - atkResult.hpLost),
+              temp_hp: atkResult.newTempHp ?? target.temp_hp,
+              conditions: atkResult.newConditions,
+              condition_durations: atkResult.newDurations,
+              class_resource_uses: atkResult.updatedResourceUses ?? target.class_resource_uses,
+            };
+            const concAtk = checkConcentration(target, st, atkResult.hpLost);
+            target = concAtk.char;
+            st = concAtk.st;
+            narrative += ` ${atkResult.narrative}${concAtk.note}`;
+            if (isMassiveDamageDeath(prevHp, atkResult.hpLost, target.max_hp)) {
+              target = { ...target, dead: true, stable: false };
+              narrative += ` MASSIVE DAMAGE — ${target.name} is killed outright!`;
+              massiveDeath = true;
+              break;
+            }
+          }
+
+          if (target.hp <= 0 && !target.dead && !massiveDeath) {
+            const {
+              narrative: dsNarr,
+              newChar: newTarget,
+              endedCombat,
+            } = processDeathSave(
+              { ...target, death_saves: target.death_saves ?? { successes: 0, failures: 0 } },
+              rm,
+              args.context,
+              args.worldName
+            );
+            target = newTarget;
+            narrative += ' ' + dsNarr;
+            if (endedCombat) st = endCombatState(st);
+          } else if (massiveDeath) {
+            const allDead = st.characters.every((c, i) => (i === targetCharIdx ? true : c.dead));
+            if (allDead) st = endCombatState(st);
+          }
+          st = {
+            ...st,
+            characters: st.characters.map((c, i) => (i === targetCharIdx ? target : c)),
+          };
+          if (st.entities) {
+            st = {
+              ...st,
+              entities: st.entities.map((e) =>
+                e.id === target.id && !e.isEnemy ? { ...e, hp: target.hp } : e
+              ),
+            };
+          }
+        }
+      }
+    }
+
+    // Reset resumeMi after the first iteration; subsequent enemies start fresh.
+    resumeMi = 0;
+    const prevAdvIdx = advIdx;
+    advIdx = (advIdx + 1) % orderLen;
+    if (advIdx === 0 && prevAdvIdx !== 0) roundWrapped = true;
+    if (advIdx === args.initialCurrentIdx) break;
+  }
+
+  return { st, narrative, exitAdvIdx: advIdx, roundWrapped, paused: false };
 }
 
 // ─── Main action handler ──────────────────────────────────────────────────────
@@ -5437,6 +5666,136 @@ export async function takeAction({
       break;
     }
 
+    // ── Resolve pending reaction (Shield window for now) ──────────────────────
+    case 'resolve_reaction': {
+      const rxAction = action as { type: 'resolve_reaction'; accept: boolean };
+      const rx = st.pending_reaction;
+      if (!rx) {
+        narrative = 'No reaction pending.';
+        break;
+      }
+      if (char.id !== rx.targetCharId) {
+        narrative = 'This reaction belongs to another character.';
+        break;
+      }
+      if (rx.kind === 'shield') {
+        if (rxAction.accept) {
+          // Consume L1 slot (lowest available) and reaction.
+          const slotsMax = char.spell_slots_max ?? {};
+          const slotsUsed = char.spell_slots_used ?? {};
+          const lvl = Object.keys(slotsMax)
+            .map(Number)
+            .filter((n) => n >= 1 && (slotsMax[n] ?? 0) > (slotsUsed[n] ?? 0))
+            .sort((a, b) => a - b)[0];
+          if (lvl === undefined) {
+            narrative = 'No spell slot available to cast Shield.';
+            // Fall through to declined-hit path
+            narrative += ` ${rx.pendingNarrative}`;
+            const declinedTarget = {
+              ...char,
+              hp: Math.max(0, char.hp - rx.pendingDamage),
+            };
+            st = {
+              ...st,
+              characters: st.characters.map((c) =>
+                c.id === char.id ? declinedTarget : c
+              ),
+              pending_reaction: undefined,
+            };
+            char = declinedTarget;
+          } else {
+            char.spell_slots_used = {
+              ...slotsUsed,
+              [lvl]: (slotsUsed[lvl] ?? 0) + 1,
+            };
+            char.turn_actions = { ...char.turn_actions, reaction_used: true };
+            narrative = `🛡️ ${char.name} casts SHIELD as a reaction (lvl ${lvl} slot)! +5 AC until the start of their next turn — ${rx.pendingNarrative.split('.')[0]} bounces off the shimmering barrier.`;
+            // Track Shield active and bump AC by 5 for the duration. tickConditions
+            // removes the bump when the condition expires (next turn start).
+            char.conditions = [...char.conditions.filter((c) => c !== 'shield_spell'), 'shield_spell'];
+            char.condition_durations = {
+              ...(char.condition_durations ?? {}),
+              shield_spell: 1,
+            };
+            char.ac = char.ac + 5;
+            st = {
+              ...st,
+              characters: st.characters.map((c) => (c.id === char.id ? char : c)),
+              pending_reaction: undefined,
+            };
+          }
+        } else {
+          // Decline — apply the pending damage and narrative.
+          const newHp = Math.max(0, char.hp - rx.pendingDamage);
+          char = { ...char, hp: newHp };
+          narrative = `${rx.pendingNarrative} (Shield declined.)`;
+          st = {
+            ...st,
+            characters: st.characters.map((c) => (c.id === char.id ? char : c)),
+            pending_reaction: undefined,
+          };
+          if (st.entities) {
+            st = {
+              ...st,
+              entities: st.entities.map((e) =>
+                e.id === char.id && !e.isEnemy ? { ...e, hp: newHp } : e
+              ),
+            };
+          }
+        }
+        // Resume the enemy turn loop from the saved coordinates.
+        const resume = runEnemyTurns({
+          st,
+          seed,
+          context,
+          worldName,
+          startAdvIdx: rx.resumeFromInitiativeIdx,
+          startMultiattackIdx: rx.resumeFromMultiattackIdx,
+          startRoundWrapped: false,
+          initialCurrentIdx: rx.resumeFromInitiativeIdx,
+        });
+        st = resume.st;
+        narrative += resume.narrative;
+        // After resume, advance the initiative cursor (or pause again if another reaction triggered).
+        if (!resume.paused) {
+          if (resume.roundWrapped) {
+            st = {
+              ...st,
+              movement_used: {},
+              surprised: [],
+              characters: st.characters.map((c) => ({ ...c, turn_actions: { ...FRESH_TURN } })),
+            };
+          }
+          st.initiative_idx = resume.exitAdvIdx;
+          const nextEntry = st.initiative_order[resume.exitAdvIdx];
+          if (nextEntry && !nextEntry.is_enemy) {
+            const nextCharIdx = st.characters.findIndex(
+              (c) => c.id === nextEntry.id && !c.dead
+            );
+            if (nextCharIdx >= 0) {
+              st = {
+                ...st,
+                movement_used: { ...(st.movement_used ?? {}), [nextEntry.id]: 0 },
+              };
+              const withFreshTurn = {
+                ...st.characters[nextCharIdx],
+                turn_actions: { ...FRESH_TURN },
+              };
+              const ticked = tickConditions(withFreshTurn);
+              st = {
+                ...st,
+                characters: st.characters.map((c, i) => (i === nextCharIdx ? ticked : c)),
+                active_character_id: ticked.id,
+              };
+            }
+          }
+        } else {
+          st.initiative_idx = resume.exitAdvIdx;
+        }
+      }
+      break;
+    }
+
     // ── Prepare spells ────────────────────────────────────────────────────────
     case 'prepare_spells': {
       if (st.combat_active) {
@@ -5495,109 +5854,28 @@ export async function takeAction({
     // Advance from current player's initiative position
     const orderLen = st.initiative_order.length;
     const currentIdx = st.initiative_idx ?? 0;
-    let advIdx = (currentIdx + 1) % orderLen;
-    let roundWrapped = advIdx === 0;
+    const startAdvIdx = (currentIdx + 1) % orderLen;
+    const initialRoundWrapped = startAdvIdx === 0;
 
-    // Auto-resolve enemy turns AND skip dead-PC slots. The loop ends when we
-    // land on a living PC's slot — that's whose turn the player gets next.
-    // Dead PCs (separate from unconscious-at-0-HP — they get a death-save
-    // turn) have no action to take and would leave generateChoices returning
-    // [] if left as the active char.
-    while (
-      st.combat_active &&
-      st.initiative_order[advIdx] &&
-      (st.initiative_order[advIdx].is_enemy ||
-        (st.characters.find((c) => c.id === st.initiative_order[advIdx].id)?.dead ?? false))
-    ) {
-      const eEntry = st.initiative_order[advIdx];
-      const rm = getEnemyById(seed, eEntry.id);
-      if (rm && !st.enemies_killed.includes(eEntry.id)) {
-        // Target: nearest living PC by grid distance from enemy entity.
-        // Companions are excluded — enemies focus on the heroes (simpler than
-        // routing damage through both entity and character paths).
-        const eEnt = st.entities?.find((e) => e.id === eEntry.id && e.isEnemy);
-        const nearestPcEntity = st.entities
-          ?.filter((e) => !e.isEnemy && !e.isCompanion && e.hp > 0)
-          .sort((a, b) => {
-            if (!eEnt) return 0;
-            return distanceFeet(eEnt.pos, a.pos) - distanceFeet(eEnt.pos, b.pos);
-          })[0];
-        const targetCharIdx = st.characters.findIndex(
-          (c) => c.id === (nearestPcEntity?.id ?? char.id) && !c.dead
-        );
-        if (targetCharIdx >= 0) {
-          let target = st.characters[targetCharIdx];
-          if (!target.dead && target.hp > 0) {
-            const attackCount = rm.multiattack ?? 1;
-            narrative += ` [${rm.name}'s turn]`;
-            let massiveDeath = false;
-            for (let mi = 0; mi < attackCount && target.hp > 0; mi++) {
-              const atkResult = applyEnemyAttackNarrative(rm, target, context);
-              const prevHp = target.hp;
-              target = {
-                ...target,
-                hp: Math.max(0, target.hp - atkResult.hpLost),
-                temp_hp: atkResult.newTempHp ?? target.temp_hp,
-                conditions: atkResult.newConditions,
-                condition_durations: atkResult.newDurations,
-                class_resource_uses: atkResult.updatedResourceUses ?? target.class_resource_uses,
-              };
-              const concAtk = checkConcentration(target, st, atkResult.hpLost);
-              target = concAtk.char;
-              st = concAtk.st;
-              narrative += ` ${atkResult.narrative}${concAtk.note}`;
-              // Massive damage check (SRD 5.2.1 p.17): instant death, bypassing
-              // death saves, if a single hit's leftover damage ≥ max HP.
-              if (isMassiveDamageDeath(prevHp, atkResult.hpLost, target.max_hp)) {
-                target = { ...target, dead: true, stable: false };
-                narrative += ` MASSIVE DAMAGE — ${target.name} is killed outright!`;
-                massiveDeath = true;
-                break;
-              }
-            }
+    const turnRes = runEnemyTurns({
+      st,
+      seed,
+      context,
+      worldName,
+      startAdvIdx,
+      startMultiattackIdx: 0,
+      startRoundWrapped: initialRoundWrapped,
+      initialCurrentIdx: currentIdx,
+    });
+    st = turnRes.st;
+    narrative += turnRes.narrative;
+    const advIdx = turnRes.exitAdvIdx;
+    const roundWrapped = turnRes.roundWrapped && !turnRes.paused;
 
-            if (target.hp <= 0 && !target.dead && !massiveDeath) {
-              const {
-                narrative: dsNarr,
-                newChar: newTarget,
-                endedCombat,
-              } = processDeathSave(
-                { ...target, death_saves: target.death_saves ?? { successes: 0, failures: 0 } },
-                rm,
-                context,
-                worldName
-              );
-              target = newTarget;
-              narrative += ' ' + dsNarr;
-              if (endedCombat) st = endCombatState(st);
-            } else if (massiveDeath) {
-              // End combat if every PC is now dead
-              const allDead = st.characters.every((c, i) => (i === targetCharIdx ? true : c.dead));
-              if (allDead) st = endCombatState(st);
-            }
-            st = {
-              ...st,
-              characters: st.characters.map((c, i) => (i === targetCharIdx ? target : c)),
-            };
-            // Sync PC entity HP after enemy attack
-            if (st.entities) {
-              st = {
-                ...st,
-                entities: st.entities.map((e) =>
-                  e.id === target.id && !e.isEnemy ? { ...e, hp: target.hp } : e
-                ),
-              };
-            }
-          }
-        }
-      }
-
-      const prevAdvIdx = advIdx;
-      advIdx = (advIdx + 1) % orderLen;
-      if (advIdx === 0 && prevAdvIdx !== 0) roundWrapped = true;
-      // Safety: if we've looped all the way back to the start and it's still enemy, break
-      if (advIdx === currentIdx) break;
-    }
+    // Save the resume point in initiative_idx so a pause leaves a coherent
+    // state; the resolve_reaction handler will re-enter runEnemyTurns from
+    // the saved coords inside pending_reaction.
+    if (turnRes.paused) st.initiative_idx = advIdx;
 
     if (roundWrapped) {
       // New round: reset turn_actions, movement budgets, and clear surprise (PHB p.189)
@@ -5609,26 +5887,30 @@ export async function takeAction({
       };
     }
 
-    st.initiative_idx = advIdx;
+    // Pause path: runEnemyTurns already set initiative_idx and active_character_id
+    // to the reactor; skip the next-PC promotion below.
+    if (!turnRes.paused) {
+      st.initiative_idx = advIdx;
 
-    // Set active character to whoever's turn it is in the order;
-    // reset their turn_actions and tick conditions as their new turn begins.
-    const currentEntry = st.initiative_order[advIdx];
-    if (currentEntry && !currentEntry.is_enemy) {
-      const nextCharIdx = st.characters.findIndex((c) => c.id === currentEntry.id && !c.dead);
-      if (nextCharIdx >= 0) {
-        // Reset movement for this character's new turn
-        st = { ...st, movement_used: { ...(st.movement_used ?? {}), [currentEntry.id]: 0 } };
-        const withFreshTurn = { ...st.characters[nextCharIdx], turn_actions: { ...FRESH_TURN } };
-        const ticked = tickConditions(withFreshTurn);
-        if (ticked.conditions.length !== st.characters[nextCharIdx].conditions.length) {
-          const expired = st.characters[nextCharIdx].conditions.filter(
-            (c) => !ticked.conditions.includes(c)
-          );
-          narrative += ` [${ticked.name}] Condition${expired.length > 1 ? 's' : ''} cleared: ${expired.join(', ')}.`;
+      // Set active character to whoever's turn it is in the order;
+      // reset their turn_actions and tick conditions as their new turn begins.
+      const currentEntry = st.initiative_order[advIdx];
+      if (currentEntry && !currentEntry.is_enemy) {
+        const nextCharIdx = st.characters.findIndex((c) => c.id === currentEntry.id && !c.dead);
+        if (nextCharIdx >= 0) {
+          // Reset movement for this character's new turn
+          st = { ...st, movement_used: { ...(st.movement_used ?? {}), [currentEntry.id]: 0 } };
+          const withFreshTurn = { ...st.characters[nextCharIdx], turn_actions: { ...FRESH_TURN } };
+          const ticked = tickConditions(withFreshTurn);
+          if (ticked.conditions.length !== st.characters[nextCharIdx].conditions.length) {
+            const expired = st.characters[nextCharIdx].conditions.filter(
+              (c) => !ticked.conditions.includes(c)
+            );
+            narrative += ` [${ticked.name}] Condition${expired.length > 1 ? 's' : ''} cleared: ${expired.join(', ')}.`;
+          }
+          st = { ...st, characters: st.characters.map((c, i) => (i === nextCharIdx ? ticked : c)) };
+          st.active_character_id = ticked.id;
         }
-        st = { ...st, characters: st.characters.map((c, i) => (i === nextCharIdx ? ticked : c)) };
-        st.active_character_id = ticked.id;
       }
     }
   } else if (!usedInitiative || !st.combat_active) {
