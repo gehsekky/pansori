@@ -34,7 +34,7 @@ Listed by impact × tractability. Each item is its own PR.
 | 3   | Weapon Masteries (framework)   | ~3h    | DONE    | Vex, Topple, Push, Sap, Slow wired; Nick/Cleave/Graze/Flex TODO                    |
 | 4   | Weapon Masteries (per-class)   | ~2h    | DONE    | Fighter (3), Paladin (2), Ranger (2), Barbarian (2), Rogue (2) granted at creation |
 | 5   | Wild Shape → Beast Forms       | ~4h    | pending | Replaces temp-HP-pool model                                                        |
-| 6   | Rage progression               | ~1h    | pending | Mostly the same — confirm diff                                                     |
+| 6   | Rage progression               | ~1h    | DONE    | Damage bonus identical; rage uses table rebalanced to 2024 progression             |
 | 7   | Class feature audit pass       | ~4h    | pending | Cleric CD, Fighter Second Wind, etc.                                               |
 
 ---

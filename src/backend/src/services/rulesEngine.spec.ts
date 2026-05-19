@@ -558,14 +558,15 @@ describe('rageDamageBonus(level)', () => {
 });
 
 describe('rageUsesMax(level)', () => {
+  // 2024 PHB rage progression — rebalanced from 2014 (more uses earlier).
   it.each([
     [1, 2],
-    [5, 2],
-    [6, 3],
-    [9, 3],
-    [10, 4],
-    [12, 4],
-    [13, 5],
+    [2, 2],
+    [3, 3],
+    [5, 3],
+    [6, 4],
+    [11, 4],
+    [12, 5],
     [16, 5],
     [17, 6],
     [20, 6],
