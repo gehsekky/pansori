@@ -876,7 +876,11 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   if (state.current_room === context.escapeRoomId && !enemyAlive) {
     choices.push({ label: context.escapeChoiceText, action: { type: 'escape' } });
   }
-  if (enemyAlive) {
+  // Attack is the Action (PHB p.192). Don't offer it once the action is spent —
+  // an unintended click on a stale Attack choice would otherwise pass through
+  // the post-action auto-advance and end the turn (e.g. an out-of-range
+  // attempt that should be a no-op).
+  if (enemyAlive && (!state.combat_active || !char.turn_actions.action_used)) {
     if (livingEnemies.length === 1) {
       choices.push({
         label: `Attack the ${livingEnemies[0].name}`,
@@ -1116,7 +1120,11 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       warlock: ['fiend', 'archfey'],
     };
     const reqLevel = subclassLevels[cls] ?? 3;
-    if (char.level >= reqLevel && subclassChoices[cls]) {
+    // RAW: subclass is acquired at level-up (a long-rest milestone), not as an
+    // in-combat action. Gating to !combat_active keeps the pick from getting
+    // caught in the post-action auto-advance and from looking like it costs
+    // an action.
+    if (!state.combat_active && char.level >= reqLevel && subclassChoices[cls]) {
       for (const sc of subclassChoices[cls]) {
         if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
         choices.push({
@@ -4789,6 +4797,17 @@ export async function takeAction({
       const grappleTargetId =
         (action as { type: 'grapple'; targetEnemyId?: string }).targetEnemyId ?? enemy.id;
       const grappleTarget = livingEnemiesInRoom.find((e) => e.id === grappleTargetId) ?? enemy;
+      // SRD 5.2.1 p.195 / 2024 PHB "Unarmed Strike: Grapple" — requires the
+      // target within 5 ft (unarmed strike reach). No action is spent if the
+      // attempt fails this prerequisite.
+      if (st.entities) {
+        const myEnt = st.entities.find((e) => e.id === char.id);
+        const tgtEnt = st.entities.find((e) => e.id === grappleTarget.id && e.isEnemy);
+        if (myEnt && tgtEnt && distanceFeet(myEnt.pos, tgtEnt.pos) > 5) {
+          narrative = `Out of reach — Grapple needs the target within 5 ft. Move closer first.`;
+          break;
+        }
+      }
       if (grappleTarget.condition_immunities?.includes('grappled')) {
         narrative = `The ${grappleTarget.name} cannot be grappled (condition immunity).`;
         char.turn_actions = { ...char.turn_actions, action_used: true };
@@ -4931,6 +4950,16 @@ export async function takeAction({
       const shoveTargetId =
         (action as { type: 'shove'; targetEnemyId?: string }).targetEnemyId ?? enemy.id;
       const shoveTarget = livingEnemiesInRoom.find((e) => e.id === shoveTargetId) ?? enemy;
+      // SRD 5.2.1 p.195 / 2024 PHB "Unarmed Strike: Shove" — requires the
+      // target within 5 ft. No action is spent if the prerequisite fails.
+      if (st.entities) {
+        const myEnt = st.entities.find((e) => e.id === char.id);
+        const tgtEnt = st.entities.find((e) => e.id === shoveTarget.id && e.isEnemy);
+        if (myEnt && tgtEnt && distanceFeet(myEnt.pos, tgtEnt.pos) > 5) {
+          narrative = `Out of reach — Shove needs the target within 5 ft. Move closer first.`;
+          break;
+        }
+      }
       if (shoveTarget.condition_immunities?.includes('prone')) {
         narrative = `The ${shoveTarget.name} cannot be knocked prone (condition immunity).`;
         char.turn_actions = { ...char.turn_actions, action_used: true };
