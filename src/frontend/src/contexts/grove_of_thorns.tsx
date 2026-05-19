@@ -1,0 +1,188 @@
+import type { FrontendContext } from '../types.js';
+
+export const context: FrontendContext = {
+  id: 'grove_of_thorns',
+
+  displayName: 'Grove of Thorns',
+  tagline:
+    'A fey trickster has bound the Ancient Oak. The Verdant Circle calls — and the wild answers with claw and root.',
+  recommendedPartySize: 3,
+  recommendedComposition: ['Druid', 'Cleric', 'Fighter'],
+  previewArt: `
+   ╔═ GROVE ══════╗
+   ║   🌿 🌿 🌿     ║
+   ║  Pinegate    ║
+   ║ ═Bridge═ ▲ ▲ ║
+   ║ ┌─Oak─┐      ║
+   ║ │ 🍃 🍃 │      ║
+   ╚══════════════╝`,
+
+  classes: [
+    { id: 'Druid', desc: 'Wild Shape into beast forms. WIS spellcaster. Shillelagh, Entangle.' },
+    { id: 'Cleric', desc: 'Divine spellcaster. Channel Divinity. Medium armor + shield.' },
+    { id: 'Ranger', desc: 'Favored Enemy. Extra Attack at L5. Longbow + medium armor.' },
+    { id: 'Fighter', desc: 'Martial combatant. Extra attack at L5. Second Wind. Heavy armor.' },
+    { id: 'Barbarian', desc: 'Rage. Greataxe damage. Extra Attack at L5. Unarmored Defense.' },
+    { id: 'Rogue', desc: 'Sneak Attack. Cunning Action. Finesse weapons. Light armor.' },
+    { id: 'Wizard', desc: 'Arcane spellcaster. INT-based. Fireball, Misty Step. No armor.' },
+    { id: 'Paladin', desc: 'Divine Smite on hit. Lay on Hands healing. Heavy armor + shield.' },
+    { id: 'Bard', desc: 'Bardic Inspiration. CHA spellcaster. Charm Person, Sleep, Healing Word.' },
+    { id: 'Sorcerer', desc: 'Innate magic. Sorcery Points + Metamagic. Fire-bolt focus.' },
+    {
+      id: 'Warlock',
+      desc: 'Pact Magic (short-rest slots). Eldritch Blast + Hex + Hunger of Hadar.',
+    },
+    { id: 'Monk', desc: 'Ki points, Martial Arts, Unarmored Defense. Shortsword + darts.' },
+  ],
+
+  classPrimaryStats: {
+    Fighter: 'STR',
+    Rogue: 'DEX',
+    Wizard: 'INT',
+    Cleric: 'WIS',
+    Ranger: 'DEX',
+    Paladin: 'STR',
+    Bard: 'CHA',
+    Druid: 'WIS',
+    Sorcerer: 'CHA',
+    Warlock: 'CHA',
+    Monk: 'WIS',
+    Barbarian: 'STR',
+  },
+
+  classSkills: {
+    Fighter: ['Athletics', 'Intimidation'],
+    Rogue: ['Stealth', 'Sleight of Hand', 'Deception', 'Perception'],
+    Wizard: ['Arcana', 'Investigation', 'History'],
+    Cleric: ['Medicine', 'Religion', 'Insight'],
+    Ranger: ['Perception', 'Stealth', 'Nature', 'Survival'],
+    Paladin: ['Athletics', 'Persuasion', 'Insight'],
+    Bard: ['Persuasion', 'Deception', 'Performance', 'Perception'],
+    Druid: ['Nature', 'Survival', 'Animal Handling'],
+    Sorcerer: ['Arcana', 'Persuasion'],
+    Warlock: ['Arcana', 'Deception', 'Intimidation'],
+    Monk: ['Athletics', 'Stealth', 'Acrobatics'],
+    Barbarian: ['Athletics', 'Intimidation', 'Survival'],
+  },
+
+  classFeatures: {
+    Fighter: ['extra_attack', 'second_wind'],
+    Rogue: ['sneak_attack', 'cunning_action'],
+    Wizard: ['spellcasting'],
+    Cleric: ['spellcasting', 'channel_divinity'],
+    Ranger: ['extra_attack', 'favored_enemy'],
+    Paladin: ['divine_smite', 'lay_on_hands'],
+    Bard: ['spellcasting', 'bardic_inspiration'],
+    Druid: ['wild_shape', 'channel_divinity', 'spellcasting'],
+    Sorcerer: ['sorcery_points', 'metamagic', 'spellcasting'],
+    Warlock: ['eldritch_blast', 'pact_magic', 'spellcasting'],
+    Monk: ['ki', 'unarmored_defense', 'martial_arts'],
+    Barbarian: ['rage', 'extra_attack', 'unarmored_defense'],
+  },
+
+  backgrounds: [
+    {
+      id: 'soldier',
+      name: 'Soldier',
+      desc: 'You served with a frontier garrison or border watch.',
+      skillProficiencies: ['Athletics', 'Intimidation'],
+      toolProficiency: null,
+      feature: 'Military Rank',
+      featureDesc: 'Watch captains and old veterans recognise your standing.',
+    },
+    {
+      id: 'criminal',
+      name: 'Criminal',
+      desc: 'You ran goods through the thornwood paths before the grove turned hostile.',
+      skillProficiencies: ['Stealth', 'Deception'],
+      toolProficiency: "Thieves' Tools",
+      feature: 'Criminal Contact',
+      featureDesc: 'A reliable contact in Pinegate handles fences and rumour.',
+    },
+    {
+      id: 'sage',
+      name: 'Sage',
+      desc: 'You studied fey lore and the old druidic compacts.',
+      skillProficiencies: ['Arcana', 'History'],
+      toolProficiency: null,
+      feature: 'Researcher',
+      featureDesc: 'If you do not know information, you know where to find it.',
+    },
+    {
+      id: 'acolyte',
+      name: 'Acolyte',
+      desc: 'You walked with the Verdant Circle before the trickster came.',
+      skillProficiencies: ['Religion', 'Insight'],
+      toolProficiency: null,
+      feature: 'Shelter of the Faithful',
+      featureDesc: 'Druidic groves and shrines offer you healing and care.',
+    },
+  ],
+
+  // Forest greens and warm bark browns — leans verdant, alive, with a fey tinge.
+  theme: {
+    pageBg: '#0a100a',
+    cardBg: '#101a12',
+    font: 'monospace',
+    primary: '#a6c489',
+    mid: '#6b8a5a',
+    dim: '#3f5a3a',
+    dimDark: '#1a2418',
+    border: '#26361f',
+    separator: '#162017',
+    itemColor: '#bcd49e',
+    hpHigh: '#7cb342',
+    hpMid: '#e6a23c',
+    hpLow: '#c93838',
+    title: 'GROVE OF THORNS',
+    worldLabel: 'GROVE',
+  },
+
+  itemIcons: {
+    dagger: '🗡',
+    handaxe: '🪓',
+    quarterstaff: '🥢',
+    mace: '🔨',
+    shortbow: '🏹',
+    shortsword: '⚔',
+    rapier: '🤺',
+    longsword: '⚔',
+    greataxe: '🪓',
+    longbow: '🏹',
+    dart: '🎯',
+    leather_armor: '🛡',
+    scale_mail: '🛡',
+    chain_mail: '🛡',
+    shield: '🛡',
+    healing_potion: '🧪',
+    holy_symbol: '✚',
+    component_pouch: '🎒',
+    circle_charm: '🍂',
+    oak_heart: '🌱',
+  },
+
+  itemDescs: {
+    dagger: '1d4 piercing, finesse, light, thrown',
+    handaxe: '1d6 slashing, light, thrown',
+    quarterstaff: '1d6 bludgeoning (1d8 two-handed), versatile',
+    mace: '1d6 bludgeoning',
+    shortbow: '1d6 piercing, ranged (80/320)',
+    shortsword: '1d6 piercing, finesse, light',
+    rapier: '1d8 piercing, finesse',
+    longsword: '1d8 slashing (1d10 two-handed), versatile',
+    greataxe: '1d12 slashing, heavy, two-handed',
+    longbow: '1d8 piercing, heavy, ranged (150/600)',
+    dart: '1d4 piercing, finesse, thrown (20/60)',
+    leather_armor: 'AC 11 + DEX mod, light armor',
+    scale_mail: 'AC 14 + DEX mod (max +2), medium armor',
+    chain_mail: 'AC 16, heavy armor',
+    shield: '+2 AC while equipped',
+    healing_potion: 'Restores 2d4+2 HP when consumed',
+    holy_symbol: 'Focus for divine spellcasting',
+    component_pouch: 'Material components for arcane spells',
+    circle_charm: "Mareth's carved acorn charm — the grove knows it as kin.",
+    oak_heart: "A fist-sized seedpod glowing with green light — the grove's heart restored.",
+  },
+
+  art: {},
+};
