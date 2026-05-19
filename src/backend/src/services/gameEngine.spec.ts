@@ -1683,6 +1683,226 @@ describe('class features', () => {
     expect(result.newState.characters[0].max_hp).toBe(30); // unchanged
   });
 
+  // ── Warlock subclasses (PHB Chapter 3) ──────────────────────────────────────
+
+  it("Fiend Warlock — Dark One's Blessing: temp HP on kill = level + CHA mod", async () => {
+    // CHA 18 (+4) at L3 → grant 7 temp HP on kill. Force a hit + lethal damage.
+    vi.spyOn(Math, 'random').mockReturnValue(0.999);
+    const warlockId = 'wl1';
+    const goblinId = `${CORRIDOR_ID}#0`;
+    const wl = makeChar({
+      id: warlockId,
+      character_class: 'Warlock',
+      subclass: 'fiend',
+      level: 3,
+      cha: 18,
+      hp: 20,
+      max_hp: 20,
+      temp_hp: 0,
+      equipped_weapon: 'wl-dagger',
+      inventory: [{ instance_id: 'wl-dagger', id: 'dagger', name: 'Dagger' }],
+    });
+    const state: GameState = {
+      characters: [wl],
+      active_character_id: warlockId,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: true,
+      initiative_order: [
+        { id: warlockId, roll: 18, is_enemy: false },
+        { id: goblinId, roll: 5, is_enemy: true },
+      ],
+      initiative_idx: 0,
+      entities: [
+        {
+          id: warlockId,
+          isEnemy: false,
+          pos: { x: 4, y: 5 },
+          hp: 20,
+          maxHp: 20,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: goblinId,
+          isEnemy: true,
+          pos: { x: 5, y: 5 },
+          hp: 1, // 1 HP — any hit kills
+          maxHp: 10,
+          conditions: [],
+          condition_durations: {},
+        },
+      ],
+      movement_used: {},
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      flags: {},
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+    };
+    const result = await takeAction({
+      action: { type: 'attack', targetEnemyId: goblinId },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    expect(result.narrative).toMatch(/Dark One's Blessing/);
+    // L3 + CHA mod (+4) = 7 temp HP
+    expect(result.newState.characters[0].temp_hp).toBe(7);
+  });
+
+  it('non-Fiend Warlock kill does NOT grant Dark One\'s Blessing', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.999);
+    const warlockId = 'wl1';
+    const goblinId = `${CORRIDOR_ID}#0`;
+    const wl = makeChar({
+      id: warlockId,
+      character_class: 'Warlock',
+      subclass: 'archfey',
+      level: 3,
+      cha: 18,
+      temp_hp: 0,
+      equipped_weapon: 'wl-dagger2',
+      inventory: [{ instance_id: 'wl-dagger2', id: 'dagger', name: 'Dagger' }],
+    });
+    const state: GameState = {
+      characters: [wl],
+      active_character_id: warlockId,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: true,
+      initiative_order: [
+        { id: warlockId, roll: 18, is_enemy: false },
+        { id: goblinId, roll: 5, is_enemy: true },
+      ],
+      initiative_idx: 0,
+      entities: [
+        {
+          id: warlockId,
+          isEnemy: false,
+          pos: { x: 4, y: 5 },
+          hp: 20,
+          maxHp: 20,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: goblinId,
+          isEnemy: true,
+          pos: { x: 5, y: 5 },
+          hp: 1,
+          maxHp: 10,
+          conditions: [],
+          condition_durations: {},
+        },
+      ],
+      movement_used: {},
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      flags: {},
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+    };
+    const result = await takeAction({
+      action: { type: 'attack', targetEnemyId: goblinId },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    expect(result.narrative).not.toMatch(/Dark One's Blessing/);
+    expect(result.newState.characters[0].temp_hp ?? 0).toBe(0);
+  });
+
+  it('Archfey Warlock — Fey Presence frightens enemies in 10 ft on failed WIS save', async () => {
+    // Force d20 → 1 on enemy saves so they fail. Warlock at (5,5), goblin at (6,6) → 5 ft.
+    vi.spyOn(Math, 'random').mockReturnValue(0); // d20 → 1 always
+    const warlockId = 'wl-archfey';
+    const goblinId = `${CORRIDOR_ID}#0`;
+    const wl = makeChar({
+      id: warlockId,
+      character_class: 'Warlock',
+      subclass: 'archfey',
+      level: 3,
+      cha: 16, // +3
+    });
+    const state: GameState = {
+      characters: [wl],
+      active_character_id: warlockId,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: true,
+      initiative_order: [
+        { id: warlockId, roll: 18, is_enemy: false },
+        { id: goblinId, roll: 5, is_enemy: true },
+      ],
+      initiative_idx: 0,
+      entities: [
+        {
+          id: warlockId,
+          isEnemy: false,
+          pos: { x: 5, y: 5 },
+          hp: 20,
+          maxHp: 20,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: goblinId,
+          isEnemy: true,
+          pos: { x: 6, y: 6 },
+          hp: 10,
+          maxHp: 10,
+          conditions: [],
+          condition_durations: {},
+        },
+      ],
+      movement_used: {},
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      flags: {},
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+    };
+    const result = await takeAction({
+      action: { type: 'use_class_feature', featureId: 'fey_presence' },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    expect(result.narrative).toMatch(/Fey Presence/);
+    const ent = result.newState.entities?.find((e) => e.id === goblinId);
+    expect(ent?.conditions).toContain('frightened');
+    // Used resource flag set
+    expect(result.newState.characters[0].class_resource_uses?.fey_presence_used).toBe(1);
+  });
+
   // ── Sneak Attack (Rogue in sandbox) ─────────────────────────────────────────
 
   it('Rogue sneak attack adds bonus damage on hit', async () => {
