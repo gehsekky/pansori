@@ -4169,6 +4169,14 @@ export async function takeAction({
                   : e
               ),
             };
+            st = pushEvent(st, {
+              kind: 'condition_applied',
+              targetId: spellTargetId,
+              targetName: spellTarget.name,
+              condition: condToApply,
+              source: spell.name,
+              round: st.round ?? 1,
+            });
             narrative += ` The ${spellTarget.name} is ${condToApply}!`;
             if (spell.concentration) {
               char.concentrating_on = { spellId, condition: condToApply };
@@ -4712,7 +4720,19 @@ export async function takeAction({
             if (isOpenHand && newHp > 0) {
               const enemyDex = (enemy?.dex ?? 10) as number;
               const dexSave = rollDice('1d20') + abilityMod(enemyDex);
-              if (dexSave < monkDc) {
+              const dexSuccess = dexSave >= monkDc;
+              st = pushEvent(st, {
+                kind: 'save',
+                characterId: enemy?.id ?? roomId,
+                characterName: enemy?.name ?? 'target',
+                ability: 'dex',
+                roll: dexSave,
+                dc: monkDc,
+                success: dexSuccess,
+                vs: 'Open Hand Technique',
+                round: st.round ?? 1,
+              });
+              if (!dexSuccess) {
                 st = {
                   ...st,
                   entities: (st.entities ?? []).map((e) =>
@@ -4724,6 +4744,14 @@ export async function takeAction({
                       : e
                   ),
                 };
+                st = pushEvent(st, {
+                  kind: 'condition_applied',
+                  targetId: enemy?.id ?? roomId,
+                  targetName: enemy?.name ?? 'target',
+                  condition: 'prone',
+                  source: 'Open Hand Technique',
+                  round: st.round ?? 1,
+                });
                 flurryNarrative += ` Open Hand: DEX ${dexSave} vs DC ${monkDc} — prone!`;
               } else {
                 flurryNarrative += ` Open Hand: DEX ${dexSave} vs DC ${monkDc} — resists.`;
@@ -4804,7 +4832,19 @@ export async function takeAction({
         const stunDC = 8 + profBonus(char.level) + abilityMod(char.wis);
         const conSave =
           rollDice('1d20') + abilityMod((enemy as unknown as Record<string, number>)['con'] ?? 10);
-        if (conSave < stunDC) {
+        const stunSuccess = conSave >= stunDC;
+        st = pushEvent(st, {
+          kind: 'save',
+          characterId: enemy.id,
+          characterName: enemy.name,
+          ability: 'con',
+          roll: conSave,
+          dc: stunDC,
+          success: stunSuccess,
+          vs: 'Stunning Strike',
+          round: st.round ?? 1,
+        });
+        if (!stunSuccess) {
           st = {
             ...st,
             entities: (st.entities ?? []).map((e) =>
@@ -4813,6 +4853,14 @@ export async function takeAction({
                 : e
             ),
           };
+          st = pushEvent(st, {
+            kind: 'condition_applied',
+            targetId: enemy.id,
+            targetName: enemy.name,
+            condition: 'stunned',
+            source: 'Stunning Strike',
+            round: st.round ?? 1,
+          });
           narrative = `Stunning Strike! CON save ${conSave} vs DC ${stunDC} — ${enemy.name} is stunned until the end of your next turn! (${kiPool3 - 1} ki remaining)`;
         } else {
           narrative = `Stunning Strike! CON save ${conSave} vs DC ${stunDC} — ${enemy.name} resists. (${kiPool3 - 1} ki remaining)`;
@@ -5678,6 +5726,14 @@ export async function takeAction({
               : e
           ),
         };
+        st = pushEvent(st, {
+          kind: 'condition_applied',
+          targetId: grappleTarget.id,
+          targetName: grappleTarget.name,
+          condition: 'grappled',
+          source: 'Grapple',
+          round: st.round ?? 1,
+        });
         narrative = `You grapple the ${grappleTarget.name}! (${playerRollGrapple} vs ${enemyRollGrapple}) They are GRAPPLED — speed 0, your attacks have advantage.`;
       } else {
         narrative = `The ${grappleTarget.name} breaks free of your grapple attempt. (${playerRollGrapple} vs ${enemyRollGrapple})`;
@@ -5823,6 +5879,14 @@ export async function takeAction({
               : e
           ),
         };
+        st = pushEvent(st, {
+          kind: 'condition_applied',
+          targetId: shoveTarget.id,
+          targetName: shoveTarget.name,
+          condition: 'prone',
+          source: 'Shove',
+          round: st.round ?? 1,
+        });
         narrative = `You shove the ${shoveTarget.name} to the ground! (${playerRollShove} vs ${enemyRollShove}) They are PRONE — melee attacks against them have advantage, ranged attacks have disadvantage.`;
       } else {
         narrative = `The ${shoveTarget.name} resists your shove. (${playerRollShove} vs ${enemyRollShove})`;

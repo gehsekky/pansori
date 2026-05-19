@@ -2562,6 +2562,95 @@ describe('class features', () => {
     expect(events.some((e) => e.kind === 'attack_miss')).toBe(true);
   });
 
+  it('Stunning Strike emits a save event and a condition_applied event on fail', async () => {
+    // d20=1 (random=0) → enemy CON save fails the DC = 8+prof+wis_mod.
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const charId = 'monk-stun';
+    const monk = makeChar({
+      id: charId,
+      character_class: 'Monk',
+      level: 5,
+      wis: 16,
+      class_resource_uses: { ki_points: 3 },
+      turn_actions: {
+        action_used: true,
+        bonus_action_used: false,
+        reaction_used: false,
+        free_interaction_used: false,
+      },
+    });
+    const goblinId = `${CORRIDOR_ID}#0`;
+    const state: GameState = {
+      characters: [monk],
+      active_character_id: charId,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: true,
+      initiative_order: [
+        { id: charId, roll: 18, is_enemy: false },
+        { id: goblinId, roll: 5, is_enemy: true },
+      ],
+      initiative_idx: 0,
+      entities: [
+        {
+          id: charId,
+          isEnemy: false,
+          pos: { x: 4, y: 5 },
+          hp: 30,
+          maxHp: 30,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: goblinId,
+          isEnemy: true,
+          pos: { x: 5, y: 5 },
+          hp: 100,
+          maxHp: 100,
+          conditions: [],
+          condition_durations: {},
+        },
+      ],
+      movement_used: {},
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      flags: {},
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+      round: 1,
+    };
+    const result = await takeAction({
+      action: { type: 'use_class_feature', featureId: 'stunning_strike' },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    const events = result.newState.combat_log ?? [];
+    const saveEvent = events.find((e) => e.kind === 'save');
+    expect(saveEvent).toBeDefined();
+    if (saveEvent && saveEvent.kind === 'save') {
+      expect(saveEvent.ability).toBe('con');
+      expect(saveEvent.vs).toBe('Stunning Strike');
+      expect(saveEvent.success).toBe(false); // d20=1 always fails
+    }
+    const condEvent = events.find((e) => e.kind === 'condition_applied');
+    expect(condEvent).toBeDefined();
+    if (condEvent && condEvent.kind === 'condition_applied') {
+      expect(condEvent.condition).toBe('stunned');
+      expect(condEvent.targetId).toBe(goblinId);
+      expect(condEvent.source).toBe('Stunning Strike');
+    }
+  });
+
   it('combat_log is capped at COMBAT_LOG_MAX entries', async () => {
     // Pre-fill the log past the cap and confirm pushEvent trims.
     vi.spyOn(Math, 'random').mockReturnValue(0.999);

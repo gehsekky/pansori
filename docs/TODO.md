@@ -20,6 +20,19 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 
 ## 5e SRD remaining gaps
 
+> **Edition alignment** — Pansori is hybrid: core combat resolution follows the 2024 SRD 5.2.1 (49 citations); class/subclass features fill in from the 2014 PHB (52 page citations from 2014 pagination) because the 2024 SRD doesn't cover subclasses and those rules are paid-PHB-only. Going forward we want to **lean fully into 2024**: rework class features (Rage progression, Wild Shape Beast Forms, 2024 Bardic Inspiration spend rules, etc.) to the 2024 PHB versions where they differ, and align Heroic Inspiration usage to the full 2024 spec (currently only granted-on-Nat-1, not the broader uses).
+>
+> **Scope of the 2024 lean** (deferred but tracked):
+>
+> - **Wild Shape** → 2024 "Beast Forms" mechanic (player keeps own stats + adds the form's profile) instead of the 2014 temp-HP-pool simplification we have today.
+> - **Rage** → 2024 progression (improved damage bonus, fewer changes than expected — mostly the same).
+> - **Bardic Inspiration** → 2024 expanded spend rules (ability checks, saves) in addition to attack rolls.
+> - **Heroic Inspiration** → support spending on saves + ability checks (currently only attack-roll advantage).
+> - **Weapon Masteries** (entirely new in 2024) — Vex, Topple, Push, Sap, etc. Major new system. Defer to a focused PR.
+> - **Class feature changes per 2024 PHB** — Cleric Channel Divinity, Fighter Second Wind, Rogue Cunning Strike, etc. Each needs an audit pass.
+>
+> Single document tracking the per-feature 2014→2024 diffs should land in `docs/2024-MIGRATION.md` before any code change so the seam is reviewable. Estimated overall effort: 15-25h spread across several PRs.
+
 ### Real gameplay impact (worth doing)
 
 - [x] **Heroic Inspiration (2024 PHB)** — granted automatically on a Nat-1 d20, spent via the `spend_inspiration` action for advantage on the next attack. CharStatsCard shows an ✦ INSP badge. Granted-on-Nat-1 model from the 2024 PHB; saves/ability-check advantage not yet wired (those rolls aren't player-mediated).
