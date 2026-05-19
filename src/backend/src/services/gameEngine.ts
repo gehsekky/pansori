@@ -56,6 +56,7 @@ import type {
   Trap,
   TurnActions,
 } from '../types.js';
+import { BEAST_FORMS, availableBeastForms } from '../contexts/srd/index.js';
 import {
   DEFAULT_SPEED_FEET,
   SQUARE_SIZE,
@@ -287,9 +288,23 @@ function applyEnemyAttackNarrative(
     const isRaging = char.conditions.includes('raging');
     // Petrified: resistance to all damage (PHB p.291)
     const isPetrified = char.conditions.includes('petrified');
-    let hpLost = isRaging || isPetrified ? Math.ceil(result.damage / 2) : result.damage;
+    // 2024 PHB Beast Form (Bear / Brown Bear) — physical damage resistance
+    // while shifted into a physicalResistance form. Enemy attacks deal
+    // half damage. (Pansori's enemy attacks are all physical for now;
+    // this becomes type-checked once we tag enemy damageType broadly.)
+    const beastForm =
+      char.conditions.includes('wild_shaped') && char.wild_shape_form
+        ? BEAST_FORMS[char.wild_shape_form]
+        : undefined;
+    const beastResist = !!beastForm?.physicalResistance;
+    let hpLost =
+      isRaging || isPetrified || beastResist ? Math.ceil(result.damage / 2) : result.damage;
     const rageNote = isRaging ? ` (Rage resistance: ${result.damage}→${hpLost})` : '';
     const petrNote = isPetrified ? ` (Petrified resistance: ${result.damage}→${hpLost})` : '';
+    const beastNote =
+      beastResist && !isRaging && !isPetrified
+        ? ` (${beastForm?.name} resistance: ${result.damage}→${hpLost})`
+        : '';
     // Arcane Ward: Abjurer Wizard — absorb damage into ward HP before character HP
     let wardNote = '';
     const wardHp = char.class_resource_uses?.arcane_ward ?? 0;
@@ -330,7 +345,7 @@ function applyEnemyAttackNarrative(
       .replace('{target}', char.name)
       .replace('{dmg}', String(hpLost));
     narrative += ` ${char.name} takes ${hpLost} damage.`;
-    narrative += rageNote + petrNote + wardNote + tempHpNote;
+    narrative += rageNote + petrNote + beastNote + wardNote + tempHpNote;
     let updatedChar = { ...char };
 
     let inspirationConsumed = false;
@@ -1505,11 +1520,17 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         ? !char.turn_actions.bonus_action_used
         : !state.combat_active || !char.turn_actions.action_used);
     if (wsAvailable) {
-      choices.push({
-        label: `Wild Shape — transform into beast${isMoon ? ' (bonus action)' : ''} (${wsUses} use${wsUses === 1 ? '' : 's'} left)`,
-        action: { type: 'use_class_feature', featureId: 'wild_shape' },
-        requiresBonusAction: isMoon || undefined,
-      });
+      // 2024 PHB Beast Forms — surface one choice per accessible form. The
+      // form's stat block replaces the druid's attack while shifted (see
+      // BEAST_FORMS in contexts/srd/beast_forms.ts).
+      const forms = availableBeastForms(char.level, isMoon);
+      for (const form of forms) {
+        choices.push({
+          label: `Wild Shape: ${form.name} (CR ${form.cr})${isMoon ? ' (bonus action)' : ''} — ${form.descriptor}`,
+          action: { type: 'use_class_feature', featureId: `wild_shape_${form.id}` },
+          requiresBonusAction: isMoon || undefined,
+        });
+      }
     }
     if (char.conditions.includes('wild_shaped')) {
       choices.push({
@@ -2834,6 +2855,16 @@ export async function takeAction({
           )
         : null;
       let weaponDamage = weaponItem?.damage ?? null;
+      // 2024 PHB Beast Forms — while shifted, the form's natural attack
+      // damage replaces the equipped weapon's. The druid's own to-hit
+      // (STR/DEX + prof) still applies — the form's RAW attack bonus is
+      // similar in magnitude so the engine's calculated to-hit is a
+      // reasonable proxy. (Future: a separate override path if we model
+      // beast STR/DEX explicitly.)
+      if (char.conditions.includes('wild_shaped') && char.wild_shape_form) {
+        const form = BEAST_FORMS[char.wild_shape_form];
+        if (form) weaponDamage = form.attackDamage;
+      }
       // Versatile: use two-handed damage when no shield is equipped
       const isVersatile = !!(weaponItem?.versatileDamage && !char.equipped_shield);
       if (isVersatile) {
@@ -3063,6 +3094,28 @@ export async function takeAction({
       // Reckless Attack (Barbarian L2+): advantage on melee weapon attacks
       const recklessAdv = !!char.turn_actions.reckless && weaponItem?.range !== 'ranged';
 
+      // 2024 PHB Beast Form Pack Tactics — Wolf and Dire Wolf forms grant
+      // advantage when an ally is within 5 ft of the target.
+      let packTacticsAdv = false;
+      if (char.conditions.includes('wild_shaped') && char.wild_shape_form) {
+        const form = BEAST_FORMS[char.wild_shape_form];
+        if (form?.packTactics && st.entities) {
+          const targetEnt = st.entities.find((e) => e.id === targetId && e.isEnemy);
+          if (targetEnt) {
+            packTacticsAdv = st.entities.some(
+              (e) =>
+                !e.isEnemy &&
+                e.id !== char.id &&
+                e.hp > 0 &&
+                Math.max(
+                  Math.abs(e.pos.x - targetEnt.pos.x),
+                  Math.abs(e.pos.y - targetEnt.pos.y)
+                ) <= 1
+            );
+          }
+        }
+      }
+
       // 2024 PHB Vex weapon mastery — previous hit with a Vex weapon by this
       // char on this target grants advantage on the next attack. Consume the
       // tag immediately (RAW: lasts until end of your next turn, but for our
@@ -3128,7 +3181,8 @@ export async function takeAction({
         recklessAdv ||
         inspirationAdv ||
         wolfAdv ||
-        vexAdv;
+        vexAdv ||
+        packTacticsAdv;
       const disadvReasons = [
         rangedInMelee ? 'ranged in melee' : '',
         conditionDisadv ? char.conditions.filter((c) => DISADV_CONDITIONS.has(c)).join(', ') : '',
@@ -5320,7 +5374,7 @@ export async function takeAction({
       }
 
       // ── Druid: Wild Shape ────────────────────────────────────────────────────
-      else if (fid === 'wild_shape') {
+      else if (fid === 'wild_shape' || fid.startsWith('wild_shape_')) {
         const cls = char.character_class.toLowerCase();
         if (cls !== 'druid') {
           narrative = 'Only Druids have Wild Shape.';
@@ -5335,17 +5389,21 @@ export async function takeAction({
           narrative = 'No Wild Shape uses remaining (recover on short rest).';
           break;
         }
-        // 2024 PHB Wild Shape (p.66) — temp HP equal to 2 × druid level.
-        // Circle of the Moon (PHB p.69) — Combat Wild Shape: bonus action
-        // instead of action, and access to higher-CR Beast Forms (which
-        // Pansori doesn't model as separate stat blocks yet). Moon gets a
-        // 3 × level temp HP allowance as compensation for the unmodeled
-        // form-specific abilities (Bear resistance, Wolf adv, etc.) until
-        // a Beast Forms catalog lands.
-        // Migration note: 2014 PHB used `max_CR × 5 × level` which gave
-        // wildly more HP at higher levels (~40 at L8). The 2024 lean
-        // brings this in line with RAW; documented in docs/2024-MIGRATION.md.
+        // Determine the form: 2024 PHB ships a Beast Forms catalog the
+        // druid picks from. The choice generator surfaces one option per
+        // form via `wild_shape_<formId>`. If just 'wild_shape' is invoked
+        // (legacy/test), fall back to the lowest-CR form the druid can
+        // access.
         const isMoon = char.subclass === 'moon';
+        const formId = fid === 'wild_shape' ? '' : fid.replace('wild_shape_', '');
+        const form = formId
+          ? BEAST_FORMS[formId]
+          : Object.values(BEAST_FORMS).find((f) => f.cr === 0);
+        if (!form) {
+          narrative = `Unknown beast form: ${formId}.`;
+          break;
+        }
+        // Gate by CR access table.
         const maxCR = isMoon
           ? Math.max(1, Math.floor(char.level / 3))
           : char.level >= 8
@@ -5353,9 +5411,15 @@ export async function takeAction({
             : char.level >= 4
               ? 0.5
               : 0.25;
+        if (form.cr > maxCR) {
+          narrative = `${form.name} requires a higher-CR form access (you can access CR ≤ ${maxCR}).`;
+          break;
+        }
+        // 2024 PHB temp HP: base 2 × level, Moon 3 × level.
         const tempHp = (isMoon ? 3 : 2) * char.level;
         char.class_resource_uses = { ...(char.class_resource_uses ?? {}), wild_shape: wsUses - 1 };
         char.conditions = [...char.conditions, 'wild_shaped'];
+        char.wild_shape_form = form.id;
         char.hp = char.hp + tempHp;
         if (st.combat_active) {
           char.turn_actions = isMoon
@@ -5364,7 +5428,16 @@ export async function takeAction({
           if (isMoon) usedInitiative = false;
           else usedInitiative = true;
         }
-        narrative = `${char.name} transforms into a beast!${isMoon ? ' (bonus action)' : ''} +${tempHp} temporary HP (max CR ${maxCR}). Wild Shape lasts until you are reduced to 0 HP or dismiss it. (${wsUses - 1} uses remaining)`;
+        const traits = [
+          form.packTactics ? 'Pack Tactics' : '',
+          form.physicalResistance ? 'Physical Resistance' : '',
+          form.flying ? 'Flying' : '',
+          form.climbing ? 'Climb' : '',
+        ]
+          .filter(Boolean)
+          .join(', ');
+        const traitNote = traits ? ` Traits: ${traits}.` : '';
+        narrative = `🐾 ${char.name} transforms into a ${form.name}!${isMoon ? ' (bonus action)' : ''} +${tempHp} temp HP. ${form.descriptor}.${traitNote} (${wsUses - 1} uses remaining)`;
       }
 
       // ── Druid: Dismiss Wild Shape ────────────────────────────────────────────
@@ -5373,6 +5446,7 @@ export async function takeAction({
           narrative = 'You are not in Wild Shape.';
           break;
         }
+        char.wild_shape_form = undefined;
         char.conditions = char.conditions.filter((c) => c !== 'wild_shaped');
         narrative = `${char.name} reverts to their normal form.`;
       }

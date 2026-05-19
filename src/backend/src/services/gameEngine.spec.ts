@@ -2400,6 +2400,90 @@ describe('class features', () => {
     expect(newDruid.hp).toBe(56);
   });
 
+  it('Wild Shape: black_bear at L4 grants physical resistance + records the form', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const druidId = 'd-bear';
+    const druid = makeChar({
+      id: druidId,
+      character_class: 'Druid',
+      subclass: 'land',
+      level: 4,
+      hp: 20,
+      max_hp: 20,
+      class_resource_uses: { wild_shape: 2 },
+    });
+    const state = makeState({}, { characters: [druid], active_character_id: druidId });
+    state.characters = [druid];
+    state.active_character_id = druidId;
+    const result = await takeAction({
+      action: { type: 'use_class_feature', featureId: 'wild_shape_black_bear' },
+      history: [],
+      state,
+      seed,
+      context: ctx,
+    });
+    const newDruid = result.newState.characters[0];
+    expect(newDruid.conditions).toContain('wild_shaped');
+    expect(newDruid.wild_shape_form).toBe('black_bear');
+    expect(result.narrative).toMatch(/Black Bear/);
+    expect(result.narrative).toMatch(/Physical Resistance/);
+  });
+
+  it('Wild Shape: refuses a too-high-CR form for a base druid', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const druidId = 'd-low';
+    const druid = makeChar({
+      id: druidId,
+      character_class: 'Druid',
+      subclass: 'land',
+      level: 1, // max CR = 0.25; brown_bear is CR 1
+      hp: 10,
+      max_hp: 10,
+      class_resource_uses: { wild_shape: 2 },
+    });
+    const state = makeState({}, { characters: [druid], active_character_id: druidId });
+    state.characters = [druid];
+    state.active_character_id = druidId;
+    const result = await takeAction({
+      action: { type: 'use_class_feature', featureId: 'wild_shape_brown_bear' },
+      history: [],
+      state,
+      seed,
+      context: ctx,
+    });
+    expect(result.narrative).toMatch(/higher-CR form access/);
+    expect(result.newState.characters[0].conditions).not.toContain('wild_shaped');
+  });
+
+  it('Wild Shape: Moon at L3 unlocks CR 1 forms', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const druidId = 'd-moon-cr1';
+    const druid = makeChar({
+      id: druidId,
+      character_class: 'Druid',
+      subclass: 'moon',
+      level: 3, // Moon: floor(3/3) = 1 → can pick CR 1
+      hp: 18,
+      max_hp: 18,
+      class_resource_uses: { wild_shape: 2 },
+    });
+    const state = makeState(
+      {},
+      { characters: [druid], active_character_id: druidId, combat_active: true }
+    );
+    state.characters = [druid];
+    state.active_character_id = druidId;
+    const result = await takeAction({
+      action: { type: 'use_class_feature', featureId: 'wild_shape_brown_bear' },
+      history: [],
+      state,
+      seed,
+      context: ctx,
+    });
+    expect(result.narrative).toMatch(/Brown Bear/);
+    expect(result.newState.characters[0].wild_shape_form).toBe('brown_bear');
+  });
+
   it('Circle of the Moon — Moon Healing while shifted spends a slot to heal', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.999); // max d8 → 8
     const druidId = 'd-moon-heal';
