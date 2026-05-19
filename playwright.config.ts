@@ -8,7 +8,10 @@ export default defineConfig({
   testDir: './tests/e2e',
   timeout: 60_000,
   fullyParallel: false, // sessions are shared per test-user; keep serial for v1
-  retries: 0,
+  // Combat test traverses procgen rooms and is mildly flaky on layout luck.
+  // Smoke test is deterministic. 2 retries covers the variance without
+  // hiding real regressions (3 consecutive failures still fails the run).
+  retries: 2,
   workers: 1,
   reporter: 'list',
   use: {

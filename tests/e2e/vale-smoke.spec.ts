@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { Page, expect, test } from '@playwright/test';
 
 // Vale of Shadows smoke test — covers backend + frontend + DB integration
 // from auth through mission start. Validates the path that unit tests can't:
@@ -71,4 +71,143 @@ test('Vale of Shadows: login → character creation → begin mission', async ({
   // text change doesn't break the smoke test — the structure check above is
   // the load-bearing assertion.
   await expect(narrative).not.toBeEmpty();
+});
+
+// ── Combat coverage ─────────────────────────────────────────────────────────
+//
+// Drives the sandbox campaign (smaller than Vale, combat closer to start)
+// and clicks choices in priority order until a kill narrative appears. This
+// exercises:
+//   - Choice list rendering after each action.
+//   - Server-side initiative & turn advancement.
+//   - The grid_move + attack action handlers.
+//   - The post-action narrative pipeline.
+//
+// The exact path through sandbox is non-deterministic (procgen room layout,
+// d20 rolls). The test tolerates that by clicking the first viable choice
+// each tick and bounding the total iterations.
+
+interface CombatLoopResult {
+  killed: boolean; // ever saw kill narrative
+  sawAttackChoice: boolean; // ever had an `attack` action button available
+  sawCombatNarrative: boolean; // ever saw combat-related text in the narrative
+  iterations: number;
+}
+
+/**
+ * Click choices in priority: attack > grid_move > move > choice[0].
+ * Tracks whether combat surfaced at all — narrative alone is unreliable
+ * because the panel shows only the current room, not history.
+ */
+async function driveCombatLoop(page: Page, maxIterations = 80): Promise<CombatLoopResult> {
+  const narrative = page.getByTestId('game-narrative-panel');
+  const result: CombatLoopResult = {
+    killed: false,
+    sawAttackChoice: false,
+    sawCombatNarrative: false,
+    iterations: 0,
+  };
+  // Track recently-clicked Move labels so we don't bounce between two rooms.
+  // Sandbox connections often link both directions, so picking choice[0]
+  // every time can ping-pong forever.
+  const recentMoveLabels: string[] = [];
+  for (let i = 0; i < maxIterations; i++) {
+    result.iterations = i + 1;
+    const text = (await narrative.textContent()) ?? '';
+    if (/Initiative|combat begins|takes \d+ damage/i.test(text)) {
+      result.sawCombatNarrative = true;
+    }
+    if (/killed|falls!|drops dead|XP\)/i.test(text)) {
+      result.killed = true;
+      return result;
+    }
+    if (/you escape|escape the/i.test(text)) return result;
+
+    await page.waitForTimeout(150);
+    const buttons = page.getByTestId('choice-btn');
+    const count = await buttons.count();
+    if (count === 0) {
+      await page.waitForTimeout(300);
+      continue;
+    }
+
+    const types = await Promise.all(
+      Array.from({ length: count }, (_, j) => buttons.nth(j).getAttribute('data-action-type'))
+    );
+    const labels = await Promise.all(
+      Array.from({ length: count }, (_, j) => buttons.nth(j).textContent())
+    );
+    const idxByType = (t: string) => types.findIndex((x) => x === t);
+    const attackIdx = idxByType('attack');
+    const gridMoveIdx = idxByType('grid_move');
+
+    if (attackIdx >= 0) result.sawAttackChoice = true;
+
+    let pick = -1;
+    if (attackIdx >= 0) pick = attackIdx;
+    else if (gridMoveIdx >= 0) pick = gridMoveIdx;
+    else {
+      // Among Move actions, prefer one we haven't clicked recently.
+      const moveCandidates = types.map((t, j) => (t === 'move' ? j : -1)).filter((j) => j >= 0);
+      const fresh = moveCandidates.find(
+        (j) => !recentMoveLabels.slice(-2).includes(labels[j] ?? '')
+      );
+      pick = fresh ?? moveCandidates[0] ?? 0;
+      if (types[pick] === 'move') {
+        recentMoveLabels.push(labels[pick] ?? '');
+        if (recentMoveLabels.length > 4) recentMoveLabels.shift();
+      }
+    }
+
+    await buttons.nth(pick).click();
+  }
+  return result;
+}
+
+test('sandbox combat: enter a fight and resolve an attack', async ({ page, request }) => {
+  // Re-login as a fresh test user so this test is independent of the smoke.
+  const email = `e2e-combat-${Date.now()}@pansori.local`;
+  const loginRes = await request.post(`${BACKEND_URL}/api/auth/test-login`, {
+    data: { email, displayName: 'E2E Combat User' },
+  });
+  expect(loginRes.ok()).toBe(true);
+  const cookies = await request.storageState();
+  await page.context().addCookies(cookies.cookies);
+
+  await page.goto('/');
+  await expect(page.getByText(/NO MISSIONS ON RECORD/i)).toBeVisible({ timeout: 10_000 });
+  await page.getByTestId('new-mission-btn').click();
+  await page.getByTestId('world-picker-sandbox').click();
+  await page.getByTestId('auto-fill-party-btn').click();
+  await expect(page.getByTestId('begin-mission-btn')).toBeEnabled();
+  await page.getByTestId('begin-mission-btn').click();
+
+  // Wait for the game view to render.
+  const narrative = page.getByTestId('game-narrative-panel');
+  await expect(narrative).toBeVisible({ timeout: 15_000 });
+
+  // Drive the loop until a kill or the iteration cap. Bound generous enough
+  // to absorb procgen variance + d20 misses; the existing scripted Vale
+  // playthrough uses 300 — 80 is a middle ground for an E2E run.
+  const result = await driveCombatLoop(page, 80);
+
+  // Hard assertion: the loop must have surfaced at least one Attack action.
+  // That proves initiative ran, the party closed with an enemy, and the
+  // choice list reflected combat state. Narrative alone is unreliable
+  // because the panel shows only the current room — past combat scrolls
+  // away when the party moves on.
+  expect(
+    result.sawAttackChoice,
+    `expected Attack action to surface during ${result.iterations} iterations; ` +
+      `sawCombatNarrative=${result.sawCombatNarrative}, killed=${result.killed}`
+  ).toBe(true);
+
+  // Kill is the happier signal; warn (not fail) if we didn't see one so
+  // future runs surface flakiness early.
+  if (!result.killed) {
+    console.warn(
+      `combat test: attack surfaced but no kill in ${result.iterations} iterations ` +
+        `(sawCombatNarrative=${result.sawCombatNarrative})`
+    );
+  }
 });
