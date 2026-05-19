@@ -274,7 +274,9 @@ function applyEnemyAttackNarrative(
 
     let narrative = pick(context.narratives.enemyAttacks)
       .replace('{enemy}', enemy.name)
+      .replace('{target}', char.name)
       .replace('{dmg}', String(hpLost));
+    narrative += ` ${char.name} takes ${hpLost} damage.`;
     narrative += rageNote + petrNote + wardNote + tempHpNote;
     let updatedChar = { ...char };
 
@@ -283,7 +285,7 @@ function applyEnemyAttackNarrative(
       if (conditionApplied) {
         updatedChar = inflictCondition(updatedChar, enemy.onHitEffect.condition);
         if (updatedChar.conditions.length > char.conditions.length) {
-          narrative += ` You are ${enemy.onHitEffect.condition}!`;
+          narrative += ` ${char.name} is ${enemy.onHitEffect.condition}!`;
         }
       }
     }
@@ -301,6 +303,7 @@ function applyEnemyAttackNarrative(
       hpLost: 0,
       narrative: pick(context.narratives.enemyDeflected)
         .replace('{enemy}', enemy.name)
+        .replace('{target}', char.name)
         .replace('{armor}', armorItem.name),
       newConditions: [...char.conditions],
       newDurations: { ...(char.condition_durations ?? {}) },
@@ -5426,7 +5429,16 @@ export async function takeAction({
     st = { ...st, flags: restFlags };
   }
 
-  const rawNarrative = extraNarrative ? `${narrative}\n\n${extraNarrative}` : narrative;
+  // Speaker prefix for multi-PC parties — when the narrative starts with
+  // "You ..." (and the active character isn't already named in it), prepend
+  // "[CharName] " so the reader can tell whose turn this was. Solo-character
+  // parties are unambiguous and skip the prefix.
+  const livingPartyCount = st.characters.filter((c) => !c.dead).length;
+  const startsAmbiguous =
+    livingPartyCount > 1 && /^You\b/.test(narrative) && !narrative.startsWith(`${char.name}:`);
+  const speakerPrefix = startsAmbiguous ? `[${char.name}] ` : '';
+  const rawNarrative =
+    speakerPrefix + (extraNarrative ? `${narrative}\n\n${extraNarrative}` : narrative);
 
   const activeRoom = seed.rooms.find((r) => r.id === st.current_room);
   const finalNarrative = await llmProvider.enhance(rawNarrative, {
