@@ -13,10 +13,16 @@
     "logs:fe": "docker compose logs -f frontend",
     "restart": "docker compose restart",
     "db": "docker compose --profile tools up -d",
-    "fresh": "docker compose down -v && docker compose up --build -d"
+    "fresh": "docker compose down -v && docker compose up --build -d",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:install": "playwright install --with-deps chromium"
   },
   "workspaces": [
     "src/frontend",
     "src/backend"
-  ]
+  ],
+  "devDependencies": {
+    "@playwright/test": "^1.60.0"
+  }
 }

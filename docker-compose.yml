@@ -41,6 +41,9 @@ services:
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
       GOOGLE_CALLBACK_URL: ${GOOGLE_CALLBACK_URL:-http://localhost:3001/api/auth/google/callback}
       SESSION_SECRET: ${SESSION_SECRET:-change-me}
+      # Dev-only auth bypass for Playwright E2E. The endpoint at
+      # /api/auth/test-login is double-gated: this flag AND NODE_ENV!=production.
+      E2E_TEST_LOGIN_ENABLED: ${E2E_TEST_LOGIN_ENABLED:-true}
     ports:
       - '3001:3001'
     volumes:

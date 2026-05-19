@@ -648,6 +648,7 @@ function CharScreen({
                 color: 'var(--t-primary)',
               }}
               onClick={autoFillParty}
+              data-testid="auto-fill-party-btn"
               title={(
                 selectedCtxForInit.recommendedComposition ??
                 DEFAULT_COMPOSITION_BY_SIZE[selectedCtxForInit.recommendedPartySize] ??
@@ -684,7 +685,12 @@ function CharScreen({
 
           {error && <p className={styles.err}>{error}</p>}
 
-          <button className={styles.submit} onClick={handle} disabled={loading}>
+          <button
+            data-testid="begin-mission-btn"
+            className={styles.submit}
+            onClick={handle}
+            disabled={loading}
+          >
             {loading ? 'LAUNCHING MISSION...' : 'BEGIN MISSION'}
           </button>
         </div>
@@ -703,6 +709,7 @@ function CharScreen({
               return (
                 <button
                   key={c.id}
+                  data-testid={`world-picker-${c.id}`}
                   onClick={() => setContextId(c.id)}
                   style={{
                     background: selected ? 'var(--t-separator)' : 'var(--t-card)',

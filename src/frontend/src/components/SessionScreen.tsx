@@ -49,6 +49,7 @@ function SessionsScreen({
               </button>
             )}
             <button
+              data-testid="new-mission-btn"
               className={styles.submit}
               style={{ marginTop: 0, width: 'auto', padding: '0.5rem 1.25rem' }}
               onClick={onNewGame}
