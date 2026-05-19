@@ -200,6 +200,8 @@ export interface Character {
     cunning_strike_pending?: 'trip' | 'poison' | 'withdraw' | 'disarm';
     movement_budget_remaining?: number;
     readied_action?: { trigger: string; action: StructuredAction };
+    monk_free_used?: boolean;
+    monk_stunning_strike_used?: boolean;
   };
   initiative_roll: number | null;
   hit_die: number;

@@ -260,6 +260,14 @@ export interface TurnActions {
     trigger: string;
     action: StructuredAction;
   };
+  // 2024 PHB Monk — Patient Defense and Step of the Wind can each be used
+  // once per turn without spending Discipline Points; spending 1 DP grants
+  // both effects. This flag marks the free monk bonus action as consumed
+  // this turn.
+  monk_free_used?: boolean;
+  // 2024 PHB Monk L5 — Stunning Strike is once per turn (was per-hit in
+  // 2014). Set when the monk has already taken their stun shot this turn.
+  monk_stunning_strike_used?: boolean;
 }
 
 export interface DeathSaves {

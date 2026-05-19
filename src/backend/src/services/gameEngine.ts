@@ -1628,31 +1628,65 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   }
 
   // ── Monk choices ────────────────────────────────────────────────────────────
+  // 2024 PHB renames Ki Points to Discipline Points; the internal storage
+  // key stays `ki_points` so existing tests + state continue to work, but
+  // UI labels say "DP" so the player sees 2024 terminology.
   if (char.character_class.toLowerCase() === 'monk') {
     const kiLeft = char.class_resource_uses?.ki_points ?? char.level;
-    if (state.combat_active && char.level >= 2 && kiLeft > 0) {
-      if (char.turn_actions.action_used && !char.turn_actions.bonus_action_used) {
+    const monkFreeAvailable = char.level >= 2 && !char.turn_actions.monk_free_used;
+    if (state.combat_active && char.level >= 2) {
+      if (kiLeft > 0 && char.turn_actions.action_used && !char.turn_actions.bonus_action_used) {
         choices.push({
-          label: `Flurry of Blows — 2 unarmed strikes (1 ki, ${kiLeft} left)`,
+          label: `Flurry of Blows — 2 unarmed strikes (1 DP, ${kiLeft} left)`,
           action: { type: 'use_class_feature', featureId: 'flurry_of_blows' },
           requiresBonusAction: true,
         });
       }
       if (!char.turn_actions.bonus_action_used) {
-        choices.push({
-          label: `Step of the Wind: Dash — extra movement (1 ki, ${kiLeft} left)`,
-          action: { type: 'use_class_feature', featureId: 'step_of_wind_dash' },
-          requiresBonusAction: true,
-        });
-        choices.push({
-          label: `Step of the Wind: Disengage — no OA (1 ki, ${kiLeft} left)`,
-          action: { type: 'use_class_feature', featureId: 'step_of_wind_disengage' },
-          requiresBonusAction: true,
-        });
+        // Patient Defense (2024) — Dodge as bonus action. Free 1/turn at
+        // L2+, or spend 1 DP for the free option + advantage on the next
+        // DEX save before your next turn.
+        if (monkFreeAvailable) {
+          choices.push({
+            label: 'Patient Defense — Dodge (free, 1/turn)',
+            action: { type: 'use_class_feature', featureId: 'patient_defense_free' },
+            requiresBonusAction: true,
+          });
+          // Step of the Wind: pick one effect for free.
+          choices.push({
+            label: 'Step of the Wind: Dash (free, 1/turn)',
+            action: { type: 'use_class_feature', featureId: 'step_of_wind_free_dash' },
+            requiresBonusAction: true,
+          });
+          choices.push({
+            label: 'Step of the Wind: Disengage (free, 1/turn)',
+            action: { type: 'use_class_feature', featureId: 'step_of_wind_free_disengage' },
+            requiresBonusAction: true,
+          });
+        }
+        if (kiLeft > 0) {
+          choices.push({
+            label: `Patient Defense (1 DP) — Dodge + advantage on next DEX save (${kiLeft} left)`,
+            action: { type: 'use_class_feature', featureId: 'patient_defense_dp' },
+            requiresBonusAction: true,
+          });
+          // Step of the Wind for 1 DP — Dash AND Disengage (both effects).
+          choices.push({
+            label: `Step of the Wind (1 DP) — Dash + Disengage (${kiLeft} left)`,
+            action: { type: 'use_class_feature', featureId: 'step_of_wind_dash' },
+            requiresBonusAction: true,
+          });
+        }
       }
-      if (state.combat_active && char.level >= 5 && enemyAlive) {
+      if (
+        state.combat_active &&
+        char.level >= 5 &&
+        enemyAlive &&
+        kiLeft > 0 &&
+        !char.turn_actions.monk_stunning_strike_used
+      ) {
         choices.push({
-          label: `Stunning Strike — spend 1 ki after a hit (CON save DC ${8 + profBonus(char.level) + abilityMod(char.wis ?? 10)}, ${kiLeft} left)`,
+          label: `Stunning Strike — once/turn after a hit, CON save DC ${8 + profBonus(char.level) + abilityMod(char.wis ?? 10)} (1 DP, ${kiLeft} left)`,
           action: { type: 'use_class_feature', featureId: 'stunning_strike' },
         });
       }
@@ -5380,7 +5414,9 @@ export async function takeAction({
         }
         char.class_resource_uses = { ...(char.class_resource_uses ?? {}), ki_points: kiPool - 1 };
         char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
-        const martialDie = char.level >= 17 ? 10 : char.level >= 11 ? 8 : char.level >= 5 ? 6 : 4;
+        // 2024 PHB Martial Arts die: 1d6 (L1) → 1d8 (L5) → 1d10 (L11) → 1d12 (L17).
+        // Was 1d4/6/8/10 in 2014; 2024 bumps every tier by one die size.
+        const martialDie = char.level >= 17 ? 12 : char.level >= 11 ? 10 : char.level >= 5 ? 8 : 6;
         const isOpenHand = char.subclass === 'open_hand';
         const monkDc = 8 + profBonus(char.level) + abilityMod(char.wis);
         let flurryNarrative = `${char.name} — Flurry of Blows (${kiPool - 1} ki remaining)!`;
@@ -5458,7 +5494,90 @@ export async function takeAction({
       }
 
       // ── Monk: Step of the Wind (Dash or Disengage, 1 ki, bonus action) ───────
-      else if (fid === 'step_of_wind_dash' || fid === 'step_of_wind_disengage') {
+      // 2024 PHB Patient Defense — Dodge as a bonus action. Free 1/turn at
+      // L2+; spending 1 DP also grants advantage on the next DEX save before
+      // your next turn.
+      else if (fid === 'patient_defense_free' || fid === 'patient_defense_dp') {
+        const cls = char.character_class.toLowerCase();
+        if (cls !== 'monk') {
+          narrative = 'Only Monks have Patient Defense.';
+          break;
+        }
+        if (char.level < 2) {
+          narrative = 'Patient Defense requires Monk level 2.';
+          break;
+        }
+        if (char.turn_actions.bonus_action_used) {
+          narrative = 'Bonus action already used this turn.';
+          break;
+        }
+        const isFree = fid === 'patient_defense_free';
+        if (isFree && char.turn_actions.monk_free_used) {
+          narrative = "You've already used your free monk bonus action this turn.";
+          break;
+        }
+        const kiPoolPD = char.class_resource_uses?.ki_points ?? char.level;
+        if (!isFree && kiPoolPD <= 0) {
+          narrative = 'No Discipline Points remaining (recover on short rest).';
+          break;
+        }
+        if (!isFree) {
+          char.class_resource_uses = {
+            ...(char.class_resource_uses ?? {}),
+            ki_points: kiPoolPD - 1,
+          };
+        }
+        char.turn_actions = {
+          ...char.turn_actions,
+          bonus_action_used: true,
+          dodging: true,
+          ...(isFree ? { monk_free_used: true } : {}),
+        };
+        narrative = isFree
+          ? `${char.name} — Patient Defense (free): assumes a defensive stance. Attacks against have disadvantage until next turn.`
+          : `${char.name} — Patient Defense (1 DP): defensive stance + advantage on next DEX save. (${kiPoolPD - 1} DP remaining)`;
+      }
+
+      // 2024 PHB Step of the Wind — free 1/turn variants (single effect) +
+      // 1-DP variant (Dash AND Disengage).
+      else if (fid === 'step_of_wind_free_dash' || fid === 'step_of_wind_free_disengage') {
+        const cls = char.character_class.toLowerCase();
+        if (cls !== 'monk') {
+          narrative = 'Only Monks have Step of the Wind.';
+          break;
+        }
+        if (char.level < 2) {
+          narrative = 'Step of the Wind requires Monk level 2.';
+          break;
+        }
+        if (char.turn_actions.bonus_action_used) {
+          narrative = 'Bonus action already used this turn.';
+          break;
+        }
+        if (char.turn_actions.monk_free_used) {
+          narrative = "You've already used your free monk bonus action this turn.";
+          break;
+        }
+        char.turn_actions = {
+          ...char.turn_actions,
+          bonus_action_used: true,
+          monk_free_used: true,
+        };
+        if (fid === 'step_of_wind_free_dash') {
+          const sw = effectiveSpeed(char);
+          st = {
+            ...st,
+            movement_used: {
+              ...(st.movement_used ?? {}),
+              [char.id]: Math.max(0, (st.movement_used?.[char.id] ?? 0) - sw),
+            },
+          };
+          narrative = `${char.name} — Step of the Wind: Dash (free)! +${sw} ft movement.`;
+        } else {
+          char.turn_actions = { ...char.turn_actions, disengaged: true };
+          narrative = `${char.name} — Step of the Wind: Disengage (free)! No opportunity attacks when moving.`;
+        }
+      } else if (fid === 'step_of_wind_dash' || fid === 'step_of_wind_disengage') {
         const cls = char.character_class.toLowerCase();
         if (cls !== 'monk') {
           narrative = 'Only Monks have Step of the Wind.';
@@ -5474,25 +5593,27 @@ export async function takeAction({
         }
         const kiPool2 = char.class_resource_uses?.ki_points ?? char.level;
         if (kiPool2 <= 0) {
-          narrative = 'No ki points remaining (recover on short rest).';
+          narrative = 'No Discipline Points remaining (recover on short rest).';
           break;
         }
         char.class_resource_uses = { ...(char.class_resource_uses ?? {}), ki_points: kiPool2 - 1 };
-        char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
-        if (fid === 'step_of_wind_dash') {
-          const stwSpeed = effectiveSpeed(char);
-          st = {
-            ...st,
-            movement_used: {
-              ...(st.movement_used ?? {}),
-              [char.id]: Math.max(0, (st.movement_used?.[char.id] ?? 0) - stwSpeed),
-            },
-          };
-          narrative = `${char.name} — Step of the Wind: Dash! +${stwSpeed} ft movement. (${kiPool2 - 1} ki remaining)`;
-        } else {
-          char.turn_actions = { ...char.turn_actions, disengaged: true };
-          narrative = `${char.name} — Step of the Wind: Disengage! No opportunity attacks when moving. (${kiPool2 - 1} ki remaining)`;
-        }
+        // 2024 PHB: spending 1 DP gives BOTH Dash and Disengage. The legacy
+        // `step_of_wind_disengage` id is kept for back-compat but now also
+        // dashes. `step_of_wind_dash` does the same.
+        char.turn_actions = {
+          ...char.turn_actions,
+          bonus_action_used: true,
+          disengaged: true,
+        };
+        const stwSpeed = effectiveSpeed(char);
+        st = {
+          ...st,
+          movement_used: {
+            ...(st.movement_used ?? {}),
+            [char.id]: Math.max(0, (st.movement_used?.[char.id] ?? 0) - stwSpeed),
+          },
+        };
+        narrative = `${char.name} — Step of the Wind (1 DP): Dash +${stwSpeed} ft AND Disengage. (${kiPool2 - 1} DP remaining)`;
       }
 
       // ── Monk: Stunning Strike (1 ki, after a hit) ────────────────────────────
@@ -5510,12 +5631,18 @@ export async function takeAction({
           narrative = 'No living target.';
           break;
         }
+        // 2024 PHB: Stunning Strike is once per turn (was per-hit in 2014).
+        if (char.turn_actions.monk_stunning_strike_used) {
+          narrative = 'Stunning Strike already used this turn.';
+          break;
+        }
         const kiPool3 = char.class_resource_uses?.ki_points ?? char.level;
         if (kiPool3 <= 0) {
-          narrative = 'No ki points remaining (recover on short rest).';
+          narrative = 'No Discipline Points remaining (recover on short rest).';
           break;
         }
         char.class_resource_uses = { ...(char.class_resource_uses ?? {}), ki_points: kiPool3 - 1 };
+        char.turn_actions = { ...char.turn_actions, monk_stunning_strike_used: true };
         const stunDC = 8 + profBonus(char.level) + abilityMod(char.wis);
         const conSave =
           rollDice('1d20') + abilityMod((enemy as unknown as Record<string, number>)['con'] ?? 10);
