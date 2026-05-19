@@ -111,6 +111,25 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 
 - [x] **Playwright E2E test** — three tests in `tests/e2e/vale-smoke.spec.ts`: (a) Vale smoke covers login → BEGIN MISSION → narrative renders; (b) session resume reloads mid-session and verifies state rehydrates; (c) sandbox combat drives the choice loop until an Attack action surfaces. `data-testid` attrs on key UI elements + `data-action-type` on choice buttons. Auth bypass `/api/auth/test-login` double-gated. Combat test has `retries: 2` for procgen variance. Wired into CI: `e2e` job in `.github/workflows/deploy.yml` runs after the unit-test job and gates `build-and-deploy`. Failure uploads `playwright-report/` + `test-results/` as artifacts and dumps backend/frontend/postgres compose logs.
 
+### Architecture audit findings (2026-05-19)
+
+Captured during the autonomous-mode audit. Items marked **autonomous** can be picked up without user input; **needs-input** requires a design call.
+
+- [ ] **Body validation gaps** (autonomous-ready) — route handlers use `req.body as { ... }` type assertions with no runtime validation. Low risk in single-player but a real best-practice gap. Add Zod schemas at the route boundary; failure path returns 400 with the validation message. ~2h.
+- [ ] **Security headers** (autonomous) — no helmet.js. Express defaults are weak (no CSP, no X-Frame-Options, etc.). Adding `helmet()` middleware in `src/backend/src/index.ts` is one line + npm install. ~10 min.
+- [ ] **Frontend error boundary** (autonomous) — uncaught errors in components produce a white screen. A top-level React `<ErrorBoundary>` with a recovery prompt would be a meaningful UX improvement. ~15 min.
+- [ ] **Strongly-typed req.user** (autonomous) — routes use `req.user!` non-null assertion (10 sites). A typed wrapper that narrows after the requireAuth middleware would remove the assertions cleanly. ~30 min.
+- [ ] **Update .env.example** (autonomous) — missing `DISCORD_CLIENT_ID/SECRET` (added last session) and `E2E_TEST_LOGIN_ENABLED` (added with E2E setup). Trivial documentation fix. ~5 min.
+- [ ] **Rate-limit auth endpoints** (autonomous) — `/api/auth/test-login` could be brute-forced. Even though it's gated to non-prod, adding `express-rate-limit` on `/api/auth/*` is a defense-in-depth win. ~15 min.
+- [ ] **Fix react-hooks/exhaustive-deps warnings** (autonomous, careful) — 5 lingering lint warnings in App.tsx, PartyPanel.tsx. Each marks a potential stale-closure bug. Need to check whether adding the dep would cause a re-render loop. ~30 min.
+- [ ] **Root-level `npm test`** (autonomous) — currently a no-op at the repo root. Should run backend + frontend unit suites in parallel. ~5 min.
+- [ ] **Socket.IO frontend client** (needs-input) — the server-side Socket.IO scaffolding already exists in `src/backend/src/index.ts` (room-join handler + per-session rooms), but no frontend client is wired and no state broadcasts happen. The Multiplayer TODO under-estimated this — half of the WebSocket scaffolding is already done. Open question: do we wire the client now (as prep for multiplayer) or wait until the participants-table item lands?
+- [ ] **Frontend↔backend type drift** (needs-input) — types are duplicated by hand between `src/backend/src/types.ts` and `src/frontend/src/types.ts`. Could share via a single types package (workspace), or codegen, or just keep mirroring. Each approach has tradeoffs.
+- [ ] **Observability** (needs-input) — only `console.log` today. Sentry / structured logging / error tracking would surface prod issues. Requires choosing a service (paid SaaS or self-hosted).
+- [ ] **`npm audit` shows 6 moderate vulnerabilities** (needs-input) — most are transitive in dev tooling. `npm audit fix --force` might break things; reviewing the list one-by-one is the safer path.
+- [ ] **CHANGELOG.md** (needs-input) — no user-visible change log. Should we keep one? Format (Keep-a-Changelog, conventional commits, etc.)?
+- [ ] **Post-deploy health check + rollback** (needs-input) — CI deploys via SSM but doesn't poll `/api/health` after to verify, nor roll back on failure. Bad deploys 500 prod until manual intervention. ~2-3h to wire properly.
+
 ---
 
 ## Deployment reference

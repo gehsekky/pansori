@@ -6,6 +6,9 @@
   "scripts": {
     "lint": "npm run lint   --workspace=src/frontend --workspace=src/backend",
     "format": "npm run format --workspace=src/frontend --workspace=src/backend",
+    "test": "npm run test:be && npm run test:fe",
+    "test:be": "vitest run --root src/backend",
+    "test:fe": "vitest run --root src/frontend",
     "dev": "docker compose up --build -d",
     "stop": "docker compose down",
     "logs": "docker compose logs -f",

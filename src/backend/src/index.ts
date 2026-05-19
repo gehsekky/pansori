@@ -7,6 +7,7 @@ import cors from 'cors';
 import { createServer } from 'http';
 import express from 'express';
 import { gameRouter } from './routes/game.js';
+import helmet from 'helmet';
 import passport from 'passport';
 import { pool } from './db/pool.js';
 import { requireAuth } from './auth/middleware.js';
@@ -23,6 +24,13 @@ app.set('trust proxy', 1);
 const io = new Server(httpServer, {
   cors: { origin: process.env.FRONTEND_URL, credentials: true },
 });
+
+// Security headers (helmet) — applied before any route handler so every
+// response carries reasonable defaults: X-Content-Type-Options, X-Frame-
+// Options DENY, Strict-Transport-Security in prod, etc. The default CSP is
+// disabled because the frontend is served from a different origin and the
+// API never returns HTML — clients are SPA or fetch JSON only.
+app.use(helmet({ contentSecurityPolicy: false }));
 
 app.use(cors({ origin: process.env.FRONTEND_URL, credentials: true }));
 app.use(express.json());
