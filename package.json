@@ -25,6 +25,10 @@
     "src/frontend",
     "src/backend"
   ],
+  "overrides": {
+    "ws": "^8.20.1",
+    "esbuild": "^0.25.0"
+  },
   "devDependencies": {
     "@playwright/test": "^1.60.0"
   }
