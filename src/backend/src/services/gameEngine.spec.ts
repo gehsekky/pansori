@@ -4139,8 +4139,8 @@ describe('class features', () => {
       seed: dungeonSeedWithEnemy,
       context: ctxWithRage,
     });
-    // rageUsesMax(6) = 3
-    expect(result.newState.characters[0].class_resource_uses.rage_uses).toBe(3);
+    // rageUsesMax(6) = 4 (2024 PHB)
+    expect(result.newState.characters[0].class_resource_uses.rage_uses).toBe(4);
   });
 
   it('generateChoices shows rage bonus action for Warrior in combat with uses remaining', () => {

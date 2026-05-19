@@ -550,20 +550,23 @@ export function extraAttackCount(cls: string, level: number): number {
   return 0;
 }
 
-// Barbarian Rage damage bonus (PHB p.48) — applies to STR-based melee attacks
+// Barbarian Rage damage bonus (2024 PHB) — applies to STR-based melee attacks.
+// Same progression as 2014: +2 / +3 / +4 at L1/L9/L16.
 export function rageDamageBonus(level: number): number {
   if (level >= 16) return 4;
   if (level >= 9) return 3;
   return 2;
 }
 
-// Rage uses per long rest (PHB p.48)
+// Rage uses per long rest (2024 PHB).
+// 2024 PHB progression rebalanced upward at lower levels compared to 2014.
+// 2024: L1-2=2, L3-5=3, L6-11=4, L12-16=5, L17+=6.
 export function rageUsesMax(level: number): number {
   if (level >= 17) return 6;
-  if (level >= 13) return 5;
-  if (level >= 10) return 4;
-  if (level >= 6) return 3;
-  return 2; // levels 1–5
+  if (level >= 12) return 5;
+  if (level >= 6) return 4;
+  if (level >= 3) return 3;
+  return 2; // levels 1–2
 }
 
 // ─── Dice manipulation ────────────────────────────────────────────────────────
