@@ -26,6 +26,11 @@ export interface AuthUser {
   avatar_url: string | null;
 }
 
+export interface AuthProvider {
+  id: string; // 'google', 'discord', etc.
+  label: string; // human-readable button text
+}
+
 export interface ActionResult {
   narrative: string;
   choices: GameChoice[];
@@ -74,6 +79,8 @@ export type CharacterInput = {
 
 export const api = {
   getMe: () => req<AuthUser>('/auth/me'),
+
+  listProviders: () => req<AuthProvider[]>('/auth/providers'),
 
   logout: () => req<{ ok: boolean }>('/auth/logout', { method: 'POST' }),
 

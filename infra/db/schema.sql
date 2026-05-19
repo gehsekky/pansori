@@ -8,12 +8,24 @@ CREATE TABLE IF NOT EXISTS users (
   id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   username      VARCHAR(50)  UNIQUE,
   password_hash TEXT,
-  google_id     TEXT UNIQUE,
   email         TEXT UNIQUE,
   display_name  TEXT,
   avatar_url    TEXT,
   created_at    TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- ─── User identities (multi-provider OAuth) ──────────────────────────────────
+-- One user → many identities. Adding a provider = adding rows here, no
+-- schema change to users. See migration 009_user_identities.sql.
+CREATE TABLE IF NOT EXISTS user_identities (
+  user_id     UUID    NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  provider    TEXT    NOT NULL,
+  provider_id TEXT    NOT NULL,
+  created_at  TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (provider, provider_id),
+  UNIQUE (user_id, provider)
+);
+CREATE INDEX IF NOT EXISTS idx_user_identities_user ON user_identities(user_id);
 
 -- ─── Game sessions ────────────────────────────────────────────────────────────
 -- Party data (every character's name, class, portrait, HP, inventory) lives

@@ -271,7 +271,7 @@
   margin-bottom: 2.5rem;
 }
 
-.googleBtn {
+.providerBtn {
   display: inline-block;
   background: var(--t-dim-dark);
   color: var(--t-primary);
