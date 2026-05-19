@@ -5671,3 +5671,138 @@ describe('Cleric universal Channel Divinity (2024)', () => {
     expect(result.narrative).toMatch(/requires Cleric level 5/);
   });
 });
+
+describe('Monk 2024 features', () => {
+  function makeMonk(overrides: Partial<Character> = {}): GameState {
+    const monk = makeChar({
+      id: 'm-1',
+      character_class: 'Monk',
+      level: 2,
+      dex: 16,
+      wis: 14,
+      class_resource_uses: { ki_points: 2 },
+      turn_actions: {
+        action_used: false,
+        bonus_action_used: false,
+        reaction_used: false,
+        free_interaction_used: false,
+      },
+      ...overrides,
+    });
+    const enemyId = `${CORRIDOR_ID}#0`;
+    return {
+      characters: [monk],
+      active_character_id: monk.id,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: true,
+      initiative_order: [{ id: monk.id, roll: 18, is_enemy: false }],
+      initiative_idx: 0,
+      entities: [
+        {
+          id: monk.id,
+          isEnemy: false,
+          pos: { x: 4, y: 5 },
+          hp: 20,
+          maxHp: 20,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: enemyId,
+          isEnemy: true,
+          pos: { x: 5, y: 5 },
+          hp: 30,
+          maxHp: 30,
+          conditions: [],
+          condition_durations: {},
+        },
+      ],
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      flags: {},
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+      round: 1,
+      movement_used: {},
+    };
+  }
+
+  it('Patient Defense (free): sets dodging without spending DP', async () => {
+    const result = await takeAction({
+      action: { type: 'use_class_feature', featureId: 'patient_defense_free' },
+      history: [],
+      state: makeMonk(),
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    expect(result.narrative).toMatch(/Patient Defense \(free\)/);
+    expect(result.newState.characters[0].turn_actions.dodging).toBe(true);
+    expect(result.newState.characters[0].turn_actions.monk_free_used).toBe(true);
+    // No DP spent
+    expect(result.newState.characters[0].class_resource_uses?.ki_points).toBe(2);
+  });
+
+  it('Patient Defense (free) blocked after the free bonus action already used', async () => {
+    const result = await takeAction({
+      action: { type: 'use_class_feature', featureId: 'patient_defense_free' },
+      history: [],
+      state: makeMonk({
+        turn_actions: {
+          action_used: false,
+          bonus_action_used: false,
+          reaction_used: false,
+          free_interaction_used: false,
+          monk_free_used: true,
+        },
+      }),
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    expect(result.narrative).toMatch(/already used your free monk bonus action/);
+  });
+
+  it('Step of the Wind (1 DP) grants both Dash and Disengage', async () => {
+    const result = await takeAction({
+      action: { type: 'use_class_feature', featureId: 'step_of_wind_dash' },
+      history: [],
+      state: makeMonk(),
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    const monk = result.newState.characters[0];
+    expect(monk.turn_actions.disengaged).toBe(true);
+    expect(monk.turn_actions.bonus_action_used).toBe(true);
+    expect(monk.class_resource_uses?.ki_points).toBe(1);
+    expect(result.narrative).toMatch(/Dash.*Disengage/);
+  });
+
+  it('Stunning Strike: 1/turn cap blocks second use', async () => {
+    const result = await takeAction({
+      action: { type: 'use_class_feature', featureId: 'stunning_strike' },
+      history: [],
+      state: makeMonk({
+        level: 5,
+        class_resource_uses: { ki_points: 5 },
+        turn_actions: {
+          action_used: false,
+          bonus_action_used: false,
+          reaction_used: false,
+          free_interaction_used: false,
+          monk_stunning_strike_used: true,
+        },
+      }),
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    expect(result.narrative).toMatch(/already used this turn/);
+  });
+});
