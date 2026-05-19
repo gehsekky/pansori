@@ -2527,6 +2527,29 @@ function runEnemyTurns(args: {
       const targetCharIdx = st.characters.findIndex((c) => c.id === nearestPcEntity?.id && !c.dead);
       if (targetCharIdx >= 0) {
         let target = st.characters[targetCharIdx];
+        // 2024 PHB Hide DC tracking — if the target is invisible AND has a
+        // recorded hide_dc, the enemy makes a passive Perception check
+        // (10 + WIS mod) against it. If they meet/exceed it, the hider is
+        // spotted: invisible is removed, hide_dc cleared, attack proceeds
+        // as normal. If they fail, the PC stays hidden — for this engine
+        // simplification the attack still happens with the invisible-imposed
+        // disadvantage (existing `invisible` condition handling).
+        if (target.conditions?.includes('invisible') && (target.hide_dc ?? 0) > 0) {
+          const enemyWis = (rm as unknown as Record<string, number>)?.wis ?? 10;
+          const passivePer = 10 + abilityMod(enemyWis);
+          if (passivePer >= target.hide_dc!) {
+            narrative += ` ${rm.name} spots ${target.name} (passive Perception ${passivePer} vs hide DC ${target.hide_dc}).`;
+            target = {
+              ...target,
+              conditions: (target.conditions ?? []).filter((c) => c !== 'invisible'),
+              hide_dc: undefined,
+            };
+            st = {
+              ...st,
+              characters: st.characters.map((c, i) => (i === targetCharIdx ? target : c)),
+            };
+          }
+        }
         if (!target.dead && target.hp > 0) {
           // ── Spell-cast intent ──────────────────────────────────────────────
           // If this enemy has a spell list and rolls under castChance, they
@@ -5313,9 +5336,14 @@ export async function takeAction({
         );
         char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
         if (hideCheck.success) {
+          // 2024 PHB: store the Stealth total as the hide DC. Enemies must
+          // beat this with a Perception/Search check (or passive Perception)
+          // to detect the hider before targeting them.
           char = inflictCondition(char, 'invisible');
-          narrative = `${char.name} hides! (Stealth ${hideCheck.total} vs DC ${sneakHideDC} — success.) Next attack has advantage.`;
+          char.hide_dc = hideCheck.total;
+          narrative = `${char.name} hides! (Stealth ${hideCheck.total} vs DC ${sneakHideDC} — success.) Hide DC = ${hideCheck.total}.`;
         } else {
+          char.hide_dc = undefined;
           narrative = `${char.name} tries to hide but fails. (Stealth ${hideCheck.total} vs DC ${sneakHideDC})`;
         }
       }
@@ -7882,7 +7910,11 @@ export async function takeAction({
         ...st,
         characters: st.characters.map((c) =>
           c.id === char.id && c.conditions.includes('invisible')
-            ? { ...c, conditions: c.conditions.filter((cc) => cc !== 'invisible') }
+            ? {
+                ...c,
+                conditions: c.conditions.filter((cc) => cc !== 'invisible'),
+                hide_dc: undefined,
+              }
             : c
         ),
       };

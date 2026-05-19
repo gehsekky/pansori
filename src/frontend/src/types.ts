@@ -231,6 +231,7 @@ export interface Character {
   darkvision_ft?: number;
   temp_hp?: number;
   inspiration?: boolean;
+  hide_dc?: number;
 }
 
 // ─── NPC system ───────────────────────────────────────────────────────────────
