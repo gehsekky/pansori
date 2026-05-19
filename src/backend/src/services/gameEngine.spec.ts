@@ -6228,6 +6228,41 @@ describe('Heavy encumbrance disadvantage (2024 variant)', () => {
     expect(result.narrative).toMatch(/heavily encumbered/);
   });
 
+  it('Bardic Inspiration die is consumed on a Stealth check', async () => {
+    // Mock so Stealth d20 + DEX + prof = ~5+2+2 = 9; bardic d6 = 6; DC 14.
+    // 9 + 6 = 15 → success only because Bardic spent.
+    const random = vi.spyOn(Math, 'random');
+    random.mockReturnValueOnce(0.2); // sneak d20 = 5
+    random.mockReturnValue(0.999); // bardic d6 = 6, anything else high
+    const rogue = makeChar({
+      id: 'r-bardic',
+      character_class: 'Rogue',
+      level: 1,
+      dex: 14,
+      skill_proficiencies: ['Stealth'],
+      bardic_inspiration_die: 'd6',
+    });
+    const enemyId = `${CORRIDOR_ID}#0`;
+    const state: GameState = {
+      ...makeState(),
+      characters: [rogue],
+      active_character_id: rogue.id,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      combat_active: false,
+    };
+    void enemyId;
+    const result = await takeAction({
+      action: { type: 'sneak' },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    // The die is consumed regardless of outcome.
+    expect(result.newState.characters[0].bardic_inspiration_die).toBeUndefined();
+  });
+
   it('Cunning Action Hide check fires with disadvantage when heavily encumbered', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0); // worst rolls — disadv intensifies
     const rogue = makeChar({

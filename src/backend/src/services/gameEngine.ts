@@ -98,6 +98,19 @@ function consumeInspirationForCheck(char: Character): boolean {
   return true;
 }
 
+// 2024 PHB Bardic Inspiration on any d20. Saves already consume the die
+// through `conditionSavingThrow`; this mirror lets skill/ability checks
+// auto-spend the stashed die. Returns the rolled die value (0 if no die),
+// and clears the die on `char` when consumed. The caller subtracts the
+// roll from the target DC (or adds to the check total) before resolving.
+function consumeBardicForCheck(char: Character): number {
+  const die = char.bardic_inspiration_die;
+  if (!die) return 0;
+  const roll = rollDice(`1${die}`);
+  char.bardic_inspiration_die = undefined;
+  return roll;
+}
+
 // Cleric/Paladin/Druid prepared-spell cap: class level + spellcasting modifier
 // (minimum 1). The casting stat is class-dependent (Cleric/Druid = WIS,
 // Paladin = CHA); resolves through context.spellcastingAbility with a fall
@@ -4218,9 +4231,10 @@ export async function takeAction({
       const exhaustionDisadv1 = (char.exhaustion_level ?? 0) >= 1;
       const checkDisadv = exhaustionDisadv1 || isHeavilyEncumbered(char);
       const inspAdvSneak = consumeInspirationForCheck(char);
+      const bardicSneakRoll = consumeBardicForCheck(char);
       const check = skillCheck(
         char.dex,
-        sneakDC,
+        sneakDC - bardicSneakRoll,
         proficient,
         char.level,
         checkDisadv,
@@ -5517,9 +5531,10 @@ export async function takeAction({
         const sneakHideDC = enemyAlive ? passivePerceptionDC(enemy!.wis ?? 10) : 10;
         const hideProf = char.skill_proficiencies?.includes('Stealth') ?? false;
         const inspAdvHide = consumeInspirationForCheck(char);
+        const bardicHideRoll = consumeBardicForCheck(char);
         const hideCheck = skillCheck(
           char.dex,
-          sneakHideDC,
+          sneakHideDC - bardicHideRoll,
           hideProf,
           char.level,
           isHeavilyEncumbered(char), // 2024 PHB: heavy encumbrance → disadv on DEX checks
@@ -6862,9 +6877,10 @@ export async function takeAction({
       // per 2024 RAW (only STR/DEX/CON), so we only honour exhaustion.
       const exhaustionDisadv1 = (char.exhaustion_level ?? 0) >= 1;
       const inspAdvSearch = consumeInspirationForCheck(char);
+      const bardicSearchRoll = consumeBardicForCheck(char);
       const check = skillCheck(
         char.int,
-        obj.searchDC ?? 12,
+        (obj.searchDC ?? 12) - bardicSearchRoll,
         proficient,
         char.level,
         exhaustionDisadv1,
