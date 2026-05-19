@@ -240,6 +240,7 @@ export interface Character {
   temp_hp?: number;
   inspiration?: boolean;
   hide_dc?: number;
+  condition_sources?: Record<string, string>;
 }
 
 // ─── NPC system ───────────────────────────────────────────────────────────────

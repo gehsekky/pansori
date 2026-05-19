@@ -50,7 +50,7 @@ to the small-impact items below.
 
 ### No-current-content (defer)
 
-- [ ] **Frightened — movement restriction** (SRD p.182) — the frightened creature cannot willingly move closer to the source of its fear. Needs a fear-source id on the condition. Currently only enemies become frightened (Vengeance Paladin's Abjure Enemy), and enemies don't grid-move, so this has no practical effect today.
+- [x] **Frightened — movement restriction** (SRD p.182) — implemented. `Character.condition_sources` tracks the entity that caused each condition (currently only used for `frightened`). Enemy on-hit effects that frighten a PC record the enemy id; the grid_move handler rejects moves that would close distance to that source. `inflictCondition` accepts an optional `sourceId`; `tickConditions` clears sources on expiry. Useful in Vale (Crypt Lord's frighten-on-hit) and any campaign with frighten-rider attacks.
 - [ ] **Heavy weapon disadvantage for Small creatures** (SRD p.90) — no Small races on either campaign's character sheet. Add when a Small race appears.
 - [ ] **Charmed: charmer's social advantage** (SRD p.181) — no spell currently sets `charmer_id`. Wire it from Charm Person when a charm-effect spell starts appearing in NPC dialogue.
 - [ ] **Costly material component consumption** — Identify's 100 gp pearl, Resurrection's 1000 gp diamond, etc. No spell currently consumes material components.

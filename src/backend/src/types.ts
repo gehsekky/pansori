@@ -561,6 +561,10 @@ export interface Character {
   // (or active Search) to reveal you before they can target effectively.
   // Cleared when invisible is cleared.
   hide_dc?: number;
+  // 2024 PHB — some conditions track the entity that caused them. Primary
+  // use: Frightened can't willingly move closer to its source. Keyed by
+  // condition name; cleared whenever the condition is removed.
+  condition_sources?: Record<string, string>;
 }
 
 // ─── Reactive spell window ───────────────────────────────────────────────────

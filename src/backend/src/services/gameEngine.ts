@@ -550,7 +550,13 @@ function applyEnemyAttackNarrative(
         narrative += ` ✦ Bardic Inspiration spent on the save (+${csResult.bardicRoll})!`;
       }
       if (csResult.applied) {
-        updatedChar = inflictCondition(updatedChar, enemy.onHitEffect.condition);
+        // For Frightened, record the source enemy so movement restrictions
+        // can check against it later.
+        updatedChar = inflictCondition(
+          updatedChar,
+          enemy.onHitEffect.condition,
+          enemy.onHitEffect.condition === 'frightened' ? enemy.id : undefined
+        );
         if (updatedChar.conditions.length > char.conditions.length) {
           narrative += ` ${char.name} is ${enemy.onHitEffect.condition}!`;
         }
@@ -704,13 +710,26 @@ const CONDITION_DURATION: Record<string, number> = {
   invisible: 2,
 };
 
-function inflictCondition(char: Character, condition: string): Character {
-  if (char.conditions.includes(condition)) return char;
+function inflictCondition(char: Character, condition: string, sourceId?: string): Character {
+  if (char.conditions.includes(condition)) {
+    if (sourceId && condition === 'frightened') {
+      return {
+        ...char,
+        condition_sources: { ...(char.condition_sources ?? {}), [condition]: sourceId },
+      };
+    }
+    return char;
+  }
   const duration = CONDITION_DURATION[condition] ?? 1;
   return {
     ...char,
     conditions: [...char.conditions, condition],
     condition_durations: { ...(char.condition_durations ?? {}), [condition]: duration },
+    // 2024 PHB Frightened (and a few others) track the source entity. Other
+    // conditions ignore sourceId — it's free metadata when provided.
+    ...(sourceId
+      ? { condition_sources: { ...(char.condition_sources ?? {}), [condition]: sourceId } }
+      : {}),
   };
 }
 
@@ -738,11 +757,18 @@ function tickConditions(char: Character): Character {
   const newConditions = char.conditions.filter((c) => !expired.includes(c));
   // Shield spell side-effect: AC bump applied on cast must be undone on expiry.
   const acDelta = expired.includes('shield_spell') ? -5 : 0;
+  // Clear condition_sources entries for any expired condition.
+  let newSources = char.condition_sources;
+  if (expired.length > 0 && newSources) {
+    newSources = { ...newSources };
+    for (const c of expired) delete newSources[c];
+  }
   return {
     ...char,
     ac: char.ac + acDelta,
     conditions: newConditions,
     condition_durations: newDurations,
+    condition_sources: newSources,
   };
 }
 
@@ -7439,6 +7465,32 @@ export async function takeAction({
         const which = char.conditions.includes('restrained') ? 'RESTRAINED' : 'GRAPPLED';
         narrative = `You are ${which} — your speed is 0.`;
         break;
+      }
+
+      // 2024 PHB Frightened — can't willingly move closer to the source of
+      // your fear. Check distance against the tracked fear-source entity;
+      // reject the move if it would decrease the distance.
+      if (char.conditions.includes('frightened') && char.condition_sources?.frightened) {
+        const fearSourceId = char.condition_sources.frightened;
+        const fearSourceEnt = st.entities.find((e) => e.id === fearSourceId);
+        if (fearSourceEnt && fearSourceEnt.hp > 0) {
+          const charEnt2 = st.entities.find((e) => e.id === char.id);
+          if (charEnt2) {
+            const currentDist = Math.max(
+              Math.abs(charEnt2.pos.x - fearSourceEnt.pos.x),
+              Math.abs(charEnt2.pos.y - fearSourceEnt.pos.y)
+            );
+            const newDist = Math.max(
+              Math.abs(gridAction.to.x - fearSourceEnt.pos.x),
+              Math.abs(gridAction.to.y - fearSourceEnt.pos.y)
+            );
+            if (newDist < currentDist) {
+              const fearName = getEnemyById(seed, fearSourceId)?.name ?? 'the source of your fear';
+              narrative = `You are FRIGHTENED — you can't willingly move closer to ${fearName}.`;
+              break;
+            }
+          }
+        }
       }
 
       const locationGrid = context.campaign?.locations?.find((l) =>
