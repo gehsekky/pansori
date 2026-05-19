@@ -17,6 +17,7 @@ import {
   SRD_CLASS_SAVING_THROWS,
   SRD_CLASS_SKILLS,
   SRD_CLASS_WEAPON_PROFICIENCIES,
+  SRD_MONSTERS,
   SRD_SPELLCASTING_ABILITY,
   SRD_SPELLS,
 } from './srd/index.js';
@@ -118,43 +119,15 @@ export const context: Context = {
   // ─── Enemy templates ──────────────────────────────────────────────────────────
 
   enemyTemplates: [
+    // SRD wolf with a cold-resist coat.
+    { ...SRD_MONSTERS.wolf, name: 'Frost Wolf', resistances: ['cold'] },
+    // Pure SRD ice mephit.
+    SRD_MONSTERS.ice_mephit,
+    // SRD bandit with cold resist + slightly tougher kit. Higher AC + dmg
+    // than the baseline bandit reflects the harsher pass — they're better
+    // armed than a Lantern District ruffian.
     {
-      name: 'Frost Wolf',
-      cr: 0.25,
-      hp: 11,
-      ac: 13,
-      damage: '1d6+1',
-      toHit: 4,
-      xp: 50,
-      str: 12,
-      dex: 15,
-      con: 12,
-      int: 3,
-      wis: 12,
-      cha: 6,
-      resistances: ['cold'],
-      damageType: 'piercing',
-    },
-    {
-      name: 'Ice Mephit',
-      cr: 0.5,
-      hp: 21,
-      ac: 11,
-      damage: '1d4+2',
-      toHit: 4,
-      xp: 100,
-      str: 7,
-      dex: 13,
-      con: 10,
-      int: 9,
-      wis: 11,
-      cha: 12,
-      immunities: ['cold'],
-      vulnerabilities: ['fire'],
-      condition_immunities: ['poisoned'],
-      damageType: 'cold',
-    },
-    {
+      ...SRD_MONSTERS.bandit,
       name: 'Snowshrouded Bandit',
       cr: 0.25,
       hp: 11,
@@ -164,12 +137,7 @@ export const context: Context = {
       xp: 50,
       str: 13,
       dex: 13,
-      con: 12,
-      int: 10,
-      wis: 10,
-      cha: 8,
       resistances: ['cold'],
-      damageType: 'slashing',
     },
     {
       name: 'Frost Cultist',
