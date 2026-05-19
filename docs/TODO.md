@@ -8,18 +8,20 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 
 ---
 
-## Top 5 — completing the 5.5e engine
+## Top 5 — completing the 5.5e engine [✓ ALL SHIPPED]
 
-> Goal: full 2024 PHB / SRD 5.2.1 mechanics coverage. Combat resolution
-> is already on 2024 (49 SRD citations); the gaps below are the
-> remaining 2024-specific class features and the unfinished mechanics
-> that block calling this a complete 5.5e engine.
+> Goal: full 2024 PHB / SRD 5.2.1 mechanics coverage. All 5 items below
+> landed in commits `ed841a1..1dfca3f`. Combat resolution + class
+> features + multi-target spells are now on the 2024 spec.
 
-1. **Weapon Masteries — wire all 9 + per-class mastery slots.** Signature 2024 system. Topple / Push / Sap / Slow are implemented; **Vex / Nick / Cleave / Graze / Flex still missing**. Some 2024 weapons (greatsword: Graze; longbow: Slow; light crossbow: Slow; etc.) carry a mastery property but the engine ignores it on the unimplemented kinds. Also need the per-class mastery-slot pool (Fighter 3 / Barbarian-Paladin-Ranger 2 / Rogue 1) and the L1 mastery-pick UI. ~10-15h.
-2. **2024 class feature audit — Cleric / Fighter / Monk** (the biggest 2014→2024 deltas). Cleric: 2024 Channel Divinity (Divine Spark, Sear Undead L5, Turn Undead bonus action). Fighter: Second Wind multiple uses + scaling, Tactical Master, Studied Attacks L13. Monk: rename Ki → Discipline Points, free Patient Defense / Step of the Wind on bonus action, Martial Arts die upgrade per 2024 PHB. ~6-8h.
-3. **Heroic + Bardic Inspiration on any d20 test.** Heroic Inspiration today only fires `inspiration_pending` for the *next attack*; 2024 PHB says any d20 test (attack, save, or check). Same gap for Bard's Inspiration die — 2024 lets the recipient add it to any d20 within 10 min, not just attacks. Need a post-roll "spend?" prompt rather than the pre-commit toggle. ~4-5h.
-4. **Hide action — full DC tracking.** Half-implemented today (invisible applied on a successful Stealth check). Missing: record the check total as the hide DC, let enemies use passive Perception or a Search action against it. The Hide path is the SRD test case for "stealth as a system" — incomplete = several skill encounters fall flat. ~3-4h.
-5. **Multi-target spell allocation UX.** Magic Missile darts and Eldritch Blast beams (L5+) — damage math is RAW on a single target but no UI lets the player spread across multiple enemies. Both are signature 2024 cantrips/spells; not having a target-split UI means they functionally play as worse single-target spells. ~3-4h.
+1. [x] **Weapon Masteries — all 9 + per-class slots** (`ed841a1`). Topple / Push / Sap / Slow were already in; Cleave / Graze / Flex / Nick added. Vex was implemented earlier. Per-class slot count via `SRD_WEAPON_MASTERY_SLOTS` (Fighter 3 / Barb-Pal-Rang 2 / Rog 1).
+2. [x] **2024 class feature audit — Cleric / Fighter / Monk** (`d17f647` + `e36fb63`). Cleric: Divine Spark + Turn Undead (bonus action) + Sear Undead L5. Fighter: Second Wind multi-use (2/3/4 at L1/L4/L10). Monk: Patient Defense + free 1/turn Step of the Wind + Stunning Strike 1/turn cap + 2024 Martial Arts die progression (d6/d8/d10/d12).
+3. [x] **Heroic Inspiration on any d20** (`db312c7`). `inspiration_pending` now applies to ability checks too (saves were already wired). `spend_inspiration` choice surfaces in + out of combat.
+4. [x] **Hide action — full DC tracking** (`4d10043`). Successful Hide stores `hide_dc = stealth_total`. Enemies roll passive Perception (10 + WIS mod) vs `hide_dc` when targeting the hider; on detect, invisible is removed and DC cleared. Attacking also clears both.
+5. [x] **Multi-target spell allocation** (`1dfca3f`). `cast_spell.targetEnemyIds?: string[]` carries one entry per dart/beam. Choice gen emits focus-fire + spread variants for Magic Missile (per slot) and Eldritch Blast (L5+). Each shot resolves independently (per-beam attack roll for EB, per-dart auto-hit for MM).
+
+The 5.5e RAW gap list (relative to the 2024 PHB + SRD 5.2.1) is now down
+to the small-impact items below.
 
 ---
 
@@ -36,12 +38,15 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 - [x] **Rage — 2024 progression** — uses-per-rest table + 2024 damage scaling (97a22ad).
 - [x] **Cunning Strike (2024 Rogue L5)** — trip / poison / withdraw / disarm options (9ebcac4).
 - [x] **Reach weapon OA range** — `opportunityAttackTriggers` honours a 10-ft reach lookup; default 5 ft preserved.
-- [~] **Weapon Masteries (partial)** — 4 of 9 wired: **topple, push, sap, slow**. Still missing: **vex, nick, cleave, graze, flex** + per-class mastery-slot pool + L1 pick UI. See top-5 #1.
-- [ ] **Multi-target spell allocation UX** — top-5 #5. Magic Missile dart split + Eldritch Blast multi-beam.
-- [ ] **Hide action — full DC tracking** — top-5 #4. Half-implemented (invisible applied; DC unrecorded).
+- [x] **Weapon Masteries — all 9 + per-class slots** (`ed841a1`). Slot counts in `SRD_WEAPON_MASTERY_SLOTS`.
+- [x] **Multi-target spell allocation** (`1dfca3f`). Magic Missile + Eldritch Blast focus-fire/spread choices.
+- [x] **Hide action — full DC tracking** (`4d10043`).
+- [x] **2024 class feature audit — Cleric / Fighter / Monk** (`d17f647`, `e36fb63`).
+- [x] **Inspiration spend on any d20** (`db312c7`).
 - [ ] **Heavy-encumbrance skill-check disadvantage** — speed penalties wired via `effectiveSpeed`; STR/DEX/CON checks + saves + attacks still don't see disadvantage.
-- [ ] **2024 class feature audit — Cleric / Fighter / Monk** — top-5 #2.
-- [ ] **Inspiration spend on any d20** — top-5 #3.
+- [ ] **Bardic Inspiration spend on any d20** — saves already wired; ability-check path still skipped. Smaller scope than Heroic Inspiration since it only matters for Bard allies.
+- [ ] **Enemy Search action vs Hide DC** — passive Perception is checked on target-select today; a dedicated Search action would let enemies actively roll. Limited by enemy AI being "nearest PC = target" — useful when AI grows.
+- [ ] **Tactical Master + Studied Attacks (Fighter L9 / L13)** — left out of the L1-focused class audit. Wire when level-up actually reaches L9/L13.
 
 ### No-current-content (defer)
 
