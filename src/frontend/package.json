@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Frontend for Pansori — a dynamic browser RPG platform.",
   "private": true,
-  "license": "GPL-3.0-only",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "predev": "tsx scripts/gen-art-manifest.ts",
