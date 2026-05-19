@@ -9,8 +9,18 @@
 //   - a boss with paralyzing onHitEffect to exercise the SRD auto-fail STR/DEX
 //     saves we added in the audit pass.
 
+import {
+  SRD_CLASS_ARMOR_PROFICIENCIES,
+  SRD_CLASS_FEATURES,
+  SRD_CLASS_HIT_DIE,
+  SRD_CLASS_PRIMARY_STATS,
+  SRD_CLASS_SAVING_THROWS,
+  SRD_CLASS_SKILLS,
+  SRD_CLASS_WEAPON_PROFICIENCIES,
+  SRD_SPELLCASTING_ABILITY,
+  SRD_SPELLS,
+} from './srd/index.js';
 import type { Context } from '../types.js';
-import { SRD_SPELLS } from './srd_spells.js';
 
 export const context: Context = {
   id: 'whispering_pines',
@@ -25,110 +35,19 @@ export const context: Context = {
 
   // ─── Classes (shared with Vale; copied to keep contexts self-contained) ──────
 
-  classPrimaryStats: {
-    Fighter: 'str',
-    Rogue: 'dex',
-    Wizard: 'int',
-    Cleric: 'wis',
-    Ranger: 'dex',
-    Paladin: 'str',
-    Bard: 'cha',
-    Druid: 'wis',
-    Sorcerer: 'cha',
-    Warlock: 'cha',
-    Monk: 'wis',
-    Barbarian: 'str',
-  },
+  classPrimaryStats: { ...SRD_CLASS_PRIMARY_STATS },
 
-  classHitDie: {
-    Fighter: 10,
-    Rogue: 8,
-    Wizard: 6,
-    Cleric: 8,
-    Ranger: 10,
-    Paladin: 10,
-    Bard: 8,
-    Druid: 8,
-    Sorcerer: 6,
-    Warlock: 8,
-    Monk: 8,
-    Barbarian: 12,
-  },
+  classHitDie: { ...SRD_CLASS_HIT_DIE },
 
-  classSkills: {
-    Fighter: ['athletics', 'intimidation'],
-    Rogue: ['stealth', 'sleight_of_hand', 'deception', 'perception'],
-    Wizard: ['arcana', 'investigation', 'history'],
-    Cleric: ['medicine', 'religion', 'insight'],
-    Ranger: ['perception', 'stealth', 'nature', 'survival'],
-    Paladin: ['athletics', 'persuasion', 'insight'],
-    Bard: ['persuasion', 'deception', 'performance', 'perception'],
-    Druid: ['nature', 'survival', 'animal_handling'],
-    Sorcerer: ['arcana', 'persuasion'],
-    Warlock: ['arcana', 'deception', 'intimidation'],
-    Monk: ['athletics', 'stealth', 'acrobatics'],
-    Barbarian: ['athletics', 'intimidation', 'survival'],
-  },
+  classSkills: { ...SRD_CLASS_SKILLS },
 
-  classArmorProficiencies: {
-    Fighter: ['light', 'medium', 'heavy', 'shield'],
-    Rogue: ['light'],
-    Wizard: [],
-    Cleric: ['light', 'medium', 'shield'],
-    Ranger: ['light', 'medium', 'shield'],
-    Paladin: ['light', 'medium', 'heavy', 'shield'],
-    Bard: ['light'],
-    Druid: ['light', 'medium', 'shield'],
-    Sorcerer: [],
-    Warlock: ['light'],
-    Monk: [],
-    Barbarian: ['light', 'medium', 'shield'],
-  },
+  classArmorProficiencies: { ...SRD_CLASS_ARMOR_PROFICIENCIES },
 
-  classWeaponProficiencies: {
-    Fighter: ['simple', 'martial'],
-    Rogue: ['simple', 'martial'],
-    Wizard: ['simple'],
-    Cleric: ['simple'],
-    Ranger: ['simple', 'martial'],
-    Paladin: ['simple', 'martial'],
-    Bard: ['simple', 'martial'],
-    Druid: ['simple'],
-    Sorcerer: ['simple'],
-    Warlock: ['simple'],
-    Monk: ['simple', 'shortsword'],
-    Barbarian: ['simple', 'martial'],
-  },
+  classWeaponProficiencies: { ...SRD_CLASS_WEAPON_PROFICIENCIES },
 
-  classSavingThrows: {
-    Fighter: ['str', 'con'],
-    Rogue: ['dex', 'int'],
-    Wizard: ['int', 'wis'],
-    Cleric: ['wis', 'cha'],
-    Ranger: ['str', 'dex'],
-    Paladin: ['wis', 'cha'],
-    Bard: ['dex', 'cha'],
-    Druid: ['str', 'wis'],
-    Sorcerer: ['con', 'cha'],
-    Warlock: ['wis', 'cha'],
-    Monk: ['str', 'dex'],
-    Barbarian: ['str', 'con'],
-  },
+  classSavingThrows: { ...SRD_CLASS_SAVING_THROWS },
 
-  classFeatures: {
-    Fighter: ['extra_attack', 'second_wind'],
-    Rogue: ['sneak_attack', 'cunning_action'],
-    Wizard: ['spellcasting'],
-    Cleric: ['spellcasting', 'channel_divinity'],
-    Ranger: ['extra_attack', 'favored_enemy'],
-    Paladin: ['divine_smite', 'lay_on_hands'],
-    Bard: ['spellcasting', 'bardic_inspiration'],
-    Druid: ['wild_shape', 'channel_divinity', 'spellcasting'],
-    Sorcerer: ['sorcery_points', 'metamagic', 'spellcasting'],
-    Warlock: ['eldritch_blast', 'pact_magic', 'spellcasting'],
-    Monk: ['ki', 'unarmored_defense', 'martial_arts'],
-    Barbarian: ['rage', 'extra_attack', 'unarmored_defense'],
-  },
+  classFeatures: { ...SRD_CLASS_FEATURES },
 
   classStartingLoot: {
     Fighter: ['longsword', 'chain_mail', 'shield'],
@@ -145,15 +64,7 @@ export const context: Context = {
     Barbarian: ['greataxe', 'handaxe', 'fur_cloak'],
   },
 
-  spellcastingAbility: {
-    Wizard: 'int',
-    Cleric: 'wis',
-    Bard: 'cha',
-    Paladin: 'cha',
-    Druid: 'wis',
-    Sorcerer: 'cha',
-    Warlock: 'cha',
-  },
+  spellcastingAbility: { ...SRD_SPELLCASTING_ABILITY },
 
   // ─── Backgrounds ──────────────────────────────────────────────────────────────
 
