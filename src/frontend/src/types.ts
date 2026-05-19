@@ -354,6 +354,14 @@ export type CombatEvent =
       success: boolean;
       vs: string;
       round: number;
+    }
+  | {
+      kind: 'phase_transition';
+      bossId: string;
+      bossName: string;
+      phaseName: string;
+      narrative: string;
+      round: number;
     };
 
 export interface GameState {
@@ -517,6 +525,7 @@ export interface CombatEntity {
   toHit?: number;
   damage?: string;
   grappled_by?: string;
+  phase_index?: number;
 }
 
 // ─── Quest system ─────────────────────────────────────────────────────────────

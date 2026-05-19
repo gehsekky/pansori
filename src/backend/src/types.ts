@@ -119,6 +119,33 @@ export interface OnHitEffect {
   dc: number;
 }
 
+// Boss phase changes. When the boss's hp drops below `hpPct` of its max,
+// the engine transitions to that phase, applies the listed effects to the
+// boss's effective stats for the rest of the fight, and emits a
+// `phase_transition` event with the narrative. Phases are evaluated in
+// order; the first un-entered phase whose threshold has been crossed
+// fires. Phases run "lowest hp first" — e.g. [50%, 25%] means the 50%
+// phase fires first, then 25%, never both at once.
+//
+// Phases mutate the *seed's* runtime Enemy stats in-place during a
+// takeAction call. On a fresh request, the engine re-applies all phases
+// up to `entity.phase_index` so the seed-from-DB looks correct.
+export interface BossPhase {
+  hpPct: number;
+  name: string;
+  narrative: string;
+  effects: BossPhaseEffect[];
+}
+
+export type BossPhaseEffect =
+  | { kind: 'set_multiattack'; value: number }
+  | { kind: 'set_damage'; dice: string }
+  | { kind: 'set_to_hit'; value: number }
+  | { kind: 'set_ac'; value: number }
+  | { kind: 'set_on_hit_effect'; effect: OnHitEffect }
+  | { kind: 'add_resistance'; damageType: string }
+  | { kind: 'heal'; amount: number };
+
 export interface EnemyTemplate {
   name: string;
   cr: number;
@@ -145,6 +172,9 @@ export interface EnemyTemplate {
   castChance?: number;
   spellSaveDC?: number;
   spellAttackBonus?: number;
+  // HP-threshold phase transitions for boss encounters. Order does not
+  // matter — engine sorts by descending hpPct internally.
+  phases?: BossPhase[];
 }
 
 export interface Enemy {
@@ -177,6 +207,13 @@ export interface Enemy {
   castChance?: number; // 0..1 probability per turn; 0 or undefined = never cast
   spellSaveDC?: number; // DC for save-based spells; defaults to 8 + prof(CR-derived) + caster mod
   spellAttackBonus?: number; // +mod for spell-attack-roll spells; defaults to toHit
+  // Boss phase definitions (carried over from template). Runtime phase
+  // index lives on the matching CombatEntity, not here, so phase progress
+  // survives state serialization without touching the seed payload.
+  phases?: BossPhase[];
+  // Max hp captured at seed time so phase thresholds can be re-evaluated
+  // against the *original* HP after damage reduces hp below maxHp.
+  maxHp?: number;
 }
 
 export interface Seed {
@@ -630,6 +667,14 @@ export type CombatEvent =
       success: boolean;
       vs: string;
       round: number;
+    }
+  | {
+      kind: 'phase_transition';
+      bossId: string;
+      bossName: string;
+      phaseName: string;
+      narrative: string;
+      round: number;
     };
 
 // ─── Game state (world/party container) ──────────────────────────────────────
@@ -883,6 +928,11 @@ export interface CombatEntity {
   // condition if the grappler dies/is incapacitated, and so the contested escape
   // check has a target's mod to roll against.
   grappled_by?: string;
+  // Boss-phase tracking. Counts how many phases the boss has entered. The
+  // engine re-applies effects 0..phase_index-1 on every takeAction so the
+  // seed's runtime Enemy fields reflect the current phase. A 0 (or undefined)
+  // means the boss is still in its base statline.
+  phase_index?: number;
 }
 
 // ─── Quest system ─────────────────────────────────────────────────────────────
