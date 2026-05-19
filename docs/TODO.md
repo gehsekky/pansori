@@ -12,7 +12,7 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 
 1. **End-to-end Vale of Shadows playtest** — complete all 3 quests in a single session, verify campaign state survives session resume, verify faction price modifiers apply in shop. This is the validation gate: until a campaign plays start-to-finish without engine bugs, every other rule addition is unverified.
 2. **Reactive spells / interrupt system** — Counterspell (PHB p.234), Shield (PHB p.275), Hellish Rebuke. Architectural: the turn engine needs a reaction-window hook so a defender can spend a reaction to interrupt the attacker's resolve. Without this, the iconic 5e arcane combat mechanics aren't representable.
-3. **Inspiration (Heroic Inspiration in 2024)** — RAW free reroll on attack/save/check. Needs UX: grant (quest completion, roleplay, level-up), display (token on character card), spend (button on the relevant choice).
+3. **Subclass packs for the remaining 5 classes** — see the §SRD gaps entry. Without these, half the engine's class roster is stuck without their L3+ identity features. Per-pack cost ~2-3h; pick the highest-impact (Sorcerer + Warlock since they're the L1 cases) first.
 4. **Combat narrative clarity (UX)** — combat currently produces a long text log scroll mixing damage numbers, condition changes, save rolls, OA narrations. A "combat log panel" that separates **mechanical events** (rolls, damage, condition apply/remove) from **prose flavour** would dramatically improve readability and let new players follow what's happening. Hooks into the existing `narrative template format` backlog item.
 5. **Authoring documentation (`AUTHORING.md`)** — for the engine to actually be "capable of running complex campaign scripts" by third parties (or future-you), the campaign format needs a written reference: required vs optional fields on `Context`/`CampaignData`, quest condition shape, rule engine consequences, loot/room/NPC patterns, gotchas. Should reference Vale + Whispering Pines as worked examples.
 
@@ -22,8 +22,17 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 
 ### Real gameplay impact (worth doing)
 
-- [ ] **Inspiration UX** — see top-5 item 3.
+- [x] **Heroic Inspiration (2024 PHB)** — granted automatically on a Nat-1 d20, spent via the `spend_inspiration` action for advantage on the next attack. CharStatsCard shows an ✦ INSP badge. Granted-on-Nat-1 model from the 2024 PHB; saves/ability-check advantage not yet wired (those rolls aren't player-mediated).
 - [ ] **Reactive spells / interrupt system** — see top-5 item 2.
+- [ ] **Subclass packs for the remaining classes** (PHB Chapter 3). The L1 picker UI is in place; only `cleric` (life, war) has options. To reach RAW completeness for all 12 classes we still need:
+  - **Sorcerer** (L1) — Draconic Bloodline + Wild Magic
+  - **Warlock** (L1) — Fiend + Archfey (or Great Old One)
+  - **Druid** (L2) — Circle of the Land + Circle of the Moon
+  - **Monk** (L3) — Way of the Open Hand + Way of Shadow
+  - **Barbarian** (L3) — Path of the Berserker + Path of the Totem Warrior
+
+  Each pack: subclass id added to `subclassChoices` map (gameEngine line ~1097), feature handlers in the appropriate sites (use_class_feature dispatch + passive checks like `char.subclass === 'fiend'`), and frontend `L1_SUBCLASS_OPTIONS` for the L1-required ones. Roughly 2-3h per pack including tests.
+
 - [ ] **Multi-target spell allocation UX** — Magic Missile dart split, Eldritch Blast multi-beam (L5+). Damage math is correct on single target; missing: the optional dart/beam-distribution UI so the player can spread across multiple enemies.
 - [x] **Reach weapon OA range** — `opportunityAttackTriggers` now takes an optional `attackerReachFt(entity)` lookup so callers can report 10-ft reach for Reach-weapon wielders. Default 5 ft preserved. Still no current loot has Reach, but infrastructure is ready (3 new tests in `gridEngine.spec.ts`).
 - [ ] **Hide action — full DC tracking** (SRD p.11) — successful Stealth grants Invisible _and_ records the check total as the DC for others to find you. Enemies should be able to make passive Perception (or active Search) against that DC. Today we apply `invisible` for one attack's advantage; we don't track the DC or allow finding. Half-implemented (invisible reveals on attack already done).
