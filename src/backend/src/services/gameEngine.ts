@@ -202,26 +202,43 @@ function conditionSavingThrow(
     | 'conditions'
     | 'turn_actions'
     | 'inspiration'
+    | 'bardic_inspiration_die'
   >,
   context: Context
-): { applied: boolean; inspirationConsumed: boolean } {
+): {
+  applied: boolean;
+  inspirationConsumed: boolean;
+  bardicInspirationConsumed: boolean;
+  bardicRoll: number;
+} {
   const proficient =
     context.classSavingThrows?.[char.character_class]?.includes(effect.ability) ?? false;
   // 2024 PHB — Heroic Inspiration can be spent on any d20 test. If the
   // player armed it via spend_inspiration, the save gets advantage and
   // the flag is consumed (the caller updates char accordingly).
   const inspirationActive = !!char.turn_actions?.inspiration_pending;
+  // 2024 PHB Bardic Inspiration — if the saver carries a BI die, it can
+  // be spent on this save (and is consumed regardless of outcome). We
+  // roll it, then check if the d20 + mods + bi-roll meets the DC.
+  const biDie = char.bardic_inspiration_die;
+  const bardicRoll = biDie ? rollDice(`1${biDie}`) : 0;
+  const dcAdjusted = effect.dc - bardicRoll;
   const applied = rollConditionSave(
     effect.ability,
     char[effect.ability] ?? 10,
-    effect.dc,
+    dcAdjusted,
     proficient,
     char.level,
     0,
     char.conditions ?? [],
     inspirationActive
   );
-  return { applied, inspirationConsumed: inspirationActive };
+  return {
+    applied,
+    inspirationConsumed: inspirationActive,
+    bardicInspirationConsumed: !!biDie,
+    bardicRoll,
+  };
 }
 
 // ─── Enemy attack helper ──────────────────────────────────────────────────────
@@ -252,6 +269,9 @@ function applyEnemyAttackNarrative(
   // True when the PC spent Heroic Inspiration on the save vs onHitEffect.
   // Caller should clear inspiration flags on the resulting Character.
   inspirationConsumed?: boolean;
+  // True when the PC's stashed Bardic Inspiration die was consumed on the
+  // save. Caller clears bardic_inspiration_die on the resulting Character.
+  bardicConsumed?: boolean;
 } {
   const isDodging = char.turn_actions?.dodging ?? false;
   const isReckless = char.turn_actions?.reckless ?? false;
@@ -314,11 +334,16 @@ function applyEnemyAttackNarrative(
     let updatedChar = { ...char };
 
     let inspirationConsumed = false;
+    let bardicConsumed = false;
     if (enemy.onHitEffect) {
       const csResult = conditionSavingThrow(enemy.onHitEffect, char, context);
       if (csResult.inspirationConsumed) {
         inspirationConsumed = true;
         narrative += ` ✦ Heroic Inspiration spent on the save!`;
+      }
+      if (csResult.bardicInspirationConsumed) {
+        bardicConsumed = true;
+        narrative += ` ✦ Bardic Inspiration spent on the save (+${csResult.bardicRoll})!`;
       }
       if (csResult.applied) {
         updatedChar = inflictCondition(updatedChar, enemy.onHitEffect.condition);
@@ -336,6 +361,9 @@ function applyEnemyAttackNarrative(
         turn_actions: { ...updatedChar.turn_actions, inspiration_pending: false },
       };
     }
+    if (bardicConsumed) {
+      updatedChar = { ...updatedChar, bardic_inspiration_die: undefined };
+    }
     return {
       hpLost,
       narrative,
@@ -346,6 +374,7 @@ function applyEnemyAttackNarrative(
       atkTotal: result.total,
       hit: true,
       inspirationConsumed,
+      bardicConsumed,
     };
   }
   if (armorItem) {
@@ -2364,6 +2393,10 @@ function runEnemyTurns(args: {
               turn_actions: atkResult.inspirationConsumed
                 ? { ...target.turn_actions, inspiration_pending: false }
                 : target.turn_actions,
+              // 2024 PHB Bardic Inspiration: similar — clear if spent.
+              bardic_inspiration_die: atkResult.bardicConsumed
+                ? undefined
+                : target.bardic_inspiration_die,
             };
             const concAtk = checkConcentration(target, st, atkResult.hpLost);
             target = concAtk.char;
@@ -3121,6 +3154,18 @@ export async function takeAction({
           critThresh,
           totalAttackBonus
         );
+        // Bardic Inspiration consumption on attack roll (2024 PHB p.52).
+        // If the wielder has a stashed BI die, roll it and add to the to-hit
+        // total. If that turns a miss into a hit, atk.hit flips to true.
+        let biNote = '';
+        if (char.bardic_inspiration_die && !atk.fumble) {
+          const biRoll = rollDice(`1${char.bardic_inspiration_die}`);
+          atk.total += biRoll;
+          const newHit = atk.roll === 20 || atk.total >= effectiveEnemyAc;
+          if (!atk.hit && newHit) atk.hit = true;
+          biNote = ` ✦ Bardic Inspiration: +${biRoll} (${char.bardic_inspiration_die})`;
+          char.bardic_inspiration_die = undefined;
+        }
         // Unconscious or Assassin-surprised: force crit on hit
         const autoCritCheck =
           (enemyUnconscious &&
@@ -3149,7 +3194,7 @@ export async function takeAction({
         const versatileNote = isVersatile ? ' (versatile)' : '';
         const coverNote = coverAcBonus > 0 ? ` +${coverAcBonus} cover` : '';
         const bonusNote = totalAttackBonus > 0 ? ` +${totalAttackBonus} bonus` : '';
-        const atkNote = ` (${label}d20 ${atk.roll}+${atk.atkMod} ${atk.atkStat}+${atk.prof} prof${bonusNote} = ${atk.total} vs AC ${effectiveEnemyAc}${coverNote}${disadvNote}${versatileNote})${noProfNote}`;
+        const atkNote = ` (${label}d20 ${atk.roll}+${atk.atkMod} ${atk.atkStat}+${atk.prof} prof${bonusNote} = ${atk.total} vs AC ${effectiveEnemyAc}${coverNote}${disadvNote}${versatileNote})${noProfNote}${biNote}`;
 
         if (atk.fumble) {
           // 2024 PHB — a Nat 1 on a d20 grants Heroic Inspiration. Failure
@@ -4666,6 +4711,13 @@ export async function takeAction({
           narrative = 'Bonus action already used this turn.';
           break;
         }
+        // Pick an ally to grant the die to. Currently auto-picks the first
+        // non-self living party member; a future PR can add a target picker.
+        const ally = st.characters.find((c) => c.id !== char.id && !c.dead && c.hp > 0);
+        if (!ally) {
+          narrative = 'No ally to inspire.';
+          break;
+        }
         char.class_resource_uses = {
           ...(char.class_resource_uses ?? {}),
           bardic_inspiration: biUses - 1,
@@ -4673,7 +4725,13 @@ export async function takeAction({
         char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
         const inspDie =
           char.level >= 15 ? 'd12' : char.level >= 10 ? 'd10' : char.level >= 5 ? 'd8' : 'd6';
-        narrative = `${char.name} grants Bardic Inspiration (d${inspDie}) to an ally! (${biUses - 1} use${biUses - 1 === 1 ? '' : 's'} remaining)`;
+        st = {
+          ...st,
+          characters: st.characters.map((c) =>
+            c.id === ally.id ? { ...c, bardic_inspiration_die: inspDie } : c
+          ),
+        };
+        narrative = `${char.name} grants Bardic Inspiration (${inspDie}) to ${ally.name}! (${biUses - 1} use${biUses - 1 === 1 ? '' : 's'} remaining)`;
       }
 
       // ── Reckless Attack (Barbarian L2+) — free toggle, no action cost ──────

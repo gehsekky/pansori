@@ -445,6 +445,12 @@ export interface Character {
   // Wizard/Druid/Bard get 0 by default. Wielding a weapon NOT in this list
   // doesn't grant its mastery property even if the weapon has one.
   weapon_masteries?: string[];
+  // Bardic Inspiration die granted by a Bard (PHB p.53 / 2024 p.52). The
+  // die is stored as a dice expression ('d6', 'd8', ...) and consumed on
+  // the next d20 test (attack/save/check). 2024 PHB expands what the die
+  // can apply to — Pansori applies it to attack-roll consumption today;
+  // save consumption follows the Heroic Inspiration pattern.
+  bardic_inspiration_die?: string;
   attuned_items: string[]; // instance_ids of attuned magic items (max 3)
   concentrating_on?: { spellId: string; condition?: string } | null;
   // Extended 5e fields
