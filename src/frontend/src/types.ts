@@ -272,7 +272,18 @@ export interface PendingHellishRebukeReaction extends PendingReactionBase {
   kind: 'hellish_rebuke';
 }
 
-export type PendingReaction = PendingShieldReaction | PendingHellishRebukeReaction;
+export interface PendingCounterspellReaction extends PendingReactionBase {
+  kind: 'counterspell';
+  enemySpellId: string;
+  enemySpellLevel: number;
+  enemySpellName: string;
+  intendedTargetPcId: string;
+}
+
+export type PendingReaction =
+  | PendingShieldReaction
+  | PendingHellishRebukeReaction
+  | PendingCounterspellReaction;
 
 export interface GameState {
   // Party

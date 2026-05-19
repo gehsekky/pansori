@@ -125,6 +125,11 @@ export interface EnemyTemplate {
   immunities?: string[]; // damage types that deal no damage
   condition_immunities?: string[]; // conditions that cannot be applied
   damageType?: string; // primary damage type for this enemy's attack
+  // Spell-casting (see Enemy.spells for runtime behaviour).
+  spells?: string[];
+  castChance?: number;
+  spellSaveDC?: number;
+  spellAttackBonus?: number;
 }
 
 export interface Enemy {
@@ -147,6 +152,16 @@ export interface Enemy {
   vulnerabilities?: string[];
   immunities?: string[];
   condition_immunities?: string[];
+  // Spell-casting enemies (e.g. cultists, acolytes, mages). On their turn,
+  // they roll castChance (0–1) to decide cast vs attack; if cast wins, one
+  // spell from `spells` is picked. Spells must exist in context.spellTable
+  // and currently only damage spells with a single-target resolution are
+  // supported on the enemy side. The casting flow also opens a Counterspell
+  // reaction window for any eligible PC.
+  spells?: string[];
+  castChance?: number; // 0..1 probability per turn; 0 or undefined = never cast
+  spellSaveDC?: number; // DC for save-based spells; defaults to 8 + prof(CR-derived) + caster mod
+  spellAttackBonus?: number; // +mod for spell-attack-roll spells; defaults to toHit
 }
 
 export interface Seed {
@@ -473,7 +488,25 @@ export interface PendingHellishRebukeReaction extends PendingReactionBase {
   kind: 'hellish_rebuke';
 }
 
-export type PendingReaction = PendingShieldReaction | PendingHellishRebukeReaction;
+// Counterspell (PHB p.234). Triggers BEFORE an enemy spell resolves — the
+// engine snapshots the enemy's intent (spell id + level + intended target)
+// so a Counterspell accept can nullify it, and a decline lets the spell
+// fire as normal during the resume.
+export interface PendingCounterspellReaction extends PendingReactionBase {
+  kind: 'counterspell';
+  enemySpellId: string;
+  enemySpellLevel: number; // base level of the enemy's spell (slot level not modeled enemy-side)
+  enemySpellName: string; // pre-fetched so generateChoices doesn't need the spellTable
+  // PC the enemy spell would hit if not countered. Resolved at trigger time
+  // (usually nearest PC) and stored so a decline branch can apply damage
+  // without re-running target selection.
+  intendedTargetPcId: string;
+}
+
+export type PendingReaction =
+  | PendingShieldReaction
+  | PendingHellishRebukeReaction
+  | PendingCounterspellReaction;
 
 // ─── Game state (world/party container) ──────────────────────────────────────
 

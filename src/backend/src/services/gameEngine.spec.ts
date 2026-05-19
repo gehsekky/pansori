@@ -2359,6 +2359,277 @@ describe('class features', () => {
     expect(result.newState.pending_reaction).toBeUndefined();
   });
 
+  // ── Counterspell (reactive spell, PHB p.234) ────────────────────────────────
+
+  it('Accepting Counterspell consumes a 3rd-level slot, auto-counters lvl-1 enemy spell', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const wizId = 'wiz-cs';
+    const goblinId = `${CORRIDOR_ID}#0`;
+    const wiz = makeChar({
+      id: wizId,
+      character_class: 'Wizard',
+      level: 5,
+      int: 16,
+      hp: 30,
+      max_hp: 30,
+      spells_known: ['counterspell'],
+      prepared_spells: ['counterspell'],
+      spell_slots_max: { 1: 4, 2: 3, 3: 2 },
+      spell_slots_used: {},
+    });
+    const state: GameState = {
+      characters: [wiz],
+      active_character_id: wizId,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: true,
+      initiative_order: [
+        { id: wizId, roll: 18, is_enemy: false },
+        { id: goblinId, roll: 5, is_enemy: true },
+      ],
+      initiative_idx: 1,
+      entities: [
+        {
+          id: wizId,
+          isEnemy: false,
+          pos: { x: 4, y: 5 },
+          hp: 30,
+          maxHp: 30,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: goblinId,
+          isEnemy: true,
+          pos: { x: 5, y: 5 },
+          hp: 10,
+          maxHp: 10,
+          conditions: [],
+          condition_durations: {},
+        },
+      ],
+      pending_reaction: {
+        kind: 'counterspell',
+        attackerEnemyId: goblinId,
+        targetCharId: wizId,
+        intendedTargetPcId: wizId,
+        enemySpellId: 'fire_bolt',
+        enemySpellLevel: 0, // cantrip — auto-counter
+        enemySpellName: 'Fire Bolt',
+        resumeFromInitiativeIdx: 0,
+        resumeFromMultiattackIdx: 0,
+        narrativeSoFar: "[Goblin's turn]",
+        eligibleCharIds: [wizId],
+      },
+      movement_used: {},
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      flags: {},
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+    };
+    const result = await takeAction({
+      action: { type: 'resolve_reaction', accept: true },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    expect(result.narrative).toMatch(/COUNTERSPELL/);
+    expect(result.narrative).toMatch(/unraveled|no effect/);
+    const newWiz = result.newState.characters[0];
+    expect(newWiz.spell_slots_used?.[3]).toBe(1);
+    expect(newWiz.turn_actions.reaction_used).toBe(true);
+    expect(newWiz.hp).toBe(30); // no damage taken — spell countered
+    expect(result.newState.pending_reaction).toBeUndefined();
+  });
+
+  it('Declining Counterspell lets the enemy spell resolve on its target', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.999); // max damage roll
+    const wizId = 'wiz-cs-decline';
+    const goblinId = `${CORRIDOR_ID}#0`;
+    const wiz = makeChar({
+      id: wizId,
+      character_class: 'Wizard',
+      level: 5,
+      int: 16,
+      hp: 30,
+      max_hp: 30,
+      spells_known: ['counterspell'],
+      prepared_spells: ['counterspell'],
+      spell_slots_max: { 1: 4, 2: 3, 3: 2 },
+      spell_slots_used: {},
+    });
+    const state: GameState = {
+      characters: [wiz],
+      active_character_id: wizId,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: true,
+      initiative_order: [
+        { id: wizId, roll: 18, is_enemy: false },
+        { id: goblinId, roll: 5, is_enemy: true },
+      ],
+      initiative_idx: 1,
+      entities: [
+        {
+          id: wizId,
+          isEnemy: false,
+          pos: { x: 4, y: 5 },
+          hp: 30,
+          maxHp: 30,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: goblinId,
+          isEnemy: true,
+          pos: { x: 5, y: 5 },
+          hp: 10,
+          maxHp: 10,
+          conditions: [],
+          condition_durations: {},
+        },
+      ],
+      pending_reaction: {
+        kind: 'counterspell',
+        attackerEnemyId: goblinId,
+        targetCharId: wizId,
+        intendedTargetPcId: wizId,
+        enemySpellId: 'fire_bolt',
+        enemySpellLevel: 0,
+        enemySpellName: 'Fire Bolt',
+        resumeFromInitiativeIdx: 0,
+        resumeFromMultiattackIdx: 0,
+        narrativeSoFar: "[Goblin's turn]",
+        eligibleCharIds: [wizId],
+      },
+      movement_used: {},
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      flags: {},
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+    };
+    const result = await takeAction({
+      action: { type: 'resolve_reaction', accept: false },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    const newWiz = result.newState.characters[0];
+    expect(newWiz.spell_slots_used?.[3] ?? 0).toBe(0); // no slot spent
+    expect(newWiz.turn_actions.reaction_used).toBe(false);
+    expect(newWiz.hp).toBeLessThan(30); // fire_bolt resolved
+    expect(result.newState.pending_reaction).toBeUndefined();
+  });
+
+  it('Counterspell at lvl-3 slot vs lvl-5 enemy spell requires ability check', async () => {
+    // Force int-based check to barely succeed: d20=20 (random=0.999) +int mod +prof
+    vi.spyOn(Math, 'random').mockReturnValue(0.999);
+    const wizId = 'wiz-cs-check';
+    const goblinId = `${CORRIDOR_ID}#0`;
+    const wiz = makeChar({
+      id: wizId,
+      character_class: 'Wizard',
+      level: 5,
+      int: 18,
+      hp: 30,
+      max_hp: 30,
+      spells_known: ['counterspell'],
+      prepared_spells: ['counterspell'],
+      spell_slots_max: { 1: 4, 2: 3, 3: 2 },
+      spell_slots_used: {},
+    });
+    const state: GameState = {
+      characters: [wiz],
+      active_character_id: wizId,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: true,
+      initiative_order: [
+        { id: wizId, roll: 18, is_enemy: false },
+        { id: goblinId, roll: 5, is_enemy: true },
+      ],
+      initiative_idx: 1,
+      entities: [
+        {
+          id: wizId,
+          isEnemy: false,
+          pos: { x: 4, y: 5 },
+          hp: 30,
+          maxHp: 30,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: goblinId,
+          isEnemy: true,
+          pos: { x: 5, y: 5 },
+          hp: 10,
+          maxHp: 10,
+          conditions: [],
+          condition_durations: {},
+        },
+      ],
+      pending_reaction: {
+        kind: 'counterspell',
+        attackerEnemyId: goblinId,
+        targetCharId: wizId,
+        intendedTargetPcId: wizId,
+        enemySpellId: 'fire_bolt',
+        enemySpellLevel: 5, // forces ability check
+        enemySpellName: 'Fire Bolt (5th)',
+        resumeFromInitiativeIdx: 0,
+        resumeFromMultiattackIdx: 0,
+        narrativeSoFar: "[Goblin's turn]",
+        eligibleCharIds: [wizId],
+      },
+      movement_used: {},
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      flags: {},
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+    };
+    const result = await takeAction({
+      action: { type: 'resolve_reaction', accept: true },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    // Either INT check or AUTO-counter — but spell level 5 > slot level 3
+    // means ability check fires. With d20=20 + INT mod (+4) + prof (+3) = 27 vs DC 15, success.
+    expect(result.narrative).toMatch(/INT check|ability check/i);
+    expect(result.narrative).toMatch(/success/);
+  });
+
   // ── Sneak Attack (Rogue in sandbox) ─────────────────────────────────────────
 
   it('Rogue sneak attack adds bonus damage on hit', async () => {
