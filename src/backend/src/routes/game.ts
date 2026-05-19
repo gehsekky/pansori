@@ -29,6 +29,7 @@ import {
   normalizeState,
   takeAction,
 } from '../services/gameEngine.js';
+import { SRD_WEAPON_MASTERY_SLOTS } from '../contexts/srd/index.js';
 import { generateSeed } from '../services/procgen.js';
 import { loadContexts } from '../services/contextLoader.js';
 import { pool } from '../db/pool.js';
@@ -41,17 +42,20 @@ const DEFAULT_CONTEXT = Object.values(CONTEXTS)[0] ?? ({ id: 'none' } as Context
 
 // 2024 PHB — initial weapon masteries by class. Each listed class starts
 // with these weapons mastered; non-listed classes don't get the feature.
-// Choices follow common 2024 PHB starting-class examples (Fighter has the
-// broadest list, Rogue gets 2 light/finesse picks, etc.).
+// Picks follow common 2024 PHB starting-class examples; the count is
+// clamped to SRD_WEAPON_MASTERY_SLOTS (Fighter 3 / Barb-Pal-Rang 2 / Rog 1)
+// so we never give a class more masteries than RAW allows.
 function defaultWeaponMasteriesFor(charClass: string): string[] {
   const map: Record<string, string[]> = {
     Fighter: ['longsword', 'shortbow', 'greataxe'],
     Paladin: ['longsword', 'warhammer'],
     Ranger: ['longbow', 'shortsword'],
     Barbarian: ['greataxe', 'handaxe'],
-    Rogue: ['shortsword', 'dagger'],
+    Rogue: ['shortsword'],
   };
-  return map[charClass] ?? [];
+  const picks = map[charClass] ?? [];
+  const cap = SRD_WEAPON_MASTERY_SLOTS[charClass] ?? 0;
+  return picks.slice(0, cap);
 }
 
 export const gameRouter = Router();

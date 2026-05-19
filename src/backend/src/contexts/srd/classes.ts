@@ -108,6 +108,21 @@ export const SRD_SPELLCASTING_ABILITY: Record<string, AbilityKey> = {
   Ranger: 'wis',
 };
 
+// ─── Weapon Mastery slots (2024 PHB) ─────────────────────────────────────────
+// Number of weapons a class can "train" with at L1, gaining access to that
+// weapon's Mastery property (e.g. Topple on a maul). Classes not listed here
+// don't get the Weapon Mastery feature. Slot counts scale at higher levels
+// in 2024 RAW (Fighter +1 at L4/L10/L16, etc.); we apply the L1 baseline and
+// extend later when leveling lands. PHB p.45 (Barb), 51 (Fight), 81 (Pal),
+// 89 (Rang), 97 (Rog).
+export const SRD_WEAPON_MASTERY_SLOTS: Record<string, number> = {
+  Barbarian: 2,
+  Fighter: 3,
+  Paladin: 2,
+  Ranger: 2,
+  Rogue: 1,
+};
+
 // ─── Class Features ──────────────────────────────────────────────────────────
 // Feature ids that the gameEngine recognizes. These drive the choice
 // generation + handler dispatch in gameEngine.ts. A class missing 'rage'

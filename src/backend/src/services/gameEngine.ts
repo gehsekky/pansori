@@ -3033,8 +3033,15 @@ export async function takeAction({
         const form = BEAST_FORMS[char.wild_shape_form];
         if (form) weaponDamage = form.attackDamage;
       }
-      // Versatile: use two-handed damage when no shield is equipped
-      const isVersatile = !!(weaponItem?.versatileDamage && !char.equipped_shield);
+      // Versatile: use two-handed damage when no shield is equipped.
+      // 2024 PHB Flex mastery (longsword, battleaxe, warhammer) lets a
+      // trained wielder use the versatile die EVEN with a shield equipped.
+      const hasFlexMastery =
+        weaponItem?.mastery === 'flex' && (char.weapon_masteries ?? []).includes(weaponItem.id);
+      const isVersatile = !!(
+        weaponItem?.versatileDamage &&
+        (!char.equipped_shield || hasFlexMastery)
+      );
       if (isVersatile) {
         weaponDamage = weaponItem!.versatileDamage!;
       }
@@ -3484,6 +3491,25 @@ export async function takeAction({
             targetAc: target.ac,
             round: st.round ?? 1,
           });
+          // 2024 PHB Graze weapon mastery (greatsword, glaive) — even on a
+          // miss, deal STR mod damage (DEX for Finesse weapons). Floor at 0.
+          if (
+            weaponItem?.mastery === 'graze' &&
+            (char.weapon_masteries ?? []).includes(weaponItem.id)
+          ) {
+            const grazeMod = weaponItem.finesse ? abilityMod(char.dex) : abilityMod(char.str);
+            const grazeDmg = Math.max(0, grazeMod);
+            if (grazeDmg > 0) {
+              const grazedHp = Math.max(0, target.hp - grazeDmg);
+              st = {
+                ...st,
+                entities: (st.entities ?? []).map((e) =>
+                  e.id === targetId && e.isEnemy ? { ...e, hp: grazedHp } : e
+                ),
+              };
+              narrative += `[Graze: ${target.name} still takes ${grazeDmg} damage from the swing.] `;
+            }
+          }
           return false;
         }
 
@@ -3751,6 +3777,39 @@ export async function takeAction({
               ),
             };
             narrative += ` [Slow: ${target.name}'s speed -10 ft]`;
+          } else if (mastery === 'cleave') {
+            // 2024 PHB Cleave (greataxe, halberd) — on a hit, a second enemy
+            // within 5 ft of the target takes the weapon's damage die (no
+            // ability mod). Requires the grid to identify a neighbour.
+            const targetEnt = st.entities?.find((e) => e.id === targetId && e.isEnemy);
+            if (targetEnt && weaponItem.damage) {
+              const cleaveTarget = (st.entities ?? []).find(
+                (e) =>
+                  e.isEnemy &&
+                  e.hp > 0 &&
+                  e.id !== targetId &&
+                  Math.max(
+                    Math.abs(e.pos.x - targetEnt.pos.x),
+                    Math.abs(e.pos.y - targetEnt.pos.y)
+                  ) <= 1
+              );
+              if (cleaveTarget) {
+                const cleaveDmg = rollDice(weaponItem.damage);
+                const cleaveNewHp = Math.max(0, cleaveTarget.hp - cleaveDmg);
+                st = {
+                  ...st,
+                  entities: (st.entities ?? []).map((e) =>
+                    e.id === cleaveTarget.id ? { ...e, hp: cleaveNewHp } : e
+                  ),
+                };
+                const cleaveName = getEnemyById(seed, cleaveTarget.id)?.name ?? cleaveTarget.id;
+                narrative += ` [Cleave: ${cleaveName} also takes ${cleaveDmg} damage!${cleaveNewHp <= 0 ? ' (killed)' : ''}]`;
+                if (cleaveNewHp <= 0) {
+                  const cleaveXp = getEnemyById(seed, cleaveTarget.id)?.xp ?? 0;
+                  char.xp = (char.xp || 0) + cleaveXp;
+                }
+              }
+            }
           }
         }
 
@@ -6256,10 +6315,6 @@ export async function takeAction({
         narrative = 'No enemy to attack.';
         break;
       }
-      if (char.turn_actions.bonus_action_used) {
-        narrative = 'Bonus action already used this turn.';
-        break;
-      }
       // Find the off-hand light weapon in inventory
       const mainWpnInstanceId = char.equipped_weapon;
       const offhandInvItem = char.inventory
@@ -6273,6 +6328,18 @@ export async function takeAction({
         break;
       }
       const offhandLoot = context.lootTable.find((l) => l.id === offhandInvItem.id)!;
+      // 2024 PHB Nick mastery (dagger, light hammer, sickle, scimitar) — when
+      // the off-hand weapon has Nick + the wielder is trained in it, the
+      // two-weapon extra attack is part of the Attack action instead of a
+      // bonus action. Frees the bonus action for Cunning Action / Rage / etc.
+      const nickFree =
+        offhandLoot.mastery === 'nick' &&
+        (char.weapon_masteries ?? []).includes(offhandLoot.id) &&
+        char.turn_actions.action_used;
+      if (!nickFree && char.turn_actions.bonus_action_used) {
+        narrative = 'Bonus action already used this turn.';
+        break;
+      }
       const offhandProficient = hasWeaponProficiency(
         char.weapon_proficiencies ?? [],
         offhandLoot.weaponType
@@ -6308,7 +6375,10 @@ export async function takeAction({
         offhandProficient,
         offhandLoot.range === 'ranged'
       );
-      char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
+      // Nick: don't consume the bonus action; it stays available this turn.
+      if (!nickFree) {
+        char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
+      }
       usedInitiative = true;
       if (atk.fumble) {
         narrative = `Off-hand fumble! The ${offhandLoot.name} slips from your grip. (d20: 1)`;
