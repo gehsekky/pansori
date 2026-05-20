@@ -47,7 +47,7 @@ function CombatActionBar({ choices, onChoose, disabled }: Props) {
   return (
     <div
       data-testid="combat-action-bar"
-      className={styles.actionBar}
+      className={styles.combatActionBar}
       role="group"
       aria-label="Combat actions"
     >
@@ -58,7 +58,7 @@ function CombatActionBar({ choices, onChoose, disabled }: Props) {
           <button
             key={def.kind}
             type="button"
-            className={`${styles.actionBtn} ${enabled ? '' : styles.actionBtnDisabled}`}
+            className={`${styles.combatActionBtn} ${enabled ? '' : styles.combatActionBtnDisabled}`}
             disabled={!enabled}
             aria-label={choice?.label ?? `${def.shortLabel} — not available`}
             title={choice?.label ?? `${def.shortLabel} — not available`}
