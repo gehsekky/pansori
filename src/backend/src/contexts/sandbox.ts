@@ -418,6 +418,7 @@ export const context: Context = {
       weaponType: 'martial',
       damageType: 'slashing',
       mastery: 'graze',
+      heavy: true,
     },
     {
       id: 'battleaxe',
@@ -453,6 +454,7 @@ export const context: Context = {
       weaponType: 'martial',
       damageType: 'slashing',
       mastery: 'cleave',
+      heavy: true,
     },
     {
       id: 'longbow',
@@ -470,6 +472,7 @@ export const context: Context = {
       weaponType: 'martial',
       damageType: 'piercing',
       mastery: 'slow',
+      heavy: true,
     },
 
     // Magic weapon (requires attunement)

@@ -3498,6 +3498,10 @@ export async function takeAction({
       const conditionDisadv = char.conditions.some((c) => DISADV_CONDITIONS.has(c));
       const exhaustionDisadv = (char.exhaustion_level ?? 0) >= 3; // exhaustion 3+: disadv on attack rolls
       const heavyEncumberedDisadv = isHeavilyEncumbered(char); // 2024 PHB variant encumbrance
+      // SRD 5.2.1 p.90 — Small species (Halfling, Gnome) have disadvantage
+      // when attacking with a Heavy weapon.
+      const smallSpecies = char.species ? SRD_SPECIES[char.species]?.size === 'small' : false;
+      const heavyWeaponSmallDisadv = !!(weaponItem?.heavy && smallSpecies);
       const conditionAdv = char.conditions.some((c) => PLAYER_ADV_CONDITIONS.has(c));
       const enemyEntity2 = st.entities?.find((e) => e.id === targetId && e.isEnemy);
       const enemyGrappled = enemyEntity2?.conditions.includes('grappled') ?? false;
@@ -3640,6 +3644,7 @@ export async function takeAction({
         conditionDisadv ||
         exhaustionDisadv ||
         heavyEncumberedDisadv ||
+        heavyWeaponSmallDisadv ||
         !armorProficient ||
         proneDisadv ||
         thrownLongRangeDisadv;
@@ -3670,6 +3675,7 @@ export async function takeAction({
         conditionDisadv ? char.conditions.filter((c) => DISADV_CONDITIONS.has(c)).join(', ') : '',
         exhaustionDisadv ? 'exhaustion' : '',
         heavyEncumberedDisadv ? 'heavily encumbered' : '',
+        heavyWeaponSmallDisadv ? 'heavy weapon — Small creature' : '',
         !armorProficient ? `not proficient with ${equippedArmorLootItem?.name ?? 'armor'}` : '',
         proneDisadv ? 'prone (ranged)' : '',
         thrownLongRangeDisadv ? 'thrown beyond normal range' : '',

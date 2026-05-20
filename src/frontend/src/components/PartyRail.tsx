@@ -174,6 +174,14 @@ function PartyTile({
 
       {showDetail && (
         <div className={styles.partyTileDetail}>
+          {char.species && (
+            <>
+              <span className={styles.partyTileDetailKey}>SPECIES</span>
+              <span className={styles.partyTileDetailVal} style={{ textTransform: 'capitalize' }}>
+                {char.species}
+              </span>
+            </>
+          )}
           <span className={styles.partyTileDetailKey}>HIT DICE</span>
           <span className={styles.partyTileDetailVal}>
             {char.hit_dice_remaining ?? 0}/{char.level} (d{char.hit_die ?? 8})
