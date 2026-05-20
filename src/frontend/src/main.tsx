@@ -1,4 +1,5 @@
 import './index.css';
+import 'rpg-awesome/css/rpg-awesome.min.css';
 import App from './App.js';
 import ErrorBoundary from './components/ErrorBoundary.tsx';
 import React from 'react';

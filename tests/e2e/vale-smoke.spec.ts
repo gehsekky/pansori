@@ -71,6 +71,38 @@ test('Vale of Shadows: login → character creation → begin mission', async ({
   // text change doesn't break the smoke test — the structure check above is
   // the load-bearing assertion.
   await expect(narrative).not.toBeEmpty();
+
+  // 8. Party composition — auto-fill seeded a 3-PC Fighter/Cleric/Rogue
+  //    party (Vale's `recommendedComposition`). Verify the engine round-
+  //    tripped all three through to the rail.
+  const partyTiles = page.getByTestId('party-tile');
+  await expect(partyTiles).toHaveCount(3);
+  const partyText = (await partyTiles.allTextContents()).join(' ');
+  expect(partyText).toContain('[Fighter]');
+  expect(partyText).toContain('[Cleric]');
+  expect(partyText).toContain('[Rogue]');
+
+  // 9. Initiative is not active in town — the strip only renders during
+  //    combat, and Vale starts in millhaven_square with no enemies.
+  await expect(page.getByTestId('initiative-strip')).toHaveCount(0);
+
+  // 10. Exactly one tile is marked active (aria-current="true"). Out-of-
+  //     combat the engine seeds the active char from state, but only one
+  //     PC ever holds the turn.
+  const activeTiles = page.locator('[data-testid="party-tile"][aria-current="true"]');
+  await expect(activeTiles).toHaveCount(1);
+  const firstActiveText = (await activeTiles.first().textContent()) ?? '';
+
+  // 11. Out-of-combat round-robin: any action advances the active PC to
+  //     the next living party member. Pick the first available choice
+  //     (typically `examine`) and confirm the active marker moved.
+  const firstChoice = page.getByTestId('choice-btn').first();
+  await expect(firstChoice).toBeVisible();
+  await firstChoice.click();
+  // Wait for the engine response + state-driven re-render before reading.
+  await page.waitForTimeout(400);
+  const newActiveText = (await activeTiles.first().textContent()) ?? '';
+  expect(newActiveText).not.toBe(firstActiveText);
 });
 
 // ── Combat coverage ─────────────────────────────────────────────────────────
@@ -124,6 +156,18 @@ async function driveCombatLoop(page: Page, maxIterations = 80): Promise<CombatLo
     if (/you escape|escape the/i.test(text)) return result;
 
     await page.waitForTimeout(150);
+
+    // Attack is now in the CombatActionBar (icon row) — check there
+    // first since it's the highest-priority pick. Enabled state means
+    // the engine surfaced an attack against the currently-selected
+    // enemy.
+    const combatAttack = page.getByTestId('combat-attack');
+    if ((await combatAttack.count()) > 0 && (await combatAttack.isEnabled())) {
+      result.sawAttackChoice = true;
+      await combatAttack.click();
+      continue;
+    }
+
     const buttons = page.getByTestId('choice-btn');
     const count = await buttons.count();
     if (count === 0) {
@@ -138,14 +182,10 @@ async function driveCombatLoop(page: Page, maxIterations = 80): Promise<CombatLo
       Array.from({ length: count }, (_, j) => buttons.nth(j).textContent())
     );
     const idxByType = (t: string) => types.findIndex((x) => x === t);
-    const attackIdx = idxByType('attack');
     const gridMoveIdx = idxByType('grid_move');
 
-    if (attackIdx >= 0) result.sawAttackChoice = true;
-
     let pick = -1;
-    if (attackIdx >= 0) pick = attackIdx;
-    else if (gridMoveIdx >= 0) pick = gridMoveIdx;
+    if (gridMoveIdx >= 0) pick = gridMoveIdx;
     else {
       // Among Move actions, prefer one we haven't clicked recently.
       const moveCandidates = types.map((t, j) => (t === 'move' ? j : -1)).filter((j) => j >= 0);
@@ -281,4 +321,211 @@ test('sandbox combat: enter a fight and resolve an attack', async ({ page, reque
         `(sawCombatNarrative=${result.sawCombatNarrative})`
     );
   }
+});
+
+// ── Multi-PC initiative + class-button separation ───────────────────────────
+//
+// Verifies the engine's class-aware choice generation under multi-PC play:
+//
+//   - Combat starts when a PC attacks an in-room enemy.
+//   - InitiativeStrip becomes visible with at least 4 entries (3 PCs + 1+ enemies).
+//   - For each PC's turn observed, the choice list contains `cast_spell`
+//     options if and only if the active PC is the Cleric. Fighter and
+//     Rogue at level 1 have no spells known and must not see cast_spell
+//     buttons; the Cleric does (Sacred Flame cantrip is always available
+//     when an enemy is in range).
+//
+// Navigation path: millhaven_square → The Old Road (a Bandit Ruffian
+// patrols here, the first hostile the party encounters). The engine
+// suppresses Move choices while an enemy is alive in the room, so the
+// only forward step from road_north is Attack — which trips combat
+// initialization.
+
+const CLASS_NAMES = ['Fighter', 'Cleric', 'Rogue'] as const;
+type PartyClass = (typeof CLASS_NAMES)[number];
+
+async function activeClass(page: Page): Promise<PartyClass | null> {
+  const active = page.locator('[data-testid="party-tile"][aria-current="true"]');
+  if ((await active.count()) === 0) return null;
+  const txt = (await active.first().textContent()) ?? '';
+  return CLASS_NAMES.find((c) => txt.includes(`[${c}]`)) ?? null;
+}
+
+// Strip the ▶ glyph and the trailing "(roll)" from an initiative entry's
+// text content so the bare creature name is left ("Fighter", "Bandit
+// Ruffian"). The ▶ is aria-hidden but still part of textContent.
+function cleanInitiativeEntry(txt: string): string {
+  return txt
+    .replace(/^▶\s*/, '')
+    .replace(/\s*\(\d+\)\s*$/, '')
+    .trim();
+}
+
+async function activeInitiativeName(page: Page): Promise<string | null> {
+  const active = page.locator('[data-testid="initiative-strip"] li[aria-current="true"]');
+  if ((await active.count()) === 0) return null;
+  const txt = (await active.first().textContent()) ?? '';
+  return cleanInitiativeEntry(txt) || null;
+}
+
+async function choiceActionTypes(page: Page): Promise<string[]> {
+  const btns = page.getByTestId('choice-btn');
+  const n = await btns.count();
+  const types: string[] = [];
+  for (let i = 0; i < n; i++) {
+    const t = await btns.nth(i).getAttribute('data-action-type');
+    if (t) types.push(t);
+  }
+  return types;
+}
+
+async function clickMoveTo(page: Page, roomName: string): Promise<void> {
+  // Move-to-room buttons are labeled "Move to <Room Name>". Use a partial
+  // text match to tolerate trailing whitespace / future label tweaks.
+  const btn = page.getByTestId('choice-btn').filter({ hasText: `Move to ${roomName}` });
+  await expect(btn).toBeVisible({ timeout: 5_000 });
+  await btn.first().click();
+  await page.waitForTimeout(300);
+}
+
+test('Vale combat: initiative live + class-specific choices respect class', async ({
+  page,
+  request,
+}) => {
+  // 1. Fresh test user + Vale auto-fill (Fighter/Cleric/Rogue).
+  const email = `e2e-vale-combat-${Date.now()}@pansori.local`;
+  const loginRes = await request.post(`${BACKEND_URL}/api/auth/test-login`, {
+    data: { email, displayName: 'E2E Vale Combat User' },
+  });
+  expect(loginRes.ok()).toBe(true);
+  const cookies = await request.storageState();
+  await page.context().addCookies(cookies.cookies);
+  await page.goto('/');
+  await expect(page.getByText(/NO MISSIONS ON RECORD/i)).toBeVisible({ timeout: 10_000 });
+  await page.getByTestId('new-mission-btn').click();
+  await page.getByTestId('world-picker-vale_of_shadows').click();
+  await page.getByTestId('auto-fill-party-btn').click();
+  await expect(page.getByTestId('begin-mission-btn')).toBeEnabled();
+  await page.getByTestId('begin-mission-btn').click();
+  await expect(page.getByTestId('game-narrative-panel')).toBeVisible({ timeout: 15_000 });
+
+  // 2. Navigate town → road_north. One move places the party in a
+  //    Bandit-Ruffian-occupied tile; the engine suppresses Move choices
+  //    while an enemy is alive, so Attack is the only forward path.
+  await clickMoveTo(page, 'The Old Road');
+
+  // 3. Trigger combat by attacking the first available enemy. The
+  //    Attack verb is iconized in the CombatActionBar — one button per
+  //    combat verb, with the target controlled by the EnemySelector.
+  const attackBtn = page.getByTestId('combat-attack');
+  await expect(attackBtn).toBeVisible({ timeout: 5_000 });
+  await expect(attackBtn).toBeEnabled();
+  await attackBtn.click();
+  await page.waitForTimeout(400);
+
+  // 4. The first attack ignites combat. InitiativeStrip appears with one
+  //    entry per PC (3) plus the bandits (2) = 5 total. Verify the full
+  //    roster: each PC class shows up exactly once and every bandit
+  //    enemy in the room is represented. A bug that left a PC out of
+  //    the order, doubled an entry, or rolled initiative for the wrong
+  //    creature would surface here rather than slipping past a count
+  //    check.
+  const initStrip = page.getByTestId('initiative-strip');
+  await expect(initStrip).toBeVisible({ timeout: 5_000 });
+  const initialEntries = (await initStrip.locator('li').allTextContents()).map(
+    cleanInitiativeEntry
+  );
+  for (const cls of CLASS_NAMES) {
+    expect(
+      initialEntries.filter((t) => t === cls),
+      `expected exactly one initiative entry named ${cls}, got ${JSON.stringify(initialEntries)}`
+    ).toHaveLength(1);
+  }
+  // road_north hosts 2 Bandit Ruffians; both should be in the order.
+  expect(
+    initialEntries.filter((t) => t === 'Bandit Ruffian'),
+    `expected 2 Bandit Ruffian entries, got ${JSON.stringify(initialEntries)}`
+  ).toHaveLength(2);
+  expect(initialEntries).toHaveLength(5);
+
+  // 5. Per-PC class invariant: cast_spell appears iff active class is
+  //    Cleric. Iterate observed PC turns; tolerate combat ending early.
+  let observed: PartyClass[] = [];
+  for (let turn = 0; turn < 8; turn++) {
+    // Combat may have ended (skeleton fell). If so, exit the loop.
+    if ((await initStrip.count()) === 0) break;
+
+    const cls = await activeClass(page);
+    if (!cls) {
+      // Active marker not on any party tile (e.g. mid-transition); pause
+      // briefly and retry next iteration.
+      await page.waitForTimeout(200);
+      continue;
+    }
+
+    // Strip ↔ PartyRail sync: the ▶-marked entry in the initiative strip
+    // must name the same character as the PartyRail's active tile. A
+    // drift here would mean the engine and the renderer disagree about
+    // whose turn it is.
+    const stripActive = await activeInitiativeName(page);
+    expect(
+      stripActive,
+      `turn=${turn}: initiative strip has no aria-current entry while PartyRail shows ${cls}`
+    ).not.toBeNull();
+    // Auto-fill sets `char.name === char.character_class`, so the strip
+    // entry name and the PartyRail class label coincide for our party.
+    expect(
+      stripActive,
+      `turn=${turn}: initiative ▶ marker is on "${stripActive}" but PartyRail aria-current is on ${cls}`
+    ).toBe(cls);
+
+    const types = await choiceActionTypes(page);
+    const hasCast = types.includes('cast_spell');
+    // Cast_spell is gated on action availability: a Cleric who already
+    // consumed their action this turn (e.g. they're the PC who
+    // initiated combat by attacking) won't see spell options until
+    // their next turn. The engine signals "action already used" by
+    // surfacing an `end_turn` choice (added only after action_used=true).
+    // Skip the cast-presence assertion in that case; the inverse
+    // assertion (Fighter/Rogue NEVER see cast_spell) still holds.
+    const actionAlreadyUsed = types.includes('end_turn');
+    if (cls !== 'Cleric') {
+      expect(
+        hasCast,
+        `class=${cls} turn=${turn}: cast_spell present=${hasCast}, ` +
+          `but only Cleric should see cast_spell. action types=${types.join(',')}`
+      ).toBe(false);
+    } else if (!actionAlreadyUsed) {
+      expect(
+        hasCast,
+        `class=Cleric turn=${turn}: action is fresh but no cast_spell offered. ` +
+          `action types=${types.join(',')}`
+      ).toBe(true);
+    }
+    observed.push(cls);
+
+    // Take a turn-ending action that doesn't damage the enemy (so combat
+    // stays alive long enough to observe more PCs). Prefer Dodge (icon
+    // bar), fall back to Disengage, then end_turn, then choice[0].
+    const dodgeBtn = page.getByTestId('action-dodge');
+    const disengageBtn = page.getByTestId('action-disengage');
+    if ((await dodgeBtn.count()) > 0 && (await dodgeBtn.isEnabled())) {
+      await dodgeBtn.click();
+    } else if ((await disengageBtn.count()) > 0 && (await disengageBtn.isEnabled())) {
+      await disengageBtn.click();
+    } else {
+      const endTurn = page
+        .getByTestId('choice-btn')
+        .and(page.locator('[data-action-type="end_turn"]'));
+      if ((await endTurn.count()) > 0) {
+        await endTurn.first().click();
+      } else {
+        await page.getByTestId('choice-btn').first().click();
+      }
+    }
+    await page.waitForTimeout(400);
+  }
+
+  // 6. Sanity floor: we should have observed at least one PC's turn.
+  expect(observed.length, 'expected at least one PC turn observed in combat').toBeGreaterThan(0);
 });

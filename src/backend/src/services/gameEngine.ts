@@ -38,6 +38,7 @@ import type {
   AbilityKey,
   BossPhase,
   Character,
+  ChoiceDirection,
   CombatEntity,
   CombatEvent,
   Context,
@@ -74,6 +75,7 @@ import {
   opportunityAttackTriggers,
   posEqual,
 } from './gridEngine.js';
+import { fmt, stripNarrativeTokens } from './narrativeFmt.js';
 import { COMBAT_LOG_MAX } from '../types.js';
 import { Engine } from 'json-rules-engine';
 import { factionShopPrice } from './campaignEngine.js';
@@ -352,7 +354,7 @@ function buildCombatHitNarrative(
   const reaction = reactionPool ? ` — ${pick(reactionPool)}` : '';
   const critNote = critical ? 'Critical hit! ' : '';
   const weaponLabel = weaponItem ? `your ${weaponItem.name}` : 'your fists';
-  return `${opening} ${critNote}${weaponLabel} ${verb}${style}${reaction}! ${damage} damage.`;
+  return `${opening} ${critNote}${weaponLabel} ${verb}${style}${reaction}! ${fmt.dmg(damage)} damage.`;
 }
 
 // 0 = uncapped. Every cap site is gated with `MAX_CHOICES && …` so a falsy
@@ -554,8 +556,8 @@ function applyEnemyAttackNarrative(
     let narrative = pick(context.narratives.enemyAttacks)
       .replace('{enemy}', enemy.name)
       .replace('{target}', char.name)
-      .replace('{dmg}', String(hpLost));
-    narrative += ` ${char.name} takes ${hpLost} damage.`;
+      .replace('{dmg}', fmt.dmg(hpLost));
+    narrative += ` ${char.name} takes ${fmt.dmg(hpLost)} damage.`;
     narrative += rageNote + petrNote + beastNote + speciesNote + wardNote + tempHpNote;
     let updatedChar = { ...char };
 
@@ -663,38 +665,39 @@ function processDeathSave(
       newChar.death_saves = { successes: 0, failures: 0 };
       newChar.stable = false;
       newChar.conditions = [];
-      narrative = `Death Save — Natural 20! You surge back to 1 HP, gasping but alive.`;
+      narrative = `Death Save — Natural ${fmt.roll(20)}! You surge back to ${fmt.hp(1)} HP, gasping but alive.`;
       return { narrative, newChar, died: false, endedCombat };
 
     case 'stable':
       newChar.stable = true;
-      narrative = `Death Save — ${save.roll} (${save.saves.successes}/3 successes). You stabilise. Unconscious but no longer dying. You need healing to act again.`;
+      narrative = `Death Save — ${fmt.roll(save.roll)} (${save.saves.successes}/3 successes). You stabilise. Unconscious but no longer dying. You need healing to act again.`;
       break;
 
     case 'success': {
       const pool = context.narratives.deathSaveStatus?.[save.saves.failures];
       const flavor = pool ? pick(pool) : 'Clinging to life...';
-      narrative = `Death Save — ${save.roll} (${save.saves.successes}/3 successes, ${save.saves.failures}/3 failures). ${flavor}`;
+      narrative = `Death Save — ${fmt.roll(save.roll)} (${save.saves.successes}/3 successes, ${save.saves.failures}/3 failures). ${flavor}`;
       break;
     }
 
     case 'double_failure': {
       const pool = context.narratives.deathSaveStatus?.[save.saves.failures];
       const flavor = pool ? pick(pool) : 'The darkness presses in...';
-      narrative = `Death Save — Natural 1! Two failures (${save.saves.failures}/3). ${flavor}`;
+      narrative = `Death Save — Natural ${fmt.roll(1)}! Two failures (${save.saves.failures}/3). ${flavor}`;
       break;
     }
 
     case 'failure': {
       const pool = context.narratives.deathSaveStatus?.[save.saves.failures];
       const flavor = pool ? pick(pool) : 'Fading...';
-      narrative = `Death Save — ${save.roll} (${save.saves.successes}/3 successes, ${save.saves.failures}/3 failures). ${flavor}`;
+      narrative = `Death Save — ${fmt.roll(save.roll)} (${save.saves.successes}/3 successes, ${save.saves.failures}/3 failures). ${flavor}`;
       break;
     }
 
     case 'dead':
       newChar.dead = true;
       narrative = pick(context.narratives.deathLines)
+        .replace(/{name}/g, char.name)
         .replace('{enemy}', enemy?.name ?? 'your wounds')
         .replace(/{world}/g, worldName);
       return { narrative, newChar, died: true, endedCombat: false };
@@ -713,6 +716,7 @@ function processDeathSave(
       narrative +=
         ' ' +
         pick(context.narratives.deathLines)
+          .replace(/{name}/g, char.name)
           .replace('{enemy}', enemy.name)
           .replace(/{world}/g, worldName);
       return { narrative, newChar, died: true, endedCombat: false };
@@ -939,6 +943,40 @@ function endCombatState(st: GameState): GameState {
         Object.entries(c.condition_durations ?? {}).filter(([k]) => k !== 'raging')
       ),
     })),
+  };
+}
+
+// Encounter XP distribution — 2024 PHB / SRD 5.2.1 (Gaining XP, p.260):
+// the XP from a defeated creature is divided equally among all party
+// members who participated. Pansori's participation model is "alive when
+// the kill resolved" — a downed/unconscious PC (hp = 0, dead = false)
+// still gets their share; only truly-dead PCs (`dead === true`) are
+// excluded. Truncation via floor matches RAW (no fractional XP).
+//
+// Returns the share each PC received and an updated state with the share
+// applied to every eligible character EXCEPT the killer. Callers keep
+// their local mutable `char` reference and add the returned `share` to
+// `char.xp` themselves — that preserves the downstream-read patterns the
+// kill blocks use (level-up check, narrative composition, etc.) without
+// requiring a refresh-from-state round trip.
+function splitEncounterXp(
+  st: GameState,
+  killerId: string,
+  totalXp: number
+): { st: GameState; share: number } {
+  if (totalXp <= 0) return { st, share: 0 };
+  const eligibleCount = st.characters.filter((c) => !c.dead).length;
+  if (eligibleCount === 0) return { st, share: 0 };
+  const share = Math.floor(totalXp / eligibleCount);
+  if (share <= 0) return { st, share: 0 };
+  return {
+    st: {
+      ...st,
+      characters: st.characters.map((c) =>
+        !c.dead && c.id !== killerId ? { ...c, xp: (c.xp || 0) + share } : c
+      ),
+    },
+    share,
   };
 }
 
@@ -1314,6 +1352,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       choices.push({
         label: `Attack the ${livingEnemies[0].name}`,
         action: { type: 'attack', targetEnemyId: livingEnemies[0].id },
+        kind: 'attack',
       });
     } else {
       // Disambiguate when there are multiple enemies of (possibly) the same name
@@ -1331,6 +1370,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         choices.push({
           label: `Attack ${en.name}${suffix}${hpNote}`,
           action: { type: 'attack', targetEnemyId: en.id },
+          kind: 'attack',
         });
       }
     }
@@ -1493,6 +1533,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     choices.push({
       label: `Dash — double movement this turn (${effectiveSpeed(char)} extra ft)`,
       action: { type: 'dash' },
+      kind: 'dash',
     });
     // Help — RAW (PHB p.192): to grant advantage on an ally's attack, an enemy
     // must be within 5 ft of the helper. Without grid entities this gate can't
@@ -1521,6 +1562,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
           trigger: 'enemy attacks',
           action: { type: 'attack', targetEnemyId: livingEnemies[0].id },
         },
+        kind: 'ready',
       });
     }
   }
@@ -1608,6 +1650,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         choices.push({
           label: `Rage — bonus action (${rageUses} use${rageUses === 1 ? '' : 's'} left)`,
           action: { type: 'use_class_feature', featureId: 'rage' },
+          kind: 'class_feature',
           requiresBonusAction: true,
         });
       }
@@ -1625,6 +1668,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       choices.push({
         label: `Frenzy — bonus melee attack (Berserker)`,
         action: { type: 'use_class_feature', featureId: 'frenzy_attack' },
+        kind: 'class_feature',
         requiresBonusAction: true,
       });
     }
@@ -1643,6 +1687,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         choices.push({
           label: `Tactical Master — swap next attack's mastery to ${m.toUpperCase()}`,
           action: { type: 'use_class_feature', featureId: `tactical_master_${m}` },
+          kind: 'class_feature',
         });
       }
     }
@@ -1660,6 +1705,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       choices.push({
         label: `Breath Weapon — 15-ft cone, ${breathDice}d10 fire, DEX save (1/short rest)`,
         action: { type: 'use_class_feature', featureId: 'breath_weapon' },
+        kind: 'class_feature',
       });
     }
 
@@ -1676,6 +1722,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       choices.push({
         label: 'Large Form — become Large for 10 rounds: +10 ft speed, adv on STR (1/short rest)',
         action: { type: 'use_class_feature', featureId: 'large_form' },
+        kind: 'class_feature',
         requiresBonusAction: true,
       });
     }
@@ -1693,6 +1740,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       choices.push({
         label: `Adrenaline Rush — bonus action Dash + ${tempHpGrant} temp HP (1/short rest)`,
         action: { type: 'use_class_feature', featureId: 'adrenaline_rush' },
+        kind: 'class_feature',
         requiresBonusAction: true,
       });
     }
@@ -1707,6 +1755,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         choices.push({
           label: `Second Wind — bonus action: heal 1d10+${char.level} HP (${secondWindLeft}/${secondWindMax} left)`,
           action: { type: 'use_class_feature', featureId: 'second_wind' },
+          kind: 'class_feature',
           requiresBonusAction: true,
         });
       }
@@ -1717,16 +1766,19 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       choices.push({
         label: 'Cunning Action: Dash — extra movement as bonus action',
         action: { type: 'use_class_feature', featureId: 'cunning_action_dash' },
+        kind: 'class_feature',
         requiresBonusAction: true,
       });
       choices.push({
         label: 'Cunning Action: Disengage — no OA this turn as bonus action',
         action: { type: 'use_class_feature', featureId: 'cunning_action_disengage' },
+        kind: 'class_feature',
         requiresBonusAction: true,
       });
       choices.push({
         label: 'Cunning Action: Hide — stealth check as bonus action',
         action: { type: 'use_class_feature', featureId: 'cunning_action_hide' },
+        kind: 'class_feature',
         requiresBonusAction: true,
       });
     }
@@ -1745,18 +1797,22 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       choices.push({
         label: 'Cunning Strike: Trip — DEX save or prone on Sneak Attack (costs 1 SA die)',
         action: { type: 'use_class_feature', featureId: 'cunning_strike_trip' },
+        kind: 'class_feature',
       });
       choices.push({
         label: 'Cunning Strike: Poison — CON save or poisoned on Sneak Attack (costs 1 SA die)',
         action: { type: 'use_class_feature', featureId: 'cunning_strike_poison' },
+        kind: 'class_feature',
       });
       choices.push({
         label: 'Cunning Strike: Withdraw — move half speed without OAs on hit (costs 1 SA die)',
         action: { type: 'use_class_feature', featureId: 'cunning_strike_withdraw' },
+        kind: 'class_feature',
       });
       choices.push({
         label: 'Cunning Strike: Disarm — drop target damage by ~2 on Sneak Attack (costs 1 SA die)',
         action: { type: 'use_class_feature', featureId: 'cunning_strike_disarm' },
+        kind: 'class_feature',
       });
     }
 
@@ -1771,6 +1827,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         choices.push({
           label: `Bardic Inspiration — give ally a ${inspDie} die (${biUses} left)`,
           action: { type: 'use_class_feature', featureId: 'bardic_inspiration' },
+          kind: 'class_feature',
           requiresBonusAction: true,
         });
       }
@@ -1787,6 +1844,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     choices.push({
       label: `Action Surge — gain one extra action this turn`,
       action: { type: 'use_class_feature', featureId: 'action_surge' },
+      kind: 'class_feature',
     });
   }
 
@@ -1805,6 +1863,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       label:
         'Reckless Attack — advantage on STR melee this turn (enemies get advantage vs you too)',
       action: { type: 'use_class_feature', featureId: 'reckless_attack' },
+      kind: 'class_feature',
     });
   }
 
@@ -1820,6 +1879,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         choices.push({
           label: `Flurry of Blows — 2 unarmed strikes (1 DP, ${kiLeft} left)`,
           action: { type: 'use_class_feature', featureId: 'flurry_of_blows' },
+          kind: 'class_feature',
           requiresBonusAction: true,
         });
       }
@@ -1831,17 +1891,20 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
           choices.push({
             label: 'Patient Defense — Dodge (free, 1/turn)',
             action: { type: 'use_class_feature', featureId: 'patient_defense_free' },
+            kind: 'class_feature',
             requiresBonusAction: true,
           });
           // Step of the Wind: pick one effect for free.
           choices.push({
             label: 'Step of the Wind: Dash (free, 1/turn)',
             action: { type: 'use_class_feature', featureId: 'step_of_wind_free_dash' },
+            kind: 'class_feature',
             requiresBonusAction: true,
           });
           choices.push({
             label: 'Step of the Wind: Disengage (free, 1/turn)',
             action: { type: 'use_class_feature', featureId: 'step_of_wind_free_disengage' },
+            kind: 'class_feature',
             requiresBonusAction: true,
           });
         }
@@ -1849,12 +1912,14 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
           choices.push({
             label: `Patient Defense (1 DP) — Dodge + advantage on next DEX save (${kiLeft} left)`,
             action: { type: 'use_class_feature', featureId: 'patient_defense_dp' },
+            kind: 'class_feature',
             requiresBonusAction: true,
           });
           // Step of the Wind for 1 DP — Dash AND Disengage (both effects).
           choices.push({
             label: `Step of the Wind (1 DP) — Dash + Disengage (${kiLeft} left)`,
             action: { type: 'use_class_feature', featureId: 'step_of_wind_dash' },
+            kind: 'class_feature',
             requiresBonusAction: true,
           });
         }
@@ -1869,6 +1934,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         choices.push({
           label: `Stunning Strike — once/turn after a hit, CON save DC ${8 + profBonus(char.level) + abilityMod(char.wis ?? 10)} (1 DP, ${kiLeft} left)`,
           action: { type: 'use_class_feature', featureId: 'stunning_strike' },
+          kind: 'class_feature',
         });
       }
       // Way of Shadow (PHB p.80) — Shadow Arts. Step into the dark and gain
@@ -1883,6 +1949,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         choices.push({
           label: `Shadow Arts — vanish into shadows (2 ki, invisible for 3 rounds, ${kiLeft} ki left)`,
           action: { type: 'use_class_feature', featureId: 'shadow_arts' },
+          kind: 'class_feature',
         });
       }
     }
@@ -1909,6 +1976,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         choices.push({
           label: `Wild Shape: ${form.name} (CR ${form.cr})${isMoon ? ' (bonus action)' : ''} — ${form.descriptor}`,
           action: { type: 'use_class_feature', featureId: `wild_shape_${form.id}` },
+          kind: 'class_feature',
           requiresBonusAction: isMoon || undefined,
         });
       }
@@ -1917,6 +1985,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       choices.push({
         label: `Dismiss Wild Shape — return to normal form`,
         action: { type: 'use_class_feature', featureId: 'dismiss_wild_shape' },
+        kind: 'class_feature',
       });
       // Circle of the Moon — spend a spell slot while shifted to heal 1d8
       // per slot level. Bonus action per PHB p.69 ("By spending a spell
@@ -1932,6 +2001,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
           choices.push({
             label: `Moon Healing — spend a spell slot to heal 1d8/slot level (bonus action)`,
             action: { type: 'use_class_feature', featureId: 'moon_healing' },
+            kind: 'class_feature',
             requiresBonusAction: true,
           });
         }
@@ -1946,16 +2016,19 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       choices.push({
         label: `Metamagic: Twinned Spell — next spell hits 2 targets (1 SP, ${spLeft} left)`,
         action: { type: 'use_class_feature', featureId: 'metamagic_twinned' },
+        kind: 'class_feature',
       });
     if (spLeft >= 2 && !char.turn_actions.bonus_action_used)
       choices.push({
         label: `Metamagic: Quickened Spell — cast as bonus action (2 SP, ${spLeft} left)`,
         action: { type: 'use_class_feature', featureId: 'metamagic_quickened' },
+        kind: 'class_feature',
       });
     if (spLeft >= 1)
       choices.push({
         label: `Metamagic: Empowered Spell — reroll up to ${abilityMod(char.cha ?? 10)} damage dice (1 SP, ${spLeft} left)`,
         action: { type: 'use_class_feature', featureId: 'metamagic_empowered' },
+        kind: 'class_feature',
       });
   }
 
@@ -1967,11 +2040,13 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       choices.push({
         label: `Learn Invocation: Agonizing Blast — +CHA to Eldritch Blast`,
         action: { type: 'use_class_feature', featureId: 'agonizing_blast' },
+        kind: 'class_feature',
       });
     if (!(char.feats ?? []).includes('devils_sight'))
       choices.push({
         label: `Learn Invocation: Devil's Sight — see in magical darkness`,
         action: { type: 'use_class_feature', featureId: 'devils_sight' },
+        kind: 'class_feature',
       });
   }
 
@@ -1987,10 +2062,12 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         choices.push({
           label: `Maneuver: Trip Attack — +1d8 dmg, STR save or prone (${sdLeft} dice left)`,
           action: { type: 'use_class_feature', featureId: 'maneuver_trip' },
+          kind: 'class_feature',
         });
         choices.push({
           label: `Maneuver: Goading Attack — +1d8 dmg, WIS save or disadvantage vs others (${sdLeft} dice left)`,
           action: { type: 'use_class_feature', featureId: 'maneuver_goading' },
+          kind: 'class_feature',
         });
       }
     }
@@ -2002,6 +2079,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         choices.push({
           label: `Cutting Words — subtract Inspiration die from enemy roll (reaction, ${biLeft2} left)`,
           action: { type: 'use_class_feature', featureId: 'cutting_words' },
+          kind: 'class_feature',
         });
     }
 
@@ -2011,10 +2089,12 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       choices.push({
         label: `Divine Spark — 1d8+${abilityMod(char.wis)} radiant damage or heal (Channel Divinity, ${cdLeft} left)`,
         action: { type: 'use_class_feature', featureId: 'divine_spark' },
+        kind: 'class_feature',
       });
       choices.push({
         label: `Turn Undead — undead in 30 ft, WIS save or flee (bonus action, Channel Divinity, ${cdLeft} left)`,
         action: { type: 'use_class_feature', featureId: 'turn_undead' },
+        kind: 'class_feature',
         requiresBonusAction: true,
       });
     }
@@ -2024,6 +2104,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       choices.push({
         label: `Sear Undead — all undead in 30 ft take ${char.level}d8 radiant, WIS save halves (Channel Divinity, ${cdLeft} left)`,
         action: { type: 'use_class_feature', featureId: 'sear_undead' },
+        kind: 'class_feature',
       });
     }
 
@@ -2032,6 +2113,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       choices.push({
         label: `Preserve Life — distribute ${5 * char.level} HP among wounded allies (Channel Divinity, ${cdLeft} left)`,
         action: { type: 'use_class_feature', featureId: 'preserve_life' },
+        kind: 'class_feature',
       });
     }
 
@@ -2040,6 +2122,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       choices.push({
         label: `Guided Strike — +10 to next attack roll (Channel Divinity, ${cdLeft} left)`,
         action: { type: 'use_class_feature', featureId: 'guided_strike' },
+        kind: 'class_feature',
       });
     }
 
@@ -2053,6 +2136,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       choices.push({
         label: `Sacred Weapon — +${abilityMod(char.cha ?? 10)} to attack rolls for 10 rounds (Channel Divinity, ${cdLeft} left)`,
         action: { type: 'use_class_feature', featureId: 'sacred_weapon' },
+        kind: 'class_feature',
       });
     }
 
@@ -2061,10 +2145,12 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       choices.push({
         label: `Vow of Enmity — advantage vs target for 1 min (Channel Divinity, ${cdLeft} left)`,
         action: { type: 'use_class_feature', featureId: 'vow_of_enmity' },
+        kind: 'class_feature',
       });
       choices.push({
         label: `Abjure Enemy — frighten target, WIS save DC ${8 + profBonus(char.level) + abilityMod(char.cha ?? 10)} (Channel Divinity, ${cdLeft} left)`,
         action: { type: 'use_class_feature', featureId: 'abjure_enemy' },
+        kind: 'class_feature',
       });
     }
 
@@ -2077,6 +2163,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       choices.push({
         label: `Colossus Slayer — +1d8 on first hit vs bloodied target`,
         action: { type: 'use_class_feature', featureId: 'colossus_slayer' },
+        kind: 'class_feature',
       });
     }
 
@@ -2095,6 +2182,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         choices.push({
           label: `Command ${companion.companionName ?? 'companion'} to attack (bonus action)`,
           action: { type: 'use_class_feature', featureId: 'command_companion' },
+          kind: 'class_feature',
           requiresBonusAction: true,
         });
       }
@@ -2105,6 +2193,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       choices.push({
         label: `Arcane Ward — create ${2 * char.level} HP damage shield`,
         action: { type: 'use_class_feature', featureId: 'arcane_ward' },
+        kind: 'class_feature',
       });
     }
 
@@ -2119,6 +2208,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       choices.push({
         label: `Fey Presence — frighten enemies in 10 ft, WIS save DC ${8 + profBonus(char.level) + abilityMod(char.cha ?? 10)} (1/short rest)`,
         action: { type: 'use_class_feature', featureId: 'fey_presence' },
+        kind: 'class_feature',
       });
     }
   }
@@ -2159,16 +2249,59 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
           }
         : undefined;
 
+      // For single-target offensive spells with 2+ living enemies, emit
+      // one cast choice per enemy so the caster picks their target — RAW
+      // (Guiding Bolt, Sacred Flame, Fire Bolt, Inflict Wounds, etc. all
+      // say "a creature of your choice"). Mirrors the Attack-per-enemy
+      // loop. Exclusions:
+      //   - AoE spells (`blastRadius`): a single origin choice is still
+      //     emitted; per-origin picker is a separate follow-up.
+      //   - Spells with their own multi-target variants below (magic_missile;
+      //     eldritch_blast at L5+ multi-beam): they emit focus-fire and
+      //     spread choices in dedicated blocks — don't duplicate here.
+      const enemyDisambig = (() => {
+        const counts: Record<string, number> = {};
+        for (const e of livingEnemies) counts[e.name] = (counts[e.name] ?? 0) + 1;
+        const seen: Record<string, number> = {};
+        return (en: { name: string }) =>
+          counts[en.name] > 1 ? ` #${(seen[en.name] = (seen[en.name] ?? 0) + 1)}` : '';
+      })();
+      const hasOwnMultiTargetVariants =
+        spellId === 'magic_missile' ||
+        (spellId === 'eldritch_blast' && char.level >= 5);
+      const emitPerEnemy =
+        isOffensive &&
+        !spell.blastRadius &&
+        !hasOwnMultiTargetVariants &&
+        livingEnemies.length >= 2;
+
       if (spell.level === 0) {
         // Cantrip: no slot needed
         const slotNote = isBonusAction ? ', bonus action' : '';
-        const targetId = isOffensive ? livingEnemies[0]?.id : undefined;
-        choices.push({
-          label: `Cast ${spell.name} (cantrip${slotNote})`,
-          action: { type: 'cast_spell', spellId, slotLevel: 0, targetEnemyId: targetId },
-          requiresBonusAction: isBonusAction || undefined,
-          aoePreview: aoePreview ? { ...aoePreview, targetEnemyId: targetId } : undefined,
-        });
+        if (emitPerEnemy) {
+          // One choice per living enemy. `enemyDisambig` is consumed in
+          // declaration order across calls so #1/#2 stay stable.
+          for (const en of livingEnemies) {
+            if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+            const suffix = enemyDisambig(en);
+            choices.push({
+              label: `Cast ${spell.name} (cantrip${slotNote}) → ${en.name}${suffix}`,
+              action: { type: 'cast_spell', spellId, slotLevel: 0, targetEnemyId: en.id },
+              requiresBonusAction: isBonusAction || undefined,
+              aoePreview: aoePreview ? { ...aoePreview, targetEnemyId: en.id } : undefined,
+              kind: 'cast_spell',
+            });
+          }
+        } else {
+          const targetId = isOffensive ? livingEnemies[0]?.id : undefined;
+          choices.push({
+            label: `Cast ${spell.name} (cantrip${slotNote})`,
+            action: { type: 'cast_spell', spellId, slotLevel: 0, targetEnemyId: targetId },
+            requiresBonusAction: isBonusAction || undefined,
+            aoePreview: aoePreview ? { ...aoePreview, targetEnemyId: targetId } : undefined,
+            kind: 'cast_spell',
+          });
+        }
       } else {
         // Leveled spell: emit one choice per available slot level (base + upcasts)
         const baseLevel = spell.level ?? 1;
@@ -2186,13 +2319,38 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
           const upcastPart =
             isUpcast && spell.upcastBonus ? ` — upcast +${sl - baseLevel}${spell.upcastBonus}` : '';
           const slotNote = isBonusAction ? ', bonus action' : '';
-          const targetId = isOffensive ? livingEnemies[0]?.id : undefined;
-          choices.push({
-            label: `Cast ${spell.name} (${sl === baseLevel ? `Lvl ${sl}` : `${sl}th slot`}${slotNote}${upcastPart} — ${avail} slot${avail === 1 ? '' : 's'} left)`,
-            action: { type: 'cast_spell', spellId, slotLevel: sl, targetEnemyId: targetId },
-            requiresBonusAction: isBonusAction || undefined,
-            aoePreview: aoePreview ? { ...aoePreview, targetEnemyId: targetId } : undefined,
-          });
+          if (emitPerEnemy) {
+            // Per-enemy basic choices at this slot level. `enemyDisambig`
+            // is reset per slot below to keep #1/#2 numbering stable
+            // within each slot's choice batch.
+            const slotDisambig = (() => {
+              const counts: Record<string, number> = {};
+              for (const e of livingEnemies) counts[e.name] = (counts[e.name] ?? 0) + 1;
+              const seen: Record<string, number> = {};
+              return (en: { name: string }) =>
+                counts[en.name] > 1 ? ` #${(seen[en.name] = (seen[en.name] ?? 0) + 1)}` : '';
+            })();
+            for (const en of livingEnemies) {
+              if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+              const suffix = slotDisambig(en);
+              choices.push({
+                label: `Cast ${spell.name} (${sl === baseLevel ? `Lvl ${sl}` : `${sl}th slot`}${slotNote}${upcastPart}) → ${en.name}${suffix}`,
+                action: { type: 'cast_spell', spellId, slotLevel: sl, targetEnemyId: en.id },
+                requiresBonusAction: isBonusAction || undefined,
+                aoePreview: aoePreview ? { ...aoePreview, targetEnemyId: en.id } : undefined,
+                kind: 'cast_spell',
+              });
+            }
+          } else {
+            const targetId = isOffensive ? livingEnemies[0]?.id : undefined;
+            choices.push({
+              label: `Cast ${spell.name} (${sl === baseLevel ? `Lvl ${sl}` : `${sl}th slot`}${slotNote}${upcastPart} — ${avail} slot${avail === 1 ? '' : 's'} left)`,
+              action: { type: 'cast_spell', spellId, slotLevel: sl, targetEnemyId: targetId },
+              requiresBonusAction: isBonusAction || undefined,
+              aoePreview: aoePreview ? { ...aoePreview, targetEnemyId: targetId } : undefined,
+              kind: 'cast_spell',
+            });
+          }
           // 2024 PHB Magic Missile multi-target: when there are 2+ living
           // enemies, emit a focus-fire choice per enemy + one "spread evenly"
           // choice that distributes darts across all targets.
@@ -2208,6 +2366,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
                   targetEnemyId: e.id,
                   targetEnemyIds: Array(dartCount).fill(e.id),
                 },
+                kind: 'cast_spell',
               });
             }
             // Spread evenly across the first min(darts, enemies) targets,
@@ -2229,6 +2388,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
                 targetEnemyId: livingEnemies[0].id,
                 targetEnemyIds: spread,
               },
+              kind: 'cast_spell',
             });
           }
         }
@@ -2250,6 +2410,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
               targetEnemyId: e.id,
               targetEnemyIds: Array(beamCount).fill(e.id),
             },
+            kind: 'cast_spell',
           });
         }
         const spread: string[] = [];
@@ -2269,6 +2430,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
             targetEnemyId: livingEnemies[0].id,
             targetEnemyIds: spread,
           },
+          kind: 'cast_spell',
         });
       }
     }
@@ -2295,6 +2457,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
           label: `Two-weapon attack — off-hand ${offhandItem.name} (no ability mod to damage)`,
           action: { type: 'two_weapon_attack', targetEnemyId: livingEnemies[0]?.id },
           requiresBonusAction: true,
+          kind: 'two_weapon_attack',
         });
       }
     }
@@ -2350,10 +2513,12 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       choices.push({
         label: `Grapple the ${en.name}${suffix} — STR vs STR/DEX contest`,
         action: { type: 'grapple', targetEnemyId: en.id },
+        kind: 'grapple',
       });
       choices.push({
         label: `Shove the ${en.name}${suffix} — STR vs STR/DEX contest (knocks prone)`,
         action: { type: 'shove', targetEnemyId: en.id },
+        kind: 'shove',
       });
     }
   }
@@ -2363,10 +2528,12 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     choices.push({
       label: 'Dodge — attacks against you have disadvantage until your next turn',
       action: { type: 'dodge' },
+      kind: 'dodge',
     });
     choices.push({
       label: 'Disengage — move without triggering opportunity attacks',
       action: { type: 'disengage' },
+      kind: 'disengage',
     });
   }
 
@@ -2409,7 +2576,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
           .filter((e) => e.id !== char.id && e.hp > 0)
           .map((e) => `${e.pos.x},${e.pos.y}`)
       );
-      const DIRS: Array<{ label: string; dx: number; dy: number }> = [
+      const DIRS: Array<{ label: ChoiceDirection; dx: number; dy: number }> = [
         { label: 'N', dx: 0, dy: -1 },
         { label: 'NE', dx: 1, dy: -1 },
         { label: 'E', dx: 1, dy: 0 },
@@ -2429,6 +2596,8 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
           choices.push({
             label: `Move ${dir.label} → (${nx},${ny}) [${remaining - 5}ft left]`,
             action: { type: 'grid_move', entityId: char.id, to: { x: nx, y: ny } },
+            kind: 'grid_move',
+            direction: dir.label,
           });
         }
       }
@@ -2878,7 +3047,7 @@ function applyPcOpportunityAttacks(args: {
     };
     if (atk.hit) {
       enemyHpNow = Math.max(0, enemyHpNow - atk.damage);
-      narrative += ` ⚔ ${pc.name} opportunity attack hits ${args.enemyName} for ${atk.damage}!`;
+      narrative += ` ⚔ ${pc.name} opportunity attack hits ${args.enemyName} for ${fmt.dmg(atk.damage)}!`;
       st = {
         ...st,
         entities: (st.entities ?? []).map((e) =>
@@ -3057,10 +3226,10 @@ function runEnemyTurns(args: {
                       ? 0
                       : dmgRoll;
                 target = { ...target, hp: Math.max(0, target.hp - dmg) };
-                narrative += ` ${rm.name} casts ${spell.name}! ${target.name} ${spell.savingThrow.toUpperCase()} save ${save} vs DC ${dc} — ${saved ? 'saves' : 'fails'}, ${dmg} ${spell.damageType ?? 'damage'}.`;
+                narrative += ` ${rm.name} casts ${spell.name}! ${target.name} ${fmt.save(spell.savingThrow.toUpperCase(), save)} vs ${fmt.dc(dc)} — ${saved ? 'saves' : 'fails'}, ${fmt.dmg(dmg)} ${spell.damageType ?? 'damage'}.`;
               } else {
                 target = { ...target, hp: Math.max(0, target.hp - dmgRoll) };
-                narrative += ` ${rm.name} casts ${spell.name}! ${target.name} takes ${dmgRoll} ${spell.damageType ?? 'damage'}.`;
+                narrative += ` ${rm.name} casts ${spell.name}! ${target.name} takes ${fmt.dmg(dmgRoll)} ${spell.damageType ?? 'damage'}.`;
               }
               st = {
                 ...st,
@@ -3206,7 +3375,7 @@ function runEnemyTurns(args: {
                 // Put the reactor in the driver's seat so the frontend prompts them.
                 active_character_id: target.id,
               };
-              narrative += ` ⚡ ${rm.name} strikes ${target.name} — total ${atkResult.atkTotal} vs AC ${target.ac}. Shield available!`;
+              narrative += ` ⚡ ${rm.name} strikes ${target.name} — total ${fmt.roll(atkResult.atkTotal)} vs ${fmt.ac(target.ac)}. Shield available!`;
               return {
                 st,
                 narrative,
@@ -3256,7 +3425,7 @@ function runEnemyTurns(args: {
                 : target.bardic_inspiration_die,
             };
             if (orcSaveFired) {
-              narrative += ` 🪓 Relentless Endurance! ${target.name} stays standing at 1 HP.`;
+              narrative += ` 🪓 Relentless Endurance! ${target.name} stays standing at ${fmt.hp(1)} HP.`;
             }
             const concAtk = checkConcentration(target, st, atkResult.hpLost);
             target = concAtk.char;
@@ -3525,7 +3694,7 @@ export async function takeAction({
             char.hp = Math.min(char.max_hp, 1 + healed);
             char.inventory = char.inventory.filter((_, i) => i !== firstIdx);
             char.stable = false;
-            narrative = `Barely conscious, you manage to use the ${held.name} — you recover ${healed} HP and pull yourself up (now ${char.hp}/${char.max_hp}).`;
+            narrative = `Barely conscious, you manage to use the ${held.name} — you recover ${fmt.hp(healed)} HP and pull yourself up (now ${fmt.hp(char.hp, char.max_hp)}).`;
           } else {
             narrative = `You are stable but unconscious. Only a healing item can restore you.`;
           }
@@ -3552,6 +3721,26 @@ export async function takeAction({
           ...(st.run_log || []),
           { character_id: char.id, action: action.type, narrative },
         ];
+        // Multi-PC parties: when one PC dies on their death save, the
+        // remaining living PCs continue. Advance active_character_id off
+        // the corpse and surface choices for the next living PC so the
+        // run isn't soft-locked. (Solo party / TPK: allDead is true and
+        // there's nothing to advance to — the front-end shows the
+        // game-over screen.)
+        if (!allDead) {
+          const livingAfterDeath = st.characters.filter((c) => !c.dead);
+          if (livingAfterDeath.length > 0) {
+            st.active_character_id = livingAfterDeath[0].id;
+          }
+          st.last_choices = generateChoices(st, seed, context);
+          return {
+            narrative,
+            choices: st.last_choices,
+            newState: st,
+            escaped: false,
+            dead: false,
+          };
+        }
         return { narrative, choices: [], newState: st, escaped: false, dead: allDead };
       }
     }
@@ -4127,7 +4316,11 @@ export async function takeAction({
         const versatileNote = isVersatile ? ' (versatile)' : '';
         const coverNote = coverAcBonus > 0 ? ` +${coverAcBonus} cover` : '';
         const bonusNote = totalAttackBonus > 0 ? ` +${totalAttackBonus} bonus` : '';
-        const atkNote = ` (${label}d20 ${atk.roll}+${atk.atkMod} ${atk.atkStat}+${atk.prof} prof${bonusNote} = ${atk.total} vs AC ${effectiveEnemyAc}${coverNote}${disadvNote}${versatileNote})${noProfNote}${biNote}`;
+        const atkNote =
+          ' ' +
+          fmt.note(
+            `(${label}d20 ${atk.roll}+${atk.atkMod} ${atk.atkStat}+${atk.prof} prof${bonusNote} = ${atk.total} vs AC ${effectiveEnemyAc}${coverNote}${disadvNote}${versatileNote})${noProfNote}${biNote}`
+          );
 
         if (atk.fumble) {
           // 2024 PHB — a Nat 1 on a d20 grants Heroic Inspiration. Failure
@@ -4501,10 +4694,12 @@ export async function takeAction({
                   ),
                 };
                 const cleaveName = getEnemyById(seed, cleaveTarget.id)?.name ?? cleaveTarget.id;
-                narrative += ` [Cleave: ${cleaveName} also takes ${cleaveDmg} damage!${cleaveNewHp <= 0 ? ' (killed)' : ''}]`;
+                narrative += ` ${fmt.note(`[Cleave: ${cleaveName} also takes ${cleaveDmg} damage!${cleaveNewHp <= 0 ? ' (killed)' : ''}]`)}`;
                 if (cleaveNewHp <= 0) {
                   const cleaveXp = getEnemyById(seed, cleaveTarget.id)?.xp ?? 0;
-                  char.xp = (char.xp || 0) + cleaveXp;
+                  const cleaveSplit = splitEncounterXp(st, char.id, cleaveXp);
+                  st = cleaveSplit.st;
+                  char.xp = (char.xp || 0) + cleaveSplit.share;
                 }
               }
             }
@@ -4513,7 +4708,10 @@ export async function takeAction({
 
         if (newEnemyHp <= 0) {
           const xpGain = target.xp ?? 10 + (target.hp || 8);
-          char.xp = (char.xp || 0) + xpGain;
+          const killSplit = splitEncounterXp(st, char.id, xpGain);
+          st = killSplit.st;
+          const xpShare = killSplit.share;
+          char.xp = (char.xp || 0) + xpShare;
           st = {
             ...st,
             entities: (st.entities ?? []).map((e) =>
@@ -4533,14 +4731,14 @@ export async function takeAction({
             attackerName: char.name,
             victimId: targetId,
             victimName: target.name,
-            xp: xpGain,
+            xp: xpShare,
             round: st.round ?? 1,
           });
           narrative +=
             ' ' +
             pick(context.narratives.killShot)
               .replace('{enemy}', target.name)
-              .replace('{xp}', String(xpGain));
+              .replace('{xp}', String(xpShare));
           if (char.xp >= char.level * 100) {
             char.level += 1;
             // 2024 PHB Dwarven Toughness adds +1 max HP at each level up.
@@ -4569,7 +4767,7 @@ export async function takeAction({
             e.id === targetId && e.isEnemy ? { ...e, hp: newEnemyHp } : e
           ),
         };
-        narrative += ` The ${target.name} has ${newEnemyHp} HP remaining. `;
+        narrative += ` The ${target.name} has ${fmt.hp(newEnemyHp)} HP remaining. `;
         return false;
       };
 
@@ -4669,11 +4867,11 @@ export async function takeAction({
               characters: st.characters.map((c, i) => (i === targetIdx ? { ...c, hp: newHp } : c)),
             };
             char.inventory = char.inventory.filter((_, i) => i !== firstIdx);
-            narrative = `${char.name} uses the ${held.name} on ${target.name} — ${healed} HP restored${bonusNote} (now ${newHp}/${target.max_hp}).`;
+            narrative = `${char.name} uses the ${held.name} on ${target.name} — ${fmt.hp(healed)} HP restored${bonusNote} (now ${fmt.hp(newHp, target.max_hp)}).`;
           } else {
             char.hp = Math.min(char.max_hp, char.hp + healed);
             char.inventory = char.inventory.filter((_, i) => i !== firstIdx);
-            narrative = `You use the ${held.name} and recover ${healed} HP${bonusNote} (now ${char.hp}/${char.max_hp}).`;
+            narrative = `You use the ${held.name} and recover ${fmt.hp(healed)} HP${bonusNote} (now ${fmt.hp(char.hp, char.max_hp)}).`;
           }
         } else if (itemData.effect === 'con_advantage') {
           char.inventory = char.inventory.filter((_, i) => i !== firstIdx);
@@ -4684,10 +4882,10 @@ export async function takeAction({
           const { result, value } = resolveMysteryConsumable();
           if (result === 'heal') {
             char.hp = Math.min(char.max_hp, char.hp + value);
-            narrative = `You use the ${held.name}. It tastes of regret and eucalyptus — but you feel better? +${value} HP.`;
+            narrative = `You use the ${held.name}. It tastes of regret and eucalyptus — but you feel better? +${fmt.hp(value)} HP.`;
           } else if (result === 'hurt') {
             char.hp = Math.max(1, char.hp - value);
-            narrative = `You use the ${held.name}. Immediate. Searing. Regret. -${value} HP.`;
+            narrative = `You use the ${held.name}. Immediate. Searing. Regret. -${fmt.hp(value)} HP.`;
           } else {
             narrative = `You use the ${held.name}. Nothing happens. You stand there feeling foolish.`;
           }
@@ -4716,6 +4914,11 @@ export async function takeAction({
     }
 
     case 'death_save': {
+      // Unreachable in practice — the early-return block at "Death saves
+      // override all actions when HP = 0" (above the switch) catches every
+      // death_save while char.hp <= 0. Kept as a defensive fallback that
+      // mirrors the early block's effect, in case some future code path
+      // routes a death_save here with hp > 0 (shouldn't happen).
       narrative = buildArrivalNarrative(roomId, st, seed, context);
       break;
     }
@@ -5487,7 +5690,9 @@ export async function takeAction({
               `${i + 1}: ${tgtEnemy.name} — HIT ${effDmg}${atkE.critical ? ' CRIT' : ''}${note ?? ''}${newHp <= 0 ? ' (killed)' : ''}.`
             );
             if (newHp <= 0) {
-              char.xp = (char.xp || 0) + (tgtEnemy.xp ?? 0);
+              const split = splitEncounterXp(st, char.id, tgtEnemy.xp ?? 0);
+              st = split.st;
+              char.xp = (char.xp || 0) + split.share;
               st.enemies_killed = [...(st.enemies_killed ?? []), tid];
             }
           } else {
@@ -5510,7 +5715,9 @@ export async function takeAction({
               `dart ${i + 1} → ${tgtEnemy.name}: ${effDmg}${note ?? ''}${newHp <= 0 ? ' (killed)' : ''}.`
             );
             if (newHp <= 0) {
-              char.xp = (char.xp || 0) + (tgtEnemy.xp ?? 0);
+              const split = splitEncounterXp(st, char.id, tgtEnemy.xp ?? 0);
+              st = split.st;
+              char.xp = (char.xp || 0) + split.share;
               st.enemies_killed = [...(st.enemies_killed ?? []), tid];
             }
           }
@@ -5647,7 +5854,10 @@ export async function takeAction({
           };
           if (newEnemyHp <= 0) {
             const xpGain = spellTarget.xp ?? 10;
-            char.xp = (char.xp || 0) + xpGain;
+            const split = splitEncounterXp(st, char.id, xpGain);
+            st = split.st;
+            const xpShare = split.share;
+            char.xp = (char.xp || 0) + xpShare;
             st = {
               ...st,
               entities: (st.entities ?? []).map((e) =>
@@ -5664,7 +5874,7 @@ export async function takeAction({
               ' ' +
               pick(context.narratives.killShot)
                 .replace('{enemy}', spellTarget.name)
-                .replace('{xp}', String(xpGain));
+                .replace('{xp}', String(xpShare));
           }
           usedInitiative = true;
           break;
@@ -5755,7 +5965,9 @@ export async function takeAction({
               };
               narrative += ` ${targetEnemy.name}: ${tFailed ? 'fails' : 'succeeds'} save — ${resDmg} dmg${newHp <= 0 ? ' (killed)' : ''}.`;
               if (newHp <= 0) {
-                char.xp = (char.xp || 0) + (targetEnemy.xp ?? 10);
+                const split = splitEncounterXp(st, char.id, targetEnemy.xp ?? 10);
+                st = split.st;
+                char.xp = (char.xp || 0) + split.share;
                 st = {
                   ...st,
                   entities: (st.entities ?? []).map((e) =>
@@ -5836,7 +6048,10 @@ export async function takeAction({
         };
         if (newEnemyHpSpell <= 0) {
           const xpGain = spellTarget.xp ?? 10;
-          char.xp = (char.xp || 0) + xpGain;
+          const split = splitEncounterXp(st, char.id, xpGain);
+          st = split.st;
+          const xpShare = split.share;
+          char.xp = (char.xp || 0) + xpShare;
           st = {
             ...st,
             entities: (st.entities ?? []).map((e) =>
@@ -5852,7 +6067,7 @@ export async function takeAction({
             ' ' +
             pick(context.narratives.killShot)
               .replace('{enemy}', spellTarget.name)
-              .replace('{xp}', String(xpGain));
+              .replace('{xp}', String(xpShare));
           if (char.xp >= char.level * 100) {
             char.level += 1;
             // 2024 PHB Dwarven Toughness adds +1 max HP at each level up.
@@ -6307,7 +6522,9 @@ export async function takeAction({
               }
             }
             if (newHp <= 0) {
-              char.xp = (char.xp || 0) + (enemy?.xp ?? 10);
+              const split = splitEncounterXp(st, char.id, enemy?.xp ?? 10);
+              st = split.st;
+              char.xp = (char.xp || 0) + split.share;
               st.enemies_killed = [...st.enemies_killed, roomId];
               st = endCombatState(st);
               break;
@@ -6589,7 +6806,9 @@ export async function takeAction({
           };
           narrative = `💢 ${char.name} — Frenzy! (${frToHit} hits AC ${frTarget.ac}) ${frDmg} ${frWeapon?.damageType ?? 'bludgeoning'}${newHp <= 0 ? ` — ${frTarget.name} falls!` : ''}`;
           if (newHp <= 0) {
-            char.xp = (char.xp || 0) + (frTarget.xp ?? 10);
+            const split = splitEncounterXp(st, char.id, frTarget.xp ?? 10);
+            st = split.st;
+            char.xp = (char.xp || 0) + split.share;
             st.enemies_killed = [...st.enemies_killed, frTarget.id];
             if (isRoomCleared(st, seed, roomId)) {
               st = endCombatState(st);
@@ -6878,7 +7097,9 @@ export async function takeAction({
         });
         narrative = `✦ Divine Spark! ${enemy.name} takes ${dsRoll} radiant damage. (${cdUsesDS - 1} Channel Divinity remaining)`;
         if (dsHp <= 0) {
-          char.xp = (char.xp || 0) + (enemy.xp ?? 0);
+          const split = splitEncounterXp(st, char.id, enemy.xp ?? 0);
+          st = split.st;
+          char.xp = (char.xp || 0) + split.share;
           narrative += ` ${enemy.name} is destroyed.`;
         }
         usedInitiative = true;
@@ -7292,7 +7513,9 @@ export async function takeAction({
             st.enemies_killed = [...st.enemies_killed, targetEnt.id];
             narrative += ` ${targetEnemy.name} falls!`;
             const xpGain = targetEnemy.xp ?? 10;
-            char.xp = (char.xp || 0) + xpGain;
+            const split = splitEncounterXp(st, char.id, xpGain);
+            st = split.st;
+            char.xp = (char.xp || 0) + split.share;
             if (isRoomCleared(st, seed, roomId)) {
               st = endCombatState(st);
             }
@@ -7694,7 +7917,9 @@ export async function takeAction({
       narrative = `Off-hand strike with ${offhandLoot.name}! ${atk.damage} damage${atk.critical ? ' (CRITICAL!)' : ''} (${atk.roll}+${atk.atkMod}+${atk.prof}=${atk.total} vs AC ${enemyInRoom.ac}, no ability mod to damage).`;
       if (newHpTwf <= 0) {
         const xpGainTwf = enemyInRoom.xp ?? 10;
-        char.xp = (char.xp || 0) + xpGainTwf;
+        const split = splitEncounterXp(st, char.id, xpGainTwf);
+        st = split.st;
+        char.xp = (char.xp || 0) + split.share;
         narrative += ` The ${enemyInRoom.name} falls!`;
         st = {
           ...st,
@@ -8547,13 +8772,16 @@ export async function takeAction({
             narrative = `🔥 ${char.name} casts HELLISH REBUKE (lvl ${slotLvl} slot)! Hellish flames engulf ${enemyName}. DEX save ${saveRoll} vs DC ${dc} — ${saved ? 'half' : 'full'} damage: ${finalDmg} fire (${baseRoll}${upcastRoll > 0 ? ` + ${upcastRoll} upcast` : ''}).`;
             if (newEnemyHp <= 0) {
               const xpGain = enemyData?.xp ?? 10;
-              char.xp = (char.xp || 0) + xpGain;
+              const split = splitEncounterXp(st, char.id, xpGain);
+              st = split.st;
+              const xpShare = split.share;
+              char.xp = (char.xp || 0) + xpShare;
               st = {
                 ...st,
                 enemies_killed: [...(st.enemies_killed ?? []), rx.attackerEnemyId],
                 characters: st.characters.map((c) => (c.id === char.id ? char : c)),
               };
-              narrative += ` ${enemyName} is consumed by the rebuke! (+${xpGain} XP)`;
+              narrative += ` ${enemyName} is consumed by the rebuke! (+${xpShare} XP)`;
               const roomId = st.current_room;
               if (isRoomCleared(st, seed, roomId)) {
                 st = endCombatState(st);
@@ -8803,8 +9031,18 @@ export async function takeAction({
         }
       }
     }
-  } else if (!usedInitiative || !st.combat_active) {
-    // Non-combat or non-initiative action: round-robin over living characters
+  } else if (!st.combat_active) {
+    // Out-of-combat actions round-robin the active marker across the
+    // living party (e.g. each PC takes a turn examining/moving in town).
+    //
+    // In combat, the active marker is driven exclusively by initiative —
+    // see the IF branch above. Crucially, when an in-combat action does
+    // NOT consume initiative (e.g. grid movement while action is still
+    // available), `active_character_id` must STAY on the acting PC so
+    // PartyRail's aria-current keeps pointing at the same character as
+    // the InitiativeStrip's ▶ marker. Falling through to this round-
+    // robin in that case would silently desync the two indicators and
+    // generate the next PC's choice list mid-turn.
     const living = st.characters.filter((c) => !c.dead);
     if (living.length > 0) {
       const idx = living.findIndex((c) => c.id === char.id);
@@ -8829,24 +9067,44 @@ export async function takeAction({
     st = { ...st, flags: restFlags };
   }
 
-  // Speaker prefix for multi-PC parties — when the narrative starts with
-  // "You ..." (and the active character isn't already named in it), prepend
-  // "[CharName] " so the reader can tell whose turn this was. Solo-character
-  // parties are unambiguous and skip the prefix.
+  // Speaker prefix for multi-PC parties — prepend "[CharName] " so the
+  // reader can tell whose turn this was. Combat narratives (combatHit,
+  // combatMiss, etc.) draw from pools with second-person ("Your attack
+  // connects..."), third-person impersonal ("A solid strike lands..."),
+  // and enemy-first ("The Crypt Ghoul reels...") openers — none of those
+  // identify the active character. We only suppress the prefix when the
+  // narrative *already* starts with the character's name (e.g. an enemy
+  // attack narrative that opens with "Sage takes 5 damage" — the active
+  // character is the one being damaged, so the prose already names them).
+  // Solo-character parties are unambiguous and skip the prefix entirely.
   const livingPartyCount = st.characters.filter((c) => !c.dead).length;
-  const startsAmbiguous =
-    livingPartyCount > 1 && /^You\b/.test(narrative) && !narrative.startsWith(`${char.name}:`);
-  const speakerPrefix = startsAmbiguous ? `[${char.name}] ` : '';
+  const alreadyNamedAtStart =
+    narrative.startsWith(`${char.name} `) ||
+    narrative.startsWith(`${char.name}:`) ||
+    narrative.startsWith(`[${char.name}]`);
+  const speakerPrefix =
+    livingPartyCount > 1 && !alreadyNamedAtStart ? `[${char.name}] ` : '';
   const rawNarrative =
     speakerPrefix + (extraNarrative ? `${narrative}\n\n${extraNarrative}` : narrative);
 
   const activeRoom = seed.rooms.find((r) => r.id === st.current_room);
-  const finalNarrative = await llmProvider.enhance(rawNarrative, {
+  // The LLM rewrites prose freely and would not preserve `{{kind|display}}`
+  // markers, so we strip them before enhancement. When LLM is enabled the
+  // user trades styled-token rendering for atmospheric prose; the
+  // structured combat_log retains the mechanical data either way. With the
+  // default NoneProvider (passthrough), strip is a no-op on prose and
+  // tokens reach the frontend intact for styled rendering.
+  const llmInput = stripNarrativeTokens(rawNarrative);
+  const enhanced = await llmProvider.enhance(llmInput, {
     worldName: seed.world_name,
     charName: char.name,
     charClass: char.character_class,
     roomName: activeRoom?.name ?? st.current_room,
   });
+  // Passthrough: if the provider returned the input unchanged (NoneProvider
+  // or LLM error fallback), restore the tokenised raw narrative so the FE
+  // can render styled spans.
+  const finalNarrative = enhanced === llmInput ? rawNarrative : enhanced;
 
   // SRD 5.2.1 p.184 — Invisible: attacking reveals location. The condition
   // ends after the attack; the character must re-Hide to regain it.

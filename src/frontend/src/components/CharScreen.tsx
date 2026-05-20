@@ -2,7 +2,7 @@ import type { AuthUser, CharacterInput } from '../lib/api';
 import { useEffect, useState } from 'react';
 import type { FrontendContext } from '../types';
 import { SPECIES } from '../data/species';
-import { applyTheme } from '../App';
+import { applyTheme } from '../lib/theme';
 import styles from '../styles.module.css';
 
 type StatBlock = { str: number; dex: number; con: number; int: number; wis: number; cha: number };

@@ -4,6 +4,10 @@
   "description": "A dynamic browser RPG platform with switchable themes, built on D&D 5e rules.",
   "private": true,
   "scripts": {
+    "sync-types": "tsx scripts/sync-shared-types.ts",
+    "sync-types:check": "tsx scripts/sync-shared-types.ts --check",
+    "pretest": "npm run sync-types",
+    "predev": "npm run sync-types",
     "lint": "npm run lint   --workspace=src/frontend --workspace=src/backend",
     "format": "npm run format --workspace=src/frontend --workspace=src/backend",
     "test": "npm run test:be && npm run test:fe",

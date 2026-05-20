@@ -3,17 +3,25 @@ import { FactionsView, QuestsView } from './components/CampaignPanel.tsx';
 import type { FrontendContext, GameChoice, Seed, SessionSummary } from './types.ts';
 import { useEffect, useRef, useState } from 'react';
 import CharScreen from './components/CharScreen.tsx';
+import ClassAbilityBar from './components/ClassAbilityBar.tsx';
+import CombatActionBar from './components/CombatActionBar.tsx';
 import CombatLogPanel from './components/CombatLogPanel.tsx';
 import ContextPanel from './components/ContextPanel.tsx';
 import type { ContextTab } from './components/ContextPanel.tsx';
+import DefaultActionBar from './components/DefaultActionBar.tsx';
+import EnemySelector from './components/EnemySelector.tsx';
 import GridCombatView from './components/GridCombatView.tsx';
 import InventoryModal from './components/InventoryModal.tsx';
 import LoginScreen from './components/LoginScreen.tsx';
 import MissionLogPanel from './components/MissionLogPanel.tsx';
+import MoveDPad from './components/MoveDPad.tsx';
+import NarrativeText from './components/NarrativeText.tsx';
 import PartyRail from './components/PartyRail.tsx';
 import RoomArtPanel from './components/RoomArtPanel.tsx';
 import SessionsScreen from './components/SessionScreen.tsx';
+import SpellBar from './components/SpellBar.tsx';
 import WorldMap from './components/WorldMap.tsx';
+import { applyTheme } from './lib/theme.ts';
 import artManifest from './art-manifest.json';
 import { context as groveContext } from './contexts/grove_of_thorns.tsx';
 import { context as sandboxContext } from './contexts/sandbox.tsx';
@@ -28,43 +36,68 @@ const CONTEXTS: Record<string, FrontendContext> = {
   whispering_pines: whisperingPinesContext,
   grove_of_thorns: groveContext,
 };
+// Choice kinds that get their own dedicated UI (D-pad / icon bar) and
+// therefore drop out of the numbered text-button column and its 1-9
+// keyboard shortcuts. Keep this list aligned with the components that
+// consume each kind so a choice never renders twice.
+const ICONIZED_KINDS = new Set<string>([
+  'grid_move',
+  'dash',
+  'disengage',
+  'dodge',
+  'ready',
+  'attack',
+  'grapple',
+  'shove',
+  'two_weapon_attack',
+  'class_feature',
+]);
+const DEFAULT_ACTION_KINDS = new Set<string>(['dash', 'disengage', 'dodge', 'ready']);
+const COMBAT_ACTION_KINDS = new Set<string>(['attack', 'grapple', 'shove', 'two_weapon_attack']);
+
+// SpellBar handles single-target offensive cast_spell choices (one
+// button per unique spell at the lowest available slot). Multi-target
+// variants (Magic Missile focus-fire / spread, Eldritch Blast multi-
+// beam) and upcast slots stay in the text list. This computes the
+// exact subset that goes to the SpellBar so the text list can filter
+// them out without losing the upcast / multi-target variants.
+function selectSpellBarChoices(choices: GameChoice[]): GameChoice[] {
+  const single = choices.filter((c) => {
+    if (c.kind !== 'cast_spell') return false;
+    const action = c.action as { targetEnemyId?: string; targetEnemyIds?: string[] };
+    return !!action.targetEnemyId && !Array.isArray(action.targetEnemyIds);
+  });
+  // One per spellId at lowest slot — match SpellBar's internal grouping.
+  const lowestPerSpell = new Map<string, GameChoice>();
+  for (const c of single) {
+    const action = c.action as { spellId: string; slotLevel: number };
+    const existing = lowestPerSpell.get(action.spellId);
+    if (!existing) {
+      lowestPerSpell.set(action.spellId, c);
+      continue;
+    }
+    const existingSlot = (existing.action as { slotLevel: number }).slotLevel;
+    if (action.slotLevel < existingSlot) lowestPerSpell.set(action.spellId, c);
+  }
+  return [...lowestPerSpell.values()];
+}
+
+// Single-target enemy filter — collapses the per-enemy variants of
+// Attack / Cast Guiding Bolt / Grapple / etc. into one visible choice
+// at a time, controlled by the EnemySelector's selection. Multi-target
+// choices (Magic Missile spread, AoE) carry a `targetEnemyIds` array
+// and bypass the filter so the player can still pick them. When no
+// enemy is selected (out of combat, or an interstitial moment with no
+// living hostiles), no choices are filtered out.
+function filterByTarget(c: GameChoice, selectedEnemyId: string | null): boolean {
+  if (!selectedEnemyId) return true;
+  const action = c.action as { targetEnemyId?: string; targetEnemyIds?: string[] };
+  if (Array.isArray(action.targetEnemyIds)) return true;
+  if (!action.targetEnemyId) return true;
+  return action.targetEnemyId === selectedEnemyId;
+}
 function getCtx(seed: Seed | null): FrontendContext {
   return (seed?.context_id ? CONTEXTS[seed.context_id] : null) ?? sandboxContext;
-}
-
-interface Theme {
-  pageBg: string;
-  cardBg: string;
-  font: string;
-  primary: string;
-  mid: string;
-  dim: string;
-  dimDark: string;
-  border: string;
-  separator: string;
-  itemColor: string;
-  hpHigh: string;
-  hpMid: string;
-  hpLow: string;
-  title: string;
-  worldLabel: string;
-}
-
-export function applyTheme(theme: Theme) {
-  const r = document.documentElement.style;
-  r.setProperty('--t-bg', theme.pageBg);
-  r.setProperty('--t-card', theme.cardBg);
-  r.setProperty('--t-font', theme.font);
-  r.setProperty('--t-primary', theme.primary);
-  r.setProperty('--t-mid', theme.mid);
-  r.setProperty('--t-dim', theme.dim);
-  r.setProperty('--t-dim-dark', theme.dimDark);
-  r.setProperty('--t-border', theme.border);
-  r.setProperty('--t-separator', theme.separator);
-  r.setProperty('--t-item', theme.itemColor);
-  r.setProperty('--t-hp-high', theme.hpHigh);
-  r.setProperty('--t-hp-mid', theme.hpMid);
-  r.setProperty('--t-hp-low', theme.hpLow);
 }
 
 applyTheme(sandboxContext.theme);
@@ -81,6 +114,12 @@ export default function App() {
   // Which choice is currently hovered — used by GridCombatView to render an
   // AoE preview tint over the cells a hovered spell would affect.
   const [hoveredChoice, setHoveredChoice] = useState<GameChoice | null>(null);
+  // Single-target enemy selection drives the choice list filter: target-
+  // bearing choices (Attack, Cast Guiding Bolt, Grapple, etc.) are shown
+  // only for the selected enemy, collapsing N target variants into 1
+  // button per action. Defaults to the first living enemy; resets when
+  // the enemy roster changes.
+  const [selectedEnemyId, setSelectedEnemyId] = useState<string | null>(null);
   const narrativeRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -108,6 +147,22 @@ export default function App() {
     applyTheme(ctx.theme);
   }, [ctx]);
 
+  // Keep the enemy selector pointed at a valid target. When the roster
+  // changes (combat starts/ends, an enemy dies, the party moves rooms),
+  // re-anchor on the first living enemy; clear when there's nothing to
+  // target. Without this the selector can stick on a dead enemy id and
+  // every targeted action becomes a no-op.
+  useEffect(() => {
+    const livingEnemies =
+      gameState?.entities?.filter((e) => e.isEnemy && e.hp > 0) ?? [];
+    if (livingEnemies.length === 0) {
+      if (selectedEnemyId !== null) setSelectedEnemyId(null);
+      return;
+    }
+    const stillValid = livingEnemies.some((e) => e.id === selectedEnemyId);
+    if (!stillValid) setSelectedEnemyId(livingEnemies[0].id);
+  }, [gameState?.entities, selectedEnemyId]);
+
   useEffect(() => {
     api
       .getMe()
@@ -126,6 +181,12 @@ export default function App() {
         }
       })
       .catch(() => setView('login'));
+    // Intentional mount-only init: re-running on every render-time
+    // identity change of `handleResumeSession` / `loadSessions` would
+    // re-fetch the user and re-request the resume target on each
+    // re-render, which is both wasteful and would let an in-flight
+    // resume fight with a fresh re-call. Keeping the dep list empty.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function loadSessions() {
@@ -167,14 +228,21 @@ export default function App() {
         setInventoryOpen((v) => !v);
         return;
       }
-      // Number keys pick choices when no modal blocks input
+      // Number keys pick choices when no modal blocks input. Choices that
+      // get their own dedicated UI (grid move D-pad, default-action icon
+      // row) drop out of the numbered list so the indices stay stable.
       if (inventoryOpen || mapOpen) return;
       const idx = parseInt(e.key, 10);
-      if (!isNaN(idx) && idx >= 1 && idx <= choices.length) handleChoice(choices[idx - 1]);
+      const numbered = choices.filter((c) => !ICONIZED_KINDS.has(c.kind ?? ''));
+      if (!isNaN(idx) && idx >= 1 && idx <= numbered.length) handleChoice(numbered[idx - 1]);
     }
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [view, loading, escaped, gameState, choices, inventoryOpen, mapOpen]);
+    // handleChoice closes over `history` from the useGame hook; without
+    // it in the dep list, a stale closure would dispatch with frozen
+    // history after the player takes several non-keyboard actions.
+    // Re-registering the listener on each render is cheap (one DOM op).
+  }, [view, loading, escaped, gameState, choices, inventoryOpen, mapOpen, handleChoice]);
 
   async function wrappedResumeSession(id: string) {
     await handleResumeSession(id);
@@ -377,7 +445,7 @@ export default function App() {
                             opacity: 0.4 + 0.6 * ((i + 1) / roomLog.length),
                           }}
                         >
-                          {text}
+                          <NarrativeText text={text} />
                         </p>
                       ))
                     )}
@@ -468,30 +536,88 @@ export default function App() {
                       </button>
                     </div>
                   ) : (
-                    <ul
-                      className={styles.choices}
-                      data-testid="choices-list"
-                      aria-label="Available actions"
-                      style={{ listStyle: 'none', margin: 0, padding: 0 }}
-                    >
+                    <>
+                      {!loading && (
+                        <MoveDPad
+                          choices={choices.filter((c) => c.kind === 'grid_move')}
+                          onChoose={handleChoice}
+                        />
+                      )}
+                      {!loading && (
+                        <DefaultActionBar
+                          choices={choices.filter((c) =>
+                            DEFAULT_ACTION_KINDS.has(c.kind ?? '')
+                          )}
+                          onChoose={handleChoice}
+                        />
+                      )}
+                      {!loading && gameState && (
+                        <EnemySelector
+                          state={gameState}
+                          seed={seed}
+                          selectedId={selectedEnemyId}
+                          onSelect={setSelectedEnemyId}
+                        />
+                      )}
+                      {!loading && (
+                        <CombatActionBar
+                          // Combat verbs are target-bearing, so route them
+                          // through the same enemy filter as the text list —
+                          // the bar then sees at most one choice per kind
+                          // (matching the EnemySelector's pick).
+                          choices={choices
+                            .filter((c) => COMBAT_ACTION_KINDS.has(c.kind ?? ''))
+                            .filter((c) => filterByTarget(c, selectedEnemyId))}
+                          onChoose={handleChoice}
+                        />
+                      )}
                       {!loading &&
-                        choices.map((c, i) => (
-                          <li key={i} style={{ listStyle: 'none' }}>
-                            <button
-                              data-testid="choice-btn"
-                              data-action-type={c.action.type}
-                              className={styles.choiceBtn}
-                              onClick={() => handleChoice(c)}
-                              onMouseEnter={() => c.aoePreview && setHoveredChoice(c)}
-                              onMouseLeave={() => setHoveredChoice(null)}
-                              aria-keyshortcuts={i < 9 ? `${i + 1}` : undefined}
-                            >
-                              <span aria-hidden="true">[{i + 1}] </span>
-                              {c.label}
-                            </button>
-                          </li>
-                        ))}
-                    </ul>
+                        (() => {
+                          const enemyFiltered = choices.filter((c) =>
+                            filterByTarget(c, selectedEnemyId)
+                          );
+                          const spellBarChoices = selectSpellBarChoices(enemyFiltered);
+                          const spellBarSet = new Set(spellBarChoices);
+                          const classFeatureChoices = enemyFiltered.filter(
+                            (c) => c.kind === 'class_feature'
+                          );
+                          const textListChoices = enemyFiltered
+                            .filter((c) => !ICONIZED_KINDS.has(c.kind ?? ''))
+                            .filter((c) => !spellBarSet.has(c));
+                          return (
+                            <>
+                              <SpellBar choices={spellBarChoices} onChoose={handleChoice} />
+                              <ClassAbilityBar
+                                choices={classFeatureChoices}
+                                onChoose={handleChoice}
+                              />
+                              <ul
+                                className={styles.choices}
+                                data-testid="choices-list"
+                                aria-label="Available actions"
+                                style={{ listStyle: 'none', margin: 0, padding: 0 }}
+                              >
+                                {textListChoices.map((c, i) => (
+                                  <li key={i} style={{ listStyle: 'none' }}>
+                                    <button
+                                      data-testid="choice-btn"
+                                      data-action-type={c.action.type}
+                                      className={styles.choiceBtn}
+                                      onClick={() => handleChoice(c)}
+                                      onMouseEnter={() => c.aoePreview && setHoveredChoice(c)}
+                                      onMouseLeave={() => setHoveredChoice(null)}
+                                      aria-keyshortcuts={i < 9 ? `${i + 1}` : undefined}
+                                    >
+                                      <span aria-hidden="true">[{i + 1}] </span>
+                                      {c.label}
+                                    </button>
+                                  </li>
+                                ))}
+                              </ul>
+                            </>
+                          );
+                        })()}
+                    </>
                   )}
 
                   <div className={styles.abortRow}>
