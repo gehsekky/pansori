@@ -6988,4 +6988,68 @@ describe('Failed precondition actions do not consume the turn', () => {
     expect(result.newState.characters[0].turn_actions.action_used).toBe(false);
     expect(result.newState.initiative_idx).toBe(0);
   });
+
+  it('Cleric in heavy armor (no proficiency) cannot cast — turn, slot, and concentration preserved', async () => {
+    // PHB p.144: casting while wearing armor you lack proficiency with fails.
+    // The guard must fire BEFORE consuming the action, the spell slot, or
+    // breaking existing concentration.
+    const state = makeRangeState(
+      { x: 1, y: 5 },
+      { x: 3, y: 5 }, // 10 ft — well within Sacred Flame's 60 ft range
+      {
+        wis: 16,
+        spells_known: ['sacred_flame', 'guiding_bolt'],
+        armor_proficiencies: ['light', 'medium', 'shield'], // no 'heavy'
+        equipped_armor: 'chain-mail-inst',
+        inventory: [
+          { instance_id: 'mace-inst', id: 'mace', name: 'Mace' },
+          { instance_id: 'chain-mail-inst', id: 'chain_mail', name: 'Chain Mail' },
+        ],
+        // Pre-existing concentration: must NOT break when the cast aborts.
+        concentrating_on: 'guiding_bolt',
+        spell_slots_max: { 1: 2 },
+        spell_slots_used: { 1: 0 },
+      }
+    );
+    const enemyId = state.entities!.find((e) => e.isEnemy)!.id;
+    const result = await takeAction({
+      action: {
+        type: 'cast_spell',
+        spellId: 'sacred_flame',
+        slotLevel: 0,
+        targetEnemyId: enemyId,
+      },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    expect(result.narrative).toMatch(/cannot cast spells while wearing/i);
+    expect(result.narrative).toMatch(/heavy/i);
+    const pc = result.newState.characters[0];
+    // Action NOT consumed
+    expect(pc.turn_actions.action_used).toBe(false);
+    // Initiative still on the player
+    expect(result.newState.initiative_idx).toBe(0);
+    // Existing concentration NOT broken
+    expect(pc.concentrating_on).toBe('guiding_bolt');
+    // For a level-1 leveled spell variant the slot would also be at risk; verify
+    // by attempting Guiding Bolt and confirming no slot is consumed.
+    const result2 = await takeAction({
+      action: {
+        type: 'cast_spell',
+        spellId: 'guiding_bolt',
+        slotLevel: 1,
+        targetEnemyId: enemyId,
+      },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    expect(result2.narrative).toMatch(/cannot cast spells while wearing/i);
+    expect(result2.newState.characters[0].spell_slots_used?.[1] ?? 0).toBe(0);
+    expect(result2.newState.characters[0].turn_actions.action_used).toBe(false);
+    expect(result2.newState.initiative_idx).toBe(0);
+  });
 });
