@@ -1,6 +1,7 @@
 import type { AuthUser, CharacterInput } from '../lib/api';
 import { useEffect, useState } from 'react';
 import type { FrontendContext } from '../types';
+import { SPECIES } from '../data/species';
 import { applyTheme } from '../App';
 import styles from '../styles.module.css';
 
@@ -103,6 +104,7 @@ const DEFAULT_COMPOSITION_BY_SIZE: Record<number, string[]> = {
 interface CharDraft {
   name: string;
   cls: string;
+  speciesId: string;
   backgroundId: string;
   stats: StatBlock;
   // PHB p.12-13 — 'roll' = 4d6-drop-lowest six times, 'array' = the
@@ -136,6 +138,7 @@ function CharScreen({
     {
       name: localStorage.getItem('operative_name') || '',
       cls: selectedCtxForInit?.classes[0]?.id ?? '',
+      speciesId: 'human',
       backgroundId: selectedCtxForInit?.backgrounds?.[0]?.id ?? '',
       stats: rollStatBlock(),
       portrait: user?.avatar_url ?? null,
@@ -221,6 +224,7 @@ function CharScreen({
       {
         name: '',
         cls: classes[0]?.id ?? '',
+        speciesId: 'human',
         backgroundId: selectedCtx?.backgrounds?.[0]?.id ?? '',
         stats: rollStatBlock(),
         portrait: null,
@@ -252,6 +256,7 @@ function CharScreen({
       composition.map((cls) => ({
         name: cls,
         cls,
+        speciesId: 'human',
         backgroundId: selectedCtxForInit.backgrounds?.[0]?.id ?? '',
         // Roll 4d6-drop-lowest x6, then assign the highest to the class's
         // primary stat and the 2nd-highest to CON. The rest fill in any
@@ -291,6 +296,7 @@ function CharScreen({
           stats: d.stats,
           portrait_url: d.portrait ?? undefined,
           subclass: d.subclass || undefined,
+          species: d.speciesId || undefined,
         })),
         contextId
       );
@@ -433,6 +439,71 @@ function CharScreen({
                     </div>
                   )}
                 </div>
+
+                <label className={styles.formLbl} style={{ marginTop: 12 }}>
+                  SPECIES
+                </label>
+                <select
+                  className={styles.formInp}
+                  style={{ cursor: 'pointer' }}
+                  value={draft.speciesId}
+                  onChange={(e) => updateDraft(idx, { speciesId: e.target.value })}
+                  data-testid={`species-select-${idx}`}
+                >
+                  {SPECIES.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+                {(() => {
+                  const sp = SPECIES.find((s) => s.id === draft.speciesId);
+                  if (!sp) return null;
+                  return (
+                    <div className={styles.classDesc}>
+                      <span style={{ color: 'var(--t-mid)' }}>{sp.desc}</span>
+                      <div style={{ marginTop: 4, fontSize: '0.7rem' }}>
+                        <span style={{ color: 'var(--t-dim)', letterSpacing: '0.08em' }}>
+                          SIZE:{' '}
+                        </span>
+                        <span style={{ color: 'var(--t-mid)' }}>{sp.size.toUpperCase()}</span>
+                        <span style={{ color: 'var(--t-dim)' }}> · </span>
+                        <span style={{ color: 'var(--t-dim)' }}>SPEED: </span>
+                        <span style={{ color: 'var(--t-mid)' }}>{sp.speedFt} ft</span>
+                        {sp.darkvisionFt && (
+                          <>
+                            <span style={{ color: 'var(--t-dim)' }}> · </span>
+                            <span style={{ color: 'var(--t-dim)' }}>DARKVISION: </span>
+                            <span style={{ color: 'var(--t-mid)' }}>{sp.darkvisionFt} ft</span>
+                          </>
+                        )}
+                        {sp.resistances && sp.resistances.length > 0 && (
+                          <>
+                            <span style={{ color: 'var(--t-dim)' }}> · </span>
+                            <span style={{ color: 'var(--t-dim)' }}>RESIST: </span>
+                            <span style={{ color: 'var(--t-mid)' }}>
+                              {sp.resistances.join(', ')}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                      {sp.traits.length > 0 && (
+                        <ul
+                          style={{
+                            margin: '4px 0 0',
+                            paddingLeft: '1rem',
+                            color: 'var(--t-mid)',
+                            fontSize: '0.7rem',
+                          }}
+                        >
+                          {sp.traits.map((t, i) => (
+                            <li key={i}>{t}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {backgrounds.length > 0 && (
                   <>

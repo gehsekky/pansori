@@ -16,3 +16,5 @@ export {
 } from './classes.js';
 export { BEAST_FORMS, maxBeastCRForLevel, availableBeastForms } from './beast_forms.js';
 export { SRD_MONSTERS } from './monsters.js';
+export { SRD_SPECIES } from './species.js';
+export type { Species } from './species.js';

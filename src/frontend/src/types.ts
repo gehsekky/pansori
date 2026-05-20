@@ -241,6 +241,7 @@ export interface Character {
   inspiration?: boolean;
   hide_dc?: number;
   condition_sources?: Record<string, string>;
+  species?: string;
 }
 
 // ─── NPC system ───────────────────────────────────────────────────────────────

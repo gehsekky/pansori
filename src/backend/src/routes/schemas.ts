@@ -39,6 +39,7 @@ const CharacterInputSchema = z
     stats: StatsSchema.optional(),
     portrait_url: z.string().max(2048).optional(),
     subclass: z.string().min(1).max(40).optional(),
+    species: z.string().min(1).max(40).optional(),
   })
   .strict();
 
