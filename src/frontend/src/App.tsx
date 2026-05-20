@@ -537,40 +537,6 @@ export default function App() {
                     </div>
                   ) : (
                     <>
-                      {!loading && (
-                        <MoveDPad
-                          choices={choices.filter((c) => c.kind === 'grid_move')}
-                          onChoose={handleChoice}
-                        />
-                      )}
-                      {!loading && (
-                        <DefaultActionBar
-                          choices={choices.filter((c) =>
-                            DEFAULT_ACTION_KINDS.has(c.kind ?? '')
-                          )}
-                          onChoose={handleChoice}
-                        />
-                      )}
-                      {!loading && gameState && (
-                        <EnemySelector
-                          state={gameState}
-                          seed={seed}
-                          selectedId={selectedEnemyId}
-                          onSelect={setSelectedEnemyId}
-                        />
-                      )}
-                      {!loading && (
-                        <CombatActionBar
-                          // Combat verbs are target-bearing, so route them
-                          // through the same enemy filter as the text list —
-                          // the bar then sees at most one choice per kind
-                          // (matching the EnemySelector's pick).
-                          choices={choices
-                            .filter((c) => COMBAT_ACTION_KINDS.has(c.kind ?? ''))
-                            .filter((c) => filterByTarget(c, selectedEnemyId))}
-                          onChoose={handleChoice}
-                        />
-                      )}
                       {!loading &&
                         (() => {
                           const enemyFiltered = choices.filter((c) =>
@@ -584,13 +550,72 @@ export default function App() {
                           const textListChoices = enemyFiltered
                             .filter((c) => !ICONIZED_KINDS.has(c.kind ?? ''))
                             .filter((c) => !spellBarSet.has(c));
+                          // Combat-controls container should render whenever
+                          // at least one inner bar will. EnemySelector +
+                          // MoveDPad + Default/Combat action bars all live
+                          // here; combat_active OR any iconized/spell choice
+                          // is enough to surface the region.
+                          const hasIconizedChoice = choices.some((c) =>
+                            ICONIZED_KINDS.has(c.kind ?? '')
+                          );
+                          const hasSpellBar = spellBarChoices.length > 0;
+                          const inCombat = !!gameState?.combat_active;
+                          const hasCombatControls =
+                            hasIconizedChoice || hasSpellBar || inCombat;
                           return (
                             <>
-                              <SpellBar choices={spellBarChoices} onChoose={handleChoice} />
-                              <ClassAbilityBar
-                                choices={classFeatureChoices}
-                                onChoose={handleChoice}
-                              />
+                              {hasCombatControls && (
+                                /* Combat controls — one bordered region holding
+                                   every icon-bar control (movement D-pad,
+                                   targeting selector, default actions,
+                                   combat verbs, spells, class features). */
+                                <section
+                                  className={styles.combatControls}
+                                  aria-label="Combat controls"
+                                  data-testid="combat-controls"
+                                >
+                                  <div className={styles.combatControlsTop}>
+                                    <MoveDPad
+                                      choices={choices.filter((c) => c.kind === 'grid_move')}
+                                      onChoose={handleChoice}
+                                    />
+                                    <div className={styles.combatControlsCol}>
+                                      {gameState && (
+                                        <EnemySelector
+                                          state={gameState}
+                                          seed={seed}
+                                          selectedId={selectedEnemyId}
+                                          onSelect={setSelectedEnemyId}
+                                        />
+                                      )}
+                                      <DefaultActionBar
+                                        choices={choices.filter((c) =>
+                                          DEFAULT_ACTION_KINDS.has(c.kind ?? '')
+                                        )}
+                                        onChoose={handleChoice}
+                                      />
+                                      <CombatActionBar
+                                        // Combat verbs are target-bearing, so route them
+                                        // through the same enemy filter as the text list —
+                                        // the bar then sees at most one choice per kind
+                                        // (matching the EnemySelector's pick).
+                                        choices={choices
+                                          .filter((c) => COMBAT_ACTION_KINDS.has(c.kind ?? ''))
+                                          .filter((c) => filterByTarget(c, selectedEnemyId))}
+                                        onChoose={handleChoice}
+                                      />
+                                    </div>
+                                  </div>
+                                  <SpellBar
+                                    choices={spellBarChoices}
+                                    onChoose={handleChoice}
+                                  />
+                                  <ClassAbilityBar
+                                    choices={classFeatureChoices}
+                                    onChoose={handleChoice}
+                                  />
+                                </section>
+                              )}
                               <ul
                                 className={styles.choices}
                                 data-testid="choices-list"

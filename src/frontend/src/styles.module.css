@@ -133,6 +133,51 @@
   animation: blink 1s step-end infinite;
 }
 
+/* Combat controls container — groups the icon-bar controls (MoveDPad,
+ * DefaultActionBar, EnemySelector, CombatActionBar, SpellBar,
+ * ClassAbilityBar) into a single bordered region beneath the narrative.
+ * Vertical-space savings come from (a) collapsing per-bar bottom margins
+ * to a shared gap, (b) placing the 3x3 D-pad alongside the selector +
+ * default + combat bars on wider screens instead of stacked below them.
+ * Empty container hides itself when no inner bar renders. */
+.combatControls {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0.75rem 0;
+  padding: 8px;
+  border: 1px solid var(--t-separator);
+  border-radius: 2px;
+  background: var(--t-card);
+}
+.combatControls:empty {
+  display: none;
+}
+/* Top row — D-pad on the left (when present) + a vertical stack of the
+ * narrow bars (selector + defaults + combat verbs) on the right. The
+ * MoveDPad self-hides out of grid combat, so the right column then
+ * fills the available width. */
+.combatControlsTop {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.combatControlsCol {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+/* Strip the per-bar bottom margins when they live inside the container;
+ * the container's gap handles inter-bar spacing. */
+.combatControls .dpad,
+.combatControls .actionBar,
+.combatControls .enemySelector {
+  margin-bottom: 0;
+}
+
 /* Movement D-pad — 3x3 grid of arrow buttons that replaces the 8-row
  * vertical list of "Move N → (3,4)" text buttons. Center cell shows
  * remaining movement budget. */
