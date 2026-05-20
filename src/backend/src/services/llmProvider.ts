@@ -22,9 +22,19 @@ class NoneProvider implements LLMProvider {
 
 // ─── Anthropic provider ───────────────────────────────────────────────────────
 
+// Audit notes (2026-05-20):
+// - Token-stripping protects {{kind|display}} markers from LLM mangling.
+// - gameEngine.ts adds a post-enhance preservesCriticalFacts() guard:
+//   if the LLM drops a multi-digit number or an outcome word like
+//   "killed"/"downed"/"critical", the engine falls back to the raw
+//   tokenised narrative. The LLM only ships when its output is faithful.
+// - Open follow-up: cost circuit-breaker (every action invokes the LLM)
+//   and side-by-side comparison of LLM vs no-LLM mode.
+
 const SYSTEM_PROMPT = (meta: NarrativeMeta) =>
   `You are a narrative writer for a tabletop RPG called "${meta.worldName}". ` +
-  `The player is ${meta.charName}, a ${meta.charClass}, currently in ${meta.roomName}. ` +
+  `The active character is ${meta.charName}, a ${meta.charClass}, currently in ${meta.roomName}. ` +
+  `The narrative may span multiple party members (lines prefixed with "[CharName] " — preserve those prefixes verbatim). ` +
   `Rewrite the following game event as vivid, atmospheric prose of 1–3 sentences. ` +
   `Rules: keep ALL facts, numbers, damage values, and outcomes exactly as given. ` +
   `Do not invent new events, items, or characters. Return only the prose — no preamble.`;
