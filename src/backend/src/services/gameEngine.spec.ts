@@ -5373,6 +5373,109 @@ describe('cast_spell — Bless (level 1, concentration buff)', () => {
     expect(clericAfter?.conditions ?? []).not.toContain('blessed');
     expect(rogueAfter?.conditions ?? []).not.toContain('blessed');
   });
+
+  it("casting Bless initialises rounds_left to 10 (1 minute SRD default)", async () => {
+    const cleric = makeChar({
+      id: 'cleric-cast',
+      character_class: 'Cleric',
+      wis: 14,
+      spell_slots_max: { 1: 2 },
+      spells_known: ['bless'],
+      prepared_spells: ['bless'],
+    });
+    const state: GameState = {
+      ...makeState(),
+      characters: [cleric],
+      active_character_id: cleric.id,
+      current_room: ctx.startRoomId,
+      combat_active: false,
+    };
+    const result = await takeAction({
+      action: { type: 'cast_spell', spellId: 'bless', slotLevel: 1 },
+      history: [],
+      state,
+      seed: spellSeed,
+      context: ctxWithRage,
+    });
+    const casterAfter = result.newState.characters[0];
+    expect(casterAfter.concentrating_on?.spellId).toBe('bless');
+    expect(casterAfter.concentrating_on?.rounds_left).toBe(10);
+  });
+
+  it("concentration auto-ends when rounds_left ticks to 0", async () => {
+    // Cleric with Bless that has 1 round left + Rogue blessed by them.
+    // PC end_turn → enemy turn → round wraps → tick drops to 0 → Bless ends.
+    vi.spyOn(Math, 'random').mockReturnValue(0); // enemy misses
+    const cleric = makeChar({
+      id: 'cleric-tick',
+      character_class: 'Cleric',
+      conditions: ['blessed'],
+      condition_sources: { blessed: 'cleric-tick' },
+      concentrating_on: { spellId: 'bless', rounds_left: 1 },
+    });
+    const rogue = makeChar({
+      id: 'rogue-tick',
+      character_class: 'Rogue',
+      conditions: ['blessed'],
+      condition_sources: { blessed: 'cleric-tick' },
+    });
+    const enemyId = `${CORRIDOR_ID}#0`;
+    const state: GameState = {
+      ...makeState(),
+      characters: [cleric, rogue],
+      active_character_id: cleric.id,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      combat_active: true,
+      initiative_order: [
+        { id: cleric.id, roll: 20, is_enemy: false },
+        { id: enemyId, roll: 5, is_enemy: true },
+      ],
+      initiative_idx: 0,
+      entities: [
+        {
+          id: cleric.id,
+          isEnemy: false,
+          pos: { x: 5, y: 5 },
+          hp: cleric.hp,
+          maxHp: cleric.max_hp,
+          conditions: ['blessed'],
+          condition_durations: {},
+        },
+        {
+          id: rogue.id,
+          isEnemy: false,
+          pos: { x: 4, y: 5 },
+          hp: rogue.hp,
+          maxHp: rogue.max_hp,
+          conditions: ['blessed'],
+          condition_durations: {},
+        },
+        {
+          id: enemyId,
+          isEnemy: true,
+          pos: { x: 7, y: 7 },
+          hp: 10,
+          maxHp: 10,
+          conditions: [],
+          condition_durations: {},
+        },
+      ],
+    };
+    const result = await takeAction({
+      action: { type: 'end_turn' },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    const clericAfter = result.newState.characters.find((c) => c.id === 'cleric-tick');
+    const rogueAfter = result.newState.characters.find((c) => c.id === 'rogue-tick');
+    expect(clericAfter?.concentrating_on).toBeFalsy();
+    expect(clericAfter?.conditions ?? []).not.toContain('blessed');
+    expect(rogueAfter?.conditions ?? []).not.toContain('blessed');
+    expect(result.narrative).toMatch(/concentration duration expired/);
+  });
 });
 
 describe('spell slots — long rest resets used slots', () => {

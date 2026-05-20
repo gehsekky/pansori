@@ -328,6 +328,12 @@ export interface Spell {
   conditionDuration?: number; // rounds; undefined = permanent until cleared
   narrative?: string; // override text for utility spells
   concentration?: boolean; // true = breaks if caster takes damage and fails CON save
+  // Round budget for concentration spells (SRD 5.2.1 — 1 round = 6 sec).
+  // 10 rounds = 1 minute (the default for Bless, Hold Person, Bane, etc.);
+  // 100 rounds = 10 minutes (Spirit Guardians); 600 rounds = 1 hour
+  // (Hex, Detect Magic-as-concentration). Only used when concentration is
+  // true. Defaults to 10 if unspecified.
+  durationRounds?: number;
   upcastBonus?: string; // extra dice per slot above base level, e.g. '1d6'
   blastRadius?: number; // AOE radius in feet; undefined = single target
   // SRD 5.2.1 p.193 — Areas of Effect. Default is 'sphere' (radius from a point).
@@ -465,7 +471,16 @@ export interface Character {
   // Cleared on dismiss_wild_shape.
   wild_shape_form?: string;
   attuned_items: string[]; // instance_ids of attuned magic items (max 3)
-  concentrating_on?: { spellId: string; condition?: string } | null;
+  // `rounds_left` ticks down on each round wrap; concentration ends
+  // automatically when it reaches 0. 10 rounds = 1 minute (the most
+  // common duration). Default applied on cast if the Spell entry
+  // doesn't specify; longer-lasting buffs (Spirit Guardians = 100,
+  // Hex = ~600) override via Spell.durationRounds.
+  concentrating_on?: {
+    spellId: string;
+    condition?: string;
+    rounds_left?: number;
+  } | null;
   // Extended 5e fields
   subclass?: string; // e.g. 'battle_master', 'thief', 'evoker'
   speed?: number; // movement speed in feet; defaults to 30
