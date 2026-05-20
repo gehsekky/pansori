@@ -267,24 +267,18 @@
   cursor: not-allowed;
 }
 
-/* Combat action bar — single-line variant. The buttons live on one
- * horizontal row (icon + label inline) with a vertical separator between
- * them, rendered as a left border on every button after the first. The
- * row itself is wrapped in a hairline border so it reads as a unified
- * "combat verbs" toolbar rather than four separate buttons. */
-.combatActionBar {
+/* Inline action bar — single-line variant for both Default and Combat
+ * action groups. The buttons live on one horizontal row (icon + label
+ * inline) with a vertical separator between them, rendered as a
+ * left border on every button after the first. A parent
+ * .combinedActionBar wraps one OR TWO of these groups (Default + Combat)
+ * inside a single hairline-bordered toolbar so eight verbs read as one
+ * coherent control surface rather than two stacked rows. */
+.inlineActionBar {
   display: flex;
   align-items: stretch;
-  flex-wrap: wrap;
-  margin: 0 0 0.75rem 0;
-  border: 1px solid var(--t-border);
-  border-radius: 2px;
-  background: var(--t-card);
-  /* Hide any wrapping seam by clipping bordered-children to the
-   * container's rounded corners. */
-  overflow: hidden;
 }
-.combatActionBtn {
+.inlineActionBtn {
   background: transparent;
   color: var(--t-primary);
   border: none;
@@ -301,23 +295,46 @@
     color 0.15s,
     background 0.15s;
 }
-.combatActionBtn:hover:not(:disabled) {
+.inlineActionBtn:hover:not(:disabled) {
   color: var(--t-primary);
   background: var(--t-dim-dark);
 }
-.combatActionBtn + .combatActionBtn {
+.inlineActionBtn + .inlineActionBtn {
   border-left: 1px solid var(--t-separator);
 }
-.combatActionBtn :global(.ra) {
+.inlineActionBtn :global(.ra) {
   font-size: 1.1rem;
 }
-.combatActionBtnDisabled {
+.inlineActionBtnDisabled {
   opacity: 0.3;
   cursor: not-allowed;
 }
-/* Strip the bottom margin when inside the combatControls container —
+
+/* Outer wrapper: one bordered toolbar holding both inline action groups.
+ * The thicker `.combinedActionBarSep` divider sits between the Default
+ * group and the Combat group (visually heavier than the per-button
+ * dividers inside each group). When only one group renders (e.g. out of
+ * combat with no combat verbs), the separator is skipped at the call
+ * site so the toolbar just hugs the remaining bar. */
+.combinedActionBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  margin: 0 0 0.75rem 0;
+  border: 1px solid var(--t-border);
+  border-radius: 2px;
+  background: var(--t-card);
+  overflow: hidden;
+}
+.combinedActionBarSep {
+  width: 1px;
+  background: var(--t-border);
+  align-self: stretch;
+  margin: 4px 6px;
+}
+/* Strip bottom margin when inside the combatControls container —
  * mirrors the same override used for .actionBar / .enemySelector. */
-.combatControls .combatActionBar {
+.combatControls .combinedActionBar {
   margin-bottom: 0;
 }
 

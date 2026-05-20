@@ -600,22 +600,50 @@ export default function App() {
                                           onSelect={setSelectedEnemyId}
                                         />
                                       )}
-                                      <DefaultActionBar
-                                        choices={choices.filter((c) =>
+                                      {(() => {
+                                        // Default + Combat actions live in one
+                                        // bordered toolbar with a thicker vertical
+                                        // separator between the two groups. Each
+                                        // group self-hides when it has no choices;
+                                        // the separator only renders when BOTH
+                                        // groups have something to show.
+                                        const defaultChoices = choices.filter((c) =>
                                           DEFAULT_ACTION_KINDS.has(c.kind ?? '')
-                                        )}
-                                        onChoose={handleChoice}
-                                      />
-                                      <CombatActionBar
-                                        // Combat verbs are target-bearing, so route them
-                                        // through the same enemy filter as the text list —
-                                        // the bar then sees at most one choice per kind
-                                        // (matching the EnemySelector's pick).
-                                        choices={choices
-                                          .filter((c) => COMBAT_ACTION_KINDS.has(c.kind ?? ''))
-                                          .filter((c) => filterByTarget(c, selectedEnemyId))}
-                                        onChoose={handleChoice}
-                                      />
+                                        );
+                                        const combatChoices = choices
+                                          .filter((c) =>
+                                            COMBAT_ACTION_KINDS.has(c.kind ?? '')
+                                          )
+                                          .filter((c) =>
+                                            filterByTarget(c, selectedEnemyId)
+                                          );
+                                        const hasDefault = defaultChoices.length > 0;
+                                        const hasCombat = combatChoices.length > 0;
+                                        if (!hasDefault && !hasCombat) return null;
+                                        return (
+                                          <div
+                                            className={styles.combinedActionBar}
+                                            role="group"
+                                            aria-label="Default and combat actions"
+                                            data-testid="combined-action-bar"
+                                          >
+                                            <DefaultActionBar
+                                              choices={defaultChoices}
+                                              onChoose={handleChoice}
+                                            />
+                                            {hasDefault && hasCombat && (
+                                              <span
+                                                className={styles.combinedActionBarSep}
+                                                aria-hidden="true"
+                                              />
+                                            )}
+                                            <CombatActionBar
+                                              choices={combatChoices}
+                                              onChoose={handleChoice}
+                                            />
+                                          </div>
+                                        );
+                                      })()}
                                     </div>
                                   </div>
                                   <SpellBar
