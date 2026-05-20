@@ -97,7 +97,7 @@ function SpellBar({ choices, onChoose, disabled }: Props) {
   return (
     <div
       data-testid="spell-bar"
-      className={styles.actionBar}
+      className={styles.inlineActionBar}
       role="group"
       aria-label="Spells"
     >
@@ -107,7 +107,7 @@ function SpellBar({ choices, onChoose, disabled }: Props) {
           <button
             key={g.spellId}
             type="button"
-            className={styles.actionBtn}
+            className={styles.inlineActionBtn}
             disabled={disabled}
             aria-label={g.choice.label}
             title={g.choice.label}

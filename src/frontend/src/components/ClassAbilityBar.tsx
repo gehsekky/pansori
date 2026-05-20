@@ -102,7 +102,7 @@ function ClassAbilityBar({ choices, onChoose, disabled }: Props) {
   return (
     <div
       data-testid="class-ability-bar"
-      className={styles.actionBar}
+      className={styles.inlineActionBar}
       role="group"
       aria-label="Class abilities"
     >
@@ -114,7 +114,7 @@ function ClassAbilityBar({ choices, onChoose, disabled }: Props) {
           <button
             key={`${featureId}-${i}`}
             type="button"
-            className={styles.actionBtn}
+            className={styles.inlineActionBtn}
             disabled={disabled}
             aria-label={c.label}
             title={c.label}
