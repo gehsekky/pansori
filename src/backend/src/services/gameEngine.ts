@@ -1777,6 +1777,26 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       label: `Talk to ${npc.name}${dcNote}${questNote}`,
       action: { type: 'talk' },
     });
+    // Dialogue responses become clickable once the party has greeted
+    // the NPC. The `talk` handler surfaces "[1. X | 2. Y | 3. Z]" in
+    // the narrative; without these matching choices the player saw
+    // the prompt but had no button to click it. The numbered label
+    // mirrors the inline hint so the player can match prompts to
+    // actions at a glance.
+    if (
+      (state.npc_talked ?? []).includes(roomId) &&
+      attitude !== 'indifferent' &&
+      npc.responses?.length
+    ) {
+      for (let i = 0; i < npc.responses.length; i++) {
+        if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+        const resp = npc.responses[i];
+        choices.push({
+          label: `${i + 1}. ${resp.label}`,
+          action: { type: 'talk_response', responseIdx: i },
+        });
+      }
+    }
     // Explicit "Accept quest" choice per unaccepted quest from this giver
     for (const q of availableQuests) {
       if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
