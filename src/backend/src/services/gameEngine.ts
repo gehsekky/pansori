@@ -4667,25 +4667,35 @@ export async function takeAction({
         );
         // Bardic Inspiration consumption on attack roll (2024 PHB p.52).
         // If the wielder has a stashed BI die, roll it and add to the to-hit
-        // total. If that turns a miss into a hit, atk.hit flips to true.
+        // total. If that turns a miss into a hit, atk.hit flips to true AND
+        // we need to roll damage (resolvePlayerAttack returned damage=0 on
+        // the original miss; flipping hit without rolling damage produced
+        // {{dmg|0}} hit narratives).
         let biNote = '';
         if (char.bardic_inspiration_die && !atk.fumble) {
           const biRoll = rollDice(`1${char.bardic_inspiration_die}`);
           atk.total += biRoll;
           const newHit = atk.roll === 20 || atk.total >= effectiveEnemyAc;
-          if (!atk.hit && newHit) atk.hit = true;
+          if (!atk.hit && newHit) {
+            atk.hit = true;
+            atk.damage = Math.max(1, rollDice(weaponDamage ?? '1d4') + atk.atkMod);
+          }
           biNote = ` ✦ Bardic Inspiration: +${biRoll} (${char.bardic_inspiration_die})`;
           char.bardic_inspiration_die = undefined;
         }
         // Bless (PHB p.219): blessed creatures add +1d4 to attack rolls.
         // Doesn't consume; the buff lasts until the caster's concentration
-        // drops. Surfaced in atkNote alongside Bardic Inspiration.
+        // drops. Surfaced in atkNote alongside Bardic Inspiration. Same
+        // miss-to-hit damage-roll concern as BI above.
         let blessNote = '';
         if ((char.conditions ?? []).includes('blessed') && !atk.fumble) {
           const blessRoll = rollDice('1d4');
           atk.total += blessRoll;
           const newHit = atk.roll === 20 || atk.total >= effectiveEnemyAc;
-          if (!atk.hit && newHit) atk.hit = true;
+          if (!atk.hit && newHit) {
+            atk.hit = true;
+            atk.damage = Math.max(1, rollDice(weaponDamage ?? '1d4') + atk.atkMod);
+          }
           blessNote = ` ✦ Bless: +${blessRoll} (1d4)`;
         }
         // Unconscious or Assassin-surprised: force crit on hit
@@ -4862,8 +4872,17 @@ export async function takeAction({
         if (isCrit && assassinAutoCrit)
           narrative += ` [Assassinate — auto-crit on surprised target!]`;
         if (sacredWeaponBonus > 0) narrative += ` [Sacred Weapon: +${sacredWeaponBonus} to hit]`;
-        if (sneakDmg > 0)
-          narrative += ` [Sneak Attack ${sneakAttackDice(char.level)}: +${sneakDmg}]`;
+        if (sneakDmg > 0) {
+          // Crits double the Sneak Attack die count too (SRD 5.2.1 crit
+          // rule applies to ALL dice rolled for the attack, including
+          // Sneak Attack). Show the doubled expression on crits so
+          // "1d6: +9" doesn't read as an impossible roll.
+          const saExpr = sneakAttackDice(char.level);
+          const saLabel = isCrit
+            ? `${parseInt(saExpr) * 2}d6 (crit)`
+            : saExpr;
+          narrative += ` [Sneak Attack ${saLabel}: +${sneakDmg}]`;
+        }
         if (rageBonus > 0) narrative += ` [Rage: +${rageBonus}]`;
         if (dmgNote) narrative += dmgNote;
 
