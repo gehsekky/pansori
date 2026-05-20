@@ -159,7 +159,10 @@
  * fills the available width. */
 .combatControlsTop {
   display: flex;
-  gap: 8px;
+  /* Wider gap separates the directional D-pad from the toolbar stack
+   * so the two regions read as distinct controls rather than crammed
+   * together. */
+  gap: 18px;
   align-items: flex-start;
   flex-wrap: wrap;
 }
@@ -325,6 +328,11 @@
   border-radius: 2px;
   background: var(--t-card);
   overflow: hidden;
+  /* Match a single MoveDPad button (44 px) so the toolbar column aligns
+   * row-by-row with the D-pad on the left. `box-sizing: border-box`
+   * keeps the 44 px outer height even with the 1 px border. */
+  min-height: 44px;
+  box-sizing: border-box;
 }
 .combinedActionBarSep {
   width: 1px;
@@ -352,6 +360,10 @@
   border: 1px solid var(--t-border);
   border-radius: 2px;
   background: var(--t-card);
+  /* Same 44 px row as the toolbars below — keeps the column on a tidy
+   * horizontal grid that matches the D-pad button height. */
+  min-height: 44px;
+  box-sizing: border-box;
 }
 .enemySelectorLabel {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
