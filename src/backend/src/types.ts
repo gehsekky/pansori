@@ -172,6 +172,11 @@ export interface EnemyTemplate {
   castChance?: number;
   spellSaveDC?: number;
   spellAttackBonus?: number;
+  // Tactical movement (SRD 5.2.1 p.190). Engine-level defaults: 5 ft melee
+  // reach, 30 ft walking speed. Override for reach weapons (10 ft) or
+  // larger/faster monsters.
+  attackReachFt?: number;
+  speedFt?: number;
   // HP-threshold phase transitions for boss encounters. Order does not
   // matter — engine sorts by descending hpPct internally.
   phases?: BossPhase[];
@@ -211,6 +216,11 @@ export interface Enemy {
   castChance?: number; // 0..1 probability per turn; 0 or undefined = never cast
   spellSaveDC?: number; // DC for save-based spells; defaults to 8 + prof(CR-derived) + caster mod
   spellAttackBonus?: number; // +mod for spell-attack-roll spells; defaults to toHit
+  // Tactical movement (SRD 5.2.1 p.190). Mirrors EnemyTemplate fields and is
+  // carried through procgen. attackReachFt defaults to 5 ft (the default
+  // melee reach); speedFt defaults to 30 ft (the default humanoid walk).
+  attackReachFt?: number;
+  speedFt?: number;
   // Boss phase definitions (carried over from template). Runtime phase
   // index lives on the matching CombatEntity, not here, so phase progress
   // survives state serialization without touching the seed payload.

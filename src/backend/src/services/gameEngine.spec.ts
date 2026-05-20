@@ -7006,7 +7006,7 @@ describe('Failed precondition actions do not consume the turn', () => {
           { instance_id: 'chain-mail-inst', id: 'chain_mail', name: 'Chain Mail' },
         ],
         // Pre-existing concentration: must NOT break when the cast aborts.
-        concentrating_on: 'guiding_bolt',
+        concentrating_on: { spellId: 'guiding_bolt' },
         spell_slots_max: { 1: 2 },
         spell_slots_used: { 1: 0 },
       }
@@ -7032,7 +7032,7 @@ describe('Failed precondition actions do not consume the turn', () => {
     // Initiative still on the player
     expect(result.newState.initiative_idx).toBe(0);
     // Existing concentration NOT broken
-    expect(pc.concentrating_on).toBe('guiding_bolt');
+    expect(pc.concentrating_on?.spellId).toBe('guiding_bolt');
     // For a level-1 leveled spell variant the slot would also be at risk; verify
     // by attempting Guiding Bolt and confirming no slot is consumed.
     const result2 = await takeAction({
@@ -7051,5 +7051,326 @@ describe('Failed precondition actions do not consume the turn', () => {
     expect(result2.newState.characters[0].spell_slots_used?.[1] ?? 0).toBe(0);
     expect(result2.newState.characters[0].turn_actions.action_used).toBe(false);
     expect(result2.newState.initiative_idx).toBe(0);
+  });
+});
+
+describe('Enemy tactical movement (must close distance to melee)', () => {
+  // Standard 1v1 grid combat with adjustable enemy stats. The PC always sits
+  // at (1, 1); the enemy at the supplied position. Initiative starts on the
+  // PC so a single end_turn drives one full enemy turn cycle.
+  function makeMoveState(
+    enemyPos: { x: number; y: number },
+    enemyOverrides: Partial<Enemy> = {}
+  ): { state: GameState; mySeed: Seed; enemyId: string } {
+    const fighter = makeChar({
+      id: 'pc-1',
+      character_class: 'Fighter',
+      str: 16,
+      dex: 14,
+      armor_proficiencies: ['light', 'medium', 'heavy', 'shield'],
+      weapon_proficiencies: ['simple', 'martial'],
+      equipped_weapon: 'longsword-inst',
+      inventory: [{ instance_id: 'longsword-inst', id: 'longsword', name: 'Longsword' }],
+    });
+    const enemyId = `${CORRIDOR_ID}#0`;
+    const mySeed: Seed = {
+      ...seed,
+      enemies: {
+        [CORRIDOR_ID]: [
+          {
+            id: enemyId,
+            name: 'Goblin',
+            hp: 10,
+            ac: 12,
+            damage: '1d4', // Low damage so a hit doesn't drop a fresh PC
+            toHit: 3,
+            xp: 20,
+            ...enemyOverrides,
+          },
+        ],
+      },
+    };
+    const state: GameState = {
+      characters: [fighter],
+      active_character_id: fighter.id,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: true,
+      initiative_order: [
+        { id: fighter.id, roll: 18, is_enemy: false },
+        { id: enemyId, roll: 10, is_enemy: true },
+      ],
+      initiative_idx: 0,
+      entities: [
+        {
+          id: fighter.id,
+          isEnemy: false,
+          pos: { x: 1, y: 1 },
+          hp: 20,
+          maxHp: 20,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: enemyId,
+          isEnemy: true,
+          pos: enemyPos,
+          hp: 10,
+          maxHp: 10,
+          conditions: [],
+          condition_durations: {},
+        },
+      ],
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      flags: {},
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+      round: 1,
+      movement_used: {},
+    };
+    return { state, mySeed, enemyId };
+  }
+
+  it('Distant enemy with default speed walks into reach and attacks', async () => {
+    // Enemy starts at (7, 7) — Chebyshev 6 from PC at (1, 1) = 30 ft. Speed
+    // 30 ft = 6 squares; reach 5 ft = 1 square. The closest unoccupied in-reach
+    // square is at distance 5 from the enemy, so the enemy makes it in one
+    // turn and attacks.
+    const { state, mySeed, enemyId } = makeMoveState({ x: 7, y: 7 });
+    const result = await takeAction({
+      action: { type: 'end_turn' },
+      history: [],
+      state,
+      seed: mySeed,
+      context: ctx,
+    });
+    const finalEnemyEnt = result.newState.entities!.find((e) => e.id === enemyId);
+    expect(finalEnemyEnt).toBeDefined();
+    // Enemy must have moved (no longer at (7, 7))
+    expect(finalEnemyEnt!.pos).not.toEqual({ x: 7, y: 7 });
+    // Final position must be within reach (5 ft = 1 square Chebyshev) of PC
+    const pcPos = result.newState.entities!.find((e) => e.id === 'pc-1')!.pos;
+    const finalDist = Math.max(
+      Math.abs(finalEnemyEnt!.pos.x - pcPos.x),
+      Math.abs(finalEnemyEnt!.pos.y - pcPos.y)
+    );
+    expect(finalDist).toBeLessThanOrEqual(1);
+    expect(result.narrative).toMatch(/closes \d+ ft/i);
+    // PC's HP may or may not have dropped (depends on the d20), but the
+    // engine emitted an attack roll — the enemy didn't skip combat.
+    expect(result.narrative).toMatch(/Goblin/i);
+  });
+
+  it('Enemy already in reach attacks without moving', async () => {
+    // Enemy at (2, 1) — 5 ft from PC; already in reach.
+    const { state, mySeed, enemyId } = makeMoveState({ x: 2, y: 1 });
+    const result = await takeAction({
+      action: { type: 'end_turn' },
+      history: [],
+      state,
+      seed: mySeed,
+      context: ctx,
+    });
+    const finalEnemyEnt = result.newState.entities!.find((e) => e.id === enemyId);
+    expect(finalEnemyEnt!.pos).toEqual({ x: 2, y: 1 });
+    expect(result.narrative).not.toMatch(/closes \d+ ft/i);
+  });
+
+  it('Slow enemy that cannot close advances but does not attack', async () => {
+    // Speed 10 ft = 2 squares. Enemy at (7, 7), PC at (1, 1) — 30 ft apart.
+    // After moving 2 squares it's still > 5 ft away. No attack this turn.
+    const { state, mySeed, enemyId } = makeMoveState(
+      { x: 7, y: 7 },
+      { speedFt: 10 }
+    );
+    const pcHpBefore = state.characters[0].hp;
+    const result = await takeAction({
+      action: { type: 'end_turn' },
+      history: [],
+      state,
+      seed: mySeed,
+      context: ctx,
+    });
+    const finalEnemyEnt = result.newState.entities!.find((e) => e.id === enemyId);
+    // Enemy moved (no longer at start)
+    expect(finalEnemyEnt!.pos).not.toEqual({ x: 7, y: 7 });
+    const pcPos = result.newState.entities!.find((e) => e.id === 'pc-1')!.pos;
+    const finalDist = Math.max(
+      Math.abs(finalEnemyEnt!.pos.x - pcPos.x),
+      Math.abs(finalEnemyEnt!.pos.y - pcPos.y)
+    );
+    // Still out of reach
+    expect(finalDist).toBeGreaterThan(1);
+    expect(result.narrative).toMatch(/still out of reach/i);
+    // PC HP unchanged
+    expect(result.newState.characters[0].hp).toBe(pcHpBefore);
+  });
+
+  it('Reach-weapon enemy (10 ft) hits at 10 ft without moving', async () => {
+    // attackReachFt: 10 → Chebyshev ≤ 2 counts as in reach. Enemy at (3, 1) is
+    // 10 ft from PC.
+    const { state, mySeed, enemyId } = makeMoveState(
+      { x: 3, y: 1 },
+      { attackReachFt: 10 }
+    );
+    const result = await takeAction({
+      action: { type: 'end_turn' },
+      history: [],
+      state,
+      seed: mySeed,
+      context: ctx,
+    });
+    const finalEnemyEnt = result.newState.entities!.find((e) => e.id === enemyId);
+    expect(finalEnemyEnt!.pos).toEqual({ x: 3, y: 1 });
+    expect(result.narrative).not.toMatch(/closes \d+ ft/i);
+  });
+
+  it("PC opportunity attack fires when enemy leaves the PC's threat zone", async () => {
+    // Two-PC layout. The enemy's nearest-target filter excludes companions,
+    // so we flag PC1 as `isCompanion: true` on the grid entity only — PC1 is
+    // still a regular character. That forces the enemy to target PC2 (far
+    // away). The path past PC1's threat zone triggers PC1's reaction OA.
+    // After: the enemy reaches PC2, PC1's reaction is consumed, and the OA
+    // narrative is in the result string.
+    const pc1 = makeChar({
+      id: 'pc-1',
+      character_class: 'Fighter',
+      str: 16,
+      dex: 14,
+      weapon_proficiencies: ['simple', 'martial'],
+      equipped_weapon: 'longsword-inst',
+      inventory: [{ instance_id: 'longsword-inst', id: 'longsword', name: 'Longsword' }],
+    });
+    const pc2 = makeChar({ id: 'pc-2', character_class: 'Cleric' });
+    const enemyId = `${CORRIDOR_ID}#0`;
+    const mySeed: Seed = {
+      ...seed,
+      enemies: {
+        [CORRIDOR_ID]: [
+          {
+            id: enemyId,
+            name: 'Bandit',
+            hp: 20,
+            ac: 12,
+            damage: '1d4',
+            toHit: 3,
+            xp: 20,
+          },
+        ],
+      },
+    };
+    const state: GameState = {
+      characters: [pc1, pc2],
+      active_character_id: pc1.id,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: true,
+      // pc-2 is intentionally NOT in initiative_order — that way one end_turn
+      // from pc-1 advances straight to the enemy slot. pc-2 is still present
+      // as an entity, so the enemy can target it.
+      initiative_order: [
+        { id: pc1.id, roll: 20, is_enemy: false },
+        { id: enemyId, roll: 10, is_enemy: true },
+      ],
+      initiative_idx: 0,
+      entities: [
+        {
+          id: pc1.id,
+          isEnemy: false,
+          // Hack: isCompanion: true excludes pc-1 from the enemy's target
+          // filter while leaving it visible to the OA pass. The OA pass
+          // looks up the character record (which is alive with full HP).
+          isCompanion: true,
+          pos: { x: 4, y: 4 },
+          hp: 10,
+          maxHp: 10,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: pc2.id,
+          isEnemy: false,
+          pos: { x: 1, y: 5 },
+          hp: 10,
+          maxHp: 10,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: enemyId,
+          isEnemy: true,
+          pos: { x: 5, y: 5 },
+          hp: 20,
+          maxHp: 20,
+          conditions: [],
+          condition_durations: {},
+        },
+      ],
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      flags: {},
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+      round: 1,
+      movement_used: {},
+    };
+    const result = await takeAction({
+      action: { type: 'end_turn' },
+      history: [],
+      state,
+      seed: mySeed,
+      context: ctx,
+    });
+    // The OA narrative names the PC by name — and *only* PC-1 should be the
+    // one OA'ing, since PC-2 was never adjacent to the enemy's start square.
+    expect(result.narrative).toMatch(/Test Hero opportunity attack/i);
+    expect(result.narrative).not.toMatch(/pc-2 opportunity attack/i);
+    // The enemy should have ended its turn adjacent to PC-2 (i.e. moved).
+    const finalEnemyEnt = result.newState.entities!.find((e) => e.id === enemyId);
+    expect(finalEnemyEnt!.pos).not.toEqual({ x: 5, y: 5 });
+    const pc2Pos = result.newState.entities!.find((e) => e.id === 'pc-2')!.pos;
+    const distToPc2 = Math.max(
+      Math.abs(finalEnemyEnt!.pos.x - pc2Pos.x),
+      Math.abs(finalEnemyEnt!.pos.y - pc2Pos.y)
+    );
+    expect(distToPc2).toBeLessThanOrEqual(1);
+  });
+
+  it('Grappled enemy cannot move and does not attack a distant PC', async () => {
+    // Enemy at (7, 7), grappled. Speed effectively 0. PC at (1, 1) is out of
+    // reach. The enemy can't move and can't attack.
+    const { state, mySeed, enemyId } = makeMoveState({ x: 7, y: 7 });
+    state.entities = state.entities!.map((e) =>
+      e.id === enemyId ? { ...e, conditions: ['grappled'] } : e
+    );
+    const pcHpBefore = state.characters[0].hp;
+    const result = await takeAction({
+      action: { type: 'end_turn' },
+      history: [],
+      state,
+      seed: mySeed,
+      context: ctx,
+    });
+    const finalEnemyEnt = result.newState.entities!.find((e) => e.id === enemyId);
+    expect(finalEnemyEnt!.pos).toEqual({ x: 7, y: 7 });
+    expect(result.narrative).toMatch(/held in place/i);
+    expect(result.newState.characters[0].hp).toBe(pcHpBefore);
   });
 });

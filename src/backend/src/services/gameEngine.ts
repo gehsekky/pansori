@@ -46,6 +46,7 @@ import type {
   GameChoice,
   GameConsequence,
   GameState,
+  GridPos,
   InventoryItem,
   LootItem,
   NpcAttitude,
@@ -2744,6 +2745,161 @@ interface EnemyTurnResult {
   paused: boolean;
 }
 
+// Tactical-grid approach planner for an enemy that wants to melee `targetPos`.
+// Returns the destination square (within `reachFt` of target, unoccupied) and
+// the truncated step path the enemy will walk this turn. Walks up to
+// `speedFt`; if the closest in-reach square is farther than that, the enemy
+// covers as much of the path as movement allows and `reached` is false.
+// Returns null when no path exists to any in-reach square (e.g. fully boxed
+// in by allies).
+function planEnemyApproach(args: {
+  st: GameState;
+  enemyId: string;
+  enemyPos: GridPos;
+  targetPos: GridPos;
+  reachFt: number;
+  speedFt: number;
+  context: Context;
+  roomId: string;
+}): { newPos: GridPos; pathSquares: GridPos[]; reached: boolean } | null {
+  const locationGrid = args.context.campaign?.locations?.find((l) =>
+    l.rooms?.some((r) => r.id === args.roomId)
+  );
+  const gridW = locationGrid?.gridWidth ?? args.context.gridWidth ?? 10;
+  const gridH = locationGrid?.gridHeight ?? args.context.gridHeight ?? 10;
+  const blocked = (args.st.entities ?? [])
+    .filter((e) => e.id !== args.enemyId && e.hp > 0)
+    .map((e) => e.pos);
+  const reachSquares = Math.max(1, Math.floor(args.reachFt / SQUARE_SIZE));
+  // Candidate end squares: any unoccupied square within reachSquares (Chebyshev)
+  // of the target.
+  const candidates: GridPos[] = [];
+  for (let dx = -reachSquares; dx <= reachSquares; dx++) {
+    for (let dy = -reachSquares; dy <= reachSquares; dy++) {
+      if (dx === 0 && dy === 0) continue;
+      const cand = { x: args.targetPos.x + dx, y: args.targetPos.y + dy };
+      if (cand.x < 0 || cand.x >= gridW || cand.y < 0 || cand.y >= gridH) continue;
+      if (blocked.some((b) => posEqual(b, cand))) continue;
+      candidates.push(cand);
+    }
+  }
+  // Prefer the candidate closest to the enemy's current position so the path
+  // is minimal — the enemy moves only as far as needed.
+  candidates.sort(
+    (a, b) =>
+      Math.max(Math.abs(args.enemyPos.x - a.x), Math.abs(args.enemyPos.y - a.y)) -
+      Math.max(Math.abs(args.enemyPos.x - b.x), Math.abs(args.enemyPos.y - b.y))
+  );
+  const maxSquares = Math.max(0, Math.floor(args.speedFt / SQUARE_SIZE));
+  for (const dest of candidates) {
+    const path = findPath(args.enemyPos, dest, blocked, gridW, gridH);
+    if (path && path.length > 0) {
+      const truncated = path.slice(0, maxSquares);
+      if (truncated.length === 0) {
+        // Speed 0 — no movement at all.
+        return { newPos: args.enemyPos, pathSquares: [], reached: false };
+      }
+      const newPos = truncated[truncated.length - 1];
+      const reached =
+        Math.max(
+          Math.abs(newPos.x - args.targetPos.x),
+          Math.abs(newPos.y - args.targetPos.y)
+        ) <= reachSquares;
+      return { newPos, pathSquares: truncated, reached };
+    }
+  }
+  return null;
+}
+
+// Resolves opportunity attacks PCs make against an enemy who walked out of
+// their melee threat zone (SRD 5.2.1 p.191). Mirrors the PC-side OA loop in
+// the grid_move handler: auto-fires for any PC with a reaction available and
+// a melee weapon (or unarmed) in hand, consumes the PC's reaction, applies
+// damage to the enemy entity, and marks the enemy killed if it hits 0 HP.
+// Returns early as soon as the enemy is killed so subsequent PCs don't get
+// to attack a corpse.
+function applyPcOpportunityAttacks(args: {
+  st: GameState;
+  enemyId: string;
+  oaTargets: CombatEntity[]; // PC entities whose threat zone was broken
+  enemyAc: number;
+  enemyName: string;
+  context: Context;
+}): { st: GameState; enemyKilled: boolean; narrative: string } {
+  let st = args.st;
+  let enemyHpNow =
+    st.entities?.find((e) => e.id === args.enemyId && e.isEnemy)?.hp ?? 0;
+  let enemyKilled = false;
+  let narrative = '';
+  for (const pcEnt of args.oaTargets) {
+    if (enemyKilled) break;
+    const pcIdx = st.characters.findIndex((c) => c.id === pcEnt.id);
+    if (pcIdx < 0) continue;
+    const pc = st.characters[pcIdx];
+    if (pc.dead || pc.stable || pc.hp <= 0) continue;
+    if (pc.turn_actions?.reaction_used) continue;
+    // Incapacitated PCs can't take reactions.
+    if (pc.conditions?.some((c) => ['incapacitated', 'paralyzed', 'stunned', 'unconscious'].includes(c))) continue;
+    // OA can only be made with a melee weapon (PHB p.190). Ranged-only weapons
+    // don't qualify; thrown melee weapons (handaxe, dagger) do because they
+    // have a melee profile too.
+    const weaponInstance = pc.equipped_weapon
+      ? pc.inventory?.find((i) => i.instance_id === pc.equipped_weapon)
+      : null;
+    const weaponItem = weaponInstance
+      ? args.context.lootTable.find((l) => l.id === weaponInstance.id)
+      : null;
+    if (weaponItem?.range === 'ranged' && !weaponItem.thrown) continue;
+    const weaponProficient = hasWeaponProficiency(
+      pc.weapon_proficiencies ?? [],
+      weaponItem?.weaponType
+    );
+    const atk = resolvePlayerAttack(
+      { str: pc.str, dex: pc.dex, level: pc.level },
+      weaponItem?.damage ?? null,
+      args.enemyAc,
+      weaponItem?.finesse ?? false,
+      false,
+      false,
+      weaponProficient,
+      false,
+      20,
+      0,
+      pc.species === 'halfling'
+    );
+    // Reaction consumed regardless of hit/miss.
+    st = {
+      ...st,
+      characters: st.characters.map((c, i) =>
+        i === pcIdx
+          ? { ...c, turn_actions: { ...c.turn_actions, reaction_used: true } }
+          : c
+      ),
+    };
+    if (atk.hit) {
+      enemyHpNow = Math.max(0, enemyHpNow - atk.damage);
+      narrative += ` ⚔ ${pc.name} opportunity attack hits ${args.enemyName} for ${atk.damage}!`;
+      st = {
+        ...st,
+        entities: (st.entities ?? []).map((e) =>
+          e.id === args.enemyId && e.isEnemy ? { ...e, hp: enemyHpNow } : e
+        ),
+      };
+      if (enemyHpNow <= 0) {
+        enemyKilled = true;
+        st = {
+          ...st,
+          enemies_killed: [...st.enemies_killed, args.enemyId],
+        };
+        narrative += ` ${args.enemyName} drops!`;
+      }
+    } else {
+      narrative += ` ⚔ ${pc.name} opportunity attack misses ${args.enemyName}.`;
+    }
+  }
+  return { st, enemyKilled, narrative };
+}
+
 function runEnemyTurns(args: {
   st: GameState;
   seed: Seed;
@@ -2923,8 +3079,104 @@ function runEnemyTurns(args: {
             }
           }
 
+          // ── Tactical movement step ─────────────────────────────────────────
+          // SRD 5.2.1 p.190 — an enemy that wants to melee must be within its
+          // reach. Walk along the grid up to `speedFt` toward an in-reach
+          // square next to the target. PCs whose threat zone is broken get
+          // opportunity attacks. If we can't close to reach this turn (or an
+          // OA drops the enemy), skip the attack entirely. Skipped when
+          // resuming mid-multiattack (resumeMi > 0) since the move already
+          // happened on the first sub-attack of this turn. Grappled/restrained
+          // enemies have effective speed 0 and won't move.
+          const reachFt = rm.attackReachFt ?? 5;
+          const baseSpeedFt = rm.speedFt ?? DEFAULT_SPEED_FEET;
+          const enemyEntPreMove = st.entities?.find(
+            (e) => e.id === eEntry.id && e.isEnemy
+          );
+          const targetEntPreMove = st.entities?.find((e) => e.id === target.id);
+          const enemyImmobile =
+            enemyEntPreMove?.conditions?.some(
+              (c) => c === 'grappled' || c === 'restrained'
+            ) ?? false;
+          const effectiveEnemySpeedFt = enemyImmobile ? 0 : baseSpeedFt;
+          const needsToMove =
+            !!enemyEntPreMove &&
+            !!targetEntPreMove &&
+            distanceFeet(enemyEntPreMove.pos, targetEntPreMove.pos) > reachFt;
+          if (resumeMi === 0 && needsToMove && enemyEntPreMove && targetEntPreMove) {
+            narrative += ` [${rm.name}'s turn]`;
+            const plan = planEnemyApproach({
+              st,
+              enemyId: eEntry.id,
+              enemyPos: enemyEntPreMove.pos,
+              targetPos: targetEntPreMove.pos,
+              reachFt,
+              speedFt: effectiveEnemySpeedFt,
+              context: args.context,
+              roomId: st.current_room,
+            });
+            const distBefore = distanceFeet(enemyEntPreMove.pos, targetEntPreMove.pos);
+            if (!plan || plan.pathSquares.length === 0) {
+              narrative += enemyImmobile
+                ? ` ${rm.name} is held in place (${enemyEntPreMove.conditions.includes('restrained') ? 'restrained' : 'grappled'}) and can't reach ${target.name} this turn.`
+                : ` ${rm.name} can't find a path to ${target.name} this turn.`;
+              resumeMi = 0;
+              const prevAdvIdxMove = advIdx;
+              advIdx = (advIdx + 1) % orderLen;
+              if (advIdx === 0 && prevAdvIdxMove !== 0) roundWrapped = true;
+              if (advIdx === args.initialCurrentIdx) break;
+              continue;
+            }
+            // Apply PC opportunity attacks from squares the enemy is leaving.
+            const oaTriggers = opportunityAttackTriggers(
+              enemyEntPreMove.pos,
+              plan.newPos,
+              st.entities ?? [],
+              true
+            );
+            const oaRes = applyPcOpportunityAttacks({
+              st,
+              enemyId: eEntry.id,
+              oaTargets: oaTriggers,
+              enemyAc: rm.ac,
+              enemyName: rm.name,
+              context: args.context,
+            });
+            st = oaRes.st;
+            const stepsFt = plan.pathSquares.length * SQUARE_SIZE;
+            narrative += ` ${rm.name} closes ${stepsFt} ft toward ${target.name} (${distBefore} ft → ${distanceFeet(plan.newPos, targetEntPreMove.pos)} ft).${oaRes.narrative}`;
+            if (oaRes.enemyKilled) {
+              resumeMi = 0;
+              const prevAdvIdxOa = advIdx;
+              advIdx = (advIdx + 1) % orderLen;
+              if (advIdx === 0 && prevAdvIdxOa !== 0) roundWrapped = true;
+              if (advIdx === args.initialCurrentIdx) break;
+              continue;
+            }
+            // Commit the new enemy position.
+            st = {
+              ...st,
+              entities: (st.entities ?? []).map((e) =>
+                e.id === eEntry.id ? { ...e, pos: plan.newPos } : e
+              ),
+            };
+            if (!plan.reached) {
+              narrative += ` ${rm.name} is still out of reach — no attack this round.`;
+              resumeMi = 0;
+              const prevAdvIdxStill = advIdx;
+              advIdx = (advIdx + 1) % orderLen;
+              if (advIdx === 0 && prevAdvIdxStill !== 0) roundWrapped = true;
+              if (advIdx === args.initialCurrentIdx) break;
+              continue;
+            }
+          }
+          // If we already moved we've printed the turn header; otherwise print
+          // it now so multi-attack resume narratives don't double up.
+          const movementHeaderPrinted = resumeMi === 0 && needsToMove;
           const attackCount = rm.multiattack ?? 1;
-          if (resumeMi === 0) narrative += ` [${rm.name}'s turn]`;
+          if (resumeMi === 0 && !movementHeaderPrinted) {
+            narrative += ` [${rm.name}'s turn]`;
+          }
           let massiveDeath = false;
           for (let mi = resumeMi; mi < attackCount && target.hp > 0; mi++) {
             const atkResult = applyEnemyAttackNarrative(rm, target, args.context);
