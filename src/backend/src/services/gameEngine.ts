@@ -387,6 +387,7 @@ function conditionSavingThrow(
     | 'inspiration'
     | 'bardic_inspiration_die'
     | 'inventory'
+    | 'species'
   >,
   context: Context
 ): {
@@ -412,6 +413,16 @@ function conditionSavingThrow(
   const enc =
     (effect.ability === 'str' || effect.ability === 'dex' || effect.ability === 'con') &&
     isHeavilyEncumbered(char);
+  // 2024 PHB species save advantages that key off the *condition being
+  // applied* (not the save ability itself):
+  //   Elf / Drow — Fey Ancestry, advantage on saves vs Charmed
+  //   Halfling   — Brave, advantage on saves vs Frightened
+  //   Dwarf      — Dwarven Resilience, advantage on saves vs Poisoned
+  const speciesId = char.species ?? 'human';
+  const speciesAdv =
+    (effect.condition === 'charmed' && (speciesId === 'elf' || speciesId === 'drow')) ||
+    (effect.condition === 'frightened' && speciesId === 'halfling') ||
+    (effect.condition === 'poisoned' && speciesId === 'dwarf');
   const applied = rollConditionSave(
     effect.ability,
     char[effect.ability] ?? 10,
@@ -420,7 +431,7 @@ function conditionSavingThrow(
     char.level,
     0,
     char.conditions ?? [],
-    inspirationActive,
+    inspirationActive || speciesAdv,
     enc
   );
   return {
