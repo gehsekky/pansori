@@ -644,41 +644,45 @@ export default function App() {
                                           </div>
                                         );
                                       })()}
+                                      {(() => {
+                                        // Spells + class abilities share one
+                                        // bordered toolbar with a thicker
+                                        // separator between the groups, parallel
+                                        // to the Combat/Default action toolbar.
+                                        // Spells go first (left), abilities second.
+                                        // Lives inside combatControlsCol so it
+                                        // sits alongside the other toolbars
+                                        // rather than below the MoveDPad.
+                                        const hasSpells = spellBarChoices.length > 0;
+                                        const hasAbilities =
+                                          classFeatureChoices.length > 0;
+                                        if (!hasSpells && !hasAbilities) return null;
+                                        return (
+                                          <div
+                                            className={styles.combinedActionBar}
+                                            role="group"
+                                            aria-label="Spells and class abilities"
+                                            data-testid="combined-spell-ability-bar"
+                                          >
+                                            <SpellBar
+                                              choices={spellBarChoices}
+                                              onChoose={handleChoice}
+                                            />
+                                            {hasSpells && hasAbilities && (
+                                              <span
+                                                className={styles.combinedActionBarSep}
+                                                aria-hidden="true"
+                                              />
+                                            )}
+                                            <ClassAbilityBar
+                                              choices={classFeatureChoices}
+                                              onChoose={handleChoice}
+                                            />
+                                          </div>
+                                        );
+                                      })()}
                                     </div>
                                   </div>
-                                  {(() => {
-                                    // Spells + class abilities share one
-                                    // bordered toolbar with a thicker
-                                    // separator between the groups, parallel
-                                    // to the Combat/Default action toolbar.
-                                    // Spells go first (left), abilities second.
-                                    const hasSpells = spellBarChoices.length > 0;
-                                    const hasAbilities = classFeatureChoices.length > 0;
-                                    if (!hasSpells && !hasAbilities) return null;
-                                    return (
-                                      <div
-                                        className={styles.combinedActionBar}
-                                        role="group"
-                                        aria-label="Spells and class abilities"
-                                        data-testid="combined-spell-ability-bar"
-                                      >
-                                        <SpellBar
-                                          choices={spellBarChoices}
-                                          onChoose={handleChoice}
-                                        />
-                                        {hasSpells && hasAbilities && (
-                                          <span
-                                            className={styles.combinedActionBarSep}
-                                            aria-hidden="true"
-                                          />
-                                        )}
-                                        <ClassAbilityBar
-                                          choices={classFeatureChoices}
-                                          onChoose={handleChoice}
-                                        />
-                                      </div>
-                                    );
-                                  })()}
                                 </section>
                               )}
                               <ul
