@@ -30,8 +30,12 @@ interface Props {
 
 function NarrativeText({ text }: Props) {
   const parts = parseNarrativeTokens(text);
+  // `whiteSpace: 'pre-line'` collapses runs of spaces (so the engine's
+  // joined narrative stays compact) but PRESERVES \n line breaks. Used to
+  // split each enemy turn into its own paragraph when the engine emits
+  // `\n\n[X's turn]` between turns.
   return (
-    <>
+    <span style={{ whiteSpace: 'pre-line' }}>
       {parts.map((part, i) => {
         if (part.type === 'text') return <span key={i}>{part.text}</span>;
         return (
@@ -45,7 +49,7 @@ function NarrativeText({ text }: Props) {
           </span>
         );
       })}
-    </>
+    </span>
   );
 }
 

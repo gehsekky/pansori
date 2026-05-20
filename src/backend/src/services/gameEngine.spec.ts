@@ -5221,6 +5221,160 @@ describe('cast_spell — Misty Step (level 2, bonus action, utility)', () => {
   });
 });
 
+// ─── Bless (PHB p.219) — concentration buff, +1d4 to attack rolls ────────────
+//
+// The Vale Crypt Lord log showed Bless casting a flavorful narrative but
+// the +1d4 never appeared in subsequent Rogue attack notes. Bless now
+// applies the `blessed` condition to caster + up to 2 living allies and
+// is surfaced in atkNote alongside Bardic Inspiration.
+
+describe('cast_spell — Bless (level 1, concentration buff)', () => {
+  it('applies blessed to caster + first 2 living party members', async () => {
+    const cleric = makeChar({
+      id: 'cleric-1',
+      character_class: 'Cleric',
+      wis: 14,
+      spell_slots_max: { 1: 2 },
+      spells_known: ['bless'],
+      prepared_spells: ['bless'],
+    });
+    const fighter = makeChar({ id: 'fighter-1', character_class: 'Fighter' });
+    const rogue = makeChar({ id: 'rogue-1', character_class: 'Rogue' });
+    const state: GameState = {
+      ...makeState(),
+      characters: [cleric, fighter, rogue],
+      active_character_id: cleric.id,
+      current_room: ctx.startRoomId,
+      combat_active: false,
+    };
+    const result = await takeAction({
+      action: { type: 'cast_spell', spellId: 'bless', slotLevel: 1 },
+      history: [],
+      state,
+      seed: spellSeed,
+      context: ctxWithRage,
+    });
+    // Caster + 2 allies blessed; source attribution points back at caster.
+    const blessed = result.newState.characters.filter((c) =>
+      c.conditions.includes('blessed')
+    );
+    expect(blessed.map((c) => c.id).sort()).toEqual(['cleric-1', 'fighter-1', 'rogue-1']);
+    for (const c of blessed) {
+      expect(c.condition_sources?.blessed).toBe('cleric-1');
+    }
+    // Caster is concentrating on bless.
+    expect(result.newState.characters[0].concentrating_on?.spellId).toBe('bless');
+  });
+
+  it('blessed PC adds +1d4 to attack rolls; surfaces "Bless: +N (1d4)" in atkNote', async () => {
+    // Mock: d20 roll just below AC, bless d4 nudges to a hit; atkNote
+    // surfaces the bless contribution.
+    const random = vi.spyOn(Math, 'random');
+    random.mockReturnValueOnce(0.55); // d20 → 12
+    random.mockReturnValue(0.999); // bless d4 → 4
+    const fighter = makeChar({
+      id: 'pc-bless',
+      character_class: 'Fighter',
+      str: 14,
+      level: 1,
+      conditions: ['blessed'],
+      condition_sources: { blessed: 'caster-id' },
+      inventory: [{ instance_id: 'sw-inst', id: 'shortsword', name: 'Shortsword' }],
+      equipped_weapon: 'sw-inst',
+    });
+    const enemyId = `${CORRIDOR_ID}#0`;
+    const state: GameState = {
+      ...makeState(),
+      characters: [fighter],
+      active_character_id: fighter.id,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      combat_active: true,
+      initiative_order: [
+        { id: fighter.id, roll: 18, is_enemy: false },
+        { id: enemyId, roll: 5, is_enemy: true },
+      ],
+      initiative_idx: 0,
+      entities: [
+        {
+          id: fighter.id,
+          isEnemy: false,
+          pos: { x: 5, y: 5 },
+          hp: fighter.hp,
+          maxHp: fighter.max_hp,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: enemyId,
+          isEnemy: true,
+          pos: { x: 6, y: 5 },
+          hp: 30,
+          maxHp: 30,
+          conditions: [],
+          condition_durations: {},
+        },
+      ],
+    };
+    const result = await takeAction({
+      action: { type: 'attack', targetEnemyId: enemyId },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    expect(result.narrative).toMatch(/Bless: \+\d \(1d4\)/);
+  });
+
+  it('casting another concentration spell drops Bless and clears blessed from allies', async () => {
+    // Cleric is concentrating on Bless. Casting Hold Person (also a
+    // concentration spell) triggers the auto-break path in the cast
+    // handler — `blessed` must clear from both PCs.
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    const cleric = makeChar({
+      id: 'cleric-bless',
+      character_class: 'Cleric',
+      wis: 14,
+      spell_slots_max: { 1: 2, 2: 1 },
+      spell_slots_used: { 1: 1 }, // Bless was already cast
+      spells_known: ['bless', 'hold_person'],
+      prepared_spells: ['bless', 'hold_person'],
+      conditions: ['blessed'],
+      condition_sources: { blessed: 'cleric-bless' },
+      concentrating_on: { spellId: 'bless' },
+    });
+    const rogue = makeChar({
+      id: 'rogue-bless',
+      character_class: 'Rogue',
+      conditions: ['blessed'],
+      condition_sources: { blessed: 'cleric-bless' },
+    });
+    const enemyId = `${CORRIDOR_ID}#0`;
+    const state: GameState = {
+      ...makeState(),
+      characters: [cleric, rogue],
+      active_character_id: cleric.id,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      combat_active: true,
+      initiative_order: [{ id: cleric.id, roll: 20, is_enemy: false }],
+      initiative_idx: 0,
+    };
+    const result = await takeAction({
+      action: { type: 'cast_spell', spellId: 'hold_person', slotLevel: 2, targetEnemyId: enemyId },
+      history: [],
+      state,
+      seed: spellSeed,
+      context: ctxWithRage,
+    });
+    const clericAfter = result.newState.characters.find((c) => c.id === 'cleric-bless');
+    const rogueAfter = result.newState.characters.find((c) => c.id === 'rogue-bless');
+    // Bless concentration was replaced — blessed must clear from BOTH PCs.
+    expect(clericAfter?.conditions ?? []).not.toContain('blessed');
+    expect(rogueAfter?.conditions ?? []).not.toContain('blessed');
+  });
+});
+
 describe('spell slots — long rest resets used slots', () => {
   it('spell_slots_used is reset to {} after long rest', async () => {
     // Must be in a room with no living enemy to rest; use startRoomId
@@ -5294,6 +5448,68 @@ describe('generateChoices — spell choices', () => {
     );
     expect(mistyStep).toBeDefined();
     expect(mistyStep?.requiresBonusAction).toBe(true);
+  });
+
+  // ── Prep-class spell filter ────────────────────────────────────────────
+  //
+  // Cleric / Paladin / Druid only cast level-1+ spells in their
+  // `prepared_spells` list. Without this filter the cast menu surfaces
+  // every known spell and the player burns clicks on rejection messages
+  // (observed in the Vale Crypt Lord log: 3× "Healing Word is not prepared").
+
+  it('Cleric: unprepared level-1+ spell is filtered out of cast menu', () => {
+    // Cleric knows guiding_bolt + cure_wounds but only prepared guiding_bolt.
+    // Use injured Cleric so cure_wounds clears the separate heal-target
+    // filter — that way the assertion isolates the prep gate.
+    const state = makeClericState({
+      prepared_spells: ['guiding_bolt'],
+      hp: 3,
+      max_hp: 10,
+    });
+    const choices = generateChoices(state, spellSeed, ctxWithRage);
+    const spellIds = choices
+      .filter((c) => c.action.type === 'cast_spell')
+      .map((c) => (c.action as { spellId: string }).spellId);
+    // Cure Wounds is level-1 + not prepared → filtered out.
+    expect(spellIds).not.toContain('cure_wounds');
+    // Guiding Bolt is prepared → still surfaced.
+    expect(spellIds).toContain('guiding_bolt');
+  });
+
+  it('Cleric: cantrips are always castable regardless of prep list', () => {
+    // sacred_flame is a level-0 cantrip — prep filter must not gate it.
+    const state = makeClericState({
+      prepared_spells: ['guiding_bolt'], // sacred_flame deliberately NOT in list
+    });
+    const choices = generateChoices(state, spellSeed, ctxWithRage);
+    const spellIds = choices
+      .filter((c) => c.action.type === 'cast_spell')
+      .map((c) => (c.action as { spellId: string }).spellId);
+    expect(spellIds).toContain('sacred_flame');
+  });
+
+  it('Cleric: empty prepared_spells falls back to surfacing all known spells (legacy state)', () => {
+    // Old DB rows / pre-prep flow have prepared_spells = []. The filter
+    // intentionally bails in that case so the player isn't left without
+    // any spell options. Use an injured Cleric so cure_wounds passes
+    // the separate "heal needs an injured target" filter.
+    const state = makeClericState({ prepared_spells: [], hp: 3, max_hp: 10 });
+    const choices = generateChoices(state, spellSeed, ctxWithRage);
+    const spellIds = choices
+      .filter((c) => c.action.type === 'cast_spell')
+      .map((c) => (c.action as { spellId: string }).spellId);
+    expect(spellIds).toContain('cure_wounds');
+    expect(spellIds).toContain('guiding_bolt');
+  });
+
+  it('Sorcerer / Bard / Warlock are NOT prep classes — no filter applies', () => {
+    // Mage state defaults to a Wizard-ish setup; the prep gate only
+    // affects cleric/paladin/druid. Even with an empty prepared_spells
+    // a Mage sees its full known list.
+    const state = makeMageState({ prepared_spells: [] });
+    const choices = generateChoices(state, spellSeed, ctxWithRage);
+    const castChoices = choices.filter((c) => c.action.type === 'cast_spell');
+    expect(castChoices.length).toBeGreaterThan(0);
   });
 });
 
@@ -7878,6 +8094,35 @@ describe('narrative tokenization', () => {
     expect(result.narrative).toMatch(/\{\{note\|.*d20 .* vs AC .*\}\}/);
   });
 
+  it('spell-attack hit emits {{dmg|N}} for cantrip damage (regression — Sacred Flame / Fire Bolt class)', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99); // hits + max damage
+    const state = makeMageState();
+    const result = await takeAction({
+      action: { type: 'cast_spell', spellId: 'fire_bolt', slotLevel: 0 },
+      history: [],
+      state,
+      seed: spellSeed,
+      context: ctxWithRage,
+    });
+    expect(result.narrative).toMatch(/\{\{dmg\|\d+\}\}/);
+  });
+
+  it('save-spell damage emits {{dmg|N}} + {{dc|DC N}} (regression — cantrip / Thunderwave class)', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0); // enemy fails save → full damage
+    const state = makeMageState();
+    const result = await takeAction({
+      action: { type: 'cast_spell', spellId: 'thunderwave', slotLevel: 1 },
+      history: [],
+      state,
+      seed: spellSeed,
+      context: ctxWithRage,
+    });
+    // Damage tokenized + DC tokenized as {{dc|DC N}}.
+    expect(result.narrative).toMatch(/\{\{dmg\|\d+\}\}/);
+    expect(result.narrative).toMatch(/\{\{dc\|DC \d+\}\}/);
+  });
+
+
   it('enemy attack on a PC emits {{dmg|N}} damage tokens', async () => {
     // Set up an adjacent enemy + active grid combat so the goblin's turn
     // resolves an attack and reaches applyEnemyAttackNarrative.
@@ -8633,7 +8878,13 @@ describe('speaker prefix (multi-PC narratives)', () => {
       hp: 0,
       max_hp: 13,
       death_saves: { successes: 1, failures: 2 },
-      conditions: ['unconscious'],
+      // Pre-existing conditions persist through Nat 20 recovery; only
+      // unconscious clears (RAW: SRD 5.2.1 p.197). Pansori previously
+      // cleared the whole array, which erased frightened from a downed-
+      // then-revived PC and dropped the disadvantage on their next attack.
+      conditions: ['unconscious', 'frightened'],
+      condition_durations: { unconscious: 1, frightened: 2 },
+      condition_sources: { frightened: 'cl-1' },
       stable: false,
       dead: false,
     });
@@ -8675,6 +8926,10 @@ describe('speaker prefix (multi-PC narratives)', () => {
     const updatedFighter = result.newState.characters.find((c) => c.id === fighter.id)!;
     expect(updatedFighter.hp).toBe(1);
     expect(updatedFighter.death_saves).toEqual({ successes: 0, failures: 0 });
+    // unconscious clears; frightened persists per RAW.
+    expect(updatedFighter.conditions).not.toContain('unconscious');
+    expect(updatedFighter.conditions).toContain('frightened');
+    expect(updatedFighter.condition_sources?.frightened).toBe('cl-1');
     expect(result.newState.active_character_id).toBe(cleric.id);
     expect(result.narrative).toMatch(/death save|natural 20/i);
   });
