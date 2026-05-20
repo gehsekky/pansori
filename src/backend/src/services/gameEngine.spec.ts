@@ -6868,3 +6868,124 @@ describe('Species damage resistance (2024)', () => {
     expect(eB!.hp).toBeLessThan(8);
   });
 });
+
+describe('Failed precondition actions do not consume the turn', () => {
+  // Helper for a 1v1 grid combat state with adjustable positions.
+  function makeRangeState(
+    charPos: { x: number; y: number },
+    enemyPos: { x: number; y: number },
+    charOverrides: Partial<Character> = {}
+  ): GameState {
+    const cleric = makeChar({
+      id: 'pc-1',
+      character_class: 'Cleric',
+      equipped_weapon: 'mace-inst',
+      inventory: [{ instance_id: 'mace-inst', id: 'mace', name: 'Mace' }],
+      ...charOverrides,
+    });
+    const enemyId = `${CORRIDOR_ID}#0`;
+    return {
+      characters: [cleric],
+      active_character_id: cleric.id,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: true,
+      initiative_order: [
+        { id: cleric.id, roll: 18, is_enemy: false },
+        { id: enemyId, roll: 10, is_enemy: true },
+      ],
+      initiative_idx: 0,
+      entities: [
+        {
+          id: cleric.id,
+          isEnemy: false,
+          pos: charPos,
+          hp: 20,
+          maxHp: 20,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: enemyId,
+          isEnemy: true,
+          pos: enemyPos,
+          hp: 30,
+          maxHp: 30,
+          conditions: [],
+          condition_durations: {},
+        },
+      ],
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      flags: {},
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+      round: 1,
+      movement_used: {},
+    };
+  }
+
+  it('Out-of-range melee attack does NOT advance initiative or consume the action', async () => {
+    const state = makeRangeState({ x: 1, y: 5 }, { x: 8, y: 5 }); // 35 ft apart
+    const enemyId = state.entities!.find((e) => e.isEnemy)!.id;
+    const result = await takeAction({
+      action: { type: 'attack', targetEnemyId: enemyId },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    expect(result.narrative).toMatch(/Out of range/);
+    // Action NOT consumed
+    expect(result.newState.characters[0].turn_actions.action_used).toBe(false);
+    // Initiative still on the player
+    expect(result.newState.initiative_idx).toBe(0);
+  });
+
+  it('Out-of-range Sacred Flame does NOT advance initiative or consume the action', async () => {
+    const state = makeRangeState(
+      { x: 1, y: 5 },
+      { x: 14, y: 5 }, // 65 ft — beyond Sacred Flame's 60 ft range
+      { wis: 16, spells_known: ['sacred_flame'] }
+    );
+    const enemyId = state.entities!.find((e) => e.isEnemy)!.id;
+    const result = await takeAction({
+      action: {
+        type: 'cast_spell',
+        spellId: 'sacred_flame',
+        slotLevel: 0,
+        targetEnemyId: enemyId,
+      },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    expect(result.narrative).toMatch(/out of range/i);
+    expect(result.newState.characters[0].turn_actions.action_used).toBe(false);
+    expect(result.newState.initiative_idx).toBe(0);
+  });
+
+  it('Out-of-reach Grapple does NOT advance initiative or consume the action', async () => {
+    const state = makeRangeState({ x: 1, y: 5 }, { x: 8, y: 5 });
+    const enemyId = state.entities!.find((e) => e.isEnemy)!.id;
+    const result = await takeAction({
+      action: { type: 'grapple', targetEnemyId: enemyId },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    expect(result.narrative).toMatch(/Out of reach/);
+    expect(result.newState.characters[0].turn_actions.action_used).toBe(false);
+    expect(result.newState.initiative_idx).toBe(0);
+  });
+});
