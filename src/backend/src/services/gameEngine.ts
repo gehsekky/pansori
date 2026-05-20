@@ -808,7 +808,10 @@ function tickConditions(char: Character): Character {
 function effectiveSpeed(char: Character): number {
   const base = char.speed ?? DEFAULT_SPEED_FEET;
   const weight = charCarriedWeight(char);
-  const str = char.str;
+  // 2024 PHB Goliath Powerful Build: count as one size larger for carrying
+  // capacity. Mechanically: double the effective STR-based thresholds.
+  const carryMult = char.species === 'goliath' ? 2 : 1;
+  const str = char.str * carryMult;
   if (weight > str * 15) return 0;
   if (weight > str * 10) return Math.max(0, base - 20);
   if (weight > str * 5) return Math.max(0, base - 10);
@@ -827,9 +830,11 @@ function charCarriedWeight(char: Pick<Character, 'inventory'>): number {
 // disadvantage on STR/DEX/CON ability checks, saving throws, AND attack
 // rolls. Encumbered (>5×STR) only reduces speed; we ignore it for
 // disadvantage purposes. Used in attack and skill/save resolution paths.
-function isHeavilyEncumbered(char: Pick<Character, 'inventory' | 'str'>): boolean {
+function isHeavilyEncumbered(char: Pick<Character, 'inventory' | 'str' | 'species'>): boolean {
   const w = charCarriedWeight(char);
-  return w > char.str * 10;
+  // Goliath Powerful Build: count as one size larger for carrying capacity.
+  const carryMult = char.species === 'goliath' ? 2 : 1;
+  return w > char.str * 10 * carryMult;
 }
 
 // ─── Enemy lookup helpers (multi-enemy per room) ──────────────────────────────
@@ -2891,13 +2896,34 @@ function runEnemyTurns(args: {
               };
             }
             const prevHp = target.hp;
+            let proposedHp = Math.max(0, target.hp - atkResult.hpLost);
+            // 2024 PHB Orc Relentless Endurance — when reduced to 0 HP
+            // (and not killed outright by massive damage), the Orc drops
+            // to 1 HP instead. 1/long rest, tracked via class_resource_uses.
+            const orcReUsed = target.class_resource_uses?.relentless_endurance_used === 1;
+            let orcSaveFired = false;
+            if (
+              target.species === 'orc' &&
+              !orcReUsed &&
+              prevHp > 0 &&
+              proposedHp === 0 &&
+              !isMassiveDamageDeath(prevHp, atkResult.hpLost, target.max_hp)
+            ) {
+              proposedHp = 1;
+              orcSaveFired = true;
+            }
             target = {
               ...target,
-              hp: Math.max(0, target.hp - atkResult.hpLost),
+              hp: proposedHp,
               temp_hp: atkResult.newTempHp ?? target.temp_hp,
               conditions: atkResult.newConditions,
               condition_durations: atkResult.newDurations,
-              class_resource_uses: atkResult.updatedResourceUses ?? target.class_resource_uses,
+              class_resource_uses: orcSaveFired
+                ? {
+                    ...(atkResult.updatedResourceUses ?? target.class_resource_uses ?? {}),
+                    relentless_endurance_used: 1,
+                  }
+                : (atkResult.updatedResourceUses ?? target.class_resource_uses),
               // 2024 PHB Heroic Inspiration: if the target spent it on the
               // save vs onHitEffect, clear the flags so it can't be re-spent.
               inspiration: atkResult.inspirationConsumed ? false : target.inspiration,
@@ -2909,6 +2935,9 @@ function runEnemyTurns(args: {
                 ? undefined
                 : target.bardic_inspiration_die,
             };
+            if (orcSaveFired) {
+              narrative += ` 🪓 Relentless Endurance! ${target.name} stays standing at 1 HP.`;
+            }
             const concAtk = checkConcentration(target, st, atkResult.hpLost);
             target = concAtk.char;
             st = concAtk.st;
@@ -4193,7 +4222,11 @@ export async function takeAction({
               .replace('{xp}', String(xpGain));
           if (char.xp >= char.level * 100) {
             char.level += 1;
-            const hpRoll = Math.max(1, rollDice(`1d${char.hit_die ?? 8}`) + abilityMod(char.con));
+            // 2024 PHB Dwarven Toughness adds +1 max HP at each level up.
+            const dwarfLvlBonus = char.species === 'dwarf' ? 1 : 0;
+            const hpRoll =
+              Math.max(1, rollDice(`1d${char.hit_die ?? 8}`) + abilityMod(char.con)) +
+              dwarfLvlBonus;
             char.max_hp += hpRoll;
             char.hp = Math.min(char.hp + hpRoll, char.max_hp);
             char.spell_slots_max = getSpellSlotsForLevel(char.character_class, char.level, context);
@@ -4584,6 +4617,15 @@ export async function takeAction({
         delete restoredUses.sacred_weapon_active;
         // Long rest reduces exhaustion by 1 level (PHB p.291); full rest clears all other conditions
         const newExhaustion = Math.max(0, (c.exhaustion_level ?? 0) - 1);
+        // 2024 PHB Human Resourceful — gain Heroic Inspiration after every
+        // Long Rest. Other species default to whatever inspiration state
+        // they had pre-rest.
+        const humanGrant = c.species === 'human';
+        // 2024 PHB Orc Relentless Endurance + Orc Adrenaline Rush both
+        // recharge on long rest; tracked under class_resource_uses.
+        if (c.species === 'orc') {
+          delete restoredUses.relentless_endurance_used;
+        }
         return {
           ...c,
           hp: c.max_hp,
@@ -4592,9 +4634,11 @@ export async function takeAction({
           hit_dice_remaining: newHd,
           conditions: [],
           condition_durations: {},
+          condition_sources: {},
           class_resource_uses: restoredUses,
           exhaustion_level: newExhaustion,
           spell_slots_used: {},
+          inspiration: humanGrant ? true : c.inspiration,
         };
       });
       st = { ...st, characters: restedChars, long_rested: true };
@@ -5478,10 +5522,11 @@ export async function takeAction({
               .replace('{xp}', String(xpGain));
           if (char.xp >= char.level * 100) {
             char.level += 1;
-            const hpRollSpell = Math.max(
-              1,
-              rollDice(`1d${char.hit_die ?? 8}`) + abilityMod(char.con)
-            );
+            // 2024 PHB Dwarven Toughness adds +1 max HP at each level up.
+            const dwarfLvlBonusSpell = char.species === 'dwarf' ? 1 : 0;
+            const hpRollSpell =
+              Math.max(1, rollDice(`1d${char.hit_die ?? 8}`) + abilityMod(char.con)) +
+              dwarfLvlBonusSpell;
             char.max_hp += hpRollSpell;
             char.hp = Math.min(char.hp + hpRollSpell, char.max_hp);
             char.spell_slots_max = getSpellSlotsForLevel(char.character_class, char.level, context);

@@ -180,16 +180,24 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
         : { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 };
       const bg = ctx.backgrounds?.find((b) => b.id === c.background_id) ?? null;
       const classSkills = ctx.classSkills?.[c.character_class] ?? [];
-      const skillProfs = Array.from(new Set([...classSkills, ...(bg?.skillProficiencies ?? [])]));
-      const toolProfs = bg?.toolProficiency ? [bg.toolProficiency] : [];
-      const armorProfs = ctx.classArmorProficiencies?.[c.character_class] ?? [];
-      const weaponProfs = ctx.classWeaponProficiencies?.[c.character_class] ?? [];
-
       // 2024 PHB species traits — speed, darkvision, resistances, innate
       // cantrips. Defaults to Human when missing/unknown.
       const speciesId = c.species && SRD_SPECIES[c.species] ? c.species : 'human';
       const speciesData = SRD_SPECIES[speciesId];
       const dwarfHpBonus = speciesId === 'dwarf' ? 1 : 0;
+
+      // Species-driven skill grants. Elf Keen Senses → Perception. Human
+      // Skillful → +1 from a small starter list (Athletics) so Humans pick
+      // up extra coverage at L1 without a feat picker.
+      const speciesSkills: string[] = [];
+      if (speciesId === 'elf' || speciesId === 'drow') speciesSkills.push('Perception');
+      if (speciesId === 'human') speciesSkills.push('Athletics');
+      const skillProfs = Array.from(
+        new Set([...classSkills, ...(bg?.skillProficiencies ?? []), ...speciesSkills])
+      );
+      const toolProfs = bg?.toolProficiency ? [bg.toolProficiency] : [];
+      const armorProfs = ctx.classArmorProficiencies?.[c.character_class] ?? [];
+      const weaponProfs = ctx.classWeaponProficiencies?.[c.character_class] ?? [];
 
       const hitDie = ctx.classHitDie[c.character_class] ?? 8;
       const conMod = Math.floor(((base.con ?? 10) - 10) / 2);
