@@ -376,6 +376,35 @@
   padding: 3px 0;
 }
 
+/* Mission log toolbar — small "Copy log" button above the entries. The
+ * button copies the FULL chronological log (oldest first) plus metadata
+ * to the clipboard for pasting into chats with the engine author. */
+.missionLogToolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 6px;
+}
+.missionLogCopyBtn {
+  background: transparent;
+  color: var(--t-mid);
+  border: 1px solid var(--t-border);
+  border-radius: 2px;
+  cursor: pointer;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  padding: 3px 8px;
+  transition:
+    border-color 0.15s,
+    color 0.15s,
+    background 0.15s;
+}
+.missionLogCopyBtn:hover {
+  border-color: var(--t-primary);
+  color: var(--t-primary);
+  background: var(--t-dim-dark);
+}
+
 .formLbl {
   display: block;
   font-size: 0.8rem;
