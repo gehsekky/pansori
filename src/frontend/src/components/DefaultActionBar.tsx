@@ -47,7 +47,7 @@ function DefaultActionBar({ choices, onChoose, disabled }: Props) {
   return (
     <div
       data-testid="default-action-bar"
-      className={styles.actionBar}
+      className={styles.inlineActionBar}
       role="group"
       aria-label="Default actions"
     >
@@ -58,7 +58,7 @@ function DefaultActionBar({ choices, onChoose, disabled }: Props) {
           <button
             key={def.kind}
             type="button"
-            className={`${styles.actionBtn} ${enabled ? '' : styles.actionBtnDisabled}`}
+            className={`${styles.inlineActionBtn} ${enabled ? '' : styles.inlineActionBtnDisabled}`}
             disabled={!enabled}
             // Full original label powers the screen-reader announcement
             // and a hover tooltip (so the icon's meaning + the engine's
