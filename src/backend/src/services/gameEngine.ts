@@ -1479,7 +1479,6 @@ export function buildArrivalNarrative(
     .join(', ');
   if (exitNames) text += ` Exits: ${exitNames}.`;
 
-  const roomEnemies = getRoomEnemies(seed, targetId);
   const livingHere = getLivingRoomEnemies(state, seed, targetId);
   if (livingHere.length > 0) {
     const parts = livingHere.map((enemy) => {
@@ -1487,9 +1486,13 @@ export function buildArrivalNarrative(
       return `${enemy.name} (HP ${hp}, AC ${enemy.ac})`;
     });
     text += ` Hostile here: ${parts.join(', ')}.`;
-  } else if (roomEnemies.length > 0) {
-    text += ' ' + pick(context.narratives.alreadyDead);
   }
+  // (Previously: an else-branch appended `alreadyDead` pool text on
+  // revisits to cleared rooms. The pool only contains attack-rejection
+  // flavor like "That foe is already defeated.", which read as a stale
+  // error message rather than re-entry flavor — see Vale playthrough
+  // log, 2026-05-21. Cleared rooms now just rely on exits + loot for
+  // their narrative cues.)
   const newLoot = seed.loot?.[targetId];
   if (newLoot && !state.loot_taken.includes(targetId)) {
     text += ` You spot a ${newLoot.name} on the ground.`;
@@ -7527,7 +7530,13 @@ export async function takeAction({
           channel_divinity: cdUsesDS - 1,
         };
         const dsRoll = rollDice('1d8') + abilityMod(char.wis);
-        const dsHp = Math.max(0, enemy.hp - dsRoll);
+        // Read the CURRENT entity HP, not the seed's template HP — otherwise
+        // Divine Spark resets the target to (full_hp - damage) and wipes
+        // every prior turn's accumulated damage. (Vale playthrough log,
+        // 2026-05-21: Ghoul jumped from 19 → 37 mid-combat after DS.)
+        const enemyEntForDs = st.entities?.find((e) => e.id === enemy.id && e.isEnemy);
+        const currentDsHp = enemyEntForDs?.hp ?? enemy.hp;
+        const dsHp = Math.max(0, currentDsHp - dsRoll);
         st = {
           ...st,
           entities: (st.entities ?? []).map((e) =>

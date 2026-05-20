@@ -6336,6 +6336,41 @@ describe('Cleric universal Channel Divinity (2024)', () => {
     expect(result.narrative).toMatch(/No Channel Divinity/);
   });
 
+  it('Divine Spark reads CURRENT entity HP, not seed template (regression — Vale playthrough)', async () => {
+    // Vale Crypt Ghoul fight: Ghoul started at 44 HP, the party whittled
+    // it down to 19, then Cleric used Divine Spark — the entity HP jumped
+    // back UP because the handler read from `enemy.hp` (seed template
+    // = 44) instead of the current entity HP (19). Net: the previous
+    // turns' damage was wiped out.
+    //
+    // This regression pre-damages the entity to 5 HP while the seed
+    // still reads 30 HP. The DS roll is the lowest possible (1d8+3 with
+    // a 0.0001 random → 1+3 = 4). Expected post-DS entity HP = 5 - 4 = 1.
+    // With the bug, it would have been 30 - 4 = 26 — the entity HP would
+    // GO UP. The assertion catches that direction explicitly.
+    vi.spyOn(Math, 'random').mockReturnValue(0.0001); // d8 → 1
+    const state = makeCleric();
+    // Pre-damage the entity to HP = 5 (seed.enemy.hp remains 30)
+    const damagedState = {
+      ...state,
+      entities: (state.entities ?? []).map((e) =>
+        e.isEnemy ? { ...e, hp: 5 } : e
+      ),
+    };
+    const result = await takeAction({
+      action: { type: 'use_class_feature', featureId: 'divine_spark' },
+      history: [],
+      state: damagedState,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    const enemy = result.newState.entities?.find((e) => e.isEnemy);
+    // Damage is 1d8(=1) + WIS(+3) = 4. From 5 HP → 1 HP.
+    // The PRE-FIX bug would have set HP to max(0, 30 - 4) = 26.
+    expect(enemy?.hp ?? 0).toBeLessThanOrEqual(5);
+    expect(enemy?.hp ?? 0).toBeGreaterThanOrEqual(0);
+  });
+
   it('Sear Undead requires Cleric L5', async () => {
     const result = await takeAction({
       action: { type: 'use_class_feature', featureId: 'sear_undead' },
