@@ -20,6 +20,14 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 - [ ] **Climbing & Crawling movement cost** — needs a "movement mode" concept. Skip until verticality.
 - [ ] **Jumping** — Long jump = STR ft, high jump = 3 + STR mod ft. Same verticality blocker.
 
+### From mission-log analysis (2026-05-20) — all shipped
+
+- [x] **Unprepared spells surface in cast menu** — `cast_spell` choices are now filtered to `prepared_spells` for Cleric/Paladin/Druid (cantrips always castable). Sorcerer/Bard/Warlock cast everything they know. Runtime rejection message no longer suggests mid-combat prep.
+- [x] **Bless +1d4 not appearing in attack notes** — Bless now applies a `blessed` condition to caster + first 2 living allies (tracked via `condition_sources.blessed = caster.id`). Each blessed attack rolls 1d4 and adds to the to-hit total; `Bless: +N (1d4)` surfaces in `atkNote` alongside Bardic Inspiration. Concentration drop clears `blessed` from all linked PCs.
+- [x] **Cantrip damage + spell HP-remaining tokenized** — `fmt.dmg()` + `fmt.hp()` + `fmt.dc()` now wrap spell-attack damage, save-spell damage + DC, auto-hit cantrip damage (e.g. Eldritch Blast), Divine Spark damage, Graze damage, Colossus Slayer damage + HP-remaining, single-target spell HP-remaining. Regression specs cover the spell-attack and save-spell paths.
+- [x] **Frightened condition persists through death-save Nat 20** — root cause was unrelated to frightened duration. The Nat-20 recovery handler was clearing ALL conditions instead of just `unconscious` (line 698 of `processDeathSave`); a downed-then-revived PC would lose every pre-existing condition, including frightened. Fix: clear only `unconscious` + matching duration entry; everything else persists per SRD 5.2.1 p.197.
+- [x] **Compound enemy-turn narratives split into paragraphs** — `runEnemyTurns` now prepends `\n\n` to each `[X's turn]` header. `NarrativeText` uses `whiteSpace: 'pre-line'` so the FE renders each turn as its own paragraph. The strip → log → narrative chain still has the same per-event combat_log entries; the prose just breathes between turns now.
+
 ---
 
 ## Content & playtest

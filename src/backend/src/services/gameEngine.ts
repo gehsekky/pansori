@@ -293,8 +293,10 @@ function clampHpForExhaustion(hp: number, maxHp: number, exhaustionLevel: number
 function breakConcentration(char: Character, st: GameState): { char: Character; st: GameState } {
   if (!char.concentrating_on) return { char, st };
   const condition = char.concentrating_on.condition;
-  const newChar = { ...char, concentrating_on: null };
-  const newSt =
+  const wasBless = char.concentrating_on.spellId === 'bless';
+  let newChar: Character = { ...char, concentrating_on: null };
+  // Strip the linked enemy condition (Hold Person etc.)
+  let newSt: GameState =
     condition && st.entities
       ? {
           ...st,
@@ -303,6 +305,35 @@ function breakConcentration(char: Character, st: GameState): { char: Character; 
           ),
         }
       : st;
+  // Bless (PHB p.219) — the buff is on ALLIES, not enemies. When the
+  // caster's concentration drops, clear `blessed` from every PC whose
+  // condition_sources.blessed pointed at this caster. The caster's
+  // local ref is mutated too so callers writing it back to state don't
+  // resurrect the cleared condition.
+  if (wasBless) {
+    newSt = {
+      ...newSt,
+      characters: newSt.characters.map((c) => {
+        if ((c.condition_sources ?? {}).blessed !== char.id) return c;
+        const { blessed: _drop, ...rest } = c.condition_sources ?? {};
+        void _drop;
+        return {
+          ...c,
+          conditions: (c.conditions ?? []).filter((x) => x !== 'blessed'),
+          condition_sources: rest,
+        };
+      }),
+    };
+    if ((newChar.condition_sources ?? {}).blessed === char.id) {
+      const { blessed: _drop2, ...rest2 } = newChar.condition_sources ?? {};
+      void _drop2;
+      newChar = {
+        ...newChar,
+        conditions: (newChar.conditions ?? []).filter((x) => x !== 'blessed'),
+        condition_sources: rest2,
+      };
+    }
+  }
   return { char: newChar, st: newSt };
 }
 
@@ -660,11 +691,19 @@ function processDeathSave(
     case 'regain_hp':
       // SRD 5.2.1 p.197 — rolling a 20 on a death save regains 1 HP and ends
       // the unconscious condition. It does NOT end the combat encounter;
-      // remaining enemies keep fighting.
+      // remaining enemies keep fighting. Other conditions (frightened /
+      // prone / grappled / etc.) persist — clearing every condition was a
+      // legacy bug that erased fear from a downed-then-revived PC.
       newChar.hp = 1;
       newChar.death_saves = { successes: 0, failures: 0 };
       newChar.stable = false;
-      newChar.conditions = [];
+      newChar.conditions = (newChar.conditions ?? []).filter((c) => c !== 'unconscious');
+      // Sync condition_durations to the trimmed list.
+      if (newChar.condition_durations) {
+        const { unconscious: _drop, ...restDur } = newChar.condition_durations;
+        void _drop;
+        newChar.condition_durations = restDur;
+      }
       narrative = `Death Save — Natural ${fmt.roll(20)}! You surge back to ${fmt.hp(1)} HP, gasping but alive.`;
       return { narrative, newChar, died: false, endedCombat };
 
@@ -2418,10 +2457,33 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   if (context.spellTable && (char.spells_known ?? []).length > 0) {
     const slots = char.spell_slots_max ?? {};
     const slotsUsed = char.spell_slots_used ?? {};
+    // Prep classes (Cleric / Paladin / Druid) only cast spells in their
+    // `prepared_spells` list — mirrors the runtime check at the cast site.
+    // Cantrips are always castable (level 0). Surfacing unprepared spells
+    // creates a UX trap: the player clicks "Cast Healing Word", gets a
+    // "not prepared" rejection, and burns the action without effect (the
+    // engine bails before the slot is spent, but the choice list keeps
+    // showing the unprepared spell every turn).
+    const prepClasses = new Set(['cleric', 'paladin', 'druid']);
+    const enforcePrep = prepClasses.has(char.character_class.toLowerCase());
+    const preparedSet = new Set(char.prepared_spells ?? []);
     for (const spellId of char.spells_known) {
       if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
       const spell = context.spellTable[spellId];
       if (!spell) continue;
+
+      // Prep gate: filter unprepared level-1+ spells out of the cast menu
+      // for prep classes. If `prepared_spells` is empty (legacy state /
+      // pre-prep flow), fall back to surfacing everything so the player
+      // isn't left without options.
+      if (
+        enforcePrep &&
+        spell.level > 0 &&
+        preparedSet.size > 0 &&
+        !preparedSet.has(spellId)
+      ) {
+        continue;
+      }
 
       // Reaction-cast spells (e.g. Shield) only fire from a pending_reaction
       // window — don't surface them in the regular cast menu.
@@ -3477,7 +3539,7 @@ function runEnemyTurns(args: {
             !!targetEntPreMove &&
             distanceFeet(enemyEntPreMove.pos, targetEntPreMove.pos) > reachFt;
           if (resumeMi === 0 && needsToMove && enemyEntPreMove && targetEntPreMove) {
-            narrative += ` [${rm.name}'s turn]`;
+            narrative += `\n\n[${rm.name}'s turn]`;
             const plan = planEnemyApproach({
               st,
               enemyId: eEntry.id,
@@ -3548,7 +3610,7 @@ function runEnemyTurns(args: {
           const movementHeaderPrinted = resumeMi === 0 && needsToMove;
           const attackCount = rm.multiattack ?? 1;
           if (resumeMi === 0 && !movementHeaderPrinted) {
-            narrative += ` [${rm.name}'s turn]`;
+            narrative += `\n\n[${rm.name}'s turn]`;
           }
           let massiveDeath = false;
           for (let mi = resumeMi; mi < attackCount && target.hp > 0; mi++) {
@@ -4492,6 +4554,17 @@ export async function takeAction({
           biNote = ` ✦ Bardic Inspiration: +${biRoll} (${char.bardic_inspiration_die})`;
           char.bardic_inspiration_die = undefined;
         }
+        // Bless (PHB p.219): blessed creatures add +1d4 to attack rolls.
+        // Doesn't consume; the buff lasts until the caster's concentration
+        // drops. Surfaced in atkNote alongside Bardic Inspiration.
+        let blessNote = '';
+        if ((char.conditions ?? []).includes('blessed') && !atk.fumble) {
+          const blessRoll = rollDice('1d4');
+          atk.total += blessRoll;
+          const newHit = atk.roll === 20 || atk.total >= effectiveEnemyAc;
+          if (!atk.hit && newHit) atk.hit = true;
+          blessNote = ` ✦ Bless: +${blessRoll} (1d4)`;
+        }
         // Unconscious or Assassin-surprised: force crit on hit
         const autoCritCheck =
           (enemyUnconscious &&
@@ -4523,7 +4596,7 @@ export async function takeAction({
         const atkNote =
           ' ' +
           fmt.note(
-            `(${label}d20 ${atk.roll}+${atk.atkMod} ${atk.atkStat}+${atk.prof} prof${bonusNote} = ${atk.total} vs AC ${effectiveEnemyAc}${coverNote}${disadvNote}${versatileNote})${noProfNote}${biNote}`
+            `(${label}d20 ${atk.roll}+${atk.atkMod} ${atk.atkStat}+${atk.prof} prof${bonusNote} = ${atk.total} vs AC ${effectiveEnemyAc}${coverNote}${disadvNote}${versatileNote})${noProfNote}${biNote}${blessNote}`
           );
 
         if (atk.fumble) {
@@ -4594,7 +4667,7 @@ export async function takeAction({
                   e.id === targetId && e.isEnemy ? { ...e, hp: grazedHp } : e
                 ),
               };
-              narrative += `[Graze: ${target.name} still takes ${grazeDmg} damage from the swing.] `;
+              narrative += `[Graze: ${target.name} still takes ${fmt.dmg(grazeDmg)} damage from the swing.] `;
             }
           }
           return false;
@@ -5660,7 +5733,11 @@ export async function takeAction({
       ) {
         const prepared = char.prepared_spells ?? [];
         if (prepared.length > 0 && !prepared.includes(spellId)) {
-          narrative = `${spell.name} is not prepared. Use 'Prepare Spells' to change your prepared spell list.`;
+          // Reachable only as a safety net — the choice generator now
+          // filters unprepared spells out of the cast menu (see the
+          // prepClasses block in generateChoices). Prep is a long-rest
+          // action, so the message no longer suggests mid-combat prep.
+          narrative = `${spell.name} is not prepared. Prepare it on a long rest.`;
           break;
         }
       }
@@ -5792,6 +5869,57 @@ export async function takeAction({
         narrative = spell.narrative
           ? spell.narrative.replace('{name}', char.name)
           : `${char.name} casts ${spell.name}${slotNote}.`;
+        // Bless (PHB p.219) — caster picks up to 3 creatures (RAW). Pansori
+        // simplifies: caster + first 2 living non-caster party members are
+        // blessed. Each gets +1d4 to attack rolls (saves are a follow-up).
+        // Concentration links the buff to the caster — `blessed` clears
+        // from all linked PCs when the Cleric's concentration drops.
+        if (spell.id === 'bless') {
+          // Mark caster as concentrating on bless. The runtime-mutated
+          // `char` reference is what gets written back to state.
+          char.concentrating_on = { spellId: 'bless' };
+          // Pick the targets: caster (always) + up to 2 living allies.
+          const blessTargets: string[] = [char.id];
+          for (const c of st.characters) {
+            if (blessTargets.length >= 3) break;
+            if (c.id === char.id || c.dead) continue;
+            blessTargets.push(c.id);
+          }
+          const targetSet = new Set(blessTargets);
+          st = {
+            ...st,
+            characters: st.characters.map((c) => {
+              // The caster is mutated in place — don't overwrite our `char`
+              // ref with a spread (it'd silently drop the concentrating_on
+              // we just set). Skip; the post-cast state writeback handles it.
+              if (c.id === char.id) return c;
+              if (!targetSet.has(c.id) || (c.conditions ?? []).includes('blessed')) {
+                return c;
+              }
+              return {
+                ...c,
+                conditions: [...(c.conditions ?? []), 'blessed'],
+                condition_sources: {
+                  ...(c.condition_sources ?? {}),
+                  blessed: char.id,
+                },
+              };
+            }),
+          };
+          // Apply blessed to the caster's local ref too.
+          if (!(char.conditions ?? []).includes('blessed')) {
+            char.conditions = [...(char.conditions ?? []), 'blessed'];
+            char.condition_sources = {
+              ...(char.condition_sources ?? {}),
+              blessed: char.id,
+            };
+          }
+          // Look up names for the narrative addendum.
+          const blessedNames = blessTargets
+            .map((id) => st.characters.find((c) => c.id === id)?.name ?? id)
+            .join(', ');
+          narrative += ` Blessed: ${blessedNames}.`;
+        }
         break;
       }
 
@@ -5963,7 +6091,7 @@ export async function takeAction({
         spellDmg += agonizingBonus;
         narrative = `${char.name} casts ${spell.name}${slotNote}!${atkNote} `;
         if (atk.critical) narrative += 'Critical spell hit! ';
-        narrative += `${spellDmg} ${spell.damageType ?? ''} damage!`;
+        narrative += `${fmt.dmg(spellDmg)} ${spell.damageType ?? ''} damage!`;
         if (agonizingBonus > 0) narrative += ` [Agonizing Blast: +${agonizingBonus}]`;
       } else if (spell.savingThrow) {
         // ── Saving throw spell ─────────────────────────────────────────────
@@ -6008,9 +6136,9 @@ export async function takeAction({
               ? Math.floor(fullDmg / 2)
               : 0;
           const saveVerb = saveFailed ? 'fails' : 'succeeds';
-          narrative = `${char.name} casts ${spell.name}${slotNote}! (DC ${dc} ${saveLabel} save — ${spellTarget.name} ${saveVerb}.) `;
+          narrative = `${char.name} casts ${spell.name}${slotNote}! (${fmt.dc(dc)} ${saveLabel} save — ${spellTarget.name} ${saveVerb}.) `;
           narrative +=
-            spellDmg > 0 ? `${spellDmg} ${spell.damageType ?? ''} damage!` : 'No damage.';
+            spellDmg > 0 ? `${fmt.dmg(spellDmg)} ${spell.damageType ?? ''} damage!` : 'No damage.';
           if (!saveFailed && spell.saveEffect === 'half') narrative += ' (half damage)';
         } else {
           narrative = `${char.name} casts ${spell.name}${slotNote}! (DC ${dc} ${saveLabel} save — `;
@@ -6096,7 +6224,7 @@ export async function takeAction({
         const autoHitExpr =
           spell.level === 0 ? cantripDamageDice(spell, char.level) : upcastDamage(spell, slotLevel);
         spellDmg = rollDice(autoHitExpr || spell.damage);
-        narrative = `${char.name} casts ${spell.name}${slotNote}! Auto-hit — ${spellDmg} ${spell.damageType ?? ''} damage!`;
+        narrative = `${char.name} casts ${spell.name}${slotNote}! Auto-hit — ${fmt.dmg(spellDmg)} ${spell.damageType ?? ''} damage!`;
       }
 
       // ── AOE spells on grid ────────────────────────────────────────────────
@@ -6283,7 +6411,7 @@ export async function takeAction({
               .replace('{xp}', String(xpShare));
           narrative += applyPartyLevelUps(st, char, context);
         } else {
-          narrative += ` The ${spellTarget.name} has ${newEnemyHpSpell} HP remaining.`;
+          narrative += ` The ${spellTarget.name} has ${fmt.hp(newEnemyHpSpell)} HP remaining.`;
         }
       }
 
@@ -7292,7 +7420,7 @@ export async function takeAction({
           targetAc: enemy.ac,
           round: st.round ?? 1,
         });
-        narrative = `✦ Divine Spark! ${enemy.name} takes ${dsRoll} radiant damage. (${cdUsesDS - 1} Channel Divinity remaining)`;
+        narrative = `✦ Divine Spark! ${enemy.name} takes ${fmt.dmg(dsRoll)} radiant damage. (${cdUsesDS - 1} Channel Divinity remaining)`;
         if (dsHp <= 0) {
           const split = splitEncounterXp(st, char.id, enemy.xp ?? 0);
           st = split.st;
@@ -7643,7 +7771,7 @@ export async function takeAction({
             e.id === roomId && e.isEnemy ? { ...e, hp: Math.max(0, csHp) } : e
           ),
         };
-        narrative = `Colossus Slayer! +${csDmg} piercing damage on a bloodied foe (${csHp <= 0 ? 'killed' : `${Math.max(0, csHp)} HP remaining`}).`;
+        narrative = `Colossus Slayer! +${fmt.dmg(csDmg)} piercing damage on a bloodied foe (${csHp <= 0 ? 'killed' : `${fmt.hp(Math.max(0, csHp))} HP remaining`}).`;
         if (csHp <= 0) {
           st.enemies_killed = [...st.enemies_killed, roomId];
           st = endCombatState(st);
