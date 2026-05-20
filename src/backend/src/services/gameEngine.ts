@@ -1679,6 +1679,23 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       });
     }
 
+    // 2024 PHB Orc — Adrenaline Rush. Bonus action: take the Dash action
+    // (refund full speed worth of movement) and gain temp HP equal to your
+    // proficiency bonus. 1/short rest.
+    if (
+      char.species === 'orc' &&
+      state.combat_active &&
+      !char.class_resource_uses?.adrenaline_rush_used &&
+      !char.turn_actions.bonus_action_used
+    ) {
+      const tempHpGrant = profBonus(char.level);
+      choices.push({
+        label: `Adrenaline Rush — bonus action Dash + ${tempHpGrant} temp HP (1/short rest)`,
+        action: { type: 'use_class_feature', featureId: 'adrenaline_rush' },
+        requiresBonusAction: true,
+      });
+    }
+
     // Fighter: Second Wind (bonus action). 2024 PHB has multi-use scaling:
     // 2 uses at L1, 3 at L4, 4 at L10. All recover on a short or long rest.
     if (char.character_class.toLowerCase() === 'fighter') {
@@ -4573,6 +4590,8 @@ export async function takeAction({
       if (char.species === 'dragonborn') delete srUses.breath_weapon_used;
       // 2024 PHB Goliath Large Form recovers on short rest.
       if (char.species === 'goliath') delete srUses.large_form_used;
+      // 2024 PHB Orc Adrenaline Rush recovers on short rest.
+      if (char.species === 'orc') delete srUses.adrenaline_rush_used;
       // Fighter: Second Wind + Action Surge recover on short rest
       if (cls === 'fighter') {
         delete srUses.second_wind;
@@ -6694,6 +6713,42 @@ export async function takeAction({
       // ── 2024 PHB Cleric L5: Sear Undead ──────────────────────────────────────
       // Action. Replaces 2014 Destroy Undead. AoE radiant: each undead in 30 ft
       // takes Nd8 (N = cleric level) radiant damage; WIS save halves.
+      // 2024 PHB Orc — Adrenaline Rush. Bonus action: gain the Dash action
+      // (refunds full speed of movement this turn) and gain temp HP equal
+      // to proficiency bonus. 1/short rest.
+      else if (fid === 'adrenaline_rush') {
+        if (char.species !== 'orc') {
+          narrative = 'Only Orcs have Adrenaline Rush.';
+          break;
+        }
+        if (char.class_resource_uses?.adrenaline_rush_used === 1) {
+          narrative = 'Adrenaline Rush already used this short rest.';
+          break;
+        }
+        if (char.turn_actions.bonus_action_used) {
+          narrative = 'Bonus action already used this turn.';
+          break;
+        }
+        const arSpeed = effectiveSpeed(char);
+        st = {
+          ...st,
+          movement_used: {
+            ...(st.movement_used ?? {}),
+            [char.id]: Math.max(0, (st.movement_used?.[char.id] ?? 0) - arSpeed),
+          },
+        };
+        const arTemp = profBonus(char.level);
+        const newTemp = Math.max(char.temp_hp ?? 0, arTemp);
+        char.temp_hp = newTemp;
+        char.class_resource_uses = {
+          ...(char.class_resource_uses ?? {}),
+          adrenaline_rush_used: 1,
+        };
+        char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
+        narrative = `🪓 ${char.name} — Adrenaline Rush! +${arSpeed} ft movement (Dash) and ${arTemp} temp HP.`;
+        usedInitiative = true;
+      }
+
       // 2024 PHB Goliath — Large Form. Bonus action; the Goliath grows to
       // Large size for ~10 rounds (1 min RAW). Gains +10 ft speed (via
       // condition wired in `effectiveSpeed`) and is treated as Large for
