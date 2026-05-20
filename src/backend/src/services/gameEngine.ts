@@ -877,6 +877,144 @@ function getLivingRoomEnemies(state: GameState, seed: Seed, roomId: string): Ene
   return base;
 }
 
+// SRD p.221 — lair actions. Fire one randomly-picked action per round on
+// the round-wrap path. Only fires if a living enemy with `lair_actions`
+// is in the current room. Returns updated state, narrative addendum,
+// and a `fired` flag so callers can skip the narrative-prefix work when
+// nothing happened.
+function fireLairAction(
+  st: GameState,
+  seed: Seed,
+  _context: Context
+): { st: GameState; narrative: string; fired: boolean } {
+  if (!st.combat_active) return { st, narrative: '', fired: false };
+  const roomId = st.current_room;
+  const livingEnemies = getLivingRoomEnemies(st, seed, roomId);
+  const lairBoss = livingEnemies.find((e) => (e.lair_actions?.length ?? 0) > 0);
+  if (!lairBoss?.lair_actions?.length) return { st, narrative: '', fired: false };
+  const action = pick(lairBoss.lair_actions);
+  if (action.kind === 'aoe_save_damage') {
+    const dc = action.saveDC;
+    const fullDmg = rollDice(action.dice);
+    let narrative = ` 🌀 Lair action: ${action.name} — ${action.narrative}`;
+    const updatedChars = st.characters.map((c) => {
+      if (c.dead) return c;
+      const scoreKey = action.savingThrow as 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha';
+      const score = (c[scoreKey] ?? 10) as number;
+      const saveFailed = rollConditionSave(
+        scoreKey,
+        score,
+        dc,
+        false,
+        c.level,
+        0,
+        c.conditions ?? []
+      );
+      const dealt = saveFailed ? fullDmg : Math.floor(fullDmg / 2);
+      const newHp = Math.max(0, c.hp - dealt);
+      narrative += ` ${c.name}: ${scoreKey.toUpperCase()} save vs DC ${dc} — ${saveFailed ? 'fails' : 'succeeds (half)'} (${dealt} ${action.damageType}).`;
+      return { ...c, hp: newHp };
+    });
+    return { st: { ...st, characters: updatedChars }, narrative, fired: true };
+  }
+  return { st, narrative: '', fired: false };
+}
+
+// SRD p.221 — legendary actions. Fire AT MOST ONE after another creature's
+// turn ends. Spends `legendary_action_points` (refreshed on the legendary
+// creature's own turn). Picks the lowest-cost available action and resolves
+// its effect immediately against the nearest living PC.
+function fireLegendaryAction(
+  st: GameState,
+  seed: Seed,
+  context: Context
+): { st: GameState; narrative: string; fired: boolean } {
+  if (!st.combat_active) return { st, narrative: '', fired: false };
+  const roomId = st.current_room;
+  const livingEnemies = getLivingRoomEnemies(st, seed, roomId);
+  const legendary = livingEnemies.find(
+    (e) => (e.legendary_actions?.length ?? 0) > 0 && (e.legendary_action_points ?? 0) > 0
+  );
+  if (!legendary?.legendary_actions?.length) return { st, narrative: '', fired: false };
+  const sorted = [...legendary.legendary_actions].sort((a, b) => a.cost - b.cost);
+  const action = sorted.find((a) => a.cost <= (legendary.legendary_action_points ?? 0));
+  if (!action) return { st, narrative: '', fired: false };
+
+  // Spend the points by mutating the seed enemy entry. Mirrors the
+  // phase-transition mutation pattern at processBossPhaseTransitions.
+  for (const [rk, list] of Object.entries(seed.enemies ?? {})) {
+    const idx = list.findIndex((e) => e.id === legendary.id);
+    if (idx >= 0) {
+      const updated: Enemy = {
+        ...list[idx],
+        legendary_action_points: (list[idx].legendary_action_points ?? 0) - action.cost,
+      };
+      seed.enemies[rk] = [...list.slice(0, idx), updated, ...list.slice(idx + 1)];
+      break;
+    }
+  }
+
+  let narrative = ` ⚜️ Legendary action — ${legendary.name} uses ${action.name}.`;
+  if (action.narrative) narrative += ` ${action.narrative}`;
+  if (action.kind === 'extra_attack') {
+    const nearestPcEnt = st.entities
+      ?.filter((e) => !e.isEnemy && !e.isCompanion && e.hp > 0)
+      .sort((a, b) => {
+        const lairEnt = st.entities?.find((x) => x.id === legendary.id && x.isEnemy);
+        if (!lairEnt) return 0;
+        return distanceFeet(lairEnt.pos, a.pos) - distanceFeet(lairEnt.pos, b.pos);
+      })[0];
+    if (!nearestPcEnt) return { st, narrative, fired: true };
+    const targetCharIdx = st.characters.findIndex(
+      (c) => c.id === nearestPcEnt.id && !c.dead
+    );
+    if (targetCharIdx < 0) return { st, narrative, fired: true };
+    const target = st.characters[targetCharIdx];
+    const atkResult = applyEnemyAttackNarrative(legendary, target, context);
+    narrative += ` ${atkResult.narrative}`;
+    // Apply hp/condition changes from the attack. We deliberately skip the
+    // full reaction-window pause path (Shield etc.) for legendary actions —
+    // they're meant to be a fast follow-up beat, and re-entering the
+    // reaction loop mid-legendary would tangle the resume coords.
+    const newHp = Math.max(0, target.hp - atkResult.hpLost);
+    const updatedTarget: Character = {
+      ...target,
+      hp: newHp,
+      temp_hp: atkResult.newTempHp ?? target.temp_hp,
+      conditions: atkResult.newConditions,
+      condition_durations: atkResult.newDurations,
+    };
+    st = {
+      ...st,
+      characters: st.characters.map((c, i) => (i === targetCharIdx ? updatedTarget : c)),
+      entities: (st.entities ?? []).map((e) =>
+        e.id === target.id && !e.isEnemy ? { ...e, hp: newHp } : e
+      ),
+    };
+    return { st, narrative, fired: true };
+  }
+  return { st, narrative, fired: true };
+}
+
+// Refresh a legendary creature's action-point pool. Called when their own
+// initiative slot comes up (handled in the enemy turn loop).
+function refreshLegendaryPool(seed: Seed, enemyId: string): void {
+  for (const [rk, list] of Object.entries(seed.enemies ?? {})) {
+    const idx = list.findIndex((e) => e.id === enemyId);
+    if (idx >= 0) {
+      const enemy = list[idx];
+      if (!enemy.legendary_actions?.length) return;
+      const pool = enemy.legendary_pool ?? 3;
+      seed.enemies[rk] = [
+        ...list.slice(0, idx),
+        { ...enemy, legendary_action_points: pool },
+        ...list.slice(idx + 1),
+      ];
+      return;
+    }
+  }
+}
+
 function getEnemyById(seed: Seed, enemyId: string): Enemy | null {
   for (const list of Object.values(seed.enemies ?? {})) {
     const found = list.find((e) => e.id === enemyId);
@@ -978,6 +1116,69 @@ function splitEncounterXp(
     },
     share,
   };
+}
+
+// Apply a level-up to one character if their XP threshold is met.
+// Mutates `char` in place. Returns the level-up narrative (empty if none).
+// 2024 PHB Dwarven Toughness adds +1 max HP at each level up.
+function applyLevelUpFromXp(char: Character, context: Context): string {
+  if (char.dead) return '';
+  if ((char.xp ?? 0) < (char.level ?? 1) * 100) return '';
+  char.level += 1;
+  const dwarfLvlBonus = char.species === 'dwarf' ? 1 : 0;
+  const hpRoll =
+    Math.max(1, rollDice(`1d${char.hit_die ?? 8}`) + abilityMod(char.con)) + dwarfLvlBonus;
+  char.max_hp += hpRoll;
+  char.hp = Math.min(char.hp + hpRoll, char.max_hp);
+  char.spell_slots_max = getSpellSlotsForLevel(char.character_class, char.level, context);
+  const levelUpLine = pick(context.narratives.levelUp)
+    .replace(/{level}/g, String(char.level))
+    .replace(/{name}/g, char.name);
+  let out = ` ${char.name}: ${levelUpLine} (+${hpRoll} HP)`;
+  if ([4, 8, 12, 16, 19].includes(char.level)) {
+    char.asi_pending = true;
+    out += ` Level ${char.level}: choose an Ability Score Improvement!`;
+  }
+  return out;
+}
+
+// Check + apply level-ups for the entire living party after a kill.
+// `killer` is mutated in place (callers expect to read `char.level` etc.);
+// other party members are read+mutated through `st.characters` references
+// that `splitEncounterXp` already replaced with fresh objects.
+function applyPartyLevelUps(st: GameState, killer: Character, context: Context): string {
+  let out = '';
+  out += applyLevelUpFromXp(killer, context);
+  for (const c of st.characters) {
+    if (c.id === killer.id || c.dead) continue;
+    out += applyLevelUpFromXp(c, context);
+  }
+  return out;
+}
+
+// Post-LLM fact-preservation check. The system prompt instructs the model
+// to keep all numbers, damage values, outcomes, and named entities — but
+// compliance isn't free. If the enhanced output drops a critical token
+// from the input (a multi-digit number, a state word like "killed" /
+// "downed" / "miss" / "hit"), we fall back to the raw narrative so the
+// player isn't shown prose that misrepresents engine state.
+//
+// We deliberately only check for *dropped* facts, not *added* embellishment
+// (prose flourish is the whole point of the LLM pass). Single-digit numbers
+// are skipped because they're often grammatical artifacts ("1 round", "2
+// turns") rather than mechanical facts.
+export function preservesCriticalFacts(input: string, output: string): boolean {
+  // Numbers: any 2+ digit sequence in input must appear in output.
+  const inputNumbers = input.match(/\b\d{2,}\b/g) ?? [];
+  for (const n of inputNumbers) {
+    if (!output.includes(n)) return false;
+  }
+  // Outcome words: presence is binary — if input says "killed", output must too.
+  const outcomeWords = ['killed', 'downed', 'critical', 'CRIT'];
+  for (const w of outcomeWords) {
+    if (input.includes(w) && !output.toLowerCase().includes(w.toLowerCase())) return false;
+  }
+  return true;
 }
 
 // Fiend Warlock — Dark One's Blessing (PHB p.108): when you reduce a hostile
@@ -3095,6 +3296,9 @@ function runEnemyTurns(args: {
     const eEntry = st.initiative_order[advIdx];
     const rm = getEnemyById(args.seed, eEntry.id);
     if (rm && !st.enemies_killed.includes(eEntry.id)) {
+      // SRD p.221 — legendary action pool refreshes at the start of the
+      // legendary creature's own turn.
+      if (rm.legendary_actions?.length) refreshLegendaryPool(args.seed, rm.id);
       const eEnt = st.entities?.find((e) => e.id === eEntry.id && e.isEnemy);
       const nearestPcEntity = st.entities
         ?.filter((e) => !e.isEnemy && !e.isCompanion && e.hp > 0)
@@ -4700,6 +4904,7 @@ export async function takeAction({
                   const cleaveSplit = splitEncounterXp(st, char.id, cleaveXp);
                   st = cleaveSplit.st;
                   char.xp = (char.xp || 0) + cleaveSplit.share;
+                  narrative += applyPartyLevelUps(st, char, context);
                 }
               }
             }
@@ -4739,25 +4944,7 @@ export async function takeAction({
             pick(context.narratives.killShot)
               .replace('{enemy}', target.name)
               .replace('{xp}', String(xpShare));
-          if (char.xp >= char.level * 100) {
-            char.level += 1;
-            // 2024 PHB Dwarven Toughness adds +1 max HP at each level up.
-            const dwarfLvlBonus = char.species === 'dwarf' ? 1 : 0;
-            const hpRoll =
-              Math.max(1, rollDice(`1d${char.hit_die ?? 8}`) + abilityMod(char.con)) +
-              dwarfLvlBonus;
-            char.max_hp += hpRoll;
-            char.hp = Math.min(char.hp + hpRoll, char.max_hp);
-            char.spell_slots_max = getSpellSlotsForLevel(char.character_class, char.level, context);
-            const levelUpLine = pick(context.narratives.levelUp)
-              .replace(/{level}/g, String(char.level))
-              .replace(/{name}/g, char.name);
-            narrative += ` ${char.name}: ${levelUpLine} (+${hpRoll} HP)`;
-            if ([4, 8, 12, 16, 19].includes(char.level)) {
-              char.asi_pending = true;
-              narrative += ` Level ${char.level}: choose an Ability Score Improvement!`;
-            }
-          }
+          narrative += applyPartyLevelUps(st, char, context);
           usedInitiative = true;
           return true;
         }
@@ -4929,28 +5116,51 @@ export async function takeAction({
         break;
       }
       const sneakDC = passivePerceptionDC(enemy.wis ?? 10);
-      const proficient = context.classSkills[char.character_class]?.includes('stealth') ?? false;
-      // Sneak is a DEX (Stealth) check — exhaustion 1+ AND heavy encumbrance
-      // both impose disadvantage. Either is enough; the check is single-roll
-      // disadvantage either way.
-      const exhaustionDisadv1 = (char.exhaustion_level ?? 0) >= 1;
-      const checkDisadv = exhaustionDisadv1 || isHeavilyEncumbered(char);
-      const inspAdvSneak = consumeInspirationForCheck(char);
-      const bardicSneakRoll = consumeBardicForCheck(char);
-      const check = skillCheck(
-        char.dex,
-        sneakDC - bardicSneakRoll,
-        proficient,
-        char.level,
-        checkDisadv,
-        false,
-        false,
-        inspAdvSneak,
-        char.species === 'halfling'
-      );
-      if (check.success) {
+      // SRD p.6 — group ability check: every participant rolls; the group
+      // succeeds if at least half of them pass. Solo parties collapse to
+      // single-PC behavior. Only the active PC auto-spends Inspiration /
+      // Bardic Inspiration; passive party members keep their resources.
+      // Swap the active PC's slot for our local `char` ref so the resource
+      // mutations apply to the same object that gets written back to state.
+      const livingParty = st.characters
+        .filter((c) => !c.dead)
+        .map((c) => (c.id === char.id ? char : c));
+      const rolls = livingParty.map((member) => {
+        const isActive = member.id === char.id;
+        const proficient =
+          context.classSkills[member.character_class]?.includes('stealth') ?? false;
+        const exhaustionDisadv1 = (member.exhaustion_level ?? 0) >= 1;
+        const checkDisadv = exhaustionDisadv1 || isHeavilyEncumbered(member);
+        const inspAdv = isActive ? consumeInspirationForCheck(member) : false;
+        const bardicRoll = isActive ? consumeBardicForCheck(member) : 0;
+        const check = skillCheck(
+          member.dex,
+          sneakDC - bardicRoll,
+          proficient,
+          member.level,
+          checkDisadv,
+          false,
+          false,
+          inspAdv,
+          member.species === 'halfling'
+        );
+        return { name: member.name, check, mod: abilityMod(member.dex) };
+      });
+      const successes = rolls.filter((r) => r.check.success).length;
+      const groupPasses = 2 * successes >= livingParty.length;
+      const detailLines = rolls
+        .map(
+          (r) =>
+            `${r.name}: ${r.check.roll}+${r.mod}=${r.check.total} ${r.check.success ? '✓' : '✗'}`
+        )
+        .join('; ');
+      const groupNote =
+        livingParty.length > 1
+          ? ` Group check: ${successes}/${livingParty.length} pass${groupPasses ? '' : ' — group fails'}.`
+          : '';
+      if (groupPasses) {
         narrative = pick(context.narratives.sneakSuccess).replace('{enemy}', enemy.name);
-        narrative += ` (Stealth: ${check.roll}+${abilityMod(char.dex)}=${check.total} vs DC ${sneakDC})`;
+        narrative += `${groupNote} (DC ${sneakDC}; ${detailLines})`;
         if (adjacent.length > 0) {
           const target = adjacent[0];
           if (st.combat_active) {
@@ -4971,7 +5181,7 @@ export async function takeAction({
             );
         }
       } else {
-        narrative = `You fail to slip past the ${enemy?.name ?? 'enemy'}. (Stealth: ${check.roll}+${abilityMod(char.dex)}=${check.total} vs DC ${sneakDC})`;
+        narrative = `The party fails to slip past the ${enemy?.name ?? 'enemy'}.${groupNote} (DC ${sneakDC}; ${detailLines})`;
       }
       // Sneak always consumes the action and ends the combat turn
       char.turn_actions = { ...char.turn_actions, action_used: true };
@@ -5726,6 +5936,7 @@ export async function takeAction({
           st = endCombatState(st);
         }
         narrative = `${char.name} casts ${spell.name}${slotNote}! ${lines.join(' ')} Total: ${totalDealt} ${spell.damageType ?? 'damage'}.`;
+        narrative += applyPartyLevelUps(st, char, context);
         usedInitiative = true;
         spellDmg = 0; // Already applied per-target; skip the single-target block below.
         spellHit = false; // Suppress the single-target damage application.
@@ -5875,6 +6086,7 @@ export async function takeAction({
               pick(context.narratives.killShot)
                 .replace('{enemy}', spellTarget.name)
                 .replace('{xp}', String(xpShare));
+            narrative += applyPartyLevelUps(st, char, context);
           }
           usedInitiative = true;
           break;
@@ -5976,6 +6188,7 @@ export async function takeAction({
                 };
                 st.enemies_killed = [...st.enemies_killed, target.id];
                 narrative += grantDarkOnesBlessing(char);
+                narrative += applyPartyLevelUps(st, char, context);
                 if (isRoomCleared(st, seed, roomId)) {
                   st = endCombatState(st);
                 }
@@ -6068,25 +6281,7 @@ export async function takeAction({
             pick(context.narratives.killShot)
               .replace('{enemy}', spellTarget.name)
               .replace('{xp}', String(xpShare));
-          if (char.xp >= char.level * 100) {
-            char.level += 1;
-            // 2024 PHB Dwarven Toughness adds +1 max HP at each level up.
-            const dwarfLvlBonusSpell = char.species === 'dwarf' ? 1 : 0;
-            const hpRollSpell =
-              Math.max(1, rollDice(`1d${char.hit_die ?? 8}`) + abilityMod(char.con)) +
-              dwarfLvlBonusSpell;
-            char.max_hp += hpRollSpell;
-            char.hp = Math.min(char.hp + hpRollSpell, char.max_hp);
-            char.spell_slots_max = getSpellSlotsForLevel(char.character_class, char.level, context);
-            const levelUpLineSpell = pick(context.narratives.levelUp)
-              .replace(/{level}/g, String(char.level))
-              .replace(/{name}/g, char.name);
-            narrative += ` ${char.name}: ${levelUpLineSpell} (+${hpRollSpell} HP)`;
-            if ([4, 8, 12, 16, 19].includes(char.level)) {
-              char.asi_pending = true;
-              narrative += ` Level ${char.level}: choose an Ability Score Improvement!`;
-            }
-          }
+          narrative += applyPartyLevelUps(st, char, context);
         } else {
           narrative += ` The ${spellTarget.name} has ${newEnemyHpSpell} HP remaining.`;
         }
@@ -6525,6 +6720,7 @@ export async function takeAction({
               const split = splitEncounterXp(st, char.id, enemy?.xp ?? 10);
               st = split.st;
               char.xp = (char.xp || 0) + split.share;
+              flurryNarrative += applyPartyLevelUps(st, char, context);
               st.enemies_killed = [...st.enemies_killed, roomId];
               st = endCombatState(st);
               break;
@@ -6809,6 +7005,7 @@ export async function takeAction({
             const split = splitEncounterXp(st, char.id, frTarget.xp ?? 10);
             st = split.st;
             char.xp = (char.xp || 0) + split.share;
+            narrative += applyPartyLevelUps(st, char, context);
             st.enemies_killed = [...st.enemies_killed, frTarget.id];
             if (isRoomCleared(st, seed, roomId)) {
               st = endCombatState(st);
@@ -7101,6 +7298,7 @@ export async function takeAction({
           st = split.st;
           char.xp = (char.xp || 0) + split.share;
           narrative += ` ${enemy.name} is destroyed.`;
+          narrative += applyPartyLevelUps(st, char, context);
         }
         usedInitiative = true;
       }
@@ -7516,6 +7714,7 @@ export async function takeAction({
             const split = splitEncounterXp(st, char.id, xpGain);
             st = split.st;
             char.xp = (char.xp || 0) + split.share;
+            narrative += applyPartyLevelUps(st, char, context);
             if (isRoomCleared(st, seed, roomId)) {
               st = endCombatState(st);
             }
@@ -7929,6 +8128,7 @@ export async function takeAction({
         };
         st.enemies_killed = [...(st.enemies_killed || []), twfTargetEntityId];
         narrative += grantDarkOnesBlessing(char);
+        narrative += applyPartyLevelUps(st, char, context);
         if (st.combat_active && isRoomCleared(st, seed, roomId)) st = endCombatState(st);
       }
       break;
@@ -8782,6 +8982,7 @@ export async function takeAction({
                 characters: st.characters.map((c) => (c.id === char.id ? char : c)),
               };
               narrative += ` ${enemyName} is consumed by the rebuke! (+${xpShare} XP)`;
+              narrative += applyPartyLevelUps(st, char, context);
               const roomId = st.current_room;
               if (isRoomCleared(st, seed, roomId)) {
                 st = endCombatState(st);
@@ -8975,6 +9176,14 @@ export async function takeAction({
     const startAdvIdx = (currentIdx + 1) % orderLen;
     const initialRoundWrapped = startAdvIdx === 0;
 
+    // SRD p.221 — legendary action: fires AFTER another creature's turn ends.
+    // Resolved before runEnemyTurns so the spend is recorded against the
+    // current pool; the legendary creature's own turn (later in the loop)
+    // will refresh the pool for the next round.
+    const legendaryRes = fireLegendaryAction(st, seed, context);
+    st = legendaryRes.st;
+    narrative += legendaryRes.narrative;
+
     const turnRes = runEnemyTurns({
       st,
       seed,
@@ -8996,13 +9205,20 @@ export async function takeAction({
     if (turnRes.paused) st.initiative_idx = advIdx;
 
     if (roundWrapped) {
-      // New round: reset turn_actions, movement budgets, and clear surprise (PHB p.189)
+      // New round: bump the round counter (so combat-event payloads tag the
+      // right round), reset turn_actions, movement budgets, and clear
+      // surprise (PHB p.189).
       st = {
         ...st,
+        round: (st.round ?? 1) + 1,
         movement_used: {},
         surprised: [],
         characters: st.characters.map((c) => ({ ...c, turn_actions: { ...FRESH_TURN } })),
       };
+      // SRD p.221 — lair action fires on round start (init count 20).
+      const lairRes = fireLairAction(st, seed, context);
+      st = lairRes.st;
+      narrative += lairRes.narrative;
     }
 
     // Pause path: runEnemyTurns already set initiative_idx and active_character_id
@@ -9104,7 +9320,17 @@ export async function takeAction({
   // Passthrough: if the provider returned the input unchanged (NoneProvider
   // or LLM error fallback), restore the tokenised raw narrative so the FE
   // can render styled spans.
-  const finalNarrative = enhanced === llmInput ? rawNarrative : enhanced;
+  //
+  // Fact-preservation check: the LLM is instructed to keep all numbers and
+  // outcome words, but compliance isn't free. If the enhancement drops a
+  // damage number, a critical state word ("killed", "downed"), or a PC
+  // name, the player gets prose that misrepresents engine state — fall
+  // back to the tokenised raw narrative instead.
+  const enhancementFaithful =
+    enhanced === llmInput ||
+    (enhanced.length > 0 && preservesCriticalFacts(llmInput, enhanced));
+  const finalNarrative =
+    enhanced === llmInput || !enhancementFaithful ? rawNarrative : enhanced;
 
   // SRD 5.2.1 p.184 — Invisible: attacking reveals location. The condition
   // ends after the attack; the character must re-Hide to regain it.

@@ -105,6 +105,35 @@ export type BossPhaseEffect =
   | { kind: 'add_resistance'; damageType: string }
   | { kind: 'heal'; amount: number };
 
+// Legendary actions (SRD p.221). Fire AFTER another creature's turn ends —
+// the legendary creature spends points from `legendary_action_points` to
+// take a quick action. Pool refreshes at the start of the legendary
+// creature's own turn. The engine fires at most one legendary action per
+// post-PC-turn slot, choosing the lowest-cost available action.
+export interface LegendaryAction {
+  id: string;
+  name: string;
+  cost: number; // points consumed when used (typical 1-3)
+  kind: 'extra_attack'; // start small; more kinds as content demands
+  narrative?: string;
+}
+
+// Lair actions (SRD p.221). Fire on initiative count 20 (round-start in
+// Pansori's simpler model) when a creature with `lair_actions` is in the
+// current room. The engine fires one lair action per round, chosen at
+// random from the list.
+export type LairAction =
+  | {
+      id: string;
+      name: string;
+      kind: 'aoe_save_damage'; // AoE damage with save-for-half
+      dice: string; // e.g. '4d6'
+      damageType: string;
+      savingThrow: 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha';
+      saveDC: number;
+      narrative: string; // pre-effect description (e.g. "The walls shake...")
+    };
+
 export interface EnemyTemplate {
   name: string;
   cr: number;
@@ -139,6 +168,12 @@ export interface EnemyTemplate {
   // HP-threshold phase transitions for boss encounters. Order does not
   // matter — engine sorts by descending hpPct internally.
   phases?: BossPhase[];
+  // Boss-only systems (SRD p.221). Bosses with `legendary_actions` get
+  // `legendary_pool` points per round to spend on post-PC-turn actions;
+  // bosses with `lair_actions` fire one environment effect on round wrap.
+  legendary_actions?: LegendaryAction[];
+  legendary_pool?: number; // points per round; default 3 if legendary_actions set
+  lair_actions?: LairAction[];
 }
 
 export interface Enemy {
@@ -187,6 +222,13 @@ export interface Enemy {
   // Max hp captured at seed time so phase thresholds can be re-evaluated
   // against the *original* HP after damage reduces hp below maxHp.
   maxHp?: number;
+  // Boss-only systems (SRD p.221). Mirrors EnemyTemplate fields and is
+  // carried through procgen. `legendary_action_points` is the current
+  // pool; refreshes on this enemy's own turn start.
+  legendary_actions?: LegendaryAction[];
+  legendary_pool?: number;
+  legendary_action_points?: number;
+  lair_actions?: LairAction[];
 }
 
 export interface Seed {

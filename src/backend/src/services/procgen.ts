@@ -160,6 +160,12 @@ export function generateRoguelikeSeed(context: Context, partySize = 1): Seed {
           speedFt: template.speedFt,
           phases: template.phases,
           damageType: template.damageType,
+          legendary_actions: template.legendary_actions,
+          legendary_pool: template.legendary_pool,
+          legendary_action_points: template.legendary_actions
+            ? (template.legendary_pool ?? 3)
+            : undefined,
+          lair_actions: template.lair_actions,
         },
       ];
     }

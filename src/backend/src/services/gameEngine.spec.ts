@@ -14,6 +14,7 @@ import {
   buildArrivalNarrative,
   generateChoices,
   normalizeState,
+  preservesCriticalFacts,
   runRules,
   takeAction,
 } from './gameEngine.js';
@@ -227,6 +228,158 @@ describe('normalizeState', () => {
     expect(result.characters[0].hp).toBe(15);
     expect(result.characters[0].character_class).toBe('Rogue');
     expect(result.run_log[0].character_id).toBe(result.characters[0].id);
+  });
+
+  // ── Schema-evolution / persistence path ────────────────────────────────────
+  //
+  // The state column is JSONB — any field added to GameState lives there
+  // and the engine must tolerate the absence of newer fields when loading
+  // sessions saved before they were added. normalizeState patches missing
+  // fields with defaults; the engine reads through `?? defaults` at use
+  // sites. These specs lock the contract so a schema-shape change can't
+  // break stored sessions silently.
+
+  it('patches missing optional fields on a new-format state (post-redeploy load)', () => {
+    // Simulate a state saved before the grid-combat / quest / campaign
+    // overlay fields existed. The spread in normalizeState passes them
+    // through as undefined; engine call sites must tolerate this.
+    const oldFormat = {
+      characters: [
+        {
+          id: 'c1',
+          name: 'Resumed Hero',
+          character_class: 'Fighter',
+          portrait_url: null,
+          hp: 20,
+          max_hp: 20,
+          ac: 14,
+          str: 14,
+          dex: 12,
+          con: 12,
+          int: 10,
+          wis: 10,
+          cha: 10,
+          xp: 0,
+          level: 1,
+          gold: 5,
+          inventory: [],
+          equipped_weapon: null,
+          equipped_armor: null,
+          equipped_shield: null,
+          conditions: [],
+          death_saves: { successes: 0, failures: 0 },
+          stable: false,
+          dead: false,
+          turn_actions: {
+            action_used: false,
+            bonus_action_used: false,
+            reaction_used: false,
+            free_interaction_used: false,
+          },
+          initiative_roll: null,
+          // Intentionally omit: hit_die, hit_dice_remaining, condition_durations,
+          // class_resource_uses, asi_pending, exhaustion_level, spell_slots_max,
+          // spell_slots_used, spells_known, background_id, skill_proficiencies,
+          // tool_proficiencies, armor_proficiencies, weapon_proficiencies,
+          // attuned_items, concentrating_on, subclass, species, etc.
+        },
+      ],
+      active_character_id: 'c1',
+      current_room: ctx.startRoomId,
+      visited_rooms: [ctx.startRoomId],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: false,
+      initiative_order: [],
+      initiative_idx: 0,
+      run_log: [],
+      room_log: [],
+      flags: {},
+      // Omit all the post-rollout fields: short_rested_rooms, long_rested,
+      // npc_attitudes, npc_talked, traps_triggered, traps_disarmed,
+      // objects_searched, entities, movement_used, quest_progress, etc.
+    };
+    const result = normalizeState(oldFormat as unknown as Record<string, unknown>);
+    expect(result.characters).toHaveLength(1);
+    // Patched fields land with sensible defaults
+    expect(result.short_rested_rooms).toEqual([]);
+    expect(result.long_rested).toBe(false);
+    expect(result.npc_attitudes).toEqual({});
+    expect(result.traps_triggered).toEqual([]);
+    expect(result.traps_disarmed).toEqual([]);
+    expect(result.objects_searched).toEqual([]);
+    expect(result.characters[0].hit_die).toBe(8);
+    expect(result.characters[0].hit_dice_remaining).toBe(1);
+    expect(result.characters[0].condition_durations).toEqual({});
+    expect(result.characters[0].class_resource_uses).toEqual({});
+    expect(result.characters[0].asi_pending).toBe(false);
+    expect(result.characters[0].exhaustion_level).toBe(0);
+    expect(result.characters[0].spell_slots_max).toBeDefined();
+    expect(result.characters[0].spell_slots_used).toEqual({});
+    expect(result.characters[0].spells_known).toEqual([]);
+  });
+
+  it('normalized old-format state is usable by takeAction without crashing', async () => {
+    const oldFormat = {
+      characters: [
+        {
+          id: 'c1',
+          name: 'Resumed Hero',
+          character_class: 'Fighter',
+          portrait_url: null,
+          hp: 20,
+          max_hp: 20,
+          ac: 14,
+          str: 14,
+          dex: 12,
+          con: 12,
+          int: 10,
+          wis: 10,
+          cha: 10,
+          xp: 0,
+          level: 1,
+          gold: 5,
+          inventory: [],
+          equipped_weapon: null,
+          equipped_armor: null,
+          equipped_shield: null,
+          conditions: [],
+          death_saves: { successes: 0, failures: 0 },
+          stable: false,
+          dead: false,
+          turn_actions: {
+            action_used: false,
+            bonus_action_used: false,
+            reaction_used: false,
+            free_interaction_used: false,
+          },
+          initiative_roll: null,
+        },
+      ],
+      active_character_id: 'c1',
+      current_room: ctx.startRoomId,
+      visited_rooms: [ctx.startRoomId],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: false,
+      initiative_order: [],
+      initiative_idx: 0,
+      run_log: [],
+      room_log: [],
+      flags: {},
+    };
+    const normalized = normalizeState(oldFormat as unknown as Record<string, unknown>);
+    const result = await takeAction({
+      action: { type: 'pass' },
+      history: [],
+      state: normalized,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    // It returns something coherent: a narrative + choices + new state.
+    expect(typeof result.narrative).toBe('string');
+    expect(result.newState).toBeDefined();
+    expect(result.newState.characters[0].id).toBe('c1');
   });
 });
 
@@ -5451,6 +5604,179 @@ describe('boss phase transitions', () => {
   });
 });
 
+// ─── Boss legendary + lair actions (SRD p.221) ───────────────────────────────
+//
+// Legendary actions fire AFTER another creature's turn ends, spending
+// points from a per-round pool that refreshes on the legendary creature's
+// own turn. Lair actions fire on round start when a creature with
+// `lair_actions` is in the current room — one randomly-picked effect.
+
+describe('boss legendary + lair actions', () => {
+  function makeBossWithLegendaryLair(): {
+    seed: Seed;
+    state: GameState;
+  } {
+    const boss: Enemy = {
+      id: 'boss#0',
+      name: 'Test Lich',
+      hp: 60,
+      maxHp: 60,
+      ac: 15,
+      damage: '1d6+2',
+      toHit: 5,
+      xp: 1000,
+      multiattack: 1,
+      legendary_pool: 3,
+      legendary_action_points: 3,
+      legendary_actions: [
+        {
+          id: 'swing',
+          name: 'Tomb Swing',
+          cost: 1,
+          kind: 'extra_attack',
+          narrative: 'The lich snaps off a quick blow.',
+        },
+      ],
+      lair_actions: [
+        {
+          id: 'necrotic_pulse',
+          name: 'Necrotic Pulse',
+          kind: 'aoe_save_damage',
+          dice: '2d6',
+          damageType: 'necrotic',
+          savingThrow: 'con',
+          saveDC: 13,
+          narrative: 'Tomb fog floods the room.',
+        },
+      ],
+    };
+    const seed: Seed = {
+      context_id: ctx.id,
+      world_name: 'Lair Test',
+      ship_name: 'Lair Test',
+      intro: '',
+      rooms: [
+        { id: 'r', name: 'Room', desc: 'A room.', exits: [], objects: [], traps: [] },
+      ] as unknown as Seed['rooms'],
+      connections: { r: [] },
+      enemies: { r: [boss] },
+      loot: {},
+      npcs: {},
+      seed_id: 'lair-seed',
+    };
+    const char = makeChar({ id: 'pc-1', hp: 30, max_hp: 30 });
+    const state: GameState = {
+      characters: [char],
+      active_character_id: char.id,
+      current_room: 'r',
+      visited_rooms: ['r'],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: true,
+      // Both PC and boss exist; PC is idx 0 (goes first).
+      initiative_order: [
+        { id: char.id, roll: 20, is_enemy: false },
+        { id: 'boss#0', roll: 5, is_enemy: true },
+      ],
+      initiative_idx: 0,
+      entities: [
+        {
+          id: char.id,
+          isEnemy: false,
+          pos: { x: 1, y: 1 },
+          hp: char.hp,
+          maxHp: char.max_hp,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: 'boss#0',
+          isEnemy: true,
+          pos: { x: 2, y: 2 },
+          hp: 60,
+          maxHp: 60,
+          conditions: [],
+          condition_durations: {},
+        },
+      ],
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+      flags: {},
+      round: 1,
+      movement_used: {},
+    };
+    return { seed, state };
+  }
+
+  it('legendary action fires after a PC end_turn (narrative emitted)', async () => {
+    // Force the legendary attack to MISS so the test doesn't care about
+    // damage application — we just verify the legendary narrative fires.
+    vi.spyOn(Math, 'random').mockReturnValue(0); // d20 → 1, miss
+    const { seed, state } = makeBossWithLegendaryLair();
+    const result = await takeAction({
+      action: { type: 'end_turn' },
+      history: [],
+      state,
+      seed,
+      context: ctx,
+    });
+    expect(result.narrative).toMatch(/Legendary action.*Tomb Swing/);
+    // The pool dropped from 3 → 2 when legendary fired, then refreshed
+    // back to 3 on the boss's own turn (same end_turn cycle). The visible
+    // end-state is the post-refresh value; we assert that here.
+    expect(seed.enemies.r[0].legendary_action_points).toBe(3);
+  });
+
+  it('lair action fires on round wrap with AoE save → damage', async () => {
+    // Mock d20 low so the save fails (DC 13 vs CON 10 + roll 1).
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const { seed, state } = makeBossWithLegendaryLair();
+    // Round-wrap requires the enemy slot to be the last in initiative AND
+    // for combat to advance through it. PC end_turn → enemy auto-acts →
+    // initiative wraps to idx 0, round 2; lair fires here.
+    const result = await takeAction({
+      action: { type: 'end_turn' },
+      history: [],
+      state,
+      seed,
+      context: ctx,
+    });
+    expect(result.newState.round).toBe(2);
+    expect(result.narrative).toMatch(/Lair action: Necrotic Pulse/);
+    expect(result.narrative).toMatch(/Tomb fog floods the room/);
+    // The PC took some damage from the failed CON save.
+    expect(result.newState.characters[0].hp).toBeLessThan(30);
+  });
+
+  it('legendary pool refreshes when the boss takes its own turn', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0); // misses
+    const { seed, state } = makeBossWithLegendaryLair();
+    // Burn 2 points: pre-drain to 1 so we can verify it bumps to 3 again.
+    seed.enemies.r[0].legendary_action_points = 1;
+    const result = await takeAction({
+      action: { type: 'end_turn' },
+      history: [],
+      state,
+      seed,
+      context: ctx,
+    });
+    // After the PC end_turn the enemy goes; entering its turn refreshes
+    // the pool to 3, then the legendary-after-PC fired BEFORE the refresh
+    // (since runEnemyTurns advances after the legendary).
+    // Net: legendary spent 1 (pool 1 → 0), then enemy turn refreshed to 3.
+    expect(seed.enemies.r[0].legendary_action_points).toBe(3);
+    expect(result.newState.round).toBe(2);
+  });
+});
+
 // ─── prepare_spells — cap calculation + clamping ─────────────────────────────
 
 describe('prepare_spells', () => {
@@ -6493,6 +6819,107 @@ describe('Heavy encumbrance disadvantage (2024 variant)', () => {
   });
 });
 
+// ─── Group ability checks (SRD p.6) ──────────────────────────────────────────
+//
+// When a number of individuals attempt a check together, if at least half
+// the group succeeds, the whole group succeeds. The sneak action is the
+// natural fit since `current_room` is single-valued — the party moves
+// together. Solo parties collapse to the existing single-PC behavior.
+
+describe('group ability check — sneak (SRD p.6)', () => {
+  function makeSneakScenario(party: Array<Partial<Character>>): GameState {
+    const characters = party.map((o, i) =>
+      makeChar({ id: `pc-${i + 1}`, name: `PC${i + 1}`, ...o })
+    );
+    const enemyId = `${CORRIDOR_ID}#0`;
+    return {
+      ...makeState(),
+      characters,
+      active_character_id: 'pc-1',
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      combat_active: false,
+      initiative_order: [{ id: enemyId, roll: 5, is_enemy: true }],
+      initiative_idx: 0,
+    };
+  }
+
+  it('group passes when at least half succeed (3-PC party, 2 successes)', async () => {
+    // Mock all d20 rolls high (0.99 → ~20). Most checks succeed; group passes.
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    const state = makeSneakScenario([{}, {}, {}]);
+    const result = await takeAction({
+      action: { type: 'sneak' },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    expect(result.narrative).toMatch(/Group check: 3\/3 pass/);
+  });
+
+  it('group fails when fewer than half succeed (3-PC party, 0 successes)', async () => {
+    // Mock all d20 rolls low (0.01 → 1). Everyone fails.
+    vi.spyOn(Math, 'random').mockReturnValue(0.01);
+    const state = makeSneakScenario([{}, {}, {}]);
+    const result = await takeAction({
+      action: { type: 'sneak' },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    expect(result.narrative).toMatch(/Group check: 0\/3 pass — group fails/);
+    expect(result.narrative).toMatch(/party fails to slip past/i);
+  });
+
+  it('solo PC keeps single-check behavior (no group note)', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    const state = makeSneakScenario([{}]);
+    const result = await takeAction({
+      action: { type: 'sneak' },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    expect(result.narrative).not.toMatch(/Group check/);
+  });
+
+  it('dead PCs are excluded from the group check', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    // PC3 dead → group is effectively 2; 2 of 2 succeed → "Group check: 2/2".
+    const state = makeSneakScenario([{}, {}, { dead: true, hp: 0 }]);
+    const result = await takeAction({
+      action: { type: 'sneak' },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    expect(result.narrative).toMatch(/Group check: 2\/2 pass/);
+  });
+
+  it('passive party members do not auto-spend Bardic Inspiration', async () => {
+    // Mock high so the active PC's check passes outright (bardic unneeded).
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    const state = makeSneakScenario([
+      {},
+      { id: 'pc-2', name: 'PC2', bardic_inspiration_die: 'd6' },
+    ]);
+    state.characters[1].id = 'pc-2';
+    const result = await takeAction({
+      action: { type: 'sneak' },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    // PC2 is passive; their bardic die survives the group check.
+    expect(result.newState.characters[1].bardic_inspiration_die).toBe('d6');
+  });
+});
+
 describe('Species damage resistance (2024)', () => {
   it('Tiefling halves fire damage from a fire-typed enemy attack', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.999); // enemy attack always hits
@@ -7393,6 +7820,43 @@ describe('Enemy tactical movement (must close distance to melee)', () => {
 // change drops the wrapper at one of these sites the structured rendering
 // silently degrades, so we want a regression gate.
 
+// ─── LLM fact-preservation guard ─────────────────────────────────────────────
+//
+// Post-LLM safety net: if the model drops a damage number or an outcome
+// word from the input, the engine falls back to the raw tokenised
+// narrative so the player isn't shown prose that misrepresents state.
+
+describe('preservesCriticalFacts (LLM safety guard)', () => {
+  it('accepts faithful paraphrase that keeps all numbers + outcomes', () => {
+    const input = 'PC1 hits the goblin for 12 damage. Goblin killed!';
+    const output = 'PC1 lands a vicious blow on the goblin — 12 damage. The goblin is killed!';
+    expect(preservesCriticalFacts(input, output)).toBe(true);
+  });
+
+  it('rejects output that drops a multi-digit damage number', () => {
+    const input = 'PC1 hits the goblin for 15 damage.';
+    const output = 'PC1 lands a heavy blow on the goblin — considerable damage.';
+    expect(preservesCriticalFacts(input, output)).toBe(false);
+  });
+
+  it('rejects output that drops the "killed" outcome word', () => {
+    const input = 'PC1 hits the goblin for 12 damage. Goblin killed!';
+    const output = 'PC1 strikes the goblin for 12 damage. It falls silent.';
+    expect(preservesCriticalFacts(input, output)).toBe(false);
+  });
+
+  it('ignores single-digit numbers (grammatical, not mechanical)', () => {
+    const input = '1 round remaining. PC1 takes 4 damage from frost.';
+    const output = 'One round remains. The frost bites PC1 for some damage.';
+    expect(preservesCriticalFacts(input, output)).toBe(true);
+  });
+
+  it('accepts identical input (passthrough path)', () => {
+    const input = 'PC1 attacks. 8 damage.';
+    expect(preservesCriticalFacts(input, input)).toBe(true);
+  });
+});
+
 describe('narrative tokenization', () => {
   it('player melee hit emits {{dmg|N}} for damage and {{note|...}} for the to-hit breakdown', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.99); // forces hit + max damage
@@ -7876,6 +8340,85 @@ describe('encounter XP distribution', () => {
     if (killEvt && killEvt.kind === 'kill') {
       expect(killEvt.xp).toBe(5);
     }
+  });
+
+  // ─── Non-killer level-up (the original gap fixed here) ────────────────────
+  //
+  // `splitEncounterXp` distributes XP across the party, but the level-up
+  // check used to fire at only 2 of 13 kill sites. Non-killers would hoard
+  // XP without ever leveling. `applyPartyLevelUps` runs after every split
+  // for both the killer and every living non-killer.
+
+  it('non-killer at XP threshold levels up on a kill', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    // 4 PCs, kill grants 20 XP, 5 each. PC2/PC3 at xp=95 cross to 100 → L2.
+    const state = makeKillScenario([{}, { xp: 95 }, { xp: 95 }, {}]);
+    const result = await takeAction({
+      action: { type: 'attack', targetEnemyId: `${CORRIDOR_ID}#0` },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    expect(result.newState.characters[0].level).toBe(1); // killer not at threshold
+    expect(result.newState.characters[1].level).toBe(2); // non-killer leveled
+    expect(result.newState.characters[2].level).toBe(2); // non-killer leveled
+    expect(result.newState.characters[3].level).toBe(1); // not at threshold
+  });
+
+  it('killer level-up still fires (existing behavior preserved)', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    // Solo PC at xp=85 + 20 = 105 → L2.
+    const state = makeKillScenario([{ xp: 85 }]);
+    const result = await takeAction({
+      action: { type: 'attack', targetEnemyId: `${CORRIDOR_ID}#0` },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    expect(result.newState.characters[0].level).toBe(2);
+  });
+
+  it('non-killer crossing into an ASI level flags asi_pending', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    // 4 PCs, 20 XP / 4 = 5 each. PC2 at level=3, xp=295 → 300 → L4 (ASI level).
+    const state = makeKillScenario([
+      {},
+      { level: 3, xp: 295, max_hp: 30, hp: 30 },
+      {},
+      {},
+    ]);
+    const result = await takeAction({
+      action: { type: 'attack', targetEnemyId: `${CORRIDOR_ID}#0` },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    expect(result.newState.characters[1].level).toBe(4);
+    expect(result.newState.characters[1].asi_pending).toBe(true);
+  });
+
+  it('dead PC at the XP threshold is excluded from the level-up', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    // PC4 is dead — gets no share, no level-up. Living PCs split 20 / 3 = 6.
+    const state = makeKillScenario([
+      {},
+      { xp: 95 }, // 95 + 6 = 101 → L2
+      {},
+      { xp: 95, dead: true, hp: 0 },
+    ]);
+    const result = await takeAction({
+      action: { type: 'attack', targetEnemyId: `${CORRIDOR_ID}#0` },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    expect(result.newState.characters[1].level).toBe(2);
+    expect(result.newState.characters[3].level).toBe(1);
+    expect(result.newState.characters[3].xp).toBe(95);
   });
 });
 
@@ -8470,5 +9013,165 @@ describe('grid-combat invariants', () => {
     expect(pc1Ent?.pos).toEqual({ x: 4, y: 4 });
     // Movement_used reflects 10 ft burned (two diagonal grid moves).
     expect((step2.newState.movement_used ?? {})['pc-1']).toBe(10);
+  });
+
+  // ── Follow-ups (full coverage) ─────────────────────────────────────────────
+  // (a) `initiative_idx` advances monotonically across a full round and
+  //     wraps cleanly at the end (round counter increments on wrap).
+  // (b) The strip↔PartyRail sync invariant is preserved through reactive-
+  //     spell pauses (Shield / Counterspell / Hellish Rebuke). The pause
+  //     path mutates `active_character_id` to the reactor while the strip
+  //     stays on the original initiative slot; the invariant we pin is
+  //     that the pending reactor is always a living PC the strip knows
+  //     about.
+
+  it('(follow-up) initiative_idx advances monotonically and wraps with round++', async () => {
+    // Force enemy d20 → 1 so its attack misses and combat persists for
+    // the whole round. The enemy still walks toward a PC (BFS pathing
+    // is deterministic on a fresh grid).
+    vi.spyOn(Math, 'random').mockReturnValue(0); // d20 → 1
+    const { state, seed } = makeGridCombatState({ partySize: 3 });
+    // 4-slot initiative: PC1 (idx 0), PC2 (idx 1), PC3 (idx 2), enemy (idx 3)
+    expect(state.initiative_order).toHaveLength(4);
+    expect(state.initiative_idx).toBe(0);
+    expect(state.round).toBe(1);
+
+    // PC1 → PC2
+    let r = await takeAction({
+      action: { type: 'end_turn' },
+      history: [],
+      state,
+      seed,
+      context: ctx,
+    });
+    expect(r.newState.initiative_idx).toBe(1);
+    expect(r.newState.active_character_id).toBe('pc-2');
+    expect(r.newState.round).toBe(1);
+
+    // PC2 → PC3
+    r = await takeAction({
+      action: { type: 'end_turn' },
+      history: [],
+      state: r.newState,
+      seed,
+      context: ctx,
+    });
+    expect(r.newState.initiative_idx).toBe(2);
+    expect(r.newState.active_character_id).toBe('pc-3');
+    expect(r.newState.round).toBe(1);
+
+    // PC3 end_turn → enemy auto-acts (miss) → wraps to PC1, round=2.
+    r = await takeAction({
+      action: { type: 'end_turn' },
+      history: [],
+      state: r.newState,
+      seed,
+      context: ctx,
+    });
+    expect(r.newState.initiative_idx).toBe(0);
+    expect(r.newState.active_character_id).toBe('pc-1');
+    expect(r.newState.round).toBe(2);
+  });
+
+  it('(follow-up) reactive-spell pause: active_character_id moves to the reactor; strip stays aligned', async () => {
+    // Enemy d20 = 15 + toHit 3 = 18 vs Wizard AC 16 → hit in [AC, AC+4]
+    // window. Wizard has Shield prepared → pending_reaction fires.
+    vi.spyOn(Math, 'random')
+      .mockReturnValueOnce(0.74) // enemy d20 → 15
+      .mockReturnValue(0.5);
+    const wizId = 'wiz-react';
+    const fighterId = 'fighter-1';
+    const enemyId = `${CORRIDOR_ID}#0`;
+    const wiz = makeChar({
+      id: wizId,
+      character_class: 'Wizard',
+      level: 3,
+      ac: 16,
+      max_hp: 18,
+      hp: 18,
+      spells_known: ['shield'],
+      prepared_spells: ['shield'],
+      spell_slots_max: { 1: 4 },
+      spell_slots_used: {},
+    });
+    const fighter = makeChar({
+      id: fighterId,
+      character_class: 'Fighter',
+      level: 3,
+      ac: 16,
+      hp: 28,
+      max_hp: 28,
+    });
+    const state: GameState = {
+      ...makeState(),
+      characters: [fighter, wiz],
+      active_character_id: fighterId,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      combat_active: true,
+      // Fighter goes first; enemy next will target the Wizard (adjacent).
+      initiative_order: [
+        { id: fighterId, roll: 18, is_enemy: false },
+        { id: enemyId, roll: 10, is_enemy: true },
+        { id: wizId, roll: 5, is_enemy: false },
+      ],
+      initiative_idx: 0,
+      entities: [
+        {
+          id: fighterId,
+          isEnemy: false,
+          pos: { x: 1, y: 1 },
+          hp: 28,
+          maxHp: 28,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: wizId,
+          isEnemy: false,
+          pos: { x: 4, y: 5 },
+          hp: 18,
+          maxHp: 18,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: enemyId,
+          isEnemy: true,
+          pos: { x: 5, y: 5 },
+          hp: 10,
+          maxHp: 10,
+          conditions: [],
+          condition_durations: {},
+        },
+      ],
+    };
+    const result = await takeAction({
+      action: { type: 'end_turn' },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    // pending_reaction is set, active_character_id moves to the reactor.
+    expect(result.newState.pending_reaction).toBeDefined();
+    expect(result.newState.pending_reaction?.kind).toBe('shield');
+    const reactor = result.newState.pending_reaction?.targetCharId;
+    expect(reactor).toBe(wizId);
+    expect(result.newState.active_character_id).toBe(reactor);
+    // Strip↔PartyRail sync invariant: the reactor is still a known PC
+    // in the initiative order, and they're alive. The strip's ▶ marker
+    // and PartyRail's aria-current both read off `active_character_id`
+    // during the pause, and the resume idx points at a real slot.
+    const reactorEntry = result.newState.initiative_order.find(
+      (e) => e.id === reactor && !e.is_enemy
+    );
+    expect(reactorEntry).toBeDefined();
+    const reactorChar = result.newState.characters.find((c) => c.id === reactor);
+    expect(reactorChar?.dead).toBe(false);
+    // resumeFromInitiativeIdx points at a valid slot.
+    const resumeIdx = result.newState.pending_reaction?.resumeFromInitiativeIdx ?? -1;
+    expect(resumeIdx).toBeGreaterThanOrEqual(0);
+    expect(resumeIdx).toBeLessThan(result.newState.initiative_order.length);
   });
 });
