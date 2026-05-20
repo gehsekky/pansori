@@ -5,6 +5,7 @@ import {
   entitiesInCone,
   entitiesInCube,
   entitiesInLine,
+  isFlankingPosition,
   opportunityAttackTriggers,
 } from './gridEngine.js';
 
@@ -146,5 +147,63 @@ describe('opportunityAttackTriggers — SRD 5.2.1 p.90 reach weapons', () => {
       (e) => (e.id === 'glaive-goblin' ? 10 : 5)
     );
     expect(triggers.map((e) => e.id)).toEqual(['glaive-goblin']);
+  });
+});
+
+// ─── Flanking (DMG 2014 optional rule) ───────────────────────────────────────
+//
+// Real RAW flanking requires BOTH the attacker and ally to be adjacent
+// to the target AND on directly opposite squares of the target perimeter.
+// The pre-fix implementation triggered for any axis-opposed positions
+// regardless of distance — a multi-PC party would silently flank almost
+// every attack after the first PC moved into position.
+
+describe("isFlankingPosition (DMG 2014 optional flanking)", () => {
+  const target: GridPos = { x: 5, y: 5 };
+
+  it("flanks when ally is directly opposite + both adjacent", () => {
+    // Attacker N (5,4), ally S (5,6) — cardinally opposite, both adjacent.
+    expect(isFlankingPosition({ x: 5, y: 4 }, { x: 5, y: 6 }, target)).toBe(true);
+    // Attacker E (6,5), ally W (4,5).
+    expect(isFlankingPosition({ x: 6, y: 5 }, { x: 4, y: 5 }, target)).toBe(true);
+    // Attacker NE (6,4), ally SW (4,6) — diagonally opposite.
+    expect(isFlankingPosition({ x: 6, y: 4 }, { x: 4, y: 6 }, target)).toBe(true);
+  });
+
+  it("does NOT flank when ally is not adjacent to target", () => {
+    // Attacker N (5,4) adjacent; ally S 3 squares away (5,8).
+    expect(isFlankingPosition({ x: 5, y: 4 }, { x: 5, y: 8 }, target)).toBe(false);
+  });
+
+  it("does NOT flank when attacker is not adjacent to target", () => {
+    // Attacker 3 squares N (5,2); ally S adjacent (5,6).
+    expect(isFlankingPosition({ x: 5, y: 2 }, { x: 5, y: 6 }, target)).toBe(false);
+  });
+
+  it("does NOT flank when ally is on the same side (not opposite)", () => {
+    // Attacker N (5,4); ally NE (6,4) — both north-ish, not flanking.
+    expect(isFlankingPosition({ x: 5, y: 4 }, { x: 6, y: 4 }, target)).toBe(false);
+  });
+
+  it("does NOT flank when ally is one corner off (not the diametric corner)", () => {
+    // Attacker NE (6,4); ally SE (6,6) — both east, not opposite.
+    expect(isFlankingPosition({ x: 6, y: 4 }, { x: 6, y: 6 }, target)).toBe(false);
+  });
+
+  it("does NOT flank when attacker shares the target square (degenerate)", () => {
+    expect(isFlankingPosition(target, { x: 5, y: 6 }, target)).toBe(false);
+  });
+
+  it("regression: 3-PC party scattered around enemy no longer auto-flanks", () => {
+    // Reconstructs the Vale playthrough scenario where a PC at (5,5),
+    // another at (5,7), and the enemy somewhere between would trigger
+    // the old too-loose flanking check. Strict adjacency now requires
+    // both PCs within 1 square of the enemy.
+    const enemy: GridPos = { x: 5, y: 6 };
+    const pcAttacker: GridPos = { x: 5, y: 5 }; // adjacent (1 sq north)
+    const pcAllyFar: GridPos = { x: 5, y: 7 }; // adjacent (1 sq south) — flanks
+    const pcAllyTooFar: GridPos = { x: 2, y: 7 }; // 3 sq away — does not flank
+    expect(isFlankingPosition(pcAttacker, pcAllyFar, enemy)).toBe(true);
+    expect(isFlankingPosition(pcAttacker, pcAllyTooFar, enemy)).toBe(false);
   });
 });
