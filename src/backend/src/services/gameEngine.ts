@@ -290,6 +290,53 @@ function clampHpForExhaustion(hp: number, maxHp: number, exhaustionLevel: number
 
 // ─── Concentration helpers ────────────────────────────────────────────────────
 
+// Initial round-budget for a concentration spell. Defaults to 10 (1 minute,
+// the standard for Bless / Hold Person / Bane / etc.); a spell can declare
+// longer durations (Spirit Guardians = 100, Hex = 600) via Spell.durationRounds.
+function concentrationRoundsFor(spell: { durationRounds?: number } | undefined): number {
+  return spell?.durationRounds ?? 10;
+}
+
+// Tick every PC's concentration timer down by one round and break any
+// concentration whose timer just hit 0. Called on round wrap so the
+// tick fires once per full initiative cycle (SRD 5.2.1 round = 6 sec).
+// Returns { st, narrative } — narrative aggregates the auto-end notes
+// for each PC whose spell timed out.
+function tickConcentrationDurations(st: GameState): { st: GameState; narrative: string } {
+  let narrative = '';
+  let stOut = st;
+  for (const c of st.characters) {
+    if (!c.concentrating_on || c.dead) continue;
+    const remaining = c.concentrating_on.rounds_left;
+    if (remaining == null) continue; // legacy state without a counter — keep persisting
+    if (remaining <= 1) {
+      // Time's up — break concentration cleanly via the existing path
+      // (handles bless-blessed cleanup, condition-link clearing, etc).
+      const { char: nc, st: ns } = breakConcentration(c, stOut);
+      stOut = {
+        ...ns,
+        characters: ns.characters.map((x) => (x.id === c.id ? nc : x)),
+      };
+      const spellName = c.concentrating_on.spellId;
+      narrative += ` [${c.name}'s ${spellName} fades — concentration duration expired.]`;
+    } else {
+      // Decrement; carry the rest of the concentrating_on payload forward.
+      stOut = {
+        ...stOut,
+        characters: stOut.characters.map((x) =>
+          x.id === c.id
+            ? {
+                ...x,
+                concentrating_on: { ...c.concentrating_on!, rounds_left: remaining - 1 },
+              }
+            : x
+        ),
+      };
+    }
+  }
+  return { st: stOut, narrative };
+}
+
 function breakConcentration(char: Character, st: GameState): { char: Character; st: GameState } {
   if (!char.concentrating_on) return { char, st };
   const condition = char.concentrating_on.condition;
@@ -5877,7 +5924,10 @@ export async function takeAction({
         if (spell.id === 'bless') {
           // Mark caster as concentrating on bless. The runtime-mutated
           // `char` reference is what gets written back to state.
-          char.concentrating_on = { spellId: 'bless' };
+          char.concentrating_on = {
+            spellId: 'bless',
+            rounds_left: concentrationRoundsFor(spell),
+          };
           // Pick the targets: caster (always) + up to 2 living allies.
           const blessTargets: string[] = [char.id];
           for (const c of st.characters) {
@@ -6173,7 +6223,11 @@ export async function takeAction({
             });
             narrative += ` The ${spellTarget.name} is ${condToApply}!`;
             if (spell.concentration) {
-              char.concentrating_on = { spellId, condition: condToApply };
+              char.concentrating_on = {
+                spellId,
+                condition: condToApply,
+                rounds_left: concentrationRoundsFor(spell),
+              };
             }
           }
           const { damage: effCondDmg, note: condDmgNote } = applyDamageMultiplier(
@@ -9347,6 +9401,13 @@ export async function takeAction({
       const lairRes = fireLairAction(st, seed, context);
       st = lairRes.st;
       narrative += lairRes.narrative;
+      // Concentration timers tick once per full round (SRD 5.2.1 — round
+      // = 6 sec). Spells whose budget reaches 0 end cleanly via
+      // breakConcentration so linked conditions (Bless's `blessed`, Hold
+      // Person's `paralyzed`, etc.) clear at the same time.
+      const concRes = tickConcentrationDurations(st);
+      st = concRes.st;
+      narrative += concRes.narrative;
     }
 
     // Pause path: runEnemyTurns already set initiative_idx and active_character_id
