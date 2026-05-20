@@ -1196,9 +1196,16 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     }
     if (pending.kind === 'hellish_rebuke') {
       const dc = 8 + profBonus(char.level) + abilityMod(char.cha);
+      const isTieflingInnate =
+        char.species === 'tiefling' &&
+        char.level >= 3 &&
+        !char.class_resource_uses?.tiefling_rebuke_used;
+      const costLabel = isTieflingInnate
+        ? 'Infernal Legacy, 1/long rest'
+        : 'reaction, 1st-level slot';
       return [
         {
-          label: `Cast Hellish Rebuke (reaction, 1st-level slot) — 2d10 fire on ${enemyForLabel} (DEX save DC ${dc} for half)`,
+          label: `Cast Hellish Rebuke (${costLabel}) — 2d10 fire on ${enemyForLabel} (DEX save DC ${dc} for half)`,
           action: { type: 'resolve_reaction', accept: true },
         },
         {
@@ -2617,8 +2624,17 @@ function isHellishRebukeEligible(
   attackerPos: { x: number; y: number } | undefined,
   context: Context
 ): boolean {
-  if (target.character_class.toLowerCase() !== 'warlock') return false;
-  if (!knowsSpellWithSlot(target, 'hellish_rebuke', context)) return false;
+  // 2024 PHB: Warlocks cast it from their spell list; Tieflings L3+ get it
+  // as a racial Innate spell (1/long rest, no slot cost).
+  const isWarlock =
+    target.character_class.toLowerCase() === 'warlock' &&
+    knowsSpellWithSlot(target, 'hellish_rebuke', context);
+  const isTieflingInnate =
+    target.species === 'tiefling' &&
+    target.level >= 3 &&
+    !target.class_resource_uses?.tiefling_rebuke_used &&
+    !!context.spellTable?.['hellish_rebuke'];
+  if (!isWarlock && !isTieflingInnate) return false;
   if (!targetPos || !attackerPos) return false;
   if (distanceFeet(targetPos, attackerPos) > 60) return false;
   return true;
@@ -4645,6 +4661,11 @@ export async function takeAction({
         // recharge on long rest; tracked under class_resource_uses.
         if (c.species === 'orc') {
           delete restoredUses.relentless_endurance_used;
+        }
+        // 2024 PHB Tiefling Infernal Legacy — racial Hellish Rebuke / Darkness
+        // 1/long rest.
+        if (c.species === 'tiefling') {
+          delete restoredUses.tiefling_rebuke_used;
         }
         return {
           ...c,
@@ -8109,18 +8130,38 @@ export async function takeAction({
         if (rxAction.accept) {
           const slotsMax = char.spell_slots_max ?? {};
           const slotsUsed = char.spell_slots_used ?? {};
-          const slotLvl = Object.keys(slotsMax)
-            .map(Number)
-            .filter((n) => n >= 1 && (slotsMax[n] ?? 0) > (slotsUsed[n] ?? 0))
-            .sort((a, b) => a - b)[0];
+          // 2024 PHB Tiefling Infernal Legacy — Hellish Rebuke 1/long rest at
+          // L3+ without consuming a slot. Tiefling Warlocks who also have it
+          // on their list prefer the racial slot (free) before burning real
+          // slots; the racial use is tracked via `tiefling_rebuke_used`.
+          const isTieflingInnate =
+            char.species === 'tiefling' &&
+            char.level >= 3 &&
+            !char.class_resource_uses?.tiefling_rebuke_used;
+          let slotLvl: number | undefined;
+          if (isTieflingInnate) {
+            slotLvl = 1;
+          } else {
+            slotLvl = Object.keys(slotsMax)
+              .map(Number)
+              .filter((n) => n >= 1 && (slotsMax[n] ?? 0) > (slotsUsed[n] ?? 0))
+              .sort((a, b) => a - b)[0];
+          }
           if (slotLvl === undefined) {
             narrative = 'No spell slot available — Hellish Rebuke fizzles.';
             st = { ...st, pending_reaction: undefined };
           } else {
-            char.spell_slots_used = {
-              ...slotsUsed,
-              [slotLvl]: (slotsUsed[slotLvl] ?? 0) + 1,
-            };
+            if (isTieflingInnate) {
+              char.class_resource_uses = {
+                ...(char.class_resource_uses ?? {}),
+                tiefling_rebuke_used: 1,
+              };
+            } else {
+              char.spell_slots_used = {
+                ...slotsUsed,
+                [slotLvl]: (slotsUsed[slotLvl] ?? 0) + 1,
+              };
+            }
             char.turn_actions = { ...char.turn_actions, reaction_used: true };
             // Upcast: 2d10 base + 1d10 per slot above 1st.
             const upcastDice = Math.max(0, slotLvl - 1);
