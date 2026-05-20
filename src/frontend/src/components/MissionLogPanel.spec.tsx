@@ -9,10 +9,14 @@ import MissionLogPanel from './MissionLogPanel';
 
 describe('MissionLogPanel', () => {
   it('renders the most recent 20 assistant entries with the > prefix', () => {
+    // History is interleaved [user, assistant, user, assistant, ...]
+    // — user (button label) at even indices, assistant (engine
+    // narrative) at odd indices. Only the engine output is useful for
+    // the log.
     const history: Array<{ content: string }> = [];
     for (let i = 0; i < 5; i++) {
-      history.push({ content: `assistant ${i}` });
       history.push({ content: `user ${i}` });
+      history.push({ content: `assistant ${i}` });
     }
     render(<MissionLogPanel history={history} />);
     expect(screen.getByText(/assistant 0/)).toBeDefined();
@@ -29,11 +33,12 @@ describe('MissionLogPanel', () => {
   it('copies the FULL chronological log (with metadata header) to the clipboard', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.assign(navigator, { clipboard: { writeText } });
+    // [user, assistant, user, assistant] — assistants at odd indices.
     const history = [
+      { content: '> begin mission' },
       { content: 'Combat begins.' },
       { content: '> attack' },
       { content: 'You hit for 5 damage.' },
-      { content: '> end turn' },
     ];
     render(
       <MissionLogPanel
@@ -65,7 +70,7 @@ describe('MissionLogPanel', () => {
   it('shows "Copied!" after a successful copy', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.assign(navigator, { clipboard: { writeText } });
-    render(<MissionLogPanel history={[{ content: 'event' }, { content: '> noop' }]} />);
+    render(<MissionLogPanel history={[{ content: '> noop' }, { content: 'event' }]} />);
     const btn = screen.getByTestId('mission-log-copy-btn');
     fireEvent.click(btn);
     await waitFor(() => expect(btn.textContent).toMatch(/Copied/));

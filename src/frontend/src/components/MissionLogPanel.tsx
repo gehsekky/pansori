@@ -21,10 +21,10 @@ function MissionLogPanel({ history, worldName, party, currentRoom }: Props) {
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'error'>('idle');
 
   // The assistant turns we display. The interleaved stream is
-  // [user, assistant, user, assistant, ...] — every other entry starting
-  // at index 0 is what the engine emitted. (The reversed view below
-  // shows the most recent first; the copy view stays chronological.)
-  const assistantEntries = history.filter((_, i) => i % 2 === 0);
+  // [user, assistant, user, assistant, ...] — odd indices are what the
+  // engine emitted (user clicks land on even indices as button labels
+  // and aren't useful for the log).
+  const assistantEntries = history.filter((_, i) => i % 2 === 1);
 
   function buildCopyText(): string {
     const headerLines: string[] = ['=== Pansori Mission Log ==='];
