@@ -806,7 +806,9 @@ function tickConditions(char: Character): Character {
 // > 10×STR, ≤ 15×STR: -20 ft (heavily encumbered)
 // > 15×STR: speed 0 (overloaded)
 function effectiveSpeed(char: Character): number {
-  const base = char.speed ?? DEFAULT_SPEED_FEET;
+  let base = char.speed ?? DEFAULT_SPEED_FEET;
+  // 2024 PHB Goliath Large Form — +10 ft speed while the condition is active.
+  if (char.conditions?.includes('large_form')) base += 10;
   const weight = charCarriedWeight(char);
   // 2024 PHB Goliath Powerful Build: count as one size larger for carrying
   // capacity. Mechanically: double the effective STR-based thresholds.
@@ -1657,6 +1659,23 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       choices.push({
         label: `Breath Weapon — 15-ft cone, ${breathDice}d10 fire, DEX save (1/short rest)`,
         action: { type: 'use_class_feature', featureId: 'breath_weapon' },
+      });
+    }
+
+    // 2024 PHB Goliath — Large Form. Bonus action; become Large for ~10
+    // rounds (1 min RAW), +10 ft speed and advantage on STR ability checks
+    // while active. 1/short rest. Tracked via `large_form` condition.
+    if (
+      char.species === 'goliath' &&
+      state.combat_active &&
+      !char.class_resource_uses?.large_form_used &&
+      !char.conditions.includes('large_form') &&
+      !char.turn_actions.bonus_action_used
+    ) {
+      choices.push({
+        label: 'Large Form — become Large for 10 rounds: +10 ft speed, adv on STR (1/short rest)',
+        action: { type: 'use_class_feature', featureId: 'large_form' },
+        requiresBonusAction: true,
       });
     }
 
@@ -4552,6 +4571,8 @@ export async function takeAction({
       const cls = char.character_class.toLowerCase();
       // 2024 PHB Dragonborn Breath Weapon recovers on short rest.
       if (char.species === 'dragonborn') delete srUses.breath_weapon_used;
+      // 2024 PHB Goliath Large Form recovers on short rest.
+      if (char.species === 'goliath') delete srUses.large_form_used;
       // Fighter: Second Wind + Action Surge recover on short rest
       if (cls === 'fighter') {
         delete srUses.second_wind;
@@ -6673,6 +6694,35 @@ export async function takeAction({
       // ── 2024 PHB Cleric L5: Sear Undead ──────────────────────────────────────
       // Action. Replaces 2014 Destroy Undead. AoE radiant: each undead in 30 ft
       // takes Nd8 (N = cleric level) radiant damage; WIS save halves.
+      // 2024 PHB Goliath — Large Form. Bonus action; the Goliath grows to
+      // Large size for ~10 rounds (1 min RAW). Gains +10 ft speed (via
+      // condition wired in `effectiveSpeed`) and is treated as Large for
+      // any size-dependent interactions. 1/short rest.
+      else if (fid === 'large_form') {
+        if (char.species !== 'goliath') {
+          narrative = 'Only Goliaths have Large Form.';
+          break;
+        }
+        if (char.class_resource_uses?.large_form_used === 1) {
+          narrative = 'Large Form already used this short rest.';
+          break;
+        }
+        if (char.turn_actions.bonus_action_used) {
+          narrative = 'Bonus action already used this turn.';
+          break;
+        }
+        char.class_resource_uses = {
+          ...(char.class_resource_uses ?? {}),
+          large_form_used: 1,
+        };
+        char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
+        char = inflictCondition(char, 'large_form');
+        if (!char.condition_durations) char.condition_durations = {};
+        char.condition_durations = { ...char.condition_durations, large_form: 10 };
+        narrative = `🗿 ${char.name} swells to Large size! +10 ft speed and advantage on STR checks for 10 rounds.`;
+        usedInitiative = true;
+      }
+
       // 2024 PHB Dragonborn — Breath Weapon. Cone of damage emanating from
       // the dragonborn in the direction of the currently-targeted enemy.
       // DEX save for half; damage scales with level. 1/short rest.
