@@ -58,17 +58,25 @@ export function coverBonus(_attacker: GridPos, target: GridPos, obstacles: GridP
   return 0;
 }
 
-// Returns true when attacker and ally are on strictly opposite sides of target
-// (PHB optional flanking rule — grants advantage on melee attacks).
+// Returns true when attacker and ally are on directly opposite squares of
+// target's perimeter (DMG 2014 optional flanking rule — grants advantage
+// on melee attacks). RAW requires BOTH the attacker and the ally to be
+// adjacent to the target, AND on diametrically opposite squares (a line
+// through the target separates them). The earlier implementation only
+// checked sign opposition on one axis and skipped the adjacency check,
+// which silently triggered flanking for almost every multi-PC attack.
 export function isFlankingPosition(attacker: GridPos, ally: GridPos, target: GridPos): boolean {
   const ax = attacker.x - target.x;
   const ay = attacker.y - target.y;
   const bx = ally.x - target.x;
   const by = ally.y - target.y;
-  // Opposite sides: one has positive, the other negative delta on at least one axis
-  return (
-    (Math.sign(ax) === -Math.sign(bx) && bx !== 0) || (Math.sign(ay) === -Math.sign(by) && by !== 0)
-  );
+  // Both must be adjacent to target (Chebyshev distance = 1), neither
+  // can be on the target's own square.
+  const attackerAdjacent = Math.abs(ax) <= 1 && Math.abs(ay) <= 1 && (ax !== 0 || ay !== 0);
+  const allyAdjacent = Math.abs(bx) <= 1 && Math.abs(by) <= 1 && (bx !== 0 || by !== 0);
+  if (!attackerAdjacent || !allyAdjacent) return false;
+  // Ally's offset is the exact negation of attacker's offset.
+  return ax === -bx && ay === -by;
 }
 
 // All entities within blastRadius feet of epicenter
