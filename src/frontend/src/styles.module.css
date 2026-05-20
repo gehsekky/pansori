@@ -267,6 +267,60 @@
   cursor: not-allowed;
 }
 
+/* Combat action bar — single-line variant. The buttons live on one
+ * horizontal row (icon + label inline) with a vertical separator between
+ * them, rendered as a left border on every button after the first. The
+ * row itself is wrapped in a hairline border so it reads as a unified
+ * "combat verbs" toolbar rather than four separate buttons. */
+.combatActionBar {
+  display: flex;
+  align-items: stretch;
+  flex-wrap: wrap;
+  margin: 0 0 0.75rem 0;
+  border: 1px solid var(--t-border);
+  border-radius: 2px;
+  background: var(--t-card);
+  /* Hide any wrapping seam by clipping bordered-children to the
+   * container's rounded corners. */
+  overflow: hidden;
+}
+.combatActionBtn {
+  background: transparent;
+  color: var(--t-primary);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-family: inherit;
+  font-size: 0.78rem;
+  line-height: 1.2;
+  transition:
+    color 0.15s,
+    background 0.15s;
+}
+.combatActionBtn:hover:not(:disabled) {
+  color: var(--t-primary);
+  background: var(--t-dim-dark);
+}
+.combatActionBtn + .combatActionBtn {
+  border-left: 1px solid var(--t-separator);
+}
+.combatActionBtn :global(.ra) {
+  font-size: 1.1rem;
+}
+.combatActionBtnDisabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+/* Strip the bottom margin when inside the combatControls container —
+ * mirrors the same override used for .actionBar / .enemySelector. */
+.combatControls .combatActionBar {
+  margin-bottom: 0;
+}
+
 /* Enemy selector — single-target picker that lives above the choice
  * list during combat. Choices that target an enemy (attack, cast a
  * single-target spell, grapple, shove) collapse to one button each;
