@@ -94,7 +94,7 @@ function EnemySelector({ state, seed, selectedId, onSelect }: Props) {
             <span>{label}</span>
             <span className={styles.enemySelectorHp}>
               {en.hp}/{en.maxHp}
-              {en.ac != null ? ` · AC ${en.ac}` : ''}
+              {en.ac != null ? ` AC ${en.ac}` : ''}
             </span>
           </button>
         );

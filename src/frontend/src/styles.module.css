@@ -356,12 +356,13 @@
   align-items: center;
   gap: 6px;
   margin: 0 0 0.75rem 0;
-  padding: 0.4rem 0.5rem;
+  /* Vertical padding kept tight so the row stays within the 44 px
+   * outer height; the buttons inside go inline (name · HP · AC on one
+   * line) so the whole selector fits a single D-pad-button row. */
+  padding: 4px 8px;
   border: 1px solid var(--t-border);
   border-radius: 2px;
   background: var(--t-card);
-  /* Same 44 px row as the toolbars below — keeps the column on a tidy
-   * horizontal grid that matches the D-pad button height. */
   min-height: 44px;
   box-sizing: border-box;
 }
@@ -378,14 +379,16 @@
   border: 1px solid var(--t-border);
   border-radius: 2px;
   cursor: pointer;
-  padding: 4px 8px;
+  /* Inline content (name + HP + AC on one line) so the selector stays
+   * single-row and fits inside the 44 px outer container. */
+  padding: 2px 8px;
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 6px;
   font-family: inherit;
   font-size: 0.78rem;
-  line-height: 1.1;
+  line-height: 1.2;
   transition:
     border-color 0.15s,
     background 0.15s,
