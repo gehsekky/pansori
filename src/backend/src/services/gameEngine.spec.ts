@@ -6761,4 +6761,110 @@ describe('Species damage resistance (2024)', () => {
     // No "heavily encumbered" in the disadvantage reason chain.
     expect(result.narrative).not.toMatch(/heavily encumbered/);
   });
+
+  it('Dragonborn Breath Weapon: cone hits enemies in front, consumes 1/short-rest use', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0); // worst d20 saves → no halving
+    const dragonborn = makeChar({
+      id: 'd-bw',
+      character_class: 'Fighter',
+      species: 'dragonborn',
+      con: 16,
+      level: 1,
+    });
+    const enemyAId = `${CORRIDOR_ID}#0`;
+    const enemyBId = `${CORRIDOR_ID}#1`;
+    const fireSeed: Seed = {
+      ...seedWithEnemy,
+      enemies: {
+        [CORRIDOR_ID]: [
+          {
+            id: enemyAId,
+            name: 'Goblin A',
+            hp: 8,
+            ac: 12,
+            damage: '1d6',
+            toHit: 3,
+            xp: 20,
+          },
+          {
+            id: enemyBId,
+            name: 'Goblin B',
+            hp: 8,
+            ac: 12,
+            damage: '1d6',
+            toHit: 3,
+            xp: 20,
+          },
+        ],
+      },
+    };
+    const state: GameState = {
+      characters: [dragonborn],
+      active_character_id: dragonborn.id,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: true,
+      initiative_order: [{ id: dragonborn.id, roll: 18, is_enemy: false }],
+      initiative_idx: 0,
+      entities: [
+        {
+          id: dragonborn.id,
+          isEnemy: false,
+          pos: { x: 4, y: 5 },
+          hp: 20,
+          maxHp: 20,
+          conditions: [],
+          condition_durations: {},
+        },
+        // Both goblins lined up in the cone — same row, to the right.
+        {
+          id: enemyAId,
+          isEnemy: true,
+          pos: { x: 5, y: 5 },
+          hp: 8,
+          maxHp: 8,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: enemyBId,
+          isEnemy: true,
+          pos: { x: 6, y: 5 },
+          hp: 8,
+          maxHp: 8,
+          conditions: [],
+          condition_durations: {},
+        },
+      ],
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      flags: {},
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+      round: 1,
+      movement_used: {},
+    };
+    const result = await takeAction({
+      action: { type: 'use_class_feature', featureId: 'breath_weapon' },
+      history: [],
+      state,
+      seed: fireSeed,
+      context: ctx,
+    });
+    expect(result.narrative).toMatch(/Breath Weapon/);
+    expect(result.newState.characters[0].class_resource_uses?.breath_weapon_used).toBe(1);
+    // Both goblins took damage.
+    const eA = result.newState.entities?.find((e) => e.id === enemyAId);
+    const eB = result.newState.entities?.find((e) => e.id === enemyBId);
+    expect(eA!.hp).toBeLessThan(8);
+    expect(eB!.hp).toBeLessThan(8);
+  });
 });

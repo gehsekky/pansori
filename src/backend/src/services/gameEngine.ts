@@ -1637,6 +1637,22 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       }
     }
 
+    // 2024 PHB Dragonborn — Breath Weapon. Action; 15-ft cone; DEX save
+    // for half. Damage scales with level (1d10/2d10/3d10/4d10 at L1/5/11/17).
+    // 1/short rest, tracked via class_resource_uses.breath_weapon_used.
+    if (
+      char.species === 'dragonborn' &&
+      state.combat_active &&
+      enemyAlive &&
+      !char.class_resource_uses?.breath_weapon_used
+    ) {
+      const breathDice = char.level >= 17 ? 4 : char.level >= 11 ? 3 : char.level >= 5 ? 2 : 1;
+      choices.push({
+        label: `Breath Weapon — 15-ft cone, ${breathDice}d10 fire, DEX save (1/short rest)`,
+        action: { type: 'use_class_feature', featureId: 'breath_weapon' },
+      });
+    }
+
     // Fighter: Second Wind (bonus action). 2024 PHB has multi-use scaling:
     // 2 uses at L1, 3 at L4, 4 at L10. All recover on a short or long rest.
     if (char.character_class.toLowerCase() === 'fighter') {
@@ -4516,6 +4532,8 @@ export async function takeAction({
       // Short-rest class resource recharge
       const srUses = { ...(char.class_resource_uses ?? {}) };
       const cls = char.character_class.toLowerCase();
+      // 2024 PHB Dragonborn Breath Weapon recovers on short rest.
+      if (char.species === 'dragonborn') delete srUses.breath_weapon_used;
       // Fighter: Second Wind + Action Surge recover on short rest
       if (cls === 'fighter') {
         delete srUses.second_wind;
@@ -6631,7 +6649,68 @@ export async function takeAction({
       // ── 2024 PHB Cleric L5: Sear Undead ──────────────────────────────────────
       // Action. Replaces 2014 Destroy Undead. AoE radiant: each undead in 30 ft
       // takes Nd8 (N = cleric level) radiant damage; WIS save halves.
-      else if (fid === 'sear_undead') {
+      // 2024 PHB Dragonborn — Breath Weapon. Cone of damage emanating from
+      // the dragonborn in the direction of the currently-targeted enemy.
+      // DEX save for half; damage scales with level. 1/short rest.
+      else if (fid === 'breath_weapon') {
+        if (char.species !== 'dragonborn') {
+          narrative = 'Only Dragonborn have a Breath Weapon.';
+          break;
+        }
+        if (char.class_resource_uses?.breath_weapon_used === 1) {
+          narrative = 'Breath Weapon already used — recovers on a short rest.';
+          break;
+        }
+        if (!enemyAlive || !enemy) {
+          narrative = 'No living target to direct your breath at.';
+          break;
+        }
+        const selfEntBW = st.entities?.find((e) => e.id === char.id);
+        const targetEntBW = st.entities?.find((e) => e.id === enemy.id && e.isEnemy);
+        if (!selfEntBW || !targetEntBW) {
+          narrative = 'Breath Weapon needs a grid position to project the cone.';
+          break;
+        }
+        const bwDice = char.level >= 17 ? 4 : char.level >= 11 ? 3 : char.level >= 5 ? 2 : 1;
+        const bwDC = 8 + profBonus(char.level) + abilityMod(char.con);
+        const bwDmgType = SRD_SPECIES.dragonborn?.resistances?.[0] ?? 'fire';
+        const cone = entitiesInCone(selfEntBW.pos, targetEntBW.pos, 15, st.entities ?? []);
+        const lines: string[] = [];
+        let updatedEntities = st.entities ?? [];
+        for (const ent of cone) {
+          if (!ent.isEnemy || ent.hp <= 0) continue;
+          const enemyData = getEnemyById(seed, ent.id);
+          if (!enemyData) continue;
+          const dexScore = enemyData.dex ?? 10;
+          const save = rollDice('1d20') + abilityMod(dexScore);
+          const fullDmg = rollDice(`${bwDice}d10`);
+          const { damage: typedDmg, note } = applyDamageMultiplier(fullDmg, bwDmgType, enemyData);
+          const dmg = save >= bwDC ? Math.floor(typedDmg / 2) : typedDmg;
+          updatedEntities = updatedEntities.map((e) =>
+            e.id === ent.id ? { ...e, hp: Math.max(0, e.hp - dmg) } : e
+          );
+          lines.push(
+            `${enemyData.name}: DEX ${save} vs DC ${bwDC} — ${dmg} ${bwDmgType}${save >= bwDC ? ' (half)' : ''}${note ?? ''}`
+          );
+        }
+        st = {
+          ...st,
+          entities: updatedEntities,
+        };
+        char.class_resource_uses = {
+          ...(char.class_resource_uses ?? {}),
+          breath_weapon_used: 1,
+        };
+        narrative =
+          lines.length > 0
+            ? `🐲 ${char.name}'s Breath Weapon (${bwDice}d10 ${bwDmgType}, 15-ft cone)! ${lines.join(' · ')}`
+            : `${char.name} exhales a cone of ${bwDmgType} but no enemies are caught in it.`;
+        usedInitiative = true;
+        // Combat may have ended if everyone in the cone dropped.
+        if (isRoomCleared(st, seed, roomId)) {
+          st = endCombatState(st);
+        }
+      } else if (fid === 'sear_undead') {
         if (char.character_class.toLowerCase() !== 'cleric') {
           narrative = 'Only Clerics have Sear Undead.';
           break;
