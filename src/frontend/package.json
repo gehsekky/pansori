@@ -21,7 +21,8 @@
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "rpg-awesome": "^0.2.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",

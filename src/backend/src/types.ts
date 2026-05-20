@@ -1,54 +1,38 @@
 // ─── Loot ─────────────────────────────────────────────────────────────────────
 
-export interface LootItem {
-  id: string;
-  name: string;
-  desc: string;
-  weight: number;
-  type: 'weapon' | 'armor' | 'consumable' | 'misc';
-  slot: 'weapon' | 'armor' | 'shield' | null;
-  damage: string | null;
-  finesse?: boolean;
-  range?: 'melee' | 'ranged';
-  ac_bonus: number | null;
-  heal: string | null;
-  effect: string | null;
-  aliases: string[];
-  useNarrative?: string;
-  armorCategory?: 'light' | 'medium' | 'heavy' | 'shield';
-  weaponType?: 'simple' | 'martial';
-  light?: boolean; // TWF: can be used in off-hand with another light weapon
-  requiresAttunement?: boolean; // magic items requiring attunement
-  armorAcBase?: number; // base AC of armor when worn (e.g. leather=11, chain mail=16)
-  dexCapToAc?: number; // max DEX bonus added to AC (2=medium, 0=heavy; undefined=full DEX)
-  versatileDamage?: string; // two-handed damage for versatile weapons (e.g. '1d8' for quarterstaff)
-  damageType?: string; // piercing / slashing / bludgeoning / fire / etc.
-  thrown?: { normalRange: number; longRange: number }; // melee weapon usable as ranged
-  // SRD 5.2.1 p.90 "Loading": one shot per Action/Bonus/Reaction regardless of
-  // Extra Attack. Hand/heavy crossbows, muskets, pistols, blowguns all have it.
-  loading?: boolean;
-  // SRD 5.2.1 p.90 "Reach": adds 5 ft to melee reach (also for opportunity
-  // attacks made with this weapon). Glaive, halberd, lance, pike, whip.
-  reach?: boolean;
-  // SRD 5.2.1 p.90 "Heavy": disadv on attacks if STR < 13 (melee) / DEX < 13
-  // (ranged). Greataxe, greatsword, maul, heavy crossbow, longbow, etc.
-  heavy?: boolean;
-  // 2024 PHB Weapon Mastery property. Each weapon has at most one mastery.
-  // Only applies when the wielder's class grants Weapon Mastery AND they
-  // have mastered this specific weapon (Character.weaponMasteries).
-  mastery?: WeaponMastery;
-}
+// Cross-cutting types live in src/shared/types.ts (single source of
+// truth) and are synced into this workspace by `npm run sync-types`.
+// Re-export here so external importers can keep using these names from
+// `./types`; the internal `import type { ... }` line below also brings
+// them into this file's own scope so the workspace-only interfaces
+// (LootItem.mastery, Trap.condition, etc.) can reference them.
+export * from './shared-types.js';
+import type {
+  AbilityKey,
+  Background,
+  CombatEntity,
+  CombatEvent,
+  ConditionName,
+  District,
+  Faction,
+  GameChoice,
+  GameConsequence,
+  GridPos,
+  LocationType,
+  LootItem,
+  NpcAttitude,
+  NpcTemplate,
+  PendingReaction,
+  PlacedNpc,
+  Quest,
+  QuestProgress,
+  RoomObject,
+  StructuredAction,
+} from './shared-types.js';
 
-export type WeaponMastery =
-  | 'vex' // advantage on next attack vs target this turn/next
-  | 'topple' // CON save or prone on hit
-  | 'push' // push target 10 ft on hit
-  | 'sap' // disadvantage on target's next attack
-  | 'slow' // target's speed -10 ft until your next turn
-  | 'nick' // bonus-action TWF attack folded into Attack action
-  | 'cleave' // hit second target in 5 ft on a hit
-  | 'graze' // missed attack still deals ability-mod damage
-  | 'flex'; // versatile two-handed damage one-handed if no shield
+// `LootItem` is re-exported from ./shared-types (see src/shared/types.ts).
+
+// `WeaponMastery` is re-exported from ./shared-types (see src/shared/types.ts).
 
 // ─── Seed (procedurally generated world state) ────────────────────────────────
 
@@ -67,17 +51,7 @@ export interface Trap {
   disarmFail: string; // text on failed disarm (trap fires)
 }
 
-export interface RoomObject {
-  id: string;
-  name: string;
-  desc: string;
-  interactText: string;
-  searchable?: boolean;
-  searchDC?: number;
-  lootIds?: string[];
-  foundText?: string;
-  emptyText?: string;
-}
+// `RoomObject` is re-exported from ./shared-types (see src/shared/types.ts).
 
 export interface Room {
   id: string;
@@ -96,22 +70,7 @@ export interface Room {
   lighting?: 'bright' | 'dim' | 'dark';
 }
 
-export type ConditionName =
-  | 'paralyzed'
-  | 'stunned'
-  | 'poisoned'
-  | 'prone'
-  | 'frightened'
-  | 'blinded'
-  | 'restrained'
-  | 'incapacitated'
-  | 'grappled'
-  | 'invisible'
-  | 'exhaustion'
-  | 'charmed'
-  | 'unconscious'
-  | 'deafened'
-  | 'petrified';
+// `ConditionName` is re-exported from ./shared-types (see src/shared/types.ts).
 
 export interface OnHitEffect {
   condition: ConditionName;
@@ -245,7 +204,7 @@ export interface Seed {
 
 // ─── Game state ───────────────────────────────────────────────────────────────
 
-export type CoverLevel = 'none' | 'half' | 'three_quarters' | 'full';
+// `CoverLevel` is re-exported from ./shared-types (see src/shared/types.ts).
 
 export interface TurnActions {
   action_used: boolean;
@@ -295,57 +254,19 @@ export interface DeathSaves {
 
 // ─── NPC system ───────────────────────────────────────────────────────────────
 
-export type NpcAttitude = 'friendly' | 'indifferent' | 'hostile';
+// `NpcAttitude` is re-exported from ./shared-types (see src/shared/types.ts).
 
-export interface NpcShopEntry {
-  itemId: string;
-  price: number;
-}
+// `NpcShopEntry` is re-exported from ./shared-types (see src/shared/types.ts).
 
-export interface NpcDialogueResponse {
-  label: string;
-  reply?: string; // NPC's follow-up text after player picks this
-  consequences?: GameConsequence[]; // applied when this response is chosen
-}
+// `NpcDialogueResponse` is re-exported from ./shared-types (see src/shared/types.ts).
 
-export interface NpcTemplate {
-  id: string;
-  name: string;
-  attitude: NpcAttitude;
-  // Stat block — used when attitude becomes hostile or player attacks
-  hp: number;
-  ac: number;
-  damage: string;
-  toHit: number;
-  xp: number;
-  dex?: number;
-  // Social
-  greeting: string;
-  responses: NpcDialogueResponse[];
-  persuasionDC?: number; // CHA check DC when indifferent (default 12)
-  // Trade
-  shop?: NpcShopEntry[];
-  // Associates the NPC's shop with a faction so price modifiers can apply
-  // (campaignEngine.factionShopPrice). Optional — NPCs without a faction
-  // tag charge their static shop entry price.
-  factionId?: string;
-}
+// `NpcTemplate` is re-exported from ./shared-types (see src/shared/types.ts).
 
-export interface PlacedNpc extends NpcTemplate {
-  roomId: string;
-}
+// `PlacedNpc` is re-exported from ./shared-types (see src/shared/types.ts).
 
 // ─── Backgrounds ──────────────────────────────────────────────────────────────
 
-export interface Background {
-  id: string;
-  name: string;
-  desc: string;
-  skillProficiencies: string[]; // 2 skill names (e.g. 'Perception', 'Stealth')
-  toolProficiency?: string; // 1 tool (e.g. "Thieves' Tools")
-  feature: string; // name of the narrative feature
-  featureDesc: string; // one-sentence description shown in UI
-}
+// `Background` is re-exported from ./shared-types (see src/shared/types.ts).
 
 // ─── Spell system ─────────────────────────────────────────────────────────────
 
@@ -415,76 +336,21 @@ export interface BeastForm {
 
 // ─── Structured actions ───────────────────────────────────────────────────────
 
-export type AbilityKey = 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha';
+// `AbilityKey` is re-exported from ./shared-types (see src/shared/types.ts).
 
-export type StructuredAction =
-  | { type: 'move'; roomId: string }
-  | { type: 'attack'; targetEnemyId?: string }
-  | { type: 'loot' }
-  | { type: 'use'; itemId: string; targetCharId?: string }
-  | { type: 'sneak' }
-  | { type: 'escape' }
-  | { type: 'examine' }
-  | { type: 'death_save' }
-  | { type: 'pass' }
-  | { type: 'end_turn' }
-  | { type: 'short_rest' }
-  | { type: 'long_rest' }
-  | { type: 'talk' }
-  | { type: 'talk_response'; responseIdx: number }
-  | { type: 'buy'; itemId: string; price: number }
-  | { type: 'attack_npc' }
-  | { type: 'use_class_feature'; featureId: string; targetEnemyId?: string }
-  | { type: 'apply_asi'; stat: AbilityKey }
-  | {
-      type: 'cast_spell';
-      spellId: string;
-      slotLevel: number;
-      ritual?: boolean;
-      targetEnemyId?: string;
-      // 2024 PHB multi-target spells (Magic Missile darts, Eldritch Blast
-      // beams). One entry per dart/beam; duplicates = multiple darts on the
-      // same target. When omitted, falls back to focus-fire on `targetEnemyId`.
-      targetEnemyIds?: string[];
-    }
-  | { type: 'disarm_trap' }
-  | { type: 'interact_object'; objectId: string }
-  | { type: 'two_weapon_attack'; targetEnemyId?: string }
-  | { type: 'attune'; instanceId: string }
-  | { type: 'grapple'; targetEnemyId?: string }
-  | { type: 'try_escape_grapple' }
-  | { type: 'stand_up' }
-  | { type: 'spend_inspiration' }
-  | { type: 'shove'; targetEnemyId?: string }
-  | { type: 'dodge' }
-  | { type: 'disengage' }
-  | { type: 'grid_move'; entityId: string; to: GridPos }
-  | { type: 'travel'; locationId: string }
-  | { type: 'enter_district'; districtId: string }
-  | { type: 'accept_quest'; questId: string }
-  | { type: 'complete_quest'; questId: string }
-  | { type: 'dash' }
-  | { type: 'help'; targetId: string }
-  | { type: 'ready'; trigger: string; action: StructuredAction }
-  | { type: 'use_reaction' }
-  | { type: 'select_subclass'; subclass: string }
-  | { type: 'prepare_spells'; spellIds: string[] }
-  | { type: 'resolve_reaction'; accept: boolean };
+// `StructuredAction` is re-exported from ./shared-types (see src/shared/types.ts).
 
-export interface GameChoice {
-  label: string;
-  action: StructuredAction;
-  requiresBonusAction?: boolean;
-  // Hint for the grid renderer: when this is a cast_spell choice for an AoE
-  // spell, lets the frontend tint the affected cells on hover without needing
-  // the spell catalog or per-shape geometry.
-  aoePreview?: {
-    shape: 'sphere' | 'cone' | 'cube' | 'line';
-    radiusFt: number;
-    targetEnemyId?: string;
-    rangeKind?: 'self' | 'touch' | 'ranged';
-  };
-}
+// Compass direction tag for grid movement choices — drives the 3x3 D-pad
+// on the frontend so it can place each arrow in the right cell.
+// `ChoiceDirection` is re-exported from ./shared-types (see src/shared/types.ts).
+
+// Semantic kind hint for the frontend. Optional: untagged choices fall back
+// to the plain text-button rendering. The frontend uses `kind` to route
+// choices to specialised renderers (D-pad for grid_move, icon row for the
+// default-action universals). New kinds can be added incrementally.
+// `ChoiceKind` is re-exported from ./shared-types (see src/shared/types.ts).
+
+// `GameChoice` is re-exported from ./shared-types (see src/shared/types.ts).
 
 export interface InventoryItem {
   instance_id: string;
@@ -606,53 +472,25 @@ export interface Character {
 //   - eligibleCharIds: which party member(s) may declare the reaction.
 // Fields shared by every reaction-window variant: who triggered it, who can
 // react, where to resume the enemy turn loop.
-interface PendingReactionBase {
-  attackerEnemyId: string;
-  targetCharId: string;
-  resumeFromInitiativeIdx: number;
-  resumeFromMultiattackIdx: number; // 0-indexed; how many sub-attacks already resolved
-  narrativeSoFar: string;
-  eligibleCharIds: string[];
-}
 
 // Shield (PHB p.275). Triggers BEFORE damage applies — accepting negates the
 // hit retroactively. pendingDamage/pendingNarrative are stashed so a decline
 // can apply them as if Shield was never offered.
-export interface PendingShieldReaction extends PendingReactionBase {
-  kind: 'shield';
-  atkTotal: number; // to-hit total that triggered the [AC, AC+4] window
-  targetAcAtAttack: number;
-  pendingDamage: number;
-  pendingNarrative: string;
-}
+// `PendingShieldReaction` is re-exported from ./shared-types (see src/shared/types.ts).
 
 // Hellish Rebuke (PHB p.252). Triggers AFTER damage applies — accepting deals
 // 2d10 fire damage back to the attacker (DEX save for half). No state to
 // stash: the damage that triggered Rebuke is already on the books, and a
 // decline just lets the loop continue.
-export interface PendingHellishRebukeReaction extends PendingReactionBase {
-  kind: 'hellish_rebuke';
-}
+// `PendingHellishRebukeReaction` is re-exported from ./shared-types (see src/shared/types.ts).
 
 // Counterspell (PHB p.234). Triggers BEFORE an enemy spell resolves — the
 // engine snapshots the enemy's intent (spell id + level + intended target)
 // so a Counterspell accept can nullify it, and a decline lets the spell
 // fire as normal during the resume.
-export interface PendingCounterspellReaction extends PendingReactionBase {
-  kind: 'counterspell';
-  enemySpellId: string;
-  enemySpellLevel: number; // base level of the enemy's spell (slot level not modeled enemy-side)
-  enemySpellName: string; // pre-fetched so generateChoices doesn't need the spellTable
-  // PC the enemy spell would hit if not countered. Resolved at trigger time
-  // (usually nearest PC) and stored so a decline branch can apply damage
-  // without re-running target selection.
-  intendedTargetPcId: string;
-}
+// `PendingCounterspellReaction` is re-exported from ./shared-types (see src/shared/types.ts).
 
-export type PendingReaction =
-  | PendingShieldReaction
-  | PendingHellishRebukeReaction
-  | PendingCounterspellReaction;
+// `PendingReaction` is re-exported from ./shared-types (see src/shared/types.ts).
 
 // ─── Combat event log ───────────────────────────────────────────────────────
 //
@@ -665,68 +503,9 @@ export type PendingReaction =
 // Kept as a circular buffer on state.combat_log; capped at COMBAT_LOG_MAX
 // so long sessions don't accumulate state.
 
-export const COMBAT_LOG_MAX = 30;
+// `COMBAT_LOG_MAX` is re-exported from ./shared-types (see src/shared/types.ts).
 
-export type CombatEvent =
-  | {
-      kind: 'attack_hit';
-      attackerId: string;
-      attackerName: string;
-      targetId: string;
-      targetName: string;
-      damage: number;
-      damageType: string;
-      isCrit: boolean;
-      toHit: number;
-      targetAc: number;
-      round: number;
-    }
-  | {
-      kind: 'attack_miss';
-      attackerId: string;
-      attackerName: string;
-      targetId: string;
-      targetName: string;
-      toHit: number;
-      targetAc: number;
-      round: number;
-    }
-  | {
-      kind: 'kill';
-      attackerId: string;
-      attackerName: string;
-      victimId: string;
-      victimName: string;
-      xp: number;
-      round: number;
-    }
-  | {
-      kind: 'condition_applied';
-      targetId: string;
-      targetName: string;
-      condition: string;
-      source: string;
-      round: number;
-    }
-  | {
-      kind: 'save';
-      characterId: string;
-      characterName: string;
-      ability: string;
-      roll: number;
-      dc: number;
-      success: boolean;
-      vs: string;
-      round: number;
-    }
-  | {
-      kind: 'phase_transition';
-      bossId: string;
-      bossName: string;
-      phaseName: string;
-      narrative: string;
-      round: number;
-    };
+// `CombatEvent` is re-exported from ./shared-types (see src/shared/types.ts).
 
 // ─── Game state (world/party container) ──────────────────────────────────────
 
@@ -802,19 +581,7 @@ export interface GameState {
 
 // ─── Script engine rules ──────────────────────────────────────────────────────
 
-export type GameConsequence =
-  | { type: 'add_narrative'; text: string }
-  | { type: 'set_flag'; key: string; value: boolean | string | number }
-  | { type: 'give_item'; itemId: string; characterId?: string }
-  | { type: 'modify_hp'; amount: number; characterId?: string }
-  | { type: 'unlock_room'; roomId: string }
-  | { type: 'spawn_enemy'; roomId: string; enemyId: string }
-  | { type: 'set_escape' }
-  | { type: 'advance_quest'; questId: string; stepId: string }
-  | { type: 'set_faction_rep'; factionId: string; delta: number }
-  | { type: 'travel_to'; locationId: string }
-  | { type: 'give_gold'; amount: number }
-  | { type: 'set_npc_attitude'; npcId: string; attitude: NpcAttitude };
+// `GameConsequence` is re-exported from ./shared-types (see src/shared/types.ts).
 
 export interface GameRule {
   name: string;
@@ -954,94 +721,29 @@ export interface Context {
 
 // ─── Grid combat ─────────────────────────────────────────────────────────────
 
-export interface GridPos {
-  x: number;
-  y: number;
-}
+// `GridPos` is re-exported from ./shared-types (see src/shared/types.ts).
 
-export interface CombatEntity {
-  id: string; // character.id for PCs, enemy instance id for enemies, owner.id + ':companion' for animal companions
-  isEnemy: boolean;
-  pos: GridPos;
-  hp: number;
-  maxHp: number;
-  conditions: string[];
-  condition_durations: Record<string, number>;
-  // Beastmaster animal companion (PHB p.93) — a CR ¼ beast tied to a Ranger PC.
-  // Acts on the Ranger's bonus action; targetable by enemies separately.
-  isCompanion?: boolean;
-  companionOwnerId?: string; // character.id of the Ranger this companion belongs to
-  companionName?: string; // display name (e.g. 'Wolf')
-  ac?: number; // companion AC (PCs use character.ac, enemies use Enemy.ac)
-  toHit?: number; // companion attack bonus
-  damage?: string; // companion damage dice expression (e.g. '2d4+2')
-  // SRD 5.2.1 — when grappled, records the id of the grappler so we can end the
-  // condition if the grappler dies/is incapacitated, and so the contested escape
-  // check has a target's mod to roll against.
-  grappled_by?: string;
-  // Boss-phase tracking. Counts how many phases the boss has entered. The
-  // engine re-applies effects 0..phase_index-1 on every takeAction so the
-  // seed's runtime Enemy fields reflect the current phase. A 0 (or undefined)
-  // means the boss is still in its base statline.
-  phase_index?: number;
-}
+// `CombatEntity` is re-exported from ./shared-types (see src/shared/types.ts).
 
 // ─── Quest system ─────────────────────────────────────────────────────────────
 
-export type QuestStatus = 'available' | 'active' | 'completed' | 'failed';
+// `QuestStatus` is re-exported from ./shared-types (see src/shared/types.ts).
 
-export interface QuestStep {
-  id: string;
-  desc: string;
-  condition: object; // json-rules-engine TopLevelCondition against CampaignFacts
-}
+// `QuestStep` is re-exported from ./shared-types (see src/shared/types.ts).
 
-export interface Quest {
-  id: string;
-  title: string;
-  desc: string;
-  giverNpcId?: string;
-  steps: QuestStep[];
-  rewards: GameConsequence[];
-  factionId?: string;
-  repGain?: number;
-}
+// `Quest` is re-exported from ./shared-types (see src/shared/types.ts).
 
-export interface QuestProgress {
-  questId: string;
-  status: QuestStatus;
-  completedSteps: string[];
-}
+// `QuestProgress` is re-exported from ./shared-types (see src/shared/types.ts).
 
 // ─── Faction system ───────────────────────────────────────────────────────────
 
-export interface FactionThresholds {
-  hostile: number;
-  unfriendly: number;
-  neutral: number;
-  friendly: number;
-  exalted: number;
-}
+// `FactionThresholds` is re-exported from ./shared-types (see src/shared/types.ts).
 
-export interface Faction {
-  id: string;
-  name: string;
-  thresholds: FactionThresholds;
-  shopPriceModifiers: Record<string, number>; // attitude tier → price multiplier
-}
+// `Faction` is re-exported from ./shared-types (see src/shared/types.ts).
 
 // ─── Campaign state (persists across sessions) ────────────────────────────────
 
-export interface CampaignState {
-  campaign_id: string;
-  user_id: string;
-  world_day: number;
-  current_location: string;
-  flags: Record<string, boolean | string | number>;
-  quests: QuestProgress[];
-  faction_rep: Record<string, number>;
-  npc_attitudes: Record<string, NpcAttitude>;
-}
+// `CampaignState` is re-exported from ./shared-types (see src/shared/types.ts).
 
 // ─── Campaign facts (evaluated against quest step conditions) ─────────────────
 
@@ -1062,14 +764,9 @@ export interface CampaignFacts {
 
 // ─── Locations ────────────────────────────────────────────────────────────────
 
-export type LocationType = 'town' | 'dungeon' | 'wilderness';
+// `LocationType` is re-exported from ./shared-types (see src/shared/types.ts).
 
-export interface District {
-  id: string;
-  name: string;
-  desc: string;
-  roomId: string;
-}
+// `District` is re-exported from ./shared-types (see src/shared/types.ts).
 
 export interface Location {
   id: string;

@@ -8,7 +8,7 @@ function InitiativeStrip({ state, seed }: { state: GameState; seed: Seed | null 
   const currentIdx = state.initiative_idx ?? 0;
 
   return (
-    <div className={styles.initiativeStrip}>
+    <div className={styles.initiativeStrip} data-testid="initiative-strip">
       <span className={styles.initiativeLabel} aria-hidden="true">
         INITIATIVE:
       </span>

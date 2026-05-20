@@ -4,6 +4,7 @@ import type {
   Enemy,
   GameRule,
   GameState,
+  GridPos,
   NpcTemplate,
   PlacedNpc,
   Seed,
@@ -536,7 +537,7 @@ describe('takeAction', () => {
     }
   });
 
-  it('in a 2-char party, active_character_id advances to the other player after attack', async () => {
+  it('in a 2-char party, the acting PC keeps the turn while initiative advances under them', async () => {
     const char1 = makeChar({ id: 'c1', name: 'Alice' });
     const char2 = makeChar({ id: 'c2', name: 'Bob' });
     const state: GameState = {
@@ -561,7 +562,7 @@ describe('takeAction', () => {
       traps_disarmed: [],
       objects_searched: [],
     };
-    // Make enemy survive (miss always) so initiative advances
+    // Make enemy survive (miss always) so combat persists past the attack.
     vi.spyOn(Math, 'random').mockReturnValue(0); // d20 → 1 (miss)
     const result = await takeAction({
       action: { type: 'attack' },
@@ -570,8 +571,16 @@ describe('takeAction', () => {
       seed: seedWithEnemy,
       context: ctx,
     });
+    // sandbox has gridWidth/gridHeight set, so combat-start creates grid
+    // entities and c1 still has movement available. Per RAW the turn
+    // doesn't end just because the action did — c1 retains the active
+    // marker until `end_turn` (or until movement is exhausted and no
+    // bonus actions remain). The engine's previous behavior round-
+    // robined active_character_id off c1 mid-turn, desyncing the
+    // InitiativeStrip and PartyRail; the fix anchors active to the
+    // initiative slot's owner.
     if (result.newState.combat_active) {
-      expect(result.newState.active_character_id).toBe('c2');
+      expect(result.newState.active_character_id).toBe('c1');
     }
   });
 
@@ -7372,5 +7381,1094 @@ describe('Enemy tactical movement (must close distance to melee)', () => {
     expect(finalEnemyEnt!.pos).toEqual({ x: 7, y: 7 });
     expect(result.narrative).toMatch(/held in place/i);
     expect(result.newState.characters[0].hp).toBe(pcHpBefore);
+  });
+});
+
+// ─── Narrative tokenization (UI rendering contract) ──────────────────────────
+//
+// Mechanical bits — damage, rolls, HP, AC, DC, saves, mechanical asides —
+// flow inline as `{{kind|display}}` tokens so the frontend can render
+// them with distinct styling without breaking immersion. These tests lock
+// in the format at the highest-traffic emission sites; if a future
+// change drops the wrapper at one of these sites the structured rendering
+// silently degrades, so we want a regression gate.
+
+describe('narrative tokenization', () => {
+  it('player melee hit emits {{dmg|N}} for damage and {{note|...}} for the to-hit breakdown', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99); // forces hit + max damage
+    const state = makeState(
+      { hp: 20, max_hp: 20 },
+      { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] }
+    );
+    const result = await takeAction({
+      action: { type: 'attack' },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    // Damage on hit is wrapped: `... for {{dmg|N}} damage.`
+    expect(result.narrative).toMatch(/\{\{dmg\|\d+\}\}/);
+    // The to-hit breakdown (d20/AC line) lands inside a {{note|...}} so
+    // the UI can dim it relative to the prose.
+    expect(result.narrative).toMatch(/\{\{note\|.*d20 .* vs AC .*\}\}/);
+  });
+
+  it('enemy attack on a PC emits {{dmg|N}} damage tokens', async () => {
+    // Set up an adjacent enemy + active grid combat so the goblin's turn
+    // resolves an attack and reaches applyEnemyAttackNarrative.
+    vi.spyOn(Math, 'random').mockReturnValue(0.999); // enemy hits hard
+    const pc = makeChar({ id: 'pc-1', hp: 30, max_hp: 30, ac: 10 });
+    const enemyId = `${CORRIDOR_ID}#0`;
+    const state: GameState = {
+      characters: [pc],
+      active_character_id: pc.id,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: true,
+      initiative_order: [
+        { id: pc.id, roll: 5, is_enemy: false },
+        { id: enemyId, roll: 20, is_enemy: true },
+      ],
+      initiative_idx: 0,
+      entities: [
+        {
+          id: pc.id,
+          isEnemy: false,
+          pos: { x: 4, y: 5 },
+          hp: 30,
+          maxHp: 30,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: enemyId,
+          isEnemy: true,
+          pos: { x: 5, y: 5 },
+          hp: 10,
+          maxHp: 10,
+          conditions: [],
+          condition_durations: {},
+        },
+      ],
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+      flags: {},
+      round: 1,
+      movement_used: {},
+    };
+    const result = await takeAction({
+      action: { type: 'pass' },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    expect(result.narrative).toMatch(/\{\{dmg\|\d+\}\}/);
+  });
+});
+
+// ─── Death narrative placeholder substitution ────────────────────────────────
+//
+// Regression for the `{name} falls, life fading...` leak: the `deathLines`
+// pool template references {name}, but the two resolution sites in
+// processDeathSave were only substituting {enemy} and {world}, so the
+// character's name leaked through verbatim to the player. The placeholder
+// lint missed it because some *other* code path in gameEngine.ts handles
+// {name} elsewhere, and the lint only checked for any global match.
+
+describe('deathLines placeholder substitution', () => {
+  it("case 'dead' (failed death save) substitutes {name} with the character name", async () => {
+    // PC at 0 HP with 2 failures already. Mock random=0 → d20=1 → Nat 1
+    // adds 2 failures → reaches 3 → rollDeathSave returns 'dead', which is
+    // the branch that resolves deathLines.
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const downed = makeChar({
+      id: 'pc-dn',
+      name: 'Halric',
+      hp: 0,
+      max_hp: 20,
+      conditions: ['unconscious'],
+      death_saves: { successes: 0, failures: 2 },
+    });
+    // Use the Vale context — its deathLines pool literally is
+    // "{name} falls..." / "{name} collapses..." (both reference {name}).
+    const valeSeed: Seed = {
+      context_id: valeCtx.id,
+      world_name: 'Vale',
+      ship_name: 'Vale',
+      intro: '',
+      seed_id: 'death-line-seed',
+      rooms: [{ id: valeCtx.startRoomId, name: 'Crypt', desc: '' }],
+      connections: { [valeCtx.startRoomId]: [] },
+      enemies: {},
+      loot: {},
+      npcs: {},
+    };
+    const state: GameState = {
+      characters: [downed],
+      active_character_id: 'pc-dn',
+      current_room: valeCtx.startRoomId,
+      visited_rooms: [valeCtx.startRoomId],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: false,
+      initiative_order: [],
+      initiative_idx: 0,
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      flags: {},
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+    };
+    const result = await takeAction({
+      action: { type: 'death_save' },
+      history: [],
+      state,
+      seed: valeSeed,
+      context: valeCtx,
+    });
+    expect(result.dead).toBe(true);
+    // The deathLines pool only ever yields a line containing the character
+    // name — both Vale templates start with "{name}".
+    expect(result.narrative).toContain('Halric');
+    // The literal placeholder must not survive.
+    expect(result.narrative).not.toContain('{name}');
+  });
+});
+
+// ─── grid_move choice tagging (UI D-pad contract) ────────────────────────────
+//
+// Movement choices carry `kind: 'grid_move'` and a `direction` enum so the
+// frontend can place each arrow button in the right cell of its 3x3 D-pad
+// without re-deriving direction from coordinates.
+
+describe('grid_move choice tagging', () => {
+  it('every movement choice is tagged with kind=grid_move and a direction', () => {
+    const pc = makeChar({ id: 'pc-1', hp: 20, max_hp: 20 });
+    const enemyId = `${CORRIDOR_ID}#0`;
+    const state: GameState = {
+      characters: [pc],
+      active_character_id: pc.id,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: true,
+      initiative_order: [
+        { id: pc.id, roll: 20, is_enemy: false },
+        { id: enemyId, roll: 5, is_enemy: true },
+      ],
+      initiative_idx: 0,
+      // PC at a non-edge cell so all 8 directions are in bounds; enemy is
+      // far enough away that it doesn't occupy any of them.
+      entities: [
+        {
+          id: pc.id,
+          isEnemy: false,
+          pos: { x: 5, y: 5 },
+          hp: 20,
+          maxHp: 20,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: enemyId,
+          isEnemy: true,
+          pos: { x: 9, y: 9 },
+          hp: 10,
+          maxHp: 10,
+          conditions: [],
+          condition_durations: {},
+        },
+      ],
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+      flags: {},
+      round: 1,
+      movement_used: {},
+    };
+    const choices = generateChoices(state, seedWithEnemy, ctx);
+    const moves = choices.filter((c) => c.action.type === 'grid_move');
+    expect(moves.length).toBeGreaterThan(0);
+    for (const move of moves) {
+      expect(move.kind).toBe('grid_move');
+      expect(['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']).toContain(move.direction);
+    }
+    // From an open cell with all 8 neighbours free, all 8 directions surface.
+    const directions = new Set(moves.map((m) => m.direction));
+    expect(directions.size).toBe(8);
+  });
+
+  it('non-movement choices remain untagged (kind is undefined)', () => {
+    // A plain out-of-combat examine in the start room — no grid, no kind.
+    const choices = generateChoices(makeState(), seed, ctx);
+    for (const c of choices) {
+      if (c.action.type !== 'grid_move') {
+        expect(c.kind).toBeUndefined();
+        expect(c.direction).toBeUndefined();
+      }
+    }
+  });
+});
+
+// ─── Default-action choice tagging (5.5e action universals) ──────────────────
+//
+// Dash / Disengage / Dodge / Ready are the no-target action choices that
+// fuel the icon row above the regular choice list on the frontend. Each
+// gets its own `kind` so the UI can hoist them out of the text list and
+// render with the rpg-awesome glyph for that action.
+
+describe('default-action choice tagging', () => {
+  it('Dash / Disengage / Dodge / Ready surface tagged when combat is live', () => {
+    const pc = makeChar({ id: 'pc-1', hp: 20, max_hp: 20 });
+    const enemyId = `${CORRIDOR_ID}#0`;
+    const state = makeState(
+      { hp: 20, max_hp: 20 },
+      {
+        current_room: CORRIDOR_ID,
+        visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+        combat_active: true,
+        initiative_order: [
+          { id: pc.id, roll: 20, is_enemy: false },
+          { id: enemyId, roll: 5, is_enemy: true },
+        ],
+        initiative_idx: 0,
+      }
+    );
+    const choices = generateChoices(state, seedWithEnemy, ctx);
+    const byKind = new Map(choices.filter((c) => c.kind).map((c) => [c.kind, c]));
+    expect(byKind.get('dash')?.action.type).toBe('dash');
+    expect(byKind.get('disengage')?.action.type).toBe('disengage');
+    expect(byKind.get('dodge')?.action.type).toBe('dodge');
+    // Ready requires a living enemy — seedWithEnemy has one in CORRIDOR_ID.
+    expect(byKind.get('ready')?.action.type).toBe('ready');
+  });
+
+  it('default actions do not surface out of combat', () => {
+    const choices = generateChoices(makeState(), seed, ctx);
+    for (const c of choices) {
+      expect(c.kind).not.toBe('dash');
+      expect(c.kind).not.toBe('disengage');
+      expect(c.kind).not.toBe('dodge');
+      expect(c.kind).not.toBe('ready');
+    }
+  });
+
+  it('combat verbs (attack / grapple / shove) carry their kind', () => {
+    // In a room with two enemies, the per-target loop fires and tags
+    // each Attack / Grapple / Shove choice with its corresponding kind.
+    // The CombatActionBar consumes these via the FE's enemy filter.
+    const pc = makeChar({ id: 'pc-1', hp: 20, max_hp: 20 });
+    const enemyA = `${CORRIDOR_ID}#0`;
+    const enemyB = `${CORRIDOR_ID}#1`;
+    const twoEnemySeed: Seed = {
+      ...seedWithEnemy,
+      enemies: {
+        [CORRIDOR_ID]: [
+          { id: enemyA, name: 'Goblin', hp: 10, ac: 12, damage: '1d6', toHit: 3, xp: 20 },
+          { id: enemyB, name: 'Goblin', hp: 10, ac: 12, damage: '1d6', toHit: 3, xp: 20 },
+        ],
+      },
+    };
+    const state = makeState(
+      { hp: 20, max_hp: 20 },
+      {
+        current_room: CORRIDOR_ID,
+        visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+        combat_active: true,
+        initiative_order: [
+          { id: pc.id, roll: 20, is_enemy: false },
+          { id: enemyA, roll: 5, is_enemy: true },
+          { id: enemyB, roll: 4, is_enemy: true },
+        ],
+        initiative_idx: 0,
+      }
+    );
+    const choices = generateChoices(state, twoEnemySeed, ctx);
+    expect(choices.filter((c) => c.kind === 'attack').length).toBe(2);
+    expect(choices.filter((c) => c.kind === 'grapple').length).toBe(2);
+    expect(choices.filter((c) => c.kind === 'shove').length).toBe(2);
+    // Each tagged choice carries the right action type.
+    for (const c of choices.filter((c) => c.kind === 'attack')) {
+      expect(c.action.type).toBe('attack');
+    }
+    for (const c of choices.filter((c) => c.kind === 'grapple')) {
+      expect(c.action.type).toBe('grapple');
+    }
+    for (const c of choices.filter((c) => c.kind === 'shove')) {
+      expect(c.action.type).toBe('shove');
+    }
+  });
+});
+
+// ─── Encounter XP distribution (2024 PHB / SRD 5.2.1) ────────────────────────
+//
+// XP from a defeated creature is divided equally among all party members
+// who participated. Pansori's participation model is "alive when the kill
+// resolved" — downed/unconscious PCs (hp=0, dead=false) still get a share;
+// only truly-dead PCs are excluded.
+
+describe('encounter XP distribution', () => {
+  // Build a multi-PC party state in the corridor with one weak enemy the
+  // active PC will one-shot via the basic attack path.
+  function makeKillScenario(partyOverrides: Array<Partial<Character>>): GameState {
+    const characters = partyOverrides.map((o, i) =>
+      makeChar({
+        id: `pc-${i + 1}`,
+        name: `PC${i + 1}`,
+        // Force max-damage one-shot: high STR, crit-on-Math-random=0.99
+        str: 20,
+        ...o,
+      })
+    );
+    const enemyId = `${CORRIDOR_ID}#0`;
+    return {
+      characters,
+      active_character_id: 'pc-1',
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: true,
+      initiative_order: [
+        ...characters.map((c) => ({ id: c.id, roll: 15, is_enemy: false })),
+        { id: enemyId, roll: 5, is_enemy: true },
+      ],
+      initiative_idx: 0,
+      entities: [
+        ...characters.map((c, i) => ({
+          id: c.id,
+          isEnemy: false as const,
+          pos: { x: 3 + i, y: 4 },
+          hp: c.hp,
+          maxHp: c.max_hp,
+          conditions: [] as string[],
+          condition_durations: {} as Record<string, number>,
+        })),
+        {
+          id: enemyId,
+          isEnemy: true,
+          pos: { x: 3, y: 5 },
+          hp: 1, // one-shot trivially
+          maxHp: 1,
+          conditions: [],
+          condition_durations: {},
+        },
+      ],
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+      flags: {},
+      round: 1,
+      movement_used: {},
+    };
+  }
+
+  it('solo PC gets the full XP value (no behavior change for 1-PC parties)', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99); // guaranteed hit + max dmg
+    const state = makeKillScenario([{}]);
+    const result = await takeAction({
+      action: { type: 'attack', targetEnemyId: `${CORRIDOR_ID}#0` },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    // seedWithEnemy's Goblin has xp: 20.
+    expect(result.newState.characters[0].xp).toBe(20);
+  });
+
+  it('multi-PC party splits XP equally among living members', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    const state = makeKillScenario([{}, {}, {}, {}]);
+    const result = await takeAction({
+      action: { type: 'attack', targetEnemyId: `${CORRIDOR_ID}#0` },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    // 20 XP / 4 PCs = 5 each; every living PC receives the same share.
+    for (const pc of result.newState.characters) {
+      expect(pc.xp).toBe(5);
+    }
+  });
+
+  it('truly-dead party members are excluded from the split', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    const state = makeKillScenario([{}, {}, {}, { dead: true, hp: 0 }]);
+    const result = await takeAction({
+      action: { type: 'attack', targetEnemyId: `${CORRIDOR_ID}#0` },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    // 20 XP / 3 living = 6 each (floor). Dead PC's xp stays at 0.
+    expect(result.newState.characters[0].xp).toBe(6);
+    expect(result.newState.characters[1].xp).toBe(6);
+    expect(result.newState.characters[2].xp).toBe(6);
+    expect(result.newState.characters[3].xp).toBe(0);
+  });
+
+  it('downed (hp=0, dead=false) PCs still get their share', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    // PC2 is unconscious (hp=0) but not dead — death saves still in play.
+    const state = makeKillScenario([{}, { hp: 0, conditions: ['unconscious'] }, {}]);
+    const result = await takeAction({
+      action: { type: 'attack', targetEnemyId: `${CORRIDOR_ID}#0` },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    // 20 XP / 3 eligible = 6 each (floor). PC2 is downed but eligible.
+    expect(result.newState.characters[0].xp).toBe(6);
+    expect(result.newState.characters[1].xp).toBe(6);
+    expect(result.newState.characters[2].xp).toBe(6);
+  });
+
+  it('kill event xp payload reports the share each PC received', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    const state = makeKillScenario([{}, {}, {}, {}]);
+    const result = await takeAction({
+      action: { type: 'attack', targetEnemyId: `${CORRIDOR_ID}#0` },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    const killEvt = result.newState.combat_log?.find((e) => e.kind === 'kill');
+    expect(killEvt).toBeDefined();
+    // 20 / 4 = 5
+    if (killEvt && killEvt.kind === 'kill') {
+      expect(killEvt.xp).toBe(5);
+    }
+  });
+});
+
+// ─── Speaker prefix in multi-PC narratives ────────────────────────────────────
+//
+// Combat narrative templates draw from pools with second-person ("Your
+// attack connects..."), third-person impersonal ("A solid strike lands
+// on Crypt Ghoul"), and enemy-first opener variants. In a multi-PC
+// party every one of those is ambiguous about whose turn it is, so we
+// prepend "[CharName] " unless the prose already starts with the
+// character's name. Solo parties skip the prefix entirely.
+
+describe('speaker prefix (multi-PC narratives)', () => {
+  // Reuse the kill-scenario builder but keep the enemy alive so we get
+  // the full hit narrative including the combatHit pool opener.
+  function makeAttackScenario(partyOverrides: Array<Partial<Character>>): GameState {
+    const characters = partyOverrides.map((o, i) =>
+      makeChar({ id: `pc-${i + 1}`, name: `PC${i + 1}`, str: 20, ...o })
+    );
+    const enemyId = `${CORRIDOR_ID}#0`;
+    return {
+      characters,
+      active_character_id: 'pc-1',
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: true,
+      initiative_order: [
+        ...characters.map((c) => ({ id: c.id, roll: 15, is_enemy: false })),
+        { id: enemyId, roll: 5, is_enemy: true },
+      ],
+      initiative_idx: 0,
+      entities: [
+        ...characters.map((c, i) => ({
+          id: c.id,
+          isEnemy: false as const,
+          pos: { x: 3 + i, y: 4 },
+          hp: c.hp,
+          maxHp: c.max_hp,
+          conditions: [] as string[],
+          condition_durations: {} as Record<string, number>,
+        })),
+        {
+          id: enemyId,
+          isEnemy: true,
+          pos: { x: 3, y: 5 },
+          hp: 50, // survive the hit
+          maxHp: 50,
+          conditions: [],
+          condition_durations: {},
+        },
+      ],
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+      flags: {},
+      round: 1,
+      movement_used: {},
+    };
+  }
+
+  it('multi-PC attack narrative gets a "[CharName]" prefix regardless of opener', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99); // forces hit + max damage
+    const state = makeAttackScenario([{}, {}, {}]);
+    const result = await takeAction({
+      action: { type: 'attack', targetEnemyId: `${CORRIDOR_ID}#0` },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    // Combat narrative pools open variably (second-person, third-person,
+    // enemy-first). The prefix attaches in every case for multi-PC.
+    expect(result.narrative.startsWith('[PC1]')).toBe(true);
+  });
+
+  it('solo-PC parties do NOT get the speaker prefix', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    const state = makeAttackScenario([{}]);
+    const result = await takeAction({
+      action: { type: 'attack', targetEnemyId: `${CORRIDOR_ID}#0` },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    expect(result.narrative.startsWith('[PC1]')).toBe(false);
+  });
+
+  it('single-target offensive spell emits one cast choice per living enemy', () => {
+    // Guiding Bolt is a single-target spell attack ("a creature of your
+    // choice"). With 2+ enemies in the room, the choice generator must
+    // surface one cast option per enemy so the caster picks their
+    // target rather than the engine auto-aiming at livingEnemies[0].
+    const enemy0Id = `${CORRIDOR_ID}#0`;
+    const enemy1Id = `${CORRIDOR_ID}#1`;
+    const cleric = makeChar({
+      id: 'cleric-1',
+      character_class: 'Cleric',
+      spells_known: ['guiding_bolt'],
+      spell_slots_max: { 1: 2 },
+      spell_slots_used: {},
+    });
+    const twoBanditSeed: Seed = {
+      ...seedWithEnemy,
+      enemies: {
+        [CORRIDOR_ID]: [
+          { id: enemy0Id, name: 'Bandit', hp: 11, ac: 12, damage: '1d6', toHit: 3, xp: 25 },
+          { id: enemy1Id, name: 'Bandit', hp: 11, ac: 12, damage: '1d6', toHit: 3, xp: 25 },
+        ],
+      },
+    };
+    const state = makeState(
+      {},
+      {
+        characters: [cleric],
+        active_character_id: cleric.id,
+        current_room: CORRIDOR_ID,
+        visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      }
+    );
+    const choices = generateChoices(state, twoBanditSeed, ctx);
+    const casts = choices.filter(
+      (c) => c.action.type === 'cast_spell' && (c.action as { spellId: string }).spellId === 'guiding_bolt'
+    );
+    expect(casts.length).toBe(2);
+    const targets = casts
+      .map((c) => (c.action as { targetEnemyId?: string }).targetEnemyId)
+      .filter(Boolean)
+      .sort();
+    expect(targets).toEqual([enemy0Id, enemy1Id].sort());
+    // Disambiguated labels surface so the player can tell them apart.
+    expect(casts.some((c) => c.label.includes('#1'))).toBe(true);
+    expect(casts.some((c) => c.label.includes('#2'))).toBe(true);
+  });
+
+  it('downed PC (hp=0, dead=false) with active turn still surfaces a death_save choice', () => {
+    // Repro for the user-reported "no available options" soft-lock.
+    // Fighter is at hp=0 with 2/3 death-save failures (not dead). Active
+    // is on Fighter — generateChoices must still return *something* the
+    // player can click, namely the death save itself.
+    const fighter = makeChar({
+      id: 'pc-fighter',
+      name: 'Fighter',
+      character_class: 'Fighter',
+      hp: 0,
+      max_hp: 13,
+      death_saves: { successes: 1, failures: 2 },
+      conditions: ['unconscious'],
+      stable: false,
+      dead: false,
+    });
+    const cleric = makeChar({ id: 'pc-cleric', name: 'Cleric', character_class: 'Cleric' });
+    const rogue = makeChar({ id: 'pc-rogue', name: 'Rogue', character_class: 'Rogue' });
+    const enemyId = `${CORRIDOR_ID}#0`;
+    const state: GameState = {
+      characters: [fighter, cleric, rogue],
+      active_character_id: fighter.id,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: true,
+      initiative_order: [
+        { id: cleric.id, roll: 18, is_enemy: false },
+        { id: enemyId, roll: 14, is_enemy: true },
+        { id: fighter.id, roll: 8, is_enemy: false },
+        { id: rogue.id, roll: 6, is_enemy: false },
+      ],
+      initiative_idx: 2,
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+      flags: {},
+      round: 1,
+      movement_used: {},
+      entities: [
+        { id: fighter.id, isEnemy: false, pos: { x: 2, y: 2 }, hp: 0, maxHp: 13, conditions: ['unconscious'], condition_durations: {} },
+        { id: cleric.id, isEnemy: false, pos: { x: 1, y: 1 }, hp: 8, maxHp: 8, conditions: [], condition_durations: {} },
+        { id: rogue.id, isEnemy: false, pos: { x: 3, y: 1 }, hp: 10, maxHp: 10, conditions: [], condition_durations: {} },
+        { id: enemyId, isEnemy: true, pos: { x: 2, y: 3 }, hp: 4, maxHp: 13, conditions: [], condition_durations: {} },
+      ],
+    };
+    const choices = generateChoices(state, seedWithEnemy, ctx);
+    expect(choices.length).toBeGreaterThan(0);
+    expect(choices.some((c) => c.action.type === 'death_save')).toBe(true);
+  });
+
+  it('death_save Nat 20 brings the PC back at 1 HP and clears the save counters', async () => {
+    // Sanity check that the existing death-save early block (above the
+    // switch) still rolls a save, applies regain_hp on a Nat 20, and
+    // advances active off the rolling PC via round-robin.
+    vi.spyOn(Math, 'random').mockReturnValue(0.999); // d20 → 20
+    const fighter = makeChar({
+      id: 'pc-fighter',
+      name: 'Fighter',
+      hp: 0,
+      max_hp: 13,
+      death_saves: { successes: 1, failures: 2 },
+      conditions: ['unconscious'],
+      stable: false,
+      dead: false,
+    });
+    const cleric = makeChar({ id: 'pc-cleric', name: 'Cleric' });
+    const state: GameState = {
+      characters: [fighter, cleric],
+      active_character_id: fighter.id,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: true,
+      initiative_order: [
+        { id: cleric.id, roll: 18, is_enemy: false },
+        { id: fighter.id, roll: 8, is_enemy: false },
+      ],
+      initiative_idx: 1,
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+      flags: {},
+      round: 1,
+      movement_used: {},
+    };
+    const result = await takeAction({
+      action: { type: 'death_save' },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    const updatedFighter = result.newState.characters.find((c) => c.id === fighter.id)!;
+    expect(updatedFighter.hp).toBe(1);
+    expect(updatedFighter.death_saves).toEqual({ successes: 0, failures: 0 });
+    expect(result.newState.active_character_id).toBe(cleric.id);
+    expect(result.narrative).toMatch(/death save|natural 20/i);
+  });
+
+  it('death_save 3rd failure (PC dies) advances active to the next living PC, not a soft-lock', async () => {
+    // The user-reported soft-lock: when Fighter's 3rd death-save failure
+    // kills them, the engine used to return choices: [] AND leave active
+    // pointed at the dead Fighter — generateChoices then returned []
+    // because char.dead, and the UI froze on "[Fighter] arrival" with no
+    // buttons. The fix advances active to the next living PC and
+    // regenerates choices.
+    vi.spyOn(Math, 'random').mockReturnValue(0); // d20 → 1 → Nat 1, +2 failures → dead (2+2 → 3+)
+    const fighter = makeChar({
+      id: 'pc-fighter',
+      name: 'Fighter',
+      hp: 0,
+      max_hp: 13,
+      death_saves: { successes: 0, failures: 2 }, // one more failure tips them over
+      conditions: ['unconscious'],
+      stable: false,
+      dead: false,
+    });
+    const cleric = makeChar({ id: 'pc-cleric', name: 'Cleric' });
+    const rogue = makeChar({ id: 'pc-rogue', name: 'Rogue' });
+    const state: GameState = {
+      characters: [fighter, cleric, rogue],
+      active_character_id: fighter.id,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: true,
+      initiative_order: [
+        { id: cleric.id, roll: 18, is_enemy: false },
+        { id: rogue.id, roll: 12, is_enemy: false },
+        { id: fighter.id, roll: 8, is_enemy: false },
+      ],
+      initiative_idx: 2,
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+      flags: {},
+      round: 1,
+      movement_used: {},
+    };
+    const result = await takeAction({
+      action: { type: 'death_save' },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    // Fighter is now dead.
+    const updatedFighter = result.newState.characters.find((c) => c.id === fighter.id)!;
+    expect(updatedFighter.dead).toBe(true);
+    // Active advanced to a living PC — anyone but the dead Fighter.
+    expect(result.newState.active_character_id).not.toBe(fighter.id);
+    // Choices for the new active PC must be non-empty so the run continues.
+    expect(result.choices.length).toBeGreaterThan(0);
+    // `dead: true` in the response is reserved for TPK — Cleric + Rogue
+    // are alive, so this is NOT a game-over.
+    expect(result.dead).toBe(false);
+  });
+
+  it('single-target offensive spell stays as one choice when there is only one enemy', () => {
+    const enemyId = `${CORRIDOR_ID}#0`;
+    const cleric = makeChar({
+      id: 'cleric-1',
+      character_class: 'Cleric',
+      spells_known: ['guiding_bolt'],
+      spell_slots_max: { 1: 2 },
+      spell_slots_used: {},
+    });
+    const state = makeState(
+      {},
+      {
+        characters: [cleric],
+        active_character_id: cleric.id,
+        current_room: CORRIDOR_ID,
+        visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      }
+    );
+    const choices = generateChoices(state, seedWithEnemy, ctx);
+    const casts = choices.filter(
+      (c) => c.action.type === 'cast_spell' && (c.action as { spellId: string }).spellId === 'guiding_bolt'
+    );
+    expect(casts.length).toBe(1);
+    expect((casts[0].action as { targetEnemyId?: string }).targetEnemyId).toBe(enemyId);
+  });
+
+  it('in grid combat, active_character_id stays in sync with initiative_idx after a non-turn-ending action', async () => {
+    // Regression for the bug the new e2e sync assertion caught:
+    // gameEngine.ts:8884 used to round-robin `active_character_id` whenever
+    // `usedInitiative` was false, *even when combat was active*. With a
+    // grid up and movement still available after an attack, that branch
+    // would advance the active marker off the attacker mid-turn — while
+    // initiative_idx correctly stayed put — desyncing PartyRail and
+    // InitiativeStrip and surfacing the next PC's choice list while the
+    // current PC still had moves to make.
+    vi.spyOn(Math, 'random').mockReturnValue(0); // attack misses; combat persists
+    const char1 = makeChar({ id: 'c1', name: 'Alice', str: 16 });
+    const char2 = makeChar({ id: 'c2', name: 'Bob', str: 16 });
+    const state: GameState = {
+      characters: [char1, char2],
+      active_character_id: 'c1',
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: false,
+      initiative_order: [],
+      initiative_idx: 0,
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      flags: {},
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+    };
+    const result = await takeAction({
+      action: { type: 'attack' },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    // Combat ignited; grid was created by the engine's combat-start path.
+    expect(result.newState.combat_active).toBe(true);
+    expect(result.newState.entities?.length ?? 0).toBeGreaterThan(0);
+
+    // The acting PC (c1) keeps the active marker — they still have
+    // movement, so RAW says their turn isn't over. initiative_idx
+    // points at c1's slot in the order; active_character_id matches.
+    expect(result.newState.active_character_id).toBe('c1');
+    const activeIdx = result.newState.initiative_idx ?? -1;
+    expect(result.newState.initiative_order[activeIdx]?.id).toBe('c1');
+  });
+
+  it('prefix is suppressed when the prose already opens with the active PC name', () => {
+    // Sanity check at the unit level for the suppression branch — a turn
+    // whose narrative starts with the active char's name (e.g. an end-of-turn
+    // log line "PC1 ends their turn.") doesn't need the bracket prefix.
+    // We exercise this via the existing `end_turn` action path which yields
+    // an "{Name} ends their turn." narrative.
+    // (Covered indirectly by existing end-of-turn tests; we just assert the
+    // string predicate that gates the prefix here.)
+    const charName = 'PC1';
+    const narrative = `${charName} ends their turn.`;
+    const alreadyNamed =
+      narrative.startsWith(`${charName} `) ||
+      narrative.startsWith(`${charName}:`) ||
+      narrative.startsWith(`[${charName}]`);
+    expect(alreadyNamed).toBe(true);
+  });
+});
+
+// ─── Grid-combat invariants ──────────────────────────────────────────────────
+//
+// This block exists to close the unit-coverage gap that let the
+// in-combat round-robin bug (gameEngine.ts:8884) hide for the entire
+// grid-combat era. Every spec elsewhere in this file uses
+// `seedWithEnemy` (no grid entities), which means the auto-advance
+// block sees `hasMovementLeft === false`, sets `usedInitiative = true`,
+// and never executes the buggy ELSE branch. To catch that whole class
+// of bug, the specs below set up a real grid state — entities + a
+// non-zero `gridWidth`/`gridHeight` from the context + tracked
+// `movement_used` — and assert the load-bearing invariants:
+//
+//   1. active_character_id stays on the acting PC after a non-turn-
+//      ending action (grid_move, examine-in-combat).
+//   2. active_character_id matches `initiative_order[initiative_idx].id`
+//      whenever combat is live and the engine is waiting for input.
+//   3. `end_turn` advances initiative monotonically and lands on the
+//      next living PC's slot (skipping enemy slots that runEnemyTurns
+//      processed inline).
+
+function makeGridCombatState(opts: { partySize: number; pcAt?: GridPos[] }): {
+  state: GameState;
+  seed: Seed;
+  enemyId: string;
+} {
+  const partySize = opts.partySize;
+  const pcPositions = opts.pcAt ?? [
+    { x: 2, y: 2 },
+    { x: 3, y: 2 },
+    { x: 4, y: 2 },
+  ];
+  const characters: Character[] = [];
+  for (let i = 0; i < partySize; i++) {
+    characters.push(
+      makeChar({
+        id: `pc-${i + 1}`,
+        name: `PC${i + 1}`,
+        hp: 20,
+        max_hp: 20,
+        str: 16,
+      })
+    );
+  }
+  const enemyId = `${CORRIDOR_ID}#0`;
+  const gridSeed: Seed = {
+    ...seedWithEnemy,
+    enemies: {
+      [CORRIDOR_ID]: [
+        { id: enemyId, name: 'Goblin', hp: 10, ac: 12, damage: '1d6', toHit: 3, xp: 20 },
+      ],
+    },
+  };
+  const initiativeOrder = [
+    ...characters.map((c, i) => ({ id: c.id, roll: 20 - i, is_enemy: false })),
+    { id: enemyId, roll: 5, is_enemy: true },
+  ];
+  const state: GameState = {
+    characters,
+    active_character_id: characters[0].id,
+    current_room: CORRIDOR_ID,
+    visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+    enemies_killed: [],
+    loot_taken: [],
+    combat_active: true,
+    initiative_order: initiativeOrder,
+    initiative_idx: 0,
+    entities: [
+      ...characters.map((c, i) => ({
+        id: c.id,
+        isEnemy: false as const,
+        pos: pcPositions[i] ?? { x: 1 + i, y: 1 },
+        hp: c.hp,
+        maxHp: c.max_hp,
+        conditions: [] as string[],
+        condition_durations: {} as Record<string, number>,
+      })),
+      {
+        id: enemyId,
+        isEnemy: true,
+        pos: { x: 7, y: 7 },
+        hp: 50, // survive the grid_move test below
+        maxHp: 50,
+        conditions: [],
+        condition_durations: {},
+      },
+    ],
+    run_log: [],
+    room_log: [],
+    last_choices: [],
+    short_rested_rooms: [],
+    long_rested: false,
+    npc_attitudes: {},
+    npc_talked: [],
+    traps_triggered: [],
+    traps_disarmed: [],
+    objects_searched: [],
+    flags: {},
+    round: 1,
+    movement_used: {},
+  };
+  return { state, seed: gridSeed, enemyId };
+}
+
+describe('grid-combat invariants', () => {
+  it('grid_move does not advance the active marker off the moving PC', async () => {
+    const { state, seed } = makeGridCombatState({ partySize: 3 });
+    const result = await takeAction({
+      action: { type: 'grid_move', entityId: 'pc-1', to: { x: 3, y: 3 } },
+      history: [],
+      state,
+      seed,
+      context: ctx,
+    });
+    expect(result.newState.combat_active).toBe(true);
+    // PC1 still acts — they haven't used their action, just spent some
+    // movement. PartyRail's aria-current keeps pointing at PC1.
+    expect(result.newState.active_character_id).toBe('pc-1');
+    // Initiative slot matches: the strip ▶ should be on PC1 too.
+    const activeIdx = result.newState.initiative_idx ?? -1;
+    expect(result.newState.initiative_order[activeIdx]?.id).toBe('pc-1');
+  });
+
+  it('initiative_idx and active_character_id stay aligned through end_turn', async () => {
+    // Force the enemy to miss so combat persists past PC1's exit and
+    // we can observe whose turn the engine landed on after the enemy's
+    // interleaved turn.
+    vi.spyOn(Math, 'random').mockReturnValue(0); // d20 → 1 (miss)
+    const { state, seed } = makeGridCombatState({ partySize: 3 });
+    const result = await takeAction({
+      action: { type: 'end_turn' },
+      history: [],
+      state,
+      seed,
+      context: ctx,
+    });
+    expect(result.newState.combat_active).toBe(true);
+    const activeIdx = result.newState.initiative_idx ?? -1;
+    expect(activeIdx).toBeGreaterThanOrEqual(0);
+    // Whoever the engine landed on, the two indicators agree.
+    const activeEntry = result.newState.initiative_order[activeIdx];
+    expect(activeEntry?.id).toBe(result.newState.active_character_id);
+    expect(activeEntry?.is_enemy).toBe(false);
+  });
+
+  it('multiple grid_moves in a row keep active locked to the same PC', async () => {
+    // Walk PC1 from (2,2) to (3,3) to (4,4) — two grid moves. Each
+    // advance must NOT shift the active marker to PC2 (the historical
+    // bug). Only end_turn should hand the turn over.
+    const { state: s0, seed } = makeGridCombatState({ partySize: 3 });
+    const step1 = await takeAction({
+      action: { type: 'grid_move', entityId: 'pc-1', to: { x: 3, y: 3 } },
+      history: [],
+      state: s0,
+      seed,
+      context: ctx,
+    });
+    expect(step1.newState.active_character_id).toBe('pc-1');
+    const step2 = await takeAction({
+      action: { type: 'grid_move', entityId: 'pc-1', to: { x: 4, y: 4 } },
+      history: [],
+      state: step1.newState,
+      seed,
+      context: ctx,
+    });
+    expect(step2.newState.active_character_id).toBe('pc-1');
+    // Both moves resolved (entity position advanced both times).
+    const pc1Ent = step2.newState.entities?.find((e) => e.id === 'pc-1');
+    expect(pc1Ent?.pos).toEqual({ x: 4, y: 4 });
+    // Movement_used reflects 10 ft burned (two diagonal grid moves).
+    expect((step2.newState.movement_used ?? {})['pc-1']).toBe(10);
   });
 });

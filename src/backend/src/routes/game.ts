@@ -30,6 +30,7 @@ import {
   normalizeState,
   takeAction,
 } from '../services/gameEngine.js';
+import type { AuthedRequest } from '../auth/middleware.js';
 import { generateSeed } from '../services/procgen.js';
 import { loadContexts } from '../services/contextLoader.js';
 import { pool } from '../db/pool.js';
@@ -45,6 +46,14 @@ const DEFAULT_CONTEXT = Object.values(CONTEXTS)[0] ?? ({ id: 'none' } as Context
 // Picks follow common 2024 PHB starting-class examples; the count is
 // clamped to SRD_WEAPON_MASTERY_SLOTS (Fighter 3 / Barb-Pal-Rang 2 / Rog 1)
 // so we never give a class more masteries than RAW allows.
+// After requireAuth, req.user is guaranteed non-null. Pull the id
+// through AuthedRequest to drop the `req.user!` non-null assertions at
+// every callsite — both shorter and louder if some future route forgets
+// the auth middleware (TS will reject the cast at the boundary).
+function authedUserId(req: Request): string {
+  return (req as AuthedRequest).user.id;
+}
+
 function defaultWeaponMasteriesFor(charClass: string): string[] {
   const map: Record<string, string[]> = {
     Fighter: ['longsword', 'shortbow', 'greataxe'],
@@ -83,7 +92,7 @@ gameRouter.get('/contexts', (_req, res) => {
 // Get a specific session by ID (must belong to the requesting user)
 gameRouter.get('/session/:id', async (req: Request, res: Response) => {
   try {
-    const userId = req.user!.id;
+    const userId = authedUserId(req);
     const { rows } = await pool.query(
       'SELECT * FROM game_sessions WHERE id = $1 AND user_id = $2',
       [req.params.id, userId]
@@ -117,7 +126,7 @@ gameRouter.get('/sessions', async (req: Request, res: Response) => {
        FROM game_sessions
        WHERE user_id = $1
        ORDER BY updated_at DESC`,
-      [req.user!.id]
+      [authedUserId(req)]
     );
     res.json(rows);
   } catch (err) {
@@ -130,7 +139,7 @@ gameRouter.delete('/session/:id', async (req: Request, res: Response) => {
   try {
     const { rowCount } = await pool.query(
       'DELETE FROM game_sessions WHERE id = $1 AND user_id = $2',
-      [req.params.id, req.user!.id]
+      [req.params.id, authedUserId(req)]
     );
     if (!rowCount) {
       res.status(404).json({ error: 'Session not found' });
@@ -147,7 +156,7 @@ gameRouter.delete('/sessions/completed', async (req: Request, res: Response) => 
   try {
     const { rowCount } = await pool.query(
       "DELETE FROM game_sessions WHERE user_id = $1 AND status IN ('dead', 'escaped', 'abandoned')",
-      [req.user!.id]
+      [authedUserId(req)]
     );
     res.json({ ok: true, deleted: rowCount ?? 0 });
   } catch (err) {
@@ -337,7 +346,7 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
     } = await client.query(
       `INSERT INTO game_sessions (user_id, seed, state)
        VALUES ($1, $2, $3) RETURNING *`,
-      [req.user!.id, JSON.stringify(seed), JSON.stringify(initialState)]
+      [authedUserId(req), JSON.stringify(seed), JSON.stringify(initialState)]
     );
     await client.query('COMMIT');
     res.json({ session, state: initialState, seed, campaignMeta: campaignMetaFor(ctx) });
@@ -372,7 +381,7 @@ gameRouter.post('/session/:id/equip', async (req: Request, res: Response) => {
       rows: [row],
     } = await pool.query('SELECT * FROM game_sessions WHERE id = $1 AND user_id = $2', [
       req.params.id,
-      req.user!.id,
+      authedUserId(req),
     ]);
     if (!row) {
       res.status(404).json({ error: 'Session not found' });
@@ -487,7 +496,7 @@ gameRouter.post('/session/:id/transfer', async (req: Request, res: Response) => 
       rows: [row],
     } = await pool.query('SELECT * FROM game_sessions WHERE id = $1 AND user_id = $2', [
       req.params.id,
-      req.user!.id,
+      authedUserId(req),
     ]);
     if (!row) {
       res.status(404).json({ error: 'Session not found' });
@@ -558,7 +567,7 @@ gameRouter.post('/session/:id/drop', async (req: Request, res: Response) => {
       rows: [row],
     } = await pool.query('SELECT * FROM game_sessions WHERE id = $1 AND user_id = $2', [
       req.params.id,
-      req.user!.id,
+      authedUserId(req),
     ]);
     if (!row) {
       res.status(404).json({ error: 'Session not found' });
@@ -608,7 +617,7 @@ gameRouter.post('/session/:id/action', async (req: Request, res: Response) => {
       rows: [row],
     } = await pool.query('SELECT * FROM game_sessions WHERE id = $1 AND user_id = $2', [
       req.params.id,
-      req.user!.id,
+      authedUserId(req),
     ]);
     if (!row) {
       res.status(404).json({ error: 'Session not found' });
@@ -629,7 +638,7 @@ gameRouter.post('/session/:id/action', async (req: Request, res: Response) => {
     // For campaign sessions, load and merge persisted campaign state
     let campaignState = null;
     if (ctx.mapType === 'campaign' && ctx.campaign) {
-      campaignState = await loadCampaignState(pool, req.user!.id, ctx.id);
+      campaignState = await loadCampaignState(pool, authedUserId(req), ctx.id);
       state = mergeCampaignIntoGameState(state, campaignState);
     }
 

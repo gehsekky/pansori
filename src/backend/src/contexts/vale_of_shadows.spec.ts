@@ -219,11 +219,22 @@ describe('Vale of Shadows — scripted playthrough', () => {
           await dispatch({ type: 'end_turn' });
           continue;
         }
+        const beforePos = { x: myEnt.pos.x, y: myEnt.pos.y };
         await dispatch({
           type: 'grid_move',
           entityId: activeChar.id,
           to: { x: myEnt.pos.x + Math.sign(dx), y: myEnt.pos.y + Math.sign(dy) },
         });
+        // If the move was blocked (target square occupied by another PC,
+        // out of bounds, etc.) the engine silently no-ops. Detect that and
+        // end the turn so we don't infinite-loop on the same blocked
+        // step. (The pre-fix engine round-robin'd the active marker each
+        // tick and masked this; the AI now needs to recognise stuck
+        // turns itself.)
+        const afterEnt = state.entities?.find((e) => e.id === activeChar.id);
+        if (afterEnt && afterEnt.pos.x === beforePos.x && afterEnt.pos.y === beforePos.y) {
+          await dispatch({ type: 'end_turn' });
+        }
       } else {
         if (activeChar.turn_actions.action_used) {
           await dispatch({ type: 'end_turn' });

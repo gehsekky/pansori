@@ -133,6 +133,197 @@
   animation: blink 1s step-end infinite;
 }
 
+/* Movement D-pad — 3x3 grid of arrow buttons that replaces the 8-row
+ * vertical list of "Move N → (3,4)" text buttons. Center cell shows
+ * remaining movement budget. */
+.dpad {
+  display: grid;
+  grid-template-columns: repeat(3, 44px);
+  grid-template-rows: repeat(3, 44px);
+  gap: 4px;
+  width: max-content;
+  margin: 0 0 0.75rem 0;
+}
+.dpadBtn {
+  background: transparent;
+  color: var(--t-primary);
+  border: 1px solid var(--t-border);
+  border-radius: 2px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: inherit;
+  padding: 0;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+.dpadBtn:hover:not(:disabled) {
+  border-color: var(--t-primary);
+  background: var(--t-dim-dark);
+}
+.dpadBtnDisabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+}
+.dpadCenter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.72rem;
+  color: var(--t-dim);
+  border: 1px dashed var(--t-border);
+  border-radius: 2px;
+}
+
+/* Default-action icon bar — horizontal row above the regular choice
+ * list. Each button stacks a rpg-awesome glyph over a short text label
+ * so first-time players can map glyph -> action without hovering. */
+.actionBar {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 0 0 0.75rem 0;
+}
+.actionBtn {
+  background: transparent;
+  color: var(--t-primary);
+  border: 1px solid var(--t-border);
+  border-radius: 2px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  min-width: 60px;
+  font-family: inherit;
+  font-size: 0.72rem;
+  line-height: 1.2;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+.actionBtn:hover:not(:disabled) {
+  border-color: var(--t-primary);
+  background: var(--t-dim-dark);
+}
+.actionBtn :global(.ra) {
+  font-size: 1.4rem;
+  margin-bottom: 4px;
+}
+.actionBtnLabel {
+  letter-spacing: 0.05em;
+}
+.actionBtnDisabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* Enemy selector — single-target picker that lives above the choice
+ * list during combat. Choices that target an enemy (attack, cast a
+ * single-target spell, grapple, shove) collapse to one button each;
+ * this control says which enemy that button hits. */
+.enemySelector {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 0.75rem 0;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--t-border);
+  border-radius: 2px;
+  background: var(--t-card);
+}
+.enemySelectorLabel {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  color: var(--t-dim);
+  margin-right: 4px;
+}
+.enemySelectorBtn {
+  background: transparent;
+  color: var(--t-mid);
+  border: 1px solid var(--t-border);
+  border-radius: 2px;
+  cursor: pointer;
+  padding: 4px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  font-family: inherit;
+  font-size: 0.78rem;
+  line-height: 1.1;
+  transition:
+    border-color 0.15s,
+    background 0.15s,
+    color 0.15s;
+}
+.enemySelectorBtn:hover {
+  border-color: var(--t-primary);
+  color: var(--t-primary);
+}
+.enemySelectorBtnActive {
+  border-color: var(--t-primary);
+  color: var(--t-primary);
+  background: var(--t-dim-dark);
+  box-shadow: 0 0 4px var(--t-primary);
+}
+.enemySelectorHp {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.68rem;
+  color: var(--t-dim);
+}
+
+/* Inline narrative tokens — mechanical bits (dice, damage, HP, DC, AC,
+ * saves, mechanical asides) rendered as upright monospace pills inside
+ * the otherwise-italic prose. Distinct hue per kind so a glance picks
+ * out numbers without breaking the line. */
+.tok {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-style: normal;
+  font-size: 0.85em;
+  padding: 0 0.32em;
+  border-radius: 3px;
+  background: var(--t-card);
+  border: 1px solid var(--t-border);
+  white-space: nowrap;
+}
+.tokDmg {
+  color: #ff8a6b;
+  border-color: #ff8a6b66;
+}
+.tokHp {
+  color: #6ee7a7;
+  border-color: #6ee7a766;
+}
+.tokRoll {
+  color: var(--t-primary);
+  border-color: var(--t-border);
+}
+.tokDc {
+  color: #c0a8ff;
+  border-color: #c0a8ff66;
+}
+.tokAc {
+  color: #9fdcff;
+  border-color: #9fdcff66;
+}
+.tokSave {
+  color: #ffd47a;
+  border-color: #ffd47a66;
+}
+.tokNote {
+  color: var(--t-dim);
+  font-size: 0.78em;
+  background: transparent;
+  border-style: dashed;
+}
+
 .logEntry {
   font-size: 0.8rem;
   color: var(--t-dim);
