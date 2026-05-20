@@ -624,11 +624,11 @@ export default function App() {
                                           <div
                                             className={styles.combinedActionBar}
                                             role="group"
-                                            aria-label="Default and combat actions"
+                                            aria-label="Combat and default actions"
                                             data-testid="combined-action-bar"
                                           >
-                                            <DefaultActionBar
-                                              choices={defaultChoices}
+                                            <CombatActionBar
+                                              choices={combatChoices}
                                               onChoose={handleChoice}
                                             />
                                             {hasDefault && hasCombat && (
@@ -637,8 +637,8 @@ export default function App() {
                                                 aria-hidden="true"
                                               />
                                             )}
-                                            <CombatActionBar
-                                              choices={combatChoices}
+                                            <DefaultActionBar
+                                              choices={defaultChoices}
                                               onChoose={handleChoice}
                                             />
                                           </div>
