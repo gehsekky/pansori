@@ -6483,3 +6483,93 @@ describe('Heavy encumbrance disadvantage (2024 variant)', () => {
     expect(result.narrative).toMatch(/fails/);
   });
 });
+
+describe('Species damage resistance (2024)', () => {
+  it('Tiefling halves fire damage from a fire-typed enemy attack', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.999); // enemy attack always hits
+    const tiefling = makeChar({
+      id: 'pc-tief',
+      character_class: 'Wizard',
+      species: 'tiefling',
+      hp: 30,
+      max_hp: 30,
+      ac: 12,
+    });
+    const enemyId = `${CORRIDOR_ID}#0`;
+    // Create a seed with a fire-typed enemy.
+    const fireSeed: Seed = {
+      ...seedWithEnemy,
+      enemies: {
+        [CORRIDOR_ID]: [
+          {
+            id: enemyId,
+            name: 'Fire Imp',
+            hp: 20,
+            ac: 12,
+            damage: '1d6',
+            toHit: 5,
+            xp: 50,
+            damageType: 'fire',
+          },
+        ],
+      },
+    };
+    const state: GameState = {
+      characters: [tiefling],
+      active_character_id: tiefling.id,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: true,
+      initiative_order: [
+        { id: tiefling.id, roll: 5, is_enemy: false },
+        { id: enemyId, roll: 20, is_enemy: true },
+      ],
+      initiative_idx: 0, // PC's turn; pass → enemy resolves
+      entities: [
+        {
+          id: tiefling.id,
+          isEnemy: false,
+          pos: { x: 4, y: 5 },
+          hp: 30,
+          maxHp: 30,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: enemyId,
+          isEnemy: true,
+          pos: { x: 5, y: 5 },
+          hp: 20,
+          maxHp: 20,
+          conditions: [],
+          condition_durations: {},
+        },
+      ],
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      flags: {},
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+      round: 1,
+      movement_used: {},
+    };
+    // Pass action to let enemy take its turn.
+    const result = await takeAction({
+      action: { type: 'pass' },
+      history: [],
+      state,
+      seed: fireSeed,
+      context: ctx,
+    });
+    // Narrative should mention the Tiefling fire resistance.
+    expect(result.narrative).toMatch(/Tiefling fire resistance/);
+  });
+});

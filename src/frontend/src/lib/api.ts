@@ -75,6 +75,9 @@ export type CharacterInput = {
   // creation. Other classes pick later (L2 Wizard/Druid, L3 the rest) so
   // this stays optional and is supplied via the in-game choice for them.
   subclass?: string;
+  // 2024 PHB Species (formerly "race"). Optional — engine defaults to
+  // Human when omitted.
+  species?: string;
 };
 
 export const api = {

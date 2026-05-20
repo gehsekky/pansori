@@ -15,6 +15,7 @@ import {
   computeTotalAc,
 } from '../services/rulesEngine.js';
 import { Request, Response, Router } from 'express';
+import { SRD_SPECIES, SRD_WEAPON_MASTERY_SLOTS } from '../contexts/srd/index.js';
 import {
   applyQuestCompletions,
   evaluateQuestSteps,
@@ -29,7 +30,6 @@ import {
   normalizeState,
   takeAction,
 } from '../services/gameEngine.js';
-import { SRD_WEAPON_MASTERY_SLOTS } from '../contexts/srd/index.js';
 import { generateSeed } from '../services/procgen.js';
 import { loadContexts } from '../services/contextLoader.js';
 import { pool } from '../db/pool.js';
@@ -185,12 +185,19 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
       const armorProfs = ctx.classArmorProficiencies?.[c.character_class] ?? [];
       const weaponProfs = ctx.classWeaponProficiencies?.[c.character_class] ?? [];
 
+      // 2024 PHB species traits — speed, darkvision, resistances, innate
+      // cantrips. Defaults to Human when missing/unknown.
+      const speciesId = c.species && SRD_SPECIES[c.species] ? c.species : 'human';
+      const speciesData = SRD_SPECIES[speciesId];
+      const dwarfHpBonus = speciesId === 'dwarf' ? 1 : 0;
+
       const hitDie = ctx.classHitDie[c.character_class] ?? 8;
       const conMod = Math.floor(((base.con ?? 10) - 10) / 2);
       // PHB: max hit die + CON mod at level 1. Sorcerer Draconic Bloodline
       // adds +1 HP per Sorcerer level (here, +1 at L1) via Draconic Resilience.
+      // Dwarven Toughness adds +1 max HP per level.
       const draconicBonus = c.character_class === 'Sorcerer' && c.subclass === 'draconic' ? 1 : 0;
-      const maxHp = Math.max(1, hitDie + conMod + draconicBonus);
+      const maxHp = Math.max(1, hitDie + conMod + draconicBonus + dwarfHpBonus);
 
       // Build starting inventory from classStartingLoot or campaign.startingLoot
       const startingIds =
@@ -268,6 +275,20 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
         // PHB: Cleric/Sorcerer/Warlock pick subclass at L1 (creation).
         // Other classes pick later via the in-game select_subclass choice.
         subclass: c.subclass,
+        // 2024 PHB species — seed mechanical traits from the catalog.
+        species: speciesId,
+        speed: speciesData.speedFt,
+        darkvision_ft: speciesData.darkvisionFt,
+        // Species innate cantrips merged into spells_known so the engine
+        // surfaces them without slot cost.
+        ...(speciesData.innateCantrips && speciesData.innateCantrips.length > 0
+          ? {
+              spells_known: [
+                ...(ctx.classSpells?.[c.character_class] ?? []),
+                ...speciesData.innateCantrips,
+              ],
+            }
+          : {}),
       };
     });
 

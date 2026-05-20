@@ -57,7 +57,7 @@ import type {
   Trap,
   TurnActions,
 } from '../types.js';
-import { BEAST_FORMS, availableBeastForms } from '../contexts/srd/index.js';
+import { BEAST_FORMS, SRD_SPECIES, availableBeastForms } from '../contexts/srd/index.js';
 import {
   DEFAULT_SPEED_FEET,
   SQUARE_SIZE,
@@ -486,13 +486,23 @@ function applyEnemyAttackNarrative(
         ? BEAST_FORMS[char.wild_shape_form]
         : undefined;
     const beastResist = !!beastForm?.physicalResistance;
-    let hpLost =
-      isRaging || isPetrified || beastResist ? Math.ceil(result.damage / 2) : result.damage;
+    // 2024 PHB species resistance — Dwarves (poison), Dragonborn (ancestry
+    // type, default fire), Tieflings (fire). Applies when the enemy's
+    // attack carries a damageType matching the species's resistance list.
+    const speciesData = char.species ? SRD_SPECIES[char.species] : undefined;
+    const speciesResist =
+      enemy.damageType && speciesData?.resistances?.includes(enemy.damageType) === true;
+    const anyResist = isRaging || isPetrified || beastResist || speciesResist;
+    let hpLost = anyResist ? Math.ceil(result.damage / 2) : result.damage;
     const rageNote = isRaging ? ` (Rage resistance: ${result.damage}→${hpLost})` : '';
     const petrNote = isPetrified ? ` (Petrified resistance: ${result.damage}→${hpLost})` : '';
     const beastNote =
       beastResist && !isRaging && !isPetrified
         ? ` (${beastForm?.name} resistance: ${result.damage}→${hpLost})`
+        : '';
+    const speciesNote =
+      speciesResist && !isRaging && !isPetrified && !beastResist
+        ? ` (${speciesData?.name} ${enemy.damageType} resistance: ${result.damage}→${hpLost})`
         : '';
     // Arcane Ward: Abjurer Wizard — absorb damage into ward HP before character HP
     let wardNote = '';
@@ -534,7 +544,7 @@ function applyEnemyAttackNarrative(
       .replace('{target}', char.name)
       .replace('{dmg}', String(hpLost));
     narrative += ` ${char.name} takes ${hpLost} damage.`;
-    narrative += rageNote + petrNote + beastNote + wardNote + tempHpNote;
+    narrative += rageNote + petrNote + beastNote + speciesNote + wardNote + tempHpNote;
     let updatedChar = { ...char };
 
     let inspirationConsumed = false;

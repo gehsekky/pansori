@@ -157,6 +157,7 @@ export function generateRoguelikeSeed(context: Context, partySize = 1): Seed {
           spellSaveDC: template.spellSaveDC,
           spellAttackBonus: template.spellAttackBonus,
           phases: template.phases,
+          damageType: template.damageType,
         },
       ];
     }

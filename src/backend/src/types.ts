@@ -197,6 +197,10 @@ export interface Enemy {
   vulnerabilities?: string[];
   immunities?: string[];
   condition_immunities?: string[];
+  // Primary damage type for this enemy's basic attack. Mirrors
+  // EnemyTemplate.damageType; carries through procgen so PCs with species
+  // resistance to a given type can take half damage RAW.
+  damageType?: string;
   // Spell-casting enemies (e.g. cultists, acolytes, mages). On their turn,
   // they roll castChance (0–1) to decide cast vs attack; if cast wins, one
   // spell from `spells` is picked. Spells must exist in context.spellTable
@@ -571,6 +575,11 @@ export interface Character {
   // use: Frightened can't willingly move closer to its source. Keyed by
   // condition name; cleared whenever the condition is removed.
   condition_sources?: Record<string, string>;
+  // 2024 PHB Species (formerly "race"). Determines size, speed, darkvision,
+  // resistances, and innate cantrips. See contexts/srd/species.ts. Optional
+  // because pre-species saves still need to load — defaults applied as
+  // "Human" when missing.
+  species?: string;
 }
 
 // ─── Reactive spell window ───────────────────────────────────────────────────
