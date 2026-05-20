@@ -113,7 +113,8 @@ export function resolvePlayerAttack(
   weaponProficient = true,
   ranged = false,
   critThreshold = 20,
-  attackBonus = 0
+  attackBonus = 0,
+  halflingLucky = false
 ): AttackResult {
   const strMod = abilityMod(player.str);
   const dexMod = abilityMod(player.dex);
@@ -124,7 +125,10 @@ export function resolvePlayerAttack(
   // Advantage + disadvantage cancel; net advantage rolls 2d20 keep higher; net disadv keeps lower
   const netAdv = advantage && !disadvantage;
   const netDisadv = disadvantage && !advantage;
-  const roll = netDisadv ? Math.min(roll1, d(20)) : netAdv ? Math.max(roll1, d(20)) : roll1;
+  let roll = netDisadv ? Math.min(roll1, d(20)) : netAdv ? Math.max(roll1, d(20)) : roll1;
+  // 2024 PHB Halfling Lucky — re-roll a Nat 1 on a d20 once; take the new
+  // result. Applies to the final kept roll (after advantage/disadvantage).
+  if (halflingLucky && roll === 1) roll = d(20);
   const total = roll + atkMod + prof + attackBonus;
 
   if (roll === 1)
@@ -446,6 +450,10 @@ export function rollConditionSave(
     (ability === 'dex' && targetConditions.includes('restrained')) || extraDisadvantage;
   const netAdv = advantage && !disadv;
   const netDisadv = disadv && !advantage;
+  // Note: Halfling Lucky for saves would land here. We don't currently
+  // thread the species through this helper since it's also called for
+  // enemies. Caller threads it via the higher-level `conditionSavingThrow`
+  // wrapper if needed.
   if (netDisadv) {
     const r1 = d(20);
     const r2 = d(20);
@@ -515,12 +523,15 @@ export function skillCheck(
   disadvantage = false,
   expertise = false,
   jackOfAllTrades = false,
-  advantage = false
+  advantage = false,
+  halflingLucky = false
 ) {
   const roll1 = d(20);
   const netAdv = advantage && !disadvantage;
   const netDisadv = disadvantage && !advantage;
-  const roll = netDisadv ? Math.min(roll1, d(20)) : netAdv ? Math.max(roll1, d(20)) : roll1;
+  let roll = netDisadv ? Math.min(roll1, d(20)) : netAdv ? Math.max(roll1, d(20)) : roll1;
+  // 2024 PHB Halfling Lucky — re-roll a Nat 1, take the new result.
+  if (halflingLucky && roll === 1) roll = d(20);
   const prof = profBonus(level);
   let profContrib = 0;
   if (proficient) profContrib = expertise ? prof * 2 : prof;

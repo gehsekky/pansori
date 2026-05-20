@@ -3780,7 +3780,8 @@ export async function takeAction({
           weaponProficient,
           weaponItem?.range === 'ranged',
           critThresh,
-          totalAttackBonus
+          totalAttackBonus,
+          char.species === 'halfling'
         );
         // Bardic Inspiration consumption on attack roll (2024 PHB p.52).
         // If the wielder has a stashed BI die, roll it and add to the to-hit
@@ -4437,7 +4438,8 @@ export async function takeAction({
         checkDisadv,
         false,
         false,
-        inspAdvSneak
+        inspAdvSneak,
+        char.species === 'halfling'
       );
       if (check.success) {
         narrative = pick(context.narratives.sneakSuccess).replace('{enemy}', enemy.name);
@@ -5787,7 +5789,8 @@ export async function takeAction({
           isHeavilyEncumbered(char), // 2024 PHB: heavy encumbrance → disadv on DEX checks
           false,
           false,
-          inspAdvHide
+          inspAdvHide,
+          char.species === 'halfling'
         );
         char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
         if (hideCheck.success) {
@@ -7194,7 +7197,8 @@ export async function takeAction({
         exhaustionDisadv1,
         false,
         false,
-        inspAdvSearch
+        inspAdvSearch,
+        char.species === 'halfling'
       );
 
       if (check.success) {
