@@ -6572,4 +6572,193 @@ describe('Species damage resistance (2024)', () => {
     // Narrative should mention the Tiefling fire resistance.
     expect(result.narrative).toMatch(/Tiefling fire resistance/);
   });
+
+  it('Human Resourceful: long rest grants Heroic Inspiration', async () => {
+    const human = makeChar({
+      id: 'h-rest',
+      species: 'human',
+      inspiration: false,
+      hp: 5,
+      max_hp: 20,
+    });
+    const state: GameState = {
+      ...makeState(),
+      characters: [human],
+      active_character_id: human.id,
+      combat_active: false,
+    };
+    const result = await takeAction({
+      action: { type: 'long_rest' },
+      history: [],
+      state,
+      seed,
+      context: ctx,
+    });
+    expect(result.newState.characters[0].inspiration).toBe(true);
+  });
+
+  it('Orc Relentless Endurance: drops to 1 HP instead of 0 on a hit (1/long rest)', async () => {
+    // Force enemy attack to hit and deal massive (but not massive-death) damage.
+    vi.spyOn(Math, 'random').mockReturnValue(0.999);
+    const orc = makeChar({
+      id: 'pc-orc',
+      character_class: 'Fighter',
+      species: 'orc',
+      hp: 8, // enemy 1d6+0 damage at 0.999 = 6 dmg; we set HP to 8 so > one hit
+      max_hp: 40,
+      ac: 5, // ensure hit
+    });
+    const enemyId = `${CORRIDOR_ID}#0`;
+    const seedBigDmg: Seed = {
+      ...seedWithEnemy,
+      enemies: {
+        [CORRIDOR_ID]: [
+          {
+            id: enemyId,
+            name: 'Brute',
+            hp: 50,
+            ac: 12,
+            damage: '4d6', // overkill — pushes well past 8 HP
+            toHit: 10,
+            xp: 50,
+          },
+        ],
+      },
+    };
+    const state: GameState = {
+      characters: [orc],
+      active_character_id: orc.id,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: true,
+      initiative_order: [
+        { id: orc.id, roll: 5, is_enemy: false },
+        { id: enemyId, roll: 20, is_enemy: true },
+      ],
+      initiative_idx: 0,
+      entities: [
+        {
+          id: orc.id,
+          isEnemy: false,
+          pos: { x: 4, y: 5 },
+          hp: 8,
+          maxHp: 40,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: enemyId,
+          isEnemy: true,
+          pos: { x: 5, y: 5 },
+          hp: 50,
+          maxHp: 50,
+          conditions: [],
+          condition_durations: {},
+        },
+      ],
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      flags: {},
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+      round: 1,
+      movement_used: {},
+    };
+    const result = await takeAction({
+      action: { type: 'pass' },
+      history: [],
+      state,
+      seed: seedBigDmg,
+      context: ctx,
+    });
+    expect(result.narrative).toMatch(/Relentless Endurance/);
+    expect(result.newState.characters[0].hp).toBe(1);
+    expect(result.newState.characters[0].class_resource_uses?.relentless_endurance_used).toBe(1);
+  });
+
+  it('Goliath Powerful Build: doubled STR for encumbrance — same load no longer heavy', async () => {
+    // Same loadout that triggered heavy-encumbrance for a STR-10 Human now
+    // passes for a STR-10 Goliath (effective STR 20 for carry).
+    vi.spyOn(Math, 'random').mockReturnValue(0.999);
+    const goliath = makeChar({
+      id: 'g-load',
+      character_class: 'Fighter',
+      species: 'goliath',
+      str: 10,
+      equipped_weapon: 'sword-inst',
+      inventory: [
+        { instance_id: 'sword-inst', id: 'shortsword', name: 'Shortsword' },
+        // 11 × 10 lb = 110 lb. STR 10 baseline cap is 100 lb (heavy at >100);
+        // Powerful Build doubles to 200 lb cap → not heavy.
+        ...Array.from({ length: 11 }, (_, i) => ({
+          instance_id: `bag-${i}`,
+          id: 'bag',
+          name: 'Heavy Bag',
+          weight: 10,
+        })),
+      ],
+    });
+    const enemyId = `${CORRIDOR_ID}#0`;
+    const state: GameState = {
+      characters: [goliath],
+      active_character_id: goliath.id,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      enemies_killed: [],
+      loot_taken: [],
+      combat_active: true,
+      initiative_order: [{ id: goliath.id, roll: 18, is_enemy: false }],
+      initiative_idx: 0,
+      entities: [
+        {
+          id: goliath.id,
+          isEnemy: false,
+          pos: { x: 4, y: 5 },
+          hp: 20,
+          maxHp: 20,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: enemyId,
+          isEnemy: true,
+          pos: { x: 5, y: 5 },
+          hp: 30,
+          maxHp: 30,
+          conditions: [],
+          condition_durations: {},
+        },
+      ],
+      run_log: [],
+      room_log: [],
+      last_choices: [],
+      flags: {},
+      short_rested_rooms: [],
+      long_rested: false,
+      npc_attitudes: {},
+      npc_talked: [],
+      traps_triggered: [],
+      traps_disarmed: [],
+      objects_searched: [],
+      round: 1,
+      movement_used: {},
+    };
+    const result = await takeAction({
+      action: { type: 'attack', targetEnemyId: enemyId },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    // No "heavily encumbered" in the disadvantage reason chain.
+    expect(result.narrative).not.toMatch(/heavily encumbered/);
+  });
 });
