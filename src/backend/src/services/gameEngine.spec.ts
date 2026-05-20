@@ -6099,7 +6099,9 @@ describe('boss legendary + lair actions', () => {
 // ─── prepare_spells — cap calculation + clamping ─────────────────────────────
 
 describe('prepare_spells', () => {
-  it('Cleric L1 with WIS 14 (mod +2) can prepare 3 spells', async () => {
+  it('cantrips are filtered out of prepared_spells (always-known, PHB p.234)', async () => {
+    // Cleric L1 WIS 14 → cap 3. spellIds includes Sacred Flame (cantrip)
+    // which must be stripped before counting + storing.
     const state = makeClericState({ wis: 14, level: 1 });
     const result = await takeAction({
       action: {
@@ -6111,14 +6113,14 @@ describe('prepare_spells', () => {
       seed: spellSeed,
       context: ctxWithRage,
     });
+    // Sacred Flame dropped; only the 2 leveled spells stored.
     expect(result.newState.characters[0].prepared_spells).toEqual([
-      'sacred_flame',
       'cure_wounds',
       'guiding_bolt',
     ]);
   });
 
-  it('Cleric L1 with WIS 10 (mod +0) caps at 1 prepared spell, rejects over-cap', async () => {
+  it('Cleric L1 WIS 10 (cap 1): all-cantrip prep stores nothing (no over-cap error)', async () => {
     const state = makeClericState({ wis: 10, level: 1 });
     const result = await takeAction({
       action: {
@@ -6130,19 +6132,39 @@ describe('prepare_spells', () => {
       seed: spellSeed,
       context: ctxWithRage,
     });
-    expect(result.narrative).toMatch(/at most 1.*tried to prepare 2/);
+    // After cantrip filter: ['cure_wounds'] — exactly the cap. Stored.
+    expect(result.newState.characters[0].prepared_spells).toEqual(['cure_wounds']);
   });
 
-  it('generateChoices clamps spellIds to the cap so prep always succeeds', () => {
-    // Cleric knows 4 spells but has WIS 10 → cap 1. The choice should
-    // surface a single-spell prep, not all 4.
+  it('Cleric L1 WIS 10 (cap 1): preparing 2 leveled spells rejects', async () => {
+    const state = makeClericState({ wis: 10, level: 1 });
+    const result = await takeAction({
+      action: {
+        type: 'prepare_spells',
+        spellIds: ['cure_wounds', 'guiding_bolt'],
+      },
+      history: [],
+      state,
+      seed: spellSeed,
+      context: ctxWithRage,
+    });
+    expect(result.narrative).toMatch(/at most 1 leveled spells.*tried to prepare 2/);
+  });
+
+  it('generateChoices auto-prep skips cantrips when picking which to prepare', () => {
+    // Cleric knows 4 spells (1 cantrip + 3 leveled), WIS 10 → cap 1.
+    // The choice should surface only leveled spells in its spellIds,
+    // and the "X of N known" count should be over the leveled subset.
     const state = makeClericState({ wis: 10, level: 1 });
     const choices = generateChoices(state, spellSeed, ctxWithRage);
     const prep = choices.find((c) => c.action.type === 'prepare_spells');
     expect(prep).toBeDefined();
     const spellIds = (prep!.action as { spellIds: string[] }).spellIds;
+    // Cap is 1 → only one spellId, and it's a leveled one (not Sacred Flame).
     expect(spellIds).toHaveLength(1);
-    expect(prep!.label).toMatch(/1 of 4 known/);
+    expect(spellIds).not.toContain('sacred_flame');
+    // 3 leveled spells in spells_known (cure_wounds, guiding_bolt, hold_person).
+    expect(prep!.label).toMatch(/1 of 3 known/);
   });
 });
 

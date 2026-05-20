@@ -709,9 +709,20 @@ function applyEnemyAttackNarrative(
       hit: false,
     };
   }
+  // Variety pool for plain misses — repeated "you dodge at the last
+  // second" reads oddly when the PC never actually took the Dodge action.
+  // Picks per-call so a multi-attack round doesn't echo the same line.
+  const missLines = [
+    `The ${enemy.name} lunges — but you dodge at the last second!`,
+    `The ${enemy.name}'s strike swings wide of the mark.`,
+    `The ${enemy.name} attacks, but the blow glances off your guard.`,
+    `The ${enemy.name} misjudges the distance — the swing finds only air.`,
+    `You sidestep the ${enemy.name}'s strike at the last moment.`,
+    `The ${enemy.name} attacks ${char.name} — and misses cleanly.`,
+  ];
   return {
     hpLost: 0,
-    narrative: `The ${enemy.name} lunges — but you dodge at the last second!`,
+    narrative: pick(missLines),
     newConditions: [...char.conditions],
     newDurations: { ...(char.condition_durations ?? {}) },
     atkTotal: result.total,
@@ -1210,6 +1221,15 @@ function splitEncounterXp(
 function applyLevelUpFromXp(char: Character, context: Context): string {
   if (char.dead) return '';
   if ((char.xp ?? 0) < (char.level ?? 1) * 100) return '';
+  // Was the PC unconscious/dying at the moment XP crossed the threshold?
+  // Mechanical level-up still applies (XP doesn't care about HP state, and
+  // the HP gain may even revive them) but the heroic-flavor narrative
+  // ("you have reached level N!") reads bizarrely for a prone, dying PC.
+  // We suppress the flavor and emit a single quiet line instead.
+  const wasDowned =
+    char.hp <= 0 ||
+    (char.conditions ?? []).includes('unconscious') ||
+    (char.death_saves?.failures ?? 0) > 0;
   char.level += 1;
   const dwarfLvlBonus = char.species === 'dwarf' ? 1 : 0;
   const hpRoll =
@@ -1217,10 +1237,15 @@ function applyLevelUpFromXp(char: Character, context: Context): string {
   char.max_hp += hpRoll;
   char.hp = Math.min(char.hp + hpRoll, char.max_hp);
   char.spell_slots_max = getSpellSlotsForLevel(char.character_class, char.level, context);
-  const levelUpLine = pick(context.narratives.levelUp)
-    .replace(/{level}/g, String(char.level))
-    .replace(/{name}/g, char.name);
-  let out = ` ${char.name}: ${levelUpLine} (+${hpRoll} HP)`;
+  let out: string;
+  if (wasDowned) {
+    out = ` ${char.name} reaches level ${char.level} (+${hpRoll} HP, while unconscious).`;
+  } else {
+    const levelUpLine = pick(context.narratives.levelUp)
+      .replace(/{level}/g, String(char.level))
+      .replace(/{name}/g, char.name);
+    out = ` ${char.name}: ${levelUpLine} (+${hpRoll} HP)`;
+  }
   if ([4, 8, 12, 16, 19].includes(char.level)) {
     char.asi_pending = true;
     out += ` Level ${char.level}: choose an Ability Score Improvement!`;
@@ -1917,7 +1942,12 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       (char.spells_known ?? []).length > 0
     ) {
       const cap = preparedSpellsCap(char, context);
-      const known = char.spells_known ?? [];
+      // Cantrips are always known, not prepared (PHB p.234) — exclude
+      // them from the auto-prep list and from the cap math so the
+      // player doesn't burn a prep slot on Sacred Flame.
+      const known = (char.spells_known ?? []).filter(
+        (id) => (context.spellTable?.[id]?.level ?? 0) > 0
+      );
       // Clamp to the cap so the action always succeeds — picking which N
       // is a future UX, but auto-prep of the first N is far better than
       // a choice that always errors out.
@@ -3405,6 +3435,20 @@ function runEnemyTurns(args: {
     const eEntry = st.initiative_order[advIdx];
     const rm = getEnemyById(args.seed, eEntry.id);
     if (rm && !st.enemies_killed.includes(eEntry.id)) {
+      // Surprised creatures skip their first turn entirely (2014 PHB
+      // p.189 — Pansori's chosen surprise model; PC-side handling mirrors
+      // this at the `Surprised — cannot act this round` choice). The
+      // `surprised` array is cleared on round-wrap so the skip only
+      // applies in round 1.
+      if ((st.surprised ?? []).includes(eEntry.id)) {
+        narrative += `\n\n[${rm.name} is surprised and loses their turn!]`;
+        resumeMi = 0;
+        const prevAdvIdxSurprise = advIdx;
+        advIdx = (advIdx + 1) % orderLen;
+        if (advIdx === 0 && prevAdvIdxSurprise !== 0) roundWrapped = true;
+        if (advIdx === args.initialCurrentIdx) break;
+        continue;
+      }
       // SRD p.221 — legendary action pool refreshes at the start of the
       // legendary creature's own turn.
       if (rm.legendary_actions?.length) refreshLegendaryPool(args.seed, rm.id);
@@ -4336,7 +4380,16 @@ export async function takeAction({
         st.initiative_idx = myInitIdx >= 0 ? myInitIdx : 0;
 
         const myRoll = order.find((e) => e.id === char.id)?.roll ?? 0;
-        narrative += `${char.name} acts (initiative ${myRoll})! `;
+        // The triggering PC's attack runs immediately — they had the
+        // element of surprise on the encounter even if their initiative
+        // wasn't highest. After this opening swing, play returns to the
+        // initiative order at the slot just past them (handled by the
+        // post-attack initiative advance). Honest framing avoids the
+        // misleading "X acts (initiative N)!" line when N wasn't first.
+        const isHighestInit = myInitIdx === 0;
+        narrative += isHighestInit
+          ? `${char.name} acts first (initiative ${myRoll})! `
+          : `${char.name} strikes with the opening blow (initiative ${myRoll})! `;
       }
 
       // ── Resolve the player's attack ────────────────────────────────────────
@@ -7773,7 +7826,24 @@ export async function takeAction({
           return c;
         });
         st = { ...st, characters: updatedChars };
-        narrative = `${char.name} — Preserve Life! Distributed ${preserved} HP among ${woundedAllies.length} wounded allies (pool: ${poolHp}). (${cdUses - 1} Channel Divinity remaining)`;
+        // RAW: Preserve Life can't raise a creature above half its HP max.
+        // When every wounded ally is already above half, the channel
+        // divinity gets spent but heals nothing — surface that gate so
+        // the player doesn't think the feature is broken.
+        const eligibleCount = woundedAllies.filter(
+          (c) => c.hp < Math.floor(c.max_hp / 2)
+        ).length;
+        if (preserved === 0) {
+          const reason =
+            woundedAllies.length === 0
+              ? 'no wounded allies in range'
+              : eligibleCount === 0
+                ? 'every wounded ally is already above half HP'
+                : 'no eligible target';
+          narrative = `${char.name} — Preserve Life! No HP distributed (${reason}). (${cdUses - 1} Channel Divinity remaining)`;
+        } else {
+          narrative = `${char.name} — Preserve Life! Distributed ${preserved} HP among ${eligibleCount} eligible ally${eligibleCount === 1 ? '' : 'ies'} (pool: ${poolHp}). (${cdUses - 1} Channel Divinity remaining)`;
+        }
       }
 
       // ── War Cleric: Guided Strike (Channel Divinity) ─────────────────────────
@@ -9309,12 +9379,17 @@ export async function takeAction({
       }
       const prepAction = action as { type: 'prepare_spells'; spellIds: string[] };
       const maxPrepared = preparedSpellsCap(char, context);
-      if (prepAction.spellIds.length > maxPrepared) {
-        narrative = `You can prepare at most ${maxPrepared} spells (your level + spellcasting modifier). You tried to prepare ${prepAction.spellIds.length}.`;
+      // Cantrips are always known (PHB p.234) — strip them from the
+      // input so they don't eat a prep slot or trip the cap check.
+      const leveledIds = prepAction.spellIds.filter(
+        (id) => (context.spellTable?.[id]?.level ?? 0) > 0
+      );
+      if (leveledIds.length > maxPrepared) {
+        narrative = `You can prepare at most ${maxPrepared} leveled spells (your level + spellcasting modifier). You tried to prepare ${leveledIds.length}.`;
         break;
       }
-      char.prepared_spells = prepAction.spellIds;
-      const spellNames = prepAction.spellIds
+      char.prepared_spells = leveledIds;
+      const spellNames = leveledIds
         .map((id) => context.spellTable?.[id]?.name ?? id)
         .join(', ');
       narrative = `${char.name} prepares their spells for the day: ${spellNames || '(none)'}.`;
