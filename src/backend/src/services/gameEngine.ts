@@ -9021,8 +9021,24 @@ export async function takeAction({
         break;
       }
 
-      st = { ...st, current_district_id: districtAction.districtId };
+      // Move physically into the district's room — without this, NPCs
+      // in the previous district stayed "in the room" (the player
+      // could still Talk to Aldric from the Lantern District because
+      // current_room stuck at millhaven_market). The visited_rooms
+      // set is also extended so the worldmap shows district visits.
+      const newRoomId = district.roomId;
+      st = {
+        ...st,
+        current_district_id: districtAction.districtId,
+        current_room: newRoomId,
+        visited_rooms: st.visited_rooms.includes(newRoomId)
+          ? st.visited_rooms
+          : [...st.visited_rooms, newRoomId],
+      };
       narrative = `You enter the ${district.name}. ${district.desc}`;
+      // Re-use the standard room-arrival narrative tail (enemies, loot,
+      // exits) so entering a district reads like entering any other room.
+      narrative += ' ' + buildArrivalNarrative(newRoomId, st, seed, context);
       usedInitiative = false;
       break;
     }

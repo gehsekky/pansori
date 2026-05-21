@@ -6383,6 +6383,47 @@ describe('set_active_character (out-of-combat lead handoff)', () => {
   });
 });
 
+// ─── enter_district sync ─────────────────────────────────────────────────────
+//
+// Regression: enter_district used to set only current_district_id without
+// updating current_room. A player who "entered" the Lantern District from
+// the Merchant District kept Aldric (placed in millhaven_market) on their
+// choice list because current_room hadn't moved.
+
+describe('enter_district moves current_room into the district roomId', () => {
+  it('updates current_room and visited_rooms when entering a sibling district', async () => {
+    const ctx2 = valeCtx;
+    const seedPlaceholder: Seed = {
+      ...seedWithEnemy,
+      context_id: ctx2.id,
+      rooms: [
+        { id: 'millhaven_market', name: 'Merchant District', desc: '' },
+        { id: 'millhaven_slums', name: 'Lantern District', desc: '' },
+      ],
+    };
+    const state: GameState = {
+      ...makeState(),
+      characters: [makeChar({ id: 'pc-1' })],
+      active_character_id: 'pc-1',
+      current_room: 'millhaven_market',
+      current_location_id: 'town_millhaven',
+      current_district_id: 'district_market',
+      visited_rooms: ['millhaven_square', 'millhaven_market'],
+      combat_active: false,
+    };
+    const result = await takeAction({
+      action: { type: 'enter_district', districtId: 'district_lantern' },
+      history: [],
+      state,
+      seed: seedPlaceholder,
+      context: ctx2,
+    });
+    expect(result.newState.current_district_id).toBe('district_lantern');
+    expect(result.newState.current_room).toBe('millhaven_slums');
+    expect(result.newState.visited_rooms).toContain('millhaven_slums');
+  });
+});
+
 // ─── 2024 PHB class feature audit ────────────────────────────────────────────
 
 describe('Fighter Second Wind (2024 multi-use)', () => {
