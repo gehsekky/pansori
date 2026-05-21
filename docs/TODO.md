@@ -64,11 +64,12 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
   reads as shipped.
 
   Follow-ups:
-  - [ ] **ParticipantsManager UI** — the assign-character endpoint exists
-    (PR 2) but there's no host-facing UI to drive it. Friends can join +
-    spectate but the host has to call the API directly to hand them a
-    PC. ~1-2h. Pick up after the first playtest confirms this is the
-    next blocker.
+  - [x] **ParticipantsManager UI** (shipped — a97ce9c). Players & invites
+    dialog now lists session_participants and gives the host a per-PC
+    owner dropdown. Realtime Socket.IO 'state' broadcasts keep the
+    dropdown values in sync. Realtime 'participants' (joined/left)
+    listener still deferred — host has to close + reopen the dialog
+    to see a freshly-joined friend.
   - [ ] **Voluntary leave** — DELETE /session/:id/participant for
     non-host participants who want out. Currently the host can rotate
     the invite token to lock people out, but explicit leave is polish.
