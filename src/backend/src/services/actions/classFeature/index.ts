@@ -1,4 +1,3 @@
-import { SRD_SPECIES } from '../../../contexts/srd/index.js';
 import {
   abilityMod,
   applyDamageMultiplier,
@@ -6,6 +5,7 @@ import {
   rollCritical,
   rollDice,
 } from '../../rulesEngine.js';
+import { SRD_SPECIES } from '../../../contexts/srd/index.js';
 import {
   applyPartyLevelUps,
   effectiveSpeed,
