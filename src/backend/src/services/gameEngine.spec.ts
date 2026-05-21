@@ -10082,7 +10082,8 @@ describe('travel updates current_room to destination central room', () => {
     // so traveling there should land current_room on road_north — not
     // leave it stuck in millhaven_temple (where Sister Maren would keep
     // emitting talk_response choices).
-    const valeSeed = generateRoguelikeSeed(valeCtx);
+    // Vale is a campaign context (empty roomPool) — use generateSeed.
+    const valeSeed = generateSeed(valeCtx, 1);
     const st = makeState(
       { id: 'pc-1', xp: 0 },
       {
@@ -10119,7 +10120,7 @@ describe('travel updates current_room to destination central room', () => {
         ],
       },
     };
-    const sd = generateRoguelikeSeed(valeCtx);
+    const sd = generateSeed(valeCtx, 1);
     const st = makeState(
       { id: 'pc-1' },
       {
