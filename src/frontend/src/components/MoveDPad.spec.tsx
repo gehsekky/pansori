@@ -61,6 +61,62 @@ describe('MoveDPad', () => {
     expect(onChoose).toHaveBeenCalledWith(east);
   });
 
+  it('roving tabindex: only the focused cell is reachable via Tab', () => {
+    const choices = [
+      moveChoice('NW', 4, 4),
+      moveChoice('N', 5, 4),
+      moveChoice('NE', 6, 4),
+      moveChoice('E', 6, 5),
+    ];
+    const { container } = render(<MoveDPad choices={choices} onChoose={() => {}} />);
+    const tabbables = container.querySelectorAll('button:not([disabled])[tabindex="0"]');
+    // Exactly one cell holds tabindex=0 at any time.
+    expect(tabbables.length).toBe(1);
+    // Initial tabbable is the first available direction in iteration order
+    // (NW comes first in our row-major check).
+    expect((tabbables[0] as HTMLButtonElement).dataset.direction).toBe('NW');
+  });
+
+  it('arrow-key navigation moves focus between available cells', async () => {
+    const choices = [
+      moveChoice('NW', 4, 4),
+      moveChoice('N', 5, 4),
+      moveChoice('NE', 6, 4),
+      moveChoice('W', 4, 5),
+      moveChoice('E', 6, 5),
+      moveChoice('SW', 4, 6),
+      moveChoice('S', 5, 6),
+      moveChoice('SE', 6, 6),
+    ];
+    const { container, getByTestId } = render(<MoveDPad choices={choices} onChoose={() => {}} />);
+    const dpad = getByTestId('move-dpad');
+    // Initial focus on NW. Press ArrowRight → N.
+    fireEvent.keyDown(dpad, { key: 'ArrowRight' });
+    const tabbableAfterRight = container.querySelector(
+      'button:not([disabled])[tabindex="0"]'
+    ) as HTMLButtonElement;
+    expect(tabbableAfterRight.dataset.direction).toBe('N');
+    // ArrowDown → S (skipping center).
+    fireEvent.keyDown(dpad, { key: 'ArrowDown' });
+    const tabbableAfterDown = container.querySelector(
+      'button:not([disabled])[tabindex="0"]'
+    ) as HTMLButtonElement;
+    expect(tabbableAfterDown.dataset.direction).toBe('S');
+  });
+
+  it('arrow-key navigation skips over disabled cells', () => {
+    // N and W are missing — pressing ArrowRight from NW should skip past
+    // N (disabled) and land on NE.
+    const choices = [moveChoice('NW', 4, 4), moveChoice('NE', 6, 4), moveChoice('E', 6, 5)];
+    const { container, getByTestId } = render(<MoveDPad choices={choices} onChoose={() => {}} />);
+    const dpad = getByTestId('move-dpad');
+    fireEvent.keyDown(dpad, { key: 'ArrowRight' });
+    const tabbable = container.querySelector(
+      'button:not([disabled])[tabindex="0"]'
+    ) as HTMLButtonElement;
+    expect(tabbable.dataset.direction).toBe('NE');
+  });
+
   it('disabled prop disables every arrow button', () => {
     const { container } = render(
       <MoveDPad
