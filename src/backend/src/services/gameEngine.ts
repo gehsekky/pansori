@@ -1358,6 +1358,7 @@ export function normalizeState(raw: Record<string, unknown>): GameState {
       traps_triggered: gs.traps_triggered ?? [],
       traps_disarmed: gs.traps_disarmed ?? [],
       objects_searched: gs.objects_searched ?? [],
+      seen_choices: gs.seen_choices ?? [],
       characters: gs.characters.map((c) => {
         const existingSlots = c.spell_slots_max ?? {};
         const slotsMax =
@@ -1521,6 +1522,33 @@ function npcIsKilled(state: GameState, roomId: string): boolean {
 }
 
 // ─── Choice generation ────────────────────────────────────────────────────────
+
+// Stable key for choice-dimming. Returns a string for choices the player
+// benefits from seeing dimmed after one use; returns undefined for
+// repeatable/transient choices (movement, combat verbs, inventory).
+//
+// Room-scoped action types (interact_object, examine, loot, talk_response)
+// fold the current room id into the key so two physically distinct
+// same-template objects (e.g. two crypts each with a "dirty_chest") get
+// distinct keys. talk_response also includes the npc id from the active
+// room so two NPCs sharing a response index don't collide.
+export function seenKeyForAction(action: StructuredAction, state: GameState): string | undefined {
+  const room = state.current_room;
+  switch (action.type) {
+    case 'talk_response':
+      return `talk_response::${room}::${action.responseIdx}`;
+    case 'interact_object':
+      return `interact_object::${room}::${action.objectId}`;
+    case 'accept_quest':
+      return `accept_quest::${action.questId}`;
+    case 'examine':
+      return `examine::${room}`;
+    case 'loot':
+      return `loot::${room}`;
+    default:
+      return undefined;
+  }
+}
 
 export function generateChoices(state: GameState, seed: Seed, context: Context): GameChoice[] {
   const char =
@@ -2983,7 +3011,14 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       choices.push({ label: `Move to ${adj.name}`, action: { type: 'move', roomId: adj.id } });
     }
   }
-  return MAX_CHOICES ? choices.slice(0, MAX_CHOICES) : choices;
+  const sliced = MAX_CHOICES ? choices.slice(0, MAX_CHOICES) : choices;
+  // Stamp seenKey on each choice (undefined for kinds not worth dimming).
+  // Centralizing the stamp here means each emit site doesn't need to know
+  // its own disambiguation rules.
+  return sliced.map((c) => {
+    const k = seenKeyForAction(c.action, state);
+    return k ? { ...c, seenKey: k } : c;
+  });
 }
 
 // ─── Script engine: rule evaluation ──────────────────────────────────────────
@@ -9946,6 +9981,16 @@ export async function takeAction({
     { character_id: char.id, action: action.type, narrative: finalNarrative },
   ];
   st.room_log = roomChanged ? [finalNarrative] : [...(st.room_log ?? []), finalNarrative];
+
+  // Record the action's seenKey (if any) so the FE can dim repeat
+  // presentations of the same choice. Computed against the pre-action
+  // state so "I clicked this in room X" survives an action that
+  // teleported the party. Dedupes via Set semantics.
+  const usedKey = seenKeyForAction(action, state);
+  if (usedKey && !(st.seen_choices ?? []).includes(usedKey)) {
+    st.seen_choices = [...(st.seen_choices ?? []), usedKey];
+  }
+
   st.last_choices = generateChoices(st, seed, context);
 
   const allDead = st.characters.every((c) => c.dead);

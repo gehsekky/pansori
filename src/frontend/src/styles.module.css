@@ -113,7 +113,20 @@
   letter-spacing: 0.03em;
   transition:
     border-color 0.15s,
-    background 0.15s;
+    background 0.15s,
+    opacity 0.15s;
+}
+
+/* "Already used this adventure" — dimmed visual hint, still clickable.
+   Hover restores full opacity so the label is readable when the player
+   considers re-clicking. */
+.choiceBtnSeen {
+  opacity: 0.45;
+  color: var(--t-dim);
+}
+
+.choiceBtnSeen:hover {
+  opacity: 0.85;
 }
 
 .sendBtn {

@@ -637,6 +637,12 @@ export interface GameState {
   quest_progress?: QuestProgress[];
   faction_rep?: Record<string, number>; // factionId → numeric rep
   world_day?: number;
+
+  // Choice-dimming memory. Each entry is a stable seenKey emitted by the
+  // backend when the corresponding choice was clicked (talk_response,
+  // interact_object, accept_quest, etc.). Resets only on a new adventure.
+  // See generateChoices / seenKeyForAction for the key construction.
+  seen_choices?: string[];
 }
 
 // ─── Script engine rules ──────────────────────────────────────────────────────

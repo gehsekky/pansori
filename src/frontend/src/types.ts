@@ -278,6 +278,10 @@ export interface GameState {
   quest_progress?: QuestProgress[];
   faction_rep?: Record<string, number>;
   world_day?: number;
+
+  // Choice-dimming memory — keys of choices already clicked this
+  // adventure. Mirror of the backend field.
+  seen_choices?: string[];
 }
 
 // `RoomObject` is re-exported from ./shared-types (see src/shared/types.ts).

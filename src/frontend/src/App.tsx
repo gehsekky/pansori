@@ -689,22 +689,36 @@ export default function App() {
                                     aria-label="Available actions"
                                     style={{ listStyle: 'none', margin: 0, padding: 0 }}
                                   >
-                                    {textListChoices.map((c, i) => (
-                                      <li key={i} style={{ listStyle: 'none' }}>
-                                        <button
-                                          data-testid="choice-btn"
-                                          data-action-type={c.action.type}
-                                          className={styles.choiceBtn}
-                                          onClick={() => handleChoice(c)}
-                                          onMouseEnter={() => c.aoePreview && setHoveredChoice(c)}
-                                          onMouseLeave={() => setHoveredChoice(null)}
-                                          aria-keyshortcuts={i < 9 ? `${i + 1}` : undefined}
-                                        >
-                                          <span aria-hidden="true">[{i + 1}] </span>
-                                          {c.label}
-                                        </button>
-                                      </li>
-                                    ))}
+                                    {textListChoices.map((c, i) => {
+                                      // Choice is dimmed when the backend
+                                      // stamped a seenKey and that key has
+                                      // already been recorded this adventure.
+                                      // Player can still click — it's a hint,
+                                      // not a lockout.
+                                      const seen =
+                                        !!c.seenKey &&
+                                        (gameState?.seen_choices ?? []).includes(c.seenKey);
+                                      return (
+                                        <li key={i} style={{ listStyle: 'none' }}>
+                                          <button
+                                            data-testid="choice-btn"
+                                            data-action-type={c.action.type}
+                                            data-seen={seen ? 'true' : undefined}
+                                            className={`${styles.choiceBtn} ${seen ? styles.choiceBtnSeen : ''}`}
+                                            onClick={() => handleChoice(c)}
+                                            onMouseEnter={() => c.aoePreview && setHoveredChoice(c)}
+                                            onMouseLeave={() => setHoveredChoice(null)}
+                                            aria-keyshortcuts={i < 9 ? `${i + 1}` : undefined}
+                                            aria-label={
+                                              seen ? `${c.label} (already used)` : undefined
+                                            }
+                                          >
+                                            <span aria-hidden="true">[{i + 1}] </span>
+                                            {c.label}
+                                          </button>
+                                        </li>
+                                      );
+                                    })}
                                   </ul>
                                 </>
                               );
