@@ -5267,12 +5267,26 @@ export async function takeAction({
             st = {
               ...st,
               characters: st.characters.map((c, i) => (i === targetIdx ? { ...c, hp: newHp } : c)),
+              // Sync the grid entity HP too so the battlefield renderer
+              // doesn't lag behind character state — a healed-back-up PC
+              // would otherwise still render as a faded skull until the
+              // next turn flushed the entities. Same fix on the self
+              // branch below.
+              entities: (st.entities ?? []).map((e) =>
+                e.id === target.id && !e.isEnemy ? { ...e, hp: newHp } : e
+              ),
             };
             char.inventory = char.inventory.filter((_, i) => i !== firstIdx);
             narrative = `${char.name} uses the ${held.name} on ${target.name} — ${fmt.hp(healed)} HP restored${bonusNote} (now ${fmt.hp(newHp, target.max_hp)}).`;
           } else {
             char.hp = Math.min(char.max_hp, char.hp + healed);
             char.inventory = char.inventory.filter((_, i) => i !== firstIdx);
+            st = {
+              ...st,
+              entities: (st.entities ?? []).map((e) =>
+                e.id === char.id && !e.isEnemy ? { ...e, hp: char.hp } : e
+              ),
+            };
             narrative = `You use the ${held.name} and recover ${fmt.hp(healed)} HP${bonusNote} (now ${fmt.hp(char.hp, char.max_hp)}).`;
           }
         } else if (itemData.effect === 'con_advantage') {
@@ -6000,6 +6014,13 @@ export async function takeAction({
           st = {
             ...st,
             characters: st.characters.map((c) => (c.id === target.id ? { ...c, hp: newHp } : c)),
+            // Sync the grid entity HP so the battlefield reflects the heal
+            // immediately — `commitChar()` only syncs the caster's entity,
+            // not the target's, so without this the healed ally would
+            // still render as a faded skull until the next state update.
+            entities: (st.entities ?? []).map((e) =>
+              e.id === target.id && !e.isEnemy ? { ...e, hp: newHp } : e
+            ),
           };
           narrative = `${char.name} casts ${spell.name}${slotNote} — restores ${healed} HP to ${target.name} (now ${newHp}/${target.max_hp}).${discipleNote}`;
         }
@@ -7862,6 +7883,7 @@ export async function takeAction({
         );
         let preserved = 0;
         let remaining = poolHp;
+        const healedIds = new Map<string, number>(); // id → new hp
         const updatedChars = st.characters.map((c) => {
           if (!c.dead && c.hp < c.max_hp && c.id !== char.id && remaining > 0) {
             const half = Math.floor(c.max_hp / 2);
@@ -7869,11 +7891,22 @@ export async function takeAction({
             const heal = Math.min(remaining, half - c.hp);
             preserved += heal;
             remaining -= heal;
-            return { ...c, hp: c.hp + heal };
+            const newHp = c.hp + heal;
+            healedIds.set(c.id, newHp);
+            return { ...c, hp: newHp };
           }
           return c;
         });
-        st = { ...st, characters: updatedChars };
+        st = {
+          ...st,
+          characters: updatedChars,
+          // Sync grid entity HP for every PC who got healed so the
+          // battlefield reflects the heal immediately. commitChar()
+          // only updates the caster's entity, not the targets'.
+          entities: (st.entities ?? []).map((e) =>
+            !e.isEnemy && healedIds.has(e.id) ? { ...e, hp: healedIds.get(e.id)! } : e
+          ),
+        };
         // RAW: Preserve Life can't raise a creature above half its HP max.
         // When every wounded ally is already above half, the channel
         // divinity gets spent but heals nothing — surface that gate so

@@ -5196,6 +5196,68 @@ describe('cast_spell — Cure Wounds (level 1, heal)', () => {
     expect(result.newState.characters[0].hp).toBeGreaterThan(3);
     expect(result.newState.characters[0].spell_slots_used[1]).toBe(1);
   });
+
+  it("healing an ally syncs the grid entity HP (regression — battlefield lag)", async () => {
+    // Cleric casts Cure Wounds on a downed Rogue (hp=0). Both the
+    // character record AND the grid entity must reflect the heal so the
+    // FE battlefield renderer doesn't keep showing the Rogue as dead
+    // until the next turn. The bug was that commitChar() only syncs
+    // the caster's entity, not the target's.
+    vi.spyOn(Math, 'random').mockReturnValue(0.999); // max heal
+    const cleric = makeChar({
+      id: 'c-heal',
+      character_class: 'Cleric',
+      wis: 14,
+      spell_slots_max: { 1: 2 },
+      spells_known: ['cure_wounds'],
+      prepared_spells: ['cure_wounds'],
+    });
+    const rogue = makeChar({ id: 'r-down', hp: 0, max_hp: 12 });
+    const state: GameState = {
+      ...makeState(),
+      characters: [cleric, rogue],
+      active_character_id: cleric.id,
+      current_room: CORRIDOR_ID,
+      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      combat_active: true,
+      initiative_order: [{ id: cleric.id, roll: 20, is_enemy: false }],
+      initiative_idx: 0,
+      entities: [
+        {
+          id: cleric.id,
+          isEnemy: false,
+          pos: { x: 4, y: 5 },
+          hp: cleric.hp,
+          maxHp: cleric.max_hp,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: rogue.id,
+          isEnemy: false,
+          pos: { x: 5, y: 5 },
+          hp: 0, // grid says dead
+          maxHp: 12,
+          conditions: ['unconscious'],
+          condition_durations: {},
+        },
+      ],
+    };
+    const result = await takeAction({
+      action: { type: 'cast_spell', spellId: 'cure_wounds', slotLevel: 1 },
+      history: [],
+      state,
+      seed: spellSeed,
+      context: ctxWithRage,
+    });
+    const rogueChar = result.newState.characters.find((c) => c.id === 'r-down');
+    const rogueEnt = result.newState.entities?.find((e) => e.id === 'r-down');
+    // Character HP healed
+    expect(rogueChar?.hp ?? 0).toBeGreaterThan(0);
+    // Grid entity HP synced — this is the regression assertion
+    expect(rogueEnt?.hp ?? 0).toBeGreaterThan(0);
+    expect(rogueEnt?.hp).toBe(rogueChar?.hp);
+  });
 });
 
 describe('cast_spell — Misty Step (level 2, bonus action, utility)', () => {
