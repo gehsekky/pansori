@@ -275,7 +275,12 @@ export type GameConsequence =
   | { type: 'set_faction_rep'; factionId: string; delta: number }
   | { type: 'travel_to'; locationId: string }
   | { type: 'give_gold'; amount: number }
-  | { type: 'set_npc_attitude'; npcId: string; attitude: NpcAttitude };
+  | { type: 'set_npc_attitude'; npcId: string; attitude: NpcAttitude }
+  // Remove one instance of itemId from the party's inventory (any
+  // member who carries it). Used for quest turn-ins like the Guild
+  // Ledger — when the player hands over a quest item, it should leave
+  // their pack.
+  | { type: 'consume_item'; itemId: string };
 
 // ─── Room objects + NPCs ─────────────────────────────────────────────
 

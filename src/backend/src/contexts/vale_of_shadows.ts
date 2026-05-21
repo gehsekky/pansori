@@ -1430,12 +1430,14 @@ export const context: Context = {
           },
         ],
         rewards: [
-          { type: 'give_gold', amount: 150 },
-          { type: 'set_faction_rep', factionId: 'faction_guild', delta: 20 },
           {
             type: 'add_narrative',
-            text: "Aldric presses a purse of 150 gold into your hand and logs your name in the Guild's books.",
+            text: "Aldric leafs through the waterlogged pages. \"This is it — proof the wagons were never delivered.\" He presses a purse into your hand and marks the Guild's books with your name.",
           },
+          { type: 'consume_item', itemId: 'guild_ledger' },
+          { type: 'give_gold', amount: 150 },
+          // Faction rep is bumped by the quest's `repGain` field above;
+          // we surface a narrative line in route/game.ts when that fires.
         ],
       },
       {
