@@ -1401,7 +1401,12 @@ export const context: Context = {
           {
             id: 'step_talk_aldric',
             desc: 'Speak with Aldric the Merchant to learn about the missing shipment.',
-            condition: { all: [{ fact: 'action', operator: 'equal', value: 'talk_response' }] },
+            condition: {
+              any: [
+                { fact: 'action', operator: 'equal', value: 'talk_response' },
+                { fact: 'action', operator: 'equal', value: 'accept_quest' },
+              ],
+            },
           },
           {
             id: 'step_find_ledger',
@@ -1441,7 +1446,12 @@ export const context: Context = {
           {
             id: 'step_learn_crypt',
             desc: 'Learn about the threat in the Shattered Crypt from Sister Maren.',
-            condition: { all: [{ fact: 'action', operator: 'equal', value: 'talk_response' }] },
+            condition: {
+              any: [
+                { fact: 'action', operator: 'equal', value: 'talk_response' },
+                { fact: 'action', operator: 'equal', value: 'accept_quest' },
+              ],
+            },
           },
           {
             id: 'step_kill_lord',
@@ -1484,7 +1494,12 @@ export const context: Context = {
           {
             id: 'step_meet_dusk',
             desc: 'Meet Dusk in the Lantern District.',
-            condition: { all: [{ fact: 'action', operator: 'equal', value: 'talk_response' }] },
+            condition: {
+              any: [
+                { fact: 'action', operator: 'equal', value: 'talk_response' },
+                { fact: 'action', operator: 'equal', value: 'accept_quest' },
+              ],
+            },
           },
           {
             id: 'step_find_letter',

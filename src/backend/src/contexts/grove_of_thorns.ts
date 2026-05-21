@@ -866,7 +866,12 @@ export const context: Context = {
       name: 'step_talk_elise',
       conditions: {
         all: [
-          { fact: 'action', operator: 'equal', value: 'talk_response' },
+          {
+            any: [
+              { fact: 'action', operator: 'equal', value: 'talk_response' },
+              { fact: 'action', operator: 'equal', value: 'accept_quest' },
+            ],
+          },
           { fact: 'room_id', operator: 'equal', value: 'pinegate_square' },
         ],
       },
