@@ -6,6 +6,7 @@ import {
   handleSelectSubclass,
   handleSetActiveCharacter,
 } from './meta.js';
+import { handleAttune, handleUse } from './inventory.js';
 import { handleBuy, handleTalk, handleTalkResponse } from './social.js';
 import {
   handleDash,
@@ -21,10 +22,11 @@ import { handleEnterDistrict, handleTravel } from './travel.js';
 import { handleGrapple, handleShove, handleTryEscapeGrapple } from './combatTactical.js';
 import { handleLongRest, handleShortRest } from './rest.js';
 import type { StructuredAction } from '../../types.js';
-import { handleAttune } from './inventory.js';
 import { handleDeathSave } from './deathSave.js';
 import { handleDisarmTrap } from './disarmTrap.js';
 import { handleEscape } from './escape.js';
+import { handleExamine } from './examineDefault.js';
+import { handleInteractObject } from './interactObject.js';
 import { handleLoot } from './loot.js';
 import { handleMove } from './move.js';
 import { handleSneak } from './sneak.js';
@@ -68,6 +70,9 @@ const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   loot: handleLoot as ActionHandler,
   sneak: handleSneak as ActionHandler,
   disarm_trap: handleDisarmTrap as ActionHandler,
+  use: handleUse as ActionHandler,
+  interact_object: handleInteractObject as ActionHandler,
+  examine: handleExamine as ActionHandler,
 };
 
 /**
