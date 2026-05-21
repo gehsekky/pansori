@@ -1828,14 +1828,11 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         });
       }
     }
-    // Explicit "Accept quest" choice per unaccepted quest from this giver
-    for (const q of availableQuests) {
-      if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
-      choices.push({
-        label: `Accept quest: ${q.title}`,
-        action: { type: 'accept_quest', questId: q.id },
-      });
-    }
+    // The explicit "Accept quest" choice is gone — quests auto-activate
+    // when their first step matches (typically a talk_response in the
+    // giver's room). The route handler surfaces "✦ Quest accepted —"
+    // narrative when this fires. The `accept_quest` action handler is
+    // retained for backward compatibility with stale FE caches.
     if (npc.shop?.length && attitude === 'friendly') {
       // Faction-aware pricing — if the NPC is tagged with a factionId and the
       // campaign defines that faction's shopPriceModifiers, the displayed and
