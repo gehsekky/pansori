@@ -141,7 +141,11 @@ function PartyTile({
     >
       <div className={styles.partyTileHead}>
         {char.portrait_url && (
-          <img src={char.portrait_url} alt="" className={styles.partyTilePortrait} />
+          <img
+            src={char.portrait_url}
+            alt={`${char.name}'s portrait`}
+            className={styles.partyTilePortrait}
+          />
         )}
         <span className={styles.partyTileName}>
           {char.name}{' '}

@@ -96,7 +96,11 @@ function SessionsScreen({
                   }}
                 >
                   {s.portrait_url ? (
-                    <img src={s.portrait_url} alt="" className={styles.sessionPortrait} />
+                    <img
+                      src={s.portrait_url}
+                      alt={s.character_name ? `${s.character_name}'s portrait` : ''}
+                      className={styles.sessionPortrait}
+                    />
                   ) : (
                     <div className={styles.sessionPortraitPlaceholder} />
                   )}

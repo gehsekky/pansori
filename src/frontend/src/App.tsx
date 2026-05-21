@@ -355,11 +355,21 @@ export default function App() {
           }
           return (
             <div className={styles.page}>
+              {/* Skip link: hidden until keyboard-focused, jumps past the
+                  header + party rail and lands on the action area. WCAG
+                  2.1 2.4.1 (Bypass Blocks). */}
+              <a href="#main-content" className={styles.skipLink}>
+                Skip to main content
+              </a>
               <header className={styles.header}>
                 <div className={styles.headerRow}>
                   <div className={styles.headerLeft}>
                     {activeChar?.portrait_url && (
-                      <img src={activeChar.portrait_url} alt="" className={styles.charPortrait} />
+                      <img
+                        src={activeChar.portrait_url}
+                        alt={`${activeChar.name}'s portrait`}
+                        className={styles.charPortrait}
+                      />
                     )}
                     <div>
                       <h1 className={styles.title}>{ctx.theme.title}</h1>
@@ -413,7 +423,7 @@ export default function App() {
                 </div>
               </header>
 
-              <main className={styles.gameLayout}>
+              <main className={styles.gameLayout} id="main-content">
                 {gameState && (
                   <PartyRail
                     state={gameState}

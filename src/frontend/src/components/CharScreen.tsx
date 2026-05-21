@@ -442,8 +442,11 @@ function CharScreen({
                   {idx === 0 ? 'PARTY LEADER' : `HERO ${idx + 1}`}
                 </p>
 
-                <label className={styles.formLbl}>HERO NAME</label>
+                <label className={styles.formLbl} htmlFor={`char-${idx}-name`}>
+                  HERO NAME
+                </label>
                 <input
+                  id={`char-${idx}-name`}
                   className={styles.formInp}
                   value={draft.name}
                   onChange={(e) => updateDraft(idx, { name: e.target.value })}
@@ -451,8 +454,11 @@ function CharScreen({
                   autoFocus={idx === 0}
                 />
 
-                <label className={styles.formLbl}>CLASS</label>
+                <label className={styles.formLbl} htmlFor={`char-${idx}-class`}>
+                  CLASS
+                </label>
                 <select
+                  id={`char-${idx}-class`}
                   className={styles.formInp}
                   style={{ cursor: 'pointer' }}
                   value={draft.cls}
@@ -472,10 +478,15 @@ function CharScreen({
 
                 {L1_SUBCLASS_OPTIONS[draft.cls]?.length && (
                   <>
-                    <label className={styles.formLbl} style={{ marginTop: 12 }}>
+                    <label
+                      className={styles.formLbl}
+                      style={{ marginTop: 12 }}
+                      htmlFor={`char-${idx}-subclass`}
+                    >
                       SUBCLASS (required at level 1)
                     </label>
                     <select
+                      id={`char-${idx}-subclass`}
                       className={styles.formInp}
                       style={{ cursor: 'pointer' }}
                       value={draft.subclass ?? ''}
@@ -514,10 +525,15 @@ function CharScreen({
                   )}
                 </div>
 
-                <label className={styles.formLbl} style={{ marginTop: 12 }}>
+                <label
+                  className={styles.formLbl}
+                  style={{ marginTop: 12 }}
+                  htmlFor={`char-${idx}-species`}
+                >
                   SPECIES
                 </label>
                 <select
+                  id={`char-${idx}-species`}
                   className={styles.formInp}
                   style={{ cursor: 'pointer' }}
                   value={draft.speciesId}
@@ -581,10 +597,15 @@ function CharScreen({
 
                 {backgrounds.length > 0 && (
                   <>
-                    <label className={styles.formLbl} style={{ marginTop: 12 }}>
+                    <label
+                      className={styles.formLbl}
+                      style={{ marginTop: 12 }}
+                      htmlFor={`char-${idx}-background`}
+                    >
                       BACKGROUND
                     </label>
                     <select
+                      id={`char-${idx}-background`}
                       className={styles.formInp}
                       style={{ cursor: 'pointer' }}
                       value={draft.backgroundId}
