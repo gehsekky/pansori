@@ -1,7 +1,6 @@
 import { BEAST_FORMS, SRD_SPECIES } from '../../../contexts/srd/index.js';
 import {
   DISADV_CONDITIONS,
-  FRESH_TURN,
   PLAYER_ADV_CONDITIONS,
   abilityMod,
   applyDamageMultiplier,
@@ -19,7 +18,6 @@ import {
 import {
   applyPartyLevelUps,
   buildCombatHitNarrative,
-  buildInitiativeOrder,
   endCombatState,
   getEnemyById,
   grantDarkOnesBlessing,
@@ -33,8 +31,8 @@ import {
 } from '../../gameEngine.js';
 import { coverBonus, distanceFeet, isFlankingPosition, posEqual } from '../../gridEngine.js';
 import type { ActionHandler } from '../types.js';
-import type { CombatEntity } from '../../../types.js';
 import { fmt } from '../../narrativeFmt.js';
+import { runCombatStart } from './combatStart.js';
 import { runPreattack } from './preattack.js';
 
 /**
@@ -75,124 +73,11 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
   if (pre.done) return;
   const { target, targetId, weaponItem, weaponDamage, isVersatile, weaponLabel } = pre;
 
-  // ── Start combat on first attack — roll initiative for all ─────────────
-  if (!ctx.st.combat_active) {
-    const enemiesForInit = ctx.livingEnemiesInRoom;
-    const order = buildInitiativeOrder(ctx.st.characters, enemiesForInit);
-    ctx.st = { ...ctx.st, combat_active: true };
-
-    const updatedCharsForInit = ctx.st.characters.map((c) => {
-      const entry = order.find((e) => e.id === c.id);
-      return entry ? { ...c, initiative_roll: entry.roll } : c;
-    });
-    ctx.st = { ...ctx.st, characters: updatedCharsForInit, initiative_order: order };
-
-    // Refresh char from updated characters array
-    const freshChar = updatedCharsForInit.find((c) => c.id === ctx.char.id);
-    if (freshChar) ctx.char = { ...freshChar };
-    ctx.char = { ...ctx.char, turn_actions: { ...FRESH_TURN } };
-
-    // ── Initialize grid entities at combat start ────────────────────────
-    if (!ctx.st.entities) {
-      const gw = ctx.context.gridWidth ?? 8;
-      const gh = ctx.context.gridHeight ?? 8;
-      const pcEntities: CombatEntity[] = ctx.st.characters.map((c, ci) => ({
-        id: c.id,
-        isEnemy: false,
-        pos: { x: 1 + ci, y: 1 },
-        hp: c.hp,
-        maxHp: c.max_hp,
-        conditions: c.conditions,
-        condition_durations: c.condition_durations,
-      }));
-      // Beastmaster Ranger L3+ enters combat with an animal companion
-      // (Wolf, MM stats: HP 11, AC 13, +4 to hit, 2d4+2 bite). PHB p.93.
-      const companionEntities: CombatEntity[] = ctx.st.characters
-        .filter(
-          (c) =>
-            !c.dead &&
-            c.character_class.toLowerCase() === 'ranger' &&
-            c.subclass === 'beastmaster' &&
-            c.level >= 3
-        )
-        .map((c, ci) => ({
-          id: `${c.id}:companion`,
-          isEnemy: false,
-          isCompanion: true,
-          companionOwnerId: c.id,
-          companionName: 'Wolf',
-          pos: { x: 1 + ci, y: 2 },
-          hp: 11,
-          maxHp: 11,
-          ac: 13,
-          toHit: 4,
-          damage: '2d4+2',
-          conditions: [],
-          condition_durations: {},
-        }));
-      const enemyEntities: CombatEntity[] = enemiesForInit.map((en, ei) => ({
-        id: en.id,
-        isEnemy: true,
-        pos: { x: Math.max(0, gw - 2 - ei), y: Math.max(0, gh - 2) },
-        hp: en.hp,
-        maxHp: en.hp,
-        conditions: [],
-        condition_durations: {},
-      }));
-      ctx.st = {
-        ...ctx.st,
-        entities: [...pcEntities, ...companionEntities, ...enemyEntities],
-        movement_used: {},
-      };
-    }
-
-    // ── Surprise check (PHB p.189) ────────────────────────────────────
-    // If the party averages a higher Stealth than the highest passive
-    // Perception among the enemies, all enemies are surprised for round 1.
-    const partyAvgStealth = Math.round(
-      ctx.st.characters
-        .filter((c) => !c.dead)
-        .reduce((sum, c) => {
-          const prof = c.skill_proficiencies?.includes('Stealth') ?? false;
-          return sum + rollDice('1d20') + abilityMod(c.dex) + (prof ? profBonus(c.level) : 0);
-        }, 0) / Math.max(1, ctx.st.characters.filter((c) => !c.dead).length)
-    );
-    const enemyPassivePerc = Math.max(...enemiesForInit.map((e) => 10 + abilityMod(e.wis ?? 10)));
-    if (partyAvgStealth > enemyPassivePerc) {
-      ctx.st = { ...ctx.st, surprised: enemiesForInit.map((e) => e.id) };
-    }
-
-    const orderText = order
-      .map((e) => {
-        const name = e.is_enemy
-          ? (enemiesForInit.find((en) => en.id === e.id)?.name ?? 'Enemy')
-          : (ctx.st.characters.find((c) => c.id === e.id)?.name ?? 'Hero');
-        return `${name}(${e.roll})`;
-      })
-      .join(' → ');
-    const surpriseLabel =
-      enemiesForInit.length === 1
-        ? `The ${enemiesForInit[0].name} is SURPRISED!`
-        : `${enemiesForInit.map((e) => e.name).join(', ')} are SURPRISED!`;
-    const surpriseNote = ctx.st.surprised?.length ? ` ${surpriseLabel}` : '';
-    const combatPrefix = ctx.context.narratives.combatStart
-      ? pick(ctx.context.narratives.combatStart).replace(/{enemy}/g, target.name) + ' '
-      : 'Combat begins! ';
-    ctx.narrative = `${combatPrefix}Initiative: ${orderText}.${surpriseNote} `;
-
-    const myInitIdx = order.findIndex((e) => e.id === ctx.char.id);
-    ctx.st.initiative_idx = myInitIdx >= 0 ? myInitIdx : 0;
-
-    const myRoll = order.find((e) => e.id === ctx.char.id)?.roll ?? 0;
-    // The triggering PC's attack runs immediately — they had the element of
-    // surprise on the encounter even if their initiative wasn't highest.
-    // After this opening swing, play returns to the initiative order at the
-    // slot just past them (handled by the post-attack initiative advance).
-    const isHighestInit = myInitIdx === 0;
-    ctx.narrative += isHighestInit
-      ? `${ctx.char.name} acts first (initiative ${myRoll})! `
-      : `${ctx.char.name} strikes with the opening blow (initiative ${myRoll})! `;
-  }
+  // ── Combat-start: only fires on the first attack of an encounter.
+  //    Rolls initiative for everyone, seeds grid entities (PCs +
+  //    Beastmaster companions + enemies), runs the surprise check, and
+  //    emits the opening-blow narrative. See attack/combatStart.ts.
+  runCombatStart(ctx, target);
 
   // ── Resolve the player's attack ────────────────────────────────────────
   // Armor proficiency check (PHB p.144): non-proficient armor → disadv on
