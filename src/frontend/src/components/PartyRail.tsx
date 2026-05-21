@@ -9,6 +9,12 @@ interface Props {
   ctx: FrontendContext;
   seed: Seed | null;
   inCombat: boolean;
+  // Out-of-combat: clicking a non-active living tile dispatches a
+  // `set_active_character` action via this callback so the player
+  // can hand the spotlight off (matches tabletop "who's talking to
+  // this NPC" pattern). Omit / no-op in combat — initiative drives
+  // the active marker there.
+  onSetActive?: (charId: string) => void;
 }
 
 // Vertical party stack — the left rail of the 3-zone layout. Every character
@@ -22,8 +28,12 @@ interface Props {
 //   - selectedCharId = which tile is expanded for viewing. Local-only.
 // They usually point at the same character but the user can browse a
 // teammate's loadout without losing initiative on the active char.
+//
+// Out of combat, clicking a tile ALSO promotes that PC to active via
+// `onSetActive` — RAW has no initiative outside combat (SRD 5.2.1
+// p.189), so the player picks who's leading.
 
-function PartyRail({ state, activeCharId, ctx, seed, inCombat }: Props) {
+function PartyRail({ state, activeCharId, ctx, seed, inCombat, onSetActive }: Props) {
   const [selectedCharId, setSelectedCharId] = useState<string>('');
 
   useEffect(() => {
@@ -58,7 +68,16 @@ function PartyRail({ state, activeCharId, ctx, seed, inCombat }: Props) {
             isSelected={isSelected}
             hasActed={hasActed}
             showDetail={showDetail}
-            onSelect={() => setSelectedCharId(c.id)}
+            onSelect={() => {
+              setSelectedCharId(c.id);
+              // Out-of-combat lead handoff: dispatch only when (a) not
+              // already active, (b) target alive, (c) not in combat.
+              // Combat clicks keep their expand-detail behavior but
+              // don't try to override initiative.
+              if (!inCombat && !c.dead && c.id !== activeCharId && onSetActive) {
+                onSetActive(c.id);
+              }
+            }}
           />
         );
       })}

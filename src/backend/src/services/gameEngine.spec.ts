@@ -6304,6 +6304,85 @@ describe('prepare_spells', () => {
   });
 });
 
+// ─── Out-of-combat lead picker (set_active_character) ────────────────────────
+
+describe('set_active_character (out-of-combat lead handoff)', () => {
+  function makeOutOfCombatParty(): GameState {
+    const pc1 = makeChar({ id: 'pc-1', name: 'Lead' });
+    const pc2 = makeChar({ id: 'pc-2', name: 'Backup' });
+    return {
+      ...makeState(),
+      characters: [pc1, pc2],
+      active_character_id: 'pc-1',
+      current_room: ctx.startRoomId,
+      combat_active: false,
+    };
+  }
+
+  it('switches active_character_id when called out of combat', async () => {
+    const state = makeOutOfCombatParty();
+    const result = await takeAction({
+      action: { type: 'set_active_character', characterId: 'pc-2' },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    expect(result.newState.active_character_id).toBe('pc-2');
+    expect(result.narrative).toMatch(/Backup steps forward to lead/);
+  });
+
+  it('is a no-op in combat — initiative drives active_character_id there', async () => {
+    const state: GameState = {
+      ...makeOutOfCombatParty(),
+      combat_active: true,
+      initiative_order: [
+        { id: 'pc-1', roll: 18, is_enemy: false },
+        { id: 'pc-2', roll: 8, is_enemy: false },
+      ],
+      initiative_idx: 0,
+    };
+    const result = await takeAction({
+      action: { type: 'set_active_character', characterId: 'pc-2' },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    expect(result.newState.active_character_id).toBe('pc-1'); // unchanged
+    expect(result.narrative).toMatch(/Initiative is rolled/);
+  });
+
+  it('rejects a dead character', async () => {
+    const state = makeOutOfCombatParty();
+    state.characters[1].dead = true;
+    state.characters[1].hp = 0;
+    const result = await takeAction({
+      action: { type: 'set_active_character', characterId: 'pc-2' },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    expect(result.newState.active_character_id).toBe('pc-1');
+    expect(result.narrative).toMatch(/dead and can't lead/);
+  });
+
+  it('out-of-combat actions no longer auto-rotate active_character_id', async () => {
+    // Take a benign action and verify active stays put. Pre-fix the
+    // engine rotated through living party every action.
+    const state = makeOutOfCombatParty();
+    const result = await takeAction({
+      action: { type: 'examine' },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    expect(result.newState.active_character_id).toBe('pc-1');
+  });
+});
+
 // ─── 2024 PHB class feature audit ────────────────────────────────────────────
 
 describe('Fighter Second Wind (2024 multi-use)', () => {

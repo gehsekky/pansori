@@ -151,7 +151,13 @@ export type StructuredAction =
   | { type: 'use_reaction' }
   | { type: 'select_subclass'; subclass: string }
   | { type: 'prepare_spells'; spellIds: string[] }
-  | { type: 'resolve_reaction'; accept: boolean };
+  | { type: 'resolve_reaction'; accept: boolean }
+  // Out-of-combat only: switch which PC is the "lead" / active character
+  // for subsequent narrative attribution + skill checks. RAW has no
+  // notion of initiative outside combat — the party operates as a unit
+  // — so the player picks whose voice drives the next interaction.
+  // No-op in combat: initiative is driven by the initiative_order.
+  | { type: 'set_active_character'; characterId: string };
 
 // ─── Choice metadata (drives FE rendering) ───────────────────────────
 

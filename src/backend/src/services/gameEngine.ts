@@ -9235,6 +9235,30 @@ export async function takeAction({
       break;
     }
 
+    // ── Set active party member (out-of-combat lead picker) ──────────────────
+    case 'set_active_character': {
+      const sacAction = action as { type: 'set_active_character'; characterId: string };
+      // No-op in combat — initiative drives `active_character_id` there.
+      if (st.combat_active) {
+        narrative = `Initiative is rolled — you can't hand the spotlight off mid-fight.`;
+        break;
+      }
+      const target = st.characters.find((c) => c.id === sacAction.characterId);
+      if (!target) {
+        narrative = 'Unknown party member.';
+        break;
+      }
+      if (target.dead) {
+        narrative = `${target.name} is dead and can't lead.`;
+        break;
+      }
+      st = { ...st, active_character_id: sacAction.characterId };
+      narrative = `${target.name} steps forward to lead.`;
+      // Out-of-combat action, doesn't consume any turn budget.
+      usedInitiative = false;
+      break;
+    }
+
     // ── Resolve pending reaction (Shield window for now) ──────────────────────
     case 'resolve_reaction': {
       const rxAction = action as { type: 'resolve_reaction'; accept: boolean };
@@ -9668,24 +9692,13 @@ export async function takeAction({
         }
       }
     }
-  } else if (!st.combat_active) {
-    // Out-of-combat actions round-robin the active marker across the
-    // living party (e.g. each PC takes a turn examining/moving in town).
-    //
-    // In combat, the active marker is driven exclusively by initiative —
-    // see the IF branch above. Crucially, when an in-combat action does
-    // NOT consume initiative (e.g. grid movement while action is still
-    // available), `active_character_id` must STAY on the acting PC so
-    // PartyRail's aria-current keeps pointing at the same character as
-    // the InitiativeStrip's ▶ marker. Falling through to this round-
-    // robin in that case would silently desync the two indicators and
-    // generate the next PC's choice list mid-turn.
-    const living = st.characters.filter((c) => !c.dead);
-    if (living.length > 0) {
-      const idx = living.findIndex((c) => c.id === char.id);
-      st.active_character_id = living[(idx + 1) % living.length].id;
-    }
   }
+  // Out-of-combat: active_character_id stays on whoever the player
+  // chose. RAW has no initiative outside combat (SRD 5.2.1 p.189) — the
+  // party operates as a unit — so the prior auto-rotate every action
+  // was non-RAW and made NPC dialogue feel jarring (different PC
+  // credited per response). Players hand the spotlight off explicitly
+  // via the `set_active_character` action (PartyRail tile click).
 
   // Run script-engine rules against the post-action state
   const { state: afterRules, extraNarrative } = await runRules(
