@@ -1372,7 +1372,7 @@ export const context: Context = {
         name: 'The Old Road',
         type: 'wilderness',
         desc: 'A rutted track through sparse woodland. Bandits have been raiding caravans here.',
-        centralRoomId: 'wilderness_old_road',
+        centralRoomId: 'road_north',
         connections: ['town_millhaven', 'dungeon_shattered_crypt'],
         encounterTable: ['Bandit Ruffian'],
         encounterChance: 0.4,

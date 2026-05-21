@@ -10072,6 +10072,70 @@ describe('generateChoices stamps seenKey on dim-tracked choices', () => {
   });
 });
 
+describe('travel updates current_room to destination central room', () => {
+  it('moving from a town to wilderness moves current_room to the location centralRoomId', async () => {
+    // Build a minimal vale-shaped state sitting in the temple. The vale
+    // campaign defines wilderness_old_road with centralRoomId road_north,
+    // so traveling there should land current_room on road_north — not
+    // leave it stuck in millhaven_temple (where Sister Maren would keep
+    // emitting talk_response choices).
+    const valeSeed = generateRoguelikeSeed(valeCtx);
+    const st = makeState(
+      { id: 'pc-1', xp: 0 },
+      {
+        current_room: 'millhaven_temple',
+        current_location_id: 'town_millhaven',
+        active_character_id: 'pc-1',
+      }
+    );
+    const result = await takeAction({
+      action: { type: 'travel', locationId: 'wilderness_old_road' },
+      history: [],
+      state: st,
+      seed: valeSeed,
+      context: valeCtx,
+    });
+    expect(result.newState.current_location_id).toBe('wilderness_old_road');
+    expect(result.newState.current_room).toBe('road_north');
+  });
+
+  it('preserves current_room when destination location has no centralRoomId', async () => {
+    // Synth a minimal context with one location that omits centralRoomId.
+    const ctxNoCentral = {
+      ...valeCtx,
+      campaign: {
+        ...valeCtx.campaign!,
+        locations: [
+          {
+            id: 'wilderness_test',
+            name: 'Test Wilderness',
+            type: 'wilderness' as const,
+            desc: '',
+            connections: [],
+          },
+        ],
+      },
+    };
+    const sd = generateRoguelikeSeed(valeCtx);
+    const st = makeState(
+      { id: 'pc-1' },
+      {
+        current_room: 'millhaven_temple',
+        current_location_id: 'town_millhaven',
+        active_character_id: 'pc-1',
+      }
+    );
+    const result = await takeAction({
+      action: { type: 'travel', locationId: 'wilderness_test' },
+      history: [],
+      state: st,
+      seed: sd,
+      context: ctxNoCentral,
+    });
+    expect(result.newState.current_room).toBe('millhaven_temple');
+  });
+});
+
 describe('normalizeState preserves seen_choices', () => {
   it('defaults to empty array when missing on a new-format state', () => {
     const st = makeState();

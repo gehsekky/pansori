@@ -9081,11 +9081,17 @@ export async function takeAction({
         }
       }
 
-      // Advance world day on travel
+      // Advance world day on travel. Also move current_room to the new
+      // location's central room so room-scoped state (NPC choices,
+      // interact_object, examine, loot) tracks the destination instead
+      // of leaving the player virtually still in the previous town.
+      // Without this, the previous town's NPC kept emitting talk_response
+      // choices after the party had departed.
       st = {
         ...st,
         current_location_id: travelAction.locationId,
         current_district_id: undefined,
+        current_room: destLocation.centralRoomId ?? st.current_room,
         world_day: (st.world_day ?? 1) + 1,
         // Place entities at entrance of new location if it's a dungeon
         entities: undefined,
