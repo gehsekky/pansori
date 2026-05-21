@@ -395,13 +395,13 @@ export default function App() {
                         <button
                           className={styles.signOutBtn}
                           onClick={() => {
-                            if (confirm('Abandon current adventure and start over?'))
+                            if (confirm('Resign from this adventure and start over?'))
                               startNewAdventure();
                           }}
-                          title="Abandon current adventure (returns to session list)"
-                          aria-label="Abort current adventure"
+                          title="Resign from this adventure (returns to session list)"
+                          aria-label="Resign from current adventure"
                         >
-                          ABORT
+                          RESIGN
                         </button>
                       )}
                       <button className={styles.signOutBtn} onClick={handleLogout}>
