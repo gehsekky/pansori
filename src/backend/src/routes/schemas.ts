@@ -72,6 +72,22 @@ export const DropSchema = z
   })
   .strict();
 
+// Multiplayer — host reassigns which user owns a given PC.
+export const AssignCharacterSchema = z
+  .object({
+    character_id: z.string().uuid(),
+    owner_user_id: z.string().uuid(),
+  })
+  .strict();
+
+// Multiplayer — accept an invite link. Token alone is enough; the session
+// id is derived from the token lookup on the server.
+export const JoinSessionSchema = z
+  .object({
+    invite_token: z.string().min(8).max(80),
+  })
+  .strict();
+
 // StructuredAction is a wide discriminated union in `types.ts` (40+ variants).
 // Rather than mirror it in Zod (and have to keep two definitions in sync
 // forever), validate only that `action` is an object with a non-empty `type`
