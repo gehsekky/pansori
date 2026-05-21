@@ -5,7 +5,6 @@ import {
   rollCritical,
   rollDice,
 } from '../../rulesEngine.js';
-import { SRD_SPECIES } from '../../../contexts/srd/index.js';
 import {
   applyPartyLevelUps,
   effectiveSpeed,
@@ -17,6 +16,7 @@ import {
   splitEncounterXp,
 } from '../../gameEngine.js';
 import { distanceFeet, entitiesInCone } from '../../gridEngine.js';
+import { SRD_SPECIES } from '../../../contexts/srd/index.js';
 import type { ActionHandler } from '../types.js';
 import { fmt } from '../../narrativeFmt.js';
 import { handleBarbarianFeature } from './barbarian.js';

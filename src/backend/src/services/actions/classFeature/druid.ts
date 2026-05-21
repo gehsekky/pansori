@@ -1,6 +1,6 @@
+import type { ActionContext } from '../types.js';
 import { BEAST_FORMS } from '../../../contexts/srd/index.js';
 import { rollDice } from '../../rulesEngine.js';
-import type { ActionContext } from '../types.js';
 
 /**
  * Druid + Circle of the Moon features.
