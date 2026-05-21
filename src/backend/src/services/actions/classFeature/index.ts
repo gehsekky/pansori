@@ -2,21 +2,15 @@ import { BEAST_FORMS, SRD_SPECIES } from '../../../contexts/srd/index.js';
 import {
   abilityMod,
   applyDamageMultiplier,
-  passivePerceptionDC,
   profBonus,
   rollCritical,
   rollDice,
-  skillCheck,
 } from '../../rulesEngine.js';
 import {
   applyPartyLevelUps,
-  consumeBardicForCheck,
-  consumeInspirationForCheck,
   effectiveSpeed,
   endCombatState,
   getEnemyById,
-  inflictCondition,
-  isHeavilyEncumbered,
   isRoomCleared,
   pushEvent,
   splitEncounterXp,
@@ -26,6 +20,7 @@ import type { ActionHandler } from '../types.js';
 import { fmt } from '../../narrativeFmt.js';
 import { handleBarbarianFeature } from './barbarian.js';
 import { handleFighterFeature } from './fighter.js';
+import { handleRogueFeature } from './rogue.js';
 
 /**
  * `use_class_feature`: per-feature dispatch — the catch-all for every
@@ -66,6 +61,7 @@ export const handleUseClassFeature: ActionHandler<{
   // below shrinks.
   if (handleBarbarianFeature(ctx, fid)) return;
   if (handleFighterFeature(ctx, fid)) return;
+  if (handleRogueFeature(ctx, fid)) return;
 
   // ── Bardic Inspiration (Bard bonus action) ────────────────────────────
   if (fid === 'bardic_inspiration') {
@@ -111,110 +107,6 @@ export const handleUseClassFeature: ActionHandler<{
       ),
     };
     ctx.narrative = `${ctx.char.name} grants Bardic Inspiration (${inspDie}) to ${ally.name}! (${biUses - 1} use${biUses - 1 === 1 ? '' : 's'} remaining)`;
-  }
-
-  // ── Cunning Action: Dash (Rogue L2+ bonus action) ─────────────────────
-  else if (fid === 'cunning_action_dash') {
-    if (ctx.char.character_class.toLowerCase() !== 'rogue') {
-      ctx.narrative = 'Only Rogues have Cunning Action.';
-      return;
-    }
-    if (ctx.char.level < 2) {
-      ctx.narrative = 'Cunning Action requires Rogue level 2.';
-      return;
-    }
-    if (ctx.char.turn_actions.bonus_action_used) {
-      ctx.narrative = 'Bonus action already used this turn.';
-      return;
-    }
-    const caSpeed = effectiveSpeed(ctx.char);
-    ctx.char.turn_actions = { ...ctx.char.turn_actions, bonus_action_used: true };
-    ctx.st = {
-      ...ctx.st,
-      movement_used: {
-        ...(ctx.st.movement_used ?? {}),
-        [ctx.char.id]: Math.max(0, (ctx.st.movement_used?.[ctx.char.id] ?? 0) - caSpeed),
-      },
-    };
-    ctx.narrative = `${ctx.char.name} uses Cunning Action: Dash — +${caSpeed} ft movement this turn.`;
-  }
-
-  // ── Cunning Action: Disengage (Rogue L2+ bonus action) ────────────────
-  else if (fid === 'cunning_action_disengage') {
-    if (ctx.char.character_class.toLowerCase() !== 'rogue') {
-      ctx.narrative = 'Only Rogues have Cunning Action.';
-      return;
-    }
-    if (ctx.char.level < 2) {
-      ctx.narrative = 'Cunning Action requires Rogue level 2.';
-      return;
-    }
-    if (ctx.char.turn_actions.bonus_action_used) {
-      ctx.narrative = 'Bonus action already used this turn.';
-      return;
-    }
-    ctx.char.turn_actions = { ...ctx.char.turn_actions, bonus_action_used: true, disengaged: true };
-    ctx.narrative = `${ctx.char.name} uses Cunning Action: Disengage — no opportunity attacks when moving this turn.`;
-  }
-
-  // ── Cunning Action: Hide (Rogue L2+ bonus action) ─────────────────────
-  else if (fid === 'cunning_action_hide') {
-    if (ctx.char.character_class.toLowerCase() !== 'rogue') {
-      ctx.narrative = 'Only Rogues have Cunning Action.';
-      return;
-    }
-    if (ctx.char.level < 2) {
-      ctx.narrative = 'Cunning Action requires Rogue level 2.';
-      return;
-    }
-    if (ctx.char.turn_actions.bonus_action_used) {
-      ctx.narrative = 'Bonus action already used this turn.';
-      return;
-    }
-    const sneakHideDC = ctx.enemyAlive ? passivePerceptionDC(ctx.enemy!.wis ?? 10) : 10;
-    const hideProf = ctx.char.skill_proficiencies?.includes('Stealth') ?? false;
-    const inspAdvHide = consumeInspirationForCheck(ctx.char);
-    const bardicHideRoll = consumeBardicForCheck(ctx.char);
-    const hideCheck = skillCheck(
-      ctx.char.dex,
-      sneakHideDC - bardicHideRoll,
-      hideProf,
-      ctx.char.level,
-      isHeavilyEncumbered(ctx.char), // 2024 PHB: heavy encumbrance → disadv on DEX checks
-      false,
-      false,
-      inspAdvHide,
-      ctx.char.species === 'halfling'
-    );
-    ctx.char.turn_actions = { ...ctx.char.turn_actions, bonus_action_used: true };
-    if (hideCheck.success) {
-      // 2024 PHB: store the Stealth total as the hide DC. Enemies must
-      // beat this with a Perception/Search check (or passive Perception)
-      // to detect the hider before targeting them.
-      ctx.char = inflictCondition(ctx.char, 'invisible');
-      ctx.char.hide_dc = hideCheck.total;
-      ctx.narrative = `${ctx.char.name} hides! (Stealth ${hideCheck.total} vs DC ${sneakHideDC} — success.) Hide DC = ${hideCheck.total}.`;
-    } else {
-      ctx.char.hide_dc = undefined;
-      ctx.narrative = `${ctx.char.name} tries to hide but fails. (Stealth ${hideCheck.total} vs DC ${sneakHideDC})`;
-    }
-  }
-
-  // ── 2024 PHB Rogue Cunning Strike (L5+) ──────────────────────────────
-  // Pre-commits an effect that fires on the next Sneak Attack. No
-  // action cost; the SA-die cost is paid in the attack handler.
-  else if (fid.startsWith('cunning_strike_')) {
-    if (ctx.char.character_class.toLowerCase() !== 'rogue') {
-      ctx.narrative = 'Only Rogues have Cunning Strike.';
-      return;
-    }
-    if (ctx.char.level < 5) {
-      ctx.narrative = 'Cunning Strike requires Rogue level 5.';
-      return;
-    }
-    const effect = fid.replace('cunning_strike_', '') as 'trip' | 'poison' | 'withdraw' | 'disarm';
-    ctx.char.turn_actions = { ...ctx.char.turn_actions, cunning_strike_pending: effect };
-    ctx.narrative = `${ctx.char.name} readies a Cunning Strike (${effect}) on the next Sneak Attack.`;
   }
 
   // ── Monk: Flurry of Blows (2 unarmed strikes, 1 ki, bonus action) ────────
