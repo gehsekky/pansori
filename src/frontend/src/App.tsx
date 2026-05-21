@@ -157,8 +157,7 @@ export default function App() {
   // target. Without this the selector can stick on a dead enemy id and
   // every targeted action becomes a no-op.
   useEffect(() => {
-    const livingEnemies =
-      gameState?.entities?.filter((e) => e.isEnemy && e.hp > 0) ?? [];
+    const livingEnemies = gameState?.entities?.filter((e) => e.isEnemy && e.hp > 0) ?? [];
     if (livingEnemies.length === 0) {
       if (selectedEnemyId !== null) setSelectedEnemyId(null);
       return;
@@ -432,23 +431,6 @@ export default function App() {
                 )}
 
                 <div className={styles.gameMain}>
-                  {gameState?.combat_active &&
-                    gameState.entities &&
-                    gameState.entities.length > 0 &&
-                    seed && (
-                      <GridCombatView
-                        state={gameState}
-                        seed={seed}
-                        aoePreview={hoveredChoice?.aoePreview}
-                        onMove={(to) => {
-                          const activeId = gameState.active_character_id;
-                          handleChoice({
-                            label: `Move to (${to.x},${to.y})`,
-                            action: { type: 'grid_move', entityId: activeId, to },
-                          });
-                        }}
-                      />
-                    )}
                   <div
                     data-testid="game-narrative-panel"
                     className={styles.card}
@@ -487,252 +469,274 @@ export default function App() {
                     )}
                   </div>
 
-                  {!loading && escaped ? (
-                    <div
-                      className={styles.card}
-                      style={{
-                        borderColor: 'var(--t-primary)',
-                        textAlign: 'center',
-                        padding: '1.5rem',
-                      }}
-                    >
-                      <h2
-                        style={{
-                          color: 'var(--t-primary)',
-                          fontSize: '1.1rem',
-                          letterSpacing: '0.2em',
-                          marginBottom: '0.5rem',
-                          marginTop: 0,
-                          textShadow: '0 0 8px var(--t-primary)',
-                          fontWeight: 'normal',
-                        }}
-                      >
-                        <span aria-hidden="true">★ </span>ADVENTURE COMPLETE
-                        <span aria-hidden="true"> ★</span>
-                      </h2>
-                      <p
-                        style={{
-                          color: 'var(--t-mid)',
-                          fontSize: '0.8rem',
-                          marginBottom: '1.25rem',
-                        }}
-                      >
-                        You escaped the {worldName}. Well done, hero.
-                      </p>
-                      <button
-                        className={styles.submit}
-                        style={{ width: 'auto', padding: '0.6rem 2rem' }}
-                        onClick={startNewAdventure}
-                      >
-                        START NEW ADVENTURE
-                      </button>
-                    </div>
-                  ) : !loading && allDead ? (
-                    <div
-                      className={styles.card}
-                      style={{
-                        borderColor: 'var(--t-hp-low)',
-                        textAlign: 'center',
-                        padding: '1.5rem',
-                      }}
-                    >
-                      <h2
-                        style={{
-                          color: 'var(--t-hp-low)',
-                          fontSize: '1.1rem',
-                          letterSpacing: '0.2em',
-                          marginBottom: '0.5rem',
-                          marginTop: 0,
-                          fontWeight: 'normal',
-                        }}
-                      >
-                        <span aria-hidden="true">✖ </span>HERO DECEASED
-                        <span aria-hidden="true"> ✖</span>
-                      </h2>
-                      <p
-                        style={{
-                          color: 'var(--t-dim)',
-                          fontSize: '0.8rem',
-                          marginBottom: '1.25rem',
-                        }}
-                      >
-                        The {worldName} has claimed another victim.
-                      </p>
-                      <button
-                        className={styles.submit}
-                        style={{ width: 'auto', padding: '0.6rem 2rem' }}
-                        onClick={startNewAdventure}
-                      >
-                        START NEW ADVENTURE
-                      </button>
-                    </div>
-                  ) : (
-                    <>
-                      {!loading &&
-                        (() => {
-                          const enemyFiltered = choices.filter((c) =>
-                            filterByTarget(c, selectedEnemyId)
-                          );
-                          const spellBarChoices = selectSpellBarChoices(enemyFiltered);
-                          const spellBarSet = new Set(spellBarChoices);
-                          const classFeatureChoices = enemyFiltered.filter(
-                            (c) => c.kind === 'class_feature'
-                          );
-                          const textListChoices = enemyFiltered
-                            .filter((c) => !ICONIZED_KINDS.has(c.kind ?? ''))
-                            .filter((c) => !spellBarSet.has(c));
-                          // Combat-controls container should render whenever
-                          // at least one inner bar will. EnemySelector +
-                          // MoveDPad + Default/Combat action bars all live
-                          // here; combat_active OR any iconized/spell choice
-                          // is enough to surface the region.
-                          const hasIconizedChoice = choices.some((c) =>
-                            ICONIZED_KINDS.has(c.kind ?? '')
-                          );
-                          const hasSpellBar = spellBarChoices.length > 0;
-                          const inCombat = !!gameState?.combat_active;
-                          const hasCombatControls =
-                            hasIconizedChoice || hasSpellBar || inCombat;
-                          return (
-                            <>
-                              {hasCombatControls && (
-                                /* Combat controls — one bordered region holding
+                  {(() => {
+                    const actionPanel =
+                      !loading && escaped ? (
+                        <div
+                          className={styles.card}
+                          style={{
+                            borderColor: 'var(--t-primary)',
+                            textAlign: 'center',
+                            padding: '1.5rem',
+                          }}
+                        >
+                          <h2
+                            style={{
+                              color: 'var(--t-primary)',
+                              fontSize: '1.1rem',
+                              letterSpacing: '0.2em',
+                              marginBottom: '0.5rem',
+                              marginTop: 0,
+                              textShadow: '0 0 8px var(--t-primary)',
+                              fontWeight: 'normal',
+                            }}
+                          >
+                            <span aria-hidden="true">★ </span>ADVENTURE COMPLETE
+                            <span aria-hidden="true"> ★</span>
+                          </h2>
+                          <p
+                            style={{
+                              color: 'var(--t-mid)',
+                              fontSize: '0.8rem',
+                              marginBottom: '1.25rem',
+                            }}
+                          >
+                            You escaped the {worldName}. Well done, hero.
+                          </p>
+                          <button
+                            className={styles.submit}
+                            style={{ width: 'auto', padding: '0.6rem 2rem' }}
+                            onClick={startNewAdventure}
+                          >
+                            START NEW ADVENTURE
+                          </button>
+                        </div>
+                      ) : !loading && allDead ? (
+                        <div
+                          className={styles.card}
+                          style={{
+                            borderColor: 'var(--t-hp-low)',
+                            textAlign: 'center',
+                            padding: '1.5rem',
+                          }}
+                        >
+                          <h2
+                            style={{
+                              color: 'var(--t-hp-low)',
+                              fontSize: '1.1rem',
+                              letterSpacing: '0.2em',
+                              marginBottom: '0.5rem',
+                              marginTop: 0,
+                              fontWeight: 'normal',
+                            }}
+                          >
+                            <span aria-hidden="true">✖ </span>HERO DECEASED
+                            <span aria-hidden="true"> ✖</span>
+                          </h2>
+                          <p
+                            style={{
+                              color: 'var(--t-dim)',
+                              fontSize: '0.8rem',
+                              marginBottom: '1.25rem',
+                            }}
+                          >
+                            The {worldName} has claimed another victim.
+                          </p>
+                          <button
+                            className={styles.submit}
+                            style={{ width: 'auto', padding: '0.6rem 2rem' }}
+                            onClick={startNewAdventure}
+                          >
+                            START NEW ADVENTURE
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          {!loading &&
+                            (() => {
+                              const enemyFiltered = choices.filter((c) =>
+                                filterByTarget(c, selectedEnemyId)
+                              );
+                              const spellBarChoices = selectSpellBarChoices(enemyFiltered);
+                              const spellBarSet = new Set(spellBarChoices);
+                              const classFeatureChoices = enemyFiltered.filter(
+                                (c) => c.kind === 'class_feature'
+                              );
+                              const textListChoices = enemyFiltered
+                                .filter((c) => !ICONIZED_KINDS.has(c.kind ?? ''))
+                                .filter((c) => !spellBarSet.has(c));
+                              // Combat-controls container should render whenever
+                              // at least one inner bar will. EnemySelector +
+                              // MoveDPad + Default/Combat action bars all live
+                              // here; combat_active OR any iconized/spell choice
+                              // is enough to surface the region.
+                              const hasIconizedChoice = choices.some((c) =>
+                                ICONIZED_KINDS.has(c.kind ?? '')
+                              );
+                              const hasSpellBar = spellBarChoices.length > 0;
+                              const inCombat = !!gameState?.combat_active;
+                              const hasCombatControls =
+                                hasIconizedChoice || hasSpellBar || inCombat;
+                              return (
+                                <>
+                                  {hasCombatControls && (
+                                    /* Combat controls — one bordered region holding
                                    every icon-bar control (movement D-pad,
                                    targeting selector, default actions,
                                    combat verbs, spells, class features). */
-                                <section
-                                  className={styles.combatControls}
-                                  aria-label="Combat controls"
-                                  data-testid="combat-controls"
-                                >
-                                  <div className={styles.combatControlsTop}>
-                                    <MoveDPad
-                                      choices={choices.filter((c) => c.kind === 'grid_move')}
-                                      onChoose={handleChoice}
-                                    />
-                                    <div className={styles.combatControlsCol}>
-                                      {gameState && (
-                                        <EnemySelector
-                                          state={gameState}
-                                          seed={seed}
-                                          selectedId={selectedEnemyId}
-                                          onSelect={setSelectedEnemyId}
-                                        />
-                                      )}
-                                      {(() => {
-                                        // Default + Combat actions live in one
-                                        // bordered toolbar with a thicker vertical
-                                        // separator between the two groups. Each
-                                        // group self-hides when it has no choices;
-                                        // the separator only renders when BOTH
-                                        // groups have something to show.
-                                        const defaultChoices = choices.filter((c) =>
-                                          DEFAULT_ACTION_KINDS.has(c.kind ?? '')
-                                        );
-                                        const combatChoices = choices
-                                          .filter((c) =>
-                                            COMBAT_ACTION_KINDS.has(c.kind ?? '')
-                                          )
-                                          .filter((c) =>
-                                            filterByTarget(c, selectedEnemyId)
-                                          );
-                                        const hasDefault = defaultChoices.length > 0;
-                                        const hasCombat = combatChoices.length > 0;
-                                        if (!hasDefault && !hasCombat) return null;
-                                        return (
-                                          <div
-                                            className={styles.combinedActionBar}
-                                            role="group"
-                                            aria-label="Combat and default actions"
-                                            data-testid="combined-action-bar"
-                                          >
-                                            <CombatActionBar
-                                              choices={combatChoices}
-                                              onChoose={handleChoice}
-                                            />
-                                            {hasDefault && hasCombat && (
-                                              <span
-                                                className={styles.combinedActionBarSep}
-                                                aria-hidden="true"
-                                              />
-                                            )}
-                                            <DefaultActionBar
-                                              choices={defaultChoices}
-                                              onChoose={handleChoice}
-                                            />
-                                          </div>
-                                        );
-                                      })()}
-                                      {(() => {
-                                        // Spells + class abilities share one
-                                        // bordered toolbar with a thicker
-                                        // separator between the groups, parallel
-                                        // to the Combat/Default action toolbar.
-                                        // Spells go first (left), abilities second.
-                                        // Lives inside combatControlsCol so it
-                                        // sits alongside the other toolbars
-                                        // rather than below the MoveDPad.
-                                        const hasSpells = spellBarChoices.length > 0;
-                                        const hasAbilities =
-                                          classFeatureChoices.length > 0;
-                                        if (!hasSpells && !hasAbilities) return null;
-                                        return (
-                                          <div
-                                            className={styles.combinedActionBar}
-                                            role="group"
-                                            aria-label="Spells and class abilities"
-                                            data-testid="combined-spell-ability-bar"
-                                          >
-                                            <SpellBar
-                                              choices={spellBarChoices}
-                                              onChoose={handleChoice}
-                                            />
-                                            {hasSpells && hasAbilities && (
-                                              <span
-                                                className={styles.combinedActionBarSep}
-                                                aria-hidden="true"
-                                              />
-                                            )}
-                                            <ClassAbilityBar
-                                              choices={classFeatureChoices}
-                                              onChoose={handleChoice}
-                                            />
-                                          </div>
-                                        );
-                                      })()}
-                                    </div>
-                                  </div>
-                                </section>
-                              )}
-                              <ul
-                                className={styles.choices}
-                                data-testid="choices-list"
-                                aria-label="Available actions"
-                                style={{ listStyle: 'none', margin: 0, padding: 0 }}
-                              >
-                                {textListChoices.map((c, i) => (
-                                  <li key={i} style={{ listStyle: 'none' }}>
-                                    <button
-                                      data-testid="choice-btn"
-                                      data-action-type={c.action.type}
-                                      className={styles.choiceBtn}
-                                      onClick={() => handleChoice(c)}
-                                      onMouseEnter={() => c.aoePreview && setHoveredChoice(c)}
-                                      onMouseLeave={() => setHoveredChoice(null)}
-                                      aria-keyshortcuts={i < 9 ? `${i + 1}` : undefined}
+                                    <section
+                                      className={styles.combatControls}
+                                      aria-label="Combat controls"
+                                      data-testid="combat-controls"
                                     >
-                                      <span aria-hidden="true">[{i + 1}] </span>
-                                      {c.label}
-                                    </button>
-                                  </li>
-                                ))}
-                              </ul>
-                            </>
-                          );
-                        })()}
-                    </>
-                  )}
-
+                                      <div className={styles.combatControlsTop}>
+                                        <MoveDPad
+                                          choices={choices.filter((c) => c.kind === 'grid_move')}
+                                          onChoose={handleChoice}
+                                        />
+                                        <div className={styles.combatControlsCol}>
+                                          {gameState && (
+                                            <EnemySelector
+                                              state={gameState}
+                                              seed={seed}
+                                              selectedId={selectedEnemyId}
+                                              onSelect={setSelectedEnemyId}
+                                            />
+                                          )}
+                                          {(() => {
+                                            // Default + Combat actions live in one
+                                            // bordered toolbar with a thicker vertical
+                                            // separator between the two groups. Each
+                                            // group self-hides when it has no choices;
+                                            // the separator only renders when BOTH
+                                            // groups have something to show.
+                                            const defaultChoices = choices.filter((c) =>
+                                              DEFAULT_ACTION_KINDS.has(c.kind ?? '')
+                                            );
+                                            const combatChoices = choices
+                                              .filter((c) => COMBAT_ACTION_KINDS.has(c.kind ?? ''))
+                                              .filter((c) => filterByTarget(c, selectedEnemyId));
+                                            const hasDefault = defaultChoices.length > 0;
+                                            const hasCombat = combatChoices.length > 0;
+                                            if (!hasDefault && !hasCombat) return null;
+                                            return (
+                                              <div
+                                                className={styles.combinedActionBar}
+                                                role="group"
+                                                aria-label="Combat and default actions"
+                                                data-testid="combined-action-bar"
+                                              >
+                                                <CombatActionBar
+                                                  choices={combatChoices}
+                                                  onChoose={handleChoice}
+                                                />
+                                                {hasDefault && hasCombat && (
+                                                  <span
+                                                    className={styles.combinedActionBarSep}
+                                                    aria-hidden="true"
+                                                  />
+                                                )}
+                                                <DefaultActionBar
+                                                  choices={defaultChoices}
+                                                  onChoose={handleChoice}
+                                                />
+                                              </div>
+                                            );
+                                          })()}
+                                          {(() => {
+                                            // Spells + class abilities share one
+                                            // bordered toolbar with a thicker
+                                            // separator between the groups, parallel
+                                            // to the Combat/Default action toolbar.
+                                            // Spells go first (left), abilities second.
+                                            // Lives inside combatControlsCol so it
+                                            // sits alongside the other toolbars
+                                            // rather than below the MoveDPad.
+                                            const hasSpells = spellBarChoices.length > 0;
+                                            const hasAbilities = classFeatureChoices.length > 0;
+                                            if (!hasSpells && !hasAbilities) return null;
+                                            return (
+                                              <div
+                                                className={styles.combinedActionBar}
+                                                role="group"
+                                                aria-label="Spells and class abilities"
+                                                data-testid="combined-spell-ability-bar"
+                                              >
+                                                <SpellBar
+                                                  choices={spellBarChoices}
+                                                  onChoose={handleChoice}
+                                                />
+                                                {hasSpells && hasAbilities && (
+                                                  <span
+                                                    className={styles.combinedActionBarSep}
+                                                    aria-hidden="true"
+                                                  />
+                                                )}
+                                                <ClassAbilityBar
+                                                  choices={classFeatureChoices}
+                                                  onChoose={handleChoice}
+                                                />
+                                              </div>
+                                            );
+                                          })()}
+                                        </div>
+                                      </div>
+                                    </section>
+                                  )}
+                                  <ul
+                                    className={styles.choices}
+                                    data-testid="choices-list"
+                                    aria-label="Available actions"
+                                    style={{ listStyle: 'none', margin: 0, padding: 0 }}
+                                  >
+                                    {textListChoices.map((c, i) => (
+                                      <li key={i} style={{ listStyle: 'none' }}>
+                                        <button
+                                          data-testid="choice-btn"
+                                          data-action-type={c.action.type}
+                                          className={styles.choiceBtn}
+                                          onClick={() => handleChoice(c)}
+                                          onMouseEnter={() => c.aoePreview && setHoveredChoice(c)}
+                                          onMouseLeave={() => setHoveredChoice(null)}
+                                          aria-keyshortcuts={i < 9 ? `${i + 1}` : undefined}
+                                        >
+                                          <span aria-hidden="true">[{i + 1}] </span>
+                                          {c.label}
+                                        </button>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </>
+                              );
+                            })()}
+                        </>
+                      );
+                    if (
+                      gameState?.combat_active &&
+                      gameState.entities &&
+                      gameState.entities.length > 0 &&
+                      seed
+                    ) {
+                      return (
+                        <div className={styles.combatRow}>
+                          <GridCombatView
+                            state={gameState}
+                            seed={seed}
+                            aoePreview={hoveredChoice?.aoePreview}
+                            onMove={(to) => {
+                              const activeId = gameState.active_character_id;
+                              handleChoice({
+                                label: `Move to (${to.x},${to.y})`,
+                                action: { type: 'grid_move', entityId: activeId, to },
+                              });
+                            }}
+                          />
+                          <div className={styles.combatActionCol}>{actionPanel}</div>
+                        </div>
+                      );
+                    }
+                    return actionPanel;
+                  })()}
                 </div>
 
                 {contextTabs.length > 0 && <ContextPanel tabs={contextTabs} />}

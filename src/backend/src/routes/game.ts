@@ -319,9 +319,7 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
     // current_location_id stays empty, and any quest step gated on
     // `location_id == 'town_millhaven'` never matches.
     const initialLocation =
-      ctx.mapType === 'campaign'
-        ? resolveLocationForRoom(ctx.campaign, ctx.startRoomId)
-        : null;
+      ctx.mapType === 'campaign' ? resolveLocationForRoom(ctx.campaign, ctx.startRoomId) : null;
     const initialState: GameState = {
       characters: partyChars,
       active_character_id: leader.id,
@@ -755,14 +753,28 @@ gameRouter.post('/session/:id/action', async (req: Request, res: Response) => {
           // standing change without adding it twice through a reward.
           if (def.factionId && def.repGain) {
             const sign = def.repGain >= 0 ? '+' : '';
-            rewardNarrativeParts.push(
-              `${sign}${def.repGain} reputation with ${def.factionId}.`
-            );
+            rewardNarrativeParts.push(`${sign}${def.repGain} reputation with ${def.factionId}.`);
           }
         }
         if (completedQuestIds.length) {
-          result.narrative =
-            (result.narrative ?? '') + rewardNarrativeParts.join(' ');
+          const completionTail = rewardNarrativeParts.join(' ');
+          result.narrative = (result.narrative ?? '') + completionTail;
+          // Mirror the tail into room_log (drives the in-game narrative
+          // panel) and run_log (drives the audit/adventure-log export) so
+          // the player sees the quest completion line where it happened,
+          // not just in result.narrative which the panel doesn't read.
+          const roomLog = result.newState.room_log ?? [];
+          if (roomLog.length) {
+            roomLog[roomLog.length - 1] = roomLog[roomLog.length - 1] + completionTail;
+          }
+          const runLog = result.newState.run_log ?? [];
+          if (runLog.length) {
+            runLog[runLog.length - 1] = {
+              ...runLog[runLog.length - 1],
+              narrative: runLog[runLog.length - 1].narrative + completionTail,
+            };
+          }
+          result.newState = { ...result.newState, room_log: roomLog, run_log: runLog };
         }
       }
       const updatedCs = extractCampaignDelta(campaignState, result.newState);
