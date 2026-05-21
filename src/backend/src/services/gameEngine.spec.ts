@@ -10257,6 +10257,154 @@ describe('normalizeState preserves seen_choices', () => {
   });
 });
 
+// ─── Hostile-in-room blocks egress + loot ────────────────────────────────────
+// User playtest report: traveled out of a Crypt room with a Crypt Ghoul
+// standing in it. RAW: a hostile in the room means engage or escape — no
+// strolling past. Guards added to travel/loot/move handlers + their choice
+// emits.
+
+describe('hostile in current room blocks travel / loot / move', () => {
+  function valeSeedWithGhoulIn(room: string): Seed {
+    const base = generateSeed(valeCtx, 1);
+    return {
+      ...base,
+      enemies: {
+        ...base.enemies,
+        [room]: [
+          {
+            id: `${room}#0`,
+            name: 'Crypt Ghoul',
+            hp: 22,
+            maxHp: 22,
+            ac: 13,
+            damage: '1d6+2',
+            toHit: 4,
+            xp: 100,
+            str: 13,
+            dex: 14,
+            con: 10,
+            int: 7,
+            wis: 10,
+            cha: 6,
+          },
+        ],
+      },
+    };
+  }
+
+  it('travel handler rejects when a hostile is in the current room', async () => {
+    const seed = valeSeedWithGhoulIn('dungeon_offering_chamber');
+    const st = makeState(
+      { id: 'pc-1' },
+      {
+        current_room: 'dungeon_offering_chamber',
+        current_location_id: 'dungeon_shattered_crypt',
+        active_character_id: 'pc-1',
+      }
+    );
+    const result = await takeAction({
+      action: { type: 'travel', locationId: 'town_millhaven' },
+      history: [],
+      state: st,
+      seed,
+      context: valeCtx,
+    });
+    // Location unchanged; narrative explains.
+    expect(result.newState.current_location_id).toBe('dungeon_shattered_crypt');
+    expect(result.narrative).toMatch(/hostile/i);
+  });
+
+  it('loot handler rejects when a hostile is in the current room', async () => {
+    const seed = {
+      ...valeSeedWithGhoulIn('dungeon_offering_chamber'),
+      loot: {
+        dungeon_offering_chamber: {
+          id: 'guild_ledger',
+          name: 'Guild Ledger',
+          weight: 1,
+          desc: '',
+          type: 'misc' as const,
+          slot: null,
+          damage: null,
+          ac_bonus: null,
+          heal: null,
+          effect: null,
+          aliases: [],
+        },
+      },
+    };
+    const st = makeState(
+      { id: 'pc-1' },
+      {
+        current_room: 'dungeon_offering_chamber',
+        active_character_id: 'pc-1',
+      }
+    );
+    const result = await takeAction({
+      action: { type: 'loot' },
+      history: [],
+      state: st,
+      seed,
+      context: valeCtx,
+    });
+    expect(result.newState.loot_taken).not.toContain('guild_ledger');
+    expect(result.narrative).toMatch(/hostile/i);
+  });
+
+  it('move handler rejects when a hostile is in the current room', async () => {
+    const seed = valeSeedWithGhoulIn('dungeon_offering_chamber');
+    const st = makeState(
+      { id: 'pc-1' },
+      {
+        current_room: 'dungeon_offering_chamber',
+        active_character_id: 'pc-1',
+      }
+    );
+    const result = await takeAction({
+      action: { type: 'move', roomId: 'dungeon_antechamber' },
+      history: [],
+      state: st,
+      seed,
+      context: valeCtx,
+    });
+    expect(result.newState.current_room).toBe('dungeon_offering_chamber');
+    expect(result.narrative).toMatch(/hostile/i);
+  });
+
+  it('generateChoices suppresses Travel + Pick up while a hostile is in the room', () => {
+    const seed = {
+      ...valeSeedWithGhoulIn('dungeon_offering_chamber'),
+      loot: {
+        dungeon_offering_chamber: {
+          id: 'guild_ledger',
+          name: 'Guild Ledger',
+          weight: 1,
+          desc: '',
+          type: 'misc' as const,
+          slot: null,
+          damage: null,
+          ac_bonus: null,
+          heal: null,
+          effect: null,
+          aliases: [],
+        },
+      },
+    };
+    const st = makeState(
+      {},
+      {
+        current_room: 'dungeon_offering_chamber',
+        current_location_id: 'dungeon_shattered_crypt',
+      }
+    );
+    const choices = generateChoices(st, seed, valeCtx);
+    expect(choices.find((c) => c.action.type === 'travel')).toBeUndefined();
+    expect(choices.find((c) => c.action.type === 'loot')).toBeUndefined();
+    // Attack-the-ghoul should still surface so the player can engage.
+    expect(choices.find((c) => c.action.type === 'attack')).toBeDefined();
+  });
+});
+
 // ─── Quest auto-acceptance ───────────────────────────────────────────────────
 // The explicit "Accept quest" choice was removed. A talk_response in the
 // giver NPC's room (matched by quest step[0]'s tightened condition) is now
