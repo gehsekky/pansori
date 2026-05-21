@@ -20,6 +20,7 @@ import PartyRail from './components/PartyRail.tsx';
 import RoomArtPanel from './components/RoomArtPanel.tsx';
 import SessionsScreen from './components/SessionScreen.tsx';
 import SpellBar from './components/SpellBar.tsx';
+import WaitingForPlayer from './components/WaitingForPlayer.tsx';
 import WorldMap from './components/WorldMap.tsx';
 import { applyTheme } from './lib/theme.ts';
 import artManifest from './art-manifest.json';
@@ -481,8 +482,49 @@ export default function App() {
                   </div>
 
                   {(() => {
+                    // Turn ownership — does the current user own the active
+                    // character (or one of the eligible reaction PCs)? Solo
+                    // mode: every PC's owner_user_id === user.id, so this
+                    // is always true. Multi: false when it's a friend's
+                    // turn, and we render <WaitingForPlayer /> instead.
+                    const pending = gameState?.pending_reaction;
+                    const isMyTurn = (() => {
+                      if (!gameState || !user) return true;
+                      if (pending && pending.eligibleCharIds.length > 0) {
+                        return pending.eligibleCharIds.some((cid) => {
+                          const c = gameState.characters.find((ch) => ch.id === cid);
+                          return !c?.owner_user_id || c.owner_user_id === user.id;
+                        });
+                      }
+                      const active = gameState.characters.find(
+                        (c) => c.id === gameState.active_character_id
+                      );
+                      return !active?.owner_user_id || active.owner_user_id === user.id;
+                    })();
+                    const waitingName = (() => {
+                      if (isMyTurn || !gameState) return null;
+                      if (pending && pending.eligibleCharIds.length > 0) {
+                        const c = gameState.characters.find((ch) =>
+                          pending.eligibleCharIds.includes(ch.id)
+                        );
+                        return c?.name ?? 'another player';
+                      }
+                      const active = gameState.characters.find(
+                        (c) => c.id === gameState.active_character_id
+                      );
+                      return active?.name ?? 'another player';
+                    })();
                     const actionPanel =
-                      !loading && escaped ? (
+                      !isMyTurn && waitingName ? (
+                        <WaitingForPlayer
+                          name={waitingName}
+                          reason={
+                            pending && pending.eligibleCharIds.length > 0
+                              ? 'to resolve a reaction'
+                              : 'to finish their turn'
+                          }
+                        />
+                      ) : !loading && escaped ? (
                         <div
                           className={styles.card}
                           style={{

@@ -142,6 +142,36 @@
     opacity 0.15s;
 }
 
+/* Renders in place of the action pane while waiting for another participant
+   to take their turn. Visible only in multiplayer (solo never sees it). */
+.waitingForPlayer {
+  background: var(--t-card);
+  border: 1px solid var(--t-border);
+  padding: 1.25rem;
+  color: var(--t-mid);
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  letter-spacing: 0.02em;
+}
+
+.waitingForPlayerSpinner {
+  color: var(--t-primary);
+  font-size: 1.1rem;
+  display: inline-block;
+  animation: waitingSpin 1.4s linear infinite;
+}
+
+@keyframes waitingSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* "Already used this adventure" — dimmed visual hint, still clickable.
    Hover restores full color so the label is unmistakable when the
    player considers re-clicking. Tuned for WCAG 2.1 AA 4.5:1 contrast

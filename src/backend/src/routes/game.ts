@@ -43,6 +43,7 @@ import {
   resolveLocationForRoom,
   saveCampaignState,
 } from '../services/campaignEngine.js';
+import { broadcastParticipantChange, broadcastSessionState } from '../services/broadcast.js';
 import type { AuthedRequest } from '../auth/middleware.js';
 import { generateSeed } from '../services/procgen.js';
 import { loadContexts } from '../services/contextLoader.js';
@@ -758,6 +759,13 @@ gameRouter.post('/session/:id/assign-character', async (req: Request, res: Respo
       JSON.stringify(newState),
       req.params.id,
     ]);
+    // Push the updated ownership + state to every participant so their
+    // UIs re-render "who owns what" without a refetch.
+    broadcastSessionState(row.id, { state: newState });
+    broadcastParticipantChange(row.id, 'ownership-changed', {
+      character_id,
+      owner_user_id: newOwner,
+    });
     res.json({ ok: true, character_id, owner_user_id: newOwner });
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
@@ -790,6 +798,11 @@ gameRouter.post('/session/join', async (req: Request, res: Response) => {
        ON CONFLICT (session_id, user_id) DO NOTHING`,
       [session.id, userId]
     );
+    // Notify the room so the host's participants modal updates without
+    // a refetch. The joining socket may not be subscribed to the room
+    // yet (FE follows up with a socket.emit('join-session', ...) after
+    // a successful POST), so they'll get state via the join handshake.
+    broadcastParticipantChange(session.id, 'joined', { user_id: userId });
     res.json({ ok: true, session_id: session.id });
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
@@ -1009,6 +1022,13 @@ gameRouter.post('/session/:id/action', async (req: Request, res: Response) => {
       'UPDATE game_sessions SET state = $1, status = $2, updated_at = NOW() WHERE id = $3',
       [JSON.stringify(result.newState), newStatus, row.id]
     );
+
+    // Broadcast the new state to every socket joined to this session's
+    // room. The acting participant gets it back via the REST response
+    // too — that's intentional; the FE applies whichever arrives first
+    // and discards the rest by identity. Other participants only see
+    // the broadcast.
+    broadcastSessionState(row.id, { state: result.newState, narrative: result.narrative });
 
     res.json(result);
   } catch (err) {
