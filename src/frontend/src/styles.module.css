@@ -178,6 +178,103 @@
   letter-spacing: 0.02em;
 }
 
+/* Party-management section inside the invites dialog — list of
+   participants + per-PC owner dropdown. Borrows the same dim palette
+   as the rest of the dialog body. */
+.partyMgrDivider {
+  border-top: 1px solid var(--t-separator);
+  margin: 0.5rem 0 0.25rem;
+}
+
+.partyMgrHeading {
+  margin: 0;
+  font-size: 0.75rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--t-dim);
+  font-weight: normal;
+}
+
+.partyMgrList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.partyMgrRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.partyMgrAvatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  object-fit: cover;
+}
+
+.partyMgrAvatarPlaceholder {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--t-separator);
+  color: var(--t-dim);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.partyMgrName {
+  color: var(--t-primary);
+  font-weight: 500;
+  flex: 1;
+  min-width: 0;
+}
+
+.partyMgrRole {
+  color: var(--t-dim);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.partyMgrInlineLabel {
+  color: var(--t-dim);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.partyMgrSelect {
+  background: var(--t-bg);
+  color: var(--t-primary);
+  border: 1px solid var(--t-border);
+  padding: 0.3rem 0.5rem;
+  font-family: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+  min-width: 140px;
+}
+
+.partyMgrSelect:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.partyMgrError {
+  color: var(--t-hp-low);
+  font-size: 0.8rem;
+  margin: 0;
+}
+
 /* Renders in place of the action pane while waiting for another participant
    to take their turn. Visible only in multiplayer (solo never sees it). */
 .waitingForPlayer {
