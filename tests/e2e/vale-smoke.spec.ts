@@ -1,7 +1,7 @@
 import { Page, expect, test } from '@playwright/test';
 
 // Vale of Shadows smoke test — covers backend + frontend + DB integration
-// from auth through mission start. Validates the path that unit tests can't:
+// from auth through adventure start. Validates the path that unit tests can't:
 // real HTTP, real session cookies, real DB writes, real UI rendering.
 //
 // Prerequisites:
@@ -11,10 +11,10 @@ import { Page, expect, test } from '@playwright/test';
 // What this covers (the user-visible "happy path"):
 //   1. Test-login bypass produces a usable session.
 //   2. Sessions screen loads (empty state for fresh test user).
-//   3. + NEW MISSION navigates to character creation.
+//   3. + NEW ADVENTURE navigates to character creation.
 //   4. World picker selects Vale of Shadows.
 //   5. Auto-fill recommended party populates the form.
-//   6. BEGIN MISSION POSTs and transitions to the game view.
+//   6. BEGIN ADVENTURE POSTs and transitions to the game view.
 //   7. The game narrative panel renders text from Vale's intro/arrival.
 //
 // What this does NOT cover (intentional — defer until smoke proves stable):
@@ -29,7 +29,7 @@ const BACKEND_URL = process.env.E2E_BACKEND_URL ?? 'http://localhost:3001';
 // Use a stable seed if you want to inspect prod-like state in the DB after.
 const TEST_EMAIL = `e2e-${Date.now()}@pansori.local`;
 
-test('Vale of Shadows: login → character creation → begin mission', async ({ page, request }) => {
+test('Vale of Shadows: login → character creation → begin adventure', async ({ page, request }) => {
   // 1. Auth bypass: POST /api/auth/test-login sets the session cookie on the
   //    request context. We then attach it to the browser context so the
   //    frontend's /api/auth/me call returns the test user.
@@ -44,12 +44,12 @@ test('Vale of Shadows: login → character creation → begin mission', async ({
   const cookies = await request.storageState();
   await page.context().addCookies(cookies.cookies);
 
-  // 2. Sessions screen — fresh test user has no missions.
+  // 2. Sessions screen — fresh test user has no adventures.
   await page.goto('/');
-  await expect(page.getByText(/NO MISSIONS ON RECORD/i)).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText(/NO ADVENTURES ON RECORD/i)).toBeVisible({ timeout: 10_000 });
 
-  // 3. Click + NEW MISSION.
-  await page.getByTestId('new-mission-btn').click();
+  // 3. Click + NEW ADVENTURE.
+  await page.getByTestId('new-adventure-btn').click();
 
   // 4. Character screen — pick Vale of Shadows.
   await page.getByTestId('world-picker-vale_of_shadows').click();
@@ -57,10 +57,10 @@ test('Vale of Shadows: login → character creation → begin mission', async ({
   // 5. Auto-fill recommended party.
   await page.getByTestId('auto-fill-party-btn').click();
 
-  // 6. Begin mission. The button is disabled while subclass picks are required
+  // 6. Begin adventure. The button is disabled while subclass picks are required
   //    on the auto-filled party; auto-fill defaults to the first L1 subclass
   //    option, so it should be enabled immediately.
-  const begin = page.getByTestId('begin-mission-btn');
+  const begin = page.getByTestId('begin-adventure-btn');
   await expect(begin).toBeEnabled();
   await begin.click();
 
@@ -217,13 +217,13 @@ test('session resume: state survives a page reload', async ({ page, request }) =
   const cookies = await request.storageState();
   await page.context().addCookies(cookies.cookies);
 
-  // Start a fresh sandbox mission.
+  // Start a fresh sandbox adventure.
   await page.goto('/');
-  await expect(page.getByText(/NO MISSIONS ON RECORD/i)).toBeVisible({ timeout: 10_000 });
-  await page.getByTestId('new-mission-btn').click();
+  await expect(page.getByText(/NO ADVENTURES ON RECORD/i)).toBeVisible({ timeout: 10_000 });
+  await page.getByTestId('new-adventure-btn').click();
   await page.getByTestId('world-picker-sandbox').click();
   await page.getByTestId('auto-fill-party-btn').click();
-  await page.getByTestId('begin-mission-btn').click();
+  await page.getByTestId('begin-adventure-btn').click();
 
   const narrative = page.getByTestId('game-narrative-panel');
   await expect(narrative).toBeVisible({ timeout: 15_000 });
@@ -286,12 +286,12 @@ test('sandbox combat: enter a fight and resolve an attack', async ({ page, reque
   await page.context().addCookies(cookies.cookies);
 
   await page.goto('/');
-  await expect(page.getByText(/NO MISSIONS ON RECORD/i)).toBeVisible({ timeout: 10_000 });
-  await page.getByTestId('new-mission-btn').click();
+  await expect(page.getByText(/NO ADVENTURES ON RECORD/i)).toBeVisible({ timeout: 10_000 });
+  await page.getByTestId('new-adventure-btn').click();
   await page.getByTestId('world-picker-sandbox').click();
   await page.getByTestId('auto-fill-party-btn').click();
-  await expect(page.getByTestId('begin-mission-btn')).toBeEnabled();
-  await page.getByTestId('begin-mission-btn').click();
+  await expect(page.getByTestId('begin-adventure-btn')).toBeEnabled();
+  await page.getByTestId('begin-adventure-btn').click();
 
   // Wait for the game view to render.
   const narrative = page.getByTestId('game-narrative-panel');
@@ -401,12 +401,12 @@ test('Vale combat: initiative live + class-specific choices respect class', asyn
   const cookies = await request.storageState();
   await page.context().addCookies(cookies.cookies);
   await page.goto('/');
-  await expect(page.getByText(/NO MISSIONS ON RECORD/i)).toBeVisible({ timeout: 10_000 });
-  await page.getByTestId('new-mission-btn').click();
+  await expect(page.getByText(/NO ADVENTURES ON RECORD/i)).toBeVisible({ timeout: 10_000 });
+  await page.getByTestId('new-adventure-btn').click();
   await page.getByTestId('world-picker-vale_of_shadows').click();
   await page.getByTestId('auto-fill-party-btn').click();
-  await expect(page.getByTestId('begin-mission-btn')).toBeEnabled();
-  await page.getByTestId('begin-mission-btn').click();
+  await expect(page.getByTestId('begin-adventure-btn')).toBeEnabled();
+  await page.getByTestId('begin-adventure-btn').click();
   await expect(page.getByTestId('game-narrative-panel')).toBeVisible({ timeout: 15_000 });
 
   // 2. Navigate town → road_north. One move places the party in a

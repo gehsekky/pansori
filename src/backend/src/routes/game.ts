@@ -628,7 +628,7 @@ gameRouter.post('/session/:id/action', async (req: Request, res: Response) => {
       return;
     }
     if (row.status === 'escaped') {
-      res.status(410).json({ error: 'Mission already complete.' });
+      res.status(410).json({ error: 'Adventure already complete.' });
       return;
     }
 

@@ -2,7 +2,7 @@ import { type ReactNode, useEffect, useRef, useState } from 'react';
 import styles from '../styles.module.css';
 
 // Right-rail tabbed container. Holds panels that don't need to be permanently
-// on-screen (room art, quests, factions, combat log, mission log) and lets
+// on-screen (room art, quests, factions, combat log, adventure log) and lets
 // the player switch between them with one click.
 //
 // WAI-ARIA tablist pattern:

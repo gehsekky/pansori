@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import MissionLogPanel from './MissionLogPanel';
+import AdventureLogPanel from './AdventureLogPanel';
 
 // History stream is interleaved [user, assistant, user, assistant, ...]
 // The panel renders every other entry starting at index 0 (the engine's
 // assistant output) and the copy export covers the FULL chronological
 // stream with a metadata header.
 
-describe('MissionLogPanel', () => {
+describe('AdventureLogPanel', () => {
   it('renders the most recent 20 assistant entries with the > prefix', () => {
     // History is interleaved [user, assistant, user, assistant, ...]
     // — user (button label) at even indices, assistant (engine
@@ -18,7 +18,7 @@ describe('MissionLogPanel', () => {
       history.push({ content: `user ${i}` });
       history.push({ content: `assistant ${i}` });
     }
-    render(<MissionLogPanel history={history} />);
+    render(<AdventureLogPanel history={history} />);
     expect(screen.getByText(/assistant 0/)).toBeDefined();
     expect(screen.getByText(/assistant 4/)).toBeDefined();
     // User-side turns are filtered out.
@@ -26,7 +26,7 @@ describe('MissionLogPanel', () => {
   });
 
   it('shows the empty state when history is empty', () => {
-    render(<MissionLogPanel history={[]} />);
+    render(<AdventureLogPanel history={[]} />);
     expect(screen.getByText(/No actions taken yet/i)).toBeDefined();
   });
 
@@ -35,25 +35,25 @@ describe('MissionLogPanel', () => {
     Object.assign(navigator, { clipboard: { writeText } });
     // [user, assistant, user, assistant] — assistants at odd indices.
     const history = [
-      { content: '> begin mission' },
+      { content: '> begin adventure' },
       { content: 'Combat begins.' },
       { content: '> attack' },
       { content: 'You hit for 5 damage.' },
     ];
     render(
-      <MissionLogPanel
+      <AdventureLogPanel
         history={history}
         worldName="Vale of Shadows"
         party={[{ name: 'Test', character_class: 'Fighter', hp: 12, max_hp: 20 }]}
         currentRoom="dungeon_throne"
       />
     );
-    const btn = screen.getByTestId('mission-log-copy-btn');
+    const btn = screen.getByTestId('adventure-log-copy-btn');
     fireEvent.click(btn);
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
     const text = writeText.mock.calls[0][0] as string;
     // Header includes campaign + party + room.
-    expect(text).toMatch(/=== Pansori Mission Log ===/);
+    expect(text).toMatch(/=== Pansori Adventure Log ===/);
     expect(text).toMatch(/Campaign: Vale of Shadows/);
     expect(text).toMatch(/Test \(Fighter\) 12\/20 HP/);
     expect(text).toMatch(/Current room: dungeon_throne/);
@@ -70,8 +70,8 @@ describe('MissionLogPanel', () => {
   it('shows "Copied!" after a successful copy', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.assign(navigator, { clipboard: { writeText } });
-    render(<MissionLogPanel history={[{ content: '> noop' }, { content: 'event' }]} />);
-    const btn = screen.getByTestId('mission-log-copy-btn');
+    render(<AdventureLogPanel history={[{ content: '> noop' }, { content: 'event' }]} />);
+    const btn = screen.getByTestId('adventure-log-copy-btn');
     fireEvent.click(btn);
     await waitFor(() => expect(btn.textContent).toMatch(/Copied/));
   });

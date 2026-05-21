@@ -49,12 +49,12 @@ function SessionsScreen({
               </button>
             )}
             <button
-              data-testid="new-mission-btn"
+              data-testid="new-adventure-btn"
               className={styles.submit}
               style={{ marginTop: 0, width: 'auto', padding: '0.5rem 1.25rem' }}
               onClick={onNewGame}
             >
-              + NEW MISSION
+              + NEW ADVENTURE
             </button>
             <button className={styles.ghostBtn} onClick={onLogout}>
               SIGN OUT
@@ -68,14 +68,14 @@ function SessionsScreen({
             style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--t-dim)' }}
           >
             <p style={{ fontSize: '0.8rem', letterSpacing: '0.12em', marginBottom: '1.25rem' }}>
-              NO MISSIONS ON RECORD
+              NO ADVENTURES ON RECORD
             </p>
             <button
               className={styles.submit}
               style={{ marginTop: 0, width: 'auto', padding: '0.5rem 1.5rem' }}
               onClick={onNewGame}
             >
-              BEGIN FIRST MISSION
+              BEGIN FIRST ADVENTURE
             </button>
           </div>
         ) : (

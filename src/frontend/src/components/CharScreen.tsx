@@ -301,7 +301,7 @@ function CharScreen({
         contextId
       );
     } catch (e) {
-      setError((e as { error?: string })?.error || 'Failed to start mission');
+      setError((e as { error?: string })?.error || 'Failed to start adventure');
     }
   }
 
@@ -784,12 +784,12 @@ function CharScreen({
           {error && <p className={styles.err}>{error}</p>}
 
           <button
-            data-testid="begin-mission-btn"
+            data-testid="begin-adventure-btn"
             className={styles.submit}
             onClick={handle}
             disabled={loading}
           >
-            {loading ? 'LAUNCHING MISSION...' : 'BEGIN MISSION'}
+            {loading ? 'LAUNCHING ADVENTURE...' : 'BEGIN ADVENTURE'}
           </button>
         </div>
 

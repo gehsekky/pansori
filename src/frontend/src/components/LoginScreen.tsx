@@ -21,7 +21,7 @@ function LoginScreen() {
         <h1 className={styles.title} style={{ marginBottom: '0.5rem' }}>
           PANSORI
         </h1>
-        <p className={styles.loginSub}>SIGN IN TO CONTINUE YOUR MISSION</p>
+        <p className={styles.loginSub}>SIGN IN TO CONTINUE YOUR ADVENTURE</p>
         {providers === null ? (
           <p className={styles.loginSub} style={{ marginTop: '1rem' }}>
             LOADING...
