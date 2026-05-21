@@ -78,9 +78,15 @@ test('Vale of Shadows: login → character creation → begin adventure', async 
   const partyTiles = page.getByTestId('party-tile');
   await expect(partyTiles).toHaveCount(3);
   const partyText = (await partyTiles.allTextContents()).join(' ');
-  expect(partyText).toContain('[Fighter]');
-  expect(partyText).toContain('[Cleric]');
-  expect(partyText).toContain('[Rogue]');
+  // Open-bracket prefix (not '[Cleric]') so the assertion works both
+  // before and after a subclass is appended — Cleric picks Life Domain
+  // at L1 so its tile reads '[Cleric / Life]', not '[Cleric]'. Fighter
+  // and Rogue pick their subclass at L3, so they're still '[Fighter]' /
+  // '[Rogue]' at this point in the playthrough, but the looser match
+  // covers both forms.
+  expect(partyText).toContain('[Fighter');
+  expect(partyText).toContain('[Cleric');
+  expect(partyText).toContain('[Rogue');
 
   // 9. Initiative is not active in town — the strip only renders during
   //    combat, and Vale starts in millhaven_square with no enemies.
