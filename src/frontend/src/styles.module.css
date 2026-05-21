@@ -142,6 +142,42 @@
     opacity 0.15s;
 }
 
+/* Invite dialog — wraps the standard Dialog with a copy-link row and an
+   optional host-only "rotate" button. The input is readonly + click-to-
+   select so a player can grab the URL with one tap. */
+.inviteDialogBody {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 360px;
+  max-width: 600px;
+}
+
+.inviteDialogHint {
+  color: var(--t-dim);
+  font-size: 0.8rem;
+  margin: 0;
+}
+
+.inviteDialogRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.inviteDialogInput {
+  flex: 1;
+  min-width: 200px;
+  background: var(--t-bg);
+  color: var(--t-primary);
+  border: 1px solid var(--t-border);
+  padding: 0.45rem 0.625rem;
+  font-family: inherit;
+  font-size: 0.85rem;
+  letter-spacing: 0.02em;
+}
+
 /* Renders in place of the action pane while waiting for another participant
    to take their turn. Visible only in multiplayer (solo never sees it). */
 .waitingForPlayer {

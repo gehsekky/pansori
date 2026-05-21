@@ -321,6 +321,15 @@ export interface Session {
   portrait_url: string | null;
   seed: Seed;
   state: GameState;
+  // Multiplayer (PR 4): the userId of the original creator (the host).
+  // Stays populated as the single point of authority for delete + token
+  // rotation + assign-character. Non-host participants see this to know
+  // whose session they're in.
+  user_id?: string;
+  // Multiplayer (PR 4): shareable token. URL form: ?join=<token>.
+  // Host can rotate via api.rotateInvite. NULL on pre-MP sessions
+  // until the host opens the invite dialog and triggers a rotate.
+  invite_token?: string | null;
 }
 
 export interface SessionSummary {

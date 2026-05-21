@@ -411,12 +411,16 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
     initialState.room_log = [startNarrative];
     initialState.last_choices = generateChoices(initialState, seed, ctx);
 
+    // Random invite token used to build the shareable URL (?join=<token>).
+    // 36 chars of UUID4 = 122 bits of entropy; effectively unguessable.
+    // Host can rotate via POST /session/:id/rotate-invite if the link leaks.
+    const inviteToken = randomUUID();
     const {
       rows: [session],
     } = await client.query(
-      `INSERT INTO game_sessions (user_id, seed, state)
-       VALUES ($1, $2, $3) RETURNING *`,
-      [hostUserId, JSON.stringify(seed), JSON.stringify(initialState)]
+      `INSERT INTO game_sessions (user_id, seed, state, invite_token)
+       VALUES ($1, $2, $3, $4) RETURNING *`,
+      [hostUserId, JSON.stringify(seed), JSON.stringify(initialState), inviteToken]
     );
     // Add the host as a participant. The migration backfilled existing
     // sessions; this row covers newly-created ones. PR 2's auth guards
@@ -767,6 +771,57 @@ gameRouter.post('/session/:id/assign-character', async (req: Request, res: Respo
       owner_user_id: newOwner,
     });
     res.json({ ok: true, character_id, owner_user_id: newOwner });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// List participants of a session, with the names of the user accounts
+// driving each one. The host's participants modal calls this to render
+// the "who's in this session" panel + per-PC owner dropdown. Any
+// participant can read this — it's not sensitive (the user IDs are
+// already implicit in the broadcasts they receive).
+gameRouter.get('/session/:id/participants', async (req: Request, res: Response) => {
+  try {
+    const row = await fetchSessionForParticipant(req.params.id, authedUserId(req));
+    if (!row) {
+      res.status(404).json({ error: 'Session not found' });
+      return;
+    }
+    const { rows } = await pool.query(
+      `SELECT sp.user_id, sp.role, sp.joined_at,
+              u.display_name, u.avatar_url
+         FROM session_participants sp
+         INNER JOIN users u ON u.id = sp.user_id
+        WHERE sp.session_id = $1
+        ORDER BY sp.joined_at`,
+      [req.params.id]
+    );
+    res.json({ host_user_id: row.user_id, participants: rows });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// Host-only: rotate the invite_token so any previously-shared links
+// stop working. Useful when a link leaks or the host wants to lock
+// the party down after everyone has joined.
+gameRouter.post('/session/:id/rotate-invite', async (req: Request, res: Response) => {
+  try {
+    const userId = authedUserId(req);
+    const newToken = randomUUID();
+    const { rows } = await pool.query(
+      `UPDATE game_sessions
+          SET invite_token = $1, updated_at = NOW()
+        WHERE id = $2 AND user_id = $3
+        RETURNING invite_token`,
+      [newToken, req.params.id, userId]
+    );
+    if (!rows[0]) {
+      res.status(404).json({ error: 'Session not found or you are not the host.' });
+      return;
+    }
+    res.json({ invite_token: rows[0].invite_token });
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
   }
