@@ -86,7 +86,7 @@ import { randomUUID } from 'crypto';
 // Append a CombatEvent to state.combat_log, trimming to COMBAT_LOG_MAX so the
 // buffer doesn't grow unbounded across long sessions. Pure function — returns
 // new state, doesn't mutate. Callers should reassign: `st = pushEvent(st, e)`.
-function pushEvent(st: GameState, event: CombatEvent): GameState {
+export function pushEvent(st: GameState, event: CombatEvent): GameState {
   const next = [...(st.combat_log ?? []), event];
   return { ...st, combat_log: next.slice(-COMBAT_LOG_MAX) };
 }
@@ -1111,7 +1111,7 @@ function refreshLegendaryPool(seed: Seed, enemyId: string): void {
   }
 }
 
-function getEnemyById(seed: Seed, enemyId: string): Enemy | null {
+export function getEnemyById(seed: Seed, enemyId: string): Enemy | null {
   for (const list of Object.values(seed.enemies ?? {})) {
     const found = list.find((e) => e.id === enemyId);
     if (found) return found;
@@ -8430,187 +8430,6 @@ export async function takeAction({
           narrative += grantDarkOnesBlessing(char);
           narrative += applyPartyLevelUps(st, char, context);
           if (st.combat_active && isRoomCleared(st, seed, roomId)) st = endCombatState(st);
-        }
-        break;
-      }
-
-      case 'grapple': {
-        if (!enemyAlive || !enemy) {
-          narrative = 'No enemy to grapple.';
-          break;
-        }
-        const grappleTargetId =
-          (action as { type: 'grapple'; targetEnemyId?: string }).targetEnemyId ?? enemy.id;
-        const grappleTarget = livingEnemiesInRoom.find((e) => e.id === grappleTargetId) ?? enemy;
-        // SRD 5.2.1 p.195 / 2024 PHB "Unarmed Strike: Grapple" — requires the
-        // target within 5 ft (unarmed strike reach). No action is spent if the
-        // attempt fails this prerequisite.
-        if (st.entities) {
-          const myEnt = st.entities.find((e) => e.id === char.id);
-          const tgtEnt = st.entities.find((e) => e.id === grappleTarget.id && e.isEnemy);
-          if (myEnt && tgtEnt && distanceFeet(myEnt.pos, tgtEnt.pos) > 5) {
-            narrative = `Out of reach — Grapple needs the target within 5 ft. Move closer first.`;
-            break;
-          }
-        }
-        if (grappleTarget.condition_immunities?.includes('grappled')) {
-          narrative = `The ${grappleTarget.name} cannot be grappled (condition immunity).`;
-          char.turn_actions = { ...char.turn_actions, action_used: true };
-          usedInitiative = true;
-          break;
-        }
-        // Contested Athletics: player STR check vs enemy STR or DEX (whichever higher)
-        const athProfGrapple = (context.classSkills[char.character_class] ?? []).includes(
-          'athletics'
-        );
-        const playerRollGrapple =
-          d(20) + abilityMod(char.str) + (athProfGrapple ? profBonus(char.level) : 0);
-        const enemyStrGrapple = abilityMod(grappleTarget.toHit); // toHit is a rough proxy for STR/DEX mod
-        const enemyDexGrapple = abilityMod(grappleTarget.dex ?? 10);
-        const enemyRollGrapple = d(20) + Math.max(enemyStrGrapple, enemyDexGrapple);
-        char.turn_actions = { ...char.turn_actions, action_used: true };
-        usedInitiative = true;
-        if (playerRollGrapple > enemyRollGrapple) {
-          st = {
-            ...st,
-            entities: (st.entities ?? []).map((e) =>
-              e.id === grappleTarget.id && e.isEnemy
-                ? {
-                    ...e,
-                    conditions: [...e.conditions.filter((c) => c !== 'grappled'), 'grappled'],
-                    grappled_by: char.id,
-                  }
-                : e
-            ),
-          };
-          st = pushEvent(st, {
-            kind: 'condition_applied',
-            targetId: grappleTarget.id,
-            targetName: grappleTarget.name,
-            condition: 'grappled',
-            source: 'Grapple',
-            round: st.round ?? 1,
-          });
-          narrative = `You grapple the ${grappleTarget.name}! (${playerRollGrapple} vs ${enemyRollGrapple}) They are GRAPPLED — speed 0, your attacks have advantage.`;
-        } else {
-          narrative = `The ${grappleTarget.name} breaks free of your grapple attempt. (${playerRollGrapple} vs ${enemyRollGrapple})`;
-        }
-        break;
-      }
-
-      // SRD 5.2.1 p.16 — A grappled creature can use its action on its turn to make
-      // a Strength (Athletics) or Dexterity (Acrobatics) check contested by the
-      // grappler's Strength (Athletics) check; success ends the grappled condition.
-      case 'try_escape_grapple': {
-        const myEntity = st.entities?.find((e) => e.id === char.id);
-        const grapplerId = myEntity?.grappled_by;
-        if (!char.conditions.includes('grappled') && !myEntity?.conditions.includes('grappled')) {
-          narrative = 'You are not grappled.';
-          break;
-        }
-        if (!grapplerId) {
-          // No tracked grappler — just drop the condition (shouldn't happen, but be lenient)
-          char = { ...char, conditions: char.conditions.filter((c) => c !== 'grappled') };
-          narrative = 'You break free of the grapple.';
-          char.turn_actions = { ...char.turn_actions, action_used: true };
-          usedInitiative = true;
-          break;
-        }
-        const grappler = st.entities?.find((e) => e.id === grapplerId);
-        const grapplerEnemy = grappler?.isEnemy ? getEnemyById(seed, grapplerId) : null;
-        const grapplerStrMod = grapplerEnemy ? abilityMod(grapplerEnemy.toHit) : 0;
-        const grapplerRoll = d(20) + grapplerStrMod;
-
-        // Player picks the better of Athletics (STR) or Acrobatics (DEX)
-        const athProf = (context.classSkills[char.character_class] ?? []).includes('athletics');
-        const acrProf = (context.classSkills[char.character_class] ?? []).includes('acrobatics');
-        const athRoll = d(20) + abilityMod(char.str) + (athProf ? profBonus(char.level) : 0);
-        const acrRoll = d(20) + abilityMod(char.dex) + (acrProf ? profBonus(char.level) : 0);
-        const myRoll = Math.max(athRoll, acrRoll);
-        const skillUsed = athRoll >= acrRoll ? 'Athletics' : 'Acrobatics';
-
-        char.turn_actions = { ...char.turn_actions, action_used: true };
-        usedInitiative = true;
-
-        if (myRoll > grapplerRoll) {
-          char = { ...char, conditions: char.conditions.filter((c) => c !== 'grappled') };
-          st = {
-            ...st,
-            entities: (st.entities ?? []).map((e) =>
-              e.id === char.id
-                ? {
-                    ...e,
-                    conditions: e.conditions.filter((c) => c !== 'grappled'),
-                    grappled_by: undefined,
-                  }
-                : e
-            ),
-          };
-          narrative = `You break free of the grapple! (${skillUsed} ${myRoll} vs ${grapplerRoll})`;
-        } else {
-          narrative = `You strain against the grapple but cannot escape. (${skillUsed} ${myRoll} vs ${grapplerRoll})`;
-        }
-        break;
-      }
-
-      // SRD 5.2.1 p.187 — standing up from prone costs half the creature's speed.
-      // 2024 PHB — declare you'll spend your Heroic Inspiration on the next
-      // attack this turn. Doesn't cost an action; the flag clears when the
-      // attack handler resolves the d20.
-      case 'shove': {
-        if (!enemyAlive || !enemy) {
-          narrative = 'No enemy to shove.';
-          break;
-        }
-        const shoveTargetId =
-          (action as { type: 'shove'; targetEnemyId?: string }).targetEnemyId ?? enemy.id;
-        const shoveTarget = livingEnemiesInRoom.find((e) => e.id === shoveTargetId) ?? enemy;
-        // SRD 5.2.1 p.195 / 2024 PHB "Unarmed Strike: Shove" — requires the
-        // target within 5 ft. No action is spent if the prerequisite fails.
-        if (st.entities) {
-          const myEnt = st.entities.find((e) => e.id === char.id);
-          const tgtEnt = st.entities.find((e) => e.id === shoveTarget.id && e.isEnemy);
-          if (myEnt && tgtEnt && distanceFeet(myEnt.pos, tgtEnt.pos) > 5) {
-            narrative = `Out of reach — Shove needs the target within 5 ft. Move closer first.`;
-            break;
-          }
-        }
-        if (shoveTarget.condition_immunities?.includes('prone')) {
-          narrative = `The ${shoveTarget.name} cannot be knocked prone (condition immunity).`;
-          char.turn_actions = { ...char.turn_actions, action_used: true };
-          usedInitiative = true;
-          break;
-        }
-        const athProfShove = (context.classSkills[char.character_class] ?? []).includes(
-          'athletics'
-        );
-        const playerRollShove =
-          d(20) + abilityMod(char.str) + (athProfShove ? profBonus(char.level) : 0);
-        const enemyStrShove = abilityMod(shoveTarget.toHit);
-        const enemyDexShove = abilityMod(shoveTarget.dex ?? 10);
-        const enemyRollShove = d(20) + Math.max(enemyStrShove, enemyDexShove);
-        char.turn_actions = { ...char.turn_actions, action_used: true };
-        usedInitiative = true;
-        if (playerRollShove > enemyRollShove) {
-          st = {
-            ...st,
-            entities: (st.entities ?? []).map((e) =>
-              e.id === shoveTarget.id && e.isEnemy
-                ? { ...e, conditions: [...e.conditions.filter((c) => c !== 'prone'), 'prone'] }
-                : e
-            ),
-          };
-          st = pushEvent(st, {
-            kind: 'condition_applied',
-            targetId: shoveTarget.id,
-            targetName: shoveTarget.name,
-            condition: 'prone',
-            source: 'Shove',
-            round: st.round ?? 1,
-          });
-          narrative = `You shove the ${shoveTarget.name} to the ground! (${playerRollShove} vs ${enemyRollShove}) They are PRONE — melee attacks against them have advantage, ranged attacks have disadvantage.`;
-        } else {
-          narrative = `The ${shoveTarget.name} resists your shove. (${playerRollShove} vs ${enemyRollShove})`;
         }
         break;
       }

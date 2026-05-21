@@ -18,6 +18,7 @@ import {
 } from './combatUtility.js';
 import { handleEndTurn, handlePass } from './utility.js';
 import { handleEnterDistrict, handleTravel } from './travel.js';
+import { handleGrapple, handleShove, handleTryEscapeGrapple } from './combatTactical.js';
 import { handleLongRest, handleShortRest } from './rest.js';
 import type { StructuredAction } from '../../types.js';
 import { handleAttune } from './inventory.js';
@@ -56,6 +57,9 @@ const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   enter_district: handleEnterDistrict as ActionHandler,
   accept_quest: handleAcceptQuest as ActionHandler,
   complete_quest: handleCompleteQuest as ActionHandler,
+  grapple: handleGrapple as ActionHandler,
+  try_escape_grapple: handleTryEscapeGrapple as ActionHandler,
+  shove: handleShove as ActionHandler,
 };
 
 /**
