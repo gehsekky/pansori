@@ -190,6 +190,51 @@ describe('generateRoguelikeSeed — sandbox', () => {
     }
     expect(found).toBe(true);
   });
+
+  it('difficult terrain, when seeded, stays in the same middle band as obstacles', () => {
+    const gh = sandboxCtx.gridHeight ?? 8;
+    const gw = sandboxCtx.gridWidth ?? 8;
+    for (const room of seed.rooms) {
+      for (const o of room.difficultTerrain ?? []) {
+        expect(o.y).toBeGreaterThanOrEqual(3);
+        expect(o.y).toBeLessThanOrEqual(gh - 3);
+        expect(o.x).toBeGreaterThanOrEqual(1);
+        expect(o.x).toBeLessThanOrEqual(gw - 2);
+      }
+    }
+  });
+
+  it('difficult terrain only lands on combat rooms', () => {
+    for (let trial = 0; trial < 30; trial++) {
+      const s = generateRoguelikeSeed(sandboxCtx);
+      for (const room of s.rooms) {
+        if (room.difficultTerrain?.length) {
+          expect(s.enemies?.[room.id]?.length ?? 0).toBeGreaterThan(0);
+        }
+      }
+    }
+  });
+
+  it('difficult terrain never overlaps obstacles in the same room', () => {
+    for (let trial = 0; trial < 50; trial++) {
+      const s = generateRoguelikeSeed(sandboxCtx);
+      for (const room of s.rooms) {
+        const obsKeys = new Set((room.obstacles ?? []).map((p) => `${p.x},${p.y}`));
+        for (const dt of room.difficultTerrain ?? []) {
+          expect(obsKeys.has(`${dt.x},${dt.y}`)).toBe(false);
+        }
+      }
+    }
+  });
+
+  it('over many seeds, at least one room gets difficult terrain', () => {
+    let found = false;
+    for (let trial = 0; trial < 80 && !found; trial++) {
+      const s = generateRoguelikeSeed(sandboxCtx);
+      found = s.rooms.some((r) => (r.difficultTerrain?.length ?? 0) > 0);
+    }
+    expect(found).toBe(true);
+  });
 });
 
 // ─── Campaign seed validation ────────────────────────────────────────────────

@@ -1180,7 +1180,8 @@
 .gridLegendReach,
 .gridLegendDim,
 .gridLegendDark,
-.gridLegendObstacle {
+.gridLegendObstacle,
+.gridLegendDifficult {
   display: inline-block;
   width: 10px;
   height: 10px;
@@ -1244,6 +1245,15 @@
     rgba(90, 85, 70, 0.85) 4px
   );
   border: 1px solid rgba(60, 55, 45, 0.95);
+}
+
+/* Difficult-terrain swatch — same stipple as the cell tint, scaled down. */
+.gridLegendDifficult {
+  border-radius: 2px;
+  background:
+    radial-gradient(circle, rgba(170, 140, 90, 0.85) 0.8px, transparent 1.2px) 0 0 / 3px 3px,
+    rgba(50, 40, 25, 0.5);
+  border: 1px solid var(--t-border);
 }
 
 /* ─── CampaignPanel ─────────────────────────────────────────────────────── */
