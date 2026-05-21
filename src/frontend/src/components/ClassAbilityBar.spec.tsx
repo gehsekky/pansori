@@ -79,9 +79,7 @@ describe('ClassAbilityBar', () => {
     const onChoose = vi.fn();
     const rage = feature('rage', 'Rage — bonus action');
     const sw = feature('second_wind', 'Second Wind — heal 1d10');
-    const { getByTestId } = render(
-      <ClassAbilityBar choices={[rage, sw]} onChoose={onChoose} />
-    );
+    const { getByTestId } = render(<ClassAbilityBar choices={[rage, sw]} onChoose={onChoose} />);
     fireEvent.click(getByTestId('feature-second_wind'));
     expect(onChoose).toHaveBeenCalledWith(sw);
   });

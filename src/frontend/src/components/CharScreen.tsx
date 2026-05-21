@@ -156,9 +156,7 @@ function sanitizeDraft(d: CharDraft, ctx: FrontendContext): CharDraft {
   const classIds = new Set(ctx.classes.map((c) => c.id));
   const bgIds = new Set((ctx.backgrounds ?? []).map((b) => b.id));
   const validCls = classIds.has(d.cls) ? d.cls : (ctx.classes[0]?.id ?? d.cls);
-  const validBg = bgIds.has(d.backgroundId)
-    ? d.backgroundId
-    : (ctx.backgrounds?.[0]?.id ?? '');
+  const validBg = bgIds.has(d.backgroundId) ? d.backgroundId : (ctx.backgrounds?.[0]?.id ?? '');
   // Subclass: keep only if the class still requires/supports one with the
   // saved id; otherwise drop so the player re-picks (handle() blocks
   // start until subclass is picked when required).

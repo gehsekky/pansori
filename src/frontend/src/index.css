@@ -7,11 +7,16 @@ body {
 }
 
 @keyframes blink {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
 }
 
 button:hover {
   border-color: var(--t-primary) !important;
-  background:   var(--t-separator) !important;
+  background: var(--t-separator) !important;
 }

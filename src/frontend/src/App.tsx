@@ -2,6 +2,7 @@ import { type AuthUser, type CharacterInput, api } from './lib/api.ts';
 import { FactionsView, QuestsView } from './components/CampaignPanel.tsx';
 import type { FrontendContext, GameChoice, Seed, SessionSummary } from './types.ts';
 import { useEffect, useRef, useState } from 'react';
+import AdventureLogPanel from './components/AdventureLogPanel.tsx';
 import CharScreen from './components/CharScreen.tsx';
 import ClassAbilityBar from './components/ClassAbilityBar.tsx';
 import CombatActionBar from './components/CombatActionBar.tsx';
@@ -13,7 +14,6 @@ import EnemySelector from './components/EnemySelector.tsx';
 import GridCombatView from './components/GridCombatView.tsx';
 import InventoryModal from './components/InventoryModal.tsx';
 import LoginScreen from './components/LoginScreen.tsx';
-import AdventureLogPanel from './components/AdventureLogPanel.tsx';
 import MoveDPad from './components/MoveDPad.tsx';
 import NarrativeText from './components/NarrativeText.tsx';
 import PartyRail from './components/PartyRail.tsx';
@@ -348,6 +348,7 @@ export default function App() {
                   worldName={worldName}
                   state={gameState ?? undefined}
                   seed={seed ?? undefined}
+                  campaignMeta={campaignMeta}
                 />
               ),
             });

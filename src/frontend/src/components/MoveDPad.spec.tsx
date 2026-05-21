@@ -28,9 +28,7 @@ describe('MoveDPad', () => {
       moveChoice('S', 5, 6),
       moveChoice('W', 4, 5),
     ];
-    const { container, getByTestId } = render(
-      <MoveDPad choices={choices} onChoose={() => {}} />
-    );
+    const { container, getByTestId } = render(<MoveDPad choices={choices} onChoose={() => {}} />);
     const dpad = getByTestId('move-dpad');
     // 8 arrow cells + 1 center cell = 9 children
     expect(dpad.children).toHaveLength(9);

@@ -17,6 +17,13 @@ import {
 import { Request, Response, Router } from 'express';
 import { SRD_SPECIES, SRD_WEAPON_MASTERY_SLOTS } from '../contexts/srd/index.js';
 import {
+  applyConsequence,
+  buildArrivalNarrative,
+  generateChoices,
+  normalizeState,
+  takeAction,
+} from '../services/gameEngine.js';
+import {
   applyQuestCompletions,
   evaluateQuestSteps,
   extractCampaignDelta,
@@ -26,13 +33,6 @@ import {
   resolveLocationForRoom,
   saveCampaignState,
 } from '../services/campaignEngine.js';
-import {
-  applyConsequence,
-  buildArrivalNarrative,
-  generateChoices,
-  normalizeState,
-  takeAction,
-} from '../services/gameEngine.js';
 import type { AuthedRequest } from '../auth/middleware.js';
 import { generateSeed } from '../services/procgen.js';
 import { loadContexts } from '../services/contextLoader.js';
