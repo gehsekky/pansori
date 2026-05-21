@@ -27,6 +27,7 @@ import {
   saveCampaignState,
 } from '../services/campaignEngine.js';
 import {
+  applyConsequence,
   buildArrivalNarrative,
   generateChoices,
   normalizeState,
@@ -723,10 +724,45 @@ gameRouter.post('/session/:id/action', async (req: Request, res: Response) => {
           quest_progress: updatedCs.quests,
           faction_rep: updatedCs.faction_rep,
         };
+        // Apply each completed quest's `rewards` array through the
+        // standard consequence pipeline. Without this, the only
+        // completion-time effect was applyQuestCompletions's repGain;
+        // the actual rewards (give_gold, consume_item, add_narrative,
+        // etc.) authored on the quest never fired. The user's Vale
+        // playthrough saw the quest mark as complete with no gold,
+        // no consumed ledger, and a bare "[Quest completed: ...]" tail.
+        const rewardNarrativeParts: string[] = [];
+        for (const qid of completedQuestIds) {
+          const def = ctx.campaign.quests?.find((q) => q.id === qid);
+          if (!def?.rewards?.length) continue;
+          const activeCharId =
+            result.newState.characters.find((c) => c.id === result.newState.active_character_id)
+              ?.id ?? result.newState.characters[0]?.id;
+          if (!activeCharId) continue;
+          // Header line per quest so reward bullets attach clearly
+          rewardNarrativeParts.push(`\n\n✦ Quest complete — ${def.title}.`);
+          for (const reward of def.rewards) {
+            result.newState = applyConsequence(
+              reward,
+              result.newState,
+              row.seed,
+              activeCharId,
+              rewardNarrativeParts
+            );
+          }
+          // applyQuestCompletions already bumped faction_rep by def.repGain
+          // — surface that as a narrative line so the player sees the
+          // standing change without adding it twice through a reward.
+          if (def.factionId && def.repGain) {
+            const sign = def.repGain >= 0 ? '+' : '';
+            rewardNarrativeParts.push(
+              `${sign}${def.repGain} reputation with ${def.factionId}.`
+            );
+          }
+        }
         if (completedQuestIds.length) {
           result.narrative =
-            (result.narrative ?? '') +
-            ` [Quest${completedQuestIds.length > 1 ? 's' : ''} completed: ${completedQuestIds.join(', ')}]`;
+            (result.narrative ?? '') + rewardNarrativeParts.join(' ');
         }
       }
       const updatedCs = extractCampaignDelta(campaignState, result.newState);

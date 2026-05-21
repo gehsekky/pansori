@@ -3066,7 +3066,7 @@ export async function runRules(
   return { state: st, extraNarrative: narrativeParts.join(' ') };
 }
 
-function applyConsequence(
+export function applyConsequence(
   c: GameConsequence,
   st: GameState,
   seed: Seed,
@@ -3133,6 +3133,82 @@ function applyConsequence(
       // Handled by takeAction's escaped flag; we signal via a flag that
       // the route can check after runRules returns.
       return { ...st, flags: { ...st.flags, _rule_escape: true } };
+
+    case 'give_gold': {
+      // Gold lands on the active character. Surfaced in narrative so
+      // the player sees the reward immediately ("+150 gold").
+      const characters = st.characters.map((ch) =>
+        ch.id === activeCharId ? { ...ch, gold: (ch.gold ?? 0) + c.amount } : ch
+      );
+      narrativeParts.push(`+${c.amount} gold.`);
+      return { ...st, characters };
+    }
+
+    case 'set_faction_rep': {
+      const cur = st.faction_rep?.[c.factionId] ?? 0;
+      const next = cur + c.delta;
+      narrativeParts.push(
+        `${c.delta >= 0 ? '+' : ''}${c.delta} reputation with ${c.factionId}.`
+      );
+      return { ...st, faction_rep: { ...(st.faction_rep ?? {}), [c.factionId]: next } };
+    }
+
+    case 'set_npc_attitude': {
+      // npcId is the npc's authored id (e.g. 'npc_aldric'); npc_attitudes
+      // is keyed by roomId since each room can host at most one NPC.
+      const targetRoomId = Object.entries(seed.npcs ?? {}).find(
+        ([, n]) => n.id === c.npcId
+      )?.[0];
+      if (!targetRoomId) return st;
+      return {
+        ...st,
+        npc_attitudes: { ...(st.npc_attitudes ?? {}), [targetRoomId]: c.attitude },
+      };
+    }
+
+    case 'advance_quest': {
+      const progress = st.quest_progress ?? [];
+      const existing = progress.find((p) => p.questId === c.questId);
+      if (existing) {
+        if (existing.completedSteps.includes(c.stepId)) return st;
+        return {
+          ...st,
+          quest_progress: progress.map((p) =>
+            p.questId === c.questId
+              ? { ...p, completedSteps: [...p.completedSteps, c.stepId] }
+              : p
+          ),
+        };
+      }
+      // Quest not yet accepted — start it active with this step done
+      return {
+        ...st,
+        quest_progress: [
+          ...progress,
+          { questId: c.questId, status: 'active', completedSteps: [c.stepId] },
+        ],
+      };
+    }
+
+    case 'travel_to':
+      // Update the location pointer; preserves room_id (caller picks
+      // a destination room separately if needed).
+      return { ...st, current_location_id: c.locationId, current_district_id: undefined };
+
+    case 'consume_item': {
+      // Remove ONE instance of itemId from whichever party member has
+      // it. Quest turn-ins (Guild Ledger, Moonstone Amulet, etc.) use
+      // this so the item leaves the player's pack at completion.
+      let removed = false;
+      const characters = st.characters.map((ch) => {
+        if (removed) return ch;
+        const idx = ch.inventory.findIndex((i) => i.id === c.itemId);
+        if (idx < 0) return ch;
+        removed = true;
+        return { ...ch, inventory: ch.inventory.filter((_, i) => i !== idx) };
+      });
+      return { ...st, characters };
+    }
 
     default:
       return st;
