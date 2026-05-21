@@ -23,7 +23,7 @@ import { handleGrapple, handleShove, handleTryEscapeGrapple } from './combatTact
 import { handleLongRest, handleShortRest } from './rest.js';
 import { handleResolveReaction, handleUseReaction } from './reaction.js';
 import type { StructuredAction } from '../../types.js';
-import { handleAttack } from './attack.js';
+import { handleAttack } from './attack/index.js';
 import { handleCastSpell } from './castSpell.js';
 import { handleDeathSave } from './deathSave.js';
 import { handleDisarmTrap } from './disarmTrap.js';

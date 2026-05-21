@@ -1,5 +1,4 @@
-import { BEAST_FORMS, SRD_SPECIES } from '../../contexts/srd/index.js';
-import type { CombatEntity, Enemy, InventoryItem } from '../../types.js';
+import { BEAST_FORMS, SRD_SPECIES } from '../../../contexts/srd/index.js';
 import {
   DISADV_CONDITIONS,
   FRESH_TURN,
@@ -16,14 +15,13 @@ import {
   rollDice,
   sneakAttackDice,
   unarmedDamage,
-} from '../rulesEngine.js';
+} from '../../rulesEngine.js';
 import {
   applyPartyLevelUps,
   buildCombatHitNarrative,
   buildInitiativeOrder,
   endCombatState,
   getEnemyById,
-  getItemData,
   grantDarkOnesBlessing,
   hpTier,
   isHeavilyEncumbered,
@@ -32,10 +30,12 @@ import {
   pickTiered,
   pushEvent,
   splitEncounterXp,
-} from '../gameEngine.js';
-import { coverBonus, distanceFeet, inRange, isFlankingPosition, posEqual } from '../gridEngine.js';
-import type { ActionHandler } from './types.js';
-import { fmt } from '../narrativeFmt.js';
+} from '../../gameEngine.js';
+import { coverBonus, distanceFeet, isFlankingPosition, posEqual } from '../../gridEngine.js';
+import type { ActionHandler } from '../types.js';
+import type { CombatEntity } from '../../../types.js';
+import { fmt } from '../../narrativeFmt.js';
+import { runPreattack } from './preattack.js';
 
 /**
  * `attack`: the core melee/ranged combat resolution. Pansori's biggest
@@ -65,118 +65,15 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
   ctx,
   action
 ) => {
-  if (!ctx.enemy) {
-    ctx.narrative = pick(ctx.context.narratives.noEnemy);
-    return;
-  }
-  if (!ctx.enemyAlive) {
-    ctx.narrative = pick(ctx.context.narratives.alreadyDead);
-    return;
-  }
-
-  // Resolve targeted enemy: explicit targetEnemyId wins; fallback to first living
-  const targetEnemyId: string = action.targetEnemyId ?? ctx.enemy.id;
-  const target: Enemy = ctx.livingEnemiesInRoom.find((e) => e.id === targetEnemyId) ?? ctx.enemy;
-  const targetId = target.id;
-
-  // Grid range check — only applies when combat entities are tracked on the grid
-  if (ctx.st.entities) {
-    const charEntity = ctx.st.entities.find((e) => e.id === ctx.char.id);
-    const enemyEntity = ctx.st.entities.find((e) => e.id === targetId && e.isEnemy);
-    if (charEntity && enemyEntity) {
-      const equippedWeaponItem = ctx.char.equipped_weapon
-        ? getItemData(
-            ctx.char.inventory?.find(
-              (i) => i.instance_id === ctx.char.equipped_weapon
-            ) as InventoryItem,
-            ctx.context
-          )
-        : null;
-      if (!inRange(charEntity.pos, enemyEntity.pos, equippedWeaponItem)) {
-        ctx.narrative = `Out of range. Move closer before attacking.`;
-        return;
-      }
-    }
-  }
-
-  // Charmed: cannot attack the charmer
-  if (
-    ctx.char.conditions.includes('charmed') &&
-    ctx.char.charmer_id &&
-    ctx.char.charmer_id === targetId
-  ) {
-    ctx.narrative = `You are charmed by the ${target.name} and cannot bring yourself to attack them.`;
-    return;
-  }
-
-  // Incapacitation is handled upstream in generateChoices (pass action); guard here as a safety net
-  if (ctx.char.conditions.includes('paralyzed') || ctx.char.conditions.includes('stunned')) {
-    ctx.narrative = `You cannot act while ${ctx.char.conditions.find((c) => c === 'stunned' || c === 'paralyzed')}.`;
-    ctx.usedInitiative = true;
-    return;
-  }
-
-  const weaponItem = ctx.char.equipped_weapon
-    ? getItemData(
-        ctx.char.inventory?.find(
-          (i) => i.instance_id === ctx.char.equipped_weapon
-        ) as InventoryItem,
-        ctx.context
-      )
-    : null;
-  let weaponDamage = weaponItem?.damage ?? null;
-  // 2024 PHB Beast Forms — while shifted, the form's natural attack damage
-  // replaces the equipped weapon's. The druid's own to-hit (STR/DEX + prof)
-  // still applies — the form's RAW attack bonus is similar in magnitude so
-  // the engine's calculated to-hit is a reasonable proxy.
-  if (ctx.char.conditions.includes('wild_shaped') && ctx.char.wild_shape_form) {
-    const form = BEAST_FORMS[ctx.char.wild_shape_form];
-    if (form) weaponDamage = form.attackDamage;
-  }
-  // Versatile: use two-handed damage when no shield is equipped. 2024 PHB
-  // Flex mastery (longsword, battleaxe, warhammer) lets a trained wielder
-  // use the versatile die EVEN with a shield equipped.
-  const hasFlexMastery =
-    weaponItem?.mastery === 'flex' && (ctx.char.weapon_masteries ?? []).includes(weaponItem.id);
-  const isVersatile = !!(
-    weaponItem?.versatileDamage &&
-    (!ctx.char.equipped_shield || hasFlexMastery)
-  );
-  if (isVersatile) {
-    weaponDamage = weaponItem!.versatileDamage!;
-  }
-  const weaponLabel = weaponItem ? `Your ${weaponItem.name}` : 'Your fists';
-
-  // ── Ammunition check (PHB p.146) ──────────────────────────────────────
-  if (weaponItem?.range === 'ranged' && !weaponItem.thrown) {
-    const ammoTypes: Record<string, string[]> = {
-      bow: ['arrow', 'arrows'],
-      crossbow: ['bolt', 'bolts'],
-      sling: ['bullet', 'bullets', 'sling_bullet'],
-    };
-    const wepKey = Object.keys(ammoTypes).find((k) => weaponItem.id.includes(k)) ?? 'arrow';
-    const ammoIds = ammoTypes[wepKey] ?? ['arrow', 'arrows'];
-    const ammoIdx = ctx.char.inventory.findIndex((i) => ammoIds.some((a) => i.id.includes(a)));
-    if (ammoIdx === -1) {
-      ctx.narrative = `You have no ammunition for your ${weaponItem.name}.`;
-      return;
-    }
-    const ammoItem = ctx.char.inventory[ammoIdx];
-    const ammoCount = (ammoItem.count as number | undefined) ?? 1;
-    if (ammoCount <= 1) {
-      ctx.char = {
-        ...ctx.char,
-        inventory: ctx.char.inventory.filter((_, i) => i !== ammoIdx),
-      };
-    } else {
-      ctx.char = {
-        ...ctx.char,
-        inventory: ctx.char.inventory.map((item, i) =>
-          i === ammoIdx ? { ...item, count: ammoCount - 1 } : item
-        ),
-      };
-    }
-  }
+  // ── Pre-attack: target resolution, range/charm/incapacitation gates,
+  //    weapon resolution (Beast Form override, Versatile/Flex), and
+  //    ranged-ammo consumption. See attack/preattack.ts. The runPreattack
+  //    function mutates ctx (narrative, usedInitiative, inventory) and
+  //    returns done:true to short-circuit, or the resolved weapon/target
+  //    payload the rest of the pipeline needs.
+  const pre = runPreattack(ctx, action);
+  if (pre.done) return;
+  const { target, targetId, weaponItem, weaponDamage, isVersatile, weaponLabel } = pre;
 
   // ── Start combat on first attack — roll initiative for all ─────────────
   if (!ctx.st.combat_active) {
