@@ -201,6 +201,11 @@ export interface GameChoice {
     targetEnemyId?: string;
     rangeKind?: 'self' | 'touch' | 'ranged';
   };
+  // Stable key for "this choice has been used this adventure." When set
+  // and present in GameState.seen_choices, the FE dims the button. The
+  // backend disambiguates by room/npc/object so distinct-but-similar
+  // choices (two different "Inspect Dirty Chest") get distinct keys.
+  seenKey?: string;
 }
 
 // ─── Combat-log events (parallel to prose narrative) ─────────────────

@@ -17,6 +17,7 @@ import {
   normalizeState,
   preservesCriticalFacts,
   runRules,
+  seenKeyForAction,
   takeAction,
 } from './gameEngine.js';
 import { context as ctx } from '../contexts/sandbox.js';
@@ -10000,5 +10001,87 @@ describe('applyConsequence give_xp', () => {
     expect(next.characters[0].xp).toBeGreaterThanOrEqual(300);
     // Level stays at 1 since no context was supplied to trigger level-up.
     expect(next.characters[0].level).toBe(1);
+  });
+});
+
+// ─── seenKeyForAction — choice-dimming key derivation ───────────────────────
+// The backend stamps each choice with a stable seenKey so the FE can dim
+// repeat presentations. Room-scoped actions fold the current room into the
+// key so two physically distinct same-template objects (e.g. two crypts with
+// "dirty_chest") get distinct keys — the bug we explicitly designed against.
+
+describe('seenKeyForAction', () => {
+  const st = makeState({}, { current_room: 'crypt_room_a' });
+
+  it('returns undefined for kinds that are not dim-tracked', () => {
+    expect(seenKeyForAction({ type: 'attack' }, st)).toBeUndefined();
+    expect(seenKeyForAction({ type: 'move', roomId: 'foo' }, st)).toBeUndefined();
+    expect(seenKeyForAction({ type: 'dash' }, st)).toBeUndefined();
+    expect(
+      seenKeyForAction({ type: 'cast_spell', spellId: 'fire_bolt', slotLevel: 0 }, st)
+    ).toBeUndefined();
+  });
+
+  it('talk_response folds the room id and response index', () => {
+    expect(seenKeyForAction({ type: 'talk_response', responseIdx: 2 }, st)).toBe(
+      'talk_response::crypt_room_a::2'
+    );
+  });
+
+  it('interact_object folds room id + object id', () => {
+    expect(seenKeyForAction({ type: 'interact_object', objectId: 'dirty_chest' }, st)).toBe(
+      'interact_object::crypt_room_a::dirty_chest'
+    );
+  });
+
+  it('same object id in different rooms produces different keys', () => {
+    const stA = makeState({}, { current_room: 'crypt_room_a' });
+    const stB = makeState({}, { current_room: 'crypt_room_b' });
+    const keyA = seenKeyForAction({ type: 'interact_object', objectId: 'dirty_chest' }, stA);
+    const keyB = seenKeyForAction({ type: 'interact_object', objectId: 'dirty_chest' }, stB);
+    expect(keyA).not.toBe(keyB);
+  });
+
+  it('accept_quest uses the quest id (room-independent)', () => {
+    expect(seenKeyForAction({ type: 'accept_quest', questId: 'quest_crypt' }, st)).toBe(
+      'accept_quest::quest_crypt'
+    );
+  });
+
+  it('examine and loot fold the room id', () => {
+    expect(seenKeyForAction({ type: 'examine' }, st)).toBe('examine::crypt_room_a');
+    expect(seenKeyForAction({ type: 'loot' }, st)).toBe('loot::crypt_room_a');
+  });
+});
+
+describe('generateChoices stamps seenKey on dim-tracked choices', () => {
+  it('emitted talk_response / interact_object / loot choices carry a seenKey', () => {
+    // Use a procgen seed so we get a real room with possible loot/objects.
+    const sd = generateRoguelikeSeed(ctx);
+    const startRoom = sd.rooms[0];
+    const st = makeState({}, { current_room: startRoom.id });
+    const choices = generateChoices(st, sd, ctx);
+    for (const c of choices) {
+      const expected = seenKeyForAction(c.action, st);
+      if (expected) {
+        expect(c.seenKey).toBe(expected);
+      } else {
+        expect(c.seenKey).toBeUndefined();
+      }
+    }
+  });
+});
+
+describe('normalizeState preserves seen_choices', () => {
+  it('defaults to empty array when missing on a new-format state', () => {
+    const st = makeState();
+    const result = normalizeState(st as unknown as Record<string, unknown>);
+    expect(result.seen_choices).toEqual([]);
+  });
+
+  it('passes through an existing seen_choices array', () => {
+    const st = makeState({}, { seen_choices: ['interact_object::roomA::chest'] });
+    const result = normalizeState(st as unknown as Record<string, unknown>);
+    expect(result.seen_choices).toEqual(['interact_object::roomA::chest']);
   });
 });
