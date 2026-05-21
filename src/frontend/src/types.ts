@@ -187,6 +187,10 @@ export interface Character {
   hide_dc?: number;
   condition_sources?: Record<string, string>;
   species?: string;
+  // Multiplayer ownership: the userId of the human controlling this PC.
+  // Mirror of the backend Character.owner_user_id — see BE types for the
+  // long explanation.
+  owner_user_id?: string;
 }
 
 // ─── NPC system ───────────────────────────────────────────────────────────────

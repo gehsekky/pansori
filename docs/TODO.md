@@ -52,24 +52,74 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 - [ ] **gameEngine.ts class refactor (deferred)** — `takeAction` is ~3900 lines with three handlers that dominate (`use_class_feature` ~800, `cast_spell` ~544, `attack` ~532). Refactor into an `ActionContext` class that dispatches to handler files (`services/actions/castSpell.ts`, etc.). Moderate regression risk. Triggers to revisit: (a) big-handler edits grind into context budget; (b) a feature touches multiple handlers; (c) a quiet maintenance day.
 - [ ] **Pre-commit hook (Husky + lint-staged)** — auto-run eslint + prettier on staged files before commit. Catches the class of bug where prettier-dirty code reaches CI and fails the build. ~30 min setup; bypassable with `--no-verify`. CI lint stays as the gate.
 
-- [ ] **Multiplayer + party chat (online co-op)** — let friends share a session and chat in realtime. Architecture audit confirmed the base is close: `state.characters[]` already models a party, `state.current_room` is single-valued (no party split → players share one narrative), and the reactive-spell pause already routes prompts to the eligible PC. Four concrete gaps:
-  1. **Ownership model**: `game_sessions.user_id` is single-tenant. Add `session_participants(session_id, user_id, character_id, role)`; authorization becomes "user is a participant." Original `user_id` stays as host (matters for delete/invite). ~3-4h.
-  2. **Turn enforcement at the API boundary**: `takeAction` doesn't check `req.user.id === characters[active].owner_user_id`. Singleplayer doesn't care; multiplayer is exploitable. Add `Character.owner_user_id` + a single route-level guard. ~1h.
-  3. **Realtime push (Socket.IO)**: one server room per session; `state` event after every takeAction broadcasts to all participants; `chat` event in both directions for messages. Keeps REST for writes (auth model unchanged, easy to reason about) and uses WS only for fanout. Needs sticky sessions if Pansori ever scales to >1 backend instance — today single EC2, no concern. ~7h server + frontend integration.
-  4. **Chat MVP**: input + message list + `chat_messages` table for persistence. ~3h.
-  5. **Race detection** (optional): `turn_seq` column rejects stale takeAction submissions when two players race-click. ~1-2h. Defer until it actually bites.
+- [ ] **Multiplayer MVP — party-of-equals with per-PC ownership** (design locked 2026-05-21).
+      Each PC has exactly one human controller via `Character.owner_user_id`. Solo
+      mode = host owns all PCs (no schema branch). 2+1 / 1+2 / 1+1+1 splits all
+      fall out of the same row layout in `session_participants`. Every participant
+      sees the full narrative (Socket.IO broadcast on every state change). Action
+      buttons render only for the player whose PC is currently active; everyone
+      else sees "Waiting for `<Name>` to finish their turn."
 
-  Total ~15-17h, splittable into 4 PRs. Order: participants table → Socket.IO scaffolding → chat → race detection. Each PR keeps singleplayer working; multiplayer only activates when a session has >1 participant.
+  **Design calls (locked)**
+  - Invite UX: shareable link with a session-scoped `invite_token`.
+  - No DM mode (yet) — strict party-of-equals. `session_participants.role`
+    column carries a default `'pc'` value from day one so a `'dm'` role can
+    be added later without a schema migration.
+  - No voice — players use their own VC (Discord, etc.).
 
-  Open questions to settle before starting:
-  - Invite UX: shareable link, or invite-by-email through users table?
-  - DM mode (one player runs encounters for others) or strict party-of-equals?
-  - Voice — pipe Discord OAuth into a Discord-server-link feature, or leave voice out and let players use their own VC?
+  **Invariants**
+  - Each PR keeps singleplayer working. In solo mode every PC is owned by
+    the host, so no guard ever rejects, no "waiting" banner ever renders.
+  - Lead handoff (out-of-combat): only the current lead's owner can pass.
+    No "claim the lead" escape hatch in MVP — add if AFK becomes a real
+    problem in playtest.
+  - Host disconnect = session paused (no actions accepted) until host
+    reconnects. Simpler than promoting a new host.
+  - Player disconnect = their PCs stay theirs; host can reassign via the
+    participants modal if they don't return.
+  - Inventory modal: viewing any PC's tab is allowed; Equip / Transfer /
+    Drop only enabled for PCs you own.
 
+  **Phases (~15-18h total, splittable into 4 PRs)**
+  1. **Data foundation** (~4-5h). Migration: `session_participants(session_id,
+user_id, joined_at, role text default 'pc')` table + index. Schema
+     evolution: every PC's `owner_user_id` is set at character creation;
+     `normalizeState` backfills missing values to `session.user_id` for
+     existing sessions. Type: `Character.owner_user_id?: string` on the
+     shared types. Specs: backfill correctness, default value on new
+     PCs. **This PR is data-only — no behavior changes.**
+  2. **Auth + turn enforcement** (~2h). Route guard: `/api/game/session/:id/*`
+     checks the requesting user is a participant (was: owner). `takeAction`
+     rejects when `req.user.id !== characters[active].owner_user_id` with
+     a clean narrative. Reaction-routed actions check the eligible PC's
+     owner instead of `active_character_id`. New endpoints:
+     `POST /session/:id/assign-character` (host-only) and
+     `POST /session/:id/join` (anyone with a valid invite token).
+  3. **Realtime push** (~6-7h). After every successful `takeAction`,
+     `io.to(\`session:${sessionId}\`).emit('state', result.newState)`.
+Frontend `useGame`connects to the socket on session load and
+replaces local state on each broadcast. Sequence number on the
+broadcast envelope so out-of-order packets don't downgrade state.
+Frontend: render`<WaitingForPlayer name={...} />` instead of the
+     action pane when the active PC's owner isn't us.
+  4. **Invite + participant management UX** (~3-4h). Generate per-session
+     `invite_token`, build a shareable URL `?join=<token>`. Landing on
+     that URL triggers login (if needed) → join → redirect to game.
+     Participants modal (host only): list all participants + which PCs
+     they own, allow host to reassign with a dropdown. "Rotate invite
+     token" button for leaked links.
+
+  **Deferred from MVP** (revisit after playtest)
+  - Race detection (`turn_seq` column rejecting stale submissions when
+    two participants race-click). Defer until it actually bites.
+  - Chat MVP (`chat_messages` table + input + log). Players can use
+    voice (Discord); chat is nice but not required for a working co-op.
+  - Per-participant cosmetics (name colors in narrative attribution, etc.)
+  - Spectator mode (a participant with no PC, observing only).
+  - "Claim the lead" escape hatch for AFK lead owners.
 
 ### Architecture audit follow-ups
 
-- [ ] **Socket.IO frontend client** (needs-input) — the server-side Socket.IO scaffolding already exists in `src/backend/src/index.ts` (room-join handler + per-session rooms), but no frontend client is wired and no state broadcasts happen. The Multiplayer TODO under-estimated this — half of the WebSocket scaffolding is already done. Open question: do we wire the client now (as prep for multiplayer) or wait until the participants-table item lands?
 - [ ] **Observability** (needs-input) — only `console.log` today. Sentry / structured logging / error tracking would surface prod issues. Requires choosing a service (paid SaaS or self-hosted).
 - [ ] **CHANGELOG.md** (needs-input) — no user-visible change log. Should we keep one? Format (Keep-a-Changelog, conventional commits, etc.)?
 - [ ] **Post-deploy health check + rollback** (needs-input) — CI deploys via SSM but doesn't poll `/api/health` after to verify, nor roll back on failure. Bad deploys 500 prod until manual intervention. ~2-3h to wire properly.
@@ -88,6 +138,7 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 > validation is the next step.
 
 ### Shipped 2026-05-21
+
 - [x] **Skip-to-main link** — `<a href="#main-content">` becomes visible-on-focus, lands keyboard users past the header on `<main id="main-content">`. WCAG 2.4.1.
 - [x] **CharScreen label htmlFor** — name / class / subclass / species / background fields now use `htmlFor` + matching `id={\`char-${idx}-X\`}` so SR announces the field name on focus.
 - [x] **Player avatar meaningful alt** — PartyRail / InventoryModal / SessionScreen portraits now read `"${name}'s portrait"` (was `alt=""`). User's own header avatar stays `alt=""` since the name is in adjacent text.
@@ -95,6 +146,7 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 - [x] **MoveDPad keyboard navigation** — WAI-ARIA Composite Widget pattern: roving tabindex (one focused cell at a time), arrow keys move focus spatially, arrow keys skip past disabled cells. 3 spec assertions cover the behavior.
 
 ### Remaining
+
 - [ ] **fieldset/legend on grouped form controls** — CharScreen's `PORTRAIT` and `ABILITY SCORES` "labels" are group descriptors (govern multiple buttons) but use plain `<label>` without an `htmlFor`. The right HTML is `<fieldset><legend>` (or `<div role="group" aria-labelledby="...">`). Larger refactor than the simple-label htmlFor pass already shipped.
 - [ ] **HP / condition live-region updates** — the combat narrative has `aria-live="polite"` so SR users hear what happened, but HP-bar fills and condition badges update silently. An off-screen `aria-live` summary of the most recent delta (`Fighter HP 18, conditions: frightened`) would help SR users track state without re-listening to the full narrative. Needs UX tuning on when to announce vs. when to stay quiet.
 - [ ] **Manual SR + keyboard-only validation** — code survey done; next step is exercising the app with VoiceOver / NVDA / JAWS and Tab-only to find the things the code review missed.
@@ -112,11 +164,13 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 > lands.
 
 ### Shipped 2026-05-21
+
 - [x] **SESSION_SECRET fail-fast** — was `?? 'change-me-in-production'`. Now boot throws if env is missing — refuses to accept requests against a known-secret session signing key.
 - [x] **Rate limit on `/api/game/*`** — 120 req/min `gameLimiter` sits after `requireAuth` and before `gameRouter`. Throttles takeAction spam without affecting normal play.
 - [x] **Socket.IO `join-session` ownership check** — session middleware is now shared between Express and `io.engine.use(...)`. Before joining a session's room, we read `req.session.passport.user` and run a `SELECT 1 FROM game_sessions WHERE id = $1 AND user_id = $2`. Single-tenant today; will broaden via `session_participants` when multiplayer lands.
 
 ### Remaining
+
 - [ ] **No CSRF protection on state-changing endpoints** — cookies use `sameSite: 'none'` in prod (required for cross-origin SPA + API), so the browser sends the session cookie on cross-origin POSTs. A malicious site could trigger `POST /api/game/session/:id/action` via a logged-in user. Options: (a) tighten to `sameSite: 'lax'` if cross-origin isn't actually needed — confirm the prod FE + API domain layout; (b) add a double-submit CSRF token; (c) require a custom header like `X-Requested-With: XMLHttpRequest` (lightweight but defense-in-depth only). **Needs design call before implementation.**
 - [ ] **Multiplayer: session ownership + turn enforcement** (already in main TODO) — `game_sessions.user_id` is single-tenant; `takeAction` doesn't verify `req.user.id === characters[active].owner_user_id`. Documented above under Multiplayer; flagged here so the security pass references it.
 - [ ] **`npm audit` in CI** — no automated dependency-vuln check. Add a job to PR builds that fails on `high` or `critical`. ~15 min YAML edit; ongoing maintenance to triage findings.
