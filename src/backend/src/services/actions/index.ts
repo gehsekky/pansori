@@ -26,10 +26,12 @@ import { handleDeathSave } from './deathSave.js';
 import { handleDisarmTrap } from './disarmTrap.js';
 import { handleEscape } from './escape.js';
 import { handleExamine } from './examineDefault.js';
+import { handleGridMove } from './gridMove.js';
 import { handleInteractObject } from './interactObject.js';
 import { handleLoot } from './loot.js';
 import { handleMove } from './move.js';
 import { handleSneak } from './sneak.js';
+import { handleTwoWeaponAttack } from './twoWeaponAttack.js';
 import { handleUseReaction } from './reaction.js';
 
 /**
@@ -76,6 +78,8 @@ const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   examine: handleExamine as ActionHandler,
   attack_npc: handleAttackNpc as ActionHandler,
   use_reaction: handleUseReaction as ActionHandler,
+  two_weapon_attack: handleTwoWeaponAttack as ActionHandler,
+  grid_move: handleGridMove as ActionHandler,
 };
 
 /**

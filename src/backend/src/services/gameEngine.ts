@@ -17,7 +17,6 @@ import {
   rageDamageBonus,
   rageUsesMax,
   resolveEnemyAttack,
-  resolveOffHandAttack,
   resolvePlayerAttack,
   resolveSpellAttack,
   rollConditionSave,
@@ -381,7 +380,7 @@ function breakConcentration(char: Character, st: GameState): { char: Character; 
   return { char: newChar, st: newSt };
 }
 
-function checkConcentration(
+export function checkConcentration(
   char: Character,
   st: GameState,
   dmgTaken: number
@@ -1130,7 +1129,7 @@ function hasLivingEnemy(state: GameState, seed: Seed, roomId: string): boolean {
   return getLivingRoomEnemies(state, seed, roomId).length > 0;
 }
 
-function isRoomCleared(state: GameState, seed: Seed, roomId: string): boolean {
+export function isRoomCleared(state: GameState, seed: Seed, roomId: string): boolean {
   const all = getRoomEnemies(seed, roomId);
   if (all.length === 0) return true;
   const killed = state.enemies_killed ?? [];
@@ -1194,7 +1193,7 @@ export function endCombatState(st: GameState): GameState {
 // `char.xp` themselves — that preserves the downstream-read patterns the
 // kill blocks use (level-up check, narrative composition, etc.) without
 // requiring a refresh-from-state round trip.
-function splitEncounterXp(
+export function splitEncounterXp(
   st: GameState,
   killerId: string,
   totalXp: number
@@ -1257,7 +1256,7 @@ function applyLevelUpFromXp(char: Character, context: Context): string {
 // `killer` is mutated in place (callers expect to read `char.level` etc.);
 // other party members are read+mutated through `st.characters` references
 // that `splitEncounterXp` already replaced with fresh objects.
-function applyPartyLevelUps(st: GameState, killer: Character, context: Context): string {
+export function applyPartyLevelUps(st: GameState, killer: Character, context: Context): string {
   let out = '';
   out += applyLevelUpFromXp(killer, context);
   for (const c of st.characters) {
@@ -1294,7 +1293,7 @@ export function preservesCriticalFacts(input: string, output: string): boolean {
 
 // Fiend Warlock — Dark One's Blessing (PHB p.108): when you reduce a hostile
 // creature to 0 HP, gain temp HP = CHA mod + warlock level (min 1).
-function grantDarkOnesBlessing(char: Character): string {
+export function grantDarkOnesBlessing(char: Character): string {
   if (char.character_class.toLowerCase() !== 'warlock' || char.subclass !== 'fiend') return '';
   const grant = Math.max(1, char.level + abilityMod(char.cha));
   const prev = char.temp_hp ?? 0;
@@ -7916,252 +7915,6 @@ export async function takeAction({
         break;
       }
 
-      case 'two_weapon_attack': {
-        if (!st.combat_active) {
-          narrative = 'No enemy to attack.';
-          break;
-        }
-        // Find the off-hand light weapon in inventory
-        const mainWpnInstanceId = char.equipped_weapon;
-        const offhandInvItem = char.inventory
-          .filter((i) => i.instance_id !== mainWpnInstanceId)
-          .find((i) => {
-            const l = context.lootTable.find((ll) => ll.id === i.id);
-            return l?.light && l.slot === 'weapon';
-          });
-        if (!offhandInvItem) {
-          narrative = 'No light off-hand weapon found.';
-          break;
-        }
-        const offhandLoot = context.lootTable.find((l) => l.id === offhandInvItem.id)!;
-        // 2024 PHB Nick mastery (dagger, light hammer, sickle, scimitar) — when
-        // the off-hand weapon has Nick + the wielder is trained in it, the
-        // two-weapon extra attack is part of the Attack action instead of a
-        // bonus action. Frees the bonus action for Cunning Action / Rage / etc.
-        const nickFree =
-          offhandLoot.mastery === 'nick' &&
-          (char.weapon_masteries ?? []).includes(offhandLoot.id) &&
-          char.turn_actions.action_used;
-        if (!nickFree && char.turn_actions.bonus_action_used) {
-          narrative = 'Bonus action already used this turn.';
-          break;
-        }
-        const offhandProficient = hasWeaponProficiency(
-          char.weapon_proficiencies ?? [],
-          offhandLoot.weaponType
-        );
-        const twfTargetId: string =
-          (action as { type: 'two_weapon_attack'; targetEnemyId?: string }).targetEnemyId ??
-          enemy?.id ??
-          '';
-        const enemyInRoom = livingEnemiesInRoom.find((e) => e.id === twfTargetId) ?? enemy;
-        if (!enemyInRoom) {
-          narrative = 'No enemy here.';
-          break;
-        }
-        const twfTargetEntityId = enemyInRoom.id;
-        const condDisadvTwf = char.conditions.some((c) => DISADV_CONDITIONS.has(c));
-        const armorLootItemTwf = char.equipped_armor
-          ? context.lootTable.find(
-              (l) => l.id === char.inventory.find((i) => i.instance_id === char.equipped_armor)?.id
-            )
-          : null;
-        const armorProfTwf = hasArmorProficiency(
-          char.armor_proficiencies ?? [],
-          armorLootItemTwf?.armorCategory
-        );
-        const disadvTwf = condDisadvTwf || !armorProfTwf;
-        const atk = resolveOffHandAttack(
-          { str: char.str, dex: char.dex, level: char.level },
-          offhandLoot.damage,
-          enemyInRoom.ac,
-          offhandLoot.finesse ?? false,
-          disadvTwf,
-          false,
-          offhandProficient,
-          offhandLoot.range === 'ranged'
-        );
-        // Nick: don't consume the bonus action; it stays available this turn.
-        if (!nickFree) {
-          char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
-        }
-        usedInitiative = true;
-        if (atk.fumble) {
-          narrative = `Off-hand fumble! The ${offhandLoot.name} slips from your grip. (d20: 1)`;
-          break;
-        }
-        if (!atk.hit) {
-          narrative = `Off-hand attack with ${offhandLoot.name} misses. (${atk.roll}+${atk.atkMod}+${atk.prof}=${atk.total} vs AC ${enemyInRoom.ac})`;
-          break;
-        }
-        const entTwf = st.entities?.find((e) => e.id === twfTargetEntityId && e.isEnemy);
-        const curHpTwf = entTwf?.hp ?? 0;
-        const newHpTwf = curHpTwf - atk.damage;
-        st = {
-          ...st,
-          entities: (st.entities ?? []).map((e) =>
-            e.id === twfTargetEntityId && e.isEnemy ? { ...e, hp: newHpTwf } : e
-          ),
-        };
-        narrative = `Off-hand strike with ${offhandLoot.name}! ${atk.damage} damage${atk.critical ? ' (CRITICAL!)' : ''} (${atk.roll}+${atk.atkMod}+${atk.prof}=${atk.total} vs AC ${enemyInRoom.ac}, no ability mod to damage).`;
-        if (newHpTwf <= 0) {
-          const xpGainTwf = enemyInRoom.xp ?? 10;
-          const split = splitEncounterXp(st, char.id, xpGainTwf);
-          st = split.st;
-          char.xp = (char.xp || 0) + split.share;
-          narrative += ` The ${enemyInRoom.name} falls!`;
-          st = {
-            ...st,
-            entities: (st.entities ?? []).map((e) =>
-              e.id === twfTargetEntityId && e.isEnemy ? { ...e, hp: 0 } : e
-            ),
-          };
-          st.enemies_killed = [...(st.enemies_killed || []), twfTargetEntityId];
-          narrative += grantDarkOnesBlessing(char);
-          narrative += applyPartyLevelUps(st, char, context);
-          if (st.combat_active && isRoomCleared(st, seed, roomId)) st = endCombatState(st);
-        }
-        break;
-      }
-
-      // ── Grid movement ────────────────────────────────────────────────────────
-      case 'grid_move': {
-        if (!st.entities) {
-          narrative = 'Grid combat is not active.';
-          break;
-        }
-        const gridAction = action as {
-          type: 'grid_move';
-          entityId: string;
-          to: { x: number; y: number };
-        };
-        if (gridAction.entityId !== char.id) {
-          narrative = 'You can only move your own character.';
-          break;
-        }
-
-        const charEntity = st.entities.find((e) => e.id === char.id);
-        if (!charEntity) {
-          narrative = 'Your character is not on the grid.';
-          break;
-        }
-
-        // SRD 5.2.1 p.16 — grappled and restrained reduce speed to 0.
-        if (char.conditions.some((c) => c === 'grappled' || c === 'restrained')) {
-          const which = char.conditions.includes('restrained') ? 'RESTRAINED' : 'GRAPPLED';
-          narrative = `You are ${which} — your speed is 0.`;
-          break;
-        }
-
-        // 2024 PHB Frightened — can't willingly move closer to the source of
-        // your fear. Check distance against the tracked fear-source entity;
-        // reject the move if it would decrease the distance.
-        if (char.conditions.includes('frightened') && char.condition_sources?.frightened) {
-          const fearSourceId = char.condition_sources.frightened;
-          const fearSourceEnt = st.entities.find((e) => e.id === fearSourceId);
-          if (fearSourceEnt && fearSourceEnt.hp > 0) {
-            const charEnt2 = st.entities.find((e) => e.id === char.id);
-            if (charEnt2) {
-              const currentDist = Math.max(
-                Math.abs(charEnt2.pos.x - fearSourceEnt.pos.x),
-                Math.abs(charEnt2.pos.y - fearSourceEnt.pos.y)
-              );
-              const newDist = Math.max(
-                Math.abs(gridAction.to.x - fearSourceEnt.pos.x),
-                Math.abs(gridAction.to.y - fearSourceEnt.pos.y)
-              );
-              if (newDist < currentDist) {
-                const fearName =
-                  getEnemyById(seed, fearSourceId)?.name ?? 'the source of your fear';
-                narrative = `You are FRIGHTENED — you can't willingly move closer to ${fearName}.`;
-                break;
-              }
-            }
-          }
-        }
-
-        const locationGrid = context.campaign?.locations?.find((l) =>
-          l.rooms?.some((r) => r.id === roomId)
-        );
-        const gridW = locationGrid?.gridWidth ?? context.gridWidth ?? 10;
-        const gridH = locationGrid?.gridHeight ?? context.gridHeight ?? 10;
-        // Dead entities (hp ≤ 0) still appear in state.entities for narrative
-        // continuity but don't block movement — you walk over the corpse. This
-        // also matches the frontend's `isReachable` (filters on hp > 0), so the
-        // click-to-move targets and the BFS pathfinder agree on what's blocked.
-        // Static room obstacles (columns/walls/debris) block movement too.
-        const currentRoomForMove = seed.rooms.find((r) => r.id === roomId);
-        const roomObstaclesForMove = currentRoomForMove?.obstacles ?? [];
-        const blocked = [
-          ...st.entities.filter((e) => e.id !== char.id && e.hp > 0).map((e) => e.pos),
-          ...roomObstaclesForMove,
-        ];
-
-        const path = findPath(charEntity.pos, gridAction.to, blocked, gridW, gridH);
-        if (!path) {
-          narrative = 'No path to that square.';
-          break;
-        }
-
-        // Terrain-aware movement cost: difficult terrain squares cost 2× movement
-        const currentSeedRoomGrid = seed.rooms.find((r) => r.id === roomId);
-        const difficultTerrain = currentSeedRoomGrid?.difficultTerrain ?? [];
-        const costFeet = path.reduce((acc, pos) => {
-          const isDifficult = difficultTerrain.some((dt) => posEqual(dt, pos));
-          return acc + (isDifficult ? SQUARE_SIZE * 2 : SQUARE_SIZE);
-        }, 0);
-
-        const speedFt = effectiveSpeed(char);
-        const usedFt = st.movement_used?.[char.id] ?? 0;
-        if (usedFt + costFeet > speedFt) {
-          narrative = `Not enough movement. (${speedFt - usedFt} ft remaining, ${costFeet} ft needed${difficultTerrain.length ? ' — difficult terrain' : ''})`;
-          break;
-        }
-
-        // Check for opportunity attacks from enemies being left behind
-        const oaTargets = opportunityAttackTriggers(
-          charEntity.pos,
-          gridAction.to,
-          st.entities,
-          false
-        );
-        let oaNarrative = '';
-        for (const oaEntity of oaTargets) {
-          const oaEnemy = getEnemyById(seed, oaEntity.id);
-          if (
-            oaEnemy &&
-            !st.enemies_killed.includes(oaEntity.id) &&
-            !char.turn_actions?.disengaged
-          ) {
-            const oaResult = resolveEnemyAttack(oaEnemy, char.ac);
-            if (oaResult.hit) {
-              const dmg = oaResult.damage;
-              char.hp = Math.max(0, char.hp - dmg);
-              const concResult = checkConcentration(char, st, dmg);
-              char = concResult.char;
-              st = concResult.st;
-              oaNarrative += ` [Opportunity attack from ${oaEnemy.name}: ${dmg} damage!${concResult.note}]`;
-            } else {
-              oaNarrative += ` [Opportunity attack from ${oaEnemy.name}: missed!]`;
-            }
-          }
-        }
-
-        // Apply movement
-        const updatedEntities: CombatEntity[] = st.entities!.map((e) =>
-          e.id === char.id ? { ...e, pos: gridAction.to } : e
-        );
-        st = {
-          ...st,
-          entities: updatedEntities,
-          movement_used: { ...st.movement_used, [char.id]: usedFt + costFeet },
-        };
-
-        narrative = `${char.name} moves to (${gridAction.to.x}, ${gridAction.to.y}).${oaNarrative}`;
-        break;
-      }
-
-      // ── Travel between locations ──────────────────────────────────────────────
       // ── Resolve pending reaction (Shield window for now) ──────────────────────
       case 'resolve_reaction': {
         const rxAction = action as { type: 'resolve_reaction'; accept: boolean };

@@ -1,0 +1,136 @@
+import { SQUARE_SIZE, findPath, opportunityAttackTriggers, posEqual } from '../gridEngine.js';
+import { checkConcentration, effectiveSpeed, getEnemyById } from '../gameEngine.js';
+import type { ActionHandler } from './types.js';
+import { resolveEnemyAttack } from '../rulesEngine.js';
+
+/**
+ * `grid_move`: tactical movement on the combat grid. Validates:
+ * - entities exist (grid combat is active)
+ * - the move targets this character (no manipulating allies)
+ * - speed isn't 0 (grappled / restrained reject the move)
+ * - 2024 PHB Frightened: can't move closer to fear source
+ * - the path exists (BFS over grid, blocked by living entities +
+ *   room obstacles; dead bodies are walked over to match the FE)
+ * - movement budget covers the path (difficult-terrain squares cost
+ *   2× per SRD 5.2.1)
+ *
+ * On valid move: triggers opportunity attacks from enemies the move
+ * leaves threat-range of (skipped if Disengaged); applies any OA
+ * damage with concentration checks; updates the entity's pos and
+ * accumulates movement_used.
+ */
+export const handleGridMove: ActionHandler<{
+  type: 'grid_move';
+  entityId: string;
+  to: { x: number; y: number };
+}> = (ctx, action) => {
+  if (!ctx.st.entities) {
+    ctx.narrative = 'Grid combat is not active.';
+    return;
+  }
+  if (action.entityId !== ctx.char.id) {
+    ctx.narrative = 'You can only move your own character.';
+    return;
+  }
+  const charEntity = ctx.st.entities.find((e) => e.id === ctx.char.id);
+  if (!charEntity) {
+    ctx.narrative = 'Your character is not on the grid.';
+    return;
+  }
+
+  if (ctx.char.conditions.some((c) => c === 'grappled' || c === 'restrained')) {
+    const which = ctx.char.conditions.includes('restrained') ? 'RESTRAINED' : 'GRAPPLED';
+    ctx.narrative = `You are ${which} — your speed is 0.`;
+    return;
+  }
+
+  // 2024 PHB Frightened — can't willingly move closer to the source of fear.
+  if (ctx.char.conditions.includes('frightened') && ctx.char.condition_sources?.frightened) {
+    const fearSourceId = ctx.char.condition_sources.frightened;
+    const fearSourceEnt = ctx.st.entities.find((e) => e.id === fearSourceId);
+    if (fearSourceEnt && fearSourceEnt.hp > 0) {
+      const currentDist = Math.max(
+        Math.abs(charEntity.pos.x - fearSourceEnt.pos.x),
+        Math.abs(charEntity.pos.y - fearSourceEnt.pos.y)
+      );
+      const newDist = Math.max(
+        Math.abs(action.to.x - fearSourceEnt.pos.x),
+        Math.abs(action.to.y - fearSourceEnt.pos.y)
+      );
+      if (newDist < currentDist) {
+        const fearName = getEnemyById(ctx.seed, fearSourceId)?.name ?? 'the source of your fear';
+        ctx.narrative = `You are FRIGHTENED — you can't willingly move closer to ${fearName}.`;
+        return;
+      }
+    }
+  }
+
+  const locationGrid = ctx.context.campaign?.locations?.find((l) =>
+    l.rooms?.some((r) => r.id === ctx.roomId)
+  );
+  const gridW = locationGrid?.gridWidth ?? ctx.context.gridWidth ?? 10;
+  const gridH = locationGrid?.gridHeight ?? ctx.context.gridHeight ?? 10;
+  // Dead entities don't block — walking over a corpse is allowed (matches
+  // the FE's isReachable). Static obstacles (columns, walls, debris) do.
+  const currentRoomForMove = ctx.seed.rooms.find((r) => r.id === ctx.roomId);
+  const roomObstacles = currentRoomForMove?.obstacles ?? [];
+  const blocked = [
+    ...ctx.st.entities.filter((e) => e.id !== ctx.char.id && e.hp > 0).map((e) => e.pos),
+    ...roomObstacles,
+  ];
+
+  const path = findPath(charEntity.pos, action.to, blocked, gridW, gridH);
+  if (!path) {
+    ctx.narrative = 'No path to that square.';
+    return;
+  }
+
+  const difficultTerrain = currentRoomForMove?.difficultTerrain ?? [];
+  const costFeet = path.reduce((acc, pos) => {
+    const isDifficult = difficultTerrain.some((dt) => posEqual(dt, pos));
+    return acc + (isDifficult ? SQUARE_SIZE * 2 : SQUARE_SIZE);
+  }, 0);
+
+  const speedFt = effectiveSpeed(ctx.char);
+  const usedFt = ctx.st.movement_used?.[ctx.char.id] ?? 0;
+  if (usedFt + costFeet > speedFt) {
+    ctx.narrative = `Not enough movement. (${speedFt - usedFt} ft remaining, ${costFeet} ft needed${difficultTerrain.length ? ' — difficult terrain' : ''})`;
+    return;
+  }
+
+  const oaTargets = opportunityAttackTriggers(charEntity.pos, action.to, ctx.st.entities, false);
+  let nextChar = ctx.char;
+  let nextSt = ctx.st;
+  let oaNarrative = '';
+  for (const oaEntity of oaTargets) {
+    const oaEnemy = getEnemyById(ctx.seed, oaEntity.id);
+    if (
+      oaEnemy &&
+      !nextSt.enemies_killed.includes(oaEntity.id) &&
+      !nextChar.turn_actions?.disengaged
+    ) {
+      const oaResult = resolveEnemyAttack(oaEnemy, nextChar.ac);
+      if (oaResult.hit) {
+        const dmg = oaResult.damage;
+        nextChar = { ...nextChar, hp: Math.max(0, nextChar.hp - dmg) };
+        const concResult = checkConcentration(nextChar, nextSt, dmg);
+        nextChar = concResult.char;
+        nextSt = concResult.st;
+        oaNarrative += ` [Opportunity attack from ${oaEnemy.name}: ${dmg} damage!${concResult.note}]`;
+      } else {
+        oaNarrative += ` [Opportunity attack from ${oaEnemy.name}: missed!]`;
+      }
+    }
+  }
+
+  nextSt = {
+    ...nextSt,
+    entities: (nextSt.entities ?? []).map((e) =>
+      e.id === ctx.char.id ? { ...e, pos: action.to } : e
+    ),
+    movement_used: { ...nextSt.movement_used, [ctx.char.id]: usedFt + costFeet },
+  };
+  ctx.char = nextChar;
+  ctx.st = nextSt;
+  ctx.narrative = `${nextChar.name} moves to (${action.to.x}, ${action.to.y}).${oaNarrative}`;
+};
