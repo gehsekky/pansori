@@ -55,17 +55,21 @@ const ICONIZED_KINDS = new Set<string>([
 const DEFAULT_ACTION_KINDS = new Set<string>(['dash', 'disengage', 'dodge', 'ready']);
 const COMBAT_ACTION_KINDS = new Set<string>(['attack', 'grapple', 'shove', 'two_weapon_attack']);
 
-// SpellBar handles single-target offensive cast_spell choices (one
-// button per unique spell at the lowest available slot). Multi-target
-// variants (Magic Missile focus-fire / spread, Eldritch Blast multi-
-// beam) and upcast slots stay in the text list. This computes the
-// exact subset that goes to the SpellBar so the text list can filter
-// them out without losing the upcast / multi-target variants.
+// SpellBar surfaces one icon per cast_spell choice the active PC has
+// available — including buffs (Bless), heals (Cure Wounds, Healing
+// Word), utility (Misty Step), AND single-target offensive (Sacred
+// Flame, Guiding Bolt). Dedup'd by spellId at the lowest available
+// slot; upcast variants stay in the text list. Multi-target focus-
+// fire / spread variants (Magic Missile, Eldritch Blast L5+) also
+// stay in the text list — their shape (multiple distinct dart/beam
+// targets) doesn't collapse to one icon button.
 function selectSpellBarChoices(choices: GameChoice[]): GameChoice[] {
   const single = choices.filter((c) => {
     if (c.kind !== 'cast_spell') return false;
-    const action = c.action as { targetEnemyId?: string; targetEnemyIds?: string[] };
-    return !!action.targetEnemyId && !Array.isArray(action.targetEnemyIds);
+    const action = c.action as { targetEnemyIds?: string[] };
+    // Drop only the multi-target variants — everything else (offensive
+    // single-target, buff, heal, utility) gets a button.
+    return !Array.isArray(action.targetEnemyIds);
   });
   // One per spellId at lowest slot — match SpellBar's internal grouping.
   const lowestPerSpell = new Map<string, GameChoice>();

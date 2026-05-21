@@ -1,25 +1,24 @@
-import type { ChoiceKind, GameChoice } from '../types.ts';
+import type { GameChoice } from '../types.ts';
 import RaIcon from './RaIcon.tsx';
 import styles from '../styles.module.css';
 
-// Horizontal icon row showing one button per single-target offensive
-// spell the active PC can cast right now. Pairs with the EnemySelector
-// (which says who the spell hits) so each tile collapses N target
-// variants into one click.
+// Horizontal icon row showing one button per spell the active PC can
+// cast right now — offensive, buff, heal, and utility all surface.
+// Pairs with the EnemySelector (which controls which enemy a single-
+// target offensive spell hits) — buff/heal/utility spells ignore the
+// selector and auto-target allies or self per the engine's cast handler.
 //
 // Scope:
-//   IN  — single-target offensive cast_spell choices that target the
-//         currently-selected enemy. One button per unique `spellId`,
-//         picking the lowest available slot (upcasts stay in the text
-//         list below until a slot picker is added).
-//   OUT — heal/utility spells (no targetEnemyId), AoE spells
-//         (blastRadius — multiple origin variants would clutter), and
-//         multi-target Magic Missile / Eldritch Blast variants
-//         (different shape, kept in the text list as focus-fire /
-//         spread choices).
+//   IN  — every cast_spell choice except multi-target variants. One
+//         button per unique `spellId` at the lowest available slot.
+//   OUT — multi-target Magic Missile / Eldritch Blast focus-fire /
+//         spread variants (each has a distinct shape — multiple dart/
+//         beam targets — that doesn't collapse to one click); upcast
+//         slots above the lowest available (player picks via text list
+//         if they want to burn a higher slot).
 //
-// Per-spell icon map below; unknown spells fall back to a generic wand
-// glyph so brand-new spells still render something useful.
+// Per-spell icon map below; unknown spells fall back to a generic
+// wand glyph so brand-new spells still render something useful.
 
 interface Props {
   // Pre-filtered: only cast_spell choices that survived the enemy
@@ -33,6 +32,7 @@ interface Props {
 // here when a spell wants its own glyph; anything not in the map uses
 // `crystal-wand`.
 const SPELL_ICON: Record<string, string> = {
+  // Offensive single-target / damage
   fire_bolt: 'fire-symbol',
   sacred_flame: 'sunbeams',
   eldritch_blast: 'burning-eye',
@@ -43,13 +43,33 @@ const SPELL_ICON: Record<string, string> = {
   magic_missile: 'arrow-cluster',
   inflict_wounds: 'bleeding-eye',
   hellish_rebuke: 'fire-ring',
+  divine_smite_spell: 'lightning-sword',
+  // Conditions / debuffs
   hold_person: 'padlock',
   hex: 'eyeball',
   charm_person: 'aura',
   sleep: 'crescent-moon',
   hunger_of_hadar: 'crystal-cluster',
+  // AoE
+  thunderwave: 'crossed-axes',
+  fireball: 'fire-bomb',
+  shatter: 'shockwave',
+  burning_hands: 'fire-symbol',
+  // Buffs (concentration / party)
+  bless: 'aura',
+  bane: 'death-skull',
   spirit_guardians: 'sparkles',
-  divine_smite_spell: 'lightning-sword',
+  shield_of_faith: 'shield',
+  // Heals
+  cure_wounds: 'health',
+  healing_word: 'health',
+  mass_healing_word: 'health',
+  // Utility / movement
+  misty_step: 'player-teleport',
+  shield: 'shield',
+  counterspell: 'crystal-wand',
+  detect_magic: 'aura',
+  identify: 'crystal-ball',
 };
 
 interface SpellGroup {
