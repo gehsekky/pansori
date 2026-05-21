@@ -49,47 +49,54 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 
 - [ ] **Save/state persistence across redeploys (manual verify)** — `normalizeState` specs assert that a JSONB state row missing post-rollout fields loads cleanly and survives a `takeAction` call without crashing. Still TODO: actual end-to-end manual exercise — start a session, redeploy the backend container, resume the session, confirm parity. ~30 min.
 - [ ] **Difficulty tuning from playtest data** — once playtests happen, capture damage/HP/encounter telemetry to inform tuning passes. Real fights are starting to expose where the math is off (Crypt Lord TPK was the first big signal). ~3-4h to wire telemetry; ongoing to tune.
-- [ ] **gameEngine.ts class refactor (deferred)** — `takeAction` is ~3900 lines with three handlers that dominate (`use_class_feature` ~800, `cast_spell` ~544, `attack` ~532). Refactor into an `ActionContext` class that dispatches to handler files (`services/actions/castSpell.ts`, etc.). Moderate regression risk. Triggers to revisit: (a) big-handler edits grind into context budget; (b) a feature touches multiple handlers; (c) a quiet maintenance day.
+- [~] **gameEngine.ts action-handler refactor (mostly shipped; resolveOneAttack + castSpell internal splits remain)** — 29 PRs across one session decomposed `takeAction`'s inline switch into per-action handler files under `services/actions/`. `gameEngine.ts` shrank 10,052 → 4,704 lines (-53%). All 38 action types dispatch through `services/actions/index.ts` against an `ActionContext` object; the inline switch is empty (just the default unknown-action fallback). `classFeature.ts` (the largest single case at 1,712 lines) fully decomposed by class into `classFeature/{barbarian,fighter,rogue,monk,druid,casters,cleric,paladinRangerBard,species,index}.ts`. `attack.ts` partially split (preattack/combatStart/toHit extracted; resolveOneAttack closure remains inline at ~615 lines). `castSpell.ts` (~840 lines) lifted but not internally split yet. Architectural addition: **transformer pattern** (`replaceWith` / `delegateTo` on handler return) for actions that yield to a different action — used by `attack_npc` and `use_reaction`; ready for future 5.5e features like Eldritch Strike, Counterspell, War Caster, Beast Form attack overrides. **What remains**:
+  - [ ] **`resolveOneAttack` extraction from `attack/index.ts`** (~615 lines) — the inner closure captures ~25 outer-scope variables. Cleanest extraction: introduce `AttackContext` struct (extends `ToHitContext` with target/weapon fields), pass to a top-level `resolveOneAttack(ctx, atk, label)`. Mostly cosmetic — the file is already organized into named phases. ~1 PR.
+  - [ ] **`castSpell.ts` internal split** (~840 lines) — same shape as classFeature/: precast (gates), heal, utility (Bless special-case), attackRoll, save, aoe (sphere/cone/cube/line), multiTarget (Magic Missile + Eldritch Blast). ~4-6 PRs.
+  - [ ] **Suspicious bug in Monk Flurry kill resolution** — `ctx.st.enemies_killed = [...ctx.st.enemies_killed, ctx.roomId]` (instead of `ctx.enemy.id`) preserved verbatim from the original gameEngine.ts during PR 16. Looks wrong but no test caught it. Either the original used `roomId` as an enemy-id alias in single-enemy rooms (intentional), or it's a real bug that's been there since before the refactor. Worth a 30-min audit.
+  - [ ] **Test gaps surfaced by sed false-positives** — PRs 15/16 sed translation introduced 3 latent bugs (`break;` → `return;` inside loops, sed-rewriting `enemy` inside string literals, if-chain breakage when deleting the first branch). All were fixed in PR 17 + caught manually during PR 20/25. The fact that 514 tests didn't catch them points to coverage gaps for Bless on 4+-member parties, Monk Flurry kill-on-first-strike, Frenzy with no enemy in range, and the unknown-feature fallback. ~2-3h to write targeted regression specs.
+
+  See git history `3696339..1ced24e` (PRs 1-29) for full commit chain. Each PR is independently revertible; tests + lint + prettier gate every commit; no CI failures across the 29-PR series.
+
 - [ ] **Pre-commit hook (Husky + lint-staged)** — auto-run eslint + prettier on staged files before commit. Catches the class of bug where prettier-dirty code reaches CI and fails the build. ~30 min setup; bypassable with `--no-verify`. CI lint stays as the gate.
 
 - [x] **Multiplayer MVP — party-of-equals with per-PC ownership** (design locked + shipped 2026-05-21).
-  All four PRs landed: PR 1 (data foundation), PR 2 (auth + turn enforcement),
-  PR 3 (Socket.IO realtime push + WaitingForPlayer), PR 4 (invite link UX).
-  Solo mode is unchanged — host owns every PC, no participant rejects, no
-  waiting banner. Multi: friend opens the shared `?join=<token>` URL,
-  becomes a participant, sees the full narrative chat via realtime
-  broadcasts, but can't act until the host reassigns a PC via the
-  assign-character endpoint (UI follow-up below). Three follow-ups
-  remain before MP feels complete; tracked separately so the MVP itself
-  reads as shipped.
+      All four PRs landed: PR 1 (data foundation), PR 2 (auth + turn enforcement),
+      PR 3 (Socket.IO realtime push + WaitingForPlayer), PR 4 (invite link UX).
+      Solo mode is unchanged — host owns every PC, no participant rejects, no
+      waiting banner. Multi: friend opens the shared `?join=<token>` URL,
+      becomes a participant, sees the full narrative chat via realtime
+      broadcasts, but can't act until the host reassigns a PC via the
+      assign-character endpoint (UI follow-up below). Three follow-ups
+      remain before MP feels complete; tracked separately so the MVP itself
+      reads as shipped.
 
   Follow-ups:
   - [x] **ParticipantsManager UI** (shipped — a97ce9c). Players & invites
-    dialog now lists session_participants and gives the host a per-PC
-    owner dropdown. Realtime Socket.IO 'state' broadcasts keep the
-    dropdown values in sync. Realtime 'participants' (joined/left)
-    listener still deferred — host has to close + reopen the dialog
-    to see a freshly-joined friend.
+        dialog now lists session_participants and gives the host a per-PC
+        owner dropdown. Realtime Socket.IO 'state' broadcasts keep the
+        dropdown values in sync. Realtime 'participants' (joined/left)
+        listener still deferred — host has to close + reopen the dialog
+        to see a freshly-joined friend.
   - [x] **Voluntary leave** (shipped — d42484e). Non-host participants
-    have a "Leave session" button in the players dialog. Server auto-
-    transfers PCs they owned to the host before removing them, so turn
-    enforcement never encounters an orphan owner.
+        have a "Leave session" button in the players dialog. Server auto-
+        transfers PCs they owned to the host before removing them, so turn
+        enforcement never encounters an orphan owner.
   - [x] **Race detection** (`turn_seq` column) — shipped 4d3b7bb.
-    `game_sessions.turn_seq` bumps on every successful takeAction;
-    clients send their last-known value with each action; server
-    rejects with 409 on mismatch. useGame handles 409 by logging
-    "out of sync" + resuming the session for fresh state.
+        `game_sessions.turn_seq` bumps on every successful takeAction;
+        clients send their last-known value with each action; server
+        rejects with 409 on mismatch. useGame handles 409 by logging
+        "out of sync" + resuming the session for fresh state.
   - [x] **Realtime participants refresh** — shipped 4d3b7bb.
-    useGame listens for Socket.IO 'participants' events and bumps
-    a participantsVersion counter; InviteDialog includes it in its
-    fetch-participants useEffect deps so the list updates the
-    moment a friend joins/leaves/has their PC reassigned.
-      Each PC has exactly one human controller via `Character.owner_user_id`. Solo
-      mode = host owns all PCs (no schema branch). 2+1 / 1+2 / 1+1+1 splits all
-      fall out of the same row layout in `session_participants`. Every participant
-      sees the full narrative (Socket.IO broadcast on every state change). Action
-      buttons render only for the player whose PC is currently active; everyone
-      else sees "Waiting for `<Name>` to finish their turn."
+        useGame listens for Socket.IO 'participants' events and bumps
+        a participantsVersion counter; InviteDialog includes it in its
+        fetch-participants useEffect deps so the list updates the
+        moment a friend joins/leaves/has their PC reassigned.
+        Each PC has exactly one human controller via `Character.owner_user_id`. Solo
+        mode = host owns all PCs (no schema branch). 2+1 / 1+2 / 1+1+1 splits all
+        fall out of the same row layout in `session_participants`. Every participant
+        sees the full narrative (Socket.IO broadcast on every state change). Action
+        buttons render only for the player whose PC is currently active; everyone
+        else sees "Waiting for `<Name>` to finish their turn."
 
   **Design calls (locked)**
   - Invite UX: shareable link with a session-scoped `invite_token`.
