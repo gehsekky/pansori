@@ -908,7 +908,7 @@ function tickConditions(char: Character): Character {
 // > 5×STR, ≤ 10×STR: -10 ft (encumbered)
 // > 10×STR, ≤ 15×STR: -20 ft (heavily encumbered)
 // > 15×STR: speed 0 (overloaded)
-function effectiveSpeed(char: Character): number {
+export function effectiveSpeed(char: Character): number {
   let base = char.speed ?? DEFAULT_SPEED_FEET;
   // 2024 PHB Goliath Large Form — +10 ft speed while the condition is active.
   if (char.conditions?.includes('large_form')) base += 10;
@@ -8890,46 +8890,6 @@ export async function takeAction({
       // 2024 PHB — declare you'll spend your Heroic Inspiration on the next
       // attack this turn. Doesn't cost an action; the flag clears when the
       // attack handler resolves the d20.
-      case 'spend_inspiration': {
-        if (!char.inspiration) {
-          narrative = 'You have no Heroic Inspiration to spend.';
-          break;
-        }
-        if (char.turn_actions.inspiration_pending) {
-          narrative = 'Inspiration already queued for your next d20 roll.';
-          break;
-        }
-        char.turn_actions = { ...char.turn_actions, inspiration_pending: true };
-        // 2024 PHB: Heroic Inspiration grants advantage on any d20 test
-        // (attack, save, ability check) — not just attacks.
-        narrative = `${char.name} steels themselves — Heroic Inspiration queued: advantage on your next d20 (attack, save, or check).`;
-        break;
-      }
-
-      case 'stand_up': {
-        if (!char.conditions.includes('prone')) {
-          narrative = 'You are not prone.';
-          break;
-        }
-        const speedFt = effectiveSpeed(char);
-        const standCost = Math.floor(speedFt / 2);
-        const usedFt = (st.movement_used ?? {})[char.id] ?? 0;
-        if (usedFt + standCost > speedFt) {
-          narrative = `Not enough movement to stand up. (${speedFt - usedFt} ft remaining, ${standCost} ft needed)`;
-          break;
-        }
-        char = { ...char, conditions: char.conditions.filter((c) => c !== 'prone') };
-        st = {
-          ...st,
-          movement_used: { ...st.movement_used, [char.id]: usedFt + standCost },
-          entities: (st.entities ?? []).map((e) =>
-            e.id === char.id ? { ...e, conditions: e.conditions.filter((c) => c !== 'prone') } : e
-          ),
-        };
-        narrative = `${char.name} stands up. (${standCost} ft of movement used)`;
-        break;
-      }
-
       case 'shove': {
         if (!enemyAlive || !enemy) {
           narrative = 'No enemy to shove.';
@@ -8985,36 +8945,6 @@ export async function takeAction({
         } else {
           narrative = `The ${shoveTarget.name} resists your shove. (${playerRollShove} vs ${enemyRollShove})`;
         }
-        break;
-      }
-
-      case 'dodge': {
-        if (!st.combat_active) {
-          narrative = 'You can only dodge in combat.';
-          break;
-        }
-        if (char.turn_actions.action_used) {
-          narrative = 'You have already used your action this turn.';
-          break;
-        }
-        char.turn_actions = { ...char.turn_actions, action_used: true, dodging: true };
-        usedInitiative = true;
-        narrative = `${char.name} takes the Dodge action — until your next turn, attacks against you have disadvantage.`;
-        break;
-      }
-
-      case 'disengage': {
-        if (!st.combat_active) {
-          narrative = 'You can only disengage in combat.';
-          break;
-        }
-        if (char.turn_actions.action_used) {
-          narrative = 'You have already used your action this turn.';
-          break;
-        }
-        char.turn_actions = { ...char.turn_actions, action_used: true, disengaged: true };
-        usedInitiative = true;
-        narrative = `${char.name} takes the Disengage action — your next movement this turn won't trigger opportunity attacks.`;
         break;
       }
 
@@ -9389,73 +9319,6 @@ export async function takeAction({
       }
 
       // ── Dash ──────────────────────────────────────────────────────────────────
-      case 'dash': {
-        if (!st.combat_active) {
-          narrative = 'Dash is a combat action.';
-          break;
-        }
-        if (char.turn_actions.action_used) {
-          narrative = 'You have already used your action this turn.';
-          break;
-        }
-        const dashSpeed = effectiveSpeed(char);
-        char.turn_actions = { ...char.turn_actions, action_used: true };
-        // movement_used tracking: reduce remaining movement cap by speed (adds a full extra speed worth)
-        st = {
-          ...st,
-          movement_used: {
-            ...(st.movement_used ?? {}),
-            [char.id]: Math.max(0, (st.movement_used?.[char.id] ?? 0) - dashSpeed),
-          },
-        };
-        narrative = `${char.name} Dashes — gaining an extra ${dashSpeed} ft of movement this turn.`;
-        break;
-      }
-
-      // ── Help ──────────────────────────────────────────────────────────────────
-      case 'help': {
-        if (!st.combat_active) {
-          narrative = 'Help is a combat action.';
-          break;
-        }
-        if (char.turn_actions.action_used) {
-          narrative = 'You have already used your action this turn.';
-          break;
-        }
-        const helpAction = action as { type: 'help'; targetId: string };
-        const helpTarget = st.characters.find((c) => c.id === helpAction.targetId && !c.dead);
-        if (!helpTarget) {
-          narrative = 'Target not found.';
-          break;
-        }
-        char.turn_actions = { ...char.turn_actions, action_used: true };
-        st = { ...st, help_target_id: helpAction.targetId };
-        narrative = `${char.name} helps ${helpTarget.name} — they have advantage on their next attack roll this turn.`;
-        usedInitiative = true;
-        break;
-      }
-
-      // ── Ready ─────────────────────────────────────────────────────────────────
-      case 'ready': {
-        if (!st.combat_active) {
-          narrative = 'Ready is a combat action.';
-          break;
-        }
-        if (char.turn_actions.action_used) {
-          narrative = 'You have already used your action this turn.';
-          break;
-        }
-        const readyAction = action as { type: 'ready'; trigger: string; action: StructuredAction };
-        char.turn_actions = {
-          ...char.turn_actions,
-          action_used: true,
-          readied_action: { trigger: readyAction.trigger, action: readyAction.action },
-        };
-        narrative = `${char.name} readies an action: "${readyAction.trigger}". Use 'Trigger readied action' when the trigger occurs.`;
-        usedInitiative = true;
-        break;
-      }
-
       // ── Use Reaction (trigger readied action) ─────────────────────────────────
       case 'use_reaction': {
         if (char.turn_actions.reaction_used) {
