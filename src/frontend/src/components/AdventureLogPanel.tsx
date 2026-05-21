@@ -11,13 +11,13 @@ interface Props {
   currentRoom?: string;
 }
 
-// Reverse-chronological mission narrative — pulls every other entry from the
+// Reverse-chronological adventure narrative — pulls every other entry from the
 // `history` stream (assistant/user are interleaved) and renders the last 20.
 // A "Copy log" button at the top serializes the FULL chronological log
 // (oldest first) to the clipboard with a metadata header — formatted for
 // pasting into a chat with the engine's author for analysis.
 
-function MissionLogPanel({ history, worldName, party, currentRoom }: Props) {
+function AdventureLogPanel({ history, worldName, party, currentRoom }: Props) {
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'error'>('idle');
 
   // The assistant turns we display. The interleaved stream is
@@ -27,7 +27,7 @@ function MissionLogPanel({ history, worldName, party, currentRoom }: Props) {
   const assistantEntries = history.filter((_, i) => i % 2 === 1);
 
   function buildCopyText(): string {
-    const headerLines: string[] = ['=== Pansori Mission Log ==='];
+    const headerLines: string[] = ['=== Pansori Adventure Log ==='];
     if (worldName) headerLines.push(`Campaign: ${worldName}`);
     if (party && party.length > 0) {
       const partyLine = party
@@ -63,13 +63,13 @@ function MissionLogPanel({ history, worldName, party, currentRoom }: Props) {
   const label = copyStatus === 'copied' ? 'Copied!' : copyStatus === 'error' ? 'Copy failed' : 'Copy log';
   return (
     <>
-      <div className={styles.missionLogToolbar}>
+      <div className={styles.adventureLogToolbar}>
         <button
           type="button"
-          className={styles.missionLogCopyBtn}
+          className={styles.adventureLogCopyBtn}
           onClick={handleCopy}
-          aria-label="Copy full mission log to clipboard"
-          data-testid="mission-log-copy-btn"
+          aria-label="Copy full adventure log to clipboard"
+          data-testid="adventure-log-copy-btn"
         >
           {label}
         </button>
@@ -84,4 +84,4 @@ function MissionLogPanel({ history, worldName, party, currentRoom }: Props) {
   );
 }
 
-export default MissionLogPanel;
+export default AdventureLogPanel;

@@ -114,7 +114,7 @@ Highlights of what's implemented:
 - **Backend**: `npm run test:be` — Vitest, ~420 tests across `gameEngine.spec.ts`, `rulesEngine.spec.ts`, `gridEngine.spec.ts`, `procgen.spec.ts`, `narrativeFmt.spec.ts`, `narrativePlaceholders.spec.ts`, `migrationRunner.spec.ts`, and per-campaign specs.
 - **Frontend**: `npm run test:fe` — Vitest in jsdom (~67 tests across component + integration specs).
 - **Shared types**: `npm run sync-types:check` — verifies `src/backend/src/shared-types.ts` and `src/frontend/src/shared-types.ts` are in sync with the source of truth at `src/shared/types.ts`. CI gate; `npm run sync-types` regenerates locally.
-- **E2E**: `npm run test:e2e` — Playwright (`tests/e2e/`) covers login → BEGIN MISSION, session resume, and a sandbox combat loop. Gates production deploys in CI.
+- **E2E**: `npm run test:e2e` — Playwright (`tests/e2e/`) covers login → BEGIN ADVENTURE, session resume, and a sandbox combat loop. Gates production deploys in CI.
 
 ## Credits
 

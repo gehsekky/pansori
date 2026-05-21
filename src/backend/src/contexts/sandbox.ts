@@ -693,7 +693,7 @@ export const context: Context = {
       'Slain by {enemy}. The dungeon claims another soul.',
       'The darkness of {world} takes you.',
     ],
-    escapeLines: ['You force the gate open and escape the dungeon. Mission complete.'],
+    escapeLines: ['You force the gate open and escape the dungeon. Adventure complete.'],
     enemyDeflected: [
       'The {enemy} swings — deflected by your {armor}!',
       "Your {armor} turns the {enemy}'s blow.",

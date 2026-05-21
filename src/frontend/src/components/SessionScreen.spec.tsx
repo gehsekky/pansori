@@ -46,7 +46,7 @@ const defaultProps = {
 describe('SessionsScreen', () => {
   it('renders empty state when no sessions exist', () => {
     render(<SessionsScreen {...defaultProps} />);
-    expect(screen.getByText(/NO MISSIONS ON RECORD/i)).toBeTruthy();
+    expect(screen.getByText(/NO ADVENTURES ON RECORD/i)).toBeTruthy();
   });
 
   it('renders the user display name', () => {
@@ -71,10 +71,10 @@ describe('SessionsScreen', () => {
     expect(onResume).toHaveBeenCalledWith('session-1');
   });
 
-  it('calls onNewGame when + NEW MISSION is clicked', () => {
+  it('calls onNewGame when + NEW ADVENTURE is clicked', () => {
     const onNewGame = vi.fn();
     render(<SessionsScreen {...defaultProps} onNewGame={onNewGame} />);
-    fireEvent.click(screen.getByRole('button', { name: /new mission/i }));
+    fireEvent.click(screen.getByRole('button', { name: /new adventure/i }));
     expect(onNewGame).toHaveBeenCalledTimes(1);
   });
 

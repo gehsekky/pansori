@@ -462,15 +462,15 @@
   padding: 3px 0;
 }
 
-/* Mission log toolbar — small "Copy log" button above the entries. The
+/* Adventure log toolbar — small "Copy log" button above the entries. The
  * button copies the FULL chronological log (oldest first) plus metadata
  * to the clipboard for pasting into chats with the engine author. */
-.missionLogToolbar {
+.adventureLogToolbar {
   display: flex;
   justify-content: flex-end;
   margin-bottom: 6px;
 }
-.missionLogCopyBtn {
+.adventureLogCopyBtn {
   background: transparent;
   color: var(--t-mid);
   border: 1px solid var(--t-border);
@@ -485,7 +485,7 @@
     color 0.15s,
     background 0.15s;
 }
-.missionLogCopyBtn:hover {
+.adventureLogCopyBtn:hover {
   border-color: var(--t-primary);
   color: var(--t-primary);
   background: var(--t-dim-dark);
@@ -777,7 +777,7 @@
   gap: 0.3rem;
 }
 
-.missionLogLabel {
+.adventureLogLabel {
   font-size: 0.75rem;
   letter-spacing: 0.1em;
   color: var(--t-dim);

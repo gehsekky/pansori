@@ -13,7 +13,7 @@ import EnemySelector from './components/EnemySelector.tsx';
 import GridCombatView from './components/GridCombatView.tsx';
 import InventoryModal from './components/InventoryModal.tsx';
 import LoginScreen from './components/LoginScreen.tsx';
-import MissionLogPanel from './components/MissionLogPanel.tsx';
+import AdventureLogPanel from './components/AdventureLogPanel.tsx';
 import MoveDPad from './components/MoveDPad.tsx';
 import NarrativeText from './components/NarrativeText.tsx';
 import PartyRail from './components/PartyRail.tsx';
@@ -254,7 +254,7 @@ export default function App() {
     setView('game');
   }
 
-  function startNewMission() {
+  function startNewAdventure() {
     resetGame();
     window.history.replaceState(null, '', '/');
     loadSessions();
@@ -337,10 +337,10 @@ export default function App() {
           }
           if (history.length > 0) {
             contextTabs.push({
-              id: 'mission-log',
-              label: 'MISSION LOG',
+              id: 'adventure-log',
+              label: 'ADVENTURE LOG',
               render: () => (
-                <MissionLogPanel
+                <AdventureLogPanel
                   history={history}
                   worldName={worldName}
                   party={gameState?.characters.map((c) => ({
@@ -488,7 +488,7 @@ export default function App() {
                           fontWeight: 'normal',
                         }}
                       >
-                        <span aria-hidden="true">★ </span>MISSION COMPLETE
+                        <span aria-hidden="true">★ </span>ADVENTURE COMPLETE
                         <span aria-hidden="true"> ★</span>
                       </h2>
                       <p
@@ -503,9 +503,9 @@ export default function App() {
                       <button
                         className={styles.submit}
                         style={{ width: 'auto', padding: '0.6rem 2rem' }}
-                        onClick={startNewMission}
+                        onClick={startNewAdventure}
                       >
-                        START NEW MISSION
+                        START NEW ADVENTURE
                       </button>
                     </div>
                   ) : !loading && allDead ? (
@@ -542,9 +542,9 @@ export default function App() {
                       <button
                         className={styles.submit}
                         style={{ width: 'auto', padding: '0.6rem 2rem' }}
-                        onClick={startNewMission}
+                        onClick={startNewAdventure}
                       >
-                        START NEW MISSION
+                        START NEW ADVENTURE
                       </button>
                     </div>
                   ) : (
@@ -719,10 +719,10 @@ export default function App() {
                       className={styles.sendBtn}
                       style={{ padding: '0.3rem 0.75rem', fontSize: '0.75rem' }}
                       onClick={() => {
-                        if (confirm('Abandon current run and start over?')) startNewMission();
+                        if (confirm('Abandon current adventure and start over?')) startNewAdventure();
                       }}
                     >
-                      ABORT MISSION
+                      ABORT ADVENTURE
                     </button>
                   </div>
                 </div>
