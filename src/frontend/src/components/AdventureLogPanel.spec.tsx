@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import AdventureLogPanel from './AdventureLogPanel';
 import { makeChar, makeState, mockSeed } from './test-fixtures';
+import AdventureLogPanel from './AdventureLogPanel';
 
 // History stream is interleaved [user, assistant, user, assistant, ...]
 // The on-screen panel renders every other entry starting at index 0 (the
@@ -74,7 +74,7 @@ describe('AdventureLogPanel', () => {
     expect(text).toMatch(/Current room: dungeon_throne/);
     expect(text).toMatch(/In combat: yes/);
     // Party snapshot includes class + level + HP + AC.
-    expect(text).toMatch(/Test \(Fighter L2\) HP 12\/20  AC 16/);
+    expect(text).toMatch(/Test \(Fighter L2\) HP 12\/20 {2}AC 16/);
     // Conditions surface with source attribution.
     expect(text).toMatch(/Conditions: blessed \(by cleric-1\)/);
     // Concentration surfaces with rounds_left.
@@ -116,11 +116,7 @@ describe('AdventureLogPanel', () => {
   it('omits empty sections cleanly when no state is provided', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.assign(navigator, { clipboard: { writeText } });
-    render(
-      <AdventureLogPanel
-        history={[{ content: '> noop' }, { content: 'something' }]}
-      />
-    );
+    render(<AdventureLogPanel history={[{ content: '> noop' }, { content: 'something' }]} />);
     fireEvent.click(screen.getByTestId('adventure-log-copy-btn'));
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
     const text = writeText.mock.calls[0][0] as string;

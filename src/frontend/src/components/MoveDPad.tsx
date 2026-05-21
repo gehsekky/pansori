@@ -35,9 +35,15 @@ const ICONS: Record<ChoiceDirection, ComponentType<{ size?: number; weight?: 'bo
 // Visual order, top-to-bottom + left-to-right. The center cell (index 4)
 // is the movement readout, not a button.
 const CELLS: Array<ChoiceDirection | 'center'> = [
-  'NW', 'N', 'NE',
-  'W', 'center', 'E',
-  'SW', 'S', 'SE',
+  'NW',
+  'N',
+  'NE',
+  'W',
+  'center',
+  'E',
+  'SW',
+  'S',
+  'SE',
 ];
 
 interface Props {
@@ -64,12 +70,7 @@ function MoveDPad({ choices, onChoose, disabled }: Props) {
   const remaining = extractRemaining(choices[0]?.label ?? '');
 
   return (
-    <div
-      data-testid="move-dpad"
-      className={styles.dpad}
-      role="group"
-      aria-label="Movement"
-    >
+    <div data-testid="move-dpad" className={styles.dpad} role="group" aria-label="Movement">
       {CELLS.map((cell, i) => {
         if (cell === 'center') {
           return (

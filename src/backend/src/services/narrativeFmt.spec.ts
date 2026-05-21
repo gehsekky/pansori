@@ -31,11 +31,9 @@ describe('narrativeFmt', () => {
   it('parseNarrativeTokens handles back-to-back tokens', () => {
     const s = `${fmt.roll(18)} vs ${fmt.ac(16)} — hit for ${fmt.dmg(7)}.`;
     const parts = parseNarrativeTokens(s);
-    expect(parts.filter((p) => p.type === 'token').map((p) => (p as { kind: string }).kind)).toEqual([
-      'roll',
-      'ac',
-      'dmg',
-    ]);
+    expect(
+      parts.filter((p) => p.type === 'token').map((p) => (p as { kind: string }).kind)
+    ).toEqual(['roll', 'ac', 'dmg']);
   });
 
   it('parseNarrativeTokens returns a single text part when no tokens', () => {

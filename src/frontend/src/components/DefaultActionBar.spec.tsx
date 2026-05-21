@@ -11,9 +11,13 @@ function makeChoice(kind: ChoiceKind, label: string, action: GameChoice['action'
 const dash = makeChoice('dash', 'Dash — double movement this turn (30 extra ft)', {
   type: 'dash',
 });
-const disengage = makeChoice('disengage', 'Disengage — move without triggering opportunity attacks', {
-  type: 'disengage',
-});
+const disengage = makeChoice(
+  'disengage',
+  'Disengage — move without triggering opportunity attacks',
+  {
+    type: 'disengage',
+  }
+);
 const dodge = makeChoice('dodge', 'Dodge — attacks against you have disadvantage', {
   type: 'dodge',
 });
@@ -61,9 +65,7 @@ describe('DefaultActionBar', () => {
   });
 
   it('exposes the full original label via aria-label + title', () => {
-    const { getByTestId } = render(
-      <DefaultActionBar choices={[dash]} onChoose={() => {}} />
-    );
+    const { getByTestId } = render(<DefaultActionBar choices={[dash]} onChoose={() => {}} />);
     const btn = getByTestId('action-dash');
     expect(btn.getAttribute('aria-label')).toBe(dash.label);
     expect(btn.getAttribute('title')).toBe(dash.label);

@@ -79,9 +79,7 @@ describe('SpellBar', () => {
     const onChoose = vi.fn();
     const sacred = spellChoice('sacred_flame', 'Cast Sacred Flame (cantrip) → Goblin', 0);
     const guiding = spellChoice('guiding_bolt', 'Cast Guiding Bolt (Lvl 1) → Goblin', 1);
-    const { getByTestId } = render(
-      <SpellBar choices={[sacred, guiding]} onChoose={onChoose} />
-    );
+    const { getByTestId } = render(<SpellBar choices={[sacred, guiding]} onChoose={onChoose} />);
     fireEvent.click(getByTestId('spell-guiding_bolt'));
     expect(onChoose).toHaveBeenCalledWith(guiding);
   });
