@@ -282,6 +282,7 @@ export type GameConsequence =
   | { type: 'set_faction_rep'; factionId: string; delta: number }
   | { type: 'travel_to'; locationId: string }
   | { type: 'give_gold'; amount: number }
+  | { type: 'give_xp'; amount: number }
   | { type: 'set_npc_attitude'; npcId: string; attitude: NpcAttitude }
   // Remove one instance of itemId from the party's inventory.
   | { type: 'consume_item'; itemId: string };

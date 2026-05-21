@@ -1315,6 +1315,7 @@ export const context: Context = {
         ],
         rewards: [
           { type: 'give_gold', amount: 80 },
+          { type: 'give_xp', amount: 250 },
           // Faction rep bumped via `repGain: 10` above — route surfaces
           // the narrative line.
           {
@@ -1364,6 +1365,7 @@ export const context: Context = {
         ],
         rewards: [
           { type: 'give_gold', amount: 250 },
+          { type: 'give_xp', amount: 1500 },
           { type: 'modify_hp', amount: 15 },
           // Faction rep bumped via `repGain: 30` above.
           {

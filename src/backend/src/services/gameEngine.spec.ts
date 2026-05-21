@@ -11,6 +11,7 @@ import type {
 } from '../types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  applyConsequence,
   buildArrivalNarrative,
   generateChoices,
   normalizeState,
@@ -4896,7 +4897,7 @@ describe('NPC actions', () => {
     expect(result.newState.flags['guide_helped']).toBe(true);
   });
 
-  it("talk_response buttons use the <To NPC> stage-direction format", () => {
+  it('talk_response buttons use the <To NPC> stage-direction format', () => {
     // After the party has greeted the NPC once, the response buttons
     // surface with labels framed as the party speaking TO the NPC
     // rather than the NPC saying them.
@@ -5222,7 +5223,7 @@ describe('cast_spell — Cure Wounds (level 1, heal)', () => {
     expect(result.newState.characters[0].spell_slots_used[1]).toBe(1);
   });
 
-  it("healing an ally syncs the grid entity HP (regression — battlefield lag)", async () => {
+  it('healing an ally syncs the grid entity HP (regression — battlefield lag)', async () => {
     // Cleric casts Cure Wounds on a downed Rogue (hp=0). Both the
     // character record AND the grid entity must reflect the heal so the
     // FE battlefield renderer doesn't keep showing the Rogue as dead
@@ -5342,9 +5343,7 @@ describe('cast_spell — Bless (level 1, concentration buff)', () => {
       context: ctxWithRage,
     });
     // Caster + 2 allies blessed; source attribution points back at caster.
-    const blessed = result.newState.characters.filter((c) =>
-      c.conditions.includes('blessed')
-    );
+    const blessed = result.newState.characters.filter((c) => c.conditions.includes('blessed'));
     expect(blessed.map((c) => c.id).sort()).toEqual(['cleric-1', 'fighter-1', 'rogue-1']);
     for (const c of blessed) {
       expect(c.condition_sources?.blessed).toBe('cleric-1');
@@ -5461,7 +5460,7 @@ describe('cast_spell — Bless (level 1, concentration buff)', () => {
     expect(rogueAfter?.conditions ?? []).not.toContain('blessed');
   });
 
-  it("casting Bless initialises rounds_left to 10 (1 minute SRD default)", async () => {
+  it('casting Bless initialises rounds_left to 10 (1 minute SRD default)', async () => {
     const cleric = makeChar({
       id: 'cleric-cast',
       character_class: 'Cleric',
@@ -5489,7 +5488,7 @@ describe('cast_spell — Bless (level 1, concentration buff)', () => {
     expect(casterAfter.concentrating_on?.rounds_left).toBe(10);
   });
 
-  it("concentration auto-ends when rounds_left ticks to 0", async () => {
+  it('concentration auto-ends when rounds_left ticks to 0', async () => {
     // Cleric with Bless that has 1 round left + Rogue blessed by them.
     // PC end_turn → enemy turn → round wraps → tick drops to 0 → Bless ends.
     vi.spyOn(Math, 'random').mockReturnValue(0); // enemy misses
@@ -5564,7 +5563,7 @@ describe('cast_spell — Bless (level 1, concentration buff)', () => {
     expect(result.narrative).toMatch(/concentration duration expired/);
   });
 
-  it("Bless flipping a miss to a hit rolls damage (regression — Vale T29 {{dmg|0}} bug)", async () => {
+  it('Bless flipping a miss to a hit rolls damage (regression — Vale T29 {{dmg|0}} bug)', async () => {
     // Vale playthrough log T29: a Fighter attack rolled d20=9, +2 STR +2
     // prof = 13 vs AC 15 — a clean miss. Bless added +3 → 16, flipping
     // hit=true. But atk.damage was already 0 from the miss path, and the
@@ -5587,9 +5586,7 @@ describe('cast_spell — Bless (level 1, concentration buff)', () => {
       level: 1,
       conditions: ['blessed'],
       condition_sources: { blessed: 'caster' },
-      inventory: [
-        { instance_id: 'sw-inst', id: 'shortsword', name: 'Shortsword' },
-      ],
+      inventory: [{ instance_id: 'sw-inst', id: 'shortsword', name: 'Shortsword' }],
       equipped_weapon: 'sw-inst',
     });
     const enemyId = `${CORRIDOR_ID}#0`;
@@ -6275,10 +6272,7 @@ describe('prepare_spells', () => {
       context: ctxWithRage,
     });
     // Sacred Flame dropped; only the 2 leveled spells stored.
-    expect(result.newState.characters[0].prepared_spells).toEqual([
-      'cure_wounds',
-      'guiding_bolt',
-    ]);
+    expect(result.newState.characters[0].prepared_spells).toEqual(['cure_wounds', 'guiding_bolt']);
   });
 
   it('Cleric L1 WIS 10 (cap 1): all-cantrip prep stores nothing (no over-cap error)', async () => {
@@ -6634,9 +6628,7 @@ describe('Cleric universal Channel Divinity (2024)', () => {
     // Pre-damage the entity to HP = 5 (seed.enemy.hp remains 30)
     const damagedState = {
       ...state,
-      entities: (state.entities ?? []).map((e) =>
-        e.isEnemy ? { ...e, hp: 5 } : e
-      ),
+      entities: (state.entities ?? []).map((e) => (e.isEnemy ? { ...e, hp: 5 } : e)),
     };
     const result = await takeAction({
       action: { type: 'use_class_feature', featureId: 'divine_spark' },
@@ -8281,10 +8273,7 @@ describe('Enemy tactical movement (must close distance to melee)', () => {
   it('Slow enemy that cannot close advances but does not attack', async () => {
     // Speed 10 ft = 2 squares. Enemy at (7, 7), PC at (1, 1) — 30 ft apart.
     // After moving 2 squares it's still > 5 ft away. No attack this turn.
-    const { state, mySeed, enemyId } = makeMoveState(
-      { x: 7, y: 7 },
-      { speedFt: 10 }
-    );
+    const { state, mySeed, enemyId } = makeMoveState({ x: 7, y: 7 }, { speedFt: 10 });
     const pcHpBefore = state.characters[0].hp;
     const result = await takeAction({
       action: { type: 'end_turn' },
@@ -8311,10 +8300,7 @@ describe('Enemy tactical movement (must close distance to melee)', () => {
   it('Reach-weapon enemy (10 ft) hits at 10 ft without moving', async () => {
     // attackReachFt: 10 → Chebyshev ≤ 2 counts as in reach. Enemy at (3, 1) is
     // 10 ft from PC.
-    const { state, mySeed, enemyId } = makeMoveState(
-      { x: 3, y: 1 },
-      { attackReachFt: 10 }
-    );
+    const { state, mySeed, enemyId } = makeMoveState({ x: 3, y: 1 }, { attackReachFt: 10 });
     const result = await takeAction({
       action: { type: 'end_turn' },
       history: [],
@@ -8562,7 +8548,6 @@ describe('narrative tokenization', () => {
     expect(result.narrative).toMatch(/\{\{dmg\|\d+\}\}/);
     expect(result.narrative).toMatch(/\{\{dc\|DC \d+\}\}/);
   });
-
 
   it('enemy attack on a PC emits {{dmg|N}} damage tokens', async () => {
     // Set up an adjacent enemy + active grid combat so the goblin's turn
@@ -9069,12 +9054,7 @@ describe('encounter XP distribution', () => {
   it('non-killer crossing into an ASI level flags asi_pending', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.99);
     // 4 PCs, 20 XP / 4 = 5 each. PC2 at level=3, xp=295 → 300 → L4 (ASI level).
-    const state = makeKillScenario([
-      {},
-      { level: 3, xp: 295, max_hp: 30, hp: 30 },
-      {},
-      {},
-    ]);
+    const state = makeKillScenario([{}, { level: 3, xp: 295, max_hp: 30, hp: 30 }, {}, {}]);
     const result = await takeAction({
       action: { type: 'attack', targetEnemyId: `${CORRIDOR_ID}#0` },
       history: [],
@@ -9236,7 +9216,9 @@ describe('speaker prefix (multi-PC narratives)', () => {
     );
     const choices = generateChoices(state, twoBanditSeed, ctx);
     const casts = choices.filter(
-      (c) => c.action.type === 'cast_spell' && (c.action as { spellId: string }).spellId === 'guiding_bolt'
+      (c) =>
+        c.action.type === 'cast_spell' &&
+        (c.action as { spellId: string }).spellId === 'guiding_bolt'
     );
     expect(casts.length).toBe(2);
     const targets = casts
@@ -9297,10 +9279,42 @@ describe('speaker prefix (multi-PC narratives)', () => {
       round: 1,
       movement_used: {},
       entities: [
-        { id: fighter.id, isEnemy: false, pos: { x: 2, y: 2 }, hp: 0, maxHp: 13, conditions: ['unconscious'], condition_durations: {} },
-        { id: cleric.id, isEnemy: false, pos: { x: 1, y: 1 }, hp: 8, maxHp: 8, conditions: [], condition_durations: {} },
-        { id: rogue.id, isEnemy: false, pos: { x: 3, y: 1 }, hp: 10, maxHp: 10, conditions: [], condition_durations: {} },
-        { id: enemyId, isEnemy: true, pos: { x: 2, y: 3 }, hp: 4, maxHp: 13, conditions: [], condition_durations: {} },
+        {
+          id: fighter.id,
+          isEnemy: false,
+          pos: { x: 2, y: 2 },
+          hp: 0,
+          maxHp: 13,
+          conditions: ['unconscious'],
+          condition_durations: {},
+        },
+        {
+          id: cleric.id,
+          isEnemy: false,
+          pos: { x: 1, y: 1 },
+          hp: 8,
+          maxHp: 8,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: rogue.id,
+          isEnemy: false,
+          pos: { x: 3, y: 1 },
+          hp: 10,
+          maxHp: 10,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: enemyId,
+          isEnemy: true,
+          pos: { x: 2, y: 3 },
+          hp: 4,
+          maxHp: 13,
+          conditions: [],
+          condition_durations: {},
+        },
       ],
     };
     const choices = generateChoices(state, seedWithEnemy, ctx);
@@ -9462,7 +9476,9 @@ describe('speaker prefix (multi-PC narratives)', () => {
     );
     const choices = generateChoices(state, seedWithEnemy, ctx);
     const casts = choices.filter(
-      (c) => c.action.type === 'cast_spell' && (c.action as { spellId: string }).spellId === 'guiding_bolt'
+      (c) =>
+        c.action.type === 'cast_spell' &&
+        (c.action as { spellId: string }).spellId === 'guiding_bolt'
     );
     expect(casts.length).toBe(1);
     expect((casts[0].action as { targetEnemyId?: string }).targetEnemyId).toBe(enemyId);
@@ -9869,5 +9885,107 @@ describe('grid-combat invariants', () => {
     const resumeIdx = result.newState.pending_reaction?.resumeFromInitiativeIdx ?? -1;
     expect(resumeIdx).toBeGreaterThanOrEqual(0);
     expect(resumeIdx).toBeLessThan(result.newState.initiative_order.length);
+  });
+});
+
+// ─── applyConsequence — give_xp ───────────────────────────────────────────────
+// Quest XP rewards: split `amount` evenly across living party members,
+// floor the share, and trigger level-ups inline when context is provided.
+
+describe('applyConsequence give_xp', () => {
+  function makeParty(specs: Array<Partial<Character>>): GameState {
+    const characters = specs.map((s, i) => makeChar({ id: `pc-${i}`, xp: 0, ...s }));
+    return makeState({}, { characters, active_character_id: characters[0].id });
+  }
+
+  it('splits XP evenly across all living party members', () => {
+    const st = makeParty([{}, {}, {}, {}]); // 4 living PCs
+    const narrativeParts: string[] = [];
+    const next = applyConsequence(
+      { type: 'give_xp', amount: 400 },
+      st,
+      seed,
+      'pc-0',
+      narrativeParts
+    );
+    for (const ch of next.characters) {
+      expect(ch.xp).toBe(100);
+    }
+    expect(narrativeParts.join(' ')).toContain('+100 XP');
+  });
+
+  it('floors the per-PC share when it does not divide evenly', () => {
+    const st = makeParty([{}, {}, {}]); // 3 living PCs, 100 XP → 33 each
+    const narrativeParts: string[] = [];
+    const next = applyConsequence(
+      { type: 'give_xp', amount: 100 },
+      st,
+      seed,
+      'pc-0',
+      narrativeParts
+    );
+    for (const ch of next.characters) {
+      expect(ch.xp).toBe(33);
+    }
+  });
+
+  it('skips dead PCs in the split', () => {
+    const st = makeParty([{ dead: true }, {}, {}]); // 1 dead, 2 living
+    const narrativeParts: string[] = [];
+    const next = applyConsequence(
+      { type: 'give_xp', amount: 200 },
+      st,
+      seed,
+      'pc-0',
+      narrativeParts
+    );
+    expect(next.characters[0].xp).toBe(0); // dead
+    expect(next.characters[1].xp).toBe(100);
+    expect(next.characters[2].xp).toBe(100);
+  });
+
+  it('returns state unchanged when amount is zero or negative', () => {
+    const st = makeParty([{}, {}]);
+    const narrativeParts: string[] = [];
+    expect(applyConsequence({ type: 'give_xp', amount: 0 }, st, seed, 'pc-0', narrativeParts)).toBe(
+      st
+    );
+    expect(
+      applyConsequence({ type: 'give_xp', amount: -50 }, st, seed, 'pc-0', narrativeParts)
+    ).toBe(st);
+    expect(narrativeParts).toHaveLength(0);
+  });
+
+  it('triggers level-up when context is provided and threshold crossed', () => {
+    // L1 → L2 = 300 XP. With 1 living PC, 300 XP grant levels them up.
+    const st = makeParty([{ level: 1, xp: 0 }]);
+    const narrativeParts: string[] = [];
+    const next = applyConsequence(
+      { type: 'give_xp', amount: 300 },
+      st,
+      seed,
+      'pc-0',
+      narrativeParts,
+      ctx
+    );
+    expect(next.characters[0].xp).toBeGreaterThanOrEqual(300);
+    expect(next.characters[0].level).toBeGreaterThanOrEqual(2);
+    // Narrative line for level-up should be emitted.
+    expect(narrativeParts.join(' ')).toMatch(/level/i);
+  });
+
+  it('does not level up when context is omitted', () => {
+    const st = makeParty([{ level: 1, xp: 0 }]);
+    const narrativeParts: string[] = [];
+    const next = applyConsequence(
+      { type: 'give_xp', amount: 300 },
+      st,
+      seed,
+      'pc-0',
+      narrativeParts
+    );
+    expect(next.characters[0].xp).toBeGreaterThanOrEqual(300);
+    // Level stays at 1 since no context was supplied to trigger level-up.
+    expect(next.characters[0].level).toBe(1);
   });
 });

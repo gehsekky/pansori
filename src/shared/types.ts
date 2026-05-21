@@ -281,6 +281,10 @@ export type GameConsequence =
   | { type: 'set_faction_rep'; factionId: string; delta: number }
   | { type: 'travel_to'; locationId: string }
   | { type: 'give_gold'; amount: number }
+  // Split `amount` XP evenly across all living party members (rounded
+  // down). Used for quest completion so the engine can level up the
+  // party at milestones rather than only through enemy kills.
+  | { type: 'give_xp'; amount: number }
   | { type: 'set_npc_attitude'; npcId: string; attitude: NpcAttitude }
   // Remove one instance of itemId from the party's inventory (any
   // member who carries it). Used for quest turn-ins like the Guild

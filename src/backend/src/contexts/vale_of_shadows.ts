@@ -1432,10 +1432,11 @@ export const context: Context = {
         rewards: [
           {
             type: 'add_narrative',
-            text: "Aldric leafs through the waterlogged pages. \"This is it — proof the wagons were never delivered.\" He presses a purse into your hand and marks the Guild's books with your name.",
+            text: 'Aldric leafs through the waterlogged pages. "This is it — proof the wagons were never delivered." He presses a purse into your hand and marks the Guild\'s books with your name.',
           },
           { type: 'consume_item', itemId: 'guild_ledger' },
           { type: 'give_gold', amount: 150 },
+          { type: 'give_xp', amount: 300 },
           // Faction rep is bumped by the quest's `repGain` field above;
           // we surface a narrative line in route/game.ts when that fires.
         ],
@@ -1481,6 +1482,7 @@ export const context: Context = {
         ],
         rewards: [
           { type: 'give_gold', amount: 200 },
+          { type: 'give_xp', amount: 1500 },
           { type: 'modify_hp', amount: 20 },
           {
             type: 'add_narrative',
@@ -1526,6 +1528,7 @@ export const context: Context = {
         ],
         rewards: [
           { type: 'give_gold', amount: 75 },
+          { type: 'give_xp', amount: 200 },
           // Faction rep penalty is applied via `repGain: -10` above;
           // route surfaces the narrative line. Don't duplicate via a
           // set_faction_rep reward (would double-count).
