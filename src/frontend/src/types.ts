@@ -167,7 +167,14 @@ export interface Character {
   bardic_inspiration_die?: string;
   wild_shape_form?: string;
   attuned_items: string[]; // instance_ids of attuned magic items (max 3)
-  concentrating_on?: { spellId: string; condition?: string } | null;
+  concentrating_on?: {
+    spellId: string;
+    condition?: string;
+    // Round budget for the active concentration spell — ticks down each
+    // round wrap and the spell ends when it hits 0. Mirrors the backend
+    // Character.concentrating_on shape (src/backend/src/types.ts:468).
+    rounds_left?: number;
+  } | null;
   subclass?: string;
   speed?: number;
   feats?: string[];
