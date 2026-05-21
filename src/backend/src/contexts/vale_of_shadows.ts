@@ -153,7 +153,11 @@ export const context: Context = {
       int: 11,
       wis: 10,
       cha: 16,
-      multiattack: 3,
+      // Multiattack 2 (was 3). At L4-party tier the third attack pushed the
+      // boss's DPR past the party's effective HP per round, especially
+      // combined with the frighten-on-hit cascade. Two attacks still hurts
+      // (2× 2d6+4) and lets the boss apply frighten reliably.
+      multiattack: 2,
       resistances: ['bludgeoning', 'piercing', 'slashing'],
       immunities: ['poison', 'necrotic'],
       condition_immunities: ['charmed', 'exhaustion', 'frightened', 'paralyzed', 'poisoned'],
@@ -921,8 +925,23 @@ export const context: Context = {
       {
         id: 'dungeon_crypt_throne',
         name: 'Throne of the Dead',
-        desc: 'A massive chamber with a raised dais. An ancient throne of black stone dominates the room. Something powerful waits here.',
+        desc: 'A massive chamber with a raised dais. An ancient throne of black stone dominates the room. Broken funeral pillars and piles of bone offer fragile cover. Something powerful waits here.',
         lighting: 'dim',
+        // Broken pillars flanking the central approach + bone-rubble corners.
+        // PCs spawn at row 1, enemies at row 8 — obstacles cluster mid-room
+        // so the boss has to path around and the rogue gets LoS breaks.
+        obstacles: [
+          { x: 3, y: 4 },
+          { x: 7, y: 4 },
+          { x: 4, y: 6 },
+          { x: 6, y: 6 },
+        ],
+        // Bone shards underfoot near the dais — slows approach.
+        difficultTerrain: [
+          { x: 4, y: 5 },
+          { x: 5, y: 5 },
+          { x: 6, y: 5 },
+        ],
       },
       {
         id: 'dungeon_crypt_exit',
@@ -1101,22 +1120,12 @@ export const context: Context = {
             },
           ],
         },
-        // Boss room minions: two Skeleton Warriors flank the Crypt Lord
+        // Boss-room minion. A single Skeleton Warrior flanks the Crypt Lord
+        // — two was over-tuned for an L4 party of 3 (the boss alone deals
+        // 3× 2d6+4 with frighten-on-hit; adding two minions made the math
+        // unwinnable). One minion still gives the fight texture.
         {
           id: 'dungeon_crypt_throne#minion_a',
-          name: 'Skeleton Warrior',
-          hp: 13,
-          ac: 13,
-          damage: '1d6+2',
-          toHit: 4,
-          xp: 50,
-          resistances: ['piercing'],
-          vulnerabilities: ['bludgeoning'],
-          immunities: ['poison'],
-          condition_immunities: ['poisoned', 'exhaustion'],
-        },
-        {
-          id: 'dungeon_crypt_throne#minion_b',
           name: 'Skeleton Warrior',
           hp: 13,
           ac: 13,

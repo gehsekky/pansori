@@ -920,8 +920,23 @@ export const context: Context = {
       {
         id: 'spire_ritual_apex',
         name: 'Ritual Apex',
-        desc: "The spire's top chamber. A green flame burns above the broken vault. The Frost Acolyte stands at the apex, hands raised, runes blazing.",
+        desc: "The spire's top chamber. A green flame burns above the broken vault. Shattered ice columns and frozen statuary line the approach. The Frost Acolyte stands at the apex, hands raised, runes blazing.",
         lighting: 'bright',
+        // Ice columns + frozen ritual statuary clustered around the approach
+        // to the apex dais. Symmetric so neither flank is "the right side".
+        obstacles: [
+          { x: 2, y: 4 },
+          { x: 8, y: 4 },
+          { x: 4, y: 6 },
+          { x: 6, y: 6 },
+          { x: 5, y: 3 },
+        ],
+        // Slick ice in the centre — slows the approach to the dais.
+        difficultTerrain: [
+          { x: 4, y: 4 },
+          { x: 5, y: 4 },
+          { x: 6, y: 4 },
+        ],
       },
       {
         id: 'spire_egress',
