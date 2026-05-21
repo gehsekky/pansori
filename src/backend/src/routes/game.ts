@@ -22,6 +22,7 @@ import {
   extractCampaignDelta,
   loadCampaignState,
   mergeCampaignIntoGameState,
+  resetCampaignState,
   saveCampaignState,
 } from '../services/campaignEngine.js';
 import {
@@ -349,6 +350,14 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
       [authedUserId(req), JSON.stringify(seed), JSON.stringify(initialState)]
     );
     await client.query('COMMIT');
+    // Reset persisted campaign state so a fresh adventure doesn't inherit
+    // quest progress / faction rep / world day from a previous run of the
+    // same campaign. campaign_states is keyed on (user_id, campaign_id),
+    // not per-session — without this, "+ NEW ADVENTURE" for Vale shows
+    // every quest from the prior Vale playthrough already marked done.
+    if (ctx.mapType === 'campaign' && ctx.campaign) {
+      await resetCampaignState(pool, authedUserId(req), ctx.id);
+    }
     res.json({ session, state: initialState, seed, campaignMeta: campaignMetaFor(ctx) });
   } catch (err) {
     await client.query('ROLLBACK');

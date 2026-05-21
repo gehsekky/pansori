@@ -44,6 +44,22 @@ export async function loadCampaignState(
   return blank;
 }
 
+// Clear a user's persisted state for a campaign so the next session
+// starts with fresh quest progress / faction rep / world day. Called
+// when a new game session is created for a campaign context — without
+// this, a player starting a fresh Vale run inherits "completed" quests
+// from their previous Vale playthrough.
+export async function resetCampaignState(
+  db: DB,
+  userId: string,
+  campaignId: string
+): Promise<void> {
+  await db.query(
+    `DELETE FROM campaign_states WHERE user_id = $1 AND campaign_id = $2`,
+    [userId, campaignId]
+  );
+}
+
 export async function saveCampaignState(db: DB, state: CampaignState): Promise<void> {
   await db.query(
     `INSERT INTO campaign_states (user_id, campaign_id, state, updated_at)
