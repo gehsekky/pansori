@@ -25,6 +25,7 @@ import { distanceFeet, entitiesInCone } from '../../gridEngine.js';
 import type { ActionHandler } from '../types.js';
 import { fmt } from '../../narrativeFmt.js';
 import { handleBarbarianFeature } from './barbarian.js';
+import { handleFighterFeature } from './fighter.js';
 
 /**
  * `use_class_feature`: per-feature dispatch — the catch-all for every
@@ -57,7 +58,6 @@ export const handleUseClassFeature: ActionHandler<{
   featureId: string;
 }> = (ctx, action) => {
   const fid = action.featureId;
-  const dispatchKey = [ctx.char.character_class, ctx.char.subclass, fid].filter(Boolean).join('_');
 
   // Per-class dispatch. Each handler returns true if the action's fid
   // matched one of its features (caller stops here); false to fall
@@ -65,79 +65,10 @@ export const handleUseClassFeature: ActionHandler<{
   // into per-class files, this chain grows and the inline if-chain
   // below shrinks.
   if (handleBarbarianFeature(ctx, fid)) return;
-
-  // ── Action Surge (Fighter) ─────────────────────────────────────────────
-  if (fid === 'action_surge') {
-    if (ctx.char.character_class.toLowerCase() !== 'fighter') {
-      ctx.narrative = 'Only Fighters have Action Surge.';
-      return;
-    }
-    if (ctx.char.level < 2) {
-      ctx.narrative = 'Action Surge requires Fighter level 2.';
-      return;
-    }
-    if ((ctx.char.class_resource_uses?.action_surge ?? 0) >= 1) {
-      ctx.narrative = 'Action Surge already used this rest.';
-      return;
-    }
-    ctx.char.class_resource_uses = { ...(ctx.char.class_resource_uses ?? {}), action_surge: 1 };
-    ctx.char.turn_actions = { ...ctx.char.turn_actions, action_used: false };
-    ctx.narrative = `${ctx.char.name} uses Action Surge — one additional action this turn!`;
-  }
-
-  // ── Second Wind (Fighter bonus action) ────────────────────────────────
-  // 2024 PHB: 2 uses at L1, 3 at L4, 4 at L10. Recovers on short rest.
-  // 2024 PHB Fighter L9 — Tactical Master mastery swap. Pre-arms the next
-  // attack to apply the chosen mastery (Push/Sap/Slow) instead of the
-  // weapon's printed one. No action cost; consumes the slot in
-  // `turn_actions` so a Fighter can't stack multiple swaps in one turn.
-  else if (
-    fid === 'tactical_master_push' ||
-    fid === 'tactical_master_sap' ||
-    fid === 'tactical_master_slow'
-  ) {
-    if (ctx.char.character_class.toLowerCase() !== 'fighter') {
-      ctx.narrative = 'Only Fighters have Tactical Master.';
-      return;
-    }
-    if (ctx.char.level < 9) {
-      ctx.narrative = 'Tactical Master requires Fighter level 9.';
-      return;
-    }
-    if (ctx.char.turn_actions.tactical_master_mastery) {
-      ctx.narrative = 'Tactical Master already queued this turn.';
-      return;
-    }
-    const m = fid.replace('tactical_master_', '') as 'push' | 'sap' | 'slow';
-    ctx.char.turn_actions = { ...ctx.char.turn_actions, tactical_master_mastery: m };
-    ctx.narrative = `${ctx.char.name} — Tactical Master: next attack will use ${m.toUpperCase()} mastery.`;
-  } else if (fid === 'second_wind') {
-    if (ctx.char.character_class.toLowerCase() !== 'fighter') {
-      ctx.narrative = 'Only Fighters have Second Wind.';
-      return;
-    }
-    const swMax = ctx.char.level >= 10 ? 4 : ctx.char.level >= 4 ? 3 : 2;
-    const swUsed = ctx.char.class_resource_uses?.second_wind ?? 0;
-    if (swUsed >= swMax) {
-      ctx.narrative = `Second Wind exhausted (${swMax}/${swMax} used). Recovers on a short or long rest.`;
-      return;
-    }
-    if (ctx.char.turn_actions.bonus_action_used) {
-      ctx.narrative = 'Bonus action already used this turn.';
-      return;
-    }
-    const swHeal = rollDice('1d10') + ctx.char.level;
-    ctx.char.hp = Math.min(ctx.char.max_hp, ctx.char.hp + swHeal);
-    ctx.char.class_resource_uses = {
-      ...(ctx.char.class_resource_uses ?? {}),
-      second_wind: swUsed + 1,
-    };
-    ctx.char.turn_actions = { ...ctx.char.turn_actions, bonus_action_used: true };
-    ctx.narrative = `${ctx.char.name} uses Second Wind — healed ${swHeal} HP (now ${ctx.char.hp}/${ctx.char.max_hp}). (${swMax - swUsed - 1}/${swMax} remaining)`;
-  }
+  if (handleFighterFeature(ctx, fid)) return;
 
   // ── Bardic Inspiration (Bard bonus action) ────────────────────────────
-  else if (fid === 'bardic_inspiration') {
+  if (fid === 'bardic_inspiration') {
     if (ctx.char.character_class.toLowerCase() !== 'bard') {
       ctx.narrative = 'Only Bards have Bardic Inspiration.';
       return;
@@ -284,83 +215,6 @@ export const handleUseClassFeature: ActionHandler<{
     const effect = fid.replace('cunning_strike_', '') as 'trip' | 'poison' | 'withdraw' | 'disarm';
     ctx.char.turn_actions = { ...ctx.char.turn_actions, cunning_strike_pending: effect };
     ctx.narrative = `${ctx.char.name} readies a Cunning Strike (${effect}) on the next Sneak Attack.`;
-  }
-
-  // ── Battle Master: Maneuver (Fighter L3+ subclass) ────────────────────
-  else if (dispatchKey.includes('battle_master') && fid.startsWith('maneuver_')) {
-    const sdPool = ctx.char.class_resource_uses?.superiority_dice ?? 4;
-    if (sdPool <= 0) {
-      ctx.narrative = 'No superiority dice remaining (recover on short rest).';
-      return;
-    }
-    ctx.char.class_resource_uses = {
-      ...(ctx.char.class_resource_uses ?? {}),
-      superiority_dice: sdPool - 1,
-    };
-    const sdRoll = rollDice('1d8');
-    if (fid === 'maneuver_trip') {
-      const tripSave =
-        rollDice('1d20') +
-        abilityMod((ctx.enemy as unknown as Record<string, number>)['str'] ?? 10);
-      const tripDC = 8 + profBonus(ctx.char.level) + abilityMod(ctx.char.str);
-      if (tripSave < tripDC) {
-        ctx.st = {
-          ...ctx.st,
-          entities: (ctx.st.entities ?? []).map((e) =>
-            e.id === ctx.roomId && e.isEnemy
-              ? { ...e, conditions: [...e.conditions.filter((c) => c !== 'prone'), 'prone'] }
-              : e
-          ),
-        };
-        ctx.narrative = `Maneuver — Trip Attack: +${sdRoll} damage, ${ctx.enemy!.name} knocked prone! (STR save ${tripSave} vs DC ${tripDC})`;
-      } else {
-        ctx.narrative = `Maneuver — Trip Attack: +${sdRoll} damage, ${ctx.enemy!.name} resists the trip. (STR save ${tripSave} vs DC ${tripDC})`;
-      }
-    } else if (fid === 'maneuver_goading') {
-      const goadSave =
-        rollDice('1d20') +
-        abilityMod((ctx.enemy as unknown as Record<string, number>)['wis'] ?? 10);
-      const goadDC = 8 + profBonus(ctx.char.level) + abilityMod(ctx.char.cha);
-      const goadSuccess = goadSave >= goadDC;
-      ctx.st = pushEvent(ctx.st, {
-        kind: 'save',
-        characterId: ctx.enemy!.id,
-        characterName: ctx.enemy!.name,
-        ability: 'wis',
-        roll: goadSave,
-        dc: goadDC,
-        success: goadSuccess,
-        vs: 'Goading Attack',
-        round: ctx.st.round ?? 1,
-      });
-      if (!goadSuccess) {
-        ctx.st = {
-          ...ctx.st,
-          entities: (ctx.st.entities ?? []).map((e) =>
-            e.id === ctx.roomId && e.isEnemy
-              ? {
-                  ...e,
-                  conditions: [...e.conditions.filter((c) => c !== 'goaded'), 'goaded'],
-                }
-              : e
-          ),
-        };
-        ctx.st = pushEvent(ctx.st, {
-          kind: 'condition_applied',
-          targetId: ctx.enemy!.id,
-          targetName: ctx.enemy!.name,
-          condition: 'goaded',
-          source: 'Goading Attack',
-          round: ctx.st.round ?? 1,
-        });
-        ctx.narrative = `Maneuver — Goading Attack: +${sdRoll} damage, ${ctx.enemy!.name} goaded (disadvantage vs others)! (WIS save ${goadSave} vs DC ${goadDC})`;
-      } else {
-        ctx.narrative = `Maneuver — Goading Attack: +${sdRoll} damage, ${ctx.enemy!.name} resists. (WIS save ${goadSave} vs DC ${goadDC})`;
-      }
-    } else {
-      // Generic maneuver: deal extra die damage
-      ctx.narrative = `Maneuver — +${sdRoll} superiority die damage! (${sdPool - 1} dice remaining)`;
-    }
   }
 
   // ── Monk: Flurry of Blows (2 unarmed strikes, 1 ki, bonus action) ────────
@@ -928,11 +782,6 @@ export const handleUseClassFeature: ActionHandler<{
     }
     ctx.char.feats = [...(ctx.char.feats ?? []), 'devils_sight'];
     ctx.narrative = `${ctx.char.name} gains Devil's Sight — you can see normally in magical darkness.`;
-  }
-
-  // ── Champion Fighter: Remarkable Athlete ────────────────────────────────
-  else if (fid === 'remarkable_athlete') {
-    ctx.narrative = `${ctx.char.name} — Remarkable Athlete: add +${Math.ceil(profBonus(ctx.char.level) / 2)} to uninvested STR/DEX/CON checks (passive).`;
   }
 
   // ── Abjurer Wizard: Arcane Ward ──────────────────────────────────────────
