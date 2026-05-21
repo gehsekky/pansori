@@ -440,7 +440,11 @@ export const handleUseClassFeature: ActionHandler<{
     let flurryNarrative = `${ctx.char.name} — Flurry of Blows (${kiPool - 1} ki remaining)!`;
     for (let i = 0; i < 2; i++) {
       const flurryTarget = ctx.st.entities?.find((e) => e.id === ctx.roomId && e.isEnemy);
-      if (!ctx.enemyAlive || !flurryTarget) return;
+      // PR 16 sed regression: had `return` here, which exited the whole
+      // handler before `ctx.narrative = flurryNarrative` could run.
+      // Restored to `break` so the loop exits cleanly and the narrative
+      // (with whatever hits landed so far) still gets written.
+      if (!ctx.enemyAlive || !flurryTarget) break;
       const toHit = rollDice('1d20') + abilityMod(ctx.char.dex) + profBonus(ctx.char.level);
       if (toHit >= (ctx.enemy?.ac ?? 10)) {
         const dmg = Math.max(1, rollDice(`1d${martialDie}`) + abilityMod(ctx.char.dex));
@@ -505,7 +509,10 @@ export const handleUseClassFeature: ActionHandler<{
           flurryNarrative += applyPartyLevelUps(ctx.st, ctx.char, ctx.context);
           ctx.st.enemies_killed = [...ctx.st.enemies_killed, ctx.roomId];
           ctx.st = endCombatState(ctx.st);
-          return;
+          // PR 16 sed regression: had `return` here, exiting the whole
+          // handler. Restored to `break` so flurryNarrative still gets
+          // written to ctx.narrative after the loop.
+          break;
         }
       } else {
         flurryNarrative += ` Strike ${i + 1}: miss (${toHit}).`;
