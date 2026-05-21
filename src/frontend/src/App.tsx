@@ -866,6 +866,7 @@ export default function App() {
                   sessionId={session.id}
                   inviteToken={session.invite_token ?? null}
                   isHost={!session.user_id || session.user_id === user?.id}
+                  state={gameState}
                   onClose={() => setInviteOpen(false)}
                 />
               )}
