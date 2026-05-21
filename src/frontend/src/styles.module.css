@@ -143,15 +143,18 @@
 }
 
 /* "Already used this adventure" — dimmed visual hint, still clickable.
-   Hover restores full opacity so the label is readable when the player
-   considers re-clicking. */
+   Hover restores full color so the label is unmistakable when the
+   player considers re-clicking. Tuned for WCAG 2.1 AA 4.5:1 contrast
+   on the default --t-bg (#0a0a0a) — earlier opacity:0.45 + --t-dim
+   landed at ~1.86:1, which failed. --t-mid at 0.7 opacity is ~4.75:1. */
 .choiceBtnSeen {
-  opacity: 0.45;
-  color: var(--t-dim);
+  opacity: 0.7;
+  color: var(--t-mid);
 }
 
 .choiceBtnSeen:hover {
-  opacity: 0.85;
+  opacity: 1;
+  color: var(--t-primary);
 }
 
 .sendBtn {
