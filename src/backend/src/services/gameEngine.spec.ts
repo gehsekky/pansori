@@ -1,4 +1,6 @@
 import type {
+  CampaignFacts,
+  CampaignState,
   Character,
   Context,
   Enemy,
@@ -20,8 +22,9 @@ import {
   seenKeyForAction,
   takeAction,
 } from './gameEngine.js';
+import { applyQuestCompletions, evaluateQuestSteps } from './campaignEngine.js';
 import { context as ctx } from '../contexts/sandbox.js';
-import { generateRoguelikeSeed } from './procgen.js';
+import { generateRoguelikeSeed, generateSeed } from './procgen.js';
 import { context as valeCtx } from '../contexts/vale_of_shadows.js';
 
 afterEach(() => vi.restoreAllMocks());
@@ -10250,5 +10253,127 @@ describe('normalizeState preserves seen_choices', () => {
     const st = makeState({}, { seen_choices: ['interact_object::roomA::chest'] });
     const result = normalizeState(st as unknown as Record<string, unknown>);
     expect(result.seen_choices).toEqual(['interact_object::roomA::chest']);
+  });
+});
+
+// ─── Quest auto-acceptance ───────────────────────────────────────────────────
+// The explicit "Accept quest" choice was removed. A talk_response in the
+// giver NPC's room (matched by quest step[0]'s tightened condition) is now
+// enough to auto-activate the quest. The router emits a "Quest accepted —"
+// narrative line in that case.
+
+describe('quest auto-acceptance via talk_response', () => {
+  it('generateChoices no longer emits an "Accept quest" choice', () => {
+    // Build a minimal vale-shaped state in Aldric's room.
+    const sd = generateSeed(valeCtx, 1);
+    const st = makeState({}, { current_room: 'millhaven_market' });
+    const choices = generateChoices(st, sd, valeCtx);
+    const acceptChoice = choices.find((c) => c.action.type === 'accept_quest');
+    expect(acceptChoice).toBeUndefined();
+    // The Talk-to-NPC choice keeps its quest indicator [!] when an
+    // unaccepted quest is available from this NPC.
+    const talkChoice = choices.find((c) => c.action.type === 'talk');
+    expect(talkChoice?.label).toMatch(/\[!\]/);
+  });
+
+  it('Vale quest_shipment step 1 only fires in millhaven_market (room-scoped)', async () => {
+    // Action matches (talk_response) but the room does not — should NOT trigger.
+    const elsewhere = {
+      action: 'talk_response',
+      room_id: 'millhaven_temple',
+      location_id: 'town_millhaven',
+      enemies_killed: [],
+      loot_taken: [],
+      flags: {},
+      campaign_flags: {},
+      quest_progress: [],
+      faction_rep: {},
+      world_day: 1,
+      active_level: 1,
+      active_class: 'Fighter',
+    };
+    const emptyCs: CampaignState = {
+      campaign_id: valeCtx.id,
+      user_id: 'u',
+      world_day: 1,
+      current_location: 'town_millhaven',
+      quests: [],
+      flags: {},
+      faction_rep: {},
+      npc_attitudes: {},
+    };
+    const completionsWrongRoom = await evaluateQuestSteps(
+      emptyCs,
+      valeCtx.campaign?.quests ?? [],
+      elsewhere
+    );
+    expect(completionsWrongRoom.find((c) => c.questId === 'quest_shipment')).toBeUndefined();
+
+    // Same action, correct room — should activate quest_shipment.
+    const correct = { ...elsewhere, room_id: 'millhaven_market' };
+    const completionsRightRoom = await evaluateQuestSteps(
+      emptyCs,
+      valeCtx.campaign?.quests ?? [],
+      correct
+    );
+    const matched = completionsRightRoom.find((c) => c.questId === 'quest_shipment');
+    expect(matched).toBeDefined();
+    expect(matched?.completedStepIds).toEqual(['step_talk_aldric']);
+  });
+
+  it('applyQuestCompletions reports newly-activated quest IDs', () => {
+    const emptyCs: CampaignState = {
+      campaign_id: valeCtx.id,
+      user_id: 'u',
+      world_day: 1,
+      current_location: 'town_millhaven',
+      quests: [],
+      flags: {},
+      faction_rep: {},
+      npc_attitudes: {},
+    };
+    const result = applyQuestCompletions(emptyCs, valeCtx.campaign?.quests ?? [], [
+      { questId: 'quest_shipment', completedStepIds: ['step_talk_aldric'] },
+    ]);
+    expect(result.newlyActivatedQuestIds).toEqual(['quest_shipment']);
+    expect(result.cs.quests).toHaveLength(1);
+    expect(result.cs.quests[0]).toMatchObject({
+      questId: 'quest_shipment',
+      status: 'active',
+      completedSteps: ['step_talk_aldric'],
+    });
+  });
+
+  it('does not auto-activate later steps of an inactive quest (only step 1 is eligible)', async () => {
+    // facts simulate "loot_taken contains guild_ledger" (which would match
+    // quest_shipment step 2). Because the quest is inactive, only step 1 is
+    // checked — and step 1 requires room_id = millhaven_market, which we
+    // don't satisfy here. So nothing should activate.
+    const facts: CampaignFacts = {
+      action: 'loot',
+      room_id: 'dungeon_crypt_throne',
+      location_id: 'dungeon_shattered_crypt',
+      enemies_killed: [],
+      loot_taken: ['guild_ledger'],
+      flags: {},
+      campaign_flags: {},
+      quest_progress: [],
+      faction_rep: {},
+      world_day: 1,
+      active_level: 1,
+      active_class: 'Fighter',
+    };
+    const emptyCs: CampaignState = {
+      campaign_id: valeCtx.id,
+      user_id: 'u',
+      world_day: 1,
+      current_location: 'town_millhaven',
+      quests: [],
+      flags: {},
+      faction_rep: {},
+      npc_attitudes: {},
+    };
+    const completions = await evaluateQuestSteps(emptyCs, valeCtx.campaign?.quests ?? [], facts);
+    expect(completions.find((c) => c.questId === 'quest_shipment')).toBeUndefined();
   });
 });

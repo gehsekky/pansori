@@ -710,11 +710,11 @@ gameRouter.post('/session/:id/action', async (req: Request, res: Response) => {
       };
       const completions = await evaluateQuestSteps(campaignState, ctx.campaign.quests ?? [], facts);
       if (completions.length) {
-        const { cs: updatedCs, completedQuestIds } = applyQuestCompletions(
-          campaignState,
-          ctx.campaign.quests ?? [],
-          completions
-        );
+        const {
+          cs: updatedCs,
+          completedQuestIds,
+          newlyActivatedQuestIds,
+        } = applyQuestCompletions(campaignState, ctx.campaign.quests ?? [], completions);
         campaignState = updatedCs;
         // Reflect completed quests back into the result state
         result.newState = {
@@ -722,6 +722,36 @@ gameRouter.post('/session/:id/action', async (req: Request, res: Response) => {
           quest_progress: updatedCs.quests,
           faction_rep: updatedCs.faction_rep,
         };
+        // Surface newly-activated quests so the player sees they signed
+        // up for something — the explicit "Accept quest" choice is gone,
+        // so without this the quest would silently appear in the log.
+        // Skip quests that activated and finished in the same evaluation
+        // (a single-step "non-NPC trigger" quest hitting all its steps
+        // at once); the completion line already tells the player about it.
+        const completedSet = new Set(completedQuestIds);
+        const activationLines: string[] = [];
+        for (const qid of newlyActivatedQuestIds) {
+          if (completedSet.has(qid)) continue;
+          const def = ctx.campaign.quests?.find((q) => q.id === qid);
+          if (!def) continue;
+          activationLines.push(`\n\n✦ Quest accepted — ${def.title}. ${def.desc}`);
+        }
+        if (activationLines.length) {
+          const tail = activationLines.join(' ');
+          result.narrative = (result.narrative ?? '') + tail;
+          const roomLog = result.newState.room_log ?? [];
+          if (roomLog.length) {
+            roomLog[roomLog.length - 1] = roomLog[roomLog.length - 1] + tail;
+          }
+          const runLog = result.newState.run_log ?? [];
+          if (runLog.length) {
+            runLog[runLog.length - 1] = {
+              ...runLog[runLog.length - 1],
+              narrative: runLog[runLog.length - 1].narrative + tail,
+            };
+          }
+          result.newState = { ...result.newState, room_log: roomLog, run_log: runLog };
+        }
         // Apply each completed quest's `rewards` array through the
         // standard consequence pipeline. Without this, the only
         // completion-time effect was applyQuestCompletions's repGain;

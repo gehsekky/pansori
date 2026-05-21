@@ -1391,10 +1391,19 @@ export const context: Context = {
           {
             id: 'step_talk_aldric',
             desc: 'Speak with Aldric the Merchant to learn about the missing shipment.',
+            // Scoped to Aldric's room so a talk_response in any other room
+            // doesn't auto-accept this quest under the new auto-acceptance
+            // model. The any-of inside still matches both the new
+            // talk_response path and the legacy accept_quest action.
             condition: {
-              any: [
-                { fact: 'action', operator: 'equal', value: 'talk_response' },
-                { fact: 'action', operator: 'equal', value: 'accept_quest' },
+              all: [
+                { fact: 'room_id', operator: 'equal', value: 'millhaven_market' },
+                {
+                  any: [
+                    { fact: 'action', operator: 'equal', value: 'talk_response' },
+                    { fact: 'action', operator: 'equal', value: 'accept_quest' },
+                  ],
+                },
               ],
             },
           },
@@ -1440,9 +1449,14 @@ export const context: Context = {
             id: 'step_learn_crypt',
             desc: 'Learn about the threat in the Shattered Crypt from Sister Maren.',
             condition: {
-              any: [
-                { fact: 'action', operator: 'equal', value: 'talk_response' },
-                { fact: 'action', operator: 'equal', value: 'accept_quest' },
+              all: [
+                { fact: 'room_id', operator: 'equal', value: 'millhaven_temple' },
+                {
+                  any: [
+                    { fact: 'action', operator: 'equal', value: 'talk_response' },
+                    { fact: 'action', operator: 'equal', value: 'accept_quest' },
+                  ],
+                },
               ],
             },
           },
@@ -1489,9 +1503,14 @@ export const context: Context = {
             id: 'step_meet_dusk',
             desc: 'Meet Dusk in the Lantern District.',
             condition: {
-              any: [
-                { fact: 'action', operator: 'equal', value: 'talk_response' },
-                { fact: 'action', operator: 'equal', value: 'accept_quest' },
+              all: [
+                { fact: 'room_id', operator: 'equal', value: 'millhaven_slums' },
+                {
+                  any: [
+                    { fact: 'action', operator: 'equal', value: 'talk_response' },
+                    { fact: 'action', operator: 'equal', value: 'accept_quest' },
+                  ],
+                },
               ],
             },
           },

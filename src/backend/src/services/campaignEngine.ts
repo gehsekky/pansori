@@ -51,7 +51,15 @@ export async function loadCampaignState(
 // so dungeon-room moves don't blank out the dungeon location_id set
 // by the original travel action).
 export function resolveLocationForRoom(
-  campaign: { locations?: Array<{ id: string; centralRoomId?: string; districts?: Array<{ id: string; roomId: string }> }> } | undefined,
+  campaign:
+    | {
+        locations?: Array<{
+          id: string;
+          centralRoomId?: string;
+          districts?: Array<{ id: string; roomId: string }>;
+        }>;
+      }
+    | undefined,
   roomId: string
 ): { locationId: string; districtId?: string } | null {
   if (!campaign?.locations) return null;
@@ -74,10 +82,10 @@ export async function resetCampaignState(
   userId: string,
   campaignId: string
 ): Promise<void> {
-  await db.query(
-    `DELETE FROM campaign_states WHERE user_id = $1 AND campaign_id = $2`,
-    [userId, campaignId]
-  );
+  await db.query(`DELETE FROM campaign_states WHERE user_id = $1 AND campaign_id = $2`, [
+    userId,
+    campaignId,
+  ]);
 }
 
 export async function saveCampaignState(db: DB, state: CampaignState): Promise<void> {
@@ -125,51 +133,86 @@ export async function evaluateQuestSteps(
   quests: Quest[],
   facts: CampaignFacts
 ): Promise<{ questId: string; completedStepIds: string[] }[]> {
-  const active = cs.quests.filter((qp) => qp.status === 'active');
+  // Quests we'll evaluate:
+  //   - status === 'active'  → all unrun steps (normal progression)
+  //   - no progress entry    → only step[0] (auto-accept on first match)
+  // Completed / failed quests are skipped entirely.
+  const progressById = new Map(cs.quests.map((qp) => [qp.questId, qp] as const));
   const results: { questId: string; completedStepIds: string[] }[] = [];
 
-  for (const qp of active) {
-    const def = quests.find((q) => q.id === qp.questId);
-    if (!def) continue;
+  async function matches(stepCondition: unknown, stepId: string): Promise<boolean> {
+    const engine = new Engine();
+    engine.addRule({
+      name: stepId,
+      conditions: stepCondition as TopLevelCondition,
+      event: { type: 'step_met' },
+    });
+    const { results: ruleResults } = await engine.run(facts as unknown as Record<string, unknown>);
+    return ruleResults.length > 0;
+  }
 
-    const newlyCompleted: string[] = [];
-    for (const step of def.steps) {
-      if (qp.completedSteps.includes(step.id)) continue;
+  for (const def of quests) {
+    const qp = progressById.get(def.id);
 
-      const engine = new Engine();
-      engine.addRule({
-        name: step.id,
-        conditions: step.condition as TopLevelCondition,
-        event: { type: 'step_met' },
-      });
-      const { results: ruleResults } = await engine.run(
-        facts as unknown as Record<string, unknown>
-      );
-      if (ruleResults.length > 0) newlyCompleted.push(step.id);
+    if (qp && qp.status === 'active') {
+      // Normal active progression — check every unrun step.
+      const newlyCompleted: string[] = [];
+      for (const step of def.steps) {
+        if (qp.completedSteps.includes(step.id)) continue;
+        if (await matches(step.condition, step.id)) newlyCompleted.push(step.id);
+      }
+      if (newlyCompleted.length)
+        results.push({ questId: def.id, completedStepIds: newlyCompleted });
+    } else if (!qp) {
+      // Auto-accept: only step[0] is eligible to start a quest. Later steps
+      // shouldn't be able to silently activate it (e.g. picking up a loot
+      // item shouldn't kick off a quest whose step 2 is "loot_taken
+      // contains X" if step 1 hasn't fired). Step 1 is the explicit "I'm
+      // engaging with this thread" event.
+      const firstStep = def.steps[0];
+      if (firstStep && (await matches(firstStep.condition, firstStep.id))) {
+        results.push({ questId: def.id, completedStepIds: [firstStep.id] });
+      }
     }
-    if (newlyCompleted.length)
-      results.push({ questId: qp.questId, completedStepIds: newlyCompleted });
+    // else: status === 'completed' or 'failed' — skip.
   }
 
   return results;
 }
 
-// Apply quest step completions to a CampaignState copy; auto-complete quests when all steps done
+// Apply quest step completions to a CampaignState copy; auto-complete quests
+// when all steps done. Also auto-activates a quest when a completion lands
+// for one that hasn't been accepted yet — `evaluateQuestSteps` only emits
+// step 1 for inactive quests, so a completion here on an unknown quest is
+// the explicit "this quest just started" signal.
 export function applyQuestCompletions(
   cs: CampaignState,
   quests: Quest[],
   completions: { questId: string; completedStepIds: string[] }[]
-): { cs: CampaignState; completedQuestIds: string[] } {
+): { cs: CampaignState; completedQuestIds: string[]; newlyActivatedQuestIds: string[] } {
   let updated = {
     ...cs,
     quests: cs.quests.map((q) => ({ ...q, completedSteps: [...q.completedSteps] })),
   };
   const completedQuestIds: string[] = [];
+  const newlyActivatedQuestIds: string[] = [];
 
   for (const { questId, completedStepIds } of completions) {
     const def = quests.find((q) => q.id === questId);
-    const qp = updated.quests.find((q) => q.questId === questId);
-    if (!def || !qp) continue;
+    if (!def) continue;
+
+    let qp = updated.quests.find((q) => q.questId === questId);
+    if (!qp) {
+      // Auto-acceptance: quest had no progress entry, evaluateQuestSteps
+      // matched step 1, so spin it up as active here.
+      qp = {
+        questId,
+        status: 'active' as QuestStatus,
+        completedSteps: [],
+      };
+      updated = { ...updated, quests: [...updated.quests, qp] };
+      newlyActivatedQuestIds.push(questId);
+    }
 
     for (const sid of completedStepIds) {
       if (!qp.completedSteps.includes(sid)) qp.completedSteps.push(sid);
@@ -191,7 +234,7 @@ export function applyQuestCompletions(
     }
   }
 
-  return { cs: updated, completedQuestIds };
+  return { cs: updated, completedQuestIds, newlyActivatedQuestIds };
 }
 
 // ─── Faction helpers ──────────────────────────────────────────────────────────
