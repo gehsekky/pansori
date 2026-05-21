@@ -9911,7 +9911,20 @@ describe('applyConsequence give_xp', () => {
     for (const ch of next.characters) {
       expect(ch.xp).toBe(100);
     }
-    expect(narrativeParts.join(' ')).toContain('+100 XP');
+    // Narrative shows the authored total + per-PC share.
+    const text = narrativeParts.join(' ');
+    expect(text).toContain('+400 XP');
+    expect(text).toContain('+100 each');
+  });
+
+  it('collapses to a single line for solo parties (each = total)', () => {
+    const st = makeParty([{}]); // 1 living PC
+    const narrativeParts: string[] = [];
+    applyConsequence({ type: 'give_xp', amount: 250 }, st, seed, 'pc-0', narrativeParts);
+    const text = narrativeParts.join(' ');
+    expect(text).toContain('+250 XP');
+    // Solo case: don't repeat the per-PC share since it matches the total.
+    expect(text).not.toContain('each');
   });
 
   it('floors the per-PC share when it does not divide evenly', () => {
