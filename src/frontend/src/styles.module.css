@@ -1,3 +1,28 @@
+/* Skip link — visually hidden until keyboard-focused. WCAG 2.4.1.
+   Pulled off-screen via absolute positioning so screen readers still
+   find it; refocus brings it back into view with a high-contrast pill. */
+.skipLink {
+  position: absolute;
+  top: -40px;
+  left: 8px;
+  z-index: 9999;
+  background: var(--t-primary);
+  color: var(--t-bg);
+  padding: 0.5rem 0.875rem;
+  text-decoration: none;
+  font-size: 0.85rem;
+  letter-spacing: 0.05em;
+  border-radius: 2px;
+  transition: top 0.15s;
+}
+
+.skipLink:focus,
+.skipLink:focus-visible {
+  top: 8px;
+  outline: 2px solid var(--t-primary);
+  outline-offset: 2px;
+}
+
 /* ─── Base classes (formerly the S object) ──────────────────────────────── */
 
 /* Global focus-visible — keyboard users need to see where focus lands. The

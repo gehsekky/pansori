@@ -93,7 +93,11 @@ function InventoryModal({
                 title={c.dead ? `${c.name} is dead` : c.name}
               >
                 {c.portrait_url && (
-                  <img src={c.portrait_url} alt="" className={styles.invTabPortrait} />
+                  <img
+                    src={c.portrait_url}
+                    alt={`${c.name}'s portrait`}
+                    className={styles.invTabPortrait}
+                  />
                 )}
                 {c.name} [{formatClassLabel(c.character_class, c.subclass)}]
               </button>

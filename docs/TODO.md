@@ -20,33 +20,12 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 - [ ] **Climbing & Crawling movement cost** — needs a "movement mode" concept. Skip until verticality.
 - [ ] **Jumping** — Long jump = STR ft, high jump = 3 + STR mod ft. Same verticality blocker.
 
-### From mission-log analysis (2026-05-20) — all shipped
-
-- [x] **Unprepared spells surface in cast menu** — `cast_spell` choices are now filtered to `prepared_spells` for Cleric/Paladin/Druid (cantrips always castable). Sorcerer/Bard/Warlock cast everything they know. Runtime rejection message no longer suggests mid-combat prep.
-- [x] **Bless +1d4 not appearing in attack notes** — Bless now applies a `blessed` condition to caster + first 2 living allies (tracked via `condition_sources.blessed = caster.id`). Each blessed attack rolls 1d4 and adds to the to-hit total; `Bless: +N (1d4)` surfaces in `atkNote` alongside Bardic Inspiration. Concentration drop clears `blessed` from all linked PCs.
-- [x] **Cantrip damage + spell HP-remaining tokenized** — `fmt.dmg()` + `fmt.hp()` + `fmt.dc()` now wrap spell-attack damage, save-spell damage + DC, auto-hit cantrip damage (e.g. Eldritch Blast), Divine Spark damage, Graze damage, Colossus Slayer damage + HP-remaining, single-target spell HP-remaining. Regression specs cover the spell-attack and save-spell paths.
-- [x] **Frightened condition persists through death-save Nat 20** — root cause was unrelated to frightened duration. The Nat-20 recovery handler was clearing ALL conditions instead of just `unconscious` (line 698 of `processDeathSave`); a downed-then-revived PC would lose every pre-existing condition, including frightened. Fix: clear only `unconscious` + matching duration entry; everything else persists per SRD 5.2.1 p.197.
-- [x] **Compound enemy-turn narratives split into paragraphs** — `runEnemyTurns` now prepends `\n\n` to each `[X's turn]` header. `NarrativeText` uses `whiteSpace: 'pre-line'` so the FE renders each turn as its own paragraph. The strip → log → narrative chain still has the same per-event combat_log entries; the prose just breathes between turns now.
-
-### From mission-log analysis (2026-05-21)
-
-> Findings from the multi-combat Vale playthrough log (Bandits → Skeleton →
-> 2× Crypt Ghoul). Ordered by impact + ease.
-
-- [x] **Mystery advantage on every subsequent PC attack** — fixed. Root cause was NOT Vex/Sap as suspected; it was `isFlankingPosition` (gridEngine.ts:63) being far too permissive. The pre-fix function returned true whenever attacker and ally had opposing signs on a single axis relative to target — regardless of distance. With a 3-PC party spread across the grid, almost every attack after the first PC repositioned would silently trigger flanking. RAW DMG 2014 flanking requires (a) both attacker AND ally adjacent to target (Chebyshev distance = 1), and (b) ally's offset is the exact negation of attacker's offset (diametrically opposite squares). 7 regression specs cover cardinals, diagonals, and the Vale 3-PC scenario.
-- [x] **Concentration spells never expire** — fixed. Added `concentrating_on.rounds_left?: number` + `Spell.durationRounds?: number` (default 10 = 1 minute). New `tickConcentrationDurations(st)` helper runs on round wrap, decrementing every PC's timer; spells whose budget hits 0 break cleanly via `breakConcentration` so linked conditions (`blessed`, `paralyzed`, etc.) clear at the same time. Bless + Hold Person + Bane all use the 10-round default; longer-duration spells (Spirit Guardians, Hex) can override per spell. 2 regression specs cover cast-time init + auto-end on round wrap.
-- [x] **Combat-start initiative narrative** — fixed. Replaced the misleading `X acts (initiative N)!` with `X strikes with the opening blow (initiative N)!` when the triggering PC isn't first in initiative. When they ARE first, narrative stays `X acts first (initiative N)!`. The behavior (PC's attack runs immediately on combat-start) is kept as an "ambusher" affordance — only the framing changed.
-- [x] **Cantrips in prep cap** — fixed. Both `generateChoices` (auto-prep clamp) and the `prepare_spells` handler now filter out cantrips (level 0) before counting against the cap. RAW: cantrips are always known, not prepared. Three regression specs updated.
-- [x] **Surprise — enemies now actually skip their first turn** — root cause: surprised PCs already skipped via the choice generator's `SURPRISED — cannot act this round (pass)` short-circuit, but the enemy turn loop had no equivalent check. A surprised enemy got the narrative marker and then acted normally. Now: surprised enemies emit `[X is surprised and loses their turn!]` and the loop advances past them. Pansori sticks with 2014 surprise model (skip first turn) consistently across both sides; 2024 init-disadvantage conversion remains a separate refactor.
-- [x] **Preserve Life narrative when no eligible target** — fixed. Channel-divinity spend still costs the use (RAW behavior — gates don't refund) but the narrative now says `No HP distributed (every wounded ally is already above half HP)` instead of the misleading `Distributed 0 HP among 1 wounded allies`.
-- [x] **Level-up narrative on a downed PC** — fixed in `applyLevelUpFromXp`. PCs at 0 HP / unconscious / accumulating death-save failures still get the mechanical level-up (level/HP/spell-slot increase, HP bump may revive them — that's RAW), but the heroic-flavor pool is suppressed in favor of a quieter `X reaches level N (+H HP, while unconscious)` line.
-- [x] **Enemy miss flavor variety** — fixed. The single repeated "you dodge at the last second" line is now a `pick()` over 6 variants ("swings wide", "blow glances off your guard", "misjudges the distance", "you sidestep", "and misses cleanly", plus the original).
-
 ---
 
 ## Content & playtest
 
-- [ ] **Boss fight follow-ups — wire to actual bosses** — engine scaffolding for legendary actions (`EnemyTemplate.legendary_actions` + per-round point pool with refresh on the legendary's own turn) and lair actions (`EnemyTemplate.lair_actions` firing on round-wrap as AoE save-for-half damage) is in place with test coverage (`describe('boss legendary + lair actions', ...)`). Effects shipped: `extra_attack` (legendary) and `aoe_save_damage` (lair). Not wired to the Vale Crypt Lord because the existing playthrough balance assumes phase transitions alone — adding strong lair pulses required re-tuning the boss. A future boss (e.g. fourth-campaign showcase) is a better fit. More effect kinds (terrain shift, debuff aura, summon, multi-attack legendary) can be added as content demands them.
+- [ ] **Boss legendary + lair actions — wire to actual bosses** — engine scaffolding (`EnemyTemplate.legendary_actions` + per-round point pool refreshing on the legendary's own turn; `EnemyTemplate.lair_actions` firing on round-wrap as AoE save-for-half damage) is in place with test coverage. Effects shipped: `extra_attack` (legendary) and `aoe_save_damage` (lair). Not wired to any current boss because per-encounter balance was tuned without them. A future boss (fourth-campaign showcase, or after Crypt Lord re-balance settles) is a better fit. More effect kinds (terrain shift, debuff aura, summon, multi-attack legendary) can be added as content demands them.
+- [ ] **Party line-of-sight indicators on the grid** — Phase 2 of the grid-detail pass needs Bresenham LoS that respects the obstacles we just shipped. Visual: ghost-tint cells the active PC can't see; suppress enemy tokens in those cells beyond the existing `dark`-illum fog. ~1 day. Was in phase-2 but deferred to its own commit since it needs LoS-blocking through obstacles.
 - [ ] **Fourth campaign module (opportunistic)** — coastal pirate town, desert ruin, planar city, etc. Stress-tests the format further. Not on the critical path.
 
 ---
@@ -59,19 +38,18 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 
 ## UX & polish
 
-- [ ] **Grid map detail pass** — phase 1 shipped (dead bodies as faded skull, same-name enemy `#N` disambiguation, AoE preview tints, rich `aria-label`). Still TODO: difficult-terrain squares (rocks/snow tile), obstacles, party LoS indicators, last-attacker arrows.
-- [ ] **Tutorial / onboarding** — 2-room intro covering the action choice loop, grid combat, inventory modal. New players have nowhere to learn the controls today.
+- [ ] **Tutorial / onboarding** (deferred-to-launch per user instruction). 2-room intro covering the action choice loop, grid combat, inventory modal. New players have nowhere to learn the controls today. Held until the engine surface stabilizes near launch — building this now means rebuilding every time a UI surface changes.
 - [ ] **Dynamic room/encounter image generation** — Google Imagen behind `IMAGE_PROVIDER` flag, off by default.
 - [ ] **Sound effects** — ambient audio per location type; combat sound cues.
-- [ ] **LLM enhancement follow-ups** — initial audit shipped (`preservesCriticalFacts()` guard in `gameEngine.ts` falls back to raw narrative when the model drops a multi-digit number or outcome word; system prompt now mentions multi-PC `[CharName]` prefix preservation). Still open: (a) cost/latency circuit-breaker — every action invokes the LLM, no per-session budget cap; (b) skip enhancement for short events (<100 chars) where prose flourish isn't worth the round-trip; (c) side-by-side comparison of LLM vs no-LLM mode to know if enhancement is net-positive for player experience.
+- [ ] **LLM enhancement cost guards** (deferred-to-launch per user instruction). Per-session token budget, short-event skip threshold, `LLM_ENHANCEMENT=off` kill switch. Held until launch volume justifies it.
 
 ---
 
 ## Engine & infrastructure
 
-- [ ] **Save/state persistence across redeploys (manual verify)** — schema-evolution contract is now under test: `normalizeState` specs assert that a JSONB state row missing post-rollout fields (grid `entities`, `movement_used`, `pending_reaction`, quest/faction overlay, etc.) loads cleanly and survives a `takeAction` call without crashing. Still TODO: an actual end-to-end manual exercise — start a session, redeploy the backend container, resume the session, confirm parity. ~30 min.
-- [ ] **Difficulty tuning from playtest data** — once playtests happen, capture damage/HP/encounter telemetry to inform tuning passes.
-- [ ] **gameEngine.ts class refactor (deferred)** — `takeAction` is ~3700 lines with three handlers that dominate (`use_class_feature` ~800, `cast_spell` ~544, `attack` ~532). Refactor into an `ActionContext` class that dispatches to handler files (`services/actions/castSpell.ts`, etc.). Moderate regression risk. Triggers to revisit: (a) big-handler edits grind into context budget; (b) a feature touches multiple handlers; (c) a quiet maintenance day.
+- [ ] **Save/state persistence across redeploys (manual verify)** — `normalizeState` specs assert that a JSONB state row missing post-rollout fields loads cleanly and survives a `takeAction` call without crashing. Still TODO: actual end-to-end manual exercise — start a session, redeploy the backend container, resume the session, confirm parity. ~30 min.
+- [ ] **Difficulty tuning from playtest data** — once playtests happen, capture damage/HP/encounter telemetry to inform tuning passes. Real fights are starting to expose where the math is off (Crypt Lord TPK was the first big signal). ~3-4h to wire telemetry; ongoing to tune.
+- [ ] **gameEngine.ts class refactor (deferred)** — `takeAction` is ~3900 lines with three handlers that dominate (`use_class_feature` ~800, `cast_spell` ~544, `attack` ~532). Refactor into an `ActionContext` class that dispatches to handler files (`services/actions/castSpell.ts`, etc.). Moderate regression risk. Triggers to revisit: (a) big-handler edits grind into context budget; (b) a feature touches multiple handlers; (c) a quiet maintenance day.
 - [ ] **Pre-commit hook (Husky + lint-staged)** — auto-run eslint + prettier on staged files before commit. Catches the class of bug where prettier-dirty code reaches CI and fails the build. ~30 min setup; bypassable with `--no-verify`. CI lint stays as the gate.
 
 - [ ] **Multiplayer + party chat (online co-op)** — let friends share a session and chat in realtime. Architecture audit confirmed the base is close: `state.characters[]` already models a party, `state.current_room` is single-valued (no party split → players share one narrative), and the reactive-spell pause already routes prompts to the eligible PC. Four concrete gaps:
@@ -95,6 +73,63 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 - [ ] **Observability** (needs-input) — only `console.log` today. Sentry / structured logging / error tracking would surface prod issues. Requires choosing a service (paid SaaS or self-hosted).
 - [ ] **CHANGELOG.md** (needs-input) — no user-visible change log. Should we keep one? Format (Keep-a-Changelog, conventional commits, etc.)?
 - [ ] **Post-deploy health check + rollback** (needs-input) — CI deploys via SSM but doesn't poll `/api/health` after to verify, nor roll back on failure. Bad deploys 500 prod until manual intervention. ~2-3h to wire properly.
+
+---
+
+## Accessibility audit (2026-05-21)
+
+> Code-survey pass focused on WCAG 2.1 AA. The engine is already strong
+> on focus-visible outlines (global `:focus-visible` rule), aria-labels
+> on icon-only buttons (MoveDPad/SpellBar/CombatActionBar), tablist
+> semantics + arrow-key navigation on ContextPanel, focus-trap +
+> Esc-close on Dialog, aria-live polite on the combat narrative, and
+> proper `<button>` elements for clickable party tiles. Items below are
+> the gaps the survey found; manual screen-reader + keyboard-only
+> validation is the next step.
+
+### Critical — likely WCAG fails
+
+- [ ] **CharScreen labels not associated with inputs** — every `<label className={styles.formLbl}>` lacks `htmlFor`; matching `<input>` / `<select>` lacks `id`. Screen readers won't announce the label when the field is focused. Fix: add stable ids per draft index, wire `htmlFor`. ~30 min.
+- [ ] **`.choiceBtnSeen` contrast** — dimmed choices use `opacity: 0.45` + `color: var(--t-dim)` (≈ `#7e7e7e` over `#0a0a0a`). The opacity reduction drops effective contrast below the WCAG AA 4.5:1 threshold. Verify with a contrast checker; if it fails, drop opacity to ~0.65 OR use a dedicated muted-but-readable color instead of stacking opacity on top of `--t-dim`. ~20 min.
+
+### Important
+
+- [ ] **Skip-to-main link** — no way for keyboard users to bypass the header (ABORT/RESIGN, SIGN OUT, portrait, party rail) and jump straight to the action area. Add an invisible-until-focused `<a href="#main">Skip to main content</a>` + `id="main"` on `<main className={styles.gameLayout}>`. ~10 min.
+- [ ] **Player avatar `alt=""` is overly terse for SR** — `<img alt="">` on portrait images marks them decorative, but the SR has no way to know which character is which when the visual portrait is the only differentiator. Consider `alt={\`${char.name}'s portrait\`}` on PartyRail/InventoryModal/SessionScreen and `alt=""` only on the user's avatar pill.
+
+### Polish
+
+- [ ] **MoveDPad arrow-key nav** — the 3×3 D-pad uses 9 sibling buttons; pressing Tab moves through each. WASD or arrow-key navigation across the grid would match the visual mental model. Add a `roving tabindex` + arrow-key handler on the dpad container.
+- [ ] **HP / condition live-region updates** — the combat narrative has `aria-live="polite"` so SR users hear what happened, but HP-bar fills and condition badges update silently. An off-screen `aria-live` summary of the most recent delta (`Fighter HP 18, conditions: frightened`) would help SR users track state without re-listening to the full narrative.
+
+---
+
+## Security audit (2026-05-21)
+
+> Code-survey pass focused on OWASP Top 10 and multiplayer-readiness.
+> Solid foundation already: helmet headers, CORS pinned to FRONTEND_URL,
+> Postgres-backed sessions with httpOnly + secure + sameSite cookies,
+> rate-limit on `/api/auth/*`, `trust proxy 1` for nginx, all DB queries
+> parameterized ($1/$2 placeholders), passport+Google OAuth. The single-
+> tenant model masks several issues that will bite when session_participants
+> lands.
+
+### Critical — fix before launch
+
+- [ ] **`SESSION_SECRET` fallback should fail-fast** — `process.env.SESSION_SECRET ?? 'change-me-in-production'` (`src/backend/src/index.ts:48`) silently boots prod with a known string if the env var is missing. Predictable secret = forgeable sessions = full auth bypass. Replace fallback with `if (!process.env.SESSION_SECRET) throw new Error(...)`. ~5 min.
+- [ ] **No CSRF protection on state-changing endpoints** — cookies use `sameSite: 'none'` in prod (required for cross-origin SPA + API), so the browser sends the session cookie on cross-origin POSTs. A malicious site could trigger `POST /api/game/session/:id/action` via a logged-in user. Options: (a) tighten to `sameSite: 'lax'` if cross-origin isn't actually needed — confirm the prod FE + API domain layout; (b) add a double-submit CSRF token; (c) require a custom header like `X-Requested-With: XMLHttpRequest` (lightweight but defense-in-depth only). Needs design call before implementation.
+- [ ] **Socket.IO `join-session` has no auth check** — `socket.on('join-session', sessionId => socket.join(\`session:${sessionId}\`))` in `src/backend/src/index.ts:94` lets any connected socket subscribe to any session's events. Currently no event broadcasts happen so the impact is zero, but the moment multiplayer wires state broadcasts (already in the TODO), this becomes a live-state leak. Fix: read the session cookie off the upgrade request, look up the user, verify they own the session before allowing the join. ~30 min once a session-cookie parser is shared between the express and socket sides.
+
+### Important
+
+- [ ] **No rate limit on `/api/game/*`** — only `/api/auth` has rate-limit middleware. A misbehaving client (or DOS) could spam `takeAction` to drain LLM budget, fill the run_log, or grind the server. Add a separate `gameLimiter` with a generous limit (~120 req/min per user). ~15 min.
+- [ ] **Multiplayer: session ownership + turn enforcement** (already in main TODO) — `game_sessions.user_id` is single-tenant; `takeAction` doesn't verify `req.user.id === characters[active].owner_user_id`. Documented above under Multiplayer; flagged here so the security pass references it.
+- [ ] **`npm audit` in CI** — no automated dependency-vuln check. Add a job to PR builds that fails on `high` or `critical`. ~15 min YAML edit; ongoing maintenance to triage findings.
+
+### Polish
+
+- [ ] **CSP for any future HTML-serving paths** — helmet's CSP is disabled (`contentSecurityPolicy: false`) because the API doesn't return HTML. If we ever serve uploaded files or generated images directly, re-enable CSP with a tight `script-src 'self'` policy.
+- [ ] **Session fixation protection** — `express-session` doesn't rotate the session id on login. Passport regenerates by default but worth confirming. Tested by logging in, copying the cookie, logging out, logging in again — should produce a new cookie.
 
 ---
 

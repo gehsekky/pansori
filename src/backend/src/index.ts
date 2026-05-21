@@ -37,25 +37,35 @@ app.use(cors({ origin: process.env.FRONTEND_URL, credentials: true }));
 app.use(express.json());
 
 // ─── Session store ────────────────────────────────────────────────────────────
+// Fail-fast if SESSION_SECRET is missing — a fallback string is a known
+// secret in prod, which means forgeable session cookies and full auth
+// bypass. Better to refuse to boot than to silently accept a known key.
+if (!process.env.SESSION_SECRET) {
+  throw new Error(
+    'SESSION_SECRET is required. Generate a 64-char random value and set it in /opt/pansori/.env (or your local .env).'
+  );
+}
 const PgSession = connectPgSimple(session);
-app.use(
-  session({
-    store: new PgSession({
-      pool,
-      tableName: 'session',
-      createTableIfMissing: false,
-    }),
-    secret: process.env.SESSION_SECRET ?? 'change-me-in-production',
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      secure: process.env.NODE_ENV === 'production',
-      httpOnly: true,
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-    },
-  })
-);
+// Built once so the same middleware can be reused by socket.io's
+// engine.use() — that's how socket connections get the session cookie
+// parsed and the user id available off socket.request.session.
+const sessionMiddleware = session({
+  store: new PgSession({
+    pool,
+    tableName: 'session',
+    createTableIfMissing: false,
+  }),
+  secret: process.env.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    httpOnly: true,
+    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+  },
+});
+app.use(sessionMiddleware);
 
 // ─── Passport ─────────────────────────────────────────────────────────────────
 app.use(passport.initialize());
@@ -75,9 +85,22 @@ const authLimiter = rateLimit({
   message: { error: 'Too many auth requests, slow down.' },
 });
 
+// Game-route rate limit — protects against a misbehaving (or malicious)
+// client spamming takeAction, which would drain LLM budget, balloon
+// run_log, and pin the server CPU. 120 req/min is well above any legit
+// playthrough cadence (the slowest action is one round = several seconds
+// of player thought) but tight enough to throttle abuse.
+const gameLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 120,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Too many game requests, slow down.' },
+});
+
 // ─── Routes ───────────────────────────────────────────────────────────────────
 app.use('/api/auth', authLimiter, authRouter);
-app.use('/api/game', requireAuth, gameRouter);
+app.use('/api/game', requireAuth, gameLimiter, gameRouter);
 
 app.get('/api/health', async (_req, res) => {
   try {
@@ -88,10 +111,39 @@ app.get('/api/health', async (_req, res) => {
   }
 });
 
-// Socket.io — multiplayer-ready: each session gets its own room
+// Socket.io — multiplayer-ready: each session gets its own room. Run the
+// express-session middleware on each connection's upgrade request so the
+// socket has access to req.session and we can authorize joins.
+io.engine.use(sessionMiddleware);
+
 io.on('connection', (socket) => {
   console.log('Socket connected:', socket.id);
-  socket.on('join-session', (sessionId: string) => {
+  socket.on('join-session', async (sessionId: string) => {
+    // Ownership check: only the session's owner may subscribe to its room.
+    // Without this any connected socket could `join-session(<any id>)`
+    // and receive future state broadcasts. Single-tenant today;
+    // session_participants will broaden this when multiplayer lands.
+    const req = socket.request as unknown as {
+      session?: { passport?: { user?: string } };
+    };
+    const userId = req.session?.passport?.user;
+    if (!userId) {
+      console.log(`Socket ${socket.id} rejected join (no session)`);
+      return;
+    }
+    try {
+      const { rowCount } = await pool.query(
+        'SELECT 1 FROM game_sessions WHERE id = $1 AND user_id = $2',
+        [sessionId, userId]
+      );
+      if (!rowCount) {
+        console.log(`Socket ${socket.id} rejected join (not session owner)`);
+        return;
+      }
+    } catch (err) {
+      console.error('[socket] join-session ownership check failed:', err);
+      return;
+    }
     socket.join(`session:${sessionId}`);
     console.log(`Socket ${socket.id} joined session:${sessionId}`);
   });
