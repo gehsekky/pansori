@@ -118,6 +118,56 @@ interface CharDraft {
   subclass?: string;
 }
 
+// Per-context localStorage key for the saved party draft. We key on the
+// context id (vale_of_shadows / whispering_pines / sandbox / etc.) so
+// each campaign carries its own "last party" — switching to Pines
+// doesn't clobber the Vale party setup, and coming back to Vale
+// restores names/classes/stats the player tuned for that campaign.
+const PARTY_DRAFT_KEY = (ctxId: string) => `pansori:party_draft:${ctxId}`;
+
+function loadPartyDraft(ctxId: string): CharDraft[] | null {
+  if (!ctxId) return null;
+  try {
+    const raw = localStorage.getItem(PARTY_DRAFT_KEY(ctxId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed) || parsed.length === 0 || parsed.length > 4) return null;
+    return parsed as CharDraft[];
+  } catch {
+    return null;
+  }
+}
+
+function savePartyDraft(ctxId: string, party: CharDraft[]): void {
+  if (!ctxId || party.length === 0) return;
+  try {
+    localStorage.setItem(PARTY_DRAFT_KEY(ctxId), JSON.stringify(party));
+  } catch {
+    // localStorage may be unavailable (private mode quota, etc.); silent fail.
+  }
+}
+
+// Coerce a saved draft into something the current context can render
+// without crashing. If the saved class / background / subclass don't
+// exist in this context (e.g. the campaign authoring removed them
+// since last save), fall back to the context's first available value.
+// Stats + names + species are left alone.
+function sanitizeDraft(d: CharDraft, ctx: FrontendContext): CharDraft {
+  const classIds = new Set(ctx.classes.map((c) => c.id));
+  const bgIds = new Set((ctx.backgrounds ?? []).map((b) => b.id));
+  const validCls = classIds.has(d.cls) ? d.cls : (ctx.classes[0]?.id ?? d.cls);
+  const validBg = bgIds.has(d.backgroundId)
+    ? d.backgroundId
+    : (ctx.backgrounds?.[0]?.id ?? '');
+  // Subclass: keep only if the class still requires/supports one with the
+  // saved id; otherwise drop so the player re-picks (handle() blocks
+  // start until subclass is picked when required).
+  const subclassOpts = L1_SUBCLASS_OPTIONS[validCls] ?? [];
+  const validSubclass =
+    d.subclass && subclassOpts.some((o) => o.id === d.subclass) ? d.subclass : undefined;
+  return { ...d, cls: validCls, backgroundId: validBg, subclass: validSubclass };
+}
+
 function CharScreen({
   onStart,
   loading,
@@ -134,18 +184,28 @@ function CharScreen({
   );
   const selectedCtxForInit =
     availableContexts.find((c) => c.id === contextId) ?? availableContexts[0];
-  const [party, setParty] = useState<CharDraft[]>([
-    {
-      name: localStorage.getItem('operative_name') || '',
-      cls: selectedCtxForInit?.classes[0]?.id ?? '',
-      speciesId: 'human',
-      backgroundId: selectedCtxForInit?.backgrounds?.[0]?.id ?? '',
-      stats: rollStatBlock(),
-      portrait: user?.avatar_url ?? null,
-      rollCount: 1,
-      statMethod: 'roll',
-    },
-  ]);
+  // Try to restore the per-context saved party. If none exists, fall
+  // back to a single-member default seeded with the legacy
+  // `operative_name` localStorage value + the user's avatar (so the
+  // first-ever character-creation visit isn't completely blank).
+  const [party, setParty] = useState<CharDraft[]>(() => {
+    const saved = loadPartyDraft(contextId);
+    if (saved && selectedCtxForInit) {
+      return saved.map((d) => sanitizeDraft(d, selectedCtxForInit));
+    }
+    return [
+      {
+        name: localStorage.getItem('operative_name') || '',
+        cls: selectedCtxForInit?.classes[0]?.id ?? '',
+        speciesId: 'human',
+        backgroundId: selectedCtxForInit?.backgrounds?.[0]?.id ?? '',
+        stats: rollStatBlock(),
+        portrait: user?.avatar_url ?? null,
+        rollCount: 1,
+        statMethod: 'roll',
+      },
+    ];
+  });
   const [error, setError] = useState('');
   // Two-click swap state — when the player clicks a stat box, we remember
   // it; clicking another stat box swaps the two values; clicking the same
@@ -194,21 +254,37 @@ function CharScreen({
 
   useEffect(() => {
     const c = availableContexts.find((c) => c.id === contextId);
-    if (c) {
-      applyTheme(c.theme);
-      localStorage.setItem('last_context_id', contextId);
-      setParty((prev) =>
-        prev.map((d) => ({
-          ...d,
-          cls: c.classes[0]?.id ?? d.cls,
+    if (!c) return;
+    applyTheme(c.theme);
+    localStorage.setItem('last_context_id', contextId);
+    // If the new context has a saved party draft, restore it (sanitized
+    // against the current campaign's classes / backgrounds). Otherwise
+    // fall back to a fresh single-member party for this context.
+    const saved = loadPartyDraft(contextId);
+    if (saved) {
+      setParty(saved.map((d) => sanitizeDraft(d, c)));
+    } else {
+      setParty([
+        {
+          name: localStorage.getItem('operative_name') || '',
+          cls: c.classes[0]?.id ?? '',
+          speciesId: 'human',
           backgroundId: c.backgrounds?.[0]?.id ?? '',
           stats: rollStatBlock(),
+          portrait: user?.avatar_url ?? null,
           rollCount: 1,
           statMethod: 'roll',
-        }))
-      );
+        },
+      ]);
     }
-  }, [contextId, availableContexts]);
+  }, [contextId, availableContexts, user]);
+
+  // Persist the current party draft to localStorage whenever it changes
+  // (debouncing isn't necessary — writes are sync but cheap, and the
+  // state changes on discrete user actions like name typing).
+  useEffect(() => {
+    savePartyDraft(contextId, party);
+  }, [contextId, party]);
 
   const selectedCtx = availableContexts.find((c) => c.id === contextId);
   const classes = selectedCtx?.classes ?? [];
