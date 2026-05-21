@@ -388,6 +388,19 @@ export default function App() {
                         <img src={user.avatar_url} alt="" className={styles.userAvatar} />
                       )}
                       <span>{user.display_name.toUpperCase()}</span>
+                      {gameState && !escaped && !allDead && (
+                        <button
+                          className={styles.signOutBtn}
+                          onClick={() => {
+                            if (confirm('Abandon current adventure and start over?'))
+                              startNewAdventure();
+                          }}
+                          title="Abandon current adventure (returns to session list)"
+                          aria-label="Abort current adventure"
+                        >
+                          ABORT
+                        </button>
+                      )}
                       <button className={styles.signOutBtn} onClick={handleLogout}>
                         SIGN OUT
                       </button>
@@ -709,17 +722,6 @@ export default function App() {
                     </>
                   )}
 
-                  <div className={styles.abortRow}>
-                    <button
-                      className={styles.sendBtn}
-                      style={{ padding: '0.3rem 0.75rem', fontSize: '0.75rem' }}
-                      onClick={() => {
-                        if (confirm('Abandon current adventure and start over?')) startNewAdventure();
-                      }}
-                    >
-                      ABORT ADVENTURE
-                    </button>
-                  </div>
                 </div>
 
                 {contextTabs.length > 0 && <ContextPanel tabs={contextTabs} />}
