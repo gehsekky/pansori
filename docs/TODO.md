@@ -74,10 +74,16 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
     have a "Leave session" button in the players dialog. Server auto-
     transfers PCs they owned to the host before removing them, so turn
     enforcement never encounters an orphan owner.
-  - [ ] **Race detection** (`turn_seq` column) — if two participants
-    race-click during the same active turn, the server already rejects
-    the loser via the turn-enforcement guard with a 403, so this isn't
-    critical. Defer until it actually bites.
+  - [x] **Race detection** (`turn_seq` column) — shipped 4d3b7bb.
+    `game_sessions.turn_seq` bumps on every successful takeAction;
+    clients send their last-known value with each action; server
+    rejects with 409 on mismatch. useGame handles 409 by logging
+    "out of sync" + resuming the session for fresh state.
+  - [x] **Realtime participants refresh** — shipped 4d3b7bb.
+    useGame listens for Socket.IO 'participants' events and bumps
+    a participantsVersion counter; InviteDialog includes it in its
+    fetch-participants useEffect deps so the list updates the
+    moment a friend joins/leaves/has their PC reassigned.
       Each PC has exactly one human controller via `Character.owner_user_id`. Solo
       mode = host owns all PCs (no schema branch). 2+1 / 1+2 / 1+1+1 splits all
       fall out of the same row layout in `session_participants`. Every participant
