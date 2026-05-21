@@ -1303,7 +1303,7 @@ function grantDarkOnesBlessing(char: Character): string {
 
 // ─── Rest helper ──────────────────────────────────────────────────────────────
 
-function canRestInRoom(state: GameState, seed: Seed): boolean {
+export function canRestInRoom(state: GameState, seed: Seed): boolean {
   const room = seed.rooms.find((r) => r.id === state.current_room);
   if (room?.canRest === false) return false;
   return !hasLivingEnemy(state, seed, state.current_room);
@@ -5580,16 +5580,6 @@ export async function takeAction({
         break;
       }
 
-      case 'death_save': {
-        // Unreachable in practice — the early-return block at "Death saves
-        // override all actions when HP = 0" (above the switch) catches every
-        // death_save while char.hp <= 0. Kept as a defensive fallback that
-        // mirrors the early block's effect, in case some future code path
-        // routes a death_save here with hp > 0 (shouldn't happen).
-        narrative = buildArrivalNarrative(roomId, st, seed, context);
-        break;
-      }
-
       case 'sneak': {
         if (!enemyAlive) {
           narrative = 'Nothing to sneak past. You move freely.';
@@ -5666,183 +5656,6 @@ export async function takeAction({
         // Sneak always consumes the action and ends the combat turn
         char.turn_actions = { ...char.turn_actions, action_used: true };
         if (st.combat_active) usedInitiative = true;
-        break;
-      }
-
-      case 'short_rest': {
-        if (st.combat_active) {
-          narrative = 'You cannot rest while in combat.';
-          break;
-        }
-        if (!canRestInRoom(st, seed)) {
-          narrative = 'You cannot rest here — an enemy is present.';
-          break;
-        }
-        if ((st.short_rested_rooms ?? []).includes(roomId)) {
-          narrative = 'You have already rested in this room.';
-          break;
-        }
-        if ((char.hit_dice_remaining ?? 0) <= 0) {
-          narrative = 'You have no hit dice remaining.';
-          break;
-        }
-        if (char.hp >= char.max_hp) {
-          narrative = 'You are already at full health.';
-          break;
-        }
-
-        const hdRoll = rollDice(`1d${char.hit_die ?? 8}`) + abilityMod(char.con);
-        const hdHealed = Math.max(1, hdRoll);
-        char.hp = Math.min(char.max_hp, char.hp + hdHealed);
-        char.hit_dice_remaining = Math.max(0, (char.hit_dice_remaining ?? 1) - 1);
-        st.short_rested_rooms = [...(st.short_rested_rooms ?? []), roomId];
-
-        // Short-rest class resource recharge
-        const srUses = { ...(char.class_resource_uses ?? {}) };
-        const cls = char.character_class.toLowerCase();
-        // 2024 PHB Dragonborn Breath Weapon recovers on short rest.
-        if (char.species === 'dragonborn') delete srUses.breath_weapon_used;
-        // 2024 PHB Goliath Large Form recovers on short rest.
-        if (char.species === 'goliath') delete srUses.large_form_used;
-        // 2024 PHB Orc Adrenaline Rush recovers on short rest.
-        if (char.species === 'orc') delete srUses.adrenaline_rush_used;
-        // Fighter: Second Wind + Action Surge recover on short rest
-        if (cls === 'fighter') {
-          delete srUses.second_wind;
-          delete srUses.action_surge;
-        }
-        // Bard L5+: Bardic Inspiration recharges on short rest; before L5 only on long rest
-        if (cls === 'bard' && char.level >= 5) delete srUses.bardic_inspiration;
-        // Monk: Ki points recharge on short rest
-        if (cls === 'monk') delete srUses.ki_points;
-        // Druid: Wild Shape recharges on short rest
-        if (cls === 'druid') srUses.wild_shape = 2;
-        // Circle of the Land — Natural Recovery (PHB p.68): once per long rest,
-        // during a short rest, recover spell slots totaling ≤ ceil(level/2)
-        // slot levels. We auto-spend on the lowest slots first for impact.
-        let naturalRecoveryNarr = '';
-        if (cls === 'druid' && char.subclass === 'land' && !(srUses.natural_recovery_used ?? 0)) {
-          let budget = Math.ceil(char.level / 2);
-          const slotsMax = char.spell_slots_max ?? {};
-          const slotsUsedSr = { ...(char.spell_slots_used ?? {}) };
-          const recovered: number[] = [];
-          for (const lvlKey of Object.keys(slotsMax)
-            .map(Number)
-            .sort((a, b) => a - b)) {
-            while (budget >= lvlKey && (slotsUsedSr[lvlKey] ?? 0) > 0) {
-              slotsUsedSr[lvlKey] = (slotsUsedSr[lvlKey] ?? 0) - 1;
-              budget -= lvlKey;
-              recovered.push(lvlKey);
-            }
-          }
-          if (recovered.length > 0) {
-            char.spell_slots_used = slotsUsedSr;
-            srUses.natural_recovery_used = 1;
-            naturalRecoveryNarr = ` 🌿 Natural Recovery — restored ${recovered.length} slot(s) [${recovered.join(', ')}].`;
-          }
-        }
-        // Cleric/Paladin: Channel Divinity recharges on short rest
-        if (cls === 'cleric' || cls === 'paladin')
-          srUses.channel_divinity = char.level >= 6 ? 2 : 1;
-        // Battle Master: Superiority Dice recharge on short rest
-        if (char.subclass === 'battle_master') delete srUses.superiority_dice;
-        // Colossus Slayer resets each turn (already reset per-turn); clean up at rest
-        delete srUses.colossus_slayer_used;
-        // Warlock: Pact Magic slots recharge on short rest
-        if (cls === 'warlock') {
-          const warlockSlots = spellSlotsForClassLevel('warlock', char.level);
-          char.spell_slots_max = warlockSlots;
-          char.spell_slots_used = {};
-          // Archfey: Fey Presence recharges on short rest (PHB p.109)
-          delete srUses.fey_presence_used;
-        }
-        char.class_resource_uses = srUses;
-
-        const hdRemain = char.hit_dice_remaining;
-        const shortRestFlavor = context.narratives.shortRest
-          ? pick(context.narratives.shortRest)
-              .replace(/{name}/g, char.name)
-              .replace(/{hpGained}/g, String(hdHealed))
-              .replace(/{hpNow}/g, String(char.hp))
-              .replace(/{hpMax}/g, String(char.max_hp)) + ' '
-          : '';
-        narrative = `${shortRestFlavor}${char.name} takes a short rest, spending a d${char.hit_die ?? 8} — ${hdHealed} HP recovered (${hdRemain} hit ${hdRemain === 1 ? 'die' : 'dice'} remaining, now ${char.hp}/${char.max_hp}).${naturalRecoveryNarr}`;
-        break;
-      }
-
-      case 'long_rest': {
-        if (st.combat_active) {
-          narrative = 'You cannot rest while in combat.';
-          break;
-        }
-        if (!canRestInRoom(st, seed)) {
-          narrative = 'You cannot rest here — an enemy is present.';
-          break;
-        }
-        if (st.long_rested ?? false) {
-          narrative = 'You have already taken a long rest this session.';
-          break;
-        }
-
-        const restLines: string[] = [];
-        const restedChars = st.characters.map((c) => {
-          if (c.dead) return c;
-          const recovered = Math.max(1, Math.floor(c.level / 2));
-          const newHd = Math.min(c.level, (c.hit_dice_remaining ?? 0) + recovered);
-          restLines.push(
-            `${c.name}: HP ${c.hp}→${c.max_hp}, HD ${c.hit_dice_remaining ?? 0}→${newHd}`
-          );
-          const charFeatures = context.classFeatures?.[c.character_class] ?? [];
-          const restoredUses: Record<string, number> = { ...(c.class_resource_uses ?? {}) };
-          if (charFeatures.includes('rage')) restoredUses.rage_uses = rageUsesMax(c.level);
-          if (charFeatures.includes('wild_shape')) restoredUses.wild_shape = 2;
-          // Circle of the Land — Natural Recovery resets on long rest.
-          delete restoredUses.natural_recovery_used;
-          if (charFeatures.includes('sorcery_points')) restoredUses.sorcery_points = c.level;
-          if (charFeatures.includes('ki')) restoredUses.ki_points = c.level;
-          if (charFeatures.includes('channel_divinity'))
-            restoredUses.channel_divinity = c.level >= 6 ? 2 : 1;
-          delete restoredUses.action_surge;
-          delete restoredUses.second_wind;
-          delete restoredUses.colossus_slayer_used;
-          delete restoredUses.sacred_weapon_active;
-          // Long rest reduces exhaustion by 1 level (PHB p.291); full rest clears all other conditions
-          const newExhaustion = Math.max(0, (c.exhaustion_level ?? 0) - 1);
-          // 2024 PHB Human Resourceful — gain Heroic Inspiration after every
-          // Long Rest. Other species default to whatever inspiration state
-          // they had pre-rest.
-          const humanGrant = c.species === 'human';
-          // 2024 PHB Orc Relentless Endurance + Orc Adrenaline Rush both
-          // recharge on long rest; tracked under class_resource_uses.
-          if (c.species === 'orc') {
-            delete restoredUses.relentless_endurance_used;
-          }
-          // 2024 PHB Tiefling Infernal Legacy — racial Hellish Rebuke / Darkness
-          // 1/long rest.
-          if (c.species === 'tiefling') {
-            delete restoredUses.tiefling_rebuke_used;
-          }
-          return {
-            ...c,
-            hp: c.max_hp,
-            // Temp HP expires on a Long Rest (SRD 5.2.1 p.18)
-            temp_hp: 0,
-            hit_dice_remaining: newHd,
-            conditions: [],
-            condition_durations: {},
-            condition_sources: {},
-            class_resource_uses: restoredUses,
-            exhaustion_level: newExhaustion,
-            spell_slots_used: {},
-            inspiration: humanGrant ? true : c.inspiration,
-          };
-        });
-        st = { ...st, characters: restedChars, long_rested: true };
-        char = { ...restedChars[safeIdx] };
-        const longRestFlavor = context.narratives.longRest
-          ? pick(context.narratives.longRest).replace(/{party}/g, restLines.join('; ')) + ' '
-          : '';
-        narrative = `${longRestFlavor}The party takes a long rest. ${restLines.join('; ')}.`;
         break;
       }
 

@@ -15,8 +15,10 @@ import {
   handleStandUp,
 } from './combatUtility.js';
 import { handleEndTurn, handlePass } from './utility.js';
+import { handleLongRest, handleShortRest } from './rest.js';
 import type { StructuredAction } from '../../types.js';
 import { handleAttune } from './inventory.js';
+import { handleDeathSave } from './deathSave.js';
 import { handleEscape } from './escape.js';
 
 /**
@@ -41,6 +43,9 @@ const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   prepare_spells: handlePrepareSpells as ActionHandler,
   escape: handleEscape as ActionHandler,
   attune: handleAttune as ActionHandler,
+  short_rest: handleShortRest as ActionHandler,
+  long_rest: handleLongRest as ActionHandler,
+  death_save: handleDeathSave as ActionHandler,
 };
 
 /**
