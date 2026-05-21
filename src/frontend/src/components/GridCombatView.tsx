@@ -143,6 +143,15 @@ function GridCombatView({
   function isObstacle(x: number, y: number): boolean {
     return obstacleSet.has(`${x},${y}`);
   }
+  // Difficult terrain — 2× movement cost. Engine enforces the cost; FE
+  // tints the cell so the player can see why a path may eat extra
+  // movement and adds an info marker in the tooltip / aria-label.
+  const difficultSet = new Set<string>(
+    (currentRoom?.difficultTerrain ?? []).map((p) => `${p.x},${p.y}`)
+  );
+  function isDifficult(x: number, y: number): boolean {
+    return difficultSet.has(`${x},${y}`);
+  }
 
   // Per-cell illumination from the party's collective vision. PCs (not
   // companions, not enemies) carry torches and contribute light + darkvision.
@@ -297,6 +306,7 @@ function GridCombatView({
       const ent = entityAt(x, y);
       const corpse = ent ? undefined : corpseAt(x, y);
       const obstacle = !ent && !corpse && isObstacle(x, y);
+      const difficult = !obstacle && isDifficult(x, y);
       const reachable = isReachable(x, y);
       const isActive = ent && ent.id === activeId && !ent.isEnemy;
       const illum = cellLight(x, y);
@@ -312,6 +322,14 @@ function GridCombatView({
       if (reachable) bg = 'rgba(120, 200, 255, 0.10)';
       // AoE preview tint wins over reachable highlight.
       if (aoeCells.has(`${x},${y}`)) bg = 'rgba(255, 140, 50, 0.30)';
+      // Difficult terrain: stipple pattern layered above the cell bg so
+      // the player can see the texture in any state (idle, reachable, AoE).
+      const DIFFICULT_STIPPLE =
+        'radial-gradient(circle, rgba(170, 140, 90, 0.55) 1.2px, transparent 1.6px) 0 0 / 4px 4px';
+      const cellBg = difficult ? `${DIFFICULT_STIPPLE}, ${bg}` : bg;
+      const cellHoverBg = difficult
+        ? `${DIFFICULT_STIPPLE}, rgba(120, 200, 255, 0.35)`
+        : 'rgba(120, 200, 255, 0.35)';
 
       const tokenBg = ent?.isEnemy
         ? 'rgba(220, 70, 70, 0.85)'
@@ -420,6 +438,9 @@ function GridCombatView({
       } else if (illum === 'dim') {
         ariaParts.push('dim light');
       }
+      if (difficult && !obstacle) {
+        ariaParts.push('difficult terrain, double movement cost');
+      }
       if (clickable) {
         ariaParts.push(
           `reachable, ${chebyshev(activeEntity!.pos, { x, y }) * SQUARE_SIZE_FT} feet`
@@ -432,7 +453,7 @@ function GridCombatView({
           key={`${x},${y}`}
           className={styles.gridCell}
           style={{
-            background: bg,
+            background: cellBg,
             cursor: clickable ? 'pointer' : 'default',
           }}
           aria-label={ariaLabel}
@@ -453,22 +474,23 @@ function GridCombatView({
           onMouseEnter={
             clickable
               ? (e) => {
-                  (e.currentTarget as HTMLDivElement).style.background =
-                    'rgba(120, 200, 255, 0.35)';
+                  (e.currentTarget as HTMLDivElement).style.background = cellHoverBg;
                 }
               : undefined
           }
           onMouseLeave={
             clickable
               ? (e) => {
-                  (e.currentTarget as HTMLDivElement).style.background = bg;
+                  (e.currentTarget as HTMLDivElement).style.background = cellBg;
                 }
               : undefined
           }
           title={
             clickable
-              ? `Move here (${chebyshev(activeEntity!.pos, { x, y }) * SQUARE_SIZE_FT} ft)`
-              : undefined
+              ? `Move here (${chebyshev(activeEntity!.pos, { x, y }) * SQUARE_SIZE_FT} ft${difficult ? ', includes difficult terrain — 2× cost' : ''})`
+              : difficult
+                ? 'Difficult terrain — 2× movement cost'
+                : undefined
           }
         >
           {token}
@@ -596,6 +618,11 @@ function GridCombatView({
         {(currentRoom?.obstacles?.length ?? 0) > 0 && (
           <span>
             <span className={styles.gridLegendObstacle} /> obstacle (blocks movement)
+          </span>
+        )}
+        {(currentRoom?.difficultTerrain?.length ?? 0) > 0 && (
+          <span>
+            <span className={styles.gridLegendDifficult} /> difficult terrain (2× cost)
           </span>
         )}
         {roomLighting !== 'bright' && (

@@ -147,6 +147,29 @@ export function generateRoguelikeSeed(context: Context, partySize = 1): Seed {
     return out;
   }
 
+  // Difficult terrain — 2× movement cost cells (rubble, vines, ice, mud).
+  // Same middle band as obstacles so it doesn't intrude on spawn rows.
+  // Skips cells already taken by obstacles in this room so they don't
+  // stack visually + mechanically on the same square.
+  function seedDifficultTerrain(existing: GridPos[]): GridPos[] {
+    const yMin = 3;
+    const yMax = Math.max(yMin, gridH - 3);
+    const yRange = yMax - yMin + 1;
+    if (yRange <= 0 || gridW < 4) return [];
+    const count = 1 + roll(3); // 1-3 cells
+    const taken = new Set<string>(existing.map((p) => `${p.x},${p.y}`));
+    const out: GridPos[] = [];
+    for (let tries = 0; tries < 20 && out.length < count; tries++) {
+      const x = 1 + roll(gridW - 2) - 1;
+      const y = yMin + roll(yRange) - 1;
+      const key = `${x},${y}`;
+      if (taken.has(key)) continue;
+      taken.add(key);
+      out.push({ x, y });
+    }
+    return out;
+  }
+
   rooms.forEach((r) => {
     if (r.id !== startId && Math.random() < 0.6) {
       const normalized = (dist[r.id] ?? 0) / maxDist;
@@ -202,6 +225,12 @@ export function generateRoguelikeSeed(context: Context, partySize = 1): Seed {
     if (enemies[r.id] && Math.random() < 0.6) {
       const obs = seedObstacles();
       if (obs.length) r.obstacles = obs;
+    }
+    // Difficult terrain — 40% chance per combat room, 1-3 cells. Skips
+    // cells already used by obstacles in this room.
+    if (enemies[r.id] && Math.random() < 0.4) {
+      const dt = seedDifficultTerrain(r.obstacles ?? []);
+      if (dt.length) r.difficultTerrain = dt;
     }
     // NPC placement: only in rooms without an enemy, excluding start/escape
     const spawnChance = context.npcSpawnChance ?? 0;
