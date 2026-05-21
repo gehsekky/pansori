@@ -868,6 +868,16 @@ export default function App() {
                   isHost={!session.user_id || session.user_id === user?.id}
                   state={gameState}
                   onClose={() => setInviteOpen(false)}
+                  onLeave={() => {
+                    // Voluntary leave for a non-host. Server already
+                    // transferred their PCs to the host; here we just
+                    // tear down local game state and surface the
+                    // session list.
+                    setInviteOpen(false);
+                    resetGame();
+                    window.history.pushState(null, '', '/');
+                    loadSessions().then(() => setView('sessions'));
+                  }}
                 />
               )}
             </div>
