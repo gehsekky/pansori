@@ -137,6 +137,12 @@ function GridCombatView({
   // 'bright' (no fog of war) when unspecified.
   const currentRoom = seed.rooms.find((r) => r.id === state.current_room);
   const roomLighting: Illum = currentRoom?.lighting ?? 'bright';
+  // Static obstacles (columns/walls/debris) — block movement, render as
+  // distinct cell content, contribute to cover on the backend.
+  const obstacleSet = new Set<string>((currentRoom?.obstacles ?? []).map((o) => `${o.x},${o.y}`));
+  function isObstacle(x: number, y: number): boolean {
+    return obstacleSet.has(`${x},${y}`);
+  }
 
   // Per-cell illumination from the party's collective vision. PCs (not
   // companions, not enemies) carry torches and contribute light + darkvision.
@@ -188,6 +194,7 @@ function GridCombatView({
   function isReachable(x: number, y: number): boolean {
     if (!activeEntity || activeChar?.dead) return false;
     if (entityAt(x, y)) return false;
+    if (isObstacle(x, y)) return false;
     const dist = chebyshev(activeEntity.pos, { x, y });
     return dist > 0 && dist <= remainingSquares;
   }
@@ -289,6 +296,7 @@ function GridCombatView({
     for (let x = 0; x < gridWidth; x++) {
       const ent = entityAt(x, y);
       const corpse = ent ? undefined : corpseAt(x, y);
+      const obstacle = !ent && !corpse && isObstacle(x, y);
       const reachable = isReachable(x, y);
       const isActive = ent && ent.id === activeId && !ent.isEnemy;
       const illum = cellLight(x, y);
@@ -380,6 +388,14 @@ function GridCombatView({
               💀
             </span>
           </div>
+        ) : obstacle ? (
+          // Static obstacle marker — blocks movement and grants cover. Rendered
+          // as a distinct stone-grey block so it reads as scenery, not a token.
+          <div
+            className={styles.gridObstacle}
+            title="Obstacle — blocks movement, grants cover"
+            aria-hidden="true"
+          />
         ) : null;
 
       const clickable = reachable && !!onMove;
@@ -397,6 +413,8 @@ function GridCombatView({
         }
       } else if (corpse && !hideCorpse) {
         ariaParts.push(`${displayName(corpse)}, corpse`);
+      } else if (obstacle) {
+        ariaParts.push('obstacle, blocks movement');
       } else if (illum === 'dark') {
         ariaParts.push('heavily obscured');
       } else if (illum === 'dim') {
@@ -575,6 +593,11 @@ function GridCombatView({
         <span>
           <span className={styles.gridLegendReach} /> reachable this turn
         </span>
+        {(currentRoom?.obstacles?.length ?? 0) > 0 && (
+          <span>
+            <span className={styles.gridLegendObstacle} /> obstacle (blocks movement)
+          </span>
+        )}
         {roomLighting !== 'bright' && (
           <>
             <span>

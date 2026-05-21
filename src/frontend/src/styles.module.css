@@ -1179,7 +1179,8 @@
 .gridLegendEnemy,
 .gridLegendReach,
 .gridLegendDim,
-.gridLegendDark {
+.gridLegendDark,
+.gridLegendObstacle {
   display: inline-block;
   width: 10px;
   height: 10px;
@@ -1214,6 +1215,35 @@
   border-radius: 0;
   background: rgba(120, 200, 255, 0.1);
   border: 1px solid rgba(120, 200, 255, 0.4);
+}
+
+/* Static-obstacle cell — stone-grey block that fills most of the cell so
+   it reads as scenery rather than a placeable token. Diagonal hatching
+   hints at brick/wall texture without an extra image asset. */
+.gridObstacle {
+  width: 24px;
+  height: 24px;
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(140, 130, 110, 0.85),
+    rgba(140, 130, 110, 0.85) 3px,
+    rgba(90, 85, 70, 0.85) 3px,
+    rgba(90, 85, 70, 0.85) 6px
+  );
+  border: 1px solid rgba(60, 55, 45, 0.95);
+  border-radius: 2px;
+}
+
+.gridLegendObstacle {
+  border-radius: 2px;
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(140, 130, 110, 0.85),
+    rgba(140, 130, 110, 0.85) 2px,
+    rgba(90, 85, 70, 0.85) 2px,
+    rgba(90, 85, 70, 0.85) 4px
+  );
+  border: 1px solid rgba(60, 55, 45, 0.95);
 }
 
 /* ─── CampaignPanel ─────────────────────────────────────────────────────── */
