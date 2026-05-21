@@ -6,8 +6,8 @@ import {
   handleSelectSubclass,
   handleSetActiveCharacter,
 } from './meta.js';
+import { handleAttackNpc, handleBuy, handleTalk, handleTalkResponse } from './social.js';
 import { handleAttune, handleUse } from './inventory.js';
-import { handleBuy, handleTalk, handleTalkResponse } from './social.js';
 import {
   handleDash,
   handleDisengage,
@@ -30,6 +30,7 @@ import { handleInteractObject } from './interactObject.js';
 import { handleLoot } from './loot.js';
 import { handleMove } from './move.js';
 import { handleSneak } from './sneak.js';
+import { handleUseReaction } from './reaction.js';
 
 /**
  * Registry of per-action-type handlers. Populated incrementally as the
@@ -73,21 +74,73 @@ const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   use: handleUse as ActionHandler,
   interact_object: handleInteractObject as ActionHandler,
   examine: handleExamine as ActionHandler,
+  attack_npc: handleAttackNpc as ActionHandler,
+  use_reaction: handleUseReaction as ActionHandler,
 };
 
 /**
- * Look up and invoke the handler for `action.type`. Returns `true` if a
- * handler ran (caller skips the legacy switch); `false` if no handler is
- * registered (caller falls back to the inline switch).
+ * Result of attempting to dispatch an action.
+ *
+ * - `handled: false` — no handler registered; caller (takeAction) falls
+ *   back to the inline legacy switch.
+ * - `handled: true, replaceWith: undefined` — a leaf handler ran;
+ *   caller proceeds with the post-action epilogue using the mutated ctx.
+ * - `handled: true, replaceWith: <action>` — a transformer wants to
+ *   replace the original action. Caller (takeAction) must re-enter
+ *   from the top with the new action AND the pre-mutated state (so
+ *   stages applied by the transformer survive). The outer epilogue is
+ *   skipped because the recursive takeAction will run its own.
+ */
+export interface DispatchResult {
+  handled: boolean;
+  replaceWith?: StructuredAction;
+}
+
+/**
+ * Dispatch `action` against the registered handler. Resolves the
+ * handler's return:
+ *
+ * - void → leaf; return handled=true.
+ * - { replaceWith } → bubble up; caller decides how to re-enter.
+ * - { delegateTo } → save outer narrative as prefix, dispatch inner
+ *   against the same ctx, prepend prefix to ctx.narrative. If the
+ *   inner returns replaceWith, iterate locally (re-dispatch the new
+ *   action against the same ctx) until the chain bottoms out at a
+ *   leaf — only the *outermost* replaceWith should bubble to
+ *   takeAction; nested ones are an implementation detail of the
+ *   delegate's resolution.
  */
 export async function dispatchAction(
   ctx: ActionContext,
   action: StructuredAction
-): Promise<boolean> {
+): Promise<DispatchResult> {
   const h = handlers[action.type] as ActionHandler | undefined;
-  if (!h) return false;
-  await h(ctx, action);
-  return true;
+  if (!h) return { handled: false };
+  const result = await h(ctx, action);
+  if (result == null) return { handled: true };
+
+  if ('replaceWith' in result) {
+    return { handled: true, replaceWith: result.replaceWith };
+  }
+
+  if ('delegateTo' in result) {
+    const prefix = ctx.narrative;
+    ctx.narrative = '';
+    let nextAction: StructuredAction = result.delegateTo;
+    // Resolve replaceWith chains internally — only the *outer* handler's
+    // replaceWith bubbles to takeAction. Iterating here means delegating
+    // to a transformer (e.g. delegateTo an attack_npc) still resolves
+    // fully without bubbling out of the delegate.
+    while (true) {
+      const inner = await dispatchAction(ctx, nextAction);
+      if (!inner.replaceWith) break;
+      nextAction = inner.replaceWith;
+    }
+    ctx.narrative = prefix + ctx.narrative;
+    return { handled: true };
+  }
+
+  return { handled: true };
 }
 
 export type { ActionContext, ActionHandler } from './types.js';

@@ -4320,12 +4320,21 @@ export async function takeAction({
   }
 
   // Action handlers extracted into services/actions/* receive this ctx and
-  // mutate its fields in place. When `dispatchAction` returns true, the
-  // handler ran — we sync the working-state fields back into the local
-  // bindings and skip the legacy inline switch. When it returns false
-  // (no handler registered for this action type yet), the inline switch
-  // below handles it. PRs land one handler at a time until the switch
-  // empties out.
+  // mutate its fields in place. The dispatch result has three shapes:
+  //
+  //  - { handled: false }: no handler is registered for this action type;
+  //    fall through to the inline legacy switch below.
+  //  - { handled: true }: a leaf handler ran — sync the working-state ctx
+  //    fields back into local bindings and continue with the post-action
+  //    epilogue (initiative, runRules, narrative, etc.).
+  //  - { handled: true, replaceWith }: a transformer handler staged
+  //    pre-mutations and asks takeAction to re-enter from the top with a
+  //    different action (e.g. attack_npc → attack). Return the recursive
+  //    call's result directly — the inner takeAction runs its own epilogue
+  //    so the outer one must NOT run again, or enemy turns / runRules /
+  //    LLM enhance would double-fire.
+  //
+  // PRs land one handler at a time until the switch empties out.
   const ctx: ActionContext = {
     context,
     state,
@@ -4360,8 +4369,20 @@ export async function takeAction({
     },
   };
 
-  const handled = await dispatchAction(ctx, action);
-  if (handled) {
+  const dispatchResult = await dispatchAction(ctx, action);
+  if (dispatchResult.handled && dispatchResult.replaceWith) {
+    // Transformer: the handler staged pre-mutations into ctx (e.g. flipped
+    // attitude); re-enter takeAction with the new action against the
+    // staged state. The recursive call owns the epilogue.
+    return await takeAction({
+      action: dispatchResult.replaceWith,
+      history,
+      state: ctx.st,
+      seed: ctx.seed,
+      context,
+    });
+  }
+  if (dispatchResult.handled) {
     seed = ctx.seed;
     st = ctx.st;
     char = ctx.char;
@@ -4370,7 +4391,7 @@ export async function takeAction({
     usedInitiative = ctx.usedInitiative;
   }
 
-  if (!handled)
+  if (!dispatchResult.handled)
     switch (action.type) {
       case 'attack': {
         if (!enemy) {
@@ -5402,36 +5423,6 @@ export async function takeAction({
         // (checked after commitChar — see auto-advance block below the switch).
         char.turn_actions = { ...char.turn_actions, action_used: true };
         break;
-      }
-
-      // ── NPC: attack_npc ──────────────────────────────────────────────────────
-      // This action is the *trigger* that flips a non-hostile NPC hostile. After
-      // flipping, the NPC participates in grid combat as a regular enemy (via
-      // getLivingRoomEnemies + getEnemyById's npc: lookup). We immediately
-      // dispatch the regular Attack action against `npc:${roomId}` so the player
-      // doesn't waste a turn just changing attitude — the combat init runs and
-      // the attack resolves in the same response.
-      case 'attack_npc': {
-        const npc = seed.npcs?.[roomId];
-        if (!npc) {
-          narrative = 'There is no one to attack here.';
-          break;
-        }
-        if (npcIsKilled(st, roomId)) {
-          narrative = 'Already dead.';
-          break;
-        }
-        // Flip to hostile so getLivingRoomEnemies surfaces this NPC as an enemy.
-        st = { ...st, npc_attitudes: { ...st.npc_attitudes, [roomId]: 'hostile' } };
-        // Commit char back into state before the recursive dispatch.
-        commitChar();
-        return await takeAction({
-          action: { type: 'attack', targetEnemyId: `npc:${roomId}` },
-          history,
-          state: st,
-          seed,
-          context,
-        });
       }
 
       case 'cast_spell': {
@@ -8171,38 +8162,6 @@ export async function takeAction({
       }
 
       // ── Travel between locations ──────────────────────────────────────────────
-      // ── Use Reaction (trigger readied action) ─────────────────────────────────
-      case 'use_reaction': {
-        if (char.turn_actions.reaction_used) {
-          narrative = 'You have already used your reaction this turn.';
-          break;
-        }
-        const readied = char.turn_actions.readied_action;
-        if (!readied) {
-          narrative = 'You have no readied action.';
-          break;
-        }
-        char.turn_actions = {
-          ...char.turn_actions,
-          reaction_used: true,
-          readied_action: undefined,
-        };
-        narrative = `${char.name} triggers their readied action! `;
-        // Recursively resolve the stored action
-        const reactionResult = await takeAction({
-          action: readied.action,
-          history: [],
-          state: { ...st, characters: st.characters.map((c, i) => (i === safeIdx ? char : c)) },
-          seed,
-          context,
-        });
-        narrative += reactionResult.narrative;
-        st = reactionResult.newState;
-        char = st.characters.find((c) => c.id === char.id) ?? char;
-        break;
-      }
-
-      // ── Select subclass ───────────────────────────────────────────────────────
       // ── Resolve pending reaction (Shield window for now) ──────────────────────
       case 'resolve_reaction': {
         const rxAction = action as { type: 'resolve_reaction'; accept: boolean };

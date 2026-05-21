@@ -125,3 +125,33 @@ export const handleBuy: ActionHandler<{
   };
   ctx.narrative = `You hand over ${action.price}cr and receive ${lootEntry.name}. ${npc.name} pockets the credits with a nod.`;
 };
+
+/**
+ * `attack_npc`: trigger that flips a non-hostile NPC to hostile and
+ * then dispatches as a regular `attack` against the npc-as-enemy
+ * (getLivingRoomEnemies + getEnemyById surface NPCs via `npc:${roomId}`
+ * once flipped, so combat initiative includes them).
+ *
+ * Returns `replaceWith` — the original takeAction's epilogue is
+ * skipped because the recursive takeAction re-entering with the new
+ * `attack` action runs its own epilogue (enemy turns, runRules, LLM
+ * enhance, etc.). Without that, we'd double-fire enemy turns and
+ * narrative enhancement.
+ */
+export const handleAttackNpc: ActionHandler<{ type: 'attack_npc' }> = (ctx) => {
+  const npc = ctx.seed.npcs?.[ctx.roomId];
+  if (!npc) {
+    ctx.narrative = 'There is no one to attack here.';
+    return;
+  }
+  if (npcIsKilled(ctx.st, ctx.roomId)) {
+    ctx.narrative = 'Already dead.';
+    return;
+  }
+  ctx.st = {
+    ...ctx.st,
+    npc_attitudes: { ...ctx.st.npc_attitudes, [ctx.roomId]: 'hostile' },
+  };
+  ctx.commitChar();
+  return { replaceWith: { type: 'attack', targetEnemyId: `npc:${ctx.roomId}` } };
+};
