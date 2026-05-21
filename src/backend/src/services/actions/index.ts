@@ -21,6 +21,7 @@ import { handleEndTurn, handlePass } from './utility.js';
 import { handleEnterDistrict, handleTravel } from './travel.js';
 import { handleGrapple, handleShove, handleTryEscapeGrapple } from './combatTactical.js';
 import { handleLongRest, handleShortRest } from './rest.js';
+import { handleResolveReaction, handleUseReaction } from './reaction.js';
 import type { StructuredAction } from '../../types.js';
 import { handleDeathSave } from './deathSave.js';
 import { handleDisarmTrap } from './disarmTrap.js';
@@ -32,7 +33,6 @@ import { handleLoot } from './loot.js';
 import { handleMove } from './move.js';
 import { handleSneak } from './sneak.js';
 import { handleTwoWeaponAttack } from './twoWeaponAttack.js';
-import { handleUseReaction } from './reaction.js';
 
 /**
  * Registry of per-action-type handlers. Populated incrementally as the
@@ -80,6 +80,7 @@ const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   use_reaction: handleUseReaction as ActionHandler,
   two_weapon_attack: handleTwoWeaponAttack as ActionHandler,
   grid_move: handleGridMove as ActionHandler,
+  resolve_reaction: handleResolveReaction as ActionHandler,
 };
 
 /**
