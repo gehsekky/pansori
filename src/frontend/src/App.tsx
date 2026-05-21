@@ -139,6 +139,7 @@ export default function App() {
     loading,
     escaped,
     roomLog,
+    participantsVersion,
     handleNewGame,
     handleResumeSession,
     handleEquip,
@@ -867,6 +868,7 @@ export default function App() {
                   inviteToken={session.invite_token ?? null}
                   isHost={!session.user_id || session.user_id === user?.id}
                   state={gameState}
+                  participantsVersion={participantsVersion}
                   onClose={() => setInviteOpen(false)}
                   onLeave={() => {
                     // Voluntary leave for a non-host. Server already

@@ -24,6 +24,11 @@ interface Props {
   // outside the dialog (in useGame) so realtime Socket.IO broadcasts
   // keep the dropdowns in sync without a refetch.
   state: GameState | null;
+  // Bumps every time the server emits a `participants` event. Used as
+  // a useEffect dep so the dialog re-fetches the participants list
+  // whenever someone joins, leaves, or has their PC ownership changed
+  // by another participant. Provided by useGame.
+  participantsVersion: number;
   onClose: () => void;
   // Called after a successful token rotation so the parent can update
   // its locally-stored session.invite_token without a refetch.
@@ -47,6 +52,7 @@ function InviteDialog({
   inviteToken,
   isHost,
   state,
+  participantsVersion,
   onClose,
   onTokenRotated,
   onLeave,
@@ -87,7 +93,10 @@ function InviteDialog({
     return () => {
       cancelled = true;
     };
-  }, [sessionId]);
+    // participantsVersion bumps on every server `participants` event so
+    // the host sees joins/leaves/ownership-changes in realtime instead
+    // of having to close + reopen the dialog.
+  }, [sessionId, participantsVersion]);
 
   const url = token ? buildInviteUrl(token) : '';
 

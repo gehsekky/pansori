@@ -80,6 +80,10 @@ interface SessionRow {
   seed: Seed;
   invite_token: string | null;
   campaign_state_id: string | null;
+  // Monotonically increases on every successful takeAction. Clients send
+  // their last-known value with each action so the server can reject
+  // stale-state writes (race detection in multiplayer).
+  turn_seq: number;
   created_at: Date;
   updated_at: Date;
 }
@@ -950,6 +954,7 @@ gameRouter.post('/session/:id/action', async (req: Request, res: Response) => {
   if (!parsed) return;
   const action = parsed.action as StructuredAction;
   const history = parsed.history;
+  const clientTurnSeq = parsed.turn_seq;
   try {
     const userId = authedUserId(req);
     const row = await fetchSessionForParticipant(req.params.id, userId);
@@ -963,6 +968,20 @@ gameRouter.post('/session/:id/action', async (req: Request, res: Response) => {
     }
     if (row.status === 'escaped') {
       res.status(410).json({ error: 'Adventure already complete.' });
+      return;
+    }
+
+    // Race detection. If the client sent a turn_seq with the request,
+    // it must match the current server value. Mismatch = the client's
+    // state is stale (another participant got there first). Reject
+    // with 409 so the client can show "out of sync, refresh." When
+    // the client doesn't send turn_seq, skip the check — keeps solo
+    // and stale FE caches working without changes.
+    if (typeof clientTurnSeq === 'number' && clientTurnSeq !== row.turn_seq) {
+      res.status(409).json({
+        error: 'Out of sync — another player acted first. The screen will refresh.',
+        turn_seq: row.turn_seq,
+      });
       return;
     }
 
@@ -1154,19 +1173,24 @@ gameRouter.post('/session/:id/action', async (req: Request, res: Response) => {
     }
 
     const newStatus = result.dead ? 'dead' : result.escaped ? 'escaped' : row.status;
+    const nextTurnSeq = row.turn_seq + 1;
     await pool.query(
-      'UPDATE game_sessions SET state = $1, status = $2, updated_at = NOW() WHERE id = $3',
-      [JSON.stringify(result.newState), newStatus, row.id]
+      'UPDATE game_sessions SET state = $1, status = $2, turn_seq = $3, updated_at = NOW() WHERE id = $4',
+      [JSON.stringify(result.newState), newStatus, nextTurnSeq, row.id]
     );
 
-    // Broadcast the new state to every socket joined to this session's
-    // room. The acting participant gets it back via the REST response
-    // too — that's intentional; the FE applies whichever arrives first
-    // and discards the rest by identity. Other participants only see
-    // the broadcast.
-    broadcastSessionState(row.id, { state: result.newState, narrative: result.narrative });
+    // Broadcast the new state + turn_seq to every socket joined to this
+    // session's room. The acting participant gets it back via the REST
+    // response too — that's intentional; the FE applies whichever
+    // arrives first and discards the rest by identity. Other
+    // participants only see the broadcast.
+    broadcastSessionState(row.id, {
+      state: result.newState,
+      narrative: result.narrative,
+      turn_seq: nextTurnSeq,
+    });
 
-    res.json(result);
+    res.json({ ...result, turn_seq: nextTurnSeq });
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
   }
