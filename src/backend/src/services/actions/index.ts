@@ -23,7 +23,11 @@ import { handleLongRest, handleShortRest } from './rest.js';
 import type { StructuredAction } from '../../types.js';
 import { handleAttune } from './inventory.js';
 import { handleDeathSave } from './deathSave.js';
+import { handleDisarmTrap } from './disarmTrap.js';
 import { handleEscape } from './escape.js';
+import { handleLoot } from './loot.js';
+import { handleMove } from './move.js';
+import { handleSneak } from './sneak.js';
 
 /**
  * Registry of per-action-type handlers. Populated incrementally as the
@@ -60,6 +64,10 @@ const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   grapple: handleGrapple as ActionHandler,
   try_escape_grapple: handleTryEscapeGrapple as ActionHandler,
   shove: handleShove as ActionHandler,
+  move: handleMove as ActionHandler,
+  loot: handleLoot as ActionHandler,
+  sneak: handleSneak as ActionHandler,
+  disarm_trap: handleDisarmTrap as ActionHandler,
 };
 
 /**

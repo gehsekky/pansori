@@ -23,16 +23,25 @@
 
 import { describe, expect, it } from 'vitest';
 import { dirname, join } from 'path';
+import { readFileSync, readdirSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { context as grove } from '../contexts/grove_of_thorns.js';
 import { context as pines } from '../contexts/whispering_pines.js';
-import { readFileSync } from 'fs';
 import { context as sandbox } from '../contexts/sandbox.js';
 import { context as vale } from '../contexts/vale_of_shadows.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const ENGINE_SRC = readFileSync(join(__dirname, 'gameEngine.ts'), 'utf-8');
+// Action handlers were extracted out of gameEngine.ts into per-action
+// files under services/actions/* — concatenate them so the placeholder
+// lint sees `.replace({token}, ...)` calls regardless of which file
+// they live in.
+const actionsDir = join(__dirname, 'actions');
+const actionsSrc = readdirSync(actionsDir)
+  .filter((f) => f.endsWith('.ts') && !f.endsWith('.spec.ts'))
+  .map((f) => readFileSync(join(actionsDir, f), 'utf-8'))
+  .join('\n');
+const ENGINE_SRC = readFileSync(join(__dirname, 'gameEngine.ts'), 'utf-8') + '\n' + actionsSrc;
 
 // Walk a `narratives.<poolName>` value to the leaves and collect every
 // `{token}` that appears in any string. Pools can be arrays of strings,

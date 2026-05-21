@@ -8,7 +8,6 @@ import {
   applyDamageMultiplier,
   cantripDamageDice,
   d,
-  disarmTrap,
   extraAttackCount,
   hasArmorProficiency,
   hasWeaponProficiency,
@@ -95,7 +94,7 @@ export function pushEvent(st: GameState, event: CombatEvent): GameState {
 // on `char`. Returns whether inspiration was active so the caller can pass
 // it as advantage to a d20 roll. Saves already integrate this through
 // applyConditionSave; this helper exists for ability/skill checks.
-function consumeInspirationForCheck(char: Character): boolean {
+export function consumeInspirationForCheck(char: Character): boolean {
   if (!char.turn_actions?.inspiration_pending) return false;
   char.turn_actions = { ...char.turn_actions, inspiration_pending: false };
   char.inspiration = false;
@@ -107,7 +106,7 @@ function consumeInspirationForCheck(char: Character): boolean {
 // auto-spend the stashed die. Returns the rolled die value (0 if no die),
 // and clears the die on `char` when consumed. The caller subtracts the
 // roll from the target DC (or adds to the check total) before resolving.
-function consumeBardicForCheck(char: Character): number {
+export function consumeBardicForCheck(char: Character): number {
   const die = char.bardic_inspiration_die;
   if (!die) return 0;
   const roll = rollDice(`1${die}`);
@@ -440,7 +439,10 @@ function buildCombatHitNarrative(
 // value short-circuits the cap checks cleanly without dead-code cleanup.
 const MAX_CHOICES = 0;
 
-function getItemData(item: InventoryItem | undefined, context: Context): LootItem & InventoryItem {
+export function getItemData(
+  item: InventoryItem | undefined,
+  context: Context
+): LootItem & InventoryItem {
   if (!item) return {} as LootItem & InventoryItem;
   const tableEntry = context.lootTable.find((i) => i.id === item.id) ?? ({} as LootItem);
   return { ...tableEntry, ...item };
@@ -935,7 +937,9 @@ function charCarriedWeight(char: Pick<Character, 'inventory'>): number {
 // disadvantage on STR/DEX/CON ability checks, saving throws, AND attack
 // rolls. Encumbered (>5×STR) only reduces speed; we ignore it for
 // disadvantage purposes. Used in attack and skill/save resolution paths.
-function isHeavilyEncumbered(char: Pick<Character, 'inventory' | 'str' | 'species'>): boolean {
+export function isHeavilyEncumbered(
+  char: Pick<Character, 'inventory' | 'str' | 'species'>
+): boolean {
   const w = charCarriedWeight(char);
   // Goliath Powerful Build: count as one size larger for carrying capacity.
   const carryMult = char.species === 'goliath' ? 2 : 1;
@@ -1160,7 +1164,7 @@ function buildInitiativeOrder(chars: Character[], enemies: Enemy[]): InitEntry[]
   return entries;
 }
 
-function endCombatState(st: GameState): GameState {
+export function endCombatState(st: GameState): GameState {
   return {
     ...st,
     combat_active: false,
@@ -1311,7 +1315,7 @@ export function canRestInRoom(state: GameState, seed: Seed): boolean {
 
 // ─── Trap helpers ─────────────────────────────────────────────────────────────
 
-function getRoomTrap(roomId: string, seed: Seed, context: Context): Trap | null {
+export function getRoomTrap(roomId: string, seed: Seed, context: Context): Trap | null {
   // Traps are defined on Room objects inside the campaign or room pool
   const campaignRoom = context.campaign?.rooms?.find((r) => r.id === roomId);
   if (campaignRoom?.trap) return campaignRoom.trap;
@@ -1320,13 +1324,13 @@ function getRoomTrap(roomId: string, seed: Seed, context: Context): Trap | null 
   return null;
 }
 
-function trapSpent(state: GameState, roomId: string): boolean {
+export function trapSpent(state: GameState, roomId: string): boolean {
   return (
     (state.traps_triggered ?? []).includes(roomId) || (state.traps_disarmed ?? []).includes(roomId)
   );
 }
 
-function partyDetectsTrap(characters: Character[], trap: Trap): boolean {
+export function partyDetectsTrap(characters: Character[], trap: Trap): boolean {
   return characters.some((c) => {
     if (c.dead) return false;
     const proficient = c.skill_proficiencies?.includes('Perception') ?? false;
@@ -4371,41 +4375,6 @@ export async function takeAction({
 
   if (!handled)
     switch (action.type) {
-      case 'move': {
-        const target = seed.rooms.find((r) => r.id === action.roomId);
-        if (!target || !adjacent.find((r) => r.id === target.id)) {
-          narrative = 'The path loops back on itself. You cannot get there from here.';
-          break;
-        }
-        // Grappled / restrained: speed reduced to 0 — cannot move
-        const immobilizer = char.conditions.find((c) => ['grappled', 'restrained'].includes(c));
-        if (immobilizer) {
-          narrative = `You are ${immobilizer} and cannot move.`;
-          break;
-        }
-        if (st.combat_active) {
-          narrative = `You cannot flee while in grid combat. Use Disengage and move on the grid.`;
-          break;
-        }
-        // Hostile present — engage or escape, don't stroll past.
-        if (enemyAlive) {
-          narrative =
-            'A hostile is in this room — engage it or attempt to escape before moving on.';
-          break;
-        }
-        st.current_room = target.id;
-        if (!st.visited_rooms.includes(target.id)) {
-          st.visited_rooms = [...st.visited_rooms, target.id];
-        }
-        narrative += buildArrivalNarrative(
-          target.id,
-          { ...st, characters: st.characters.map((c, i) => (i === safeIdx ? char : c)) },
-          seed,
-          context
-        );
-        break;
-      }
-
       case 'attack': {
         if (!enemy) {
           narrative = pick(context.narratives.noEnemy);
@@ -5438,50 +5407,6 @@ export async function takeAction({
         break;
       }
 
-      case 'loot': {
-        if (!loot) {
-          narrative = pick(context.narratives.noLoot);
-          break;
-        }
-        if (!lootAvail) {
-          narrative = pick(context.narratives.alreadyLooted);
-          break;
-        }
-        // Hostile in the room — engage or escape, don't pocket items in plain
-        // sight. Defense for stale FE caches that might still show the choice.
-        if (enemyAlive) {
-          narrative = 'A hostile is watching — you cannot loot until the room is clear.';
-          break;
-        }
-        char.inventory = [...(char.inventory || []), { ...loot, instance_id: randomUUID() }];
-        // Track BOTH the roomId (for the lootAvail "already looted" gate) and
-        // the item id (so quest conditions like `loot_taken contains 'guild_ledger'`
-        // resolve correctly regardless of which room or container the item came
-        // from).
-        st.loot_taken = [...st.loot_taken, roomId, loot.id];
-        narrative = pick(context.narratives.lootPickedUp).replace(/{item}/g, loot.name);
-        // SRD 5.2.1 p.136 — magic items are unidentified on pickup until you
-        // spend a short rest examining them, OR a character with Arcana /
-        // Investigation skill IDs them on sight. Mundane quest items (the
-        // Guild Ledger, the cult idol, a locket) aren't magical and should
-        // never be flagged "unidentified" — gate on `requiresAttunement` as
-        // the proxy for "this is a real magic item."
-        const isMagicMisc = loot.type === 'misc' && !!loot.requiresAttunement;
-        const hasIdentify =
-          context.classSkills[char.character_class]?.some((s) =>
-            ['arcana', 'investigation'].includes(s)
-          ) ?? false;
-        if (isMagicMisc && !hasIdentify) {
-          narrative += ` [${loot.name}: unidentified]`;
-        } else {
-          narrative += ` [${loot.name}: ${loot.desc}]`;
-          if (hasIdentify && isMagicMisc) {
-            narrative += ' Your expertise lets you identify it immediately.';
-          }
-        }
-        break;
-      }
-
       case 'use': {
         const held = char.inventory?.find((i) => i.id === action.itemId);
         if (!held) {
@@ -5580,85 +5505,6 @@ export async function takeAction({
         break;
       }
 
-      case 'sneak': {
-        if (!enemyAlive) {
-          narrative = 'Nothing to sneak past. You move freely.';
-          break;
-        }
-        const sneakDC = passivePerceptionDC(enemy.wis ?? 10);
-        // SRD p.6 — group ability check: every participant rolls; the group
-        // succeeds if at least half of them pass. Solo parties collapse to
-        // single-PC behavior. Only the active PC auto-spends Inspiration /
-        // Bardic Inspiration; passive party members keep their resources.
-        // Swap the active PC's slot for our local `char` ref so the resource
-        // mutations apply to the same object that gets written back to state.
-        const livingParty = st.characters
-          .filter((c) => !c.dead)
-          .map((c) => (c.id === char.id ? char : c));
-        const rolls = livingParty.map((member) => {
-          const isActive = member.id === char.id;
-          const proficient =
-            context.classSkills[member.character_class]?.includes('stealth') ?? false;
-          const exhaustionDisadv1 = (member.exhaustion_level ?? 0) >= 1;
-          const checkDisadv = exhaustionDisadv1 || isHeavilyEncumbered(member);
-          const inspAdv = isActive ? consumeInspirationForCheck(member) : false;
-          const bardicRoll = isActive ? consumeBardicForCheck(member) : 0;
-          const check = skillCheck(
-            member.dex,
-            sneakDC - bardicRoll,
-            proficient,
-            member.level,
-            checkDisadv,
-            false,
-            false,
-            inspAdv,
-            member.species === 'halfling'
-          );
-          return { name: member.name, check, mod: abilityMod(member.dex) };
-        });
-        const successes = rolls.filter((r) => r.check.success).length;
-        const groupPasses = 2 * successes >= livingParty.length;
-        const detailLines = rolls
-          .map(
-            (r) =>
-              `${r.name}: ${r.check.roll}+${r.mod}=${r.check.total} ${r.check.success ? '✓' : '✗'}`
-          )
-          .join('; ');
-        const groupNote =
-          livingParty.length > 1
-            ? ` Group check: ${successes}/${livingParty.length} pass${groupPasses ? '' : ' — group fails'}.`
-            : '';
-        if (groupPasses) {
-          narrative = pick(context.narratives.sneakSuccess).replace('{enemy}', enemy.name);
-          narrative += `${groupNote} (DC ${sneakDC}; ${detailLines})`;
-          if (adjacent.length > 0) {
-            const target = adjacent[0];
-            if (st.combat_active) {
-              st = endCombatState(st);
-              char.conditions = [];
-            }
-            st.current_room = target.id;
-            if (!st.visited_rooms.includes(target.id)) {
-              st.visited_rooms = [...st.visited_rooms, target.id];
-            }
-            narrative +=
-              ' ' +
-              buildArrivalNarrative(
-                target.id,
-                { ...st, characters: st.characters.map((c, i) => (i === safeIdx ? char : c)) },
-                seed,
-                context
-              );
-          }
-        } else {
-          narrative = `The party fails to slip past the ${enemy?.name ?? 'enemy'}.${groupNote} (DC ${sneakDC}; ${detailLines})`;
-        }
-        // Sneak always consumes the action and ends the combat turn
-        char.turn_actions = { ...char.turn_actions, action_used: true };
-        if (st.combat_active) usedInitiative = true;
-        break;
-      }
-
       // ── NPC: attack_npc ──────────────────────────────────────────────────────
       // This action is the *trigger* that flips a non-hostile NPC hostile. After
       // flipping, the NPC participates in grid combat as a regular enemy (via
@@ -5687,57 +5533,6 @@ export async function takeAction({
           seed,
           context,
         });
-      }
-
-      case 'disarm_trap': {
-        const trap = getRoomTrap(roomId, seed, context);
-        if (!trap || trapSpent(st, roomId)) {
-          narrative = 'There is no trap here to disarm.';
-          break;
-        }
-        // Must have detected it (passive Perception) to attempt disarm
-        if (!partyDetectsTrap(st.characters, trap)) {
-          narrative = 'You have not located the trap.';
-          break;
-        }
-        const hasToolProf =
-          char.tool_proficiencies?.some(
-            (t) => t.toLowerCase().includes('thieves') || t.toLowerCase().includes('hacking')
-          ) ?? false;
-        // Exhaustion 1+: disadvantage on ability checks (disarmTrap uses DEX)
-        // disarmTrap does not support disadvantage natively; apply by calling twice and taking lower
-        const exhaustionDisadv1Trap = (char.exhaustion_level ?? 0) >= 1;
-        const trapAttempt1 = disarmTrap(char.dex, char.level, hasToolProf);
-        const trapAttempt2 = exhaustionDisadv1Trap
-          ? disarmTrap(char.dex, char.level, hasToolProf)
-          : trapAttempt1;
-        const { roll, total } =
-          trapAttempt1.total <= trapAttempt2.total ? trapAttempt1 : trapAttempt2;
-        const profNote = hasToolProf ? ` (tool proficiency)` : '';
-        if (total >= trap.dc) {
-          st.traps_disarmed = [...(st.traps_disarmed ?? []), roomId];
-          narrative = `${trap.disarmSuccess} (DEX ${roll} + ${total - roll}${profNote} = ${total} vs DC ${trap.dc})`;
-        } else {
-          // Disarm failure — trap triggers
-          st.traps_triggered = [...(st.traps_triggered ?? []), roomId];
-          const trapDmg = rollDice(trap.damage);
-          char.hp = Math.max(0, char.hp - trapDmg);
-          let failNarr = `${trap.disarmFail} (DEX ${roll} + ${total - roll}${profNote} = ${total} vs DC ${trap.dc}). `;
-          failNarr += trap.triggerNarrative
-            .replace(/{name}/g, char.name)
-            .replace(/{dmg}/g, String(trapDmg));
-          narrative = failNarr;
-          if (trap.condition && char.hp > 0) {
-            char.conditions = [...new Set([...char.conditions, trap.condition])];
-            if (trap.conditionDuration)
-              char.condition_durations = {
-                ...char.condition_durations,
-                [trap.condition]: trap.conditionDuration,
-              };
-          }
-        }
-        char.turn_actions = { ...char.turn_actions, action_used: true };
-        break;
       }
 
       case 'cast_spell': {
