@@ -1,15 +1,13 @@
-import { BEAST_FORMS, SRD_SPECIES } from '../../contexts/srd/index.js';
+import { BEAST_FORMS, SRD_SPECIES } from '../../../contexts/srd/index.js';
 import {
   abilityMod,
   applyDamageMultiplier,
   passivePerceptionDC,
   profBonus,
-  rageDamageBonus,
-  rageUsesMax,
   rollCritical,
   rollDice,
   skillCheck,
-} from '../rulesEngine.js';
+} from '../../rulesEngine.js';
 import {
   applyPartyLevelUps,
   consumeBardicForCheck,
@@ -17,17 +15,16 @@ import {
   effectiveSpeed,
   endCombatState,
   getEnemyById,
-  getItemData,
   inflictCondition,
   isHeavilyEncumbered,
   isRoomCleared,
   pushEvent,
   splitEncounterXp,
-} from '../gameEngine.js';
-import { distanceFeet, entitiesInCone } from '../gridEngine.js';
-import type { ActionHandler } from './types.js';
-import type { InventoryItem } from '../../types.js';
-import { fmt } from '../narrativeFmt.js';
+} from '../../gameEngine.js';
+import { distanceFeet, entitiesInCone } from '../../gridEngine.js';
+import type { ActionHandler } from '../types.js';
+import { fmt } from '../../narrativeFmt.js';
+import { handleBarbarianFeature } from './barbarian.js';
 
 /**
  * `use_class_feature`: per-feature dispatch — the catch-all for every
@@ -59,36 +56,18 @@ export const handleUseClassFeature: ActionHandler<{
   type: 'use_class_feature';
   featureId: string;
 }> = (ctx, action) => {
-  const features = ctx.context.classFeatures?.[ctx.char.character_class] ?? [];
   const fid = action.featureId;
   const dispatchKey = [ctx.char.character_class, ctx.char.subclass, fid].filter(Boolean).join('_');
 
-  // ── Rage (Barbarian bonus action) ──────────────────────────────────────
-  if (fid === 'rage') {
-    if (!features.includes('rage')) {
-      ctx.narrative = `${ctx.char.character_class} does not have Rage.`;
-      return;
-    }
-    if (ctx.char.conditions.includes('raging')) {
-      ctx.narrative = 'You are already raging!';
-      return;
-    }
-    const rageUses = ctx.char.class_resource_uses?.rage_uses ?? rageUsesMax(ctx.char.level);
-    if (rageUses <= 0) {
-      ctx.narrative = 'No rage uses remaining. They recover on a long rest.';
-      return;
-    }
-    ctx.char.conditions = [...ctx.char.conditions, 'raging'];
-    ctx.char.class_resource_uses = {
-      ...(ctx.char.class_resource_uses ?? {}),
-      rage_uses: rageUses - 1,
-    };
-    ctx.char.turn_actions = { ...ctx.char.turn_actions, bonus_action_used: true };
-    ctx.narrative = `${ctx.char.name} RAGES! +${rageDamageBonus(ctx.char.level)} bonus STR melee damage, resistance to physical attacks. (${rageUses - 1} use${rageUses - 1 === 1 ? '' : 's'} remaining)`;
-  }
+  // Per-class dispatch. Each handler returns true if the action's fid
+  // matched one of its features (caller stops here); false to fall
+  // through to the next class's handler. As more classes get extracted
+  // into per-class files, this chain grows and the inline if-chain
+  // below shrinks.
+  if (handleBarbarianFeature(ctx, fid)) return;
 
   // ── Action Surge (Fighter) ─────────────────────────────────────────────
-  else if (fid === 'action_surge') {
+  if (fid === 'action_surge') {
     if (ctx.char.character_class.toLowerCase() !== 'fighter') {
       ctx.narrative = 'Only Fighters have Action Surge.';
       return;
@@ -201,24 +180,6 @@ export const handleUseClassFeature: ActionHandler<{
       ),
     };
     ctx.narrative = `${ctx.char.name} grants Bardic Inspiration (${inspDie}) to ${ally.name}! (${biUses - 1} use${biUses - 1 === 1 ? '' : 's'} remaining)`;
-  }
-
-  // ── Reckless Attack (Barbarian L2+) — free toggle, no action cost ──────
-  else if (fid === 'reckless_attack') {
-    if (ctx.char.character_class.toLowerCase() !== 'barbarian') {
-      ctx.narrative = 'Only Barbarians have Reckless Attack.';
-      return;
-    }
-    if (ctx.char.level < 2) {
-      ctx.narrative = 'Reckless Attack requires Barbarian level 2.';
-      return;
-    }
-    if (ctx.char.turn_actions.reckless) {
-      ctx.narrative = 'You are already attacking recklessly this turn.';
-      return;
-    }
-    ctx.char.turn_actions = { ...ctx.char.turn_actions, reckless: true };
-    ctx.narrative = `${ctx.char.name} attacks recklessly! Advantage on STR melee attacks this turn — but enemies have advantage against you until your next turn.`;
   }
 
   // ── Cunning Action: Dash (Rogue L2+ bonus action) ─────────────────────
@@ -746,78 +707,6 @@ export const handleUseClassFeature: ActionHandler<{
     ctx.char.turn_actions = { ...ctx.char.turn_actions, action_used: true };
     ctx.usedInitiative = true;
     ctx.narrative = `🌑 ${ctx.char.name} weaves Shadow Arts — invisible for 3 rounds. (${kiSa - 2} ki remaining)`;
-  }
-
-  // ── Path of the Berserker — Frenzy (PHB p.49) ────────────────────────────
-  // While raging, make a single melee weapon attack as a bonus action.
-  // Damage uses the equipped weapon's die + STR mod + rage bonus, matching
-  // the regular attack handler's pattern but in a self-contained roll.
-  // RAW: when rage ends, you suffer one level of exhaustion. Deferred —
-  // tracking "rage ended after Frenzy used this round" needs more state.
-  else if (fid === 'frenzy_attack') {
-    if (
-      ctx.char.subclass !== 'berserker' ||
-      ctx.char.character_class.toLowerCase() !== 'barbarian'
-    ) {
-      ctx.narrative = 'Only Berserker Barbarians have Frenzy.';
-      return;
-    }
-    if (!ctx.char.conditions.includes('raging')) {
-      ctx.narrative = 'You must be raging to use Frenzy.';
-      return;
-    }
-    if (ctx.char.turn_actions.bonus_action_used) {
-      ctx.narrative = 'Bonus action already used this turn.';
-      return;
-    }
-    if (!ctx.enemyAlive || !ctx.enemy) {
-      ctx.narrative = 'No ctx.enemy to Frenzy attack.';
-      return;
-    }
-    const frWeapon = ctx.char.equipped_weapon
-      ? getItemData(
-          ctx.char.inventory?.find(
-            (i) => i.instance_id === ctx.char.equipped_weapon
-          ) as InventoryItem,
-          ctx.context
-        )
-      : null;
-    if (frWeapon?.range === 'ranged') {
-      ctx.narrative = 'Frenzy requires a melee weapon.';
-      return;
-    }
-    ctx.char.turn_actions = { ...ctx.char.turn_actions, bonus_action_used: true };
-    const frTarget = ctx.livingEnemiesInRoom[0] ?? ctx.enemy;
-    const frToHit = rollDice('1d20') + abilityMod(ctx.char.str) + profBonus(ctx.char.level);
-    if (frToHit >= (frTarget.ac ?? 10)) {
-      const dmgDice = frWeapon?.damage ?? '1d4';
-      const frDmg = Math.max(
-        1,
-        rollDice(dmgDice) + abilityMod(ctx.char.str) + rageDamageBonus(ctx.char.level)
-      );
-      const curHp = ctx.st.entities?.find((e) => e.id === frTarget.id && e.isEnemy)?.hp ?? 0;
-      const newHp = Math.max(0, curHp - frDmg);
-      ctx.st = {
-        ...ctx.st,
-        entities: (ctx.st.entities ?? []).map((e) =>
-          e.id === frTarget.id && e.isEnemy ? { ...e, hp: newHp } : e
-        ),
-      };
-      ctx.narrative = `💢 ${ctx.char.name} — Frenzy! (${frToHit} hits AC ${frTarget.ac}) ${frDmg} ${frWeapon?.damageType ?? 'bludgeoning'}${newHp <= 0 ? ` — ${frTarget.name} falls!` : ''}`;
-      if (newHp <= 0) {
-        const split = splitEncounterXp(ctx.st, ctx.char.id, frTarget.xp ?? 10);
-        ctx.st = split.st;
-        ctx.char.xp = (ctx.char.xp || 0) + split.share;
-        ctx.narrative += applyPartyLevelUps(ctx.st, ctx.char, ctx.context);
-        ctx.st.enemies_killed = [...ctx.st.enemies_killed, frTarget.id];
-        if (isRoomCleared(ctx.st, ctx.seed, ctx.roomId)) {
-          ctx.st = endCombatState(ctx.st);
-          ctx.char.conditions = ctx.char.conditions.filter((c) => c !== 'raging');
-        }
-      }
-    } else {
-      ctx.narrative = `💢 ${ctx.char.name} — Frenzy! (${frToHit} vs AC ${frTarget.ac}) — miss.`;
-    }
   }
 
   // ── Druid: Wild Shape ────────────────────────────────────────────────────
@@ -1523,7 +1412,7 @@ export const handleUseClassFeature: ActionHandler<{
       .filter((e) => e.isEnemy && e.hp > 0)
       .sort((a, b) => distanceFeet(comp.pos, a.pos) - distanceFeet(comp.pos, b.pos))[0];
     if (!targetEnt) {
-      ctx.narrative = 'No living ctx.enemy in sight for the companion.';
+      ctx.narrative = 'No living enemy in sight for the companion.';
       return;
     }
     const targetEnemy = getEnemyById(ctx.seed, targetEnt.id);
