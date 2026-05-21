@@ -1527,11 +1527,11 @@ export function buildArrivalNarrative(
 
 // ─── NPC helpers ─────────────────────────────────────────────────────────────
 
-function getNpcAttitude(state: GameState, npc: PlacedNpc): NpcAttitude {
+export function getNpcAttitude(state: GameState, npc: PlacedNpc): NpcAttitude {
   return state.npc_attitudes?.[npc.roomId] ?? npc.attitude;
 }
 
-function npcIsKilled(state: GameState, roomId: string): boolean {
+export function npcIsKilled(state: GameState, roomId: string): boolean {
   return !!(
     state.npc_attitudes?.[roomId] === 'hostile' && state.enemies_killed?.includes(`npc:${roomId}`)
   );
@@ -5656,115 +5656,6 @@ export async function takeAction({
         // Sneak always consumes the action and ends the combat turn
         char.turn_actions = { ...char.turn_actions, action_used: true };
         if (st.combat_active) usedInitiative = true;
-        break;
-      }
-
-      // ── NPC: talk ────────────────────────────────────────────────────────────
-      case 'talk': {
-        const npc = seed.npcs?.[roomId];
-        if (!npc) {
-          narrative = 'There is no one to talk to here.';
-          break;
-        }
-        if (npcIsKilled(st, roomId)) {
-          narrative = 'They are dead.';
-          break;
-        }
-
-        const attitude = getNpcAttitude(st, npc);
-        if (attitude === 'hostile') {
-          narrative = `${npc.name} snarls at you and attacks!`;
-          break;
-        }
-
-        // Indifferent: require CHA (Persuasion) check
-        if (attitude === 'indifferent') {
-          const dc = npc.persuasionDC ?? 12;
-          const chaMod = abilityMod(char.cha);
-          const roll = rollDice('1d20') + chaMod + profBonus(char.level);
-          const success = roll >= dc;
-          if (success) {
-            st = { ...st, npc_attitudes: { ...st.npc_attitudes, [roomId]: 'friendly' } };
-            narrative = `You approach ${npc.name} with care (CHA check ${roll} vs DC ${dc} — success). ${npc.greeting}`;
-          } else {
-            narrative = `${npc.name} eyes you warily (CHA check ${roll} vs DC ${dc} — fail). They're not ready to talk yet.`;
-            break;
-          }
-        } else {
-          narrative = npc.greeting;
-        }
-
-        // Mark room as talked — responses become choices
-        if (!st.npc_talked.includes(roomId)) {
-          st = { ...st, npc_talked: [...st.npc_talked, roomId] };
-        }
-
-        // Append the response choices as inline hints in the narrative,
-        // matching the stage-direction format used on the buttons.
-        if (npc.responses.length > 0) {
-          narrative +=
-            ' [' + npc.responses.map((r) => `<To ${npc.name}> ${r.label}`).join(' | ') + ']';
-        }
-        if (st.combat_active) char.turn_actions = { ...char.turn_actions, action_used: true };
-        break;
-      }
-
-      // ── NPC: talk_response ───────────────────────────────────────────────────
-      case 'talk_response': {
-        const npc = seed.npcs?.[roomId];
-        if (!npc) {
-          narrative = 'There is no one here.';
-          break;
-        }
-
-        const idx = action.responseIdx;
-        const response = npc.responses[idx];
-        if (!response) {
-          narrative = 'Invalid response.';
-          break;
-        }
-
-        narrative = response.reply ? `${npc.name}: "${response.reply}"` : `${npc.name} nods.`;
-
-        // Apply any consequences attached to this response
-        if (response.consequences?.length) {
-          const narrativeParts: string[] = [];
-          for (const c of response.consequences) {
-            st = applyConsequence(c, st, seed, char.id, narrativeParts, context);
-          }
-          if (narrativeParts.length) narrative += ' ' + narrativeParts.join(' ');
-        }
-        break;
-      }
-
-      // ── NPC: buy ─────────────────────────────────────────────────────────────
-      case 'buy': {
-        const npc = seed.npcs?.[roomId];
-        if (!npc) {
-          narrative = 'There is no one to buy from.';
-          break;
-        }
-        if (getNpcAttitude(st, npc) !== 'friendly') {
-          narrative = `${npc.name} won't trade with you right now.`;
-          break;
-        }
-
-        if (char.gold < action.price) {
-          narrative = `You can't afford that — you only have ${char.gold}cr.`;
-          break;
-        }
-        const lootEntry = context.lootTable.find((l) => l.id === action.itemId);
-        if (!lootEntry) {
-          narrative = 'That item is not available.';
-          break;
-        }
-
-        char = {
-          ...char,
-          gold: char.gold - action.price,
-          inventory: [...char.inventory, { ...lootEntry, instance_id: randomUUID() }],
-        };
-        narrative = `You hand over ${action.price}cr and receive ${lootEntry.name}. ${npc.name} pockets the credits with a nod.`;
         break;
       }
 
