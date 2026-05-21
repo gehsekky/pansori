@@ -1,4 +1,5 @@
 import type { CampaignMeta, Faction, GameState, Seed } from '../types.ts';
+import { formatClassLabel } from '../lib/characterFmt.ts';
 import styles from '../styles.module.css';
 import { useState } from 'react';
 
@@ -57,7 +58,8 @@ function AdventureLogPanel({ history, worldName, state, seed, campaignMeta }: Pr
     if (!state?.characters?.length) return [];
     const lines: string[] = ['Party:'];
     for (const c of state.characters) {
-      const head = `  ${c.name} (${c.character_class} L${c.level}) HP ${c.hp}/${c.max_hp}  AC ${c.ac}  STR ${c.str} DEX ${c.dex} CON ${c.con}`;
+      const classLabel = formatClassLabel(c.character_class, c.subclass);
+      const head = `  ${c.name} (${classLabel} L${c.level}) HP ${c.hp}/${c.max_hp}  AC ${c.ac}  STR ${c.str} DEX ${c.dex} CON ${c.con}`;
       lines.push(head);
       // Conditions + sources
       const conds = c.conditions ?? [];

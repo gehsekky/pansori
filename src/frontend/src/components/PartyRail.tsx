@@ -1,6 +1,7 @@
 import type { Character, FrontendContext, GameState, Seed } from '../types';
 import { useEffect, useState } from 'react';
 import InitiativeStrip from './InitiativeStrip';
+import { formatClassLabel } from '../lib/characterFmt';
 import styles from '../styles.module.css';
 
 interface Props {
@@ -143,7 +144,10 @@ function PartyTile({
           <img src={char.portrait_url} alt="" className={styles.partyTilePortrait} />
         )}
         <span className={styles.partyTileName}>
-          {char.name} <span style={{ color: 'var(--t-dim)' }}>[{char.character_class}]</span>
+          {char.name}{' '}
+          <span style={{ color: 'var(--t-dim)' }}>
+            [{formatClassLabel(char.character_class, char.subclass)}]
+          </span>
         </span>
         {isActive && (
           <span className={styles.partyTileActiveBadge} aria-label="Active turn">

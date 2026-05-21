@@ -1,5 +1,6 @@
 import type { Character, FrontendContext, GameState } from '../types';
 import Dialog from './Dialog.tsx';
+import { formatClassLabel } from '../lib/characterFmt';
 import styles from '../styles.module.css';
 import { useState } from 'react';
 
@@ -94,7 +95,7 @@ function InventoryModal({
                 {c.portrait_url && (
                   <img src={c.portrait_url} alt="" className={styles.invTabPortrait} />
                 )}
-                {c.name} [{c.character_class}]
+                {c.name} [{formatClassLabel(c.character_class, c.subclass)}]
               </button>
             );
           })}
