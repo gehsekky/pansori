@@ -1,5 +1,11 @@
 import type { ActionContext, ActionHandler } from './types.js';
 import {
+  handleApplyAsi,
+  handlePrepareSpells,
+  handleSelectSubclass,
+  handleSetActiveCharacter,
+} from './meta.js';
+import {
   handleDash,
   handleDisengage,
   handleDodge,
@@ -10,6 +16,8 @@ import {
 } from './combatUtility.js';
 import { handleEndTurn, handlePass } from './utility.js';
 import type { StructuredAction } from '../../types.js';
+import { handleAttune } from './inventory.js';
+import { handleEscape } from './escape.js';
 
 /**
  * Registry of per-action-type handlers. Populated incrementally as the
@@ -27,6 +35,12 @@ const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   dash: handleDash as ActionHandler,
   help: handleHelp as ActionHandler,
   ready: handleReady as ActionHandler,
+  apply_asi: handleApplyAsi as ActionHandler,
+  select_subclass: handleSelectSubclass as ActionHandler,
+  set_active_character: handleSetActiveCharacter as ActionHandler,
+  prepare_spells: handlePrepareSpells as ActionHandler,
+  escape: handleEscape as ActionHandler,
+  attune: handleAttune as ActionHandler,
 };
 
 /**

@@ -119,7 +119,7 @@ function consumeBardicForCheck(char: Character): number {
 // (minimum 1). The casting stat is class-dependent (Cleric/Druid = WIS,
 // Paladin = CHA); resolves through context.spellcastingAbility with a fall
 // back to the class's primary stat.
-function preparedSpellsCap(char: Character, context: Context): number {
+export function preparedSpellsCap(char: Character, context: Context): number {
   const ability = (context.spellcastingAbility?.[char.character_class] ??
     context.classPrimaryStats[char.character_class] ??
     'wis') as AbilityKey;
@@ -272,7 +272,7 @@ function processBossPhaseTransitions(st: GameState, seed: Seed): GameState {
   return anyChange ? { ...updated, entities: newEntities } : updated;
 }
 
-function pick<T>(arr: T[]): T {
+export function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
@@ -5669,20 +5669,6 @@ export async function takeAction({
         break;
       }
 
-      case 'escape': {
-        if (roomId !== context.escapeRoomId) {
-          narrative = pick(context.narratives.noEscapeNearby);
-          break;
-        }
-        if (enemyAlive) {
-          narrative = `The ${enemy.name} ${pick(context.narratives.escapeBlocked)}`;
-          break;
-        }
-        escaped = true;
-        narrative = pick(context.narratives.escapeLines).replace(/{world}/g, worldName);
-        break;
-      }
-
       case 'short_rest': {
         if (st.combat_active) {
           narrative = 'You cannot rest while in combat.';
@@ -6047,29 +6033,6 @@ export async function takeAction({
           }
         }
         char.turn_actions = { ...char.turn_actions, action_used: true };
-        break;
-      }
-
-      case 'apply_asi': {
-        if (!char.asi_pending) {
-          narrative = 'No Ability Score Improvement pending.';
-          break;
-        }
-        const stat = action.stat as AbilityKey;
-        char[stat] = (char[stat] ?? 10) + 2;
-        char.asi_pending = false;
-        const statName = { str: 'STR', dex: 'DEX', con: 'CON', int: 'INT', wis: 'WIS', cha: 'CHA' }[
-          stat
-        ];
-        narrative = `${char.name} increases ${statName} by 2 (now ${char[stat]})!`;
-        // CON increase retroactively raises max HP (per 5e PHB: apply to all existing levels)
-        if (stat === 'con') {
-          const bonus = Math.floor((char.con - 10) / 2) - Math.floor((char.con - 2 - 10) / 2);
-          char.max_hp = Math.max(1, char.max_hp + bonus * char.level);
-          char.hp = Math.min(char.max_hp, char.hp + bonus * char.level);
-          if (bonus > 0)
-            narrative += ` Max HP increased by ${bonus * char.level} (${bonus}/level × ${char.level} levels).`;
-        }
         break;
       }
 
@@ -8948,40 +8911,6 @@ export async function takeAction({
         break;
       }
 
-      case 'attune': {
-        if (st.combat_active) {
-          narrative = 'You cannot attune to items during combat.';
-          break;
-        }
-        const attuneInstanceId =
-          'instanceId' in action
-            ? (action as { type: 'attune'; instanceId: string }).instanceId
-            : '';
-        const attuneInvItem = char.inventory.find((i) => i.instance_id === attuneInstanceId);
-        if (!attuneInvItem) {
-          narrative = "You don't have that item.";
-          break;
-        }
-        const attuneLootItem = context.lootTable.find((l) => l.id === attuneInvItem.id);
-        if (!attuneLootItem?.requiresAttunement) {
-          narrative = `The ${attuneInvItem.name} doesn't require attunement.`;
-          break;
-        }
-        const attunedList = char.attuned_items ?? [];
-        if (attunedList.includes(attuneInstanceId)) {
-          narrative = `You are already attuned to the ${attuneInvItem.name}.`;
-          break;
-        }
-        if (attunedList.length >= 3) {
-          narrative =
-            'You can only be attuned to 3 items at a time (PHB p.138). De-attune one first.';
-          break;
-        }
-        char.attuned_items = [...attunedList, attuneInstanceId];
-        narrative = `You spend a moment focusing on the ${attuneInvItem.name}, attuning yourself to its magic. (${attunedList.length + 1}/3 attuned items)`;
-        break;
-      }
-
       // ── Grid movement ────────────────────────────────────────────────────────
       case 'grid_move': {
         if (!st.entities) {
@@ -9351,50 +9280,6 @@ export async function takeAction({
       }
 
       // ── Select subclass ───────────────────────────────────────────────────────
-      case 'select_subclass': {
-        const scAction = action as { type: 'select_subclass'; subclass: string };
-        if (char.subclass) {
-          narrative = `You have already chosen the ${char.subclass} subclass.`;
-          break;
-        }
-        char.subclass = scAction.subclass;
-        narrative = `${char.name} follows the path of the ${scAction.subclass}!`;
-        // Sorcerer · Draconic Bloodline · Draconic Resilience (PHB p.103):
-        // +1 HP per Sorcerer level. The L1 portion would have been granted at
-        // character creation if subclass was picked there; this catches any
-        // mid-game selection too.
-        if (scAction.subclass === 'draconic' && char.character_class.toLowerCase() === 'sorcerer') {
-          char.max_hp += char.level;
-          char.hp += char.level;
-          narrative += ` Draconic Resilience: +${char.level} max HP (now ${char.hp}/${char.max_hp}).`;
-        }
-        break;
-      }
-
-      // ── Set active party member (out-of-combat lead picker) ──────────────────
-      case 'set_active_character': {
-        const sacAction = action as { type: 'set_active_character'; characterId: string };
-        // No-op in combat — initiative drives `active_character_id` there.
-        if (st.combat_active) {
-          narrative = `Initiative is rolled — you can't hand the spotlight off mid-fight.`;
-          break;
-        }
-        const target = st.characters.find((c) => c.id === sacAction.characterId);
-        if (!target) {
-          narrative = 'Unknown party member.';
-          break;
-        }
-        if (target.dead) {
-          narrative = `${target.name} is dead and can't lead.`;
-          break;
-        }
-        st = { ...st, active_character_id: sacAction.characterId };
-        narrative = `${target.name} steps forward to lead.`;
-        // Out-of-combat action, doesn't consume any turn budget.
-        usedInitiative = false;
-        break;
-      }
-
       // ── Resolve pending reaction (Shield window for now) ──────────────────────
       case 'resolve_reaction': {
         const rxAction = action as { type: 'resolve_reaction'; accept: boolean };
@@ -9687,29 +9572,6 @@ export async function takeAction({
             st.initiative_idx = resume.exitAdvIdx;
           }
         }
-        break;
-      }
-
-      // ── Prepare spells ────────────────────────────────────────────────────────
-      case 'prepare_spells': {
-        if (st.combat_active) {
-          narrative = 'You cannot prepare spells during combat.';
-          break;
-        }
-        const prepAction = action as { type: 'prepare_spells'; spellIds: string[] };
-        const maxPrepared = preparedSpellsCap(char, context);
-        // Cantrips are always known (PHB p.234) — strip them from the
-        // input so they don't eat a prep slot or trip the cap check.
-        const leveledIds = prepAction.spellIds.filter(
-          (id) => (context.spellTable?.[id]?.level ?? 0) > 0
-        );
-        if (leveledIds.length > maxPrepared) {
-          narrative = `You can prepare at most ${maxPrepared} leveled spells (your level + spellcasting modifier). You tried to prepare ${leveledIds.length}.`;
-          break;
-        }
-        char.prepared_spells = leveledIds;
-        const spellNames = leveledIds.map((id) => context.spellTable?.[id]?.name ?? id).join(', ');
-        narrative = `${char.name} prepares their spells for the day: ${spellNames || '(none)'}.`;
         break;
       }
 
