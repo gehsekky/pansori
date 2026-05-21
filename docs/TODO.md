@@ -70,10 +70,10 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
     dropdown values in sync. Realtime 'participants' (joined/left)
     listener still deferred — host has to close + reopen the dialog
     to see a freshly-joined friend.
-  - [ ] **Voluntary leave** — DELETE /session/:id/participant for
-    non-host participants who want out. Currently the host can rotate
-    the invite token to lock people out, but explicit leave is polish.
-    ~30min.
+  - [x] **Voluntary leave** (shipped — d42484e). Non-host participants
+    have a "Leave session" button in the players dialog. Server auto-
+    transfers PCs they owned to the host before removing them, so turn
+    enforcement never encounters an orphan owner.
   - [ ] **Race detection** (`turn_seq` column) — if two participants
     race-click during the same active turn, the server already rejects
     the loser via the turn-enforcement guard with a 403, so this isn't
