@@ -330,6 +330,12 @@ export interface Session {
   // Host can rotate via api.rotateInvite. NULL on pre-MP sessions
   // until the host opens the invite dialog and triggers a rotate.
   invite_token?: string | null;
+  // Multiplayer race detection: monotonically increasing per session.
+  // Bumped on every successful takeAction. The client sends its
+  // last-known value with each action; the server returns 409 on
+  // mismatch (stale state). Optional for pre-MP sessions that load
+  // before the migration runs.
+  turn_seq?: number;
 }
 
 export interface SessionSummary {

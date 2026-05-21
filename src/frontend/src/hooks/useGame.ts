@@ -22,6 +22,10 @@ export interface UseGameReturn {
   loading: boolean;
   escaped: boolean;
   roomLog: string[];
+  // Bumps every time the server emits a `participants` event (join /
+  // leave / ownership-changed). InviteDialog uses it as a useEffect
+  // dep so it can re-fetch the participants list without polling.
+  participantsVersion: number;
 
   handleNewGame: (characters: CharacterInput[], contextId: string) => Promise<void>;
   handleResumeSession: (id: string) => Promise<void>;
@@ -42,6 +46,12 @@ export function useGame(): UseGameReturn {
   const [loading, setLoading] = useState(false);
   const [escaped, setEscaped] = useState(false);
   const [roomLog, setRoomLog] = useState<string[]>([]);
+  const [participantsVersion, setParticipantsVersion] = useState(0);
+  // Local mirror of game_sessions.turn_seq — included with every
+  // takeAction so the server can detect stale writes (multiplayer
+  // race detection). Updated from REST responses, session loads,
+  // and Socket.IO `state` broadcasts.
+  const [turnSeq, setTurnSeq] = useState<number | undefined>(undefined);
 
   // Socket.IO subscription per session. When session.id changes (new
   // session created, resumed, or reset), tear down the previous socket
@@ -68,7 +78,7 @@ export function useGame(): UseGameReturn {
     socket.on('connect', () => {
       socket.emit('join-session', session.id);
     });
-    socket.on('state', (payload: { state: GameState; narrative?: string }) => {
+    socket.on('state', (payload: { state: GameState; narrative?: string; turn_seq?: number }) => {
       // The server emits the full post-action state. Replace
       // wholesale — partial diffing isn't worth the complexity for
       // the once-per-action cadence we get from D&D rounds.
@@ -76,6 +86,13 @@ export function useGame(): UseGameReturn {
       setChoices(payload.state.last_choices ?? []);
       setRoomLog(payload.state.room_log ?? []);
       if (payload.state.flags?._rule_escape) setEscaped(true);
+      if (typeof payload.turn_seq === 'number') setTurnSeq(payload.turn_seq);
+    });
+    // Participants events (joined / left / ownership-changed). We don't
+    // care about the payload shape here — consumers (InviteDialog) react
+    // to the version bump and re-fetch listParticipants for fresh data.
+    socket.on('participants', () => {
+      setParticipantsVersion((v) => v + 1);
     });
     return () => {
       socket.disconnect();
@@ -95,6 +112,7 @@ export function useGame(): UseGameReturn {
       setEscaped(false);
       setRoomLog(result.state.room_log || []);
       setChoices(result.state.last_choices || []);
+      setTurnSeq(result.session.turn_seq ?? 0);
       window.history.pushState(null, '', `/${result.session.id}`);
     } finally {
       setLoading(false);
@@ -112,6 +130,7 @@ export function useGame(): UseGameReturn {
       setRoomLog(s.state.room_log || []);
       setEscaped(s.status === 'escaped');
       setChoices(s.state.last_choices || []);
+      setTurnSeq(s.turn_seq ?? 0);
       window.history.pushState(null, '', `/${id}`);
     } catch (e) {
       console.error(e);
@@ -125,7 +144,7 @@ export function useGame(): UseGameReturn {
     if (!sid) return;
     setLoading(true);
     try {
-      const result = await api.takeAction(sid, action, currentHistory);
+      const result = await api.takeAction(sid, action, currentHistory, turnSeq);
       const newHistory: HistoryEntry[] = [
         ...currentHistory,
         { role: 'user', content: label },
@@ -136,8 +155,26 @@ export function useGame(): UseGameReturn {
       setGameState(result.newState);
       setRoomLog(result.newState.room_log || []);
       if (result.escaped) setEscaped(true);
-    } catch {
-      setRoomLog((prev) => [...prev, 'Communications array offline... (error contacting server)']);
+      if (typeof result.turn_seq === 'number') setTurnSeq(result.turn_seq);
+    } catch (e) {
+      // 409 Conflict from race detection — another participant acted
+      // first. Refetch the session to resync state instead of
+      // surfacing a generic error. The Socket.IO 'state' broadcast
+      // from the winning action SHOULD have already updated local
+      // state, but refetching here is the belt-and-suspenders safety.
+      const err = e as { error?: string; turn_seq?: number };
+      if (err?.error?.toLowerCase().includes('out of sync')) {
+        setRoomLog((prev) => [...prev, `⚠ ${err.error}`]);
+        if (typeof err.turn_seq === 'number') setTurnSeq(err.turn_seq);
+        // Resume to pick up fresh state; safe even when the broadcast
+        // already arrived (idempotent setState).
+        await handleResumeSession(sid);
+      } else {
+        setRoomLog((prev) => [
+          ...prev,
+          'Communications array offline... (error contacting server)',
+        ]);
+      }
     } finally {
       setLoading(false);
     }
@@ -201,6 +238,7 @@ export function useGame(): UseGameReturn {
     loading,
     escaped,
     roomLog,
+    participantsVersion,
     handleNewGame,
     handleResumeSession,
     handleEquip,

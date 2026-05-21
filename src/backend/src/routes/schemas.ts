@@ -93,6 +93,9 @@ export const JoinSessionSchema = z
 // forever), validate only that `action` is an object with a non-empty `type`
 // string — the handler's exhaustive switch handles dispatch, and unknown
 // types fall through to a default arm. `history` is an opaque array.
+// Optional `turn_seq` is the client's last-known sequence number; the
+// handler uses it for race detection in multiplayer (solo clients
+// always have the latest value, so this is a no-op for them).
 export const ActionSchema = z
   .object({
     action: z
@@ -101,6 +104,7 @@ export const ActionSchema = z
       })
       .passthrough(),
     history: z.array(z.unknown()).optional(),
+    turn_seq: z.number().int().nonnegative().optional(),
   })
   .strict();
 

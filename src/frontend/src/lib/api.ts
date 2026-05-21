@@ -37,6 +37,10 @@ export interface ActionResult {
   newState: GameState;
   escaped: boolean;
   dead: boolean;
+  // Multiplayer race detection: the new server-side turn sequence number
+  // after this action was applied. Clients send this back on their next
+  // takeAction so the server can reject stale-state writes.
+  turn_seq?: number;
 }
 
 export interface NewSessionResult {
@@ -100,10 +104,15 @@ export const api = {
       body: JSON.stringify({ characters, context_id }),
     }),
 
-  takeAction: (sessionId: string, action: StructuredAction, history: unknown[]) =>
+  takeAction: (
+    sessionId: string,
+    action: StructuredAction,
+    history: unknown[],
+    turn_seq?: number
+  ) =>
     req<ActionResult>(`/game/session/${sessionId}/action`, {
       method: 'POST',
-      body: JSON.stringify({ action, history }),
+      body: JSON.stringify({ action, history, turn_seq }),
     }),
 
   equipItem: (sessionId: string, item_id: string, character_id: string) =>
