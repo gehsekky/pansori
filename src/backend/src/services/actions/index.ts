@@ -24,6 +24,7 @@ import { handleLongRest, handleShortRest } from './rest.js';
 import { handleResolveReaction, handleUseReaction } from './reaction.js';
 import type { StructuredAction } from '../../types.js';
 import { handleAttack } from './attack.js';
+import { handleCastSpell } from './castSpell.js';
 import { handleDeathSave } from './deathSave.js';
 import { handleDisarmTrap } from './disarmTrap.js';
 import { handleEscape } from './escape.js';
@@ -83,6 +84,7 @@ const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   grid_move: handleGridMove as ActionHandler,
   resolve_reaction: handleResolveReaction as ActionHandler,
   attack: handleAttack as ActionHandler,
+  cast_spell: handleCastSpell as ActionHandler,
 };
 
 /**
