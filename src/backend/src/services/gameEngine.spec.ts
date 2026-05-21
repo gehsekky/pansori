@@ -4896,6 +4896,31 @@ describe('NPC actions', () => {
     expect(result.newState.flags['guide_helped']).toBe(true);
   });
 
+  it("talk_response buttons use the <To NPC> stage-direction format", () => {
+    // After the party has greeted the NPC once, the response buttons
+    // surface with labels framed as the party speaking TO the NPC
+    // rather than the NPC saying them.
+    const state = { ...makeNpcState(), npc_talked: [npcRoomId] };
+    const choices = generateChoices(state, seedWithNpc, ctx);
+    const responseChoices = choices.filter((c) => c.action.type === 'talk_response');
+    expect(responseChoices.length).toBe(2);
+    expect(responseChoices[0].label).toBe('<To Friendly Guide> Ask about the area');
+    expect(responseChoices[1].label).toBe('<To Friendly Guide> Ask for help');
+  });
+
+  it("talk handler's inline dialogue hint also uses the <To NPC> format", async () => {
+    const result = await takeAction({
+      action: { type: 'talk' },
+      history: [],
+      state: makeNpcState(),
+      seed: seedWithNpc,
+      context: ctx,
+    });
+    // Inline hints reflect the same framing the buttons use.
+    expect(result.narrative).toMatch(/<To Friendly Guide> Ask about the area/);
+    expect(result.narrative).toMatch(/<To Friendly Guide> Ask for help/);
+  });
+
   it('buy deducts gold and adds item to inventory', async () => {
     const state = makeNpcState({ gold: 10 });
     const result = await takeAction({

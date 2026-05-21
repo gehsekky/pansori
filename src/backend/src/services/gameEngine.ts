@@ -1794,8 +1794,10 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       for (let i = 0; i < npc.responses.length; i++) {
         if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
         const resp = npc.responses[i];
+        // Stage-direction format: the button reads as the party
+        // speaking TO the NPC, not the NPC saying it.
         choices.push({
-          label: `${i + 1}. ${resp.label}`,
+          label: `<To ${npc.name}> ${resp.label}`,
           action: { type: 'talk_response', responseIdx: i },
         });
       }
@@ -5741,9 +5743,13 @@ export async function takeAction({
         st = { ...st, npc_talked: [...st.npc_talked, roomId] };
       }
 
-      // Append responses as inline choice hints in narrative
+      // Append the response choices as inline hints in the narrative,
+      // matching the stage-direction format used on the buttons.
       if (npc.responses.length > 0) {
-        narrative += ' [' + npc.responses.map((r, i) => `${i + 1}. ${r.label}`).join(' | ') + ']';
+        narrative +=
+          ' [' +
+          npc.responses.map((r) => `<To ${npc.name}> ${r.label}`).join(' | ') +
+          ']';
       }
       if (st.combat_active) char.turn_actions = { ...char.turn_actions, action_used: true };
       break;
