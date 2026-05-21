@@ -35,6 +35,7 @@ import { handleLoot } from './loot.js';
 import { handleMove } from './move.js';
 import { handleSneak } from './sneak.js';
 import { handleTwoWeaponAttack } from './twoWeaponAttack.js';
+import { handleUseClassFeature } from './classFeature.js';
 
 /**
  * Registry of per-action-type handlers. Populated incrementally as the
@@ -85,6 +86,7 @@ const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   resolve_reaction: handleResolveReaction as ActionHandler,
   attack: handleAttack as ActionHandler,
   cast_spell: handleCastSpell as ActionHandler,
+  use_class_feature: handleUseClassFeature as ActionHandler,
 };
 
 /**
