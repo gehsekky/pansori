@@ -20,6 +20,7 @@ import type { ActionHandler } from '../types.js';
 import { SRD_SPECIES } from '../../../contexts/srd/index.js';
 import { fmt } from '../../narrativeFmt.js';
 import { handleBarbarianFeature } from './barbarian.js';
+import { handleCasterFeature } from './casters.js';
 import { handleDruidFeature } from './druid.js';
 import { handleFighterFeature } from './fighter.js';
 import { handleMonkFeature } from './monk.js';
@@ -67,6 +68,7 @@ export const handleUseClassFeature: ActionHandler<{
   if (handleRogueFeature(ctx, fid)) return;
   if (handleMonkFeature(ctx, fid)) return;
   if (handleDruidFeature(ctx, fid)) return;
+  if (handleCasterFeature(ctx, fid)) return;
 
   // ── Bardic Inspiration (Bard bonus action) ────────────────────────────
   if (fid === 'bardic_inspiration') {
@@ -112,125 +114,6 @@ export const handleUseClassFeature: ActionHandler<{
       ),
     };
     ctx.narrative = `${ctx.char.name} grants Bardic Inspiration (${inspDie}) to ${ally.name}! (${biUses - 1} use${biUses - 1 === 1 ? '' : 's'} remaining)`;
-  }
-  // ── Sorcerer: Metamagic — Twinned Spell (1 sorcery point) ────────────────
-  else if (fid === 'metamagic_twinned') {
-    const cls = ctx.char.character_class.toLowerCase();
-    if (cls !== 'sorcerer') {
-      ctx.narrative = 'Only Sorcerers have Metamagic.';
-      return;
-    }
-    const spPool = ctx.char.class_resource_uses?.sorcery_points ?? ctx.char.level;
-    if (spPool < 1) {
-      ctx.narrative = 'Not enough sorcery points (need 1).';
-      return;
-    }
-    ctx.char.class_resource_uses = {
-      ...(ctx.char.class_resource_uses ?? {}),
-      sorcery_points: spPool - 1,
-    };
-    ctx.st = { ...ctx.st, metamagic_active: 'twinned' };
-    ctx.narrative = `${ctx.char.name} — Metamagic: Twinned Spell! Your next spell will target a second creature. (${spPool - 1} sorcery points remaining)`;
-  }
-
-  // ── Sorcerer: Metamagic — Quickened Spell (2 sorcery points) ─────────────
-  else if (fid === 'metamagic_quickened') {
-    const cls = ctx.char.character_class.toLowerCase();
-    if (cls !== 'sorcerer') {
-      ctx.narrative = 'Only Sorcerers have Metamagic.';
-      return;
-    }
-    if (ctx.char.turn_actions.bonus_action_used) {
-      ctx.narrative = 'Bonus action already used this turn.';
-      return;
-    }
-    // SRD 5.2.1 p.67: can't activate Quickened if you've already cast a
-    // level 1+ spell this turn.
-    if (ctx.char.turn_actions.leveled_spell_cast) {
-      ctx.narrative =
-        'You have already cast a level 1+ spell this turn — Quickened Spell cannot be used.';
-      return;
-    }
-    const spPool2 = ctx.char.class_resource_uses?.sorcery_points ?? ctx.char.level;
-    if (spPool2 < 2) {
-      ctx.narrative = 'Not enough sorcery points (need 2).';
-      return;
-    }
-    ctx.char.class_resource_uses = {
-      ...(ctx.char.class_resource_uses ?? {}),
-      sorcery_points: spPool2 - 2,
-    };
-    ctx.char.turn_actions = {
-      ...ctx.char.turn_actions,
-      bonus_action_used: true,
-      action_used: false,
-      quickened_used: true,
-    };
-    ctx.st = { ...ctx.st, metamagic_active: 'quickened' };
-    ctx.narrative = `${ctx.char.name} — Metamagic: Quickened Spell! Cast your next spell as a bonus action. (${spPool2 - 2} sorcery points remaining)`;
-  }
-
-  // ── Sorcerer: Metamagic — Empowered Spell (1 sorcery point) ──────────────
-  else if (fid === 'metamagic_empowered') {
-    const cls = ctx.char.character_class.toLowerCase();
-    if (cls !== 'sorcerer') {
-      ctx.narrative = 'Only Sorcerers have Metamagic.';
-      return;
-    }
-    const spPool3 = ctx.char.class_resource_uses?.sorcery_points ?? ctx.char.level;
-    if (spPool3 < 1) {
-      ctx.narrative = 'Not enough sorcery points (need 1).';
-      return;
-    }
-    ctx.char.class_resource_uses = {
-      ...(ctx.char.class_resource_uses ?? {}),
-      sorcery_points: spPool3 - 1,
-    };
-    ctx.st = { ...ctx.st, metamagic_active: 'empowered' };
-    ctx.narrative = `${ctx.char.name} — Metamagic: Empowered Spell! You may reroll up to ${abilityMod(ctx.char.cha)} damage dice on your next spell. (${spPool3 - 1} sorcery points remaining)`;
-  }
-
-  // ── Warlock: Agonizing Blast invocation (passive — toggled on/off) ────────
-  else if (fid === 'agonizing_blast') {
-    const cls = ctx.char.character_class.toLowerCase();
-    if (cls !== 'warlock') {
-      ctx.narrative = 'Only Warlocks can take Agonizing Blast.';
-      return;
-    }
-    const hasIt = ctx.char.feats?.includes('agonizing_blast') ?? false;
-    if (hasIt) {
-      ctx.narrative = 'You already have the Agonizing Blast invocation.';
-      return;
-    }
-    ctx.char.feats = [...(ctx.char.feats ?? []), 'agonizing_blast'];
-    ctx.narrative = `${ctx.char.name} gains the Agonizing Blast invocation — Eldritch Blast now adds +${abilityMod(ctx.char.cha)} force damage per beam.`;
-  }
-
-  // ── Warlock: Devil's Sight invocation ────────────────────────────────────
-  else if (fid === 'devils_sight') {
-    const cls = ctx.char.character_class.toLowerCase();
-    if (cls !== 'warlock') {
-      ctx.narrative = "Only Warlocks can take Devil's Sight.";
-      return;
-    }
-    const hasIt2 = ctx.char.feats?.includes('devils_sight') ?? false;
-    if (hasIt2) {
-      ctx.narrative = "You already have the Devil's Sight invocation.";
-      return;
-    }
-    ctx.char.feats = [...(ctx.char.feats ?? []), 'devils_sight'];
-    ctx.narrative = `${ctx.char.name} gains Devil's Sight — you can see normally in magical darkness.`;
-  }
-
-  // ── Abjurer Wizard: Arcane Ward ──────────────────────────────────────────
-  else if (fid === 'arcane_ward') {
-    if (ctx.char.subclass !== 'abjurer') {
-      ctx.narrative = 'Only Abjurer Wizards have Arcane Ward.';
-      return;
-    }
-    const wardHp = 2 * ctx.char.level;
-    ctx.char.class_resource_uses = { ...(ctx.char.class_resource_uses ?? {}), arcane_ward: wardHp };
-    ctx.narrative = `${ctx.char.name} creates an Arcane Ward with ${wardHp} HP. It absorbs damage before your HP is reduced.`;
   }
 
   // ── 2024 PHB Cleric: Divine Spark (universal Channel Divinity) ───────────
@@ -876,84 +759,6 @@ export const handleUseClassFeature: ActionHandler<{
     const cuttingRoll = rollDice(`1d${cuttingDie}`);
     ctx.narrative = `${ctx.char.name} — Cutting Words! Subtract ${cuttingRoll} from ${ctx.enemy!.name}'s next attack roll or ability check this round. (${biLeft - 1} Bardic Inspiration remaining)`;
     ctx.st = { ...ctx.st, cutting_words_penalty: cuttingRoll };
-  }
-
-  // ── Archfey Warlock: Fey Presence (PHB p.109) ────────────────────────────
-  else if (fid === 'fey_presence') {
-    if (ctx.char.subclass !== 'archfey' || ctx.char.character_class.toLowerCase() !== 'warlock') {
-      ctx.narrative = 'Only Archfey Warlocks have Fey Presence.';
-      return;
-    }
-    if (ctx.char.class_resource_uses?.fey_presence_used) {
-      ctx.narrative = 'Fey Presence already used — recovers on a short rest.';
-      return;
-    }
-    const selfEnt = ctx.st.entities?.find((e) => e.id === ctx.char.id);
-    if (!selfEnt) {
-      ctx.narrative = 'Fey Presence requires a grid position.';
-      return;
-    }
-    const dc = 8 + profBonus(ctx.char.level) + abilityMod(ctx.char.cha);
-    const inRangeEnemies = (ctx.st.entities ?? []).filter(
-      (e) => e.isEnemy && e.hp > 0 && distanceFeet(e.pos, selfEnt.pos) <= 10
-    );
-    if (inRangeEnemies.length === 0) {
-      ctx.narrative = 'No enemies within 10 ft to ensnare with Fey Presence.';
-      return;
-    }
-    ctx.char.class_resource_uses = {
-      ...(ctx.char.class_resource_uses ?? {}),
-      fey_presence_used: 1,
-    };
-    const lines: string[] = [];
-    const frightenedIds = new Set<string>();
-    for (const e of inRangeEnemies) {
-      const enemyData = getEnemyById(ctx.seed, e.id);
-      const targetName = enemyData?.name ?? e.id;
-      const wisScore = (enemyData as unknown as Record<string, number>)?.wis ?? 10;
-      const save = rollDice('1d20') + abilityMod(wisScore);
-      const feySuccess = save >= dc;
-      ctx.st = pushEvent(ctx.st, {
-        kind: 'save',
-        characterId: e.id,
-        characterName: targetName,
-        ability: 'wis',
-        roll: save,
-        dc,
-        success: feySuccess,
-        vs: 'Fey Presence',
-        round: ctx.st.round ?? 1,
-      });
-      if (!feySuccess) {
-        frightenedIds.add(e.id);
-        lines.push(`${targetName}: WIS ${save} vs DC ${dc} — frightened!`);
-        ctx.st = pushEvent(ctx.st, {
-          kind: 'condition_applied',
-          targetId: e.id,
-          targetName,
-          condition: 'frightened',
-          source: 'Fey Presence',
-          round: ctx.st.round ?? 1,
-        });
-      } else {
-        lines.push(`${targetName}: WIS ${save} vs DC ${dc} — resists.`);
-      }
-    }
-    if (frightenedIds.size > 0) {
-      ctx.st = {
-        ...ctx.st,
-        entities: (ctx.st.entities ?? []).map((e) =>
-          frightenedIds.has(e.id)
-            ? {
-                ...e,
-                conditions: [...e.conditions.filter((c) => c !== 'frightened'), 'frightened'],
-              }
-            : e
-        ),
-      };
-    }
-    ctx.narrative = `🌿 Fey Presence! ${ctx.char.name} radiates fey magic. ${lines.join(' ')}`;
-    ctx.usedInitiative = true;
   }
 
   // ── Unknown feature fallthrough ────────────────────────────────────────
