@@ -827,6 +827,87 @@ gameRouter.post('/session/:id/rotate-invite', async (req: Request, res: Response
   }
 });
 
+// Multiplayer — voluntary leave. Non-host participant removes themselves
+// from the session. PCs they owned auto-transfer to the host so no
+// turn-enforcement check ever encounters an orphan owner_user_id.
+//
+// Host can't leave (they'd nuke their own session) — they DELETE the
+// whole session via DELETE /session/:id instead. Rejecting host leaves
+// here also avoids the "transfer PCs to whom?" ambiguity.
+gameRouter.delete('/session/:id/participant', async (req: Request, res: Response) => {
+  const client = await pool.connect();
+  try {
+    const userId = authedUserId(req);
+    await client.query('BEGIN');
+    // Confirm session exists + caller is a participant (not host).
+    const {
+      rows: [row],
+    } = await client.query<SessionRow>('SELECT * FROM game_sessions WHERE id = $1 LIMIT 1', [
+      req.params.id,
+    ]);
+    if (!row) {
+      await client.query('ROLLBACK');
+      res.status(404).json({ error: 'Session not found' });
+      return;
+    }
+    if (row.user_id === userId) {
+      await client.query('ROLLBACK');
+      res.status(400).json({
+        error:
+          'The host cannot leave their own session — delete the session instead, or transfer ownership first (not yet implemented).',
+      });
+      return;
+    }
+    const { rowCount: participantRows } = await client.query(
+      'SELECT 1 FROM session_participants WHERE session_id = $1 AND user_id = $2',
+      [req.params.id, userId]
+    );
+    if (!participantRows) {
+      await client.query('ROLLBACK');
+      res.status(404).json({ error: 'Not a participant of this session.' });
+      return;
+    }
+    // Reassign any PCs the leaver owned to the host so turn enforcement
+    // never sees an orphan owner. Solo invariant restored: every PC ends
+    // up owned by the host after every leave.
+    const state = backfillOwnership(normalizeState(row.state), row.user_id);
+    let mutated = false;
+    const characters = state.characters.map((c) => {
+      if (c.owner_user_id === userId) {
+        mutated = true;
+        return { ...c, owner_user_id: row.user_id };
+      }
+      return c;
+    });
+    if (mutated) {
+      const newState = { ...state, characters };
+      await client.query('UPDATE game_sessions SET state = $1, updated_at = NOW() WHERE id = $2', [
+        JSON.stringify(newState),
+        req.params.id,
+      ]);
+    }
+    await client.query('DELETE FROM session_participants WHERE session_id = $1 AND user_id = $2', [
+      req.params.id,
+      userId,
+    ]);
+    await client.query('COMMIT');
+
+    // Broadcast to anyone still in the room: PCs may have changed
+    // owners, and the participants list shrunk.
+    if (mutated) {
+      const refreshedState = { ...state, characters };
+      broadcastSessionState(row.id, { state: refreshedState });
+    }
+    broadcastParticipantChange(row.id, 'left', { user_id: userId });
+    res.json({ ok: true });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: (err as Error).message });
+  } finally {
+    client.release();
+  }
+});
+
 // Multiplayer — accept an invite token and become a participant of the
 // session it identifies. The token-to-session lookup is the only way
 // for a non-host to surface a session id (game_sessions.invite_token

@@ -166,4 +166,9 @@ export const api = {
         body: JSON.stringify({ character_id, owner_user_id }),
       }
     ),
+
+  // Non-host voluntary leave. Server transfers any PCs the caller
+  // owned to the host before removing the participant row.
+  leaveSession: (sessionId: string) =>
+    req<{ ok: boolean }>(`/game/session/${sessionId}/participant`, { method: 'DELETE' }),
 };

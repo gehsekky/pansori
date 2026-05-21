@@ -28,6 +28,10 @@ interface Props {
   // Called after a successful token rotation so the parent can update
   // its locally-stored session.invite_token without a refetch.
   onTokenRotated?: (newToken: string) => void;
+  // Called after the non-host participant successfully leaves the
+  // session. Parent typically resets game state + redirects to the
+  // session list. Only invoked when isHost === false.
+  onLeave?: () => void;
 }
 
 // Build the shareable URL from the invite token. Same-origin format —
@@ -38,7 +42,15 @@ function buildInviteUrl(token: string): string {
   return url.toString();
 }
 
-function InviteDialog({ sessionId, inviteToken, isHost, state, onClose, onTokenRotated }: Props) {
+function InviteDialog({
+  sessionId,
+  inviteToken,
+  isHost,
+  state,
+  onClose,
+  onTokenRotated,
+  onLeave,
+}: Props) {
   // Local mirror of the token so a successful rotate updates the URL
   // without waiting for a parent re-render.
   const [token, setToken] = useState<string | null>(inviteToken);
@@ -60,6 +72,7 @@ function InviteDialog({ sessionId, inviteToken, isHost, state, onClose, onTokenR
   // Per-character "is the dropdown busy waiting for a response" so the
   // UI doesn't let the host triple-click during a slow assign.
   const [assigning, setAssigning] = useState<Record<string, boolean>>({});
+  const [leaving, setLeaving] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -101,6 +114,25 @@ function InviteDialog({ sessionId, inviteToken, isHost, state, onClose, onTokenR
       setTimeout(() => setCopyStatus('idle'), 2500);
     } finally {
       setRotating(false);
+    }
+  }
+
+  async function handleLeave() {
+    if (
+      !confirm(
+        'Leave this session? Any PCs you control will return to the host. You can rejoin later if the host re-shares the invite link.'
+      )
+    ) {
+      return;
+    }
+    setLeaving(true);
+    try {
+      await api.leaveSession(sessionId);
+      onLeave?.();
+    } catch (e) {
+      const err = e as { error?: string };
+      setParticipantsErr(err?.error ?? 'Leave failed.');
+      setLeaving(false);
     }
   }
 
@@ -238,6 +270,30 @@ function InviteDialog({ sessionId, inviteToken, isHost, state, onClose, onTokenR
                 );
               })}
             </ul>
+          </>
+        )}
+
+        {/* Leave-session — non-host only. The host removes the session
+            entirely via the RESIGN button on the header. PCs the leaver
+            owned auto-transfer to the host on the server side. */}
+        {!isHost && onLeave && (
+          <>
+            <div className={styles.partyMgrDivider} aria-hidden="true" />
+            <div className={styles.inviteDialogRow}>
+              <p className={styles.inviteDialogHint}>
+                Leave the session. Any PCs you control return to the host; you can rejoin later from
+                the invite link.
+              </p>
+              <button
+                type="button"
+                className={styles.ghostBtn}
+                onClick={handleLeave}
+                disabled={leaving}
+                data-testid="leave-session-btn"
+              >
+                {leaving ? 'Leaving…' : 'Leave session'}
+              </button>
+            </div>
           </>
         )}
       </div>
