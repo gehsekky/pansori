@@ -157,7 +157,11 @@ export type StructuredAction =
   | { type: 'select_subclass'; subclass: string }
   | { type: 'prepare_spells'; spellIds: string[] }
   | { type: 'resolve_reaction'; accept: boolean }
-  // Out-of-combat only: switch active PC. No-op in combat.
+  // Out-of-combat only: switch which PC is the "lead" / active character
+  // for subsequent narrative attribution + skill checks. RAW has no
+  // notion of initiative outside combat — the party operates as a unit
+  // — so the player picks whose voice drives the next interaction.
+  // No-op in combat: initiative is driven by the initiative_order.
   | { type: 'set_active_character'; characterId: string };
 
 // ─── Choice metadata (drives FE rendering) ───────────────────────────
@@ -201,10 +205,11 @@ export interface GameChoice {
     targetEnemyId?: string;
     rangeKind?: 'self' | 'touch' | 'ranged';
   };
-  // Stable key for "this choice has been used this adventure." When set
-  // and present in GameState.seen_choices, the FE dims the button. The
-  // backend disambiguates by room/npc/object so distinct-but-similar
-  // choices (two different "Inspect Dirty Chest") get distinct keys.
+  // Stable key for "this choice has already been used this adventure."
+  // When set and the key appears in GameState.seen_choices, the FE dims
+  // the button. The backend disambiguates by room / npc / object instance
+  // so e.g. two different "Inspect Dirty Chest" objects get distinct keys.
+  // Absent on choices that don't benefit from dimming (movement, combat).
   seenKey?: string;
 }
 
@@ -287,9 +292,15 @@ export type GameConsequence =
   | { type: 'set_faction_rep'; factionId: string; delta: number }
   | { type: 'travel_to'; locationId: string }
   | { type: 'give_gold'; amount: number }
+  // Split `amount` XP evenly across all living party members (rounded
+  // down). Used for quest completion so the engine can level up the
+  // party at milestones rather than only through enemy kills.
   | { type: 'give_xp'; amount: number }
   | { type: 'set_npc_attitude'; npcId: string; attitude: NpcAttitude }
-  // Remove one instance of itemId from the party's inventory.
+  // Remove one instance of itemId from the party's inventory (any
+  // member who carries it). Used for quest turn-ins like the Guild
+  // Ledger — when the player hands over a quest item, it should leave
+  // their pack.
   | { type: 'consume_item'; itemId: string };
 
 // ─── Room objects + NPCs ─────────────────────────────────────────────
