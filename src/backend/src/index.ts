@@ -14,6 +14,7 @@ import { rateLimit } from 'express-rate-limit';
 import { requireAuth } from './auth/middleware.js';
 import { runMigrations } from './services/migrationRunner.js';
 import session from 'express-session';
+import { setIO } from './services/broadcast.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -25,6 +26,10 @@ app.set('trust proxy', 1);
 const io = new Server(httpServer, {
   cors: { origin: process.env.FRONTEND_URL, credentials: true },
 });
+
+// Stash the io instance in the broadcast module so route handlers can
+// emit to session rooms without a circular import.
+setIO(io);
 
 // Security headers (helmet) — applied before any route handler so every
 // response carries reasonable defaults: X-Content-Type-Options, X-Frame-
@@ -133,15 +138,15 @@ io.on('connection', (socket) => {
     }
     try {
       const { rowCount } = await pool.query(
-        'SELECT 1 FROM game_sessions WHERE id = $1 AND user_id = $2',
+        'SELECT 1 FROM session_participants WHERE session_id = $1 AND user_id = $2',
         [sessionId, userId]
       );
       if (!rowCount) {
-        console.log(`Socket ${socket.id} rejected join (not session owner)`);
+        console.log(`Socket ${socket.id} rejected join (not a participant)`);
         return;
       }
     } catch (err) {
-      console.error('[socket] join-session ownership check failed:', err);
+      console.error('[socket] join-session participant check failed:', err);
       return;
     }
     socket.join(`session:${sessionId}`);

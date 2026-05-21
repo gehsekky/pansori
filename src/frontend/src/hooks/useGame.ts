@@ -7,7 +7,8 @@ import type {
   StructuredAction,
 } from '../types.ts';
 import { type CharacterInput, api } from '../lib/api.ts';
-import { useState } from 'react';
+import { type Socket, io as socketIO } from 'socket.io-client';
+import { useEffect, useRef, useState } from 'react';
 
 type HistoryEntry = { role: 'user' | 'assistant'; content: string };
 
@@ -41,6 +42,46 @@ export function useGame(): UseGameReturn {
   const [loading, setLoading] = useState(false);
   const [escaped, setEscaped] = useState(false);
   const [roomLog, setRoomLog] = useState<string[]>([]);
+
+  // Socket.IO subscription per session. When session.id changes (new
+  // session created, resumed, or reset), tear down the previous socket
+  // and open a fresh one. Server emits `state` after every successful
+  // takeAction; we replace local state on receipt. The participant who
+  // initiated the action gets the broadcast too — same data as the
+  // REST response, applied idempotently (setState with the same shape
+  // is a no-op render).
+  const socketRef = useRef<Socket | null>(null);
+  useEffect(() => {
+    if (!session?.id) return;
+    // Default to same-origin in dev (Vite proxies WS); honor an explicit
+    // VITE_SOCKET_URL override for staging/production where the API is
+    // on a different host than the SPA.
+    const url = import.meta.env.VITE_SOCKET_URL ?? window.location.origin;
+    const socket = socketIO(url, {
+      withCredentials: true,
+      // Long-poll fallback ensures the socket works behind tighter
+      // proxies that drop the WebSocket upgrade; cost is one extra
+      // round-trip on first connection.
+      transports: ['websocket', 'polling'],
+    });
+    socketRef.current = socket;
+    socket.on('connect', () => {
+      socket.emit('join-session', session.id);
+    });
+    socket.on('state', (payload: { state: GameState; narrative?: string }) => {
+      // The server emits the full post-action state. Replace
+      // wholesale — partial diffing isn't worth the complexity for
+      // the once-per-action cadence we get from D&D rounds.
+      setGameState(payload.state);
+      setChoices(payload.state.last_choices ?? []);
+      setRoomLog(payload.state.room_log ?? []);
+      if (payload.state.flags?._rule_escape) setEscaped(true);
+    });
+    return () => {
+      socket.disconnect();
+      socketRef.current = null;
+    };
+  }, [session?.id]);
 
   async function handleNewGame(characters: CharacterInput[], contextId: string) {
     setLoading(true);
