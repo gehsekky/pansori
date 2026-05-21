@@ -1,12 +1,21 @@
 import {
   ActionSchema,
+  AssignCharacterSchema,
   DropSchema,
   EquipSchema,
+  JoinSessionSchema,
   NewSessionSchema,
   TransferSchema,
   parseBody,
 } from './schemas.js';
-import type { CampaignFacts, Character, Context, GameState, StructuredAction } from '../types.js';
+import type {
+  CampaignFacts,
+  Character,
+  Context,
+  GameState,
+  Seed,
+  StructuredAction,
+} from '../types.js';
 import {
   FRESH_TURN,
   canDonArmor,
@@ -58,6 +67,44 @@ function authedUserId(req: Request): string {
   return (req as AuthedRequest).user.id;
 }
 
+// Shape of a row in the game_sessions table — the columns the route
+// handlers actually read off the pool.query result. Kept narrow on
+// purpose; if a new column needs reading, add it here so all callers
+// get typed access.
+interface SessionRow {
+  id: string;
+  user_id: string;
+  status: string;
+  state: Record<string, unknown>;
+  seed: Seed;
+  invite_token: string | null;
+  campaign_state_id: string | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+// Fetch a session row IFF the requesting user is a participant. Returns null
+// if the session doesn't exist OR the user isn't in session_participants.
+// Returning 404 on "not a participant" mirrors the pre-MP behavior — we
+// don't differentiate "session doesn't exist" from "you can't see it" so
+// random session ids don't leak existence.
+async function fetchSessionForParticipant(
+  sessionId: string | string[] | undefined,
+  userId: string
+): Promise<SessionRow | null> {
+  if (typeof sessionId !== 'string') return null;
+  const { rows } = await pool.query<SessionRow>(
+    `SELECT gs.*
+       FROM game_sessions gs
+       INNER JOIN session_participants sp
+         ON sp.session_id = gs.id AND sp.user_id = $2
+      WHERE gs.id = $1
+      LIMIT 1`,
+    [sessionId, userId]
+  );
+  return rows[0] ?? null;
+}
+
 function defaultWeaponMasteriesFor(charClass: string): string[] {
   const map: Record<string, string[]> = {
     Fighter: ['longsword', 'shortbow', 'greataxe'],
@@ -93,20 +140,15 @@ gameRouter.get('/contexts', (_req, res) => {
   res.json(list);
 });
 
-// Get a specific session by ID (must belong to the requesting user)
+// Get a specific session by ID (must be a participant)
 gameRouter.get('/session/:id', async (req: Request, res: Response) => {
   try {
-    const userId = authedUserId(req);
-    const { rows } = await pool.query(
-      'SELECT * FROM game_sessions WHERE id = $1 AND user_id = $2',
-      [req.params.id, userId]
-    );
-    if (!rows[0]) {
+    const row = await fetchSessionForParticipant(req.params.id, authedUserId(req));
+    if (!row) {
       res.status(404).json({ error: 'Session not found' });
       return;
     }
-    const row = rows[0];
-    const ctxId: string | undefined = row.seed?.context_id;
+    const ctxId = row.seed?.context_id;
     const ctx = ctxId ? CONTEXTS[ctxId] : undefined;
     res.json({ ...row, campaignMeta: campaignMetaFor(ctx) });
   } catch (err) {
@@ -114,22 +156,26 @@ gameRouter.get('/session/:id', async (req: Request, res: Response) => {
   }
 });
 
-// List all sessions for the current user. Leader display info + party size
-// are derived from the JSONB state at read time — no denormalized columns.
+// List all sessions the user is participating in. Was "where I'm the host" —
+// now "where I have a session_participants row." For solo mode the host
+// always has a row (migration 010 backfilled it), so this is a strict
+// superset of the old behavior.
 gameRouter.get('/sessions', async (req: Request, res: Response) => {
   try {
     const { rows } = await pool.query(
-      `SELECT id,
-              status,
-              seed->>'context_id' AS context_id,
-              state->'characters'->0->>'name' AS character_name,
-              state->'characters'->0->>'character_class' AS character_class,
-              state->'characters'->0->>'portrait_url' AS portrait_url,
-              jsonb_array_length(COALESCE(state->'characters', '[]'::jsonb)) AS party_size,
-              created_at, updated_at
-       FROM game_sessions
-       WHERE user_id = $1
-       ORDER BY updated_at DESC`,
+      `SELECT gs.id,
+              gs.status,
+              gs.seed->>'context_id' AS context_id,
+              gs.state->'characters'->0->>'name' AS character_name,
+              gs.state->'characters'->0->>'character_class' AS character_class,
+              gs.state->'characters'->0->>'portrait_url' AS portrait_url,
+              jsonb_array_length(COALESCE(gs.state->'characters', '[]'::jsonb)) AS party_size,
+              gs.user_id AS host_user_id,
+              gs.created_at, gs.updated_at
+         FROM game_sessions gs
+         INNER JOIN session_participants sp
+           ON sp.session_id = gs.id AND sp.user_id = $1
+        ORDER BY gs.updated_at DESC`,
       [authedUserId(req)]
     );
     res.json(rows);
@@ -138,7 +184,11 @@ gameRouter.get('/sessions', async (req: Request, res: Response) => {
   }
 });
 
-// Delete a single session (must belong to the requesting user)
+// Delete a single session — HOST-ONLY. Participants can't delete each
+// other's sessions; that's a destructive operation reserved for the
+// session creator. A non-host participant who wants out should use
+// the leave endpoint (PR 4) which removes their session_participants
+// row without deleting the session for everyone else.
 gameRouter.delete('/session/:id', async (req: Request, res: Response) => {
   try {
     const { rowCount } = await pool.query(
@@ -413,18 +463,14 @@ gameRouter.post('/session/:id/equip', async (req: Request, res: Response) => {
   if (!parsed) return;
   const { item_id, character_id } = parsed;
   try {
-    const {
-      rows: [row],
-    } = await pool.query('SELECT * FROM game_sessions WHERE id = $1 AND user_id = $2', [
-      req.params.id,
-      authedUserId(req),
-    ]);
+    const userId = authedUserId(req);
+    const row = await fetchSessionForParticipant(req.params.id, userId);
     if (!row) {
       res.status(404).json({ error: 'Session not found' });
       return;
     }
 
-    const ctx = CONTEXTS[row.seed.context_id] ?? DEFAULT_CONTEXT;
+    const ctx = CONTEXTS[row.seed.context_id ?? ''] ?? DEFAULT_CONTEXT;
     const state = backfillOwnership(normalizeState(row.state), row.user_id);
 
     // Resolve target character
@@ -432,6 +478,17 @@ gameRouter.post('/session/:id/equip', async (req: Request, res: Response) => {
     const charIdx = state.characters.findIndex((c) => c.id === targetId);
     if (charIdx < 0) {
       res.status(400).json({ error: 'Character not found in session' });
+      return;
+    }
+
+    // Owner check: only the PC's owner can equip/unequip on it. Equipment
+    // is a mechanical decision that affects how the engine resolves
+    // subsequent actions; another participant shouldn't be able to flip
+    // a friend's gear mid-session.
+    if (state.characters[charIdx].owner_user_id !== userId) {
+      res.status(403).json({
+        error: `Only ${state.characters[charIdx].name}'s player can change their equipment.`,
+      });
       return;
     }
 
@@ -528,12 +585,8 @@ gameRouter.post('/session/:id/transfer', async (req: Request, res: Response) => 
     return;
   }
   try {
-    const {
-      rows: [row],
-    } = await pool.query('SELECT * FROM game_sessions WHERE id = $1 AND user_id = $2', [
-      req.params.id,
-      authedUserId(req),
-    ]);
+    const userId = authedUserId(req);
+    const row = await fetchSessionForParticipant(req.params.id, userId);
     if (!row) {
       res.status(404).json({ error: 'Session not found' });
       return;
@@ -549,6 +602,16 @@ gameRouter.post('/session/:id/transfer', async (req: Request, res: Response) => 
     const toChar = state.characters[toIdx];
     if (fromChar.dead || toChar.dead) {
       res.status(409).json({ error: 'Cannot transfer to or from a dead character' });
+      return;
+    }
+    // Owner check on the SOURCE PC only. Transfer is semantically "I give
+    // you my X" — the source's owner is the one initiating. Taking from
+    // another player's PC isn't allowed; if they want to give you their
+    // item, they initiate the transfer.
+    if (fromChar.owner_user_id !== userId) {
+      res.status(403).json({
+        error: `Only ${fromChar.name}'s player can transfer items from their inventory.`,
+      });
       return;
     }
     const item = fromChar.inventory.find((i) => i.instance_id === item_instance_id);
@@ -599,12 +662,8 @@ gameRouter.post('/session/:id/drop', async (req: Request, res: Response) => {
   if (!parsed) return;
   const { item_instance_id, character_id } = parsed;
   try {
-    const {
-      rows: [row],
-    } = await pool.query('SELECT * FROM game_sessions WHERE id = $1 AND user_id = $2', [
-      req.params.id,
-      authedUserId(req),
-    ]);
+    const userId = authedUserId(req);
+    const row = await fetchSessionForParticipant(req.params.id, userId);
     if (!row) {
       res.status(404).json({ error: 'Session not found' });
       return;
@@ -616,6 +675,12 @@ gameRouter.post('/session/:id/drop', async (req: Request, res: Response) => {
       return;
     }
     const char = state.characters[charIdx];
+    if (char.owner_user_id !== userId) {
+      res.status(403).json({
+        error: `Only ${char.name}'s player can drop items from their inventory.`,
+      });
+      return;
+    }
     if (!char.inventory.find((i) => i.instance_id === item_instance_id)) {
       res.status(400).json({ error: 'Item not found in character inventory' });
       return;
@@ -643,18 +708,102 @@ gameRouter.post('/session/:id/drop', async (req: Request, res: Response) => {
 });
 
 // Take a game action
+// Multiplayer — host reassigns which user owns a given PC. Lets the host
+// hand a PC to a participant via the participants modal (PR 4). Updates
+// state.characters[i].owner_user_id in the JSONB blob; the next read
+// (any subsequent normalizeState pass) surfaces the new owner.
+gameRouter.post('/session/:id/assign-character', async (req: Request, res: Response) => {
+  const parsed = parseBody(req, res, AssignCharacterSchema);
+  if (!parsed) return;
+  const { character_id, owner_user_id: newOwner } = parsed;
+  try {
+    const userId = authedUserId(req);
+    // Host-only: confirm the requester is the session's user_id (not
+    // just any participant). A non-host participant can't reassign
+    // ownership — keeps the host as the single point of authority
+    // over party composition.
+    const { rows } = await pool.query(
+      'SELECT * FROM game_sessions WHERE id = $1 AND user_id = $2',
+      [req.params.id, userId]
+    );
+    const row = rows[0];
+    if (!row) {
+      res.status(404).json({ error: 'Session not found or you are not the host.' });
+      return;
+    }
+    // The new owner must be a participant of this session (host
+    // can't assign a PC to a user who hasn't joined). Defends
+    // against the host typo'ing a random uuid.
+    const { rowCount: participantRows } = await pool.query(
+      'SELECT 1 FROM session_participants WHERE session_id = $1 AND user_id = $2',
+      [req.params.id, newOwner]
+    );
+    if (!participantRows) {
+      res.status(400).json({ error: 'Target user is not a participant of this session.' });
+      return;
+    }
+    const state = backfillOwnership(normalizeState(row.state), row.user_id);
+    const charIdx = state.characters.findIndex((c) => c.id === character_id);
+    if (charIdx < 0) {
+      res.status(400).json({ error: 'Character not found in session.' });
+      return;
+    }
+    const newState: GameState = {
+      ...state,
+      characters: state.characters.map((c, i) =>
+        i === charIdx ? { ...c, owner_user_id: newOwner } : c
+      ),
+    };
+    await pool.query('UPDATE game_sessions SET state = $1, updated_at = NOW() WHERE id = $2', [
+      JSON.stringify(newState),
+      req.params.id,
+    ]);
+    res.json({ ok: true, character_id, owner_user_id: newOwner });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// Multiplayer — accept an invite token and become a participant of the
+// session it identifies. The token-to-session lookup is the only way
+// for a non-host to surface a session id (game_sessions.invite_token
+// is indexed for this). Idempotent — re-joining is a no-op via
+// ON CONFLICT.
+gameRouter.post('/session/join', async (req: Request, res: Response) => {
+  const parsed = parseBody(req, res, JoinSessionSchema);
+  if (!parsed) return;
+  const { invite_token } = parsed;
+  try {
+    const userId = authedUserId(req);
+    const { rows } = await pool.query(
+      'SELECT id, user_id FROM game_sessions WHERE invite_token = $1 LIMIT 1',
+      [invite_token]
+    );
+    const session = rows[0];
+    if (!session) {
+      res.status(404).json({ error: 'Invite link is invalid or expired.' });
+      return;
+    }
+    await pool.query(
+      `INSERT INTO session_participants (session_id, user_id, role)
+       VALUES ($1, $2, 'pc')
+       ON CONFLICT (session_id, user_id) DO NOTHING`,
+      [session.id, userId]
+    );
+    res.json({ ok: true, session_id: session.id });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
 gameRouter.post('/session/:id/action', async (req: Request, res: Response) => {
   const parsed = parseBody(req, res, ActionSchema);
   if (!parsed) return;
   const action = parsed.action as StructuredAction;
   const history = parsed.history;
   try {
-    const {
-      rows: [row],
-    } = await pool.query('SELECT * FROM game_sessions WHERE id = $1 AND user_id = $2', [
-      req.params.id,
-      authedUserId(req),
-    ]);
+    const userId = authedUserId(req);
+    const row = await fetchSessionForParticipant(req.params.id, userId);
     if (!row) {
       res.status(404).json({ error: 'Session not found' });
       return;
@@ -668,8 +817,35 @@ gameRouter.post('/session/:id/action', async (req: Request, res: Response) => {
       return;
     }
 
-    const ctx = CONTEXTS[row.seed.context_id] ?? DEFAULT_CONTEXT;
+    const ctx = CONTEXTS[row.seed.context_id ?? ''] ?? DEFAULT_CONTEXT;
     let state = backfillOwnership(normalizeState(row.state), row.user_id);
+
+    // Turn enforcement. Two cases:
+    //   (a) A reaction window is open — the requester must own one of
+    //       the eligible PCs (Shield, Counterspell, Hellish Rebuke).
+    //   (b) Normal flow — the requester must own the active character.
+    // In solo mode every PC is owned by the host so this never rejects.
+    const pending = state.pending_reaction;
+    if (pending && pending.eligibleCharIds.length > 0) {
+      const ownsEligible = pending.eligibleCharIds.some((cid) => {
+        const c = state.characters.find((ch) => ch.id === cid);
+        return c?.owner_user_id === userId;
+      });
+      if (!ownsEligible) {
+        res.status(403).json({
+          error: 'Reaction window is open — wait for another player to resolve it.',
+        });
+        return;
+      }
+    } else {
+      const active = state.characters.find((c) => c.id === state.active_character_id);
+      if (active && active.owner_user_id && active.owner_user_id !== userId) {
+        res.status(403).json({
+          error: `Not your turn — ${active.name} is acting.`,
+        });
+        return;
+      }
+    }
 
     // For campaign sessions, load and merge persisted campaign state
     let campaignState = null;
