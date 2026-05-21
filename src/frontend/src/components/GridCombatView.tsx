@@ -106,6 +106,32 @@ function GridCombatView({
     for (const e of list) enemyLookup.set(e.id, { name: e.name, ac: e.ac });
   }
 
+  // Last-attacker arrows — pluck the most recent attack events from
+  // combat_log and render an arrow from each attacker's cell to its
+  // target's cell. Drawn as an SVG overlay on top of the board. Fades
+  // older events; solid for hits, dashed for misses. Helps players track
+  // multi-attacker rounds without rescanning the combat log.
+  const RECENT_ATTACK_LIMIT = 3;
+  const recentAttacks = (() => {
+    const log = state.combat_log ?? [];
+    const out: Array<{ from: GridPos; to: GridPos; hit: boolean; index: number }> = [];
+    for (let i = log.length - 1; i >= 0 && out.length < RECENT_ATTACK_LIMIT; i--) {
+      const ev = log[i];
+      if (ev.kind !== 'attack_hit' && ev.kind !== 'attack_miss') continue;
+      const attacker = entities.find((e) => e.id === ev.attackerId);
+      const target = entities.find((e) => e.id === ev.targetId);
+      if (!attacker || !target) continue;
+      if (attacker.pos.x === target.pos.x && attacker.pos.y === target.pos.y) continue;
+      out.push({
+        from: attacker.pos,
+        to: target.pos,
+        hit: ev.kind === 'attack_hit',
+        index: out.length,
+      });
+    }
+    return out;
+  })();
+
   // ── Lighting / fog-of-war (SRD 5.2.1 p.11 Vision and Light) ──────────────
   // Determine the current room's ambient lighting from the seed. Default
   // 'bright' (no fog of war) when unspecified.
@@ -449,14 +475,92 @@ function GridCombatView({
           {lightingNote}
         </span>
       </div>
-      <div
-        className={styles.gridBoard}
-        style={{
-          gridTemplateColumns: `repeat(${gridWidth}, ${CELL_PX}px)`,
-          gridTemplateRows: `repeat(${gridHeight}, ${CELL_PX}px)`,
-        }}
-      >
-        {cells}
+      <div className={styles.gridBoardWrap}>
+        <div
+          className={styles.gridBoard}
+          style={{
+            gridTemplateColumns: `repeat(${gridWidth}, ${CELL_PX}px)`,
+            gridTemplateRows: `repeat(${gridHeight}, ${CELL_PX}px)`,
+          }}
+        >
+          {cells}
+        </div>
+        {recentAttacks.length > 0 &&
+          (() => {
+            // Cells gap of 1px between each, plus 1px outer padding.
+            // Center of cell (x, y) = 1 + x*(32+1) + 16 = 17 + x*33.
+            const STRIDE = CELL_PX + 1;
+            const OFFSET = 1 + CELL_PX / 2;
+            const boardW = gridWidth * STRIDE + 1;
+            const boardH = gridHeight * STRIDE + 1;
+            return (
+              <svg
+                className={styles.gridArrows}
+                width={boardW}
+                height={boardH}
+                viewBox={`0 0 ${boardW} ${boardH}`}
+                aria-hidden="true"
+              >
+                <defs>
+                  <marker
+                    id="grid-arrow-hit"
+                    viewBox="0 0 10 10"
+                    refX="9"
+                    refY="5"
+                    markerWidth="6"
+                    markerHeight="6"
+                    orient="auto-start-reverse"
+                  >
+                    <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--t-hp-low)" />
+                  </marker>
+                  <marker
+                    id="grid-arrow-miss"
+                    viewBox="0 0 10 10"
+                    refX="9"
+                    refY="5"
+                    markerWidth="6"
+                    markerHeight="6"
+                    orient="auto-start-reverse"
+                  >
+                    <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--t-mid)" />
+                  </marker>
+                </defs>
+                {recentAttacks.map((a, i) => {
+                  const fromX = OFFSET + a.from.x * STRIDE;
+                  const fromY = OFFSET + a.from.y * STRIDE;
+                  const toX = OFFSET + a.to.x * STRIDE;
+                  const toY = OFFSET + a.to.y * STRIDE;
+                  // Pull line endpoints in slightly so they don't end at
+                  // the dead center of the token (which obscures it).
+                  const dx = toX - fromX;
+                  const dy = toY - fromY;
+                  const len = Math.hypot(dx, dy);
+                  const inset = 10;
+                  const ux = dx / len;
+                  const uy = dy / len;
+                  const sx = fromX + ux * inset;
+                  const sy = fromY + uy * inset;
+                  const ex = toX - ux * inset;
+                  const ey = toY - uy * inset;
+                  const opacity = 1 - a.index * 0.3;
+                  return (
+                    <line
+                      key={i}
+                      x1={sx}
+                      y1={sy}
+                      x2={ex}
+                      y2={ey}
+                      stroke={a.hit ? 'var(--t-hp-low)' : 'var(--t-mid)'}
+                      strokeWidth={2}
+                      strokeDasharray={a.hit ? undefined : '4 3'}
+                      opacity={opacity}
+                      markerEnd={`url(#grid-arrow-${a.hit ? 'hit' : 'miss'})`}
+                    />
+                  );
+                })}
+              </svg>
+            );
+          })()}
       </div>
       <div className={styles.gridLegend}>
         <span>

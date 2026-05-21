@@ -627,6 +627,31 @@
   min-width: 0;
 }
 
+/* Combat row — battlefield grid (left) sits beside the action UI (right) so
+   the player can read the map and pick a choice without scanning across the
+   page. Falls back to a single column on narrow viewports so the grid keeps
+   its natural width and the choices stack below. */
+.combatRow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: start;
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .combatRow {
+    grid-template-columns: 1fr;
+  }
+}
+
+.combatActionCol {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
 /* Party rail (left column) — vertical stack of character tiles. */
 .partyRail {
   display: flex;
@@ -1060,12 +1085,27 @@
   color: var(--t-dim);
 }
 
+/* Relative wrapper so the SVG arrow overlay can absolutely-position itself
+   above the cell grid without affecting layout. */
+.gridBoardWrap {
+  position: relative;
+  width: fit-content;
+}
+
 .gridBoard {
   display: grid;
   gap: 1px;
   background: var(--t-separator);
   padding: 1px;
   width: fit-content;
+}
+
+/* Last-attacker arrows — sit on top of the board, never intercept clicks. */
+.gridArrows {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
 }
 
 .gridCell {
