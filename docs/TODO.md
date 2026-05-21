@@ -87,20 +87,17 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 > the gaps the survey found; manual screen-reader + keyboard-only
 > validation is the next step.
 
-### Critical — likely WCAG fails
+### Shipped 2026-05-21
+- [x] **Skip-to-main link** — `<a href="#main-content">` becomes visible-on-focus, lands keyboard users past the header on `<main id="main-content">`. WCAG 2.4.1.
+- [x] **CharScreen label htmlFor** — name / class / subclass / species / background fields now use `htmlFor` + matching `id={\`char-${idx}-X\`}` so SR announces the field name on focus.
+- [x] **Player avatar meaningful alt** — PartyRail / InventoryModal / SessionScreen portraits now read `"${name}'s portrait"` (was `alt=""`). User's own header avatar stays `alt=""` since the name is in adjacent text.
+- [x] **`.choiceBtnSeen` contrast** — was `opacity:0.45` + `--t-dim` ≈ 1.86:1 (WCAG AA fail). Now `opacity:0.7` + `--t-mid` ≈ 4.75:1 (passes). Hover restores full color.
+- [x] **MoveDPad keyboard navigation** — WAI-ARIA Composite Widget pattern: roving tabindex (one focused cell at a time), arrow keys move focus spatially, arrow keys skip past disabled cells. 3 spec assertions cover the behavior.
 
-- [ ] **CharScreen labels not associated with inputs** — every `<label className={styles.formLbl}>` lacks `htmlFor`; matching `<input>` / `<select>` lacks `id`. Screen readers won't announce the label when the field is focused. Fix: add stable ids per draft index, wire `htmlFor`. ~30 min.
-- [ ] **`.choiceBtnSeen` contrast** — dimmed choices use `opacity: 0.45` + `color: var(--t-dim)` (≈ `#7e7e7e` over `#0a0a0a`). The opacity reduction drops effective contrast below the WCAG AA 4.5:1 threshold. Verify with a contrast checker; if it fails, drop opacity to ~0.65 OR use a dedicated muted-but-readable color instead of stacking opacity on top of `--t-dim`. ~20 min.
-
-### Important
-
-- [ ] **Skip-to-main link** — no way for keyboard users to bypass the header (ABORT/RESIGN, SIGN OUT, portrait, party rail) and jump straight to the action area. Add an invisible-until-focused `<a href="#main">Skip to main content</a>` + `id="main"` on `<main className={styles.gameLayout}>`. ~10 min.
-- [ ] **Player avatar `alt=""` is overly terse for SR** — `<img alt="">` on portrait images marks them decorative, but the SR has no way to know which character is which when the visual portrait is the only differentiator. Consider `alt={\`${char.name}'s portrait\`}` on PartyRail/InventoryModal/SessionScreen and `alt=""` only on the user's avatar pill.
-
-### Polish
-
-- [ ] **MoveDPad arrow-key nav** — the 3×3 D-pad uses 9 sibling buttons; pressing Tab moves through each. WASD or arrow-key navigation across the grid would match the visual mental model. Add a `roving tabindex` + arrow-key handler on the dpad container.
-- [ ] **HP / condition live-region updates** — the combat narrative has `aria-live="polite"` so SR users hear what happened, but HP-bar fills and condition badges update silently. An off-screen `aria-live` summary of the most recent delta (`Fighter HP 18, conditions: frightened`) would help SR users track state without re-listening to the full narrative.
+### Remaining
+- [ ] **fieldset/legend on grouped form controls** — CharScreen's `PORTRAIT` and `ABILITY SCORES` "labels" are group descriptors (govern multiple buttons) but use plain `<label>` without an `htmlFor`. The right HTML is `<fieldset><legend>` (or `<div role="group" aria-labelledby="...">`). Larger refactor than the simple-label htmlFor pass already shipped.
+- [ ] **HP / condition live-region updates** — the combat narrative has `aria-live="polite"` so SR users hear what happened, but HP-bar fills and condition badges update silently. An off-screen `aria-live` summary of the most recent delta (`Fighter HP 18, conditions: frightened`) would help SR users track state without re-listening to the full narrative. Needs UX tuning on when to announce vs. when to stay quiet.
+- [ ] **Manual SR + keyboard-only validation** — code survey done; next step is exercising the app with VoiceOver / NVDA / JAWS and Tab-only to find the things the code review missed.
 
 ---
 
@@ -114,20 +111,15 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 > tenant model masks several issues that will bite when session_participants
 > lands.
 
-### Critical — fix before launch
+### Shipped 2026-05-21
+- [x] **SESSION_SECRET fail-fast** — was `?? 'change-me-in-production'`. Now boot throws if env is missing — refuses to accept requests against a known-secret session signing key.
+- [x] **Rate limit on `/api/game/*`** — 120 req/min `gameLimiter` sits after `requireAuth` and before `gameRouter`. Throttles takeAction spam without affecting normal play.
+- [x] **Socket.IO `join-session` ownership check** — session middleware is now shared between Express and `io.engine.use(...)`. Before joining a session's room, we read `req.session.passport.user` and run a `SELECT 1 FROM game_sessions WHERE id = $1 AND user_id = $2`. Single-tenant today; will broaden via `session_participants` when multiplayer lands.
 
-- [ ] **`SESSION_SECRET` fallback should fail-fast** — `process.env.SESSION_SECRET ?? 'change-me-in-production'` (`src/backend/src/index.ts:48`) silently boots prod with a known string if the env var is missing. Predictable secret = forgeable sessions = full auth bypass. Replace fallback with `if (!process.env.SESSION_SECRET) throw new Error(...)`. ~5 min.
-- [ ] **No CSRF protection on state-changing endpoints** — cookies use `sameSite: 'none'` in prod (required for cross-origin SPA + API), so the browser sends the session cookie on cross-origin POSTs. A malicious site could trigger `POST /api/game/session/:id/action` via a logged-in user. Options: (a) tighten to `sameSite: 'lax'` if cross-origin isn't actually needed — confirm the prod FE + API domain layout; (b) add a double-submit CSRF token; (c) require a custom header like `X-Requested-With: XMLHttpRequest` (lightweight but defense-in-depth only). Needs design call before implementation.
-- [ ] **Socket.IO `join-session` has no auth check** — `socket.on('join-session', sessionId => socket.join(\`session:${sessionId}\`))` in `src/backend/src/index.ts:94` lets any connected socket subscribe to any session's events. Currently no event broadcasts happen so the impact is zero, but the moment multiplayer wires state broadcasts (already in the TODO), this becomes a live-state leak. Fix: read the session cookie off the upgrade request, look up the user, verify they own the session before allowing the join. ~30 min once a session-cookie parser is shared between the express and socket sides.
-
-### Important
-
-- [ ] **No rate limit on `/api/game/*`** — only `/api/auth` has rate-limit middleware. A misbehaving client (or DOS) could spam `takeAction` to drain LLM budget, fill the run_log, or grind the server. Add a separate `gameLimiter` with a generous limit (~120 req/min per user). ~15 min.
+### Remaining
+- [ ] **No CSRF protection on state-changing endpoints** — cookies use `sameSite: 'none'` in prod (required for cross-origin SPA + API), so the browser sends the session cookie on cross-origin POSTs. A malicious site could trigger `POST /api/game/session/:id/action` via a logged-in user. Options: (a) tighten to `sameSite: 'lax'` if cross-origin isn't actually needed — confirm the prod FE + API domain layout; (b) add a double-submit CSRF token; (c) require a custom header like `X-Requested-With: XMLHttpRequest` (lightweight but defense-in-depth only). **Needs design call before implementation.**
 - [ ] **Multiplayer: session ownership + turn enforcement** (already in main TODO) — `game_sessions.user_id` is single-tenant; `takeAction` doesn't verify `req.user.id === characters[active].owner_user_id`. Documented above under Multiplayer; flagged here so the security pass references it.
 - [ ] **`npm audit` in CI** — no automated dependency-vuln check. Add a job to PR builds that fails on `high` or `critical`. ~15 min YAML edit; ongoing maintenance to triage findings.
-
-### Polish
-
 - [ ] **CSP for any future HTML-serving paths** — helmet's CSP is disabled (`contentSecurityPolicy: false`) because the API doesn't return HTML. If we ever serve uploaded files or generated images directly, re-enable CSP with a tight `script-src 'self'` policy.
 - [ ] **Session fixation protection** — `express-session` doesn't rotate the session id on login. Passport regenerates by default but worth confirming. Tested by logging in, copying the cookie, logging out, logging in again — should produce a new cookie.
 
