@@ -10136,6 +10136,109 @@ describe('travel updates current_room to destination central room', () => {
   });
 });
 
+describe('interact_object retry on fail', () => {
+  function buildSearchableSeed(): Seed {
+    return {
+      context_id: ctx.id,
+      world_name: 'Search Test',
+      ship_name: 'Search Test',
+      intro: '',
+      seed_id: 'search-test',
+      rooms: [
+        {
+          id: 'test_room',
+          name: 'Test Room',
+          desc: '',
+          objects: [
+            {
+              id: 'test_chest',
+              name: 'Test Chest',
+              desc: '',
+              interactText: 'You work the lock.',
+              searchable: true,
+              searchDC: 15,
+              lootIds: ['healing_potion'],
+              foundText: 'Inside: a potion!',
+              emptyText: 'The lock resists you. Try again.',
+            },
+          ],
+        },
+      ],
+      connections: { test_room: [] },
+      enemies: {},
+      loot: {},
+      npcs: {},
+    };
+  }
+
+  it('does NOT mark searched on a failed roll (player can retry)', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0); // d20 → 1, always fails DC 15
+    const sd = buildSearchableSeed();
+    const st = makeState({ int: 10 }, { current_room: 'test_room' });
+    const result = await takeAction({
+      action: { type: 'interact_object', objectId: 'test_chest' },
+      history: [],
+      state: st,
+      seed: sd,
+      context: ctx,
+    });
+    // The choice should remain available for a retry.
+    expect(result.newState.objects_searched).toEqual([]);
+    expect(result.narrative).toMatch(/fail/i);
+    expect(result.narrative).toMatch(/try again/i);
+    // No loot granted.
+    expect(result.newState.characters[0].inventory).toHaveLength(0);
+  });
+
+  it('DOES mark searched on success and grants loot', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99); // d20 → 20, beats any DC
+    const sd = buildSearchableSeed();
+    const st = makeState({ int: 10 }, { current_room: 'test_room' });
+    const result = await takeAction({
+      action: { type: 'interact_object', objectId: 'test_chest' },
+      history: [],
+      state: st,
+      seed: sd,
+      context: ctx,
+    });
+    expect(result.newState.objects_searched).toContain('test_room:test_chest');
+    expect(result.narrative).toMatch(/success/i);
+    expect(result.newState.characters[0].inventory.length).toBeGreaterThan(0);
+  });
+
+  it('flavor objects (no DC, no loot) mark searched on first click', async () => {
+    const sd: Seed = {
+      ...buildSearchableSeed(),
+      rooms: [
+        {
+          id: 'test_room',
+          name: 'Test Room',
+          desc: '',
+          objects: [
+            {
+              id: 'painting',
+              name: 'Painting',
+              desc: '',
+              interactText: 'A faded portrait.',
+              // No searchable / no lootIds — pure flavor.
+            },
+          ],
+        },
+      ],
+    };
+    const st = makeState({}, { current_room: 'test_room' });
+    const result = await takeAction({
+      action: { type: 'interact_object', objectId: 'painting' },
+      history: [],
+      state: st,
+      seed: sd,
+      context: ctx,
+    });
+    // Flavor objects still one-shot — repeat clicks add nothing.
+    expect(result.newState.objects_searched).toContain('test_room:painting');
+  });
+});
+
 describe('normalizeState preserves seen_choices', () => {
   it('defaults to empty array when missing on a new-format state', () => {
     const st = makeState();

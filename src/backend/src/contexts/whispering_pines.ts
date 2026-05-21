@@ -866,8 +866,7 @@ export const context: Context = {
             searchDC: 12,
             lootIds: ['elixir_of_warmth'],
             foundText: 'Inside: a wax-stoppered vial. An elixir of warmth.',
-            emptyText:
-              'The locker is empty. Marta must have packed it for the wardens this morning.',
+            emptyText: 'The latch sticks. Brace it properly and try the lock again.',
           },
         ],
       },

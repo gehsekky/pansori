@@ -8462,9 +8462,11 @@ export async function takeAction({
         char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
       }
 
-      st = { ...st, objects_searched: [...(st.objects_searched ?? []), searchKey] };
-
+      // Flavor objects (no DC, no loot) are one-shot — repeating adds
+      // nothing. Mark searched immediately so they drop out of the
+      // choice list.
       if (!obj.searchable || !obj.lootIds?.length) {
+        st = { ...st, objects_searched: [...(st.objects_searched ?? []), searchKey] };
         narrative = obj.interactText;
         break;
       }
@@ -8507,10 +8509,16 @@ export async function takeAction({
         if (gainedIds.length) {
           st = { ...st, loot_taken: [...(st.loot_taken ?? []), ...gainedIds] };
         }
+        // Mark searched only on success — a failed Investigation leaves
+        // the choice alive so the player can retry (each retry costs
+        // one turn). Matches 5e: a lock/search check is normally
+        // re-attemptable. The seenKey written by takeAction still dims
+        // the button so the player sees they've tried it.
+        st = { ...st, objects_searched: [...(st.objects_searched ?? []), searchKey] };
         const foundDesc = obj.foundText ?? `You find: ${gained.join(', ')}.`;
         narrative = `${obj.interactText} (Investigation: ${check.roll}+${abilityMod(char.int)}=${check.total} vs DC ${obj.searchDC ?? 12} — success!) ${foundDesc}`;
       } else {
-        narrative = `${obj.interactText} (Investigation: ${check.roll}+${abilityMod(char.int)}=${check.total} vs DC ${obj.searchDC ?? 12} — fail.) ${obj.emptyText ?? 'You find nothing useful.'}`;
+        narrative = `${obj.interactText} (Investigation: ${check.roll}+${abilityMod(char.int)}=${check.total} vs DC ${obj.searchDC ?? 12} — fail.) ${obj.emptyText ?? 'You can try again.'}`;
       }
       break;
     }
