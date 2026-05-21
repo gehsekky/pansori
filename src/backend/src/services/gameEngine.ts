@@ -59,6 +59,7 @@ import type {
   Trap,
   TurnActions,
 } from '../types.js';
+import { type ActionContext, dispatchAction } from './actions/index.js';
 import { BEAST_FORMS, SRD_SPECIES, availableBeastForms } from '../contexts/srd/index.js';
 import {
   DEFAULT_SPEED_FEET,
@@ -4317,682 +4318,424 @@ export async function takeAction({
     };
   }
 
-  switch (action.type) {
-    case 'move': {
-      const target = seed.rooms.find((r) => r.id === action.roomId);
-      if (!target || !adjacent.find((r) => r.id === target.id)) {
-        narrative = 'The path loops back on itself. You cannot get there from here.';
-        break;
+  // Action handlers extracted into services/actions/* receive this ctx and
+  // mutate its fields in place. When `dispatchAction` returns true, the
+  // handler ran — we sync the working-state fields back into the local
+  // bindings and skip the legacy inline switch. When it returns false
+  // (no handler registered for this action type yet), the inline switch
+  // below handles it. PRs land one handler at a time until the switch
+  // empties out.
+  const ctx: ActionContext = {
+    context,
+    state,
+    worldName,
+    safeIdx,
+    prevRoomId,
+    roomId,
+    roomObstacleCells,
+    livingEnemiesInRoom,
+    enemy,
+    enemyAlive,
+    loot,
+    lootAvail,
+    adjacent,
+    seed,
+    st,
+    char,
+    narrative,
+    escaped,
+    usedInitiative,
+    commitChar() {
+      const updatedChars = this.st.characters.map((c, i) => (i === this.safeIdx ? this.char : c));
+      let updatedEntities = this.st.entities;
+      if (updatedEntities) {
+        updatedEntities = updatedEntities.map((e) =>
+          e.id === this.char.id && !e.isEnemy
+            ? { ...e, hp: this.char.hp, conditions: this.char.conditions }
+            : e
+        );
       }
-      // Grappled / restrained: speed reduced to 0 — cannot move
-      const immobilizer = char.conditions.find((c) => ['grappled', 'restrained'].includes(c));
-      if (immobilizer) {
-        narrative = `You are ${immobilizer} and cannot move.`;
-        break;
-      }
-      if (st.combat_active) {
-        narrative = `You cannot flee while in grid combat. Use Disengage and move on the grid.`;
-        break;
-      }
-      // Hostile present — engage or escape, don't stroll past.
-      if (enemyAlive) {
-        narrative = 'A hostile is in this room — engage it or attempt to escape before moving on.';
-        break;
-      }
-      st.current_room = target.id;
-      if (!st.visited_rooms.includes(target.id)) {
-        st.visited_rooms = [...st.visited_rooms, target.id];
-      }
-      narrative += buildArrivalNarrative(
-        target.id,
-        { ...st, characters: st.characters.map((c, i) => (i === safeIdx ? char : c)) },
-        seed,
-        context
-      );
-      break;
-    }
+      this.st = { ...this.st, characters: updatedChars, entities: updatedEntities };
+    },
+  };
 
-    case 'attack': {
-      if (!enemy) {
-        narrative = pick(context.narratives.noEnemy);
-        break;
-      }
-      if (!enemyAlive) {
-        narrative = pick(context.narratives.alreadyDead);
-        break;
-      }
+  const handled = await dispatchAction(ctx, action);
+  if (handled) {
+    seed = ctx.seed;
+    st = ctx.st;
+    char = ctx.char;
+    narrative = ctx.narrative;
+    escaped = ctx.escaped;
+    usedInitiative = ctx.usedInitiative;
+  }
 
-      // Resolve targeted enemy: explicit targetEnemyId wins; fallback to first living
-      const targetEnemyId: string =
-        (action as { type: 'attack'; targetEnemyId?: string }).targetEnemyId ?? enemy.id;
-      const target: Enemy = livingEnemiesInRoom.find((e) => e.id === targetEnemyId) ?? enemy;
-      const targetId = target.id;
-
-      // Grid range check — only applies when combat entities are tracked on the grid
-      if (st.entities) {
-        const charEntity = st.entities.find((e) => e.id === char.id);
-        const enemyEntity = st.entities.find((e) => e.id === targetId && e.isEnemy);
-        if (charEntity && enemyEntity) {
-          const equippedWeaponItem = char.equipped_weapon
-            ? getItemData(
-                char.inventory?.find(
-                  (i) => i.instance_id === char.equipped_weapon
-                ) as InventoryItem,
-                context
-              )
-            : null;
-          if (!inRange(charEntity.pos, enemyEntity.pos, equippedWeaponItem)) {
-            narrative = `Out of range. Move closer before attacking.`;
-            break;
-          }
-        }
-      }
-
-      // Charmed: cannot attack the charmer
-      if (char.conditions.includes('charmed') && char.charmer_id && char.charmer_id === targetId) {
-        narrative = `You are charmed by the ${target.name} and cannot bring yourself to attack them.`;
-        break;
-      }
-
-      // Incapacitation is handled upstream in generateChoices (pass action); guard here as a safety net
-      if (char.conditions.includes('paralyzed') || char.conditions.includes('stunned')) {
-        narrative = `You cannot act while ${char.conditions.find((c) => c === 'stunned' || c === 'paralyzed')}.`;
-        usedInitiative = true;
-        break;
-      }
-
-      const weaponItem = char.equipped_weapon
-        ? getItemData(
-            char.inventory?.find((i) => i.instance_id === char.equipped_weapon) as InventoryItem,
-            context
-          )
-        : null;
-      let weaponDamage = weaponItem?.damage ?? null;
-      // 2024 PHB Beast Forms — while shifted, the form's natural attack
-      // damage replaces the equipped weapon's. The druid's own to-hit
-      // (STR/DEX + prof) still applies — the form's RAW attack bonus is
-      // similar in magnitude so the engine's calculated to-hit is a
-      // reasonable proxy. (Future: a separate override path if we model
-      // beast STR/DEX explicitly.)
-      if (char.conditions.includes('wild_shaped') && char.wild_shape_form) {
-        const form = BEAST_FORMS[char.wild_shape_form];
-        if (form) weaponDamage = form.attackDamage;
-      }
-      // Versatile: use two-handed damage when no shield is equipped.
-      // 2024 PHB Flex mastery (longsword, battleaxe, warhammer) lets a
-      // trained wielder use the versatile die EVEN with a shield equipped.
-      const hasFlexMastery =
-        weaponItem?.mastery === 'flex' && (char.weapon_masteries ?? []).includes(weaponItem.id);
-      const isVersatile = !!(
-        weaponItem?.versatileDamage &&
-        (!char.equipped_shield || hasFlexMastery)
-      );
-      if (isVersatile) {
-        weaponDamage = weaponItem!.versatileDamage!;
-      }
-      const weaponLabel = weaponItem ? `Your ${weaponItem.name}` : 'Your fists';
-
-      // ── Ammunition check (PHB p.146) ──────────────────────────────────────
-      if (weaponItem?.range === 'ranged' && !weaponItem.thrown) {
-        // Determine ammo type — convention: arrows for bows, bolts for crossbows, bullets for slings
-        const ammoTypes: Record<string, string[]> = {
-          bow: ['arrow', 'arrows'],
-          crossbow: ['bolt', 'bolts'],
-          sling: ['bullet', 'bullets', 'sling_bullet'],
-        };
-        const wepKey = Object.keys(ammoTypes).find((k) => weaponItem.id.includes(k)) ?? 'arrow';
-        const ammoIds = ammoTypes[wepKey] ?? ['arrow', 'arrows'];
-        const ammoIdx = char.inventory.findIndex((i) => ammoIds.some((a) => i.id.includes(a)));
-        if (ammoIdx === -1) {
-          narrative = `You have no ammunition for your ${weaponItem.name}.`;
+  if (!handled)
+    switch (action.type) {
+      case 'move': {
+        const target = seed.rooms.find((r) => r.id === action.roomId);
+        if (!target || !adjacent.find((r) => r.id === target.id)) {
+          narrative = 'The path loops back on itself. You cannot get there from here.';
           break;
         }
-        const ammoItem = char.inventory[ammoIdx];
-        const ammoCount = (ammoItem.count as number | undefined) ?? 1;
-        if (ammoCount <= 1) {
-          char.inventory = char.inventory.filter((_, i) => i !== ammoIdx);
-        } else {
-          char.inventory = char.inventory.map((item, i) =>
-            i === ammoIdx ? { ...item, count: ammoCount - 1 } : item
-          );
+        // Grappled / restrained: speed reduced to 0 — cannot move
+        const immobilizer = char.conditions.find((c) => ['grappled', 'restrained'].includes(c));
+        if (immobilizer) {
+          narrative = `You are ${immobilizer} and cannot move.`;
+          break;
         }
+        if (st.combat_active) {
+          narrative = `You cannot flee while in grid combat. Use Disengage and move on the grid.`;
+          break;
+        }
+        // Hostile present — engage or escape, don't stroll past.
+        if (enemyAlive) {
+          narrative =
+            'A hostile is in this room — engage it or attempt to escape before moving on.';
+          break;
+        }
+        st.current_room = target.id;
+        if (!st.visited_rooms.includes(target.id)) {
+          st.visited_rooms = [...st.visited_rooms, target.id];
+        }
+        narrative += buildArrivalNarrative(
+          target.id,
+          { ...st, characters: st.characters.map((c, i) => (i === safeIdx ? char : c)) },
+          seed,
+          context
+        );
+        break;
       }
 
-      // ── Start combat on first attack — roll initiative for all ─────────────
-      if (!st.combat_active) {
-        const enemiesForInit = livingEnemiesInRoom;
-        const order = buildInitiativeOrder(st.characters, enemiesForInit);
-        st.combat_active = true;
+      case 'attack': {
+        if (!enemy) {
+          narrative = pick(context.narratives.noEnemy);
+          break;
+        }
+        if (!enemyAlive) {
+          narrative = pick(context.narratives.alreadyDead);
+          break;
+        }
 
-        // Assign initiative_roll to each character in the order
-        const updatedCharsForInit = st.characters.map((c) => {
-          const entry = order.find((e) => e.id === c.id);
-          return entry ? { ...c, initiative_roll: entry.roll } : c;
-        });
-        st = { ...st, characters: updatedCharsForInit, initiative_order: order };
+        // Resolve targeted enemy: explicit targetEnemyId wins; fallback to first living
+        const targetEnemyId: string =
+          (action as { type: 'attack'; targetEnemyId?: string }).targetEnemyId ?? enemy.id;
+        const target: Enemy = livingEnemiesInRoom.find((e) => e.id === targetEnemyId) ?? enemy;
+        const targetId = target.id;
 
-        // Refresh char from updated characters array
-        const freshChar = updatedCharsForInit.find((c) => c.id === char.id);
-        if (freshChar) char = { ...freshChar };
-        char.turn_actions = { ...FRESH_TURN };
+        // Grid range check — only applies when combat entities are tracked on the grid
+        if (st.entities) {
+          const charEntity = st.entities.find((e) => e.id === char.id);
+          const enemyEntity = st.entities.find((e) => e.id === targetId && e.isEnemy);
+          if (charEntity && enemyEntity) {
+            const equippedWeaponItem = char.equipped_weapon
+              ? getItemData(
+                  char.inventory?.find(
+                    (i) => i.instance_id === char.equipped_weapon
+                  ) as InventoryItem,
+                  context
+                )
+              : null;
+            if (!inRange(charEntity.pos, enemyEntity.pos, equippedWeaponItem)) {
+              narrative = `Out of range. Move closer before attacking.`;
+              break;
+            }
+          }
+        }
 
-        // ── Initialize grid entities at combat start ────────────────────────
-        if (!st.entities) {
-          const gw = context.gridWidth ?? 8;
-          const gh = context.gridHeight ?? 8;
-          const pcEntities: CombatEntity[] = st.characters.map((c, ci) => ({
-            id: c.id,
-            isEnemy: false,
-            pos: { x: 1 + ci, y: 1 },
-            hp: c.hp,
-            maxHp: c.max_hp,
-            conditions: c.conditions,
-            condition_durations: c.condition_durations,
-          }));
-          // Beastmaster Ranger L3+ enters combat with an animal companion
-          // (Wolf, MM stats: HP 11, AC 13, +4 to hit, 2d4+2 bite). PHB p.93.
-          const companionEntities: CombatEntity[] = st.characters
-            .filter(
-              (c) =>
-                !c.dead &&
-                c.character_class.toLowerCase() === 'ranger' &&
-                c.subclass === 'beastmaster' &&
-                c.level >= 3
+        // Charmed: cannot attack the charmer
+        if (
+          char.conditions.includes('charmed') &&
+          char.charmer_id &&
+          char.charmer_id === targetId
+        ) {
+          narrative = `You are charmed by the ${target.name} and cannot bring yourself to attack them.`;
+          break;
+        }
+
+        // Incapacitation is handled upstream in generateChoices (pass action); guard here as a safety net
+        if (char.conditions.includes('paralyzed') || char.conditions.includes('stunned')) {
+          narrative = `You cannot act while ${char.conditions.find((c) => c === 'stunned' || c === 'paralyzed')}.`;
+          usedInitiative = true;
+          break;
+        }
+
+        const weaponItem = char.equipped_weapon
+          ? getItemData(
+              char.inventory?.find((i) => i.instance_id === char.equipped_weapon) as InventoryItem,
+              context
             )
-            .map((c, ci) => ({
-              id: `${c.id}:companion`,
-              isEnemy: false,
-              isCompanion: true,
-              companionOwnerId: c.id,
-              companionName: 'Wolf',
-              pos: { x: 1 + ci, y: 2 },
-              hp: 11,
-              maxHp: 11,
-              ac: 13,
-              toHit: 4,
-              damage: '2d4+2',
-              conditions: [],
-              condition_durations: {},
-            }));
-          // One grid entity per living enemy, spaced out along the far edge
-          const enemyEntities: CombatEntity[] = enemiesForInit.map((en, ei) => ({
-            id: en.id,
-            isEnemy: true,
-            pos: { x: Math.max(0, gw - 2 - ei), y: Math.max(0, gh - 2) },
-            hp: en.hp,
-            maxHp: en.hp,
-            conditions: [],
-            condition_durations: {},
-          }));
-          st = {
-            ...st,
-            entities: [...pcEntities, ...companionEntities, ...enemyEntities],
-            movement_used: {},
+          : null;
+        let weaponDamage = weaponItem?.damage ?? null;
+        // 2024 PHB Beast Forms — while shifted, the form's natural attack
+        // damage replaces the equipped weapon's. The druid's own to-hit
+        // (STR/DEX + prof) still applies — the form's RAW attack bonus is
+        // similar in magnitude so the engine's calculated to-hit is a
+        // reasonable proxy. (Future: a separate override path if we model
+        // beast STR/DEX explicitly.)
+        if (char.conditions.includes('wild_shaped') && char.wild_shape_form) {
+          const form = BEAST_FORMS[char.wild_shape_form];
+          if (form) weaponDamage = form.attackDamage;
+        }
+        // Versatile: use two-handed damage when no shield is equipped.
+        // 2024 PHB Flex mastery (longsword, battleaxe, warhammer) lets a
+        // trained wielder use the versatile die EVEN with a shield equipped.
+        const hasFlexMastery =
+          weaponItem?.mastery === 'flex' && (char.weapon_masteries ?? []).includes(weaponItem.id);
+        const isVersatile = !!(
+          weaponItem?.versatileDamage &&
+          (!char.equipped_shield || hasFlexMastery)
+        );
+        if (isVersatile) {
+          weaponDamage = weaponItem!.versatileDamage!;
+        }
+        const weaponLabel = weaponItem ? `Your ${weaponItem.name}` : 'Your fists';
+
+        // ── Ammunition check (PHB p.146) ──────────────────────────────────────
+        if (weaponItem?.range === 'ranged' && !weaponItem.thrown) {
+          // Determine ammo type — convention: arrows for bows, bolts for crossbows, bullets for slings
+          const ammoTypes: Record<string, string[]> = {
+            bow: ['arrow', 'arrows'],
+            crossbow: ['bolt', 'bolts'],
+            sling: ['bullet', 'bullets', 'sling_bullet'],
           };
-        }
-
-        // ── Surprise check (PHB p.189) ────────────────────────────────────
-        // If the party averages a higher Stealth than the highest passive Perception
-        // among the enemies, all enemies are surprised for round 1.
-        const partyAvgStealth = Math.round(
-          st.characters
-            .filter((c) => !c.dead)
-            .reduce((sum, c) => {
-              const prof = c.skill_proficiencies?.includes('Stealth') ?? false;
-              return sum + rollDice('1d20') + abilityMod(c.dex) + (prof ? profBonus(c.level) : 0);
-            }, 0) / Math.max(1, st.characters.filter((c) => !c.dead).length)
-        );
-        const enemyPassivePerc = Math.max(
-          ...enemiesForInit.map((e) => 10 + abilityMod(e.wis ?? 10))
-        );
-        if (partyAvgStealth > enemyPassivePerc) {
-          st = { ...st, surprised: enemiesForInit.map((e) => e.id) };
-        }
-
-        const orderText = order
-          .map((e) => {
-            const name = e.is_enemy
-              ? (enemiesForInit.find((en) => en.id === e.id)?.name ?? 'Enemy')
-              : (st.characters.find((c) => c.id === e.id)?.name ?? 'Hero');
-            return `${name}(${e.roll})`;
-          })
-          .join(' → ');
-        const surpriseLabel =
-          enemiesForInit.length === 1
-            ? `The ${enemiesForInit[0].name} is SURPRISED!`
-            : `${enemiesForInit.map((e) => e.name).join(', ')} are SURPRISED!`;
-        const surpriseNote = st.surprised?.length ? ` ${surpriseLabel}` : '';
-        const combatPrefix = context.narratives.combatStart
-          ? pick(context.narratives.combatStart).replace(/{enemy}/g, target.name) + ' '
-          : 'Combat begins! ';
-        narrative = `${combatPrefix}Initiative: ${orderText}.${surpriseNote} `;
-
-        // Find this character's position in the initiative order
-        const myInitIdx = order.findIndex((e) => e.id === char.id);
-        st.initiative_idx = myInitIdx >= 0 ? myInitIdx : 0;
-
-        const myRoll = order.find((e) => e.id === char.id)?.roll ?? 0;
-        // The triggering PC's attack runs immediately — they had the
-        // element of surprise on the encounter even if their initiative
-        // wasn't highest. After this opening swing, play returns to the
-        // initiative order at the slot just past them (handled by the
-        // post-attack initiative advance). Honest framing avoids the
-        // misleading "X acts (initiative N)!" line when N wasn't first.
-        const isHighestInit = myInitIdx === 0;
-        narrative += isHighestInit
-          ? `${char.name} acts first (initiative ${myRoll})! `
-          : `${char.name} strikes with the opening blow (initiative ${myRoll})! `;
-      }
-
-      // ── Resolve the player's attack ────────────────────────────────────────
-      // Armor proficiency check (PHB p.144): non-proficient armor → disadv on STR/DEX attack rolls
-      const equippedArmorLootItem = char.equipped_armor
-        ? context.lootTable.find(
-            (l) => l.id === char.inventory?.find((i) => i.instance_id === char.equipped_armor)?.id
-          )
-        : null;
-      const armorProficient = hasArmorProficiency(
-        char.armor_proficiencies ?? [],
-        equippedArmorLootItem?.armorCategory
-      );
-      // Weapon proficiency check (PHB p.147): non-proficient weapon → no profBonus (passed to resolvePlayerAttack)
-      const weaponProficient = hasWeaponProficiency(
-        char.weapon_proficiencies ?? [],
-        weaponItem?.weaponType
-      );
-
-      const rangedInMelee = weaponItem?.range === 'ranged';
-      const conditionDisadv = char.conditions.some((c) => DISADV_CONDITIONS.has(c));
-      const exhaustionDisadv = (char.exhaustion_level ?? 0) >= 3; // exhaustion 3+: disadv on attack rolls
-      const heavyEncumberedDisadv = isHeavilyEncumbered(char); // 2024 PHB variant encumbrance
-      // SRD 5.2.1 p.90 — Small species (Halfling, Gnome) have disadvantage
-      // when attacking with a Heavy weapon.
-      const smallSpecies = char.species ? SRD_SPECIES[char.species]?.size === 'small' : false;
-      const heavyWeaponSmallDisadv = !!(weaponItem?.heavy && smallSpecies);
-      const conditionAdv = char.conditions.some((c) => PLAYER_ADV_CONDITIONS.has(c));
-      const enemyEntity2 = st.entities?.find((e) => e.id === targetId && e.isEnemy);
-      const enemyGrappled = enemyEntity2?.conditions.includes('grappled') ?? false;
-      const enemyProne = enemyEntity2?.conditions.includes('prone') ?? false;
-      const enemyParalyzed = enemyEntity2?.conditions.includes('paralyzed') ?? false;
-      // Unconscious: auto-crit when attacker is within 5ft
-      const enemyUnconscious = enemyEntity2?.conditions.includes('unconscious') ?? false;
-      // Prone: melee attacks have advantage, ranged attacks have disadvantage
-      const proneAdv = enemyProne && weaponItem?.range !== 'ranged';
-      const proneDisadv = enemyProne && weaponItem?.range === 'ranged';
-      // Thrown weapon beyond normal range: disadvantage (PHB p.147)
-      let thrownLongRangeDisadv = false;
-      if (weaponItem?.thrown && st.entities) {
-        const charEnt = st.entities.find((e) => e.id === char.id);
-        const enemyEnt = st.entities.find((e) => e.id === targetId && e.isEnemy);
-        if (charEnt && enemyEnt) {
-          const dist = distanceFeet(charEnt.pos, enemyEnt.pos);
-          if (dist > weaponItem.thrown.normalRange) thrownLongRangeDisadv = true;
-        }
-      }
-
-      // Cover bonus: raise enemy's effective AC from obstacles between attacker and target
-      let coverAcBonus = 0;
-      let flankingAdv = false;
-      if (st.entities) {
-        const charEntity = st.entities.find((e) => e.id === char.id);
-        const enemyEntity = st.entities.find((e) => e.id === targetId && e.isEnemy);
-        if (charEntity && enemyEntity) {
-          const obstacles = [
-            ...st.entities.filter((e) => e.id !== char.id && e.id !== targetId).map((e) => e.pos),
-            ...roomObstacleCells,
-          ];
-          coverAcBonus = coverBonus(charEntity.pos, enemyEntity.pos, obstacles);
-          // Flanking (PHB optional): ally on opposite side of enemy grants advantage
-          const flankingAlly = st.entities.find(
-            (e) =>
-              !e.isEnemy &&
-              e.id !== char.id &&
-              isFlankingPosition(charEntity.pos, e.pos, enemyEntity.pos)
-          );
-          if (flankingAlly) flankingAdv = true;
-        }
-      }
-
-      // Help action advantage: another character used Help targeting this one
-      const helpAdv = st.help_target_id === char.id;
-      if (helpAdv) st = { ...st, help_target_id: undefined };
-
-      // Assassin: advantage vs creatures who haven't acted (surprised list or first round)
-      const assassinAdv =
-        char.subclass === 'assassin' &&
-        char.character_class.toLowerCase() === 'rogue' &&
-        ((st.surprised ?? []).includes(targetId) || (st.round ?? 1) === 1);
-
-      // Vow of Enmity: advantage vs the vow target
-      const vowAdv = st.vow_of_enmity_target === targetId;
-
-      // Reckless Attack (Barbarian L2+): advantage on melee weapon attacks
-      const recklessAdv = !!char.turn_actions.reckless && weaponItem?.range !== 'ranged';
-
-      // 2024 PHB Beast Form Pack Tactics — Wolf and Dire Wolf forms grant
-      // advantage when an ally is within 5 ft of the target.
-      let packTacticsAdv = false;
-      if (char.conditions.includes('wild_shaped') && char.wild_shape_form) {
-        const form = BEAST_FORMS[char.wild_shape_form];
-        if (form?.packTactics && st.entities) {
-          const targetEnt = st.entities.find((e) => e.id === targetId && e.isEnemy);
-          if (targetEnt) {
-            packTacticsAdv = st.entities.some(
-              (e) =>
-                !e.isEnemy &&
-                e.id !== char.id &&
-                e.hp > 0 &&
-                Math.max(
-                  Math.abs(e.pos.x - targetEnt.pos.x),
-                  Math.abs(e.pos.y - targetEnt.pos.y)
-                ) <= 1
+          const wepKey = Object.keys(ammoTypes).find((k) => weaponItem.id.includes(k)) ?? 'arrow';
+          const ammoIds = ammoTypes[wepKey] ?? ['arrow', 'arrows'];
+          const ammoIdx = char.inventory.findIndex((i) => ammoIds.some((a) => i.id.includes(a)));
+          if (ammoIdx === -1) {
+            narrative = `You have no ammunition for your ${weaponItem.name}.`;
+            break;
+          }
+          const ammoItem = char.inventory[ammoIdx];
+          const ammoCount = (ammoItem.count as number | undefined) ?? 1;
+          if (ammoCount <= 1) {
+            char.inventory = char.inventory.filter((_, i) => i !== ammoIdx);
+          } else {
+            char.inventory = char.inventory.map((item, i) =>
+              i === ammoIdx ? { ...item, count: ammoCount - 1 } : item
             );
           }
         }
-      }
 
-      // 2024 PHB Vex weapon mastery — previous hit with a Vex weapon by this
-      // char on this target grants advantage on the next attack. Consume the
-      // tag immediately (RAW: lasts until end of your next turn, but for our
-      // single-attack action model, one-shot is closer to what players
-      // expect).
-      const vexTag = `vexed_by_${char.id}`;
-      const vexAdv = !!st.entities?.find(
-        (e) => e.id === targetId && e.isEnemy && e.conditions.includes(vexTag)
-      );
-      if (vexAdv) {
-        st = {
-          ...st,
-          entities: (st.entities ?? []).map((e) =>
-            e.id === targetId && e.isEnemy
-              ? { ...e, conditions: e.conditions.filter((c) => c !== vexTag) }
-              : e
-          ),
-        };
-      }
+        // ── Start combat on first attack — roll initiative for all ─────────────
+        if (!st.combat_active) {
+          const enemiesForInit = livingEnemiesInRoom;
+          const order = buildInitiativeOrder(st.characters, enemiesForInit);
+          st.combat_active = true;
 
-      // 2024 PHB Fighter L13 Studied Attacks — same shape as Vex but seeded
-      // by a *miss* on a prior turn (mark applied in the miss branch above).
-      const studyTag = `studied_by_${char.id}`;
-      const studyAdv = !!st.entities?.find(
-        (e) => e.id === targetId && e.isEnemy && e.conditions.includes(studyTag)
-      );
-      if (studyAdv) {
-        st = {
-          ...st,
-          entities: (st.entities ?? []).map((e) =>
-            e.id === targetId && e.isEnemy
-              ? { ...e, conditions: e.conditions.filter((c) => c !== studyTag) }
-              : e
-          ),
-        };
-      }
-
-      // Path of the Totem Warrior — Wolf (PHB p.51): "While raging, your
-      // allies have advantage on melee attack rolls against any creature
-      // within 5 feet of you that is hostile to you." Find any Wolf-totem
-      // barbarian in the party who's raging and adjacent to the target.
-      const wolfAdv =
-        weaponItem?.range !== 'ranged' &&
-        !!st.entities &&
-        st.characters.some((ally) => {
-          if (ally.id === char.id) return false;
-          if (ally.dead || ally.hp <= 0) return false;
-          if (ally.subclass !== 'totem_warrior') return false;
-          if (ally.character_class.toLowerCase() !== 'barbarian') return false;
-          if (!ally.conditions.includes('raging')) return false;
-          const allyEnt = st.entities?.find((e) => e.id === ally.id);
-          const targetEnt = st.entities?.find((e) => e.id === targetId && e.isEnemy);
-          if (!allyEnt || !targetEnt) return false;
-          return distanceFeet(allyEnt.pos, targetEnt.pos) <= 5;
-        });
-
-      const disadvantage =
-        rangedInMelee ||
-        conditionDisadv ||
-        exhaustionDisadv ||
-        heavyEncumberedDisadv ||
-        heavyWeaponSmallDisadv ||
-        !armorProficient ||
-        proneDisadv ||
-        thrownLongRangeDisadv;
-      // Heroic Inspiration spent this turn — grants advantage on the next
-      // attack roll, then both the pending flag and char.inspiration clear.
-      const inspirationAdv = !!char.turn_actions.inspiration_pending;
-      if (inspirationAdv) {
-        char.turn_actions = { ...char.turn_actions, inspiration_pending: false };
-        char.inspiration = false;
-      }
-      const advantage =
-        conditionAdv ||
-        enemyGrappled ||
-        proneAdv ||
-        enemyParalyzed ||
-        flankingAdv ||
-        helpAdv ||
-        assassinAdv ||
-        vowAdv ||
-        recklessAdv ||
-        inspirationAdv ||
-        wolfAdv ||
-        vexAdv ||
-        studyAdv ||
-        packTacticsAdv;
-      const disadvReasons = [
-        rangedInMelee ? 'ranged in melee' : '',
-        conditionDisadv ? char.conditions.filter((c) => DISADV_CONDITIONS.has(c)).join(', ') : '',
-        exhaustionDisadv ? 'exhaustion' : '',
-        heavyEncumberedDisadv ? 'heavily encumbered' : '',
-        heavyWeaponSmallDisadv ? 'heavy weapon — Small creature' : '',
-        !armorProficient ? `not proficient with ${equippedArmorLootItem?.name ?? 'armor'}` : '',
-        proneDisadv ? 'prone (ranged)' : '',
-        thrownLongRangeDisadv ? 'thrown beyond normal range' : '',
-      ]
-        .filter(Boolean)
-        .join(', ');
-      const disadvNote = disadvReasons
-        ? ` (disadvantage — ${disadvReasons})`
-        : advantage && !disadvantage
-          ? ' (advantage)'
-          : '';
-      const noProfNote = !weaponProficient ? ` [no weapon proficiency — prof bonus omitted]` : '';
-
-      const features = context.classFeatures?.[char.character_class] ?? [];
-      const isRaging = char.conditions.includes('raging');
-
-      // Champion: Improved Critical — crit on 19–20 at level 3+
-      const critThresh =
-        char.subclass === 'champion' &&
-        char.character_class.toLowerCase() === 'fighter' &&
-        char.level >= 3
-          ? 19
-          : 20;
-      // Sacred Weapon: +CHA mod to attack rolls
-      const sacredWeaponBonus =
-        (char.class_resource_uses?.sacred_weapon_active ?? 0) > 0 ? abilityMod(char.cha) : 0;
-      // Guided Strike: +10 to attack roll (War Cleric Channel Divinity)
-      const guidedStrikeBonus = st.guided_strike_active ? 10 : 0;
-      const totalAttackBonus = sacredWeaponBonus + guidedStrikeBonus;
-      if (guidedStrikeBonus) st = { ...st, guided_strike_active: false };
-
-      // Helper that resolves one attack roll and applies it to enemy HP / narrative.
-      // Returns true if the enemy was killed (so the caller can break early).
-      const resolveOneAttack = (label: string): boolean => {
-        const effectiveEnemyAc = target.ac + coverAcBonus;
-        // Assassin auto-crit on surprised target (PHB p.97)
-        const assassinAutoCrit =
-          char.subclass === 'assassin' && (st.surprised ?? []).includes(targetId);
-        const atk = resolvePlayerAttack(
-          { str: char.str, dex: char.dex, level: char.level },
-          weaponDamage,
-          effectiveEnemyAc,
-          weaponItem?.finesse ?? false,
-          disadvantage,
-          advantage,
-          weaponProficient,
-          weaponItem?.range === 'ranged',
-          critThresh,
-          totalAttackBonus,
-          char.species === 'halfling'
-        );
-        // Bardic Inspiration consumption on attack roll (2024 PHB p.52).
-        // If the wielder has a stashed BI die, roll it and add to the to-hit
-        // total. If that turns a miss into a hit, atk.hit flips to true AND
-        // we need to roll damage (resolvePlayerAttack returned damage=0 on
-        // the original miss; flipping hit without rolling damage produced
-        // {{dmg|0}} hit narratives).
-        let biNote = '';
-        if (char.bardic_inspiration_die && !atk.fumble) {
-          const biRoll = rollDice(`1${char.bardic_inspiration_die}`);
-          atk.total += biRoll;
-          const newHit = atk.roll === 20 || atk.total >= effectiveEnemyAc;
-          if (!atk.hit && newHit) {
-            atk.hit = true;
-            atk.damage = Math.max(1, rollDice(weaponDamage ?? '1d4') + atk.atkMod);
-          }
-          biNote = ` ✦ Bardic Inspiration: +${biRoll} (${char.bardic_inspiration_die})`;
-          char.bardic_inspiration_die = undefined;
-        }
-        // Bless (PHB p.219): blessed creatures add +1d4 to attack rolls.
-        // Doesn't consume; the buff lasts until the caster's concentration
-        // drops. Surfaced in atkNote alongside Bardic Inspiration. Same
-        // miss-to-hit damage-roll concern as BI above.
-        let blessNote = '';
-        if ((char.conditions ?? []).includes('blessed') && !atk.fumble) {
-          const blessRoll = rollDice('1d4');
-          atk.total += blessRoll;
-          const newHit = atk.roll === 20 || atk.total >= effectiveEnemyAc;
-          if (!atk.hit && newHit) {
-            atk.hit = true;
-            atk.damage = Math.max(1, rollDice(weaponDamage ?? '1d4') + atk.atkMod);
-          }
-          blessNote = ` ✦ Bless: +${blessRoll} (1d4)`;
-        }
-        // Unconscious or Assassin-surprised: force crit on hit
-        const autoCritCheck =
-          (enemyUnconscious &&
-            (!st.entities ||
-              (() => {
-                const charEnt = st.entities?.find((e) => e.id === char.id);
-                const enmEnt = st.entities?.find((e) => e.id === targetId);
-                return charEnt && enmEnt
-                  ? posEqual(
-                      { x: charEnt.pos.x, y: charEnt.pos.y },
-                      { x: enmEnt.pos.x, y: enmEnt.pos.y }
-                    ) ||
-                      Math.max(
-                        Math.abs(charEnt.pos.x - enmEnt.pos.x),
-                        Math.abs(charEnt.pos.y - enmEnt.pos.y)
-                      ) <= 1
-                  : true;
-              })())) ||
-          assassinAutoCrit;
-        const isCrit = atk.critical || (autoCritCheck && atk.hit);
-        const baseHit = weaponDamage
-          ? isCrit && !atk.critical
-            ? Math.max(1, rollCritical(weaponDamage) + atk.atkMod)
-            : atk.damage
-          : Math.max(1, unarmedDamage(char.str));
-        const versatileNote = isVersatile ? ' (versatile)' : '';
-        const coverNote = coverAcBonus > 0 ? ` +${coverAcBonus} cover` : '';
-        const bonusNote = totalAttackBonus > 0 ? ` +${totalAttackBonus} bonus` : '';
-        const atkNote =
-          ' ' +
-          fmt.note(
-            `(${label}d20 ${atk.roll}+${atk.atkMod} ${atk.atkStat}+${atk.prof} prof${bonusNote} = ${atk.total} vs AC ${effectiveEnemyAc}${coverNote}${disadvNote}${versatileNote})${noProfNote}${biNote}${blessNote}`
-          );
-
-        if (atk.fumble) {
-          // 2024 PHB — a Nat 1 on a d20 grants Heroic Inspiration. Failure
-          // becomes the seed of next turn's success.
-          let inspirationNote = '';
-          if (!char.inspiration) {
-            char.inspiration = true;
-            inspirationNote = ` ✦ Heroic Inspiration granted (${char.name}).`;
-          }
-          narrative += `Natural 1 — a fumble! ${weaponLabel} goes completely wide.${atkNote}${inspirationNote} `;
-          st = pushEvent(st, {
-            kind: 'attack_miss',
-            attackerId: char.id,
-            attackerName: char.name,
-            targetId,
-            targetName: target.name,
-            toHit: atk.total,
-            targetAc: target.ac,
-            round: st.round ?? 1,
+          // Assign initiative_roll to each character in the order
+          const updatedCharsForInit = st.characters.map((c) => {
+            const entry = order.find((e) => e.id === c.id);
+            return entry ? { ...c, initiative_roll: entry.roll } : c;
           });
-          return false;
-        }
-        if (!atk.hit) {
-          narrative += pickTiered(context.narratives.combatMiss, hpTier(char)).replace(
-            /{enemy}/g,
-            target.name
-          );
-          narrative += atkNote + ' ';
-          st = pushEvent(st, {
-            kind: 'attack_miss',
-            attackerId: char.id,
-            attackerName: char.name,
-            targetId,
-            targetName: target.name,
-            toHit: atk.total,
-            targetAc: target.ac,
-            round: st.round ?? 1,
-          });
-          // 2024 PHB Fighter L13 — Studied Attacks. On miss, mark the target
-          // so this Fighter's next attack against them has advantage. Stored
-          // as a per-character tag so multiple Fighters can stack independently.
-          if (char.character_class.toLowerCase() === 'fighter' && char.level >= 13) {
-            const studyTag = `studied_by_${char.id}`;
+          st = { ...st, characters: updatedCharsForInit, initiative_order: order };
+
+          // Refresh char from updated characters array
+          const freshChar = updatedCharsForInit.find((c) => c.id === char.id);
+          if (freshChar) char = { ...freshChar };
+          char.turn_actions = { ...FRESH_TURN };
+
+          // ── Initialize grid entities at combat start ────────────────────────
+          if (!st.entities) {
+            const gw = context.gridWidth ?? 8;
+            const gh = context.gridHeight ?? 8;
+            const pcEntities: CombatEntity[] = st.characters.map((c, ci) => ({
+              id: c.id,
+              isEnemy: false,
+              pos: { x: 1 + ci, y: 1 },
+              hp: c.hp,
+              maxHp: c.max_hp,
+              conditions: c.conditions,
+              condition_durations: c.condition_durations,
+            }));
+            // Beastmaster Ranger L3+ enters combat with an animal companion
+            // (Wolf, MM stats: HP 11, AC 13, +4 to hit, 2d4+2 bite). PHB p.93.
+            const companionEntities: CombatEntity[] = st.characters
+              .filter(
+                (c) =>
+                  !c.dead &&
+                  c.character_class.toLowerCase() === 'ranger' &&
+                  c.subclass === 'beastmaster' &&
+                  c.level >= 3
+              )
+              .map((c, ci) => ({
+                id: `${c.id}:companion`,
+                isEnemy: false,
+                isCompanion: true,
+                companionOwnerId: c.id,
+                companionName: 'Wolf',
+                pos: { x: 1 + ci, y: 2 },
+                hp: 11,
+                maxHp: 11,
+                ac: 13,
+                toHit: 4,
+                damage: '2d4+2',
+                conditions: [],
+                condition_durations: {},
+              }));
+            // One grid entity per living enemy, spaced out along the far edge
+            const enemyEntities: CombatEntity[] = enemiesForInit.map((en, ei) => ({
+              id: en.id,
+              isEnemy: true,
+              pos: { x: Math.max(0, gw - 2 - ei), y: Math.max(0, gh - 2) },
+              hp: en.hp,
+              maxHp: en.hp,
+              conditions: [],
+              condition_durations: {},
+            }));
             st = {
               ...st,
-              entities: (st.entities ?? []).map((e) =>
-                e.id === targetId && e.isEnemy
-                  ? { ...e, conditions: [...e.conditions.filter((c) => c !== studyTag), studyTag] }
-                  : e
-              ),
+              entities: [...pcEntities, ...companionEntities, ...enemyEntities],
+              movement_used: {},
             };
-            narrative += ` [Studied Attacks: advantage on next attack vs ${target.name}]`;
           }
-          // 2024 PHB Graze weapon mastery (greatsword, glaive) — even on a
-          // miss, deal STR mod damage (DEX for Finesse weapons). Floor at 0.
-          if (
-            weaponItem?.mastery === 'graze' &&
-            (char.weapon_masteries ?? []).includes(weaponItem.id)
-          ) {
-            const grazeMod = weaponItem.finesse ? abilityMod(char.dex) : abilityMod(char.str);
-            const grazeDmg = Math.max(0, grazeMod);
-            if (grazeDmg > 0) {
-              const grazedHp = Math.max(0, target.hp - grazeDmg);
-              st = {
-                ...st,
-                entities: (st.entities ?? []).map((e) =>
-                  e.id === targetId && e.isEnemy ? { ...e, hp: grazedHp } : e
-                ),
-              };
-              narrative += `[Graze: ${target.name} still takes ${fmt.dmg(grazeDmg)} damage from the swing.] `;
-            }
+
+          // ── Surprise check (PHB p.189) ────────────────────────────────────
+          // If the party averages a higher Stealth than the highest passive Perception
+          // among the enemies, all enemies are surprised for round 1.
+          const partyAvgStealth = Math.round(
+            st.characters
+              .filter((c) => !c.dead)
+              .reduce((sum, c) => {
+                const prof = c.skill_proficiencies?.includes('Stealth') ?? false;
+                return sum + rollDice('1d20') + abilityMod(c.dex) + (prof ? profBonus(c.level) : 0);
+              }, 0) / Math.max(1, st.characters.filter((c) => !c.dead).length)
+          );
+          const enemyPassivePerc = Math.max(
+            ...enemiesForInit.map((e) => 10 + abilityMod(e.wis ?? 10))
+          );
+          if (partyAvgStealth > enemyPassivePerc) {
+            st = { ...st, surprised: enemiesForInit.map((e) => e.id) };
           }
-          return false;
+
+          const orderText = order
+            .map((e) => {
+              const name = e.is_enemy
+                ? (enemiesForInit.find((en) => en.id === e.id)?.name ?? 'Enemy')
+                : (st.characters.find((c) => c.id === e.id)?.name ?? 'Hero');
+              return `${name}(${e.roll})`;
+            })
+            .join(' → ');
+          const surpriseLabel =
+            enemiesForInit.length === 1
+              ? `The ${enemiesForInit[0].name} is SURPRISED!`
+              : `${enemiesForInit.map((e) => e.name).join(', ')} are SURPRISED!`;
+          const surpriseNote = st.surprised?.length ? ` ${surpriseLabel}` : '';
+          const combatPrefix = context.narratives.combatStart
+            ? pick(context.narratives.combatStart).replace(/{enemy}/g, target.name) + ' '
+            : 'Combat begins! ';
+          narrative = `${combatPrefix}Initiative: ${orderText}.${surpriseNote} `;
+
+          // Find this character's position in the initiative order
+          const myInitIdx = order.findIndex((e) => e.id === char.id);
+          st.initiative_idx = myInitIdx >= 0 ? myInitIdx : 0;
+
+          const myRoll = order.find((e) => e.id === char.id)?.roll ?? 0;
+          // The triggering PC's attack runs immediately — they had the
+          // element of surprise on the encounter even if their initiative
+          // wasn't highest. After this opening swing, play returns to the
+          // initiative order at the slot just past them (handled by the
+          // post-attack initiative advance). Honest framing avoids the
+          // misleading "X acts (initiative N)!" line when N wasn't first.
+          const isHighestInit = myInitIdx === 0;
+          narrative += isHighestInit
+            ? `${char.name} acts first (initiative ${myRoll})! `
+            : `${char.name} strikes with the opening blow (initiative ${myRoll})! `;
         }
 
-        // ── Hit ──────────────────────────────────────────────────────────────
-        // Sneak Attack (SRD 5.2.1 — Rogue): once per turn, on a hit, with
-        // either advantage on the attack OR an ally within 5 ft of the
-        // target (and you don't have disadvantage). Weapon must be Finesse
-        // or Ranged.
-        let sneakDmg = 0;
-        if (features.includes('sneak_attack')) {
-          const isFinesseOrRanged =
-            (weaponItem?.finesse ?? false) || weaponItem?.range === 'ranged';
-          // "Ally within 5 ft of target" via grid (Chebyshev distance ≤ 1).
-          // When no grid is active, fall back to "any living ally" (the
-          // previous looser check).
-          let allyAdjacent = false;
-          if (st.entities) {
+        // ── Resolve the player's attack ────────────────────────────────────────
+        // Armor proficiency check (PHB p.144): non-proficient armor → disadv on STR/DEX attack rolls
+        const equippedArmorLootItem = char.equipped_armor
+          ? context.lootTable.find(
+              (l) => l.id === char.inventory?.find((i) => i.instance_id === char.equipped_armor)?.id
+            )
+          : null;
+        const armorProficient = hasArmorProficiency(
+          char.armor_proficiencies ?? [],
+          equippedArmorLootItem?.armorCategory
+        );
+        // Weapon proficiency check (PHB p.147): non-proficient weapon → no profBonus (passed to resolvePlayerAttack)
+        const weaponProficient = hasWeaponProficiency(
+          char.weapon_proficiencies ?? [],
+          weaponItem?.weaponType
+        );
+
+        const rangedInMelee = weaponItem?.range === 'ranged';
+        const conditionDisadv = char.conditions.some((c) => DISADV_CONDITIONS.has(c));
+        const exhaustionDisadv = (char.exhaustion_level ?? 0) >= 3; // exhaustion 3+: disadv on attack rolls
+        const heavyEncumberedDisadv = isHeavilyEncumbered(char); // 2024 PHB variant encumbrance
+        // SRD 5.2.1 p.90 — Small species (Halfling, Gnome) have disadvantage
+        // when attacking with a Heavy weapon.
+        const smallSpecies = char.species ? SRD_SPECIES[char.species]?.size === 'small' : false;
+        const heavyWeaponSmallDisadv = !!(weaponItem?.heavy && smallSpecies);
+        const conditionAdv = char.conditions.some((c) => PLAYER_ADV_CONDITIONS.has(c));
+        const enemyEntity2 = st.entities?.find((e) => e.id === targetId && e.isEnemy);
+        const enemyGrappled = enemyEntity2?.conditions.includes('grappled') ?? false;
+        const enemyProne = enemyEntity2?.conditions.includes('prone') ?? false;
+        const enemyParalyzed = enemyEntity2?.conditions.includes('paralyzed') ?? false;
+        // Unconscious: auto-crit when attacker is within 5ft
+        const enemyUnconscious = enemyEntity2?.conditions.includes('unconscious') ?? false;
+        // Prone: melee attacks have advantage, ranged attacks have disadvantage
+        const proneAdv = enemyProne && weaponItem?.range !== 'ranged';
+        const proneDisadv = enemyProne && weaponItem?.range === 'ranged';
+        // Thrown weapon beyond normal range: disadvantage (PHB p.147)
+        let thrownLongRangeDisadv = false;
+        if (weaponItem?.thrown && st.entities) {
+          const charEnt = st.entities.find((e) => e.id === char.id);
+          const enemyEnt = st.entities.find((e) => e.id === targetId && e.isEnemy);
+          if (charEnt && enemyEnt) {
+            const dist = distanceFeet(charEnt.pos, enemyEnt.pos);
+            if (dist > weaponItem.thrown.normalRange) thrownLongRangeDisadv = true;
+          }
+        }
+
+        // Cover bonus: raise enemy's effective AC from obstacles between attacker and target
+        let coverAcBonus = 0;
+        let flankingAdv = false;
+        if (st.entities) {
+          const charEntity = st.entities.find((e) => e.id === char.id);
+          const enemyEntity = st.entities.find((e) => e.id === targetId && e.isEnemy);
+          if (charEntity && enemyEntity) {
+            const obstacles = [
+              ...st.entities.filter((e) => e.id !== char.id && e.id !== targetId).map((e) => e.pos),
+              ...roomObstacleCells,
+            ];
+            coverAcBonus = coverBonus(charEntity.pos, enemyEntity.pos, obstacles);
+            // Flanking (PHB optional): ally on opposite side of enemy grants advantage
+            const flankingAlly = st.entities.find(
+              (e) =>
+                !e.isEnemy &&
+                e.id !== char.id &&
+                isFlankingPosition(charEntity.pos, e.pos, enemyEntity.pos)
+            );
+            if (flankingAlly) flankingAdv = true;
+          }
+        }
+
+        // Help action advantage: another character used Help targeting this one
+        const helpAdv = st.help_target_id === char.id;
+        if (helpAdv) st = { ...st, help_target_id: undefined };
+
+        // Assassin: advantage vs creatures who haven't acted (surprised list or first round)
+        const assassinAdv =
+          char.subclass === 'assassin' &&
+          char.character_class.toLowerCase() === 'rogue' &&
+          ((st.surprised ?? []).includes(targetId) || (st.round ?? 1) === 1);
+
+        // Vow of Enmity: advantage vs the vow target
+        const vowAdv = st.vow_of_enmity_target === targetId;
+
+        // Reckless Attack (Barbarian L2+): advantage on melee weapon attacks
+        const recklessAdv = !!char.turn_actions.reckless && weaponItem?.range !== 'ranged';
+
+        // 2024 PHB Beast Form Pack Tactics — Wolf and Dire Wolf forms grant
+        // advantage when an ally is within 5 ft of the target.
+        let packTacticsAdv = false;
+        if (char.conditions.includes('wild_shaped') && char.wild_shape_form) {
+          const form = BEAST_FORMS[char.wild_shape_form];
+          if (form?.packTactics && st.entities) {
             const targetEnt = st.entities.find((e) => e.id === targetId && e.isEnemy);
             if (targetEnt) {
-              allyAdjacent = st.entities.some(
+              packTacticsAdv = st.entities.some(
                 (e) =>
                   !e.isEnemy &&
                   e.id !== char.id &&
@@ -5003,115 +4746,468 @@ export async function takeAction({
                   ) <= 1
               );
             }
-          } else {
-            allyAdjacent = st.characters.some((c) => !c.dead && c.id !== char.id);
-          }
-          const hasAdv = advantage && !disadvantage;
-          const triggers = (hasAdv || allyAdjacent) && !disadvantage;
-          if (isFinesseOrRanged && triggers) {
-            const saExpr = sneakAttackDice(char.level);
-            sneakDmg = isCrit ? rollCritical(saExpr) : rollDice(saExpr);
-            // 2024 PHB Cunning Strike: if the player pre-committed an
-            // effect, subtract one die from the SA roll (average 3.5 on
-            // 1d6) and stage the effect for application after the hit
-            // resolves and damage is committed.
-            if (char.turn_actions.cunning_strike_pending) {
-              sneakDmg = Math.max(0, sneakDmg - rollDice('1d6'));
-            }
           }
         }
 
-        // Rage damage bonus: STR-based attacks only (PHB p.48)
-        const rageBonus =
-          features.includes('rage') && isRaging && atk.atkStat === 'STR'
-            ? rageDamageBonus(char.level)
-            : 0;
-
-        const rawDmg = baseHit + sneakDmg + rageBonus;
-        const { damage: finalDmg, note: dmgNote } = applyDamageMultiplier(
-          rawDmg,
-          weaponItem?.damageType,
-          target
+        // 2024 PHB Vex weapon mastery — previous hit with a Vex weapon by this
+        // char on this target grants advantage on the next attack. Consume the
+        // tag immediately (RAW: lasts until end of your next turn, but for our
+        // single-attack action model, one-shot is closer to what players
+        // expect).
+        const vexTag = `vexed_by_${char.id}`;
+        const vexAdv = !!st.entities?.find(
+          (e) => e.id === targetId && e.isEnemy && e.conditions.includes(vexTag)
         );
-        const enemyEnt = st.entities?.find((e) => e.id === targetId && e.isEnemy);
-        const curEnemyHp = enemyEnt?.hp ?? 0;
-        const newEnemyHp = curEnemyHp - finalDmg;
-
-        narrative += buildCombatHitNarrative(target, weaponItem, finalDmg, isCrit, char, context);
-        narrative += atkNote;
-        if (isCrit && assassinAutoCrit)
-          narrative += ` [Assassinate — auto-crit on surprised target!]`;
-        if (sacredWeaponBonus > 0) narrative += ` [Sacred Weapon: +${sacredWeaponBonus} to hit]`;
-        if (sneakDmg > 0) {
-          // Crits double the Sneak Attack die count too (SRD 5.2.1 crit
-          // rule applies to ALL dice rolled for the attack, including
-          // Sneak Attack). Show the doubled expression on crits so
-          // "1d6: +9" doesn't read as an impossible roll.
-          const saExpr = sneakAttackDice(char.level);
-          const saLabel = isCrit ? `${parseInt(saExpr) * 2}d6 (crit)` : saExpr;
-          narrative += ` [Sneak Attack ${saLabel}: +${sneakDmg}]`;
+        if (vexAdv) {
+          st = {
+            ...st,
+            entities: (st.entities ?? []).map((e) =>
+              e.id === targetId && e.isEnemy
+                ? { ...e, conditions: e.conditions.filter((c) => c !== vexTag) }
+                : e
+            ),
+          };
         }
-        if (rageBonus > 0) narrative += ` [Rage: +${rageBonus}]`;
-        if (dmgNote) narrative += dmgNote;
 
-        st = pushEvent(st, {
-          kind: 'attack_hit',
-          attackerId: char.id,
-          attackerName: char.name,
-          targetId,
-          targetName: target.name,
-          damage: finalDmg,
-          damageType: weaponItem?.damageType ?? 'physical',
-          isCrit,
-          toHit: atk.total,
-          targetAc: target.ac,
-          round: st.round ?? 1,
-        });
+        // 2024 PHB Fighter L13 Studied Attacks — same shape as Vex but seeded
+        // by a *miss* on a prior turn (mark applied in the miss branch above).
+        const studyTag = `studied_by_${char.id}`;
+        const studyAdv = !!st.entities?.find(
+          (e) => e.id === targetId && e.isEnemy && e.conditions.includes(studyTag)
+        );
+        if (studyAdv) {
+          st = {
+            ...st,
+            entities: (st.entities ?? []).map((e) =>
+              e.id === targetId && e.isEnemy
+                ? { ...e, conditions: e.conditions.filter((c) => c !== studyTag) }
+                : e
+            ),
+          };
+        }
 
-        // ── 2024 PHB Cunning Strike effect application ───────────────────────
-        // If the Rogue pre-committed an effect AND Sneak Attack damage
-        // was rolled (i.e. SA triggered on this hit), apply the effect.
-        if (char.turn_actions.cunning_strike_pending && sneakDmg > 0 && newEnemyHp > 0) {
-          const csEffect = char.turn_actions.cunning_strike_pending;
-          const csDc = 8 + profBonus(char.level) + abilityMod(char.dex);
-          char.turn_actions = { ...char.turn_actions, cunning_strike_pending: undefined };
-          if (csEffect === 'trip') {
-            const enemyDex = (target.dex ?? 10) as number;
-            const dexSave = rollDice('1d20') + abilityMod(enemyDex);
-            if (dexSave < csDc) {
-              st = {
-                ...st,
-                entities: (st.entities ?? []).map((e) =>
-                  e.id === targetId && e.isEnemy
-                    ? { ...e, conditions: [...e.conditions.filter((c) => c !== 'prone'), 'prone'] }
-                    : e
-                ),
-              };
-              st = pushEvent(st, {
-                kind: 'condition_applied',
-                targetId,
-                targetName: target.name,
-                condition: 'prone',
-                source: 'Cunning Strike: Trip',
-                round: st.round ?? 1,
-              });
-              narrative += ` [Cunning Strike — Trip: DEX ${dexSave} vs DC ${csDc} — ${target.name} is prone!]`;
-            } else {
-              narrative += ` [Cunning Strike — Trip: DEX ${dexSave} vs DC ${csDc} — resists]`;
+        // Path of the Totem Warrior — Wolf (PHB p.51): "While raging, your
+        // allies have advantage on melee attack rolls against any creature
+        // within 5 feet of you that is hostile to you." Find any Wolf-totem
+        // barbarian in the party who's raging and adjacent to the target.
+        const wolfAdv =
+          weaponItem?.range !== 'ranged' &&
+          !!st.entities &&
+          st.characters.some((ally) => {
+            if (ally.id === char.id) return false;
+            if (ally.dead || ally.hp <= 0) return false;
+            if (ally.subclass !== 'totem_warrior') return false;
+            if (ally.character_class.toLowerCase() !== 'barbarian') return false;
+            if (!ally.conditions.includes('raging')) return false;
+            const allyEnt = st.entities?.find((e) => e.id === ally.id);
+            const targetEnt = st.entities?.find((e) => e.id === targetId && e.isEnemy);
+            if (!allyEnt || !targetEnt) return false;
+            return distanceFeet(allyEnt.pos, targetEnt.pos) <= 5;
+          });
+
+        const disadvantage =
+          rangedInMelee ||
+          conditionDisadv ||
+          exhaustionDisadv ||
+          heavyEncumberedDisadv ||
+          heavyWeaponSmallDisadv ||
+          !armorProficient ||
+          proneDisadv ||
+          thrownLongRangeDisadv;
+        // Heroic Inspiration spent this turn — grants advantage on the next
+        // attack roll, then both the pending flag and char.inspiration clear.
+        const inspirationAdv = !!char.turn_actions.inspiration_pending;
+        if (inspirationAdv) {
+          char.turn_actions = { ...char.turn_actions, inspiration_pending: false };
+          char.inspiration = false;
+        }
+        const advantage =
+          conditionAdv ||
+          enemyGrappled ||
+          proneAdv ||
+          enemyParalyzed ||
+          flankingAdv ||
+          helpAdv ||
+          assassinAdv ||
+          vowAdv ||
+          recklessAdv ||
+          inspirationAdv ||
+          wolfAdv ||
+          vexAdv ||
+          studyAdv ||
+          packTacticsAdv;
+        const disadvReasons = [
+          rangedInMelee ? 'ranged in melee' : '',
+          conditionDisadv ? char.conditions.filter((c) => DISADV_CONDITIONS.has(c)).join(', ') : '',
+          exhaustionDisadv ? 'exhaustion' : '',
+          heavyEncumberedDisadv ? 'heavily encumbered' : '',
+          heavyWeaponSmallDisadv ? 'heavy weapon — Small creature' : '',
+          !armorProficient ? `not proficient with ${equippedArmorLootItem?.name ?? 'armor'}` : '',
+          proneDisadv ? 'prone (ranged)' : '',
+          thrownLongRangeDisadv ? 'thrown beyond normal range' : '',
+        ]
+          .filter(Boolean)
+          .join(', ');
+        const disadvNote = disadvReasons
+          ? ` (disadvantage — ${disadvReasons})`
+          : advantage && !disadvantage
+            ? ' (advantage)'
+            : '';
+        const noProfNote = !weaponProficient ? ` [no weapon proficiency — prof bonus omitted]` : '';
+
+        const features = context.classFeatures?.[char.character_class] ?? [];
+        const isRaging = char.conditions.includes('raging');
+
+        // Champion: Improved Critical — crit on 19–20 at level 3+
+        const critThresh =
+          char.subclass === 'champion' &&
+          char.character_class.toLowerCase() === 'fighter' &&
+          char.level >= 3
+            ? 19
+            : 20;
+        // Sacred Weapon: +CHA mod to attack rolls
+        const sacredWeaponBonus =
+          (char.class_resource_uses?.sacred_weapon_active ?? 0) > 0 ? abilityMod(char.cha) : 0;
+        // Guided Strike: +10 to attack roll (War Cleric Channel Divinity)
+        const guidedStrikeBonus = st.guided_strike_active ? 10 : 0;
+        const totalAttackBonus = sacredWeaponBonus + guidedStrikeBonus;
+        if (guidedStrikeBonus) st = { ...st, guided_strike_active: false };
+
+        // Helper that resolves one attack roll and applies it to enemy HP / narrative.
+        // Returns true if the enemy was killed (so the caller can break early).
+        const resolveOneAttack = (label: string): boolean => {
+          const effectiveEnemyAc = target.ac + coverAcBonus;
+          // Assassin auto-crit on surprised target (PHB p.97)
+          const assassinAutoCrit =
+            char.subclass === 'assassin' && (st.surprised ?? []).includes(targetId);
+          const atk = resolvePlayerAttack(
+            { str: char.str, dex: char.dex, level: char.level },
+            weaponDamage,
+            effectiveEnemyAc,
+            weaponItem?.finesse ?? false,
+            disadvantage,
+            advantage,
+            weaponProficient,
+            weaponItem?.range === 'ranged',
+            critThresh,
+            totalAttackBonus,
+            char.species === 'halfling'
+          );
+          // Bardic Inspiration consumption on attack roll (2024 PHB p.52).
+          // If the wielder has a stashed BI die, roll it and add to the to-hit
+          // total. If that turns a miss into a hit, atk.hit flips to true AND
+          // we need to roll damage (resolvePlayerAttack returned damage=0 on
+          // the original miss; flipping hit without rolling damage produced
+          // {{dmg|0}} hit narratives).
+          let biNote = '';
+          if (char.bardic_inspiration_die && !atk.fumble) {
+            const biRoll = rollDice(`1${char.bardic_inspiration_die}`);
+            atk.total += biRoll;
+            const newHit = atk.roll === 20 || atk.total >= effectiveEnemyAc;
+            if (!atk.hit && newHit) {
+              atk.hit = true;
+              atk.damage = Math.max(1, rollDice(weaponDamage ?? '1d4') + atk.atkMod);
             }
-          } else if (csEffect === 'poison') {
-            const enemyCon = (target.con ?? 10) as number;
-            const conSave = rollDice('1d20') + abilityMod(enemyCon);
-            if (target.condition_immunities?.includes('poisoned')) {
-              narrative += ` [Cunning Strike — Poison: ${target.name} is immune]`;
-            } else if (conSave < csDc) {
+            biNote = ` ✦ Bardic Inspiration: +${biRoll} (${char.bardic_inspiration_die})`;
+            char.bardic_inspiration_die = undefined;
+          }
+          // Bless (PHB p.219): blessed creatures add +1d4 to attack rolls.
+          // Doesn't consume; the buff lasts until the caster's concentration
+          // drops. Surfaced in atkNote alongside Bardic Inspiration. Same
+          // miss-to-hit damage-roll concern as BI above.
+          let blessNote = '';
+          if ((char.conditions ?? []).includes('blessed') && !atk.fumble) {
+            const blessRoll = rollDice('1d4');
+            atk.total += blessRoll;
+            const newHit = atk.roll === 20 || atk.total >= effectiveEnemyAc;
+            if (!atk.hit && newHit) {
+              atk.hit = true;
+              atk.damage = Math.max(1, rollDice(weaponDamage ?? '1d4') + atk.atkMod);
+            }
+            blessNote = ` ✦ Bless: +${blessRoll} (1d4)`;
+          }
+          // Unconscious or Assassin-surprised: force crit on hit
+          const autoCritCheck =
+            (enemyUnconscious &&
+              (!st.entities ||
+                (() => {
+                  const charEnt = st.entities?.find((e) => e.id === char.id);
+                  const enmEnt = st.entities?.find((e) => e.id === targetId);
+                  return charEnt && enmEnt
+                    ? posEqual(
+                        { x: charEnt.pos.x, y: charEnt.pos.y },
+                        { x: enmEnt.pos.x, y: enmEnt.pos.y }
+                      ) ||
+                        Math.max(
+                          Math.abs(charEnt.pos.x - enmEnt.pos.x),
+                          Math.abs(charEnt.pos.y - enmEnt.pos.y)
+                        ) <= 1
+                    : true;
+                })())) ||
+            assassinAutoCrit;
+          const isCrit = atk.critical || (autoCritCheck && atk.hit);
+          const baseHit = weaponDamage
+            ? isCrit && !atk.critical
+              ? Math.max(1, rollCritical(weaponDamage) + atk.atkMod)
+              : atk.damage
+            : Math.max(1, unarmedDamage(char.str));
+          const versatileNote = isVersatile ? ' (versatile)' : '';
+          const coverNote = coverAcBonus > 0 ? ` +${coverAcBonus} cover` : '';
+          const bonusNote = totalAttackBonus > 0 ? ` +${totalAttackBonus} bonus` : '';
+          const atkNote =
+            ' ' +
+            fmt.note(
+              `(${label}d20 ${atk.roll}+${atk.atkMod} ${atk.atkStat}+${atk.prof} prof${bonusNote} = ${atk.total} vs AC ${effectiveEnemyAc}${coverNote}${disadvNote}${versatileNote})${noProfNote}${biNote}${blessNote}`
+            );
+
+          if (atk.fumble) {
+            // 2024 PHB — a Nat 1 on a d20 grants Heroic Inspiration. Failure
+            // becomes the seed of next turn's success.
+            let inspirationNote = '';
+            if (!char.inspiration) {
+              char.inspiration = true;
+              inspirationNote = ` ✦ Heroic Inspiration granted (${char.name}).`;
+            }
+            narrative += `Natural 1 — a fumble! ${weaponLabel} goes completely wide.${atkNote}${inspirationNote} `;
+            st = pushEvent(st, {
+              kind: 'attack_miss',
+              attackerId: char.id,
+              attackerName: char.name,
+              targetId,
+              targetName: target.name,
+              toHit: atk.total,
+              targetAc: target.ac,
+              round: st.round ?? 1,
+            });
+            return false;
+          }
+          if (!atk.hit) {
+            narrative += pickTiered(context.narratives.combatMiss, hpTier(char)).replace(
+              /{enemy}/g,
+              target.name
+            );
+            narrative += atkNote + ' ';
+            st = pushEvent(st, {
+              kind: 'attack_miss',
+              attackerId: char.id,
+              attackerName: char.name,
+              targetId,
+              targetName: target.name,
+              toHit: atk.total,
+              targetAc: target.ac,
+              round: st.round ?? 1,
+            });
+            // 2024 PHB Fighter L13 — Studied Attacks. On miss, mark the target
+            // so this Fighter's next attack against them has advantage. Stored
+            // as a per-character tag so multiple Fighters can stack independently.
+            if (char.character_class.toLowerCase() === 'fighter' && char.level >= 13) {
+              const studyTag = `studied_by_${char.id}`;
               st = {
                 ...st,
                 entities: (st.entities ?? []).map((e) =>
                   e.id === targetId && e.isEnemy
                     ? {
                         ...e,
-                        conditions: [...e.conditions.filter((c) => c !== 'poisoned'), 'poisoned'],
+                        conditions: [...e.conditions.filter((c) => c !== studyTag), studyTag],
+                      }
+                    : e
+                ),
+              };
+              narrative += ` [Studied Attacks: advantage on next attack vs ${target.name}]`;
+            }
+            // 2024 PHB Graze weapon mastery (greatsword, glaive) — even on a
+            // miss, deal STR mod damage (DEX for Finesse weapons). Floor at 0.
+            if (
+              weaponItem?.mastery === 'graze' &&
+              (char.weapon_masteries ?? []).includes(weaponItem.id)
+            ) {
+              const grazeMod = weaponItem.finesse ? abilityMod(char.dex) : abilityMod(char.str);
+              const grazeDmg = Math.max(0, grazeMod);
+              if (grazeDmg > 0) {
+                const grazedHp = Math.max(0, target.hp - grazeDmg);
+                st = {
+                  ...st,
+                  entities: (st.entities ?? []).map((e) =>
+                    e.id === targetId && e.isEnemy ? { ...e, hp: grazedHp } : e
+                  ),
+                };
+                narrative += `[Graze: ${target.name} still takes ${fmt.dmg(grazeDmg)} damage from the swing.] `;
+              }
+            }
+            return false;
+          }
+
+          // ── Hit ──────────────────────────────────────────────────────────────
+          // Sneak Attack (SRD 5.2.1 — Rogue): once per turn, on a hit, with
+          // either advantage on the attack OR an ally within 5 ft of the
+          // target (and you don't have disadvantage). Weapon must be Finesse
+          // or Ranged.
+          let sneakDmg = 0;
+          if (features.includes('sneak_attack')) {
+            const isFinesseOrRanged =
+              (weaponItem?.finesse ?? false) || weaponItem?.range === 'ranged';
+            // "Ally within 5 ft of target" via grid (Chebyshev distance ≤ 1).
+            // When no grid is active, fall back to "any living ally" (the
+            // previous looser check).
+            let allyAdjacent = false;
+            if (st.entities) {
+              const targetEnt = st.entities.find((e) => e.id === targetId && e.isEnemy);
+              if (targetEnt) {
+                allyAdjacent = st.entities.some(
+                  (e) =>
+                    !e.isEnemy &&
+                    e.id !== char.id &&
+                    e.hp > 0 &&
+                    Math.max(
+                      Math.abs(e.pos.x - targetEnt.pos.x),
+                      Math.abs(e.pos.y - targetEnt.pos.y)
+                    ) <= 1
+                );
+              }
+            } else {
+              allyAdjacent = st.characters.some((c) => !c.dead && c.id !== char.id);
+            }
+            const hasAdv = advantage && !disadvantage;
+            const triggers = (hasAdv || allyAdjacent) && !disadvantage;
+            if (isFinesseOrRanged && triggers) {
+              const saExpr = sneakAttackDice(char.level);
+              sneakDmg = isCrit ? rollCritical(saExpr) : rollDice(saExpr);
+              // 2024 PHB Cunning Strike: if the player pre-committed an
+              // effect, subtract one die from the SA roll (average 3.5 on
+              // 1d6) and stage the effect for application after the hit
+              // resolves and damage is committed.
+              if (char.turn_actions.cunning_strike_pending) {
+                sneakDmg = Math.max(0, sneakDmg - rollDice('1d6'));
+              }
+            }
+          }
+
+          // Rage damage bonus: STR-based attacks only (PHB p.48)
+          const rageBonus =
+            features.includes('rage') && isRaging && atk.atkStat === 'STR'
+              ? rageDamageBonus(char.level)
+              : 0;
+
+          const rawDmg = baseHit + sneakDmg + rageBonus;
+          const { damage: finalDmg, note: dmgNote } = applyDamageMultiplier(
+            rawDmg,
+            weaponItem?.damageType,
+            target
+          );
+          const enemyEnt = st.entities?.find((e) => e.id === targetId && e.isEnemy);
+          const curEnemyHp = enemyEnt?.hp ?? 0;
+          const newEnemyHp = curEnemyHp - finalDmg;
+
+          narrative += buildCombatHitNarrative(target, weaponItem, finalDmg, isCrit, char, context);
+          narrative += atkNote;
+          if (isCrit && assassinAutoCrit)
+            narrative += ` [Assassinate — auto-crit on surprised target!]`;
+          if (sacredWeaponBonus > 0) narrative += ` [Sacred Weapon: +${sacredWeaponBonus} to hit]`;
+          if (sneakDmg > 0) {
+            // Crits double the Sneak Attack die count too (SRD 5.2.1 crit
+            // rule applies to ALL dice rolled for the attack, including
+            // Sneak Attack). Show the doubled expression on crits so
+            // "1d6: +9" doesn't read as an impossible roll.
+            const saExpr = sneakAttackDice(char.level);
+            const saLabel = isCrit ? `${parseInt(saExpr) * 2}d6 (crit)` : saExpr;
+            narrative += ` [Sneak Attack ${saLabel}: +${sneakDmg}]`;
+          }
+          if (rageBonus > 0) narrative += ` [Rage: +${rageBonus}]`;
+          if (dmgNote) narrative += dmgNote;
+
+          st = pushEvent(st, {
+            kind: 'attack_hit',
+            attackerId: char.id,
+            attackerName: char.name,
+            targetId,
+            targetName: target.name,
+            damage: finalDmg,
+            damageType: weaponItem?.damageType ?? 'physical',
+            isCrit,
+            toHit: atk.total,
+            targetAc: target.ac,
+            round: st.round ?? 1,
+          });
+
+          // ── 2024 PHB Cunning Strike effect application ───────────────────────
+          // If the Rogue pre-committed an effect AND Sneak Attack damage
+          // was rolled (i.e. SA triggered on this hit), apply the effect.
+          if (char.turn_actions.cunning_strike_pending && sneakDmg > 0 && newEnemyHp > 0) {
+            const csEffect = char.turn_actions.cunning_strike_pending;
+            const csDc = 8 + profBonus(char.level) + abilityMod(char.dex);
+            char.turn_actions = { ...char.turn_actions, cunning_strike_pending: undefined };
+            if (csEffect === 'trip') {
+              const enemyDex = (target.dex ?? 10) as number;
+              const dexSave = rollDice('1d20') + abilityMod(enemyDex);
+              if (dexSave < csDc) {
+                st = {
+                  ...st,
+                  entities: (st.entities ?? []).map((e) =>
+                    e.id === targetId && e.isEnemy
+                      ? {
+                          ...e,
+                          conditions: [...e.conditions.filter((c) => c !== 'prone'), 'prone'],
+                        }
+                      : e
+                  ),
+                };
+                st = pushEvent(st, {
+                  kind: 'condition_applied',
+                  targetId,
+                  targetName: target.name,
+                  condition: 'prone',
+                  source: 'Cunning Strike: Trip',
+                  round: st.round ?? 1,
+                });
+                narrative += ` [Cunning Strike — Trip: DEX ${dexSave} vs DC ${csDc} — ${target.name} is prone!]`;
+              } else {
+                narrative += ` [Cunning Strike — Trip: DEX ${dexSave} vs DC ${csDc} — resists]`;
+              }
+            } else if (csEffect === 'poison') {
+              const enemyCon = (target.con ?? 10) as number;
+              const conSave = rollDice('1d20') + abilityMod(enemyCon);
+              if (target.condition_immunities?.includes('poisoned')) {
+                narrative += ` [Cunning Strike — Poison: ${target.name} is immune]`;
+              } else if (conSave < csDc) {
+                st = {
+                  ...st,
+                  entities: (st.entities ?? []).map((e) =>
+                    e.id === targetId && e.isEnemy
+                      ? {
+                          ...e,
+                          conditions: [...e.conditions.filter((c) => c !== 'poisoned'), 'poisoned'],
+                        }
+                      : e
+                  ),
+                };
+                st = pushEvent(st, {
+                  kind: 'condition_applied',
+                  targetId,
+                  targetName: target.name,
+                  condition: 'poisoned',
+                  source: 'Cunning Strike: Poison',
+                  round: st.round ?? 1,
+                });
+                narrative += ` [Cunning Strike — Poison: CON ${conSave} vs DC ${csDc} — ${target.name} is poisoned!]`;
+              } else {
+                narrative += ` [Cunning Strike — Poison: CON ${conSave} vs DC ${csDc} — resists]`;
+              }
+            } else if (csEffect === 'withdraw') {
+              // Move half speed without provoking OAs this turn — represented
+              // by the existing `disengaged` flag, which suppresses OAs.
+              char.turn_actions = { ...char.turn_actions, disengaged: true };
+              narrative += ` [Cunning Strike — Withdraw: ${char.name} disengages without provoking OAs]`;
+            } else if (csEffect === 'disarm') {
+              // Pansori enemies don't carry weapons as separate items — model
+              // disarm as a `disarmed` condition the damage handler will read
+              // later. For now just narrate + apply the condition.
+              st = {
+                ...st,
+                entities: (st.entities ?? []).map((e) =>
+                  e.id === targetId && e.isEnemy
+                    ? {
+                        ...e,
+                        conditions: [...e.conditions.filter((c) => c !== 'disarmed'), 'disarmed'],
                       }
                     : e
                 ),
@@ -5120,1427 +5216,1625 @@ export async function takeAction({
                 kind: 'condition_applied',
                 targetId,
                 targetName: target.name,
-                condition: 'poisoned',
-                source: 'Cunning Strike: Poison',
+                condition: 'disarmed',
+                source: 'Cunning Strike: Disarm',
                 round: st.round ?? 1,
               });
-              narrative += ` [Cunning Strike — Poison: CON ${conSave} vs DC ${csDc} — ${target.name} is poisoned!]`;
-            } else {
-              narrative += ` [Cunning Strike — Poison: CON ${conSave} vs DC ${csDc} — resists]`;
+              narrative += ` [Cunning Strike — Disarm: ${target.name} drops their weapon!]`;
             }
-          } else if (csEffect === 'withdraw') {
-            // Move half speed without provoking OAs this turn — represented
-            // by the existing `disengaged` flag, which suppresses OAs.
-            char.turn_actions = { ...char.turn_actions, disengaged: true };
-            narrative += ` [Cunning Strike — Withdraw: ${char.name} disengages without provoking OAs]`;
-          } else if (csEffect === 'disarm') {
-            // Pansori enemies don't carry weapons as separate items — model
-            // disarm as a `disarmed` condition the damage handler will read
-            // later. For now just narrate + apply the condition.
-            st = {
-              ...st,
-              entities: (st.entities ?? []).map((e) =>
-                e.id === targetId && e.isEnemy
-                  ? {
-                      ...e,
-                      conditions: [...e.conditions.filter((c) => c !== 'disarmed'), 'disarmed'],
-                    }
-                  : e
-              ),
-            };
-            st = pushEvent(st, {
-              kind: 'condition_applied',
-              targetId,
-              targetName: target.name,
-              condition: 'disarmed',
-              source: 'Cunning Strike: Disarm',
-              round: st.round ?? 1,
-            });
-            narrative += ` [Cunning Strike — Disarm: ${target.name} drops their weapon!]`;
           }
-        }
 
-        // ── 2024 PHB Weapon Mastery on hit ────────────────────────────────────
-        // Apply the weapon's mastery property IF the PC has mastered this
-        // weapon. Mastery effects are post-damage so they don't change
-        // whether the hit lands.
-        if (
-          weaponItem?.mastery &&
-          newEnemyHp > 0 &&
-          (char.weapon_masteries ?? []).includes(weaponItem.id)
-        ) {
-          // 2024 PHB Fighter L9 Tactical Master — pre-armed swap wins over
-          // the weapon's printed mastery for this one attack. Clear the
-          // flag so it doesn't carry into the next swing.
-          let mastery = weaponItem.mastery;
-          if (char.turn_actions.tactical_master_mastery) {
-            mastery = char.turn_actions.tactical_master_mastery;
-            char.turn_actions = { ...char.turn_actions, tactical_master_mastery: undefined };
-            narrative += ` [Tactical Master: applying ${mastery.toUpperCase()}]`;
-          }
-          const weaponDc = 8 + profBonus(char.level) + abilityMod(char.str);
-          if (mastery === 'vex') {
-            // Mark target so this PC's next attack against them has adv.
-            // Stored as a condition with the char.id suffix so multiple PCs
-            // can vex independently.
-            const tag = `vexed_by_${char.id}`;
-            st = {
-              ...st,
-              entities: (st.entities ?? []).map((e) =>
-                e.id === targetId && e.isEnemy
-                  ? { ...e, conditions: [...e.conditions.filter((c) => c !== tag), tag] }
-                  : e
-              ),
-            };
-            narrative += ` [Vex: advantage on your next attack vs ${target.name}]`;
-          } else if (mastery === 'topple') {
-            const enemyCon = (target.con ?? 10) as number;
-            const conSave = rollDice('1d20') + abilityMod(enemyCon);
-            if (conSave < weaponDc) {
+          // ── 2024 PHB Weapon Mastery on hit ────────────────────────────────────
+          // Apply the weapon's mastery property IF the PC has mastered this
+          // weapon. Mastery effects are post-damage so they don't change
+          // whether the hit lands.
+          if (
+            weaponItem?.mastery &&
+            newEnemyHp > 0 &&
+            (char.weapon_masteries ?? []).includes(weaponItem.id)
+          ) {
+            // 2024 PHB Fighter L9 Tactical Master — pre-armed swap wins over
+            // the weapon's printed mastery for this one attack. Clear the
+            // flag so it doesn't carry into the next swing.
+            let mastery = weaponItem.mastery;
+            if (char.turn_actions.tactical_master_mastery) {
+              mastery = char.turn_actions.tactical_master_mastery;
+              char.turn_actions = { ...char.turn_actions, tactical_master_mastery: undefined };
+              narrative += ` [Tactical Master: applying ${mastery.toUpperCase()}]`;
+            }
+            const weaponDc = 8 + profBonus(char.level) + abilityMod(char.str);
+            if (mastery === 'vex') {
+              // Mark target so this PC's next attack against them has adv.
+              // Stored as a condition with the char.id suffix so multiple PCs
+              // can vex independently.
+              const tag = `vexed_by_${char.id}`;
               st = {
                 ...st,
                 entities: (st.entities ?? []).map((e) =>
                   e.id === targetId && e.isEnemy
-                    ? { ...e, conditions: [...e.conditions.filter((c) => c !== 'prone'), 'prone'] }
+                    ? { ...e, conditions: [...e.conditions.filter((c) => c !== tag), tag] }
+                    : e
+                ),
+              };
+              narrative += ` [Vex: advantage on your next attack vs ${target.name}]`;
+            } else if (mastery === 'topple') {
+              const enemyCon = (target.con ?? 10) as number;
+              const conSave = rollDice('1d20') + abilityMod(enemyCon);
+              if (conSave < weaponDc) {
+                st = {
+                  ...st,
+                  entities: (st.entities ?? []).map((e) =>
+                    e.id === targetId && e.isEnemy
+                      ? {
+                          ...e,
+                          conditions: [...e.conditions.filter((c) => c !== 'prone'), 'prone'],
+                        }
+                      : e
+                  ),
+                };
+                st = pushEvent(st, {
+                  kind: 'condition_applied',
+                  targetId,
+                  targetName: target.name,
+                  condition: 'prone',
+                  source: 'Topple (weapon mastery)',
+                  round: st.round ?? 1,
+                });
+                narrative += ` [Topple: CON ${conSave} vs DC ${weaponDc} — ${target.name} is prone!]`;
+              } else {
+                narrative += ` [Topple: CON ${conSave} vs DC ${weaponDc} — resists]`;
+              }
+            } else if (mastery === 'push') {
+              // Move target 10 ft (2 grid squares) directly away from the attacker.
+              const charEnt = st.entities?.find((e) => e.id === char.id);
+              const targetEnt = st.entities?.find((e) => e.id === targetId && e.isEnemy);
+              if (charEnt && targetEnt) {
+                const dx = Math.sign(targetEnt.pos.x - charEnt.pos.x);
+                const dy = Math.sign(targetEnt.pos.y - charEnt.pos.y);
+                const newPos = { x: targetEnt.pos.x + dx * 2, y: targetEnt.pos.y + dy * 2 };
+                st = {
+                  ...st,
+                  entities: (st.entities ?? []).map((e) =>
+                    e.id === targetId && e.isEnemy ? { ...e, pos: newPos } : e
+                  ),
+                };
+                narrative += ` [Push: ${target.name} shoved 10 ft back]`;
+              }
+            } else if (mastery === 'sap') {
+              // Disadvantage on target's next attack — tag with sapped_<charId>
+              st = {
+                ...st,
+                entities: (st.entities ?? []).map((e) =>
+                  e.id === targetId && e.isEnemy
+                    ? {
+                        ...e,
+                        conditions: [...e.conditions.filter((c) => c !== 'sapped'), 'sapped'],
+                      }
+                    : e
+                ),
+              };
+              narrative += ` [Sap: ${target.name} has disadvantage on its next attack]`;
+            } else if (mastery === 'slow') {
+              // Speed -10 ft until your next turn. Store as slowed_until_next_turn.
+              st = {
+                ...st,
+                entities: (st.entities ?? []).map((e) =>
+                  e.id === targetId && e.isEnemy
+                    ? {
+                        ...e,
+                        conditions: [...e.conditions.filter((c) => c !== 'slowed'), 'slowed'],
+                      }
+                    : e
+                ),
+              };
+              narrative += ` [Slow: ${target.name}'s speed -10 ft]`;
+            } else if (mastery === 'cleave') {
+              // 2024 PHB Cleave (greataxe, halberd) — on a hit, a second enemy
+              // within 5 ft of the target takes the weapon's damage die (no
+              // ability mod). Requires the grid to identify a neighbour.
+              const targetEnt = st.entities?.find((e) => e.id === targetId && e.isEnemy);
+              if (targetEnt && weaponItem.damage) {
+                const cleaveTarget = (st.entities ?? []).find(
+                  (e) =>
+                    e.isEnemy &&
+                    e.hp > 0 &&
+                    e.id !== targetId &&
+                    Math.max(
+                      Math.abs(e.pos.x - targetEnt.pos.x),
+                      Math.abs(e.pos.y - targetEnt.pos.y)
+                    ) <= 1
+                );
+                if (cleaveTarget) {
+                  const cleaveDmg = rollDice(weaponItem.damage);
+                  const cleaveNewHp = Math.max(0, cleaveTarget.hp - cleaveDmg);
+                  st = {
+                    ...st,
+                    entities: (st.entities ?? []).map((e) =>
+                      e.id === cleaveTarget.id ? { ...e, hp: cleaveNewHp } : e
+                    ),
+                  };
+                  const cleaveName = getEnemyById(seed, cleaveTarget.id)?.name ?? cleaveTarget.id;
+                  narrative += ` ${fmt.note(`[Cleave: ${cleaveName} also takes ${cleaveDmg} damage!${cleaveNewHp <= 0 ? ' (killed)' : ''}]`)}`;
+                  if (cleaveNewHp <= 0) {
+                    const cleaveXp = getEnemyById(seed, cleaveTarget.id)?.xp ?? 0;
+                    const cleaveSplit = splitEncounterXp(st, char.id, cleaveXp);
+                    st = cleaveSplit.st;
+                    char.xp = (char.xp || 0) + cleaveSplit.share;
+                    narrative += applyPartyLevelUps(st, char, context);
+                  }
+                }
+              }
+            }
+          }
+
+          if (newEnemyHp <= 0) {
+            const xpGain = target.xp ?? 10 + (target.hp || 8);
+            const killSplit = splitEncounterXp(st, char.id, xpGain);
+            st = killSplit.st;
+            const xpShare = killSplit.share;
+            char.xp = (char.xp || 0) + xpShare;
+            st = {
+              ...st,
+              entities: (st.entities ?? []).map((e) =>
+                e.id === targetId && e.isEnemy ? { ...e, hp: 0 } : e
+              ),
+            };
+            st.enemies_killed = [...st.enemies_killed, targetId];
+            narrative += grantDarkOnesBlessing(char);
+            // Only end combat once every enemy in the room is down
+            if (isRoomCleared(st, seed, roomId)) {
+              st = endCombatState(st);
+              char.conditions = char.conditions.filter((c) => c !== 'raging');
+            }
+            st = pushEvent(st, {
+              kind: 'kill',
+              attackerId: char.id,
+              attackerName: char.name,
+              victimId: targetId,
+              victimName: target.name,
+              xp: xpShare,
+              round: st.round ?? 1,
+            });
+            narrative +=
+              ' ' +
+              pick(context.narratives.killShot)
+                .replace('{enemy}', target.name)
+                .replace('{xp}', String(xpShare));
+            narrative += applyPartyLevelUps(st, char, context);
+            usedInitiative = true;
+            return true;
+          }
+          st = {
+            ...st,
+            entities: (st.entities ?? []).map((e) =>
+              e.id === targetId && e.isEnemy ? { ...e, hp: newEnemyHp } : e
+            ),
+          };
+          narrative += ` The ${target.name} has ${fmt.hp(newEnemyHp)} HP remaining. `;
+          return false;
+        };
+
+        // ── First attack ─────────────────────────────────────────────────────
+        const killed = resolveOneAttack('');
+        if (!killed) {
+          // ── Extra Attack (Fighter/Warrior level 5+) ───────────────────────
+          // SRD 5.2.1 p.90 "Loading": a Loading weapon fires only once per
+          // Action/Bonus/Reaction regardless of Extra Attack — so Fighter L5
+          // with a hand crossbow still gets just one shot per action.
+          const extraCount =
+            features.includes('extra_attack') && !weaponItem?.loading
+              ? extraAttackCount(char.character_class, char.level)
+              : 0;
+          for (let ei = 0; ei < extraCount; ei++) {
+            if ((st.entities?.find((e) => e.id === targetId && e.isEnemy)?.hp ?? 0) <= 0) break;
+            const killedExtra = resolveOneAttack(`Attack ${ei + 2} — `);
+            if (killedExtra) break;
+          }
+        }
+
+        // Action consumed. Initiative advances unless a bonus-action choice is available
+        // (checked after commitChar — see auto-advance block below the switch).
+        char.turn_actions = { ...char.turn_actions, action_used: true };
+        break;
+      }
+
+      case 'loot': {
+        if (!loot) {
+          narrative = pick(context.narratives.noLoot);
+          break;
+        }
+        if (!lootAvail) {
+          narrative = pick(context.narratives.alreadyLooted);
+          break;
+        }
+        // Hostile in the room — engage or escape, don't pocket items in plain
+        // sight. Defense for stale FE caches that might still show the choice.
+        if (enemyAlive) {
+          narrative = 'A hostile is watching — you cannot loot until the room is clear.';
+          break;
+        }
+        char.inventory = [...(char.inventory || []), { ...loot, instance_id: randomUUID() }];
+        // Track BOTH the roomId (for the lootAvail "already looted" gate) and
+        // the item id (so quest conditions like `loot_taken contains 'guild_ledger'`
+        // resolve correctly regardless of which room or container the item came
+        // from).
+        st.loot_taken = [...st.loot_taken, roomId, loot.id];
+        narrative = pick(context.narratives.lootPickedUp).replace(/{item}/g, loot.name);
+        // SRD 5.2.1 p.136 — magic items are unidentified on pickup until you
+        // spend a short rest examining them, OR a character with Arcana /
+        // Investigation skill IDs them on sight. Mundane quest items (the
+        // Guild Ledger, the cult idol, a locket) aren't magical and should
+        // never be flagged "unidentified" — gate on `requiresAttunement` as
+        // the proxy for "this is a real magic item."
+        const isMagicMisc = loot.type === 'misc' && !!loot.requiresAttunement;
+        const hasIdentify =
+          context.classSkills[char.character_class]?.some((s) =>
+            ['arcana', 'investigation'].includes(s)
+          ) ?? false;
+        if (isMagicMisc && !hasIdentify) {
+          narrative += ` [${loot.name}: unidentified]`;
+        } else {
+          narrative += ` [${loot.name}: ${loot.desc}]`;
+          if (hasIdentify && isMagicMisc) {
+            narrative += ' Your expertise lets you identify it immediately.';
+          }
+        }
+        break;
+      }
+
+      case 'use': {
+        const held = char.inventory?.find((i) => i.id === action.itemId);
+        if (!held) {
+          narrative = "You search your pack — you don't have that.";
+          break;
+        }
+        const itemData = getItemData(held, context);
+        const firstIdx = char.inventory.findIndex((i) => i.id === held.id);
+
+        if (itemData.slot === 'weapon') {
+          narrative = `The ${held.name} is ready. Use "attack" to strike, or "equip" to make it your active weapon.`;
+        } else if (itemData.slot === 'armor') {
+          narrative = `The ${held.name} offers protection. Use "equip" to don it for a +${itemData.ac_bonus || 0} AC bonus.`;
+        } else if (itemData.type === 'consumable') {
+          if (itemData.heal) {
+            const hasMedicine =
+              context.classSkills[char.character_class]?.includes('medicine') ?? false;
+            const healBonus = hasMedicine ? profBonus(char.level) : 0;
+            const healed = rollDice(itemData.heal) + healBonus;
+            const bonusNote = healBonus > 0 ? ` (+${healBonus} medicine)` : '';
+
+            // Resolve heal target — may be a different party member
+            const targetId = 'targetCharId' in action ? action.targetCharId : undefined;
+            const targetIdx = targetId
+              ? st.characters.findIndex((c) => c.id === targetId)
+              : safeIdx;
+            const isSelf = !targetId || targetIdx === safeIdx;
+
+            if (!isSelf && targetIdx >= 0) {
+              const target = st.characters[targetIdx];
+              const newHp = Math.min(target.max_hp, target.hp + healed);
+              st = {
+                ...st,
+                characters: st.characters.map((c, i) =>
+                  i === targetIdx ? { ...c, hp: newHp } : c
+                ),
+                // Sync the grid entity HP too so the battlefield renderer
+                // doesn't lag behind character state — a healed-back-up PC
+                // would otherwise still render as a faded skull until the
+                // next turn flushed the entities. Same fix on the self
+                // branch below.
+                entities: (st.entities ?? []).map((e) =>
+                  e.id === target.id && !e.isEnemy ? { ...e, hp: newHp } : e
+                ),
+              };
+              char.inventory = char.inventory.filter((_, i) => i !== firstIdx);
+              narrative = `${char.name} uses the ${held.name} on ${target.name} — ${fmt.hp(healed)} HP restored${bonusNote} (now ${fmt.hp(newHp, target.max_hp)}).`;
+            } else {
+              char.hp = Math.min(char.max_hp, char.hp + healed);
+              char.inventory = char.inventory.filter((_, i) => i !== firstIdx);
+              st = {
+                ...st,
+                entities: (st.entities ?? []).map((e) =>
+                  e.id === char.id && !e.isEnemy ? { ...e, hp: char.hp } : e
+                ),
+              };
+              narrative = `You use the ${held.name} and recover ${fmt.hp(healed)} HP${bonusNote} (now ${fmt.hp(char.hp, char.max_hp)}).`;
+            }
+          } else if (itemData.effect === 'con_advantage') {
+            char.inventory = char.inventory.filter((_, i) => i !== firstIdx);
+            const { roll1, roll2, best } = resolveSaveWithAdvantage(char.con);
+            narrative = `You use the ${held.name}. CON save with advantage: rolled ${roll1} and ${roll2} — keeping the ${best}. You feel steadier.`;
+          } else if (itemData.effect === 'mystery') {
+            char.inventory = char.inventory.filter((_, i) => i !== firstIdx);
+            const { result, value } = resolveMysteryConsumable();
+            if (result === 'heal') {
+              char.hp = Math.min(char.max_hp, char.hp + value);
+              narrative = `You use the ${held.name}. It tastes of regret and eucalyptus — but you feel better? +${fmt.hp(value)} HP.`;
+            } else if (result === 'hurt') {
+              char.hp = Math.max(1, char.hp - value);
+              narrative = `You use the ${held.name}. Immediate. Searing. Regret. -${fmt.hp(value)} HP.`;
+            } else {
+              narrative = `You use the ${held.name}. Nothing happens. You stand there feeling foolish.`;
+            }
+          } else {
+            narrative = `You use the ${held.name}. Something may have happened.`;
+          }
+        } else {
+          narrative = itemData.useNarrative || `You examine the ${held.name}. Might come in handy.`;
+        }
+        // SRD 5.2.1 p.204 (Using a Potion): "Drinking a potion or administering
+        // it to another creature requires a Bonus Action." Other consumables
+        // (scrolls, food, etc.) and item examinations remain a full action.
+        if (st.combat_active) {
+          const isPotionLike =
+            itemData.type === 'consumable' &&
+            (itemData.heal != null ||
+              itemData.effect === 'con_advantage' ||
+              itemData.effect === 'mystery');
+          if (isPotionLike) {
+            char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
+          } else {
+            char.turn_actions = { ...char.turn_actions, action_used: true };
+          }
+        }
+        break;
+      }
+
+      case 'death_save': {
+        // Unreachable in practice — the early-return block at "Death saves
+        // override all actions when HP = 0" (above the switch) catches every
+        // death_save while char.hp <= 0. Kept as a defensive fallback that
+        // mirrors the early block's effect, in case some future code path
+        // routes a death_save here with hp > 0 (shouldn't happen).
+        narrative = buildArrivalNarrative(roomId, st, seed, context);
+        break;
+      }
+
+      case 'sneak': {
+        if (!enemyAlive) {
+          narrative = 'Nothing to sneak past. You move freely.';
+          break;
+        }
+        const sneakDC = passivePerceptionDC(enemy.wis ?? 10);
+        // SRD p.6 — group ability check: every participant rolls; the group
+        // succeeds if at least half of them pass. Solo parties collapse to
+        // single-PC behavior. Only the active PC auto-spends Inspiration /
+        // Bardic Inspiration; passive party members keep their resources.
+        // Swap the active PC's slot for our local `char` ref so the resource
+        // mutations apply to the same object that gets written back to state.
+        const livingParty = st.characters
+          .filter((c) => !c.dead)
+          .map((c) => (c.id === char.id ? char : c));
+        const rolls = livingParty.map((member) => {
+          const isActive = member.id === char.id;
+          const proficient =
+            context.classSkills[member.character_class]?.includes('stealth') ?? false;
+          const exhaustionDisadv1 = (member.exhaustion_level ?? 0) >= 1;
+          const checkDisadv = exhaustionDisadv1 || isHeavilyEncumbered(member);
+          const inspAdv = isActive ? consumeInspirationForCheck(member) : false;
+          const bardicRoll = isActive ? consumeBardicForCheck(member) : 0;
+          const check = skillCheck(
+            member.dex,
+            sneakDC - bardicRoll,
+            proficient,
+            member.level,
+            checkDisadv,
+            false,
+            false,
+            inspAdv,
+            member.species === 'halfling'
+          );
+          return { name: member.name, check, mod: abilityMod(member.dex) };
+        });
+        const successes = rolls.filter((r) => r.check.success).length;
+        const groupPasses = 2 * successes >= livingParty.length;
+        const detailLines = rolls
+          .map(
+            (r) =>
+              `${r.name}: ${r.check.roll}+${r.mod}=${r.check.total} ${r.check.success ? '✓' : '✗'}`
+          )
+          .join('; ');
+        const groupNote =
+          livingParty.length > 1
+            ? ` Group check: ${successes}/${livingParty.length} pass${groupPasses ? '' : ' — group fails'}.`
+            : '';
+        if (groupPasses) {
+          narrative = pick(context.narratives.sneakSuccess).replace('{enemy}', enemy.name);
+          narrative += `${groupNote} (DC ${sneakDC}; ${detailLines})`;
+          if (adjacent.length > 0) {
+            const target = adjacent[0];
+            if (st.combat_active) {
+              st = endCombatState(st);
+              char.conditions = [];
+            }
+            st.current_room = target.id;
+            if (!st.visited_rooms.includes(target.id)) {
+              st.visited_rooms = [...st.visited_rooms, target.id];
+            }
+            narrative +=
+              ' ' +
+              buildArrivalNarrative(
+                target.id,
+                { ...st, characters: st.characters.map((c, i) => (i === safeIdx ? char : c)) },
+                seed,
+                context
+              );
+          }
+        } else {
+          narrative = `The party fails to slip past the ${enemy?.name ?? 'enemy'}.${groupNote} (DC ${sneakDC}; ${detailLines})`;
+        }
+        // Sneak always consumes the action and ends the combat turn
+        char.turn_actions = { ...char.turn_actions, action_used: true };
+        if (st.combat_active) usedInitiative = true;
+        break;
+      }
+
+      case 'escape': {
+        if (roomId !== context.escapeRoomId) {
+          narrative = pick(context.narratives.noEscapeNearby);
+          break;
+        }
+        if (enemyAlive) {
+          narrative = `The ${enemy.name} ${pick(context.narratives.escapeBlocked)}`;
+          break;
+        }
+        escaped = true;
+        narrative = pick(context.narratives.escapeLines).replace(/{world}/g, worldName);
+        break;
+      }
+
+      case 'pass': {
+        const cond =
+          char.conditions.find((c) => c === 'stunned' || c === 'paralyzed') ?? char.conditions[0];
+        narrative = cond
+          ? `${char.name} is ${cond} and cannot act. Turn passed.`
+          : `${char.name} passes their turn.`;
+        char.turn_actions = { ...char.turn_actions, action_used: true, bonus_action_used: true };
+        usedInitiative = true;
+        break;
+      }
+
+      case 'end_turn': {
+        narrative = `${char.name} ends their turn.`;
+        usedInitiative = true;
+        break;
+      }
+
+      case 'short_rest': {
+        if (st.combat_active) {
+          narrative = 'You cannot rest while in combat.';
+          break;
+        }
+        if (!canRestInRoom(st, seed)) {
+          narrative = 'You cannot rest here — an enemy is present.';
+          break;
+        }
+        if ((st.short_rested_rooms ?? []).includes(roomId)) {
+          narrative = 'You have already rested in this room.';
+          break;
+        }
+        if ((char.hit_dice_remaining ?? 0) <= 0) {
+          narrative = 'You have no hit dice remaining.';
+          break;
+        }
+        if (char.hp >= char.max_hp) {
+          narrative = 'You are already at full health.';
+          break;
+        }
+
+        const hdRoll = rollDice(`1d${char.hit_die ?? 8}`) + abilityMod(char.con);
+        const hdHealed = Math.max(1, hdRoll);
+        char.hp = Math.min(char.max_hp, char.hp + hdHealed);
+        char.hit_dice_remaining = Math.max(0, (char.hit_dice_remaining ?? 1) - 1);
+        st.short_rested_rooms = [...(st.short_rested_rooms ?? []), roomId];
+
+        // Short-rest class resource recharge
+        const srUses = { ...(char.class_resource_uses ?? {}) };
+        const cls = char.character_class.toLowerCase();
+        // 2024 PHB Dragonborn Breath Weapon recovers on short rest.
+        if (char.species === 'dragonborn') delete srUses.breath_weapon_used;
+        // 2024 PHB Goliath Large Form recovers on short rest.
+        if (char.species === 'goliath') delete srUses.large_form_used;
+        // 2024 PHB Orc Adrenaline Rush recovers on short rest.
+        if (char.species === 'orc') delete srUses.adrenaline_rush_used;
+        // Fighter: Second Wind + Action Surge recover on short rest
+        if (cls === 'fighter') {
+          delete srUses.second_wind;
+          delete srUses.action_surge;
+        }
+        // Bard L5+: Bardic Inspiration recharges on short rest; before L5 only on long rest
+        if (cls === 'bard' && char.level >= 5) delete srUses.bardic_inspiration;
+        // Monk: Ki points recharge on short rest
+        if (cls === 'monk') delete srUses.ki_points;
+        // Druid: Wild Shape recharges on short rest
+        if (cls === 'druid') srUses.wild_shape = 2;
+        // Circle of the Land — Natural Recovery (PHB p.68): once per long rest,
+        // during a short rest, recover spell slots totaling ≤ ceil(level/2)
+        // slot levels. We auto-spend on the lowest slots first for impact.
+        let naturalRecoveryNarr = '';
+        if (cls === 'druid' && char.subclass === 'land' && !(srUses.natural_recovery_used ?? 0)) {
+          let budget = Math.ceil(char.level / 2);
+          const slotsMax = char.spell_slots_max ?? {};
+          const slotsUsedSr = { ...(char.spell_slots_used ?? {}) };
+          const recovered: number[] = [];
+          for (const lvlKey of Object.keys(slotsMax)
+            .map(Number)
+            .sort((a, b) => a - b)) {
+            while (budget >= lvlKey && (slotsUsedSr[lvlKey] ?? 0) > 0) {
+              slotsUsedSr[lvlKey] = (slotsUsedSr[lvlKey] ?? 0) - 1;
+              budget -= lvlKey;
+              recovered.push(lvlKey);
+            }
+          }
+          if (recovered.length > 0) {
+            char.spell_slots_used = slotsUsedSr;
+            srUses.natural_recovery_used = 1;
+            naturalRecoveryNarr = ` 🌿 Natural Recovery — restored ${recovered.length} slot(s) [${recovered.join(', ')}].`;
+          }
+        }
+        // Cleric/Paladin: Channel Divinity recharges on short rest
+        if (cls === 'cleric' || cls === 'paladin')
+          srUses.channel_divinity = char.level >= 6 ? 2 : 1;
+        // Battle Master: Superiority Dice recharge on short rest
+        if (char.subclass === 'battle_master') delete srUses.superiority_dice;
+        // Colossus Slayer resets each turn (already reset per-turn); clean up at rest
+        delete srUses.colossus_slayer_used;
+        // Warlock: Pact Magic slots recharge on short rest
+        if (cls === 'warlock') {
+          const warlockSlots = spellSlotsForClassLevel('warlock', char.level);
+          char.spell_slots_max = warlockSlots;
+          char.spell_slots_used = {};
+          // Archfey: Fey Presence recharges on short rest (PHB p.109)
+          delete srUses.fey_presence_used;
+        }
+        char.class_resource_uses = srUses;
+
+        const hdRemain = char.hit_dice_remaining;
+        const shortRestFlavor = context.narratives.shortRest
+          ? pick(context.narratives.shortRest)
+              .replace(/{name}/g, char.name)
+              .replace(/{hpGained}/g, String(hdHealed))
+              .replace(/{hpNow}/g, String(char.hp))
+              .replace(/{hpMax}/g, String(char.max_hp)) + ' '
+          : '';
+        narrative = `${shortRestFlavor}${char.name} takes a short rest, spending a d${char.hit_die ?? 8} — ${hdHealed} HP recovered (${hdRemain} hit ${hdRemain === 1 ? 'die' : 'dice'} remaining, now ${char.hp}/${char.max_hp}).${naturalRecoveryNarr}`;
+        break;
+      }
+
+      case 'long_rest': {
+        if (st.combat_active) {
+          narrative = 'You cannot rest while in combat.';
+          break;
+        }
+        if (!canRestInRoom(st, seed)) {
+          narrative = 'You cannot rest here — an enemy is present.';
+          break;
+        }
+        if (st.long_rested ?? false) {
+          narrative = 'You have already taken a long rest this session.';
+          break;
+        }
+
+        const restLines: string[] = [];
+        const restedChars = st.characters.map((c) => {
+          if (c.dead) return c;
+          const recovered = Math.max(1, Math.floor(c.level / 2));
+          const newHd = Math.min(c.level, (c.hit_dice_remaining ?? 0) + recovered);
+          restLines.push(
+            `${c.name}: HP ${c.hp}→${c.max_hp}, HD ${c.hit_dice_remaining ?? 0}→${newHd}`
+          );
+          const charFeatures = context.classFeatures?.[c.character_class] ?? [];
+          const restoredUses: Record<string, number> = { ...(c.class_resource_uses ?? {}) };
+          if (charFeatures.includes('rage')) restoredUses.rage_uses = rageUsesMax(c.level);
+          if (charFeatures.includes('wild_shape')) restoredUses.wild_shape = 2;
+          // Circle of the Land — Natural Recovery resets on long rest.
+          delete restoredUses.natural_recovery_used;
+          if (charFeatures.includes('sorcery_points')) restoredUses.sorcery_points = c.level;
+          if (charFeatures.includes('ki')) restoredUses.ki_points = c.level;
+          if (charFeatures.includes('channel_divinity'))
+            restoredUses.channel_divinity = c.level >= 6 ? 2 : 1;
+          delete restoredUses.action_surge;
+          delete restoredUses.second_wind;
+          delete restoredUses.colossus_slayer_used;
+          delete restoredUses.sacred_weapon_active;
+          // Long rest reduces exhaustion by 1 level (PHB p.291); full rest clears all other conditions
+          const newExhaustion = Math.max(0, (c.exhaustion_level ?? 0) - 1);
+          // 2024 PHB Human Resourceful — gain Heroic Inspiration after every
+          // Long Rest. Other species default to whatever inspiration state
+          // they had pre-rest.
+          const humanGrant = c.species === 'human';
+          // 2024 PHB Orc Relentless Endurance + Orc Adrenaline Rush both
+          // recharge on long rest; tracked under class_resource_uses.
+          if (c.species === 'orc') {
+            delete restoredUses.relentless_endurance_used;
+          }
+          // 2024 PHB Tiefling Infernal Legacy — racial Hellish Rebuke / Darkness
+          // 1/long rest.
+          if (c.species === 'tiefling') {
+            delete restoredUses.tiefling_rebuke_used;
+          }
+          return {
+            ...c,
+            hp: c.max_hp,
+            // Temp HP expires on a Long Rest (SRD 5.2.1 p.18)
+            temp_hp: 0,
+            hit_dice_remaining: newHd,
+            conditions: [],
+            condition_durations: {},
+            condition_sources: {},
+            class_resource_uses: restoredUses,
+            exhaustion_level: newExhaustion,
+            spell_slots_used: {},
+            inspiration: humanGrant ? true : c.inspiration,
+          };
+        });
+        st = { ...st, characters: restedChars, long_rested: true };
+        char = { ...restedChars[safeIdx] };
+        const longRestFlavor = context.narratives.longRest
+          ? pick(context.narratives.longRest).replace(/{party}/g, restLines.join('; ')) + ' '
+          : '';
+        narrative = `${longRestFlavor}The party takes a long rest. ${restLines.join('; ')}.`;
+        break;
+      }
+
+      // ── NPC: talk ────────────────────────────────────────────────────────────
+      case 'talk': {
+        const npc = seed.npcs?.[roomId];
+        if (!npc) {
+          narrative = 'There is no one to talk to here.';
+          break;
+        }
+        if (npcIsKilled(st, roomId)) {
+          narrative = 'They are dead.';
+          break;
+        }
+
+        const attitude = getNpcAttitude(st, npc);
+        if (attitude === 'hostile') {
+          narrative = `${npc.name} snarls at you and attacks!`;
+          break;
+        }
+
+        // Indifferent: require CHA (Persuasion) check
+        if (attitude === 'indifferent') {
+          const dc = npc.persuasionDC ?? 12;
+          const chaMod = abilityMod(char.cha);
+          const roll = rollDice('1d20') + chaMod + profBonus(char.level);
+          const success = roll >= dc;
+          if (success) {
+            st = { ...st, npc_attitudes: { ...st.npc_attitudes, [roomId]: 'friendly' } };
+            narrative = `You approach ${npc.name} with care (CHA check ${roll} vs DC ${dc} — success). ${npc.greeting}`;
+          } else {
+            narrative = `${npc.name} eyes you warily (CHA check ${roll} vs DC ${dc} — fail). They're not ready to talk yet.`;
+            break;
+          }
+        } else {
+          narrative = npc.greeting;
+        }
+
+        // Mark room as talked — responses become choices
+        if (!st.npc_talked.includes(roomId)) {
+          st = { ...st, npc_talked: [...st.npc_talked, roomId] };
+        }
+
+        // Append the response choices as inline hints in the narrative,
+        // matching the stage-direction format used on the buttons.
+        if (npc.responses.length > 0) {
+          narrative +=
+            ' [' + npc.responses.map((r) => `<To ${npc.name}> ${r.label}`).join(' | ') + ']';
+        }
+        if (st.combat_active) char.turn_actions = { ...char.turn_actions, action_used: true };
+        break;
+      }
+
+      // ── NPC: talk_response ───────────────────────────────────────────────────
+      case 'talk_response': {
+        const npc = seed.npcs?.[roomId];
+        if (!npc) {
+          narrative = 'There is no one here.';
+          break;
+        }
+
+        const idx = action.responseIdx;
+        const response = npc.responses[idx];
+        if (!response) {
+          narrative = 'Invalid response.';
+          break;
+        }
+
+        narrative = response.reply ? `${npc.name}: "${response.reply}"` : `${npc.name} nods.`;
+
+        // Apply any consequences attached to this response
+        if (response.consequences?.length) {
+          const narrativeParts: string[] = [];
+          for (const c of response.consequences) {
+            st = applyConsequence(c, st, seed, char.id, narrativeParts, context);
+          }
+          if (narrativeParts.length) narrative += ' ' + narrativeParts.join(' ');
+        }
+        break;
+      }
+
+      // ── NPC: buy ─────────────────────────────────────────────────────────────
+      case 'buy': {
+        const npc = seed.npcs?.[roomId];
+        if (!npc) {
+          narrative = 'There is no one to buy from.';
+          break;
+        }
+        if (getNpcAttitude(st, npc) !== 'friendly') {
+          narrative = `${npc.name} won't trade with you right now.`;
+          break;
+        }
+
+        if (char.gold < action.price) {
+          narrative = `You can't afford that — you only have ${char.gold}cr.`;
+          break;
+        }
+        const lootEntry = context.lootTable.find((l) => l.id === action.itemId);
+        if (!lootEntry) {
+          narrative = 'That item is not available.';
+          break;
+        }
+
+        char = {
+          ...char,
+          gold: char.gold - action.price,
+          inventory: [...char.inventory, { ...lootEntry, instance_id: randomUUID() }],
+        };
+        narrative = `You hand over ${action.price}cr and receive ${lootEntry.name}. ${npc.name} pockets the credits with a nod.`;
+        break;
+      }
+
+      // ── NPC: attack_npc ──────────────────────────────────────────────────────
+      // This action is the *trigger* that flips a non-hostile NPC hostile. After
+      // flipping, the NPC participates in grid combat as a regular enemy (via
+      // getLivingRoomEnemies + getEnemyById's npc: lookup). We immediately
+      // dispatch the regular Attack action against `npc:${roomId}` so the player
+      // doesn't waste a turn just changing attitude — the combat init runs and
+      // the attack resolves in the same response.
+      case 'attack_npc': {
+        const npc = seed.npcs?.[roomId];
+        if (!npc) {
+          narrative = 'There is no one to attack here.';
+          break;
+        }
+        if (npcIsKilled(st, roomId)) {
+          narrative = 'Already dead.';
+          break;
+        }
+        // Flip to hostile so getLivingRoomEnemies surfaces this NPC as an enemy.
+        st = { ...st, npc_attitudes: { ...st.npc_attitudes, [roomId]: 'hostile' } };
+        // Commit char back into state before the recursive dispatch.
+        commitChar();
+        return await takeAction({
+          action: { type: 'attack', targetEnemyId: `npc:${roomId}` },
+          history,
+          state: st,
+          seed,
+          context,
+        });
+      }
+
+      case 'disarm_trap': {
+        const trap = getRoomTrap(roomId, seed, context);
+        if (!trap || trapSpent(st, roomId)) {
+          narrative = 'There is no trap here to disarm.';
+          break;
+        }
+        // Must have detected it (passive Perception) to attempt disarm
+        if (!partyDetectsTrap(st.characters, trap)) {
+          narrative = 'You have not located the trap.';
+          break;
+        }
+        const hasToolProf =
+          char.tool_proficiencies?.some(
+            (t) => t.toLowerCase().includes('thieves') || t.toLowerCase().includes('hacking')
+          ) ?? false;
+        // Exhaustion 1+: disadvantage on ability checks (disarmTrap uses DEX)
+        // disarmTrap does not support disadvantage natively; apply by calling twice and taking lower
+        const exhaustionDisadv1Trap = (char.exhaustion_level ?? 0) >= 1;
+        const trapAttempt1 = disarmTrap(char.dex, char.level, hasToolProf);
+        const trapAttempt2 = exhaustionDisadv1Trap
+          ? disarmTrap(char.dex, char.level, hasToolProf)
+          : trapAttempt1;
+        const { roll, total } =
+          trapAttempt1.total <= trapAttempt2.total ? trapAttempt1 : trapAttempt2;
+        const profNote = hasToolProf ? ` (tool proficiency)` : '';
+        if (total >= trap.dc) {
+          st.traps_disarmed = [...(st.traps_disarmed ?? []), roomId];
+          narrative = `${trap.disarmSuccess} (DEX ${roll} + ${total - roll}${profNote} = ${total} vs DC ${trap.dc})`;
+        } else {
+          // Disarm failure — trap triggers
+          st.traps_triggered = [...(st.traps_triggered ?? []), roomId];
+          const trapDmg = rollDice(trap.damage);
+          char.hp = Math.max(0, char.hp - trapDmg);
+          let failNarr = `${trap.disarmFail} (DEX ${roll} + ${total - roll}${profNote} = ${total} vs DC ${trap.dc}). `;
+          failNarr += trap.triggerNarrative
+            .replace(/{name}/g, char.name)
+            .replace(/{dmg}/g, String(trapDmg));
+          narrative = failNarr;
+          if (trap.condition && char.hp > 0) {
+            char.conditions = [...new Set([...char.conditions, trap.condition])];
+            if (trap.conditionDuration)
+              char.condition_durations = {
+                ...char.condition_durations,
+                [trap.condition]: trap.conditionDuration,
+              };
+          }
+        }
+        char.turn_actions = { ...char.turn_actions, action_used: true };
+        break;
+      }
+
+      case 'apply_asi': {
+        if (!char.asi_pending) {
+          narrative = 'No Ability Score Improvement pending.';
+          break;
+        }
+        const stat = action.stat as AbilityKey;
+        char[stat] = (char[stat] ?? 10) + 2;
+        char.asi_pending = false;
+        const statName = { str: 'STR', dex: 'DEX', con: 'CON', int: 'INT', wis: 'WIS', cha: 'CHA' }[
+          stat
+        ];
+        narrative = `${char.name} increases ${statName} by 2 (now ${char[stat]})!`;
+        // CON increase retroactively raises max HP (per 5e PHB: apply to all existing levels)
+        if (stat === 'con') {
+          const bonus = Math.floor((char.con - 10) / 2) - Math.floor((char.con - 2 - 10) / 2);
+          char.max_hp = Math.max(1, char.max_hp + bonus * char.level);
+          char.hp = Math.min(char.max_hp, char.hp + bonus * char.level);
+          if (bonus > 0)
+            narrative += ` Max HP increased by ${bonus * char.level} (${bonus}/level × ${char.level} levels).`;
+        }
+        break;
+      }
+
+      case 'cast_spell': {
+        const { spellId, slotLevel } = action;
+        const isRitualCast =
+          (action as { type: 'cast_spell'; spellId: string; slotLevel: number; ritual?: boolean })
+            .ritual ?? false;
+        const spell = context.spellTable?.[spellId];
+        if (!spell) {
+          narrative = `Unknown spell: ${spellId}.`;
+          break;
+        }
+
+        // PHB p.144: cannot cast spells while wearing armor you are not proficient with
+        const spellArmorItem = char.equipped_armor
+          ? context.lootTable.find(
+              (l) => l.id === char.inventory?.find((i) => i.instance_id === char.equipped_armor)?.id
+            )
+          : null;
+        if (
+          spellArmorItem &&
+          !hasArmorProficiency(char.armor_proficiencies ?? [], spellArmorItem.armorCategory)
+        ) {
+          narrative = `You cannot cast spells while wearing ${spellArmorItem.name} — you are not proficient with ${spellArmorItem.armorCategory ?? 'this'} armor.`;
+          break;
+        }
+
+        // Deafened: cannot cast spells with verbal components
+        if (char.conditions.includes('deafened') && (spell as { verbal?: boolean }).verbal) {
+          narrative = `You cannot cast ${spell.name} while deafened — it requires a verbal component.`;
+          break;
+        }
+
+        // Ritual casting: no slot cost, only out of combat
+        if (isRitualCast) {
+          if (!(spell as { ritualCasting?: boolean }).ritualCasting) {
+            narrative = `${spell.name} cannot be cast as a ritual.`;
+            break;
+          }
+          if (st.combat_active) {
+            narrative = `Ritual casting takes 10 minutes — not usable in combat.`;
+            break;
+          }
+          // No slot consumed for ritual casting
+        }
+
+        // Spell preparation check (Cleric, Paladin, Druid)
+        const prepClasses = ['cleric', 'paladin', 'druid'];
+        if (
+          prepClasses.includes(char.character_class.toLowerCase()) &&
+          spell.level > 0 &&
+          !isRitualCast
+        ) {
+          const prepared = char.prepared_spells ?? [];
+          if (prepared.length > 0 && !prepared.includes(spellId)) {
+            // Reachable only as a safety net — the choice generator now
+            // filters unprepared spells out of the cast menu (see the
+            // prepClasses block in generateChoices). Prep is a long-rest
+            // action, so the message no longer suggests mid-combat prep.
+            narrative = `${spell.name} is not prepared. Prepare it on a long rest.`;
+            break;
+          }
+        }
+
+        // Break existing concentration if this spell also requires concentration (PHB p.203)
+        if (spell.concentration && char.concentrating_on) {
+          const { char: nc, st: ns } = breakConcentration(char, st);
+          char = nc;
+          st = ns;
+        }
+
+        // Expend a slot for non-cantrips (unless ritual)
+        if (spell.level > 0 && !isRitualCast) {
+          if (slotLevel < spell.level) {
+            narrative = `${spell.name} requires at least a level-${spell.level} slot.`;
+            break;
+          }
+          const slotsMax = (char.spell_slots_max ?? {})[slotLevel] ?? 0;
+          const slotsUsed = (char.spell_slots_used ?? {})[slotLevel] ?? 0;
+          if (slotsUsed >= slotsMax) {
+            narrative = `No level-${slotLevel} spell slots remaining (recovered on long rest).`;
+            break;
+          }
+          char.spell_slots_used = { ...(char.spell_slots_used ?? {}), [slotLevel]: slotsUsed + 1 };
+        }
+
+        // 2024 PHB / SRD 5.2.1 — costly material components (Identify's 100 gp
+        // pearl, Revivify's 300 gp diamond, etc.) are consumed on cast. Block
+        // the cast if the caster can't afford it; deduct from gold otherwise.
+        if (spell.materialCost && spell.materialCost > 0) {
+          if ((char.gold ?? 0) < spell.materialCost) {
+            narrative = `${spell.name} requires a ${spell.materialCost} gp material component you don't have.`;
+            break;
+          }
+          char.gold = (char.gold ?? 0) - spell.materialCost;
+          narrative = `${char.name} expends a ${spell.materialCost} gp component. `;
+        }
+
+        // SRD 5.2.1 p.67 (Quickened Spell): after consuming Quickened, can't
+        // cast a level 1+ spell on the same turn EXCEPT the quickened cast
+        // itself (which is the spell that got "modified"). We detect the
+        // quickened cast via st.metamagic_active === 'quickened' being still
+        // active at the start of resolution.
+        const isQuickenedCast = st.metamagic_active === 'quickened';
+        if (
+          spell.level > 0 &&
+          !isRitualCast &&
+          char.turn_actions.quickened_used &&
+          !isQuickenedCast
+        ) {
+          narrative =
+            'You used Quickened Spell this turn — you cannot cast another level 1+ spell.';
+          break;
+        }
+
+        // Mark action economy
+        if (spell.castTime === 'bonus_action') {
+          char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
+        } else {
+          char.turn_actions = { ...char.turn_actions, action_used: true };
+        }
+        // Track that a leveled spell was cast this turn (for the Quickened
+        // activation check on a subsequent metamagic invocation).
+        if (spell.level > 0 && !isRitualCast) {
+          char.turn_actions = { ...char.turn_actions, leveled_spell_cast: true };
+        }
+        // Sorcerer · Wild Magic Surge (PHB p.103) — 1-in-20 chance after each
+        // leveled spell to trigger a chaotic effect. RAW rolls 1d20 and on a 1
+        // rolls a result on the Wild Magic table (d100). We use a small
+        // curated table appropriate to our engine's mechanics.
+        if (
+          spell.level > 0 &&
+          !isRitualCast &&
+          char.character_class.toLowerCase() === 'sorcerer' &&
+          char.subclass === 'wild_magic' &&
+          d(20) === 1
+        ) {
+          const surge = pick([
+            'You glow with a soft blue light for 1 minute (visible from 30 ft).',
+            'A poof of harmless multicolored smoke envelops you.',
+            `You regain 2d4 (${rollDice('2d4')}) hit points (Wild Magic Surge).`,
+            'Your hair (or scales, where applicable) turns vivid pink until your next long rest.',
+            'You feel a momentary disorientation — disadvantage on your next attack.',
+          ]);
+          // Apply mechanical effects where possible.
+          if (surge.startsWith('You regain')) {
+            const heal = rollDice('2d4');
+            char.hp = Math.min(char.max_hp, char.hp + heal);
+          }
+          narrative += ` 🌀 WILD MAGIC SURGE: ${surge}`;
+        }
+
+        const castingAbility = (context.spellcastingAbility?.[char.character_class] ??
+          context.classPrimaryStats[char.character_class] ??
+          'int') as AbilityKey;
+        const castingScore = char[castingAbility] ?? 10;
+        const slotNote = spell.level > 0 ? ` (level-${slotLevel} slot)` : ' (cantrip)';
+
+        // ── Heal spells ────────────────────────────────────────────────────────
+        if (spell.heal) {
+          const healMod = Math.max(0, Math.floor((castingScore - 10) / 2));
+          const baseHealed = rollDice(spell.heal) + healMod;
+          // Life Cleric: Disciple of Life — healing spells restore extra 2 + spell level HP
+          const discipleBonus =
+            char.subclass === 'life' && char.character_class.toLowerCase() === 'cleric'
+              ? 2 + (spell.level ?? 1)
+              : 0;
+          const healed = baseHealed + discipleBonus;
+          // Target the most injured party member (excluding the caster, unless only one)
+          const injured = st.characters.filter(
+            (c) => !c.dead && c.hp < c.max_hp && c.id !== char.id
+          );
+          const target =
+            injured.length > 0 ? injured.reduce((a, b) => (a.hp < b.hp ? a : b)) : char;
+          const isSelf = target.id === char.id;
+          const discipleNote = discipleBonus > 0 ? ` [Disciple of Life: +${discipleBonus}]` : '';
+          if (isSelf) {
+            char.hp = Math.min(char.max_hp, char.hp + healed);
+            narrative = `${char.name} casts ${spell.name}${slotNote} — restores ${healed} HP to self (now ${char.hp}/${char.max_hp}).${discipleNote}`;
+          } else {
+            const newHp = Math.min(target.max_hp, target.hp + healed);
+            st = {
+              ...st,
+              characters: st.characters.map((c) => (c.id === target.id ? { ...c, hp: newHp } : c)),
+              // Sync the grid entity HP so the battlefield reflects the heal
+              // immediately — `commitChar()` only syncs the caster's entity,
+              // not the target's, so without this the healed ally would
+              // still render as a faded skull until the next state update.
+              entities: (st.entities ?? []).map((e) =>
+                e.id === target.id && !e.isEnemy ? { ...e, hp: newHp } : e
+              ),
+            };
+            narrative = `${char.name} casts ${spell.name}${slotNote} — restores ${healed} HP to ${target.name} (now ${newHp}/${target.max_hp}).${discipleNote}`;
+          }
+          break;
+        }
+
+        // ── Utility spells (no damage, no save, no heal) ───────────────────────
+        if (!spell.damage && !spell.savingThrow && !spell.attackRoll && !spell.condition) {
+          narrative = spell.narrative
+            ? spell.narrative.replace('{name}', char.name)
+            : `${char.name} casts ${spell.name}${slotNote}.`;
+          // Bless (PHB p.219) — caster picks up to 3 creatures (RAW). Pansori
+          // simplifies: caster + first 2 living non-caster party members are
+          // blessed. Each gets +1d4 to attack rolls (saves are a follow-up).
+          // Concentration links the buff to the caster — `blessed` clears
+          // from all linked PCs when the Cleric's concentration drops.
+          if (spell.id === 'bless') {
+            // Mark caster as concentrating on bless. The runtime-mutated
+            // `char` reference is what gets written back to state.
+            char.concentrating_on = {
+              spellId: 'bless',
+              rounds_left: concentrationRoundsFor(spell),
+            };
+            // Pick the targets: caster (always) + up to 2 living allies.
+            const blessTargets: string[] = [char.id];
+            for (const c of st.characters) {
+              if (blessTargets.length >= 3) break;
+              if (c.id === char.id || c.dead) continue;
+              blessTargets.push(c.id);
+            }
+            const targetSet = new Set(blessTargets);
+            st = {
+              ...st,
+              characters: st.characters.map((c) => {
+                // The caster is mutated in place — don't overwrite our `char`
+                // ref with a spread (it'd silently drop the concentrating_on
+                // we just set). Skip; the post-cast state writeback handles it.
+                if (c.id === char.id) return c;
+                if (!targetSet.has(c.id) || (c.conditions ?? []).includes('blessed')) {
+                  return c;
+                }
+                return {
+                  ...c,
+                  conditions: [...(c.conditions ?? []), 'blessed'],
+                  condition_sources: {
+                    ...(c.condition_sources ?? {}),
+                    blessed: char.id,
+                  },
+                };
+              }),
+            };
+            // Apply blessed to the caster's local ref too.
+            if (!(char.conditions ?? []).includes('blessed')) {
+              char.conditions = [...(char.conditions ?? []), 'blessed'];
+              char.condition_sources = {
+                ...(char.condition_sources ?? {}),
+                blessed: char.id,
+              };
+            }
+            // Look up names for the narrative addendum.
+            const blessedNames = blessTargets
+              .map((id) => st.characters.find((c) => c.id === id)?.name ?? id)
+              .join(', ');
+            narrative += ` Blessed: ${blessedNames}.`;
+          }
+          break;
+        }
+
+        // ── Offensive spells — need a living enemy ─────────────────────────────
+        if (!enemy || !enemyAlive) {
+          narrative = pick(context.narratives.noEnemy);
+          break;
+        }
+
+        // Resolve targeted enemy: explicit targetEnemyId wins; fallback to first living
+        const spellTargetId: string =
+          (action as { type: 'cast_spell'; targetEnemyId?: string }).targetEnemyId ?? enemy.id;
+        const spellTarget: Enemy = livingEnemiesInRoom.find((e) => e.id === spellTargetId) ?? enemy;
+
+        // SRD 5.2.1 — enforce spell range against the grid when entities exist.
+        // 'self' spells need no target check (they originate from the caster).
+        // 'touch' = adjacent only (≤ 1 grid square / 5 ft).
+        // 'ranged' = up to spell.rangeFt feet of grid distance.
+        if (st.entities && spell.rangeKind && spell.rangeKind !== 'self') {
+          const casterEnt = st.entities.find((e) => e.id === char.id);
+          const targetEnt = st.entities.find((e) => e.id === spellTargetId && e.isEnemy);
+          if (casterEnt && targetEnt) {
+            const distFt = distanceFeet(casterEnt.pos, targetEnt.pos);
+            const maxFt = spell.rangeKind === 'touch' ? 5 : (spell.rangeFt ?? 0);
+            if (distFt > maxFt) {
+              narrative =
+                spell.rangeKind === 'touch'
+                  ? `${spell.name} requires a touch — the ${spellTarget.name} is ${distFt} ft away.`
+                  : `${spell.name} is out of range (${distFt} ft to target, max ${maxFt} ft).`;
+              // Refund the slot we just spent
+              if (spell.level > 0 && !isRitualCast) {
+                const slotsUsedRefund = char.spell_slots_used?.[slotLevel] ?? 1;
+                char.spell_slots_used = {
+                  ...(char.spell_slots_used ?? {}),
+                  [slotLevel]: Math.max(0, slotsUsedRefund - 1),
+                };
+              }
+              // Refund the action economy too
+              if (spell.castTime === 'bonus_action') {
+                char.turn_actions = { ...char.turn_actions, bonus_action_used: false };
+              } else {
+                char.turn_actions = { ...char.turn_actions, action_used: false };
+              }
+              if (spell.level > 0 && !isRitualCast) {
+                char.turn_actions = { ...char.turn_actions, leveled_spell_cast: false };
+              }
+              break;
+            }
+          }
+        }
+
+        const dc = spellSaveDC(char.level, castingScore);
+        let spellDmg = 0;
+        let spellHit = true;
+
+        // 2024 PHB Magic Missile / Eldritch Blast multi-target.
+        // Action payload `targetEnemyIds` lists one entry per dart/beam
+        // (duplicates = multiple on same target). Resolves each independently,
+        // then short-circuits the single-target damage path.
+        const castAction = action as { type: 'cast_spell'; targetEnemyIds?: string[] };
+        const multiTargets = castAction.targetEnemyIds;
+        if (
+          multiTargets &&
+          multiTargets.length > 1 &&
+          (spell.id === 'magic_missile' || spell.id === 'eldritch_blast')
+        ) {
+          const perShot = spell.id === 'magic_missile' ? '1d4+1' : '1d10';
+          const agonizingBonusPerBeam =
+            spell.id === 'eldritch_blast' && (char.feats ?? []).includes('agonizing_blast')
+              ? Math.max(0, abilityMod(char.cha))
+              : 0;
+          let totalDealt = 0;
+          const lines: string[] = [];
+          for (let i = 0; i < multiTargets.length; i++) {
+            const tid = multiTargets[i];
+            const tgtEnemy = livingEnemiesInRoom.find((e) => e.id === tid);
+            const tgtEnt = st.entities?.find((e) => e.id === tid && e.isEnemy);
+            if (!tgtEnemy || !tgtEnt || tgtEnt.hp <= 0) {
+              lines.push(`${i + 1}: ${tgtEnemy?.name ?? tid} — already down, fizzles.`);
+              continue;
+            }
+            if (spell.id === 'eldritch_blast') {
+              // Each beam rolls its own attack vs the target's AC.
+              const atkE = resolveSpellAttack(char.level, castingScore, tgtEnemy.ac);
+              if (!atkE.hit) {
+                lines.push(
+                  `${i + 1}: ${tgtEnemy.name} — MISS (${atkE.total} vs AC ${tgtEnemy.ac}).`
+                );
+                continue;
+              }
+              const dmgRoll = atkE.critical
+                ? rollCritical(perShot) + agonizingBonusPerBeam
+                : rollDice(perShot) + agonizingBonusPerBeam;
+              const { damage: effDmg, note } = applyDamageMultiplier(
+                dmgRoll,
+                spell.damageType,
+                tgtEnemy
+              );
+              const newHp = Math.max(0, tgtEnt.hp - effDmg);
+              st = {
+                ...st,
+                entities: (st.entities ?? []).map((e) =>
+                  e.id === tid && e.isEnemy ? { ...e, hp: newHp } : e
+                ),
+              };
+              totalDealt += effDmg;
+              lines.push(
+                `${i + 1}: ${tgtEnemy.name} — HIT ${effDmg}${atkE.critical ? ' CRIT' : ''}${note ?? ''}${newHp <= 0 ? ' (killed)' : ''}.`
+              );
+              if (newHp <= 0) {
+                const split = splitEncounterXp(st, char.id, tgtEnemy.xp ?? 0);
+                st = split.st;
+                char.xp = (char.xp || 0) + split.share;
+                st.enemies_killed = [...(st.enemies_killed ?? []), tid];
+              }
+            } else {
+              // Magic Missile — auto-hit, no attack roll.
+              const dmgRoll = rollDice(perShot);
+              const { damage: effDmg, note } = applyDamageMultiplier(
+                dmgRoll,
+                spell.damageType,
+                tgtEnemy
+              );
+              const newHp = Math.max(0, tgtEnt.hp - effDmg);
+              st = {
+                ...st,
+                entities: (st.entities ?? []).map((e) =>
+                  e.id === tid && e.isEnemy ? { ...e, hp: newHp } : e
+                ),
+              };
+              totalDealt += effDmg;
+              lines.push(
+                `dart ${i + 1} → ${tgtEnemy.name}: ${effDmg}${note ?? ''}${newHp <= 0 ? ' (killed)' : ''}.`
+              );
+              if (newHp <= 0) {
+                const split = splitEncounterXp(st, char.id, tgtEnemy.xp ?? 0);
+                st = split.st;
+                char.xp = (char.xp || 0) + split.share;
+                st.enemies_killed = [...(st.enemies_killed ?? []), tid];
+              }
+            }
+          }
+          if (isRoomCleared(st, seed, roomId)) {
+            st = endCombatState(st);
+          }
+          narrative = `${char.name} casts ${spell.name}${slotNote}! ${lines.join(' ')} Total: ${totalDealt} ${spell.damageType ?? 'damage'}.`;
+          narrative += applyPartyLevelUps(st, char, context);
+          usedInitiative = true;
+          spellDmg = 0; // Already applied per-target; skip the single-target block below.
+          spellHit = false; // Suppress the single-target damage application.
+          break;
+        }
+
+        if (spell.attackRoll) {
+          // ── Spell attack roll ──────────────────────────────────────────────
+          const atk = resolveSpellAttack(char.level, castingScore, spellTarget.ac);
+          spellHit = atk.hit;
+          const atkNote = ` (spell attack ${atk.roll}+${atk.bonus}=${atk.total} vs AC ${spellTarget.ac})`;
+          if (!spellHit) {
+            narrative = `${char.name} casts ${spell.name}${slotNote} — MISS!${atkNote}`;
+            break;
+          }
+          const atkDmgExpr =
+            spell.level === 0
+              ? cantripDamageDice(spell, char.level)
+              : upcastDamage(spell, slotLevel);
+          spellDmg = atk.critical
+            ? rollCritical(atkDmgExpr || null)
+            : rollDice(atkDmgExpr || '1d4');
+          // Agonizing Blast: Warlock invocation — add CHA mod to Eldritch Blast damage
+          const agonizingBonus =
+            spell.id === 'eldritch_blast' && (char.feats ?? []).includes('agonizing_blast')
+              ? Math.max(0, abilityMod(char.cha))
+              : 0;
+          spellDmg += agonizingBonus;
+          narrative = `${char.name} casts ${spell.name}${slotNote}!${atkNote} `;
+          if (atk.critical) narrative += 'Critical spell hit! ';
+          narrative += `${fmt.dmg(spellDmg)} ${spell.damageType ?? ''} damage!`;
+          if (agonizingBonus > 0) narrative += ` [Agonizing Blast: +${agonizingBonus}]`;
+        } else if (spell.savingThrow) {
+          // ── Saving throw spell ─────────────────────────────────────────────
+          const saveAbility = spell.savingThrow;
+          const enemyScore = (spellTarget as unknown as Record<string, number>)[saveAbility] ?? 10;
+          // Cover bonus to DEX saves (SRD 5.2.1 p.15): the spell originates from
+          // the caster, so half/three-quarters cover between caster→target
+          // applies to the target's DEX save against the spell. Other abilities
+          // are unaffected.
+          let saveCoverDexBonus = 0;
+          if (saveAbility === 'dex' && st.entities) {
+            const casterEntSave = st.entities.find((e) => e.id === char.id);
+            const targetEntSave = st.entities.find((e) => e.id === spellTargetId && e.isEnemy);
+            if (casterEntSave && targetEntSave) {
+              const obstaclesSave = [
+                ...st.entities
+                  .filter((e) => e.id !== char.id && e.id !== spellTargetId)
+                  .map((e) => e.pos),
+                ...roomObstacleCells,
+              ];
+              saveCoverDexBonus = coverBonus(casterEntSave.pos, targetEntSave.pos, obstaclesSave);
+            }
+          }
+          const targetEntForCond = st.entities?.find((e) => e.id === spellTargetId && e.isEnemy);
+          const saveFailed = rollConditionSave(
+            saveAbility,
+            enemyScore,
+            dc,
+            false,
+            char.level,
+            saveCoverDexBonus,
+            targetEntForCond?.conditions ?? []
+          );
+          const saveLabel = saveAbility.toUpperCase();
+
+          if (spell.damage) {
+            const saveDmgExpr =
+              spell.level === 0
+                ? cantripDamageDice(spell, char.level)
+                : upcastDamage(spell, slotLevel);
+            const fullDmg = rollDice(saveDmgExpr || spell.damage);
+            spellDmg = saveFailed
+              ? fullDmg
+              : spell.saveEffect === 'half'
+                ? Math.floor(fullDmg / 2)
+                : 0;
+            const saveVerb = saveFailed ? 'fails' : 'succeeds';
+            narrative = `${char.name} casts ${spell.name}${slotNote}! (${fmt.dc(dc)} ${saveLabel} save — ${spellTarget.name} ${saveVerb}.) `;
+            narrative +=
+              spellDmg > 0
+                ? `${fmt.dmg(spellDmg)} ${spell.damageType ?? ''} damage!`
+                : 'No damage.';
+            if (!saveFailed && spell.saveEffect === 'half') narrative += ' (half damage)';
+          } else {
+            narrative = `${char.name} casts ${spell.name}${slotNote}! (DC ${dc} ${saveLabel} save — `;
+            narrative += saveFailed
+              ? `${spellTarget.name} fails.)`
+              : `${spellTarget.name} succeeds.)`;
+          }
+
+          if (spell.condition && saveFailed) {
+            if (spellTarget.condition_immunities?.includes(spell.condition)) {
+              narrative += ` [${spellTarget.name} is immune to ${spell.condition}]`;
+            } else {
+              const condToApply = spell.condition!;
+              st = {
+                ...st,
+                entities: (st.entities ?? []).map((e) =>
+                  e.id === spellTargetId && e.isEnemy
+                    ? {
+                        ...e,
+                        conditions: [...e.conditions.filter((c) => c !== condToApply), condToApply],
+                      }
                     : e
                 ),
               };
               st = pushEvent(st, {
                 kind: 'condition_applied',
-                targetId,
-                targetName: target.name,
-                condition: 'prone',
-                source: 'Topple (weapon mastery)',
+                targetId: spellTargetId,
+                targetName: spellTarget.name,
+                condition: condToApply,
+                source: spell.name,
                 round: st.round ?? 1,
               });
-              narrative += ` [Topple: CON ${conSave} vs DC ${weaponDc} — ${target.name} is prone!]`;
-            } else {
-              narrative += ` [Topple: CON ${conSave} vs DC ${weaponDc} — resists]`;
+              narrative += ` The ${spellTarget.name} is ${condToApply}!`;
+              if (spell.concentration) {
+                char.concentrating_on = {
+                  spellId,
+                  condition: condToApply,
+                  rounds_left: concentrationRoundsFor(spell),
+                };
+              }
             }
-          } else if (mastery === 'push') {
-            // Move target 10 ft (2 grid squares) directly away from the attacker.
-            const charEnt = st.entities?.find((e) => e.id === char.id);
-            const targetEnt = st.entities?.find((e) => e.id === targetId && e.isEnemy);
-            if (charEnt && targetEnt) {
-              const dx = Math.sign(targetEnt.pos.x - charEnt.pos.x);
-              const dy = Math.sign(targetEnt.pos.y - charEnt.pos.y);
-              const newPos = { x: targetEnt.pos.x + dx * 2, y: targetEnt.pos.y + dy * 2 };
+            const { damage: effCondDmg, note: condDmgNote } = applyDamageMultiplier(
+              spellDmg,
+              spell.damageType,
+              spellTarget
+            );
+            if (condDmgNote) narrative += condDmgNote;
+            const enemyEntCond = st.entities?.find((e) => e.id === spellTargetId && e.isEnemy);
+            const curHpCond = enemyEntCond?.hp ?? 0;
+            const newEnemyHp = curHpCond - effCondDmg;
+            st = {
+              ...st,
+              entities: (st.entities ?? []).map((e) =>
+                e.id === spellTargetId && e.isEnemy ? { ...e, hp: Math.max(0, newEnemyHp) } : e
+              ),
+            };
+            if (newEnemyHp <= 0) {
+              const xpGain = spellTarget.xp ?? 10;
+              const split = splitEncounterXp(st, char.id, xpGain);
+              st = split.st;
+              const xpShare = split.share;
+              char.xp = (char.xp || 0) + xpShare;
               st = {
                 ...st,
                 entities: (st.entities ?? []).map((e) =>
-                  e.id === targetId && e.isEnemy ? { ...e, pos: newPos } : e
+                  e.id === spellTargetId && e.isEnemy ? { ...e, hp: 0 } : e
                 ),
               };
-              narrative += ` [Push: ${target.name} shoved 10 ft back]`;
-            }
-          } else if (mastery === 'sap') {
-            // Disadvantage on target's next attack — tag with sapped_<charId>
-            st = {
-              ...st,
-              entities: (st.entities ?? []).map((e) =>
-                e.id === targetId && e.isEnemy
-                  ? { ...e, conditions: [...e.conditions.filter((c) => c !== 'sapped'), 'sapped'] }
-                  : e
-              ),
-            };
-            narrative += ` [Sap: ${target.name} has disadvantage on its next attack]`;
-          } else if (mastery === 'slow') {
-            // Speed -10 ft until your next turn. Store as slowed_until_next_turn.
-            st = {
-              ...st,
-              entities: (st.entities ?? []).map((e) =>
-                e.id === targetId && e.isEnemy
-                  ? { ...e, conditions: [...e.conditions.filter((c) => c !== 'slowed'), 'slowed'] }
-                  : e
-              ),
-            };
-            narrative += ` [Slow: ${target.name}'s speed -10 ft]`;
-          } else if (mastery === 'cleave') {
-            // 2024 PHB Cleave (greataxe, halberd) — on a hit, a second enemy
-            // within 5 ft of the target takes the weapon's damage die (no
-            // ability mod). Requires the grid to identify a neighbour.
-            const targetEnt = st.entities?.find((e) => e.id === targetId && e.isEnemy);
-            if (targetEnt && weaponItem.damage) {
-              const cleaveTarget = (st.entities ?? []).find(
-                (e) =>
-                  e.isEnemy &&
-                  e.hp > 0 &&
-                  e.id !== targetId &&
-                  Math.max(
-                    Math.abs(e.pos.x - targetEnt.pos.x),
-                    Math.abs(e.pos.y - targetEnt.pos.y)
-                  ) <= 1
-              );
-              if (cleaveTarget) {
-                const cleaveDmg = rollDice(weaponItem.damage);
-                const cleaveNewHp = Math.max(0, cleaveTarget.hp - cleaveDmg);
-                st = {
-                  ...st,
-                  entities: (st.entities ?? []).map((e) =>
-                    e.id === cleaveTarget.id ? { ...e, hp: cleaveNewHp } : e
-                  ),
-                };
-                const cleaveName = getEnemyById(seed, cleaveTarget.id)?.name ?? cleaveTarget.id;
-                narrative += ` ${fmt.note(`[Cleave: ${cleaveName} also takes ${cleaveDmg} damage!${cleaveNewHp <= 0 ? ' (killed)' : ''}]`)}`;
-                if (cleaveNewHp <= 0) {
-                  const cleaveXp = getEnemyById(seed, cleaveTarget.id)?.xp ?? 0;
-                  const cleaveSplit = splitEncounterXp(st, char.id, cleaveXp);
-                  st = cleaveSplit.st;
-                  char.xp = (char.xp || 0) + cleaveSplit.share;
-                  narrative += applyPartyLevelUps(st, char, context);
-                }
+              st.enemies_killed = [...st.enemies_killed, spellTargetId];
+              char.concentrating_on = null;
+              narrative += grantDarkOnesBlessing(char);
+              if (isRoomCleared(st, seed, roomId)) {
+                st = endCombatState(st);
               }
+              narrative +=
+                ' ' +
+                pick(context.narratives.killShot)
+                  .replace('{enemy}', spellTarget.name)
+                  .replace('{xp}', String(xpShare));
+              narrative += applyPartyLevelUps(st, char, context);
             }
-          }
-        }
-
-        if (newEnemyHp <= 0) {
-          const xpGain = target.xp ?? 10 + (target.hp || 8);
-          const killSplit = splitEncounterXp(st, char.id, xpGain);
-          st = killSplit.st;
-          const xpShare = killSplit.share;
-          char.xp = (char.xp || 0) + xpShare;
-          st = {
-            ...st,
-            entities: (st.entities ?? []).map((e) =>
-              e.id === targetId && e.isEnemy ? { ...e, hp: 0 } : e
-            ),
-          };
-          st.enemies_killed = [...st.enemies_killed, targetId];
-          narrative += grantDarkOnesBlessing(char);
-          // Only end combat once every enemy in the room is down
-          if (isRoomCleared(st, seed, roomId)) {
-            st = endCombatState(st);
-            char.conditions = char.conditions.filter((c) => c !== 'raging');
-          }
-          st = pushEvent(st, {
-            kind: 'kill',
-            attackerId: char.id,
-            attackerName: char.name,
-            victimId: targetId,
-            victimName: target.name,
-            xp: xpShare,
-            round: st.round ?? 1,
-          });
-          narrative +=
-            ' ' +
-            pick(context.narratives.killShot)
-              .replace('{enemy}', target.name)
-              .replace('{xp}', String(xpShare));
-          narrative += applyPartyLevelUps(st, char, context);
-          usedInitiative = true;
-          return true;
-        }
-        st = {
-          ...st,
-          entities: (st.entities ?? []).map((e) =>
-            e.id === targetId && e.isEnemy ? { ...e, hp: newEnemyHp } : e
-          ),
-        };
-        narrative += ` The ${target.name} has ${fmt.hp(newEnemyHp)} HP remaining. `;
-        return false;
-      };
-
-      // ── First attack ─────────────────────────────────────────────────────
-      const killed = resolveOneAttack('');
-      if (!killed) {
-        // ── Extra Attack (Fighter/Warrior level 5+) ───────────────────────
-        // SRD 5.2.1 p.90 "Loading": a Loading weapon fires only once per
-        // Action/Bonus/Reaction regardless of Extra Attack — so Fighter L5
-        // with a hand crossbow still gets just one shot per action.
-        const extraCount =
-          features.includes('extra_attack') && !weaponItem?.loading
-            ? extraAttackCount(char.character_class, char.level)
-            : 0;
-        for (let ei = 0; ei < extraCount; ei++) {
-          if ((st.entities?.find((e) => e.id === targetId && e.isEnemy)?.hp ?? 0) <= 0) break;
-          const killedExtra = resolveOneAttack(`Attack ${ei + 2} — `);
-          if (killedExtra) break;
-        }
-      }
-
-      // Action consumed. Initiative advances unless a bonus-action choice is available
-      // (checked after commitChar — see auto-advance block below the switch).
-      char.turn_actions = { ...char.turn_actions, action_used: true };
-      break;
-    }
-
-    case 'loot': {
-      if (!loot) {
-        narrative = pick(context.narratives.noLoot);
-        break;
-      }
-      if (!lootAvail) {
-        narrative = pick(context.narratives.alreadyLooted);
-        break;
-      }
-      // Hostile in the room — engage or escape, don't pocket items in plain
-      // sight. Defense for stale FE caches that might still show the choice.
-      if (enemyAlive) {
-        narrative = 'A hostile is watching — you cannot loot until the room is clear.';
-        break;
-      }
-      char.inventory = [...(char.inventory || []), { ...loot, instance_id: randomUUID() }];
-      // Track BOTH the roomId (for the lootAvail "already looted" gate) and
-      // the item id (so quest conditions like `loot_taken contains 'guild_ledger'`
-      // resolve correctly regardless of which room or container the item came
-      // from).
-      st.loot_taken = [...st.loot_taken, roomId, loot.id];
-      narrative = pick(context.narratives.lootPickedUp).replace(/{item}/g, loot.name);
-      // SRD 5.2.1 p.136 — magic items are unidentified on pickup until you
-      // spend a short rest examining them, OR a character with Arcana /
-      // Investigation skill IDs them on sight. Mundane quest items (the
-      // Guild Ledger, the cult idol, a locket) aren't magical and should
-      // never be flagged "unidentified" — gate on `requiresAttunement` as
-      // the proxy for "this is a real magic item."
-      const isMagicMisc = loot.type === 'misc' && !!loot.requiresAttunement;
-      const hasIdentify =
-        context.classSkills[char.character_class]?.some((s) =>
-          ['arcana', 'investigation'].includes(s)
-        ) ?? false;
-      if (isMagicMisc && !hasIdentify) {
-        narrative += ` [${loot.name}: unidentified]`;
-      } else {
-        narrative += ` [${loot.name}: ${loot.desc}]`;
-        if (hasIdentify && isMagicMisc) {
-          narrative += ' Your expertise lets you identify it immediately.';
-        }
-      }
-      break;
-    }
-
-    case 'use': {
-      const held = char.inventory?.find((i) => i.id === action.itemId);
-      if (!held) {
-        narrative = "You search your pack — you don't have that.";
-        break;
-      }
-      const itemData = getItemData(held, context);
-      const firstIdx = char.inventory.findIndex((i) => i.id === held.id);
-
-      if (itemData.slot === 'weapon') {
-        narrative = `The ${held.name} is ready. Use "attack" to strike, or "equip" to make it your active weapon.`;
-      } else if (itemData.slot === 'armor') {
-        narrative = `The ${held.name} offers protection. Use "equip" to don it for a +${itemData.ac_bonus || 0} AC bonus.`;
-      } else if (itemData.type === 'consumable') {
-        if (itemData.heal) {
-          const hasMedicine =
-            context.classSkills[char.character_class]?.includes('medicine') ?? false;
-          const healBonus = hasMedicine ? profBonus(char.level) : 0;
-          const healed = rollDice(itemData.heal) + healBonus;
-          const bonusNote = healBonus > 0 ? ` (+${healBonus} medicine)` : '';
-
-          // Resolve heal target — may be a different party member
-          const targetId = 'targetCharId' in action ? action.targetCharId : undefined;
-          const targetIdx = targetId ? st.characters.findIndex((c) => c.id === targetId) : safeIdx;
-          const isSelf = !targetId || targetIdx === safeIdx;
-
-          if (!isSelf && targetIdx >= 0) {
-            const target = st.characters[targetIdx];
-            const newHp = Math.min(target.max_hp, target.hp + healed);
-            st = {
-              ...st,
-              characters: st.characters.map((c, i) => (i === targetIdx ? { ...c, hp: newHp } : c)),
-              // Sync the grid entity HP too so the battlefield renderer
-              // doesn't lag behind character state — a healed-back-up PC
-              // would otherwise still render as a faded skull until the
-              // next turn flushed the entities. Same fix on the self
-              // branch below.
-              entities: (st.entities ?? []).map((e) =>
-                e.id === target.id && !e.isEnemy ? { ...e, hp: newHp } : e
-              ),
-            };
-            char.inventory = char.inventory.filter((_, i) => i !== firstIdx);
-            narrative = `${char.name} uses the ${held.name} on ${target.name} — ${fmt.hp(healed)} HP restored${bonusNote} (now ${fmt.hp(newHp, target.max_hp)}).`;
-          } else {
-            char.hp = Math.min(char.max_hp, char.hp + healed);
-            char.inventory = char.inventory.filter((_, i) => i !== firstIdx);
-            st = {
-              ...st,
-              entities: (st.entities ?? []).map((e) =>
-                e.id === char.id && !e.isEnemy ? { ...e, hp: char.hp } : e
-              ),
-            };
-            narrative = `You use the ${held.name} and recover ${fmt.hp(healed)} HP${bonusNote} (now ${fmt.hp(char.hp, char.max_hp)}).`;
-          }
-        } else if (itemData.effect === 'con_advantage') {
-          char.inventory = char.inventory.filter((_, i) => i !== firstIdx);
-          const { roll1, roll2, best } = resolveSaveWithAdvantage(char.con);
-          narrative = `You use the ${held.name}. CON save with advantage: rolled ${roll1} and ${roll2} — keeping the ${best}. You feel steadier.`;
-        } else if (itemData.effect === 'mystery') {
-          char.inventory = char.inventory.filter((_, i) => i !== firstIdx);
-          const { result, value } = resolveMysteryConsumable();
-          if (result === 'heal') {
-            char.hp = Math.min(char.max_hp, char.hp + value);
-            narrative = `You use the ${held.name}. It tastes of regret and eucalyptus — but you feel better? +${fmt.hp(value)} HP.`;
-          } else if (result === 'hurt') {
-            char.hp = Math.max(1, char.hp - value);
-            narrative = `You use the ${held.name}. Immediate. Searing. Regret. -${fmt.hp(value)} HP.`;
-          } else {
-            narrative = `You use the ${held.name}. Nothing happens. You stand there feeling foolish.`;
-          }
-        } else {
-          narrative = `You use the ${held.name}. Something may have happened.`;
-        }
-      } else {
-        narrative = itemData.useNarrative || `You examine the ${held.name}. Might come in handy.`;
-      }
-      // SRD 5.2.1 p.204 (Using a Potion): "Drinking a potion or administering
-      // it to another creature requires a Bonus Action." Other consumables
-      // (scrolls, food, etc.) and item examinations remain a full action.
-      if (st.combat_active) {
-        const isPotionLike =
-          itemData.type === 'consumable' &&
-          (itemData.heal != null ||
-            itemData.effect === 'con_advantage' ||
-            itemData.effect === 'mystery');
-        if (isPotionLike) {
-          char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
-        } else {
-          char.turn_actions = { ...char.turn_actions, action_used: true };
-        }
-      }
-      break;
-    }
-
-    case 'death_save': {
-      // Unreachable in practice — the early-return block at "Death saves
-      // override all actions when HP = 0" (above the switch) catches every
-      // death_save while char.hp <= 0. Kept as a defensive fallback that
-      // mirrors the early block's effect, in case some future code path
-      // routes a death_save here with hp > 0 (shouldn't happen).
-      narrative = buildArrivalNarrative(roomId, st, seed, context);
-      break;
-    }
-
-    case 'sneak': {
-      if (!enemyAlive) {
-        narrative = 'Nothing to sneak past. You move freely.';
-        break;
-      }
-      const sneakDC = passivePerceptionDC(enemy.wis ?? 10);
-      // SRD p.6 — group ability check: every participant rolls; the group
-      // succeeds if at least half of them pass. Solo parties collapse to
-      // single-PC behavior. Only the active PC auto-spends Inspiration /
-      // Bardic Inspiration; passive party members keep their resources.
-      // Swap the active PC's slot for our local `char` ref so the resource
-      // mutations apply to the same object that gets written back to state.
-      const livingParty = st.characters
-        .filter((c) => !c.dead)
-        .map((c) => (c.id === char.id ? char : c));
-      const rolls = livingParty.map((member) => {
-        const isActive = member.id === char.id;
-        const proficient =
-          context.classSkills[member.character_class]?.includes('stealth') ?? false;
-        const exhaustionDisadv1 = (member.exhaustion_level ?? 0) >= 1;
-        const checkDisadv = exhaustionDisadv1 || isHeavilyEncumbered(member);
-        const inspAdv = isActive ? consumeInspirationForCheck(member) : false;
-        const bardicRoll = isActive ? consumeBardicForCheck(member) : 0;
-        const check = skillCheck(
-          member.dex,
-          sneakDC - bardicRoll,
-          proficient,
-          member.level,
-          checkDisadv,
-          false,
-          false,
-          inspAdv,
-          member.species === 'halfling'
-        );
-        return { name: member.name, check, mod: abilityMod(member.dex) };
-      });
-      const successes = rolls.filter((r) => r.check.success).length;
-      const groupPasses = 2 * successes >= livingParty.length;
-      const detailLines = rolls
-        .map(
-          (r) =>
-            `${r.name}: ${r.check.roll}+${r.mod}=${r.check.total} ${r.check.success ? '✓' : '✗'}`
-        )
-        .join('; ');
-      const groupNote =
-        livingParty.length > 1
-          ? ` Group check: ${successes}/${livingParty.length} pass${groupPasses ? '' : ' — group fails'}.`
-          : '';
-      if (groupPasses) {
-        narrative = pick(context.narratives.sneakSuccess).replace('{enemy}', enemy.name);
-        narrative += `${groupNote} (DC ${sneakDC}; ${detailLines})`;
-        if (adjacent.length > 0) {
-          const target = adjacent[0];
-          if (st.combat_active) {
-            st = endCombatState(st);
-            char.conditions = [];
-          }
-          st.current_room = target.id;
-          if (!st.visited_rooms.includes(target.id)) {
-            st.visited_rooms = [...st.visited_rooms, target.id];
-          }
-          narrative +=
-            ' ' +
-            buildArrivalNarrative(
-              target.id,
-              { ...st, characters: st.characters.map((c, i) => (i === safeIdx ? char : c)) },
-              seed,
-              context
-            );
-        }
-      } else {
-        narrative = `The party fails to slip past the ${enemy?.name ?? 'enemy'}.${groupNote} (DC ${sneakDC}; ${detailLines})`;
-      }
-      // Sneak always consumes the action and ends the combat turn
-      char.turn_actions = { ...char.turn_actions, action_used: true };
-      if (st.combat_active) usedInitiative = true;
-      break;
-    }
-
-    case 'escape': {
-      if (roomId !== context.escapeRoomId) {
-        narrative = pick(context.narratives.noEscapeNearby);
-        break;
-      }
-      if (enemyAlive) {
-        narrative = `The ${enemy.name} ${pick(context.narratives.escapeBlocked)}`;
-        break;
-      }
-      escaped = true;
-      narrative = pick(context.narratives.escapeLines).replace(/{world}/g, worldName);
-      break;
-    }
-
-    case 'pass': {
-      const cond =
-        char.conditions.find((c) => c === 'stunned' || c === 'paralyzed') ?? char.conditions[0];
-      narrative = cond
-        ? `${char.name} is ${cond} and cannot act. Turn passed.`
-        : `${char.name} passes their turn.`;
-      char.turn_actions = { ...char.turn_actions, action_used: true, bonus_action_used: true };
-      usedInitiative = true;
-      break;
-    }
-
-    case 'end_turn': {
-      narrative = `${char.name} ends their turn.`;
-      usedInitiative = true;
-      break;
-    }
-
-    case 'short_rest': {
-      if (st.combat_active) {
-        narrative = 'You cannot rest while in combat.';
-        break;
-      }
-      if (!canRestInRoom(st, seed)) {
-        narrative = 'You cannot rest here — an enemy is present.';
-        break;
-      }
-      if ((st.short_rested_rooms ?? []).includes(roomId)) {
-        narrative = 'You have already rested in this room.';
-        break;
-      }
-      if ((char.hit_dice_remaining ?? 0) <= 0) {
-        narrative = 'You have no hit dice remaining.';
-        break;
-      }
-      if (char.hp >= char.max_hp) {
-        narrative = 'You are already at full health.';
-        break;
-      }
-
-      const hdRoll = rollDice(`1d${char.hit_die ?? 8}`) + abilityMod(char.con);
-      const hdHealed = Math.max(1, hdRoll);
-      char.hp = Math.min(char.max_hp, char.hp + hdHealed);
-      char.hit_dice_remaining = Math.max(0, (char.hit_dice_remaining ?? 1) - 1);
-      st.short_rested_rooms = [...(st.short_rested_rooms ?? []), roomId];
-
-      // Short-rest class resource recharge
-      const srUses = { ...(char.class_resource_uses ?? {}) };
-      const cls = char.character_class.toLowerCase();
-      // 2024 PHB Dragonborn Breath Weapon recovers on short rest.
-      if (char.species === 'dragonborn') delete srUses.breath_weapon_used;
-      // 2024 PHB Goliath Large Form recovers on short rest.
-      if (char.species === 'goliath') delete srUses.large_form_used;
-      // 2024 PHB Orc Adrenaline Rush recovers on short rest.
-      if (char.species === 'orc') delete srUses.adrenaline_rush_used;
-      // Fighter: Second Wind + Action Surge recover on short rest
-      if (cls === 'fighter') {
-        delete srUses.second_wind;
-        delete srUses.action_surge;
-      }
-      // Bard L5+: Bardic Inspiration recharges on short rest; before L5 only on long rest
-      if (cls === 'bard' && char.level >= 5) delete srUses.bardic_inspiration;
-      // Monk: Ki points recharge on short rest
-      if (cls === 'monk') delete srUses.ki_points;
-      // Druid: Wild Shape recharges on short rest
-      if (cls === 'druid') srUses.wild_shape = 2;
-      // Circle of the Land — Natural Recovery (PHB p.68): once per long rest,
-      // during a short rest, recover spell slots totaling ≤ ceil(level/2)
-      // slot levels. We auto-spend on the lowest slots first for impact.
-      let naturalRecoveryNarr = '';
-      if (cls === 'druid' && char.subclass === 'land' && !(srUses.natural_recovery_used ?? 0)) {
-        let budget = Math.ceil(char.level / 2);
-        const slotsMax = char.spell_slots_max ?? {};
-        const slotsUsedSr = { ...(char.spell_slots_used ?? {}) };
-        const recovered: number[] = [];
-        for (const lvlKey of Object.keys(slotsMax)
-          .map(Number)
-          .sort((a, b) => a - b)) {
-          while (budget >= lvlKey && (slotsUsedSr[lvlKey] ?? 0) > 0) {
-            slotsUsedSr[lvlKey] = (slotsUsedSr[lvlKey] ?? 0) - 1;
-            budget -= lvlKey;
-            recovered.push(lvlKey);
-          }
-        }
-        if (recovered.length > 0) {
-          char.spell_slots_used = slotsUsedSr;
-          srUses.natural_recovery_used = 1;
-          naturalRecoveryNarr = ` 🌿 Natural Recovery — restored ${recovered.length} slot(s) [${recovered.join(', ')}].`;
-        }
-      }
-      // Cleric/Paladin: Channel Divinity recharges on short rest
-      if (cls === 'cleric' || cls === 'paladin') srUses.channel_divinity = char.level >= 6 ? 2 : 1;
-      // Battle Master: Superiority Dice recharge on short rest
-      if (char.subclass === 'battle_master') delete srUses.superiority_dice;
-      // Colossus Slayer resets each turn (already reset per-turn); clean up at rest
-      delete srUses.colossus_slayer_used;
-      // Warlock: Pact Magic slots recharge on short rest
-      if (cls === 'warlock') {
-        const warlockSlots = spellSlotsForClassLevel('warlock', char.level);
-        char.spell_slots_max = warlockSlots;
-        char.spell_slots_used = {};
-        // Archfey: Fey Presence recharges on short rest (PHB p.109)
-        delete srUses.fey_presence_used;
-      }
-      char.class_resource_uses = srUses;
-
-      const hdRemain = char.hit_dice_remaining;
-      const shortRestFlavor = context.narratives.shortRest
-        ? pick(context.narratives.shortRest)
-            .replace(/{name}/g, char.name)
-            .replace(/{hpGained}/g, String(hdHealed))
-            .replace(/{hpNow}/g, String(char.hp))
-            .replace(/{hpMax}/g, String(char.max_hp)) + ' '
-        : '';
-      narrative = `${shortRestFlavor}${char.name} takes a short rest, spending a d${char.hit_die ?? 8} — ${hdHealed} HP recovered (${hdRemain} hit ${hdRemain === 1 ? 'die' : 'dice'} remaining, now ${char.hp}/${char.max_hp}).${naturalRecoveryNarr}`;
-      break;
-    }
-
-    case 'long_rest': {
-      if (st.combat_active) {
-        narrative = 'You cannot rest while in combat.';
-        break;
-      }
-      if (!canRestInRoom(st, seed)) {
-        narrative = 'You cannot rest here — an enemy is present.';
-        break;
-      }
-      if (st.long_rested ?? false) {
-        narrative = 'You have already taken a long rest this session.';
-        break;
-      }
-
-      const restLines: string[] = [];
-      const restedChars = st.characters.map((c) => {
-        if (c.dead) return c;
-        const recovered = Math.max(1, Math.floor(c.level / 2));
-        const newHd = Math.min(c.level, (c.hit_dice_remaining ?? 0) + recovered);
-        restLines.push(
-          `${c.name}: HP ${c.hp}→${c.max_hp}, HD ${c.hit_dice_remaining ?? 0}→${newHd}`
-        );
-        const charFeatures = context.classFeatures?.[c.character_class] ?? [];
-        const restoredUses: Record<string, number> = { ...(c.class_resource_uses ?? {}) };
-        if (charFeatures.includes('rage')) restoredUses.rage_uses = rageUsesMax(c.level);
-        if (charFeatures.includes('wild_shape')) restoredUses.wild_shape = 2;
-        // Circle of the Land — Natural Recovery resets on long rest.
-        delete restoredUses.natural_recovery_used;
-        if (charFeatures.includes('sorcery_points')) restoredUses.sorcery_points = c.level;
-        if (charFeatures.includes('ki')) restoredUses.ki_points = c.level;
-        if (charFeatures.includes('channel_divinity'))
-          restoredUses.channel_divinity = c.level >= 6 ? 2 : 1;
-        delete restoredUses.action_surge;
-        delete restoredUses.second_wind;
-        delete restoredUses.colossus_slayer_used;
-        delete restoredUses.sacred_weapon_active;
-        // Long rest reduces exhaustion by 1 level (PHB p.291); full rest clears all other conditions
-        const newExhaustion = Math.max(0, (c.exhaustion_level ?? 0) - 1);
-        // 2024 PHB Human Resourceful — gain Heroic Inspiration after every
-        // Long Rest. Other species default to whatever inspiration state
-        // they had pre-rest.
-        const humanGrant = c.species === 'human';
-        // 2024 PHB Orc Relentless Endurance + Orc Adrenaline Rush both
-        // recharge on long rest; tracked under class_resource_uses.
-        if (c.species === 'orc') {
-          delete restoredUses.relentless_endurance_used;
-        }
-        // 2024 PHB Tiefling Infernal Legacy — racial Hellish Rebuke / Darkness
-        // 1/long rest.
-        if (c.species === 'tiefling') {
-          delete restoredUses.tiefling_rebuke_used;
-        }
-        return {
-          ...c,
-          hp: c.max_hp,
-          // Temp HP expires on a Long Rest (SRD 5.2.1 p.18)
-          temp_hp: 0,
-          hit_dice_remaining: newHd,
-          conditions: [],
-          condition_durations: {},
-          condition_sources: {},
-          class_resource_uses: restoredUses,
-          exhaustion_level: newExhaustion,
-          spell_slots_used: {},
-          inspiration: humanGrant ? true : c.inspiration,
-        };
-      });
-      st = { ...st, characters: restedChars, long_rested: true };
-      char = { ...restedChars[safeIdx] };
-      const longRestFlavor = context.narratives.longRest
-        ? pick(context.narratives.longRest).replace(/{party}/g, restLines.join('; ')) + ' '
-        : '';
-      narrative = `${longRestFlavor}The party takes a long rest. ${restLines.join('; ')}.`;
-      break;
-    }
-
-    // ── NPC: talk ────────────────────────────────────────────────────────────
-    case 'talk': {
-      const npc = seed.npcs?.[roomId];
-      if (!npc) {
-        narrative = 'There is no one to talk to here.';
-        break;
-      }
-      if (npcIsKilled(st, roomId)) {
-        narrative = 'They are dead.';
-        break;
-      }
-
-      const attitude = getNpcAttitude(st, npc);
-      if (attitude === 'hostile') {
-        narrative = `${npc.name} snarls at you and attacks!`;
-        break;
-      }
-
-      // Indifferent: require CHA (Persuasion) check
-      if (attitude === 'indifferent') {
-        const dc = npc.persuasionDC ?? 12;
-        const chaMod = abilityMod(char.cha);
-        const roll = rollDice('1d20') + chaMod + profBonus(char.level);
-        const success = roll >= dc;
-        if (success) {
-          st = { ...st, npc_attitudes: { ...st.npc_attitudes, [roomId]: 'friendly' } };
-          narrative = `You approach ${npc.name} with care (CHA check ${roll} vs DC ${dc} — success). ${npc.greeting}`;
-        } else {
-          narrative = `${npc.name} eyes you warily (CHA check ${roll} vs DC ${dc} — fail). They're not ready to talk yet.`;
-          break;
-        }
-      } else {
-        narrative = npc.greeting;
-      }
-
-      // Mark room as talked — responses become choices
-      if (!st.npc_talked.includes(roomId)) {
-        st = { ...st, npc_talked: [...st.npc_talked, roomId] };
-      }
-
-      // Append the response choices as inline hints in the narrative,
-      // matching the stage-direction format used on the buttons.
-      if (npc.responses.length > 0) {
-        narrative +=
-          ' [' + npc.responses.map((r) => `<To ${npc.name}> ${r.label}`).join(' | ') + ']';
-      }
-      if (st.combat_active) char.turn_actions = { ...char.turn_actions, action_used: true };
-      break;
-    }
-
-    // ── NPC: talk_response ───────────────────────────────────────────────────
-    case 'talk_response': {
-      const npc = seed.npcs?.[roomId];
-      if (!npc) {
-        narrative = 'There is no one here.';
-        break;
-      }
-
-      const idx = action.responseIdx;
-      const response = npc.responses[idx];
-      if (!response) {
-        narrative = 'Invalid response.';
-        break;
-      }
-
-      narrative = response.reply ? `${npc.name}: "${response.reply}"` : `${npc.name} nods.`;
-
-      // Apply any consequences attached to this response
-      if (response.consequences?.length) {
-        const narrativeParts: string[] = [];
-        for (const c of response.consequences) {
-          st = applyConsequence(c, st, seed, char.id, narrativeParts, context);
-        }
-        if (narrativeParts.length) narrative += ' ' + narrativeParts.join(' ');
-      }
-      break;
-    }
-
-    // ── NPC: buy ─────────────────────────────────────────────────────────────
-    case 'buy': {
-      const npc = seed.npcs?.[roomId];
-      if (!npc) {
-        narrative = 'There is no one to buy from.';
-        break;
-      }
-      if (getNpcAttitude(st, npc) !== 'friendly') {
-        narrative = `${npc.name} won't trade with you right now.`;
-        break;
-      }
-
-      if (char.gold < action.price) {
-        narrative = `You can't afford that — you only have ${char.gold}cr.`;
-        break;
-      }
-      const lootEntry = context.lootTable.find((l) => l.id === action.itemId);
-      if (!lootEntry) {
-        narrative = 'That item is not available.';
-        break;
-      }
-
-      char = {
-        ...char,
-        gold: char.gold - action.price,
-        inventory: [...char.inventory, { ...lootEntry, instance_id: randomUUID() }],
-      };
-      narrative = `You hand over ${action.price}cr and receive ${lootEntry.name}. ${npc.name} pockets the credits with a nod.`;
-      break;
-    }
-
-    // ── NPC: attack_npc ──────────────────────────────────────────────────────
-    // This action is the *trigger* that flips a non-hostile NPC hostile. After
-    // flipping, the NPC participates in grid combat as a regular enemy (via
-    // getLivingRoomEnemies + getEnemyById's npc: lookup). We immediately
-    // dispatch the regular Attack action against `npc:${roomId}` so the player
-    // doesn't waste a turn just changing attitude — the combat init runs and
-    // the attack resolves in the same response.
-    case 'attack_npc': {
-      const npc = seed.npcs?.[roomId];
-      if (!npc) {
-        narrative = 'There is no one to attack here.';
-        break;
-      }
-      if (npcIsKilled(st, roomId)) {
-        narrative = 'Already dead.';
-        break;
-      }
-      // Flip to hostile so getLivingRoomEnemies surfaces this NPC as an enemy.
-      st = { ...st, npc_attitudes: { ...st.npc_attitudes, [roomId]: 'hostile' } };
-      // Commit char back into state before the recursive dispatch.
-      commitChar();
-      return await takeAction({
-        action: { type: 'attack', targetEnemyId: `npc:${roomId}` },
-        history,
-        state: st,
-        seed,
-        context,
-      });
-    }
-
-    case 'disarm_trap': {
-      const trap = getRoomTrap(roomId, seed, context);
-      if (!trap || trapSpent(st, roomId)) {
-        narrative = 'There is no trap here to disarm.';
-        break;
-      }
-      // Must have detected it (passive Perception) to attempt disarm
-      if (!partyDetectsTrap(st.characters, trap)) {
-        narrative = 'You have not located the trap.';
-        break;
-      }
-      const hasToolProf =
-        char.tool_proficiencies?.some(
-          (t) => t.toLowerCase().includes('thieves') || t.toLowerCase().includes('hacking')
-        ) ?? false;
-      // Exhaustion 1+: disadvantage on ability checks (disarmTrap uses DEX)
-      // disarmTrap does not support disadvantage natively; apply by calling twice and taking lower
-      const exhaustionDisadv1Trap = (char.exhaustion_level ?? 0) >= 1;
-      const trapAttempt1 = disarmTrap(char.dex, char.level, hasToolProf);
-      const trapAttempt2 = exhaustionDisadv1Trap
-        ? disarmTrap(char.dex, char.level, hasToolProf)
-        : trapAttempt1;
-      const { roll, total } =
-        trapAttempt1.total <= trapAttempt2.total ? trapAttempt1 : trapAttempt2;
-      const profNote = hasToolProf ? ` (tool proficiency)` : '';
-      if (total >= trap.dc) {
-        st.traps_disarmed = [...(st.traps_disarmed ?? []), roomId];
-        narrative = `${trap.disarmSuccess} (DEX ${roll} + ${total - roll}${profNote} = ${total} vs DC ${trap.dc})`;
-      } else {
-        // Disarm failure — trap triggers
-        st.traps_triggered = [...(st.traps_triggered ?? []), roomId];
-        const trapDmg = rollDice(trap.damage);
-        char.hp = Math.max(0, char.hp - trapDmg);
-        let failNarr = `${trap.disarmFail} (DEX ${roll} + ${total - roll}${profNote} = ${total} vs DC ${trap.dc}). `;
-        failNarr += trap.triggerNarrative
-          .replace(/{name}/g, char.name)
-          .replace(/{dmg}/g, String(trapDmg));
-        narrative = failNarr;
-        if (trap.condition && char.hp > 0) {
-          char.conditions = [...new Set([...char.conditions, trap.condition])];
-          if (trap.conditionDuration)
-            char.condition_durations = {
-              ...char.condition_durations,
-              [trap.condition]: trap.conditionDuration,
-            };
-        }
-      }
-      char.turn_actions = { ...char.turn_actions, action_used: true };
-      break;
-    }
-
-    case 'apply_asi': {
-      if (!char.asi_pending) {
-        narrative = 'No Ability Score Improvement pending.';
-        break;
-      }
-      const stat = action.stat as AbilityKey;
-      char[stat] = (char[stat] ?? 10) + 2;
-      char.asi_pending = false;
-      const statName = { str: 'STR', dex: 'DEX', con: 'CON', int: 'INT', wis: 'WIS', cha: 'CHA' }[
-        stat
-      ];
-      narrative = `${char.name} increases ${statName} by 2 (now ${char[stat]})!`;
-      // CON increase retroactively raises max HP (per 5e PHB: apply to all existing levels)
-      if (stat === 'con') {
-        const bonus = Math.floor((char.con - 10) / 2) - Math.floor((char.con - 2 - 10) / 2);
-        char.max_hp = Math.max(1, char.max_hp + bonus * char.level);
-        char.hp = Math.min(char.max_hp, char.hp + bonus * char.level);
-        if (bonus > 0)
-          narrative += ` Max HP increased by ${bonus * char.level} (${bonus}/level × ${char.level} levels).`;
-      }
-      break;
-    }
-
-    case 'cast_spell': {
-      const { spellId, slotLevel } = action;
-      const isRitualCast =
-        (action as { type: 'cast_spell'; spellId: string; slotLevel: number; ritual?: boolean })
-          .ritual ?? false;
-      const spell = context.spellTable?.[spellId];
-      if (!spell) {
-        narrative = `Unknown spell: ${spellId}.`;
-        break;
-      }
-
-      // PHB p.144: cannot cast spells while wearing armor you are not proficient with
-      const spellArmorItem = char.equipped_armor
-        ? context.lootTable.find(
-            (l) => l.id === char.inventory?.find((i) => i.instance_id === char.equipped_armor)?.id
-          )
-        : null;
-      if (
-        spellArmorItem &&
-        !hasArmorProficiency(char.armor_proficiencies ?? [], spellArmorItem.armorCategory)
-      ) {
-        narrative = `You cannot cast spells while wearing ${spellArmorItem.name} — you are not proficient with ${spellArmorItem.armorCategory ?? 'this'} armor.`;
-        break;
-      }
-
-      // Deafened: cannot cast spells with verbal components
-      if (char.conditions.includes('deafened') && (spell as { verbal?: boolean }).verbal) {
-        narrative = `You cannot cast ${spell.name} while deafened — it requires a verbal component.`;
-        break;
-      }
-
-      // Ritual casting: no slot cost, only out of combat
-      if (isRitualCast) {
-        if (!(spell as { ritualCasting?: boolean }).ritualCasting) {
-          narrative = `${spell.name} cannot be cast as a ritual.`;
-          break;
-        }
-        if (st.combat_active) {
-          narrative = `Ritual casting takes 10 minutes — not usable in combat.`;
-          break;
-        }
-        // No slot consumed for ritual casting
-      }
-
-      // Spell preparation check (Cleric, Paladin, Druid)
-      const prepClasses = ['cleric', 'paladin', 'druid'];
-      if (
-        prepClasses.includes(char.character_class.toLowerCase()) &&
-        spell.level > 0 &&
-        !isRitualCast
-      ) {
-        const prepared = char.prepared_spells ?? [];
-        if (prepared.length > 0 && !prepared.includes(spellId)) {
-          // Reachable only as a safety net — the choice generator now
-          // filters unprepared spells out of the cast menu (see the
-          // prepClasses block in generateChoices). Prep is a long-rest
-          // action, so the message no longer suggests mid-combat prep.
-          narrative = `${spell.name} is not prepared. Prepare it on a long rest.`;
-          break;
-        }
-      }
-
-      // Break existing concentration if this spell also requires concentration (PHB p.203)
-      if (spell.concentration && char.concentrating_on) {
-        const { char: nc, st: ns } = breakConcentration(char, st);
-        char = nc;
-        st = ns;
-      }
-
-      // Expend a slot for non-cantrips (unless ritual)
-      if (spell.level > 0 && !isRitualCast) {
-        if (slotLevel < spell.level) {
-          narrative = `${spell.name} requires at least a level-${spell.level} slot.`;
-          break;
-        }
-        const slotsMax = (char.spell_slots_max ?? {})[slotLevel] ?? 0;
-        const slotsUsed = (char.spell_slots_used ?? {})[slotLevel] ?? 0;
-        if (slotsUsed >= slotsMax) {
-          narrative = `No level-${slotLevel} spell slots remaining (recovered on long rest).`;
-          break;
-        }
-        char.spell_slots_used = { ...(char.spell_slots_used ?? {}), [slotLevel]: slotsUsed + 1 };
-      }
-
-      // 2024 PHB / SRD 5.2.1 — costly material components (Identify's 100 gp
-      // pearl, Revivify's 300 gp diamond, etc.) are consumed on cast. Block
-      // the cast if the caster can't afford it; deduct from gold otherwise.
-      if (spell.materialCost && spell.materialCost > 0) {
-        if ((char.gold ?? 0) < spell.materialCost) {
-          narrative = `${spell.name} requires a ${spell.materialCost} gp material component you don't have.`;
-          break;
-        }
-        char.gold = (char.gold ?? 0) - spell.materialCost;
-        narrative = `${char.name} expends a ${spell.materialCost} gp component. `;
-      }
-
-      // SRD 5.2.1 p.67 (Quickened Spell): after consuming Quickened, can't
-      // cast a level 1+ spell on the same turn EXCEPT the quickened cast
-      // itself (which is the spell that got "modified"). We detect the
-      // quickened cast via st.metamagic_active === 'quickened' being still
-      // active at the start of resolution.
-      const isQuickenedCast = st.metamagic_active === 'quickened';
-      if (
-        spell.level > 0 &&
-        !isRitualCast &&
-        char.turn_actions.quickened_used &&
-        !isQuickenedCast
-      ) {
-        narrative = 'You used Quickened Spell this turn — you cannot cast another level 1+ spell.';
-        break;
-      }
-
-      // Mark action economy
-      if (spell.castTime === 'bonus_action') {
-        char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
-      } else {
-        char.turn_actions = { ...char.turn_actions, action_used: true };
-      }
-      // Track that a leveled spell was cast this turn (for the Quickened
-      // activation check on a subsequent metamagic invocation).
-      if (spell.level > 0 && !isRitualCast) {
-        char.turn_actions = { ...char.turn_actions, leveled_spell_cast: true };
-      }
-      // Sorcerer · Wild Magic Surge (PHB p.103) — 1-in-20 chance after each
-      // leveled spell to trigger a chaotic effect. RAW rolls 1d20 and on a 1
-      // rolls a result on the Wild Magic table (d100). We use a small
-      // curated table appropriate to our engine's mechanics.
-      if (
-        spell.level > 0 &&
-        !isRitualCast &&
-        char.character_class.toLowerCase() === 'sorcerer' &&
-        char.subclass === 'wild_magic' &&
-        d(20) === 1
-      ) {
-        const surge = pick([
-          'You glow with a soft blue light for 1 minute (visible from 30 ft).',
-          'A poof of harmless multicolored smoke envelops you.',
-          `You regain 2d4 (${rollDice('2d4')}) hit points (Wild Magic Surge).`,
-          'Your hair (or scales, where applicable) turns vivid pink until your next long rest.',
-          'You feel a momentary disorientation — disadvantage on your next attack.',
-        ]);
-        // Apply mechanical effects where possible.
-        if (surge.startsWith('You regain')) {
-          const heal = rollDice('2d4');
-          char.hp = Math.min(char.max_hp, char.hp + heal);
-        }
-        narrative += ` 🌀 WILD MAGIC SURGE: ${surge}`;
-      }
-
-      const castingAbility = (context.spellcastingAbility?.[char.character_class] ??
-        context.classPrimaryStats[char.character_class] ??
-        'int') as AbilityKey;
-      const castingScore = char[castingAbility] ?? 10;
-      const slotNote = spell.level > 0 ? ` (level-${slotLevel} slot)` : ' (cantrip)';
-
-      // ── Heal spells ────────────────────────────────────────────────────────
-      if (spell.heal) {
-        const healMod = Math.max(0, Math.floor((castingScore - 10) / 2));
-        const baseHealed = rollDice(spell.heal) + healMod;
-        // Life Cleric: Disciple of Life — healing spells restore extra 2 + spell level HP
-        const discipleBonus =
-          char.subclass === 'life' && char.character_class.toLowerCase() === 'cleric'
-            ? 2 + (spell.level ?? 1)
-            : 0;
-        const healed = baseHealed + discipleBonus;
-        // Target the most injured party member (excluding the caster, unless only one)
-        const injured = st.characters.filter((c) => !c.dead && c.hp < c.max_hp && c.id !== char.id);
-        const target = injured.length > 0 ? injured.reduce((a, b) => (a.hp < b.hp ? a : b)) : char;
-        const isSelf = target.id === char.id;
-        const discipleNote = discipleBonus > 0 ? ` [Disciple of Life: +${discipleBonus}]` : '';
-        if (isSelf) {
-          char.hp = Math.min(char.max_hp, char.hp + healed);
-          narrative = `${char.name} casts ${spell.name}${slotNote} — restores ${healed} HP to self (now ${char.hp}/${char.max_hp}).${discipleNote}`;
-        } else {
-          const newHp = Math.min(target.max_hp, target.hp + healed);
-          st = {
-            ...st,
-            characters: st.characters.map((c) => (c.id === target.id ? { ...c, hp: newHp } : c)),
-            // Sync the grid entity HP so the battlefield reflects the heal
-            // immediately — `commitChar()` only syncs the caster's entity,
-            // not the target's, so without this the healed ally would
-            // still render as a faded skull until the next state update.
-            entities: (st.entities ?? []).map((e) =>
-              e.id === target.id && !e.isEnemy ? { ...e, hp: newHp } : e
-            ),
-          };
-          narrative = `${char.name} casts ${spell.name}${slotNote} — restores ${healed} HP to ${target.name} (now ${newHp}/${target.max_hp}).${discipleNote}`;
-        }
-        break;
-      }
-
-      // ── Utility spells (no damage, no save, no heal) ───────────────────────
-      if (!spell.damage && !spell.savingThrow && !spell.attackRoll && !spell.condition) {
-        narrative = spell.narrative
-          ? spell.narrative.replace('{name}', char.name)
-          : `${char.name} casts ${spell.name}${slotNote}.`;
-        // Bless (PHB p.219) — caster picks up to 3 creatures (RAW). Pansori
-        // simplifies: caster + first 2 living non-caster party members are
-        // blessed. Each gets +1d4 to attack rolls (saves are a follow-up).
-        // Concentration links the buff to the caster — `blessed` clears
-        // from all linked PCs when the Cleric's concentration drops.
-        if (spell.id === 'bless') {
-          // Mark caster as concentrating on bless. The runtime-mutated
-          // `char` reference is what gets written back to state.
-          char.concentrating_on = {
-            spellId: 'bless',
-            rounds_left: concentrationRoundsFor(spell),
-          };
-          // Pick the targets: caster (always) + up to 2 living allies.
-          const blessTargets: string[] = [char.id];
-          for (const c of st.characters) {
-            if (blessTargets.length >= 3) break;
-            if (c.id === char.id || c.dead) continue;
-            blessTargets.push(c.id);
-          }
-          const targetSet = new Set(blessTargets);
-          st = {
-            ...st,
-            characters: st.characters.map((c) => {
-              // The caster is mutated in place — don't overwrite our `char`
-              // ref with a spread (it'd silently drop the concentrating_on
-              // we just set). Skip; the post-cast state writeback handles it.
-              if (c.id === char.id) return c;
-              if (!targetSet.has(c.id) || (c.conditions ?? []).includes('blessed')) {
-                return c;
-              }
-              return {
-                ...c,
-                conditions: [...(c.conditions ?? []), 'blessed'],
-                condition_sources: {
-                  ...(c.condition_sources ?? {}),
-                  blessed: char.id,
-                },
-              };
-            }),
-          };
-          // Apply blessed to the caster's local ref too.
-          if (!(char.conditions ?? []).includes('blessed')) {
-            char.conditions = [...(char.conditions ?? []), 'blessed'];
-            char.condition_sources = {
-              ...(char.condition_sources ?? {}),
-              blessed: char.id,
-            };
-          }
-          // Look up names for the narrative addendum.
-          const blessedNames = blessTargets
-            .map((id) => st.characters.find((c) => c.id === id)?.name ?? id)
-            .join(', ');
-          narrative += ` Blessed: ${blessedNames}.`;
-        }
-        break;
-      }
-
-      // ── Offensive spells — need a living enemy ─────────────────────────────
-      if (!enemy || !enemyAlive) {
-        narrative = pick(context.narratives.noEnemy);
-        break;
-      }
-
-      // Resolve targeted enemy: explicit targetEnemyId wins; fallback to first living
-      const spellTargetId: string =
-        (action as { type: 'cast_spell'; targetEnemyId?: string }).targetEnemyId ?? enemy.id;
-      const spellTarget: Enemy = livingEnemiesInRoom.find((e) => e.id === spellTargetId) ?? enemy;
-
-      // SRD 5.2.1 — enforce spell range against the grid when entities exist.
-      // 'self' spells need no target check (they originate from the caster).
-      // 'touch' = adjacent only (≤ 1 grid square / 5 ft).
-      // 'ranged' = up to spell.rangeFt feet of grid distance.
-      if (st.entities && spell.rangeKind && spell.rangeKind !== 'self') {
-        const casterEnt = st.entities.find((e) => e.id === char.id);
-        const targetEnt = st.entities.find((e) => e.id === spellTargetId && e.isEnemy);
-        if (casterEnt && targetEnt) {
-          const distFt = distanceFeet(casterEnt.pos, targetEnt.pos);
-          const maxFt = spell.rangeKind === 'touch' ? 5 : (spell.rangeFt ?? 0);
-          if (distFt > maxFt) {
-            narrative =
-              spell.rangeKind === 'touch'
-                ? `${spell.name} requires a touch — the ${spellTarget.name} is ${distFt} ft away.`
-                : `${spell.name} is out of range (${distFt} ft to target, max ${maxFt} ft).`;
-            // Refund the slot we just spent
-            if (spell.level > 0 && !isRitualCast) {
-              const slotsUsedRefund = char.spell_slots_used?.[slotLevel] ?? 1;
-              char.spell_slots_used = {
-                ...(char.spell_slots_used ?? {}),
-                [slotLevel]: Math.max(0, slotsUsedRefund - 1),
-              };
-            }
-            // Refund the action economy too
-            if (spell.castTime === 'bonus_action') {
-              char.turn_actions = { ...char.turn_actions, bonus_action_used: false };
-            } else {
-              char.turn_actions = { ...char.turn_actions, action_used: false };
-            }
-            if (spell.level > 0 && !isRitualCast) {
-              char.turn_actions = { ...char.turn_actions, leveled_spell_cast: false };
-            }
+            usedInitiative = true;
             break;
           }
-        }
-      }
-
-      const dc = spellSaveDC(char.level, castingScore);
-      let spellDmg = 0;
-      let spellHit = true;
-
-      // 2024 PHB Magic Missile / Eldritch Blast multi-target.
-      // Action payload `targetEnemyIds` lists one entry per dart/beam
-      // (duplicates = multiple on same target). Resolves each independently,
-      // then short-circuits the single-target damage path.
-      const castAction = action as { type: 'cast_spell'; targetEnemyIds?: string[] };
-      const multiTargets = castAction.targetEnemyIds;
-      if (
-        multiTargets &&
-        multiTargets.length > 1 &&
-        (spell.id === 'magic_missile' || spell.id === 'eldritch_blast')
-      ) {
-        const perShot = spell.id === 'magic_missile' ? '1d4+1' : '1d10';
-        const agonizingBonusPerBeam =
-          spell.id === 'eldritch_blast' && (char.feats ?? []).includes('agonizing_blast')
-            ? Math.max(0, abilityMod(char.cha))
-            : 0;
-        let totalDealt = 0;
-        const lines: string[] = [];
-        for (let i = 0; i < multiTargets.length; i++) {
-          const tid = multiTargets[i];
-          const tgtEnemy = livingEnemiesInRoom.find((e) => e.id === tid);
-          const tgtEnt = st.entities?.find((e) => e.id === tid && e.isEnemy);
-          if (!tgtEnemy || !tgtEnt || tgtEnt.hp <= 0) {
-            lines.push(`${i + 1}: ${tgtEnemy?.name ?? tid} — already down, fizzles.`);
-            continue;
-          }
-          if (spell.id === 'eldritch_blast') {
-            // Each beam rolls its own attack vs the target's AC.
-            const atkE = resolveSpellAttack(char.level, castingScore, tgtEnemy.ac);
-            if (!atkE.hit) {
-              lines.push(`${i + 1}: ${tgtEnemy.name} — MISS (${atkE.total} vs AC ${tgtEnemy.ac}).`);
-              continue;
-            }
-            const dmgRoll = atkE.critical
-              ? rollCritical(perShot) + agonizingBonusPerBeam
-              : rollDice(perShot) + agonizingBonusPerBeam;
-            const { damage: effDmg, note } = applyDamageMultiplier(
-              dmgRoll,
-              spell.damageType,
-              tgtEnemy
-            );
-            const newHp = Math.max(0, tgtEnt.hp - effDmg);
-            st = {
-              ...st,
-              entities: (st.entities ?? []).map((e) =>
-                e.id === tid && e.isEnemy ? { ...e, hp: newHp } : e
-              ),
-            };
-            totalDealt += effDmg;
-            lines.push(
-              `${i + 1}: ${tgtEnemy.name} — HIT ${effDmg}${atkE.critical ? ' CRIT' : ''}${note ?? ''}${newHp <= 0 ? ' (killed)' : ''}.`
-            );
-            if (newHp <= 0) {
-              const split = splitEncounterXp(st, char.id, tgtEnemy.xp ?? 0);
-              st = split.st;
-              char.xp = (char.xp || 0) + split.share;
-              st.enemies_killed = [...(st.enemies_killed ?? []), tid];
-            }
-          } else {
-            // Magic Missile — auto-hit, no attack roll.
-            const dmgRoll = rollDice(perShot);
-            const { damage: effDmg, note } = applyDamageMultiplier(
-              dmgRoll,
-              spell.damageType,
-              tgtEnemy
-            );
-            const newHp = Math.max(0, tgtEnt.hp - effDmg);
-            st = {
-              ...st,
-              entities: (st.entities ?? []).map((e) =>
-                e.id === tid && e.isEnemy ? { ...e, hp: newHp } : e
-              ),
-            };
-            totalDealt += effDmg;
-            lines.push(
-              `dart ${i + 1} → ${tgtEnemy.name}: ${effDmg}${note ?? ''}${newHp <= 0 ? ' (killed)' : ''}.`
-            );
-            if (newHp <= 0) {
-              const split = splitEncounterXp(st, char.id, tgtEnemy.xp ?? 0);
-              st = split.st;
-              char.xp = (char.xp || 0) + split.share;
-              st.enemies_killed = [...(st.enemies_killed ?? []), tid];
-            }
-          }
-        }
-        if (isRoomCleared(st, seed, roomId)) {
-          st = endCombatState(st);
-        }
-        narrative = `${char.name} casts ${spell.name}${slotNote}! ${lines.join(' ')} Total: ${totalDealt} ${spell.damageType ?? 'damage'}.`;
-        narrative += applyPartyLevelUps(st, char, context);
-        usedInitiative = true;
-        spellDmg = 0; // Already applied per-target; skip the single-target block below.
-        spellHit = false; // Suppress the single-target damage application.
-        break;
-      }
-
-      if (spell.attackRoll) {
-        // ── Spell attack roll ──────────────────────────────────────────────
-        const atk = resolveSpellAttack(char.level, castingScore, spellTarget.ac);
-        spellHit = atk.hit;
-        const atkNote = ` (spell attack ${atk.roll}+${atk.bonus}=${atk.total} vs AC ${spellTarget.ac})`;
-        if (!spellHit) {
-          narrative = `${char.name} casts ${spell.name}${slotNote} — MISS!${atkNote}`;
-          break;
-        }
-        const atkDmgExpr =
-          spell.level === 0 ? cantripDamageDice(spell, char.level) : upcastDamage(spell, slotLevel);
-        spellDmg = atk.critical ? rollCritical(atkDmgExpr || null) : rollDice(atkDmgExpr || '1d4');
-        // Agonizing Blast: Warlock invocation — add CHA mod to Eldritch Blast damage
-        const agonizingBonus =
-          spell.id === 'eldritch_blast' && (char.feats ?? []).includes('agonizing_blast')
-            ? Math.max(0, abilityMod(char.cha))
-            : 0;
-        spellDmg += agonizingBonus;
-        narrative = `${char.name} casts ${spell.name}${slotNote}!${atkNote} `;
-        if (atk.critical) narrative += 'Critical spell hit! ';
-        narrative += `${fmt.dmg(spellDmg)} ${spell.damageType ?? ''} damage!`;
-        if (agonizingBonus > 0) narrative += ` [Agonizing Blast: +${agonizingBonus}]`;
-      } else if (spell.savingThrow) {
-        // ── Saving throw spell ─────────────────────────────────────────────
-        const saveAbility = spell.savingThrow;
-        const enemyScore = (spellTarget as unknown as Record<string, number>)[saveAbility] ?? 10;
-        // Cover bonus to DEX saves (SRD 5.2.1 p.15): the spell originates from
-        // the caster, so half/three-quarters cover between caster→target
-        // applies to the target's DEX save against the spell. Other abilities
-        // are unaffected.
-        let saveCoverDexBonus = 0;
-        if (saveAbility === 'dex' && st.entities) {
-          const casterEntSave = st.entities.find((e) => e.id === char.id);
-          const targetEntSave = st.entities.find((e) => e.id === spellTargetId && e.isEnemy);
-          if (casterEntSave && targetEntSave) {
-            const obstaclesSave = [
-              ...st.entities
-                .filter((e) => e.id !== char.id && e.id !== spellTargetId)
-                .map((e) => e.pos),
-              ...roomObstacleCells,
-            ];
-            saveCoverDexBonus = coverBonus(casterEntSave.pos, targetEntSave.pos, obstaclesSave);
-          }
-        }
-        const targetEntForCond = st.entities?.find((e) => e.id === spellTargetId && e.isEnemy);
-        const saveFailed = rollConditionSave(
-          saveAbility,
-          enemyScore,
-          dc,
-          false,
-          char.level,
-          saveCoverDexBonus,
-          targetEntForCond?.conditions ?? []
-        );
-        const saveLabel = saveAbility.toUpperCase();
-
-        if (spell.damage) {
-          const saveDmgExpr =
+        } else if (spell.damage && !spell.savingThrow && !spell.attackRoll) {
+          // ── Auto-hit (Magic Missile style) ─────────────────────────────────
+          const autoHitExpr =
             spell.level === 0
               ? cantripDamageDice(spell, char.level)
               : upcastDamage(spell, slotLevel);
-          const fullDmg = rollDice(saveDmgExpr || spell.damage);
-          spellDmg = saveFailed
-            ? fullDmg
-            : spell.saveEffect === 'half'
-              ? Math.floor(fullDmg / 2)
-              : 0;
-          const saveVerb = saveFailed ? 'fails' : 'succeeds';
-          narrative = `${char.name} casts ${spell.name}${slotNote}! (${fmt.dc(dc)} ${saveLabel} save — ${spellTarget.name} ${saveVerb}.) `;
-          narrative +=
-            spellDmg > 0 ? `${fmt.dmg(spellDmg)} ${spell.damageType ?? ''} damage!` : 'No damage.';
-          if (!saveFailed && spell.saveEffect === 'half') narrative += ' (half damage)';
-        } else {
-          narrative = `${char.name} casts ${spell.name}${slotNote}! (DC ${dc} ${saveLabel} save — `;
-          narrative += saveFailed
-            ? `${spellTarget.name} fails.)`
-            : `${spellTarget.name} succeeds.)`;
+          spellDmg = rollDice(autoHitExpr || spell.damage);
+          narrative = `${char.name} casts ${spell.name}${slotNote}! Auto-hit — ${fmt.dmg(spellDmg)} ${spell.damageType ?? ''} damage!`;
         }
 
-        if (spell.condition && saveFailed) {
-          if (spellTarget.condition_immunities?.includes(spell.condition)) {
-            narrative += ` [${spellTarget.name} is immune to ${spell.condition}]`;
-          } else {
-            const condToApply = spell.condition!;
-            st = {
-              ...st,
-              entities: (st.entities ?? []).map((e) =>
-                e.id === spellTargetId && e.isEnemy
-                  ? {
-                      ...e,
-                      conditions: [...e.conditions.filter((c) => c !== condToApply), condToApply],
-                    }
-                  : e
-              ),
-            };
-            st = pushEvent(st, {
-              kind: 'condition_applied',
-              targetId: spellTargetId,
-              targetName: spellTarget.name,
-              condition: condToApply,
-              source: spell.name,
-              round: st.round ?? 1,
-            });
-            narrative += ` The ${spellTarget.name} is ${condToApply}!`;
-            if (spell.concentration) {
-              char.concentrating_on = {
-                spellId,
-                condition: condToApply,
-                rounds_left: concentrationRoundsFor(spell),
-              };
+        // ── AOE spells on grid ────────────────────────────────────────────────
+        // If the spell has a blastRadius and grid entities exist, resolve against all
+        // entities in the blast instead of the single-target path. Default shape is
+        // sphere (radius from target square); cone/cube/line emanate from caster
+        // toward the target square per SRD 5.2.1 p.193.
+        const aoeBR = (spell as { blastRadius?: number }).blastRadius;
+        const aoeShape =
+          (spell as { aoeShape?: 'sphere' | 'cone' | 'cube' | 'line' }).aoeShape ?? 'sphere';
+        if (aoeBR && st.entities && spell.savingThrow && spellDmg >= 0) {
+          const epicenter =
+            st.entities.find((e) => e.id === enemy.id && e.isEnemy)?.pos ??
+            st.entities.find((e) => e.isEnemy)?.pos;
+          const casterPos = st.entities.find((e) => e.id === char.id)?.pos;
+          if (epicenter) {
+            const blastTargets =
+              aoeShape === 'sphere'
+                ? entitiesInBlast(epicenter, aoeBR, st.entities)
+                : aoeShape === 'cone' && casterPos
+                  ? entitiesInCone(casterPos, epicenter, aoeBR, st.entities)
+                  : aoeShape === 'cube' && casterPos
+                    ? entitiesInCube(casterPos, epicenter, aoeBR, st.entities)
+                    : aoeShape === 'line' && casterPos
+                      ? entitiesInLine(casterPos, epicenter, aoeBR, st.entities)
+                      : entitiesInBlast(epicenter, aoeBR, st.entities);
+            const isEvoker = char.subclass === 'evoker';
+            narrative += ` [AOE ${aoeBR}ft ${aoeShape}]`;
+            for (const target of blastTargets) {
+              if (target.id === char.id) continue;
+              const targetEnemy = target.isEnemy ? getEnemyById(seed, target.id) : null;
+              const targetChar = !target.isEnemy
+                ? st.characters.find((c) => c.id === target.id)
+                : null;
+
+              if (target.isEnemy && targetEnemy) {
+                const tScore =
+                  (targetEnemy as unknown as Record<string, number>)[spell.savingThrow] ?? 10;
+                // Cover bonus on DEX saves (SRD 5.2.1 p.15): obstacles between
+                // the blast epicenter and this target give +2 (half) / +5
+                // (three-quarters) to the DEX save.
+                let tCover = 0;
+                if (spell.savingThrow === 'dex' && st.entities) {
+                  const obstaclesAoe = [
+                    ...st.entities
+                      .filter((e) => e.id !== target.id && !posEqual(e.pos, epicenter))
+                      .map((e) => e.pos),
+                    ...roomObstacleCells,
+                  ];
+                  tCover = coverBonus(epicenter, target.pos, obstaclesAoe);
+                }
+                const targetEntCond =
+                  st.entities?.find((e) => e.id === target.id && e.isEnemy)?.conditions ?? [];
+                const tFailed = rollConditionSave(
+                  spell.savingThrow,
+                  tScore,
+                  dc,
+                  false,
+                  char.level,
+                  tCover,
+                  targetEntCond
+                );
+                const baseDmg = rollDice(upcastDamage(spell, slotLevel) || (spell.damage ?? '0'));
+                const effDmg = tFailed
+                  ? baseDmg
+                  : spell.saveEffect === 'half'
+                    ? Math.floor(baseDmg / 2)
+                    : 0;
+                const { damage: resDmg } = applyDamageMultiplier(
+                  effDmg,
+                  spell.damageType,
+                  targetEnemy
+                );
+                const curHp = st.entities?.find((e) => e.id === target.id && e.isEnemy)?.hp ?? 0;
+                const newHp = curHp - resDmg;
+                st = {
+                  ...st,
+                  entities: (st.entities ?? []).map((e) =>
+                    e.id === target.id && e.isEnemy ? { ...e, hp: Math.max(0, newHp) } : e
+                  ),
+                };
+                narrative += ` ${targetEnemy.name}: ${tFailed ? 'fails' : 'succeeds'} save — ${resDmg} dmg${newHp <= 0 ? ' (killed)' : ''}.`;
+                if (newHp <= 0) {
+                  const split = splitEncounterXp(st, char.id, targetEnemy.xp ?? 10);
+                  st = split.st;
+                  char.xp = (char.xp || 0) + split.share;
+                  st = {
+                    ...st,
+                    entities: (st.entities ?? []).map((e) =>
+                      e.id === target.id && e.isEnemy ? { ...e, hp: 0 } : e
+                    ),
+                  };
+                  st.enemies_killed = [...st.enemies_killed, target.id];
+                  narrative += grantDarkOnesBlessing(char);
+                  narrative += applyPartyLevelUps(st, char, context);
+                  if (isRoomCleared(st, seed, roomId)) {
+                    st = endCombatState(st);
+                  }
+                }
+              } else if (targetChar && !target.isEnemy) {
+                // Allies in blast: Evoker Sculpt Spells lets them auto-succeed (PHB p.117)
+                const autoSucceed = isEvoker;
+                if (!autoSucceed && spell.saveEffect !== 'negates') {
+                  const allyScore =
+                    (targetChar[spell.savingThrow as keyof Character] as number) ?? 10;
+                  let allyCover = 0;
+                  if (spell.savingThrow === 'dex' && st.entities) {
+                    const obstaclesAllyAoe = [
+                      ...st.entities
+                        .filter((e) => e.id !== target.id && !posEqual(e.pos, epicenter))
+                        .map((e) => e.pos),
+                      ...roomObstacleCells,
+                    ];
+                    allyCover = coverBonus(epicenter, target.pos, obstaclesAllyAoe);
+                  }
+                  const allyFailed = rollConditionSave(
+                    spell.savingThrow,
+                    allyScore,
+                    dc,
+                    false,
+                    char.level,
+                    allyCover,
+                    targetChar.conditions ?? []
+                  );
+                  const baseDmg = rollDice(upcastDamage(spell, slotLevel) || (spell.damage ?? '0'));
+                  const effDmg = allyFailed
+                    ? baseDmg
+                    : spell.saveEffect === 'half'
+                      ? Math.floor(baseDmg / 2)
+                      : 0;
+                  if (effDmg > 0) {
+                    const newAllyHp = Math.max(0, targetChar.hp - effDmg);
+                    st = {
+                      ...st,
+                      characters: st.characters.map((c) =>
+                        c.id === targetChar.id ? { ...c, hp: newAllyHp } : c
+                      ),
+                    };
+                    narrative += ` ${targetChar.name}: ${allyFailed ? 'fails' : 'succeeds'} save — ${effDmg} dmg.`;
+                  }
+                } else if (autoSucceed) {
+                  narrative += ` ${targetChar.name}: auto-succeeds (Sculpt Spells).`;
+                }
+              }
             }
+            usedInitiative = true;
+            break;
           }
-          const { damage: effCondDmg, note: condDmgNote } = applyDamageMultiplier(
+        }
+
+        // Apply damage to single enemy target
+        if (spellDmg > 0 || spellHit) {
+          const { damage: effSpellDmg, note: spellDmgNote } = applyDamageMultiplier(
             spellDmg,
             spell.damageType,
             spellTarget
           );
-          if (condDmgNote) narrative += condDmgNote;
-          const enemyEntCond = st.entities?.find((e) => e.id === spellTargetId && e.isEnemy);
-          const curHpCond = enemyEntCond?.hp ?? 0;
-          const newEnemyHp = curHpCond - effCondDmg;
+          if (spellDmgNote) narrative += spellDmgNote;
+          spellDmg = effSpellDmg;
+          const enemyEntSpell = st.entities?.find((e) => e.id === spellTargetId && e.isEnemy);
+          const curEnemyHpSpell = enemyEntSpell?.hp ?? 0;
+          const newEnemyHpSpell = curEnemyHpSpell - spellDmg;
           st = {
             ...st,
             entities: (st.entities ?? []).map((e) =>
-              e.id === spellTargetId && e.isEnemy ? { ...e, hp: Math.max(0, newEnemyHp) } : e
+              e.id === spellTargetId && e.isEnemy ? { ...e, hp: newEnemyHpSpell } : e
             ),
           };
-          if (newEnemyHp <= 0) {
+          if (newEnemyHpSpell <= 0) {
             const xpGain = spellTarget.xp ?? 10;
             const split = splitEncounterXp(st, char.id, xpGain);
             st = split.st;
@@ -6553,7 +6847,6 @@ export async function takeAction({
               ),
             };
             st.enemies_killed = [...st.enemies_killed, spellTargetId];
-            char.concentrating_on = null;
             narrative += grantDarkOnesBlessing(char);
             if (isRoomCleared(st, seed, roomId)) {
               st = endCombatState(st);
@@ -6564,3174 +6857,3024 @@ export async function takeAction({
                 .replace('{enemy}', spellTarget.name)
                 .replace('{xp}', String(xpShare));
             narrative += applyPartyLevelUps(st, char, context);
-          }
-          usedInitiative = true;
-          break;
-        }
-      } else if (spell.damage && !spell.savingThrow && !spell.attackRoll) {
-        // ── Auto-hit (Magic Missile style) ─────────────────────────────────
-        const autoHitExpr =
-          spell.level === 0 ? cantripDamageDice(spell, char.level) : upcastDamage(spell, slotLevel);
-        spellDmg = rollDice(autoHitExpr || spell.damage);
-        narrative = `${char.name} casts ${spell.name}${slotNote}! Auto-hit — ${fmt.dmg(spellDmg)} ${spell.damageType ?? ''} damage!`;
-      }
-
-      // ── AOE spells on grid ────────────────────────────────────────────────
-      // If the spell has a blastRadius and grid entities exist, resolve against all
-      // entities in the blast instead of the single-target path. Default shape is
-      // sphere (radius from target square); cone/cube/line emanate from caster
-      // toward the target square per SRD 5.2.1 p.193.
-      const aoeBR = (spell as { blastRadius?: number }).blastRadius;
-      const aoeShape =
-        (spell as { aoeShape?: 'sphere' | 'cone' | 'cube' | 'line' }).aoeShape ?? 'sphere';
-      if (aoeBR && st.entities && spell.savingThrow && spellDmg >= 0) {
-        const epicenter =
-          st.entities.find((e) => e.id === enemy.id && e.isEnemy)?.pos ??
-          st.entities.find((e) => e.isEnemy)?.pos;
-        const casterPos = st.entities.find((e) => e.id === char.id)?.pos;
-        if (epicenter) {
-          const blastTargets =
-            aoeShape === 'sphere'
-              ? entitiesInBlast(epicenter, aoeBR, st.entities)
-              : aoeShape === 'cone' && casterPos
-                ? entitiesInCone(casterPos, epicenter, aoeBR, st.entities)
-                : aoeShape === 'cube' && casterPos
-                  ? entitiesInCube(casterPos, epicenter, aoeBR, st.entities)
-                  : aoeShape === 'line' && casterPos
-                    ? entitiesInLine(casterPos, epicenter, aoeBR, st.entities)
-                    : entitiesInBlast(epicenter, aoeBR, st.entities);
-          const isEvoker = char.subclass === 'evoker';
-          narrative += ` [AOE ${aoeBR}ft ${aoeShape}]`;
-          for (const target of blastTargets) {
-            if (target.id === char.id) continue;
-            const targetEnemy = target.isEnemy ? getEnemyById(seed, target.id) : null;
-            const targetChar = !target.isEnemy
-              ? st.characters.find((c) => c.id === target.id)
-              : null;
-
-            if (target.isEnemy && targetEnemy) {
-              const tScore =
-                (targetEnemy as unknown as Record<string, number>)[spell.savingThrow] ?? 10;
-              // Cover bonus on DEX saves (SRD 5.2.1 p.15): obstacles between
-              // the blast epicenter and this target give +2 (half) / +5
-              // (three-quarters) to the DEX save.
-              let tCover = 0;
-              if (spell.savingThrow === 'dex' && st.entities) {
-                const obstaclesAoe = [
-                  ...st.entities
-                    .filter((e) => e.id !== target.id && !posEqual(e.pos, epicenter))
-                    .map((e) => e.pos),
-                  ...roomObstacleCells,
-                ];
-                tCover = coverBonus(epicenter, target.pos, obstaclesAoe);
-              }
-              const targetEntCond =
-                st.entities?.find((e) => e.id === target.id && e.isEnemy)?.conditions ?? [];
-              const tFailed = rollConditionSave(
-                spell.savingThrow,
-                tScore,
-                dc,
-                false,
-                char.level,
-                tCover,
-                targetEntCond
-              );
-              const baseDmg = rollDice(upcastDamage(spell, slotLevel) || (spell.damage ?? '0'));
-              const effDmg = tFailed
-                ? baseDmg
-                : spell.saveEffect === 'half'
-                  ? Math.floor(baseDmg / 2)
-                  : 0;
-              const { damage: resDmg } = applyDamageMultiplier(
-                effDmg,
-                spell.damageType,
-                targetEnemy
-              );
-              const curHp = st.entities?.find((e) => e.id === target.id && e.isEnemy)?.hp ?? 0;
-              const newHp = curHp - resDmg;
-              st = {
-                ...st,
-                entities: (st.entities ?? []).map((e) =>
-                  e.id === target.id && e.isEnemy ? { ...e, hp: Math.max(0, newHp) } : e
-                ),
-              };
-              narrative += ` ${targetEnemy.name}: ${tFailed ? 'fails' : 'succeeds'} save — ${resDmg} dmg${newHp <= 0 ? ' (killed)' : ''}.`;
-              if (newHp <= 0) {
-                const split = splitEncounterXp(st, char.id, targetEnemy.xp ?? 10);
-                st = split.st;
-                char.xp = (char.xp || 0) + split.share;
-                st = {
-                  ...st,
-                  entities: (st.entities ?? []).map((e) =>
-                    e.id === target.id && e.isEnemy ? { ...e, hp: 0 } : e
-                  ),
-                };
-                st.enemies_killed = [...st.enemies_killed, target.id];
-                narrative += grantDarkOnesBlessing(char);
-                narrative += applyPartyLevelUps(st, char, context);
-                if (isRoomCleared(st, seed, roomId)) {
-                  st = endCombatState(st);
-                }
-              }
-            } else if (targetChar && !target.isEnemy) {
-              // Allies in blast: Evoker Sculpt Spells lets them auto-succeed (PHB p.117)
-              const autoSucceed = isEvoker;
-              if (!autoSucceed && spell.saveEffect !== 'negates') {
-                const allyScore =
-                  (targetChar[spell.savingThrow as keyof Character] as number) ?? 10;
-                let allyCover = 0;
-                if (spell.savingThrow === 'dex' && st.entities) {
-                  const obstaclesAllyAoe = [
-                    ...st.entities
-                      .filter((e) => e.id !== target.id && !posEqual(e.pos, epicenter))
-                      .map((e) => e.pos),
-                    ...roomObstacleCells,
-                  ];
-                  allyCover = coverBonus(epicenter, target.pos, obstaclesAllyAoe);
-                }
-                const allyFailed = rollConditionSave(
-                  spell.savingThrow,
-                  allyScore,
-                  dc,
-                  false,
-                  char.level,
-                  allyCover,
-                  targetChar.conditions ?? []
-                );
-                const baseDmg = rollDice(upcastDamage(spell, slotLevel) || (spell.damage ?? '0'));
-                const effDmg = allyFailed
-                  ? baseDmg
-                  : spell.saveEffect === 'half'
-                    ? Math.floor(baseDmg / 2)
-                    : 0;
-                if (effDmg > 0) {
-                  const newAllyHp = Math.max(0, targetChar.hp - effDmg);
-                  st = {
-                    ...st,
-                    characters: st.characters.map((c) =>
-                      c.id === targetChar.id ? { ...c, hp: newAllyHp } : c
-                    ),
-                  };
-                  narrative += ` ${targetChar.name}: ${allyFailed ? 'fails' : 'succeeds'} save — ${effDmg} dmg.`;
-                }
-              } else if (autoSucceed) {
-                narrative += ` ${targetChar.name}: auto-succeeds (Sculpt Spells).`;
-              }
-            }
-          }
-          usedInitiative = true;
-          break;
-        }
-      }
-
-      // Apply damage to single enemy target
-      if (spellDmg > 0 || spellHit) {
-        const { damage: effSpellDmg, note: spellDmgNote } = applyDamageMultiplier(
-          spellDmg,
-          spell.damageType,
-          spellTarget
-        );
-        if (spellDmgNote) narrative += spellDmgNote;
-        spellDmg = effSpellDmg;
-        const enemyEntSpell = st.entities?.find((e) => e.id === spellTargetId && e.isEnemy);
-        const curEnemyHpSpell = enemyEntSpell?.hp ?? 0;
-        const newEnemyHpSpell = curEnemyHpSpell - spellDmg;
-        st = {
-          ...st,
-          entities: (st.entities ?? []).map((e) =>
-            e.id === spellTargetId && e.isEnemy ? { ...e, hp: newEnemyHpSpell } : e
-          ),
-        };
-        if (newEnemyHpSpell <= 0) {
-          const xpGain = spellTarget.xp ?? 10;
-          const split = splitEncounterXp(st, char.id, xpGain);
-          st = split.st;
-          const xpShare = split.share;
-          char.xp = (char.xp || 0) + xpShare;
-          st = {
-            ...st,
-            entities: (st.entities ?? []).map((e) =>
-              e.id === spellTargetId && e.isEnemy ? { ...e, hp: 0 } : e
-            ),
-          };
-          st.enemies_killed = [...st.enemies_killed, spellTargetId];
-          narrative += grantDarkOnesBlessing(char);
-          if (isRoomCleared(st, seed, roomId)) {
-            st = endCombatState(st);
-          }
-          narrative +=
-            ' ' +
-            pick(context.narratives.killShot)
-              .replace('{enemy}', spellTarget.name)
-              .replace('{xp}', String(xpShare));
-          narrative += applyPartyLevelUps(st, char, context);
-        } else {
-          narrative += ` The ${spellTarget.name} has ${fmt.hp(newEnemyHpSpell)} HP remaining.`;
-        }
-      }
-
-      usedInitiative = true;
-      break;
-    }
-
-    case 'use_class_feature': {
-      const features = context.classFeatures?.[char.character_class] ?? [];
-      const fid = action.featureId;
-      const dispatchKey = [char.character_class, char.subclass, fid].filter(Boolean).join('_');
-
-      // ── Rage (Barbarian bonus action) ──────────────────────────────────────
-      if (fid === 'rage') {
-        if (!features.includes('rage')) {
-          narrative = `${char.character_class} does not have Rage.`;
-          break;
-        }
-        if (char.conditions.includes('raging')) {
-          narrative = 'You are already raging!';
-          break;
-        }
-        const rageUses = char.class_resource_uses?.rage_uses ?? rageUsesMax(char.level);
-        if (rageUses <= 0) {
-          narrative = 'No rage uses remaining. They recover on a long rest.';
-          break;
-        }
-        char.conditions = [...char.conditions, 'raging'];
-        char.class_resource_uses = { ...(char.class_resource_uses ?? {}), rage_uses: rageUses - 1 };
-        char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
-        narrative = `${char.name} RAGES! +${rageDamageBonus(char.level)} bonus STR melee damage, resistance to physical attacks. (${rageUses - 1} use${rageUses - 1 === 1 ? '' : 's'} remaining)`;
-      }
-
-      // ── Action Surge (Fighter) ─────────────────────────────────────────────
-      else if (fid === 'action_surge') {
-        if (char.character_class.toLowerCase() !== 'fighter') {
-          narrative = 'Only Fighters have Action Surge.';
-          break;
-        }
-        if (char.level < 2) {
-          narrative = 'Action Surge requires Fighter level 2.';
-          break;
-        }
-        if ((char.class_resource_uses?.action_surge ?? 0) >= 1) {
-          narrative = 'Action Surge already used this rest.';
-          break;
-        }
-        char.class_resource_uses = { ...(char.class_resource_uses ?? {}), action_surge: 1 };
-        char.turn_actions = { ...char.turn_actions, action_used: false };
-        narrative = `${char.name} uses Action Surge — one additional action this turn!`;
-      }
-
-      // ── Second Wind (Fighter bonus action) ────────────────────────────────
-      // 2024 PHB: 2 uses at L1, 3 at L4, 4 at L10. Recovers on short rest.
-      // 2024 PHB Fighter L9 — Tactical Master mastery swap. Pre-arms the next
-      // attack to apply the chosen mastery (Push/Sap/Slow) instead of the
-      // weapon's printed one. No action cost; consumes the slot in
-      // `turn_actions` so a Fighter can't stack multiple swaps in one turn.
-      else if (
-        fid === 'tactical_master_push' ||
-        fid === 'tactical_master_sap' ||
-        fid === 'tactical_master_slow'
-      ) {
-        if (char.character_class.toLowerCase() !== 'fighter') {
-          narrative = 'Only Fighters have Tactical Master.';
-          break;
-        }
-        if (char.level < 9) {
-          narrative = 'Tactical Master requires Fighter level 9.';
-          break;
-        }
-        if (char.turn_actions.tactical_master_mastery) {
-          narrative = 'Tactical Master already queued this turn.';
-          break;
-        }
-        const m = fid.replace('tactical_master_', '') as 'push' | 'sap' | 'slow';
-        char.turn_actions = { ...char.turn_actions, tactical_master_mastery: m };
-        narrative = `${char.name} — Tactical Master: next attack will use ${m.toUpperCase()} mastery.`;
-      } else if (fid === 'second_wind') {
-        if (char.character_class.toLowerCase() !== 'fighter') {
-          narrative = 'Only Fighters have Second Wind.';
-          break;
-        }
-        const swMax = char.level >= 10 ? 4 : char.level >= 4 ? 3 : 2;
-        const swUsed = char.class_resource_uses?.second_wind ?? 0;
-        if (swUsed >= swMax) {
-          narrative = `Second Wind exhausted (${swMax}/${swMax} used). Recovers on a short or long rest.`;
-          break;
-        }
-        if (char.turn_actions.bonus_action_used) {
-          narrative = 'Bonus action already used this turn.';
-          break;
-        }
-        const swHeal = rollDice('1d10') + char.level;
-        char.hp = Math.min(char.max_hp, char.hp + swHeal);
-        char.class_resource_uses = { ...(char.class_resource_uses ?? {}), second_wind: swUsed + 1 };
-        char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
-        narrative = `${char.name} uses Second Wind — healed ${swHeal} HP (now ${char.hp}/${char.max_hp}). (${swMax - swUsed - 1}/${swMax} remaining)`;
-      }
-
-      // ── Bardic Inspiration (Bard bonus action) ────────────────────────────
-      else if (fid === 'bardic_inspiration') {
-        if (char.character_class.toLowerCase() !== 'bard') {
-          narrative = 'Only Bards have Bardic Inspiration.';
-          break;
-        }
-        const biUses =
-          char.class_resource_uses?.bardic_inspiration ??
-          Math.max(1, Math.floor((char.cha - 10) / 2));
-        if (biUses <= 0) {
-          narrative = 'No Bardic Inspiration uses remaining.';
-          break;
-        }
-        if (char.turn_actions.bonus_action_used) {
-          narrative = 'Bonus action already used this turn.';
-          break;
-        }
-        // Pick an ally to grant the die to. Currently auto-picks the first
-        // non-self living party member; a future PR can add a target picker.
-        const ally = st.characters.find((c) => c.id !== char.id && !c.dead && c.hp > 0);
-        if (!ally) {
-          narrative = 'No ally to inspire.';
-          break;
-        }
-        char.class_resource_uses = {
-          ...(char.class_resource_uses ?? {}),
-          bardic_inspiration: biUses - 1,
-        };
-        char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
-        const inspDie =
-          char.level >= 15 ? 'd12' : char.level >= 10 ? 'd10' : char.level >= 5 ? 'd8' : 'd6';
-        st = {
-          ...st,
-          characters: st.characters.map((c) =>
-            c.id === ally.id ? { ...c, bardic_inspiration_die: inspDie } : c
-          ),
-        };
-        narrative = `${char.name} grants Bardic Inspiration (${inspDie}) to ${ally.name}! (${biUses - 1} use${biUses - 1 === 1 ? '' : 's'} remaining)`;
-      }
-
-      // ── Reckless Attack (Barbarian L2+) — free toggle, no action cost ──────
-      else if (fid === 'reckless_attack') {
-        if (char.character_class.toLowerCase() !== 'barbarian') {
-          narrative = 'Only Barbarians have Reckless Attack.';
-          break;
-        }
-        if (char.level < 2) {
-          narrative = 'Reckless Attack requires Barbarian level 2.';
-          break;
-        }
-        if (char.turn_actions.reckless) {
-          narrative = 'You are already attacking recklessly this turn.';
-          break;
-        }
-        char.turn_actions = { ...char.turn_actions, reckless: true };
-        narrative = `${char.name} attacks recklessly! Advantage on STR melee attacks this turn — but enemies have advantage against you until your next turn.`;
-      }
-
-      // ── Cunning Action: Dash (Rogue L2+ bonus action) ─────────────────────
-      else if (fid === 'cunning_action_dash') {
-        if (char.character_class.toLowerCase() !== 'rogue') {
-          narrative = 'Only Rogues have Cunning Action.';
-          break;
-        }
-        if (char.level < 2) {
-          narrative = 'Cunning Action requires Rogue level 2.';
-          break;
-        }
-        if (char.turn_actions.bonus_action_used) {
-          narrative = 'Bonus action already used this turn.';
-          break;
-        }
-        const caSpeed = effectiveSpeed(char);
-        char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
-        st = {
-          ...st,
-          movement_used: {
-            ...(st.movement_used ?? {}),
-            [char.id]: Math.max(0, (st.movement_used?.[char.id] ?? 0) - caSpeed),
-          },
-        };
-        narrative = `${char.name} uses Cunning Action: Dash — +${caSpeed} ft movement this turn.`;
-      }
-
-      // ── Cunning Action: Disengage (Rogue L2+ bonus action) ────────────────
-      else if (fid === 'cunning_action_disengage') {
-        if (char.character_class.toLowerCase() !== 'rogue') {
-          narrative = 'Only Rogues have Cunning Action.';
-          break;
-        }
-        if (char.level < 2) {
-          narrative = 'Cunning Action requires Rogue level 2.';
-          break;
-        }
-        if (char.turn_actions.bonus_action_used) {
-          narrative = 'Bonus action already used this turn.';
-          break;
-        }
-        char.turn_actions = { ...char.turn_actions, bonus_action_used: true, disengaged: true };
-        narrative = `${char.name} uses Cunning Action: Disengage — no opportunity attacks when moving this turn.`;
-      }
-
-      // ── Cunning Action: Hide (Rogue L2+ bonus action) ─────────────────────
-      else if (fid === 'cunning_action_hide') {
-        if (char.character_class.toLowerCase() !== 'rogue') {
-          narrative = 'Only Rogues have Cunning Action.';
-          break;
-        }
-        if (char.level < 2) {
-          narrative = 'Cunning Action requires Rogue level 2.';
-          break;
-        }
-        if (char.turn_actions.bonus_action_used) {
-          narrative = 'Bonus action already used this turn.';
-          break;
-        }
-        const sneakHideDC = enemyAlive ? passivePerceptionDC(enemy!.wis ?? 10) : 10;
-        const hideProf = char.skill_proficiencies?.includes('Stealth') ?? false;
-        const inspAdvHide = consumeInspirationForCheck(char);
-        const bardicHideRoll = consumeBardicForCheck(char);
-        const hideCheck = skillCheck(
-          char.dex,
-          sneakHideDC - bardicHideRoll,
-          hideProf,
-          char.level,
-          isHeavilyEncumbered(char), // 2024 PHB: heavy encumbrance → disadv on DEX checks
-          false,
-          false,
-          inspAdvHide,
-          char.species === 'halfling'
-        );
-        char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
-        if (hideCheck.success) {
-          // 2024 PHB: store the Stealth total as the hide DC. Enemies must
-          // beat this with a Perception/Search check (or passive Perception)
-          // to detect the hider before targeting them.
-          char = inflictCondition(char, 'invisible');
-          char.hide_dc = hideCheck.total;
-          narrative = `${char.name} hides! (Stealth ${hideCheck.total} vs DC ${sneakHideDC} — success.) Hide DC = ${hideCheck.total}.`;
-        } else {
-          char.hide_dc = undefined;
-          narrative = `${char.name} tries to hide but fails. (Stealth ${hideCheck.total} vs DC ${sneakHideDC})`;
-        }
-      }
-
-      // ── 2024 PHB Rogue Cunning Strike (L5+) ──────────────────────────────
-      // Pre-commits an effect that fires on the next Sneak Attack. No
-      // action cost; the SA-die cost is paid in the attack handler.
-      else if (fid.startsWith('cunning_strike_')) {
-        if (char.character_class.toLowerCase() !== 'rogue') {
-          narrative = 'Only Rogues have Cunning Strike.';
-          break;
-        }
-        if (char.level < 5) {
-          narrative = 'Cunning Strike requires Rogue level 5.';
-          break;
-        }
-        const effect = fid.replace('cunning_strike_', '') as
-          | 'trip'
-          | 'poison'
-          | 'withdraw'
-          | 'disarm';
-        char.turn_actions = { ...char.turn_actions, cunning_strike_pending: effect };
-        narrative = `${char.name} readies a Cunning Strike (${effect}) on the next Sneak Attack.`;
-      }
-
-      // ── Battle Master: Maneuver (Fighter L3+ subclass) ────────────────────
-      else if (dispatchKey.includes('battle_master') && fid.startsWith('maneuver_')) {
-        const sdPool = char.class_resource_uses?.superiority_dice ?? 4;
-        if (sdPool <= 0) {
-          narrative = 'No superiority dice remaining (recover on short rest).';
-          break;
-        }
-        char.class_resource_uses = {
-          ...(char.class_resource_uses ?? {}),
-          superiority_dice: sdPool - 1,
-        };
-        const sdRoll = rollDice('1d8');
-        if (fid === 'maneuver_trip') {
-          const tripSave =
-            rollDice('1d20') +
-            abilityMod((enemy as unknown as Record<string, number>)['str'] ?? 10);
-          const tripDC = 8 + profBonus(char.level) + abilityMod(char.str);
-          if (tripSave < tripDC) {
-            st = {
-              ...st,
-              entities: (st.entities ?? []).map((e) =>
-                e.id === roomId && e.isEnemy
-                  ? { ...e, conditions: [...e.conditions.filter((c) => c !== 'prone'), 'prone'] }
-                  : e
-              ),
-            };
-            narrative = `Maneuver — Trip Attack: +${sdRoll} damage, ${enemy!.name} knocked prone! (STR save ${tripSave} vs DC ${tripDC})`;
           } else {
-            narrative = `Maneuver — Trip Attack: +${sdRoll} damage, ${enemy!.name} resists the trip. (STR save ${tripSave} vs DC ${tripDC})`;
+            narrative += ` The ${spellTarget.name} has ${fmt.hp(newEnemyHpSpell)} HP remaining.`;
           }
-        } else if (fid === 'maneuver_goading') {
-          const goadSave =
-            rollDice('1d20') +
-            abilityMod((enemy as unknown as Record<string, number>)['wis'] ?? 10);
-          const goadDC = 8 + profBonus(char.level) + abilityMod(char.cha);
-          const goadSuccess = goadSave >= goadDC;
-          st = pushEvent(st, {
-            kind: 'save',
-            characterId: enemy!.id,
-            characterName: enemy!.name,
-            ability: 'wis',
-            roll: goadSave,
-            dc: goadDC,
-            success: goadSuccess,
-            vs: 'Goading Attack',
-            round: st.round ?? 1,
-          });
-          if (!goadSuccess) {
-            st = {
-              ...st,
-              entities: (st.entities ?? []).map((e) =>
-                e.id === roomId && e.isEnemy
-                  ? { ...e, conditions: [...e.conditions.filter((c) => c !== 'goaded'), 'goaded'] }
-                  : e
-              ),
-            };
-            st = pushEvent(st, {
-              kind: 'condition_applied',
-              targetId: enemy!.id,
-              targetName: enemy!.name,
-              condition: 'goaded',
-              source: 'Goading Attack',
-              round: st.round ?? 1,
-            });
-            narrative = `Maneuver — Goading Attack: +${sdRoll} damage, ${enemy!.name} goaded (disadvantage vs others)! (WIS save ${goadSave} vs DC ${goadDC})`;
-          } else {
-            narrative = `Maneuver — Goading Attack: +${sdRoll} damage, ${enemy!.name} resists. (WIS save ${goadSave} vs DC ${goadDC})`;
-          }
-        } else {
-          // Generic maneuver: deal extra die damage
-          narrative = `Maneuver — +${sdRoll} superiority die damage! (${sdPool - 1} dice remaining)`;
         }
+
+        usedInitiative = true;
+        break;
       }
 
-      // ── Monk: Flurry of Blows (2 unarmed strikes, 1 ki, bonus action) ────────
-      else if (fid === 'flurry_of_blows') {
-        const cls = char.character_class.toLowerCase();
-        if (cls !== 'monk') {
-          narrative = 'Only Monks have Flurry of Blows.';
-          break;
-        }
-        if (char.level < 2) {
-          narrative = 'Flurry of Blows requires Monk level 2.';
-          break;
-        }
-        if (char.turn_actions.bonus_action_used) {
-          narrative = 'Bonus action already used this turn.';
-          break;
-        }
-        if (!char.turn_actions.action_used) {
-          narrative = 'You must use your Attack action before using Flurry of Blows.';
-          break;
-        }
-        const kiPool = char.class_resource_uses?.ki_points ?? char.level;
-        if (kiPool <= 0) {
-          narrative = 'No ki points remaining (recover on short rest).';
-          break;
-        }
-        char.class_resource_uses = { ...(char.class_resource_uses ?? {}), ki_points: kiPool - 1 };
-        char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
-        // 2024 PHB Martial Arts die: 1d6 (L1) → 1d8 (L5) → 1d10 (L11) → 1d12 (L17).
-        // Was 1d4/6/8/10 in 2014; 2024 bumps every tier by one die size.
-        const martialDie = char.level >= 17 ? 12 : char.level >= 11 ? 10 : char.level >= 5 ? 8 : 6;
-        const isOpenHand = char.subclass === 'open_hand';
-        const monkDc = 8 + profBonus(char.level) + abilityMod(char.wis);
-        let flurryNarrative = `${char.name} — Flurry of Blows (${kiPool - 1} ki remaining)!`;
-        for (let i = 0; i < 2; i++) {
-          const flurryTarget = st.entities?.find((e) => e.id === roomId && e.isEnemy);
-          if (!enemyAlive || !flurryTarget) break;
-          const toHit = rollDice('1d20') + abilityMod(char.dex) + profBonus(char.level);
-          if (toHit >= (enemy?.ac ?? 10)) {
-            const dmg = Math.max(1, rollDice(`1d${martialDie}`) + abilityMod(char.dex));
-            const curHp = st.entities?.find((e) => e.id === roomId && e.isEnemy)?.hp ?? 0;
-            const newHp = curHp - dmg;
-            st = {
-              ...st,
-              entities: (st.entities ?? []).map((e) =>
-                e.id === roomId && e.isEnemy ? { ...e, hp: Math.max(0, newHp) } : e
-              ),
-            };
-            flurryNarrative += ` Strike ${i + 1}: hit (${toHit}) — ${dmg} bludgeoning.${newHp <= 0 ? ' (killed)' : ''}`;
-            // Way of the Open Hand (PHB p.79) — Open Hand Technique. Each
-            // Flurry hit forces the target to make a DEX save (Monk DC) or
-            // be knocked prone. (RAW lets the player choose between prone /
-            // push 15 ft / no reactions; prone is the most universally
-            // valuable for the engine's combat model so we auto-pick it.)
-            if (isOpenHand && newHp > 0) {
-              const enemyDex = (enemy?.dex ?? 10) as number;
-              const dexSave = rollDice('1d20') + abilityMod(enemyDex);
-              const dexSuccess = dexSave >= monkDc;
-              st = pushEvent(st, {
-                kind: 'save',
-                characterId: enemy?.id ?? roomId,
-                characterName: enemy?.name ?? 'target',
-                ability: 'dex',
-                roll: dexSave,
-                dc: monkDc,
-                success: dexSuccess,
-                vs: 'Open Hand Technique',
-                round: st.round ?? 1,
-              });
-              if (!dexSuccess) {
-                st = {
-                  ...st,
-                  entities: (st.entities ?? []).map((e) =>
-                    e.id === roomId && e.isEnemy
-                      ? {
-                          ...e,
-                          conditions: [...e.conditions.filter((c) => c !== 'prone'), 'prone'],
-                        }
-                      : e
-                  ),
-                };
-                st = pushEvent(st, {
-                  kind: 'condition_applied',
-                  targetId: enemy?.id ?? roomId,
-                  targetName: enemy?.name ?? 'target',
-                  condition: 'prone',
-                  source: 'Open Hand Technique',
-                  round: st.round ?? 1,
-                });
-                flurryNarrative += ` Open Hand: DEX ${dexSave} vs DC ${monkDc} — prone!`;
-              } else {
-                flurryNarrative += ` Open Hand: DEX ${dexSave} vs DC ${monkDc} — resists.`;
-              }
-            }
-            if (newHp <= 0) {
-              const split = splitEncounterXp(st, char.id, enemy?.xp ?? 10);
-              st = split.st;
-              char.xp = (char.xp || 0) + split.share;
-              flurryNarrative += applyPartyLevelUps(st, char, context);
-              st.enemies_killed = [...st.enemies_killed, roomId];
-              st = endCombatState(st);
-              break;
-            }
-          } else {
-            flurryNarrative += ` Strike ${i + 1}: miss (${toHit}).`;
-          }
-        }
-        narrative = flurryNarrative;
-      }
+      case 'use_class_feature': {
+        const features = context.classFeatures?.[char.character_class] ?? [];
+        const fid = action.featureId;
+        const dispatchKey = [char.character_class, char.subclass, fid].filter(Boolean).join('_');
 
-      // ── Monk: Step of the Wind (Dash or Disengage, 1 ki, bonus action) ───────
-      // 2024 PHB Patient Defense — Dodge as a bonus action. Free 1/turn at
-      // L2+; spending 1 DP also grants advantage on the next DEX save before
-      // your next turn.
-      else if (fid === 'patient_defense_free' || fid === 'patient_defense_dp') {
-        const cls = char.character_class.toLowerCase();
-        if (cls !== 'monk') {
-          narrative = 'Only Monks have Patient Defense.';
-          break;
-        }
-        if (char.level < 2) {
-          narrative = 'Patient Defense requires Monk level 2.';
-          break;
-        }
-        if (char.turn_actions.bonus_action_used) {
-          narrative = 'Bonus action already used this turn.';
-          break;
-        }
-        const isFree = fid === 'patient_defense_free';
-        if (isFree && char.turn_actions.monk_free_used) {
-          narrative = "You've already used your free monk bonus action this turn.";
-          break;
-        }
-        const kiPoolPD = char.class_resource_uses?.ki_points ?? char.level;
-        if (!isFree && kiPoolPD <= 0) {
-          narrative = 'No Discipline Points remaining (recover on short rest).';
-          break;
-        }
-        if (!isFree) {
+        // ── Rage (Barbarian bonus action) ──────────────────────────────────────
+        if (fid === 'rage') {
+          if (!features.includes('rage')) {
+            narrative = `${char.character_class} does not have Rage.`;
+            break;
+          }
+          if (char.conditions.includes('raging')) {
+            narrative = 'You are already raging!';
+            break;
+          }
+          const rageUses = char.class_resource_uses?.rage_uses ?? rageUsesMax(char.level);
+          if (rageUses <= 0) {
+            narrative = 'No rage uses remaining. They recover on a long rest.';
+            break;
+          }
+          char.conditions = [...char.conditions, 'raging'];
           char.class_resource_uses = {
             ...(char.class_resource_uses ?? {}),
-            ki_points: kiPoolPD - 1,
+            rage_uses: rageUses - 1,
           };
+          char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
+          narrative = `${char.name} RAGES! +${rageDamageBonus(char.level)} bonus STR melee damage, resistance to physical attacks. (${rageUses - 1} use${rageUses - 1 === 1 ? '' : 's'} remaining)`;
         }
-        char.turn_actions = {
-          ...char.turn_actions,
-          bonus_action_used: true,
-          dodging: true,
-          ...(isFree ? { monk_free_used: true } : {}),
-        };
-        narrative = isFree
-          ? `${char.name} — Patient Defense (free): assumes a defensive stance. Attacks against have disadvantage until next turn.`
-          : `${char.name} — Patient Defense (1 DP): defensive stance + advantage on next DEX save. (${kiPoolPD - 1} DP remaining)`;
-      }
 
-      // 2024 PHB Step of the Wind — free 1/turn variants (single effect) +
-      // 1-DP variant (Dash AND Disengage).
-      else if (fid === 'step_of_wind_free_dash' || fid === 'step_of_wind_free_disengage') {
-        const cls = char.character_class.toLowerCase();
-        if (cls !== 'monk') {
-          narrative = 'Only Monks have Step of the Wind.';
-          break;
+        // ── Action Surge (Fighter) ─────────────────────────────────────────────
+        else if (fid === 'action_surge') {
+          if (char.character_class.toLowerCase() !== 'fighter') {
+            narrative = 'Only Fighters have Action Surge.';
+            break;
+          }
+          if (char.level < 2) {
+            narrative = 'Action Surge requires Fighter level 2.';
+            break;
+          }
+          if ((char.class_resource_uses?.action_surge ?? 0) >= 1) {
+            narrative = 'Action Surge already used this rest.';
+            break;
+          }
+          char.class_resource_uses = { ...(char.class_resource_uses ?? {}), action_surge: 1 };
+          char.turn_actions = { ...char.turn_actions, action_used: false };
+          narrative = `${char.name} uses Action Surge — one additional action this turn!`;
         }
-        if (char.level < 2) {
-          narrative = 'Step of the Wind requires Monk level 2.';
-          break;
+
+        // ── Second Wind (Fighter bonus action) ────────────────────────────────
+        // 2024 PHB: 2 uses at L1, 3 at L4, 4 at L10. Recovers on short rest.
+        // 2024 PHB Fighter L9 — Tactical Master mastery swap. Pre-arms the next
+        // attack to apply the chosen mastery (Push/Sap/Slow) instead of the
+        // weapon's printed one. No action cost; consumes the slot in
+        // `turn_actions` so a Fighter can't stack multiple swaps in one turn.
+        else if (
+          fid === 'tactical_master_push' ||
+          fid === 'tactical_master_sap' ||
+          fid === 'tactical_master_slow'
+        ) {
+          if (char.character_class.toLowerCase() !== 'fighter') {
+            narrative = 'Only Fighters have Tactical Master.';
+            break;
+          }
+          if (char.level < 9) {
+            narrative = 'Tactical Master requires Fighter level 9.';
+            break;
+          }
+          if (char.turn_actions.tactical_master_mastery) {
+            narrative = 'Tactical Master already queued this turn.';
+            break;
+          }
+          const m = fid.replace('tactical_master_', '') as 'push' | 'sap' | 'slow';
+          char.turn_actions = { ...char.turn_actions, tactical_master_mastery: m };
+          narrative = `${char.name} — Tactical Master: next attack will use ${m.toUpperCase()} mastery.`;
+        } else if (fid === 'second_wind') {
+          if (char.character_class.toLowerCase() !== 'fighter') {
+            narrative = 'Only Fighters have Second Wind.';
+            break;
+          }
+          const swMax = char.level >= 10 ? 4 : char.level >= 4 ? 3 : 2;
+          const swUsed = char.class_resource_uses?.second_wind ?? 0;
+          if (swUsed >= swMax) {
+            narrative = `Second Wind exhausted (${swMax}/${swMax} used). Recovers on a short or long rest.`;
+            break;
+          }
+          if (char.turn_actions.bonus_action_used) {
+            narrative = 'Bonus action already used this turn.';
+            break;
+          }
+          const swHeal = rollDice('1d10') + char.level;
+          char.hp = Math.min(char.max_hp, char.hp + swHeal);
+          char.class_resource_uses = {
+            ...(char.class_resource_uses ?? {}),
+            second_wind: swUsed + 1,
+          };
+          char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
+          narrative = `${char.name} uses Second Wind — healed ${swHeal} HP (now ${char.hp}/${char.max_hp}). (${swMax - swUsed - 1}/${swMax} remaining)`;
         }
-        if (char.turn_actions.bonus_action_used) {
-          narrative = 'Bonus action already used this turn.';
-          break;
+
+        // ── Bardic Inspiration (Bard bonus action) ────────────────────────────
+        else if (fid === 'bardic_inspiration') {
+          if (char.character_class.toLowerCase() !== 'bard') {
+            narrative = 'Only Bards have Bardic Inspiration.';
+            break;
+          }
+          const biUses =
+            char.class_resource_uses?.bardic_inspiration ??
+            Math.max(1, Math.floor((char.cha - 10) / 2));
+          if (biUses <= 0) {
+            narrative = 'No Bardic Inspiration uses remaining.';
+            break;
+          }
+          if (char.turn_actions.bonus_action_used) {
+            narrative = 'Bonus action already used this turn.';
+            break;
+          }
+          // Pick an ally to grant the die to. Currently auto-picks the first
+          // non-self living party member; a future PR can add a target picker.
+          const ally = st.characters.find((c) => c.id !== char.id && !c.dead && c.hp > 0);
+          if (!ally) {
+            narrative = 'No ally to inspire.';
+            break;
+          }
+          char.class_resource_uses = {
+            ...(char.class_resource_uses ?? {}),
+            bardic_inspiration: biUses - 1,
+          };
+          char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
+          const inspDie =
+            char.level >= 15 ? 'd12' : char.level >= 10 ? 'd10' : char.level >= 5 ? 'd8' : 'd6';
+          st = {
+            ...st,
+            characters: st.characters.map((c) =>
+              c.id === ally.id ? { ...c, bardic_inspiration_die: inspDie } : c
+            ),
+          };
+          narrative = `${char.name} grants Bardic Inspiration (${inspDie}) to ${ally.name}! (${biUses - 1} use${biUses - 1 === 1 ? '' : 's'} remaining)`;
         }
-        if (char.turn_actions.monk_free_used) {
-          narrative = "You've already used your free monk bonus action this turn.";
-          break;
+
+        // ── Reckless Attack (Barbarian L2+) — free toggle, no action cost ──────
+        else if (fid === 'reckless_attack') {
+          if (char.character_class.toLowerCase() !== 'barbarian') {
+            narrative = 'Only Barbarians have Reckless Attack.';
+            break;
+          }
+          if (char.level < 2) {
+            narrative = 'Reckless Attack requires Barbarian level 2.';
+            break;
+          }
+          if (char.turn_actions.reckless) {
+            narrative = 'You are already attacking recklessly this turn.';
+            break;
+          }
+          char.turn_actions = { ...char.turn_actions, reckless: true };
+          narrative = `${char.name} attacks recklessly! Advantage on STR melee attacks this turn — but enemies have advantage against you until your next turn.`;
         }
-        char.turn_actions = {
-          ...char.turn_actions,
-          bonus_action_used: true,
-          monk_free_used: true,
-        };
-        if (fid === 'step_of_wind_free_dash') {
-          const sw = effectiveSpeed(char);
+
+        // ── Cunning Action: Dash (Rogue L2+ bonus action) ─────────────────────
+        else if (fid === 'cunning_action_dash') {
+          if (char.character_class.toLowerCase() !== 'rogue') {
+            narrative = 'Only Rogues have Cunning Action.';
+            break;
+          }
+          if (char.level < 2) {
+            narrative = 'Cunning Action requires Rogue level 2.';
+            break;
+          }
+          if (char.turn_actions.bonus_action_used) {
+            narrative = 'Bonus action already used this turn.';
+            break;
+          }
+          const caSpeed = effectiveSpeed(char);
+          char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
           st = {
             ...st,
             movement_used: {
               ...(st.movement_used ?? {}),
-              [char.id]: Math.max(0, (st.movement_used?.[char.id] ?? 0) - sw),
+              [char.id]: Math.max(0, (st.movement_used?.[char.id] ?? 0) - caSpeed),
             },
           };
-          narrative = `${char.name} — Step of the Wind: Dash (free)! +${sw} ft movement.`;
-        } else {
-          char.turn_actions = { ...char.turn_actions, disengaged: true };
-          narrative = `${char.name} — Step of the Wind: Disengage (free)! No opportunity attacks when moving.`;
+          narrative = `${char.name} uses Cunning Action: Dash — +${caSpeed} ft movement this turn.`;
         }
-      } else if (fid === 'step_of_wind_dash' || fid === 'step_of_wind_disengage') {
-        const cls = char.character_class.toLowerCase();
-        if (cls !== 'monk') {
-          narrative = 'Only Monks have Step of the Wind.';
-          break;
-        }
-        if (char.level < 2) {
-          narrative = 'Step of the Wind requires Monk level 2.';
-          break;
-        }
-        if (char.turn_actions.bonus_action_used) {
-          narrative = 'Bonus action already used this turn.';
-          break;
-        }
-        const kiPool2 = char.class_resource_uses?.ki_points ?? char.level;
-        if (kiPool2 <= 0) {
-          narrative = 'No Discipline Points remaining (recover on short rest).';
-          break;
-        }
-        char.class_resource_uses = { ...(char.class_resource_uses ?? {}), ki_points: kiPool2 - 1 };
-        // 2024 PHB: spending 1 DP gives BOTH Dash and Disengage. The legacy
-        // `step_of_wind_disengage` id is kept for back-compat but now also
-        // dashes. `step_of_wind_dash` does the same.
-        char.turn_actions = {
-          ...char.turn_actions,
-          bonus_action_used: true,
-          disengaged: true,
-        };
-        const stwSpeed = effectiveSpeed(char);
-        st = {
-          ...st,
-          movement_used: {
-            ...(st.movement_used ?? {}),
-            [char.id]: Math.max(0, (st.movement_used?.[char.id] ?? 0) - stwSpeed),
-          },
-        };
-        narrative = `${char.name} — Step of the Wind (1 DP): Dash +${stwSpeed} ft AND Disengage. (${kiPool2 - 1} DP remaining)`;
-      }
 
-      // ── Monk: Stunning Strike (1 ki, after a hit) ────────────────────────────
-      else if (fid === 'stunning_strike') {
-        const cls = char.character_class.toLowerCase();
-        if (cls !== 'monk') {
-          narrative = 'Only Monks have Stunning Strike.';
-          break;
+        // ── Cunning Action: Disengage (Rogue L2+ bonus action) ────────────────
+        else if (fid === 'cunning_action_disengage') {
+          if (char.character_class.toLowerCase() !== 'rogue') {
+            narrative = 'Only Rogues have Cunning Action.';
+            break;
+          }
+          if (char.level < 2) {
+            narrative = 'Cunning Action requires Rogue level 2.';
+            break;
+          }
+          if (char.turn_actions.bonus_action_used) {
+            narrative = 'Bonus action already used this turn.';
+            break;
+          }
+          char.turn_actions = { ...char.turn_actions, bonus_action_used: true, disengaged: true };
+          narrative = `${char.name} uses Cunning Action: Disengage — no opportunity attacks when moving this turn.`;
         }
-        if (char.level < 5) {
-          narrative = 'Stunning Strike requires Monk level 5.';
-          break;
+
+        // ── Cunning Action: Hide (Rogue L2+ bonus action) ─────────────────────
+        else if (fid === 'cunning_action_hide') {
+          if (char.character_class.toLowerCase() !== 'rogue') {
+            narrative = 'Only Rogues have Cunning Action.';
+            break;
+          }
+          if (char.level < 2) {
+            narrative = 'Cunning Action requires Rogue level 2.';
+            break;
+          }
+          if (char.turn_actions.bonus_action_used) {
+            narrative = 'Bonus action already used this turn.';
+            break;
+          }
+          const sneakHideDC = enemyAlive ? passivePerceptionDC(enemy!.wis ?? 10) : 10;
+          const hideProf = char.skill_proficiencies?.includes('Stealth') ?? false;
+          const inspAdvHide = consumeInspirationForCheck(char);
+          const bardicHideRoll = consumeBardicForCheck(char);
+          const hideCheck = skillCheck(
+            char.dex,
+            sneakHideDC - bardicHideRoll,
+            hideProf,
+            char.level,
+            isHeavilyEncumbered(char), // 2024 PHB: heavy encumbrance → disadv on DEX checks
+            false,
+            false,
+            inspAdvHide,
+            char.species === 'halfling'
+          );
+          char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
+          if (hideCheck.success) {
+            // 2024 PHB: store the Stealth total as the hide DC. Enemies must
+            // beat this with a Perception/Search check (or passive Perception)
+            // to detect the hider before targeting them.
+            char = inflictCondition(char, 'invisible');
+            char.hide_dc = hideCheck.total;
+            narrative = `${char.name} hides! (Stealth ${hideCheck.total} vs DC ${sneakHideDC} — success.) Hide DC = ${hideCheck.total}.`;
+          } else {
+            char.hide_dc = undefined;
+            narrative = `${char.name} tries to hide but fails. (Stealth ${hideCheck.total} vs DC ${sneakHideDC})`;
+          }
         }
-        if (!enemyAlive || !enemy) {
-          narrative = 'No living target.';
-          break;
+
+        // ── 2024 PHB Rogue Cunning Strike (L5+) ──────────────────────────────
+        // Pre-commits an effect that fires on the next Sneak Attack. No
+        // action cost; the SA-die cost is paid in the attack handler.
+        else if (fid.startsWith('cunning_strike_')) {
+          if (char.character_class.toLowerCase() !== 'rogue') {
+            narrative = 'Only Rogues have Cunning Strike.';
+            break;
+          }
+          if (char.level < 5) {
+            narrative = 'Cunning Strike requires Rogue level 5.';
+            break;
+          }
+          const effect = fid.replace('cunning_strike_', '') as
+            | 'trip'
+            | 'poison'
+            | 'withdraw'
+            | 'disarm';
+          char.turn_actions = { ...char.turn_actions, cunning_strike_pending: effect };
+          narrative = `${char.name} readies a Cunning Strike (${effect}) on the next Sneak Attack.`;
         }
-        // 2024 PHB: Stunning Strike is once per turn (was per-hit in 2014).
-        if (char.turn_actions.monk_stunning_strike_used) {
-          narrative = 'Stunning Strike already used this turn.';
-          break;
+
+        // ── Battle Master: Maneuver (Fighter L3+ subclass) ────────────────────
+        else if (dispatchKey.includes('battle_master') && fid.startsWith('maneuver_')) {
+          const sdPool = char.class_resource_uses?.superiority_dice ?? 4;
+          if (sdPool <= 0) {
+            narrative = 'No superiority dice remaining (recover on short rest).';
+            break;
+          }
+          char.class_resource_uses = {
+            ...(char.class_resource_uses ?? {}),
+            superiority_dice: sdPool - 1,
+          };
+          const sdRoll = rollDice('1d8');
+          if (fid === 'maneuver_trip') {
+            const tripSave =
+              rollDice('1d20') +
+              abilityMod((enemy as unknown as Record<string, number>)['str'] ?? 10);
+            const tripDC = 8 + profBonus(char.level) + abilityMod(char.str);
+            if (tripSave < tripDC) {
+              st = {
+                ...st,
+                entities: (st.entities ?? []).map((e) =>
+                  e.id === roomId && e.isEnemy
+                    ? { ...e, conditions: [...e.conditions.filter((c) => c !== 'prone'), 'prone'] }
+                    : e
+                ),
+              };
+              narrative = `Maneuver — Trip Attack: +${sdRoll} damage, ${enemy!.name} knocked prone! (STR save ${tripSave} vs DC ${tripDC})`;
+            } else {
+              narrative = `Maneuver — Trip Attack: +${sdRoll} damage, ${enemy!.name} resists the trip. (STR save ${tripSave} vs DC ${tripDC})`;
+            }
+          } else if (fid === 'maneuver_goading') {
+            const goadSave =
+              rollDice('1d20') +
+              abilityMod((enemy as unknown as Record<string, number>)['wis'] ?? 10);
+            const goadDC = 8 + profBonus(char.level) + abilityMod(char.cha);
+            const goadSuccess = goadSave >= goadDC;
+            st = pushEvent(st, {
+              kind: 'save',
+              characterId: enemy!.id,
+              characterName: enemy!.name,
+              ability: 'wis',
+              roll: goadSave,
+              dc: goadDC,
+              success: goadSuccess,
+              vs: 'Goading Attack',
+              round: st.round ?? 1,
+            });
+            if (!goadSuccess) {
+              st = {
+                ...st,
+                entities: (st.entities ?? []).map((e) =>
+                  e.id === roomId && e.isEnemy
+                    ? {
+                        ...e,
+                        conditions: [...e.conditions.filter((c) => c !== 'goaded'), 'goaded'],
+                      }
+                    : e
+                ),
+              };
+              st = pushEvent(st, {
+                kind: 'condition_applied',
+                targetId: enemy!.id,
+                targetName: enemy!.name,
+                condition: 'goaded',
+                source: 'Goading Attack',
+                round: st.round ?? 1,
+              });
+              narrative = `Maneuver — Goading Attack: +${sdRoll} damage, ${enemy!.name} goaded (disadvantage vs others)! (WIS save ${goadSave} vs DC ${goadDC})`;
+            } else {
+              narrative = `Maneuver — Goading Attack: +${sdRoll} damage, ${enemy!.name} resists. (WIS save ${goadSave} vs DC ${goadDC})`;
+            }
+          } else {
+            // Generic maneuver: deal extra die damage
+            narrative = `Maneuver — +${sdRoll} superiority die damage! (${sdPool - 1} dice remaining)`;
+          }
         }
-        const kiPool3 = char.class_resource_uses?.ki_points ?? char.level;
-        if (kiPool3 <= 0) {
-          narrative = 'No Discipline Points remaining (recover on short rest).';
-          break;
+
+        // ── Monk: Flurry of Blows (2 unarmed strikes, 1 ki, bonus action) ────────
+        else if (fid === 'flurry_of_blows') {
+          const cls = char.character_class.toLowerCase();
+          if (cls !== 'monk') {
+            narrative = 'Only Monks have Flurry of Blows.';
+            break;
+          }
+          if (char.level < 2) {
+            narrative = 'Flurry of Blows requires Monk level 2.';
+            break;
+          }
+          if (char.turn_actions.bonus_action_used) {
+            narrative = 'Bonus action already used this turn.';
+            break;
+          }
+          if (!char.turn_actions.action_used) {
+            narrative = 'You must use your Attack action before using Flurry of Blows.';
+            break;
+          }
+          const kiPool = char.class_resource_uses?.ki_points ?? char.level;
+          if (kiPool <= 0) {
+            narrative = 'No ki points remaining (recover on short rest).';
+            break;
+          }
+          char.class_resource_uses = { ...(char.class_resource_uses ?? {}), ki_points: kiPool - 1 };
+          char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
+          // 2024 PHB Martial Arts die: 1d6 (L1) → 1d8 (L5) → 1d10 (L11) → 1d12 (L17).
+          // Was 1d4/6/8/10 in 2014; 2024 bumps every tier by one die size.
+          const martialDie =
+            char.level >= 17 ? 12 : char.level >= 11 ? 10 : char.level >= 5 ? 8 : 6;
+          const isOpenHand = char.subclass === 'open_hand';
+          const monkDc = 8 + profBonus(char.level) + abilityMod(char.wis);
+          let flurryNarrative = `${char.name} — Flurry of Blows (${kiPool - 1} ki remaining)!`;
+          for (let i = 0; i < 2; i++) {
+            const flurryTarget = st.entities?.find((e) => e.id === roomId && e.isEnemy);
+            if (!enemyAlive || !flurryTarget) break;
+            const toHit = rollDice('1d20') + abilityMod(char.dex) + profBonus(char.level);
+            if (toHit >= (enemy?.ac ?? 10)) {
+              const dmg = Math.max(1, rollDice(`1d${martialDie}`) + abilityMod(char.dex));
+              const curHp = st.entities?.find((e) => e.id === roomId && e.isEnemy)?.hp ?? 0;
+              const newHp = curHp - dmg;
+              st = {
+                ...st,
+                entities: (st.entities ?? []).map((e) =>
+                  e.id === roomId && e.isEnemy ? { ...e, hp: Math.max(0, newHp) } : e
+                ),
+              };
+              flurryNarrative += ` Strike ${i + 1}: hit (${toHit}) — ${dmg} bludgeoning.${newHp <= 0 ? ' (killed)' : ''}`;
+              // Way of the Open Hand (PHB p.79) — Open Hand Technique. Each
+              // Flurry hit forces the target to make a DEX save (Monk DC) or
+              // be knocked prone. (RAW lets the player choose between prone /
+              // push 15 ft / no reactions; prone is the most universally
+              // valuable for the engine's combat model so we auto-pick it.)
+              if (isOpenHand && newHp > 0) {
+                const enemyDex = (enemy?.dex ?? 10) as number;
+                const dexSave = rollDice('1d20') + abilityMod(enemyDex);
+                const dexSuccess = dexSave >= monkDc;
+                st = pushEvent(st, {
+                  kind: 'save',
+                  characterId: enemy?.id ?? roomId,
+                  characterName: enemy?.name ?? 'target',
+                  ability: 'dex',
+                  roll: dexSave,
+                  dc: monkDc,
+                  success: dexSuccess,
+                  vs: 'Open Hand Technique',
+                  round: st.round ?? 1,
+                });
+                if (!dexSuccess) {
+                  st = {
+                    ...st,
+                    entities: (st.entities ?? []).map((e) =>
+                      e.id === roomId && e.isEnemy
+                        ? {
+                            ...e,
+                            conditions: [...e.conditions.filter((c) => c !== 'prone'), 'prone'],
+                          }
+                        : e
+                    ),
+                  };
+                  st = pushEvent(st, {
+                    kind: 'condition_applied',
+                    targetId: enemy?.id ?? roomId,
+                    targetName: enemy?.name ?? 'target',
+                    condition: 'prone',
+                    source: 'Open Hand Technique',
+                    round: st.round ?? 1,
+                  });
+                  flurryNarrative += ` Open Hand: DEX ${dexSave} vs DC ${monkDc} — prone!`;
+                } else {
+                  flurryNarrative += ` Open Hand: DEX ${dexSave} vs DC ${monkDc} — resists.`;
+                }
+              }
+              if (newHp <= 0) {
+                const split = splitEncounterXp(st, char.id, enemy?.xp ?? 10);
+                st = split.st;
+                char.xp = (char.xp || 0) + split.share;
+                flurryNarrative += applyPartyLevelUps(st, char, context);
+                st.enemies_killed = [...st.enemies_killed, roomId];
+                st = endCombatState(st);
+                break;
+              }
+            } else {
+              flurryNarrative += ` Strike ${i + 1}: miss (${toHit}).`;
+            }
+          }
+          narrative = flurryNarrative;
         }
-        char.class_resource_uses = { ...(char.class_resource_uses ?? {}), ki_points: kiPool3 - 1 };
-        char.turn_actions = { ...char.turn_actions, monk_stunning_strike_used: true };
-        const stunDC = 8 + profBonus(char.level) + abilityMod(char.wis);
-        const conSave =
-          rollDice('1d20') + abilityMod((enemy as unknown as Record<string, number>)['con'] ?? 10);
-        const stunSuccess = conSave >= stunDC;
-        st = pushEvent(st, {
-          kind: 'save',
-          characterId: enemy.id,
-          characterName: enemy.name,
-          ability: 'con',
-          roll: conSave,
-          dc: stunDC,
-          success: stunSuccess,
-          vs: 'Stunning Strike',
-          round: st.round ?? 1,
-        });
-        if (!stunSuccess) {
+
+        // ── Monk: Step of the Wind (Dash or Disengage, 1 ki, bonus action) ───────
+        // 2024 PHB Patient Defense — Dodge as a bonus action. Free 1/turn at
+        // L2+; spending 1 DP also grants advantage on the next DEX save before
+        // your next turn.
+        else if (fid === 'patient_defense_free' || fid === 'patient_defense_dp') {
+          const cls = char.character_class.toLowerCase();
+          if (cls !== 'monk') {
+            narrative = 'Only Monks have Patient Defense.';
+            break;
+          }
+          if (char.level < 2) {
+            narrative = 'Patient Defense requires Monk level 2.';
+            break;
+          }
+          if (char.turn_actions.bonus_action_used) {
+            narrative = 'Bonus action already used this turn.';
+            break;
+          }
+          const isFree = fid === 'patient_defense_free';
+          if (isFree && char.turn_actions.monk_free_used) {
+            narrative = "You've already used your free monk bonus action this turn.";
+            break;
+          }
+          const kiPoolPD = char.class_resource_uses?.ki_points ?? char.level;
+          if (!isFree && kiPoolPD <= 0) {
+            narrative = 'No Discipline Points remaining (recover on short rest).';
+            break;
+          }
+          if (!isFree) {
+            char.class_resource_uses = {
+              ...(char.class_resource_uses ?? {}),
+              ki_points: kiPoolPD - 1,
+            };
+          }
+          char.turn_actions = {
+            ...char.turn_actions,
+            bonus_action_used: true,
+            dodging: true,
+            ...(isFree ? { monk_free_used: true } : {}),
+          };
+          narrative = isFree
+            ? `${char.name} — Patient Defense (free): assumes a defensive stance. Attacks against have disadvantage until next turn.`
+            : `${char.name} — Patient Defense (1 DP): defensive stance + advantage on next DEX save. (${kiPoolPD - 1} DP remaining)`;
+        }
+
+        // 2024 PHB Step of the Wind — free 1/turn variants (single effect) +
+        // 1-DP variant (Dash AND Disengage).
+        else if (fid === 'step_of_wind_free_dash' || fid === 'step_of_wind_free_disengage') {
+          const cls = char.character_class.toLowerCase();
+          if (cls !== 'monk') {
+            narrative = 'Only Monks have Step of the Wind.';
+            break;
+          }
+          if (char.level < 2) {
+            narrative = 'Step of the Wind requires Monk level 2.';
+            break;
+          }
+          if (char.turn_actions.bonus_action_used) {
+            narrative = 'Bonus action already used this turn.';
+            break;
+          }
+          if (char.turn_actions.monk_free_used) {
+            narrative = "You've already used your free monk bonus action this turn.";
+            break;
+          }
+          char.turn_actions = {
+            ...char.turn_actions,
+            bonus_action_used: true,
+            monk_free_used: true,
+          };
+          if (fid === 'step_of_wind_free_dash') {
+            const sw = effectiveSpeed(char);
+            st = {
+              ...st,
+              movement_used: {
+                ...(st.movement_used ?? {}),
+                [char.id]: Math.max(0, (st.movement_used?.[char.id] ?? 0) - sw),
+              },
+            };
+            narrative = `${char.name} — Step of the Wind: Dash (free)! +${sw} ft movement.`;
+          } else {
+            char.turn_actions = { ...char.turn_actions, disengaged: true };
+            narrative = `${char.name} — Step of the Wind: Disengage (free)! No opportunity attacks when moving.`;
+          }
+        } else if (fid === 'step_of_wind_dash' || fid === 'step_of_wind_disengage') {
+          const cls = char.character_class.toLowerCase();
+          if (cls !== 'monk') {
+            narrative = 'Only Monks have Step of the Wind.';
+            break;
+          }
+          if (char.level < 2) {
+            narrative = 'Step of the Wind requires Monk level 2.';
+            break;
+          }
+          if (char.turn_actions.bonus_action_used) {
+            narrative = 'Bonus action already used this turn.';
+            break;
+          }
+          const kiPool2 = char.class_resource_uses?.ki_points ?? char.level;
+          if (kiPool2 <= 0) {
+            narrative = 'No Discipline Points remaining (recover on short rest).';
+            break;
+          }
+          char.class_resource_uses = {
+            ...(char.class_resource_uses ?? {}),
+            ki_points: kiPool2 - 1,
+          };
+          // 2024 PHB: spending 1 DP gives BOTH Dash and Disengage. The legacy
+          // `step_of_wind_disengage` id is kept for back-compat but now also
+          // dashes. `step_of_wind_dash` does the same.
+          char.turn_actions = {
+            ...char.turn_actions,
+            bonus_action_used: true,
+            disengaged: true,
+          };
+          const stwSpeed = effectiveSpeed(char);
+          st = {
+            ...st,
+            movement_used: {
+              ...(st.movement_used ?? {}),
+              [char.id]: Math.max(0, (st.movement_used?.[char.id] ?? 0) - stwSpeed),
+            },
+          };
+          narrative = `${char.name} — Step of the Wind (1 DP): Dash +${stwSpeed} ft AND Disengage. (${kiPool2 - 1} DP remaining)`;
+        }
+
+        // ── Monk: Stunning Strike (1 ki, after a hit) ────────────────────────────
+        else if (fid === 'stunning_strike') {
+          const cls = char.character_class.toLowerCase();
+          if (cls !== 'monk') {
+            narrative = 'Only Monks have Stunning Strike.';
+            break;
+          }
+          if (char.level < 5) {
+            narrative = 'Stunning Strike requires Monk level 5.';
+            break;
+          }
+          if (!enemyAlive || !enemy) {
+            narrative = 'No living target.';
+            break;
+          }
+          // 2024 PHB: Stunning Strike is once per turn (was per-hit in 2014).
+          if (char.turn_actions.monk_stunning_strike_used) {
+            narrative = 'Stunning Strike already used this turn.';
+            break;
+          }
+          const kiPool3 = char.class_resource_uses?.ki_points ?? char.level;
+          if (kiPool3 <= 0) {
+            narrative = 'No Discipline Points remaining (recover on short rest).';
+            break;
+          }
+          char.class_resource_uses = {
+            ...(char.class_resource_uses ?? {}),
+            ki_points: kiPool3 - 1,
+          };
+          char.turn_actions = { ...char.turn_actions, monk_stunning_strike_used: true };
+          const stunDC = 8 + profBonus(char.level) + abilityMod(char.wis);
+          const conSave =
+            rollDice('1d20') +
+            abilityMod((enemy as unknown as Record<string, number>)['con'] ?? 10);
+          const stunSuccess = conSave >= stunDC;
+          st = pushEvent(st, {
+            kind: 'save',
+            characterId: enemy.id,
+            characterName: enemy.name,
+            ability: 'con',
+            roll: conSave,
+            dc: stunDC,
+            success: stunSuccess,
+            vs: 'Stunning Strike',
+            round: st.round ?? 1,
+          });
+          if (!stunSuccess) {
+            st = {
+              ...st,
+              entities: (st.entities ?? []).map((e) =>
+                e.id === roomId && e.isEnemy
+                  ? {
+                      ...e,
+                      conditions: [...e.conditions.filter((c) => c !== 'stunned'), 'stunned'],
+                    }
+                  : e
+              ),
+            };
+            st = pushEvent(st, {
+              kind: 'condition_applied',
+              targetId: enemy.id,
+              targetName: enemy.name,
+              condition: 'stunned',
+              source: 'Stunning Strike',
+              round: st.round ?? 1,
+            });
+            narrative = `Stunning Strike! CON save ${conSave} vs DC ${stunDC} — ${enemy.name} is stunned until the end of your next turn! (${kiPool3 - 1} ki remaining)`;
+          } else {
+            narrative = `Stunning Strike! CON save ${conSave} vs DC ${stunDC} — ${enemy.name} resists. (${kiPool3 - 1} ki remaining)`;
+          }
+        }
+
+        // ── Way of Shadow: Shadow Arts (PHB p.80) ────────────────────────────────
+        // The L3 Shadow Monk learns to cast shadow-aligned spells via ki. Our
+        // model collapses the cantrip/spell list into a single 2-ki action
+        // that grants the `invisible` condition for 3 rounds — represents
+        // "step into magical darkness" tactically.
+        else if (fid === 'shadow_arts') {
+          if (char.subclass !== 'shadow' || char.character_class.toLowerCase() !== 'monk') {
+            narrative = 'Only Way of Shadow Monks have Shadow Arts.';
+            break;
+          }
+          if (char.level < 3) {
+            narrative = 'Shadow Arts requires Monk level 3.';
+            break;
+          }
+          const kiSa = char.class_resource_uses?.ki_points ?? char.level;
+          if (kiSa < 2) {
+            narrative = 'Need 2 ki points for Shadow Arts.';
+            break;
+          }
+          char.class_resource_uses = { ...(char.class_resource_uses ?? {}), ki_points: kiSa - 2 };
+          char.conditions = [...char.conditions.filter((c) => c !== 'invisible'), 'invisible'];
+          char.condition_durations = {
+            ...(char.condition_durations ?? {}),
+            invisible: 3,
+          };
+          char.turn_actions = { ...char.turn_actions, action_used: true };
+          usedInitiative = true;
+          narrative = `🌑 ${char.name} weaves Shadow Arts — invisible for 3 rounds. (${kiSa - 2} ki remaining)`;
+        }
+
+        // ── Path of the Berserker — Frenzy (PHB p.49) ────────────────────────────
+        // While raging, make a single melee weapon attack as a bonus action.
+        // Damage uses the equipped weapon's die + STR mod + rage bonus, matching
+        // the regular attack handler's pattern but in a self-contained roll.
+        // RAW: when rage ends, you suffer one level of exhaustion. Deferred —
+        // tracking "rage ended after Frenzy used this round" needs more state.
+        else if (fid === 'frenzy_attack') {
+          if (char.subclass !== 'berserker' || char.character_class.toLowerCase() !== 'barbarian') {
+            narrative = 'Only Berserker Barbarians have Frenzy.';
+            break;
+          }
+          if (!char.conditions.includes('raging')) {
+            narrative = 'You must be raging to use Frenzy.';
+            break;
+          }
+          if (char.turn_actions.bonus_action_used) {
+            narrative = 'Bonus action already used this turn.';
+            break;
+          }
+          if (!enemyAlive || !enemy) {
+            narrative = 'No enemy to Frenzy attack.';
+            break;
+          }
+          const frWeapon = char.equipped_weapon
+            ? getItemData(
+                char.inventory?.find(
+                  (i) => i.instance_id === char.equipped_weapon
+                ) as InventoryItem,
+                context
+              )
+            : null;
+          if (frWeapon?.range === 'ranged') {
+            narrative = 'Frenzy requires a melee weapon.';
+            break;
+          }
+          char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
+          const frTarget = livingEnemiesInRoom[0] ?? enemy;
+          const frToHit = rollDice('1d20') + abilityMod(char.str) + profBonus(char.level);
+          if (frToHit >= (frTarget.ac ?? 10)) {
+            const dmgDice = frWeapon?.damage ?? '1d4';
+            const frDmg = Math.max(
+              1,
+              rollDice(dmgDice) + abilityMod(char.str) + rageDamageBonus(char.level)
+            );
+            const curHp = st.entities?.find((e) => e.id === frTarget.id && e.isEnemy)?.hp ?? 0;
+            const newHp = Math.max(0, curHp - frDmg);
+            st = {
+              ...st,
+              entities: (st.entities ?? []).map((e) =>
+                e.id === frTarget.id && e.isEnemy ? { ...e, hp: newHp } : e
+              ),
+            };
+            narrative = `💢 ${char.name} — Frenzy! (${frToHit} hits AC ${frTarget.ac}) ${frDmg} ${frWeapon?.damageType ?? 'bludgeoning'}${newHp <= 0 ? ` — ${frTarget.name} falls!` : ''}`;
+            if (newHp <= 0) {
+              const split = splitEncounterXp(st, char.id, frTarget.xp ?? 10);
+              st = split.st;
+              char.xp = (char.xp || 0) + split.share;
+              narrative += applyPartyLevelUps(st, char, context);
+              st.enemies_killed = [...st.enemies_killed, frTarget.id];
+              if (isRoomCleared(st, seed, roomId)) {
+                st = endCombatState(st);
+                char.conditions = char.conditions.filter((c) => c !== 'raging');
+              }
+            }
+          } else {
+            narrative = `💢 ${char.name} — Frenzy! (${frToHit} vs AC ${frTarget.ac}) — miss.`;
+          }
+        }
+
+        // ── Druid: Wild Shape ────────────────────────────────────────────────────
+        else if (fid === 'wild_shape' || fid.startsWith('wild_shape_')) {
+          const cls = char.character_class.toLowerCase();
+          if (cls !== 'druid') {
+            narrative = 'Only Druids have Wild Shape.';
+            break;
+          }
+          if (char.conditions.includes('wild_shaped')) {
+            narrative =
+              'You are already in Wild Shape. Attack or use Dismiss Wild Shape to end it.';
+            break;
+          }
+          const wsUses = char.class_resource_uses?.wild_shape ?? 2;
+          if (wsUses <= 0) {
+            narrative = 'No Wild Shape uses remaining (recover on short rest).';
+            break;
+          }
+          // Determine the form: 2024 PHB ships a Beast Forms catalog the
+          // druid picks from. The choice generator surfaces one option per
+          // form via `wild_shape_<formId>`. If just 'wild_shape' is invoked
+          // (legacy/test), fall back to the lowest-CR form the druid can
+          // access.
+          const isMoon = char.subclass === 'moon';
+          const formId = fid === 'wild_shape' ? '' : fid.replace('wild_shape_', '');
+          const form = formId
+            ? BEAST_FORMS[formId]
+            : Object.values(BEAST_FORMS).find((f) => f.cr === 0);
+          if (!form) {
+            narrative = `Unknown beast form: ${formId}.`;
+            break;
+          }
+          // Gate by CR access table.
+          const maxCR = isMoon
+            ? Math.max(1, Math.floor(char.level / 3))
+            : char.level >= 8
+              ? 1
+              : char.level >= 4
+                ? 0.5
+                : 0.25;
+          if (form.cr > maxCR) {
+            narrative = `${form.name} requires a higher-CR form access (you can access CR ≤ ${maxCR}).`;
+            break;
+          }
+          // 2024 PHB temp HP: base 2 × level, Moon 3 × level.
+          const tempHp = (isMoon ? 3 : 2) * char.level;
+          char.class_resource_uses = {
+            ...(char.class_resource_uses ?? {}),
+            wild_shape: wsUses - 1,
+          };
+          char.conditions = [...char.conditions, 'wild_shaped'];
+          char.wild_shape_form = form.id;
+          char.hp = char.hp + tempHp;
+          if (st.combat_active) {
+            char.turn_actions = isMoon
+              ? { ...char.turn_actions, bonus_action_used: true }
+              : { ...char.turn_actions, action_used: true };
+            if (isMoon) usedInitiative = false;
+            else usedInitiative = true;
+          }
+          const traits = [
+            form.packTactics ? 'Pack Tactics' : '',
+            form.physicalResistance ? 'Physical Resistance' : '',
+            form.flying ? 'Flying' : '',
+            form.climbing ? 'Climb' : '',
+          ]
+            .filter(Boolean)
+            .join(', ');
+          const traitNote = traits ? ` Traits: ${traits}.` : '';
+          narrative = `🐾 ${char.name} transforms into a ${form.name}!${isMoon ? ' (bonus action)' : ''} +${tempHp} temp HP. ${form.descriptor}.${traitNote} (${wsUses - 1} uses remaining)`;
+        }
+
+        // ── Druid: Dismiss Wild Shape ────────────────────────────────────────────
+        else if (fid === 'dismiss_wild_shape') {
+          if (!char.conditions.includes('wild_shaped')) {
+            narrative = 'You are not in Wild Shape.';
+            break;
+          }
+          char.wild_shape_form = undefined;
+          char.conditions = char.conditions.filter((c) => c !== 'wild_shaped');
+          narrative = `${char.name} reverts to their normal form.`;
+        }
+
+        // ── Circle of the Moon: Moon Healing (PHB p.69) ──────────────────────────
+        // While shifted, spend a spell slot as a bonus action to heal 1d8 per
+        // slot level. Limited to combat-active scenarios in practice (it's a
+        // bonus action; outside combat the regular cure_wounds path is better).
+        else if (fid === 'moon_healing') {
+          if (char.subclass !== 'moon' || char.character_class.toLowerCase() !== 'druid') {
+            narrative = 'Only Circle of the Moon Druids have Moon Healing.';
+            break;
+          }
+          if (!char.conditions.includes('wild_shaped')) {
+            narrative = 'You must be in Wild Shape to use Moon Healing.';
+            break;
+          }
+          const mhSlotsMax = char.spell_slots_max ?? {};
+          const mhSlotsUsed = char.spell_slots_used ?? {};
+          const mhSlotLvl = Object.keys(mhSlotsMax)
+            .map(Number)
+            .filter((n) => n >= 1 && (mhSlotsMax[n] ?? 0) > (mhSlotsUsed[n] ?? 0))
+            .sort((a, b) => a - b)[0];
+          if (mhSlotLvl === undefined) {
+            narrative = 'No spell slot available for Moon Healing.';
+            break;
+          }
+          const heal = rollDice(`${mhSlotLvl}d8`);
+          char.spell_slots_used = {
+            ...mhSlotsUsed,
+            [mhSlotLvl]: (mhSlotsUsed[mhSlotLvl] ?? 0) + 1,
+          };
+          char.hp = Math.min(char.max_hp, char.hp + heal);
+          char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
+          narrative = `🌙 ${char.name} channels lunar energy — heals ${heal} HP (now ${char.hp}/${char.max_hp}). Spent lvl ${mhSlotLvl} slot.`;
+        }
+
+        // ── Sorcerer: Metamagic — Twinned Spell (1 sorcery point) ────────────────
+        else if (fid === 'metamagic_twinned') {
+          const cls = char.character_class.toLowerCase();
+          if (cls !== 'sorcerer') {
+            narrative = 'Only Sorcerers have Metamagic.';
+            break;
+          }
+          const spPool = char.class_resource_uses?.sorcery_points ?? char.level;
+          if (spPool < 1) {
+            narrative = 'Not enough sorcery points (need 1).';
+            break;
+          }
+          char.class_resource_uses = {
+            ...(char.class_resource_uses ?? {}),
+            sorcery_points: spPool - 1,
+          };
+          st = { ...st, metamagic_active: 'twinned' };
+          narrative = `${char.name} — Metamagic: Twinned Spell! Your next spell will target a second creature. (${spPool - 1} sorcery points remaining)`;
+        }
+
+        // ── Sorcerer: Metamagic — Quickened Spell (2 sorcery points) ─────────────
+        else if (fid === 'metamagic_quickened') {
+          const cls = char.character_class.toLowerCase();
+          if (cls !== 'sorcerer') {
+            narrative = 'Only Sorcerers have Metamagic.';
+            break;
+          }
+          if (char.turn_actions.bonus_action_used) {
+            narrative = 'Bonus action already used this turn.';
+            break;
+          }
+          // SRD 5.2.1 p.67: can't activate Quickened if you've already cast a
+          // level 1+ spell this turn.
+          if (char.turn_actions.leveled_spell_cast) {
+            narrative =
+              'You have already cast a level 1+ spell this turn — Quickened Spell cannot be used.';
+            break;
+          }
+          const spPool2 = char.class_resource_uses?.sorcery_points ?? char.level;
+          if (spPool2 < 2) {
+            narrative = 'Not enough sorcery points (need 2).';
+            break;
+          }
+          char.class_resource_uses = {
+            ...(char.class_resource_uses ?? {}),
+            sorcery_points: spPool2 - 2,
+          };
+          char.turn_actions = {
+            ...char.turn_actions,
+            bonus_action_used: true,
+            action_used: false,
+            quickened_used: true,
+          };
+          st = { ...st, metamagic_active: 'quickened' };
+          narrative = `${char.name} — Metamagic: Quickened Spell! Cast your next spell as a bonus action. (${spPool2 - 2} sorcery points remaining)`;
+        }
+
+        // ── Sorcerer: Metamagic — Empowered Spell (1 sorcery point) ──────────────
+        else if (fid === 'metamagic_empowered') {
+          const cls = char.character_class.toLowerCase();
+          if (cls !== 'sorcerer') {
+            narrative = 'Only Sorcerers have Metamagic.';
+            break;
+          }
+          const spPool3 = char.class_resource_uses?.sorcery_points ?? char.level;
+          if (spPool3 < 1) {
+            narrative = 'Not enough sorcery points (need 1).';
+            break;
+          }
+          char.class_resource_uses = {
+            ...(char.class_resource_uses ?? {}),
+            sorcery_points: spPool3 - 1,
+          };
+          st = { ...st, metamagic_active: 'empowered' };
+          narrative = `${char.name} — Metamagic: Empowered Spell! You may reroll up to ${abilityMod(char.cha)} damage dice on your next spell. (${spPool3 - 1} sorcery points remaining)`;
+        }
+
+        // ── Warlock: Agonizing Blast invocation (passive — toggled on/off) ────────
+        else if (fid === 'agonizing_blast') {
+          const cls = char.character_class.toLowerCase();
+          if (cls !== 'warlock') {
+            narrative = 'Only Warlocks can take Agonizing Blast.';
+            break;
+          }
+          const hasIt = char.feats?.includes('agonizing_blast') ?? false;
+          if (hasIt) {
+            narrative = 'You already have the Agonizing Blast invocation.';
+            break;
+          }
+          char.feats = [...(char.feats ?? []), 'agonizing_blast'];
+          narrative = `${char.name} gains the Agonizing Blast invocation — Eldritch Blast now adds +${abilityMod(char.cha)} force damage per beam.`;
+        }
+
+        // ── Warlock: Devil's Sight invocation ────────────────────────────────────
+        else if (fid === 'devils_sight') {
+          const cls = char.character_class.toLowerCase();
+          if (cls !== 'warlock') {
+            narrative = "Only Warlocks can take Devil's Sight.";
+            break;
+          }
+          const hasIt2 = char.feats?.includes('devils_sight') ?? false;
+          if (hasIt2) {
+            narrative = "You already have the Devil's Sight invocation.";
+            break;
+          }
+          char.feats = [...(char.feats ?? []), 'devils_sight'];
+          narrative = `${char.name} gains Devil's Sight — you can see normally in magical darkness.`;
+        }
+
+        // ── Champion Fighter: Remarkable Athlete ────────────────────────────────
+        else if (fid === 'remarkable_athlete') {
+          narrative = `${char.name} — Remarkable Athlete: add +${Math.ceil(profBonus(char.level) / 2)} to uninvested STR/DEX/CON checks (passive).`;
+        }
+
+        // ── Abjurer Wizard: Arcane Ward ──────────────────────────────────────────
+        else if (fid === 'arcane_ward') {
+          if (char.subclass !== 'abjurer') {
+            narrative = 'Only Abjurer Wizards have Arcane Ward.';
+            break;
+          }
+          const wardHp = 2 * char.level;
+          char.class_resource_uses = { ...(char.class_resource_uses ?? {}), arcane_ward: wardHp };
+          narrative = `${char.name} creates an Arcane Ward with ${wardHp} HP. It absorbs damage before your HP is reduced.`;
+        }
+
+        // ── 2024 PHB Cleric: Divine Spark (universal Channel Divinity) ───────────
+        // Action. Spend CD to deal 1d8 + WIS mod radiant damage to a target OR
+        // heal a target ally the same amount. Default: damage the current enemy.
+        else if (fid === 'divine_spark') {
+          if (char.character_class.toLowerCase() !== 'cleric') {
+            narrative = 'Only Clerics have Divine Spark.';
+            break;
+          }
+          const cdUsesDS = char.class_resource_uses?.channel_divinity ?? 1;
+          if (cdUsesDS <= 0) {
+            narrative = 'No Channel Divinity uses remaining.';
+            break;
+          }
+          if (!enemyAlive || !enemy) {
+            narrative = 'No living target.';
+            break;
+          }
+          char.class_resource_uses = {
+            ...(char.class_resource_uses ?? {}),
+            channel_divinity: cdUsesDS - 1,
+          };
+          const dsRoll = rollDice('1d8') + abilityMod(char.wis);
+          // Read the CURRENT entity HP, not the seed's template HP — otherwise
+          // Divine Spark resets the target to (full_hp - damage) and wipes
+          // every prior turn's accumulated damage. (Vale playthrough log,
+          // 2026-05-21: Ghoul jumped from 19 → 37 mid-combat after DS.)
+          const enemyEntForDs = st.entities?.find((e) => e.id === enemy.id && e.isEnemy);
+          const currentDsHp = enemyEntForDs?.hp ?? enemy.hp;
+          const dsHp = Math.max(0, currentDsHp - dsRoll);
           st = {
             ...st,
             entities: (st.entities ?? []).map((e) =>
-              e.id === roomId && e.isEnemy
-                ? { ...e, conditions: [...e.conditions.filter((c) => c !== 'stunned'), 'stunned'] }
+              e.id === enemy.id && e.isEnemy ? { ...e, hp: dsHp } : e
+            ),
+          };
+          st = pushEvent(st, {
+            kind: 'attack_hit',
+            attackerId: char.id,
+            attackerName: char.name,
+            targetId: enemy.id,
+            targetName: enemy.name,
+            damage: dsRoll,
+            damageType: 'radiant',
+            isCrit: false,
+            toHit: 0,
+            targetAc: enemy.ac,
+            round: st.round ?? 1,
+          });
+          narrative = `✦ Divine Spark! ${enemy.name} takes ${fmt.dmg(dsRoll)} radiant damage. (${cdUsesDS - 1} Channel Divinity remaining)`;
+          if (dsHp <= 0) {
+            const split = splitEncounterXp(st, char.id, enemy.xp ?? 0);
+            st = split.st;
+            char.xp = (char.xp || 0) + split.share;
+            narrative += ` ${enemy.name} is destroyed.`;
+            narrative += applyPartyLevelUps(st, char, context);
+          }
+          usedInitiative = true;
+        }
+
+        // ── 2024 PHB Cleric: Turn Undead (universal Channel Divinity) ────────────
+        // Magic Action (full action), per 2024 PHB p.74. All undead within 30 ft
+        // must make a WIS save or be frightened of the cleric for 1 minute. They
+        // can't willingly move closer; if affected they must Dash away when
+        // possible. We model with the existing `frightened` condition.
+        else if (fid === 'turn_undead') {
+          if (char.character_class.toLowerCase() !== 'cleric') {
+            narrative = 'Only Clerics have Turn Undead.';
+            break;
+          }
+          const cdUsesTU = char.class_resource_uses?.channel_divinity ?? 1;
+          if (cdUsesTU <= 0) {
+            narrative = 'No Channel Divinity uses remaining.';
+            break;
+          }
+          if (char.turn_actions.action_used) {
+            narrative = 'Action already used this turn.';
+            break;
+          }
+          char.class_resource_uses = {
+            ...(char.class_resource_uses ?? {}),
+            channel_divinity: cdUsesTU - 1,
+          };
+          char.turn_actions = { ...char.turn_actions, action_used: true };
+          const tuDC = 8 + profBonus(char.level) + abilityMod(char.wis);
+          const selfEntTU = st.entities?.find((e) => e.id === char.id);
+          // Identify undead enemies. Convention: enemy name contains "skeleton",
+          // "ghoul", "shadow", "zombie", "lich", "wraith", "undead" — RAW would
+          // check creature type but our enemy templates don't carry that yet.
+          const undeadKeywords = /skeleton|ghoul|shadow|zombie|lich|wraith|undead|crypt/i;
+          const turnedIds: string[] = [];
+          const lines: string[] = [];
+          for (const e of st.entities ?? []) {
+            if (!e.isEnemy || e.hp <= 0) continue;
+            if (!selfEntTU) continue;
+            const dist = Math.max(
+              Math.abs(e.pos.x - selfEntTU.pos.x),
+              Math.abs(e.pos.y - selfEntTU.pos.y)
+            );
+            if (dist > 6) continue; // 30 ft = 6 squares
+            const enemyData = getEnemyById(seed, e.id);
+            if (!enemyData || !undeadKeywords.test(enemyData.name)) continue;
+            const wisScore = (enemyData as unknown as Record<string, number>)?.wis ?? 10;
+            const save = rollDice('1d20') + abilityMod(wisScore);
+            if (save < tuDC) {
+              turnedIds.push(e.id);
+              lines.push(`${enemyData.name}: WIS ${save} vs DC ${tuDC} — turned!`);
+              st = pushEvent(st, {
+                kind: 'condition_applied',
+                targetId: e.id,
+                targetName: enemyData.name,
+                condition: 'frightened',
+                source: 'Turn Undead',
+                round: st.round ?? 1,
+              });
+            } else {
+              lines.push(`${enemyData.name}: WIS ${save} vs DC ${tuDC} — resists.`);
+            }
+          }
+          if (turnedIds.length > 0) {
+            st = {
+              ...st,
+              entities: (st.entities ?? []).map((e) =>
+                turnedIds.includes(e.id)
+                  ? {
+                      ...e,
+                      conditions: [...e.conditions.filter((c) => c !== 'frightened'), 'frightened'],
+                    }
+                  : e
+              ),
+            };
+          }
+          narrative =
+            lines.length > 0
+              ? `✦ Turn Undead! ${lines.join(' ')} (${cdUsesTU - 1} Channel Divinity remaining)`
+              : `Turn Undead — no undead within 30 ft. (${cdUsesTU - 1} Channel Divinity remaining)`;
+        }
+
+        // ── 2024 PHB Cleric L5: Sear Undead ──────────────────────────────────────
+        // Action. Replaces 2014 Destroy Undead. AoE radiant: each undead in 30 ft
+        // takes Nd8 (N = cleric level) radiant damage; WIS save halves.
+        // 2024 PHB Orc — Adrenaline Rush. Bonus action: gain the Dash action
+        // (refunds full speed of movement this turn) and gain temp HP equal
+        // to proficiency bonus. 1/short rest.
+        else if (fid === 'adrenaline_rush') {
+          if (char.species !== 'orc') {
+            narrative = 'Only Orcs have Adrenaline Rush.';
+            break;
+          }
+          if (char.class_resource_uses?.adrenaline_rush_used === 1) {
+            narrative = 'Adrenaline Rush already used this short rest.';
+            break;
+          }
+          if (char.turn_actions.bonus_action_used) {
+            narrative = 'Bonus action already used this turn.';
+            break;
+          }
+          const arSpeed = effectiveSpeed(char);
+          st = {
+            ...st,
+            movement_used: {
+              ...(st.movement_used ?? {}),
+              [char.id]: Math.max(0, (st.movement_used?.[char.id] ?? 0) - arSpeed),
+            },
+          };
+          const arTemp = profBonus(char.level);
+          const newTemp = Math.max(char.temp_hp ?? 0, arTemp);
+          char.temp_hp = newTemp;
+          char.class_resource_uses = {
+            ...(char.class_resource_uses ?? {}),
+            adrenaline_rush_used: 1,
+          };
+          char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
+          narrative = `🪓 ${char.name} — Adrenaline Rush! +${arSpeed} ft movement (Dash) and ${arTemp} temp HP.`;
+          usedInitiative = true;
+        }
+
+        // 2024 PHB Goliath — Large Form. Bonus action; the Goliath grows to
+        // Large size for ~10 rounds (1 min RAW). Gains +10 ft speed (via
+        // condition wired in `effectiveSpeed`) and is treated as Large for
+        // any size-dependent interactions. 1/short rest.
+        else if (fid === 'large_form') {
+          if (char.species !== 'goliath') {
+            narrative = 'Only Goliaths have Large Form.';
+            break;
+          }
+          if (char.class_resource_uses?.large_form_used === 1) {
+            narrative = 'Large Form already used this short rest.';
+            break;
+          }
+          if (char.turn_actions.bonus_action_used) {
+            narrative = 'Bonus action already used this turn.';
+            break;
+          }
+          char.class_resource_uses = {
+            ...(char.class_resource_uses ?? {}),
+            large_form_used: 1,
+          };
+          char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
+          char = inflictCondition(char, 'large_form');
+          if (!char.condition_durations) char.condition_durations = {};
+          char.condition_durations = { ...char.condition_durations, large_form: 10 };
+          narrative = `🗿 ${char.name} swells to Large size! +10 ft speed and advantage on STR checks for 10 rounds.`;
+          usedInitiative = true;
+        }
+
+        // 2024 PHB Dragonborn — Breath Weapon. Cone of damage emanating from
+        // the dragonborn in the direction of the currently-targeted enemy.
+        // DEX save for half; damage scales with level. 1/short rest.
+        else if (fid === 'breath_weapon') {
+          if (char.species !== 'dragonborn') {
+            narrative = 'Only Dragonborn have a Breath Weapon.';
+            break;
+          }
+          if (char.class_resource_uses?.breath_weapon_used === 1) {
+            narrative = 'Breath Weapon already used — recovers on a short rest.';
+            break;
+          }
+          if (!enemyAlive || !enemy) {
+            narrative = 'No living target to direct your breath at.';
+            break;
+          }
+          const selfEntBW = st.entities?.find((e) => e.id === char.id);
+          const targetEntBW = st.entities?.find((e) => e.id === enemy.id && e.isEnemy);
+          if (!selfEntBW || !targetEntBW) {
+            narrative = 'Breath Weapon needs a grid position to project the cone.';
+            break;
+          }
+          const bwDice = char.level >= 17 ? 4 : char.level >= 11 ? 3 : char.level >= 5 ? 2 : 1;
+          const bwDC = 8 + profBonus(char.level) + abilityMod(char.con);
+          const bwDmgType = SRD_SPECIES.dragonborn?.resistances?.[0] ?? 'fire';
+          const cone = entitiesInCone(selfEntBW.pos, targetEntBW.pos, 15, st.entities ?? []);
+          const lines: string[] = [];
+          let updatedEntities = st.entities ?? [];
+          for (const ent of cone) {
+            if (!ent.isEnemy || ent.hp <= 0) continue;
+            const enemyData = getEnemyById(seed, ent.id);
+            if (!enemyData) continue;
+            const dexScore = enemyData.dex ?? 10;
+            const save = rollDice('1d20') + abilityMod(dexScore);
+            const fullDmg = rollDice(`${bwDice}d10`);
+            const { damage: typedDmg, note } = applyDamageMultiplier(fullDmg, bwDmgType, enemyData);
+            const dmg = save >= bwDC ? Math.floor(typedDmg / 2) : typedDmg;
+            updatedEntities = updatedEntities.map((e) =>
+              e.id === ent.id ? { ...e, hp: Math.max(0, e.hp - dmg) } : e
+            );
+            lines.push(
+              `${enemyData.name}: DEX ${save} vs DC ${bwDC} — ${dmg} ${bwDmgType}${save >= bwDC ? ' (half)' : ''}${note ?? ''}`
+            );
+          }
+          st = {
+            ...st,
+            entities: updatedEntities,
+          };
+          char.class_resource_uses = {
+            ...(char.class_resource_uses ?? {}),
+            breath_weapon_used: 1,
+          };
+          narrative =
+            lines.length > 0
+              ? `🐲 ${char.name}'s Breath Weapon (${bwDice}d10 ${bwDmgType}, 15-ft cone)! ${lines.join(' · ')}`
+              : `${char.name} exhales a cone of ${bwDmgType} but no enemies are caught in it.`;
+          usedInitiative = true;
+          // Combat may have ended if everyone in the cone dropped.
+          if (isRoomCleared(st, seed, roomId)) {
+            st = endCombatState(st);
+          }
+        } else if (fid === 'sear_undead') {
+          if (char.character_class.toLowerCase() !== 'cleric') {
+            narrative = 'Only Clerics have Sear Undead.';
+            break;
+          }
+          if (char.level < 5) {
+            narrative = 'Sear Undead requires Cleric level 5.';
+            break;
+          }
+          const cdUsesSU = char.class_resource_uses?.channel_divinity ?? 1;
+          if (cdUsesSU <= 0) {
+            narrative = 'No Channel Divinity uses remaining.';
+            break;
+          }
+          char.class_resource_uses = {
+            ...(char.class_resource_uses ?? {}),
+            channel_divinity: cdUsesSU - 1,
+          };
+          const suDC = 8 + profBonus(char.level) + abilityMod(char.wis);
+          const selfEntSU = st.entities?.find((e) => e.id === char.id);
+          const undeadRegex = /skeleton|ghoul|shadow|zombie|lich|wraith|undead|crypt/i;
+          const lines: string[] = [];
+          const newEntities = (st.entities ?? []).map((e) => {
+            if (!e.isEnemy || e.hp <= 0 || !selfEntSU) return e;
+            const dist = Math.max(
+              Math.abs(e.pos.x - selfEntSU.pos.x),
+              Math.abs(e.pos.y - selfEntSU.pos.y)
+            );
+            if (dist > 6) return e;
+            const enemyData = getEnemyById(seed, e.id);
+            if (!enemyData || !undeadRegex.test(enemyData.name)) return e;
+            const wisScore = (enemyData as unknown as Record<string, number>)?.wis ?? 10;
+            const save = rollDice('1d20') + abilityMod(wisScore);
+            const fullDmg = rollDice(`${char.level}d8`);
+            const dmg = save >= suDC ? Math.floor(fullDmg / 2) : fullDmg;
+            lines.push(
+              `${enemyData.name}: WIS ${save} vs DC ${suDC} — ${dmg} radiant${save >= suDC ? ' (half)' : ''}`
+            );
+            return { ...e, hp: Math.max(0, e.hp - dmg) };
+          });
+          st = { ...st, entities: newEntities };
+          narrative =
+            lines.length > 0
+              ? `☀️ Sear Undead! ${lines.join(' · ')} (${cdUsesSU - 1} Channel Divinity remaining)`
+              : `Sear Undead — no undead within 30 ft. (${cdUsesSU - 1} Channel Divinity remaining)`;
+          usedInitiative = true;
+        }
+
+        // ── Life Cleric: Preserve Life (Channel Divinity) ────────────────────────
+        else if (fid === 'preserve_life') {
+          if (char.subclass !== 'life') {
+            narrative = 'Only Life Clerics have Preserve Life.';
+            break;
+          }
+          const cdUses = char.class_resource_uses?.channel_divinity ?? 1;
+          if (cdUses <= 0) {
+            narrative = 'No Channel Divinity uses remaining (recover on short rest).';
+            break;
+          }
+          char.class_resource_uses = {
+            ...(char.class_resource_uses ?? {}),
+            channel_divinity: cdUses - 1,
+          };
+          const poolHp = 5 * char.level;
+          const woundedAllies = st.characters.filter(
+            (c) => !c.dead && c.hp < c.max_hp && c.id !== char.id
+          );
+          let preserved = 0;
+          let remaining = poolHp;
+          const healedIds = new Map<string, number>(); // id → new hp
+          const updatedChars = st.characters.map((c) => {
+            if (!c.dead && c.hp < c.max_hp && c.id !== char.id && remaining > 0) {
+              const half = Math.floor(c.max_hp / 2);
+              if (c.hp >= half) return c;
+              const heal = Math.min(remaining, half - c.hp);
+              preserved += heal;
+              remaining -= heal;
+              const newHp = c.hp + heal;
+              healedIds.set(c.id, newHp);
+              return { ...c, hp: newHp };
+            }
+            return c;
+          });
+          st = {
+            ...st,
+            characters: updatedChars,
+            // Sync grid entity HP for every PC who got healed so the
+            // battlefield reflects the heal immediately. commitChar()
+            // only updates the caster's entity, not the targets'.
+            entities: (st.entities ?? []).map((e) =>
+              !e.isEnemy && healedIds.has(e.id) ? { ...e, hp: healedIds.get(e.id)! } : e
+            ),
+          };
+          // RAW: Preserve Life can't raise a creature above half its HP max.
+          // When every wounded ally is already above half, the channel
+          // divinity gets spent but heals nothing — surface that gate so
+          // the player doesn't think the feature is broken.
+          const eligibleCount = woundedAllies.filter((c) => c.hp < Math.floor(c.max_hp / 2)).length;
+          if (preserved === 0) {
+            const reason =
+              woundedAllies.length === 0
+                ? 'no wounded allies in range'
+                : eligibleCount === 0
+                  ? 'every wounded ally is already above half HP'
+                  : 'no eligible target';
+            narrative = `${char.name} — Preserve Life! No HP distributed (${reason}). (${cdUses - 1} Channel Divinity remaining)`;
+          } else {
+            narrative = `${char.name} — Preserve Life! Distributed ${preserved} HP among ${eligibleCount} eligible ally${eligibleCount === 1 ? '' : 'ies'} (pool: ${poolHp}). (${cdUses - 1} Channel Divinity remaining)`;
+          }
+        }
+
+        // ── War Cleric: Guided Strike (Channel Divinity) ─────────────────────────
+        else if (fid === 'guided_strike') {
+          if (char.subclass !== 'war') {
+            narrative = 'Only War Clerics have Guided Strike.';
+            break;
+          }
+          const cdUsesWar = char.class_resource_uses?.channel_divinity ?? 1;
+          if (cdUsesWar <= 0) {
+            narrative = 'No Channel Divinity uses remaining.';
+            break;
+          }
+          char.class_resource_uses = {
+            ...(char.class_resource_uses ?? {}),
+            channel_divinity: cdUsesWar - 1,
+          };
+          st = { ...st, guided_strike_active: true };
+          narrative = `${char.name} — Guided Strike! Your next attack roll gains +10. (${cdUsesWar - 1} Channel Divinity remaining)`;
+        }
+
+        // ── Hunter Ranger: Hunter's Prey — Colossus Slayer ───────────────────────
+        else if (fid === 'colossus_slayer') {
+          if (char.subclass !== 'hunter') {
+            narrative = 'Only Hunter Rangers have Colossus Slayer.';
+            break;
+          }
+          const csTarget = st.entities?.find((e) => e.id === roomId && e.isEnemy);
+          if (!enemyAlive || !csTarget) {
+            narrative = 'No living target.';
+            break;
+          }
+          const enemyMaxHp =
+            (enemy as unknown as Record<string, number>)['max_hp'] ?? csTarget.hp * 2;
+          if (csTarget.hp >= enemyMaxHp) {
+            narrative = 'Colossus Slayer only triggers on a bloodied (below max HP) target.';
+            break;
+          }
+          if ((char.class_resource_uses?.colossus_slayer_used ?? 0) >= 1) {
+            narrative = 'Colossus Slayer already triggered this turn.';
+            break;
+          }
+          const csDmg = rollDice('1d8');
+          char.class_resource_uses = {
+            ...(char.class_resource_uses ?? {}),
+            colossus_slayer_used: 1,
+          };
+          const csHp = (st.entities?.find((e) => e.id === roomId && e.isEnemy)?.hp ?? 0) - csDmg;
+          st = {
+            ...st,
+            entities: (st.entities ?? []).map((e) =>
+              e.id === roomId && e.isEnemy ? { ...e, hp: Math.max(0, csHp) } : e
+            ),
+          };
+          narrative = `Colossus Slayer! +${fmt.dmg(csDmg)} piercing damage on a bloodied foe (${csHp <= 0 ? 'killed' : `${fmt.hp(Math.max(0, csHp))} HP remaining`}).`;
+          if (csHp <= 0) {
+            st.enemies_killed = [...st.enemies_killed, roomId];
+            st = endCombatState(st);
+          }
+        }
+
+        // ── Beastmaster Ranger: command animal companion (bonus action, PHB p.93)
+        else if (fid === 'command_companion') {
+          if (char.subclass !== 'beastmaster' || char.character_class.toLowerCase() !== 'ranger') {
+            narrative = 'Only Beastmaster Rangers can command an animal companion.';
+            break;
+          }
+          if (char.level < 3) {
+            narrative = 'Animal Companion unlocks at Ranger level 3.';
+            break;
+          }
+          if (char.turn_actions.bonus_action_used) {
+            narrative = 'Bonus action already used this turn.';
+            break;
+          }
+          const comp = st.entities?.find(
+            (e) => e.isCompanion && e.companionOwnerId === char.id && e.hp > 0
+          );
+          if (!comp) {
+            narrative = 'Your animal companion is unavailable.';
+            break;
+          }
+          // Pick the nearest living enemy as the target
+          const targetEnt = (st.entities ?? [])
+            .filter((e) => e.isEnemy && e.hp > 0)
+            .sort((a, b) => distanceFeet(comp.pos, a.pos) - distanceFeet(comp.pos, b.pos))[0];
+          if (!targetEnt) {
+            narrative = 'No living enemy in sight for the companion.';
+            break;
+          }
+          const targetEnemy = getEnemyById(seed, targetEnt.id);
+          if (!targetEnemy) {
+            narrative = "Companion's target is unreachable.";
+            break;
+          }
+          char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
+          usedInitiative = true;
+          // Resolve the companion's bite attack against the target's AC
+          const toHit = comp.toHit ?? 4;
+          const dmgDice = comp.damage ?? '2d4+2';
+          const compName = comp.companionName ?? 'companion';
+          const attackRoll = rollDice('1d20');
+          const total = attackRoll + toHit;
+          if (attackRoll === 1) {
+            narrative = `${compName} lunges but misses wildly! (d20:1+${toHit}=${total} vs AC ${targetEnemy.ac})`;
+          } else if (attackRoll === 20 || total >= targetEnemy.ac) {
+            const isCrit = attackRoll === 20;
+            const dmg = isCrit ? rollCritical(dmgDice) : rollDice(dmgDice);
+            const { damage: finalDmg, note } = applyDamageMultiplier(dmg, 'piercing', targetEnemy);
+            const curHp = targetEnt.hp;
+            const newHp = Math.max(0, curHp - finalDmg);
+            st = {
+              ...st,
+              entities: (st.entities ?? []).map((e) =>
+                e.id === targetEnt.id && e.isEnemy ? { ...e, hp: newHp } : e
+              ),
+            };
+            narrative = `${compName} bites the ${targetEnemy.name}! ${finalDmg} piercing damage${isCrit ? ' (CRIT)' : ''} (d20:${attackRoll}+${toHit}=${total} vs AC ${targetEnemy.ac})${note}`;
+            if (newHp <= 0) {
+              st.enemies_killed = [...st.enemies_killed, targetEnt.id];
+              narrative += ` ${targetEnemy.name} falls!`;
+              const xpGain = targetEnemy.xp ?? 10;
+              const split = splitEncounterXp(st, char.id, xpGain);
+              st = split.st;
+              char.xp = (char.xp || 0) + split.share;
+              narrative += applyPartyLevelUps(st, char, context);
+              if (isRoomCleared(st, seed, roomId)) {
+                st = endCombatState(st);
+              }
+            }
+          } else {
+            narrative = `${compName} bites at the ${targetEnemy.name} but misses. (d20:${attackRoll}+${toHit}=${total} vs AC ${targetEnemy.ac})`;
+          }
+        }
+
+        // ── Devotion Paladin: Sacred Weapon (Channel Divinity) ───────────────────
+        else if (fid === 'sacred_weapon') {
+          if (char.subclass !== 'devotion') {
+            narrative = 'Only Devotion Paladins have Sacred Weapon.';
+            break;
+          }
+          const cdUsesDev = char.class_resource_uses?.channel_divinity ?? 1;
+          if (cdUsesDev <= 0) {
+            narrative = 'No Channel Divinity uses remaining.';
+            break;
+          }
+          char.class_resource_uses = {
+            ...(char.class_resource_uses ?? {}),
+            channel_divinity: cdUsesDev - 1,
+            sacred_weapon_active: 1,
+          };
+          const chaMod = abilityMod(char.cha);
+          narrative = `${char.name} — Sacred Weapon! +${chaMod} to attack rolls for 1 minute (10 rounds). Your weapon gleams with divine light. (${cdUsesDev - 1} Channel Divinity remaining)`;
+        }
+
+        // ── Vengeance Paladin: Vow of Enmity (Channel Divinity) ──────────────────
+        else if (fid === 'vow_of_enmity') {
+          if (char.subclass !== 'vengeance') {
+            narrative = 'Only Vengeance Paladins have Vow of Enmity.';
+            break;
+          }
+          const cdUsesVen = char.class_resource_uses?.channel_divinity ?? 1;
+          if (cdUsesVen <= 0) {
+            narrative = 'No Channel Divinity uses remaining.';
+            break;
+          }
+          char.class_resource_uses = {
+            ...(char.class_resource_uses ?? {}),
+            channel_divinity: cdUsesVen - 1,
+          };
+          st = { ...st, vow_of_enmity_target: roomId };
+          narrative = `${char.name} — Vow of Enmity! You have advantage on all attack rolls against ${enemy?.name ?? 'your target'} for 1 minute. (${cdUsesVen - 1} Channel Divinity remaining)`;
+        }
+
+        // ── Vengeance Paladin: Abjure Enemy (Channel Divinity) ───────────────────
+        else if (fid === 'abjure_enemy') {
+          if (char.subclass !== 'vengeance') {
+            narrative = 'Only Vengeance Paladins have Abjure Enemy.';
+            break;
+          }
+          if (!enemyAlive || !enemy) {
+            narrative = 'No living target.';
+            break;
+          }
+          const cdUsesVen2 = char.class_resource_uses?.channel_divinity ?? 1;
+          if (cdUsesVen2 <= 0) {
+            narrative = 'No Channel Divinity uses remaining.';
+            break;
+          }
+          char.class_resource_uses = {
+            ...(char.class_resource_uses ?? {}),
+            channel_divinity: cdUsesVen2 - 1,
+          };
+          const wisSave =
+            rollDice('1d20') +
+            abilityMod((enemy as unknown as Record<string, number>)['wis'] ?? 10);
+          const frightenDC = 8 + profBonus(char.level) + abilityMod(char.cha);
+          const abjureSuccess = wisSave >= frightenDC;
+          st = pushEvent(st, {
+            kind: 'save',
+            characterId: enemy.id,
+            characterName: enemy.name,
+            ability: 'wis',
+            roll: wisSave,
+            dc: frightenDC,
+            success: abjureSuccess,
+            vs: 'Abjure Enemy',
+            round: st.round ?? 1,
+          });
+          if (!abjureSuccess) {
+            st = {
+              ...st,
+              entities: (st.entities ?? []).map((e) =>
+                e.id === roomId && e.isEnemy
+                  ? {
+                      ...e,
+                      conditions: [...e.conditions.filter((c) => c !== 'frightened'), 'frightened'],
+                    }
+                  : e
+              ),
+            };
+            st = pushEvent(st, {
+              kind: 'condition_applied',
+              targetId: enemy.id,
+              targetName: enemy.name,
+              condition: 'frightened',
+              source: 'Abjure Enemy',
+              round: st.round ?? 1,
+            });
+            narrative = `Abjure Enemy! WIS save ${wisSave} vs DC ${frightenDC} — ${enemy.name} is frightened! (${cdUsesVen2 - 1} Channel Divinity remaining)`;
+          } else {
+            narrative = `Abjure Enemy! WIS save ${wisSave} vs DC ${frightenDC} — ${enemy.name} resists. (${cdUsesVen2 - 1} Channel Divinity remaining)`;
+          }
+          usedInitiative = true;
+        }
+
+        // ── Lore Bard: Cutting Words (reaction) ──────────────────────────────────
+        else if (fid === 'cutting_words') {
+          if (char.subclass !== 'lore') {
+            narrative = 'Only Lore Bards have Cutting Words.';
+            break;
+          }
+          if (char.turn_actions.reaction_used) {
+            narrative = 'Reaction already used this turn.';
+            break;
+          }
+          if (!enemyAlive || !enemy) {
+            narrative = 'No living target.';
+            break;
+          }
+          const biLeft = char.class_resource_uses?.bardic_inspiration ?? abilityMod(char.cha);
+          if (biLeft <= 0) {
+            narrative = 'No Bardic Inspiration uses remaining.';
+            break;
+          }
+          char.class_resource_uses = {
+            ...(char.class_resource_uses ?? {}),
+            bardic_inspiration: biLeft - 1,
+          };
+          char.turn_actions = { ...char.turn_actions, reaction_used: true };
+          const cuttingDie =
+            char.level >= 15 ? 12 : char.level >= 10 ? 10 : char.level >= 5 ? 8 : 6;
+          const cuttingRoll = rollDice(`1d${cuttingDie}`);
+          narrative = `${char.name} — Cutting Words! Subtract ${cuttingRoll} from ${enemy.name}'s next attack roll or ability check this round. (${biLeft - 1} Bardic Inspiration remaining)`;
+          st = { ...st, cutting_words_penalty: cuttingRoll };
+        }
+
+        // ── Archfey Warlock: Fey Presence (PHB p.109) ────────────────────────────
+        else if (fid === 'fey_presence') {
+          if (char.subclass !== 'archfey' || char.character_class.toLowerCase() !== 'warlock') {
+            narrative = 'Only Archfey Warlocks have Fey Presence.';
+            break;
+          }
+          if (char.class_resource_uses?.fey_presence_used) {
+            narrative = 'Fey Presence already used — recovers on a short rest.';
+            break;
+          }
+          const selfEnt = st.entities?.find((e) => e.id === char.id);
+          if (!selfEnt) {
+            narrative = 'Fey Presence requires a grid position.';
+            break;
+          }
+          const dc = 8 + profBonus(char.level) + abilityMod(char.cha);
+          const inRangeEnemies = (st.entities ?? []).filter(
+            (e) => e.isEnemy && e.hp > 0 && distanceFeet(e.pos, selfEnt.pos) <= 10
+          );
+          if (inRangeEnemies.length === 0) {
+            narrative = 'No enemies within 10 ft to ensnare with Fey Presence.';
+            break;
+          }
+          char.class_resource_uses = {
+            ...(char.class_resource_uses ?? {}),
+            fey_presence_used: 1,
+          };
+          const lines: string[] = [];
+          const frightenedIds = new Set<string>();
+          for (const e of inRangeEnemies) {
+            const enemyData = getEnemyById(seed, e.id);
+            const targetName = enemyData?.name ?? e.id;
+            const wisScore = (enemyData as unknown as Record<string, number>)?.wis ?? 10;
+            const save = rollDice('1d20') + abilityMod(wisScore);
+            const feySuccess = save >= dc;
+            st = pushEvent(st, {
+              kind: 'save',
+              characterId: e.id,
+              characterName: targetName,
+              ability: 'wis',
+              roll: save,
+              dc,
+              success: feySuccess,
+              vs: 'Fey Presence',
+              round: st.round ?? 1,
+            });
+            if (!feySuccess) {
+              frightenedIds.add(e.id);
+              lines.push(`${targetName}: WIS ${save} vs DC ${dc} — frightened!`);
+              st = pushEvent(st, {
+                kind: 'condition_applied',
+                targetId: e.id,
+                targetName,
+                condition: 'frightened',
+                source: 'Fey Presence',
+                round: st.round ?? 1,
+              });
+            } else {
+              lines.push(`${targetName}: WIS ${save} vs DC ${dc} — resists.`);
+            }
+          }
+          if (frightenedIds.size > 0) {
+            st = {
+              ...st,
+              entities: (st.entities ?? []).map((e) =>
+                frightenedIds.has(e.id)
+                  ? {
+                      ...e,
+                      conditions: [...e.conditions.filter((c) => c !== 'frightened'), 'frightened'],
+                    }
+                  : e
+              ),
+            };
+          }
+          narrative = `🌿 Fey Presence! ${char.name} radiates fey magic. ${lines.join(' ')}`;
+          usedInitiative = true;
+        }
+
+        // ── Unknown feature fallthrough ────────────────────────────────────────
+        else {
+          narrative = `Unknown class feature: ${fid}.`;
+        }
+        break;
+      }
+
+      case 'interact_object': {
+        const currentSeedRoom = seed.rooms.find((r) => r.id === roomId);
+        const obj: RoomObject | undefined = currentSeedRoom?.objects?.find(
+          (o) => o.id === action.objectId
+        );
+        if (!obj) {
+          narrative = 'There is nothing like that here.';
+          break;
+        }
+
+        const searchKey = `${roomId}:${obj.id}`;
+        if ((st.objects_searched ?? []).includes(searchKey)) {
+          narrative = `You have already searched the ${obj.name}.`;
+          break;
+        }
+
+        // Thief Fast Hands (PHB p.97): in combat, interaction is a bonus action.
+        // Out of combat, it's a free interaction (existing behavior).
+        if (st.combat_active) {
+          const fastHandsEligible =
+            char.character_class.toLowerCase() === 'rogue' &&
+            char.subclass === 'thief' &&
+            char.level >= 3;
+          if (!fastHandsEligible) {
+            narrative = 'You cannot interact with objects during combat.';
+            break;
+          }
+          if (char.turn_actions.bonus_action_used) {
+            narrative = 'Bonus action already used this turn.';
+            break;
+          }
+          char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
+        }
+
+        // Flavor objects (no DC, no loot) are one-shot — repeating adds
+        // nothing. Mark searched immediately so they drop out of the
+        // choice list.
+        if (!obj.searchable || !obj.lootIds?.length) {
+          st = { ...st, objects_searched: [...(st.objects_searched ?? []), searchKey] };
+          narrative = obj.interactText;
+          break;
+        }
+
+        const proficient =
+          char.skill_proficiencies?.some(
+            (s) => s.toLowerCase() === 'investigation' || s.toLowerCase() === 'perception'
+          ) ?? false;
+        // Search is INT (Investigation) — heavy encumbrance doesn't affect INT
+        // per 2024 RAW (only STR/DEX/CON), so we only honour exhaustion.
+        const exhaustionDisadv1 = (char.exhaustion_level ?? 0) >= 1;
+        const inspAdvSearch = consumeInspirationForCheck(char);
+        const bardicSearchRoll = consumeBardicForCheck(char);
+        const check = skillCheck(
+          char.int,
+          (obj.searchDC ?? 12) - bardicSearchRoll,
+          proficient,
+          char.level,
+          exhaustionDisadv1,
+          false,
+          false,
+          inspAdvSearch,
+          char.species === 'halfling'
+        );
+
+        if (check.success) {
+          const gained: string[] = [];
+          const gainedIds: string[] = [];
+          for (const lootId of obj.lootIds) {
+            const item = context.lootTable.find((l) => l.id === lootId);
+            if (item) {
+              char.inventory = [...(char.inventory ?? []), { ...item, instance_id: randomUUID() }];
+              gained.push(item.name);
+              gainedIds.push(item.id);
+            }
+          }
+          // Mirror the floor-loot flow: record item ids in loot_taken so quest
+          // conditions (`loot_taken contains 'shadow_evidence'`) fire whether
+          // the player picked it up from the floor or from a container.
+          if (gainedIds.length) {
+            st = { ...st, loot_taken: [...(st.loot_taken ?? []), ...gainedIds] };
+          }
+          // Mark searched only on success — a failed Investigation leaves
+          // the choice alive so the player can retry (each retry costs
+          // one turn). Matches 5e: a lock/search check is normally
+          // re-attemptable. The seenKey written by takeAction still dims
+          // the button so the player sees they've tried it.
+          st = { ...st, objects_searched: [...(st.objects_searched ?? []), searchKey] };
+          const foundDesc = obj.foundText ?? `You find: ${gained.join(', ')}.`;
+          narrative = `${obj.interactText} (Investigation: ${check.roll}+${abilityMod(char.int)}=${check.total} vs DC ${obj.searchDC ?? 12} — success!) ${foundDesc}`;
+        } else {
+          narrative = `${obj.interactText} (Investigation: ${check.roll}+${abilityMod(char.int)}=${check.total} vs DC ${obj.searchDC ?? 12} — fail.) ${obj.emptyText ?? 'You can try again.'}`;
+        }
+        break;
+      }
+
+      case 'two_weapon_attack': {
+        if (!st.combat_active) {
+          narrative = 'No enemy to attack.';
+          break;
+        }
+        // Find the off-hand light weapon in inventory
+        const mainWpnInstanceId = char.equipped_weapon;
+        const offhandInvItem = char.inventory
+          .filter((i) => i.instance_id !== mainWpnInstanceId)
+          .find((i) => {
+            const l = context.lootTable.find((ll) => ll.id === i.id);
+            return l?.light && l.slot === 'weapon';
+          });
+        if (!offhandInvItem) {
+          narrative = 'No light off-hand weapon found.';
+          break;
+        }
+        const offhandLoot = context.lootTable.find((l) => l.id === offhandInvItem.id)!;
+        // 2024 PHB Nick mastery (dagger, light hammer, sickle, scimitar) — when
+        // the off-hand weapon has Nick + the wielder is trained in it, the
+        // two-weapon extra attack is part of the Attack action instead of a
+        // bonus action. Frees the bonus action for Cunning Action / Rage / etc.
+        const nickFree =
+          offhandLoot.mastery === 'nick' &&
+          (char.weapon_masteries ?? []).includes(offhandLoot.id) &&
+          char.turn_actions.action_used;
+        if (!nickFree && char.turn_actions.bonus_action_used) {
+          narrative = 'Bonus action already used this turn.';
+          break;
+        }
+        const offhandProficient = hasWeaponProficiency(
+          char.weapon_proficiencies ?? [],
+          offhandLoot.weaponType
+        );
+        const twfTargetId: string =
+          (action as { type: 'two_weapon_attack'; targetEnemyId?: string }).targetEnemyId ??
+          enemy?.id ??
+          '';
+        const enemyInRoom = livingEnemiesInRoom.find((e) => e.id === twfTargetId) ?? enemy;
+        if (!enemyInRoom) {
+          narrative = 'No enemy here.';
+          break;
+        }
+        const twfTargetEntityId = enemyInRoom.id;
+        const condDisadvTwf = char.conditions.some((c) => DISADV_CONDITIONS.has(c));
+        const armorLootItemTwf = char.equipped_armor
+          ? context.lootTable.find(
+              (l) => l.id === char.inventory.find((i) => i.instance_id === char.equipped_armor)?.id
+            )
+          : null;
+        const armorProfTwf = hasArmorProficiency(
+          char.armor_proficiencies ?? [],
+          armorLootItemTwf?.armorCategory
+        );
+        const disadvTwf = condDisadvTwf || !armorProfTwf;
+        const atk = resolveOffHandAttack(
+          { str: char.str, dex: char.dex, level: char.level },
+          offhandLoot.damage,
+          enemyInRoom.ac,
+          offhandLoot.finesse ?? false,
+          disadvTwf,
+          false,
+          offhandProficient,
+          offhandLoot.range === 'ranged'
+        );
+        // Nick: don't consume the bonus action; it stays available this turn.
+        if (!nickFree) {
+          char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
+        }
+        usedInitiative = true;
+        if (atk.fumble) {
+          narrative = `Off-hand fumble! The ${offhandLoot.name} slips from your grip. (d20: 1)`;
+          break;
+        }
+        if (!atk.hit) {
+          narrative = `Off-hand attack with ${offhandLoot.name} misses. (${atk.roll}+${atk.atkMod}+${atk.prof}=${atk.total} vs AC ${enemyInRoom.ac})`;
+          break;
+        }
+        const entTwf = st.entities?.find((e) => e.id === twfTargetEntityId && e.isEnemy);
+        const curHpTwf = entTwf?.hp ?? 0;
+        const newHpTwf = curHpTwf - atk.damage;
+        st = {
+          ...st,
+          entities: (st.entities ?? []).map((e) =>
+            e.id === twfTargetEntityId && e.isEnemy ? { ...e, hp: newHpTwf } : e
+          ),
+        };
+        narrative = `Off-hand strike with ${offhandLoot.name}! ${atk.damage} damage${atk.critical ? ' (CRITICAL!)' : ''} (${atk.roll}+${atk.atkMod}+${atk.prof}=${atk.total} vs AC ${enemyInRoom.ac}, no ability mod to damage).`;
+        if (newHpTwf <= 0) {
+          const xpGainTwf = enemyInRoom.xp ?? 10;
+          const split = splitEncounterXp(st, char.id, xpGainTwf);
+          st = split.st;
+          char.xp = (char.xp || 0) + split.share;
+          narrative += ` The ${enemyInRoom.name} falls!`;
+          st = {
+            ...st,
+            entities: (st.entities ?? []).map((e) =>
+              e.id === twfTargetEntityId && e.isEnemy ? { ...e, hp: 0 } : e
+            ),
+          };
+          st.enemies_killed = [...(st.enemies_killed || []), twfTargetEntityId];
+          narrative += grantDarkOnesBlessing(char);
+          narrative += applyPartyLevelUps(st, char, context);
+          if (st.combat_active && isRoomCleared(st, seed, roomId)) st = endCombatState(st);
+        }
+        break;
+      }
+
+      case 'grapple': {
+        if (!enemyAlive || !enemy) {
+          narrative = 'No enemy to grapple.';
+          break;
+        }
+        const grappleTargetId =
+          (action as { type: 'grapple'; targetEnemyId?: string }).targetEnemyId ?? enemy.id;
+        const grappleTarget = livingEnemiesInRoom.find((e) => e.id === grappleTargetId) ?? enemy;
+        // SRD 5.2.1 p.195 / 2024 PHB "Unarmed Strike: Grapple" — requires the
+        // target within 5 ft (unarmed strike reach). No action is spent if the
+        // attempt fails this prerequisite.
+        if (st.entities) {
+          const myEnt = st.entities.find((e) => e.id === char.id);
+          const tgtEnt = st.entities.find((e) => e.id === grappleTarget.id && e.isEnemy);
+          if (myEnt && tgtEnt && distanceFeet(myEnt.pos, tgtEnt.pos) > 5) {
+            narrative = `Out of reach — Grapple needs the target within 5 ft. Move closer first.`;
+            break;
+          }
+        }
+        if (grappleTarget.condition_immunities?.includes('grappled')) {
+          narrative = `The ${grappleTarget.name} cannot be grappled (condition immunity).`;
+          char.turn_actions = { ...char.turn_actions, action_used: true };
+          usedInitiative = true;
+          break;
+        }
+        // Contested Athletics: player STR check vs enemy STR or DEX (whichever higher)
+        const athProfGrapple = (context.classSkills[char.character_class] ?? []).includes(
+          'athletics'
+        );
+        const playerRollGrapple =
+          d(20) + abilityMod(char.str) + (athProfGrapple ? profBonus(char.level) : 0);
+        const enemyStrGrapple = abilityMod(grappleTarget.toHit); // toHit is a rough proxy for STR/DEX mod
+        const enemyDexGrapple = abilityMod(grappleTarget.dex ?? 10);
+        const enemyRollGrapple = d(20) + Math.max(enemyStrGrapple, enemyDexGrapple);
+        char.turn_actions = { ...char.turn_actions, action_used: true };
+        usedInitiative = true;
+        if (playerRollGrapple > enemyRollGrapple) {
+          st = {
+            ...st,
+            entities: (st.entities ?? []).map((e) =>
+              e.id === grappleTarget.id && e.isEnemy
+                ? {
+                    ...e,
+                    conditions: [...e.conditions.filter((c) => c !== 'grappled'), 'grappled'],
+                    grappled_by: char.id,
+                  }
                 : e
             ),
           };
           st = pushEvent(st, {
             kind: 'condition_applied',
-            targetId: enemy.id,
-            targetName: enemy.name,
-            condition: 'stunned',
-            source: 'Stunning Strike',
+            targetId: grappleTarget.id,
+            targetName: grappleTarget.name,
+            condition: 'grappled',
+            source: 'Grapple',
             round: st.round ?? 1,
           });
-          narrative = `Stunning Strike! CON save ${conSave} vs DC ${stunDC} — ${enemy.name} is stunned until the end of your next turn! (${kiPool3 - 1} ki remaining)`;
+          narrative = `You grapple the ${grappleTarget.name}! (${playerRollGrapple} vs ${enemyRollGrapple}) They are GRAPPLED — speed 0, your attacks have advantage.`;
         } else {
-          narrative = `Stunning Strike! CON save ${conSave} vs DC ${stunDC} — ${enemy.name} resists. (${kiPool3 - 1} ki remaining)`;
+          narrative = `The ${grappleTarget.name} breaks free of your grapple attempt. (${playerRollGrapple} vs ${enemyRollGrapple})`;
         }
+        break;
       }
 
-      // ── Way of Shadow: Shadow Arts (PHB p.80) ────────────────────────────────
-      // The L3 Shadow Monk learns to cast shadow-aligned spells via ki. Our
-      // model collapses the cantrip/spell list into a single 2-ki action
-      // that grants the `invisible` condition for 3 rounds — represents
-      // "step into magical darkness" tactically.
-      else if (fid === 'shadow_arts') {
-        if (char.subclass !== 'shadow' || char.character_class.toLowerCase() !== 'monk') {
-          narrative = 'Only Way of Shadow Monks have Shadow Arts.';
+      // SRD 5.2.1 p.16 — A grappled creature can use its action on its turn to make
+      // a Strength (Athletics) or Dexterity (Acrobatics) check contested by the
+      // grappler's Strength (Athletics) check; success ends the grappled condition.
+      case 'try_escape_grapple': {
+        const myEntity = st.entities?.find((e) => e.id === char.id);
+        const grapplerId = myEntity?.grappled_by;
+        if (!char.conditions.includes('grappled') && !myEntity?.conditions.includes('grappled')) {
+          narrative = 'You are not grappled.';
           break;
         }
-        if (char.level < 3) {
-          narrative = 'Shadow Arts requires Monk level 3.';
+        if (!grapplerId) {
+          // No tracked grappler — just drop the condition (shouldn't happen, but be lenient)
+          char = { ...char, conditions: char.conditions.filter((c) => c !== 'grappled') };
+          narrative = 'You break free of the grapple.';
+          char.turn_actions = { ...char.turn_actions, action_used: true };
+          usedInitiative = true;
           break;
         }
-        const kiSa = char.class_resource_uses?.ki_points ?? char.level;
-        if (kiSa < 2) {
-          narrative = 'Need 2 ki points for Shadow Arts.';
-          break;
-        }
-        char.class_resource_uses = { ...(char.class_resource_uses ?? {}), ki_points: kiSa - 2 };
-        char.conditions = [...char.conditions.filter((c) => c !== 'invisible'), 'invisible'];
-        char.condition_durations = {
-          ...(char.condition_durations ?? {}),
-          invisible: 3,
-        };
+        const grappler = st.entities?.find((e) => e.id === grapplerId);
+        const grapplerEnemy = grappler?.isEnemy ? getEnemyById(seed, grapplerId) : null;
+        const grapplerStrMod = grapplerEnemy ? abilityMod(grapplerEnemy.toHit) : 0;
+        const grapplerRoll = d(20) + grapplerStrMod;
+
+        // Player picks the better of Athletics (STR) or Acrobatics (DEX)
+        const athProf = (context.classSkills[char.character_class] ?? []).includes('athletics');
+        const acrProf = (context.classSkills[char.character_class] ?? []).includes('acrobatics');
+        const athRoll = d(20) + abilityMod(char.str) + (athProf ? profBonus(char.level) : 0);
+        const acrRoll = d(20) + abilityMod(char.dex) + (acrProf ? profBonus(char.level) : 0);
+        const myRoll = Math.max(athRoll, acrRoll);
+        const skillUsed = athRoll >= acrRoll ? 'Athletics' : 'Acrobatics';
+
         char.turn_actions = { ...char.turn_actions, action_used: true };
         usedInitiative = true;
-        narrative = `🌑 ${char.name} weaves Shadow Arts — invisible for 3 rounds. (${kiSa - 2} ki remaining)`;
-      }
 
-      // ── Path of the Berserker — Frenzy (PHB p.49) ────────────────────────────
-      // While raging, make a single melee weapon attack as a bonus action.
-      // Damage uses the equipped weapon's die + STR mod + rage bonus, matching
-      // the regular attack handler's pattern but in a self-contained roll.
-      // RAW: when rage ends, you suffer one level of exhaustion. Deferred —
-      // tracking "rage ended after Frenzy used this round" needs more state.
-      else if (fid === 'frenzy_attack') {
-        if (char.subclass !== 'berserker' || char.character_class.toLowerCase() !== 'barbarian') {
-          narrative = 'Only Berserker Barbarians have Frenzy.';
-          break;
-        }
-        if (!char.conditions.includes('raging')) {
-          narrative = 'You must be raging to use Frenzy.';
-          break;
-        }
-        if (char.turn_actions.bonus_action_used) {
-          narrative = 'Bonus action already used this turn.';
-          break;
-        }
-        if (!enemyAlive || !enemy) {
-          narrative = 'No enemy to Frenzy attack.';
-          break;
-        }
-        const frWeapon = char.equipped_weapon
-          ? getItemData(
-              char.inventory?.find((i) => i.instance_id === char.equipped_weapon) as InventoryItem,
-              context
-            )
-          : null;
-        if (frWeapon?.range === 'ranged') {
-          narrative = 'Frenzy requires a melee weapon.';
-          break;
-        }
-        char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
-        const frTarget = livingEnemiesInRoom[0] ?? enemy;
-        const frToHit = rollDice('1d20') + abilityMod(char.str) + profBonus(char.level);
-        if (frToHit >= (frTarget.ac ?? 10)) {
-          const dmgDice = frWeapon?.damage ?? '1d4';
-          const frDmg = Math.max(
-            1,
-            rollDice(dmgDice) + abilityMod(char.str) + rageDamageBonus(char.level)
-          );
-          const curHp = st.entities?.find((e) => e.id === frTarget.id && e.isEnemy)?.hp ?? 0;
-          const newHp = Math.max(0, curHp - frDmg);
+        if (myRoll > grapplerRoll) {
+          char = { ...char, conditions: char.conditions.filter((c) => c !== 'grappled') };
           st = {
             ...st,
             entities: (st.entities ?? []).map((e) =>
-              e.id === frTarget.id && e.isEnemy ? { ...e, hp: newHp } : e
+              e.id === char.id
+                ? {
+                    ...e,
+                    conditions: e.conditions.filter((c) => c !== 'grappled'),
+                    grappled_by: undefined,
+                  }
+                : e
             ),
           };
-          narrative = `💢 ${char.name} — Frenzy! (${frToHit} hits AC ${frTarget.ac}) ${frDmg} ${frWeapon?.damageType ?? 'bludgeoning'}${newHp <= 0 ? ` — ${frTarget.name} falls!` : ''}`;
-          if (newHp <= 0) {
-            const split = splitEncounterXp(st, char.id, frTarget.xp ?? 10);
-            st = split.st;
-            char.xp = (char.xp || 0) + split.share;
-            narrative += applyPartyLevelUps(st, char, context);
-            st.enemies_killed = [...st.enemies_killed, frTarget.id];
-            if (isRoomCleared(st, seed, roomId)) {
-              st = endCombatState(st);
-              char.conditions = char.conditions.filter((c) => c !== 'raging');
-            }
-          }
+          narrative = `You break free of the grapple! (${skillUsed} ${myRoll} vs ${grapplerRoll})`;
         } else {
-          narrative = `💢 ${char.name} — Frenzy! (${frToHit} vs AC ${frTarget.ac}) — miss.`;
+          narrative = `You strain against the grapple but cannot escape. (${skillUsed} ${myRoll} vs ${grapplerRoll})`;
         }
+        break;
       }
 
-      // ── Druid: Wild Shape ────────────────────────────────────────────────────
-      else if (fid === 'wild_shape' || fid.startsWith('wild_shape_')) {
-        const cls = char.character_class.toLowerCase();
-        if (cls !== 'druid') {
-          narrative = 'Only Druids have Wild Shape.';
+      // SRD 5.2.1 p.187 — standing up from prone costs half the creature's speed.
+      // 2024 PHB — declare you'll spend your Heroic Inspiration on the next
+      // attack this turn. Doesn't cost an action; the flag clears when the
+      // attack handler resolves the d20.
+      case 'spend_inspiration': {
+        if (!char.inspiration) {
+          narrative = 'You have no Heroic Inspiration to spend.';
           break;
         }
-        if (char.conditions.includes('wild_shaped')) {
-          narrative = 'You are already in Wild Shape. Attack or use Dismiss Wild Shape to end it.';
+        if (char.turn_actions.inspiration_pending) {
+          narrative = 'Inspiration already queued for your next d20 roll.';
           break;
         }
-        const wsUses = char.class_resource_uses?.wild_shape ?? 2;
-        if (wsUses <= 0) {
-          narrative = 'No Wild Shape uses remaining (recover on short rest).';
-          break;
-        }
-        // Determine the form: 2024 PHB ships a Beast Forms catalog the
-        // druid picks from. The choice generator surfaces one option per
-        // form via `wild_shape_<formId>`. If just 'wild_shape' is invoked
-        // (legacy/test), fall back to the lowest-CR form the druid can
-        // access.
-        const isMoon = char.subclass === 'moon';
-        const formId = fid === 'wild_shape' ? '' : fid.replace('wild_shape_', '');
-        const form = formId
-          ? BEAST_FORMS[formId]
-          : Object.values(BEAST_FORMS).find((f) => f.cr === 0);
-        if (!form) {
-          narrative = `Unknown beast form: ${formId}.`;
-          break;
-        }
-        // Gate by CR access table.
-        const maxCR = isMoon
-          ? Math.max(1, Math.floor(char.level / 3))
-          : char.level >= 8
-            ? 1
-            : char.level >= 4
-              ? 0.5
-              : 0.25;
-        if (form.cr > maxCR) {
-          narrative = `${form.name} requires a higher-CR form access (you can access CR ≤ ${maxCR}).`;
-          break;
-        }
-        // 2024 PHB temp HP: base 2 × level, Moon 3 × level.
-        const tempHp = (isMoon ? 3 : 2) * char.level;
-        char.class_resource_uses = { ...(char.class_resource_uses ?? {}), wild_shape: wsUses - 1 };
-        char.conditions = [...char.conditions, 'wild_shaped'];
-        char.wild_shape_form = form.id;
-        char.hp = char.hp + tempHp;
-        if (st.combat_active) {
-          char.turn_actions = isMoon
-            ? { ...char.turn_actions, bonus_action_used: true }
-            : { ...char.turn_actions, action_used: true };
-          if (isMoon) usedInitiative = false;
-          else usedInitiative = true;
-        }
-        const traits = [
-          form.packTactics ? 'Pack Tactics' : '',
-          form.physicalResistance ? 'Physical Resistance' : '',
-          form.flying ? 'Flying' : '',
-          form.climbing ? 'Climb' : '',
-        ]
-          .filter(Boolean)
-          .join(', ');
-        const traitNote = traits ? ` Traits: ${traits}.` : '';
-        narrative = `🐾 ${char.name} transforms into a ${form.name}!${isMoon ? ' (bonus action)' : ''} +${tempHp} temp HP. ${form.descriptor}.${traitNote} (${wsUses - 1} uses remaining)`;
+        char.turn_actions = { ...char.turn_actions, inspiration_pending: true };
+        // 2024 PHB: Heroic Inspiration grants advantage on any d20 test
+        // (attack, save, ability check) — not just attacks.
+        narrative = `${char.name} steels themselves — Heroic Inspiration queued: advantage on your next d20 (attack, save, or check).`;
+        break;
       }
 
-      // ── Druid: Dismiss Wild Shape ────────────────────────────────────────────
-      else if (fid === 'dismiss_wild_shape') {
-        if (!char.conditions.includes('wild_shaped')) {
-          narrative = 'You are not in Wild Shape.';
+      case 'stand_up': {
+        if (!char.conditions.includes('prone')) {
+          narrative = 'You are not prone.';
           break;
         }
-        char.wild_shape_form = undefined;
-        char.conditions = char.conditions.filter((c) => c !== 'wild_shaped');
-        narrative = `${char.name} reverts to their normal form.`;
-      }
-
-      // ── Circle of the Moon: Moon Healing (PHB p.69) ──────────────────────────
-      // While shifted, spend a spell slot as a bonus action to heal 1d8 per
-      // slot level. Limited to combat-active scenarios in practice (it's a
-      // bonus action; outside combat the regular cure_wounds path is better).
-      else if (fid === 'moon_healing') {
-        if (char.subclass !== 'moon' || char.character_class.toLowerCase() !== 'druid') {
-          narrative = 'Only Circle of the Moon Druids have Moon Healing.';
+        const speedFt = effectiveSpeed(char);
+        const standCost = Math.floor(speedFt / 2);
+        const usedFt = (st.movement_used ?? {})[char.id] ?? 0;
+        if (usedFt + standCost > speedFt) {
+          narrative = `Not enough movement to stand up. (${speedFt - usedFt} ft remaining, ${standCost} ft needed)`;
           break;
         }
-        if (!char.conditions.includes('wild_shaped')) {
-          narrative = 'You must be in Wild Shape to use Moon Healing.';
-          break;
-        }
-        const mhSlotsMax = char.spell_slots_max ?? {};
-        const mhSlotsUsed = char.spell_slots_used ?? {};
-        const mhSlotLvl = Object.keys(mhSlotsMax)
-          .map(Number)
-          .filter((n) => n >= 1 && (mhSlotsMax[n] ?? 0) > (mhSlotsUsed[n] ?? 0))
-          .sort((a, b) => a - b)[0];
-        if (mhSlotLvl === undefined) {
-          narrative = 'No spell slot available for Moon Healing.';
-          break;
-        }
-        const heal = rollDice(`${mhSlotLvl}d8`);
-        char.spell_slots_used = { ...mhSlotsUsed, [mhSlotLvl]: (mhSlotsUsed[mhSlotLvl] ?? 0) + 1 };
-        char.hp = Math.min(char.max_hp, char.hp + heal);
-        char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
-        narrative = `🌙 ${char.name} channels lunar energy — heals ${heal} HP (now ${char.hp}/${char.max_hp}). Spent lvl ${mhSlotLvl} slot.`;
-      }
-
-      // ── Sorcerer: Metamagic — Twinned Spell (1 sorcery point) ────────────────
-      else if (fid === 'metamagic_twinned') {
-        const cls = char.character_class.toLowerCase();
-        if (cls !== 'sorcerer') {
-          narrative = 'Only Sorcerers have Metamagic.';
-          break;
-        }
-        const spPool = char.class_resource_uses?.sorcery_points ?? char.level;
-        if (spPool < 1) {
-          narrative = 'Not enough sorcery points (need 1).';
-          break;
-        }
-        char.class_resource_uses = {
-          ...(char.class_resource_uses ?? {}),
-          sorcery_points: spPool - 1,
-        };
-        st = { ...st, metamagic_active: 'twinned' };
-        narrative = `${char.name} — Metamagic: Twinned Spell! Your next spell will target a second creature. (${spPool - 1} sorcery points remaining)`;
-      }
-
-      // ── Sorcerer: Metamagic — Quickened Spell (2 sorcery points) ─────────────
-      else if (fid === 'metamagic_quickened') {
-        const cls = char.character_class.toLowerCase();
-        if (cls !== 'sorcerer') {
-          narrative = 'Only Sorcerers have Metamagic.';
-          break;
-        }
-        if (char.turn_actions.bonus_action_used) {
-          narrative = 'Bonus action already used this turn.';
-          break;
-        }
-        // SRD 5.2.1 p.67: can't activate Quickened if you've already cast a
-        // level 1+ spell this turn.
-        if (char.turn_actions.leveled_spell_cast) {
-          narrative =
-            'You have already cast a level 1+ spell this turn — Quickened Spell cannot be used.';
-          break;
-        }
-        const spPool2 = char.class_resource_uses?.sorcery_points ?? char.level;
-        if (spPool2 < 2) {
-          narrative = 'Not enough sorcery points (need 2).';
-          break;
-        }
-        char.class_resource_uses = {
-          ...(char.class_resource_uses ?? {}),
-          sorcery_points: spPool2 - 2,
-        };
-        char.turn_actions = {
-          ...char.turn_actions,
-          bonus_action_used: true,
-          action_used: false,
-          quickened_used: true,
-        };
-        st = { ...st, metamagic_active: 'quickened' };
-        narrative = `${char.name} — Metamagic: Quickened Spell! Cast your next spell as a bonus action. (${spPool2 - 2} sorcery points remaining)`;
-      }
-
-      // ── Sorcerer: Metamagic — Empowered Spell (1 sorcery point) ──────────────
-      else if (fid === 'metamagic_empowered') {
-        const cls = char.character_class.toLowerCase();
-        if (cls !== 'sorcerer') {
-          narrative = 'Only Sorcerers have Metamagic.';
-          break;
-        }
-        const spPool3 = char.class_resource_uses?.sorcery_points ?? char.level;
-        if (spPool3 < 1) {
-          narrative = 'Not enough sorcery points (need 1).';
-          break;
-        }
-        char.class_resource_uses = {
-          ...(char.class_resource_uses ?? {}),
-          sorcery_points: spPool3 - 1,
-        };
-        st = { ...st, metamagic_active: 'empowered' };
-        narrative = `${char.name} — Metamagic: Empowered Spell! You may reroll up to ${abilityMod(char.cha)} damage dice on your next spell. (${spPool3 - 1} sorcery points remaining)`;
-      }
-
-      // ── Warlock: Agonizing Blast invocation (passive — toggled on/off) ────────
-      else if (fid === 'agonizing_blast') {
-        const cls = char.character_class.toLowerCase();
-        if (cls !== 'warlock') {
-          narrative = 'Only Warlocks can take Agonizing Blast.';
-          break;
-        }
-        const hasIt = char.feats?.includes('agonizing_blast') ?? false;
-        if (hasIt) {
-          narrative = 'You already have the Agonizing Blast invocation.';
-          break;
-        }
-        char.feats = [...(char.feats ?? []), 'agonizing_blast'];
-        narrative = `${char.name} gains the Agonizing Blast invocation — Eldritch Blast now adds +${abilityMod(char.cha)} force damage per beam.`;
-      }
-
-      // ── Warlock: Devil's Sight invocation ────────────────────────────────────
-      else if (fid === 'devils_sight') {
-        const cls = char.character_class.toLowerCase();
-        if (cls !== 'warlock') {
-          narrative = "Only Warlocks can take Devil's Sight.";
-          break;
-        }
-        const hasIt2 = char.feats?.includes('devils_sight') ?? false;
-        if (hasIt2) {
-          narrative = "You already have the Devil's Sight invocation.";
-          break;
-        }
-        char.feats = [...(char.feats ?? []), 'devils_sight'];
-        narrative = `${char.name} gains Devil's Sight — you can see normally in magical darkness.`;
-      }
-
-      // ── Champion Fighter: Remarkable Athlete ────────────────────────────────
-      else if (fid === 'remarkable_athlete') {
-        narrative = `${char.name} — Remarkable Athlete: add +${Math.ceil(profBonus(char.level) / 2)} to uninvested STR/DEX/CON checks (passive).`;
-      }
-
-      // ── Abjurer Wizard: Arcane Ward ──────────────────────────────────────────
-      else if (fid === 'arcane_ward') {
-        if (char.subclass !== 'abjurer') {
-          narrative = 'Only Abjurer Wizards have Arcane Ward.';
-          break;
-        }
-        const wardHp = 2 * char.level;
-        char.class_resource_uses = { ...(char.class_resource_uses ?? {}), arcane_ward: wardHp };
-        narrative = `${char.name} creates an Arcane Ward with ${wardHp} HP. It absorbs damage before your HP is reduced.`;
-      }
-
-      // ── 2024 PHB Cleric: Divine Spark (universal Channel Divinity) ───────────
-      // Action. Spend CD to deal 1d8 + WIS mod radiant damage to a target OR
-      // heal a target ally the same amount. Default: damage the current enemy.
-      else if (fid === 'divine_spark') {
-        if (char.character_class.toLowerCase() !== 'cleric') {
-          narrative = 'Only Clerics have Divine Spark.';
-          break;
-        }
-        const cdUsesDS = char.class_resource_uses?.channel_divinity ?? 1;
-        if (cdUsesDS <= 0) {
-          narrative = 'No Channel Divinity uses remaining.';
-          break;
-        }
-        if (!enemyAlive || !enemy) {
-          narrative = 'No living target.';
-          break;
-        }
-        char.class_resource_uses = {
-          ...(char.class_resource_uses ?? {}),
-          channel_divinity: cdUsesDS - 1,
-        };
-        const dsRoll = rollDice('1d8') + abilityMod(char.wis);
-        // Read the CURRENT entity HP, not the seed's template HP — otherwise
-        // Divine Spark resets the target to (full_hp - damage) and wipes
-        // every prior turn's accumulated damage. (Vale playthrough log,
-        // 2026-05-21: Ghoul jumped from 19 → 37 mid-combat after DS.)
-        const enemyEntForDs = st.entities?.find((e) => e.id === enemy.id && e.isEnemy);
-        const currentDsHp = enemyEntForDs?.hp ?? enemy.hp;
-        const dsHp = Math.max(0, currentDsHp - dsRoll);
+        char = { ...char, conditions: char.conditions.filter((c) => c !== 'prone') };
         st = {
           ...st,
+          movement_used: { ...st.movement_used, [char.id]: usedFt + standCost },
           entities: (st.entities ?? []).map((e) =>
-            e.id === enemy.id && e.isEnemy ? { ...e, hp: dsHp } : e
+            e.id === char.id ? { ...e, conditions: e.conditions.filter((c) => c !== 'prone') } : e
           ),
         };
-        st = pushEvent(st, {
-          kind: 'attack_hit',
-          attackerId: char.id,
-          attackerName: char.name,
-          targetId: enemy.id,
-          targetName: enemy.name,
-          damage: dsRoll,
-          damageType: 'radiant',
-          isCrit: false,
-          toHit: 0,
-          targetAc: enemy.ac,
-          round: st.round ?? 1,
-        });
-        narrative = `✦ Divine Spark! ${enemy.name} takes ${fmt.dmg(dsRoll)} radiant damage. (${cdUsesDS - 1} Channel Divinity remaining)`;
-        if (dsHp <= 0) {
-          const split = splitEncounterXp(st, char.id, enemy.xp ?? 0);
-          st = split.st;
-          char.xp = (char.xp || 0) + split.share;
-          narrative += ` ${enemy.name} is destroyed.`;
-          narrative += applyPartyLevelUps(st, char, context);
-        }
-        usedInitiative = true;
+        narrative = `${char.name} stands up. (${standCost} ft of movement used)`;
+        break;
       }
 
-      // ── 2024 PHB Cleric: Turn Undead (universal Channel Divinity) ────────────
-      // Magic Action (full action), per 2024 PHB p.74. All undead within 30 ft
-      // must make a WIS save or be frightened of the cleric for 1 minute. They
-      // can't willingly move closer; if affected they must Dash away when
-      // possible. We model with the existing `frightened` condition.
-      else if (fid === 'turn_undead') {
-        if (char.character_class.toLowerCase() !== 'cleric') {
-          narrative = 'Only Clerics have Turn Undead.';
+      case 'shove': {
+        if (!enemyAlive || !enemy) {
+          narrative = 'No enemy to shove.';
           break;
         }
-        const cdUsesTU = char.class_resource_uses?.channel_divinity ?? 1;
-        if (cdUsesTU <= 0) {
-          narrative = 'No Channel Divinity uses remaining.';
+        const shoveTargetId =
+          (action as { type: 'shove'; targetEnemyId?: string }).targetEnemyId ?? enemy.id;
+        const shoveTarget = livingEnemiesInRoom.find((e) => e.id === shoveTargetId) ?? enemy;
+        // SRD 5.2.1 p.195 / 2024 PHB "Unarmed Strike: Shove" — requires the
+        // target within 5 ft. No action is spent if the prerequisite fails.
+        if (st.entities) {
+          const myEnt = st.entities.find((e) => e.id === char.id);
+          const tgtEnt = st.entities.find((e) => e.id === shoveTarget.id && e.isEnemy);
+          if (myEnt && tgtEnt && distanceFeet(myEnt.pos, tgtEnt.pos) > 5) {
+            narrative = `Out of reach — Shove needs the target within 5 ft. Move closer first.`;
+            break;
+          }
+        }
+        if (shoveTarget.condition_immunities?.includes('prone')) {
+          narrative = `The ${shoveTarget.name} cannot be knocked prone (condition immunity).`;
+          char.turn_actions = { ...char.turn_actions, action_used: true };
+          usedInitiative = true;
+          break;
+        }
+        const athProfShove = (context.classSkills[char.character_class] ?? []).includes(
+          'athletics'
+        );
+        const playerRollShove =
+          d(20) + abilityMod(char.str) + (athProfShove ? profBonus(char.level) : 0);
+        const enemyStrShove = abilityMod(shoveTarget.toHit);
+        const enemyDexShove = abilityMod(shoveTarget.dex ?? 10);
+        const enemyRollShove = d(20) + Math.max(enemyStrShove, enemyDexShove);
+        char.turn_actions = { ...char.turn_actions, action_used: true };
+        usedInitiative = true;
+        if (playerRollShove > enemyRollShove) {
+          st = {
+            ...st,
+            entities: (st.entities ?? []).map((e) =>
+              e.id === shoveTarget.id && e.isEnemy
+                ? { ...e, conditions: [...e.conditions.filter((c) => c !== 'prone'), 'prone'] }
+                : e
+            ),
+          };
+          st = pushEvent(st, {
+            kind: 'condition_applied',
+            targetId: shoveTarget.id,
+            targetName: shoveTarget.name,
+            condition: 'prone',
+            source: 'Shove',
+            round: st.round ?? 1,
+          });
+          narrative = `You shove the ${shoveTarget.name} to the ground! (${playerRollShove} vs ${enemyRollShove}) They are PRONE — melee attacks against them have advantage, ranged attacks have disadvantage.`;
+        } else {
+          narrative = `The ${shoveTarget.name} resists your shove. (${playerRollShove} vs ${enemyRollShove})`;
+        }
+        break;
+      }
+
+      case 'dodge': {
+        if (!st.combat_active) {
+          narrative = 'You can only dodge in combat.';
           break;
         }
         if (char.turn_actions.action_used) {
-          narrative = 'Action already used this turn.';
+          narrative = 'You have already used your action this turn.';
           break;
         }
-        char.class_resource_uses = {
-          ...(char.class_resource_uses ?? {}),
-          channel_divinity: cdUsesTU - 1,
-        };
-        char.turn_actions = { ...char.turn_actions, action_used: true };
-        const tuDC = 8 + profBonus(char.level) + abilityMod(char.wis);
-        const selfEntTU = st.entities?.find((e) => e.id === char.id);
-        // Identify undead enemies. Convention: enemy name contains "skeleton",
-        // "ghoul", "shadow", "zombie", "lich", "wraith", "undead" — RAW would
-        // check creature type but our enemy templates don't carry that yet.
-        const undeadKeywords = /skeleton|ghoul|shadow|zombie|lich|wraith|undead|crypt/i;
-        const turnedIds: string[] = [];
-        const lines: string[] = [];
-        for (const e of st.entities ?? []) {
-          if (!e.isEnemy || e.hp <= 0) continue;
-          if (!selfEntTU) continue;
-          const dist = Math.max(
-            Math.abs(e.pos.x - selfEntTU.pos.x),
-            Math.abs(e.pos.y - selfEntTU.pos.y)
-          );
-          if (dist > 6) continue; // 30 ft = 6 squares
-          const enemyData = getEnemyById(seed, e.id);
-          if (!enemyData || !undeadKeywords.test(enemyData.name)) continue;
-          const wisScore = (enemyData as unknown as Record<string, number>)?.wis ?? 10;
-          const save = rollDice('1d20') + abilityMod(wisScore);
-          if (save < tuDC) {
-            turnedIds.push(e.id);
-            lines.push(`${enemyData.name}: WIS ${save} vs DC ${tuDC} — turned!`);
-            st = pushEvent(st, {
-              kind: 'condition_applied',
-              targetId: e.id,
-              targetName: enemyData.name,
-              condition: 'frightened',
-              source: 'Turn Undead',
-              round: st.round ?? 1,
-            });
-          } else {
-            lines.push(`${enemyData.name}: WIS ${save} vs DC ${tuDC} — resists.`);
-          }
-        }
-        if (turnedIds.length > 0) {
-          st = {
-            ...st,
-            entities: (st.entities ?? []).map((e) =>
-              turnedIds.includes(e.id)
-                ? {
-                    ...e,
-                    conditions: [...e.conditions.filter((c) => c !== 'frightened'), 'frightened'],
-                  }
-                : e
-            ),
-          };
-        }
-        narrative =
-          lines.length > 0
-            ? `✦ Turn Undead! ${lines.join(' ')} (${cdUsesTU - 1} Channel Divinity remaining)`
-            : `Turn Undead — no undead within 30 ft. (${cdUsesTU - 1} Channel Divinity remaining)`;
+        char.turn_actions = { ...char.turn_actions, action_used: true, dodging: true };
+        usedInitiative = true;
+        narrative = `${char.name} takes the Dodge action — until your next turn, attacks against you have disadvantage.`;
+        break;
       }
 
-      // ── 2024 PHB Cleric L5: Sear Undead ──────────────────────────────────────
-      // Action. Replaces 2014 Destroy Undead. AoE radiant: each undead in 30 ft
-      // takes Nd8 (N = cleric level) radiant damage; WIS save halves.
-      // 2024 PHB Orc — Adrenaline Rush. Bonus action: gain the Dash action
-      // (refunds full speed of movement this turn) and gain temp HP equal
-      // to proficiency bonus. 1/short rest.
-      else if (fid === 'adrenaline_rush') {
-        if (char.species !== 'orc') {
-          narrative = 'Only Orcs have Adrenaline Rush.';
+      case 'disengage': {
+        if (!st.combat_active) {
+          narrative = 'You can only disengage in combat.';
           break;
         }
-        if (char.class_resource_uses?.adrenaline_rush_used === 1) {
-          narrative = 'Adrenaline Rush already used this short rest.';
+        if (char.turn_actions.action_used) {
+          narrative = 'You have already used your action this turn.';
           break;
         }
-        if (char.turn_actions.bonus_action_used) {
-          narrative = 'Bonus action already used this turn.';
+        char.turn_actions = { ...char.turn_actions, action_used: true, disengaged: true };
+        usedInitiative = true;
+        narrative = `${char.name} takes the Disengage action — your next movement this turn won't trigger opportunity attacks.`;
+        break;
+      }
+
+      case 'attune': {
+        if (st.combat_active) {
+          narrative = 'You cannot attune to items during combat.';
           break;
         }
-        const arSpeed = effectiveSpeed(char);
+        const attuneInstanceId =
+          'instanceId' in action
+            ? (action as { type: 'attune'; instanceId: string }).instanceId
+            : '';
+        const attuneInvItem = char.inventory.find((i) => i.instance_id === attuneInstanceId);
+        if (!attuneInvItem) {
+          narrative = "You don't have that item.";
+          break;
+        }
+        const attuneLootItem = context.lootTable.find((l) => l.id === attuneInvItem.id);
+        if (!attuneLootItem?.requiresAttunement) {
+          narrative = `The ${attuneInvItem.name} doesn't require attunement.`;
+          break;
+        }
+        const attunedList = char.attuned_items ?? [];
+        if (attunedList.includes(attuneInstanceId)) {
+          narrative = `You are already attuned to the ${attuneInvItem.name}.`;
+          break;
+        }
+        if (attunedList.length >= 3) {
+          narrative =
+            'You can only be attuned to 3 items at a time (PHB p.138). De-attune one first.';
+          break;
+        }
+        char.attuned_items = [...attunedList, attuneInstanceId];
+        narrative = `You spend a moment focusing on the ${attuneInvItem.name}, attuning yourself to its magic. (${attunedList.length + 1}/3 attuned items)`;
+        break;
+      }
+
+      // ── Grid movement ────────────────────────────────────────────────────────
+      case 'grid_move': {
+        if (!st.entities) {
+          narrative = 'Grid combat is not active.';
+          break;
+        }
+        const gridAction = action as {
+          type: 'grid_move';
+          entityId: string;
+          to: { x: number; y: number };
+        };
+        if (gridAction.entityId !== char.id) {
+          narrative = 'You can only move your own character.';
+          break;
+        }
+
+        const charEntity = st.entities.find((e) => e.id === char.id);
+        if (!charEntity) {
+          narrative = 'Your character is not on the grid.';
+          break;
+        }
+
+        // SRD 5.2.1 p.16 — grappled and restrained reduce speed to 0.
+        if (char.conditions.some((c) => c === 'grappled' || c === 'restrained')) {
+          const which = char.conditions.includes('restrained') ? 'RESTRAINED' : 'GRAPPLED';
+          narrative = `You are ${which} — your speed is 0.`;
+          break;
+        }
+
+        // 2024 PHB Frightened — can't willingly move closer to the source of
+        // your fear. Check distance against the tracked fear-source entity;
+        // reject the move if it would decrease the distance.
+        if (char.conditions.includes('frightened') && char.condition_sources?.frightened) {
+          const fearSourceId = char.condition_sources.frightened;
+          const fearSourceEnt = st.entities.find((e) => e.id === fearSourceId);
+          if (fearSourceEnt && fearSourceEnt.hp > 0) {
+            const charEnt2 = st.entities.find((e) => e.id === char.id);
+            if (charEnt2) {
+              const currentDist = Math.max(
+                Math.abs(charEnt2.pos.x - fearSourceEnt.pos.x),
+                Math.abs(charEnt2.pos.y - fearSourceEnt.pos.y)
+              );
+              const newDist = Math.max(
+                Math.abs(gridAction.to.x - fearSourceEnt.pos.x),
+                Math.abs(gridAction.to.y - fearSourceEnt.pos.y)
+              );
+              if (newDist < currentDist) {
+                const fearName =
+                  getEnemyById(seed, fearSourceId)?.name ?? 'the source of your fear';
+                narrative = `You are FRIGHTENED — you can't willingly move closer to ${fearName}.`;
+                break;
+              }
+            }
+          }
+        }
+
+        const locationGrid = context.campaign?.locations?.find((l) =>
+          l.rooms?.some((r) => r.id === roomId)
+        );
+        const gridW = locationGrid?.gridWidth ?? context.gridWidth ?? 10;
+        const gridH = locationGrid?.gridHeight ?? context.gridHeight ?? 10;
+        // Dead entities (hp ≤ 0) still appear in state.entities for narrative
+        // continuity but don't block movement — you walk over the corpse. This
+        // also matches the frontend's `isReachable` (filters on hp > 0), so the
+        // click-to-move targets and the BFS pathfinder agree on what's blocked.
+        // Static room obstacles (columns/walls/debris) block movement too.
+        const currentRoomForMove = seed.rooms.find((r) => r.id === roomId);
+        const roomObstaclesForMove = currentRoomForMove?.obstacles ?? [];
+        const blocked = [
+          ...st.entities.filter((e) => e.id !== char.id && e.hp > 0).map((e) => e.pos),
+          ...roomObstaclesForMove,
+        ];
+
+        const path = findPath(charEntity.pos, gridAction.to, blocked, gridW, gridH);
+        if (!path) {
+          narrative = 'No path to that square.';
+          break;
+        }
+
+        // Terrain-aware movement cost: difficult terrain squares cost 2× movement
+        const currentSeedRoomGrid = seed.rooms.find((r) => r.id === roomId);
+        const difficultTerrain = currentSeedRoomGrid?.difficultTerrain ?? [];
+        const costFeet = path.reduce((acc, pos) => {
+          const isDifficult = difficultTerrain.some((dt) => posEqual(dt, pos));
+          return acc + (isDifficult ? SQUARE_SIZE * 2 : SQUARE_SIZE);
+        }, 0);
+
+        const speedFt = effectiveSpeed(char);
+        const usedFt = st.movement_used?.[char.id] ?? 0;
+        if (usedFt + costFeet > speedFt) {
+          narrative = `Not enough movement. (${speedFt - usedFt} ft remaining, ${costFeet} ft needed${difficultTerrain.length ? ' — difficult terrain' : ''})`;
+          break;
+        }
+
+        // Check for opportunity attacks from enemies being left behind
+        const oaTargets = opportunityAttackTriggers(
+          charEntity.pos,
+          gridAction.to,
+          st.entities,
+          false
+        );
+        let oaNarrative = '';
+        for (const oaEntity of oaTargets) {
+          const oaEnemy = getEnemyById(seed, oaEntity.id);
+          if (
+            oaEnemy &&
+            !st.enemies_killed.includes(oaEntity.id) &&
+            !char.turn_actions?.disengaged
+          ) {
+            const oaResult = resolveEnemyAttack(oaEnemy, char.ac);
+            if (oaResult.hit) {
+              const dmg = oaResult.damage;
+              char.hp = Math.max(0, char.hp - dmg);
+              const concResult = checkConcentration(char, st, dmg);
+              char = concResult.char;
+              st = concResult.st;
+              oaNarrative += ` [Opportunity attack from ${oaEnemy.name}: ${dmg} damage!${concResult.note}]`;
+            } else {
+              oaNarrative += ` [Opportunity attack from ${oaEnemy.name}: missed!]`;
+            }
+          }
+        }
+
+        // Apply movement
+        const updatedEntities: CombatEntity[] = st.entities!.map((e) =>
+          e.id === char.id ? { ...e, pos: gridAction.to } : e
+        );
+        st = {
+          ...st,
+          entities: updatedEntities,
+          movement_used: { ...st.movement_used, [char.id]: usedFt + costFeet },
+        };
+
+        narrative = `${char.name} moves to (${gridAction.to.x}, ${gridAction.to.y}).${oaNarrative}`;
+        break;
+      }
+
+      // ── Travel between locations ──────────────────────────────────────────────
+      case 'travel': {
+        const travelAction = action as { type: 'travel'; locationId: string };
+        const destLocation = context.campaign?.locations?.find(
+          (l) => l.id === travelAction.locationId
+        );
+        if (!destLocation) {
+          narrative = 'Unknown destination.';
+          break;
+        }
+        // Hostile in the current room — RAW: engage or escape, don't just
+        // walk out of the dungeon. Mirrors the move/loot gates above.
+        if (enemyAlive) {
+          narrative = 'A hostile is in the room — you cannot travel away until the room is clear.';
+          break;
+        }
+
+        // Wilderness encounter check
+        let encounterNote = '';
+        if (
+          destLocation.encounterTable?.length &&
+          destLocation.encounterChance &&
+          Math.random() < destLocation.encounterChance
+        ) {
+          const pick2 = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)];
+          const templateKey = pick2(destLocation.encounterTable);
+          const tpl = context.enemyTemplates.find((t) => t.name === templateKey);
+          if (tpl) {
+            const newEnemyId = `${roomId}#enc${Date.now()}`;
+            seed = {
+              ...seed,
+              enemies: {
+                ...seed.enemies,
+                [roomId]: [
+                  ...(seed.enemies?.[roomId] ?? []),
+                  {
+                    id: newEnemyId,
+                    name: tpl.name,
+                    hp: tpl.hp,
+                    ac: tpl.ac,
+                    damage: tpl.damage,
+                    toHit: tpl.toHit,
+                    xp: tpl.xp,
+                  },
+                ],
+              },
+            };
+            encounterNote = ` A ${tpl.name} bars your path!`;
+          }
+        }
+
+        // Advance world day on travel. Also move current_room to the new
+        // location's central room so room-scoped state (NPC choices,
+        // interact_object, examine, loot) tracks the destination instead
+        // of leaving the player virtually still in the previous town.
+        // Without this, the previous town's NPC kept emitting talk_response
+        // choices after the party had departed.
+        st = {
+          ...st,
+          current_location_id: travelAction.locationId,
+          current_district_id: undefined,
+          current_room: destLocation.centralRoomId ?? st.current_room,
+          world_day: (st.world_day ?? 1) + 1,
+          // Place entities at entrance of new location if it's a dungeon
+          entities: undefined,
+          movement_used: undefined,
+        };
+
+        narrative = `You travel to ${destLocation.name}.${encounterNote}`;
+        usedInitiative = false;
+        break;
+      }
+
+      // ── Enter a town district ─────────────────────────────────────────────────
+      case 'enter_district': {
+        const districtAction = action as { type: 'enter_district'; districtId: string };
+        const currentLoc = context.campaign?.locations?.find(
+          (l) => l.id === st.current_location_id
+        );
+        const district = currentLoc?.districts?.find((d) => d.id === districtAction.districtId);
+        if (!district) {
+          narrative = 'Unknown district.';
+          break;
+        }
+
+        // Move physically into the district's room — without this, NPCs
+        // in the previous district stayed "in the room" (the player
+        // could still Talk to Aldric from the Lantern District because
+        // current_room stuck at millhaven_market). The visited_rooms
+        // set is also extended so the worldmap shows district visits.
+        const newRoomId = district.roomId;
+        st = {
+          ...st,
+          current_district_id: districtAction.districtId,
+          current_room: newRoomId,
+          visited_rooms: st.visited_rooms.includes(newRoomId)
+            ? st.visited_rooms
+            : [...st.visited_rooms, newRoomId],
+        };
+        narrative = `You enter the ${district.name}. ${district.desc}`;
+        // Re-use the standard room-arrival narrative tail (enemies, loot,
+        // exits) so entering a district reads like entering any other room.
+        narrative += ' ' + buildArrivalNarrative(newRoomId, st, seed, context);
+        usedInitiative = false;
+        break;
+      }
+
+      // ── Accept quest ──────────────────────────────────────────────────────────
+      case 'accept_quest': {
+        const aqAction = action as { type: 'accept_quest'; questId: string };
+        const questDef = context.campaign?.quests?.find((q) => q.id === aqAction.questId);
+        if (!questDef) {
+          narrative = 'Unknown quest.';
+          break;
+        }
+
+        const existingProgress = (st.quest_progress ?? []).find(
+          (qp) => qp.questId === aqAction.questId
+        );
+        if (existingProgress) {
+          narrative = `You have already accepted "${questDef.title}".`;
+          break;
+        }
+
+        st = {
+          ...st,
+          quest_progress: [
+            ...(st.quest_progress ?? []),
+            { questId: aqAction.questId, status: 'active', completedSteps: [] },
+          ],
+        };
+        narrative = `Quest accepted: "${questDef.title}" — ${questDef.desc}`;
+        usedInitiative = false;
+        break;
+      }
+
+      // ── Complete quest (manual trigger) ──────────────────────────────────────
+      case 'complete_quest': {
+        const cqAction = action as { type: 'complete_quest'; questId: string };
+        const cqDef = context.campaign?.quests?.find((q) => q.id === cqAction.questId);
+        if (!cqDef) {
+          narrative = 'Unknown quest.';
+          break;
+        }
+
+        const cqProgress = (st.quest_progress ?? []).find((qp) => qp.questId === cqAction.questId);
+        if (!cqProgress || cqProgress.status !== 'active') {
+          narrative = `Quest "${cqDef.title}" is not active.`;
+          break;
+        }
+
+        // Check all steps are done
+        const allStepsDone = cqDef.steps.every((s) => cqProgress.completedSteps.includes(s.id));
+        if (!allStepsDone) {
+          const remaining = cqDef.steps.filter((s) => !cqProgress.completedSteps.includes(s.id));
+          narrative = `Quest "${cqDef.title}" is not yet complete. Remaining: ${remaining.map((s) => s.desc).join('; ')}`;
+          break;
+        }
+
+        // Apply rewards
+        const rewardLines: string[] = [];
+        for (const reward of cqDef.rewards) {
+          if (reward.type === 'give_item') {
+            const item = context.lootTable.find((l) => l.id === reward.itemId);
+            if (item) {
+              char.inventory = [...char.inventory, { instance_id: randomUUID(), ...item }];
+              rewardLines.push(`received ${item.name}`);
+            }
+          } else if (reward.type === 'give_gold') {
+            char.gold = (char.gold ?? 0) + reward.amount;
+            rewardLines.push(`${reward.amount} gold`);
+          } else if (reward.type === 'modify_hp') {
+            char.hp = Math.min(char.max_hp, char.hp + reward.amount);
+          } else if (reward.type === 'set_faction_rep') {
+            st = {
+              ...st,
+              faction_rep: {
+                ...(st.faction_rep ?? {}),
+                [reward.factionId]: ((st.faction_rep ?? {})[reward.factionId] ?? 0) + reward.delta,
+              },
+            };
+            rewardLines.push(`+${reward.delta} rep with faction`);
+          }
+        }
+
+        st = {
+          ...st,
+          quest_progress: (st.quest_progress ?? []).map((qp) =>
+            qp.questId === cqAction.questId ? { ...qp, status: 'completed' } : qp
+          ),
+          faction_rep: st.faction_rep,
+        };
+
+        const rewardStr = rewardLines.length ? ` Rewards: ${rewardLines.join(', ')}.` : '';
+        narrative = `Quest complete: "${cqDef.title}".${rewardStr}`;
+        usedInitiative = false;
+        break;
+      }
+
+      // ── Dash ──────────────────────────────────────────────────────────────────
+      case 'dash': {
+        if (!st.combat_active) {
+          narrative = 'Dash is a combat action.';
+          break;
+        }
+        if (char.turn_actions.action_used) {
+          narrative = 'You have already used your action this turn.';
+          break;
+        }
+        const dashSpeed = effectiveSpeed(char);
+        char.turn_actions = { ...char.turn_actions, action_used: true };
+        // movement_used tracking: reduce remaining movement cap by speed (adds a full extra speed worth)
         st = {
           ...st,
           movement_used: {
             ...(st.movement_used ?? {}),
-            [char.id]: Math.max(0, (st.movement_used?.[char.id] ?? 0) - arSpeed),
+            [char.id]: Math.max(0, (st.movement_used?.[char.id] ?? 0) - dashSpeed),
           },
         };
-        const arTemp = profBonus(char.level);
-        const newTemp = Math.max(char.temp_hp ?? 0, arTemp);
-        char.temp_hp = newTemp;
-        char.class_resource_uses = {
-          ...(char.class_resource_uses ?? {}),
-          adrenaline_rush_used: 1,
-        };
-        char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
-        narrative = `🪓 ${char.name} — Adrenaline Rush! +${arSpeed} ft movement (Dash) and ${arTemp} temp HP.`;
+        narrative = `${char.name} Dashes — gaining an extra ${dashSpeed} ft of movement this turn.`;
+        break;
+      }
+
+      // ── Help ──────────────────────────────────────────────────────────────────
+      case 'help': {
+        if (!st.combat_active) {
+          narrative = 'Help is a combat action.';
+          break;
+        }
+        if (char.turn_actions.action_used) {
+          narrative = 'You have already used your action this turn.';
+          break;
+        }
+        const helpAction = action as { type: 'help'; targetId: string };
+        const helpTarget = st.characters.find((c) => c.id === helpAction.targetId && !c.dead);
+        if (!helpTarget) {
+          narrative = 'Target not found.';
+          break;
+        }
+        char.turn_actions = { ...char.turn_actions, action_used: true };
+        st = { ...st, help_target_id: helpAction.targetId };
+        narrative = `${char.name} helps ${helpTarget.name} — they have advantage on their next attack roll this turn.`;
         usedInitiative = true;
+        break;
       }
 
-      // 2024 PHB Goliath — Large Form. Bonus action; the Goliath grows to
-      // Large size for ~10 rounds (1 min RAW). Gains +10 ft speed (via
-      // condition wired in `effectiveSpeed`) and is treated as Large for
-      // any size-dependent interactions. 1/short rest.
-      else if (fid === 'large_form') {
-        if (char.species !== 'goliath') {
-          narrative = 'Only Goliaths have Large Form.';
+      // ── Ready ─────────────────────────────────────────────────────────────────
+      case 'ready': {
+        if (!st.combat_active) {
+          narrative = 'Ready is a combat action.';
           break;
         }
-        if (char.class_resource_uses?.large_form_used === 1) {
-          narrative = 'Large Form already used this short rest.';
+        if (char.turn_actions.action_used) {
+          narrative = 'You have already used your action this turn.';
           break;
         }
-        if (char.turn_actions.bonus_action_used) {
-          narrative = 'Bonus action already used this turn.';
-          break;
-        }
-        char.class_resource_uses = {
-          ...(char.class_resource_uses ?? {}),
-          large_form_used: 1,
+        const readyAction = action as { type: 'ready'; trigger: string; action: StructuredAction };
+        char.turn_actions = {
+          ...char.turn_actions,
+          action_used: true,
+          readied_action: { trigger: readyAction.trigger, action: readyAction.action },
         };
-        char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
-        char = inflictCondition(char, 'large_form');
-        if (!char.condition_durations) char.condition_durations = {};
-        char.condition_durations = { ...char.condition_durations, large_form: 10 };
-        narrative = `🗿 ${char.name} swells to Large size! +10 ft speed and advantage on STR checks for 10 rounds.`;
+        narrative = `${char.name} readies an action: "${readyAction.trigger}". Use 'Trigger readied action' when the trigger occurs.`;
         usedInitiative = true;
+        break;
       }
 
-      // 2024 PHB Dragonborn — Breath Weapon. Cone of damage emanating from
-      // the dragonborn in the direction of the currently-targeted enemy.
-      // DEX save for half; damage scales with level. 1/short rest.
-      else if (fid === 'breath_weapon') {
-        if (char.species !== 'dragonborn') {
-          narrative = 'Only Dragonborn have a Breath Weapon.';
-          break;
-        }
-        if (char.class_resource_uses?.breath_weapon_used === 1) {
-          narrative = 'Breath Weapon already used — recovers on a short rest.';
-          break;
-        }
-        if (!enemyAlive || !enemy) {
-          narrative = 'No living target to direct your breath at.';
-          break;
-        }
-        const selfEntBW = st.entities?.find((e) => e.id === char.id);
-        const targetEntBW = st.entities?.find((e) => e.id === enemy.id && e.isEnemy);
-        if (!selfEntBW || !targetEntBW) {
-          narrative = 'Breath Weapon needs a grid position to project the cone.';
-          break;
-        }
-        const bwDice = char.level >= 17 ? 4 : char.level >= 11 ? 3 : char.level >= 5 ? 2 : 1;
-        const bwDC = 8 + profBonus(char.level) + abilityMod(char.con);
-        const bwDmgType = SRD_SPECIES.dragonborn?.resistances?.[0] ?? 'fire';
-        const cone = entitiesInCone(selfEntBW.pos, targetEntBW.pos, 15, st.entities ?? []);
-        const lines: string[] = [];
-        let updatedEntities = st.entities ?? [];
-        for (const ent of cone) {
-          if (!ent.isEnemy || ent.hp <= 0) continue;
-          const enemyData = getEnemyById(seed, ent.id);
-          if (!enemyData) continue;
-          const dexScore = enemyData.dex ?? 10;
-          const save = rollDice('1d20') + abilityMod(dexScore);
-          const fullDmg = rollDice(`${bwDice}d10`);
-          const { damage: typedDmg, note } = applyDamageMultiplier(fullDmg, bwDmgType, enemyData);
-          const dmg = save >= bwDC ? Math.floor(typedDmg / 2) : typedDmg;
-          updatedEntities = updatedEntities.map((e) =>
-            e.id === ent.id ? { ...e, hp: Math.max(0, e.hp - dmg) } : e
-          );
-          lines.push(
-            `${enemyData.name}: DEX ${save} vs DC ${bwDC} — ${dmg} ${bwDmgType}${save >= bwDC ? ' (half)' : ''}${note ?? ''}`
-          );
-        }
-        st = {
-          ...st,
-          entities: updatedEntities,
-        };
-        char.class_resource_uses = {
-          ...(char.class_resource_uses ?? {}),
-          breath_weapon_used: 1,
-        };
-        narrative =
-          lines.length > 0
-            ? `🐲 ${char.name}'s Breath Weapon (${bwDice}d10 ${bwDmgType}, 15-ft cone)! ${lines.join(' · ')}`
-            : `${char.name} exhales a cone of ${bwDmgType} but no enemies are caught in it.`;
-        usedInitiative = true;
-        // Combat may have ended if everyone in the cone dropped.
-        if (isRoomCleared(st, seed, roomId)) {
-          st = endCombatState(st);
-        }
-      } else if (fid === 'sear_undead') {
-        if (char.character_class.toLowerCase() !== 'cleric') {
-          narrative = 'Only Clerics have Sear Undead.';
-          break;
-        }
-        if (char.level < 5) {
-          narrative = 'Sear Undead requires Cleric level 5.';
-          break;
-        }
-        const cdUsesSU = char.class_resource_uses?.channel_divinity ?? 1;
-        if (cdUsesSU <= 0) {
-          narrative = 'No Channel Divinity uses remaining.';
-          break;
-        }
-        char.class_resource_uses = {
-          ...(char.class_resource_uses ?? {}),
-          channel_divinity: cdUsesSU - 1,
-        };
-        const suDC = 8 + profBonus(char.level) + abilityMod(char.wis);
-        const selfEntSU = st.entities?.find((e) => e.id === char.id);
-        const undeadRegex = /skeleton|ghoul|shadow|zombie|lich|wraith|undead|crypt/i;
-        const lines: string[] = [];
-        const newEntities = (st.entities ?? []).map((e) => {
-          if (!e.isEnemy || e.hp <= 0 || !selfEntSU) return e;
-          const dist = Math.max(
-            Math.abs(e.pos.x - selfEntSU.pos.x),
-            Math.abs(e.pos.y - selfEntSU.pos.y)
-          );
-          if (dist > 6) return e;
-          const enemyData = getEnemyById(seed, e.id);
-          if (!enemyData || !undeadRegex.test(enemyData.name)) return e;
-          const wisScore = (enemyData as unknown as Record<string, number>)?.wis ?? 10;
-          const save = rollDice('1d20') + abilityMod(wisScore);
-          const fullDmg = rollDice(`${char.level}d8`);
-          const dmg = save >= suDC ? Math.floor(fullDmg / 2) : fullDmg;
-          lines.push(
-            `${enemyData.name}: WIS ${save} vs DC ${suDC} — ${dmg} radiant${save >= suDC ? ' (half)' : ''}`
-          );
-          return { ...e, hp: Math.max(0, e.hp - dmg) };
-        });
-        st = { ...st, entities: newEntities };
-        narrative =
-          lines.length > 0
-            ? `☀️ Sear Undead! ${lines.join(' · ')} (${cdUsesSU - 1} Channel Divinity remaining)`
-            : `Sear Undead — no undead within 30 ft. (${cdUsesSU - 1} Channel Divinity remaining)`;
-        usedInitiative = true;
-      }
-
-      // ── Life Cleric: Preserve Life (Channel Divinity) ────────────────────────
-      else if (fid === 'preserve_life') {
-        if (char.subclass !== 'life') {
-          narrative = 'Only Life Clerics have Preserve Life.';
-          break;
-        }
-        const cdUses = char.class_resource_uses?.channel_divinity ?? 1;
-        if (cdUses <= 0) {
-          narrative = 'No Channel Divinity uses remaining (recover on short rest).';
-          break;
-        }
-        char.class_resource_uses = {
-          ...(char.class_resource_uses ?? {}),
-          channel_divinity: cdUses - 1,
-        };
-        const poolHp = 5 * char.level;
-        const woundedAllies = st.characters.filter(
-          (c) => !c.dead && c.hp < c.max_hp && c.id !== char.id
-        );
-        let preserved = 0;
-        let remaining = poolHp;
-        const healedIds = new Map<string, number>(); // id → new hp
-        const updatedChars = st.characters.map((c) => {
-          if (!c.dead && c.hp < c.max_hp && c.id !== char.id && remaining > 0) {
-            const half = Math.floor(c.max_hp / 2);
-            if (c.hp >= half) return c;
-            const heal = Math.min(remaining, half - c.hp);
-            preserved += heal;
-            remaining -= heal;
-            const newHp = c.hp + heal;
-            healedIds.set(c.id, newHp);
-            return { ...c, hp: newHp };
-          }
-          return c;
-        });
-        st = {
-          ...st,
-          characters: updatedChars,
-          // Sync grid entity HP for every PC who got healed so the
-          // battlefield reflects the heal immediately. commitChar()
-          // only updates the caster's entity, not the targets'.
-          entities: (st.entities ?? []).map((e) =>
-            !e.isEnemy && healedIds.has(e.id) ? { ...e, hp: healedIds.get(e.id)! } : e
-          ),
-        };
-        // RAW: Preserve Life can't raise a creature above half its HP max.
-        // When every wounded ally is already above half, the channel
-        // divinity gets spent but heals nothing — surface that gate so
-        // the player doesn't think the feature is broken.
-        const eligibleCount = woundedAllies.filter((c) => c.hp < Math.floor(c.max_hp / 2)).length;
-        if (preserved === 0) {
-          const reason =
-            woundedAllies.length === 0
-              ? 'no wounded allies in range'
-              : eligibleCount === 0
-                ? 'every wounded ally is already above half HP'
-                : 'no eligible target';
-          narrative = `${char.name} — Preserve Life! No HP distributed (${reason}). (${cdUses - 1} Channel Divinity remaining)`;
-        } else {
-          narrative = `${char.name} — Preserve Life! Distributed ${preserved} HP among ${eligibleCount} eligible ally${eligibleCount === 1 ? '' : 'ies'} (pool: ${poolHp}). (${cdUses - 1} Channel Divinity remaining)`;
-        }
-      }
-
-      // ── War Cleric: Guided Strike (Channel Divinity) ─────────────────────────
-      else if (fid === 'guided_strike') {
-        if (char.subclass !== 'war') {
-          narrative = 'Only War Clerics have Guided Strike.';
-          break;
-        }
-        const cdUsesWar = char.class_resource_uses?.channel_divinity ?? 1;
-        if (cdUsesWar <= 0) {
-          narrative = 'No Channel Divinity uses remaining.';
-          break;
-        }
-        char.class_resource_uses = {
-          ...(char.class_resource_uses ?? {}),
-          channel_divinity: cdUsesWar - 1,
-        };
-        st = { ...st, guided_strike_active: true };
-        narrative = `${char.name} — Guided Strike! Your next attack roll gains +10. (${cdUsesWar - 1} Channel Divinity remaining)`;
-      }
-
-      // ── Hunter Ranger: Hunter's Prey — Colossus Slayer ───────────────────────
-      else if (fid === 'colossus_slayer') {
-        if (char.subclass !== 'hunter') {
-          narrative = 'Only Hunter Rangers have Colossus Slayer.';
-          break;
-        }
-        const csTarget = st.entities?.find((e) => e.id === roomId && e.isEnemy);
-        if (!enemyAlive || !csTarget) {
-          narrative = 'No living target.';
-          break;
-        }
-        const enemyMaxHp =
-          (enemy as unknown as Record<string, number>)['max_hp'] ?? csTarget.hp * 2;
-        if (csTarget.hp >= enemyMaxHp) {
-          narrative = 'Colossus Slayer only triggers on a bloodied (below max HP) target.';
-          break;
-        }
-        if ((char.class_resource_uses?.colossus_slayer_used ?? 0) >= 1) {
-          narrative = 'Colossus Slayer already triggered this turn.';
-          break;
-        }
-        const csDmg = rollDice('1d8');
-        char.class_resource_uses = { ...(char.class_resource_uses ?? {}), colossus_slayer_used: 1 };
-        const csHp = (st.entities?.find((e) => e.id === roomId && e.isEnemy)?.hp ?? 0) - csDmg;
-        st = {
-          ...st,
-          entities: (st.entities ?? []).map((e) =>
-            e.id === roomId && e.isEnemy ? { ...e, hp: Math.max(0, csHp) } : e
-          ),
-        };
-        narrative = `Colossus Slayer! +${fmt.dmg(csDmg)} piercing damage on a bloodied foe (${csHp <= 0 ? 'killed' : `${fmt.hp(Math.max(0, csHp))} HP remaining`}).`;
-        if (csHp <= 0) {
-          st.enemies_killed = [...st.enemies_killed, roomId];
-          st = endCombatState(st);
-        }
-      }
-
-      // ── Beastmaster Ranger: command animal companion (bonus action, PHB p.93)
-      else if (fid === 'command_companion') {
-        if (char.subclass !== 'beastmaster' || char.character_class.toLowerCase() !== 'ranger') {
-          narrative = 'Only Beastmaster Rangers can command an animal companion.';
-          break;
-        }
-        if (char.level < 3) {
-          narrative = 'Animal Companion unlocks at Ranger level 3.';
-          break;
-        }
-        if (char.turn_actions.bonus_action_used) {
-          narrative = 'Bonus action already used this turn.';
-          break;
-        }
-        const comp = st.entities?.find(
-          (e) => e.isCompanion && e.companionOwnerId === char.id && e.hp > 0
-        );
-        if (!comp) {
-          narrative = 'Your animal companion is unavailable.';
-          break;
-        }
-        // Pick the nearest living enemy as the target
-        const targetEnt = (st.entities ?? [])
-          .filter((e) => e.isEnemy && e.hp > 0)
-          .sort((a, b) => distanceFeet(comp.pos, a.pos) - distanceFeet(comp.pos, b.pos))[0];
-        if (!targetEnt) {
-          narrative = 'No living enemy in sight for the companion.';
-          break;
-        }
-        const targetEnemy = getEnemyById(seed, targetEnt.id);
-        if (!targetEnemy) {
-          narrative = "Companion's target is unreachable.";
-          break;
-        }
-        char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
-        usedInitiative = true;
-        // Resolve the companion's bite attack against the target's AC
-        const toHit = comp.toHit ?? 4;
-        const dmgDice = comp.damage ?? '2d4+2';
-        const compName = comp.companionName ?? 'companion';
-        const attackRoll = rollDice('1d20');
-        const total = attackRoll + toHit;
-        if (attackRoll === 1) {
-          narrative = `${compName} lunges but misses wildly! (d20:1+${toHit}=${total} vs AC ${targetEnemy.ac})`;
-        } else if (attackRoll === 20 || total >= targetEnemy.ac) {
-          const isCrit = attackRoll === 20;
-          const dmg = isCrit ? rollCritical(dmgDice) : rollDice(dmgDice);
-          const { damage: finalDmg, note } = applyDamageMultiplier(dmg, 'piercing', targetEnemy);
-          const curHp = targetEnt.hp;
-          const newHp = Math.max(0, curHp - finalDmg);
-          st = {
-            ...st,
-            entities: (st.entities ?? []).map((e) =>
-              e.id === targetEnt.id && e.isEnemy ? { ...e, hp: newHp } : e
-            ),
-          };
-          narrative = `${compName} bites the ${targetEnemy.name}! ${finalDmg} piercing damage${isCrit ? ' (CRIT)' : ''} (d20:${attackRoll}+${toHit}=${total} vs AC ${targetEnemy.ac})${note}`;
-          if (newHp <= 0) {
-            st.enemies_killed = [...st.enemies_killed, targetEnt.id];
-            narrative += ` ${targetEnemy.name} falls!`;
-            const xpGain = targetEnemy.xp ?? 10;
-            const split = splitEncounterXp(st, char.id, xpGain);
-            st = split.st;
-            char.xp = (char.xp || 0) + split.share;
-            narrative += applyPartyLevelUps(st, char, context);
-            if (isRoomCleared(st, seed, roomId)) {
-              st = endCombatState(st);
-            }
-          }
-        } else {
-          narrative = `${compName} bites at the ${targetEnemy.name} but misses. (d20:${attackRoll}+${toHit}=${total} vs AC ${targetEnemy.ac})`;
-        }
-      }
-
-      // ── Devotion Paladin: Sacred Weapon (Channel Divinity) ───────────────────
-      else if (fid === 'sacred_weapon') {
-        if (char.subclass !== 'devotion') {
-          narrative = 'Only Devotion Paladins have Sacred Weapon.';
-          break;
-        }
-        const cdUsesDev = char.class_resource_uses?.channel_divinity ?? 1;
-        if (cdUsesDev <= 0) {
-          narrative = 'No Channel Divinity uses remaining.';
-          break;
-        }
-        char.class_resource_uses = {
-          ...(char.class_resource_uses ?? {}),
-          channel_divinity: cdUsesDev - 1,
-          sacred_weapon_active: 1,
-        };
-        const chaMod = abilityMod(char.cha);
-        narrative = `${char.name} — Sacred Weapon! +${chaMod} to attack rolls for 1 minute (10 rounds). Your weapon gleams with divine light. (${cdUsesDev - 1} Channel Divinity remaining)`;
-      }
-
-      // ── Vengeance Paladin: Vow of Enmity (Channel Divinity) ──────────────────
-      else if (fid === 'vow_of_enmity') {
-        if (char.subclass !== 'vengeance') {
-          narrative = 'Only Vengeance Paladins have Vow of Enmity.';
-          break;
-        }
-        const cdUsesVen = char.class_resource_uses?.channel_divinity ?? 1;
-        if (cdUsesVen <= 0) {
-          narrative = 'No Channel Divinity uses remaining.';
-          break;
-        }
-        char.class_resource_uses = {
-          ...(char.class_resource_uses ?? {}),
-          channel_divinity: cdUsesVen - 1,
-        };
-        st = { ...st, vow_of_enmity_target: roomId };
-        narrative = `${char.name} — Vow of Enmity! You have advantage on all attack rolls against ${enemy?.name ?? 'your target'} for 1 minute. (${cdUsesVen - 1} Channel Divinity remaining)`;
-      }
-
-      // ── Vengeance Paladin: Abjure Enemy (Channel Divinity) ───────────────────
-      else if (fid === 'abjure_enemy') {
-        if (char.subclass !== 'vengeance') {
-          narrative = 'Only Vengeance Paladins have Abjure Enemy.';
-          break;
-        }
-        if (!enemyAlive || !enemy) {
-          narrative = 'No living target.';
-          break;
-        }
-        const cdUsesVen2 = char.class_resource_uses?.channel_divinity ?? 1;
-        if (cdUsesVen2 <= 0) {
-          narrative = 'No Channel Divinity uses remaining.';
-          break;
-        }
-        char.class_resource_uses = {
-          ...(char.class_resource_uses ?? {}),
-          channel_divinity: cdUsesVen2 - 1,
-        };
-        const wisSave =
-          rollDice('1d20') + abilityMod((enemy as unknown as Record<string, number>)['wis'] ?? 10);
-        const frightenDC = 8 + profBonus(char.level) + abilityMod(char.cha);
-        const abjureSuccess = wisSave >= frightenDC;
-        st = pushEvent(st, {
-          kind: 'save',
-          characterId: enemy.id,
-          characterName: enemy.name,
-          ability: 'wis',
-          roll: wisSave,
-          dc: frightenDC,
-          success: abjureSuccess,
-          vs: 'Abjure Enemy',
-          round: st.round ?? 1,
-        });
-        if (!abjureSuccess) {
-          st = {
-            ...st,
-            entities: (st.entities ?? []).map((e) =>
-              e.id === roomId && e.isEnemy
-                ? {
-                    ...e,
-                    conditions: [...e.conditions.filter((c) => c !== 'frightened'), 'frightened'],
-                  }
-                : e
-            ),
-          };
-          st = pushEvent(st, {
-            kind: 'condition_applied',
-            targetId: enemy.id,
-            targetName: enemy.name,
-            condition: 'frightened',
-            source: 'Abjure Enemy',
-            round: st.round ?? 1,
-          });
-          narrative = `Abjure Enemy! WIS save ${wisSave} vs DC ${frightenDC} — ${enemy.name} is frightened! (${cdUsesVen2 - 1} Channel Divinity remaining)`;
-        } else {
-          narrative = `Abjure Enemy! WIS save ${wisSave} vs DC ${frightenDC} — ${enemy.name} resists. (${cdUsesVen2 - 1} Channel Divinity remaining)`;
-        }
-        usedInitiative = true;
-      }
-
-      // ── Lore Bard: Cutting Words (reaction) ──────────────────────────────────
-      else if (fid === 'cutting_words') {
-        if (char.subclass !== 'lore') {
-          narrative = 'Only Lore Bards have Cutting Words.';
-          break;
-        }
+      // ── Use Reaction (trigger readied action) ─────────────────────────────────
+      case 'use_reaction': {
         if (char.turn_actions.reaction_used) {
-          narrative = 'Reaction already used this turn.';
+          narrative = 'You have already used your reaction this turn.';
           break;
         }
-        if (!enemyAlive || !enemy) {
-          narrative = 'No living target.';
+        const readied = char.turn_actions.readied_action;
+        if (!readied) {
+          narrative = 'You have no readied action.';
           break;
         }
-        const biLeft = char.class_resource_uses?.bardic_inspiration ?? abilityMod(char.cha);
-        if (biLeft <= 0) {
-          narrative = 'No Bardic Inspiration uses remaining.';
-          break;
-        }
-        char.class_resource_uses = {
-          ...(char.class_resource_uses ?? {}),
-          bardic_inspiration: biLeft - 1,
+        char.turn_actions = {
+          ...char.turn_actions,
+          reaction_used: true,
+          readied_action: undefined,
         };
-        char.turn_actions = { ...char.turn_actions, reaction_used: true };
-        const cuttingDie = char.level >= 15 ? 12 : char.level >= 10 ? 10 : char.level >= 5 ? 8 : 6;
-        const cuttingRoll = rollDice(`1d${cuttingDie}`);
-        narrative = `${char.name} — Cutting Words! Subtract ${cuttingRoll} from ${enemy.name}'s next attack roll or ability check this round. (${biLeft - 1} Bardic Inspiration remaining)`;
-        st = { ...st, cutting_words_penalty: cuttingRoll };
-      }
-
-      // ── Archfey Warlock: Fey Presence (PHB p.109) ────────────────────────────
-      else if (fid === 'fey_presence') {
-        if (char.subclass !== 'archfey' || char.character_class.toLowerCase() !== 'warlock') {
-          narrative = 'Only Archfey Warlocks have Fey Presence.';
-          break;
-        }
-        if (char.class_resource_uses?.fey_presence_used) {
-          narrative = 'Fey Presence already used — recovers on a short rest.';
-          break;
-        }
-        const selfEnt = st.entities?.find((e) => e.id === char.id);
-        if (!selfEnt) {
-          narrative = 'Fey Presence requires a grid position.';
-          break;
-        }
-        const dc = 8 + profBonus(char.level) + abilityMod(char.cha);
-        const inRangeEnemies = (st.entities ?? []).filter(
-          (e) => e.isEnemy && e.hp > 0 && distanceFeet(e.pos, selfEnt.pos) <= 10
-        );
-        if (inRangeEnemies.length === 0) {
-          narrative = 'No enemies within 10 ft to ensnare with Fey Presence.';
-          break;
-        }
-        char.class_resource_uses = {
-          ...(char.class_resource_uses ?? {}),
-          fey_presence_used: 1,
-        };
-        const lines: string[] = [];
-        const frightenedIds = new Set<string>();
-        for (const e of inRangeEnemies) {
-          const enemyData = getEnemyById(seed, e.id);
-          const targetName = enemyData?.name ?? e.id;
-          const wisScore = (enemyData as unknown as Record<string, number>)?.wis ?? 10;
-          const save = rollDice('1d20') + abilityMod(wisScore);
-          const feySuccess = save >= dc;
-          st = pushEvent(st, {
-            kind: 'save',
-            characterId: e.id,
-            characterName: targetName,
-            ability: 'wis',
-            roll: save,
-            dc,
-            success: feySuccess,
-            vs: 'Fey Presence',
-            round: st.round ?? 1,
-          });
-          if (!feySuccess) {
-            frightenedIds.add(e.id);
-            lines.push(`${targetName}: WIS ${save} vs DC ${dc} — frightened!`);
-            st = pushEvent(st, {
-              kind: 'condition_applied',
-              targetId: e.id,
-              targetName,
-              condition: 'frightened',
-              source: 'Fey Presence',
-              round: st.round ?? 1,
-            });
-          } else {
-            lines.push(`${targetName}: WIS ${save} vs DC ${dc} — resists.`);
-          }
-        }
-        if (frightenedIds.size > 0) {
-          st = {
-            ...st,
-            entities: (st.entities ?? []).map((e) =>
-              frightenedIds.has(e.id)
-                ? {
-                    ...e,
-                    conditions: [...e.conditions.filter((c) => c !== 'frightened'), 'frightened'],
-                  }
-                : e
-            ),
-          };
-        }
-        narrative = `🌿 Fey Presence! ${char.name} radiates fey magic. ${lines.join(' ')}`;
-        usedInitiative = true;
-      }
-
-      // ── Unknown feature fallthrough ────────────────────────────────────────
-      else {
-        narrative = `Unknown class feature: ${fid}.`;
-      }
-      break;
-    }
-
-    case 'interact_object': {
-      const currentSeedRoom = seed.rooms.find((r) => r.id === roomId);
-      const obj: RoomObject | undefined = currentSeedRoom?.objects?.find(
-        (o) => o.id === action.objectId
-      );
-      if (!obj) {
-        narrative = 'There is nothing like that here.';
-        break;
-      }
-
-      const searchKey = `${roomId}:${obj.id}`;
-      if ((st.objects_searched ?? []).includes(searchKey)) {
-        narrative = `You have already searched the ${obj.name}.`;
-        break;
-      }
-
-      // Thief Fast Hands (PHB p.97): in combat, interaction is a bonus action.
-      // Out of combat, it's a free interaction (existing behavior).
-      if (st.combat_active) {
-        const fastHandsEligible =
-          char.character_class.toLowerCase() === 'rogue' &&
-          char.subclass === 'thief' &&
-          char.level >= 3;
-        if (!fastHandsEligible) {
-          narrative = 'You cannot interact with objects during combat.';
-          break;
-        }
-        if (char.turn_actions.bonus_action_used) {
-          narrative = 'Bonus action already used this turn.';
-          break;
-        }
-        char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
-      }
-
-      // Flavor objects (no DC, no loot) are one-shot — repeating adds
-      // nothing. Mark searched immediately so they drop out of the
-      // choice list.
-      if (!obj.searchable || !obj.lootIds?.length) {
-        st = { ...st, objects_searched: [...(st.objects_searched ?? []), searchKey] };
-        narrative = obj.interactText;
-        break;
-      }
-
-      const proficient =
-        char.skill_proficiencies?.some(
-          (s) => s.toLowerCase() === 'investigation' || s.toLowerCase() === 'perception'
-        ) ?? false;
-      // Search is INT (Investigation) — heavy encumbrance doesn't affect INT
-      // per 2024 RAW (only STR/DEX/CON), so we only honour exhaustion.
-      const exhaustionDisadv1 = (char.exhaustion_level ?? 0) >= 1;
-      const inspAdvSearch = consumeInspirationForCheck(char);
-      const bardicSearchRoll = consumeBardicForCheck(char);
-      const check = skillCheck(
-        char.int,
-        (obj.searchDC ?? 12) - bardicSearchRoll,
-        proficient,
-        char.level,
-        exhaustionDisadv1,
-        false,
-        false,
-        inspAdvSearch,
-        char.species === 'halfling'
-      );
-
-      if (check.success) {
-        const gained: string[] = [];
-        const gainedIds: string[] = [];
-        for (const lootId of obj.lootIds) {
-          const item = context.lootTable.find((l) => l.id === lootId);
-          if (item) {
-            char.inventory = [...(char.inventory ?? []), { ...item, instance_id: randomUUID() }];
-            gained.push(item.name);
-            gainedIds.push(item.id);
-          }
-        }
-        // Mirror the floor-loot flow: record item ids in loot_taken so quest
-        // conditions (`loot_taken contains 'shadow_evidence'`) fire whether
-        // the player picked it up from the floor or from a container.
-        if (gainedIds.length) {
-          st = { ...st, loot_taken: [...(st.loot_taken ?? []), ...gainedIds] };
-        }
-        // Mark searched only on success — a failed Investigation leaves
-        // the choice alive so the player can retry (each retry costs
-        // one turn). Matches 5e: a lock/search check is normally
-        // re-attemptable. The seenKey written by takeAction still dims
-        // the button so the player sees they've tried it.
-        st = { ...st, objects_searched: [...(st.objects_searched ?? []), searchKey] };
-        const foundDesc = obj.foundText ?? `You find: ${gained.join(', ')}.`;
-        narrative = `${obj.interactText} (Investigation: ${check.roll}+${abilityMod(char.int)}=${check.total} vs DC ${obj.searchDC ?? 12} — success!) ${foundDesc}`;
-      } else {
-        narrative = `${obj.interactText} (Investigation: ${check.roll}+${abilityMod(char.int)}=${check.total} vs DC ${obj.searchDC ?? 12} — fail.) ${obj.emptyText ?? 'You can try again.'}`;
-      }
-      break;
-    }
-
-    case 'two_weapon_attack': {
-      if (!st.combat_active) {
-        narrative = 'No enemy to attack.';
-        break;
-      }
-      // Find the off-hand light weapon in inventory
-      const mainWpnInstanceId = char.equipped_weapon;
-      const offhandInvItem = char.inventory
-        .filter((i) => i.instance_id !== mainWpnInstanceId)
-        .find((i) => {
-          const l = context.lootTable.find((ll) => ll.id === i.id);
-          return l?.light && l.slot === 'weapon';
+        narrative = `${char.name} triggers their readied action! `;
+        // Recursively resolve the stored action
+        const reactionResult = await takeAction({
+          action: readied.action,
+          history: [],
+          state: { ...st, characters: st.characters.map((c, i) => (i === safeIdx ? char : c)) },
+          seed,
+          context,
         });
-      if (!offhandInvItem) {
-        narrative = 'No light off-hand weapon found.';
+        narrative += reactionResult.narrative;
+        st = reactionResult.newState;
+        char = st.characters.find((c) => c.id === char.id) ?? char;
         break;
       }
-      const offhandLoot = context.lootTable.find((l) => l.id === offhandInvItem.id)!;
-      // 2024 PHB Nick mastery (dagger, light hammer, sickle, scimitar) — when
-      // the off-hand weapon has Nick + the wielder is trained in it, the
-      // two-weapon extra attack is part of the Attack action instead of a
-      // bonus action. Frees the bonus action for Cunning Action / Rage / etc.
-      const nickFree =
-        offhandLoot.mastery === 'nick' &&
-        (char.weapon_masteries ?? []).includes(offhandLoot.id) &&
-        char.turn_actions.action_used;
-      if (!nickFree && char.turn_actions.bonus_action_used) {
-        narrative = 'Bonus action already used this turn.';
-        break;
-      }
-      const offhandProficient = hasWeaponProficiency(
-        char.weapon_proficiencies ?? [],
-        offhandLoot.weaponType
-      );
-      const twfTargetId: string =
-        (action as { type: 'two_weapon_attack'; targetEnemyId?: string }).targetEnemyId ??
-        enemy?.id ??
-        '';
-      const enemyInRoom = livingEnemiesInRoom.find((e) => e.id === twfTargetId) ?? enemy;
-      if (!enemyInRoom) {
-        narrative = 'No enemy here.';
-        break;
-      }
-      const twfTargetEntityId = enemyInRoom.id;
-      const condDisadvTwf = char.conditions.some((c) => DISADV_CONDITIONS.has(c));
-      const armorLootItemTwf = char.equipped_armor
-        ? context.lootTable.find(
-            (l) => l.id === char.inventory.find((i) => i.instance_id === char.equipped_armor)?.id
-          )
-        : null;
-      const armorProfTwf = hasArmorProficiency(
-        char.armor_proficiencies ?? [],
-        armorLootItemTwf?.armorCategory
-      );
-      const disadvTwf = condDisadvTwf || !armorProfTwf;
-      const atk = resolveOffHandAttack(
-        { str: char.str, dex: char.dex, level: char.level },
-        offhandLoot.damage,
-        enemyInRoom.ac,
-        offhandLoot.finesse ?? false,
-        disadvTwf,
-        false,
-        offhandProficient,
-        offhandLoot.range === 'ranged'
-      );
-      // Nick: don't consume the bonus action; it stays available this turn.
-      if (!nickFree) {
-        char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
-      }
-      usedInitiative = true;
-      if (atk.fumble) {
-        narrative = `Off-hand fumble! The ${offhandLoot.name} slips from your grip. (d20: 1)`;
-        break;
-      }
-      if (!atk.hit) {
-        narrative = `Off-hand attack with ${offhandLoot.name} misses. (${atk.roll}+${atk.atkMod}+${atk.prof}=${atk.total} vs AC ${enemyInRoom.ac})`;
-        break;
-      }
-      const entTwf = st.entities?.find((e) => e.id === twfTargetEntityId && e.isEnemy);
-      const curHpTwf = entTwf?.hp ?? 0;
-      const newHpTwf = curHpTwf - atk.damage;
-      st = {
-        ...st,
-        entities: (st.entities ?? []).map((e) =>
-          e.id === twfTargetEntityId && e.isEnemy ? { ...e, hp: newHpTwf } : e
-        ),
-      };
-      narrative = `Off-hand strike with ${offhandLoot.name}! ${atk.damage} damage${atk.critical ? ' (CRITICAL!)' : ''} (${atk.roll}+${atk.atkMod}+${atk.prof}=${atk.total} vs AC ${enemyInRoom.ac}, no ability mod to damage).`;
-      if (newHpTwf <= 0) {
-        const xpGainTwf = enemyInRoom.xp ?? 10;
-        const split = splitEncounterXp(st, char.id, xpGainTwf);
-        st = split.st;
-        char.xp = (char.xp || 0) + split.share;
-        narrative += ` The ${enemyInRoom.name} falls!`;
-        st = {
-          ...st,
-          entities: (st.entities ?? []).map((e) =>
-            e.id === twfTargetEntityId && e.isEnemy ? { ...e, hp: 0 } : e
-          ),
-        };
-        st.enemies_killed = [...(st.enemies_killed || []), twfTargetEntityId];
-        narrative += grantDarkOnesBlessing(char);
-        narrative += applyPartyLevelUps(st, char, context);
-        if (st.combat_active && isRoomCleared(st, seed, roomId)) st = endCombatState(st);
-      }
-      break;
-    }
 
-    case 'grapple': {
-      if (!enemyAlive || !enemy) {
-        narrative = 'No enemy to grapple.';
-        break;
-      }
-      const grappleTargetId =
-        (action as { type: 'grapple'; targetEnemyId?: string }).targetEnemyId ?? enemy.id;
-      const grappleTarget = livingEnemiesInRoom.find((e) => e.id === grappleTargetId) ?? enemy;
-      // SRD 5.2.1 p.195 / 2024 PHB "Unarmed Strike: Grapple" — requires the
-      // target within 5 ft (unarmed strike reach). No action is spent if the
-      // attempt fails this prerequisite.
-      if (st.entities) {
-        const myEnt = st.entities.find((e) => e.id === char.id);
-        const tgtEnt = st.entities.find((e) => e.id === grappleTarget.id && e.isEnemy);
-        if (myEnt && tgtEnt && distanceFeet(myEnt.pos, tgtEnt.pos) > 5) {
-          narrative = `Out of reach — Grapple needs the target within 5 ft. Move closer first.`;
+      // ── Select subclass ───────────────────────────────────────────────────────
+      case 'select_subclass': {
+        const scAction = action as { type: 'select_subclass'; subclass: string };
+        if (char.subclass) {
+          narrative = `You have already chosen the ${char.subclass} subclass.`;
           break;
         }
-      }
-      if (grappleTarget.condition_immunities?.includes('grappled')) {
-        narrative = `The ${grappleTarget.name} cannot be grappled (condition immunity).`;
-        char.turn_actions = { ...char.turn_actions, action_used: true };
-        usedInitiative = true;
+        char.subclass = scAction.subclass;
+        narrative = `${char.name} follows the path of the ${scAction.subclass}!`;
+        // Sorcerer · Draconic Bloodline · Draconic Resilience (PHB p.103):
+        // +1 HP per Sorcerer level. The L1 portion would have been granted at
+        // character creation if subclass was picked there; this catches any
+        // mid-game selection too.
+        if (scAction.subclass === 'draconic' && char.character_class.toLowerCase() === 'sorcerer') {
+          char.max_hp += char.level;
+          char.hp += char.level;
+          narrative += ` Draconic Resilience: +${char.level} max HP (now ${char.hp}/${char.max_hp}).`;
+        }
         break;
       }
-      // Contested Athletics: player STR check vs enemy STR or DEX (whichever higher)
-      const athProfGrapple = (context.classSkills[char.character_class] ?? []).includes(
-        'athletics'
-      );
-      const playerRollGrapple =
-        d(20) + abilityMod(char.str) + (athProfGrapple ? profBonus(char.level) : 0);
-      const enemyStrGrapple = abilityMod(grappleTarget.toHit); // toHit is a rough proxy for STR/DEX mod
-      const enemyDexGrapple = abilityMod(grappleTarget.dex ?? 10);
-      const enemyRollGrapple = d(20) + Math.max(enemyStrGrapple, enemyDexGrapple);
-      char.turn_actions = { ...char.turn_actions, action_used: true };
-      usedInitiative = true;
-      if (playerRollGrapple > enemyRollGrapple) {
-        st = {
-          ...st,
-          entities: (st.entities ?? []).map((e) =>
-            e.id === grappleTarget.id && e.isEnemy
-              ? {
-                  ...e,
-                  conditions: [...e.conditions.filter((c) => c !== 'grappled'), 'grappled'],
-                  grappled_by: char.id,
-                }
-              : e
-          ),
-        };
-        st = pushEvent(st, {
-          kind: 'condition_applied',
-          targetId: grappleTarget.id,
-          targetName: grappleTarget.name,
-          condition: 'grappled',
-          source: 'Grapple',
-          round: st.round ?? 1,
-        });
-        narrative = `You grapple the ${grappleTarget.name}! (${playerRollGrapple} vs ${enemyRollGrapple}) They are GRAPPLED — speed 0, your attacks have advantage.`;
-      } else {
-        narrative = `The ${grappleTarget.name} breaks free of your grapple attempt. (${playerRollGrapple} vs ${enemyRollGrapple})`;
-      }
-      break;
-    }
 
-    // SRD 5.2.1 p.16 — A grappled creature can use its action on its turn to make
-    // a Strength (Athletics) or Dexterity (Acrobatics) check contested by the
-    // grappler's Strength (Athletics) check; success ends the grappled condition.
-    case 'try_escape_grapple': {
-      const myEntity = st.entities?.find((e) => e.id === char.id);
-      const grapplerId = myEntity?.grappled_by;
-      if (!char.conditions.includes('grappled') && !myEntity?.conditions.includes('grappled')) {
-        narrative = 'You are not grappled.';
-        break;
-      }
-      if (!grapplerId) {
-        // No tracked grappler — just drop the condition (shouldn't happen, but be lenient)
-        char = { ...char, conditions: char.conditions.filter((c) => c !== 'grappled') };
-        narrative = 'You break free of the grapple.';
-        char.turn_actions = { ...char.turn_actions, action_used: true };
-        usedInitiative = true;
-        break;
-      }
-      const grappler = st.entities?.find((e) => e.id === grapplerId);
-      const grapplerEnemy = grappler?.isEnemy ? getEnemyById(seed, grapplerId) : null;
-      const grapplerStrMod = grapplerEnemy ? abilityMod(grapplerEnemy.toHit) : 0;
-      const grapplerRoll = d(20) + grapplerStrMod;
-
-      // Player picks the better of Athletics (STR) or Acrobatics (DEX)
-      const athProf = (context.classSkills[char.character_class] ?? []).includes('athletics');
-      const acrProf = (context.classSkills[char.character_class] ?? []).includes('acrobatics');
-      const athRoll = d(20) + abilityMod(char.str) + (athProf ? profBonus(char.level) : 0);
-      const acrRoll = d(20) + abilityMod(char.dex) + (acrProf ? profBonus(char.level) : 0);
-      const myRoll = Math.max(athRoll, acrRoll);
-      const skillUsed = athRoll >= acrRoll ? 'Athletics' : 'Acrobatics';
-
-      char.turn_actions = { ...char.turn_actions, action_used: true };
-      usedInitiative = true;
-
-      if (myRoll > grapplerRoll) {
-        char = { ...char, conditions: char.conditions.filter((c) => c !== 'grappled') };
-        st = {
-          ...st,
-          entities: (st.entities ?? []).map((e) =>
-            e.id === char.id
-              ? {
-                  ...e,
-                  conditions: e.conditions.filter((c) => c !== 'grappled'),
-                  grappled_by: undefined,
-                }
-              : e
-          ),
-        };
-        narrative = `You break free of the grapple! (${skillUsed} ${myRoll} vs ${grapplerRoll})`;
-      } else {
-        narrative = `You strain against the grapple but cannot escape. (${skillUsed} ${myRoll} vs ${grapplerRoll})`;
-      }
-      break;
-    }
-
-    // SRD 5.2.1 p.187 — standing up from prone costs half the creature's speed.
-    // 2024 PHB — declare you'll spend your Heroic Inspiration on the next
-    // attack this turn. Doesn't cost an action; the flag clears when the
-    // attack handler resolves the d20.
-    case 'spend_inspiration': {
-      if (!char.inspiration) {
-        narrative = 'You have no Heroic Inspiration to spend.';
-        break;
-      }
-      if (char.turn_actions.inspiration_pending) {
-        narrative = 'Inspiration already queued for your next d20 roll.';
-        break;
-      }
-      char.turn_actions = { ...char.turn_actions, inspiration_pending: true };
-      // 2024 PHB: Heroic Inspiration grants advantage on any d20 test
-      // (attack, save, ability check) — not just attacks.
-      narrative = `${char.name} steels themselves — Heroic Inspiration queued: advantage on your next d20 (attack, save, or check).`;
-      break;
-    }
-
-    case 'stand_up': {
-      if (!char.conditions.includes('prone')) {
-        narrative = 'You are not prone.';
-        break;
-      }
-      const speedFt = effectiveSpeed(char);
-      const standCost = Math.floor(speedFt / 2);
-      const usedFt = (st.movement_used ?? {})[char.id] ?? 0;
-      if (usedFt + standCost > speedFt) {
-        narrative = `Not enough movement to stand up. (${speedFt - usedFt} ft remaining, ${standCost} ft needed)`;
-        break;
-      }
-      char = { ...char, conditions: char.conditions.filter((c) => c !== 'prone') };
-      st = {
-        ...st,
-        movement_used: { ...st.movement_used, [char.id]: usedFt + standCost },
-        entities: (st.entities ?? []).map((e) =>
-          e.id === char.id ? { ...e, conditions: e.conditions.filter((c) => c !== 'prone') } : e
-        ),
-      };
-      narrative = `${char.name} stands up. (${standCost} ft of movement used)`;
-      break;
-    }
-
-    case 'shove': {
-      if (!enemyAlive || !enemy) {
-        narrative = 'No enemy to shove.';
-        break;
-      }
-      const shoveTargetId =
-        (action as { type: 'shove'; targetEnemyId?: string }).targetEnemyId ?? enemy.id;
-      const shoveTarget = livingEnemiesInRoom.find((e) => e.id === shoveTargetId) ?? enemy;
-      // SRD 5.2.1 p.195 / 2024 PHB "Unarmed Strike: Shove" — requires the
-      // target within 5 ft. No action is spent if the prerequisite fails.
-      if (st.entities) {
-        const myEnt = st.entities.find((e) => e.id === char.id);
-        const tgtEnt = st.entities.find((e) => e.id === shoveTarget.id && e.isEnemy);
-        if (myEnt && tgtEnt && distanceFeet(myEnt.pos, tgtEnt.pos) > 5) {
-          narrative = `Out of reach — Shove needs the target within 5 ft. Move closer first.`;
+      // ── Set active party member (out-of-combat lead picker) ──────────────────
+      case 'set_active_character': {
+        const sacAction = action as { type: 'set_active_character'; characterId: string };
+        // No-op in combat — initiative drives `active_character_id` there.
+        if (st.combat_active) {
+          narrative = `Initiative is rolled — you can't hand the spotlight off mid-fight.`;
           break;
         }
-      }
-      if (shoveTarget.condition_immunities?.includes('prone')) {
-        narrative = `The ${shoveTarget.name} cannot be knocked prone (condition immunity).`;
-        char.turn_actions = { ...char.turn_actions, action_used: true };
-        usedInitiative = true;
-        break;
-      }
-      const athProfShove = (context.classSkills[char.character_class] ?? []).includes('athletics');
-      const playerRollShove =
-        d(20) + abilityMod(char.str) + (athProfShove ? profBonus(char.level) : 0);
-      const enemyStrShove = abilityMod(shoveTarget.toHit);
-      const enemyDexShove = abilityMod(shoveTarget.dex ?? 10);
-      const enemyRollShove = d(20) + Math.max(enemyStrShove, enemyDexShove);
-      char.turn_actions = { ...char.turn_actions, action_used: true };
-      usedInitiative = true;
-      if (playerRollShove > enemyRollShove) {
-        st = {
-          ...st,
-          entities: (st.entities ?? []).map((e) =>
-            e.id === shoveTarget.id && e.isEnemy
-              ? { ...e, conditions: [...e.conditions.filter((c) => c !== 'prone'), 'prone'] }
-              : e
-          ),
-        };
-        st = pushEvent(st, {
-          kind: 'condition_applied',
-          targetId: shoveTarget.id,
-          targetName: shoveTarget.name,
-          condition: 'prone',
-          source: 'Shove',
-          round: st.round ?? 1,
-        });
-        narrative = `You shove the ${shoveTarget.name} to the ground! (${playerRollShove} vs ${enemyRollShove}) They are PRONE — melee attacks against them have advantage, ranged attacks have disadvantage.`;
-      } else {
-        narrative = `The ${shoveTarget.name} resists your shove. (${playerRollShove} vs ${enemyRollShove})`;
-      }
-      break;
-    }
-
-    case 'dodge': {
-      if (!st.combat_active) {
-        narrative = 'You can only dodge in combat.';
-        break;
-      }
-      if (char.turn_actions.action_used) {
-        narrative = 'You have already used your action this turn.';
-        break;
-      }
-      char.turn_actions = { ...char.turn_actions, action_used: true, dodging: true };
-      usedInitiative = true;
-      narrative = `${char.name} takes the Dodge action — until your next turn, attacks against you have disadvantage.`;
-      break;
-    }
-
-    case 'disengage': {
-      if (!st.combat_active) {
-        narrative = 'You can only disengage in combat.';
-        break;
-      }
-      if (char.turn_actions.action_used) {
-        narrative = 'You have already used your action this turn.';
-        break;
-      }
-      char.turn_actions = { ...char.turn_actions, action_used: true, disengaged: true };
-      usedInitiative = true;
-      narrative = `${char.name} takes the Disengage action — your next movement this turn won't trigger opportunity attacks.`;
-      break;
-    }
-
-    case 'attune': {
-      if (st.combat_active) {
-        narrative = 'You cannot attune to items during combat.';
-        break;
-      }
-      const attuneInstanceId =
-        'instanceId' in action ? (action as { type: 'attune'; instanceId: string }).instanceId : '';
-      const attuneInvItem = char.inventory.find((i) => i.instance_id === attuneInstanceId);
-      if (!attuneInvItem) {
-        narrative = "You don't have that item.";
-        break;
-      }
-      const attuneLootItem = context.lootTable.find((l) => l.id === attuneInvItem.id);
-      if (!attuneLootItem?.requiresAttunement) {
-        narrative = `The ${attuneInvItem.name} doesn't require attunement.`;
-        break;
-      }
-      const attunedList = char.attuned_items ?? [];
-      if (attunedList.includes(attuneInstanceId)) {
-        narrative = `You are already attuned to the ${attuneInvItem.name}.`;
-        break;
-      }
-      if (attunedList.length >= 3) {
-        narrative =
-          'You can only be attuned to 3 items at a time (PHB p.138). De-attune one first.';
-        break;
-      }
-      char.attuned_items = [...attunedList, attuneInstanceId];
-      narrative = `You spend a moment focusing on the ${attuneInvItem.name}, attuning yourself to its magic. (${attunedList.length + 1}/3 attuned items)`;
-      break;
-    }
-
-    // ── Grid movement ────────────────────────────────────────────────────────
-    case 'grid_move': {
-      if (!st.entities) {
-        narrative = 'Grid combat is not active.';
-        break;
-      }
-      const gridAction = action as {
-        type: 'grid_move';
-        entityId: string;
-        to: { x: number; y: number };
-      };
-      if (gridAction.entityId !== char.id) {
-        narrative = 'You can only move your own character.';
+        const target = st.characters.find((c) => c.id === sacAction.characterId);
+        if (!target) {
+          narrative = 'Unknown party member.';
+          break;
+        }
+        if (target.dead) {
+          narrative = `${target.name} is dead and can't lead.`;
+          break;
+        }
+        st = { ...st, active_character_id: sacAction.characterId };
+        narrative = `${target.name} steps forward to lead.`;
+        // Out-of-combat action, doesn't consume any turn budget.
+        usedInitiative = false;
         break;
       }
 
-      const charEntity = st.entities.find((e) => e.id === char.id);
-      if (!charEntity) {
-        narrative = 'Your character is not on the grid.';
-        break;
-      }
-
-      // SRD 5.2.1 p.16 — grappled and restrained reduce speed to 0.
-      if (char.conditions.some((c) => c === 'grappled' || c === 'restrained')) {
-        const which = char.conditions.includes('restrained') ? 'RESTRAINED' : 'GRAPPLED';
-        narrative = `You are ${which} — your speed is 0.`;
-        break;
-      }
-
-      // 2024 PHB Frightened — can't willingly move closer to the source of
-      // your fear. Check distance against the tracked fear-source entity;
-      // reject the move if it would decrease the distance.
-      if (char.conditions.includes('frightened') && char.condition_sources?.frightened) {
-        const fearSourceId = char.condition_sources.frightened;
-        const fearSourceEnt = st.entities.find((e) => e.id === fearSourceId);
-        if (fearSourceEnt && fearSourceEnt.hp > 0) {
-          const charEnt2 = st.entities.find((e) => e.id === char.id);
-          if (charEnt2) {
-            const currentDist = Math.max(
-              Math.abs(charEnt2.pos.x - fearSourceEnt.pos.x),
-              Math.abs(charEnt2.pos.y - fearSourceEnt.pos.y)
-            );
-            const newDist = Math.max(
-              Math.abs(gridAction.to.x - fearSourceEnt.pos.x),
-              Math.abs(gridAction.to.y - fearSourceEnt.pos.y)
-            );
-            if (newDist < currentDist) {
-              const fearName = getEnemyById(seed, fearSourceId)?.name ?? 'the source of your fear';
-              narrative = `You are FRIGHTENED — you can't willingly move closer to ${fearName}.`;
-              break;
+      // ── Resolve pending reaction (Shield window for now) ──────────────────────
+      case 'resolve_reaction': {
+        const rxAction = action as { type: 'resolve_reaction'; accept: boolean };
+        const rx = st.pending_reaction;
+        if (!rx) {
+          narrative = 'No reaction pending.';
+          break;
+        }
+        if (char.id !== rx.targetCharId) {
+          narrative = 'This reaction belongs to another character.';
+          break;
+        }
+        if (rx.kind === 'shield') {
+          if (rxAction.accept) {
+            // Consume L1 slot (lowest available) and reaction.
+            const slotsMax = char.spell_slots_max ?? {};
+            const slotsUsed = char.spell_slots_used ?? {};
+            const lvl = Object.keys(slotsMax)
+              .map(Number)
+              .filter((n) => n >= 1 && (slotsMax[n] ?? 0) > (slotsUsed[n] ?? 0))
+              .sort((a, b) => a - b)[0];
+            if (lvl === undefined) {
+              narrative = 'No spell slot available to cast Shield.';
+              // Fall through to declined-hit path
+              narrative += ` ${rx.pendingNarrative}`;
+              const declinedTarget = {
+                ...char,
+                hp: Math.max(0, char.hp - rx.pendingDamage),
+              };
+              st = {
+                ...st,
+                characters: st.characters.map((c) => (c.id === char.id ? declinedTarget : c)),
+                pending_reaction: undefined,
+              };
+              char = declinedTarget;
+            } else {
+              char.spell_slots_used = {
+                ...slotsUsed,
+                [lvl]: (slotsUsed[lvl] ?? 0) + 1,
+              };
+              char.turn_actions = { ...char.turn_actions, reaction_used: true };
+              narrative = `🛡️ ${char.name} casts SHIELD as a reaction (lvl ${lvl} slot)! +5 AC until the start of their next turn — ${rx.pendingNarrative.split('.')[0]} bounces off the shimmering barrier.`;
+              // Track Shield active and bump AC by 5 for the duration. tickConditions
+              // removes the bump when the condition expires (next turn start).
+              char.conditions = [
+                ...char.conditions.filter((c) => c !== 'shield_spell'),
+                'shield_spell',
+              ];
+              char.condition_durations = {
+                ...(char.condition_durations ?? {}),
+                shield_spell: 1,
+              };
+              char.ac = char.ac + 5;
+              st = {
+                ...st,
+                characters: st.characters.map((c) => (c.id === char.id ? char : c)),
+                pending_reaction: undefined,
+              };
             }
-          }
-        }
-      }
-
-      const locationGrid = context.campaign?.locations?.find((l) =>
-        l.rooms?.some((r) => r.id === roomId)
-      );
-      const gridW = locationGrid?.gridWidth ?? context.gridWidth ?? 10;
-      const gridH = locationGrid?.gridHeight ?? context.gridHeight ?? 10;
-      // Dead entities (hp ≤ 0) still appear in state.entities for narrative
-      // continuity but don't block movement — you walk over the corpse. This
-      // also matches the frontend's `isReachable` (filters on hp > 0), so the
-      // click-to-move targets and the BFS pathfinder agree on what's blocked.
-      // Static room obstacles (columns/walls/debris) block movement too.
-      const currentRoomForMove = seed.rooms.find((r) => r.id === roomId);
-      const roomObstaclesForMove = currentRoomForMove?.obstacles ?? [];
-      const blocked = [
-        ...st.entities.filter((e) => e.id !== char.id && e.hp > 0).map((e) => e.pos),
-        ...roomObstaclesForMove,
-      ];
-
-      const path = findPath(charEntity.pos, gridAction.to, blocked, gridW, gridH);
-      if (!path) {
-        narrative = 'No path to that square.';
-        break;
-      }
-
-      // Terrain-aware movement cost: difficult terrain squares cost 2× movement
-      const currentSeedRoomGrid = seed.rooms.find((r) => r.id === roomId);
-      const difficultTerrain = currentSeedRoomGrid?.difficultTerrain ?? [];
-      const costFeet = path.reduce((acc, pos) => {
-        const isDifficult = difficultTerrain.some((dt) => posEqual(dt, pos));
-        return acc + (isDifficult ? SQUARE_SIZE * 2 : SQUARE_SIZE);
-      }, 0);
-
-      const speedFt = effectiveSpeed(char);
-      const usedFt = st.movement_used?.[char.id] ?? 0;
-      if (usedFt + costFeet > speedFt) {
-        narrative = `Not enough movement. (${speedFt - usedFt} ft remaining, ${costFeet} ft needed${difficultTerrain.length ? ' — difficult terrain' : ''})`;
-        break;
-      }
-
-      // Check for opportunity attacks from enemies being left behind
-      const oaTargets = opportunityAttackTriggers(
-        charEntity.pos,
-        gridAction.to,
-        st.entities,
-        false
-      );
-      let oaNarrative = '';
-      for (const oaEntity of oaTargets) {
-        const oaEnemy = getEnemyById(seed, oaEntity.id);
-        if (oaEnemy && !st.enemies_killed.includes(oaEntity.id) && !char.turn_actions?.disengaged) {
-          const oaResult = resolveEnemyAttack(oaEnemy, char.ac);
-          if (oaResult.hit) {
-            const dmg = oaResult.damage;
-            char.hp = Math.max(0, char.hp - dmg);
-            const concResult = checkConcentration(char, st, dmg);
-            char = concResult.char;
-            st = concResult.st;
-            oaNarrative += ` [Opportunity attack from ${oaEnemy.name}: ${dmg} damage!${concResult.note}]`;
           } else {
-            oaNarrative += ` [Opportunity attack from ${oaEnemy.name}: missed!]`;
-          }
-        }
-      }
-
-      // Apply movement
-      const updatedEntities: CombatEntity[] = st.entities!.map((e) =>
-        e.id === char.id ? { ...e, pos: gridAction.to } : e
-      );
-      st = {
-        ...st,
-        entities: updatedEntities,
-        movement_used: { ...st.movement_used, [char.id]: usedFt + costFeet },
-      };
-
-      narrative = `${char.name} moves to (${gridAction.to.x}, ${gridAction.to.y}).${oaNarrative}`;
-      break;
-    }
-
-    // ── Travel between locations ──────────────────────────────────────────────
-    case 'travel': {
-      const travelAction = action as { type: 'travel'; locationId: string };
-      const destLocation = context.campaign?.locations?.find(
-        (l) => l.id === travelAction.locationId
-      );
-      if (!destLocation) {
-        narrative = 'Unknown destination.';
-        break;
-      }
-      // Hostile in the current room — RAW: engage or escape, don't just
-      // walk out of the dungeon. Mirrors the move/loot gates above.
-      if (enemyAlive) {
-        narrative = 'A hostile is in the room — you cannot travel away until the room is clear.';
-        break;
-      }
-
-      // Wilderness encounter check
-      let encounterNote = '';
-      if (
-        destLocation.encounterTable?.length &&
-        destLocation.encounterChance &&
-        Math.random() < destLocation.encounterChance
-      ) {
-        const pick2 = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)];
-        const templateKey = pick2(destLocation.encounterTable);
-        const tpl = context.enemyTemplates.find((t) => t.name === templateKey);
-        if (tpl) {
-          const newEnemyId = `${roomId}#enc${Date.now()}`;
-          seed = {
-            ...seed,
-            enemies: {
-              ...seed.enemies,
-              [roomId]: [
-                ...(seed.enemies?.[roomId] ?? []),
-                {
-                  id: newEnemyId,
-                  name: tpl.name,
-                  hp: tpl.hp,
-                  ac: tpl.ac,
-                  damage: tpl.damage,
-                  toHit: tpl.toHit,
-                  xp: tpl.xp,
-                },
-              ],
-            },
-          };
-          encounterNote = ` A ${tpl.name} bars your path!`;
-        }
-      }
-
-      // Advance world day on travel. Also move current_room to the new
-      // location's central room so room-scoped state (NPC choices,
-      // interact_object, examine, loot) tracks the destination instead
-      // of leaving the player virtually still in the previous town.
-      // Without this, the previous town's NPC kept emitting talk_response
-      // choices after the party had departed.
-      st = {
-        ...st,
-        current_location_id: travelAction.locationId,
-        current_district_id: undefined,
-        current_room: destLocation.centralRoomId ?? st.current_room,
-        world_day: (st.world_day ?? 1) + 1,
-        // Place entities at entrance of new location if it's a dungeon
-        entities: undefined,
-        movement_used: undefined,
-      };
-
-      narrative = `You travel to ${destLocation.name}.${encounterNote}`;
-      usedInitiative = false;
-      break;
-    }
-
-    // ── Enter a town district ─────────────────────────────────────────────────
-    case 'enter_district': {
-      const districtAction = action as { type: 'enter_district'; districtId: string };
-      const currentLoc = context.campaign?.locations?.find((l) => l.id === st.current_location_id);
-      const district = currentLoc?.districts?.find((d) => d.id === districtAction.districtId);
-      if (!district) {
-        narrative = 'Unknown district.';
-        break;
-      }
-
-      // Move physically into the district's room — without this, NPCs
-      // in the previous district stayed "in the room" (the player
-      // could still Talk to Aldric from the Lantern District because
-      // current_room stuck at millhaven_market). The visited_rooms
-      // set is also extended so the worldmap shows district visits.
-      const newRoomId = district.roomId;
-      st = {
-        ...st,
-        current_district_id: districtAction.districtId,
-        current_room: newRoomId,
-        visited_rooms: st.visited_rooms.includes(newRoomId)
-          ? st.visited_rooms
-          : [...st.visited_rooms, newRoomId],
-      };
-      narrative = `You enter the ${district.name}. ${district.desc}`;
-      // Re-use the standard room-arrival narrative tail (enemies, loot,
-      // exits) so entering a district reads like entering any other room.
-      narrative += ' ' + buildArrivalNarrative(newRoomId, st, seed, context);
-      usedInitiative = false;
-      break;
-    }
-
-    // ── Accept quest ──────────────────────────────────────────────────────────
-    case 'accept_quest': {
-      const aqAction = action as { type: 'accept_quest'; questId: string };
-      const questDef = context.campaign?.quests?.find((q) => q.id === aqAction.questId);
-      if (!questDef) {
-        narrative = 'Unknown quest.';
-        break;
-      }
-
-      const existingProgress = (st.quest_progress ?? []).find(
-        (qp) => qp.questId === aqAction.questId
-      );
-      if (existingProgress) {
-        narrative = `You have already accepted "${questDef.title}".`;
-        break;
-      }
-
-      st = {
-        ...st,
-        quest_progress: [
-          ...(st.quest_progress ?? []),
-          { questId: aqAction.questId, status: 'active', completedSteps: [] },
-        ],
-      };
-      narrative = `Quest accepted: "${questDef.title}" — ${questDef.desc}`;
-      usedInitiative = false;
-      break;
-    }
-
-    // ── Complete quest (manual trigger) ──────────────────────────────────────
-    case 'complete_quest': {
-      const cqAction = action as { type: 'complete_quest'; questId: string };
-      const cqDef = context.campaign?.quests?.find((q) => q.id === cqAction.questId);
-      if (!cqDef) {
-        narrative = 'Unknown quest.';
-        break;
-      }
-
-      const cqProgress = (st.quest_progress ?? []).find((qp) => qp.questId === cqAction.questId);
-      if (!cqProgress || cqProgress.status !== 'active') {
-        narrative = `Quest "${cqDef.title}" is not active.`;
-        break;
-      }
-
-      // Check all steps are done
-      const allStepsDone = cqDef.steps.every((s) => cqProgress.completedSteps.includes(s.id));
-      if (!allStepsDone) {
-        const remaining = cqDef.steps.filter((s) => !cqProgress.completedSteps.includes(s.id));
-        narrative = `Quest "${cqDef.title}" is not yet complete. Remaining: ${remaining.map((s) => s.desc).join('; ')}`;
-        break;
-      }
-
-      // Apply rewards
-      const rewardLines: string[] = [];
-      for (const reward of cqDef.rewards) {
-        if (reward.type === 'give_item') {
-          const item = context.lootTable.find((l) => l.id === reward.itemId);
-          if (item) {
-            char.inventory = [...char.inventory, { instance_id: randomUUID(), ...item }];
-            rewardLines.push(`received ${item.name}`);
-          }
-        } else if (reward.type === 'give_gold') {
-          char.gold = (char.gold ?? 0) + reward.amount;
-          rewardLines.push(`${reward.amount} gold`);
-        } else if (reward.type === 'modify_hp') {
-          char.hp = Math.min(char.max_hp, char.hp + reward.amount);
-        } else if (reward.type === 'set_faction_rep') {
-          st = {
-            ...st,
-            faction_rep: {
-              ...(st.faction_rep ?? {}),
-              [reward.factionId]: ((st.faction_rep ?? {})[reward.factionId] ?? 0) + reward.delta,
-            },
-          };
-          rewardLines.push(`+${reward.delta} rep with faction`);
-        }
-      }
-
-      st = {
-        ...st,
-        quest_progress: (st.quest_progress ?? []).map((qp) =>
-          qp.questId === cqAction.questId ? { ...qp, status: 'completed' } : qp
-        ),
-        faction_rep: st.faction_rep,
-      };
-
-      const rewardStr = rewardLines.length ? ` Rewards: ${rewardLines.join(', ')}.` : '';
-      narrative = `Quest complete: "${cqDef.title}".${rewardStr}`;
-      usedInitiative = false;
-      break;
-    }
-
-    // ── Dash ──────────────────────────────────────────────────────────────────
-    case 'dash': {
-      if (!st.combat_active) {
-        narrative = 'Dash is a combat action.';
-        break;
-      }
-      if (char.turn_actions.action_used) {
-        narrative = 'You have already used your action this turn.';
-        break;
-      }
-      const dashSpeed = effectiveSpeed(char);
-      char.turn_actions = { ...char.turn_actions, action_used: true };
-      // movement_used tracking: reduce remaining movement cap by speed (adds a full extra speed worth)
-      st = {
-        ...st,
-        movement_used: {
-          ...(st.movement_used ?? {}),
-          [char.id]: Math.max(0, (st.movement_used?.[char.id] ?? 0) - dashSpeed),
-        },
-      };
-      narrative = `${char.name} Dashes — gaining an extra ${dashSpeed} ft of movement this turn.`;
-      break;
-    }
-
-    // ── Help ──────────────────────────────────────────────────────────────────
-    case 'help': {
-      if (!st.combat_active) {
-        narrative = 'Help is a combat action.';
-        break;
-      }
-      if (char.turn_actions.action_used) {
-        narrative = 'You have already used your action this turn.';
-        break;
-      }
-      const helpAction = action as { type: 'help'; targetId: string };
-      const helpTarget = st.characters.find((c) => c.id === helpAction.targetId && !c.dead);
-      if (!helpTarget) {
-        narrative = 'Target not found.';
-        break;
-      }
-      char.turn_actions = { ...char.turn_actions, action_used: true };
-      st = { ...st, help_target_id: helpAction.targetId };
-      narrative = `${char.name} helps ${helpTarget.name} — they have advantage on their next attack roll this turn.`;
-      usedInitiative = true;
-      break;
-    }
-
-    // ── Ready ─────────────────────────────────────────────────────────────────
-    case 'ready': {
-      if (!st.combat_active) {
-        narrative = 'Ready is a combat action.';
-        break;
-      }
-      if (char.turn_actions.action_used) {
-        narrative = 'You have already used your action this turn.';
-        break;
-      }
-      const readyAction = action as { type: 'ready'; trigger: string; action: StructuredAction };
-      char.turn_actions = {
-        ...char.turn_actions,
-        action_used: true,
-        readied_action: { trigger: readyAction.trigger, action: readyAction.action },
-      };
-      narrative = `${char.name} readies an action: "${readyAction.trigger}". Use 'Trigger readied action' when the trigger occurs.`;
-      usedInitiative = true;
-      break;
-    }
-
-    // ── Use Reaction (trigger readied action) ─────────────────────────────────
-    case 'use_reaction': {
-      if (char.turn_actions.reaction_used) {
-        narrative = 'You have already used your reaction this turn.';
-        break;
-      }
-      const readied = char.turn_actions.readied_action;
-      if (!readied) {
-        narrative = 'You have no readied action.';
-        break;
-      }
-      char.turn_actions = { ...char.turn_actions, reaction_used: true, readied_action: undefined };
-      narrative = `${char.name} triggers their readied action! `;
-      // Recursively resolve the stored action
-      const reactionResult = await takeAction({
-        action: readied.action,
-        history: [],
-        state: { ...st, characters: st.characters.map((c, i) => (i === safeIdx ? char : c)) },
-        seed,
-        context,
-      });
-      narrative += reactionResult.narrative;
-      st = reactionResult.newState;
-      char = st.characters.find((c) => c.id === char.id) ?? char;
-      break;
-    }
-
-    // ── Select subclass ───────────────────────────────────────────────────────
-    case 'select_subclass': {
-      const scAction = action as { type: 'select_subclass'; subclass: string };
-      if (char.subclass) {
-        narrative = `You have already chosen the ${char.subclass} subclass.`;
-        break;
-      }
-      char.subclass = scAction.subclass;
-      narrative = `${char.name} follows the path of the ${scAction.subclass}!`;
-      // Sorcerer · Draconic Bloodline · Draconic Resilience (PHB p.103):
-      // +1 HP per Sorcerer level. The L1 portion would have been granted at
-      // character creation if subclass was picked there; this catches any
-      // mid-game selection too.
-      if (scAction.subclass === 'draconic' && char.character_class.toLowerCase() === 'sorcerer') {
-        char.max_hp += char.level;
-        char.hp += char.level;
-        narrative += ` Draconic Resilience: +${char.level} max HP (now ${char.hp}/${char.max_hp}).`;
-      }
-      break;
-    }
-
-    // ── Set active party member (out-of-combat lead picker) ──────────────────
-    case 'set_active_character': {
-      const sacAction = action as { type: 'set_active_character'; characterId: string };
-      // No-op in combat — initiative drives `active_character_id` there.
-      if (st.combat_active) {
-        narrative = `Initiative is rolled — you can't hand the spotlight off mid-fight.`;
-        break;
-      }
-      const target = st.characters.find((c) => c.id === sacAction.characterId);
-      if (!target) {
-        narrative = 'Unknown party member.';
-        break;
-      }
-      if (target.dead) {
-        narrative = `${target.name} is dead and can't lead.`;
-        break;
-      }
-      st = { ...st, active_character_id: sacAction.characterId };
-      narrative = `${target.name} steps forward to lead.`;
-      // Out-of-combat action, doesn't consume any turn budget.
-      usedInitiative = false;
-      break;
-    }
-
-    // ── Resolve pending reaction (Shield window for now) ──────────────────────
-    case 'resolve_reaction': {
-      const rxAction = action as { type: 'resolve_reaction'; accept: boolean };
-      const rx = st.pending_reaction;
-      if (!rx) {
-        narrative = 'No reaction pending.';
-        break;
-      }
-      if (char.id !== rx.targetCharId) {
-        narrative = 'This reaction belongs to another character.';
-        break;
-      }
-      if (rx.kind === 'shield') {
-        if (rxAction.accept) {
-          // Consume L1 slot (lowest available) and reaction.
-          const slotsMax = char.spell_slots_max ?? {};
-          const slotsUsed = char.spell_slots_used ?? {};
-          const lvl = Object.keys(slotsMax)
-            .map(Number)
-            .filter((n) => n >= 1 && (slotsMax[n] ?? 0) > (slotsUsed[n] ?? 0))
-            .sort((a, b) => a - b)[0];
-          if (lvl === undefined) {
-            narrative = 'No spell slot available to cast Shield.';
-            // Fall through to declined-hit path
-            narrative += ` ${rx.pendingNarrative}`;
-            const declinedTarget = {
-              ...char,
-              hp: Math.max(0, char.hp - rx.pendingDamage),
-            };
-            st = {
-              ...st,
-              characters: st.characters.map((c) => (c.id === char.id ? declinedTarget : c)),
-              pending_reaction: undefined,
-            };
-            char = declinedTarget;
-          } else {
-            char.spell_slots_used = {
-              ...slotsUsed,
-              [lvl]: (slotsUsed[lvl] ?? 0) + 1,
-            };
-            char.turn_actions = { ...char.turn_actions, reaction_used: true };
-            narrative = `🛡️ ${char.name} casts SHIELD as a reaction (lvl ${lvl} slot)! +5 AC until the start of their next turn — ${rx.pendingNarrative.split('.')[0]} bounces off the shimmering barrier.`;
-            // Track Shield active and bump AC by 5 for the duration. tickConditions
-            // removes the bump when the condition expires (next turn start).
-            char.conditions = [
-              ...char.conditions.filter((c) => c !== 'shield_spell'),
-              'shield_spell',
-            ];
-            char.condition_durations = {
-              ...(char.condition_durations ?? {}),
-              shield_spell: 1,
-            };
-            char.ac = char.ac + 5;
+            // Decline — apply the pending damage and narrative.
+            const newHp = Math.max(0, char.hp - rx.pendingDamage);
+            char = { ...char, hp: newHp };
+            narrative = `${rx.pendingNarrative} (Shield declined.)`;
             st = {
               ...st,
               characters: st.characters.map((c) => (c.id === char.id ? char : c)),
               pending_reaction: undefined,
             };
-          }
-        } else {
-          // Decline — apply the pending damage and narrative.
-          const newHp = Math.max(0, char.hp - rx.pendingDamage);
-          char = { ...char, hp: newHp };
-          narrative = `${rx.pendingNarrative} (Shield declined.)`;
-          st = {
-            ...st,
-            characters: st.characters.map((c) => (c.id === char.id ? char : c)),
-            pending_reaction: undefined,
-          };
-          if (st.entities) {
-            st = {
-              ...st,
-              entities: st.entities.map((e) =>
-                e.id === char.id && !e.isEnemy ? { ...e, hp: newHp } : e
-              ),
-            };
-          }
-        }
-      } else if (rx.kind === 'hellish_rebuke') {
-        // Hellish Rebuke (PHB p.252) — counter-attack. Triggering damage
-        // already applied; this branch only handles what the reaction itself
-        // does. Accept: consume slot + reaction, deal 2d10 fire to attacker
-        // (DEX save halves). Decline: clear pending_reaction and continue.
-        if (rxAction.accept) {
-          const slotsMax = char.spell_slots_max ?? {};
-          const slotsUsed = char.spell_slots_used ?? {};
-          // 2024 PHB Tiefling Infernal Legacy — Hellish Rebuke 1/long rest at
-          // L3+ without consuming a slot. Tiefling Warlocks who also have it
-          // on their list prefer the racial slot (free) before burning real
-          // slots; the racial use is tracked via `tiefling_rebuke_used`.
-          const isTieflingInnate =
-            char.species === 'tiefling' &&
-            char.level >= 3 &&
-            !char.class_resource_uses?.tiefling_rebuke_used;
-          let slotLvl: number | undefined;
-          if (isTieflingInnate) {
-            slotLvl = 1;
-          } else {
-            slotLvl = Object.keys(slotsMax)
-              .map(Number)
-              .filter((n) => n >= 1 && (slotsMax[n] ?? 0) > (slotsUsed[n] ?? 0))
-              .sort((a, b) => a - b)[0];
-          }
-          if (slotLvl === undefined) {
-            narrative = 'No spell slot available — Hellish Rebuke fizzles.';
-            st = { ...st, pending_reaction: undefined };
-          } else {
-            if (isTieflingInnate) {
-              char.class_resource_uses = {
-                ...(char.class_resource_uses ?? {}),
-                tiefling_rebuke_used: 1,
+            if (st.entities) {
+              st = {
+                ...st,
+                entities: st.entities.map((e) =>
+                  e.id === char.id && !e.isEnemy ? { ...e, hp: newHp } : e
+                ),
               };
+            }
+          }
+        } else if (rx.kind === 'hellish_rebuke') {
+          // Hellish Rebuke (PHB p.252) — counter-attack. Triggering damage
+          // already applied; this branch only handles what the reaction itself
+          // does. Accept: consume slot + reaction, deal 2d10 fire to attacker
+          // (DEX save halves). Decline: clear pending_reaction and continue.
+          if (rxAction.accept) {
+            const slotsMax = char.spell_slots_max ?? {};
+            const slotsUsed = char.spell_slots_used ?? {};
+            // 2024 PHB Tiefling Infernal Legacy — Hellish Rebuke 1/long rest at
+            // L3+ without consuming a slot. Tiefling Warlocks who also have it
+            // on their list prefer the racial slot (free) before burning real
+            // slots; the racial use is tracked via `tiefling_rebuke_used`.
+            const isTieflingInnate =
+              char.species === 'tiefling' &&
+              char.level >= 3 &&
+              !char.class_resource_uses?.tiefling_rebuke_used;
+            let slotLvl: number | undefined;
+            if (isTieflingInnate) {
+              slotLvl = 1;
+            } else {
+              slotLvl = Object.keys(slotsMax)
+                .map(Number)
+                .filter((n) => n >= 1 && (slotsMax[n] ?? 0) > (slotsUsed[n] ?? 0))
+                .sort((a, b) => a - b)[0];
+            }
+            if (slotLvl === undefined) {
+              narrative = 'No spell slot available — Hellish Rebuke fizzles.';
+              st = { ...st, pending_reaction: undefined };
+            } else {
+              if (isTieflingInnate) {
+                char.class_resource_uses = {
+                  ...(char.class_resource_uses ?? {}),
+                  tiefling_rebuke_used: 1,
+                };
+              } else {
+                char.spell_slots_used = {
+                  ...slotsUsed,
+                  [slotLvl]: (slotsUsed[slotLvl] ?? 0) + 1,
+                };
+              }
+              char.turn_actions = { ...char.turn_actions, reaction_used: true };
+              // Upcast: 2d10 base + 1d10 per slot above 1st.
+              const upcastDice = Math.max(0, slotLvl - 1);
+              const baseRoll = rollDice('2d10');
+              const upcastRoll = upcastDice > 0 ? rollDice(`${upcastDice}d10`) : 0;
+              const fullDmg = baseRoll + upcastRoll;
+              // Enemy DEX save vs caster's spell save DC. Half on success.
+              const enemyData = getEnemyById(seed, rx.attackerEnemyId);
+              const enemyDex = enemyData?.dex ?? 10;
+              const dc = 8 + profBonus(char.level) + abilityMod(char.cha);
+              const saveRoll = rollDice('1d20') + abilityMod(enemyDex);
+              const saved = saveRoll >= dc;
+              const finalDmg = saved ? Math.floor(fullDmg / 2) : fullDmg;
+              // Apply damage to the attacker entity.
+              const attackerEnt = st.entities?.find(
+                (e) => e.id === rx.attackerEnemyId && e.isEnemy
+              );
+              const newEnemyHp = Math.max(0, (attackerEnt?.hp ?? 0) - finalDmg);
+              st = {
+                ...st,
+                entities: st.entities?.map((e) =>
+                  e.id === rx.attackerEnemyId && e.isEnemy ? { ...e, hp: newEnemyHp } : e
+                ),
+                characters: st.characters.map((c) => (c.id === char.id ? char : c)),
+                pending_reaction: undefined,
+              };
+              const enemyName = enemyData?.name ?? 'the attacker';
+              narrative = `🔥 ${char.name} casts HELLISH REBUKE (lvl ${slotLvl} slot)! Hellish flames engulf ${enemyName}. DEX save ${saveRoll} vs DC ${dc} — ${saved ? 'half' : 'full'} damage: ${finalDmg} fire (${baseRoll}${upcastRoll > 0 ? ` + ${upcastRoll} upcast` : ''}).`;
+              if (newEnemyHp <= 0) {
+                const xpGain = enemyData?.xp ?? 10;
+                const split = splitEncounterXp(st, char.id, xpGain);
+                st = split.st;
+                const xpShare = split.share;
+                char.xp = (char.xp || 0) + xpShare;
+                st = {
+                  ...st,
+                  enemies_killed: [...(st.enemies_killed ?? []), rx.attackerEnemyId],
+                  characters: st.characters.map((c) => (c.id === char.id ? char : c)),
+                };
+                narrative += ` ${enemyName} is consumed by the rebuke! (+${xpShare} XP)`;
+                narrative += applyPartyLevelUps(st, char, context);
+                const roomId = st.current_room;
+                if (isRoomCleared(st, seed, roomId)) {
+                  st = endCombatState(st);
+                }
+              }
+            }
+          } else {
+            narrative = `${char.name} declines to retaliate.`;
+            st = { ...st, pending_reaction: undefined };
+          }
+        } else if (rx.kind === 'counterspell') {
+          // PHB p.234. Accept = burn a 3rd-level (or higher) slot to interrupt.
+          // Slots ≥ enemy spell level auto-counter; otherwise an ability check
+          // vs DC 10 + spell level. Decline = enemy spell resolves on the
+          // intended target.
+          if (rxAction.accept) {
+            const slotsMax = char.spell_slots_max ?? {};
+            const slotsUsed = char.spell_slots_used ?? {};
+            // Pick the lowest available slot ≥ 3 that's ≥ the enemy spell level.
+            // Falling back to the lowest ≥ 3 means we may need the ability check.
+            const slotLvl = Object.keys(slotsMax)
+              .map(Number)
+              .filter((n) => n >= 3 && (slotsMax[n] ?? 0) > (slotsUsed[n] ?? 0))
+              .sort((a, b) => a - b)[0];
+            if (slotLvl === undefined) {
+              narrative = 'No 3rd-level or higher slot — Counterspell fizzles.';
+              st = { ...st, pending_reaction: undefined };
             } else {
               char.spell_slots_used = {
                 ...slotsUsed,
                 [slotLvl]: (slotsUsed[slotLvl] ?? 0) + 1,
               };
-            }
-            char.turn_actions = { ...char.turn_actions, reaction_used: true };
-            // Upcast: 2d10 base + 1d10 per slot above 1st.
-            const upcastDice = Math.max(0, slotLvl - 1);
-            const baseRoll = rollDice('2d10');
-            const upcastRoll = upcastDice > 0 ? rollDice(`${upcastDice}d10`) : 0;
-            const fullDmg = baseRoll + upcastRoll;
-            // Enemy DEX save vs caster's spell save DC. Half on success.
-            const enemyData = getEnemyById(seed, rx.attackerEnemyId);
-            const enemyDex = enemyData?.dex ?? 10;
-            const dc = 8 + profBonus(char.level) + abilityMod(char.cha);
-            const saveRoll = rollDice('1d20') + abilityMod(enemyDex);
-            const saved = saveRoll >= dc;
-            const finalDmg = saved ? Math.floor(fullDmg / 2) : fullDmg;
-            // Apply damage to the attacker entity.
-            const attackerEnt = st.entities?.find((e) => e.id === rx.attackerEnemyId && e.isEnemy);
-            const newEnemyHp = Math.max(0, (attackerEnt?.hp ?? 0) - finalDmg);
-            st = {
-              ...st,
-              entities: st.entities?.map((e) =>
-                e.id === rx.attackerEnemyId && e.isEnemy ? { ...e, hp: newEnemyHp } : e
-              ),
-              characters: st.characters.map((c) => (c.id === char.id ? char : c)),
-              pending_reaction: undefined,
-            };
-            const enemyName = enemyData?.name ?? 'the attacker';
-            narrative = `🔥 ${char.name} casts HELLISH REBUKE (lvl ${slotLvl} slot)! Hellish flames engulf ${enemyName}. DEX save ${saveRoll} vs DC ${dc} — ${saved ? 'half' : 'full'} damage: ${finalDmg} fire (${baseRoll}${upcastRoll > 0 ? ` + ${upcastRoll} upcast` : ''}).`;
-            if (newEnemyHp <= 0) {
-              const xpGain = enemyData?.xp ?? 10;
-              const split = splitEncounterXp(st, char.id, xpGain);
-              st = split.st;
-              const xpShare = split.share;
-              char.xp = (char.xp || 0) + xpShare;
-              st = {
-                ...st,
-                enemies_killed: [...(st.enemies_killed ?? []), rx.attackerEnemyId],
-                characters: st.characters.map((c) => (c.id === char.id ? char : c)),
-              };
-              narrative += ` ${enemyName} is consumed by the rebuke! (+${xpShare} XP)`;
-              narrative += applyPartyLevelUps(st, char, context);
-              const roomId = st.current_room;
-              if (isRoomCleared(st, seed, roomId)) {
-                st = endCombatState(st);
+              char.turn_actions = { ...char.turn_actions, reaction_used: true };
+              const autoCounter = slotLvl >= rx.enemySpellLevel;
+              let success = autoCounter;
+              let checkDetail = '';
+              if (!autoCounter) {
+                const castingAbility = (context.spellcastingAbility?.[char.character_class] ??
+                  context.classPrimaryStats[char.character_class] ??
+                  'int') as 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha';
+                const score = char[castingAbility] ?? 10;
+                const dc = 10 + rx.enemySpellLevel;
+                const checkRoll = rollDice('1d20') + abilityMod(score) + profBonus(char.level);
+                success = checkRoll >= dc;
+                checkDetail = ` ${castingAbility.toUpperCase()} check ${checkRoll} vs DC ${dc} — ${success ? 'success' : 'failed'}.`;
               }
-            }
-          }
-        } else {
-          narrative = `${char.name} declines to retaliate.`;
-          st = { ...st, pending_reaction: undefined };
-        }
-      } else if (rx.kind === 'counterspell') {
-        // PHB p.234. Accept = burn a 3rd-level (or higher) slot to interrupt.
-        // Slots ≥ enemy spell level auto-counter; otherwise an ability check
-        // vs DC 10 + spell level. Decline = enemy spell resolves on the
-        // intended target.
-        if (rxAction.accept) {
-          const slotsMax = char.spell_slots_max ?? {};
-          const slotsUsed = char.spell_slots_used ?? {};
-          // Pick the lowest available slot ≥ 3 that's ≥ the enemy spell level.
-          // Falling back to the lowest ≥ 3 means we may need the ability check.
-          const slotLvl = Object.keys(slotsMax)
-            .map(Number)
-            .filter((n) => n >= 3 && (slotsMax[n] ?? 0) > (slotsUsed[n] ?? 0))
-            .sort((a, b) => a - b)[0];
-          if (slotLvl === undefined) {
-            narrative = 'No 3rd-level or higher slot — Counterspell fizzles.';
-            st = { ...st, pending_reaction: undefined };
-          } else {
-            char.spell_slots_used = {
-              ...slotsUsed,
-              [slotLvl]: (slotsUsed[slotLvl] ?? 0) + 1,
-            };
-            char.turn_actions = { ...char.turn_actions, reaction_used: true };
-            const autoCounter = slotLvl >= rx.enemySpellLevel;
-            let success = autoCounter;
-            let checkDetail = '';
-            if (!autoCounter) {
-              const castingAbility = (context.spellcastingAbility?.[char.character_class] ??
-                context.classPrimaryStats[char.character_class] ??
-                'int') as 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha';
-              const score = char[castingAbility] ?? 10;
-              const dc = 10 + rx.enemySpellLevel;
-              const checkRoll = rollDice('1d20') + abilityMod(score) + profBonus(char.level);
-              success = checkRoll >= dc;
-              checkDetail = ` ${castingAbility.toUpperCase()} check ${checkRoll} vs DC ${dc} — ${success ? 'success' : 'failed'}.`;
-            }
-            if (success) {
-              narrative = `⚡ ${char.name} casts COUNTERSPELL (lvl ${slotLvl} slot)!${checkDetail} ${rx.enemySpellName} is unraveled — no effect.`;
-            } else {
-              // Counterspell check failed — the enemy spell still resolves.
-              const damage = applyEnemySpellDamage(st, rx, context);
-              if (damage) {
-                st = damage.st;
-                // If the reactor IS the spell target, sync char so commitChar
-                // doesn't overwrite the damage at the end of takeAction.
-                if (rx.intendedTargetPcId === char.id) {
-                  char = { ...char, hp: damage.targetHp };
-                }
-                narrative = `⚡ ${char.name} casts COUNTERSPELL (lvl ${slotLvl} slot)!${checkDetail} ${rx.enemySpellName} bursts through — ${damage.targetName} takes ${damage.dmgRoll} ${damage.damageType}.`;
+              if (success) {
+                narrative = `⚡ ${char.name} casts COUNTERSPELL (lvl ${slotLvl} slot)!${checkDetail} ${rx.enemySpellName} is unraveled — no effect.`;
               } else {
-                narrative = `${char.name} fails to counter ${rx.enemySpellName}. The spell resolves.`;
+                // Counterspell check failed — the enemy spell still resolves.
+                const damage = applyEnemySpellDamage(st, rx, context);
+                if (damage) {
+                  st = damage.st;
+                  // If the reactor IS the spell target, sync char so commitChar
+                  // doesn't overwrite the damage at the end of takeAction.
+                  if (rx.intendedTargetPcId === char.id) {
+                    char = { ...char, hp: damage.targetHp };
+                  }
+                  narrative = `⚡ ${char.name} casts COUNTERSPELL (lvl ${slotLvl} slot)!${checkDetail} ${rx.enemySpellName} bursts through — ${damage.targetName} takes ${damage.dmgRoll} ${damage.damageType}.`;
+                } else {
+                  narrative = `${char.name} fails to counter ${rx.enemySpellName}. The spell resolves.`;
+                }
+              }
+              st = {
+                ...st,
+                characters: st.characters.map((c) => (c.id === char.id ? char : c)),
+                pending_reaction: undefined,
+              };
+            }
+          } else {
+            // Decline — enemy spell resolves on its intended target.
+            const damage = applyEnemySpellDamage(st, rx, context);
+            if (damage) {
+              st = damage.st;
+              if (rx.intendedTargetPcId === char.id) {
+                char = { ...char, hp: damage.targetHp };
+              }
+              narrative = `${char.name} declines to counter. ${rx.enemySpellName} resolves — ${damage.targetName} takes ${damage.dmgRoll} ${damage.damageType}.`;
+            } else {
+              narrative = `${char.name} declines to counter. ${rx.enemySpellName} resolves.`;
+            }
+            st = { ...st, pending_reaction: undefined };
+          }
+        }
+        {
+          // Resume the enemy turn loop from the saved coordinates.
+          const resume = runEnemyTurns({
+            st,
+            seed,
+            context,
+            worldName,
+            startAdvIdx: rx.resumeFromInitiativeIdx,
+            startMultiattackIdx: rx.resumeFromMultiattackIdx,
+            startRoundWrapped: false,
+            initialCurrentIdx: rx.resumeFromInitiativeIdx,
+          });
+          st = resume.st;
+          narrative += resume.narrative;
+          // After resume, advance the initiative cursor (or pause again if another reaction triggered).
+          if (!resume.paused) {
+            if (resume.roundWrapped) {
+              st = {
+                ...st,
+                movement_used: {},
+                surprised: [],
+                characters: st.characters.map((c) => ({ ...c, turn_actions: { ...FRESH_TURN } })),
+              };
+            }
+            st.initiative_idx = resume.exitAdvIdx;
+            const nextEntry = st.initiative_order[resume.exitAdvIdx];
+            if (nextEntry && !nextEntry.is_enemy) {
+              const nextCharIdx = st.characters.findIndex((c) => c.id === nextEntry.id && !c.dead);
+              if (nextCharIdx >= 0) {
+                st = {
+                  ...st,
+                  movement_used: { ...(st.movement_used ?? {}), [nextEntry.id]: 0 },
+                };
+                const withFreshTurn = {
+                  ...st.characters[nextCharIdx],
+                  turn_actions: { ...FRESH_TURN },
+                };
+                const ticked = tickConditions(withFreshTurn);
+                st = {
+                  ...st,
+                  characters: st.characters.map((c, i) => (i === nextCharIdx ? ticked : c)),
+                  active_character_id: ticked.id,
+                };
               }
             }
-            st = {
-              ...st,
-              characters: st.characters.map((c) => (c.id === char.id ? char : c)),
-              pending_reaction: undefined,
-            };
-          }
-        } else {
-          // Decline — enemy spell resolves on its intended target.
-          const damage = applyEnemySpellDamage(st, rx, context);
-          if (damage) {
-            st = damage.st;
-            if (rx.intendedTargetPcId === char.id) {
-              char = { ...char, hp: damage.targetHp };
-            }
-            narrative = `${char.name} declines to counter. ${rx.enemySpellName} resolves — ${damage.targetName} takes ${damage.dmgRoll} ${damage.damageType}.`;
           } else {
-            narrative = `${char.name} declines to counter. ${rx.enemySpellName} resolves.`;
+            st.initiative_idx = resume.exitAdvIdx;
           }
-          st = { ...st, pending_reaction: undefined };
         }
-      }
-      {
-        // Resume the enemy turn loop from the saved coordinates.
-        const resume = runEnemyTurns({
-          st,
-          seed,
-          context,
-          worldName,
-          startAdvIdx: rx.resumeFromInitiativeIdx,
-          startMultiattackIdx: rx.resumeFromMultiattackIdx,
-          startRoundWrapped: false,
-          initialCurrentIdx: rx.resumeFromInitiativeIdx,
-        });
-        st = resume.st;
-        narrative += resume.narrative;
-        // After resume, advance the initiative cursor (or pause again if another reaction triggered).
-        if (!resume.paused) {
-          if (resume.roundWrapped) {
-            st = {
-              ...st,
-              movement_used: {},
-              surprised: [],
-              characters: st.characters.map((c) => ({ ...c, turn_actions: { ...FRESH_TURN } })),
-            };
-          }
-          st.initiative_idx = resume.exitAdvIdx;
-          const nextEntry = st.initiative_order[resume.exitAdvIdx];
-          if (nextEntry && !nextEntry.is_enemy) {
-            const nextCharIdx = st.characters.findIndex((c) => c.id === nextEntry.id && !c.dead);
-            if (nextCharIdx >= 0) {
-              st = {
-                ...st,
-                movement_used: { ...(st.movement_used ?? {}), [nextEntry.id]: 0 },
-              };
-              const withFreshTurn = {
-                ...st.characters[nextCharIdx],
-                turn_actions: { ...FRESH_TURN },
-              };
-              const ticked = tickConditions(withFreshTurn);
-              st = {
-                ...st,
-                characters: st.characters.map((c, i) => (i === nextCharIdx ? ticked : c)),
-                active_character_id: ticked.id,
-              };
-            }
-          }
-        } else {
-          st.initiative_idx = resume.exitAdvIdx;
-        }
-      }
-      break;
-    }
-
-    // ── Prepare spells ────────────────────────────────────────────────────────
-    case 'prepare_spells': {
-      if (st.combat_active) {
-        narrative = 'You cannot prepare spells during combat.';
         break;
       }
-      const prepAction = action as { type: 'prepare_spells'; spellIds: string[] };
-      const maxPrepared = preparedSpellsCap(char, context);
-      // Cantrips are always known (PHB p.234) — strip them from the
-      // input so they don't eat a prep slot or trip the cap check.
-      const leveledIds = prepAction.spellIds.filter(
-        (id) => (context.spellTable?.[id]?.level ?? 0) > 0
-      );
-      if (leveledIds.length > maxPrepared) {
-        narrative = `You can prepare at most ${maxPrepared} leveled spells (your level + spellcasting modifier). You tried to prepare ${leveledIds.length}.`;
+
+      // ── Prepare spells ────────────────────────────────────────────────────────
+      case 'prepare_spells': {
+        if (st.combat_active) {
+          narrative = 'You cannot prepare spells during combat.';
+          break;
+        }
+        const prepAction = action as { type: 'prepare_spells'; spellIds: string[] };
+        const maxPrepared = preparedSpellsCap(char, context);
+        // Cantrips are always known (PHB p.234) — strip them from the
+        // input so they don't eat a prep slot or trip the cap check.
+        const leveledIds = prepAction.spellIds.filter(
+          (id) => (context.spellTable?.[id]?.level ?? 0) > 0
+        );
+        if (leveledIds.length > maxPrepared) {
+          narrative = `You can prepare at most ${maxPrepared} leveled spells (your level + spellcasting modifier). You tried to prepare ${leveledIds.length}.`;
+          break;
+        }
+        char.prepared_spells = leveledIds;
+        const spellNames = leveledIds.map((id) => context.spellTable?.[id]?.name ?? id).join(', ');
+        narrative = `${char.name} prepares their spells for the day: ${spellNames || '(none)'}.`;
         break;
       }
-      char.prepared_spells = leveledIds;
-      const spellNames = leveledIds.map((id) => context.spellTable?.[id]?.name ?? id).join(', ');
-      narrative = `${char.name} prepares their spells for the day: ${spellNames || '(none)'}.`;
-      break;
-    }
 
-    case 'examine':
-    default: {
-      narrative = buildArrivalNarrative(roomId, st, seed, context);
-      if (st.combat_active) narrative += ` You are in combat!`;
-      if (char.conditions.length > 0) narrative += ` [Conditions: ${char.conditions.join(', ')}]`;
-      break;
+      case 'examine':
+      default: {
+        narrative = buildArrivalNarrative(roomId, st, seed, context);
+        if (st.combat_active) narrative += ` You are in combat!`;
+        if (char.conditions.length > 0) narrative += ` [Conditions: ${char.conditions.join(', ')}]`;
+        break;
+      }
     }
-  }
 
   // ── Write char back into state ─────────────────────────────────────────────
   commitChar();
