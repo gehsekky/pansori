@@ -537,7 +537,23 @@ export const context: Context = {
       {
         id: 'ancient_oak',
         name: 'The Ancient Oak',
-        desc: "A vast, ancient oak at the grove's heart. Roots curl up from the earth in a circular dais. A figure in fey green stands at the trunk — the Trickster, with two trained bears flanking it.",
+        desc: "A vast, ancient oak at the grove's heart. Roots curl up from the earth in a circular dais, splitting the approach into braided paths. A figure in fey green stands at the trunk — the Trickster, with two trained bears flanking it.",
+        // Gnarled roots arching up through the floor — split the approach so
+        // the bears can't all converge at once.
+        obstacles: [
+          { x: 4, y: 3 },
+          { x: 6, y: 3 },
+          { x: 3, y: 5 },
+          { x: 7, y: 5 },
+          { x: 5, y: 6 },
+        ],
+        // Thorned undergrowth in patches — slows movement near the dais.
+        difficultTerrain: [
+          { x: 4, y: 5 },
+          { x: 5, y: 5 },
+          { x: 6, y: 5 },
+          { x: 5, y: 4 },
+        ],
       },
       {
         id: 'grove_sanctum_exit',

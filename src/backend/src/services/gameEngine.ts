@@ -2462,10 +2462,9 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         kind: 'class_feature',
       });
       choices.push({
-        label: `Turn Undead — undead in 30 ft, WIS save or flee (bonus action, Channel Divinity, ${cdLeft} left)`,
+        label: `Turn Undead — undead in 30 ft, WIS save or flee (Channel Divinity, ${cdLeft} left)`,
         action: { type: 'use_class_feature', featureId: 'turn_undead' },
         kind: 'class_feature',
-        requiresBonusAction: true,
       });
     }
     // 2024 PHB Cleric L5: Sear Undead replaces Destroy Undead. AoE radiant
@@ -7779,10 +7778,10 @@ export async function takeAction({
       }
 
       // ── 2024 PHB Cleric: Turn Undead (universal Channel Divinity) ────────────
-      // Bonus action (was an action in 2014). All undead within 30 ft must make
-      // a WIS save or be frightened of the cleric for 1 minute. They can't
-      // willingly move closer; if affected they must Dash away when possible.
-      // We model with the existing `frightened` condition.
+      // Magic Action (full action), per 2024 PHB p.74. All undead within 30 ft
+      // must make a WIS save or be frightened of the cleric for 1 minute. They
+      // can't willingly move closer; if affected they must Dash away when
+      // possible. We model with the existing `frightened` condition.
       else if (fid === 'turn_undead') {
         if (char.character_class.toLowerCase() !== 'cleric') {
           narrative = 'Only Clerics have Turn Undead.';
@@ -7793,15 +7792,15 @@ export async function takeAction({
           narrative = 'No Channel Divinity uses remaining.';
           break;
         }
-        if (char.turn_actions.bonus_action_used) {
-          narrative = 'Bonus action already used this turn.';
+        if (char.turn_actions.action_used) {
+          narrative = 'Action already used this turn.';
           break;
         }
         char.class_resource_uses = {
           ...(char.class_resource_uses ?? {}),
           channel_divinity: cdUsesTU - 1,
         };
-        char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
+        char.turn_actions = { ...char.turn_actions, action_used: true };
         const tuDC = 8 + profBonus(char.level) + abilityMod(char.wis);
         const selfEntTU = st.entities?.find((e) => e.id === char.id);
         // Identify undead enemies. Convention: enemy name contains "skeleton",

@@ -10405,6 +10405,149 @@ describe('hostile in current room blocks travel / loot / move', () => {
   });
 });
 
+// ─── Turn Undead is a Magic Action (not bonus action) ───────────────────────
+// 2024 PHB p.74. Earlier the engine had Turn Undead gated on bonus_action_used
+// + the choice flagged requiresBonusAction:true, which blocked the Cleric
+// from using it after a Healing Potion (also bonus action) in a real
+// playthrough. This regression catches the action-economy.
+
+describe('Turn Undead — action economy + behavior', () => {
+  function clericInThroneRoom(): { st: GameState; sd: Seed } {
+    const cleric = makeChar({
+      id: 'pc-1',
+      name: 'Cleric',
+      character_class: 'Cleric',
+      level: 4,
+      wis: 18,
+      class_resource_uses: { channel_divinity: 1 },
+      conditions: [],
+      condition_durations: {},
+    });
+    const sd: Seed = {
+      context_id: ctx.id,
+      world_name: '',
+      ship_name: '',
+      intro: '',
+      seed_id: 'turn-undead-test',
+      rooms: [{ id: 'crypt', name: 'Crypt', desc: '' }],
+      connections: { crypt: [] },
+      enemies: {
+        crypt: [
+          {
+            id: 'crypt#0',
+            name: 'Skeleton Warrior',
+            hp: 10,
+            ac: 13,
+            damage: '1d6',
+            toHit: 4,
+            xp: 50,
+            str: 10,
+            dex: 14,
+            con: 15,
+            int: 6,
+            wis: 8,
+            cha: 5,
+          },
+        ],
+      },
+      loot: {},
+      npcs: {},
+    };
+    const st = makeState(
+      {},
+      {
+        characters: [cleric],
+        active_character_id: 'pc-1',
+        current_room: 'crypt',
+        combat_active: true,
+        initiative_order: [{ id: 'pc-1', roll: 20, is_enemy: false }],
+        initiative_idx: 0,
+        entities: [
+          {
+            id: 'pc-1',
+            isEnemy: false,
+            pos: { x: 1, y: 1 },
+            hp: 23,
+            maxHp: 23,
+            conditions: [],
+            condition_durations: {},
+          },
+          {
+            id: 'crypt#0',
+            isEnemy: true,
+            pos: { x: 3, y: 3 },
+            hp: 10,
+            maxHp: 10,
+            conditions: [],
+            condition_durations: {},
+          },
+        ],
+      }
+    );
+    return { st, sd };
+  }
+
+  it('is NOT blocked by a spent bonus action (regression)', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0); // d20 → 1 — Skeleton fails its save
+    const { st: initial, sd } = clericInThroneRoom();
+    // Simulate the player having already used their bonus action this turn
+    // (e.g. drank a Healing Potion or moved a Spiritual Weapon).
+    const st: GameState = {
+      ...initial,
+      characters: initial.characters.map((c) =>
+        c.id === 'pc-1' ? { ...c, turn_actions: { ...c.turn_actions, bonus_action_used: true } } : c
+      ),
+    };
+    const result = await takeAction({
+      action: { type: 'use_class_feature', featureId: 'turn_undead' },
+      history: [],
+      state: st,
+      seed: sd,
+      context: ctx,
+    });
+    expect(result.narrative).not.toMatch(/Bonus action already used/i);
+    expect(result.narrative).toMatch(/Turn Undead/i);
+    // Undead in range should have failed the save and gained 'frightened'.
+    const skel = result.newState.entities?.find((e) => e.id === 'crypt#0');
+    expect(skel?.conditions).toContain('frightened');
+  });
+
+  it('consumes the action (action_used = true)', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const { st, sd } = clericInThroneRoom();
+    const result = await takeAction({
+      action: { type: 'use_class_feature', featureId: 'turn_undead' },
+      history: [],
+      state: st,
+      seed: sd,
+      context: ctx,
+    });
+    const cleric = result.newState.characters.find((c) => c.id === 'pc-1');
+    expect(cleric?.turn_actions.action_used).toBe(true);
+    // Bonus action should NOT have been consumed — that's the bug we fixed.
+    expect(cleric?.turn_actions.bonus_action_used).not.toBe(true);
+  });
+
+  it('rejects when the main action is already spent', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const { st: initial, sd } = clericInThroneRoom();
+    const st: GameState = {
+      ...initial,
+      characters: initial.characters.map((c) =>
+        c.id === 'pc-1' ? { ...c, turn_actions: { ...c.turn_actions, action_used: true } } : c
+      ),
+    };
+    const result = await takeAction({
+      action: { type: 'use_class_feature', featureId: 'turn_undead' },
+      history: [],
+      state: st,
+      seed: sd,
+      context: ctx,
+    });
+    expect(result.narrative).toMatch(/Action already used/i);
+  });
+});
+
 // ─── Quest auto-acceptance ───────────────────────────────────────────────────
 // The explicit "Accept quest" choice was removed. A talk_response in the
 // giver NPC's room (matched by quest step[0]'s tightened condition) is now
