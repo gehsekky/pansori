@@ -1315,7 +1315,8 @@ export const context: Context = {
         ],
         rewards: [
           { type: 'give_gold', amount: 80 },
-          { type: 'set_faction_rep', factionId: 'faction_wardens', delta: 10 },
+          // Faction rep bumped via `repGain: 10` above — route surfaces
+          // the narrative line.
           {
             type: 'add_narrative',
             text: 'Brann presses a purse of 80 gold into your hand and bows his head. "His daughter will rest easier knowing."',
@@ -1364,7 +1365,7 @@ export const context: Context = {
         rewards: [
           { type: 'give_gold', amount: 250 },
           { type: 'modify_hp', amount: 15 },
-          { type: 'set_faction_rep', factionId: 'faction_wardens', delta: 30 },
+          // Faction rep bumped via `repGain: 30` above.
           {
             type: 'add_narrative',
             text: 'Captain Riese turns the idol in her hands, then drops it into the brazier. "For a generation, then. Drink with us tonight."',

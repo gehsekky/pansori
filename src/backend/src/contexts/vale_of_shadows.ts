@@ -1526,7 +1526,9 @@ export const context: Context = {
         ],
         rewards: [
           { type: 'give_gold', amount: 75 },
-          { type: 'set_faction_rep', factionId: 'faction_watch', delta: -10 },
+          // Faction rep penalty is applied via `repGain: -10` above;
+          // route surfaces the narrative line. Don't duplicate via a
+          // set_faction_rep reward (would double-count).
           {
             type: 'add_narrative',
             text: 'Dusk takes the letter with a tight smile. "Captain Vane\'s days are numbered. You\'ve made some useful friends today."',
