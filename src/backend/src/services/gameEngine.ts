@@ -17,10 +17,8 @@ import {
   rageDamageBonus,
   rageUsesMax,
   resolveEnemyAttack,
-  resolveMysteryConsumable,
   resolveOffHandAttack,
   resolvePlayerAttack,
-  resolveSaveWithAdvantage,
   resolveSpellAttack,
   rollConditionSave,
   rollCritical,
@@ -52,7 +50,6 @@ import type {
   NpcAttitude,
   OnHitEffect,
   PlacedNpc,
-  RoomObject,
   Seed,
   StructuredAction,
   Trap,
@@ -5407,104 +5404,6 @@ export async function takeAction({
         break;
       }
 
-      case 'use': {
-        const held = char.inventory?.find((i) => i.id === action.itemId);
-        if (!held) {
-          narrative = "You search your pack — you don't have that.";
-          break;
-        }
-        const itemData = getItemData(held, context);
-        const firstIdx = char.inventory.findIndex((i) => i.id === held.id);
-
-        if (itemData.slot === 'weapon') {
-          narrative = `The ${held.name} is ready. Use "attack" to strike, or "equip" to make it your active weapon.`;
-        } else if (itemData.slot === 'armor') {
-          narrative = `The ${held.name} offers protection. Use "equip" to don it for a +${itemData.ac_bonus || 0} AC bonus.`;
-        } else if (itemData.type === 'consumable') {
-          if (itemData.heal) {
-            const hasMedicine =
-              context.classSkills[char.character_class]?.includes('medicine') ?? false;
-            const healBonus = hasMedicine ? profBonus(char.level) : 0;
-            const healed = rollDice(itemData.heal) + healBonus;
-            const bonusNote = healBonus > 0 ? ` (+${healBonus} medicine)` : '';
-
-            // Resolve heal target — may be a different party member
-            const targetId = 'targetCharId' in action ? action.targetCharId : undefined;
-            const targetIdx = targetId
-              ? st.characters.findIndex((c) => c.id === targetId)
-              : safeIdx;
-            const isSelf = !targetId || targetIdx === safeIdx;
-
-            if (!isSelf && targetIdx >= 0) {
-              const target = st.characters[targetIdx];
-              const newHp = Math.min(target.max_hp, target.hp + healed);
-              st = {
-                ...st,
-                characters: st.characters.map((c, i) =>
-                  i === targetIdx ? { ...c, hp: newHp } : c
-                ),
-                // Sync the grid entity HP too so the battlefield renderer
-                // doesn't lag behind character state — a healed-back-up PC
-                // would otherwise still render as a faded skull until the
-                // next turn flushed the entities. Same fix on the self
-                // branch below.
-                entities: (st.entities ?? []).map((e) =>
-                  e.id === target.id && !e.isEnemy ? { ...e, hp: newHp } : e
-                ),
-              };
-              char.inventory = char.inventory.filter((_, i) => i !== firstIdx);
-              narrative = `${char.name} uses the ${held.name} on ${target.name} — ${fmt.hp(healed)} HP restored${bonusNote} (now ${fmt.hp(newHp, target.max_hp)}).`;
-            } else {
-              char.hp = Math.min(char.max_hp, char.hp + healed);
-              char.inventory = char.inventory.filter((_, i) => i !== firstIdx);
-              st = {
-                ...st,
-                entities: (st.entities ?? []).map((e) =>
-                  e.id === char.id && !e.isEnemy ? { ...e, hp: char.hp } : e
-                ),
-              };
-              narrative = `You use the ${held.name} and recover ${fmt.hp(healed)} HP${bonusNote} (now ${fmt.hp(char.hp, char.max_hp)}).`;
-            }
-          } else if (itemData.effect === 'con_advantage') {
-            char.inventory = char.inventory.filter((_, i) => i !== firstIdx);
-            const { roll1, roll2, best } = resolveSaveWithAdvantage(char.con);
-            narrative = `You use the ${held.name}. CON save with advantage: rolled ${roll1} and ${roll2} — keeping the ${best}. You feel steadier.`;
-          } else if (itemData.effect === 'mystery') {
-            char.inventory = char.inventory.filter((_, i) => i !== firstIdx);
-            const { result, value } = resolveMysteryConsumable();
-            if (result === 'heal') {
-              char.hp = Math.min(char.max_hp, char.hp + value);
-              narrative = `You use the ${held.name}. It tastes of regret and eucalyptus — but you feel better? +${fmt.hp(value)} HP.`;
-            } else if (result === 'hurt') {
-              char.hp = Math.max(1, char.hp - value);
-              narrative = `You use the ${held.name}. Immediate. Searing. Regret. -${fmt.hp(value)} HP.`;
-            } else {
-              narrative = `You use the ${held.name}. Nothing happens. You stand there feeling foolish.`;
-            }
-          } else {
-            narrative = `You use the ${held.name}. Something may have happened.`;
-          }
-        } else {
-          narrative = itemData.useNarrative || `You examine the ${held.name}. Might come in handy.`;
-        }
-        // SRD 5.2.1 p.204 (Using a Potion): "Drinking a potion or administering
-        // it to another creature requires a Bonus Action." Other consumables
-        // (scrolls, food, etc.) and item examinations remain a full action.
-        if (st.combat_active) {
-          const isPotionLike =
-            itemData.type === 'consumable' &&
-            (itemData.heal != null ||
-              itemData.effect === 'con_advantage' ||
-              itemData.effect === 'mystery');
-          if (isPotionLike) {
-            char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
-          } else {
-            char.turn_actions = { ...char.turn_actions, action_used: true };
-          }
-        }
-        break;
-      }
-
       // ── NPC: attack_npc ──────────────────────────────────────────────────────
       // This action is the *trigger* that flips a non-hostile NPC hostile. After
       // flipping, the NPC participates in grid combat as a regular enemy (via
@@ -8026,101 +7925,6 @@ export async function takeAction({
         break;
       }
 
-      case 'interact_object': {
-        const currentSeedRoom = seed.rooms.find((r) => r.id === roomId);
-        const obj: RoomObject | undefined = currentSeedRoom?.objects?.find(
-          (o) => o.id === action.objectId
-        );
-        if (!obj) {
-          narrative = 'There is nothing like that here.';
-          break;
-        }
-
-        const searchKey = `${roomId}:${obj.id}`;
-        if ((st.objects_searched ?? []).includes(searchKey)) {
-          narrative = `You have already searched the ${obj.name}.`;
-          break;
-        }
-
-        // Thief Fast Hands (PHB p.97): in combat, interaction is a bonus action.
-        // Out of combat, it's a free interaction (existing behavior).
-        if (st.combat_active) {
-          const fastHandsEligible =
-            char.character_class.toLowerCase() === 'rogue' &&
-            char.subclass === 'thief' &&
-            char.level >= 3;
-          if (!fastHandsEligible) {
-            narrative = 'You cannot interact with objects during combat.';
-            break;
-          }
-          if (char.turn_actions.bonus_action_used) {
-            narrative = 'Bonus action already used this turn.';
-            break;
-          }
-          char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
-        }
-
-        // Flavor objects (no DC, no loot) are one-shot — repeating adds
-        // nothing. Mark searched immediately so they drop out of the
-        // choice list.
-        if (!obj.searchable || !obj.lootIds?.length) {
-          st = { ...st, objects_searched: [...(st.objects_searched ?? []), searchKey] };
-          narrative = obj.interactText;
-          break;
-        }
-
-        const proficient =
-          char.skill_proficiencies?.some(
-            (s) => s.toLowerCase() === 'investigation' || s.toLowerCase() === 'perception'
-          ) ?? false;
-        // Search is INT (Investigation) — heavy encumbrance doesn't affect INT
-        // per 2024 RAW (only STR/DEX/CON), so we only honour exhaustion.
-        const exhaustionDisadv1 = (char.exhaustion_level ?? 0) >= 1;
-        const inspAdvSearch = consumeInspirationForCheck(char);
-        const bardicSearchRoll = consumeBardicForCheck(char);
-        const check = skillCheck(
-          char.int,
-          (obj.searchDC ?? 12) - bardicSearchRoll,
-          proficient,
-          char.level,
-          exhaustionDisadv1,
-          false,
-          false,
-          inspAdvSearch,
-          char.species === 'halfling'
-        );
-
-        if (check.success) {
-          const gained: string[] = [];
-          const gainedIds: string[] = [];
-          for (const lootId of obj.lootIds) {
-            const item = context.lootTable.find((l) => l.id === lootId);
-            if (item) {
-              char.inventory = [...(char.inventory ?? []), { ...item, instance_id: randomUUID() }];
-              gained.push(item.name);
-              gainedIds.push(item.id);
-            }
-          }
-          // Mirror the floor-loot flow: record item ids in loot_taken so quest
-          // conditions (`loot_taken contains 'shadow_evidence'`) fire whether
-          // the player picked it up from the floor or from a container.
-          if (gainedIds.length) {
-            st = { ...st, loot_taken: [...(st.loot_taken ?? []), ...gainedIds] };
-          }
-          // Mark searched only on success — a failed Investigation leaves
-          // the choice alive so the player can retry (each retry costs
-          // one turn). Matches 5e: a lock/search check is normally
-          // re-attemptable. The seenKey written by takeAction still dims
-          // the button so the player sees they've tried it.
-          st = { ...st, objects_searched: [...(st.objects_searched ?? []), searchKey] };
-          const foundDesc = obj.foundText ?? `You find: ${gained.join(', ')}.`;
-          narrative = `${obj.interactText} (Investigation: ${check.roll}+${abilityMod(char.int)}=${check.total} vs DC ${obj.searchDC ?? 12} — success!) ${foundDesc}`;
-        } else {
-          narrative = `${obj.interactText} (Investigation: ${check.roll}+${abilityMod(char.int)}=${check.total} vs DC ${obj.searchDC ?? 12} — fail.) ${obj.emptyText ?? 'You can try again.'}`;
-        }
-        break;
-      }
-
       case 'two_weapon_attack': {
         if (!st.combat_active) {
           narrative = 'No enemy to attack.';
@@ -8694,7 +8498,10 @@ export async function takeAction({
         break;
       }
 
-      case 'examine':
+      // The `examine` action is now registered in the dispatch table
+      // (services/actions/examineDefault.ts); this default arm catches
+      // truly unknown action types and falls back to the same arrival
+      // narrative the examine handler emits.
       default: {
         narrative = buildArrivalNarrative(roomId, st, seed, context);
         if (st.combat_active) narrative += ` You are in combat!`;
