@@ -1,0 +1,180 @@
+import type { ActionHandler } from './types.js';
+import { effectiveSpeed } from '../gameEngine.js';
+
+/**
+ * `spend_inspiration`: queue Heroic Inspiration to grant advantage on
+ * the next d20 test (2024 PHB — applies to any check, not just
+ * attacks). Costs nothing if no inspiration is held; idempotent if
+ * already queued.
+ */
+export const handleSpendInspiration: ActionHandler<{ type: 'spend_inspiration' }> = (ctx) => {
+  if (!ctx.char.inspiration) {
+    ctx.narrative = 'You have no Heroic Inspiration to spend.';
+    return;
+  }
+  if (ctx.char.turn_actions.inspiration_pending) {
+    ctx.narrative = 'Inspiration already queued for your next d20 roll.';
+    return;
+  }
+  ctx.char = {
+    ...ctx.char,
+    turn_actions: { ...ctx.char.turn_actions, inspiration_pending: true },
+  };
+  ctx.narrative = `${ctx.char.name} steels themselves — Heroic Inspiration queued: advantage on your next d20 (attack, save, or check).`;
+};
+
+/**
+ * `stand_up`: spend half-speed of movement to drop prone. PHB p.190 —
+ * "Standing up takes more effort; doing so costs an amount of movement
+ * equal to half your speed." Guarded by remaining movement budget so a
+ * mid-turn stand-up after a partial move can't exceed the cap.
+ */
+export const handleStandUp: ActionHandler<{ type: 'stand_up' }> = (ctx) => {
+  if (!ctx.char.conditions.includes('prone')) {
+    ctx.narrative = 'You are not prone.';
+    return;
+  }
+  const speedFt = effectiveSpeed(ctx.char);
+  const standCost = Math.floor(speedFt / 2);
+  const usedFt = (ctx.st.movement_used ?? {})[ctx.char.id] ?? 0;
+  if (usedFt + standCost > speedFt) {
+    ctx.narrative = `Not enough movement to stand up. (${speedFt - usedFt} ft remaining, ${standCost} ft needed)`;
+    return;
+  }
+  ctx.char = { ...ctx.char, conditions: ctx.char.conditions.filter((c) => c !== 'prone') };
+  ctx.st = {
+    ...ctx.st,
+    movement_used: { ...ctx.st.movement_used, [ctx.char.id]: usedFt + standCost },
+    entities: (ctx.st.entities ?? []).map((e) =>
+      e.id === ctx.char.id ? { ...e, conditions: e.conditions.filter((c) => c !== 'prone') } : e
+    ),
+  };
+  ctx.narrative = `${ctx.char.name} stands up. (${standCost} ft of movement used)`;
+};
+
+/**
+ * `dodge`: PHB p.192 — until your next turn, attack rolls against you
+ * have disadvantage (if you can see the attacker) and you have
+ * advantage on Dex saves. Engine tracks via `turn_actions.dodging` and
+ * applies the modifier in attack resolution.
+ */
+export const handleDodge: ActionHandler<{ type: 'dodge' }> = (ctx) => {
+  if (!ctx.st.combat_active) {
+    ctx.narrative = 'You can only dodge in combat.';
+    return;
+  }
+  if (ctx.char.turn_actions.action_used) {
+    ctx.narrative = 'You have already used your action this turn.';
+    return;
+  }
+  ctx.char = {
+    ...ctx.char,
+    turn_actions: { ...ctx.char.turn_actions, action_used: true, dodging: true },
+  };
+  ctx.usedInitiative = true;
+  ctx.narrative = `${ctx.char.name} takes the Dodge action — until your next turn, attacks against you have disadvantage.`;
+};
+
+/**
+ * `disengage`: PHB p.192 — your movement this turn doesn't provoke
+ * opportunity attacks. Engine tracks via `turn_actions.disengaged` and
+ * skips OA triggers when set.
+ */
+export const handleDisengage: ActionHandler<{ type: 'disengage' }> = (ctx) => {
+  if (!ctx.st.combat_active) {
+    ctx.narrative = 'You can only disengage in combat.';
+    return;
+  }
+  if (ctx.char.turn_actions.action_used) {
+    ctx.narrative = 'You have already used your action this turn.';
+    return;
+  }
+  ctx.char = {
+    ...ctx.char,
+    turn_actions: { ...ctx.char.turn_actions, action_used: true, disengaged: true },
+  };
+  ctx.usedInitiative = true;
+  ctx.narrative = `${ctx.char.name} takes the Disengage action — your next movement this turn won't trigger opportunity attacks.`;
+};
+
+/**
+ * `dash`: PHB p.192 — gain extra movement equal to your speed for the
+ * turn. Implemented by reducing `movement_used` by speed so the
+ * remaining-budget math implicitly gives a full extra speed worth.
+ */
+export const handleDash: ActionHandler<{ type: 'dash' }> = (ctx) => {
+  if (!ctx.st.combat_active) {
+    ctx.narrative = 'Dash is a combat action.';
+    return;
+  }
+  if (ctx.char.turn_actions.action_used) {
+    ctx.narrative = 'You have already used your action this turn.';
+    return;
+  }
+  const dashSpeed = effectiveSpeed(ctx.char);
+  ctx.char = { ...ctx.char, turn_actions: { ...ctx.char.turn_actions, action_used: true } };
+  ctx.st = {
+    ...ctx.st,
+    movement_used: {
+      ...(ctx.st.movement_used ?? {}),
+      [ctx.char.id]: Math.max(0, (ctx.st.movement_used?.[ctx.char.id] ?? 0) - dashSpeed),
+    },
+  };
+  ctx.narrative = `${ctx.char.name} Dashes — gaining an extra ${dashSpeed} ft of movement this turn.`;
+};
+
+/**
+ * `help`: PHB p.192 — give an ally advantage on their next attack
+ * roll. Engine tracks via `state.help_target_id`; the bonus is
+ * consumed on the helped ally's next attack resolution.
+ */
+export const handleHelp: ActionHandler<{ type: 'help'; targetId: string }> = (ctx, action) => {
+  if (!ctx.st.combat_active) {
+    ctx.narrative = 'Help is a combat action.';
+    return;
+  }
+  if (ctx.char.turn_actions.action_used) {
+    ctx.narrative = 'You have already used your action this turn.';
+    return;
+  }
+  const helpTarget = ctx.st.characters.find((c) => c.id === action.targetId && !c.dead);
+  if (!helpTarget) {
+    ctx.narrative = 'Target not found.';
+    return;
+  }
+  ctx.char = { ...ctx.char, turn_actions: { ...ctx.char.turn_actions, action_used: true } };
+  ctx.st = { ...ctx.st, help_target_id: action.targetId };
+  ctx.narrative = `${ctx.char.name} helps ${helpTarget.name} — they have advantage on their next attack roll this turn.`;
+  ctx.usedInitiative = true;
+};
+
+/**
+ * `ready`: PHB p.193 — prepare an action to fire when a trigger
+ * condition occurs. Stored on `turn_actions.readied_action`; consumed
+ * by the matching `use_reaction` handler when the player declares the
+ * trigger has fired.
+ */
+export const handleReady: ActionHandler<{
+  type: 'ready';
+  trigger: string;
+  action: import('../../types.js').StructuredAction;
+}> = (ctx, action) => {
+  if (!ctx.st.combat_active) {
+    ctx.narrative = 'Ready is a combat action.';
+    return;
+  }
+  if (ctx.char.turn_actions.action_used) {
+    ctx.narrative = 'You have already used your action this turn.';
+    return;
+  }
+  ctx.char = {
+    ...ctx.char,
+    turn_actions: {
+      ...ctx.char.turn_actions,
+      action_used: true,
+      readied_action: { trigger: action.trigger, action: action.action },
+    },
+  };
+  ctx.narrative = `${ctx.char.name} readies an action: "${action.trigger}". Use 'Trigger readied action' when the trigger occurs.`;
+  ctx.usedInitiative = true;
+};

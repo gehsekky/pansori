@@ -1,4 +1,13 @@
 import type { ActionContext, ActionHandler } from './types.js';
+import {
+  handleDash,
+  handleDisengage,
+  handleDodge,
+  handleHelp,
+  handleReady,
+  handleSpendInspiration,
+  handleStandUp,
+} from './combatUtility.js';
 import { handleEndTurn, handlePass } from './utility.js';
 import type { StructuredAction } from '../../types.js';
 
@@ -11,6 +20,13 @@ import type { StructuredAction } from '../../types.js';
 const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   pass: handlePass as ActionHandler,
   end_turn: handleEndTurn as ActionHandler,
+  spend_inspiration: handleSpendInspiration as ActionHandler,
+  stand_up: handleStandUp as ActionHandler,
+  dodge: handleDodge as ActionHandler,
+  disengage: handleDisengage as ActionHandler,
+  dash: handleDash as ActionHandler,
+  help: handleHelp as ActionHandler,
+  ready: handleReady as ActionHandler,
 };
 
 /**
