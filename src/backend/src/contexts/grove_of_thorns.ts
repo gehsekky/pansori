@@ -797,6 +797,7 @@ export const context: Context = {
         ],
         rewards: [
           { type: 'give_gold', amount: 100 },
+          { type: 'give_xp', amount: 350 },
           // Faction rep bumped via `repGain: 15` above.
           {
             type: 'add_narrative',
@@ -827,6 +828,7 @@ export const context: Context = {
         ],
         rewards: [
           { type: 'give_gold', amount: 300 },
+          { type: 'give_xp', amount: 1500 },
           // Faction rep bumped via `repGain: 30` above.
           { type: 'set_escape' },
           {

@@ -745,7 +745,8 @@ gameRouter.post('/session/:id/action', async (req: Request, res: Response) => {
               result.newState,
               row.seed,
               activeCharId,
-              rewardNarrativeParts
+              rewardNarrativeParts,
+              ctx
             );
           }
           // applyQuestCompletions already bumped faction_rep by def.repGain

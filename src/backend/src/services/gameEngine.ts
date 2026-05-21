@@ -3049,7 +3049,7 @@ export async function runRules(
     if (!firedNames.has(rule.name)) continue;
 
     for (const c of rule.consequences) {
-      st = applyConsequence(c, st, seed, activeChar.id, narrativeParts);
+      st = applyConsequence(c, st, seed, activeChar.id, narrativeParts, context);
     }
 
     if (rule.once) {
@@ -3065,7 +3065,11 @@ export function applyConsequence(
   st: GameState,
   seed: Seed,
   activeCharId: string,
-  narrativeParts: string[]
+  narrativeParts: string[],
+  // Optional: when supplied, `give_xp` triggers immediate level-ups via
+  // `applyLevelUpFromXp`. Older call sites that don't pass it still
+  // award the XP — the level-up will fire on the next kill grant.
+  context?: Context
 ): GameState {
   switch (c.type) {
     case 'add_narrative':
@@ -3135,6 +3139,39 @@ export function applyConsequence(
         ch.id === activeCharId ? { ...ch, gold: (ch.gold ?? 0) + c.amount } : ch
       );
       narrativeParts.push(`+${c.amount} gold.`);
+      return { ...st, characters };
+    }
+
+    case 'give_xp': {
+      // Quest XP — split the amount evenly across all living party
+      // members (rounded down). Mirrors how `splitEncounterXp` shares
+      // kill XP, but every eligible PC gets a share (no killer carve-out).
+      // When context is provided, also trigger immediate level-ups so
+      // the player sees the level bump on quest turn-in instead of
+      // having to wait for the next kill.
+      if (c.amount <= 0) return st;
+      const living = st.characters.filter((ch) => !ch.dead);
+      const eligibleCount = living.length;
+      if (eligibleCount === 0) return st;
+      const share = Math.floor(c.amount / eligibleCount);
+      if (share <= 0) {
+        narrativeParts.push(`+${c.amount} XP awarded but party too large for a share.`);
+        return st;
+      }
+      // Apply XP to a mutable clone so applyLevelUpFromXp (which mutates
+      // its argument) can run on each living PC without losing the XP write.
+      const livingIds = new Set(living.map((ch) => ch.id));
+      let levelUpNote = '';
+      const characters = st.characters.map((ch) => {
+        if (!livingIds.has(ch.id)) return ch;
+        const next: Character = { ...ch, xp: (ch.xp || 0) + share };
+        if (context) {
+          levelUpNote += applyLevelUpFromXp(next, context);
+        }
+        return next;
+      });
+      narrativeParts.push(`+${share} XP (each).`);
+      if (levelUpNote) narrativeParts.push(levelUpNote.trim());
       return { ...st, characters };
     }
 
@@ -5766,7 +5803,7 @@ export async function takeAction({
       if (response.consequences?.length) {
         const narrativeParts: string[] = [];
         for (const c of response.consequences) {
-          st = applyConsequence(c, st, seed, char.id, narrativeParts);
+          st = applyConsequence(c, st, seed, char.id, narrativeParts, context);
         }
         if (narrativeParts.length) narrative += ' ' + narrativeParts.join(' ');
       }
