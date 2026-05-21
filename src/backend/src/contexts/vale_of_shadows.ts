@@ -1344,6 +1344,7 @@ export const context: Context = {
         name: 'Millhaven',
         type: 'town',
         desc: "A market town at the vale's edge. Three distinct districts serve different needs.",
+        centralRoomId: 'millhaven_square',
         districts: [
           {
             id: 'district_market',
@@ -1371,6 +1372,7 @@ export const context: Context = {
         name: 'The Old Road',
         type: 'wilderness',
         desc: 'A rutted track through sparse woodland. Bandits have been raiding caravans here.',
+        centralRoomId: 'wilderness_old_road',
         connections: ['town_millhaven', 'dungeon_shattered_crypt'],
         encounterTable: ['Bandit Ruffian'],
         encounterChance: 0.4,
@@ -1380,6 +1382,7 @@ export const context: Context = {
         name: 'Shattered Crypt',
         type: 'dungeon',
         desc: 'An ancient tomb complex, sealed for generations. Something powerful has broken those seals from within.',
+        centralRoomId: 'dungeon_crypt_entrance',
         gridWidth: 10,
         gridHeight: 10,
         rooms: [], // Rooms are defined in campaign.rooms and campaign.connections above

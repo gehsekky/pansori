@@ -837,4 +837,11 @@ export interface Location {
   connections?: string[];
   encounterTable?: string[];
   encounterChance?: number;
+  // Anchor room for "you're at this location" — used to resolve
+  // current_location_id from current_room when the player hasn't
+  // explicitly travelled (e.g. the campaign starts the party at a
+  // town's central square; without this, quest steps gated on
+  // location_id never match because the engine had no way to know
+  // the party was in town).
+  centralRoomId?: string;
 }

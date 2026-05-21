@@ -1228,6 +1228,7 @@ export const context: Context = {
         name: 'Whispering Pines',
         type: 'town',
         desc: 'A snow-bound village at the foot of the pass.',
+        centralRoomId: 'pines_square',
         districts: [
           {
             id: 'district_tavern',
@@ -1255,6 +1256,7 @@ export const context: Context = {
         name: 'The Frozen Pass',
         type: 'wilderness',
         desc: 'A cliff trail to the spire. Cold winds and worse company.',
+        centralRoomId: 'wilderness_pass',
         connections: ['town_pines', 'dungeon_iceshard_spire'],
         encounterTable: ['Snowshrouded Bandit', 'Frost Wolf'],
         encounterChance: 0.4,
@@ -1264,6 +1266,7 @@ export const context: Context = {
         name: 'Iceshard Spire',
         type: 'dungeon',
         desc: 'A black tower at the top of the pass, sheathed in ice.',
+        centralRoomId: 'spire_entry',
         gridWidth: 10,
         gridHeight: 10,
         rooms: [],
