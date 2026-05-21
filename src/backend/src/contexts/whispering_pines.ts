@@ -1285,7 +1285,12 @@ export const context: Context = {
           {
             id: 'step_talk_brann',
             desc: 'Speak with Innkeeper Brann about the missing trapper.',
-            condition: { all: [{ fact: 'action', operator: 'equal', value: 'talk_response' }] },
+            condition: {
+              any: [
+                { fact: 'action', operator: 'equal', value: 'talk_response' },
+                { fact: 'action', operator: 'equal', value: 'accept_quest' },
+              ],
+            },
           },
           {
             id: 'step_find_locket',
@@ -1325,7 +1330,12 @@ export const context: Context = {
           {
             id: 'step_meet_riese',
             desc: 'Speak with Captain Riese at the Warden Post.',
-            condition: { all: [{ fact: 'action', operator: 'equal', value: 'talk_response' }] },
+            condition: {
+              any: [
+                { fact: 'action', operator: 'equal', value: 'talk_response' },
+                { fact: 'action', operator: 'equal', value: 'accept_quest' },
+              ],
+            },
           },
           {
             id: 'step_kill_acolyte',
