@@ -14,6 +14,7 @@ import type {
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   applyConsequence,
+  backfillOwnership,
   buildArrivalNarrative,
   generateChoices,
   normalizeState,
@@ -10254,6 +10255,45 @@ describe('normalizeState preserves seen_choices', () => {
     const st = makeState({}, { seen_choices: ['interact_object::roomA::chest'] });
     const result = normalizeState(st as unknown as Record<string, unknown>);
     expect(result.seen_choices).toEqual(['interact_object::roomA::chest']);
+  });
+});
+
+// ─── Multiplayer ownership backfill ──────────────────────────────────────────
+// Pre-MP saves don't carry Character.owner_user_id. backfillOwnership writes
+// the host's id onto every PC that lacks one — the same idempotent
+// schema-evolution pattern as normalizeState's defaulted fields.
+
+describe('backfillOwnership', () => {
+  it('fills in owner_user_id on PCs that lack one', () => {
+    const pcA = makeChar({ id: 'pc-a' });
+    const pcB = makeChar({ id: 'pc-b' });
+    const st = makeState({}, { characters: [pcA, pcB] });
+    expect(pcA.owner_user_id).toBeUndefined();
+    expect(pcB.owner_user_id).toBeUndefined();
+    const next = backfillOwnership(st, 'host-id');
+    expect(next.characters[0].owner_user_id).toBe('host-id');
+    expect(next.characters[1].owner_user_id).toBe('host-id');
+  });
+
+  it('leaves existing owner_user_id untouched', () => {
+    const pcA = makeChar({ id: 'pc-a', owner_user_id: 'friend-id' });
+    const pcB = makeChar({ id: 'pc-b' });
+    const st = makeState({}, { characters: [pcA, pcB] });
+    const next = backfillOwnership(st, 'host-id');
+    // Friend's PC stays theirs even though the route-level host is different.
+    expect(next.characters[0].owner_user_id).toBe('friend-id');
+    // The unassigned PC defaults to the host.
+    expect(next.characters[1].owner_user_id).toBe('host-id');
+  });
+
+  it('returns the same state object reference when nothing needs backfilling', () => {
+    // Idempotency / cheapness: if every PC already has an owner, we skip the
+    // map+spread and hand back the input unchanged. Lets callers cheaply
+    // detect "no migration needed" via referential equality.
+    const pcA = makeChar({ id: 'pc-a', owner_user_id: 'host-id' });
+    const pcB = makeChar({ id: 'pc-b', owner_user_id: 'host-id' });
+    const st = makeState({}, { characters: [pcA, pcB] });
+    expect(backfillOwnership(st, 'host-id')).toBe(st);
   });
 });
 

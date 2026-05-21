@@ -12,13 +12,13 @@ Internet → Nginx (EC2) ─┬→ /api/*   → Express backend (Docker)
 
 ### Estimated monthly cost (us-east-1)
 
-| Resource | Spec | Cost/mo |
-|---|---|---|
-| EC2 | t3.micro (2 vCPU, 1 GB RAM) | ~$8.50 |
-| Elastic IP | 1 static IP | ~$3.60 |
-| EBS storage | 20 GB gp3 | ~$1.60 |
-| Data transfer | First 100 GB outbound | ~$0–9 |
-| **Total** | | **~$14–22/mo** |
+| Resource      | Spec                        | Cost/mo        |
+| ------------- | --------------------------- | -------------- |
+| EC2           | t3.micro (2 vCPU, 1 GB RAM) | ~$8.50         |
+| Elastic IP    | 1 static IP                 | ~$3.60         |
+| EBS storage   | 20 GB gp3                   | ~$1.60         |
+| Data transfer | First 100 GB outbound       | ~$0–9          |
+| **Total**     |                             | **~$14–22/mo** |
 
 Free tier covers EC2 t2.micro + 30 GB EBS for 12 months if this is a new account.
 
@@ -71,11 +71,11 @@ Pansori uses Google SSO for authentication. You need a Google Cloud project with
 5. **Key pair**: Create or select an existing key pair — download the `.pem` file
 6. **Security group** — create a new one with these inbound rules:
 
-   | Type | Protocol | Port | Source |
-   |------|----------|------|--------|
-   | SSH | TCP | 22 | Your IP |
-   | HTTP | TCP | 80 | 0.0.0.0/0 |
-   | HTTPS | TCP | 443 | 0.0.0.0/0 |
+   | Type  | Protocol | Port | Source    |
+   | ----- | -------- | ---- | --------- |
+   | SSH   | TCP      | 22   | Your IP   |
+   | HTTP  | TCP      | 80   | 0.0.0.0/0 |
+   | HTTPS | TCP      | 443  | 0.0.0.0/0 |
 
 7. **Storage**: 20 GB gp3
 8. Launch the instance
@@ -284,13 +284,13 @@ Add `EC2_HOST` (your Elastic IP) and `EC2_SSH_KEY` (contents of your `.pem` file
 
 ## Scaling up (when needed)
 
-| Need | Solution |
-|------|----------|
-| More concurrent players | Upgrade to t3.small or t3.medium |
-| Managed database backups | Move Postgres to RDS db.t3.micro (add ~$15/mo) |
-| Global CDN for static assets | Build frontend and serve from S3 + CloudFront |
-| Zero-downtime deploys | Move to ECS Fargate with rolling deployments |
-| Multiple regions | Add CloudFront with origin failover |
+| Need                         | Solution                                       |
+| ---------------------------- | ---------------------------------------------- |
+| More concurrent players      | Upgrade to t3.small or t3.medium               |
+| Managed database backups     | Move Postgres to RDS db.t3.micro (add ~$15/mo) |
+| Global CDN for static assets | Build frontend and serve from S3 + CloudFront  |
+| Zero-downtime deploys        | Move to ECS Fargate with rolling deployments   |
+| Multiple regions             | Add CloudFront with origin failover            |
 
 For S3/CloudFront (static frontend), build the frontend locally and sync:
 

@@ -69,7 +69,7 @@ describe('migrationRunner', () => {
   });
 
   it('only runs migrations not already in schema_migrations', async () => {
-    // Pretend 001-008 are applied; only 009 should run.
+    // Pretend 001-009 are applied; only 010 should run.
     const allButLast = [
       '001_init.sql',
       '002_remove_user_auth.sql',
@@ -79,6 +79,7 @@ describe('migrationRunner', () => {
       '006_campaign_state.sql',
       '007_drop_leader_columns.sql',
       '008_drop_leader_columns_recheck.sql',
+      '009_user_identities.sql',
     ];
     const mock = makeMockPool({ appliedMigrations: allButLast, gameSessionsExists: true });
     await runMigrations(mock.pool);
@@ -87,8 +88,8 @@ describe('migrationRunner', () => {
     ).mock.calls.filter(
       ([sql]: unknown[]) => typeof sql === 'string' && sql.startsWith('BEGIN')
     ).length;
-    expect(transactions).toBe(1); // just 009
-    expect([...mock.applied]).toContain('009_user_identities.sql');
+    expect(transactions).toBe(1); // just 010
+    expect([...mock.applied]).toContain('010_session_participants.sql');
   });
 
   it('is a no-op when DB is up to date', async () => {
@@ -104,6 +105,7 @@ describe('migrationRunner', () => {
       '007_drop_leader_columns.sql',
       '008_drop_leader_columns_recheck.sql',
       '009_user_identities.sql',
+      '010_session_participants.sql',
     ];
     const mock = makeMockPool({ appliedMigrations: allApplied, gameSessionsExists: true });
     await runMigrations(mock.pool);

@@ -1345,6 +1345,21 @@ function getSpellSlotsForLevel(
 
 // ─── Backward-compatibility normalizer ───────────────────────────────────────
 
+// Backfill Character.owner_user_id for pre-multiplayer saves. New sessions
+// set owner_user_id at character creation (every PC = host). Existing
+// sessions stored before MP shipped have no owner field — every PC there
+// gets the session's host user id. Called by routes/game.ts right after
+// normalizeState; idempotent (only writes when the field is missing).
+export function backfillOwnership(state: GameState, hostUserId: string): GameState {
+  let mutated = false;
+  const characters = state.characters.map((c) => {
+    if (c.owner_user_id) return c;
+    mutated = true;
+    return { ...c, owner_user_id: hostUserId };
+  });
+  return mutated ? { ...state, characters } : state;
+}
+
 export function normalizeState(raw: Record<string, unknown>): GameState {
   // Already new format — patch any fields added after initial rollout
   if (Array.isArray((raw as unknown as GameState).characters)) {

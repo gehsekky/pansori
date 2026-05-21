@@ -516,6 +516,13 @@ export interface Character {
   // because pre-species saves still need to load — defaults applied as
   // "Human" when missing.
   species?: string;
+  // Multiplayer ownership: the userId of the human controlling this PC.
+  // In solo mode every PC is owned by the host (= session.user_id). In
+  // multiplayer the host can reassign via session_participants UI; the
+  // assignment lives on the character so per-PC ownership reads in one
+  // hop without a join. Optional because pre-MP saves don't carry it —
+  // normalizeState backfills missing values to session.user_id.
+  owner_user_id?: string;
 }
 
 // ─── Reactive spell window ───────────────────────────────────────────────────

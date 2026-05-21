@@ -18,6 +18,7 @@ import { Request, Response, Router } from 'express';
 import { SRD_SPECIES, SRD_WEAPON_MASTERY_SLOTS } from '../contexts/srd/index.js';
 import {
   applyConsequence,
+  backfillOwnership,
   buildArrivalNarrative,
   generateChoices,
   normalizeState,
@@ -179,6 +180,7 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
   try {
     await client.query('BEGIN');
 
+    const hostUserId = authedUserId(req);
     const partyChars: Character[] = characters.map((c, _charIdx) => {
       const base = c.stats
         ? {
@@ -299,6 +301,11 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
         species: speciesId,
         speed: speciesData.speedFt,
         darkvision_ft: speciesData.darkvisionFt,
+        // Multiplayer ownership — every PC defaults to the host at
+        // creation. The host can reassign via the participants modal
+        // (PR 4) when a friend joins. Solo sessions never see this
+        // touched. See docs/TODO.md "Multiplayer MVP".
+        owner_user_id: hostUserId,
         // Species innate cantrips merged into spells_known so the engine
         // surfaces them without slot cost.
         ...(speciesData.innateCantrips && speciesData.innateCantrips.length > 0
@@ -358,7 +365,16 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
     } = await client.query(
       `INSERT INTO game_sessions (user_id, seed, state)
        VALUES ($1, $2, $3) RETURNING *`,
-      [authedUserId(req), JSON.stringify(seed), JSON.stringify(initialState)]
+      [hostUserId, JSON.stringify(seed), JSON.stringify(initialState)]
+    );
+    // Add the host as a participant. The migration backfilled existing
+    // sessions; this row covers newly-created ones. PR 2's auth guards
+    // expect every session to have at least one participant row.
+    await client.query(
+      `INSERT INTO session_participants (session_id, user_id, role)
+       VALUES ($1, $2, 'pc')
+       ON CONFLICT (session_id, user_id) DO NOTHING`,
+      [session.id, hostUserId]
     );
     await client.query('COMMIT');
     // Reset persisted campaign state so a fresh adventure doesn't inherit
@@ -409,7 +425,7 @@ gameRouter.post('/session/:id/equip', async (req: Request, res: Response) => {
     }
 
     const ctx = CONTEXTS[row.seed.context_id] ?? DEFAULT_CONTEXT;
-    const state = normalizeState(row.state);
+    const state = backfillOwnership(normalizeState(row.state), row.user_id);
 
     // Resolve target character
     const targetId = character_id ?? state.active_character_id;
@@ -522,7 +538,7 @@ gameRouter.post('/session/:id/transfer', async (req: Request, res: Response) => 
       res.status(404).json({ error: 'Session not found' });
       return;
     }
-    const state = normalizeState(row.state);
+    const state = backfillOwnership(normalizeState(row.state), row.user_id);
     const fromIdx = state.characters.findIndex((c) => c.id === from_character_id);
     const toIdx = state.characters.findIndex((c) => c.id === to_character_id);
     if (fromIdx < 0 || toIdx < 0) {
@@ -593,7 +609,7 @@ gameRouter.post('/session/:id/drop', async (req: Request, res: Response) => {
       res.status(404).json({ error: 'Session not found' });
       return;
     }
-    const state = normalizeState(row.state);
+    const state = backfillOwnership(normalizeState(row.state), row.user_id);
     const charIdx = state.characters.findIndex((c) => c.id === character_id);
     if (charIdx < 0) {
       res.status(400).json({ error: 'Character not found in session' });
@@ -653,7 +669,7 @@ gameRouter.post('/session/:id/action', async (req: Request, res: Response) => {
     }
 
     const ctx = CONTEXTS[row.seed.context_id] ?? DEFAULT_CONTEXT;
-    let state = normalizeState(row.state);
+    let state = backfillOwnership(normalizeState(row.state), row.user_id);
 
     // For campaign sessions, load and merge persisted campaign state
     let campaignState = null;
