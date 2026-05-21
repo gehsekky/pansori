@@ -5,6 +5,7 @@ import {
   handleSelectSubclass,
   handleSetActiveCharacter,
 } from './meta.js';
+import { handleBuy, handleTalk, handleTalkResponse } from './social.js';
 import {
   handleDash,
   handleDisengage,
@@ -46,6 +47,9 @@ const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   short_rest: handleShortRest as ActionHandler,
   long_rest: handleLongRest as ActionHandler,
   death_save: handleDeathSave as ActionHandler,
+  talk: handleTalk as ActionHandler,
+  talk_response: handleTalkResponse as ActionHandler,
+  buy: handleBuy as ActionHandler,
 };
 
 /**
