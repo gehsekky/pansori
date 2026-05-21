@@ -343,13 +343,8 @@ export default function App() {
                 <AdventureLogPanel
                   history={history}
                   worldName={worldName}
-                  party={gameState?.characters.map((c) => ({
-                    name: c.name,
-                    character_class: c.character_class,
-                    hp: c.hp,
-                    max_hp: c.max_hp,
-                  }))}
-                  currentRoom={gameState?.current_room}
+                  state={gameState ?? undefined}
+                  seed={seed ?? undefined}
                 />
               ),
             });
