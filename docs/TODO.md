@@ -52,7 +52,31 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 - [ ] **gameEngine.ts class refactor (deferred)** — `takeAction` is ~3900 lines with three handlers that dominate (`use_class_feature` ~800, `cast_spell` ~544, `attack` ~532). Refactor into an `ActionContext` class that dispatches to handler files (`services/actions/castSpell.ts`, etc.). Moderate regression risk. Triggers to revisit: (a) big-handler edits grind into context budget; (b) a feature touches multiple handlers; (c) a quiet maintenance day.
 - [ ] **Pre-commit hook (Husky + lint-staged)** — auto-run eslint + prettier on staged files before commit. Catches the class of bug where prettier-dirty code reaches CI and fails the build. ~30 min setup; bypassable with `--no-verify`. CI lint stays as the gate.
 
-- [ ] **Multiplayer MVP — party-of-equals with per-PC ownership** (design locked 2026-05-21).
+- [x] **Multiplayer MVP — party-of-equals with per-PC ownership** (design locked + shipped 2026-05-21).
+  All four PRs landed: PR 1 (data foundation), PR 2 (auth + turn enforcement),
+  PR 3 (Socket.IO realtime push + WaitingForPlayer), PR 4 (invite link UX).
+  Solo mode is unchanged — host owns every PC, no participant rejects, no
+  waiting banner. Multi: friend opens the shared `?join=<token>` URL,
+  becomes a participant, sees the full narrative chat via realtime
+  broadcasts, but can't act until the host reassigns a PC via the
+  assign-character endpoint (UI follow-up below). Three follow-ups
+  remain before MP feels complete; tracked separately so the MVP itself
+  reads as shipped.
+
+  Follow-ups:
+  - [ ] **ParticipantsManager UI** — the assign-character endpoint exists
+    (PR 2) but there's no host-facing UI to drive it. Friends can join +
+    spectate but the host has to call the API directly to hand them a
+    PC. ~1-2h. Pick up after the first playtest confirms this is the
+    next blocker.
+  - [ ] **Voluntary leave** — DELETE /session/:id/participant for
+    non-host participants who want out. Currently the host can rotate
+    the invite token to lock people out, but explicit leave is polish.
+    ~30min.
+  - [ ] **Race detection** (`turn_seq` column) — if two participants
+    race-click during the same active turn, the server already rejects
+    the loser via the turn-enforcement guard with a 403, so this isn't
+    critical. Defer until it actually bites.
       Each PC has exactly one human controller via `Character.owner_user_id`. Solo
       mode = host owns all PCs (no schema branch). 2+1 / 1+2 / 1+1+1 splits all
       fall out of the same row layout in `session_participants`. Every participant
