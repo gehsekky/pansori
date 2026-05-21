@@ -163,6 +163,23 @@ function PartyTile({
             ✦
           </span>
         )}
+        {char.asi_pending && (
+          <span
+            aria-label="Ability Score Improvement available"
+            title="Ability Score Improvement — choose an attribute to raise"
+            style={{
+              color: 'var(--t-hp-mid)',
+              fontSize: '0.65rem',
+              fontWeight: 'bold',
+              border: '1px solid var(--t-hp-mid)',
+              borderRadius: 2,
+              padding: '0 4px',
+              letterSpacing: '0.05em',
+            }}
+          >
+            +ASI
+          </span>
+        )}
       </div>
 
       <div className={styles.partyTileBars}>
