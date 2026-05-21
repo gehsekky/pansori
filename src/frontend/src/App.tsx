@@ -13,6 +13,7 @@ import DefaultActionBar from './components/DefaultActionBar.tsx';
 import EnemySelector from './components/EnemySelector.tsx';
 import GridCombatView from './components/GridCombatView.tsx';
 import InventoryModal from './components/InventoryModal.tsx';
+import InviteDialog from './components/InviteDialog.tsx';
 import LoginScreen from './components/LoginScreen.tsx';
 import MoveDPad from './components/MoveDPad.tsx';
 import NarrativeText from './components/NarrativeText.tsx';
@@ -116,6 +117,7 @@ export default function App() {
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [mapOpen, setMapOpen] = useState(false);
   const [inventoryOpen, setInventoryOpen] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
   // Which choice is currently hovered — used by GridCombatView to render an
   // AoE preview tint over the cells a hovered spell would affect.
   const [hoveredChoice, setHoveredChoice] = useState<GameChoice | null>(null);
@@ -128,6 +130,7 @@ export default function App() {
   const narrativeRef = useRef<HTMLDivElement>(null);
 
   const {
+    session,
     gameState,
     seed,
     campaignMeta,
@@ -170,8 +173,31 @@ export default function App() {
   useEffect(() => {
     api
       .getMe()
-      .then((me) => {
+      .then(async (me) => {
         setUser(me);
+        // Multiplayer invite handler: ?join=<token> means a friend
+        // clicked our shareable link. POST the token to /session/join
+        // (adds them to session_participants) and resume the returned
+        // session. The token is stripped from the URL on success so
+        // a refresh doesn't re-join (idempotent at the server too,
+        // but cleaner URL).
+        const params = new URLSearchParams(window.location.search);
+        const joinToken = params.get('join');
+        if (joinToken) {
+          try {
+            const { session_id } = await api.joinSession(joinToken);
+            window.history.replaceState(null, '', `/${session_id}`);
+            await handleResumeSession(session_id);
+            setView('game');
+            return;
+          } catch {
+            // Invalid / expired token — fall through to the normal
+            // session-list view so the user can see they're logged
+            // in even if the link didn't work.
+            window.history.replaceState(null, '', '/');
+            return loadSessions();
+          }
+        }
         const uuidInPath = window.location.pathname.match(/^\/([0-9a-f-]{36})$/i)?.[1];
         if (uuidInPath) {
           return handleResumeSession(uuidInPath)
@@ -403,6 +429,17 @@ export default function App() {
                         <img src={user.avatar_url} alt="" className={styles.userAvatar} />
                       )}
                       <span>{user.display_name.toUpperCase()}</span>
+                      {gameState && !escaped && !allDead && (
+                        <button
+                          className={styles.signOutBtn}
+                          onClick={() => setInviteOpen(true)}
+                          title="Share an invite link so friends can join"
+                          aria-label="Invite players"
+                          data-testid="invite-btn"
+                        >
+                          INVITE
+                        </button>
+                      )}
                       {gameState && !escaped && !allDead && (
                         <button
                           className={styles.signOutBtn}
@@ -821,6 +858,15 @@ export default function App() {
                   onEquip={handleEquip}
                   onTransfer={handleTransfer}
                   onDrop={handleDrop}
+                />
+              )}
+
+              {inviteOpen && session && (
+                <InviteDialog
+                  sessionId={session.id}
+                  inviteToken={session.invite_token ?? null}
+                  isHost={!session.user_id || session.user_id === user?.id}
+                  onClose={() => setInviteOpen(false)}
                 />
               )}
             </div>

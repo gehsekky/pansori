@@ -133,4 +133,37 @@ export const api = {
 
   clearCompleted: () =>
     req<{ ok: boolean; deleted: number }>('/game/sessions/completed', { method: 'DELETE' }),
+
+  // Multiplayer endpoints (PR 4)
+  joinSession: (invite_token: string) =>
+    req<{ ok: boolean; session_id: string }>('/game/session/join', {
+      method: 'POST',
+      body: JSON.stringify({ invite_token }),
+    }),
+
+  listParticipants: (sessionId: string) =>
+    req<{
+      host_user_id: string;
+      participants: Array<{
+        user_id: string;
+        role: string;
+        joined_at: string;
+        display_name: string;
+        avatar_url: string | null;
+      }>;
+    }>(`/game/session/${sessionId}/participants`),
+
+  rotateInvite: (sessionId: string) =>
+    req<{ invite_token: string }>(`/game/session/${sessionId}/rotate-invite`, {
+      method: 'POST',
+    }),
+
+  assignCharacter: (sessionId: string, character_id: string, owner_user_id: string) =>
+    req<{ ok: boolean; character_id: string; owner_user_id: string }>(
+      `/game/session/${sessionId}/assign-character`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ character_id, owner_user_id }),
+      }
+    ),
 };
