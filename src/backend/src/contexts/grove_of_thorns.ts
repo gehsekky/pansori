@@ -797,7 +797,7 @@ export const context: Context = {
         ],
         rewards: [
           { type: 'give_gold', amount: 100 },
-          { type: 'set_faction_rep', factionId: 'faction_verdant', delta: 15 },
+          // Faction rep bumped via `repGain: 15` above.
           {
             type: 'add_narrative',
             text: "Old Elise presses your hand in both of hers. 'The Verdant Circle remembers you.'",
@@ -827,7 +827,7 @@ export const context: Context = {
         ],
         rewards: [
           { type: 'give_gold', amount: 300 },
-          { type: 'set_faction_rep', factionId: 'faction_verdant', delta: 30 },
+          // Faction rep bumped via `repGain: 30` above.
           { type: 'set_escape' },
           {
             type: 'add_narrative',
