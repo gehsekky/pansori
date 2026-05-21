@@ -3170,7 +3170,12 @@ export function applyConsequence(
         }
         return next;
       });
-      narrativeParts.push(`+${share} XP (each).`);
+      // Show the authored total + per-PC share so the player can see
+      // the quest's reward magnitude and what each PC actually got.
+      // Solo parties collapse to just the total (each = total).
+      narrativeParts.push(
+        eligibleCount > 1 ? `+${c.amount} XP (+${share} each).` : `+${c.amount} XP.`
+      );
       if (levelUpNote) narrativeParts.push(levelUpNote.trim());
       return { ...st, characters };
     }
