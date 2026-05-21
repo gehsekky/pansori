@@ -289,7 +289,11 @@ export const handleCastSpell: ActionHandler<{
       // Pick the targets: caster (always) + up to 2 living allies.
       const blessTargets: string[] = [ctx.char.id];
       for (const c of ctx.st.characters) {
-        if (blessTargets.length >= 3) return;
+        // Cap at 3 targets per RAW. (PR 15 sed regression: had `return`
+        // here, which exited the whole handler before the bless effect
+        // ever applied. Tests didn't catch it because no test hits the
+        // exact 4+-party-member path. Restored to `break`.)
+        if (blessTargets.length >= 3) break;
         if (c.id === ctx.char.id || c.dead) continue;
         blessTargets.push(c.id);
       }
