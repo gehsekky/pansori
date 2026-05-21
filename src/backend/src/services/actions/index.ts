@@ -1,4 +1,5 @@
 import type { ActionContext, ActionHandler } from './types.js';
+import { handleAcceptQuest, handleCompleteQuest } from './quest.js';
 import {
   handleApplyAsi,
   handlePrepareSpells,
@@ -16,6 +17,7 @@ import {
   handleStandUp,
 } from './combatUtility.js';
 import { handleEndTurn, handlePass } from './utility.js';
+import { handleEnterDistrict, handleTravel } from './travel.js';
 import { handleLongRest, handleShortRest } from './rest.js';
 import type { StructuredAction } from '../../types.js';
 import { handleAttune } from './inventory.js';
@@ -50,6 +52,10 @@ const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   talk: handleTalk as ActionHandler,
   talk_response: handleTalkResponse as ActionHandler,
   buy: handleBuy as ActionHandler,
+  travel: handleTravel as ActionHandler,
+  enter_district: handleEnterDistrict as ActionHandler,
+  accept_quest: handleAcceptQuest as ActionHandler,
+  complete_quest: handleCompleteQuest as ActionHandler,
 };
 
 /**
