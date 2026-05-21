@@ -156,6 +156,40 @@ function validateSeed(ctx: Context, seed: Seed) {
 describe('generateRoguelikeSeed — sandbox', () => {
   const seed = generateRoguelikeSeed(sandboxCtx);
   validateSeed(sandboxCtx, seed);
+
+  it('obstacles, when seeded, stay in the middle band (away from spawn rows)', () => {
+    const gh = sandboxCtx.gridHeight ?? 8;
+    const gw = sandboxCtx.gridWidth ?? 8;
+    for (const room of seed.rooms) {
+      for (const o of room.obstacles ?? []) {
+        expect(o.y).toBeGreaterThanOrEqual(3);
+        expect(o.y).toBeLessThanOrEqual(gh - 3);
+        expect(o.x).toBeGreaterThanOrEqual(1);
+        expect(o.x).toBeLessThanOrEqual(gw - 2);
+      }
+    }
+  });
+
+  it('obstacles only land on rooms that have enemies (combat rooms)', () => {
+    // Across many seeds: every obstacle should be in a combat room.
+    for (let trial = 0; trial < 30; trial++) {
+      const s = generateRoguelikeSeed(sandboxCtx);
+      for (const room of s.rooms) {
+        if (room.obstacles?.length) {
+          expect(s.enemies?.[room.id]?.length ?? 0).toBeGreaterThan(0);
+        }
+      }
+    }
+  });
+
+  it('over many seeds, at least one room gets obstacles (procgen actually fires)', () => {
+    let found = false;
+    for (let trial = 0; trial < 50 && !found; trial++) {
+      const s = generateRoguelikeSeed(sandboxCtx);
+      found = s.rooms.some((r) => (r.obstacles?.length ?? 0) > 0);
+    }
+    expect(found).toBe(true);
+  });
 });
 
 // ─── Campaign seed validation ────────────────────────────────────────────────

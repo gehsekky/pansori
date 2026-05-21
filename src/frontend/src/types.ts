@@ -203,7 +203,6 @@ export interface Character {
 
 // ─── Game state (world/party container) ──────────────────────────────────────
 
-
 // `PendingShieldReaction` is re-exported from ./shared-types (see src/shared/types.ts).
 
 // `PendingHellishRebukeReaction` is re-exported from ./shared-types (see src/shared/types.ts).
@@ -294,6 +293,11 @@ export interface Seed {
     desc: string;
     objects?: RoomObject[];
     lighting?: 'bright' | 'dim' | 'dark';
+    // Static obstacles (columns, walls, debris) — render-only on the FE,
+    // the engine reads these from the matching BE Room for cover and to
+    // block movement through these cells.
+    obstacles?: GridPos[];
+    difficultTerrain?: GridPos[];
   }>;
   connections: Record<string, string[]>;
   enemies?: Record<string, Array<{ id: string; name: string; hp: number; ac: number }>>;

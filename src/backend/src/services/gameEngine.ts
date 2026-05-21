@@ -1062,9 +1062,7 @@ function fireLegendaryAction(
         return distanceFeet(lairEnt.pos, a.pos) - distanceFeet(lairEnt.pos, b.pos);
       })[0];
     if (!nearestPcEnt) return { st, narrative, fired: true };
-    const targetCharIdx = st.characters.findIndex(
-      (c) => c.id === nearestPcEnt.id && !c.dead
-    );
+    const targetCharIdx = st.characters.findIndex((c) => c.id === nearestPcEnt.id && !c.dead);
     if (targetCharIdx < 0) return { st, narrative, fired: true };
     const target = st.characters[targetCharIdx];
     const atkResult = applyEnemyAttackNarrative(legendary, target, context);
@@ -2578,12 +2576,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       // for prep classes. If `prepared_spells` is empty (legacy state /
       // pre-prep flow), fall back to surfacing everything so the player
       // isn't left without options.
-      if (
-        enforcePrep &&
-        spell.level > 0 &&
-        preparedSet.size > 0 &&
-        !preparedSet.has(spellId)
-      ) {
+      if (enforcePrep && spell.level > 0 && preparedSet.size > 0 && !preparedSet.has(spellId)) {
         continue;
       }
 
@@ -2632,8 +2625,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
           counts[en.name] > 1 ? ` #${(seen[en.name] = (seen[en.name] ?? 0) + 1)}` : '';
       })();
       const hasOwnMultiTargetVariants =
-        spellId === 'magic_missile' ||
-        (spellId === 'eldritch_blast' && char.level >= 5);
+        spellId === 'magic_missile' || (spellId === 'eldritch_blast' && char.level >= 5);
       const emitPerEnemy =
         isOffensive &&
         !spell.blastRadius &&
@@ -3149,18 +3141,14 @@ export function applyConsequence(
     case 'set_faction_rep': {
       const cur = st.faction_rep?.[c.factionId] ?? 0;
       const next = cur + c.delta;
-      narrativeParts.push(
-        `${c.delta >= 0 ? '+' : ''}${c.delta} reputation with ${c.factionId}.`
-      );
+      narrativeParts.push(`${c.delta >= 0 ? '+' : ''}${c.delta} reputation with ${c.factionId}.`);
       return { ...st, faction_rep: { ...(st.faction_rep ?? {}), [c.factionId]: next } };
     }
 
     case 'set_npc_attitude': {
       // npcId is the npc's authored id (e.g. 'npc_aldric'); npc_attitudes
       // is keyed by roomId since each room can host at most one NPC.
-      const targetRoomId = Object.entries(seed.npcs ?? {}).find(
-        ([, n]) => n.id === c.npcId
-      )?.[0];
+      const targetRoomId = Object.entries(seed.npcs ?? {}).find(([, n]) => n.id === c.npcId)?.[0];
       if (!targetRoomId) return st;
       return {
         ...st,
@@ -3176,9 +3164,7 @@ export function applyConsequence(
         return {
           ...st,
           quest_progress: progress.map((p) =>
-            p.questId === c.questId
-              ? { ...p, completedSteps: [...p.completedSteps, c.stepId] }
-              : p
+            p.questId === c.questId ? { ...p, completedSteps: [...p.completedSteps, c.stepId] } : p
           ),
         };
       }
@@ -3371,15 +3357,17 @@ function planEnemyApproach(args: {
   speedFt: number;
   context: Context;
   roomId: string;
+  roomObstacles?: GridPos[];
 }): { newPos: GridPos; pathSquares: GridPos[]; reached: boolean } | null {
   const locationGrid = args.context.campaign?.locations?.find((l) =>
     l.rooms?.some((r) => r.id === args.roomId)
   );
   const gridW = locationGrid?.gridWidth ?? args.context.gridWidth ?? 10;
   const gridH = locationGrid?.gridHeight ?? args.context.gridHeight ?? 10;
-  const blocked = (args.st.entities ?? [])
-    .filter((e) => e.id !== args.enemyId && e.hp > 0)
-    .map((e) => e.pos);
+  const blocked = [
+    ...(args.st.entities ?? []).filter((e) => e.id !== args.enemyId && e.hp > 0).map((e) => e.pos),
+    ...(args.roomObstacles ?? []),
+  ];
   const reachSquares = Math.max(1, Math.floor(args.reachFt / SQUARE_SIZE));
   // Candidate end squares: any unoccupied square within reachSquares (Chebyshev)
   // of the target.
@@ -3411,10 +3399,8 @@ function planEnemyApproach(args: {
       }
       const newPos = truncated[truncated.length - 1];
       const reached =
-        Math.max(
-          Math.abs(newPos.x - args.targetPos.x),
-          Math.abs(newPos.y - args.targetPos.y)
-        ) <= reachSquares;
+        Math.max(Math.abs(newPos.x - args.targetPos.x), Math.abs(newPos.y - args.targetPos.y)) <=
+        reachSquares;
       return { newPos, pathSquares: truncated, reached };
     }
   }
@@ -3437,8 +3423,7 @@ function applyPcOpportunityAttacks(args: {
   context: Context;
 }): { st: GameState; enemyKilled: boolean; narrative: string } {
   let st = args.st;
-  let enemyHpNow =
-    st.entities?.find((e) => e.id === args.enemyId && e.isEnemy)?.hp ?? 0;
+  let enemyHpNow = st.entities?.find((e) => e.id === args.enemyId && e.isEnemy)?.hp ?? 0;
   let enemyKilled = false;
   let narrative = '';
   for (const pcEnt of args.oaTargets) {
@@ -3449,7 +3434,12 @@ function applyPcOpportunityAttacks(args: {
     if (pc.dead || pc.stable || pc.hp <= 0) continue;
     if (pc.turn_actions?.reaction_used) continue;
     // Incapacitated PCs can't take reactions.
-    if (pc.conditions?.some((c) => ['incapacitated', 'paralyzed', 'stunned', 'unconscious'].includes(c))) continue;
+    if (
+      pc.conditions?.some((c) =>
+        ['incapacitated', 'paralyzed', 'stunned', 'unconscious'].includes(c)
+      )
+    )
+      continue;
     // OA can only be made with a melee weapon (PHB p.190). Ranged-only weapons
     // don't qualify; thrown melee weapons (handaxe, dagger) do because they
     // have a melee profile too.
@@ -3481,9 +3471,7 @@ function applyPcOpportunityAttacks(args: {
     st = {
       ...st,
       characters: st.characters.map((c, i) =>
-        i === pcIdx
-          ? { ...c, turn_actions: { ...c.turn_actions, reaction_used: true } }
-          : c
+        i === pcIdx ? { ...c, turn_actions: { ...c.turn_actions, reaction_used: true } } : c
       ),
     };
     if (atk.hit) {
@@ -3526,6 +3514,9 @@ function runEnemyTurns(args: {
   let roundWrapped = args.startRoundWrapped;
   const orderLen = st.initiative_order.length;
   let resumeMi = args.startMultiattackIdx;
+  // Static obstacles in the current room — pathfinding for enemy approach
+  // must route around these the same way PC movement does.
+  const roomObstacleCells = args.seed.rooms.find((r) => r.id === st.current_room)?.obstacles ?? [];
 
   while (
     st.combat_active &&
@@ -3717,14 +3708,11 @@ function runEnemyTurns(args: {
           // enemies have effective speed 0 and won't move.
           const reachFt = rm.attackReachFt ?? 5;
           const baseSpeedFt = rm.speedFt ?? DEFAULT_SPEED_FEET;
-          const enemyEntPreMove = st.entities?.find(
-            (e) => e.id === eEntry.id && e.isEnemy
-          );
+          const enemyEntPreMove = st.entities?.find((e) => e.id === eEntry.id && e.isEnemy);
           const targetEntPreMove = st.entities?.find((e) => e.id === target.id);
           const enemyImmobile =
-            enemyEntPreMove?.conditions?.some(
-              (c) => c === 'grappled' || c === 'restrained'
-            ) ?? false;
+            enemyEntPreMove?.conditions?.some((c) => c === 'grappled' || c === 'restrained') ??
+            false;
           const effectiveEnemySpeedFt = enemyImmobile ? 0 : baseSpeedFt;
           const needsToMove =
             !!enemyEntPreMove &&
@@ -3741,6 +3729,7 @@ function runEnemyTurns(args: {
               speedFt: effectiveEnemySpeedFt,
               context: args.context,
               roomId: st.current_room,
+              roomObstacles: roomObstacleCells,
             });
             const distBefore = distanceFeet(enemyEntPreMove.pos, targetEntPreMove.pos);
             if (!plan || plan.pathSquares.length === 0) {
@@ -4082,6 +4071,10 @@ export async function takeAction({
 
   const worldName = getWorldName(seed);
   const roomId = st.current_room;
+  // Static obstacle cells (columns, walls, debris) in the current room.
+  // Combined with entity positions when computing cover bonuses below so
+  // the grid feels tactically real.
+  const roomObstacleCells = seed.rooms.find((r) => r.id === roomId)?.obstacles ?? [];
   // Living enemies in this room (multi-enemy support). For legacy narrative use,
   // `enemy` is the first living enemy; resolution code should target a specific
   // enemy via `action.targetEnemyId`.
@@ -4546,9 +4539,10 @@ export async function takeAction({
         const charEntity = st.entities.find((e) => e.id === char.id);
         const enemyEntity = st.entities.find((e) => e.id === targetId && e.isEnemy);
         if (charEntity && enemyEntity) {
-          const obstacles = st.entities
-            .filter((e) => e.id !== char.id && e.id !== targetId)
-            .map((e) => e.pos);
+          const obstacles = [
+            ...st.entities.filter((e) => e.id !== char.id && e.id !== targetId).map((e) => e.pos),
+            ...roomObstacleCells,
+          ];
           coverAcBonus = coverBonus(charEntity.pos, enemyEntity.pos, obstacles);
           // Flanking (PHB optional): ally on opposite side of enemy grants advantage
           const flankingAlly = st.entities.find(
@@ -4956,9 +4950,7 @@ export async function takeAction({
           // Sneak Attack). Show the doubled expression on crits so
           // "1d6: +9" doesn't read as an impossible roll.
           const saExpr = sneakAttackDice(char.level);
-          const saLabel = isCrit
-            ? `${parseInt(saExpr) * 2}d6 (crit)`
-            : saExpr;
+          const saLabel = isCrit ? `${parseInt(saExpr) * 2}d6 (crit)` : saExpr;
           narrative += ` [Sneak Attack ${saLabel}: +${sneakDmg}]`;
         }
         if (rageBonus > 0) narrative += ` [Rage: +${rageBonus}]`;
@@ -5747,9 +5739,7 @@ export async function takeAction({
       // matching the stage-direction format used on the buttons.
       if (npc.responses.length > 0) {
         narrative +=
-          ' [' +
-          npc.responses.map((r) => `<To ${npc.name}> ${r.label}`).join(' | ') +
-          ']';
+          ' [' + npc.responses.map((r) => `<To ${npc.name}> ${r.label}`).join(' | ') + ']';
       }
       if (st.combat_active) char.turn_actions = { ...char.turn_actions, action_used: true };
       break;
@@ -6354,9 +6344,12 @@ export async function takeAction({
           const casterEntSave = st.entities.find((e) => e.id === char.id);
           const targetEntSave = st.entities.find((e) => e.id === spellTargetId && e.isEnemy);
           if (casterEntSave && targetEntSave) {
-            const obstaclesSave = st.entities
-              .filter((e) => e.id !== char.id && e.id !== spellTargetId)
-              .map((e) => e.pos);
+            const obstaclesSave = [
+              ...st.entities
+                .filter((e) => e.id !== char.id && e.id !== spellTargetId)
+                .map((e) => e.pos),
+              ...roomObstacleCells,
+            ];
             saveCoverDexBonus = coverBonus(casterEntSave.pos, targetEntSave.pos, obstaclesSave);
           }
         }
@@ -6520,9 +6513,12 @@ export async function takeAction({
               // (three-quarters) to the DEX save.
               let tCover = 0;
               if (spell.savingThrow === 'dex' && st.entities) {
-                const obstaclesAoe = st.entities
-                  .filter((e) => e.id !== target.id && !posEqual(e.pos, epicenter))
-                  .map((e) => e.pos);
+                const obstaclesAoe = [
+                  ...st.entities
+                    .filter((e) => e.id !== target.id && !posEqual(e.pos, epicenter))
+                    .map((e) => e.pos),
+                  ...roomObstacleCells,
+                ];
                 tCover = coverBonus(epicenter, target.pos, obstaclesAoe);
               }
               const targetEntCond =
@@ -6581,9 +6577,12 @@ export async function takeAction({
                   (targetChar[spell.savingThrow as keyof Character] as number) ?? 10;
                 let allyCover = 0;
                 if (spell.savingThrow === 'dex' && st.entities) {
-                  const obstaclesAllyAoe = st.entities
-                    .filter((e) => e.id !== target.id && !posEqual(e.pos, epicenter))
-                    .map((e) => e.pos);
+                  const obstaclesAllyAoe = [
+                    ...st.entities
+                      .filter((e) => e.id !== target.id && !posEqual(e.pos, epicenter))
+                      .map((e) => e.pos),
+                    ...roomObstacleCells,
+                  ];
                   allyCover = coverBonus(epicenter, target.pos, obstaclesAllyAoe);
                 }
                 const allyFailed = rollConditionSave(
@@ -7993,9 +7992,7 @@ export async function takeAction({
         // When every wounded ally is already above half, the channel
         // divinity gets spent but heals nothing — surface that gate so
         // the player doesn't think the feature is broken.
-        const eligibleCount = woundedAllies.filter(
-          (c) => c.hp < Math.floor(c.max_hp / 2)
-        ).length;
+        const eligibleCount = woundedAllies.filter((c) => c.hp < Math.floor(c.max_hp / 2)).length;
         if (preserved === 0) {
           const reason =
             woundedAllies.length === 0
@@ -8894,7 +8891,13 @@ export async function takeAction({
       // continuity but don't block movement — you walk over the corpse. This
       // also matches the frontend's `isReachable` (filters on hp > 0), so the
       // click-to-move targets and the BFS pathfinder agree on what's blocked.
-      const blocked = st.entities.filter((e) => e.id !== char.id && e.hp > 0).map((e) => e.pos);
+      // Static room obstacles (columns/walls/debris) block movement too.
+      const currentRoomForMove = seed.rooms.find((r) => r.id === roomId);
+      const roomObstaclesForMove = currentRoomForMove?.obstacles ?? [];
+      const blocked = [
+        ...st.entities.filter((e) => e.id !== char.id && e.hp > 0).map((e) => e.pos),
+        ...roomObstaclesForMove,
+      ];
 
       const path = findPath(charEntity.pos, gridAction.to, blocked, gridW, gridH);
       if (!path) {
@@ -9592,9 +9595,7 @@ export async function takeAction({
         break;
       }
       char.prepared_spells = leveledIds;
-      const spellNames = leveledIds
-        .map((id) => context.spellTable?.[id]?.name ?? id)
-        .join(', ');
+      const spellNames = leveledIds.map((id) => context.spellTable?.[id]?.name ?? id).join(', ');
       narrative = `${char.name} prepares their spells for the day: ${spellNames || '(none)'}.`;
       break;
     }
@@ -9754,8 +9755,7 @@ export async function takeAction({
     narrative.startsWith(`${char.name} `) ||
     narrative.startsWith(`${char.name}:`) ||
     narrative.startsWith(`[${char.name}]`);
-  const speakerPrefix =
-    livingPartyCount > 1 && !alreadyNamedAtStart ? `[${char.name}] ` : '';
+  const speakerPrefix = livingPartyCount > 1 && !alreadyNamedAtStart ? `[${char.name}] ` : '';
   const rawNarrative =
     speakerPrefix + (extraNarrative ? `${narrative}\n\n${extraNarrative}` : narrative);
 
@@ -9783,10 +9783,8 @@ export async function takeAction({
   // name, the player gets prose that misrepresents engine state — fall
   // back to the tokenised raw narrative instead.
   const enhancementFaithful =
-    enhanced === llmInput ||
-    (enhanced.length > 0 && preservesCriticalFacts(llmInput, enhanced));
-  const finalNarrative =
-    enhanced === llmInput || !enhancementFaithful ? rawNarrative : enhanced;
+    enhanced === llmInput || (enhanced.length > 0 && preservesCriticalFacts(llmInput, enhanced));
+  const finalNarrative = enhanced === llmInput || !enhancementFaithful ? rawNarrative : enhanced;
 
   // SRD 5.2.1 p.184 — Invisible: attacking reveals location. The condition
   // ends after the attack; the character must re-Hide to regain it.

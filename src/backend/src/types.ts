@@ -62,6 +62,10 @@ export interface Room {
   objects?: RoomObject[];
   difficultTerrain?: GridPos[]; // squares costing 2× movement to enter
   coverPositions?: GridPos[]; // squares granting half cover (+2 AC) to occupant
+  // Static obstacles (columns, walls, debris) — fully block movement and
+  // count as cover for ranged attacks behind them. Seeded by procgen for
+  // combat rooms, can also be authored in roomPool entries.
+  obstacles?: GridPos[];
   // Ambient lighting per SRD 5.2.1 p.11 "Vision and Light". Default 'bright'
   // (the room is well-lit; tactical fog-of-war is disabled). 'dim' makes the
   // whole room Lightly Obscured (Disadvantage on sight-based Perception).
@@ -122,17 +126,16 @@ export interface LegendaryAction {
 // Pansori's simpler model) when a creature with `lair_actions` is in the
 // current room. The engine fires one lair action per round, chosen at
 // random from the list.
-export type LairAction =
-  | {
-      id: string;
-      name: string;
-      kind: 'aoe_save_damage'; // AoE damage with save-for-half
-      dice: string; // e.g. '4d6'
-      damageType: string;
-      savingThrow: 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha';
-      saveDC: number;
-      narrative: string; // pre-effect description (e.g. "The walls shake...")
-    };
+export type LairAction = {
+  id: string;
+  name: string;
+  kind: 'aoe_save_damage'; // AoE damage with save-for-half
+  dice: string; // e.g. '4d6'
+  damageType: string;
+  savingThrow: 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha';
+  saveDC: number;
+  narrative: string; // pre-effect description (e.g. "The walls shake...")
+};
 
 export interface EnemyTemplate {
   name: string;

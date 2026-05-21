@@ -1,4 +1,4 @@
-import type { Context, Enemy, LootItem, PlacedNpc, Seed } from '../types.js';
+import type { Context, Enemy, GridPos, LootItem, PlacedNpc, Room, Seed } from '../types.js';
 import { randomUUID } from 'crypto';
 
 function roll(sides: number): number {
@@ -73,7 +73,7 @@ export function generateRoguelikeSeed(context: Context, partySize = 1): Seed {
   const findTrap = (id: string) => context.roomPool.find((r) => r.id === id)?.trap;
   const findObjects = (id: string) => context.roomPool.find((r) => r.id === id)?.objects;
 
-  const rooms = [
+  const rooms: Room[] = [
     {
       id: startId,
       name: startRoom.name,
@@ -123,6 +123,30 @@ export function generateRoguelikeSeed(context: Context, partySize = 1): Seed {
   const enemies: Seed['enemies'] = {};
   const loot: Seed['loot'] = {};
   const npcs: Seed['npcs'] = {};
+  const gridW = context.gridWidth ?? 8;
+  const gridH = context.gridHeight ?? 8;
+  // 60% of combat rooms get 1-3 obstacles placed in the middle band so they
+  // don't collide with PC (rows 0-1, companions at row 2) or enemy spawn
+  // points (row gh-2). Middle band: y in [3, gh-3], x in [1, gw-2].
+  function seedObstacles(): GridPos[] {
+    const yMin = 3;
+    const yMax = Math.max(yMin, gridH - 3); // inclusive upper bound
+    const yRange = yMax - yMin + 1;
+    if (yRange <= 0 || gridW < 4) return [];
+    const count = 1 + roll(3); // 1-3 obstacles
+    const taken = new Set<string>();
+    const out: GridPos[] = [];
+    for (let tries = 0; tries < 20 && out.length < count; tries++) {
+      const x = 1 + roll(gridW - 2) - 1; // [1, gridW-2]
+      const y = yMin + roll(yRange) - 1; // [yMin, yMax]
+      const key = `${x},${y}`;
+      if (taken.has(key)) continue;
+      taken.add(key);
+      out.push({ x, y });
+    }
+    return out;
+  }
+
   rooms.forEach((r) => {
     if (r.id !== startId && Math.random() < 0.6) {
       const normalized = (dist[r.id] ?? 0) / maxDist;
@@ -171,6 +195,13 @@ export function generateRoguelikeSeed(context: Context, partySize = 1): Seed {
     }
     if (Math.random() < 0.5) {
       loot[r.id] = weightedPick(context.lootTable);
+    }
+    // Static obstacles — only for rooms with enemies (combat rooms). Seeded
+    // after enemy gen so we can target the same rooms. 60% chance per
+    // combat room; 1-3 obstacles in the middle band.
+    if (enemies[r.id] && Math.random() < 0.6) {
+      const obs = seedObstacles();
+      if (obs.length) r.obstacles = obs;
     }
     // NPC placement: only in rooms without an enemy, excluding start/escape
     const spawnChance = context.npcSpawnChance ?? 0;
