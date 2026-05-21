@@ -421,6 +421,13 @@ export default function App() {
                     ctx={ctx}
                     seed={seed}
                     inCombat={!!gameState.combat_active}
+                    onSetActive={(charId) => {
+                      const target = gameState.characters.find((c) => c.id === charId);
+                      handleChoice({
+                        label: `Hand the lead to ${target?.name ?? charId}`,
+                        action: { type: 'set_active_character', characterId: charId },
+                      });
+                    }}
                   />
                 )}
 

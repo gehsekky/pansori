@@ -156,7 +156,9 @@ export type StructuredAction =
   | { type: 'use_reaction' }
   | { type: 'select_subclass'; subclass: string }
   | { type: 'prepare_spells'; spellIds: string[] }
-  | { type: 'resolve_reaction'; accept: boolean };
+  | { type: 'resolve_reaction'; accept: boolean }
+  // Out-of-combat only: switch active PC. No-op in combat.
+  | { type: 'set_active_character'; characterId: string };
 
 // ─── Choice metadata (drives FE rendering) ───────────────────────────
 
