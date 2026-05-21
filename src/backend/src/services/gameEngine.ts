@@ -5683,23 +5683,6 @@ export async function takeAction({
         break;
       }
 
-      case 'pass': {
-        const cond =
-          char.conditions.find((c) => c === 'stunned' || c === 'paralyzed') ?? char.conditions[0];
-        narrative = cond
-          ? `${char.name} is ${cond} and cannot act. Turn passed.`
-          : `${char.name} passes their turn.`;
-        char.turn_actions = { ...char.turn_actions, action_used: true, bonus_action_used: true };
-        usedInitiative = true;
-        break;
-      }
-
-      case 'end_turn': {
-        narrative = `${char.name} ends their turn.`;
-        usedInitiative = true;
-        break;
-      }
-
       case 'short_rest': {
         if (st.combat_active) {
           narrative = 'You cannot rest while in combat.';
