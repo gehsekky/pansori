@@ -1716,7 +1716,11 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       }
     }
   }
-  if (lootAvail) {
+  // Loot is suppressed while a hostile is in the room — RAW: you don't get
+  // to casually pocket items with a Crypt Ghoul watching. Engage or escape
+  // first. Mirrors the same author intent already enforced on Move-between-
+  // rooms at the bottom of generateChoices.
+  if (lootAvail && !enemyAlive) {
     choices.push({ label: `Pick up the ${loot.name}`, action: { type: 'loot' } });
   }
   // SRD 5.2.1 p.204: drinking/administering a potion is a Bonus Action. In
@@ -1864,8 +1868,9 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   }
 
   // ── Town/district navigation choices ──────────────────────────────────────
-  // Emit travel choices for connected locations (out of combat only)
-  if (!state.combat_active && state.current_location_id) {
+  // Emit travel choices for connected locations (out of combat only, and not
+  // with a hostile in the current room — RAW egress rule).
+  if (!state.combat_active && !enemyAlive && state.current_location_id) {
     const here = context.campaign?.locations?.find((l) => l.id === state.current_location_id);
     for (const connId of here?.connections ?? []) {
       if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
@@ -4315,6 +4320,11 @@ export async function takeAction({
         narrative = `You cannot flee while in grid combat. Use Disengage and move on the grid.`;
         break;
       }
+      // Hostile present — engage or escape, don't stroll past.
+      if (enemyAlive) {
+        narrative = 'A hostile is in this room — engage it or attempt to escape before moving on.';
+        break;
+      }
       st.current_room = target.id;
       if (!st.visited_rooms.includes(target.id)) {
         st.visited_rooms = [...st.visited_rooms, target.id];
@@ -5348,6 +5358,12 @@ export async function takeAction({
       }
       if (!lootAvail) {
         narrative = pick(context.narratives.alreadyLooted);
+        break;
+      }
+      // Hostile in the room — engage or escape, don't pocket items in plain
+      // sight. Defense for stale FE caches that might still show the choice.
+      if (enemyAlive) {
+        narrative = 'A hostile is watching — you cannot loot until the room is clear.';
         break;
       }
       char.inventory = [...(char.inventory || []), { ...loot, instance_id: randomUUID() }];
@@ -9049,6 +9065,12 @@ export async function takeAction({
       );
       if (!destLocation) {
         narrative = 'Unknown destination.';
+        break;
+      }
+      // Hostile in the current room — RAW: engage or escape, don't just
+      // walk out of the dungeon. Mirrors the move/loot gates above.
+      if (enemyAlive) {
+        narrative = 'A hostile is in the room — you cannot travel away until the room is clear.';
         break;
       }
 
