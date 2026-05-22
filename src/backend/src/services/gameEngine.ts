@@ -2281,18 +2281,18 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       barbarian: 3,
     };
     const subclassChoices: Record<string, string[]> = {
-      fighter: ['champion', 'battle_master', 'eldritch_knight'],
-      rogue: ['thief', 'assassin', 'soulknife'],
+      fighter: ['champion', 'battle_master', 'eldritch_knight', 'psi_warrior'],
+      rogue: ['thief', 'assassin', 'soulknife', 'arcane_trickster'],
       wizard: ['evoker', 'abjurer', 'diviner', 'illusionist'],
       cleric: ['life', 'war', 'light', 'trickery'],
       ranger: ['hunter', 'beastmaster', 'fey_wanderer', 'gloom_stalker'],
       paladin: ['devotion', 'vengeance', 'ancients', 'glory'],
-      bard: ['lore', 'valor'],
-      sorcerer: ['draconic', 'wild_magic'],
+      bard: ['lore', 'valor', 'dance', 'glamour'],
+      sorcerer: ['draconic', 'wild_magic', 'aberrant_mind', 'clockwork_soul'],
       warlock: ['fiend', 'archfey', 'celestial', 'great_old_one'],
       druid: ['land', 'moon', 'sea', 'stars'],
-      monk: ['open_hand', 'shadow', 'mercy'],
-      barbarian: ['berserker', 'totem_warrior'],
+      monk: ['open_hand', 'shadow', 'mercy', 'elements'],
+      barbarian: ['berserker', 'totem_warrior', 'world_tree', 'zealot'],
     };
     const reqLevel = subclassLevels[cls] ?? 3;
     // RAW: subclass is acquired at level-up (a long-rest milestone), not as an

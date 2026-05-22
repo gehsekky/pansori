@@ -57,4 +57,34 @@ describe('Subclass picker exposes the new options', () => {
     const pc = makeChar({ id: 'pc', character_class: 'Druid', level: 3 });
     expect(pickerOffers(pc)).toEqual(expect.arrayContaining(['sea', 'stars']));
   });
+
+  it('Fighter L3 offers psi_warrior', () => {
+    const pc = makeChar({ id: 'pc', character_class: 'Fighter', level: 3 });
+    expect(pickerOffers(pc)).toContain('psi_warrior');
+  });
+
+  it('Rogue L3 offers arcane_trickster', () => {
+    const pc = makeChar({ id: 'pc', character_class: 'Rogue', level: 3 });
+    expect(pickerOffers(pc)).toContain('arcane_trickster');
+  });
+
+  it('Bard L3 offers dance + glamour', () => {
+    const pc = makeChar({ id: 'pc', character_class: 'Bard', level: 3 });
+    expect(pickerOffers(pc)).toEqual(expect.arrayContaining(['dance', 'glamour']));
+  });
+
+  it('Sorcerer L3 offers aberrant_mind + clockwork_soul', () => {
+    const pc = makeChar({ id: 'pc', character_class: 'Sorcerer', level: 3 });
+    expect(pickerOffers(pc)).toEqual(expect.arrayContaining(['aberrant_mind', 'clockwork_soul']));
+  });
+
+  it('Monk L3 offers elements', () => {
+    const pc = makeChar({ id: 'pc', character_class: 'Monk', level: 3 });
+    expect(pickerOffers(pc)).toContain('elements');
+  });
+
+  it('Barbarian L3 offers world_tree + zealot', () => {
+    const pc = makeChar({ id: 'pc', character_class: 'Barbarian', level: 3 });
+    expect(pickerOffers(pc)).toEqual(expect.arrayContaining(['world_tree', 'zealot']));
+  });
 });
