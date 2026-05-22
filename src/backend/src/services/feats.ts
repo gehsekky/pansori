@@ -300,6 +300,14 @@ export function applyFeatTake(
       narrativeParts.push('No disadvantage on crossbow shots within 5 ft of an enemy.');
       break;
     }
+    case 'polearm-master': {
+      // No take-time state change — the `polearm_butt_end` action
+      // handler reads `char.feats` and gates on it. Narrative only.
+      narrativeParts.push(
+        'After Attack with a polearm: bonus-action butt-end strike (1d4 + ability mod).'
+      );
+      break;
+    }
   }
   return { newChar: next, narrative: narrativeParts.join(' ') };
 }

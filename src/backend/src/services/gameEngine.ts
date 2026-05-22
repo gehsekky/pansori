@@ -3143,6 +3143,23 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         });
       }
     }
+    // Polearm Master bonus-action butt-end attack — qualifying
+    // polearm equipped + feat held. Surfaces alongside TWF when
+    // both are eligible (the player picks).
+    const POLEARMS = new Set(['quarterstaff', 'spear', 'glaive', 'halberd', 'pike']);
+    if (
+      (char.feats ?? []).includes('polearm_master') &&
+      equippedWpnItem &&
+      POLEARMS.has(equippedWpnItem.id) &&
+      livingEnemies.length > 0
+    ) {
+      choices.push({
+        label: `Polearm Master — butt-end strike with the ${equippedWpnItem.name} (1d4 + ability mod)`,
+        action: { type: 'polearm_butt_end', targetEnemyId: livingEnemies[0].id },
+        requiresBonusAction: true,
+        kind: 'two_weapon_attack', // reuse the bonus-action-attack category for now
+      });
+    }
   }
 
   // Try to escape grapple — SRD 5.2.1 p.16, contested Athletics or Acrobatics
