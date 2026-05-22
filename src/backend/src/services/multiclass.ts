@@ -321,6 +321,72 @@ export function extraAttackCountForChar(char: Character): number {
   return best;
 }
 
+// Maps a class to the spell list(s) it draws from. Used to match a
+// PC's classes against a spell's `spellList` tag so multiclass
+// casters can use the right casting ability per spell.
+const CLASS_SPELL_LISTS: Record<string, Array<'arcane' | 'divine' | 'primal'>> = {
+  wizard: ['arcane'],
+  sorcerer: ['arcane'],
+  warlock: ['arcane'],
+  bard: ['arcane'],
+  cleric: ['divine'],
+  paladin: ['divine'],
+  druid: ['primal'],
+  ranger: ['primal'],
+};
+
+/**
+ * Multiclass spell-casting ability resolver (2024 PHB).
+ *
+ * RAW: when a multiclass spellcaster casts a spell, they use the
+ * casting ability of the class whose spell list grants access to
+ * it. Pansori auto-picks the best ability for the player —
+ * iterating through the PC's caster classes, keeping any whose
+ * spell-list overlaps the spell's tags, and picking the one with
+ * the highest modifier.
+ *
+ * `spellLists` is the spell's `spellList` field (e.g. `['arcane',
+ * 'divine', 'primal']` for Cure Wounds). If the spell has no
+ * spellList tag (legacy spells) or no class match, falls back to
+ * the PC's primary-class casting ability.
+ *
+ * Returns the chosen AbilityKey ('int' | 'wis' | 'cha' | ...).
+ */
+export function resolveCastingAbility(
+  char: Character,
+  spellLists: ReadonlyArray<'arcane' | 'divine' | 'primal'> | undefined,
+  spellcastingAbilityTable: Record<string, string>,
+  fallback: string
+): string {
+  if (!spellLists || spellLists.length === 0) return fallback;
+  const classLevels = getClassLevels(char);
+  // Two-pass: first find all classes whose spell list overlaps the
+  // spell's tags. If any do, pick the one with the highest casting-
+  // ability mod among the matching classes. If none match, fall back
+  // to the primary-class ability (RAW: a non-caster casting via a
+  // feat-granted spell uses their primary ability).
+  let bestAbility: string | undefined;
+  let bestMod = -Infinity;
+  for (const cls of Object.keys(classLevels)) {
+    const lists = CLASS_SPELL_LISTS[cls.toLowerCase()] ?? [];
+    const overlap = lists.some((l) => spellLists.includes(l));
+    if (!overlap) continue;
+    // Try both lowercase and capitalized keys — pansori's
+    // spellcastingAbility table uses capitalized class names.
+    const ability =
+      spellcastingAbilityTable[cls] ??
+      spellcastingAbilityTable[cls.charAt(0).toUpperCase() + cls.slice(1)];
+    if (!ability) continue;
+    const score = ((char as unknown as Record<string, number>)[ability] ?? 10) as number;
+    const mod = Math.floor((score - 10) / 2);
+    if (mod > bestMod) {
+      bestMod = mod;
+      bestAbility = ability;
+    }
+  }
+  return bestAbility ?? fallback;
+}
+
 /**
  * Returns the spell-slot map (slot level → count) `char` has access to,
  * accounting for multiclass caster-level contributions (2024 PHB Ch. 1).
