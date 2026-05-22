@@ -137,11 +137,17 @@ export type StructuredAction =
       // Take a feat. When the feat is a half-feat with `choices`,
       // `abilityChoice` records the player's pick. When the feat has
       // a `save-proficiency` effect with empty abilities, the chosen
-      // abilities are recorded on Character.feat_choices.
+      // abilities are recorded on Character.feat_choices. For Magic
+      // Initiate (`extra-cantrips-and-l1`), the player picks 2 cantrip
+      // ids + 1 L1 spell id from the matching list; the engine adds
+      // them to `spells_known` and tracks the L1 free-cast token on
+      // `class_resource_uses.magic_initiate_l1_used`.
       type: 'take_feat';
       featId: string;
       abilityChoice?: AbilityKey;
       saveProficiencyChoices?: AbilityKey[];
+      cantripChoices?: string[];
+      l1Choice?: string;
     }
   | { type: 'de_attune'; instanceId: string }
   | {

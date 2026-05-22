@@ -69,8 +69,22 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
     surfaces on the hit narrative. 5 direct tests. Long-range no-
     disadv is a no-op until ranged long-range disadv is enforced
     (not in pansori today).
-  - Magic Initiate's spell-grant flow (FE chooser + add to
-    `spells_known` + per-rest L1 cast tracking).
+  - [~] Magic Initiate backend (2026-05-22). Three seed feats —
+    `magic_initiate_arcane / divine / primal` — each granting 2
+    cantrips + 1 L1 spell. `take_feat` action accepts
+    `cantripChoices: string[]` + `l1Choice: string`; `applyFeatTake`
+    appends them to `spells_known`, records the L1 id on
+    `feat_choices[featId].magicInitiateL1`, and seeds
+    `class_resource_uses.magic_initiate_l1_used = 0`. castSpell.ts
+    recognizes the recorded L1 spell at cast time: if the token is
+    available and the cast is at the spell's base level, consumes
+    the token instead of a slot. Upcasts still use a slot.
+    `resetFeatLongRestResources` clears the token on long rest. 8
+    tests cover the take-time flow, the free cast, the no-slot
+    rejection on second cast, and the long-rest reset.
+    **Remaining:** FE chooser UX (a spell-picker dialog when the
+    player picks Magic Initiate). Currently the action requires the
+    `cantripChoices` / `l1Choice` to be supplied via API.
   - More feats: Resilient (half-feat with `save-proficiency`),
     Mobile, Sentinel, War Caster, Polearm Master, Great Weapon
     Master, Heavy Armor Master, Crossbow Expert, Tavern Brawler,

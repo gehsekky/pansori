@@ -75,7 +75,12 @@ export function canTakeFeat(char: Character, feat: Feat): string {
 export function applyFeatTake(
   char: Character,
   feat: Feat,
-  opts: { abilityChoice?: AbilityKey; saveProficiencyChoices?: AbilityKey[] } = {}
+  opts: {
+    abilityChoice?: AbilityKey;
+    saveProficiencyChoices?: AbilityKey[];
+    cantripChoices?: string[];
+    l1Choice?: string;
+  } = {}
 ): { newChar: Character; narrative: string } {
   let next: Character = { ...char, feats: [...(char.feats ?? []), feat.id] };
   const narrativeParts: string[] = [`${next.name} gains the ${feat.name} feat!`];
@@ -128,12 +133,53 @@ export function applyFeatTake(
       break;
     }
     case 'extra-cantrips-and-l1': {
-      // Spell grant happens on take but spell selection is a separate
-      // FE flow; record placeholder. A follow-up PR wires the spell
-      // chooser.
-      narrativeParts.push(
-        `May learn ${feat.effect.cantripCount} cantrips + ${feat.effect.l1Count} L1 spell from the ${feat.effect.spellList} list.`
-      );
+      // Magic Initiate (Arcane / Divine / Primal). Player picks N
+      // cantrips + 1 L1 spell from the matching list; we add them to
+      // `spells_known`, record the L1 id for the cast-handler to
+      // identify, and seed the per-long-rest free-cast token.
+      const cantrips = opts.cantripChoices ?? [];
+      const l1 = opts.l1Choice;
+      const grants: string[] = [];
+      const existing = new Set(next.spells_known ?? []);
+      for (const c of cantrips) {
+        if (!existing.has(c)) {
+          existing.add(c);
+          grants.push(c);
+        }
+      }
+      if (l1 && !existing.has(l1)) {
+        existing.add(l1);
+        grants.push(l1);
+      }
+      next = {
+        ...next,
+        spells_known: [...existing],
+        // Per-long-rest free-cast token. Defaults to "available" (0
+        // means "not yet used"); the cast handler bumps it on use.
+        class_resource_uses: {
+          ...(next.class_resource_uses ?? {}),
+          magic_initiate_l1_used: 0,
+        },
+      };
+      if (l1) {
+        next = {
+          ...next,
+          feat_choices: {
+            ...(next.feat_choices ?? {}),
+            [feat.id]: {
+              ...(next.feat_choices?.[feat.id] ?? {}),
+              magicInitiateL1: l1,
+            },
+          },
+        };
+      }
+      if (grants.length > 0) {
+        narrativeParts.push(`Learns ${grants.join(', ')} from the ${feat.effect.spellList} list.`);
+      } else {
+        narrativeParts.push(
+          `May learn ${feat.effect.cantripCount} cantrips + ${feat.effect.l1Count} L1 spell from the ${feat.effect.spellList} list (no choices supplied yet).`
+        );
+      }
       break;
     }
     case 'save-proficiency': {
@@ -182,12 +228,16 @@ export function getFeat(featId: string, context: Context): Feat | undefined {
  * Reset per-long-rest feat resources to their max values. Walks the
  * character's feats, looks each one up in the context's feat table,
  * and resets the matching `class_resource_uses` entry for any feat
- * whose effect carries a per-long-rest pool (today: `d20-reroll`).
+ * whose effect carries a per-long-rest pool.
+ *
+ * Resets handled:
+ *   - `d20-reroll` (Lucky): `feat_<id>_uses` ← usesPerLongRest.
+ *   - `extra-cantrips-and-l1` (Magic Initiate): `magic_initiate_l1_used`
+ *     ← 0 (free-cast available again).
  *
  * Called from `handleLongRest`. Returns a new `class_resource_uses`
- * record; callers merge it into the rest's overall update.
- *
- * Feats with no per-rest pool are no-ops.
+ * record; callers merge it into the rest's overall update. Feats
+ * with no per-rest pool are no-ops.
  */
 export function resetFeatLongRestResources(
   char: Character,
@@ -200,6 +250,11 @@ export function resetFeatLongRestResources(
     if (!feat) continue;
     if (feat.effect.kind === 'd20-reroll') {
       next = { ...next, [`feat_${feat.id}_uses`]: feat.effect.usesPerLongRest };
+    } else if (feat.effect.kind === 'extra-cantrips-and-l1') {
+      // Reset the free-cast token. Single shared token for all
+      // Magic Initiate variants since RAW grants only one (you can't
+      // double-dip by taking Magic Initiate twice).
+      next = { ...next, magic_initiate_l1_used: 0 };
     }
   }
   return next;
