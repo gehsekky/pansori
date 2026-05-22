@@ -544,20 +544,10 @@ describe('class features', () => {
   // ── Monk subclasses (PHB p.79-80) ───────────────────────────────────────────
 
   it('Way of the Open Hand — Flurry hits force DEX save or prone', async () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0); // d20 → 1 enemy DEX save fails; monk hits at max
-    // We need monk hits to land. With d20=1 on every roll, even monk attack
-    // misses. Mix: first roll for monk attack must be ≥ goblin AC. Easier:
-    // mock per-call to alternate. For simplicity: spy mockReturnValueOnce
-    // chain.
-    const random = vi.spyOn(Math, 'random');
-    random
-      .mockReturnValueOnce(0) // initiative monk
-      .mockReturnValueOnce(0) // initiative goblin
-      .mockReturnValueOnce(0) // surprise stealth
-      .mockReturnValueOnce(0.999) // monk strike 1 d20 → hit
-      .mockReturnValueOnce(0.999) // monk strike 1 damage roll
-      .mockReturnValueOnce(0.5) // ?
-      .mockReturnValue(0); // remaining → enemy DEX saves fail
+    // All rolls high → strikes auto-hit (AC 12), DEX saves auto-pass.
+    // Test asserts the Open Hand DEX-save branch fires (either prone
+    // or resist path emits "Open Hand:" prose), not the save outcome.
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
     const monkId = 'mk-oh';
     const goblinId = `${CORRIDOR_ID}#0`;
     const monk = makeChar({
@@ -631,11 +621,12 @@ describe('class features', () => {
       seed: seedWithEnemy,
       context: ctx,
     });
-    // At least one of the strikes should hit and impose prone.
-    if (result.narrative.includes('Open Hand:')) {
-      // If a hit landed, the goblin should have been forced to make a save.
-      expect(result.narrative).toMatch(/Open Hand:/);
-    }
+    // With the entity-lookup fix (ctx.enemy.id instead of ctx.roomId,
+    // shipped 2026-05-22), Flurry actually lands damage and the Open
+    // Hand DEX-save rider fires on every hit. Pre-fix this assertion
+    // was wrapped in an `if (narrative.includes(...))` guard that was
+    // vacuous because the rider never reached its branch.
+    expect(result.narrative).toMatch(/Open Hand:/);
   });
 
   it('Way of Shadow — Shadow Arts spends 2 ki and applies invisible', async () => {
