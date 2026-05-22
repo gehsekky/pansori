@@ -1,10 +1,12 @@
 import type { AbilityKey, Character, Enemy, Spell } from '../../types.js';
 import {
   abilityMod,
+  addDice,
   applyDamageMultiplier,
   cantripDamageDice,
   d,
   hasArmorProficiency,
+  multiplyDice,
   resolveSpellAttack,
   rollConditionSave,
   rollCritical,
@@ -296,7 +298,15 @@ export const handleCastSpell: ActionHandler<{
   // ── Heal spells ────────────────────────────────────────────────────────
   if (spell.heal) {
     const healMod = Math.max(0, Math.floor((castingScore - 10) / 2));
-    const baseHealed = rollDice(spell.heal) + healMod;
+    // Upcast scaling — Cure Wounds at slot 2 rolls 2d8 (base) + 2d8
+    // (upcastBonus × 1 extra level) = 4d8 + mod. Previously the
+    // upcast slot was consumed but only the base heal dice rolled.
+    const extraLevels = Math.max(0, slotLevel - (spell.level ?? 1));
+    const healDice =
+      spell.upcastBonus && extraLevels > 0
+        ? addDice(spell.heal, multiplyDice(spell.upcastBonus, extraLevels))
+        : spell.heal;
+    const baseHealed = rollDice(healDice) + healMod;
     // Life Cleric: Disciple of Life — healing spells restore extra 2 + spell level HP
     const discipleBonus =
       ctx.char.subclass === 'life' && hasClass(ctx.char, 'cleric') ? 2 + (spell.level ?? 1) : 0;
