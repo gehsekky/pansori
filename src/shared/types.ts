@@ -219,6 +219,9 @@ export type StructuredAction =
       targetCharId?: string;
       targetEnemyId?: string;
     }
+  // Mercy Monk L3 — Hand of Healing: bonus action, spend 1 Ki
+  // to heal self/ally for 1d6 + WIS mod.
+  | { type: 'use_hand_of_healing'; targetCharId?: string }
   // Aasimar Celestial Revelation (2024 PHB, L3+) — bonus-action
   // transformation, 1/long rest. Player picks the sub-option at
   // use time: 'necrotic_shroud', 'radiant_soul', 'radiant_consumption'.
@@ -303,6 +306,7 @@ export type ChoiceKind =
   | 'ek_war_magic_attack'
   | 'use_healing_light'
   | 'use_lands_aid'
+  | 'use_hand_of_healing'
   | 'use_celestial_revelation'
   | 'cast_spell'
   | 'class_feature';
