@@ -1,5 +1,5 @@
 import { abilityMod, skillCheck } from '../rulesEngine.js';
-import { consumeBardicForCheck, consumeInspirationForCheck } from '../gameEngine.js';
+import { consumeBardicForCheck, consumeInspirationForCheck, consumeLuckForCheck } from '../gameEngine.js';
 import { getClassLevel, hasClass } from '../multiclass.js';
 import type { ActionHandler } from './types.js';
 import { randomUUID } from 'crypto';
@@ -72,6 +72,7 @@ export const handleInteractObject: ActionHandler<{
   // RAW, so we only honour exhaustion here.
   const exhaustionDisadv1 = (nextChar.exhaustion_level ?? 0) >= 1;
   const inspAdv = consumeInspirationForCheck(nextChar);
+  const luckAdv = consumeLuckForCheck(nextChar);
   const bardicRoll = consumeBardicForCheck(nextChar);
   const check = skillCheck(
     nextChar.int,
@@ -81,7 +82,7 @@ export const handleInteractObject: ActionHandler<{
     exhaustionDisadv1,
     false,
     false,
-    inspAdv,
+    inspAdv || luckAdv,
     nextChar.species === 'halfling'
   );
 

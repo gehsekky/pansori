@@ -65,3 +65,35 @@ export function pcActor(char: Character, safeIdx: number): PcActor {
 export function enemyActor(enemy: Enemy, ent?: CombatEntity): EnemyActor {
   return { kind: 'enemy', enemy, ent };
 }
+
+/**
+ * Update a PcActor's character with a partial patch, keeping
+ * `ctx.actor.char` and `ctx.char` in lockstep. The Phase 1 type
+ * seam left `ctx.char` and `ctx.actor.char` referencing the same
+ * Character at handler entry; after a `ctx.char = {...ctx.char, ...}`
+ * reassignment they would diverge. This helper rewrites both fields
+ * to the same new object so handlers can migrate to actor-first
+ * reads without introducing staleness bugs.
+ *
+ * No-op when `ctx.actor.kind !== 'pc'` (enemy actors don't have a
+ * Character; their data lives on `ctx.actor.enemy`). Returns the
+ * updated character for fluent reads.
+ *
+ * Pattern for migrated handlers:
+ *
+ *   if (ctx.actor.kind !== 'pc') return { rejected: '...' };
+ *   const { char } = ctx.actor;
+ *   updatePcActor(ctx, {
+ *     turn_actions: { ...char.turn_actions, dodging: true },
+ *   });
+ */
+export function updatePcActor(
+  ctx: { char: Character; actor: Actor },
+  patch: Partial<Character>
+): Character | null {
+  if (ctx.actor.kind !== 'pc') return null;
+  const updated = { ...ctx.actor.char, ...patch };
+  ctx.actor.char = updated;
+  ctx.char = updated;
+  return updated;
+}

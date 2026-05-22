@@ -115,6 +115,17 @@ export function consumeInspirationForCheck(char: Character): boolean {
   return true;
 }
 
+// Lucky feat — same shape as inspiration. Read the pending flag and
+// (if set) clear it on `char`. The luck-point pool was decremented
+// at spend time in the `use_luck` handler; this helper only manages
+// the per-roll flag consumption. Returns true so callers can pass it
+// as an advantage source to skill checks and saving throws.
+export function consumeLuckForCheck(char: Character): boolean {
+  if (!char.turn_actions?.luck_pending) return false;
+  char.turn_actions = { ...char.turn_actions, luck_pending: false };
+  return true;
+}
+
 // 2024 PHB Bardic Inspiration on any d20. Saves already consume the die
 // through `conditionSavingThrow`; this mirror lets skill/ability checks
 // auto-spend the stashed die. Returns the rolled die value (0 if no die),
@@ -494,6 +505,7 @@ function conditionSavingThrow(
 ): {
   applied: boolean;
   inspirationConsumed: boolean;
+  luckConsumed: boolean;
   bardicInspirationConsumed: boolean;
   bardicRoll: number;
 } {
@@ -503,6 +515,10 @@ function conditionSavingThrow(
   // player armed it via spend_inspiration, the save gets advantage and
   // the flag is consumed (the caller updates char accordingly).
   const inspirationActive = !!char.turn_actions?.inspiration_pending;
+  // Lucky feat (2024 PHB) — same shape: per-roll flag set via
+  // `use_luck`, consumed here. The luck-point pool was already
+  // decremented at spend time.
+  const luckActive = !!char.turn_actions?.luck_pending;
   // 2024 PHB Bardic Inspiration — if the saver carries a BI die, it can
   // be spent on this save (and is consumed regardless of outcome). We
   // roll it, then check if the d20 + mods + bi-roll meets the DC.
@@ -532,12 +548,13 @@ function conditionSavingThrow(
     char.level,
     0,
     char.conditions ?? [],
-    inspirationActive || speciesAdv,
+    inspirationActive || luckActive || speciesAdv,
     enc
   );
   return {
     applied,
     inspirationConsumed: inspirationActive,
+    luckConsumed: luckActive,
     bardicInspirationConsumed: !!biDie,
     bardicRoll,
   };
@@ -676,12 +693,17 @@ function computeEnemyAttack(
     narrative += dmgResult.concentrationNote;
 
     let inspirationConsumed = false;
+    let luckConsumed = false;
     let bardicConsumed = false;
     if (enemy.onHitEffect) {
       const csResult = conditionSavingThrow(enemy.onHitEffect, updatedChar, context);
       if (csResult.inspirationConsumed) {
         inspirationConsumed = true;
         narrative += ` ✦ Heroic Inspiration spent on the save!`;
+      }
+      if (csResult.luckConsumed) {
+        luckConsumed = true;
+        narrative += ` 🍀 Luck point spent on the save!`;
       }
       if (csResult.bardicInspirationConsumed) {
         bardicConsumed = true;
@@ -709,6 +731,12 @@ function computeEnemyAttack(
         ...updatedChar,
         inspiration: false,
         turn_actions: { ...updatedChar.turn_actions, inspiration_pending: false },
+      };
+    }
+    if (luckConsumed) {
+      updatedChar = {
+        ...updatedChar,
+        turn_actions: { ...updatedChar.turn_actions, luck_pending: false },
       };
     }
     if (bardicConsumed) {

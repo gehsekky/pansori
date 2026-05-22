@@ -3,6 +3,7 @@ import {
   buildArrivalNarrative,
   consumeBardicForCheck,
   consumeInspirationForCheck,
+  consumeLuckForCheck,
   endCombatState,
   isHeavilyEncumbered,
   pick,
@@ -39,6 +40,7 @@ export const handleSneak: ActionHandler<{ type: 'sneak' }> = (ctx) => {
     const exhaustionDisadv1 = (member.exhaustion_level ?? 0) >= 1;
     const checkDisadv = exhaustionDisadv1 || isHeavilyEncumbered(member);
     const inspAdv = isActive ? consumeInspirationForCheck(member) : false;
+    const luckAdv = isActive ? consumeLuckForCheck(member) : false;
     const bardicRoll = isActive ? consumeBardicForCheck(member) : 0;
     if (isActive) activeChar = member;
     const check = skillCheck(
@@ -49,7 +51,7 @@ export const handleSneak: ActionHandler<{ type: 'sneak' }> = (ctx) => {
       checkDisadv,
       false,
       false,
-      inspAdv,
+      inspAdv || luckAdv,
       member.species === 'halfling'
     );
     return { name: member.name, check, mod: abilityMod(member.dex) };
