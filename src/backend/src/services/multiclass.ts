@@ -19,7 +19,11 @@
 //     creation). Saving-throw profs are derived from this class
 //     only — that rule stays once the prereq + spell-slot PRs land.
 
-import { spellSlotsForCasterLevel, spellSlotsForClassLevel } from './rulesEngine.js';
+import {
+  extraAttackCount,
+  spellSlotsForCasterLevel,
+  spellSlotsForClassLevel,
+} from './rulesEngine.js';
 import type { Character } from '../types.js';
 
 // ─── Multiclass proficiency grants (2024 PHB Ch. 1) ────────────────────────
@@ -297,6 +301,24 @@ export function getAllClasses(char: Character): string[] {
  */
 export function getPrimaryClass(char: Character): string {
   return char.character_class.toLowerCase();
+}
+
+/**
+ * 2024 PHB Multiclassing — Extra Attack: "If you gain the Extra
+ * Attack feature from more than one class, the features don't add
+ * together." Take the maximum extraAttackCount across all classes
+ * the PC has levels in. A Fighter 4 / Ranger 4 (total 8) gets 0
+ * extras (neither class hit L5 yet, and the helper doesn't look at
+ * total level). A Fighter 5 / Wizard 10 (total 15) gets 1 extra
+ * (Fighter L5 = +1; Wizard doesn't contribute).
+ */
+export function extraAttackCountForChar(char: Character): number {
+  let best = 0;
+  for (const [cls, lvl] of Object.entries(getClassLevels(char))) {
+    const cnt = extraAttackCount(cls, lvl);
+    if (cnt > best) best = cnt;
+  }
+  return best;
 }
 
 /**
