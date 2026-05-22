@@ -135,6 +135,8 @@ export const handleTakeFeat: ActionHandler<{
   featId: string;
   abilityChoice?: AbilityKey;
   saveProficiencyChoices?: AbilityKey[];
+  cantripChoices?: string[];
+  l1Choice?: string;
 }> = (ctx, action) => {
   const feat = getFeat(action.featId, ctx.context);
   if (!feat) {
@@ -164,6 +166,8 @@ export const handleTakeFeat: ActionHandler<{
   const { newChar, narrative } = applyFeatTake(ctx.char, feat, {
     abilityChoice: action.abilityChoice,
     saveProficiencyChoices: action.saveProficiencyChoices,
+    cantripChoices: action.cantripChoices,
+    l1Choice: action.l1Choice,
   });
   // ASI-slot consumption — only when an ASI was pending (general-feat
   // path). Origin feats from background don't gate on asi_pending.

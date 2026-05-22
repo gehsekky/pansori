@@ -164,8 +164,33 @@ export const handleCastSpell: ActionHandler<{
     ctx.st = ns;
   }
 
-  // Expend a slot for non-cantrips (unless ritual)
+  // Magic Initiate free L1 cast (2024 PHB origin feat) — the player
+  // picked one L1 spell when taking Magic Initiate (Arcane/Divine/
+  // Primal). That specific spell can be cast 1× per long rest without
+  // expending a slot; subsequent casts that day need a slot like any
+  // other spell. Recognized by walking `feat_choices` for any feat
+  // entry whose `magicInitiateL1` matches the spell being cast.
+  let usedMagicInitiateFree = false;
   if (spell.level > 0 && !isRitualCast) {
+    const choices = ctx.char.feat_choices ?? {};
+    const matched = Object.values(choices).some(
+      (c) => c?.magicInitiateL1 === spellId
+    );
+    if (matched && (ctx.char.class_resource_uses?.magic_initiate_l1_used ?? 0) === 0) {
+      // Free cast at the spell's base level — upcasting still
+      // requires a slot, so gate the freebie to slotLevel === spell.level.
+      if (slotLevel === spell.level) {
+        ctx.char.class_resource_uses = {
+          ...(ctx.char.class_resource_uses ?? {}),
+          magic_initiate_l1_used: 1,
+        };
+        usedMagicInitiateFree = true;
+      }
+    }
+  }
+
+  // Expend a slot for non-cantrips (unless ritual or Magic-Initiate free cast)
+  if (spell.level > 0 && !isRitualCast && !usedMagicInitiateFree) {
     if (slotLevel < spell.level) {
       ctx.narrative = `${spell.name} requires at least a level-${spell.level} slot.`;
       return;

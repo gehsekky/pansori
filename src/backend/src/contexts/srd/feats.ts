@@ -73,4 +73,50 @@ export const SRD_FEATS: Record<string, Feat> = {
       kind: 'sentinel-react',
     },
   },
+
+  // 2024 PHB Magic Initiate (Arcane / Divine / Primal) — origin feat
+  // variants. Each grants 2 cantrips + 1 L1 spell from the matching
+  // spell list. The L1 spell can be cast 1/long rest without spending
+  // a spell slot, OR using an available slot at any time. The engine
+  // tracks the per-rest free cast via
+  // `class_resource_uses.magic_initiate_l1_used`; the L1 choice is
+  // recorded on `feat_choices['magic_initiate_*'].l1` so the cast
+  // handler can identify the free-cast spell. Cantrips simply land on
+  // `spells_known`.
+  magic_initiate_arcane: {
+    id: 'magic_initiate_arcane',
+    name: 'Magic Initiate (Arcane)',
+    desc: 'Choose 2 cantrips and 1 level-1 spell from the Wizard / Sorcerer spell list. You can cast the L1 spell once per long rest without expending a slot (or via a slot as normal).',
+    category: 'origin',
+    effect: {
+      kind: 'extra-cantrips-and-l1',
+      spellList: 'arcane',
+      cantripCount: 2,
+      l1Count: 1,
+    },
+  },
+  magic_initiate_divine: {
+    id: 'magic_initiate_divine',
+    name: 'Magic Initiate (Divine)',
+    desc: 'Choose 2 cantrips and 1 level-1 spell from the Cleric / Paladin spell list. You can cast the L1 spell once per long rest without expending a slot (or via a slot as normal).',
+    category: 'origin',
+    effect: {
+      kind: 'extra-cantrips-and-l1',
+      spellList: 'divine',
+      cantripCount: 2,
+      l1Count: 1,
+    },
+  },
+  magic_initiate_primal: {
+    id: 'magic_initiate_primal',
+    name: 'Magic Initiate (Primal)',
+    desc: 'Choose 2 cantrips and 1 level-1 spell from the Druid / Ranger spell list. You can cast the L1 spell once per long rest without expending a slot (or via a slot as normal).',
+    category: 'origin',
+    effect: {
+      kind: 'extra-cantrips-and-l1',
+      spellList: 'primal',
+      cantripCount: 2,
+      l1Count: 1,
+    },
+  },
 };

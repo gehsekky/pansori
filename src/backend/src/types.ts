@@ -564,6 +564,9 @@ export interface Character {
     {
       abilityBonus?: AbilityKey;
       saveProficiencies?: AbilityKey[];
+      // Magic Initiate — the chosen L1 spell id (so the cast handler
+      // can identify the free-cast spell from `feat_choices`).
+      magicInitiateL1?: string;
     }
   >;
   expertise_skills?: string[]; // skills with double proficiency bonus (Rogue/Bard)
