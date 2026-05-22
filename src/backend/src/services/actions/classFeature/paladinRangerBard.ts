@@ -308,6 +308,83 @@ export function handlePaladinRangerBardFeature(ctx: ActionContext, fid: string):
     return true;
   }
 
+  if (fid === 'natures_wrath') {
+    // 2024 PHB Oath of the Ancients Paladin L3 — Channel Divinity:
+    // spectral vines lash a creature within 10 ft. WIS save or
+    // restrained for 5 rounds.
+    if (ctx.char.subclass !== 'ancients') {
+      ctx.narrative = "Only Ancients Paladins have Nature's Wrath.";
+      return true;
+    }
+    if (!ctx.enemyAlive || !ctx.enemy) {
+      ctx.narrative = 'No living target.';
+      return true;
+    }
+    const cdUsesAnc = ctx.char.class_resource_uses?.channel_divinity ?? 1;
+    if (cdUsesAnc <= 0) {
+      ctx.narrative = 'No Channel Divinity uses remaining.';
+      return true;
+    }
+    ctx.char.class_resource_uses = {
+      ...(ctx.char.class_resource_uses ?? {}),
+      channel_divinity: cdUsesAnc - 1,
+    };
+    const dexSaveNW =
+      rollDice('1d20') + abilityMod((ctx.enemy as unknown as Record<string, number>)['dex'] ?? 10);
+    const nwDC = 8 + profBonus(ctx.char.level) + abilityMod(ctx.char.cha);
+    const nwSuccess = dexSaveNW >= nwDC;
+    if (!nwSuccess) {
+      ctx.st = {
+        ...ctx.st,
+        entities: (ctx.st.entities ?? []).map((e) =>
+          e.id === ctx.enemy?.id && e.isEnemy
+            ? {
+                ...e,
+                conditions: [...e.conditions.filter((c) => c !== 'restrained'), 'restrained'],
+                condition_durations: {
+                  ...(e.condition_durations ?? {}),
+                  restrained: 5,
+                },
+              }
+            : e
+        ),
+      };
+      composeNow(ctx, {
+        kind: 'save',
+        characterId: ctx.enemy!.id,
+        characterName: ctx.enemy!.name,
+        ability: 'dex',
+        roll: dexSaveNW,
+        dc: nwDC,
+        success: false,
+        vs: "Nature's Wrath",
+        prose: '',
+      });
+      composeNow(ctx, {
+        kind: 'condition_applied',
+        targetId: ctx.enemy!.id,
+        targetName: ctx.enemy!.name,
+        condition: 'restrained',
+        source: "Nature's Wrath",
+        prose: `🌿 Nature's Wrath! DEX save ${dexSaveNW} vs DC ${nwDC} — spectral vines restrain ${ctx.enemy!.name} for 5 rounds. (${cdUsesAnc - 1} Channel Divinity remaining)`,
+      });
+    } else {
+      composeNow(ctx, {
+        kind: 'save',
+        characterId: ctx.enemy!.id,
+        characterName: ctx.enemy!.name,
+        ability: 'dex',
+        roll: dexSaveNW,
+        dc: nwDC,
+        success: true,
+        vs: "Nature's Wrath",
+        prose: `🌿 Nature's Wrath! DEX save ${dexSaveNW} vs DC ${nwDC} — ${ctx.enemy!.name} dodges the vines. (${cdUsesAnc - 1} Channel Divinity remaining)`,
+      });
+    }
+    ctx.usedInitiative = true;
+    return true;
+  }
+
   if (fid === 'cutting_words') {
     if (ctx.char.subclass !== 'lore') {
       ctx.narrative = 'Only Lore Bards have Cutting Words.';

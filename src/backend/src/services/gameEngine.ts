@@ -2286,7 +2286,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       wizard: ['evoker', 'abjurer'],
       cleric: ['life', 'war', 'light'],
       ranger: ['hunter', 'beastmaster', 'fey_wanderer'],
-      paladin: ['devotion', 'vengeance'],
+      paladin: ['devotion', 'vengeance', 'ancients'],
       bard: ['lore', 'valor'],
       sorcerer: ['draconic', 'wild_magic'],
       warlock: ['fiend', 'archfey', 'celestial'],
@@ -2890,6 +2890,21 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       choices.push({
         label: `Abjure Enemy — frighten target, WIS save DC ${8 + profBonus(char.level) + abilityMod(char.cha ?? 10)} (Channel Divinity, ${cdLeft} left)`,
         action: { type: 'use_class_feature', featureId: 'abjure_enemy' },
+        kind: 'class_feature',
+      });
+    }
+
+    // Ancients Paladin: Nature's Wrath (Channel Divinity, restrain)
+    if (
+      char.subclass === 'ancients' &&
+      hasClass(char, 'paladin') &&
+      cdLeft > 0 &&
+      state.combat_active &&
+      enemyAlive
+    ) {
+      choices.push({
+        label: `Nature's Wrath — restrain target, DEX save DC ${8 + profBonus(char.level) + abilityMod(char.cha ?? 10)} (Channel Divinity, ${cdLeft} left)`,
+        action: { type: 'use_class_feature', featureId: 'natures_wrath' },
         kind: 'class_feature',
       });
     }
