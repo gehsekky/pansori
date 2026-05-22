@@ -34,15 +34,22 @@ export const handleTwoWeaponAttack: ActionHandler<{
     ctx.narrative = 'No enemy to attack.';
     return;
   }
+  // 2024 PHB Dual Wielder relaxes the off-hand to any one-handed
+  // melee weapon (not just Light). Without the feat, off-hand must
+  // be Light per RAW.
+  const hasDualWielder = (ctx.char.feats ?? []).includes('dual_wielder');
   const mainWpnInstanceId = ctx.char.equipped_weapon;
   const offhandInvItem = ctx.char.inventory
     .filter((i) => i.instance_id !== mainWpnInstanceId)
     .find((i) => {
       const l = ctx.context.lootTable.find((ll) => ll.id === i.id);
-      return l?.light && l.slot === 'weapon';
+      if (!l || l.slot !== 'weapon' || l.range === 'ranged') return false;
+      return l.light || hasDualWielder;
     });
   if (!offhandInvItem) {
-    ctx.narrative = 'No light off-hand weapon found.';
+    ctx.narrative = hasDualWielder
+      ? 'No off-hand one-handed melee weapon found.'
+      : 'No light off-hand weapon found.';
     return;
   }
   const offhandLoot = ctx.context.lootTable.find((l) => l.id === offhandInvItem.id)!;
