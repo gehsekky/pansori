@@ -308,6 +308,12 @@ export function applyFeatTake(
       );
       break;
     }
+    case 'healer': {
+      // No take-time state change — the `use_healer_kit` action
+      // handler reads `char.feats` and gates on it. Narrative only.
+      narrativeParts.push("Action: spend a Healer's Kit charge to heal 1d6 + 4 + prof bonus HP.");
+      break;
+    }
   }
   return { newChar: next, narrative: narrativeParts.join(' ') };
 }

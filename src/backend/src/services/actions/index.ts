@@ -34,6 +34,7 @@ import { handleEnterDistrict, handleTravel } from './travel.js';
 import { handleGrapple, handleShove, handleTryEscapeGrapple } from './combatTactical.js';
 import { handleLongRest, handleShortRest } from './rest.js';
 import { handleResolveReaction, handleUseReaction } from './reaction.js';
+import { handleUseHealerKit, handleUseHealingHands } from './healActions.js';
 import type { StructuredAction } from '../../types.js';
 import { handleAttack } from './attack/index.js';
 import { handleCastSpell } from './castSpell.js';
@@ -103,6 +104,8 @@ const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   use_reaction: handleUseReaction as ActionHandler,
   two_weapon_attack: handleTwoWeaponAttack as ActionHandler,
   polearm_butt_end: handlePolearmButtEnd as ActionHandler,
+  use_healer_kit: handleUseHealerKit as ActionHandler,
+  use_healing_hands: handleUseHealingHands as ActionHandler,
   grid_move: handleGridMove as ActionHandler,
   resolve_reaction: handleResolveReaction as ActionHandler,
   attack: handleAttack as ActionHandler,
