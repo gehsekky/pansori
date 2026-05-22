@@ -563,6 +563,22 @@ export type FeatEffect =
       // engine (pansori's enemy movement is one-step-per-turn so
       // "speed 0 for the rest of the turn" rarely matters).
       kind: 'sentinel-react';
+    }
+  | {
+      // Alert feat (2024 PHB origin) — +proficiency bonus to
+      // Initiative rolls AND immunity to the Surprised condition.
+      // The third Alert benefit (swap initiative with an ally) is
+      // deferred — needs an explicit action and a swap window the
+      // engine doesn't model yet.
+      kind: 'alert';
+    }
+  | {
+      // Savage Attacker feat (2024 PHB origin) — once per turn, when
+      // you hit with a weapon's damage roll, you can reroll the damage
+      // and use either total. Engine auto-takes the higher of the two
+      // and marks `turn_actions.savage_attacker_used`. Reset at turn
+      // start (FRESH_TURN clears it implicitly).
+      kind: 'savage-attacker';
     };
 
 /**

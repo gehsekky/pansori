@@ -119,4 +119,24 @@ export const SRD_FEATS: Record<string, Feat> = {
       l1Count: 1,
     },
   },
+
+  alert: {
+    id: 'alert',
+    name: 'Alert',
+    desc: 'You gain a +proficiency bonus to Initiative rolls. You cannot be surprised while you are conscious. (The third RAW benefit — swap initiative with a willing ally — is not yet modeled.)',
+    category: 'origin',
+    effect: {
+      kind: 'alert',
+    },
+  },
+
+  savage_attacker: {
+    id: 'savage_attacker',
+    name: 'Savage Attacker',
+    desc: "Once per turn, when you hit a creature with a weapon's damage roll, you can reroll the damage and use either total. The engine automatically takes the higher of the two.",
+    category: 'origin',
+    effect: {
+      kind: 'savage-attacker',
+    },
+  },
 };

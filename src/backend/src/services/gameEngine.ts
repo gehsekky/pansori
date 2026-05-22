@@ -1233,11 +1233,15 @@ export function buildInitiativeOrder(chars: Character[], enemies: Enemy[]): Init
   const entries: InitEntry[] = [
     ...chars
       .filter((c) => !c.dead)
-      .map((c) => ({
-        id: c.id,
-        roll: rollDice('1d20') + abilityMod(c.dex),
-        is_enemy: false,
-      })),
+      .map((c) => {
+        // 2024 PHB Alert feat — adds proficiency bonus to Initiative.
+        const alertBonus = (c.feats ?? []).includes('alert') ? profBonus(c.level) : 0;
+        return {
+          id: c.id,
+          roll: rollDice('1d20') + abilityMod(c.dex) + alertBonus,
+          is_enemy: false,
+        };
+      }),
     ...enemies.map((enemy) => ({
       id: enemy.id,
       roll: rollDice('1d20') + abilityMod(enemy.dex ?? 10),

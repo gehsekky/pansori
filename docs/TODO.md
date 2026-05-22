@@ -95,11 +95,26 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
     feat's `spellList` ('arcane' / 'divine' / 'primal'). 4 added
     validation tests.
   - More feats: Resilient (half-feat with `save-proficiency`),
-    Mobile, Sentinel, War Caster, Polearm Master, Great Weapon
-    Master, Heavy Armor Master, Crossbow Expert, Tavern Brawler,
-    Magic Initiate (data). Each is ~30 lines of data once the
-    matching effect kind exists; new shapes need one new union
-    variant.
+    Mobile, ~~Sentinel~~ (shipped), War Caster, Polearm Master,
+    Great Weapon Master, Heavy Armor Master, Crossbow Expert,
+    Tavern Brawler, ~~Magic Initiate~~ (shipped). Each is ~30 lines
+    of data once the matching effect kind exists; new shapes need
+    one new union variant.
+
+    **2024 PHB origin feats added 2026-05-22:**
+    - **Alert** (`kind: 'alert'`) — `+profBonus` to initiative
+      rolls, wired in `buildInitiativeOrder` (reads `char.feats`
+      and adds `profBonus(level)` when present). Surprise immunity
+      is a no-op in pansori today (PCs can't currently be
+      surprised — only enemies can via the party stealth check at
+      combat start) but the feat data is in place for when PC
+      surprise lands.
+    - **Savage Attacker** (`kind: 'savage-attacker'`) — once per
+      turn, weapon-damage hits reroll and take the higher total.
+      Gates on `turn_actions.savage_attacker_used` (auto-cleared
+      on next turn via FRESH_TURN). Unarmed strikes excluded per
+      RAW ("weapon's damage roll"). 5 direct tests covering both
+      feats (initiative bonus, per-turn limit, feat-absent no-op).
   - ASI-vs-feat UX on the FE (both `apply_asi` and `take_feat`
     actions are available when `asi_pending` is set; FE picks the
     surfacing).
