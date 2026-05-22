@@ -5680,9 +5680,14 @@ export async function takeAction({
           if (cels > 0 && ticked.celestial_revelation_variant) {
             const next = cels - 1;
             if (next <= 0) {
+              // Variant clears; the Radiant Soul fly speed grant
+              // also ends. Necrotic Shroud / Radiant Consumption
+              // didn't grant flight so this clear is a no-op for
+              // those — safe to drop unconditionally.
               final = {
                 ...ticked,
                 celestial_revelation_variant: undefined,
+                fly_speed_ft: undefined,
                 class_resource_uses: {
                   ...(ticked.class_resource_uses ?? {}),
                   celestial_revelation_rounds: 0,

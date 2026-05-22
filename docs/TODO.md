@@ -538,11 +538,35 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 - [ ] **Crafting** — potions, scrolls, magic items.
 - [ ] **Mounted combat.**
 - [ ] **Vehicles.**
-- [ ] **Movement modes** — climb / swim / jump / fly speed handling
-      (also blocks the Climbing/Crawling/Jumping items below). Also
-      blocks: full Athlete feat (climbing speed), Aasimar Radiant
-      Soul (flight), Fly spell, Levitate, Sea Druid's Aquatic
-      Affinity, several other deferred subclass features.
+- [~] **Movement modes** — partial (shipped 2026-05-22 — fly fully
+      wired with gameplay impact; climb / swim as data-only grants
+      until terrain-mode model lands). New BE-only fields
+      `fly_speed_ft`, `swim_speed_ft`, `climb_speed_ft` on Character.
+      `gridMove` reads `fly_speed_ft`: when ≥ walking speed, the
+      path may bypass obstacle cells (no landing in obstacles) and
+      difficult-terrain cost drops from 2× to 1×. Long rest clears
+      `fly_speed_ft` defensively; `climb` / `swim` are persistent
+      grants from feats / subclasses (don't clear on rest).
+
+      **Wired grants:**
+      - Aasimar Celestial Revelation: Radiant Soul variant sets
+        `fly_speed_ft = speed`; clears when the 10-round transformation
+        timer expires (round-wrap handler in gameEngine.ts).
+      - Athlete feat (take-time): grants `climb_speed_ft = speed`.
+      - Sea Druid Aquatic Affinity (subclass-select): grants
+        `swim_speed_ft = speed`.
+
+      **Remaining for full closure:**
+      - Climb / swim terrain-mode model — cells flagged as climbable
+        or swimmable that consume movement at half cost vs full when
+        the matching speed exists. Without this, climb / swim grants
+        are data-only.
+      - Fly spell + Levitate spell — add to SRD catalog so any caster
+        can grant flight to a willing creature. Concentration tracking
+        clears `fly_speed_ft` on drop.
+      - Jumping (long / high) — needs height + horizontal distance
+        tracking on the grid, deferred until terrain mode lands.
+      - Burrowing — monster-only RAW; not on the critical path.
 
 ### Subclass coverage (2026-05-22 — all 48 RAW selectable)
 

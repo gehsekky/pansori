@@ -322,9 +322,14 @@ export function applyFeatTake(
       break;
     }
     case 'athlete': {
-      // No take-time state change — the `stand_up` handler reads
-      // `char.feats` and reduces the cost from half-speed to 5 ft.
-      narrativeParts.push('Standing up from prone costs only 5 ft of movement.');
+      // 2024 PHB Athlete: climbing speed equal to walking speed.
+      // Persistent grant — set at take-time, never cleared. The
+      // `stand_up` handler also reads `char.feats` and reduces the
+      // stand cost from half-speed to 5 ft.
+      next = { ...next, climb_speed_ft: next.speed ?? 30 };
+      narrativeParts.push(
+        `Climbing speed equals walking speed (${next.climb_speed_ft} ft). Standing up from prone costs only 5 ft of movement.`
+      );
       break;
     }
   }
