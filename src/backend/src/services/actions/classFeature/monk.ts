@@ -4,7 +4,6 @@ import {
   effectiveSpeed,
   endCombatState,
   isRoomCleared,
-  pushEvent,
   splitEncounterXp,
 } from '../../gameEngine.js';
 import { getClassLevel, hasClass } from '../../multiclass.js';
@@ -80,7 +79,9 @@ export function handleMonkFeature(ctx: ActionContext, fid: string): boolean {
           const enemyDex = (ctx.enemy?.dex ?? 10) as number;
           const dexSave = rollDice('1d20') + abilityMod(enemyDex);
           const dexSuccess = dexSave >= monkDc;
-          ctx.st = pushEvent(ctx.st, {
+          // Save event for the combat log (consolidated prose lives
+          // in `flurryNarrative` below; fragment carries empty prose).
+          composeNow(ctx, {
             kind: 'save',
             characterId: ctx.enemy?.id ?? ctx.roomId,
             characterName: ctx.enemy?.name ?? 'target',
@@ -89,7 +90,7 @@ export function handleMonkFeature(ctx: ActionContext, fid: string): boolean {
             dc: monkDc,
             success: dexSuccess,
             vs: 'Open Hand Technique',
-            round: ctx.st.round ?? 1,
+            prose: '',
           });
           if (!dexSuccess) {
             ctx.st = {
@@ -103,13 +104,13 @@ export function handleMonkFeature(ctx: ActionContext, fid: string): boolean {
                   : e
               ),
             };
-            ctx.st = pushEvent(ctx.st, {
+            composeNow(ctx, {
               kind: 'condition_applied',
               targetId: ctx.enemy?.id ?? ctx.roomId,
               targetName: ctx.enemy?.name ?? 'target',
               condition: 'prone',
               source: 'Open Hand Technique',
-              round: ctx.st.round ?? 1,
+              prose: '',
             });
             flurryNarrative += ` Open Hand: DEX ${dexSave} vs DC ${monkDc} — prone!`;
           } else {
