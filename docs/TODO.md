@@ -141,7 +141,19 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
       doesn't model hand state) and opportunity-cast spell as a
       reaction (needs a reaction-window redesign). L4 + Spellcasting
       feature prereq.
-    11 added tests cover the three feats.
+    - **Heavy Armor Master** (`kind: 'heavy-armor-master'`) —
+      while wearing heavy armor and not incapacitated, attacks
+      against you deal 3 less damage (floor 0). Wired as a
+      last-step reduction in `computeEnemyAttack`, after
+      resistance + Arcane Ward but before applyDamage. Uses an
+      independent armor-loot lookup via `instance_id` to side-
+      step the pre-existing buggy `armorItem` lookup in the same
+      function (documented inline; fix in a separate PR since
+      the deflected-narrative path depends on the broken
+      behavior). L4 + heavy-armor proficiency prereq. The take-
+      time heavy-armor proficiency grant isn't wired (would need
+      `applyFeatTake` to add 'heavy' to char.armor_proficiencies).
+    16 added tests cover the four feats.
   - ASI-vs-feat UX on the FE (both `apply_asi` and `take_feat`
     actions are available when `asi_pending` is set; FE picks the
     surfacing).

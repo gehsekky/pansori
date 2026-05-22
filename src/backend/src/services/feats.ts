@@ -243,6 +243,15 @@ export function applyFeatTake(
       );
       break;
     }
+    case 'heavy-armor-master': {
+      // No take-time state change — `computeEnemyAttack` reads
+      // `char.feats` and subtracts 3 from damage when in heavy
+      // armor and not incapacitated. Narrative only.
+      narrativeParts.push(
+        'Heavy armor attacks against you deal 3 less damage (while not incapacitated).'
+      );
+      break;
+    }
   }
   return { newChar: next, narrative: narrativeParts.join(' ') };
 }

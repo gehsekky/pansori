@@ -154,6 +154,20 @@ export const SRD_FEATS: Record<string, Feat> = {
     },
   },
 
+  heavy_armor_master: {
+    id: 'heavy_armor_master',
+    name: 'Heavy Armor Master',
+    desc: "While you're wearing heavy armor and not incapacitated, attacks against you deal 3 less damage. (Also grants heavy-armor proficiency on take — not yet wired by the take handler.)",
+    category: 'general',
+    prerequisites: {
+      minLevel: 4,
+      other: ['Proficiency with heavy armor'],
+    },
+    effect: {
+      kind: 'heavy-armor-master',
+    },
+  },
+
   war_caster: {
     id: 'war_caster',
     name: 'War Caster',
