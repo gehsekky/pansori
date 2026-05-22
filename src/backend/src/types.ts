@@ -676,6 +676,13 @@ export interface Character {
   // duration (up to 10 min). computeTotalAc reads this. Expires
   // when the caster's concentration drops.
   shield_of_faith_active?: boolean;
+  // 2024 PHB Trickery Cleric — Blessing of the Trickster (Channel
+  // Divinity). The cleric touches an ally; the ally gains advantage
+  // on Stealth (Dex) checks for 1 hour. Pansori models the duration
+  // as "until long rest" (long enough to cover any single adventure
+  // scope, simpler than a per-turn timer). The sneak handler reads
+  // this flag as an advantage source; the rest handler clears it.
+  tricksters_blessing_active?: boolean;
   // SRD 5.2.1 p.11: Darkvision treats Darkness as Dim Light within this radius
   // (typically 60 ft for elves/dwarves/halflings/etc.). Default 0 = no
   // darkvision (typical human).

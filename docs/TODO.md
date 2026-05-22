@@ -553,7 +553,7 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 > (typically because the RAW mechanic needs infrastructure that
 > isn't shipped yet).
 
-**Selectable + features (39):**
+**Selectable + features (42):**
 
 | Class | Subclass | Headline L3 feature shipped |
 |---|---|---|
@@ -567,6 +567,7 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 | Cleric | Life | Disciple of Life + Preserve Life CD (pre-session) |
 | Cleric | War | Guided Strike CD (pre-session) |
 | Cleric | Light | Radiance of the Dawn CD |
+| Cleric | Trickery | Blessing of the Trickster (Stealth advantage until long rest) |
 | Druid | Land | Land's Aid CD (heal/harm) |
 | Druid | Moon | Wild Shape Beast Form (pre-session) |
 | Fighter | Champion | Improved Crit (pre-session) |
@@ -591,22 +592,23 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 | Rogue | Arcane Trickster | Third-caster slots (auto-wired) |
 | Sorcerer | Draconic | Draconic Resilience per-level HP |
 | Sorcerer | Wild Magic | Wild Magic Surge (pre-session) |
+| Sorcerer | Aberrant Mind | Psionic Spells data grant (closest-fit pansori spells) |
+| Sorcerer | Clockwork Soul | Bastion of Law (1 SP → 5 temp HP, bonus action) |
 | Warlock | Fiend | Dark One's Blessing (pre-session) |
 | Warlock | Archfey | Fey Presence (pre-session) |
 | Warlock | Celestial | Healing Light pool |
 | Wizard | Abjurer | Arcane Ward (pre-session) |
 | Wizard | Evoker | Sculpt Spells (pre-session) |
 
-**Picker-only — features deferred (9):**
+**Picker-only — features partially / fully deferred (6):**
 
 | Class | Subclass | What's deferred |
 |---|---|---|
 | Bard | Dance | Bardic Inspiration die variants (damage/AC/move) |
-| Cleric | Trickery | Blessing of the Trickster, Invoke Duplicity |
+| Cleric | Trickery | Invoke Duplicity (Blessing of the Trickster shipped) |
 | Druid | Sea | Wrath of the Sea (push on cantrip hit) |
 | Druid | Stars | Starry Form (Wild Shape variant w/ 3 constellations) |
-| Sorcerer | Aberrant Mind | Telepathic Speech + Psionic Spells list |
-| Sorcerer | Clockwork Soul | Bastion of Law temp HP, Restore Balance |
+| Sorcerer | Clockwork Soul | Restore Balance reaction (Bastion of Law shipped) |
 | Warlock | Great Old One | Awakened Mind telepathy |
 | Wizard | Diviner | Portent dice ROLLED on long rest; INTERCEPTION deferred |
 | Wizard | Illusionist | Improved Minor Illusion, Malleable Illusions |

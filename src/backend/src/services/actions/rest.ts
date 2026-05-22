@@ -217,6 +217,10 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
       // before a rest, but clear defensively.
       mage_armor_active: undefined,
       shield_of_faith_active: undefined,
+      // 2024 PHB Trickery Cleric — Blessing of the Trickster is a
+      // 1-hour buff; long rest clears it for any PC carrying the
+      // flag (the caster's or a previously-blessed ally's).
+      tricksters_blessing_active: undefined,
       // 2024 PHB Diviner Wizard Portent — roll 2 d20s on each long
       // rest (3 at L14+). Stored on the character; player can use
       // them to replace rolls later (interception not wired yet).
