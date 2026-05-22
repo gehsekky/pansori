@@ -85,6 +85,14 @@ export const handleSelectSubclass: ActionHandler<{ type: 'select_subclass'; subc
   // charm_person (L1 mental influence), sleep (L1 mind-affect). RAW
   // tags these as "always prepared" + "count as Sorcerer spells";
   // pansori just appends them to spells_known.
+  // 2024 PHB Sea Druid (Circle of the Sea) — Aquatic Affinity at L3
+  // grants a swim speed equal to walking speed. Persistent grant.
+  // (Wrath of the Sea — the push-on-cantrip-hit feature — needs a
+  // cantrip-hit hook that's still deferred.)
+  if (action.subclass === 'sea' && hasClass(next, 'druid')) {
+    next.swim_speed_ft = next.speed ?? 30;
+    narrative += ` Aquatic Affinity: swim speed equals walking speed (${next.swim_speed_ft} ft).`;
+  }
   if (action.subclass === 'aberrant_mind' && hasClass(next, 'sorcerer')) {
     const grants = ['vicious_mockery', 'charm_person', 'sleep'];
     const knownSet = new Set(next.spells_known ?? []);

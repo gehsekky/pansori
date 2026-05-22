@@ -75,9 +75,19 @@ export const handleGridMove: ActionHandler<{
   // the FE's isReachable). Static obstacles (columns, walls, debris) do.
   const currentRoomForMove = ctx.seed.rooms.find((r) => r.id === ctx.roomId);
   const roomObstacles = currentRoomForMove?.obstacles ?? [];
+  const walkSpeedFt = effectiveSpeed(ctx.char);
+  // 2024 PHB flying movement — when the PC has a fly speed ≥ their
+  // walking speed, the path may pass over obstacle cells (boulders,
+  // columns, debris) and difficult-terrain cells without the 2× cost.
+  // RAW lets flying creatures move over difficult terrain without
+  // penalty. We still block on living entities (no flying through
+  // someone in the same square) and require the final cell to be
+  // an empty space — flying doesn't let you land in a wall.
+  const flySpeedFt = ctx.char.fly_speed_ft ?? 0;
+  const isFlying = flySpeedFt > 0 && flySpeedFt >= walkSpeedFt;
   const blocked = [
     ...ctx.st.entities.filter((e) => e.id !== ctx.char.id && e.hp > 0).map((e) => e.pos),
-    ...roomObstacles,
+    ...(isFlying ? [] : roomObstacles),
   ];
 
   const path = findPath(charEntity.pos, action.to, blocked, gridW, gridH);
@@ -85,14 +95,27 @@ export const handleGridMove: ActionHandler<{
     ctx.narrative = 'No path to that square.';
     return;
   }
+  // The destination must not be inside an obstacle even when flying —
+  // RAW: you have to land somewhere. findPath gates on `blocked`, which
+  // already includes living entities; we re-check obstacles for the
+  // landing cell specifically when flying so the player can't end up
+  // standing inside a wall.
+  if (isFlying && roomObstacles.some((o) => posEqual(o, action.to))) {
+    ctx.narrative = 'You cannot land inside an obstacle.';
+    return;
+  }
 
   const difficultTerrain = currentRoomForMove?.difficultTerrain ?? [];
   const costFeet = path.reduce((acc, pos) => {
-    const isDifficult = difficultTerrain.some((dt) => posEqual(dt, pos));
+    // Flying ignores difficult terrain (PHB 2024).
+    const isDifficult = !isFlying && difficultTerrain.some((dt) => posEqual(dt, pos));
     return acc + (isDifficult ? SQUARE_SIZE * 2 : SQUARE_SIZE);
   }, 0);
 
-  const speedFt = effectiveSpeed(ctx.char);
+  // Use the larger of walking or flying speed as the movement budget
+  // when flying — RAW the creature picks which mode per turn but
+  // pansori models a single combined move per action.
+  const speedFt = isFlying ? Math.max(walkSpeedFt, flySpeedFt) : walkSpeedFt;
   const usedFt = ctx.st.movement_used?.[ctx.char.id] ?? 0;
   if (usedFt + costFeet > speedFt) {
     ctx.narrative = `Not enough movement. (${speedFt - usedFt} ft remaining, ${costFeet} ft needed${difficultTerrain.length ? ' — difficult terrain' : ''})`;

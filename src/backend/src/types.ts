@@ -683,6 +683,21 @@ export interface Character {
   // scope, simpler than a per-turn timer). The sneak handler reads
   // this flag as an advantage source; the rest handler clears it.
   tricksters_blessing_active?: boolean;
+  // 2024 PHB movement modes (separate from `speed`, which is the
+  // walking speed). When non-zero, the character has the matching
+  // mode; the engine reads these where the mode changes gameplay.
+  // Today the only fully-wired mode is `fly_speed_ft`: gridMove
+  // lets a flying character bypass obstacle cells and ignore
+  // difficult-terrain cost when their flying speed equals or
+  // exceeds walking speed. `swim_speed_ft` and `climb_speed_ft`
+  // store data from feature grants (Athlete, Sea Druid, etc.) but
+  // don't yet change engine behavior — the matching terrain-mode
+  // model (climb / swim cells) is deferred to a follow-up PR.
+  // Long rest clears all three defensively (most sources are
+  // short-duration concentration buffs or transformations).
+  fly_speed_ft?: number;
+  swim_speed_ft?: number;
+  climb_speed_ft?: number;
   // 2024 PHB Stars Druid — Starry Form constellation. Set via the
   // bonus-action activation (consumes a Wild Shape charge); each
   // constellation grants a different rider:

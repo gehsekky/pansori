@@ -226,6 +226,14 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
       // so the constellation persists until the next rest. Cleared
       // here so the Druid starts the next adventuring day fresh.
       starry_form_constellation: undefined,
+      // 2024 PHB movement modes — fly is the only one with purely
+      // short-duration sources today (Fly spell, Aasimar Radiant
+      // Soul transformation). Climb / swim grants from Athlete and
+      // Sea Druid Aquatic Affinity are PERMANENT and applied at
+      // feat-take / subclass-select time, so we must NOT clear
+      // them on rest. Defensive fly clear handles the case where
+      // an Aasimar's 1-minute transformation overruns into a rest.
+      fly_speed_ft: undefined,
       // 2024 PHB Diviner Wizard Portent — roll 2 d20s on each long
       // rest (3 at L14+). Stored on the character; player can use
       // them to replace rolls later (interception not wired yet).

@@ -5,8 +5,10 @@
 // at use time:
 //   - **Necrotic Shroud**: once per turn, a melee weapon hit adds
 //     +prof necrotic damage.
-//   - **Radiant Soul**: same, +prof radiant; RAW also grants fly
-//     speed = walking (movement modes not modeled — skip).
+//   - **Radiant Soul**: same, +prof radiant; ALSO grants a fly
+//     speed equal to walking speed. The flight clears when the
+//     transformation timer (`celestial_revelation_rounds`) ticks
+//     to zero — see the round-wrap handler in gameEngine.ts.
 //   - **Radiant Consumption**: same +prof radiant rider; RAW also
 //     deals +prof radiant to creatures within 10 ft at the start
 //     of each of your turns (AoE aura — deferred).
@@ -58,9 +60,14 @@ export const handleCelestialRevelation: ActionHandler<{
   };
   const damageType = action.variant === 'necrotic_shroud' ? 'necrotic' : 'radiant';
 
+  // Radiant Soul grants a fly speed equal to walking speed for the
+  // duration. The flight clears alongside the variant when the
+  // transformation timer ticks to zero (round-wrap in gameEngine.ts).
+  const flyGrant = action.variant === 'radiant_soul' ? { fly_speed_ft: ctx.char.speed ?? 30 } : {};
   ctx.char = {
     ...ctx.char,
     celestial_revelation_variant: action.variant,
+    ...flyGrant,
     turn_actions: { ...ctx.char.turn_actions, bonus_action_used: true },
     class_resource_uses: {
       ...(ctx.char.class_resource_uses ?? {}),
@@ -69,5 +76,7 @@ export const handleCelestialRevelation: ActionHandler<{
     },
   };
   ctx.usedInitiative = true;
-  ctx.narrative = `${ctx.char.name} — Celestial Revelation: ${labels[action.variant]}! For 1 minute, a melee weapon hit deals +prof ${damageType} damage (once per turn).`;
+  const flyNote =
+    action.variant === 'radiant_soul' ? ` Fly speed ${ctx.char.fly_speed_ft} ft.` : '';
+  ctx.narrative = `${ctx.char.name} — Celestial Revelation: ${labels[action.variant]}! For 1 minute, a melee weapon hit deals +prof ${damageType} damage (once per turn).${flyNote}`;
 };
