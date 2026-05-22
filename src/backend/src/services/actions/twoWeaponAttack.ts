@@ -1,5 +1,6 @@
 import {
   DISADV_CONDITIONS,
+  applyDamageMultiplier,
   hasArmorProficiency,
   hasWeaponProficiency,
   resolveOffHandAttack,
@@ -110,14 +111,23 @@ export const handleTwoWeaponAttack: ActionHandler<{
   }
   const ent = ctx.st.entities?.find((e) => e.id === targetEntityId && e.isEnemy);
   const curHp = ent?.hp ?? 0;
-  const newHp = curHp - atk.damage;
+  // Apply enemy resistance / vulnerability to the off-hand damage
+  // type. Previously the raw `atk.damage` was written straight to
+  // entity HP — a slashing-resistant enemy took full damage from an
+  // off-hand shortsword.
+  const { damage: effDmg, note: dmgNote } = applyDamageMultiplier(
+    atk.damage,
+    offhandLoot.damageType,
+    enemyInRoom
+  );
+  const newHp = curHp - effDmg;
   let nextSt: GameState = {
     ...ctx.st,
     entities: (ctx.st.entities ?? []).map((e) =>
       e.id === targetEntityId && e.isEnemy ? { ...e, hp: newHp } : e
     ),
   };
-  let narrative = `Off-hand strike with ${offhandLoot.name}! ${atk.damage} damage${atk.critical ? ' (CRITICAL!)' : ''} (${atk.roll}+${atk.atkMod}+${atk.prof}=${atk.total} vs AC ${enemyInRoom.ac}, no ability mod to damage).`;
+  let narrative = `Off-hand strike with ${offhandLoot.name}! ${effDmg} damage${dmgNote}${atk.critical ? ' (CRITICAL!)' : ''} (${atk.roll}+${atk.atkMod}+${atk.prof}=${atk.total} vs AC ${enemyInRoom.ac}, no ability mod to damage).`;
 
   if (newHp <= 0) {
     const xpGain = enemyInRoom.xp ?? 10;

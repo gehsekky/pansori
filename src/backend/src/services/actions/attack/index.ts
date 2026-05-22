@@ -635,7 +635,17 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
                 1
           );
           if (cleaveTarget) {
-            const cleaveDmg = rollDice(weaponItem.damage);
+            const rawCleaveDmg = rollDice(weaponItem.damage);
+            // Apply enemy resistance / vulnerability to the cleave
+            // damage type — previously this raw weapon-die damage was
+            // written straight to entity HP, ignoring any resistance
+            // the second target had to the weapon's damage type.
+            const cleaveEnemy = getEnemyById(ctx.seed, cleaveTarget.id);
+            const { damage: cleaveDmg, note: cleaveDmgNote } = applyDamageMultiplier(
+              rawCleaveDmg,
+              weaponItem.damageType,
+              cleaveEnemy ?? {}
+            );
             const cleaveNewHp = Math.max(0, cleaveTarget.hp - cleaveDmg);
             ctx.st = {
               ...ctx.st,
@@ -643,8 +653,8 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
                 e.id === cleaveTarget.id ? { ...e, hp: cleaveNewHp } : e
               ),
             };
-            const cleaveName = getEnemyById(ctx.seed, cleaveTarget.id)?.name ?? cleaveTarget.id;
-            ctx.narrative += ` ${fmt.note(`[Cleave: ${cleaveName} also takes ${cleaveDmg} damage!${cleaveNewHp <= 0 ? ' (killed)' : ''}]`)}`;
+            const cleaveName = cleaveEnemy?.name ?? cleaveTarget.id;
+            ctx.narrative += ` ${fmt.note(`[Cleave: ${cleaveName} also takes ${cleaveDmg} damage!${cleaveDmgNote}${cleaveNewHp <= 0 ? ' (killed)' : ''}]`)}`;
             if (cleaveNewHp <= 0) {
               const cleaveXp = getEnemyById(ctx.seed, cleaveTarget.id)?.xp ?? 0;
               const cleaveSplit = splitEncounterXp(ctx.st, ctx.char.id, cleaveXp);
