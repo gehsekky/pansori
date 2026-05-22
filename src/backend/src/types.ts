@@ -270,6 +270,11 @@ export interface TurnActions {
   // Heroic Inspiration pending — when set, the next attack roll gets
   // advantage and both this flag + char.inspiration are cleared (one-shot).
   inspiration_pending?: boolean;
+  // Lucky feat (2024 PHB) — when set, the next PC attack roll gets
+  // advantage. Decoupled from inspiration_pending so a PC can stack
+  // sources or use Lucky without burning their Heroic Inspiration.
+  // Set by `use_luck`, cleared on consumption (one-shot).
+  luck_pending?: boolean;
   // 2024 PHB Rogue Cunning Strike (L5+) — when set, the next Sneak Attack
   // spends 1 die for the chosen effect (trip, poison, withdraw, disarm)
   // and one SA die is removed from the damage roll. Cleared after applied.

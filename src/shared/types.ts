@@ -193,6 +193,11 @@ export type StructuredAction =
   | { type: 'try_escape_grapple' }
   | { type: 'stand_up' }
   | { type: 'spend_inspiration' }
+  // Lucky feat (2024 PHB Chapter 5). Spend 1 luck point to queue
+  // advantage on the next d20 test (mirror of `spend_inspiration`).
+  // Requires the Lucky feat + remaining `feat_lucky_uses`. Free of
+  // action-economy cost; refills on a long rest.
+  | { type: 'use_luck' }
   | { type: 'shove'; targetEnemyId?: string }
   | { type: 'dodge' }
   | { type: 'disengage' }

@@ -40,6 +40,8 @@ export interface ToHitContext {
  *  - Consumes the `vexed_by_<charId>` tag on the target enemy
  *  - Consumes the `studied_by_<charId>` tag on the target enemy
  *  - Consumes `inspiration_pending` + `inspiration` on the active PC
+ *  - Consumes `luck_pending` on the active PC (Lucky feat — point is
+ *    decremented at spend time in `use_luck`, the flag clears here)
  *  - Consumes `guided_strike_active` from state
  *
  * Advantage sources stacked (any one enables advantage):
@@ -49,7 +51,7 @@ export interface ToHitContext {
  *   (Heroic Inspiration), wolfAdv (Wolf Totem Barbarian ally within
  *   5 ft, melee only), vexAdv (consumed Vex tag), studyAdv (Fighter
  *   L13 miss-tag), packTacticsAdv (Wolf/Dire Wolf Beast Form +
- *   ally within 5 ft).
+ *   ally within 5 ft), luckAdv (Lucky feat, queued via `use_luck`).
  *
  * Disadvantage sources:
  *   rangedInMelee, conditionDisadv, exhaustionDisadv (lvl 3+),
@@ -234,6 +236,14 @@ export function computeToHitContext(
     };
   }
 
+  const luckAdv = !!ctx.char.turn_actions.luck_pending;
+  if (luckAdv) {
+    ctx.char = {
+      ...ctx.char,
+      turn_actions: { ...ctx.char.turn_actions, luck_pending: false },
+    };
+  }
+
   const advantage =
     conditionAdv ||
     enemyGrappled ||
@@ -248,7 +258,8 @@ export function computeToHitContext(
     wolfAdv ||
     vexAdv ||
     studyAdv ||
-    packTacticsAdv;
+    packTacticsAdv ||
+    luckAdv;
 
   const disadvReasons = [
     rangedInMelee ? 'ranged in melee' : '',

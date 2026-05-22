@@ -24,6 +24,45 @@ export const handleSpendInspiration: ActionHandler<{ type: 'spend_inspiration' }
 };
 
 /**
+ * `use_luck`: spend one Lucky feat point (2024 PHB Chapter 5) to queue
+ * advantage on the next PC attack roll. Mirrors the `spend_inspiration`
+ * shape — sets `turn_actions.luck_pending` which `attack/toHit.ts`
+ * consumes as an advantage source. Costs no action-economy slot.
+ *
+ * RAW the spend window is AFTER the d20 result is known; pansori's
+ * MVP shifts it to BEFORE the roll (simpler, mirrors Heroic
+ * Inspiration). The player's tactical choice still has teeth —
+ * spend pre-roll on a tough swing — without requiring a pending-
+ * reaction pause on every PC d20.
+ *
+ * Saves + ability checks not yet hooked; this PR covers attack
+ * rolls only. Follow-ups will thread the flag through `skillCheck`
+ * + save-roll callers.
+ */
+export const handleUseLuck: ActionHandler<{ type: 'use_luck' }> = (ctx) => {
+  if (!(ctx.char.feats ?? []).includes('lucky')) {
+    return { rejected: `${ctx.char.name} does not have the Lucky feat.` };
+  }
+  const remaining = ctx.char.class_resource_uses?.feat_lucky_uses ?? 0;
+  if (remaining <= 0) {
+    return { rejected: `${ctx.char.name} has no luck points remaining (refresh on long rest).` };
+  }
+  if (ctx.char.turn_actions.luck_pending) {
+    return { rejected: 'Luck already queued for your next d20 roll.' };
+  }
+  ctx.char = {
+    ...ctx.char,
+    class_resource_uses: {
+      ...(ctx.char.class_resource_uses ?? {}),
+      feat_lucky_uses: remaining - 1,
+    },
+    turn_actions: { ...ctx.char.turn_actions, luck_pending: true },
+  };
+  const left = remaining - 1;
+  ctx.narrative = `${ctx.char.name} spends a luck point — advantage on your next attack. (${left} luck point${left === 1 ? '' : 's'} left.)`;
+};
+
+/**
  * `stand_up`: spend half-speed of movement to drop prone. PHB p.190 —
  * "Standing up takes more effort; doing so costs an amount of movement
  * equal to half your speed." Guarded by remaining movement budget so a

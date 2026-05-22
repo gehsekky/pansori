@@ -1,4 +1,4 @@
-import { applyFeatTake, canTakeFeat, getFeat } from './feats.js';
+import { applyFeatTake, canTakeFeat, getFeat, resetFeatLongRestResources } from './feats.js';
 import { describe, expect, it } from 'vitest';
 import { SRD_FEATS } from '../contexts/srd/feats.js';
 import { context as ctx } from '../contexts/sandbox.js';
@@ -68,6 +68,36 @@ describe('getFeat', () => {
   it('looks up a feat by id from context.featTable', () => {
     expect(getFeat('tough', ctx)?.name).toBe('Tough');
     expect(getFeat('nonexistent', ctx)).toBeUndefined();
+  });
+});
+
+describe('resetFeatLongRestResources', () => {
+  it("refills Lucky's luck-point pool to the feat's usesPerLongRest max", () => {
+    const char = makeChar({
+      id: 'pc-1',
+      feats: ['lucky'],
+      class_resource_uses: { feat_lucky_uses: 0, rage_uses: 1 },
+    });
+    const next = resetFeatLongRestResources(char, ctx, char.class_resource_uses ?? {});
+    expect(next.feat_lucky_uses).toBe(3);
+    // Non-feat resources untouched (long-rest handler owns those).
+    expect(next.rage_uses).toBe(1);
+  });
+
+  it('is a no-op for feats with no per-long-rest resource (Tough, Sharpshooter)', () => {
+    const char = makeChar({
+      id: 'pc-1',
+      feats: ['tough', 'sharpshooter'],
+      class_resource_uses: { unrelated: 1 },
+    });
+    const next = resetFeatLongRestResources(char, ctx, char.class_resource_uses ?? {});
+    expect(next).toEqual({ unrelated: 1 });
+  });
+
+  it('handles a character with no feats', () => {
+    const char = makeChar({ id: 'pc-1', class_resource_uses: { rage_uses: 2 } });
+    const next = resetFeatLongRestResources(char, ctx, char.class_resource_uses ?? {});
+    expect(next).toEqual({ rage_uses: 2 });
   });
 });
 
