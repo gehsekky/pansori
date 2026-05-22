@@ -429,6 +429,24 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
         turn_actions: { ...ctx.char.turn_actions, dreadful_strikes_used: true },
       };
     }
+    // 2024 PHB Gloom Stalker Ranger L3 — Dread Ambusher: first
+    // weapon attack of combat deals +1d8. Flag is set in
+    // runCombatStart for Gloom Stalkers and consumed here on the
+    // first hit. FRESH_TURN at turn start expires the flag if
+    // unused (matches the RAW "first turn of combat" cap).
+    let dreadAmbusherDmg = 0;
+    if (
+      ctx.char.turn_actions.dread_ambusher_pending &&
+      weaponItem &&
+      hasClass(ctx.char, 'ranger') &&
+      ctx.char.subclass === 'gloom_stalker'
+    ) {
+      dreadAmbusherDmg = rollDice('1d8');
+      ctx.char = {
+        ...ctx.char,
+        turn_actions: { ...ctx.char.turn_actions, dread_ambusher_pending: undefined },
+      };
+    }
     // 2024 PHB Mercy Monk L3 — Hand of Harm: once per turn, on an
     // unarmed-strike hit, spend 1 Ki to add 1d6 + WIS mod necrotic.
     // Only fires on UNARMED strikes (RAW). Gated on Ki availability
@@ -462,7 +480,8 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
       gwmDmg +
       celRevDmg +
       dreadfulStrikesDmg +
-      handOfHarmDmg;
+      handOfHarmDmg +
+      dreadAmbusherDmg;
     const { damage: finalDmg, note: dmgNote } = applyDamageMultiplier(
       rawDmg,
       weaponItem?.damageType,
@@ -507,6 +526,9 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
     }
     if (handOfHarmDmg > 0) {
       hitBonuses.push({ label: `Hand of Harm: +${handOfHarmDmg} necrotic (1 Ki)` });
+    }
+    if (dreadAmbusherDmg > 0) {
+      hitBonuses.push({ label: `Dread Ambusher: +${dreadAmbusherDmg}` });
     }
     if (dmgNote) {
       // dmgNote arrives as " [resistant: 6 → 3]" — strip leading space and
