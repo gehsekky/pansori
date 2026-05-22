@@ -290,6 +290,46 @@ export const SRD_SPELLS: Record<string, Spell> = {
     // Druid / Ranger (2024 PHB).
     spellList: ['primal'],
   },
+  mage_armor: {
+    id: 'mage_armor',
+    name: 'Mage Armor',
+    level: 1,
+    castTime: 'action',
+    targetType: 'self_or_ally',
+    // No condition / no temp HP / no max HP bonus — the AC effect is
+    // applied via the per-spell side-effect hook in castSpell that
+    // sets mage_armor_active and recomputes AC.
+    rangeKind: 'touch',
+    desc: "A willing creature gains a protective magical force. Until the spell ends, the target's base AC becomes 13 + DEX (only effective while not wearing body armor). Lasts 8 hours; cleared on long rest.",
+    narratives: {
+      cast: [
+        '{name} traces wards in the air around {target} — {spell}{slotNote} settles into a shimmering second skin',
+        '{name} casts {spell}{slotNote}; pale runes drift across {target}, settling into a magical shield',
+      ],
+    },
+    spellList: ['arcane'],
+  },
+  shield_of_faith: {
+    id: 'shield_of_faith',
+    name: 'Shield of Faith',
+    level: 1,
+    castTime: 'bonus_action',
+    concentration: true,
+    targetType: 'self_or_ally',
+    // Side-effect hook (shield_of_faith_active) flips on cast.
+    durationRounds: 10, // 1 min concentration
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    desc: 'A shimmering field grants the target +2 AC for the duration (Concentration, up to 1 minute).',
+    narratives: {
+      cast: [
+        '{name} murmurs {spell}{slotNote} — a shimmering field of faith wraps {target}',
+        "{name}'s prayer kindles {spell}{slotNote}; golden light hovers about {target}",
+      ],
+    },
+    spellList: ['divine'],
+  },
+
   heroism: {
     id: 'heroism',
     name: 'Heroism',

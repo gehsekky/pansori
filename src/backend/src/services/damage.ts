@@ -48,6 +48,14 @@ export interface ApplyDamageOptions {
   skipConcentration?: boolean;
   /** Skip temp HP absorption (e.g. damage that bypasses resistances/buffers). */
   skipTempHp?: boolean;
+  /**
+   * Game context. Passed through to breakConcentration so that
+   * concentration-linked AC buffs (Shield of Faith) can clear the
+   * shield_of_faith_active flag + recompute AC when the caster's
+   * concentration breaks under damage. Without this, the +2 AC flag
+   * stays set after the spell technically ends.
+   */
+  context?: import('../types.js').Context;
 }
 
 export interface ApplyDamageResult {
@@ -116,7 +124,7 @@ export function applyDamage(
   let concentrationBroken = false;
   if (!opts.skipConcentration && amountDealt > 0) {
     const before = newChar.concentrating_on;
-    const conc = checkConcentration(newChar, newSt, amountDealt);
+    const conc = checkConcentration(newChar, newSt, amountDealt, opts.context);
     newChar = conc.char;
     newSt = conc.st;
     concentrationNote = conc.note;

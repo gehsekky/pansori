@@ -3,6 +3,7 @@ import {
   ENEMY_DISADV_CONDITIONS,
   FRESH_TURN,
   abilityMod,
+  computeTotalAc,
   d,
   hasWeaponProficiency,
   passivePerception,
@@ -328,7 +329,10 @@ export function clampHpForExhaustion(hp: number, maxHp: number, exhaustionLevel:
 // tick fires once per full initiative cycle (SRD 5.2.1 round = 6 sec).
 // Returns { st, narrative } — narrative aggregates the auto-end notes
 // for each PC whose spell timed out.
-function tickConcentrationDurations(st: GameState): { st: GameState; narrative: string } {
+function tickConcentrationDurations(
+  st: GameState,
+  context?: Context
+): { st: GameState; narrative: string } {
   let narrative = '';
   let stOut = st;
   for (const c of st.characters) {
@@ -338,7 +342,7 @@ function tickConcentrationDurations(st: GameState): { st: GameState; narrative: 
     if (remaining <= 1) {
       // Time's up — break concentration cleanly via the existing path
       // (handles bless-blessed cleanup, condition-link clearing, etc).
-      const { char: nc, st: ns } = breakConcentration(c, stOut);
+      const { char: nc, st: ns } = breakConcentration(c, stOut, context);
       stOut = {
         ...ns,
         characters: ns.characters.map((x) => (x.id === c.id ? nc : x)),
@@ -365,11 +369,19 @@ function tickConcentrationDurations(st: GameState): { st: GameState; narrative: 
 
 export function breakConcentration(
   char: Character,
-  st: GameState
+  st: GameState,
+  context?: Context
 ): { char: Character; st: GameState } {
   if (!char.concentrating_on) return { char, st };
   const condition = char.concentrating_on.condition;
   const wasBless = char.concentrating_on.spellId === 'bless';
+  // 2024 PHB Shield of Faith — concentration drop clears the +2 AC.
+  // Pansori MVP assumes ONE Shield of Faith active in the party at
+  // a time (the typical case — one Cleric concentrating). When the
+  // caster's concentration drops, sweep every PC with the flag and
+  // clear + recompute AC. Multi-caster SoF on different targets
+  // isn't tracked; defensible since the failure mode is rare.
+  const wasShieldOfFaith = char.concentrating_on.spellId === 'shield_of_faith';
   let newChar: Character = { ...char, concentrating_on: null };
   // Strip the linked enemy condition (Hold Person etc.)
   let newSt: GameState =
@@ -410,13 +422,32 @@ export function breakConcentration(
       };
     }
   }
+  if (wasShieldOfFaith && context) {
+    const recomputeFor = (c: Character): Character => {
+      if (!c.shield_of_faith_active) return c;
+      const cleared: Character = { ...c, shield_of_faith_active: false };
+      cleared.ac = computeTotalAc(
+        cleared.dex,
+        cleared.equipped_armor,
+        cleared.equipped_shield,
+        cleared.inventory ?? [],
+        context.lootTable,
+        cleared.mage_armor_active ?? false,
+        false
+      );
+      return cleared;
+    };
+    newSt = { ...newSt, characters: newSt.characters.map(recomputeFor) };
+    newChar = recomputeFor(newChar);
+  }
   return { char: newChar, st: newSt };
 }
 
 export function checkConcentration(
   char: Character,
   st: GameState,
-  dmgTaken: number
+  dmgTaken: number,
+  context?: Context
 ): { char: Character; st: GameState; note: string } {
   if (!char.concentrating_on || dmgTaken <= 0) return { char, st, note: '' };
   // SRD 5.2.1 p.203 — Concentration DC is 10 or half damage taken, whichever
@@ -431,7 +462,7 @@ export function checkConcentration(
   if (save >= dc)
     return { char, st, note: ` [Concentration hold: ${save} vs DC ${dc}${warCasterNote}]` };
   const spellName = char.concentrating_on.spellId;
-  const { char: nc, st: ns } = breakConcentration(char, st);
+  const { char: nc, st: ns } = breakConcentration(char, st, context);
   return {
     char: nc,
     st: ns,
@@ -5295,7 +5326,7 @@ export async function takeAction({
       // = 6 sec). Spells whose budget reaches 0 end cleanly via
       // breakConcentration so linked conditions (Bless's `blessed`, Hold
       // Person's `paralyzed`, etc.) clear at the same time.
-      const concRes = tickConcentrationDurations(st);
+      const concRes = tickConcentrationDurations(st, context);
       st = concRes.st;
       narrative += concRes.narrative;
     }
@@ -5522,7 +5553,7 @@ export async function takeAction({
       if (!c.concentrating_on) continue;
       const isIncap = c.dead || c.hp <= 0 || c.conditions.some((cc) => incapCond.has(cc));
       if (isIncap) {
-        const r = breakConcentration(c, updated);
+        const r = breakConcentration(c, updated, context);
         anyBroken = true;
         updated = {
           ...r.st,

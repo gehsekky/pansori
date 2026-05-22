@@ -103,11 +103,11 @@ describe('Totem Warrior — choice surface', () => {
           c.action.featureId === 'rage_wolf')
     );
     expect(rageChoices).toHaveLength(3);
-    expect(rageChoices.map((c) => c.action.featureId).sort()).toEqual([
-      'rage_bear',
-      'rage_eagle',
-      'rage_wolf',
-    ]);
+    const featureIds = rageChoices
+      .map((c) => (c.action.type === 'use_class_feature' ? c.action.featureId : undefined))
+      .filter((x): x is string => !!x)
+      .sort();
+    expect(featureIds).toEqual(['rage_bear', 'rage_eagle', 'rage_wolf']);
   });
 
   it('Berserker (non-Totem) surfaces the plain Rage option (one choice)', () => {
