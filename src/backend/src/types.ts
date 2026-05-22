@@ -286,6 +286,12 @@ export interface TurnActions {
   // marks the reroll as already spent this turn so multi-hit turns
   // (Extra Attack, two-weapon) only benefit once.
   savage_attacker_used?: boolean;
+  // Sneak Attack (Rogue) — once per turn. Without this gate, a
+  // multiclass Rogue with Extra Attack (Fighter/Ranger/Paladin/
+  // Barbarian/Monk multiclass) or any Rogue using Two-Weapon
+  // Fighting could trigger SA on every hit. RAW: only on the
+  // first qualifying hit. Cleared by FRESH_TURN at turn start.
+  sneak_attack_used?: boolean;
   // 2024 PHB Rogue Cunning Strike (L5+) — when set, the next Sneak Attack
   // spends 1 die for the chosen effect (trip, poison, withdraw, disarm)
   // and one SA die is removed from the damage roll. Cleared after applied.
