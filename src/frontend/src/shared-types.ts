@@ -584,6 +584,15 @@ export type FeatEffect =
       // and marks `turn_actions.savage_attacker_used`. Reset at turn
       // start (FRESH_TURN clears it implicitly).
       kind: 'savage-attacker';
+    }
+  | {
+      // Speed bonus (Mobile, future Skulker variants, etc.). Hook
+      // is `effectiveSpeed(char)` which reads `char.feats[]` and adds
+      // the matching feat's `bonusFeet`. Stored as feat-effect data
+      // (not hardcoded in effectiveSpeed) so future speed-bonus feats
+      // are pure data additions.
+      kind: 'speed-bonus';
+      bonusFeet: number;
     };
 
 /**
