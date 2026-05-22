@@ -292,7 +292,7 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
     // only the PC's PRIMARY class). Dice scale below uses
     // `getClassLevel(char, 'rogue')` for the same reason.
     let sneakDmg = 0;
-    if (hasClass(ctx.char, 'rogue')) {
+    if (hasClass(ctx.char, 'rogue') && !ctx.char.turn_actions.sneak_attack_used) {
       const isFinesseOrRanged = (weaponItem?.finesse ?? false) || weaponItem?.range === 'ranged';
       let allyAdjacent = false;
       if (ctx.st.entities) {
@@ -320,6 +320,12 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
         if (ctx.char.turn_actions.cunning_strike_pending) {
           sneakDmg = Math.max(0, sneakDmg - rollDice('1d6'));
         }
+        // SRD 5.2.1 — once per turn. Mark spent so Extra Attack /
+        // two-weapon follow-up attacks don't re-trigger SA.
+        ctx.char = {
+          ...ctx.char,
+          turn_actions: { ...ctx.char.turn_actions, sneak_attack_used: true },
+        };
       }
     }
 
