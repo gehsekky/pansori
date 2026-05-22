@@ -588,6 +588,18 @@ export type FeatEffect =
       // are pure data additions.
       kind: 'speed-bonus';
       bonusFeet: number;
+    }
+  | {
+      // War Caster feat (2024 PHB general) — three benefits, ranked
+      // by how much engine wiring each needs:
+      //   1. Advantage on CON saves to maintain concentration when
+      //      damaged. Wired in `checkConcentration`.
+      //   2. Somatic spell components even with both hands full.
+      //      Pansori doesn't model hand state, so no-op today.
+      //   3. Cast a single-target spell as an Opportunity Attack
+      //      reaction (instead of the OA melee attack). Needs a
+      //      reaction-window redesign; deferred.
+      kind: 'war-caster';
     };
 
 /**

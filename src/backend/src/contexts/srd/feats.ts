@@ -154,6 +154,20 @@ export const SRD_FEATS: Record<string, Feat> = {
     },
   },
 
+  war_caster: {
+    id: 'war_caster',
+    name: 'War Caster',
+    desc: 'Advantage on CON saves to maintain concentration when you take damage. (RAW also grants: somatic components with both hands full; cast as an OA reaction — neither modeled yet.)',
+    category: 'general',
+    prerequisites: {
+      minLevel: 4,
+      other: ['Spellcasting feature'],
+    },
+    effect: {
+      kind: 'war-caster',
+    },
+  },
+
   resilient: {
     id: 'resilient',
     name: 'Resilient',

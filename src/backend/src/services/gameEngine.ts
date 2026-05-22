@@ -421,14 +421,22 @@ export function checkConcentration(
   // SRD 5.2.1 p.203 — Concentration DC is 10 or half damage taken, whichever
   // is higher; capped at 30. The cap basically only matters at >60 dmg.
   const dc = Math.min(30, Math.max(10, Math.floor(dmgTaken / 2)));
-  const save = d(20) + abilityMod(char.con);
-  if (save >= dc) return { char, st, note: ` [Concentration hold: ${save} vs DC ${dc}]` };
+  // 2024 PHB War Caster feat — advantage on CON saves to maintain
+  // concentration when damaged. Roll 2d20, keep higher.
+  const hasWarCaster = (char.feats ?? []).includes('war_caster');
+  const conMod = abilityMod(char.con);
+  const save = hasWarCaster
+    ? Math.max(d(20), d(20)) + conMod
+    : d(20) + conMod;
+  const warCasterNote = hasWarCaster ? ' (War Caster advantage)' : '';
+  if (save >= dc)
+    return { char, st, note: ` [Concentration hold: ${save} vs DC ${dc}${warCasterNote}]` };
   const spellName = char.concentrating_on.spellId;
   const { char: nc, st: ns } = breakConcentration(char, st);
   return {
     char: nc,
     st: ns,
-    note: ` [Concentration broken: ${save} vs DC ${dc} — ${spellName} ends!]`,
+    note: ` [Concentration broken: ${save} vs DC ${dc}${warCasterNote} — ${spellName} ends!]`,
   };
 }
 
