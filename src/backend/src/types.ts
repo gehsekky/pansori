@@ -649,6 +649,12 @@ export interface Character {
   // handler fires; cleared when rage ends (combat end, manual stop,
   // or rage timer expiry).
   totem_spirit?: 'bear' | 'eagle' | 'wolf';
+  // 2024 PHB Diviner Wizard Portent — rolled on long rest. Two d20
+  // results stored here; player can later replace any d20 roll
+  // with one of these (interception not yet wired — defer). The
+  // dice are surfaced in the UI as a flavor element until that
+  // ships. RAW expands to 3 dice at L14.
+  portent_dice?: number[];
   // 2024 PHB Mage Armor spell — when active, base AC becomes
   // 13 + DEX mod (only effective when not wearing body armor).
   // computeTotalAc reads this. Expires on long rest.

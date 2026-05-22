@@ -211,6 +211,17 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
       // before a rest, but clear defensively.
       mage_armor_active: undefined,
       shield_of_faith_active: undefined,
+      // 2024 PHB Diviner Wizard Portent — roll 2 d20s on each long
+      // rest (3 at L14+). Stored on the character; player can use
+      // them to replace rolls later (interception not wired yet).
+      portent_dice:
+        c.subclass === 'diviner' && hasClass(c, 'wizard')
+          ? [
+              rollDice('1d20'),
+              rollDice('1d20'),
+              ...(getClassLevel(c, 'wizard') >= 14 ? [rollDice('1d20')] : []),
+            ]
+          : undefined,
     };
     // Recompute AC after clearing the magical buffs so the stored
     // `ac` field reflects the post-rest state.
