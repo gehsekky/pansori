@@ -490,10 +490,22 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 
 #### Tier 3: rule-edge mechanics
 
-- [ ] **Spell components.** Partial — has deafened-blocks-verbal +
-      armor-prof-for-casting, but no systematic V/S/M flag
-      enforcement per spell, no spellcasting-focus rule, no
-      costly-material-component consumption.
+- [~] **Spell components.** Verbal + costly material shipped;
+      somatic deferred behind a hand-state model that pansori
+      doesn't track. Specifically: `Spell.verbal` flag is checked
+      against the `deafened` condition in `castSpell/precast.ts`
+      (blocks cast). `Spell.materialCost` consumes the listed gp
+      cost from `char.gold` on cast (blocks when insufficient).
+      Armor proficiency check also gates casting in heavy armor
+      without prof. **Deferred — somatic enforcement:** RAW says
+      a creature must have a free hand for somatic components
+      (War Caster relaxes this). Pansori would need a hand-state
+      model — equipped_weapon + equipped_shield = both hands,
+      heavy weapons = two-handed grip — to know when somatic is
+      blocked. The Spell type doesn't yet carry a `somatic` flag;
+      no existing spells are tagged. Mostly a content task once
+      the hand model lands. The spellcasting-focus rule (focus
+      substitutes for non-costly material) is similarly deferred.
 - [x] **Ritual casting** (shipped 2026-05-22). Existing infra in
       `castSpell/precast.ts` was already wired (gates on
       `spell.ritualCasting` + `!combat_active`, skips slot
@@ -512,11 +524,52 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
       specs cover choice surfacing per class + combat block + handler
       no-slot-burn + non-ritual-spell rejection + Identify gold
       consumption + insufficient-gold rejection + narrative emission.
-- [ ] **Long rest 2024 limits** — once per 24h; 8h with 6h sleep +
-      2h light activity; interruption rules.
-- [ ] **Lighting tracking** — bright/dim/dark. Affects perception,
-      darkvision, hide. Likely 0%.
-- [ ] **Difficult terrain** — costs 2× movement. Status unknown.
+- [x] **Long rest 2024 limits** (modelled as "1 per session"). The
+      RAW rules are 1/24h, 8h with 6h sleep + 2h light activity,
+      and interruption restarts the clock. Pansori has no time-of-
+      day axis (no hours/days counter), so the engine substitutes
+      "1 per game session" via `state.long_rested` (set true on
+      success, blocks subsequent attempts with "You have already
+      taken a long rest this session"). This is approximately
+      equivalent to RAW for a typical session of play (one
+      adventuring day = one session); a multi-day campaign would
+      benefit from an explicit day counter that resets the flag.
+      Defer the day-counter work until campaigns actually span
+      multiple in-fiction days; the current behavior is the
+      practical RAW approximation.
+- [~] **Lighting tracking** (partial — shipped 2026-05-22 for the
+      Stealth/Perception path). `Room.lighting` was previously a
+      data field with no engine effect; this PR wires it into the
+      sneak + Cunning Action Hide path.
+
+      **Helpers (`rulesEngine.ts`):**
+      - `effectiveLightFor(roomLighting, darkvisionFt)` — applies
+        darkvision: dark → dim, dim → bright when `darkvisionFt > 0`.
+      - `passivePerceptionDcInLight(enemyWisdom, effectiveLight)` —
+        bright = base DC; dim = -5 (Disadvantage on sight Perception
+        per RAW); dark = 0 (observer effectively Blinded for sight).
+
+      **Engine effect:** the sneak action's group Stealth check
+      reads the room's lighting via the observer enemy's effective
+      light. Cunning Action Hide uses the same helper for the
+      single-PC Stealth roll. Enemies don't yet track darkvision
+      (passed as 0), so the observer's effective light matches the
+      room's lighting; PC darkvision doesn't change the observer's
+      side of the contest.
+
+      **Deferred:**
+      - Cell-grained lighting (torchlight cones, darkness spells)
+        — pansori's lighting is room-grained.
+      - Blinded condition auto-applied in dark rooms — would let
+        attack rolls / save rolls etc. inherit the Blinded effects.
+        Currently the only Stealth-vs-Perception path uses the
+        helper directly.
+      - Active Perception (search via interactObject) doesn't yet
+        adjust for lighting.
+- [x] **Difficult terrain** (shipped pre-session and verified). Cells
+      flagged `Room.difficultTerrain` cost 2× movement to enter; per
+      RAW the cost doesn't stack with other 2× sources (terrain
+      modes). gridMove implements both rules.
 - [ ] **Battleaxe mastery: Flex → Topple migration.** Sandbox loot
       data tags Battleaxe with the homebrew `mastery: 'flex'`
       property (lets a versatile weapon roll its two-handed die
