@@ -98,8 +98,16 @@ export function computeToHitContext(
   // no disadvantage from them. Without grid positions (e.g. legacy
   // saves without entities), default to no disadvantage so the
   // penalty is opt-in.
+  // 2024 PHB Crossbow Expert: feat suppresses the disadvantage when
+  // attacking with a crossbow. Identified by weapon id prefix.
+  const isCrossbow =
+    weaponItem?.range === 'ranged' &&
+    (weaponItem.id === 'hand_crossbow' ||
+      weaponItem.id === 'light_crossbow' ||
+      weaponItem.id === 'heavy_crossbow');
+  const hasCrossbowExpert = isCrossbow && (ctx.char.feats ?? []).includes('crossbow_expert');
   let rangedInMelee = false;
-  if (weaponItem?.range === 'ranged' && ctx.st.entities) {
+  if (weaponItem?.range === 'ranged' && !hasCrossbowExpert && ctx.st.entities) {
     const charEnt = ctx.st.entities.find((e) => e.id === ctx.char.id);
     if (charEnt) {
       rangedInMelee = ctx.st.entities.some(

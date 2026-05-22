@@ -293,6 +293,13 @@ export function applyFeatTake(
       narrativeParts.push('Passive Perception and Investigation increase by 5.');
       break;
     }
+    case 'crossbow-expert': {
+      // No take-time state change — toHit.ts reads `char.feats`
+      // and suppresses the ranged-in-melee disadvantage when the
+      // weapon is a crossbow.
+      narrativeParts.push('No disadvantage on crossbow shots within 5 ft of an enemy.');
+      break;
+    }
   }
   return { newChar: next, narrative: narrativeParts.join(' ') };
 }

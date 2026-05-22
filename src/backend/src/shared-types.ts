@@ -652,6 +652,17 @@ export type FeatEffect =
       // Investigation. `partyDetectsTrap` reads `char.feats` for
       // 'observant' and adds 5 to the passive score.
       kind: 'observant';
+    }
+  | {
+      // Crossbow Expert feat (2024 PHB general, L4). Shipped
+      // benefit: when attacking with a crossbow, the
+      // ranged-in-melee disadvantage doesn't apply (the attacker
+      // can fire at point-blank without penalty). Wired in toHit.ts
+      // alongside the existing rangedInMelee gate. Two other RAW
+      // benefits deferred: ignore Loading property (pansori
+      // doesn't enforce Loading) and bonus-action hand-crossbow
+      // shot after Attack action (needs new action shape).
+      kind: 'crossbow-expert';
     };
 
 /**

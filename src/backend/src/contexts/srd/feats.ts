@@ -190,6 +190,19 @@ export const SRD_FEATS: Record<string, Feat> = {
     },
   },
 
+  crossbow_expert: {
+    id: 'crossbow_expert',
+    name: 'Crossbow Expert',
+    desc: "When you attack with a crossbow you don't have disadvantage from being within 5 ft of an enemy. (RAW also ignores the Loading property and grants a bonus-action hand crossbow shot after Attack — neither modeled yet.)",
+    category: 'general',
+    prerequisites: {
+      minLevel: 4,
+    },
+    effect: {
+      kind: 'crossbow-expert',
+    },
+  },
+
   great_weapon_master: {
     id: 'great_weapon_master',
     name: 'Great Weapon Master',
