@@ -318,6 +318,11 @@ export interface TurnActions {
   // cleared by the attack handler on first hit. FRESH_TURN at
   // turn start naturally expires the flag after one turn.
   dread_ambusher_pending?: boolean;
+  // 2024 PHB Psi Warrior Fighter L3 — Psionic Strike: once per
+  // turn, on a weapon hit, auto-spend 1 Psi Energy die for
+  // +(die + INT mod) force damage. Once-per-turn gate cleared by
+  // FRESH_TURN.
+  psionic_strike_used?: boolean;
   // Great Weapon Master damage rider (2024 PHB) — once per turn,
   // a heavy-weapon hit adds +profBonus damage. Same shape as
   // Savage Attacker / Sneak Attack once-per-turn gates.
