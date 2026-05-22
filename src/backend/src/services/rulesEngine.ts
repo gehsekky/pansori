@@ -612,6 +612,47 @@ export function cantripDamageDice(spell: Spell, charLevel: number): string {
 // ─── Spell slot tables (PHB) ─────────────────────────────────────────────────
 
 // Returns max slots per spell level for a given class and character level.
+// PHB multiclass spell-slot table, indexed by effective caster level
+// (1–20). Single-class full-casters use their level directly; half-
+// casters use ⌊level/2⌋; third-casters use ⌊level/3⌋. Multiclass
+// characters sum the contributions and look up here. Defined as a
+// constant so both `spellSlotsForClassLevel` and the multiclass
+// helper in `services/multiclass.ts` can index it.
+const MULTICLASS_SLOT_TABLE: Record<number, Record<number, number>> = {
+  1: { 1: 2 },
+  2: { 1: 3 },
+  3: { 1: 4, 2: 2 },
+  4: { 1: 4, 2: 3 },
+  5: { 1: 4, 2: 3, 3: 2 },
+  6: { 1: 4, 2: 3, 3: 3 },
+  7: { 1: 4, 2: 3, 3: 3, 4: 1 },
+  8: { 1: 4, 2: 3, 3: 3, 4: 2 },
+  9: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 1 },
+  10: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 2 },
+  11: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 2, 6: 1 },
+  12: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 2, 6: 1 },
+  13: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 2, 6: 1, 7: 1 },
+  14: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 2, 6: 1, 7: 1 },
+  15: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 2, 6: 1, 7: 1, 8: 1 },
+  16: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 2, 6: 1, 7: 1, 8: 1 },
+  17: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 2, 6: 1, 7: 1, 8: 1, 9: 1 },
+  18: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 3, 6: 1, 7: 1, 8: 1, 9: 1 },
+  19: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 3, 6: 2, 7: 1, 8: 1, 9: 1 },
+  20: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 3, 6: 2, 7: 2, 8: 1, 9: 1 },
+};
+
+/**
+ * Looks up the spell-slot row for an effective caster level (1–20).
+ * Returns an empty record outside the valid range. Used by both
+ * single-class (`spellSlotsForClassLevel`) and multiclass
+ * (`spellSlotsForChar`) computations; the only difference is how the
+ * effective level is derived.
+ */
+export function spellSlotsForCasterLevel(effectiveLevel: number): Record<number, number> {
+  if (effectiveLevel < 1) return {};
+  return MULTICLASS_SLOT_TABLE[Math.min(effectiveLevel, 20)] ?? {};
+}
+
 // Full casters: Wizard, Cleric, Druid, Bard, Sorcerer.
 // Half casters (÷2 effective level): Ranger, Paladin.
 // Pact Magic (Warlock): separate table, all slots are the same level.
@@ -648,32 +689,9 @@ export function spellSlotsForClassLevel(cls: string, level: number): Record<numb
   }
 
   // PHB multiclassing spell slot table (full casters; half casters use ⌊level/2⌋)
-  const effectiveLevel = halfCasters.includes(cls) ? Math.floor(level / 2) : level;
   if (!fullCasters.includes(cls) && !halfCasters.includes(cls)) return {};
-
-  const table: Record<number, Record<number, number>> = {
-    1: { 1: 2 },
-    2: { 1: 3 },
-    3: { 1: 4, 2: 2 },
-    4: { 1: 4, 2: 3 },
-    5: { 1: 4, 2: 3, 3: 2 },
-    6: { 1: 4, 2: 3, 3: 3 },
-    7: { 1: 4, 2: 3, 3: 3, 4: 1 },
-    8: { 1: 4, 2: 3, 3: 3, 4: 2 },
-    9: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 1 },
-    10: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 2 },
-    11: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 2, 6: 1 },
-    12: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 2, 6: 1 },
-    13: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 2, 6: 1, 7: 1 },
-    14: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 2, 6: 1, 7: 1 },
-    15: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 2, 6: 1, 7: 1, 8: 1 },
-    16: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 2, 6: 1, 7: 1, 8: 1 },
-    17: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 2, 6: 1, 7: 1, 8: 1, 9: 1 },
-    18: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 3, 6: 1, 7: 1, 8: 1, 9: 1 },
-    19: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 3, 6: 2, 7: 1, 8: 1, 9: 1 },
-    20: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 3, 6: 2, 7: 2, 8: 1, 9: 1 },
-  };
-  return table[Math.min(effectiveLevel, 20)] ?? {};
+  const effectiveLevel = halfCasters.includes(cls) ? Math.floor(level / 2) : level;
+  return spellSlotsForCasterLevel(effectiveLevel);
 }
 
 // ─── Spell helpers ────────────────────────────────────────────────────────────

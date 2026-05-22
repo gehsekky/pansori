@@ -14,8 +14,10 @@ import {
   getPrimaryClass,
   getTotalLevel,
   hasClass,
+  spellSlotsForChar,
 } from './multiclass.js';
 import { makeChar } from '../test-fixtures.js';
+import { spellSlotsForClassLevel } from './rulesEngine.js';
 
 describe('getClassLevels — legacy single-class fallback', () => {
   it('derives a one-entry record from character_class + level', () => {
@@ -140,5 +142,96 @@ describe('getPrimaryClass', () => {
       class_levels: { wizard: 4, fighter: 1 }, // wizard added later
     });
     expect(getPrimaryClass(char)).toBe('fighter');
+  });
+});
+
+describe('spellSlotsForChar — single-class parity', () => {
+  it('returns the same slots as spellSlotsForClassLevel for a single-class Wizard 5', () => {
+    const char = makeChar({ character_class: 'Wizard', level: 5 });
+    expect(spellSlotsForChar(char)).toEqual(spellSlotsForClassLevel('wizard', 5));
+  });
+
+  it('half-caster Paladin 5 → caster level 2 slots (3 L1)', () => {
+    const char = makeChar({ character_class: 'Paladin', level: 5 });
+    // ⌊5/2⌋ = 2 → row { 1: 3 }
+    expect(spellSlotsForChar(char)).toEqual({ 1: 3 });
+  });
+
+  it('third-caster Fighter 9 with Eldritch Knight subclass → caster level 3', () => {
+    const char = makeChar({
+      character_class: 'Fighter',
+      level: 9,
+      subclass: 'eldritch_knight',
+    });
+    // ⌊9/3⌋ = 3 → row { 1: 4, 2: 2 }
+    expect(spellSlotsForChar(char)).toEqual({ 1: 4, 2: 2 });
+  });
+
+  it('non-caster Barbarian returns empty', () => {
+    const char = makeChar({ character_class: 'Barbarian', level: 5 });
+    expect(spellSlotsForChar(char)).toEqual({});
+  });
+});
+
+describe('spellSlotsForChar — multiclass sums', () => {
+  it('Wizard 3 / Cleric 2 → caster level 5 (full + full)', () => {
+    const char = makeChar({
+      character_class: 'Wizard',
+      level: 5,
+      class_levels: { wizard: 3, cleric: 2 },
+    });
+    // Caster level 5 row.
+    expect(spellSlotsForChar(char)).toEqual(spellSlotsForClassLevel('wizard', 5));
+  });
+
+  it('Paladin 4 / Wizard 2 → caster level 4 (half ⌊4/2⌋=2 + full 2)', () => {
+    const char = makeChar({
+      character_class: 'Paladin',
+      level: 6,
+      class_levels: { paladin: 4, wizard: 2 },
+    });
+    expect(spellSlotsForChar(char)).toEqual(spellSlotsForClassLevel('wizard', 4));
+  });
+
+  it('Paladin 1 / Wizard 1 → caster level 1 (half ⌊1/2⌋=0 + full 1)', () => {
+    const char = makeChar({
+      character_class: 'Paladin',
+      level: 2,
+      class_levels: { paladin: 1, wizard: 1 },
+    });
+    expect(spellSlotsForChar(char)).toEqual({ 1: 2 });
+  });
+
+  it('non-primary subclass does NOT grant third-caster yet (known limit)', () => {
+    // Wizard 5 / Fighter 6 — fighter has eldritch_knight subclass but
+    // char.subclass applies only to the primary class today. So fighter
+    // contributes 0 (non-caster from the helper's POV).
+    const char = makeChar({
+      character_class: 'Wizard',
+      level: 11,
+      class_levels: { wizard: 5, fighter: 6 },
+      subclass: 'eldritch_knight', // applies to wizard (primary) only
+    });
+    // Wizard 5 alone → caster level 5.
+    expect(spellSlotsForChar(char)).toEqual(spellSlotsForClassLevel('wizard', 5));
+  });
+});
+
+describe('spellSlotsForChar — warlock', () => {
+  it('pure Warlock 3 returns pact slots only', () => {
+    const char = makeChar({ character_class: 'Warlock', level: 3 });
+    expect(spellSlotsForChar(char)).toEqual(spellSlotsForClassLevel('warlock', 3));
+  });
+
+  it('Wizard 1 / Warlock 2 merges multiclass + pact slots (known approximation)', () => {
+    const char = makeChar({
+      character_class: 'Wizard',
+      level: 3,
+      class_levels: { wizard: 1, warlock: 2 },
+    });
+    // Wizard 1 → caster level 1 → { 1: 2 }
+    // Warlock 2 → pact { 1: 2 }
+    // Merged sum: { 1: 4 } (RAW would keep them as separate pools)
+    expect(spellSlotsForChar(char)).toEqual({ 1: 4 });
   });
 });

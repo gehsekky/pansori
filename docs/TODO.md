@@ -82,14 +82,21 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
       continue to read `char.character_class` + `char.level`.
 
   **Remaining (separate PRs, in rough dependency order):**
-  - **Spell-slot multiclass calc.** `spellSlotsForClassLevel` in
-    `rulesEngine.ts:619` only handles single-class. Replace with
-    `spellSlotsForMulticlass(class_levels)` that sums caster-level
-    contributions (full = level × 1; half = ⌊level/2⌋; third =
-    ⌊level/3⌋ for Eldritch Knight / Arcane Trickster; Warlock pact
-    separate) and indexes the existing table. Migrate the single-class
-    callers to the new helper (single-class still produces the same
-    answer).
+  - [x] **Spell-slot multiclass calc** (Phase 2 — shipped 2026-05-22).
+    New `spellSlotsForChar(char)` in `services/multiclass.ts` sums
+    caster-level contributions (full × 1 / half ÷ 2 / third ÷ 3 for
+    Eldritch Knight / Arcane Trickster) and looks up the multiclass
+    slot table. Pure-warlock returns pact slots. Multi-class with
+    warlock merges the two pools at matching slot levels (known
+    approximation; RAW separates them — fix deferred to a pact-vs-
+    multiclass schema split). `rulesEngine.ts` refactored to expose
+    `spellSlotsForCasterLevel(level)` so both single-class and
+    multiclass paths index the same table constant.
+    `normalizeState` migrated; level-up + `rest.ts` warlock refresh
+    deferred (work correctly for the single-class case they handle).
+    9 added tests (single-class parity, full+full sum, half+full sum,
+    half-rounds-down, primary-only subclass limit, pure warlock,
+    warlock+full merge approximation).
   - **Multiclass prerequisites.** Each class has a 2024 PHB ability-
     score minimum (Cleric WIS 13, Rogue DEX 13, etc.). New
     `canMulticlassInto(char, class)` validator. Surfaced in the
