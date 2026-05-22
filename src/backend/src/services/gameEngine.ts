@@ -46,6 +46,7 @@ import {
   distanceFeet,
   findPath,
   opportunityAttackTriggers,
+  pamEnterReachTriggers,
   posEqual,
 } from './gridEngine.js';
 import type { EnemyAttackHitFragment, EnemyAttackMissFragment } from './narrative/fragments.js';
@@ -4350,10 +4351,45 @@ function attemptEnemyApproach(args: {
     st.entities ?? [],
     true
   );
+  // 2024 PHB Polearm Master — additional OA trigger: the wielder
+  // attacks creatures that ENTER their reach (not just leave it).
+  // Detected via `pamEnterReachTriggers` with a per-PC reachFt
+  // lookup that returns the polearm's extended reach (10 ft) for
+  // PAM-wielding PCs and 0 for everyone else (so non-PAM PCs
+  // don't fire enter-reach OAs).
+  const POLEARMS_FOR_PAM = new Set(['quarterstaff', 'spear', 'glaive', 'halberd', 'pike']);
+  const pamReachLookup = (e: CombatEntity): number => {
+    if (e.isEnemy) return 0;
+    const pc = st.characters.find((c) => c.id === e.id);
+    if (!pc || !(pc.feats ?? []).includes('polearm_master')) return 0;
+    const eqp = pc.equipped_weapon
+      ? pc.inventory?.find((i) => i.instance_id === pc.equipped_weapon)
+      : null;
+    if (!eqp || !POLEARMS_FOR_PAM.has(eqp.id)) return 0;
+    const loot = context.lootTable.find((l) => l.id === eqp.id);
+    // Glaive/halberd/pike have reach=true → 10 ft; staff/spear → 5 ft.
+    return loot?.reach ? 10 : 5;
+  };
+  const pamTriggers = pamEnterReachTriggers(
+    enemyEntPreMove.pos,
+    plan.newPos,
+    st.entities ?? [],
+    true,
+    pamReachLookup
+  );
+  // De-dupe: if a PC is in both the exit-trigger and enter-trigger
+  // lists (unlikely but possible on edge layouts), only fire one OA
+  // per reaction budget. `applyPcOpportunityAttacks` already
+  // enforces reaction_used so duplicates are gated naturally — but
+  // we still combine the lists to ensure both triggers attempt.
+  const combinedTriggers = [
+    ...oaTriggers,
+    ...pamTriggers.filter((p) => !oaTriggers.some((o) => o.id === p.id)),
+  ];
   const oaRes = applyPcOpportunityAttacks({
     st,
     enemyId,
-    oaTargets: oaTriggers,
+    oaTargets: combinedTriggers,
     enemyAc: enemy.ac,
     enemyName: enemy.name,
     context,

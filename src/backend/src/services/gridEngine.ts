@@ -226,3 +226,19 @@ export function opportunityAttackTriggers(
   const isAdjacent = (e: CombatEntity) => distanceFeet(e.pos, movedTo) <= attackerReachFt(e);
   return entities.filter((e) => e.isEnemy !== moverIsEnemy && wasAdjacent(e) && !isAdjacent(e));
 }
+
+// 2024 PHB Polearm Master — inverse OA trigger. When a creature
+// ENTERS a polearm wielder's reach, the wielder may make an
+// opportunity attack. Returns the attackers whose reach the mover
+// just entered (was outside, is now inside).
+export function pamEnterReachTriggers(
+  mover: GridPos,
+  movedTo: GridPos,
+  entities: CombatEntity[],
+  moverIsEnemy: boolean,
+  attackerReachFt: (e: CombatEntity) => number = () => DEFAULT_MELEE_REACH
+): CombatEntity[] {
+  const wasAdjacent = (e: CombatEntity) => distanceFeet(e.pos, mover) <= attackerReachFt(e);
+  const isAdjacent = (e: CombatEntity) => distanceFeet(e.pos, movedTo) <= attackerReachFt(e);
+  return entities.filter((e) => e.isEnemy !== moverIsEnemy && !wasAdjacent(e) && isAdjacent(e));
+}
