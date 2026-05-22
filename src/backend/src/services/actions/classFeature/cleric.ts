@@ -311,5 +311,69 @@ export function handleClericFeature(ctx: ActionContext, fid: string): boolean {
     return true;
   }
 
+  if (fid === 'radiance_of_the_dawn') {
+    if (!hasClass(ctx.char, 'cleric')) {
+      ctx.narrative = 'Only Clerics have Radiance of the Dawn.';
+      return true;
+    }
+    if (ctx.char.subclass !== 'light') {
+      ctx.narrative = 'Only Light Clerics have Radiance of the Dawn.';
+      return true;
+    }
+    const clericLvlRotD = getClassLevel(ctx.char, 'cleric');
+    const cdUsesRotD = ctx.char.class_resource_uses?.channel_divinity ?? 1;
+    if (cdUsesRotD <= 0) {
+      ctx.narrative = 'No Channel Divinity uses remaining.';
+      return true;
+    }
+    ctx.char.class_resource_uses = {
+      ...(ctx.char.class_resource_uses ?? {}),
+      channel_divinity: cdUsesRotD - 1,
+    };
+    // RAW 2024 PHB: 2d10 + cleric level radiant in 30-ft radius;
+    // CON save (DC = 8 + prof + WIS mod) for half. Dispels magical
+    // darkness in range — not modeled (lighting tracking is a
+    // future task).
+    const rotdDC = 8 + profBonus(ctx.char.level) + abilityMod(ctx.char.wis);
+    const selfEntRotD = ctx.st.entities?.find((e) => e.id === ctx.char.id);
+    const rotdLines: string[] = [];
+    const rotdEntities = (ctx.st.entities ?? []).map((e) => {
+      if (!e.isEnemy || e.hp <= 0 || !selfEntRotD) return e;
+      const dist = Math.max(
+        Math.abs(e.pos.x - selfEntRotD.pos.x),
+        Math.abs(e.pos.y - selfEntRotD.pos.y)
+      );
+      if (dist > 6) return e; // 30 ft = 6 squares
+      const enemyDataRotD = getEnemyById(ctx.seed, e.id);
+      const targetNameRotD = enemyDataRotD?.name ?? e.id;
+      const conScore = (enemyDataRotD as unknown as Record<string, number>)?.con ?? 10;
+      const saveRotD = rollDice('1d20') + abilityMod(conScore);
+      const fullDmgRotD = rollDice('2d10') + clericLvlRotD;
+      const dmgRotD = saveRotD >= rotdDC ? Math.floor(fullDmgRotD / 2) : fullDmgRotD;
+      composeNow(ctx, {
+        kind: 'save',
+        characterId: e.id,
+        characterName: targetNameRotD,
+        ability: 'con',
+        roll: saveRotD,
+        dc: rotdDC,
+        success: saveRotD >= rotdDC,
+        vs: 'Radiance of the Dawn',
+        prose: '',
+      });
+      rotdLines.push(
+        `${targetNameRotD}: CON ${saveRotD} vs DC ${rotdDC} — ${dmgRotD} radiant${saveRotD >= rotdDC ? ' (half)' : ''}`
+      );
+      return { ...e, hp: Math.max(0, e.hp - dmgRotD) };
+    });
+    ctx.st = { ...ctx.st, entities: rotdEntities };
+    ctx.narrative =
+      rotdLines.length > 0
+        ? `☀️ Radiance of the Dawn! ${rotdLines.join(' · ')} (${cdUsesRotD - 1} Channel Divinity remaining)`
+        : `Radiance of the Dawn — no enemies within 30 ft. (${cdUsesRotD - 1} Channel Divinity remaining)`;
+    ctx.usedInitiative = true;
+    return true;
+  }
+
   return false;
 }

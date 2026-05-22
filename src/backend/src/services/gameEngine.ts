@@ -2245,7 +2245,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       fighter: ['champion', 'battle_master'],
       rogue: ['thief', 'assassin'],
       wizard: ['evoker', 'abjurer'],
-      cleric: ['life', 'war'],
+      cleric: ['life', 'war', 'light'],
       ranger: ['hunter', 'beastmaster'],
       paladin: ['devotion', 'vengeance'],
       bard: ['lore', 'valor'],
@@ -2783,6 +2783,22 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       choices.push({
         label: `Guided Strike — +10 to next attack roll (Channel Divinity, ${cdLeft} left)`,
         action: { type: 'use_class_feature', featureId: 'guided_strike' },
+        kind: 'class_feature',
+      });
+    }
+
+    // Light Cleric: Radiance of the Dawn (Channel Divinity, AoE radiant)
+    if (
+      char.subclass === 'light' &&
+      hasClass(char, 'cleric') &&
+      cdLeft > 0 &&
+      state.combat_active &&
+      enemyAlive
+    ) {
+      const cl = getClassLevel(char, 'cleric');
+      choices.push({
+        label: `Radiance of the Dawn — 2d10+${cl} radiant to all enemies within 30 ft, CON save halves (Channel Divinity, ${cdLeft} left)`,
+        action: { type: 'use_class_feature', featureId: 'radiance_of_the_dawn' },
         kind: 'class_feature',
       });
     }
