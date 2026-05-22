@@ -1,7 +1,9 @@
+import { abilityMod, profBonus, rollCritical, rollDice } from '../../rulesEngine.js';
+import { applyPartyLevelUps, splitEncounterXp } from '../../gameEngine.js';
 import { getClassLevel, hasClass } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import { BEAST_FORMS } from '../../../contexts/srd/index.js';
-import { rollDice } from '../../rulesEngine.js';
+import { composeNow } from '../../narrative/compose.js';
 
 /**
  * Druid + Circle of the Moon features.
@@ -87,6 +89,136 @@ export function handleDruidFeature(ctx: ActionContext, fid: string): boolean {
     ctx.char.wild_shape_form = undefined;
     ctx.char.conditions = ctx.char.conditions.filter((c) => c !== 'wild_shaped');
     ctx.narrative = `${ctx.char.name} reverts to their normal form.`;
+    return true;
+  }
+
+  // ── 2024 PHB Stars Druid — Starry Form (L3+) ─────────────────────────
+  // Bonus-action transformation that shares the Wild Shape resource
+  // pool. The druid keeps their stats (unlike beast forms) and gains
+  // a constellation-specific rider:
+  //   - 'archer': enables a ranged spell attack action (1d8 + WIS
+  //     radiant) via the starry_form_attack fid.
+  //   - 'chalice': heal spells add +1d8 to the healed amount (read
+  //     in castSpell/heal.ts).
+  //   - 'dragon': concentration saves (and RAW INT/WIS checks, not
+  //     yet wired) treat a sub-10 d20 as a 10.
+  // Switching constellations costs another Wild Shape charge (RAW
+  // says you can switch on subsequent activations).
+  const starryFids: Record<string, 'archer' | 'chalice' | 'dragon'> = {
+    starry_form_archer: 'archer',
+    starry_form_chalice: 'chalice',
+    starry_form_dragon: 'dragon',
+  };
+  if (fid in starryFids) {
+    const constellation = starryFids[fid];
+    if (!hasClass(ctx.char, 'druid') || ctx.char.subclass !== 'stars') {
+      ctx.narrative = 'Only Stars Druids have Starry Form.';
+      return true;
+    }
+    if (getClassLevel(ctx.char, 'druid') < 3) {
+      ctx.narrative = 'Starry Form unlocks at Druid level 3.';
+      return true;
+    }
+    const wsUsesS = ctx.char.class_resource_uses?.wild_shape ?? 2;
+    if (wsUsesS <= 0) {
+      ctx.narrative = 'No Wild Shape uses remaining (recover on short rest).';
+      return true;
+    }
+    if (ctx.char.turn_actions.bonus_action_used) {
+      ctx.narrative = 'Bonus action already used this turn.';
+      return true;
+    }
+    ctx.char.class_resource_uses = {
+      ...(ctx.char.class_resource_uses ?? {}),
+      wild_shape: wsUsesS - 1,
+    };
+    ctx.char.starry_form_constellation = constellation;
+    ctx.char.turn_actions = { ...ctx.char.turn_actions, bonus_action_used: true };
+    const constellationDescr =
+      constellation === 'archer'
+        ? 'Archer — a glowing spell attack ready to fire.'
+        : constellation === 'chalice'
+          ? 'Chalice — healing spells grant +1d8 to the target.'
+          : 'Dragon — concentration holds firm against the storm.';
+    ctx.narrative = `🌌 ${ctx.char.name} blazes with Starry Form: ${constellationDescr} (${wsUsesS - 1} Wild Shape uses remaining)`;
+    return true;
+  }
+
+  if (fid === 'starry_form_attack') {
+    // 2024 PHB Stars Druid Archer constellation — ranged spell
+    // attack action. Damage = 1d8 + WIS mod radiant. Range 60 ft;
+    // pansori MVP simplifies to "any enemy in the room" since the
+    // grid-range gate would require a target square.
+    if (ctx.char.starry_form_constellation !== 'archer') {
+      ctx.narrative = 'You must have the Archer constellation active to use Starry Form: Attack.';
+      return true;
+    }
+    if (!ctx.enemyAlive || !ctx.enemy) {
+      ctx.narrative = 'No living target.';
+      return true;
+    }
+    if (ctx.char.turn_actions.action_used) {
+      ctx.narrative = 'Action already used this turn.';
+      return true;
+    }
+    const wisMod = abilityMod(ctx.char.wis);
+    const attackBonus = wisMod + profBonus(ctx.char.level);
+    const d20 = rollDice('1d20');
+    const isCrit = d20 === 20;
+    const total = d20 + attackBonus;
+    const target = ctx.enemy;
+    ctx.char.turn_actions = { ...ctx.char.turn_actions, action_used: true };
+    if (total < target.ac && !isCrit) {
+      composeNow(ctx, {
+        kind: 'spell_attack_miss',
+        attackerId: ctx.char.id,
+        attackerName: ctx.char.name,
+        target,
+        spellId: 'starry_form_archer',
+        spellName: 'Starry Form: Archer',
+        castPrefix: `${ctx.char.name} fires a beam of radiant starlight at ${target.name}`,
+        toHit: total,
+        targetAc: target.ac,
+        atkNote: ` (spell attack d20 ${d20}+${attackBonus}=${total} vs AC ${target.ac})`,
+      });
+      ctx.usedInitiative = true;
+      return true;
+    }
+    const dmgExpr = '1d8';
+    const damage = (isCrit ? rollCritical(dmgExpr) : rollDice(dmgExpr)) + wisMod;
+    const enemyEnt = ctx.st.entities?.find((e) => e.id === target.id && e.isEnemy);
+    const curHp = enemyEnt?.hp ?? target.hp;
+    const newHp = Math.max(0, curHp - damage);
+    ctx.st = {
+      ...ctx.st,
+      entities: (ctx.st.entities ?? []).map((e) =>
+        e.id === target.id && e.isEnemy ? { ...e, hp: newHp } : e
+      ),
+    };
+    composeNow(ctx, {
+      kind: 'spell_attack_hit',
+      attackerId: ctx.char.id,
+      attackerName: ctx.char.name,
+      target,
+      spellId: 'starry_form_archer',
+      spellName: 'Starry Form: Archer',
+      castPrefix: `${ctx.char.name} fires a beam of radiant starlight at ${target.name}`,
+      damage,
+      damageType: 'radiant',
+      isCrit,
+      toHit: total,
+      targetAc: target.ac,
+      atkNote: ` (spell attack d20 ${d20}+${attackBonus}=${total} vs AC ${target.ac})`,
+    });
+    if (newHp <= 0) {
+      const xpGain = target.xp ?? 10;
+      const split = splitEncounterXp(ctx.st, ctx.char.id, xpGain);
+      ctx.st = split.st;
+      ctx.char.xp = (ctx.char.xp || 0) + split.share;
+      ctx.st.enemies_killed = [...ctx.st.enemies_killed, target.id];
+      ctx.narrative += applyPartyLevelUps(ctx.st, ctx.char, ctx.context);
+    }
+    ctx.usedInitiative = true;
     return true;
   }
 

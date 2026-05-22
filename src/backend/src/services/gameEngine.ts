@@ -457,16 +457,31 @@ export function checkConcentration(
   // concentration when damaged. Roll 2d20, keep higher.
   const hasWarCaster = (char.feats ?? []).includes('war_caster');
   const conMod = abilityMod(char.con);
-  const save = hasWarCaster ? Math.max(d(20), d(20)) + conMod : d(20) + conMod;
+  // 2024 PHB Stars Druid — Dragon constellation: concentration saves
+  // treat a sub-10 d20 as a 10 (the same floor RAW applies to INT/WIS
+  // checks; pansori wires the concentration leg here, defers the
+  // skill-check leg). Stacks with War Caster — apply the floor to
+  // both d20 rolls.
+  const dragonFloor = char.starry_form_constellation === 'dragon';
+  const rollOne = (): number => {
+    const r = d(20);
+    return dragonFloor && r < 10 ? 10 : r;
+  };
+  const save = hasWarCaster ? Math.max(rollOne(), rollOne()) + conMod : rollOne() + conMod;
   const warCasterNote = hasWarCaster ? ' (War Caster advantage)' : '';
+  const dragonNote = dragonFloor ? ' (Dragon constellation floor)' : '';
   if (save >= dc)
-    return { char, st, note: ` [Concentration hold: ${save} vs DC ${dc}${warCasterNote}]` };
+    return {
+      char,
+      st,
+      note: ` [Concentration hold: ${save} vs DC ${dc}${warCasterNote}${dragonNote}]`,
+    };
   const spellName = char.concentrating_on.spellId;
   const { char: nc, st: ns } = breakConcentration(char, st, context);
   return {
     char: nc,
     st: ns,
-    note: ` [Concentration broken: ${save} vs DC ${dc}${warCasterNote} — ${spellName} ends!]`,
+    note: ` [Concentration broken: ${save} vs DC ${dc}${warCasterNote}${dragonNote} — ${spellName} ends!]`,
   };
 }
 
@@ -2745,6 +2760,49 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
           });
         }
       }
+    }
+
+    // ── 2024 PHB Stars Druid L3+ — Starry Form ──────────────────────────
+    // Shares the Wild Shape resource pool. Bonus-action activation;
+    // each constellation grants a different rider (see handler in
+    // druid.ts). Switching constellations re-spends a Wild Shape
+    // charge — RAW allows reshape on subsequent activations.
+    if (
+      char.subclass === 'stars' &&
+      getClassLevel(char, 'druid') >= 3 &&
+      wsUses > 0 &&
+      !char.turn_actions.bonus_action_used
+    ) {
+      const current = char.starry_form_constellation;
+      const variants: Array<{ id: 'archer' | 'chalice' | 'dragon'; label: string }> = [
+        { id: 'archer', label: 'Archer — ranged spell attack (1d8 + WIS radiant)' },
+        { id: 'chalice', label: 'Chalice — healing spells grant +1d8 to the target' },
+        { id: 'dragon', label: 'Dragon — concentration saves treat sub-10 d20 as 10' },
+      ];
+      for (const v of variants) {
+        if (v.id === current) continue; // Don't re-suggest the active one.
+        choices.push({
+          label: `Starry Form: ${v.label} (bonus action, costs Wild Shape, ${wsUses} left)`,
+          action: { type: 'use_class_feature', featureId: `starry_form_${v.id}` },
+          kind: 'class_feature',
+          requiresBonusAction: true,
+        });
+      }
+    }
+    // Archer attack action — surface only while the Archer
+    // constellation is active and the druid has an Action.
+    if (
+      char.subclass === 'stars' &&
+      char.starry_form_constellation === 'archer' &&
+      !char.turn_actions.action_used &&
+      state.combat_active &&
+      enemyAlive
+    ) {
+      choices.push({
+        label: `Starry Form: Attack — fire a beam of radiant starlight (action, 1d8 + WIS radiant)`,
+        action: { type: 'use_class_feature', featureId: 'starry_form_attack' },
+        kind: 'class_feature',
+      });
     }
   }
 

@@ -553,7 +553,7 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 > (typically because the RAW mechanic needs infrastructure that
 > isn't shipped yet).
 
-**Selectable + features (43):**
+**Selectable + features (44):**
 
 | Class | Subclass | Headline L3 feature shipped |
 |---|---|---|
@@ -570,6 +570,7 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 | Cleric | Trickery | Blessing of the Trickster (Stealth advantage until long rest) |
 | Druid | Land | Land's Aid CD (heal/harm) |
 | Druid | Moon | Wild Shape Beast Form (pre-session) |
+| Druid | Stars | Starry Form — Archer / Chalice / Dragon constellations |
 | Fighter | Champion | Improved Crit (pre-session) |
 | Fighter | Battle Master | Maneuvers (pre-session) |
 | Fighter | Eldritch Knight | Third-caster slots + War Magic L7 |
@@ -601,14 +602,13 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 | Wizard | Abjurer | Arcane Ward (pre-session) |
 | Wizard | Evoker | Sculpt Spells (pre-session) |
 
-**Picker-only — features partially / fully deferred (5):**
+**Picker-only — features partially / fully deferred (4):**
 
 | Class | Subclass | What's deferred |
 |---|---|---|
 | Bard | Dance | Bardic Inspiration die variants (damage/AC/move) |
 | Cleric | Trickery | Invoke Duplicity (Blessing of the Trickster shipped) |
 | Druid | Sea | Wrath of the Sea (push on cantrip hit) |
-| Druid | Stars | Starry Form (Wild Shape variant w/ 3 constellations) |
 | Sorcerer | Clockwork Soul | Restore Balance reaction (Bastion of Law shipped) |
 | Warlock | Great Old One | Awakened Mind telepathy |
 | Wizard | Illusionist | Improved Minor Illusion, Malleable Illusions |
