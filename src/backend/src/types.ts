@@ -312,6 +312,12 @@ export interface TurnActions {
   // unarmed-strike hit, spend 1 Ki to add 1d6 + WIS mod necrotic
   // damage. Once-per-turn gate cleared by FRESH_TURN.
   hand_of_harm_used?: boolean;
+  // 2024 PHB Gloom Stalker Ranger L3 — Dread Ambusher: on the
+  // first turn of combat, the first weapon attack deals +1d8.
+  // Set in runCombatStart for Gloom Stalker rangers; consumed +
+  // cleared by the attack handler on first hit. FRESH_TURN at
+  // turn start naturally expires the flag after one turn.
+  dread_ambusher_pending?: boolean;
   // Great Weapon Master damage rider (2024 PHB) — once per turn,
   // a heavy-weapon hit adds +profBonus damage. Same shape as
   // Savage Attacker / Sneak Attack once-per-turn gates.

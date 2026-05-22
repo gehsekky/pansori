@@ -2285,7 +2285,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       rogue: ['thief', 'assassin', 'soulknife'],
       wizard: ['evoker', 'abjurer'],
       cleric: ['life', 'war', 'light'],
-      ranger: ['hunter', 'beastmaster', 'fey_wanderer'],
+      ranger: ['hunter', 'beastmaster', 'fey_wanderer', 'gloom_stalker'],
       paladin: ['devotion', 'vengeance', 'ancients', 'glory'],
       bard: ['lore', 'valor'],
       sorcerer: ['draconic', 'wild_magic'],

@@ -45,6 +45,32 @@ export function runCombatStart(ctx: ActionContext, target: Enemy): void {
   if (freshChar) ctx.char = { ...freshChar };
   ctx.char = { ...ctx.char, turn_actions: { ...FRESH_TURN } };
 
+  // 2024 PHB Gloom Stalker Ranger L3 — Dread Ambusher: on the
+  // first turn of combat, the first attack deals +1d8. Set the
+  // flag on every Gloom Stalker so each gets the bonus on their
+  // first attack this combat. FRESH_TURN at the start of each
+  // PC's turn clears the flag if they didn't attack — i.e., it
+  // expires after the FIRST turn naturally, matching RAW.
+  ctx.st = {
+    ...ctx.st,
+    characters: ctx.st.characters.map((c) =>
+      hasClass(c, 'ranger') && c.subclass === 'gloom_stalker' && getClassLevel(c, 'ranger') >= 3
+        ? { ...c, turn_actions: { ...c.turn_actions, dread_ambusher_pending: true } }
+        : c
+    ),
+  };
+  // Refresh ctx.char if it was the Gloom Stalker we just flagged.
+  if (
+    hasClass(ctx.char, 'ranger') &&
+    ctx.char.subclass === 'gloom_stalker' &&
+    getClassLevel(ctx.char, 'ranger') >= 3
+  ) {
+    ctx.char = {
+      ...ctx.char,
+      turn_actions: { ...ctx.char.turn_actions, dread_ambusher_pending: true },
+    };
+  }
+
   // ── Initialize grid entities at combat start ────────────────────────
   if (!ctx.st.entities) {
     const gw = ctx.context.gridWidth ?? 8;
