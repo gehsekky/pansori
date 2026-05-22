@@ -1439,6 +1439,14 @@ export function normalizeState(raw: Record<string, unknown>): GameState {
           Object.keys(existingSlots).length > 0
             ? existingSlots
             : spellSlotsForClassLevel(c.character_class, c.level ?? 1);
+        // Multiclass schema backfill — pre-multiclass saves omit
+        // class_levels entirely. Synthesize from character_class +
+        // level so the helpers in services/multiclass.ts can rely on
+        // the field being present after normalization.
+        const classLevels =
+          c.class_levels && Object.keys(c.class_levels).length > 0
+            ? c.class_levels
+            : { [c.character_class.toLowerCase()]: c.level ?? 1 };
         return {
           ...c,
           hit_die: c.hit_die ?? 8,
@@ -1456,6 +1464,7 @@ export function normalizeState(raw: Record<string, unknown>): GameState {
           armor_proficiencies: c.armor_proficiencies ?? [],
           weapon_proficiencies: c.weapon_proficiencies ?? [],
           attuned_items: c.attuned_items ?? ([] as string[]),
+          class_levels: classLevels,
         };
       }),
     };
@@ -1464,10 +1473,12 @@ export function normalizeState(raw: Record<string, unknown>): GameState {
 
   const charId = randomUUID();
   const level = Number(raw.level ?? 1);
+  const charClass = String(raw.character_class ?? 'Adventurer');
   const char: Character = {
     id: charId,
     name: String(raw.character_name ?? 'Hero'),
-    character_class: String(raw.character_class ?? 'Adventurer'),
+    character_class: charClass,
+    class_levels: { [charClass.toLowerCase()]: level },
     portrait_url: (raw.portrait_url as string | null | undefined) ?? null,
     hp: Number(raw.hp ?? 20),
     max_hp: Number(raw.max_hp ?? 20),

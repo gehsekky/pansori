@@ -69,13 +69,45 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
   - ASI-vs-feat UX on the FE (both `apply_asi` and `take_feat`
     actions are available when `asi_pending` is set; FE picks the
     surfacing).
-- [ ] **Multiclassing.** `Character.character_class: string` is a
-      single string; PHB multiclass spell-slot table is commented
-      in `rulesEngine.ts:650` but only computes single-class slots.
-      Needs schema change to `class_levels: Record<string, number>`,
-      prerequisite check (ability score min), combined spell slot
-      calc, feature gating by per-class level, saving-throw profs
-      from first class only, level-up UX for class choice.
+- [~] **Multiclassing** (Phase 1 type seam — shipped 2026-05-22).
+      `Character.class_levels?: Record<string, number>` added (keys
+      lowercased, values per-class levels). New
+      `services/multiclass.ts` exposes read-side helpers
+      (`getClassLevels`, `getClassLevel`, `hasClass`, `getTotalLevel`,
+      `getAllClasses`, `getPrimaryClass`) that transparently fall back
+      to `{[character_class]: level}` for legacy single-class PCs.
+      Character creation in `routes/game.ts` initializes
+      `class_levels = { [first_class]: 1 }`; `normalizeState` backfills
+      pre-multiclass saves on load. No behavior changes — call sites
+      continue to read `char.character_class` + `char.level`.
+
+  **Remaining (separate PRs, in rough dependency order):**
+  - **Spell-slot multiclass calc.** `spellSlotsForClassLevel` in
+    `rulesEngine.ts:619` only handles single-class. Replace with
+    `spellSlotsForMulticlass(class_levels)` that sums caster-level
+    contributions (full = level × 1; half = ⌊level/2⌋; third =
+    ⌊level/3⌋ for Eldritch Knight / Arcane Trickster; Warlock pact
+    separate) and indexes the existing table. Migrate the single-class
+    callers to the new helper (single-class still produces the same
+    answer).
+  - **Multiclass prerequisites.** Each class has a 2024 PHB ability-
+    score minimum (Cleric WIS 13, Rogue DEX 13, etc.). New
+    `canMulticlassInto(char, class)` validator. Surfaced in the
+    level-up flow.
+  - **Feature gating by per-class level.** Call sites that read
+    `char.character_class.toLowerCase() === 'X'` to grant a feature
+    need to flip to `hasClass(char, 'X')` + per-class-level checks
+    (so a Fighter 3 / Wizard 2 doesn't claim Wizard's L3 features).
+    ~30 call sites in classFeature/, gameEngine.ts, rulesEngine.ts.
+  - **Saving-throw profs from first class only.** Already the
+    intended semantics (`character_class` IS the first class). Adding
+    a multiclass level grants only the narrow proficiency set per
+    RAW; needs a one-shot grant table on the level-up flow.
+  - **ASI gating.** ASI is per-class at levels 4/8/12/16/19 — needs
+    bookkeeping on which class-levels have had their ASI applied.
+  - **Level-up UX.** FE chooser when adding a level: "Continue in
+    Fighter, or take a level in another class?" Server-side
+    `level_up_class` action accepting a `className` parameter.
 - [x] **Backgrounds with behavioral effects** (shipped 2026-05-21).
       `Background` type extended in `shared/types.ts` with 2024 PHB
       fields: `originFeat`, `abilityScoreIncreases`, `startingEquipment`,

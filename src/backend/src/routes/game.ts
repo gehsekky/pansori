@@ -314,6 +314,11 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
         id: randomUUID(),
         name: c.name,
         character_class: c.character_class,
+        // Multiclass schema seam — every PC starts as single-class with
+        // 1 level in its first class. Future level-ups via multiclass
+        // bump the matching key; mono-class level-ups continue to
+        // increment both this and `level`.
+        class_levels: { [c.character_class.toLowerCase()]: 1 },
         portrait_url: c.portrait_url ?? null,
         hp: maxHp,
         max_hp: maxHp,
