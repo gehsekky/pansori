@@ -105,11 +105,23 @@ export const handleGridMove: ActionHandler<{
     return;
   }
 
+  // 2024 PHB cost rules. Per RAW, multiple "extra-foot" sources DON'T
+  // stack — a cell that's both difficult terrain AND climbable still
+  // costs 2× total, not 3×. Flying bypasses ALL of these (RAW: flying
+  // creatures ignore difficult terrain; a climbable wall or swimmable
+  // water cell is no obstacle to flight).
   const difficultTerrain = currentRoomForMove?.difficultTerrain ?? [];
+  const climbTerrain = currentRoomForMove?.climbTerrain ?? [];
+  const swimTerrain = currentRoomForMove?.swimTerrain ?? [];
+  const hasClimbSpeed = (ctx.char.climb_speed_ft ?? 0) > 0;
+  const hasSwimSpeed = (ctx.char.swim_speed_ft ?? 0) > 0;
   const costFeet = path.reduce((acc, pos) => {
-    // Flying ignores difficult terrain (PHB 2024).
-    const isDifficult = !isFlying && difficultTerrain.some((dt) => posEqual(dt, pos));
-    return acc + (isDifficult ? SQUARE_SIZE * 2 : SQUARE_SIZE);
+    if (isFlying) return acc + SQUARE_SIZE;
+    const isDifficult = difficultTerrain.some((dt) => posEqual(dt, pos));
+    const needsClimb = climbTerrain.some((ct) => posEqual(ct, pos)) && !hasClimbSpeed;
+    const needsSwim = swimTerrain.some((sw) => posEqual(sw, pos)) && !hasSwimSpeed;
+    const slowed = isDifficult || needsClimb || needsSwim;
+    return acc + (slowed ? SQUARE_SIZE * 2 : SQUARE_SIZE);
   }, 0);
 
   // Use the larger of walking or flying speed as the movement budget
@@ -118,7 +130,12 @@ export const handleGridMove: ActionHandler<{
   const speedFt = isFlying ? Math.max(walkSpeedFt, flySpeedFt) : walkSpeedFt;
   const usedFt = ctx.st.movement_used?.[ctx.char.id] ?? 0;
   if (usedFt + costFeet > speedFt) {
-    ctx.narrative = `Not enough movement. (${speedFt - usedFt} ft remaining, ${costFeet} ft needed${difficultTerrain.length ? ' — difficult terrain' : ''})`;
+    const reasons: string[] = [];
+    if (difficultTerrain.length) reasons.push('difficult terrain');
+    if (climbTerrain.length && !hasClimbSpeed) reasons.push('climbing (no climb speed)');
+    if (swimTerrain.length && !hasSwimSpeed) reasons.push('swimming (no swim speed)');
+    const suffix = reasons.length ? ` — ${reasons.join(', ')}` : '';
+    ctx.narrative = `Not enough movement. (${speedFt - usedFt} ft remaining, ${costFeet} ft needed${suffix})`;
     return;
   }
 
