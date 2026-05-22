@@ -290,6 +290,32 @@ export const SRD_SPELLS: Record<string, Spell> = {
     // Druid / Ranger (2024 PHB).
     spellList: ['primal'],
   },
+  faerie_fire: {
+    id: 'faerie_fire',
+    name: 'Faerie Fire',
+    level: 1,
+    castTime: 'action',
+    damage: '0',
+    damageType: 'none',
+    savingThrow: 'dex',
+    saveEffect: 'negates',
+    condition: 'faerie_fired',
+    conditionDuration: 10, // 1 minute, concentration-capped
+    concentration: true,
+    blastRadius: 20, // 20-ft cube; pansori's sphere/cube AoE handling
+    aoeShape: 'cube',
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    desc: 'Each creature in a 20-ft cube must make a DEX save or be outlined. Attacks against an outlined creature have advantage.',
+    narratives: {
+      cast: [
+        '{name} casts {spell}{slotNote} — silvery motes drift through the air, clinging to anything they touch',
+        '{name} weaves {spell}{slotNote}; pale blue flames trace the silhouettes of every creature in the area',
+      ],
+    },
+    // Bard / Druid (2024 PHB).
+    spellList: ['arcane', 'primal'],
+  },
   charm_person: {
     id: 'charm_person',
     name: 'Charm Person',
@@ -435,6 +461,29 @@ export const SRD_SPELLS: Record<string, Spell> = {
         '{name} hurls a tiny bead of flame — {spell}{slotNote} blooms into a roaring sphere of fire',
         '{name} speaks the syllables of {spell}{slotNote} and a spark blossoms into an inferno',
         "A glowing mote leaps from {name}'s palm — {spell}{slotNote} detonates in a wave of heat",
+      ],
+    },
+    spellList: ['arcane'],
+  },
+  lightning_bolt: {
+    id: 'lightning_bolt',
+    name: 'Lightning Bolt',
+    level: 3,
+    castTime: 'action',
+    damage: '8d6',
+    damageType: 'lightning',
+    savingThrow: 'dex',
+    saveEffect: 'half',
+    upcastBonus: '1d6',
+    blastRadius: 100, // 100-ft line, 5-ft wide
+    aoeShape: 'line',
+    rangeKind: 'self',
+    desc: 'A stroke of lightning forming a 100-foot line bursts from your hand.',
+    narratives: {
+      cast: [
+        '{name} raises an arm and {spell}{slotNote} crackles down the corridor in a blinding spear of lightning',
+        "{name}'s fingers spark — {spell}{slotNote} arcs out as a thundering line of voltage",
+        '{name} channels {spell}{slotNote} into a searing electric javelin that punches through the line',
       ],
     },
     spellList: ['arcane'],
