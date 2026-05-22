@@ -2,7 +2,6 @@ import { abilityMod, profBonus, rollDice } from '../../rulesEngine.js';
 import { getClassLevel, hasClass } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import { composeNow } from '../../narrative/compose.js';
-import { pushEvent } from '../../gameEngine.js';
 
 /**
  * Fighter + Battle Master + Champion features.
@@ -131,17 +130,6 @@ export function handleFighterFeature(ctx: ActionContext, fid: string): boolean {
         abilityMod((ctx.enemy as unknown as Record<string, number>)['wis'] ?? 10);
       const goadDC = 8 + profBonus(ctx.char.level) + abilityMod(ctx.char.cha);
       const goadSuccess = goadSave >= goadDC;
-      ctx.st = pushEvent(ctx.st, {
-        kind: 'save',
-        characterId: ctx.enemy!.id,
-        characterName: ctx.enemy!.name,
-        ability: 'wis',
-        roll: goadSave,
-        dc: goadDC,
-        success: goadSuccess,
-        vs: 'Goading Attack',
-        round: ctx.st.round ?? 1,
-      });
       if (!goadSuccess) {
         ctx.st = {
           ...ctx.st,
@@ -155,6 +143,17 @@ export function handleFighterFeature(ctx: ActionContext, fid: string): boolean {
           ),
         };
         composeNow(ctx, {
+          kind: 'save',
+          characterId: ctx.enemy!.id,
+          characterName: ctx.enemy!.name,
+          ability: 'wis',
+          roll: goadSave,
+          dc: goadDC,
+          success: false,
+          vs: 'Goading Attack',
+          prose: '',
+        });
+        composeNow(ctx, {
           kind: 'condition_applied',
           targetId: ctx.enemy!.id,
           targetName: ctx.enemy!.name,
@@ -163,7 +162,17 @@ export function handleFighterFeature(ctx: ActionContext, fid: string): boolean {
           prose: `Maneuver — Goading Attack: +${sdRoll} damage, ${ctx.enemy!.name} goaded (disadvantage vs others)! (WIS save ${goadSave} vs DC ${goadDC})`,
         });
       } else {
-        ctx.narrative = `Maneuver — Goading Attack: +${sdRoll} damage, ${ctx.enemy!.name} resists. (WIS save ${goadSave} vs DC ${goadDC})`;
+        composeNow(ctx, {
+          kind: 'save',
+          characterId: ctx.enemy!.id,
+          characterName: ctx.enemy!.name,
+          ability: 'wis',
+          roll: goadSave,
+          dc: goadDC,
+          success: true,
+          vs: 'Goading Attack',
+          prose: `Maneuver — Goading Attack: +${sdRoll} damage, ${ctx.enemy!.name} resists. (WIS save ${goadSave} vs DC ${goadDC})`,
+        });
       }
     } else {
       // Generic maneuver: deal extra die damage

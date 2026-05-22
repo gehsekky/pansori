@@ -296,17 +296,6 @@ export function handleMonkFeature(ctx: ActionContext, fid: string): boolean {
     const conSave =
       rollDice('1d20') + abilityMod((ctx.enemy as unknown as Record<string, number>)['con'] ?? 10);
     const stunSuccess = conSave >= stunDC;
-    ctx.st = pushEvent(ctx.st, {
-      kind: 'save',
-      characterId: ctx.enemy!.id,
-      characterName: ctx.enemy!.name,
-      ability: 'con',
-      roll: conSave,
-      dc: stunDC,
-      success: stunSuccess,
-      vs: 'Stunning Strike',
-      round: ctx.st.round ?? 1,
-    });
     if (!stunSuccess) {
       ctx.st = {
         ...ctx.st,
@@ -320,6 +309,17 @@ export function handleMonkFeature(ctx: ActionContext, fid: string): boolean {
         ),
       };
       composeNow(ctx, {
+        kind: 'save',
+        characterId: ctx.enemy!.id,
+        characterName: ctx.enemy!.name,
+        ability: 'con',
+        roll: conSave,
+        dc: stunDC,
+        success: false,
+        vs: 'Stunning Strike',
+        prose: '',
+      });
+      composeNow(ctx, {
         kind: 'condition_applied',
         targetId: ctx.enemy!.id,
         targetName: ctx.enemy!.name,
@@ -328,7 +328,17 @@ export function handleMonkFeature(ctx: ActionContext, fid: string): boolean {
         prose: `Stunning Strike! CON save ${conSave} vs DC ${stunDC} — ${ctx.enemy!.name} is stunned until the end of your next turn! (${kiPool3 - 1} ki remaining)`,
       });
     } else {
-      ctx.narrative = `Stunning Strike! CON save ${conSave} vs DC ${stunDC} — ${ctx.enemy!.name} resists. (${kiPool3 - 1} ki remaining)`;
+      composeNow(ctx, {
+        kind: 'save',
+        characterId: ctx.enemy!.id,
+        characterName: ctx.enemy!.name,
+        ability: 'con',
+        roll: conSave,
+        dc: stunDC,
+        success: true,
+        vs: 'Stunning Strike',
+        prose: `Stunning Strike! CON save ${conSave} vs DC ${stunDC} — ${ctx.enemy!.name} resists. (${kiPool3 - 1} ki remaining)`,
+      });
     }
     return true;
   }

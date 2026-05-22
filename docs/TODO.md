@@ -717,11 +717,30 @@ Frontend: render`<WaitingForPlayer name={...} />` instead of the
         weapon-mastery `condition_applied` post-hit pushEvent
         sweep is still deferred** — needs a `condition_applied`
         fragment kind; not in 4C.2.B scope.
-  - [ ] **4C.3. Class-feature handler migration.**
-        `classFeature/*.ts` files emit ad-hoc narrative + events for
-        Stunning Strike, Divine Smite, Flurry of Blows, etc. Each
-        needs a fragment kind or to reuse the spell/attack kinds
-        where shape overlaps.
+  - [~] **4C.3. Class-feature handler migration** (shipped 2026-05-22,
+        partial). New `SaveFragment` kind in
+        `services/narrative/fragments.ts` carries the full save outcome
+        (roll, DC, success, source) + the prose the composer should
+        append. `renderSave` in compose.ts emits a `kind: 'save'`
+        CombatEvent. Three handlers migrated from bare-`pushEvent` to
+        the fragment: Monk Stunning Strike (CON), Fighter Maneuver
+        Goading Attack (WIS), Paladin Abjure Enemy (WIS). All three
+        pair a save fragment with a follow-up condition_applied
+        fragment when the save fails. 2 added composer tests cover
+        the save fragment in success + failure shapes.
+
+        **Remaining sites that still call `pushEvent({kind:'save'})`:**
+        - `monk.ts` Open Hand Technique DEX save (the in-Flurry rider).
+        - `cleric.ts` Divine Spark / Turn Undead / Sear Undead — these
+          iterate over multiple targets and accumulate prose lines into
+          a single output narrative; the per-target fragment pattern
+          would change the player-facing format. Needs a multi-target
+          save fragment or prose-buffer redesign first.
+        - `casters.ts` Fey Presence (same per-target pattern as the
+          Cleric AoEs).
+        - Damage-only paths (Divine Smite, Flurry-of-Blows hit) emit
+          their notes via `bonuses[]` on the existing attack fragment;
+          already migrated as of the original 4C.1.
   - [x] **4C.4.A. `applyEnemyAttackNarrative` damage-pipeline
         migration** (shipped 2026-05-21). **PR-2's deferred
         follow-up is closed.** `applyEnemyAttackNarrative` now

@@ -10,7 +10,6 @@ import {
   endCombatState,
   getEnemyById,
   isRoomCleared,
-  pushEvent,
   splitEncounterXp,
 } from '../../gameEngine.js';
 import { getClassLevel, hasClass } from '../../multiclass.js';
@@ -262,17 +261,6 @@ export function handlePaladinRangerBardFeature(ctx: ActionContext, fid: string):
       rollDice('1d20') + abilityMod((ctx.enemy as unknown as Record<string, number>)['wis'] ?? 10);
     const frightenDC = 8 + profBonus(ctx.char.level) + abilityMod(ctx.char.cha);
     const abjureSuccess = wisSave >= frightenDC;
-    ctx.st = pushEvent(ctx.st, {
-      kind: 'save',
-      characterId: ctx.enemy!.id,
-      characterName: ctx.enemy!.name,
-      ability: 'wis',
-      roll: wisSave,
-      dc: frightenDC,
-      success: abjureSuccess,
-      vs: 'Abjure Enemy',
-      round: ctx.st.round ?? 1,
-    });
     if (!abjureSuccess) {
       ctx.st = {
         ...ctx.st,
@@ -286,6 +274,17 @@ export function handlePaladinRangerBardFeature(ctx: ActionContext, fid: string):
         ),
       };
       composeNow(ctx, {
+        kind: 'save',
+        characterId: ctx.enemy!.id,
+        characterName: ctx.enemy!.name,
+        ability: 'wis',
+        roll: wisSave,
+        dc: frightenDC,
+        success: false,
+        vs: 'Abjure Enemy',
+        prose: '',
+      });
+      composeNow(ctx, {
         kind: 'condition_applied',
         targetId: ctx.enemy!.id,
         targetName: ctx.enemy!.name,
@@ -294,7 +293,17 @@ export function handlePaladinRangerBardFeature(ctx: ActionContext, fid: string):
         prose: `Abjure Enemy! WIS save ${wisSave} vs DC ${frightenDC} — ${ctx.enemy!.name} is frightened! (${cdUsesVen2 - 1} Channel Divinity remaining)`,
       });
     } else {
-      ctx.narrative = `Abjure Enemy! WIS save ${wisSave} vs DC ${frightenDC} — ${ctx.enemy!.name} resists. (${cdUsesVen2 - 1} Channel Divinity remaining)`;
+      composeNow(ctx, {
+        kind: 'save',
+        characterId: ctx.enemy!.id,
+        characterName: ctx.enemy!.name,
+        ability: 'wis',
+        roll: wisSave,
+        dc: frightenDC,
+        success: true,
+        vs: 'Abjure Enemy',
+        prose: `Abjure Enemy! WIS save ${wisSave} vs DC ${frightenDC} — ${ctx.enemy!.name} resists. (${cdUsesVen2 - 1} Channel Divinity remaining)`,
+      });
     }
     ctx.usedInitiative = true;
     return true;
