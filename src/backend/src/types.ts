@@ -323,6 +323,10 @@ export interface TurnActions {
   // +(die + INT mod) force damage. Once-per-turn gate cleared by
   // FRESH_TURN.
   psionic_strike_used?: boolean;
+  // 2024 PHB Elements Monk L3 — Elemental Strikes: once per turn,
+  // on an unarmed hit, spend 1 Discipline (Ki) for +1d10 fire
+  // damage. Once-per-turn gate cleared by FRESH_TURN.
+  elemental_strikes_used?: boolean;
   // Great Weapon Master damage rider (2024 PHB) — once per turn,
   // a heavy-weapon hit adds +profBonus damage. Same shape as
   // Savage Attacker / Sneak Attack once-per-turn gates.
