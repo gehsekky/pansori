@@ -376,6 +376,124 @@ export const handleCastSpell: ActionHandler<{
     return;
   }
 
+  // ── Self / ally buff spells (early) ──────────────────────────────────
+  // Spells where `targetType` is 'self', 'ally', or 'self_or_ally' don't
+  // need a living enemy — they apply a condition and/or temp HP and/or a
+  // max-HP bonus to the caster or a chosen party member. Wired BEFORE
+  // the utility-spell early-return so non-condition buffs (Heroism +
+  // tempHpGrant, Aid + maxHpBonus, Mage Armor) don't get short-circuited.
+  {
+    const targetType =
+      (spell as { targetType?: 'self' | 'ally' | 'enemy' | 'self_or_ally' }).targetType ?? 'enemy';
+    if (targetType === 'self' || targetType === 'ally' || targetType === 'self_or_ally') {
+      const buffTargetCharId = (action as { type: 'cast_spell'; targetCharId?: string })
+        .targetCharId;
+      let buffTarget = ctx.char;
+      if (targetType === 'ally' || (targetType === 'self_or_ally' && buffTargetCharId)) {
+        const explicit = ctx.st.characters.find((c) => c.id === buffTargetCharId && !c.dead);
+        if (explicit) buffTarget = explicit;
+      }
+      const isCasterTarget = buffTarget.id === ctx.char.id;
+
+      // Apply condition if specified.
+      const buffCondition = spell.condition;
+      if (buffCondition) {
+        if (isCasterTarget) {
+          if (!(ctx.char.conditions ?? []).includes(buffCondition)) {
+            ctx.char.conditions = [...(ctx.char.conditions ?? []), buffCondition];
+            if (spell.conditionDuration) {
+              ctx.char.condition_durations = {
+                ...(ctx.char.condition_durations ?? {}),
+                [buffCondition]: spell.conditionDuration,
+              };
+            }
+          }
+        } else {
+          ctx.st = {
+            ...ctx.st,
+            characters: ctx.st.characters.map((c) =>
+              c.id === buffTarget.id && !(c.conditions ?? []).includes(buffCondition)
+                ? {
+                    ...c,
+                    conditions: [...(c.conditions ?? []), buffCondition],
+                    condition_durations: spell.conditionDuration
+                      ? {
+                          ...(c.condition_durations ?? {}),
+                          [buffCondition]: spell.conditionDuration,
+                        }
+                      : c.condition_durations,
+                  }
+                : c
+            ),
+            entities: (ctx.st.entities ?? []).map((e) =>
+              e.id === buffTarget.id && !e.isEnemy
+                ? {
+                    ...e,
+                    conditions: e.conditions.includes(buffCondition)
+                      ? e.conditions
+                      : [...e.conditions, buffCondition],
+                  }
+                : e
+            ),
+          };
+        }
+      }
+
+      // Apply temp HP grant (replace if greater — temp HP doesn't stack).
+      if (spell.tempHpGrant) {
+        const grant = spell.tempHpGrant;
+        if (isCasterTarget) {
+          const prev = ctx.char.temp_hp ?? 0;
+          if (grant > prev) ctx.char.temp_hp = grant;
+        } else {
+          ctx.st = {
+            ...ctx.st,
+            characters: ctx.st.characters.map((c) =>
+              c.id === buffTarget.id ? { ...c, temp_hp: Math.max(c.temp_hp ?? 0, grant) } : c
+            ),
+          };
+        }
+      }
+
+      // Apply max HP bonus (Aid). Upcast: +N per slot above base.
+      const baseBonus = spell.maxHpBonus ?? 0;
+      if (baseBonus > 0) {
+        const extra = Math.max(0, slotLevel - (spell.level ?? 1));
+        const totalBonus = baseBonus + (spell.upcastMaxHpBonus ?? 0) * extra;
+        if (isCasterTarget) {
+          ctx.char.max_hp += totalBonus;
+          ctx.char.hp += totalBonus;
+        } else {
+          ctx.st = {
+            ...ctx.st,
+            characters: ctx.st.characters.map((c) =>
+              c.id === buffTarget.id
+                ? { ...c, max_hp: c.max_hp + totalBonus, hp: c.hp + totalBonus }
+                : c
+            ),
+          };
+        }
+      }
+
+      if (spell.concentration) {
+        ctx.char.concentrating_on = {
+          spellId,
+          rounds_left: concentrationRoundsFor(spell),
+        };
+      }
+
+      const buffProse =
+        pickCastPrefix(spell, {
+          name: ctx.char.name,
+          spell: spell.name,
+          slotNote,
+          target: isCasterTarget ? ctx.char.name : buffTarget.name,
+        }) + '.';
+      composeNow(ctx, { kind: 'spell_utility', prose: buffProse });
+      return;
+    }
+  }
+
   // ── Utility spells (no damage, no save, no heal) ───────────────────────
   if (!spell.damage && !spell.savingThrow && !spell.attackRoll && !spell.condition) {
     const utilityProse = spell.narrative

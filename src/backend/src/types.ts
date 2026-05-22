@@ -425,6 +425,19 @@ export interface Spell {
   // When unspecified, the engine treats the spell as untargeted/utility.
   rangeKind?: 'self' | 'touch' | 'ranged';
   rangeFt?: number;
+  // Buff-spell target type. Defaults to 'enemy' (existing behavior — the
+  // spell needs a living enemy in range). 'self' / 'ally' / 'self_or_ally'
+  // route to the buff-spell branch in castSpell that targets the caster
+  // or a chosen party member, applies any condition + temp HP + max HP
+  // bonus + concentration without an enemy gate. Used for Greater
+  // Invisibility, Heroism, Aid, etc.
+  targetType?: 'enemy' | 'self' | 'ally' | 'self_or_ally';
+  // Buff-spell payloads. Numeric where possible (no roll needed at cast
+  // time for most buffs). Dice-expression form would land if a future buff
+  // spell randomizes the grant.
+  tempHpGrant?: number; // Heroism gives mod-equal temp HP each turn; MVP grants once on cast.
+  maxHpBonus?: number; // Aid bumps target's max HP (and current HP).
+  upcastMaxHpBonus?: number; // extra max HP per slot above base (Aid: +5 per slot).
   // 2024 PHB — some spells require a costly material component that's
   // consumed on cast (Identify's 100 gp pearl, Revivify's 300 gp diamond,
   // Resurrection's 1000 gp diamond, etc.). Engine deducts from char.gold

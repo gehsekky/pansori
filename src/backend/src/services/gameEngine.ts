@@ -5406,9 +5406,23 @@ export async function takeAction({
 
   // SRD 5.2.1 p.184 — Invisible: attacking reveals location. The condition
   // ends after the attack; the character must re-Hide to regain it.
+  // EXCEPTION: 2024 PHB Greater Invisibility (and Invisibility cast as a
+  // BUFF, not from Hide) explicitly allows attacking while invisible —
+  // the condition source is magical and persists. Self-cast invisibility
+  // spells are exempted from this break-on-attack rule.
   {
     const attackActions = new Set(['attack', 'attack_npc', 'two_weapon_attack', 'cast_spell']);
-    if (attackActions.has(action.type)) {
+    const SPELLS_THAT_KEEP_INVISIBILITY = new Set(['greater_invisibility']);
+    const castSpellId =
+      action.type === 'cast_spell' ? (action as { spellId?: string }).spellId : undefined;
+    // If the player is concentrating on a magical-invisibility spell,
+    // attacking does NOT drop the condition. We approximate by reading
+    // `concentrating_on.spellId`.
+    const concSpellId = char.concentrating_on?.spellId;
+    const keepsInvisible =
+      (castSpellId && SPELLS_THAT_KEEP_INVISIBILITY.has(castSpellId)) ||
+      (concSpellId && SPELLS_THAT_KEEP_INVISIBILITY.has(concSpellId));
+    if (attackActions.has(action.type) && !keepsInvisible) {
       st = {
         ...st,
         characters: st.characters.map((c) =>
