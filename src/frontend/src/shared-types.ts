@@ -212,6 +212,9 @@ export type StructuredAction =
   // Eldritch Knight Fighter L7 — War Magic: bonus-action weapon
   // attack after casting a cantrip on the same turn.
   | { type: 'ek_war_magic_attack'; targetEnemyId?: string }
+  // Celestial Warlock L3 — Healing Light: bonus action, spend N
+  // dice from a (1 + warlock level)-d6 pool to heal self/ally.
+  | { type: 'use_healing_light'; dice: number; targetCharId?: string }
   // Aasimar Celestial Revelation (2024 PHB, L3+) — bonus-action
   // transformation, 1/long rest. Player picks the sub-option at
   // use time: 'necrotic_shroud', 'radiant_soul', 'radiant_consumption'.
@@ -294,6 +297,7 @@ export type ChoiceKind =
   | 'polearm_butt_end'
   | 'gwm_bonus_attack'
   | 'ek_war_magic_attack'
+  | 'use_healing_light'
   | 'use_celestial_revelation'
   | 'cast_spell'
   | 'class_feature';

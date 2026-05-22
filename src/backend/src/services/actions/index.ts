@@ -46,6 +46,7 @@ import { handleEscape } from './escape.js';
 import { handleExamine } from './examineDefault.js';
 import { handleGridMove } from './gridMove.js';
 import { handleGwmBonusAttack } from './gwmBonusAttack.js';
+import { handleHealingLight } from './healingLight.js';
 import { handleInteractObject } from './interactObject.js';
 import { handleLoot } from './loot.js';
 import { handleMove } from './move.js';
@@ -109,6 +110,7 @@ const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   polearm_butt_end: handlePolearmButtEnd as ActionHandler,
   gwm_bonus_attack: handleGwmBonusAttack as ActionHandler,
   ek_war_magic_attack: handleEkWarMagicAttack as ActionHandler,
+  use_healing_light: handleHealingLight as ActionHandler,
   use_celestial_revelation: handleCelestialRevelation as ActionHandler,
   use_healer_kit: handleUseHealerKit as ActionHandler,
   use_healing_hands: handleUseHealingHands as ActionHandler,
