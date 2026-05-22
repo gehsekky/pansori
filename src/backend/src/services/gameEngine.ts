@@ -506,8 +506,7 @@ export function hasSaveProficiency(
   ability: AbilityKey,
   context: Context
 ): boolean {
-  const classProf =
-    context.classSavingThrows?.[char.character_class]?.includes(ability) ?? false;
+  const classProf = context.classSavingThrows?.[char.character_class]?.includes(ability) ?? false;
   if (classProf) return true;
   return Object.values(char.feat_choices ?? {}).some((c) =>
     c?.saveProficiencies?.includes(ability)
@@ -5296,6 +5295,47 @@ export async function takeAction({
         ),
       };
     }
+  }
+
+  // SRD 5.2.1 — Unconscious ends when the creature regains any HP.
+  // The condition is registered with duration: 'permanent' and only
+  // explicitly cleared by the natural-20 death save path. Healing a
+  // downed PC (Cure Wounds, Healing Word, healing potion, quest
+  // reward modify_hp) brought them above 0 HP but left the condition
+  // intact — leaving the PC "alive but still unconscious", unable
+  // to act, with enemies still getting advantage on attacks.
+  // This sweep drops the condition whenever a living PC has hp > 0.
+  // Also resets `death_saves` and `stable` since they're tied to the
+  // unconscious lifecycle.
+  {
+    let anyRevived = false;
+    let updated = st;
+    for (let i = 0; i < updated.characters.length; i++) {
+      const c = updated.characters[i];
+      if (c.dead) continue;
+      if (c.hp <= 0) continue;
+      if (!c.conditions.includes('unconscious')) continue;
+      const revived: Character = {
+        ...c,
+        conditions: c.conditions.filter((cc) => cc !== 'unconscious'),
+        condition_durations: Object.fromEntries(
+          Object.entries(c.condition_durations ?? {}).filter(([k]) => k !== 'unconscious')
+        ),
+        death_saves: { successes: 0, failures: 0 },
+        stable: false,
+      };
+      updated = {
+        ...updated,
+        characters: updated.characters.map((cc, idx) => (idx === i ? revived : cc)),
+        entities: (updated.entities ?? []).map((e) =>
+          e.id === c.id && !e.isEnemy
+            ? { ...e, conditions: e.conditions.filter((cc) => cc !== 'unconscious') }
+            : e
+        ),
+      };
+      anyRevived = true;
+    }
+    if (anyRevived) st = updated;
   }
 
   // SRD 5.2.1 p.203 — Concentration ends when the caster is incapacitated or
