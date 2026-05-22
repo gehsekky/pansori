@@ -31,6 +31,20 @@ const StatsSchema = z
   })
   .strict();
 
+// Origin-feat picks that need player input at character creation. Today
+// only Magic Initiate (Arcane / Divine / Primal) uses this — the player
+// picks 2 cantrips + 1 L1 spell from the matching spell list. Other
+// origin feats with player choice (Resilient ability pick, Skilled
+// skill picks) aren't auto-applied at creation today so they don't
+// route through this seam. Schema stays loose — `take_feat` re-validates
+// every choice against the spellTable/feat config.
+const FeatChoicesSchema = z
+  .object({
+    cantripChoices: z.array(z.string().min(1).max(60)).max(4).optional(),
+    l1Choice: z.string().min(1).max(60).optional(),
+  })
+  .strict();
+
 const CharacterInputSchema = z
   .object({
     name: z.string().min(1).max(80),
@@ -40,6 +54,7 @@ const CharacterInputSchema = z
     portrait_url: z.string().max(2048).optional(),
     subclass: z.string().min(1).max(40).optional(),
     species: z.string().min(1).max(40).optional(),
+    feat_choices: FeatChoicesSchema.optional(),
   })
   .strict();
 

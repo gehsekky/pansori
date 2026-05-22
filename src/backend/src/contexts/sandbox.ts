@@ -102,10 +102,10 @@ export const context: Context = {
       feature: 'Researcher',
       featureDesc: 'If you do not know information, you know where to find it.',
       abilityScoreIncreases: ['con', 'int', 'wis'],
-      // Canonically Magic Initiate (Wizard) — placeholder until Magic
-      // Initiate ships in feats.ts. Tough keeps Sages alive long enough
-      // to research.
-      originFeat: 'tough',
+      // 2024 PHB: Sage gets Magic Initiate (Wizard / Arcane list).
+      // Cantrips + L1 choice come from the FE spell picker at
+      // character creation; the BE re-validates the picks.
+      originFeat: 'magic_initiate_arcane',
       language: 'Common',
     },
     {
@@ -117,9 +117,8 @@ export const context: Context = {
       feature: 'Shelter of the Faithful',
       featureDesc: 'You and your companions can receive healing and care at temples.',
       abilityScoreIncreases: ['int', 'wis', 'cha'],
-      // Canonically Magic Initiate (Cleric) — placeholder until that
-      // feat ships.
-      originFeat: 'lucky',
+      // 2024 PHB: Acolyte gets Magic Initiate (Cleric / Divine list).
+      originFeat: 'magic_initiate_divine',
       language: 'Celestial',
     },
   ],
