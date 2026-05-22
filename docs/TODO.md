@@ -132,7 +132,16 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
       `effectiveSpeed` hook hardcodes the feat id for now (will
       factor into a feats helper when a 2nd speed-bonus feat
       ships). L4+ prereq.
-    6 added tests cover both feats.
+    - **War Caster** (`kind: 'war-caster'`) — advantage on CON
+      saves to maintain concentration when damaged. Wired in
+      `checkConcentration` — rolls 2d20 keep-higher when the PC
+      has the feat. Narrative notes "(War Caster advantage)" on
+      both hold and break outcomes. Two other RAW benefits
+      deferred: somatic spell components with hands full (pansori
+      doesn't model hand state) and opportunity-cast spell as a
+      reaction (needs a reaction-window redesign). L4 + Spellcasting
+      feature prereq.
+    11 added tests cover the three feats.
   - ASI-vs-feat UX on the FE (both `apply_asi` and `take_feat`
     actions are available when `asi_pending` is set; FE picks the
     surfacing).

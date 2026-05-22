@@ -234,6 +234,15 @@ export function applyFeatTake(
       narrativeParts.push(`+${feat.effect.bonusFeet} ft speed.`);
       break;
     }
+    case 'war-caster': {
+      // No take-time state change — `checkConcentration` reads
+      // `char.feats` and rolls 2d20 keep-higher when War Caster is
+      // present. Narrative only.
+      narrativeParts.push(
+        'Advantage on CON saves to maintain concentration when damaged.'
+      );
+      break;
+    }
   }
   return { newChar: next, narrative: narrativeParts.join(' ') };
 }
