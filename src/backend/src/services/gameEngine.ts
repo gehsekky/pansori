@@ -626,8 +626,15 @@ function computeEnemyAttack(
   const hasAdvantage = char.conditions.some((c) => ADVANTAGE_CONDITIONS.has(c)) || isReckless;
   const hasDisadvantage = char.conditions.some((c) => ENEMY_DISADV_CONDITIONS.has(c)) || isDodging;
   const result = resolveEnemyAttack(enemy, char.ac, hasAdvantage, hasDisadvantage);
+  // Equipped-armor lookup. `equipped_armor` stores an `instance_id`
+  // (see routes/game.ts character creation), not a loot id — the
+  // previous `i.id === ...` form silently never matched, leaving
+  // `armorItem` undefined and the `enemyDeflected` narrative pool
+  // (defined in every context) unused on misses. Fixed to match by
+  // instance_id, which is the same pattern used elsewhere
+  // (twoWeaponAttack.ts, attack/toHit.ts, castSpell.ts).
   const armorItem = char.equipped_armor
-    ? char.inventory?.find((i) => i.id === char.equipped_armor)
+    ? char.inventory?.find((i) => i.instance_id === char.equipped_armor)
     : null;
 
   if (result.hit) {
