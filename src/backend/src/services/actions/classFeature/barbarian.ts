@@ -35,13 +35,33 @@ import type { InventoryItem } from '../../../types.js';
 export function handleBarbarianFeature(ctx: ActionContext, fid: string): boolean {
   const features = ctx.context.classFeatures?.[ctx.char.character_class] ?? [];
 
-  if (fid === 'rage') {
+  // `rage` accepts an optional totem suffix encoded in the feature id —
+  // `rage_bear`, `rage_eagle`, `rage_wolf` — for Totem Warrior PCs.
+  // Plain `rage` enters rage without a totem (any class with the
+  // feature) and is also the fallback for Totem Warriors who don't
+  // pick a totem at activation.
+  const isRageId =
+    fid === 'rage' || fid === 'rage_bear' || fid === 'rage_eagle' || fid === 'rage_wolf';
+  if (isRageId) {
     if (!features.includes('rage')) {
       ctx.narrative = `${ctx.char.character_class} does not have Rage.`;
       return true;
     }
     if (ctx.char.conditions.includes('raging')) {
       ctx.narrative = 'You are already raging!';
+      return true;
+    }
+    // Totem variants require the Totem Warrior subclass.
+    const totem: 'bear' | 'eagle' | 'wolf' | undefined =
+      fid === 'rage_bear'
+        ? 'bear'
+        : fid === 'rage_eagle'
+          ? 'eagle'
+          : fid === 'rage_wolf'
+            ? 'wolf'
+            : undefined;
+    if (totem && ctx.char.subclass !== 'totem_warrior') {
+      ctx.narrative = 'Only Totem Warrior Barbarians can rage with a totem spirit.';
       return true;
     }
     // Rage uses + damage scale with BARBARIAN level (not total level).
@@ -57,7 +77,19 @@ export function handleBarbarianFeature(ctx: ActionContext, fid: string): boolean
       rage_uses: rageUses - 1,
     };
     ctx.char.turn_actions = { ...ctx.char.turn_actions, bonus_action_used: true };
-    ctx.narrative = `${ctx.char.name} RAGES! +${rageDamageBonus(barbLvl)} bonus STR melee damage, resistance to physical attacks. (${rageUses - 1} use${rageUses - 1 === 1 ? '' : 's'} remaining)`;
+    if (totem) {
+      ctx.char.totem_spirit = totem;
+    }
+    // Totem-specific narrative flavor.
+    const totemBlurb =
+      totem === 'bear'
+        ? " The spirit of the Bear hardens you — resistance extends to all damage types except psychic (the Rage cover applies in pansori's simplified model)."
+        : totem === 'eagle'
+          ? ' The spirit of the Eagle quickens your reflexes — Dash as a bonus action, and opportunity attacks against you have disadvantage.'
+          : totem === 'wolf'
+            ? ' The spirit of the Wolf coordinates the pack — allies within 5 ft of your target have advantage on attacks against it.'
+            : '';
+    ctx.narrative = `${ctx.char.name} RAGES! +${rageDamageBonus(barbLvl)} bonus STR melee damage, resistance to physical attacks. (${rageUses - 1} use${rageUses - 1 === 1 ? '' : 's'} remaining)${totemBlurb}`;
     return true;
   }
 
@@ -137,6 +169,7 @@ export function handleBarbarianFeature(ctx: ActionContext, fid: string): boolean
         if (isRoomCleared(ctx.st, ctx.seed, ctx.roomId)) {
           ctx.st = endCombatState(ctx.st);
           ctx.char.conditions = ctx.char.conditions.filter((c) => c !== 'raging');
+          ctx.char.totem_spirit = undefined;
         }
       }
     } else {

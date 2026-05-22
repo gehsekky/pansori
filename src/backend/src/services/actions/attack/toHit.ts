@@ -249,6 +249,9 @@ export function computeToHitContext(
   // Path of the Totem Warrior — Wolf (PHB p.51): "While raging, your
   // allies have advantage on melee attack rolls against any creature
   // within 5 feet of you that is hostile to you."
+  // Gated on totem_spirit === 'wolf' specifically (not just the
+  // subclass) so Bear- and Eagle-raging Barbarians don't grant the
+  // pack-tactics-style bonus.
   const wolfAdv =
     weaponItem?.range !== 'ranged' &&
     !!ctx.st.entities &&
@@ -256,6 +259,7 @@ export function computeToHitContext(
       if (ally.id === ctx.char.id) return false;
       if (ally.dead || ally.hp <= 0) return false;
       if (ally.subclass !== 'totem_warrior') return false;
+      if (ally.totem_spirit !== 'wolf') return false;
       if (!hasClass(ally, 'barbarian')) return false;
       if (!ally.conditions.includes('raging')) return false;
       const allyEnt = ctx.st.entities?.find((e) => e.id === ally.id);
