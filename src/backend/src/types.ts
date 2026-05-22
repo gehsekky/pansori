@@ -292,6 +292,12 @@ export interface TurnActions {
   // Fighting could trigger SA on every hit. RAW: only on the
   // first qualifying hit. Cleared by FRESH_TURN at turn start.
   sneak_attack_used?: boolean;
+  // Aasimar Celestial Revelation damage rider — once per turn,
+  // while the transformation is active, a melee weapon hit adds
+  // +prof damage of the matching type (necrotic / radiant).
+  // Same gate shape as gwm_used / sneak_attack_used. Cleared by
+  // FRESH_TURN at turn start.
+  celestial_revelation_rider_used?: boolean;
   // Great Weapon Master damage rider (2024 PHB) — once per turn,
   // a heavy-weapon hit adds +profBonus damage. Same shape as
   // Savage Attacker / Sneak Attack once-per-turn gates.
@@ -599,6 +605,12 @@ export interface Character {
   expertise_skills?: string[]; // skills with double proficiency bonus (Rogue/Bard)
   prepared_spells?: string[]; // spell ids currently prepared (Cleric/Paladin/Druid)
   charmer_id?: string; // entity id of the charmer when charmed
+  // Aasimar Celestial Revelation (2024 PHB L3+) — active variant
+  // while the transformation is up. Set when use_celestial_revelation
+  // is invoked; cleared when the duration ticks to 0 (10 rounds =
+  // 1 minute) or on long rest. Remaining rounds tracked via
+  // `class_resource_uses.celestial_revelation_rounds`.
+  celestial_revelation_variant?: 'necrotic_shroud' | 'radiant_soul' | 'radiant_consumption';
   // SRD 5.2.1 p.11: Darkvision treats Darkness as Dim Light within this radius
   // (typically 60 ft for elves/dwarves/halflings/etc.). Default 0 = no
   // darkvision (typical human).

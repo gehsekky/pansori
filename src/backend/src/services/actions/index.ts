@@ -38,6 +38,7 @@ import { handleUseHealerKit, handleUseHealingHands } from './healActions.js';
 import type { StructuredAction } from '../../types.js';
 import { handleAttack } from './attack/index.js';
 import { handleCastSpell } from './castSpell.js';
+import { handleCelestialRevelation } from './celestialRevelation.js';
 import { handleDeathSave } from './deathSave.js';
 import { handleDisarmTrap } from './disarmTrap.js';
 import { handleEscape } from './escape.js';
@@ -106,6 +107,7 @@ const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   two_weapon_attack: handleTwoWeaponAttack as ActionHandler,
   polearm_butt_end: handlePolearmButtEnd as ActionHandler,
   gwm_bonus_attack: handleGwmBonusAttack as ActionHandler,
+  use_celestial_revelation: handleCelestialRevelation as ActionHandler,
   use_healer_kit: handleUseHealerKit as ActionHandler,
   use_healing_hands: handleUseHealingHands as ActionHandler,
   grid_move: handleGridMove as ActionHandler,

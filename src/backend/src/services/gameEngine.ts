@@ -5273,8 +5273,35 @@ export async function takeAction({
             );
             narrative += ` ${fmt.note(`[${ticked.name}] Condition${expired.length > 1 ? 's' : ''} cleared: ${expired.join(', ')}.`)}`;
           }
-          st = { ...st, characters: st.characters.map((c, i) => (i === nextCharIdx ? ticked : c)) };
-          st.active_character_id = ticked.id;
+          // Aasimar Celestial Revelation — tick the 10-round duration
+          // at the start of each of the wielder's turns. When the
+          // counter hits 0, clear the variant + narrate the end.
+          let final = ticked;
+          const cels = ticked.class_resource_uses?.celestial_revelation_rounds ?? 0;
+          if (cels > 0 && ticked.celestial_revelation_variant) {
+            const next = cels - 1;
+            if (next <= 0) {
+              final = {
+                ...ticked,
+                celestial_revelation_variant: undefined,
+                class_resource_uses: {
+                  ...(ticked.class_resource_uses ?? {}),
+                  celestial_revelation_rounds: 0,
+                },
+              };
+              narrative += ` ${fmt.note(`[${ticked.name}] Celestial Revelation ends.`)}`;
+            } else {
+              final = {
+                ...ticked,
+                class_resource_uses: {
+                  ...(ticked.class_resource_uses ?? {}),
+                  celestial_revelation_rounds: next,
+                },
+              };
+            }
+          }
+          st = { ...st, characters: st.characters.map((c, i) => (i === nextCharIdx ? final : c)) };
+          st.active_character_id = final.id;
         }
       }
     }
