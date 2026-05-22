@@ -270,22 +270,30 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
     level). Multi-class PCs no longer get a spurious ASI on the
     SECOND level (Fighter 3 / Wizard 1 → total 4 doesn't fire ASI;
     Fighter 4 / Wizard 0 → fighter level 4 does fire).
-  - [~] **Level-up UX** (Phase 7 — backend shipped 2026-05-22; FE
-    chooser deferred). New `level_up_class` action takes a
-    `className` param. Validates: out-of-combat, level cap (20), XP
-    threshold, multiclass prereq on class **entry** (skipped for
-    continuation in an already-taken class). Delegates to the new
-    exported `applyLevelUpForClass(char, className, context)` helper
-    that bumps `char.level` + `class_levels[className]` in lockstep,
-    applies HP / spell slot recompute / per-class ASI / multiclass
+  - [x] **Level-up UX** (Phase 7 — shipped 2026-05-22). Backend:
+    `level_up_class { className }` action validates out-of-combat,
+    level cap (20), XP threshold, and multiclass prereq on class
+    **entry** (skipped for continuation in an already-taken class).
+    Delegates to `applyLevelUpForClass(char, className, context)`
+    which bumps `char.level` + `class_levels[className]` in lockstep
+    and applies HP / spell slot recompute / per-class ASI / multiclass
     prof grants. Auto-level-up from XP (kill events) still defaults
     to the primary class, so single-class behavior is unchanged.
-    13 direct tests covering XP gating, combat-block, level cap,
-    primary-class permissiveness, prereq enforcement, ASI per-class
-    boundary, prof grant timing, spell-slot recompute on multiclass.
-    **Remaining:** FE choice surfacing — currently the player can
-    only invoke `level_up_class` programmatically (no choice button
-    on the FE when XP threshold is met).
+    13 BE tests cover XP gating, combat-block, level cap, primary-
+    class permissiveness, prereq enforcement, per-class ASI boundary,
+    prof grant timing, and multiclass spell-slot recompute.
+
+    **FE chooser:** `LevelUpDialog` component + `lib/multiclass.ts`
+    helper (mirrors the BE `MULTICLASS_PREREQS` / `canMulticlassInto`
+    shape for up-front render — the BE re-validates so a stat change
+    between trigger and selection still gates correctly). `PartyRail`
+    shows a `+LVL` badge + "LEVEL UP →" button on any PC tile whose
+    XP ≥ next threshold (out-of-combat only); clicking opens the
+    dialog. Dialog lists all 12 PHB classes — primary always selectable
+    (continuation), other classes show their prereq, grey out, and
+    show the failing-stat reason when the PC can't meet it. Selecting
+    a class dispatches `level_up_class { className }` via the existing
+    choice path. 19 FE tests (helper + dialog).
 - [x] **Backgrounds with behavioral effects** (shipped 2026-05-21).
       `Background` type extended in `shared/types.ts` with 2024 PHB
       fields: `originFeat`, `abilityScoreIncreases`, `startingEquipment`,

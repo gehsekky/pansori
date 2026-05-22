@@ -872,6 +872,12 @@
   text-transform: uppercase;
 }
 
+.partyTileWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
 .partyTile {
   background: var(--t-card);
   border: 1px solid var(--t-border);
@@ -886,6 +892,24 @@
   gap: 0.4rem;
   width: 100%;
   letter-spacing: 0.04em;
+}
+
+.partyTileLevelUpBtn {
+  background: transparent;
+  border: 1px solid var(--t-primary);
+  color: var(--t-primary);
+  font-family: inherit;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  padding: 0.25rem 0.55rem;
+  cursor: pointer;
+  text-transform: uppercase;
+  align-self: stretch;
+  text-align: center;
+}
+
+.partyTileLevelUpBtn:hover {
+  background: var(--t-separator);
 }
 
 .partyTileActive {
