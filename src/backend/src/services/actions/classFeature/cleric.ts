@@ -1,5 +1,6 @@
 import { abilityMod, profBonus, rollDice } from '../../rulesEngine.js';
 import { applyPartyLevelUps, getEnemyById, pushEvent, splitEncounterXp } from '../../gameEngine.js';
+import { getClassLevel, hasClass } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import { fmt } from '../../narrativeFmt.js';
 
@@ -23,7 +24,7 @@ import { fmt } from '../../narrativeFmt.js';
  */
 export function handleClericFeature(ctx: ActionContext, fid: string): boolean {
   if (fid === 'divine_spark') {
-    if (ctx.char.character_class.toLowerCase() !== 'cleric') {
+    if (!hasClass(ctx.char, 'cleric')) {
       ctx.narrative = 'Only Clerics have Divine Spark.';
       return true;
     }
@@ -80,7 +81,7 @@ export function handleClericFeature(ctx: ActionContext, fid: string): boolean {
   }
 
   if (fid === 'turn_undead') {
-    if (ctx.char.character_class.toLowerCase() !== 'cleric') {
+    if (!hasClass(ctx.char, 'cleric')) {
       ctx.narrative = 'Only Clerics have Turn Undead.';
       return true;
     }
@@ -153,11 +154,12 @@ export function handleClericFeature(ctx: ActionContext, fid: string): boolean {
   }
 
   if (fid === 'sear_undead') {
-    if (ctx.char.character_class.toLowerCase() !== 'cleric') {
+    if (!hasClass(ctx.char, 'cleric')) {
       ctx.narrative = 'Only Clerics have Sear Undead.';
       return true;
     }
-    if (ctx.char.level < 5) {
+    const clericLvl = getClassLevel(ctx.char, 'cleric');
+    if (clericLvl < 5) {
       ctx.narrative = 'Sear Undead requires Cleric level 5.';
       return true;
     }
@@ -185,7 +187,8 @@ export function handleClericFeature(ctx: ActionContext, fid: string): boolean {
       if (!enemyData || !undeadRegex.test(enemyData.name)) return e;
       const wisScore = (enemyData as unknown as Record<string, number>)?.wis ?? 10;
       const save = rollDice('1d20') + abilityMod(wisScore);
-      const fullDmg = rollDice(`${ctx.char.level}d8`);
+      // Sear Undead damage scales with Cleric level only.
+      const fullDmg = rollDice(`${clericLvl}d8`);
       const dmg = save >= suDC ? Math.floor(fullDmg / 2) : fullDmg;
       lines.push(
         `${enemyData.name}: WIS ${save} vs DC ${suDC} — ${dmg} radiant${save >= suDC ? ' (half)' : ''}`
@@ -215,7 +218,8 @@ export function handleClericFeature(ctx: ActionContext, fid: string): boolean {
       ...(ctx.char.class_resource_uses ?? {}),
       channel_divinity: cdUses - 1,
     };
-    const poolHp = 5 * ctx.char.level;
+    // Preserve Life pool: 5 × Cleric level.
+    const poolHp = 5 * getClassLevel(ctx.char, 'cleric');
     const woundedAllies = ctx.st.characters.filter(
       (c) => !c.dead && c.hp < c.max_hp && c.id !== ctx.char.id
     );

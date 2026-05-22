@@ -52,6 +52,7 @@ import type { EnemyAttackHitFragment, EnemyAttackMissFragment } from './narrativ
 import { applyExpiryHooks, getConditionDuration } from './conditions/registry.js';
 import { composeFragments, enemyAttackFragmentEvent } from './narrative/compose.js';
 import { fmt, stripForLlm } from './narrativeFmt.js';
+import { getClassLevel, hasClass, spellSlotsForChar } from './multiclass.js';
 import { COMBAT_LOG_MAX } from '../types.js';
 import { Engine } from 'json-rules-engine';
 import { applyDamage } from './damage.js';
@@ -60,7 +61,6 @@ import { factionShopPrice } from './campaignEngine.js';
 import { llmProvider } from './llmProvider.js';
 import { pcActor } from './actions/actor.js';
 import { randomUUID } from 'crypto';
-import { spellSlotsForChar } from './multiclass.js';
 
 // Append a CombatEvent to state.combat_log, trimming to COMBAT_LOG_MAX so the
 // buffer doesn't grow unbounded across long sessions. Pure function — returns
@@ -1350,8 +1350,8 @@ export function preservesCriticalFacts(input: string, output: string): boolean {
 // Fiend Warlock — Dark One's Blessing (PHB p.108): when you reduce a hostile
 // creature to 0 HP, gain temp HP = CHA mod + warlock level (min 1).
 export function grantDarkOnesBlessing(char: Character): string {
-  if (char.character_class.toLowerCase() !== 'warlock' || char.subclass !== 'fiend') return '';
-  const grant = Math.max(1, char.level + abilityMod(char.cha));
+  if (!hasClass(char, 'warlock') || char.subclass !== 'fiend') return '';
+  const grant = Math.max(1, getClassLevel(char, 'warlock') + abilityMod(char.cha));
   const prev = char.temp_hp ?? 0;
   if (grant > prev) char.temp_hp = grant;
   return ` 🔥 Dark One's Blessing: ${char.name} gains ${grant} temp HP.`;
@@ -1856,7 +1856,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   // In combat: only Thief Rogue L3+ via Fast Hands (consumes bonus action).
   const currentRoom = seed.rooms.find((r) => r.id === roomId);
   const isThiefFastHands =
-    char.character_class.toLowerCase() === 'rogue' && char.subclass === 'thief' && char.level >= 3;
+    hasClass(char, 'rogue') && char.subclass === 'thief' && getClassLevel(char, 'rogue') >= 3;
   const canInteractObjects =
     currentRoom?.objects?.length &&
     (!enemyAlive ||
@@ -2076,7 +2076,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   if (!state.combat_active) {
     const prepClasses = ['cleric', 'paladin', 'druid'];
     if (
-      prepClasses.includes(char.character_class.toLowerCase()) &&
+      prepClasses.some((c) => hasClass(char, c)) &&
       (char.spells_known ?? []).length > 0
     ) {
       const cap = preparedSpellsCap(char, context);
@@ -2100,7 +2100,8 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   if (state.combat_active && !char.turn_actions.bonus_action_used) {
     const features = context.classFeatures?.[char.character_class] ?? [];
     if (features.includes('rage') && !char.conditions.includes('raging')) {
-      const rageUses = char.class_resource_uses?.rage_uses ?? rageUsesMax(char.level);
+      const rageUses =
+        char.class_resource_uses?.rage_uses ?? rageUsesMax(getClassLevel(char, 'barbarian'));
       if (rageUses > 0) {
         choices.push({
           label: `Rage — bonus action (${rageUses} use${rageUses === 1 ? '' : 's'} left)`,
@@ -2116,7 +2117,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     // imposes exhaustion when the rage ends; deferred to keep MVP scope.
     if (
       char.subclass === 'berserker' &&
-      char.character_class.toLowerCase() === 'barbarian' &&
+      hasClass(char, 'barbarian') &&
       char.conditions.includes('raging') &&
       enemyAlive
     ) {
@@ -2132,8 +2133,8 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     // next attack uses Push/Sap/Slow regardless of the weapon's actual
     // mastery. Available once per attack; cleared when the attack resolves.
     if (
-      char.character_class.toLowerCase() === 'fighter' &&
-      char.level >= 9 &&
+      hasClass(char, 'fighter') &&
+      getClassLevel(char, 'fighter') >= 9 &&
       state.combat_active &&
       !char.turn_actions.tactical_master_mastery &&
       enemyAlive
@@ -2202,13 +2203,14 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
 
     // Fighter: Second Wind (bonus action). 2024 PHB has multi-use scaling:
     // 2 uses at L1, 3 at L4, 4 at L10. All recover on a short or long rest.
-    if (char.character_class.toLowerCase() === 'fighter') {
-      const secondWindMax = char.level >= 10 ? 4 : char.level >= 4 ? 3 : 2;
+    if (hasClass(char, 'fighter')) {
+      const fighterLvl = getClassLevel(char, 'fighter');
+      const secondWindMax = fighterLvl >= 10 ? 4 : fighterLvl >= 4 ? 3 : 2;
       const secondWindUsed = char.class_resource_uses?.second_wind ?? 0;
       const secondWindLeft = secondWindMax - secondWindUsed;
       if (secondWindLeft > 0) {
         choices.push({
-          label: `Second Wind — bonus action: heal 1d10+${char.level} HP (${secondWindLeft}/${secondWindMax} left)`,
+          label: `Second Wind — bonus action: heal 1d10+${fighterLvl} HP (${secondWindLeft}/${secondWindMax} left)`,
           action: { type: 'use_class_feature', featureId: 'second_wind' },
           kind: 'class_feature',
           requiresBonusAction: true,
@@ -2217,7 +2219,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     }
 
     // Rogue L2+: Cunning Action (bonus action options)
-    if (char.character_class.toLowerCase() === 'rogue' && char.level >= 2) {
+    if (hasClass(char, 'rogue') && getClassLevel(char, 'rogue') >= 2) {
       choices.push({
         label: 'Cunning Action: Dash — extra movement as bonus action',
         action: { type: 'use_class_feature', featureId: 'cunning_action_dash' },
@@ -2243,8 +2245,8 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     // from the SA damage roll). Setting a Cunning Strike is free — no
     // action cost.
     if (
-      char.character_class.toLowerCase() === 'rogue' &&
-      char.level >= 5 &&
+      hasClass(char, 'rogue') &&
+      getClassLevel(char, 'rogue') >= 5 &&
       !char.turn_actions.action_used &&
       !char.turn_actions.cunning_strike_pending &&
       enemyAlive
@@ -2272,12 +2274,12 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     }
 
     // Bard: Bardic Inspiration (bonus action)
-    if (char.character_class.toLowerCase() === 'bard') {
+    if (hasClass(char, 'bard')) {
       const biUses =
         char.class_resource_uses?.bardic_inspiration ??
         Math.max(1, Math.floor(((char.cha ?? 10) - 10) / 2));
-      const inspDie =
-        char.level >= 15 ? 'd12' : char.level >= 10 ? 'd10' : char.level >= 5 ? 'd8' : 'd6';
+      const bardLvl = getClassLevel(char, 'bard');
+      const inspDie = bardLvl >= 15 ? 'd12' : bardLvl >= 10 ? 'd10' : bardLvl >= 5 ? 'd8' : 'd6';
       if (biUses > 0) {
         choices.push({
           label: `Bardic Inspiration — give ally a ${inspDie} die (${biUses} left)`,
@@ -2292,8 +2294,8 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   // Fighter: Action Surge — shown in combat when not yet used
   if (
     state.combat_active &&
-    char.character_class.toLowerCase() === 'fighter' &&
-    char.level >= 2 &&
+    hasClass(char, 'fighter') &&
+    getClassLevel(char, 'fighter') >= 2 &&
     !char.class_resource_uses?.action_surge
   ) {
     choices.push({
@@ -2309,8 +2311,8 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   // Must be available regardless of bonus-action state.
   if (
     state.combat_active &&
-    char.character_class.toLowerCase() === 'barbarian' &&
-    char.level >= 2 &&
+    hasClass(char, 'barbarian') &&
+    getClassLevel(char, 'barbarian') >= 2 &&
     !char.turn_actions.reckless &&
     !char.turn_actions.action_used
   ) {
@@ -2326,10 +2328,11 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   // 2024 PHB renames Ki Points to Discipline Points; the internal storage
   // key stays `ki_points` so existing tests + state continue to work, but
   // UI labels say "DP" so the player sees 2024 terminology.
-  if (char.character_class.toLowerCase() === 'monk') {
-    const kiLeft = char.class_resource_uses?.ki_points ?? char.level;
-    const monkFreeAvailable = char.level >= 2 && !char.turn_actions.monk_free_used;
-    if (state.combat_active && char.level >= 2) {
+  if (hasClass(char, 'monk')) {
+    const monkLvl = getClassLevel(char, 'monk');
+    const kiLeft = char.class_resource_uses?.ki_points ?? monkLvl;
+    const monkFreeAvailable = monkLvl >= 2 && !char.turn_actions.monk_free_used;
+    if (state.combat_active && monkLvl >= 2) {
       if (kiLeft > 0 && char.turn_actions.action_used && !char.turn_actions.bonus_action_used) {
         choices.push({
           label: `Flurry of Blows — 2 unarmed strikes (1 DP, ${kiLeft} left)`,
@@ -2381,7 +2384,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       }
       if (
         state.combat_active &&
-        char.level >= 5 &&
+        monkLvl >= 5 &&
         enemyAlive &&
         kiLeft > 0 &&
         !char.turn_actions.monk_stunning_strike_used
@@ -2411,7 +2414,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   }
 
   // ── Druid: Wild Shape ───────────────────────────────────────────────────────
-  if (char.character_class.toLowerCase() === 'druid') {
+  if (hasClass(char, 'druid')) {
     const wsUses = char.class_resource_uses?.wild_shape ?? 2;
     // Circle of the Moon (PHB p.69) — Combat Wild Shape: use as a bonus
     // action instead of action.
@@ -2426,7 +2429,8 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       // 2024 PHB Beast Forms — surface one choice per accessible form. The
       // form's stat block replaces the druid's attack while shifted (see
       // BEAST_FORMS in contexts/srd/beast_forms.ts).
-      const forms = availableBeastForms(char.level, isMoon);
+      // Wild Shape CR access scales with Druid level only.
+      const forms = availableBeastForms(getClassLevel(char, 'druid'), isMoon);
       for (const form of forms) {
         choices.push({
           label: `Wild Shape: ${form.name} (CR ${form.cr})${isMoon ? ' (bonus action)' : ''} — ${form.descriptor}`,
@@ -2465,8 +2469,9 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   }
 
   // ── Sorcerer: Metamagic ─────────────────────────────────────────────────────
-  if (char.character_class.toLowerCase() === 'sorcerer' && char.level >= 3) {
-    const spLeft = char.class_resource_uses?.sorcery_points ?? char.level;
+  if (hasClass(char, 'sorcerer') && getClassLevel(char, 'sorcerer') >= 3) {
+    const sorcLvl = getClassLevel(char, 'sorcerer');
+    const spLeft = char.class_resource_uses?.sorcery_points ?? sorcLvl;
     if (spLeft >= 1)
       choices.push({
         label: `Metamagic: Twinned Spell — next spell hits 2 targets (1 SP, ${spLeft} left)`,
@@ -2490,7 +2495,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   // ── Warlock: Invocations ─────────────────────────────────────────────────────
   // RAW (PHB p.107): invocations are learned at level-up, not chosen mid-fight.
   // Gate to out-of-combat so this surfaces as a downtime/level-up decision.
-  if (!state.combat_active && char.character_class.toLowerCase() === 'warlock' && char.level >= 2) {
+  if (!state.combat_active && hasClass(char, 'warlock') && getClassLevel(char, 'warlock') >= 2) {
     if (!(char.feats ?? []).includes('agonizing_blast'))
       choices.push({
         label: `Learn Invocation: Agonizing Blast — +CHA to Eldritch Blast`,
@@ -2507,7 +2512,6 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
 
   // ── Subclass active features ────────────────────────────────────────────────
   if (state.combat_active && enemyAlive && char.subclass) {
-    const cls = char.character_class.toLowerCase();
     const cdLeft = char.class_resource_uses?.channel_divinity ?? 1;
 
     // Battle Master: maneuver choices (in combat, superiority dice remaining)
@@ -2528,7 +2532,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     }
 
     // Lore Bard: Cutting Words (reaction, costs Bardic Inspiration)
-    if (char.subclass === 'lore' && cls === 'bard' && !char.turn_actions.reaction_used) {
+    if (char.subclass === 'lore' && hasClass(char, 'bard') && !char.turn_actions.reaction_used) {
       const biLeft2 = char.class_resource_uses?.bardic_inspiration ?? abilityMod(char.cha ?? 10);
       if (biLeft2 > 0)
         choices.push({
@@ -2540,7 +2544,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
 
     // 2024 PHB Cleric universal Channel Divinity options — available to
     // every Cleric regardless of subclass.
-    if (cls === 'cleric' && cdLeft > 0 && state.combat_active && enemyAlive) {
+    if (hasClass(char, 'cleric') && cdLeft > 0 && state.combat_active && enemyAlive) {
       choices.push({
         label: `Divine Spark — 1d8+${abilityMod(char.wis)} radiant damage or heal (Channel Divinity, ${cdLeft} left)`,
         action: { type: 'use_class_feature', featureId: 'divine_spark' },
@@ -2554,25 +2558,32 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     }
     // 2024 PHB Cleric L5: Sear Undead replaces Destroy Undead. AoE radiant
     // damage to all undead in 30 ft, WIS save halves.
-    if (cls === 'cleric' && char.level >= 5 && cdLeft > 0 && state.combat_active && enemyAlive) {
+    if (
+      hasClass(char, 'cleric') &&
+      getClassLevel(char, 'cleric') >= 5 &&
+      cdLeft > 0 &&
+      state.combat_active &&
+      enemyAlive
+    ) {
+      const clericLvl = getClassLevel(char, 'cleric');
       choices.push({
-        label: `Sear Undead — all undead in 30 ft take ${char.level}d8 radiant, WIS save halves (Channel Divinity, ${cdLeft} left)`,
+        label: `Sear Undead — all undead in 30 ft take ${clericLvl}d8 radiant, WIS save halves (Channel Divinity, ${cdLeft} left)`,
         action: { type: 'use_class_feature', featureId: 'sear_undead' },
         kind: 'class_feature',
       });
     }
 
     // Life Cleric: Preserve Life (Channel Divinity, out-of-combat heal)
-    if (char.subclass === 'life' && cls === 'cleric' && cdLeft > 0) {
+    if (char.subclass === 'life' && hasClass(char, 'cleric') && cdLeft > 0) {
       choices.push({
-        label: `Preserve Life — distribute ${5 * char.level} HP among wounded allies (Channel Divinity, ${cdLeft} left)`,
+        label: `Preserve Life — distribute ${5 * getClassLevel(char, 'cleric')} HP among wounded allies (Channel Divinity, ${cdLeft} left)`,
         action: { type: 'use_class_feature', featureId: 'preserve_life' },
         kind: 'class_feature',
       });
     }
 
     // War Cleric: Guided Strike (Channel Divinity, +10 to next attack)
-    if (char.subclass === 'war' && cls === 'cleric' && cdLeft > 0) {
+    if (char.subclass === 'war' && hasClass(char, 'cleric') && cdLeft > 0) {
       choices.push({
         label: `Guided Strike — +10 to next attack roll (Channel Divinity, ${cdLeft} left)`,
         action: { type: 'use_class_feature', featureId: 'guided_strike' },
@@ -2583,7 +2594,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     // Devotion Paladin: Sacred Weapon (Channel Divinity)
     if (
       char.subclass === 'devotion' &&
-      cls === 'paladin' &&
+      hasClass(char, 'paladin') &&
       cdLeft > 0 &&
       !char.class_resource_uses?.sacred_weapon_active
     ) {
@@ -2595,7 +2606,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     }
 
     // Vengeance Paladin: Vow of Enmity & Abjure Enemy (Channel Divinity)
-    if (char.subclass === 'vengeance' && cls === 'paladin' && cdLeft > 0) {
+    if (char.subclass === 'vengeance' && hasClass(char, 'paladin') && cdLeft > 0) {
       choices.push({
         label: `Vow of Enmity — advantage vs target for 1 min (Channel Divinity, ${cdLeft} left)`,
         action: { type: 'use_class_feature', featureId: 'vow_of_enmity' },
@@ -2611,7 +2622,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     // Hunter Ranger: Colossus Slayer
     if (
       char.subclass === 'hunter' &&
-      cls === 'ranger' &&
+      hasClass(char, 'ranger') &&
       !char.class_resource_uses?.colossus_slayer_used
     ) {
       choices.push({
@@ -2625,8 +2636,8 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     // The companion bites the nearest living enemy from its grid position.
     if (
       char.subclass === 'beastmaster' &&
-      cls === 'ranger' &&
-      char.level >= 3 &&
+      hasClass(char, 'ranger') &&
+      getClassLevel(char, 'ranger') >= 3 &&
       !char.turn_actions.bonus_action_used
     ) {
       const companion = state.entities?.find(
@@ -2656,7 +2667,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     // end of your next turn.
     if (
       char.subclass === 'archfey' &&
-      cls === 'warlock' &&
+      hasClass(char, 'warlock') &&
       !char.class_resource_uses?.fey_presence_used
     ) {
       choices.push({
@@ -2679,7 +2690,8 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     // engine bails before the slot is spent, but the choice list keeps
     // showing the unprepared spell every turn).
     const prepClasses = new Set(['cleric', 'paladin', 'druid']);
-    const enforcePrep = prepClasses.has(char.character_class.toLowerCase());
+    // Enforce prep when ANY of the PC's classes is a prep class.
+    const enforcePrep = [...prepClasses].some((c) => hasClass(char, c));
     const preparedSet = new Set(char.prepared_spells ?? []);
     for (const spellId of char.spells_known) {
       if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
@@ -3502,8 +3514,8 @@ function isAbsorbElementsEligible(
  *     can't see").
  */
 function isUncannyDodgeEligible(target: Character): boolean {
-  if (target.character_class.toLowerCase() !== 'rogue') return false;
-  if ((target.level ?? 1) < 5) return false;
+  if (!hasClass(target, 'rogue')) return false;
+  if (getClassLevel(target, 'rogue') < 5) return false;
   if (target.turn_actions?.reaction_used) return false;
   if (target.hp <= 0) return false;
   if (target.conditions?.includes('blinded')) return false;
@@ -3522,9 +3534,7 @@ function isHellishRebukeEligible(
 ): boolean {
   // 2024 PHB: Warlocks cast it from their spell list; Tieflings L3+ get it
   // as a racial Innate spell (1/long rest, no slot cost).
-  const isWarlock =
-    target.character_class.toLowerCase() === 'warlock' &&
-    knowsSpellWithSlot(target, 'hellish_rebuke', context);
+  const isWarlock = hasClass(target, 'warlock') && knowsSpellWithSlot(target, 'hellish_rebuke', context);
   const isTieflingInnate =
     target.species === 'tiefling' &&
     target.level >= 3 &&

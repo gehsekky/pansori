@@ -1,4 +1,5 @@
 import { applyFeatTake, canTakeFeat, getFeat } from '../feats.js';
+import { getClassLevel, hasClass } from '../multiclass.js';
 import type { AbilityKey } from '../../types.js';
 import type { ActionHandler } from './types.js';
 import { preparedSpellsCap } from '../gameEngine.js';
@@ -50,10 +51,12 @@ export const handleSelectSubclass: ActionHandler<{ type: 'select_subclass'; subc
   }
   const next = { ...ctx.char, subclass: action.subclass };
   let narrative = `${next.name} follows the path of the ${action.subclass}!`;
-  if (action.subclass === 'draconic' && next.character_class.toLowerCase() === 'sorcerer') {
-    next.max_hp += next.level;
-    next.hp += next.level;
-    narrative += ` Draconic Resilience: +${next.level} max HP (now ${next.hp}/${next.max_hp}).`;
+  if (action.subclass === 'draconic' && hasClass(next, 'sorcerer')) {
+    // Draconic Resilience scales with Sorcerer level only.
+    const sorcLvl = getClassLevel(next, 'sorcerer');
+    next.max_hp += sorcLvl;
+    next.hp += sorcLvl;
+    narrative += ` Draconic Resilience: +${sorcLvl} max HP (now ${next.hp}/${next.max_hp}).`;
   }
   ctx.char = next;
   ctx.narrative = narrative;

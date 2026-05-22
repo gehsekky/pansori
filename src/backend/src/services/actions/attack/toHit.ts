@@ -8,6 +8,7 @@ import {
 } from '../../rulesEngine.js';
 import type { Enemy, InventoryItem, LootItem } from '../../../types.js';
 import { coverBonus, distanceFeet, isFlankingPosition } from '../../gridEngine.js';
+import { getClassLevel, hasClass } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import { isHeavilyEncumbered } from '../../gameEngine.js';
 
@@ -155,7 +156,7 @@ export function computeToHitContext(
   // Assassin: advantage vs creatures who haven't acted (surprised list or first round)
   const assassinAdv =
     ctx.char.subclass === 'assassin' &&
-    ctx.char.character_class.toLowerCase() === 'rogue' &&
+    hasClass(ctx.char, 'rogue') &&
     ((ctx.st.surprised ?? []).includes(targetId) || (ctx.st.round ?? 1) === 1);
 
   const vowAdv = ctx.st.vow_of_enmity_target === targetId;
@@ -224,7 +225,7 @@ export function computeToHitContext(
       if (ally.id === ctx.char.id) return false;
       if (ally.dead || ally.hp <= 0) return false;
       if (ally.subclass !== 'totem_warrior') return false;
-      if (ally.character_class.toLowerCase() !== 'barbarian') return false;
+      if (!hasClass(ally, 'barbarian')) return false;
       if (!ally.conditions.includes('raging')) return false;
       const allyEnt = ctx.st.entities?.find((e) => e.id === ally.id);
       const targetEnt = ctx.st.entities?.find((e) => e.id === targetId && e.isEnemy);
@@ -301,8 +302,8 @@ export function computeToHitContext(
   // Champion: Improved Critical — crit on 19–20 at level 3+
   const critThresh =
     ctx.char.subclass === 'champion' &&
-    ctx.char.character_class.toLowerCase() === 'fighter' &&
-    ctx.char.level >= 3
+    hasClass(ctx.char, 'fighter') &&
+    getClassLevel(ctx.char, 'fighter') >= 3
       ? 19
       : 20;
   const sacredWeaponBonus =

@@ -13,6 +13,7 @@ import {
   pushEvent,
   splitEncounterXp,
 } from '../../gameEngine.js';
+import { getClassLevel, hasClass } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import { composeNow } from '../../narrative/compose.js';
 import { distanceFeet } from '../../gridEngine.js';
@@ -44,7 +45,7 @@ import { fmt } from '../../narrativeFmt.js';
  */
 export function handlePaladinRangerBardFeature(ctx: ActionContext, fid: string): boolean {
   if (fid === 'bardic_inspiration') {
-    if (ctx.char.character_class.toLowerCase() !== 'bard') {
+    if (!hasClass(ctx.char, 'bard')) {
       ctx.narrative = 'Only Bards have Bardic Inspiration.';
       return true;
     }
@@ -69,14 +70,10 @@ export function handlePaladinRangerBardFeature(ctx: ActionContext, fid: string):
       bardic_inspiration: biUses - 1,
     };
     ctx.char.turn_actions = { ...ctx.char.turn_actions, bonus_action_used: true };
+    // Bardic Inspiration die scales with Bard level.
+    const bardLvl = getClassLevel(ctx.char, 'bard');
     const inspDie =
-      ctx.char.level >= 15
-        ? 'd12'
-        : ctx.char.level >= 10
-          ? 'd10'
-          : ctx.char.level >= 5
-            ? 'd8'
-            : 'd6';
+      bardLvl >= 15 ? 'd12' : bardLvl >= 10 ? 'd10' : bardLvl >= 5 ? 'd8' : 'd6';
     ctx.st = {
       ...ctx.st,
       characters: ctx.st.characters.map((c) =>
@@ -133,14 +130,11 @@ export function handlePaladinRangerBardFeature(ctx: ActionContext, fid: string):
   }
 
   if (fid === 'command_companion') {
-    if (
-      ctx.char.subclass !== 'beastmaster' ||
-      ctx.char.character_class.toLowerCase() !== 'ranger'
-    ) {
+    if (ctx.char.subclass !== 'beastmaster' || !hasClass(ctx.char, 'ranger')) {
       ctx.narrative = 'Only Beastmaster Rangers can command an animal companion.';
       return true;
     }
-    if (ctx.char.level < 3) {
+    if (getClassLevel(ctx.char, 'ranger') < 3) {
       ctx.narrative = 'Animal Companion unlocks at Ranger level 3.';
       return true;
     }
@@ -329,8 +323,10 @@ export function handlePaladinRangerBardFeature(ctx: ActionContext, fid: string):
       bardic_inspiration: biLeft - 1,
     };
     ctx.char.turn_actions = { ...ctx.char.turn_actions, reaction_used: true };
+    // Cutting Words die scales with Bard level (Bardic Inspiration die).
+    const cwBardLvl = getClassLevel(ctx.char, 'bard');
     const cuttingDie =
-      ctx.char.level >= 15 ? 12 : ctx.char.level >= 10 ? 10 : ctx.char.level >= 5 ? 8 : 6;
+      cwBardLvl >= 15 ? 12 : cwBardLvl >= 10 ? 10 : cwBardLvl >= 5 ? 8 : 6;
     const cuttingRoll = rollDice(`1d${cuttingDie}`);
     ctx.narrative = `${ctx.char.name} — Cutting Words! Subtract ${cuttingRoll} from ${ctx.enemy!.name}'s next attack roll or ability check this round. (${biLeft - 1} Bardic Inspiration remaining)`;
     ctx.st = { ...ctx.st, cutting_words_penalty: cuttingRoll };

@@ -7,6 +7,7 @@ import {
   pushEvent,
   splitEncounterXp,
 } from '../../gameEngine.js';
+import { getClassLevel, hasClass } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import { composeNow } from '../../narrative/compose.js';
 
@@ -28,12 +29,13 @@ import { composeNow } from '../../narrative/compose.js';
  */
 export function handleMonkFeature(ctx: ActionContext, fid: string): boolean {
   if (fid === 'flurry_of_blows') {
-    const cls = ctx.char.character_class.toLowerCase();
-    if (cls !== 'monk') {
+    if (!hasClass(ctx.char, 'monk')) {
       ctx.narrative = 'Only Monks have Flurry of Blows.';
       return true;
     }
-    if (ctx.char.level < 2) {
+    // Monk level gates feature unlock + ki pool + martial die size.
+    const monkLvl = getClassLevel(ctx.char, 'monk');
+    if (monkLvl < 2) {
       ctx.narrative = 'Flurry of Blows requires Monk level 2.';
       return true;
     }
@@ -45,7 +47,7 @@ export function handleMonkFeature(ctx: ActionContext, fid: string): boolean {
       ctx.narrative = 'You must use your Attack action before using Flurry of Blows.';
       return true;
     }
-    const kiPool = ctx.char.class_resource_uses?.ki_points ?? ctx.char.level;
+    const kiPool = ctx.char.class_resource_uses?.ki_points ?? monkLvl;
     if (kiPool <= 0) {
       ctx.narrative = 'No ki points remaining (recover on short rest).';
       return true;
@@ -55,8 +57,7 @@ export function handleMonkFeature(ctx: ActionContext, fid: string): boolean {
       ki_points: kiPool - 1,
     };
     ctx.char.turn_actions = { ...ctx.char.turn_actions, bonus_action_used: true };
-    const martialDie =
-      ctx.char.level >= 17 ? 12 : ctx.char.level >= 11 ? 10 : ctx.char.level >= 5 ? 8 : 6;
+    const martialDie = monkLvl >= 17 ? 12 : monkLvl >= 11 ? 10 : monkLvl >= 5 ? 8 : 6;
     const isOpenHand = ctx.char.subclass === 'open_hand';
     const monkDc = 8 + profBonus(ctx.char.level) + abilityMod(ctx.char.wis);
     let flurryNarrative = `${ctx.char.name} — Flurry of Blows (${kiPool - 1} ki remaining)!`;
@@ -140,12 +141,12 @@ export function handleMonkFeature(ctx: ActionContext, fid: string): boolean {
   }
 
   if (fid === 'patient_defense_free' || fid === 'patient_defense_dp') {
-    const cls = ctx.char.character_class.toLowerCase();
-    if (cls !== 'monk') {
+    if (!hasClass(ctx.char, 'monk')) {
       ctx.narrative = 'Only Monks have Patient Defense.';
       return true;
     }
-    if (ctx.char.level < 2) {
+    const monkLvl2 = getClassLevel(ctx.char, 'monk');
+    if (monkLvl2 < 2) {
       ctx.narrative = 'Patient Defense requires Monk level 2.';
       return true;
     }
@@ -158,7 +159,7 @@ export function handleMonkFeature(ctx: ActionContext, fid: string): boolean {
       ctx.narrative = "You've already used your free monk bonus action this turn.";
       return true;
     }
-    const kiPoolPD = ctx.char.class_resource_uses?.ki_points ?? ctx.char.level;
+    const kiPoolPD = ctx.char.class_resource_uses?.ki_points ?? monkLvl2;
     if (!isFree && kiPoolPD <= 0) {
       ctx.narrative = 'No Discipline Points remaining (recover on short rest).';
       return true;
@@ -182,12 +183,11 @@ export function handleMonkFeature(ctx: ActionContext, fid: string): boolean {
   }
 
   if (fid === 'step_of_wind_free_dash' || fid === 'step_of_wind_free_disengage') {
-    const cls = ctx.char.character_class.toLowerCase();
-    if (cls !== 'monk') {
+    if (!hasClass(ctx.char, 'monk')) {
       ctx.narrative = 'Only Monks have Step of the Wind.';
       return true;
     }
-    if (ctx.char.level < 2) {
+    if (getClassLevel(ctx.char, 'monk') < 2) {
       ctx.narrative = 'Step of the Wind requires Monk level 2.';
       return true;
     }
@@ -222,12 +222,12 @@ export function handleMonkFeature(ctx: ActionContext, fid: string): boolean {
   }
 
   if (fid === 'step_of_wind_dash' || fid === 'step_of_wind_disengage') {
-    const cls = ctx.char.character_class.toLowerCase();
-    if (cls !== 'monk') {
+    if (!hasClass(ctx.char, 'monk')) {
       ctx.narrative = 'Only Monks have Step of the Wind.';
       return true;
     }
-    if (ctx.char.level < 2) {
+    const monkLvl3 = getClassLevel(ctx.char, 'monk');
+    if (monkLvl3 < 2) {
       ctx.narrative = 'Step of the Wind requires Monk level 2.';
       return true;
     }
@@ -235,7 +235,7 @@ export function handleMonkFeature(ctx: ActionContext, fid: string): boolean {
       ctx.narrative = 'Bonus action already used this turn.';
       return true;
     }
-    const kiPool2 = ctx.char.class_resource_uses?.ki_points ?? ctx.char.level;
+    const kiPool2 = ctx.char.class_resource_uses?.ki_points ?? monkLvl3;
     if (kiPool2 <= 0) {
       ctx.narrative = 'No Discipline Points remaining (recover on short rest).';
       return true;
@@ -265,12 +265,12 @@ export function handleMonkFeature(ctx: ActionContext, fid: string): boolean {
   }
 
   if (fid === 'stunning_strike') {
-    const cls = ctx.char.character_class.toLowerCase();
-    if (cls !== 'monk') {
+    if (!hasClass(ctx.char, 'monk')) {
       ctx.narrative = 'Only Monks have Stunning Strike.';
       return true;
     }
-    if (ctx.char.level < 5) {
+    const monkLvl4 = getClassLevel(ctx.char, 'monk');
+    if (monkLvl4 < 5) {
       ctx.narrative = 'Stunning Strike requires Monk level 5.';
       return true;
     }
@@ -282,7 +282,7 @@ export function handleMonkFeature(ctx: ActionContext, fid: string): boolean {
       ctx.narrative = 'Stunning Strike already used this turn.';
       return true;
     }
-    const kiPool3 = ctx.char.class_resource_uses?.ki_points ?? ctx.char.level;
+    const kiPool3 = ctx.char.class_resource_uses?.ki_points ?? monkLvl4;
     if (kiPool3 <= 0) {
       ctx.narrative = 'No Discipline Points remaining (recover on short rest).';
       return true;
@@ -334,15 +334,16 @@ export function handleMonkFeature(ctx: ActionContext, fid: string): boolean {
   }
 
   if (fid === 'shadow_arts') {
-    if (ctx.char.subclass !== 'shadow' || ctx.char.character_class.toLowerCase() !== 'monk') {
+    if (ctx.char.subclass !== 'shadow' || !hasClass(ctx.char, 'monk')) {
       ctx.narrative = 'Only Way of Shadow Monks have Shadow Arts.';
       return true;
     }
-    if (ctx.char.level < 3) {
+    const monkLvl5 = getClassLevel(ctx.char, 'monk');
+    if (monkLvl5 < 3) {
       ctx.narrative = 'Shadow Arts requires Monk level 3.';
       return true;
     }
-    const kiSa = ctx.char.class_resource_uses?.ki_points ?? ctx.char.level;
+    const kiSa = ctx.char.class_resource_uses?.ki_points ?? monkLvl5;
     if (kiSa < 2) {
       ctx.narrative = 'Need 2 ki points for Shadow Arts.';
       return true;

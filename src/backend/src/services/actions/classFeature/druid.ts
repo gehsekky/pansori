@@ -1,3 +1,4 @@
+import { getClassLevel, hasClass } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import { BEAST_FORMS } from '../../../contexts/srd/index.js';
 import { rollDice } from '../../rulesEngine.js';
@@ -17,8 +18,7 @@ import { rollDice } from '../../rulesEngine.js';
  */
 export function handleDruidFeature(ctx: ActionContext, fid: string): boolean {
   if (fid === 'wild_shape' || fid.startsWith('wild_shape_')) {
-    const cls = ctx.char.character_class.toLowerCase();
-    if (cls !== 'druid') {
+    if (!hasClass(ctx.char, 'druid')) {
       ctx.narrative = 'Only Druids have Wild Shape.';
       return true;
     }
@@ -38,18 +38,20 @@ export function handleDruidFeature(ctx: ActionContext, fid: string): boolean {
       ctx.narrative = `Unknown beast form: ${formId}.`;
       return true;
     }
+    // CR access + temp HP scale with Druid level (not total level).
+    const druidLvl = getClassLevel(ctx.char, 'druid');
     const maxCR = isMoon
-      ? Math.max(1, Math.floor(ctx.char.level / 3))
-      : ctx.char.level >= 8
+      ? Math.max(1, Math.floor(druidLvl / 3))
+      : druidLvl >= 8
         ? 1
-        : ctx.char.level >= 4
+        : druidLvl >= 4
           ? 0.5
           : 0.25;
     if (form.cr > maxCR) {
       ctx.narrative = `${form.name} requires a higher-CR form access (you can access CR ≤ ${maxCR}).`;
       return true;
     }
-    const tempHp = (isMoon ? 3 : 2) * ctx.char.level;
+    const tempHp = (isMoon ? 3 : 2) * druidLvl;
     ctx.char.class_resource_uses = {
       ...(ctx.char.class_resource_uses ?? {}),
       wild_shape: wsUses - 1,
@@ -89,7 +91,7 @@ export function handleDruidFeature(ctx: ActionContext, fid: string): boolean {
   }
 
   if (fid === 'moon_healing') {
-    if (ctx.char.subclass !== 'moon' || ctx.char.character_class.toLowerCase() !== 'druid') {
+    if (ctx.char.subclass !== 'moon' || !hasClass(ctx.char, 'druid')) {
       ctx.narrative = 'Only Circle of the Moon Druids have Moon Healing.';
       return true;
     }

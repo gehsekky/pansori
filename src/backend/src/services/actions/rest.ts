@@ -1,5 +1,6 @@
 import { abilityMod, rageUsesMax, rollDice, spellSlotsForClassLevel } from '../rulesEngine.js';
 import { canRestInRoom, pick } from '../gameEngine.js';
+import { getClassLevel, hasClass } from '../multiclass.js';
 import type { ActionHandler } from './types.js';
 import { resetFeatLongRestResources } from '../feats.js';
 
@@ -48,21 +49,28 @@ export const handleShortRest: ActionHandler<{ type: 'short_rest' }> = (ctx) => {
     short_rested_rooms: [...(ctx.st.short_rested_rooms ?? []), ctx.roomId],
   };
 
+  // Short-rest resource refreshes. Multiclass: a Fighter / Cleric
+  // short rest refreshes BOTH classes' short-rest pools — so use
+  // `hasClass` (any class match), and use per-class levels for level-
+  // gated refreshes (Channel Divinity at cleric L6, Bardic Inspiration
+  // at bard L5).
   const srUses = { ...(next.class_resource_uses ?? {}) };
-  const cls = next.character_class.toLowerCase();
   if (next.species === 'dragonborn') delete srUses.breath_weapon_used;
   if (next.species === 'goliath') delete srUses.large_form_used;
   if (next.species === 'orc') delete srUses.adrenaline_rush_used;
-  if (cls === 'fighter') {
+  if (hasClass(next, 'fighter')) {
     delete srUses.second_wind;
     delete srUses.action_surge;
   }
-  if (cls === 'bard' && next.level >= 5) delete srUses.bardic_inspiration;
-  if (cls === 'monk') delete srUses.ki_points;
-  if (cls === 'druid') srUses.wild_shape = 2;
+  if (hasClass(next, 'bard') && getClassLevel(next, 'bard') >= 5) {
+    delete srUses.bardic_inspiration;
+  }
+  if (hasClass(next, 'monk')) delete srUses.ki_points;
+  if (hasClass(next, 'druid')) srUses.wild_shape = 2;
   let naturalRecoveryNarr = '';
-  if (cls === 'druid' && next.subclass === 'land' && !(srUses.natural_recovery_used ?? 0)) {
-    let budget = Math.ceil(next.level / 2);
+  if (hasClass(next, 'druid') && next.subclass === 'land' && !(srUses.natural_recovery_used ?? 0)) {
+    // Natural Recovery budget = ⌈Druid level / 2⌉ (Land Druid feature).
+    let budget = Math.ceil(getClassLevel(next, 'druid') / 2);
     const slotsMax = next.spell_slots_max ?? {};
     const slotsUsedSr = { ...(next.spell_slots_used ?? {}) };
     const recovered: number[] = [];
@@ -81,11 +89,19 @@ export const handleShortRest: ActionHandler<{ type: 'short_rest' }> = (ctx) => {
       naturalRecoveryNarr = ` 🌿 Natural Recovery — restored ${recovered.length} slot(s) [${recovered.join(', ')}].`;
     }
   }
-  if (cls === 'cleric' || cls === 'paladin') srUses.channel_divinity = next.level >= 6 ? 2 : 1;
+  if (hasClass(next, 'cleric') || hasClass(next, 'paladin')) {
+    // Channel Divinity scales with cleric/paladin level (use the higher
+    // of the two for multi-class).
+    const cdLvl = Math.max(getClassLevel(next, 'cleric'), getClassLevel(next, 'paladin'));
+    srUses.channel_divinity = cdLvl >= 6 ? 2 : 1;
+  }
   if (next.subclass === 'battle_master') delete srUses.superiority_dice;
   delete srUses.colossus_slayer_used;
-  if (cls === 'warlock') {
-    next.spell_slots_max = spellSlotsForClassLevel('warlock', next.level);
+  if (hasClass(next, 'warlock')) {
+    // Warlock pact slots refresh on short rest. Multi-class warlock
+    // separation isn't modeled yet (see services/multiclass.ts notes)
+    // — uses warlock level for pact lookup.
+    next.spell_slots_max = spellSlotsForClassLevel('warlock', getClassLevel(next, 'warlock'));
     next.spell_slots_used = {};
     delete srUses.fey_presence_used;
   }
