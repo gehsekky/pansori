@@ -556,17 +556,29 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
       - Sea Druid Aquatic Affinity (subclass-select): grants
         `swim_speed_ft = speed`.
 
+      **Terrain-mode model shipped 2026-05-22.** New optional
+      `climbTerrain` + `swimTerrain` `GridPos[]` fields on `Room`
+      (sibling to `difficultTerrain`). `gridMove` computes the
+      per-cell cost: 5 ft base, +5 ft if difficult OR (climbable
+      without climb speed) OR (swimmable without swim speed) —
+      capped per cell per RAW "multiple sources don't stack".
+      Flying still bypasses everything. Budget-exceeded narrative
+      surfaces which terrain modes contributed. Authoring content
+      (room pool / campaigns) can now flag climb / swim cells; the
+      Sea Druid's `swim_speed_ft` and the Athlete feat's
+      `climb_speed_ft` finally have real gameplay impact.
+
       **Remaining for full closure:**
-      - Climb / swim terrain-mode model — cells flagged as climbable
-        or swimmable that consume movement at half cost vs full when
-        the matching speed exists. Without this, climb / swim grants
-        are data-only.
       - Fly spell + Levitate spell — add to SRD catalog so any caster
         can grant flight to a willing creature. Concentration tracking
         clears `fly_speed_ft` on drop.
       - Jumping (long / high) — needs height + horizontal distance
-        tracking on the grid, deferred until terrain mode lands.
+        tracking on the grid; deferred. Different shape from climb/
+        swim terrain (a single jump action vs. per-cell cost).
       - Burrowing — monster-only RAW; not on the critical path.
+      - Climb / swim authored content — no current room actually
+        flags these cells; the engine is ready for content as soon
+        as a campaign needs it.
 
 ### Subclass coverage (2026-05-22 — all 48 RAW selectable)
 
@@ -719,8 +731,16 @@ the prerequisite infrastructure lands.
 
 ### Architectural blockers
 
-- [ ] **Climbing & Crawling movement cost** — needs a "movement mode" concept. Skip until verticality.
-- [ ] **Jumping** — Long jump = STR ft, high jump = 3 + STR mod ft. Same verticality blocker.
+- [x] **Climbing movement cost** — shipped 2026-05-22 via the
+      terrain-mode model. Cells flagged `climbTerrain` cost 2× per
+      cell without a climb speed, 1× with `climb_speed_ft > 0`.
+      Crawling cost (half-speed prone movement) is separate and
+      not modeled — RAW says prone halves movement, which the
+      engine could surface as a movement_used multiplier on the
+      whole turn when the prone condition is set. Defer.
+- [ ] **Jumping** — Long jump = STR ft, high jump = 3 + STR mod ft.
+      Different shape from per-cell terrain cost (one-shot horizontal
+      or vertical action). Defer.
 
 ---
 

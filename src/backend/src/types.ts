@@ -62,6 +62,16 @@ export interface Room {
   trap?: Trap; // static trap defined in context; can be overridden per-room
   objects?: RoomObject[];
   difficultTerrain?: GridPos[]; // squares costing 2× movement to enter
+  // 2024 PHB terrain modes — squares that require a matching movement
+  // mode to traverse at full speed:
+  //   `climbTerrain` (walls / cliffs / ladders): costs 2× movement to
+  //     enter without a climb speed; full cost with `climb_speed_ft > 0`.
+  //   `swimTerrain` (water / submerged): same shape with `swim_speed_ft`.
+  // RAW says these costs don't stack with difficult terrain — a cell
+  // counted as both still only costs 2×. gridMove implements the
+  // max-not-stack rule.
+  climbTerrain?: GridPos[];
+  swimTerrain?: GridPos[];
   coverPositions?: GridPos[]; // squares granting half cover (+2 AC) to occupant
   // Static obstacles (columns, walls, debris) — fully block movement and
   // count as cover for ranged attacks behind them. Seeded by procgen for
