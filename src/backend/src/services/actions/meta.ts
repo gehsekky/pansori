@@ -1,8 +1,8 @@
 import { applyFeatTake, canTakeFeat, getFeat } from '../feats.js';
-import { getClassLevel, hasClass } from '../multiclass.js';
+import { applyLevelUpForClass, preparedSpellsCap } from '../gameEngine.js';
+import { canMulticlassInto, getClassLevel, hasClass } from '../multiclass.js';
 import type { AbilityKey } from '../../types.js';
 import type { ActionHandler } from './types.js';
-import { preparedSpellsCap } from '../gameEngine.js';
 
 /**
  * `apply_asi`: spend a pending Ability Score Improvement (granted by
@@ -170,4 +170,56 @@ export const handleTakeFeat: ActionHandler<{
   const consumeAsi = ctx.char.asi_pending && feat.category === 'general';
   ctx.char = consumeAsi ? { ...newChar, asi_pending: false } : newChar;
   ctx.narrative = narrative;
+};
+
+/**
+ * `level_up_class`: manually advance one level, choosing the class
+ * to add the level to (2024 PHB multiclassing). Validates:
+ *
+ *   - XP threshold met for `char.level + 1`.
+ *   - Out of combat (RAW: level-ups happen during downtime).
+ *   - Total level not yet at the cap (20).
+ *   - 2024 PHB multiclass prerequisites for any class other than
+ *     `char.character_class` (the primary, taken at creation).
+ *
+ * On success delegates to `applyLevelUpForClass` which does the
+ * mutation (HP gain, slot recompute, ASI gating on per-class level,
+ * multiclass proficiency grants on first level in a non-primary
+ * class). Out-of-combat only — does not consume an action.
+ */
+export const handleLevelUpClass: ActionHandler<{ type: 'level_up_class'; className: string }> = (
+  ctx,
+  action
+) => {
+  if (ctx.st.combat_active) {
+    return { rejected: 'You cannot level up during combat.' };
+  }
+  if ((ctx.char.level ?? 1) >= 20) {
+    return { rejected: `${ctx.char.name} is already at the level cap (20).` };
+  }
+  // XP threshold: level N → N+1 needs N × 100 XP (same gate as
+  // applyLevelUpFromXp).
+  if ((ctx.char.xp ?? 0) < (ctx.char.level ?? 1) * 100) {
+    const need = (ctx.char.level ?? 1) * 100 - (ctx.char.xp ?? 0);
+    return { rejected: `${ctx.char.name} needs ${need} more XP to level up.` };
+  }
+  const cls = action.className.toLowerCase();
+  // Multiclass prereq check only applies on **entry** to a new class
+  // (RAW: subsequent levels in an already-taken class don't re-check
+  // the ability minimum). canMulticlassInto returns empty for the
+  // primary class so this also covers the single-class continuation.
+  if (getClassLevel(ctx.char, cls) === 0) {
+    const prereqError = canMulticlassInto(ctx.char, cls);
+    if (prereqError) {
+      return { rejected: prereqError };
+    }
+  }
+  // Mutate a working copy so the level-up narrative composes the same
+  // way as the auto-level path.
+  const next = { ...ctx.char };
+  const narrative = applyLevelUpForClass(next, cls, ctx.context);
+  ctx.char = next;
+  ctx.narrative = narrative.trim();
+  // Mirror applyPartyLevelUps' implicit "uses initiative? no" stance
+  // — out-of-combat level-up never advances turn order.
 };

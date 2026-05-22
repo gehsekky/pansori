@@ -127,15 +127,41 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
     sites are intentional primary-class semantics (subclass-picker
     for primary class, `normalizeState` legacy-save backfill, char
     creation init).
-  - **Saving-throw profs from first class only.** Already the
-    intended semantics (`character_class` IS the first class). Adding
-    a multiclass level grants only the narrow proficiency set per
-    RAW; needs a one-shot grant table on the level-up flow.
-  - **ASI gating.** ASI is per-class at levels 4/8/12/16/19 — needs
-    bookkeeping on which class-levels have had their ASI applied.
-  - **Level-up UX.** FE chooser when adding a level: "Continue in
-    Fighter, or take a level in another class?" Server-side
-    `level_up_class` action accepting a `className` parameter.
+  - [~] **Saving-throw profs from first class only** (Phase 5 —
+    partial 2026-05-22). Saving-throw proficiencies are character-
+    creation-time and tied to `character_class` (the primary), so
+    the "first-class only" rule is already correct semantics. **What
+    shipped:** armor + weapon proficiency grants on multiclass entry
+    via `applyMulticlassProfGrants` — 2024 PHB narrow-subset table
+    in `services/multiclass.ts` (e.g. Cleric grants light/medium
+    armor + shield; Wizard / Sorcerer grant nothing). Called from
+    `applyLevelUpForClass` on the FIRST level in a non-primary class.
+    **Remaining:** skill + tool + instrument grants that require a
+    player chooser (Bard, Ranger, Rogue each grant one Skill; Bard
+    grants one Musical Instrument). Lands with the level-up UX PR.
+  - [x] **ASI gating** (Phase 6 — shipped 2026-05-22). `asi_pending`
+    now flags on a per-class milestone (`class_levels[X]` lands on
+    4, 8, 12, 16, or 19) instead of the total character level. For
+    pure single-class PCs nothing changes (class level == total
+    level). Multi-class PCs no longer get a spurious ASI on the
+    SECOND level (Fighter 3 / Wizard 1 → total 4 doesn't fire ASI;
+    Fighter 4 / Wizard 0 → fighter level 4 does fire).
+  - [~] **Level-up UX** (Phase 7 — backend shipped 2026-05-22; FE
+    chooser deferred). New `level_up_class` action takes a
+    `className` param. Validates: out-of-combat, level cap (20), XP
+    threshold, multiclass prereq on class **entry** (skipped for
+    continuation in an already-taken class). Delegates to the new
+    exported `applyLevelUpForClass(char, className, context)` helper
+    that bumps `char.level` + `class_levels[className]` in lockstep,
+    applies HP / spell slot recompute / per-class ASI / multiclass
+    prof grants. Auto-level-up from XP (kill events) still defaults
+    to the primary class, so single-class behavior is unchanged.
+    13 direct tests covering XP gating, combat-block, level cap,
+    primary-class permissiveness, prereq enforcement, ASI per-class
+    boundary, prof grant timing, spell-slot recompute on multiclass.
+    **Remaining:** FE choice surfacing — currently the player can
+    only invoke `level_up_class` programmatically (no choice button
+    on the FE when XP threshold is met).
 - [x] **Backgrounds with behavioral effects** (shipped 2026-05-21).
       `Background` type extended in `shared/types.ts` with 2024 PHB
       fields: `originFeat`, `abilityScoreIncreases`, `startingEquipment`,

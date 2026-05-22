@@ -22,6 +22,76 @@
 import { spellSlotsForCasterLevel, spellSlotsForClassLevel } from './rulesEngine.js';
 import type { Character } from '../types.js';
 
+// ─── Multiclass proficiency grants (2024 PHB Ch. 1) ────────────────────────
+
+/**
+ * Armor + weapon proficiencies granted on multiclass entry (the FIRST
+ * level taken in a non-primary class). RAW 2024 PHB grants a narrow
+ * subset — not the full class loadout. Skill / tool / instrument
+ * choices are listed for some classes (Bard, Ranger, Rogue) and need
+ * a player chooser; deferred to the level-up UX PR.
+ *
+ * Source classes that grant *no* multiclass props (Sorcerer, Wizard)
+ * are absent from the table; `applyMulticlassProfGrants` is a no-op
+ * for them.
+ */
+type ProfGrant = {
+  armor?: string[]; // 'light' | 'medium' | 'shield'
+  weapon?: string[]; // 'simple' | 'martial' | 'martial-light'
+};
+
+const MULTICLASS_PROF_GRANTS: Record<string, ProfGrant> = {
+  barbarian: { armor: ['shield'], weapon: ['simple', 'martial'] },
+  bard: { armor: ['light'] },
+  cleric: { armor: ['light', 'medium', 'shield'] },
+  druid: { armor: ['light', 'medium', 'shield'] },
+  fighter: { armor: ['light', 'medium', 'shield'], weapon: ['simple', 'martial'] },
+  // Monk multiclass entry grants simple weapons + martial weapons that
+  // have the Light property. The Light-only restriction isn't currently
+  // modeled by the weapon-proficiency strings; treating it as 'simple'
+  // only is more conservative than RAW (slightly under-grants).
+  monk: { weapon: ['simple'] },
+  paladin: { armor: ['light', 'medium', 'shield'], weapon: ['simple', 'martial'] },
+  ranger: { armor: ['light', 'medium', 'shield'], weapon: ['simple', 'martial'] },
+  rogue: { armor: ['light'] },
+  warlock: { armor: ['light'], weapon: ['simple'] },
+};
+
+/**
+ * Apply the 2024 PHB multiclass proficiency grants to `char` for
+ * a first level in `className`. Mutates `char` in place (adds
+ * proficiencies that aren't already present). Returns a human-
+ * readable note for the level-up narrative, or empty if nothing
+ * was granted.
+ */
+export function applyMulticlassProfGrants(char: Character, className: string): string {
+  const grant = MULTICLASS_PROF_GRANTS[className.toLowerCase()];
+  if (!grant) return '';
+  const added: string[] = [];
+  if (grant.armor) {
+    const existing = new Set(char.armor_proficiencies ?? []);
+    for (const a of grant.armor) {
+      if (!existing.has(a)) {
+        existing.add(a);
+        added.push(`${a} armor`);
+      }
+    }
+    char.armor_proficiencies = [...existing];
+  }
+  if (grant.weapon) {
+    const existing = new Set(char.weapon_proficiencies ?? []);
+    for (const w of grant.weapon) {
+      if (!existing.has(w)) {
+        existing.add(w);
+        added.push(`${w} weapons`);
+      }
+    }
+    char.weapon_proficiencies = [...existing];
+  }
+  if (added.length === 0) return '';
+  return ` Multiclass proficiency: ${added.join(', ')}.`;
+}
+
 // ─── Multiclass prerequisites (2024 PHB Ch. 1) ─────────────────────────────
 
 /**
