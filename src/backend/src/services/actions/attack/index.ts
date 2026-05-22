@@ -288,8 +288,12 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
     // Sneak Attack (SRD 5.2.1 — Rogue): once per turn, on a hit, with
     // either advantage on the attack OR an ally within 5 ft of the target
     // (and you don't have disadvantage). Weapon must be Finesse or Ranged.
+    // Multiclass: gate on `hasClass(char, 'rogue')` so a Fighter 5 /
+    // Rogue 2 actually gets Sneak Attack (the `features` array reads
+    // only the PC's PRIMARY class). Dice scale below uses
+    // `getClassLevel(char, 'rogue')` for the same reason.
     let sneakDmg = 0;
-    if (features.includes('sneak_attack')) {
+    if (hasClass(ctx.char, 'rogue')) {
       const isFinesseOrRanged = (weaponItem?.finesse ?? false) || weaponItem?.range === 'ranged';
       let allyAdjacent = false;
       if (ctx.st.entities) {
@@ -310,7 +314,7 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
       const hasAdv = advantage && !disadvantage;
       const triggers = (hasAdv || allyAdjacent) && !disadvantage;
       if (isFinesseOrRanged && triggers) {
-        const saExpr = sneakAttackDice(ctx.char.level);
+        const saExpr = sneakAttackDice(getClassLevel(ctx.char, 'rogue'));
         sneakDmg = isCrit ? rollCritical(saExpr) : rollDice(saExpr);
         // 2024 PHB Cunning Strike: if the player pre-committed an effect,
         // subtract one die from the SA roll (average 3.5 on 1d6).
@@ -385,7 +389,7 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
       hitBonuses.push({ label: `Sacred Weapon: +${sacredWeaponBonus} to hit` });
     }
     if (sneakDmg > 0) {
-      const saExpr = sneakAttackDice(ctx.char.level);
+      const saExpr = sneakAttackDice(getClassLevel(ctx.char, 'rogue'));
       const saLabel = isCrit ? `${parseInt(saExpr) * 2}d6 (crit)` : saExpr;
       hitBonuses.push({ label: `Sneak Attack ${saLabel}: +${sneakDmg}` });
     }
