@@ -1,7 +1,6 @@
 import {
   abilityMod,
   applyDamageMultiplier,
-  extraAttackCount,
   profBonus,
   rageDamageBonus,
   resolvePlayerAttack,
@@ -19,7 +18,7 @@ import {
   pick,
   splitEncounterXp,
 } from '../../gameEngine.js';
-import { getClassLevel, hasClass } from '../../multiclass.js';
+import { extraAttackCountForChar, getClassLevel, hasClass } from '../../multiclass.js';
 import type { ActionHandler } from '../types.js';
 import { composeNow } from '../../narrative/compose.js';
 import { computeToHitContext } from './toHit.js';
@@ -705,13 +704,15 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
   // ── First attack ─────────────────────────────────────────────────────
   const killed = resolveOneAttack('');
   if (!killed) {
-    // ── Extra Attack (Fighter/Warrior level 5+) ───────────────────────
+    // ── Extra Attack (Fighter L5+, Ranger/Paladin/Barbarian/Monk L5) ───
     // SRD 5.2.1 p.90 "Loading": a Loading weapon fires only once per
     // Action/Bonus/Reaction regardless of Extra Attack.
-    const extraCount =
-      features.includes('extra_attack') && !weaponItem?.loading
-        ? extraAttackCount(ctx.char.character_class, ctx.char.level)
-        : 0;
+    // Multiclass: `extraAttackCountForChar` walks all class levels
+    // and takes the max. RAW: Extra Attack from multiple classes
+    // doesn't add together — a Fighter 5 / Ranger 5 gets 1 extra
+    // (not 2). The Fighter L11/20 cap only applies when the PC
+    // actually has 11+ fighter levels.
+    const extraCount = weaponItem?.loading ? 0 : extraAttackCountForChar(ctx.char);
     for (let ei = 0; ei < extraCount; ei++) {
       if ((ctx.st.entities?.find((e) => e.id === targetId && e.isEnemy)?.hp ?? 0) <= 0) break;
       const killedExtra = resolveOneAttack(`Attack ${ei + 2} — `);

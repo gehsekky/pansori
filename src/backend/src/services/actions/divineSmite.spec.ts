@@ -134,8 +134,11 @@ describe('Divine Smite — next weapon hit consumes the dice', () => {
 
   it('does not consume dice on a miss (mock low roll)', async () => {
     mockRandom(0); // d20 → 1 → miss (fumble)
+    // Use L4 Paladin to avoid Extra Attack (L5+) — a second attack
+    // would roll an unmocked d20 and might hit, consuming the dice
+    // and breaking the assertion. L4 has a single attack action.
     const state = buildPaladin({
-      level: 5,
+      level: 4,
       slots: { 1: 2 },
       smiteDice: 2,
     });
