@@ -1,4 +1,5 @@
 import { abilityMod, profBonus, rollDice } from '../../rulesEngine.js';
+import { getClassLevel, hasClass } from '../../multiclass.js';
 import { getEnemyById, pushEvent } from '../../gameEngine.js';
 import type { ActionContext } from '../types.js';
 import { distanceFeet } from '../../gridEngine.js';
@@ -29,12 +30,12 @@ import { distanceFeet } from '../../gridEngine.js';
  */
 export function handleCasterFeature(ctx: ActionContext, fid: string): boolean {
   if (fid === 'metamagic_twinned') {
-    const cls = ctx.char.character_class.toLowerCase();
-    if (cls !== 'sorcerer') {
+    if (!hasClass(ctx.char, 'sorcerer')) {
       ctx.narrative = 'Only Sorcerers have Metamagic.';
       return true;
     }
-    const spPool = ctx.char.class_resource_uses?.sorcery_points ?? ctx.char.level;
+    // Sorcery points scale with Sorcerer level.
+    const spPool = ctx.char.class_resource_uses?.sorcery_points ?? getClassLevel(ctx.char, 'sorcerer');
     if (spPool < 1) {
       ctx.narrative = 'Not enough sorcery points (need 1).';
       return true;
@@ -49,8 +50,7 @@ export function handleCasterFeature(ctx: ActionContext, fid: string): boolean {
   }
 
   if (fid === 'metamagic_quickened') {
-    const cls = ctx.char.character_class.toLowerCase();
-    if (cls !== 'sorcerer') {
+    if (!hasClass(ctx.char, 'sorcerer')) {
       ctx.narrative = 'Only Sorcerers have Metamagic.';
       return true;
     }
@@ -65,7 +65,7 @@ export function handleCasterFeature(ctx: ActionContext, fid: string): boolean {
         'You have already cast a level 1+ spell this turn — Quickened Spell cannot be used.';
       return true;
     }
-    const spPool2 = ctx.char.class_resource_uses?.sorcery_points ?? ctx.char.level;
+    const spPool2 = ctx.char.class_resource_uses?.sorcery_points ?? getClassLevel(ctx.char, 'sorcerer');
     if (spPool2 < 2) {
       ctx.narrative = 'Not enough sorcery points (need 2).';
       return true;
@@ -86,12 +86,11 @@ export function handleCasterFeature(ctx: ActionContext, fid: string): boolean {
   }
 
   if (fid === 'metamagic_empowered') {
-    const cls = ctx.char.character_class.toLowerCase();
-    if (cls !== 'sorcerer') {
+    if (!hasClass(ctx.char, 'sorcerer')) {
       ctx.narrative = 'Only Sorcerers have Metamagic.';
       return true;
     }
-    const spPool3 = ctx.char.class_resource_uses?.sorcery_points ?? ctx.char.level;
+    const spPool3 = ctx.char.class_resource_uses?.sorcery_points ?? getClassLevel(ctx.char, 'sorcerer');
     if (spPool3 < 1) {
       ctx.narrative = 'Not enough sorcery points (need 1).';
       return true;
@@ -106,8 +105,7 @@ export function handleCasterFeature(ctx: ActionContext, fid: string): boolean {
   }
 
   if (fid === 'agonizing_blast') {
-    const cls = ctx.char.character_class.toLowerCase();
-    if (cls !== 'warlock') {
+    if (!hasClass(ctx.char, 'warlock')) {
       ctx.narrative = 'Only Warlocks can take Agonizing Blast.';
       return true;
     }
@@ -122,8 +120,7 @@ export function handleCasterFeature(ctx: ActionContext, fid: string): boolean {
   }
 
   if (fid === 'devils_sight') {
-    const cls = ctx.char.character_class.toLowerCase();
-    if (cls !== 'warlock') {
+    if (!hasClass(ctx.char, 'warlock')) {
       ctx.narrative = "Only Warlocks can take Devil's Sight.";
       return true;
     }
@@ -142,14 +139,15 @@ export function handleCasterFeature(ctx: ActionContext, fid: string): boolean {
       ctx.narrative = 'Only Abjurer Wizards have Arcane Ward.';
       return true;
     }
-    const wardHp = 2 * ctx.char.level;
+    // Arcane Ward HP = 2 × Wizard level (Abjurer subclass).
+    const wardHp = 2 * getClassLevel(ctx.char, 'wizard');
     ctx.char.class_resource_uses = { ...(ctx.char.class_resource_uses ?? {}), arcane_ward: wardHp };
     ctx.narrative = `${ctx.char.name} creates an Arcane Ward with ${wardHp} HP. It absorbs damage before your HP is reduced.`;
     return true;
   }
 
   if (fid === 'fey_presence') {
-    if (ctx.char.subclass !== 'archfey' || ctx.char.character_class.toLowerCase() !== 'warlock') {
+    if (ctx.char.subclass !== 'archfey' || !hasClass(ctx.char, 'warlock')) {
       ctx.narrative = 'Only Archfey Warlocks have Fey Presence.';
       return true;
     }

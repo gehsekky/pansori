@@ -5,6 +5,7 @@ import {
   inflictCondition,
   isHeavilyEncumbered,
 } from '../../gameEngine.js';
+import { getClassLevel, hasClass } from '../../multiclass.js';
 import { passivePerceptionDC, skillCheck } from '../../rulesEngine.js';
 import type { ActionContext } from '../types.js';
 
@@ -25,11 +26,11 @@ import type { ActionContext } from '../types.js';
  */
 export function handleRogueFeature(ctx: ActionContext, fid: string): boolean {
   if (fid === 'cunning_action_dash') {
-    if (ctx.char.character_class.toLowerCase() !== 'rogue') {
+    if (!hasClass(ctx.char, 'rogue')) {
       ctx.narrative = 'Only Rogues have Cunning Action.';
       return true;
     }
-    if (ctx.char.level < 2) {
+    if (getClassLevel(ctx.char, 'rogue') < 2) {
       ctx.narrative = 'Cunning Action requires Rogue level 2.';
       return true;
     }
@@ -51,11 +52,11 @@ export function handleRogueFeature(ctx: ActionContext, fid: string): boolean {
   }
 
   if (fid === 'cunning_action_disengage') {
-    if (ctx.char.character_class.toLowerCase() !== 'rogue') {
+    if (!hasClass(ctx.char, 'rogue')) {
       ctx.narrative = 'Only Rogues have Cunning Action.';
       return true;
     }
-    if (ctx.char.level < 2) {
+    if (getClassLevel(ctx.char, 'rogue') < 2) {
       ctx.narrative = 'Cunning Action requires Rogue level 2.';
       return true;
     }
@@ -69,11 +70,11 @@ export function handleRogueFeature(ctx: ActionContext, fid: string): boolean {
   }
 
   if (fid === 'cunning_action_hide') {
-    if (ctx.char.character_class.toLowerCase() !== 'rogue') {
+    if (!hasClass(ctx.char, 'rogue')) {
       ctx.narrative = 'Only Rogues have Cunning Action.';
       return true;
     }
-    if (ctx.char.level < 2) {
+    if (getClassLevel(ctx.char, 'rogue') < 2) {
       ctx.narrative = 'Cunning Action requires Rogue level 2.';
       return true;
     }
@@ -109,11 +110,11 @@ export function handleRogueFeature(ctx: ActionContext, fid: string): boolean {
   }
 
   if (fid.startsWith('cunning_strike_')) {
-    if (ctx.char.character_class.toLowerCase() !== 'rogue') {
+    if (!hasClass(ctx.char, 'rogue')) {
       ctx.narrative = 'Only Rogues have Cunning Strike.';
       return true;
     }
-    if (ctx.char.level < 5) {
+    if (getClassLevel(ctx.char, 'rogue') < 5) {
       ctx.narrative = 'Cunning Strike requires Rogue level 5.';
       return true;
     }

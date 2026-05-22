@@ -12,6 +12,7 @@ import {
   isRoomCleared,
   splitEncounterXp,
 } from '../../gameEngine.js';
+import { getClassLevel, hasClass } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import type { InventoryItem } from '../../../types.js';
 
@@ -43,7 +44,9 @@ export function handleBarbarianFeature(ctx: ActionContext, fid: string): boolean
       ctx.narrative = 'You are already raging!';
       return true;
     }
-    const rageUses = ctx.char.class_resource_uses?.rage_uses ?? rageUsesMax(ctx.char.level);
+    // Rage uses + damage scale with BARBARIAN level (not total level).
+    const barbLvl = getClassLevel(ctx.char, 'barbarian');
+    const rageUses = ctx.char.class_resource_uses?.rage_uses ?? rageUsesMax(barbLvl);
     if (rageUses <= 0) {
       ctx.narrative = 'No rage uses remaining. They recover on a long rest.';
       return true;
@@ -54,16 +57,16 @@ export function handleBarbarianFeature(ctx: ActionContext, fid: string): boolean
       rage_uses: rageUses - 1,
     };
     ctx.char.turn_actions = { ...ctx.char.turn_actions, bonus_action_used: true };
-    ctx.narrative = `${ctx.char.name} RAGES! +${rageDamageBonus(ctx.char.level)} bonus STR melee damage, resistance to physical attacks. (${rageUses - 1} use${rageUses - 1 === 1 ? '' : 's'} remaining)`;
+    ctx.narrative = `${ctx.char.name} RAGES! +${rageDamageBonus(barbLvl)} bonus STR melee damage, resistance to physical attacks. (${rageUses - 1} use${rageUses - 1 === 1 ? '' : 's'} remaining)`;
     return true;
   }
 
   if (fid === 'reckless_attack') {
-    if (ctx.char.character_class.toLowerCase() !== 'barbarian') {
+    if (!hasClass(ctx.char, 'barbarian')) {
       ctx.narrative = 'Only Barbarians have Reckless Attack.';
       return true;
     }
-    if (ctx.char.level < 2) {
+    if (getClassLevel(ctx.char, 'barbarian') < 2) {
       ctx.narrative = 'Reckless Attack requires Barbarian level 2.';
       return true;
     }
@@ -77,10 +80,7 @@ export function handleBarbarianFeature(ctx: ActionContext, fid: string): boolean
   }
 
   if (fid === 'frenzy_attack') {
-    if (
-      ctx.char.subclass !== 'berserker' ||
-      ctx.char.character_class.toLowerCase() !== 'barbarian'
-    ) {
+    if (ctx.char.subclass !== 'berserker' || !hasClass(ctx.char, 'barbarian')) {
       ctx.narrative = 'Only Berserker Barbarians have Frenzy.';
       return true;
     }
@@ -115,7 +115,7 @@ export function handleBarbarianFeature(ctx: ActionContext, fid: string): boolean
       const dmgDice = frWeapon?.damage ?? '1d4';
       const frDmg = Math.max(
         1,
-        rollDice(dmgDice) + abilityMod(ctx.char.str) + rageDamageBonus(ctx.char.level)
+        rollDice(dmgDice) + abilityMod(ctx.char.str) + rageDamageBonus(getClassLevel(ctx.char, 'barbarian'))
       );
       const curHp = ctx.st.entities?.find((e) => e.id === frTarget.id && e.isEnemy)?.hp ?? 0;
       const newHp = Math.max(0, curHp - frDmg);

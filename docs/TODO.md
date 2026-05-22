@@ -108,11 +108,25 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
     unknown class, primary class fast-path). Level-up surfacing
     (which calls this when the player picks a non-primary class)
     lands in the Phase 6 / level-up UX PR.
-  - **Feature gating by per-class level.** Call sites that read
-    `char.character_class.toLowerCase() === 'X'` to grant a feature
-    need to flip to `hasClass(char, 'X')` + per-class-level checks
-    (so a Fighter 3 / Wizard 2 doesn't claim Wizard's L3 features).
-    ~30 call sites in classFeature/, gameEngine.ts, rulesEngine.ts.
+  - [x] **Feature gating by per-class level** (Phase 4 — shipped
+    2026-05-22). ~50 call sites across 13 files migrated from
+    `char.character_class.toLowerCase() === 'X' && char.level >= N`
+    to `hasClass(char, 'X') && getClassLevel(char, 'X') >= N`.
+    Resource pools (rage uses, ki points, sorcery points, Bardic
+    Inspiration die, Second Wind heal, Sneak Attack dice, Wild Shape
+    CR access, Druid Natural Recovery budget, Cleric Sear Undead /
+    Preserve Life scaling, Improved Divine Smite, Sorcerer Draconic
+    Resilience HP, Arcane Ward HP) now scale with the relevant
+    per-class level. Per-rest refreshes (`short_rest` handler)
+    refresh ALL of a multi-class PC's eligible pools at once.
+    Spell prep enforcement (`prepClasses.some(c => hasClass(...))`)
+    triggers if ANY class is Cleric/Paladin/Druid. Class-gated
+    eligibility helpers (`isUncannyDodgeEligible`,
+    `isHellishRebukeEligible`, Thief Fast Hands) all key off
+    `hasClass`. Three remaining `character_class.toLowerCase()`
+    sites are intentional primary-class semantics (subclass-picker
+    for primary class, `normalizeState` legacy-save backfill, char
+    creation init).
   - **Saving-throw profs from first class only.** Already the
     intended semantics (`character_class` IS the first class). Adding
     a multiclass level grants only the narrow proficiency set per

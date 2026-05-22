@@ -34,6 +34,7 @@ import {
 import type { ActionHandler } from './types.js';
 import { composeNow } from '../narrative/compose.js';
 import { fmt } from '../narrativeFmt.js';
+import { hasClass } from '../multiclass.js';
 
 // concentrationRoundsFor is a small helper used by the cast handler.
 // Inlined here (instead of exported from gameEngine) because it's only
@@ -141,13 +142,10 @@ export const handleCastSpell: ActionHandler<{
     // No slot consumed for ritual casting
   }
 
-  // Spell preparation check (Cleric, Paladin, Druid)
+  // Spell preparation check (Cleric, Paladin, Druid). Multi-class
+  // characters with ANY prep class are subject to prep enforcement.
   const prepClasses = ['cleric', 'paladin', 'druid'];
-  if (
-    prepClasses.includes(ctx.char.character_class.toLowerCase()) &&
-    spell.level > 0 &&
-    !isRitualCast
-  ) {
+  if (prepClasses.some((c) => hasClass(ctx.char, c)) && spell.level > 0 && !isRitualCast) {
     const prepared = ctx.char.prepared_spells ?? [];
     if (prepared.length > 0 && !prepared.includes(spellId)) {
       // Reachable only as a safety net — the choice generator now
@@ -230,7 +228,7 @@ export const handleCastSpell: ActionHandler<{
   if (
     spell.level > 0 &&
     !isRitualCast &&
-    ctx.char.character_class.toLowerCase() === 'sorcerer' &&
+    hasClass(ctx.char, 'sorcerer') &&
     ctx.char.subclass === 'wild_magic' &&
     d(20) === 1
   ) {
@@ -278,7 +276,7 @@ export const handleCastSpell: ActionHandler<{
     const baseHealed = rollDice(spell.heal) + healMod;
     // Life Cleric: Disciple of Life — healing spells restore extra 2 + spell level HP
     const discipleBonus =
-      ctx.char.subclass === 'life' && ctx.char.character_class.toLowerCase() === 'cleric'
+      ctx.char.subclass === 'life' && hasClass(ctx.char, 'cleric')
         ? 2 + (spell.level ?? 1)
         : 0;
     const healed = baseHealed + discipleBonus;

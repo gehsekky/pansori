@@ -1,4 +1,5 @@
 import { abilityMod, profBonus, rollDice } from '../../rulesEngine.js';
+import { getClassLevel, hasClass } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import { composeNow } from '../../narrative/compose.js';
 import { pushEvent } from '../../gameEngine.js';
@@ -25,11 +26,11 @@ export function handleFighterFeature(ctx: ActionContext, fid: string): boolean {
   const dispatchKey = [ctx.char.character_class, ctx.char.subclass, fid].filter(Boolean).join('_');
 
   if (fid === 'action_surge') {
-    if (ctx.char.character_class.toLowerCase() !== 'fighter') {
+    if (!hasClass(ctx.char, 'fighter')) {
       ctx.narrative = 'Only Fighters have Action Surge.';
       return true;
     }
-    if (ctx.char.level < 2) {
+    if (getClassLevel(ctx.char, 'fighter') < 2) {
       ctx.narrative = 'Action Surge requires Fighter level 2.';
       return true;
     }
@@ -48,11 +49,11 @@ export function handleFighterFeature(ctx: ActionContext, fid: string): boolean {
     fid === 'tactical_master_sap' ||
     fid === 'tactical_master_slow'
   ) {
-    if (ctx.char.character_class.toLowerCase() !== 'fighter') {
+    if (!hasClass(ctx.char, 'fighter')) {
       ctx.narrative = 'Only Fighters have Tactical Master.';
       return true;
     }
-    if (ctx.char.level < 9) {
+    if (getClassLevel(ctx.char, 'fighter') < 9) {
       ctx.narrative = 'Tactical Master requires Fighter level 9.';
       return true;
     }
@@ -67,11 +68,14 @@ export function handleFighterFeature(ctx: ActionContext, fid: string): boolean {
   }
 
   if (fid === 'second_wind') {
-    if (ctx.char.character_class.toLowerCase() !== 'fighter') {
+    if (!hasClass(ctx.char, 'fighter')) {
       ctx.narrative = 'Only Fighters have Second Wind.';
       return true;
     }
-    const swMax = ctx.char.level >= 10 ? 4 : ctx.char.level >= 4 ? 3 : 2;
+    // Second Wind uses scale with Fighter level (RAW 2/3/4 at L1/4/10),
+    // and the heal adds Fighter level — not total character level.
+    const fighterLvl = getClassLevel(ctx.char, 'fighter');
+    const swMax = fighterLvl >= 10 ? 4 : fighterLvl >= 4 ? 3 : 2;
     const swUsed = ctx.char.class_resource_uses?.second_wind ?? 0;
     if (swUsed >= swMax) {
       ctx.narrative = `Second Wind exhausted (${swMax}/${swMax} used). Recovers on a short or long rest.`;
@@ -81,7 +85,7 @@ export function handleFighterFeature(ctx: ActionContext, fid: string): boolean {
       ctx.narrative = 'Bonus action already used this turn.';
       return true;
     }
-    const swHeal = rollDice('1d10') + ctx.char.level;
+    const swHeal = rollDice('1d10') + fighterLvl;
     ctx.char.hp = Math.min(ctx.char.max_hp, ctx.char.hp + swHeal);
     ctx.char.class_resource_uses = {
       ...(ctx.char.class_resource_uses ?? {}),

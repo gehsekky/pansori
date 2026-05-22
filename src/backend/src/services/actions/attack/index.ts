@@ -19,6 +19,7 @@ import {
   pick,
   splitEncounterXp,
 } from '../../gameEngine.js';
+import { getClassLevel, hasClass } from '../../multiclass.js';
 import type { ActionHandler } from '../types.js';
 import { composeNow } from '../../narrative/compose.js';
 import { computeToHitContext } from './toHit.js';
@@ -209,7 +210,7 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
       const bonuses: { label: string }[] = [];
       // 2024 PHB Fighter L13 — Studied Attacks. On miss, mark the target
       // so this Fighter's next attack against them has advantage.
-      if (ctx.char.character_class.toLowerCase() === 'fighter' && ctx.char.level >= 13) {
+      if (hasClass(ctx.char, 'fighter') && getClassLevel(ctx.char, 'fighter') >= 13) {
         const tag = `studied_by_${ctx.char.id}`;
         ctx.st = {
           ...ctx.st,
@@ -312,7 +313,7 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
     let smiteDice = 0;
     if (
       (ctx.char.divine_smite_dice ?? 0) > 0 &&
-      (weaponItem || ctx.char.character_class.toLowerCase() === 'monk')
+      (weaponItem || hasClass(ctx.char, 'monk'))
     ) {
       smiteDice = ctx.char.divine_smite_dice!;
       const expr = `${smiteDice}d8`;
@@ -328,8 +329,8 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
     // the gating differs between the two.
     let improvedSmiteDmg = 0;
     if (
-      ctx.char.character_class.toLowerCase() === 'paladin' &&
-      (ctx.char.level ?? 1) >= 11 &&
+      hasClass(ctx.char, 'paladin') &&
+      getClassLevel(ctx.char, 'paladin') >= 11 &&
       weaponItem &&
       weaponItem.range !== 'ranged'
     ) {

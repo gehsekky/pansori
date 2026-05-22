@@ -1,6 +1,7 @@
 import type { CombatEntity, Enemy } from '../../../types.js';
 import { FRESH_TURN, abilityMod, profBonus, rollDice } from '../../rulesEngine.js';
 import { buildInitiativeOrder, pick } from '../../gameEngine.js';
+import { getClassLevel, hasClass } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 
 /**
@@ -63,9 +64,9 @@ export function runCombatStart(ctx: ActionContext, target: Enemy): void {
       .filter(
         (c) =>
           !c.dead &&
-          c.character_class.toLowerCase() === 'ranger' &&
+          hasClass(c, 'ranger') &&
           c.subclass === 'beastmaster' &&
-          c.level >= 3
+          getClassLevel(c, 'ranger') >= 3
       )
       .map((c, ci) => ({
         id: `${c.id}:companion`,

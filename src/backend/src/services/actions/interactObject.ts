@@ -1,5 +1,6 @@
 import { abilityMod, skillCheck } from '../rulesEngine.js';
 import { consumeBardicForCheck, consumeInspirationForCheck } from '../gameEngine.js';
+import { getClassLevel, hasClass } from '../multiclass.js';
 import type { ActionHandler } from './types.js';
 import { randomUUID } from 'crypto';
 
@@ -38,9 +39,9 @@ export const handleInteractObject: ActionHandler<{
 
   if (nextSt.combat_active) {
     const fastHandsEligible =
-      nextChar.character_class.toLowerCase() === 'rogue' &&
+      hasClass(nextChar, 'rogue') &&
       nextChar.subclass === 'thief' &&
-      nextChar.level >= 3;
+      getClassLevel(nextChar, 'rogue') >= 3;
     if (!fastHandsEligible) {
       ctx.narrative = 'You cannot interact with objects during combat.';
       return;
