@@ -292,6 +292,10 @@ export interface TurnActions {
   // Fighting could trigger SA on every hit. RAW: only on the
   // first qualifying hit. Cleared by FRESH_TURN at turn start.
   sneak_attack_used?: boolean;
+  // Great Weapon Master damage rider (2024 PHB) — once per turn,
+  // a heavy-weapon hit adds +profBonus damage. Same shape as
+  // Savage Attacker / Sneak Attack once-per-turn gates.
+  gwm_used?: boolean;
   // 2024 PHB Rogue Cunning Strike (L5+) — when set, the next Sneak Attack
   // spends 1 die for the chosen effect (trip, poison, withdraw, disarm)
   // and one SA die is removed from the damage roll. Cleared after applied.

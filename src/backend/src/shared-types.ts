@@ -626,6 +626,17 @@ export type FeatEffect =
       // and a free Shove on unarmed hit (needs a new action shape)
       // — both deferred.
       kind: 'tavern-brawler';
+    }
+  | {
+      // Great Weapon Master feat (2024 PHB general, L4 + heavy
+      // weapon prof prereq). Damage rider: on a heavy-weapon hit,
+      // the target takes extra damage equal to the attacker's
+      // proficiency bonus. Wired in `attack/index.ts` post-hit.
+      // Once per turn — gates on `turn_actions.gwm_used` so multi-
+      // hit turns (Extra Attack, two-weapon) only benefit once.
+      // The RAW bonus-action attack on Crit/kill needs new action
+      // wiring; deferred.
+      kind: 'gwm-bonus-damage';
     };
 
 /**

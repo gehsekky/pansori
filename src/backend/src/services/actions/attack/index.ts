@@ -370,7 +370,22 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
     // resistance / vulnerability multiplier applies (RAW: a creature
     // resistant to piercing halves the +10 too).
     const sharpshooterDmg = sharpshooterActive ? 10 : 0;
-    const rawDmg = baseHit + sneakDmg + rageBonus + sharpshooterDmg;
+    // Great Weapon Master (2024 PHB) — once per turn, on a hit with
+    // a Heavy weapon, add prof bonus damage. Same shape as Sneak
+    // Attack: gated on `turn_actions.gwm_used`, set after firing.
+    let gwmDmg = 0;
+    if (
+      (ctx.char.feats ?? []).includes('great_weapon_master') &&
+      weaponItem?.heavy &&
+      !ctx.char.turn_actions.gwm_used
+    ) {
+      gwmDmg = profBonus(ctx.char.level);
+      ctx.char = {
+        ...ctx.char,
+        turn_actions: { ...ctx.char.turn_actions, gwm_used: true },
+      };
+    }
+    const rawDmg = baseHit + sneakDmg + rageBonus + sharpshooterDmg + gwmDmg;
     const { damage: finalDmg, note: dmgNote } = applyDamageMultiplier(
       rawDmg,
       weaponItem?.damageType,
@@ -403,6 +418,9 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
     }
     if (sharpshooterDmg > 0) {
       hitBonuses.push({ label: `Sharpshooter: +${sharpshooterDmg} (-5 to hit)` });
+    }
+    if (gwmDmg > 0) {
+      hitBonuses.push({ label: `Great Weapon Master: +${gwmDmg}` });
     }
     if (dmgNote) {
       // dmgNote arrives as " [resistant: 6 → 3]" — strip leading space and
