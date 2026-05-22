@@ -20,6 +20,7 @@ import type {
   EnemyAttackHitFragment,
   EnemyAttackMissFragment,
   NarrativeFragment,
+  SaveFragment,
   SpellAttackHitFragment,
   SpellAttackMissFragment,
   SpellAutoHitFragment,
@@ -309,6 +310,21 @@ export function renderSpellMultiTarget(
   return { prose, events };
 }
 
+export function renderSave(f: SaveFragment, ctx: ActionContext): ComposedFragment {
+  const event: CombatEvent = {
+    kind: 'save',
+    characterId: f.characterId,
+    characterName: f.characterName,
+    ability: f.ability,
+    roll: f.roll,
+    dc: f.dc,
+    success: f.success,
+    vs: f.vs,
+    round: ctx.st.round ?? 1,
+  };
+  return { prose: f.prose, events: [event] };
+}
+
 export function renderConditionApplied(
   f: ConditionAppliedFragment,
   ctx: ActionContext
@@ -385,6 +401,8 @@ function renderFragment(f: NarrativeFragment, ctx: ActionContext): ComposedFragm
       return renderSpellAutoHit(f, ctx);
     case 'spell_multi_target':
       return renderSpellMultiTarget(f, ctx);
+    case 'save':
+      return renderSave(f, ctx);
     case 'condition_applied':
       return renderConditionApplied(f, ctx);
     case 'enemy_attack_hit':

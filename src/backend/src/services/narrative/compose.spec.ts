@@ -9,6 +9,7 @@ import {
   renderConditionApplied,
   renderEnemyAttackHit,
   renderEnemyAttackMiss,
+  renderSave,
   renderSpellAttackHit,
   renderSpellAttackMiss,
   renderSpellAutoHit,
@@ -649,6 +650,60 @@ describe('renderSpellMultiTarget', () => {
     expect(events).toHaveLength(1);
     if (events[0].kind === 'attack_hit') {
       expect(events[0].targetId).toBe('g2');
+    }
+  });
+});
+
+describe('renderSave', () => {
+  it('emits a save event and passes prose through verbatim', () => {
+    const ctx = fixtureCtx();
+    const { prose, events } = renderSave(
+      {
+        kind: 'save',
+        characterId: 'orc-1',
+        characterName: 'Orc',
+        ability: 'con',
+        roll: 17,
+        dc: 14,
+        success: true,
+        vs: 'Stunning Strike',
+        prose: 'Stunning Strike! CON save 17 vs DC 14 — Orc resists.',
+      },
+      ctx
+    );
+    expect(prose).toBe('Stunning Strike! CON save 17 vs DC 14 — Orc resists.');
+    expect(events).toHaveLength(1);
+    if (events[0].kind === 'save') {
+      expect(events[0].characterId).toBe('orc-1');
+      expect(events[0].ability).toBe('con');
+      expect(events[0].roll).toBe(17);
+      expect(events[0].dc).toBe(14);
+      expect(events[0].success).toBe(true);
+      expect(events[0].vs).toBe('Stunning Strike');
+      expect(events[0].round).toBe(3);
+    }
+  });
+
+  it('handles save-failed branch (prose can be empty so a follow-up condition_applied owns the line)', () => {
+    const ctx = fixtureCtx();
+    const { prose, events } = renderSave(
+      {
+        kind: 'save',
+        characterId: 'orc-1',
+        characterName: 'Orc',
+        ability: 'wis',
+        roll: 5,
+        dc: 14,
+        success: false,
+        vs: 'Goading Attack',
+        prose: '', // failure path; condition_applied carries the prose
+      },
+      ctx
+    );
+    expect(prose).toBe('');
+    expect(events).toHaveLength(1);
+    if (events[0].kind === 'save') {
+      expect(events[0].success).toBe(false);
     }
   });
 });

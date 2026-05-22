@@ -301,6 +301,38 @@ export interface EnemyAttackMissFragment {
 }
 
 /**
+ * A target made (or failed) a saving throw. Used by class-feature
+ * handlers (Stunning Strike CON, Goading Attack WIS, Abjure Enemy
+ * WIS, Fey Presence WIS, Open Hand DEX-on-hit, etc.) to replace
+ * the bare `pushEvent({kind:'save'})` calls that ran in parallel
+ * with inline `ctx.narrative += ...` strings.
+ *
+ * The fragment carries the full save outcome data (roll, DC,
+ * success/fail, source label) plus the prose the composer should
+ * append. Save event always emitted; condition application is a
+ * separate `condition_applied` fragment that follows.
+ */
+export interface SaveFragment {
+  kind: 'save';
+  characterId: string;
+  characterName: string;
+  /** 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha' (lowercase for
+   *  the CombatEvent). */
+  ability: string;
+  roll: number;
+  dc: number;
+  success: boolean;
+  /** Source label for the save (e.g. "Stunning Strike",
+   *  "Goading Attack"). Stored verbatim on the CombatEvent. */
+  vs: string;
+  /** Handler-built prose appended after the event fires. Carries
+   *  the full save-line ("Stunning Strike! CON save 12 vs DC 14
+   *  — Goblin resists.") so the composer doesn't need to
+   *  re-derive the format. */
+  prose: string;
+}
+
+/**
  * A condition landed on a target — Cunning Strike Trip / Poison,
  * weapon-mastery Topple, save-spell condition (Hold Person, Bane),
  * Stunning Strike, grapple/shove. The handler builds the prose
@@ -332,6 +364,7 @@ export type NarrativeFragment =
   | SpellSaveConditionFragment
   | SpellAutoHitFragment
   | SpellMultiTargetFragment
+  | SaveFragment
   | ConditionAppliedFragment
   | EnemyAttackHitFragment
   | EnemyAttackMissFragment;
