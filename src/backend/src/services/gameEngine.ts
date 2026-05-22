@@ -50,9 +50,14 @@ import {
 } from './gridEngine.js';
 import type { EnemyAttackHitFragment, EnemyAttackMissFragment } from './narrative/fragments.js';
 import { applyExpiryHooks, getConditionDuration } from './conditions/registry.js';
+import {
+  applyMulticlassProfGrants,
+  getClassLevel,
+  hasClass,
+  spellSlotsForChar,
+} from './multiclass.js';
 import { composeFragments, enemyAttackFragmentEvent } from './narrative/compose.js';
 import { fmt, stripForLlm } from './narrativeFmt.js';
-import { getClassLevel, hasClass, spellSlotsForChar } from './multiclass.js';
 import { COMBAT_LOG_MAX } from '../types.js';
 import { Engine } from 'json-rules-engine';
 import { applyDamage } from './damage.js';
@@ -1270,42 +1275,92 @@ export function splitEncounterXp(
   };
 }
 
-// Apply a level-up to one character if their XP threshold is met.
-// Mutates `char` in place. Returns the level-up narrative (empty if none).
-// 2024 PHB Dwarven Toughness adds +1 max HP at each level up.
-function applyLevelUpFromXp(char: Character, context: Context): string {
-  if (char.dead) return '';
-  if ((char.xp ?? 0) < (char.level ?? 1) * 100) return '';
-  // Was the PC unconscious/dying at the moment XP crossed the threshold?
-  // Mechanical level-up still applies (XP doesn't care about HP state, and
-  // the HP gain may even revive them) but the heroic-flavor narrative
-  // ("you have reached level N!") reads bizarrely for a prone, dying PC.
-  // We suppress the flavor and emit a single quiet line instead.
+/**
+ * Apply one level in `className` to `char`. Mutates in place. Returns
+ * the level-up narrative. Performs:
+ *
+ *   - `char.level++`
+ *   - `class_levels[className]++` (initialized to 0 if absent)
+ *   - HP gain: `1d<hit_die> + CON mod`; Dwarven Toughness adds +1.
+ *   - Spell-slot recompute via the multiclass-aware `spellSlotsForChar`.
+ *   - ASI pending when the **per-class** level lands on 4, 8, 12, 16,
+ *     or 19 (RAW: ASIs are per-class milestones). For pure single-class
+ *     PCs this still fires at total levels 4/8/12/16/19 since the two
+ *     are equal.
+ *   - Multiclass prof grants when this is the **first** level in a
+ *     non-primary class (`applyMulticlassProfGrants`).
+ */
+export function applyLevelUpForClass(char: Character, className: string, context: Context): string {
+  const cls = className.toLowerCase();
+  // Backfill class_levels for legacy single-class fixtures that skip
+  // normalizeState. After this, every char going through level-up has
+  // a populated breakdown.
+  const currentBreakdown = char.class_levels ?? {
+    [char.character_class.toLowerCase()]: char.level ?? 1,
+  };
+  // Track FIRST level in this class for multiclass prof grants (RAW:
+  // multiclass entry grants only a narrow proficiency subset).
+  const isFirstLevelInClass = (currentBreakdown[cls] ?? 0) === 0;
   const wasDowned =
     char.hp <= 0 ||
     (char.conditions ?? []).includes('unconscious') ||
     (char.death_saves?.failures ?? 0) > 0;
+
+  // Bump total level + per-class level in lockstep.
   char.level += 1;
+  char.class_levels = {
+    ...currentBreakdown,
+    [cls]: (currentBreakdown[cls] ?? 0) + 1,
+  };
+  const newClassLevel = char.class_levels[cls];
+
   const dwarfLvlBonus = char.species === 'dwarf' ? 1 : 0;
   const hpRoll =
     Math.max(1, rollDice(`1d${char.hit_die ?? 8}`) + abilityMod(char.con)) + dwarfLvlBonus;
   char.max_hp += hpRoll;
   char.hp = Math.min(char.hp + hpRoll, char.max_hp);
-  char.spell_slots_max = getSpellSlotsForLevel(char.character_class, char.level, context);
+
+  // Recompute slots from class_levels (multiclass-aware).
+  char.spell_slots_max = spellSlotsForChar(char);
+
   let out: string;
   if (wasDowned) {
-    out = ` ${char.name} reaches level ${char.level} (+${hpRoll} HP, while unconscious).`;
+    out = ` ${char.name} reaches level ${char.level} in ${className} (+${hpRoll} HP, while unconscious).`;
   } else {
     const levelUpLine = pick(context.narratives.levelUp)
       .replace(/{level}/g, String(char.level))
       .replace(/{name}/g, char.name);
-    out = ` ${char.name}: ${levelUpLine} (+${hpRoll} HP)`;
+    // Only attach the class name when multiclassing has actually
+    // happened (would be redundant noise for single-class PCs).
+    const classNote = Object.keys(char.class_levels).length > 1 ? ` (${className} ${newClassLevel})` : '';
+    out = ` ${char.name}: ${levelUpLine} (+${hpRoll} HP)${classNote}`;
   }
-  if ([4, 8, 12, 16, 19].includes(char.level)) {
+
+  // ASI / feat at per-class milestones (4, 8, 12, 16, 19). RAW: each
+  // class gates its own ASI; multiclass PCs get one per qualifying
+  // class-level boundary, not per total-level boundary.
+  if ([4, 8, 12, 16, 19].includes(newClassLevel)) {
     char.asi_pending = true;
-    out += ` Level ${char.level}: choose an Ability Score Improvement!`;
+    out += ` ${className} level ${newClassLevel}: choose an Ability Score Improvement!`;
   }
+
+  // First multiclass level: narrow proficiency grants per 2024 PHB.
+  if (isFirstLevelInClass && cls !== char.character_class.toLowerCase()) {
+    const profNote = applyMulticlassProfGrants(char, cls);
+    if (profNote) out += profNote;
+  }
+
   return out;
+}
+
+// Apply a level-up to one character if their XP threshold is met.
+// Mutates `char` in place. Returns the level-up narrative (empty if none).
+// Auto-levels into the PRIMARY class. Multiclassing is opt-in via the
+// explicit `level_up_class` action.
+function applyLevelUpFromXp(char: Character, context: Context): string {
+  if (char.dead) return '';
+  if ((char.xp ?? 0) < (char.level ?? 1) * 100) return '';
+  return applyLevelUpForClass(char, char.character_class, context);
 }
 
 // Check + apply level-ups for the entire living party after a kill.
@@ -1388,16 +1443,6 @@ export function partyDetectsTrap(characters: Character[], trap: Trap): boolean {
     const proficient = c.skill_proficiencies?.includes('Perception') ?? false;
     return passivePerception(c.wis, c.level, proficient) >= trap.dc;
   });
-}
-
-// ─── Spell helpers ────────────────────────────────────────────────────────────
-
-function getSpellSlotsForLevel(
-  className: string,
-  level: number,
-  context: Context
-): Record<number, number> {
-  return context.classSpellSlots?.[className]?.[level - 1] ?? {};
 }
 
 // ─── Backward-compatibility normalizer ───────────────────────────────────────

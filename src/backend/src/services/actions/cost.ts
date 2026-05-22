@@ -62,6 +62,7 @@ export const ACTION_COSTS: Record<StructuredAction['type'], ActionCost> = {
   spend_inspiration: 'managed',
   use_luck: 'managed',
   toggle_sharpshooter: 'managed',
+  level_up_class: 'managed',
   stand_up: 'managed',
   apply_asi: 'managed',
   take_feat: 'managed',

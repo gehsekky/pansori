@@ -204,6 +204,13 @@ export type StructuredAction =
   // of action-economy cost; auto-clears on turn end. Toggles state
   // (calling again turns it off).
   | { type: 'toggle_sharpshooter' }
+  // Manual level-up into a specific class (2024 PHB multiclassing).
+  // Bumps `char.level` + `class_levels[className]` together. Validates
+  // XP threshold; for non-primary classes also validates the 2024 PHB
+  // multiclass prerequisites (ability-score minimums). Surfaces as a
+  // choice when XP crosses the next-level threshold. Out-of-combat
+  // only (RAW: level-ups happen during downtime / long rest).
+  | { type: 'level_up_class'; className: string }
   | { type: 'shove'; targetEnemyId?: string }
   | { type: 'dodge' }
   | { type: 'disengage' }

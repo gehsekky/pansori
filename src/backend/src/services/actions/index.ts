@@ -3,6 +3,7 @@ import type { ActionContext, ActionHandler } from './types.js';
 import { handleAcceptQuest, handleCompleteQuest } from './quest.js';
 import {
   handleApplyAsi,
+  handleLevelUpClass,
   handlePrepareSpells,
   handleSelectSubclass,
   handleSetActiveCharacter,
@@ -67,6 +68,7 @@ const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   help: handleHelp as ActionHandler,
   ready: handleReady as ActionHandler,
   apply_asi: handleApplyAsi as ActionHandler,
+  level_up_class: handleLevelUpClass as ActionHandler,
   take_feat: handleTakeFeat as ActionHandler,
   select_subclass: handleSelectSubclass as ActionHandler,
   set_active_character: handleSetActiveCharacter as ActionHandler,
