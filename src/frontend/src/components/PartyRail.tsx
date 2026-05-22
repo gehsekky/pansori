@@ -2,6 +2,7 @@ import type { Character, FrontendContext, GameState, Seed } from '../types';
 import { useEffect, useState } from 'react';
 import InitiativeStrip from './InitiativeStrip';
 import { formatClassLabel } from '../lib/characterFmt';
+import { levelUpAvailable } from '../lib/multiclass';
 import styles from '../styles.module.css';
 
 interface Props {
@@ -16,6 +17,11 @@ interface Props {
   // this NPC" pattern). Omit / no-op in combat — initiative drives
   // the active marker there.
   onSetActive?: (charId: string) => void;
+  // Out-of-combat: when a PC's XP threshold is met, the rail shows a
+  // "Level Up" button under that PC's tile. Click forwards the charId
+  // here so App.tsx can open the LevelUpDialog. No-op in combat (RAW:
+  // level-ups happen during downtime).
+  onLevelUp?: (charId: string) => void;
 }
 
 // Vertical party stack — the left rail of the 3-zone layout. Every character
@@ -34,7 +40,7 @@ interface Props {
 // `onSetActive` — RAW has no initiative outside combat (SRD 5.2.1
 // p.189), so the player picks who's leading.
 
-function PartyRail({ state, activeCharId, ctx, seed, inCombat, onSetActive }: Props) {
+function PartyRail({ state, activeCharId, ctx, seed, inCombat, onSetActive, onLevelUp }: Props) {
   const [selectedCharId, setSelectedCharId] = useState<string>('');
 
   useEffect(() => {
@@ -60,26 +66,41 @@ function PartyRail({ state, activeCharId, ctx, seed, inCombat, onSetActive }: Pr
         const isSelected = c.id === selectedCharId;
         const hasActed = hasActedThisRound(c.id);
         const showDetail = isSelected;
+        const canLevelUp = levelUpAvailable(c, inCombat);
         return (
-          <PartyTile
-            key={c.id}
-            char={c}
-            ctx={ctx}
-            isActive={isActive}
-            isSelected={isSelected}
-            hasActed={hasActed}
-            showDetail={showDetail}
-            onSelect={() => {
-              setSelectedCharId(c.id);
-              // Out-of-combat lead handoff: dispatch only when (a) not
-              // already active, (b) target alive, (c) not in combat.
-              // Combat clicks keep their expand-detail behavior but
-              // don't try to override initiative.
-              if (!inCombat && !c.dead && c.id !== activeCharId && onSetActive) {
-                onSetActive(c.id);
-              }
-            }}
-          />
+          <div key={c.id} className={styles.partyTileWrap}>
+            <PartyTile
+              char={c}
+              ctx={ctx}
+              isActive={isActive}
+              isSelected={isSelected}
+              hasActed={hasActed}
+              showDetail={showDetail}
+              canLevelUp={canLevelUp}
+              onSelect={() => {
+                setSelectedCharId(c.id);
+                // Out-of-combat lead handoff: dispatch only when (a) not
+                // already active, (b) target alive, (c) not in combat.
+                // Combat clicks keep their expand-detail behavior but
+                // don't try to override initiative.
+                if (!inCombat && !c.dead && c.id !== activeCharId && onSetActive) {
+                  onSetActive(c.id);
+                }
+              }}
+            />
+            {canLevelUp && onLevelUp && (
+              <button
+                type="button"
+                className={styles.partyTileLevelUpBtn}
+                onClick={() => onLevelUp(c.id)}
+                data-testid="party-tile-level-up"
+                data-character-id={c.id}
+                title={`Level up ${c.name}`}
+              >
+                LEVEL UP →
+              </button>
+            )}
+          </div>
         );
       })}
     </aside>
@@ -93,6 +114,7 @@ function PartyTile({
   isSelected,
   hasActed,
   showDetail,
+  canLevelUp,
   onSelect,
 }: {
   char: Character;
@@ -101,6 +123,7 @@ function PartyTile({
   isSelected: boolean;
   hasActed: boolean;
   showDetail: boolean;
+  canLevelUp: boolean;
   onSelect: () => void;
 }) {
   const hpPct = char.max_hp > 0 ? Math.max(0, Math.min(1, char.hp / char.max_hp)) : 0;
@@ -182,6 +205,23 @@ function PartyTile({
             }}
           >
             +ASI
+          </span>
+        )}
+        {canLevelUp && (
+          <span
+            aria-label="Level-up available"
+            title="XP threshold met — click LEVEL UP below to advance"
+            style={{
+              color: 'var(--t-primary)',
+              fontSize: '0.65rem',
+              fontWeight: 'bold',
+              border: '1px solid var(--t-primary)',
+              borderRadius: 2,
+              padding: '0 4px',
+              letterSpacing: '0.05em',
+            }}
+          >
+            +LVL
           </span>
         )}
       </div>
