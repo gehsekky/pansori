@@ -2281,7 +2281,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       barbarian: 3,
     };
     const subclassChoices: Record<string, string[]> = {
-      fighter: ['champion', 'battle_master'],
+      fighter: ['champion', 'battle_master', 'eldritch_knight'],
       rogue: ['thief', 'assassin'],
       wizard: ['evoker', 'abjurer'],
       cleric: ['life', 'war', 'light'],
@@ -3261,6 +3261,16 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         action: { type: 'gwm_bonus_attack', targetEnemyId: livingEnemies[0].id },
         requiresBonusAction: true,
         kind: 'two_weapon_attack', // reuse the bonus-action-attack category
+      });
+    }
+    // Eldritch Knight L7 War Magic — flagged after a cantrip this
+    // turn. Bonus-action weapon attack with the equipped weapon.
+    if (char.turn_actions.ek_war_magic_pending && equippedWpnItem && livingEnemies.length > 0) {
+      choices.push({
+        label: `War Magic — bonus attack with the ${equippedWpnItem.name}`,
+        action: { type: 'ek_war_magic_attack', targetEnemyId: livingEnemies[0].id },
+        requiresBonusAction: true,
+        kind: 'two_weapon_attack',
       });
     }
   }

@@ -34,7 +34,7 @@ import {
   entitiesInLine,
   posEqual,
 } from '../gridEngine.js';
-import { hasClass, resolveCastingAbility } from '../multiclass.js';
+import { getClassLevel, hasClass, resolveCastingAbility } from '../multiclass.js';
 import type { ActionHandler } from './types.js';
 import { composeNow } from '../narrative/compose.js';
 import { fmt } from '../narrativeFmt.js';
@@ -246,6 +246,24 @@ export const handleCastSpell: ActionHandler<{
   // activation check on a subsequent metamagic invocation).
   if (spell.level > 0 && !isRitualCast) {
     ctx.char.turn_actions = { ...ctx.char.turn_actions, leveled_spell_cast: true };
+  }
+  // 2024 PHB Eldritch Knight L7 War Magic — after casting a CANTRIP
+  // with your action (not bonus action, not as part of a different
+  // sequence), you may make one weapon attack as a bonus action.
+  // Set the flag; the choice surfaces from generateChoices and is
+  // consumed by ek_war_magic_attack.
+  if (
+    spell.level === 0 &&
+    spell.castTime === 'action' &&
+    hasClass(ctx.char, 'fighter') &&
+    ctx.char.subclass === 'eldritch_knight' &&
+    getClassLevel(ctx.char, 'fighter') >= 7 &&
+    !ctx.char.turn_actions.bonus_action_used
+  ) {
+    ctx.char.turn_actions = {
+      ...ctx.char.turn_actions,
+      ek_war_magic_pending: true,
+    };
   }
   // Sorcerer · Wild Magic Surge (PHB p.103) — 1-in-20 chance after each
   // leveled spell to trigger a chaotic effect. RAW rolls 1d20 and on a 1

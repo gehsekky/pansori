@@ -298,6 +298,12 @@ export interface TurnActions {
   // Same gate shape as gwm_used / sneak_attack_used. Cleared by
   // FRESH_TURN at turn start.
   celestial_revelation_rider_used?: boolean;
+  // 2024 PHB Eldritch Knight Fighter L7 — War Magic: after casting
+  // a cantrip with your action, you may make one weapon attack as
+  // a bonus action. Set when an EK L7+ casts a cantrip; the
+  // ek_war_magic_attack choice surfaces while the flag is true.
+  // Cleared by FRESH_TURN.
+  ek_war_magic_pending?: boolean;
   // Great Weapon Master damage rider (2024 PHB) — once per turn,
   // a heavy-weapon hit adds +profBonus damage. Same shape as
   // Savage Attacker / Sneak Attack once-per-turn gates.

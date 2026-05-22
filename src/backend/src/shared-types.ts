@@ -209,6 +209,9 @@ export type StructuredAction =
   // Great Weapon Master (2024 PHB) — bonus-action attack after a
   // Heavy-weapon Crit or kill on this turn.
   | { type: 'gwm_bonus_attack'; targetEnemyId?: string }
+  // Eldritch Knight Fighter L7 — War Magic: bonus-action weapon
+  // attack after casting a cantrip on the same turn.
+  | { type: 'ek_war_magic_attack'; targetEnemyId?: string }
   // Aasimar Celestial Revelation (2024 PHB, L3+) — bonus-action
   // transformation, 1/long rest. Player picks the sub-option at
   // use time: 'necrotic_shroud', 'radiant_soul', 'radiant_consumption'.
@@ -290,6 +293,7 @@ export type ChoiceKind =
   | 'two_weapon_attack'
   | 'polearm_butt_end'
   | 'gwm_bonus_attack'
+  | 'ek_war_magic_attack'
   | 'use_celestial_revelation'
   | 'cast_spell'
   | 'class_feature';
