@@ -392,6 +392,33 @@ export const context: Context = {
       thrown: { normalRange: 20, longRange: 60 },
     },
 
+    // 2024 PHB Soulknife Rogue — Psychic Blades. Manifest as a free
+    // action (not modeled — granted via subclass select); a single
+    // psychic-damage finesse weapon. RAW damage scales with Rogue
+    // level (1d6 → 1d8 → 1d10 → 1d12 at L3/L5/L11/L17); pansori MVP
+    // is fixed at 1d6 (the L3-4 baseline). Counts as a simple
+    // weapon for Sneak Attack / weapon mastery purposes.
+    {
+      id: 'psychic_blade',
+      name: 'Psychic Blade',
+      desc: 'A shimmering blade conjured from psychic energy. 1d6 psychic, finesse, thrown.',
+      weight: 0, // psychic — no physical weight
+      type: 'weapon',
+      slot: 'weapon',
+      damage: '1d6',
+      finesse: true,
+      light: true,
+      // RAW 2024 PHB: throw range 60 ft (no long range — disappears
+      // on hit/miss and re-manifests at will).
+      thrown: { normalRange: 60, longRange: 60 },
+      range: 'melee',
+      ac_bonus: null,
+      heal: null,
+      effect: null,
+      aliases: ['psychic blade', 'mind blade', 'psychic_blades'],
+      weaponType: 'simple',
+      damageType: 'psychic',
+    },
     // Martial melee weapons
     {
       id: 'shortsword',
