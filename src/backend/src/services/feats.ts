@@ -321,6 +321,12 @@ export function applyFeatTake(
       narrativeParts.push('TWF off-hand can be any one-handed melee weapon (not just Light).');
       break;
     }
+    case 'athlete': {
+      // No take-time state change — the `stand_up` handler reads
+      // `char.feats` and reduces the cost from half-speed to 5 ft.
+      narrativeParts.push('Standing up from prone costs only 5 ft of movement.');
+      break;
+    }
   }
   return { newChar: next, narrative: narrativeParts.join(' ') };
 }

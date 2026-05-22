@@ -699,6 +699,14 @@ export type FeatEffect =
       // (relaxes the light-only off-hand check) and twoWeaponAttack.ts
       // handler (allows non-light off-hand selection).
       kind: 'dual-wielder';
+    }
+  | {
+      // Athlete feat (2024 PHB general, L4, half-feat). +1 STR or
+      // DEX, plus standing up from prone costs only 5 ft (instead
+      // of half speed). Wired in the stand_up handler. Climbing/
+      // swimming speed-doesn't-halve benefit not modeled (pansori
+      // doesn't differentiate movement modes yet).
+      kind: 'athlete';
     };
 
 /**

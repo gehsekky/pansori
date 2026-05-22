@@ -100,7 +100,10 @@ export const handleStandUp: ActionHandler<{ type: 'stand_up' }> = (ctx) => {
     return;
   }
   const speedFt = effectiveSpeed(ctx.char);
-  const standCost = Math.floor(speedFt / 2);
+  // 2024 PHB Athlete feat — standing up from prone costs only 5 ft
+  // instead of half your speed.
+  const hasAthlete = (ctx.char.feats ?? []).includes('athlete');
+  const standCost = hasAthlete ? 5 : Math.floor(speedFt / 2);
   const usedFt = (ctx.st.movement_used ?? {})[ctx.char.id] ?? 0;
   if (usedFt + standCost > speedFt) {
     ctx.narrative = `Not enough movement to stand up. (${speedFt - usedFt} ft remaining, ${standCost} ft needed)`;
