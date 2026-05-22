@@ -327,6 +327,10 @@ export interface TurnActions {
   // on an unarmed hit, spend 1 Discipline (Ki) for +1d10 fire
   // damage. Once-per-turn gate cleared by FRESH_TURN.
   elemental_strikes_used?: boolean;
+  // 2024 PHB Zealot Barbarian L3 — Divine Fury: while raging,
+  // first weapon attack of the turn deals +1d6 + (barb lvl / 2)
+  // radiant. Once-per-turn gate cleared by FRESH_TURN.
+  divine_fury_used?: boolean;
   // Great Weapon Master damage rider (2024 PHB) — once per turn,
   // a heavy-weapon hit adds +profBonus damage. Same shape as
   // Savage Attacker / Sneak Attack once-per-turn gates.
