@@ -860,11 +860,21 @@ function computeEnemyAttack(
 
 // ─── Death save handler ───────────────────────────────────────────────────────
 
+/**
+ * `enemyAttackContext` — pass when this death save is being rolled
+ * IMMEDIATELY AFTER an enemy attack that landed on the unconscious
+ * PC (the multiattack-loop call path). Triggers the "2 failures from
+ * the attack" SRD rule. Omit for the PC-invokes-`death_save` action
+ * path: the PC is rolling on their own turn, no enemy attack
+ * happened, and adding 2 failures every turn would silently double-
+ * penalize them whenever any enemy is alive in the room.
+ */
 function processDeathSave(
   char: Character,
   enemy: Enemy | null | undefined,
   context: Context,
-  worldName: string
+  worldName: string,
+  enemyAttackContext: boolean = false
 ): { narrative: string; newChar: Character; died: boolean; endedCombat: boolean } {
   const save = rollDeathSave(char.death_saves);
   const newChar = { ...char, death_saves: save.saves };
@@ -928,8 +938,15 @@ function processDeathSave(
       return { narrative, newChar, died: true, endedCombat: false };
   }
 
-  // While unconscious, a living enemy delivers automatic hits → 2 death save failures
-  if (enemy && !newChar.dead) {
+  // SRD 5.2.1 p.197 — when an enemy hits an Unconscious creature
+  // within 5 ft, the attack is a Critical Hit AND counts as 2 death
+  // save failures. Only fire here when the death save is being
+  // rolled as a follow-up to the attack that just landed (the
+  // multiattack-loop call path). The PC-invokes-`death_save` action
+  // path passes `enemyAttackContext = false` so a downed PC rolling
+  // their own save on their turn doesn't eat a phantom 2-failure
+  // penalty for every nearby enemy.
+  if (enemyAttackContext && enemy && !newChar.dead) {
     const attackSaves = {
       successes: newChar.death_saves.successes,
       failures: Math.min(3, newChar.death_saves.failures + 2),
@@ -4708,7 +4725,10 @@ export function runEnemyTurns(args: {
               { ...target, death_saves: target.death_saves ?? { successes: 0, failures: 0 } },
               rm,
               args.context,
-              args.worldName
+              args.worldName,
+              // Multiattack call path — the enemy just hit the downed
+              // PC; trigger the SRD 2-failure-on-attack penalty.
+              true
             );
             target = newTarget;
             narrative += ' ' + dsNarr;
