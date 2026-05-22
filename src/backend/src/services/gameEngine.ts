@@ -2283,14 +2283,14 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     const subclassChoices: Record<string, string[]> = {
       fighter: ['champion', 'battle_master', 'eldritch_knight'],
       rogue: ['thief', 'assassin', 'soulknife'],
-      wizard: ['evoker', 'abjurer'],
-      cleric: ['life', 'war', 'light'],
+      wizard: ['evoker', 'abjurer', 'diviner', 'illusionist'],
+      cleric: ['life', 'war', 'light', 'trickery'],
       ranger: ['hunter', 'beastmaster', 'fey_wanderer', 'gloom_stalker'],
       paladin: ['devotion', 'vengeance', 'ancients', 'glory'],
       bard: ['lore', 'valor'],
       sorcerer: ['draconic', 'wild_magic'],
-      warlock: ['fiend', 'archfey', 'celestial'],
-      druid: ['land', 'moon'],
+      warlock: ['fiend', 'archfey', 'celestial', 'great_old_one'],
+      druid: ['land', 'moon', 'sea', 'stars'],
       monk: ['open_hand', 'shadow', 'mercy'],
       barbarian: ['berserker', 'totem_warrior'],
     };
