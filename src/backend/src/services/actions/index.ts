@@ -51,6 +51,7 @@ import { handleHealingLight } from './healingLight.js';
 import { handleInteractObject } from './interactObject.js';
 import { handleLandsAid } from './landsAid.js';
 import { handleLoot } from './loot.js';
+import { handleMantleOfInspiration } from './mantleOfInspiration.js';
 import { handleMove } from './move.js';
 import { handlePolearmButtEnd } from './polearmButtEnd.js';
 import { handleSneak } from './sneak.js';
@@ -115,6 +116,7 @@ const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   use_healing_light: handleHealingLight as ActionHandler,
   use_hand_of_healing: handleHandOfHealing as ActionHandler,
   use_lands_aid: handleLandsAid as ActionHandler,
+  use_mantle_of_inspiration: handleMantleOfInspiration as ActionHandler,
   use_celestial_revelation: handleCelestialRevelation as ActionHandler,
   use_healer_kit: handleUseHealerKit as ActionHandler,
   use_healing_hands: handleUseHealingHands as ActionHandler,
