@@ -154,6 +154,17 @@ export const SRD_FEATS: Record<string, Feat> = {
     },
   },
 
+  tavern_brawler: {
+    id: 'tavern_brawler',
+    name: 'Tavern Brawler',
+    desc: 'Half-feat: +1 STR or CON. Your unarmed strikes deal 1d4 + STR mod instead of 1 + STR mod. (RAW also grants improvised-weapon proficiency and a free Shove on unarmed hit — neither modeled yet.)',
+    category: 'origin',
+    abilityBonus: { choices: ['str', 'con'] },
+    effect: {
+      kind: 'tavern-brawler',
+    },
+  },
+
   heavy_armor_master: {
     id: 'heavy_armor_master',
     name: 'Heavy Armor Master',

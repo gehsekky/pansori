@@ -279,9 +279,11 @@ export function resolveEnemyAttack(
   return { hit, roll, total, damage: hit ? rollDice(enemy.damage) : 0 };
 }
 
-// Unarmed strike: 1 + STR modifier (minimum 1), per 5e PHB
-export function unarmedDamage(str: number): number {
-  return Math.max(1, 1 + abilityMod(str));
+// Unarmed strike: 1 + STR modifier (minimum 1), per 5e PHB.
+// Tavern Brawler (2024 PHB) bumps the die to 1d4 + STR modifier.
+export function unarmedDamage(str: number, tavernBrawler = false): number {
+  const base = tavernBrawler ? rollDice('1d4') : 1;
+  return Math.max(1, base + abilityMod(str));
 }
 
 // ─── Equipment legality ───────────────────────────────────────────────────────

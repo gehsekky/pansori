@@ -170,7 +170,7 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
       ? isCrit && !atk.critical
         ? Math.max(1, rollCritical(weaponDamage) + atk.atkMod)
         : atk.damage
-      : Math.max(1, unarmedDamage(ctx.char.str));
+      : Math.max(1, unarmedDamage(ctx.char.str, (ctx.char.feats ?? []).includes('tavern_brawler')));
 
     // 2024 PHB Savage Attacker origin feat — once per turn, on a
     // weapon-damage hit, reroll the damage and use the higher total.
