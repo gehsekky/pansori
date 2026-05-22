@@ -202,6 +202,12 @@ export type StructuredAction =
   // Polearm Master (2024 PHB) — bonus-action butt-end attack with
   // a qualifying polearm. Available after the Attack action.
   | { type: 'polearm_butt_end'; targetEnemyId?: string }
+  // Healer feat (2024 PHB) — action, spend one charge of a
+  // Healer's Kit to heal a target 1d6 + 4 + prof.
+  | { type: 'use_healer_kit'; targetCharId: string }
+  // Aasimar Healing Hands — action, 1/long rest, heal a target
+  // (prof)d4 HP.
+  | { type: 'use_healing_hands'; targetCharId: string }
   | { type: 'attune'; instanceId: string }
   | { type: 'grapple'; targetEnemyId?: string }
   | { type: 'try_escape_grapple' }
@@ -678,6 +684,12 @@ export type FeatEffect =
       // OA-on-enter-reach RAW benefit needs reaction infrastructure;
       // deferred.
       kind: 'polearm-master';
+    }
+  | {
+      // Healer feat (2024 PHB origin). Action: spend one charge
+      // from a Healer's Kit to heal a creature 1d6 + 4 + prof
+      // bonus HP. Wired via the `use_healer_kit` action handler.
+      kind: 'healer';
     };
 
 /**

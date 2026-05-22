@@ -167,6 +167,7 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
     const humanGrant = c.species === 'human';
     if (c.species === 'orc') delete restoredUses.relentless_endurance_used;
     if (c.species === 'tiefling') delete restoredUses.tiefling_rebuke_used;
+    if (c.species === 'aasimar') delete restoredUses.healing_hands_used;
     const restoredUsesWithFeats = resetFeatLongRestResources(c, ctx.context, restoredUses);
     return {
       ...c,

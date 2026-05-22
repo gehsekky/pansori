@@ -760,6 +760,23 @@ export const context: Context = {
       effect: null,
       aliases: ['healing potion', 'potion', 'health potion'],
     },
+    {
+      // Healer's Kit (2024 PHB) — 10 uses. The Healer feat lets a
+      // PC use a charge to heal a creature with the Use-an-Object
+      // action. Charges tracked via inventory `count` field; the
+      // `use_healer_kit` handler decrements and removes at 0.
+      id: 'healers_kit',
+      name: "Healer's Kit",
+      desc: 'Bag of bandages, splints, and salves. 10 uses. With the Healer feat, an action heals 1d6 + 4 + prof bonus HP per use.',
+      weight: 3,
+      type: 'consumable',
+      slot: null,
+      damage: null,
+      ac_bonus: null,
+      heal: null,
+      effect: null,
+      aliases: ['healers kit', "healer's kit", 'healers_kit'],
+    },
   ],
 
   // ─── Intro texts ──────────────────────────────────────────────────────────────

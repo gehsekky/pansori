@@ -190,6 +190,16 @@ export const SRD_FEATS: Record<string, Feat> = {
     },
   },
 
+  healer: {
+    id: 'healer',
+    name: 'Healer',
+    desc: "Action: spend one use of a Healer's Kit to restore 1d6 + 4 + your proficiency bonus HP to a creature you can touch.",
+    category: 'origin',
+    effect: {
+      kind: 'healer',
+    },
+  },
+
   polearm_master: {
     id: 'polearm_master',
     name: 'Polearm Master',
