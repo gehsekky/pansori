@@ -3300,6 +3300,26 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     }
   }
 
+  // Glamour Bard — Mantle of Inspiration (bonus action, 1 BI use).
+  if (
+    !char.turn_actions.bonus_action_used &&
+    char.subclass === 'glamour' &&
+    hasClass(char, 'bard') &&
+    getClassLevel(char, 'bard') >= 3
+  ) {
+    const biUses =
+      char.class_resource_uses?.bardic_inspiration ?? Math.max(1, Math.floor((char.cha - 10) / 2));
+    if (biUses > 0) {
+      const grant = 5 + abilityMod(char.cha);
+      choices.push({
+        label: `Mantle of Inspiration — bonus action, grant ${grant} temp HP to up to 5 allies (Bardic Inspiration: ${biUses} left)`,
+        action: { type: 'use_mantle_of_inspiration' },
+        requiresBonusAction: true,
+        kind: 'class_feature',
+      });
+    }
+  }
+
   // Celestial Warlock — Healing Light (bonus action, 1+lvl d6 pool).
   // Outside the action-used gate above: this is available any time
   // a Celestial Warlock has a free bonus action, not just after
