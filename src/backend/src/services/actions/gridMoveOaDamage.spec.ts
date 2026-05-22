@@ -66,7 +66,7 @@ describe('grid_move OA damage — routes through applyDamage', () => {
       hp: 30,
       max_hp: 30,
       temp_hp: 8,
-      character_class_speed: 30,
+      speed: 30,
     });
     const state = {
       ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
