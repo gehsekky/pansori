@@ -296,6 +296,11 @@ export interface TurnActions {
   // a heavy-weapon hit adds +profBonus damage. Same shape as
   // Savage Attacker / Sneak Attack once-per-turn gates.
   gwm_used?: boolean;
+  // Great Weapon Master bonus-action attack (2024 PHB) — set when
+  // a heavy-weapon hit scores a Crit OR reduces a creature to 0
+  // HP. The player can spend their bonus action on one additional
+  // weapon attack. Cleared after firing or at turn end (FRESH_TURN).
+  gwm_bonus_attack_pending?: boolean;
   // 2024 PHB Rogue Cunning Strike (L5+) — when set, the next Sneak Attack
   // spends 1 die for the chosen effect (trip, poison, withdraw, disarm)
   // and one SA die is removed from the damage roll. Cleared after applied.
