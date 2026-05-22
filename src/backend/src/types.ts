@@ -281,6 +281,11 @@ export interface TurnActions {
   // turn end (FRESH_TURN reset). Sticky across multiple attacks in
   // the same turn (matches how players actually use it).
   sharpshooter_active?: boolean;
+  // Savage Attacker feat (2024 PHB origin) — once per turn, on a
+  // weapon-damage hit, reroll damage and take the higher. This flag
+  // marks the reroll as already spent this turn so multi-hit turns
+  // (Extra Attack, two-weapon) only benefit once.
+  savage_attacker_used?: boolean;
   // 2024 PHB Rogue Cunning Strike (L5+) — when set, the next Sneak Attack
   // spends 1 die for the chosen effect (trip, poison, withdraw, disarm)
   // and one SA die is removed from the damage roll. Cleared after applied.

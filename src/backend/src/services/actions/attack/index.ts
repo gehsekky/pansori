@@ -166,11 +166,33 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
           })())) ||
       assassinAutoCrit;
     const isCrit = atk.critical || (autoCritCheck && atk.hit);
-    const baseHit = weaponDamage
+    let baseHit = weaponDamage
       ? isCrit && !atk.critical
         ? Math.max(1, rollCritical(weaponDamage) + atk.atkMod)
         : atk.damage
       : Math.max(1, unarmedDamage(ctx.char.str));
+
+    // 2024 PHB Savage Attacker origin feat — once per turn, on a
+    // weapon-damage hit, reroll the damage and use the higher total.
+    // Gates on `turn_actions.savage_attacker_used` to enforce the
+    // once-per-turn limit across Extra Attack / two-weapon sequences.
+    // Unarmed strikes don't carry a `weaponDamage` expression, so
+    // they're excluded (RAW: feat reads "weapon's damage roll").
+    if (
+      atk.hit &&
+      weaponDamage &&
+      (ctx.char.feats ?? []).includes('savage_attacker') &&
+      !ctx.char.turn_actions.savage_attacker_used
+    ) {
+      const reroll = isCrit
+        ? Math.max(1, rollCritical(weaponDamage) + atk.atkMod)
+        : Math.max(1, rollDice(weaponDamage) + atk.atkMod);
+      if (reroll > baseHit) baseHit = reroll;
+      ctx.char = {
+        ...ctx.char,
+        turn_actions: { ...ctx.char.turn_actions, savage_attacker_used: true },
+      };
+    }
     const versatileNote = isVersatile ? ' (versatile)' : '';
     const coverNote = coverAcBonus > 0 ? ` +${coverAcBonus} cover` : '';
     const bonusNote = totalAttackBonus > 0 ? ` +${totalAttackBonus} bonus` : '';

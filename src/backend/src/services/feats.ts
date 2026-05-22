@@ -212,6 +212,21 @@ export function applyFeatTake(
       );
       break;
     }
+    case 'alert': {
+      // No take-time state change — the hooks fire at
+      // `buildInitiativeOrder` (prof bonus to init) and at the
+      // combat-start surprise check (immunity). Narrative only.
+      narrativeParts.push(
+        '+prof bonus to Initiative rolls; immune to the Surprised condition.'
+      );
+      break;
+    }
+    case 'savage-attacker': {
+      // No take-time state change — the damage-reroll hook fires in
+      // `attack/index.ts` once per turn. Narrative only.
+      narrativeParts.push("Once per turn, weapon-damage hits reroll and take the higher result.");
+      break;
+    }
   }
   return { newChar: next, narrative: narrativeParts.join(' ') };
 }
