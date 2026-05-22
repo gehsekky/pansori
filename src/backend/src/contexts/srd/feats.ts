@@ -190,6 +190,19 @@ export const SRD_FEATS: Record<string, Feat> = {
     },
   },
 
+  polearm_master: {
+    id: 'polearm_master',
+    name: 'Polearm Master',
+    desc: 'After the Attack action with a qualifying polearm (quarterstaff/spear/glaive/halberd/pike), make a bonus-action attack with the opposite end — 1d4 damage + your ability mod, same damage type as the weapon. (RAW also grants an OA when a creature enters your reach — not yet wired.)',
+    category: 'general',
+    prerequisites: {
+      minLevel: 4,
+    },
+    effect: {
+      kind: 'polearm-master',
+    },
+  },
+
   crossbow_expert: {
     id: 'crossbow_expert',
     name: 'Crossbow Expert',

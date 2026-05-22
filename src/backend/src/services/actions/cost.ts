@@ -91,6 +91,7 @@ export const ACTION_COSTS: Record<StructuredAction['type'], ActionCost> = {
   influence: 'managed',
   study: 'managed',
   two_weapon_attack: 'managed',
+  polearm_butt_end: 'managed',
   grid_move: 'managed',
   resolve_reaction: 'managed',
   attack: 'managed',

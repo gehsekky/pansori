@@ -45,6 +45,7 @@ import { handleGridMove } from './gridMove.js';
 import { handleInteractObject } from './interactObject.js';
 import { handleLoot } from './loot.js';
 import { handleMove } from './move.js';
+import { handlePolearmButtEnd } from './polearmButtEnd.js';
 import { handleSneak } from './sneak.js';
 import { handleTwoWeaponAttack } from './twoWeaponAttack.js';
 import { handleUseClassFeature } from './classFeature/index.js';
@@ -101,6 +102,7 @@ const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   study: handleStudy as ActionHandler,
   use_reaction: handleUseReaction as ActionHandler,
   two_weapon_attack: handleTwoWeaponAttack as ActionHandler,
+  polearm_butt_end: handlePolearmButtEnd as ActionHandler,
   grid_move: handleGridMove as ActionHandler,
   resolve_reaction: handleResolveReaction as ActionHandler,
   attack: handleAttack as ActionHandler,

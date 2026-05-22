@@ -194,6 +194,9 @@ export type StructuredAction =
   | { type: 'disarm_trap' }
   | { type: 'interact_object'; objectId: string }
   | { type: 'two_weapon_attack'; targetEnemyId?: string }
+  // Polearm Master (2024 PHB) — bonus-action butt-end attack with
+  // a qualifying polearm. Available after the Attack action.
+  | { type: 'polearm_butt_end'; targetEnemyId?: string }
   | { type: 'attune'; instanceId: string }
   | { type: 'grapple'; targetEnemyId?: string }
   | { type: 'try_escape_grapple' }
@@ -259,6 +262,7 @@ export type ChoiceKind =
   | 'grapple'
   | 'shove'
   | 'two_weapon_attack'
+  | 'polearm_butt_end'
   | 'cast_spell'
   | 'class_feature';
 
@@ -658,6 +662,17 @@ export type FeatEffect =
       // doesn't enforce Loading) and bonus-action hand-crossbow
       // shot after Attack action (needs new action shape).
       kind: 'crossbow-expert';
+    }
+  | {
+      // Polearm Master feat (2024 PHB general, L4). Shipped
+      // benefit: after taking the Attack action with a qualifying
+      // polearm (quarterstaff/spear/glaive/halberd/pike), make a
+      // bonus-action attack with the opposite end of the weapon —
+      // 1d4 damage + ability mod, same damage type as the weapon.
+      // Wired via the `polearm_butt_end` action handler. The
+      // OA-on-enter-reach RAW benefit needs reaction infrastructure;
+      // deferred.
+      kind: 'polearm-master';
     };
 
 /**
