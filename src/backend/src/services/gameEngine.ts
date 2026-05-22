@@ -13,7 +13,6 @@ import {
   rollConditionSave,
   rollDeathSave,
   rollDice,
-  spellSlotsForClassLevel,
 } from './rulesEngine.js';
 import type {
   AbilityKey,
@@ -61,6 +60,7 @@ import { factionShopPrice } from './campaignEngine.js';
 import { llmProvider } from './llmProvider.js';
 import { pcActor } from './actions/actor.js';
 import { randomUUID } from 'crypto';
+import { spellSlotsForChar } from './multiclass.js';
 
 // Append a CombatEvent to state.combat_log, trimming to COMBAT_LOG_MAX so the
 // buffer doesn't grow unbounded across long sessions. Pure function — returns
@@ -1434,11 +1434,6 @@ export function normalizeState(raw: Record<string, unknown>): GameState {
       objects_searched: gs.objects_searched ?? [],
       seen_choices: gs.seen_choices ?? [],
       characters: gs.characters.map((c) => {
-        const existingSlots = c.spell_slots_max ?? {};
-        const slotsMax =
-          Object.keys(existingSlots).length > 0
-            ? existingSlots
-            : spellSlotsForClassLevel(c.character_class, c.level ?? 1);
         // Multiclass schema backfill — pre-multiclass saves omit
         // class_levels entirely. Synthesize from character_class +
         // level so the helpers in services/multiclass.ts can rely on
@@ -1447,6 +1442,10 @@ export function normalizeState(raw: Record<string, unknown>): GameState {
           c.class_levels && Object.keys(c.class_levels).length > 0
             ? c.class_levels
             : { [c.character_class.toLowerCase()]: c.level ?? 1 };
+        const charWithLevels = { ...c, class_levels: classLevels };
+        const existingSlots = c.spell_slots_max ?? {};
+        const slotsMax =
+          Object.keys(existingSlots).length > 0 ? existingSlots : spellSlotsForChar(charWithLevels);
         return {
           ...c,
           hit_die: c.hit_die ?? 8,
