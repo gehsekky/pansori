@@ -455,7 +455,24 @@ export interface InventoryItem {
 export interface Character {
   id: string;
   name: string;
+  /**
+   * Primary / first class — taken at character creation. Single-class
+   * characters carry only this. Multiclass characters use it for
+   * tie-breaking (e.g. saving-throw profs come from the FIRST class
+   * only per 2024 PHB) and as the display label.
+   *
+   * For per-class level lookups, prefer `class_levels` via the
+   * `getClassLevels` / `getClassLevel` helpers in `services/multiclass.ts`.
+   */
   character_class: string;
+  /**
+   * Per-class level breakdown (multiclassing — 2024 PHB Ch. 1). Keys
+   * are class names lowercased (`'fighter'`, `'wizard'`); values are
+   * the level taken in that class. Sum across all keys should equal
+   * `level`. Absent on legacy single-class PCs — `getClassLevels`
+   * synthesizes `{[character_class]: level}` in that case.
+   */
+  class_levels?: Record<string, number>;
   portrait_url: string | null;
   hp: number;
   max_hp: number;

@@ -235,6 +235,10 @@ describe('normalizeState', () => {
     expect(result.characters[0].spell_slots_max).toBeDefined();
     expect(result.characters[0].spell_slots_used).toEqual({});
     expect(result.characters[0].spells_known).toEqual([]);
+    // Multiclass schema backfill — pre-multiclass save loads with
+    // class_levels derived from character_class + level so the helpers
+    // in services/multiclass.ts have a populated breakdown.
+    expect(result.characters[0].class_levels).toEqual({ fighter: 1 });
   });
 
   it('normalized old-format state is usable by takeAction without crashing', async () => {
