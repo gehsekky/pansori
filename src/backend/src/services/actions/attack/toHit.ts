@@ -90,7 +90,27 @@ export function computeToHitContext(
     weaponItem?.weaponType
   );
 
-  const rangedInMelee = weaponItem?.range === 'ranged';
+  // 2024 PHB ranged-in-melee disadvantage: only applies when a
+  // non-incapacitated enemy is within 5 ft of the attacker. Previously
+  // pansori applied the penalty to every ranged attack — making bows
+  // strictly worse than melee in any combat. The grid + condition
+  // check matches RAW: an Incapacitated enemy doesn't threaten, so
+  // no disadvantage from them. Without grid positions (e.g. legacy
+  // saves without entities), default to no disadvantage so the
+  // penalty is opt-in.
+  let rangedInMelee = false;
+  if (weaponItem?.range === 'ranged' && ctx.st.entities) {
+    const charEnt = ctx.st.entities.find((e) => e.id === ctx.char.id);
+    if (charEnt) {
+      rangedInMelee = ctx.st.entities.some(
+        (e) =>
+          e.isEnemy &&
+          e.hp > 0 &&
+          !e.conditions.includes('incapacitated') &&
+          distanceFeet(charEnt.pos, e.pos) <= 5
+      );
+    }
+  }
   const conditionDisadv = ctx.char.conditions.some((c) => DISADV_CONDITIONS.has(c));
   const exhaustionDisadv = (ctx.char.exhaustion_level ?? 0) >= 3;
   const heavyEncumberedDisadv = isHeavilyEncumbered(ctx.char);
