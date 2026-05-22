@@ -29,14 +29,9 @@ import {
 } from './rulesEngine.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { LootItem } from '../types.js';
+import { mockRandom } from '../test-fixtures.js';
 
 afterEach(() => vi.restoreAllMocks());
-
-function mockRandom(...values: number[]) {
-  const spy = vi.spyOn(Math, 'random');
-  values.forEach((v) => spy.mockReturnValueOnce(v));
-  return spy;
-}
 
 // d(N) = Math.floor(Math.random() * N) + 1
 // random 0.0   → 1
@@ -641,11 +636,3 @@ describe('resolveSpellAttack(level, castingAbilityScore, enemyAc)', () => {
   });
 });
 
-// ─── Future systems (not yet implemented) ────────────────────────────────────
-
-describe('future systems', () => {
-  it.todo('[Case A] movement point tracking: 30ft speed, use 20ft, 10ft remains');
-  it.todo('[Case B] bonus-action spell + action spell → invalid under 5e casting rules');
-  it.todo('[Case C] two-handed weapon held → spellcasting requires free hand');
-  it.todo('[Case H] concentration: damage triggers CON save or drop concentration');
-});

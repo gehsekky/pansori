@@ -9,6 +9,8 @@ import type {
   Seed,
   StructuredAction,
 } from '../../types.js';
+import type { Actor } from './actor.js';
+import type { NarrativeFragment } from '../narrative/fragments.js';
 
 /**
  * Mutable context passed to every action handler. Mirrors the local
@@ -42,9 +44,33 @@ export interface ActionContext {
   seed: Seed;
   st: GameState;
   char: Character;
+  /**
+   * Polymorphic actor reference (architecture audit #5 follow-up).
+   * Today every dispatched action is PC-initiated, so this is always
+   * `{kind: 'pc', char, safeIdx}` — a tagged mirror of `ctx.char` +
+   * `ctx.safeIdx`. The field exists ahead of the enemy-turn migration
+   * so handlers can begin reading actor data from one polymorphic
+   * source instead of assuming PC-shape via `ctx.char`. See
+   * `services/actions/actor.ts` for the migration roadmap.
+   *
+   * **For now:** handlers can continue to use `ctx.char`. New
+   * handlers should prefer `ctx.actor` to make eventual PC/enemy
+   * sharing trivial.
+   */
+  actor: Actor;
   narrative: string;
   escaped: boolean;
   usedInitiative: boolean;
+  /**
+   * Structured emission queue (see services/narrative/fragments.ts).
+   * Migrated handlers push fragments here instead of doing
+   * `ctx.narrative += ...` + `pushEvent(...)` in parallel; the composer
+   * (`services/narrative/compose.ts`) runs after the handler returns,
+   * appends rendered prose to `narrative`, and pushes the corresponding
+   * `CombatEvent` to `st.combat_log`. Unmigrated handlers push nothing
+   * and the composer is a no-op for them.
+   */
+  fragments: NarrativeFragment[];
 
   /**
    * Write `char` back into `st.characters[safeIdx]` and sync HP /
@@ -56,23 +82,32 @@ export interface ActionContext {
 /**
  * Most handlers are "leaf" — they mutate ctx fields and return nothing.
  *
- * A few are "transformers" — actions that don't resolve directly but
- * yield to another action. Two flavors:
+ * Result variants:
+ *
+ * - `void` — successful leaf handler. Dispatcher post-deducts the
+ *   declared cost from `ACTION_COSTS` (no-op for 'managed').
+ *
+ * - `{ rejected: string }` — validation early-exit. Dispatcher sets
+ *   `ctx.narrative` to the rejection message and skips the cost
+ *   deduction. Use for cases like "no enemy to target" or "you can
+ *   only dodge in combat" where the action wasn't actually performed.
  *
  * - `replaceWith`: the original action *becomes* the new one. The
  *   handler may stage pre-mutations (e.g. attack_npc flipping NPC
  *   attitude to hostile), then `dispatchAction` bubbles the new action
  *   up to `takeAction`, which re-enters from the top with the new
  *   action and the staged state. The outer takeAction's epilogue is
- *   skipped — the recursive call runs its own.
+ *   skipped — the recursive call runs its own. Outer cost is NOT
+ *   deducted (the re-dispatched action pays its own).
  *
  * - `delegateTo`: the handler does the trigger work (e.g. use_reaction
  *   marks the reaction consumed and emits a "triggers their readied
  *   action!" prefix), then yields to an inner action that runs against
  *   the *same* ctx. The inner mutations stack; the outer's narrative
  *   prefix is preserved. The outer takeAction's epilogue runs once,
- *   over the combined state. (Different semantics from replaceWith:
- *   delegateTo wraps; replaceWith replaces.)
+ *   over the combined state. The outer cost IS deducted (the wrapper
+ *   spent its slot); the inner action pays its own cost during the
+ *   nested dispatch.
  *
  * Future 5.5e rules that fit this shape:
  *   replaceWith → Eldritch Strike (attack swap), Beast Form attack
@@ -83,6 +118,7 @@ export interface ActionContext {
  */
 export type HandlerResult =
   | void
+  | { rejected: string }
   | { replaceWith: StructuredAction }
   | { delegateTo: StructuredAction };
 

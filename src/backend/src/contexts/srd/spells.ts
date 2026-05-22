@@ -103,6 +103,13 @@ export const SRD_SPELLS: Record<string, Spell> = {
     upcastBonus: '2d8',
     desc: 'A creature you touch regains 2d8 + spell modifier HP. +2d8 per slot above 1st.',
     rangeKind: 'touch',
+    narratives: {
+      cast: [
+        '{name} lays a glowing palm on {target} — {spell}{slotNote}',
+        "{name}'s touch kindles a warm golden light around {target} — {spell}{slotNote}",
+        '{name} breathes a quiet prayer and touches {target} — {spell}{slotNote}',
+      ],
+    },
   },
   healing_word: {
     id: 'healing_word',
@@ -140,6 +147,13 @@ export const SRD_SPELLS: Record<string, Spell> = {
     desc: 'Three magical darts each deal 1d4+1 force damage, automatically hitting. +1 dart per slot above 1st.',
     rangeKind: 'ranged',
     rangeFt: 120,
+    narratives: {
+      cast: [
+        '{name} weaves {spell}{slotNote} — darts of pure force leap from their fingertips',
+        '{name} points and speaks the words of {spell}{slotNote} — silvery bolts streak unerring',
+        "Three glowing motes of {spell}{slotNote} spiral from {name}'s palm",
+      ],
+    },
   },
   shield: {
     id: 'shield',
@@ -148,6 +162,32 @@ export const SRD_SPELLS: Record<string, Spell> = {
     // targeted by the magic missile spell, you can cast this spell as a
     // reaction to gain +5 AC until the start of your next turn."
     desc: 'A reaction that grants +5 AC until the start of your next turn against the triggering attack and any others.',
+    level: 1,
+    castTime: 'reaction',
+    rangeKind: 'self',
+  },
+  silvery_barbs: {
+    id: 'silvery_barbs',
+    name: 'Silvery Barbs',
+    // Strixhaven, 1st-level enchantment. Reaction triggered on an
+    // enemy's successful attack/save/check. Forces the enemy to
+    // reroll the d20 and use the lower result. MVP handles the
+    // reroll branch only; the "ally gains advantage on next d20"
+    // follow-up is in docs/TODO.md.
+    desc: 'A reaction that forces an enemy to reroll a successful attack roll, taking the lower result.',
+    level: 1,
+    castTime: 'reaction',
+    rangeKind: 'self',
+  },
+  absorb_elements: {
+    id: 'absorb_elements',
+    name: 'Absorb Elements',
+    // PHB p.211 — abjuration, 1st-level. Reaction triggered when the
+    // caster takes acid / cold / fire / lightning / thunder damage.
+    // MVP halves the trigger damage on accept; the "resistance until
+    // next turn" + "+1d6 next melee" enhancements are TODOs tracked
+    // in docs/TODO.md.
+    desc: 'A reaction that halves the triggering elemental damage (acid / cold / fire / lightning / thunder).',
     level: 1,
     castTime: 'reaction',
     rangeKind: 'self',
@@ -272,10 +312,14 @@ export const SRD_SPELLS: Record<string, Spell> = {
     id: 'divine_smite_spell',
     name: 'Divine Smite',
     level: 1,
-    castTime: 'action',
+    // 2024 PHB — bonus-action cast. The spell doesn't deal damage on
+    // its own; it pre-buffs the caster so the next successful weapon
+    // attack within 1 minute / before the end of the next turn adds
+    // +2d8 radiant (upcast +1d8 per level above 1).
+    castTime: 'bonusAction',
     damageType: 'radiant',
     damage: '2d8',
-    desc: 'When you hit with a melee attack, you may expend a spell slot to deal +2d8 radiant damage.',
+    desc: 'Bonus action. Next successful weapon attack within 1 minute deals an extra 2d8 radiant damage (upcast +1d8 per level above 1st).',
     rangeKind: 'self',
   },
 
@@ -347,6 +391,13 @@ export const SRD_SPELLS: Record<string, Spell> = {
     rangeKind: 'ranged',
     rangeFt: 150,
     desc: 'A bright streak erupts into a ball of flame.',
+    narratives: {
+      cast: [
+        '{name} hurls a tiny bead of flame — {spell}{slotNote} blooms into a roaring sphere of fire',
+        '{name} speaks the syllables of {spell}{slotNote} and a spark blossoms into an inferno',
+        "A glowing mote leaps from {name}'s palm — {spell}{slotNote} detonates in a wave of heat",
+      ],
+    },
   },
   hunger_of_hadar: {
     id: 'hunger_of_hadar',

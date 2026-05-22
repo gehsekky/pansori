@@ -1,5 +1,6 @@
 import type { ActionHandler } from './types.js';
 import { buildArrivalNarrative } from '../gameEngine.js';
+import { fmt } from '../narrativeFmt.js';
 
 /**
  * `examine`: re-emit the room's arrival narrative. Appends combat
@@ -13,7 +14,7 @@ export const handleExamine: ActionHandler<{ type: 'examine' }> = (ctx) => {
   let narrative = buildArrivalNarrative(ctx.roomId, ctx.st, ctx.seed, ctx.context);
   if (ctx.st.combat_active) narrative += ` You are in combat!`;
   if (ctx.char.conditions.length > 0) {
-    narrative += ` [Conditions: ${ctx.char.conditions.join(', ')}]`;
+    narrative += ` ${fmt.note(`[Conditions: ${ctx.char.conditions.join(', ')}]`)}`;
   }
   ctx.narrative = narrative;
 };

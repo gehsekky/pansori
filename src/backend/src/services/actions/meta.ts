@@ -1,3 +1,4 @@
+import { applyFeatTake, canTakeFeat, getFeat } from '../feats.js';
 import type { AbilityKey } from '../../types.js';
 import type { ActionHandler } from './types.js';
 import { preparedSpellsCap } from '../gameEngine.js';
@@ -110,4 +111,60 @@ export const handlePrepareSpells: ActionHandler<{
   ctx.char = { ...ctx.char, prepared_spells: leveledIds };
   const spellNames = leveledIds.map((id) => ctx.context.spellTable?.[id]?.name ?? id).join(', ');
   ctx.narrative = `${ctx.char.name} prepares their spells for the day: ${spellNames || '(none)'}.`;
+};
+
+/**
+ * `take_feat`: choose a feat. Surfaced at character creation (origin
+ * feats from background) and at ASI levels (general feats replace the
+ * +2 ability bump). The handler runs the prereq check, then applies
+ * take-time bonuses via `applyFeatTake` (HP grant for Tough, +1
+ * ability for half-feats, save profs for Resilient, etc.). Active-
+ * effect feats (Lucky, Sharpshooter) only register here; their
+ * runtime hooks fire at the relevant gameplay moment in follow-up
+ * PRs.
+ *
+ * `asi_pending` is consumed when the feat is taken in lieu of an ASI.
+ * Origin feats from backgrounds don't consume it; the FE picks the
+ * right scope when surfacing the action.
+ */
+export const handleTakeFeat: ActionHandler<{
+  type: 'take_feat';
+  featId: string;
+  abilityChoice?: AbilityKey;
+  saveProficiencyChoices?: AbilityKey[];
+}> = (ctx, action) => {
+  const feat = getFeat(action.featId, ctx.context);
+  if (!feat) {
+    ctx.narrative = `Unknown feat: ${action.featId}.`;
+    return;
+  }
+  const fail = canTakeFeat(ctx.char, feat);
+  if (fail) {
+    ctx.narrative = fail;
+    return;
+  }
+  // Half-feats with player-chosen ability need a pick.
+  if (feat.abilityBonus && 'choices' in feat.abilityBonus && !action.abilityChoice) {
+    ctx.narrative = `${feat.name} is a half-feat — pick an ability for the +1 bonus.`;
+    return;
+  }
+  // save-proficiency feats with empty `abilities` need a pick.
+  if (
+    feat.effect.kind === 'save-proficiency' &&
+    feat.effect.abilities.length === 0 &&
+    (!action.saveProficiencyChoices || action.saveProficiencyChoices.length === 0)
+  ) {
+    ctx.narrative = `${feat.name} requires a save-proficiency choice.`;
+    return;
+  }
+
+  const { newChar, narrative } = applyFeatTake(ctx.char, feat, {
+    abilityChoice: action.abilityChoice,
+    saveProficiencyChoices: action.saveProficiencyChoices,
+  });
+  // ASI-slot consumption — only when an ASI was pending (general-feat
+  // path). Origin feats from background don't gate on asi_pending.
+  const consumeAsi = ctx.char.asi_pending && feat.category === 'general';
+  ctx.char = consumeAsi ? { ...newChar, asi_pending: false } : newChar;
+  ctx.narrative = narrative;
 };

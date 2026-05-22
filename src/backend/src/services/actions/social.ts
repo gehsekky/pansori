@@ -155,3 +155,207 @@ export const handleAttackNpc: ActionHandler<{ type: 'attack_npc' }> = (ctx) => {
   ctx.commitChar();
   return { replaceWith: { type: 'attack', targetEnemyId: `npc:${ctx.roomId}` } };
 };
+
+/**
+ * 2024 PHB **Influence action**. Distinct from `talk` (free narrative
+ * dialogue):
+ *
+ *   - **Talk** = open-ended chat, costless, no skill check. Player
+ *     learns information and uncovers dialogue paths.
+ *   - **Influence** = mechanical attempt to change an NPC's behavior
+ *     or coerce an enemy mid-fight. Triggers a CHA-based skill check.
+ *
+ * Costs:
+ *   - In combat: consumes the Action for the turn (no attack on a
+ *     turn the Rogue tries to talk a bandit into yielding).
+ *   - Out of combat: no action cost (the 10-min narrative time
+ *     investment doesn't translate to Pansori's turn loop).
+ *
+ * DC: `max(15, target's INT)`. Roll d20 + CHA mod + proficiency
+ * bonus (if the PC is proficient in the chosen skill).
+ *
+ * Outcomes:
+ *   - **Enemy target, success**: enemy yields / flees — added to
+ *     `enemies_killed` so the engine treats them as removed without
+ *     XP penalty. Narrative says they retreated.
+ *   - **Enemy target, fail**: action spent, narrative-only.
+ *   - **NPC target, success**: shifts `npc_attitudes[roomId]` one
+ *     step friendlier (hostile → indifferent → friendly).
+ *   - **NPC target, fail**: narrative-only.
+ *
+ * The pre-existing `talk` flow's implicit Persuasion check for
+ * indifferent NPCs remains — those are framed as "the act of
+ * approaching counts as a soft check." `influence` is the explicit,
+ * high-stakes path.
+ */
+export const handleInfluence: ActionHandler<{
+  type: 'influence';
+  skill: 'persuasion' | 'deception' | 'intimidation';
+  targetNpcRoomId?: string;
+  targetEnemyId?: string;
+}> = (ctx, action) => {
+  // Resolve target: prefer explicit npc room, then explicit enemy,
+  // then current-room npc if either is omitted.
+  const npcRoomId = action.targetNpcRoomId ?? ctx.roomId;
+  const npc = ctx.seed.npcs?.[npcRoomId];
+  const enemy = action.targetEnemyId
+    ? ctx.livingEnemiesInRoom.find((e) => e.id === action.targetEnemyId)
+    : null;
+
+  if (!npc && !enemy) {
+    return { rejected: 'No valid target to influence here.' };
+  }
+
+  // DC: max(15, target INT). Monsters have `int` in their template;
+  // NPCs do not (their template has only the social `persuasionDC`
+  // we already use for `talk`). For NPC targets we use the higher of
+  // 15 or the existing `persuasionDC`.
+  const targetIntScore = enemy
+    ? ((enemy as unknown as Record<string, number>).int ?? 10)
+    : (npc?.persuasionDC ?? 12);
+  const dc = Math.max(15, targetIntScore);
+
+  const chaMod = abilityMod(ctx.char.cha);
+  const skillName = action.skill; // 'persuasion' | 'deception' | 'intimidation'
+  const profMod = ctx.char.skill_proficiencies?.includes(skillName) ? profBonus(ctx.char.level) : 0;
+  const d20 = rollDice('1d20');
+  const total = d20 + chaMod + profMod;
+  const success = total >= dc;
+
+  const skillLabel = {
+    persuasion: 'Persuasion',
+    deception: 'Deception',
+    intimidation: 'Intimidation',
+  }[action.skill];
+
+  // Combat-mode action cost: spend the Action regardless of success.
+  // The check is committed effort; failure still costs the action slot.
+  const inCombat = ctx.st.combat_active === true;
+  if (inCombat) {
+    ctx.char = {
+      ...ctx.char,
+      turn_actions: { ...ctx.char.turn_actions, action_used: true },
+    };
+  }
+
+  if (success) {
+    if (enemy) {
+      // Enemy yields. Mark as killed (no XP) and narrate the retreat.
+      ctx.st = {
+        ...ctx.st,
+        enemies_killed: [...ctx.st.enemies_killed, enemy.id],
+      };
+      ctx.narrative = `${ctx.char.name} attempts a ${skillLabel} check on ${enemy.name} (${total} vs DC ${dc}) — success! ${enemy.name} yields and retreats from the fight.`;
+    } else if (npc) {
+      const currentAttitude = ctx.st.npc_attitudes?.[npcRoomId] ?? npc.attitude;
+      const nextAttitude =
+        currentAttitude === 'hostile'
+          ? 'indifferent'
+          : currentAttitude === 'indifferent'
+            ? 'friendly'
+            : 'friendly';
+      ctx.st = {
+        ...ctx.st,
+        npc_attitudes: { ...ctx.st.npc_attitudes, [npcRoomId]: nextAttitude },
+      };
+      ctx.narrative = `${ctx.char.name} uses ${skillLabel} on ${npc.name} (${total} vs DC ${dc}) — success! ${npc.name}'s attitude shifts to ${nextAttitude}.`;
+    }
+  } else {
+    const targetName = enemy ? enemy.name : (npc?.name ?? 'them');
+    ctx.narrative = `${ctx.char.name} tries to ${skillLabel.toLowerCase()} ${targetName} (${total} vs DC ${dc}) — fails. ${targetName} is unmoved.`;
+  }
+  ctx.usedInitiative = inCombat;
+};
+
+/**
+ * 2024 PHB **Study action**. INT-based mental-deduction action,
+ * distinct from `examine` (which is informal in pansori — short
+ * sensory description with no roll). 5.5e splits the old "look at
+ * something" into:
+ *
+ *   - **Search** (WIS) — physical senses; spot hidden things.
+ *   - **Study** (INT) — recall lore, deduce mechanism, identify
+ *     creatures.
+ *
+ * This handler covers the **creature-analysis** branch: roll INT +
+ * skill (Arcana / History / Investigation / Nature / Religion) vs
+ * DC. On success, reveal the target's known weaknesses
+ * (`vulnerabilities`, `resistances`, `immunities`,
+ * `condition_immunities`) so the player can make informed
+ * tactical choices. Failure spends the action with no info.
+ *
+ * DC: `15 + Math.floor(enemy.cr ?? 0)` for creature analysis.
+ * (Pansori monsters don't all carry CR; fall back to 15.)
+ *
+ * In combat: consumes the Action. Out of combat: no cost. The
+ * object-analysis and free-form lore-recall branches are TODO —
+ * the type already accepts `loreTopic` so future PRs can extend
+ * here.
+ */
+export const handleStudy: ActionHandler<{
+  type: 'study';
+  skill: 'arcana' | 'history' | 'investigation' | 'nature' | 'religion';
+  targetEnemyId?: string;
+  loreTopic?: string;
+}> = (ctx, action) => {
+  const enemy = action.targetEnemyId
+    ? ctx.livingEnemiesInRoom.find((e) => e.id === action.targetEnemyId)
+    : null;
+  // For now, creature-analysis is the only resolved branch. Free-form
+  // lore + object analysis bounce off with a narrative-only message.
+  if (!enemy) {
+    if (action.loreTopic) {
+      ctx.narrative = `${ctx.char.name} contemplates "${action.loreTopic}", but the engine doesn't yet model freeform lore recall.`;
+      return;
+    }
+    return { rejected: 'No valid creature to study here.' };
+  }
+
+  const enemyCr = (enemy as unknown as Record<string, number>).cr ?? 0;
+  const dc = 15 + Math.floor(enemyCr);
+  const intMod = abilityMod(ctx.char.int);
+  const skillName = action.skill;
+  const profMod = ctx.char.skill_proficiencies?.includes(skillName) ? profBonus(ctx.char.level) : 0;
+  const d20 = rollDice('1d20');
+  const total = d20 + intMod + profMod;
+  const success = total >= dc;
+
+  const skillLabel = {
+    arcana: 'Arcana',
+    history: 'History',
+    investigation: 'Investigation',
+    nature: 'Nature',
+    religion: 'Religion',
+  }[action.skill];
+
+  const inCombat = ctx.st.combat_active === true;
+  if (inCombat) {
+    ctx.char = {
+      ...ctx.char,
+      turn_actions: { ...ctx.char.turn_actions, action_used: true },
+    };
+  }
+
+  if (!success) {
+    ctx.narrative = `${ctx.char.name} studies ${enemy.name} (INT ${skillLabel} ${total} vs DC ${dc}) — fails to recall anything useful.`;
+    ctx.usedInitiative = inCombat;
+    return;
+  }
+
+  const facts: string[] = [];
+  if (enemy.vulnerabilities && enemy.vulnerabilities.length > 0) {
+    facts.push(`vulnerable to ${enemy.vulnerabilities.join(', ')}`);
+  }
+  if (enemy.resistances && enemy.resistances.length > 0) {
+    facts.push(`resistant to ${enemy.resistances.join(', ')}`);
+  }
+  if (enemy.immunities && enemy.immunities.length > 0) {
+    facts.push(`immune to ${enemy.immunities.join(', ')}`);
+  }
+  if (enemy.condition_immunities && enemy.condition_immunities.length > 0) {
+    facts.push(`cannot be ${enemy.condition_immunities.join(' / ')}`);
+  }
+  const summary = facts.length > 0 ? facts.join('; ') : 'no notable weaknesses or strengths';
+  ctx.narrative = `${ctx.char.name} studies ${enemy.name} (INT ${skillLabel} ${total} vs DC ${dc}) — success! ${enemy.name} is ${summary}.`;
+  ctx.usedInitiative = inCombat;
+};

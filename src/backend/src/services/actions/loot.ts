@@ -1,4 +1,5 @@
 import type { ActionHandler } from './types.js';
+import { fmt } from '../narrativeFmt.js';
 import { pick } from '../gameEngine.js';
 import { randomUUID } from 'crypto';
 
@@ -40,9 +41,9 @@ export const handleLoot: ActionHandler<{ type: 'loot' }> = (ctx) => {
       ['arcana', 'investigation'].includes(s)
     ) ?? false;
   if (isMagicMisc && !hasIdentify) {
-    narrative += ` [${loot.name}: unidentified]`;
+    narrative += ` ${fmt.note(`[${loot.name}: unidentified]`)}`;
   } else {
-    narrative += ` [${loot.name}: ${loot.desc}]`;
+    narrative += ` ${fmt.note(`[${loot.name}: ${loot.desc}]`)}`;
     if (hasIdentify && isMagicMisc) {
       narrative += ' Your expertise lets you identify it immediately.';
     }

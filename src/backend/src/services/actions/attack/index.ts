@@ -12,18 +12,15 @@ import {
 } from '../../rulesEngine.js';
 import {
   applyPartyLevelUps,
-  buildCombatHitNarrative,
   endCombatState,
   getEnemyById,
   grantDarkOnesBlessing,
-  hpTier,
   isRoomCleared,
   pick,
-  pickTiered,
-  pushEvent,
   splitEncounterXp,
 } from '../../gameEngine.js';
 import type { ActionHandler } from '../types.js';
+import { composeNow } from '../../narrative/compose.js';
 import { computeToHitContext } from './toHit.js';
 import { fmt } from '../../narrativeFmt.js';
 import { posEqual } from '../../gridEngine.js';
@@ -184,40 +181,31 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
     if (atk.fumble) {
       // 2024 PHB — a Nat 1 on a d20 grants Heroic Inspiration. Failure
       // becomes the seed of next turn's success.
-      let inspirationNote = '';
+      const bonuses: { label: string }[] = [];
       if (!ctx.char.inspiration) {
         ctx.char = { ...ctx.char, inspiration: true };
-        inspirationNote = ` ✦ Heroic Inspiration granted (${ctx.char.name}).`;
+        // Inspiration grant is conceptually a narrative aside, not a
+        // mechanical bracket — but routing it through bonuses keeps
+        // LLM input free of the ✦ symbol and keeps the composer as
+        // the single source of fragment prose.
+        bonuses.push({ label: `✦ Heroic Inspiration granted (${ctx.char.name}).` });
       }
-      ctx.narrative += `Natural 1 — a fumble! ${weaponLabel} goes completely wide.${atkNote}${inspirationNote} `;
-      ctx.st = pushEvent(ctx.st, {
+      composeNow(ctx, {
         kind: 'attack_miss',
         attackerId: ctx.char.id,
         attackerName: ctx.char.name,
-        targetId,
-        targetName: target.name,
+        target,
+        weaponLabel,
         toHit: atk.total,
         targetAc: target.ac,
-        round: ctx.st.round ?? 1,
+        atkNote,
+        reason: 'fumble',
+        bonuses,
       });
       return false;
     }
     if (!atk.hit) {
-      ctx.narrative += pickTiered(ctx.context.narratives.combatMiss, hpTier(ctx.char)).replace(
-        /{enemy}/g,
-        target.name
-      );
-      ctx.narrative += atkNote + ' ';
-      ctx.st = pushEvent(ctx.st, {
-        kind: 'attack_miss',
-        attackerId: ctx.char.id,
-        attackerName: ctx.char.name,
-        targetId,
-        targetName: target.name,
-        toHit: atk.total,
-        targetAc: target.ac,
-        round: ctx.st.round ?? 1,
-      });
+      const bonuses: { label: string }[] = [];
       // 2024 PHB Fighter L13 — Studied Attacks. On miss, mark the target
       // so this Fighter's next attack against them has advantage.
       if (ctx.char.character_class.toLowerCase() === 'fighter' && ctx.char.level >= 13) {
@@ -233,7 +221,9 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
               : e
           ),
         };
-        ctx.narrative += ` [Studied Attacks: advantage on next attack vs ${target.name}]`;
+        bonuses.push({
+          label: `Studied Attacks: advantage on next attack vs ${target.name}`,
+        });
       }
       // 2024 PHB Graze weapon mastery (greatsword, glaive) — even on a
       // miss, deal STR mod damage (DEX for Finesse weapons). Floor at 0.
@@ -251,9 +241,22 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
               e.id === targetId && e.isEnemy ? { ...e, hp: grazedHp } : e
             ),
           };
-          ctx.narrative += `[Graze: ${target.name} still takes ${fmt.dmg(grazeDmg)} damage from the swing.] `;
+          bonuses.push({
+            label: `Graze: ${target.name} still takes ${fmt.dmg(grazeDmg)} damage from the swing.`,
+          });
         }
       }
+      composeNow(ctx, {
+        kind: 'attack_miss',
+        attackerId: ctx.char.id,
+        attackerName: ctx.char.name,
+        target,
+        weaponLabel,
+        toHit: atk.total,
+        targetAc: target.ac,
+        atkNote,
+        bonuses,
+      });
       return false;
     }
 
@@ -298,48 +301,99 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
         ? rageDamageBonus(ctx.char.level)
         : 0;
 
+    // ── Divine Smite (2024 PHB) ─────────────────────────────────────
+    // Pre-buff from the bonus-action `divine_smite_spell` cast.
+    // Consumes `divine_smite_dice` on the next weapon hit and rolls
+    // that many d8 radiant. Crit doubles the dice per RAW
+    // ("you can roll the spell's damage dice twice and add them
+    // together" — 2024 PHB Divine Smite).
+    let smiteDmg = 0;
+    let smiteDice = 0;
+    if (
+      (ctx.char.divine_smite_dice ?? 0) > 0 &&
+      (weaponItem || ctx.char.character_class.toLowerCase() === 'monk')
+    ) {
+      smiteDice = ctx.char.divine_smite_dice!;
+      const expr = `${smiteDice}d8`;
+      smiteDmg = isCrit ? rollCritical(expr) : rollDice(expr);
+      ctx.char.divine_smite_dice = undefined;
+    }
+
+    // ── Improved Divine Smite (Paladin L11+) ────────────────────────
+    // Passive radiant rider: every melee-weapon hit adds 1d8 radiant.
+    // (No interaction with the spell version — both stack RAW. Crit
+    // doubles the d8.) RAW restricts to Melee Weapon only — ranged
+    // attacks don't qualify; the spell version DOES allow ranged so
+    // the gating differs between the two.
+    let improvedSmiteDmg = 0;
+    if (
+      ctx.char.character_class.toLowerCase() === 'paladin' &&
+      (ctx.char.level ?? 1) >= 11 &&
+      weaponItem &&
+      weaponItem.range !== 'ranged'
+    ) {
+      improvedSmiteDmg = isCrit ? rollCritical('1d8') : rollDice('1d8');
+    }
+
     const rawDmg = baseHit + sneakDmg + rageBonus;
     const { damage: finalDmg, note: dmgNote } = applyDamageMultiplier(
       rawDmg,
       weaponItem?.damageType,
       target
     );
+    // Radiant damage rides on top of the weapon multiplier (a creature
+    // resistant to the weapon's damage type still takes full radiant).
+    // RAW radiant-resistant creatures would halve this too — TODO:
+    // separate multiplier check for radiant.
+    const radiantRider = smiteDmg + improvedSmiteDmg;
+    const totalDmg = finalDmg + radiantRider;
     const enemyEnt = ctx.st.entities?.find((e) => e.id === targetId && e.isEnemy);
     const curEnemyHp = enemyEnt?.hp ?? 0;
-    const newEnemyHp = curEnemyHp - finalDmg;
+    const newEnemyHp = curEnemyHp - totalDmg;
 
-    ctx.narrative += buildCombatHitNarrative(
-      target,
-      weaponItem,
-      finalDmg,
-      isCrit,
-      ctx.char,
-      ctx.context
-    );
-    ctx.narrative += atkNote;
-    if (isCrit && assassinAutoCrit)
-      ctx.narrative += ` [Assassinate — auto-crit on surprised target!]`;
-    if (sacredWeaponBonus > 0) ctx.narrative += ` [Sacred Weapon: +${sacredWeaponBonus} to hit]`;
+    const hitBonuses: { label: string }[] = [];
+    if (isCrit && assassinAutoCrit) {
+      hitBonuses.push({ label: 'Assassinate — auto-crit on surprised target!' });
+    }
+    if (sacredWeaponBonus > 0) {
+      hitBonuses.push({ label: `Sacred Weapon: +${sacredWeaponBonus} to hit` });
+    }
     if (sneakDmg > 0) {
       const saExpr = sneakAttackDice(ctx.char.level);
       const saLabel = isCrit ? `${parseInt(saExpr) * 2}d6 (crit)` : saExpr;
-      ctx.narrative += ` [Sneak Attack ${saLabel}: +${sneakDmg}]`;
+      hitBonuses.push({ label: `Sneak Attack ${saLabel}: +${sneakDmg}` });
     }
-    if (rageBonus > 0) ctx.narrative += ` [Rage: +${rageBonus}]`;
-    if (dmgNote) ctx.narrative += dmgNote;
-
-    ctx.st = pushEvent(ctx.st, {
+    if (rageBonus > 0) {
+      hitBonuses.push({ label: `Rage: +${rageBonus}` });
+    }
+    if (dmgNote) {
+      // dmgNote arrives as " [resistant: 6 → 3]" — strip leading space and
+      // the surrounding brackets so the composer's fmt.note wrap doesn't
+      // double-bracket.
+      const labelText = dmgNote.replace(/^\s*\[(.*)\]\s*$/, '$1');
+      hitBonuses.push({ label: labelText });
+    }
+    if (smiteDmg > 0) {
+      const expr = isCrit ? `${smiteDice * 2}d8 (crit)` : `${smiteDice}d8`;
+      hitBonuses.push({ label: `Divine Smite ${expr}: +${smiteDmg} radiant` });
+    }
+    if (improvedSmiteDmg > 0) {
+      const expr = isCrit ? '2d8 (crit)' : '1d8';
+      hitBonuses.push({ label: `Improved Divine Smite ${expr}: +${improvedSmiteDmg} radiant` });
+    }
+    composeNow(ctx, {
       kind: 'attack_hit',
       attackerId: ctx.char.id,
       attackerName: ctx.char.name,
-      targetId,
-      targetName: target.name,
-      damage: finalDmg,
+      target,
+      weapon: weaponItem ?? null,
+      damage: totalDmg,
       damageType: weaponItem?.damageType ?? 'physical',
       isCrit,
       toHit: atk.total,
       targetAc: target.ac,
-      round: ctx.st.round ?? 1,
+      atkNote,
+      bonuses: hitBonuses,
     });
 
     // ── 2024 PHB Cunning Strike effect application ───────────────────────
@@ -365,23 +419,22 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
                 : e
             ),
           };
-          ctx.st = pushEvent(ctx.st, {
+          composeNow(ctx, {
             kind: 'condition_applied',
             targetId,
             targetName: target.name,
             condition: 'prone',
             source: 'Cunning Strike: Trip',
-            round: ctx.st.round ?? 1,
+            prose: ` ${fmt.note(`[Cunning Strike — Trip: DEX ${dexSave} vs DC ${csDc} — ${target.name} is prone!]`)}`,
           });
-          ctx.narrative += ` [Cunning Strike — Trip: DEX ${dexSave} vs DC ${csDc} — ${target.name} is prone!]`;
         } else {
-          ctx.narrative += ` [Cunning Strike — Trip: DEX ${dexSave} vs DC ${csDc} — resists]`;
+          ctx.narrative += ` ${fmt.note(`[Cunning Strike — Trip: DEX ${dexSave} vs DC ${csDc} — resists]`)}`;
         }
       } else if (csEffect === 'poison') {
         const enemyCon = (target.con ?? 10) as number;
         const conSave = rollDice('1d20') + abilityMod(enemyCon);
         if (target.condition_immunities?.includes('poisoned')) {
-          ctx.narrative += ` [Cunning Strike — Poison: ${target.name} is immune]`;
+          ctx.narrative += ` ${fmt.note(`[Cunning Strike — Poison: ${target.name} is immune]`)}`;
         } else if (conSave < csDc) {
           ctx.st = {
             ...ctx.st,
@@ -394,24 +447,23 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
                 : e
             ),
           };
-          ctx.st = pushEvent(ctx.st, {
+          composeNow(ctx, {
             kind: 'condition_applied',
             targetId,
             targetName: target.name,
             condition: 'poisoned',
             source: 'Cunning Strike: Poison',
-            round: ctx.st.round ?? 1,
+            prose: ` ${fmt.note(`[Cunning Strike — Poison: CON ${conSave} vs DC ${csDc} — ${target.name} is poisoned!]`)}`,
           });
-          ctx.narrative += ` [Cunning Strike — Poison: CON ${conSave} vs DC ${csDc} — ${target.name} is poisoned!]`;
         } else {
-          ctx.narrative += ` [Cunning Strike — Poison: CON ${conSave} vs DC ${csDc} — resists]`;
+          ctx.narrative += ` ${fmt.note(`[Cunning Strike — Poison: CON ${conSave} vs DC ${csDc} — resists]`)}`;
         }
       } else if (csEffect === 'withdraw') {
         ctx.char = {
           ...ctx.char,
           turn_actions: { ...ctx.char.turn_actions, disengaged: true },
         };
-        ctx.narrative += ` [Cunning Strike — Withdraw: ${ctx.char.name} disengages without provoking OAs]`;
+        ctx.narrative += ` ${fmt.note(`[Cunning Strike — Withdraw: ${ctx.char.name} disengages without provoking OAs]`)}`;
       } else if (csEffect === 'disarm') {
         ctx.st = {
           ...ctx.st,
@@ -424,15 +476,14 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
               : e
           ),
         };
-        ctx.st = pushEvent(ctx.st, {
+        composeNow(ctx, {
           kind: 'condition_applied',
           targetId,
           targetName: target.name,
           condition: 'disarmed',
           source: 'Cunning Strike: Disarm',
-          round: ctx.st.round ?? 1,
+          prose: ` ${fmt.note(`[Cunning Strike — Disarm: ${target.name} drops their weapon!]`)}`,
         });
-        ctx.narrative += ` [Cunning Strike — Disarm: ${target.name} drops their weapon!]`;
       }
     }
 
@@ -451,7 +502,7 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
           ...ctx.char,
           turn_actions: { ...ctx.char.turn_actions, tactical_master_mastery: undefined },
         };
-        ctx.narrative += ` [Tactical Master: applying ${mastery.toUpperCase()}]`;
+        ctx.narrative += ` ${fmt.note(`[Tactical Master: applying ${mastery.toUpperCase()}]`)}`;
       }
       const weaponDc = 8 + profBonus(ctx.char.level) + abilityMod(ctx.char.str);
       if (mastery === 'vex') {
@@ -464,7 +515,7 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
               : e
           ),
         };
-        ctx.narrative += ` [Vex: advantage on your next attack vs ${target.name}]`;
+        ctx.narrative += ` ${fmt.note(`[Vex: advantage on your next attack vs ${target.name}]`)}`;
       } else if (mastery === 'topple') {
         const enemyCon = (target.con ?? 10) as number;
         const conSave = rollDice('1d20') + abilityMod(enemyCon);
@@ -480,17 +531,16 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
                 : e
             ),
           };
-          ctx.st = pushEvent(ctx.st, {
+          composeNow(ctx, {
             kind: 'condition_applied',
             targetId,
             targetName: target.name,
             condition: 'prone',
             source: 'Topple (weapon mastery)',
-            round: ctx.st.round ?? 1,
+            prose: ` ${fmt.note(`[Topple: CON ${conSave} vs DC ${weaponDc} — ${target.name} is prone!]`)}`,
           });
-          ctx.narrative += ` [Topple: CON ${conSave} vs DC ${weaponDc} — ${target.name} is prone!]`;
         } else {
-          ctx.narrative += ` [Topple: CON ${conSave} vs DC ${weaponDc} — resists]`;
+          ctx.narrative += ` ${fmt.note(`[Topple: CON ${conSave} vs DC ${weaponDc} — resists]`)}`;
         }
       } else if (mastery === 'push') {
         const charEnt = ctx.st.entities?.find((e) => e.id === ctx.char.id);
@@ -505,7 +555,7 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
               e.id === targetId && e.isEnemy ? { ...e, pos: newPos } : e
             ),
           };
-          ctx.narrative += ` [Push: ${target.name} shoved 10 ft back]`;
+          ctx.narrative += ` ${fmt.note(`[Push: ${target.name} shoved 10 ft back]`)}`;
         }
       } else if (mastery === 'sap') {
         ctx.st = {
@@ -519,7 +569,7 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
               : e
           ),
         };
-        ctx.narrative += ` [Sap: ${target.name} has disadvantage on its next attack]`;
+        ctx.narrative += ` ${fmt.note(`[Sap: ${target.name} has disadvantage on its next attack]`)}`;
       } else if (mastery === 'slow') {
         ctx.st = {
           ...ctx.st,
@@ -532,7 +582,7 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
               : e
           ),
         };
-        ctx.narrative += ` [Slow: ${target.name}'s speed -10 ft]`;
+        ctx.narrative += ` ${fmt.note(`[Slow: ${target.name}'s speed -10 ft]`)}`;
       } else if (mastery === 'cleave') {
         // 2024 PHB Cleave (greataxe, halberd) — second enemy within 5 ft
         // takes the weapon's damage die (no ability mod).
@@ -591,20 +641,20 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
           conditions: ctx.char.conditions.filter((c) => c !== 'raging'),
         };
       }
-      ctx.st = pushEvent(ctx.st, {
-        kind: 'kill',
+      const killProse =
+        ' ' +
+        pick(ctx.context.narratives.killShot)
+          .replace('{enemy}', target.name)
+          .replace('{xp}', String(xpShare));
+      composeNow(ctx, {
+        kind: 'attack_kill',
         attackerId: ctx.char.id,
         attackerName: ctx.char.name,
         victimId: targetId,
         victimName: target.name,
         xp: xpShare,
-        round: ctx.st.round ?? 1,
+        killProse,
       });
-      ctx.narrative +=
-        ' ' +
-        pick(ctx.context.narratives.killShot)
-          .replace('{enemy}', target.name)
-          .replace('{xp}', String(xpShare));
       ctx.narrative += applyPartyLevelUps(ctx.st, ctx.char, ctx.context);
       ctx.usedInitiative = true;
       return true;
