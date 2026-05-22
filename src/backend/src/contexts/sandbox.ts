@@ -519,6 +519,7 @@ export const context: Context = {
       damageType: 'slashing',
       mastery: 'graze',
       heavy: true,
+      reach: true,
     },
     {
       id: 'halberd',
@@ -537,6 +538,7 @@ export const context: Context = {
       damageType: 'slashing',
       mastery: 'cleave',
       heavy: true,
+      reach: true,
     },
     {
       id: 'pike',
@@ -555,6 +557,7 @@ export const context: Context = {
       damageType: 'piercing',
       mastery: 'push',
       heavy: true,
+      reach: true,
     },
     {
       id: 'longbow',
