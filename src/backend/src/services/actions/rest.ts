@@ -221,6 +221,11 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
       // 1-hour buff; long rest clears it for any PC carrying the
       // flag (the caster's or a previously-blessed ally's).
       tricksters_blessing_active: undefined,
+      // 2024 PHB Stars Druid — Starry Form is a 10-minute buff. The
+      // engine surface lacks a finer-grained timer than long rest,
+      // so the constellation persists until the next rest. Cleared
+      // here so the Druid starts the next adventuring day fresh.
+      starry_form_constellation: undefined,
       // 2024 PHB Diviner Wizard Portent — roll 2 d20s on each long
       // rest (3 at L14+). Stored on the character; player can use
       // them to replace rolls later (interception not wired yet).

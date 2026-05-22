@@ -32,15 +32,26 @@ export function runHealSpell(
   // Life Cleric: Disciple of Life — healing spells restore extra 2 + spell level HP
   const discipleBonus =
     ctx.char.subclass === 'life' && hasClass(ctx.char, 'cleric') ? 2 + (spell.level ?? 1) : 0;
-  const healed = baseHealed + discipleBonus;
+  // 2024 PHB Stars Druid — Chalice constellation: each healing spell
+  // the druid casts adds +1d8 to the healed amount. The bonus is
+  // computed once per cast (RAW says "When you cast a Spell ... the
+  // target regains additional Hit Points equal to 1d8") and shown on
+  // the heal fragment as a separate bonus.
+  const chaliceBonus =
+    ctx.char.starry_form_constellation === 'chalice' && hasClass(ctx.char, 'druid')
+      ? rollDice('1d8')
+      : 0;
+  const healed = baseHealed + discipleBonus + chaliceBonus;
   // Target the most injured party member (excluding the caster, unless only one)
   const injured = ctx.st.characters.filter(
     (c) => !c.dead && c.hp < c.max_hp && c.id !== ctx.char.id
   );
   const target = injured.length > 0 ? injured.reduce((a, b) => (a.hp < b.hp ? a : b)) : ctx.char;
   const isSelf = target.id === ctx.char.id;
-  const healBonuses =
-    discipleBonus > 0 ? [{ label: `Disciple of Life: +${discipleBonus}` }] : undefined;
+  const healBonusList: Array<{ label: string }> = [];
+  if (discipleBonus > 0) healBonusList.push({ label: `Disciple of Life: +${discipleBonus}` });
+  if (chaliceBonus > 0) healBonusList.push({ label: `Chalice constellation: +${chaliceBonus}` });
+  const healBonuses = healBonusList.length > 0 ? healBonusList : undefined;
   let targetNewHp: number;
   let actualHealed: number;
   if (isSelf) {
