@@ -330,7 +330,25 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 - [~] **gameEngine.ts action-handler refactor (mostly shipped; resolveOneAttack + castSpell internal splits remain)** — 29 PRs across one session decomposed `takeAction`'s inline switch into per-action handler files under `services/actions/`. `gameEngine.ts` shrank 10,052 → 4,704 lines (-53%). All 38 action types dispatch through `services/actions/index.ts` against an `ActionContext` object; the inline switch is empty (just the default unknown-action fallback). `classFeature.ts` (the largest single case at 1,712 lines) fully decomposed by class into `classFeature/{barbarian,fighter,rogue,monk,druid,casters,cleric,paladinRangerBard,species,index}.ts`. `attack.ts` partially split (preattack/combatStart/toHit extracted; resolveOneAttack closure remains inline at ~615 lines). `castSpell.ts` (~840 lines) lifted but not internally split yet. Architectural addition: **transformer pattern** (`replaceWith` / `delegateTo` on handler return) for actions that yield to a different action — used by `attack_npc` and `use_reaction`; ready for future 5.5e features like Eldritch Strike, Counterspell, War Caster, Beast Form attack overrides. **What remains**:
   - [ ] **`resolveOneAttack` extraction from `attack/index.ts`** (~615 lines) — the inner closure captures ~25 outer-scope variables. Cleanest extraction: introduce `AttackContext` struct (extends `ToHitContext` with target/weapon fields), pass to a top-level `resolveOneAttack(ctx, atk, label)`. Mostly cosmetic — the file is already organized into named phases. ~1 PR.
   - [ ] **`castSpell.ts` internal split** (~840 lines) — same shape as classFeature/: precast (gates), heal, utility (Bless special-case), attackRoll, save, aoe (sphere/cone/cube/line), multiTarget (Magic Missile + Eldritch Blast). ~4-6 PRs.
-  - [ ] **Suspicious bug in Monk Flurry kill resolution** — `ctx.st.enemies_killed = [...ctx.st.enemies_killed, ctx.roomId]` (instead of `ctx.enemy.id`) preserved verbatim from the original gameEngine.ts during PR 16. Looks wrong but no test caught it. Either the original used `roomId` as an enemy-id alias in single-enemy rooms (intentional), or it's a real bug that's been there since before the refactor. Worth a 30-min audit.
+  - [x] **Monk Flurry kill resolution + adjacent class-feature bugs**
+    (audited + fixed 2026-05-22). The suspicious `ctx.roomId` write to
+    `enemies_killed` was the tip of a bigger bug class: `monk.ts` (Flurry
+    of Blows) and `paladinRangerBard.ts` (Colossus Slayer, Vow of Enmity,
+    Abjure Enemy) plus `fighter.ts` (Trip Attack, Goading Attack) all
+    used `e.id === ctx.roomId && e.isEnemy` as their entity-lookup
+    predicate. Since entity ids are `${roomId}#0`, the predicate never
+    matched — Flurry's damage path silently no-op'd, Colossus Slayer
+    read 0 hp and "killed" a stale target on every cast, Vow of Enmity
+    set `vow_of_enmity_target` to the room id so the `toHit.ts`
+    advantage check never fired. All sites now key off `ctx.enemy?.id`.
+    Flurry + Colossus Slayer also previously called `endCombatState`
+    unconditionally on a kill — now gated behind `isRoomCleared` to
+    match the canonical attack-handler pattern. The test that
+    "covered" Flurry had a tautological `if (narrative.includes(...))
+    expect(narrative).toMatch(...)` wrapper; replaced with `flurryColossus.spec.ts`
+    (4 regression cases: damage applied, kill-bookkeeping with correct
+    id, no early combat-end with other enemies in the room, Vow of
+    Enmity target set to enemy id).
   - [ ] **Test gaps surfaced by sed false-positives** — PRs 15/16 sed translation introduced 3 latent bugs (`break;` → `return;` inside loops, sed-rewriting `enemy` inside string literals, if-chain breakage when deleting the first branch). All were fixed in PR 17 + caught manually during PR 20/25. The fact that 514 tests didn't catch them points to coverage gaps for Bless on 4+-member parties, Monk Flurry kill-on-first-strike, Frenzy with no enemy in range, and the unknown-feature fallback. ~2-3h to write targeted regression specs.
 
   See git history `3696339..1ced24e` (PRs 1-29) for full commit chain. Each PR is independently revertible; tests + lint + prettier gate every commit; no CI failures across the 29-PR series.
