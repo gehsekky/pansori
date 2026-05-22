@@ -3170,6 +3170,20 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         kind: 'two_weapon_attack', // reuse the bonus-action-attack category for now
       });
     }
+    // Great Weapon Master bonus-action attack — flagged on the
+    // PC after a heavy-weapon Crit or kill earlier this turn.
+    if (
+      char.turn_actions.gwm_bonus_attack_pending &&
+      equippedWpnItem?.heavy &&
+      livingEnemies.length > 0
+    ) {
+      choices.push({
+        label: `Great Weapon Master — bonus attack with the ${equippedWpnItem.name}`,
+        action: { type: 'gwm_bonus_attack', targetEnemyId: livingEnemies[0].id },
+        requiresBonusAction: true,
+        kind: 'two_weapon_attack', // reuse the bonus-action-attack category
+      });
+    }
   }
 
   // Try to escape grapple — SRD 5.2.1 p.16, contested Athletics or Acrobatics

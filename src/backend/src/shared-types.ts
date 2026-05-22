@@ -202,6 +202,9 @@ export type StructuredAction =
   // Polearm Master (2024 PHB) — bonus-action butt-end attack with
   // a qualifying polearm. Available after the Attack action.
   | { type: 'polearm_butt_end'; targetEnemyId?: string }
+  // Great Weapon Master (2024 PHB) — bonus-action attack after a
+  // Heavy-weapon Crit or kill on this turn.
+  | { type: 'gwm_bonus_attack'; targetEnemyId?: string }
   // Healer feat (2024 PHB) — action, spend one charge of a
   // Healer's Kit to heal a target 1d6 + 4 + prof.
   | { type: 'use_healer_kit'; targetCharId: string }
@@ -274,6 +277,7 @@ export type ChoiceKind =
   | 'shove'
   | 'two_weapon_attack'
   | 'polearm_butt_end'
+  | 'gwm_bonus_attack'
   | 'cast_spell'
   | 'class_feature';
 

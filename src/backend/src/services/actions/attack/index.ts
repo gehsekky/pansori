@@ -685,6 +685,22 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
       }
     }
 
+    // 2024 PHB Great Weapon Master — when a Heavy-weapon hit
+    // scores a Crit OR reduces a creature to 0 HP, queue a
+    // bonus-action attack. Surfaced as the `gwm_bonus_attack`
+    // choice; cleared by FRESH_TURN at turn start. The damage
+    // rider above (gwm_used flag) is separate from this trigger.
+    if (
+      (ctx.char.feats ?? []).includes('great_weapon_master') &&
+      weaponItem?.heavy &&
+      (isCrit || newEnemyHp <= 0) &&
+      !ctx.char.turn_actions.bonus_action_used
+    ) {
+      ctx.char = {
+        ...ctx.char,
+        turn_actions: { ...ctx.char.turn_actions, gwm_bonus_attack_pending: true },
+      };
+    }
     if (newEnemyHp <= 0) {
       const xpGain = target.xp ?? 10 + (target.hp || 8);
       const killSplit = splitEncounterXp(ctx.st, ctx.char.id, xpGain);

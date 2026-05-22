@@ -43,6 +43,7 @@ import { handleDisarmTrap } from './disarmTrap.js';
 import { handleEscape } from './escape.js';
 import { handleExamine } from './examineDefault.js';
 import { handleGridMove } from './gridMove.js';
+import { handleGwmBonusAttack } from './gwmBonusAttack.js';
 import { handleInteractObject } from './interactObject.js';
 import { handleLoot } from './loot.js';
 import { handleMove } from './move.js';
@@ -104,6 +105,7 @@ const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   use_reaction: handleUseReaction as ActionHandler,
   two_weapon_attack: handleTwoWeaponAttack as ActionHandler,
   polearm_butt_end: handlePolearmButtEnd as ActionHandler,
+  gwm_bonus_attack: handleGwmBonusAttack as ActionHandler,
   use_healer_kit: handleUseHealerKit as ActionHandler,
   use_healing_hands: handleUseHealingHands as ActionHandler,
   grid_move: handleGridMove as ActionHandler,
