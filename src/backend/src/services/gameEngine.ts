@@ -1938,6 +1938,27 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         },
       ];
     }
+    if (pending.kind === 'd20_interception') {
+      // Today only Portent fires this kind; the labels assume that
+      // source. When Lucky / Restore Balance plug into the same shape,
+      // branch on `pending.source` to vary the label.
+      const sourceLabel = pending.source === 'portent' ? 'Portent' : 'D20 Interception';
+      const replacementOpts = pending.replacementValues.map((value, idx) => ({
+        label: `Use ${sourceLabel} die [${value}] — ${enemyForLabel}'s d20 ${pending.proposedD20} → ${value} (total ${value + (pending.atkTotal - pending.proposedD20)} vs AC ${pending.targetAc})`,
+        action: {
+          type: 'resolve_reaction' as const,
+          accept: true,
+          replacementIndex: idx,
+        },
+      }));
+      return [
+        ...replacementOpts,
+        {
+          label: `Decline — take the hit (${pending.proposedDamage} damage)`,
+          action: { type: 'resolve_reaction', accept: false },
+        },
+      ];
+    }
   }
 
   // Pending ASI: only show stat-boost choices until resolved
@@ -3958,6 +3979,30 @@ function findSentinelEligiblePcs(
 }
 
 /**
+ * Diviner Portent (PHB 2024 — Wizard L2 subclass feature). Reaction
+ * triggered AFTER an enemy attack hits — the Diviner replaces the
+ * enemy's d20 with one of their pre-rolled portent dice. If the
+ * replacement total drops below targetAc, the hit becomes a miss.
+ *
+ * Eligibility (this MVP slice):
+ *   - PC is a Wizard L2+ with subclass 'diviner'.
+ *   - PC has at least one portent die remaining (`portent_dice`
+ *     stocked on long rest; see rest.ts).
+ *   - Reaction available this turn.
+ *
+ * Out of scope: targeting enemies' rolls against ALLIES (MVP only
+ * scans the attack target); replacing PCs' own attack/save/check
+ * d20s (needs a PC-turn pause point that pansori doesn't have).
+ */
+function isPortentEligible(target: Character): boolean {
+  if (target.turn_actions?.reaction_used) return false;
+  if (target.character_class?.toLowerCase() !== 'wizard') return false;
+  if (target.subclass !== 'diviner') return false;
+  if ((target.level ?? 1) < 2) return false;
+  return (target.portent_dice ?? []).length > 0;
+}
+
+/**
  * Silvery Barbs (Strixhaven, 1st-level enchantment). Reaction
  * triggered when a creature within 60 ft of the caster succeeds on
  * an attack roll. MVP scope: only the target of the attack reacts
@@ -4357,6 +4402,40 @@ function runEnemyMultiattackLoop(args: {
       narrative += ` ⚡ ${enemy.name} strikes ${target.name} — total ${fmt.roll(computed.atkTotal)} vs ${fmt.ac(target.ac)}. Shield available!`;
       return { kind: 'paused', st, narrative };
     }
+    // Diviner Portent reaction window. Fires when the enemy attack
+    // hits AND the target is a Diviner Wizard L2+ with at least one
+    // portent die remaining. The resolver replaces the enemy's d20
+    // with the chosen portent value and re-evaluates the hit. Wired
+    // BEFORE Silvery Barbs so Diviners get first crack — both are
+    // post-roll modifications, but Portent is the more impactful
+    // one (no slot cost, deterministic replacement vs. a reroll).
+    if (computed.hit && computed.hpLost > 0 && isPortentEligible(target)) {
+      st = {
+        ...st,
+        pending_reaction: {
+          kind: 'd20_interception',
+          source: 'portent',
+          attackerEnemyId: enemyId,
+          targetCharId: target.id,
+          atkTotal: computed.atkTotal,
+          proposedD20: computed.atkD20,
+          proposedDamage: computed.hpLost,
+          targetAc: target.ac,
+          replacementValues: [...(target.portent_dice ?? [])],
+          pendingFragment: computed.fragment as EnemyAttackHitFragment,
+          pendingProposedChar: computed.proposedChar,
+          pendingProposedSt: { ...computed.proposedSt, pending_reaction: undefined },
+          resumeFromInitiativeIdx: advIdx,
+          resumeFromMultiattackIdx: mi + 1,
+          narrativeSoFar: narrative,
+          eligibleCharIds: [target.id],
+        },
+        active_character_id: target.id,
+      };
+      narrative += ` ⚡ ${enemy.name} hits ${target.name} (d20 ${computed.atkD20} → total ${fmt.roll(computed.atkTotal)} vs ${fmt.ac(target.ac)}) — Portent available!`;
+      return { kind: 'paused', st, narrative };
+    }
+
     // Silvery Barbs reaction window. Fires when the enemy attack
     // hits AND the PC knows the spell + has a slot. The resolver
     // rerolls the enemy d20 and takes the lower — potentially

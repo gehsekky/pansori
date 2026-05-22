@@ -553,7 +553,7 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 > (typically because the RAW mechanic needs infrastructure that
 > isn't shipped yet).
 
-**Selectable + features (42):**
+**Selectable + features (43):**
 
 | Class | Subclass | Headline L3 feature shipped |
 |---|---|---|
@@ -594,13 +594,14 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 | Sorcerer | Wild Magic | Wild Magic Surge (pre-session) |
 | Sorcerer | Aberrant Mind | Psionic Spells data grant (closest-fit pansori spells) |
 | Sorcerer | Clockwork Soul | Bastion of Law (1 SP → 5 temp HP, bonus action) |
+| Wizard | Diviner | Portent — d20-interception reaction on enemy hits |
 | Warlock | Fiend | Dark One's Blessing (pre-session) |
 | Warlock | Archfey | Fey Presence (pre-session) |
 | Warlock | Celestial | Healing Light pool |
 | Wizard | Abjurer | Arcane Ward (pre-session) |
 | Wizard | Evoker | Sculpt Spells (pre-session) |
 
-**Picker-only — features partially / fully deferred (6):**
+**Picker-only — features partially / fully deferred (5):**
 
 | Class | Subclass | What's deferred |
 |---|---|---|
@@ -610,8 +611,20 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 | Druid | Stars | Starry Form (Wild Shape variant w/ 3 constellations) |
 | Sorcerer | Clockwork Soul | Restore Balance reaction (Bastion of Law shipped) |
 | Warlock | Great Old One | Awakened Mind telepathy |
-| Wizard | Diviner | Portent dice ROLLED on long rest; INTERCEPTION deferred |
 | Wizard | Illusionist | Improved Minor Illusion, Malleable Illusions |
+
+**Reaction-window infrastructure (new — 2026-05-22):** Generic
+`PendingD20InterceptionReaction` shape in the PendingReaction union,
+with a `source: 'portent'` discriminator that's intentionally open so
+follow-up users (Lucky's RAW spend-after-roll timing, Clockwork Soul's
+Restore Balance reaction) can plug in by registering a new source +
+resolver branch. Today the trigger point is wired only at enemy attack
+rolls inside `runEnemyMultiattackLoop` (mirrors Silvery Barbs); PC-turn
+d20 sites (PC's own attacks, saves, ability checks) don't yet emit the
+reaction window because pansori's PC-turn execution doesn't have a
+pause/resume contract. The remaining picker-only subclasses needing
+this infrastructure are now scoped to "extend the existing window to
+new trigger points" rather than "build it from scratch".
 
 Most deferred features need a specific surface that pansori
 doesn't have yet (reaction-window for d20 interception, full
