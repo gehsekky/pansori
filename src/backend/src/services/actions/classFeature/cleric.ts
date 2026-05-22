@@ -375,5 +375,48 @@ export function handleClericFeature(ctx: ActionContext, fid: string): boolean {
     return true;
   }
 
+  if (fid === 'blessing_of_the_trickster') {
+    // 2024 PHB Trickery Cleric L3 — Blessing of the Trickster. Channel
+    // Divinity, touch a willing creature within 30 ft (other than
+    // yourself; RAW is "another creature"). That creature gains
+    // advantage on Stealth (Dex) checks for 1 hour. Pansori models
+    // the duration as "until long rest" because the engine lacks a
+    // 1-hour timer that fires on more than the round granularity;
+    // the rest handler clears the flag. Targeting picks the most-
+    // injured living ally (a stand-in for "the ally most likely to
+    // need cover") with a self fallback when alone.
+    if (ctx.char.subclass !== 'trickery') {
+      ctx.narrative = 'Only Trickery Clerics have Blessing of the Trickster.';
+      return true;
+    }
+    const cdUsesBoT = ctx.char.class_resource_uses?.channel_divinity ?? 1;
+    if (cdUsesBoT <= 0) {
+      ctx.narrative = 'No Channel Divinity uses remaining.';
+      return true;
+    }
+    const eligible = ctx.st.characters.filter((c) => !c.dead && c.id !== ctx.char.id);
+    // Prefer the most-injured ally (matches Bastion of Law / heal targeting);
+    // fall back to the caster if the cleric is alone.
+    const recipient =
+      eligible.length > 0 ? eligible.reduce((a, b) => (a.hp < b.hp ? a : b)) : ctx.char;
+    const isSelf = recipient.id === ctx.char.id;
+    if (isSelf) {
+      ctx.char.tricksters_blessing_active = true;
+    } else {
+      ctx.st = {
+        ...ctx.st,
+        characters: ctx.st.characters.map((c) =>
+          c.id === recipient.id ? { ...c, tricksters_blessing_active: true } : c
+        ),
+      };
+    }
+    ctx.char.class_resource_uses = {
+      ...(ctx.char.class_resource_uses ?? {}),
+      channel_divinity: cdUsesBoT - 1,
+    };
+    ctx.narrative = `🎭 Blessing of the Trickster — ${ctx.char.name} touches ${recipient.name}, who gains advantage on Stealth checks until the next long rest. (${cdUsesBoT - 1} Channel Divinity remaining)`;
+    return true;
+  }
+
   return false;
 }

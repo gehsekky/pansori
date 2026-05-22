@@ -2982,6 +2982,56 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     }
   }
 
+  // ── Out-of-combat subclass features ─────────────────────────────────────────
+  // These live outside the `state.combat_active && enemyAlive` gate so
+  // they surface during exploration / downtime turns. Bastion of Law
+  // and Blessing of the Trickster are both proactive utility features
+  // RAW doesn't restrict to combat (Bastion of Law is a bonus action
+  // that, while typically used in combat, the engine allows out-of-
+  // combat use; Blessing of the Trickster RAW is an Action grant of a
+  // 1-hour duration buff — the player wants this BEFORE combat starts).
+  if (char.subclass) {
+    const cdLeftOutOfCombat = char.class_resource_uses?.channel_divinity ?? 1;
+
+    // Trickery Cleric: Blessing of the Trickster (Channel Divinity).
+    // Grants tricksters_blessing_active to the most-injured ally (or
+    // self if alone). Buff persists until long rest.
+    if (
+      char.subclass === 'trickery' &&
+      hasClass(char, 'cleric') &&
+      cdLeftOutOfCombat > 0 &&
+      !char.tricksters_blessing_active
+    ) {
+      choices.push({
+        label: `Blessing of the Trickster — advantage on Stealth checks until long rest (Channel Divinity, ${cdLeftOutOfCombat} left)`,
+        action: { type: 'use_class_feature', featureId: 'blessing_of_the_trickster' },
+        kind: 'class_feature',
+      });
+    }
+
+    // Clockwork Soul Sorcerer L3 — Bastion of Law (PHB 2024). Bonus
+    // action: spend 1 sorcery point, grant 5 temp HP to caster or a
+    // living ally. RAW lets the caster spend 1-5 SP for 5N temp HP;
+    // pansori MVP fixes at 1 SP / 5 temp HP for choice-list clarity
+    // (player can repeat casts to stack the buff via the temp-HP
+    // replace-if-greater rule).
+    if (
+      char.subclass === 'clockwork_soul' &&
+      hasClass(char, 'sorcerer') &&
+      getClassLevel(char, 'sorcerer') >= 3 &&
+      !char.turn_actions.bonus_action_used
+    ) {
+      const sp = char.class_resource_uses?.sorcery_points ?? getClassLevel(char, 'sorcerer');
+      if (sp >= 1) {
+        choices.push({
+          label: `Bastion of Law — spend 1 sorcery point, grant 5 temp HP (${sp} SP)`,
+          action: { type: 'use_class_feature', featureId: 'bastion_of_law' },
+          kind: 'class_feature',
+        });
+      }
+    }
+  }
+
   // Spell choices
   if (context.spellTable && (char.spells_known ?? []).length > 0) {
     const slots = char.spell_slots_max ?? {};

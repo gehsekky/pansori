@@ -42,6 +42,12 @@ export const handleSneak: ActionHandler<{ type: 'sneak' }> = (ctx) => {
     const inspAdv = isActive ? consumeInspirationForCheck(member) : false;
     const luckAdv = isActive ? consumeLuckForCheck(member) : false;
     const bardicRoll = isActive ? consumeBardicForCheck(member) : 0;
+    // 2024 PHB Trickery Cleric — Blessing of the Trickster grants
+    // advantage on Stealth checks until long rest. Reads on every
+    // party member (the buff applies to the recipient, not just the
+    // caster). Doesn't consume the flag — it's a duration buff, not
+    // a one-shot resource.
+    const trickAdv = !!member.tricksters_blessing_active;
     if (isActive) activeChar = member;
     const check = skillCheck(
       member.dex,
@@ -51,7 +57,7 @@ export const handleSneak: ActionHandler<{ type: 'sneak' }> = (ctx) => {
       checkDisadv,
       false,
       false,
-      inspAdv || luckAdv,
+      inspAdv || luckAdv || trickAdv,
       member.species === 'halfling'
     );
     return { name: member.name, check, mod: abilityMod(member.dex) };
