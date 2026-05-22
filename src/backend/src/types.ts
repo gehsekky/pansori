@@ -275,6 +275,12 @@ export interface TurnActions {
   // sources or use Lucky without burning their Heroic Inspiration.
   // Set by `use_luck`, cleared on consumption (one-shot).
   luck_pending?: boolean;
+  // Sharpshooter feat (2024 PHB) — when true, ranged-weapon attacks
+  // this turn take -5 to hit / +10 damage and ignore half + three-
+  // quarters cover. Toggled by `toggle_sharpshooter`; auto-clears at
+  // turn end (FRESH_TURN reset). Sticky across multiple attacks in
+  // the same turn (matches how players actually use it).
+  sharpshooter_active?: boolean;
   // 2024 PHB Rogue Cunning Strike (L5+) — when set, the next Sneak Attack
   // spends 1 die for the chosen effect (trip, poison, withdraw, disarm)
   // and one SA die is removed from the damage roll. Cleared after applied.

@@ -63,6 +63,31 @@ export const handleUseLuck: ActionHandler<{ type: 'use_luck' }> = (ctx) => {
 };
 
 /**
+ * `toggle_sharpshooter`: opt in to the Sharpshooter feat's tradeoff
+ * for ranged-weapon attacks this turn — -5 to hit, +10 damage,
+ * ignore half + three-quarters cover. Toggles state (calling again
+ * turns it off). Free of action-economy cost. Auto-clears on turn
+ * end via the FRESH_TURN reset.
+ *
+ * The effect gates on `weaponItem.range === 'ranged'` at attack
+ * time — toggling on with a melee weapon equipped is harmless
+ * (handler-side check would conflict with mid-turn weapon swaps).
+ */
+export const handleToggleSharpshooter: ActionHandler<{ type: 'toggle_sharpshooter' }> = (ctx) => {
+  if (!(ctx.char.feats ?? []).includes('sharpshooter')) {
+    return { rejected: `${ctx.char.name} does not have the Sharpshooter feat.` };
+  }
+  const next = !ctx.char.turn_actions.sharpshooter_active;
+  ctx.char = {
+    ...ctx.char,
+    turn_actions: { ...ctx.char.turn_actions, sharpshooter_active: next },
+  };
+  ctx.narrative = next
+    ? `${ctx.char.name} sights down the shaft — Sharpshooter armed: -5 to hit, +10 damage on ranged attacks this turn.`
+    : `${ctx.char.name} eases off the precision shot — Sharpshooter disengaged.`;
+};
+
+/**
  * `stand_up`: spend half-speed of movement to drop prone. PHB p.190 —
  * "Standing up takes more effort; doing so costs an amount of movement
  * equal to half your speed." Guarded by remaining movement budget so a

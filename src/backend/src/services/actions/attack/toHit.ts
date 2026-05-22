@@ -32,6 +32,10 @@ export interface ToHitContext {
   totalAttackBonus: number;
   features: string[];
   isRaging: boolean;
+  /** Sharpshooter is active AND the equipped weapon is ranged. The
+   *  -5 to-hit penalty is already folded into `totalAttackBonus`; the
+   *  attack handler reads this flag to add +10 damage on hit. */
+  sharpshooterActive: boolean;
 }
 
 /**
@@ -124,6 +128,17 @@ export function computeToHitContext(
         ...ctx.roomObstacleCells,
       ];
       coverAcBonus = coverBonus(charEntity.pos, enemyEntity.pos, obstacles);
+      // Sharpshooter — ignore half and three-quarters cover on ranged
+      // attacks. `coverBonus` returns 0 | 2 | 5 (half | three-quarters);
+      // both are suppressed. Full cover isn't modeled here so this
+      // covers RAW completely for the cases the engine reaches.
+      if (
+        ctx.char.turn_actions.sharpshooter_active &&
+        weaponItem?.range === 'ranged' &&
+        coverAcBonus > 0
+      ) {
+        coverAcBonus = 0;
+      }
       const flankingAlly = ctx.st.entities.find(
         (e) =>
           !e.isEnemy &&
@@ -293,7 +308,12 @@ export function computeToHitContext(
   const sacredWeaponBonus =
     (ctx.char.class_resource_uses?.sacred_weapon_active ?? 0) > 0 ? abilityMod(ctx.char.cha) : 0;
   const guidedStrikeBonus = ctx.st.guided_strike_active ? 10 : 0;
-  const totalAttackBonus = sacredWeaponBonus + guidedStrikeBonus;
+  // Sharpshooter — -5 to hit when active and attacking with a ranged
+  // weapon. Damage rider lands in attack/index.ts on the hit branch.
+  const sharpshooterActive =
+    !!ctx.char.turn_actions.sharpshooter_active && weaponItem?.range === 'ranged';
+  const sharpshooterPenalty = sharpshooterActive ? -5 : 0;
+  const totalAttackBonus = sacredWeaponBonus + guidedStrikeBonus + sharpshooterPenalty;
   if (guidedStrikeBonus) ctx.st = { ...ctx.st, guided_strike_active: false };
 
   // Silence linter: target is part of the signature but referenced via the
@@ -315,5 +335,6 @@ export function computeToHitContext(
     totalAttackBonus,
     features,
     isRaging,
+    sharpshooterActive,
   };
 }

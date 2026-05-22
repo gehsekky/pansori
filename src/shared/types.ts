@@ -198,6 +198,12 @@ export type StructuredAction =
   // Requires the Lucky feat + remaining `feat_lucky_uses`. Free of
   // action-economy cost; refills on a long rest.
   | { type: 'use_luck' }
+  // Sharpshooter feat (2024 PHB) — toggle the -5 to-hit / +10 damage
+  // tradeoff for ranged-weapon attacks this turn. Also suppresses
+  // half- and three-quarters-cover AC bonuses on those attacks. Free
+  // of action-economy cost; auto-clears on turn end. Toggles state
+  // (calling again turns it off).
+  | { type: 'toggle_sharpshooter' }
   | { type: 'shove'; targetEnemyId?: string }
   | { type: 'dodge' }
   | { type: 'disengage' }
