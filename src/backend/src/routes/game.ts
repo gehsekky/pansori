@@ -126,23 +126,46 @@ function defaultWeaponMasteriesFor(charClass: string): string[] {
 
 export const gameRouter = Router();
 
-// List all available game contexts (id + display metadata only — no rules/loot)
+// List all available game contexts (id + display metadata only — no rules/loot).
+// Backgrounds carry their `originFeat` id so the FE can spot Magic Initiate
+// at character creation and route to the spell picker. Spell metadata is
+// included as a slim list per `spellList` tag (arcane / divine / primal)
+// for the same picker. Sized one-time, fetched once at app start.
 gameRouter.get('/contexts', (_req, res) => {
-  const list = Object.values(CONTEXTS).map((c) => ({
-    id: c.id,
-    displayName: c.worldNoun,
-    mapType: c.mapType,
-    classes: Object.keys(c.classPrimaryStats),
-    backgrounds: (c.backgrounds ?? []).map((b) => ({
-      id: b.id,
-      name: b.name,
-      desc: b.desc,
-      skillProficiencies: b.skillProficiencies,
-      toolProficiency: b.toolProficiency ?? null,
-      feature: b.feature,
-      featureDesc: b.featureDesc,
-    })),
-  }));
+  const list = Object.values(CONTEXTS).map((c) => {
+    const spells = Object.values(c.spellTable ?? {}).map((s) => ({
+      id: s.id,
+      name: s.name,
+      level: s.level,
+      desc: s.desc,
+      spellList: s.spellList ?? [],
+    }));
+    return {
+      id: c.id,
+      displayName: c.worldNoun,
+      mapType: c.mapType,
+      classes: Object.keys(c.classPrimaryStats),
+      backgrounds: (c.backgrounds ?? []).map((b) => ({
+        id: b.id,
+        name: b.name,
+        desc: b.desc,
+        skillProficiencies: b.skillProficiencies,
+        toolProficiency: b.toolProficiency ?? null,
+        feature: b.feature,
+        featureDesc: b.featureDesc,
+        originFeat: b.originFeat ?? null,
+      })),
+      featTable: c.featTable
+        ? Object.fromEntries(
+            Object.entries(c.featTable).map(([id, f]) => [
+              id,
+              { id: f.id, name: f.name, desc: f.desc, effect: f.effect },
+            ])
+          )
+        : {},
+      spells,
+    };
+  });
   res.json(list);
 });
 
@@ -382,10 +405,15 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
       // feat per background (Acolyte → Magic Initiate, Farmer → Tough,
       // etc.). The feat is auto-applied at creation; no asi_pending
       // is consumed because origin feats don't compete with ASI slots.
+      // Magic Initiate variants need `feat_choices` from the FE picker
+      // — without choices the feat applies a no-op narrative.
       if (bg?.originFeat) {
         const feat = ctx.featTable?.[bg.originFeat];
         if (feat) {
-          const { newChar } = applyFeatTake(builtChar, feat);
+          const { newChar } = applyFeatTake(builtChar, feat, {
+            cantripChoices: c.feat_choices?.cantripChoices,
+            l1Choice: c.feat_choices?.l1Choice,
+          });
           return newChar;
         }
       }

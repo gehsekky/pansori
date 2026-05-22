@@ -82,10 +82,58 @@ export type CharacterInput = {
   // 2024 PHB Species (formerly "race"). Optional — engine defaults to
   // Human when omitted.
   species?: string;
+  // Origin-feat choices that need player input at character creation.
+  // Today only Magic Initiate variants populate this — the player picks
+  // 2 cantrips + 1 L1 spell. BE validates the shape AND that each picked
+  // spell exists + matches the feat's spellList tag.
+  feat_choices?: {
+    cantripChoices?: string[];
+    l1Choice?: string;
+  };
 };
+
+// Slim BE-context data the FE picker needs at character creation. The
+// shape mirrors the response of `GET /api/game/contexts` — backgrounds
+// carry `originFeat`, the feat table identifies cantrip + L1 counts +
+// spell list for Magic Initiate variants, and `spells` is filtered
+// client-side by the feat's spellList tag.
+export interface BackendContextSummary {
+  id: string;
+  displayName: string;
+  mapType: string;
+  classes: string[];
+  backgrounds: Array<{
+    id: string;
+    name: string;
+    desc: string;
+    skillProficiencies: string[];
+    toolProficiency: string | null;
+    feature: string;
+    featureDesc: string;
+    originFeat: string | null;
+  }>;
+  featTable: Record<
+    string,
+    {
+      id: string;
+      name: string;
+      desc: string;
+      effect: { kind: string; [k: string]: unknown };
+    }
+  >;
+  spells: Array<{
+    id: string;
+    name: string;
+    level: number;
+    desc: string;
+    spellList: Array<'arcane' | 'divine' | 'primal'>;
+  }>;
+}
 
 export const api = {
   getMe: () => req<AuthUser>('/auth/me'),
+
+  listContexts: () => req<BackendContextSummary[]>('/game/contexts'),
 
   listProviders: () => req<AuthProvider[]>('/auth/providers'),
 

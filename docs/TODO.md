@@ -71,9 +71,9 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
     surfaces on the hit narrative. 5 direct tests. Long-range no-
     disadv is a no-op until ranged long-range disadv is enforced
     (not in pansori today).
-  - [~] Magic Initiate backend (2026-05-22). Three seed feats —
-    `magic_initiate_arcane / divine / primal` — each granting 2
-    cantrips + 1 L1 spell. `take_feat` action accepts
+  - [x] Magic Initiate (shipped 2026-05-22 — full BE + FE). Three
+    seed feats — `magic_initiate_arcane / divine / primal` — each
+    granting 2 cantrips + 1 L1 spell. `take_feat` action accepts
     `cantripChoices: string[]` + `l1Choice: string`; `applyFeatTake`
     appends them to `spells_known`, records the L1 id on
     `feat_choices[featId].magicInitiateL1`, and seeds
@@ -81,12 +81,25 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
     recognizes the recorded L1 spell at cast time: if the token is
     available and the cast is at the spell's base level, consumes
     the token instead of a slot. Upcasts still use a slot.
-    `resetFeatLongRestResources` clears the token on long rest. 8
-    tests cover the take-time flow, the free cast, the no-slot
-    rejection on second cast, and the long-rest reset.
-    **Remaining:** FE chooser UX (a spell-picker dialog when the
-    player picks Magic Initiate). Currently the action requires the
-    `cantripChoices` / `l1Choice` to be supplied via API.
+    `resetFeatLongRestResources` clears the token on long rest.
+
+    **FE picker shipped 2026-05-22.** `SpellPickerDialog` component
+    + CharScreen integration. `/api/game/contexts` extended to
+    return `originFeat` per background plus a slim `featTable` + L1/
+    cantrip `spells` (with `spellList` tags). CharScreen fetches the
+    BE summary on mount; when the player picks a background whose
+    origin feat is one of the three Magic Initiate variants, a
+    chooser button surfaces inline ("⚠ Magic Initiate (Arcane) —
+    pick 2 cantrips + 1 L1 spell"). Click → modal with checkbox-
+    limited cantrips + radio-pick L1 (filtered by spell list).
+    Picks persist to the per-context party draft so a reload doesn't
+    drop them. `handle()` blocks Start when picks are incomplete.
+    `CharacterInput.feat_choices` plumbs through `POST /session/new`
+    via a new `FeatChoicesSchema` (Zod) and into `applyFeatTake`.
+    Sandbox `Sage` → `magic_initiate_arcane`, `Acolyte` →
+    `magic_initiate_divine` per 2024 PHB (the placeholders called
+    out in `sandbox.ts` comments). 9 added FE tests + existing BE
+    Magic Initiate coverage carries the new path.
 
     **Spell-list tagging shipped 2026-05-22.** `Spell.spellList?:
     Array<'arcane'|'divine'|'primal'>` field added; all 30 SRD

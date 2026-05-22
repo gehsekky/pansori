@@ -1,9 +1,58 @@
-import type { AuthUser, CharacterInput } from '../lib/api';
+import { type AuthUser, type BackendContextSummary, type CharacterInput, api } from '../lib/api';
 import { useEffect, useState } from 'react';
 import type { FrontendContext } from '../types';
 import { SPECIES } from '../data/species';
+import SpellPickerDialog from './SpellPickerDialog';
 import { applyTheme } from '../lib/theme';
 import styles from '../styles.module.css';
+
+const MAGIC_INITIATE_FEAT_IDS: ReadonlySet<string> = new Set([
+  'magic_initiate_arcane',
+  'magic_initiate_divine',
+  'magic_initiate_primal',
+]);
+
+// Extract the picker inputs (feat shape + filtered spells) for a given
+// background id from the BE context summary. Returns null if the
+// background isn't found, doesn't have an originFeat, the feat is
+// unknown, or the feat doesn't need a chooser. Defense-in-depth: even
+// if the BE adds a new chooser feat shape later, we explicitly gate
+// on the `extra-cantrips-and-l1` discriminator here so unrelated feats
+// don't open the spell picker.
+function getMagicInitiatePickerInputs(
+  beCtx: BackendContextSummary | undefined,
+  backgroundId: string
+): {
+  featId: string;
+  featName: string;
+  spellList: 'arcane' | 'divine' | 'primal';
+  cantripCount: number;
+  l1Count: number;
+} | null {
+  if (!beCtx) return null;
+  const bg = beCtx.backgrounds.find((b) => b.id === backgroundId);
+  if (!bg?.originFeat) return null;
+  if (!MAGIC_INITIATE_FEAT_IDS.has(bg.originFeat)) return null;
+  const feat = beCtx.featTable[bg.originFeat];
+  if (!feat) return null;
+  const effect = feat.effect as {
+    kind: string;
+    spellList?: 'arcane' | 'divine' | 'primal';
+    cantripCount?: number;
+    l1Count?: number;
+  };
+  if (effect.kind !== 'extra-cantrips-and-l1') return null;
+  if (!effect.spellList || effect.cantripCount === undefined || effect.l1Count === undefined) {
+    return null;
+  }
+  return {
+    featId: bg.originFeat,
+    featName: feat.name,
+    spellList: effect.spellList,
+    cantripCount: effect.cantripCount,
+    l1Count: effect.l1Count,
+  };
+}
 
 type StatBlock = { str: number; dex: number; con: number; int: number; wis: number; cha: number };
 const STAT_KEYS: (keyof StatBlock)[] = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
@@ -116,6 +165,15 @@ interface CharDraft {
   // Required for Cleric / Sorcerer / Warlock (when their subclasses are
   // authored); ignored for other classes (they pick later at level 2/3).
   subclass?: string;
+  // Origin-feat picks for backgrounds whose feat needs player input
+  // (currently only Magic Initiate variants). Persisted in the per-
+  // context party draft so the player doesn't lose picks on reload.
+  // Cleared when the background changes to one whose feat doesn't
+  // need picks.
+  featChoices?: {
+    cantripChoices?: string[];
+    l1Choice?: string;
+  };
 }
 
 // Per-context localStorage key for the saved party draft. We key on the
@@ -210,6 +268,31 @@ function CharScreen({
   // box again cancels. Allows assigning rolled or array values to the right
   // abilities (PHB p.13: "Standard Method" assignment).
   const [swapFrom, setSwapFrom] = useState<{ partyIdx: number; key: keyof StatBlock } | null>(null);
+  // BE context summaries (originFeat per background, feat shapes, spell
+  // catalog) drive the Magic Initiate spell picker. Lazy-loaded on mount;
+  // empty until the request resolves. The picker trigger button stays
+  // hidden until the data is ready so players can't open an empty dialog.
+  const [beContexts, setBeContexts] = useState<Record<string, BackendContextSummary>>({});
+  // Which party-member index has the spell picker open. null = closed.
+  const [spellPickerIdx, setSpellPickerIdx] = useState<number | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.listContexts().then(
+      (list) => {
+        if (cancelled) return;
+        const map: Record<string, BackendContextSummary> = {};
+        for (const c of list) map[c.id] = c;
+        setBeContexts(map);
+      },
+      // Silent failure — picker just stays hidden. Character creation
+      // still works for backgrounds without choice-requiring feats.
+      () => {}
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function swapStats(partyIdx: number, a: keyof StatBlock, b: keyof StatBlock) {
     if (a === b) return;
@@ -359,6 +442,24 @@ function CharScreen({
         `${missingSubclass.name || missingSubclass.cls} must choose a ${missingSubclass.cls} subclass before starting`
       );
     }
+    // Magic Initiate backgrounds need the player to have completed the
+    // spell picker. Without choices, BE silently emits a "may learn..."
+    // narrative + grants nothing — block start so the player notices.
+    const beCtx = beContexts[contextId];
+    const missingSpellPicks = party.findIndex((d) => {
+      const inputs = getMagicInitiatePickerInputs(beCtx, d.backgroundId);
+      if (!inputs) return false;
+      const picks = d.featChoices ?? {};
+      const cantripsOk = (picks.cantripChoices?.length ?? 0) === inputs.cantripCount;
+      const l1Ok = inputs.l1Count === 0 || !!picks.l1Choice;
+      return !(cantripsOk && l1Ok);
+    });
+    if (missingSpellPicks >= 0) {
+      const d = party[missingSpellPicks];
+      return setError(
+        `${d.name || `Hero ${missingSpellPicks + 1}`} must finish picking Magic Initiate spells before starting`
+      );
+    }
     setError('');
     localStorage.setItem('operative_name', leader.name.trim());
     try {
@@ -371,6 +472,7 @@ function CharScreen({
           portrait_url: d.portrait ?? undefined,
           subclass: d.subclass || undefined,
           species: d.speciesId || undefined,
+          feat_choices: d.featChoices,
         })),
         contextId
       );
@@ -609,7 +711,15 @@ function CharScreen({
                       className={styles.formInp}
                       style={{ cursor: 'pointer' }}
                       value={draft.backgroundId}
-                      onChange={(e) => updateDraft(idx, { backgroundId: e.target.value })}
+                      onChange={(e) =>
+                        // Clear feat picks on background swap — the next
+                        // background's origin feat may not need them, or
+                        // may need a different spell list.
+                        updateDraft(idx, {
+                          backgroundId: e.target.value,
+                          featChoices: undefined,
+                        })
+                      }
                     >
                       {backgrounds.map((b) => (
                         <option key={b.id} value={b.id}>
@@ -645,6 +755,38 @@ function CharScreen({
                         </div>
                       </div>
                     )}
+                    {(() => {
+                      const inputs = getMagicInitiatePickerInputs(
+                        beContexts[contextId],
+                        draft.backgroundId
+                      );
+                      if (!inputs) return null;
+                      const picks = draft.featChoices ?? {};
+                      const cantripsPicked = picks.cantripChoices?.length ?? 0;
+                      const l1Picked = !!picks.l1Choice;
+                      const complete =
+                        cantripsPicked === inputs.cantripCount &&
+                        (inputs.l1Count === 0 || l1Picked);
+                      return (
+                        <button
+                          type="button"
+                          className={styles.formInp}
+                          style={{
+                            cursor: 'pointer',
+                            marginTop: 8,
+                            color: complete ? 'var(--t-primary)' : 'var(--t-hp-mid)',
+                            borderColor: complete ? 'var(--t-primary)' : 'var(--t-hp-mid)',
+                            textAlign: 'left',
+                          }}
+                          onClick={() => setSpellPickerIdx(idx)}
+                          data-testid={`magic-initiate-trigger-${idx}`}
+                        >
+                          {complete
+                            ? `✓ ${inputs.featName} — ${cantripsPicked} cantrips + ${l1Picked ? '1' : '0'} L1 chosen (click to change)`
+                            : `⚠ ${inputs.featName} — pick ${inputs.cantripCount} cantrips${inputs.l1Count > 0 ? ' + 1 L1 spell' : ''}`}
+                        </button>
+                      );
+                    })()}
                   </>
                 )}
 
@@ -979,6 +1121,34 @@ function CharScreen({
           </div>
         </div>
       </div>
+      {spellPickerIdx !== null &&
+        (() => {
+          const draft = party[spellPickerIdx];
+          if (!draft) return null;
+          const inputs = getMagicInitiatePickerInputs(beContexts[contextId], draft.backgroundId);
+          if (!inputs) return null;
+          const beCtx = beContexts[contextId];
+          return (
+            <SpellPickerDialog
+              featName={inputs.featName}
+              spellList={inputs.spellList}
+              cantripCount={inputs.cantripCount}
+              l1Count={inputs.l1Count}
+              spells={beCtx?.spells ?? []}
+              initialCantrips={draft.featChoices?.cantripChoices ?? []}
+              initialL1={draft.featChoices?.l1Choice ?? null}
+              onClose={() => setSpellPickerIdx(null)}
+              onSave={(cantripChoices, l1Choice) => {
+                updateDraft(spellPickerIdx, {
+                  featChoices: {
+                    cantripChoices,
+                    l1Choice: l1Choice ?? undefined,
+                  },
+                });
+              }}
+            />
+          );
+        })()}
     </div>
   );
 }

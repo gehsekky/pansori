@@ -75,6 +75,30 @@ export interface CharClass {
 
 // `WeaponMastery` is re-exported from ./shared-types (see src/shared/types.ts).
 
+// Slim spell shape the FE needs for the Magic Initiate spell picker
+// and (eventually) the spell prep / scroll-write UX. Mirrors the BE
+// Spell type but drops the runtime-execution fields (resolveOnHit,
+// resolveOnSave, etc.) the FE never reads. Carries the `spellList`
+// tag so the picker can filter by 'arcane' / 'divine' / 'primal'.
+export interface SpellSummary {
+  id: string;
+  name: string;
+  level: number;
+  desc: string;
+  spellList: Array<'arcane' | 'divine' | 'primal'>;
+}
+
+// Slim feat shape the FE needs to know which origin feats require a
+// chooser at character creation. Mirrors the BE Feat type but drops
+// take-time handlers. The `effect` discriminator is kept so the FE
+// can dispatch (today only `extra-cantrips-and-l1` routes to a UI).
+export interface FeatSummary {
+  id: string;
+  name: string;
+  desc: string;
+  effect: { kind: string; [k: string]: unknown };
+}
+
 export interface FrontendContext {
   id: string;
   displayName: string;
