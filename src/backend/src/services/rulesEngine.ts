@@ -476,13 +476,16 @@ export function passivePerceptionDC(enemyWisdom: number): number {
 }
 
 // Passive Perception score for trap detection: 10 + WIS mod + prof if proficient in Perception
-// 5e DMG ch.5: compare passive score to trap DC; meet/exceed = spotted before triggering
+// 5e DMG ch.5: compare passive score to trap DC; meet/exceed = spotted before triggering.
+// 2024 PHB Observant feat — +5 to passive Perception / Investigation. Caller passes
+// `observantBonus = 5` when the PC has the feat.
 export function passivePerception(
   wisdom: number,
   level: number,
-  perceptionProficient: boolean
+  perceptionProficient: boolean,
+  observantBonus = 0
 ): number {
-  return 10 + abilityMod(wisdom) + (perceptionProficient ? profBonus(level) : 0);
+  return 10 + abilityMod(wisdom) + (perceptionProficient ? profBonus(level) : 0) + observantBonus;
 }
 
 // Disarm trap: DEX check + profBonus if character has Thieves' Tools or Hacking Tools proficiency

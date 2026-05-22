@@ -80,6 +80,9 @@ export function applyFeatTake(
     saveProficiencyChoices?: AbilityKey[];
     cantripChoices?: string[];
     l1Choice?: string;
+    /** Skilled feat — player-chosen skill names (case-sensitive,
+     *  matched against context.classSkills entries). */
+    skillChoices?: string[];
   } = {}
 ): { newChar: Character; narrative: string } {
   let next: Character = { ...char, feats: [...(char.feats ?? []), feat.id] };
@@ -258,6 +261,36 @@ export function applyFeatTake(
       // `char.feats` and adds prof bonus damage on heavy-weapon
       // hits, gated by `turn_actions.gwm_used` for once-per-turn.
       narrativeParts.push('Heavy-weapon hits deal +prof bonus damage (once per turn).');
+      break;
+    }
+    case 'skill-proficiencies': {
+      // Player picks N skills (where N = feat.effect.count, 3 for
+      // Skilled). Merge into char.skill_proficiencies, deduping
+      // against existing entries so retaking via a different feat
+      // doesn't double-stack.
+      const chosen = opts.skillChoices ?? [];
+      const existing = new Set(next.skill_proficiencies ?? []);
+      const granted: string[] = [];
+      for (const s of chosen) {
+        if (!existing.has(s)) {
+          existing.add(s);
+          granted.push(s);
+        }
+      }
+      next = { ...next, skill_proficiencies: [...existing] };
+      if (granted.length > 0) {
+        narrativeParts.push(`Proficient in: ${granted.join(', ')}.`);
+      } else {
+        narrativeParts.push(
+          `May choose ${feat.effect.count} skill proficiencies (no choices supplied yet).`
+        );
+      }
+      break;
+    }
+    case 'observant': {
+      // No take-time state change — `partyDetectsTrap` reads
+      // `char.feats` and adds +5 to passive Perception.
+      narrativeParts.push('Passive Perception and Investigation increase by 5.');
       break;
     }
   }

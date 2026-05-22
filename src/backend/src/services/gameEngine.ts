@@ -1587,7 +1587,9 @@ export function partyDetectsTrap(characters: Character[], trap: Trap): boolean {
   return characters.some((c) => {
     if (c.dead) return false;
     const proficient = c.skill_proficiencies?.includes('Perception') ?? false;
-    return passivePerception(c.wis, c.level, proficient) >= trap.dc;
+    // 2024 PHB Observant feat — +5 to passive Perception.
+    const observantBonus = (c.feats ?? []).includes('observant') ? 5 : 0;
+    return passivePerception(c.wis, c.level, proficient, observantBonus) >= trap.dc;
   });
 }
 

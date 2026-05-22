@@ -165,6 +165,31 @@ export const SRD_FEATS: Record<string, Feat> = {
     },
   },
 
+  skilled: {
+    id: 'skilled',
+    name: 'Skilled',
+    desc: 'You gain proficiency in any combination of three skills or tools of your choice.',
+    category: 'origin',
+    effect: {
+      kind: 'skill-proficiencies',
+      count: 3,
+    },
+  },
+
+  observant: {
+    id: 'observant',
+    name: 'Observant',
+    desc: 'Half-feat: +1 INT or WIS. Your passive Perception and passive Investigation scores both increase by 5.',
+    category: 'general',
+    prerequisites: {
+      minLevel: 4,
+    },
+    abilityBonus: { choices: ['int', 'wis'] },
+    effect: {
+      kind: 'observant',
+    },
+  },
+
   great_weapon_master: {
     id: 'great_weapon_master',
     name: 'Great Weapon Master',

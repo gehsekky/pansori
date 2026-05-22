@@ -632,6 +632,21 @@ export type FeatEffect =
       // The RAW bonus-action attack on Crit/kill needs new action
       // wiring; deferred.
       kind: 'gwm-bonus-damage';
+    }
+  | {
+      // Skilled feat (2024 PHB origin) — gain proficiency in three
+      // skills of your choice. The take handler reads
+      // `opts.skillChoices` (3 entries) and merges them into
+      // `char.skill_proficiencies`.
+      kind: 'skill-proficiencies';
+      count: number;
+    }
+  | {
+      // Observant feat (2024 PHB general, L4, half-feat) — +1 INT
+      // or WIS (ability bonus), +5 passive Perception and
+      // Investigation. `partyDetectsTrap` reads `char.feats` for
+      // 'observant' and adds 5 to the passive score.
+      kind: 'observant';
     };
 
 /**
