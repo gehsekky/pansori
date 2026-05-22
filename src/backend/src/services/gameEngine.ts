@@ -1461,8 +1461,14 @@ export function applyLevelUpForClass(char: Character, className: string, context
   const newClassLevel = char.class_levels[cls];
 
   const dwarfLvlBonus = char.species === 'dwarf' ? 1 : 0;
+  // 2024 PHB Draconic Sorcerer Draconic Resilience — +1 HP per
+  // Sorcerer level (retroactive on subclass-select; +1 per level
+  // taken thereafter). Stacks on top of the d6 roll.
+  const draconicBonus = cls === 'sorcerer' && char.subclass === 'draconic' ? 1 : 0;
   const hpRoll =
-    Math.max(1, rollDice(`1d${char.hit_die ?? 8}`) + abilityMod(char.con)) + dwarfLvlBonus;
+    Math.max(1, rollDice(`1d${char.hit_die ?? 8}`) + abilityMod(char.con)) +
+    dwarfLvlBonus +
+    draconicBonus;
   char.max_hp += hpRoll;
   char.hp = Math.min(char.hp + hpRoll, char.max_hp);
 
