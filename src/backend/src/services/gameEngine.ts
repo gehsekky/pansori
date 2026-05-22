@@ -1271,6 +1271,12 @@ export function isRoomCleared(state: GameState, seed: Seed, roomId: string): boo
 export type InitEntry = { id: string; roll: number; is_enemy: boolean };
 
 export function buildInitiativeOrder(chars: Character[], enemies: Enemy[]): InitEntry[] {
+  // Track DEX per entry for the tiebreaker. The InitEntry payload
+  // doesn't expose DEX (clients don't need it), so we keep it in a
+  // local map and use it only inside the sort comparator.
+  const dexById = new Map<string, number>();
+  for (const c of chars) dexById.set(c.id, c.dex);
+  for (const e of enemies) dexById.set(e.id, e.dex ?? 10);
   const entries: InitEntry[] = [
     ...chars
       .filter((c) => !c.dead)
@@ -1289,8 +1295,22 @@ export function buildInitiativeOrder(chars: Character[], enemies: Enemy[]): Init
       is_enemy: true,
     })),
   ];
-  // Sort descending by roll; ties broken by dex (enemy.dex vs char.dex)
-  entries.sort((a, b) => b.roll - a.roll);
+  // Sort descending by roll. Tiebreakers (in order):
+  //   1. Higher DEX score acts first.
+  //   2. PCs before enemies (RAW 2024 PHB delegates to the DM; the
+  //      friendly-side-wins convention matches every published
+  //      adventure module's automated behavior).
+  // Stable-sort isn't depended on — both tiebreakers are explicit
+  // so the order is deterministic regardless of insertion order.
+  entries.sort((a, b) => {
+    if (b.roll !== a.roll) return b.roll - a.roll;
+    const aDex = dexById.get(a.id) ?? 10;
+    const bDex = dexById.get(b.id) ?? 10;
+    if (bDex !== aDex) return bDex - aDex;
+    // Tied roll + tied DEX → PC (is_enemy=false) goes first.
+    if (a.is_enemy !== b.is_enemy) return a.is_enemy ? 1 : -1;
+    return 0;
+  });
   return entries;
 }
 

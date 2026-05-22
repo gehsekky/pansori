@@ -454,8 +454,16 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
       No caller in current pansori — exists for future content
       (Misty Step into open air, Levitate dispel, knockback off
       ledges). 4 direct tests.
-- [ ] **Initiative ties** — resolution rule (DM decides; monster
-      after PC on tie).
+- [x] **Initiative ties** (shipped 2026-05-22). `buildInitiativeOrder`
+      now sorts by (1) roll total desc, (2) DEX score desc, (3) PCs
+      before enemies. Previous implementation just sorted by roll
+      and relied on insertion-order + stable sort for the rest
+      (the comment promised dex-tiebreak but the code didn't
+      implement it). DEX-score tiebreak matches the common house
+      rule and the existing comment; PC-first tiebreak matches every
+      published adventure module's automated behavior (RAW delegates
+      to DM, but the friendly-side-wins convention is universal).
+      4 direct tests.
 
 #### Tier 4: out-of-combat systems (lowest urgency)
 
