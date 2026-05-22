@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Spell } from '../../types.js';
-import { pickCastPrefix } from './castSpell.js';
+import { pickCastPrefix } from './castSpell/index.js';
 
 afterEach(() => vi.restoreAllMocks());
 
