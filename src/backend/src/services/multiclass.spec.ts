@@ -6,8 +6,8 @@
 //     set,
 //   - lower-case class names on lookup so callers don't have to.
 
-import { describe, expect, it } from 'vitest';
 import {
+  canMulticlassInto,
   getAllClasses,
   getClassLevel,
   getClassLevels,
@@ -16,6 +16,7 @@ import {
   hasClass,
   spellSlotsForChar,
 } from './multiclass.js';
+import { describe, expect, it } from 'vitest';
 import { makeChar } from '../test-fixtures.js';
 import { spellSlotsForClassLevel } from './rulesEngine.js';
 
@@ -233,5 +234,59 @@ describe('spellSlotsForChar — warlock', () => {
     // Warlock 2 → pact { 1: 2 }
     // Merged sum: { 1: 4 } (RAW would keep them as separate pools)
     expect(spellSlotsForChar(char)).toEqual({ 1: 4 });
+  });
+});
+
+describe('canMulticlassInto — 2024 PHB prereqs', () => {
+  it('returns empty for the first class (no prereq check)', () => {
+    const char = makeChar({ character_class: 'Fighter', str: 8, dex: 8 });
+    // Even with terrible stats, continuing in the first class is fine.
+    expect(canMulticlassInto(char, 'Fighter')).toBe('');
+    // Case-insensitive on the comparison.
+    expect(canMulticlassInto(char, 'fighter')).toBe('');
+  });
+
+  it('returns an unknown-class error for a class not in the table', () => {
+    const char = makeChar({ character_class: 'Fighter' });
+    expect(canMulticlassInto(char, 'Necromancer')).toMatch(/not a known class/);
+  });
+
+  it('rejects when a required ability is below the minimum (single-ability AND)', () => {
+    const char = makeChar({ character_class: 'Fighter', wis: 12 });
+    expect(canMulticlassInto(char, 'Cleric')).toMatch(/WIS 13/);
+  });
+
+  it('accepts when the required ability is at the minimum', () => {
+    const char = makeChar({ character_class: 'Fighter', wis: 13 });
+    expect(canMulticlassInto(char, 'Cleric')).toBe('');
+  });
+
+  it('rejects when one of multiple required abilities is below the minimum (AND)', () => {
+    // Paladin requires STR 13 AND CHA 13.
+    const char = makeChar({ character_class: 'Wizard', str: 13, cha: 12 });
+    const reason = canMulticlassInto(char, 'Paladin');
+    expect(reason).toMatch(/CHA 13/);
+    expect(reason).not.toMatch(/STR 13/);
+  });
+
+  it('accepts when both AND abilities meet the minimum', () => {
+    const char = makeChar({ character_class: 'Wizard', str: 13, cha: 13 });
+    expect(canMulticlassInto(char, 'Paladin')).toBe('');
+  });
+
+  it('Fighter — OR — accepts STR 13 alone', () => {
+    const char = makeChar({ character_class: 'Wizard', str: 13, dex: 8 });
+    expect(canMulticlassInto(char, 'Fighter')).toBe('');
+  });
+
+  it('Fighter — OR — accepts DEX 13 alone', () => {
+    const char = makeChar({ character_class: 'Wizard', str: 8, dex: 13 });
+    expect(canMulticlassInto(char, 'Fighter')).toBe('');
+  });
+
+  it('Fighter — OR — rejects when both STR and DEX are below 13', () => {
+    const char = makeChar({ character_class: 'Wizard', str: 12, dex: 12 });
+    const reason = canMulticlassInto(char, 'Fighter');
+    expect(reason).toMatch(/STR 13 or DEX 13/);
   });
 });

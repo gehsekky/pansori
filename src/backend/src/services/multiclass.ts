@@ -22,6 +22,103 @@
 import { spellSlotsForCasterLevel, spellSlotsForClassLevel } from './rulesEngine.js';
 import type { Character } from '../types.js';
 
+// ─── Multiclass prerequisites (2024 PHB Ch. 1) ─────────────────────────────
+
+/**
+ * Minimum ability scores required to take a level in each class as
+ * a multiclass option. Values are pulled directly from 2024 PHB Ch. 1
+ * "Multiclassing — Prerequisites" — every entry is an AND across the
+ * listed pairs (`Paladin` needs STR 13 AND CHA 13; `Fighter` is the
+ * one OR — STR 13 OR DEX 13 — modeled below as the `or` variant).
+ *
+ * These ARE NOT applied at character creation — the first class is
+ * always free of prereqs (that's RAW: prereqs gate multiclassing in,
+ * not character generation). Used by `canMulticlassInto` which runs
+ * at level-up time when the player picks a second class.
+ */
+type AbilityRequirement =
+  | { kind: 'and'; abilities: Array<['str' | 'dex' | 'con' | 'int' | 'wis' | 'cha', number]> }
+  | { kind: 'or'; abilities: Array<['str' | 'dex' | 'con' | 'int' | 'wis' | 'cha', number]> };
+
+const MULTICLASS_PREREQS: Record<string, AbilityRequirement> = {
+  barbarian: { kind: 'and', abilities: [['str', 13]] },
+  bard: { kind: 'and', abilities: [['cha', 13]] },
+  cleric: { kind: 'and', abilities: [['wis', 13]] },
+  druid: { kind: 'and', abilities: [['wis', 13]] },
+  fighter: {
+    kind: 'or',
+    abilities: [
+      ['str', 13],
+      ['dex', 13],
+    ],
+  },
+  monk: {
+    kind: 'and',
+    abilities: [
+      ['dex', 13],
+      ['wis', 13],
+    ],
+  },
+  paladin: {
+    kind: 'and',
+    abilities: [
+      ['str', 13],
+      ['cha', 13],
+    ],
+  },
+  ranger: {
+    kind: 'and',
+    abilities: [
+      ['dex', 13],
+      ['wis', 13],
+    ],
+  },
+  rogue: { kind: 'and', abilities: [['dex', 13]] },
+  sorcerer: { kind: 'and', abilities: [['cha', 13]] },
+  warlock: { kind: 'and', abilities: [['cha', 13]] },
+  wizard: { kind: 'and', abilities: [['int', 13]] },
+};
+
+/**
+ * Checks whether `char` meets the 2024 PHB multiclass prerequisites
+ * for `targetClass` (case-insensitive). Returns an empty string on
+ * success or a human-readable reason on failure (mirrors the
+ * `canTakeFeat` shape — callers short-circuit on truthy returns).
+ *
+ *   - First-class checks (`char.character_class === targetClass`)
+ *     return empty since the first class has no prereq per RAW.
+ *   - Unknown classes return an unknown-class error.
+ *
+ * Does NOT validate that the level-up itself is legal (level cap,
+ * XP, etc.) — that's the level-up handler's responsibility.
+ */
+export function canMulticlassInto(char: Character, targetClass: string): string {
+  const cls = targetClass.toLowerCase();
+  if (cls === char.character_class.toLowerCase()) {
+    // Continuing in the first class — never a multiclass-prereq concern.
+    return '';
+  }
+  const req = MULTICLASS_PREREQS[cls];
+  if (!req) {
+    return `${targetClass} is not a known class.`;
+  }
+  const scoreOf = (ab: 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha'): number =>
+    (char[ab] ?? 10) as number;
+  if (req.kind === 'and') {
+    for (const [ab, min] of req.abilities) {
+      if (scoreOf(ab) < min) {
+        return `Multiclassing into ${targetClass} requires ${ab.toUpperCase()} ${min} (${char.name}'s ${ab.toUpperCase()} is ${scoreOf(ab)}).`;
+      }
+    }
+    return '';
+  }
+  // 'or' — only Fighter today (STR 13 OR DEX 13).
+  const passes = req.abilities.some(([ab, min]) => scoreOf(ab) >= min);
+  if (passes) return '';
+  const reqList = req.abilities.map(([ab, min]) => `${ab.toUpperCase()} ${min}`).join(' or ');
+  return `Multiclassing into ${targetClass} requires ${reqList}.`;
+}
+
 // ─── Caster contributions (2024 PHB Ch. 1 multiclass spell-slot rule) ──────
 
 const FULL_CASTERS = new Set(['bard', 'cleric', 'druid', 'sorcerer', 'wizard']);
