@@ -97,10 +97,17 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
     9 added tests (single-class parity, full+full sum, half+full sum,
     half-rounds-down, primary-only subclass limit, pure warlock,
     warlock+full merge approximation).
-  - **Multiclass prerequisites.** Each class has a 2024 PHB ability-
-    score minimum (Cleric WIS 13, Rogue DEX 13, etc.). New
-    `canMulticlassInto(char, class)` validator. Surfaced in the
-    level-up flow.
+  - [x] **Multiclass prerequisites** (Phase 3 — shipped 2026-05-22).
+    `MULTICLASS_PREREQS` table in `services/multiclass.ts` covers all
+    12 SRD classes (AND for single + multi-ability requirements;
+    Fighter is the one OR — STR 13 or DEX 13). `canMulticlassInto(char,
+    class)` returns empty on success or a human-readable reason
+    (mirrors the `canTakeFeat` shape). First-class checks are
+    auto-passed since RAW prereqs gate multiclassing in, not
+    character creation. 9 added tests (single-AND, multi-AND, OR,
+    unknown class, primary class fast-path). Level-up surfacing
+    (which calls this when the player picks a non-primary class)
+    lands in the Phase 6 / level-up UX PR.
   - **Feature gating by per-class level.** Call sites that read
     `char.character_class.toLowerCase() === 'X'` to grant a feature
     need to flip to `hasClass(char, 'X')` + per-class-level checks
