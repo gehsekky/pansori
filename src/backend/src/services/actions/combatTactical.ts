@@ -1,7 +1,8 @@
 import { abilityMod, d, profBonus } from '../rulesEngine.js';
-import { getEnemyById, pushEvent } from '../gameEngine.js';
 import type { ActionHandler } from './types.js';
+import { composeNow } from '../narrative/compose.js';
 import { distanceFeet } from '../gridEngine.js';
+import { getEnemyById } from '../gameEngine.js';
 
 /**
  * `grapple`: 2024 PHB Unarmed Strike: Grapple. Contested STR
@@ -16,8 +17,7 @@ export const handleGrapple: ActionHandler<{
   targetEnemyId?: string;
 }> = (ctx, action) => {
   if (!ctx.enemyAlive || !ctx.enemy) {
-    ctx.narrative = 'No enemy to grapple.';
-    return;
+    return { rejected: 'No enemy to grapple.' };
   }
   const targetId = action.targetEnemyId ?? ctx.enemy.id;
   const target = ctx.livingEnemiesInRoom.find((e) => e.id === targetId) ?? ctx.enemy;
@@ -25,13 +25,15 @@ export const handleGrapple: ActionHandler<{
     const myEnt = ctx.st.entities.find((e) => e.id === ctx.char.id);
     const tgtEnt = ctx.st.entities.find((e) => e.id === target.id && e.isEnemy);
     if (myEnt && tgtEnt && distanceFeet(myEnt.pos, tgtEnt.pos) > 5) {
-      ctx.narrative = `Out of reach — Grapple needs the target within 5 ft. Move closer first.`;
-      return;
+      return {
+        rejected: `Out of reach — Grapple needs the target within 5 ft. Move closer first.`,
+      };
     }
   }
   if (target.condition_immunities?.includes('grappled')) {
+    // RAW: the action was committed (unarmed strike attempt); target's
+    // immunity merely negates the grapple effect. Dispatcher deducts.
     ctx.narrative = `The ${target.name} cannot be grappled (condition immunity).`;
-    ctx.char = { ...ctx.char, turn_actions: { ...ctx.char.turn_actions, action_used: true } };
     ctx.usedInitiative = true;
     return;
   }
@@ -40,7 +42,6 @@ export const handleGrapple: ActionHandler<{
   const enemyStr = abilityMod(target.toHit);
   const enemyDex = abilityMod(target.dex ?? 10);
   const enemyRoll = d(20) + Math.max(enemyStr, enemyDex);
-  ctx.char = { ...ctx.char, turn_actions: { ...ctx.char.turn_actions, action_used: true } };
   ctx.usedInitiative = true;
   if (playerRoll > enemyRoll) {
     ctx.st = {
@@ -55,15 +56,14 @@ export const handleGrapple: ActionHandler<{
           : e
       ),
     };
-    ctx.st = pushEvent(ctx.st, {
+    composeNow(ctx, {
       kind: 'condition_applied',
       targetId: target.id,
       targetName: target.name,
       condition: 'grappled',
       source: 'Grapple',
-      round: ctx.st.round ?? 1,
+      prose: `You grapple the ${target.name}! (${playerRoll} vs ${enemyRoll}) They are GRAPPLED — speed 0, your attacks have advantage.`,
     });
-    ctx.narrative = `You grapple the ${target.name}! (${playerRoll} vs ${enemyRoll}) They are GRAPPLED — speed 0, your attacks have advantage.`;
   } else {
     ctx.narrative = `The ${target.name} breaks free of your grapple attempt. (${playerRoll} vs ${enemyRoll})`;
   }
@@ -80,14 +80,12 @@ export const handleTryEscapeGrapple: ActionHandler<{ type: 'try_escape_grapple' 
   const myEntity = ctx.st.entities?.find((e) => e.id === ctx.char.id);
   const grapplerId = myEntity?.grappled_by;
   if (!ctx.char.conditions.includes('grappled') && !myEntity?.conditions.includes('grappled')) {
-    ctx.narrative = 'You are not grappled.';
-    return;
+    return { rejected: 'You are not grappled.' };
   }
   if (!grapplerId) {
     ctx.char = {
       ...ctx.char,
       conditions: ctx.char.conditions.filter((c) => c !== 'grappled'),
-      turn_actions: { ...ctx.char.turn_actions, action_used: true },
     };
     ctx.narrative = 'You break free of the grapple.';
     ctx.usedInitiative = true;
@@ -105,7 +103,6 @@ export const handleTryEscapeGrapple: ActionHandler<{ type: 'try_escape_grapple' 
   const myRoll = Math.max(athRoll, acrRoll);
   const skillUsed = athRoll >= acrRoll ? 'Athletics' : 'Acrobatics';
 
-  ctx.char = { ...ctx.char, turn_actions: { ...ctx.char.turn_actions, action_used: true } };
   ctx.usedInitiative = true;
   if (myRoll > grapplerRoll) {
     ctx.char = { ...ctx.char, conditions: ctx.char.conditions.filter((c) => c !== 'grappled') };
@@ -139,8 +136,7 @@ export const handleShove: ActionHandler<{
   targetEnemyId?: string;
 }> = (ctx, action) => {
   if (!ctx.enemyAlive || !ctx.enemy) {
-    ctx.narrative = 'No enemy to shove.';
-    return;
+    return { rejected: 'No enemy to shove.' };
   }
   const targetId = action.targetEnemyId ?? ctx.enemy.id;
   const target = ctx.livingEnemiesInRoom.find((e) => e.id === targetId) ?? ctx.enemy;
@@ -148,13 +144,12 @@ export const handleShove: ActionHandler<{
     const myEnt = ctx.st.entities.find((e) => e.id === ctx.char.id);
     const tgtEnt = ctx.st.entities.find((e) => e.id === target.id && e.isEnemy);
     if (myEnt && tgtEnt && distanceFeet(myEnt.pos, tgtEnt.pos) > 5) {
-      ctx.narrative = `Out of reach — Shove needs the target within 5 ft. Move closer first.`;
-      return;
+      return { rejected: `Out of reach — Shove needs the target within 5 ft. Move closer first.` };
     }
   }
   if (target.condition_immunities?.includes('prone')) {
+    // RAW: the action was committed; target's prone-immunity negates effect.
     ctx.narrative = `The ${target.name} cannot be knocked prone (condition immunity).`;
-    ctx.char = { ...ctx.char, turn_actions: { ...ctx.char.turn_actions, action_used: true } };
     ctx.usedInitiative = true;
     return;
   }
@@ -163,7 +158,6 @@ export const handleShove: ActionHandler<{
   const enemyStr = abilityMod(target.toHit);
   const enemyDex = abilityMod(target.dex ?? 10);
   const enemyRoll = d(20) + Math.max(enemyStr, enemyDex);
-  ctx.char = { ...ctx.char, turn_actions: { ...ctx.char.turn_actions, action_used: true } };
   ctx.usedInitiative = true;
   if (playerRoll > enemyRoll) {
     ctx.st = {
@@ -174,15 +168,14 @@ export const handleShove: ActionHandler<{
           : e
       ),
     };
-    ctx.st = pushEvent(ctx.st, {
+    composeNow(ctx, {
       kind: 'condition_applied',
       targetId: target.id,
       targetName: target.name,
       condition: 'prone',
       source: 'Shove',
-      round: ctx.st.round ?? 1,
+      prose: `You shove the ${target.name} to the ground! (${playerRoll} vs ${enemyRoll}) They are PRONE — melee attacks against them have advantage, ranged attacks have disadvantage.`,
     });
-    ctx.narrative = `You shove the ${target.name} to the ground! (${playerRoll} vs ${enemyRoll}) They are PRONE — melee attacks against them have advantage, ranged attacks have disadvantage.`;
   } else {
     ctx.narrative = `The ${target.name} resists your shove. (${playerRoll} vs ${enemyRoll})`;
   }

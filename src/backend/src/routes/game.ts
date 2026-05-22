@@ -45,6 +45,7 @@ import {
 } from '../services/campaignEngine.js';
 import { broadcastParticipantChange, broadcastSessionState } from '../services/broadcast.js';
 import type { AuthedRequest } from '../auth/middleware.js';
+import { applyFeatTake } from '../services/feats.js';
 import { generateSeed } from '../services/procgen.js';
 import { loadContexts } from '../services/contextLoader.js';
 import { pool } from '../db/pool.js';
@@ -309,7 +310,7 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
         ctx.lootTable
       );
 
-      return {
+      const builtChar: Character = {
         id: randomUUID(),
         name: c.name,
         character_class: c.character_class,
@@ -372,6 +373,18 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
             }
           : {}),
       };
+      // Apply origin feat from background. 2024 PHB grants one origin
+      // feat per background (Acolyte → Magic Initiate, Farmer → Tough,
+      // etc.). The feat is auto-applied at creation; no asi_pending
+      // is consumed because origin feats don't compete with ASI slots.
+      if (bg?.originFeat) {
+        const feat = ctx.featTable?.[bg.originFeat];
+        if (feat) {
+          const { newChar } = applyFeatTake(builtChar, feat);
+          return newChar;
+        }
+      }
+      return builtChar;
     });
 
     const leader = partyChars[0];

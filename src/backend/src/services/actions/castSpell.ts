@@ -1,4 +1,4 @@
-import type { AbilityKey, Character, Enemy } from '../../types.js';
+import type { AbilityKey, Character, Enemy, Spell } from '../../types.js';
 import {
   abilityMod,
   applyDamageMultiplier,
@@ -20,7 +20,6 @@ import {
   grantDarkOnesBlessing,
   isRoomCleared,
   pick,
-  pushEvent,
   splitEncounterXp,
 } from '../gameEngine.js';
 import {
@@ -33,6 +32,7 @@ import {
   posEqual,
 } from '../gridEngine.js';
 import type { ActionHandler } from './types.js';
+import { composeNow } from '../narrative/compose.js';
 import { fmt } from '../narrativeFmt.js';
 
 // concentrationRoundsFor is a small helper used by the cast handler.
@@ -40,6 +40,30 @@ import { fmt } from '../narrativeFmt.js';
 // used by spell-cast logic; lives next to its sole caller.
 function concentrationRoundsFor(spell: { durationRounds?: number } | undefined): number {
   return spell?.durationRounds ?? 10;
+}
+
+/**
+ * Build the cast-prefix prose for a spell. If `spell.narratives.cast`
+ * is populated, picks one entry and substitutes {name}/{spell}/
+ * {slotNote}/{target}. Otherwise returns the engine default
+ * "{name} casts {spell}{slotNote}".
+ *
+ * Pool entries are flavor-only — engine appends mechanical resolution
+ * (damage tokens, save outcomes, etc.) AFTER this prefix.
+ */
+export function pickCastPrefix(
+  spell: Spell,
+  tokens: { name: string; spell: string; slotNote: string; target?: string }
+): string {
+  const pool = spell.narratives?.cast;
+  if (pool && pool.length > 0) {
+    return pick(pool)
+      .replace(/\{name\}/g, tokens.name)
+      .replace(/\{spell\}/g, tokens.spell)
+      .replace(/\{slotNote\}/g, tokens.slotNote)
+      .replace(/\{target\}/g, tokens.target ?? '');
+  }
+  return `${tokens.name} casts ${tokens.spell}${tokens.slotNote}`;
 }
 
 /**
@@ -231,6 +255,23 @@ export const handleCastSpell: ActionHandler<{
   const castingScore = ctx.char[castingAbility] ?? 10;
   const slotNote = spell.level > 0 ? ` (level-${slotLevel} slot)` : ' (cantrip)';
 
+  // ── Divine Smite (2024 PHB) ────────────────────────────────────────────
+  // Bonus-action pre-buff: queues 2d8 radiant on the caster's next
+  // successful weapon attack, upcast +1d8 per slot level above 1st.
+  // The buff doesn't deal damage on cast — it stashes
+  // `divine_smite_dice` on the character; the attack handler reads
+  // and clears it on hit. Caller already paid the slot above.
+  if (spell.id === 'divine_smite_spell') {
+    const upcastBonus = Math.max(0, slotLevel - 1);
+    const dice = 2 + upcastBonus;
+    ctx.char.divine_smite_dice = dice;
+    composeNow(ctx, {
+      kind: 'spell_utility',
+      prose: `${ctx.char.name} channels divine power${slotNote}! Their next weapon hit will deal an additional ${dice}d8 radiant damage.`,
+    });
+    return;
+  }
+
   // ── Heal spells ────────────────────────────────────────────────────────
   if (spell.heal) {
     const healMod = Math.max(0, Math.floor((castingScore - 10) / 2));
@@ -247,33 +288,52 @@ export const handleCastSpell: ActionHandler<{
     );
     const target = injured.length > 0 ? injured.reduce((a, b) => (a.hp < b.hp ? a : b)) : ctx.char;
     const isSelf = target.id === ctx.char.id;
-    const discipleNote = discipleBonus > 0 ? ` [Disciple of Life: +${discipleBonus}]` : '';
+    const healBonuses =
+      discipleBonus > 0 ? [{ label: `Disciple of Life: +${discipleBonus}` }] : undefined;
+    let targetNewHp: number;
     if (isSelf) {
       ctx.char.hp = Math.min(ctx.char.max_hp, ctx.char.hp + healed);
-      ctx.narrative = `${ctx.char.name} casts ${spell.name}${slotNote} — restores ${healed} HP to self (now ${ctx.char.hp}/${ctx.char.max_hp}).${discipleNote}`;
+      targetNewHp = ctx.char.hp;
     } else {
-      const newHp = Math.min(target.max_hp, target.hp + healed);
+      targetNewHp = Math.min(target.max_hp, target.hp + healed);
       ctx.st = {
         ...ctx.st,
-        characters: ctx.st.characters.map((c) => (c.id === target.id ? { ...c, hp: newHp } : c)),
+        characters: ctx.st.characters.map((c) =>
+          c.id === target.id ? { ...c, hp: targetNewHp } : c
+        ),
         // Sync the grid entity HP so the battlefield reflects the heal
         // immediately — `commitChar()` only syncs the caster's entity,
         // not the target's, so without this the healed ally would
         // still render as a faded skull until the next state update.
         entities: (ctx.st.entities ?? []).map((e) =>
-          e.id === target.id && !e.isEnemy ? { ...e, hp: newHp } : e
+          e.id === target.id && !e.isEnemy ? { ...e, hp: targetNewHp } : e
         ),
       };
-      ctx.narrative = `${ctx.char.name} casts ${spell.name}${slotNote} — restores ${healed} HP to ${target.name} (now ${newHp}/${target.max_hp}).${discipleNote}`;
     }
+    composeNow(ctx, {
+      kind: 'spell_heal',
+      castPrefix: pickCastPrefix(spell, {
+        name: ctx.char.name,
+        spell: spell.name,
+        slotNote,
+        target: isSelf ? undefined : target.name,
+      }),
+      healed,
+      targetName: target.name,
+      isSelf,
+      targetNewHp,
+      targetMaxHp: target.max_hp,
+      bonuses: healBonuses,
+    });
     return;
   }
 
   // ── Utility spells (no damage, no save, no heal) ───────────────────────
   if (!spell.damage && !spell.savingThrow && !spell.attackRoll && !spell.condition) {
-    ctx.narrative = spell.narrative
+    const utilityProse = spell.narrative
       ? spell.narrative.replace('{name}', ctx.char.name)
       : `${ctx.char.name} casts ${spell.name}${slotNote}.`;
+    composeNow(ctx, { kind: 'spell_utility', prose: utilityProse });
     // Bless (PHB p.219) — caster picks up to 3 creatures (RAW). Pansori
     // simplifies: caster + first 2 living non-caster party members are
     // blessed. Each gets +1d4 to attack rolls (saves are a follow-up).
@@ -406,6 +466,14 @@ export const handleCastSpell: ActionHandler<{
         : 0;
     let totalDealt = 0;
     const lines: string[] = [];
+    const hits: Array<{
+      enemyId: string;
+      enemyName: string;
+      targetAc: number;
+      damage: number;
+      killed: boolean;
+      note?: string;
+    }> = [];
     for (let i = 0; i < multiTargets.length; i++) {
       const tid = multiTargets[i];
       const tgtEnemy = ctx.livingEnemiesInRoom.find((e) => e.id === tid);
@@ -433,10 +501,19 @@ export const handleCastSpell: ActionHandler<{
           ),
         };
         totalDealt += effDmg;
+        const killed = newHp <= 0;
         lines.push(
-          `${i + 1}: ${tgtEnemy.name} — HIT ${effDmg}${atkE.critical ? ' CRIT' : ''}${note ?? ''}${newHp <= 0 ? ' (killed)' : ''}.`
+          `${i + 1}: ${tgtEnemy.name} — HIT ${effDmg}${atkE.critical ? ' CRIT' : ''}${note ?? ''}${killed ? ' (killed)' : ''}.`
         );
-        if (newHp <= 0) {
+        hits.push({
+          enemyId: tid,
+          enemyName: tgtEnemy.name,
+          targetAc: tgtEnemy.ac,
+          damage: effDmg,
+          killed,
+          note,
+        });
+        if (killed) {
           const split = splitEncounterXp(ctx.st, ctx.char.id, tgtEnemy.xp ?? 0);
           ctx.st = split.st;
           ctx.char.xp = (ctx.char.xp || 0) + split.share;
@@ -454,10 +531,19 @@ export const handleCastSpell: ActionHandler<{
           ),
         };
         totalDealt += effDmg;
+        const killed = newHp <= 0;
         lines.push(
-          `dart ${i + 1} → ${tgtEnemy.name}: ${effDmg}${note ?? ''}${newHp <= 0 ? ' (killed)' : ''}.`
+          `dart ${i + 1} → ${tgtEnemy.name}: ${effDmg}${note ?? ''}${killed ? ' (killed)' : ''}.`
         );
-        if (newHp <= 0) {
+        hits.push({
+          enemyId: tid,
+          enemyName: tgtEnemy.name,
+          targetAc: tgtEnemy.ac,
+          damage: effDmg,
+          killed,
+          note,
+        });
+        if (killed) {
           const split = splitEncounterXp(ctx.st, ctx.char.id, tgtEnemy.xp ?? 0);
           ctx.st = split.st;
           ctx.char.xp = (ctx.char.xp || 0) + split.share;
@@ -468,7 +554,22 @@ export const handleCastSpell: ActionHandler<{
     if (isRoomCleared(ctx.st, ctx.seed, ctx.roomId)) {
       ctx.st = endCombatState(ctx.st);
     }
-    ctx.narrative = `${ctx.char.name} casts ${spell.name}${slotNote}! ${lines.join(' ')} Total: ${totalDealt} ${spell.damageType ?? 'damage'}.`;
+    composeNow(ctx, {
+      kind: 'spell_multi_target',
+      attackerId: ctx.char.id,
+      attackerName: ctx.char.name,
+      spellId: spell.id,
+      spellName: spell.name,
+      castPrefix: pickCastPrefix(spell, {
+        name: ctx.char.name,
+        spell: spell.name,
+        slotNote,
+      }),
+      damageType: spell.damageType ?? '',
+      hits,
+      totalDamage: totalDealt,
+      labels: lines,
+    });
     ctx.narrative += applyPartyLevelUps(ctx.st, ctx.char, ctx.context);
     ctx.usedInitiative = true;
     spellDmg = 0; // Already applied per-target; skip the single-target block below.
@@ -481,8 +582,25 @@ export const handleCastSpell: ActionHandler<{
     const atk = resolveSpellAttack(ctx.char.level, castingScore, spellTarget.ac);
     spellHit = atk.hit;
     const atkNote = ` (spell attack ${atk.roll}+${atk.bonus}=${atk.total} vs AC ${spellTarget.ac})`;
+    const castPrefix = pickCastPrefix(spell, {
+      name: ctx.char.name,
+      spell: spell.name,
+      slotNote,
+      target: spellTarget.name,
+    });
     if (!spellHit) {
-      ctx.narrative = `${ctx.char.name} casts ${spell.name}${slotNote} — MISS!${atkNote}`;
+      composeNow(ctx, {
+        kind: 'spell_attack_miss',
+        attackerId: ctx.char.id,
+        attackerName: ctx.char.name,
+        target: spellTarget,
+        spellId: spell.id,
+        spellName: spell.name,
+        castPrefix,
+        toHit: atk.total,
+        targetAc: spellTarget.ac,
+        atkNote,
+      });
       return;
     }
     const atkDmgExpr =
@@ -494,10 +612,22 @@ export const handleCastSpell: ActionHandler<{
         ? Math.max(0, abilityMod(ctx.char.cha))
         : 0;
     spellDmg += agonizingBonus;
-    ctx.narrative = `${ctx.char.name} casts ${spell.name}${slotNote}!${atkNote} `;
-    if (atk.critical) ctx.narrative += 'Critical spell hit! ';
-    ctx.narrative += `${fmt.dmg(spellDmg)} ${spell.damageType ?? ''} damage!`;
-    if (agonizingBonus > 0) ctx.narrative += ` [Agonizing Blast: +${agonizingBonus}]`;
+    composeNow(ctx, {
+      kind: 'spell_attack_hit',
+      attackerId: ctx.char.id,
+      attackerName: ctx.char.name,
+      target: spellTarget,
+      spellId: spell.id,
+      spellName: spell.name,
+      castPrefix,
+      damage: spellDmg,
+      damageType: spell.damageType ?? '',
+      isCrit: atk.critical,
+      toHit: atk.total,
+      targetAc: spellTarget.ac,
+      atkNote,
+      bonuses: agonizingBonus > 0 ? [{ label: `Agonizing Blast: +${agonizingBonus}` }] : undefined,
+    });
   } else if (spell.savingThrow) {
     // ── Saving throw spell ─────────────────────────────────────────────
     const saveAbility = spell.savingThrow;
@@ -532,6 +662,12 @@ export const handleCastSpell: ActionHandler<{
     );
     const saveLabel = saveAbility.toUpperCase();
 
+    const saveCastPrefix = pickCastPrefix(spell, {
+      name: ctx.char.name,
+      spell: spell.name,
+      slotNote,
+      target: spellTarget.name,
+    });
     if (spell.damage) {
       const saveDmgExpr =
         spell.level === 0
@@ -539,21 +675,39 @@ export const handleCastSpell: ActionHandler<{
           : upcastDamage(spell, slotLevel);
       const fullDmg = rollDice(saveDmgExpr || spell.damage);
       spellDmg = saveFailed ? fullDmg : spell.saveEffect === 'half' ? Math.floor(fullDmg / 2) : 0;
-      const saveVerb = saveFailed ? 'fails' : 'succeeds';
-      ctx.narrative = `${ctx.char.name} casts ${spell.name}${slotNote}! (${fmt.dc(dc)} ${saveLabel} save — ${spellTarget.name} ${saveVerb}.) `;
-      ctx.narrative +=
-        spellDmg > 0 ? `${fmt.dmg(spellDmg)} ${spell.damageType ?? ''} damage!` : 'No damage.';
-      if (!saveFailed && spell.saveEffect === 'half') ctx.narrative += ' (half damage)';
+      composeNow(ctx, {
+        kind: 'spell_save_damage',
+        attackerId: ctx.char.id,
+        attackerName: ctx.char.name,
+        target: spellTarget,
+        spellId: spell.id,
+        spellName: spell.name,
+        castPrefix: saveCastPrefix,
+        saveAbility: saveLabel,
+        saveDC: dc,
+        saveFailed,
+        damage: spellDmg,
+        damageType: spell.damageType ?? '',
+        halfOnSave: spell.saveEffect === 'half',
+      });
     } else {
-      ctx.narrative = `${ctx.char.name} casts ${spell.name}${slotNote}! (DC ${dc} ${saveLabel} save — `;
-      ctx.narrative += saveFailed
-        ? `${spellTarget.name} fails.)`
-        : `${spellTarget.name} succeeds.)`;
+      composeNow(ctx, {
+        kind: 'spell_save_condition',
+        attackerId: ctx.char.id,
+        attackerName: ctx.char.name,
+        target: spellTarget,
+        spellId: spell.id,
+        spellName: spell.name,
+        castPrefix: saveCastPrefix,
+        saveAbility: saveLabel,
+        saveDC: dc,
+        saveFailed,
+      });
     }
 
     if (spell.condition && saveFailed) {
       if (spellTarget.condition_immunities?.includes(spell.condition)) {
-        ctx.narrative += ` [${spellTarget.name} is immune to ${spell.condition}]`;
+        ctx.narrative += ` ${fmt.note(`[${spellTarget.name} is immune to ${spell.condition}]`)}`;
       } else {
         const condToApply = spell.condition!;
         ctx.st = {
@@ -567,15 +721,14 @@ export const handleCastSpell: ActionHandler<{
               : e
           ),
         };
-        ctx.st = pushEvent(ctx.st, {
+        composeNow(ctx, {
           kind: 'condition_applied',
           targetId: spellTargetId,
           targetName: spellTarget.name,
           condition: condToApply,
           source: spell.name,
-          round: ctx.st.round ?? 1,
+          prose: ` The ${spellTarget.name} is ${condToApply}!`,
         });
-        ctx.narrative += ` The ${spellTarget.name} is ${condToApply}!`;
         if (spell.concentration) {
           ctx.char.concentrating_on = {
             spellId,
@@ -632,7 +785,21 @@ export const handleCastSpell: ActionHandler<{
     const autoHitExpr =
       spell.level === 0 ? cantripDamageDice(spell, ctx.char.level) : upcastDamage(spell, slotLevel);
     spellDmg = rollDice(autoHitExpr || spell.damage);
-    ctx.narrative = `${ctx.char.name} casts ${spell.name}${slotNote}! Auto-hit — ${fmt.dmg(spellDmg)} ${spell.damageType ?? ''} damage!`;
+    composeNow(ctx, {
+      kind: 'spell_auto_hit',
+      attackerId: ctx.char.id,
+      attackerName: ctx.char.name,
+      target: spellTarget,
+      spellId: spell.id,
+      spellName: spell.name,
+      castPrefix: pickCastPrefix(spell, {
+        name: ctx.char.name,
+        spell: spell.name,
+        slotNote,
+      }),
+      damage: spellDmg,
+      damageType: spell.damageType ?? '',
+    });
   }
 
   // ── AOE spells on grid ────────────────────────────────────────────────
@@ -664,7 +831,7 @@ export const handleCastSpell: ActionHandler<{
                 ? entitiesInLine(casterPos, epicenter, aoeBR, ctx.st.entities)
                 : entitiesInBlast(epicenter, aoeBR, ctx.st.entities);
       const isEvoker = ctx.char.subclass === 'evoker';
-      ctx.narrative += ` [AOE ${aoeBR}ft ${aoeShape}]`;
+      ctx.narrative += ` ${fmt.note(`[AOE ${aoeBR}ft ${aoeShape}]`)}`;
       for (const target of blastTargets) {
         if (target.id === ctx.char.id) continue;
         const targetEnemy = target.isEnemy ? getEnemyById(ctx.seed, target.id) : null;

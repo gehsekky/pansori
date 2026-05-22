@@ -1,15 +1,26 @@
-import { FRESH_TURN, abilityMod, profBonus, rollDice } from '../rulesEngine.js';
+import type { Character, GameState } from '../../types.js';
+import {
+  FRESH_TURN,
+  abilityMod,
+  hasWeaponProficiency,
+  profBonus,
+  resolvePlayerAttack,
+  rollDice,
+} from '../rulesEngine.js';
 import {
   applyEnemySpellDamage,
   applyPartyLevelUps,
   endCombatState,
   getEnemyById,
   isRoomCleared,
+  pushEvent,
   runEnemyTurns,
   splitEncounterXp,
   tickConditions,
 } from '../gameEngine.js';
 import type { ActionHandler } from './types.js';
+import type { EnemyAttackHitFragment } from '../narrative/fragments.js';
+import { enemyAttackFragmentEvent } from '../narrative/compose.js';
 
 /**
  * `use_reaction`: trigger the readied action stored from a prior
@@ -32,20 +43,16 @@ import type { ActionHandler } from './types.js';
  * extracted.
  */
 export const handleUseReaction: ActionHandler<{ type: 'use_reaction' }> = (ctx) => {
-  if (ctx.char.turn_actions.reaction_used) {
-    ctx.narrative = 'You have already used your reaction this turn.';
-    return;
-  }
   const readied = ctx.char.turn_actions.readied_action;
   if (!readied) {
-    ctx.narrative = 'You have no readied action.';
-    return;
+    return { rejected: 'You have no readied action.' };
   }
+  // Dispatcher post-deducts `reaction_used` after the delegateTo
+  // resolves (use_reaction's declared cost is 'reaction').
   ctx.char = {
     ...ctx.char,
     turn_actions: {
       ...ctx.char.turn_actions,
-      reaction_used: true,
       readied_action: undefined,
     },
   };
@@ -89,6 +96,31 @@ export const handleResolveReaction: ActionHandler<{
   }
 
   if (rx.kind === 'shield') {
+    // Narrow the BE-only pending payloads (typed as `unknown` in
+    // shared-types since FE doesn't introspect them).
+    const pendingFragment = rx.pendingFragment as EnemyAttackHitFragment;
+    const pendingProposedChar = rx.pendingProposedChar as Character;
+    const pendingProposedSt = rx.pendingProposedSt as GameState;
+    const commitProposed = (): void => {
+      // Merge the proposed snapshot's characters/entities onto ctx.st,
+      // preserving other fields (initiative_order, round, etc.) which
+      // weren't touched during the Shield pause. The proposed snapshot
+      // carries the rolled-but-not-committed mutations: HP, conditions,
+      // concentration outcome, Bless cleanup on linked allies. Sync the
+      // grid entity HP so the FE reflects the new HP.
+      ctx.st = {
+        ...ctx.st,
+        characters: pendingProposedSt.characters.map((c) =>
+          c.id === ctx.char.id ? pendingProposedChar : c
+        ),
+        entities: (pendingProposedSt.entities ?? ctx.st.entities ?? []).map((e) =>
+          e.id === ctx.char.id && !e.isEnemy ? { ...e, hp: pendingProposedChar.hp } : e
+        ),
+        pending_reaction: undefined,
+      };
+      ctx.char = pendingProposedChar;
+      ctx.st = pushEvent(ctx.st, enemyAttackFragmentEvent(pendingFragment, ctx.st.round ?? 1));
+    };
     if (action.accept) {
       const slotsMax = ctx.char.spell_slots_max ?? {};
       const slotsUsed = ctx.char.spell_slots_used ?? {};
@@ -97,20 +129,15 @@ export const handleResolveReaction: ActionHandler<{
         .filter((n) => n >= 1 && (slotsMax[n] ?? 0) > (slotsUsed[n] ?? 0))
         .sort((a, b) => a - b)[0];
       if (lvl === undefined) {
-        ctx.narrative = `No spell slot available to cast Shield. ${rx.pendingNarrative}`;
-        const declinedTarget = {
-          ...ctx.char,
-          hp: Math.max(0, ctx.char.hp - rx.pendingDamage),
-        };
-        ctx.st = {
-          ...ctx.st,
-          characters: ctx.st.characters.map((c) => (c.id === ctx.char.id ? declinedTarget : c)),
-          pending_reaction: undefined,
-        };
-        ctx.char = declinedTarget;
+        // No slot to consume — damage applies as if Shield was declined.
+        ctx.narrative = `No spell slot available to cast Shield. ${pendingFragment.prose}`;
+        commitProposed();
       } else {
         // Shield active: +5 AC until the start of the caster's next turn.
         // tickConditions clears the bump when shield_spell expires.
+        // The proposed snapshot (including any concentration save) is
+        // DISCARDED — no damage landed, so concentration was never
+        // actually tested per RAW.
         ctx.char = {
           ...ctx.char,
           spell_slots_used: { ...slotsUsed, [lvl]: (slotsUsed[lvl] ?? 0) + 1 },
@@ -122,7 +149,7 @@ export const handleResolveReaction: ActionHandler<{
           },
           ac: ctx.char.ac + 5,
         };
-        ctx.narrative = `🛡️ ${ctx.char.name} casts SHIELD as a reaction (lvl ${lvl} slot)! +5 AC until the start of their next turn — ${rx.pendingNarrative.split('.')[0]} bounces off the shimmering barrier.`;
+        ctx.narrative = `🛡️ ${ctx.char.name} casts SHIELD as a reaction (lvl ${lvl} slot)! +5 AC until the start of their next turn — the ${pendingFragment.attackerName}'s strike bounces off the shimmering barrier.`;
         ctx.st = {
           ...ctx.st,
           characters: ctx.st.characters.map((c) => (c.id === ctx.char.id ? ctx.char : c)),
@@ -130,22 +157,9 @@ export const handleResolveReaction: ActionHandler<{
         };
       }
     } else {
-      const newHp = Math.max(0, ctx.char.hp - rx.pendingDamage);
-      ctx.char = { ...ctx.char, hp: newHp };
-      ctx.narrative = `${rx.pendingNarrative} (Shield declined.)`;
-      ctx.st = {
-        ...ctx.st,
-        characters: ctx.st.characters.map((c) => (c.id === ctx.char.id ? ctx.char : c)),
-        pending_reaction: undefined,
-      };
-      if (ctx.st.entities) {
-        ctx.st = {
-          ...ctx.st,
-          entities: ctx.st.entities.map((e) =>
-            e.id === ctx.char.id && !e.isEnemy ? { ...e, hp: newHp } : e
-          ),
-        };
-      }
+      // Decline — commit the proposed snapshot with a trailing notice.
+      ctx.narrative = `${pendingFragment.prose} (Shield declined.)`;
+      commitProposed();
     }
   } else if (rx.kind === 'hellish_rebuke') {
     if (action.accept) {
@@ -300,6 +314,305 @@ export const handleResolveReaction: ActionHandler<{
         ctx.narrative = `${ctx.char.name} declines to counter. ${rx.enemySpellName} resolves.`;
       }
       ctx.st = { ...ctx.st, pending_reaction: undefined };
+    }
+  } else if (rx.kind === 'uncanny_dodge') {
+    // PHB Rogue L5. Accept = halve the proposed damage + commit;
+    // decline = commit the full proposed snapshot.
+    const pendingFragment = rx.pendingFragment as EnemyAttackHitFragment;
+    const pendingProposedChar = rx.pendingProposedChar as Character;
+    const pendingProposedSt = rx.pendingProposedSt as GameState;
+    if (action.accept) {
+      // Halve the damage. The proposedChar already had the full damage
+      // applied; back out half of it.
+      const halved = Math.floor(rx.proposedDamage / 2);
+      const dmgSaved = rx.proposedDamage - halved;
+      const charAfterHalve: Character = {
+        ...pendingProposedChar,
+        hp: Math.min(pendingProposedChar.max_hp, pendingProposedChar.hp + dmgSaved),
+        turn_actions: { ...pendingProposedChar.turn_actions, reaction_used: true },
+      };
+      ctx.st = {
+        ...ctx.st,
+        characters: pendingProposedSt.characters.map((c) =>
+          c.id === ctx.char.id ? charAfterHalve : c
+        ),
+        entities: (pendingProposedSt.entities ?? ctx.st.entities ?? []).map((e) =>
+          e.id === ctx.char.id && !e.isEnemy ? { ...e, hp: charAfterHalve.hp } : e
+        ),
+        pending_reaction: undefined,
+      };
+      ctx.char = charAfterHalve;
+      ctx.st = pushEvent(
+        ctx.st,
+        enemyAttackFragmentEvent({ ...pendingFragment, damage: halved }, ctx.st.round ?? 1)
+      );
+      ctx.narrative = `🌀 ${ctx.char.name} uses Uncanny Dodge! ${pendingFragment.prose} — but only ${halved} damage lands (saved ${dmgSaved}).`;
+    } else {
+      // Decline — commit the full-damage proposed snapshot.
+      ctx.st = {
+        ...ctx.st,
+        characters: pendingProposedSt.characters.map((c) =>
+          c.id === ctx.char.id ? pendingProposedChar : c
+        ),
+        entities: (pendingProposedSt.entities ?? ctx.st.entities ?? []).map((e) =>
+          e.id === ctx.char.id && !e.isEnemy ? { ...e, hp: pendingProposedChar.hp } : e
+        ),
+        pending_reaction: undefined,
+      };
+      ctx.char = pendingProposedChar;
+      ctx.st = pushEvent(ctx.st, enemyAttackFragmentEvent(pendingFragment, ctx.st.round ?? 1));
+      ctx.narrative = `${pendingFragment.prose} (Uncanny Dodge declined.)`;
+    }
+  } else if (rx.kind === 'sentinel') {
+    // PHB 2024 Sentinel feat. Accept = the Sentinel PC makes a melee
+    // weapon attack against the triggering enemy. Decline = nothing
+    // happens. Reaction consumed on accept (decline doesn't burn it).
+    if (action.accept) {
+      const enemyEnt = ctx.st.entities?.find(
+        (e) => e.id === rx.triggerAttackerEnemyId && e.isEnemy
+      );
+      const enemy = getEnemyById(ctx.seed, rx.triggerAttackerEnemyId);
+      if (!enemyEnt || !enemy) {
+        ctx.narrative = `${ctx.char.name} reaches to intercept, but the attacker is gone.`;
+        ctx.st = { ...ctx.st, pending_reaction: undefined };
+      } else {
+        const weaponInstance = ctx.char.equipped_weapon
+          ? ctx.char.inventory?.find((i) => i.instance_id === ctx.char.equipped_weapon)
+          : null;
+        const weaponItem = weaponInstance
+          ? ctx.context.lootTable.find((l) => l.id === weaponInstance.id)
+          : null;
+        // Sentinel reaction is melee only (RAW). Ranged weapons can't
+        // be used — fall back to unarmed strike if no melee weapon.
+        const isMelee = !!weaponItem && weaponItem.range !== 'ranged';
+        const usedWeapon = isMelee ? weaponItem : null;
+        const weaponProficient = hasWeaponProficiency(
+          ctx.char.weapon_proficiencies ?? [],
+          usedWeapon?.weaponType
+        );
+        const atk = resolvePlayerAttack(
+          { str: ctx.char.str, dex: ctx.char.dex, level: ctx.char.level },
+          usedWeapon?.damage ?? '1d4',
+          enemy.ac,
+          usedWeapon?.finesse ?? false,
+          false,
+          false,
+          weaponProficient,
+          false,
+          20,
+          0,
+          ctx.char.species === 'halfling'
+        );
+        // Burn the reaction.
+        ctx.char = {
+          ...ctx.char,
+          turn_actions: { ...ctx.char.turn_actions, reaction_used: true },
+        };
+        const weaponLabel = usedWeapon ? usedWeapon.name : 'an unarmed strike';
+        if (atk.hit) {
+          const newEnemyHp = Math.max(0, enemyEnt.hp - atk.damage);
+          let newSt: GameState = {
+            ...ctx.st,
+            entities: (ctx.st.entities ?? []).map((e) =>
+              e.id === rx.triggerAttackerEnemyId && e.isEnemy ? { ...e, hp: newEnemyHp } : e
+            ),
+            pending_reaction: undefined,
+            characters: ctx.st.characters.map((c) => (c.id === ctx.char.id ? ctx.char : c)),
+          };
+          if (newEnemyHp <= 0) {
+            newSt = { ...newSt, enemies_killed: [...newSt.enemies_killed, enemy.id] };
+          }
+          ctx.st = newSt;
+          ctx.narrative = `⚔ ${ctx.char.name} intercepts with Sentinel — ${weaponLabel} hits ${enemy.name} for ${atk.damage}! (${newEnemyHp <= 0 ? `${enemy.name} drops!` : ''})`;
+        } else {
+          ctx.st = {
+            ...ctx.st,
+            pending_reaction: undefined,
+            characters: ctx.st.characters.map((c) => (c.id === ctx.char.id ? ctx.char : c)),
+          };
+          ctx.narrative = `⚔ ${ctx.char.name} swings with Sentinel — ${weaponLabel} misses ${enemy.name}.`;
+        }
+      }
+    } else {
+      ctx.narrative = `${ctx.char.name} declines to intercept.`;
+      ctx.st = { ...ctx.st, pending_reaction: undefined };
+    }
+  } else if (rx.kind === 'silvery_barbs') {
+    // Strixhaven L1. Accept = burn a L1+ slot, reroll the d20, take
+    // the lower of the original vs the new. If the new total falls
+    // below targetAc, the attack becomes a miss (damage discarded).
+    // Otherwise the hit stands (proposed snapshot commits).
+    // Decline = commit the full-damage proposed snapshot.
+    const pendingFragment = rx.pendingFragment as EnemyAttackHitFragment;
+    const pendingProposedChar = rx.pendingProposedChar as Character;
+    const pendingProposedSt = rx.pendingProposedSt as GameState;
+    if (action.accept) {
+      const slotsMax = ctx.char.spell_slots_max ?? {};
+      const slotsUsed = ctx.char.spell_slots_used ?? {};
+      const slotLvl = Object.keys(slotsMax)
+        .map(Number)
+        .filter((n) => n >= 1 && (slotsMax[n] ?? 0) > (slotsUsed[n] ?? 0))
+        .sort((a, b) => a - b)[0];
+      if (slotLvl === undefined) {
+        // No slot — full damage commits.
+        ctx.narrative = `No spell slot available for Silvery Barbs. ${pendingFragment.prose}`;
+        ctx.st = {
+          ...ctx.st,
+          characters: pendingProposedSt.characters.map((c) =>
+            c.id === ctx.char.id ? pendingProposedChar : c
+          ),
+          entities: (pendingProposedSt.entities ?? ctx.st.entities ?? []).map((e) =>
+            e.id === ctx.char.id && !e.isEnemy ? { ...e, hp: pendingProposedChar.hp } : e
+          ),
+          pending_reaction: undefined,
+        };
+        ctx.char = pendingProposedChar;
+        ctx.st = pushEvent(ctx.st, enemyAttackFragmentEvent(pendingFragment, ctx.st.round ?? 1));
+      } else {
+        // Slot consumed; reroll the d20.
+        const newD20 = rollDice('1d20');
+        const finalD20 = Math.min(rx.proposedD20, newD20);
+        const mods = rx.atkTotal - rx.proposedD20;
+        const newTotal = finalD20 + mods;
+        const newHit = newTotal >= rx.targetAc;
+        // PC consumes slot + reaction regardless of outcome.
+        const charBase: Character = {
+          ...ctx.char,
+          spell_slots_used: { ...slotsUsed, [slotLvl]: (slotsUsed[slotLvl] ?? 0) + 1 },
+          turn_actions: { ...ctx.char.turn_actions, reaction_used: true },
+        };
+        if (newHit) {
+          // Hit stands — commit the proposed snapshot (with damage)
+          // but keep our slot + reaction consumed.
+          const charAfter: Character = {
+            ...pendingProposedChar,
+            spell_slots_used: charBase.spell_slots_used,
+            turn_actions: charBase.turn_actions,
+          };
+          ctx.st = {
+            ...ctx.st,
+            characters: pendingProposedSt.characters.map((c) =>
+              c.id === ctx.char.id ? charAfter : c
+            ),
+            entities: (pendingProposedSt.entities ?? ctx.st.entities ?? []).map((e) =>
+              e.id === ctx.char.id && !e.isEnemy ? { ...e, hp: charAfter.hp } : e
+            ),
+            pending_reaction: undefined,
+          };
+          ctx.char = charAfter;
+          ctx.st = pushEvent(ctx.st, enemyAttackFragmentEvent(pendingFragment, ctx.st.round ?? 1));
+          ctx.narrative = `🌟 ${ctx.char.name} weaves Silvery Barbs (lvl ${slotLvl} slot)! Reroll: d20 ${newD20} → total ${newTotal} vs AC ${rx.targetAc} — still hits. ${pendingFragment.prose}`;
+        } else {
+          // Reroll causes a miss — discard damage. PC stays at its
+          // pre-attack HP. Emit attack_miss event instead.
+          ctx.st = {
+            ...ctx.st,
+            characters: ctx.st.characters.map((c) => (c.id === ctx.char.id ? charBase : c)),
+            pending_reaction: undefined,
+          };
+          ctx.char = charBase;
+          ctx.st = pushEvent(ctx.st, {
+            kind: 'attack_miss',
+            attackerId: pendingFragment.attackerEnemyId,
+            attackerName: pendingFragment.attackerName,
+            targetId: pendingFragment.targetCharId,
+            targetName: pendingFragment.targetName,
+            toHit: newTotal,
+            targetAc: rx.targetAc,
+            round: ctx.st.round ?? 1,
+          });
+          ctx.narrative = `🌟 ${ctx.char.name} weaves Silvery Barbs (lvl ${slotLvl} slot)! Reroll: d20 ${newD20} → total ${newTotal} vs AC ${rx.targetAc} — the strike misses!`;
+        }
+      }
+    } else {
+      // Decline — commit full proposed snapshot.
+      ctx.st = {
+        ...ctx.st,
+        characters: pendingProposedSt.characters.map((c) =>
+          c.id === ctx.char.id ? pendingProposedChar : c
+        ),
+        entities: (pendingProposedSt.entities ?? ctx.st.entities ?? []).map((e) =>
+          e.id === ctx.char.id && !e.isEnemy ? { ...e, hp: pendingProposedChar.hp } : e
+        ),
+        pending_reaction: undefined,
+      };
+      ctx.char = pendingProposedChar;
+      ctx.st = pushEvent(ctx.st, enemyAttackFragmentEvent(pendingFragment, ctx.st.round ?? 1));
+      ctx.narrative = `${pendingFragment.prose} (Silvery Barbs declined.)`;
+    }
+  } else if (rx.kind === 'absorb_elements') {
+    // PHB p.211. Accept = burn a L1+ slot, halve damage, commit;
+    // decline = commit the full-damage snapshot.
+    // (TODO: also grant resistance to that damage type until start
+    // of next turn + queue +1d6 bonus damage on next melee attack.
+    // MVP halves the trigger only — see task #60.)
+    const pendingFragment = rx.pendingFragment as EnemyAttackHitFragment;
+    const pendingProposedChar = rx.pendingProposedChar as Character;
+    const pendingProposedSt = rx.pendingProposedSt as GameState;
+    if (action.accept) {
+      const slotsMax = ctx.char.spell_slots_max ?? {};
+      const slotsUsed = ctx.char.spell_slots_used ?? {};
+      const slotLvl = Object.keys(slotsMax)
+        .map(Number)
+        .filter((n) => n >= 1 && (slotsMax[n] ?? 0) > (slotsUsed[n] ?? 0))
+        .sort((a, b) => a - b)[0];
+      if (slotLvl === undefined) {
+        // No slot — fall through to full damage commit.
+        ctx.narrative = `No spell slot available for Absorb Elements. ${pendingFragment.prose}`;
+        ctx.st = {
+          ...ctx.st,
+          characters: pendingProposedSt.characters.map((c) =>
+            c.id === ctx.char.id ? pendingProposedChar : c
+          ),
+          entities: (pendingProposedSt.entities ?? ctx.st.entities ?? []).map((e) =>
+            e.id === ctx.char.id && !e.isEnemy ? { ...e, hp: pendingProposedChar.hp } : e
+          ),
+          pending_reaction: undefined,
+        };
+        ctx.char = pendingProposedChar;
+        ctx.st = pushEvent(ctx.st, enemyAttackFragmentEvent(pendingFragment, ctx.st.round ?? 1));
+      } else {
+        // Slot consumed; halve the damage.
+        const halved = Math.floor(rx.proposedDamage / 2);
+        const dmgSaved = rx.proposedDamage - halved;
+        const charAfterAbsorb: Character = {
+          ...pendingProposedChar,
+          hp: Math.min(pendingProposedChar.max_hp, pendingProposedChar.hp + dmgSaved),
+          spell_slots_used: { ...slotsUsed, [slotLvl]: (slotsUsed[slotLvl] ?? 0) + 1 },
+          turn_actions: { ...pendingProposedChar.turn_actions, reaction_used: true },
+        };
+        ctx.st = {
+          ...ctx.st,
+          characters: pendingProposedSt.characters.map((c) =>
+            c.id === ctx.char.id ? charAfterAbsorb : c
+          ),
+          entities: (pendingProposedSt.entities ?? ctx.st.entities ?? []).map((e) =>
+            e.id === ctx.char.id && !e.isEnemy ? { ...e, hp: charAfterAbsorb.hp } : e
+          ),
+          pending_reaction: undefined,
+        };
+        ctx.char = charAfterAbsorb;
+        ctx.st = pushEvent(
+          ctx.st,
+          enemyAttackFragmentEvent({ ...pendingFragment, damage: halved }, ctx.st.round ?? 1)
+        );
+        ctx.narrative = `🌊 ${ctx.char.name} absorbs the ${rx.damageType} energy (lvl ${slotLvl} slot)! Only ${halved} damage lands (absorbed ${dmgSaved}).`;
+      }
+    } else {
+      // Decline — commit full proposed snapshot.
+      ctx.st = {
+        ...ctx.st,
+        characters: pendingProposedSt.characters.map((c) =>
+          c.id === ctx.char.id ? pendingProposedChar : c
+        ),
+        entities: (pendingProposedSt.entities ?? ctx.st.entities ?? []).map((e) =>
+          e.id === ctx.char.id && !e.isEnemy ? { ...e, hp: pendingProposedChar.hp } : e
+        ),
+        pending_reaction: undefined,
+      };
+      ctx.char = pendingProposedChar;
+      ctx.st = pushEvent(ctx.st, enemyAttackFragmentEvent(pendingFragment, ctx.st.round ?? 1));
+      ctx.narrative = `${pendingFragment.prose} (Absorb Elements declined.)`;
     }
   }
 

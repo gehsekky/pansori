@@ -6,6 +6,7 @@ import {
   SRD_CLASS_SAVING_THROWS,
   SRD_CLASS_SKILLS,
   SRD_CLASS_WEAPON_PROFICIENCIES,
+  SRD_FEATS,
   SRD_MONSTERS,
   SRD_SPELLCASTING_ABILITY,
   SRD_SPELLS,
@@ -70,8 +71,12 @@ export const context: Context = {
       name: 'Soldier',
       desc: 'You have served in an organized military force.',
       skillProficiencies: ['athletics', 'intimidation'],
+      toolProficiency: 'Gaming set',
       feature: 'Military Rank',
       featureDesc: 'Soldiers and veterans recognize your authority.',
+      abilityScoreIncreases: ['str', 'dex', 'con'],
+      originFeat: 'tough',
+      language: 'Common',
     },
     {
       id: 'criminal',
@@ -81,27 +86,49 @@ export const context: Context = {
       toolProficiency: "Thieves' Tools",
       feature: 'Criminal Contact',
       featureDesc: 'You have a contact who can help you find information or fences stolen goods.',
+      abilityScoreIncreases: ['dex', 'con', 'int'],
+      // Lucky is canonically Farmer's origin feat in 2024 PHB, but Criminal
+      // gets Alert; Alert isn't seeded yet so Lucky stands in until Alert
+      // ships. The choice doesn't change RAW intent — both are origin feats.
+      originFeat: 'lucky',
+      language: "Thieves' Cant",
     },
     {
       id: 'sage',
       name: 'Sage',
       desc: 'You spent years learning the lore of the multiverse.',
       skillProficiencies: ['arcana', 'history'],
+      toolProficiency: "Calligrapher's Tools",
       feature: 'Researcher',
       featureDesc: 'If you do not know information, you know where to find it.',
+      abilityScoreIncreases: ['con', 'int', 'wis'],
+      // Canonically Magic Initiate (Wizard) — placeholder until Magic
+      // Initiate ships in feats.ts. Tough keeps Sages alive long enough
+      // to research.
+      originFeat: 'tough',
+      language: 'Common',
     },
     {
       id: 'acolyte',
       name: 'Acolyte',
       desc: 'You have spent your life in service to a temple.',
       skillProficiencies: ['religion', 'insight'],
+      toolProficiency: "Calligrapher's Tools",
       feature: 'Shelter of the Faithful',
       featureDesc: 'You and your companions can receive healing and care at temples.',
+      abilityScoreIncreases: ['int', 'wis', 'cha'],
+      // Canonically Magic Initiate (Cleric) — placeholder until that
+      // feat ships.
+      originFeat: 'lucky',
+      language: 'Celestial',
     },
   ],
 
   // ─── Spell system ─────────────────────────────────────────────────────────────
   spellTable: { ...SRD_SPELLS },
+
+  // ─── Feat system ──────────────────────────────────────────────────────────────
+  featTable: { ...SRD_FEATS },
 
   classSpells: {
     Wizard: ['fire_bolt', 'magic_missile', 'thunderwave', 'misty_step', 'fireball'],

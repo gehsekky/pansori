@@ -79,8 +79,23 @@ export interface CombatEntity {
   id: string; // character.id for PCs, enemy instance id for enemies, owner.id + ':companion' for animal companions
   isEnemy: boolean;
   pos: GridPos;
+  /**
+   * Current HP.
+   * - **Enemies (`isEnemy: true`):** authoritative; the engine mutates
+   *   this directly when an enemy takes damage.
+   * - **PCs (`isEnemy: false`):** mirror of `characters[].hp`. Writes
+   *   MUST route through `commitCharacter(st, char)` (BE) so the
+   *   characters[] entry and this mirror stay in sync. Reads from this
+   *   field are safe; if you suspect drift, prefer reading
+   *   `characters[].hp` by id.
+   */
   hp: number;
   maxHp: number;
+  /**
+   * Active conditions. Same mirror policy as `hp` — for PCs, source
+   * of truth is `characters[].conditions`; route writes through
+   * `commitCharacter`.
+   */
   conditions: string[];
   condition_durations: Record<string, number>;
   // Beastmaster animal companion (PHB p.93) — a CR ¼ beast tied to a Ranger PC.
@@ -123,6 +138,47 @@ export type StructuredAction =
   | { type: 'attack_npc' }
   | { type: 'use_class_feature'; featureId: string; targetEnemyId?: string }
   | { type: 'apply_asi'; stat: AbilityKey }
+  | {
+      // Take a feat. When the feat is a half-feat with `choices`,
+      // `abilityChoice` records the player's pick. When the feat has
+      // a `save-proficiency` effect with empty abilities, the chosen
+      // abilities are recorded on Character.feat_choices.
+      type: 'take_feat';
+      featId: string;
+      abilityChoice?: AbilityKey;
+      saveProficiencyChoices?: AbilityKey[];
+    }
+  | { type: 'de_attune'; instanceId: string }
+  | {
+      // 2024 PHB Influence action — distinct from `talk` (free narrative
+      // dialogue). Triggers a CHA-based skill check to change an NPC's
+      // mind or coerce an enemy mid-combat. In combat: consumes the
+      // Action (no attack that turn). Out of combat: no action cost
+      // (the narrative time investment is the cost). DC = max(15, target's
+      // INT score). Exactly one of `targetNpcRoomId` / `targetEnemyId` is
+      // expected.
+      type: 'influence';
+      skill: 'persuasion' | 'deception' | 'intimidation';
+      targetNpcRoomId?: string;
+      targetEnemyId?: string;
+    }
+  | {
+      // 2024 PHB Study action — INT-based mental deduction. Distinct
+      // from the legacy `examine` action (which never had formal
+      // combat-action status). Lets a player roll INT + skill prof
+      // to identify a creature's vulnerabilities / immunities,
+      // analyze an object's mechanism, or recall lore. In combat:
+      // costs the Action (no attack on a Study turn). Out of combat:
+      // no action cost. DC: 15 base for general lore; tuned to CR
+      // for creature analysis.
+      type: 'study';
+      skill: 'arcana' | 'history' | 'investigation' | 'nature' | 'religion';
+      targetEnemyId?: string;
+      // Free-form lore prompt; reserved for future loremaster flows.
+      // The current handler covers creature-analysis only; lore +
+      // object branches are TODO.
+      loreTopic?: string;
+    }
   | {
       type: 'cast_spell';
       spellId: string;
@@ -397,6 +453,117 @@ export interface Background {
   toolProficiency?: string | null;
   feature: string;
   featureDesc: string;
+  // 2024 PHB additions. Optional so legacy context backgrounds
+  // continue to work; new backgrounds should set them.
+  /**
+   * Origin feat granted automatically at character creation. References
+   * a feat id in `Context.featTable`. The 2024 PHB lists one origin
+   * feat per background (e.g. Acolyte → Magic Initiate, Farmer → Tough).
+   */
+  originFeat?: string;
+  /**
+   * Three abilities the background's +1/+1/+1 or +2/+1 ability score
+   * bonus may go into. Display + validation only — players supply
+   * final stats at character creation (`stats: { str, dex, ... }`),
+   * and the engine doesn't re-apply this delta. Future PRs that move
+   * stat-pick UX to the FE will consult this list.
+   */
+  abilityScoreIncreases?: AbilityKey[];
+  /**
+   * Item ids granted at character creation in addition to
+   * `classStartingLoot`. Empty / undefined → use class-only gear.
+   */
+  startingEquipment?: string[];
+  /**
+   * Additional language granted by the background.
+   */
+  language?: string;
+}
+
+// ─── Feats (2024 PHB Chapter 5) ──────────────────────────────────────
+//
+// A feat is a chunk of mechanical effect a player chooses at
+// character creation (origin feats), at ASI levels (general feats),
+// at L19 (epic boon feats), or from a class feature (fighting-style
+// feats). Some feats are "half-feats" that include a +1 ability
+// score bump alongside their main effect.
+//
+// `effect` is a discriminated union so the engine dispatches feat
+// behavior via the `kind` tag (see `services/feats.ts`). Adding a
+// new feat is a data entry plus, if it introduces a new effect
+// pattern, one new union variant + one new case in the dispatcher.
+// Common patterns (passive HP, d20 reroll resource, ranged attack
+// toggle, spell list extension, save proficiency) share existing
+// kinds so most feats are pure data.
+
+/**
+ * Discriminated union of feat effect shapes. Each `kind` corresponds
+ * to a dispatch case in `services/feats.ts`. When adding a feat that
+ * doesn't fit any existing kind, add a new variant and the matching
+ * dispatcher case.
+ */
+export type FeatEffect =
+  | {
+      // Passive HP grant per character level (Tough: +2 HP/level).
+      kind: 'hp-per-level';
+      amount: number;
+    }
+  | {
+      // Per-long-rest resource for rerolling a d20 (Lucky).
+      kind: 'd20-reroll';
+      usesPerLongRest: number;
+    }
+  | {
+      // Ranged-attack toggle: pre-attack opt-in to swap -toHit for +damage,
+      // ignore cover, no long-range disadv (Sharpshooter).
+      kind: 'ranged-toggle';
+      toHitPenalty: number;
+      bonusDamage: number;
+      ignoreHalfAndThreeQuartersCover: boolean;
+      longRangeNoDisadvantage: boolean;
+    }
+  | {
+      // Extra cantrips + one L1 spell from another class's list,
+      // cast 1×/long rest without slot (Magic Initiate).
+      kind: 'extra-cantrips-and-l1';
+      spellList: 'arcane' | 'divine' | 'primal';
+      cantripCount: number;
+      l1Count: number;
+    }
+  | {
+      // Save proficiency in chosen abilities (Resilient half-feat).
+      kind: 'save-proficiency';
+      // Empty here means "choose at take time"; the chosen abilities
+      // are recorded on the Character via `feat_choices`.
+      abilities: AbilityKey[];
+    };
+
+/**
+ * Static data shape for a feat. Lives in `context.featTable` keyed by
+ * `id`. Players reference feats by id on `Character.feats`.
+ */
+export interface Feat {
+  id: string;
+  name: string;
+  desc: string;
+  category: 'origin' | 'general' | 'fighting-style' | 'epic-boon';
+  /**
+   * Half-feats grant a +1 ability bump alongside their main effect.
+   * - `{ fixed: 'con' }` — always +1 CON (e.g. Durable).
+   * - `{ choices: ['str', 'con'] }` — player picks one at take time.
+   * Absent → not a half-feat.
+   */
+  abilityBonus?: { fixed: AbilityKey } | { choices: AbilityKey[] };
+  prerequisites?: {
+    minLevel?: number;
+    minAbilityScores?: Partial<Record<AbilityKey, number>>;
+    classes?: string[];
+    requiredFeat?: string;
+    // Display-only prereq strings the engine doesn't model explicitly
+    // ("Spellcasting feature", "Proficiency with martial weapons").
+    other?: string[];
+  };
+  effect: FeatEffect;
 }
 
 // ─── Quests + factions (full bodies) ─────────────────────────────────
@@ -459,6 +626,19 @@ export interface LootItem {
   weaponType?: 'simple' | 'martial';
   light?: boolean; // TWF: can be used in off-hand with another light weapon
   requiresAttunement?: boolean; // magic items requiring attunement
+  /**
+   * Cursed item flag (PHB p.214). The curse reveals on attunement and
+   * voluntary de-attunement is blocked — only Remove Curse / Greater
+   * Restoration / equivalent magic can break the bond. Pansori doesn't
+   * yet implement those spells, so cursed items are effectively
+   * permanent for now; the flag is in place for when remove-curse lands.
+   */
+  cursed?: boolean;
+  /**
+   * Display text shown when the curse reveals on attunement. Empty / undefined
+   * → a generic fallback narrative is used.
+   */
+  curseDesc?: string;
   armorAcBase?: number; // base AC of armor when worn (e.g. leather=11, chain mail=16)
   dexCapToAc?: number; // max DEX bonus added to AC (2=medium, 0=heavy; undefined=full DEX)
   versatileDamage?: string; // two-handed damage for versatile weapons (e.g. '1d8' for quarterstaff)
@@ -496,14 +676,25 @@ interface PendingReactionBase {
 }
 
 // Shield (PHB p.275). Triggers BEFORE damage applies — accepting negates the
-// hit retroactively. pendingDamage/pendingNarrative are stashed so a decline
-// can apply them as if Shield was never offered.
+// hit retroactively. The BE stashes a pre-computed proposed snapshot
+// (fragment + char + state) so a decline commits them as-rolled and an
+// accept discards them — including the concentration-save outcome that
+// was rolled at attack time. Discard on accept is the RAW-correct
+// behavior: one save per damage TAKEN, not per damage threatened.
+//
+// `pendingFragment` / `pendingProposedChar` / `pendingProposedSt` are
+// typed as `unknown` here because their full shapes (EnemyAttackHitFragment,
+// Character, GameState) live in BE-only modules (`services/narrative/
+// fragments.ts` and the BE Character/GameState definitions); the FE
+// doesn't introspect them — it just round-trips the pending_reaction
+// state. BE narrows via cast.
 export interface PendingShieldReaction extends PendingReactionBase {
   kind: 'shield';
   atkTotal: number; // to-hit total that triggered the [AC, AC+4] window
   targetAcAtAttack: number;
-  pendingDamage: number;
-  pendingNarrative: string;
+  pendingFragment: unknown;
+  pendingProposedChar: unknown;
+  pendingProposedSt: unknown;
 }
 
 // Hellish Rebuke (PHB p.252). Triggers AFTER damage applies — accepting deals
@@ -512,6 +703,59 @@ export interface PendingShieldReaction extends PendingReactionBase {
 // decline just lets the enemy turn continue.
 export interface PendingHellishRebukeReaction extends PendingReactionBase {
   kind: 'hellish_rebuke';
+}
+
+// Uncanny Dodge (PHB Rogue L5). Triggers BEFORE damage commits when
+// the Rogue can see the attacker — accepting halves the damage from
+// that one attack. Pre-built proposed snapshot is stashed the same
+// way as Shield: accept ⇒ halve damage in the snapshot, commit;
+// decline ⇒ commit the full-damage snapshot. Same proposed-state
+// `unknown` typing as Shield (BE narrows via cast).
+export interface PendingUncannyDodgeReaction extends PendingReactionBase {
+  kind: 'uncanny_dodge';
+  atkTotal: number;
+  /** Full proposed damage before halving — for narrative display. */
+  proposedDamage: number;
+  pendingFragment: unknown;
+  pendingProposedChar: unknown;
+  pendingProposedSt: unknown;
+}
+
+// Absorb Elements (PHB p.211, 1st-level abjuration). Reaction
+// triggered when the caster takes acid / cold / fire / lightning /
+// thunder damage. Accepting consumes a level-1+ slot, halves the
+// triggering damage. (RAW also grants resistance to that type
+// until the start of your next turn AND a +1d6 bonus to the
+// caster's next melee attack — both deferred as follow-ups; MVP
+// halves the trigger only.) Same proposed-snapshot stash pattern
+// as Shield / Uncanny Dodge.
+export interface PendingAbsorbElementsReaction extends PendingReactionBase {
+  kind: 'absorb_elements';
+  damageType: 'acid' | 'cold' | 'fire' | 'lightning' | 'thunder';
+  proposedDamage: number;
+  pendingFragment: unknown;
+  pendingProposedChar: unknown;
+  pendingProposedSt: unknown;
+}
+
+// Silvery Barbs (Strixhaven origin spell, 1st-level enchantment).
+// Reaction triggered when a creature within 60 ft succeeds on an
+// attack roll, ability check, or saving throw. Accepting consumes a
+// L1+ slot and forces the triggering creature to reroll the d20,
+// using the lower result. (RAW also grants advantage to one ally on
+// their next d20 test within the next minute — that follow-up is
+// deferred; MVP handles the reroll only.) `proposedD20` is the
+// enemy's original d20 result; the resolver rolls a new d20, takes
+// the lower, and re-evaluates the hit.
+export interface PendingSilveryBarbsReaction extends PendingReactionBase {
+  kind: 'silvery_barbs';
+  atkTotal: number;
+  proposedD20: number;
+  proposedDamage: number;
+  targetAc: number;
+  pendingFragment: unknown;
+  pendingProposedChar: unknown;
+  pendingProposedSt: unknown;
 }
 
 // Counterspell (PHB p.228). Triggers BEFORE the enemy spell resolves —
@@ -530,4 +774,7 @@ export interface PendingCounterspellReaction extends PendingReactionBase {
 export type PendingReaction =
   | PendingShieldReaction
   | PendingHellishRebukeReaction
-  | PendingCounterspellReaction;
+  | PendingCounterspellReaction
+  | PendingUncannyDodgeReaction
+  | PendingAbsorbElementsReaction
+  | PendingSilveryBarbsReaction;

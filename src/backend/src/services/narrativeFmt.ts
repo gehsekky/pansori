@@ -90,9 +90,31 @@ export function parseNarrativeTokens(s: string): NarrativePart[] {
 }
 
 // Reduces a tokenised narrative to its plain display text. Used by tests
-// asserting against old substrings ("takes 5 damage") and by any code path
-// that needs the prose-only form (LLM prompts, plain-text exports).
+// asserting against old substrings ("takes 5 damage") and any code path
+// that needs the prose-only form (plain-text exports).
 export function stripNarrativeTokens(s: string): string {
   if (!s) return '';
   return s.replace(TOKEN_RE, (_full, _kind, display) => unescapeDisplay(display));
+}
+
+// LLM-input variant: drops `note` tokens entirely (mechanical asides like
+// "[Sneak Attack 2d6: +7]" or "(d20 18+5 STR = 25 vs AC 16)" are not
+// narrative and shouldn't be in the prose the LLM rewrites — they end up
+// rendered as styled sidebar/pill spans by the FE anyway). Other token
+// kinds keep their display text so the LLM can preserve damage numbers,
+// HP totals, DCs etc. as required by `preservesCriticalFacts`.
+//
+// Cleans up any double-space the note removal leaves behind so the LLM
+// prompt doesn't carry awkward gaps. Trailing whitespace is stripped per
+// line; consecutive blank lines collapse to one.
+export function stripForLlm(s: string): string {
+  if (!s) return '';
+  const noNotes = s.replace(TOKEN_RE, (_full, kind, display) =>
+    kind === 'note' ? '' : unescapeDisplay(display)
+  );
+  return noNotes
+    .split('\n')
+    .map((line) => line.replace(/ {2,}/g, ' ').replace(/\s+$/, ''))
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n');
 }

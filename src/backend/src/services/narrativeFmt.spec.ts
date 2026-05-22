@@ -2,6 +2,7 @@ import {
   type NarrativePart,
   fmt,
   parseNarrativeTokens,
+  stripForLlm,
   stripNarrativeTokens,
 } from './narrativeFmt.js';
 import { describe, expect, it } from 'vitest';
@@ -69,5 +70,35 @@ describe('narrativeFmt', () => {
     expect(parts).toEqual<NarrativePart[]>([
       { type: 'token', kind: 'note', display: 'STR|DEX save' },
     ]);
+  });
+
+  describe('stripForLlm', () => {
+    it('drops note tokens entirely (mechanical asides not sent to LLM)', () => {
+      const s = `Bjorn strikes the orc! ${fmt.note('[Sneak Attack 2d6: +7]')} ${fmt.dmg(15)} damage.`;
+      expect(stripForLlm(s)).toBe('Bjorn strikes the orc! 15 damage.');
+    });
+
+    it('keeps non-note tokens as display text (damage numbers preserved for fact-check)', () => {
+      const s = `Roll: ${fmt.roll(18)} vs ${fmt.ac(16)} — ${fmt.dmg(8)} damage.`;
+      expect(stripForLlm(s)).toBe('Roll: 18 vs AC 16 — 8 damage.');
+    });
+
+    it('handles multiple notes on one line cleanly', () => {
+      const s = `The fighter strikes. ${fmt.note('[Rage: +2]')} ${fmt.note('[Sneak Attack: +7]')} Done.`;
+      expect(stripForLlm(s)).toBe('The fighter strikes. Done.');
+    });
+
+    it('preserves line breaks but collapses extra blank lines', () => {
+      const s = `Line 1.\n\n${fmt.note('[note]')}\n\nLine 2.`;
+      expect(stripForLlm(s)).toBe('Line 1.\n\nLine 2.');
+    });
+
+    it('is a no-op on plain prose', () => {
+      expect(stripForLlm('nothing to strip here')).toBe('nothing to strip here');
+    });
+
+    it('returns empty string on empty input', () => {
+      expect(stripForLlm('')).toBe('');
+    });
   });
 });

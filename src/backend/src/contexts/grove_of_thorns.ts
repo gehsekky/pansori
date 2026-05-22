@@ -20,6 +20,7 @@ import {
   SRD_CLASS_SAVING_THROWS,
   SRD_CLASS_SKILLS,
   SRD_CLASS_WEAPON_PROFICIENCIES,
+  SRD_FEATS,
   SRD_MONSTERS,
   SRD_SPELLCASTING_ABILITY,
   SRD_SPELLS,
@@ -116,6 +117,7 @@ export const context: Context = {
   // ─── Spell system ────────────────────────────────────────────────────────────
 
   spellTable: { ...SRD_SPELLS },
+  featTable: { ...SRD_FEATS },
   classSpells: {
     Cleric: ['sacred_flame', 'cure_wounds', 'guiding_bolt', 'healing_word', 'hold_person', 'bless'],
     Wizard: ['fire_bolt', 'magic_missile', 'thunderwave', 'misty_step', 'shield'],

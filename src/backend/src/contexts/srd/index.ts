@@ -18,3 +18,4 @@ export { BEAST_FORMS, maxBeastCRForLevel, availableBeastForms } from './beast_fo
 export { SRD_MONSTERS } from './monsters.js';
 export { SRD_SPECIES } from './species.js';
 export type { Species } from './species.js';
+export { SRD_FEATS } from './feats.js';

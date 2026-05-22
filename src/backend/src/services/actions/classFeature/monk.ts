@@ -7,6 +7,7 @@ import {
   splitEncounterXp,
 } from '../../gameEngine.js';
 import type { ActionContext } from '../types.js';
+import { composeNow } from '../../narrative/compose.js';
 
 /**
  * Monk + Open Hand + Shadow features.
@@ -310,15 +311,14 @@ export function handleMonkFeature(ctx: ActionContext, fid: string): boolean {
             : e
         ),
       };
-      ctx.st = pushEvent(ctx.st, {
+      composeNow(ctx, {
         kind: 'condition_applied',
         targetId: ctx.enemy!.id,
         targetName: ctx.enemy!.name,
         condition: 'stunned',
         source: 'Stunning Strike',
-        round: ctx.st.round ?? 1,
+        prose: `Stunning Strike! CON save ${conSave} vs DC ${stunDC} — ${ctx.enemy!.name} is stunned until the end of your next turn! (${kiPool3 - 1} ki remaining)`,
       });
-      ctx.narrative = `Stunning Strike! CON save ${conSave} vs DC ${stunDC} — ${ctx.enemy!.name} is stunned until the end of your next turn! (${kiPool3 - 1} ki remaining)`;
     } else {
       ctx.narrative = `Stunning Strike! CON save ${conSave} vs DC ${stunDC} — ${ctx.enemy!.name} resists. (${kiPool3 - 1} ki remaining)`;
     }

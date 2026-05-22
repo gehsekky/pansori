@@ -1,3 +1,4 @@
+import { ACTION_COSTS, checkBudget, deductCost } from './cost.js';
 import type { ActionContext, ActionHandler } from './types.js';
 import { handleAcceptQuest, handleCompleteQuest } from './quest.js';
 import {
@@ -5,9 +6,17 @@ import {
   handlePrepareSpells,
   handleSelectSubclass,
   handleSetActiveCharacter,
+  handleTakeFeat,
 } from './meta.js';
-import { handleAttackNpc, handleBuy, handleTalk, handleTalkResponse } from './social.js';
-import { handleAttune, handleUse } from './inventory.js';
+import {
+  handleAttackNpc,
+  handleBuy,
+  handleInfluence,
+  handleStudy,
+  handleTalk,
+  handleTalkResponse,
+} from './social.js';
+import { handleAttune, handleDeAttune, handleUse } from './inventory.js';
 import {
   handleDash,
   handleDisengage,
@@ -54,11 +63,13 @@ const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   help: handleHelp as ActionHandler,
   ready: handleReady as ActionHandler,
   apply_asi: handleApplyAsi as ActionHandler,
+  take_feat: handleTakeFeat as ActionHandler,
   select_subclass: handleSelectSubclass as ActionHandler,
   set_active_character: handleSetActiveCharacter as ActionHandler,
   prepare_spells: handlePrepareSpells as ActionHandler,
   escape: handleEscape as ActionHandler,
   attune: handleAttune as ActionHandler,
+  de_attune: handleDeAttune as ActionHandler,
   short_rest: handleShortRest as ActionHandler,
   long_rest: handleLongRest as ActionHandler,
   death_save: handleDeathSave as ActionHandler,
@@ -80,6 +91,8 @@ const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   interact_object: handleInteractObject as ActionHandler,
   examine: handleExamine as ActionHandler,
   attack_npc: handleAttackNpc as ActionHandler,
+  influence: handleInfluence as ActionHandler,
+  study: handleStudy as ActionHandler,
   use_reaction: handleUseReaction as ActionHandler,
   two_weapon_attack: handleTwoWeaponAttack as ActionHandler,
   grid_move: handleGridMove as ActionHandler,
@@ -127,14 +140,33 @@ export async function dispatchAction(
 ): Promise<DispatchResult> {
   const h = handlers[action.type] as ActionHandler | undefined;
   if (!h) return { handled: false };
-  const result = await h(ctx, action);
-  if (result == null) return { handled: true };
 
-  if ('replaceWith' in result) {
+  // Action-economy pre-check. For declared-cost handlers, reject early
+  // when the budget is exhausted so handlers don't repeat the check.
+  // 'managed' handlers (variable cost, free actions, transformers) opt out.
+  const cost = ACTION_COSTS[action.type] ?? 'managed';
+  const budgetErr = checkBudget(ctx.char, cost);
+  if (budgetErr) {
+    ctx.narrative = budgetErr;
+    return { handled: true };
+  }
+
+  const result = await h(ctx, action);
+
+  if (result != null && 'rejected' in result) {
+    // Validation failed mid-handler. Set the narrative and skip the
+    // post-deduct so the player's action slot survives.
+    ctx.narrative = result.rejected;
+    return { handled: true };
+  }
+
+  if (result != null && 'replaceWith' in result) {
+    // Bubble up — the re-dispatched action runs its own pre-check + deduct.
+    // Skip outer deduct to avoid double-counting.
     return { handled: true, replaceWith: result.replaceWith };
   }
 
-  if ('delegateTo' in result) {
+  if (result != null && 'delegateTo' in result) {
     const prefix = ctx.narrative;
     ctx.narrative = '';
     let nextAction: StructuredAction = result.delegateTo;
@@ -148,9 +180,14 @@ export async function dispatchAction(
       nextAction = inner.replaceWith;
     }
     ctx.narrative = prefix + ctx.narrative;
+    // Outer cost (e.g. 'reaction' for use_reaction) still deducts; the
+    // inner action paid its own cost during the nested dispatch.
+    ctx.char = deductCost(ctx.char, cost);
     return { handled: true };
   }
 
+  // Leaf handler returned void — deduct the declared cost (no-op for 'managed').
+  ctx.char = deductCost(ctx.char, cost);
   return { handled: true };
 }
 

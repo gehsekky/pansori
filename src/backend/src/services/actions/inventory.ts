@@ -1,3 +1,4 @@
+import { commitCharacter, getItemData } from '../gameEngine.js';
 import {
   profBonus,
   resolveMysteryConsumable,
@@ -5,8 +6,8 @@ import {
   rollDice,
 } from '../rulesEngine.js';
 import type { ActionHandler } from './types.js';
+import { applyDamage } from '../damage.js';
 import { fmt } from '../narrativeFmt.js';
-import { getItemData } from '../gameEngine.js';
 
 /**
  * `attune`: PHB p.138 — bind to a magic item that requires
@@ -44,7 +45,56 @@ export const handleAttune: ActionHandler<{ type: 'attune'; instanceId: string }>
     return;
   }
   ctx.char = { ...ctx.char, attuned_items: [...attunedList, instanceId] };
-  ctx.narrative = `You spend a moment focusing on the ${invItem.name}, attuning yourself to its magic. (${attunedList.length + 1}/3 attuned items)`;
+  let narrative = `You spend a moment focusing on the ${invItem.name}, attuning yourself to its magic. (${attunedList.length + 1}/3 attuned items)`;
+  // Cursed items reveal on attunement (PHB p.214). The curse text is
+  // appended so the player learns about the curse and knows they're
+  // bound until remove-curse or equivalent.
+  if (lootItem.cursed) {
+    narrative += ` ⚠ Curse revealed: ${lootItem.curseDesc ?? 'this item is cursed. You cannot end the attunement by choice.'}`;
+  }
+  ctx.narrative = narrative;
+};
+
+/**
+ * `de_attune`: voluntarily end attunement with a magic item (PHB
+ * p.215 — "If you cease attunement, you spend another short rest..."
+ * — Pansori treats this as out-of-combat, no resource cost). Cursed
+ * items resist voluntary de-attunement; a Remove Curse / Greater
+ * Restoration would be required (not yet implemented as a spell —
+ * cursed items currently can't be unbound until that lands).
+ */
+export const handleDeAttune: ActionHandler<{ type: 'de_attune'; instanceId: string }> = (
+  ctx,
+  action
+) => {
+  if (ctx.st.combat_active) {
+    ctx.narrative = 'You cannot end attunement during combat.';
+    return;
+  }
+  const attunedList = ctx.char.attuned_items ?? [];
+  if (!attunedList.includes(action.instanceId)) {
+    ctx.narrative = 'You are not attuned to that item.';
+    return;
+  }
+  const invItem = ctx.char.inventory.find((i) => i.instance_id === action.instanceId);
+  const lootItem = invItem ? ctx.context.lootTable.find((l) => l.id === invItem.id) : undefined;
+  if (lootItem?.cursed) {
+    ctx.narrative = `The curse on the ${invItem?.name ?? 'item'} prevents voluntary de-attunement. You'll need Remove Curse magic to break this bond.`;
+    return;
+  }
+  // De-attuning a currently-equipped attunement-required item also
+  // implicitly unequips it (since the equip check gates on attunement).
+  let next = {
+    ...ctx.char,
+    attuned_items: attunedList.filter((id) => id !== action.instanceId),
+  };
+  if (lootItem?.requiresAttunement) {
+    if (next.equipped_weapon === action.instanceId) next = { ...next, equipped_weapon: null };
+    if (next.equipped_armor === action.instanceId) next = { ...next, equipped_armor: null };
+    if (next.equipped_shield === action.instanceId) next = { ...next, equipped_shield: null };
+  }
+  ctx.char = next;
+  ctx.narrative = `You release your attunement to the ${invItem?.name ?? 'item'}.`;
 };
 
 /**
@@ -96,13 +146,7 @@ export const handleUse: ActionHandler<{
       if (!isSelf && targetIdx >= 0) {
         const target = nextSt.characters[targetIdx];
         const newHp = Math.min(target.max_hp, target.hp + healed);
-        nextSt = {
-          ...nextSt,
-          characters: nextSt.characters.map((c, i) => (i === targetIdx ? { ...c, hp: newHp } : c)),
-          entities: (nextSt.entities ?? []).map((e) =>
-            e.id === target.id && !e.isEnemy ? { ...e, hp: newHp } : e
-          ),
-        };
+        nextSt = commitCharacter(nextSt, { ...target, hp: newHp });
         nextChar = {
           ...nextChar,
           inventory: nextChar.inventory.filter((_, i) => i !== firstIdx),
@@ -134,8 +178,13 @@ export const handleUse: ActionHandler<{
         nextChar = { ...nextChar, hp: Math.min(nextChar.max_hp, nextChar.hp + value) };
         narrative = `You use the ${held.name}. It tastes of regret and eucalyptus — but you feel better? +${fmt.hp(value)} HP.`;
       } else if (result === 'hurt') {
-        nextChar = { ...nextChar, hp: Math.max(1, nextChar.hp - value) };
-        narrative = `You use the ${held.name}. Immediate. Searing. Regret. -${fmt.hp(value)} HP.`;
+        // Mystery consumable can't kill — cap the damage at hp-1 then route
+        // through applyDamage so concentration is checked correctly.
+        const safeDmg = Math.min(value, Math.max(0, nextChar.hp - 1));
+        const dmgResult = applyDamage(nextChar, nextSt, safeDmg);
+        nextChar = dmgResult.char;
+        nextSt = dmgResult.st;
+        narrative = `You use the ${held.name}. Immediate. Searing. Regret. -${fmt.hp(value)} HP.${dmgResult.concentrationNote}`;
       } else {
         narrative = `You use the ${held.name}. Nothing happens. You stand there feeling foolish.`;
       }

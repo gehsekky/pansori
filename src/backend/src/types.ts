@@ -15,6 +15,7 @@ import type {
   ConditionName,
   District,
   Faction,
+  Feat,
   GameChoice,
   GameConsequence,
   GridPos,
@@ -315,6 +316,32 @@ export interface DeathSaves {
 
 // ─── Spell system ─────────────────────────────────────────────────────────────
 
+/**
+ * Per-spell narrative pools — one entry per resolution stage. Each pool
+ * is a `string[]` so the engine picks one at random (matching the
+ * pattern of context.narratives.combatHit, weaponVerbs, etc.).
+ *
+ * Tokens substituted in pool strings:
+ *   {name}       caster name
+ *   {spell}      spell display name
+ *   {slotNote}   upcast hint, e.g. " (lvl 3)" or "" — already includes
+ *                leading space, so place adjacent to other text
+ *   {target}     primary target name (where applicable)
+ *
+ * The engine appends mechanical outcome data (damage tokens, save
+ * results) AFTER the chosen prose, so pool entries should be flavor-
+ * only — don't try to substitute damage numbers here, the engine adds
+ * them outside the pool.
+ *
+ * Pools are optional; missing pools fall back to engine defaults.
+ */
+export interface SpellNarrative {
+  /** Cast-prefix prose for spells with mechanical effects (replaces
+   *  the default "{name} casts {spell}{slotNote}!" lead-in). The
+   *  engine appends the rest of the mechanical resolution after. */
+  cast?: string[];
+}
+
 export interface Spell {
   id: string;
   name: string;
@@ -329,7 +356,9 @@ export interface Spell {
   heal?: string; // dice expr for healing
   condition?: ConditionName;
   conditionDuration?: number; // rounds; undefined = permanent until cleared
-  narrative?: string; // override text for utility spells
+  narrative?: string; // override text for utility spells (single-string;
+  //                     for richer per-stage flavor use `narratives` below)
+  narratives?: SpellNarrative;
   concentration?: boolean; // true = breaks if caster takes damage and fails CON save
   // Round budget for concentration spells (SRD 5.2.1 — 1 round = 6 sec).
   // 10 rounds = 1 minute (the default for Bless, Hold Person, Bane, etc.);
@@ -470,6 +499,14 @@ export interface Character {
   // can apply to — Pansori applies it to attack-roll consumption today;
   // save consumption follows the Heroic Inspiration pattern.
   bardic_inspiration_die?: string;
+  /**
+   * 2024 PHB Divine Smite spell — bonus-action pre-buff. When the
+   * Paladin casts the spell, this records the number of d8 radiant
+   * dice queued for the next weapon-attack hit. Cleared when the
+   * next weapon hit consumes the buff (or at the end of the next
+   * turn, per RAW — duration tracking is a follow-up).
+   */
+  divine_smite_dice?: number;
   // 2024 PHB Wild Shape — id of the active BeastForm while wild_shaped.
   // Cleared on dismiss_wild_shape.
   wild_shape_form?: string;
@@ -488,6 +525,19 @@ export interface Character {
   subclass?: string; // e.g. 'battle_master', 'thief', 'evoker'
   speed?: number; // movement speed in feet; defaults to 30
   feats?: string[];
+  /**
+   * Per-feat selections that the player made when taking a feat — e.g.
+   * which ability the +1 half-feat bonus went to, or which abilities a
+   * `save-proficiency` feat (Resilient) granted save profs in. Keyed
+   * by feat id. Absent when no feat needed a runtime choice.
+   */
+  feat_choices?: Record<
+    string,
+    {
+      abilityBonus?: AbilityKey;
+      saveProficiencies?: AbilityKey[];
+    }
+  >;
   expertise_skills?: string[]; // skills with double proficiency bonus (Rogue/Bard)
   prepared_spells?: string[]; // spell ids currently prepared (Cleric/Paladin/Druid)
   charmer_id?: string; // entity id of the charmer when charmed
@@ -577,6 +627,13 @@ export interface Character {
 // ─── Game state (world/party container) ──────────────────────────────────────
 
 export interface GameState {
+  // Schema version. `normalizeState` stamps this with
+  // `CURRENT_SCHEMA_VERSION` on every load; older saves (or saves
+  // missing the field — pre-versioning) are routed through the
+  // migration ladder in `services/stateSchema.ts`. See that module
+  // for the version history and migration rules.
+  schemaVersion?: number;
+
   // Party
   characters: Character[];
   active_character_id: string;
@@ -750,6 +807,9 @@ export interface Context {
   backgrounds?: Background[];
   // Spell system — optional; only present for contexts with spellcasting classes
   spellTable?: Record<string, Spell>;
+  // Feat system — optional; only present for contexts that surface feat
+  // choice at character creation / level-up. Keys match `Character.feats`.
+  featTable?: Record<string, Feat>;
   classSpells?: Record<string, string[]>; // class → spell IDs
   // classSpellSlots[class][level-1] → Record<spellLevel, maxSlots>
   classSpellSlots?: Record<string, Array<Record<number, number>>>;

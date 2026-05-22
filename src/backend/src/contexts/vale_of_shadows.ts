@@ -6,6 +6,7 @@ import {
   SRD_CLASS_SAVING_THROWS,
   SRD_CLASS_SKILLS,
   SRD_CLASS_WEAPON_PROFICIENCIES,
+  SRD_FEATS,
   SRD_MONSTERS,
   SRD_SPELLCASTING_ABILITY,
   SRD_SPELLS,
@@ -1588,6 +1589,7 @@ export const context: Context = {
   // ─── Spell table ──────────────────────────────────────────────────────────────
 
   spellTable: { ...SRD_SPELLS },
+  featTable: { ...SRD_FEATS },
 
   classSpells: {
     Cleric: [

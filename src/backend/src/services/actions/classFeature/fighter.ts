@@ -1,5 +1,6 @@
 import { abilityMod, profBonus, rollDice } from '../../rulesEngine.js';
 import type { ActionContext } from '../types.js';
+import { composeNow } from '../../narrative/compose.js';
 import { pushEvent } from '../../gameEngine.js';
 
 /**
@@ -149,15 +150,14 @@ export function handleFighterFeature(ctx: ActionContext, fid: string): boolean {
               : e
           ),
         };
-        ctx.st = pushEvent(ctx.st, {
+        composeNow(ctx, {
           kind: 'condition_applied',
           targetId: ctx.enemy!.id,
           targetName: ctx.enemy!.name,
           condition: 'goaded',
           source: 'Goading Attack',
-          round: ctx.st.round ?? 1,
+          prose: `Maneuver — Goading Attack: +${sdRoll} damage, ${ctx.enemy!.name} goaded (disadvantage vs others)! (WIS save ${goadSave} vs DC ${goadDC})`,
         });
-        ctx.narrative = `Maneuver — Goading Attack: +${sdRoll} damage, ${ctx.enemy!.name} goaded (disadvantage vs others)! (WIS save ${goadSave} vs DC ${goadDC})`;
       } else {
         ctx.narrative = `Maneuver — Goading Attack: +${sdRoll} damage, ${ctx.enemy!.name} resists. (WIS save ${goadSave} vs DC ${goadDC})`;
       }

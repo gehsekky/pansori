@@ -1,0 +1,179 @@
+// Feat machinery — prerequisite check, passive bonus application,
+// take-feat side effects. Feats live as data in `context.featTable`;
+// this module is the engine glue. See `contexts/srd/feats.ts` for the
+// seed feats and `shared/types.ts` for the `Feat` / `FeatEffect`
+// shape.
+//
+// Most feats are pure passive grants (Tough = +N HP/level) that take
+// effect when `applyFeatTakeBonuses` runs. Active feats (Lucky's
+// d20 reroll, Sharpshooter's per-attack toggle) need handler-side
+// hooks — those land in follow-up PRs as we wire the relevant call
+// sites. The infrastructure here is the seam they hook into.
+
+import type { AbilityKey, Character, Context, Feat } from '../types.js';
+
+/**
+ * Check whether `char` meets the prerequisites for `feat`. Returns
+ * an empty string on success, or a human-readable reason string on
+ * failure. Callers can short-circuit on truthy returns.
+ *
+ * Modeled prereqs: `minLevel`, `minAbilityScores`, `classes` (any-of
+ * match against the PC's class), `requiredFeat`. `other` is a list
+ * of human-readable prereq strings the engine doesn't model — they
+ * always pass here; UI surfaces them so the player knows.
+ */
+export function canTakeFeat(char: Character, feat: Feat): string {
+  // Already have this feat? Most feats can't be taken twice.
+  if ((char.feats ?? []).includes(feat.id)) {
+    return `${char.name} already has the ${feat.name} feat.`;
+  }
+  const p = feat.prerequisites;
+  if (!p) return '';
+  if (p.minLevel !== undefined && (char.level ?? 1) < p.minLevel) {
+    return `${feat.name} requires character level ${p.minLevel} (${char.name} is level ${char.level ?? 1}).`;
+  }
+  if (p.minAbilityScores) {
+    for (const [ab, min] of Object.entries(p.minAbilityScores)) {
+      const score = (char[ab as AbilityKey] ?? 10) as number;
+      if (score < (min ?? 0)) {
+        return `${feat.name} requires ${ab.toUpperCase()} ${min} (${char.name}'s ${ab.toUpperCase()} is ${score}).`;
+      }
+    }
+  }
+  if (p.classes && p.classes.length > 0) {
+    const cls = char.character_class?.toLowerCase();
+    const allowed = p.classes.map((c) => c.toLowerCase());
+    if (!allowed.includes(cls)) {
+      return `${feat.name} requires class: ${p.classes.join(' / ')} (${char.name} is a ${char.character_class}).`;
+    }
+  }
+  if (p.requiredFeat) {
+    if (!(char.feats ?? []).includes(p.requiredFeat)) {
+      return `${feat.name} requires the ${p.requiredFeat} feat first.`;
+    }
+  }
+  return '';
+}
+
+/**
+ * Apply the take-time side effects of a feat to `char`. Returns a
+ * new Character with the feat's id pushed onto `feats[]` plus any
+ * passive bonuses (HP for `hp-per-level`, ability bonus for half-feats,
+ * etc.) applied.
+ *
+ * Active-effect feats (Lucky, Sharpshooter) only push their id and
+ * optional `feat_choices` — their actual behavior fires at the
+ * relevant gameplay moment via separate hooks (not implemented yet
+ * for the seed feats; this PR establishes the take-time path).
+ *
+ * `abilityChoice` is required when:
+ *   - the feat's `abilityBonus` has `choices` (player must pick).
+ * `saveProficiencyChoices` is required when:
+ *   - the feat's effect is `save-proficiency` with an empty
+ *     `abilities` array (player picks at take time).
+ */
+export function applyFeatTake(
+  char: Character,
+  feat: Feat,
+  opts: { abilityChoice?: AbilityKey; saveProficiencyChoices?: AbilityKey[] } = {}
+): { newChar: Character; narrative: string } {
+  let next: Character = { ...char, feats: [...(char.feats ?? []), feat.id] };
+  const narrativeParts: string[] = [`${next.name} gains the ${feat.name} feat!`];
+
+  // Half-feat ability bonus.
+  if (feat.abilityBonus) {
+    const ab = 'fixed' in feat.abilityBonus ? feat.abilityBonus.fixed : opts.abilityChoice;
+    if (ab) {
+      next = { ...next, [ab]: (next[ab] ?? 10) + 1 };
+      narrativeParts.push(`+1 ${ab.toUpperCase()} (now ${next[ab]}).`);
+      // Record the choice on feat_choices so retroactive recalcs
+      // (level-up, refund) know which ability the bonus went to.
+      next = {
+        ...next,
+        feat_choices: {
+          ...(next.feat_choices ?? {}),
+          [feat.id]: { ...(next.feat_choices?.[feat.id] ?? {}), abilityBonus: ab },
+        },
+      };
+    }
+  }
+
+  // Effect-specific take-time application.
+  switch (feat.effect.kind) {
+    case 'hp-per-level': {
+      const grant = feat.effect.amount * (next.level ?? 1);
+      next = { ...next, max_hp: next.max_hp + grant, hp: next.hp + grant };
+      narrativeParts.push(`+${grant} max HP (${feat.effect.amount}/level × ${next.level} levels).`);
+      break;
+    }
+    case 'd20-reroll': {
+      // Initialize the per-long-rest pool. Reset path lives in the
+      // long-rest handler (future PR).
+      next = {
+        ...next,
+        class_resource_uses: {
+          ...(next.class_resource_uses ?? {}),
+          [`feat_${feat.id}_uses`]: feat.effect.usesPerLongRest,
+        },
+      };
+      narrativeParts.push(
+        `Gains ${feat.effect.usesPerLongRest} luck points (refresh on long rest).`
+      );
+      break;
+    }
+    case 'ranged-toggle': {
+      // No take-time state change — the toggle fires at attack time.
+      // Narrative only.
+      narrativeParts.push('Ranged attack bonus available on opt-in.');
+      break;
+    }
+    case 'extra-cantrips-and-l1': {
+      // Spell grant happens on take but spell selection is a separate
+      // FE flow; record placeholder. A follow-up PR wires the spell
+      // chooser.
+      narrativeParts.push(
+        `May learn ${feat.effect.cantripCount} cantrips + ${feat.effect.l1Count} L1 spell from the ${feat.effect.spellList} list.`
+      );
+      break;
+    }
+    case 'save-proficiency': {
+      // Either explicit abilities (Resilient-fixed variants) or
+      // player-chosen via opts.saveProficiencyChoices (Resilient).
+      const chosen =
+        feat.effect.abilities.length > 0
+          ? feat.effect.abilities
+          : (opts.saveProficiencyChoices ?? []);
+      if (chosen.length > 0) {
+        next = {
+          ...next,
+          feat_choices: {
+            ...(next.feat_choices ?? {}),
+            [feat.id]: {
+              ...(next.feat_choices?.[feat.id] ?? {}),
+              saveProficiencies: chosen,
+            },
+          },
+        };
+        narrativeParts.push(`Save proficiency: ${chosen.map((a) => a.toUpperCase()).join(', ')}.`);
+      }
+      break;
+    }
+    case 'sentinel-react': {
+      // No take-time state change — the reaction window fires at
+      // ally-hit time. Narrative only.
+      narrativeParts.push(
+        'Reaction available when an enemy hits an ally within 5 ft of you.'
+      );
+      break;
+    }
+  }
+  return { newChar: next, narrative: narrativeParts.join(' ') };
+}
+
+/**
+ * Look up a feat by id in the context's feat table. Returns
+ * `undefined` if the feat isn't registered.
+ */
+export function getFeat(featId: string, context: Context): Feat | undefined {
+  return context.featTable?.[featId];
+}

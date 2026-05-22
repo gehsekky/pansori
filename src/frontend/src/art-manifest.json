@@ -1,18 +1,1 @@
-{
-  "scifi-terror": {
-    "airlock": "webp",
-    "armory": "png",
-    "bridge": "png",
-    "cafeteria": "webp",
-    "cargo_hold": "png",
-    "crew_quarters": "png",
-    "cryo_bay": "webp",
-    "engine_room": "png",
-    "escape_pods": "png",
-    "gaming_room": "png",
-    "lab": "png",
-    "med_bay": "png",
-    "ship_gym": "png",
-    "stellar_cartography": "png"
-  }
-}
+{}

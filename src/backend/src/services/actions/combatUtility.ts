@@ -59,17 +59,10 @@ export const handleStandUp: ActionHandler<{ type: 'stand_up' }> = (ctx) => {
  * applies the modifier in attack resolution.
  */
 export const handleDodge: ActionHandler<{ type: 'dodge' }> = (ctx) => {
-  if (!ctx.st.combat_active) {
-    ctx.narrative = 'You can only dodge in combat.';
-    return;
-  }
-  if (ctx.char.turn_actions.action_used) {
-    ctx.narrative = 'You have already used your action this turn.';
-    return;
-  }
+  if (!ctx.st.combat_active) return { rejected: 'You can only dodge in combat.' };
   ctx.char = {
     ...ctx.char,
-    turn_actions: { ...ctx.char.turn_actions, action_used: true, dodging: true },
+    turn_actions: { ...ctx.char.turn_actions, dodging: true },
   };
   ctx.usedInitiative = true;
   ctx.narrative = `${ctx.char.name} takes the Dodge action — until your next turn, attacks against you have disadvantage.`;
@@ -81,17 +74,10 @@ export const handleDodge: ActionHandler<{ type: 'dodge' }> = (ctx) => {
  * skips OA triggers when set.
  */
 export const handleDisengage: ActionHandler<{ type: 'disengage' }> = (ctx) => {
-  if (!ctx.st.combat_active) {
-    ctx.narrative = 'You can only disengage in combat.';
-    return;
-  }
-  if (ctx.char.turn_actions.action_used) {
-    ctx.narrative = 'You have already used your action this turn.';
-    return;
-  }
+  if (!ctx.st.combat_active) return { rejected: 'You can only disengage in combat.' };
   ctx.char = {
     ...ctx.char,
-    turn_actions: { ...ctx.char.turn_actions, action_used: true, disengaged: true },
+    turn_actions: { ...ctx.char.turn_actions, disengaged: true },
   };
   ctx.usedInitiative = true;
   ctx.narrative = `${ctx.char.name} takes the Disengage action — your next movement this turn won't trigger opportunity attacks.`;
@@ -103,16 +89,8 @@ export const handleDisengage: ActionHandler<{ type: 'disengage' }> = (ctx) => {
  * remaining-budget math implicitly gives a full extra speed worth.
  */
 export const handleDash: ActionHandler<{ type: 'dash' }> = (ctx) => {
-  if (!ctx.st.combat_active) {
-    ctx.narrative = 'Dash is a combat action.';
-    return;
-  }
-  if (ctx.char.turn_actions.action_used) {
-    ctx.narrative = 'You have already used your action this turn.';
-    return;
-  }
+  if (!ctx.st.combat_active) return { rejected: 'Dash is a combat action.' };
   const dashSpeed = effectiveSpeed(ctx.char);
-  ctx.char = { ...ctx.char, turn_actions: { ...ctx.char.turn_actions, action_used: true } };
   ctx.st = {
     ...ctx.st,
     movement_used: {
@@ -129,20 +107,9 @@ export const handleDash: ActionHandler<{ type: 'dash' }> = (ctx) => {
  * consumed on the helped ally's next attack resolution.
  */
 export const handleHelp: ActionHandler<{ type: 'help'; targetId: string }> = (ctx, action) => {
-  if (!ctx.st.combat_active) {
-    ctx.narrative = 'Help is a combat action.';
-    return;
-  }
-  if (ctx.char.turn_actions.action_used) {
-    ctx.narrative = 'You have already used your action this turn.';
-    return;
-  }
+  if (!ctx.st.combat_active) return { rejected: 'Help is a combat action.' };
   const helpTarget = ctx.st.characters.find((c) => c.id === action.targetId && !c.dead);
-  if (!helpTarget) {
-    ctx.narrative = 'Target not found.';
-    return;
-  }
-  ctx.char = { ...ctx.char, turn_actions: { ...ctx.char.turn_actions, action_used: true } };
+  if (!helpTarget) return { rejected: 'Target not found.' };
   ctx.st = { ...ctx.st, help_target_id: action.targetId };
   ctx.narrative = `${ctx.char.name} helps ${helpTarget.name} — they have advantage on their next attack roll this turn.`;
   ctx.usedInitiative = true;
@@ -159,19 +126,11 @@ export const handleReady: ActionHandler<{
   trigger: string;
   action: import('../../types.js').StructuredAction;
 }> = (ctx, action) => {
-  if (!ctx.st.combat_active) {
-    ctx.narrative = 'Ready is a combat action.';
-    return;
-  }
-  if (ctx.char.turn_actions.action_used) {
-    ctx.narrative = 'You have already used your action this turn.';
-    return;
-  }
+  if (!ctx.st.combat_active) return { rejected: 'Ready is a combat action.' };
   ctx.char = {
     ...ctx.char,
     turn_actions: {
       ...ctx.char.turn_actions,
-      action_used: true,
       readied_action: { trigger: action.trigger, action: action.action },
     },
   };

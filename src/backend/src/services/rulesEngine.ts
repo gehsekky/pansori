@@ -389,30 +389,17 @@ export function computeAcAfterArmorChange(
 
 // ─── Conditions ───────────────────────────────────────────────────────────────
 
-// Enemy gets advantage on attacks against the player when player has these conditions
-export const ADVANTAGE_CONDITIONS = new Set([
-  'paralyzed',
-  'stunned',
-  'prone',
-  'blinded',
-  'restrained',
-]);
-// Player attacks with disadvantage when they have these conditions
-export const DISADV_CONDITIONS = new Set([
-  'poisoned',
-  'prone',
-  'frightened',
-  'blinded',
-  'restrained',
-]);
-// Player attacks with advantage when they have these conditions (invisible enemy = player can't see)
-export const PLAYER_ADV_CONDITIONS = new Set(['invisible']);
-// Enemy attacks the player with disadvantage when the player has these conditions
-export const ENEMY_DISADV_CONDITIONS = new Set(['invisible']);
-
-// Conditions that force STR/DEX saves to auto-fail (SRD 5.2.1 p.186/p.189).
-// Paralyzed, stunned, unconscious, petrified all share this rule.
-const STR_DEX_AUTO_FAIL = new Set(['paralyzed', 'stunned', 'unconscious', 'petrified']);
+// Condition effect data lives in `services/conditions/registry.ts`. These
+// Sets are derived views — kept exported for the call sites that read
+// them directly (`conditions.some((c) => SET.has(c))`). New code should
+// prefer the query helpers in the registry module.
+export {
+  ADVANTAGE_CONDITIONS,
+  DISADV_CONDITIONS,
+  PLAYER_ADV_CONDITIONS,
+  ENEMY_DISADV_CONDITIONS,
+} from './conditions/registry.js';
+import { autoFailsSave, disadvantageOnSave } from './conditions/registry.js';
 
 // On-hit saving throw: returns true if the save FAILS (condition is applied).
 // Pass proficient=true when the character has saving throw proficiency in this ability.
@@ -433,21 +420,18 @@ export function rollConditionSave(
   advantage = false,
   extraDisadvantage = false
 ): boolean {
-  // Auto-fail STR/DEX saves while incapacitated by paralysis/stun/unconscious/petrified
-  if (
-    (ability === 'str' || ability === 'dex') &&
-    targetConditions.some((c) => STR_DEX_AUTO_FAIL.has(c))
-  ) {
+  // Auto-fail saves: registry-driven. Paralyzed/stunned/unconscious/petrified
+  // auto-fail STR + DEX saves (SRD 5.2.1 p.186/p.189).
+  if (autoFailsSave(targetConditions, ability)) {
     return true;
   }
   const prof = proficient ? profBonus(level) : 0;
   const cover = ability === 'dex' ? coverDexBonus : 0;
-  // Restrained: disadvantage on DEX saves (SRD p.187). Advantage and
-  // disadvantage cancel — see 2024 PHB advantage/disadvantage rules.
+  // Save disadvantage from conditions (e.g. restrained → DEX saves). Advantage
+  // and disadvantage cancel — see 2024 PHB advantage/disadvantage rules.
   // `extraDisadvantage` covers any caller-supplied source (e.g. heavy
   // encumbrance giving disadv on STR/DEX/CON saves per 2024 PHB).
-  const disadv =
-    (ability === 'dex' && targetConditions.includes('restrained')) || extraDisadvantage;
+  const disadv = disadvantageOnSave(targetConditions, ability) || extraDisadvantage;
   const netAdv = advantage && !disadv;
   const netDisadv = disadv && !advantage;
   // Note: Halfling Lucky for saves would land here. We don't currently

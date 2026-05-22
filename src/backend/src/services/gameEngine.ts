@@ -49,16 +49,51 @@ import {
   opportunityAttackTriggers,
   posEqual,
 } from './gridEngine.js';
-import { fmt, stripNarrativeTokens } from './narrativeFmt.js';
+import type { EnemyAttackHitFragment, EnemyAttackMissFragment } from './narrative/fragments.js';
+import { applyExpiryHooks, getConditionDuration } from './conditions/registry.js';
+import { composeFragments, enemyAttackFragmentEvent } from './narrative/compose.js';
+import { fmt, stripForLlm } from './narrativeFmt.js';
 import { COMBAT_LOG_MAX } from '../types.js';
 import { Engine } from 'json-rules-engine';
+import { applyDamage } from './damage.js';
+import { applyStateMigrations } from './stateSchema.js';
 import { factionShopPrice } from './campaignEngine.js';
 import { llmProvider } from './llmProvider.js';
+import { pcActor } from './actions/actor.js';
 import { randomUUID } from 'crypto';
 
 // Append a CombatEvent to state.combat_log, trimming to COMBAT_LOG_MAX so the
 // buffer doesn't grow unbounded across long sessions. Pure function — returns
 // new state, doesn't mutate. Callers should reassign: `st = pushEvent(st, e)`.
+/**
+ * Free-function version of `takeAction`'s closure-scoped `commitChar`.
+ * Writes `char` back into `st.characters` (matched by id) AND syncs
+ * the matching grid entity's `hp` + `conditions` for PC entities. Use
+ * this anywhere that mutates a character's hp / conditions outside of
+ * the dispatcher's per-handler ctx (e.g. `applyEnemySpellDamage`,
+ * inventory heal-other-PC, future helpers).
+ *
+ * **Why this exists.** Before, sites that updated a character's HP
+ * had to remember to mirror the change onto `st.entities[].hp` too.
+ * The two writes drifted easily — a handler updates one and forgets
+ * the other, the grid view shows stale HP, and a downstream gate
+ * (e.g. `hp > 0` check) makes the wrong decision. Routing through
+ * one helper makes the mirror invariant a single-call responsibility.
+ *
+ * **For enemies:** entity.hp IS the source of truth (no Character
+ * record exists). This helper is PC-only; enemies that take damage
+ * mutate `entity.hp` directly (or via the seed for boss phases).
+ */
+export function commitCharacter(st: GameState, char: Character): GameState {
+  const idx = st.characters.findIndex((c) => c.id === char.id);
+  if (idx < 0) return st;
+  const updatedChars = st.characters.map((c, i) => (i === idx ? char : c));
+  const updatedEntities = st.entities?.map((e) =>
+    e.id === char.id && !e.isEnemy ? { ...e, hp: char.hp, conditions: char.conditions } : e
+  );
+  return { ...st, characters: updatedChars, entities: updatedEntities };
+}
+
 export function pushEvent(st: GameState, event: CombatEvent): GameState {
   const next = [...(st.combat_log ?? []), event];
   return { ...st, combat_log: next.slice(-COMBAT_LOG_MAX) };
@@ -257,7 +292,7 @@ export function hpTier(char: Character): 'healthy' | 'hurt' | 'critical' {
 }
 
 // Exhaustion 4: effective max HP is halved (PHB p.291)
-function clampHpForExhaustion(hp: number, maxHp: number, exhaustionLevel: number): number {
+export function clampHpForExhaustion(hp: number, maxHp: number, exhaustionLevel: number): number {
   if (exhaustionLevel >= 4) return Math.min(hp, Math.floor(maxHp / 2));
   return hp;
 }
@@ -292,7 +327,7 @@ function tickConcentrationDurations(st: GameState): { st: GameState; narrative: 
         characters: ns.characters.map((x) => (x.id === c.id ? nc : x)),
       };
       const spellName = c.concentrating_on.spellId;
-      narrative += ` [${c.name}'s ${spellName} fades — concentration duration expired.]`;
+      narrative += ` ${fmt.note(`[${c.name}'s ${spellName} fades — concentration duration expired.]`)}`;
     } else {
       // Decrement; carry the rest of the concentrating_on payload forward.
       stOut = {
@@ -514,26 +549,49 @@ function isMassiveDamageDeath(prevHp: number, damage: number, maxHp: number): bo
   return remainder >= maxHp;
 }
 
-function applyEnemyAttackNarrative(
+/**
+ * Compute an enemy attack against `char` without committing to game
+ * state. The function rolls everything (attack, applyDamage,
+ * onHitEffect save), builds the full narrative prose into a fragment,
+ * and returns the *proposed* post-attack character + state. The caller
+ * decides whether to commit immediately (no reaction window) or stash
+ * the proposed values in `pending_reaction` for Shield-deferred
+ * commit. Shield-accept discards the proposed values — the
+ * concentration save outcome is thrown away with them, which is the
+ * RAW-correct behavior (one save per damage *taken*, not per damage
+ * threatened).
+ *
+ * `proposedSt` carries:
+ *   - The character mutations via the matching characters[] entry.
+ *   - Bless cleanup on linked allies when concentration breaks.
+ *
+ * `pending_reaction` on the returned proposedSt is intentionally NOT
+ * cleared here — callers that stash it should clear it themselves.
+ */
+function computeEnemyAttack(
   enemy: Enemy,
   char: Character,
+  st: GameState,
   context: Context
 ): {
+  /** Updated character — HP, temp_hp, conditions, condition_durations,
+   *  class_resource_uses, concentrating_on, inspiration, and
+   *  bardic_inspiration_die applied. */
+  proposedChar: Character;
+  /** Updated state — Bless cleanup etc. from concentration breaks. */
+  proposedSt: GameState;
   hpLost: number;
-  narrative: string;
-  newConditions: string[];
-  newDurations: Record<string, number>;
-  updatedResourceUses?: Record<string, number>;
-  newTempHp?: number;
+  /** Fragment carrying the full attack prose + payload for the
+   *  `attack_hit` / `attack_miss` `CombatEvent`. */
+  fragment: EnemyAttackHitFragment | EnemyAttackMissFragment;
   // Exposed so callers can detect reaction windows (Shield: total in [AC, AC+4]).
   atkTotal: number;
+  /** The raw d20 result from the attack roll (without adv/disadv
+   *  resolution applied — see `resolveEnemyAttack` for details).
+   *  Preserved so reaction handlers that need to reroll (Silvery
+   *  Barbs) or compare against the d20 directly can do so. */
+  atkD20: number;
   hit: boolean;
-  // True when the PC spent Heroic Inspiration on the save vs onHitEffect.
-  // Caller should clear inspiration flags on the resulting Character.
-  inspirationConsumed?: boolean;
-  // True when the PC's stashed Bardic Inspiration die was consumed on the
-  // save. Caller clears bardic_inspiration_die on the resulting Character.
-  bardicConsumed?: boolean;
 } {
   const isDodging = char.turn_actions?.dodging ?? false;
   const isReckless = char.turn_actions?.reckless ?? false;
@@ -550,66 +608,59 @@ function applyEnemyAttackNarrative(
     // Petrified: resistance to all damage (PHB p.291)
     const isPetrified = char.conditions.includes('petrified');
     // 2024 PHB Beast Form (Bear / Brown Bear) — physical damage resistance
-    // while shifted into a physicalResistance form. Enemy attacks deal
-    // half damage. (Pansori's enemy attacks are all physical for now;
-    // this becomes type-checked once we tag enemy damageType broadly.)
+    // while shifted into a physicalResistance form.
     const beastForm =
       char.conditions.includes('wild_shaped') && char.wild_shape_form
         ? BEAST_FORMS[char.wild_shape_form]
         : undefined;
     const beastResist = !!beastForm?.physicalResistance;
     // 2024 PHB species resistance — Dwarves (poison), Dragonborn (ancestry
-    // type, default fire), Tieflings (fire). Applies when the enemy's
-    // attack carries a damageType matching the species's resistance list.
+    // type, default fire), Tieflings (fire).
     const speciesData = char.species ? SRD_SPECIES[char.species] : undefined;
     const speciesResist =
       enemy.damageType && speciesData?.resistances?.includes(enemy.damageType) === true;
     const anyResist = isRaging || isPetrified || beastResist || speciesResist;
-    let hpLost = anyResist ? Math.ceil(result.damage / 2) : result.damage;
-    const rageNote = isRaging ? ` (Rage resistance: ${result.damage}→${hpLost})` : '';
-    const petrNote = isPetrified ? ` (Petrified resistance: ${result.damage}→${hpLost})` : '';
+    const postResistDmg = anyResist ? Math.ceil(result.damage / 2) : result.damage;
+    const rageNote = isRaging ? ` (Rage resistance: ${result.damage}→${postResistDmg})` : '';
+    const petrNote = isPetrified
+      ? ` (Petrified resistance: ${result.damage}→${postResistDmg})`
+      : '';
     const beastNote =
       beastResist && !isRaging && !isPetrified
-        ? ` (${beastForm?.name} resistance: ${result.damage}→${hpLost})`
+        ? ` (${beastForm?.name} resistance: ${result.damage}→${postResistDmg})`
         : '';
     const speciesNote =
       speciesResist && !isRaging && !isPetrified && !beastResist
-        ? ` (${speciesData?.name} ${enemy.damageType} resistance: ${result.damage}→${hpLost})`
+        ? ` (${speciesData?.name} ${enemy.damageType} resistance: ${result.damage}→${postResistDmg})`
         : '';
     // Arcane Ward: Abjurer Wizard — absorb damage into ward HP before character HP
     let wardNote = '';
+    let charAfterWard = char;
+    let postWardDmg = postResistDmg;
     const wardHp = char.class_resource_uses?.arcane_ward ?? 0;
     if (wardHp > 0 && char.subclass === 'abjurer') {
-      const absorbed = Math.min(wardHp, hpLost);
-      hpLost -= absorbed;
-      char = {
-        ...char,
+      const absorbed = Math.min(wardHp, postWardDmg);
+      postWardDmg -= absorbed;
+      charAfterWard = {
+        ...charAfterWard,
         class_resource_uses: {
-          ...(char.class_resource_uses ?? {}),
+          ...(charAfterWard.class_resource_uses ?? {}),
           arcane_ward: wardHp - absorbed,
         },
       };
       wardNote = ` (Arcane Ward absorbed ${absorbed} — ward HP: ${wardHp - absorbed})`;
     }
-    // Temporary HP (SRD 5.2.1 p.17–18): absorb damage before regular HP.
-    // Temp HP doesn't stack with itself; it decrements with damage and is
-    // tracked on the character. Once depleted, remaining damage hits HP.
-    let tempHpAbsorbed = 0;
-    let newTempHp = char.temp_hp ?? 0;
-    if (newTempHp > 0 && hpLost > 0) {
-      tempHpAbsorbed = Math.min(newTempHp, hpLost);
-      hpLost -= tempHpAbsorbed;
-      newTempHp -= tempHpAbsorbed;
-    }
+    // Universal damage application — temp_hp absorption, exhaustion-4 max-HP
+    // clamp, knock-out detection, and the SRD concentration save all flow
+    // through `applyDamage`. (PR-2's deferred enemy-attack migration.)
+    const dmgResult = applyDamage(charAfterWard, st, postWardDmg);
+    let updatedChar = dmgResult.char;
+    const newSt = dmgResult.st;
+    const hpLost = dmgResult.amountDealt;
     const tempHpNote =
-      tempHpAbsorbed > 0 ? ` (Temp HP absorbed ${tempHpAbsorbed} — temp HP: ${newTempHp})` : '';
-    // Exhaustion 4: effective max HP is halved — clamp current HP after taking damage
-    const newHpAfterDmg = clampHpForExhaustion(
-      Math.max(0, char.hp - hpLost),
-      char.max_hp,
-      char.exhaustion_level ?? 0
-    );
-    hpLost = char.hp - newHpAfterDmg; // recalculate actual HP lost after clamp
+      dmgResult.tempHpAbsorbed > 0
+        ? ` (Temp HP absorbed ${dmgResult.tempHpAbsorbed} — temp HP: ${dmgResult.tempHpRemaining})`
+        : '';
 
     let narrative = pick(context.narratives.enemyAttacks)
       .replace('{enemy}', enemy.name)
@@ -617,12 +668,12 @@ function applyEnemyAttackNarrative(
       .replace('{dmg}', fmt.dmg(hpLost));
     narrative += ` ${char.name} takes ${fmt.dmg(hpLost)} damage.`;
     narrative += rageNote + petrNote + beastNote + speciesNote + wardNote + tempHpNote;
-    let updatedChar = { ...char };
+    narrative += dmgResult.concentrationNote;
 
     let inspirationConsumed = false;
     let bardicConsumed = false;
     if (enemy.onHitEffect) {
-      const csResult = conditionSavingThrow(enemy.onHitEffect, char, context);
+      const csResult = conditionSavingThrow(enemy.onHitEffect, updatedChar, context);
       if (csResult.inspirationConsumed) {
         inspirationConsumed = true;
         narrative += ` ✦ Heroic Inspiration spent on the save!`;
@@ -632,12 +683,9 @@ function applyEnemyAttackNarrative(
         narrative += ` ✦ Bardic Inspiration spent on the save (+${csResult.bardicRoll})!`;
       }
       if (csResult.applied) {
-        // For Frightened, record the source enemy so movement restrictions
-        // can check against it later. For Charmed, also stash the charmer
-        // on `charmer_id` so the existing "cannot attack your charmer"
-        // guard fires (gameEngine.ts ~3277).
         const sourceCond = enemy.onHitEffect.condition;
         const tracksSource = sourceCond === 'frightened' || sourceCond === 'charmed';
+        const beforeConds = updatedChar.conditions.length;
         updatedChar = inflictCondition(
           updatedChar,
           sourceCond,
@@ -646,13 +694,11 @@ function applyEnemyAttackNarrative(
         if (sourceCond === 'charmed') {
           updatedChar = { ...updatedChar, charmer_id: enemy.id };
         }
-        if (updatedChar.conditions.length > char.conditions.length) {
+        if (updatedChar.conditions.length > beforeConds) {
           narrative += ` ${char.name} is ${sourceCond}!`;
         }
       }
     }
-    // Clear the inspiration flag on the char being returned so the caller
-    // doesn't double-spend it on a later roll this turn.
     if (inspirationConsumed) {
       updatedChar = {
         ...updatedChar,
@@ -663,29 +709,49 @@ function applyEnemyAttackNarrative(
     if (bardicConsumed) {
       updatedChar = { ...updatedChar, bardic_inspiration_die: undefined };
     }
-    return {
-      hpLost,
-      narrative,
-      newTempHp,
-      newConditions: updatedChar.conditions,
-      newDurations: updatedChar.condition_durations,
-      updatedResourceUses: char.class_resource_uses,
+    const hitFragment: EnemyAttackHitFragment = {
+      kind: 'enemy_attack_hit',
+      attackerEnemyId: enemy.id,
+      attackerName: enemy.name,
+      targetCharId: char.id,
+      targetName: char.name,
+      damage: hpLost,
+      damageType: enemy.damageType ?? 'physical',
       atkTotal: result.total,
+      targetAc: char.ac,
+      prose: narrative,
+    };
+    return {
+      proposedChar: updatedChar,
+      proposedSt: newSt,
+      hpLost,
+      fragment: hitFragment,
+      atkTotal: result.total,
+      atkD20: result.roll,
       hit: true,
-      inspirationConsumed,
-      bardicConsumed,
     };
   }
   if (armorItem) {
+    const deflectedProse = pick(context.narratives.enemyDeflected)
+      .replace('{enemy}', enemy.name)
+      .replace('{target}', char.name)
+      .replace('{armor}', armorItem.name);
     return {
+      proposedChar: char,
+      proposedSt: st,
       hpLost: 0,
-      narrative: pick(context.narratives.enemyDeflected)
-        .replace('{enemy}', enemy.name)
-        .replace('{target}', char.name)
-        .replace('{armor}', armorItem.name),
-      newConditions: [...char.conditions],
-      newDurations: { ...(char.condition_durations ?? {}) },
+      fragment: {
+        kind: 'enemy_attack_miss',
+        attackerEnemyId: enemy.id,
+        attackerName: enemy.name,
+        targetCharId: char.id,
+        targetName: char.name,
+        atkTotal: result.total,
+        targetAc: char.ac,
+        prose: deflectedProse,
+      },
       atkTotal: result.total,
+      atkD20: result.roll,
       hit: false,
     };
   }
@@ -701,11 +767,21 @@ function applyEnemyAttackNarrative(
     `The ${enemy.name} attacks ${char.name} — and misses cleanly.`,
   ];
   return {
+    proposedChar: char,
+    proposedSt: st,
     hpLost: 0,
-    narrative: pick(missLines),
-    newConditions: [...char.conditions],
-    newDurations: { ...(char.condition_durations ?? {}) },
+    fragment: {
+      kind: 'enemy_attack_miss',
+      attackerEnemyId: enemy.id,
+      attackerName: enemy.name,
+      targetCharId: char.id,
+      targetName: char.name,
+      atkTotal: result.total,
+      targetAc: char.ac,
+      prose: pick(missLines),
+    },
     atkTotal: result.total,
+    atkD20: result.roll,
     hit: false,
   };
 }
@@ -805,20 +881,9 @@ function processDeathSave(
 
 // ─── Condition duration helpers ───────────────────────────────────────────────
 
-// How many rounds each on-hit condition lasts (cleared at start of victim's next turn).
-// Conditions with no entry (exhaustion) are permanent until explicitly cleared.
-const CONDITION_DURATION: Record<string, number> = {
-  stunned: 1,
-  paralyzed: 1,
-  poisoned: 2,
-  prone: 1,
-  frightened: 2,
-  blinded: 1,
-  restrained: 1,
-  incapacitated: 1,
-  grappled: 1,
-  invisible: 2,
-};
+// Condition rule data (durations, advantage/disadvantage grants, save mods,
+// on-expire hooks) lives in `services/conditions/registry.ts`. These two
+// functions are the inflict + tick wrappers around char.conditions[].
 
 export function inflictCondition(char: Character, condition: string, sourceId?: string): Character {
   if (char.conditions.includes(condition)) {
@@ -830,11 +895,17 @@ export function inflictCondition(char: Character, condition: string, sourceId?: 
     }
     return char;
   }
-  const duration = CONDITION_DURATION[condition] ?? 1;
+  const rawDuration = getConditionDuration(condition);
+  // 'permanent' conditions (unconscious, petrified) are stored with no
+  // duration entry so tickConditions treats them as un-decremented.
+  const durationEntry: Record<string, number> =
+    rawDuration === 'permanent'
+      ? { ...(char.condition_durations ?? {}) }
+      : { ...(char.condition_durations ?? {}), [condition]: rawDuration };
   return {
     ...char,
     conditions: [...char.conditions, condition],
-    condition_durations: { ...(char.condition_durations ?? {}), [condition]: duration },
+    condition_durations: durationEntry,
     // 2024 PHB Frightened (and a few others) track the source entity. Other
     // conditions ignore sourceId — it's free metadata when provided.
     ...(sourceId
@@ -865,21 +936,23 @@ export function tickConditions(char: Character): Character {
   }
 
   const newConditions = char.conditions.filter((c) => !expired.includes(c));
-  // Shield spell side-effect: AC bump applied on cast must be undone on expiry.
-  const acDelta = expired.includes('shield_spell') ? -5 : 0;
   // Clear condition_sources entries for any expired condition.
   let newSources = char.condition_sources;
   if (expired.length > 0 && newSources) {
     newSources = { ...newSources };
     for (const c of expired) delete newSources[c];
   }
-  return {
-    ...char,
-    ac: char.ac + acDelta,
-    conditions: newConditions,
-    condition_durations: newDurations,
-    condition_sources: newSources,
-  };
+  // Registry-driven on-expire hooks (e.g. Shield spell reverses its +5 AC).
+  const withExpiryHooks = applyExpiryHooks(
+    {
+      ...char,
+      conditions: newConditions,
+      condition_durations: newDurations,
+      condition_sources: newSources,
+    },
+    expired
+  );
+  return withExpiryHooks;
 }
 
 // SRD 5.2.1 p.178 (Variant Encumbrance) — speed reductions tied to carried weight.
@@ -976,25 +1049,33 @@ function fireLairAction(
     const dc = action.saveDC;
     const fullDmg = rollDice(action.dice);
     let narrative = ` 🌀 Lair action: ${action.name} — ${action.narrative}`;
-    const updatedChars = st.characters.map((c) => {
-      if (c.dead) return c;
+    // Iterate so each PC's concentration check (and any concentration-break
+    // side-effects on st like Bless cleanup) accumulates into workingSt.
+    let workingSt = st;
+    for (const origC of st.characters) {
+      if (origC.dead) continue;
       const scoreKey = action.savingThrow as 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha';
-      const score = (c[scoreKey] ?? 10) as number;
+      const score = (origC[scoreKey] ?? 10) as number;
       const saveFailed = rollConditionSave(
         scoreKey,
         score,
         dc,
         false,
-        c.level,
+        origC.level,
         0,
-        c.conditions ?? []
+        origC.conditions ?? []
       );
       const dealt = saveFailed ? fullDmg : Math.floor(fullDmg / 2);
-      const newHp = Math.max(0, c.hp - dealt);
-      narrative += ` ${c.name}: ${scoreKey.toUpperCase()} save vs DC ${dc} — ${saveFailed ? 'fails' : 'succeeds (half)'} (${dealt} ${action.damageType}).`;
-      return { ...c, hp: newHp };
-    });
-    return { st: { ...st, characters: updatedChars }, narrative, fired: true };
+      const dmgResult = applyDamage(origC, workingSt, dealt);
+      workingSt = {
+        ...dmgResult.st,
+        characters: dmgResult.st.characters.map((c) =>
+          c.id === dmgResult.char.id ? dmgResult.char : c
+        ),
+      };
+      narrative += ` ${origC.name}: ${scoreKey.toUpperCase()} save vs DC ${dc} — ${saveFailed ? 'fails' : 'succeeds (half)'} (${dealt} ${action.damageType}).${dmgResult.concentrationNote}`;
+    }
+    return { st: workingSt, narrative, fired: true };
   }
   return { st, narrative: '', fired: false };
 }
@@ -1047,27 +1128,21 @@ function fireLegendaryAction(
     const targetCharIdx = st.characters.findIndex((c) => c.id === nearestPcEnt.id && !c.dead);
     if (targetCharIdx < 0) return { st, narrative, fired: true };
     const target = st.characters[targetCharIdx];
-    const atkResult = applyEnemyAttackNarrative(legendary, target, context);
-    narrative += ` ${atkResult.narrative}`;
-    // Apply hp/condition changes from the attack. We deliberately skip the
-    // full reaction-window pause path (Shield etc.) for legendary actions —
-    // they're meant to be a fast follow-up beat, and re-entering the
-    // reaction loop mid-legendary would tangle the resume coords.
-    const newHp = Math.max(0, target.hp - atkResult.hpLost);
-    const updatedTarget: Character = {
-      ...target,
-      hp: newHp,
-      temp_hp: atkResult.newTempHp ?? target.temp_hp,
-      conditions: atkResult.newConditions,
-      condition_durations: atkResult.newDurations,
-    };
+    const computed = computeEnemyAttack(legendary, target, st, context);
+    narrative += ` ${computed.fragment.prose}`;
+    // Legendary actions skip the Shield-pause path — they're meant to be
+    // a fast follow-up beat. Commit immediately: write proposed state
+    // and push the corresponding CombatEvent.
     st = {
-      ...st,
-      characters: st.characters.map((c, i) => (i === targetCharIdx ? updatedTarget : c)),
-      entities: (st.entities ?? []).map((e) =>
-        e.id === target.id && !e.isEnemy ? { ...e, hp: newHp } : e
+      ...computed.proposedSt,
+      characters: computed.proposedSt.characters.map((c, i) =>
+        i === targetCharIdx ? computed.proposedChar : c
+      ),
+      entities: (computed.proposedSt.entities ?? []).map((e) =>
+        e.id === target.id && !e.isEnemy ? { ...e, hp: computed.proposedChar.hp } : e
       ),
     };
+    st = pushEvent(st, enemyAttackFragmentEvent(computed.fragment, st.round ?? 1));
     return { st, narrative, fired: true };
   }
   return { st, narrative, fired: true };
@@ -1344,9 +1419,11 @@ export function backfillOwnership(state: GameState, hostUserId: string): GameSta
 
 export function normalizeState(raw: Record<string, unknown>): GameState {
   // Already new format — patch any fields added after initial rollout
+  // (default-backfill), then route through the schema migration ladder
+  // so version-stamping and any per-version logic land in one place.
   if (Array.isArray((raw as unknown as GameState).characters)) {
     const gs = raw as unknown as GameState;
-    return {
+    const backfilled: GameState = {
       ...gs,
       short_rested_rooms: gs.short_rested_rooms ?? [],
       long_rested: gs.long_rested ?? false,
@@ -1382,6 +1459,7 @@ export function normalizeState(raw: Record<string, unknown>): GameState {
         };
       }),
     };
+    return applyStateMigrations(backfilled);
   }
 
   const charId = randomUUID();
@@ -1430,7 +1508,7 @@ export function normalizeState(raw: Record<string, unknown>): GameState {
     attuned_items: [] as string[],
   };
   const oldRunLog = (raw.run_log as Array<{ action: string; narrative: string }>) ?? [];
-  return {
+  return applyStateMigrations({
     characters: [char],
     active_character_id: charId,
     current_room: String(raw.current_room ?? ''),
@@ -1455,7 +1533,7 @@ export function normalizeState(raw: Record<string, unknown>): GameState {
     traps_disarmed: [],
     objects_searched: [],
     flags: (raw.flags as Record<string, boolean | string | number>) ?? {},
-  };
+  });
 }
 
 // ─── Arrival narrative ────────────────────────────────────────────────────────
@@ -3322,6 +3400,106 @@ function isShieldEligible(
   return true;
 }
 
+/**
+ * Sentinel feat (2024 PHB) — protect-ally reaction. When an enemy
+ * hits an ally, any PC OTHER THAN the target who:
+ *   - has the Sentinel feat,
+ *   - is within 5 ft of the target,
+ *   - has a reaction available,
+ *   - is conscious + can see the attacker (not blinded)
+ * can use their reaction to make a melee weapon attack against the
+ * attacker. Returns the list of eligible PC ids (may be empty).
+ */
+function findSentinelEligiblePcs(
+  targetCharId: string,
+  st: GameState,
+  attackerEnt: CombatEntity | undefined
+): Character[] {
+  if (!attackerEnt) return [];
+  const targetEnt = st.entities?.find((e) => e.id === targetCharId && !e.isEnemy);
+  if (!targetEnt) return [];
+  const eligible: Character[] = [];
+  for (const pc of st.characters) {
+    if (pc.id === targetCharId) continue; // not the target
+    if (pc.dead || pc.hp <= 0) continue;
+    if (pc.turn_actions?.reaction_used) continue;
+    if (pc.conditions?.includes('blinded')) continue;
+    if (!(pc.feats ?? []).includes('sentinel')) continue;
+    const pcEnt = st.entities?.find((e) => e.id === pc.id && !e.isEnemy);
+    if (!pcEnt) continue;
+    if (distanceFeet(pcEnt.pos, targetEnt.pos) > 5) continue;
+    eligible.push(pc);
+  }
+  return eligible;
+}
+
+/**
+ * Silvery Barbs (Strixhaven, 1st-level enchantment). Reaction
+ * triggered when a creature within 60 ft of the caster succeeds on
+ * an attack roll. MVP scope: only the target of the attack reacts
+ * (RAW any caster within 60 ft qualifies — party-wide eligibility
+ * is a TODO). The resolver rerolls the d20 and uses the lower
+ * result, potentially turning the hit into a miss.
+ */
+function isSilveryBarbsEligible(target: Character, context: Context): boolean {
+  if (target.turn_actions?.reaction_used) return false;
+  if (!knowsSpellWithSlot(target, 'silvery_barbs', context)) return false;
+  return true;
+}
+
+/**
+ * Absorb Elements (PHB p.211) — reaction spell triggered when the
+ * caster takes acid / cold / fire / lightning / thunder damage.
+ * Requires:
+ *   - The spell known + a level-1+ slot available.
+ *   - The triggering damage type matches one of the five.
+ *   - Reaction available this turn.
+ *   - PC conscious after the proposed damage commits (we read
+ *     `target.hp` BEFORE the commit, so we check `> 0` against the
+ *     pre-attack HP — sets aside the edge case of "killed by the
+ *     hit"; RAW the spell would still let you react before dropping
+ *     because reactions trigger on damage TAKEN. Pansori models this
+ *     as: if the proposed snapshot would leave you at 0, you're
+ *     still eligible to react).
+ */
+function isAbsorbElementsEligible(
+  target: Character,
+  damageType: string,
+  context: Context
+): boolean {
+  const eligibleTypes = ['acid', 'cold', 'fire', 'lightning', 'thunder'];
+  if (!eligibleTypes.includes(damageType)) return false;
+  if (target.turn_actions?.reaction_used) return false;
+  if (!knowsSpellWithSlot(target, 'absorb_elements', context)) return false;
+  return true;
+}
+
+/**
+ * Uncanny Dodge (PHB Rogue L5). Triggers BEFORE damage commits when
+ * the Rogue can see the attacker — halves damage from that one
+ * attack at the cost of their reaction.
+ *
+ * Modeled prereqs:
+ *   - PC must be a Rogue (class match, since multi-class isn't modeled).
+ *   - Rogue level ≥ 5.
+ *   - Reaction not yet used this round.
+ *   - Target conscious (`hp > 0` BEFORE the proposed damage commits).
+ *   - "Can see the attacker" is modeled loosely as "PC is not blinded"
+ *     (line-of-sight blocking by walls isn't tracked yet — see TODO
+ *     "Party line-of-sight indicators on the grid"). Blindness is a
+ *     condition the engine tracks; checking it here avoids a clearly
+ *     wrong narrative ("you halve the damage from the goblin you
+ *     can't see").
+ */
+function isUncannyDodgeEligible(target: Character): boolean {
+  if (target.character_class.toLowerCase() !== 'rogue') return false;
+  if ((target.level ?? 1) < 5) return false;
+  if (target.turn_actions?.reaction_used) return false;
+  if (target.hp <= 0) return false;
+  if (target.conditions?.includes('blinded')) return false;
+  return true;
+}
+
 // Hellish Rebuke (PHB p.252) — triggers AFTER damage applies. Requires the
 // PC to be conscious (target.hp > 0 after the hit), within 60 ft of the
 // attacker (we have grid positions), and Warlock-only since that's the spell
@@ -3365,11 +3543,7 @@ export function applyEnemySpellDamage(
   const dmgRoll = rollDice(spell.damage);
   const tgt = st.characters[tgtIdx];
   const newHp = Math.max(0, tgt.hp - dmgRoll);
-  const newSt: GameState = {
-    ...st,
-    characters: st.characters.map((c, i) => (i === tgtIdx ? { ...c, hp: newHp } : c)),
-    entities: st.entities?.map((e) => (e.id === tgt.id && !e.isEnemy ? { ...e, hp: newHp } : e)),
-  };
+  const newSt = commitCharacter(st, { ...tgt, hp: newHp });
   return {
     st: newSt,
     targetHp: newHp,
@@ -3573,6 +3747,630 @@ function applyPcOpportunityAttacks(args: {
   return { st, enemyKilled, narrative };
 }
 
+/**
+ * Run an enemy's multiattack sequence against a PC target. Each
+ * iteration calls `computeEnemyAttack` to roll the attack + damage
+ * into a proposed snapshot, then checks for two reaction windows
+ * that pause the loop:
+ *
+ *   1. **Shield reaction** (BEFORE damage commits) — the PC can cast
+ *      Shield to negate this specific hit. `computeEnemyAttack`
+ *      already rolled the concentration save into proposed state;
+ *      we stash that snapshot so a Shield-decline commits it
+ *      verbatim and a Shield-accept discards it (closing the
+ *      Shield-vs-concentration ordering bug).
+ *   2. **Hellish Rebuke** (AFTER damage commits) — the PC can deal
+ *      2d10 fire back to the attacker.
+ *
+ * Either pause returns `'paused'`; the caller exits with
+ * `paused: true` so the resume cycle picks up at
+ * `resumeFromMultiattackIdx`.
+ *
+ * The Orc Relentless Endurance bump (1 HP instead of 0) and the
+ * Massive Damage Death check both run inline here against the
+ * commit snapshot.
+ *
+ * `'completed'` means the full multiattack ran without a pause —
+ * caller proceeds to death save processing and the per-turn
+ * commitCharacter at the end of the enemy turn.
+ *
+ * Extracted from `runEnemyTurns` (architecture audit #5).
+ */
+function runEnemyMultiattackLoop(args: {
+  enemy: Enemy;
+  enemyId: string;
+  enemyEnt: CombatEntity | undefined;
+  target: Character;
+  st: GameState;
+  resumeMi: number;
+  attackCount: number;
+  advIdx: number;
+  context: Context;
+  narrative: string;
+}):
+  | {
+      kind: 'paused';
+      st: GameState;
+      narrative: string;
+    }
+  | {
+      kind: 'completed';
+      st: GameState;
+      target: Character;
+      narrative: string;
+      massiveDeath: boolean;
+    } {
+  const { enemy, enemyId, enemyEnt, st: initialSt, attackCount, advIdx, context } = args;
+  let st = initialSt;
+  let target = args.target;
+  let narrative = args.narrative;
+  let massiveDeath = false;
+  for (let mi = args.resumeMi; mi < attackCount && target.hp > 0; mi++) {
+    const prevHp = target.hp;
+    const computed = computeEnemyAttack(enemy, target, st, context);
+    // Shield reaction window — pause before committing the proposed snapshot.
+    if (computed.hit && isShieldEligible(target, computed.atkTotal, target.ac, context)) {
+      st = {
+        ...st,
+        pending_reaction: {
+          kind: 'shield',
+          attackerEnemyId: enemyId,
+          targetCharId: target.id,
+          atkTotal: computed.atkTotal,
+          targetAcAtAttack: target.ac,
+          pendingFragment: computed.fragment as EnemyAttackHitFragment,
+          pendingProposedChar: computed.proposedChar,
+          // Clear the inner pending_reaction to avoid self-recursion
+          // when stashing the proposed snapshot.
+          pendingProposedSt: { ...computed.proposedSt, pending_reaction: undefined },
+          resumeFromInitiativeIdx: advIdx,
+          resumeFromMultiattackIdx: mi + 1,
+          narrativeSoFar: narrative,
+          eligibleCharIds: [target.id],
+        },
+        // Put the reactor in the driver's seat so the FE prompts them.
+        active_character_id: target.id,
+      };
+      narrative += ` ⚡ ${enemy.name} strikes ${target.name} — total ${fmt.roll(computed.atkTotal)} vs ${fmt.ac(target.ac)}. Shield available!`;
+      return { kind: 'paused', st, narrative };
+    }
+    // Silvery Barbs reaction window. Fires when the enemy attack
+    // hits AND the PC knows the spell + has a slot. The resolver
+    // rerolls the enemy d20 and takes the lower — potentially
+    // turning the hit into a miss.
+    if (computed.hit && computed.hpLost > 0 && isSilveryBarbsEligible(target, context)) {
+      st = {
+        ...st,
+        pending_reaction: {
+          kind: 'silvery_barbs',
+          attackerEnemyId: enemyId,
+          targetCharId: target.id,
+          atkTotal: computed.atkTotal,
+          proposedD20: computed.atkD20,
+          proposedDamage: computed.hpLost,
+          targetAc: target.ac,
+          pendingFragment: computed.fragment as EnemyAttackHitFragment,
+          pendingProposedChar: computed.proposedChar,
+          pendingProposedSt: { ...computed.proposedSt, pending_reaction: undefined },
+          resumeFromInitiativeIdx: advIdx,
+          resumeFromMultiattackIdx: mi + 1,
+          narrativeSoFar: narrative,
+          eligibleCharIds: [target.id],
+        },
+        active_character_id: target.id,
+      };
+      narrative += ` ⚡ ${enemy.name} hits ${target.name} (d20 ${computed.atkD20} → total ${fmt.roll(computed.atkTotal)} vs ${fmt.ac(target.ac)}) — Silvery Barbs available!`;
+      return { kind: 'paused', st, narrative };
+    }
+    // Absorb Elements reaction window. Fires when the enemy attack
+    // deals one of the five elemental damage types AND the PC has
+    // the spell + a slot. Same proposed-snapshot stash pattern as
+    // Shield / Uncanny Dodge.
+    if (
+      computed.hit &&
+      computed.hpLost > 0 &&
+      isAbsorbElementsEligible(target, computed.fragment.damageType, context)
+    ) {
+      st = {
+        ...st,
+        pending_reaction: {
+          kind: 'absorb_elements',
+          attackerEnemyId: enemyId,
+          targetCharId: target.id,
+          damageType: computed.fragment.damageType as
+            | 'acid'
+            | 'cold'
+            | 'fire'
+            | 'lightning'
+            | 'thunder',
+          proposedDamage: computed.hpLost,
+          pendingFragment: computed.fragment as EnemyAttackHitFragment,
+          pendingProposedChar: computed.proposedChar,
+          pendingProposedSt: { ...computed.proposedSt, pending_reaction: undefined },
+          resumeFromInitiativeIdx: advIdx,
+          resumeFromMultiattackIdx: mi + 1,
+          narrativeSoFar: narrative,
+          eligibleCharIds: [target.id],
+        },
+        active_character_id: target.id,
+      };
+      narrative += ` ⚡ ${enemy.name} hits ${target.name} for ${fmt.dmg(computed.hpLost)} ${computed.fragment.damageType} — Absorb Elements available!`;
+      return { kind: 'paused', st, narrative };
+    }
+    // Uncanny Dodge reaction window (Rogue L5+). Triggers BEFORE
+    // damage commits when the Rogue can see the attacker. Same
+    // proposed-snapshot stash pattern as Shield; the resolver in
+    // reaction.ts halves `proposedDamage` before committing.
+    if (computed.hit && computed.hpLost > 0 && isUncannyDodgeEligible(target)) {
+      st = {
+        ...st,
+        pending_reaction: {
+          kind: 'uncanny_dodge',
+          attackerEnemyId: enemyId,
+          targetCharId: target.id,
+          atkTotal: computed.atkTotal,
+          proposedDamage: computed.hpLost,
+          pendingFragment: computed.fragment as EnemyAttackHitFragment,
+          pendingProposedChar: computed.proposedChar,
+          pendingProposedSt: { ...computed.proposedSt, pending_reaction: undefined },
+          resumeFromInitiativeIdx: advIdx,
+          resumeFromMultiattackIdx: mi + 1,
+          narrativeSoFar: narrative,
+          eligibleCharIds: [target.id],
+        },
+        active_character_id: target.id,
+      };
+      narrative += ` ⚡ ${enemy.name} strikes ${target.name} for ${fmt.dmg(computed.hpLost)} — Uncanny Dodge available!`;
+      return { kind: 'paused', st, narrative };
+    }
+    // No Shield / Uncanny Dodge window — commit the proposed character + state.
+    // Orc Relentless Endurance: when reduced to 0 HP (and not killed
+    // outright by massive damage), the Orc drops to 1 HP instead.
+    // 1/long rest.
+    const proposedHp = computed.proposedChar.hp;
+    const orcReUsed = target.class_resource_uses?.relentless_endurance_used === 1;
+    let orcSaveFired = false;
+    if (
+      target.species === 'orc' &&
+      !orcReUsed &&
+      prevHp > 0 &&
+      proposedHp === 0 &&
+      !isMassiveDamageDeath(prevHp, computed.hpLost, target.max_hp)
+    ) {
+      orcSaveFired = true;
+      target = {
+        ...computed.proposedChar,
+        hp: 1,
+        class_resource_uses: {
+          ...(computed.proposedChar.class_resource_uses ?? {}),
+          relentless_endurance_used: 1,
+        },
+      };
+    } else {
+      target = computed.proposedChar;
+    }
+    st = computed.proposedSt;
+    if (orcSaveFired) {
+      narrative += ` 🪓 Relentless Endurance! ${target.name} stays standing at ${fmt.hp(1)} HP.`;
+    }
+    narrative += ` ${computed.fragment.prose}`;
+    st = pushEvent(st, enemyAttackFragmentEvent(computed.fragment, st.round ?? 1));
+    if (isMassiveDamageDeath(prevHp, computed.hpLost, target.max_hp)) {
+      target = { ...target, dead: true, stable: false };
+      narrative += ` MASSIVE DAMAGE — ${target.name} is killed outright!`;
+      massiveDeath = true;
+      break;
+    }
+
+    // Sentinel feat reaction (2024 PHB) — triggers AFTER an enemy
+    // attack hits, eligible to OTHER PCs within 5 ft of the target.
+    // Commit the target's HP first so the resumed run sees the
+    // correct state.
+    if (computed.hit && computed.hpLost > 0) {
+      const sentinelPcs = findSentinelEligiblePcs(target.id, st, enemyEnt);
+      if (sentinelPcs.length > 0) {
+        // Pansori's reaction validator checks `ctx.char.id ===
+        // rx.targetCharId` — so for cross-actor reactions like
+        // Sentinel where the reactor isn't the attack target,
+        // `targetCharId` carries the REACTOR's id. The original
+        // attack target stays in `triggerAttackerEnemyId` context;
+        // we record it separately for narrative if needed.
+        st = {
+          ...commitCharacter(st, target),
+          pending_reaction: {
+            kind: 'sentinel',
+            attackerEnemyId: enemyId,
+            targetCharId: sentinelPcs[0].id,
+            triggerAttackerEnemyId: enemyId,
+            resumeFromInitiativeIdx: advIdx,
+            resumeFromMultiattackIdx: mi + 1,
+            narrativeSoFar: narrative,
+            eligibleCharIds: sentinelPcs.map((p) => p.id),
+          },
+          active_character_id: sentinelPcs[0].id,
+        };
+        narrative += ` ⚔ ${sentinelPcs[0].name} could intercept with Sentinel!`;
+        return { kind: 'paused', st, narrative };
+      }
+    }
+
+    // Hellish Rebuke (PHB p.252) — triggers AFTER damage applies. The
+    // damage is already on the books in `target`; if the player
+    // accepts, the resolve path deals damage back to the attacker.
+    // Commit the new target HP to state BEFORE pausing so the resumed
+    // run sees the correct HP.
+    if (computed.hit && computed.hpLost > 0 && target.hp > 0) {
+      const myPos = st.entities?.find((e) => e.id === target.id)?.pos;
+      if (isHellishRebukeEligible(target, myPos, enemyEnt?.pos, context)) {
+        st = {
+          ...commitCharacter(st, target),
+          pending_reaction: {
+            kind: 'hellish_rebuke',
+            attackerEnemyId: enemyId,
+            targetCharId: target.id,
+            resumeFromInitiativeIdx: advIdx,
+            resumeFromMultiattackIdx: mi + 1,
+            narrativeSoFar: narrative,
+            eligibleCharIds: [target.id],
+          },
+          active_character_id: target.id,
+        };
+        narrative += ` 🔥 ${target.name} could retaliate with Hellish Rebuke!`;
+        return { kind: 'paused', st, narrative };
+      }
+    }
+  }
+  return { kind: 'completed', st, target, narrative, massiveDeath };
+}
+
+/**
+ * Tactical approach movement for an enemy that wants to melee a PC.
+ * SRD 5.2.1 p.190 — the enemy must be within `attackReachFt` of the
+ * target before its swing connects; otherwise it walks up to
+ * `speedFt` toward an in-reach square. PCs whose threat zone is
+ * broken by the move get opportunity attacks (which may kill the
+ * mover).
+ *
+ * Returns one of:
+ *   - `'proceed-to-attack'` — either resuming a multi-attack
+ *     (`resumeMi > 0`), already in reach (`!needsToMove`), or
+ *     successfully closed to reach this turn. Caller proceeds to the
+ *     multiattack loop. `movementHeaderPrinted` indicates whether
+ *     the `[Name's turn]` header was already emitted by this helper.
+ *   - `'skip-turn'` — no path found, enemy killed by an OA, or
+ *     moved but still out of reach. Caller advances initiative and
+ *     continues the loop.
+ *
+ * Grappled / restrained enemies have effective speed 0 → no path →
+ * skip-turn with a "held in place" message.
+ *
+ * Extracted from `runEnemyTurns` (architecture audit #5).
+ */
+function attemptEnemyApproach(args: {
+  enemy: Enemy;
+  enemyId: string;
+  target: Character;
+  st: GameState;
+  resumeMi: number;
+  context: Context;
+  roomObstacleCells: GridPos[];
+  narrative: string;
+}):
+  | { kind: 'proceed-to-attack'; st: GameState; narrative: string; movementHeaderPrinted: boolean }
+  | { kind: 'skip-turn'; st: GameState; narrative: string } {
+  const { enemy, enemyId, target, st, resumeMi, context, roomObstacleCells } = args;
+  let narrative = args.narrative;
+  const reachFt = enemy.attackReachFt ?? 5;
+  const baseSpeedFt = enemy.speedFt ?? DEFAULT_SPEED_FEET;
+  const enemyEntPreMove = st.entities?.find((e) => e.id === enemyId && e.isEnemy);
+  const targetEntPreMove = st.entities?.find((e) => e.id === target.id);
+  const enemyImmobile =
+    enemyEntPreMove?.conditions?.some((c) => c === 'grappled' || c === 'restrained') ?? false;
+  const effectiveEnemySpeedFt = enemyImmobile ? 0 : baseSpeedFt;
+  const needsToMove =
+    !!enemyEntPreMove &&
+    !!targetEntPreMove &&
+    distanceFeet(enemyEntPreMove.pos, targetEntPreMove.pos) > reachFt;
+
+  // Skip the movement work entirely when resuming a multi-attack or
+  // when already in reach. Caller falls through to the attack loop.
+  if (resumeMi !== 0 || !needsToMove || !enemyEntPreMove || !targetEntPreMove) {
+    return { kind: 'proceed-to-attack', st, narrative, movementHeaderPrinted: false };
+  }
+
+  narrative += `\n\n[${enemy.name}'s turn]`;
+  const plan = planEnemyApproach({
+    st,
+    enemyId,
+    enemyPos: enemyEntPreMove.pos,
+    targetPos: targetEntPreMove.pos,
+    reachFt,
+    speedFt: effectiveEnemySpeedFt,
+    context,
+    roomId: st.current_room,
+    roomObstacles: roomObstacleCells,
+  });
+  const distBefore = distanceFeet(enemyEntPreMove.pos, targetEntPreMove.pos);
+  if (!plan || plan.pathSquares.length === 0) {
+    narrative += enemyImmobile
+      ? ` ${enemy.name} is held in place (${enemyEntPreMove.conditions.includes('restrained') ? 'restrained' : 'grappled'}) and can't reach ${target.name} this turn.`
+      : ` ${enemy.name} can't find a path to ${target.name} this turn.`;
+    return { kind: 'skip-turn', st, narrative };
+  }
+
+  // Apply PC opportunity attacks from squares the enemy is leaving.
+  const oaTriggers = opportunityAttackTriggers(
+    enemyEntPreMove.pos,
+    plan.newPos,
+    st.entities ?? [],
+    true
+  );
+  const oaRes = applyPcOpportunityAttacks({
+    st,
+    enemyId,
+    oaTargets: oaTriggers,
+    enemyAc: enemy.ac,
+    enemyName: enemy.name,
+    context,
+  });
+  let nextSt = oaRes.st;
+  const stepsFt = plan.pathSquares.length * SQUARE_SIZE;
+  narrative += ` ${enemy.name} closes ${stepsFt} ft toward ${target.name} (${distBefore} ft → ${distanceFeet(plan.newPos, targetEntPreMove.pos)} ft).${oaRes.narrative}`;
+  if (oaRes.enemyKilled) {
+    return { kind: 'skip-turn', st: nextSt, narrative };
+  }
+
+  // Commit the new enemy position.
+  nextSt = {
+    ...nextSt,
+    entities: (nextSt.entities ?? []).map((e) =>
+      e.id === enemyId ? { ...e, pos: plan.newPos } : e
+    ),
+  };
+  if (!plan.reached) {
+    narrative += ` ${enemy.name} is still out of reach — no attack this round.`;
+    return { kind: 'skip-turn', st: nextSt, narrative };
+  }
+  return { kind: 'proceed-to-attack', st: nextSt, narrative, movementHeaderPrinted: true };
+}
+
+/**
+ * Enemy spell-cast intent + resolution. Called at the start of an
+ * enemy's turn before the melee/multiattack path. Returns one of three
+ * outcomes:
+ *
+ *   - `'no-cast'` — the enemy doesn't have a spell list, the
+ *     castChance roll missed, the spell doesn't deal damage, or the
+ *     caller is mid-multiattack (`resumeMi > 0`). Fall through to
+ *     melee.
+ *   - `'counterspell-pending'` — a party PC qualifies for Counterspell;
+ *     `pending_reaction` is staged + active_character_id moved to the
+ *     reactor. Caller returns `{paused: true}` immediately.
+ *   - `'spell-resolved'` — no counterspeller available; the spell
+ *     resolves now and damage is committed. Caller advances initiative
+ *     and continues (the spell IS this turn's action, no melee follows).
+ *
+ * Extracted from `runEnemyTurns` as part of the architecture audit #5
+ * refactor. The block was ~90 lines of deeply-nested branches; lifting
+ * it gives the closure a clean three-way dispatch and exposes the
+ * outcome surface for direct tests.
+ */
+function attemptEnemySpellCast(args: {
+  enemy: Enemy;
+  enemyId: string;
+  enemyEnt: CombatEntity | undefined;
+  target: Character;
+  targetCharIdx: number;
+  st: GameState;
+  context: Context;
+  resumeMi: number;
+  advIdx: number;
+  orderLen: number;
+  narrative: string;
+}):
+  | { kind: 'no-cast' }
+  | { kind: 'counterspell-pending'; st: GameState; narrative: string }
+  | { kind: 'spell-resolved'; st: GameState; target: Character; narrative: string } {
+  const {
+    enemy,
+    enemyId,
+    enemyEnt,
+    target,
+    targetCharIdx,
+    st,
+    context,
+    resumeMi,
+    advIdx,
+    orderLen,
+  } = args;
+  let narrative = args.narrative;
+  // `resumeMi > 0` means we're already mid-multiattack from a prior
+  // pause/resume cycle — don't re-decide cast intent.
+  if (
+    resumeMi !== 0 ||
+    !enemy.spells ||
+    enemy.spells.length === 0 ||
+    (enemy.castChance ?? 0) === 0 ||
+    Math.random() >= (enemy.castChance ?? 0)
+  ) {
+    return { kind: 'no-cast' };
+  }
+  const spellId = pick(enemy.spells);
+  const spell = context.spellTable?.[spellId];
+  if (!spell?.damage) return { kind: 'no-cast' };
+
+  // Counterspell eligibility — check all party PCs.
+  const reactor = st.characters.find((c) =>
+    isCounterspellEligible(c, st.entities?.find((e) => e.id === c.id)?.pos, enemyEnt?.pos, context)
+  );
+  if (reactor) {
+    const stagedSt: GameState = {
+      ...st,
+      pending_reaction: {
+        kind: 'counterspell',
+        attackerEnemyId: enemyId,
+        targetCharId: reactor.id,
+        intendedTargetPcId: target.id,
+        enemySpellId: spellId,
+        enemySpellLevel: spell.level,
+        enemySpellName: spell.name,
+        // Counterspell collapses the WHOLE enemy turn — there's no
+        // further sub-attack to resume to. Point past this enemy so
+        // the loop continues with the next initiative slot.
+        resumeFromInitiativeIdx: (advIdx + 1) % orderLen,
+        resumeFromMultiattackIdx: 0,
+        narrativeSoFar: narrative,
+        eligibleCharIds: [reactor.id],
+      },
+      active_character_id: reactor.id,
+    };
+    narrative += ` ✨ ${enemy.name} begins casting ${spell.name}! Counterspell available.`;
+    return { kind: 'counterspell-pending', st: stagedSt, narrative };
+  }
+
+  // No counterspeller — resolve the spell now.
+  const dmgRoll = rollDice(spell.damage);
+  let newTarget = target;
+  if (spell.savingThrow) {
+    const saveScore = (target[spell.savingThrow] ?? 10) as number;
+    const dc = enemy.spellSaveDC ?? 8 + Math.floor((enemy.toHit + 5) / 2);
+    const save = rollDice('1d20') + abilityMod(saveScore);
+    const saved = save >= dc;
+    const dmg =
+      saved && spell.saveEffect === 'half'
+        ? Math.floor(dmgRoll / 2)
+        : saved && spell.saveEffect === 'negates'
+          ? 0
+          : dmgRoll;
+    newTarget = { ...target, hp: Math.max(0, target.hp - dmg) };
+    narrative += ` ${enemy.name} casts ${spell.name}! ${target.name} ${fmt.save(spell.savingThrow.toUpperCase(), save)} vs ${fmt.dc(dc)} — ${saved ? 'saves' : 'fails'}, ${fmt.dmg(dmg)} ${spell.damageType ?? 'damage'}.`;
+  } else {
+    newTarget = { ...target, hp: Math.max(0, target.hp - dmgRoll) };
+    narrative += ` ${enemy.name} casts ${spell.name}! ${target.name} takes ${fmt.dmg(dmgRoll)} ${spell.damageType ?? 'damage'}.`;
+  }
+  void targetCharIdx;
+  return {
+    kind: 'spell-resolved',
+    st: commitCharacter(st, newTarget),
+    target: newTarget,
+    narrative,
+  };
+}
+
+/**
+ * Pick the nearest living non-companion PC for an enemy to attack.
+ * Returns the enemy's own entity (for downstream positioning checks),
+ * the chosen target entity, and the target's index in `st.characters`
+ * (so callers can write back updates without re-searching).
+ *
+ * `targetCharIdx === -1` means no eligible target (no living PCs in
+ * range, or all are companions). Callers should advance the
+ * initiative slot when this happens.
+ *
+ * Extracted from `runEnemyTurns` (architecture audit #5). The
+ * extraction makes the target-selection contract observable and sets
+ * up a future swap-in for per-enemy targeting AI (e.g., focus the
+ * lowest-HP PC, target the cleric first, etc.) without touching the
+ * surrounding closure.
+ */
+export function selectEnemyMeleeTarget(
+  enemyId: string,
+  st: GameState
+): {
+  enemyEnt: CombatEntity | undefined;
+  targetEnt: CombatEntity | undefined;
+  targetCharIdx: number;
+} {
+  const enemyEnt = st.entities?.find((e) => e.id === enemyId && e.isEnemy);
+  const targetEnt = st.entities
+    ?.filter((e) => !e.isEnemy && !e.isCompanion && e.hp > 0)
+    .sort((a, b) => {
+      if (!enemyEnt) return 0;
+      return distanceFeet(enemyEnt.pos, a.pos) - distanceFeet(enemyEnt.pos, b.pos);
+    })[0];
+  const targetCharIdx = st.characters.findIndex((c) => c.id === targetEnt?.id && !c.dead);
+  return { enemyEnt, targetEnt, targetCharIdx };
+}
+
+/**
+ * Hide DC check for an enemy attacking an invisible PC. The 2024 PHB
+ * Hide rules use a stable hide DC (rolled at Hide-action time and
+ * stashed on the character); enemies check against it via passive
+ * Perception first, then active Search if passive falls short.
+ *
+ * Outcomes:
+ *   - `'spotted-passive'`: enemy passive ≥ DC → invisible drops, attack proceeds.
+ *   - `'spotted-active'`: passive failed but active Search ≥ DC → invisible
+ *     drops, but the enemy used their action to Search so no attack this turn.
+ *   - `'not-spotted'`: both checks failed → PC stays hidden, no attack this turn.
+ *   - `'not-hidden'`: no Hide DC tracked / target not invisible → caller proceeds.
+ *
+ * Mutates the target's `conditions` (removes invisible) and clears
+ * `hide_dc` when the PC is spotted. Returns the updated state.
+ *
+ * Extracted from `runEnemyTurns` as part of the multi-PR refactor to
+ * monsters-as-first-class-action-subjects (architecture audit item
+ * #5). The extraction makes the closure thinner and gives future PRs
+ * a self-contained handler to wire through the dispatcher.
+ */
+export function resolveEnemyHideCheck(
+  enemy: Enemy,
+  target: Character,
+  targetCharIdx: number,
+  st: GameState
+): {
+  outcome: 'spotted-passive' | 'spotted-active' | 'not-spotted' | 'not-hidden';
+  st: GameState;
+  target: Character;
+  narrative: string;
+} {
+  if (!target.conditions?.includes('invisible') || (target.hide_dc ?? 0) === 0) {
+    return { outcome: 'not-hidden', st, target, narrative: '' };
+  }
+  const hideDc = target.hide_dc!;
+  const enemyWis = (enemy as unknown as Record<string, number>)?.wis ?? 10;
+  const passivePer = 10 + abilityMod(enemyWis);
+  if (passivePer >= hideDc) {
+    const newTarget: Character = {
+      ...target,
+      conditions: (target.conditions ?? []).filter((c) => c !== 'invisible'),
+      hide_dc: undefined,
+    };
+    return {
+      outcome: 'spotted-passive',
+      st: {
+        ...st,
+        characters: st.characters.map((c, i) => (i === targetCharIdx ? newTarget : c)),
+      },
+      target: newTarget,
+      narrative: ` ${enemy.name} spots ${target.name} (passive Perception ${passivePer} vs hide DC ${hideDc}).`,
+    };
+  }
+  const activeSearch = rollDice('1d20') + abilityMod(enemyWis);
+  if (activeSearch >= hideDc) {
+    const newTarget: Character = {
+      ...target,
+      conditions: (target.conditions ?? []).filter((c) => c !== 'invisible'),
+      hide_dc: undefined,
+    };
+    return {
+      outcome: 'spotted-active',
+      st: {
+        ...st,
+        characters: st.characters.map((c, i) => (i === targetCharIdx ? newTarget : c)),
+      },
+      target: newTarget,
+      narrative: ` ${enemy.name} actively searches and locates ${target.name}! (Search ${activeSearch} vs hide DC ${hideDc}; attack forfeited this turn.)`,
+    };
+  }
+  return {
+    outcome: 'not-spotted',
+    st,
+    target,
+    narrative: ` ${enemy.name} searches the room but cannot find ${target.name}. (Search ${activeSearch} vs hide DC ${hideDc}; turn lost.)`,
+  };
+}
+
 export function runEnemyTurns(args: {
   st: GameState;
   seed: Seed;
@@ -3619,60 +4417,17 @@ export function runEnemyTurns(args: {
       // SRD p.221 — legendary action pool refreshes at the start of the
       // legendary creature's own turn.
       if (rm.legendary_actions?.length) refreshLegendaryPool(args.seed, rm.id);
-      const eEnt = st.entities?.find((e) => e.id === eEntry.id && e.isEnemy);
-      const nearestPcEntity = st.entities
-        ?.filter((e) => !e.isEnemy && !e.isCompanion && e.hp > 0)
-        .sort((a, b) => {
-          if (!eEnt) return 0;
-          return distanceFeet(eEnt.pos, a.pos) - distanceFeet(eEnt.pos, b.pos);
-        })[0];
-      const targetCharIdx = st.characters.findIndex((c) => c.id === nearestPcEntity?.id && !c.dead);
+      const { enemyEnt: eEnt, targetCharIdx } = selectEnemyMeleeTarget(eEntry.id, st);
       if (targetCharIdx >= 0) {
         let target = st.characters[targetCharIdx];
-        // 2024 PHB Hide DC tracking — when the target is invisible + has
-        // recorded hide_dc, the enemy first tries passive Perception. If
-        // that fails, they fall back to an active Search action (d20 + WIS
-        // mod) — which replaces this turn's attack. Result:
-        //   passive ≥ hide_dc       → spotted, attack proceeds normally
-        //   passive < dc, active ≥  → spotted next turn, no attack this round
-        //   passive < dc, active <  → PC stays hidden, no attack this round
-        // This makes Hide actually deny enemy attacks instead of just
-        // imposing disadvantage on a guaranteed swing.
-        let hideBlockedAttack = false;
-        if (target.conditions?.includes('invisible') && (target.hide_dc ?? 0) > 0) {
-          const enemyWis = (rm as unknown as Record<string, number>)?.wis ?? 10;
-          const passivePer = 10 + abilityMod(enemyWis);
-          if (passivePer >= target.hide_dc!) {
-            narrative += ` ${rm.name} spots ${target.name} (passive Perception ${passivePer} vs hide DC ${target.hide_dc}).`;
-            target = {
-              ...target,
-              conditions: (target.conditions ?? []).filter((c) => c !== 'invisible'),
-              hide_dc: undefined,
-            };
-            st = {
-              ...st,
-              characters: st.characters.map((c, i) => (i === targetCharIdx ? target : c)),
-            };
-          } else {
-            // Active Search instead of attacking.
-            const activeSearch = rollDice('1d20') + abilityMod(enemyWis);
-            if (activeSearch >= target.hide_dc!) {
-              narrative += ` ${rm.name} actively searches and locates ${target.name}! (Search ${activeSearch} vs hide DC ${target.hide_dc}; attack forfeited this turn.)`;
-              target = {
-                ...target,
-                conditions: (target.conditions ?? []).filter((c) => c !== 'invisible'),
-                hide_dc: undefined,
-              };
-              st = {
-                ...st,
-                characters: st.characters.map((c, i) => (i === targetCharIdx ? target : c)),
-              };
-            } else {
-              narrative += ` ${rm.name} searches the room but cannot find ${target.name}. (Search ${activeSearch} vs hide DC ${target.hide_dc}; turn lost.)`;
-            }
-            hideBlockedAttack = true;
-          }
-        }
+        // 2024 PHB Hide DC tracking — delegated to `resolveEnemyHideCheck`.
+        // See that function's JSDoc for the outcome matrix.
+        const hideResult = resolveEnemyHideCheck(rm, target, targetCharIdx, st);
+        st = hideResult.st;
+        target = hideResult.target;
+        narrative += hideResult.narrative;
+        const hideBlockedAttack =
+          hideResult.outcome === 'spotted-active' || hideResult.outcome === 'not-spotted';
         if (hideBlockedAttack) {
           // End this enemy's turn — they used their action to Search.
           const prevAdvIdxHide = advIdx;
@@ -3682,348 +4437,97 @@ export function runEnemyTurns(args: {
           continue;
         }
         if (!target.dead && target.hp > 0) {
-          // ── Spell-cast intent ──────────────────────────────────────────────
-          // If this enemy has a spell list and rolls under castChance, they
-          // cast instead of melee-attacking this turn. resumeMi > 0 means we
-          // already started a multi-attack last time — skip the cast check
-          // on resume to avoid re-deciding mid-burst.
-          if (
-            resumeMi === 0 &&
-            rm.spells &&
-            rm.spells.length > 0 &&
-            (rm.castChance ?? 0) > 0 &&
-            Math.random() < (rm.castChance ?? 0)
-          ) {
-            const spellId = pick(rm.spells);
-            const spell = args.context.spellTable?.[spellId];
-            if (spell && spell.damage) {
-              // Counterspell eligibility — check all party PCs.
-              const reactor = st.characters.find((c) =>
-                isCounterspellEligible(
-                  c,
-                  st.entities?.find((e) => e.id === c.id)?.pos,
-                  eEnt?.pos,
-                  args.context
-                )
-              );
-              if (reactor) {
-                st = {
-                  ...st,
-                  pending_reaction: {
-                    kind: 'counterspell',
-                    attackerEnemyId: eEntry.id,
-                    targetCharId: reactor.id,
-                    intendedTargetPcId: target.id,
-                    enemySpellId: spellId,
-                    enemySpellLevel: spell.level,
-                    enemySpellName: spell.name,
-                    // Counterspell collapses the WHOLE enemy turn — there's
-                    // no further sub-attack to resume to. Point past this
-                    // enemy so the loop continues with the next initiative slot.
-                    resumeFromInitiativeIdx: (advIdx + 1) % orderLen,
-                    resumeFromMultiattackIdx: 0,
-                    narrativeSoFar: narrative,
-                    eligibleCharIds: [reactor.id],
-                  },
-                  active_character_id: reactor.id,
-                };
-                narrative += ` ✨ ${rm.name} begins casting ${spell.name}! Counterspell available.`;
-                return {
-                  st,
-                  narrative,
-                  exitAdvIdx: advIdx,
-                  roundWrapped,
-                  paused: true,
-                };
-              }
-              // No counterspeller — resolve the spell now and skip multi-attack.
-              const dmgRoll = rollDice(spell.damage);
-              if (spell.savingThrow) {
-                const saveScore = (target[spell.savingThrow] ?? 10) as number;
-                const dc = rm.spellSaveDC ?? 8 + Math.floor((rm.toHit + 5) / 2);
-                const save = rollDice('1d20') + abilityMod(saveScore);
-                const saved = save >= dc;
-                const dmg =
-                  saved && spell.saveEffect === 'half'
-                    ? Math.floor(dmgRoll / 2)
-                    : saved && spell.saveEffect === 'negates'
-                      ? 0
-                      : dmgRoll;
-                target = { ...target, hp: Math.max(0, target.hp - dmg) };
-                narrative += ` ${rm.name} casts ${spell.name}! ${target.name} ${fmt.save(spell.savingThrow.toUpperCase(), save)} vs ${fmt.dc(dc)} — ${saved ? 'saves' : 'fails'}, ${fmt.dmg(dmg)} ${spell.damageType ?? 'damage'}.`;
-              } else {
-                target = { ...target, hp: Math.max(0, target.hp - dmgRoll) };
-                narrative += ` ${rm.name} casts ${spell.name}! ${target.name} takes ${fmt.dmg(dmgRoll)} ${spell.damageType ?? 'damage'}.`;
-              }
-              st = {
-                ...st,
-                characters: st.characters.map((c, i) => (i === targetCharIdx ? target : c)),
-                entities: st.entities?.map((e) =>
-                  e.id === target.id && !e.isEnemy ? { ...e, hp: target.hp } : e
-                ),
-              };
-              // Skip the multi-attack — spell IS the action this turn.
-              resumeMi = 0;
-              const prevAdvIdx2 = advIdx;
-              advIdx = (advIdx + 1) % orderLen;
-              if (advIdx === 0 && prevAdvIdx2 !== 0) roundWrapped = true;
-              if (advIdx === args.initialCurrentIdx) break;
-              continue;
-            }
-          }
-
-          // ── Tactical movement step ─────────────────────────────────────────
-          // SRD 5.2.1 p.190 — an enemy that wants to melee must be within its
-          // reach. Walk along the grid up to `speedFt` toward an in-reach
-          // square next to the target. PCs whose threat zone is broken get
-          // opportunity attacks. If we can't close to reach this turn (or an
-          // OA drops the enemy), skip the attack entirely. Skipped when
-          // resuming mid-multiattack (resumeMi > 0) since the move already
-          // happened on the first sub-attack of this turn. Grappled/restrained
-          // enemies have effective speed 0 and won't move.
-          const reachFt = rm.attackReachFt ?? 5;
-          const baseSpeedFt = rm.speedFt ?? DEFAULT_SPEED_FEET;
-          const enemyEntPreMove = st.entities?.find((e) => e.id === eEntry.id && e.isEnemy);
-          const targetEntPreMove = st.entities?.find((e) => e.id === target.id);
-          const enemyImmobile =
-            enemyEntPreMove?.conditions?.some((c) => c === 'grappled' || c === 'restrained') ??
-            false;
-          const effectiveEnemySpeedFt = enemyImmobile ? 0 : baseSpeedFt;
-          const needsToMove =
-            !!enemyEntPreMove &&
-            !!targetEntPreMove &&
-            distanceFeet(enemyEntPreMove.pos, targetEntPreMove.pos) > reachFt;
-          if (resumeMi === 0 && needsToMove && enemyEntPreMove && targetEntPreMove) {
-            narrative += `\n\n[${rm.name}'s turn]`;
-            const plan = planEnemyApproach({
-              st,
-              enemyId: eEntry.id,
-              enemyPos: enemyEntPreMove.pos,
-              targetPos: targetEntPreMove.pos,
-              reachFt,
-              speedFt: effectiveEnemySpeedFt,
-              context: args.context,
-              roomId: st.current_room,
-              roomObstacles: roomObstacleCells,
-            });
-            const distBefore = distanceFeet(enemyEntPreMove.pos, targetEntPreMove.pos);
-            if (!plan || plan.pathSquares.length === 0) {
-              narrative += enemyImmobile
-                ? ` ${rm.name} is held in place (${enemyEntPreMove.conditions.includes('restrained') ? 'restrained' : 'grappled'}) and can't reach ${target.name} this turn.`
-                : ` ${rm.name} can't find a path to ${target.name} this turn.`;
-              resumeMi = 0;
-              const prevAdvIdxMove = advIdx;
-              advIdx = (advIdx + 1) % orderLen;
-              if (advIdx === 0 && prevAdvIdxMove !== 0) roundWrapped = true;
-              if (advIdx === args.initialCurrentIdx) break;
-              continue;
-            }
-            // Apply PC opportunity attacks from squares the enemy is leaving.
-            const oaTriggers = opportunityAttackTriggers(
-              enemyEntPreMove.pos,
-              plan.newPos,
-              st.entities ?? [],
-              true
-            );
-            const oaRes = applyPcOpportunityAttacks({
-              st,
-              enemyId: eEntry.id,
-              oaTargets: oaTriggers,
-              enemyAc: rm.ac,
-              enemyName: rm.name,
-              context: args.context,
-            });
-            st = oaRes.st;
-            const stepsFt = plan.pathSquares.length * SQUARE_SIZE;
-            narrative += ` ${rm.name} closes ${stepsFt} ft toward ${target.name} (${distBefore} ft → ${distanceFeet(plan.newPos, targetEntPreMove.pos)} ft).${oaRes.narrative}`;
-            if (oaRes.enemyKilled) {
-              resumeMi = 0;
-              const prevAdvIdxOa = advIdx;
-              advIdx = (advIdx + 1) % orderLen;
-              if (advIdx === 0 && prevAdvIdxOa !== 0) roundWrapped = true;
-              if (advIdx === args.initialCurrentIdx) break;
-              continue;
-            }
-            // Commit the new enemy position.
-            st = {
-              ...st,
-              entities: (st.entities ?? []).map((e) =>
-                e.id === eEntry.id ? { ...e, pos: plan.newPos } : e
-              ),
+          // ── Spell-cast intent ─ delegated to `attemptEnemySpellCast` ──────
+          const spellResult = attemptEnemySpellCast({
+            enemy: rm,
+            enemyId: eEntry.id,
+            enemyEnt: eEnt,
+            target,
+            targetCharIdx,
+            st,
+            context: args.context,
+            resumeMi,
+            advIdx,
+            orderLen,
+            narrative,
+          });
+          if (spellResult.kind === 'counterspell-pending') {
+            return {
+              st: spellResult.st,
+              narrative: spellResult.narrative,
+              exitAdvIdx: advIdx,
+              roundWrapped,
+              paused: true,
             };
-            if (!plan.reached) {
-              narrative += ` ${rm.name} is still out of reach — no attack this round.`;
-              resumeMi = 0;
-              const prevAdvIdxStill = advIdx;
-              advIdx = (advIdx + 1) % orderLen;
-              if (advIdx === 0 && prevAdvIdxStill !== 0) roundWrapped = true;
-              if (advIdx === args.initialCurrentIdx) break;
-              continue;
-            }
           }
-          // If we already moved we've printed the turn header; otherwise print
-          // it now so multi-attack resume narratives don't double up.
-          const movementHeaderPrinted = resumeMi === 0 && needsToMove;
+          if (spellResult.kind === 'spell-resolved') {
+            st = spellResult.st;
+            target = spellResult.target;
+            narrative = spellResult.narrative;
+            // Skip the multi-attack — spell IS the action this turn.
+            resumeMi = 0;
+            const prevAdvIdx2 = advIdx;
+            advIdx = (advIdx + 1) % orderLen;
+            if (advIdx === 0 && prevAdvIdx2 !== 0) roundWrapped = true;
+            if (advIdx === args.initialCurrentIdx) break;
+            continue;
+          }
+          // spellResult.kind === 'no-cast' → fall through to melee.
+
+          // ── Tactical movement step ─ delegated to `attemptEnemyApproach` ───
+          const approach = attemptEnemyApproach({
+            enemy: rm,
+            enemyId: eEntry.id,
+            target,
+            st,
+            resumeMi,
+            context: args.context,
+            roomObstacleCells,
+            narrative,
+          });
+          if (approach.kind === 'skip-turn') {
+            st = approach.st;
+            narrative = approach.narrative;
+            resumeMi = 0;
+            const prevAdvIdxMove = advIdx;
+            advIdx = (advIdx + 1) % orderLen;
+            if (advIdx === 0 && prevAdvIdxMove !== 0) roundWrapped = true;
+            if (advIdx === args.initialCurrentIdx) break;
+            continue;
+          }
+          st = approach.st;
+          narrative = approach.narrative;
+          const movementHeaderPrinted = approach.movementHeaderPrinted;
           const attackCount = rm.multiattack ?? 1;
           if (resumeMi === 0 && !movementHeaderPrinted) {
             narrative += `\n\n[${rm.name}'s turn]`;
           }
-          let massiveDeath = false;
-          for (let mi = resumeMi; mi < attackCount && target.hp > 0; mi++) {
-            const atkResult = applyEnemyAttackNarrative(rm, target, args.context);
-            // Shield reaction window — pause the loop if the defender can
-            // negate this hit. The d20 has already been rolled; on resume
-            // the saved damage/narrative either fires (decline) or is
-            // discarded (accept).
-            if (
-              atkResult.hit &&
-              isShieldEligible(target, atkResult.atkTotal, target.ac, args.context)
-            ) {
-              st = {
-                ...st,
-                pending_reaction: {
-                  kind: 'shield',
-                  attackerEnemyId: eEntry.id,
-                  targetCharId: target.id,
-                  atkTotal: atkResult.atkTotal,
-                  targetAcAtAttack: target.ac,
-                  pendingDamage: atkResult.hpLost,
-                  pendingNarrative: atkResult.narrative,
-                  resumeFromInitiativeIdx: advIdx,
-                  resumeFromMultiattackIdx: mi + 1,
-                  narrativeSoFar: narrative,
-                  eligibleCharIds: [target.id],
-                },
-                // Put the reactor in the driver's seat so the frontend prompts them.
-                active_character_id: target.id,
-              };
-              narrative += ` ⚡ ${rm.name} strikes ${target.name} — total ${fmt.roll(atkResult.atkTotal)} vs ${fmt.ac(target.ac)}. Shield available!`;
-              return {
-                st,
-                narrative,
-                exitAdvIdx: advIdx,
-                roundWrapped,
-                paused: true,
-              };
-            }
-            const prevHp = target.hp;
-            let proposedHp = Math.max(0, target.hp - atkResult.hpLost);
-            // 2024 PHB Orc Relentless Endurance — when reduced to 0 HP
-            // (and not killed outright by massive damage), the Orc drops
-            // to 1 HP instead. 1/long rest, tracked via class_resource_uses.
-            const orcReUsed = target.class_resource_uses?.relentless_endurance_used === 1;
-            let orcSaveFired = false;
-            if (
-              target.species === 'orc' &&
-              !orcReUsed &&
-              prevHp > 0 &&
-              proposedHp === 0 &&
-              !isMassiveDamageDeath(prevHp, atkResult.hpLost, target.max_hp)
-            ) {
-              proposedHp = 1;
-              orcSaveFired = true;
-            }
-            target = {
-              ...target,
-              hp: proposedHp,
-              temp_hp: atkResult.newTempHp ?? target.temp_hp,
-              conditions: atkResult.newConditions,
-              condition_durations: atkResult.newDurations,
-              class_resource_uses: orcSaveFired
-                ? {
-                    ...(atkResult.updatedResourceUses ?? target.class_resource_uses ?? {}),
-                    relentless_endurance_used: 1,
-                  }
-                : (atkResult.updatedResourceUses ?? target.class_resource_uses),
-              // 2024 PHB Heroic Inspiration: if the target spent it on the
-              // save vs onHitEffect, clear the flags so it can't be re-spent.
-              inspiration: atkResult.inspirationConsumed ? false : target.inspiration,
-              turn_actions: atkResult.inspirationConsumed
-                ? { ...target.turn_actions, inspiration_pending: false }
-                : target.turn_actions,
-              // 2024 PHB Bardic Inspiration: similar — clear if spent.
-              bardic_inspiration_die: atkResult.bardicConsumed
-                ? undefined
-                : target.bardic_inspiration_die,
+          // ── Multiattack loop ─ delegated to `runEnemyMultiattackLoop` ─────
+          const multi = runEnemyMultiattackLoop({
+            enemy: rm,
+            enemyId: eEntry.id,
+            enemyEnt: eEnt,
+            target,
+            st,
+            resumeMi,
+            attackCount,
+            advIdx,
+            context: args.context,
+            narrative,
+          });
+          if (multi.kind === 'paused') {
+            return {
+              st: multi.st,
+              narrative: multi.narrative,
+              exitAdvIdx: advIdx,
+              roundWrapped,
+              paused: true,
             };
-            if (orcSaveFired) {
-              narrative += ` 🪓 Relentless Endurance! ${target.name} stays standing at ${fmt.hp(1)} HP.`;
-            }
-            const concAtk = checkConcentration(target, st, atkResult.hpLost);
-            target = concAtk.char;
-            st = concAtk.st;
-            narrative += ` ${atkResult.narrative}${concAtk.note}`;
-            // Emit a structured event for the enemy's attack outcome so the
-            // frontend combat log can render it separately from the prose.
-            if (atkResult.hit) {
-              st = pushEvent(st, {
-                kind: 'attack_hit',
-                attackerId: eEntry.id,
-                attackerName: rm.name,
-                targetId: target.id,
-                targetName: target.name,
-                damage: atkResult.hpLost,
-                damageType: 'physical',
-                isCrit: false,
-                toHit: atkResult.atkTotal,
-                targetAc: target.ac,
-                round: st.round ?? 1,
-              });
-            } else {
-              st = pushEvent(st, {
-                kind: 'attack_miss',
-                attackerId: eEntry.id,
-                attackerName: rm.name,
-                targetId: target.id,
-                targetName: target.name,
-                toHit: atkResult.atkTotal,
-                targetAc: target.ac,
-                round: st.round ?? 1,
-              });
-            }
-            if (isMassiveDamageDeath(prevHp, atkResult.hpLost, target.max_hp)) {
-              target = { ...target, dead: true, stable: false };
-              narrative += ` MASSIVE DAMAGE — ${target.name} is killed outright!`;
-              massiveDeath = true;
-              break;
-            }
-
-            // Hellish Rebuke (PHB p.252) — triggers AFTER damage applies.
-            // The damage is already on the books in `target`; if the player
-            // accepts, the resolve path deals damage back to the attacker.
-            // Commit the new target HP to state BEFORE pausing so the
-            // resumed run sees the correct HP.
-            if (atkResult.hit && atkResult.hpLost > 0 && target.hp > 0) {
-              const myPos = st.entities?.find((e) => e.id === target.id)?.pos;
-              if (isHellishRebukeEligible(target, myPos, eEnt?.pos, args.context)) {
-                st = {
-                  ...st,
-                  characters: st.characters.map((c, i) => (i === targetCharIdx ? target : c)),
-                  entities: st.entities?.map((e) =>
-                    e.id === target.id && !e.isEnemy ? { ...e, hp: target.hp } : e
-                  ),
-                  pending_reaction: {
-                    kind: 'hellish_rebuke',
-                    attackerEnemyId: eEntry.id,
-                    targetCharId: target.id,
-                    resumeFromInitiativeIdx: advIdx,
-                    resumeFromMultiattackIdx: mi + 1,
-                    narrativeSoFar: narrative,
-                    eligibleCharIds: [target.id],
-                  },
-                  active_character_id: target.id,
-                };
-                narrative += ` 🔥 ${target.name} could retaliate with Hellish Rebuke!`;
-                return {
-                  st,
-                  narrative,
-                  exitAdvIdx: advIdx,
-                  roundWrapped,
-                  paused: true,
-                };
-              }
-            }
           }
+          st = multi.st;
+          target = multi.target;
+          narrative = multi.narrative;
+          const massiveDeath = multi.massiveDeath;
 
           if (target.hp <= 0 && !target.dead && !massiveDeath) {
             const {
@@ -4043,18 +4547,7 @@ export function runEnemyTurns(args: {
             const allDead = st.characters.every((c, i) => (i === targetCharIdx ? true : c.dead));
             if (allDead) st = endCombatState(st);
           }
-          st = {
-            ...st,
-            characters: st.characters.map((c, i) => (i === targetCharIdx ? target : c)),
-          };
-          if (st.entities) {
-            st = {
-              ...st,
-              entities: st.entities.map((e) =>
-                e.id === target.id && !e.isEnemy ? { ...e, hp: target.hp } : e
-              ),
-            };
-          }
+          st = commitCharacter(st, target);
         }
       }
     }
@@ -4178,11 +4671,15 @@ export async function takeAction({
     if (hiddenTrap && !trapSpent(st, roomId) && !partyDetectsTrap(st.characters, hiddenTrap)) {
       st.traps_triggered = [...(st.traps_triggered ?? []), roomId];
       const trapDmg = rollDice(hiddenTrap.damage);
-      char.hp = Math.max(0, char.hp - trapDmg);
+      const dmgResult = applyDamage(char, st, trapDmg);
+      char = dmgResult.char;
+      st = dmgResult.st;
       narrative +=
         hiddenTrap.triggerNarrative
           .replace(/{name}/g, char.name)
-          .replace(/{dmg}/g, String(trapDmg)) + ' ';
+          .replace(/{dmg}/g, String(trapDmg)) +
+        dmgResult.concentrationNote +
+        ' ';
       if (hiddenTrap.condition && char.hp > 0) {
         char.conditions = [...new Set([...char.conditions, hiddenTrap.condition])];
         if (hiddenTrap.conditionDuration)
@@ -4197,14 +4694,7 @@ export async function takeAction({
 
   // Helper: write char back to st, and sync HP into grid entity if present
   function commitChar() {
-    const updatedChars = st.characters.map((c, i) => (i === safeIdx ? char : c));
-    let updatedEntities = st.entities;
-    if (updatedEntities) {
-      updatedEntities = updatedEntities.map((e) =>
-        e.id === char.id && !e.isEnemy ? { ...e, hp: char.hp, conditions: char.conditions } : e
-      );
-    }
-    st = { ...st, characters: updatedChars, entities: updatedEntities };
+    st = commitCharacter(st, char);
   }
 
   // ── Death saves override all actions when HP = 0 ───────────────────────────
@@ -4332,20 +4822,13 @@ export async function takeAction({
     seed,
     st,
     char,
+    actor: pcActor(char, safeIdx),
     narrative,
     escaped,
     usedInitiative,
+    fragments: [],
     commitChar() {
-      const updatedChars = this.st.characters.map((c, i) => (i === this.safeIdx ? this.char : c));
-      let updatedEntities = this.st.entities;
-      if (updatedEntities) {
-        updatedEntities = updatedEntities.map((e) =>
-          e.id === this.char.id && !e.isEnemy
-            ? { ...e, hp: this.char.hp, conditions: this.char.conditions }
-            : e
-        );
-      }
-      this.st = { ...this.st, characters: updatedChars, entities: updatedEntities };
+      this.st = commitCharacter(this.st, this.char);
     },
   };
 
@@ -4363,6 +4846,11 @@ export async function takeAction({
     });
   }
   if (dispatchResult.handled) {
+    // Render any structured fragments the handler pushed into ctx.fragments
+    // (see services/narrative/compose.ts). For unmigrated handlers this is
+    // a no-op; for migrated ones, the composer appends rendered prose to
+    // ctx.narrative and pushes corresponding CombatEvents to ctx.st.
+    composeFragments(ctx);
     seed = ctx.seed;
     st = ctx.st;
     char = ctx.char;
@@ -4380,7 +4868,8 @@ export async function takeAction({
       default: {
         narrative = buildArrivalNarrative(roomId, st, seed, context);
         if (st.combat_active) narrative += ` You are in combat!`;
-        if (char.conditions.length > 0) narrative += ` [Conditions: ${char.conditions.join(', ')}]`;
+        if (char.conditions.length > 0)
+          narrative += ` ${fmt.note(`[Conditions: ${char.conditions.join(', ')}]`)}`;
         break;
       }
     }
@@ -4484,7 +4973,7 @@ export async function takeAction({
             const expired = st.characters[nextCharIdx].conditions.filter(
               (c) => !ticked.conditions.includes(c)
             );
-            narrative += ` [${ticked.name}] Condition${expired.length > 1 ? 's' : ''} cleared: ${expired.join(', ')}.`;
+            narrative += ` ${fmt.note(`[${ticked.name}] Condition${expired.length > 1 ? 's' : ''} cleared: ${expired.join(', ')}.`)}`;
           }
           st = { ...st, characters: st.characters.map((c, i) => (i === nextCharIdx ? ticked : c)) };
           st.active_character_id = ticked.id;
@@ -4536,13 +5025,19 @@ export async function takeAction({
     speakerPrefix + (extraNarrative ? `${narrative}\n\n${extraNarrative}` : narrative);
 
   const activeRoom = seed.rooms.find((r) => r.id === st.current_room);
-  // The LLM rewrites prose freely and would not preserve `{{kind|display}}`
-  // markers, so we strip them before enhancement. When LLM is enabled the
-  // user trades styled-token rendering for atmospheric prose; the
-  // structured combat_log retains the mechanical data either way. With the
-  // default NoneProvider (passthrough), strip is a no-op on prose and
-  // tokens reach the frontend intact for styled rendering.
-  const llmInput = stripNarrativeTokens(rawNarrative);
+  // The LLM rewrites prose freely. We strip:
+  //   - non-note tokens (`{{dmg|5}}` → "5") so the LLM sees the numbers
+  //     it must preserve for `preservesCriticalFacts`
+  //   - note tokens (`{{note|[Sneak Attack: +7]}}`) entirely — mechanical
+  //     asides aren't narrative and shouldn't be woven into prose. They
+  //     reach the FE intact (as styled sidebar pills) on either the
+  //     enhanced or the raw-fallback path.
+  // When LLM is enabled the user trades styled-token rendering of damage
+  // numbers etc. for atmospheric prose; mechanical notes remain styled
+  // either way; the structured combat_log retains all mechanical data.
+  // With the default NoneProvider (passthrough) the FE renders the
+  // tokenised raw narrative directly.
+  const llmInput = stripForLlm(rawNarrative);
   const enhanced = await llmProvider.enhance(llmInput, {
     worldName: seed.world_name,
     charName: char.name,

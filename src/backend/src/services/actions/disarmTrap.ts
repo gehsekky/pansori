@@ -1,6 +1,7 @@
 import { disarmTrap, rollDice } from '../rulesEngine.js';
 import { getRoomTrap, partyDetectsTrap, trapSpent } from '../gameEngine.js';
 import type { ActionHandler } from './types.js';
+import { applyDamage } from '../damage.js';
 
 /**
  * `disarm_trap`: must have already detected the trap (passive
@@ -15,12 +16,10 @@ import type { ActionHandler } from './types.js';
 export const handleDisarmTrap: ActionHandler<{ type: 'disarm_trap' }> = (ctx) => {
   const trap = getRoomTrap(ctx.roomId, ctx.seed, ctx.context);
   if (!trap || trapSpent(ctx.st, ctx.roomId)) {
-    ctx.narrative = 'There is no trap here to disarm.';
-    return;
+    return { rejected: 'There is no trap here to disarm.' };
   }
   if (!partyDetectsTrap(ctx.st.characters, trap)) {
-    ctx.narrative = 'You have not located the trap.';
-    return;
+    return { rejected: 'You have not located the trap.' };
   }
   const hasToolProf =
     ctx.char.tool_proficiencies?.some(
@@ -42,11 +41,14 @@ export const handleDisarmTrap: ActionHandler<{ type: 'disarm_trap' }> = (ctx) =>
   } else {
     nextSt = { ...nextSt, traps_triggered: [...(nextSt.traps_triggered ?? []), ctx.roomId] };
     const trapDmg = rollDice(trap.damage);
-    next = { ...next, hp: Math.max(0, next.hp - trapDmg) };
+    const dmgResult = applyDamage(next, nextSt, trapDmg);
+    next = dmgResult.char;
+    nextSt = dmgResult.st;
     let failNarr = `${trap.disarmFail} (DEX ${roll} + ${total - roll}${profNote} = ${total} vs DC ${trap.dc}). `;
     failNarr += trap.triggerNarrative
       .replace(/{name}/g, next.name)
       .replace(/{dmg}/g, String(trapDmg));
+    failNarr += dmgResult.concentrationNote;
     narrative = failNarr;
     if (trap.condition && next.hp > 0) {
       next = {
@@ -58,7 +60,6 @@ export const handleDisarmTrap: ActionHandler<{ type: 'disarm_trap' }> = (ctx) =>
       };
     }
   }
-  next = { ...next, turn_actions: { ...next.turn_actions, action_used: true } };
   ctx.char = next;
   ctx.st = nextSt;
   ctx.narrative = narrative;

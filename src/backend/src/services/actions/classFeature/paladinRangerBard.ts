@@ -14,6 +14,7 @@ import {
   splitEncounterXp,
 } from '../../gameEngine.js';
 import type { ActionContext } from '../types.js';
+import { composeNow } from '../../narrative/compose.js';
 import { distanceFeet } from '../../gridEngine.js';
 import { fmt } from '../../narrativeFmt.js';
 
@@ -285,15 +286,14 @@ export function handlePaladinRangerBardFeature(ctx: ActionContext, fid: string):
             : e
         ),
       };
-      ctx.st = pushEvent(ctx.st, {
+      composeNow(ctx, {
         kind: 'condition_applied',
         targetId: ctx.enemy!.id,
         targetName: ctx.enemy!.name,
         condition: 'frightened',
         source: 'Abjure Enemy',
-        round: ctx.st.round ?? 1,
+        prose: `Abjure Enemy! WIS save ${wisSave} vs DC ${frightenDC} — ${ctx.enemy!.name} is frightened! (${cdUsesVen2 - 1} Channel Divinity remaining)`,
       });
-      ctx.narrative = `Abjure Enemy! WIS save ${wisSave} vs DC ${frightenDC} — ${ctx.enemy!.name} is frightened! (${cdUsesVen2 - 1} Channel Divinity remaining)`;
     } else {
       ctx.narrative = `Abjure Enemy! WIS save ${wisSave} vs DC ${frightenDC} — ${ctx.enemy!.name} resists. (${cdUsesVen2 - 1} Channel Divinity remaining)`;
     }

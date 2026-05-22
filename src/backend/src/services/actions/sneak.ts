@@ -22,8 +22,7 @@ import type { ActionHandler } from './types.js';
  */
 export const handleSneak: ActionHandler<{ type: 'sneak' }> = (ctx) => {
   if (!ctx.enemyAlive || !ctx.enemy) {
-    ctx.narrative = 'Nothing to sneak past. You move freely.';
-    return;
+    return { rejected: 'Nothing to sneak past. You move freely.' };
   }
   const enemy = ctx.enemy;
   const sneakDC = passivePerceptionDC(enemy.wis ?? 10);
@@ -99,7 +98,6 @@ export const handleSneak: ActionHandler<{ type: 'sneak' }> = (ctx) => {
   } else {
     narrative = `The party fails to slip past the ${enemy.name}.${groupNote} (DC ${sneakDC}; ${detailLines})`;
   }
-  ctx.char = { ...ctx.char, turn_actions: { ...ctx.char.turn_actions, action_used: true } };
   if (ctx.st.combat_active) ctx.usedInitiative = true;
   ctx.narrative = narrative;
 };
