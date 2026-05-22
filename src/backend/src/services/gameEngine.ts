@@ -2289,7 +2289,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       paladin: ['devotion', 'vengeance'],
       bard: ['lore', 'valor'],
       sorcerer: ['draconic', 'wild_magic'],
-      warlock: ['fiend', 'archfey'],
+      warlock: ['fiend', 'archfey', 'celestial'],
       druid: ['land', 'moon'],
       monk: ['open_hand', 'shadow'],
       barbarian: ['berserker', 'totem_warrior'],
@@ -3271,6 +3271,30 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         action: { type: 'ek_war_magic_attack', targetEnemyId: livingEnemies[0].id },
         requiresBonusAction: true,
         kind: 'two_weapon_attack',
+      });
+    }
+  }
+
+  // Celestial Warlock — Healing Light (bonus action, 1+lvl d6 pool).
+  // Outside the action-used gate above: this is available any time
+  // a Celestial Warlock has a free bonus action, not just after
+  // they've used their main action.
+  if (
+    !char.turn_actions.bonus_action_used &&
+    char.subclass === 'celestial' &&
+    hasClass(char, 'warlock') &&
+    getClassLevel(char, 'warlock') >= 3
+  ) {
+    const wlLvl = getClassLevel(char, 'warlock');
+    const pool = 1 + wlLvl;
+    const used = char.class_resource_uses?.healing_light_used ?? 0;
+    const remaining = pool - used;
+    if (remaining > 0) {
+      choices.push({
+        label: `Healing Light — bonus action, spend 1 d6 (${remaining}/${pool} dice left)`,
+        action: { type: 'use_healing_light', dice: 1 },
+        requiresBonusAction: true,
+        kind: 'class_feature',
       });
     }
   }

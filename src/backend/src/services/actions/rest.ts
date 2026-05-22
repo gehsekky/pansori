@@ -178,6 +178,11 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
       delete restoredUses.celestial_revelation_used;
       delete restoredUses.celestial_revelation_rounds;
     }
+    // 2024 PHB Celestial Warlock Healing Light pool — refills on
+    // long rest.
+    if (c.subclass === 'celestial' && hasClass(c, 'warlock')) {
+      delete restoredUses.healing_light_used;
+    }
     const restoredUsesWithFeats = resetFeatLongRestResources(c, ctx.context, restoredUses);
     const refreshed = {
       ...c,
