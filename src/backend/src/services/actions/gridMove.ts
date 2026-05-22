@@ -1,6 +1,7 @@
 import { SQUARE_SIZE, findPath, opportunityAttackTriggers, posEqual } from '../gridEngine.js';
-import { checkConcentration, effectiveSpeed, getEnemyById } from '../gameEngine.js';
+import { effectiveSpeed, getEnemyById } from '../gameEngine.js';
 import type { ActionHandler } from './types.js';
+import { applyDamage } from '../damage.js';
 import { resolveEnemyAttack } from '../rulesEngine.js';
 
 /**
@@ -111,12 +112,17 @@ export const handleGridMove: ActionHandler<{
     ) {
       const oaResult = resolveEnemyAttack(oaEnemy, nextChar.ac);
       if (oaResult.hit) {
-        const dmg = oaResult.damage;
-        nextChar = { ...nextChar, hp: Math.max(0, nextChar.hp - dmg) };
-        const concResult = checkConcentration(nextChar, nextSt, dmg);
-        nextChar = concResult.char;
-        nextSt = concResult.st;
-        oaNarrative += ` [Opportunity attack from ${oaEnemy.name}: ${dmg} damage!${concResult.note}]`;
+        const rawDmg = oaResult.damage;
+        // Route through applyDamage so the OA respects every PC-side
+        // damage gate: temp HP, exhaustion-4 max-HP clamp,
+        // knock-out detection, AND the concentration save (no
+        // separate checkConcentration call needed — applyDamage runs
+        // it internally). Pre-fix the OA bypassed all of these and
+        // applied raw damage with `hp = Math.max(0, hp - dmg)`.
+        const dmgResult = applyDamage(nextChar, nextSt, rawDmg);
+        nextChar = dmgResult.char;
+        nextSt = dmgResult.st;
+        oaNarrative += ` [Opportunity attack from ${oaEnemy.name}: ${dmgResult.amountDealt} damage!${dmgResult.concentrationNote}]`;
       } else {
         oaNarrative += ` [Opportunity attack from ${oaEnemy.name}: missed!]`;
       }
