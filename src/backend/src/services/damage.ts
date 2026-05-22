@@ -123,6 +123,32 @@ export function applyDamage(
     concentrationBroken = before != null && conc.char.concentrating_on == null;
   }
 
+  // 2024 PHB — a creature reduced to 0 HP without being killed
+  // outright becomes Unconscious. Inflict the condition here so
+  // every damage path (enemy attacks, traps, falling, mystery
+  // consumables, OA) consistently transitions to the right
+  // condition state. The post-action sweep in gameEngine.ts
+  // already clears Unconscious when hp > 0 again.
+  const knockedOut = clampedHp === 0 && char.hp > 0 && !char.dead;
+  if (knockedOut && !newChar.conditions.includes('unconscious')) {
+    newChar = inflictCondition(newChar, 'unconscious');
+    // Mirror onto the entity row so the renderer's "sleeping"
+    // badge tracks state.
+    newSt = {
+      ...newSt,
+      entities: (newSt.entities ?? []).map((e) =>
+        e.id === newChar.id && !e.isEnemy
+          ? {
+              ...e,
+              conditions: e.conditions.includes('unconscious')
+                ? e.conditions
+                : [...e.conditions, 'unconscious'],
+            }
+          : e
+      ),
+    };
+  }
+
   return {
     char: newChar,
     st: newSt,
@@ -131,7 +157,7 @@ export function applyDamage(
     tempHpRemaining: newTempHp,
     concentrationNote,
     concentrationBroken,
-    knockedOut: clampedHp === 0 && char.hp > 0,
+    knockedOut,
   };
 }
 
