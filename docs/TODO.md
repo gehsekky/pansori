@@ -768,17 +768,24 @@ Frontend: render`<WaitingForPlayer name={...} />` instead of the
         the save fragment in success + failure shapes.
 
         **Remaining sites that still call `pushEvent({kind:'save'})`:**
-        - `monk.ts` Open Hand Technique DEX save (the in-Flurry rider).
-        - `cleric.ts` Divine Spark / Turn Undead / Sear Undead — these
-          iterate over multiple targets and accumulate prose lines into
-          a single output narrative; the per-target fragment pattern
-          would change the player-facing format. Needs a multi-target
-          save fragment or prose-buffer redesign first.
-        - `casters.ts` Fey Presence (same per-target pattern as the
-          Cleric AoEs).
+        - ~~`monk.ts` Open Hand Technique DEX save~~ — migrated
+          2026-05-22 via composeNow + empty prose (consolidated
+          flurry narrative still owns the player-facing line).
+        - ~~`cleric.ts` Turn Undead / Sear Undead~~ — migrated
+          2026-05-22, same pattern: per-target SaveFragment with
+          prose='' adds combat-log entries for every save; the
+          consolidated lines[] narrative is unchanged.
+        - ~~`casters.ts` Fey Presence~~ — migrated 2026-05-22, same
+          pattern as the Cleric AoEs.
         - Damage-only paths (Divine Smite, Flurry-of-Blows hit) emit
           their notes via `bonuses[]` on the existing attack fragment;
           already migrated as of the original 4C.1.
+        - **Still inline (single-target attack-hit event):**
+          `cleric.ts` Divine Spark (~ line 59) emits a custom
+          `attack_hit` CombatEvent with `toHit: 0` — auto-hit spell
+          damage. Could migrate to a `spell_auto_hit` fragment but
+          that changes the prose format. Defer until a Divine Spark
+          rework is on the docket.
   - [x] **4C.4.A. `applyEnemyAttackNarrative` damage-pipeline
         migration** (shipped 2026-05-21). **PR-2's deferred
         follow-up is closed.** `applyEnemyAttackNarrative` now

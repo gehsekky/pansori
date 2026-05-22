@@ -1,8 +1,9 @@
 import { abilityMod, profBonus, rollDice } from '../../rulesEngine.js';
 import { getClassLevel, hasClass } from '../../multiclass.js';
-import { getEnemyById, pushEvent } from '../../gameEngine.js';
 import type { ActionContext } from '../types.js';
+import { composeNow } from '../../narrative/compose.js';
 import { distanceFeet } from '../../gridEngine.js';
+import { getEnemyById } from '../../gameEngine.js';
 
 /**
  * Caster features for Sorcerer, Warlock, and Wizard. Bundled because
@@ -180,7 +181,9 @@ export function handleCasterFeature(ctx: ActionContext, fid: string): boolean {
       const wisScore = (enemyData as unknown as Record<string, number>)?.wis ?? 10;
       const save = rollDice('1d20') + abilityMod(wisScore);
       const feySuccess = save >= dc;
-      ctx.st = pushEvent(ctx.st, {
+      // Per-target save event for the combat log (prose=''; the
+      // consolidated narrative below combines all targets).
+      composeNow(ctx, {
         kind: 'save',
         characterId: e.id,
         characterName: targetName,
@@ -189,18 +192,18 @@ export function handleCasterFeature(ctx: ActionContext, fid: string): boolean {
         dc,
         success: feySuccess,
         vs: 'Fey Presence',
-        round: ctx.st.round ?? 1,
+        prose: '',
       });
       if (!feySuccess) {
         frightenedIds.add(e.id);
         lines.push(`${targetName}: WIS ${save} vs DC ${dc} — frightened!`);
-        ctx.st = pushEvent(ctx.st, {
+        composeNow(ctx, {
           kind: 'condition_applied',
           targetId: e.id,
           targetName,
           condition: 'frightened',
           source: 'Fey Presence',
-          round: ctx.st.round ?? 1,
+          prose: '',
         });
       } else {
         lines.push(`${targetName}: WIS ${save} vs DC ${dc} — resists.`);

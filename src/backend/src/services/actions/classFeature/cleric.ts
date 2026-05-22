@@ -2,6 +2,7 @@ import { abilityMod, profBonus, rollDice } from '../../rulesEngine.js';
 import { applyPartyLevelUps, getEnemyById, pushEvent, splitEncounterXp } from '../../gameEngine.js';
 import { getClassLevel, hasClass } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
+import { composeNow } from '../../narrative/compose.js';
 import { fmt } from '../../narrativeFmt.js';
 
 /**
@@ -118,16 +119,30 @@ export function handleClericFeature(ctx: ActionContext, fid: string): boolean {
       if (!enemyData || !undeadKeywords.test(enemyData.name)) continue;
       const wisScore = (enemyData as unknown as Record<string, number>)?.wis ?? 10;
       const save = rollDice('1d20') + abilityMod(wisScore);
+      // Per-target save event (composed via fragment so the combat
+      // log captures the roll). Prose is empty because the
+      // consolidated `lines` array drives the player-facing narrative.
+      composeNow(ctx, {
+        kind: 'save',
+        characterId: e.id,
+        characterName: enemyData.name,
+        ability: 'wis',
+        roll: save,
+        dc: tuDC,
+        success: save >= tuDC,
+        vs: 'Turn Undead',
+        prose: '',
+      });
       if (save < tuDC) {
         turnedIds.push(e.id);
         lines.push(`${enemyData.name}: WIS ${save} vs DC ${tuDC} — turned!`);
-        ctx.st = pushEvent(ctx.st, {
+        composeNow(ctx, {
           kind: 'condition_applied',
           targetId: e.id,
           targetName: enemyData.name,
           condition: 'frightened',
           source: 'Turn Undead',
-          round: ctx.st.round ?? 1,
+          prose: '',
         });
       } else {
         lines.push(`${enemyData.name}: WIS ${save} vs DC ${tuDC} — resists.`);
@@ -190,6 +205,19 @@ export function handleClericFeature(ctx: ActionContext, fid: string): boolean {
       // Sear Undead damage scales with Cleric level only.
       const fullDmg = rollDice(`${clericLvl}d8`);
       const dmg = save >= suDC ? Math.floor(fullDmg / 2) : fullDmg;
+      // Per-target save event for the combat log (prose=''; the
+      // consolidated narrative below combines all targets).
+      composeNow(ctx, {
+        kind: 'save',
+        characterId: e.id,
+        characterName: enemyData.name,
+        ability: 'wis',
+        roll: save,
+        dc: suDC,
+        success: save >= suDC,
+        vs: 'Sear Undead',
+        prose: '',
+      });
       lines.push(
         `${enemyData.name}: WIS ${save} vs DC ${suDC} — ${dmg} radiant${save >= suDC ? ' (half)' : ''}`
       );
