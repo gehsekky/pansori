@@ -1,6 +1,7 @@
 import { abilityMod, rageUsesMax, rollDice, spellSlotsForClassLevel } from '../rulesEngine.js';
 import { canRestInRoom, pick } from '../gameEngine.js';
 import type { ActionHandler } from './types.js';
+import { resetFeatLongRestResources } from '../feats.js';
 
 /**
  * `short_rest`: PHB p.196 — spend Hit Dice to recover HP, refresh
@@ -150,6 +151,7 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
     const humanGrant = c.species === 'human';
     if (c.species === 'orc') delete restoredUses.relentless_endurance_used;
     if (c.species === 'tiefling') delete restoredUses.tiefling_rebuke_used;
+    const restoredUsesWithFeats = resetFeatLongRestResources(c, ctx.context, restoredUses);
     return {
       ...c,
       hp: c.max_hp,
@@ -158,7 +160,7 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
       conditions: [],
       condition_durations: {},
       condition_sources: {},
-      class_resource_uses: restoredUses,
+      class_resource_uses: restoredUsesWithFeats,
       exhaustion_level: newExhaustion,
       spell_slots_used: {},
       inspiration: humanGrant ? true : c.inspiration,

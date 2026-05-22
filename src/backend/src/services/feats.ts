@@ -177,3 +177,30 @@ export function applyFeatTake(
 export function getFeat(featId: string, context: Context): Feat | undefined {
   return context.featTable?.[featId];
 }
+
+/**
+ * Reset per-long-rest feat resources to their max values. Walks the
+ * character's feats, looks each one up in the context's feat table,
+ * and resets the matching `class_resource_uses` entry for any feat
+ * whose effect carries a per-long-rest pool (today: `d20-reroll`).
+ *
+ * Called from `handleLongRest`. Returns a new `class_resource_uses`
+ * record; callers merge it into the rest's overall update.
+ *
+ * Feats with no per-rest pool are no-ops.
+ */
+export function resetFeatLongRestResources(
+  char: Character,
+  context: Context,
+  resourceUses: Record<string, number>
+): Record<string, number> {
+  let next = resourceUses;
+  for (const featId of char.feats ?? []) {
+    const feat = getFeat(featId, context);
+    if (!feat) continue;
+    if (feat.effect.kind === 'd20-reroll') {
+      next = { ...next, [`feat_${feat.id}_uses`]: feat.effect.usesPerLongRest };
+    }
+  }
+  return next;
+}

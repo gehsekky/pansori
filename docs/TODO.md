@@ -38,8 +38,16 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
       grove, whispering). 11 direct tests.
 
   **Remaining (data + runtime hooks):**
-  - Lucky's spend hook into d20 rolls (claim a luck point to gain
-    advantage on attack/save/check).
+  - [~] Lucky's spend hook (2026-05-22, attack-only MVP). New
+    `use_luck` action mirrors `spend_inspiration`'s shape — sets
+    `turn_actions.luck_pending`, decrements `feat_lucky_uses`. Hook
+    in `attack/toHit.ts` consumes the flag as an advantage source.
+    `resetFeatLongRestResources` in `services/feats.ts` refills the
+    pool on long rest. **Remaining:** save + ability-check hooks
+    (each calling site has to thread `luck_pending → advantage`
+    through `skillCheck` / `rollConditionSave`). RAW spend-after-
+    roll timing also deferred (current MVP is spend-before-roll for
+    simplicity).
   - Sharpshooter's per-attack toggle hook in `attack/toHit.ts`.
   - Magic Initiate's spell-grant flow (FE chooser + add to
     `spells_known` + per-rest L1 cast tracking).

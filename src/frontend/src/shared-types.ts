@@ -198,6 +198,11 @@ export type StructuredAction =
   | { type: 'try_escape_grapple' }
   | { type: 'stand_up' }
   | { type: 'spend_inspiration' }
+  // Lucky feat (2024 PHB Chapter 5). Spend 1 luck point to queue
+  // advantage on the next d20 test (mirror of `spend_inspiration`).
+  // Requires the Lucky feat + remaining `feat_lucky_uses`. Free of
+  // action-economy cost; refills on a long rest.
+  | { type: 'use_luck' }
   | { type: 'shove'; targetEnemyId?: string }
   | { type: 'dodge' }
   | { type: 'disengage' }
@@ -536,6 +541,14 @@ export type FeatEffect =
       // Empty here means "choose at take time"; the chosen abilities
       // are recorded on the Character via `feat_choices`.
       abilities: AbilityKey[];
+    }
+  | {
+      // Sentinel feat — protect-ally reaction (PHB 2024). Triggers
+      // when an enemy hits an ally within 5 ft. The OA speed-zero
+      // benefit is also part of Sentinel but isn't modeled in this
+      // engine (pansori's enemy movement is one-step-per-turn so
+      // "speed 0 for the rest of the turn" rarely matters).
+      kind: 'sentinel-react';
     };
 
 /**
@@ -738,6 +751,20 @@ export interface PendingAbsorbElementsReaction extends PendingReactionBase {
   pendingProposedSt: unknown;
 }
 
+// Sentinel feat (PHB 2024) — protect-ally reaction. Triggered when
+// an enemy attack hits an ally within 5 ft of a Sentinel-feat PC who
+// is NOT the target. The Sentinel can use their reaction to make a
+// melee weapon attack against the attacker. (The feat also grants
+// an OA speed-zero benefit which is a passive modifier to OAs — not
+// modeled here.) No proposed-snapshot stash: the triggering attack
+// already committed; this reaction is a counter-attack, not a
+// modifier.
+export interface PendingSentinelReaction extends PendingReactionBase {
+  kind: 'sentinel';
+  /** The enemy id whose attack triggered this Sentinel window. */
+  triggerAttackerEnemyId: string;
+}
+
 // Silvery Barbs (Strixhaven origin spell, 1st-level enchantment).
 // Reaction triggered when a creature within 60 ft succeeds on an
 // attack roll, ability check, or saving throw. Accepting consumes a
@@ -777,4 +804,5 @@ export type PendingReaction =
   | PendingCounterspellReaction
   | PendingUncannyDodgeReaction
   | PendingAbsorbElementsReaction
-  | PendingSilveryBarbsReaction;
+  | PendingSilveryBarbsReaction
+  | PendingSentinelReaction;
