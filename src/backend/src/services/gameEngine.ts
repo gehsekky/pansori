@@ -2286,7 +2286,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       wizard: ['evoker', 'abjurer'],
       cleric: ['life', 'war', 'light'],
       ranger: ['hunter', 'beastmaster', 'fey_wanderer'],
-      paladin: ['devotion', 'vengeance', 'ancients'],
+      paladin: ['devotion', 'vengeance', 'ancients', 'glory'],
       bard: ['lore', 'valor'],
       sorcerer: ['draconic', 'wild_magic'],
       warlock: ['fiend', 'archfey', 'celestial'],
@@ -2905,6 +2905,16 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       choices.push({
         label: `Nature's Wrath — restrain target, DEX save DC ${8 + profBonus(char.level) + abilityMod(char.cha ?? 10)} (Channel Divinity, ${cdLeft} left)`,
         action: { type: 'use_class_feature', featureId: 'natures_wrath' },
+        kind: 'class_feature',
+      });
+    }
+
+    // Glory Paladin: Inspiring Smite (Channel Divinity, AoE temp HP).
+    if (char.subclass === 'glory' && hasClass(char, 'paladin') && cdLeft > 0) {
+      const palLvl = getClassLevel(char, 'paladin');
+      choices.push({
+        label: `Inspiring Smite — grant 2d8+${palLvl} temp HP to party (Channel Divinity, ${cdLeft} left)`,
+        action: { type: 'use_class_feature', featureId: 'inspiring_smite' },
         kind: 'class_feature',
       });
     }

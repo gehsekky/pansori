@@ -385,6 +385,48 @@ export function handlePaladinRangerBardFeature(ctx: ActionContext, fid: string):
     return true;
   }
 
+  if (fid === 'inspiring_smite') {
+    // 2024 PHB Glory Paladin L3 — Channel Divinity. RAW: triggered
+    // after a Divine Smite. Pansori MVP relaxes this and lets the
+    // Glory paladin use Inspiring Smite as a standalone CD AoE
+    // temp HP grant. 2d8 + paladin level temp HP to caster + each
+    // living ally (treated as "within 30 ft" → party-wide in
+    // pansori's room scope).
+    if (ctx.char.subclass !== 'glory') {
+      ctx.narrative = 'Only Glory Paladins have Inspiring Smite.';
+      return true;
+    }
+    const cdUsesIS = ctx.char.class_resource_uses?.channel_divinity ?? 1;
+    if (cdUsesIS <= 0) {
+      ctx.narrative = 'No Channel Divinity uses remaining.';
+      return true;
+    }
+    ctx.char.class_resource_uses = {
+      ...(ctx.char.class_resource_uses ?? {}),
+      channel_divinity: cdUsesIS - 1,
+    };
+    const palLvl = getClassLevel(ctx.char, 'paladin');
+    const grant = rollDice('2d8') + palLvl;
+    // Apply to caster (in-place) + each living ally in the party.
+    if ((ctx.char.temp_hp ?? 0) < grant) ctx.char.temp_hp = grant;
+    const allyIds = ctx.st.characters
+      .filter((c) => c.id !== ctx.char.id && !c.dead && c.hp > 0)
+      .map((c) => c.id);
+    ctx.st = {
+      ...ctx.st,
+      characters: ctx.st.characters.map((c) =>
+        allyIds.includes(c.id) ? { ...c, temp_hp: Math.max(c.temp_hp ?? 0, grant) } : c
+      ),
+    };
+    const buffedNames = [
+      ctx.char.name,
+      ...allyIds.map((id) => ctx.st.characters.find((c) => c.id === id)?.name).filter(Boolean),
+    ].join(', ');
+    ctx.narrative = `✨ Inspiring Smite — ${ctx.char.name} channels glory: ${grant} temp HP to ${buffedNames}. (${cdUsesIS - 1} Channel Divinity remaining)`;
+    ctx.usedInitiative = true;
+    return true;
+  }
+
   if (fid === 'cutting_words') {
     if (ctx.char.subclass !== 'lore') {
       ctx.narrative = 'Only Lore Bards have Cutting Words.';
