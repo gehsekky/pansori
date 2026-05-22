@@ -61,6 +61,7 @@ describe('computeTotalAc — buff flags', () => {
       effect: null,
       weight: 55,
       desc: 'Heavy armor',
+      aliases: [],
     };
     const inventory = [{ instance_id: 'armor-1', id: 'chain-mail', name: 'Chain Mail' }];
     const ac = computeTotalAc(14, 'armor-1', null, inventory, [armor], true, false);
