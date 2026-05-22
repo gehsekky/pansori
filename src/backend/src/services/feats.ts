@@ -227,6 +227,13 @@ export function applyFeatTake(
       narrativeParts.push("Once per turn, weapon-damage hits reroll and take the higher result.");
       break;
     }
+    case 'speed-bonus': {
+      // No take-time state change — `effectiveSpeed` adds the bonus
+      // every time it's called. Narrative records the bonus for the
+      // level-up log.
+      narrativeParts.push(`+${feat.effect.bonusFeet} ft speed.`);
+      break;
+    }
   }
   return { newChar: next, narrative: narrativeParts.join(' ') };
 }

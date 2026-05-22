@@ -139,4 +139,41 @@ export const SRD_FEATS: Record<string, Feat> = {
       kind: 'savage-attacker',
     },
   },
+
+  mobile: {
+    id: 'mobile',
+    name: 'Mobile',
+    desc: 'Your speed increases by 10 feet. (RAW also grants: difficult terrain doesn\'t halve Dash speed; melee attack against a creature prevents OAs from that creature this turn — neither modeled yet.)',
+    category: 'general',
+    prerequisites: {
+      minLevel: 4,
+    },
+    effect: {
+      kind: 'speed-bonus',
+      bonusFeet: 10,
+    },
+  },
+
+  resilient: {
+    id: 'resilient',
+    name: 'Resilient',
+    desc: 'Increase one ability score of your choice by 1. You gain saving-throw proficiency in that ability.',
+    category: 'general',
+    prerequisites: {
+      minLevel: 4,
+    },
+    // Half-feat — player picks one of the six abilities for the +1
+    // bump AND the save proficiency. `applyFeatTake` uses
+    // `abilityChoice` for the +1 and `saveProficiencyChoices` for the
+    // save prof; for Resilient they're the same ability, surfaced
+    // by the FE as a single pick.
+    abilityBonus: { choices: ['str', 'dex', 'con', 'int', 'wis', 'cha'] },
+    effect: {
+      kind: 'save-proficiency',
+      // Empty `abilities` triggers the "player picks" branch in
+      // `applyFeatTake`; the chosen ability is passed via
+      // `saveProficiencyChoices`.
+      abilities: [],
+    },
+  },
 };

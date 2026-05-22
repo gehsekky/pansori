@@ -115,6 +115,24 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
       on next turn via FRESH_TURN). Unarmed strikes excluded per
       RAW ("weapon's damage roll"). 5 direct tests covering both
       feats (initiative bonus, per-turn limit, feat-absent no-op).
+
+    **2024 PHB general feats added 2026-05-22:**
+    - **Resilient** — half-feat: +1 to chosen ability + save
+      proficiency in that ability. Pure data; reuses existing
+      `abilityBonus.choices` + `save-proficiency` effect kinds.
+      L4+ prereq.
+    - **Mobile** (`kind: 'speed-bonus'; bonusFeet: 10`) — +10 ft
+      speed. Wired in `effectiveSpeed` (which is called from
+      grid_move, dash, etc., so the bonus lands everywhere
+      automatically). Stacks with Goliath Large Form; encumbrance
+      still reduces post-bonus speed normally. The two other RAW
+      benefits (no difficult-terrain Dash slowdown, melee-attack
+      target can't OA you) aren't modeled yet. New `speed-bonus`
+      effect kind documents the bonus on feat data; the
+      `effectiveSpeed` hook hardcodes the feat id for now (will
+      factor into a feats helper when a 2nd speed-bonus feat
+      ships). L4+ prereq.
+    6 added tests cover both feats.
   - ASI-vs-feat UX on the FE (both `apply_asi` and `take_feat`
     actions are available when `asi_pending` is set; FE picks the
     surfacing).

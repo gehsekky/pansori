@@ -997,6 +997,13 @@ export function effectiveSpeed(char: Character): number {
   let base = char.speed ?? DEFAULT_SPEED_FEET;
   // 2024 PHB Goliath Large Form — +10 ft speed while the condition is active.
   if (char.conditions?.includes('large_form')) base += 10;
+  // 2024 PHB Mobile feat — +10 ft speed. Hardcoded id+bonus here
+  // because `effectiveSpeed` doesn't take a context for feat-table
+  // lookup. The feat's `effect.bonusFeet = 10` lives in feat data
+  // for documentation; this hook mirrors it. When a second
+  // speed-bonus feat ships, factor into a `feats.ts` helper that
+  // takes (char, context) so the data drives the bonus directly.
+  if ((char.feats ?? []).includes('mobile')) base += 10;
   const weight = charCarriedWeight(char);
   // 2024 PHB Goliath Powerful Build: count as one size larger for carrying
   // capacity. Mechanically: double the effective STR-based thresholds.
