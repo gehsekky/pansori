@@ -28,6 +28,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     desc: 'Radiant flame descends on a target. DEX save or take 1d8 radiant damage.',
     rangeKind: 'ranged',
     rangeFt: 60,
+    spellList: ['divine'],
   },
   fire_bolt: {
     id: 'fire_bolt',
@@ -41,6 +42,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     desc: 'Hurl a mote of fire. Spell attack roll, 1d10 fire damage (scales with level).',
     rangeKind: 'ranged',
     rangeFt: 120,
+    spellList: ['arcane'],
   },
   eldritch_blast: {
     id: 'eldritch_blast',
@@ -54,6 +56,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     rangeKind: 'ranged',
     rangeFt: 120,
     desc: 'A beam of crackling energy streaks toward a creature.',
+    spellList: ['arcane'],
   },
   shillelagh: {
     id: 'shillelagh',
@@ -63,6 +66,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     narrative: 'Your staff glows with natural energy.',
     desc: 'Your staff deals 1d8 magical bludgeoning using WIS for attack/damage.',
     rangeKind: 'self',
+    spellList: ['primal'],
   },
   bardic_inspiration_spell: {
     id: 'bardic_inspiration_spell',
@@ -89,6 +93,8 @@ export const SRD_SPELLS: Record<string, Spell> = {
     rangeKind: 'ranged',
     rangeFt: 60,
     desc: 'Hurl insults at a creature. WIS save or take 1d6 psychic damage (scales with level).',
+    // Bard is on the arcane list in 2024 PHB.
+    spellList: ['arcane'],
   },
 
   // ─── Level 1 ────────────────────────────────────────────────────────────────
@@ -110,6 +116,8 @@ export const SRD_SPELLS: Record<string, Spell> = {
         '{name} breathes a quiet prayer and touches {target} — {spell}{slotNote}',
       ],
     },
+    // Bard / Cleric / Druid / Paladin / Ranger list (2024 PHB).
+    spellList: ['arcane', 'divine', 'primal'],
   },
   healing_word: {
     id: 'healing_word',
@@ -122,6 +130,8 @@ export const SRD_SPELLS: Record<string, Spell> = {
     rangeKind: 'ranged',
     rangeFt: 60,
     desc: 'A creature of your choice regains HP. Bonus action.',
+    // Bard / Cleric / Druid (2024 PHB).
+    spellList: ['arcane', 'divine', 'primal'],
   },
   guiding_bolt: {
     id: 'guiding_bolt',
@@ -134,6 +144,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     desc: 'A flash of light streaks toward a target. Spell attack roll, 4d6 radiant on hit.',
     rangeKind: 'ranged',
     rangeFt: 120,
+    spellList: ['divine'],
   },
   magic_missile: {
     id: 'magic_missile',
@@ -154,6 +165,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
         "Three glowing motes of {spell}{slotNote} spiral from {name}'s palm",
       ],
     },
+    spellList: ['arcane'],
   },
   shield: {
     id: 'shield',
@@ -165,6 +177,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     level: 1,
     castTime: 'reaction',
     rangeKind: 'self',
+    spellList: ['arcane'],
   },
   silvery_barbs: {
     id: 'silvery_barbs',
@@ -178,6 +191,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     level: 1,
     castTime: 'reaction',
     rangeKind: 'self',
+    spellList: ['arcane'],
   },
   absorb_elements: {
     id: 'absorb_elements',
@@ -191,6 +205,8 @@ export const SRD_SPELLS: Record<string, Spell> = {
     level: 1,
     castTime: 'reaction',
     rangeKind: 'self',
+    // Druid / Ranger / Sorcerer / Wizard (2024 PHB).
+    spellList: ['arcane', 'primal'],
   },
   hellish_rebuke: {
     id: 'hellish_rebuke',
@@ -209,6 +225,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     upcastBonus: '1d10',
     rangeKind: 'ranged',
     rangeFt: 60,
+    spellList: ['arcane'],
   },
   bless: {
     id: 'bless',
@@ -220,6 +237,8 @@ export const SRD_SPELLS: Record<string, Spell> = {
     desc: 'Concentration. Allies gain +1d4 to attack rolls and saving throws.',
     rangeKind: 'ranged',
     rangeFt: 30,
+    // Cleric / Paladin (2024 PHB).
+    spellList: ['divine'],
   },
   thunderwave: {
     id: 'thunderwave',
@@ -232,6 +251,8 @@ export const SRD_SPELLS: Record<string, Spell> = {
     saveEffect: 'half',
     desc: 'A wave of thunderous force erupts from you. CON save or take 2d8 thunder, half on success.',
     rangeKind: 'self',
+    // Bard / Druid / Sorcerer / Wizard (2024 PHB).
+    spellList: ['arcane', 'primal'],
   },
   burning_hands: {
     id: 'burning_hands',
@@ -247,6 +268,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     aoeShape: 'cone',
     rangeKind: 'self',
     desc: 'A 15-foot cone of flame shoots from your hands.',
+    spellList: ['arcane'],
   },
   entangle: {
     id: 'entangle',
@@ -265,6 +287,8 @@ export const SRD_SPELLS: Record<string, Spell> = {
     rangeKind: 'ranged',
     rangeFt: 90,
     desc: 'Grasping weeds restrain creatures in a 20-ft area.',
+    // Druid / Ranger (2024 PHB).
+    spellList: ['primal'],
   },
   charm_person: {
     id: 'charm_person',
@@ -278,6 +302,8 @@ export const SRD_SPELLS: Record<string, Spell> = {
     rangeKind: 'ranged',
     rangeFt: 30,
     desc: 'A humanoid you can see is charmed for 1 hour on failed WIS save.',
+    // Bard / Druid / Sorcerer / Warlock / Wizard (2024 PHB).
+    spellList: ['arcane', 'primal'],
   },
   sleep: {
     id: 'sleep',
@@ -296,6 +322,8 @@ export const SRD_SPELLS: Record<string, Spell> = {
     rangeKind: 'ranged',
     rangeFt: 90,
     desc: 'Sends creatures into a magical slumber (5d8 HP pool).',
+    // Bard / Sorcerer / Wizard (2024 PHB).
+    spellList: ['arcane'],
   },
   hex: {
     id: 'hex',
@@ -307,6 +335,8 @@ export const SRD_SPELLS: Record<string, Spell> = {
     concentration: true,
     rangeKind: 'ranged',
     rangeFt: 90,
+    // Warlock-only.
+    spellList: ['arcane'],
   },
   divine_smite_spell: {
     id: 'divine_smite_spell',
@@ -321,6 +351,8 @@ export const SRD_SPELLS: Record<string, Spell> = {
     damage: '2d8',
     desc: 'Bonus action. Next successful weapon attack within 1 minute deals an extra 2d8 radiant damage (upcast +1d8 per level above 1st).',
     rangeKind: 'self',
+    // Paladin-only.
+    spellList: ['divine'],
   },
 
   // ─── Level 2 ────────────────────────────────────────────────────────────────
@@ -337,6 +369,8 @@ export const SRD_SPELLS: Record<string, Spell> = {
     desc: 'Target must make a WIS save or be paralyzed for up to 3 rounds (Concentration).',
     rangeKind: 'ranged',
     rangeFt: 60,
+    // Bard / Cleric / Druid / Sorcerer / Warlock / Wizard (2024 PHB).
+    spellList: ['arcane', 'divine', 'primal'],
   },
   misty_step: {
     id: 'misty_step',
@@ -346,6 +380,8 @@ export const SRD_SPELLS: Record<string, Spell> = {
     narrative: 'You vanish in a puff of silver mist and reappear nearby.',
     desc: 'Surrounded by silver mist, you teleport up to 30 feet.',
     rangeKind: 'self',
+    // Sorcerer / Warlock / Wizard (2024 PHB). Druid also has it.
+    spellList: ['arcane', 'primal'],
   },
   spiritual_weapon: {
     id: 'spiritual_weapon',
@@ -358,6 +394,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     rangeKind: 'ranged',
     rangeFt: 60,
     desc: 'A floating spectral weapon makes melee attacks.',
+    spellList: ['divine'],
   },
 
   // ─── Level 3 ────────────────────────────────────────────────────────────────
@@ -375,6 +412,8 @@ export const SRD_SPELLS: Record<string, Spell> = {
     castTime: 'reaction',
     rangeKind: 'ranged',
     rangeFt: 60,
+    // Sorcerer / Warlock / Wizard (2024 PHB).
+    spellList: ['arcane'],
   },
   fireball: {
     id: 'fireball',
@@ -398,6 +437,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
         "A glowing mote leaps from {name}'s palm — {spell}{slotNote} detonates in a wave of heat",
       ],
     },
+    spellList: ['arcane'],
   },
   hunger_of_hadar: {
     id: 'hunger_of_hadar',
@@ -414,6 +454,8 @@ export const SRD_SPELLS: Record<string, Spell> = {
     rangeKind: 'ranged',
     rangeFt: 150,
     desc: 'Open a gate to the void — creatures inside take 2d6 cold and DEX save or 2d6 acid.',
+    // Warlock-only.
+    spellList: ['arcane'],
   },
   spirit_guardians: {
     id: 'spirit_guardians',
@@ -435,6 +477,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     aoeShape: 'sphere',
     rangeKind: 'self',
     desc: 'Concentration. Spirits surround you in a 15-ft radius. Hostiles in the area make a WIS save or take 3d8 radiant damage (half on success).',
+    spellList: ['divine'],
   },
   inflict_wounds: {
     id: 'inflict_wounds',
@@ -449,5 +492,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     attackRoll: true,
     rangeKind: 'touch',
     desc: 'A creature you touch takes 2d10 necrotic on a hit. +2d10 per slot above 1st.',
+    // Cleric / Warlock — divine + arcane.
+    spellList: ['arcane', 'divine'],
   },
 };
