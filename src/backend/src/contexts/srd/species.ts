@@ -164,4 +164,20 @@ export const SRD_SPECIES: Record<string, Species> = {
       'Relentless Endurance: when dropped to 0 HP without dying, drop to 1 HP instead (1/long rest).',
     ],
   },
+  aasimar: {
+    id: 'aasimar',
+    name: 'Aasimar',
+    desc: 'Mortals touched by celestial heritage — protectors and emissaries of the upper planes (2024 PHB).',
+    size: 'medium',
+    speedFt: 30,
+    darkvisionFt: 60,
+    resistances: ['necrotic', 'radiant'],
+    innateCantrips: ['light'],
+    traits: [
+      'Celestial Resistance: resistance to necrotic and radiant damage.',
+      'Light Bearer: cast Light cantrip without material components.',
+      'Healing Hands: as an Action, touch a creature to heal a number of d4 equal to your proficiency bonus (1/long rest) — not yet wired.',
+      'Celestial Revelation (L3+): once per long rest, transform as a bonus action — pick Necrotic Shroud / Radiant Soul / Radiant Consumption — not yet wired.',
+    ],
+  },
 };
