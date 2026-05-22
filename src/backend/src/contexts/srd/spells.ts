@@ -398,6 +398,52 @@ export const SRD_SPELLS: Record<string, Spell> = {
     // Bard / Cleric / Druid / Sorcerer / Warlock / Wizard (2024 PHB).
     spellList: ['arcane', 'divine', 'primal'],
   },
+  web: {
+    id: 'web',
+    name: 'Web',
+    level: 2,
+    castTime: 'action',
+    concentration: true,
+    condition: 'restrained',
+    conditionDuration: 10, // 1 hour concentration; combat-capped here
+    savingThrow: 'dex',
+    saveEffect: 'negates',
+    blastRadius: 20,
+    aoeShape: 'cube',
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    desc: 'You conjure a mass of thick, sticky webbing filling a 20-ft cube. Creatures must make a DEX save or be restrained.',
+    narratives: {
+      cast: [
+        '{name} flings a glob of {spell}{slotNote} — strands of viscous silk spread across the area',
+        '{name} weaves {spell}{slotNote} into a sticky lattice that fills the chamber',
+      ],
+    },
+    // Sorcerer / Wizard (2024 PHB).
+    spellList: ['arcane'],
+  },
+  suggestion: {
+    id: 'suggestion',
+    name: 'Suggestion',
+    level: 2,
+    castTime: 'action',
+    concentration: true,
+    condition: 'charmed',
+    conditionDuration: 8, // shortened from 8 hours for combat scale
+    savingThrow: 'wis',
+    saveEffect: 'negates',
+    rangeKind: 'ranged',
+    rangeFt: 30,
+    desc: 'Suggest a reasonable course of action to one creature. WIS save or be charmed and pursue the suggestion (Concentration).',
+    narratives: {
+      cast: [
+        "{name} leans in close and whispers {spell}{slotNote} — their words slip past {target}'s defenses",
+        '{name} murmurs {spell}{slotNote} — honeyed words wind around {target}',
+      ],
+    },
+    // Bard / Sorcerer / Warlock / Wizard (2024 PHB).
+    spellList: ['arcane'],
+  },
   misty_step: {
     id: 'misty_step',
     name: 'Misty Step',
@@ -527,6 +573,28 @@ export const SRD_SPELLS: Record<string, Spell> = {
     rangeKind: 'self',
     desc: 'Concentration. Spirits surround you in a 15-ft radius. Hostiles in the area make a WIS save or take 3d8 radiant damage (half on success).',
     spellList: ['divine'],
+  },
+  hold_monster: {
+    id: 'hold_monster',
+    name: 'Hold Monster',
+    level: 5,
+    castTime: 'action',
+    concentration: true,
+    condition: 'paralyzed',
+    conditionDuration: 5,
+    savingThrow: 'wis',
+    saveEffect: 'negates',
+    desc: 'Choose a creature you can see. WIS save or be paralyzed (Concentration, up to 1 minute). Repeats saves at end of its turns (not modeled — uses fixed duration).',
+    rangeKind: 'ranged',
+    rangeFt: 90,
+    narratives: {
+      cast: [
+        '{name} weaves {spell}{slotNote} — invisible bonds clamp around {target}',
+        "{name} casts {spell}{slotNote}; {target}'s limbs lock as if frozen mid-motion",
+      ],
+    },
+    // Bard / Sorcerer / Warlock / Wizard (2024 PHB).
+    spellList: ['arcane'],
   },
   inflict_wounds: {
     id: 'inflict_wounds',
