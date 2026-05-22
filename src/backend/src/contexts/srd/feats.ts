@@ -190,6 +190,20 @@ export const SRD_FEATS: Record<string, Feat> = {
     },
   },
 
+  athlete: {
+    id: 'athlete',
+    name: 'Athlete',
+    desc: 'Half-feat: +1 STR or DEX. Standing up from prone costs only 5 ft of movement (instead of half your speed). (RAW also: climbing speed not halved — not modeled.)',
+    category: 'general',
+    prerequisites: {
+      minLevel: 4,
+    },
+    abilityBonus: { choices: ['str', 'dex'] },
+    effect: {
+      kind: 'athlete',
+    },
+  },
+
   dual_wielder: {
     id: 'dual_wielder',
     name: 'Dual Wielder',
