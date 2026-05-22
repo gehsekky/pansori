@@ -84,6 +84,7 @@ export const handleUseReaction: ActionHandler<{ type: 'use_reaction' }> = (ctx) 
 export const handleResolveReaction: ActionHandler<{
   type: 'resolve_reaction';
   accept: boolean;
+  replacementIndex?: number;
 }> = (ctx, action) => {
   const rx = ctx.st.pending_reaction;
   if (!rx) {
@@ -613,6 +614,123 @@ export const handleResolveReaction: ActionHandler<{
       ctx.char = pendingProposedChar;
       ctx.st = pushEvent(ctx.st, enemyAttackFragmentEvent(pendingFragment, ctx.st.round ?? 1));
       ctx.narrative = `${pendingFragment.prose} (Absorb Elements declined.)`;
+    }
+  } else if (rx.kind === 'd20_interception') {
+    // Generic post-roll d20 interception (PHB 2024 Diviner Portent
+    // today; Lucky-RAW timing + Clockwork Soul Restore Balance plug
+    // into the same shape later). Accept = pop the chosen replacement
+    // value from `replacementValues`, substitute for the rolled d20,
+    // recompute hit/miss with the same modifier, and commit. Decline
+    // = commit the original proposed snapshot.
+    const pendingFragment = rx.pendingFragment as EnemyAttackHitFragment;
+    const pendingProposedChar = rx.pendingProposedChar as Character;
+    const pendingProposedSt = rx.pendingProposedSt as GameState;
+    if (action.accept) {
+      // Pick the replacement: explicit index from the action, else
+      // the lowest available (most likely to convert hit → miss).
+      const replacements = rx.replacementValues;
+      if (replacements.length === 0) {
+        ctx.narrative = `No replacement available. ${pendingFragment.prose}`;
+        ctx.st = {
+          ...ctx.st,
+          characters: pendingProposedSt.characters.map((c) =>
+            c.id === ctx.char.id ? pendingProposedChar : c
+          ),
+          entities: (pendingProposedSt.entities ?? ctx.st.entities ?? []).map((e) =>
+            e.id === ctx.char.id && !e.isEnemy ? { ...e, hp: pendingProposedChar.hp } : e
+          ),
+          pending_reaction: undefined,
+        };
+        ctx.char = pendingProposedChar;
+        ctx.st = pushEvent(ctx.st, enemyAttackFragmentEvent(pendingFragment, ctx.st.round ?? 1));
+      } else {
+        const idx =
+          action.replacementIndex !== undefined &&
+          action.replacementIndex >= 0 &&
+          action.replacementIndex < replacements.length
+            ? action.replacementIndex
+            : replacements.indexOf(Math.min(...replacements));
+        const chosen = replacements[idx];
+        const mods = rx.atkTotal - rx.proposedD20;
+        const newTotal = chosen + mods;
+        const newHit = newTotal >= rx.targetAc;
+        // Reactor consumes the resource + reaction regardless of outcome.
+        // For Portent that's a portent die at the chosen index. The
+        // resource-source switch keeps the shape generic so Lucky /
+        // Restore Balance can plug in by reading rx.source.
+        const consumeResource = (c: Character): Character => {
+          if (rx.source === 'portent') {
+            const remainingDice = [...(c.portent_dice ?? [])];
+            remainingDice.splice(idx, 1);
+            return { ...c, portent_dice: remainingDice };
+          }
+          return c;
+        };
+        const charBase: Character = consumeResource({
+          ...ctx.char,
+          turn_actions: { ...ctx.char.turn_actions, reaction_used: true },
+        });
+        const sourceLabel = rx.source === 'portent' ? 'Portent' : 'D20 Interception';
+        if (newHit) {
+          // Replacement still hits — commit the proposed snapshot
+          // (with damage) but preserve the resource + reaction
+          // consumption on the reactor.
+          const charAfter: Character = {
+            ...pendingProposedChar,
+            portent_dice: charBase.portent_dice,
+            turn_actions: charBase.turn_actions,
+          };
+          ctx.st = {
+            ...ctx.st,
+            characters: pendingProposedSt.characters.map((c) =>
+              c.id === ctx.char.id ? charAfter : c
+            ),
+            entities: (pendingProposedSt.entities ?? ctx.st.entities ?? []).map((e) =>
+              e.id === ctx.char.id && !e.isEnemy ? { ...e, hp: charAfter.hp } : e
+            ),
+            pending_reaction: undefined,
+          };
+          ctx.char = charAfter;
+          ctx.st = pushEvent(ctx.st, enemyAttackFragmentEvent(pendingFragment, ctx.st.round ?? 1));
+          ctx.narrative = `🔮 ${ctx.char.name} weaves ${sourceLabel}! d20 ${rx.proposedD20} → ${chosen}, total ${newTotal} vs AC ${rx.targetAc} — still hits. ${pendingFragment.prose}`;
+        } else {
+          // Replacement makes the attack miss — discard damage. PC
+          // stays at pre-attack HP. Emit attack_miss event.
+          ctx.st = {
+            ...ctx.st,
+            characters: ctx.st.characters.map((c) => (c.id === ctx.char.id ? charBase : c)),
+            pending_reaction: undefined,
+          };
+          ctx.char = charBase;
+          ctx.st = pushEvent(ctx.st, {
+            kind: 'attack_miss',
+            attackerId: pendingFragment.attackerEnemyId,
+            attackerName: pendingFragment.attackerName,
+            targetId: pendingFragment.targetCharId,
+            targetName: pendingFragment.targetName,
+            toHit: newTotal,
+            targetAc: rx.targetAc,
+            round: ctx.st.round ?? 1,
+          });
+          ctx.narrative = `🔮 ${ctx.char.name} weaves ${sourceLabel}! d20 ${rx.proposedD20} → ${chosen}, total ${newTotal} vs AC ${rx.targetAc} — the strike misses!`;
+        }
+      }
+    } else {
+      // Decline — commit full proposed snapshot.
+      ctx.st = {
+        ...ctx.st,
+        characters: pendingProposedSt.characters.map((c) =>
+          c.id === ctx.char.id ? pendingProposedChar : c
+        ),
+        entities: (pendingProposedSt.entities ?? ctx.st.entities ?? []).map((e) =>
+          e.id === ctx.char.id && !e.isEnemy ? { ...e, hp: pendingProposedChar.hp } : e
+        ),
+        pending_reaction: undefined,
+      };
+      ctx.char = pendingProposedChar;
+      ctx.st = pushEvent(ctx.st, enemyAttackFragmentEvent(pendingFragment, ctx.st.round ?? 1));
+      const sourceLabel = rx.source === 'portent' ? 'Portent' : 'D20 Interception';
+      ctx.narrative = `${pendingFragment.prose} (${sourceLabel} declined.)`;
     }
   }
 
