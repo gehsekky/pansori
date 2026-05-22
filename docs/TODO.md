@@ -494,8 +494,24 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
       armor-prof-for-casting, but no systematic V/S/M flag
       enforcement per spell, no spellcasting-focus rule, no
       costly-material-component consumption.
-- [ ] **Ritual casting** — cast without slot, +10 minutes. 0%
-      implemented.
+- [x] **Ritual casting** (shipped 2026-05-22). Existing infra in
+      `castSpell/precast.ts` was already wired (gates on
+      `spell.ritualCasting` + `!combat_active`, skips slot
+      consumption); this PR added the user-facing surface and the
+      data. New `canRitualCast(char)` helper in `services/multiclass.ts`
+      gates on Wizard / Cleric / Druid / Bard. `generateChoices`
+      emits a "Cast as ritual (10 min, no slot)" option alongside
+      slot-based variants when the spell is ritual-castable, the PC
+      is eligible, and combat is off. Three new SRD ritual utilities
+      seeded: Detect Magic, Identify (still costs the 100 gp
+      material component RAW), Comprehend Languages. All three are
+      pure narrative — no mechanical effect beyond the flavour text
+      (engine doesn't yet model "you sense magic" / "you understand
+      languages" as game-state). Pansori models the 10-minute time
+      cost as "out of combat"; no finer-grained time axis. 10 BE
+      specs cover choice surfacing per class + combat block + handler
+      no-slot-burn + non-ritual-spell rejection + Identify gold
+      consumption + insufficient-gold rejection + narrative emission.
 - [ ] **Long rest 2024 limits** — once per 24h; 8h with 6h sleep +
       2h light activity; interruption rules.
 - [ ] **Lighting tracking** — bright/dim/dark. Affects perception,

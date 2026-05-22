@@ -790,4 +790,51 @@ export const SRD_SPELLS: Record<string, Spell> = {
     // Cleric / Warlock — divine + arcane.
     spellList: ['arcane', 'divine'],
   },
+
+  // ── Ritual spells (2024 PHB Chapter 3, Ritual tag) ───────────────────
+  // RAW: a ritual spell can be cast normally (action + slot) OR as a
+  // ritual (10 min, no slot, out of combat). Pansori models the
+  // 10-minute time cost as "out of combat" — the engine doesn't have
+  // a finer-grained time axis. Class gating: Wizard / Cleric / Druid /
+  // Bard can ritual-cast their known/prepared spells (see canRitualCast
+  // in gameEngine.ts). The spells themselves are narrative utility —
+  // no damage, save, or condition mechanics — until pansori needs
+  // engine-side hooks for "you sense magic" / "you identify an item".
+  detect_magic: {
+    id: 'detect_magic',
+    name: 'Detect Magic',
+    level: 1,
+    castTime: 'action',
+    desc: 'For the next 10 minutes you sense magical auras within 30 feet.',
+    narrative: '{name} weaves a probing sigil — auras of magic shimmer at the edge of sight.',
+    ritualCasting: true,
+    // No targetType — routes through the utility branch (no damage,
+    // save, attack, condition, heal, or buff effect). The branch
+    // reads `spell.narrative` for prose.
+    rangeKind: 'self',
+    spellList: ['arcane', 'divine', 'primal'],
+  },
+  identify: {
+    id: 'identify',
+    name: 'Identify',
+    level: 1,
+    castTime: 'action',
+    materialCost: 100,
+    desc: 'Touch an item to learn its magical properties, command words, and remaining charges.',
+    narrative: '{name} traces glyphs over the item — its history glows behind the eyes.',
+    ritualCasting: true,
+    rangeKind: 'touch',
+    spellList: ['arcane'],
+  },
+  comprehend_languages: {
+    id: 'comprehend_languages',
+    name: 'Comprehend Languages',
+    level: 1,
+    castTime: 'action',
+    desc: 'For 1 hour you understand the literal meaning of any spoken language you hear.',
+    narrative: '{name} mouths a syllable — the babble of foreign tongues resolves into sense.',
+    ritualCasting: true,
+    rangeKind: 'self',
+    spellList: ['arcane'],
+  },
 };
