@@ -130,6 +130,9 @@ export function computeToHitContext(
   const enemyProne = enemyEntity2?.conditions.includes('prone') ?? false;
   const enemyParalyzed = enemyEntity2?.conditions.includes('paralyzed') ?? false;
   const enemyUnconscious = enemyEntity2?.conditions.includes('unconscious') ?? false;
+  // 2024 PHB Faerie Fire — attacks against an outlined creature
+  // have advantage.
+  const enemyFaerieFired = enemyEntity2?.conditions.includes('faerie_fired') ?? false;
   const proneAdv = enemyProne && weaponItem?.range !== 'ranged';
   const proneDisadv = enemyProne && weaponItem?.range === 'ranged';
 
@@ -293,6 +296,7 @@ export function computeToHitContext(
     enemyGrappled ||
     proneAdv ||
     enemyParalyzed ||
+    enemyFaerieFired ||
     flankingAdv ||
     helpAdv ||
     assassinAdv ||

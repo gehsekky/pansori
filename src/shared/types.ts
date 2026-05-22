@@ -53,7 +53,11 @@ export type ConditionName =
   | 'charmed'
   | 'unconscious'
   | 'deafened'
-  | 'petrified';
+  | 'petrified'
+  // 2024 PHB Faerie Fire — outlined creature. Attacks against it
+  // have advantage. Engine-internal marker, not in the SRD 14
+  // standard conditions list.
+  | 'faerie_fired';
 
 export type NpcAttitude = 'friendly' | 'indifferent' | 'hostile';
 
