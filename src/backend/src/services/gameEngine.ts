@@ -506,6 +506,7 @@ function conditionSavingThrow(
     | 'bardic_inspiration_die'
     | 'inventory'
     | 'species'
+    | 'feat_choices'
   >,
   context: Context
 ): {
@@ -515,8 +516,16 @@ function conditionSavingThrow(
   bardicInspirationConsumed: boolean;
   bardicRoll: number;
 } {
-  const proficient =
+  const classProf =
     context.classSavingThrows?.[char.character_class]?.includes(effect.ability) ?? false;
+  // 2024 PHB Resilient feat grants save proficiency in a chosen
+  // ability — recorded on `feat_choices.<featId>.saveProficiencies`.
+  // Walk every feat entry so future save-proficiency feats (Lucky's
+  // companion grants, etc.) don't need re-wiring here.
+  const featProf = Object.values(char.feat_choices ?? {}).some((c) =>
+    c?.saveProficiencies?.includes(effect.ability)
+  );
+  const proficient = classProf || featProf;
   // 2024 PHB — Heroic Inspiration can be spent on any d20 test. If the
   // player armed it via spend_inspiration, the save gets advantage and
   // the flag is consumed (the caller updates char accordingly).
