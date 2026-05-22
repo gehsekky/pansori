@@ -25,6 +25,7 @@ import {
   handleReady,
   handleSpendInspiration,
   handleStandUp,
+  handleToggleSharpshooter,
   handleUseLuck,
 } from './combatUtility.js';
 import { handleEndTurn, handlePass } from './utility.js';
@@ -58,6 +59,7 @@ const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   end_turn: handleEndTurn as ActionHandler,
   spend_inspiration: handleSpendInspiration as ActionHandler,
   use_luck: handleUseLuck as ActionHandler,
+  toggle_sharpshooter: handleToggleSharpshooter as ActionHandler,
   stand_up: handleStandUp as ActionHandler,
   dodge: handleDodge as ActionHandler,
   disengage: handleDisengage as ActionHandler,

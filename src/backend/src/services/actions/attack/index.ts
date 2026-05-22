@@ -90,6 +90,7 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
     totalAttackBonus,
     features,
     isRaging,
+    sharpshooterActive,
   } = toHit;
 
   /**
@@ -335,7 +336,12 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
       improvedSmiteDmg = isCrit ? rollCritical('1d8') : rollDice('1d8');
     }
 
-    const rawDmg = baseHit + sneakDmg + rageBonus;
+    // Sharpshooter — +10 damage on ranged-weapon hits when active.
+    // Same damage type as the weapon → folded into rawDmg so the
+    // resistance / vulnerability multiplier applies (RAW: a creature
+    // resistant to piercing halves the +10 too).
+    const sharpshooterDmg = sharpshooterActive ? 10 : 0;
+    const rawDmg = baseHit + sneakDmg + rageBonus + sharpshooterDmg;
     const { damage: finalDmg, note: dmgNote } = applyDamageMultiplier(
       rawDmg,
       weaponItem?.damageType,
@@ -365,6 +371,9 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
     }
     if (rageBonus > 0) {
       hitBonuses.push({ label: `Rage: +${rageBonus}` });
+    }
+    if (sharpshooterDmg > 0) {
+      hitBonuses.push({ label: `Sharpshooter: +${sharpshooterDmg} (-5 to hit)` });
     }
     if (dmgNote) {
       // dmgNote arrives as " [resistant: 6 → 3]" — strip leading space and

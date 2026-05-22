@@ -48,7 +48,16 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
     through `skillCheck` / `rollConditionSave`). RAW spend-after-
     roll timing also deferred (current MVP is spend-before-roll for
     simplicity).
-  - Sharpshooter's per-attack toggle hook in `attack/toHit.ts`.
+  - [x] Sharpshooter toggle (2026-05-22). New `toggle_sharpshooter`
+    action flips `turn_actions.sharpshooter_active` (free of action
+    economy; auto-clears at turn end via FRESH_TURN). In `toHit.ts`:
+    -5 penalty folded into `totalAttackBonus`, cover suppression
+    (half + three-quarters → 0), gates on `weaponItem.range ===
+    'ranged'`. In `attack/index.ts`: +10 damage rider rolled into
+    `rawDmg` so resistance/vulnerability multiplier applies; bonus
+    surfaces on the hit narrative. 5 direct tests. Long-range no-
+    disadv is a no-op until ranged long-range disadv is enforced
+    (not in pansori today).
   - Magic Initiate's spell-grant flow (FE chooser + add to
     `spells_known` + per-rest L1 cast tracking).
   - More feats: Resilient (half-feat with `save-proficiency`),
