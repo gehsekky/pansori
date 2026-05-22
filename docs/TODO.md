@@ -12,8 +12,10 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 
 > **Edition alignment** — Pansori targets 2024 PHB / SRD 5.2.1. The Top 5
 > (weapon masteries, class feature audit, inspiration spend, Hide DC,
-> multi-target spells) and the bulk of subsystems are shipped; remaining
-> RAW gaps are small-impact or architecturally blocked.
+> multi-target spells) plus all 48 RAW subclasses (selectable as of
+> 2026-05-22; mechanical features wired for the majority) plus the bulk
+> of subsystems are shipped; remaining RAW gaps are small-impact, content-
+> data follow-ups, or architecturally blocked.
 
 ### Mechanics-completeness roadmap (2026-05-21)
 
@@ -94,12 +96,38 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
     matches (cantrip vs L1), and `spell.spellList` includes the
     feat's `spellList` ('arcane' / 'divine' / 'primal'). 4 added
     validation tests.
-  - More feats: Resilient (half-feat with `save-proficiency`),
-    Mobile, ~~Sentinel~~ (shipped), War Caster, Polearm Master,
-    Great Weapon Master, Heavy Armor Master, Crossbow Expert,
-    Tavern Brawler, ~~Magic Initiate~~ (shipped). Each is ~30 lines
-    of data once the matching effect kind exists; new shapes need
-    one new union variant.
+  - ~~More feats: Resilient, Mobile, Sentinel, War Caster, Polearm
+    Master, Great Weapon Master, Heavy Armor Master, Crossbow
+    Expert, Tavern Brawler, Magic Initiate~~ — all shipped
+    2026-05-22. Plus additional 2024 PHB feats wired this session
+    (each with mechanical hook, not just data):
+    - **Skilled** — choose 3 skill profs (`skill-proficiencies`
+      effect kind).
+    - **Observant** — half-feat: +1 INT/WIS, advantage on
+      Investigation/Perception/Insight checks (effect surfaced via
+      a feats helper used by ad-hoc d20 sites).
+    - **Healer** — `use_healer_kit` action heals 1d6+4+prof; spends
+      a kit charge (item count). Stabilizes on use even at 0 HP.
+    - **Dual Wielder** — relaxes off-hand-light rule so any one-
+      handed melee qualifies for TWF; gates the off-hand path.
+    - **Athlete** — half-feat: +1 STR/DEX, partial climbing-speed
+      grant (no movement-mode model — narrative-only); standing
+      from prone costs 5 ft instead of half speed.
+    - **Polearm Master (full)** — bonus-action butt-end attack
+      (1d4 + ability mod) shipped, plus the OA-on-enter-reach
+      trigger via `pamEnterReachTriggers` in gridEngine.
+    - **Great Weapon Master (full)** — damage rider (already
+      shipped) + the bonus-action attack on Crit-or-kill with a
+      heavy weapon. Flag `turn_actions.gwm_bonus_attack_pending`
+      set in the attack handler; consumed by `gwm_bonus_attack`
+      handler.
+    - **Crossbow Expert** — ignores loading on crossbows + ranged
+      attacks within 5 ft of enemy don't impose disadvantage.
+      Wired in toHit + ammo-consumption paths. Also added the
+      missing crossbow weapons (hand / light / heavy) to sandbox
+      loot.
+    Each was ~30-100 lines of data + integration. See git history
+    for the per-PR details.
 
     **2024 PHB origin feats added 2026-05-22:**
     - **Alert** (`kind: 'alert'`) — `+profBonus` to initiative
@@ -452,6 +480,15 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 - [ ] **Lighting tracking** — bright/dim/dark. Affects perception,
       darkvision, hide. Likely 0%.
 - [ ] **Difficult terrain** — costs 2× movement. Status unknown.
+- [ ] **Battleaxe mastery: Flex → Topple migration.** Sandbox loot
+      data tags Battleaxe with the homebrew `mastery: 'flex'`
+      property (lets a versatile weapon roll its two-handed die
+      while a shield is equipped). RAW 2024 PHB assigns Battleaxe
+      **Topple**. Auditing the other Flex-tagged weapons is also
+      due (Longsword is correctly Sap in sandbox, so the picker is
+      mixed). Either: update sandbox to RAW masteries and retire
+      'flex' entirely, or keep 'flex' as a documented pansori
+      variant. Surfaced from a real-game log review on 2026-05-22.
 - [x] **Falling damage** (shipped 2026-05-21). New
       `applyFallingDamage(char, distanceFt, st)` in `damage.ts`.
       Rolls 1d6 bludgeoning per 10 ft fallen (capped at 20d6 = 200 ft
@@ -481,7 +518,144 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 - [ ] **Mounted combat.**
 - [ ] **Vehicles.**
 - [ ] **Movement modes** — climb / swim / jump / fly speed handling
-      (also blocks the Climbing/Crawling/Jumping items below).
+      (also blocks the Climbing/Crawling/Jumping items below). Also
+      blocks: full Athlete feat (climbing speed), Aasimar Radiant
+      Soul (flight), Fly spell, Levitate, Sea Druid's Aquatic
+      Affinity, several other deferred subclass features.
+
+### Subclass coverage (2026-05-22 — all 48 RAW selectable)
+
+> Every 2024 PHB subclass is now a selectable picker entry. The
+> table below tracks mechanical-feature completeness per subclass.
+> "Selectable + features" means the iconic L3 feature is wired with
+> tests. "Picker-only" means selectable but L3 feature is deferred
+> (typically because the RAW mechanic needs infrastructure that
+> isn't shipped yet).
+
+**Selectable + features (39):**
+
+| Class | Subclass | Headline L3 feature shipped |
+|---|---|---|
+| Barbarian | Berserker | Frenzy (pre-session) |
+| Barbarian | Totem Warrior | Bear/Eagle/Wolf totem with mechanical effects |
+| Barbarian | World Tree | Vitality of the Tree (rage temp HP) |
+| Barbarian | Zealot | Divine Fury (radiant damage rider) |
+| Bard | Lore | Cutting Words (pre-session) |
+| Bard | Valor | Extra Attack at L6 |
+| Bard | Glamour | Mantle of Inspiration (AoE temp HP) |
+| Cleric | Life | Disciple of Life + Preserve Life CD (pre-session) |
+| Cleric | War | Guided Strike CD (pre-session) |
+| Cleric | Light | Radiance of the Dawn CD |
+| Druid | Land | Land's Aid CD (heal/harm) |
+| Druid | Moon | Wild Shape Beast Form (pre-session) |
+| Fighter | Champion | Improved Crit (pre-session) |
+| Fighter | Battle Master | Maneuvers (pre-session) |
+| Fighter | Eldritch Knight | Third-caster slots + War Magic L7 |
+| Fighter | Psi Warrior | Psionic Strike damage rider |
+| Monk | Open Hand | Open Hand Technique (pre-session) |
+| Monk | Shadow | Shadow Arts (pre-session) |
+| Monk | Mercy | Hand of Healing + Hand of Harm |
+| Monk | Elements | Elemental Strikes (fire damage rider) |
+| Paladin | Devotion | Sacred Weapon CD (pre-session) |
+| Paladin | Vengeance | Vow of Enmity + Abjure Enemy (pre-session) |
+| Paladin | Ancients | Nature's Wrath CD (restrain) |
+| Paladin | Glory | Inspiring Smite CD (AoE temp HP) |
+| Ranger | Hunter | Colossus Slayer (pre-session) |
+| Ranger | Beastmaster | Animal Companion (pre-session) |
+| Ranger | Fey Wanderer | Dreadful Strikes damage rider |
+| Ranger | Gloom Stalker | Dread Ambusher first-attack rider |
+| Rogue | Thief | Fast Hands (Utilize → bonus action) |
+| Rogue | Assassin | Assassinate auto-crit (pre-session) |
+| Rogue | Soulknife | Psychic Blade weapon auto-grant |
+| Rogue | Arcane Trickster | Third-caster slots (auto-wired) |
+| Sorcerer | Draconic | Draconic Resilience per-level HP |
+| Sorcerer | Wild Magic | Wild Magic Surge (pre-session) |
+| Warlock | Fiend | Dark One's Blessing (pre-session) |
+| Warlock | Archfey | Fey Presence (pre-session) |
+| Warlock | Celestial | Healing Light pool |
+| Wizard | Abjurer | Arcane Ward (pre-session) |
+| Wizard | Evoker | Sculpt Spells (pre-session) |
+
+**Picker-only — features deferred (9):**
+
+| Class | Subclass | What's deferred |
+|---|---|---|
+| Bard | Dance | Bardic Inspiration die variants (damage/AC/move) |
+| Cleric | Trickery | Blessing of the Trickster, Invoke Duplicity |
+| Druid | Sea | Wrath of the Sea (push on cantrip hit) |
+| Druid | Stars | Starry Form (Wild Shape variant w/ 3 constellations) |
+| Sorcerer | Aberrant Mind | Telepathic Speech + Psionic Spells list |
+| Sorcerer | Clockwork Soul | Bastion of Law temp HP, Restore Balance |
+| Warlock | Great Old One | Awakened Mind telepathy |
+| Wizard | Diviner | Portent dice ROLLED on long rest; INTERCEPTION deferred |
+| Wizard | Illusionist | Improved Minor Illusion, Malleable Illusions |
+
+Most deferred features need a specific surface that pansori
+doesn't have yet (reaction-window for d20 interception, full
+movement-mode model, multi-target Wild Shape variants). Each can
+ship in a follow-up PR when a campaign needs the feature or when
+the prerequisite infrastructure lands.
+
+**Species additions (related work this session):**
+- [x] **Aasimar species** (shipped 2026-05-22). Necrotic + radiant
+      resistance, darkvision 60 ft, Light cantrip auto-prep.
+      Added to `SRD_SPECIES` in srd/species.ts.
+- [x] **Healing Hands** (Aasimar 1/long rest). New
+      `use_healing_hands` action; rolls prof-bonus d4s. Long-rest
+      reset wired.
+- [x] **Celestial Revelation** (Aasimar L3+). New
+      `use_celestial_revelation { variant }` action with 3 sub-
+      options (Necrotic Shroud / Radiant Soul / Radiant
+      Consumption). Bonus action, 1/long rest, 10-round
+      transformation. Per-variant +prof melee damage rider
+      (necrotic for Shroud, radiant for the others). Round-tick
+      duration via `class_resource_uses.celestial_revelation_rounds`.
+      Deferred: flight speed (Radiant Soul), 10-ft aura damage
+      (Radiant Consumption).
+
+### Spells (2026-05-22 — catalog expanded, infrastructure built)
+
+> The 30-spell SRD catalog grew by 14 spells across the May 2026
+> session. Two infrastructure pieces shipped that unlock further
+> additions.
+
+**Infrastructure shipped:**
+- [x] **Buff-spell path** (2026-05-22). `castSpell.ts` runs a new
+      branch BEFORE the offensive-spell "needs an enemy" gate.
+      Spells with `targetType: 'self' | 'ally' | 'self_or_ally'`
+      route here. Applies condition (if any) + temp HP grant + max
+      HP bonus to caster or chosen party member; sets concentration
+      if applicable. Greater Invisibility break-on-attack carve-out
+      so magical invisibility persists through attacks.
+- [x] **AC pipeline** (2026-05-22). `computeTotalAc` now accepts
+      `mageArmorActive` + `shieldOfFaithActive` flags. Two new
+      Character fields. `breakConcentration` sweeps SoF flags on
+      concentration drop. Long rest clears both + recomputes AC.
+
+**New spells (14 added this session):**
+- L1: Lightning Bolt is L3 below, Faerie Fire (advantage on
+  attacks vs outlined creatures), Mage Armor (+3 AC unarmored),
+  Shield of Faith (+2 AC concentration), Heroism (3 temp HP +
+  concentration).
+- L2: Web (restrained AoE cube), Suggestion (charmed
+  concentration), Aid (+5 max HP, upcast scales).
+- L3: Lightning Bolt (8d6 lightning line), Stinking Cloud
+  (poisoned AoE sphere).
+- L4: Wall of Fire (5d8 fire line, concentration), Greater
+  Invisibility (invisible + concentration, attacks don't break).
+- L5: Cone of Cold (8d8 cold cone), Hold Monster (paralyzed any
+  creature, concentration).
+
+**Spells still missing (data + complexity notes):**
+- **Mass Healing Word / Mass Cure Wounds** — need multi-target
+  heal infrastructure (current heal targets one creature).
+- **Fly / Levitate** — need movement-mode model.
+- **Polymorph** — needs creature transform pipeline.
+- **Banishment** — needs target-removed-from-combat state.
+- **Dimension Door** — teleport mechanic.
+- **Counterspell** — already shipped pre-session.
+- **Detect Magic / Identify** — pure narrative utility.
+- **Spirit Guardians** — already shipped pre-session.
 
 ### Architectural blockers
 
@@ -540,6 +714,36 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
     id, no early combat-end with other enemies in the room, Vow of
     Enmity target set to enemy id).
   - [ ] **Test gaps surfaced by sed false-positives** — PRs 15/16 sed translation introduced 3 latent bugs (`break;` → `return;` inside loops, sed-rewriting `enemy` inside string literals, if-chain breakage when deleting the first branch). All were fixed in PR 17 + caught manually during PR 20/25. The fact that 514 tests didn't catch them points to coverage gaps for Bless on 4+-member parties, Monk Flurry kill-on-first-strike, Frenzy with no enemy in range, and the unknown-feature fallback. ~2-3h to write targeted regression specs.
+  - [x] **2026-05-22 combat bug sweep.** Twelve bugs caught during
+    the gap-list/subclass implementation work, each shipped with a
+    regression spec:
+    1. `rangedInMelee` now requires an enemy WITHIN 5 ft of attacker
+       (was firing on any enemy in the room).
+    2. `armorItem` lookup in `computeEnemyAttack` corrected.
+    3. Death save no longer phantom-applies 2 failures on the PC's
+       own turn (the multi-attack-prone trigger was conflated with
+       the PC's death-save action).
+    4. Resilient feat's save proficiency now honored by
+       `conditionSavingThrow` (the save path read class-grant prof
+       only, not feat-grant).
+    5. OA damage in `gridMove.ts` now routes through `applyDamage`
+       (was bypassing temp HP / exhaustion clamp / concentration).
+    6. Unconscious condition now cleared on heal-from-0 HP (was
+       leaving PCs "alive but unconscious").
+    7. Sneak Attack now scales correctly + triggers for multiclass
+       Rogues (was reading the primary-class level only).
+    8. Extra Attack now scales correctly across multiclass
+       (Fighter 5 / Rogue 2 → 1 extra; was 0).
+    9. Sneak Attack now gates once-per-turn (was firing on every
+       hit during Extra Attack / TWF sequences).
+    10. Cleave (Greatsword mastery) damage now routes through
+        `applyDamageMultiplier` (was bypassing
+        resistance/vulnerability).
+    11. Heal-spell upcast now scales heal dice with slot level (was
+        consuming the upcast slot but only rolling base dice).
+    12. Heal narrative now reports the actual amount restored
+        post-cap (was reporting the raw rolled value — "restores
+        13 HP to Fighter (now 8/8)" type display bug).
 
   See git history `3696339..1ced24e` (PRs 1-29) for full commit chain. Each PR is independently revertible; tests + lint + prettier gate every commit; no CI failures across the 29-PR series.
 
