@@ -3129,11 +3129,20 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
           (l) => l.id === char.inventory.find((i) => i.instance_id === char.equipped_weapon)?.id
         )
       : null;
-    if (equippedWpnItem?.light) {
+    // 2024 PHB Dual Wielder feat — relaxes the off-hand to any
+    // one-handed melee weapon (not just Light). Main hand must
+    // still be one-handed melee; both weapons remain non-two-handed.
+    const hasDualWielder = (char.feats ?? []).includes('dual_wielder');
+    const mainHandEligible =
+      equippedWpnItem &&
+      equippedWpnItem.slot === 'weapon' &&
+      equippedWpnItem.range !== 'ranged' &&
+      (equippedWpnItem.light || hasDualWielder);
+    if (mainHandEligible) {
       const offhandItem = char.inventory
         .filter((i) => i.instance_id !== char.equipped_weapon)
         .map((i) => context.lootTable.find((l) => l.id === i.id))
-        .find((l) => l?.light && l.slot === 'weapon');
+        .find((l) => l?.slot === 'weapon' && l.range !== 'ranged' && (l.light || hasDualWielder));
       if (offhandItem) {
         choices.push({
           label: `Two-weapon attack — off-hand ${offhandItem.name} (no ability mod to damage)`,

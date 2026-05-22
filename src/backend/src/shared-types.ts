@@ -690,6 +690,15 @@ export type FeatEffect =
       // from a Healer's Kit to heal a creature 1d6 + 4 + prof
       // bonus HP. Wired via the `use_healer_kit` action handler.
       kind: 'healer';
+    }
+  | {
+      // Dual Wielder feat (2024 PHB general, L4). Half-feat (+1
+      // STR or DEX). The other shipped benefit: two-weapon fighting
+      // can use any one-handed melee weapon in the off-hand (not
+      // restricted to Light). Wired in gameEngine.ts choice-gen
+      // (relaxes the light-only off-hand check) and twoWeaponAttack.ts
+      // handler (allows non-light off-hand selection).
+      kind: 'dual-wielder';
     };
 
 /**

@@ -190,6 +190,20 @@ export const SRD_FEATS: Record<string, Feat> = {
     },
   },
 
+  dual_wielder: {
+    id: 'dual_wielder',
+    name: 'Dual Wielder',
+    desc: 'Half-feat: +1 STR or DEX. You can use any one-handed melee weapon (not just Light) in your off-hand for two-weapon fighting. (RAW also grants free draw/stow of both weapons — not modeled.)',
+    category: 'general',
+    prerequisites: {
+      minLevel: 4,
+    },
+    abilityBonus: { choices: ['str', 'dex'] },
+    effect: {
+      kind: 'dual-wielder',
+    },
+  },
+
   healer: {
     id: 'healer',
     name: 'Healer',

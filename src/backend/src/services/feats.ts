@@ -314,6 +314,13 @@ export function applyFeatTake(
       narrativeParts.push("Action: spend a Healer's Kit charge to heal 1d6 + 4 + prof bonus HP.");
       break;
     }
+    case 'dual-wielder': {
+      // No take-time state change — gameEngine choice-gen and
+      // twoWeaponAttack handler read `char.feats` to loosen the
+      // light-only off-hand requirement.
+      narrativeParts.push('TWF off-hand can be any one-handed melee weapon (not just Light).');
+      break;
+    }
   }
   return { newChar: next, narrative: narrativeParts.join(' ') };
 }
