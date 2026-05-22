@@ -12,7 +12,7 @@ import { context as ctx } from '../../contexts/sandbox.js';
 afterEach(() => vi.restoreAllMocks());
 
 describe('Alert feat — Initiative bonus', () => {
-  it('adds proficiency bonus to a PC\'s initiative roll', () => {
+  it("adds proficiency bonus to a PC's initiative roll", () => {
     // d20 mocked to 10. Without Alert: 10 + DEX mod. With Alert at L5:
     // 10 + DEX mod + 3 (prof). Compare both PCs side-by-side.
     mockRandom(0.45, 0.45); // both d20s → 10

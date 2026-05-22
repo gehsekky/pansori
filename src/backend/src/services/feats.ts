@@ -207,24 +207,20 @@ export function applyFeatTake(
     case 'sentinel-react': {
       // No take-time state change — the reaction window fires at
       // ally-hit time. Narrative only.
-      narrativeParts.push(
-        'Reaction available when an enemy hits an ally within 5 ft of you.'
-      );
+      narrativeParts.push('Reaction available when an enemy hits an ally within 5 ft of you.');
       break;
     }
     case 'alert': {
       // No take-time state change — the hooks fire at
       // `buildInitiativeOrder` (prof bonus to init) and at the
       // combat-start surprise check (immunity). Narrative only.
-      narrativeParts.push(
-        '+prof bonus to Initiative rolls; immune to the Surprised condition.'
-      );
+      narrativeParts.push('+prof bonus to Initiative rolls; immune to the Surprised condition.');
       break;
     }
     case 'savage-attacker': {
       // No take-time state change — the damage-reroll hook fires in
       // `attack/index.ts` once per turn. Narrative only.
-      narrativeParts.push("Once per turn, weapon-damage hits reroll and take the higher result.");
+      narrativeParts.push('Once per turn, weapon-damage hits reroll and take the higher result.');
       break;
     }
     case 'speed-bonus': {
@@ -238,9 +234,7 @@ export function applyFeatTake(
       // No take-time state change — `checkConcentration` reads
       // `char.feats` and rolls 2d20 keep-higher when War Caster is
       // present. Narrative only.
-      narrativeParts.push(
-        'Advantage on CON saves to maintain concentration when damaged.'
-      );
+      narrativeParts.push('Advantage on CON saves to maintain concentration when damaged.');
       break;
     }
     case 'heavy-armor-master': {

@@ -165,10 +165,7 @@ export const handleTakeFeat: ActionHandler<{
 
   // Magic Initiate — validate that the chosen cantrips + L1 spell
   // exist, are the right level, and belong to the feat's spell list.
-  if (
-    feat.effect.kind === 'extra-cantrips-and-l1' &&
-    (action.cantripChoices || action.l1Choice)
-  ) {
+  if (feat.effect.kind === 'extra-cantrips-and-l1' && (action.cantripChoices || action.l1Choice)) {
     const list = feat.effect.spellList;
     const cantripCount = feat.effect.cantripCount;
     const cantrips = action.cantripChoices ?? [];

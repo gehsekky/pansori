@@ -91,8 +91,10 @@ describe('renderAttackHit', () => {
     expect(prose).toContain('{{dmg|8}}'); // buildCombatHitNarrative wraps damage in fmt.dmg
     expect(prose).toContain('(d20 14+4 STR = 18 vs AC 13)'); // atkNote inline
     expect(event.kind).toBe('attack_hit');
-    expect(event.damage).toBe(8);
-    expect(event.round).toBe(3);
+    if (event.kind === 'attack_hit') {
+      expect(event.damage).toBe(8);
+      expect(event.round).toBe(3);
+    }
   });
 
   it('appends bonuses as fmt.note-wrapped tokens', () => {
@@ -290,8 +292,8 @@ describe('renderSpellAttackHit', () => {
     expect(prose).toContain('{{dmg|7}} fire damage!');
     expect(prose).not.toContain('Critical');
     expect(event.kind).toBe('attack_hit');
-    expect(event.damage).toBe(7);
     if (event.kind === 'attack_hit') {
+      expect(event.damage).toBe(7);
       expect(event.damageType).toBe('fire');
     }
   });
@@ -846,6 +848,6 @@ describe('composeNow', () => {
     });
     expect(ctx.narrative).toBe('Bjorn swings.  The orc falls.');
     expect(ctx.st.combat_log).toHaveLength(1);
-    expect(ctx.st.combat_log[0].kind).toBe('kill');
+    expect(ctx.st.combat_log?.[0].kind).toBe('kill');
   });
 });

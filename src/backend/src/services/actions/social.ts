@@ -1,5 +1,10 @@
 import { abilityMod, profBonus, rollDice } from '../rulesEngine.js';
-import { applyConsequence, consumeLuckForCheck, getNpcAttitude, npcIsKilled } from '../gameEngine.js';
+import {
+  applyConsequence,
+  consumeLuckForCheck,
+  getNpcAttitude,
+  npcIsKilled,
+} from '../gameEngine.js';
 import type { ActionHandler } from './types.js';
 import { randomUUID } from 'crypto';
 
@@ -221,9 +226,7 @@ export const handleInfluence: ActionHandler<{
   // Lucky feat — queued via `use_luck` grants advantage (roll 2d20,
   // take higher). Same pattern as Heroic Inspiration for ad-hoc d20s.
   const luckActive = consumeLuckForCheck(ctx.char);
-  const d20 = luckActive
-    ? Math.max(rollDice('1d20'), rollDice('1d20'))
-    : rollDice('1d20');
+  const d20 = luckActive ? Math.max(rollDice('1d20'), rollDice('1d20')) : rollDice('1d20');
   const total = d20 + chaMod + profMod;
   const success = total >= dc;
 
@@ -323,9 +326,7 @@ export const handleStudy: ActionHandler<{
   const profMod = ctx.char.skill_proficiencies?.includes(skillName) ? profBonus(ctx.char.level) : 0;
   // Lucky feat — same pattern as Influence above.
   const studyLuckActive = consumeLuckForCheck(ctx.char);
-  const d20 = studyLuckActive
-    ? Math.max(rollDice('1d20'), rollDice('1d20'))
-    : rollDice('1d20');
+  const d20 = studyLuckActive ? Math.max(rollDice('1d20'), rollDice('1d20')) : rollDice('1d20');
   const total = d20 + intMod + profMod;
   const success = total >= dc;
 
