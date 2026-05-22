@@ -1,0 +1,201 @@
+import type { Enemy, Spell } from '../../../types.js';
+import {
+  applyDamageMultiplier,
+  cantripDamageDice,
+  rollConditionSave,
+  rollDice,
+  upcastDamage,
+} from '../../rulesEngine.js';
+import {
+  applyPartyLevelUps,
+  endCombatState,
+  grantDarkOnesBlessing,
+  isRoomCleared,
+  pick,
+  splitEncounterXp,
+} from '../../gameEngine.js';
+import { concentrationRoundsFor, pickCastPrefix } from './utils.js';
+import type { ActionContext } from '../types.js';
+import { composeNow } from '../../narrative/compose.js';
+import { coverBonus } from '../../gridEngine.js';
+import { fmt } from '../../narrativeFmt.js';
+
+/**
+ * Saving-throw spell branch. Rolls the target's save vs `dc`, applies
+ * cover bonus on DEX saves, and emits one of:
+ *
+ *   - `spell_save_damage` — damage spell (full on fail, half/none on save).
+ *   - `spell_save_condition` — pure condition spell (no damage).
+ *
+ * When the spell ALSO carries a condition (e.g. Hold Person), failure
+ * applies the condition + concentration link AND handles kill resolution
+ * inline (Magic Missile-style auto damage application + XP split + end-
+ * combat-on-clear). That branch returns `{ done: true }` so the
+ * orchestrator skips its own single-target damage block.
+ *
+ * Pure damage saves (no condition) return `{ done: false }` and the
+ * orchestrator's `applySingleTargetDamage` runs to apply HP + kill
+ * resolution against the resistance-multiplied damage.
+ */
+export function runSaveSpell(
+  ctx: ActionContext,
+  spellTarget: Enemy,
+  spellTargetId: string,
+  spell: Spell,
+  slotLevel: number,
+  slotNote: string,
+  dc: number
+): { done: boolean; spellDmg: number; spellHit: boolean } {
+  const saveAbility = spell.savingThrow!;
+  const enemyScore = (spellTarget as unknown as Record<string, number>)[saveAbility] ?? 10;
+  // Cover bonus to DEX saves (SRD 5.2.1 p.15): the spell originates from
+  // the caster, so half/three-quarters cover between caster→target
+  // applies to the target's DEX save against the spell. Other abilities
+  // are unaffected.
+  let saveCoverDexBonus = 0;
+  if (saveAbility === 'dex' && ctx.st.entities) {
+    const casterEntSave = ctx.st.entities.find((e) => e.id === ctx.char.id);
+    const targetEntSave = ctx.st.entities.find((e) => e.id === spellTargetId && e.isEnemy);
+    if (casterEntSave && targetEntSave) {
+      const obstaclesSave = [
+        ...ctx.st.entities
+          .filter((e) => e.id !== ctx.char.id && e.id !== spellTargetId)
+          .map((e) => e.pos),
+        ...ctx.roomObstacleCells,
+      ];
+      saveCoverDexBonus = coverBonus(casterEntSave.pos, targetEntSave.pos, obstaclesSave);
+    }
+  }
+  const targetEntForCond = ctx.st.entities?.find((e) => e.id === spellTargetId && e.isEnemy);
+  const saveFailed = rollConditionSave(
+    saveAbility,
+    enemyScore,
+    dc,
+    false,
+    ctx.char.level,
+    saveCoverDexBonus,
+    targetEntForCond?.conditions ?? []
+  );
+  const saveLabel = saveAbility.toUpperCase();
+
+  const saveCastPrefix = pickCastPrefix(spell, {
+    name: ctx.char.name,
+    spell: spell.name,
+    slotNote,
+    target: spellTarget.name,
+  });
+
+  let spellDmg = 0;
+  if (spell.damage) {
+    const saveDmgExpr =
+      spell.level === 0 ? cantripDamageDice(spell, ctx.char.level) : upcastDamage(spell, slotLevel);
+    const fullDmg = rollDice(saveDmgExpr || spell.damage);
+    spellDmg = saveFailed ? fullDmg : spell.saveEffect === 'half' ? Math.floor(fullDmg / 2) : 0;
+    composeNow(ctx, {
+      kind: 'spell_save_damage',
+      attackerId: ctx.char.id,
+      attackerName: ctx.char.name,
+      target: spellTarget,
+      spellId: spell.id,
+      spellName: spell.name,
+      castPrefix: saveCastPrefix,
+      saveAbility: saveLabel,
+      saveDC: dc,
+      saveFailed,
+      damage: spellDmg,
+      damageType: spell.damageType ?? '',
+      halfOnSave: spell.saveEffect === 'half',
+    });
+  } else {
+    composeNow(ctx, {
+      kind: 'spell_save_condition',
+      attackerId: ctx.char.id,
+      attackerName: ctx.char.name,
+      target: spellTarget,
+      spellId: spell.id,
+      spellName: spell.name,
+      castPrefix: saveCastPrefix,
+      saveAbility: saveLabel,
+      saveDC: dc,
+      saveFailed,
+    });
+  }
+
+  if (spell.condition && saveFailed) {
+    if (spellTarget.condition_immunities?.includes(spell.condition)) {
+      ctx.narrative += ` ${fmt.note(`[${spellTarget.name} is immune to ${spell.condition}]`)}`;
+    } else {
+      const condToApply = spell.condition;
+      ctx.st = {
+        ...ctx.st,
+        entities: (ctx.st.entities ?? []).map((e) =>
+          e.id === spellTargetId && e.isEnemy
+            ? {
+                ...e,
+                conditions: [...e.conditions.filter((c) => c !== condToApply), condToApply],
+              }
+            : e
+        ),
+      };
+      composeNow(ctx, {
+        kind: 'condition_applied',
+        targetId: spellTargetId,
+        targetName: spellTarget.name,
+        condition: condToApply,
+        source: spell.name,
+        prose: ` The ${spellTarget.name} is ${condToApply}!`,
+      });
+      if (spell.concentration) {
+        ctx.char.concentrating_on = {
+          spellId: spell.id,
+          condition: condToApply,
+          rounds_left: concentrationRoundsFor(spell),
+        };
+      }
+    }
+    const { damage: effCondDmg, note: condDmgNote } = applyDamageMultiplier(
+      spellDmg,
+      spell.damageType,
+      spellTarget
+    );
+    if (condDmgNote) ctx.narrative += condDmgNote;
+    const enemyEntCond = ctx.st.entities?.find((e) => e.id === spellTargetId && e.isEnemy);
+    const curHpCond = enemyEntCond?.hp ?? 0;
+    const newEnemyHp = curHpCond - effCondDmg;
+    ctx.st = {
+      ...ctx.st,
+      entities: (ctx.st.entities ?? []).map((e) =>
+        e.id === spellTargetId && e.isEnemy ? { ...e, hp: Math.max(0, newEnemyHp) } : e
+      ),
+    };
+    if (newEnemyHp <= 0) {
+      const xpGain = spellTarget.xp ?? 10;
+      const split = splitEncounterXp(ctx.st, ctx.char.id, xpGain);
+      ctx.st = split.st;
+      const xpShare = split.share;
+      ctx.char.xp = (ctx.char.xp || 0) + xpShare;
+      ctx.st = {
+        ...ctx.st,
+        entities: (ctx.st.entities ?? []).map((e) =>
+          e.id === spellTargetId && e.isEnemy ? { ...e, hp: 0 } : e
+        ),
+      };
+      ctx.st.enemies_killed = [...ctx.st.enemies_killed, spellTargetId];
+      ctx.char.concentrating_on = null;
+      ctx.narrative += grantDarkOnesBlessing(ctx.char);
+      if (isRoomCleared(ctx.st, ctx.seed, ctx.roomId)) {
+        ctx.st = endCombatState(ctx.st);
+      }
+      ctx.narrative +=
+        ' ' +
+        pick(ctx.context.narratives.killShot)
+          .replace('{enemy}', spellTarget.name)
+          .replace('{xp}', String(xpShare));
+      ctx.narrative += applyPartyLevelUps(ctx.st, ctx.char, ctx.context);
+    }
+    ctx.usedInitiative = true;
+    return { done: true, spellDmg, spellHit: true };
+  }
+
+  return { done: false, spellDmg, spellHit: true };
+}

@@ -35,12 +35,23 @@ const __dirname = dirname(__filename);
 // Action handlers were extracted out of gameEngine.ts into per-action
 // files under services/actions/* — concatenate them so the placeholder
 // lint sees `.replace({token}, ...)` calls regardless of which file
-// they live in.
+// they live in. Sub-directories (attack/, castSpell/, classFeature/)
+// carry the per-phase splits and must also be picked up.
+function readActionFilesRecursively(dir: string): string {
+  const entries = readdirSync(dir, { withFileTypes: true });
+  const parts: string[] = [];
+  for (const entry of entries) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      parts.push(readActionFilesRecursively(full));
+    } else if (entry.isFile() && entry.name.endsWith('.ts') && !entry.name.endsWith('.spec.ts')) {
+      parts.push(readFileSync(full, 'utf-8'));
+    }
+  }
+  return parts.join('\n');
+}
 const actionsDir = join(__dirname, 'actions');
-const actionsSrc = readdirSync(actionsDir)
-  .filter((f) => f.endsWith('.ts') && !f.endsWith('.spec.ts'))
-  .map((f) => readFileSync(join(actionsDir, f), 'utf-8'))
-  .join('\n');
+const actionsSrc = readActionFilesRecursively(actionsDir);
 const ENGINE_SRC = readFileSync(join(__dirname, 'gameEngine.ts'), 'utf-8') + '\n' + actionsSrc;
 
 // Walk a `narratives.<poolName>` value to the leaves and collect every
