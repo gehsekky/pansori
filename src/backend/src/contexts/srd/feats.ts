@@ -143,7 +143,7 @@ export const SRD_FEATS: Record<string, Feat> = {
   mobile: {
     id: 'mobile',
     name: 'Mobile',
-    desc: 'Your speed increases by 10 feet. (RAW also grants: difficult terrain doesn\'t halve Dash speed; melee attack against a creature prevents OAs from that creature this turn — neither modeled yet.)',
+    desc: "Your speed increases by 10 feet. (RAW also grants: difficult terrain doesn't halve Dash speed; melee attack against a creature prevents OAs from that creature this turn — neither modeled yet.)",
     category: 'general',
     prerequisites: {
       minLevel: 4,

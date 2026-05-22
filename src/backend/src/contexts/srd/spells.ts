@@ -346,7 +346,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     // its own; it pre-buffs the caster so the next successful weapon
     // attack within 1 minute / before the end of the next turn adds
     // +2d8 radiant (upcast +1d8 per level above 1).
-    castTime: 'bonusAction',
+    castTime: 'bonus_action',
     damageType: 'radiant',
     damage: '2d8',
     desc: 'Bonus action. Next successful weapon attack within 1 minute deals an extra 2d8 radiant damage (upcast +1d8 per level above 1st).',

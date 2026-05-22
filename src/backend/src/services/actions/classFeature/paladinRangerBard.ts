@@ -71,8 +71,7 @@ export function handlePaladinRangerBardFeature(ctx: ActionContext, fid: string):
     ctx.char.turn_actions = { ...ctx.char.turn_actions, bonus_action_used: true };
     // Bardic Inspiration die scales with Bard level.
     const bardLvl = getClassLevel(ctx.char, 'bard');
-    const inspDie =
-      bardLvl >= 15 ? 'd12' : bardLvl >= 10 ? 'd10' : bardLvl >= 5 ? 'd8' : 'd6';
+    const inspDie = bardLvl >= 15 ? 'd12' : bardLvl >= 10 ? 'd10' : bardLvl >= 5 ? 'd8' : 'd6';
     ctx.st = {
       ...ctx.st,
       characters: ctx.st.characters.map((c) =>
@@ -334,8 +333,7 @@ export function handlePaladinRangerBardFeature(ctx: ActionContext, fid: string):
     ctx.char.turn_actions = { ...ctx.char.turn_actions, reaction_used: true };
     // Cutting Words die scales with Bard level (Bardic Inspiration die).
     const cwBardLvl = getClassLevel(ctx.char, 'bard');
-    const cuttingDie =
-      cwBardLvl >= 15 ? 12 : cwBardLvl >= 10 ? 10 : cwBardLvl >= 5 ? 8 : 6;
+    const cuttingDie = cwBardLvl >= 15 ? 12 : cwBardLvl >= 10 ? 10 : cwBardLvl >= 5 ? 8 : 6;
     const cuttingRoll = rollDice(`1d${cuttingDie}`);
     ctx.narrative = `${ctx.char.name} — Cutting Words! Subtract ${cuttingRoll} from ${ctx.enemy!.name}'s next attack roll or ability check this round. (${biLeft - 1} Bardic Inspiration remaining)`;
     ctx.st = { ...ctx.st, cutting_words_penalty: cuttingRoll };

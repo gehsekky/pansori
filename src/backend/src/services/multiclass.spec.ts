@@ -131,12 +131,12 @@ describe('getAllClasses', () => {
 });
 
 describe('getPrimaryClass', () => {
-  it("returns char.character_class lowercased", () => {
+  it('returns char.character_class lowercased', () => {
     const char = makeChar({ character_class: 'Paladin', level: 6 });
     expect(getPrimaryClass(char)).toBe('paladin');
   });
 
-  it("ignores class_levels — primary is always the first class taken", () => {
+  it('ignores class_levels — primary is always the first class taken', () => {
     const char = makeChar({
       character_class: 'Fighter',
       level: 5,

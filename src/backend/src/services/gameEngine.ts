@@ -425,9 +425,7 @@ export function checkConcentration(
   // concentration when damaged. Roll 2d20, keep higher.
   const hasWarCaster = (char.feats ?? []).includes('war_caster');
   const conMod = abilityMod(char.con);
-  const save = hasWarCaster
-    ? Math.max(d(20), d(20)) + conMod
-    : d(20) + conMod;
+  const save = hasWarCaster ? Math.max(d(20), d(20)) + conMod : d(20) + conMod;
   const warCasterNote = hasWarCaster ? ' (War Caster advantage)' : '';
   if (save >= dc)
     return { char, st, note: ` [Concentration hold: ${save} vs DC ${dc}${warCasterNote}]` };
@@ -1425,7 +1423,8 @@ export function applyLevelUpForClass(char: Character, className: string, context
       .replace(/{name}/g, char.name);
     // Only attach the class name when multiclassing has actually
     // happened (would be redundant noise for single-class PCs).
-    const classNote = Object.keys(char.class_levels).length > 1 ? ` (${className} ${newClassLevel})` : '';
+    const classNote =
+      Object.keys(char.class_levels).length > 1 ? ` (${className} ${newClassLevel})` : '';
     out = ` ${char.name}: ${levelUpLine} (+${hpRoll} HP)${classNote}`;
   }
 
@@ -1788,13 +1787,18 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       seed.enemies?.[state.current_room]?.find((e) => e.id === pending.attackerEnemyId)?.name ??
       'attacker';
     if (pending.kind === 'shield') {
+      // The proposed-damage value lives on the stashed fragment.
+      // PendingShieldReaction types it as `unknown` (the FE doesn't
+      // introspect it); narrow via a local shape just for the label.
+      const proposedFragment = pending.pendingFragment as { damage?: number } | undefined;
+      const proposedDmg = proposedFragment?.damage ?? 0;
       return [
         {
           label: `Cast Shield (reaction, 1st-level slot) — +5 AC, ${enemyForLabel}'s attack (total ${pending.atkTotal} vs AC ${pending.targetAcAtAttack}) misses!`,
           action: { type: 'resolve_reaction', accept: true },
         },
         {
-          label: `Decline — take the hit (${pending.pendingDamage} damage)`,
+          label: `Decline — take the hit (${proposedDmg} damage)`,
           action: { type: 'resolve_reaction', accept: false },
         },
       ];
@@ -2213,10 +2217,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   // ── Prepare spells (out of combat, prep-class only) ────────────────────────
   if (!state.combat_active) {
     const prepClasses = ['cleric', 'paladin', 'druid'];
-    if (
-      prepClasses.some((c) => hasClass(char, c)) &&
-      (char.spells_known ?? []).length > 0
-    ) {
+    if (prepClasses.some((c) => hasClass(char, c)) && (char.spells_known ?? []).length > 0) {
       const cap = preparedSpellsCap(char, context);
       // Cantrips are always known, not prepared (PHB p.234) — exclude
       // them from the auto-prep list and from the cap math so the
@@ -2792,7 +2793,11 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     }
 
     // Abjurer Wizard: Arcane Ward (create when not active)
-    if (char.subclass === 'abjurer' && cls === 'wizard' && !char.class_resource_uses?.arcane_ward) {
+    if (
+      char.subclass === 'abjurer' &&
+      hasClass(char, 'wizard') &&
+      !char.class_resource_uses?.arcane_ward
+    ) {
       choices.push({
         label: `Arcane Ward — create ${2 * char.level} HP damage shield`,
         action: { type: 'use_class_feature', featureId: 'arcane_ward' },
@@ -3672,7 +3677,8 @@ function isHellishRebukeEligible(
 ): boolean {
   // 2024 PHB: Warlocks cast it from their spell list; Tieflings L3+ get it
   // as a racial Innate spell (1/long rest, no slot cost).
-  const isWarlock = hasClass(target, 'warlock') && knowsSpellWithSlot(target, 'hellish_rebuke', context);
+  const isWarlock =
+    hasClass(target, 'warlock') && knowsSpellWithSlot(target, 'hellish_rebuke', context);
   const isTieflingInnate =
     target.species === 'tiefling' &&
     target.level >= 3 &&
@@ -4027,22 +4033,21 @@ function runEnemyMultiattackLoop(args: {
     if (
       computed.hit &&
       computed.hpLost > 0 &&
+      computed.fragment.kind === 'enemy_attack_hit' &&
       isAbsorbElementsEligible(target, computed.fragment.damageType, context)
     ) {
+      // Inside this branch TS has narrowed `computed.fragment` to
+      // `EnemyAttackHitFragment` (the discriminant guard above).
+      const hitFragment = computed.fragment;
       st = {
         ...st,
         pending_reaction: {
           kind: 'absorb_elements',
           attackerEnemyId: enemyId,
           targetCharId: target.id,
-          damageType: computed.fragment.damageType as
-            | 'acid'
-            | 'cold'
-            | 'fire'
-            | 'lightning'
-            | 'thunder',
+          damageType: hitFragment.damageType as 'acid' | 'cold' | 'fire' | 'lightning' | 'thunder',
           proposedDamage: computed.hpLost,
-          pendingFragment: computed.fragment as EnemyAttackHitFragment,
+          pendingFragment: hitFragment,
           pendingProposedChar: computed.proposedChar,
           pendingProposedSt: { ...computed.proposedSt, pending_reaction: undefined },
           resumeFromInitiativeIdx: advIdx,
@@ -4052,7 +4057,7 @@ function runEnemyMultiattackLoop(args: {
         },
         active_character_id: target.id,
       };
-      narrative += ` ⚡ ${enemy.name} hits ${target.name} for ${fmt.dmg(computed.hpLost)} ${computed.fragment.damageType} — Absorb Elements available!`;
+      narrative += ` ⚡ ${enemy.name} hits ${target.name} for ${fmt.dmg(computed.hpLost)} ${hitFragment.damageType} — Absorb Elements available!`;
       return { kind: 'paused', st, narrative };
     }
     // Uncanny Dodge reaction window (Rogue L5+). Triggers BEFORE

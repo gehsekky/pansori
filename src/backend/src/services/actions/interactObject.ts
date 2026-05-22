@@ -1,5 +1,9 @@
 import { abilityMod, skillCheck } from '../rulesEngine.js';
-import { consumeBardicForCheck, consumeInspirationForCheck, consumeLuckForCheck } from '../gameEngine.js';
+import {
+  consumeBardicForCheck,
+  consumeInspirationForCheck,
+  consumeLuckForCheck,
+} from '../gameEngine.js';
 import { getClassLevel, hasClass } from '../multiclass.js';
 import type { ActionHandler } from './types.js';
 import { randomUUID } from 'crypto';

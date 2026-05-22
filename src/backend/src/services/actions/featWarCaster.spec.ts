@@ -15,7 +15,7 @@ function withConcentration(overrides: Partial<ReturnType<typeof makeChar>> = {})
   return makeChar({
     id: 'pc-1',
     con: 10,
-    concentrating_on: { spellId: 'bless', sourceCharId: 'pc-1', roundsRemaining: 10 },
+    concentrating_on: { spellId: 'bless', rounds_left: 10 },
     ...overrides,
   });
 }
@@ -43,7 +43,7 @@ describe('War Caster — concentration save advantage', () => {
     expect(result.char.concentrating_on).toBeFalsy();
   });
 
-  it("with War Caster but both d20s low, save still fails", () => {
+  it('with War Caster but both d20s low, save still fails', () => {
     // Both d20s → 1. DC 10. Even with advantage, both rolls fail.
     mockRandom(0, 0);
     const char = withConcentration({ feats: ['war_caster'] });

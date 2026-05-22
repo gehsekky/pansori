@@ -333,10 +333,7 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
     // together" — 2024 PHB Divine Smite).
     let smiteDmg = 0;
     let smiteDice = 0;
-    if (
-      (ctx.char.divine_smite_dice ?? 0) > 0 &&
-      (weaponItem || hasClass(ctx.char, 'monk'))
-    ) {
+    if ((ctx.char.divine_smite_dice ?? 0) > 0 && (weaponItem || hasClass(ctx.char, 'monk'))) {
       smiteDice = ctx.char.divine_smite_dice!;
       const expr = `${smiteDice}d8`;
       smiteDmg = isCrit ? rollCritical(expr) : rollDice(expr);

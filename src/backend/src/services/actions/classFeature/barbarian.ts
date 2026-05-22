@@ -115,7 +115,9 @@ export function handleBarbarianFeature(ctx: ActionContext, fid: string): boolean
       const dmgDice = frWeapon?.damage ?? '1d4';
       const frDmg = Math.max(
         1,
-        rollDice(dmgDice) + abilityMod(ctx.char.str) + rageDamageBonus(getClassLevel(ctx.char, 'barbarian'))
+        rollDice(dmgDice) +
+          abilityMod(ctx.char.str) +
+          rageDamageBonus(getClassLevel(ctx.char, 'barbarian'))
       );
       const curHp = ctx.st.entities?.find((e) => e.id === frTarget.id && e.isEnemy)?.hp ?? 0;
       const newHp = Math.max(0, curHp - frDmg);

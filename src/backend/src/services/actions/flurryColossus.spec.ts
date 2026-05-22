@@ -169,7 +169,12 @@ describe('Flurry of Blows — entity lookup uses ctx.enemy.id', () => {
       action: { type: 'use_class_feature', featureId: 'flurry_of_blows' },
       history: [],
       state,
-      seed: { ...seedWithOneGoblin, enemies: { [ctx.startRoomId]: [{ ...seedWithOneGoblin.enemies[ctx.startRoomId][0], hp: 5 }] } },
+      seed: {
+        ...seedWithOneGoblin,
+        enemies: {
+          [ctx.startRoomId]: [{ ...seedWithOneGoblin.enemies[ctx.startRoomId][0], hp: 5 }],
+        },
+      },
       context: ctx,
     });
     expect(result.newState.enemies_killed).toContain(enemyId);

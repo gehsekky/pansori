@@ -635,4 +635,3 @@ describe('resolveSpellAttack(level, castingAbilityScore, enemyAc)', () => {
     expect(result.hit).toBe(false);
   });
 });
-

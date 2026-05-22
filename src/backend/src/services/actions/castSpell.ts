@@ -173,9 +173,7 @@ export const handleCastSpell: ActionHandler<{
   let usedMagicInitiateFree = false;
   if (spell.level > 0 && !isRitualCast) {
     const choices = ctx.char.feat_choices ?? {};
-    const matched = Object.values(choices).some(
-      (c) => c?.magicInitiateL1 === spellId
-    );
+    const matched = Object.values(choices).some((c) => c?.magicInitiateL1 === spellId);
     if (matched && (ctx.char.class_resource_uses?.magic_initiate_l1_used ?? 0) === 0) {
       // Free cast at the spell's base level — upcasting still
       // requires a slot, so gate the freebie to slotLevel === spell.level.
@@ -301,9 +299,7 @@ export const handleCastSpell: ActionHandler<{
     const baseHealed = rollDice(spell.heal) + healMod;
     // Life Cleric: Disciple of Life — healing spells restore extra 2 + spell level HP
     const discipleBonus =
-      ctx.char.subclass === 'life' && hasClass(ctx.char, 'cleric')
-        ? 2 + (spell.level ?? 1)
-        : 0;
+      ctx.char.subclass === 'life' && hasClass(ctx.char, 'cleric') ? 2 + (spell.level ?? 1) : 0;
     const healed = baseHealed + discipleBonus;
     // Target the most injured party member (excluding the caster, unless only one)
     const injured = ctx.st.characters.filter(

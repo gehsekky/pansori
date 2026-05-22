@@ -36,7 +36,8 @@ export function handleCasterFeature(ctx: ActionContext, fid: string): boolean {
       return true;
     }
     // Sorcery points scale with Sorcerer level.
-    const spPool = ctx.char.class_resource_uses?.sorcery_points ?? getClassLevel(ctx.char, 'sorcerer');
+    const spPool =
+      ctx.char.class_resource_uses?.sorcery_points ?? getClassLevel(ctx.char, 'sorcerer');
     if (spPool < 1) {
       ctx.narrative = 'Not enough sorcery points (need 1).';
       return true;
@@ -66,7 +67,8 @@ export function handleCasterFeature(ctx: ActionContext, fid: string): boolean {
         'You have already cast a level 1+ spell this turn — Quickened Spell cannot be used.';
       return true;
     }
-    const spPool2 = ctx.char.class_resource_uses?.sorcery_points ?? getClassLevel(ctx.char, 'sorcerer');
+    const spPool2 =
+      ctx.char.class_resource_uses?.sorcery_points ?? getClassLevel(ctx.char, 'sorcerer');
     if (spPool2 < 2) {
       ctx.narrative = 'Not enough sorcery points (need 2).';
       return true;
@@ -91,7 +93,8 @@ export function handleCasterFeature(ctx: ActionContext, fid: string): boolean {
       ctx.narrative = 'Only Sorcerers have Metamagic.';
       return true;
     }
-    const spPool3 = ctx.char.class_resource_uses?.sorcery_points ?? getClassLevel(ctx.char, 'sorcerer');
+    const spPool3 =
+      ctx.char.class_resource_uses?.sorcery_points ?? getClassLevel(ctx.char, 'sorcerer');
     if (spPool3 < 1) {
       ctx.narrative = 'Not enough sorcery points (need 1).';
       return true;
