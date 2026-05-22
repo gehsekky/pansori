@@ -624,6 +624,11 @@ export interface Character {
   // 1 minute) or on long rest. Remaining rounds tracked via
   // `class_resource_uses.celestial_revelation_rounds`.
   celestial_revelation_variant?: 'necrotic_shroud' | 'radiant_soul' | 'radiant_consumption';
+  // 2024 PHB Path of the Wild Heart (Totem Warrior) Barbarian — totem
+  // spirit picked at rage activation. Set when the rage-with-totem
+  // handler fires; cleared when rage ends (combat end, manual stop,
+  // or rage timer expiry).
+  totem_spirit?: 'bear' | 'eagle' | 'wolf';
   // SRD 5.2.1 p.11: Darkvision treats Darkness as Dim Light within this radius
   // (typically 60 ft for elves/dwarves/halflings/etc.). Default 0 = no
   // darkvision (typical human).

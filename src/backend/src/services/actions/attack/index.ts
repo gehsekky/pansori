@@ -750,6 +750,8 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
         ctx.char = {
           ...ctx.char,
           conditions: ctx.char.conditions.filter((c) => c !== 'raging'),
+          // Clear Totem Warrior totem when rage ends (combat clear).
+          totem_spirit: undefined,
         };
       }
       const killProse =
