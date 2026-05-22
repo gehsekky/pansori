@@ -153,7 +153,15 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
       behavior). L4 + heavy-armor proficiency prereq. The take-
       time heavy-armor proficiency grant isn't wired (would need
       `applyFeatTake` to add 'heavy' to char.armor_proficiencies).
-    16 added tests cover the four feats.
+    - **Tavern Brawler** (`kind: 'tavern-brawler'`) — half-feat:
+      +1 STR or CON; unarmed strikes deal 1d4 + STR mod instead
+      of 1 + STR mod. `unarmedDamage(str, tavernBrawler?)` now
+      takes the flag; attack handler threads it from
+      `(char.feats ?? []).includes('tavern_brawler')`. Two RAW
+      benefits skipped: improvised-weapon proficiency (pansori
+      doesn't model improvised weapons) and free Shove on
+      unarmed hit (needs a new action shape).
+    21 added tests cover the five feats.
   - ASI-vs-feat UX on the FE (both `apply_asi` and `take_feat`
     actions are available when `asi_pending` is set; FE picks the
     surfacing).

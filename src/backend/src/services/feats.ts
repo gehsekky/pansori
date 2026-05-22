@@ -252,6 +252,13 @@ export function applyFeatTake(
       );
       break;
     }
+    case 'tavern-brawler': {
+      // No take-time state change — `unarmedDamage` reads the
+      // `tavernBrawler` flag (threaded from the attack handler).
+      // Narrative only.
+      narrativeParts.push('Unarmed strikes now roll 1d4 + STR mod instead of 1 + STR mod.');
+      break;
+    }
   }
   return { newChar: next, narrative: narrativeParts.join(' ') };
 }

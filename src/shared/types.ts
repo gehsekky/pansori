@@ -610,6 +610,17 @@ export type FeatEffect =
       // wired yet (the take path would need to add 'heavy' to
       // `char.armor_proficiencies`).
       kind: 'heavy-armor-master';
+    }
+  | {
+      // Tavern Brawler feat (2024 PHB origin) — half-feat: +1 STR
+      // or CON; unarmed strikes deal 1d4 + STR mod instead of
+      // 1 + STR mod. Wired in `unarmedDamage` (rulesEngine.ts)
+      // which now reads a `tavernBrawler` flag passed from the
+      // attack handler. RAW also grants improvised-weapon
+      // proficiency (pansori doesn't model improvised weapons)
+      // and a free Shove on unarmed hit (needs a new action shape)
+      // — both deferred.
+      kind: 'tavern-brawler';
     };
 
 /**
