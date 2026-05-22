@@ -1,6 +1,7 @@
 import {
   consumeBardicForCheck,
   consumeInspirationForCheck,
+  consumeLuckForCheck,
   effectiveSpeed,
   inflictCondition,
   isHeavilyEncumbered,
@@ -85,6 +86,7 @@ export function handleRogueFeature(ctx: ActionContext, fid: string): boolean {
     const sneakHideDC = ctx.enemyAlive ? passivePerceptionDC(ctx.enemy!.wis ?? 10) : 10;
     const hideProf = ctx.char.skill_proficiencies?.includes('Stealth') ?? false;
     const inspAdvHide = consumeInspirationForCheck(ctx.char);
+    const luckAdvHide = consumeLuckForCheck(ctx.char);
     const bardicHideRoll = consumeBardicForCheck(ctx.char);
     const hideCheck = skillCheck(
       ctx.char.dex,
@@ -94,7 +96,7 @@ export function handleRogueFeature(ctx: ActionContext, fid: string): boolean {
       isHeavilyEncumbered(ctx.char),
       false,
       false,
-      inspAdvHide,
+      inspAdvHide || luckAdvHide,
       ctx.char.species === 'halfling'
     );
     ctx.char.turn_actions = { ...ctx.char.turn_actions, bonus_action_used: true };

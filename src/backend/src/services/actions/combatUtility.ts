@@ -1,5 +1,6 @@
 import type { ActionHandler } from './types.js';
 import { effectiveSpeed } from '../gameEngine.js';
+import { updatePcActor } from './actor.js';
 
 /**
  * `spend_inspiration`: queue Heroic Inspiration to grant advantage on
@@ -121,15 +122,28 @@ export const handleStandUp: ActionHandler<{ type: 'stand_up' }> = (ctx) => {
  * have disadvantage (if you can see the attacker) and you have
  * advantage on Dex saves. Engine tracks via `turn_actions.dodging` and
  * applies the modifier in attack resolution.
+ *
+ * **Architecture audit #5 phase 2 pilot.** Reads + writes route
+ * through `ctx.actor` (narrowed to PC) instead of `ctx.char`. The
+ * `updatePcActor` helper keeps `ctx.char` mirrored so downstream
+ * single-source-of-truth code paths (`commitChar`, post-handler
+ * epilogue) see the same Character. This is the canonical migration
+ * shape future handlers should follow.
  */
 export const handleDodge: ActionHandler<{ type: 'dodge' }> = (ctx) => {
   if (!ctx.st.combat_active) return { rejected: 'You can only dodge in combat.' };
-  ctx.char = {
-    ...ctx.char,
-    turn_actions: { ...ctx.char.turn_actions, dodging: true },
-  };
+  if (ctx.actor.kind !== 'pc') {
+    // Enemy-side Dodge isn't modeled — when enemies start routing
+    // through the dispatcher (Phase 4), this guard becomes the slot
+    // for enemy-Dodge semantics.
+    return { rejected: 'Only PCs can take the Dodge action.' };
+  }
+  const { char } = ctx.actor;
+  updatePcActor(ctx, {
+    turn_actions: { ...char.turn_actions, dodging: true },
+  });
   ctx.usedInitiative = true;
-  ctx.narrative = `${ctx.char.name} takes the Dodge action — until your next turn, attacks against you have disadvantage.`;
+  ctx.narrative = `${char.name} takes the Dodge action — until your next turn, attacks against you have disadvantage.`;
 };
 
 /**

@@ -1,6 +1,6 @@
 import type { CombatEntity, Enemy } from '../../types.js';
 import { describe, expect, it } from 'vitest';
-import { enemyActor, pcActor } from './actor.js';
+import { enemyActor, pcActor, updatePcActor } from './actor.js';
 import { makeChar } from '../../test-fixtures.js';
 
 describe('pcActor', () => {
@@ -43,6 +43,36 @@ describe('enemyActor', () => {
     expect(a.kind).toBe('enemy');
     expect(a.enemy).toBe(enemy);
     expect(a.ent).toBeUndefined();
+  });
+});
+
+describe('updatePcActor', () => {
+  it('keeps ctx.char and ctx.actor.char in lockstep after a patch', () => {
+    const char = makeChar({ id: 'pc-1', hp: 10 });
+    const ctx = { char, actor: pcActor(char, 0) };
+    updatePcActor(ctx, { hp: 7 });
+    expect(ctx.char.hp).toBe(7);
+    if (ctx.actor.kind !== 'pc') throw new Error('expected pc actor');
+    expect(ctx.actor.char.hp).toBe(7);
+    // Same reference — single Character object.
+    expect(ctx.actor.char).toBe(ctx.char);
+  });
+
+  it('is a no-op for enemy actors', () => {
+    const enemy = { id: 'orc-1', name: 'Orc' } as unknown as Enemy;
+    const char = makeChar({ id: 'pc-1', hp: 10 });
+    const ctx = { char, actor: enemyActor(enemy) };
+    const result = updatePcActor(ctx, { hp: 1 });
+    expect(result).toBeNull();
+    expect(ctx.char.hp).toBe(10);
+  });
+
+  it('returns the updated character for fluent reads', () => {
+    const char = makeChar({ id: 'pc-1', hp: 20 });
+    const ctx = { char, actor: pcActor(char, 0) };
+    const updated = updatePcActor(ctx, { hp: 15 });
+    expect(updated).not.toBeNull();
+    expect(updated?.hp).toBe(15);
   });
 });
 

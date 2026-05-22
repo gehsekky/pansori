@@ -38,16 +38,27 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
       grove, whispering). 11 direct tests.
 
   **Remaining (data + runtime hooks):**
-  - [~] Lucky's spend hook (2026-05-22, attack-only MVP). New
-    `use_luck` action mirrors `spend_inspiration`'s shape — sets
-    `turn_actions.luck_pending`, decrements `feat_lucky_uses`. Hook
-    in `attack/toHit.ts` consumes the flag as an advantage source.
-    `resetFeatLongRestResources` in `services/feats.ts` refills the
-    pool on long rest. **Remaining:** save + ability-check hooks
-    (each calling site has to thread `luck_pending → advantage`
-    through `skillCheck` / `rollConditionSave`). RAW spend-after-
-    roll timing also deferred (current MVP is spend-before-roll for
-    simplicity).
+  - [x] Lucky's spend hook (2026-05-22). New `use_luck` action
+    mirrors `spend_inspiration`'s shape — sets
+    `turn_actions.luck_pending`, decrements `feat_lucky_uses`.
+    Coverage:
+    - **Attack rolls:** `attack/toHit.ts` consumes the flag as an
+      advantage source.
+    - **Skill checks:** new `consumeLuckForCheck(char)` helper
+      threaded through `interactObject` (search), `sneak` (group
+      stealth), and `classFeature/rogue` (Cunning Action Hide).
+    - **Saves:** `conditionSavingThrow` (the onHit-effect save path
+      that handles enemy attack riders like stunning / paralysis)
+      reads `luck_pending` and returns a `luckConsumed` flag the
+      caller uses to clear it. Narrative surfaces "🍀 Luck point
+      spent on the save".
+    - **Ability checks (Influence + Study):** ad-hoc d20 sites
+      consume luck via `consumeLuckForCheck` + roll-2-take-higher.
+    `resetFeatLongRestResources` refills the pool on long rest.
+    RAW spend-after-roll timing still deferred (MVP is
+    spend-before-roll). AoE saves (lair-action sweeps) and death
+    saves intentionally don't auto-consume (multi-roll / no
+    decision point).
   - [x] Sharpshooter toggle (2026-05-22). New `toggle_sharpshooter`
     action flips `turn_actions.sharpshooter_active` (free of action
     economy; auto-clears at turn end via FRESH_TURN). In `toHit.ts`:
@@ -813,6 +824,13 @@ Frontend: render`<WaitingForPlayer name={...} />` instead of the
   surprised → legendary refresh → select target → hide check →
   spell cast → approach → multiattack → death save → commit →
   advance.
+
+  **Phase 2 pilot shipped 2026-05-22.** `handleDodge` migrated to
+  read + write through `ctx.actor` (narrowed to PC) via a new
+  `updatePcActor(ctx, patch)` helper in `services/actions/actor.ts`
+  that keeps `ctx.char` and `ctx.actor.char` in lockstep across
+  reassignments. Documented inline as the canonical migration
+  pattern future handlers should follow. 3 added helper tests.
 
   **Phase 1 dispatcher integration shipped 2026-05-21 — type seam:**
   - New `services/actions/actor.ts` module: `Actor` discriminated
