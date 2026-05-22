@@ -183,6 +183,12 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
     if (c.subclass === 'celestial' && hasClass(c, 'warlock')) {
       delete restoredUses.healing_light_used;
     }
+    // 2024 PHB Land Druid Land's Aid uses — refills on long rest.
+    // (RAW: Channel Nature is short-rest, but pansori MVP is
+    // long-rest only.)
+    if (c.subclass === 'land' && hasClass(c, 'druid')) {
+      delete restoredUses.lands_aid_used;
+    }
     const restoredUsesWithFeats = resetFeatLongRestResources(c, ctx.context, restoredUses);
     const refreshed = {
       ...c,
