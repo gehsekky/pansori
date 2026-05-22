@@ -488,6 +488,32 @@ function getWorldName(seed: Seed): string {
 
 // ─── Condition helpers ────────────────────────────────────────────────────────
 
+/**
+ * True when `char` has save proficiency in `ability` from any source
+ * the engine tracks today:
+ *   - Class save proficiency (from context.classSavingThrows).
+ *   - Feat-granted save proficiency (Resilient — recorded on
+ *     feat_choices.<featId>.saveProficiencies; the walk is generic
+ *     so future feats with the same shape just work).
+ *
+ * Exported for any save site that needs the full picture (lair
+ * action AoE saves, future legendary-action saves, etc.). The
+ * existing `rollConditionSave` helper takes a single proficient flag
+ * and trusts the caller — this is how callers compute it.
+ */
+export function hasSaveProficiency(
+  char: Pick<Character, 'character_class' | 'feat_choices'>,
+  ability: AbilityKey,
+  context: Context
+): boolean {
+  const classProf =
+    context.classSavingThrows?.[char.character_class]?.includes(ability) ?? false;
+  if (classProf) return true;
+  return Object.values(char.feat_choices ?? {}).some((c) =>
+    c?.saveProficiencies?.includes(ability)
+  );
+}
+
 function conditionSavingThrow(
   effect: OnHitEffect,
   char: Pick<
@@ -516,16 +542,7 @@ function conditionSavingThrow(
   bardicInspirationConsumed: boolean;
   bardicRoll: number;
 } {
-  const classProf =
-    context.classSavingThrows?.[char.character_class]?.includes(effect.ability) ?? false;
-  // 2024 PHB Resilient feat grants save proficiency in a chosen
-  // ability — recorded on `feat_choices.<featId>.saveProficiencies`.
-  // Walk every feat entry so future save-proficiency feats (Lucky's
-  // companion grants, etc.) don't need re-wiring here.
-  const featProf = Object.values(char.feat_choices ?? {}).some((c) =>
-    c?.saveProficiencies?.includes(effect.ability)
-  );
-  const proficient = classProf || featProf;
+  const proficient = hasSaveProficiency(char, effect.ability, context);
   // 2024 PHB — Heroic Inspiration can be spent on any d20 test. If the
   // player armed it via spend_inspiration, the save gets advantage and
   // the flag is consumed (the caller updates char accordingly).
@@ -1142,7 +1159,7 @@ function getLivingRoomEnemies(state: GameState, seed: Seed, roomId: string): Ene
 function fireLairAction(
   st: GameState,
   seed: Seed,
-  _context: Context
+  context: Context
 ): { st: GameState; narrative: string; fired: boolean } {
   if (!st.combat_active) return { st, narrative: '', fired: false };
   const roomId = st.current_room;
@@ -1161,11 +1178,16 @@ function fireLairAction(
       if (origC.dead) continue;
       const scoreKey = action.savingThrow as 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha';
       const score = (origC[scoreKey] ?? 10) as number;
+      // Pull save proficiency from class + feat sources so a Wizard
+      // with INT class prof actually adds it on an INT-save lair AoE,
+      // and a PC with Resilient (CON) saves with proficiency on a
+      // CON-save lair AoE. Previously hardcoded `false`.
+      const proficient = hasSaveProficiency(origC, scoreKey, context);
       const saveFailed = rollConditionSave(
         scoreKey,
         score,
         dc,
-        false,
+        proficient,
         origC.level,
         0,
         origC.conditions ?? []
