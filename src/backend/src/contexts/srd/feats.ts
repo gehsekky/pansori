@@ -165,6 +165,20 @@ export const SRD_FEATS: Record<string, Feat> = {
     },
   },
 
+  great_weapon_master: {
+    id: 'great_weapon_master',
+    name: 'Great Weapon Master',
+    desc: 'Once per turn, on a hit with a Heavy weapon, the target takes extra damage equal to your proficiency bonus. (RAW also grants a Bonus Action attack on a crit or kill with a Heavy weapon — not yet wired.)',
+    category: 'general',
+    prerequisites: {
+      minLevel: 4,
+      other: ['Proficiency with a Heavy weapon'],
+    },
+    effect: {
+      kind: 'gwm-bonus-damage',
+    },
+  },
+
   heavy_armor_master: {
     id: 'heavy_armor_master',
     name: 'Heavy Armor Master',

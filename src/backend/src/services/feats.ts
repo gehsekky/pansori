@@ -253,6 +253,13 @@ export function applyFeatTake(
       narrativeParts.push('Unarmed strikes now roll 1d4 + STR mod instead of 1 + STR mod.');
       break;
     }
+    case 'gwm-bonus-damage': {
+      // No take-time state change — the attack handler reads
+      // `char.feats` and adds prof bonus damage on heavy-weapon
+      // hits, gated by `turn_actions.gwm_used` for once-per-turn.
+      narrativeParts.push('Heavy-weapon hits deal +prof bonus damage (once per turn).');
+      break;
+    }
   }
   return { newChar: next, narrative: narrativeParts.join(' ') };
 }
