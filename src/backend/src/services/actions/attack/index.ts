@@ -411,7 +411,26 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
         },
       };
     }
-    const rawDmg = baseHit + sneakDmg + rageBonus + sharpshooterDmg + gwmDmg + celRevDmg;
+    // 2024 PHB Fey Wanderer Ranger L3 — Dreadful Strikes: once per
+    // turn, a weapon hit deals +1d4 psychic. RAW upscales to +1d6
+    // at L11 (deferred — flat 1d4 for now). Same gate shape as
+    // GWM / Celestial Revelation riders; cleared by FRESH_TURN.
+    let dreadfulStrikesDmg = 0;
+    if (
+      hasClass(ctx.char, 'ranger') &&
+      ctx.char.subclass === 'fey_wanderer' &&
+      getClassLevel(ctx.char, 'ranger') >= 3 &&
+      weaponItem &&
+      !ctx.char.turn_actions.dreadful_strikes_used
+    ) {
+      dreadfulStrikesDmg = rollDice('1d4');
+      ctx.char = {
+        ...ctx.char,
+        turn_actions: { ...ctx.char.turn_actions, dreadful_strikes_used: true },
+      };
+    }
+    const rawDmg =
+      baseHit + sneakDmg + rageBonus + sharpshooterDmg + gwmDmg + celRevDmg + dreadfulStrikesDmg;
     const { damage: finalDmg, note: dmgNote } = applyDamageMultiplier(
       rawDmg,
       weaponItem?.damageType,
@@ -450,6 +469,9 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
     }
     if (celRevDmg > 0 && celRevDmgType) {
       hitBonuses.push({ label: `Celestial Revelation: +${celRevDmg} ${celRevDmgType}` });
+    }
+    if (dreadfulStrikesDmg > 0) {
+      hitBonuses.push({ label: `Dreadful Strikes: +${dreadfulStrikesDmg} psychic` });
     }
     if (dmgNote) {
       // dmgNote arrives as " [resistant: 6 → 3]" — strip leading space and
