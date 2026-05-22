@@ -304,6 +304,10 @@ export interface TurnActions {
   // ek_war_magic_attack choice surfaces while the flag is true.
   // Cleared by FRESH_TURN.
   ek_war_magic_pending?: boolean;
+  // 2024 PHB Fey Wanderer Ranger L3 — Dreadful Strikes: once per
+  // turn, on a weapon hit, add +1d4 psychic damage. Same gate
+  // shape as gwm_used / sneak_attack_used. Cleared by FRESH_TURN.
+  dreadful_strikes_used?: boolean;
   // Great Weapon Master damage rider (2024 PHB) — once per turn,
   // a heavy-weapon hit adds +profBonus damage. Same shape as
   // Savage Attacker / Sneak Attack once-per-turn gates.
