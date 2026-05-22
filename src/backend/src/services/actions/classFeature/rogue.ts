@@ -6,8 +6,8 @@ import {
   inflictCondition,
   isHeavilyEncumbered,
 } from '../../gameEngine.js';
+import { effectiveLightFor, passivePerceptionDcInLight, skillCheck } from '../../rulesEngine.js';
 import { getClassLevel, hasClass } from '../../multiclass.js';
-import { passivePerceptionDC, skillCheck } from '../../rulesEngine.js';
 import type { ActionContext } from '../types.js';
 
 /**
@@ -83,7 +83,15 @@ export function handleRogueFeature(ctx: ActionContext, fid: string): boolean {
       ctx.narrative = 'Bonus action already used this turn.';
       return true;
     }
-    const sneakHideDC = ctx.enemyAlive ? passivePerceptionDC(ctx.enemy!.wis ?? 10) : 10;
+    // 2024 PHB lighting affects the observer's passive Perception:
+    // dim → -5, dark → effective 0. Cunning Action Hide reads the
+    // room's lighting via the same path as the sneak action.
+    const cunningRoomLighting =
+      ctx.seed.rooms.find((r) => r.id === ctx.roomId)?.lighting ?? 'bright';
+    const cunningEnemyLight = effectiveLightFor(cunningRoomLighting, 0);
+    const sneakHideDC = ctx.enemyAlive
+      ? passivePerceptionDcInLight(ctx.enemy!.wis ?? 10, cunningEnemyLight)
+      : 10;
     const hideProf = ctx.char.skill_proficiencies?.includes('Stealth') ?? false;
     const inspAdvHide = consumeInspirationForCheck(ctx.char);
     const luckAdvHide = consumeLuckForCheck(ctx.char);

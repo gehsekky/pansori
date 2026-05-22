@@ -483,6 +483,55 @@ export function passivePerceptionDC(enemyWisdom: number): number {
   return 10 + abilityMod(enemyWisdom);
 }
 
+/**
+ * 2024 PHB lighting & vision (PHB p.190).
+ *
+ * Each cell / room has one of three light levels:
+ *   - bright: normal vision; no effect.
+ *   - dim:    "lightly obscured". Sight-based Perception has
+ *             Disadvantage. Treated as -5 to passive Perception.
+ *   - dark:   "heavily obscured". Sight-based observers are
+ *             effectively Blinded — automatically fail Perception
+ *             vs hidden things; attacks against them are at
+ *             advantage, their attacks at disadvantage. For the
+ *             Stealth/Perception contest, the observer auto-fails.
+ *
+ * Darkvision (`darkvisionFt > 0`) shifts the effective level one
+ * step brighter within range: dark → dim, dim → bright. For
+ * pansori's room-grained model, every cell counts as within
+ * range (rooms are smaller than the typical 60 ft darkvision).
+ *
+ * `effectiveLightFor` returns the level a given creature actually
+ * perceives. Used by sneak / search call sites that need the
+ * observer's effective light to adjust DCs.
+ */
+export type LightLevel = 'bright' | 'dim' | 'dark';
+
+export function effectiveLightFor(roomLighting: LightLevel, darkvisionFt: number): LightLevel {
+  if (darkvisionFt <= 0) return roomLighting;
+  // Shift one step brighter.
+  if (roomLighting === 'dark') return 'dim';
+  if (roomLighting === 'dim') return 'bright';
+  return 'bright';
+}
+
+/**
+ * Light-adjusted passive Perception DC. Dim light gives the observer
+ * Disadvantage on sight-based Perception (-5 to passive). Dark light
+ * heavily obscures — observer effectively auto-fails sight Perception;
+ * we model this as DC = 0 so any roll succeeds (the caller can detect
+ * the `dark` case explicitly if it wants a different short-circuit).
+ */
+export function passivePerceptionDcInLight(
+  enemyWisdom: number,
+  effectiveLight: LightLevel
+): number {
+  const base = passivePerceptionDC(enemyWisdom);
+  if (effectiveLight === 'dim') return Math.max(0, base - 5);
+  if (effectiveLight === 'dark') return 0;
+  return base;
+}
+
 // Passive Perception score for trap detection: 10 + WIS mod + prof if proficient in Perception
 // 5e DMG ch.5: compare passive score to trap DC; meet/exceed = spotted before triggering.
 // 2024 PHB Observant feat — +5 to passive Perception / Investigation. Caller passes

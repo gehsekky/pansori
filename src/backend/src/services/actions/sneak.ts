@@ -1,4 +1,9 @@
-import { abilityMod, passivePerceptionDC, skillCheck } from '../rulesEngine.js';
+import {
+  abilityMod,
+  effectiveLightFor,
+  passivePerceptionDcInLight,
+  skillCheck,
+} from '../rulesEngine.js';
 import {
   buildArrivalNarrative,
   consumeBardicForCheck,
@@ -26,7 +31,16 @@ export const handleSneak: ActionHandler<{ type: 'sneak' }> = (ctx) => {
     return { rejected: 'Nothing to sneak past. You move freely.' };
   }
   const enemy = ctx.enemy;
-  const sneakDC = passivePerceptionDC(enemy.wis ?? 10);
+  // 2024 PHB lighting (PHB p.190). Dim light gives observers
+  // Disadvantage on sight Perception (-5 to passive); dark light
+  // heavily obscures (effective passive 0 — sneak auto-succeeds).
+  // Pansori enemies don't track darkvision today, so the observer's
+  // effective light equals the room's lighting. Darkvision on the
+  // sneaker side doesn't change the observer's view, so we don't
+  // pass it here.
+  const roomLighting = ctx.seed.rooms.find((r) => r.id === ctx.roomId)?.lighting ?? 'bright';
+  const enemyEffectiveLight = effectiveLightFor(roomLighting, 0);
+  const sneakDC = passivePerceptionDcInLight(enemy.wis ?? 10, enemyEffectiveLight);
   const livingParty = ctx.st.characters
     .filter((c) => !c.dead)
     .map((c) => (c.id === ctx.char.id ? ctx.char : c));
