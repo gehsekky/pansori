@@ -112,7 +112,7 @@ export function handleFighterFeature(ctx: ActionContext, fid: string): boolean {
         ctx.st = {
           ...ctx.st,
           entities: (ctx.st.entities ?? []).map((e) =>
-            e.id === ctx.roomId && e.isEnemy
+            e.id === ctx.enemy?.id && e.isEnemy
               ? { ...e, conditions: [...e.conditions.filter((c) => c !== 'prone'), 'prone'] }
               : e
           ),
@@ -142,7 +142,7 @@ export function handleFighterFeature(ctx: ActionContext, fid: string): boolean {
         ctx.st = {
           ...ctx.st,
           entities: (ctx.st.entities ?? []).map((e) =>
-            e.id === ctx.roomId && e.isEnemy
+            e.id === ctx.enemy?.id && e.isEnemy
               ? {
                   ...e,
                   conditions: [...e.conditions.filter((c) => c !== 'goaded'), 'goaded'],

@@ -3,6 +3,7 @@ import {
   applyPartyLevelUps,
   effectiveSpeed,
   endCombatState,
+  isRoomCleared,
   pushEvent,
   splitEncounterXp,
 } from '../../gameEngine.js';
@@ -60,17 +61,17 @@ export function handleMonkFeature(ctx: ActionContext, fid: string): boolean {
     const monkDc = 8 + profBonus(ctx.char.level) + abilityMod(ctx.char.wis);
     let flurryNarrative = `${ctx.char.name} — Flurry of Blows (${kiPool - 1} ki remaining)!`;
     for (let i = 0; i < 2; i++) {
-      const flurryTarget = ctx.st.entities?.find((e) => e.id === ctx.roomId && e.isEnemy);
+      const flurryTarget = ctx.st.entities?.find((e) => e.id === ctx.enemy?.id && e.isEnemy);
       if (!ctx.enemyAlive || !flurryTarget) break;
       const toHit = rollDice('1d20') + abilityMod(ctx.char.dex) + profBonus(ctx.char.level);
       if (toHit >= (ctx.enemy?.ac ?? 10)) {
         const dmg = Math.max(1, rollDice(`1d${martialDie}`) + abilityMod(ctx.char.dex));
-        const curHp = ctx.st.entities?.find((e) => e.id === ctx.roomId && e.isEnemy)?.hp ?? 0;
+        const curHp = ctx.st.entities?.find((e) => e.id === ctx.enemy?.id && e.isEnemy)?.hp ?? 0;
         const newHp = curHp - dmg;
         ctx.st = {
           ...ctx.st,
           entities: (ctx.st.entities ?? []).map((e) =>
-            e.id === ctx.roomId && e.isEnemy ? { ...e, hp: Math.max(0, newHp) } : e
+            e.id === ctx.enemy?.id && e.isEnemy ? { ...e, hp: Math.max(0, newHp) } : e
           ),
         };
         flurryNarrative += ` Strike ${i + 1}: hit (${toHit}) — ${dmg} bludgeoning.${newHp <= 0 ? ' (killed)' : ''}`;
@@ -93,7 +94,7 @@ export function handleMonkFeature(ctx: ActionContext, fid: string): boolean {
             ctx.st = {
               ...ctx.st,
               entities: (ctx.st.entities ?? []).map((e) =>
-                e.id === ctx.roomId && e.isEnemy
+                e.id === ctx.enemy?.id && e.isEnemy
                   ? {
                       ...e,
                       conditions: [...e.conditions.filter((c) => c !== 'prone'), 'prone'],
@@ -119,8 +120,15 @@ export function handleMonkFeature(ctx: ActionContext, fid: string): boolean {
           ctx.st = split.st;
           ctx.char.xp = (ctx.char.xp || 0) + split.share;
           flurryNarrative += applyPartyLevelUps(ctx.st, ctx.char, ctx.context);
-          ctx.st.enemies_killed = [...ctx.st.enemies_killed, ctx.roomId];
-          ctx.st = endCombatState(ctx.st);
+          if (ctx.enemy) {
+            ctx.st.enemies_killed = [...ctx.st.enemies_killed, ctx.enemy.id];
+          }
+          // Only end combat once every enemy in the room is down — matches
+          // the canonical attack handler's pattern. Was previously
+          // unconditional, which ended combat early in multi-enemy rooms.
+          if (isRoomCleared(ctx.st, ctx.seed, ctx.roomId)) {
+            ctx.st = endCombatState(ctx.st);
+          }
           break;
         }
       } else {
@@ -303,7 +311,7 @@ export function handleMonkFeature(ctx: ActionContext, fid: string): boolean {
       ctx.st = {
         ...ctx.st,
         entities: (ctx.st.entities ?? []).map((e) =>
-          e.id === ctx.roomId && e.isEnemy
+          e.id === ctx.enemy?.id && e.isEnemy
             ? {
                 ...e,
                 conditions: [...e.conditions.filter((c) => c !== 'stunned'), 'stunned'],

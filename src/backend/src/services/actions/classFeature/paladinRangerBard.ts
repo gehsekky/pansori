@@ -92,8 +92,8 @@ export function handlePaladinRangerBardFeature(ctx: ActionContext, fid: string):
       ctx.narrative = 'Only Hunter Rangers have Colossus Slayer.';
       return true;
     }
-    const csTarget = ctx.st.entities?.find((e) => e.id === ctx.roomId && e.isEnemy);
-    if (!ctx.enemyAlive || !csTarget) {
+    const csTarget = ctx.st.entities?.find((e) => e.id === ctx.enemy?.id && e.isEnemy);
+    if (!ctx.enemyAlive || !ctx.enemy || !csTarget) {
       ctx.narrative = 'No living target.';
       return true;
     }
@@ -112,17 +112,22 @@ export function handlePaladinRangerBardFeature(ctx: ActionContext, fid: string):
       ...(ctx.char.class_resource_uses ?? {}),
       colossus_slayer_used: 1,
     };
-    const csHp = (ctx.st.entities?.find((e) => e.id === ctx.roomId && e.isEnemy)?.hp ?? 0) - csDmg;
+    const csHp = csTarget.hp - csDmg;
     ctx.st = {
       ...ctx.st,
       entities: (ctx.st.entities ?? []).map((e) =>
-        e.id === ctx.roomId && e.isEnemy ? { ...e, hp: Math.max(0, csHp) } : e
+        e.id === ctx.enemy?.id && e.isEnemy ? { ...e, hp: Math.max(0, csHp) } : e
       ),
     };
     ctx.narrative = `Colossus Slayer! +${fmt.dmg(csDmg)} piercing damage on a bloodied foe (${csHp <= 0 ? 'killed' : `${fmt.hp(Math.max(0, csHp))} HP remaining`}).`;
     if (csHp <= 0) {
-      ctx.st.enemies_killed = [...ctx.st.enemies_killed, ctx.roomId];
-      ctx.st = endCombatState(ctx.st);
+      ctx.st.enemies_killed = [...ctx.st.enemies_killed, ctx.enemy.id];
+      // Only end combat once every enemy in the room is down — matches
+      // the canonical attack handler's pattern. Was previously
+      // unconditional, which ended combat early in multi-enemy rooms.
+      if (isRoomCleared(ctx.st, ctx.seed, ctx.roomId)) {
+        ctx.st = endCombatState(ctx.st);
+      }
     }
     return true;
   }
@@ -236,7 +241,7 @@ export function handlePaladinRangerBardFeature(ctx: ActionContext, fid: string):
       ...(ctx.char.class_resource_uses ?? {}),
       channel_divinity: cdUsesVen - 1,
     };
-    ctx.st = { ...ctx.st, vow_of_enmity_target: ctx.roomId };
+    ctx.st = { ...ctx.st, vow_of_enmity_target: ctx.enemy?.id };
     ctx.narrative = `${ctx.char.name} — Vow of Enmity! You have advantage on all attack rolls against ${ctx.enemy?.name ?? 'your target'} for 1 minute. (${cdUsesVen - 1} Channel Divinity remaining)`;
     return true;
   }
@@ -278,7 +283,7 @@ export function handlePaladinRangerBardFeature(ctx: ActionContext, fid: string):
       ctx.st = {
         ...ctx.st,
         entities: (ctx.st.entities ?? []).map((e) =>
-          e.id === ctx.roomId && e.isEnemy
+          e.id === ctx.enemy?.id && e.isEnemy
             ? {
                 ...e,
                 conditions: [...e.conditions.filter((c) => c !== 'frightened'), 'frightened'],
