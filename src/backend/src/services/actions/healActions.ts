@@ -69,10 +69,18 @@ export const handleUseHealerKit: ActionHandler<{
     newCharges <= 0
       ? ctx.char.inventory.filter((_, i) => i !== kitIdx)
       : ctx.char.inventory.map((i, idx) => (idx === kitIdx ? { ...i, count: newCharges } : i));
+  // 2024 PHB Thief Rogue Fast Hands — Utilize action becomes a
+  // Bonus Action. Healer's Kit application is a Utilize-style
+  // object use, so a Thief Rogue spends bonus action instead of
+  // action.
+  const isThiefBonus = ctx.char.subclass === 'thief';
   ctx.char = {
     ...ctx.char,
     inventory: newInventory,
-    turn_actions: { ...ctx.char.turn_actions, action_used: true },
+    turn_actions: {
+      ...ctx.char.turn_actions,
+      ...(isThiefBonus ? { bonus_action_used: true } : { action_used: true }),
+    },
   };
   syncCharIntoState(ctx, target.id, newHp);
   const chargeNote = newCharges > 0 ? ` (${newCharges} charges left)` : ' (kit exhausted)';
