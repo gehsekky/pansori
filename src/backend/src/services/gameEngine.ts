@@ -3299,6 +3299,41 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     }
   }
 
+  // Land Druid — Land's Aid (bonus action, 2 uses per long rest).
+  // Surfaces 3 variants: heal + harm-necrotic + harm-radiant.
+  if (
+    !char.turn_actions.bonus_action_used &&
+    char.subclass === 'land' &&
+    hasClass(char, 'druid') &&
+    getClassLevel(char, 'druid') >= 3
+  ) {
+    const used = char.class_resource_uses?.lands_aid_used ?? 0;
+    const remaining = 2 - used;
+    if (remaining > 0) {
+      const dl = getClassLevel(char, 'druid');
+      choices.push({
+        label: `Land's Aid (heal) — heal one ally for 2d6+${dl} HP (${remaining}/2 uses left)`,
+        action: { type: 'use_lands_aid', variant: 'heal' },
+        requiresBonusAction: true,
+        kind: 'class_feature',
+      });
+      if (state.combat_active && enemyAlive) {
+        choices.push({
+          label: `Land's Aid (necrotic) — 2d6+${dl} necrotic to an enemy, CON save halves (${remaining}/2 uses left)`,
+          action: { type: 'use_lands_aid', variant: 'harm_necrotic' },
+          requiresBonusAction: true,
+          kind: 'class_feature',
+        });
+        choices.push({
+          label: `Land's Aid (radiant) — 2d6+${dl} radiant to an enemy, CON save halves (${remaining}/2 uses left)`,
+          action: { type: 'use_lands_aid', variant: 'harm_radiant' },
+          requiresBonusAction: true,
+          kind: 'class_feature',
+        });
+      }
+    }
+  }
+
   // Try to escape grapple — SRD 5.2.1 p.16, contested Athletics or Acrobatics
   if (
     state.combat_active &&
