@@ -33,10 +33,10 @@ import {
   entitiesInLine,
   posEqual,
 } from '../gridEngine.js';
+import { hasClass, resolveCastingAbility } from '../multiclass.js';
 import type { ActionHandler } from './types.js';
 import { composeNow } from '../narrative/compose.js';
 import { fmt } from '../narrativeFmt.js';
-import { hasClass } from '../multiclass.js';
 
 // concentrationRoundsFor is a small helper used by the cast handler.
 // Inlined here (instead of exported from gameEngine) because it's only
@@ -272,9 +272,19 @@ export const handleCastSpell: ActionHandler<{
     ctx.narrative += ` 🌀 WILD MAGIC SURGE: ${surge}`;
   }
 
-  const castingAbility = (ctx.context.spellcastingAbility?.[ctx.char.character_class] ??
+  // Multiclass spell-casting ability resolution (2024 PHB). For a
+  // multiclass PC, pick the best casting ability across the classes
+  // whose spell list matches the spell's `spellList` tag. Single-
+  // class PCs fall through to the primary-class lookup.
+  const primaryCastingAbility = (ctx.context.spellcastingAbility?.[ctx.char.character_class] ??
     ctx.context.classPrimaryStats[ctx.char.character_class] ??
     'int') as AbilityKey;
+  const castingAbility = resolveCastingAbility(
+    ctx.char,
+    (spell as { spellList?: ReadonlyArray<'arcane' | 'divine' | 'primal'> }).spellList,
+    ctx.context.spellcastingAbility ?? {},
+    primaryCastingAbility
+  ) as AbilityKey;
   const castingScore = ctx.char[castingAbility] ?? 10;
   const slotNote = spell.level > 0 ? ` (level-${slotLevel} slot)` : ' (cantrip)';
 
