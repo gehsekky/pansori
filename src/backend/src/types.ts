@@ -629,6 +629,14 @@ export interface Character {
   // handler fires; cleared when rage ends (combat end, manual stop,
   // or rage timer expiry).
   totem_spirit?: 'bear' | 'eagle' | 'wolf';
+  // 2024 PHB Mage Armor spell — when active, base AC becomes
+  // 13 + DEX mod (only effective when not wearing body armor).
+  // computeTotalAc reads this. Expires on long rest.
+  mage_armor_active?: boolean;
+  // 2024 PHB Shield of Faith spell — +2 AC for concentration
+  // duration (up to 10 min). computeTotalAc reads this. Expires
+  // when the caster's concentration drops.
+  shield_of_faith_active?: boolean;
   // SRD 5.2.1 p.11: Darkvision treats Darkness as Dim Light within this radius
   // (typically 60 ft for elves/dwarves/halflings/etc.). Default 0 = no
   // darkvision (typical human).

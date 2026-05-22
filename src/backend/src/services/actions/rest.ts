@@ -1,4 +1,10 @@
-import { abilityMod, rageUsesMax, rollDice, spellSlotsForClassLevel } from '../rulesEngine.js';
+import {
+  abilityMod,
+  computeTotalAc,
+  rageUsesMax,
+  rollDice,
+  spellSlotsForClassLevel,
+} from '../rulesEngine.js';
 import { canRestInRoom, pick } from '../gameEngine.js';
 import { getClassLevel, hasClass } from '../multiclass.js';
 import type { ActionHandler } from './types.js';
@@ -173,7 +179,7 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
       delete restoredUses.celestial_revelation_rounds;
     }
     const restoredUsesWithFeats = resetFeatLongRestResources(c, ctx.context, restoredUses);
-    return {
+    const refreshed = {
       ...c,
       hp: c.max_hp,
       temp_hp: 0,
@@ -189,7 +195,24 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
       // active (the 1-minute timer almost always ticks out before a
       // long rest, but clear defensively).
       celestial_revelation_variant: undefined,
+      // 2024 PHB Mage Armor — 8-hour duration, ends on long rest.
+      // Shield of Faith is concentration so it'd normally end well
+      // before a rest, but clear defensively.
+      mage_armor_active: undefined,
+      shield_of_faith_active: undefined,
     };
+    // Recompute AC after clearing the magical buffs so the stored
+    // `ac` field reflects the post-rest state.
+    refreshed.ac = computeTotalAc(
+      refreshed.dex,
+      refreshed.equipped_armor,
+      refreshed.equipped_shield,
+      refreshed.inventory ?? [],
+      ctx.context.lootTable,
+      false,
+      false
+    );
+    return refreshed;
   });
   ctx.st = { ...ctx.st, characters: restedChars, long_rested: true };
   ctx.char = { ...restedChars[ctx.safeIdx] };

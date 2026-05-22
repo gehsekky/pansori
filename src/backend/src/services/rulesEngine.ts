@@ -354,7 +354,13 @@ export function computeTotalAc(
   equippedArmorInstanceId: string | null | undefined,
   equippedShieldInstanceId: string | null | undefined,
   inventory: Array<{ instance_id: string; id: string; [key: string]: unknown }>,
-  lootTable: LootItem[]
+  lootTable: LootItem[],
+  // Optional buff toggles. Mage Armor changes unarmored base from
+  // 10 to 13 (no-op when wearing body armor). Shield of Faith adds
+  // a flat +2 regardless of armor. Both spells set the flags on the
+  // caster's character; computeTotalAc honors them here.
+  mageArmorActive: boolean = false,
+  shieldOfFaithActive: boolean = false
 ): number {
   const dexMod = abilityMod(dex);
   const armorId = equippedArmorInstanceId
@@ -371,9 +377,11 @@ export function computeTotalAc(
     const cap = armor.dexCapToAc ?? Infinity;
     ac = armor.armorAcBase + Math.min(dexMod, cap);
   } else {
-    ac = 10 + dexMod; // unarmored
+    // Unarmored. Mage Armor bumps base from 10 to 13.
+    ac = (mageArmorActive ? 13 : 10) + dexMod;
   }
   if (shield?.ac_bonus) ac += shield.ac_bonus;
+  if (shieldOfFaithActive) ac += 2;
   return ac;
 }
 

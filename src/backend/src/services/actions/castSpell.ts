@@ -4,6 +4,7 @@ import {
   addDice,
   applyDamageMultiplier,
   cantripDamageDice,
+  computeTotalAc,
   d,
   hasArmorProficiency,
   multiplyDice,
@@ -161,7 +162,7 @@ export const handleCastSpell: ActionHandler<{
 
   // Break existing concentration if this spell also requires concentration (PHB p.203)
   if (spell.concentration && ctx.char.concentrating_on) {
-    const { char: nc, st: ns } = breakConcentration(ctx.char, ctx.st);
+    const { char: nc, st: ns } = breakConcentration(ctx.char, ctx.st, ctx.context);
     ctx.char = nc;
     ctx.st = ns;
   }
@@ -480,6 +481,43 @@ export const handleCastSpell: ActionHandler<{
           spellId,
           rounds_left: concentrationRoundsFor(spell),
         };
+      }
+
+      // Per-spell side effects. Some buffs flip a flag on the target
+      // (mage_armor_active, shield_of_faith_active) AND need a fresh
+      // AC computation to take effect. The flag toggle is here; the
+      // AC recompute uses the same computeTotalAc + inventory lookup
+      // pattern as the equip-armor path in routes/game.ts.
+      if (spell.id === 'mage_armor' || spell.id === 'shield_of_faith') {
+        const recomputeAcFor = (c: typeof buffTarget): number =>
+          computeTotalAc(
+            c.dex,
+            c.equipped_armor,
+            c.equipped_shield,
+            c.inventory ?? [],
+            ctx.context.lootTable,
+            (spell.id === 'mage_armor' ? true : (c.mage_armor_active ?? false)) as boolean,
+            (spell.id === 'shield_of_faith' ? true : (c.shield_of_faith_active ?? false)) as boolean
+          );
+        if (isCasterTarget) {
+          if (spell.id === 'mage_armor') ctx.char.mage_armor_active = true;
+          if (spell.id === 'shield_of_faith') ctx.char.shield_of_faith_active = true;
+          ctx.char.ac = recomputeAcFor(ctx.char);
+        } else {
+          ctx.st = {
+            ...ctx.st,
+            characters: ctx.st.characters.map((c) => {
+              if (c.id !== buffTarget.id) return c;
+              const flagged = {
+                ...c,
+                mage_armor_active: spell.id === 'mage_armor' ? true : c.mage_armor_active,
+                shield_of_faith_active:
+                  spell.id === 'shield_of_faith' ? true : c.shield_of_faith_active,
+              };
+              return { ...flagged, ac: recomputeAcFor(flagged) };
+            }),
+          };
+        }
       }
 
       const buffProse =

@@ -552,7 +552,9 @@ gameRouter.post('/session/:id/equip', async (req: Request, res: Response) => {
         char.equipped_armor,
         char.equipped_shield,
         char.inventory,
-        ctx.lootTable
+        ctx.lootTable,
+        char.mage_armor_active ?? false,
+        char.shield_of_faith_active ?? false
       );
     } else if (loot.slot === 'armor') {
       const toggling = char.equipped_armor === iid;
@@ -567,7 +569,9 @@ gameRouter.post('/session/:id/equip', async (req: Request, res: Response) => {
         char.equipped_armor,
         char.equipped_shield,
         char.inventory,
-        ctx.lootTable
+        ctx.lootTable,
+        char.mage_armor_active ?? false,
+        char.shield_of_faith_active ?? false
       );
     } else if (loot.damage) {
       const toggling = char.equipped_weapon === iid;
