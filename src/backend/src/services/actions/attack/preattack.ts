@@ -137,9 +137,12 @@ export function runPreattack(
 
   // ── Ammunition check (PHB p.146) ──────────────────────────────────────
   if (weaponItem?.range === 'ranged' && !weaponItem.thrown) {
+    // NOTE: order matters. 'hand_crossbow' includes both 'bow' and
+    // 'crossbow' as substrings, so 'crossbow' must be checked first
+    // or all crossbows would incorrectly look for arrows.
     const ammoTypes: Record<string, string[]> = {
-      bow: ['arrow', 'arrows'],
       crossbow: ['bolt', 'bolts'],
+      bow: ['arrow', 'arrows'],
       sling: ['bullet', 'bullets', 'sling_bullet'],
     };
     const wepKey = Object.keys(ammoTypes).find((k) => weaponItem.id.includes(k)) ?? 'arrow';
