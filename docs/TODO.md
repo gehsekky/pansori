@@ -85,6 +85,15 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
     **Remaining:** FE chooser UX (a spell-picker dialog when the
     player picks Magic Initiate). Currently the action requires the
     `cantripChoices` / `l1Choice` to be supplied via API.
+
+    **Spell-list tagging shipped 2026-05-22.** `Spell.spellList?:
+    Array<'arcane'|'divine'|'primal'>` field added; all 30 SRD
+    spells tagged per 2024 PHB class lists. `take_feat` action now
+    validates Magic Initiate choices: cantrip count matches the
+    feat's required count, every choice exists in spellTable, level
+    matches (cantrip vs L1), and `spell.spellList` includes the
+    feat's `spellList` ('arcane' / 'divine' / 'primal'). 4 added
+    validation tests.
   - More feats: Resilient (half-feat with `save-proficiency`),
     Mobile, Sentinel, War Caster, Polearm Master, Great Weapon
     Master, Heavy Armor Master, Crossbow Expert, Tavern Brawler,

@@ -387,6 +387,13 @@ export interface Spell {
   aoeShape?: 'sphere' | 'cone' | 'cube' | 'line';
   ritualCasting?: boolean; // castable as ritual (no slot cost, only out of combat)
   verbal?: boolean; // has verbal component (blocked when deafened)
+  // 2024 PHB spell-list tags. A spell can belong to multiple lists
+  // (e.g. Healing Word is on the Cleric, Druid, and Bard lists →
+  // ['divine', 'primal', 'arcane']). Used by Magic Initiate to
+  // validate that the player's spell pick comes from the matching
+  // list. Absent on context-local utility spells that aren't tied
+  // to a class list.
+  spellList?: Array<'arcane' | 'divine' | 'primal'>;
   // SRD 5.2.1: spell range. 'self' = no external target; 'touch' = adjacent
   // only (≤ 5 ft / 1 grid square); 'ranged' uses rangeFt for the max distance.
   // When unspecified, the engine treats the spell as untargeted/utility.

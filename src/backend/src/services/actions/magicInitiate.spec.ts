@@ -207,6 +207,105 @@ describe('Magic Initiate — free L1 cast at cast time', () => {
   });
 });
 
+describe('Magic Initiate — choice validation (take_feat action)', () => {
+  function makeState1(char: ReturnType<typeof makeChar>) {
+    return {
+      ...makeState({ id: char.id, asi_pending: true }),
+      characters: [char],
+      active_character_id: char.id,
+    };
+  }
+
+  const minimalSeed: Seed = {
+    context_id: ctx.id,
+    world_name: 'MI Validation Test',
+    ship_name: 'MI Validation Test',
+    intro: '',
+    seed_id: 'mi-validate',
+    rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+    connections: { [ctx.startRoomId]: [] },
+    enemies: {},
+    loot: {},
+    npcs: {},
+  };
+
+  it('rejects cantrips off the matching spell list', async () => {
+    const pc = makeChar({ id: 'pc-1', level: 4, asi_pending: true });
+    const result = await takeAction({
+      action: {
+        type: 'take_feat',
+        featId: 'magic_initiate_divine',
+        // Fire Bolt is on the arcane list — wrong for the divine variant.
+        cantripChoices: ['fire_bolt', 'sacred_flame'],
+        l1Choice: 'cure_wounds',
+      },
+      history: [],
+      state: makeState1(pc),
+      seed: minimalSeed,
+      context: ctx,
+    });
+    expect(result.narrative).toMatch(/not on the divine spell list/);
+    expect(result.newState.characters[0].feats ?? []).not.toContain('magic_initiate_divine');
+  });
+
+  it('rejects when the L1 choice is wrong-level', async () => {
+    const pc = makeChar({ id: 'pc-1', level: 4, asi_pending: true });
+    const result = await takeAction({
+      action: {
+        type: 'take_feat',
+        featId: 'magic_initiate_arcane',
+        cantripChoices: ['fire_bolt', 'vicious_mockery'],
+        // Hold Person is L2, not L1.
+        l1Choice: 'hold_person',
+      },
+      history: [],
+      state: makeState1(pc),
+      seed: minimalSeed,
+      context: ctx,
+    });
+    expect(result.narrative).toMatch(/not a level-1 spell/);
+  });
+
+  it('rejects when cantrip count is wrong', async () => {
+    const pc = makeChar({ id: 'pc-1', level: 4, asi_pending: true });
+    const result = await takeAction({
+      action: {
+        type: 'take_feat',
+        featId: 'magic_initiate_arcane',
+        cantripChoices: ['fire_bolt'], // need 2
+        l1Choice: 'magic_missile',
+      },
+      history: [],
+      state: makeState1(pc),
+      seed: minimalSeed,
+      context: ctx,
+    });
+    expect(result.narrative).toMatch(/exactly 2 cantrip choice/);
+  });
+
+  it('accepts a valid Arcane pick (Fire Bolt + Vicious Mockery cantrips + Magic Missile L1)', async () => {
+    const pc = makeChar({ id: 'pc-1', level: 4, asi_pending: true });
+    // mage_hand isn't in the SRD set; use fire_bolt + vicious_mockery
+    // (both tagged arcane).
+    const result = await takeAction({
+      action: {
+        type: 'take_feat',
+        featId: 'magic_initiate_arcane',
+        cantripChoices: ['fire_bolt', 'vicious_mockery'],
+        l1Choice: 'magic_missile',
+      },
+      history: [],
+      state: makeState1(pc),
+      seed: minimalSeed,
+      context: ctx,
+    });
+    expect(result.newState.characters[0].feats ?? []).toContain('magic_initiate_arcane');
+    expect(result.newState.characters[0].spells_known).toEqual(
+      expect.arrayContaining(['fire_bolt', 'vicious_mockery', 'magic_missile'])
+    );
+  });
+});
+
 describe('Magic Initiate — long-rest reset', () => {
   it('clears magic_initiate_l1_used so the next day grants the free cast again', () => {
     const char = makeChar({

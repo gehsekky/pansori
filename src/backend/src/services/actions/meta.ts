@@ -163,6 +163,56 @@ export const handleTakeFeat: ActionHandler<{
     return;
   }
 
+  // Magic Initiate — validate that the chosen cantrips + L1 spell
+  // exist, are the right level, and belong to the feat's spell list.
+  if (
+    feat.effect.kind === 'extra-cantrips-and-l1' &&
+    (action.cantripChoices || action.l1Choice)
+  ) {
+    const list = feat.effect.spellList;
+    const cantripCount = feat.effect.cantripCount;
+    const cantrips = action.cantripChoices ?? [];
+    if (cantrips.length !== cantripCount) {
+      ctx.narrative = `${feat.name} requires exactly ${cantripCount} cantrip choice${cantripCount === 1 ? '' : 's'} (got ${cantrips.length}).`;
+      return;
+    }
+    for (const cId of cantrips) {
+      const spell = ctx.context.spellTable?.[cId];
+      if (!spell) {
+        ctx.narrative = `${feat.name}: unknown cantrip "${cId}".`;
+        return;
+      }
+      if (spell.level !== 0) {
+        ctx.narrative = `${feat.name}: "${spell.name}" is not a cantrip.`;
+        return;
+      }
+      if (!spell.spellList?.includes(list)) {
+        ctx.narrative = `${feat.name}: "${spell.name}" is not on the ${list} spell list.`;
+        return;
+      }
+    }
+    if (feat.effect.l1Count > 0) {
+      const l1 = action.l1Choice;
+      if (!l1) {
+        ctx.narrative = `${feat.name} requires a level-1 spell choice.`;
+        return;
+      }
+      const spell = ctx.context.spellTable?.[l1];
+      if (!spell) {
+        ctx.narrative = `${feat.name}: unknown L1 spell "${l1}".`;
+        return;
+      }
+      if (spell.level !== 1) {
+        ctx.narrative = `${feat.name}: "${spell.name}" is not a level-1 spell.`;
+        return;
+      }
+      if (!spell.spellList?.includes(list)) {
+        ctx.narrative = `${feat.name}: "${spell.name}" is not on the ${list} spell list.`;
+        return;
+      }
+    }
+  }
+
   const { newChar, narrative } = applyFeatTake(ctx.char, feat, {
     abilityChoice: action.abilityChoice,
     saveProficiencyChoices: action.saveProficiencyChoices,
