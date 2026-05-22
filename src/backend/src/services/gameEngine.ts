@@ -2291,7 +2291,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       sorcerer: ['draconic', 'wild_magic'],
       warlock: ['fiend', 'archfey', 'celestial'],
       druid: ['land', 'moon'],
-      monk: ['open_hand', 'shadow'],
+      monk: ['open_hand', 'shadow', 'mercy'],
       barbarian: ['berserker', 'totem_warrior'],
     };
     const reqLevel = subclassLevels[cls] ?? 3;
@@ -3293,6 +3293,25 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       choices.push({
         label: `Healing Light — bonus action, spend 1 d6 (${remaining}/${pool} dice left)`,
         action: { type: 'use_healing_light', dice: 1 },
+        requiresBonusAction: true,
+        kind: 'class_feature',
+      });
+    }
+  }
+
+  // Mercy Monk — Hand of Healing (bonus action, 1 Ki).
+  if (
+    !char.turn_actions.bonus_action_used &&
+    char.subclass === 'mercy' &&
+    hasClass(char, 'monk') &&
+    getClassLevel(char, 'monk') >= 3
+  ) {
+    const monkLvl = getClassLevel(char, 'monk');
+    const ki = char.class_resource_uses?.ki_points ?? monkLvl;
+    if (ki > 0) {
+      choices.push({
+        label: `Hand of Healing — bonus action, 1 Ki → heal 1d6+WIS (${ki} Ki left)`,
+        action: { type: 'use_hand_of_healing' },
         requiresBonusAction: true,
         kind: 'class_feature',
       });

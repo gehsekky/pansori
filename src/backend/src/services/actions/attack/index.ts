@@ -429,8 +429,40 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
         turn_actions: { ...ctx.char.turn_actions, dreadful_strikes_used: true },
       };
     }
+    // 2024 PHB Mercy Monk L3 — Hand of Harm: once per turn, on an
+    // unarmed-strike hit, spend 1 Ki to add 1d6 + WIS mod necrotic.
+    // Only fires on UNARMED strikes (RAW). Gated on Ki availability
+    // and the once-per-turn flag.
+    let handOfHarmDmg = 0;
+    const isUnarmed = !weaponItem; // weaponItem null on unarmed strikes
+    if (
+      isUnarmed &&
+      hasClass(ctx.char, 'monk') &&
+      ctx.char.subclass === 'mercy' &&
+      getClassLevel(ctx.char, 'monk') >= 3 &&
+      !ctx.char.turn_actions.hand_of_harm_used &&
+      (ctx.char.class_resource_uses?.ki_points ?? getClassLevel(ctx.char, 'monk')) > 0
+    ) {
+      handOfHarmDmg = rollDice('1d6') + abilityMod(ctx.char.wis);
+      const currentKi = ctx.char.class_resource_uses?.ki_points ?? getClassLevel(ctx.char, 'monk');
+      ctx.char = {
+        ...ctx.char,
+        turn_actions: { ...ctx.char.turn_actions, hand_of_harm_used: true },
+        class_resource_uses: {
+          ...(ctx.char.class_resource_uses ?? {}),
+          ki_points: currentKi - 1,
+        },
+      };
+    }
     const rawDmg =
-      baseHit + sneakDmg + rageBonus + sharpshooterDmg + gwmDmg + celRevDmg + dreadfulStrikesDmg;
+      baseHit +
+      sneakDmg +
+      rageBonus +
+      sharpshooterDmg +
+      gwmDmg +
+      celRevDmg +
+      dreadfulStrikesDmg +
+      handOfHarmDmg;
     const { damage: finalDmg, note: dmgNote } = applyDamageMultiplier(
       rawDmg,
       weaponItem?.damageType,
@@ -472,6 +504,9 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
     }
     if (dreadfulStrikesDmg > 0) {
       hitBonuses.push({ label: `Dreadful Strikes: +${dreadfulStrikesDmg} psychic` });
+    }
+    if (handOfHarmDmg > 0) {
+      hitBonuses.push({ label: `Hand of Harm: +${handOfHarmDmg} necrotic (1 Ki)` });
     }
     if (dmgNote) {
       // dmgNote arrives as " [resistant: 6 → 3]" — strip leading space and
