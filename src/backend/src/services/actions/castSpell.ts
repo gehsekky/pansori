@@ -330,11 +330,16 @@ export const handleCastSpell: ActionHandler<{
     const healBonuses =
       discipleBonus > 0 ? [{ label: `Disciple of Life: +${discipleBonus}` }] : undefined;
     let targetNewHp: number;
+    let actualHealed: number;
     if (isSelf) {
+      const prevHp = ctx.char.hp;
       ctx.char.hp = Math.min(ctx.char.max_hp, ctx.char.hp + healed);
       targetNewHp = ctx.char.hp;
+      actualHealed = targetNewHp - prevHp;
     } else {
+      const prevHp = target.hp;
       targetNewHp = Math.min(target.max_hp, target.hp + healed);
+      actualHealed = targetNewHp - prevHp;
       ctx.st = {
         ...ctx.st,
         characters: ctx.st.characters.map((c) =>
@@ -357,7 +362,11 @@ export const handleCastSpell: ActionHandler<{
         slotNote,
         target: isSelf ? undefined : target.name,
       }),
-      healed,
+      // `actualHealed` is post-cap. Previously the fragment showed the
+      // rolled value (e.g. "restores 13 HP to Fighter (now 8/8)") even
+      // when the target only had room for less. Now matches the visible
+      // newHp delta.
+      healed: actualHealed,
       targetName: target.name,
       isSelf,
       targetNewHp,
