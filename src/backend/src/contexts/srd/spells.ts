@@ -290,6 +290,75 @@ export const SRD_SPELLS: Record<string, Spell> = {
     // Druid / Ranger (2024 PHB).
     spellList: ['primal'],
   },
+  heroism: {
+    id: 'heroism',
+    name: 'Heroism',
+    level: 1,
+    castTime: 'action',
+    concentration: true,
+    targetType: 'self_or_ally',
+    // RAW: temp HP equal to spellcasting modifier at the start of each
+    // of the target's turns + immunity to Frightened. Pansori MVP grants
+    // a flat 3 temp HP on cast (mod-ish for L1-4) and leaves the
+    // refresh-per-turn + frightened-immunity for a follow-up.
+    tempHpGrant: 3,
+    durationRounds: 10, // 1 minute concentration
+    rangeKind: 'touch',
+    desc: 'A willing creature gains 3 temporary HP and emboldened resolve (Concentration, up to 1 minute).',
+    narratives: {
+      cast: [
+        '{name} grasps {target} by the shoulder — {spell}{slotNote} surges through them like liquid courage',
+        '{name} whispers {spell}{slotNote} and {target} stands taller, fear washing away',
+      ],
+    },
+    spellList: ['arcane', 'divine'],
+  },
+  aid: {
+    id: 'aid',
+    name: 'Aid',
+    level: 2,
+    castTime: 'action',
+    // RAW: choose up to 3 creatures, each gets +5 max HP and +5 current
+    // HP for 8 hours. Pansori MVP targets one (the caster or chosen ally)
+    // and bumps both max_hp and current hp. The duration is until the
+    // next long rest (which clears the temp bonus via the rest sweep —
+    // wired below in rest.ts? actually no, this is durable until
+    // long rest naturally resets max_hp from char build... actually
+    // it persists; documented as a known simplification).
+    targetType: 'self_or_ally',
+    maxHpBonus: 5,
+    upcastMaxHpBonus: 5,
+    rangeKind: 'ranged',
+    rangeFt: 30,
+    desc: 'A creature’s hit point maximum and current hit points increase by 5 (+5 per slot above 2nd).',
+    narratives: {
+      cast: [
+        '{name} channels {spell}{slotNote} — {target} feels their resolve thicken into iron',
+        '{name} casts {spell}{slotNote}; warmth pools in {target}’s chest, steeling them against the fight',
+      ],
+    },
+    spellList: ['divine'],
+  },
+  greater_invisibility: {
+    id: 'greater_invisibility',
+    name: 'Greater Invisibility',
+    level: 4,
+    castTime: 'action',
+    concentration: true,
+    targetType: 'self_or_ally',
+    condition: 'invisible',
+    conditionDuration: 10, // 1 minute concentration
+    rangeKind: 'touch',
+    desc: 'A willing creature becomes invisible. Anything it is wearing or carrying is invisible too. The target can attack while invisible (Concentration, up to 1 minute).',
+    narratives: {
+      cast: [
+        '{name} traces {spell}{slotNote} in the air — {target} fades from sight',
+        '{name} whispers {spell}{slotNote} and {target} winks out of view',
+      ],
+    },
+    spellList: ['arcane'],
+  },
+
   faerie_fire: {
     id: 'faerie_fire',
     name: 'Faerie Fire',
