@@ -267,6 +267,23 @@ export function hasClass(char: Character, className: string): boolean {
 }
 
 /**
+ * 2024 PHB ritual-cast eligibility — Wizard / Cleric / Druid / Bard
+ * can cast spells tagged `ritualCasting` as 10-minute rituals without
+ * expending a slot. Warlock + Sorcerer have NO base ritual access
+ * (Warlock RAW gets it only via Pact of the Tome + Book of Ancient
+ * Secrets invocation; pansori defers that path). Paladin / Ranger
+ * have no ritual access by RAW.
+ */
+export function canRitualCast(char: Character): boolean {
+  return (
+    hasClass(char, 'wizard') ||
+    hasClass(char, 'cleric') ||
+    hasClass(char, 'druid') ||
+    hasClass(char, 'bard')
+  );
+}
+
+/**
  * Returns the character's total level (== sum of all class levels).
  * For single-class characters this is `char.level`. For multiclass
  * the sum derived from `class_levels` should agree with `char.level`

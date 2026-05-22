@@ -54,6 +54,7 @@ import type { EnemyAttackHitFragment, EnemyAttackMissFragment } from './narrativ
 import { applyExpiryHooks, getConditionDuration } from './conditions/registry.js';
 import {
   applyMulticlassProfGrants,
+  canRitualCast,
   getClassLevel,
   hasClass,
   spellSlotsForChar,
@@ -3219,8 +3220,26 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
           });
         }
       } else {
-        // Leveled spell: emit one choice per available slot level (base + upcasts)
+        // Leveled spell: emit one choice per available slot level (base + upcasts).
+        // 2024 PHB Ritual casting (10 min, no slot, out of combat) — when
+        // the spell is tagged ritualCasting AND the PC has a ritual-cast-
+        // eligible class (Wizard / Cleric / Druid / Bard) AND combat is
+        // not active, emit an additional "Cast as ritual" choice. The
+        // ritual cast surface fires alongside any slot-based options so
+        // the player can pick (e.g. slot Identify in combat-prep, or
+        // ritual when out of slots).
         const baseLevel = spell.level ?? 1;
+        const canRitual =
+          (spell as { ritualCasting?: boolean }).ritualCasting === true &&
+          !state.combat_active &&
+          canRitualCast(char);
+        if (canRitual) {
+          choices.push({
+            label: `Cast ${spell.name} as a ritual (10 min, no slot)`,
+            action: { type: 'cast_spell', spellId, slotLevel: baseLevel, ritual: true },
+            kind: 'cast_spell',
+          });
+        }
         const maxSlotLevel = Math.max(
           ...Object.keys(slots)
             .map(Number)
