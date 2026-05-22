@@ -429,6 +429,37 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
         turn_actions: { ...ctx.char.turn_actions, dreadful_strikes_used: true },
       };
     }
+    // 2024 PHB Psi Warrior Fighter L3 — Psionic Strike: once per
+    // turn, on a weapon hit, auto-spend 1 Psi Energy die for
+    // (die + INT mod) force damage. Die size scales:
+    //   L3 → d6, L5 → d8, L11 → d10, L17 → d12
+    // Pool: 4 + 2× prof bonus per long rest. RAW: player choice
+    // each hit; pansori MVP auto-spends to keep wiring simple
+    // (similar to GWM / Dreadful Strikes auto-trigger pattern).
+    let psionicStrikeDmg = 0;
+    if (
+      weaponItem &&
+      hasClass(ctx.char, 'fighter') &&
+      ctx.char.subclass === 'psi_warrior' &&
+      getClassLevel(ctx.char, 'fighter') >= 3 &&
+      !ctx.char.turn_actions.psionic_strike_used
+    ) {
+      const fLvl = getClassLevel(ctx.char, 'fighter');
+      const psiPool = 4 + 2 * profBonus(ctx.char.level);
+      const psiUsed = ctx.char.class_resource_uses?.psi_dice_used ?? 0;
+      if (psiUsed < psiPool) {
+        const psiDieSize = fLvl >= 17 ? 'd12' : fLvl >= 11 ? 'd10' : fLvl >= 5 ? 'd8' : 'd6';
+        psionicStrikeDmg = rollDice(`1${psiDieSize}`) + abilityMod(ctx.char.int);
+        ctx.char = {
+          ...ctx.char,
+          turn_actions: { ...ctx.char.turn_actions, psionic_strike_used: true },
+          class_resource_uses: {
+            ...(ctx.char.class_resource_uses ?? {}),
+            psi_dice_used: psiUsed + 1,
+          },
+        };
+      }
+    }
     // 2024 PHB Gloom Stalker Ranger L3 — Dread Ambusher: first
     // weapon attack of combat deals +1d8. Flag is set in
     // runCombatStart for Gloom Stalkers and consumed here on the
@@ -481,7 +512,8 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
       celRevDmg +
       dreadfulStrikesDmg +
       handOfHarmDmg +
-      dreadAmbusherDmg;
+      dreadAmbusherDmg +
+      psionicStrikeDmg;
     const { damage: finalDmg, note: dmgNote } = applyDamageMultiplier(
       rawDmg,
       weaponItem?.damageType,
@@ -529,6 +561,9 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
     }
     if (dreadAmbusherDmg > 0) {
       hitBonuses.push({ label: `Dread Ambusher: +${dreadAmbusherDmg}` });
+    }
+    if (psionicStrikeDmg > 0) {
+      hitBonuses.push({ label: `Psionic Strike: +${psionicStrikeDmg} force (1 Psi die)` });
     }
     if (dmgNote) {
       // dmgNote arrives as " [resistant: 6 → 3]" — strip leading space and

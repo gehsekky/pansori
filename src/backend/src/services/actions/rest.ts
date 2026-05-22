@@ -189,6 +189,12 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
     if (c.subclass === 'land' && hasClass(c, 'druid')) {
       delete restoredUses.lands_aid_used;
     }
+    // 2024 PHB Psi Warrior Fighter Psi Energy dice — refills on
+    // long rest. (RAW also has a short-rest 1-die recovery;
+    // pansori MVP is long-rest only.)
+    if (c.subclass === 'psi_warrior' && hasClass(c, 'fighter')) {
+      delete restoredUses.psi_dice_used;
+    }
     const restoredUsesWithFeats = resetFeatLongRestResources(c, ctx.context, restoredUses);
     const refreshed = {
       ...c,
