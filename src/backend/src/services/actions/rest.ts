@@ -167,7 +167,11 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
     const humanGrant = c.species === 'human';
     if (c.species === 'orc') delete restoredUses.relentless_endurance_used;
     if (c.species === 'tiefling') delete restoredUses.tiefling_rebuke_used;
-    if (c.species === 'aasimar') delete restoredUses.healing_hands_used;
+    if (c.species === 'aasimar') {
+      delete restoredUses.healing_hands_used;
+      delete restoredUses.celestial_revelation_used;
+      delete restoredUses.celestial_revelation_rounds;
+    }
     const restoredUsesWithFeats = resetFeatLongRestResources(c, ctx.context, restoredUses);
     return {
       ...c,
@@ -181,6 +185,10 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
       exhaustion_level: newExhaustion,
       spell_slots_used: {},
       inspiration: humanGrant ? true : c.inspiration,
+      // Aasimar Celestial Revelation — ends on long rest if still
+      // active (the 1-minute timer almost always ticks out before a
+      // long rest, but clear defensively).
+      celestial_revelation_variant: undefined,
     };
   });
   ctx.st = { ...ctx.st, characters: restedChars, long_rested: true };

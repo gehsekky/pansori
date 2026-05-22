@@ -385,7 +385,33 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
         turn_actions: { ...ctx.char.turn_actions, gwm_used: true },
       };
     }
-    const rawDmg = baseHit + sneakDmg + rageBonus + sharpshooterDmg + gwmDmg;
+    // Aasimar Celestial Revelation (2024 PHB L3+) — once per turn,
+    // a melee weapon hit while transformed adds +prof damage of
+    // the matching type (necrotic for Necrotic Shroud, radiant for
+    // Radiant Soul / Radiant Consumption). The rider rides on top
+    // of the weapon damage but in a different damage type — the
+    // weapon's resistance multiplier wouldn't apply to it. Pansori
+    // currently folds it into the same rawDmg total (same as Divine
+    // Smite radiant rider — a known simplification documented inline).
+    let celRevDmg = 0;
+    let celRevDmgType: 'necrotic' | 'radiant' | undefined;
+    if (
+      ctx.char.celestial_revelation_variant &&
+      weaponItem?.range !== 'ranged' &&
+      !ctx.char.turn_actions.celestial_revelation_rider_used
+    ) {
+      celRevDmg = profBonus(ctx.char.level);
+      celRevDmgType =
+        ctx.char.celestial_revelation_variant === 'necrotic_shroud' ? 'necrotic' : 'radiant';
+      ctx.char = {
+        ...ctx.char,
+        turn_actions: {
+          ...ctx.char.turn_actions,
+          celestial_revelation_rider_used: true,
+        },
+      };
+    }
+    const rawDmg = baseHit + sneakDmg + rageBonus + sharpshooterDmg + gwmDmg + celRevDmg;
     const { damage: finalDmg, note: dmgNote } = applyDamageMultiplier(
       rawDmg,
       weaponItem?.damageType,
@@ -421,6 +447,9 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
     }
     if (gwmDmg > 0) {
       hitBonuses.push({ label: `Great Weapon Master: +${gwmDmg}` });
+    }
+    if (celRevDmg > 0 && celRevDmgType) {
+      hitBonuses.push({ label: `Celestial Revelation: +${celRevDmg} ${celRevDmgType}` });
     }
     if (dmgNote) {
       // dmgNote arrives as " [resistant: 6 → 3]" — strip leading space and

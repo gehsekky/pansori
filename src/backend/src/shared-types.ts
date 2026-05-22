@@ -205,6 +205,14 @@ export type StructuredAction =
   // Great Weapon Master (2024 PHB) — bonus-action attack after a
   // Heavy-weapon Crit or kill on this turn.
   | { type: 'gwm_bonus_attack'; targetEnemyId?: string }
+  // Aasimar Celestial Revelation (2024 PHB, L3+) — bonus-action
+  // transformation, 1/long rest. Player picks the sub-option at
+  // use time: 'necrotic_shroud', 'radiant_soul', 'radiant_consumption'.
+  // Transformation lasts 1 minute (10 rounds in pansori).
+  | {
+      type: 'use_celestial_revelation';
+      variant: 'necrotic_shroud' | 'radiant_soul' | 'radiant_consumption';
+    }
   // Healer feat (2024 PHB) — action, spend one charge of a
   // Healer's Kit to heal a target 1d6 + 4 + prof.
   | { type: 'use_healer_kit'; targetCharId: string }
@@ -278,6 +286,7 @@ export type ChoiceKind =
   | 'two_weapon_attack'
   | 'polearm_butt_end'
   | 'gwm_bonus_attack'
+  | 'use_celestial_revelation'
   | 'cast_spell'
   | 'class_feature';
 
