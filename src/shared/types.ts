@@ -600,6 +600,16 @@ export type FeatEffect =
       //      reaction (instead of the OA melee attack). Needs a
       //      reaction-window redesign; deferred.
       kind: 'war-caster';
+    }
+  | {
+      // Heavy Armor Master feat (2024 PHB general) — while wearing
+      // heavy armor and not incapacitated, attacks that hit you
+      // deal 3 less damage (floor 0). Wired in `computeEnemyAttack`
+      // as a flat last-step reduction (after resistance + ward).
+      // 2024 PHB also grants heavy-armor proficiency on take; not
+      // wired yet (the take path would need to add 'heavy' to
+      // `char.armor_proficiencies`).
+      kind: 'heavy-armor-master';
     };
 
 /**

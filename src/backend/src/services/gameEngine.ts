@@ -680,10 +680,36 @@ function computeEnemyAttack(
       };
       wardNote = ` (Arcane Ward absorbed ${absorbed} — ward HP: ${wardHp - absorbed})`;
     }
+    // 2024 PHB Heavy Armor Master feat — while wearing heavy armor and not
+    // incapacitated, attacks that hit you deal 3 less damage. Floor at 0.
+    // Applied after resistance + ward so the -3 is a flat last-step
+    // reduction (matches RAW ordering "attacks that hit you deal").
+    // Independent armor lookup (uses instance_id, the correct pattern)
+    // because the existing `armorItem` capture at top of the function
+    // matches on `i.id`, which never resolves for equipped armor stored
+    // by instance_id — a separate latent bug that's out of scope here.
+    let hamNote = '';
+    let postHamDmg = postWardDmg;
+    if (
+      (char.feats ?? []).includes('heavy_armor_master') &&
+      !char.conditions.includes('incapacitated')
+    ) {
+      const equippedArmorInstance = char.equipped_armor
+        ? char.inventory?.find((i) => i.instance_id === char.equipped_armor)
+        : undefined;
+      const equippedArmorLoot = equippedArmorInstance
+        ? context.lootTable.find((l) => l.id === equippedArmorInstance.id)
+        : undefined;
+      if (equippedArmorLoot?.armorCategory === 'heavy' && postHamDmg > 0) {
+        const reduction = Math.min(3, postHamDmg);
+        postHamDmg -= reduction;
+        hamNote = ` (Heavy Armor Master: -${reduction})`;
+      }
+    }
     // Universal damage application — temp_hp absorption, exhaustion-4 max-HP
     // clamp, knock-out detection, and the SRD concentration save all flow
     // through `applyDamage`. (PR-2's deferred enemy-attack migration.)
-    const dmgResult = applyDamage(charAfterWard, st, postWardDmg);
+    const dmgResult = applyDamage(charAfterWard, st, postHamDmg);
     let updatedChar = dmgResult.char;
     const newSt = dmgResult.st;
     const hpLost = dmgResult.amountDealt;
@@ -697,7 +723,7 @@ function computeEnemyAttack(
       .replace('{target}', char.name)
       .replace('{dmg}', fmt.dmg(hpLost));
     narrative += ` ${char.name} takes ${fmt.dmg(hpLost)} damage.`;
-    narrative += rageNote + petrNote + beastNote + speciesNote + wardNote + tempHpNote;
+    narrative += rageNote + petrNote + beastNote + speciesNote + wardNote + hamNote + tempHpNote;
     narrative += dmgResult.concentrationNote;
 
     let inspirationConsumed = false;
