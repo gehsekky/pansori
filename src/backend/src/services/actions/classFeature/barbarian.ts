@@ -80,6 +80,17 @@ export function handleBarbarianFeature(ctx: ActionContext, fid: string): boolean
     if (totem) {
       ctx.char.totem_spirit = totem;
     }
+    // 2024 PHB Path of the World Tree Barbarian L3 — Vitality of
+    // the Tree. When you enter rage, gain (barbarian level) temp
+    // HP. The bonus-action ally-heal option is deferred.
+    let worldTreeBlurb = '';
+    if (ctx.char.subclass === 'world_tree' && barbLvl >= 3) {
+      const tempHpGrant = barbLvl;
+      if ((ctx.char.temp_hp ?? 0) < tempHpGrant) {
+        ctx.char.temp_hp = tempHpGrant;
+      }
+      worldTreeBlurb = ` Vitality of the Tree: ${tempHpGrant} temp HP.`;
+    }
     // Totem-specific narrative flavor.
     const totemBlurb =
       totem === 'bear'
@@ -89,7 +100,7 @@ export function handleBarbarianFeature(ctx: ActionContext, fid: string): boolean
           : totem === 'wolf'
             ? ' The spirit of the Wolf coordinates the pack — allies within 5 ft of your target have advantage on attacks against it.'
             : '';
-    ctx.narrative = `${ctx.char.name} RAGES! +${rageDamageBonus(barbLvl)} bonus STR melee damage, resistance to physical attacks. (${rageUses - 1} use${rageUses - 1 === 1 ? '' : 's'} remaining)${totemBlurb}`;
+    ctx.narrative = `${ctx.char.name} RAGES! +${rageDamageBonus(barbLvl)} bonus STR melee damage, resistance to physical attacks. (${rageUses - 1} use${rageUses - 1 === 1 ? '' : 's'} remaining)${totemBlurb}${worldTreeBlurb}`;
     return true;
   }
 
