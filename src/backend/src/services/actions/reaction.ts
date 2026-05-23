@@ -611,6 +611,107 @@ export const handleResolveReaction: ActionHandler<{
       ctx.st = pushEvent(ctx.st, enemyAttackFragmentEvent(pendingFragment, ctx.st.round ?? 1));
       ctx.narrative = `${pendingFragment.prose} (Silvery Barbs declined.)`;
     }
+  } else if (rx.kind === 'lucky_disadv') {
+    // 2024 PHB Lucky feat — Disadvantage benefit. Accept spends 1
+    // luck point and re-rolls the enemy attack with Disadvantage
+    // (roll 2 fresh d20s, take the lower). If the lower d20 falls
+    // below the AC, the attack becomes a miss (damage discarded).
+    // Otherwise the hit stands (proposed snapshot commits). Decline
+    // = commit the full-damage proposed snapshot.
+    const pendingFragment = rx.pendingFragment as EnemyAttackHitFragment;
+    const pendingProposedChar = rx.pendingProposedChar as Character;
+    const pendingProposedSt = rx.pendingProposedSt as GameState;
+    if (action.accept) {
+      const remaining = ctx.char.class_resource_uses?.feat_lucky_uses ?? 0;
+      if (remaining <= 0) {
+        // No luck points — full damage commits.
+        ctx.narrative = `No luck points available. ${pendingFragment.prose}`;
+        ctx.st = {
+          ...ctx.st,
+          characters: pendingProposedSt.characters.map((c) =>
+            c.id === ctx.char.id ? pendingProposedChar : c
+          ),
+          entities: (pendingProposedSt.entities ?? ctx.st.entities ?? []).map((e) =>
+            e.id === ctx.char.id && !e.isEnemy ? { ...e, hp: pendingProposedChar.hp } : e
+          ),
+          pending_reaction: undefined,
+        };
+        ctx.char = pendingProposedChar;
+        ctx.st = pushEvent(ctx.st, enemyAttackFragmentEvent(pendingFragment, ctx.st.round ?? 1));
+      } else {
+        // Spend 1 luck point. Re-roll the enemy attack with
+        // Disadvantage: roll 2 fresh d20s, take the lower. RAW: "you
+        // must use the new roll" — the original d20 is discarded.
+        const r1 = rollDice('1d20');
+        const r2 = rollDice('1d20');
+        const newD20 = Math.min(r1, r2);
+        const mods = rx.atkTotal - rx.proposedD20;
+        const newTotal = newD20 + mods;
+        const newHit = newTotal >= rx.targetAc;
+        const charBase: Character = {
+          ...ctx.char,
+          class_resource_uses: {
+            ...(ctx.char.class_resource_uses ?? {}),
+            feat_lucky_uses: remaining - 1,
+          },
+        };
+        if (newHit) {
+          // Reroll still hits — commit proposed (with damage) but
+          // keep our luck point spend on the reactor.
+          const charAfter: Character = {
+            ...pendingProposedChar,
+            class_resource_uses: charBase.class_resource_uses,
+          };
+          ctx.st = {
+            ...ctx.st,
+            characters: pendingProposedSt.characters.map((c) =>
+              c.id === ctx.char.id ? charAfter : c
+            ),
+            entities: (pendingProposedSt.entities ?? ctx.st.entities ?? []).map((e) =>
+              e.id === ctx.char.id && !e.isEnemy ? { ...e, hp: charAfter.hp } : e
+            ),
+            pending_reaction: undefined,
+          };
+          ctx.char = charAfter;
+          ctx.st = pushEvent(ctx.st, enemyAttackFragmentEvent(pendingFragment, ctx.st.round ?? 1));
+          ctx.narrative = `🍀 ${ctx.char.name} spends a luck point — disadvantage on the attack! Reroll: d20s ${r1}/${r2} → ${newD20}, total ${newTotal} vs AC ${rx.targetAc} — still hits. ${pendingFragment.prose}`;
+        } else {
+          // Disadvantage turns the hit into a miss — damage discarded.
+          ctx.st = {
+            ...ctx.st,
+            characters: ctx.st.characters.map((c) => (c.id === ctx.char.id ? charBase : c)),
+            pending_reaction: undefined,
+          };
+          ctx.char = charBase;
+          ctx.st = pushEvent(ctx.st, {
+            kind: 'attack_miss',
+            attackerId: pendingFragment.attackerEnemyId,
+            attackerName: pendingFragment.attackerName,
+            targetId: pendingFragment.targetCharId,
+            targetName: pendingFragment.targetName,
+            toHit: newTotal,
+            targetAc: rx.targetAc,
+            round: ctx.st.round ?? 1,
+          });
+          ctx.narrative = `🍀 ${ctx.char.name} spends a luck point — disadvantage on the attack! Reroll: d20s ${r1}/${r2} → ${newD20}, total ${newTotal} vs AC ${rx.targetAc} — the strike misses!`;
+        }
+      }
+    } else {
+      // Decline — commit full proposed snapshot.
+      ctx.st = {
+        ...ctx.st,
+        characters: pendingProposedSt.characters.map((c) =>
+          c.id === ctx.char.id ? pendingProposedChar : c
+        ),
+        entities: (pendingProposedSt.entities ?? ctx.st.entities ?? []).map((e) =>
+          e.id === ctx.char.id && !e.isEnemy ? { ...e, hp: pendingProposedChar.hp } : e
+        ),
+        pending_reaction: undefined,
+      };
+      ctx.char = pendingProposedChar;
+      ctx.st = pushEvent(ctx.st, enemyAttackFragmentEvent(pendingFragment, ctx.st.round ?? 1));
+      ctx.narrative = `${pendingFragment.prose} (Lucky declined.)`;
+    }
   } else if (rx.kind === 'absorb_elements') {
     // PHB p.211. Accept = burn a L1+ slot, halve damage, commit;
     // decline = commit the full-damage snapshot.

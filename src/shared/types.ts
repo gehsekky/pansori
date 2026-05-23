@@ -1027,6 +1027,29 @@ export interface PendingSentinelReaction extends PendingReactionBase {
   triggerAttackerEnemyId: string;
 }
 
+// 2024 PHB Lucky feat — Disadvantage benefit. Triggered when an
+// enemy attack roll against the PC hits + the PC has the Lucky
+// feat with at least one luck point remaining. Accept spends 1 luck
+// point and re-rolls the enemy d20 with Disadvantage (per 2024 RAW
+// "you can spend 1 Luck Point to impose Disadvantage on that
+// roll"). Same proposed-snapshot stash pattern as Silvery Barbs.
+//
+// Pansori divergence from RAW: the spend window is post-roll
+// (player sees the hit before deciding), where RAW is pre-roll
+// (spend before knowing the result). This makes the feat slightly
+// stronger than RAW since players never "waste" points on attacks
+// that would have missed. Documented as a known divergence.
+export interface PendingLuckyDisadvReaction extends PendingReactionBase {
+  kind: 'lucky_disadv';
+  atkTotal: number;
+  proposedD20: number;
+  proposedDamage: number;
+  targetAc: number;
+  pendingFragment: unknown;
+  pendingProposedChar: unknown;
+  pendingProposedSt: unknown;
+}
+
 // Silvery Barbs (Strixhaven origin spell, 1st-level enchantment).
 // Reaction triggered when a creature within 60 ft succeeds on an
 // attack roll, ability check, or saving throw. Accepting consumes a
@@ -1157,6 +1180,7 @@ export type PendingReaction =
   | PendingUncannyDodgeReaction
   | PendingAbsorbElementsReaction
   | PendingSilveryBarbsReaction
+  | PendingLuckyDisadvReaction
   | PendingSentinelReaction
   | PendingD20InterceptionReaction
   | PendingPcD20Reaction;
