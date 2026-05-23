@@ -4268,20 +4268,6 @@ function isPortentEligible(target: Character): boolean {
 }
 
 /**
- * Silvery Barbs (Strixhaven, 1st-level enchantment). Reaction
- * triggered when a creature within 60 ft of the caster succeeds on
- * an attack roll. MVP scope: only the target of the attack reacts
- * (RAW any caster within 60 ft qualifies — party-wide eligibility
- * is a TODO). The resolver rerolls the d20 and uses the lower
- * result, potentially turning the hit into a miss.
- */
-function isSilveryBarbsEligible(target: Character, context: Context): boolean {
-  if (target.turn_actions?.reaction_used) return false;
-  if (!knowsSpellWithSlot(target, 'silvery_barbs', context)) return false;
-  return true;
-}
-
-/**
  * 2024 PHB Lucky feat — Disadvantage benefit. Eligible when the
  * target PC has the Lucky feat with at least one luck point
  * remaining. Doesn't consume the reaction slot (RAW: "When a
@@ -4320,33 +4306,6 @@ function isLuckyDisadvEligible(target: Character): boolean {
   // self-advantage roll, that point is in-flight and shouldn't also
   // be offered for disadvantage on an enemy roll.
   if (target.turn_actions?.luck_pending) return false;
-  return true;
-}
-
-/**
- * Absorb Elements (PHB p.211) — reaction spell triggered when the
- * caster takes acid / cold / fire / lightning / thunder damage.
- * Requires:
- *   - The spell known + a level-1+ slot available.
- *   - The triggering damage type matches one of the five.
- *   - Reaction available this turn.
- *   - PC conscious after the proposed damage commits (we read
- *     `target.hp` BEFORE the commit, so we check `> 0` against the
- *     pre-attack HP — sets aside the edge case of "killed by the
- *     hit"; RAW the spell would still let you react before dropping
- *     because reactions trigger on damage TAKEN. Pansori models this
- *     as: if the proposed snapshot would leave you at 0, you're
- *     still eligible to react).
- */
-function isAbsorbElementsEligible(
-  target: Character,
-  damageType: string,
-  context: Context
-): boolean {
-  const eligibleTypes = ['acid', 'cold', 'fire', 'lightning', 'thunder'];
-  if (!eligibleTypes.includes(damageType)) return false;
-  if (target.turn_actions?.reaction_used) return false;
-  if (!knowsSpellWithSlot(target, 'absorb_elements', context)) return false;
   return true;
 }
 
@@ -4712,10 +4671,7 @@ function runEnemyMultiattackLoop(args: {
     // Diviner Portent reaction window. Fires when the enemy attack
     // hits AND the target is a Diviner Wizard L2+ with at least one
     // portent die remaining. The resolver replaces the enemy's d20
-    // with the chosen portent value and re-evaluates the hit. Wired
-    // BEFORE Silvery Barbs so Diviners get first crack — both are
-    // post-roll modifications, but Portent is the more impactful
-    // one (no slot cost, deterministic replacement vs. a reroll).
+    // with the chosen portent value and re-evaluates the hit.
     if (computed.hit && computed.hpLost > 0 && isPortentEligible(target)) {
       st = {
         ...st,
@@ -4743,34 +4699,6 @@ function runEnemyMultiattackLoop(args: {
       return { kind: 'paused', st, narrative };
     }
 
-    // Silvery Barbs reaction window. Fires when the enemy attack
-    // hits AND the PC knows the spell + has a slot. The resolver
-    // rerolls the enemy d20 and takes the lower — potentially
-    // turning the hit into a miss.
-    if (computed.hit && computed.hpLost > 0 && isSilveryBarbsEligible(target, context)) {
-      st = {
-        ...st,
-        pending_reaction: {
-          kind: 'silvery_barbs',
-          attackerEnemyId: enemyId,
-          targetCharId: target.id,
-          atkTotal: computed.atkTotal,
-          proposedD20: computed.atkD20,
-          proposedDamage: computed.hpLost,
-          targetAc: target.ac,
-          pendingFragment: computed.fragment as EnemyAttackHitFragment,
-          pendingProposedChar: computed.proposedChar,
-          pendingProposedSt: { ...computed.proposedSt, pending_reaction: undefined },
-          resumeFromInitiativeIdx: advIdx,
-          resumeFromMultiattackIdx: mi + 1,
-          narrativeSoFar: narrative,
-          eligibleCharIds: [target.id],
-        },
-        active_character_id: target.id,
-      };
-      narrative += ` ⚡ ${enemy.name} hits ${target.name} (d20 ${computed.atkD20} → total ${fmt.roll(computed.atkTotal)} vs ${fmt.ac(target.ac)}) — Silvery Barbs available!`;
-      return { kind: 'paused', st, narrative };
-    }
     // 2024 PHB Lucky feat — Disadvantage benefit. Fires when the enemy
     // attack hits AND the PC has Lucky + a remaining luck point. The
     // resolver re-rolls the enemy attack with Disadvantage forced
@@ -4834,40 +4762,6 @@ function runEnemyMultiattackLoop(args: {
         narrative += ` ⚡ ${enemy.name} hits ${target.name} with advantage (d20 ${computed.atkD20} → total ${fmt.roll(computed.atkTotal)} vs ${fmt.ac(target.ac)}) — Restore Balance available!`;
         return { kind: 'paused', st, narrative };
       }
-    }
-    // Absorb Elements reaction window. Fires when the enemy attack
-    // deals one of the five elemental damage types AND the PC has
-    // the spell + a slot. Same proposed-snapshot stash pattern as
-    // Shield / Uncanny Dodge.
-    if (
-      computed.hit &&
-      computed.hpLost > 0 &&
-      computed.fragment.kind === 'enemy_attack_hit' &&
-      isAbsorbElementsEligible(target, computed.fragment.damageType, context)
-    ) {
-      // Inside this branch TS has narrowed `computed.fragment` to
-      // `EnemyAttackHitFragment` (the discriminant guard above).
-      const hitFragment = computed.fragment;
-      st = {
-        ...st,
-        pending_reaction: {
-          kind: 'absorb_elements',
-          attackerEnemyId: enemyId,
-          targetCharId: target.id,
-          damageType: hitFragment.damageType as 'acid' | 'cold' | 'fire' | 'lightning' | 'thunder',
-          proposedDamage: computed.hpLost,
-          pendingFragment: hitFragment,
-          pendingProposedChar: computed.proposedChar,
-          pendingProposedSt: { ...computed.proposedSt, pending_reaction: undefined },
-          resumeFromInitiativeIdx: advIdx,
-          resumeFromMultiattackIdx: mi + 1,
-          narrativeSoFar: narrative,
-          eligibleCharIds: [target.id],
-        },
-        active_character_id: target.id,
-      };
-      narrative += ` ⚡ ${enemy.name} hits ${target.name} for ${fmt.dmg(computed.hpLost)} ${hitFragment.damageType} — Absorb Elements available!`;
-      return { kind: 'paused', st, narrative };
     }
     // Uncanny Dodge reaction window (Rogue L5+). Triggers BEFORE
     // damage commits when the Rogue can see the attacker. Same

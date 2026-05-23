@@ -1459,7 +1459,7 @@ export const context: Context = {
     Bard: ['bardic_inspiration_spell', 'cure_wounds', 'healing_word', 'charm_person', 'sleep'],
     Druid: ['shillelagh', 'entangle', 'cure_wounds', 'healing_word'],
     Sorcerer: ['fire_bolt', 'sleep', 'burning_hands', 'misty_step', 'fireball'],
-    Warlock: ['eldritch_blast', 'hex', 'charm_person', 'hunger_of_hadar'],
+    Warlock: ['eldritch_blast', 'hex', 'charm_person'],
   },
 
   classSpellSlots: {
