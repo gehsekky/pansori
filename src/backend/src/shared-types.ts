@@ -260,9 +260,6 @@ export type StructuredAction =
   // Great Weapon Master (2024 PHB) — bonus-action attack after a
   // Heavy-weapon Crit or kill on this turn.
   | { type: 'gwm_bonus_attack'; targetEnemyId?: string }
-  // Celestial Warlock L3 — Healing Light: bonus action, spend N
-  // dice from a (1 + warlock level)-d6 pool to heal self/ally.
-  | { type: 'use_healing_light'; dice: number; targetCharId?: string }
   // Land Druid L3 — Land's Aid: bonus action (2 uses/long rest)
   // that heals an ally OR damages an enemy. Picks one of three
   // variants at use time.
@@ -361,7 +358,6 @@ export type ChoiceKind =
   | 'two_weapon_attack'
   | 'polearm_butt_end'
   | 'gwm_bonus_attack'
-  | 'use_healing_light'
   | 'use_lands_aid'
   | 'use_celestial_revelation'
   | 'cast_spell'
