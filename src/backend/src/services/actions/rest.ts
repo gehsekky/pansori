@@ -188,13 +188,6 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
     if (c.subclass === 'land' && hasClass(c, 'druid')) {
       delete restoredUses.lands_aid_used;
     }
-    // 2024 PHB Clockwork Soul Sorcerer — Restore Balance pool
-    // refreshes to CHA mod (min 1) on long rest. Tracks CHA changes
-    // between rests (e.g. ASI bumps the pool size on next refresh).
-    if (c.subclass === 'clockwork_soul' && hasClass(c, 'sorcerer')) {
-      const chaMod = Math.max(0, Math.floor(((c.cha ?? 10) - 10) / 2));
-      restoredUses.restore_balance_uses = Math.max(1, chaMod);
-    }
     const restoredUsesWithFeats = resetFeatLongRestResources(c, ctx.context, restoredUses);
     const refreshed = {
       ...c,

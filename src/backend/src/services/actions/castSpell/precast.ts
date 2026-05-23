@@ -1,8 +1,8 @@
 import type { AbilityKey, Spell } from '../../../types.js';
-import { breakConcentration, pick } from '../../gameEngine.js';
-import { d, hasArmorProficiency, rollDice, spellSaveDC } from '../../rulesEngine.js';
+import { hasArmorProficiency, spellSaveDC } from '../../rulesEngine.js';
 import { hasClass, resolveCastingAbility } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
+import { breakConcentration } from '../../gameEngine.js';
 import { distanceFeet } from '../../gridEngine.js';
 
 /**
@@ -171,31 +171,6 @@ export function runPrecast(
   // activation check on a subsequent metamagic invocation).
   if (spell.level > 0 && !isRitualCast) {
     ctx.char.turn_actions = { ...ctx.char.turn_actions, leveled_spell_cast: true };
-  }
-  // Sorcerer · Wild Magic Surge (PHB p.103) — 1-in-20 chance after each
-  // leveled spell to trigger a chaotic effect. RAW rolls 1d20 and on a 1
-  // rolls a result on the Wild Magic table (d100). We use a small
-  // curated table appropriate to our engine's mechanics.
-  if (
-    spell.level > 0 &&
-    !isRitualCast &&
-    hasClass(ctx.char, 'sorcerer') &&
-    ctx.char.subclass === 'wild_magic' &&
-    d(20) === 1
-  ) {
-    const surge = pick([
-      'You glow with a soft blue light for 1 minute (visible from 30 ft).',
-      'A poof of harmless multicolored smoke envelops you.',
-      `You regain 2d4 (${rollDice('2d4')}) hit points (Wild Magic Surge).`,
-      'Your hair (or scales, where applicable) turns vivid pink until your next long rest.',
-      'You feel a momentary disorientation — disadvantage on your next attack.',
-    ]);
-    // Apply mechanical effects where possible.
-    if (surge.startsWith('You regain')) {
-      const heal = rollDice('2d4');
-      ctx.char.hp = Math.min(ctx.char.max_hp, ctx.char.hp + heal);
-    }
-    ctx.narrative += ` 🌀 WILD MAGIC SURGE: ${surge}`;
   }
 
   // Multiclass spell-casting ability resolution (2024 PHB). For a

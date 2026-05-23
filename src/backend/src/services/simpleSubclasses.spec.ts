@@ -47,9 +47,4 @@ describe('Subclass picker exposes the new options', () => {
     const pc = makeChar({ id: 'pc', character_class: 'Warlock', level: 3 });
     expect(pickerOffers(pc)).toContain('great_old_one');
   });
-
-  it('Sorcerer L3 offers aberrant_mind + clockwork_soul', () => {
-    const pc = makeChar({ id: 'pc', character_class: 'Sorcerer', level: 3 });
-    expect(pickerOffers(pc)).toEqual(expect.arrayContaining(['aberrant_mind', 'clockwork_soul']));
-  });
 });
