@@ -1,5 +1,18 @@
 # Notes for Claude (and other AI assistants)
 
+## Project scope: strict SRD-only
+
+Pansori is a strict SRD 5.2.1 build. **No PHB-only content** —
+not subclasses, feats, species, or spells. If you find yourself
+wanting to add Lucky / Sharpshooter / Sentinel / Polearm Master /
+Battle Master / Aasimar / Absorb Elements / etc., the answer is
+**no**. See [docs/srd-only-audit.md](docs/srd-only-audit.md) for
+the rationale and the audit that walked back the prior PHB-derived
+content.
+
+When unsure whether a feature is SRD or PHB, grep the SRD txt
+first (see below). If it's not there, it doesn't belong in pansori.
+
 ## RAW reference: SRD 5.2.1
 
 The 2024 PHB-compatible SRD lives at [docs/srd-5.2.1.txt](docs/srd-5.2.1.txt)
@@ -8,7 +21,7 @@ The 2024 PHB-compatible SRD lives at [docs/srd-5.2.1.txt](docs/srd-5.2.1.txt)
 
 **When to consult it:**
 - Before adding a new spell, condition, feat, or species — `grep` the SRD
-  for the canonical rules text.
+  for the canonical rules text. If it's not in the SRD, it doesn't go in.
 - Before writing a `// SRD: <section>` comment — verify the wording.
 - When a player or reviewer flags a RAW question — check the SRD as the
   source of truth before relying on memory.
@@ -31,80 +44,44 @@ grep -n "Difficult Terrain\|Cover\|Hide Action\|Long Rest" docs/srd-5.2.1.txt
 
 # Movement modes
 grep -n "Climb\|Swim\|Fly Speed\|Burrow" docs/srd-5.2.1.txt
+
+# Feat names (SRD 5.2.1 has only 4 origin feats + Ability Score
+# Improvement + Grappler + 4 fighting styles + 7 epic boons):
+grep -n "^Alert$\|^Magic Initiate$\|^Savage Attacker$\|^Skilled$" docs/srd-5.2.1.txt
 ```
 
-**What the SRD covers vs. doesn't:**
+**What the SRD covers (and how much is in pansori):**
 
-✅ In the SRD:
-- All 2024 PHB core rules (combat, conditions, saves, action economy)
-- Base classes + the "iconic" subclass for each (Champion / Battle Master /
-  Life / War / etc.)
-- ~150 of the most common spells
-- Standard species (Human, Elf, Dwarf, etc.) and some others
-- 2024-revised mechanics (Polymorph temp-HP rewrite, Influence action, etc.)
+| Category | SRD count | In pansori |
+|---|---|---|
+| Subclasses | 1 iconic per class | 12 (all SRD-iconic) |
+| Origin feats | 4 (+ Magic Initiate's 3 list variants) | 6 |
+| General feats | 2 (ASI + Grappler) | 0 (neither fits the choose-a-feat surface today) |
+| Species | 9 standalone + Drow as Elf-lineage | 9 |
+| Spells | ~150 | 71 |
 
-❌ Not in the SRD (need the full 2024 PHB):
-- Most non-iconic subclasses (Stars Druid, Trickery Cleric, Clockwork Soul
-  Sorcerer, Aberrant Mind, Soulknife, Glamour Bard, World Tree, etc.)
-- 2024-specific feats not yet in the SRD (some Magic Initiate details,
-  some general feats)
-- ~half the PHB spell catalog
-- Detailed monster stat blocks beyond the SRD sample
-
-For SRD-covered content, the txt file is authoritative — use it before
-relying on training-data recall. For PHB-only content, rely on:
-1. User-provided RAW excerpts in conversation (paste-as-you-go from
-   the user's D&D Beyond browser view — clean, targeted, fair-use)
-2. Pansori's existing tests + documented decisions in `docs/TODO.md`
-3. Cross-checks against published commentary (e.g. user pasting Gemini
-   citations) — defer to those over memory.
-
-## Free Basic Rules (D&D Beyond) — cross-check via WebFetch
-
-Wizards hosts the 2024 Basic Rules for free on D&D Beyond. It covers
-more than SRD 5.2.1 (some 2024 PHB revisions land in Basic Rules
-before flowing to the SRD). The content is © Wizards / All Rights
-Reserved, but free to read on the official site — so WebFetch with
-short-bullet-summary prompts is fair-use cross-check.
-
-**Use this as a SECONDARY reference (after SRD grep) for:**
-- Core rules chapters (Playing the Game, Spells overview, Rules
-  Glossary entries on Concentration, Cover, etc.)
-- 2024-specific rule revisions not yet propagated to SRD
-- Quick verification of mechanics before shipping
-
-**Useful URL patterns:**
-
-```
-https://www.dndbeyond.com/sources/dnd/br-2024/playing-the-game
-https://www.dndbeyond.com/sources/dnd/br-2024/spells
-https://www.dndbeyond.com/sources/dnd/br-2024/spell-descriptions
-https://www.dndbeyond.com/sources/dnd/br-2024/character-classes
-https://www.dndbeyond.com/sources/dnd/br-2024/rules-glossary
-```
-
-**Prompt template for WebFetch:**
-
-> "For a development cross-check, give me terse mechanical bullets
-> (no verbatim rules text, just the rule shape) on [topic]: [list
-> the specific mechanics you want to confirm]. Bullet format. I'll
-> write original code from understanding."
-
-**Known WebFetch limitation:** long paginated pages (the
-spell-descriptions alphabetical listing in particular) truncate at
-the front of the alphabet. Individual spells starting with letters
-past ~D are not reliably reachable. Fallback: ask the user to paste
-the specific spell excerpt from their browser.
-
-**Never:** bulk-extract Basic Rules content to a file in the repo.
-Wizards lets you READ the Free Basic Rules on their site but hasn't
-licensed it for redistribution — that's a difference from SRD 5.2.1
-(CC-BY-4.0). On-demand WebFetch summaries are fine; persistent
-text files are not.
+The SRD's General Feats section is intentionally small — most
+iconic combat-optimization feats (Lucky / Sharpshooter / Sentinel
+/ GWM / Polearm Master / War Caster / Heavy Armor Master /
+Resilient / Tough / Mobile / Observant / Athlete / Dual Wielder /
+Healer / Tavern Brawler / Crossbow Expert) are PHB-only.
 
 ## Citation convention
 
-Replace `// PHB p.X` comments with `// SRD: <section name>` when
-shipping new mechanics. Page numbers shift across PHB printings; SRD
-section names are stable. For 2024 content covered by Basic Rules
-but not the SRD, cite as `// 2024 Basic Rules: <section>`.
+Use `// SRD: <section name>` for SRD-derived comments. Page
+numbers shift across PHB printings; SRD section names are stable.
+Never cite PHB pages — pansori doesn't carry PHB content.
+
+## Workflow for new content
+
+1. **Confirm SRD coverage first.** `grep` the relevant header in
+   `docs/srd-5.2.1.txt`. If the feature isn't there, do not add
+   it — propose a redesign that uses SRD-covered mechanics, or
+   defer the work.
+2. **Original code only.** Implement the mechanics in pansori's
+   data + dispatcher shape; descriptions in the `desc` field are
+   written in our own words (not pasted from SRD prose). The SRD
+   txt is a reference for verification, not a source to paste from.
+3. **Test before commit.** Each new mechanical addition gets a
+   matching `.spec.ts`; lint, tsc, and the full test suite must
+   pass.
