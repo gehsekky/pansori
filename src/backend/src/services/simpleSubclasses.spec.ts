@@ -37,9 +37,9 @@ function pickerOffers(pc: ReturnType<typeof makeChar>): string[] {
     .filter(Boolean);
 }
 
-describe('Subclass picker exposes the new options', () => {
-  it('Wizard L3 offers diviner + illusionist', () => {
+describe('Subclass picker — SRD-only baseline', () => {
+  it('Wizard L3 offers evoker', () => {
     const pc = makeChar({ id: 'pc', character_class: 'Wizard', level: 3 });
-    expect(pickerOffers(pc)).toEqual(expect.arrayContaining(['diviner', 'illusionist']));
+    expect(pickerOffers(pc)).toContain('evoker');
   });
 });

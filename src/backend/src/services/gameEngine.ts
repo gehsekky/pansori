@@ -842,23 +842,9 @@ function computeEnemyAttack(
       speciesResist && !isRaging && !isPetrified && !beastResist
         ? ` (${speciesData?.name} ${enemy.damageType} resistance: ${result.damage}→${postResistDmg})`
         : '';
-    // Arcane Ward: Abjurer Wizard — absorb damage into ward HP before character HP
-    let wardNote = '';
-    let charAfterWard = char;
-    let postWardDmg = postResistDmg;
-    const wardHp = char.class_resource_uses?.arcane_ward ?? 0;
-    if (wardHp > 0 && char.subclass === 'abjurer') {
-      const absorbed = Math.min(wardHp, postWardDmg);
-      postWardDmg -= absorbed;
-      charAfterWard = {
-        ...charAfterWard,
-        class_resource_uses: {
-          ...(charAfterWard.class_resource_uses ?? {}),
-          arcane_ward: wardHp - absorbed,
-        },
-      };
-      wardNote = ` (Arcane Ward absorbed ${absorbed} — ward HP: ${wardHp - absorbed})`;
-    }
+    const wardNote = '';
+    const charAfterWard = char;
+    const postWardDmg = postResistDmg;
     // 2024 PHB Heavy Armor Master feat — while wearing heavy armor and not
     // incapacitated, attacks that hit you deal 3 less damage. Floor at 0.
     // Applied after resistance + ward so the -3 is a flat last-step
@@ -2088,27 +2074,6 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         },
       ];
     }
-    if (pending.kind === 'd20_interception') {
-      // Today only Portent fires this kind; the labels assume that
-      // source. When Lucky / Restore Balance plug into the same shape,
-      // branch on `pending.source` to vary the label.
-      const sourceLabel = pending.source === 'portent' ? 'Portent' : 'D20 Interception';
-      const replacementOpts = pending.replacementValues.map((value, idx) => ({
-        label: `Use ${sourceLabel} die [${value}] — ${enemyForLabel}'s d20 ${pending.proposedD20} → ${value} (total ${value + (pending.atkTotal - pending.proposedD20)} vs AC ${pending.targetAc})`,
-        action: {
-          type: 'resolve_reaction' as const,
-          accept: true,
-          replacementIndex: idx,
-        },
-      }));
-      return [
-        ...replacementOpts,
-        {
-          label: `Decline — take the hit (${pending.proposedDamage} damage)`,
-          action: { type: 'resolve_reaction', accept: false },
-        },
-      ];
-    }
     if (pending.kind === 'lucky_disadv') {
       const remaining = char.class_resource_uses?.feat_lucky_uses ?? 0;
       return [
@@ -2479,7 +2444,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     const subclassChoices: Record<string, string[]> = {
       fighter: ['champion'],
       rogue: ['assassin'],
-      wizard: ['evoker', 'abjurer', 'diviner', 'illusionist'],
+      wizard: ['evoker'],
       cleric: ['life'],
       ranger: ['hunter'],
       paladin: ['devotion'],
@@ -2980,19 +2945,6 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       choices.push({
         label: `Colossus Slayer — +1d8 on first hit vs bloodied target`,
         action: { type: 'use_class_feature', featureId: 'colossus_slayer' },
-        kind: 'class_feature',
-      });
-    }
-
-    // Abjurer Wizard: Arcane Ward (create when not active)
-    if (
-      char.subclass === 'abjurer' &&
-      hasClass(char, 'wizard') &&
-      !char.class_resource_uses?.arcane_ward
-    ) {
-      choices.push({
-        label: `Arcane Ward — create ${2 * char.level} HP damage shield`,
-        action: { type: 'use_class_feature', featureId: 'arcane_ward' },
         kind: 'class_feature',
       });
     }
@@ -3869,29 +3821,6 @@ function findSentinelEligiblePcs(
 }
 
 /**
- * Diviner Portent (PHB 2024 — Wizard L2 subclass feature). Reaction
- * triggered AFTER an enemy attack hits — the Diviner replaces the
- * enemy's d20 with one of their pre-rolled portent dice. If the
- * replacement total drops below targetAc, the hit becomes a miss.
- *
- * Eligibility (this MVP slice):
- *   - PC is a Wizard L2+ with subclass 'diviner'.
- *   - PC has at least one portent die remaining (`portent_dice`
- *     stocked on long rest; see rest.ts).
- *   - Reaction available this turn.
- *
- * Out of scope: targeting enemies' rolls against ALLIES (MVP only
- * scans the attack target); replacing PCs' own attack/save/check
- * d20s (needs a PC-turn pause point that pansori doesn't have).
- */
-function isPortentEligible(target: Character): boolean {
-  if (target.turn_actions?.reaction_used) return false;
-  if (target.character_class?.toLowerCase() !== 'wizard') return false;
-  if (target.subclass !== 'diviner') return false;
-  if ((target.level ?? 1) < 2) return false;
-  return (target.portent_dice ?? []).length > 0;
-}
-
 /**
  * 2024 PHB Lucky feat — Disadvantage benefit. Eligible when the
  * target PC has the Lucky feat with at least one luck point
@@ -4268,36 +4197,6 @@ function runEnemyMultiattackLoop(args: {
         active_character_id: target.id,
       };
       narrative += ` ⚡ ${enemy.name} strikes ${target.name} — total ${fmt.roll(computed.atkTotal)} vs ${fmt.ac(target.ac)}. Shield available!`;
-      return { kind: 'paused', st, narrative };
-    }
-    // Diviner Portent reaction window. Fires when the enemy attack
-    // hits AND the target is a Diviner Wizard L2+ with at least one
-    // portent die remaining. The resolver replaces the enemy's d20
-    // with the chosen portent value and re-evaluates the hit.
-    if (computed.hit && computed.hpLost > 0 && isPortentEligible(target)) {
-      st = {
-        ...st,
-        pending_reaction: {
-          kind: 'd20_interception',
-          source: 'portent',
-          attackerEnemyId: enemyId,
-          targetCharId: target.id,
-          atkTotal: computed.atkTotal,
-          proposedD20: computed.atkD20,
-          proposedDamage: computed.hpLost,
-          targetAc: target.ac,
-          replacementValues: [...(target.portent_dice ?? [])],
-          pendingFragment: computed.fragment as EnemyAttackHitFragment,
-          pendingProposedChar: computed.proposedChar,
-          pendingProposedSt: { ...computed.proposedSt, pending_reaction: undefined },
-          resumeFromInitiativeIdx: advIdx,
-          resumeFromMultiattackIdx: mi + 1,
-          narrativeSoFar: narrative,
-          eligibleCharIds: [target.id],
-        },
-        active_character_id: target.id,
-      };
-      narrative += ` ⚡ ${enemy.name} hits ${target.name} (d20 ${computed.atkD20} → total ${fmt.roll(computed.atkTotal)} vs ${fmt.ac(target.ac)}) — Portent available!`;
       return { kind: 'paused', st, narrative };
     }
 

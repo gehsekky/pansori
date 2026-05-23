@@ -320,15 +320,7 @@ export type StructuredAction =
   | { type: 'use_reaction' }
   | { type: 'select_subclass'; subclass: string }
   | { type: 'prepare_spells'; spellIds: string[] }
-  | {
-      type: 'resolve_reaction';
-      accept: boolean;
-      // Generic d20-interception reactions (Portent today; Lucky-RAW
-      // and Restore Balance later) take an index into the pending
-      // reaction's `replacementValues` array. Omitted = server picks
-      // the lowest available (most likely to convert hit → miss).
-      replacementIndex?: number;
-    }
+  | { type: 'resolve_reaction'; accept: boolean }
   // Out-of-combat only: switch which PC is the "lead" / active character
   // for subsequent narrative attribution + skill checks. RAW has no
   // notion of initiative outside combat — the party operates as a unit
@@ -1034,39 +1026,6 @@ export interface PendingCounterspellReaction extends PendingReactionBase {
   intendedTargetPcId: string;
 }
 
-// Generic post-roll d20 interception (PHB 2024 — Diviner Portent and
-// future Lucky-RAW-timing variants). The engine has rolled an enemy d20
-// + computed a proposed hit outcome; the eligible PC may replace the
-// d20 with a pre-rolled value (Portent) or otherwise modify it. The
-// resolver re-evaluates the hit using the replacement value and either
-// commits the proposed snapshot (if the replacement still hits) or
-// discards the damage (if the replacement turns the hit into a miss).
-//
-// `replacementValues` carries each available replacement so the FE can
-// surface one accept option per choice. The reaction action's
-// `portentDieIndex` (or future generic `d20InterceptionIndex`) picks
-// which one to spend; defaults to the lowest available when omitted.
-//
-// Today only Portent fires this reaction kind on enemy attack rolls.
-// The shape is intentionally generic so Lucky's RAW spend-after-roll
-// timing + Clockwork Soul's Restore Balance reaction can plug into it
-// in follow-up PRs.
-export interface PendingD20InterceptionReaction extends PendingReactionBase {
-  kind: 'd20_interception';
-  source: 'portent';
-  atkTotal: number;
-  proposedD20: number;
-  proposedDamage: number;
-  targetAc: number;
-  /** Each replacement value the reactor can spend. Indexed by their
-   *  position in `Character.portent_dice` (or future per-feature
-   *  resource array) so the resolver can pop the right entry. */
-  replacementValues: number[];
-  pendingFragment: unknown;
-  pendingProposedChar: unknown;
-  pendingProposedSt: unknown;
-}
-
 // 2024 PHB PC-turn d20 reaction window. Fires when a PC rolls a d20
 // for an attack roll (initial scope; saves + ability checks land next)
 // and the engine should pause to offer post-roll reactions before
@@ -1131,5 +1090,4 @@ export type PendingReaction =
   | PendingUncannyDodgeReaction
   | PendingLuckyDisadvReaction
   | PendingSentinelReaction
-  | PendingD20InterceptionReaction
   | PendingPcD20Reaction;
