@@ -799,6 +799,18 @@ the prerequisite infrastructure lands.
   vertical-only modeled as a limited flying speed).
 - ~~**Detect Magic / Identify / Comprehend Languages**~~ — shipped
   with ritual casting.
+- ~~**Slow (L3)**~~ — shipped 2026-05-22. WIS save, concentration.
+  Single-target via the existing save+condition path (RAW multi-
+  target via 40-ft cube deferred). New `slowed` condition + engine
+  effects: `effectiveSpeed` halves the value, `effectiveEnemyAc` in
+  resolveOneAttack subtracts 2 from the target's AC, and
+  `rollConditionSave` subtracts 2 from Dex saves on slowed targets.
+  Renamed the prior narrative-only `slowed` weapon-mastery condition
+  to `slow_struck` to free the canonical name for the spell. The
+  RAW action-economy gate (action OR bonus action, one attack max),
+  no reactions, and 25% somatic-spell fail are all deferred behind
+  the same turn-flow rework Haste's extra-action needs. The end-of-
+  turn save to throw off the effect is also deferred. 6 BE specs.
 - ~~**Heal (L6)**~~ — shipped 2026-05-22. 70 HP + WIS mod, +10 per
   slot above 6th. Uses the existing heal pipeline. Required an
   `addDice` / `multiplyDice` fix to handle plain-numeric heal
@@ -877,6 +889,32 @@ the prerequisite infrastructure lands.
   destination picker lands.
 - **Counterspell** — already shipped pre-session.
 - **Spirit Guardians** — already shipped pre-session.
+
+**Tier C closure note (2026-05-22):** The architectural / new-pattern
+work in Tier C is done — every "different shape" spell that pansori
+needed reusable infrastructure for has shipped (multi-target heal,
+buff temp-HP, save-with-condition-revert, target-removed-from-combat,
+stat-block swap via temp HP, real grid teleport, multi-stat buff,
+multi-stat debuff). The remaining content (more spells, more monsters,
+more backgrounds, magic items, epic boon feats, higher-level subclass
+features) is repeatable data churn — each future addition slots into
+an existing pattern. Ship as campaigns / playtests demand them, not
+as a critical-path engine block.
+
+**Spells deferred behind specific infra:**
+- **Wall of Force / Wall of Fire (real grid blocker)** — needs
+  transient grid obstacles that expire on concentration drop.
+- **Mirror Image / Counterspell-on-self / Foresight** — need a
+  PC-turn d20 reaction window (the Lucky / Restore Balance work).
+- **Bestow Curse / Hold Monster variants** — need multi-option
+  picker UX on the FE for the curse type selection.
+- **Revivify / Raise Dead** — need a death + return-to-life
+  pipeline (currently dead PCs stay dead until manual revive).
+- **Haste + Slow extra-action / cap-action gates** — need the
+  PC-turn extra-action flow (let a hasted PC take a second
+  limited action; cap a slowed PC at action OR bonus, etc.).
+- **Heroes' Feast / Greater Restoration** — pluggable via the
+  existing `removeConditions` + multi-target heal infra.
 
 ### Architectural blockers
 

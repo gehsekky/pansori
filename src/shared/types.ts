@@ -80,7 +80,14 @@ export type ConditionName =
   // adds +2; rollConditionSave gives advantage on Dex. When the
   // caster's concentration drops, the lethargy hook applies
   // `incapacitated` for one round per RAW.
-  | 'hasted';
+  | 'hasted'
+  // 2024 PHB Slow — Speed halved, -2 AC, -2 Dex saves, no reactions,
+  // and capped action economy each turn (action-economy gate
+  // deferred in pansori MVP behind the same turn-flow refactor that
+  // Haste's extra action needs). effectiveSpeed halves speed when
+  // the flag is set; toHit pipeline subtracts 2 from the target's
+  // effective AC; rollConditionSave subtracts 2 from Dex saves.
+  | 'slowed';
 
 export type NpcAttitude = 'friendly' | 'indifferent' | 'hostile';
 
