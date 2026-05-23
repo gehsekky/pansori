@@ -1,7 +1,6 @@
 import type { CombatEntity, Enemy } from '../../../types.js';
 import { FRESH_TURN, abilityMod, profBonus, rollDice } from '../../rulesEngine.js';
 import { buildInitiativeOrder, pick } from '../../gameEngine.js';
-import { getClassLevel, hasClass } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 
 /**
@@ -45,32 +44,6 @@ export function runCombatStart(ctx: ActionContext, target: Enemy): void {
   if (freshChar) ctx.char = { ...freshChar };
   ctx.char = { ...ctx.char, turn_actions: { ...FRESH_TURN } };
 
-  // 2024 PHB Gloom Stalker Ranger L3 — Dread Ambusher: on the
-  // first turn of combat, the first attack deals +1d8. Set the
-  // flag on every Gloom Stalker so each gets the bonus on their
-  // first attack this combat. FRESH_TURN at the start of each
-  // PC's turn clears the flag if they didn't attack — i.e., it
-  // expires after the FIRST turn naturally, matching RAW.
-  ctx.st = {
-    ...ctx.st,
-    characters: ctx.st.characters.map((c) =>
-      hasClass(c, 'ranger') && c.subclass === 'gloom_stalker' && getClassLevel(c, 'ranger') >= 3
-        ? { ...c, turn_actions: { ...c.turn_actions, dread_ambusher_pending: true } }
-        : c
-    ),
-  };
-  // Refresh ctx.char if it was the Gloom Stalker we just flagged.
-  if (
-    hasClass(ctx.char, 'ranger') &&
-    ctx.char.subclass === 'gloom_stalker' &&
-    getClassLevel(ctx.char, 'ranger') >= 3
-  ) {
-    ctx.char = {
-      ...ctx.char,
-      turn_actions: { ...ctx.char.turn_actions, dread_ambusher_pending: true },
-    };
-  }
-
   // ── Initialize grid entities at combat start ────────────────────────
   if (!ctx.st.entities) {
     const gw = ctx.context.gridWidth ?? 8;
@@ -84,31 +57,6 @@ export function runCombatStart(ctx: ActionContext, target: Enemy): void {
       conditions: c.conditions,
       condition_durations: c.condition_durations,
     }));
-    // Beastmaster Ranger L3+ enters combat with an animal companion
-    // (Wolf, MM stats: HP 11, AC 13, +4 to hit, 2d4+2 bite). PHB p.93.
-    const companionEntities: CombatEntity[] = ctx.st.characters
-      .filter(
-        (c) =>
-          !c.dead &&
-          hasClass(c, 'ranger') &&
-          c.subclass === 'beastmaster' &&
-          getClassLevel(c, 'ranger') >= 3
-      )
-      .map((c, ci) => ({
-        id: `${c.id}:companion`,
-        isEnemy: false,
-        isCompanion: true,
-        companionOwnerId: c.id,
-        companionName: 'Wolf',
-        pos: { x: 1 + ci, y: 2 },
-        hp: 11,
-        maxHp: 11,
-        ac: 13,
-        toHit: 4,
-        damage: '2d4+2',
-        conditions: [],
-        condition_durations: {},
-      }));
     const enemyEntities: CombatEntity[] = enemiesForInit.map((en, ei) => ({
       id: en.id,
       isEnemy: true,
@@ -120,7 +68,7 @@ export function runCombatStart(ctx: ActionContext, target: Enemy): void {
     }));
     ctx.st = {
       ...ctx.st,
-      entities: [...pcEntities, ...companionEntities, ...enemyEntities],
+      entities: [...pcEntities, ...enemyEntities],
       movement_used: {},
     };
   }

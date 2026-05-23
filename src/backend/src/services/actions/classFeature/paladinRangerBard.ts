@@ -1,14 +1,7 @@
-import { abilityMod, applyDamageMultiplier, rollCritical, rollDice } from '../../rulesEngine.js';
-import {
-  applyPartyLevelUps,
-  endCombatState,
-  getEnemyById,
-  isRoomCleared,
-  splitEncounterXp,
-} from '../../gameEngine.js';
+import { abilityMod, rollDice } from '../../rulesEngine.js';
+import { endCombatState, isRoomCleared } from '../../gameEngine.js';
 import { getClassLevel, hasClass } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
-import { distanceFeet } from '../../gridEngine.js';
 import { fmt } from '../../narrativeFmt.js';
 
 /**
@@ -114,78 +107,6 @@ export function handlePaladinRangerBardFeature(ctx: ActionContext, fid: string):
       if (isRoomCleared(ctx.st, ctx.seed, ctx.roomId)) {
         ctx.st = endCombatState(ctx.st);
       }
-    }
-    return true;
-  }
-
-  if (fid === 'command_companion') {
-    if (ctx.char.subclass !== 'beastmaster' || !hasClass(ctx.char, 'ranger')) {
-      ctx.narrative = 'Only Beastmaster Rangers can command an animal companion.';
-      return true;
-    }
-    if (getClassLevel(ctx.char, 'ranger') < 3) {
-      ctx.narrative = 'Animal Companion unlocks at Ranger level 3.';
-      return true;
-    }
-    if (ctx.char.turn_actions.bonus_action_used) {
-      ctx.narrative = 'Bonus action already used this turn.';
-      return true;
-    }
-    const comp = ctx.st.entities?.find(
-      (e) => e.isCompanion && e.companionOwnerId === ctx.char.id && e.hp > 0
-    );
-    if (!comp) {
-      ctx.narrative = 'Your animal companion is unavailable.';
-      return true;
-    }
-    const targetEnt = (ctx.st.entities ?? [])
-      .filter((e) => e.isEnemy && e.hp > 0)
-      .sort((a, b) => distanceFeet(comp.pos, a.pos) - distanceFeet(comp.pos, b.pos))[0];
-    if (!targetEnt) {
-      ctx.narrative = 'No living enemy in sight for the companion.';
-      return true;
-    }
-    const targetEnemy = getEnemyById(ctx.seed, targetEnt.id);
-    if (!targetEnemy) {
-      ctx.narrative = "Companion's target is unreachable.";
-      return true;
-    }
-    ctx.char.turn_actions = { ...ctx.char.turn_actions, bonus_action_used: true };
-    ctx.usedInitiative = true;
-    const toHit = comp.toHit ?? 4;
-    const dmgDice = comp.damage ?? '2d4+2';
-    const compName = comp.companionName ?? 'companion';
-    const attackRoll = rollDice('1d20');
-    const total = attackRoll + toHit;
-    if (attackRoll === 1) {
-      ctx.narrative = `${compName} lunges but misses wildly! (d20:1+${toHit}=${total} vs AC ${targetEnemy.ac})`;
-    } else if (attackRoll === 20 || total >= targetEnemy.ac) {
-      const isCrit = attackRoll === 20;
-      const dmg = isCrit ? rollCritical(dmgDice) : rollDice(dmgDice);
-      const { damage: finalDmg, note } = applyDamageMultiplier(dmg, 'piercing', targetEnemy);
-      const curHp = targetEnt.hp;
-      const newHp = Math.max(0, curHp - finalDmg);
-      ctx.st = {
-        ...ctx.st,
-        entities: (ctx.st.entities ?? []).map((e) =>
-          e.id === targetEnt.id && e.isEnemy ? { ...e, hp: newHp } : e
-        ),
-      };
-      ctx.narrative = `${compName} bites the ${targetEnemy.name}! ${finalDmg} piercing damage${isCrit ? ' (CRIT)' : ''} (d20:${attackRoll}+${toHit}=${total} vs AC ${targetEnemy.ac})${note}`;
-      if (newHp <= 0) {
-        ctx.st.enemies_killed = [...ctx.st.enemies_killed, targetEnt.id];
-        ctx.narrative += ` ${targetEnemy.name} falls!`;
-        const xpGain = targetEnemy.xp ?? 10;
-        const split = splitEncounterXp(ctx.st, ctx.char.id, xpGain);
-        ctx.st = split.st;
-        ctx.char.xp = (ctx.char.xp || 0) + split.share;
-        ctx.narrative += applyPartyLevelUps(ctx.st, ctx.char, ctx.context);
-        if (isRoomCleared(ctx.st, ctx.seed, ctx.roomId)) {
-          ctx.st = endCombatState(ctx.st);
-        }
-      }
-    } else {
-      ctx.narrative = `${compName} bites at the ${targetEnemy.name} but misses. (d20:${attackRoll}+${toHit}=${total} vs AC ${targetEnemy.ac})`;
     }
     return true;
   }
