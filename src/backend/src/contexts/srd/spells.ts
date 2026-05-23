@@ -941,4 +941,23 @@ export const SRD_SPELLS: Record<string, Spell> = {
     rangeFt: 60,
     spellList: ['arcane', 'divine'],
   },
+
+  // 2024 PHB Dimension Door (L4 conjuration). Teleport up to 500 ft
+  // to an unoccupied space. Pansori treats the grid as effectively
+  // "within range" since rooms are smaller than 500 ft. New castSpell
+  // branch auto-picks the cell with maximum min-distance to any
+  // living enemy (pansori MVP — no FE picker yet for destination
+  // cells). Willing-creature passenger (RAW: one creature within 5 ft)
+  // deferred until the action shape carries an optional companion id.
+  dimension_door: {
+    id: 'dimension_door',
+    name: 'Dimension Door',
+    level: 4,
+    castTime: 'action',
+    desc: 'You teleport yourself up to 500 feet to an unoccupied space you can see.',
+    narrative:
+      '{name} steps through a tear in the air — reality folds and they reappear elsewhere.',
+    rangeKind: 'self',
+    spellList: ['arcane'],
+  },
 };

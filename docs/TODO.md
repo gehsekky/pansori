@@ -819,7 +819,16 @@ the prerequisite infrastructure lands.
   drop via `breakConcentration` strips the linked condition,
   returning the enemy. RAW upcast (+1 target per slot above 4th)
   deferred — pansori MVP hits one target via the save branch.
-- **Dimension Door** — teleport mechanic.
+- ~~**Dimension Door**~~ — shipped 2026-05-22. L4 conjuration. Real
+  grid teleport for the caster (RAW also lets you bring one willing
+  creature within 5 ft — deferred). New branch in `castSpell/utility.ts`
+  auto-picks the cell with maximum min-distance to any living enemy
+  (pansori MVP — no FE picker yet for destination cells). Movement
+  budget for the turn isn't consumed (RAW: teleport doesn't use
+  movement). Falls back to narrative-only when the grid is empty
+  (out-of-combat). Misty Step stays narrative-only for now —
+  could share the same teleport branch if/when a Misty Step FE
+  destination picker lands.
 - **Counterspell** — already shipped pre-session.
 - **Spirit Guardians** — already shipped pre-session.
 
