@@ -24,460 +24,137 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 
 ## 5e SRD remaining gaps
 
-> **Edition alignment** — Pansori targets SRD 5.2.1 only. The Top 5
-> (weapon masteries, class feature audit, inspiration spend, Hide DC,
-> multi-target spells) plus all 12 SRD-iconic subclasses plus the bulk
-> of subsystems are shipped; remaining RAW gaps are small-impact,
-> content-data follow-ups, or architecturally blocked.
+> **Edition alignment** — Pansori targets SRD 5.2.1 only. The core
+> rules *frameworks* are largely shipped (attack/damage pipelines,
+> conditions, grid/tactical combat, spell slots + concentration +
+> components + AoE shapes + saves, reactions, rest/death, the
+> bring-from-dead ladder, weapon masteries, 12 SRD-iconic subclasses
+> at their L3 feature). The remaining work to a *complete* engine is
+> overwhelmingly **breadth on top of those frameworks** — the
+> prioritized gaps live in the rules-engine roadmap immediately below.
 
-### Mechanics-completeness roadmap (2026-05-21)
+### Rules-engine completeness roadmap (2026-05-23)
 
-> Engine + mechanics first; content (more spells, more monsters,
-> more class feature data) is data-entry work once the framework
-> exists. Items below are ordered roughly by leverage — Tier 1
-> unlocks the most downstream features per unit of code.
+> Derived from a full code survey on 2026-05-23. The frameworks exist;
+> what's left is mostly feature/content breadth plus a handful of
+> bounded subsystems. Ordered by leverage. Per the project workflow,
+> grep `docs/srd-5.2.1.txt` for the canonical feature list before
+> implementing any item here.
 
-#### Tier 1: schema + registry gaps (blocks rule expression)
+#### RE-1: Monsters as first-class action subjects (unblocks the most)
 
-- [x] **Feats system** (foundation shipped 2026-05-21; SRD feat
-      catalog finalized in the 2026-05-23 SRD-only reset). New `Feat`
-      type + `FeatEffect` discriminated union in `shared/types.ts`.
-      `featTable?: Record<string, Feat>` on `Context`.
-      `services/feats.ts` with `canTakeFeat` (prereq check) +
-      `applyFeatTake` (per-effect take-time grants). `take_feat`
-      action handler in `meta.ts` consumes `asi_pending` for
-      `general`-category feats (not for `origin` feats from
-      background). `Character.feat_choices` records half-feat /
-      save-proficiency / Magic Initiate picks. Wired into all 4
-      contexts (sandbox, vale, grove, whispering).
+- [ ] Finish the Phase 2–5 migration started under "Architecture audit
+  follow-ups → item 5" below (enemy turns invoke `dispatchAction` with
+  an enemy actor; shared abilities run for any actor). This is the seam
+  that unblocks **summoned creatures + companions** (Find Familiar,
+  Spiritual Weapon, conjure spells, full Beastmaster companion) — all
+  narrative-only today. Highest leverage: pays back into spells, class
+  features, and monster abilities at once.
 
-      **SRD feat catalog (6):** Alert (`+profBonus` initiative, wired
-      in `buildInitiativeOrder`), Savage Attacker (once/turn
-      weapon-damage reroll-take-higher, unarmed excluded per RAW),
-      Skilled (3 skill profs), and Magic Initiate × 3 (Arcane /
-      Divine / Primal — detail below). The PHB-only feats that
-      briefly shipped here (Lucky, Sharpshooter, Tough, Resilient,
-      Mobile, Sentinel, War Caster, Polearm Master, Great Weapon
-      Master, Heavy Armor Master, Crossbow Expert, Tavern Brawler,
-      Observant, Healer, Dual Wielder, Athlete) were removed in the
-      SRD-only reset — see srd-only-audit.md.
+#### RE-2: Class + subclass feature progression to L20
 
-  - [x] Magic Initiate (shipped 2026-05-22 — full BE + FE). Three
-    seed feats — `magic_initiate_arcane / divine / primal` — each
-    granting 2 cantrips + 1 L1 spell. `take_feat` action accepts
-    `cantripChoices: string[]` + `l1Choice: string`; `applyFeatTake`
-    appends them to `spells_known`, records the L1 id on
-    `feat_choices[featId].magicInitiateL1`, and seeds
-    `class_resource_uses.magic_initiate_l1_used = 0`. castSpell.ts
-    recognizes the recorded L1 spell at cast time: if the token is
-    available and the cast is at the spell's base level, consumes
-    the token instead of a slot. Upcasts still use a slot.
-    `resetFeatLongRestResources` clears the token on long rest.
+> Today most classes implement features only through ~L3–L5, with a
+> few scattered higher gates (Monk die scaling L17, Improved Divine
+> Smite L11). Subclasses mostly carry just their L3 feature; Wizard has
+> almost no class features. The resource-pool + handler machinery
+> exists, so most of this is data + dispatcher pattern, parallelizable
+> per class. The "gaps" column is a pointer, not an authoritative level
+> table — grep the SRD per class before implementing.
 
-    **FE picker shipped 2026-05-22.** `SpellPickerDialog` component
-    + CharScreen integration. `/api/game/contexts` extended to
-    return `originFeat` per background plus a slim `featTable` + L1/
-    cantrip `spells` (with `spellList` tags). CharScreen fetches the
-    BE summary on mount; when the player picks a background whose
-    origin feat is one of the three Magic Initiate variants, a
-    chooser button surfaces inline ("⚠ Magic Initiate (Arcane) —
-    pick 2 cantrips + 1 L1 spell"). Click → modal with checkbox-
-    limited cantrips + radio-pick L1 (filtered by spell list).
-    Picks persist to the per-context party draft so a reload doesn't
-    drop them. `handle()` blocks Start when picks are incomplete.
-    `CharacterInput.feat_choices` plumbs through `POST /session/new`
-    via a new `FeatChoicesSchema` (Zod) and into `applyFeatTake`.
-    Sandbox `Sage` → `magic_initiate_arcane`, `Acolyte` →
-    `magic_initiate_divine` per 2024 PHB (the placeholders called
-    out in `sandbox.ts` comments). 9 added FE tests + existing BE
-    Magic Initiate coverage carries the new path.
+| Class | Implemented (approx) | Major SRD gaps to fill |
+|---|---|---|
+| Barbarian | Rage, Reckless (L1–2), Frenzy (L3) | Danger Sense, Extra Attack, Fast Movement, Feral Instinct, Brutal Strike, Relentless Rage, Persistent Rage, Indomitable Might, capstone; exhaustion-on-rage-end |
+| Bard | Bardic Inspiration (L1), Cutting Words (L3) | Expertise, Jack of All Trades, Font of Inspiration, Countercharm, Magical Secrets, Superior Inspiration, capstone |
+| Cleric | Channel Divinity, Turn/Sear Undead, Preserve Life (Life) | Blessed Strikes, Divine Intervention, improved Channel uses, higher Life-domain grades |
+| Druid | Wild Shape (L2, CR L4/8), Land's Aid | Wild Companion, full Circle of the Land grades, Wild Shape improvements, Beast Spells, Archdruid |
+| Fighter | Second Wind, Action Surge (L2), Tactical Master (L9) | Fighting style, Extra Attack 2/3/4, Indomitable, Champion grades (Remarkable Athlete, Additional Style, Superior Critical, Survivor) |
+| Monk | Martial Arts, Flurry/Patient/Step (L2), Stunning Strike (L5) | Deflect Attacks, Slow Fall, Stillness of Mind, Evasion, Self-Restoration, Disciplined Survivor, Empty Body, Body & Mind, higher Open Hand grades |
+| Paladin | Sacred Weapon (Devotion L3) | Fighting style, Extra Attack, Aura of Protection (L6), Aura of Courage, Faithful Steed, Divine-Smite-as-feature, Devotion grades, capstone |
+| Ranger | Colossus Slayer (Hunter L3) | Fighting style, spellcasting integration, Extra Attack, Roving, Expertise, Tireless, Nature's Veil, Hunter grades |
+| Rogue | Cunning Action (L2), Cunning Strike (L5), Sneak Attack, Uncanny Dodge | Steady Aim, Evasion, Reliable Talent, Slippery Mind, Elusive, Stroke of Luck, Assassin grades |
+| Sorcerer | Metamagic (L3–5), sorcery points | Innate Sorcery, Sorcerous Restoration, SP↔slot conversion completeness, full Draconic grades, capstone |
+| Warlock | Agonizing Blast (passive) | Eldritch Blast beam scaling, Pact Boon, more invocations, Mystic Arcanum, Magical Cunning, Fiend grades, Eldritch Master |
+| Wizard | cantrips only (Arcane Ward partial) | Arcane Recovery, Scholar, Memorize Spell, Spell Mastery, Signature Spells, full Evoker grades |
 
-    **Spell-list tagging shipped 2026-05-22.** `Spell.spellList?:
-    Array<'arcane'|'divine'|'primal'>` field added; all 30 SRD
-    spells tagged per 2024 PHB class lists. `take_feat` action now
-    validates Magic Initiate choices: cantrip count matches the
-    feat's required count, every choice exists in spellTable, level
-    matches (cantrip vs L1), and `spell.spellList` includes the
-    feat's `spellList` ('arcane' / 'divine' / 'primal'). 4 added
-    validation tests.
-  - ASI-vs-feat UX on the FE (both `apply_asi` and `take_feat`
-    actions are available when `asi_pending` is set; FE picks the
-    surfacing).
-- [~] **Multiclassing** (Phase 1 type seam — shipped 2026-05-22).
-      `Character.class_levels?: Record<string, number>` added (keys
-      lowercased, values per-class levels). New
-      `services/multiclass.ts` exposes read-side helpers
-      (`getClassLevels`, `getClassLevel`, `hasClass`, `getTotalLevel`,
-      `getAllClasses`, `getPrimaryClass`) that transparently fall back
-      to `{[character_class]: level}` for legacy single-class PCs.
-      Character creation in `routes/game.ts` initializes
-      `class_levels = { [first_class]: 1 }`; `normalizeState` backfills
-      pre-multiclass saves on load. No behavior changes — call sites
-      continue to read `char.character_class` + `char.level`.
+#### RE-3: Character-build systems (small, high RAW payoff)
 
-  **Remaining (separate PRs, in rough dependency order):**
-  - [x] **Spell-slot multiclass calc** (Phase 2 — shipped 2026-05-22).
-    New `spellSlotsForChar(char)` in `services/multiclass.ts` sums
-    caster-level contributions (full × 1 / half ÷ 2 / third ÷ 3 for
-    Eldritch Knight / Arcane Trickster) and looks up the multiclass
-    slot table. Pure-warlock returns pact slots. Multi-class with
-    warlock merges the two pools at matching slot levels (known
-    approximation; RAW separates them — fix deferred to a pact-vs-
-    multiclass schema split). `rulesEngine.ts` refactored to expose
-    `spellSlotsForCasterLevel(level)` so both single-class and
-    multiclass paths index the same table constant.
-    `normalizeState` migrated; level-up + `rest.ts` warlock refresh
-    deferred (work correctly for the single-class case they handle).
-    9 added tests (single-class parity, full+full sum, half+full sum,
-    half-rounds-down, primary-only subclass limit, pure warlock,
-    warlock+full merge approximation).
-  - [x] **Multiclass prerequisites** (Phase 3 — shipped 2026-05-22).
-    `MULTICLASS_PREREQS` table in `services/multiclass.ts` covers all
-    12 SRD classes (AND for single + multi-ability requirements;
-    Fighter is the one OR — STR 13 or DEX 13). `canMulticlassInto(char,
-    class)` returns empty on success or a human-readable reason
-    (mirrors the `canTakeFeat` shape). First-class checks are
-    auto-passed since RAW prereqs gate multiclassing in, not
-    character creation. 9 added tests (single-AND, multi-AND, OR,
-    unknown class, primary class fast-path). Level-up surfacing
-    (which calls this when the player picks a non-primary class)
-    lands in the Phase 6 / level-up UX PR.
-  - [x] **Feature gating by per-class level** (Phase 4 — shipped
-    2026-05-22). ~50 call sites across 13 files migrated from
-    `char.character_class.toLowerCase() === 'X' && char.level >= N`
-    to `hasClass(char, 'X') && getClassLevel(char, 'X') >= N`.
-    Resource pools (rage uses, ki points, sorcery points, Bardic
-    Inspiration die, Second Wind heal, Sneak Attack dice, Wild Shape
-    CR access, Druid Natural Recovery budget, Cleric Sear Undead /
-    Preserve Life scaling, Improved Divine Smite, Sorcerer Draconic
-    Resilience HP, Arcane Ward HP) now scale with the relevant
-    per-class level. Per-rest refreshes (`short_rest` handler)
-    refresh ALL of a multi-class PC's eligible pools at once.
-    Spell prep enforcement (`prepClasses.some(c => hasClass(...))`)
-    triggers if ANY class is Cleric/Paladin/Druid. Class-gated
-    eligibility helpers (`isUncannyDodgeEligible`,
-    `isHellishRebukeEligible`, Thief Fast Hands) all key off
-    `hasClass`. Three remaining `character_class.toLowerCase()`
-    sites are intentional primary-class semantics (subclass-picker
-    for primary class, `normalizeState` legacy-save backfill, char
-    creation init).
-  - [~] **Saving-throw profs from first class only** (Phase 5 —
-    partial 2026-05-22). Saving-throw proficiencies are character-
-    creation-time and tied to `character_class` (the primary), so
-    the "first-class only" rule is already correct semantics. **What
-    shipped:** armor + weapon proficiency grants on multiclass entry
-    via `applyMulticlassProfGrants` — 2024 PHB narrow-subset table
-    in `services/multiclass.ts` (e.g. Cleric grants light/medium
-    armor + shield; Wizard / Sorcerer grant nothing). Called from
-    `applyLevelUpForClass` on the FIRST level in a non-primary class.
-    **Remaining:** skill + tool + instrument grants that require a
-    player chooser (Bard, Ranger, Rogue each grant one Skill; Bard
-    grants one Musical Instrument). Lands with the level-up UX PR.
-  - [x] **ASI gating** (Phase 6 — shipped 2026-05-22). `asi_pending`
-    now flags on a per-class milestone (`class_levels[X]` lands on
-    4, 8, 12, 16, or 19) instead of the total character level. For
-    pure single-class PCs nothing changes (class level == total
-    level). Multi-class PCs no longer get a spurious ASI on the
-    SECOND level (Fighter 3 / Wizard 1 → total 4 doesn't fire ASI;
-    Fighter 4 / Wizard 0 → fighter level 4 does fire).
-  - [x] **Level-up UX** (Phase 7 — shipped 2026-05-22). Backend:
-    `level_up_class { className }` action validates out-of-combat,
-    level cap (20), XP threshold, and multiclass prereq on class
-    **entry** (skipped for continuation in an already-taken class).
-    Delegates to `applyLevelUpForClass(char, className, context)`
-    which bumps `char.level` + `class_levels[className]` in lockstep
-    and applies HP / spell slot recompute / per-class ASI / multiclass
-    prof grants. Auto-level-up from XP (kill events) still defaults
-    to the primary class, so single-class behavior is unchanged.
-    13 BE tests cover XP gating, combat-block, level cap, primary-
-    class permissiveness, prereq enforcement, per-class ASI boundary,
-    prof grant timing, and multiclass spell-slot recompute.
+- [ ] **Fighting styles** — SRD 5.2.1 has 4: Archery, Defense, Great
+  Weapon Fighting, Two-Weapon Fighting. None implemented. Needed by
+  Fighter / Paladin / Ranger.
+- [ ] **Epic boons** (L19+ feat options) — SRD has 7: Combat Prowess,
+  Dimensional Travel, Fate, Irresistible Offense, Spell Recall, the
+  Night Spirit, Truesight. Slot into the existing `take_feat` surface.
+- [ ] **Exhaustion (2024 model)** — replace the binary-disadvantage-at-L3
+  approximation with the RAW **−2 to all d20 tests per level** and
+  **−5 ft speed per level**. `reviveD20Penalty` already shows the
+  per-d20 numeric-penalty threading pattern.
+- [ ] **Ability-score generation** — standard array / point buy at
+  character creation (scores are effectively hard-coded today).
 
-    **FE chooser:** `LevelUpDialog` component + `lib/multiclass.ts`
-    helper (mirrors the BE `MULTICLASS_PREREQS` / `canMulticlassInto`
-    shape for up-front render — the BE re-validates so a stat change
-    between trigger and selection still gates correctly). `PartyRail`
-    shows a `+LVL` badge + "LEVEL UP →" button on any PC tile whose
-    XP ≥ next threshold (out-of-combat only); clicking opens the
-    dialog. Dialog lists all 12 PHB classes — primary always selectable
-    (continuation), other classes show their prereq, grey out, and
-    show the failing-stat reason when the PC can't meet it. Selecting
-    a class dispatches `level_up_class { className }` via the existing
-    choice path. 19 FE tests (helper + dialog).
-- [x] **Backgrounds with behavioral effects** (shipped 2026-05-21).
-      `Background` type extended in `shared/types.ts` with 2024 PHB
-      fields: `originFeat`, `abilityScoreIncreases`, `startingEquipment`,
-      `language`. Character creation in `routes/game.ts` auto-applies
-      `originFeat` via `applyFeatTake` after the base character is
-      built. New `services/backgrounds.ts` exposes `getBackground` +
-      `backgroundGrants` for FE display. Sandbox seed backgrounds
-      (Soldier / Criminal / Sage / Acolyte) populated with the new
-      fields and their SRD origin feats (Magic Initiate / Alert).
-      4 direct tests.
+#### RE-4: Combat / exploration subsystems (bounded)
 
-  **Remaining (data + flows):**
-  - `startingEquipment` application path — currently informational;
-    needs to merge with `classStartingLoot` and the auto-equip
-    flow in character creation.
-  - Backgrounds in non-sandbox contexts (Vale, Grove, Whispering)
-    still use the legacy minimal shape; can be enriched any time
-    without breaking existing characters.
-- [~] **Magic item attunement** (mostly shipped — 2026-05-21).
-      Pre-existing: `handleAttune` enforces 3-max + out-of-combat
-      gate, equip flow in routes/game.ts gates attunement-required
-      items behind `attuned_items`. **New this PR:**
-      - `cursed` + `curseDesc` fields on `LootItem` (synced via
-        shared types).
-      - Curse reveal in `handleAttune` — narrative appends the
-        curse text when an item with `cursed: true` is attuned.
-      - New `de_attune` action + `handleDeAttune` for voluntary
-        unbinding. Cursed items refuse de-attunement (require
-        Remove Curse, not yet implemented). De-attuning an
-        equipped attunement-required item implicitly unequips it.
-      - 6 direct tests covering all branches (cursed reveal,
-        un-cursed de-attune, cursed-refuse, implicit unequip,
-        combat-rejected, not-attuned-rejected).
+- [ ] **Wall/terrain spells as real grid blockers** — transient grid
+  obstacles that expire on concentration drop (Wall of Fire / Force).
+- [ ] **Mounted combat** — `mount_id` exists but isn't enforced (forced
+  dismount on damage, reach, ranged-while-mounted rules).
+- [ ] **Underwater combat** — non-piercing melee disadvantage, ranged
+  rules, fire resistance.
+- [ ] **Jumping** (long = STR ft, high = 3 + STR mod ft) — also flagged
+  under architectural blockers.
+- [ ] **Line-of-sight / vision blocking by walls** — Bresenham LoS
+  respecting obstacles (pairs with the FE grid-fog item).
+- [ ] **Massive-damage instant death** (single hit ≥ max HP).
 
-  **Remaining:** Short-rest gating per RAW ("spend a short rest
-  attuning"), Remove Curse spell + interaction with `de_attune`,
-  cursed magic items in seed loot tables (currently no test
-  context has cursed items beyond the spec fixtures).
+#### RE-5: Condition + spellcasting fidelity (cleanups)
 
-#### Tier 2: 2024 PHB actions + reactions (combat completeness)
+- [ ] Register **Deafened**; add **Petrified** damage resistance + save
+  advantage; **Charmed** CHA-check disadvantage; **Slow** end-of-turn
+  recurring save; make concentration's **incapacitation** gate explicit.
+- [ ] **Choice-UX mechanics** that auto-resolve today: Polymorph beast
+  pick, Greater Restoration "pick one effect," multi-target picker
+  (Bless / Bane / upcast +1 target). Part engine, part FE.
+- [ ] **Multiclass edge cases** — ASI spacing validation, skill/tool
+  grants on multiclass entry, warlock pact-slot pool separation,
+  second-class subclass features.
 
-- [x] **Influence action** (shipped 2026-05-21). Distinct from
-      pre-existing `talk` / `talk_response` (which stay free
-      narrative). New `influence` action: CHA + skill check
-      (persuasion / deception / intimidation) vs `max(15, target INT)`.
-      In combat: consumes the Action (`usedInitiative = true`).
-      Outcomes: enemy-target success removes enemy from fight (no
-      XP, narrative yields); NPC-target success shifts attitude
-      one step friendlier. 5 direct tests.
-- [x] **Study action** (shipped 2026-05-21). Distinct from
-      `examine` (which is a sensory-description action with no
-      check). New `study` action: INT + skill (arcana / history /
-      investigation / nature / religion) vs `15 + ⌊CR⌋`. Creature
-      analysis success reveals vulnerabilities / resistances /
-      immunities / condition_immunities. In combat: consumes the
-      Action. Object analysis + free-form lore-recall branches are
-      TODO (the type accepts `loreTopic` for future use). 4 direct
-      tests.
-- [ ] **Magic / Utilize action-category tags** — deferred. The
-      2024 PHB Magic and Utilize aren't new player-facing actions:
-      they're category wrappers around things Pansori already does
-      (cast_spell + magic-item-use + magical class features =
-      Magic; mundane item-use + interact_object = Utilize). The
-      only mechanic that needs the categorization is Action Surge's
-      "extra action, except the Magic action" rule — and that only
-      matters once multiclassing lets a Fighter take Cleric levels.
-      Best done in the same PR as multiclass. Mapping documented
-      here so the future PR has the table:
-      - `cast_spell` → Magic
-      - `use` on magic item → Magic
-      - `use_class_feature` for Channel Divinity / Wild Shape / similar → Magic
-      - `use` on mundane item → Utilize
-      - `interact_object` → Utilize
-- [x] **Uncanny Dodge reaction** (Rogue L5 — shipped 2026-05-21).
-      New `PendingUncannyDodgeReaction` variant in the shared
-      PendingReaction union; mirrors Shield's proposed-snapshot
-      stash pattern. `isUncannyDodgeEligible` helper in
-      `gameEngine.ts` gates on: Rogue class, L5+, reaction
-      available, conscious, not blinded. Wired into
-      `runEnemyMultiattackLoop` between the Shield-eligibility
-      check and the commit path. `reaction.ts` resolver handles
-      accept (halves damage by adding back half to proposed char
-      hp, consumes reaction, emits half-damage event) and decline
-      (commits full proposed snapshot with a "(Uncanny Dodge
-      declined.)" suffix). 2 direct tests.
-- [x] **Smite mechanics** (shipped 2026-05-21). Note: the original
-      "Smite reactions" framing was inaccurate — in 2024 PHB,
-      Divine Smite is a **bonus-action spell** that pre-buffs the
-      next weapon hit, and Improved Divine Smite is a **passive
-      damage rider**. Neither is a reaction, and no "smite reaction"
-      exists per RAW.
+#### RE-6: Content (data on existing patterns, not engine)
 
-  **Divine Smite (spell):** cast time changed to `bonusAction`.
-  New `Character.divine_smite_dice` field stashes pending d8s; the
-  cast handler in `castSpell.ts` sets it to `2 + (slotLevel - 1)`
-  and consumes the slot. The attack handler's hit branch reads +
-  clears the field, rolls `Nd8` radiant (or `2N d8` on crit), and
-  adds it as a `hitBonuses[]` entry. Allowed for weapon attacks
-  and Monk unarmed strikes (matches PHB "Weapon or Unarmed Strike").
+- [ ] **Spells** — ~112 of ~330 SRD spells. Most remaining categories
+  are already representable (data entry); summons depend on RE-1, a few
+  "pick an option" spells on RE-5's picker.
+- [ ] **Monsters** — stat-block content; legendary/lair effects can use
+  the shipped scaffolding (see boss-wiring item under Content & playtest).
+- [ ] **Magic items** — content; attunement + curse infra is shipped.
 
-  **Improved Divine Smite (L11 Paladin):** always-on +1d8 radiant
-  on every **melee-weapon** hit (ranged excluded per RAW). Crit
-  doubles. Stacks with the spell.
+### Remaining subsystem follow-ups
 
-  Both riders add their damage on top of `applyDamageMultiplier`
-  output, so weapon-type resistance doesn't reduce them. TODO:
-  separate multiplier check for radiant (the few radiant-resistant
-  creatures in MM would currently take full smite damage).
-  6 direct tests.
-- [x] **Cutting Words** (Lore Bard) — already implemented; verified
-      during the 2026-05-21 audit. Uses Bardic Inspiration as a
-      reaction to penalize an enemy's attack roll, ability check,
-      or damage roll.
+> Open items from the earlier (2026-05-21) mechanics roadmap whose
+> frameworks have shipped. Mounted combat, jumping, multiclass edge
+> cases, and somatic-component enforcement now live in the RE-1…RE-6
+> roadmap above; the rest:
 
-#### Tier 3: rule-edge mechanics
-
-- [~] **Spell components.** Verbal + costly material shipped;
-      somatic deferred behind a hand-state model that pansori
-      doesn't track. Specifically: `Spell.verbal` flag is checked
-      against the `deafened` condition in `castSpell/precast.ts`
-      (blocks cast). `Spell.materialCost` consumes the listed gp
-      cost from `char.gold` on cast (blocks when insufficient).
-      Armor proficiency check also gates casting in heavy armor
-      without prof. **Deferred — somatic enforcement:** RAW says
-      a creature must have a free hand for somatic components.
-      Pansori would need a hand-state
-      model — equipped_weapon + equipped_shield = both hands,
-      heavy weapons = two-handed grip — to know when somatic is
-      blocked. The Spell type doesn't yet carry a `somatic` flag;
-      no existing spells are tagged. Mostly a content task once
-      the hand model lands. The spellcasting-focus rule (focus
-      substitutes for non-costly material) is similarly deferred.
-- [x] **Ritual casting** (shipped 2026-05-22). Existing infra in
-      `castSpell/precast.ts` was already wired (gates on
-      `spell.ritualCasting` + `!combat_active`, skips slot
-      consumption); this PR added the user-facing surface and the
-      data. New `canRitualCast(char)` helper in `services/multiclass.ts`
-      gates on Wizard / Cleric / Druid / Bard. `generateChoices`
-      emits a "Cast as ritual (10 min, no slot)" option alongside
-      slot-based variants when the spell is ritual-castable, the PC
-      is eligible, and combat is off. Three new SRD ritual utilities
-      seeded: Detect Magic, Identify (still costs the 100 gp
-      material component RAW), Comprehend Languages. All three are
-      pure narrative — no mechanical effect beyond the flavour text
-      (engine doesn't yet model "you sense magic" / "you understand
-      languages" as game-state). Pansori models the 10-minute time
-      cost as "out of combat"; no finer-grained time axis. 10 BE
-      specs cover choice surfacing per class + combat block + handler
-      no-slot-burn + non-ritual-spell rejection + Identify gold
-      consumption + insufficient-gold rejection + narrative emission.
-- [x] **Long rest 2024 limits** (modelled as "1 per session"). The
-      RAW rules are 1/24h, 8h with 6h sleep + 2h light activity,
-      and interruption restarts the clock. Pansori has no time-of-
-      day axis (no hours/days counter), so the engine substitutes
-      "1 per game session" via `state.long_rested` (set true on
-      success, blocks subsequent attempts with "You have already
-      taken a long rest this session"). This is approximately
-      equivalent to RAW for a typical session of play (one
-      adventuring day = one session); a multi-day campaign would
-      benefit from an explicit day counter that resets the flag.
-      Defer the day-counter work until campaigns actually span
-      multiple in-fiction days; the current behavior is the
-      practical RAW approximation.
-- [~] **Lighting tracking** (partial — shipped 2026-05-22 for the
-      Stealth/Perception path). `Room.lighting` was previously a
-      data field with no engine effect; this PR wires it into the
-      sneak + Cunning Action Hide path.
-
-      **Helpers (`rulesEngine.ts`):**
-      - `effectiveLightFor(roomLighting, darkvisionFt)` — applies
-        darkvision: dark → dim, dim → bright when `darkvisionFt > 0`.
-      - `passivePerceptionDcInLight(enemyWisdom, effectiveLight)` —
-        bright = base DC; dim = -5 (Disadvantage on sight Perception
-        per RAW); dark = 0 (observer effectively Blinded for sight).
-
-      **Engine effect:** the sneak action's group Stealth check
-      reads the room's lighting via the observer enemy's effective
-      light. Cunning Action Hide uses the same helper for the
-      single-PC Stealth roll. Enemies don't yet track darkvision
-      (passed as 0), so the observer's effective light matches the
-      room's lighting; PC darkvision doesn't change the observer's
-      side of the contest.
-
-      **Deferred:**
-      - Cell-grained lighting (torchlight cones, darkness spells)
-        — pansori's lighting is room-grained.
-      - Blinded condition auto-applied in dark rooms — would let
-        attack rolls / save rolls etc. inherit the Blinded effects.
-        Currently the only Stealth-vs-Perception path uses the
-        helper directly.
-      - Active Perception (search via interactObject) doesn't yet
-        adjust for lighting.
-- [x] **Difficult terrain** (shipped pre-session and verified). Cells
-      flagged `Room.difficultTerrain` cost 2× movement to enter; per
-      RAW the cost doesn't stack with other 2× sources (terrain
-      modes). gridMove implements both rules.
-- [ ] **Battleaxe mastery: Flex → Topple migration.** Sandbox loot
-      data tags Battleaxe with the homebrew `mastery: 'flex'`
-      property (lets a versatile weapon roll its two-handed die
-      while a shield is equipped). RAW 2024 PHB assigns Battleaxe
-      **Topple**. Auditing the other Flex-tagged weapons is also
-      due (Longsword is correctly Sap in sandbox, so the picker is
-      mixed). Either: update sandbox to RAW masteries and retire
-      'flex' entirely, or keep 'flex' as a documented pansori
-      variant. Surfaced from a real-game log review on 2026-05-22.
-- [x] **Falling damage** (shipped 2026-05-21). New
-      `applyFallingDamage(char, distanceFt, st)` in `damage.ts`.
-      Rolls 1d6 bludgeoning per 10 ft fallen (capped at 20d6 = 200 ft
-      terminal velocity). Routes through `applyDamage` so temp_hp /
-      exhaustion clamp / concentration check all fire. Applies
-      `prone` on survive; skipped on knockout / kill (a dying
-      character is already prone-equivalent). Sub-10ft is a no-op.
-      No caller in current pansori — exists for future content
-      (Misty Step into open air, Levitate dispel, knockback off
-      ledges). 4 direct tests.
-- [x] **Initiative ties** (shipped 2026-05-22). `buildInitiativeOrder`
-      now sorts by (1) roll total desc, (2) DEX score desc, (3) PCs
-      before enemies. Previous implementation just sorted by roll
-      and relied on insertion-order + stable sort for the rest
-      (the comment promised dex-tiebreak but the code didn't
-      implement it). DEX-score tiebreak matches the common house
-      rule and the existing comment; PC-first tiebreak matches every
-      published adventure module's automated behavior (RAW delegates
-      to DM, but the friendly-side-wins convention is universal).
-      4 direct tests.
-
-#### Tier 4: out-of-combat systems (lowest urgency)
-
-- [ ] **Downtime activities** — work, training, crafting.
-- [ ] **Bastions** (2024 PHB property system).
-- [ ] **Crafting** — potions, scrolls, magic items.
-- [ ] **Mounted combat.**
-- [ ] **Vehicles.**
-- [~] **Movement modes** — partial (shipped 2026-05-22 — fly fully
-      wired with gameplay impact; climb / swim as data-only grants
-      until terrain-mode model lands). New BE-only fields
-      `fly_speed_ft`, `swim_speed_ft`, `climb_speed_ft` on Character.
-      `gridMove` reads `fly_speed_ft`: when ≥ walking speed, the
-      path may bypass obstacle cells (no landing in obstacles) and
-      difficult-terrain cost drops from 2× to 1×. Long rest clears
-      `fly_speed_ft` defensively; `climb` / `swim` are persistent
-      grants from feats / subclasses (don't clear on rest).
-
-      **Wired grants:** `fly_speed_ft` is set by the Fly (60 ft)
-      and Levitate (20 ft) spells via the buff path; concentration
-      drop sweeps it in `breakConcentration`. `climb_speed_ft` /
-      `swim_speed_ft` have no in-scope grant today — the Athlete
-      feat and Sea Druid subclass that populated them were removed
-      in the SRD reset, but the fields + engine reads remain for
-      future content.
-
-      **Terrain-mode model shipped 2026-05-22.** New optional
-      `climbTerrain` + `swimTerrain` `GridPos[]` fields on `Room`
-      (sibling to `difficultTerrain`). `gridMove` computes the
-      per-cell cost: 5 ft base, +5 ft if difficult OR (climbable
-      without climb speed) OR (swimmable without swim speed) —
-      capped per cell per RAW "multiple sources don't stack".
-      Flying still bypasses everything. Budget-exceeded narrative
-      surfaces which terrain modes contributed. Authoring content
-      (room pool / campaigns) can now flag climb / swim cells; a
-      character granted `swim_speed_ft` / `climb_speed_ft` by future
-      content gets the reduced per-cell cost.
-
-      **Remaining for full closure:**
-      - Fly spell + Levitate spell — add to SRD catalog so any caster
-        can grant flight to a willing creature. Concentration tracking
-        clears `fly_speed_ft` on drop.
-      - Jumping (long / high) — needs height + horizontal distance
-        tracking on the grid; deferred. Different shape from climb/
-        swim terrain (a single jump action vs. per-cell cost).
-      - Burrowing — monster-only RAW; not on the critical path.
-      - Climb / swim authored content — no current room actually
-        flags these cells; the engine is ready for content as soon
-        as a campaign needs it.
+- [ ] **Magic / Utilize action-category tags** — category wrappers
+  (cast_spell + magic-item-use + magical features = Magic; mundane
+  item-use + interact_object = Utilize). Only needed for Action Surge's
+  "extra action, except the Magic action" rule once a martial
+  multiclasses into a caster. Bundle with multiclass UX.
+- [ ] **Magic-item attunement — remaining** — short-rest attune gating
+  per RAW, Remove Curse ↔ `de_attune` interaction, and cursed items in
+  seed loot tables (only spec fixtures carry them today).
+- [ ] **Lighting — remaining** — cell-grained lighting (torchlight
+  cones, darkness spells), auto-apply Blinded in dark rooms, and
+  lighting-adjusted active Perception (search). The room-grained
+  Stealth/Perception path already shipped.
+- [ ] **Somatic spell components** — RAW requires a free hand; needs a
+  hand-state model (weapon + shield = both hands, two-handed = both).
+  No spell carries a `somatic` flag yet. Also unlocks the
+  focus-substitutes-for-material rule.
+- [ ] **Battleaxe mastery: Flex → Topple** — sandbox tags Battleaxe with
+  the homebrew `flex` mastery; RAW 2024 assigns Topple. Audit the other
+  Flex-tagged weapons and either retire `flex` or document it as a
+  pansori variant.
+- [ ] **Out-of-combat systems** — Downtime activities, Bastions,
+  Crafting (potions / scrolls / items), Vehicles. Lowest urgency.
 
 ### Subclass coverage (2026-05-23 — 12 SRD-iconic, one per class)
 
@@ -489,366 +166,6 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 > Champion, Open Hand, Oath of Devotion, Hunter, Assassin, Draconic
 > Sorcery, Fiend, Evoker. See [srd-only-audit.md](srd-only-audit.md)
 > for the full subclass + species removal record.
-
-### Spells (2026-05-22 — catalog expanded, infrastructure built)
-
-> The 30-spell SRD catalog grew by 14 spells across the May 2026
-> session. Two infrastructure pieces shipped that unlock further
-> additions.
-
-**Infrastructure shipped:**
-- [x] **Buff-spell path** (2026-05-22). `castSpell.ts` runs a new
-      branch BEFORE the offensive-spell "needs an enemy" gate.
-      Spells with `targetType: 'self' | 'ally' | 'self_or_ally'`
-      route here. Applies condition (if any) + temp HP grant + max
-      HP bonus to caster or chosen party member; sets concentration
-      if applicable. Greater Invisibility break-on-attack carve-out
-      so magical invisibility persists through attacks.
-- [x] **AC pipeline** (2026-05-22). `computeTotalAc` now accepts
-      `mageArmorActive` + `shieldOfFaithActive` flags. Two new
-      Character fields. `breakConcentration` sweeps SoF flags on
-      concentration drop. Long rest clears both + recomputes AC.
-
-**New spells (14 added this session):**
-- L1: Lightning Bolt is L3 below, Faerie Fire (advantage on
-  attacks vs outlined creatures), Mage Armor (+3 AC unarmored),
-  Shield of Faith (+2 AC concentration), Heroism (3 temp HP +
-  concentration).
-- L2: Web (restrained AoE cube), Suggestion (charmed
-  concentration), Aid (+5 max HP, upcast scales).
-- L3: Lightning Bolt (8d6 lightning line), Stinking Cloud
-  (poisoned AoE sphere).
-- L4: Wall of Fire (5d8 fire line, concentration), Greater
-  Invisibility (invisible + concentration, attacks don't break).
-- L5: Cone of Cold (8d8 cold cone), Hold Monster (paralyzed any
-  creature, concentration).
-
-**Spells still missing (data + complexity notes):**
-- ~~**Mass Healing Word / Mass Cure Wounds**~~ — shipped
-  2026-05-22. New mass-heal path in `castSpell/heal.ts` checks the
-  spell id and distributes the rolled heal across all living party
-  members (Disciple of Life + Chalice bonus apply per-target).
-- ~~**Fly / Levitate**~~ — shipped 2026-05-22. Buff-shaped spells
-  (`targetType: 'self_or_ally'`) set `fly_speed_ft` on the target
-  via the buff path; concentration drop sweeps the flag in
-  `breakConcentration`. Fly = 60 ft, Levitate = 20 ft (RAW
-  vertical-only modeled as a limited flying speed).
-- ~~**Detect Magic / Identify / Comprehend Languages**~~ — shipped
-  with ritual casting.
-- ~~**Slow (L3)**~~ — shipped 2026-05-22. WIS save, concentration.
-  Single-target via the existing save+condition path (RAW multi-
-  target via 40-ft cube deferred). New `slowed` condition + engine
-  effects: `effectiveSpeed` halves the value, `effectiveEnemyAc` in
-  resolveOneAttack subtracts 2 from the target's AC, and
-  `rollConditionSave` subtracts 2 from Dex saves on slowed targets.
-  Renamed the prior narrative-only `slowed` weapon-mastery condition
-  to `slow_struck` to free the canonical name for the spell. The
-  RAW action-economy gate (action OR bonus action, one attack max),
-  no reactions, and 25% somatic-spell fail are all deferred behind
-  the same turn-flow rework Haste's extra-action needs. The end-of-
-  turn save to throw off the effect is also deferred. 6 BE specs.
-- ~~**Heal (L6)**~~ — shipped 2026-05-22. 70 HP + WIS mod, +10 per
-  slot above 6th. Uses the existing heal pipeline. Required an
-  `addDice` / `multiplyDice` fix to handle plain-numeric heal
-  expressions ('70' + '10' was being concatenated as '70+10' which
-  rollDice parsed as just 70). Condition removal (Blinded /
-  Deafened / Poisoned per SRD: "This spell also ends the Blinded,
-  Deafened, and Poisoned conditions on the target.") shipped via
-  new `Spell.removeConditions` field that the heal branch reads +
-  strips after the HP restore. Future spells (Greater Restoration,
-  Lesser Restoration, etc.) plug into the same field.
-- ~~**Haste (L3)**~~ — shipped 2026-05-22. Buff path
-  (targetType: 'self_or_ally'), concentration. Applies the new
-  `hasted` condition. effectiveSpeed doubles when hasted; the new
-  `hastedActive` flag on computeTotalAc adds +2 AC (wired in the
-  buff-path AC-recompute alongside Mage Armor / Shield of Faith);
-  rollConditionSave grants advantage on Dex saves when 'hasted' is
-  in targetConditions. Concentration drop in breakConcentration
-  strips hasted, applies incapacitated for 1 round (the RAW
-  "lethargy"), and recomputes AC. The extra-action mechanic (RAW
-  "additional action each turn limited to Attack-one / Dash /
-  Disengage / Hide / Utilize") is deferred behind a turn-flow
-  refactor that would let a PC take a second action without ending
-  their turn. The speed-0 detail of the lethargy isn't separately
-  enforced (incapacitated already gates actions; pansori MVP).
-- ~~**Polymorph**~~ — shipped 2026-05-22 using the 2024 PHB rewrite
-  (form HP lives on temp HP instead of swapping primary HP). L4
-  transmutation, WIS save. New `polymorph_state: { formName }` field
-  on `CombatEntity` marks the entity as polymorphed; the form's HP
-  pool lives on `entity.temp_hp` (also new on CombatEntity — enemies
-  didn't track temp HP before). Pansori MVP auto-picks Wolf (11 HP)
-  regardless of target CR.
-
-  **Damage flow**: resolveOneAttack absorbs damage into temp_hp first,
-  excess to hp. When temp_hp depletes to 0, the polymorph form drops
-  automatically: condition cleared, polymorph_state cleared, temp_hp
-  cleared. Excess damage carries over to hp (RAW). This matches the
-  2024 PHB rewrite that uses TemporaryHitPoints instead of a separate
-  buffer — the heal exploit (2014: healing spells could restore form
-  HP because it was real HP) is structurally blocked since healing
-  doesn't restore temp HP.
-
-  **Enemy turn**: polymorphed entities skip their turn entirely (RAW:
-  they'd use the beast's actions, but pansori would need the
-  computeEnemyAttack pipeline to substitute attack profiles — deferred).
-
-  **Revert paths**:
-  - Form-drops-to-0 (temp_hp depleted): condition + state cleared, hp
-    takes the spillover. Caster's concentration is NOT explicitly
-    cleared in pansori MVP — they can keep "concentrating" on a
-    non-existent target (no-op, harmless drift).
-  - Concentration drop: breakConcentration sweeps every polymorphed
-    entity and clears the state + condition + temp_hp.
-
-  5 BE specs: failed save grants temp_hp + condition; success resists;
-  temp_hp absorbs damage with spillover form-drop; concentration drop
-  reverts.
-- ~~**Banishment**~~ — shipped 2026-05-22. New `banished` condition
-  in the registry (duration: permanent — concentration is the actual
-  timer). Banishment spell (L4 abjuration, CHA save, concentration)
-  uses the existing save+condition pipeline to apply it. Enemy
-  turn loop skips banished entities (same shape as the surprised
-  check). Player attack-target filter excludes banished enemies
-  from `livingEnemies` + `livingEnemiesInRoom`. Concentration
-  drop via `breakConcentration` strips the linked condition,
-  returning the enemy. RAW upcast (+1 target per slot above 4th)
-  deferred — pansori MVP hits one target via the save branch.
-- ~~**Dimension Door**~~ — shipped 2026-05-22. L4 conjuration. Real
-  grid teleport for the caster (RAW also lets you bring one willing
-  creature within 5 ft — deferred). New branch in `castSpell/utility.ts`
-  auto-picks the cell with maximum min-distance to any living enemy
-  (pansori MVP — no FE picker yet for destination cells). Movement
-  budget for the turn isn't consumed (RAW: teleport doesn't use
-  movement). Falls back to narrative-only when the grid is empty
-  (out-of-combat). Misty Step stays narrative-only for now —
-  could share the same teleport branch if/when a Misty Step FE
-  destination picker lands.
-- **Counterspell** — already shipped pre-session.
-- **Spirit Guardians** — already shipped pre-session.
-- ~~**Lesser Restoration / Greater Restoration**~~ — shipped
-  2026-05-23. Routed through the buff branch (targetType:
-  'self_or_ally') with `removeConditions` driving the condition
-  strip. Greater additionally reduces exhaustion by 1 and consumes
-  100 gp of diamond dust. (RAW "pick one" + curse / ability-score /
-  max-HP reduction removals deferred — pansori MVP strips all
-  configured conditions and doesn't model the deferred effects.)
-- ~~**Prayer of Healing**~~ — shipped 2026-05-23. Routed through
-  the mass-heal id-gated branch in `castSpell/heal.ts` (same
-  branch as Mass Healing Word / Mass Cure Wounds). RAW 10-minute
-  cast + 1/long-rest target gate + short-rest benefits all
-  deferred.
-- ~~**Beacon of Hope**~~ — shipped 2026-05-23. Hand-rolled in
-  `castSpell/utility.ts` the same way Bless is — 3-target
-  concentration buff applying the new `hopeful` condition.
-  `rollConditionSave` reads it for WIS-save advantage;
-  `rollDeathSave` accepts an `advantage` flag the death-save
-  handler passes when the dying PC has `hopeful`. The RAW
-  max-heal effect (heal rolls land at max) is deferred — it'd
-  need a hook into the heal-roll site to surface the dice
-  ceiling.
-- ~~**Death Ward**~~ — shipped 2026-05-23. New
-  `Character.death_ward_active` one-shot flag set by the buff
-  branch. `applyDamage` intercepts the proposed HP-to-0 transition,
-  sets HP to 1, clears the flag. RAW instant-death negation (Power
-  Word Kill etc.) deferred since pansori doesn't model those.
-- ~~**Bane**~~ — shipped 2026-05-23. Mirror of Bless: save +
-  condition pipeline applies the new `baned` condition on a
-  failed CHA save. `resolveOneAttack` subtracts 1d4 from the
-  attacker's roll (with a hit-to-miss re-check on non-Nat-20);
-  `rollConditionSave` subtracts 1d4 from all save abilities.
-  Concentration drop sweeps the condition. RAW upcast (+1 target
-  per slot) deferred behind the same multi-target picker UX that
-  Bless awaits.
-- ~~**Scorching Ray**~~ — shipped 2026-05-23. Added to the
-  `multiTarget` branch's allow-list. 3 fire rays × 2d6 each,
-  ranged spell-attack roll per ray. Same shape as Eldritch Blast
-  (renamed the EB-only attack-roll predicate to
-  `isAttackRollMulti`). +1 ray per slot above 2nd.
-- ~~**Chromatic Orb**~~ — shipped 2026-05-23. Single-target
-  attack-roll spell, 3d8 fire (MVP — chosen-damage-type picker
-  deferred). Consumes a 50 gp diamond. +1d8 per slot. The "leap"
-  rider on matching d8 values is deferred (needs per-die runtime
-  introspection from the AttackRoll branch + the picker UX for
-  the leap target).
-
-**Tier C closure note (2026-05-22):** The architectural / new-pattern
-work in Tier C is done — every "different shape" spell that pansori
-needed reusable infrastructure for has shipped (multi-target heal,
-buff temp-HP, save-with-condition-revert, target-removed-from-combat,
-stat-block swap via temp HP, real grid teleport, multi-stat buff,
-multi-stat debuff). The remaining content (more spells, more monsters,
-more backgrounds, magic items, epic boon feats, higher-level subclass
-features) is repeatable data churn — each future addition slots into
-an existing pattern. Ship as campaigns / playtests demand them, not
-as a critical-path engine block.
-
-**Spells deferred behind specific infra:**
-- **Wall of Force / Wall of Fire (real grid blocker)** — needs
-  transient grid obstacles that expire on concentration drop.
-- ~~**PC-turn d20 reaction window**~~ — architecture shipped
-  2026-05-22. New `PendingPcD20Reaction` variant on the
-  PendingReaction union (distinct from PendingReactionBase — carries
-  `rollerCharId` instead of `attackerEnemyId/targetCharId`).
-  resolvePlayerAttack gained a `forceRoll1` parameter that bypasses
-  internal d20 generation; AttackContext gained `forceD20` that
-  resolveOneAttack passes through. attack/index.ts now stashes a
-  pre-attack snapshot + proposed (miss) snapshot + the AttackContext
-  blob when a PC misses + has Heroic Inspiration (not pre-declared),
-  and pauses. The resolve_reaction handler's new pc_d20 branch
-  rewinds to the pre-attack state on accept, rolls a new d20,
-  clears inspiration, and re-calls resolveOneAttack with forceD20
-  set. On decline, commits the proposed miss snapshot and retains
-  Inspiration.
-
-  First wiring: **Heroic Inspiration on missed attacks** (SRD:
-  "expend it to reroll any die immediately after rolling it, and
-  you must use the new roll"). Pansori MVP triggers only on attack
-  misses (RAW also allows rerolling hits for crit chasing — deferred
-  for UX); only on the first attack of a multi-attack sequence
-  (Extra Attack iterations don't pause); only on attack rolls (saves
-  + ability checks deferred to follow-ups). The pre-declared
-  `spend_inspiration` path remains for legacy / immediate-advantage
-  use; players can also wait and use the post-roll reaction. 7 BE
-  specs cover pause, no-pause, choice surfacing, accept-to-hit,
-  accept-still-miss, decline. The `inspiration_pending` flag check
-  in attack/index.ts gates the post-roll surfacing so the two paths
-  don't double-fire.
-
-  Future plug-ins on the same shape (each is its own PR's worth):
-    - **Mirror Image** — each enemy attack against the imaged PC
-      needs to roll vs the image AC; spell ends when last image
-      drops. New pause site in the enemy-attack pipeline.
-    - **Counterspell-on-self / Foresight** — each hooks one
-      specific d20 site.
-    - **Heroic Inspiration on saves + checks** — extend the same
-      reaction shape to checkConcentration, death-save, the various
-      skillCheck sites. Each site needs its own pause/rewind
-      contract since failure consequences differ (concentration
-      drop, death-save accumulator, hide vs. perception, etc.).
-    - **Bardic Inspiration as post-roll choice** — 2024 PHB rewrite
-      makes BI a post-roll user choice (currently pansori auto-
-      applies in resolveOneAttack). Same architecture, new source.
-
-  **Tier B closure (2026-05-22):** Core reaction-window architecture
-  is shipped. `PendingPcD20Reaction.rollContext` is typed as
-  `'attack' | 'save' | 'check'` so future plug-ins land without
-  shared-type bumps. The remaining work is all per-feature plug-in
-  PRs — each adds (a) a pause point at the relevant d20 roll site,
-  (b) a new `source` discriminator value, and (c) a resolver branch
-  in `reaction.ts`. The hardest piece (the proposed-snapshot stash +
-  re-resolve contract) is solved; future wiring is mechanical.
-- **Mirror Image / Counterspell-on-self / Foresight** — each is a
-  d20 reaction now that the window infra exists; ship as needed.
-- **Bestow Curse / Hold Monster variants** — need multi-option
-  picker UX on the FE for the curse type selection.
-- ~~**Revivify**~~ — shipped 2026-05-23 as the bring-from-dead
-  pipeline foundation. New `Character.died_at_round` field set at
-  every death-setter site (massive damage, both `processDeathSave`
-  branches, exhaustion); cleared on revive. New `Spell.revive`
-  field carries `hpRestored` / `windowRounds` / `materialCost`.
-  New `runReviveSpell` branch in `castSpell/index.ts` runs after
-  heal and before the offensive enemy-required check; validates
-  dead target + window + material-cost gating. Revivify (L3
-  Necromancy, divine + primal lists, 300 gp diamond, 10-round
-  window, restores 1 HP) is the first concrete spell on the
-  pipeline. Precast was reordered so material-cost check now
-  precedes slot deduction — a missing diamond no longer wastes
-  the slot. 5 BE specs cover happy path + window expiry +
-  material gating + alive-target reject + missing-target reject.
-
-  **Ladder shipped 2026-05-23:** Raise Dead (L5, 500 gp, 1 HP,
-  sentinel window), Resurrection (L7, 1000 gp, full HP),
-  True Resurrection (L9, 25000 gp, full HP), Reincarnate (L5,
-  1000 gp, full HP, Druid-only). All route through the same
-  `runReviveSpell` branch with `windowRounds: 99999` to skip the
-  in-combat round-window gate. 6 BE specs in `reviveLadder.spec.ts`.
-
-  **Deferred mechanics shipped 2026-05-23:**
-  - **−4 D20 penalty** on Raise Dead / Resurrection — shipped.
-    New `Character.revive_d20_penalty?: number` field set to 4
-    on a successful Raise Dead / Resurrection cast (True
-    Resurrection / Revivify / Reincarnate skip per RAW). New
-    `reviveD20Penalty(char)` helper in `rulesEngine.ts` returns
-    the magnitude; subtracted at every threaded d20 site: attack
-    rolls (`toHit.ts` via `totalAttackBonus`), condition saves
-    (`rollConditionSave` via new param), death saves
-    (`rollDeathSave` via new param), concentration saves
-    (`checkConcentration` inline), disarm trap (`disarmTrap` via
-    new param), Influence + Study (inline). Long rest in
-    `rest.ts` decrements the field by 1 until it clears.
-    Skill-check sites that weren't threaded (Grapple/Shove
-    contests, group Stealth, Search, Cunning Action Hide) are
-    documented as best-effort — RAW penalty doesn't fire there in
-    pansori MVP, but the helper is available to thread later.
-  - **Reincarnate species reroll** — shipped. New
-    `REINCARNATE_SPECIES` export from `contexts/srd/species.ts`
-    lists the 9 concrete species (RAW's "Roll again" outcome
-    short-circuited away — statistically identical). `runReviveSpell`
-    rolls `d(9)` for Reincarnate, swaps `char.species`, and clears
-    stale species-specific resource flags (`relentless_endurance_used`,
-    `tiefling_rebuke_used`, `breath_weapon_used`). Other species
-    traits (darkvision, resistances, innate cantrips, breath
-    weapon eligibility) derive live from `SRD_SPECIES[char.species]`
-    at their read sites, so the swap propagates without a separate
-    trait-apply pass.
-
-  **Still deferred (RAW-accurate but not modelled):**
-  - **365-day Resurrection caster-tax** — RAW: if the target has
-    been dead ≥ 1 year, the *caster* can't cast spells and has
-    disadvantage on D20 tests until they long-rest. Needs
-    absolute-time tracking (calendar days), which pansori doesn't
-    model today.
-- ~~**Haste + Slow extra-action / cap-action gates**~~ — shipped
-  2026-05-23. **Haste**: new `TurnActions.haste_extra_action_used`
-  flag + new `haste_extra_action` wrapper action that clears
-  `action_used` and `delegateTo`'s the inner action (Attack /
-  Dash / Disengage / Hide). Choice generator surfaces the
-  restricted menu after the normal action is spent; auto-advance
-  holds off while the extra slot is unspent so the player can
-  see and pick from it. **Slow**: post-dispatch hook in
-  `takeAction` (after `commitChar`) snapshots
-  action_used/bonus_action_used before dispatch and mirrors the
-  false→true transition on either slot to the other when char
-  has `slowed` — the existing choice generator then naturally
-  hides the remaining type.
-
-  **Closeouts shipped 2026-05-23:**
-  - **Haste's "one weapon attack only" cap** — shipped. The
-    attack handler reads `ctx.char.turn_actions.haste_extra_action_used`
-    (set by the wrapper before delegating) and suppresses the
-    Extra Attack loop when true.
-  - **Slow's reaction restriction** — shipped. New `canReact(char)`
-    helper in `rulesEngine.ts` returns false when slowed OR
-    reaction_used. Threaded through every reaction-gate site:
-    `cost.ts checkBudget` for dispatcher-level reaction-cost
-    rejection, the readied-action choice surface, Lore Bard
-    Cutting Words choice + handler, `knowsSpellWithSlot`
-    (Shield / Hellish Rebuke), `isUncannyDodgeEligible`,
-    `applyPcOpportunityAttacks` PC loop, and the Counterspell
-    eligibility check.
-  - **Slow's somatic-spell 25% fail** — shipped. New
-    `Spell.somatic?: boolean` field (defaults true if unspecified
-    since virtually every SRD spell has S). Precast gate rolls
-    d20 after slot + action-economy consumption when the caster
-    is slowed and the spell has S; on 1-10 the cast fizzles
-    (slot wasted, action wasted, narrative explains the
-    disruption).
-- **Heroes' Feast** — pluggable via the existing `removeConditions`
-  + multi-target heal infra. (Greater Restoration shipped 2026-05-23
-  — see the heal-pipeline block above.)
-
-### Architectural blockers
-
-- [x] **Climbing movement cost** — shipped 2026-05-22 via the
-      terrain-mode model. Cells flagged `climbTerrain` cost 2× per
-      cell without a climb speed, 1× with `climb_speed_ft > 0`.
-      Crawling cost (half-speed prone movement) is separate and
-      not modeled — RAW says prone halves movement, which the
-      engine could surface as a movement_used multiplier on the
-      whole turn when the prone condition is set. Defer.
-- [ ] **Jumping** — Long jump = STR ft, high jump = 3 + STR mod ft.
-      Different shape from per-cell terrain cost (one-shot horizontal
-      or vertical action). Defer.
 
 ---
 
@@ -879,160 +196,9 @@ as a critical-path engine block.
 
 - [ ] **Save/state persistence across redeploys (manual verify)** — `normalizeState` specs assert that a JSONB state row missing post-rollout fields loads cleanly and survives a `takeAction` call without crashing. Still TODO: actual end-to-end manual exercise — start a session, redeploy the backend container, resume the session, confirm parity. ~30 min.
 - [ ] **Difficulty tuning from playtest data** — once playtests happen, capture damage/HP/encounter telemetry to inform tuning passes. Real fights are starting to expose where the math is off (Crypt Lord TPK was the first big signal). ~3-4h to wire telemetry; ongoing to tune.
-- [x] **gameEngine.ts action-handler refactor** (fully shipped 2026-05-22 with the resolveOneAttack + castSpell internal splits) — 29 PRs across one session decomposed `takeAction`'s inline switch into per-action handler files under `services/actions/`. `gameEngine.ts` shrank 10,052 → 4,704 lines (-53%). All 38 action types dispatch through `services/actions/index.ts` against an `ActionContext` object; the inline switch is empty (just the default unknown-action fallback). `classFeature.ts` (the largest single case at 1,712 lines) fully decomposed by class into `classFeature/{barbarian,fighter,rogue,monk,druid,casters,cleric,paladinRangerBard,species,index}.ts`. `attack.ts` partially split (preattack/combatStart/toHit extracted; resolveOneAttack closure remains inline at ~615 lines). `castSpell.ts` (~840 lines) lifted but not internally split yet. Architectural addition: **transformer pattern** (`replaceWith` / `delegateTo` on handler return) for actions that yield to a different action — used by `attack_npc` and `use_reaction`; ready for future 5.5e features like Eldritch Strike, Counterspell, War Caster, Beast Form attack overrides. **What remains**:
-  - [x] **`resolveOneAttack` extraction from `attack/index.ts`** (shipped 2026-05-22). New `attack/resolveOneAttack.ts` carries the top-level `resolveOneAttack(ctx, atkCtx, label)` function + an `AttackContext` interface that bundles the closure's previously-captured state (target / targetId / weaponItem / weaponDamage / isVersatile / weaponLabel + the full ToHitContext). `attack/index.ts` shrank 977 → 100 lines; the handler now constructs the AttackContext once after the to-hit phase and calls `resolveOneAttack` for the first attack + each Extra Attack iteration. Adv/disadv state stays stable across the loop (computed once, read N times). Behavior unchanged — all 1016 BE tests pass.
-  - [x] **`castSpell.ts` internal split** (shipped 2026-05-22). Decomposed into `services/actions/castSpell/`: `index.ts` (orchestrator, 184 lines), `precast.ts` (gates + slot + action-economy + casting ability + Wild Magic Surge + EK War Magic, 291 lines), `heal.ts`, `buff.ts` (self/ally/self_or_ally + Mage Armor + Shield of Faith), `utility.ts` (narrative + Bless), `multiTarget.ts` (Magic Missile / Eldritch Blast), `attackRoll.ts`, `save.ts` (with embedded condition + kill resolution), `autoHit.ts`, `aoe.ts` (sphere/cone/cube/line), `applyDamage.ts` (post-resistance multiplier + kill resolution), `utils.ts` (pickCastPrefix + concentrationRoundsFor). Behavior unchanged — all 1016 BE tests pass. The narrativePlaceholders lint was updated to recurse into action subdirectories (attack/, castSpell/, classFeature/) so the placeholder check picks up the per-phase split files.
-  - [x] **Monk Flurry kill resolution + adjacent class-feature bugs**
-    (audited + fixed 2026-05-22). The suspicious `ctx.roomId` write to
-    `enemies_killed` was the tip of a bigger bug class: `monk.ts` (Flurry
-    of Blows) and `paladinRangerBard.ts` (Colossus Slayer, Vow of Enmity,
-    Abjure Enemy) plus `fighter.ts` (Trip Attack, Goading Attack) all
-    used `e.id === ctx.roomId && e.isEnemy` as their entity-lookup
-    predicate. Since entity ids are `${roomId}#0`, the predicate never
-    matched — Flurry's damage path silently no-op'd, Colossus Slayer
-    read 0 hp and "killed" a stale target on every cast, Vow of Enmity
-    set `vow_of_enmity_target` to the room id so the `toHit.ts`
-    advantage check never fired. All sites now key off `ctx.enemy?.id`.
-    Flurry + Colossus Slayer also previously called `endCombatState`
-    unconditionally on a kill — now gated behind `isRoomCleared` to
-    match the canonical attack-handler pattern. The test that
-    "covered" Flurry had a tautological `if (narrative.includes(...))
-    expect(narrative).toMatch(...)` wrapper; replaced with `flurryColossus.spec.ts`
-    (4 regression cases: damage applied, kill-bookkeeping with correct
-    id, no early combat-end with other enemies in the room, Vow of
-    Enmity target set to enemy id).
-  - [ ] **Test gaps surfaced by sed false-positives** — PRs 15/16 sed translation introduced 3 latent bugs (`break;` → `return;` inside loops, sed-rewriting `enemy` inside string literals, if-chain breakage when deleting the first branch). All were fixed in PR 17 + caught manually during PR 20/25. The fact that 514 tests didn't catch them points to coverage gaps for Bless on 4+-member parties, Monk Flurry kill-on-first-strike, Frenzy with no enemy in range, and the unknown-feature fallback. ~2-3h to write targeted regression specs.
-  - [x] **2026-05-22 combat bug sweep.** Twelve bugs caught during
-    the gap-list/subclass implementation work, each shipped with a
-    regression spec:
-    1. `rangedInMelee` now requires an enemy WITHIN 5 ft of attacker
-       (was firing on any enemy in the room).
-    2. `armorItem` lookup in `computeEnemyAttack` corrected.
-    3. Death save no longer phantom-applies 2 failures on the PC's
-       own turn (the multi-attack-prone trigger was conflated with
-       the PC's death-save action).
-    4. Resilient feat's save proficiency now honored by
-       `conditionSavingThrow` (the save path read class-grant prof
-       only, not feat-grant).
-    5. OA damage in `gridMove.ts` now routes through `applyDamage`
-       (was bypassing temp HP / exhaustion clamp / concentration).
-    6. Unconscious condition now cleared on heal-from-0 HP (was
-       leaving PCs "alive but unconscious").
-    7. Sneak Attack now scales correctly + triggers for multiclass
-       Rogues (was reading the primary-class level only).
-    8. Extra Attack now scales correctly across multiclass
-       (Fighter 5 / Rogue 2 → 1 extra; was 0).
-    9. Sneak Attack now gates once-per-turn (was firing on every
-       hit during Extra Attack / TWF sequences).
-    10. Cleave (Greatsword mastery) damage now routes through
-        `applyDamageMultiplier` (was bypassing
-        resistance/vulnerability).
-    11. Heal-spell upcast now scales heal dice with slot level (was
-        consuming the upcast slot but only rolling base dice).
-    12. Heal narrative now reports the actual amount restored
-        post-cap (was reporting the raw rolled value — "restores
-        13 HP to Fighter (now 8/8)" type display bug).
-
-  See git history `3696339..1ced24e` (PRs 1-29) for full commit chain. Each PR is independently revertible; tests + lint + prettier gate every commit; no CI failures across the 29-PR series.
+- [ ] **Regression-spec coverage gaps** — add targeted specs for Bless on 4+-member parties, Monk Flurry kill-on-first-strike, Frenzy with no enemy in range, and the unknown-feature fallback (gaps surfaced during the action-handler refactor). ~2-3h.
 
 - [ ] **Pre-commit hook (Husky + lint-staged)** — auto-run eslint + prettier on staged files before commit. Catches the class of bug where prettier-dirty code reaches CI and fails the build. ~30 min setup; bypassable with `--no-verify`. CI lint stays as the gate.
-
-- [x] **Multiplayer MVP — party-of-equals with per-PC ownership** (design locked + shipped 2026-05-21).
-      All four PRs landed: PR 1 (data foundation), PR 2 (auth + turn enforcement),
-      PR 3 (Socket.IO realtime push + WaitingForPlayer), PR 4 (invite link UX).
-      Solo mode is unchanged — host owns every PC, no participant rejects, no
-      waiting banner. Multi: friend opens the shared `?join=<token>` URL,
-      becomes a participant, sees the full narrative chat via realtime
-      broadcasts, but can't act until the host reassigns a PC via the
-      assign-character endpoint (UI follow-up below). Three follow-ups
-      remain before MP feels complete; tracked separately so the MVP itself
-      reads as shipped.
-
-  Follow-ups:
-  - [x] **ParticipantsManager UI** (shipped — a97ce9c). Players & invites
-        dialog now lists session_participants and gives the host a per-PC
-        owner dropdown. Realtime Socket.IO 'state' broadcasts keep the
-        dropdown values in sync. Realtime 'participants' (joined/left)
-        listener still deferred — host has to close + reopen the dialog
-        to see a freshly-joined friend.
-  - [x] **Voluntary leave** (shipped — d42484e). Non-host participants
-        have a "Leave session" button in the players dialog. Server auto-
-        transfers PCs they owned to the host before removing them, so turn
-        enforcement never encounters an orphan owner.
-  - [x] **Race detection** (`turn_seq` column) — shipped 4d3b7bb.
-        `game_sessions.turn_seq` bumps on every successful takeAction;
-        clients send their last-known value with each action; server
-        rejects with 409 on mismatch. useGame handles 409 by logging
-        "out of sync" + resuming the session for fresh state.
-  - [x] **Realtime participants refresh** — shipped 4d3b7bb.
-        useGame listens for Socket.IO 'participants' events and bumps
-        a participantsVersion counter; InviteDialog includes it in its
-        fetch-participants useEffect deps so the list updates the
-        moment a friend joins/leaves/has their PC reassigned.
-        Each PC has exactly one human controller via `Character.owner_user_id`. Solo
-        mode = host owns all PCs (no schema branch). 2+1 / 1+2 / 1+1+1 splits all
-        fall out of the same row layout in `session_participants`. Every participant
-        sees the full narrative (Socket.IO broadcast on every state change). Action
-        buttons render only for the player whose PC is currently active; everyone
-        else sees "Waiting for `<Name>` to finish their turn."
-
-  **Design calls (locked)**
-  - Invite UX: shareable link with a session-scoped `invite_token`.
-  - No DM mode (yet) — strict party-of-equals. `session_participants.role`
-    column carries a default `'pc'` value from day one so a `'dm'` role can
-    be added later without a schema migration.
-  - No voice — players use their own VC (Discord, etc.).
-
-  **Invariants**
-  - Each PR keeps singleplayer working. In solo mode every PC is owned by
-    the host, so no guard ever rejects, no "waiting" banner ever renders.
-  - Lead handoff (out-of-combat): only the current lead's owner can pass.
-    No "claim the lead" escape hatch in MVP — add if AFK becomes a real
-    problem in playtest.
-  - Host disconnect = session paused (no actions accepted) until host
-    reconnects. Simpler than promoting a new host.
-  - Player disconnect = their PCs stay theirs; host can reassign via the
-    participants modal if they don't return.
-  - Inventory modal: viewing any PC's tab is allowed; Equip / Transfer /
-    Drop only enabled for PCs you own.
-
-  **Phases (~15-18h total, splittable into 4 PRs)**
-  1. **Data foundation** (~4-5h). Migration: `session_participants(session_id,
-user_id, joined_at, role text default 'pc')` table + index. Schema
-     evolution: every PC's `owner_user_id` is set at character creation;
-     `normalizeState` backfills missing values to `session.user_id` for
-     existing sessions. Type: `Character.owner_user_id?: string` on the
-     shared types. Specs: backfill correctness, default value on new
-     PCs. **This PR is data-only — no behavior changes.**
-  2. **Auth + turn enforcement** (~2h). Route guard: `/api/game/session/:id/*`
-     checks the requesting user is a participant (was: owner). `takeAction`
-     rejects when `req.user.id !== characters[active].owner_user_id` with
-     a clean narrative. Reaction-routed actions check the eligible PC's
-     owner instead of `active_character_id`. New endpoints:
-     `POST /session/:id/assign-character` (host-only) and
-     `POST /session/:id/join` (anyone with a valid invite token).
-  3. **Realtime push** (~6-7h). After every successful `takeAction`,
-     `io.to(\`session:${sessionId}\`).emit('state', result.newState)`.
-Frontend `useGame`connects to the socket on session load and
-replaces local state on each broadcast. Sequence number on the
-broadcast envelope so out-of-order packets don't downgrade state.
-Frontend: render`<WaitingForPlayer name={...} />` instead of the
-     action pane when the active PC's owner isn't us.
-  4. **Invite + participant management UX** (~3-4h). Generate per-session
-     `invite_token`, build a shareable URL `?join=<token>`. Landing on
-     that URL triggers login (if needed) → join → redirect to game.
-     Participants modal (host only): list all participants + which PCs
-     they own, allow host to reassign with a dropdown. "Rotate invite
-     token" button for leaked links.
-
-  **Deferred from MVP** (revisit after playtest)
-  - Race detection (`turn_seq` column rejecting stale submissions when
-    two participants race-click). Defer until it actually bites.
-  - Chat MVP (`chat_messages` table + input + log). Players can use
-    voice (Discord); chat is nice but not required for a working co-op.
-  - Per-participant cosmetics (name colors in narrative attribution, etc.)
-  - Spectator mode (a participant with no PC, observing only).
-  - "Claim the lead" escape hatch for AFK lead owners.
 
 ### Architecture audit follow-ups
 
@@ -1042,394 +208,25 @@ Frontend: render`<WaitingForPlayer name={...} />` instead of the
 > leverage — items 1-3 pay for themselves within 2-3 features and
 > compound; 4-7 are medium-leverage; 8-9 are flagged but deferred.
 
-#### High leverage (do first)
-
-- [x] **1. Conditions registry** (shipped 2026-05-21). New module
-      `services/conditions/registry.ts` is the single source of truth
-      for condition rule data (duration, advantage/disadvantage,
-      auto-fail saves, disadvantage saves, movement gates, on-expire
-      hooks). The four ADV/DISADV Sets in rulesEngine + the
-      `STR_DEX_AUTO_FAIL` set + the `CONDITION_DURATION` dict in
-      gameEngine are gone — Sets are re-exported as derived views for
-      compat; rulesEngine save logic now reads `autoFailsSave` /
-      `disadvantageOnSave`; gameEngine `inflictCondition` /
-      `tickConditions` use `getConditionDuration` / `applyExpiryHooks`
-      (replaces the shield_spell AC -5 hack). 20 direct registry
-      tests. Adding a new condition is now one registry entry.
-
-- [x] **2. `applyDamage` helper** (shipped 2026-05-21, partial).
-      `services/damage.ts` handles HP floor, temp-HP absorption,
-      exhaustion-4 max-HP clamp, automatic concentration check,
-      knock-out detection. **Closed latent bug:** four damage sites
-      that bypassed concentration now route through the helper —
-      `disarmTrap` (trap on fail), `gameEngine.ts:4179` (hidden trap),
-      `gameEngine.ts:991` (lair action AoE — refactored from `.map`
-      to loop so per-PC concentration breaks accumulate), and
-      `inventory.ts` (mystery consumable, "can't kill" semantics
-      preserved). 16 direct damage tests.
-
-  **Deferred (separate follow-up PRs):**
-  - **Resistance / vulnerability in helper** — current sites bypass
-    it; helper signature is forward-compatible.
-  - **`applyEnemyAttackNarrative` migration** — ~80-line block in
-    gameEngine.ts with inlined resistance (Rage, Petrified, Beast
-    Form, species), ward absorption (Abjurer), temp HP, exhaustion
-    clamp, narrative tokens. Needs narrative-fragment rework
-    (related to #4) before it can migrate safely.
-
-  **Dropped from scope (closer inspection):**
-  - **`reaction.ts` pending damage migration** — investigated
-    2026-05-21 and dropped. The two PC-damage sites
-    (Shield-declined-no-slot at reaction.ts:103,
-    Shield-declined-explicit at reaction.ts:133) apply
-    `pendingDamage` that's already had resistance, temp HP,
-    exhaustion clamp, AND concentration check applied upstream by
-    `applyEnemyAttackNarrative` (gameEngine.ts:3950). Routing
-    through `applyDamage` would require both `skipConcentration` and
-    `skipTempHp` to avoid double-processing, which makes the
-    migration purely cosmetic. The Hellish Rebuke site at
-    reaction.ts:203 is PC→enemy damage and outside `applyDamage`'s
-    scope (enemies don't concentrate or carry temp HP). A separate
-    real bug exists in the upstream flow — concentration is checked
-    against pre-Shield damage, so a successful Shield block doesn't
-    undo the spurious save — but that's a `applyEnemyAttackNarrative`
-    bug, not a reaction.ts one.
-
-- [x] **3. Action-economy invariants in the dispatcher** (shipped
-      2026-05-21, partial). `services/actions/cost.ts` declares
-      `ACTION_COSTS: Record<actionType, 'action' | 'bonusAction' |
-      'reaction' | 'managed'>`. Dispatcher pre-checks the budget
-      (rejects with standard narrative) and post-deducts on success.
-      Handler contract gained a `{ rejected: string }` return variant
-      for validation early-exits that don't consume the slot. Five
-      clean handlers migrated (`dodge`, `disengage`, `dash`, `help`,
-      `ready`): manual `if (action_used) error` + `action_used: true`
-      removed; the dispatcher handles both. 13 direct cost-map tests.
-
-  **Shipped 2026-05-21 (follow-up sweep):** `sneak`, `disarm_trap`,
-  `grapple`, `shove`, `try_escape_grapple`, `use_reaction` migrated.
-  Per-branch classification: validation early-exits (no enemy /
-  out-of-reach / no trap / not located / not grappled / no readied)
-  return `{ rejected: ... }` and don't consume the slot. Post-validation
-  failure paths (grapple-immune / prone-immune target — RAW: the
-  unarmed strike was committed) and the contested-roll paths run to
-  void return; dispatcher post-deducts. `use_reaction`'s manual
-  reaction-used pre-check went away — dispatcher pre-checks via
-  declared cost 'reaction'.
-
-  **Still 'managed' (variable per-feature cost — would need richer
-  dispatcher contract):** `attack`, `cast_spell`, `use_class_feature`,
-  `two_weapon_attack`, plus the free / out-of-combat handlers (`pass`,
-  `end_turn`, `examine`, `move`, `loot`, `stand_up`, social/quest/travel
-  handlers, etc.). These either consume budgets conditionally
-  (Quickened Spell, Extra Attack, Nick property) or don't consume
-  action economy at all.
-
-#### Surfaced bugs (from this audit)
-
-- [x] **Concentration save fires before Shield-reaction window**
-      (shipped 2026-05-21 as part of 4C.4.B). The fix landed via
-      the compute/commit split in `applyEnemyAttackNarrative` →
-      `computeEnemyAttack`. The concentration save is now rolled
-      into a *proposed* state that's discarded on Shield-accept —
-      so a successful Shield no longer commits a failed
-      concentration save. RAW-correct per SRD 5.2.1 p.203 (save
-      fires on damage TAKEN, not threatened).
-
 #### Medium leverage
 
-- [~] **4. Narrative pipeline — mechanical/prose split, spell
-      pools, structured fragments** (partial — 3 sub-PRs shipped
-      2026-05-21; multi-stage migration ongoing).
+- [~] **4. Narrative pipeline — structured fragments** (multi-stage
+  migration; attack + spell + enemy-side paths shipped). Remaining:
+  - [ ] `twoWeaponAttack` fragment migration — needs a `two_weapon_hit`
+    kind or prose alignment; off-hand outcomes emit no `CombatEvent` today.
+  - [ ] Cleave-hit fragment — secondary-target damage emits no event.
+  - [ ] `resolveTarget(ctx, action)` helper to dedupe target resolution
+    across ~5 sites.
+  - [ ] `cleric.ts` Divine Spark auto-hit → `spell_auto_hit` fragment
+    (defer until a Divine Spark rework).
 
-  **Shipped:**
-  - [x] **4B. `stripForLlm` + bracketed-note migration.** New helper
-        in `narrativeFmt.ts` drops `{{note|...}}` tokens entirely
-        from LLM input while keeping other tokens as display text
-        (so `preservesCriticalFacts` still sees the numbers). 25
-        inline `[mechanical aside]` brackets across the handlers
-        (`attack/index.ts`, `castSpell.ts`, `loot.ts`,
-        `examineDefault.ts`, `gameEngine.ts`) wrapped in
-        `fmt.note(...)`. The LLM-fallback case is now readable:
-        bracketed asides render as styled sidebar pills, not inline
-        prose. 6 direct tests.
-  - [x] **4A. Per-spell narrative pools.** `Spell.narratives.cast`
-        pool with `{name}/{spell}/{slotNote}/{target}` token
-        substitution. New `pickCastPrefix` helper in `castSpell.ts`
-        replaces the 8 hardcoded `"{name} casts {spell}{slotNote}"`
-        prefix sites. Three demo pools populated (Magic Missile,
-        Fireball, Cure Wounds). Adding a new spell with flavor is
-        now data, not code. 9 direct tests.
-  - [x] **4C.1. Structured `NarrativeFragment[]` — attack vertical
-        slice.** New `services/narrative/` module:
-        `fragments.ts` (discriminated union) and `compose.ts` (per-
-        kind renderers + `composeFragments` / `composeNow`).
-        `ctx.fragments: NarrativeFragment[]` on `ActionContext`,
-        composed after `dispatchAction` returns. Attack handler's
-        four emission sites (fumble, miss, hit, kill) migrated to
-        `composeNow(ctx, fragment)`; the composer is now the single
-        source of truth for prose AND `CombatEvent`s for those
-        outcomes. Bonus notes (Sneak Attack, Rage, Sacred Weapon,
-        Assassinate, Studied Attacks, Graze, dmgNote) carried as
-        structured `bonuses: {label: string}[]` payload. Wraps
-        existing `buildCombatHitNarrative` rather than rebuilding
-        prose logic. 9 direct tests.
-
-  **Remaining:**
-  - [x] **4C.2.A. Spell attack-roll paths migrated** (shipped
-        2026-05-21). Two new fragment kinds `spell_attack_hit` /
-        `spell_attack_miss` (both emit existing `attack_hit` /
-        `attack_miss` CombatEvent kinds, so spell outcomes now
-        appear in `combat_log` for the first time). Composer
-        renderers mirror the pre-migration prose
-        (`<castPrefix>!<atkNote> [Critical spell hit! ]<dmg>
-        damage!<bonuses>`). `pickCastPrefix` runs handler-side so
-        the composer doesn't import `castSpell` (no circular dep).
-        Agonizing Blast bonus migrates to `fragment.bonuses[]`. 5
-        direct tests.
-  - [x] **4C.2.B. Spell save / heal / utility / multi-target / AOE
-        paths migrated** (shipped 2026-05-21). 6 new fragment kinds:
-        `spell_heal`, `spell_utility`, `spell_save_damage`,
-        `spell_save_condition`, `spell_auto_hit`, `spell_multi_target`.
-        Composer return shape generalized to `{ prose; events:
-        CombatEvent[] }` so renderers emit zero events (heal /
-        utility), one event (most kinds), or many (multi-target →
-        one `attack_hit` per damaged target). Disciple of Life
-        bonus moved from inline bracketed prose to `bonuses[]` (wraps
-        in `fmt.note`, excluded from LLM input). Save / auto-hit /
-        multi-target spell outcomes now appear in combat_log for
-        the first time. 11 new tests. **The Cunning Strike /
-        weapon-mastery `condition_applied` post-hit pushEvent
-        sweep is still deferred** — needs a `condition_applied`
-        fragment kind; not in 4C.2.B scope.
-  - [~] **4C.3. Class-feature handler migration** (shipped 2026-05-22,
-        partial). New `SaveFragment` kind in
-        `services/narrative/fragments.ts` carries the full save outcome
-        (roll, DC, success, source) + the prose the composer should
-        append. `renderSave` in compose.ts emits a `kind: 'save'`
-        CombatEvent. Three handlers migrated from bare-`pushEvent` to
-        the fragment: Monk Stunning Strike (CON), Fighter Maneuver
-        Goading Attack (WIS), Paladin Abjure Enemy (WIS). All three
-        pair a save fragment with a follow-up condition_applied
-        fragment when the save fails. 2 added composer tests cover
-        the save fragment in success + failure shapes.
-
-        **Remaining sites that still call `pushEvent({kind:'save'})`:**
-        - ~~`monk.ts` Open Hand Technique DEX save~~ — migrated
-          2026-05-22 via composeNow + empty prose (consolidated
-          flurry narrative still owns the player-facing line).
-        - ~~`cleric.ts` Turn Undead / Sear Undead~~ — migrated
-          2026-05-22, same pattern: per-target SaveFragment with
-          prose='' adds combat-log entries for every save; the
-          consolidated lines[] narrative is unchanged.
-        - ~~`casters.ts` Fey Presence~~ — migrated 2026-05-22, same
-          pattern as the Cleric AoEs.
-        - Damage-only paths (Divine Smite, Flurry-of-Blows hit) emit
-          their notes via `bonuses[]` on the existing attack fragment;
-          already migrated as of the original 4C.1.
-        - **Still inline (single-target attack-hit event):**
-          `cleric.ts` Divine Spark (~ line 59) emits a custom
-          `attack_hit` CombatEvent with `toHit: 0` — auto-hit spell
-          damage. Could migrate to a `spell_auto_hit` fragment but
-          that changes the prose format. Defer until a Divine Spark
-          rework is on the docket.
-  - [x] **4C.4.A. `applyEnemyAttackNarrative` damage-pipeline
-        migration** (shipped 2026-05-21). **PR-2's deferred
-        follow-up is closed.** `applyEnemyAttackNarrative` now
-        takes `st` and routes damage through `applyDamage` —
-        temp_hp absorption, exhaustion-4 clamp, and concentration
-        check all run via the helper. ~50 lines of inline math
-        removed. Function signature simplified: returns
-        `{ newChar, newSt, hpLost, narrative, atkTotal, hit, ...}`
-        — `newChar` carries the full character mutation so callers
-        write it back wholesale instead of threading temp_hp /
-        conditions / condition_durations / class_resource_uses /
-        concentrating_on / inspiration / bardic_inspiration_die
-        individually. Both call sites updated (legendary action +
-        enemy-turn loop). Orc Relentless Endurance and Massive
-        Damage Death checks stay in the caller. Resistance / ward
-        math stays inline (PC-specific, not generalized into
-        `applyDamage`). All 603 BE tests still pass.
-  - [x] **4C.4.B. Enemy-side narrative fragments + Shield-window
-        fragment stashing** (shipped 2026-05-21). Two new fragment
-        kinds `enemy_attack_hit` / `enemy_attack_miss` carry the
-        full attack prose + event payload. `applyEnemyAttackNarrative`
-        split into `computeEnemyAttack` (pure compute, returns
-        proposed char/state + fragment) and a commit step at the
-        caller. `PendingShieldReaction.pendingDamage` /
-        `pendingNarrative` replaced with `pendingFragment` /
-        `pendingProposedChar` / `pendingProposedSt` (typed as
-        `unknown` in shared-types since FE doesn't introspect them;
-        BE narrows via cast). Closes the Shield-vs-concentration
-        ordering bug — Shield-accept discards the proposed state,
-        so a failed concentration save rolled during compute is
-        thrown away when no damage actually lands. Enemy turn loop
-        + legendary action call site updated. `enemyAttackFragmentEvent`
-        adapter helper bridges non-ctx callers to the composer's
-        CombatEvent shape. 4 direct tests for the new renderers.
-  - [x] **4C.5. `reaction.ts` Shield resolver migration**
-        (shipped 2026-05-21 as part of 4C.4.B). `commitProposed`
-        helper in `reaction.ts` writes the proposed snapshot and
-        pushes the `attack_hit` event via `enemyAttackFragmentEvent`.
-        Three Shield outcomes: accept-no-slot commits proposed,
-        accept-with-slot discards proposed (concentration unaffected),
-        decline commits proposed with " (Shield declined.)" suffix.
-        Hellish Rebuke path unchanged (after-damage reaction; no
-        stashed fragment needed).
-  - [ ] **`twoWeaponAttack` fragment migration.** The off-hand
-        attack uses a different narrative shape (`"Off-hand strike
-        with..."`) than `buildCombatHitNarrative`. Migration needs
-        either a new `two_weapon_hit` fragment kind (cleaner) or
-        prose alignment with the main attack (changes visible text
-        — see existing `/Off-hand/` test assertion). Deferred from
-        4C.1 because it's a product-flavor decision, not a
-        technical blocker. Also: today twoWeaponAttack emits
-        narrative WITHOUT corresponding `CombatEvent`s — fixing
-        that mid-migration adds events to combat_log for the first
-        time for off-hand outcomes.
-  - [ ] **Cleave-hit migration.** The `[Cleave: ...]` note in
-        `attack/index.ts:~560` stays inline today; it's a
-        secondary-target damage application that doesn't currently
-        emit its own `CombatEvent`. Promote to a fragment kind when
-        a feature actually needs cleave outcomes in the log
-        (e.g. visualizing the cleave target on the grid).
-  - [ ] **`resolveTarget(ctx, action)` helper.** Originally part of
-        item 4 with the fragments work. Lower leverage on its own
-        — saves ~10 lines across 5 sites
-        (`combatTactical.ts`, `attack/preattack.ts`,
-        `twoWeaponAttack.ts`, `castSpell.ts`). Bundle with the
-        spell-handler migration (4C.2) since both touch the same
-        target-resolution code.
-
-- [~] **5. Monsters as first-class action subjects** (extraction
-      phase complete; dispatcher integration deferred). The
-      `runEnemyTurns` closure went from 460 → 191 lines (-58%) by
-      lifting every cohesive sub-routine into a named free function
-      with an explicit input/output contract.
-
-  **Shipped 2026-05-21 — five extractions:**
-  - `resolveEnemyHideCheck(enemy, target, idx, st)` — 2024 PHB Hide
-    DC check (passive Perception → active Search fallback). Returns
-    `{outcome, st, target, narrative}`. 4 direct tests.
-  - `selectEnemyMeleeTarget(enemyId, st)` — nearest-living-PC
-    targeting AI. Returns `{enemyEnt, targetEnt, targetCharIdx}`.
-    Skips dead PCs + companions. 5 direct tests.
-  - `attemptEnemySpellCast({...})` — spell-cast intent + counterspell
-    window + spell resolution. Returns discriminated union
-    `'no-cast' | 'counterspell-pending' | 'spell-resolved'` so the
-    closure has a clean three-way dispatch. ~90 lines lifted.
-  - `attemptEnemyApproach({...})` — pathfinding + opportunity
-    attacks + position commit. Returns `'proceed-to-attack'`
-    (carrying `movementHeaderPrinted` flag) or `'skip-turn'`
-    (no path / OA-killed / out-of-reach-after-move). ~90 lines lifted.
-  - `runEnemyMultiattackLoop({...})` — the multiattack body with
-    both reaction pause points (Shield BEFORE damage commit;
-    Hellish Rebuke AFTER damage commit). Returns `'paused'` or
-    `'completed'` (with `massiveDeath` flag for the dead-target
-    check). Orc Relentless Endurance + Massive Damage Death stay
-    inside. ~115 lines lifted.
-  - All parallel-write sites in the enemy-turn path now route
-    through `commitCharacter` — drift risks eliminated.
-
-  The closure body is now a sequence of named handler calls:
-  surprised → legendary refresh → select target → hide check →
-  spell cast → approach → multiattack → death save → commit →
-  advance.
-
-  **Phase 2 pilot shipped 2026-05-22.** `handleDodge` migrated to
-  read + write through `ctx.actor` (narrowed to PC) via a new
-  `updatePcActor(ctx, patch)` helper in `services/actions/actor.ts`
-  that keeps `ctx.char` and `ctx.actor.char` in lockstep across
-  reassignments. Documented inline as the canonical migration
-  pattern future handlers should follow. 3 added helper tests.
-
-  **Phase 1 dispatcher integration shipped 2026-05-21 — type seam:**
-  - New `services/actions/actor.ts` module: `Actor` discriminated
-    union (`PcActor` | `EnemyActor`) + constructor helpers
-    `pcActor(char, safeIdx)` and `enemyActor(enemy, ent?)`. 6
-    direct tests for the constructors + narrowing behavior.
-  - `ActionContext` gained an `actor: Actor` field. `takeAction`
-    populates it as `pcActor(char, safeIdx)` so existing handlers
-    have a polymorphic source ready when they want to migrate.
-    `ctx.char` and `ctx.safeIdx` stay for back-compat; nothing
-    changes for current handlers.
-  - Five-phase migration roadmap documented in
-    `services/actions/actor.ts`:
-    1. ✅ Type seam (this PR).
-    2. Pilot one handler reading from `ctx.actor` instead of `ctx.char`.
-    3. Migrate more handlers, narrowing via discriminant when
-       PC-specific data is needed.
-    4. Wire enemy turns to invoke `dispatchAction` with an enemy
-       actor; the closure-extracted helpers (Phase 5 above) become
-       registered handlers.
-    5. Drop `ctx.char` / `ctx.safeIdx` once every handler reads
-       from `ctx.actor`. Shared abilities (Stunning Strike, Divine
-       Smite, ...) work for PCs and monsters from one implementation.
-
-  **Remaining (future sessions):** phases 2-5 above. Each phase
-  is a separate PR sequence. The Phase 1 type seam makes phases 2-3
-  mechanical (per-handler narrowing) and unblocks phase 4 (the
-  dispatcher entry point now has somewhere to write enemy actor data).
-
-- [x] **6. Single grid/character HP source of truth** (shipped
-      2026-05-21). New free function `commitCharacter(st, char)` in
-      `gameEngine.ts` is the single seam for writing PC HP /
-      conditions — updates both `characters[]` and the mirrored
-      `entities[]` entry in one place. Two parallel-write sites
-      refactored: `applyEnemySpellDamage` (gameEngine.ts) and the
-      heal-other-PC path in `inventory.ts`. The closure-scoped
-      `commitChar` inside `takeAction` and the `ctx.commitChar()`
-      method on ActionContext both delegate to the free function
-      (three copies → one). `CombatEntity.hp` / `CombatEntity.conditions`
-      JSDoc documents the mirror policy: enemies are authoritative,
-      PCs are mirrored, writes route through `commitCharacter`. 6
-      direct tests. Wire format unchanged; FE continues to read
-      `entity.hp` for grid rendering.
-
-- [x] **7. Schema version on saved state** (shipped 2026-05-21). New
-      `services/stateSchema.ts` module with `CURRENT_SCHEMA_VERSION`
-      constant + `applyStateMigrations(state)` ladder.
-      `normalizeState` (gameEngine.ts) stamps the version on every
-      load; pre-versioning saves are treated as v0 and routed
-      through `migrateV0ToV1` (no-op besides version stamp). Forward
-      compat: a save written by a newer engine and loaded by an
-      older deploy passes through unchanged. Version-bump policy
-      documented at the top of stateSchema.ts. Future schema changes
-      that need per-row logic now have a defined entry point. 4
-      direct tests.
-
-#### Test-suite cleanup (shipped 2026-05-21)
-
-- [x] **PR A. Shared test fixtures.** New `src/backend/src/test-fixtures.ts`
-      module with canonical `makeChar`, `makeState`, `makeEnemy`,
-      `makeMinimalContext`, `mockRandom`, plus per-class scenario
-      builders (`makeMageState`, `makeClericState`) and the canonical
-      seeds (`baseSandboxSeed`, `seedWithEnemy`, `dungeonSeedWithEnemy`,
-      `spellSeed`, `ctxWithRage`). 6 specs migrated; ~400 lines of
-      inline fixture duplication eliminated. `mockRandom` no longer
-      defined twice (was in rulesEngine.spec.ts and damage.spec.ts).
-- [x] **PR B. Split `gameEngine.spec.ts`** into domain-cohesive
-      specs colocated with the engine. Five new files:
-      `gameEngine.boss_encounters.spec.ts`,
-      `gameEngine.cast_spell.spec.ts`,
-      `gameEngine.conditions.spec.ts`,
-      `gameEngine.class_features.spec.ts`,
-      `gameEngine.grid_combat.spec.ts`.
-      Main spec went from 10,711 → 5,575 lines (-48%). 608 tests
-      preserved across 18 spec files.
-- [x] **PR C. Resolve 4 `it.todo` tests in `rulesEngine.spec.ts`.**
-      All obsolete: movement tracking and concentration-on-damage
-      are implemented (via `movement_used` field and
-      `checkConcentration` in damage.ts), bonus-action-spell-restriction
-      was removed by the 2024 PHB, and two-handed-weapon-spellcasting
-      is an RAW edge case not modeled. `future systems` describe
-      block deleted.
-- [x] **PR D. Vale spec duplication check** — no-op. The two files
-      are complementary across layers:
-      `contexts/vale_of_shadows.spec.ts` (BE, vitest) validates the
-      quest engine + state machine in isolation; `tests/e2e/vale-smoke.spec.ts`
-      (Playwright) validates the full HTTP/DB/UI stack. Different
-      runners, different assertions, different failure modes.
+- [~] **5. Monsters as first-class action subjects** (extraction +
+  type-seam shipped; dispatcher integration is **RE-1** above).
+  `runEnemyTurns` is decomposed into named handlers; the `Actor` union +
+  `ctx.actor` seam is in place; `handleDodge` piloted reading/writing via
+  `ctx.actor`. Remaining = phases 2–5: migrate handlers to `ctx.actor`,
+  then wire enemy turns through `dispatchAction` so shared abilities
+  (Stunning Strike, smites, …) run for PCs and monsters from one path.
 
 #### Lower urgency (flag now, defer)
 
@@ -1465,14 +262,6 @@ Frontend: render`<WaitingForPlayer name={...} />` instead of the
 > the gaps the survey found; manual screen-reader + keyboard-only
 > validation is the next step.
 
-### Shipped 2026-05-21
-
-- [x] **Skip-to-main link** — `<a href="#main-content">` becomes visible-on-focus, lands keyboard users past the header on `<main id="main-content">`. WCAG 2.4.1.
-- [x] **CharScreen label htmlFor** — name / class / subclass / species / background fields now use `htmlFor` + matching `id={\`char-${idx}-X\`}` so SR announces the field name on focus.
-- [x] **Player avatar meaningful alt** — PartyRail / InventoryModal / SessionScreen portraits now read `"${name}'s portrait"` (was `alt=""`). User's own header avatar stays `alt=""` since the name is in adjacent text.
-- [x] **`.choiceBtnSeen` contrast** — was `opacity:0.45` + `--t-dim` ≈ 1.86:1 (WCAG AA fail). Now `opacity:0.7` + `--t-mid` ≈ 4.75:1 (passes). Hover restores full color.
-- [x] **MoveDPad keyboard navigation** — WAI-ARIA Composite Widget pattern: roving tabindex (one focused cell at a time), arrow keys move focus spatially, arrow keys skip past disabled cells. 3 spec assertions cover the behavior.
-
 ### Remaining
 
 - [ ] **fieldset/legend on grouped form controls** — CharScreen's `PORTRAIT` and `ABILITY SCORES` "labels" are group descriptors (govern multiple buttons) but use plain `<label>` without an `htmlFor`. The right HTML is `<fieldset><legend>` (or `<div role="group" aria-labelledby="...">`). Larger refactor than the simple-label htmlFor pass already shipped.
@@ -1490,12 +279,6 @@ Frontend: render`<WaitingForPlayer name={...} />` instead of the
 > parameterized ($1/$2 placeholders), passport+Google OAuth. The single-
 > tenant model masks several issues that will bite when session_participants
 > lands.
-
-### Shipped 2026-05-21
-
-- [x] **SESSION_SECRET fail-fast** — was `?? 'change-me-in-production'`. Now boot throws if env is missing — refuses to accept requests against a known-secret session signing key.
-- [x] **Rate limit on `/api/game/*`** — 120 req/min `gameLimiter` sits after `requireAuth` and before `gameRouter`. Throttles takeAction spam without affecting normal play.
-- [x] **Socket.IO `join-session` ownership check** — session middleware is now shared between Express and `io.engine.use(...)`. Before joining a session's room, we read `req.session.passport.user` and run a `SELECT 1 FROM game_sessions WHERE id = $1 AND user_id = $2`. Single-tenant today; will broaden via `session_participants` when multiplayer lands.
 
 ### Remaining
 
