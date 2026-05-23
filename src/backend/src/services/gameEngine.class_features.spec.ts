@@ -517,65 +517,6 @@ describe('class features', () => {
     expect(result.narrative).toMatch(/Open Hand:/);
   });
 
-  it('Way of Shadow — Shadow Arts spends 2 ki and applies invisible', async () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0.5);
-    const monkId = 'mk-sh';
-    const monk = makeChar({
-      id: monkId,
-      character_class: 'Monk',
-      subclass: 'shadow',
-      level: 3,
-      hp: 20,
-      max_hp: 20,
-      class_resource_uses: { ki_points: 3 },
-    });
-    const state = makeState(
-      {},
-      { characters: [monk], active_character_id: monkId, combat_active: true }
-    );
-    state.characters = [monk];
-    state.active_character_id = monkId;
-    const result = await takeAction({
-      action: { type: 'use_class_feature', featureId: 'shadow_arts' },
-      history: [],
-      state,
-      seed,
-      context: ctx,
-    });
-    const newMonk = result.newState.characters[0];
-    expect(newMonk.conditions).toContain('invisible');
-    expect(newMonk.condition_durations?.invisible).toBe(3);
-    expect(newMonk.class_resource_uses?.ki_points).toBe(1); // 3 - 2
-    expect(newMonk.turn_actions.action_used).toBe(true);
-    expect(result.narrative).toMatch(/Shadow Arts/);
-  });
-
-  it('Way of Shadow — Shadow Arts fails when ki is insufficient', async () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0.5);
-    const monkId = 'mk-sh-low';
-    const monk = makeChar({
-      id: monkId,
-      character_class: 'Monk',
-      subclass: 'shadow',
-      level: 3,
-      hp: 20,
-      max_hp: 20,
-      class_resource_uses: { ki_points: 1 }, // only 1 ki, need 2
-    });
-    const state = makeState({}, { characters: [monk], active_character_id: monkId });
-    state.characters = [monk];
-    state.active_character_id = monkId;
-    const result = await takeAction({
-      action: { type: 'use_class_feature', featureId: 'shadow_arts' },
-      history: [],
-      state,
-      seed,
-      context: ctx,
-    });
-    expect(result.narrative).toMatch(/Need 2 ki/);
-    expect(result.newState.characters[0].conditions).not.toContain('invisible');
-  });
-
   // ── Barbarian subclasses (PHB p.49-51) ──────────────────────────────────────
 
   it('Path of the Berserker — Frenzy makes a bonus-action melee attack while raging', async () => {

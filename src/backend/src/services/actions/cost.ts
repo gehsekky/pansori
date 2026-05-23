@@ -94,7 +94,6 @@ export const ACTION_COSTS: Record<StructuredAction['type'], ActionCost> = {
   polearm_butt_end: 'managed',
   gwm_bonus_attack: 'managed',
   use_healing_light: 'managed',
-  use_hand_of_healing: 'managed',
   use_lands_aid: 'managed',
   use_celestial_revelation: 'managed',
   use_healer_kit: 'managed',

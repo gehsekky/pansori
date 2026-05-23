@@ -2506,7 +2506,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       sorcerer: ['draconic', 'wild_magic', 'aberrant_mind', 'clockwork_soul'],
       warlock: ['fiend', 'archfey', 'celestial', 'great_old_one'],
       druid: ['land'],
-      monk: ['open_hand', 'shadow', 'mercy', 'elements'],
+      monk: ['open_hand'],
       barbarian: ['berserker'],
     };
     const reqLevel = subclassLevels[cls] ?? 3;
@@ -2842,21 +2842,6 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         choices.push({
           label: `Stunning Strike — once/turn after a hit, CON save DC ${8 + profBonus(char.level) + abilityMod(char.wis ?? 10)} (1 DP, ${kiLeft} left)`,
           action: { type: 'use_class_feature', featureId: 'stunning_strike' },
-          kind: 'class_feature',
-        });
-      }
-      // Way of Shadow (PHB p.80) — Shadow Arts. Step into the dark and gain
-      // invisibility (attacks against you have disadvantage). Costs 2 ki and
-      // your action. Lasts 3 rounds via condition_durations.
-      if (
-        char.subclass === 'shadow' &&
-        kiLeft >= 2 &&
-        !char.turn_actions.action_used &&
-        !char.conditions.includes('invisible')
-      ) {
-        choices.push({
-          label: `Shadow Arts — vanish into shadows (2 ki, invisible for 3 rounds, ${kiLeft} ki left)`,
-          action: { type: 'use_class_feature', featureId: 'shadow_arts' },
           kind: 'class_feature',
         });
       }
@@ -3483,25 +3468,6 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       choices.push({
         label: `Healing Light — bonus action, spend 1 d6 (${remaining}/${pool} dice left)`,
         action: { type: 'use_healing_light', dice: 1 },
-        requiresBonusAction: true,
-        kind: 'class_feature',
-      });
-    }
-  }
-
-  // Mercy Monk — Hand of Healing (bonus action, 1 Ki).
-  if (
-    !char.turn_actions.bonus_action_used &&
-    char.subclass === 'mercy' &&
-    hasClass(char, 'monk') &&
-    getClassLevel(char, 'monk') >= 3
-  ) {
-    const monkLvl = getClassLevel(char, 'monk');
-    const ki = char.class_resource_uses?.ki_points ?? monkLvl;
-    if (ki > 0) {
-      choices.push({
-        label: `Hand of Healing — bonus action, 1 Ki → heal 1d6+WIS (${ki} Ki left)`,
-        action: { type: 'use_hand_of_healing' },
         requiresBonusAction: true,
         kind: 'class_feature',
       });

@@ -312,20 +312,12 @@ export interface TurnActions {
   // turn, on a weapon hit, add +1d4 psychic damage. Same gate
   // shape as gwm_used / sneak_attack_used. Cleared by FRESH_TURN.
   dreadful_strikes_used?: boolean;
-  // 2024 PHB Mercy Monk L3 — Hand of Harm: once per turn, on an
-  // unarmed-strike hit, spend 1 Ki to add 1d6 + WIS mod necrotic
-  // damage. Once-per-turn gate cleared by FRESH_TURN.
-  hand_of_harm_used?: boolean;
   // 2024 PHB Gloom Stalker Ranger L3 — Dread Ambusher: on the
   // first turn of combat, the first weapon attack deals +1d8.
   // Set in runCombatStart for Gloom Stalker rangers; consumed +
   // cleared by the attack handler on first hit. FRESH_TURN at
   // turn start naturally expires the flag after one turn.
   dread_ambusher_pending?: boolean;
-  // 2024 PHB Elements Monk L3 — Elemental Strikes: once per turn,
-  // on an unarmed hit, spend 1 Discipline (Ki) for +1d10 fire
-  // damage. Once-per-turn gate cleared by FRESH_TURN.
-  elemental_strikes_used?: boolean;
   // Great Weapon Master damage rider (2024 PHB) — once per turn,
   // a heavy-weapon hit adds +profBonus damage. Same shape as
   // Savage Attacker / Sneak Attack once-per-turn gates.
