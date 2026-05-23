@@ -200,7 +200,6 @@ export type StructuredAction =
       type: 'take_feat';
       featId: string;
       abilityChoice?: AbilityKey;
-      saveProficiencyChoices?: AbilityKey[];
       cantripChoices?: string[];
       l1Choice?: string;
     }
@@ -616,55 +615,7 @@ export interface Background {
  */
 export type FeatEffect =
   | {
-      // Passive HP grant per character level (Tough: +2 HP/level).
-      kind: 'hp-per-level';
-      amount: number;
-    }
-  | {
-      // Per-long-rest resource for spending on d20-modifier effects
-      // (Lucky feat — advantage on own d20, or disadvantage on
-      // incoming attack). `usesPerLongRest` is the fixed pool size;
-      // when `scalesWithPb` is true the pool is recomputed at
-      // application + long rest from the character's current
-      // proficiency bonus (RAW for the 2024 Lucky feat).
-      kind: 'd20-reroll';
-      usesPerLongRest: number;
-      scalesWithPb?: boolean;
-    }
-  | {
-      // Ranged-attack toggle: pre-attack opt-in to swap -toHit for +damage,
-      // ignore cover, no long-range disadv (Sharpshooter).
-      kind: 'ranged-toggle';
-      toHitPenalty: number;
-      bonusDamage: number;
-      ignoreHalfAndThreeQuartersCover: boolean;
-      longRangeNoDisadvantage: boolean;
-    }
-  | {
-      // Extra cantrips + one L1 spell from another class's list,
-      // cast 1×/long rest without slot (Magic Initiate).
-      kind: 'extra-cantrips-and-l1';
-      spellList: 'arcane' | 'divine' | 'primal';
-      cantripCount: number;
-      l1Count: number;
-    }
-  | {
-      // Save proficiency in chosen abilities (Resilient half-feat).
-      kind: 'save-proficiency';
-      // Empty here means "choose at take time"; the chosen abilities
-      // are recorded on the Character via `feat_choices`.
-      abilities: AbilityKey[];
-    }
-  | {
-      // Sentinel feat — protect-ally reaction (PHB 2024). Triggers
-      // when an enemy hits an ally within 5 ft. The OA speed-zero
-      // benefit is also part of Sentinel but isn't modeled in this
-      // engine (pansori's enemy movement is one-step-per-turn so
-      // "speed 0 for the rest of the turn" rarely matters).
-      kind: 'sentinel-react';
-    }
-  | {
-      // Alert feat (2024 PHB origin) — +proficiency bonus to
+      // Alert feat (SRD 5.2.1 origin) — +proficiency bonus to
       // Initiative rolls AND immunity to the Surprised condition.
       // The third Alert benefit (swap initiative with an ally) is
       // deferred — needs an explicit action and a swap window the
@@ -672,125 +623,31 @@ export type FeatEffect =
       kind: 'alert';
     }
   | {
-      // Savage Attacker feat (2024 PHB origin) — once per turn, when
-      // you hit with a weapon's damage roll, you can reroll the damage
-      // and use either total. Engine auto-takes the higher of the two
-      // and marks `turn_actions.savage_attacker_used`. Reset at turn
-      // start (FRESH_TURN clears it implicitly).
+      // Savage Attacker feat (SRD 5.2.1 origin) — once per turn,
+      // when you hit with a weapon's damage roll, you can reroll
+      // the damage and use either total. Engine auto-takes the
+      // higher of the two and marks
+      // `turn_actions.savage_attacker_used`. Reset at turn start.
       kind: 'savage-attacker';
     }
   | {
-      // Speed bonus (Mobile, future Skulker variants, etc.). Hook
-      // is `effectiveSpeed(char)` which reads `char.feats[]` and adds
-      // the matching feat's `bonusFeet`. Stored as feat-effect data
-      // (not hardcoded in effectiveSpeed) so future speed-bonus feats
-      // are pure data additions.
-      kind: 'speed-bonus';
-      bonusFeet: number;
+      // Magic Initiate (SRD 5.2.1 origin) — extra cantrips + one L1
+      // spell from a chosen class list, cast 1×/long rest without
+      // slot. Pansori splits the choose-list step into three feat
+      // IDs (arcane / divine / primal) so the picker surface is one
+      // button per option rather than a take-then-pick workflow.
+      kind: 'extra-cantrips-and-l1';
+      spellList: 'arcane' | 'divine' | 'primal';
+      cantripCount: number;
+      l1Count: number;
     }
   | {
-      // War Caster feat (2024 PHB general) — three benefits, ranked
-      // by how much engine wiring each needs:
-      //   1. Advantage on CON saves to maintain concentration when
-      //      damaged. Wired in `checkConcentration`.
-      //   2. Somatic spell components even with both hands full.
-      //      Pansori doesn't model hand state, so no-op today.
-      //   3. Cast a single-target spell as an Opportunity Attack
-      //      reaction (instead of the OA melee attack). Needs a
-      //      reaction-window redesign; deferred.
-      kind: 'war-caster';
-    }
-  | {
-      // Heavy Armor Master feat (2024 PHB general) — while wearing
-      // heavy armor and not incapacitated, attacks that hit you
-      // deal 3 less damage (floor 0). Wired in `computeEnemyAttack`
-      // as a flat last-step reduction (after resistance + ward).
-      // 2024 PHB also grants heavy-armor proficiency on take; not
-      // wired yet (the take path would need to add 'heavy' to
-      // `char.armor_proficiencies`).
-      kind: 'heavy-armor-master';
-    }
-  | {
-      // Tavern Brawler feat (2024 PHB origin) — half-feat: +1 STR
-      // or CON; unarmed strikes deal 1d4 + STR mod instead of
-      // 1 + STR mod. Wired in `unarmedDamage` (rulesEngine.ts)
-      // which now reads a `tavernBrawler` flag passed from the
-      // attack handler. RAW also grants improvised-weapon
-      // proficiency (pansori doesn't model improvised weapons)
-      // and a free Shove on unarmed hit (needs a new action shape)
-      // — both deferred.
-      kind: 'tavern-brawler';
-    }
-  | {
-      // Great Weapon Master feat (2024 PHB general, L4 + heavy
-      // weapon prof prereq). Damage rider: on a heavy-weapon hit,
-      // the target takes extra damage equal to the attacker's
-      // proficiency bonus. Wired in `attack/index.ts` post-hit.
-      // Once per turn — gates on `turn_actions.gwm_used` so multi-
-      // hit turns (Extra Attack, two-weapon) only benefit once.
-      // The RAW bonus-action attack on Crit/kill needs new action
-      // wiring; deferred.
-      kind: 'gwm-bonus-damage';
-    }
-  | {
-      // Skilled feat (2024 PHB origin) — gain proficiency in three
+      // Skilled feat (SRD 5.2.1 origin) — gain proficiency in three
       // skills of your choice. The take handler reads
       // `opts.skillChoices` (3 entries) and merges them into
       // `char.skill_proficiencies`.
       kind: 'skill-proficiencies';
       count: number;
-    }
-  | {
-      // Observant feat (2024 PHB general, L4, half-feat) — +1 INT
-      // or WIS (ability bonus), +5 passive Perception and
-      // Investigation. `partyDetectsTrap` reads `char.feats` for
-      // 'observant' and adds 5 to the passive score.
-      kind: 'observant';
-    }
-  | {
-      // Crossbow Expert feat (2024 PHB general, L4). Shipped
-      // benefit: when attacking with a crossbow, the
-      // ranged-in-melee disadvantage doesn't apply (the attacker
-      // can fire at point-blank without penalty). Wired in toHit.ts
-      // alongside the existing rangedInMelee gate. Two other RAW
-      // benefits deferred: ignore Loading property (pansori
-      // doesn't enforce Loading) and bonus-action hand-crossbow
-      // shot after Attack action (needs new action shape).
-      kind: 'crossbow-expert';
-    }
-  | {
-      // Polearm Master feat (2024 PHB general, L4). Shipped
-      // benefit: after taking the Attack action with a qualifying
-      // polearm (quarterstaff/spear/glaive/halberd/pike), make a
-      // bonus-action attack with the opposite end of the weapon —
-      // 1d4 damage + ability mod, same damage type as the weapon.
-      // Wired via the `polearm_butt_end` action handler. The
-      // OA-on-enter-reach RAW benefit needs reaction infrastructure;
-      // deferred.
-      kind: 'polearm-master';
-    }
-  | {
-      // Healer feat (2024 PHB origin). Action: spend one charge
-      // from a Healer's Kit to heal a creature 1d6 + 4 + prof
-      // bonus HP. Wired via the `use_healer_kit` action handler.
-      kind: 'healer';
-    }
-  | {
-      // Dual Wielder feat (2024 PHB general, L4). Half-feat (+1
-      // STR or DEX). The other shipped benefit: two-weapon fighting
-      // can use any one-handed melee weapon in the off-hand (not
-      // restricted to Light). Wired in gameEngine.ts choice-gen
-      // (relaxes the light-only off-hand check) and twoWeaponAttack.ts
-      // handler (allows non-light off-hand selection).
-      kind: 'dual-wielder';
-    }
-  | {
-      // Athlete feat (2024 PHB general, L4, half-feat). +1 STR or
-      // DEX, plus standing up from prone costs only 5 ft (instead
-      // of half speed). Wired in the stand_up handler. Climbing/
-      // swimming speed-doesn't-halve benefit not modeled (pansori
-      // doesn't differentiate movement modes yet).
-      kind: 'athlete';
     };
 
 /**

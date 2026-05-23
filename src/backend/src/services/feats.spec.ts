@@ -1,3 +1,8 @@
+// Tests for the feat machinery. Pansori is SRD-only; the catalog
+// contains only Alert, Magic Initiate (arcane/divine/primal),
+// Savage Attacker, and Skilled. PHB-only feats (Lucky, Sharpshooter,
+// Tough, etc.) were removed in the SRD-only refactor.
+
 import { applyFeatTake, canTakeFeat, getFeat, resetFeatLongRestResources } from './feats.js';
 import { describe, expect, it } from 'vitest';
 import { SRD_FEATS } from '../contexts/srd/feats.js';
@@ -7,104 +12,87 @@ import { makeChar } from '../test-fixtures.js';
 describe('canTakeFeat', () => {
   it('returns empty string when the feat has no prereqs and PC does not have it', () => {
     const char = makeChar({ id: 'pc-1' });
-    expect(canTakeFeat(char, SRD_FEATS.tough)).toBe('');
+    expect(canTakeFeat(char, SRD_FEATS.alert)).toBe('');
   });
 
   it('rejects taking the same feat twice', () => {
-    const char = makeChar({ id: 'pc-1', feats: ['tough'] });
-    expect(canTakeFeat(char, SRD_FEATS.tough)).toMatch(/already has the Tough feat/);
-  });
-
-  it('enforces minLevel prerequisite', () => {
-    // Sharpshooter requires level 4.
-    const lowLevel = makeChar({ id: 'pc-1', level: 1 });
-    expect(canTakeFeat(lowLevel, SRD_FEATS.sharpshooter)).toMatch(/level 4/);
-    const highLevel = makeChar({ id: 'pc-1', level: 4 });
-    expect(canTakeFeat(highLevel, SRD_FEATS.sharpshooter)).toBe('');
+    const char = makeChar({ id: 'pc-1', feats: ['alert'] });
+    expect(canTakeFeat(char, SRD_FEATS.alert)).toMatch(/already has the Alert feat/);
   });
 });
 
-describe('applyFeatTake — Tough (hp-per-level)', () => {
-  it('grants +2 HP per character level (max + current) and records the feat id', () => {
-    const char = makeChar({ id: 'pc-1', level: 5, hp: 30, max_hp: 30 });
-    const { newChar, narrative } = applyFeatTake(char, SRD_FEATS.tough);
-    expect(newChar.feats).toContain('tough');
-    expect(newChar.max_hp).toBe(40); // 30 + 2*5
-    expect(newChar.hp).toBe(40);
-    expect(narrative).toMatch(/Tough feat/);
-    expect(narrative).toMatch(/\+10 max HP/);
-  });
-
-  it("doesn't heal beyond max — both max_hp and hp get the same delta", () => {
-    const char = makeChar({ id: 'pc-1', level: 3, hp: 5, max_hp: 18 });
-    const { newChar } = applyFeatTake(char, SRD_FEATS.tough);
-    expect(newChar.max_hp).toBe(24); // 18 + 2*3
-    expect(newChar.hp).toBe(11); // 5 + 2*3 (preserves the wound)
-  });
-});
-
-describe('applyFeatTake — Lucky (d20-reroll, scales with PB per 2024 RAW)', () => {
-  it('L1 char: pool size = 2 (PB at L1-4)', () => {
-    const char = makeChar({ id: 'pc-1', level: 1 });
-    const { newChar, narrative } = applyFeatTake(char, SRD_FEATS.lucky);
-    expect(newChar.feats).toContain('lucky');
-    expect(newChar.class_resource_uses?.feat_lucky_uses).toBe(2);
-    expect(narrative).toMatch(/2 luck points/);
-  });
-  it('L5 char: pool size = 3 (PB at L5-8)', () => {
+describe('applyFeatTake — Alert', () => {
+  it('records the feat id and narrates the initiative + surprise benefit', () => {
     const char = makeChar({ id: 'pc-1', level: 5 });
-    const { newChar } = applyFeatTake(char, SRD_FEATS.lucky);
-    expect(newChar.class_resource_uses?.feat_lucky_uses).toBe(3);
-  });
-  it('L9 char: pool size = 4 (PB at L9-12)', () => {
-    const char = makeChar({ id: 'pc-1', level: 9 });
-    const { newChar } = applyFeatTake(char, SRD_FEATS.lucky);
-    expect(newChar.class_resource_uses?.feat_lucky_uses).toBe(4);
+    const { newChar, narrative } = applyFeatTake(char, SRD_FEATS.alert);
+    expect(newChar.feats).toContain('alert');
+    expect(narrative).toMatch(/Alert feat/);
+    expect(narrative).toMatch(/Initiative/);
   });
 });
 
-describe('applyFeatTake — Sharpshooter (ranged-toggle)', () => {
-  it('registers the feat without mutating stats — toggle is at attack time', () => {
+describe('applyFeatTake — Savage Attacker', () => {
+  it('records the feat id; no take-time stat changes', () => {
     const char = makeChar({ id: 'pc-1', level: 5, hp: 30, max_hp: 30 });
-    const { newChar } = applyFeatTake(char, SRD_FEATS.sharpshooter);
-    expect(newChar.feats).toContain('sharpshooter');
-    // No HP / ability changes — only the feat id is recorded.
+    const { newChar } = applyFeatTake(char, SRD_FEATS.savage_attacker);
+    expect(newChar.feats).toContain('savage_attacker');
     expect(newChar.max_hp).toBe(30);
     expect(newChar.hp).toBe(30);
   });
 });
 
+describe('applyFeatTake — Skilled', () => {
+  it('grants three chosen skill proficiencies', () => {
+    const char = makeChar({ id: 'pc-1', skill_proficiencies: [], feats: [] });
+    const { newChar } = applyFeatTake(char, SRD_FEATS.skilled, {
+      skillChoices: ['Stealth', 'Perception', 'Athletics'],
+    });
+    expect(newChar.skill_proficiencies).toEqual(
+      expect.arrayContaining(['Stealth', 'Perception', 'Athletics'])
+    );
+    expect(newChar.feats).toContain('skilled');
+  });
+});
+
+describe('applyFeatTake — Magic Initiate', () => {
+  it('grants cantrips + L1 spell from the chosen list and seeds the free-cast token', () => {
+    const char = makeChar({ id: 'pc-1', spells_known: [] });
+    const { newChar } = applyFeatTake(char, SRD_FEATS.magic_initiate_arcane, {
+      cantripChoices: ['fire_bolt', 'mage_hand'],
+      l1Choice: 'magic_missile',
+    });
+    expect(newChar.feats).toContain('magic_initiate_arcane');
+    expect(newChar.spells_known).toEqual(
+      expect.arrayContaining(['fire_bolt', 'mage_hand', 'magic_missile'])
+    );
+    expect(newChar.class_resource_uses?.magic_initiate_l1_used).toBe(0);
+    expect(newChar.feat_choices?.magic_initiate_arcane?.magicInitiateL1).toBe('magic_missile');
+  });
+});
+
 describe('getFeat', () => {
   it('looks up a feat by id from context.featTable', () => {
-    expect(getFeat('tough', ctx)?.name).toBe('Tough');
+    expect(getFeat('alert', ctx)?.name).toBe('Alert');
     expect(getFeat('nonexistent', ctx)).toBeUndefined();
   });
 });
 
 describe('resetFeatLongRestResources', () => {
-  it('refills Lucky to PB-based max (2024 RAW)', () => {
+  it('resets the Magic Initiate L1 free-cast token to 0 (available)', () => {
     const char = makeChar({
       id: 'pc-1',
-      level: 5, // PB = 3
-      feats: ['lucky'],
-      class_resource_uses: { feat_lucky_uses: 0, rage_uses: 1 },
+      feats: ['magic_initiate_arcane'],
+      class_resource_uses: { magic_initiate_l1_used: 1, rage_uses: 1 },
     });
     const next = resetFeatLongRestResources(char, ctx, char.class_resource_uses ?? {});
-    expect(next.feat_lucky_uses).toBe(3);
-    // Non-feat resources untouched (long-rest handler owns those).
+    expect(next.magic_initiate_l1_used).toBe(0);
     expect(next.rage_uses).toBe(1);
   });
-  it('Lucky pool tracks PB across level brackets', () => {
-    const charL1 = makeChar({ id: 'pc-1', level: 1, feats: ['lucky'] });
-    const charL13 = makeChar({ id: 'pc-1', level: 13, feats: ['lucky'] });
-    expect(resetFeatLongRestResources(charL1, ctx, {}).feat_lucky_uses).toBe(2);
-    expect(resetFeatLongRestResources(charL13, ctx, {}).feat_lucky_uses).toBe(5);
-  });
 
-  it('is a no-op for feats with no per-long-rest resource (Tough, Sharpshooter)', () => {
+  it('is a no-op for feats with no per-long-rest resource', () => {
     const char = makeChar({
       id: 'pc-1',
-      feats: ['tough', 'sharpshooter'],
+      feats: ['alert', 'savage_attacker'],
       class_resource_uses: { unrelated: 1 },
     });
     const next = resetFeatLongRestResources(char, ctx, char.class_resource_uses ?? {});
@@ -144,32 +132,7 @@ describe('take_feat action — integration through sandbox context', () => {
     expect(result.narrative).toMatch(/Unknown feat/);
   });
 
-  it('rejects taking Sharpshooter at level 1 (prereq fail)', async () => {
-    const { takeAction } = await import('./gameEngine.js');
-    const { makeState } = await import('../test-fixtures.js');
-    const state = makeState({ id: 'pc-1', level: 1, asi_pending: true });
-    const result = await takeAction({
-      action: { type: 'take_feat', featId: 'sharpshooter' },
-      history: [],
-      state,
-      seed: {
-        context_id: ctx.id,
-        world_name: 'Test',
-        ship_name: 'Test',
-        intro: '',
-        seed_id: 'feat-test',
-        rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-        connections: { [ctx.startRoomId]: [] },
-        enemies: {},
-        loot: {},
-        npcs: {},
-      },
-      context: ctx,
-    });
-    expect(result.narrative).toMatch(/level 4/);
-  });
-
-  it('grants Tough on take_feat and consumes asi_pending when applicable', async () => {
+  it('grants Alert on take_feat (origin feat — does not consume asi_pending)', async () => {
     const { takeAction } = await import('./gameEngine.js');
     const { makeState } = await import('../test-fixtures.js');
     const state = makeState({
@@ -180,7 +143,7 @@ describe('take_feat action — integration through sandbox context', () => {
       asi_pending: true,
     });
     const result = await takeAction({
-      action: { type: 'take_feat', featId: 'tough' },
+      action: { type: 'take_feat', featId: 'alert' },
       history: [],
       state,
       seed: {
@@ -198,10 +161,8 @@ describe('take_feat action — integration through sandbox context', () => {
       context: ctx,
     });
     const pc = result.newState.characters[0];
-    expect(pc.feats).toContain('tough');
-    // Tough is an 'origin' feat, NOT 'general', so asi_pending is NOT consumed
-    // (origin feats don't compete with ASI slots).
+    expect(pc.feats).toContain('alert');
+    // Alert is 'origin', NOT 'general', so asi_pending is NOT consumed.
     expect(pc.asi_pending).toBe(true);
-    expect(pc.max_hp).toBe(28); // 20 + 2*4
   });
 });
