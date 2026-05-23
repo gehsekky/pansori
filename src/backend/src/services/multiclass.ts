@@ -335,17 +335,6 @@ export function extraAttackCountForChar(char: Character): number {
     const cnt = extraAttackCount(cls, lvl);
     if (cnt > best) best = cnt;
   }
-  // 2024 PHB Valor Bard — L6 gains Extra Attack (one extra). The
-  // base extraAttackCount table doesn't know about subclasses, so
-  // we union it in here.
-  if (
-    char.subclass === 'valor' &&
-    hasClass(char, 'bard') &&
-    getClassLevel(char, 'bard') >= 6 &&
-    best < 1
-  ) {
-    best = 1;
-  }
   return best;
 }
 
