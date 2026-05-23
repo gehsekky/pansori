@@ -58,44 +58,6 @@ export const handleSelectSubclass: ActionHandler<{ type: 'select_subclass'; subc
     next.hp += sorcLvl;
     narrative += ` Draconic Resilience: +${sorcLvl} max HP (now ${next.hp}/${next.max_hp}).`;
   }
-  // 2024 PHB Aberrant Mind Sorcerer L3 — Psionic Spells. Grants a
-  // small list of spells flavored as psionic manifestation. RAW
-  // lists Mind Sliver / Arms of Hadar / Dissonant Whispers / Detect
-  // Thoughts / Tasha's Mind Whip; pansori's spell catalog doesn't
-  // include those psionic-named spells yet, so we grant the closest
-  // mind-affect approximations from what IS seeded: vicious_mockery
-  // (cantrip psychic damage, RAW Bard but flavor-fits Aberrant Mind),
-  // charm_person (L1 mental influence), sleep (L1 mind-affect). RAW
-  // tags these as "always prepared" + "count as Sorcerer spells";
-  // pansori just appends them to spells_known.
-  // 2024 PHB Clockwork Soul Sorcerer L3 — Restore Balance pool. Uses
-  // equal CHA modifier (min 1); refresh on long rest (handled in
-  // rest.ts). Tracked on class_resource_uses.restore_balance_uses.
-  if (action.subclass === 'clockwork_soul' && hasClass(next, 'sorcerer')) {
-    const chaMod = Math.max(0, Math.floor(((next.cha ?? 10) - 10) / 2));
-    const poolSize = Math.max(1, chaMod);
-    next.class_resource_uses = {
-      ...(next.class_resource_uses ?? {}),
-      restore_balance_uses: poolSize,
-    };
-    narrative += ` Restore Balance: ${poolSize} use${poolSize === 1 ? '' : 's'}/long rest.`;
-  }
-  if (action.subclass === 'aberrant_mind' && hasClass(next, 'sorcerer')) {
-    const grants = ['vicious_mockery', 'charm_person', 'sleep'];
-    const knownSet = new Set(next.spells_known ?? []);
-    const added: string[] = [];
-    for (const id of grants) {
-      if (!knownSet.has(id)) {
-        knownSet.add(id);
-        added.push(id);
-      }
-    }
-    if (added.length > 0) {
-      next.spells_known = [...knownSet];
-      const names = added.map((id) => ctx.context.spellTable?.[id]?.name ?? id).join(', ');
-      narrative += ` Psionic Spells manifest in their mind: ${names}.`;
-    }
-  }
   ctx.char = next;
   ctx.narrative = narrative;
 };

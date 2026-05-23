@@ -230,55 +230,5 @@ export function handleCasterFeature(ctx: ActionContext, fid: string): boolean {
     return true;
   }
 
-  if (fid === 'bastion_of_law') {
-    // 2024 PHB Clockwork Soul Sorcerer L3. Bonus action: spend 1
-    // sorcery point, target a creature within 30 ft (caster or one
-    // ally for pansori MVP — RAW allows any creature you can see).
-    // The target gains 5 temp HP. RAW lets the caster spend 1-5 SP
-    // for 5N temp HP; pansori MVP fixes at 1 SP / 5 temp HP. Multi-
-    // point spend is a follow-up once the choice list supports
-    // variable-cost options without ballooning button count.
-    if (ctx.char.subclass !== 'clockwork_soul' || !hasClass(ctx.char, 'sorcerer')) {
-      ctx.narrative = 'Only Clockwork Soul Sorcerers have Bastion of Law.';
-      return true;
-    }
-    if (ctx.char.turn_actions.bonus_action_used) {
-      ctx.narrative = 'Bonus action already used this turn.';
-      return true;
-    }
-    const spBol =
-      ctx.char.class_resource_uses?.sorcery_points ?? getClassLevel(ctx.char, 'sorcerer');
-    if (spBol < 1) {
-      ctx.narrative = 'Not enough sorcery points (need 1).';
-      return true;
-    }
-    const grant = 5;
-    // Target selection: most-injured living ally (mirrors heal
-    // targeting), falling back to the caster if no eligible ally.
-    const injured = ctx.st.characters.filter(
-      (c) => !c.dead && c.hp < c.max_hp && c.id !== ctx.char.id
-    );
-    const target = injured.length > 0 ? injured.reduce((a, b) => (a.hp < b.hp ? a : b)) : ctx.char;
-    const isSelf = target.id === ctx.char.id;
-    if (isSelf) {
-      const prev = ctx.char.temp_hp ?? 0;
-      if (grant > prev) ctx.char.temp_hp = grant;
-    } else {
-      ctx.st = {
-        ...ctx.st,
-        characters: ctx.st.characters.map((c) =>
-          c.id === target.id ? { ...c, temp_hp: Math.max(c.temp_hp ?? 0, grant) } : c
-        ),
-      };
-    }
-    ctx.char.class_resource_uses = {
-      ...(ctx.char.class_resource_uses ?? {}),
-      sorcery_points: spBol - 1,
-    };
-    ctx.char.turn_actions = { ...ctx.char.turn_actions, bonus_action_used: true };
-    ctx.narrative = `⚙ Bastion of Law — ${ctx.char.name} channels ordered protection. ${target.name} gains ${grant} temp HP. (${spBol - 1} sorcery points remaining)`;
-    return true;
-  }
-
   return false;
 }

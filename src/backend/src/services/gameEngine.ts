@@ -2122,19 +2122,6 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         },
       ];
     }
-    if (pending.kind === 'restore_balance') {
-      const remaining = char.class_resource_uses?.restore_balance_uses ?? 0;
-      return [
-        {
-          label: `Restore Balance (reaction) — cancel Advantage, ${enemyForLabel} rerolls flat (${remaining - 1} use${remaining - 1 === 1 ? '' : 's'} left)`,
-          action: { type: 'resolve_reaction', accept: true },
-        },
-        {
-          label: `Decline — the hit lands (${pending.proposedDamage} damage)`,
-          action: { type: 'resolve_reaction', accept: false },
-        },
-      ];
-    }
   }
 
   // Pending ASI: only show stat-boost choices until resolved
@@ -2497,7 +2484,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       ranger: ['hunter'],
       paladin: ['devotion'],
       bard: ['lore'],
-      sorcerer: ['draconic', 'wild_magic', 'aberrant_mind', 'clockwork_soul'],
+      sorcerer: ['draconic'],
       warlock: ['fiend', 'archfey', 'celestial', 'great_old_one'],
       druid: ['land'],
       monk: ['open_hand'],
@@ -3023,38 +3010,6 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         action: { type: 'use_class_feature', featureId: 'fey_presence' },
         kind: 'class_feature',
       });
-    }
-  }
-
-  // ── Out-of-combat subclass features ─────────────────────────────────────────
-  // These live outside the `state.combat_active && enemyAlive` gate so
-  // they surface during exploration / downtime turns. Bastion of Law
-  // and Blessing of the Trickster are both proactive utility features
-  // RAW doesn't restrict to combat (Bastion of Law is a bonus action
-  // that, while typically used in combat, the engine allows out-of-
-  // combat use; Blessing of the Trickster RAW is an Action grant of a
-  // 1-hour duration buff — the player wants this BEFORE combat starts).
-  if (char.subclass) {
-    // Clockwork Soul Sorcerer L3 — Bastion of Law (PHB 2024). Bonus
-    // action: spend 1 sorcery point, grant 5 temp HP to caster or a
-    // living ally. RAW lets the caster spend 1-5 SP for 5N temp HP;
-    // pansori MVP fixes at 1 SP / 5 temp HP for choice-list clarity
-    // (player can repeat casts to stack the buff via the temp-HP
-    // replace-if-greater rule).
-    if (
-      char.subclass === 'clockwork_soul' &&
-      hasClass(char, 'sorcerer') &&
-      getClassLevel(char, 'sorcerer') >= 3 &&
-      !char.turn_actions.bonus_action_used
-    ) {
-      const sp = char.class_resource_uses?.sorcery_points ?? getClassLevel(char, 'sorcerer');
-      if (sp >= 1) {
-        choices.push({
-          label: `Bastion of Law — spend 1 sorcery point, grant 5 temp HP (${sp} SP)`,
-          action: { type: 'use_class_feature', featureId: 'bastion_of_law' },
-          kind: 'class_feature',
-        });
-      }
     }
   }
 
@@ -3984,29 +3939,6 @@ function isPortentEligible(target: Character): boolean {
  * spend 1 Luck Point" — no reaction cost mentioned). Pansori
  * follows that and skips the `reaction_used` check.
  */
-/**
- * 2024 PHB Clockwork Soul Sorcerer (L3 subclass) — Restore Balance.
- * Returns the list of eligible reactors (Clockwork Soul Sorcerers
- * with remaining uses + reaction available) who are in range. RAW
- * gates on "within 60 ft of yourself"; pansori uses room-scope as
- * the proxy (rooms are smaller than 60 ft in practice).
- *
- * The eligible reactor can be the attack target themselves OR a
- * different party member — RAW allows either.
- */
-function findRestoreBalanceEligibleReactors(st: GameState): Character[] {
-  const eligible: Character[] = [];
-  for (const pc of st.characters) {
-    if (pc.dead || pc.hp <= 0) continue;
-    if (pc.turn_actions?.reaction_used) continue;
-    if (pc.subclass !== 'clockwork_soul') continue;
-    const uses = pc.class_resource_uses?.restore_balance_uses ?? 0;
-    if (uses <= 0) continue;
-    eligible.push(pc);
-  }
-  return eligible;
-}
-
 function isLuckyDisadvEligible(target: Character): boolean {
   if (!(target.feats ?? []).includes('lucky')) return false;
   const remaining = target.class_resource_uses?.feat_lucky_uses ?? 0;
@@ -4437,40 +4369,6 @@ function runEnemyMultiattackLoop(args: {
       };
       narrative += ` ⚡ ${enemy.name} hits ${target.name} (d20 ${computed.atkD20} → total ${fmt.roll(computed.atkTotal)} vs ${fmt.ac(target.ac)}) — Lucky (Disadvantage) available!`;
       return { kind: 'paused', st, narrative };
-    }
-    // 2024 PHB Clockwork Soul Sorcerer L3 — Restore Balance reaction.
-    // Fires when an enemy attack hits with Advantage AND a Clockwork
-    // Soul Sorcerer with remaining uses is in the party. Resolver
-    // re-rolls the enemy d20 flat (no adv/disadv). Pansori MVP only
-    // gates on enemy-rolled-with-advantage; the other RAW cases
-    // (cancel disadv on PC attack, etc.) are deferred follow-ups.
-    if (computed.hit && computed.hpLost > 0 && computed.hadAdvantage) {
-      const reactors = findRestoreBalanceEligibleReactors(st);
-      if (reactors.length > 0) {
-        const reactor = reactors[0]; // MVP: first eligible reactor
-        st = {
-          ...st,
-          pending_reaction: {
-            kind: 'restore_balance',
-            attackerEnemyId: enemyId,
-            targetCharId: target.id,
-            atkTotal: computed.atkTotal,
-            proposedD20: computed.atkD20,
-            proposedDamage: computed.hpLost,
-            targetAc: target.ac,
-            pendingFragment: computed.fragment as EnemyAttackHitFragment,
-            pendingProposedChar: computed.proposedChar,
-            pendingProposedSt: { ...computed.proposedSt, pending_reaction: undefined },
-            resumeFromInitiativeIdx: advIdx,
-            resumeFromMultiattackIdx: mi + 1,
-            narrativeSoFar: narrative,
-            eligibleCharIds: [reactor.id],
-          },
-          active_character_id: reactor.id,
-        };
-        narrative += ` ⚡ ${enemy.name} hits ${target.name} with advantage (d20 ${computed.atkD20} → total ${fmt.roll(computed.atkTotal)} vs ${fmt.ac(target.ac)}) — Restore Balance available!`;
-        return { kind: 'paused', st, narrative };
-      }
     }
     // Uncanny Dodge reaction window (Rogue L5+). Triggers BEFORE
     // damage commits when the Rogue can see the attacker. Same
