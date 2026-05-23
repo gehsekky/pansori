@@ -47,7 +47,6 @@ export interface ToHitContext {
  *  - Consumes `inspiration_pending` + `inspiration` on the active PC
  *  - Consumes `luck_pending` on the active PC (Lucky feat — point is
  *    decremented at spend time in `use_luck`, the flag clears here)
- *  - Consumes `guided_strike_active` from state
  *
  * Advantage sources stacked (any one enables advantage):
  *   conditionAdv, enemyGrappled, proneAdv, enemyParalyzed, flankingAdv,
@@ -320,14 +319,12 @@ export function computeToHitContext(
       : 20;
   const sacredWeaponBonus =
     (ctx.char.class_resource_uses?.sacred_weapon_active ?? 0) > 0 ? abilityMod(ctx.char.cha) : 0;
-  const guidedStrikeBonus = ctx.st.guided_strike_active ? 10 : 0;
   // Sharpshooter — -5 to hit when active and attacking with a ranged
   // weapon. Damage rider lands in attack/index.ts on the hit branch.
   const sharpshooterActive =
     !!ctx.char.turn_actions.sharpshooter_active && weaponItem?.range === 'ranged';
   const sharpshooterPenalty = sharpshooterActive ? -5 : 0;
-  const totalAttackBonus = sacredWeaponBonus + guidedStrikeBonus + sharpshooterPenalty;
-  if (guidedStrikeBonus) ctx.st = { ...ctx.st, guided_strike_active: false };
+  const totalAttackBonus = sacredWeaponBonus + sharpshooterPenalty;
 
   // Silence linter: target is part of the signature but referenced via the
   // returned ToHitContext (resolveOneAttack reads target via the closure).

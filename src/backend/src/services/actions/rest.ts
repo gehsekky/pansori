@@ -224,10 +224,6 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
       // before a rest, but clear defensively.
       mage_armor_active: undefined,
       shield_of_faith_active: undefined,
-      // 2024 PHB Trickery Cleric — Blessing of the Trickster is a
-      // 1-hour buff; long rest clears it for any PC carrying the
-      // flag (the caster's or a previously-blessed ally's).
-      tricksters_blessing_active: undefined,
       // 2024 PHB Stars Druid — Starry Form is a 10-minute buff. The
       // engine surface lacks a finer-grained timer than long rest,
       // so the constellation persists until the next rest. Cleared
