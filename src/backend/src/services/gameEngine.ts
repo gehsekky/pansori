@@ -774,7 +774,12 @@ function computeEnemyAttack(
   enemy: Enemy,
   char: Character,
   st: GameState,
-  context: Context
+  context: Context,
+  // 2024 PHB Lucky feat (Disadvantage benefit) — when set, the target
+  // spent a luck point to impose Disadvantage on this attack roll.
+  // Combines with any existing adv/disadv per RAW (single advantage
+  // + single disadvantage cancel to a normal roll).
+  forceDisadvantage = false
 ): {
   /** Updated character — HP, temp_hp, conditions, condition_durations,
    *  class_resource_uses, concentrating_on, inspiration, and
@@ -798,7 +803,8 @@ function computeEnemyAttack(
   const isDodging = char.turn_actions?.dodging ?? false;
   const isReckless = char.turn_actions?.reckless ?? false;
   const hasAdvantage = char.conditions.some((c) => ADVANTAGE_CONDITIONS.has(c)) || isReckless;
-  const hasDisadvantage = char.conditions.some((c) => ENEMY_DISADV_CONDITIONS.has(c)) || isDodging;
+  const baseDisadvantage = char.conditions.some((c) => ENEMY_DISADV_CONDITIONS.has(c)) || isDodging;
+  const hasDisadvantage = baseDisadvantage || forceDisadvantage;
   const result = resolveEnemyAttack(enemy, char.ac, hasAdvantage, hasDisadvantage);
   // Equipped-armor lookup. `equipped_armor` stores an `instance_id`
   // (see routes/game.ts character creation), not a loot id — the
@@ -2100,6 +2106,19 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       }));
       return [
         ...replacementOpts,
+        {
+          label: `Decline — take the hit (${pending.proposedDamage} damage)`,
+          action: { type: 'resolve_reaction', accept: false },
+        },
+      ];
+    }
+    if (pending.kind === 'lucky_disadv') {
+      const remaining = char.class_resource_uses?.feat_lucky_uses ?? 0;
+      return [
+        {
+          label: `Spend 1 Luck Point — ${enemyForLabel}'s attack rerolls with Disadvantage (${remaining - 1} luck left)`,
+          action: { type: 'resolve_reaction', accept: true },
+        },
         {
           label: `Decline — take the hit (${pending.proposedDamage} damage)`,
           action: { type: 'resolve_reaction', accept: false },
@@ -4231,6 +4250,25 @@ function isSilveryBarbsEligible(target: Character, context: Context): boolean {
 }
 
 /**
+ * 2024 PHB Lucky feat — Disadvantage benefit. Eligible when the
+ * target PC has the Lucky feat with at least one luck point
+ * remaining. Doesn't consume the reaction slot (RAW: "When a
+ * creature rolls a d20 for an attack roll against you, you can
+ * spend 1 Luck Point" — no reaction cost mentioned). Pansori
+ * follows that and skips the `reaction_used` check.
+ */
+function isLuckyDisadvEligible(target: Character): boolean {
+  if (!(target.feats ?? []).includes('lucky')) return false;
+  const remaining = target.class_resource_uses?.feat_lucky_uses ?? 0;
+  if (remaining <= 0) return false;
+  // Don't double-spend: if luck_pending is already armed for a
+  // self-advantage roll, that point is in-flight and shouldn't also
+  // be offered for disadvantage on an enemy roll.
+  if (target.turn_actions?.luck_pending) return false;
+  return true;
+}
+
+/**
  * Absorb Elements (PHB p.211) — reaction spell triggered when the
  * caster takes acid / cold / fire / lightning / thunder damage.
  * Requires:
@@ -4676,6 +4714,36 @@ function runEnemyMultiattackLoop(args: {
         active_character_id: target.id,
       };
       narrative += ` ⚡ ${enemy.name} hits ${target.name} (d20 ${computed.atkD20} → total ${fmt.roll(computed.atkTotal)} vs ${fmt.ac(target.ac)}) — Silvery Barbs available!`;
+      return { kind: 'paused', st, narrative };
+    }
+    // 2024 PHB Lucky feat — Disadvantage benefit. Fires when the enemy
+    // attack hits AND the PC has Lucky + a remaining luck point. The
+    // resolver re-rolls the enemy attack with Disadvantage forced
+    // (combines with existing adv/disadv per RAW). Pansori's pause is
+    // post-roll (player sees the hit before deciding) where RAW is
+    // pre-roll — documented divergence; mechanical effect is preserved.
+    if (computed.hit && computed.hpLost > 0 && isLuckyDisadvEligible(target)) {
+      st = {
+        ...st,
+        pending_reaction: {
+          kind: 'lucky_disadv',
+          attackerEnemyId: enemyId,
+          targetCharId: target.id,
+          atkTotal: computed.atkTotal,
+          proposedD20: computed.atkD20,
+          proposedDamage: computed.hpLost,
+          targetAc: target.ac,
+          pendingFragment: computed.fragment as EnemyAttackHitFragment,
+          pendingProposedChar: computed.proposedChar,
+          pendingProposedSt: { ...computed.proposedSt, pending_reaction: undefined },
+          resumeFromInitiativeIdx: advIdx,
+          resumeFromMultiattackIdx: mi + 1,
+          narrativeSoFar: narrative,
+          eligibleCharIds: [target.id],
+        },
+        active_character_id: target.id,
+      };
+      narrative += ` ⚡ ${enemy.name} hits ${target.name} (d20 ${computed.atkD20} → total ${fmt.roll(computed.atkTotal)} vs ${fmt.ac(target.ac)}) — Lucky (Disadvantage) available!`;
       return { kind: 'paused', st, narrative };
     }
     // Absorb Elements reaction window. Fires when the enemy attack
