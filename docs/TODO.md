@@ -1115,8 +1115,9 @@ as a critical-path engine block.
     is slowed and the spell has S; on 1-10 the cast fizzles
     (slot wasted, action wasted, narrative explains the
     disruption).
-- **Heroes' Feast / Greater Restoration** — pluggable via the
-  existing `removeConditions` + multi-target heal infra.
+- **Heroes' Feast** — pluggable via the existing `removeConditions`
+  + multi-target heal infra. (Greater Restoration shipped 2026-05-23
+  — see the heal-pipeline block above.)
 
 ### Architectural blockers
 
