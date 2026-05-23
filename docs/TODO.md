@@ -799,6 +799,13 @@ the prerequisite infrastructure lands.
   vertical-only modeled as a limited flying speed).
 - ~~**Detect Magic / Identify / Comprehend Languages**~~ — shipped
   with ritual casting.
+- ~~**Heal (L6)**~~ — shipped 2026-05-22. 70 HP + WIS mod, +10 per
+  slot above 6th. Uses the existing heal pipeline. Required a
+  `addDice` / `multiplyDice` fix to handle plain-numeric heal
+  expressions ('70' + '10' was being concatenated as '70+10' which
+  rollDice parsed as just 70). Condition removal (Blinded /
+  Deafened / Poisoned RAW) deferred — needs a `removeConditions`
+  field on Spell.
 - **Polymorph** — needs creature transform pipeline (caster
   becomes a chosen beast). Different shape from Wild Shape — works
   on any creature, not just druids on themselves.

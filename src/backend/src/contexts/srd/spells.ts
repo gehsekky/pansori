@@ -898,4 +898,21 @@ export const SRD_SPELLS: Record<string, Spell> = {
     rangeFt: 60,
     spellList: ['divine', 'primal'],
   },
+
+  // L6 dedicated heal — restores a fixed 70 HP and removes some
+  // adverse conditions on the target. Different from Cure Wounds /
+  // Healing Word in that the heal amount is fixed (not rolled);
+  // pansori models this as a high static heal expression.
+  heal: {
+    id: 'heal',
+    name: 'Heal',
+    level: 6,
+    castTime: 'action',
+    heal: '70',
+    upcastBonus: '10',
+    desc: 'A creature you can see within 60 ft regains 70 HP and is cured of Blinded, Deafened, and Poisoned. +10 HP per slot above 6th.',
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    spellList: ['divine', 'primal'],
+  },
 };

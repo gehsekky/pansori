@@ -635,6 +635,12 @@ export function rageUsesMax(level: number): number {
 // Multiply a dice expression by a count: multiplyDice('1d6', 3) → '3d6'
 export function multiplyDice(expr: string, count: number): string {
   if (count <= 0 || !expr) return '0';
+  // Plain numeric expressions (used by Heal-style static-value heals)
+  // multiply directly: multiplyDice('10', 2) → '20'.
+  if (!expr.includes('d')) {
+    const flat = parseInt(expr, 10);
+    if (!isNaN(flat)) return String(flat * count);
+  }
   const m = expr.match(/^(\d+)d(\d+)((?:[+-]\d+)?)$/);
   if (!m) return expr;
   const newCount = parseInt(m[1], 10) * count;
@@ -642,9 +648,21 @@ export function multiplyDice(expr: string, count: number): string {
 }
 
 // Add two same-die expressions: addDice('2d6', '1d6') → '3d6'.
-// If die sizes differ, falls back to rolling both and summing (no simplification).
+// Also handles plain-numeric expressions: addDice('70', '10') → '80'
+// (used by Heal-style static-value heals + their upcast bonuses).
+// If die sizes differ, falls back to a '+'-chained string (rollDice
+// reads the leading term only — callers should avoid this path for
+// load-bearing math).
 export function addDice(base: string, extra: string): string {
   if (!extra || extra === '0') return base;
+  // Both plain numbers (no 'd') — sum them.
+  if (!base.includes('d') && !extra.includes('d')) {
+    const flatBase = parseInt(base, 10);
+    const flatExtra = parseInt(extra, 10);
+    if (!isNaN(flatBase) && !isNaN(flatExtra)) {
+      return String(flatBase + flatExtra);
+    }
+  }
   const mb = base.match(/^(\d+)d(\d+)((?:[+-]\d+)?)$/);
   const me = extra.match(/^(\d+)d(\d+)((?:[+-]\d+)?)$/);
   if (mb && me && mb[2] === me[2] && !mb[3] && !me[3]) {
