@@ -43,17 +43,30 @@ export function inRange(
   return dist <= reachFt;
 }
 
-// Returns +2 (half) or +5 (three-quarters) cover bonus for the target.
-// Counts how many of the target's 4 cardinal neighbours are occupied by obstacles.
-export function coverBonus(_attacker: GridPos, target: GridPos, obstacles: GridPos[]): 0 | 2 | 5 {
-  const cardinals = [
-    { x: target.x - 1, y: target.y },
-    { x: target.x + 1, y: target.y },
-    { x: target.x, y: target.y - 1 },
-    { x: target.x, y: target.y + 1 },
-  ];
-  const blocked = cardinals.filter((c) => obstacles.some((o) => posEqual(o, c))).length;
-  if (blocked >= 3) return 5;
+// Returns +2 (half) or +5 (three-quarters) cover bonus for the target,
+// from a specific attacker's angle. Only cardinals BETWEEN the attacker
+// and target count — an obstacle on the far side of the target from the
+// attacker doesn't grant cover.
+//
+// Previously this function ignored attacker position and checked all 4
+// cardinals, which silently inflated every attack by +2 when any
+// adjacent entity existed (e.g., two enemies spawning side-by-side at
+// combat-start placement). After the fix:
+//   - Attacker E of target → East cardinal candidate
+//   - Attacker NE of target → East + North cardinals
+//   - Etc.
+// Both candidates blocked = three-quarters cover (corner-pocket).
+export function coverBonus(attacker: GridPos, target: GridPos, obstacles: GridPos[]): 0 | 2 | 5 {
+  const dx = attacker.x - target.x;
+  const dy = attacker.y - target.y;
+  if (dx === 0 && dy === 0) return 0;
+  const candidates: GridPos[] = [];
+  if (dx > 0) candidates.push({ x: target.x + 1, y: target.y });
+  if (dx < 0) candidates.push({ x: target.x - 1, y: target.y });
+  if (dy > 0) candidates.push({ x: target.x, y: target.y + 1 });
+  if (dy < 0) candidates.push({ x: target.x, y: target.y - 1 });
+  const blocked = candidates.filter((c) => obstacles.some((o) => posEqual(o, c))).length;
+  if (blocked >= 2) return 5;
   if (blocked >= 1) return 2;
   return 0;
 }
