@@ -43,13 +43,23 @@ describe('applyFeatTake — Tough (hp-per-level)', () => {
   });
 });
 
-describe('applyFeatTake — Lucky (d20-reroll)', () => {
-  it('initializes luck-point pool on class_resource_uses', () => {
-    const char = makeChar({ id: 'pc-1' });
+describe('applyFeatTake — Lucky (d20-reroll, scales with PB per 2024 RAW)', () => {
+  it('L1 char: pool size = 2 (PB at L1-4)', () => {
+    const char = makeChar({ id: 'pc-1', level: 1 });
     const { newChar, narrative } = applyFeatTake(char, SRD_FEATS.lucky);
     expect(newChar.feats).toContain('lucky');
+    expect(newChar.class_resource_uses?.feat_lucky_uses).toBe(2);
+    expect(narrative).toMatch(/2 luck points/);
+  });
+  it('L5 char: pool size = 3 (PB at L5-8)', () => {
+    const char = makeChar({ id: 'pc-1', level: 5 });
+    const { newChar } = applyFeatTake(char, SRD_FEATS.lucky);
     expect(newChar.class_resource_uses?.feat_lucky_uses).toBe(3);
-    expect(narrative).toMatch(/3 luck points/);
+  });
+  it('L9 char: pool size = 4 (PB at L9-12)', () => {
+    const char = makeChar({ id: 'pc-1', level: 9 });
+    const { newChar } = applyFeatTake(char, SRD_FEATS.lucky);
+    expect(newChar.class_resource_uses?.feat_lucky_uses).toBe(4);
   });
 });
 
@@ -72,9 +82,10 @@ describe('getFeat', () => {
 });
 
 describe('resetFeatLongRestResources', () => {
-  it("refills Lucky's luck-point pool to the feat's usesPerLongRest max", () => {
+  it('refills Lucky to PB-based max (2024 RAW)', () => {
     const char = makeChar({
       id: 'pc-1',
+      level: 5, // PB = 3
       feats: ['lucky'],
       class_resource_uses: { feat_lucky_uses: 0, rage_uses: 1 },
     });
@@ -82,6 +93,12 @@ describe('resetFeatLongRestResources', () => {
     expect(next.feat_lucky_uses).toBe(3);
     // Non-feat resources untouched (long-rest handler owns those).
     expect(next.rage_uses).toBe(1);
+  });
+  it('Lucky pool tracks PB across level brackets', () => {
+    const charL1 = makeChar({ id: 'pc-1', level: 1, feats: ['lucky'] });
+    const charL13 = makeChar({ id: 'pc-1', level: 13, feats: ['lucky'] });
+    expect(resetFeatLongRestResources(charL1, ctx, {}).feat_lucky_uses).toBe(2);
+    expect(resetFeatLongRestResources(charL13, ctx, {}).feat_lucky_uses).toBe(5);
   });
 
   it('is a no-op for feats with no per-long-rest resource (Tough, Sharpshooter)', () => {

@@ -11,6 +11,7 @@
 // sites. The infrastructure here is the seam they hook into.
 
 import type { AbilityKey, Character, Context, Feat } from '../types.js';
+import { profBonus } from './rulesEngine.js';
 
 /**
  * Check whether `char` meets the prerequisites for `feat`. Returns
@@ -115,18 +116,22 @@ export function applyFeatTake(
       break;
     }
     case 'd20-reroll': {
-      // Initialize the per-long-rest pool. Reset path lives in the
-      // long-rest handler (future PR).
+      // Initialize the per-long-rest pool. 2024 PHB Lucky scales with
+      // proficiency bonus (2 at L1-4, 3 at L5-8, 4 at L9-12, 5 at
+      // L13-16, 6 at L17-20). Other d20-reroll feats fall back to
+      // the fixed `usesPerLongRest`. Long-rest refresh logic in
+      // services/actions/rest.ts mirrors this calculation.
+      const poolSize = feat.effect.scalesWithPb
+        ? profBonus(next.level ?? 1)
+        : feat.effect.usesPerLongRest;
       next = {
         ...next,
         class_resource_uses: {
           ...(next.class_resource_uses ?? {}),
-          [`feat_${feat.id}_uses`]: feat.effect.usesPerLongRest,
+          [`feat_${feat.id}_uses`]: poolSize,
         },
       };
-      narrativeParts.push(
-        `Gains ${feat.effect.usesPerLongRest} luck points (refresh on long rest).`
-      );
+      narrativeParts.push(`Gains ${poolSize} luck points (refresh on long rest).`);
       break;
     }
     case 'ranged-toggle': {
@@ -369,7 +374,14 @@ export function resetFeatLongRestResources(
     const feat = getFeat(featId, context);
     if (!feat) continue;
     if (feat.effect.kind === 'd20-reroll') {
-      next = { ...next, [`feat_${feat.id}_uses`]: feat.effect.usesPerLongRest };
+      // 2024 PHB Lucky scales with proficiency bonus; other d20-reroll
+      // feats use the fixed `usesPerLongRest`. Mirrors the calculation
+      // in applyFeatTake's d20-reroll case so the pool size stays
+      // consistent across feat-take and long-rest refresh.
+      const poolSize = feat.effect.scalesWithPb
+        ? profBonus(char.level ?? 1)
+        : feat.effect.usesPerLongRest;
+      next = { ...next, [`feat_${feat.id}_uses`]: poolSize };
     } else if (feat.effect.kind === 'extra-cantrips-and-l1') {
       // Reset the free-cast token. Single shared token for all
       // Magic Initiate variants since RAW grants only one (you can't

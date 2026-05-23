@@ -33,13 +33,18 @@ export const SRD_FEATS: Record<string, Feat> = {
   lucky: {
     id: 'lucky',
     name: 'Lucky',
-    desc: 'You have inexplicable luck that seems to kick in at just the right moment. You have a number of luck points equal to your Proficiency Bonus (3 at typical play levels). After you roll a d20 for a D20 Test, you can spend 1 luck point to give yourself advantage on the roll. You regain all expended luck points when you finish a long rest.',
+    // 2024 PHB Lucky (Origin Feat). Pool of Luck Points equal to
+    // proficiency bonus, refreshed on long rest. Two ways to spend:
+    // (a) grant yourself Advantage on your own d20 roll, or (b)
+    // impose Disadvantage on an incoming attack roll against you.
+    desc: 'Pool of Luck Points equal to your proficiency bonus (refreshed on long rest). Spend 1 to give yourself Advantage on a d20 roll, or 1 to impose Disadvantage on an attack roll against you.',
     category: 'origin',
     effect: {
       kind: 'd20-reroll',
-      // 2024 PHB scales with Proficiency Bonus; seed with 3 (level-5 PB).
-      // A future PR can wire this to char.level for dynamic scaling.
-      usesPerLongRest: 3,
+      // Sentinel value — actual pool size derived from PB at
+      // applyFeatTake / long-rest time when `scalesWithPb` is set.
+      usesPerLongRest: 0,
+      scalesWithPb: true,
     },
   },
 
