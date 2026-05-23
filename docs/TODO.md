@@ -935,11 +935,32 @@ as a critical-path engine block.
 
   Future plug-ins on the same shape (each is its own PR's worth):
     - **Lucky feat (PHB-only)** — same pause point on attacks; also
-      pauses on PC saves + ability checks.
-    - **Clockwork Soul Restore Balance** — different pause point
-      (pre-roll, cancels adv/disadv).
-    - **Mirror Image, Counterspell-on-self, Foresight** — each
-      hooks one specific d20 site.
+      pauses on PC saves + ability checks. Awaits PHB acquisition.
+    - **Clockwork Soul Restore Balance** — Sorcerer L1 subclass
+      reaction; not in SRD 5.2.1. Different pause point (pre-roll,
+      cancels adv/disadv on any d20 in 60 ft). Awaits PHB.
+    - **Mirror Image** — each enemy attack against the imaged PC
+      needs to roll vs the image AC; spell ends when last image
+      drops. New pause site in the enemy-attack pipeline.
+    - **Counterspell-on-self / Foresight** — each hooks one
+      specific d20 site.
+    - **Heroic Inspiration on saves + checks** — extend the same
+      reaction shape to checkConcentration, death-save, the various
+      skillCheck sites. Each site needs its own pause/rewind
+      contract since failure consequences differ (concentration
+      drop, death-save accumulator, hide vs. perception, etc.).
+    - **Bardic Inspiration as post-roll choice** — 2024 PHB rewrite
+      makes BI a post-roll user choice (currently pansori auto-
+      applies in resolveOneAttack). Same architecture, new source.
+
+  **Tier B closure (2026-05-22):** Core reaction-window architecture
+  is shipped. `PendingPcD20Reaction.rollContext` is typed as
+  `'attack' | 'save' | 'check'` so future plug-ins land without
+  shared-type bumps. The remaining work is all per-feature plug-in
+  PRs — each adds (a) a pause point at the relevant d20 roll site,
+  (b) a new `source` discriminator value, and (c) a resolver branch
+  in `reaction.ts`. The hardest piece (the proposed-snapshot stash +
+  re-resolve contract) is solved; future wiring is mechanical.
 - **Mirror Image / Counterspell-on-self / Foresight** — each is a
   d20 reaction now that the window infra exists; ship as needed.
 - **Bestow Curse / Hold Monster variants** — need multi-option

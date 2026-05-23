@@ -1111,8 +1111,19 @@ export interface PendingPcD20Reaction {
   source: 'inspiration';
   /** PC who rolled the original d20 + (initial scope) who reacts. */
   rollerCharId: string;
-  /** Initial scope is attack rolls only; saves + checks land next. */
-  rollContext: 'attack';
+  /** What kind of d20 roll the PC made.
+   *  - 'attack': shipped — pause in attack/index.ts after the first
+   *    resolveOneAttack, rewind on accept, re-call with forced d20.
+   *  - 'save': deferred plug-in. Pause point lives in the function
+   *    that rolls the save (e.g. checkConcentration, the death-save
+   *    branch in gameEngine, or any spell-save site). Each site
+   *    needs its own rewind/resume since the consequences of a
+   *    failed save differ (concentration drop, condition apply,
+   *    death-save accumulator, etc.).
+   *  - 'check': deferred plug-in. Same shape as 'save' but for
+   *    ability checks (skill checks via skillCheck, the sneak
+   *    Stealth contest, trap-disarm checks, etc.). */
+  rollContext: 'attack' | 'save' | 'check';
   /** The d20 face that was rolled (1-20). */
   originalD20: number;
   /** Original total (d20 + mods). For narrative. */
