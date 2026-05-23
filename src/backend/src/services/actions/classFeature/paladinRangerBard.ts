@@ -141,7 +141,7 @@ export function handlePaladinRangerBardFeature(ctx: ActionContext, fid: string):
       return true;
     }
     if ((ctx.char.conditions ?? []).includes('slowed')) {
-      ctx.narrative = 'You are Slowed — you can\'t take reactions this turn.';
+      ctx.narrative = "You are Slowed — you can't take reactions this turn.";
       return true;
     }
     if (!ctx.enemyAlive || !ctx.enemy) {

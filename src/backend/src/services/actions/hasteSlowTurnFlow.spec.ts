@@ -38,10 +38,7 @@ function seedWithEnemy(enemy: Enemy): Seed {
 
 function combatStateWith(pc: ReturnType<typeof makeChar>, enemy: Enemy) {
   return {
-    ...makeState(
-      { id: pc.id },
-      { current_room: ctx.startRoomId, combat_active: true }
-    ),
+    ...makeState({ id: pc.id }, { current_room: ctx.startRoomId, combat_active: true }),
     characters: [pc],
     active_character_id: pc.id,
     initiative_order: [
@@ -212,14 +209,10 @@ describe('Haste — extra-action menu', () => {
     const state = combatStateWith(pc, enemy);
     const choices = generateChoices(state, seedWithEnemy(enemy), ctx);
     const hasteAttack = choices.find(
-      (c) =>
-        c.action.type === 'haste_extra_action' &&
-        c.action.inner.type === 'attack'
+      (c) => c.action.type === 'haste_extra_action' && c.action.inner.type === 'attack'
     );
     const hasteDash = choices.find(
-      (c) =>
-        c.action.type === 'haste_extra_action' &&
-        c.action.inner.type === 'dash'
+      (c) => c.action.type === 'haste_extra_action' && c.action.inner.type === 'dash'
     );
     expect(hasteAttack).toBeDefined();
     expect(hasteDash).toBeDefined();

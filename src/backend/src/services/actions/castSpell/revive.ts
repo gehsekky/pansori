@@ -40,8 +40,7 @@ export function runReviveSpell(
   }
   const target = ctx.st.characters.find((c) => c.id === targetCharId);
   if (!target) {
-    ctx.narrative =
-      (ctx.narrative ?? '') + `${spell.name} fails — no such ally in the party.`;
+    ctx.narrative = (ctx.narrative ?? '') + `${spell.name} fails — no such ally in the party.`;
     return true;
   }
   if (!target.dead) {
@@ -75,8 +74,7 @@ export function runReviveSpell(
 
   // Restore HP. Numeric = exact value (Revivify: 1). 'full' = max
   // (Resurrection / True Resurrection).
-  const restoredHp =
-    spell.revive.hpRestored === 'full' ? target.max_hp : spell.revive.hpRestored;
+  const restoredHp = spell.revive.hpRestored === 'full' ? target.max_hp : spell.revive.hpRestored;
   // SRD revive penalty — Raise Dead and Resurrection impose a −4 D20
   // penalty that decays on long rest. True Resurrection (whole-soul
   // restoration), Revivify (still warm), and Reincarnate (new body)

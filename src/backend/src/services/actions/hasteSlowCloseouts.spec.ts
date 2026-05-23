@@ -38,10 +38,7 @@ function seedWithEnemy(enemy: Enemy): Seed {
 
 function combatStateWith(pc: ReturnType<typeof makeChar>, enemy: Enemy) {
   return {
-    ...makeState(
-      { id: pc.id },
-      { current_room: ctx.startRoomId, combat_active: true }
-    ),
+    ...makeState({ id: pc.id }, { current_room: ctx.startRoomId, combat_active: true }),
     characters: [pc],
     active_character_id: pc.id,
     initiative_order: [
