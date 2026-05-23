@@ -389,6 +389,12 @@ export function breakConcentration(
   // defensive against drift.
   const wasFlight =
     char.concentrating_on.spellId === 'fly' || char.concentrating_on.spellId === 'levitate';
+  // 2024 PHB Polymorph — concentration drop reverts every polymorphed
+  // entity. The polymorph_state stash carries originalHp / originalMaxHp;
+  // restore those + clear the polymorphed condition. Pansori MVP assumes
+  // one Polymorph active at a time and reverts every polymorphed entity.
+  // RAW would track per-caster.
+  const wasPolymorph = char.concentrating_on.spellId === 'polymorph';
   let newChar: Character = { ...char, concentrating_on: null };
   // Strip the linked enemy condition (Hold Person etc.)
   let newSt: GameState =
@@ -439,6 +445,27 @@ export function breakConcentration(
     if (newChar.fly_speed_ft) {
       newChar = { ...newChar, fly_speed_ft: undefined };
     }
+  }
+  if (wasPolymorph && newSt.entities) {
+    newSt = {
+      ...newSt,
+      entities: newSt.entities.map((e) => {
+        if (!e.polymorph_state) return e;
+        // Restore originals + drop the condition. If the new form
+        // was at 0 HP (polymorphed creature was killed), pansori MVP
+        // keeps them dead — the entity hp stays 0 after the swap.
+        // RAW would revert with leftover damage applied to original
+        // HP; pansori's MVP simplification documented inline.
+        const originalAlive = e.hp > 0;
+        return {
+          ...e,
+          hp: originalAlive ? e.polymorph_state.originalHp : 0,
+          maxHp: e.polymorph_state.originalMaxHp,
+          polymorph_state: undefined,
+          conditions: e.conditions.filter((c) => c !== 'polymorphed'),
+        };
+      }),
+    };
   }
   if (wasShieldOfFaith && context) {
     const recomputeFor = (c: Character): Character => {
@@ -5162,6 +5189,24 @@ export function runEnemyTurns(args: {
         const prevAdvIdxBanish = advIdx;
         advIdx = (advIdx + 1) % orderLen;
         if (advIdx === 0 && prevAdvIdxBanish !== 0) roundWrapped = true;
+        if (advIdx === args.initialCurrentIdx) break;
+        continue;
+      }
+      // 2024 PHB Polymorph — polymorphed creatures retain their
+      // personality but use the new form's actions (RAW). Pansori
+      // MVP skips their turn entirely — the beast form's attack
+      // profile would need to substitute for the seed template's
+      // damage/toHit, which is a deeper refactor of computeEnemyAttack.
+      // Skipping is the safe simplification; the player still gets
+      // value from "this dragon is now a passive wolf for the duration".
+      const polymorphedEnt = st.entities?.find((e) => e.id === eEntry.id && e.isEnemy);
+      if (polymorphedEnt && polymorphedEnt.conditions.includes('polymorphed')) {
+        const formName = polymorphedEnt.polymorph_state?.formName ?? 'a beast';
+        narrative += `\n\n[${rm.name} is polymorphed into ${formName} — no actions this turn.]`;
+        resumeMi = 0;
+        const prevAdvIdxPoly = advIdx;
+        advIdx = (advIdx + 1) % orderLen;
+        if (advIdx === 0 && prevAdvIdxPoly !== 0) roundWrapped = true;
         if (advIdx === args.initialCurrentIdx) break;
         continue;
       }

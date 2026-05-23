@@ -70,7 +70,15 @@ export type ConditionName =
   // concentration drops (or the 1-minute timer expires); the
   // creature returns to its space. Linked to caster via
   // `concentrating_on.condition = 'banished'`.
-  | 'banished';
+  | 'banished'
+  // 2024 PHB Polymorph — target is transformed into a small beast.
+  // The creature stays on the grid + can be attacked; their HP is
+  // replaced with the beast form's pool (originals stashed on
+  // `entity.polymorph_state`). Enemy turn loop skips polymorphed
+  // entities (RAW: they retain their personality but use the new
+  // form's actions — pansori MVP skips for simplicity). Cleared
+  // by concentration drop, which also restores the original HP.
+  | 'polymorphed';
 
 export type NpcAttitude = 'friendly' | 'indifferent' | 'hostile';
 
@@ -127,6 +135,19 @@ export interface CombatEntity {
   // seed's runtime Enemy fields reflect the current phase. A 0 (or undefined)
   // means the boss is still in its base statline.
   phase_index?: number;
+  // 2024 PHB Polymorph state — when set, the entity is transformed into
+  // a different stat block. `hp` / `maxHp` reflect the new form's pool;
+  // the originals are stashed here so `breakConcentration` can revert.
+  // Pansori MVP: form is a single beast (auto-selected; wolf for CR ≤
+  // ~1). RAW excess-damage carryover on form-drops-to-0 not modeled —
+  // a polymorphed creature reduced to 0 HP in its new form just dies
+  // (pansori MVP simplification; RAW would revert with leftover damage
+  // applied to the original HP).
+  polymorph_state?: {
+    formName: string;
+    originalHp: number;
+    originalMaxHp: number;
+  };
 }
 
 // ─── Structured actions ──────────────────────────────────────────────
