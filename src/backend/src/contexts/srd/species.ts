@@ -152,3 +152,20 @@ export const SRD_SPECIES: Record<string, Species> = {
     ],
   },
 };
+
+// SRD Reincarnate — the 1d10 species table. RAW: rolling 1 says
+// "Roll again," so callers should resample until they hit 2–10.
+// Pansori's roller short-circuits by indexing directly into this
+// 9-entry array (one entry per non-"roll again" outcome), which is
+// statistically identical without the recursion.
+export const REINCARNATE_SPECIES: ReadonlyArray<keyof typeof SRD_SPECIES> = [
+  'dragonborn',
+  'dwarf',
+  'elf',
+  'gnome',
+  'goliath',
+  'halfling',
+  'human',
+  'orc',
+  'tiefling',
+];

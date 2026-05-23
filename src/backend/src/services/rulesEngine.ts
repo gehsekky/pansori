@@ -35,6 +35,30 @@ export function abilityMod(score: number | undefined): number {
   return Math.floor(((score ?? 10) - 10) / 2);
 }
 
+// SRD Raise Dead / Resurrection — "The target takes a −4 penalty to
+// D20 Tests. Every time the target finishes a Long Rest, the penalty
+// is reduced by 1 until it becomes 0." Returns a non-negative magnitude;
+// callers subtract it. Reads `revive_d20_penalty` off the character;
+// missing or zero = no penalty.
+export function reviveD20Penalty(char: { revive_d20_penalty?: number }): number {
+  return Math.max(0, char.revive_d20_penalty ?? 0);
+}
+
+// SRD Slow — "It can't take reactions." Combine with the existing
+// reaction-slot exhaustion check to gate every reaction site
+// (Shield / Hellish Rebuke / Counterspell, OAs, Uncanny Dodge,
+// Sentinel-style triggers, Lucky-feat reactions, Bardic Cutting
+// Words, readied-action use_reaction). Use at every reaction-gate
+// site so the engine consistently respects the condition.
+export function canReact(char: {
+  turn_actions?: { reaction_used?: boolean };
+  conditions?: string[];
+}): boolean {
+  if (char.turn_actions?.reaction_used) return false;
+  if ((char.conditions ?? []).includes('slowed')) return false;
+  return true;
+}
+
 // PHB proficiency bonus table
 export function profBonus(level: number | undefined): number {
   return Math.ceil((level ?? 1) / 4) + 1;
@@ -293,11 +317,9 @@ export function resolveEnemyAttack(
   return { hit, roll, total, damage: hit ? rollDice(enemy.damage) : 0 };
 }
 
-// Unarmed strike: 1 + STR modifier (minimum 1), per 5e PHB.
-// Tavern Brawler (2024 PHB) bumps the die to 1d4 + STR modifier.
-export function unarmedDamage(str: number, tavernBrawler = false): number {
-  const base = tavernBrawler ? rollDice('1d4') : 1;
-  return Math.max(1, base + abilityMod(str));
+// Unarmed strike: 1 + STR modifier (minimum 1), per SRD 5.2.1.
+export function unarmedDamage(str: number): number {
+  return Math.max(1, 1 + abilityMod(str));
 }
 
 // ─── Equipment legality ───────────────────────────────────────────────────────
@@ -447,7 +469,12 @@ export function rollConditionSave(
   coverDexBonus = 0,
   targetConditions: string[] = [],
   advantage = false,
-  extraDisadvantage = false
+  extraDisadvantage = false,
+  // SRD Raise Dead / Resurrection — −N penalty to D20 Tests until
+  // long-rested off. Caller passes `reviveD20Penalty(char)`; the
+  // save subtracts it from the final roll, same shape as the Bane
+  // and Slow penalties below.
+  reviveD20Pen = 0
 ): boolean {
   // Auto-fail saves: registry-driven. Paralyzed/stunned/unconscious/petrified
   // auto-fail STR + DEX saves (SRD 5.2.1 p.186/p.189).
@@ -461,6 +488,10 @@ export function rollConditionSave(
   // only on Dex saves (RAW: "−2 penalty to ... Dexterity saving
   // throws"); other saves unaffected.
   const slowedDexPenalty = ability === 'dex' && targetConditions.includes('slowed') ? 2 : 0;
+  // SRD Bane — baned creature subtracts 1d4 from saves. Applies to
+  // every save ability (RAW: "make an attack roll or a saving
+  // throw"). Rolled fresh on each save, mirror of the toHit baneRoll.
+  const baneRoll = targetConditions.includes('baned') ? d(4) : 0;
   // Save disadvantage from conditions (e.g. restrained → DEX saves). Advantage
   // and disadvantage cancel — see 2024 PHB advantage/disadvantage rules.
   // `extraDisadvantage` covers any caller-supplied source (e.g. heavy
@@ -470,23 +501,26 @@ export function rollConditionSave(
   // throws." Caller advantage wins by 2024 PHB stacking rules, so OR
   // these together rather than threading a separate parameter.
   const hasteAdv = ability === 'dex' && targetConditions.includes('hasted');
-  const netAdv = (advantage || hasteAdv) && !disadv;
-  const netDisadv = disadv && !(advantage || hasteAdv);
+  // SRD Beacon of Hope — hopeful creatures have advantage on WIS
+  // saves (and death saves; that path lives in the death-save
+  // handler, not here).
+  const hopefulAdv = ability === 'wis' && targetConditions.includes('hopeful');
+  const advSource = advantage || hasteAdv || hopefulAdv;
+  const netAdv = advSource && !disadv;
+  const netDisadv = disadv && !advSource;
   // Note: Halfling Lucky for saves would land here. We don't currently
   // thread the species through this helper since it's also called for
   // enemies. Caller threads it via the higher-level `conditionSavingThrow`
   // wrapper if needed.
+  const final = (roll: number): number =>
+    roll + abilityMod(score) + prof + cover - slowedDexPenalty - baneRoll - reviveD20Pen;
   if (netDisadv) {
-    const r1 = d(20);
-    const r2 = d(20);
-    return Math.min(r1, r2) + abilityMod(score) + prof + cover - slowedDexPenalty < dc;
+    return final(Math.min(d(20), d(20))) < dc;
   }
   if (netAdv) {
-    const r1 = d(20);
-    const r2 = d(20);
-    return Math.max(r1, r2) + abilityMod(score) + prof + cover - slowedDexPenalty < dc;
+    return final(Math.max(d(20), d(20))) < dc;
   }
-  return d(20) + abilityMod(score) + prof + cover - slowedDexPenalty < dc;
+  return final(d(20)) < dc;
 }
 
 // ─── Consumable effects ───────────────────────────────────────────────────────
@@ -561,26 +595,25 @@ export function passivePerceptionDcInLight(
 }
 
 // Passive Perception score for trap detection: 10 + WIS mod + prof if proficient in Perception
-// 5e DMG ch.5: compare passive score to trap DC; meet/exceed = spotted before triggering.
-// 2024 PHB Observant feat — +5 to passive Perception / Investigation. Caller passes
-// `observantBonus = 5` when the PC has the feat.
+// SRD 5.2.1 / 5e DMG ch.5: compare passive score to trap DC; meet/exceed = spotted before triggering.
 export function passivePerception(
   wisdom: number,
   level: number,
-  perceptionProficient: boolean,
-  observantBonus = 0
+  perceptionProficient: boolean
 ): number {
-  return 10 + abilityMod(wisdom) + (perceptionProficient ? profBonus(level) : 0) + observantBonus;
+  return 10 + abilityMod(wisdom) + (perceptionProficient ? profBonus(level) : 0);
 }
 
 // Disarm trap: DEX check + profBonus if character has Thieves' Tools or Hacking Tools proficiency
 export function disarmTrap(
   dexterity: number,
   level: number,
-  toolProficient: boolean
+  toolProficient: boolean,
+  reviveD20Pen = 0
 ): { roll: number; total: number; success: boolean } {
   const roll = d(20);
-  const total = roll + abilityMod(dexterity) + (toolProficient ? profBonus(level) : 0);
+  const total =
+    roll + abilityMod(dexterity) + (toolProficient ? profBonus(level) : 0) - reviveD20Pen;
   return { roll, total, success: false }; // dc compared at call site
 }
 
@@ -598,7 +631,10 @@ export function skillCheck(
   expertise = false,
   jackOfAllTrades = false,
   advantage = false,
-  halflingLucky = false
+  halflingLucky = false,
+  // SRD Raise Dead / Resurrection — −N penalty to D20 Tests until
+  // long-rested off. Subtracted from the final total.
+  reviveD20Pen = 0
 ) {
   const roll1 = d(20);
   const netAdv = advantage && !disadvantage;
@@ -610,7 +646,7 @@ export function skillCheck(
   let profContrib = 0;
   if (proficient) profContrib = expertise ? prof * 2 : prof;
   else if (jackOfAllTrades) profContrib = Math.floor(prof / 2);
-  const total = roll + abilityMod(abilityScore) + profContrib;
+  const total = roll + abilityMod(abilityScore) + profContrib - reviveD20Pen;
   return { roll, total, success: total >= dc };
 }
 
@@ -832,8 +868,17 @@ export function resolveSpellAttack(
 
 // Per 5e PHB: d20, 10+ = success, 1-9 = failure, nat 20 = regain 1 HP, nat 1 = 2 failures.
 // 3 successes = stable, 3 failures = dead.
-export function rollDeathSave(current: DeathSaves = { successes: 0, failures: 0 }) {
-  const roll = d(20);
+// SRD Beacon of Hope grants advantage on death saves — caller passes
+// `advantage = true` when the dying PC has the `hopeful` condition.
+// SRD Raise Dead / Resurrection penalty subtracts from the success
+// threshold check (the raw d20 still decides nat-1/nat-20 specials,
+// but the 10+ pass/fail comparison reads `roll + adjustment >= 10`).
+export function rollDeathSave(
+  current: DeathSaves = { successes: 0, failures: 0 },
+  advantage = false,
+  reviveD20Pen = 0
+) {
+  const roll = advantage ? Math.max(d(20), d(20)) : d(20);
   if (roll === 20)
     return { roll, result: 'regain_hp' as const, saves: { successes: 0, failures: 0 } };
   if (roll === 1) {
@@ -841,7 +886,7 @@ export function rollDeathSave(current: DeathSaves = { successes: 0, failures: 0 
     const result = saves.failures >= 3 ? ('dead' as const) : ('double_failure' as const);
     return { roll, result, saves };
   }
-  if (roll >= 10) {
+  if (roll - reviveD20Pen >= 10) {
     const saves = { ...current, successes: current.successes + 1 };
     const result = saves.successes >= 3 ? ('stable' as const) : ('success' as const);
     return { roll, result, saves };

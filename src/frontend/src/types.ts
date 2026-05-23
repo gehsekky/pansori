@@ -155,6 +155,7 @@ export interface Character {
   death_saves: { successes: number; failures: number };
   stable: boolean;
   dead: boolean;
+  died_at_round?: number;
   turn_actions: {
     action_used: boolean;
     bonus_action_used: boolean;

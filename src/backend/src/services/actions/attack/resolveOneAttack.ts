@@ -78,7 +78,6 @@ export function resolveOneAttack(
     totalAttackBonus,
     features,
     isRaging,
-    sharpshooterActive,
   } = toHit;
 
   // 2024 PHB Slow — slowed creature takes -2 AC. Read the live target
@@ -147,6 +146,21 @@ export function resolveOneAttack(
     }
     blessNote = ` ✦ Bless: +${blessRoll} (1d4)`;
   }
+  // SRD Bane: -1d4 to attack rolls. Mirror of Bless, opposite sign.
+  // A hit-becomes-miss on subtraction stays a hit (RAW: the d20
+  // value alone settled it; this just shifts the total down).
+  let baneNote = '';
+  if ((ctx.char.conditions ?? []).includes('baned') && !atk.fumble) {
+    const baneRoll = rollDice('1d4');
+    atk.total -= baneRoll;
+    // Hit-to-miss on a non-natural-20: re-check the threshold and
+    // zero out damage if the subtraction drops below AC.
+    if (atk.hit && atk.roll !== 20 && atk.total < effectiveEnemyAc) {
+      atk.hit = false;
+      atk.damage = 0;
+    }
+    baneNote = ` ☠ Bane: -${baneRoll} (1d4)`;
+  }
   // Unconscious or Assassin-surprised: force crit on hit
   const autoCritCheck =
     (enemyUnconscious &&
@@ -171,7 +185,7 @@ export function resolveOneAttack(
     ? isCrit && !atk.critical
       ? Math.max(1, rollCritical(weaponDamage) + atk.atkMod)
       : atk.damage
-    : Math.max(1, unarmedDamage(ctx.char.str, (ctx.char.feats ?? []).includes('tavern_brawler')));
+    : Math.max(1, unarmedDamage(ctx.char.str));
 
   // 2024 PHB Savage Attacker origin feat — once per turn, on a
   // weapon-damage hit, reroll the damage and use the higher total.
@@ -200,7 +214,7 @@ export function resolveOneAttack(
   const atkNote =
     ' ' +
     fmt.note(
-      `(${label}d20 ${atk.roll}+${atk.atkMod} ${atk.atkStat}+${atk.prof} prof${bonusNote} = ${atk.total} vs AC ${effectiveEnemyAc}${coverNote}${disadvNote}${versatileNote})${noProfNote}${biNote}${blessNote}`
+      `(${label}d20 ${atk.roll}+${atk.atkMod} ${atk.atkStat}+${atk.prof} prof${bonusNote} = ${atk.total} vs AC ${effectiveEnemyAc}${coverNote}${disadvNote}${versatileNote})${noProfNote}${biNote}${blessNote}${baneNote}`
     );
 
   if (atk.fumble) {
@@ -366,53 +380,7 @@ export function resolveOneAttack(
     improvedSmiteDmg = isCrit ? rollCritical('1d8') : rollDice('1d8');
   }
 
-  // Sharpshooter — +10 damage on ranged-weapon hits when active.
-  // Same damage type as the weapon → folded into rawDmg so the
-  // resistance / vulnerability multiplier applies (RAW: a creature
-  // resistant to piercing halves the +10 too).
-  const sharpshooterDmg = sharpshooterActive ? 10 : 0;
-  // Great Weapon Master (2024 PHB) — once per turn, on a hit with
-  // a Heavy weapon, add prof bonus damage. Same shape as Sneak
-  // Attack: gated on `turn_actions.gwm_used`, set after firing.
-  let gwmDmg = 0;
-  if (
-    (ctx.char.feats ?? []).includes('great_weapon_master') &&
-    weaponItem?.heavy &&
-    !ctx.char.turn_actions.gwm_used
-  ) {
-    gwmDmg = profBonus(ctx.char.level);
-    ctx.char = {
-      ...ctx.char,
-      turn_actions: { ...ctx.char.turn_actions, gwm_used: true },
-    };
-  }
-  // Aasimar Celestial Revelation (2024 PHB L3+) — once per turn,
-  // a melee weapon hit while transformed adds +prof damage of
-  // the matching type (necrotic for Necrotic Shroud, radiant for
-  // Radiant Soul / Radiant Consumption). The rider rides on top
-  // of the weapon damage but in a different damage type — the
-  // weapon's resistance multiplier wouldn't apply to it. Pansori
-  // currently folds it into the same rawDmg total (same as Divine
-  // Smite radiant rider — a known simplification documented inline).
-  let celRevDmg = 0;
-  let celRevDmgType: 'necrotic' | 'radiant' | undefined;
-  if (
-    ctx.char.celestial_revelation_variant &&
-    weaponItem?.range !== 'ranged' &&
-    !ctx.char.turn_actions.celestial_revelation_rider_used
-  ) {
-    celRevDmg = profBonus(ctx.char.level);
-    celRevDmgType =
-      ctx.char.celestial_revelation_variant === 'necrotic_shroud' ? 'necrotic' : 'radiant';
-    ctx.char = {
-      ...ctx.char,
-      turn_actions: {
-        ...ctx.char.turn_actions,
-        celestial_revelation_rider_used: true,
-      },
-    };
-  }
-  const rawDmg = baseHit + sneakDmg + rageBonus + sharpshooterDmg + gwmDmg + celRevDmg;
+  const rawDmg = baseHit + sneakDmg + rageBonus;
   const { damage: finalDmg, note: dmgNote } = applyDamageMultiplier(
     rawDmg,
     weaponItem?.damageType,
@@ -451,15 +419,6 @@ export function resolveOneAttack(
   }
   if (rageBonus > 0) {
     hitBonuses.push({ label: `Rage: +${rageBonus}` });
-  }
-  if (sharpshooterDmg > 0) {
-    hitBonuses.push({ label: `Sharpshooter: +${sharpshooterDmg} (-5 to hit)` });
-  }
-  if (gwmDmg > 0) {
-    hitBonuses.push({ label: `Great Weapon Master: +${gwmDmg}` });
-  }
-  if (celRevDmg > 0 && celRevDmgType) {
-    hitBonuses.push({ label: `Celestial Revelation: +${celRevDmg} ${celRevDmgType}` });
   }
   if (dmgNote) {
     // dmgNote arrives as " [resistant: 6 → 3]" — strip leading space and
@@ -728,22 +687,6 @@ export function resolveOneAttack(
     }
   }
 
-  // 2024 PHB Great Weapon Master — when a Heavy-weapon hit
-  // scores a Crit OR reduces a creature to 0 HP, queue a
-  // bonus-action attack. Surfaced as the `gwm_bonus_attack`
-  // choice; cleared by FRESH_TURN at turn start. The damage
-  // rider above (gwm_used flag) is separate from this trigger.
-  if (
-    (ctx.char.feats ?? []).includes('great_weapon_master') &&
-    weaponItem?.heavy &&
-    (isCrit || newEnemyHp <= 0) &&
-    !ctx.char.turn_actions.bonus_action_used
-  ) {
-    ctx.char = {
-      ...ctx.char,
-      turn_actions: { ...ctx.char.turn_actions, gwm_bonus_attack_pending: true },
-    };
-  }
   if (newEnemyHp <= 0) {
     const xpGain = target.xp ?? 10 + (target.hp || 8);
     const killSplit = splitEncounterXp(ctx.st, ctx.char.id, xpGain);

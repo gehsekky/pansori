@@ -1,12 +1,11 @@
-// 2024 PHB movement modes — per-mode speed fields (fly / swim /
-// climb) on Character + the engine effects that follow:
-//   - Aasimar Radiant Soul Celestial Revelation grants fly_speed_ft.
-//   - Athlete feat grants climb_speed_ft at take time.
-//   - Sea Druid grants swim_speed_ft at subclass select.
+// 2024 PHB / SRD 5.2.1 movement modes — per-mode speed fields
+// (fly / swim / climb) on Character + the engine effects:
 //   - gridMove lets a flying PC bypass obstacles + ignore difficult-
 //     terrain cost.
-//   - Long rest defensively clears fly_speed_ft (the only one with
-//     short-duration sources today).
+//   - Long rest defensively clears fly_speed_ft (it's typically
+//     short-duration: Fly spell, Levitate). climb_speed_ft and
+//     swim_speed_ft persist (they come from species traits or
+//     subclass features that survive long rest).
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { makeChar, makeState } from '../../test-fixtures.js';
@@ -60,68 +59,13 @@ function buildGridState(pc: ReturnType<typeof makeChar>) {
   };
 }
 
-describe('Aasimar Radiant Soul — flight grant', () => {
-  it('Radiant Soul sets fly_speed_ft = walking speed', async () => {
-    const pc = makeChar({
-      id: 'pc-1',
-      character_class: 'Cleric',
-      level: 5,
-      species: 'aasimar',
-      speed: 30,
-    });
-    const state = {
-      ...makeState({ id: pc.id }, { current_room: ctx.startRoomId, combat_active: true }),
-      characters: [pc],
-      active_character_id: pc.id,
-      initiative_order: [{ id: pc.id, roll: 18, is_enemy: false }],
-      initiative_idx: 0,
-    };
-    const result = await takeAction({
-      action: { type: 'use_celestial_revelation', variant: 'radiant_soul' },
-      history: [],
-      state,
-      seed,
-      context: ctx,
-    });
-    const after = result.newState.characters.find((c) => c.id === 'pc-1');
-    expect(after?.fly_speed_ft).toBe(30);
-    expect(after?.celestial_revelation_variant).toBe('radiant_soul');
-    expect(result.narrative).toMatch(/Fly speed 30 ft/);
-  });
-
-  it('Necrotic Shroud does NOT grant flight', async () => {
-    const pc = makeChar({
-      id: 'pc-1',
-      character_class: 'Cleric',
-      level: 5,
-      species: 'aasimar',
-    });
-    const state = {
-      ...makeState({ id: pc.id }, { current_room: ctx.startRoomId, combat_active: true }),
-      characters: [pc],
-      active_character_id: pc.id,
-      initiative_order: [{ id: pc.id, roll: 18, is_enemy: false }],
-      initiative_idx: 0,
-    };
-    const result = await takeAction({
-      action: { type: 'use_celestial_revelation', variant: 'necrotic_shroud' },
-      history: [],
-      state,
-      seed,
-      context: ctx,
-    });
-    const after = result.newState.characters.find((c) => c.id === 'pc-1');
-    expect(after?.fly_speed_ft).toBeUndefined();
-  });
-});
-
 describe('gridMove — flying bypass', () => {
   it('flying PC can move to a cell behind an obstacle', async () => {
     const pc = makeChar({
       id: 'pc-1',
       character_class: 'Cleric',
       level: 5,
-      species: 'aasimar',
+      species: 'human',
       speed: 30,
       fly_speed_ft: 30,
     });
@@ -167,7 +111,7 @@ describe('gridMove — flying bypass', () => {
       id: 'pc-1',
       character_class: 'Cleric',
       level: 5,
-      species: 'aasimar',
+      species: 'human',
       speed: 30,
       fly_speed_ft: 30,
     });
@@ -188,7 +132,7 @@ describe('gridMove — flying bypass', () => {
       id: 'pc-1',
       character_class: 'Cleric',
       level: 5,
-      species: 'aasimar',
+      species: 'human',
       speed: 30,
       fly_speed_ft: 30,
     });
@@ -207,13 +151,11 @@ describe('gridMove — flying bypass', () => {
   });
 });
 
-describe('Athlete + Sea Druid persistent grants', () => {
-  // The Athlete + Sea Druid grants happen via applyFeatTake / select_subclass
-  // respectively — those flows are exercised by feat-take and select-subclass
-  // specs elsewhere. Here we verify the per-mode field shape is what those
-  // sites write to, ensuring the gridMove / rest plumbing reads the right
-  // names. These tests document the contract rather than re-run the take
-  // flow.
+describe('Persistent move-mode grants', () => {
+  // climb_speed_ft / swim_speed_ft are typically granted by species
+  // traits or subclass features that persist across rests. fly_speed_ft
+  // is short-duration (Fly spell, Levitate, etc.) and the long-rest
+  // sweep clears it.
   it('character with climb_speed_ft preserves it across non-rest actions', async () => {
     const pc = makeChar({
       id: 'pc-1',
@@ -221,7 +163,6 @@ describe('Athlete + Sea Druid persistent grants', () => {
       level: 5,
       speed: 30,
       climb_speed_ft: 30,
-      feats: ['athlete'],
     });
     const state = {
       ...makeState({ id: pc.id }, { current_room: ctx.startRoomId, combat_active: false }),

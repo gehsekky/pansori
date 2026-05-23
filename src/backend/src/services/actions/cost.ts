@@ -90,13 +90,16 @@ export const ACTION_COSTS: Record<StructuredAction['type'], ActionCost> = {
   study: 'managed',
   two_weapon_attack: 'managed',
   use_lands_aid: 'managed',
-  use_celestial_revelation: 'managed',
-  use_healing_hands: 'managed',
   grid_move: 'managed',
   resolve_reaction: 'managed',
   attack: 'managed',
   cast_spell: 'managed',
   use_class_feature: 'managed',
+  // SRD Haste wrapper — bookkeeping handled inside the handler
+  // (validates hasted state, marks haste_extra_action_used, clears
+  // action_used for the inner action). The inner action pays its
+  // own cost during the nested dispatchAction call.
+  haste_extra_action: 'managed',
 };
 
 const BUDGET_ERRORS: Record<Exclude<ActionCost, 'managed'>, string> = {
@@ -115,6 +118,10 @@ export function checkBudget(char: Character, cost: ActionCost): string | null {
   if (cost === 'action' && flags?.action_used) return BUDGET_ERRORS.action;
   if (cost === 'bonusAction' && flags?.bonus_action_used) return BUDGET_ERRORS.bonusAction;
   if (cost === 'reaction' && flags?.reaction_used) return BUDGET_ERRORS.reaction;
+  // SRD Slow — "It can't take reactions."
+  if (cost === 'reaction' && (char.conditions ?? []).includes('slowed')) {
+    return 'You are Slowed — you can\'t take reactions this turn.';
+  }
   return null;
 }
 

@@ -174,6 +174,68 @@ export function runBuffSpell(
   // movement-mode pipeline (gridMove obstacle bypass + difficult-
   // terrain ignore) keys off this field. Concentration drop in
   // breakConcentration clears the flag (see gameEngine.ts).
+  // SRD restoration spells — strip listed conditions from the
+  // target. Both Lesser and Greater Restoration share this hook;
+  // the lists differ (Lesser: blinded/deafened/paralyzed/poisoned,
+  // Greater: charmed/petrified/stunned). Mirrors the heal path's
+  // `removeConditions` strip but in the buff branch since
+  // restoration has no HP heal.
+  const stripList = spell.removeConditions ?? [];
+  if (stripList.length > 0) {
+    const stripFrom = (conditions: string[]): string[] =>
+      conditions.filter((c) => !stripList.includes(c));
+    if (isCasterTarget) {
+      ctx.char.conditions = stripFrom(ctx.char.conditions);
+    } else {
+      ctx.st = {
+        ...ctx.st,
+        characters: ctx.st.characters.map((c) =>
+          c.id === buffTarget.id ? { ...c, conditions: stripFrom(c.conditions) } : c
+        ),
+        entities: (ctx.st.entities ?? []).map((e) =>
+          e.id === buffTarget.id && !e.isEnemy
+            ? { ...e, conditions: stripFrom(e.conditions) }
+            : e
+        ),
+      };
+    }
+  }
+
+  // SRD Greater Restoration — reduce target's exhaustion level by 1
+  // (clamped to 0). One of the spell's selectable effects. Pansori
+  // MVP applies it unconditionally when Greater Restoration is the
+  // spell being cast; the "pick one of five effects" UX is deferred.
+  if (spell.id === 'greater_restoration') {
+    if (isCasterTarget) {
+      ctx.char.exhaustion_level = Math.max(0, (ctx.char.exhaustion_level ?? 0) - 1);
+    } else {
+      ctx.st = {
+        ...ctx.st,
+        characters: ctx.st.characters.map((c) =>
+          c.id === buffTarget.id
+            ? { ...c, exhaustion_level: Math.max(0, (c.exhaustion_level ?? 0) - 1) }
+            : c
+        ),
+      };
+    }
+  }
+
+  // SRD Death Ward — set the one-shot flag on the target. The
+  // interception logic lives in `applyDamage` where HP would hit
+  // 0; the flag clears there on consumption.
+  if (spell.id === 'death_ward') {
+    if (isCasterTarget) {
+      ctx.char.death_ward_active = true;
+    } else {
+      ctx.st = {
+        ...ctx.st,
+        characters: ctx.st.characters.map((c) =>
+          c.id === buffTarget.id ? { ...c, death_ward_active: true } : c
+        ),
+      };
+    }
+  }
+
   if (spell.id === 'fly' || spell.id === 'levitate') {
     const flyFt = spell.id === 'fly' ? 60 : 20;
     if (isCasterTarget) {

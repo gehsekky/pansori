@@ -12,6 +12,7 @@ import { runBuffSpell } from './buff.js';
 import { runCombatStart } from '../attack/combatStart.js';
 import { runHealSpell } from './heal.js';
 import { runMultiTargetSpell } from './multiTarget.js';
+import { runReviveSpell } from './revive.js';
 import { runSaveSpell } from './save.js';
 import { runUtilitySpell } from './utility.js';
 
@@ -89,6 +90,27 @@ export const handleCastSpell: ActionHandler<{
   // ── Heal spells ────────────────────────────────────────────────────────
   if (spell.heal) {
     runHealSpell(ctx, spell, slotLevel, castingScore, slotNote);
+    return;
+  }
+
+  // ── Bring-from-dead spells ────────────────────────────────────────────
+  // Spells with `revive` set target a dead PC (the only state where
+  // `dead === true`). Runs before the offensive enemy-required check
+  // because revive doesn't need a living enemy, and before utility
+  // because the revive validator wants to own the no-target error.
+  if (
+    runReviveSpell(
+      ctx,
+      action as {
+        type: 'cast_spell';
+        spellId: string;
+        slotLevel: number;
+        targetCharId?: string;
+      },
+      spell,
+      slotNote
+    )
+  ) {
     return;
   }
 

@@ -39,7 +39,10 @@ export function runHealSpell(
   // injured ally. RAW caps at 6 targets within range; pansori MVP heals
   // the whole party (parties are 1-4 PCs so the cap doesn't bite).
   // Disciple of Life + Chalice bonus apply per-target.
-  const isMassHeal = spell.id === 'mass_healing_word' || spell.id === 'mass_cure_wounds';
+  const isMassHeal =
+    spell.id === 'mass_healing_word' ||
+    spell.id === 'mass_cure_wounds' ||
+    spell.id === 'prayer_of_healing';
   if (isMassHeal) {
     const livingParty = ctx.st.characters.filter((c) => !c.dead);
     const perTargetLines: string[] = [];

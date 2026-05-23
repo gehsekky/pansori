@@ -1,4 +1,4 @@
-import { disarmTrap, rollDice } from '../rulesEngine.js';
+import { disarmTrap, reviveD20Penalty, rollDice } from '../rulesEngine.js';
 import { getRoomTrap, partyDetectsTrap, trapSpent } from '../gameEngine.js';
 import type { ActionHandler } from './types.js';
 import { applyDamage } from '../damage.js';
@@ -26,9 +26,10 @@ export const handleDisarmTrap: ActionHandler<{ type: 'disarm_trap' }> = (ctx) =>
       (t) => t.toLowerCase().includes('thieves') || t.toLowerCase().includes('hacking')
     ) ?? false;
   const exhaustionDisadv1 = (ctx.char.exhaustion_level ?? 0) >= 1;
-  const attempt1 = disarmTrap(ctx.char.dex, ctx.char.level, hasToolProf);
+  const revivePen = reviveD20Penalty(ctx.char);
+  const attempt1 = disarmTrap(ctx.char.dex, ctx.char.level, hasToolProf, revivePen);
   const attempt2 = exhaustionDisadv1
-    ? disarmTrap(ctx.char.dex, ctx.char.level, hasToolProf)
+    ? disarmTrap(ctx.char.dex, ctx.char.level, hasToolProf, revivePen)
     : attempt1;
   const { roll, total } = attempt1.total <= attempt2.total ? attempt1 : attempt2;
   const profNote = hasToolProf ? ` (tool proficiency)` : '';

@@ -108,13 +108,21 @@ export function applyDamage(
   // damaged value). The actual HP delta accounts for the clamp so
   // narrative numbers stay honest.
   const proposedHp = Math.max(0, char.hp - remaining);
-  const clampedHp = clampHpForExhaustion(proposedHp, char.max_hp, char.exhaustion_level ?? 0);
+  // SRD Death Ward — "The first time the target would drop to 0
+  // HP before the spell ends, the target instead drops to 1 HP,
+  // and the spell ends." Intercept here before exhaustion clamp;
+  // the +1 HP is what the player walks away with. One-shot: flag
+  // clears on consumption.
+  const deathWardSaves = proposedHp === 0 && char.hp > 0 && char.death_ward_active;
+  const postWardHp = deathWardSaves ? 1 : proposedHp;
+  const clampedHp = clampHpForExhaustion(postWardHp, char.max_hp, char.exhaustion_level ?? 0);
   const amountDealt = char.hp - clampedHp;
 
   let newChar: Character = {
     ...char,
     hp: clampedHp,
     ...(tempHpAbsorbed > 0 ? { temp_hp: newTempHp } : {}),
+    ...(deathWardSaves ? { death_ward_active: false } : {}),
   };
   let newSt = st;
 

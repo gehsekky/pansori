@@ -58,7 +58,7 @@ grep -n "^Alert$\|^Magic Initiate$\|^Savage Attacker$\|^Skilled$" docs/srd-5.2.1
 | Origin feats | 4 (+ Magic Initiate's 3 list variants) | 6 |
 | General feats | 2 (ASI + Grappler) | 0 (neither fits the choose-a-feat surface today) |
 | Species | 9 standalone + Drow as Elf-lineage | 9 |
-| Spells | ~150 | 71 |
+| Spells | ~332 | 111 |
 
 The SRD's General Feats section is intentionally small — most
 iconic combat-optimization feats (Lucky / Sharpshooter / Sentinel

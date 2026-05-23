@@ -509,6 +509,59 @@ export const SRD_SPELLS: Record<string, Spell> = {
     // Bard / Cleric / Druid (2024 PHB).
     spellList: ['arcane', 'divine', 'primal'],
   },
+  // SRD: Lesser Restoration — L2 Abjuration, bonus action, touch.
+  // End ONE of Blinded / Deafened / Paralyzed / Poisoned on the
+  // target. Pansori MVP strips all four if present (the "pick one"
+  // UX is deferred — for now restoration is forgiving). Routes
+  // through the buff branch via `removeConditions`.
+  lesser_restoration: {
+    id: 'lesser_restoration',
+    name: 'Lesser Restoration',
+    level: 2,
+    castTime: 'bonus_action',
+    targetType: 'self_or_ally',
+    rangeKind: 'touch',
+    removeConditions: ['blinded', 'deafened', 'paralyzed', 'poisoned'],
+    desc:
+      'Touch: end Blinded / Deafened / Paralyzed / Poisoned on the target. ' +
+      '(RAW "pick one" — pansori MVP strips any present.)',
+    narratives: {
+      cast: [
+        '{name} places a steady hand on {target} — the affliction loosens its grip',
+        "{name}'s touch draws the poison-thread of {spell} out of {target}",
+      ],
+    },
+    spellList: ['arcane', 'divine', 'primal'],
+  },
+  // SRD: Greater Restoration — L5 Abjuration, action, touch.
+  // Removes one of: 1 exhaustion level / Charmed / Petrified / a
+  // curse / an ability-score reduction / a max-HP reduction.
+  // Consumes 100 gp diamond dust. Pansori MVP strips Charmed +
+  // Petrified + Stunned if present AND reduces exhaustion by 1
+  // (Stunned is added here as a generous bundle for the MVP since
+  // the 5-option picker UX isn't surfaced). Curse / ability-score /
+  // max-HP reduction effects aren't modeled in pansori yet.
+  greater_restoration: {
+    id: 'greater_restoration',
+    name: 'Greater Restoration',
+    level: 5,
+    castTime: 'action',
+    materialCost: 100,
+    targetType: 'self_or_ally',
+    rangeKind: 'touch',
+    removeConditions: ['charmed', 'petrified', 'stunned'],
+    desc:
+      'Touch: end Charmed / Petrified / Stunned on the target and reduce exhaustion by 1. ' +
+      'Consumes 100 gp of diamond dust. (RAW curse / ability-score / max-HP reduction ' +
+      'removal deferred — those effects aren\'t modeled in pansori.)',
+    narratives: {
+      cast: [
+        "{name} sprinkles diamond dust over {target}, and the curse breaks like brittle ice",
+        "{name} crushes the dust between their palms — {target}'s eyes clear, breath quickens",
+      ],
+    },
+    spellList: ['arcane', 'divine', 'primal'],
+  },
   guiding_bolt: {
     id: 'guiding_bolt',
     name: 'Guiding Bolt',
@@ -539,6 +592,61 @@ export const SRD_SPELLS: Record<string, Spell> = {
         '{name} weaves {spell}{slotNote} — darts of pure force leap from their fingertips',
         '{name} points and speaks the words of {spell}{slotNote} — silvery bolts streak unerring',
         "Three glowing motes of {spell}{slotNote} spiral from {name}'s palm",
+      ],
+    },
+    spellList: ['arcane'],
+  },
+  // SRD: Scorching Ray — L2 Evocation. Three rays of fire; each
+  // rolls its own ranged spell attack. 2d6 fire per hit. Upcast
+  // adds +1 ray per slot above 2nd. Routes through the multi-
+  // target branch alongside Magic Missile and Eldritch Blast.
+  scorching_ray: {
+    id: 'scorching_ray',
+    name: 'Scorching Ray',
+    level: 2,
+    castTime: 'action',
+    damageType: 'fire',
+    damage: '6d6', // 3 rays × 2d6 — surfaced as the base "damage" for
+    //                 single-target fallback when the FE doesn't
+    //                 split into separate targetEnemyIds yet.
+    attackRoll: true,
+    rangeKind: 'ranged',
+    rangeFt: 120,
+    desc: 'Three fiery rays. Spell attack per ray; 2d6 fire each. +1 ray per slot above 2nd.',
+    narratives: {
+      cast: [
+        '{name} hurls three lances of fire{slotNote} — the air shimmers in their wake',
+        '{name} sweeps a hand, and three ribbons of flame streak toward {target}{slotNote}',
+      ],
+    },
+    spellList: ['arcane'],
+  },
+  // SRD: Chromatic Orb — L1 Evocation. Single ranged spell attack;
+  // 3d8 of a chosen damage type (Acid / Cold / Fire / Lightning /
+  // Poison / Thunder). Pansori MVP defaults to fire (the picker UX
+  // for choosing the damage type is deferred). Upcast: +1d8 per
+  // slot above 1st. RAW also has a "leap" rider (matching d8 values
+  // bounce to a second target) — deferred behind the same FE picker
+  // work since it needs runtime per-die introspection.
+  chromatic_orb: {
+    id: 'chromatic_orb',
+    name: 'Chromatic Orb',
+    level: 1,
+    castTime: 'action',
+    damageType: 'fire',
+    damage: '3d8',
+    upcastBonus: '1d8',
+    attackRoll: true,
+    materialCost: 50,
+    rangeKind: 'ranged',
+    rangeFt: 90,
+    desc:
+      'Ranged spell attack: 3d8 fire damage (MVP — chosen-type picker deferred). ' +
+      'Consumes a 50 gp diamond. +1d8 per slot above 1st.',
+    narratives: {
+      cast: [
+        '{name} cradles a glowing 50-gp diamond — chromatic light flares and lances at {target}{slotNote}',
+        '{name} hurls a shimmering orb of fire{slotNote} — the diamond detonates mid-arc',
       ],
     },
     spellList: ['arcane'],
@@ -585,6 +693,87 @@ export const SRD_SPELLS: Record<string, Spell> = {
     rangeKind: 'ranged',
     rangeFt: 30,
     // Cleric / Paladin (2024 PHB).
+    spellList: ['divine'],
+  },
+  // SRD: Bane — the inverse of Bless. Three target enemies CHA save
+  // or subtract 1d4 from their attack rolls and saves for the
+  // concentration duration. Pansori wires the `baned` condition the
+  // same way Bless wires `blessed`: a string flag on the target's
+  // conditions list that toHit + rollConditionSave read. Upcast adds
+  // +1 target per slot above 1st (data only — pansori MVP applies to
+  // a single enemy through the save+condition pipeline; multi-target
+  // upcast is deferred behind the same picker UX that Bless awaits).
+  bane: {
+    id: 'bane',
+    name: 'Bane',
+    level: 1,
+    castTime: 'action',
+    savingThrow: 'cha',
+    saveEffect: 'negates',
+    concentration: true,
+    condition: 'baned',
+    conditionDuration: 10,
+    rangeKind: 'ranged',
+    rangeFt: 30,
+    desc:
+      'CHA save or the target subtracts 1d4 from attack rolls and saves for the duration. ' +
+      'Concentration, up to 1 minute. (RAW up to 3 targets — pansori MVP hits one.)',
+    narratives: {
+      cast: [
+        '{name} whispers a curse{slotNote} — black motes settle around {target}',
+        '{name} traces a sigil of blood{slotNote} and a sickly halo clings to {target}',
+      ],
+    },
+    spellList: ['arcane', 'divine'],
+  },
+  // SRD: Death Ward — L4 Abjuration, Cleric/Paladin. Touch buff.
+  // The first time the target would drop to 0 HP before the spell
+  // ends, drops to 1 instead and the spell ends. 8-hour duration.
+  // RAW also negates instant-death effects that don't deal damage
+  // (Power Word Kill); pansori doesn't model those today so the
+  // hook is unused. Routes through the buff branch — sets the
+  // one-shot `death_ward_active` flag; interception lives in
+  // `applyDamage` where HP would otherwise hit 0.
+  death_ward: {
+    id: 'death_ward',
+    name: 'Death Ward',
+    level: 4,
+    castTime: 'action',
+    targetType: 'self_or_ally',
+    rangeKind: 'touch',
+    desc:
+      'Touch: the first time the target would drop to 0 HP before the spell ends, it drops ' +
+      'to 1 instead. 8-hour duration; consumed on the rescue.',
+    narratives: {
+      cast: [
+        '{name} traces a sigil of protection over {target} — the next mortal blow will hesitate at the threshold',
+        "{name}'s touch leaves a silver echo around {target}, listening for the killing strike",
+      ],
+    },
+    spellList: ['divine'],
+  },
+  // SRD: Beacon of Hope — Cleric L3 Abjuration, concentration.
+  // Targets in 30 ft gain advantage on WIS saves + death saves +
+  // max heal on any healing. Pansori wires the `hopeful` condition
+  // (read by rollConditionSave for WIS adv + by the death-save
+  // handler for death-save adv). The max-heal effect is deferred —
+  // it'd require the heal-roll site to know the dice ceiling, a
+  // hook that hasn't landed yet. Hand-rolled in `utility.ts` the
+  // same way Bless is, since utility doesn't have a Bless-shaped
+  // generic-multi-target-condition primitive.
+  beacon_of_hope: {
+    id: 'beacon_of_hope',
+    name: 'Beacon of Hope',
+    level: 3,
+    castTime: 'action',
+    concentration: true,
+    narrative:
+      "{name} kindles a beacon of hope — allies' resolve hardens against fear and death.",
+    desc:
+      'Concentration, up to 1 minute. Up to 3 allies within 30 ft gain advantage on WIS saves ' +
+      'and death saves. (RAW max-heal effect deferred.)',
+    rangeKind: 'ranged',
+    rangeFt: 30,
     spellList: ['divine'],
   },
   thunderwave: {
@@ -1235,6 +1424,163 @@ export const SRD_SPELLS: Record<string, Spell> = {
     rangeKind: 'touch',
     spellList: ['arcane', 'divine'],
   },
+  // SRD: Revivify — touch a creature that died within the last
+  // minute; they revive at 1 HP. Consumes a 300 gp diamond. Doesn't
+  // restore missing body parts or work on death-by-old-age. Pansori
+  // tracks the death-window via `died_at_round` (set when `dead`
+  // flips to true) and gates the cast against the spell's
+  // `revive.windowRounds` (1 minute = 10 combat rounds).
+  revivify: {
+    id: 'revivify',
+    name: 'Revivify',
+    level: 3,
+    castTime: 'action',
+    materialCost: 300,
+    narratives: {
+      cast: [
+        '{name} presses a flickering diamond to {target} and pours faith through the stone{slotNote}',
+        '{name} kneels over {target}, diamond clutched between their palms — a slow, deliberate prayer{slotNote}',
+        '{name} breaks open the stored light of a diamond and calls {target} back from the dark{slotNote}',
+      ],
+    },
+    desc: 'Touch a creature dead < 1 minute. Returns them at 1 HP. Consumes a 300 gp diamond.',
+    rangeKind: 'touch',
+    spellList: ['divine', 'primal'],
+    revive: {
+      hpRestored: 1,
+      windowRounds: 10,
+      materialCost: 300,
+    },
+  },
+  // SRD: Raise Dead — touch a creature dead ≤ 10 days; returns at
+  // 1 HP, closes mortal wounds, neutralizes poisons. 1-hour cast.
+  // Consumes a 500 gp diamond. RAW also imposes a −4 D20 penalty
+  // until the target's long-rest count clears it; pansori MVP
+  // skips that nerf (the d20-mod plumbing across every roll site
+  // is meaningful surgery — deferred behind a global penalty
+  // helper if the mechanic ever lands).
+  raise_dead: {
+    id: 'raise_dead',
+    name: 'Raise Dead',
+    level: 5,
+    castTime: 'action',
+    materialCost: 500,
+    narratives: {
+      cast: [
+        '{name} sets the diamond on {target}\'s chest and begins the slow ritual{slotNote}',
+        '{name} chants over {target} for an hour, the diamond cracking as the soul returns{slotNote}',
+      ],
+    },
+    desc:
+      'Touch a creature dead < 10 days. Returns at 1 HP; closes mortal wounds, neutralizes poison. ' +
+      'Consumes a 500 gp diamond. (RAW −4 D20 penalty until long-rested off — deferred in pansori.)',
+    rangeKind: 'touch',
+    spellList: ['arcane', 'divine'],
+    revive: {
+      hpRestored: 1,
+      windowRounds: 99999,
+      materialCost: 500,
+    },
+  },
+  // SRD: Resurrection — touch a creature dead ≤ 100 years; returns
+  // at full HP, closes wounds, neutralizes poison, restores missing
+  // body parts. 1-hour cast. Consumes a 1000 gp diamond. RAW also
+  // imposes the −4 D20 penalty + a 365-day caster-tax when reviving
+  // a creature dead a year or more (no-spell-cast and disadvantage
+  // on D20 tests until the caster long-rests). Pansori MVP skips
+  // both (the 365-day check needs absolute-time tracking the engine
+  // doesn't model today).
+  resurrection: {
+    id: 'resurrection',
+    name: 'Resurrection',
+    level: 7,
+    castTime: 'action',
+    materialCost: 1000,
+    narratives: {
+      cast: [
+        '{name} pours a thousand gold of starfire into {target} and calls the soul home{slotNote}',
+        "{name}'s hour-long invocation closes around {target}, knitting flesh and breath alike{slotNote}",
+      ],
+    },
+    desc:
+      'Touch a creature dead < 1 century. Returns at full HP; closes wounds, neutralizes poison, ' +
+      'restores missing body parts. Consumes a 1000 gp diamond. (RAW −4 D20 penalty + 365-day ' +
+      'caster-tax both deferred in pansori.)',
+    rangeKind: 'touch',
+    spellList: ['arcane', 'divine'],
+    revive: {
+      hpRestored: 'full',
+      windowRounds: 99999,
+      materialCost: 1000,
+    },
+  },
+  // SRD: True Resurrection — touch a creature dead ≤ 200 years;
+  // returns at full HP, closes all wounds, neutralizes poison,
+  // cures magical contagions, lifts curses, replaces missing limbs
+  // and organs. 1-hour cast. Consumes 25,000 gp of diamonds. RAW
+  // also lifts any curses and restores undead to non-undead form
+  // (pansori has no curse/undead-transformation state to clear).
+  // No bedrest penalty.
+  true_resurrection: {
+    id: 'true_resurrection',
+    name: 'True Resurrection',
+    level: 9,
+    castTime: 'action',
+    materialCost: 25000,
+    narratives: {
+      cast: [
+        '{name} crushes a king\'s ransom of diamonds and reweaves {target} from the soul outward{slotNote}',
+        '{name} speaks {target}\'s true name across the veil; the body answers, whole and breathing{slotNote}',
+      ],
+    },
+    desc:
+      'Touch a creature dead < 200 years. Returns at full HP; closes all wounds, neutralizes ' +
+      'poison, lifts curses, replaces missing organs and limbs. Consumes 25,000 gp of diamonds.',
+    rangeKind: 'touch',
+    spellList: ['divine', 'primal'],
+    revive: {
+      hpRestored: 'full',
+      windowRounds: 99999,
+      materialCost: 25000,
+    },
+  },
+  // SRD: Reincarnate — touch a dead Humanoid (or piece thereof)
+  // dead ≤ 10 days; a new body forms and the soul enters. 1-hour
+  // cast. Consumes 1000 gp of rare oils. RAW rolls 1d10 on the
+  // species table to pick the new form (Dragonborn / Dwarf / Elf /
+  // Gnome / Goliath / Halfling / Human / Orc / Tiefling).
+  //
+  // Pansori MVP: returns at full HP, KEEPS the original species —
+  // the random species reroll requires species-trait revoke +
+  // apply infrastructure (resistance lists, innate cantrips,
+  // darkvision, breath weapon, species-resource flags) plus a UX
+  // flow to surface the new form. Deferred behind a follow-up; in
+  // the meantime, Reincarnate behaves as a Druid-list-only flavor
+  // alternative to Raise Dead / Resurrection.
+  reincarnate: {
+    id: 'reincarnate',
+    name: 'Reincarnate',
+    level: 5,
+    castTime: 'action',
+    materialCost: 1000,
+    narratives: {
+      cast: [
+        '{name} anoints {target} with rare oils and lets the green-pulse of the world re-knit the body{slotNote}',
+        '{name} chants the long druidic rite over {target}; bone reforms, breath returns{slotNote}',
+      ],
+    },
+    desc:
+      'Touch a Humanoid dead < 10 days. Returns at full HP, reborn into a new species ' +
+      'rolled uniformly from the SRD reincarnation table (Dragonborn / Dwarf / Elf / ' +
+      'Gnome / Goliath / Halfling / Human / Orc / Tiefling). Consumes 1000 gp of rare oils.',
+    rangeKind: 'touch',
+    spellList: ['primal'],
+    revive: {
+      hpRestored: 'full',
+      windowRounds: 99999,
+      materialCost: 1000,
+    },
+  },
   // SRD: Fear — 30-ft cone WIS save or Frightened (concentration,
   // up to 1 minute). Frightened creatures must Dash away from the
   // caster each turn. Pansori MVP applies the Frightened condition;
@@ -1611,6 +1957,27 @@ export const SRD_SPELLS: Record<string, Spell> = {
     rangeKind: 'ranged',
     rangeFt: 60,
     spellList: ['divine', 'primal'],
+  },
+  // SRD: Prayer of Healing — L2 Abjuration, 10-minute cast. Up to
+  // 5 creatures within 30 ft regain 2d8 + casting mod HP each.
+  // Upcast: +1d8 per slot above 2nd. RAW also grants short-rest
+  // benefits + the 1/long-rest target gate; pansori MVP skips both
+  // (short-rest plumbing isn't surfaced per-spell, and the gate
+  // would need a per-PC "prayed-on this rest" flag — deferred).
+  // Routes through the mass-heal path, same as mass_healing_word.
+  prayer_of_healing: {
+    id: 'prayer_of_healing',
+    name: 'Prayer of Healing',
+    level: 2,
+    castTime: 'action',
+    heal: '2d8',
+    upcastBonus: '1d8',
+    desc:
+      'Up to 5 allies within 30 ft regain 2d8 + casting mod HP each. +1d8 per slot above 2nd. ' +
+      '(RAW 10-minute cast + 1/long-rest gate + short-rest benefits deferred in pansori.)',
+    rangeKind: 'ranged',
+    rangeFt: 30,
+    spellList: ['divine'],
   },
 
   // L6 dedicated heal — restores a fixed 70 HP and removes some
