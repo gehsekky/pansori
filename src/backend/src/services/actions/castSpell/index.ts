@@ -9,6 +9,7 @@ import { runAoeSpell } from './aoe.js';
 import { runAttackRollSpell } from './attackRoll.js';
 import { runAutoHitSpell } from './autoHit.js';
 import { runBuffSpell } from './buff.js';
+import { runCombatStart } from '../attack/combatStart.js';
 import { runHealSpell } from './heal.js';
 import { runMultiTargetSpell } from './multiTarget.js';
 import { runSaveSpell } from './save.js';
@@ -125,6 +126,38 @@ export const handleCastSpell: ActionHandler<{
     (action as { type: 'cast_spell'; targetEnemyId?: string }).targetEnemyId ?? ctx.enemy.id;
   const spellTarget: Enemy =
     ctx.livingEnemiesInRoom.find((e) => e.id === spellTargetId) ?? ctx.enemy;
+
+  // Combat-start hook. If a hostile spell is the first engaging action
+  // in a fresh room (no combat yet, no entities seeded), `runCombatStart`
+  // rolls initiative, seeds grid entities, and runs the surprise check
+  // — the same setup the Attack handler does. Without this,
+  // `applySingleTargetDamage` reads the missing entity's HP as 0 and
+  // fake-kills the target with any positive damage (Spiritual Weapon
+  // one-shotting bosses, etc.). `runCombatStart` is idempotent (returns
+  // early when `combat_active` is set), so re-casting during combat is
+  // a no-op.
+  //
+  // Three integration concerns:
+  //   1. precast mutated ctx.char (slot spent, action_used, gold, etc.)
+  //      but those mutations live on the local ctx.char reference;
+  //      they aren't in ctx.st.characters yet. runCombatStart rebuilds
+  //      ctx.char from `ctx.st.characters` (line ~44, freshChar
+  //      lookup) — without `commitChar()` first, the rebuild reverts
+  //      every precast mutation. Commit before the call so they stick.
+  //   2. combatStart overwrites `ctx.narrative` — save + prepend so
+  //      precast's prelude (material-cost note) survives.
+  //   3. combatStart resets `turn_actions` to FRESH_TURN, undoing the
+  //      `action_used` (or `bonus_action_used`) precast just set. Save
+  //      the precast turn_actions and restore after the call.
+  const precastNarrative = ctx.narrative;
+  const precastTurnActions = ctx.char.turn_actions;
+  ctx.commitChar();
+  runCombatStart(ctx, spellTarget);
+  if (precastNarrative) {
+    ctx.narrative = precastNarrative + ctx.narrative;
+  }
+  ctx.char = { ...ctx.char, turn_actions: precastTurnActions };
+  ctx.commitChar();
 
   // SRD 5.2.1 — enforce spell range against the grid when entities exist.
   // 'self' spells need no target check (they originate from the caster).

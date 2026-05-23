@@ -57,16 +57,26 @@ export const handleTravel: ActionHandler<{ type: 'travel'; locationId: string }>
     }
   }
 
+  const destRoomId = destLocation.centralRoomId ?? ctx.st.current_room;
   ctx.st = {
     ...ctx.st,
     current_location_id: action.locationId,
     current_district_id: undefined,
-    current_room: destLocation.centralRoomId ?? ctx.st.current_room,
+    current_room: destRoomId,
     world_day: (ctx.st.world_day ?? 1) + 1,
     entities: undefined,
     movement_used: undefined,
   };
-  ctx.narrative = `You travel to ${destLocation.name}.${encounterNote}`;
+  // Append the standard arrival narrative (room desc + enemies-here +
+  // loot-here + exits) so players see what's at the destination. Before
+  // this fix the player just saw "You travel to X." with no room
+  // context — enemies in the destination room were silently present.
+  // The encounter-splice line (see `encounterNote` above) reads as a
+  // separate hostile-spawn flag; the arrival narrative then lists
+  // every hostile present in the room, including the spliced one.
+  ctx.narrative =
+    `You travel to ${destLocation.name}.${encounterNote} ` +
+    buildArrivalNarrative(destRoomId, ctx.st, ctx.seed, ctx.context);
   ctx.usedInitiative = false;
 };
 
