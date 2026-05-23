@@ -817,7 +817,6 @@ export interface GameState {
   help_target_id?: string; // char id receiving Help action advantage
   surprised?: string[]; // entity ids surprised at combat start (skip first turn)
   metamagic_active?: string; // active Metamagic modifier for Sorcerer
-  vow_of_enmity_target?: string; // Vengeance Paladin vow target entity id
   cutting_words_penalty?: number; // Lore Bard Cutting Words penalty to apply
   round?: number; // current combat round (1-indexed)
 

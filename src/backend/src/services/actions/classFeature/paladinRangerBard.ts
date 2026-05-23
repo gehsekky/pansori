@@ -1,10 +1,4 @@
-import {
-  abilityMod,
-  applyDamageMultiplier,
-  profBonus,
-  rollCritical,
-  rollDice,
-} from '../../rulesEngine.js';
+import { abilityMod, applyDamageMultiplier, rollCritical, rollDice } from '../../rulesEngine.js';
 import {
   applyPartyLevelUps,
   endCombatState,
@@ -14,7 +8,6 @@ import {
 } from '../../gameEngine.js';
 import { getClassLevel, hasClass } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
-import { composeNow } from '../../narrative/compose.js';
 import { distanceFeet } from '../../gridEngine.js';
 import { fmt } from '../../narrativeFmt.js';
 
@@ -38,8 +31,6 @@ import { fmt } from '../../narrativeFmt.js';
  *  Paladin Channel Divinity:
  *   - `sacred_weapon` (Devotion): +CHA to attack rolls for 1 minute.
  *     Read by attack.ts via state.sacred_weapon_active flag.
- *   - `vow_of_enmity` (Vengeance): tag the current target for
- *     attack-roll advantage. state.vow_of_enmity_target picks it up.
  *   - `abjure_enemy` (Vengeance): WIS save → frightened.
  */
 export function handlePaladinRangerBardFeature(ctx: ActionContext, fid: string): boolean {
@@ -216,214 +207,6 @@ export function handlePaladinRangerBardFeature(ctx: ActionContext, fid: string):
     };
     const chaMod = abilityMod(ctx.char.cha);
     ctx.narrative = `${ctx.char.name} — Sacred Weapon! +${chaMod} to attack rolls for 1 minute (10 rounds). Your weapon gleams with divine light. (${cdUsesDev - 1} Channel Divinity remaining)`;
-    return true;
-  }
-
-  if (fid === 'vow_of_enmity') {
-    if (ctx.char.subclass !== 'vengeance') {
-      ctx.narrative = 'Only Vengeance Paladins have Vow of Enmity.';
-      return true;
-    }
-    const cdUsesVen = ctx.char.class_resource_uses?.channel_divinity ?? 1;
-    if (cdUsesVen <= 0) {
-      ctx.narrative = 'No Channel Divinity uses remaining.';
-      return true;
-    }
-    ctx.char.class_resource_uses = {
-      ...(ctx.char.class_resource_uses ?? {}),
-      channel_divinity: cdUsesVen - 1,
-    };
-    ctx.st = { ...ctx.st, vow_of_enmity_target: ctx.enemy?.id };
-    ctx.narrative = `${ctx.char.name} — Vow of Enmity! You have advantage on all attack rolls against ${ctx.enemy?.name ?? 'your target'} for 1 minute. (${cdUsesVen - 1} Channel Divinity remaining)`;
-    return true;
-  }
-
-  if (fid === 'abjure_enemy') {
-    if (ctx.char.subclass !== 'vengeance') {
-      ctx.narrative = 'Only Vengeance Paladins have Abjure Enemy.';
-      return true;
-    }
-    if (!ctx.enemyAlive || !ctx.enemy) {
-      ctx.narrative = 'No living target.';
-      return true;
-    }
-    const cdUsesVen2 = ctx.char.class_resource_uses?.channel_divinity ?? 1;
-    if (cdUsesVen2 <= 0) {
-      ctx.narrative = 'No Channel Divinity uses remaining.';
-      return true;
-    }
-    ctx.char.class_resource_uses = {
-      ...(ctx.char.class_resource_uses ?? {}),
-      channel_divinity: cdUsesVen2 - 1,
-    };
-    const wisSave =
-      rollDice('1d20') + abilityMod((ctx.enemy as unknown as Record<string, number>)['wis'] ?? 10);
-    const frightenDC = 8 + profBonus(ctx.char.level) + abilityMod(ctx.char.cha);
-    const abjureSuccess = wisSave >= frightenDC;
-    if (!abjureSuccess) {
-      ctx.st = {
-        ...ctx.st,
-        entities: (ctx.st.entities ?? []).map((e) =>
-          e.id === ctx.enemy?.id && e.isEnemy
-            ? {
-                ...e,
-                conditions: [...e.conditions.filter((c) => c !== 'frightened'), 'frightened'],
-              }
-            : e
-        ),
-      };
-      composeNow(ctx, {
-        kind: 'save',
-        characterId: ctx.enemy!.id,
-        characterName: ctx.enemy!.name,
-        ability: 'wis',
-        roll: wisSave,
-        dc: frightenDC,
-        success: false,
-        vs: 'Abjure Enemy',
-        prose: '',
-      });
-      composeNow(ctx, {
-        kind: 'condition_applied',
-        targetId: ctx.enemy!.id,
-        targetName: ctx.enemy!.name,
-        condition: 'frightened',
-        source: 'Abjure Enemy',
-        prose: `Abjure Enemy! WIS save ${wisSave} vs DC ${frightenDC} — ${ctx.enemy!.name} is frightened! (${cdUsesVen2 - 1} Channel Divinity remaining)`,
-      });
-    } else {
-      composeNow(ctx, {
-        kind: 'save',
-        characterId: ctx.enemy!.id,
-        characterName: ctx.enemy!.name,
-        ability: 'wis',
-        roll: wisSave,
-        dc: frightenDC,
-        success: true,
-        vs: 'Abjure Enemy',
-        prose: `Abjure Enemy! WIS save ${wisSave} vs DC ${frightenDC} — ${ctx.enemy!.name} resists. (${cdUsesVen2 - 1} Channel Divinity remaining)`,
-      });
-    }
-    ctx.usedInitiative = true;
-    return true;
-  }
-
-  if (fid === 'natures_wrath') {
-    // 2024 PHB Oath of the Ancients Paladin L3 — Channel Divinity:
-    // spectral vines lash a creature within 10 ft. WIS save or
-    // restrained for 5 rounds.
-    if (ctx.char.subclass !== 'ancients') {
-      ctx.narrative = "Only Ancients Paladins have Nature's Wrath.";
-      return true;
-    }
-    if (!ctx.enemyAlive || !ctx.enemy) {
-      ctx.narrative = 'No living target.';
-      return true;
-    }
-    const cdUsesAnc = ctx.char.class_resource_uses?.channel_divinity ?? 1;
-    if (cdUsesAnc <= 0) {
-      ctx.narrative = 'No Channel Divinity uses remaining.';
-      return true;
-    }
-    ctx.char.class_resource_uses = {
-      ...(ctx.char.class_resource_uses ?? {}),
-      channel_divinity: cdUsesAnc - 1,
-    };
-    const dexSaveNW =
-      rollDice('1d20') + abilityMod((ctx.enemy as unknown as Record<string, number>)['dex'] ?? 10);
-    const nwDC = 8 + profBonus(ctx.char.level) + abilityMod(ctx.char.cha);
-    const nwSuccess = dexSaveNW >= nwDC;
-    if (!nwSuccess) {
-      ctx.st = {
-        ...ctx.st,
-        entities: (ctx.st.entities ?? []).map((e) =>
-          e.id === ctx.enemy?.id && e.isEnemy
-            ? {
-                ...e,
-                conditions: [...e.conditions.filter((c) => c !== 'restrained'), 'restrained'],
-                condition_durations: {
-                  ...(e.condition_durations ?? {}),
-                  restrained: 5,
-                },
-              }
-            : e
-        ),
-      };
-      composeNow(ctx, {
-        kind: 'save',
-        characterId: ctx.enemy!.id,
-        characterName: ctx.enemy!.name,
-        ability: 'dex',
-        roll: dexSaveNW,
-        dc: nwDC,
-        success: false,
-        vs: "Nature's Wrath",
-        prose: '',
-      });
-      composeNow(ctx, {
-        kind: 'condition_applied',
-        targetId: ctx.enemy!.id,
-        targetName: ctx.enemy!.name,
-        condition: 'restrained',
-        source: "Nature's Wrath",
-        prose: `🌿 Nature's Wrath! DEX save ${dexSaveNW} vs DC ${nwDC} — spectral vines restrain ${ctx.enemy!.name} for 5 rounds. (${cdUsesAnc - 1} Channel Divinity remaining)`,
-      });
-    } else {
-      composeNow(ctx, {
-        kind: 'save',
-        characterId: ctx.enemy!.id,
-        characterName: ctx.enemy!.name,
-        ability: 'dex',
-        roll: dexSaveNW,
-        dc: nwDC,
-        success: true,
-        vs: "Nature's Wrath",
-        prose: `🌿 Nature's Wrath! DEX save ${dexSaveNW} vs DC ${nwDC} — ${ctx.enemy!.name} dodges the vines. (${cdUsesAnc - 1} Channel Divinity remaining)`,
-      });
-    }
-    ctx.usedInitiative = true;
-    return true;
-  }
-
-  if (fid === 'inspiring_smite') {
-    // 2024 PHB Glory Paladin L3 — Channel Divinity. RAW: triggered
-    // after a Divine Smite. Pansori MVP relaxes this and lets the
-    // Glory paladin use Inspiring Smite as a standalone CD AoE
-    // temp HP grant. 2d8 + paladin level temp HP to caster + each
-    // living ally (treated as "within 30 ft" → party-wide in
-    // pansori's room scope).
-    if (ctx.char.subclass !== 'glory') {
-      ctx.narrative = 'Only Glory Paladins have Inspiring Smite.';
-      return true;
-    }
-    const cdUsesIS = ctx.char.class_resource_uses?.channel_divinity ?? 1;
-    if (cdUsesIS <= 0) {
-      ctx.narrative = 'No Channel Divinity uses remaining.';
-      return true;
-    }
-    ctx.char.class_resource_uses = {
-      ...(ctx.char.class_resource_uses ?? {}),
-      channel_divinity: cdUsesIS - 1,
-    };
-    const palLvl = getClassLevel(ctx.char, 'paladin');
-    const grant = rollDice('2d8') + palLvl;
-    // Apply to caster (in-place) + each living ally in the party.
-    if ((ctx.char.temp_hp ?? 0) < grant) ctx.char.temp_hp = grant;
-    const allyIds = ctx.st.characters
-      .filter((c) => c.id !== ctx.char.id && !c.dead && c.hp > 0)
-      .map((c) => c.id);
-    ctx.st = {
-      ...ctx.st,
-      characters: ctx.st.characters.map((c) =>
-        allyIds.includes(c.id) ? { ...c, temp_hp: Math.max(c.temp_hp ?? 0, grant) } : c
-      ),
-    };
-    const buffedNames = [
-      ctx.char.name,
-      ...allyIds.map((id) => ctx.st.characters.find((c) => c.id === id)?.name).filter(Boolean),
-    ].join(', ');
-    ctx.narrative = `✨ Inspiring Smite — ${ctx.char.name} channels glory: ${grant} temp HP to ${buffedNames}. (${cdUsesIS - 1} Channel Divinity remaining)`;
-    ctx.usedInitiative = true;
     return true;
   }
 
