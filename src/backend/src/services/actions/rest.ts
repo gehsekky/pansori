@@ -224,11 +224,6 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
       // before a rest, but clear defensively.
       mage_armor_active: undefined,
       shield_of_faith_active: undefined,
-      // 2024 PHB Stars Druid — Starry Form is a 10-minute buff. The
-      // engine surface lacks a finer-grained timer than long rest,
-      // so the constellation persists until the next rest. Cleared
-      // here so the Druid starts the next adventuring day fresh.
-      starry_form_constellation: undefined,
       // 2024 PHB movement modes — fly is the only one with purely
       // short-duration sources today (Fly spell, Aasimar Radiant
       // Soul transformation). Climb / swim grants from Athlete and

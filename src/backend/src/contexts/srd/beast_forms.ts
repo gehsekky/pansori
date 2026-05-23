@@ -94,17 +94,15 @@ export const BEAST_FORMS: Record<string, BeastForm> = {
 };
 
 // Returns the max CR a druid of this level can access.
-// 2024 PHB progression: base druid is 1/4 (L1-3) → 1/2 (L4-7) → 1 (L8+).
-// Moon is level/3 (min 1).
-export function maxBeastCRForLevel(level: number, isMoon: boolean): number {
-  if (isMoon) return Math.max(1, Math.floor(level / 3));
+// SRD progression: 1/4 (L1-3) → 1/2 (L4-7) → 1 (L8+).
+export function maxBeastCRForLevel(level: number): number {
   if (level >= 8) return 1;
   if (level >= 4) return 0.5;
   return 0.25;
 }
 
 // Filter the catalog to the forms available to a druid at this level.
-export function availableBeastForms(level: number, isMoon: boolean): BeastForm[] {
-  const maxCR = maxBeastCRForLevel(level, isMoon);
+export function availableBeastForms(level: number): BeastForm[] {
+  const maxCR = maxBeastCRForLevel(level);
   return Object.values(BEAST_FORMS).filter((f) => f.cr <= maxCR);
 }

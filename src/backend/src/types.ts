@@ -699,18 +699,6 @@ export interface Character {
   fly_speed_ft?: number;
   swim_speed_ft?: number;
   climb_speed_ft?: number;
-  // 2024 PHB Stars Druid — Starry Form constellation. Set via the
-  // bonus-action activation (consumes a Wild Shape charge); each
-  // constellation grants a different rider:
-  //   - 'archer': enables the starry_form_attack action (ranged
-  //     spell attack, 1d8 + WIS mod radiant).
-  //   - 'chalice': healing spells the druid casts also grant +1d8
-  //     to the healed target.
-  //   - 'dragon': concentration saves (and RAW INT/WIS checks, not
-  //     yet wired) treat a sub-10 d20 as a 10.
-  // RAW duration is 10 minutes; pansori clears on long rest (the
-  // engine surface doesn't have a finer-grained ten-minute timer).
-  starry_form_constellation?: 'archer' | 'chalice' | 'dragon';
   // SRD 5.2.1 p.11: Darkvision treats Darkness as Dim Light within this radius
   // (typically 60 ft for elves/dwarves/halflings/etc.). Default 0 = no
   // darkvision (typical human).
