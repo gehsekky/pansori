@@ -212,17 +212,6 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
       // them on rest. Defensive fly clear handles the case where
       // an Aasimar's 1-minute transformation overruns into a rest.
       fly_speed_ft: undefined,
-      // 2024 PHB Diviner Wizard Portent — roll 2 d20s on each long
-      // rest (3 at L14+). Stored on the character; player can use
-      // them to replace rolls later (interception not wired yet).
-      portent_dice:
-        c.subclass === 'diviner' && hasClass(c, 'wizard')
-          ? [
-              rollDice('1d20'),
-              rollDice('1d20'),
-              ...(getClassLevel(c, 'wizard') >= 14 ? [rollDice('1d20')] : []),
-            ]
-          : undefined,
     };
     // Recompute AC after clearing the magical buffs so the stored
     // `ac` field reflects the post-rest state.

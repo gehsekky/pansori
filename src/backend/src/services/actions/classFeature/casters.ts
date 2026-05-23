@@ -135,17 +135,5 @@ export function handleCasterFeature(ctx: ActionContext, fid: string): boolean {
     return true;
   }
 
-  if (fid === 'arcane_ward') {
-    if (ctx.char.subclass !== 'abjurer') {
-      ctx.narrative = 'Only Abjurer Wizards have Arcane Ward.';
-      return true;
-    }
-    // Arcane Ward HP = 2 × Wizard level (Abjurer subclass).
-    const wardHp = 2 * getClassLevel(ctx.char, 'wizard');
-    ctx.char.class_resource_uses = { ...(ctx.char.class_resource_uses ?? {}), arcane_ward: wardHp };
-    ctx.narrative = `${ctx.char.name} creates an Arcane Ward with ${wardHp} HP. It absorbs damage before your HP is reduced.`;
-    return true;
-  }
-
   return false;
 }
