@@ -4,7 +4,6 @@ import {
   consumeInspirationForCheck,
   consumeLuckForCheck,
 } from '../gameEngine.js';
-import { getClassLevel, hasClass } from '../multiclass.js';
 import type { ActionHandler } from './types.js';
 import { randomUUID } from 'crypto';
 
@@ -42,22 +41,8 @@ export const handleInteractObject: ActionHandler<{
   let nextSt = ctx.st;
 
   if (nextSt.combat_active) {
-    const fastHandsEligible =
-      hasClass(nextChar, 'rogue') &&
-      nextChar.subclass === 'thief' &&
-      getClassLevel(nextChar, 'rogue') >= 3;
-    if (!fastHandsEligible) {
-      ctx.narrative = 'You cannot interact with objects during combat.';
-      return;
-    }
-    if (nextChar.turn_actions.bonus_action_used) {
-      ctx.narrative = 'Bonus action already used this turn.';
-      return;
-    }
-    nextChar = {
-      ...nextChar,
-      turn_actions: { ...nextChar.turn_actions, bonus_action_used: true },
-    };
+    ctx.narrative = 'You cannot interact with objects during combat.';
+    return;
   }
 
   if (!obj.searchable || !obj.lootIds?.length) {

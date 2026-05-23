@@ -201,18 +201,11 @@ export const handleUse: ActionHandler<{
       (itemData.heal != null ||
         itemData.effect === 'con_advantage' ||
         itemData.effect === 'mystery');
-    // 2024 PHB Thief Rogue Fast Hands — Utilize action becomes a
-    // Bonus Action. Any item-use that would normally cost an
-    // action now costs a bonus action instead. Doesn't change
-    // potions (already bonus-action) or weapon-equip flavor texts.
-    // The 'thief' subclass is exclusive to Rogue, so the subclass
-    // check is sufficient.
-    const isFastHandsBonus = !isPotionLike && nextChar.subclass === 'thief';
     nextChar = {
       ...nextChar,
       turn_actions: {
         ...nextChar.turn_actions,
-        ...(isPotionLike || isFastHandsBonus ? { bonus_action_used: true } : { action_used: true }),
+        ...(isPotionLike ? { bonus_action_used: true } : { action_used: true }),
       },
     };
   }
