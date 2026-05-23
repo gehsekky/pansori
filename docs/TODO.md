@@ -13,12 +13,12 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 > and PHB-only spells were all removed. See
 > [srd-only-audit.md](srd-only-audit.md) for the migration record.
 >
-> Many entries below were written when pansori targeted "2024 PHB
-> compatible" and reference PHB-only features (Lucky, Sharpshooter,
-> Sentinel, GWM, Polearm Master, Battle Master maneuvers, Stars
-> Druid constellations, Aasimar Celestial Revelation, Silvery Barbs,
-> etc.). Those are **out of scope** now — leaving the entries for
-> historical context but they are not active TODOs.
+> Entries that referenced now-removed PHB-only features (Lucky,
+> Sharpshooter, Sentinel, GWM, Polearm Master, Battle Master
+> maneuvers, Stars Druid constellations, Aasimar Celestial
+> Revelation, Silvery Barbs, etc.) have been pruned from this file.
+> See [srd-only-audit.md](srd-only-audit.md) for the full removal
+> record.
 >
 > Net-new content additions should grep `docs/srd-5.2.1.txt` first.
 
@@ -39,51 +39,29 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 
 #### Tier 1: schema + registry gaps (blocks rule expression)
 
-- [~] **Feats system** (Tier 1A — shipped 2026-05-21 as foundation;
-      runtime hooks pending). New `Feat` type + `FeatEffect`
-      discriminated union in `shared/types.ts`. `featTable?:
-      Record<string, Feat>` on `Context`. `services/feats.ts` with
-      `canTakeFeat` (prereq check) + `applyFeatTake` (per-effect
-      take-time grants). `take_feat` action handler in `meta.ts`;
-      consumes `asi_pending` for `general`-category feats (not for
-      `origin` from background). `Character.feat_choices` records
-      half-feat / save-proficiency picks. 3 seed feats: Tough
-      (`hp-per-level`), Lucky (`d20-reroll` resource), Sharpshooter
-      (`ranged-toggle`). Wired into all 4 contexts (sandbox, vale,
-      grove, whispering). 11 direct tests.
+- [x] **Feats system** (foundation shipped 2026-05-21; SRD feat
+      catalog finalized in the 2026-05-23 SRD-only reset). New `Feat`
+      type + `FeatEffect` discriminated union in `shared/types.ts`.
+      `featTable?: Record<string, Feat>` on `Context`.
+      `services/feats.ts` with `canTakeFeat` (prereq check) +
+      `applyFeatTake` (per-effect take-time grants). `take_feat`
+      action handler in `meta.ts` consumes `asi_pending` for
+      `general`-category feats (not for `origin` feats from
+      background). `Character.feat_choices` records half-feat /
+      save-proficiency / Magic Initiate picks. Wired into all 4
+      contexts (sandbox, vale, grove, whispering).
 
-  **Remaining (data + runtime hooks):**
-  - [x] Lucky's spend hook (2026-05-22). New `use_luck` action
-    mirrors `spend_inspiration`'s shape — sets
-    `turn_actions.luck_pending`, decrements `feat_lucky_uses`.
-    Coverage:
-    - **Attack rolls:** `attack/toHit.ts` consumes the flag as an
-      advantage source.
-    - **Skill checks:** new `consumeLuckForCheck(char)` helper
-      threaded through `interactObject` (search), `sneak` (group
-      stealth), and `classFeature/rogue` (Cunning Action Hide).
-    - **Saves:** `conditionSavingThrow` (the onHit-effect save path
-      that handles enemy attack riders like stunning / paralysis)
-      reads `luck_pending` and returns a `luckConsumed` flag the
-      caller uses to clear it. Narrative surfaces "🍀 Luck point
-      spent on the save".
-    - **Ability checks (Influence + Study):** ad-hoc d20 sites
-      consume luck via `consumeLuckForCheck` + roll-2-take-higher.
-    `resetFeatLongRestResources` refills the pool on long rest.
-    RAW spend-after-roll timing still deferred (MVP is
-    spend-before-roll). AoE saves (lair-action sweeps) and death
-    saves intentionally don't auto-consume (multi-roll / no
-    decision point).
-  - [x] Sharpshooter toggle (2026-05-22). New `toggle_sharpshooter`
-    action flips `turn_actions.sharpshooter_active` (free of action
-    economy; auto-clears at turn end via FRESH_TURN). In `toHit.ts`:
-    -5 penalty folded into `totalAttackBonus`, cover suppression
-    (half + three-quarters → 0), gates on `weaponItem.range ===
-    'ranged'`. In `attack/index.ts`: +10 damage rider rolled into
-    `rawDmg` so resistance/vulnerability multiplier applies; bonus
-    surfaces on the hit narrative. 5 direct tests. Long-range no-
-    disadv is a no-op until ranged long-range disadv is enforced
-    (not in pansori today).
+      **SRD feat catalog (6):** Alert (`+profBonus` initiative, wired
+      in `buildInitiativeOrder`), Savage Attacker (once/turn
+      weapon-damage reroll-take-higher, unarmed excluded per RAW),
+      Skilled (3 skill profs), and Magic Initiate × 3 (Arcane /
+      Divine / Primal — detail below). The PHB-only feats that
+      briefly shipped here (Lucky, Sharpshooter, Tough, Resilient,
+      Mobile, Sentinel, War Caster, Polearm Master, Great Weapon
+      Master, Heavy Armor Master, Crossbow Expert, Tavern Brawler,
+      Observant, Healer, Dual Wielder, Athlete) were removed in the
+      SRD-only reset — see srd-only-audit.md.
+
   - [x] Magic Initiate (shipped 2026-05-22 — full BE + FE). Three
     seed feats — `magic_initiate_arcane / divine / primal` — each
     granting 2 cantrips + 1 L1 spell. `take_feat` action accepts
@@ -122,100 +100,6 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
     matches (cantrip vs L1), and `spell.spellList` includes the
     feat's `spellList` ('arcane' / 'divine' / 'primal'). 4 added
     validation tests.
-  - ~~More feats: Resilient, Mobile, Sentinel, War Caster, Polearm
-    Master, Great Weapon Master, Heavy Armor Master, Crossbow
-    Expert, Tavern Brawler, Magic Initiate~~ — all shipped
-    2026-05-22. Plus additional 2024 PHB feats wired this session
-    (each with mechanical hook, not just data):
-    - **Skilled** — choose 3 skill profs (`skill-proficiencies`
-      effect kind).
-    - **Observant** — half-feat: +1 INT/WIS, advantage on
-      Investigation/Perception/Insight checks (effect surfaced via
-      a feats helper used by ad-hoc d20 sites).
-    - **Healer** — `use_healer_kit` action heals 1d6+4+prof; spends
-      a kit charge (item count). Stabilizes on use even at 0 HP.
-    - **Dual Wielder** — relaxes off-hand-light rule so any one-
-      handed melee qualifies for TWF; gates the off-hand path.
-    - **Athlete** — half-feat: +1 STR/DEX, partial climbing-speed
-      grant (no movement-mode model — narrative-only); standing
-      from prone costs 5 ft instead of half speed.
-    - **Polearm Master (full)** — bonus-action butt-end attack
-      (1d4 + ability mod) shipped, plus the OA-on-enter-reach
-      trigger via `pamEnterReachTriggers` in gridEngine.
-    - **Great Weapon Master (full)** — damage rider (already
-      shipped) + the bonus-action attack on Crit-or-kill with a
-      heavy weapon. Flag `turn_actions.gwm_bonus_attack_pending`
-      set in the attack handler; consumed by `gwm_bonus_attack`
-      handler.
-    - **Crossbow Expert** — ignores loading on crossbows + ranged
-      attacks within 5 ft of enemy don't impose disadvantage.
-      Wired in toHit + ammo-consumption paths. Also added the
-      missing crossbow weapons (hand / light / heavy) to sandbox
-      loot.
-    Each was ~30-100 lines of data + integration. See git history
-    for the per-PR details.
-
-    **2024 PHB origin feats added 2026-05-22:**
-    - **Alert** (`kind: 'alert'`) — `+profBonus` to initiative
-      rolls, wired in `buildInitiativeOrder` (reads `char.feats`
-      and adds `profBonus(level)` when present). Surprise immunity
-      is a no-op in pansori today (PCs can't currently be
-      surprised — only enemies can via the party stealth check at
-      combat start) but the feat data is in place for when PC
-      surprise lands.
-    - **Savage Attacker** (`kind: 'savage-attacker'`) — once per
-      turn, weapon-damage hits reroll and take the higher total.
-      Gates on `turn_actions.savage_attacker_used` (auto-cleared
-      on next turn via FRESH_TURN). Unarmed strikes excluded per
-      RAW ("weapon's damage roll"). 5 direct tests covering both
-      feats (initiative bonus, per-turn limit, feat-absent no-op).
-
-    **2024 PHB general feats added 2026-05-22:**
-    - **Resilient** — half-feat: +1 to chosen ability + save
-      proficiency in that ability. Pure data; reuses existing
-      `abilityBonus.choices` + `save-proficiency` effect kinds.
-      L4+ prereq.
-    - **Mobile** (`kind: 'speed-bonus'; bonusFeet: 10`) — +10 ft
-      speed. Wired in `effectiveSpeed` (which is called from
-      grid_move, dash, etc., so the bonus lands everywhere
-      automatically). Stacks with Goliath Large Form; encumbrance
-      still reduces post-bonus speed normally. The two other RAW
-      benefits (no difficult-terrain Dash slowdown, melee-attack
-      target can't OA you) aren't modeled yet. New `speed-bonus`
-      effect kind documents the bonus on feat data; the
-      `effectiveSpeed` hook hardcodes the feat id for now (will
-      factor into a feats helper when a 2nd speed-bonus feat
-      ships). L4+ prereq.
-    - **War Caster** (`kind: 'war-caster'`) — advantage on CON
-      saves to maintain concentration when damaged. Wired in
-      `checkConcentration` — rolls 2d20 keep-higher when the PC
-      has the feat. Narrative notes "(War Caster advantage)" on
-      both hold and break outcomes. Two other RAW benefits
-      deferred: somatic spell components with hands full (pansori
-      doesn't model hand state) and opportunity-cast spell as a
-      reaction (needs a reaction-window redesign). L4 + Spellcasting
-      feature prereq.
-    - **Heavy Armor Master** (`kind: 'heavy-armor-master'`) —
-      while wearing heavy armor and not incapacitated, attacks
-      against you deal 3 less damage (floor 0). Wired as a
-      last-step reduction in `computeEnemyAttack`, after
-      resistance + Arcane Ward but before applyDamage. Uses an
-      independent armor-loot lookup via `instance_id` to side-
-      step the pre-existing buggy `armorItem` lookup in the same
-      function (documented inline; fix in a separate PR since
-      the deflected-narrative path depends on the broken
-      behavior). L4 + heavy-armor proficiency prereq. The take-
-      time heavy-armor proficiency grant isn't wired (would need
-      `applyFeatTake` to add 'heavy' to char.armor_proficiencies).
-    - **Tavern Brawler** (`kind: 'tavern-brawler'`) — half-feat:
-      +1 STR or CON; unarmed strikes deal 1d4 + STR mod instead
-      of 1 + STR mod. `unarmedDamage(str, tavernBrawler?)` now
-      takes the flag; attack handler threads it from
-      `(char.feats ?? []).includes('tavern_brawler')`. Two RAW
-      benefits skipped: improvised-weapon proficiency (pansori
-      doesn't model improvised weapons) and free Shove on
-      unarmed hit (needs a new action shape).
-    21 added tests cover the five feats.
   - ASI-vs-feat UX on the FE (both `apply_asi` and `take_feat`
     actions are available when `asi_pending` is set; FE picks the
     surfacing).
@@ -328,17 +212,13 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
       built. New `services/backgrounds.ts` exposes `getBackground` +
       `backgroundGrants` for FE display. Sandbox seed backgrounds
       (Soldier / Criminal / Sage / Acolyte) populated with the new
-      fields; canonical origin feats stub on Tough / Lucky until
-      Magic Initiate / Alert / etc. ship. 4 direct tests.
+      fields and their SRD origin feats (Magic Initiate / Alert).
+      4 direct tests.
 
   **Remaining (data + flows):**
   - `startingEquipment` application path — currently informational;
     needs to merge with `classStartingLoot` and the auto-equip
     flow in character creation.
-  - PHB origin feats not yet seeded: Alert, Crafter, Healer,
-    Magic Initiate (3 variants), Musician, Savage Attacker, Skilled,
-    Tavern Brawler. Each is data once the matching feat shape
-    exists.
   - Backgrounds in non-sandbox contexts (Vale, Grove, Whispering)
     still use the legacy minimal shape; can be enriched any time
     without breaking existing characters.
@@ -409,31 +289,12 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
       hp, consumes reaction, emits half-damage event) and decline
       (commits full proposed snapshot with a "(Uncanny Dodge
       declined.)" suffix). 2 direct tests.
-- [~] **Absorb Elements reaction spell** (MVP shipped 2026-05-21).
-      New `PendingAbsorbElementsReaction` variant. Detection in
-      `runEnemyMultiattackLoop` fires when the enemy attack deals
-      acid/cold/fire/lightning/thunder AND the PC has the spell
-      with an available L1+ slot. Resolver: accept-with-slot
-      halves the trigger damage + consumes lowest L1+ slot; accept-
-      no-slot falls through to full damage; decline commits the
-      full-damage snapshot. Spell data added to `srd/spells.ts`.
-      3 direct tests covering all three resolver branches.
-
-  **Remaining (post-MVP enhancements per RAW):**
-  - Grant resistance to the triggering damage type until the start
-    of the caster's next turn (subsequent same-type damage that
-    round also halved). Needs an active-buff condition like
-    `absorbing_<type>` with auto-clear on turn start.
-  - Bonus +1d6 damage of the triggering type on the caster's next
-    melee weapon attack. Needs a `pending_bonus_damage` field on
-    the character + attack-handler hook.
 - [x] **Smite mechanics** (shipped 2026-05-21). Note: the original
       "Smite reactions" framing was inaccurate — in 2024 PHB,
       Divine Smite is a **bonus-action spell** that pre-buffs the
       next weapon hit, and Improved Divine Smite is a **passive
-      damage rider**. Neither is a reaction. The Vengeance subclass
-      has bonus-action features (Vow of Enmity, already wired) but
-      no "smite reaction" exists per RAW.
+      damage rider**. Neither is a reaction, and no "smite reaction"
+      exists per RAW.
 
   **Divine Smite (spell):** cast time changed to `bonusAction`.
   New `Character.divine_smite_dice` field stashes pending d8s; the
@@ -452,50 +313,6 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
   separate multiplier check for radiant (the few radiant-resistant
   creatures in MM would currently take full smite damage).
   6 direct tests.
-- [~] **Silvery Barbs reaction spell** (MVP shipped 2026-05-21).
-      New `PendingSilveryBarbsReaction` variant. `computeEnemyAttack`
-      now preserves the raw `atkD20` alongside `atkTotal` so the
-      resolver can reroll meaningfully. Detection fires on any
-      enemy hit when the PC has the spell + L1+ slot. Resolver
-      rerolls a new d20, takes `min(originalD20, newD20)`, recomputes
-      total, and re-evaluates vs `targetAc`: if it becomes a miss,
-      damage is discarded and an `attack_miss` event is pushed;
-      otherwise the hit stands. Slot + reaction consumed regardless.
-      Spell data added to `srd/spells.ts`. 4 direct tests (lower-d20
-      miss, higher-d20 hit-stands, no-slot fallback, decline).
-
-  **Remaining (post-MVP):**
-  - "Ally gets advantage on next d20" follow-up — needs a
-    transient buff on the chosen ally tied to their next attack /
-    save / ability check (1 minute or first-use cancel).
-  - Party-wide eligibility — RAW any caster within 60 ft of the
-    triggering creature can react; current MVP is target-only.
-    `eligibleCharIds` already supports a list; the detection
-    just needs to populate all qualifying PCs.
-- [~] **Sentinel feat — protect-ally reaction** (shipped 2026-05-21).
-      New `PendingSentinelReaction` variant. `findSentinelEligiblePcs`
-      helper does party-wide eligibility (PCs other than the target,
-      within 5 ft of target, has the Sentinel feat, reaction
-      available, not blinded). Detection fires AFTER an enemy
-      attack commits — pauses the multiattack loop. Resolver in
-      `reaction.ts`: accept = the Sentinel PC makes a melee weapon
-      attack against the attacker (full `resolvePlayerAttack` —
-      d20 + STR/DEX + prof, vs enemy AC, damage on hit). Declines
-      pass through with no resource spent. 3 direct tests.
-
-  **Followup convention surfaced:** `pending_reaction.targetCharId`
-  is the *reactor* (matches the validator check
-  `ctx.char.id === rx.targetCharId`), not the original attack
-  target. Sentinel was the first cross-actor reaction in Pansori;
-  Counterspell already followed this convention. Documented inline
-  in the multiattack-loop detection.
-
-  **Remaining (deferred):**
-  - Sentinel's second benefit (OA speed-zero on hit) — pansori's
-    enemy movement is one-step-per-turn, so "speed 0 for the rest
-    of the turn" rarely matters. Skip until multi-step enemy
-    movement lands.
-
 - [x] **Cutting Words** (Lore Bard) — already implemented; verified
       during the 2026-05-21 audit. Uses Bardic Inspiration as a
       reaction to penalize an enemy's attack roll, ability check,
@@ -511,8 +328,8 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
       cost from `char.gold` on cast (blocks when insufficient).
       Armor proficiency check also gates casting in heavy armor
       without prof. **Deferred — somatic enforcement:** RAW says
-      a creature must have a free hand for somatic components
-      (War Caster relaxes this). Pansori would need a hand-state
+      a creature must have a free hand for somatic components.
+      Pansori would need a hand-state
       model — equipped_weapon + equipped_shield = both hands,
       heavy weapons = two-handed grip — to know when somatic is
       blocked. The Spell type doesn't yet carry a `somatic` flag;
@@ -630,13 +447,13 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
       `fly_speed_ft` defensively; `climb` / `swim` are persistent
       grants from feats / subclasses (don't clear on rest).
 
-      **Wired grants:**
-      - Aasimar Celestial Revelation: Radiant Soul variant sets
-        `fly_speed_ft = speed`; clears when the 10-round transformation
-        timer expires (round-wrap handler in gameEngine.ts).
-      - Athlete feat (take-time): grants `climb_speed_ft = speed`.
-      - Sea Druid Aquatic Affinity (subclass-select): grants
-        `swim_speed_ft = speed`.
+      **Wired grants:** `fly_speed_ft` is set by the Fly (60 ft)
+      and Levitate (20 ft) spells via the buff path; concentration
+      drop sweeps it in `breakConcentration`. `climb_speed_ft` /
+      `swim_speed_ft` have no in-scope grant today — the Athlete
+      feat and Sea Druid subclass that populated them were removed
+      in the SRD reset, but the fields + engine reads remain for
+      future content.
 
       **Terrain-mode model shipped 2026-05-22.** New optional
       `climbTerrain` + `swimTerrain` `GridPos[]` fields on `Room`
@@ -646,9 +463,9 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
       capped per cell per RAW "multiple sources don't stack".
       Flying still bypasses everything. Budget-exceeded narrative
       surfaces which terrain modes contributed. Authoring content
-      (room pool / campaigns) can now flag climb / swim cells; the
-      Sea Druid's `swim_speed_ft` and the Athlete feat's
-      `climb_speed_ft` finally have real gameplay impact.
+      (room pool / campaigns) can now flag climb / swim cells; a
+      character granted `swim_speed_ft` / `climb_speed_ft` by future
+      content gets the reduced per-cell cost.
 
       **Remaining for full closure:**
       - Fly spell + Levitate spell — add to SRD catalog so any caster
@@ -662,110 +479,16 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
         flags these cells; the engine is ready for content as soon
         as a campaign needs it.
 
-### Subclass coverage (2026-05-22 — all 48 RAW selectable)
+### Subclass coverage (2026-05-23 — 12 SRD-iconic, one per class)
 
-> Every 2024 PHB subclass is now a selectable picker entry. The
-> table below tracks mechanical-feature completeness per subclass.
-> "Selectable + features" means the iconic L3 feature is wired with
-> tests. "Picker-only" means selectable but L3 feature is deferred
-> (typically because the RAW mechanic needs infrastructure that
-> isn't shipped yet).
-
-**Selectable + features (44):**
-
-| Class | Subclass | Headline L3 feature shipped |
-|---|---|---|
-| Barbarian | Berserker | Frenzy (pre-session) |
-| Barbarian | Totem Warrior | Bear/Eagle/Wolf totem with mechanical effects |
-| Barbarian | World Tree | Vitality of the Tree (rage temp HP) |
-| Barbarian | Zealot | Divine Fury (radiant damage rider) |
-| Bard | Lore | Cutting Words (pre-session) |
-| Bard | Valor | Extra Attack at L6 |
-| Bard | Glamour | Mantle of Inspiration (AoE temp HP) |
-| Cleric | Life | Disciple of Life + Preserve Life CD (pre-session) |
-| Cleric | War | Guided Strike CD (pre-session) |
-| Cleric | Light | Radiance of the Dawn CD |
-| Cleric | Trickery | Blessing of the Trickster (Stealth advantage until long rest) |
-| Druid | Land | Land's Aid CD (heal/harm) |
-| Druid | Moon | Wild Shape Beast Form (pre-session) |
-| Druid | Stars | Starry Form — Archer / Chalice / Dragon constellations |
-| Fighter | Champion | Improved Crit (pre-session) |
-| Fighter | Battle Master | Maneuvers (pre-session) |
-| Fighter | Eldritch Knight | Third-caster slots + War Magic L7 |
-| Fighter | Psi Warrior | Psionic Strike damage rider |
-| Monk | Open Hand | Open Hand Technique (pre-session) |
-| Monk | Shadow | Shadow Arts (pre-session) |
-| Monk | Mercy | Hand of Healing + Hand of Harm |
-| Monk | Elements | Elemental Strikes (fire damage rider) |
-| Paladin | Devotion | Sacred Weapon CD (pre-session) |
-| Paladin | Vengeance | Vow of Enmity + Abjure Enemy (pre-session) |
-| Paladin | Ancients | Nature's Wrath CD (restrain) |
-| Paladin | Glory | Inspiring Smite CD (AoE temp HP) |
-| Ranger | Hunter | Colossus Slayer (pre-session) |
-| Ranger | Beastmaster | Animal Companion (pre-session) |
-| Ranger | Fey Wanderer | Dreadful Strikes damage rider |
-| Ranger | Gloom Stalker | Dread Ambusher first-attack rider |
-| Rogue | Thief | Fast Hands (Utilize → bonus action) |
-| Rogue | Assassin | Assassinate auto-crit (pre-session) |
-| Rogue | Soulknife | Psychic Blade weapon auto-grant |
-| Rogue | Arcane Trickster | Third-caster slots (auto-wired) |
-| Sorcerer | Draconic | Draconic Resilience per-level HP |
-| Sorcerer | Wild Magic | Wild Magic Surge (pre-session) |
-| Sorcerer | Aberrant Mind | Psionic Spells data grant (closest-fit pansori spells) |
-| Sorcerer | Clockwork Soul | Bastion of Law (1 SP → 5 temp HP, bonus action) |
-| Wizard | Diviner | Portent — d20-interception reaction on enemy hits |
-| Warlock | Fiend | Dark One's Blessing (pre-session) |
-| Warlock | Archfey | Fey Presence (pre-session) |
-| Warlock | Celestial | Healing Light pool |
-| Wizard | Abjurer | Arcane Ward (pre-session) |
-| Wizard | Evoker | Sculpt Spells (pre-session) |
-
-**Picker-only — features partially / fully deferred (4):**
-
-| Class | Subclass | What's deferred |
-|---|---|---|
-| Bard | Dance | Bardic Inspiration die variants (damage/AC/move) |
-| Cleric | Trickery | Invoke Duplicity (Blessing of the Trickster shipped) |
-| Druid | Sea | Wrath of the Sea (push on cantrip hit) |
-| Sorcerer | Clockwork Soul | Restore Balance reaction (Bastion of Law shipped) |
-| Warlock | Great Old One | Awakened Mind telepathy |
-| Wizard | Illusionist | Improved Minor Illusion, Malleable Illusions |
-
-**Reaction-window infrastructure (new — 2026-05-22):** Generic
-`PendingD20InterceptionReaction` shape in the PendingReaction union,
-with a `source: 'portent'` discriminator that's intentionally open so
-follow-up users (Lucky's RAW spend-after-roll timing, Clockwork Soul's
-Restore Balance reaction) can plug in by registering a new source +
-resolver branch. Today the trigger point is wired only at enemy attack
-rolls inside `runEnemyMultiattackLoop` (mirrors Silvery Barbs); PC-turn
-d20 sites (PC's own attacks, saves, ability checks) don't yet emit the
-reaction window because pansori's PC-turn execution doesn't have a
-pause/resume contract. The remaining picker-only subclasses needing
-this infrastructure are now scoped to "extend the existing window to
-new trigger points" rather than "build it from scratch".
-
-Most deferred features need a specific surface that pansori
-doesn't have yet (reaction-window for d20 interception, full
-movement-mode model, multi-target Wild Shape variants). Each can
-ship in a follow-up PR when a campaign needs the feature or when
-the prerequisite infrastructure lands.
-
-**Species additions (related work this session):**
-- [x] **Aasimar species** (shipped 2026-05-22). Necrotic + radiant
-      resistance, darkvision 60 ft, Light cantrip auto-prep.
-      Added to `SRD_SPECIES` in srd/species.ts.
-- [x] **Healing Hands** (Aasimar 1/long rest). New
-      `use_healing_hands` action; rolls prof-bonus d4s. Long-rest
-      reset wired.
-- [x] **Celestial Revelation** (Aasimar L3+). New
-      `use_celestial_revelation { variant }` action with 3 sub-
-      options (Necrotic Shroud / Radiant Soul / Radiant
-      Consumption). Bonus action, 1/long rest, 10-round
-      transformation. Per-variant +prof melee damage rider
-      (necrotic for Shroud, radiant for the others). Round-tick
-      duration via `class_resource_uses.celestial_revelation_rounds`.
-      Deferred: flight speed (Radiant Soul), 10-ft aura damage
-      (Radiant Consumption).
+> The SRD-only reset removed all non-iconic subclasses (and the
+> Aasimar species + its Healing Hands / Celestial Revelation
+> actions). The 12 iconic subclasses that remain — one per class —
+> are each selectable with their iconic L3 feature wired + tested:
+> Berserker, College of Lore, Life Domain, Circle of the Land,
+> Champion, Open Hand, Oath of Devotion, Hunter, Assassin, Draconic
+> Sorcery, Fiend, Evoker. See [srd-only-audit.md](srd-only-audit.md)
+> for the full subclass + species removal record.
 
 ### Spells (2026-05-22 — catalog expanded, infrastructure built)
 
@@ -992,11 +715,6 @@ as a critical-path engine block.
   don't double-fire.
 
   Future plug-ins on the same shape (each is its own PR's worth):
-    - **Lucky feat (PHB-only)** — same pause point on attacks; also
-      pauses on PC saves + ability checks. Awaits PHB acquisition.
-    - **Clockwork Soul Restore Balance** — Sorcerer L1 subclass
-      reaction; not in SRD 5.2.1. Different pause point (pre-roll,
-      cancels adv/disadv on any d20 in 60 ft). Awaits PHB.
     - **Mirror Image** — each enemy attack against the imaged PC
       needs to roll vs the image AC; spell ends when last image
       drops. New pause site in the enemy-attack pipeline.
