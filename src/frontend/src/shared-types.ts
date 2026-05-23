@@ -1001,23 +1001,6 @@ export interface PendingUncannyDodgeReaction extends PendingReactionBase {
   pendingProposedSt: unknown;
 }
 
-// Absorb Elements (PHB p.211, 1st-level abjuration). Reaction
-// triggered when the caster takes acid / cold / fire / lightning /
-// thunder damage. Accepting consumes a level-1+ slot, halves the
-// triggering damage. (RAW also grants resistance to that type
-// until the start of your next turn AND a +1d6 bonus to the
-// caster's next melee attack — both deferred as follow-ups; MVP
-// halves the trigger only.) Same proposed-snapshot stash pattern
-// as Shield / Uncanny Dodge.
-export interface PendingAbsorbElementsReaction extends PendingReactionBase {
-  kind: 'absorb_elements';
-  damageType: 'acid' | 'cold' | 'fire' | 'lightning' | 'thunder';
-  proposedDamage: number;
-  pendingFragment: unknown;
-  pendingProposedChar: unknown;
-  pendingProposedSt: unknown;
-}
-
 // Sentinel feat (PHB 2024) — protect-ally reaction. Triggered when
 // an enemy attack hits an ally within 5 ft of a Sentinel-feat PC who
 // is NOT the target. The Sentinel can use their reaction to make a
@@ -1074,26 +1057,6 @@ export interface PendingRestoreBalanceReaction extends PendingReactionBase {
 // that would have missed. Documented as a known divergence.
 export interface PendingLuckyDisadvReaction extends PendingReactionBase {
   kind: 'lucky_disadv';
-  atkTotal: number;
-  proposedD20: number;
-  proposedDamage: number;
-  targetAc: number;
-  pendingFragment: unknown;
-  pendingProposedChar: unknown;
-  pendingProposedSt: unknown;
-}
-
-// Silvery Barbs (Strixhaven origin spell, 1st-level enchantment).
-// Reaction triggered when a creature within 60 ft succeeds on an
-// attack roll, ability check, or saving throw. Accepting consumes a
-// L1+ slot and forces the triggering creature to reroll the d20,
-// using the lower result. (RAW also grants advantage to one ally on
-// their next d20 test within the next minute — that follow-up is
-// deferred; MVP handles the reroll only.) `proposedD20` is the
-// enemy's original d20 result; the resolver rolls a new d20, takes
-// the lower, and re-evaluates the hit.
-export interface PendingSilveryBarbsReaction extends PendingReactionBase {
-  kind: 'silvery_barbs';
   atkTotal: number;
   proposedD20: number;
   proposedDamage: number;
@@ -1211,8 +1174,6 @@ export type PendingReaction =
   | PendingHellishRebukeReaction
   | PendingCounterspellReaction
   | PendingUncannyDodgeReaction
-  | PendingAbsorbElementsReaction
-  | PendingSilveryBarbsReaction
   | PendingLuckyDisadvReaction
   | PendingRestoreBalanceReaction
   | PendingSentinelReaction

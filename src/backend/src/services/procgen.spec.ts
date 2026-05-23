@@ -328,7 +328,6 @@ describe('campaign feature parity', () => {
     'hold_person',
     'spiritual_weapon',
     'hex',
-    'hunger_of_hadar',
   ];
 
   for (const [label, ctx] of [

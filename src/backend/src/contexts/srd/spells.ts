@@ -296,35 +296,6 @@ export const SRD_SPELLS: Record<string, Spell> = {
     rangeKind: 'self',
     spellList: ['arcane'],
   },
-  silvery_barbs: {
-    id: 'silvery_barbs',
-    name: 'Silvery Barbs',
-    // Strixhaven, 1st-level enchantment. Reaction triggered on an
-    // enemy's successful attack/save/check. Forces the enemy to
-    // reroll the d20 and use the lower result. MVP handles the
-    // reroll branch only; the "ally gains advantage on next d20"
-    // follow-up is in docs/TODO.md.
-    desc: 'A reaction that forces an enemy to reroll a successful attack roll, taking the lower result.',
-    level: 1,
-    castTime: 'reaction',
-    rangeKind: 'self',
-    spellList: ['arcane'],
-  },
-  absorb_elements: {
-    id: 'absorb_elements',
-    name: 'Absorb Elements',
-    // PHB p.211 — abjuration, 1st-level. Reaction triggered when the
-    // caster takes acid / cold / fire / lightning / thunder damage.
-    // MVP halves the trigger damage on accept; the "resistance until
-    // next turn" + "+1d6 next melee" enhancements are TODOs tracked
-    // in docs/TODO.md.
-    desc: 'A reaction that halves the triggering elemental damage (acid / cold / fire / lightning / thunder).',
-    level: 1,
-    castTime: 'reaction',
-    rangeKind: 'self',
-    // Druid / Ranger / Sorcerer / Wizard (2024 PHB).
-    spellList: ['arcane', 'primal'],
-  },
   hellish_rebuke: {
     id: 'hellish_rebuke',
     name: 'Hellish Rebuke',
@@ -799,24 +770,6 @@ export const SRD_SPELLS: Record<string, Spell> = {
         '{name} channels {spell}{slotNote} into a searing electric javelin that punches through the line',
       ],
     },
-    spellList: ['arcane'],
-  },
-  hunger_of_hadar: {
-    id: 'hunger_of_hadar',
-    name: 'Hunger of Hadar',
-    level: 3,
-    castTime: 'action',
-    damage: '2d6',
-    damageType: 'cold',
-    savingThrow: 'dex',
-    saveEffect: 'half',
-    concentration: true,
-    blastRadius: 20,
-    aoeShape: 'sphere',
-    rangeKind: 'ranged',
-    rangeFt: 150,
-    desc: 'Open a gate to the void — creatures inside take 2d6 cold and DEX save or 2d6 acid.',
-    // Warlock-only.
     spellList: ['arcane'],
   },
   spirit_guardians: {
