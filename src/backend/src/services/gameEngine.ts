@@ -5180,8 +5180,7 @@ export async function takeAction({
     // choose from the Haste-extra menu. They can always explicitly
     // forfeit it via End turn.
     const hasUnspentHasteExtra =
-      activeChar.conditions.includes('hasted') &&
-      !activeChar.turn_actions.haste_extra_action_used;
+      activeChar.conditions.includes('hasted') && !activeChar.turn_actions.haste_extra_action_used;
     if (!hasBonusChoices && !hasMovementLeft && !hasUnspentHasteExtra) {
       usedInitiative = true;
     }

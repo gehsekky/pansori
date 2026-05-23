@@ -120,7 +120,7 @@ export function checkBudget(char: Character, cost: ActionCost): string | null {
   if (cost === 'reaction' && flags?.reaction_used) return BUDGET_ERRORS.reaction;
   // SRD Slow — "It can't take reactions."
   if (cost === 'reaction' && (char.conditions ?? []).includes('slowed')) {
-    return 'You are Slowed — you can\'t take reactions this turn.';
+    return "You are Slowed — you can't take reactions this turn.";
   }
   return null;
 }

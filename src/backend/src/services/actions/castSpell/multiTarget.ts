@@ -39,9 +39,7 @@ export function runMultiTargetSpell(
 ): boolean {
   const multiTargets = action.targetEnemyIds;
   const isMultiTargetable =
-    spell.id === 'magic_missile' ||
-    spell.id === 'eldritch_blast' ||
-    spell.id === 'scorching_ray';
+    spell.id === 'magic_missile' || spell.id === 'eldritch_blast' || spell.id === 'scorching_ray';
   if (!multiTargets || multiTargets.length <= 1 || !isMultiTargetable) {
     return false;
   }
@@ -56,8 +54,7 @@ export function runMultiTargetSpell(
     spell.id === 'eldritch_blast' && (ctx.char.feats ?? []).includes('agonizing_blast')
       ? Math.max(0, abilityMod(ctx.char.cha))
       : 0;
-  const isAttackRollMulti =
-    spell.id === 'eldritch_blast' || spell.id === 'scorching_ray';
+  const isAttackRollMulti = spell.id === 'eldritch_blast' || spell.id === 'scorching_ray';
   let totalDealt = 0;
   const lines: string[] = [];
   const hits: Array<{

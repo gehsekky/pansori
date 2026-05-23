@@ -835,7 +835,6 @@ export interface PendingCounterspellReaction extends PendingReactionBase {
   intendedTargetPcId: string;
 }
 
-
 // 2024 PHB PC-turn d20 reaction window. Fires when a PC rolls a d20
 // for an attack roll (initial scope; saves + ability checks land next)
 // and the engine should pause to offer post-roll reactions before

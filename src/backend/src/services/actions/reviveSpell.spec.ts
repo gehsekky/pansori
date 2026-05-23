@@ -147,13 +147,16 @@ describe('Revivify — gate failures', () => {
   });
 
   it('rejects an alive target with a clear error', async () => {
-    const state = buildReviveParty({}, {
-      hp: 30,
-      dead: false,
-      stable: false,
-      death_saves: { successes: 0, failures: 0 },
-      died_at_round: undefined,
-    });
+    const state = buildReviveParty(
+      {},
+      {
+        hp: 30,
+        dead: false,
+        stable: false,
+        death_saves: { successes: 0, failures: 0 },
+        died_at_round: undefined,
+      }
+    );
     const result = await takeAction({
       action: {
         type: 'cast_spell',

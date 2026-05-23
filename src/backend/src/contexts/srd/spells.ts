@@ -553,10 +553,10 @@ export const SRD_SPELLS: Record<string, Spell> = {
     desc:
       'Touch: end Charmed / Petrified / Stunned on the target and reduce exhaustion by 1. ' +
       'Consumes 100 gp of diamond dust. (RAW curse / ability-score / max-HP reduction ' +
-      'removal deferred — those effects aren\'t modeled in pansori.)',
+      "removal deferred — those effects aren't modeled in pansori.)",
     narratives: {
       cast: [
-        "{name} sprinkles diamond dust over {target}, and the curse breaks like brittle ice",
+        '{name} sprinkles diamond dust over {target}, and the curse breaks like brittle ice',
         "{name} crushes the dust between their palms — {target}'s eyes clear, breath quickens",
       ],
     },
@@ -767,8 +767,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     level: 3,
     castTime: 'action',
     concentration: true,
-    narrative:
-      "{name} kindles a beacon of hope — allies' resolve hardens against fear and death.",
+    narrative: "{name} kindles a beacon of hope — allies' resolve hardens against fear and death.",
     desc:
       'Concentration, up to 1 minute. Up to 3 allies within 30 ft gain advantage on WIS saves ' +
       'and death saves. (RAW max-heal effect deferred.)',
@@ -1467,7 +1466,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     materialCost: 500,
     narratives: {
       cast: [
-        '{name} sets the diamond on {target}\'s chest and begins the slow ritual{slotNote}',
+        "{name} sets the diamond on {target}'s chest and begins the slow ritual{slotNote}",
         '{name} chants over {target} for an hour, the diamond cracking as the soul returns{slotNote}',
       ],
     },
@@ -1529,8 +1528,8 @@ export const SRD_SPELLS: Record<string, Spell> = {
     materialCost: 25000,
     narratives: {
       cast: [
-        '{name} crushes a king\'s ransom of diamonds and reweaves {target} from the soul outward{slotNote}',
-        '{name} speaks {target}\'s true name across the veil; the body answers, whole and breathing{slotNote}',
+        "{name} crushes a king's ransom of diamonds and reweaves {target} from the soul outward{slotNote}",
+        "{name} speaks {target}'s true name across the veil; the body answers, whole and breathing{slotNote}",
       ],
     },
     desc:

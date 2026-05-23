@@ -193,9 +193,7 @@ export function runBuffSpell(
           c.id === buffTarget.id ? { ...c, conditions: stripFrom(c.conditions) } : c
         ),
         entities: (ctx.st.entities ?? []).map((e) =>
-          e.id === buffTarget.id && !e.isEnemy
-            ? { ...e, conditions: stripFrom(e.conditions) }
-            : e
+          e.id === buffTarget.id && !e.isEnemy ? { ...e, conditions: stripFrom(e.conditions) } : e
         ),
       };
     }
