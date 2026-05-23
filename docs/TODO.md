@@ -8,14 +8,27 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 
 ---
 
+> **⚠ SRD-only scope reset (2026-05-23):** Pansori was refactored to
+> strict SRD 5.2.1 — non-iconic subclasses, PHB-only feats, Aasimar,
+> and PHB-only spells were all removed. See
+> [srd-only-audit.md](srd-only-audit.md) for the migration record.
+>
+> Many entries below were written when pansori targeted "2024 PHB
+> compatible" and reference PHB-only features (Lucky, Sharpshooter,
+> Sentinel, GWM, Polearm Master, Battle Master maneuvers, Stars
+> Druid constellations, Aasimar Celestial Revelation, Silvery Barbs,
+> etc.). Those are **out of scope** now — leaving the entries for
+> historical context but they are not active TODOs.
+>
+> Net-new content additions should grep `docs/srd-5.2.1.txt` first.
+
 ## 5e SRD remaining gaps
 
-> **Edition alignment** — Pansori targets 2024 PHB / SRD 5.2.1. The Top 5
+> **Edition alignment** — Pansori targets SRD 5.2.1 only. The Top 5
 > (weapon masteries, class feature audit, inspiration spend, Hide DC,
-> multi-target spells) plus all 48 RAW subclasses (selectable as of
-> 2026-05-22; mechanical features wired for the majority) plus the bulk
-> of subsystems are shipped; remaining RAW gaps are small-impact, content-
-> data follow-ups, or architecturally blocked.
+> multi-target spells) plus all 12 SRD-iconic subclasses plus the bulk
+> of subsystems are shipped; remaining RAW gaps are small-impact,
+> content-data follow-ups, or architecturally blocked.
 
 ### Mechanics-completeness roadmap (2026-05-21)
 
