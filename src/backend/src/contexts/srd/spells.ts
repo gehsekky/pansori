@@ -374,6 +374,106 @@ export const SRD_SPELLS: Record<string, Spell> = {
     rangeFt: 10,
     spellList: ['arcane'],
   },
+  // SRD: Detect Evil and Good — concentration up to 10 minutes,
+  // ritual. Caster knows the location of Aberrations / Celestials /
+  // Elementals / Fey / Fiends / Undead within 30 ft. Narrative.
+  detect_evil_and_good: {
+    id: 'detect_evil_and_good',
+    name: 'Detect Evil and Good',
+    level: 1,
+    castTime: 'action',
+    concentration: true,
+    durationRounds: 100, // 10 minutes
+    narrative:
+      '{name} extends their senses — the planar fingerprints of nearby creatures register cleanly.',
+    desc: 'Sense Aberrations / Celestials / Elementals / Fey / Fiends / Undead within 30 ft (concentration, 10 minutes).',
+    rangeKind: 'self',
+    spellList: ['divine'],
+  },
+  // SRD: Detect Poison and Disease — concentration up to 10 minutes,
+  // ritual. Sense location of poisons, poisonous creatures, and
+  // diseases within 30 ft. Narrative.
+  detect_poison_and_disease: {
+    id: 'detect_poison_and_disease',
+    name: 'Detect Poison and Disease',
+    level: 1,
+    castTime: 'action',
+    concentration: true,
+    durationRounds: 100, // 10 minutes
+    narrative:
+      "{name}'s nose tightens — every taint of poison or sickness within 30 ft becomes obvious.",
+    desc: 'Sense poisons + diseased creatures within 30 ft (concentration, 10 minutes).',
+    rangeKind: 'self',
+    spellList: ['divine', 'primal'],
+  },
+  // SRD: Disguise Self — illusion that changes the caster's
+  // appearance for 1 hour. Visual + tactile illusion (touching
+  // gives it away on a successful INT check). Narrative — pansori
+  // doesn't track NPC visual identification for the disguise to
+  // bypass.
+  disguise_self: {
+    id: 'disguise_self',
+    name: 'Disguise Self',
+    level: 1,
+    castTime: 'action',
+    durationRounds: 600, // 1 hour
+    narrative: "{name}'s outline shimmers — a new face, a new gait, a new voice settle into place.",
+    desc: 'Change your appearance for 1 hour. Touch reveals the illusion (INT (Investigation) check).',
+    rangeKind: 'self',
+    spellList: ['arcane'],
+  },
+  // SRD: Feather Fall — reaction triggered when caster or up to 5
+  // creatures within 60 ft fall. Falling rate slows to 60 ft/round
+  // for 1 minute. Narrative — pansori doesn't model falling damage
+  // mechanics deeply enough for this to have a mechanical hook.
+  feather_fall: {
+    id: 'feather_fall',
+    name: 'Feather Fall',
+    level: 1,
+    castTime: 'reaction',
+    narrative: '{name} sketches a quick gesture — falling creatures drift, light as autumn leaves.',
+    desc: 'Reaction: slow the descent of up to 5 falling creatures within 60 ft (no fall damage).',
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    spellList: ['arcane'],
+  },
+  // SRD: Hideous Laughter — single-target WIS save or Prone +
+  // Incapacitated for the duration (concentration, up to 1 minute).
+  // Target re-saves at end of each turn or after taking damage.
+  // Pansori MVP applies Prone (the mechanically dominant rider);
+  // the Incapacitated co-application and per-turn save are
+  // deferred.
+  hideous_laughter: {
+    id: 'hideous_laughter',
+    name: 'Hideous Laughter',
+    level: 1,
+    castTime: 'action',
+    savingThrow: 'wis',
+    saveEffect: 'negates',
+    concentration: true,
+    condition: 'prone',
+    conditionDuration: 10,
+    rangeKind: 'ranged',
+    rangeFt: 30,
+    desc: 'WIS save or Prone (and Incapacitated, RAW) for 1 minute (concentration). Target re-saves on damage.',
+    spellList: ['arcane'],
+  },
+  // SRD: Longstrider — touch, +10 speed for 1 hour. Multi-target
+  // via upcast. Pansori MVP is narrative — speed-buff persistence
+  // across encounters needs a per-buff state field that's
+  // deferred (effectiveSpeed currently reads only base speed +
+  // feat bonuses).
+  longstrider: {
+    id: 'longstrider',
+    name: 'Longstrider',
+    level: 1,
+    castTime: 'action',
+    durationRounds: 600, // 1 hour
+    narrative: '{name} touches an ally — their stride lengthens, the ground feels closer.',
+    desc: 'Touch buff: +10 speed for 1 hour. Targets one creature; upcast +1 creature per slot above 1.',
+    rangeKind: 'touch',
+    spellList: ['arcane', 'primal'],
+  },
   cure_wounds: {
     id: 'cure_wounds',
     name: 'Cure Wounds',
@@ -753,6 +853,40 @@ export const SRD_SPELLS: Record<string, Spell> = {
   },
 
   // ─── Level 2 ────────────────────────────────────────────────────────────────
+  // SRD: Barkskin — touch a willing creature; their AC becomes 17
+  // (if lower) for 1 hour (concentration). Pansori MVP is narrative
+  // — persistent AC overrides need an AC-buff stack on the
+  // character that's deferred.
+  barkskin: {
+    id: 'barkskin',
+    name: 'Barkskin',
+    level: 2,
+    castTime: 'action',
+    concentration: true,
+    durationRounds: 600, // 1 hour
+    narrative:
+      '{name} presses a sprig of holly to an ally — rough bark-like skin hardens over their hide.',
+    desc: 'Touch buff: minimum AC 17 for 1 hour (concentration).',
+    rangeKind: 'touch',
+    spellList: ['primal'],
+  },
+  // SRD: Magic Weapon — touch a nonmagical weapon; it becomes a
+  // +1 weapon (attack + damage) for 1 hour (concentration). Pansori
+  // MVP is narrative — persistent weapon-buff stacks need a
+  // per-weapon-buff field that's deferred.
+  magic_weapon: {
+    id: 'magic_weapon',
+    name: 'Magic Weapon',
+    level: 2,
+    castTime: 'bonus_action',
+    concentration: true,
+    durationRounds: 600, // 1 hour
+    narrative:
+      "{name}'s palm traces along the weapon — runes flare and the steel rings with new edge.",
+    desc: 'Touch a weapon: +1 to attack + damage for 1 hour (concentration). Upcast: +2 at L4, +3 at L6.',
+    rangeKind: 'touch',
+    spellList: ['arcane', 'divine'],
+  },
   // SRD: Calm Emotions — 20-ft sphere within 60 ft. Humanoids in
   // the area make a CHA save or one of: immunity to Charmed and
   // Frightened (and suppression of any current Charmed/Frightened),
@@ -1041,6 +1175,52 @@ export const SRD_SPELLS: Record<string, Spell> = {
   },
 
   // ─── Level 3 ────────────────────────────────────────────────────────────────
+  // SRD: Tongues — touch a willing creature; for 1 hour they
+  // understand any spoken language and any creature that knows a
+  // language understands them. Narrative.
+  tongues: {
+    id: 'tongues',
+    name: 'Tongues',
+    level: 3,
+    castTime: 'action',
+    durationRounds: 600, // 1 hour
+    narrative:
+      "{name} touches an ally's lips — speech and understanding become unbound from any single tongue.",
+    desc: 'Touch buff: understand and be understood in any spoken language for 1 hour.',
+    rangeKind: 'touch',
+    spellList: ['arcane', 'divine'],
+  },
+  // SRD: Speak with Dead — grant a corpse the ability to answer
+  // five questions; corpse responds within its knowledge but won't
+  // betray secrets. Lasts 10 minutes. Narrative.
+  speak_with_dead: {
+    id: 'speak_with_dead',
+    name: 'Speak with Dead',
+    level: 3,
+    castTime: 'action',
+    durationRounds: 100, // 10 minutes
+    narrative:
+      "{name} kneels by the body and speaks the question. After a long pause, the corpse's lips move with grave-borrowed words.",
+    desc: 'Question a corpse — five answers, no oaths of silence broken. Lasts 10 minutes.',
+    rangeKind: 'ranged',
+    rangeFt: 10,
+    spellList: ['arcane', 'divine'],
+  },
+  // SRD: Speak with Plants — for 10 minutes the caster can
+  // communicate with plants in a 30-ft Emanation: ask about
+  // recent events, who has passed nearby, etc. Narrative.
+  speak_with_plants: {
+    id: 'speak_with_plants',
+    name: 'Speak with Plants',
+    level: 3,
+    castTime: 'action',
+    durationRounds: 100, // 10 minutes
+    narrative:
+      '{name} kneels among the plants and listens. Roots remember; leaves whisper recent days.',
+    desc: 'Converse with plants within 30 ft for 10 minutes — learn who has passed, recent events.',
+    rangeKind: 'self',
+    spellList: ['primal'],
+  },
   // SRD: Remove Curse — touch a creature; all curses on them end.
   // Cursed magic items keep their curse but the attunement is
   // broken. Pansori MVP is narrative — no curse-condition pipeline
