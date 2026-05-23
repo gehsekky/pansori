@@ -108,7 +108,6 @@ export const handleShortRest: ActionHandler<{ type: 'short_rest' }> = (ctx) => {
     // — uses warlock level for pact lookup.
     next.spell_slots_max = spellSlotsForClassLevel('warlock', getClassLevel(next, 'warlock'));
     next.spell_slots_used = {};
-    delete srUses.fey_presence_used;
   }
   next.class_resource_uses = srUses;
   ctx.char = next;
@@ -176,11 +175,6 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
       delete restoredUses.healing_hands_used;
       delete restoredUses.celestial_revelation_used;
       delete restoredUses.celestial_revelation_rounds;
-    }
-    // 2024 PHB Celestial Warlock Healing Light pool — refills on
-    // long rest.
-    if (c.subclass === 'celestial' && hasClass(c, 'warlock')) {
-      delete restoredUses.healing_light_used;
     }
     // 2024 PHB Land Druid Land's Aid uses — refills on long rest.
     // (RAW: Channel Nature is short-rest, but pansori MVP is

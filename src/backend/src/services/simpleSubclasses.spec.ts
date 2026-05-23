@@ -42,9 +42,4 @@ describe('Subclass picker exposes the new options', () => {
     const pc = makeChar({ id: 'pc', character_class: 'Wizard', level: 3 });
     expect(pickerOffers(pc)).toEqual(expect.arrayContaining(['diviner', 'illusionist']));
   });
-
-  it('Warlock L3 offers great_old_one (Warlock subclass unlocks at L1 → also at L3)', () => {
-    const pc = makeChar({ id: 'pc', character_class: 'Warlock', level: 3 });
-    expect(pickerOffers(pc)).toContain('great_old_one');
-  });
 });

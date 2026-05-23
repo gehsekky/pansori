@@ -2485,7 +2485,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       paladin: ['devotion'],
       bard: ['lore'],
       sorcerer: ['draconic'],
-      warlock: ['fiend', 'archfey', 'celestial', 'great_old_one'],
+      warlock: ['fiend'],
       druid: ['land'],
       monk: ['open_hand'],
       barbarian: ['berserker'],
@@ -2996,21 +2996,6 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         kind: 'class_feature',
       });
     }
-
-    // Archfey Warlock: Fey Presence (PHB p.109) — 1/short rest, all creatures
-    // in a 10-ft cube within 10 ft make a WIS save or are frightened until
-    // end of your next turn.
-    if (
-      char.subclass === 'archfey' &&
-      hasClass(char, 'warlock') &&
-      !char.class_resource_uses?.fey_presence_used
-    ) {
-      choices.push({
-        label: `Fey Presence — frighten enemies in 10 ft, WIS save DC ${8 + profBonus(char.level) + abilityMod(char.cha ?? 10)} (1/short rest)`,
-        action: { type: 'use_class_feature', featureId: 'fey_presence' },
-        kind: 'class_feature',
-      });
-    }
   }
 
   // Spell choices
@@ -3335,30 +3320,6 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         action: { type: 'gwm_bonus_attack', targetEnemyId: livingEnemies[0].id },
         requiresBonusAction: true,
         kind: 'two_weapon_attack', // reuse the bonus-action-attack category
-      });
-    }
-  }
-
-  // Celestial Warlock — Healing Light (bonus action, 1+lvl d6 pool).
-  // Outside the action-used gate above: this is available any time
-  // a Celestial Warlock has a free bonus action, not just after
-  // they've used their main action.
-  if (
-    !char.turn_actions.bonus_action_used &&
-    char.subclass === 'celestial' &&
-    hasClass(char, 'warlock') &&
-    getClassLevel(char, 'warlock') >= 3
-  ) {
-    const wlLvl = getClassLevel(char, 'warlock');
-    const pool = 1 + wlLvl;
-    const used = char.class_resource_uses?.healing_light_used ?? 0;
-    const remaining = pool - used;
-    if (remaining > 0) {
-      choices.push({
-        label: `Healing Light — bonus action, spend 1 d6 (${remaining}/${pool} dice left)`,
-        action: { type: 'use_healing_light', dice: 1 },
-        requiresBonusAction: true,
-        kind: 'class_feature',
       });
     }
   }

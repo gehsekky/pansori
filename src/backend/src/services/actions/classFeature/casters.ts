@@ -1,9 +1,6 @@
-import { abilityMod, profBonus, rollDice } from '../../rulesEngine.js';
 import { getClassLevel, hasClass } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
-import { composeNow } from '../../narrative/compose.js';
-import { distanceFeet } from '../../gridEngine.js';
-import { getEnemyById } from '../../gameEngine.js';
+import { abilityMod } from '../../rulesEngine.js';
 
 /**
  * Caster features for Sorcerer, Warlock, and Wizard. Bundled because
@@ -147,86 +144,6 @@ export function handleCasterFeature(ctx: ActionContext, fid: string): boolean {
     const wardHp = 2 * getClassLevel(ctx.char, 'wizard');
     ctx.char.class_resource_uses = { ...(ctx.char.class_resource_uses ?? {}), arcane_ward: wardHp };
     ctx.narrative = `${ctx.char.name} creates an Arcane Ward with ${wardHp} HP. It absorbs damage before your HP is reduced.`;
-    return true;
-  }
-
-  if (fid === 'fey_presence') {
-    if (ctx.char.subclass !== 'archfey' || !hasClass(ctx.char, 'warlock')) {
-      ctx.narrative = 'Only Archfey Warlocks have Fey Presence.';
-      return true;
-    }
-    if (ctx.char.class_resource_uses?.fey_presence_used) {
-      ctx.narrative = 'Fey Presence already used — recovers on a short rest.';
-      return true;
-    }
-    const selfEnt = ctx.st.entities?.find((e) => e.id === ctx.char.id);
-    if (!selfEnt) {
-      ctx.narrative = 'Fey Presence requires a grid position.';
-      return true;
-    }
-    const dc = 8 + profBonus(ctx.char.level) + abilityMod(ctx.char.cha);
-    const inRangeEnemies = (ctx.st.entities ?? []).filter(
-      (e) => e.isEnemy && e.hp > 0 && distanceFeet(e.pos, selfEnt.pos) <= 10
-    );
-    if (inRangeEnemies.length === 0) {
-      ctx.narrative = 'No enemies within 10 ft to ensnare with Fey Presence.';
-      return true;
-    }
-    ctx.char.class_resource_uses = {
-      ...(ctx.char.class_resource_uses ?? {}),
-      fey_presence_used: 1,
-    };
-    const lines: string[] = [];
-    const frightenedIds = new Set<string>();
-    for (const e of inRangeEnemies) {
-      const enemyData = getEnemyById(ctx.seed, e.id);
-      const targetName = enemyData?.name ?? e.id;
-      const wisScore = (enemyData as unknown as Record<string, number>)?.wis ?? 10;
-      const save = rollDice('1d20') + abilityMod(wisScore);
-      const feySuccess = save >= dc;
-      // Per-target save event for the combat log (prose=''; the
-      // consolidated narrative below combines all targets).
-      composeNow(ctx, {
-        kind: 'save',
-        characterId: e.id,
-        characterName: targetName,
-        ability: 'wis',
-        roll: save,
-        dc,
-        success: feySuccess,
-        vs: 'Fey Presence',
-        prose: '',
-      });
-      if (!feySuccess) {
-        frightenedIds.add(e.id);
-        lines.push(`${targetName}: WIS ${save} vs DC ${dc} — frightened!`);
-        composeNow(ctx, {
-          kind: 'condition_applied',
-          targetId: e.id,
-          targetName,
-          condition: 'frightened',
-          source: 'Fey Presence',
-          prose: '',
-        });
-      } else {
-        lines.push(`${targetName}: WIS ${save} vs DC ${dc} — resists.`);
-      }
-    }
-    if (frightenedIds.size > 0) {
-      ctx.st = {
-        ...ctx.st,
-        entities: (ctx.st.entities ?? []).map((e) =>
-          frightenedIds.has(e.id)
-            ? {
-                ...e,
-                conditions: [...e.conditions.filter((c) => c !== 'frightened'), 'frightened'],
-              }
-            : e
-        ),
-      };
-    }
-    ctx.narrative = `🌿 Fey Presence! ${ctx.char.name} radiates fey magic. ${lines.join(' ')}`;
-    ctx.usedInitiative = true;
     return true;
   }
 
