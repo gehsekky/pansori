@@ -412,51 +412,7 @@ export function resolveOneAttack(
       },
     };
   }
-  // 2024 PHB Fey Wanderer Ranger L3 — Dreadful Strikes: once per
-  // turn, a weapon hit deals +1d4 psychic. RAW upscales to +1d6
-  // at L11 (deferred — flat 1d4 for now). Same gate shape as
-  // GWM / Celestial Revelation riders; cleared by FRESH_TURN.
-  let dreadfulStrikesDmg = 0;
-  if (
-    hasClass(ctx.char, 'ranger') &&
-    ctx.char.subclass === 'fey_wanderer' &&
-    getClassLevel(ctx.char, 'ranger') >= 3 &&
-    weaponItem &&
-    !ctx.char.turn_actions.dreadful_strikes_used
-  ) {
-    dreadfulStrikesDmg = rollDice('1d4');
-    ctx.char = {
-      ...ctx.char,
-      turn_actions: { ...ctx.char.turn_actions, dreadful_strikes_used: true },
-    };
-  }
-  // 2024 PHB Gloom Stalker Ranger L3 — Dread Ambusher: first
-  // weapon attack of combat deals +1d8. Flag is set in
-  // runCombatStart for Gloom Stalkers and consumed here on the
-  // first hit. FRESH_TURN at turn start expires the flag if
-  // unused (matches the RAW "first turn of combat" cap).
-  let dreadAmbusherDmg = 0;
-  if (
-    ctx.char.turn_actions.dread_ambusher_pending &&
-    weaponItem &&
-    hasClass(ctx.char, 'ranger') &&
-    ctx.char.subclass === 'gloom_stalker'
-  ) {
-    dreadAmbusherDmg = rollDice('1d8');
-    ctx.char = {
-      ...ctx.char,
-      turn_actions: { ...ctx.char.turn_actions, dread_ambusher_pending: undefined },
-    };
-  }
-  const rawDmg =
-    baseHit +
-    sneakDmg +
-    rageBonus +
-    sharpshooterDmg +
-    gwmDmg +
-    celRevDmg +
-    dreadfulStrikesDmg +
-    dreadAmbusherDmg;
+  const rawDmg = baseHit + sneakDmg + rageBonus + sharpshooterDmg + gwmDmg + celRevDmg;
   const { damage: finalDmg, note: dmgNote } = applyDamageMultiplier(
     rawDmg,
     weaponItem?.damageType,
@@ -504,12 +460,6 @@ export function resolveOneAttack(
   }
   if (celRevDmg > 0 && celRevDmgType) {
     hitBonuses.push({ label: `Celestial Revelation: +${celRevDmg} ${celRevDmgType}` });
-  }
-  if (dreadfulStrikesDmg > 0) {
-    hitBonuses.push({ label: `Dreadful Strikes: +${dreadfulStrikesDmg} psychic` });
-  }
-  if (dreadAmbusherDmg > 0) {
-    hitBonuses.push({ label: `Dread Ambusher: +${dreadAmbusherDmg}` });
   }
   if (dmgNote) {
     // dmgNote arrives as " [resistant: 6 → 3]" — strip leading space and

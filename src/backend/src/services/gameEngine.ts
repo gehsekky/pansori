@@ -2500,7 +2500,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       rogue: ['thief', 'assassin', 'soulknife', 'arcane_trickster'],
       wizard: ['evoker', 'abjurer', 'diviner', 'illusionist'],
       cleric: ['life'],
-      ranger: ['hunter', 'beastmaster', 'fey_wanderer', 'gloom_stalker'],
+      ranger: ['hunter'],
       paladin: ['devotion'],
       bard: ['lore'],
       sorcerer: ['draconic', 'wild_magic', 'aberrant_mind', 'clockwork_soul'],
@@ -3001,27 +3001,6 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         action: { type: 'use_class_feature', featureId: 'colossus_slayer' },
         kind: 'class_feature',
       });
-    }
-
-    // Beastmaster Ranger: Command Animal Companion (bonus action, PHB p.93).
-    // The companion bites the nearest living enemy from its grid position.
-    if (
-      char.subclass === 'beastmaster' &&
-      hasClass(char, 'ranger') &&
-      getClassLevel(char, 'ranger') >= 3 &&
-      !char.turn_actions.bonus_action_used
-    ) {
-      const companion = state.entities?.find(
-        (e) => e.isCompanion && e.companionOwnerId === char.id && e.hp > 0
-      );
-      if (companion) {
-        choices.push({
-          label: `Command ${companion.companionName ?? 'companion'} to attack (bonus action)`,
-          action: { type: 'use_class_feature', featureId: 'command_companion' },
-          kind: 'class_feature',
-          requiresBonusAction: true,
-        });
-      }
     }
 
     // Abjurer Wizard: Arcane Ward (create when not active)
