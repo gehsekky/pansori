@@ -199,6 +199,11 @@ export type StructuredAction =
       // beams). One entry per dart/beam; duplicates = multiple darts on the
       // same target. When omitted, falls back to focus-fire on `targetEnemyId`.
       targetEnemyIds?: string[];
+      // Buff-spell ally target — when a self_or_ally / ally spell is cast
+      // (Heroism, Aid, Greater Invisibility, Fly, Levitate, ...) the FE
+      // can pick which living party member receives the buff. Omitted =
+      // caster targets self. The buff branch in castSpell reads this.
+      targetCharId?: string;
     }
   | { type: 'disarm_trap' }
   | { type: 'interact_object'; objectId: string }

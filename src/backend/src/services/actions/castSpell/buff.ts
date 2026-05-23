@@ -161,6 +161,24 @@ export function runBuffSpell(
     }
   }
 
+  // 2024 PHB Fly + Levitate: set fly_speed_ft on the target. The
+  // movement-mode pipeline (gridMove obstacle bypass + difficult-
+  // terrain ignore) keys off this field. Concentration drop in
+  // breakConcentration clears the flag (see gameEngine.ts).
+  if (spell.id === 'fly' || spell.id === 'levitate') {
+    const flyFt = spell.id === 'fly' ? 60 : 20;
+    if (isCasterTarget) {
+      ctx.char.fly_speed_ft = flyFt;
+    } else {
+      ctx.st = {
+        ...ctx.st,
+        characters: ctx.st.characters.map((c) =>
+          c.id === buffTarget.id ? { ...c, fly_speed_ft: flyFt } : c
+        ),
+      };
+    }
+  }
+
   const buffProse =
     pickCastPrefix(spell, {
       name: ctx.char.name,

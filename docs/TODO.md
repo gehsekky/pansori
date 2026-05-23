@@ -788,14 +788,24 @@ the prerequisite infrastructure lands.
   creature, concentration).
 
 **Spells still missing (data + complexity notes):**
-- **Mass Healing Word / Mass Cure Wounds** — need multi-target
-  heal infrastructure (current heal targets one creature).
-- **Fly / Levitate** — need movement-mode model.
-- **Polymorph** — needs creature transform pipeline.
-- **Banishment** — needs target-removed-from-combat state.
+- ~~**Mass Healing Word / Mass Cure Wounds**~~ — shipped
+  2026-05-22. New mass-heal path in `castSpell/heal.ts` checks the
+  spell id and distributes the rolled heal across all living party
+  members (Disciple of Life + Chalice bonus apply per-target).
+- ~~**Fly / Levitate**~~ — shipped 2026-05-22. Buff-shaped spells
+  (`targetType: 'self_or_ally'`) set `fly_speed_ft` on the target
+  via the buff path; concentration drop sweeps the flag in
+  `breakConcentration`. Fly = 60 ft, Levitate = 20 ft (RAW
+  vertical-only modeled as a limited flying speed).
+- ~~**Detect Magic / Identify / Comprehend Languages**~~ — shipped
+  with ritual casting.
+- **Polymorph** — needs creature transform pipeline (caster
+  becomes a chosen beast). Different shape from Wild Shape — works
+  on any creature, not just druids on themselves.
+- **Banishment** — needs target-removed-from-combat state +
+  return-on-concentration-end.
 - **Dimension Door** — teleport mechanic.
 - **Counterspell** — already shipped pre-session.
-- **Detect Magic / Identify** — pure narrative utility.
 - **Spirit Guardians** — already shipped pre-session.
 
 ### Architectural blockers
