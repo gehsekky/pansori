@@ -248,12 +248,6 @@ export type StructuredAction =
   | { type: 'disarm_trap' }
   | { type: 'interact_object'; objectId: string }
   | { type: 'two_weapon_attack'; targetEnemyId?: string }
-  // Polearm Master (2024 PHB) — bonus-action butt-end attack with
-  // a qualifying polearm. Available after the Attack action.
-  | { type: 'polearm_butt_end'; targetEnemyId?: string }
-  // Great Weapon Master (2024 PHB) — bonus-action attack after a
-  // Heavy-weapon Crit or kill on this turn.
-  | { type: 'gwm_bonus_attack'; targetEnemyId?: string }
   // Land Druid L3 — Land's Aid: bonus action (2 uses/long rest)
   // that heals an ally OR damages an enemy. Picks one of three
   // variants at use time.
@@ -271,9 +265,6 @@ export type StructuredAction =
       type: 'use_celestial_revelation';
       variant: 'necrotic_shroud' | 'radiant_soul' | 'radiant_consumption';
     }
-  // Healer feat (2024 PHB) — action, spend one charge of a
-  // Healer's Kit to heal a target 1d6 + 4 + prof.
-  | { type: 'use_healer_kit'; targetCharId: string }
   // Aasimar Healing Hands — action, 1/long rest, heal a target
   // (prof)d4 HP.
   | { type: 'use_healing_hands'; targetCharId: string }
@@ -282,17 +273,6 @@ export type StructuredAction =
   | { type: 'try_escape_grapple' }
   | { type: 'stand_up' }
   | { type: 'spend_inspiration' }
-  // Lucky feat (2024 PHB Chapter 5). Spend 1 luck point to queue
-  // advantage on the next d20 test (mirror of `spend_inspiration`).
-  // Requires the Lucky feat + remaining `feat_lucky_uses`. Free of
-  // action-economy cost; refills on a long rest.
-  | { type: 'use_luck' }
-  // Sharpshooter feat (2024 PHB) — toggle the -5 to-hit / +10 damage
-  // tradeoff for ranged-weapon attacks this turn. Also suppresses
-  // half- and three-quarters-cover AC bonuses on those attacks. Free
-  // of action-economy cost; auto-clears on turn end. Toggles state
-  // (calling again turns it off).
-  | { type: 'toggle_sharpshooter' }
   // Manual level-up into a specific class (2024 PHB multiclassing).
   // Bumps `char.level` + `class_levels[className]` together. Validates
   // XP threshold; for non-primary classes also validates the 2024 PHB
@@ -342,8 +322,6 @@ export type ChoiceKind =
   | 'grapple'
   | 'shove'
   | 'two_weapon_attack'
-  | 'polearm_butt_end'
-  | 'gwm_bonus_attack'
   | 'use_lands_aid'
   | 'use_celestial_revelation'
   | 'cast_spell'
@@ -828,43 +806,6 @@ export interface PendingUncannyDodgeReaction extends PendingReactionBase {
   pendingProposedSt: unknown;
 }
 
-// Sentinel feat (PHB 2024) — protect-ally reaction. Triggered when
-// an enemy attack hits an ally within 5 ft of a Sentinel-feat PC who
-// is NOT the target. The Sentinel can use their reaction to make a
-// melee weapon attack against the attacker. (The feat also grants
-// an OA speed-zero benefit which is a passive modifier to OAs — not
-// modeled here.) No proposed-snapshot stash: the triggering attack
-// already committed; this reaction is a counter-attack, not a
-// modifier.
-export interface PendingSentinelReaction extends PendingReactionBase {
-  kind: 'sentinel';
-  /** The enemy id whose attack triggered this Sentinel window. */
-  triggerAttackerEnemyId: string;
-}
-
-// 2024 PHB Lucky feat — Disadvantage benefit. Triggered when an
-// enemy attack roll against the PC hits + the PC has the Lucky
-// feat with at least one luck point remaining. Accept spends 1 luck
-// point and re-rolls the enemy d20 with Disadvantage (per 2024 RAW
-// "you can spend 1 Luck Point to impose Disadvantage on that
-// roll"). Same proposed-snapshot stash pattern as Silvery Barbs.
-//
-// Pansori divergence from RAW: the spend window is post-roll
-// (player sees the hit before deciding), where RAW is pre-roll
-// (spend before knowing the result). This makes the feat slightly
-// stronger than RAW since players never "waste" points on attacks
-// that would have missed. Documented as a known divergence.
-export interface PendingLuckyDisadvReaction extends PendingReactionBase {
-  kind: 'lucky_disadv';
-  atkTotal: number;
-  proposedD20: number;
-  proposedDamage: number;
-  targetAc: number;
-  pendingFragment: unknown;
-  pendingProposedChar: unknown;
-  pendingProposedSt: unknown;
-}
-
 // Counterspell (PHB p.228). Triggers BEFORE the enemy spell resolves —
 // accepting consumes a slot on the PC and negates the enemy spell.
 export interface PendingCounterspellReaction extends PendingReactionBase {
@@ -941,6 +882,4 @@ export type PendingReaction =
   | PendingHellishRebukeReaction
   | PendingCounterspellReaction
   | PendingUncannyDodgeReaction
-  | PendingLuckyDisadvReaction
-  | PendingSentinelReaction
   | PendingPcD20Reaction;

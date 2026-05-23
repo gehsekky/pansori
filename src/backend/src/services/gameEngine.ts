@@ -2074,19 +2074,6 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         },
       ];
     }
-    if (pending.kind === 'lucky_disadv') {
-      const remaining = char.class_resource_uses?.feat_lucky_uses ?? 0;
-      return [
-        {
-          label: `Spend 1 Luck Point — ${enemyForLabel}'s attack rerolls with Disadvantage (${remaining - 1} luck left)`,
-          action: { type: 'resolve_reaction', accept: true },
-        },
-        {
-          label: `Decline — take the hit (${pending.proposedDamage} damage)`,
-          action: { type: 'resolve_reaction', accept: false },
-        },
-      ];
-    }
   }
 
   // Pending ASI: only show stat-boost choices until resolved
@@ -3243,37 +3230,6 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         });
       }
     }
-    // Polearm Master bonus-action butt-end attack — qualifying
-    // polearm equipped + feat held. Surfaces alongside TWF when
-    // both are eligible (the player picks).
-    const POLEARMS = new Set(['quarterstaff', 'spear', 'glaive', 'halberd', 'pike']);
-    if (
-      (char.feats ?? []).includes('polearm_master') &&
-      equippedWpnItem &&
-      POLEARMS.has(equippedWpnItem.id) &&
-      livingEnemies.length > 0
-    ) {
-      choices.push({
-        label: `Polearm Master — butt-end strike with the ${equippedWpnItem.name} (1d4 + ability mod)`,
-        action: { type: 'polearm_butt_end', targetEnemyId: livingEnemies[0].id },
-        requiresBonusAction: true,
-        kind: 'two_weapon_attack', // reuse the bonus-action-attack category for now
-      });
-    }
-    // Great Weapon Master bonus-action attack — flagged on the
-    // PC after a heavy-weapon Crit or kill earlier this turn.
-    if (
-      char.turn_actions.gwm_bonus_attack_pending &&
-      equippedWpnItem?.heavy &&
-      livingEnemies.length > 0
-    ) {
-      choices.push({
-        label: `Great Weapon Master — bonus attack with the ${equippedWpnItem.name}`,
-        action: { type: 'gwm_bonus_attack', targetEnemyId: livingEnemies[0].id },
-        requiresBonusAction: true,
-        kind: 'two_weapon_attack', // reuse the bonus-action-attack category
-      });
-    }
   }
 
   // Land Druid — Land's Aid (bonus action, 2 uses per long rest).
@@ -3788,59 +3744,6 @@ function isShieldEligible(
 }
 
 /**
- * Sentinel feat (2024 PHB) — protect-ally reaction. When an enemy
- * hits an ally, any PC OTHER THAN the target who:
- *   - has the Sentinel feat,
- *   - is within 5 ft of the target,
- *   - has a reaction available,
- *   - is conscious + can see the attacker (not blinded)
- * can use their reaction to make a melee weapon attack against the
- * attacker. Returns the list of eligible PC ids (may be empty).
- */
-function findSentinelEligiblePcs(
-  targetCharId: string,
-  st: GameState,
-  attackerEnt: CombatEntity | undefined
-): Character[] {
-  if (!attackerEnt) return [];
-  const targetEnt = st.entities?.find((e) => e.id === targetCharId && !e.isEnemy);
-  if (!targetEnt) return [];
-  const eligible: Character[] = [];
-  for (const pc of st.characters) {
-    if (pc.id === targetCharId) continue; // not the target
-    if (pc.dead || pc.hp <= 0) continue;
-    if (pc.turn_actions?.reaction_used) continue;
-    if (pc.conditions?.includes('blinded')) continue;
-    if (!(pc.feats ?? []).includes('sentinel')) continue;
-    const pcEnt = st.entities?.find((e) => e.id === pc.id && !e.isEnemy);
-    if (!pcEnt) continue;
-    if (distanceFeet(pcEnt.pos, targetEnt.pos) > 5) continue;
-    eligible.push(pc);
-  }
-  return eligible;
-}
-
-/**
-/**
- * 2024 PHB Lucky feat — Disadvantage benefit. Eligible when the
- * target PC has the Lucky feat with at least one luck point
- * remaining. Doesn't consume the reaction slot (RAW: "When a
- * creature rolls a d20 for an attack roll against you, you can
- * spend 1 Luck Point" — no reaction cost mentioned). Pansori
- * follows that and skips the `reaction_used` check.
- */
-function isLuckyDisadvEligible(target: Character): boolean {
-  if (!(target.feats ?? []).includes('lucky')) return false;
-  const remaining = target.class_resource_uses?.feat_lucky_uses ?? 0;
-  if (remaining <= 0) return false;
-  // Don't double-spend: if luck_pending is already armed for a
-  // self-advantage roll, that point is in-flight and shouldn't also
-  // be offered for disadvantage on an enemy roll.
-  if (target.turn_actions?.luck_pending) return false;
-  return true;
-}
-
-/**
  * Uncanny Dodge (PHB Rogue L5). Triggers BEFORE damage commits when
  * the Rogue can see the attacker — halves damage from that one
  * attack at the cost of their reaction.
@@ -4200,36 +4103,6 @@ function runEnemyMultiattackLoop(args: {
       return { kind: 'paused', st, narrative };
     }
 
-    // 2024 PHB Lucky feat — Disadvantage benefit. Fires when the enemy
-    // attack hits AND the PC has Lucky + a remaining luck point. The
-    // resolver re-rolls the enemy attack with Disadvantage forced
-    // (combines with existing adv/disadv per RAW). Pansori's pause is
-    // post-roll (player sees the hit before deciding) where RAW is
-    // pre-roll — documented divergence; mechanical effect is preserved.
-    if (computed.hit && computed.hpLost > 0 && isLuckyDisadvEligible(target)) {
-      st = {
-        ...st,
-        pending_reaction: {
-          kind: 'lucky_disadv',
-          attackerEnemyId: enemyId,
-          targetCharId: target.id,
-          atkTotal: computed.atkTotal,
-          proposedD20: computed.atkD20,
-          proposedDamage: computed.hpLost,
-          targetAc: target.ac,
-          pendingFragment: computed.fragment as EnemyAttackHitFragment,
-          pendingProposedChar: computed.proposedChar,
-          pendingProposedSt: { ...computed.proposedSt, pending_reaction: undefined },
-          resumeFromInitiativeIdx: advIdx,
-          resumeFromMultiattackIdx: mi + 1,
-          narrativeSoFar: narrative,
-          eligibleCharIds: [target.id],
-        },
-        active_character_id: target.id,
-      };
-      narrative += ` ⚡ ${enemy.name} hits ${target.name} (d20 ${computed.atkD20} → total ${fmt.roll(computed.atkTotal)} vs ${fmt.ac(target.ac)}) — Lucky (Disadvantage) available!`;
-      return { kind: 'paused', st, narrative };
-    }
     // Uncanny Dodge reaction window (Rogue L5+). Triggers BEFORE
     // damage commits when the Rogue can see the attacker. Same
     // proposed-snapshot stash pattern as Shield; the resolver in
@@ -4293,38 +4166,6 @@ function runEnemyMultiattackLoop(args: {
       narrative += ` MASSIVE DAMAGE — ${target.name} is killed outright!`;
       massiveDeath = true;
       break;
-    }
-
-    // Sentinel feat reaction (2024 PHB) — triggers AFTER an enemy
-    // attack hits, eligible to OTHER PCs within 5 ft of the target.
-    // Commit the target's HP first so the resumed run sees the
-    // correct state.
-    if (computed.hit && computed.hpLost > 0) {
-      const sentinelPcs = findSentinelEligiblePcs(target.id, st, enemyEnt);
-      if (sentinelPcs.length > 0) {
-        // Pansori's reaction validator checks `ctx.char.id ===
-        // rx.targetCharId` — so for cross-actor reactions like
-        // Sentinel where the reactor isn't the attack target,
-        // `targetCharId` carries the REACTOR's id. The original
-        // attack target stays in `triggerAttackerEnemyId` context;
-        // we record it separately for narrative if needed.
-        st = {
-          ...commitCharacter(st, target),
-          pending_reaction: {
-            kind: 'sentinel',
-            attackerEnemyId: enemyId,
-            targetCharId: sentinelPcs[0].id,
-            triggerAttackerEnemyId: enemyId,
-            resumeFromInitiativeIdx: advIdx,
-            resumeFromMultiattackIdx: mi + 1,
-            narrativeSoFar: narrative,
-            eligibleCharIds: sentinelPcs.map((p) => p.id),
-          },
-          active_character_id: sentinelPcs[0].id,
-        };
-        narrative += ` ⚔ ${sentinelPcs[0].name} could intercept with Sentinel!`;
-        return { kind: 'paused', st, narrative };
-      }
     }
 
     // Hellish Rebuke (PHB p.252) — triggers AFTER damage applies. The

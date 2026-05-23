@@ -25,70 +25,6 @@ export const handleSpendInspiration: ActionHandler<{ type: 'spend_inspiration' }
 };
 
 /**
- * `use_luck`: spend one Lucky feat point (2024 PHB Chapter 5) to queue
- * advantage on the next PC attack roll. Mirrors the `spend_inspiration`
- * shape — sets `turn_actions.luck_pending` which `attack/toHit.ts`
- * consumes as an advantage source. Costs no action-economy slot.
- *
- * RAW the spend window is AFTER the d20 result is known; pansori's
- * MVP shifts it to BEFORE the roll (simpler, mirrors Heroic
- * Inspiration). The player's tactical choice still has teeth —
- * spend pre-roll on a tough swing — without requiring a pending-
- * reaction pause on every PC d20.
- *
- * Saves + ability checks not yet hooked; this PR covers attack
- * rolls only. Follow-ups will thread the flag through `skillCheck`
- * + save-roll callers.
- */
-export const handleUseLuck: ActionHandler<{ type: 'use_luck' }> = (ctx) => {
-  if (!(ctx.char.feats ?? []).includes('lucky')) {
-    return { rejected: `${ctx.char.name} does not have the Lucky feat.` };
-  }
-  const remaining = ctx.char.class_resource_uses?.feat_lucky_uses ?? 0;
-  if (remaining <= 0) {
-    return { rejected: `${ctx.char.name} has no luck points remaining (refresh on long rest).` };
-  }
-  if (ctx.char.turn_actions.luck_pending) {
-    return { rejected: 'Luck already queued for your next d20 roll.' };
-  }
-  ctx.char = {
-    ...ctx.char,
-    class_resource_uses: {
-      ...(ctx.char.class_resource_uses ?? {}),
-      feat_lucky_uses: remaining - 1,
-    },
-    turn_actions: { ...ctx.char.turn_actions, luck_pending: true },
-  };
-  const left = remaining - 1;
-  ctx.narrative = `${ctx.char.name} spends a luck point — advantage on your next attack. (${left} luck point${left === 1 ? '' : 's'} left.)`;
-};
-
-/**
- * `toggle_sharpshooter`: opt in to the Sharpshooter feat's tradeoff
- * for ranged-weapon attacks this turn — -5 to hit, +10 damage,
- * ignore half + three-quarters cover. Toggles state (calling again
- * turns it off). Free of action-economy cost. Auto-clears on turn
- * end via the FRESH_TURN reset.
- *
- * The effect gates on `weaponItem.range === 'ranged'` at attack
- * time — toggling on with a melee weapon equipped is harmless
- * (handler-side check would conflict with mid-turn weapon swaps).
- */
-export const handleToggleSharpshooter: ActionHandler<{ type: 'toggle_sharpshooter' }> = (ctx) => {
-  if (!(ctx.char.feats ?? []).includes('sharpshooter')) {
-    return { rejected: `${ctx.char.name} does not have the Sharpshooter feat.` };
-  }
-  const next = !ctx.char.turn_actions.sharpshooter_active;
-  ctx.char = {
-    ...ctx.char,
-    turn_actions: { ...ctx.char.turn_actions, sharpshooter_active: next },
-  };
-  ctx.narrative = next
-    ? `${ctx.char.name} sights down the shaft — Sharpshooter armed: -5 to hit, +10 damage on ranged attacks this turn.`
-    : `${ctx.char.name} eases off the precision shot — Sharpshooter disengaged.`;
-};
-
-/**
  * `stand_up`: spend half-speed of movement to drop prone. PHB p.190 —
  * "Standing up takes more effort; doing so costs an amount of movement
  * equal to half your speed." Guarded by remaining movement budget so a
@@ -100,10 +36,7 @@ export const handleStandUp: ActionHandler<{ type: 'stand_up' }> = (ctx) => {
     return;
   }
   const speedFt = effectiveSpeed(ctx.char);
-  // 2024 PHB Athlete feat — standing up from prone costs only 5 ft
-  // instead of half your speed.
-  const hasAthlete = (ctx.char.feats ?? []).includes('athlete');
-  const standCost = hasAthlete ? 5 : Math.floor(speedFt / 2);
+  const standCost = Math.floor(speedFt / 2);
   const usedFt = (ctx.st.movement_used ?? {})[ctx.char.id] ?? 0;
   if (usedFt + standCost > speedFt) {
     ctx.narrative = `Not enough movement to stand up. (${speedFt - usedFt} ft remaining, ${standCost} ft needed)`;

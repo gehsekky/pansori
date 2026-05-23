@@ -20,7 +20,7 @@ describe('backgroundGrants', () => {
     expect(grants.skillProficiencies).toEqual(['athletics', 'intimidation']);
     expect(grants.toolProficiency).toBe('Gaming set');
     expect(grants.language).toBe('Common');
-    expect(grants.originFeat).toBe('tough');
+    expect(grants.originFeat).toBe('savage_attacker');
     expect(grants.abilityScoreIncreases).toEqual(['str', 'dex', 'con']);
   });
 
