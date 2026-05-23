@@ -799,6 +799,10 @@ function computeEnemyAttack(
    *  Barbs) or compare against the d20 directly can do so. */
   atkD20: number;
   hit: boolean;
+  /** Whether the attack rolled with advantage. Exposed so the
+   *  Restore Balance reaction (Clockwork Soul Sorcerer) can gate on
+   *  enemy-rolled-with-advantage. */
+  hadAdvantage: boolean;
 } {
   const isDodging = char.turn_actions?.dodging ?? false;
   const isReckless = char.turn_actions?.reckless ?? false;
@@ -981,6 +985,7 @@ function computeEnemyAttack(
       atkTotal: result.total,
       atkD20: result.roll,
       hit: true,
+      hadAdvantage: hasAdvantage,
     };
   }
   if (armorItem) {
@@ -1005,6 +1010,7 @@ function computeEnemyAttack(
       atkTotal: result.total,
       atkD20: result.roll,
       hit: false,
+      hadAdvantage: hasAdvantage,
     };
   }
   // Variety pool for plain misses — repeated "you dodge at the last
@@ -1035,6 +1041,7 @@ function computeEnemyAttack(
     atkTotal: result.total,
     atkD20: result.roll,
     hit: false,
+    hadAdvantage: hasAdvantage,
   };
 }
 
@@ -2121,6 +2128,19 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         },
         {
           label: `Decline — take the hit (${pending.proposedDamage} damage)`,
+          action: { type: 'resolve_reaction', accept: false },
+        },
+      ];
+    }
+    if (pending.kind === 'restore_balance') {
+      const remaining = char.class_resource_uses?.restore_balance_uses ?? 0;
+      return [
+        {
+          label: `Restore Balance (reaction) — cancel Advantage, ${enemyForLabel} rerolls flat (${remaining - 1} use${remaining - 1 === 1 ? '' : 's'} left)`,
+          action: { type: 'resolve_reaction', accept: true },
+        },
+        {
+          label: `Decline — the hit lands (${pending.proposedDamage} damage)`,
           action: { type: 'resolve_reaction', accept: false },
         },
       ];
@@ -4257,6 +4277,29 @@ function isSilveryBarbsEligible(target: Character, context: Context): boolean {
  * spend 1 Luck Point" — no reaction cost mentioned). Pansori
  * follows that and skips the `reaction_used` check.
  */
+/**
+ * 2024 PHB Clockwork Soul Sorcerer (L3 subclass) — Restore Balance.
+ * Returns the list of eligible reactors (Clockwork Soul Sorcerers
+ * with remaining uses + reaction available) who are in range. RAW
+ * gates on "within 60 ft of yourself"; pansori uses room-scope as
+ * the proxy (rooms are smaller than 60 ft in practice).
+ *
+ * The eligible reactor can be the attack target themselves OR a
+ * different party member — RAW allows either.
+ */
+function findRestoreBalanceEligibleReactors(st: GameState): Character[] {
+  const eligible: Character[] = [];
+  for (const pc of st.characters) {
+    if (pc.dead || pc.hp <= 0) continue;
+    if (pc.turn_actions?.reaction_used) continue;
+    if (pc.subclass !== 'clockwork_soul') continue;
+    const uses = pc.class_resource_uses?.restore_balance_uses ?? 0;
+    if (uses <= 0) continue;
+    eligible.push(pc);
+  }
+  return eligible;
+}
+
 function isLuckyDisadvEligible(target: Character): boolean {
   if (!(target.feats ?? []).includes('lucky')) return false;
   const remaining = target.class_resource_uses?.feat_lucky_uses ?? 0;
@@ -4745,6 +4788,40 @@ function runEnemyMultiattackLoop(args: {
       };
       narrative += ` ⚡ ${enemy.name} hits ${target.name} (d20 ${computed.atkD20} → total ${fmt.roll(computed.atkTotal)} vs ${fmt.ac(target.ac)}) — Lucky (Disadvantage) available!`;
       return { kind: 'paused', st, narrative };
+    }
+    // 2024 PHB Clockwork Soul Sorcerer L3 — Restore Balance reaction.
+    // Fires when an enemy attack hits with Advantage AND a Clockwork
+    // Soul Sorcerer with remaining uses is in the party. Resolver
+    // re-rolls the enemy d20 flat (no adv/disadv). Pansori MVP only
+    // gates on enemy-rolled-with-advantage; the other RAW cases
+    // (cancel disadv on PC attack, etc.) are deferred follow-ups.
+    if (computed.hit && computed.hpLost > 0 && computed.hadAdvantage) {
+      const reactors = findRestoreBalanceEligibleReactors(st);
+      if (reactors.length > 0) {
+        const reactor = reactors[0]; // MVP: first eligible reactor
+        st = {
+          ...st,
+          pending_reaction: {
+            kind: 'restore_balance',
+            attackerEnemyId: enemyId,
+            targetCharId: target.id,
+            atkTotal: computed.atkTotal,
+            proposedD20: computed.atkD20,
+            proposedDamage: computed.hpLost,
+            targetAc: target.ac,
+            pendingFragment: computed.fragment as EnemyAttackHitFragment,
+            pendingProposedChar: computed.proposedChar,
+            pendingProposedSt: { ...computed.proposedSt, pending_reaction: undefined },
+            resumeFromInitiativeIdx: advIdx,
+            resumeFromMultiattackIdx: mi + 1,
+            narrativeSoFar: narrative,
+            eligibleCharIds: [reactor.id],
+          },
+          active_character_id: reactor.id,
+        };
+        narrative += ` ⚡ ${enemy.name} hits ${target.name} with advantage (d20 ${computed.atkD20} → total ${fmt.roll(computed.atkTotal)} vs ${fmt.ac(target.ac)}) — Restore Balance available!`;
+        return { kind: 'paused', st, narrative };
+      }
     }
     // Absorb Elements reaction window. Fires when the enemy attack
     // deals one of the five elemental damage types AND the PC has
