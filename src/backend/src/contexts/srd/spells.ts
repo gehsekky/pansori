@@ -96,6 +96,123 @@ export const SRD_SPELLS: Record<string, Spell> = {
     // Bard is on the arcane list in 2024 PHB.
     spellList: ['arcane'],
   },
+  // SRD: Poison Spray — ranged spell attack, single target, 1d12 poison.
+  // Cantrip scaling per the standard SRD ladder.
+  poison_spray: {
+    id: 'poison_spray',
+    name: 'Poison Spray',
+    level: 0,
+    castTime: 'action',
+    damage: '1d12',
+    upcastBonus: '1d12',
+    damageType: 'poison',
+    attackRoll: true,
+    desc: 'Spray toxic mist at a target. Ranged spell attack; 1d12 poison damage on hit (scales with level).',
+    rangeKind: 'ranged',
+    rangeFt: 30,
+    spellList: ['arcane', 'primal'],
+  },
+  // SRD: Ray of Frost — ranged spell attack, 1d8 cold. RAW also slows
+  // the target's speed by 10 ft until the caster's next turn; the
+  // speed-debuff side effect is deferred until pansori has a
+  // short-duration speed-debuff mechanic (the existing `slowed`
+  // condition halves speed — a different magnitude). Damage works
+  // immediately.
+  ray_of_frost: {
+    id: 'ray_of_frost',
+    name: 'Ray of Frost',
+    level: 0,
+    castTime: 'action',
+    damage: '1d8',
+    upcastBonus: '1d8',
+    damageType: 'cold',
+    attackRoll: true,
+    desc: 'A beam of cold strikes a target. Ranged spell attack; 1d8 cold damage on hit (scales with level).',
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    spellList: ['arcane'],
+  },
+  // SRD: Chill Touch — melee spell attack, 1d10 necrotic. RAW also
+  // prevents the target from regaining hit points until the end of
+  // the caster's next turn; the heal-block side effect is deferred
+  // until pansori has a no-healing condition. Damage works.
+  chill_touch: {
+    id: 'chill_touch',
+    name: 'Chill Touch',
+    level: 0,
+    castTime: 'action',
+    damage: '1d10',
+    upcastBonus: '1d10',
+    damageType: 'necrotic',
+    attackRoll: true,
+    desc: 'Channel grave-chill in a melee spell attack; 1d10 necrotic damage on hit (scales with level).',
+    rangeKind: 'touch',
+    spellList: ['arcane'],
+  },
+  // SRD: Shocking Grasp — melee spell attack, 1d8 lightning. RAW
+  // also prevents the target from making opportunity attacks until
+  // the start of its next turn; the OA-block side effect is deferred
+  // until pansori models opportunity-attack suppression. Damage works.
+  shocking_grasp: {
+    id: 'shocking_grasp',
+    name: 'Shocking Grasp',
+    level: 0,
+    castTime: 'action',
+    damage: '1d8',
+    upcastBonus: '1d8',
+    damageType: 'lightning',
+    attackRoll: true,
+    desc: 'A jolt arcs from your hand. Melee spell attack; 1d8 lightning damage on hit (scales with level).',
+    rangeKind: 'touch',
+    spellList: ['arcane'],
+  },
+  // SRD: Light — touch an object; it sheds Bright Light 20 ft + Dim
+  // Light 20 ft for 1 hour. Pure narrative cantrip; no mechanical
+  // hooks beyond the lighting-pipeline (which is room-grained in
+  // pansori, so the spell's effect is flavor-only at the room scope).
+  light: {
+    id: 'light',
+    name: 'Light',
+    level: 0,
+    castTime: 'action',
+    narrative: '{name} touches the object and a steady glow blooms across its surface.',
+    desc: 'Touch a Large-or-smaller object so it sheds light for 1 hour.',
+    rangeKind: 'touch',
+    spellList: ['arcane', 'divine'],
+  },
+  // SRD: Dancing Lights — up to four hovering lights for 1 minute
+  // (concentration). Pure narrative cantrip; pansori models this as
+  // flavor since the engine has no per-light positional rendering.
+  dancing_lights: {
+    id: 'dancing_lights',
+    name: 'Dancing Lights',
+    level: 0,
+    castTime: 'action',
+    concentration: true,
+    durationRounds: 10,
+    narrative: '{name} traces a sigil — small lights drift up like fireflies.',
+    desc: 'Up to four hovering lights drift within 120 ft for up to 1 minute (concentration).',
+    rangeKind: 'ranged',
+    rangeFt: 120,
+    spellList: ['arcane'],
+  },
+  // SRD: Mage Hand — a spectral floating hand performs minor
+  // manipulations within 30 ft for 1 minute. Pure narrative cantrip
+  // in pansori's interaction model (the FE doesn't pick separate
+  // hand-versus-PC targets for object interactions).
+  mage_hand: {
+    id: 'mage_hand',
+    name: 'Mage Hand',
+    level: 0,
+    castTime: 'action',
+    durationRounds: 10,
+    narrative:
+      '{name} sketches a quick gesture — a translucent hand fades into view, awaiting commands.',
+    desc: 'A spectral hand within 30 ft performs minor manipulations for 1 minute.',
+    rangeKind: 'ranged',
+    rangeFt: 30,
+    spellList: ['arcane'],
+  },
 
   // ─── Level 1 ────────────────────────────────────────────────────────────────
   cure_wounds: {
@@ -491,6 +608,47 @@ export const SRD_SPELLS: Record<string, Spell> = {
   },
 
   // ─── Level 2 ────────────────────────────────────────────────────────────────
+  // SRD: Shatter — 10-ft sphere AoE centered on a point within 60 ft;
+  // CON save for half. 3d8 thunder, +1d8 per slot above 2nd. Constructs
+  // roll the save at disadvantage RAW; pansori's enemy-disadvantage
+  // path doesn't yet take a per-enemy-type tag, so the Construct
+  // disadvantage is deferred.
+  shatter: {
+    id: 'shatter',
+    name: 'Shatter',
+    level: 2,
+    castTime: 'action',
+    damage: '3d8',
+    upcastBonus: '1d8',
+    damageType: 'thunder',
+    savingThrow: 'con',
+    saveEffect: 'half',
+    desc: '10-ft thunder sphere; CON save for half. 3d8 thunder (+1d8 per slot above 2nd).',
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    blastRadius: 10,
+    aoeShape: 'sphere',
+    spellList: ['arcane'],
+  },
+  // SRD: Acid Arrow — ranged spell attack; on hit deals 4d4 acid +
+  // 2d4 acid at the end of the target's next turn. RAW also splashes
+  // half initial damage on a miss. Pansori MVP applies just the
+  // initial 4d4 on hit; the end-of-next-turn DoT and miss-splash are
+  // both deferred behind a future "delayed-damage" hook.
+  acid_arrow: {
+    id: 'acid_arrow',
+    name: 'Acid Arrow',
+    level: 2,
+    castTime: 'action',
+    damage: '4d4',
+    upcastBonus: '1d4',
+    damageType: 'acid',
+    attackRoll: true,
+    desc: 'Ranged spell attack; 4d4 acid on hit (+1d4 per slot above 2nd). Future-tick splash deferred.',
+    rangeKind: 'ranged',
+    rangeFt: 90,
+    spellList: ['arcane'],
+  },
   hold_person: {
     id: 'hold_person',
     name: 'Hold Person',
