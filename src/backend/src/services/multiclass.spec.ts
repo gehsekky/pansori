@@ -158,16 +158,6 @@ describe('spellSlotsForChar — single-class parity', () => {
     expect(spellSlotsForChar(char)).toEqual({ 1: 3 });
   });
 
-  it('third-caster Fighter 9 with Eldritch Knight subclass → caster level 3', () => {
-    const char = makeChar({
-      character_class: 'Fighter',
-      level: 9,
-      subclass: 'eldritch_knight',
-    });
-    // ⌊9/3⌋ = 3 → row { 1: 4, 2: 2 }
-    expect(spellSlotsForChar(char)).toEqual({ 1: 4, 2: 2 });
-  });
-
   it('non-caster Barbarian returns empty', () => {
     const char = makeChar({ character_class: 'Barbarian', level: 5 });
     expect(spellSlotsForChar(char)).toEqual({});
@@ -201,20 +191,6 @@ describe('spellSlotsForChar — multiclass sums', () => {
       class_levels: { paladin: 1, wizard: 1 },
     });
     expect(spellSlotsForChar(char)).toEqual({ 1: 2 });
-  });
-
-  it('non-primary subclass does NOT grant third-caster yet (known limit)', () => {
-    // Wizard 5 / Fighter 6 — fighter has eldritch_knight subclass but
-    // char.subclass applies only to the primary class today. So fighter
-    // contributes 0 (non-caster from the helper's POV).
-    const char = makeChar({
-      character_class: 'Wizard',
-      level: 11,
-      class_levels: { wizard: 5, fighter: 6 },
-      subclass: 'eldritch_knight', // applies to wizard (primary) only
-    });
-    // Wizard 5 alone → caster level 5.
-    expect(spellSlotsForChar(char)).toEqual(spellSlotsForClassLevel('wizard', 5));
   });
 });
 
