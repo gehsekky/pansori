@@ -73,7 +73,14 @@ export type ConditionName =
   // entities (RAW: they retain their personality but use the new
   // form's actions — pansori MVP skips for simplicity). Cleared
   // by concentration drop, which also restores the original HP.
-  | 'polymorphed';
+  | 'polymorphed'
+  // 2024 PHB Haste — Speed doubled, +2 AC, advantage on Dex saves,
+  // and an extra limited action each turn (extra action deferred in
+  // pansori MVP). effectiveSpeed reads this flag; computeTotalAc
+  // adds +2; rollConditionSave gives advantage on Dex. When the
+  // caster's concentration drops, the lethargy hook applies
+  // `incapacitated` for one round per RAW.
+  | 'hasted';
 
 export type NpcAttitude = 'friendly' | 'indifferent' | 'hostile';
 

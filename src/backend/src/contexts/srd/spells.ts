@@ -910,6 +910,9 @@ export const SRD_SPELLS: Record<string, Spell> = {
     castTime: 'action',
     heal: '70',
     upcastBonus: '10',
+    // SRD: "This spell also ends the Blinded, Deafened, and Poisoned
+    // conditions on the target."
+    removeConditions: ['blinded', 'deafened', 'poisoned'],
     desc: 'A creature you can see within 60 ft regains 70 HP and is cured of Blinded, Deafened, and Poisoned. +10 HP per slot above 6th.',
     rangeKind: 'ranged',
     rangeFt: 60,
@@ -968,6 +971,40 @@ export const SRD_SPELLS: Record<string, Spell> = {
     rangeKind: 'ranged',
     rangeFt: 60,
     spellList: ['arcane', 'primal'],
+  },
+
+  // 2024 PHB Haste (L3 transmutation). Buff a willing creature
+  // for concentration up to 1 minute: Speed doubled, +2 AC,
+  // advantage on Dex saves, and one extra action per turn (limited
+  // to Attack-one / Dash / Disengage / Hide / Utilize). When the
+  // spell ends, the target is Incapacitated and has Speed 0 until
+  // the end of its next turn (the "lethargy" RAW carries).
+  //
+  // SRD: "Choose a willing creature ... the target's Speed is doubled,
+  // it gains a +2 bonus to Armor Class, it has Advantage on Dexterity
+  // saving throws, and it gains an additional action on each of its
+  // turns. ... When the spell ends, the target is Incapacitated and
+  // has a Speed of 0 until the end of its next turn."
+  //
+  // Pansori MVP wires the speed / AC / Dex save / lethargy parts via
+  // the `hasted` condition flag; the extra-action mechanic is
+  // deferred behind a turn-flow refactor that would let a PC take a
+  // second limited action without ending their turn.
+  haste: {
+    id: 'haste',
+    name: 'Haste',
+    level: 3,
+    castTime: 'action',
+    concentration: true,
+    durationRounds: 100, // 1 minute = 10 rounds; doubled to track lethargy carryover
+    condition: 'hasted',
+    conditionDuration: 100,
+    desc: 'A willing creature gains Speed×2, +2 AC, Advantage on Dex saves, and one extra limited action per turn for 1 minute. When the spell ends, the target is Incapacitated until the end of its next turn.',
+    narrative: '{name} chants the rune of swiftness — {target} blurs with sudden speed.',
+    targetType: 'self_or_ally',
+    rangeKind: 'ranged',
+    rangeFt: 30,
+    spellList: ['arcane'],
   },
 
   // 2024 PHB Dimension Door (L4 conjuration). Teleport up to 500 ft

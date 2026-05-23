@@ -395,6 +395,15 @@ export function breakConcentration(
   // one Polymorph active at a time and reverts every polymorphed entity.
   // RAW would track per-caster.
   const wasPolymorph = char.concentrating_on.spellId === 'polymorph';
+  // 2024 PHB Haste — concentration drop strips the hasted condition
+  // and triggers the RAW lethargy: "the target is Incapacitated and
+  // has a Speed of 0 until the end of its next turn." Pansori models
+  // the speed-0 via the existing `incapacitated` condition (which
+  // already gates actions); the targeted speed-0 detail is approximate
+  // since incapacitated doesn't normally include movement gating —
+  // but pansori MVP treats incapacitated PCs as not acting, which
+  // closely matches "lose your turn".
+  const wasHaste = char.concentrating_on.spellId === 'haste';
   let newChar: Character = { ...char, concentrating_on: null };
   // Strip the linked enemy condition (Hold Person etc.)
   let newSt: GameState =
@@ -466,6 +475,54 @@ export function breakConcentration(
           : e
       ),
     };
+  }
+  if (wasHaste && context) {
+    // Sweep all PCs carrying the hasted condition. For each:
+    //   - drop hasted
+    //   - apply incapacitated for 1 round (the RAW "lethargy")
+    //   - recompute AC (drop the +2)
+    // The condition is mirrored on the entity too, but pansori's
+    // applyDamage / save paths read char.conditions; the entity
+    // mirror is updated for FE rendering parity.
+    const dropHaste = (c: Character): Character => {
+      if (!(c.conditions ?? []).includes('hasted')) return c;
+      const next: Character = {
+        ...c,
+        conditions: [...(c.conditions ?? []).filter((x) => x !== 'hasted'), 'incapacitated'],
+        condition_durations: {
+          ...(c.condition_durations ?? {}),
+          incapacitated: 1,
+        },
+      };
+      next.ac = computeTotalAc(
+        next.dex,
+        next.equipped_armor,
+        next.equipped_shield,
+        next.inventory ?? [],
+        context.lootTable,
+        next.mage_armor_active ?? false,
+        next.shield_of_faith_active ?? false,
+        false
+      );
+      return next;
+    };
+    newSt = {
+      ...newSt,
+      characters: newSt.characters.map(dropHaste),
+      entities: (newSt.entities ?? []).map((e) =>
+        !e.isEnemy && e.conditions.includes('hasted')
+          ? {
+              ...e,
+              conditions: [...e.conditions.filter((x) => x !== 'hasted'), 'incapacitated'],
+              condition_durations: {
+                ...e.condition_durations,
+                incapacitated: 1,
+              },
+            }
+          : e
+      ),
+    };
+    newChar = dropHaste(newChar);
   }
   if (wasShieldOfFaith && context) {
     const recomputeFor = (c: Character): Character => {
@@ -1170,6 +1227,11 @@ export function effectiveSpeed(char: Character): number {
   let base = char.speed ?? DEFAULT_SPEED_FEET;
   // 2024 PHB Goliath Large Form — +10 ft speed while the condition is active.
   if (char.conditions?.includes('large_form')) base += 10;
+  // 2024 PHB Haste — "the target's Speed is doubled." Multiplies the
+  // post-Goliath / post-Mobile base; encumbrance still reduces after.
+  // Applies to both walking and any future modes that derive from this
+  // value (gridMove uses effectiveSpeed as the walking budget).
+  if (char.conditions?.includes('hasted')) base *= 2;
   // 2024 PHB Mobile feat — +10 ft speed. Hardcoded id+bonus here
   // because `effectiveSpeed` doesn't take a context for feat-table
   // lookup. The feat's `effect.bonusFeet = 10` lives in feat data

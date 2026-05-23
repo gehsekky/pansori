@@ -101,11 +101,22 @@ export function runHealSpell(
   const healBonuses = healBonusList.length > 0 ? healBonusList : undefined;
   let targetNewHp: number;
   let actualHealed: number;
+  // SRD — some healing spells (Heal, Greater Restoration, ...) strip
+  // conditions from the target after the HP restore. The list is on
+  // `spell.removeConditions`; clearing applies to both the character
+  // record AND the grid entity mirror for the same drift-prevention
+  // reason as HP sync.
+  const stripList = spell.removeConditions ?? [];
+  const stripFrom = (conditions: string[]): string[] =>
+    stripList.length > 0 ? conditions.filter((c) => !stripList.includes(c)) : conditions;
   if (isSelf) {
     const prevHp = ctx.char.hp;
     ctx.char.hp = Math.min(ctx.char.max_hp, ctx.char.hp + healed);
     targetNewHp = ctx.char.hp;
     actualHealed = targetNewHp - prevHp;
+    if (stripList.length > 0) {
+      ctx.char.conditions = stripFrom(ctx.char.conditions);
+    }
   } else {
     const prevHp = target.hp;
     targetNewHp = Math.min(target.max_hp, target.hp + healed);
@@ -113,14 +124,16 @@ export function runHealSpell(
     ctx.st = {
       ...ctx.st,
       characters: ctx.st.characters.map((c) =>
-        c.id === target.id ? { ...c, hp: targetNewHp } : c
+        c.id === target.id ? { ...c, hp: targetNewHp, conditions: stripFrom(c.conditions) } : c
       ),
       // Sync the grid entity HP so the battlefield reflects the heal
       // immediately — `commitChar()` only syncs the caster's entity,
       // not the target's, so without this the healed ally would
       // still render as a faded skull until the next state update.
       entities: (ctx.st.entities ?? []).map((e) =>
-        e.id === target.id && !e.isEnemy ? { ...e, hp: targetNewHp } : e
+        e.id === target.id && !e.isEnemy
+          ? { ...e, hp: targetNewHp, conditions: stripFrom(e.conditions) }
+          : e
       ),
     };
   }
