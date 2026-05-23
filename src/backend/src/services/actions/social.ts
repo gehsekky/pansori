@@ -1,4 +1,4 @@
-import { abilityMod, profBonus, rollDice } from '../rulesEngine.js';
+import { abilityMod, profBonus, reviveD20Penalty, rollDice } from '../rulesEngine.js';
 import {
   applyConsequence,
   consumeLuckForCheck,
@@ -227,7 +227,7 @@ export const handleInfluence: ActionHandler<{
   // take higher). Same pattern as Heroic Inspiration for ad-hoc d20s.
   const luckActive = consumeLuckForCheck(ctx.char);
   const d20 = luckActive ? Math.max(rollDice('1d20'), rollDice('1d20')) : rollDice('1d20');
-  const total = d20 + chaMod + profMod;
+  const total = d20 + chaMod + profMod - reviveD20Penalty(ctx.char);
   const success = total >= dc;
 
   const skillLabel = {
@@ -327,7 +327,7 @@ export const handleStudy: ActionHandler<{
   // Lucky feat — same pattern as Influence above.
   const studyLuckActive = consumeLuckForCheck(ctx.char);
   const d20 = studyLuckActive ? Math.max(rollDice('1d20'), rollDice('1d20')) : rollDice('1d20');
-  const total = d20 + intMod + profMod;
+  const total = d20 + intMod + profMod - reviveD20Penalty(ctx.char);
   const success = total >= dc;
 
   const skillLabel = {

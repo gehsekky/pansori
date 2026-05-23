@@ -5,6 +5,7 @@ import {
   abilityMod,
   hasArmorProficiency,
   hasWeaponProficiency,
+  reviveD20Penalty,
 } from '../../rulesEngine.js';
 import type { Enemy, InventoryItem, LootItem } from '../../../types.js';
 import { coverBonus, distanceFeet, isFlankingPosition } from '../../gridEngine.js';
@@ -33,10 +34,6 @@ export interface ToHitContext {
   totalAttackBonus: number;
   features: string[];
   isRaging: boolean;
-  /** Sharpshooter is active AND the equipped weapon is ranged. The
-   *  -5 to-hit penalty is already folded into `totalAttackBonus`; the
-   *  attack handler reads this flag to add +10 damage on hit. */
-  sharpshooterActive: boolean;
 }
 
 /**
@@ -96,16 +93,8 @@ export function computeToHitContext(
   // no disadvantage from them. Without grid positions (e.g. legacy
   // saves without entities), default to no disadvantage so the
   // penalty is opt-in.
-  // 2024 PHB Crossbow Expert: feat suppresses the disadvantage when
-  // attacking with a crossbow. Identified by weapon id prefix.
-  const isCrossbow =
-    weaponItem?.range === 'ranged' &&
-    (weaponItem.id === 'hand_crossbow' ||
-      weaponItem.id === 'light_crossbow' ||
-      weaponItem.id === 'heavy_crossbow');
-  const hasCrossbowExpert = isCrossbow && (ctx.char.feats ?? []).includes('crossbow_expert');
   let rangedInMelee = false;
-  if (weaponItem?.range === 'ranged' && !hasCrossbowExpert && ctx.st.entities) {
+  if (weaponItem?.range === 'ranged' && ctx.st.entities) {
     const charEnt = ctx.st.entities.find((e) => e.id === ctx.char.id);
     if (charEnt) {
       rangedInMelee = ctx.st.entities.some(
@@ -158,17 +147,6 @@ export function computeToHitContext(
         ...ctx.roomObstacleCells,
       ];
       coverAcBonus = coverBonus(charEntity.pos, enemyEntity.pos, obstacles);
-      // Sharpshooter — ignore half and three-quarters cover on ranged
-      // attacks. `coverBonus` returns 0 | 2 | 5 (half | three-quarters);
-      // both are suppressed. Full cover isn't modeled here so this
-      // covers RAW completely for the cases the engine reaches.
-      if (
-        ctx.char.turn_actions.sharpshooter_active &&
-        weaponItem?.range === 'ranged' &&
-        coverAcBonus > 0
-      ) {
-        coverAcBonus = 0;
-      }
       const flankingAlly = ctx.st.entities.find(
         (e) =>
           !e.isEnemy &&
@@ -317,12 +295,11 @@ export function computeToHitContext(
       : 20;
   const sacredWeaponBonus =
     (ctx.char.class_resource_uses?.sacred_weapon_active ?? 0) > 0 ? abilityMod(ctx.char.cha) : 0;
-  // Sharpshooter — -5 to hit when active and attacking with a ranged
-  // weapon. Damage rider lands in attack/index.ts on the hit branch.
-  const sharpshooterActive =
-    !!ctx.char.turn_actions.sharpshooter_active && weaponItem?.range === 'ranged';
-  const sharpshooterPenalty = sharpshooterActive ? -5 : 0;
-  const totalAttackBonus = sacredWeaponBonus + sharpshooterPenalty;
+  // SRD Raise Dead / Resurrection — recently-revived PCs take a
+  // −N penalty on D20 Tests (attacks, saves, checks) until it
+  // decays off via long rest. Subtracted from the attack bonus.
+  const revivePenalty = reviveD20Penalty(ctx.char);
+  const totalAttackBonus = sacredWeaponBonus - revivePenalty;
 
   // Silence linter: target is part of the signature but referenced via the
   // returned ToHitContext (resolveOneAttack reads target via the closure).
@@ -343,6 +320,5 @@ export function computeToHitContext(
     totalAttackBonus,
     features,
     isRaging,
-    sharpshooterActive,
   };
 }

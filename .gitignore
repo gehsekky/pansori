@@ -11,3 +11,5 @@ playwright-report/
 playwright/.cache/
 
 reference/
+
+docs/latestlog

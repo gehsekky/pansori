@@ -267,6 +267,14 @@ export interface TurnActions {
   bonus_action_used: boolean;
   reaction_used: boolean;
   free_interaction_used: boolean;
+  // SRD 5.2.1 Haste — "It gains an additional action on each of its
+  // turns. That action can be used only to take the Attack (one weapon
+  // attack only), Dash, Disengage, Hide, or Utilize action." Pansori
+  // wires this via the `haste_extra_action` wrapper handler. Set true
+  // once the extra action is consumed; auto-clears at turn start via
+  // FRESH_TURN reset. RAW one-attack cap on the Attack variant is
+  // deferred (Extra Attack still fires on the wrapped attack today).
+  haste_extra_action_used?: boolean;
   dodging?: boolean; // Dodge action: enemy attacks have disadvantage until next turn
   disengaged?: boolean; // Disengage action: no opportunity attacks this turn
   // Barbarian Reckless Attack (PHB p.49): advantage on STR melee attacks this turn,
@@ -285,12 +293,6 @@ export interface TurnActions {
   // sources or use Lucky without burning their Heroic Inspiration.
   // Set by `use_luck`, cleared on consumption (one-shot).
   luck_pending?: boolean;
-  // Sharpshooter feat (2024 PHB) — when true, ranged-weapon attacks
-  // this turn take -5 to hit / +10 damage and ignore half + three-
-  // quarters cover. Toggled by `toggle_sharpshooter`; auto-clears at
-  // turn end (FRESH_TURN reset). Sticky across multiple attacks in
-  // the same turn (matches how players actually use it).
-  sharpshooter_active?: boolean;
   // Savage Attacker feat (2024 PHB origin) — once per turn, on a
   // weapon-damage hit, reroll damage and take the higher. This flag
   // marks the reroll as already spent this turn so multi-hit turns
@@ -302,21 +304,6 @@ export interface TurnActions {
   // Fighting could trigger SA on every hit. RAW: only on the
   // first qualifying hit. Cleared by FRESH_TURN at turn start.
   sneak_attack_used?: boolean;
-  // Aasimar Celestial Revelation damage rider — once per turn,
-  // while the transformation is active, a melee weapon hit adds
-  // +prof damage of the matching type (necrotic / radiant).
-  // Same gate shape as gwm_used / sneak_attack_used. Cleared by
-  // FRESH_TURN at turn start.
-  celestial_revelation_rider_used?: boolean;
-  // Great Weapon Master damage rider (2024 PHB) — once per turn,
-  // a heavy-weapon hit adds +profBonus damage. Same shape as
-  // Savage Attacker / Sneak Attack once-per-turn gates.
-  gwm_used?: boolean;
-  // Great Weapon Master bonus-action attack (2024 PHB) — set when
-  // a heavy-weapon hit scores a Crit OR reduces a creature to 0
-  // HP. The player can spend their bonus action on one additional
-  // weapon attack. Cleared after firing or at turn end (FRESH_TURN).
-  gwm_bonus_attack_pending?: boolean;
   // 2024 PHB Rogue Cunning Strike (L5+) — when set, the next Sneak Attack
   // spends 1 die for the chosen effect (trip, poison, withdraw, disarm)
   // and one SA die is removed from the damage roll. Cleared after applied.
@@ -423,6 +410,16 @@ export interface Spell {
   aoeShape?: 'sphere' | 'cone' | 'cube' | 'line';
   ritualCasting?: boolean; // castable as ritual (no slot cost, only out of combat)
   verbal?: boolean; // has verbal component (blocked when deafened)
+  // SRD Slow — "When the creature attempts to cast a spell with a
+  // Somatic component, roll a d20. On an 11 or higher, the spell
+  // functions normally; otherwise, the spell fails and the action,
+  // bonus action, or reaction used to cast the spell is wasted."
+  // Defaults to `true` if unspecified — virtually every SRD spell
+  // has S (only Power Word Heal / Power Word Kill / a handful of
+  // V-only specials lack it). Mark `somatic: false` on the
+  // exceptions. The precast somatic-fail gate reads this only when
+  // the caster has the 'slowed' condition.
+  somatic?: boolean;
   // 2024 PHB spell-list tags. A spell can belong to multiple lists
   // (e.g. Healing Word is on the Cleric, Druid, and Bard lists →
   // ['divine', 'primal', 'arcane']). Used by Magic Initiate to
@@ -461,6 +458,24 @@ export interface Spell {
   // from `char.conditions` after the HP restore. Single-target only
   // — mass-heal path doesn't apply per-target condition strips today.
   removeConditions?: string[];
+  // Bring-from-dead. When set, the spell targets a *dead* PC (not a
+  // living enemy/ally) and routes through the revive branch in
+  // castSpell. `hpRestored` is the HP value the target wakes up at:
+  // a number (Revivify: 1) or 'full' (Resurrection / True Resurrection
+  // restore to max). `windowRounds` is how many combat rounds may
+  // have elapsed since `Character.died_at_round` — beyond that, the
+  // cast fails (Revivify's 1 minute = 10 rounds). Long-window spells
+  // (Raise Dead's 10 days, Resurrection's 100 years) use a sentinel
+  // large number — pansori only tracks round-grained windows today;
+  // the engine treats anything >= 10000 as "no in-combat limit".
+  // `materialCost` is duplicated here from the outer field for
+  // discoverability, but the actual deduction reads the outer
+  // `materialCost` — keep them in sync.
+  revive?: {
+    hpRestored: number | 'full';
+    windowRounds: number;
+    materialCost: number;
+  };
 }
 
 // ─── Beast Forms (2024 PHB Wild Shape) ───────────────────────────────────────
@@ -558,6 +573,25 @@ export interface Character {
   death_saves: DeathSaves;
   stable: boolean;
   dead: boolean;
+  // Combat-round counter at the moment the PC died — set when
+  // `dead` flips to true, used by revive spells (Revivify et al.)
+  // to gate the "within N rounds of death" window. Cleared when
+  // the PC is revived. Out-of-combat deaths set this to the last
+  // known round counter (typically 0), meaning Revivify will fail
+  // its window check; that matches RAW (Revivify needs a combat-
+  // adjacent timeline). Long-window revives (Raise Dead, True
+  // Resurrection) ignore this field — they have their own
+  // multi-day windows that pansori doesn't track yet.
+  died_at_round?: number;
+  // SRD revive penalty — Raise Dead and Resurrection impose a
+  // −4 penalty to D20 tests (attack rolls, saves, ability checks)
+  // on the revived target. Decrements by 1 on each long rest until
+  // it reaches 0. True Resurrection and Revivify do NOT impose it.
+  // Reincarnate also skips per RAW (the new body emerges whole).
+  // Threaded into toHit, rollConditionSave, rollDeathSave,
+  // checkConcentration, and the ad-hoc skill-check sites via the
+  // `reviveD20Penalty(char)` helper.
+  revive_d20_penalty?: number;
   turn_actions: TurnActions;
   initiative_roll: number | null;
   hit_die: number;
@@ -635,12 +669,6 @@ export interface Character {
   expertise_skills?: string[]; // skills with double proficiency bonus (Rogue/Bard)
   prepared_spells?: string[]; // spell ids currently prepared (Cleric/Paladin/Druid)
   charmer_id?: string; // entity id of the charmer when charmed
-  // Aasimar Celestial Revelation (2024 PHB L3+) — active variant
-  // while the transformation is up. Set when use_celestial_revelation
-  // is invoked; cleared when the duration ticks to 0 (10 rounds =
-  // 1 minute) or on long rest. Remaining rounds tracked via
-  // `class_resource_uses.celestial_revelation_rounds`.
-  celestial_revelation_variant?: 'necrotic_shroud' | 'radiant_soul' | 'radiant_consumption';
   // 2024 PHB Mage Armor spell — when active, base AC becomes
   // 13 + DEX mod (only effective when not wearing body armor).
   // computeTotalAc reads this. Expires on long rest.
@@ -649,6 +677,12 @@ export interface Character {
   // duration (up to 10 min). computeTotalAc reads this. Expires
   // when the caster's concentration drops.
   shield_of_faith_active?: boolean;
+  // SRD Death Ward (L4 Abjuration) — one-shot rescue. While set,
+  // the next time the target's HP would drop to 0, it drops to 1
+  // instead and the flag clears (the spell "ends" per RAW). 8-hour
+  // duration; pansori clears it defensively on long rest like the
+  // other buff flags. The flag is consumed inside `applyDamage`.
+  death_ward_active?: boolean;
   // 2024 PHB movement modes (separate from `speed`, which is the
   // walking speed). When non-zero, the character has the matching
   // mode; the engine reads these where the mode changes gameplay.

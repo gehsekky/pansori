@@ -35,12 +35,12 @@ import { handleResolveReaction, handleUseReaction } from './reaction.js';
 import type { StructuredAction } from '../../types.js';
 import { handleAttack } from './attack/index.js';
 import { handleCastSpell } from './castSpell/index.js';
-import { handleCelestialRevelation } from './celestialRevelation.js';
 import { handleDeathSave } from './deathSave.js';
 import { handleDisarmTrap } from './disarmTrap.js';
 import { handleEscape } from './escape.js';
 import { handleExamine } from './examineDefault.js';
 import { handleGridMove } from './gridMove.js';
+import { handleHasteExtraAction } from './hasteExtraAction.js';
 import { handleInteractObject } from './interactObject.js';
 import { handleLandsAid } from './landsAid.js';
 import { handleLoot } from './loot.js';
@@ -48,7 +48,6 @@ import { handleMove } from './move.js';
 import { handleSneak } from './sneak.js';
 import { handleTwoWeaponAttack } from './twoWeaponAttack.js';
 import { handleUseClassFeature } from './classFeature/index.js';
-import { handleUseHealingHands } from './healActions.js';
 
 /**
  * Registry of per-action-type handlers. Populated incrementally as the
@@ -101,13 +100,12 @@ const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   use_reaction: handleUseReaction as ActionHandler,
   two_weapon_attack: handleTwoWeaponAttack as ActionHandler,
   use_lands_aid: handleLandsAid as ActionHandler,
-  use_celestial_revelation: handleCelestialRevelation as ActionHandler,
-  use_healing_hands: handleUseHealingHands as ActionHandler,
   grid_move: handleGridMove as ActionHandler,
   resolve_reaction: handleResolveReaction as ActionHandler,
   attack: handleAttack as ActionHandler,
   cast_spell: handleCastSpell as ActionHandler,
   use_class_feature: handleUseClassFeature as ActionHandler,
+  haste_extra_action: handleHasteExtraAction as ActionHandler,
 };
 
 /**

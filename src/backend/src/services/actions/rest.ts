@@ -171,11 +171,6 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
     const humanGrant = c.species === 'human';
     if (c.species === 'orc') delete restoredUses.relentless_endurance_used;
     if (c.species === 'tiefling') delete restoredUses.tiefling_rebuke_used;
-    if (c.species === 'aasimar') {
-      delete restoredUses.healing_hands_used;
-      delete restoredUses.celestial_revelation_used;
-      delete restoredUses.celestial_revelation_rounds;
-    }
     // 2024 PHB Land Druid Land's Aid uses — refills on long rest.
     // (RAW: Channel Nature is short-rest, but pansori MVP is
     // long-rest only.)
@@ -195,22 +190,23 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
       exhaustion_level: newExhaustion,
       spell_slots_used: {},
       inspiration: humanGrant ? true : c.inspiration,
-      // Aasimar Celestial Revelation — ends on long rest if still
-      // active (the 1-minute timer almost always ticks out before a
-      // long rest, but clear defensively).
-      celestial_revelation_variant: undefined,
       // 2024 PHB Mage Armor — 8-hour duration, ends on long rest.
       // Shield of Faith is concentration so it'd normally end well
       // before a rest, but clear defensively.
       mage_armor_active: undefined,
       shield_of_faith_active: undefined,
+      // SRD Death Ward — 8-hour duration, ends on long rest if not
+      // consumed mid-day by a near-death intercept.
+      death_ward_active: undefined,
+      // SRD Raise Dead / Resurrection penalty decays by 1 per long
+      // rest until it reaches 0. `undefined` once cleared so memory-
+      // /serialization-conscious paths don't carry a useless 0 around.
+      revive_d20_penalty:
+        (c.revive_d20_penalty ?? 0) > 1 ? (c.revive_d20_penalty ?? 0) - 1 : undefined,
       // 2024 PHB movement modes — fly is the only one with purely
-      // short-duration sources today (Fly spell, Aasimar Radiant
-      // Soul transformation). Climb / swim grants from Athlete and
-      // Sea Druid Aquatic Affinity are PERMANENT and applied at
-      // feat-take / subclass-select time, so we must NOT clear
-      // them on rest. Defensive fly clear handles the case where
-      // an Aasimar's 1-minute transformation overruns into a rest.
+      // short-duration sources today (the Fly spell). Climb / swim
+      // grants come from species traits / subclass features that
+      // persist across rests, so they're NOT cleared here.
       fly_speed_ft: undefined,
     };
     // Recompute AC after clearing the magical buffs so the stored

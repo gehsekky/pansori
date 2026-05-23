@@ -87,7 +87,17 @@ export type ConditionName =
   // Haste's extra action needs). effectiveSpeed halves speed when
   // the flag is set; toHit pipeline subtracts 2 from the target's
   // effective AC; rollConditionSave subtracts 2 from Dex saves.
-  | 'slowed';
+  | 'slowed'
+  // SRD: Bane — the target subtracts 1d4 from attack rolls and
+  // saves for the spell's concentration duration. Mirror of the
+  // engine-internal 'blessed' flag. toHit subtracts 1d4 from the
+  // attack roll; rollConditionSave subtracts 1d4 from the save.
+  | 'baned'
+  // SRD: Beacon of Hope — the target has advantage on WIS saves
+  // and death saves for the spell's concentration duration.
+  // rollConditionSave reads this for WIS-save advantage; the death-
+  // save handler reads it for advantage on the d20.
+  | 'hopeful';
 
 export type NpcAttitude = 'friendly' | 'indifferent' | 'hostile';
 
@@ -239,10 +249,13 @@ export type StructuredAction =
       // beams). One entry per dart/beam; duplicates = multiple darts on the
       // same target. When omitted, falls back to focus-fire on `targetEnemyId`.
       targetEnemyIds?: string[];
-      // Buff-spell ally target — when a self_or_ally / ally spell is cast
-      // (Heroism, Aid, Greater Invisibility, Fly, Levitate, ...) the FE
-      // can pick which living party member receives the buff. Omitted =
-      // caster targets self. The buff branch in castSpell reads this.
+      // Ally / party-member target. Two consumers:
+      //   - Buff spells (Heroism, Aid, Greater Invisibility, Fly,
+      //     Levitate, ...): FE picks which living party member
+      //     receives the buff. Omitted = caster targets self.
+      //   - Revive spells (Revivify, Raise Dead, ...): the *dead*
+      //     party member to be restored. Required for revive spells;
+      //     the handler errors out when missing.
       targetCharId?: string;
     }
   | { type: 'disarm_trap' }
@@ -257,17 +270,6 @@ export type StructuredAction =
       targetCharId?: string;
       targetEnemyId?: string;
     }
-  // Aasimar Celestial Revelation (2024 PHB, L3+) — bonus-action
-  // transformation, 1/long rest. Player picks the sub-option at
-  // use time: 'necrotic_shroud', 'radiant_soul', 'radiant_consumption'.
-  // Transformation lasts 1 minute (10 rounds in pansori).
-  | {
-      type: 'use_celestial_revelation';
-      variant: 'necrotic_shroud' | 'radiant_soul' | 'radiant_consumption';
-    }
-  // Aasimar Healing Hands — action, 1/long rest, heal a target
-  // (prof)d4 HP.
-  | { type: 'use_healing_hands'; targetCharId: string }
   | { type: 'attune'; instanceId: string }
   | { type: 'grapple'; targetEnemyId?: string }
   | { type: 'try_escape_grapple' }
@@ -292,6 +294,21 @@ export type StructuredAction =
   | { type: 'help'; targetId: string }
   | { type: 'ready'; trigger: string; action: StructuredAction }
   | { type: 'use_reaction' }
+  // SRD 5.2.1 Haste — wrapper for the spell's additional action. The
+  // inner action runs in a context where the standard action_used
+  // gate is bypassed (the spell gives a free second action slot
+  // restricted to Attack / Dash / Disengage / Hide / Utilize).
+  // Setting `haste_extra_action_used = true` marks the slot consumed
+  // so the choice generator stops surfacing the Haste menu.
+  | {
+      type: 'haste_extra_action';
+      inner:
+        | { type: 'attack'; targetEnemyId?: string }
+        | { type: 'dash' }
+        | { type: 'disengage' }
+        | { type: 'sneak' }
+        | { type: 'interact_object'; objectId: string };
+    }
   | { type: 'select_subclass'; subclass: string }
   | { type: 'prepare_spells'; spellIds: string[] }
   | { type: 'resolve_reaction'; accept: boolean }
@@ -323,7 +340,6 @@ export type ChoiceKind =
   | 'shove'
   | 'two_weapon_attack'
   | 'use_lands_aid'
-  | 'use_celestial_revelation'
   | 'cast_spell'
   | 'class_feature';
 

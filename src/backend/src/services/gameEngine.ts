@@ -3,6 +3,7 @@ import {
   ENEMY_DISADV_CONDITIONS,
   FRESH_TURN,
   abilityMod,
+  canReact,
   computeTotalAc,
   d,
   hasWeaponProficiency,
@@ -11,6 +12,7 @@ import {
   rageUsesMax,
   resolveEnemyAttack,
   resolvePlayerAttack,
+  reviveD20Penalty,
   rollConditionSave,
   rollDeathSave,
   rollDice,
@@ -47,7 +49,6 @@ import {
   distanceFeet,
   findPath,
   opportunityAttackTriggers,
-  pamEnterReachTriggers,
   posEqual,
 } from './gridEngine.js';
 import type { EnemyAttackHitFragment, EnemyAttackMissFragment } from './narrative/fragments.js';
@@ -555,25 +556,21 @@ export function checkConcentration(
   // SRD 5.2.1 p.203 — Concentration DC is 10 or half damage taken, whichever
   // is higher; capped at 30. The cap basically only matters at >60 dmg.
   const dc = Math.min(30, Math.max(10, Math.floor(dmgTaken / 2)));
-  // 2024 PHB War Caster feat — advantage on CON saves to maintain
-  // concentration when damaged. Roll 2d20, keep higher.
-  const hasWarCaster = (char.feats ?? []).includes('war_caster');
-  const conMod = abilityMod(char.con);
-  const rollOne = (): number => d(20);
-  const save = hasWarCaster ? Math.max(rollOne(), rollOne()) + conMod : rollOne() + conMod;
-  const warCasterNote = hasWarCaster ? ' (War Caster advantage)' : '';
+  // SRD revive penalty applies to the concentration CON save like
+  // any other D20 Test.
+  const save = d(20) + abilityMod(char.con) - reviveD20Penalty(char);
   if (save >= dc)
     return {
       char,
       st,
-      note: ` [Concentration hold: ${save} vs DC ${dc}${warCasterNote}]`,
+      note: ` [Concentration hold: ${save} vs DC ${dc}]`,
     };
   const spellName = char.concentrating_on.spellId;
   const { char: nc, st: ns } = breakConcentration(char, st, context);
   return {
     char: nc,
     st: ns,
-    note: ` [Concentration broken: ${save} vs DC ${dc}${warCasterNote} — ${spellName} ends!]`,
+    note: ` [Concentration broken: ${save} vs DC ${dc} — ${spellName} ends!]`,
   };
 }
 
@@ -671,6 +668,7 @@ function conditionSavingThrow(
     | 'inventory'
     | 'species'
     | 'feat_choices'
+    | 'revive_d20_penalty'
   >,
   context: Context
 ): {
@@ -719,7 +717,8 @@ function conditionSavingThrow(
     0,
     char.conditions ?? [],
     inspirationActive || luckActive || speciesAdv,
-    enc
+    enc,
+    reviveD20Penalty(char)
   );
   return {
     applied,
@@ -845,36 +844,10 @@ function computeEnemyAttack(
     const wardNote = '';
     const charAfterWard = char;
     const postWardDmg = postResistDmg;
-    // 2024 PHB Heavy Armor Master feat — while wearing heavy armor and not
-    // incapacitated, attacks that hit you deal 3 less damage. Floor at 0.
-    // Applied after resistance + ward so the -3 is a flat last-step
-    // reduction (matches RAW ordering "attacks that hit you deal").
-    // Independent armor lookup (uses instance_id, the correct pattern)
-    // because the existing `armorItem` capture at top of the function
-    // matches on `i.id`, which never resolves for equipped armor stored
-    // by instance_id — a separate latent bug that's out of scope here.
-    let hamNote = '';
-    let postHamDmg = postWardDmg;
-    if (
-      (char.feats ?? []).includes('heavy_armor_master') &&
-      !char.conditions.includes('incapacitated')
-    ) {
-      const equippedArmorInstance = char.equipped_armor
-        ? char.inventory?.find((i) => i.instance_id === char.equipped_armor)
-        : undefined;
-      const equippedArmorLoot = equippedArmorInstance
-        ? context.lootTable.find((l) => l.id === equippedArmorInstance.id)
-        : undefined;
-      if (equippedArmorLoot?.armorCategory === 'heavy' && postHamDmg > 0) {
-        const reduction = Math.min(3, postHamDmg);
-        postHamDmg -= reduction;
-        hamNote = ` (Heavy Armor Master: -${reduction})`;
-      }
-    }
     // Universal damage application — temp_hp absorption, exhaustion-4 max-HP
     // clamp, knock-out detection, and the SRD concentration save all flow
     // through `applyDamage`. (PR-2's deferred enemy-attack migration.)
-    const dmgResult = applyDamage(charAfterWard, st, postHamDmg);
+    const dmgResult = applyDamage(charAfterWard, st, postWardDmg);
     let updatedChar = dmgResult.char;
     const newSt = dmgResult.st;
     const hpLost = dmgResult.amountDealt;
@@ -888,7 +861,7 @@ function computeEnemyAttack(
       .replace('{target}', char.name)
       .replace('{dmg}', fmt.dmg(hpLost));
     narrative += ` ${char.name} takes ${fmt.dmg(hpLost)} damage.`;
-    narrative += rageNote + petrNote + beastNote + speciesNote + wardNote + hamNote + tempHpNote;
+    narrative += rageNote + petrNote + beastNote + speciesNote + wardNote + tempHpNote;
     narrative += dmgResult.concentrationNote;
 
     let inspirationConsumed = false;
@@ -1037,9 +1010,17 @@ function processDeathSave(
   enemy: Enemy | null | undefined,
   context: Context,
   worldName: string,
-  enemyAttackContext: boolean = false
+  enemyAttackContext: boolean = false,
+  currentRound: number = 1
 ): { narrative: string; newChar: Character; died: boolean; endedCombat: boolean } {
-  const save = rollDeathSave(char.death_saves);
+  // SRD Beacon of Hope — death saves rolled with advantage while
+  // the dying PC has the `hopeful` condition. SRD revive penalty
+  // (Raise Dead / Resurrection) subtracts from the d20 threshold.
+  const save = rollDeathSave(
+    char.death_saves,
+    (char.conditions ?? []).includes('hopeful'),
+    reviveD20Penalty(char)
+  );
   const newChar = { ...char, death_saves: save.saves };
   let narrative = '';
   // No code path currently sets endedCombat = true. Kept as a return field for
@@ -1094,6 +1075,7 @@ function processDeathSave(
 
     case 'dead':
       newChar.dead = true;
+      newChar.died_at_round = currentRound;
       narrative = pick(context.narratives.deathLines)
         .replace(/{name}/g, char.name)
         .replace('{enemy}', enemy?.name ?? 'your wounds')
@@ -1118,6 +1100,7 @@ function processDeathSave(
     narrative += ` The ${enemy.name} attacks your prone form — 2 death save failures (${attackSaves.failures}/3)!`;
     if (attackSaves.failures >= 3) {
       newChar.dead = true;
+      newChar.died_at_round = currentRound;
       narrative +=
         ' ' +
         pick(context.narratives.deathLines)
@@ -1226,13 +1209,6 @@ export function effectiveSpeed(char: Character): number {
   // and slowed are somehow stacked (RAW: cancel adv/disadv style), they
   // multiplicatively offset — pansori MVP applies both in sequence.
   if (char.conditions?.includes('slowed')) base = Math.floor(base / 2);
-  // 2024 PHB Mobile feat — +10 ft speed. Hardcoded id+bonus here
-  // because `effectiveSpeed` doesn't take a context for feat-table
-  // lookup. The feat's `effect.bonusFeet = 10` lives in feat data
-  // for documentation; this hook mirrors it. When a second
-  // speed-bonus feat ships, factor into a `feats.ts` helper that
-  // takes (char, context) so the data drives the bonus directly.
-  if ((char.feats ?? []).includes('mobile')) base += 10;
   const weight = charCarriedWeight(char);
   // 2024 PHB Goliath Powerful Build: count as one size larger for carrying
   // capacity. Mechanically: double the effective STR-based thresholds.
@@ -1337,7 +1313,10 @@ function fireLairAction(
         proficient,
         origC.level,
         0,
-        origC.conditions ?? []
+        origC.conditions ?? [],
+        false,
+        false,
+        reviveD20Penalty(origC)
       );
       const dealt = saveFailed ? fullDmg : Math.floor(fullDmg / 2);
       const dmgResult = applyDamage(origC, workingSt, dealt);
@@ -1743,9 +1722,7 @@ export function partyDetectsTrap(characters: Character[], trap: Trap): boolean {
   return characters.some((c) => {
     if (c.dead) return false;
     const proficient = c.skill_proficiencies?.includes('Perception') ?? false;
-    // 2024 PHB Observant feat — +5 to passive Perception.
-    const observantBonus = (c.feats ?? []).includes('observant') ? 5 : 0;
-    return passivePerception(c.wis, c.level, proficient, observantBonus) >= trap.dc;
+    return passivePerception(c.wis, c.level, proficient) >= trap.dc;
   });
 }
 
@@ -2404,10 +2381,63 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   }
 
   // Use Reaction (trigger readied action) — shown when readied_action is set and reaction not yet used
-  if (state.combat_active && !char.turn_actions.reaction_used && char.turn_actions.readied_action) {
+  if (state.combat_active && canReact(char) && char.turn_actions.readied_action) {
     choices.push({
       label: `Trigger readied action: "${char.turn_actions.readied_action.trigger}"`,
       action: { type: 'use_reaction' },
+    });
+  }
+
+  // ── SRD Haste extra-action menu ────────────────────────────────────────────
+  // When a Hasted PC has spent their normal action but not the
+  // Haste-granted extra, surface a restricted secondary menu (Attack /
+  // Dash / Disengage / Hide). Each item wraps the inner action in a
+  // `haste_extra_action` dispatch so the action_used gate is bypassed
+  // and the extra slot is marked consumed.
+  if (
+    state.combat_active &&
+    char.conditions.includes('hasted') &&
+    char.turn_actions.action_used &&
+    !char.turn_actions.haste_extra_action_used
+  ) {
+    if (enemyAlive) {
+      // One Attack option per living enemy, mirroring the normal Attack
+      // menu shape so the player can pick a specific target.
+      if (livingEnemies.length === 1) {
+        choices.push({
+          label: `Haste extra: Attack the ${livingEnemies[0].name}`,
+          action: {
+            type: 'haste_extra_action',
+            inner: { type: 'attack', targetEnemyId: livingEnemies[0].id },
+          },
+          kind: 'attack',
+        });
+      } else {
+        for (const en of livingEnemies) {
+          if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+          choices.push({
+            label: `Haste extra: Attack ${en.name}`,
+            action: {
+              type: 'haste_extra_action',
+              inner: { type: 'attack', targetEnemyId: en.id },
+            },
+            kind: 'attack',
+          });
+        }
+      }
+    }
+    choices.push({
+      label: 'Haste extra: Dash — double movement',
+      action: { type: 'haste_extra_action', inner: { type: 'dash' } },
+      kind: 'dash',
+    });
+    choices.push({
+      label: 'Haste extra: Disengage — no OAs this turn',
+      action: { type: 'haste_extra_action', inner: { type: 'disengage' } },
+    });
+    choices.push({
+      label: 'Haste extra: Hide — stealth check',
+      action: { type: 'haste_extra_action', inner: { type: 'sneak' } },
     });
   }
 
@@ -2859,7 +2889,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     const cdLeft = char.class_resource_uses?.channel_divinity ?? 1;
 
     // Lore Bard: Cutting Words (reaction, costs Bardic Inspiration)
-    if (char.subclass === 'lore' && hasClass(char, 'bard') && !char.turn_actions.reaction_used) {
+    if (char.subclass === 'lore' && hasClass(char, 'bard') && canReact(char)) {
       const biLeft2 = char.class_resource_uses?.bardic_inspiration ?? abilityMod(char.cha ?? 10);
       if (biLeft2 > 0)
         choices.push({
@@ -3207,20 +3237,18 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
           (l) => l.id === char.inventory.find((i) => i.instance_id === char.equipped_weapon)?.id
         )
       : null;
-    // 2024 PHB Dual Wielder feat — relaxes the off-hand to any
-    // one-handed melee weapon (not just Light). Main hand must
-    // still be one-handed melee; both weapons remain non-two-handed.
-    const hasDualWielder = (char.feats ?? []).includes('dual_wielder');
+    // SRD 5.2.1 — two-weapon fighting requires both weapons to
+    // be one-handed melee Light weapons.
     const mainHandEligible =
       equippedWpnItem &&
       equippedWpnItem.slot === 'weapon' &&
       equippedWpnItem.range !== 'ranged' &&
-      (equippedWpnItem.light || hasDualWielder);
+      equippedWpnItem.light;
     if (mainHandEligible) {
       const offhandItem = char.inventory
         .filter((i) => i.instance_id !== char.equipped_weapon)
         .map((i) => context.lootTable.find((l) => l.id === i.id))
-        .find((l) => l?.slot === 'weapon' && l.range !== 'ranged' && (l.light || hasDualWielder));
+        .find((l) => l?.slot === 'weapon' && l.range !== 'ranged' && l.light);
       if (offhandItem) {
         choices.push({
           label: `Two-weapon attack — off-hand ${offhandItem.name} (no ability mod to damage)`,
@@ -3715,7 +3743,7 @@ export function applyConsequence(
 // spell table. Each reaction adds its own trigger predicate on top.
 function knowsSpellWithSlot(target: Character, spellId: string, context: Context): boolean {
   if (target.dead || target.hp <= 0) return false;
-  if (target.turn_actions?.reaction_used) return false;
+  if (!canReact(target)) return false;
   const knows =
     (target.prepared_spells ?? []).includes(spellId) ||
     (target.spells_known ?? []).includes(spellId);
@@ -3763,7 +3791,7 @@ function isShieldEligible(
 function isUncannyDodgeEligible(target: Character): boolean {
   if (!hasClass(target, 'rogue')) return false;
   if (getClassLevel(target, 'rogue') < 5) return false;
-  if (target.turn_actions?.reaction_used) return false;
+  if (!canReact(target)) return false;
   if (target.hp <= 0) return false;
   if (target.conditions?.includes('blinded')) return false;
   return true;
@@ -3831,7 +3859,7 @@ function isCounterspellEligible(
   context: Context
 ): boolean {
   if (reactor.dead || reactor.hp <= 0) return false;
-  if (reactor.turn_actions?.reaction_used) return false;
+  if (!canReact(reactor)) return false;
   const knows =
     (reactor.prepared_spells ?? []).includes('counterspell') ||
     (reactor.spells_known ?? []).includes('counterspell');
@@ -3949,7 +3977,7 @@ function applyPcOpportunityAttacks(args: {
     if (pcIdx < 0) continue;
     const pc = st.characters[pcIdx];
     if (pc.dead || pc.stable || pc.hp <= 0) continue;
-    if (pc.turn_actions?.reaction_used) continue;
+    if (!canReact(pc)) continue;
     // Incapacitated PCs can't take reactions.
     if (
       pc.conditions?.some((c) =>
@@ -4162,7 +4190,7 @@ function runEnemyMultiattackLoop(args: {
     narrative += ` ${computed.fragment.prose}`;
     st = pushEvent(st, enemyAttackFragmentEvent(computed.fragment, st.round ?? 1));
     if (isMassiveDamageDeath(prevHp, computed.hpLost, target.max_hp)) {
-      target = { ...target, dead: true, stable: false };
+      target = { ...target, dead: true, stable: false, died_at_round: st.round ?? 1 };
       narrative += ` MASSIVE DAMAGE — ${target.name} is killed outright!`;
       massiveDeath = true;
       break;
@@ -4279,45 +4307,10 @@ function attemptEnemyApproach(args: {
     st.entities ?? [],
     true
   );
-  // 2024 PHB Polearm Master — additional OA trigger: the wielder
-  // attacks creatures that ENTER their reach (not just leave it).
-  // Detected via `pamEnterReachTriggers` with a per-PC reachFt
-  // lookup that returns the polearm's extended reach (10 ft) for
-  // PAM-wielding PCs and 0 for everyone else (so non-PAM PCs
-  // don't fire enter-reach OAs).
-  const POLEARMS_FOR_PAM = new Set(['quarterstaff', 'spear', 'glaive', 'halberd', 'pike']);
-  const pamReachLookup = (e: CombatEntity): number => {
-    if (e.isEnemy) return 0;
-    const pc = st.characters.find((c) => c.id === e.id);
-    if (!pc || !(pc.feats ?? []).includes('polearm_master')) return 0;
-    const eqp = pc.equipped_weapon
-      ? pc.inventory?.find((i) => i.instance_id === pc.equipped_weapon)
-      : null;
-    if (!eqp || !POLEARMS_FOR_PAM.has(eqp.id)) return 0;
-    const loot = context.lootTable.find((l) => l.id === eqp.id);
-    // Glaive/halberd/pike have reach=true → 10 ft; staff/spear → 5 ft.
-    return loot?.reach ? 10 : 5;
-  };
-  const pamTriggers = pamEnterReachTriggers(
-    enemyEntPreMove.pos,
-    plan.newPos,
-    st.entities ?? [],
-    true,
-    pamReachLookup
-  );
-  // De-dupe: if a PC is in both the exit-trigger and enter-trigger
-  // lists (unlikely but possible on edge layouts), only fire one OA
-  // per reaction budget. `applyPcOpportunityAttacks` already
-  // enforces reaction_used so duplicates are gated naturally — but
-  // we still combine the lists to ensure both triggers attempt.
-  const combinedTriggers = [
-    ...oaTriggers,
-    ...pamTriggers.filter((p) => !oaTriggers.some((o) => o.id === p.id)),
-  ];
   const oaRes = applyPcOpportunityAttacks({
     st,
     enemyId,
-    oaTargets: combinedTriggers,
+    oaTargets: oaTriggers,
     enemyAc: enemy.ac,
     enemyName: enemy.name,
     context,
@@ -4783,7 +4776,8 @@ export function runEnemyTurns(args: {
               args.worldName,
               // Multiattack call path — the enemy just hit the downed
               // PC; trigger the SRD 2-failure-on-attack penalty.
-              true
+              true,
+              st.round ?? 1
             );
             target = newTarget;
             narrative += ' ' + dsNarr;
@@ -4976,7 +4970,14 @@ export async function takeAction({
         newChar,
         died,
         endedCombat,
-      } = processDeathSave(char, enemyAlive ? enemy : null, context, worldName);
+      } = processDeathSave(
+        char,
+        enemyAlive ? enemy : null,
+        context,
+        worldName,
+        false,
+        st.round ?? 1
+      );
       narrative = dsNarr;
       char = newChar;
       if (endedCombat) st = endCombatState(st);
@@ -5025,6 +5026,7 @@ export async function takeAction({
   // Exhaustion level 6 = death (PHB p.291)
   if ((char.exhaustion_level ?? 0) >= 6 && !char.dead) {
     char.dead = true;
+    char.died_at_round = st.round ?? 0;
     narrative = `${char.name} succumbs to exhaustion (level 6) and dies.`;
     commitChar();
     st.run_log = [...(st.run_log || []), { character_id: char.id, action: action.type, narrative }];
@@ -5082,6 +5084,12 @@ export async function takeAction({
     },
   };
 
+  // Slow lock snapshot — captured BEFORE dispatch so the post-action
+  // hook can detect a false→true transition on either slot and mirror
+  // it to the other. See the Slow block right after `commitChar()`.
+  const slowSnapshotActionUsed = char.turn_actions.action_used;
+  const slowSnapshotBonusUsed = char.turn_actions.bonus_action_used;
+
   const dispatchResult = await dispatchAction(ctx, action);
   if (dispatchResult.handled && dispatchResult.replaceWith) {
     // Transformer: the handler staged pre-mutations into ctx (e.g. flipped
@@ -5124,6 +5132,32 @@ export async function takeAction({
       }
     }
 
+  // ── Slow's action-OR-bonus economy ─────────────────────────────────────────
+  // SRD 5.2.1 Slow — "It can use either an action or a bonus action on its
+  // turn, not both." Mirror the false→true transition on either slot to
+  // the other so the existing choice generator (which gates on
+  // action_used / bonus_action_used) naturally hides the unavailable type
+  // after the first is consumed. Reaction restriction + one-attack cap +
+  // somatic-fail are deferred (each is its own sub-system).
+  if (char.conditions.includes('slowed')) {
+    const turn = char.turn_actions;
+    const actionJustUsed = !slowSnapshotActionUsed && turn.action_used;
+    const bonusJustUsed = !slowSnapshotBonusUsed && turn.bonus_action_used;
+    if (actionJustUsed && !turn.bonus_action_used) {
+      char = {
+        ...char,
+        turn_actions: { ...turn, bonus_action_used: true },
+      };
+      narrative += ` ${fmt.note('[Slowed: bonus action locked.]')}`;
+    } else if (bonusJustUsed && !turn.action_used) {
+      char = {
+        ...char,
+        turn_actions: { ...turn, action_used: true },
+      };
+      narrative += ` ${fmt.note('[Slowed: action locked.]')}`;
+    }
+  }
+
   // ── Write char back into state ─────────────────────────────────────────────
   commitChar();
 
@@ -5141,7 +5175,16 @@ export async function takeAction({
     const speedFt = effectiveSpeed(activeChar);
     const usedFt = st.movement_used?.[activeChar.id] ?? 0;
     const hasMovementLeft = !!st.entities && usedFt < speedFt;
-    if (!hasBonusChoices && !hasMovementLeft) usedInitiative = true;
+    // SRD Haste — when the PC is Hasted and hasn't yet spent the
+    // extra action, hold off auto-advance so the player can see and
+    // choose from the Haste-extra menu. They can always explicitly
+    // forfeit it via End turn.
+    const hasUnspentHasteExtra =
+      activeChar.conditions.includes('hasted') &&
+      !activeChar.turn_actions.haste_extra_action_used;
+    if (!hasBonusChoices && !hasMovementLeft && !hasUnspentHasteExtra) {
+      usedInitiative = true;
+    }
   }
 
   // ── Advance initiative / active character ──────────────────────────────────
@@ -5225,40 +5268,8 @@ export async function takeAction({
             );
             narrative += ` ${fmt.note(`[${ticked.name}] Condition${expired.length > 1 ? 's' : ''} cleared: ${expired.join(', ')}.`)}`;
           }
-          // Aasimar Celestial Revelation — tick the 10-round duration
-          // at the start of each of the wielder's turns. When the
-          // counter hits 0, clear the variant + narrate the end.
-          let final = ticked;
-          const cels = ticked.class_resource_uses?.celestial_revelation_rounds ?? 0;
-          if (cels > 0 && ticked.celestial_revelation_variant) {
-            const next = cels - 1;
-            if (next <= 0) {
-              // Variant clears; the Radiant Soul fly speed grant
-              // also ends. Necrotic Shroud / Radiant Consumption
-              // didn't grant flight so this clear is a no-op for
-              // those — safe to drop unconditionally.
-              final = {
-                ...ticked,
-                celestial_revelation_variant: undefined,
-                fly_speed_ft: undefined,
-                class_resource_uses: {
-                  ...(ticked.class_resource_uses ?? {}),
-                  celestial_revelation_rounds: 0,
-                },
-              };
-              narrative += ` ${fmt.note(`[${ticked.name}] Celestial Revelation ends.`)}`;
-            } else {
-              final = {
-                ...ticked,
-                class_resource_uses: {
-                  ...(ticked.class_resource_uses ?? {}),
-                  celestial_revelation_rounds: next,
-                },
-              };
-            }
-          }
-          st = { ...st, characters: st.characters.map((c, i) => (i === nextCharIdx ? final : c)) };
-          st.active_character_id = final.id;
+          st = { ...st, characters: st.characters.map((c, i) => (i === nextCharIdx ? ticked : c)) };
+          st.active_character_id = ticked.id;
         }
       }
     }

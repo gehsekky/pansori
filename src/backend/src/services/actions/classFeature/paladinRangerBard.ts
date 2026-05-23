@@ -140,6 +140,10 @@ export function handlePaladinRangerBardFeature(ctx: ActionContext, fid: string):
       ctx.narrative = 'Reaction already used this turn.';
       return true;
     }
+    if ((ctx.char.conditions ?? []).includes('slowed')) {
+      ctx.narrative = 'You are Slowed — you can\'t take reactions this turn.';
+      return true;
+    }
     if (!ctx.enemyAlive || !ctx.enemy) {
       ctx.narrative = 'No living target.';
       return true;

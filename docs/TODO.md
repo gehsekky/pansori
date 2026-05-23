@@ -902,6 +902,51 @@ the prerequisite infrastructure lands.
   destination picker lands.
 - **Counterspell** — already shipped pre-session.
 - **Spirit Guardians** — already shipped pre-session.
+- ~~**Lesser Restoration / Greater Restoration**~~ — shipped
+  2026-05-23. Routed through the buff branch (targetType:
+  'self_or_ally') with `removeConditions` driving the condition
+  strip. Greater additionally reduces exhaustion by 1 and consumes
+  100 gp of diamond dust. (RAW "pick one" + curse / ability-score /
+  max-HP reduction removals deferred — pansori MVP strips all
+  configured conditions and doesn't model the deferred effects.)
+- ~~**Prayer of Healing**~~ — shipped 2026-05-23. Routed through
+  the mass-heal id-gated branch in `castSpell/heal.ts` (same
+  branch as Mass Healing Word / Mass Cure Wounds). RAW 10-minute
+  cast + 1/long-rest target gate + short-rest benefits all
+  deferred.
+- ~~**Beacon of Hope**~~ — shipped 2026-05-23. Hand-rolled in
+  `castSpell/utility.ts` the same way Bless is — 3-target
+  concentration buff applying the new `hopeful` condition.
+  `rollConditionSave` reads it for WIS-save advantage;
+  `rollDeathSave` accepts an `advantage` flag the death-save
+  handler passes when the dying PC has `hopeful`. The RAW
+  max-heal effect (heal rolls land at max) is deferred — it'd
+  need a hook into the heal-roll site to surface the dice
+  ceiling.
+- ~~**Death Ward**~~ — shipped 2026-05-23. New
+  `Character.death_ward_active` one-shot flag set by the buff
+  branch. `applyDamage` intercepts the proposed HP-to-0 transition,
+  sets HP to 1, clears the flag. RAW instant-death negation (Power
+  Word Kill etc.) deferred since pansori doesn't model those.
+- ~~**Bane**~~ — shipped 2026-05-23. Mirror of Bless: save +
+  condition pipeline applies the new `baned` condition on a
+  failed CHA save. `resolveOneAttack` subtracts 1d4 from the
+  attacker's roll (with a hit-to-miss re-check on non-Nat-20);
+  `rollConditionSave` subtracts 1d4 from all save abilities.
+  Concentration drop sweeps the condition. RAW upcast (+1 target
+  per slot) deferred behind the same multi-target picker UX that
+  Bless awaits.
+- ~~**Scorching Ray**~~ — shipped 2026-05-23. Added to the
+  `multiTarget` branch's allow-list. 3 fire rays × 2d6 each,
+  ranged spell-attack roll per ray. Same shape as Eldritch Blast
+  (renamed the EB-only attack-roll predicate to
+  `isAttackRollMulti`). +1 ray per slot above 2nd.
+- ~~**Chromatic Orb**~~ — shipped 2026-05-23. Single-target
+  attack-roll spell, 3d8 fire (MVP — chosen-damage-type picker
+  deferred). Consumes a 50 gp diamond. +1d8 per slot. The "leap"
+  rider on matching d8 values is deferred (needs per-die runtime
+  introspection from the AttackRoll branch + the picker UX for
+  the leap target).
 
 **Tier C closure note (2026-05-22):** The architectural / new-pattern
 work in Tier C is done — every "different shape" spell that pansori
@@ -978,11 +1023,98 @@ as a critical-path engine block.
   d20 reaction now that the window infra exists; ship as needed.
 - **Bestow Curse / Hold Monster variants** — need multi-option
   picker UX on the FE for the curse type selection.
-- **Revivify / Raise Dead** — need a death + return-to-life
-  pipeline (currently dead PCs stay dead until manual revive).
-- **Haste + Slow extra-action / cap-action gates** — need the
-  PC-turn extra-action flow (let a hasted PC take a second
-  limited action; cap a slowed PC at action OR bonus, etc.).
+- ~~**Revivify**~~ — shipped 2026-05-23 as the bring-from-dead
+  pipeline foundation. New `Character.died_at_round` field set at
+  every death-setter site (massive damage, both `processDeathSave`
+  branches, exhaustion); cleared on revive. New `Spell.revive`
+  field carries `hpRestored` / `windowRounds` / `materialCost`.
+  New `runReviveSpell` branch in `castSpell/index.ts` runs after
+  heal and before the offensive enemy-required check; validates
+  dead target + window + material-cost gating. Revivify (L3
+  Necromancy, divine + primal lists, 300 gp diamond, 10-round
+  window, restores 1 HP) is the first concrete spell on the
+  pipeline. Precast was reordered so material-cost check now
+  precedes slot deduction — a missing diamond no longer wastes
+  the slot. 5 BE specs cover happy path + window expiry +
+  material gating + alive-target reject + missing-target reject.
+
+  **Ladder shipped 2026-05-23:** Raise Dead (L5, 500 gp, 1 HP,
+  sentinel window), Resurrection (L7, 1000 gp, full HP),
+  True Resurrection (L9, 25000 gp, full HP), Reincarnate (L5,
+  1000 gp, full HP, Druid-only). All route through the same
+  `runReviveSpell` branch with `windowRounds: 99999` to skip the
+  in-combat round-window gate. 6 BE specs in `reviveLadder.spec.ts`.
+
+  **Deferred mechanics shipped 2026-05-23:**
+  - **−4 D20 penalty** on Raise Dead / Resurrection — shipped.
+    New `Character.revive_d20_penalty?: number` field set to 4
+    on a successful Raise Dead / Resurrection cast (True
+    Resurrection / Revivify / Reincarnate skip per RAW). New
+    `reviveD20Penalty(char)` helper in `rulesEngine.ts` returns
+    the magnitude; subtracted at every threaded d20 site: attack
+    rolls (`toHit.ts` via `totalAttackBonus`), condition saves
+    (`rollConditionSave` via new param), death saves
+    (`rollDeathSave` via new param), concentration saves
+    (`checkConcentration` inline), disarm trap (`disarmTrap` via
+    new param), Influence + Study (inline). Long rest in
+    `rest.ts` decrements the field by 1 until it clears.
+    Skill-check sites that weren't threaded (Grapple/Shove
+    contests, group Stealth, Search, Cunning Action Hide) are
+    documented as best-effort — RAW penalty doesn't fire there in
+    pansori MVP, but the helper is available to thread later.
+  - **Reincarnate species reroll** — shipped. New
+    `REINCARNATE_SPECIES` export from `contexts/srd/species.ts`
+    lists the 9 concrete species (RAW's "Roll again" outcome
+    short-circuited away — statistically identical). `runReviveSpell`
+    rolls `d(9)` for Reincarnate, swaps `char.species`, and clears
+    stale species-specific resource flags (`relentless_endurance_used`,
+    `tiefling_rebuke_used`, `breath_weapon_used`). Other species
+    traits (darkvision, resistances, innate cantrips, breath
+    weapon eligibility) derive live from `SRD_SPECIES[char.species]`
+    at their read sites, so the swap propagates without a separate
+    trait-apply pass.
+
+  **Still deferred (RAW-accurate but not modelled):**
+  - **365-day Resurrection caster-tax** — RAW: if the target has
+    been dead ≥ 1 year, the *caster* can't cast spells and has
+    disadvantage on D20 tests until they long-rest. Needs
+    absolute-time tracking (calendar days), which pansori doesn't
+    model today.
+- ~~**Haste + Slow extra-action / cap-action gates**~~ — shipped
+  2026-05-23. **Haste**: new `TurnActions.haste_extra_action_used`
+  flag + new `haste_extra_action` wrapper action that clears
+  `action_used` and `delegateTo`'s the inner action (Attack /
+  Dash / Disengage / Hide). Choice generator surfaces the
+  restricted menu after the normal action is spent; auto-advance
+  holds off while the extra slot is unspent so the player can
+  see and pick from it. **Slow**: post-dispatch hook in
+  `takeAction` (after `commitChar`) snapshots
+  action_used/bonus_action_used before dispatch and mirrors the
+  false→true transition on either slot to the other when char
+  has `slowed` — the existing choice generator then naturally
+  hides the remaining type.
+
+  **Closeouts shipped 2026-05-23:**
+  - **Haste's "one weapon attack only" cap** — shipped. The
+    attack handler reads `ctx.char.turn_actions.haste_extra_action_used`
+    (set by the wrapper before delegating) and suppresses the
+    Extra Attack loop when true.
+  - **Slow's reaction restriction** — shipped. New `canReact(char)`
+    helper in `rulesEngine.ts` returns false when slowed OR
+    reaction_used. Threaded through every reaction-gate site:
+    `cost.ts checkBudget` for dispatcher-level reaction-cost
+    rejection, the readied-action choice surface, Lore Bard
+    Cutting Words choice + handler, `knowsSpellWithSlot`
+    (Shield / Hellish Rebuke), `isUncannyDodgeEligible`,
+    `applyPcOpportunityAttacks` PC loop, and the Counterspell
+    eligibility check.
+  - **Slow's somatic-spell 25% fail** — shipped. New
+    `Spell.somatic?: boolean` field (defaults true if unspecified
+    since virtually every SRD spell has S). Precast gate rolls
+    d20 after slot + action-economy consumption when the caster
+    is slowed and the spell has S; on 1-10 the cast fizzles
+    (slot wasted, action wasted, narrative explains the
+    disruption).
 - **Heroes' Feast / Greater Restoration** — pluggable via the
   existing `removeConditions` + multi-target heal infra.
 

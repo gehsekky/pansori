@@ -38,16 +38,26 @@ export function runMultiTargetSpell(
   slotNote: string
 ): boolean {
   const multiTargets = action.targetEnemyIds;
-  const isMultiTargetable = spell.id === 'magic_missile' || spell.id === 'eldritch_blast';
+  const isMultiTargetable =
+    spell.id === 'magic_missile' ||
+    spell.id === 'eldritch_blast' ||
+    spell.id === 'scorching_ray';
   if (!multiTargets || multiTargets.length <= 1 || !isMultiTargetable) {
     return false;
   }
 
-  const perShot = spell.id === 'magic_missile' ? '1d4+1' : '1d10';
+  // Per-shot damage expression. Magic Missile: 1d4+1 force darts
+  // (auto-hit). Eldritch Blast: 1d10 beams (spell-attack roll).
+  // Scorching Ray: 2d6 fire rays (spell-attack roll, same shape
+  // as EB).
+  const perShot =
+    spell.id === 'magic_missile' ? '1d4+1' : spell.id === 'eldritch_blast' ? '1d10' : '2d6';
   const agonizingBonusPerBeam =
     spell.id === 'eldritch_blast' && (ctx.char.feats ?? []).includes('agonizing_blast')
       ? Math.max(0, abilityMod(ctx.char.cha))
       : 0;
+  const isAttackRollMulti =
+    spell.id === 'eldritch_blast' || spell.id === 'scorching_ray';
   let totalDealt = 0;
   const lines: string[] = [];
   const hits: Array<{
@@ -66,8 +76,8 @@ export function runMultiTargetSpell(
       lines.push(`${i + 1}: ${tgtEnemy?.name ?? tid} — already down, fizzles.`);
       continue;
     }
-    if (spell.id === 'eldritch_blast') {
-      // Each beam rolls its own attack vs the target's AC.
+    if (isAttackRollMulti) {
+      // Each beam/ray rolls its own attack vs the target's AC.
       const atkE = resolveSpellAttack(ctx.char.level, castingScore, tgtEnemy.ac);
       if (!atkE.hit) {
         lines.push(`${i + 1}: ${tgtEnemy.name} — MISS (${atkE.total} vs AC ${tgtEnemy.ac}).`);

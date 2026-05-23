@@ -1,5 +1,5 @@
 import type { AbilityKey, Spell } from '../../../types.js';
-import { hasArmorProficiency, spellSaveDC } from '../../rulesEngine.js';
+import { d, hasArmorProficiency, spellSaveDC } from '../../rulesEngine.js';
 import { hasClass, resolveCastingAbility } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import { breakConcentration } from '../../gameEngine.js';
@@ -115,6 +115,18 @@ export function runPrecast(
     }
   }
 
+  // 2024 PHB / SRD 5.2.1 — costly material components (Identify's 100 gp
+  // pearl, Revivify's 300 gp diamond, etc.) are consumed on cast. Block
+  // the cast if the caster can't afford it; deduct from gold otherwise.
+  // Checked BEFORE slot deduction so a missing diamond doesn't waste a
+  // slot — RAW treats slot + material as a single cast-initiation event.
+  if (spell.materialCost && spell.materialCost > 0) {
+    if ((ctx.char.gold ?? 0) < spell.materialCost) {
+      ctx.narrative = `${spell.name} requires a ${spell.materialCost} gp material component you don't have.`;
+      return { done: true };
+    }
+  }
+
   // Expend a slot for non-cantrips (unless ritual or Magic-Initiate free cast)
   if (spell.level > 0 && !isRitualCast && !usedMagicInitiateFree) {
     if (slotLevel < spell.level) {
@@ -133,14 +145,12 @@ export function runPrecast(
     };
   }
 
-  // 2024 PHB / SRD 5.2.1 — costly material components (Identify's 100 gp
-  // pearl, Revivify's 300 gp diamond, etc.) are consumed on cast. Block
-  // the cast if the caster can't afford it; deduct from gold otherwise.
+  // Deduct the material cost now that slot + affordability are both
+  // confirmed. Material is consumed on a successful cast initiation
+  // even if a downstream gate (e.g. Revivify's death-window check)
+  // later fails — RAW: the diamond is gone the moment you start
+  // casting, not when the spell resolves.
   if (spell.materialCost && spell.materialCost > 0) {
-    if ((ctx.char.gold ?? 0) < spell.materialCost) {
-      ctx.narrative = `${spell.name} requires a ${spell.materialCost} gp material component you don't have.`;
-      return { done: true };
-    }
     ctx.char.gold = (ctx.char.gold ?? 0) - spell.materialCost;
     ctx.narrative = `${ctx.char.name} expends a ${spell.materialCost} gp component. `;
   }
@@ -171,6 +181,24 @@ export function runPrecast(
   // activation check on a subsequent metamagic invocation).
   if (spell.level > 0 && !isRitualCast) {
     ctx.char.turn_actions = { ...ctx.char.turn_actions, leveled_spell_cast: true };
+  }
+
+  // SRD Slow — "When the creature attempts to cast a spell with a
+  // Somatic component, roll a d20. On an 11 or higher, the spell
+  // functions normally; otherwise, the spell fails and the action,
+  // bonus action, or reaction used to cast the spell is wasted."
+  // Fires AFTER slot + action-economy consumption per RAW (the slot
+  // is gone whether or not the spell fizzles). `somatic` defaults to
+  // true if unspecified — virtually every SRD spell has S.
+  const hasSomatic = (spell as { somatic?: boolean }).somatic ?? true;
+  if (ctx.char.conditions.includes('slowed') && hasSomatic) {
+    const fizzleRoll = d(20);
+    if (fizzleRoll < 11) {
+      ctx.narrative =
+        (ctx.narrative ?? '') +
+        `${ctx.char.name} tries to cast ${spell.name}${' (level-' + slotLevel + ' slot)'} but Slow disrupts the somatic gesture — the spell fizzles (rolled ${fizzleRoll}, needed 11+). The slot is spent.`;
+      return { done: true };
+    }
   }
 
   // Multiclass spell-casting ability resolution (2024 PHB). For a

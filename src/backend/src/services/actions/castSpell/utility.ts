@@ -82,6 +82,52 @@ export function runUtilitySpell(ctx: ActionContext, spell: Spell, slotNote: stri
     ctx.narrative += ` Blessed: ${blessedNames}.`;
   }
 
+  // SRD: Beacon of Hope — same up-to-3-target concentration buff
+  // shape as Bless, but grants the `hopeful` condition instead of
+  // `blessed`. rollConditionSave gives advantage on WIS saves;
+  // the death-save handler gives advantage on death-save d20s.
+  if (spell.id === 'beacon_of_hope') {
+    ctx.char.concentrating_on = {
+      spellId: 'beacon_of_hope',
+      rounds_left: concentrationRoundsFor(spell),
+    };
+    const hopefulTargets: string[] = [ctx.char.id];
+    for (const c of ctx.st.characters) {
+      if (hopefulTargets.length >= 3) break;
+      if (c.id === ctx.char.id || c.dead) continue;
+      hopefulTargets.push(c.id);
+    }
+    const targetSet = new Set(hopefulTargets);
+    ctx.st = {
+      ...ctx.st,
+      characters: ctx.st.characters.map((c) => {
+        if (c.id === ctx.char.id) return c;
+        if (!targetSet.has(c.id) || (c.conditions ?? []).includes('hopeful')) {
+          return c;
+        }
+        return {
+          ...c,
+          conditions: [...(c.conditions ?? []), 'hopeful'],
+          condition_sources: {
+            ...(c.condition_sources ?? {}),
+            hopeful: ctx.char.id,
+          },
+        };
+      }),
+    };
+    if (!(ctx.char.conditions ?? []).includes('hopeful')) {
+      ctx.char.conditions = [...(ctx.char.conditions ?? []), 'hopeful'];
+      ctx.char.condition_sources = {
+        ...(ctx.char.condition_sources ?? {}),
+        hopeful: ctx.char.id,
+      };
+    }
+    const hopefulNames = hopefulTargets
+      .map((id) => ctx.st.characters.find((c) => c.id === id)?.name ?? id)
+      .join(', ');
+    ctx.narrative += ` Hopeful: ${hopefulNames}.`;
+  }
+
   // 2024 PHB Dimension Door (L4) — real grid teleport. Pansori MVP
   // auto-picks the cell with maximum min-distance to any living enemy
   // (the "safest" cell). The caster's grid entity moves there; movement
