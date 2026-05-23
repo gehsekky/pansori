@@ -1232,6 +1232,11 @@ export function effectiveSpeed(char: Character): number {
   // Applies to both walking and any future modes that derive from this
   // value (gridMove uses effectiveSpeed as the walking budget).
   if (char.conditions?.includes('hasted')) base *= 2;
+  // 2024 PHB Slow — "the target's Speed is halved." Floor-divide so
+  // odd speeds (a rare 25 ft speed) don't fractional. If both hasted
+  // and slowed are somehow stacked (RAW: cancel adv/disadv style), they
+  // multiplicatively offset — pansori MVP applies both in sequence.
+  if (char.conditions?.includes('slowed')) base = Math.floor(base / 2);
   // 2024 PHB Mobile feat — +10 ft speed. Hardcoded id+bonus here
   // because `effectiveSpeed` doesn't take a context for feat-table
   // lookup. The feat's `effect.bonusFeet = 10` lives in feat data

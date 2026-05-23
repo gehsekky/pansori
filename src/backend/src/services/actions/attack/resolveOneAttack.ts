@@ -75,7 +75,13 @@ export function resolveOneAttack(
     sharpshooterActive,
   } = toHit;
 
-  const effectiveEnemyAc = target.ac + coverAcBonus;
+  // 2024 PHB Slow — slowed creature takes -2 AC. Read the live target
+  // entity (target.ac comes from the seed template; the slowed flag
+  // lives on the grid entity). Stacks with cover (RAW: penalties +
+  // bonuses are additive).
+  const targetEntForSlow = ctx.st.entities?.find((e) => e.id === targetId && e.isEnemy);
+  const slowedAcPenalty = targetEntForSlow?.conditions.includes('slowed') ? 2 : 0;
+  const effectiveEnemyAc = target.ac + coverAcBonus - slowedAcPenalty;
   const assassinAutoCrit =
     ctx.char.subclass === 'assassin' && (ctx.st.surprised ?? []).includes(targetId);
   const atk = resolvePlayerAttack(
@@ -808,13 +814,18 @@ export function resolveOneAttack(
       };
       ctx.narrative += ` ${fmt.note(`[Sap: ${target.name} has disadvantage on its next attack]`)}`;
     } else if (mastery === 'slow') {
+      // 2024 PHB Slow weapon mastery — narrative-only "speed -10 ft"
+      // marker. Distinct from the Slow SPELL's `slowed` condition
+      // (speed halved, -2 AC, -2 Dex saves). Renamed from `slowed`
+      // to `slow_struck` to avoid name collision with the spell;
+      // neither path reads the condition for engine effects today.
       ctx.st = {
         ...ctx.st,
         entities: (ctx.st.entities ?? []).map((e) =>
           e.id === targetId && e.isEnemy
             ? {
                 ...e,
-                conditions: [...e.conditions.filter((c) => c !== 'slowed'), 'slowed'],
+                conditions: [...e.conditions.filter((c) => c !== 'slow_struck'), 'slow_struck'],
               }
             : e
         ),

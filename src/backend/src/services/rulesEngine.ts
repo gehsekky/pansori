@@ -442,6 +442,11 @@ export function rollConditionSave(
   }
   const prof = proficient ? profBonus(level) : 0;
   const cover = ability === 'dex' ? coverDexBonus : 0;
+  // 2024 PHB Slow — slowed creature has a -2 penalty to Dex saves.
+  // Stacks linearly with proficiency / cover. Pansori MVP applies
+  // only on Dex saves (RAW: "−2 penalty to ... Dexterity saving
+  // throws"); other saves unaffected.
+  const slowedDexPenalty = ability === 'dex' && targetConditions.includes('slowed') ? 2 : 0;
   // Save disadvantage from conditions (e.g. restrained → DEX saves). Advantage
   // and disadvantage cancel — see 2024 PHB advantage/disadvantage rules.
   // `extraDisadvantage` covers any caller-supplied source (e.g. heavy
@@ -460,14 +465,14 @@ export function rollConditionSave(
   if (netDisadv) {
     const r1 = d(20);
     const r2 = d(20);
-    return Math.min(r1, r2) + abilityMod(score) + prof + cover < dc;
+    return Math.min(r1, r2) + abilityMod(score) + prof + cover - slowedDexPenalty < dc;
   }
   if (netAdv) {
     const r1 = d(20);
     const r2 = d(20);
-    return Math.max(r1, r2) + abilityMod(score) + prof + cover < dc;
+    return Math.max(r1, r2) + abilityMod(score) + prof + cover - slowedDexPenalty < dc;
   }
-  return d(20) + abilityMod(score) + prof + cover < dc;
+  return d(20) + abilityMod(score) + prof + cover - slowedDexPenalty < dc;
 }
 
 // ─── Consumable effects ───────────────────────────────────────────────────────

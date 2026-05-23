@@ -973,6 +973,42 @@ export const SRD_SPELLS: Record<string, Spell> = {
     spellList: ['arcane', 'primal'],
   },
 
+  // 2024 PHB Slow (L3 transmutation). Up to 6 creatures in a 40-ft
+  // cube make a WIS save or are slowed for the duration. Pansori MVP
+  // hits a single target via the existing save+condition path (RAW
+  // multi-target deferred).
+  //
+  // SRD: "An affected target's Speed is halved, it takes a −2 penalty
+  // to AC and Dexterity saving throws, and it can't take Reactions.
+  // On its turns, it can take either an action or a Bonus Action, not
+  // both, and it can make only one attack if it takes the Attack
+  // action. If it casts a spell with a Somatic component, there is a
+  // 25 percent chance the spell fails..."
+  //
+  // Pansori MVP wires the speed-halving + AC penalty + Dex-save
+  // penalty via the `slowed` condition. The action-economy cap
+  // (action OR bonus, one attack max), no reactions, and the 25%
+  // somatic fail are deferred behind the same turn-flow / reaction-
+  // window work that Haste's extra-action is blocked on. The end-of-
+  // turn save to throw off the effect is also deferred.
+  slow: {
+    id: 'slow',
+    name: 'Slow',
+    level: 3,
+    castTime: 'action',
+    concentration: true,
+    durationRounds: 100, // 1 minute
+    savingThrow: 'wis',
+    saveEffect: 'negates',
+    condition: 'slowed',
+    conditionDuration: 100,
+    desc: 'Up to six creatures in a 40 ft cube make a WIS save or are slowed for 1 minute: Speed halved, -2 AC, -2 Dex saves.',
+    narrative: '{name} weaves the rune of stilled time — {target} drags as if through mud.',
+    rangeKind: 'ranged',
+    rangeFt: 120,
+    spellList: ['arcane'],
+  },
+
   // 2024 PHB Haste (L3 transmutation). Buff a willing creature
   // for concentration up to 1 minute: Speed doubled, +2 AC,
   // advantage on Dex saves, and one extra action per turn (limited

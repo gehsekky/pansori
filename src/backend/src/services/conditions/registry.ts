@@ -156,6 +156,13 @@ const defs: ConditionDef[] = [
   // Permanent duration here means tickConditions doesn't auto-expire;
   // the caster's concentration is the real timer.
   { id: 'hasted', duration: 'permanent' },
+  // 2024 PHB Slow — Speed halved, -2 AC, -2 Dex saves. Concentration-
+  // linked, cleared on caster's concentration drop. Per RAW the
+  // target also repeats the save at the end of each of its turns to
+  // throw off the effect — pansori MVP doesn't auto-fire this
+  // recurring save (deferred). Permanent duration here means
+  // tickConditions doesn't auto-expire; concentration is the timer.
+  { id: 'slowed', duration: 'permanent' },
   // Engine-internal: Shield spell bumps AC +5 on cast (in reaction.ts);
   // ticking the condition off must reverse the bump.
   {
