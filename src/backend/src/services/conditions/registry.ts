@@ -138,6 +138,13 @@ const defs: ConditionDef[] = [
   },
   { id: 'incapacitated', duration: 1 },
   { id: 'grappled', duration: 1, blocksMovement: true },
+  // 2024 PHB Banishment — target removed from combat to a harmless
+  // demiplane. Duration is concentration-linked (cleared by the
+  // caster's concentration drop via the linked-condition path in
+  // breakConcentration). Marked 'permanent' here so tickConditions
+  // doesn't auto-expire it round-by-round; the caster's concentration
+  // is the actual timer.
+  { id: 'banished', duration: 'permanent' },
   // Engine-internal: Shield spell bumps AC +5 on cast (in reaction.ts);
   // ticking the condition off must reverse the bump.
   {

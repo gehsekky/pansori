@@ -2040,7 +2040,13 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   const roomId = state.current_room;
   const livingEnemies = getLivingRoomEnemies(state, seed, roomId).filter((e) => {
     const ent = state.entities?.find((ent) => ent.id === e.id && ent.isEnemy);
-    return ent ? ent.hp > 0 : true;
+    if (!ent) return true;
+    if (ent.hp <= 0) return false;
+    // 2024 PHB Banishment — banished enemies are in a harmless demiplane
+    // and aren't targetable. Filter them out of attack-target selection
+    // here so cast / attack choices don't surface them.
+    if (ent.conditions.includes('banished')) return false;
+    return true;
   });
   const enemyAlive = livingEnemies.length > 0;
   const loot = seed.loot?.[roomId];
@@ -5144,6 +5150,21 @@ export function runEnemyTurns(args: {
         if (advIdx === args.initialCurrentIdx) break;
         continue;
       }
+      // 2024 PHB Banishment — banished creatures are in a harmless
+      // demiplane and skip their turn entirely. The condition is
+      // cleared by the caster's concentration drop in
+      // breakConcentration, so the creature returns the moment the
+      // caster takes too much damage or willingly ends the spell.
+      const banishedEnt = st.entities?.find((e) => e.id === eEntry.id && e.isEnemy);
+      if (banishedEnt && banishedEnt.conditions.includes('banished')) {
+        narrative += `\n\n[${rm.name} is banished — out of reach this turn.]`;
+        resumeMi = 0;
+        const prevAdvIdxBanish = advIdx;
+        advIdx = (advIdx + 1) % orderLen;
+        if (advIdx === 0 && prevAdvIdxBanish !== 0) roundWrapped = true;
+        if (advIdx === args.initialCurrentIdx) break;
+        continue;
+      }
       // SRD p.221 — legendary action pool refreshes at the start of the
       // legendary creature's own turn.
       if (rm.legendary_actions?.length) refreshLegendaryPool(args.seed, rm.id);
@@ -5378,10 +5399,15 @@ export async function takeAction({
   const roomObstacleCells = seed.rooms.find((r) => r.id === roomId)?.obstacles ?? [];
   // Living enemies in this room (multi-enemy support). For legacy narrative use,
   // `enemy` is the first living enemy; resolution code should target a specific
-  // enemy via `action.targetEnemyId`.
+  // enemy via `action.targetEnemyId`. Banished enemies (Banishment spell) are
+  // filtered out — they're in a harmless demiplane and not targetable until the
+  // caster's concentration drops.
   const livingEnemiesInRoom = getLivingRoomEnemies(st, seed, roomId).filter((e) => {
     const ent = st.entities?.find((ent) => ent.id === e.id && ent.isEnemy);
-    return ent ? ent.hp > 0 : true;
+    if (!ent) return true;
+    if (ent.hp <= 0) return false;
+    if (ent.conditions.includes('banished')) return false;
+    return true;
   });
   const enemy: Enemy | undefined = livingEnemiesInRoom[0];
   const enemyAlive = livingEnemiesInRoom.length > 0;

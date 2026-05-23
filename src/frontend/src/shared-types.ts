@@ -62,7 +62,15 @@ export type ConditionName =
   // 2024 PHB Faerie Fire — outlined creature. Attacks against it
   // have advantage. Engine-internal marker, not in the SRD 14
   // standard conditions list.
-  | 'faerie_fired';
+  | 'faerie_fired'
+  // 2024 PHB Banishment — target is sent to a harmless demiplane.
+  // While banished, the creature is removed from combat: skipped
+  // by the enemy turn loop, filtered out of player attack-target
+  // selection, can't be hit or healed. Cleared when the caster's
+  // concentration drops (or the 1-minute timer expires); the
+  // creature returns to its space. Linked to caster via
+  // `concentrating_on.condition = 'banished'`.
+  | 'banished';
 
 export type NpcAttitude = 'friendly' | 'indifferent' | 'hostile';
 
