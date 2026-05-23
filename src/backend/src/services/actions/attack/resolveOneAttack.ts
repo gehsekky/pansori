@@ -448,57 +448,6 @@ export function resolveOneAttack(
       turn_actions: { ...ctx.char.turn_actions, dread_ambusher_pending: undefined },
     };
   }
-  // 2024 PHB Elements Monk L3 — Elemental Strikes: once per turn,
-  // on an unarmed hit, auto-spend 1 Discipline (Ki) for +1d10
-  // fire. RAW lets the player pick the damage type (acid / cold
-  // / fire / lightning / thunder); pansori MVP hardcodes fire
-  // (player-pickable element deferred). Also defers RAW's 10 ft
-  // push effect.
-  let elementalStrikesDmg = 0;
-  if (
-    !weaponItem && // unarmed only
-    hasClass(ctx.char, 'monk') &&
-    ctx.char.subclass === 'elements' &&
-    getClassLevel(ctx.char, 'monk') >= 3 &&
-    !ctx.char.turn_actions.elemental_strikes_used &&
-    (ctx.char.class_resource_uses?.ki_points ?? getClassLevel(ctx.char, 'monk')) > 0
-  ) {
-    elementalStrikesDmg = rollDice('1d10');
-    const currentKiE = ctx.char.class_resource_uses?.ki_points ?? getClassLevel(ctx.char, 'monk');
-    ctx.char = {
-      ...ctx.char,
-      turn_actions: { ...ctx.char.turn_actions, elemental_strikes_used: true },
-      class_resource_uses: {
-        ...(ctx.char.class_resource_uses ?? {}),
-        ki_points: currentKiE - 1,
-      },
-    };
-  }
-  // 2024 PHB Mercy Monk L3 — Hand of Harm: once per turn, on an
-  // unarmed-strike hit, spend 1 Ki to add 1d6 + WIS mod necrotic.
-  // Only fires on UNARMED strikes (RAW). Gated on Ki availability
-  // and the once-per-turn flag.
-  let handOfHarmDmg = 0;
-  const isUnarmed = !weaponItem; // weaponItem null on unarmed strikes
-  if (
-    isUnarmed &&
-    hasClass(ctx.char, 'monk') &&
-    ctx.char.subclass === 'mercy' &&
-    getClassLevel(ctx.char, 'monk') >= 3 &&
-    !ctx.char.turn_actions.hand_of_harm_used &&
-    (ctx.char.class_resource_uses?.ki_points ?? getClassLevel(ctx.char, 'monk')) > 0
-  ) {
-    handOfHarmDmg = rollDice('1d6') + abilityMod(ctx.char.wis);
-    const currentKi = ctx.char.class_resource_uses?.ki_points ?? getClassLevel(ctx.char, 'monk');
-    ctx.char = {
-      ...ctx.char,
-      turn_actions: { ...ctx.char.turn_actions, hand_of_harm_used: true },
-      class_resource_uses: {
-        ...(ctx.char.class_resource_uses ?? {}),
-        ki_points: currentKi - 1,
-      },
-    };
-  }
   const rawDmg =
     baseHit +
     sneakDmg +
@@ -507,9 +456,7 @@ export function resolveOneAttack(
     gwmDmg +
     celRevDmg +
     dreadfulStrikesDmg +
-    handOfHarmDmg +
-    dreadAmbusherDmg +
-    elementalStrikesDmg;
+    dreadAmbusherDmg;
   const { damage: finalDmg, note: dmgNote } = applyDamageMultiplier(
     rawDmg,
     weaponItem?.damageType,
@@ -561,14 +508,8 @@ export function resolveOneAttack(
   if (dreadfulStrikesDmg > 0) {
     hitBonuses.push({ label: `Dreadful Strikes: +${dreadfulStrikesDmg} psychic` });
   }
-  if (handOfHarmDmg > 0) {
-    hitBonuses.push({ label: `Hand of Harm: +${handOfHarmDmg} necrotic (1 Ki)` });
-  }
   if (dreadAmbusherDmg > 0) {
     hitBonuses.push({ label: `Dread Ambusher: +${dreadAmbusherDmg}` });
-  }
-  if (elementalStrikesDmg > 0) {
-    hitBonuses.push({ label: `Elemental Strikes: +${elementalStrikesDmg} fire (1 Ki)` });
   }
   if (dmgNote) {
     // dmgNote arrives as " [resistant: 6 → 3]" — strip leading space and

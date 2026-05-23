@@ -23,8 +23,6 @@ import { composeNow } from '../../narrative/compose.js';
  *    Dash AND Disengage. Free uses share the `monk_free_used` slot.
  *  - `stunning_strike`: 1 ki, once per turn (was per-hit in 2014).
  *    CON save vs Monk DC or stunned until end of caster's next turn.
- *  - `shadow_arts`: L3 Shadow Monk subclass. 2 ki → invisible for 3
- *    rounds. Costs an action (not a bonus action).
  */
 export function handleMonkFeature(ctx: ActionContext, fid: string): boolean {
   if (fid === 'flurry_of_blows') {
@@ -341,33 +339,6 @@ export function handleMonkFeature(ctx: ActionContext, fid: string): boolean {
         prose: `Stunning Strike! CON save ${conSave} vs DC ${stunDC} — ${ctx.enemy!.name} resists. (${kiPool3 - 1} ki remaining)`,
       });
     }
-    return true;
-  }
-
-  if (fid === 'shadow_arts') {
-    if (ctx.char.subclass !== 'shadow' || !hasClass(ctx.char, 'monk')) {
-      ctx.narrative = 'Only Way of Shadow Monks have Shadow Arts.';
-      return true;
-    }
-    const monkLvl5 = getClassLevel(ctx.char, 'monk');
-    if (monkLvl5 < 3) {
-      ctx.narrative = 'Shadow Arts requires Monk level 3.';
-      return true;
-    }
-    const kiSa = ctx.char.class_resource_uses?.ki_points ?? monkLvl5;
-    if (kiSa < 2) {
-      ctx.narrative = 'Need 2 ki points for Shadow Arts.';
-      return true;
-    }
-    ctx.char.class_resource_uses = { ...(ctx.char.class_resource_uses ?? {}), ki_points: kiSa - 2 };
-    ctx.char.conditions = [...ctx.char.conditions.filter((c) => c !== 'invisible'), 'invisible'];
-    ctx.char.condition_durations = {
-      ...(ctx.char.condition_durations ?? {}),
-      invisible: 3,
-    };
-    ctx.char.turn_actions = { ...ctx.char.turn_actions, action_used: true };
-    ctx.usedInitiative = true;
-    ctx.narrative = `🌑 ${ctx.char.name} weaves Shadow Arts — invisible for 3 rounds. (${kiSa - 2} ki remaining)`;
     return true;
   }
 
