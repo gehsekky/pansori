@@ -75,7 +75,7 @@ export const context: Context = {
       feature: 'Military Rank',
       featureDesc: 'Soldiers and veterans recognize your authority.',
       abilityScoreIncreases: ['str', 'dex', 'con'],
-      originFeat: 'tough',
+      originFeat: 'savage_attacker',
       language: 'Common',
     },
     {
@@ -87,10 +87,7 @@ export const context: Context = {
       feature: 'Criminal Contact',
       featureDesc: 'You have a contact who can help you find information or fences stolen goods.',
       abilityScoreIncreases: ['dex', 'con', 'int'],
-      // Lucky is canonically Farmer's origin feat in 2024 PHB, but Criminal
-      // gets Alert; Alert isn't seeded yet so Lucky stands in until Alert
-      // ships. The choice doesn't change RAW intent — both are origin feats.
-      originFeat: 'lucky',
+      originFeat: 'alert',
       language: "Thieves' Cant",
     },
     {

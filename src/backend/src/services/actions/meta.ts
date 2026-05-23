@@ -153,16 +153,6 @@ export const handleTakeFeat: ActionHandler<{
     ctx.narrative = `${feat.name} is a half-feat — pick an ability for the +1 bonus.`;
     return;
   }
-  // save-proficiency feats with empty `abilities` need a pick.
-  if (
-    feat.effect.kind === 'save-proficiency' &&
-    feat.effect.abilities.length === 0 &&
-    (!action.saveProficiencyChoices || action.saveProficiencyChoices.length === 0)
-  ) {
-    ctx.narrative = `${feat.name} requires a save-proficiency choice.`;
-    return;
-  }
-
   // Magic Initiate — validate that the chosen cantrips + L1 spell
   // exist, are the right level, and belong to the feat's spell list.
   if (feat.effect.kind === 'extra-cantrips-and-l1' && (action.cantripChoices || action.l1Choice)) {
@@ -212,7 +202,6 @@ export const handleTakeFeat: ActionHandler<{
 
   const { newChar, narrative } = applyFeatTake(ctx.char, feat, {
     abilityChoice: action.abilityChoice,
-    saveProficiencyChoices: action.saveProficiencyChoices,
     cantripChoices: action.cantripChoices,
     l1Choice: action.l1Choice,
   });
