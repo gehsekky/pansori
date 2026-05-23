@@ -73,6 +73,26 @@ export interface ActionContext {
   fragments: NarrativeFragment[];
 
   /**
+   * 2024 PHB PC-turn d20 reaction window — side-channel for the
+   * attack-handler orchestrator to detect hit/miss + capture the
+   * inputs needed to re-resolve on Heroic Inspiration reroll. Set by
+   * resolveOneAttack after each attack; consumed by attack/index.ts
+   * to decide whether to pause for a reaction. Optional because
+   * unrelated handlers (cast_spell, sneak, etc.) never set it.
+   */
+  lastAttackResult?: {
+    hit: boolean;
+    fumble: boolean;
+    critical: boolean;
+    d20: number;
+    total: number;
+    atkMod: number;
+    prof: number;
+    attackBonus: number;
+    targetAc: number;
+  };
+
+  /**
    * Write `char` back into `st.characters[safeIdx]` and sync HP /
    * conditions into the grid entity when one exists. Mutates `this.st`.
    */

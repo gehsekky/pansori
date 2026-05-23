@@ -656,7 +656,10 @@ describe('grid-combat invariants', () => {
     // pending_reaction is set, active_character_id moves to the reactor.
     expect(result.newState.pending_reaction).toBeDefined();
     expect(result.newState.pending_reaction?.kind).toBe('shield');
-    const reactor = result.newState.pending_reaction?.targetCharId;
+    const reactor =
+      result.newState.pending_reaction?.kind === 'shield'
+        ? result.newState.pending_reaction.targetCharId
+        : undefined;
     expect(reactor).toBe(wizId);
     expect(result.newState.active_character_id).toBe(reactor);
     // Strip↔PartyRail sync invariant: the reactor is still a known PC

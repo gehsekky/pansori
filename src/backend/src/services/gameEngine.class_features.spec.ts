@@ -1292,7 +1292,9 @@ describe('class features', () => {
     });
     expect(result.newState.pending_reaction).toBeDefined();
     expect(result.newState.pending_reaction?.kind).toBe('shield');
-    expect(result.newState.pending_reaction?.targetCharId).toBe(wizId);
+    if (result.newState.pending_reaction?.kind === 'shield') {
+      expect(result.newState.pending_reaction.targetCharId).toBe(wizId);
+    }
     expect(result.newState.active_character_id).toBe(wizId);
   });
 

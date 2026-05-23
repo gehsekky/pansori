@@ -21,6 +21,7 @@ import {
 import type { ActionHandler } from './types.js';
 import type { EnemyAttackHitFragment } from '../narrative/fragments.js';
 import { enemyAttackFragmentEvent } from '../narrative/compose.js';
+import { resolveOneAttack } from './attack/resolveOneAttack.js';
 
 /**
  * `use_reaction`: trigger the readied action stored from a prior
@@ -91,8 +92,77 @@ export const handleResolveReaction: ActionHandler<{
     ctx.narrative = 'No reaction pending.';
     return;
   }
-  if (ctx.char.id !== rx.targetCharId) {
+  // 2024 PHB PC-turn d20 reactions (Heroic Inspiration etc.) carry
+  // `rollerCharId` instead of the enemy-attack-base `targetCharId`.
+  const reactionOwnerId = rx.kind === 'pc_d20' ? rx.rollerCharId : rx.targetCharId;
+  if (ctx.char.id !== reactionOwnerId) {
     ctx.narrative = 'This reaction belongs to another character.';
+    return;
+  }
+
+  // 2024 PHB PC-turn d20 reaction window. Heroic Inspiration is the
+  // first source; Lucky-RAW (PHB-only feat) and Clockwork Soul Restore
+  // Balance will plug into the same shape. Branches early (returns) so
+  // the enemy-turn resume below doesn't fire — the PC is still on their
+  // turn and the standard post-action epilogue drives initiative.
+  //
+  // Accept (Heroic Inspiration): rewind to pre-attack state, clear
+  // inspiration on the char, set forceD20 on the AttackContext, re-call
+  // resolveOneAttack. SRD: "you must use the new roll" — no
+  // adv/disadv on the reroll; resolvePlayerAttack reads forceRoll1 and
+  // skips its internal d20 generation. Inspiration is consumed
+  // regardless of whether the new roll improves the outcome.
+  //
+  // Decline: commit the proposed snapshot (the original miss). Inspiration
+  // stays on the char.
+  if (rx.kind === 'pc_d20') {
+    type AttackContextBlob = {
+      preAttackChar: Character;
+      preAttackSt: GameState;
+      atkCtx: Parameters<typeof resolveOneAttack>[1];
+    };
+    const blob = rx.attackContext as AttackContextBlob;
+    if (action.accept) {
+      // Rewind to pre-attack state on ctx.
+      ctx.char = blob.preAttackChar;
+      ctx.st = { ...blob.preAttackSt, pending_reaction: undefined };
+      // Inspiration is spent regardless of outcome.
+      ctx.char = { ...ctx.char, inspiration: false };
+      // Roll the new d20 (RAW: "you must use the new roll").
+      const newD20 = Math.floor(Math.random() * 20) + 1;
+      // Re-run the same attack with the forced d20 baked into the
+      // AttackContext. resolveOneAttack reads atkCtx.forceD20 and
+      // passes it to resolvePlayerAttack as `forceRoll1`.
+      const rerunCtx = {
+        ...blob.atkCtx,
+        forceD20: newD20,
+      };
+      const inspirationNote = `\n\n[Heroic Inspiration: reroll d20 ${rx.originalD20} → ${newD20}.] `;
+      ctx.narrative += inspirationNote;
+      resolveOneAttack(ctx, rerunCtx, '');
+      // Action is consumed (the original attack was the action; the
+      // reroll just resolves it).
+      ctx.char = {
+        ...ctx.char,
+        turn_actions: { ...ctx.char.turn_actions, action_used: true },
+      };
+      ctx.usedInitiative = true;
+    } else {
+      // Decline — commit the proposed (miss) snapshot. Inspiration
+      // retained; turn_actions.action_used stays as the post-miss
+      // state already had it (resolveOneAttack flowed through the
+      // miss branch).
+      const proposedChar = rx.pendingProposedChar as Character;
+      const proposedSt = rx.pendingProposedSt as GameState;
+      ctx.char = proposedChar;
+      ctx.st = { ...proposedSt, pending_reaction: undefined };
+      ctx.char = {
+        ...ctx.char,
+        turn_actions: { ...ctx.char.turn_actions, action_used: true },
+      };
+      ctx.narrative += '\n\n[Heroic Inspiration declined.] ';
+      ctx.usedInitiative = true;
+    }
     return;
   }
 

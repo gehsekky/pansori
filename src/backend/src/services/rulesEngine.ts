@@ -114,21 +114,35 @@ export function resolvePlayerAttack(
   ranged = false,
   critThreshold = 20,
   attackBonus = 0,
-  halflingLucky = false
+  halflingLucky = false,
+  // 2024 PHB Heroic Inspiration / Lucky-RAW reroll — when set, the
+  // function skips the internal d20 generation and uses this value
+  // as the (single) roll instead. RAW for Heroic Inspiration says
+  // "you must use the new roll" — no advantage/disadvantage logic,
+  // no Halfling Lucky retry on the reroll. The first-roll path is
+  // unchanged.
+  forceRoll1?: number
 ): AttackResult {
   const strMod = abilityMod(player.str);
   const dexMod = abilityMod(player.dex);
   const atkMod = ranged ? dexMod : finesse ? Math.max(strMod, dexMod) : strMod;
   const atkStat: 'STR' | 'DEX' = ranged ? 'DEX' : finesse && dexMod > strMod ? 'DEX' : 'STR';
   const prof = weaponProficient ? profBonus(player.level) : 0;
-  const roll1 = d(20);
-  // Advantage + disadvantage cancel; net advantage rolls 2d20 keep higher; net disadv keeps lower
-  const netAdv = advantage && !disadvantage;
-  const netDisadv = disadvantage && !advantage;
-  let roll = netDisadv ? Math.min(roll1, d(20)) : netAdv ? Math.max(roll1, d(20)) : roll1;
-  // 2024 PHB Halfling Lucky — re-roll a Nat 1 on a d20 once; take the new
-  // result. Applies to the final kept roll (after advantage/disadvantage).
-  if (halflingLucky && roll === 1) roll = d(20);
+  let roll: number;
+  if (forceRoll1 !== undefined) {
+    // Reroll path — must use the forced value, no adv/disadv, no
+    // Halfling Lucky chain re-rolls.
+    roll = forceRoll1;
+  } else {
+    const roll1 = d(20);
+    // Advantage + disadvantage cancel; net advantage rolls 2d20 keep higher; net disadv keeps lower
+    const netAdv = advantage && !disadvantage;
+    const netDisadv = disadvantage && !advantage;
+    roll = netDisadv ? Math.min(roll1, d(20)) : netAdv ? Math.max(roll1, d(20)) : roll1;
+    // 2024 PHB Halfling Lucky — re-roll a Nat 1 on a d20 once; take the new
+    // result. Applies to the final kept roll (after advantage/disadvantage).
+    if (halflingLucky && roll === 1) roll = d(20);
+  }
   const total = roll + atkMod + prof + attackBonus;
 
   if (roll === 1)
