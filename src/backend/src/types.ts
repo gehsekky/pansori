@@ -684,13 +684,6 @@ export interface Character {
   // duration (up to 10 min). computeTotalAc reads this. Expires
   // when the caster's concentration drops.
   shield_of_faith_active?: boolean;
-  // 2024 PHB Trickery Cleric — Blessing of the Trickster (Channel
-  // Divinity). The cleric touches an ally; the ally gains advantage
-  // on Stealth (Dex) checks for 1 hour. Pansori models the duration
-  // as "until long rest" (long enough to cover any single adventure
-  // scope, simpler than a per-turn timer). The sneak handler reads
-  // this flag as an advantage source; the rest handler clears it.
-  tricksters_blessing_active?: boolean;
   // 2024 PHB movement modes (separate from `speed`, which is the
   // walking speed). When non-zero, the character has the matching
   // mode; the engine reads these where the mode changes gameplay.
@@ -855,7 +848,6 @@ export interface GameState {
   help_target_id?: string; // char id receiving Help action advantage
   surprised?: string[]; // entity ids surprised at combat start (skip first turn)
   metamagic_active?: string; // active Metamagic modifier for Sorcerer
-  guided_strike_active?: boolean; // War Cleric Channel Divinity +10 attack pending
   vow_of_enmity_target?: string; // Vengeance Paladin vow target entity id
   cutting_words_penalty?: number; // Lore Bard Cutting Words penalty to apply
   round?: number; // current combat round (1-indexed)

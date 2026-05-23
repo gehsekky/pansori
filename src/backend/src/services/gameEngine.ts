@@ -2509,7 +2509,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       fighter: ['champion', 'battle_master', 'eldritch_knight', 'psi_warrior'],
       rogue: ['thief', 'assassin', 'soulknife', 'arcane_trickster'],
       wizard: ['evoker', 'abjurer', 'diviner', 'illusionist'],
-      cleric: ['life', 'war', 'light', 'trickery'],
+      cleric: ['life'],
       ranger: ['hunter', 'beastmaster', 'fey_wanderer', 'gloom_stalker'],
       paladin: ['devotion', 'vengeance', 'ancients', 'glory'],
       bard: ['lore'],
@@ -3085,31 +3085,6 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       });
     }
 
-    // War Cleric: Guided Strike (Channel Divinity, +10 to next attack)
-    if (char.subclass === 'war' && hasClass(char, 'cleric') && cdLeft > 0) {
-      choices.push({
-        label: `Guided Strike — +10 to next attack roll (Channel Divinity, ${cdLeft} left)`,
-        action: { type: 'use_class_feature', featureId: 'guided_strike' },
-        kind: 'class_feature',
-      });
-    }
-
-    // Light Cleric: Radiance of the Dawn (Channel Divinity, AoE radiant)
-    if (
-      char.subclass === 'light' &&
-      hasClass(char, 'cleric') &&
-      cdLeft > 0 &&
-      state.combat_active &&
-      enemyAlive
-    ) {
-      const cl = getClassLevel(char, 'cleric');
-      choices.push({
-        label: `Radiance of the Dawn — 2d10+${cl} radiant to all enemies within 30 ft, CON save halves (Channel Divinity, ${cdLeft} left)`,
-        action: { type: 'use_class_feature', featureId: 'radiance_of_the_dawn' },
-        kind: 'class_feature',
-      });
-    }
-
     // Devotion Paladin: Sacred Weapon (Channel Divinity)
     if (
       char.subclass === 'devotion' &&
@@ -3235,24 +3210,6 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   // combat use; Blessing of the Trickster RAW is an Action grant of a
   // 1-hour duration buff — the player wants this BEFORE combat starts).
   if (char.subclass) {
-    const cdLeftOutOfCombat = char.class_resource_uses?.channel_divinity ?? 1;
-
-    // Trickery Cleric: Blessing of the Trickster (Channel Divinity).
-    // Grants tricksters_blessing_active to the most-injured ally (or
-    // self if alone). Buff persists until long rest.
-    if (
-      char.subclass === 'trickery' &&
-      hasClass(char, 'cleric') &&
-      cdLeftOutOfCombat > 0 &&
-      !char.tricksters_blessing_active
-    ) {
-      choices.push({
-        label: `Blessing of the Trickster — advantage on Stealth checks until long rest (Channel Divinity, ${cdLeftOutOfCombat} left)`,
-        action: { type: 'use_class_feature', featureId: 'blessing_of_the_trickster' },
-        kind: 'class_feature',
-      });
-    }
-
     // Clockwork Soul Sorcerer L3 — Bastion of Law (PHB 2024). Bonus
     // action: spend 1 sorcery point, grant 5 temp HP to caster or a
     // living ally. RAW lets the caster spend 1-5 SP for 5N temp HP;
