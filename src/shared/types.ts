@@ -1027,6 +1027,34 @@ export interface PendingSentinelReaction extends PendingReactionBase {
   triggerAttackerEnemyId: string;
 }
 
+// 2024 PHB Clockwork Soul Sorcerer (L3) — Restore Balance reaction.
+// Triggered when an enemy attack hits a PC AND the enemy rolled with
+// Advantage AND a Clockwork Soul Sorcerer within 60 ft has a
+// remaining Restore Balance use. Accept consumes 1 use + reaction
+// and re-rolls the enemy d20 without Advantage (flat roll). Decline
+// commits the full-damage proposed snapshot.
+//
+// Pansori MVP scope: only fires on enemy-with-advantage attacks
+// (the most common useful case). RAW also lets the sorcerer cancel
+// disadvantage on any d20 in 60 ft — those other cases (cancel
+// disadv on PC attack, cancel disadv on enemy attack against ally,
+// etc.) are deferred follow-ups since they pause at different
+// roll sites.
+//
+// Pansori divergence from RAW: pause is post-roll where RAW is
+// pre-roll (same divergence as Lucky Disadv). Mechanically
+// equivalent — one fresh d20 either way.
+export interface PendingRestoreBalanceReaction extends PendingReactionBase {
+  kind: 'restore_balance';
+  atkTotal: number;
+  proposedD20: number;
+  proposedDamage: number;
+  targetAc: number;
+  pendingFragment: unknown;
+  pendingProposedChar: unknown;
+  pendingProposedSt: unknown;
+}
+
 // 2024 PHB Lucky feat — Disadvantage benefit. Triggered when an
 // enemy attack roll against the PC hits + the PC has the Lucky
 // feat with at least one luck point remaining. Accept spends 1 luck
@@ -1181,6 +1209,7 @@ export type PendingReaction =
   | PendingAbsorbElementsReaction
   | PendingSilveryBarbsReaction
   | PendingLuckyDisadvReaction
+  | PendingRestoreBalanceReaction
   | PendingSentinelReaction
   | PendingD20InterceptionReaction
   | PendingPcD20Reaction;

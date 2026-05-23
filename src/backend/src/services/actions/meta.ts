@@ -93,6 +93,18 @@ export const handleSelectSubclass: ActionHandler<{ type: 'select_subclass'; subc
     next.swim_speed_ft = next.speed ?? 30;
     narrative += ` Aquatic Affinity: swim speed equals walking speed (${next.swim_speed_ft} ft).`;
   }
+  // 2024 PHB Clockwork Soul Sorcerer L3 — Restore Balance pool. Uses
+  // equal CHA modifier (min 1); refresh on long rest (handled in
+  // rest.ts). Tracked on class_resource_uses.restore_balance_uses.
+  if (action.subclass === 'clockwork_soul' && hasClass(next, 'sorcerer')) {
+    const chaMod = Math.max(0, Math.floor(((next.cha ?? 10) - 10) / 2));
+    const poolSize = Math.max(1, chaMod);
+    next.class_resource_uses = {
+      ...(next.class_resource_uses ?? {}),
+      restore_balance_uses: poolSize,
+    };
+    narrative += ` Restore Balance: ${poolSize} use${poolSize === 1 ? '' : 's'}/long rest.`;
+  }
   if (action.subclass === 'aberrant_mind' && hasClass(next, 'sorcerer')) {
     const grants = ['vicious_mockery', 'charm_person', 'sleep'];
     const knownSet = new Set(next.spells_known ?? []);
