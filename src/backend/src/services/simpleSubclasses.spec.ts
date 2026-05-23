@@ -82,9 +82,4 @@ describe('Subclass picker exposes the new options', () => {
     const pc = makeChar({ id: 'pc', character_class: 'Monk', level: 3 });
     expect(pickerOffers(pc)).toContain('elements');
   });
-
-  it('Barbarian L3 offers world_tree + zealot', () => {
-    const pc = makeChar({ id: 'pc', character_class: 'Barbarian', level: 3 });
-    expect(pickerOffers(pc)).toEqual(expect.arrayContaining(['world_tree', 'zealot']));
-  });
 });

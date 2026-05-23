@@ -430,27 +430,6 @@ export function resolveOneAttack(
       turn_actions: { ...ctx.char.turn_actions, dreadful_strikes_used: true },
     };
   }
-  // 2024 PHB Zealot Barbarian L3 — Divine Fury: while raging,
-  // the first weapon attack of the turn deals +1d6 + (barb lvl /
-  // 2) radiant damage. RAW: player picks radiant or necrotic at
-  // subclass-select; pansori MVP hardcodes radiant. Once-per-turn
-  // gate cleared by FRESH_TURN.
-  let divineFuryDmg = 0;
-  if (
-    weaponItem &&
-    isRaging &&
-    hasClass(ctx.char, 'barbarian') &&
-    ctx.char.subclass === 'zealot' &&
-    getClassLevel(ctx.char, 'barbarian') >= 3 &&
-    !ctx.char.turn_actions.divine_fury_used
-  ) {
-    const barbLvl = getClassLevel(ctx.char, 'barbarian');
-    divineFuryDmg = rollDice('1d6') + Math.floor(barbLvl / 2);
-    ctx.char = {
-      ...ctx.char,
-      turn_actions: { ...ctx.char.turn_actions, divine_fury_used: true },
-    };
-  }
   // 2024 PHB Psi Warrior Fighter L3 — Psionic Strike: once per
   // turn, on a weapon hit, auto-spend 1 Psi Energy die for
   // (die + INT mod) force damage. Die size scales:
@@ -562,8 +541,7 @@ export function resolveOneAttack(
     handOfHarmDmg +
     dreadAmbusherDmg +
     psionicStrikeDmg +
-    elementalStrikesDmg +
-    divineFuryDmg;
+    elementalStrikesDmg;
   const { damage: finalDmg, note: dmgNote } = applyDamageMultiplier(
     rawDmg,
     weaponItem?.damageType,
@@ -626,9 +604,6 @@ export function resolveOneAttack(
   }
   if (elementalStrikesDmg > 0) {
     hitBonuses.push({ label: `Elemental Strikes: +${elementalStrikesDmg} fire (1 Ki)` });
-  }
-  if (divineFuryDmg > 0) {
-    hitBonuses.push({ label: `Divine Fury: +${divineFuryDmg} radiant` });
   }
   if (dmgNote) {
     // dmgNote arrives as " [resistant: 6 → 3]" — strip leading space and
@@ -933,8 +908,6 @@ export function resolveOneAttack(
       ctx.char = {
         ...ctx.char,
         conditions: ctx.char.conditions.filter((c) => c !== 'raging'),
-        // Clear Totem Warrior totem when rage ends (combat clear).
-        totem_spirit: undefined,
       };
     }
     const killProse =
