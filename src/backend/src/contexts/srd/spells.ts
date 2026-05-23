@@ -284,8 +284,78 @@ export const SRD_SPELLS: Record<string, Spell> = {
     rangeFt: 30,
     spellList: ['divine'],
   },
+  // SRD: Resistance — concentration cantrip. Touch a willing
+  // creature and pick a damage type; until the spell ends the
+  // creature reduces damage of that type by 1d4 (once per turn).
+  // Pansori MVP is narrative — the damage-reduction rider would
+  // need a per-type-resistance hook on the damage pipeline.
+  resistance: {
+    id: 'resistance',
+    name: 'Resistance',
+    level: 0,
+    castTime: 'action',
+    concentration: true,
+    durationRounds: 10,
+    narrative: '{name} touches an ally and shapes a ward against the chosen element.',
+    desc: 'Touch buff: -1d4 damage of chosen type per turn (concentration, 1 minute).',
+    rangeKind: 'touch',
+    spellList: ['divine', 'primal'],
+  },
+  // SRD: Guidance — concentration cantrip. Touch a willing
+  // creature, pick a skill; until the spell ends, the creature
+  // adds 1d4 to any ability check using that skill. Pansori MVP
+  // is narrative — the +1d4 skill-check rider would need a
+  // per-skill-buff hook on the check pipeline.
+  guidance: {
+    id: 'guidance',
+    name: 'Guidance',
+    level: 0,
+    castTime: 'action',
+    concentration: true,
+    durationRounds: 10,
+    narrative: "{name} murmurs a few quiet words — focus settles into the recipient's hands.",
+    desc: 'Touch buff: +1d4 on the chosen skill (concentration, 1 minute).',
+    rangeKind: 'touch',
+    spellList: ['divine', 'primal'],
+  },
 
   // ─── Level 1 ────────────────────────────────────────────────────────────────
+  // SRD: Goodberry — conjure 10 magical berries that each restore
+  // 1 HP when eaten as a bonus action. Berries last 24 hours.
+  // Narrative spell in pansori — granted-consumable inventory is a
+  // future infra item; the spell is flavor for narrative purposes.
+  goodberry: {
+    id: 'goodberry',
+    name: 'Goodberry',
+    level: 1,
+    castTime: 'action',
+    narrative:
+      '{name} cups a sprig of mistletoe — ten berries form, each one humming with faint primal life.',
+    desc: 'Conjure 10 magical berries; each restores 1 HP (bonus action to eat). Berries last 24 hours.',
+    rangeKind: 'self',
+    spellList: ['primal'],
+  },
+  // SRD: Protection from Evil and Good — touch a willing creature
+  // for 10 minutes of concentration; targeted by Aberrations,
+  // Celestials, Elementals, Fey, Fiends, or Undead with
+  // Disadvantage on their attacks against the warded creature,
+  // and the warded creature is immune to Charm / Fear / Possession
+  // from those creature types. Pansori MVP is narrative; the
+  // creature-type-tagged Disadv would need an enemy-type tag on
+  // the toHit pipeline that's deferred.
+  protection_from_evil_and_good: {
+    id: 'protection_from_evil_and_good',
+    name: 'Protection from Evil and Good',
+    level: 1,
+    castTime: 'action',
+    concentration: true,
+    durationRounds: 100, // 10 minutes
+    narrative:
+      '{name} traces a sigil against an ally — a faint shimmer wards them from otherworldly malice.',
+    desc: 'Touch buff: protection against Aberrations / Celestials / Elementals / Fey / Fiends / Undead for 10 minutes (concentration).',
+    rangeKind: 'touch',
+    spellList: ['arcane', 'divine'],
+  },
   // SRD: Find Familiar — 1-hour ritual cast (10 gp material consumed).
   // Summons a Tiny familiar that scouts and shares senses. Narrative
   // spell in pansori — companion entities are out of scope (the
@@ -683,6 +753,60 @@ export const SRD_SPELLS: Record<string, Spell> = {
   },
 
   // ─── Level 2 ────────────────────────────────────────────────────────────────
+  // SRD: Calm Emotions — 20-ft sphere within 60 ft. Humanoids in
+  // the area make a CHA save or one of: immunity to Charmed and
+  // Frightened (and suppression of any current Charmed/Frightened),
+  // or made indifferent to chosen creatures. Pansori MVP is
+  // narrative — the suppress-condition rider would need a per-
+  // condition-immunity hook on the condition pipeline.
+  calm_emotions: {
+    id: 'calm_emotions',
+    name: 'Calm Emotions',
+    level: 2,
+    castTime: 'action',
+    concentration: true,
+    durationRounds: 10,
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    blastRadius: 20,
+    aoeShape: 'sphere',
+    narrative: '{name} sweeps a wave of calm through the room — tempers cool, fears thin.',
+    desc: '20-ft sphere; humanoid targets CHA save or be calmed (suppress Charmed/Frightened OR indifferent). Concentration.',
+    spellList: ['arcane', 'divine'],
+  },
+  // SRD: Continual Flame — permanent magical light from an object
+  // touched. 50 gp ruby dust consumed at cast. Until dispelled.
+  // Pansori MVP is narrative — flavor-only at the room-grained
+  // lighting model.
+  continual_flame: {
+    id: 'continual_flame',
+    name: 'Continual Flame',
+    level: 2,
+    castTime: 'action',
+    materialCost: 50,
+    narrative: '{name} touches the object — a perfectly steady flame springs from it, heatless.',
+    desc: 'Permanent magical flame on a touched object (Bright Light 20 ft + Dim Light 20 ft). Consumes 50 gp ruby dust.',
+    rangeKind: 'touch',
+    spellList: ['arcane', 'divine', 'primal'],
+  },
+  // SRD: Pass without Trace — radiate a 30-ft aura of stealth for
+  // 1 hour (concentration). Caster + each chosen creature gets
+  // +10 to Dex (Stealth) and leaves no tracks. Pansori MVP is
+  // narrative — the +10 stealth rider would need a per-skill
+  // buff hook on the check pipeline (same shape Guidance defers).
+  pass_without_trace: {
+    id: 'pass_without_trace',
+    name: 'Pass without Trace',
+    level: 2,
+    castTime: 'action',
+    concentration: true,
+    durationRounds: 600, // 1 hour
+    narrative:
+      '{name} burns a sprig of mistletoe — a hush settles over the party. Footsteps vanish into the loam.',
+    desc: '30-ft party-stealth aura: +10 Stealth, leave no tracks (concentration, 1 hour).',
+    rangeKind: 'self',
+    spellList: ['primal'],
+  },
   // SRD: Blindness/Deafness — single target, CON save or Blinded
   // (or Deafened — caster's choice) for 1 minute. RAW: target
   // repeats the save at end of each of its turns. Pansori MVP
@@ -917,6 +1041,20 @@ export const SRD_SPELLS: Record<string, Spell> = {
   },
 
   // ─── Level 3 ────────────────────────────────────────────────────────────────
+  // SRD: Remove Curse — touch a creature; all curses on them end.
+  // Cursed magic items keep their curse but the attunement is
+  // broken. Pansori MVP is narrative — no curse-condition pipeline
+  // exists today (Bestow Curse / Hex / etc. aren't seeded).
+  remove_curse: {
+    id: 'remove_curse',
+    name: 'Remove Curse',
+    level: 3,
+    castTime: 'action',
+    narrative: '{name} lays a hand on the cursed — the dark hum that has followed them falls away.',
+    desc: 'Touch: end all curses on the target. Breaks attunement to cursed items.',
+    rangeKind: 'touch',
+    spellList: ['arcane', 'divine'],
+  },
   // SRD: Fear — 30-ft cone WIS save or Frightened (concentration,
   // up to 1 minute). Frightened creatures must Dash away from the
   // caster each turn. Pansori MVP applies the Frightened condition;
