@@ -2208,9 +2208,21 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     .map((id) => seed.rooms.find((r) => r.id === id))
     .filter((r): r is NonNullable<typeof r> => r != null);
 
-  // Trap: offer disarm if trap is detected (party passive Perception beat the DC) but not yet spent
+  // Trap: offer disarm if trap is detected (party passive Perception
+  // beat the DC) but not yet spent. Disarm is an Action (cost.ts) — in
+  // combat, hide the choice once the active PC has used their action,
+  // otherwise the player can click 4 times in a row and get the same
+  // "action already used" rejection each time (see Whispering Pines
+  // log turns 51-54). Out of combat the action_used flag isn't enforced
+  // so the choice always surfaces when the trap is detected.
   const roomTrap = getRoomTrap(roomId, seed, context);
-  if (roomTrap && !trapSpent(state, roomId) && partyDetectsTrap(state.characters, roomTrap)) {
+  const trapDisarmActionAvailable = !state.combat_active || !char.turn_actions.action_used;
+  if (
+    roomTrap &&
+    !trapSpent(state, roomId) &&
+    partyDetectsTrap(state.characters, roomTrap) &&
+    trapDisarmActionAvailable
+  ) {
     choices.push({
       label: `Disarm Trap — DEX check (DC ${roomTrap.dc})`,
       action: { type: 'disarm_trap' },
