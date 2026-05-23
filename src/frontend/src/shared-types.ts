@@ -646,9 +646,15 @@ export type FeatEffect =
       amount: number;
     }
   | {
-      // Per-long-rest resource for rerolling a d20 (Lucky).
+      // Per-long-rest resource for spending on d20-modifier effects
+      // (Lucky feat — advantage on own d20, or disadvantage on
+      // incoming attack). `usesPerLongRest` is the fixed pool size;
+      // when `scalesWithPb` is true the pool is recomputed at
+      // application + long rest from the character's current
+      // proficiency bonus (RAW for the 2024 Lucky feat).
       kind: 'd20-reroll';
       usesPerLongRest: number;
+      scalesWithPb?: boolean;
     }
   | {
       // Ranged-attack toggle: pre-attack opt-in to swap -toHit for +damage,
