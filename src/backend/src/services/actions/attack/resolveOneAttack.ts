@@ -550,7 +550,16 @@ export function resolveOneAttack(
   const totalDmg = finalDmg + radiantRider;
   const enemyEnt = ctx.st.entities?.find((e) => e.id === targetId && e.isEnemy);
   const curEnemyHp = enemyEnt?.hp ?? 0;
-  const newEnemyHp = curEnemyHp - totalDmg;
+  // 2024 PHB enemy temp HP — currently only set by Polymorph. Absorb
+  // damage into temp_hp first, then into hp. When temp_hp depletes,
+  // the polymorph form drops automatically (cleared below at the
+  // state-update site).
+  const curEnemyTempHp = enemyEnt?.temp_hp ?? 0;
+  const tempHpAbsorbed = Math.min(totalDmg, curEnemyTempHp);
+  const damageToHp = totalDmg - tempHpAbsorbed;
+  const newEnemyTempHp = curEnemyTempHp - tempHpAbsorbed;
+  const polymorphFormDrops = enemyEnt?.polymorph_state && newEnemyTempHp <= 0;
+  const newEnemyHp = curEnemyHp - damageToHp;
 
   const hitBonuses: { label: string }[] = [];
   if (isCrit && assassinAutoCrit) {
@@ -916,10 +925,32 @@ export function resolveOneAttack(
   }
   ctx.st = {
     ...ctx.st,
-    entities: (ctx.st.entities ?? []).map((e) =>
-      e.id === targetId && e.isEnemy ? { ...e, hp: newEnemyHp } : e
-    ),
+    entities: (ctx.st.entities ?? []).map((e) => {
+      if (e.id !== targetId || !e.isEnemy) return e;
+      const updated = {
+        ...e,
+        hp: newEnemyHp,
+        temp_hp: newEnemyTempHp > 0 ? newEnemyTempHp : undefined,
+      };
+      // 2024 PHB Polymorph form-drop: when the polymorph buffer
+      // (temp_hp) depletes to 0, the form ends. Clear polymorph_state
+      // + the polymorphed condition; the entity's real `hp` is
+      // unchanged (it was never modified by the polymorph cast).
+      if (polymorphFormDrops) {
+        return {
+          ...updated,
+          temp_hp: undefined,
+          polymorph_state: undefined,
+          conditions: e.conditions.filter((c) => c !== 'polymorphed'),
+        };
+      }
+      return updated;
+    }),
   };
+  if (polymorphFormDrops) {
+    const formName = enemyEnt?.polymorph_state?.formName ?? 'the beast form';
+    ctx.narrative += ` The ${formName} form shatters — ${target.name} returns to themselves!`;
+  }
   ctx.narrative += ` The ${target.name} has ${fmt.hp(newEnemyHp)} HP remaining. `;
   return false;
 }

@@ -806,20 +806,38 @@ the prerequisite infrastructure lands.
   rollDice parsed as just 70). Condition removal (Blinded /
   Deafened / Poisoned RAW) deferred — needs a `removeConditions`
   field on Spell.
-- ~~**Polymorph**~~ — shipped 2026-05-22. L4 transmutation, WIS save.
-  New `polymorph_state` field on `CombatEntity` stashes originalHp /
-  originalMaxHp / formName; the save handler in `castSpell/save.ts`
-  swaps the entity's HP to the chosen beast form's pool (pansori MVP
-  auto-picks Wolf at 11 HP regardless of target CR). New `polymorphed`
-  condition causes the enemy turn loop to skip the entity entirely
-  (RAW: they'd use the beast's actions, but pansori would need the
-  computeEnemyAttack pipeline to substitute attack profiles — that's a
-  deeper refactor deferred to a follow-up). breakConcentration reverts
-  every polymorphed entity: alive in new form → restore originalHp;
-  killed in new form → stay dead (RAW would revert with excess
-  damage applied to original HP — pansori MVP simplification). RAW
-  upcast does nothing for Polymorph specifically. 4 BE specs cover
-  failed/success save + concentration drop alive/dead branches.
+- ~~**Polymorph**~~ — shipped 2026-05-22 using the 2024 PHB rewrite
+  (form HP lives on temp HP instead of swapping primary HP). L4
+  transmutation, WIS save. New `polymorph_state: { formName }` field
+  on `CombatEntity` marks the entity as polymorphed; the form's HP
+  pool lives on `entity.temp_hp` (also new on CombatEntity — enemies
+  didn't track temp HP before). Pansori MVP auto-picks Wolf (11 HP)
+  regardless of target CR.
+
+  **Damage flow**: resolveOneAttack absorbs damage into temp_hp first,
+  excess to hp. When temp_hp depletes to 0, the polymorph form drops
+  automatically: condition cleared, polymorph_state cleared, temp_hp
+  cleared. Excess damage carries over to hp (RAW). This matches the
+  2024 PHB rewrite that uses TemporaryHitPoints instead of a separate
+  buffer — the heal exploit (2014: healing spells could restore form
+  HP because it was real HP) is structurally blocked since healing
+  doesn't restore temp HP.
+
+  **Enemy turn**: polymorphed entities skip their turn entirely (RAW:
+  they'd use the beast's actions, but pansori would need the
+  computeEnemyAttack pipeline to substitute attack profiles — deferred).
+
+  **Revert paths**:
+  - Form-drops-to-0 (temp_hp depleted): condition + state cleared, hp
+    takes the spillover. Caster's concentration is NOT explicitly
+    cleared in pansori MVP — they can keep "concentrating" on a
+    non-existent target (no-op, harmless drift).
+  - Concentration drop: breakConcentration sweeps every polymorphed
+    entity and clears the state + condition + temp_hp.
+
+  5 BE specs: failed save grants temp_hp + condition; success resists;
+  temp_hp absorbs damage with spillover form-drop; concentration drop
+  reverts.
 - ~~**Banishment**~~ — shipped 2026-05-22. New `banished` condition
   in the registry (duration: permanent — concentration is the actual
   timer). Banishment spell (L4 abjuration, CHA save, concentration)
