@@ -62,19 +62,6 @@ export const SRD_SPECIES: Record<string, Species> = {
       "Fey Ancestry: advantage on saves vs Charmed; magic can't put you to sleep.",
     ],
   },
-  drow: {
-    id: 'drow',
-    name: 'Drow (Elf lineage)',
-    desc: 'Subterranean elves with superior darkvision and innate Underdark magic.',
-    size: 'medium',
-    speedFt: 30,
-    darkvisionFt: 120,
-    innateCantrips: ['dancing_lights'],
-    traits: [
-      'Drow Magic: cast Faerie Fire 1/day at L3, Darkness 1/day at L5.',
-      'Sunlight Sensitivity: disadvantage on attack rolls + WIS (Perception) checks in direct sunlight.',
-    ],
-  },
   dwarf: {
     id: 'dwarf',
     name: 'Dwarf',
@@ -162,22 +149,6 @@ export const SRD_SPECIES: Record<string, Species> = {
     traits: [
       'Adrenaline Rush: take the Dash action as a bonus action (1/short rest), gain temp HP equal to prof bonus.',
       'Relentless Endurance: when dropped to 0 HP without dying, drop to 1 HP instead (1/long rest).',
-    ],
-  },
-  aasimar: {
-    id: 'aasimar',
-    name: 'Aasimar',
-    desc: 'Mortals touched by celestial heritage — protectors and emissaries of the upper planes (2024 PHB).',
-    size: 'medium',
-    speedFt: 30,
-    darkvisionFt: 60,
-    resistances: ['necrotic', 'radiant'],
-    innateCantrips: ['light'],
-    traits: [
-      'Celestial Resistance: resistance to necrotic and radiant damage.',
-      'Light Bearer: cast Light cantrip without material components.',
-      'Healing Hands: as an Action, touch a creature to heal a number of d4 equal to your proficiency bonus (1/long rest) — not yet wired.',
-      'Celestial Revelation (L3+): once per long rest, transform as a bonus action — pick Necrotic Shroud / Radiant Soul / Radiant Consumption — not yet wired.',
     ],
   },
 };
