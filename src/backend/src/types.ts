@@ -613,7 +613,7 @@ export interface Character {
     rounds_left?: number;
   } | null;
   // Extended 5e fields
-  subclass?: string; // e.g. 'battle_master', 'thief', 'evoker'
+  subclass?: string; // e.g. 'berserker', 'evoker', 'assassin'
   speed?: number; // movement speed in feet; defaults to 30
   feats?: string[];
   /**

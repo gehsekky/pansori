@@ -2305,17 +2305,11 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     }
   }
   // Interactive object choices — once per object, collapsed into a single Interact action.
-  // Out of combat: anyone can interact (consumes main action).
-  // In combat: only Thief Rogue L3+ via Fast Hands (consumes bonus action).
+  // Out of combat: anyone can interact (consumes main action). In combat: blocked.
   const currentRoom = seed.rooms.find((r) => r.id === roomId);
-  const isThiefFastHands =
-    hasClass(char, 'rogue') && char.subclass === 'thief' && getClassLevel(char, 'rogue') >= 3;
-  const canInteractObjects =
-    currentRoom?.objects?.length &&
-    (!enemyAlive ||
-      (isThiefFastHands && state.combat_active && !char.turn_actions.bonus_action_used));
+  const canInteractObjects = currentRoom?.objects?.length && !enemyAlive;
   if (canInteractObjects && currentRoom?.objects) {
-    const useBonus = enemyAlive && isThiefFastHands;
+    const useBonus = false;
     for (const obj of currentRoom.objects) {
       if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
       const searchKey = `${roomId}:${obj.id}`;
@@ -2497,7 +2491,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     };
     const subclassChoices: Record<string, string[]> = {
       fighter: ['champion'],
-      rogue: ['thief', 'assassin', 'soulknife', 'arcane_trickster'],
+      rogue: ['assassin'],
       wizard: ['evoker', 'abjurer', 'diviner', 'illusionist'],
       cleric: ['life'],
       ranger: ['hunter'],

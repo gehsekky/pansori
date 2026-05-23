@@ -58,23 +58,6 @@ export const handleSelectSubclass: ActionHandler<{ type: 'select_subclass'; subc
     next.hp += sorcLvl;
     narrative += ` Draconic Resilience: +${sorcLvl} max HP (now ${next.hp}/${next.max_hp}).`;
   }
-  // 2024 PHB Soulknife Rogue — grant the Psychic Blade weapon at
-  // subclass-select so the character can equip it like any other
-  // weapon. RAW manifests as a free action each turn; pansori
-  // simplifies to "always in inventory". Damage is fixed at 1d6
-  // (the L3-4 baseline) — scaling to 1d8/1d10/1d12 at L5/L11/L17
-  // is deferred (would require dynamic weapon damage).
-  if (action.subclass === 'soulknife' && hasClass(next, 'rogue')) {
-    const hasBlade = (next.inventory ?? []).some((i) => i.id === 'psychic_blade');
-    if (!hasBlade) {
-      const newId = `psychic_blade_${next.id}`;
-      next.inventory = [
-        ...(next.inventory ?? []),
-        { instance_id: newId, id: 'psychic_blade', name: 'Psychic Blade' },
-      ];
-      narrative += ' Psychic Blades manifest — a shimmering blade now answers your will.';
-    }
-  }
   // 2024 PHB Aberrant Mind Sorcerer L3 — Psionic Spells. Grants a
   // small list of spells flavored as psionic manifestation. RAW
   // lists Mind Sliver / Arms of Hadar / Dissonant Whispers / Detect
