@@ -447,24 +447,24 @@ export function breakConcentration(
     }
   }
   if (wasPolymorph && newSt.entities) {
+    // 2024 PHB Polymorph rewrite — form HP lives on `temp_hp`, not a
+    // separate pool. Concentration drop clears temp_hp + the
+    // polymorph_state stash + the polymorphed condition. The
+    // entity's `hp` was never modified by the polymorph cast, so
+    // no HP revert is needed — the creature simply emerges with
+    // whatever HP they had when polymorphed.
     newSt = {
       ...newSt,
-      entities: newSt.entities.map((e) => {
-        if (!e.polymorph_state) return e;
-        // Restore originals + drop the condition. If the new form
-        // was at 0 HP (polymorphed creature was killed), pansori MVP
-        // keeps them dead — the entity hp stays 0 after the swap.
-        // RAW would revert with leftover damage applied to original
-        // HP; pansori's MVP simplification documented inline.
-        const originalAlive = e.hp > 0;
-        return {
-          ...e,
-          hp: originalAlive ? e.polymorph_state.originalHp : 0,
-          maxHp: e.polymorph_state.originalMaxHp,
-          polymorph_state: undefined,
-          conditions: e.conditions.filter((c) => c !== 'polymorphed'),
-        };
-      }),
+      entities: newSt.entities.map((e) =>
+        e.polymorph_state
+          ? {
+              ...e,
+              temp_hp: undefined,
+              polymorph_state: undefined,
+              conditions: e.conditions.filter((c) => c !== 'polymorphed'),
+            }
+          : e
+      ),
     };
   }
   if (wasShieldOfFaith && context) {

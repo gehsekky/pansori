@@ -1,9 +1,13 @@
-// 2024 PHB Polymorph (L4 transmutation). WIS save or transform target
-// into a small beast (pansori MVP auto-picks Wolf at 11 HP). The new
-// stats live on the entity (hp, maxHp swapped); originals stashed on
-// `polymorph_state`. Concentration drop reverts. RAW excess-damage
-// carryover on form-drops-to-0 not modeled — pansori MVP keeps the
-// polymorphed creature dead if their new-form HP hits 0.
+// 2024 PHB Polymorph (L4 transmutation). WIS save or target is
+// transformed into a small beast. Per the 2024 PHB rewrite the form's
+// HP is **Temporary Hit Points**, not a separate buffer:
+//   - Damage absorbs into entity.temp_hp first; excess carries to hp.
+//   - When temp_hp depletes the form drops automatically (condition +
+//     polymorph_state cleared; the entity's real hp is unchanged).
+//   - Healing can't restore temp_hp, so the 2014 heal exploit is
+//     structurally blocked.
+// Pansori MVP auto-picks Wolf (11 HP) as the form regardless of
+// target CR.
 
 import type { GameState, Seed } from '../../types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -73,10 +77,9 @@ function buildState(pc: ReturnType<typeof makeChar>): GameState {
   };
 }
 
-describe('Polymorph — cast effect', () => {
-  it('failed WIS save swaps HP to 11 + applies polymorphed condition', async () => {
-    // d20 = 1 → ogre save 1 + -2 = -1 vs DC 15+ → fail.
-    vi.spyOn(Math, 'random').mockReturnValue(0);
+describe('Polymorph — cast effect (2024 temp HP rule)', () => {
+  it('failed WIS save grants 11 temp HP + applies polymorphed condition', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0); // d20 = 1 → fail
     const pc = makeChar({
       id: 'pc-1',
       character_class: 'Wizard',
@@ -96,13 +99,12 @@ describe('Polymorph — cast effect', () => {
     });
     const enemyEnt = result.newState.entities?.find((e) => e.id === enemyId && e.isEnemy);
     expect(enemyEnt?.conditions).toContain('polymorphed');
-    expect(enemyEnt?.hp).toBe(11); // Wolf HP
-    expect(enemyEnt?.maxHp).toBe(11);
-    expect(enemyEnt?.polymorph_state).toEqual({
-      formName: 'Wolf',
-      originalHp: 60,
-      originalMaxHp: 60,
-    });
+    // Real HP is NOT swapped (2024 PHB rewrite — form HP is temp HP).
+    expect(enemyEnt?.hp).toBe(60);
+    expect(enemyEnt?.maxHp).toBe(60);
+    // Wolf form pool lives on temp_hp.
+    expect(enemyEnt?.temp_hp).toBe(11);
+    expect(enemyEnt?.polymorph_state).toEqual({ formName: 'Wolf' });
     const after = result.newState.characters.find((c) => c.id === 'pc-1');
     expect(after?.concentrating_on?.spellId).toBe('polymorph');
   });
@@ -128,13 +130,64 @@ describe('Polymorph — cast effect', () => {
     });
     const enemyEnt = result.newState.entities?.find((e) => e.id === enemyId && e.isEnemy);
     expect(enemyEnt?.conditions ?? []).not.toContain('polymorphed');
-    expect(enemyEnt?.hp).toBe(60); // unchanged
+    expect(enemyEnt?.temp_hp).toBeUndefined();
     expect(enemyEnt?.polymorph_state).toBeUndefined();
   });
 });
 
+describe('Polymorph — form drops when temp_hp depletes', () => {
+  it('damage absorbs into temp_hp first, excess to hp; form drops at 0 temp_hp', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const pc = makeChar({
+      id: 'pc-1',
+      character_class: 'Fighter',
+      level: 9,
+      str: 18,
+      // Greatsword for predictable hit + damage
+      inventory: [{ instance_id: 'gs-1', id: 'greatsword', name: 'Greatsword' }],
+      equipped_weapon: 'gs-1',
+      weapon_proficiencies: ['martial'],
+      skill_proficiencies: [],
+    });
+    const polyState: GameState = {
+      ...buildState(pc),
+      // Manually polymorph the ogre — 4 HP of wolf form left.
+      entities: (buildState(pc).entities ?? []).map((e) =>
+        e.id === enemyId && e.isEnemy
+          ? {
+              ...e,
+              hp: 60,
+              maxHp: 60,
+              temp_hp: 4,
+              polymorph_state: { formName: 'Wolf' },
+              conditions: [...e.conditions, 'polymorphed'],
+            }
+          : e
+      ),
+    };
+    const result = await takeAction({
+      action: { type: 'attack', targetEnemyId: enemyId },
+      history: [],
+      state: polyState,
+      seed,
+      context: ctx,
+    });
+    const enemyEnt = result.newState.entities?.find((e) => e.id === enemyId && e.isEnemy);
+    // 4 HP of temp_hp soaks first. Greatsword damage at L9 is 2d6+4
+    // (avg ~11) → temp_hp depletes, excess flows to hp. So polymorph
+    // ends and the ogre is back in its real form, slightly chipped.
+    expect(enemyEnt?.temp_hp).toBeUndefined(); // form drops
+    expect(enemyEnt?.polymorph_state).toBeUndefined();
+    expect(enemyEnt?.conditions ?? []).not.toContain('polymorphed');
+    // Some excess damage applied to the real HP — at minimum some
+    // chipping (could vary by damage roll), at most a few points.
+    expect(enemyEnt?.hp ?? 60).toBeLessThan(60);
+    expect(enemyEnt?.hp ?? 0).toBeGreaterThan(0); // ogre survives the spillover
+  });
+});
+
 describe('Polymorph — concentration drop reverts', () => {
-  it('drops the polymorphed condition + restores original HP', () => {
+  it('drops polymorphed condition + clears temp_hp + polymorph_state', () => {
     const pc = makeChar({
       id: 'pc-1',
       character_class: 'Wizard',
@@ -142,7 +195,6 @@ describe('Polymorph — concentration drop reverts', () => {
       concentrating_on: { spellId: 'polymorph', condition: 'polymorphed', rounds_left: 100 },
     });
     const state = buildState(pc);
-    // Manually mark the ogre polymorphed.
     const polyState: GameState = {
       ...state,
       entities: (state.entities ?? []).map((e) =>
@@ -150,48 +202,20 @@ describe('Polymorph — concentration drop reverts', () => {
           ? {
               ...e,
               conditions: [...e.conditions, 'polymorphed'],
-              hp: 8, // chipped down from the 11 wolf HP
-              maxHp: 11,
-              polymorph_state: { formName: 'Wolf', originalHp: 60, originalMaxHp: 60 },
+              temp_hp: 8, // chipped down from the 11 wolf HP
+              polymorph_state: { formName: 'Wolf' },
             }
           : e
       ),
     };
     const { st } = breakConcentration(pc, polyState, ctx);
     const enemyEnt = st.entities?.find((e) => e.id === enemyId && e.isEnemy);
-    // Alive in new form → restore original HP/maxHp.
+    // Real HP unchanged (was never swapped).
     expect(enemyEnt?.hp).toBe(60);
     expect(enemyEnt?.maxHp).toBe(60);
+    // Temp HP buffer + state cleared.
+    expect(enemyEnt?.temp_hp).toBeUndefined();
     expect(enemyEnt?.polymorph_state).toBeUndefined();
     expect(enemyEnt?.conditions).not.toContain('polymorphed');
-  });
-
-  it('keeps the polymorphed creature dead when new-form HP hit 0', () => {
-    const pc = makeChar({
-      id: 'pc-1',
-      character_class: 'Wizard',
-      level: 9,
-      concentrating_on: { spellId: 'polymorph', condition: 'polymorphed', rounds_left: 100 },
-    });
-    const state = buildState(pc);
-    const polyState: GameState = {
-      ...state,
-      entities: (state.entities ?? []).map((e) =>
-        e.id === enemyId && e.isEnemy
-          ? {
-              ...e,
-              conditions: [...e.conditions, 'polymorphed'],
-              hp: 0, // killed in new form
-              maxHp: 11,
-              polymorph_state: { formName: 'Wolf', originalHp: 60, originalMaxHp: 60 },
-            }
-          : e
-      ),
-    };
-    const { st } = breakConcentration(pc, polyState, ctx);
-    const enemyEnt = st.entities?.find((e) => e.id === enemyId && e.isEnemy);
-    expect(enemyEnt?.hp).toBe(0); // stays dead — pansori MVP
-    expect(enemyEnt?.maxHp).toBe(60); // maxHp restored for housekeeping
-    expect(enemyEnt?.polymorph_state).toBeUndefined();
   });
 });

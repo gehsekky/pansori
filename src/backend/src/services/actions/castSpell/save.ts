@@ -126,13 +126,13 @@ export function runSaveSpell(
       ctx.narrative += ` ${fmt.note(`[${spellTarget.name} is immune to ${spell.condition}]`)}`;
     } else {
       const condToApply = spell.condition;
-      // 2024 PHB Polymorph — swap HP to the chosen beast form's pool.
-      // Pansori MVP auto-picks Wolf (11 HP) regardless of target CR;
-      // RAW lets the caster pick any beast ≤ target level. Originals
-      // stashed on polymorph_state so concentration drop can revert.
-      // Only sets polymorph_state if not already polymorphed (re-cast
-      // by another caster on the same target stays at the first
-      // caster's form — pansori MVP).
+      // 2024 PHB Polymorph — give the target Temporary Hit Points
+      // equal to the chosen beast form's HP (Wolf: 11). The form's
+      // pool lives on `entity.temp_hp`; damage absorbs into it first,
+      // and when temp_hp depletes the form drops automatically (the
+      // attack resolver clears polymorph_state + the polymorphed
+      // condition). Pansori MVP auto-picks Wolf regardless of target
+      // CR; RAW lets the caster pick any beast ≤ target level.
       const isPolymorph = spell.id === 'polymorph';
       ctx.st = {
         ...ctx.st,
@@ -145,13 +145,8 @@ export function runSaveSpell(
           if (isPolymorph && !next.polymorph_state) {
             return {
               ...next,
-              polymorph_state: {
-                formName: 'Wolf',
-                originalHp: e.hp,
-                originalMaxHp: e.maxHp,
-              },
-              hp: 11,
-              maxHp: 11,
+              polymorph_state: { formName: 'Wolf' },
+              temp_hp: 11,
             };
           }
           return next;

@@ -135,19 +135,22 @@ export interface CombatEntity {
   // seed's runtime Enemy fields reflect the current phase. A 0 (or undefined)
   // means the boss is still in its base statline.
   phase_index?: number;
-  // 2024 PHB Polymorph state — when set, the entity is transformed into
-  // a different stat block. `hp` / `maxHp` reflect the new form's pool;
-  // the originals are stashed here so `breakConcentration` can revert.
-  // Pansori MVP: form is a single beast (auto-selected; wolf for CR ≤
-  // ~1). RAW excess-damage carryover on form-drops-to-0 not modeled —
-  // a polymorphed creature reduced to 0 HP in its new form just dies
-  // (pansori MVP simplification; RAW would revert with leftover damage
-  // applied to the original HP).
+  // 2024 PHB Polymorph state — when set, the entity is transformed
+  // into a beast form. The form's HP pool lives on `temp_hp` (per
+  // 2024 PHB Polymorph rewrite: form HP is Temporary Hit Points, not
+  // a separate buffer). Damage absorbs into temp_hp first; when
+  // temp_hp depletes to 0 the form drops automatically (entity stays
+  // at its real `hp`, condition cleared, polymorph_state cleared).
+  // Healing spells can't restore the form's HP — temp HP can't be
+  // healed in 5e, so the 2014 heal exploit is structurally blocked.
   polymorph_state?: {
     formName: string;
-    originalHp: number;
-    originalMaxHp: number;
   };
+  // 2024 PHB temporary hit points (enemies only — PC temp HP lives
+  // on `Character.temp_hp`). Damage absorbs into this before `hp`;
+  // when depleted, the polymorph form drops (if `polymorph_state`
+  // is set) and excess damage carries over to `hp` (per RAW).
+  temp_hp?: number;
 }
 
 // ─── Structured actions ──────────────────────────────────────────────
