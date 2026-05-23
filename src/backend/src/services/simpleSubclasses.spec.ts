@@ -48,11 +48,6 @@ describe('Subclass picker exposes the new options', () => {
     expect(pickerOffers(pc)).toContain('great_old_one');
   });
 
-  it('Druid L3 offers sea + stars', () => {
-    const pc = makeChar({ id: 'pc', character_class: 'Druid', level: 3 });
-    expect(pickerOffers(pc)).toEqual(expect.arrayContaining(['sea', 'stars']));
-  });
-
   it('Fighter L3 offers psi_warrior', () => {
     const pc = makeChar({ id: 'pc', character_class: 'Fighter', level: 3 });
     expect(pickerOffers(pc)).toContain('psi_warrior');

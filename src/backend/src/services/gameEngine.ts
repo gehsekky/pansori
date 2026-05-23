@@ -559,31 +559,21 @@ export function checkConcentration(
   // concentration when damaged. Roll 2d20, keep higher.
   const hasWarCaster = (char.feats ?? []).includes('war_caster');
   const conMod = abilityMod(char.con);
-  // 2024 PHB Stars Druid — Dragon constellation: concentration saves
-  // treat a sub-10 d20 as a 10 (the same floor RAW applies to INT/WIS
-  // checks; pansori wires the concentration leg here, defers the
-  // skill-check leg). Stacks with War Caster — apply the floor to
-  // both d20 rolls.
-  const dragonFloor = char.starry_form_constellation === 'dragon';
-  const rollOne = (): number => {
-    const r = d(20);
-    return dragonFloor && r < 10 ? 10 : r;
-  };
+  const rollOne = (): number => d(20);
   const save = hasWarCaster ? Math.max(rollOne(), rollOne()) + conMod : rollOne() + conMod;
   const warCasterNote = hasWarCaster ? ' (War Caster advantage)' : '';
-  const dragonNote = dragonFloor ? ' (Dragon constellation floor)' : '';
   if (save >= dc)
     return {
       char,
       st,
-      note: ` [Concentration hold: ${save} vs DC ${dc}${warCasterNote}${dragonNote}]`,
+      note: ` [Concentration hold: ${save} vs DC ${dc}${warCasterNote}]`,
     };
   const spellName = char.concentrating_on.spellId;
   const { char: nc, st: ns } = breakConcentration(char, st, context);
   return {
     char: nc,
     st: ns,
-    note: ` [Concentration broken: ${save} vs DC ${dc}${warCasterNote}${dragonNote} — ${spellName} ends!]`,
+    note: ` [Concentration broken: ${save} vs DC ${dc}${warCasterNote} — ${spellName} ends!]`,
   };
 }
 
@@ -2515,7 +2505,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       bard: ['lore'],
       sorcerer: ['draconic', 'wild_magic', 'aberrant_mind', 'clockwork_soul'],
       warlock: ['fiend', 'archfey', 'celestial', 'great_old_one'],
-      druid: ['land', 'moon', 'sea', 'stars'],
+      druid: ['land'],
       monk: ['open_hand', 'shadow', 'mercy', 'elements'],
       barbarian: ['berserker'],
     };
@@ -2877,26 +2867,21 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   if (hasClass(char, 'druid')) {
     const wsUses = char.class_resource_uses?.wild_shape ?? 2;
     // Circle of the Moon (PHB p.69) — Combat Wild Shape: use as a bonus
-    // action instead of action.
-    const isMoon = char.subclass === 'moon';
     const wsAvailable =
       !char.conditions.includes('wild_shaped') &&
       wsUses > 0 &&
-      (isMoon
-        ? !char.turn_actions.bonus_action_used
-        : !state.combat_active || !char.turn_actions.action_used);
+      (!state.combat_active || !char.turn_actions.action_used);
     if (wsAvailable) {
       // 2024 PHB Beast Forms — surface one choice per accessible form. The
       // form's stat block replaces the druid's attack while shifted (see
       // BEAST_FORMS in contexts/srd/beast_forms.ts).
       // Wild Shape CR access scales with Druid level only.
-      const forms = availableBeastForms(getClassLevel(char, 'druid'), isMoon);
+      const forms = availableBeastForms(getClassLevel(char, 'druid'));
       for (const form of forms) {
         choices.push({
-          label: `Wild Shape: ${form.name} (CR ${form.cr})${isMoon ? ' (bonus action)' : ''} — ${form.descriptor}`,
+          label: `Wild Shape: ${form.name} (CR ${form.cr}) — ${form.descriptor}`,
           action: { type: 'use_class_feature', featureId: `wild_shape_${form.id}` },
           kind: 'class_feature',
-          requiresBonusAction: isMoon || undefined,
         });
       }
     }
@@ -2904,68 +2889,6 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       choices.push({
         label: `Dismiss Wild Shape — return to normal form`,
         action: { type: 'use_class_feature', featureId: 'dismiss_wild_shape' },
-        kind: 'class_feature',
-      });
-      // Circle of the Moon — spend a spell slot while shifted to heal 1d8
-      // per slot level. Bonus action per PHB p.69 ("By spending a spell
-      // slot, ... You can choose to take this bonus action only while...").
-      if (isMoon && !char.turn_actions.bonus_action_used) {
-        const slotsMax = char.spell_slots_max ?? {};
-        const slotsUsed = char.spell_slots_used ?? {};
-        const hasSlot = Object.entries(slotsMax).some(([lvl, max]) => {
-          const lvlN = Number(lvl);
-          return lvlN >= 1 && (max ?? 0) > (slotsUsed[lvlN] ?? 0);
-        });
-        if (hasSlot && char.hp < char.max_hp) {
-          choices.push({
-            label: `Moon Healing — spend a spell slot to heal 1d8/slot level (bonus action)`,
-            action: { type: 'use_class_feature', featureId: 'moon_healing' },
-            kind: 'class_feature',
-            requiresBonusAction: true,
-          });
-        }
-      }
-    }
-
-    // ── 2024 PHB Stars Druid L3+ — Starry Form ──────────────────────────
-    // Shares the Wild Shape resource pool. Bonus-action activation;
-    // each constellation grants a different rider (see handler in
-    // druid.ts). Switching constellations re-spends a Wild Shape
-    // charge — RAW allows reshape on subsequent activations.
-    if (
-      char.subclass === 'stars' &&
-      getClassLevel(char, 'druid') >= 3 &&
-      wsUses > 0 &&
-      !char.turn_actions.bonus_action_used
-    ) {
-      const current = char.starry_form_constellation;
-      const variants: Array<{ id: 'archer' | 'chalice' | 'dragon'; label: string }> = [
-        { id: 'archer', label: 'Archer — ranged spell attack (1d8 + WIS radiant)' },
-        { id: 'chalice', label: 'Chalice — healing spells grant +1d8 to the target' },
-        { id: 'dragon', label: 'Dragon — concentration saves treat sub-10 d20 as 10' },
-      ];
-      for (const v of variants) {
-        if (v.id === current) continue; // Don't re-suggest the active one.
-        choices.push({
-          label: `Starry Form: ${v.label} (bonus action, costs Wild Shape, ${wsUses} left)`,
-          action: { type: 'use_class_feature', featureId: `starry_form_${v.id}` },
-          kind: 'class_feature',
-          requiresBonusAction: true,
-        });
-      }
-    }
-    // Archer attack action — surface only while the Archer
-    // constellation is active and the druid has an Action.
-    if (
-      char.subclass === 'stars' &&
-      char.starry_form_constellation === 'archer' &&
-      !char.turn_actions.action_used &&
-      state.combat_active &&
-      enemyAlive
-    ) {
-      choices.push({
-        label: `Starry Form: Attack — fire a beam of radiant starlight (action, 1d8 + WIS radiant)`,
-        action: { type: 'use_class_feature', featureId: 'starry_form_attack' },
         kind: 'class_feature',
       });
     }

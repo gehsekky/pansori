@@ -282,48 +282,6 @@ describe('class features', () => {
 
   // ── Druid subclasses (PHB p.65-69) ──────────────────────────────────────────
 
-  it('Circle of the Moon — Wild Shape uses bonus action + CR scales by level/3', async () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0.5);
-    const druidId = 'd1';
-    const druid = makeChar({
-      id: druidId,
-      character_class: 'Druid',
-      subclass: 'moon',
-      level: 6, // moon CR = 6/3 = 2
-      hp: 30,
-      max_hp: 30,
-      class_resource_uses: { wild_shape: 2 },
-    });
-    const state = makeState(
-      {},
-      {
-        characters: [druid],
-        active_character_id: druidId,
-        combat_active: true,
-        initiative_order: [{ id: druidId, roll: 18, is_enemy: false }],
-        initiative_idx: 0,
-      }
-    );
-    state.characters = [druid];
-    state.active_character_id = druidId;
-    const result = await takeAction({
-      action: { type: 'use_class_feature', featureId: 'wild_shape' },
-      history: [],
-      state,
-      seed,
-      context: ctx,
-    });
-    const newDruid = result.newState.characters[0];
-    expect(newDruid.conditions).toContain('wild_shaped');
-    expect(newDruid.turn_actions.bonus_action_used).toBe(true);
-    expect(newDruid.turn_actions.action_used).toBe(false);
-    expect(newDruid.class_resource_uses?.wild_shape).toBe(1);
-    // 2024 PHB: Moon temp HP = 3 × druid level. At L6 → 18 temp HP on top
-    // of 30 base → 48. (Base druid would give 2 × 6 = 12 → 42.)
-    expect(newDruid.hp).toBe(48);
-    expect(result.narrative).toMatch(/bonus action/i);
-  });
-
   it('Base Druid Wild Shape — temp HP = 2 × druid level (2024 PHB)', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
     const druidId = 'd-base';
@@ -405,76 +363,6 @@ describe('class features', () => {
     });
     expect(result.narrative).toMatch(/higher-CR form access/);
     expect(result.newState.characters[0].conditions).not.toContain('wild_shaped');
-  });
-
-  it('Wild Shape: Moon at L3 unlocks CR 1 forms', async () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0.5);
-    const druidId = 'd-moon-cr1';
-    const druid = makeChar({
-      id: druidId,
-      character_class: 'Druid',
-      subclass: 'moon',
-      level: 3, // Moon: floor(3/3) = 1 → can pick CR 1
-      hp: 18,
-      max_hp: 18,
-      class_resource_uses: { wild_shape: 2 },
-    });
-    const state = makeState(
-      {},
-      { characters: [druid], active_character_id: druidId, combat_active: true }
-    );
-    state.characters = [druid];
-    state.active_character_id = druidId;
-    const result = await takeAction({
-      action: { type: 'use_class_feature', featureId: 'wild_shape_brown_bear' },
-      history: [],
-      state,
-      seed,
-      context: ctx,
-    });
-    expect(result.narrative).toMatch(/Brown Bear/);
-    expect(result.newState.characters[0].wild_shape_form).toBe('brown_bear');
-  });
-
-  it('Circle of the Moon — Moon Healing while shifted spends a slot to heal', async () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0.999); // max d8 → 8
-    const druidId = 'd-moon-heal';
-    const druid = makeChar({
-      id: druidId,
-      character_class: 'Druid',
-      subclass: 'moon',
-      level: 4,
-      hp: 10,
-      max_hp: 30,
-      conditions: ['wild_shaped'],
-      spell_slots_max: { 1: 3, 2: 2 },
-      spell_slots_used: {},
-    });
-    const state = makeState(
-      {},
-      {
-        characters: [druid],
-        active_character_id: druidId,
-        combat_active: true,
-        initiative_order: [{ id: druidId, roll: 18, is_enemy: false }],
-        initiative_idx: 0,
-      }
-    );
-    state.characters = [druid];
-    state.active_character_id = druidId;
-    const result = await takeAction({
-      action: { type: 'use_class_feature', featureId: 'moon_healing' },
-      history: [],
-      state,
-      seed,
-      context: ctx,
-    });
-    const newDruid = result.newState.characters[0];
-    // Spent lowest slot (lvl 1) → 1d8 = 8 healed
-    expect(newDruid.spell_slots_used?.[1]).toBe(1);
-    expect(newDruid.hp).toBe(18); // 10 + 8
-    expect(newDruid.turn_actions.bonus_action_used).toBe(true);
-    expect(result.narrative).toMatch(/Moon|lunar/i);
   });
 
   it('Circle of the Land — Natural Recovery refunds slot levels on short rest', async () => {
