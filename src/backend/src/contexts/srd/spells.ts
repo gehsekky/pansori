@@ -666,8 +666,107 @@ export const SRD_SPELLS: Record<string, Spell> = {
     // Paladin-only.
     spellList: ['divine'],
   },
+  // SRD: Speak with Animals — for 10 minutes the caster can
+  // comprehend beasts. Action or ritual. Narrative-only in pansori
+  // (no beast NPC dialog model today).
+  speak_with_animals: {
+    id: 'speak_with_animals',
+    name: 'Speak with Animals',
+    level: 1,
+    castTime: 'action',
+    durationRounds: 100, // 10 minutes
+    narrative:
+      '{name} attunes their voice to a wilder register — the local beasts cock their heads to listen.',
+    desc: 'Comprehend and converse with beasts for 10 minutes (also castable as a ritual).',
+    rangeKind: 'self',
+    spellList: ['primal'],
+  },
 
   // ─── Level 2 ────────────────────────────────────────────────────────────────
+  // SRD: Blindness/Deafness — single target, CON save or Blinded
+  // (or Deafened — caster's choice) for 1 minute. RAW: target
+  // repeats the save at end of each of its turns. Pansori MVP
+  // sets a 10-round duration and doesn't repeat the save (matches
+  // most other save-or-condition spells today).
+  blindness_deafness: {
+    id: 'blindness_deafness',
+    name: 'Blindness/Deafness',
+    level: 2,
+    castTime: 'action',
+    savingThrow: 'con',
+    saveEffect: 'negates',
+    condition: 'blinded',
+    conditionDuration: 10,
+    rangeKind: 'ranged',
+    rangeFt: 120,
+    desc: 'CON save or Blinded for 1 minute. (Deafened option deferred — pansori MVP defaults to Blinded.)',
+    spellList: ['arcane', 'divine'],
+  },
+  // SRD: Detect Thoughts — divination, concentration up to 1 minute.
+  // Sense thinking creatures within 30 ft; can probe surface
+  // thoughts on a failed WIS save (deeper probe is a contested
+  // check). Pansori MVP is narrative — no enemy "thinking creature"
+  // detection model yet.
+  detect_thoughts: {
+    id: 'detect_thoughts',
+    name: 'Detect Thoughts',
+    level: 2,
+    castTime: 'action',
+    concentration: true,
+    durationRounds: 10,
+    narrative:
+      '{name} extends a thread of attention — minds within 30 ft register as distinct presences.',
+    desc: 'Sense thinking creatures within 30 ft for 1 minute (concentration).',
+    rangeKind: 'self',
+    spellList: ['arcane'],
+  },
+  // SRD: Knock — instantly unlock or unstick one mundane lock or
+  // arcanely-sealed object within 60 ft. Loud (~300 ft audible).
+  // Narrative spell — pansori's lock states are binary, so the
+  // spell flips the latch without further mechanics.
+  knock: {
+    id: 'knock',
+    name: 'Knock',
+    level: 2,
+    castTime: 'action',
+    narrative:
+      '{name} barks a hard syllable — the lock cracks open with a sound the whole hall hears.',
+    desc: 'Unlock one mundane or arcanely-sealed object within 60 ft. Loud.',
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    spellList: ['arcane'],
+  },
+  // SRD: Locate Object — divination concentration up to 10 minutes.
+  // Caster knows the direction to a familiar object within 1,000 ft.
+  // Narrative spell in pansori — quest items typically have known
+  // locations; the spell is flavor for player narrative.
+  locate_object: {
+    id: 'locate_object',
+    name: 'Locate Object',
+    level: 2,
+    castTime: 'action',
+    concentration: true,
+    durationRounds: 100, // 10 minutes
+    narrative:
+      "{name}'s mind reaches out — a tug in the air points the way to the object's location.",
+    desc: 'Sense the direction to a familiar object within 1,000 ft (concentration, 10 minutes).',
+    rangeKind: 'self',
+    spellList: ['arcane', 'divine', 'primal'],
+  },
+  // SRD: Augury — divination ritual (1 minute or ritual). Returns
+  // a one-word omen (weal / woe / weal-and-woe / nothing) for an
+  // action the caster is about to take. Narrative.
+  augury: {
+    id: 'augury',
+    name: 'Augury',
+    level: 2,
+    castTime: 'action',
+    narrative:
+      '{name} casts bones, sticks, or marked cards — the world answers with an omen, brief and certain.',
+    desc: 'Ritual divination: receive an omen (weal / woe / both / nothing) about a future course of action.',
+    rangeKind: 'self',
+    spellList: ['divine', 'primal'],
+  },
   // SRD: Darkness — 15-ft radius sphere of magical darkness for 10
   // minutes (concentration). Heavy obscurement; even darkvision
   // can't see through. Narrative spell in pansori — the engine
@@ -818,6 +917,41 @@ export const SRD_SPELLS: Record<string, Spell> = {
   },
 
   // ─── Level 3 ────────────────────────────────────────────────────────────────
+  // SRD: Fear — 30-ft cone WIS save or Frightened (concentration,
+  // up to 1 minute). Frightened creatures must Dash away from the
+  // caster each turn. Pansori MVP applies the Frightened condition;
+  // the forced-Dash behavior is deferred (would need an AI hook
+  // for the enemy-turn move planner).
+  fear: {
+    id: 'fear',
+    name: 'Fear',
+    level: 3,
+    castTime: 'action',
+    savingThrow: 'wis',
+    saveEffect: 'negates',
+    concentration: true,
+    condition: 'frightened',
+    conditionDuration: 10,
+    rangeKind: 'self',
+    blastRadius: 30,
+    aoeShape: 'cone',
+    desc: '30-ft cone WIS save or Frightened (concentration, 1 minute). RAW forced-Dash behavior deferred.',
+    spellList: ['arcane'],
+  },
+  // SRD: Sending — telepathic 25-word message to anyone the caster
+  // has met or had described to them. Unlimited range, even across
+  // planes. Pure narrative spell.
+  sending: {
+    id: 'sending',
+    name: 'Sending',
+    level: 3,
+    castTime: 'action',
+    narrative:
+      "{name} fixes the recipient's face in mind — a thought-thread carries 25 words across any distance.",
+    desc: 'Send a 25-word telepathic message to anyone you have met. Unlimited range.',
+    rangeKind: 'self',
+    spellList: ['arcane', 'divine'],
+  },
   // SRD: Hypnotic Pattern — 30-ft cube within 120 ft. WIS save or
   // Charmed for the duration (concentration, up to 1 minute);
   // Charmed targets also gain Incapacitated + Speed 0. RAW: the
