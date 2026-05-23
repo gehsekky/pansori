@@ -2501,7 +2501,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       wizard: ['evoker', 'abjurer', 'diviner', 'illusionist'],
       cleric: ['life'],
       ranger: ['hunter', 'beastmaster', 'fey_wanderer', 'gloom_stalker'],
-      paladin: ['devotion', 'vengeance', 'ancients', 'glory'],
+      paladin: ['devotion'],
       bard: ['lore'],
       sorcerer: ['draconic', 'wild_magic', 'aberrant_mind', 'clockwork_soul'],
       warlock: ['fiend', 'archfey', 'celestial', 'great_old_one'],
@@ -2986,45 +2986,6 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       choices.push({
         label: `Sacred Weapon — +${abilityMod(char.cha ?? 10)} to attack rolls for 10 rounds (Channel Divinity, ${cdLeft} left)`,
         action: { type: 'use_class_feature', featureId: 'sacred_weapon' },
-        kind: 'class_feature',
-      });
-    }
-
-    // Vengeance Paladin: Vow of Enmity & Abjure Enemy (Channel Divinity)
-    if (char.subclass === 'vengeance' && hasClass(char, 'paladin') && cdLeft > 0) {
-      choices.push({
-        label: `Vow of Enmity — advantage vs target for 1 min (Channel Divinity, ${cdLeft} left)`,
-        action: { type: 'use_class_feature', featureId: 'vow_of_enmity' },
-        kind: 'class_feature',
-      });
-      choices.push({
-        label: `Abjure Enemy — frighten target, WIS save DC ${8 + profBonus(char.level) + abilityMod(char.cha ?? 10)} (Channel Divinity, ${cdLeft} left)`,
-        action: { type: 'use_class_feature', featureId: 'abjure_enemy' },
-        kind: 'class_feature',
-      });
-    }
-
-    // Ancients Paladin: Nature's Wrath (Channel Divinity, restrain)
-    if (
-      char.subclass === 'ancients' &&
-      hasClass(char, 'paladin') &&
-      cdLeft > 0 &&
-      state.combat_active &&
-      enemyAlive
-    ) {
-      choices.push({
-        label: `Nature's Wrath — restrain target, DEX save DC ${8 + profBonus(char.level) + abilityMod(char.cha ?? 10)} (Channel Divinity, ${cdLeft} left)`,
-        action: { type: 'use_class_feature', featureId: 'natures_wrath' },
-        kind: 'class_feature',
-      });
-    }
-
-    // Glory Paladin: Inspiring Smite (Channel Divinity, AoE temp HP).
-    if (char.subclass === 'glory' && hasClass(char, 'paladin') && cdLeft > 0) {
-      const palLvl = getClassLevel(char, 'paladin');
-      choices.push({
-        label: `Inspiring Smite — grant 2d8+${palLvl} temp HP to party (Channel Divinity, ${cdLeft} left)`,
-        action: { type: 'use_class_feature', featureId: 'inspiring_smite' },
         kind: 'class_feature',
       });
     }

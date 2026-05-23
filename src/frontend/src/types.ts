@@ -288,8 +288,6 @@ export interface GameState {
   help_target_id?: string;
   surprised?: string[];
   metamagic_active?: string;
-  guided_strike_active?: boolean;
-  vow_of_enmity_target?: string;
   cutting_words_penalty?: number;
   round?: number;
 

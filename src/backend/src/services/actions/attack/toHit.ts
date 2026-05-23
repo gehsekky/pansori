@@ -50,8 +50,8 @@ export interface ToHitContext {
  *
  * Advantage sources stacked (any one enables advantage):
  *   conditionAdv, enemyGrappled, proneAdv, enemyParalyzed, flankingAdv,
- *   helpAdv, assassinAdv (vs surprised / round-1), vowAdv (Vengeance
- *   Paladin), recklessAdv (Barbarian L2+, melee only), inspirationAdv
+ *   helpAdv, assassinAdv (vs surprised / round-1),
+ *   recklessAdv (Barbarian L2+, melee only), inspirationAdv
  *   (Heroic Inspiration), vexAdv (consumed Vex tag), studyAdv
  *   (Fighter L13 miss-tag), packTacticsAdv (Wolf/Dire Wolf Beast Form
  *   + ally within 5 ft), luckAdv (Lucky feat, queued via `use_luck`).
@@ -188,7 +188,6 @@ export function computeToHitContext(
     hasClass(ctx.char, 'rogue') &&
     ((ctx.st.surprised ?? []).includes(targetId) || (ctx.st.round ?? 1) === 1);
 
-  const vowAdv = ctx.st.vow_of_enmity_target === targetId;
   const recklessAdv = !!ctx.char.turn_actions.reckless && weaponItem?.range !== 'ranged';
 
   let packTacticsAdv = false;
@@ -280,7 +279,6 @@ export function computeToHitContext(
     flankingAdv ||
     helpAdv ||
     assassinAdv ||
-    vowAdv ||
     recklessAdv ||
     inspirationAdv ||
     vexAdv ||
