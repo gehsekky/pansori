@@ -809,8 +809,16 @@ the prerequisite infrastructure lands.
 - **Polymorph** — needs creature transform pipeline (caster
   becomes a chosen beast). Different shape from Wild Shape — works
   on any creature, not just druids on themselves.
-- **Banishment** — needs target-removed-from-combat state +
-  return-on-concentration-end.
+- ~~**Banishment**~~ — shipped 2026-05-22. New `banished` condition
+  in the registry (duration: permanent — concentration is the actual
+  timer). Banishment spell (L4 abjuration, CHA save, concentration)
+  uses the existing save+condition pipeline to apply it. Enemy
+  turn loop skips banished entities (same shape as the surprised
+  check). Player attack-target filter excludes banished enemies
+  from `livingEnemies` + `livingEnemiesInRoom`. Concentration
+  drop via `breakConcentration` strips the linked condition,
+  returning the enemy. RAW upcast (+1 target per slot above 4th)
+  deferred — pansori MVP hits one target via the save branch.
 - **Dimension Door** — teleport mechanic.
 - **Counterspell** — already shipped pre-session.
 - **Spirit Guardians** — already shipped pre-session.

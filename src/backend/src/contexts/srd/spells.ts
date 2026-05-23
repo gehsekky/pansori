@@ -915,4 +915,30 @@ export const SRD_SPELLS: Record<string, Spell> = {
     rangeFt: 60,
     spellList: ['divine', 'primal'],
   },
+
+  // 2024 PHB Banishment (L4 abjuration). Send a creature to a
+  // harmless demiplane on a failed CHA save. The banished target is
+  // removed from combat — enemy-turn loop skips them, player attack
+  // selection filters them out. Concentration drop returns them
+  // (`breakConcentration` strips the linked `banished` condition).
+  // RAW upcast: +1 target per slot above 4th — deferred (pansori
+  // models single-target via the save branch).
+  banishment: {
+    id: 'banishment',
+    name: 'Banishment',
+    level: 4,
+    castTime: 'action',
+    concentration: true,
+    durationRounds: 10,
+    savingThrow: 'cha',
+    saveEffect: 'negates',
+    condition: 'banished',
+    conditionDuration: 10,
+    desc: 'A creature within 60 ft makes a CHA save or is banished to a harmless demiplane for the duration. Concentration up to 1 minute.',
+    narrative:
+      '{name} unfurls a sigil — the air around {target} buckles inward, swallowing them whole.',
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    spellList: ['arcane', 'divine'],
+  },
 };
