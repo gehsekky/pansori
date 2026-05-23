@@ -74,8 +74,68 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
     toHit,
   };
 
+  // 2024 PHB Heroic Inspiration post-roll reaction window — snapshot
+  // the pre-attack state so the reaction resolver can rewind on accept
+  // (the resolver re-runs this attack with a forced d20).
+  const preAttackChar = ctx.char;
+  const preAttackSt = ctx.st;
+
   // ── First attack ─────────────────────────────────────────────────────
   const killed = resolveOneAttack(ctx, atkCtx, '');
+
+  // 2024 PHB Heroic Inspiration post-roll pause. SRD: "expend it to
+  // reroll any die immediately after rolling it, and you must use the
+  // new roll." Pansori MVP surfaces the prompt only on a missed
+  // attack — RAW would also let you reroll a hit for crit chasing,
+  // but the UX cost of paging through "do you want to reroll your
+  // hit?" on every attack is too high for MVP.
+  //
+  // Pre-declared `spend_inspiration` (advantage at roll time) takes
+  // priority — if `inspiration_pending` is set, the advantage already
+  // applied and we don't surface the post-roll reaction (Inspiration
+  // is already spent).
+  const lastResult = ctx.lastAttackResult;
+  const shouldPauseForInspiration =
+    !killed &&
+    !!lastResult &&
+    !lastResult.hit &&
+    !lastResult.fumble &&
+    !!ctx.char.inspiration &&
+    !ctx.char.turn_actions?.inspiration_pending;
+
+  if (shouldPauseForInspiration && lastResult) {
+    // Stash the proposed snapshot (post-miss) + pre-attack snapshot
+    // (for rewind) + attack-context (for re-resolve with forced d20).
+    // Resolver in reaction.ts consumes these.
+    ctx.st = {
+      ...ctx.st,
+      pending_reaction: {
+        kind: 'pc_d20',
+        source: 'inspiration',
+        rollerCharId: ctx.char.id,
+        rollContext: 'attack',
+        originalD20: lastResult.d20,
+        originalTotal: lastResult.total,
+        originalHit: lastResult.hit,
+        eligibleCharIds: [ctx.char.id],
+        // BE-only narrowing of the attack-context blob — FE just
+        // round-trips this and reads kind/source/d20 for the choice
+        // label.
+        attackContext: {
+          preAttackChar,
+          preAttackSt,
+          atkCtx,
+        },
+        pendingProposedChar: ctx.char,
+        pendingProposedSt: ctx.st,
+        resumeFromInitiativeIdx: ctx.st.initiative_idx,
+      },
+    };
+    // Don't run Extra Attack and don't consume the action — the
+    // resolver decides whether the attack happens at all.
+    return;
+  }
+
   if (!killed) {
     // ── Extra Attack (Fighter L5+, Ranger/Paladin/Barbarian/Monk L5) ───
     // SRD 5.2.1 p.90 "Loading": a Loading weapon fires only once per

@@ -2006,6 +2006,26 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   // player decides. Suppresses everything else (attacks, movement, etc.).
   const pending = state.pending_reaction;
   if (pending && pending.eligibleCharIds.includes(char.id)) {
+    // 2024 PHB PC-turn d20 reaction window — distinct shape from
+    // the enemy-attack-base reactions (no attackerEnemyId; rollerCharId
+    // instead). Branch early so the enemy-attack label lookup below
+    // doesn't crash on the missing field.
+    if (pending.kind === 'pc_d20') {
+      if (pending.source === 'inspiration') {
+        return [
+          {
+            label: `Spend Heroic Inspiration to reroll the d20 (was ${pending.originalD20}, MUST use new roll)`,
+            action: { type: 'resolve_reaction', accept: true },
+          },
+          {
+            label: `Decline — keep the missed attack (d20 ${pending.originalD20})`,
+            action: { type: 'resolve_reaction', accept: false },
+          },
+        ];
+      }
+      // Future sources (Lucky-RAW, Restore Balance) plug in here.
+      return [];
+    }
     const enemyForLabel =
       seed.enemies?.[state.current_room]?.find((e) => e.id === pending.attackerEnemyId)?.name ??
       'attacker';

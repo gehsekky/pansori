@@ -41,6 +41,12 @@ export interface AttackContext {
   isVersatile: boolean;
   weaponLabel: string;
   toHit: ToHitContext;
+  /** 2024 PHB Heroic Inspiration / Lucky-RAW reroll plumbing — when set,
+   *  resolveOneAttack passes this d20 to resolvePlayerAttack via
+   *  `forceRoll1`. Caller is responsible for clearing the resource that
+   *  granted the reroll BEFORE re-invoking, to prevent infinite-pause
+   *  loops on a second miss. */
+  forceD20?: number;
 }
 
 /**
@@ -95,8 +101,23 @@ export function resolveOneAttack(
     weaponItem?.range === 'ranged',
     critThresh,
     totalAttackBonus,
-    ctx.char.species === 'halfling'
+    ctx.char.species === 'halfling',
+    atkCtx.forceD20
   );
+  // Side-channel for callers: stash the attack result on ctx so the
+  // outer attack/index.ts orchestrator can detect hit/miss without
+  // changing the function's return shape (still `boolean killed`).
+  ctx.lastAttackResult = {
+    hit: atk.hit,
+    fumble: atk.fumble,
+    critical: atk.critical,
+    d20: atk.roll,
+    total: atk.total,
+    atkMod: atk.atkMod,
+    prof: atk.prof,
+    attackBonus: totalAttackBonus,
+    targetAc: effectiveEnemyAc,
+  };
   // Bardic Inspiration consumption on attack roll (2024 PHB p.52). If
   // a stashed BI die exists, roll it and add to total. If that turns a
   // miss into a hit, atk.hit flips AND we need to roll damage

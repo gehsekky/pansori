@@ -1092,6 +1092,52 @@ export interface PendingD20InterceptionReaction extends PendingReactionBase {
   pendingProposedSt: unknown;
 }
 
+// 2024 PHB PC-turn d20 reaction window. Fires when a PC rolls a d20
+// for an attack roll (initial scope; saves + ability checks land next)
+// and the engine should pause to offer post-roll reactions before
+// committing the outcome. Distinct base from PendingReactionBase
+// because the roller is a PC and the eligible reactor is usually the
+// roller themselves (Heroic Inspiration is a self-reaction). The
+// enemy-attack base (`attackerEnemyId` + `targetCharId`) doesn't
+// match this shape.
+//
+// First wiring: Heroic Inspiration (SRD: "expend it to reroll any die
+// immediately after rolling it, and you must use the new roll").
+// Future plug-ins:
+//   - Lucky feat (PHB-only; spend a luck point after roll)
+//   - Clockwork Soul Restore Balance (cancel adv/disadv on any d20)
+//   - Other post-roll dice-modifier reactions
+//
+// `accept` re-resolves the action with a new d20 (RAW: must use new);
+// `decline` commits the proposed snapshot as-rolled.
+export interface PendingPcD20Reaction {
+  kind: 'pc_d20';
+  /** Which feature is offering the reaction. */
+  source: 'inspiration';
+  /** PC who rolled the original d20 + (initial scope) who reacts. */
+  rollerCharId: string;
+  /** Initial scope is attack rolls only; saves + checks land next. */
+  rollContext: 'attack';
+  /** The d20 face that was rolled (1-20). */
+  originalD20: number;
+  /** Original total (d20 + mods). For narrative. */
+  originalTotal: number;
+  /** Did the original roll hit? Pansori MVP only pauses on miss. */
+  originalHit: boolean;
+  /** Eligible reactor ids — initial scope is self only. */
+  eligibleCharIds: string[];
+  /** Attack-context fields needed to inline-re-resolve on accept.
+   *  Typed as `unknown` because the FE doesn't introspect; BE narrows. */
+  attackContext: unknown;
+  /** State to commit on decline (the as-rolled miss). */
+  pendingProposedChar: unknown;
+  pendingProposedSt: unknown;
+  /** Initiative resume anchor. Pansori MVP only pauses after the FIRST
+   *  attack (Extra Attack iterations are not paused — they continue
+   *  after the reaction resolves). */
+  resumeFromInitiativeIdx: number;
+}
+
 export type PendingReaction =
   | PendingShieldReaction
   | PendingHellishRebukeReaction
@@ -1100,4 +1146,5 @@ export type PendingReaction =
   | PendingAbsorbElementsReaction
   | PendingSilveryBarbsReaction
   | PendingSentinelReaction
-  | PendingD20InterceptionReaction;
+  | PendingD20InterceptionReaction
+  | PendingPcD20Reaction;

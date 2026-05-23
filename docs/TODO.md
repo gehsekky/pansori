@@ -904,8 +904,44 @@ as a critical-path engine block.
 **Spells deferred behind specific infra:**
 - **Wall of Force / Wall of Fire (real grid blocker)** — needs
   transient grid obstacles that expire on concentration drop.
-- **Mirror Image / Counterspell-on-self / Foresight** — need a
-  PC-turn d20 reaction window (the Lucky / Restore Balance work).
+- ~~**PC-turn d20 reaction window**~~ — architecture shipped
+  2026-05-22. New `PendingPcD20Reaction` variant on the
+  PendingReaction union (distinct from PendingReactionBase — carries
+  `rollerCharId` instead of `attackerEnemyId/targetCharId`).
+  resolvePlayerAttack gained a `forceRoll1` parameter that bypasses
+  internal d20 generation; AttackContext gained `forceD20` that
+  resolveOneAttack passes through. attack/index.ts now stashes a
+  pre-attack snapshot + proposed (miss) snapshot + the AttackContext
+  blob when a PC misses + has Heroic Inspiration (not pre-declared),
+  and pauses. The resolve_reaction handler's new pc_d20 branch
+  rewinds to the pre-attack state on accept, rolls a new d20,
+  clears inspiration, and re-calls resolveOneAttack with forceD20
+  set. On decline, commits the proposed miss snapshot and retains
+  Inspiration.
+
+  First wiring: **Heroic Inspiration on missed attacks** (SRD:
+  "expend it to reroll any die immediately after rolling it, and
+  you must use the new roll"). Pansori MVP triggers only on attack
+  misses (RAW also allows rerolling hits for crit chasing — deferred
+  for UX); only on the first attack of a multi-attack sequence
+  (Extra Attack iterations don't pause); only on attack rolls (saves
+  + ability checks deferred to follow-ups). The pre-declared
+  `spend_inspiration` path remains for legacy / immediate-advantage
+  use; players can also wait and use the post-roll reaction. 7 BE
+  specs cover pause, no-pause, choice surfacing, accept-to-hit,
+  accept-still-miss, decline. The `inspiration_pending` flag check
+  in attack/index.ts gates the post-roll surfacing so the two paths
+  don't double-fire.
+
+  Future plug-ins on the same shape (each is its own PR's worth):
+    - **Lucky feat (PHB-only)** — same pause point on attacks; also
+      pauses on PC saves + ability checks.
+    - **Clockwork Soul Restore Balance** — different pause point
+      (pre-roll, cancels adv/disadv).
+    - **Mirror Image, Counterspell-on-self, Foresight** — each
+      hooks one specific d20 site.
+- **Mirror Image / Counterspell-on-self / Foresight** — each is a
+  d20 reaction now that the window infra exists; ship as needed.
 - **Bestow Curse / Hold Monster variants** — need multi-option
   picker UX on the FE for the curse type selection.
 - **Revivify / Raise Dead** — need a death + return-to-life
