@@ -255,9 +255,6 @@ export type StructuredAction =
   // Great Weapon Master (2024 PHB) — bonus-action attack after a
   // Heavy-weapon Crit or kill on this turn.
   | { type: 'gwm_bonus_attack'; targetEnemyId?: string }
-  // Eldritch Knight Fighter L7 — War Magic: bonus-action weapon
-  // attack after casting a cantrip on the same turn.
-  | { type: 'ek_war_magic_attack'; targetEnemyId?: string }
   // Celestial Warlock L3 — Healing Light: bonus action, spend N
   // dice from a (1 + warlock level)-d6 pool to heal self/ally.
   | { type: 'use_healing_light'; dice: number; targetCharId?: string }
@@ -362,7 +359,6 @@ export type ChoiceKind =
   | 'two_weapon_attack'
   | 'polearm_butt_end'
   | 'gwm_bonus_attack'
-  | 'ek_war_magic_attack'
   | 'use_healing_light'
   | 'use_lands_aid'
   | 'use_hand_of_healing'

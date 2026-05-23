@@ -308,12 +308,6 @@ export interface TurnActions {
   // Same gate shape as gwm_used / sneak_attack_used. Cleared by
   // FRESH_TURN at turn start.
   celestial_revelation_rider_used?: boolean;
-  // 2024 PHB Eldritch Knight Fighter L7 — War Magic: after casting
-  // a cantrip with your action, you may make one weapon attack as
-  // a bonus action. Set when an EK L7+ casts a cantrip; the
-  // ek_war_magic_attack choice surfaces while the flag is true.
-  // Cleared by FRESH_TURN.
-  ek_war_magic_pending?: boolean;
   // 2024 PHB Fey Wanderer Ranger L3 — Dreadful Strikes: once per
   // turn, on a weapon hit, add +1d4 psychic damage. Same gate
   // shape as gwm_used / sneak_attack_used. Cleared by FRESH_TURN.
@@ -328,11 +322,6 @@ export interface TurnActions {
   // cleared by the attack handler on first hit. FRESH_TURN at
   // turn start naturally expires the flag after one turn.
   dread_ambusher_pending?: boolean;
-  // 2024 PHB Psi Warrior Fighter L3 — Psionic Strike: once per
-  // turn, on a weapon hit, auto-spend 1 Psi Energy die for
-  // +(die + INT mod) force damage. Once-per-turn gate cleared by
-  // FRESH_TURN.
-  psionic_strike_used?: boolean;
   // 2024 PHB Elements Monk L3 — Elemental Strikes: once per turn,
   // on an unarmed hit, spend 1 Discipline (Ki) for +1d10 fire
   // damage. Once-per-turn gate cleared by FRESH_TURN.

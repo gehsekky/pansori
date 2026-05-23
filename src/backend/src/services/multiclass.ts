@@ -197,12 +197,11 @@ export function canMulticlassInto(char: Character, targetClass: string): string 
 
 const FULL_CASTERS = new Set(['bard', 'cleric', 'druid', 'sorcerer', 'wizard']);
 const HALF_CASTERS = new Set(['paladin', 'ranger']);
-// Third-casters depend on subclass — Fighter (Eldritch Knight) and Rogue
-// (Arcane Trickster). The subclass check lives in `casterLevelContribution`.
-const THIRD_CASTER_SUBCLASSES: Record<string, string> = {
-  fighter: 'eldritch_knight',
-  rogue: 'arcane_trickster',
-};
+// Third-casters depend on subclass — pansori SRD-only build doesn't
+// include any third-caster subclasses (Eldritch Knight / Arcane Trickster
+// are PHB-only). Table kept as the integration shape for any future
+// SRD third-caster work.
+const THIRD_CASTER_SUBCLASSES: Record<string, string> = {};
 
 /**
  * Caster-level contribution from `levelsInClass` levels in `className`,

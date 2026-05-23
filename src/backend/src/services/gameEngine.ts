@@ -2496,7 +2496,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       barbarian: 3,
     };
     const subclassChoices: Record<string, string[]> = {
-      fighter: ['champion', 'battle_master', 'eldritch_knight', 'psi_warrior'],
+      fighter: ['champion'],
       rogue: ['thief', 'assassin', 'soulknife', 'arcane_trickster'],
       wizard: ['evoker', 'abjurer', 'diviner', 'illusionist'],
       cleric: ['life'],
@@ -2939,23 +2939,6 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   // ── Subclass active features ────────────────────────────────────────────────
   if (state.combat_active && enemyAlive && char.subclass) {
     const cdLeft = char.class_resource_uses?.channel_divinity ?? 1;
-
-    // Battle Master: maneuver choices (in combat, superiority dice remaining)
-    if (char.subclass === 'battle_master') {
-      const sdLeft = char.class_resource_uses?.superiority_dice ?? 4;
-      if (sdLeft > 0) {
-        choices.push({
-          label: `Maneuver: Trip Attack — +1d8 dmg, STR save or prone (${sdLeft} dice left)`,
-          action: { type: 'use_class_feature', featureId: 'maneuver_trip' },
-          kind: 'class_feature',
-        });
-        choices.push({
-          label: `Maneuver: Goading Attack — +1d8 dmg, WIS save or disadvantage vs others (${sdLeft} dice left)`,
-          action: { type: 'use_class_feature', featureId: 'maneuver_goading' },
-          kind: 'class_feature',
-        });
-      }
-    }
 
     // Lore Bard: Cutting Words (reaction, costs Bardic Inspiration)
     if (char.subclass === 'lore' && hasClass(char, 'bard') && !char.turn_actions.reaction_used) {
@@ -3478,16 +3461,6 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         action: { type: 'gwm_bonus_attack', targetEnemyId: livingEnemies[0].id },
         requiresBonusAction: true,
         kind: 'two_weapon_attack', // reuse the bonus-action-attack category
-      });
-    }
-    // Eldritch Knight L7 War Magic — flagged after a cantrip this
-    // turn. Bonus-action weapon attack with the equipped weapon.
-    if (char.turn_actions.ek_war_magic_pending && equippedWpnItem && livingEnemies.length > 0) {
-      choices.push({
-        label: `War Magic — bonus attack with the ${equippedWpnItem.name}`,
-        action: { type: 'ek_war_magic_attack', targetEnemyId: livingEnemies[0].id },
-        requiresBonusAction: true,
-        kind: 'two_weapon_attack',
       });
     }
   }

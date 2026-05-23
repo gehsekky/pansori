@@ -101,7 +101,6 @@ export const handleShortRest: ActionHandler<{ type: 'short_rest' }> = (ctx) => {
     const cdLvl = Math.max(getClassLevel(next, 'cleric'), getClassLevel(next, 'paladin'));
     srUses.channel_divinity = cdLvl >= 6 ? 2 : 1;
   }
-  if (next.subclass === 'battle_master') delete srUses.superiority_dice;
   delete srUses.colossus_slayer_used;
   if (hasClass(next, 'warlock')) {
     // Warlock pact slots refresh on short rest. Multi-class warlock
@@ -188,12 +187,6 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
     // long-rest only.)
     if (c.subclass === 'land' && hasClass(c, 'druid')) {
       delete restoredUses.lands_aid_used;
-    }
-    // 2024 PHB Psi Warrior Fighter Psi Energy dice — refills on
-    // long rest. (RAW also has a short-rest 1-die recovery;
-    // pansori MVP is long-rest only.)
-    if (c.subclass === 'psi_warrior' && hasClass(c, 'fighter')) {
-      delete restoredUses.psi_dice_used;
     }
     // 2024 PHB Clockwork Soul Sorcerer — Restore Balance pool
     // refreshes to CHA mod (min 1) on long rest. Tracks CHA changes

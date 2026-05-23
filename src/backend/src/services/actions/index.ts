@@ -41,7 +41,6 @@ import { handleCastSpell } from './castSpell/index.js';
 import { handleCelestialRevelation } from './celestialRevelation.js';
 import { handleDeathSave } from './deathSave.js';
 import { handleDisarmTrap } from './disarmTrap.js';
-import { handleEkWarMagicAttack } from './ekWarMagicAttack.js';
 import { handleEscape } from './escape.js';
 import { handleExamine } from './examineDefault.js';
 import { handleGridMove } from './gridMove.js';
@@ -111,7 +110,6 @@ const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   two_weapon_attack: handleTwoWeaponAttack as ActionHandler,
   polearm_butt_end: handlePolearmButtEnd as ActionHandler,
   gwm_bonus_attack: handleGwmBonusAttack as ActionHandler,
-  ek_war_magic_attack: handleEkWarMagicAttack as ActionHandler,
   use_healing_light: handleHealingLight as ActionHandler,
   use_hand_of_healing: handleHandOfHealing as ActionHandler,
   use_lands_aid: handleLandsAid as ActionHandler,

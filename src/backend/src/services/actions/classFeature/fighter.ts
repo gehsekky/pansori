@@ -1,29 +1,19 @@
-import { abilityMod, profBonus, rollDice } from '../../rulesEngine.js';
 import { getClassLevel, hasClass } from '../../multiclass.js';
+import { profBonus, rollDice } from '../../rulesEngine.js';
 import type { ActionContext } from '../types.js';
-import { composeNow } from '../../narrative/compose.js';
 
 /**
- * Fighter + Battle Master + Champion features.
+ * Fighter + Champion features (SRD-only build).
  *
- *  - `action_surge`: 2024 PHB — once per rest, refunds the action so the
- *    Fighter can take two actions this turn. Resets on short rest.
+ *  - `action_surge`: once per rest, refunds the action so the Fighter
+ *    can take two actions this turn. Resets on short rest.
  *  - `tactical_master_{push|sap|slow}`: Fighter L9+. Pre-arms the next
- *    attack to apply the chosen mastery instead of the weapon's printed
- *    one. Consumes the queue slot in turn_actions.
- *  - `second_wind`: 2024 PHB — 2/3/4 uses per rest at L1/4/10. Bonus
- *    action heal of 1d10 + level HP.
- *  - `maneuver_{trip|goading|...}`: Battle Master L3+. Spend a
- *    superiority die (1d8 default pool of 4, recovers on short rest)
- *    to add damage + apply a maneuver effect. Trip: STR-save to prone.
- *    Goading: WIS-save to apply 'goaded' (disadvantage vs others).
- *  - `remarkable_athlete`: Champion subclass. Passive narrative line
- *    only (the actual proficiency-half bonus is applied in skill check
- *    resolution paths elsewhere).
+ *    attack to apply the chosen mastery.
+ *  - `second_wind`: 2/3/4 uses per rest at L1/4/10. Bonus action heal
+ *    of 1d10 + level HP.
+ *  - `remarkable_athlete`: Champion. Passive narrative line.
  */
 export function handleFighterFeature(ctx: ActionContext, fid: string): boolean {
-  const dispatchKey = [ctx.char.character_class, ctx.char.subclass, fid].filter(Boolean).join('_');
-
   if (fid === 'action_surge') {
     if (!hasClass(ctx.char, 'fighter')) {
       ctx.narrative = 'Only Fighters have Action Surge.';
@@ -92,92 +82,6 @@ export function handleFighterFeature(ctx: ActionContext, fid: string): boolean {
     };
     ctx.char.turn_actions = { ...ctx.char.turn_actions, bonus_action_used: true };
     ctx.narrative = `${ctx.char.name} uses Second Wind — healed ${swHeal} HP (now ${ctx.char.hp}/${ctx.char.max_hp}). (${swMax - swUsed - 1}/${swMax} remaining)`;
-    return true;
-  }
-
-  if (dispatchKey.includes('battle_master') && fid.startsWith('maneuver_')) {
-    const sdPool = ctx.char.class_resource_uses?.superiority_dice ?? 4;
-    if (sdPool <= 0) {
-      ctx.narrative = 'No superiority dice remaining (recover on short rest).';
-      return true;
-    }
-    ctx.char.class_resource_uses = {
-      ...(ctx.char.class_resource_uses ?? {}),
-      superiority_dice: sdPool - 1,
-    };
-    const sdRoll = rollDice('1d8');
-    if (fid === 'maneuver_trip') {
-      const tripSave =
-        rollDice('1d20') +
-        abilityMod((ctx.enemy as unknown as Record<string, number>)['str'] ?? 10);
-      const tripDC = 8 + profBonus(ctx.char.level) + abilityMod(ctx.char.str);
-      if (tripSave < tripDC) {
-        ctx.st = {
-          ...ctx.st,
-          entities: (ctx.st.entities ?? []).map((e) =>
-            e.id === ctx.enemy?.id && e.isEnemy
-              ? { ...e, conditions: [...e.conditions.filter((c) => c !== 'prone'), 'prone'] }
-              : e
-          ),
-        };
-        ctx.narrative = `Maneuver — Trip Attack: +${sdRoll} damage, ${ctx.enemy!.name} knocked prone! (STR save ${tripSave} vs DC ${tripDC})`;
-      } else {
-        ctx.narrative = `Maneuver — Trip Attack: +${sdRoll} damage, ${ctx.enemy!.name} resists the trip. (STR save ${tripSave} vs DC ${tripDC})`;
-      }
-    } else if (fid === 'maneuver_goading') {
-      const goadSave =
-        rollDice('1d20') +
-        abilityMod((ctx.enemy as unknown as Record<string, number>)['wis'] ?? 10);
-      const goadDC = 8 + profBonus(ctx.char.level) + abilityMod(ctx.char.cha);
-      const goadSuccess = goadSave >= goadDC;
-      if (!goadSuccess) {
-        ctx.st = {
-          ...ctx.st,
-          entities: (ctx.st.entities ?? []).map((e) =>
-            e.id === ctx.enemy?.id && e.isEnemy
-              ? {
-                  ...e,
-                  conditions: [...e.conditions.filter((c) => c !== 'goaded'), 'goaded'],
-                }
-              : e
-          ),
-        };
-        composeNow(ctx, {
-          kind: 'save',
-          characterId: ctx.enemy!.id,
-          characterName: ctx.enemy!.name,
-          ability: 'wis',
-          roll: goadSave,
-          dc: goadDC,
-          success: false,
-          vs: 'Goading Attack',
-          prose: '',
-        });
-        composeNow(ctx, {
-          kind: 'condition_applied',
-          targetId: ctx.enemy!.id,
-          targetName: ctx.enemy!.name,
-          condition: 'goaded',
-          source: 'Goading Attack',
-          prose: `Maneuver — Goading Attack: +${sdRoll} damage, ${ctx.enemy!.name} goaded (disadvantage vs others)! (WIS save ${goadSave} vs DC ${goadDC})`,
-        });
-      } else {
-        composeNow(ctx, {
-          kind: 'save',
-          characterId: ctx.enemy!.id,
-          characterName: ctx.enemy!.name,
-          ability: 'wis',
-          roll: goadSave,
-          dc: goadDC,
-          success: true,
-          vs: 'Goading Attack',
-          prose: `Maneuver — Goading Attack: +${sdRoll} damage, ${ctx.enemy!.name} resists. (WIS save ${goadSave} vs DC ${goadDC})`,
-        });
-      }
-    } else {
-      // Generic maneuver: deal extra die damage
-      ctx.narrative = `Maneuver — +${sdRoll} superiority die damage! (${sdPool - 1} dice remaining)`;
-    }
     return true;
   }
 
