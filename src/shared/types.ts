@@ -261,10 +261,6 @@ export type StructuredAction =
   // Celestial Warlock L3 — Healing Light: bonus action, spend N
   // dice from a (1 + warlock level)-d6 pool to heal self/ally.
   | { type: 'use_healing_light'; dice: number; targetCharId?: string }
-  // Glamour Bard L3 — Mantle of Inspiration: bonus action, spend
-  // 1 Bardic Inspiration use, grant (5 + CHA mod) temp HP to up
-  // to 5 ally targets.
-  | { type: 'use_mantle_of_inspiration' }
   // Land Druid L3 — Land's Aid: bonus action (2 uses/long rest)
   // that heals an ally OR damages an enemy. Picks one of three
   // variants at use time.
@@ -370,7 +366,6 @@ export type ChoiceKind =
   | 'use_healing_light'
   | 'use_lands_aid'
   | 'use_hand_of_healing'
-  | 'use_mantle_of_inspiration'
   | 'use_celestial_revelation'
   | 'cast_spell'
   | 'class_feature';
