@@ -150,6 +150,12 @@ const defs: ConditionDef[] = [
   // via the polymorph_state stash. Same 'permanent' shape as
   // banished so tickConditions doesn't auto-expire it.
   { id: 'polymorphed', duration: 'permanent' },
+  // 2024 PHB Haste — Speed doubled, +2 AC, advantage on Dex saves.
+  // Concentration-linked; cleared on caster's concentration drop +
+  // applies the `incapacitated` lethargy condition for one round.
+  // Permanent duration here means tickConditions doesn't auto-expire;
+  // the caster's concentration is the real timer.
+  { id: 'hasted', duration: 'permanent' },
   // Engine-internal: Shield spell bumps AC +5 on cast (in reaction.ts);
   // ticking the condition off must reverse the bump.
   {

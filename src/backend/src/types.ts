@@ -487,6 +487,13 @@ export interface Spell {
   // on cast and blocks the cast if the caster can't afford it. Free
   // material components (just listed in the description) don't set this.
   materialCost?: number;
+  // 2024 PHB — some healing spells also strip conditions from the
+  // target on cast (Heal: Blinded / Deafened / Poisoned; Greater
+  // Restoration: Charmed / Petrified / Stunned + Exhaustion; etc.).
+  // The heal branch in castSpell reads this and removes each entry
+  // from `char.conditions` after the HP restore. Single-target only
+  // — mass-heal path doesn't apply per-target condition strips today.
+  removeConditions?: string[];
 }
 
 // ─── Beast Forms (2024 PHB Wild Shape) ───────────────────────────────────────

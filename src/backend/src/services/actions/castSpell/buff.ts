@@ -129,7 +129,11 @@ export function runBuffSpell(
   // AC computation to take effect. The flag toggle is here; the
   // AC recompute uses the same computeTotalAc + inventory lookup
   // pattern as the equip-armor path in routes/game.ts.
-  if (spell.id === 'mage_armor' || spell.id === 'shield_of_faith') {
+  // Haste also gets +2 AC via the hasted condition — recompute when
+  // the buff path adds the condition.
+  const grantsAcBump =
+    spell.id === 'mage_armor' || spell.id === 'shield_of_faith' || spell.id === 'haste';
+  if (grantsAcBump) {
     const recomputeAcFor = (c: typeof buffTarget): number =>
       computeTotalAc(
         c.dex,
@@ -138,7 +142,12 @@ export function runBuffSpell(
         c.inventory ?? [],
         ctx.context.lootTable,
         (spell.id === 'mage_armor' ? true : (c.mage_armor_active ?? false)) as boolean,
-        (spell.id === 'shield_of_faith' ? true : (c.shield_of_faith_active ?? false)) as boolean
+        (spell.id === 'shield_of_faith' ? true : (c.shield_of_faith_active ?? false)) as boolean,
+        // Haste adds +2 AC via the hasted condition. After this buff
+        // path runs, the target's conditions include 'hasted', so
+        // pass true when this is the Haste cast OR when the target
+        // already had the condition from a prior cast.
+        spell.id === 'haste' || (c.conditions ?? []).includes('hasted')
       );
     if (isCasterTarget) {
       if (spell.id === 'mage_armor') ctx.char.mage_armor_active = true;

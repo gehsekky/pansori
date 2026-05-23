@@ -1,7 +1,8 @@
 // 2024 PHB Heal (L6). Big single-target heal — 70 HP fixed (+10
-// per slot above 6th). RAW also cures Blinded / Deafened /
-// Poisoned; pansori MVP only restores HP (condition removal is a
-// follow-up that needs a removeConditions field on Spell).
+// per slot above 6th). Also cures Blinded / Deafened / Poisoned
+// per SRD: "This spell also ends the Blinded, Deafened, and
+// Poisoned conditions on the target." Wired via the new
+// `Spell.removeConditions` field consumed by the heal branch.
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { makeChar, makeState } from '../../test-fixtures.js';
@@ -129,5 +130,41 @@ describe('Heal (L6)', () => {
     const afterAlly = result.newState.characters.find((c) => c.id === 'ally-1');
     // 70 (base) + 10 (upcast) + 3 (WIS mod) = 83. 3 + 83 = 86.
     expect(afterAlly?.hp).toBe(86);
+  });
+
+  it('strips Blinded / Deafened / Poisoned from the target', async () => {
+    const pc = makeChar({
+      id: 'pc-1',
+      character_class: 'Cleric',
+      level: 11,
+      wis: 16,
+      hp: 60,
+      max_hp: 70,
+      spells_known: ['heal'],
+      prepared_spells: ['heal'],
+      spell_slots_max: { 6: 1 },
+      spell_slots_used: { 6: 0 },
+    });
+    const ally = makeChar({
+      id: 'ally-1',
+      character_class: 'Fighter',
+      level: 11,
+      hp: 10,
+      max_hp: 80,
+      conditions: ['blinded', 'poisoned', 'frightened'],
+    });
+    const state = buildState(pc, ally);
+    const result = await takeAction({
+      action: { type: 'cast_spell', spellId: 'heal', slotLevel: 6 },
+      history: [],
+      state,
+      seed,
+      context: ctx,
+    });
+    const afterAlly = result.newState.characters.find((c) => c.id === 'ally-1');
+    expect(afterAlly?.conditions).not.toContain('blinded');
+    expect(afterAlly?.conditions).not.toContain('poisoned');
+    // Frightened is NOT on the strip list, so it persists.
+    expect(afterAlly?.conditions).toContain('frightened');
   });
 });

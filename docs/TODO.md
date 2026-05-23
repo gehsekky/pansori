@@ -800,12 +800,29 @@ the prerequisite infrastructure lands.
 - ~~**Detect Magic / Identify / Comprehend Languages**~~ — shipped
   with ritual casting.
 - ~~**Heal (L6)**~~ — shipped 2026-05-22. 70 HP + WIS mod, +10 per
-  slot above 6th. Uses the existing heal pipeline. Required a
+  slot above 6th. Uses the existing heal pipeline. Required an
   `addDice` / `multiplyDice` fix to handle plain-numeric heal
   expressions ('70' + '10' was being concatenated as '70+10' which
   rollDice parsed as just 70). Condition removal (Blinded /
-  Deafened / Poisoned RAW) deferred — needs a `removeConditions`
-  field on Spell.
+  Deafened / Poisoned per SRD: "This spell also ends the Blinded,
+  Deafened, and Poisoned conditions on the target.") shipped via
+  new `Spell.removeConditions` field that the heal branch reads +
+  strips after the HP restore. Future spells (Greater Restoration,
+  Lesser Restoration, etc.) plug into the same field.
+- ~~**Haste (L3)**~~ — shipped 2026-05-22. Buff path
+  (targetType: 'self_or_ally'), concentration. Applies the new
+  `hasted` condition. effectiveSpeed doubles when hasted; the new
+  `hastedActive` flag on computeTotalAc adds +2 AC (wired in the
+  buff-path AC-recompute alongside Mage Armor / Shield of Faith);
+  rollConditionSave grants advantage on Dex saves when 'hasted' is
+  in targetConditions. Concentration drop in breakConcentration
+  strips hasted, applies incapacitated for 1 round (the RAW
+  "lethargy"), and recomputes AC. The extra-action mechanic (RAW
+  "additional action each turn limited to Attack-one / Dash /
+  Disengage / Hide / Utilize") is deferred behind a turn-flow
+  refactor that would let a PC take a second action without ending
+  their turn. The speed-0 detail of the lethargy isn't separately
+  enforced (incapacitated already gates actions; pansori MVP).
 - ~~**Polymorph**~~ — shipped 2026-05-22 using the 2024 PHB rewrite
   (form HP lives on temp HP instead of swapping primary HP). L4
   transmutation, WIS save. New `polymorph_state: { formName }` field

@@ -357,10 +357,14 @@ export function computeTotalAc(
   lootTable: LootItem[],
   // Optional buff toggles. Mage Armor changes unarmored base from
   // 10 to 13 (no-op when wearing body armor). Shield of Faith adds
-  // a flat +2 regardless of armor. Both spells set the flags on the
-  // caster's character; computeTotalAc honors them here.
+  // a flat +2 regardless of armor. Haste adds a flat +2 from the
+  // hasted condition; the buff spell handler / save handler doesn't
+  // need to recompute AC since most call sites read the live
+  // condition list directly via `hastedActive`. All flags default
+  // false for legacy compat.
   mageArmorActive: boolean = false,
-  shieldOfFaithActive: boolean = false
+  shieldOfFaithActive: boolean = false,
+  hastedActive: boolean = false
 ): number {
   const dexMod = abilityMod(dex);
   const armorId = equippedArmorInstanceId
@@ -382,6 +386,7 @@ export function computeTotalAc(
   }
   if (shield?.ac_bonus) ac += shield.ac_bonus;
   if (shieldOfFaithActive) ac += 2;
+  if (hastedActive) ac += 2;
   return ac;
 }
 
@@ -442,8 +447,12 @@ export function rollConditionSave(
   // `extraDisadvantage` covers any caller-supplied source (e.g. heavy
   // encumbrance giving disadv on STR/DEX/CON saves per 2024 PHB).
   const disadv = disadvantageOnSave(targetConditions, ability) || extraDisadvantage;
-  const netAdv = advantage && !disadv;
-  const netDisadv = disadv && !advantage;
+  // 2024 PHB Haste — "the target has Advantage on Dexterity saving
+  // throws." Caller advantage wins by 2024 PHB stacking rules, so OR
+  // these together rather than threading a separate parameter.
+  const hasteAdv = ability === 'dex' && targetConditions.includes('hasted');
+  const netAdv = (advantage || hasteAdv) && !disadv;
+  const netDisadv = disadv && !(advantage || hasteAdv);
   // Note: Halfling Lucky for saves would land here. We don't currently
   // thread the species through this helper since it's also called for
   // enemies. Caller threads it via the higher-level `conditionSavingThrow`
