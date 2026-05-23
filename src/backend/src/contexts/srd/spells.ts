@@ -942,6 +942,34 @@ export const SRD_SPELLS: Record<string, Spell> = {
     spellList: ['arcane', 'divine'],
   },
 
+  // 2024 PHB Polymorph (L4 transmutation). Target makes a WIS save or
+  // is transformed into a small beast for the duration. Pansori MVP
+  // auto-picks 'Wolf' (CR 1/4, 11 HP, 2d4+2 bite) as the form for
+  // every successful polymorph. RAW lets the caster pick a beast with
+  // CR ≤ target's level; auto-pick keeps the choice surface clean
+  // (no destination picker yet on the FE). Stats are swapped via the
+  // entity's `polymorph_state` field — concentration drop reverts.
+  // 0 HP in new form: pansori MVP just dies (RAW would revert with
+  // excess damage carrying over).
+  polymorph: {
+    id: 'polymorph',
+    name: 'Polymorph',
+    level: 4,
+    castTime: 'action',
+    concentration: true,
+    durationRounds: 100,
+    savingThrow: 'wis',
+    saveEffect: 'negates',
+    condition: 'polymorphed',
+    conditionDuration: 100,
+    desc: 'A creature within 60 ft makes a WIS save or is transformed into a small beast (Wolf, 11 HP) for the duration. Concentration up to 1 hour.',
+    narrative:
+      '{name} weaves a transmutation rune — {target} contorts, shrinks, fur and fang reshaping flesh.',
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    spellList: ['arcane', 'primal'],
+  },
+
   // 2024 PHB Dimension Door (L4 conjuration). Teleport up to 500 ft
   // to an unoccupied space. Pansori treats the grid as effectively
   // "within range" since rooms are smaller than 500 ft. New castSpell

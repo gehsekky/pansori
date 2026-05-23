@@ -145,6 +145,11 @@ const defs: ConditionDef[] = [
   // doesn't auto-expire it round-by-round; the caster's concentration
   // is the actual timer.
   { id: 'banished', duration: 'permanent' },
+  // 2024 PHB Polymorph — target transformed into a beast. Duration
+  // is concentration-linked; the caster's drop reverts the entity
+  // via the polymorph_state stash. Same 'permanent' shape as
+  // banished so tickConditions doesn't auto-expire it.
+  { id: 'polymorphed', duration: 'permanent' },
   // Engine-internal: Shield spell bumps AC +5 on cast (in reaction.ts);
   // ticking the condition off must reverse the bump.
   {
