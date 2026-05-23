@@ -213,8 +213,97 @@ export const SRD_SPELLS: Record<string, Spell> = {
     rangeFt: 30,
     spellList: ['arcane'],
   },
+  // SRD: Spare the Dying — touch a creature with 0 HP and stabilize
+  // it (becomes Stable, stops death saves). Narrative cantrip;
+  // pansori's death-save flow consumes a `Stable` condition flag
+  // automatically when reached, so the handler-side wiring is
+  // minimal. Range scales by level (15/30/60/120 ft) but pansori
+  // doesn't enforce spell range at this granularity yet.
+  spare_the_dying: {
+    id: 'spare_the_dying',
+    name: 'Spare the Dying',
+    level: 0,
+    castTime: 'action',
+    narrative: '{name} steadies the wounded. Death loosens its grip.',
+    desc: 'Stabilize a dying creature within 15 ft (range increases with level).',
+    rangeKind: 'ranged',
+    rangeFt: 15,
+    spellList: ['divine', 'primal'],
+  },
+  // SRD: Mending — repair a single break/tear in an object touched.
+  // Pure narrative cantrip in pansori (no object-damage tracking).
+  mending: {
+    id: 'mending',
+    name: 'Mending',
+    level: 0,
+    castTime: 'action',
+    narrative: '{name} threads magic through the breach — the seam closes.',
+    desc: 'Repair a single break or tear in an object touched.',
+    rangeKind: 'touch',
+    spellList: ['arcane', 'divine', 'primal'],
+  },
+  // SRD: Druidcraft — minor druidic effects (predict weather, bloom
+  // a flower, snuff a tiny flame, etc.). Narrative cantrip.
+  druidcraft: {
+    id: 'druidcraft',
+    name: 'Druidcraft',
+    level: 0,
+    castTime: 'action',
+    narrative: '{name} whispers to the wild — a small wonder answers.',
+    desc: 'Minor druidic effects: predict weather, bloom flora, snuff a tiny flame, sense the weather.',
+    rangeKind: 'ranged',
+    rangeFt: 30,
+    spellList: ['primal'],
+  },
+  // SRD: Prestidigitation — minor magical tricks (light a candle,
+  // chill or warm a small object, conjure a tiny illusion, etc.).
+  // Narrative cantrip.
+  prestidigitation: {
+    id: 'prestidigitation',
+    name: 'Prestidigitation',
+    level: 0,
+    castTime: 'action',
+    narrative: '{name} gestures — a small flourish of magic answers.',
+    desc: 'Minor magical effects within 10 ft: light a candle, chill/warm a small object, conjure tiny illusions, clean or soil an object.',
+    rangeKind: 'ranged',
+    rangeFt: 10,
+    spellList: ['arcane'],
+  },
+  // SRD: Thaumaturgy — minor cleric "showmanship" effects (boom
+  // your voice, flicker flames, tremor underfoot, etc.). Narrative
+  // cantrip. Granted as an innate cantrip to Tieflings (see
+  // contexts/srd/species.ts).
+  thaumaturgy: {
+    id: 'thaumaturgy',
+    name: 'Thaumaturgy',
+    level: 0,
+    castTime: 'action',
+    narrative: '{name} speaks a word that rings with weight — the air shifts.',
+    desc: 'Minor wonder: boom your voice, flicker flames, tremor underfoot, alter an open flame, harmless tremors.',
+    rangeKind: 'ranged',
+    rangeFt: 30,
+    spellList: ['divine'],
+  },
 
   // ─── Level 1 ────────────────────────────────────────────────────────────────
+  // SRD: Find Familiar — 1-hour ritual cast (10 gp material consumed).
+  // Summons a Tiny familiar that scouts and shares senses. Narrative
+  // spell in pansori — companion entities are out of scope (the
+  // Beastmaster companion was removed in Phase 2H). RAW lists the
+  // available animal forms (cat, owl, frog, etc.); we leave the
+  // form choice as flavor.
+  find_familiar: {
+    id: 'find_familiar',
+    name: 'Find Familiar',
+    level: 1,
+    castTime: 'action',
+    narrative:
+      '{name} traces an intricate sigil; brass and incense crumble away, and a small familiar takes shape.',
+    desc: 'Ritual: summon a Tiny familiar. Narrative-only in pansori — the familiar accompanies the caster as flavor.',
+    rangeKind: 'ranged',
+    rangeFt: 10,
+    spellList: ['arcane'],
+  },
   cure_wounds: {
     id: 'cure_wounds',
     name: 'Cure Wounds',
@@ -579,6 +668,27 @@ export const SRD_SPELLS: Record<string, Spell> = {
   },
 
   // ─── Level 2 ────────────────────────────────────────────────────────────────
+  // SRD: Darkness — 15-ft radius sphere of magical darkness for 10
+  // minutes (concentration). Heavy obscurement; even darkvision
+  // can't see through. Narrative spell in pansori — the engine
+  // doesn't model per-tile lighting at the resolution Darkness
+  // operates on, so the spell is flavor-only. (Drow's racial
+  // Darkness in pansori's earlier build used the same shape.)
+  darkness: {
+    id: 'darkness',
+    name: 'Darkness',
+    level: 2,
+    castTime: 'action',
+    concentration: true,
+    durationRounds: 100, // 10 minutes
+    narrative: '{name} sketches a black sigil — light bleeds out of the air around it.',
+    desc: '60-ft radius sphere of magical darkness for 10 minutes (concentration). Heavily Obscured area.',
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    blastRadius: 15,
+    aoeShape: 'sphere',
+    spellList: ['arcane'],
+  },
   // SRD: Shatter — 10-ft sphere AoE centered on a point within 60 ft;
   // CON save for half. 3d8 thunder, +1d8 per slot above 2nd. Constructs
   // roll the save at disadvantage RAW; pansori's enemy-disadvantage
@@ -708,6 +818,47 @@ export const SRD_SPELLS: Record<string, Spell> = {
   },
 
   // ─── Level 3 ────────────────────────────────────────────────────────────────
+  // SRD: Hypnotic Pattern — 30-ft cube within 120 ft. WIS save or
+  // Charmed for the duration (concentration, up to 1 minute);
+  // Charmed targets also gain Incapacitated + Speed 0. RAW: the
+  // spell ends for an affected creature if it takes damage or an
+  // ally uses an action to shake it out. Pansori MVP applies the
+  // charmed condition with a 10-round duration and skips the
+  // damage-breaks-charm rider for now (would need a per-condition
+  // break-on-damage hook).
+  hypnotic_pattern: {
+    id: 'hypnotic_pattern',
+    name: 'Hypnotic Pattern',
+    level: 3,
+    castTime: 'action',
+    savingThrow: 'wis',
+    saveEffect: 'negates',
+    concentration: true,
+    condition: 'charmed',
+    conditionDuration: 10,
+    rangeKind: 'ranged',
+    rangeFt: 120,
+    blastRadius: 30,
+    aoeShape: 'cube',
+    desc: '30-ft cube WIS save or charmed (concentration, 1 minute). Damage breaks the charm — deferred.',
+    spellList: ['arcane'],
+  },
+  // SRD: Daylight — creates a 60-ft sphere of bright sunlight for
+  // 1 hour. Bright Light + 60 ft of Dim Light beyond. Narrative
+  // spell in pansori (room-grained lighting model); the spell
+  // can also be cast on an object to make it a sun-source.
+  daylight: {
+    id: 'daylight',
+    name: 'Daylight',
+    level: 3,
+    castTime: 'action',
+    durationRounds: 600, // 1 hour
+    narrative: '{name} kindles a star at their fingertips — daylight floods the room.',
+    desc: '60-ft sphere of sunlight for 1 hour. Counters magical Darkness of level 3 or lower.',
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    spellList: ['divine', 'primal'],
+  },
   counterspell: {
     id: 'counterspell',
     name: 'Counterspell',
