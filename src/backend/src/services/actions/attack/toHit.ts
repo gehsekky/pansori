@@ -53,10 +53,9 @@ export interface ToHitContext {
  *   conditionAdv, enemyGrappled, proneAdv, enemyParalyzed, flankingAdv,
  *   helpAdv, assassinAdv (vs surprised / round-1), vowAdv (Vengeance
  *   Paladin), recklessAdv (Barbarian L2+, melee only), inspirationAdv
- *   (Heroic Inspiration), wolfAdv (Wolf Totem Barbarian ally within
- *   5 ft, melee only), vexAdv (consumed Vex tag), studyAdv (Fighter
- *   L13 miss-tag), packTacticsAdv (Wolf/Dire Wolf Beast Form +
- *   ally within 5 ft), luckAdv (Lucky feat, queued via `use_luck`).
+ *   (Heroic Inspiration), vexAdv (consumed Vex tag), studyAdv
+ *   (Fighter L13 miss-tag), packTacticsAdv (Wolf/Dire Wolf Beast Form
+ *   + ally within 5 ft), luckAdv (Lucky feat, queued via `use_luck`).
  *
  * Disadvantage sources:
  *   rangedInMelee, conditionDisadv, exhaustionDisadv (lvl 3+),
@@ -246,28 +245,6 @@ export function computeToHitContext(
     };
   }
 
-  // Path of the Totem Warrior — Wolf (PHB p.51): "While raging, your
-  // allies have advantage on melee attack rolls against any creature
-  // within 5 feet of you that is hostile to you."
-  // Gated on totem_spirit === 'wolf' specifically (not just the
-  // subclass) so Bear- and Eagle-raging Barbarians don't grant the
-  // pack-tactics-style bonus.
-  const wolfAdv =
-    weaponItem?.range !== 'ranged' &&
-    !!ctx.st.entities &&
-    ctx.st.characters.some((ally) => {
-      if (ally.id === ctx.char.id) return false;
-      if (ally.dead || ally.hp <= 0) return false;
-      if (ally.subclass !== 'totem_warrior') return false;
-      if (ally.totem_spirit !== 'wolf') return false;
-      if (!hasClass(ally, 'barbarian')) return false;
-      if (!ally.conditions.includes('raging')) return false;
-      const allyEnt = ctx.st.entities?.find((e) => e.id === ally.id);
-      const targetEnt = ctx.st.entities?.find((e) => e.id === targetId && e.isEnemy);
-      if (!allyEnt || !targetEnt) return false;
-      return distanceFeet(allyEnt.pos, targetEnt.pos) <= 5;
-    });
-
   const disadvantage =
     rangedInMelee ||
     conditionDisadv ||
@@ -307,7 +284,6 @@ export function computeToHitContext(
     vowAdv ||
     recklessAdv ||
     inspirationAdv ||
-    wolfAdv ||
     vexAdv ||
     studyAdv ||
     packTacticsAdv ||

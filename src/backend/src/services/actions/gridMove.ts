@@ -150,14 +150,7 @@ export const handleGridMove: ActionHandler<{
       !nextSt.enemies_killed.includes(oaEntity.id) &&
       !nextChar.turn_actions?.disengaged
     ) {
-      // 2024 PHB Eagle totem (Totem Warrior, Path of the Wild Heart) —
-      // while raging with the Eagle spirit, opportunity attacks against
-      // you have disadvantage. Wired here on the enemy OA path.
-      const eagleDisadv =
-        nextChar.subclass === 'totem_warrior' &&
-        nextChar.totem_spirit === 'eagle' &&
-        nextChar.conditions.includes('raging');
-      const oaResult = resolveEnemyAttack(oaEnemy, nextChar.ac, false, eagleDisadv);
+      const oaResult = resolveEnemyAttack(oaEnemy, nextChar.ac, false, false);
       if (oaResult.hit) {
         const rawDmg = oaResult.damage;
         // Route through applyDamage so the OA respects every PC-side

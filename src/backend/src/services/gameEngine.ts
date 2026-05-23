@@ -2517,7 +2517,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       warlock: ['fiend', 'archfey', 'celestial', 'great_old_one'],
       druid: ['land', 'moon', 'sea', 'stars'],
       monk: ['open_hand', 'shadow', 'mercy', 'elements'],
-      barbarian: ['berserker', 'totem_warrior', 'world_tree', 'zealot'],
+      barbarian: ['berserker'],
     };
     const reqLevel = subclassLevels[cls] ?? 3;
     // RAW: subclass is acquired at level-up (a long-rest milestone), not as an
@@ -2563,36 +2563,12 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       const rageUses =
         char.class_resource_uses?.rage_uses ?? rageUsesMax(getClassLevel(char, 'barbarian'));
       if (rageUses > 0) {
-        // Totem Warrior subclass: replace the single Rage option with
-        // three totem variants. RAW: at the start of each rage, pick
-        // Bear / Eagle / Wolf for the corresponding totem benefit.
-        if (char.subclass === 'totem_warrior') {
-          choices.push({
-            label: `Rage as Bear — resistance to all damage (Rage already covers; ${rageUses} use${rageUses === 1 ? '' : 's'} left)`,
-            action: { type: 'use_class_feature', featureId: 'rage_bear' },
-            kind: 'class_feature',
-            requiresBonusAction: true,
-          });
-          choices.push({
-            label: `Rage as Eagle — OAs vs you have disadvantage; Dash as bonus action (${rageUses} use${rageUses === 1 ? '' : 's'} left)`,
-            action: { type: 'use_class_feature', featureId: 'rage_eagle' },
-            kind: 'class_feature',
-            requiresBonusAction: true,
-          });
-          choices.push({
-            label: `Rage as Wolf — allies near your target get advantage (${rageUses} use${rageUses === 1 ? '' : 's'} left)`,
-            action: { type: 'use_class_feature', featureId: 'rage_wolf' },
-            kind: 'class_feature',
-            requiresBonusAction: true,
-          });
-        } else {
-          choices.push({
-            label: `Rage — bonus action (${rageUses} use${rageUses === 1 ? '' : 's'} left)`,
-            action: { type: 'use_class_feature', featureId: 'rage' },
-            kind: 'class_feature',
-            requiresBonusAction: true,
-          });
-        }
+        choices.push({
+          label: `Rage — bonus action (${rageUses} use${rageUses === 1 ? '' : 's'} left)`,
+          action: { type: 'use_class_feature', featureId: 'rage' },
+          kind: 'class_feature',
+          requiresBonusAction: true,
+        });
       }
     }
 
