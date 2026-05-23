@@ -837,4 +837,65 @@ export const SRD_SPELLS: Record<string, Spell> = {
     rangeKind: 'self',
     spellList: ['arcane'],
   },
+
+  // ── Flight & movement-mode spells (PHB 2024 Chapter 3) ────────────────
+  // These two spells set fly_speed_ft on the target via the buff path
+  // (see castSpell/buff.ts spell-id check). Concentration drop clears
+  // the flag in breakConcentration (gameEngine.ts).
+  levitate: {
+    id: 'levitate',
+    name: 'Levitate',
+    level: 2,
+    castTime: 'action',
+    concentration: true,
+    durationRounds: 100, // RAW 10 min; pansori rounds-based timer
+    desc: 'One willing creature within 60 ft rises or descends vertically up to 20 ft per turn. Concentration up to 10 min.',
+    narrative: '{name} traces an upward sigil — {target} drifts free of gravity.',
+    targetType: 'self_or_ally',
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    spellList: ['arcane'],
+  },
+  fly: {
+    id: 'fly',
+    name: 'Fly',
+    level: 3,
+    castTime: 'action',
+    concentration: true,
+    durationRounds: 100, // RAW 10 min
+    desc: 'A willing creature you touch gains a flying speed of 60 ft for 10 min. Concentration.',
+    narrative: '{name} touches {target} — invisible wings unfurl.',
+    targetType: 'self_or_ally',
+    rangeKind: 'touch',
+    spellList: ['arcane'],
+  },
+
+  // ── Multi-target heals (PHB 2024 Chapter 3) ──────────────────────────
+  // Route through the new `multiTargetHeal` branch in castSpell —
+  // distributes the rolled heal across all living party members
+  // (pansori MVP: party-wide, not RAW's "up to 6 within 30 ft").
+  mass_healing_word: {
+    id: 'mass_healing_word',
+    name: 'Mass Healing Word',
+    level: 3,
+    castTime: 'bonus_action',
+    heal: '1d4',
+    upcastBonus: '1d4',
+    desc: 'Up to 6 creatures within 60 ft regain 1d4 + casting mod HP. +1d4 per slot above 3rd.',
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    spellList: ['divine'],
+  },
+  mass_cure_wounds: {
+    id: 'mass_cure_wounds',
+    name: 'Mass Cure Wounds',
+    level: 5,
+    castTime: 'action',
+    heal: '3d8',
+    upcastBonus: '1d8',
+    desc: 'Up to 6 creatures within 60 ft regain 3d8 + casting mod HP. +1d8 per slot above 5th.',
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    spellList: ['divine', 'primal'],
+  },
 };

@@ -42,6 +42,53 @@ export function runHealSpell(
       ? rollDice('1d8')
       : 0;
   const healed = baseHealed + discipleBonus + chaliceBonus;
+
+  // 2024 PHB Mass Healing Word (L3) / Mass Cure Wounds (L5) — apply the
+  // rolled heal to EVERY living party member instead of just the most-
+  // injured ally. RAW caps at 6 targets within range; pansori MVP heals
+  // the whole party (parties are 1-4 PCs so the cap doesn't bite).
+  // Disciple of Life + Chalice bonus apply per-target.
+  const isMassHeal = spell.id === 'mass_healing_word' || spell.id === 'mass_cure_wounds';
+  if (isMassHeal) {
+    const livingParty = ctx.st.characters.filter((c) => !c.dead);
+    const perTargetLines: string[] = [];
+    let updatedChars = ctx.st.characters;
+    let updatedEntities = ctx.st.entities ?? [];
+    let casterAfter = ctx.char;
+    for (const member of livingParty) {
+      const isMemberCaster = member.id === ctx.char.id;
+      const target = isMemberCaster ? casterAfter : member;
+      const prevHp = target.hp;
+      const newHp = Math.min(target.max_hp, prevHp + healed);
+      const delta = newHp - prevHp;
+      perTargetLines.push(`${target.name}: ${prevHp}→${newHp} (+${delta})`);
+      if (isMemberCaster) {
+        casterAfter = { ...casterAfter, hp: newHp };
+      } else {
+        updatedChars = updatedChars.map((c) => (c.id === member.id ? { ...c, hp: newHp } : c));
+        updatedEntities = updatedEntities.map((e) =>
+          e.id === member.id && !e.isEnemy ? { ...e, hp: newHp } : e
+        );
+      }
+    }
+    ctx.char = casterAfter;
+    ctx.st = { ...ctx.st, characters: updatedChars, entities: updatedEntities };
+    const bonusNote: string[] = [];
+    if (discipleBonus > 0) bonusNote.push(`Disciple of Life: +${discipleBonus}`);
+    if (chaliceBonus > 0) bonusNote.push(`Chalice constellation: +${chaliceBonus}`);
+    const bonusSuffix = bonusNote.length > 0 ? ` (${bonusNote.join(' · ')})` : '';
+    composeNow(ctx, {
+      kind: 'spell_utility',
+      prose:
+        pickCastPrefix(spell, {
+          name: ctx.char.name,
+          spell: spell.name,
+          slotNote,
+        }) + ` — ${healed} HP to each: ${perTargetLines.join(', ')}.${bonusSuffix}`,
+    });
+    return;
+  }
+
   // Target the most injured party member (excluding the caster, unless only one)
   const injured = ctx.st.characters.filter(
     (c) => !c.dead && c.hp < c.max_hp && c.id !== ctx.char.id

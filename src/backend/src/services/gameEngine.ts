@@ -383,6 +383,12 @@ export function breakConcentration(
   // clear + recompute AC. Multi-caster SoF on different targets
   // isn't tracked; defensible since the failure mode is rare.
   const wasShieldOfFaith = char.concentrating_on.spellId === 'shield_of_faith';
+  // 2024 PHB Fly / Levitate — concentration drop clears the fly_speed_ft
+  // grant the caster placed on the target. Pansori models one Fly /
+  // Levitate active per caster (the typical case); sweeping all PCs is
+  // defensive against drift.
+  const wasFlight =
+    char.concentrating_on.spellId === 'fly' || char.concentrating_on.spellId === 'levitate';
   let newChar: Character = { ...char, concentrating_on: null };
   // Strip the linked enemy condition (Hold Person etc.)
   let newSt: GameState =
@@ -421,6 +427,17 @@ export function breakConcentration(
         conditions: (newChar.conditions ?? []).filter((x) => x !== 'blessed'),
         condition_sources: rest2,
       };
+    }
+  }
+  if (wasFlight) {
+    newSt = {
+      ...newSt,
+      characters: newSt.characters.map((c) =>
+        c.fly_speed_ft ? { ...c, fly_speed_ft: undefined } : c
+      ),
+    };
+    if (newChar.fly_speed_ft) {
+      newChar = { ...newChar, fly_speed_ft: undefined };
     }
   }
   if (wasShieldOfFaith && context) {
