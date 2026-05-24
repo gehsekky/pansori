@@ -3,6 +3,7 @@ import { effectiveSpeed, getEnemyById } from '../gameEngine.js';
 import type { ActionHandler } from './types.js';
 import { applyDamage } from '../damage.js';
 import { resolveEnemyAttack } from '../rulesEngine.js';
+import { updatePcActor } from './actor.js';
 
 /**
  * `grid_move`: tactical movement on the combat grid. Validates:
@@ -25,29 +26,31 @@ export const handleGridMove: ActionHandler<{
   entityId: string;
   to: { x: number; y: number };
 }> = (ctx, action) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can move on the grid.' };
+  const { char } = ctx.actor;
   if (!ctx.st.entities) {
     ctx.narrative = 'Grid combat is not active.';
     return;
   }
-  if (action.entityId !== ctx.char.id) {
+  if (action.entityId !== char.id) {
     ctx.narrative = 'You can only move your own character.';
     return;
   }
-  const charEntity = ctx.st.entities.find((e) => e.id === ctx.char.id);
+  const charEntity = ctx.st.entities.find((e) => e.id === char.id);
   if (!charEntity) {
     ctx.narrative = 'Your character is not on the grid.';
     return;
   }
 
-  if (ctx.char.conditions.some((c) => c === 'grappled' || c === 'restrained')) {
-    const which = ctx.char.conditions.includes('restrained') ? 'RESTRAINED' : 'GRAPPLED';
+  if (char.conditions.some((c) => c === 'grappled' || c === 'restrained')) {
+    const which = char.conditions.includes('restrained') ? 'RESTRAINED' : 'GRAPPLED';
     ctx.narrative = `You are ${which} — your speed is 0.`;
     return;
   }
 
   // 2024 PHB Frightened — can't willingly move closer to the source of fear.
-  if (ctx.char.conditions.includes('frightened') && ctx.char.condition_sources?.frightened) {
-    const fearSourceId = ctx.char.condition_sources.frightened;
+  if (char.conditions.includes('frightened') && char.condition_sources?.frightened) {
+    const fearSourceId = char.condition_sources.frightened;
     const fearSourceEnt = ctx.st.entities.find((e) => e.id === fearSourceId);
     if (fearSourceEnt && fearSourceEnt.hp > 0) {
       const currentDist = Math.max(
@@ -75,7 +78,7 @@ export const handleGridMove: ActionHandler<{
   // the FE's isReachable). Static obstacles (columns, walls, debris) do.
   const currentRoomForMove = ctx.seed.rooms.find((r) => r.id === ctx.roomId);
   const roomObstacles = currentRoomForMove?.obstacles ?? [];
-  const walkSpeedFt = effectiveSpeed(ctx.char);
+  const walkSpeedFt = effectiveSpeed(char);
   // 2024 PHB flying movement — when the PC has a fly speed ≥ their
   // walking speed, the path may pass over obstacle cells (boulders,
   // columns, debris) and difficult-terrain cells without the 2× cost.
@@ -83,10 +86,10 @@ export const handleGridMove: ActionHandler<{
   // penalty. We still block on living entities (no flying through
   // someone in the same square) and require the final cell to be
   // an empty space — flying doesn't let you land in a wall.
-  const flySpeedFt = ctx.char.fly_speed_ft ?? 0;
+  const flySpeedFt = char.fly_speed_ft ?? 0;
   const isFlying = flySpeedFt > 0 && flySpeedFt >= walkSpeedFt;
   const blocked = [
-    ...ctx.st.entities.filter((e) => e.id !== ctx.char.id && e.hp > 0).map((e) => e.pos),
+    ...ctx.st.entities.filter((e) => e.id !== char.id && e.hp > 0).map((e) => e.pos),
     ...(isFlying ? [] : roomObstacles),
   ];
 
@@ -113,8 +116,8 @@ export const handleGridMove: ActionHandler<{
   const difficultTerrain = currentRoomForMove?.difficultTerrain ?? [];
   const climbTerrain = currentRoomForMove?.climbTerrain ?? [];
   const swimTerrain = currentRoomForMove?.swimTerrain ?? [];
-  const hasClimbSpeed = (ctx.char.climb_speed_ft ?? 0) > 0;
-  const hasSwimSpeed = (ctx.char.swim_speed_ft ?? 0) > 0;
+  const hasClimbSpeed = (char.climb_speed_ft ?? 0) > 0;
+  const hasSwimSpeed = (char.swim_speed_ft ?? 0) > 0;
   const costFeet = path.reduce((acc, pos) => {
     if (isFlying) return acc + SQUARE_SIZE;
     const isDifficult = difficultTerrain.some((dt) => posEqual(dt, pos));
@@ -128,7 +131,7 @@ export const handleGridMove: ActionHandler<{
   // when flying — RAW the creature picks which mode per turn but
   // pansori models a single combined move per action.
   const speedFt = isFlying ? Math.max(walkSpeedFt, flySpeedFt) : walkSpeedFt;
-  const usedFt = ctx.st.movement_used?.[ctx.char.id] ?? 0;
+  const usedFt = ctx.st.movement_used?.[char.id] ?? 0;
   if (usedFt + costFeet > speedFt) {
     const reasons: string[] = [];
     if (difficultTerrain.length) reasons.push('difficult terrain');
@@ -140,7 +143,7 @@ export const handleGridMove: ActionHandler<{
   }
 
   const oaTargets = opportunityAttackTriggers(charEntity.pos, action.to, ctx.st.entities, false);
-  let nextChar = ctx.char;
+  let nextChar = char;
   let nextSt = ctx.st;
   let oaNarrative = '';
   for (const oaEntity of oaTargets) {
@@ -171,12 +174,10 @@ export const handleGridMove: ActionHandler<{
 
   nextSt = {
     ...nextSt,
-    entities: (nextSt.entities ?? []).map((e) =>
-      e.id === ctx.char.id ? { ...e, pos: action.to } : e
-    ),
-    movement_used: { ...nextSt.movement_used, [ctx.char.id]: usedFt + costFeet },
+    entities: (nextSt.entities ?? []).map((e) => (e.id === char.id ? { ...e, pos: action.to } : e)),
+    movement_used: { ...nextSt.movement_used, [char.id]: usedFt + costFeet },
   };
-  ctx.char = nextChar;
+  updatePcActor(ctx, nextChar);
   ctx.st = nextSt;
   ctx.narrative = `${nextChar.name} moves to (${action.to.x}, ${action.to.y}).${oaNarrative}`;
 };
