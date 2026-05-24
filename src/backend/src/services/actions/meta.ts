@@ -3,6 +3,7 @@ import { applyLevelUpForClass, preparedSpellsCap } from '../gameEngine.js';
 import { canMulticlassInto, getClassLevel, hasClass } from '../multiclass.js';
 import type { AbilityKey } from '../../types.js';
 import type { ActionHandler } from './types.js';
+import { updatePcActor } from './actor.js';
 
 /**
  * `apply_asi`: spend a pending Ability Score Improvement (granted by
@@ -14,13 +15,15 @@ export const handleApplyAsi: ActionHandler<{ type: 'apply_asi'; stat: AbilityKey
   ctx,
   action
 ) => {
-  if (!ctx.char.asi_pending) {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can improve ability scores.' };
+  const { char } = ctx.actor;
+  if (!char.asi_pending) {
     ctx.narrative = 'No Ability Score Improvement pending.';
     return;
   }
   const stat = action.stat;
-  const next = { ...ctx.char, asi_pending: false } as typeof ctx.char;
-  next[stat] = (ctx.char[stat] ?? 10) + 2;
+  const next = { ...char, asi_pending: false } as typeof char;
+  next[stat] = (char[stat] ?? 10) + 2;
   const statName = { str: 'STR', dex: 'DEX', con: 'CON', int: 'INT', wis: 'WIS', cha: 'CHA' }[stat];
   let narrative = `${next.name} increases ${statName} by 2 (now ${next[stat]})!`;
   if (stat === 'con') {
@@ -30,7 +33,7 @@ export const handleApplyAsi: ActionHandler<{ type: 'apply_asi'; stat: AbilityKey
     if (bonus > 0)
       narrative += ` Max HP increased by ${bonus * next.level} (${bonus}/level × ${next.level} levels).`;
   }
-  ctx.char = next;
+  updatePcActor(ctx, next);
   ctx.narrative = narrative;
 };
 
@@ -45,11 +48,13 @@ export const handleSelectSubclass: ActionHandler<{ type: 'select_subclass'; subc
   ctx,
   action
 ) => {
-  if (ctx.char.subclass) {
-    ctx.narrative = `You have already chosen the ${ctx.char.subclass} subclass.`;
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can choose a subclass.' };
+  const { char } = ctx.actor;
+  if (char.subclass) {
+    ctx.narrative = `You have already chosen the ${char.subclass} subclass.`;
     return;
   }
-  const next = { ...ctx.char, subclass: action.subclass };
+  const next = { ...char, subclass: action.subclass };
   let narrative = `${next.name} follows the path of the ${action.subclass}!`;
   if (action.subclass === 'draconic' && hasClass(next, 'sorcerer')) {
     // Draconic Resilience scales with Sorcerer level only.
@@ -58,7 +63,7 @@ export const handleSelectSubclass: ActionHandler<{ type: 'select_subclass'; subc
     next.hp += sorcLvl;
     narrative += ` Draconic Resilience: +${sorcLvl} max HP (now ${next.hp}/${next.max_hp}).`;
   }
-  ctx.char = next;
+  updatePcActor(ctx, next);
   ctx.narrative = narrative;
 };
 
@@ -101,19 +106,21 @@ export const handlePrepareSpells: ActionHandler<{
   type: 'prepare_spells';
   spellIds: string[];
 }> = (ctx, action) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can prepare spells.' };
+  const { char } = ctx.actor;
   if (ctx.st.combat_active) {
     ctx.narrative = 'You cannot prepare spells during combat.';
     return;
   }
-  const maxPrepared = preparedSpellsCap(ctx.char, ctx.context);
+  const maxPrepared = preparedSpellsCap(char, ctx.context);
   const leveledIds = action.spellIds.filter((id) => (ctx.context.spellTable?.[id]?.level ?? 0) > 0);
   if (leveledIds.length > maxPrepared) {
     ctx.narrative = `You can prepare at most ${maxPrepared} leveled spells (your level + spellcasting modifier). You tried to prepare ${leveledIds.length}.`;
     return;
   }
-  ctx.char = { ...ctx.char, prepared_spells: leveledIds };
+  updatePcActor(ctx, { prepared_spells: leveledIds });
   const spellNames = leveledIds.map((id) => ctx.context.spellTable?.[id]?.name ?? id).join(', ');
-  ctx.narrative = `${ctx.char.name} prepares their spells for the day: ${spellNames || '(none)'}.`;
+  ctx.narrative = `${char.name} prepares their spells for the day: ${spellNames || '(none)'}.`;
 };
 
 /**
@@ -138,12 +145,14 @@ export const handleTakeFeat: ActionHandler<{
   cantripChoices?: string[];
   l1Choice?: string;
 }> = (ctx, action) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can take a feat.' };
+  const { char } = ctx.actor;
   const feat = getFeat(action.featId, ctx.context);
   if (!feat) {
     ctx.narrative = `Unknown feat: ${action.featId}.`;
     return;
   }
-  const fail = canTakeFeat(ctx.char, feat);
+  const fail = canTakeFeat(char, feat);
   if (fail) {
     ctx.narrative = fail;
     return;
@@ -200,15 +209,15 @@ export const handleTakeFeat: ActionHandler<{
     }
   }
 
-  const { newChar, narrative } = applyFeatTake(ctx.char, feat, {
+  const { newChar, narrative } = applyFeatTake(char, feat, {
     abilityChoice: action.abilityChoice,
     cantripChoices: action.cantripChoices,
     l1Choice: action.l1Choice,
   });
   // ASI-slot consumption — only when an ASI was pending (general-feat
   // path). Origin feats from background don't gate on asi_pending.
-  const consumeAsi = ctx.char.asi_pending && feat.category === 'general';
-  ctx.char = consumeAsi ? { ...newChar, asi_pending: false } : newChar;
+  const consumeAsi = char.asi_pending && feat.category === 'general';
+  updatePcActor(ctx, consumeAsi ? { ...newChar, asi_pending: false } : newChar);
   ctx.narrative = narrative;
 };
 
@@ -231,34 +240,36 @@ export const handleLevelUpClass: ActionHandler<{ type: 'level_up_class'; classNa
   ctx,
   action
 ) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can level up.' };
+  const { char } = ctx.actor;
   if (ctx.st.combat_active) {
     return { rejected: 'You cannot level up during combat.' };
   }
-  if ((ctx.char.level ?? 1) >= 20) {
-    return { rejected: `${ctx.char.name} is already at the level cap (20).` };
+  if ((char.level ?? 1) >= 20) {
+    return { rejected: `${char.name} is already at the level cap (20).` };
   }
   // XP threshold: level N → N+1 needs N × 100 XP (same gate as
   // applyLevelUpFromXp).
-  if ((ctx.char.xp ?? 0) < (ctx.char.level ?? 1) * 100) {
-    const need = (ctx.char.level ?? 1) * 100 - (ctx.char.xp ?? 0);
-    return { rejected: `${ctx.char.name} needs ${need} more XP to level up.` };
+  if ((char.xp ?? 0) < (char.level ?? 1) * 100) {
+    const need = (char.level ?? 1) * 100 - (char.xp ?? 0);
+    return { rejected: `${char.name} needs ${need} more XP to level up.` };
   }
   const cls = action.className.toLowerCase();
   // Multiclass prereq check only applies on **entry** to a new class
   // (RAW: subsequent levels in an already-taken class don't re-check
   // the ability minimum). canMulticlassInto returns empty for the
   // primary class so this also covers the single-class continuation.
-  if (getClassLevel(ctx.char, cls) === 0) {
-    const prereqError = canMulticlassInto(ctx.char, cls);
+  if (getClassLevel(char, cls) === 0) {
+    const prereqError = canMulticlassInto(char, cls);
     if (prereqError) {
       return { rejected: prereqError };
     }
   }
   // Mutate a working copy so the level-up narrative composes the same
   // way as the auto-level path.
-  const next = { ...ctx.char };
+  const next = { ...char };
   const narrative = applyLevelUpForClass(next, cls, ctx.context);
-  ctx.char = next;
+  updatePcActor(ctx, next);
   ctx.narrative = narrative.trim();
   // Mirror applyPartyLevelUps' implicit "uses initiative? no" stance
   // — out-of-combat level-up never advances turn order.
