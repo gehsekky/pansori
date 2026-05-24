@@ -107,6 +107,7 @@ export const handleShortRest: ActionHandler<{ type: 'short_rest' }> = (ctx) => {
   }
   delete srUses.colossus_slayer_used;
   if (hasClass(next, 'rogue')) delete srUses.stroke_of_luck; // Stroke of Luck — short OR long rest
+  if (hasClass(next, 'barbarian')) delete srUses.relentless_rage_used; // Relentless Rage DC resets to 10
   if (hasClass(next, 'warlock')) {
     // Warlock pact slots refresh on short rest. Multi-class warlock
     // separation isn't modeled yet (see services/multiclass.ts notes)
@@ -177,6 +178,7 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
     delete restoredUses.lay_on_hands; // Paladin pool replenishes on a long rest
     delete restoredUses.indomitable; // Fighter Indomitable rerolls reset on a long rest
     delete restoredUses.stroke_of_luck; // Rogue Stroke of Luck resets on a long rest too
+    delete restoredUses.relentless_rage_used; // Barbarian Relentless Rage DC resets on a long rest too
     const newExhaustion = Math.max(0, (c.exhaustion_level ?? 0) - 1);
     const humanGrant = c.species === 'human';
     if (c.species === 'orc') delete restoredUses.relentless_endurance_used;
