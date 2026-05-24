@@ -836,17 +836,14 @@
    page. Falls back to a single column on narrow viewports so the grid keeps
    its natural width and the choices stack below. */
 .combatRow {
+  /* Stacked layout: the grid/map on top, the action panel (combat bar +
+     choices) below it. Previously a 2-column [map | actions] grid; moved
+     to a single column to put the combat bar under the map. */
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.75rem;
   align-items: start;
   min-width: 0;
-}
-
-@media (max-width: 900px) {
-  .combatRow {
-    grid-template-columns: 1fr;
-  }
 }
 
 .combatActionCol {
