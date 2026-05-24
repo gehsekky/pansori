@@ -31,7 +31,10 @@ export function runAttackRollSpell(
 ): { done: boolean; spellDmg: number; spellHit: boolean } {
   if (ctx.actor.kind !== 'pc') return { done: true, spellDmg: 0, spellHit: false };
   const { char } = ctx.actor;
-  const atk = resolveSpellAttack(char.level, castingScore, spellTarget.ac);
+  // SRD Sorcerer Innate Sorcery (L1): Advantage on Sorcerer spell attack rolls
+  // while active.
+  const innateAdv = char.conditions.includes('innate_sorcery');
+  const atk = resolveSpellAttack(char.level, castingScore, spellTarget.ac, innateAdv);
   const spellHit = atk.hit;
   const atkNote = ` (spell attack ${atk.roll}+${atk.bonus}=${atk.total} vs AC ${spellTarget.ac})`;
   const castPrefix = pickCastPrefix(spell, {
