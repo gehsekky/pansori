@@ -206,7 +206,7 @@ export function handleMonkFeature(ctx: ActionContext, fid: string): boolean {
       monk_free_used: true,
     };
     if (fid === 'step_of_wind_free_dash') {
-      const sw = effectiveSpeed(char);
+      const sw = effectiveSpeed(char, ctx.context.lootTable);
       ctx.st = {
         ...ctx.st,
         movement_used: {
@@ -253,7 +253,7 @@ export function handleMonkFeature(ctx: ActionContext, fid: string): boolean {
       bonus_action_used: true,
       disengaged: true,
     };
-    const stwSpeed = effectiveSpeed(char);
+    const stwSpeed = effectiveSpeed(char, ctx.context.lootTable);
     ctx.st = {
       ...ctx.st,
       movement_used: {
