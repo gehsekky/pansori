@@ -448,6 +448,15 @@ export function canCountercharm(char: Character): boolean {
  * unless Incapacitated (incl. the conditions that impose it). Applied wherever
  * the barbarian rolls a DEX save. (RE-2.)
  */
+/**
+ * SRD 5.2.1 Indomitable Might (Barbarian L18): if your total for a Strength
+ * check is less than your Strength score, use the score in place of the total.
+ * Returns the floored total; a no-op below L18. (RE-2.)
+ */
+export function applyIndomitableMight(char: Character, strCheckTotal: number): number {
+  return getClassLevel(char, 'barbarian') >= 18 ? Math.max(strCheckTotal, char.str) : strCheckTotal;
+}
+
 export function hasDangerSense(char: Character): boolean {
   if (
     (char.conditions ?? []).some((c) =>
