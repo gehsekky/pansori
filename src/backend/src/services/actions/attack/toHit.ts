@@ -49,7 +49,7 @@ export interface ToHitContext {
  *
  * Advantage sources stacked (any one enables advantage):
  *   conditionAdv, enemyGrappled, proneAdv, enemyParalyzed, flankingAdv,
- *   helpAdv, assassinAdv (vs surprised / round-1),
+ *   helpAdv,
  *   recklessAdv (Barbarian L2+, melee only), inspirationAdv
  *   (Heroic Inspiration), vexAdv (consumed Vex tag), studyAdv
  *   (Fighter L13 miss-tag), packTacticsAdv (Wolf/Dire Wolf Beast Form
@@ -180,12 +180,6 @@ export function computeToHitContext(
   const helpAdv = ctx.st.help_target_id === pc.char.id;
   if (helpAdv) ctx.st = { ...ctx.st, help_target_id: undefined };
 
-  // Assassin: advantage vs creatures who haven't acted (surprised list or first round)
-  const assassinAdv =
-    pc.char.subclass === 'assassin' &&
-    hasClass(pc.char, 'rogue') &&
-    ((ctx.st.surprised ?? []).includes(targetId) || (ctx.st.round ?? 1) === 1);
-
   const recklessAdv = !!pc.char.turn_actions.reckless && weaponItem?.range !== 'ranged';
 
   let packTacticsAdv = false;
@@ -283,7 +277,6 @@ export function computeToHitContext(
     enemyFaerieFired ||
     flankingAdv ||
     helpAdv ||
-    assassinAdv ||
     recklessAdv ||
     inspirationAdv ||
     vexAdv ||

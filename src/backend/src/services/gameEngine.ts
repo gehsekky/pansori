@@ -2854,7 +2854,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     };
     const subclassChoices: Record<string, string[]> = {
       fighter: ['champion'],
-      rogue: ['assassin'],
+      rogue: ['thief'],
       wizard: ['evoker'],
       cleric: ['life'],
       ranger: ['hunter'],
