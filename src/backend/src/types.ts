@@ -783,6 +783,22 @@ export interface Character {
 
 // ─── Game state (world/party container) ──────────────────────────────────────
 
+/**
+ * A persistent ally combatant the party owns out of combat (e.g. an
+ * Animate Dead skeleton). Stored on GameState and materialized into a
+ * grid `CombatEntity` (side: 'ally') + an initiative slot at combat
+ * start. (RE-1 Phase 4.)
+ */
+export interface SummonedAlly {
+  id: string;
+  ownerId: string; // character.id of the caster/owner
+  name: string;
+  ac: number;
+  maxHp: number;
+  toHit: number;
+  damage: string; // dice expression, e.g. '1d6+3'
+}
+
 export interface GameState {
   // Schema version. `normalizeState` stamps this with
   // `CURRENT_SCHEMA_VERSION` on every load; older saves (or saves
@@ -805,6 +821,10 @@ export interface GameState {
   combat_active: boolean;
   initiative_order: Array<{ id: string; roll: number; is_enemy: boolean }>;
   initiative_idx: number;
+  // RE-1 Phase 4 — persistent ally combatants (e.g. an Animate Dead
+  // skeleton) raised out of combat; seeded into `entities` +
+  // `initiative_order` at combat start by `seedSummonedAllies`.
+  summoned_allies?: SummonedAlly[];
 
   // Logging
   run_log: Array<{ character_id: string; action: string; narrative: string }>;

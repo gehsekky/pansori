@@ -4592,6 +4592,46 @@ export function removeCombatant(st: GameState, entityId: string): GameState {
 }
 
 /**
+ * Materialize `state.summoned_allies` into combat: for each persistent
+ * ally owned by a living PC who's present, add an `ally` `CombatEntity`
+ * (positioned just behind its owner) + an initiative slot right after
+ * the owner via `addAllyCombatant`. Idempotent (skips allies already on
+ * the grid) and a no-op when there are no summons — so existing combats
+ * are unaffected. Called from `runCombatStart`. (RE-1 Phase 4.)
+ */
+export function seedSummonedAllies(st: GameState): GameState {
+  let next = st;
+  for (const summon of st.summoned_allies ?? []) {
+    const owner = next.characters.find((c) => c.id === summon.ownerId && !c.dead);
+    if (!owner) continue; // owner dead / not in this party → summon doesn't appear
+    if (next.entities?.some((e) => e.id === summon.id)) continue; // already on the grid
+    const ownerEnt = next.entities?.find((e) => e.id === summon.ownerId);
+    const pos = ownerEnt ? { x: ownerEnt.pos.x, y: ownerEnt.pos.y + 1 } : { x: 1, y: 2 };
+    const ally: CombatEntity = {
+      id: summon.id,
+      isEnemy: false,
+      side: 'ally',
+      companionName: summon.name,
+      pos,
+      hp: summon.maxHp,
+      maxHp: summon.maxHp,
+      conditions: [],
+      condition_durations: {},
+      ac: summon.ac,
+      toHit: summon.toHit,
+      damage: summon.damage,
+      summoned_by: summon.ownerId,
+      summon_concentration: false,
+    };
+    next = addAllyCombatant(next, ally, {
+      afterId: summon.ownerId,
+      initiativeRoll: owner.initiative_roll ?? 0,
+    });
+  }
+  return next;
+}
+
+/**
  * One AI-default turn for an ally combatant (companion / summon): pick
  * the nearest enemy via `selectTarget`, close to melee reach if needed
  * (provoking opportunity attacks from enemies it leaves), then make a

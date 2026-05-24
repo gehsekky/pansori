@@ -150,8 +150,10 @@ export interface CombatEntity {
    */
   conditions: string[];
   condition_durations: Record<string, number>;
-  // Beastmaster animal companion (PHB p.93) — a CR ¼ beast tied to a Ranger PC.
-  // Acts on the Ranger's bonus action; targetable by enemies separately.
+  // Ally combatant fields (companions / summons). `isCompanion` marks an
+  // ally tied to an owner PC; the stat-block fields below (ac/toHit/damage)
+  // drive its attacks. (Beast Master itself is PHB-only / out of scope;
+  // these fields serve SRD summons such as Animate Dead — RE-1 Phase 4.)
   isCompanion?: boolean;
   companionOwnerId?: string; // character.id of the Ranger this companion belongs to
   companionName?: string; // display name (e.g. 'Wolf')
