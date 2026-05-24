@@ -240,6 +240,19 @@ Bonus(char, st)`: a creature within 10 ft of a conscious L6+ Paladin (the
       dispatch-level integration tests proving an Attack action emits exactly 3
       "Attack N — " swings at L11 and 4 at L20 (all-miss rolls keep the enemy
       alive through the loop). No source change needed.
+- [x] **Reliable Talent (done 2026-05-24)** — Rogue **L7** (SRD 5.2.1 moved it
+      earlier from the 2014 L11). Treat a d20 of 9 or lower as a 10 on a check
+      using a skill/tool proficiency. `hasReliableTalent` (multiclass.ts) +
+      a `reliableTalent` flag on the shared `skillCheck` resolver that floors
+      the post-reroll die at 10, gated on `proficient` so it only fires on a
+      proficient check (RAW). Threaded from all three `skillCheck` callers —
+      search/Investigation (`interactObject`), group Stealth (`sneak`), and the
+      Rogue hide (`classFeature/rogue`). Spec covers the helper + the floor /
+      not-proficient / no-feature / post-Halfling-Lucky-reroll cases. Deferred:
+      the inline contested checks (grapple/shove Athletics-Acrobatics in
+      `combatTactical`, social Persuasion) roll raw `d(20)+mod` without
+      `skillCheck` (and without a proficiency bonus today), so RT doesn't reach
+      them yet — folding those into `skillCheck` is a separate correctness pass.
 
 | Class     | Implemented (approx)                                                                                            | Major SRD gaps to fill                                                                                                                            |
 | --------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -251,7 +264,7 @@ Bonus(char, st)`: a creature within 10 ft of a conscious L6+ Paladin (the
 | Monk      | Martial Arts, Flurry/Patient/Step (L2), Stunning Strike (L5), Extra Attack (L5), Evasion (L7)                   | Deflect Attacks, Slow Fall, Stillness of Mind, Self-Restoration, Disciplined Survivor, Empty Body, Body & Mind, higher Open Hand grades           |
 | Paladin   | Sacred Weapon (Devotion L3), Fighting Style (L2), Extra Attack (L5), Lay on Hands (L1), Aura of Protection (L6) | Aura of Courage, Faithful Steed, Divine-Smite-as-feature, Devotion grades, capstone                                                               |
 | Ranger    | Colossus Slayer (Hunter L3), Fighting Style (L2), Extra Attack (L5)                                             | spellcasting integration, Roving, Expertise, Tireless, Nature's Veil, Hunter grades                                                               |
-| Rogue     | Cunning Action (L2), Cunning Strike (L5), Sneak Attack, Uncanny Dodge, Evasion (L7)                             | Steady Aim, Reliable Talent, Slippery Mind, Elusive, Stroke of Luck, Assassin grades                                                              |
+| Rogue     | Cunning Action (L2), Cunning Strike (L5), Sneak Attack, Uncanny Dodge, Evasion (L7), Reliable Talent (L7)       | Steady Aim, Slippery Mind, Elusive, Stroke of Luck, Assassin grades                                                                               |
 | Sorcerer  | Metamagic (L3–5), sorcery points                                                                                | Innate Sorcery, Sorcerous Restoration, SP↔slot conversion completeness, full Draconic grades, capstone                                            |
 | Warlock   | Agonizing Blast (passive)                                                                                       | Eldritch Blast beam scaling, Pact Boon, more invocations, Mystic Arcanum, Magical Cunning, Fiend grades, Eldritch Master                          |
 | Wizard    | cantrips only (Arcane Ward partial)                                                                             | Arcane Recovery, Scholar, Memorize Spell, Spell Mastery, Signature Spells, full Evoker grades                                                     |

@@ -14,6 +14,7 @@ import {
   pick,
 } from '../gameEngine.js';
 import type { ActionHandler } from './types.js';
+import { hasReliableTalent } from '../multiclass.js';
 import { updatePcActor } from './actor.js';
 
 /**
@@ -69,7 +70,8 @@ export const handleSneak: ActionHandler<{ type: 'sneak' }> = (ctx) => {
       false,
       false,
       inspAdv || luckAdv,
-      member.species === 'halfling'
+      member.species === 'halfling',
+      hasReliableTalent(member)
     );
     return { name: member.name, check, mod: abilityMod(member.dex) };
   });

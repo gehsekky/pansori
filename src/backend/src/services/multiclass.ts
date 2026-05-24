@@ -348,6 +348,16 @@ export function hasEvasion(char: Character): boolean {
 }
 
 /**
+ * SRD 5.2.1 Reliable Talent (Rogue L7): on an ability check that uses one of
+ * the rogue's skill or tool proficiencies, treat a d20 of 9 or lower as a 10.
+ * Passive, with no incapacitation gate (it's not an action or reaction). The
+ * proficiency requirement is enforced at the `skillCheck` call. (RE-2.)
+ */
+export function hasReliableTalent(char: Character): boolean {
+  return getClassLevel(char, 'rogue') >= 7;
+}
+
+/**
  * SRD 5.2.1 Paladin Lay on Hands (L1): HP remaining in the healing pool —
  * 5 × Paladin level minus points already spent (`class_resource_uses
  * .lay_on_hands`, replenished on a long rest). 0 for non-paladins. (RE-2.)
