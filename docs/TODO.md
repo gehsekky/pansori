@@ -43,13 +43,24 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 
 #### RE-1: Monsters as first-class action subjects (unblocks the most)
 
-- [ ] Finish the Phase 2–5 migration started under "Architecture audit
-  follow-ups → item 5" below (enemy turns invoke `dispatchAction` with
-  an enemy actor; shared abilities run for any actor). This is the seam
-  that unblocks **summoned creatures + companions** (Find Familiar,
-  Spiritual Weapon, conjure spells, full Beastmaster companion) — all
-  narrative-only today. Highest leverage: pays back into spells, class
-  features, and monster abilities at once.
+> Phases 1–3 shipped (2026-05-23, the `refactor(re-1):` commit series):
+> the `Actor` type seam, the `updatePcActor` helper, and all isolated
+> PC-state handlers now read/write via `ctx.actor` with a
+> `kind !== 'pc'` guard (the Phase-4 enemy-action slot). What's left is
+> the payoff, below.
+
+- [ ] **Phase 4** — wire enemy turns through `dispatchAction` with an
+  `enemyActor`; turn the extracted `runEnemyMultiattackLoop` /
+  `attemptEnemyApproach` / `attemptEnemySpellCast` / etc. into registered
+  handlers, and migrate the shared-ability handlers (`attack/`,
+  `castSpell/`, `classFeature/`, `reaction.ts`, `twoWeaponAttack`,
+  `hasteExtraAction`, `landsAid`) so one implementation runs for PCs and
+  monsters. This is the seam that unblocks **summoned creatures +
+  companions** (Find Familiar, Spiritual Weapon, conjure spells, full
+  Beastmaster companion) — all narrative-only today. Hot-path combat
+  code; warrants a written design pass before implementation.
+- [ ] **Phase 5** — drop `ctx.char` / `ctx.safeIdx` once every handler
+  reads from `ctx.actor`.
 
 #### RE-2: Class + subclass feature progression to L20
 
@@ -221,12 +232,13 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
     (defer until a Divine Spark rework).
 
 - [~] **5. Monsters as first-class action subjects** (extraction +
-  type-seam shipped; dispatcher integration is **RE-1** above).
-  `runEnemyTurns` is decomposed into named handlers; the `Actor` union +
-  `ctx.actor` seam is in place; `handleDodge` piloted reading/writing via
-  `ctx.actor`. Remaining = phases 2–5: migrate handlers to `ctx.actor`,
-  then wire enemy turns through `dispatchAction` so shared abilities
-  (Stunning Strike, smites, …) run for PCs and monsters from one path.
+  type-seam + Phase-3 handler migration shipped; dispatcher integration
+  is **RE-1** above). `runEnemyTurns` is decomposed into named handlers;
+  the `Actor` union + `ctx.actor` seam is in place; all isolated PC-state
+  handlers now read/write via `ctx.actor`. Remaining = phases 4–5: wire
+  enemy turns through `dispatchAction` so shared abilities (Stunning
+  Strike, smites, …) run for PCs and monsters from one path, then drop
+  `ctx.char` / `ctx.safeIdx`.
 
 #### Lower urgency (flag now, defer)
 
