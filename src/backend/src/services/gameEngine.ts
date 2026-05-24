@@ -6126,6 +6126,30 @@ export async function takeAction({
     // Advance from current player's initiative position
     const orderLen = st.initiative_order.length;
     const currentIdx = st.initiative_idx ?? 0;
+
+    // SRD Monk Self-Restoration (L10): at the end of your turn, remove one of
+    // Charmed / Frightened / Poisoned from yourself. The turn just ending is
+    // the PC at `currentIdx` (before initiative advances below).
+    const endingEntry = st.initiative_order[currentIdx];
+    if (endingEntry && !endingEntry.is_enemy) {
+      const endIdx = st.characters.findIndex((c) => c.id === endingEntry.id);
+      const ending = endIdx >= 0 ? st.characters[endIdx] : undefined;
+      if (ending && getClassLevel(ending, 'monk') >= 10) {
+        const toRemove = (ending.conditions ?? []).find((c) =>
+          ['charmed', 'frightened', 'poisoned'].includes(c)
+        );
+        if (toRemove) {
+          const cleaned = {
+            ...ending,
+            conditions: ending.conditions.filter((c) => c !== toRemove),
+            ...(toRemove === 'charmed' ? { charmer_id: undefined } : {}),
+          };
+          st = { ...st, characters: st.characters.map((c, i) => (i === endIdx ? cleaned : c)) };
+          narrative += ` ${fmt.note(`[Self-Restoration: ${ending.name} shakes off ${toRemove}]`)}`;
+        }
+      }
+    }
+
     const startAdvIdx = (currentIdx + 1) % orderLen;
     const initialRoundWrapped = startAdvIdx === 0;
 
