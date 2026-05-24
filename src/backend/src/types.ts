@@ -685,7 +685,7 @@ export interface Character {
     rounds_left?: number;
   } | null;
   // Extended 5e fields
-  subclass?: string; // e.g. 'berserker', 'evoker', 'assassin'
+  subclass?: string; // e.g. 'champion', 'evoker', 'thief'
   // SRD 5.2.1 Fighting Style feats chosen via class features (Fighter L1 +
   // L7, Paladin/Ranger L2). Ids: 'archery' | 'defense' | 'great_weapon' |
   // 'two_weapon'. Each id appears at most once (RAW: can't take the same

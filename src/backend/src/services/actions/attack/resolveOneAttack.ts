@@ -108,8 +108,6 @@ export function resolveOneAttack(
   const targetEntForSlow = ctx.st.entities?.find((e) => e.id === targetId && e.isEnemy);
   const slowedAcPenalty = targetEntForSlow?.conditions.includes('slowed') ? 2 : 0;
   const effectiveEnemyAc = target.ac + coverAcBonus - slowedAcPenalty;
-  const assassinAutoCrit =
-    pc.char.subclass === 'assassin' && (ctx.st.surprised ?? []).includes(targetId);
   // SRD Fighting Style: Great Weapon Fighting — applies to a two-handed melee
   // weapon (a heavy two-handed weapon, or a versatile weapon used two-handed).
   const gwfApplies =
@@ -215,25 +213,24 @@ export function resolveOneAttack(
     });
     brutalNote = ' 💥 Brutal Strike (advantage forgone)';
   }
-  // Unconscious or Assassin-surprised: force crit on hit
+  // Unconscious target within 5 ft: an attack that hits is a crit (SRD).
   const autoCritCheck =
-    (enemyUnconscious &&
-      (!ctx.st.entities ||
-        (() => {
-          const charEnt = ctx.st.entities?.find((e) => e.id === pc.char.id);
-          const enmEnt = ctx.st.entities?.find((e) => e.id === targetId);
-          return charEnt && enmEnt
-            ? posEqual(
-                { x: charEnt.pos.x, y: charEnt.pos.y },
-                { x: enmEnt.pos.x, y: enmEnt.pos.y }
-              ) ||
-                Math.max(
-                  Math.abs(charEnt.pos.x - enmEnt.pos.x),
-                  Math.abs(charEnt.pos.y - enmEnt.pos.y)
-                ) <= 1
-            : true;
-        })())) ||
-    assassinAutoCrit;
+    enemyUnconscious &&
+    (!ctx.st.entities ||
+      (() => {
+        const charEnt = ctx.st.entities?.find((e) => e.id === pc.char.id);
+        const enmEnt = ctx.st.entities?.find((e) => e.id === targetId);
+        return charEnt && enmEnt
+          ? posEqual(
+              { x: charEnt.pos.x, y: charEnt.pos.y },
+              { x: enmEnt.pos.x, y: enmEnt.pos.y }
+            ) ||
+              Math.max(
+                Math.abs(charEnt.pos.x - enmEnt.pos.x),
+                Math.abs(charEnt.pos.y - enmEnt.pos.y)
+              ) <= 1
+          : true;
+      })());
   const isCrit = atk.critical || (autoCritCheck && atk.hit);
   let baseHit = weaponDamage
     ? isCrit && !atk.critical
@@ -469,9 +466,6 @@ export function resolveOneAttack(
   const newEnemyHp = curEnemyHp - damageToHp;
 
   const hitBonuses: { label: string }[] = [];
-  if (isCrit && assassinAutoCrit) {
-    hitBonuses.push({ label: 'Assassinate — auto-crit on surprised target!' });
-  }
   if (sacredWeaponBonus > 0) {
     hitBonuses.push({ label: `Sacred Weapon: +${sacredWeaponBonus} to hit` });
   }

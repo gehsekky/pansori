@@ -24,7 +24,7 @@ import { updatePcActor } from '../actor.js';
  *     via group Stealth vs enemy passive Perception, opening-blow text.
  *     See attack/combatStart.ts.
  *  3. To-hit context: armor/weapon proficiency, condition advantages,
- *     cover/flanking, Help target, Assassin/Vow/Reckless/Inspiration/
+ *     cover/flanking, Help target, Vow/Reckless/Inspiration/
  *     Pack Tactics/Vex/Studied/Wolf Totem adv/disadv stacking. See
  *     attack/toHit.ts.
  *  4. `resolveOneAttack` (per attack): rolls, BI/Bless re-rolls,
