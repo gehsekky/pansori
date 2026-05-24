@@ -72,6 +72,7 @@ import {
   hasDisciplinedSurvivor,
   hasElusive,
   hasEvasion,
+  hasMultiattackDefense,
   hasSlipperyMind,
   hunterFeatureOptions,
   huntersPrey,
@@ -1030,7 +1031,13 @@ function computeEnemyAttack(
     ? false
     : char.conditions.some((c) => ADVANTAGE_CONDITIONS.has(c)) || isReckless;
   const baseDisadvantage = char.conditions.some((c) => ENEMY_DISADV_CONDITIONS.has(c)) || isDodging;
-  const hasDisadvantage = baseDisadvantage || forceDisadvantage;
+  // SRD Ranger Multiattack Defense (L7) — once this enemy has hit the PC this
+  // round, its further attacks against them roll with Disadvantage (the mark
+  // is round-stamped, so it self-expires next round).
+  const multiattackDefenseDisadv =
+    hasMultiattackDefense(char) &&
+    (char.multiattack_defense_marks?.[enemy.id] ?? -1) === (st.round ?? 1);
+  const hasDisadvantage = baseDisadvantage || forceDisadvantage || multiattackDefenseDisadv;
   const result = resolveEnemyAttack(enemy, char.ac, hasAdvantage, hasDisadvantage);
   // Equipped-armor lookup. `equipped_armor` stores an `instance_id`
   // (see routes/game.ts character creation), not a loot id — the
@@ -1230,6 +1237,17 @@ function computeEnemyAttack(
       targetAc: char.ac,
       prose: narrative,
     };
+    // SRD Multiattack Defense — record this enemy's hit for the round so its
+    // subsequent attacks vs this PC roll with Disadvantage.
+    if (hasMultiattackDefense(updatedChar)) {
+      updatedChar = {
+        ...updatedChar,
+        multiattack_defense_marks: {
+          ...(updatedChar.multiattack_defense_marks ?? {}),
+          [enemy.id]: st.round ?? 1,
+        },
+      };
+    }
     return {
       proposedChar: updatedChar,
       proposedSt: newSt,
@@ -2913,19 +2931,20 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
 
   // ── Ranger Hunter feature-option picks (swappable on a rest) ───────────────
   // Generic picker over hunterFeatureOptions; offers the option(s) the Hunter
-  // hasn't currently chosen (Hunter's Prey defaults to Colossus Slayer). Only
-  // Hunter's Prey (L3) is surfaced today — Defensive Tactics (L7) lands with
-  // its effects. (RE-2.)
+  // hasn't currently chosen. Hunter's Prey (L3) defaults to Colossus Slayer;
+  // Defensive Tactics (L7) is unset until picked, so both are offered. (RE-2.)
   if (!state.combat_active && char.subclass === 'hunter' && hasClass(char, 'ranger')) {
-    const prey = hunterFeatureOptions.hunters_prey;
-    if (getClassLevel(char, 'ranger') >= prey.level) {
-      const current = huntersPrey(char);
-      for (const option of prey.options) {
+    const rangerLvl = getClassLevel(char, 'ranger');
+    for (const key of ['hunters_prey', 'defensive_tactics'] as const) {
+      const def = hunterFeatureOptions[key];
+      if (rangerLvl < def.level) continue;
+      const current = key === 'hunters_prey' ? huntersPrey(char) : char.defensive_tactics;
+      for (const option of def.options) {
         if (option === current) continue;
         if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
         choices.push({
-          label: `${prey.feature}: ${prey.labels[option]}`,
-          action: { type: 'choose_hunter_option', feature: 'hunters_prey', option },
+          label: `${def.feature}: ${def.labels[option]}`,
+          action: { type: 'choose_hunter_option', feature: key, option },
         });
       }
     }

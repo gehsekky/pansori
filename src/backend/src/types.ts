@@ -702,6 +702,11 @@ export interface Character {
   //   Defensive Tactics (L7): 'escape_the_horde' | 'multiattack_defense'.
   hunters_prey?: 'colossus_slayer' | 'horde_breaker';
   defensive_tactics?: 'escape_the_horde' | 'multiattack_defense';
+  // SRD Multiattack Defense bookkeeping — enemy entity id → the combat round
+  // in which that enemy hit this PC. While the stamp equals the current round,
+  // that enemy's further attacks vs this PC roll with Disadvantage. The round
+  // stamp self-expires (no explicit clearing needed).
+  multiattack_defense_marks?: Record<string, number>;
   // Extended 5e fields
   subclass?: string; // e.g. 'champion', 'evoker', 'thief'
   // SRD 5.2.1 Fighting Style feats chosen via class features (Fighter L1 +

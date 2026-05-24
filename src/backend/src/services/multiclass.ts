@@ -513,6 +513,26 @@ export function huntersPrey(char: Character): 'colossus_slayer' | 'horde_breaker
   return char.hunters_prey ?? 'colossus_slayer';
 }
 
+/** SRD Ranger Defensive Tactics (L7) — Escape the Horde: opportunity attacks
+ *  against you have Disadvantage. */
+export function hasEscapeTheHorde(char: Character): boolean {
+  return (
+    char.subclass === 'hunter' &&
+    getClassLevel(char, 'ranger') >= 7 &&
+    char.defensive_tactics === 'escape_the_horde'
+  );
+}
+
+/** SRD Ranger Defensive Tactics (L7) — Multiattack Defense: a creature that
+ *  hits you has Disadvantage on its other attack rolls against you this turn. */
+export function hasMultiattackDefense(char: Character): boolean {
+  return (
+    char.subclass === 'hunter' &&
+    getClassLevel(char, 'ranger') >= 7 &&
+    char.defensive_tactics === 'multiattack_defense'
+  );
+}
+
 export function hasDangerSense(char: Character): boolean {
   if (
     (char.conditions ?? []).some((c) =>
