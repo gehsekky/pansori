@@ -367,6 +367,22 @@ export function hasSlipperyMind(char: Character): boolean {
 }
 
 /**
+ * SRD 5.2.1 Elusive (Rogue L18): no attack roll can have Advantage against the
+ * rogue unless they have the Incapacitated condition. Returns true when the
+ * feature is actively suppressing incoming advantage — Rogue L18+ and not under
+ * any condition that imposes Incapacitated (paralyzed / stunned / unconscious /
+ * petrified all do, so they switch the protection off, matching the conditions
+ * that would otherwise grant attackers advantage). (RE-2.)
+ */
+export function hasElusive(char: Character): boolean {
+  const incapacitated = (char.conditions ?? []).some((c) =>
+    ['incapacitated', 'paralyzed', 'stunned', 'unconscious', 'petrified'].includes(c)
+  );
+  if (incapacitated) return false;
+  return getClassLevel(char, 'rogue') >= 18;
+}
+
+/**
  * SRD 5.2.1 Paladin Lay on Hands (L1): HP remaining in the healing pool —
  * 5 × Paladin level minus points already spent (`class_resource_uses
  * .lay_on_hands`, replenished on a long rest). 0 for non-paladins. (RE-2.)

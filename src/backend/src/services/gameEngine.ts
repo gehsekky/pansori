@@ -66,6 +66,7 @@ import {
   canRitualCast,
   getClassLevel,
   hasClass,
+  hasElusive,
   hasEvasion,
   hasSlipperyMind,
   layOnHandsRemaining,
@@ -881,7 +882,13 @@ function computeEnemyAttack(
 } {
   const isDodging = char.turn_actions?.dodging ?? false;
   const isReckless = char.turn_actions?.reckless ?? false;
-  const hasAdvantage = char.conditions.some((c) => ADVANTAGE_CONDITIONS.has(c)) || isReckless;
+  // SRD Rogue Elusive (L18): no attack roll can have Advantage against the
+  // rogue unless they're Incapacitated — overrides every advantage source
+  // (prone/blinded/restrained, Reckless, etc.). `hasElusive` already returns
+  // false when the rogue is under an incapacitating condition.
+  const hasAdvantage = hasElusive(char)
+    ? false
+    : char.conditions.some((c) => ADVANTAGE_CONDITIONS.has(c)) || isReckless;
   const baseDisadvantage = char.conditions.some((c) => ENEMY_DISADV_CONDITIONS.has(c)) || isDodging;
   const hasDisadvantage = baseDisadvantage || forceDisadvantage;
   const result = resolveEnemyAttack(enemy, char.ac, hasAdvantage, hasDisadvantage);
