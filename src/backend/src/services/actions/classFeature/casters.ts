@@ -27,111 +27,110 @@ import { abilityMod } from '../../rulesEngine.js';
  * enemy-attack resolver elsewhere.
  */
 export function handleCasterFeature(ctx: ActionContext, fid: string): boolean {
+  if (ctx.actor.kind !== 'pc') return false;
+  const { char } = ctx.actor;
   if (fid === 'metamagic_twinned') {
-    if (!hasClass(ctx.char, 'sorcerer')) {
+    if (!hasClass(char, 'sorcerer')) {
       ctx.narrative = 'Only Sorcerers have Metamagic.';
       return true;
     }
     // Sorcery points scale with Sorcerer level.
-    const spPool =
-      ctx.char.class_resource_uses?.sorcery_points ?? getClassLevel(ctx.char, 'sorcerer');
+    const spPool = char.class_resource_uses?.sorcery_points ?? getClassLevel(char, 'sorcerer');
     if (spPool < 1) {
       ctx.narrative = 'Not enough sorcery points (need 1).';
       return true;
     }
-    ctx.char.class_resource_uses = {
-      ...(ctx.char.class_resource_uses ?? {}),
+    char.class_resource_uses = {
+      ...(char.class_resource_uses ?? {}),
       sorcery_points: spPool - 1,
     };
     ctx.st = { ...ctx.st, metamagic_active: 'twinned' };
-    ctx.narrative = `${ctx.char.name} — Metamagic: Twinned Spell! Your next spell will target a second creature. (${spPool - 1} sorcery points remaining)`;
+    ctx.narrative = `${char.name} — Metamagic: Twinned Spell! Your next spell will target a second creature. (${spPool - 1} sorcery points remaining)`;
     return true;
   }
 
   if (fid === 'metamagic_quickened') {
-    if (!hasClass(ctx.char, 'sorcerer')) {
+    if (!hasClass(char, 'sorcerer')) {
       ctx.narrative = 'Only Sorcerers have Metamagic.';
       return true;
     }
-    if (ctx.char.turn_actions.bonus_action_used) {
+    if (char.turn_actions.bonus_action_used) {
       ctx.narrative = 'Bonus action already used this turn.';
       return true;
     }
     // SRD 5.2.1 p.67: can't activate Quickened if you've already cast
     // a level 1+ spell this turn.
-    if (ctx.char.turn_actions.leveled_spell_cast) {
+    if (char.turn_actions.leveled_spell_cast) {
       ctx.narrative =
         'You have already cast a level 1+ spell this turn — Quickened Spell cannot be used.';
       return true;
     }
-    const spPool2 =
-      ctx.char.class_resource_uses?.sorcery_points ?? getClassLevel(ctx.char, 'sorcerer');
+    const spPool2 = char.class_resource_uses?.sorcery_points ?? getClassLevel(char, 'sorcerer');
     if (spPool2 < 2) {
       ctx.narrative = 'Not enough sorcery points (need 2).';
       return true;
     }
-    ctx.char.class_resource_uses = {
-      ...(ctx.char.class_resource_uses ?? {}),
+    char.class_resource_uses = {
+      ...(char.class_resource_uses ?? {}),
       sorcery_points: spPool2 - 2,
     };
-    ctx.char.turn_actions = {
-      ...ctx.char.turn_actions,
+    char.turn_actions = {
+      ...char.turn_actions,
       bonus_action_used: true,
       action_used: false,
       quickened_used: true,
     };
     ctx.st = { ...ctx.st, metamagic_active: 'quickened' };
-    ctx.narrative = `${ctx.char.name} — Metamagic: Quickened Spell! Cast your next spell as a bonus action. (${spPool2 - 2} sorcery points remaining)`;
+    ctx.narrative = `${char.name} — Metamagic: Quickened Spell! Cast your next spell as a bonus action. (${spPool2 - 2} sorcery points remaining)`;
     return true;
   }
 
   if (fid === 'metamagic_empowered') {
-    if (!hasClass(ctx.char, 'sorcerer')) {
+    if (!hasClass(char, 'sorcerer')) {
       ctx.narrative = 'Only Sorcerers have Metamagic.';
       return true;
     }
-    const spPool3 =
-      ctx.char.class_resource_uses?.sorcery_points ?? getClassLevel(ctx.char, 'sorcerer');
+    const spPool3 = char.class_resource_uses?.sorcery_points ?? getClassLevel(char, 'sorcerer');
     if (spPool3 < 1) {
       ctx.narrative = 'Not enough sorcery points (need 1).';
       return true;
     }
-    ctx.char.class_resource_uses = {
-      ...(ctx.char.class_resource_uses ?? {}),
+    char.class_resource_uses = {
+      ...(char.class_resource_uses ?? {}),
       sorcery_points: spPool3 - 1,
     };
     ctx.st = { ...ctx.st, metamagic_active: 'empowered' };
-    ctx.narrative = `${ctx.char.name} — Metamagic: Empowered Spell! You may reroll up to ${abilityMod(ctx.char.cha)} damage dice on your next spell. (${spPool3 - 1} sorcery points remaining)`;
+    ctx.narrative = `${char.name} — Metamagic: Empowered Spell! You may reroll up to ${abilityMod(char.cha)} damage dice on your next spell. (${spPool3 - 1} sorcery points remaining)`;
     return true;
   }
 
   if (fid === 'agonizing_blast') {
-    if (!hasClass(ctx.char, 'warlock')) {
+    if (!hasClass(char, 'warlock')) {
       ctx.narrative = 'Only Warlocks can take Agonizing Blast.';
       return true;
     }
-    const hasIt = ctx.char.feats?.includes('agonizing_blast') ?? false;
+    const hasIt = char.feats?.includes('agonizing_blast') ?? false;
     if (hasIt) {
       ctx.narrative = 'You already have the Agonizing Blast invocation.';
       return true;
     }
-    ctx.char.feats = [...(ctx.char.feats ?? []), 'agonizing_blast'];
-    ctx.narrative = `${ctx.char.name} gains the Agonizing Blast invocation — Eldritch Blast now adds +${abilityMod(ctx.char.cha)} force damage per beam.`;
+    char.feats = [...(char.feats ?? []), 'agonizing_blast'];
+    ctx.narrative = `${char.name} gains the Agonizing Blast invocation — Eldritch Blast now adds +${abilityMod(char.cha)} force damage per beam.`;
     return true;
   }
 
   if (fid === 'devils_sight') {
-    if (!hasClass(ctx.char, 'warlock')) {
+    if (!hasClass(char, 'warlock')) {
       ctx.narrative = "Only Warlocks can take Devil's Sight.";
       return true;
     }
-    const hasIt2 = ctx.char.feats?.includes('devils_sight') ?? false;
+    const hasIt2 = char.feats?.includes('devils_sight') ?? false;
     if (hasIt2) {
       ctx.narrative = "You already have the Devil's Sight invocation.";
       return true;
     }
-    ctx.char.feats = [...(ctx.char.feats ?? []), 'devils_sight'];
-    ctx.narrative = `${ctx.char.name} gains Devil's Sight — you can see normally in magical darkness.`;
+    char.feats = [...(char.feats ?? []), 'devils_sight'];
+    ctx.narrative = `${char.name} gains Devil's Sight — you can see normally in magical darkness.`;
     return true;
   }
 

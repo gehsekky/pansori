@@ -22,12 +22,14 @@ import { fmt } from '../../narrativeFmt.js';
  *    allies, capped at half max HP per target.
  */
 export function handleClericFeature(ctx: ActionContext, fid: string): boolean {
+  if (ctx.actor.kind !== 'pc') return false;
+  const { char } = ctx.actor;
   if (fid === 'divine_spark') {
-    if (!hasClass(ctx.char, 'cleric')) {
+    if (!hasClass(char, 'cleric')) {
       ctx.narrative = 'Only Clerics have Divine Spark.';
       return true;
     }
-    const cdUsesDS = ctx.char.class_resource_uses?.channel_divinity ?? 1;
+    const cdUsesDS = char.class_resource_uses?.channel_divinity ?? 1;
     if (cdUsesDS <= 0) {
       ctx.narrative = 'No Channel Divinity uses remaining.';
       return true;
@@ -36,11 +38,11 @@ export function handleClericFeature(ctx: ActionContext, fid: string): boolean {
       ctx.narrative = 'No living target.';
       return true;
     }
-    ctx.char.class_resource_uses = {
-      ...(ctx.char.class_resource_uses ?? {}),
+    char.class_resource_uses = {
+      ...(char.class_resource_uses ?? {}),
       channel_divinity: cdUsesDS - 1,
     };
-    const dsRoll = rollDice('1d8') + abilityMod(ctx.char.wis);
+    const dsRoll = rollDice('1d8') + abilityMod(char.wis);
     // Read the CURRENT entity HP, not the seed's template HP — otherwise
     // Divine Spark resets the target to (full_hp - damage) and wipes
     // every prior turn's accumulated damage. (Vale playthrough log,
@@ -56,8 +58,8 @@ export function handleClericFeature(ctx: ActionContext, fid: string): boolean {
     };
     ctx.st = pushEvent(ctx.st, {
       kind: 'attack_hit',
-      attackerId: ctx.char.id,
-      attackerName: ctx.char.name,
+      attackerId: char.id,
+      attackerName: char.name,
       targetId: ctx.enemy!.id,
       targetName: ctx.enemy!.name,
       damage: dsRoll,
@@ -69,37 +71,37 @@ export function handleClericFeature(ctx: ActionContext, fid: string): boolean {
     });
     ctx.narrative = `✦ Divine Spark! ${ctx.enemy!.name} takes ${fmt.dmg(dsRoll)} radiant damage. (${cdUsesDS - 1} Channel Divinity remaining)`;
     if (dsHp <= 0) {
-      const split = splitEncounterXp(ctx.st, ctx.char.id, ctx.enemy!.xp ?? 0);
+      const split = splitEncounterXp(ctx.st, char.id, ctx.enemy!.xp ?? 0);
       ctx.st = split.st;
-      ctx.char.xp = (ctx.char.xp || 0) + split.share;
+      char.xp = (char.xp || 0) + split.share;
       ctx.narrative += ` ${ctx.enemy!.name} is destroyed.`;
-      ctx.narrative += applyPartyLevelUps(ctx.st, ctx.char, ctx.context);
+      ctx.narrative += applyPartyLevelUps(ctx.st, char, ctx.context);
     }
     ctx.usedInitiative = true;
     return true;
   }
 
   if (fid === 'turn_undead') {
-    if (!hasClass(ctx.char, 'cleric')) {
+    if (!hasClass(char, 'cleric')) {
       ctx.narrative = 'Only Clerics have Turn Undead.';
       return true;
     }
-    const cdUsesTU = ctx.char.class_resource_uses?.channel_divinity ?? 1;
+    const cdUsesTU = char.class_resource_uses?.channel_divinity ?? 1;
     if (cdUsesTU <= 0) {
       ctx.narrative = 'No Channel Divinity uses remaining.';
       return true;
     }
-    if (ctx.char.turn_actions.action_used) {
+    if (char.turn_actions.action_used) {
       ctx.narrative = 'Action already used this turn.';
       return true;
     }
-    ctx.char.class_resource_uses = {
-      ...(ctx.char.class_resource_uses ?? {}),
+    char.class_resource_uses = {
+      ...(char.class_resource_uses ?? {}),
       channel_divinity: cdUsesTU - 1,
     };
-    ctx.char.turn_actions = { ...ctx.char.turn_actions, action_used: true };
-    const tuDC = 8 + profBonus(ctx.char.level) + abilityMod(ctx.char.wis);
-    const selfEntTU = ctx.st.entities?.find((e) => e.id === ctx.char.id);
+    char.turn_actions = { ...char.turn_actions, action_used: true };
+    const tuDC = 8 + profBonus(char.level) + abilityMod(char.wis);
+    const selfEntTU = ctx.st.entities?.find((e) => e.id === char.id);
     // Identify undead enemies. Convention: enemy name keyword match — RAW
     // would check creature type but our enemy templates don't carry that.
     const undeadKeywords = /skeleton|ghoul|shadow|zombie|lich|wraith|undead|crypt/i;
@@ -167,26 +169,26 @@ export function handleClericFeature(ctx: ActionContext, fid: string): boolean {
   }
 
   if (fid === 'sear_undead') {
-    if (!hasClass(ctx.char, 'cleric')) {
+    if (!hasClass(char, 'cleric')) {
       ctx.narrative = 'Only Clerics have Sear Undead.';
       return true;
     }
-    const clericLvl = getClassLevel(ctx.char, 'cleric');
+    const clericLvl = getClassLevel(char, 'cleric');
     if (clericLvl < 5) {
       ctx.narrative = 'Sear Undead requires Cleric level 5.';
       return true;
     }
-    const cdUsesSU = ctx.char.class_resource_uses?.channel_divinity ?? 1;
+    const cdUsesSU = char.class_resource_uses?.channel_divinity ?? 1;
     if (cdUsesSU <= 0) {
       ctx.narrative = 'No Channel Divinity uses remaining.';
       return true;
     }
-    ctx.char.class_resource_uses = {
-      ...(ctx.char.class_resource_uses ?? {}),
+    char.class_resource_uses = {
+      ...(char.class_resource_uses ?? {}),
       channel_divinity: cdUsesSU - 1,
     };
-    const suDC = 8 + profBonus(ctx.char.level) + abilityMod(ctx.char.wis);
-    const selfEntSU = ctx.st.entities?.find((e) => e.id === ctx.char.id);
+    const suDC = 8 + profBonus(char.level) + abilityMod(char.wis);
+    const selfEntSU = ctx.st.entities?.find((e) => e.id === char.id);
     const undeadRegex = /skeleton|ghoul|shadow|zombie|lich|wraith|undead|crypt/i;
     const lines: string[] = [];
     const newEntities = (ctx.st.entities ?? []).map((e) => {
@@ -231,29 +233,29 @@ export function handleClericFeature(ctx: ActionContext, fid: string): boolean {
   }
 
   if (fid === 'preserve_life') {
-    if (ctx.char.subclass !== 'life') {
+    if (char.subclass !== 'life') {
       ctx.narrative = 'Only Life Clerics have Preserve Life.';
       return true;
     }
-    const cdUses = ctx.char.class_resource_uses?.channel_divinity ?? 1;
+    const cdUses = char.class_resource_uses?.channel_divinity ?? 1;
     if (cdUses <= 0) {
       ctx.narrative = 'No Channel Divinity uses remaining (recover on short rest).';
       return true;
     }
-    ctx.char.class_resource_uses = {
-      ...(ctx.char.class_resource_uses ?? {}),
+    char.class_resource_uses = {
+      ...(char.class_resource_uses ?? {}),
       channel_divinity: cdUses - 1,
     };
     // Preserve Life pool: 5 × Cleric level.
-    const poolHp = 5 * getClassLevel(ctx.char, 'cleric');
+    const poolHp = 5 * getClassLevel(char, 'cleric');
     const woundedAllies = ctx.st.characters.filter(
-      (c) => !c.dead && c.hp < c.max_hp && c.id !== ctx.char.id
+      (c) => !c.dead && c.hp < c.max_hp && c.id !== char.id
     );
     let preserved = 0;
     let remaining = poolHp;
     const healedIds = new Map<string, number>();
     const updatedChars = ctx.st.characters.map((c) => {
-      if (!c.dead && c.hp < c.max_hp && c.id !== ctx.char.id && remaining > 0) {
+      if (!c.dead && c.hp < c.max_hp && c.id !== char.id && remaining > 0) {
         const half = Math.floor(c.max_hp / 2);
         if (c.hp >= half) return c;
         const heal = Math.min(remaining, half - c.hp);
@@ -283,9 +285,9 @@ export function handleClericFeature(ctx: ActionContext, fid: string): boolean {
           : eligibleCount === 0
             ? 'every wounded ally is already above half HP'
             : 'no eligible target';
-      ctx.narrative = `${ctx.char.name} — Preserve Life! No HP distributed (${reason}). (${cdUses - 1} Channel Divinity remaining)`;
+      ctx.narrative = `${char.name} — Preserve Life! No HP distributed (${reason}). (${cdUses - 1} Channel Divinity remaining)`;
     } else {
-      ctx.narrative = `${ctx.char.name} — Preserve Life! Distributed ${preserved} HP among ${eligibleCount} eligible ally${eligibleCount === 1 ? '' : 'ies'} (pool: ${poolHp}). (${cdUses - 1} Channel Divinity remaining)`;
+      ctx.narrative = `${char.name} — Preserve Life! Distributed ${preserved} HP among ${eligibleCount} eligible ally${eligibleCount === 1 ? '' : 'ies'} (pool: ${poolHp}). (${cdUses - 1} Channel Divinity remaining)`;
     }
     return true;
   }

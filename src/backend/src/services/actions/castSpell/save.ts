@@ -46,6 +46,8 @@ export function runSaveSpell(
   slotNote: string,
   dc: number
 ): { done: boolean; spellDmg: number; spellHit: boolean } {
+  if (ctx.actor.kind !== 'pc') return { done: true, spellDmg: 0, spellHit: false };
+  const { char } = ctx.actor;
   const saveAbility = spell.savingThrow!;
   const enemyScore = (spellTarget as unknown as Record<string, number>)[saveAbility] ?? 10;
   // Cover bonus to DEX saves (SRD 5.2.1 p.15): the spell originates from
@@ -54,12 +56,12 @@ export function runSaveSpell(
   // are unaffected.
   let saveCoverDexBonus = 0;
   if (saveAbility === 'dex' && ctx.st.entities) {
-    const casterEntSave = ctx.st.entities.find((e) => e.id === ctx.char.id);
+    const casterEntSave = ctx.st.entities.find((e) => e.id === char.id);
     const targetEntSave = ctx.st.entities.find((e) => e.id === spellTargetId && e.isEnemy);
     if (casterEntSave && targetEntSave) {
       const obstaclesSave = [
         ...ctx.st.entities
-          .filter((e) => e.id !== ctx.char.id && e.id !== spellTargetId)
+          .filter((e) => e.id !== char.id && e.id !== spellTargetId)
           .map((e) => e.pos),
         ...ctx.roomObstacleCells,
       ];
@@ -72,14 +74,14 @@ export function runSaveSpell(
     enemyScore,
     dc,
     false,
-    ctx.char.level,
+    char.level,
     saveCoverDexBonus,
     targetEntForCond?.conditions ?? []
   );
   const saveLabel = saveAbility.toUpperCase();
 
   const saveCastPrefix = pickCastPrefix(spell, {
-    name: ctx.char.name,
+    name: char.name,
     spell: spell.name,
     slotNote,
     target: spellTarget.name,
@@ -88,13 +90,13 @@ export function runSaveSpell(
   let spellDmg = 0;
   if (spell.damage) {
     const saveDmgExpr =
-      spell.level === 0 ? cantripDamageDice(spell, ctx.char.level) : upcastDamage(spell, slotLevel);
+      spell.level === 0 ? cantripDamageDice(spell, char.level) : upcastDamage(spell, slotLevel);
     const fullDmg = rollDice(saveDmgExpr || spell.damage);
     spellDmg = saveFailed ? fullDmg : spell.saveEffect === 'half' ? Math.floor(fullDmg / 2) : 0;
     composeNow(ctx, {
       kind: 'spell_save_damage',
-      attackerId: ctx.char.id,
-      attackerName: ctx.char.name,
+      attackerId: char.id,
+      attackerName: char.name,
       target: spellTarget,
       spellId: spell.id,
       spellName: spell.name,
@@ -109,8 +111,8 @@ export function runSaveSpell(
   } else {
     composeNow(ctx, {
       kind: 'spell_save_condition',
-      attackerId: ctx.char.id,
-      attackerName: ctx.char.name,
+      attackerId: char.id,
+      attackerName: char.name,
       target: spellTarget,
       spellId: spell.id,
       spellName: spell.name,
@@ -161,7 +163,7 @@ export function runSaveSpell(
         prose: ` The ${spellTarget.name} is ${condToApply}!`,
       });
       if (spell.concentration) {
-        ctx.char.concentrating_on = {
+        char.concentrating_on = {
           spellId: spell.id,
           condition: condToApply,
           rounds_left: concentrationRoundsFor(spell),
@@ -185,10 +187,10 @@ export function runSaveSpell(
     };
     if (newEnemyHp <= 0) {
       const xpGain = spellTarget.xp ?? 10;
-      const split = splitEncounterXp(ctx.st, ctx.char.id, xpGain);
+      const split = splitEncounterXp(ctx.st, char.id, xpGain);
       ctx.st = split.st;
       const xpShare = split.share;
-      ctx.char.xp = (ctx.char.xp || 0) + xpShare;
+      char.xp = (char.xp || 0) + xpShare;
       ctx.st = {
         ...ctx.st,
         entities: (ctx.st.entities ?? []).map((e) =>
@@ -196,8 +198,8 @@ export function runSaveSpell(
         ),
       };
       ctx.st.enemies_killed = [...ctx.st.enemies_killed, spellTargetId];
-      ctx.char.concentrating_on = null;
-      ctx.narrative += grantDarkOnesBlessing(ctx.char);
+      char.concentrating_on = null;
+      ctx.narrative += grantDarkOnesBlessing(char);
       if (isRoomCleared(ctx.st, ctx.seed, ctx.roomId)) {
         ctx.st = endCombatState(ctx.st);
       }
@@ -206,7 +208,7 @@ export function runSaveSpell(
         pick(ctx.context.narratives.killShot)
           .replace('{enemy}', spellTarget.name)
           .replace('{xp}', String(xpShare));
-      ctx.narrative += applyPartyLevelUps(ctx.st, ctx.char, ctx.context);
+      ctx.narrative += applyPartyLevelUps(ctx.st, char, ctx.context);
     }
     ctx.usedInitiative = true;
     return { done: true, spellDmg, spellHit: true };

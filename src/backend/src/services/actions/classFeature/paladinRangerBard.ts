@@ -27,34 +27,35 @@ import { fmt } from '../../narrativeFmt.js';
  *   - `abjure_enemy` (Vengeance): WIS save → frightened.
  */
 export function handlePaladinRangerBardFeature(ctx: ActionContext, fid: string): boolean {
+  if (ctx.actor.kind !== 'pc') return false;
+  const { char } = ctx.actor;
   if (fid === 'bardic_inspiration') {
-    if (!hasClass(ctx.char, 'bard')) {
+    if (!hasClass(char, 'bard')) {
       ctx.narrative = 'Only Bards have Bardic Inspiration.';
       return true;
     }
     const biUses =
-      ctx.char.class_resource_uses?.bardic_inspiration ??
-      Math.max(1, Math.floor((ctx.char.cha - 10) / 2));
+      char.class_resource_uses?.bardic_inspiration ?? Math.max(1, Math.floor((char.cha - 10) / 2));
     if (biUses <= 0) {
       ctx.narrative = 'No Bardic Inspiration uses remaining.';
       return true;
     }
-    if (ctx.char.turn_actions.bonus_action_used) {
+    if (char.turn_actions.bonus_action_used) {
       ctx.narrative = 'Bonus action already used this turn.';
       return true;
     }
-    const ally = ctx.st.characters.find((c) => c.id !== ctx.char.id && !c.dead && c.hp > 0);
+    const ally = ctx.st.characters.find((c) => c.id !== char.id && !c.dead && c.hp > 0);
     if (!ally) {
       ctx.narrative = 'No ally to inspire.';
       return true;
     }
-    ctx.char.class_resource_uses = {
-      ...(ctx.char.class_resource_uses ?? {}),
+    char.class_resource_uses = {
+      ...(char.class_resource_uses ?? {}),
       bardic_inspiration: biUses - 1,
     };
-    ctx.char.turn_actions = { ...ctx.char.turn_actions, bonus_action_used: true };
+    char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
     // Bardic Inspiration die scales with Bard level.
-    const bardLvl = getClassLevel(ctx.char, 'bard');
+    const bardLvl = getClassLevel(char, 'bard');
     const inspDie = bardLvl >= 15 ? 'd12' : bardLvl >= 10 ? 'd10' : bardLvl >= 5 ? 'd8' : 'd6';
     ctx.st = {
       ...ctx.st,
@@ -62,12 +63,12 @@ export function handlePaladinRangerBardFeature(ctx: ActionContext, fid: string):
         c.id === ally.id ? { ...c, bardic_inspiration_die: inspDie } : c
       ),
     };
-    ctx.narrative = `${ctx.char.name} grants Bardic Inspiration (${inspDie}) to ${ally.name}! (${biUses - 1} use${biUses - 1 === 1 ? '' : 's'} remaining)`;
+    ctx.narrative = `${char.name} grants Bardic Inspiration (${inspDie}) to ${ally.name}! (${biUses - 1} use${biUses - 1 === 1 ? '' : 's'} remaining)`;
     return true;
   }
 
   if (fid === 'colossus_slayer') {
-    if (ctx.char.subclass !== 'hunter') {
+    if (char.subclass !== 'hunter') {
       ctx.narrative = 'Only Hunter Rangers have Colossus Slayer.';
       return true;
     }
@@ -82,13 +83,13 @@ export function handlePaladinRangerBardFeature(ctx: ActionContext, fid: string):
       ctx.narrative = 'Colossus Slayer only triggers on a bloodied (below max HP) target.';
       return true;
     }
-    if ((ctx.char.class_resource_uses?.colossus_slayer_used ?? 0) >= 1) {
+    if ((char.class_resource_uses?.colossus_slayer_used ?? 0) >= 1) {
       ctx.narrative = 'Colossus Slayer already triggered this turn.';
       return true;
     }
     const csDmg = rollDice('1d8');
-    ctx.char.class_resource_uses = {
-      ...(ctx.char.class_resource_uses ?? {}),
+    char.class_resource_uses = {
+      ...(char.class_resource_uses ?? {}),
       colossus_slayer_used: 1,
     };
     const csHp = csTarget.hp - csDmg;
@@ -112,35 +113,35 @@ export function handlePaladinRangerBardFeature(ctx: ActionContext, fid: string):
   }
 
   if (fid === 'sacred_weapon') {
-    if (ctx.char.subclass !== 'devotion') {
+    if (char.subclass !== 'devotion') {
       ctx.narrative = 'Only Devotion Paladins have Sacred Weapon.';
       return true;
     }
-    const cdUsesDev = ctx.char.class_resource_uses?.channel_divinity ?? 1;
+    const cdUsesDev = char.class_resource_uses?.channel_divinity ?? 1;
     if (cdUsesDev <= 0) {
       ctx.narrative = 'No Channel Divinity uses remaining.';
       return true;
     }
-    ctx.char.class_resource_uses = {
-      ...(ctx.char.class_resource_uses ?? {}),
+    char.class_resource_uses = {
+      ...(char.class_resource_uses ?? {}),
       channel_divinity: cdUsesDev - 1,
       sacred_weapon_active: 1,
     };
-    const chaMod = abilityMod(ctx.char.cha);
-    ctx.narrative = `${ctx.char.name} — Sacred Weapon! +${chaMod} to attack rolls for 1 minute (10 rounds). Your weapon gleams with divine light. (${cdUsesDev - 1} Channel Divinity remaining)`;
+    const chaMod = abilityMod(char.cha);
+    ctx.narrative = `${char.name} — Sacred Weapon! +${chaMod} to attack rolls for 1 minute (10 rounds). Your weapon gleams with divine light. (${cdUsesDev - 1} Channel Divinity remaining)`;
     return true;
   }
 
   if (fid === 'cutting_words') {
-    if (ctx.char.subclass !== 'lore') {
+    if (char.subclass !== 'lore') {
       ctx.narrative = 'Only Lore Bards have Cutting Words.';
       return true;
     }
-    if (ctx.char.turn_actions.reaction_used) {
+    if (char.turn_actions.reaction_used) {
       ctx.narrative = 'Reaction already used this turn.';
       return true;
     }
-    if ((ctx.char.conditions ?? []).includes('slowed')) {
+    if ((char.conditions ?? []).includes('slowed')) {
       ctx.narrative = "You are Slowed — you can't take reactions this turn.";
       return true;
     }
@@ -148,21 +149,21 @@ export function handlePaladinRangerBardFeature(ctx: ActionContext, fid: string):
       ctx.narrative = 'No living target.';
       return true;
     }
-    const biLeft = ctx.char.class_resource_uses?.bardic_inspiration ?? abilityMod(ctx.char.cha);
+    const biLeft = char.class_resource_uses?.bardic_inspiration ?? abilityMod(char.cha);
     if (biLeft <= 0) {
       ctx.narrative = 'No Bardic Inspiration uses remaining.';
       return true;
     }
-    ctx.char.class_resource_uses = {
-      ...(ctx.char.class_resource_uses ?? {}),
+    char.class_resource_uses = {
+      ...(char.class_resource_uses ?? {}),
       bardic_inspiration: biLeft - 1,
     };
-    ctx.char.turn_actions = { ...ctx.char.turn_actions, reaction_used: true };
+    char.turn_actions = { ...char.turn_actions, reaction_used: true };
     // Cutting Words die scales with Bard level (Bardic Inspiration die).
-    const cwBardLvl = getClassLevel(ctx.char, 'bard');
+    const cwBardLvl = getClassLevel(char, 'bard');
     const cuttingDie = cwBardLvl >= 15 ? 12 : cwBardLvl >= 10 ? 10 : cwBardLvl >= 5 ? 8 : 6;
     const cuttingRoll = rollDice(`1d${cuttingDie}`);
-    ctx.narrative = `${ctx.char.name} — Cutting Words! Subtract ${cuttingRoll} from ${ctx.enemy!.name}'s next attack roll or ability check this round. (${biLeft - 1} Bardic Inspiration remaining)`;
+    ctx.narrative = `${char.name} — Cutting Words! Subtract ${cuttingRoll} from ${ctx.enemy!.name}'s next attack roll or ability check this round. (${biLeft - 1} Bardic Inspiration remaining)`;
     ctx.st = { ...ctx.st, cutting_words_penalty: cuttingRoll };
     return true;
   }

@@ -14,13 +14,15 @@ import { concentrationRoundsFor } from './utils.js';
  * to the offensive pipeline.
  */
 export function runUtilitySpell(ctx: ActionContext, spell: Spell, slotNote: string): boolean {
+  if (ctx.actor.kind !== 'pc') return false;
+  const { char } = ctx.actor;
   if (spell.damage || spell.savingThrow || spell.attackRoll || spell.condition) {
     return false;
   }
 
   const utilityProse = spell.narrative
-    ? spell.narrative.replace('{name}', ctx.char.name)
-    : `${ctx.char.name} casts ${spell.name}${slotNote}.`;
+    ? spell.narrative.replace('{name}', char.name)
+    : `${char.name} casts ${spell.name}${slotNote}.`;
   composeNow(ctx, { kind: 'spell_utility', prose: utilityProse });
 
   // Bless (PHB p.219) — caster picks up to 3 creatures (RAW). Pansori
@@ -30,30 +32,30 @@ export function runUtilitySpell(ctx: ActionContext, spell: Spell, slotNote: stri
   // from all linked PCs when the Cleric's concentration drops.
   if (spell.id === 'bless') {
     // Mark caster as concentrating on bless. The runtime-mutated
-    // `ctx.char` reference is what gets written back to state.
-    ctx.char.concentrating_on = {
+    // `char` reference is what gets written back to state.
+    char.concentrating_on = {
       spellId: 'bless',
       rounds_left: concentrationRoundsFor(spell),
     };
     // Pick the targets: caster (always) + up to 2 living allies.
-    const blessTargets: string[] = [ctx.char.id];
+    const blessTargets: string[] = [char.id];
     for (const c of ctx.st.characters) {
       // Cap at 3 targets per RAW. (PR 15 sed regression: had `return`
       // here, which exited the whole handler before the bless effect
       // ever applied. Tests didn't catch it because no test hits the
       // exact 4+-party-member path. Restored to `break`.)
       if (blessTargets.length >= 3) break;
-      if (c.id === ctx.char.id || c.dead) continue;
+      if (c.id === char.id || c.dead) continue;
       blessTargets.push(c.id);
     }
     const targetSet = new Set(blessTargets);
     ctx.st = {
       ...ctx.st,
       characters: ctx.st.characters.map((c) => {
-        // The caster is mutated in place — don't overwrite our `ctx.char`
+        // The caster is mutated in place — don't overwrite our `char`
         // ref with a spread (it'd silently drop the concentrating_on
         // we just set). Skip; the post-cast state writeback handles it.
-        if (c.id === ctx.char.id) return c;
+        if (c.id === char.id) return c;
         if (!targetSet.has(c.id) || (c.conditions ?? []).includes('blessed')) {
           return c;
         }
@@ -62,17 +64,17 @@ export function runUtilitySpell(ctx: ActionContext, spell: Spell, slotNote: stri
           conditions: [...(c.conditions ?? []), 'blessed'],
           condition_sources: {
             ...(c.condition_sources ?? {}),
-            blessed: ctx.char.id,
+            blessed: char.id,
           },
         };
       }),
     };
     // Apply blessed to the caster's local ref too.
-    if (!(ctx.char.conditions ?? []).includes('blessed')) {
-      ctx.char.conditions = [...(ctx.char.conditions ?? []), 'blessed'];
-      ctx.char.condition_sources = {
-        ...(ctx.char.condition_sources ?? {}),
-        blessed: ctx.char.id,
+    if (!(char.conditions ?? []).includes('blessed')) {
+      char.conditions = [...(char.conditions ?? []), 'blessed'];
+      char.condition_sources = {
+        ...(char.condition_sources ?? {}),
+        blessed: char.id,
       };
     }
     // Look up names for the ctx.narrative addendum.
@@ -87,21 +89,21 @@ export function runUtilitySpell(ctx: ActionContext, spell: Spell, slotNote: stri
   // `blessed`. rollConditionSave gives advantage on WIS saves;
   // the death-save handler gives advantage on death-save d20s.
   if (spell.id === 'beacon_of_hope') {
-    ctx.char.concentrating_on = {
+    char.concentrating_on = {
       spellId: 'beacon_of_hope',
       rounds_left: concentrationRoundsFor(spell),
     };
-    const hopefulTargets: string[] = [ctx.char.id];
+    const hopefulTargets: string[] = [char.id];
     for (const c of ctx.st.characters) {
       if (hopefulTargets.length >= 3) break;
-      if (c.id === ctx.char.id || c.dead) continue;
+      if (c.id === char.id || c.dead) continue;
       hopefulTargets.push(c.id);
     }
     const targetSet = new Set(hopefulTargets);
     ctx.st = {
       ...ctx.st,
       characters: ctx.st.characters.map((c) => {
-        if (c.id === ctx.char.id) return c;
+        if (c.id === char.id) return c;
         if (!targetSet.has(c.id) || (c.conditions ?? []).includes('hopeful')) {
           return c;
         }
@@ -110,16 +112,16 @@ export function runUtilitySpell(ctx: ActionContext, spell: Spell, slotNote: stri
           conditions: [...(c.conditions ?? []), 'hopeful'],
           condition_sources: {
             ...(c.condition_sources ?? {}),
-            hopeful: ctx.char.id,
+            hopeful: char.id,
           },
         };
       }),
     };
-    if (!(ctx.char.conditions ?? []).includes('hopeful')) {
-      ctx.char.conditions = [...(ctx.char.conditions ?? []), 'hopeful'];
-      ctx.char.condition_sources = {
-        ...(ctx.char.condition_sources ?? {}),
-        hopeful: ctx.char.id,
+    if (!(char.conditions ?? []).includes('hopeful')) {
+      char.conditions = [...(char.conditions ?? []), 'hopeful'];
+      char.condition_sources = {
+        ...(char.condition_sources ?? {}),
+        hopeful: char.id,
       };
     }
     const hopefulNames = hopefulTargets
@@ -144,7 +146,7 @@ export function runUtilitySpell(ctx: ActionContext, spell: Spell, slotNote: stri
     const roomObstacles = currentRoomForDD?.obstacles ?? [];
     const occupied = new Set(
       [
-        ...ctx.st.entities.filter((e) => e.id !== ctx.char.id && e.hp > 0).map((e) => e.pos),
+        ...ctx.st.entities.filter((e) => e.id !== char.id && e.hp > 0).map((e) => e.pos),
         ...roomObstacles,
       ].map((p) => `${p.x},${p.y}`)
     );
@@ -157,7 +159,7 @@ export function runUtilitySpell(ctx: ActionContext, spell: Spell, slotNote: stri
       for (let y = 0; y < gridH; y++) {
         if (occupied.has(`${x},${y}`)) continue;
         // Skip the caster's own current cell — no-op teleport.
-        const casterEnt = ctx.st.entities.find((e) => e.id === ctx.char.id);
+        const casterEnt = ctx.st.entities.find((e) => e.id === char.id);
         if (casterEnt && casterEnt.pos.x === x && casterEnt.pos.y === y) continue;
         const minDistFromEnemy =
           livingEnemyPositions.length === 0
@@ -175,7 +177,7 @@ export function runUtilitySpell(ctx: ActionContext, spell: Spell, slotNote: stri
       const safe = bestCell;
       ctx.st = {
         ...ctx.st,
-        entities: ctx.st.entities.map((e) => (e.id === ctx.char.id ? { ...e, pos: safe } : e)),
+        entities: ctx.st.entities.map((e) => (e.id === char.id ? { ...e, pos: safe } : e)),
       };
       ctx.narrative += ` Reappears at (${safe.x}, ${safe.y}).`;
     }

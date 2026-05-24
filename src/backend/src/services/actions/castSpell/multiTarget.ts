@@ -37,6 +37,8 @@ export function runMultiTargetSpell(
   castingScore: number,
   slotNote: string
 ): boolean {
+  if (ctx.actor.kind !== 'pc') return false;
+  const { char } = ctx.actor;
   const multiTargets = action.targetEnemyIds;
   const isMultiTargetable =
     spell.id === 'magic_missile' || spell.id === 'eldritch_blast' || spell.id === 'scorching_ray';
@@ -51,8 +53,8 @@ export function runMultiTargetSpell(
   const perShot =
     spell.id === 'magic_missile' ? '1d4+1' : spell.id === 'eldritch_blast' ? '1d10' : '2d6';
   const agonizingBonusPerBeam =
-    spell.id === 'eldritch_blast' && (ctx.char.feats ?? []).includes('agonizing_blast')
-      ? Math.max(0, abilityMod(ctx.char.cha))
+    spell.id === 'eldritch_blast' && (char.feats ?? []).includes('agonizing_blast')
+      ? Math.max(0, abilityMod(char.cha))
       : 0;
   const isAttackRollMulti = spell.id === 'eldritch_blast' || spell.id === 'scorching_ray';
   let totalDealt = 0;
@@ -75,7 +77,7 @@ export function runMultiTargetSpell(
     }
     if (isAttackRollMulti) {
       // Each beam/ray rolls its own attack vs the target's AC.
-      const atkE = resolveSpellAttack(ctx.char.level, castingScore, tgtEnemy.ac);
+      const atkE = resolveSpellAttack(char.level, castingScore, tgtEnemy.ac);
       if (!atkE.hit) {
         lines.push(`${i + 1}: ${tgtEnemy.name} — MISS (${atkE.total} vs AC ${tgtEnemy.ac}).`);
         continue;
@@ -105,9 +107,9 @@ export function runMultiTargetSpell(
         note,
       });
       if (killed) {
-        const split = splitEncounterXp(ctx.st, ctx.char.id, tgtEnemy.xp ?? 0);
+        const split = splitEncounterXp(ctx.st, char.id, tgtEnemy.xp ?? 0);
         ctx.st = split.st;
-        ctx.char.xp = (ctx.char.xp || 0) + split.share;
+        char.xp = (char.xp || 0) + split.share;
         ctx.st.enemies_killed = [...(ctx.st.enemies_killed ?? []), tid];
       }
     } else {
@@ -135,9 +137,9 @@ export function runMultiTargetSpell(
         note,
       });
       if (killed) {
-        const split = splitEncounterXp(ctx.st, ctx.char.id, tgtEnemy.xp ?? 0);
+        const split = splitEncounterXp(ctx.st, char.id, tgtEnemy.xp ?? 0);
         ctx.st = split.st;
-        ctx.char.xp = (ctx.char.xp || 0) + split.share;
+        char.xp = (char.xp || 0) + split.share;
         ctx.st.enemies_killed = [...(ctx.st.enemies_killed ?? []), tid];
       }
     }
@@ -147,12 +149,12 @@ export function runMultiTargetSpell(
   }
   composeNow(ctx, {
     kind: 'spell_multi_target',
-    attackerId: ctx.char.id,
-    attackerName: ctx.char.name,
+    attackerId: char.id,
+    attackerName: char.name,
     spellId: spell.id,
     spellName: spell.name,
     castPrefix: pickCastPrefix(spell, {
-      name: ctx.char.name,
+      name: char.name,
       spell: spell.name,
       slotNote,
     }),
@@ -161,7 +163,7 @@ export function runMultiTargetSpell(
     totalDamage: totalDealt,
     labels: lines,
   });
-  ctx.narrative += applyPartyLevelUps(ctx.st, ctx.char, ctx.context);
+  ctx.narrative += applyPartyLevelUps(ctx.st, char, ctx.context);
   ctx.usedInitiative = true;
   return true;
 }
