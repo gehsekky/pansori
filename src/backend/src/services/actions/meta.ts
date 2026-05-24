@@ -7,7 +7,7 @@ import {
 } from '../fightingStyle.js';
 import { applyFeatTake, canTakeFeat, getFeat } from '../feats.js';
 import { applyLevelUpForClass, preparedSpellsCap } from '../gameEngine.js';
-import { canMulticlassInto, getClassLevel, hasClass } from '../multiclass.js';
+import { canMulticlassInto, expertiseSlots, getClassLevel, hasClass } from '../multiclass.js';
 import type { AbilityKey } from '../../types.js';
 import type { ActionHandler } from './types.js';
 import { updatePcActor } from './actor.js';
@@ -110,6 +110,40 @@ export const handleChooseFightingStyle: ActionHandler<{
   }
   updatePcActor(ctx, patch);
   ctx.narrative = `${char.name} adopts the ${FIGHTING_STYLE_LABELS[style] ?? style} Fighting Style.`;
+};
+
+/**
+ * `choose_expertise`: pick a skill proficiency to gain Expertise in (double
+ * proficiency bonus). Granted by Rogue (L1 + L6) and Bard (L2 + L9). Validates
+ * that the skill is one the character is proficient in, isn't already an
+ * Expertise pick, and that a slot is open (`expertiseSlots`). Out-of-combat,
+ * no action cost. (RE-2.)
+ */
+export const handleChooseExpertise: ActionHandler<{
+  type: 'choose_expertise';
+  skill: string;
+}> = (ctx, action) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can choose Expertise.' };
+  const { char } = ctx.actor;
+  const match = (char.skill_proficiencies ?? []).find(
+    (s) => s.toLowerCase() === action.skill.toLowerCase()
+  );
+  if (!match) {
+    return {
+      rejected: `You aren't proficient in ${action.skill}, so you can't gain Expertise in it.`,
+    };
+  }
+  const current = char.expertise_skills ?? [];
+  if (current.some((s) => s.toLowerCase() === match.toLowerCase())) {
+    ctx.narrative = `You already have Expertise in ${match}.`;
+    return;
+  }
+  if (current.length >= expertiseSlots(char)) {
+    ctx.narrative = 'You have no Expertise choice available right now.';
+    return;
+  }
+  updatePcActor(ctx, { expertise_skills: [...current, match] });
+  ctx.narrative = `${char.name} gains Expertise in ${match} (double proficiency bonus).`;
 };
 
 /**
