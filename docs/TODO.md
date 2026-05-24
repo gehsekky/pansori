@@ -379,10 +379,21 @@ Bonus(char, st)`: a creature within 10 ft of a conscious L6+ Paladin (the
       escalating-DC / not-raging control via the dispatched `enemy_attack`
       handler. Deferred: knockouts from enemy spells / lair AoEs (same path-
       scoping limitation as Orc Relentless Endurance — only the attack path).
+- [x] **Persistent Rage (done 2026-05-24)** — Barbarian L15: when you roll
+      Initiative, regain all expended uses of Rage (once per long rest).
+      `persistentRageTopUp` (multiclass.ts) applied to every PC in
+      `runCombatStart`, beside Superior Inspiration — refreshes `rage_uses` to
+      `rageUsesMax` and sets a `persistent_rage_used` flag (reset on a long
+      rest), only when uses are expended. The "Rage lasts 10 minutes / no need
+      to extend it" clause is already pansori's behavior (Rage persists for the
+      encounter, clearing only at combat end). Spec: helper (refresh, used-flag
+      no-op, full-uses no-op, sub-L15/non-barb) + a combat-start integration.
+      (Note: "exhaustion-on-rage-end" in the gap list is a 2014 rule — 2024 SRD
+      Rage imposes no exhaustion, so it's out of scope.)
 
 | Class     | Implemented (approx)                                                                                                                                                                                   | Major SRD gaps to fill                                                                                                                  |
 | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
-| Barbarian | Rage, Reckless (L1–2), Frenzy (L3), Danger Sense (L2), Extra Attack (L5), Feral Instinct (L7), Relentless Rage (L11)                                                                                   | Fast Movement, Brutal Strike, Persistent Rage, Indomitable Might, capstone; exhaustion-on-rage-end                                      |
+| Barbarian | Rage, Reckless (L1–2), Frenzy (L3), Danger Sense (L2), Extra Attack (L5), Feral Instinct (L7), Relentless Rage (L11), Persistent Rage (L15)                                                            | Fast Movement, Brutal Strike, Indomitable Might, capstone (exhaustion-on-rage-end is 2014-only, out of scope)                           |
 | Bard      | Bardic Inspiration (L1), Cutting Words (L3), Jack of All Trades (L2), Expertise (L2/9), Font of Inspiration (L5), Countercharm (L7), Superior Inspiration (L18)                                        | Magical Secrets, capstone                                                                                                               |
 | Cleric    | Channel Divinity, Turn/Sear Undead, Preserve Life (Life)                                                                                                                                               | Blessed Strikes, Divine Intervention, improved Channel uses, higher Life-domain grades                                                  |
 | Druid     | Wild Shape (L2, CR L4/8), Land's Aid                                                                                                                                                                   | Wild Companion, full Circle of the Land grades, Wild Shape improvements, Beast Spells, Archdruid                                        |

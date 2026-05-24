@@ -22,6 +22,7 @@
 import {
   abilityMod,
   extraAttackCount,
+  rageUsesMax,
   spellSlotsForCasterLevel,
   spellSlotsForClassLevel,
 } from './rulesEngine.js';
@@ -456,6 +457,30 @@ export function hasDangerSense(char: Character): boolean {
     return false;
   }
   return getClassLevel(char, 'barbarian') >= 2;
+}
+
+/**
+ * SRD 5.2.1 Persistent Rage (Barbarian L15): when you roll Initiative, you can
+ * regain all expended uses of Rage (once per long rest). Returns the char with
+ * `rage_uses` refreshed to max + a `persistent_rage_used` flag, only when uses
+ * are actually expended and the feature hasn't been used since the last long
+ * rest. (The "Rage lasts 10 minutes" clause is already pansori's behavior —
+ * Rage persists for the encounter.) No-op below L15. (RE-2.)
+ */
+export function persistentRageTopUp(char: Character): Character {
+  if (getClassLevel(char, 'barbarian') < 15) return char;
+  if (char.class_resource_uses?.persistent_rage_used) return char;
+  const max = rageUsesMax(getClassLevel(char, 'barbarian'));
+  const current = char.class_resource_uses?.rage_uses ?? max;
+  if (current >= max) return char; // nothing expended — don't burn the once-per-rest refresh
+  return {
+    ...char,
+    class_resource_uses: {
+      ...(char.class_resource_uses ?? {}),
+      rage_uses: max,
+      persistent_rage_used: 1,
+    },
+  };
 }
 
 export function superiorInspirationTopUp(char: Character): Character {
