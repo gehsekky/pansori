@@ -305,11 +305,23 @@ Bonus(char, st)`: a creature within 10 ft of a conscious L6+ Paladin (the
       strokeOfLuck.spec.ts (helper + checks + saves) + strokeOfLuckAttack.spec.ts
       (the auto-crit). Deferred: death saves (separate `processDeathSave` path);
       an interactive "use it now?" surface for timing control.
+- [x] **Jack of All Trades (done 2026-05-24)** — Bard L2: add half the
+      proficiency bonus (round down) to any ability check using a skill the bard
+      is NOT proficient in. `hasJackOfAllTrades` (Bard L2+) threaded as the
+      `jackOfAllTrades` flag through the three `skillCheck` callers (search /
+      sneak / hide); `skillCheck` already applied the half-prof when set and the
+      check is non-proficient — this just turns the flag on. Spec: helper +
+      skillCheck math (half-prof when unproficient, full prof when proficient,
+      nothing when off). Deferred: **Expertise** (the `expertise_skills` field
+      and `skillCheck`'s `expertise` param exist but nothing populates the
+      list — needs a skill-selection surface at L2/L9 first); and the inline
+      contested checks (grapple/shove, social) don't route through `skillCheck`,
+      same boundary as Reliable Talent.
 
 | Class     | Implemented (approx)                                                                                                                                                                 | Major SRD gaps to fill                                                                                                                            |
 | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Barbarian | Rage, Reckless (L1–2), Frenzy (L3), Extra Attack (L5)                                                                                                                                | Danger Sense, Fast Movement, Feral Instinct, Brutal Strike, Relentless Rage, Persistent Rage, Indomitable Might, capstone; exhaustion-on-rage-end |
-| Bard      | Bardic Inspiration (L1), Cutting Words (L3)                                                                                                                                          | Expertise, Jack of All Trades, Font of Inspiration, Countercharm, Magical Secrets, Superior Inspiration, capstone                                 |
+| Bard      | Bardic Inspiration (L1), Cutting Words (L3), Jack of All Trades (L2)                                                                                                                 | Expertise, Font of Inspiration, Countercharm, Magical Secrets, Superior Inspiration, capstone                                                     |
 | Cleric    | Channel Divinity, Turn/Sear Undead, Preserve Life (Life)                                                                                                                             | Blessed Strikes, Divine Intervention, improved Channel uses, higher Life-domain grades                                                            |
 | Druid     | Wild Shape (L2, CR L4/8), Land's Aid                                                                                                                                                 | Wild Companion, full Circle of the Land grades, Wild Shape improvements, Beast Spells, Archdruid                                                  |
 | Fighter   | Second Wind, Action Surge (L2), Extra Attack (2/3/4), Indomitable (L9), Tactical Master (L9)                                                                                         | Champion grades (Remarkable Athlete, Additional Style, Superior Critical, Survivor)                                                               |

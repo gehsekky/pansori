@@ -5,8 +5,8 @@ import {
   consumeLuckForCheck,
 } from '../gameEngine.js';
 import { consumeStrokeOfLuck, strokeOfLuckAvailable } from '../strokeOfLuck.js';
+import { hasJackOfAllTrades, hasReliableTalent } from '../multiclass.js';
 import type { ActionHandler } from './types.js';
-import { hasReliableTalent } from '../multiclass.js';
 import { randomUUID } from 'crypto';
 import { updatePcActor } from './actor.js';
 
@@ -75,7 +75,7 @@ export const handleInteractObject: ActionHandler<{
     nextChar.level,
     exhaustionDisadv1,
     false,
-    false,
+    hasJackOfAllTrades(nextChar),
     inspAdv || luckAdv,
     nextChar.species === 'halfling',
     hasReliableTalent(nextChar),

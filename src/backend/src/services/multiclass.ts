@@ -383,6 +383,16 @@ export function hasElusive(char: Character): boolean {
 }
 
 /**
+ * SRD 5.2.1 Jack of All Trades (Bard L2): add half the proficiency bonus
+ * (round down) to any ability check that uses a skill the bard is NOT
+ * proficient in. `skillCheck` applies the half-prof when its `jackOfAllTrades`
+ * flag is set and the check is non-proficient. (RE-2.)
+ */
+export function hasJackOfAllTrades(char: Character): boolean {
+  return getClassLevel(char, 'bard') >= 2;
+}
+
+/**
  * SRD 5.2.1 Paladin Lay on Hands (L1): HP remaining in the healing pool —
  * 5 × Paladin level minus points already spent (`class_resource_uses
  * .lay_on_hands`, replenished on a long rest). 0 for non-paladins. (RE-2.)
