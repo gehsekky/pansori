@@ -344,6 +344,36 @@ export function handleMonkFeature(ctx: ActionContext, fid: string): boolean {
     return true;
   }
 
+  if (fid === 'wholeness_of_body') {
+    // SRD Warrior of the Open Hand L6 — bonus action: heal a Martial Arts
+    // die + WIS mod (min 1 HP). Uses = WIS mod (min 1) per long rest.
+    if (!hasClass(char, 'monk') || char.subclass !== 'open_hand' || getClassLevel(char, 'monk') < 6) {
+      ctx.narrative = 'Wholeness of Body requires an Open Hand Monk of level 6.';
+      return true;
+    }
+    if (char.turn_actions.bonus_action_used) {
+      ctx.narrative = 'Bonus action already used this turn.';
+      return true;
+    }
+    const wobMax = Math.max(1, abilityMod(char.wis));
+    const wobUsed = char.class_resource_uses?.wholeness_of_body_used ?? 0;
+    if (wobUsed >= wobMax) {
+      ctx.narrative = `Wholeness of Body exhausted (${wobMax}/${wobMax} used). Recovers on a long rest.`;
+      return true;
+    }
+    const wobLvl = getClassLevel(char, 'monk');
+    const wobDie = wobLvl >= 17 ? 12 : wobLvl >= 11 ? 10 : wobLvl >= 5 ? 8 : 6;
+    const wobHeal = Math.max(1, rollDice(`1d${wobDie}`) + abilityMod(char.wis));
+    char.hp = Math.min(char.max_hp, char.hp + wobHeal);
+    char.class_resource_uses = {
+      ...(char.class_resource_uses ?? {}),
+      wholeness_of_body_used: wobUsed + 1,
+    };
+    char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
+    ctx.narrative = `${char.name} channels ki inward — Wholeness of Body heals ${wobHeal} HP (now ${char.hp}/${char.max_hp}). (${wobMax - wobUsed - 1}/${wobMax} remaining)`;
+    return true;
+  }
+
   if (fid === 'superior_defense') {
     if (!hasClass(char, 'monk') || getClassLevel(char, 'monk') < 18) {
       ctx.narrative = 'Superior Defense requires Monk level 18.';

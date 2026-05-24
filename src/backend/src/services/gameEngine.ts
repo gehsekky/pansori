@@ -3332,6 +3332,26 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         });
       }
     }
+    // SRD Warrior of the Open Hand Wholeness of Body (L6): bonus-action
+    // self-heal, WIS-mod uses per long rest. Usable in and out of combat
+    // (a heal), so it lives outside the combat-only block above.
+    if (
+      char.subclass === 'open_hand' &&
+      monkLvl >= 6 &&
+      char.hp < char.max_hp &&
+      !char.turn_actions.bonus_action_used
+    ) {
+      const wobMax = Math.max(1, abilityMod(char.wis));
+      const wobLeft = wobMax - (char.class_resource_uses?.wholeness_of_body_used ?? 0);
+      if (wobLeft > 0) {
+        choices.push({
+          label: `Wholeness of Body — heal (bonus action, ${wobLeft} left)`,
+          action: { type: 'use_class_feature', featureId: 'wholeness_of_body' },
+          kind: 'class_feature',
+          requiresBonusAction: true,
+        });
+      }
+    }
   }
 
   // ── Druid: Wild Shape ───────────────────────────────────────────────────────

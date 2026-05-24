@@ -439,9 +439,14 @@ export function resolveOneAttack(
   const brutalStrikeDmg =
     brutalStrikeApplies && atk.hit ? (isCrit ? rollCritical('1d10') : rollDice('1d10')) : 0;
   const rawDmg = baseHit + sneakDmg + rageBonus + brutalStrikeDmg;
+  // SRD Monk Empowered Strikes (L6) — unarmed strikes can deal Force damage.
+  // pansori auto-picks Force (it bypasses most resistances); only when unarmed
+  // (no weaponItem). Otherwise the weapon's own type stands.
+  const empoweredStrikes = !weaponItem && getClassLevel(pc.char, 'monk') >= 6;
+  const effectiveDamageType = weaponItem?.damageType ?? (empoweredStrikes ? 'force' : undefined);
   const { damage: finalDmg, note: dmgNote } = applyDamageMultiplier(
     rawDmg,
-    weaponItem?.damageType,
+    effectiveDamageType,
     target
   );
   // Radiant damage rides on top of the weapon multiplier (a creature
@@ -505,7 +510,7 @@ export function resolveOneAttack(
     target,
     weapon: weaponItem ?? null,
     damage: totalDmg,
-    damageType: weaponItem?.damageType ?? 'physical',
+    damageType: effectiveDamageType ?? 'physical',
     isCrit,
     toHit: atk.total,
     targetAc: target.ac,
