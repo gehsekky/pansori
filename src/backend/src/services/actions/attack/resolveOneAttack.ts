@@ -1,4 +1,5 @@
 import type { Enemy, InventoryItem, LootItem } from '../../../types.js';
+import { SQUARE_SIZE, posEqual } from '../../gridEngine.js';
 import {
   abilityMod,
   applyDamageMultiplier,
@@ -14,6 +15,7 @@ import {
 } from '../../rulesEngine.js';
 import {
   applyPartyLevelUps,
+  effectiveSpeed,
   endCombatState,
   getEnemyById,
   grantDarkOnesBlessing,
@@ -28,7 +30,6 @@ import type { ToHitContext } from './toHit.js';
 import { composeNow } from '../../narrative/compose.js';
 import { fmt } from '../../narrativeFmt.js';
 import { hasFightingStyle } from '../../fightingStyle.js';
-import { posEqual } from '../../gridEngine.js';
 import { updatePcActor } from '../actor.js';
 
 /**
@@ -87,6 +88,19 @@ export function resolveOneAttack(
     isRaging,
   } = toHit;
 
+  // SRD Barbarian Brutal Strike (L9): while Reckless, a pre-committed rider
+  // forgoes the Reckless advantage on one STR melee attack that isn't at
+  // disadvantage; on a hit it deals +1d10 (weapon's type) and applies the
+  // chosen effect. `effectiveAdvantage` drops the advantage for this swing.
+  const brutalRider = pc.char.turn_actions.brutal_strike_pending;
+  const brutalStrikeApplies =
+    !!brutalRider &&
+    getClassLevel(pc.char, 'barbarian') >= 9 &&
+    !!pc.char.turn_actions.reckless &&
+    weaponItem?.range !== 'ranged' &&
+    !disadvantage;
+  const effectiveAdvantage = brutalStrikeApplies ? false : advantage;
+
   // 2024 PHB Slow — slowed creature takes -2 AC. Read the live target
   // entity (target.ac comes from the seed template; the slowed flag
   // lives on the grid entity). Stacks with cover (RAW: penalties +
@@ -111,7 +125,7 @@ export function resolveOneAttack(
     effectiveEnemyAc,
     weaponItem?.finesse ?? false,
     disadvantage,
-    advantage,
+    effectiveAdvantage,
     weaponProficient,
     weaponItem?.range === 'ranged',
     critThresh,
@@ -192,6 +206,15 @@ export function resolveOneAttack(
     updatePcActor(ctx, consumeStrokeOfLuck(pc.char));
     strokeNote = ' ✦ Stroke of Luck — a natural 20!';
   }
+  // Brutal Strike: the chosen swing is now resolving — consume the rider
+  // (the advantage was already forgone above) regardless of hit/miss.
+  let brutalNote = '';
+  if (brutalStrikeApplies) {
+    updatePcActor(ctx, {
+      turn_actions: { ...pc.char.turn_actions, brutal_strike_pending: undefined },
+    });
+    brutalNote = ' 💥 Brutal Strike (advantage forgone)';
+  }
   // Unconscious or Assassin-surprised: force crit on hit
   const autoCritCheck =
     (enemyUnconscious &&
@@ -244,7 +267,7 @@ export function resolveOneAttack(
   const atkNote =
     ' ' +
     fmt.note(
-      `(${label}d20 ${atk.roll}+${atk.atkMod} ${atk.atkStat}+${atk.prof} prof${bonusNote} = ${atk.total} vs AC ${effectiveEnemyAc}${coverNote}${disadvNote}${versatileNote})${noProfNote}${biNote}${blessNote}${baneNote}${strokeNote}`
+      `(${label}d20 ${atk.roll}+${atk.atkMod} ${atk.atkStat}+${atk.prof} prof${bonusNote} = ${atk.total} vs AC ${effectiveEnemyAc}${coverNote}${disadvNote}${versatileNote})${noProfNote}${biNote}${blessNote}${baneNote}${strokeNote}${brutalNote}`
     );
 
   if (atk.fumble) {
@@ -409,7 +432,13 @@ export function resolveOneAttack(
     improvedSmiteDmg = isCrit ? rollCritical('1d8') : rollDice('1d8');
   }
 
-  const rawDmg = baseHit + sneakDmg + rageBonus;
+  // Brutal Strike +1d10 (weapon's damage type, so it rides inside rawDmg and
+  // shares the weapon's resistance/vulnerability multiplier). Doubled on a crit
+  // like the rest of the attack's dice. Plain d10 — GWF only rerolls the
+  // weapon's own dice, not this feature rider.
+  const brutalStrikeDmg =
+    brutalStrikeApplies && atk.hit ? (isCrit ? rollCritical('1d10') : rollDice('1d10')) : 0;
+  const rawDmg = baseHit + sneakDmg + rageBonus + brutalStrikeDmg;
   const { damage: finalDmg, note: dmgNote } = applyDamageMultiplier(
     rawDmg,
     weaponItem?.damageType,
@@ -449,6 +478,11 @@ export function resolveOneAttack(
   if (rageBonus > 0) {
     hitBonuses.push({ label: `Rage: +${rageBonus}` });
   }
+  if (brutalStrikeDmg > 0) {
+    hitBonuses.push({
+      label: `Brutal Strike ${isCrit ? '2d10 (crit)' : '1d10'}: +${brutalStrikeDmg}`,
+    });
+  }
   if (dmgNote) {
     // dmgNote arrives as " [resistant: 6 → 3]" — strip leading space and
     // the surrounding brackets so the composer's fmt.note wrap doesn't
@@ -478,6 +512,55 @@ export function resolveOneAttack(
     atkNote,
     bonuses: hitBonuses,
   });
+
+  // ── Barbarian Brutal Strike effect application (on a hit) ────────────
+  if (brutalStrikeApplies && atk.hit && newEnemyHp > 0) {
+    const bsCharEnt = ctx.st.entities?.find((e) => e.id === pc.char.id);
+    const bsTargetEnt = ctx.st.entities?.find((e) => e.id === targetId && e.isEnemy);
+    if (brutalRider === 'forceful' && bsCharEnt && bsTargetEnt) {
+      // Push 15 ft (3 squares) straight away from the attacker...
+      const dx = Math.sign(bsTargetEnt.pos.x - bsCharEnt.pos.x);
+      const dy = Math.sign(bsTargetEnt.pos.y - bsCharEnt.pos.y);
+      const pushedPos = { x: bsTargetEnt.pos.x + dx * 3, y: bsTargetEnt.pos.y + dy * 3 };
+      // ...then move up to half Speed straight toward the target (no OA),
+      // stopping adjacent. Direct entity move ⇒ no opportunity attacks.
+      const halfSpeedSquares = Math.floor(
+        effectiveSpeed(pc.char, ctx.context.lootTable) / 2 / SQUARE_SIZE
+      );
+      const distToPushed = Math.max(
+        Math.abs(pushedPos.x - bsCharEnt.pos.x),
+        Math.abs(pushedPos.y - bsCharEnt.pos.y)
+      );
+      const followSquares = Math.min(halfSpeedSquares, Math.max(0, distToPushed - 1));
+      const followedPos = {
+        x: bsCharEnt.pos.x + dx * followSquares,
+        y: bsCharEnt.pos.y + dy * followSquares,
+      };
+      ctx.st = {
+        ...ctx.st,
+        entities: (ctx.st.entities ?? []).map((e) =>
+          e.id === targetId && e.isEnemy
+            ? { ...e, pos: pushedPos }
+            : e.id === pc.char.id
+              ? { ...e, pos: followedPos }
+              : e
+        ),
+      };
+      ctx.narrative += ` ${fmt.note(`[Forceful Blow: ${target.name} pushed 15 ft; ${pc.char.name} closes ${followSquares * SQUARE_SIZE} ft]`)}`;
+    } else if (brutalRider === 'hamstring' && bsTargetEnt) {
+      // -15 ft Speed until the start of your next turn — honored by
+      // attemptEnemyApproach; cleared on round wrap.
+      ctx.st = {
+        ...ctx.st,
+        entities: (ctx.st.entities ?? []).map((e) =>
+          e.id === targetId && e.isEnemy
+            ? { ...e, conditions: [...e.conditions.filter((c) => c !== 'hamstrung'), 'hamstrung'] }
+            : e
+        ),
+      };
+      ctx.narrative += ` ${fmt.note(`[Hamstring Blow: ${target.name}'s Speed −15 ft]`)}`;
+    }
+  }
 
   // ── 2024 PHB Cunning Strike effect application ───────────────────────
   if (pc.char.turn_actions.cunning_strike_pending && sneakDmg > 0 && newEnemyHp > 0) {

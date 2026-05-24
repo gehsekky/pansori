@@ -144,5 +144,24 @@ export function handleBarbarianFeature(ctx: ActionContext, fid: string): boolean
     return true;
   }
 
+  if (fid === 'brutal_strike_forceful' || fid === 'brutal_strike_hamstring') {
+    if (!hasClass(char, 'barbarian') || getClassLevel(char, 'barbarian') < 9) {
+      ctx.narrative = 'Brutal Strike requires Barbarian level 9.';
+      return true;
+    }
+    if (!char.turn_actions.reckless) {
+      ctx.narrative = 'Brutal Strike requires Reckless Attack this turn.';
+      return true;
+    }
+    const rider = fid === 'brutal_strike_forceful' ? 'forceful' : 'hamstring';
+    char.turn_actions = { ...char.turn_actions, brutal_strike_pending: rider };
+    const label =
+      rider === 'forceful'
+        ? 'Forceful Blow (push 15 ft, then close in)'
+        : 'Hamstring Blow (−15 ft Speed)';
+    ctx.narrative = `${char.name} readies a Brutal Strike — ${label}. The next Strength melee attack forgoes advantage; on a hit it deals +1d10 and applies the effect.`;
+    return true;
+  }
+
   return false;
 }
