@@ -20,6 +20,7 @@
 //     only — that rule stays once the prereq + spell-slot PRs land.
 
 import {
+  abilityMod,
   extraAttackCount,
   spellSlotsForCasterLevel,
   spellSlotsForClassLevel,
@@ -431,6 +432,26 @@ export function canCountercharm(char: Character): boolean {
     return false;
   }
   return getClassLevel(char, 'bard') >= 7;
+}
+
+/**
+ * SRD 5.2.1 Superior Inspiration (Bard L18): when you roll Initiative, regain
+ * expended uses of Bardic Inspiration until you have two (if you have fewer).
+ * Returns the char with `class_resource_uses.bardic_inspiration` topped up to
+ * `min(2, max)` — capped at the bard's normal maximum (CHA mod, min 1), since
+ * it regains *expended* uses. No-op below L18 or when already at/above the
+ * target. (RE-2.)
+ */
+export function superiorInspirationTopUp(char: Character): Character {
+  if (getClassLevel(char, 'bard') < 18) return char;
+  const max = Math.max(1, abilityMod(char.cha));
+  const current = char.class_resource_uses?.bardic_inspiration ?? max;
+  const target = Math.min(2, max);
+  if (current >= target) return char;
+  return {
+    ...char,
+    class_resource_uses: { ...(char.class_resource_uses ?? {}), bardic_inspiration: target },
+  };
 }
 
 /**

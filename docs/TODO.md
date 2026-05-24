@@ -350,11 +350,19 @@ Bonus(char, st)`: a creature within 10 ft of a conscious L6+ Paladin (the
       `enemy_attack` handler. Deferred: an interactive reaction prompt so the
       bard's player chooses whether to spend the reaction (today it auto-fires
       on the first rescuable charmed/frightened save).
+- [x] **Superior Inspiration (done 2026-05-24)** — Bard L18: when you roll
+      Initiative, regain expended Bardic Inspiration until you have two (if
+      fewer). `superiorInspirationTopUp` (multiclass.ts) applied to every PC in
+      `runCombatStart` (the single initiative-roll path, shared by attack + cast
+      combat starts). Tops `class_resource_uses.bardic_inspiration` up to
+      `min(2, max)` — capped at the bard's normal max (CHA mod) since it only
+      regains expended uses. Spec: helper (top-up from 0/1, no-op at 2+, low-CHA
+      cap, sub-L18/non-bard) + a combat-start integration.
 
 | Class     | Implemented (approx)                                                                                                                                                                                   | Major SRD gaps to fill                                                                                                                            |
 | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Barbarian | Rage, Reckless (L1–2), Frenzy (L3), Extra Attack (L5)                                                                                                                                                  | Danger Sense, Fast Movement, Feral Instinct, Brutal Strike, Relentless Rage, Persistent Rage, Indomitable Might, capstone; exhaustion-on-rage-end |
-| Bard      | Bardic Inspiration (L1), Cutting Words (L3), Jack of All Trades (L2), Expertise (L2/9), Font of Inspiration (L5), Countercharm (L7)                                                                    | Magical Secrets, Superior Inspiration, capstone                                                                                                   |
+| Bard      | Bardic Inspiration (L1), Cutting Words (L3), Jack of All Trades (L2), Expertise (L2/9), Font of Inspiration (L5), Countercharm (L7), Superior Inspiration (L18)                                        | Magical Secrets, capstone                                                                                                                         |
 | Cleric    | Channel Divinity, Turn/Sear Undead, Preserve Life (Life)                                                                                                                                               | Blessed Strikes, Divine Intervention, improved Channel uses, higher Life-domain grades                                                            |
 | Druid     | Wild Shape (L2, CR L4/8), Land's Aid                                                                                                                                                                   | Wild Companion, full Circle of the Land grades, Wild Shape improvements, Beast Spells, Archdruid                                                  |
 | Fighter   | Second Wind, Action Surge (L2), Extra Attack (2/3/4), Indomitable (L9), Tactical Master (L9)                                                                                                           | Champion grades (Remarkable Athlete, Additional Style, Superior Critical, Survivor)                                                               |
