@@ -525,6 +525,53 @@ export function resolveOneAttack(
     bonuses: hitBonuses,
   });
 
+  // ── Ranger Superior Hunter's Prey (L11) ──────────────────────────────
+  // Once per turn, when you deal Hunter's Mark damage to the marked target,
+  // deal that same extra (Force) damage to a different creature within 30 ft.
+  if (
+    huntersMarkDmg > 0 &&
+    pc.char.subclass === 'hunter' &&
+    getClassLevel(pc.char, 'ranger') >= 11 &&
+    !pc.char.turn_actions.superior_hunters_prey_used
+  ) {
+    const markEnt = ctx.st.entities?.find((e) => e.id === targetId && e.isEnemy);
+    const shpTarget = markEnt
+      ? (ctx.st.entities ?? []).find(
+          (e) =>
+            e.isEnemy &&
+            e.hp > 0 &&
+            e.id !== targetId &&
+            Math.max(Math.abs(e.pos.x - markEnt.pos.x), Math.abs(e.pos.y - markEnt.pos.y)) <= 6
+        )
+      : undefined;
+    if (shpTarget) {
+      const shpEnemy = getEnemyById(ctx.seed, shpTarget.id);
+      const { damage: shpDmg, note: shpNote } = applyDamageMultiplier(
+        huntersMarkDmg,
+        'force',
+        shpEnemy ?? {}
+      );
+      const shpNewHp = Math.max(0, shpTarget.hp - shpDmg);
+      ctx.st = {
+        ...ctx.st,
+        entities: (ctx.st.entities ?? []).map((e) =>
+          e.id === shpTarget.id ? { ...e, hp: shpNewHp } : e
+        ),
+      };
+      updatePcActor(ctx, {
+        turn_actions: { ...pc.char.turn_actions, superior_hunters_prey_used: true },
+      });
+      const shpName = shpEnemy?.name ?? shpTarget.id;
+      ctx.narrative += ` ${fmt.note(`[Superior Hunter's Prey: ${shpName} also takes ${shpDmg} force${shpNote}${shpNewHp <= 0 ? ' (killed)' : ''}]`)}`;
+      if (shpNewHp <= 0) {
+        const shpSplit = splitEncounterXp(ctx.st, pc.char.id, shpEnemy?.xp ?? 0);
+        ctx.st = shpSplit.st;
+        updatePcActor(ctx, { xp: (pc.char.xp || 0) + shpSplit.share });
+        ctx.narrative += applyPartyLevelUps(ctx.st, pc.char, ctx.context);
+      }
+    }
+  }
+
   // ── Barbarian Brutal Strike effect application (on a hit) ────────────
   if (brutalStrikeApplies && atk.hit && newEnemyHp > 0) {
     const bsCharEnt = ctx.st.entities?.find((e) => e.id === pc.char.id);
