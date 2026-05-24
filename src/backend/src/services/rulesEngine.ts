@@ -511,7 +511,12 @@ export function rollConditionSave(
   // long-rested off. Caller passes `reviveD20Penalty(char)`; the
   // save subtracts it from the final roll, same shape as the Bane
   // and Slow penalties below.
-  reviveD20Pen = 0
+  reviveD20Pen = 0,
+  // When set, use this value for the d20 instead of rolling (advantage /
+  // disadvantage ignored). Lets a caller test a fixed die — e.g. Rogue
+  // Stroke of Luck checking whether turning the roll into a 20 would pass.
+  // Auto-fail conditions (paralyzed/stunned STR/DEX) still apply, per RAW.
+  forceD20?: number
 ): boolean {
   // Auto-fail saves: registry-driven. Paralyzed/stunned/unconscious/petrified
   // auto-fail STR + DEX saves (SRD 5.2.1 p.186/p.189).
@@ -551,6 +556,9 @@ export function rollConditionSave(
   // wrapper if needed.
   const final = (roll: number): number =>
     roll + abilityMod(score) + prof + cover - slowedDexPenalty - baneRoll - reviveD20Pen;
+  if (forceD20 !== undefined) {
+    return final(forceD20) < dc;
+  }
   if (netDisadv) {
     return final(Math.min(d(20), d(20))) < dc;
   }
@@ -674,6 +682,11 @@ export function skillCheck(
   // rogue has the feature; we additionally gate on `proficient` so it only
   // fires on a proficient check, per RAW.
   reliableTalent = false,
+  // SRD Rogue Stroke of Luck (L20) — when set, a *failed* check is turned into
+  // a natural 20 if that 20 would meet the DC. The caller passes whether the
+  // rogue has the use available and, when `strokeOfLuckUsed` comes back true,
+  // spends it. One D20-Test category among attack/check/save.
+  strokeOfLuck = false,
   // SRD Raise Dead / Resurrection — −N penalty to D20 Tests until
   // long-rested off. Subtracted from the final total.
   reviveD20Pen = 0
@@ -690,8 +703,16 @@ export function skillCheck(
   let profContrib = 0;
   if (proficient) profContrib = expertise ? prof * 2 : prof;
   else if (jackOfAllTrades) profContrib = Math.floor(prof / 2);
-  const total = roll + abilityMod(abilityScore) + profContrib - reviveD20Pen;
-  return { roll, total, success: total >= dc };
+  const mods = abilityMod(abilityScore) + profContrib - reviveD20Pen;
+  let total = roll + mods;
+  // Stroke of Luck — turn a failed check into a 20 when that rescues it.
+  let strokeOfLuckUsed = false;
+  if (strokeOfLuck && total < dc && 20 + mods >= dc) {
+    roll = 20;
+    total = 20 + mods;
+    strokeOfLuckUsed = true;
+  }
+  return { roll, total, success: total >= dc, strokeOfLuckUsed };
 }
 
 // ─── Death saves ──────────────────────────────────────────────────────────────

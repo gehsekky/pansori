@@ -13,6 +13,7 @@ import {
   isHeavilyEncumbered,
   pick,
 } from '../gameEngine.js';
+import { consumeStrokeOfLuck, strokeOfLuckAvailable } from '../strokeOfLuck.js';
 import type { ActionHandler } from './types.js';
 import { hasReliableTalent } from '../multiclass.js';
 import { updatePcActor } from './actor.js';
@@ -71,8 +72,12 @@ export const handleSneak: ActionHandler<{ type: 'sneak' }> = (ctx) => {
       false,
       inspAdv || luckAdv,
       member.species === 'halfling',
-      hasReliableTalent(member)
+      hasReliableTalent(member),
+      isActive && strokeOfLuckAvailable(member)
     );
+    // Only the active PC auto-spends a once-per-rest resource (same policy as
+    // Inspiration/Luck/Bardic above).
+    if (isActive && check.strokeOfLuckUsed) activeChar = consumeStrokeOfLuck(member);
     return { name: member.name, check, mod: abilityMod(member.dex) };
   });
   updatePcActor(ctx, activeChar);
