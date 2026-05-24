@@ -4189,6 +4189,164 @@ function applyPcOpportunityAttacks(args: {
  *
  * Extracted from `runEnemyTurns` (architecture audit #5).
  */
+/**
+ * Resolve a SINGLE enemy sub-attack against `target` (one swing of a
+ * multiattack). Extracted from `runEnemyMultiattackLoop` so the same
+ * per-attack core can be driven both by the inline loop and (Phase
+ * "dispatcher-integrated enemy turns") by the `enemy_attack` handler.
+ *
+ * Returns one of:
+ *   - `paused`        — a PC reaction window opened (Shield / Uncanny
+ *     Dodge / Hellish Rebuke); `pending_reaction` is stashed with the
+ *     resume coords and the caller must stop and surface the reaction.
+ *   - `killed-massive`— the swing dealt massive damage; target is dead.
+ *   - `done`          — swing resolved (hit or miss); caller continues
+ *     the multiattack with the returned `target` (loop stops on hp 0).
+ *
+ * `mi` / `advIdx` only feed the pause resume coords; behavior is
+ * otherwise independent of the surrounding loop.
+ */
+type EnemySubAttackResult =
+  | { outcome: 'paused'; st: GameState; narrative: string }
+  | { outcome: 'killed-massive'; st: GameState; target: Character; narrative: string }
+  | { outcome: 'done'; st: GameState; target: Character; narrative: string };
+
+function resolveEnemySubAttack(args: {
+  enemy: Enemy;
+  enemyId: string;
+  enemyEnt: CombatEntity | undefined;
+  target: Character;
+  st: GameState;
+  context: Context;
+  advIdx: number;
+  mi: number;
+  narrative: string;
+}): EnemySubAttackResult {
+  const { enemy, enemyId, enemyEnt, context, advIdx, mi } = args;
+  let st = args.st;
+  let target = args.target;
+  let narrative = args.narrative;
+  const prevHp = target.hp;
+  const computed = computeEnemyAttack(enemy, target, st, context);
+  // Shield reaction window — pause before committing the proposed snapshot.
+  if (computed.hit && isShieldEligible(target, computed.atkTotal, target.ac, context)) {
+    st = {
+      ...st,
+      pending_reaction: {
+        kind: 'shield',
+        attackerEnemyId: enemyId,
+        targetCharId: target.id,
+        atkTotal: computed.atkTotal,
+        targetAcAtAttack: target.ac,
+        pendingFragment: computed.fragment as EnemyAttackHitFragment,
+        pendingProposedChar: computed.proposedChar,
+        // Clear the inner pending_reaction to avoid self-recursion
+        // when stashing the proposed snapshot.
+        pendingProposedSt: { ...computed.proposedSt, pending_reaction: undefined },
+        resumeFromInitiativeIdx: advIdx,
+        resumeFromMultiattackIdx: mi + 1,
+        narrativeSoFar: narrative,
+        eligibleCharIds: [target.id],
+      },
+      // Put the reactor in the driver's seat so the FE prompts them.
+      active_character_id: target.id,
+    };
+    narrative += ` ⚡ ${enemy.name} strikes ${target.name} — total ${fmt.roll(computed.atkTotal)} vs ${fmt.ac(target.ac)}. Shield available!`;
+    return { outcome: 'paused', st, narrative };
+  }
+
+  // Uncanny Dodge reaction window (Rogue L5+). Triggers BEFORE
+  // damage commits when the Rogue can see the attacker. Same
+  // proposed-snapshot stash pattern as Shield; the resolver in
+  // reaction.ts halves `proposedDamage` before committing.
+  if (computed.hit && computed.hpLost > 0 && isUncannyDodgeEligible(target)) {
+    st = {
+      ...st,
+      pending_reaction: {
+        kind: 'uncanny_dodge',
+        attackerEnemyId: enemyId,
+        targetCharId: target.id,
+        atkTotal: computed.atkTotal,
+        proposedDamage: computed.hpLost,
+        pendingFragment: computed.fragment as EnemyAttackHitFragment,
+        pendingProposedChar: computed.proposedChar,
+        pendingProposedSt: { ...computed.proposedSt, pending_reaction: undefined },
+        resumeFromInitiativeIdx: advIdx,
+        resumeFromMultiattackIdx: mi + 1,
+        narrativeSoFar: narrative,
+        eligibleCharIds: [target.id],
+      },
+      active_character_id: target.id,
+    };
+    narrative += ` ⚡ ${enemy.name} strikes ${target.name} for ${fmt.dmg(computed.hpLost)} — Uncanny Dodge available!`;
+    return { outcome: 'paused', st, narrative };
+  }
+  // No Shield / Uncanny Dodge window — commit the proposed character + state.
+  // Orc Relentless Endurance: when reduced to 0 HP (and not killed
+  // outright by massive damage), the Orc drops to 1 HP instead.
+  // 1/long rest.
+  const proposedHp = computed.proposedChar.hp;
+  const orcReUsed = target.class_resource_uses?.relentless_endurance_used === 1;
+  let orcSaveFired = false;
+  if (
+    target.species === 'orc' &&
+    !orcReUsed &&
+    prevHp > 0 &&
+    proposedHp === 0 &&
+    !isMassiveDamageDeath(prevHp, computed.hpLost, target.max_hp)
+  ) {
+    orcSaveFired = true;
+    target = {
+      ...computed.proposedChar,
+      hp: 1,
+      class_resource_uses: {
+        ...(computed.proposedChar.class_resource_uses ?? {}),
+        relentless_endurance_used: 1,
+      },
+    };
+  } else {
+    target = computed.proposedChar;
+  }
+  st = computed.proposedSt;
+  if (orcSaveFired) {
+    narrative += ` 🪓 Relentless Endurance! ${target.name} stays standing at ${fmt.hp(1)} HP.`;
+  }
+  narrative += ` ${computed.fragment.prose}`;
+  st = pushEvent(st, enemyAttackFragmentEvent(computed.fragment, st.round ?? 1));
+  if (isMassiveDamageDeath(prevHp, computed.hpLost, target.max_hp)) {
+    target = { ...target, dead: true, stable: false, died_at_round: st.round ?? 1 };
+    narrative += ` MASSIVE DAMAGE — ${target.name} is killed outright!`;
+    return { outcome: 'killed-massive', st, target, narrative };
+  }
+
+  // Hellish Rebuke (PHB p.252) — triggers AFTER damage applies. The
+  // damage is already on the books in `target`; if the player
+  // accepts, the resolve path deals damage back to the attacker.
+  // Commit the new target HP to state BEFORE pausing so the resumed
+  // run sees the correct HP.
+  if (computed.hit && computed.hpLost > 0 && target.hp > 0) {
+    const myPos = st.entities?.find((e) => e.id === target.id)?.pos;
+    if (isHellishRebukeEligible(target, myPos, enemyEnt?.pos, context)) {
+      st = {
+        ...commitCharacter(st, target),
+        pending_reaction: {
+          kind: 'hellish_rebuke',
+          attackerEnemyId: enemyId,
+          targetCharId: target.id,
+          resumeFromInitiativeIdx: advIdx,
+          resumeFromMultiattackIdx: mi + 1,
+          narrativeSoFar: narrative,
+          eligibleCharIds: [target.id],
+        },
+        active_character_id: target.id,
+      };
+      narrative += ` 🔥 ${target.name} could retaliate with Hellish Rebuke!`;
+      return { outcome: 'paused', st, narrative };
+    }
+  }
+  return { outcome: 'done', st, target, narrative };
+}
+
 function runEnemyMultiattackLoop(args: {
   enemy: Enemy;
   enemyId: string;
@@ -4213,130 +4371,30 @@ function runEnemyMultiattackLoop(args: {
       narrative: string;
       massiveDeath: boolean;
     } {
-  const { enemy, enemyId, enemyEnt, st: initialSt, attackCount, advIdx, context } = args;
-  let st = initialSt;
+  const { attackCount } = args;
+  let st = args.st;
   let target = args.target;
   let narrative = args.narrative;
   let massiveDeath = false;
   for (let mi = args.resumeMi; mi < attackCount && target.hp > 0; mi++) {
-    const prevHp = target.hp;
-    const computed = computeEnemyAttack(enemy, target, st, context);
-    // Shield reaction window — pause before committing the proposed snapshot.
-    if (computed.hit && isShieldEligible(target, computed.atkTotal, target.ac, context)) {
-      st = {
-        ...st,
-        pending_reaction: {
-          kind: 'shield',
-          attackerEnemyId: enemyId,
-          targetCharId: target.id,
-          atkTotal: computed.atkTotal,
-          targetAcAtAttack: target.ac,
-          pendingFragment: computed.fragment as EnemyAttackHitFragment,
-          pendingProposedChar: computed.proposedChar,
-          // Clear the inner pending_reaction to avoid self-recursion
-          // when stashing the proposed snapshot.
-          pendingProposedSt: { ...computed.proposedSt, pending_reaction: undefined },
-          resumeFromInitiativeIdx: advIdx,
-          resumeFromMultiattackIdx: mi + 1,
-          narrativeSoFar: narrative,
-          eligibleCharIds: [target.id],
-        },
-        // Put the reactor in the driver's seat so the FE prompts them.
-        active_character_id: target.id,
-      };
-      narrative += ` ⚡ ${enemy.name} strikes ${target.name} — total ${fmt.roll(computed.atkTotal)} vs ${fmt.ac(target.ac)}. Shield available!`;
-      return { kind: 'paused', st, narrative };
-    }
-
-    // Uncanny Dodge reaction window (Rogue L5+). Triggers BEFORE
-    // damage commits when the Rogue can see the attacker. Same
-    // proposed-snapshot stash pattern as Shield; the resolver in
-    // reaction.ts halves `proposedDamage` before committing.
-    if (computed.hit && computed.hpLost > 0 && isUncannyDodgeEligible(target)) {
-      st = {
-        ...st,
-        pending_reaction: {
-          kind: 'uncanny_dodge',
-          attackerEnemyId: enemyId,
-          targetCharId: target.id,
-          atkTotal: computed.atkTotal,
-          proposedDamage: computed.hpLost,
-          pendingFragment: computed.fragment as EnemyAttackHitFragment,
-          pendingProposedChar: computed.proposedChar,
-          pendingProposedSt: { ...computed.proposedSt, pending_reaction: undefined },
-          resumeFromInitiativeIdx: advIdx,
-          resumeFromMultiattackIdx: mi + 1,
-          narrativeSoFar: narrative,
-          eligibleCharIds: [target.id],
-        },
-        active_character_id: target.id,
-      };
-      narrative += ` ⚡ ${enemy.name} strikes ${target.name} for ${fmt.dmg(computed.hpLost)} — Uncanny Dodge available!`;
-      return { kind: 'paused', st, narrative };
-    }
-    // No Shield / Uncanny Dodge window — commit the proposed character + state.
-    // Orc Relentless Endurance: when reduced to 0 HP (and not killed
-    // outright by massive damage), the Orc drops to 1 HP instead.
-    // 1/long rest.
-    const proposedHp = computed.proposedChar.hp;
-    const orcReUsed = target.class_resource_uses?.relentless_endurance_used === 1;
-    let orcSaveFired = false;
-    if (
-      target.species === 'orc' &&
-      !orcReUsed &&
-      prevHp > 0 &&
-      proposedHp === 0 &&
-      !isMassiveDamageDeath(prevHp, computed.hpLost, target.max_hp)
-    ) {
-      orcSaveFired = true;
-      target = {
-        ...computed.proposedChar,
-        hp: 1,
-        class_resource_uses: {
-          ...(computed.proposedChar.class_resource_uses ?? {}),
-          relentless_endurance_used: 1,
-        },
-      };
-    } else {
-      target = computed.proposedChar;
-    }
-    st = computed.proposedSt;
-    if (orcSaveFired) {
-      narrative += ` 🪓 Relentless Endurance! ${target.name} stays standing at ${fmt.hp(1)} HP.`;
-    }
-    narrative += ` ${computed.fragment.prose}`;
-    st = pushEvent(st, enemyAttackFragmentEvent(computed.fragment, st.round ?? 1));
-    if (isMassiveDamageDeath(prevHp, computed.hpLost, target.max_hp)) {
-      target = { ...target, dead: true, stable: false, died_at_round: st.round ?? 1 };
-      narrative += ` MASSIVE DAMAGE — ${target.name} is killed outright!`;
+    const sub = resolveEnemySubAttack({
+      enemy: args.enemy,
+      enemyId: args.enemyId,
+      enemyEnt: args.enemyEnt,
+      target,
+      st,
+      context: args.context,
+      advIdx: args.advIdx,
+      mi,
+      narrative,
+    });
+    st = sub.st;
+    narrative = sub.narrative;
+    if (sub.outcome === 'paused') return { kind: 'paused', st, narrative };
+    target = sub.target;
+    if (sub.outcome === 'killed-massive') {
       massiveDeath = true;
       break;
-    }
-
-    // Hellish Rebuke (PHB p.252) — triggers AFTER damage applies. The
-    // damage is already on the books in `target`; if the player
-    // accepts, the resolve path deals damage back to the attacker.
-    // Commit the new target HP to state BEFORE pausing so the resumed
-    // run sees the correct HP.
-    if (computed.hit && computed.hpLost > 0 && target.hp > 0) {
-      const myPos = st.entities?.find((e) => e.id === target.id)?.pos;
-      if (isHellishRebukeEligible(target, myPos, enemyEnt?.pos, context)) {
-        st = {
-          ...commitCharacter(st, target),
-          pending_reaction: {
-            kind: 'hellish_rebuke',
-            attackerEnemyId: enemyId,
-            targetCharId: target.id,
-            resumeFromInitiativeIdx: advIdx,
-            resumeFromMultiattackIdx: mi + 1,
-            narrativeSoFar: narrative,
-            eligibleCharIds: [target.id],
-          },
-          active_character_id: target.id,
-        };
-        narrative += ` 🔥 ${target.name} could retaliate with Hellish Rebuke!`;
-        return { kind: 'paused', st, narrative };
-      }
     }
   }
   return { kind: 'completed', st, target, narrative, massiveDeath };
