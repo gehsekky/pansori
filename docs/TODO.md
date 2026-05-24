@@ -58,7 +58,10 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
   monsters. This is the seam that unblocks **summoned creatures +
   companions** (Find Familiar, Spiritual Weapon, conjure spells, full
   Beastmaster companion) — all narrative-only today. Hot-path combat
-  code; warrants a written design pass before implementation.
+  code; **design pass:** [re1-phase4-design.md](re1-phase4-design.md) —
+  recommends the lower-risk path (drive summons/companions through the
+  generalized enemy-turn loop, deferring the full PC/enemy attack-handler
+  merge). Awaiting review.
 - [ ] **Phase 5** — drop `ctx.char` / `ctx.safeIdx` once every handler
   reads from `ctx.actor`.
 
