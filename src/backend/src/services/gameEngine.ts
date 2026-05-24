@@ -2782,17 +2782,22 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   // ── Subclass selection ─────────────────────────────────────────────────────
   if (!char.subclass) {
     const cls = char.character_class.toLowerCase();
+    // SRD 5.2.1 standardized EVERY class's subclass choice to level 3 (the
+    // 2014 PHB granted Cleric/Sorcerer/Warlock at L1 and Druid/Wizard at L2;
+    // the 2024 rules moved them all to L3 — verified against the class tables
+    // in docs/srd-5.2.1.txt, e.g. "3 +2 Cleric Subclass"). The map is kept
+    // explicit for readability even though every value is now 3.
     const subclassLevels: Record<string, number> = {
       fighter: 3,
       rogue: 3,
-      wizard: 2,
-      cleric: 1,
+      wizard: 3,
+      cleric: 3,
       ranger: 3,
       paladin: 3,
       bard: 3,
-      druid: 2,
-      sorcerer: 1,
-      warlock: 1,
+      druid: 3,
+      sorcerer: 3,
+      warlock: 3,
       monk: 3,
       barbarian: 3,
     };
