@@ -5,6 +5,7 @@ import {
   consumeLuckForCheck,
 } from '../gameEngine.js';
 import type { ActionHandler } from './types.js';
+import { hasReliableTalent } from '../multiclass.js';
 import { randomUUID } from 'crypto';
 import { updatePcActor } from './actor.js';
 
@@ -75,7 +76,8 @@ export const handleInteractObject: ActionHandler<{
     false,
     false,
     inspAdv || luckAdv,
-    nextChar.species === 'halfling'
+    nextChar.species === 'halfling',
+    hasReliableTalent(nextChar)
   );
 
   let narrative: string;

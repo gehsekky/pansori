@@ -7,7 +7,7 @@ import {
   isHeavilyEncumbered,
 } from '../../gameEngine.js';
 import { effectiveLightFor, passivePerceptionDcInLight, skillCheck } from '../../rulesEngine.js';
-import { getClassLevel, hasClass } from '../../multiclass.js';
+import { getClassLevel, hasClass, hasReliableTalent } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import { updatePcActor } from '../actor.js';
 
@@ -108,7 +108,8 @@ export function handleRogueFeature(ctx: ActionContext, fid: string): boolean {
       false,
       false,
       inspAdvHide || luckAdvHide,
-      pc.char.species === 'halfling'
+      pc.char.species === 'halfling',
+      hasReliableTalent(pc.char)
     );
     pc.char.turn_actions = { ...pc.char.turn_actions, bonus_action_used: true };
     if (hideCheck.success) {

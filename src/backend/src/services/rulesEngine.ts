@@ -669,6 +669,11 @@ export function skillCheck(
   jackOfAllTrades = false,
   advantage = false,
   halflingLucky = false,
+  // SRD Rogue Reliable Talent (L7) — treat a d20 of 9 or lower as a 10 on a
+  // check that uses a skill/tool proficiency. The caller passes whether the
+  // rogue has the feature; we additionally gate on `proficient` so it only
+  // fires on a proficient check, per RAW.
+  reliableTalent = false,
   // SRD Raise Dead / Resurrection — −N penalty to D20 Tests until
   // long-rested off. Subtracted from the final total.
   reviveD20Pen = 0
@@ -679,6 +684,8 @@ export function skillCheck(
   let roll = netDisadv ? Math.min(roll1, d(20)) : netAdv ? Math.max(roll1, d(20)) : roll1;
   // 2024 PHB Halfling Lucky — re-roll a Nat 1, take the new result.
   if (halflingLucky && roll === 1) roll = d(20);
+  // Reliable Talent floors the (post-reroll) die at 10 on a proficient check.
+  if (reliableTalent && proficient && roll < 10) roll = 10;
   const prof = profBonus(level);
   let profContrib = 0;
   if (proficient) profContrib = expertise ? prof * 2 : prof;
