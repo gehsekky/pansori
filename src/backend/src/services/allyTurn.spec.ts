@@ -6,7 +6,7 @@
 import type { CombatEntity, GameState } from '../types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { applyDamageToEntity, runAllyTurn } from './gameEngine.js';
-import { baseSandboxSeed, makeState, mockRandom } from '../test-fixtures.js';
+import { baseSandboxSeed, makeMinimalContext, makeState, mockRandom } from '../test-fixtures.js';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -56,22 +56,50 @@ describe('applyDamageToEntity', () => {
 describe('runAllyTurn', () => {
   it('does nothing when there is no enemy to target', () => {
     const st = stateWith([wolf({ x: 1, y: 1 })]);
-    const res = runAllyTurn({ allyEnt: st.entities![0], st, seed: baseSandboxSeed });
+    const res = runAllyTurn({
+      allyEnt: st.entities![0],
+      st,
+      seed: baseSandboxSeed,
+      context: makeMinimalContext(),
+    });
     expect(res.narrative).toBe('');
     expect(res.st).toBe(st);
   });
 
-  it('waits when the nearest enemy is out of melee reach (movement is a later slice)', () => {
-    const st = stateWith([wolf({ x: 1, y: 1 }), goblin({ x: 1, y: 8 })]);
-    const res = runAllyTurn({ allyEnt: st.entities![0], st, seed: baseSandboxSeed });
-    expect(res.narrative).toContain("can't reach");
+  it('moves toward and attacks an enemy it can reach this turn', () => {
+    mockRandom(0.95, 0.5); // hit + 3 damage (no OA: nobody adjacent at the start square)
+    const st = stateWith([wolf({ x: 1, y: 1 }), goblin({ x: 1, y: 5 })]);
+    const res = runAllyTurn({
+      allyEnt: st.entities![0],
+      st,
+      seed: baseSandboxSeed,
+      context: makeMinimalContext(),
+    });
+    expect(res.narrative).toContain('closes');
+    expect(res.st.entities?.find((e) => e.id === 'goblin-1')?.hp).toBe(7);
+  });
+
+  it('does not reach a far enemy in one turn (no attack lands)', () => {
+    const st = stateWith([wolf({ x: 1, y: 1 }), goblin({ x: 1, y: 9 })]);
+    const res = runAllyTurn({
+      allyEnt: st.entities![0],
+      st,
+      seed: baseSandboxSeed,
+      context: makeMinimalContext(),
+    });
     expect(res.st.entities?.find((e) => e.id === 'goblin-1')?.hp).toBe(10);
+    expect(res.narrative.length).toBeGreaterThan(0);
   });
 
   it('attacks and damages an adjacent enemy', () => {
     mockRandom(0.95, 0.5); // d20 -> 20 (hit), 1d4 -> 3 damage
     const st = stateWith([wolf({ x: 1, y: 1 }), goblin({ x: 1, y: 2 })]);
-    const res = runAllyTurn({ allyEnt: st.entities![0], st, seed: baseSandboxSeed });
+    const res = runAllyTurn({
+      allyEnt: st.entities![0],
+      st,
+      seed: baseSandboxSeed,
+      context: makeMinimalContext(),
+    });
     expect(res.narrative).toContain('Wolf attacks');
     expect(res.narrative).toContain('damage');
     expect(res.st.entities?.find((e) => e.id === 'goblin-1')?.hp).toBe(7);
@@ -80,7 +108,12 @@ describe('runAllyTurn', () => {
   it('marks the enemy slain and ends combat when it was the last one', () => {
     mockRandom(0.95, 0.5); // hit, 3 damage -> kills a 3-HP goblin
     const st = stateWith([wolf({ x: 1, y: 1 }), goblin({ x: 1, y: 2 }, 3)]);
-    const res = runAllyTurn({ allyEnt: st.entities![0], st, seed: baseSandboxSeed });
+    const res = runAllyTurn({
+      allyEnt: st.entities![0],
+      st,
+      seed: baseSandboxSeed,
+      context: makeMinimalContext(),
+    });
     expect(res.narrative).toContain('slain');
     expect(res.st.enemies_killed).toContain('goblin-1');
     expect(res.st.combat_active).toBe(false);

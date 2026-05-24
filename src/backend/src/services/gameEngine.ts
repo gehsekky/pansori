@@ -4542,30 +4542,83 @@ export function applyDamageToEntity(st: GameState, entityId: string, dmg: number
 
 /**
  * One AI-default turn for an ally combatant (companion / summon): pick
- * the nearest enemy via `selectTarget` and make a single stat-block
- * melee attack when within reach. Uses the simple `resolveEnemyAttack`
+ * the nearest enemy via `selectTarget`, close to melee reach if needed
+ * (provoking opportunity attacks from enemies it leaves), then make a
+ * single stat-block melee attack. Uses the simple `resolveEnemyAttack`
  * roll + `applyDamageToEntity` — NOT the PC-target `computeEnemyAttack`,
  * whose proposed-snapshot + PC reaction windows allies don't trigger.
- * Movement (approach) and the RAW player-command override are follow-up
- * slices; an uncommanded ally that's out of reach simply waits.
+ * Allies have no per-creature speed/reach fields yet, so they default to
+ * 5 ft reach + the standard movement budget. The RAW player-command
+ * override (P4.5) calls the same primitives on the owner's turn.
  * Returns the new state + the action narrative (the caller owns the
  * `[<name>'s turn]` header). (RE-1 Phase 4.)
  */
-export function runAllyTurn(args: { allyEnt: CombatEntity; st: GameState; seed: Seed }): {
+export function runAllyTurn(args: {
+  allyEnt: CombatEntity;
   st: GameState;
-  narrative: string;
-} {
-  const { allyEnt, seed } = args;
+  seed: Seed;
+  context: Context;
+  roomObstacles?: GridPos[];
+}): { st: GameState; narrative: string } {
+  const { allyEnt, seed, context } = args;
   let st = args.st;
+  let narrative = '';
   const allyName = allyEnt.companionName ?? 'Ally';
   const { targetEnt } = selectTarget(allyEnt.id, st);
   if (!targetEnt) return { st, narrative: '' };
   const foe = getEnemyById(seed, targetEnt.id);
   const foeName = foe?.name ?? 'the enemy';
   const foeAc = foe?.ac ?? targetEnt.ac ?? 10;
-  if (distanceFeet(allyEnt.pos, targetEnt.pos) > 5) {
-    return { st, narrative: ` ${allyName} can't reach ${foeName} this turn.` };
+
+  // ── Approach if out of melee reach (5 ft). ──────────────────────────
+  let moverPos = allyEnt.pos;
+  if (distanceFeet(moverPos, targetEnt.pos) > 5) {
+    const plan = planEnemyApproach({
+      st,
+      enemyId: allyEnt.id,
+      enemyPos: moverPos,
+      targetPos: targetEnt.pos,
+      reachFt: 5,
+      speedFt: DEFAULT_SPEED_FEET,
+      context,
+      roomId: st.current_room,
+      roomObstacles: args.roomObstacles,
+    });
+    if (!plan || plan.pathSquares.length === 0) {
+      return { st, narrative: ` ${allyName} can't find a path to ${foeName} this turn.` };
+    }
+    // Opportunity attacks from enemies whose reach the ally is leaving
+    // (moverIsEnemy: false → the threatening side is the enemies).
+    const oaEnemies = opportunityAttackTriggers(moverPos, plan.newPos, st.entities ?? [], false);
+    let allyHp = allyEnt.hp;
+    for (const oaE of oaEnemies) {
+      if (st.enemies_killed.includes(oaE.id)) continue;
+      const oaStats = getEnemyById(seed, oaE.id);
+      if (!oaStats) continue;
+      const oaRes = resolveEnemyAttack(oaStats, allyEnt.ac ?? 10);
+      if (oaRes.hit) {
+        st = applyDamageToEntity(st, allyEnt.id, oaRes.damage);
+        allyHp = Math.max(0, allyHp - oaRes.damage);
+        narrative += ` (Opportunity attack from ${oaStats.name}: ${fmt.dmg(oaRes.damage)}!)`;
+      }
+    }
+    moverPos = plan.newPos;
+    st = {
+      ...st,
+      entities: (st.entities ?? []).map((e) =>
+        e.id === allyEnt.id ? { ...e, pos: plan.newPos } : e
+      ),
+    };
+    narrative += ` ${allyName} closes ${plan.pathSquares.length * SQUARE_SIZE} ft toward ${foeName}.`;
+    if (allyHp <= 0) {
+      return { st, narrative: `${narrative} ${allyName} falls before reaching ${foeName}!` };
+    }
+    if (!plan.reached) {
+      return { st, narrative: `${narrative} ${allyName} is still out of reach.` };
+    }
   }
+
+  // ── Attack. ─────────────────────────────────────────────────────────
   const res = resolveEnemyAttack(
     { toHit: allyEnt.toHit ?? 0, damage: allyEnt.damage ?? '1d4' },
     foeAc
@@ -4573,11 +4626,11 @@ export function runAllyTurn(args: { allyEnt: CombatEntity; st: GameState; seed: 
   if (!res.hit) {
     return {
       st,
-      narrative: ` ${allyName} attacks ${foeName} — ${fmt.roll(res.total)} vs ${fmt.ac(foeAc)}, miss.`,
+      narrative: `${narrative} ${allyName} attacks ${foeName} — ${fmt.roll(res.total)} vs ${fmt.ac(foeAc)}, miss.`,
     };
   }
   st = applyDamageToEntity(st, targetEnt.id, res.damage);
-  let narrative = ` ${allyName} attacks ${foeName} — ${fmt.roll(res.total)} vs ${fmt.ac(foeAc)}, ${fmt.dmg(res.damage)} damage!`;
+  narrative += ` ${allyName} attacks ${foeName} — ${fmt.roll(res.total)} vs ${fmt.ac(foeAc)}, ${fmt.dmg(res.damage)} damage!`;
   const slain = (st.entities?.find((e) => e.id === targetEnt.id)?.hp ?? 0) <= 0;
   if (slain) {
     st = { ...st, enemies_killed: [...st.enemies_killed, targetEnt.id] };
@@ -4705,7 +4758,13 @@ export function runEnemyTurns(args: {
     // `runAllyTurn`; the loop only owns the turn header + advance.
     const allyEnt = st.entities?.find((e) => e.id === eEntry.id);
     if (allyEnt && entitySide(allyEnt) === 'ally' && allyEnt.hp > 0) {
-      const allyTurn = runAllyTurn({ allyEnt, st, seed: args.seed });
+      const allyTurn = runAllyTurn({
+        allyEnt,
+        st,
+        seed: args.seed,
+        context: args.context,
+        roomObstacles: roomObstacleCells,
+      });
       st = allyTurn.st;
       if (allyTurn.narrative) {
         narrative += `\n\n[${allyEnt.companionName ?? 'Ally'}'s turn]${allyTurn.narrative}`;
