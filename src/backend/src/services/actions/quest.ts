@@ -1,5 +1,6 @@
 import type { ActionHandler } from './types.js';
 import { randomUUID } from 'crypto';
+import { updatePcActor } from './actor.js';
 
 /**
  * `accept_quest`: opt in to a quest defined in the campaign. Adds a
@@ -45,6 +46,8 @@ export const handleCompleteQuest: ActionHandler<{ type: 'complete_quest'; questI
   ctx,
   action
 ) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can complete quests.' };
+  const { char } = ctx.actor;
   const cqDef = ctx.context.campaign?.quests?.find((q) => q.id === action.questId);
   if (!cqDef) {
     ctx.narrative = 'Unknown quest.';
@@ -63,7 +66,7 @@ export const handleCompleteQuest: ActionHandler<{ type: 'complete_quest'; questI
   }
 
   const rewardLines: string[] = [];
-  let nextChar = ctx.char;
+  let nextChar = char;
   let nextSt = ctx.st;
   for (const reward of cqDef.rewards) {
     if (reward.type === 'give_item') {
@@ -97,7 +100,7 @@ export const handleCompleteQuest: ActionHandler<{ type: 'complete_quest'; questI
       qp.questId === action.questId ? { ...qp, status: 'completed' } : qp
     ),
   };
-  ctx.char = nextChar;
+  updatePcActor(ctx, nextChar);
   ctx.st = nextSt;
   const rewardStr = rewardLines.length ? ` Rewards: ${rewardLines.join(', ')}.` : '';
   ctx.narrative = `Quest complete: "${cqDef.title}".${rewardStr}`;
