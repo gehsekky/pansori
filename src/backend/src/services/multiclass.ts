@@ -370,6 +370,16 @@ export function hasSlipperyMind(char: Character): boolean {
 }
 
 /**
+ * SRD 5.2.1 Disciplined Survivor (Monk L14): proficiency in all saving throws.
+ * (Also lets the monk spend a Focus Point to reroll a failed save — that
+ * ki-reroll half is deferred; see docs/TODO.md.) Applied at `hasSaveProficiency`.
+ * (RE-2.)
+ */
+export function hasDisciplinedSurvivor(char: Character): boolean {
+  return getClassLevel(char, 'monk') >= 14;
+}
+
+/**
  * SRD 5.2.1 Elusive (Rogue L18): no attack roll can have Advantage against the
  * rogue unless they have the Incapacitated condition. Returns true when the
  * feature is actively suppressing incoming advantage — Rogue L18+ and not under
