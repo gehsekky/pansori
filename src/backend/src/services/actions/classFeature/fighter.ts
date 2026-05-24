@@ -25,13 +25,22 @@ export function handleFighterFeature(ctx: ActionContext, fid: string): boolean {
       ctx.narrative = 'Action Surge requires Fighter level 2.';
       return true;
     }
-    if ((char.class_resource_uses?.action_surge ?? 0) >= 1) {
-      ctx.narrative = 'Action Surge already used this rest.';
+    // SRD Fighter L17 — two uses per rest (still only once per turn).
+    const surgeMax = getClassLevel(char, 'fighter') >= 17 ? 2 : 1;
+    const surgeUsed = char.class_resource_uses?.action_surge ?? 0;
+    if (surgeUsed >= surgeMax) {
+      ctx.narrative = `Action Surge exhausted (${surgeMax}/${surgeMax} used). Recovers on a rest.`;
       return true;
     }
-    char.class_resource_uses = { ...(char.class_resource_uses ?? {}), action_surge: 1 };
-    char.turn_actions = { ...char.turn_actions, action_used: false };
-    ctx.narrative = `${char.name} uses Action Surge — one additional action this turn!`;
+    if (char.turn_actions.action_surge_used) {
+      ctx.narrative = 'Action Surge can be used only once per turn.';
+      return true;
+    }
+    char.class_resource_uses = { ...(char.class_resource_uses ?? {}), action_surge: surgeUsed + 1 };
+    char.turn_actions = { ...char.turn_actions, action_used: false, action_surge_used: true };
+    ctx.narrative = `${char.name} uses Action Surge — one additional action this turn!${
+      surgeMax > 1 ? ` (${surgeMax - surgeUsed - 1}/${surgeMax} remaining)` : ''
+    }`;
     return true;
   }
 

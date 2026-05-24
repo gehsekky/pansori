@@ -314,13 +314,11 @@ export function computeToHitContext(
   const features = ctx.context.classFeatures?.[pc.char.character_class] ?? [];
   const isRaging = pc.char.conditions.includes('raging');
 
-  // Champion: Improved Critical — crit on 19–20 at level 3+
-  const critThresh =
-    pc.char.subclass === 'champion' &&
-    hasClass(pc.char, 'fighter') &&
-    getClassLevel(pc.char, 'fighter') >= 3
-      ? 19
-      : 20;
+  // Champion: Improved Critical — crit on 19–20 at L3+, upgrading to
+  // Superior Critical — crit on 18–20 at L15+.
+  const isChampion = pc.char.subclass === 'champion' && hasClass(pc.char, 'fighter');
+  const championLvl = isChampion ? getClassLevel(pc.char, 'fighter') : 0;
+  const critThresh = championLvl >= 15 ? 18 : championLvl >= 3 ? 19 : 20;
   const sacredWeaponBonus =
     (pc.char.class_resource_uses?.sacred_weapon_active ?? 0) > 0 ? abilityMod(pc.char.cha) : 0;
   // SRD Fighting Style: Archery — +2 to attack rolls with Ranged weapons.
