@@ -1662,9 +1662,12 @@ export function buildInitiativeOrder(chars: Character[], enemies: Enemy[]): Init
       .map((c) => {
         // 2024 PHB Alert feat — adds proficiency bonus to Initiative.
         const alertBonus = (c.feats ?? []).includes('alert') ? profBonus(c.level) : 0;
+        // SRD Barbarian Feral Instinct (L7) — Advantage on Initiative rolls.
+        const feralAdv = getClassLevel(c, 'barbarian') >= 7;
+        const d20 = feralAdv ? Math.max(rollDice('1d20'), rollDice('1d20')) : rollDice('1d20');
         return {
           id: c.id,
-          roll: rollDice('1d20') + abilityMod(c.dex) + alertBonus,
+          roll: d20 + abilityMod(c.dex) + alertBonus,
           is_enemy: false,
         };
       }),
