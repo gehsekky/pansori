@@ -74,6 +74,7 @@ import {
   hasEvasion,
   hasMultiattackDefense,
   hasSlipperyMind,
+  hasSuperiorHuntersDefense,
   hunterFeatureOptions,
   huntersPrey,
   layOnHandsRemaining,
@@ -1115,16 +1116,45 @@ function computeEnemyAttack(
       deflectUsed = true;
       deflectNote = ` 🥋 Deflect Attacks: ${fmt.dmg(postWardDmg)} → ${fmt.dmg(postDeflectDmg)} (−${reduction})`;
     }
+    // SRD Ranger Superior Hunter's Defense (L15): a Reaction grants Resistance
+    // to the damage type until end of turn. Auto-resolved (player-favorable,
+    // like Deflect Attacks): spend the reaction the first time a type lands this
+    // round, then halve that type free for the rest of the round (round-stamped,
+    // self-expiring). Skipped if Deflect already spent the reaction this hit.
+    const shdDmgType = enemy.damageType ?? 'bludgeoning';
+    const shdActiveType =
+      char.superior_hunters_def?.round === (st.round ?? 1)
+        ? char.superior_hunters_def?.type
+        : undefined;
+    const shdAlready = shdActiveType === shdDmgType;
+    const shdTrigger =
+      hasSuperiorHuntersDefense(char) && !deflectUsed && !char.turn_actions?.reaction_used;
+    let shdNote = '';
+    let shdStamp = char.superior_hunters_def;
+    let shdReactionUsed = false;
+    let postShdDmg = postDeflectDmg;
+    if ((shdAlready || shdTrigger) && postDeflectDmg > 0) {
+      postShdDmg = Math.ceil(postDeflectDmg / 2);
+      shdNote = ` 🏹 Superior Hunter's Defense: ${fmt.dmg(postDeflectDmg)} → ${fmt.dmg(postShdDmg)} (resist ${shdDmgType})`;
+      if (!shdAlready) {
+        shdStamp = { type: shdDmgType, round: st.round ?? 1 };
+        shdReactionUsed = true;
+      }
+    }
     // Universal damage application — temp_hp absorption, exhaustion-4 max-HP
     // clamp, knock-out detection, and the SRD concentration save all flow
     // through `applyDamage`. (PR-2's deferred enemy-attack migration.)
-    const dmgResult = applyDamage(charAfterWard, st, postDeflectDmg);
-    let updatedChar = deflectUsed
-      ? {
-          ...dmgResult.char,
-          turn_actions: { ...dmgResult.char.turn_actions, reaction_used: true },
-        }
-      : dmgResult.char;
+    const dmgResult = applyDamage(charAfterWard, st, postShdDmg);
+    let updatedChar = dmgResult.char;
+    if (deflectUsed || shdReactionUsed) {
+      updatedChar = {
+        ...updatedChar,
+        turn_actions: { ...updatedChar.turn_actions, reaction_used: true },
+      };
+    }
+    if (shdStamp !== char.superior_hunters_def) {
+      updatedChar = { ...updatedChar, superior_hunters_def: shdStamp };
+    }
     let newSt = dmgResult.st;
     const hpLost = dmgResult.amountDealt;
     const tempHpNote =
@@ -1140,6 +1170,7 @@ function computeEnemyAttack(
     narrative +=
       rageNote + petrNote + beastNote + speciesNote + superiorDefNote + wardNote + tempHpNote;
     narrative += deflectNote;
+    narrative += shdNote;
     narrative += dmgResult.concentrationNote;
 
     let inspirationConsumed = false;

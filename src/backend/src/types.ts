@@ -707,6 +707,10 @@ export interface Character {
   // that enemy's further attacks vs this PC roll with Disadvantage. The round
   // stamp self-expires (no explicit clearing needed).
   multiattack_defense_marks?: Record<string, number>;
+  // SRD Superior Hunter's Defense bookkeeping — the damage type currently
+  // resisted and the round the reaction fired. While `round` equals the current
+  // round, damage of `type` is halved (free); the round stamp self-expires.
+  superior_hunters_def?: { type: string; round: number };
   // Extended 5e fields
   subclass?: string; // e.g. 'champion', 'evoker', 'thief'
   // SRD 5.2.1 Fighting Style feats chosen via class features (Fighter L1 +
