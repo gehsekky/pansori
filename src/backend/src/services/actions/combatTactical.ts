@@ -3,6 +3,7 @@ import type { ActionHandler } from './types.js';
 import { composeNow } from '../narrative/compose.js';
 import { distanceFeet } from '../gridEngine.js';
 import { getEnemyById } from '../gameEngine.js';
+import { updatePcActor } from './actor.js';
 
 /**
  * `grapple`: 2024 PHB Unarmed Strike: Grapple. Contested STR
@@ -16,13 +17,15 @@ export const handleGrapple: ActionHandler<{
   type: 'grapple';
   targetEnemyId?: string;
 }> = (ctx, action) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can grapple.' };
+  const { char } = ctx.actor;
   if (!ctx.enemyAlive || !ctx.enemy) {
     return { rejected: 'No enemy to grapple.' };
   }
   const targetId = action.targetEnemyId ?? ctx.enemy.id;
   const target = ctx.livingEnemiesInRoom.find((e) => e.id === targetId) ?? ctx.enemy;
   if (ctx.st.entities) {
-    const myEnt = ctx.st.entities.find((e) => e.id === ctx.char.id);
+    const myEnt = ctx.st.entities.find((e) => e.id === char.id);
     const tgtEnt = ctx.st.entities.find((e) => e.id === target.id && e.isEnemy);
     if (myEnt && tgtEnt && distanceFeet(myEnt.pos, tgtEnt.pos) > 5) {
       return {
@@ -37,8 +40,8 @@ export const handleGrapple: ActionHandler<{
     ctx.usedInitiative = true;
     return;
   }
-  const athProf = (ctx.context.classSkills[ctx.char.character_class] ?? []).includes('athletics');
-  const playerRoll = d(20) + abilityMod(ctx.char.str) + (athProf ? profBonus(ctx.char.level) : 0);
+  const athProf = (ctx.context.classSkills[char.character_class] ?? []).includes('athletics');
+  const playerRoll = d(20) + abilityMod(char.str) + (athProf ? profBonus(char.level) : 0);
   const enemyStr = abilityMod(target.toHit);
   const enemyDex = abilityMod(target.dex ?? 10);
   const enemyRoll = d(20) + Math.max(enemyStr, enemyDex);
@@ -51,7 +54,7 @@ export const handleGrapple: ActionHandler<{
           ? {
               ...e,
               conditions: [...e.conditions.filter((c) => c !== 'grappled'), 'grappled'],
-              grappled_by: ctx.char.id,
+              grappled_by: char.id,
             }
           : e
       ),
@@ -77,16 +80,15 @@ export const handleGrapple: ActionHandler<{
  * just drop the condition (shouldn't happen, but be defensive).
  */
 export const handleTryEscapeGrapple: ActionHandler<{ type: 'try_escape_grapple' }> = (ctx) => {
-  const myEntity = ctx.st.entities?.find((e) => e.id === ctx.char.id);
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can escape a grapple.' };
+  const { char } = ctx.actor;
+  const myEntity = ctx.st.entities?.find((e) => e.id === char.id);
   const grapplerId = myEntity?.grappled_by;
-  if (!ctx.char.conditions.includes('grappled') && !myEntity?.conditions.includes('grappled')) {
+  if (!char.conditions.includes('grappled') && !myEntity?.conditions.includes('grappled')) {
     return { rejected: 'You are not grappled.' };
   }
   if (!grapplerId) {
-    ctx.char = {
-      ...ctx.char,
-      conditions: ctx.char.conditions.filter((c) => c !== 'grappled'),
-    };
+    updatePcActor(ctx, { conditions: char.conditions.filter((c) => c !== 'grappled') });
     ctx.narrative = 'You break free of the grapple.';
     ctx.usedInitiative = true;
     return;
@@ -96,20 +98,20 @@ export const handleTryEscapeGrapple: ActionHandler<{ type: 'try_escape_grapple' 
   const grapplerStrMod = grapplerEnemy ? abilityMod(grapplerEnemy.toHit) : 0;
   const grapplerRoll = d(20) + grapplerStrMod;
 
-  const athProf = (ctx.context.classSkills[ctx.char.character_class] ?? []).includes('athletics');
-  const acrProf = (ctx.context.classSkills[ctx.char.character_class] ?? []).includes('acrobatics');
-  const athRoll = d(20) + abilityMod(ctx.char.str) + (athProf ? profBonus(ctx.char.level) : 0);
-  const acrRoll = d(20) + abilityMod(ctx.char.dex) + (acrProf ? profBonus(ctx.char.level) : 0);
+  const athProf = (ctx.context.classSkills[char.character_class] ?? []).includes('athletics');
+  const acrProf = (ctx.context.classSkills[char.character_class] ?? []).includes('acrobatics');
+  const athRoll = d(20) + abilityMod(char.str) + (athProf ? profBonus(char.level) : 0);
+  const acrRoll = d(20) + abilityMod(char.dex) + (acrProf ? profBonus(char.level) : 0);
   const myRoll = Math.max(athRoll, acrRoll);
   const skillUsed = athRoll >= acrRoll ? 'Athletics' : 'Acrobatics';
 
   ctx.usedInitiative = true;
   if (myRoll > grapplerRoll) {
-    ctx.char = { ...ctx.char, conditions: ctx.char.conditions.filter((c) => c !== 'grappled') };
+    updatePcActor(ctx, { conditions: char.conditions.filter((c) => c !== 'grappled') });
     ctx.st = {
       ...ctx.st,
       entities: (ctx.st.entities ?? []).map((e) =>
-        e.id === ctx.char.id
+        e.id === char.id
           ? {
               ...e,
               conditions: e.conditions.filter((c) => c !== 'grappled'),
@@ -135,13 +137,15 @@ export const handleShove: ActionHandler<{
   type: 'shove';
   targetEnemyId?: string;
 }> = (ctx, action) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can shove.' };
+  const { char } = ctx.actor;
   if (!ctx.enemyAlive || !ctx.enemy) {
     return { rejected: 'No enemy to shove.' };
   }
   const targetId = action.targetEnemyId ?? ctx.enemy.id;
   const target = ctx.livingEnemiesInRoom.find((e) => e.id === targetId) ?? ctx.enemy;
   if (ctx.st.entities) {
-    const myEnt = ctx.st.entities.find((e) => e.id === ctx.char.id);
+    const myEnt = ctx.st.entities.find((e) => e.id === char.id);
     const tgtEnt = ctx.st.entities.find((e) => e.id === target.id && e.isEnemy);
     if (myEnt && tgtEnt && distanceFeet(myEnt.pos, tgtEnt.pos) > 5) {
       return { rejected: `Out of reach — Shove needs the target within 5 ft. Move closer first.` };
@@ -153,8 +157,8 @@ export const handleShove: ActionHandler<{
     ctx.usedInitiative = true;
     return;
   }
-  const athProf = (ctx.context.classSkills[ctx.char.character_class] ?? []).includes('athletics');
-  const playerRoll = d(20) + abilityMod(ctx.char.str) + (athProf ? profBonus(ctx.char.level) : 0);
+  const athProf = (ctx.context.classSkills[char.character_class] ?? []).includes('athletics');
+  const playerRoll = d(20) + abilityMod(char.str) + (athProf ? profBonus(char.level) : 0);
   const enemyStr = abilityMod(target.toHit);
   const enemyDex = abilityMod(target.dex ?? 10);
   const enemyRoll = d(20) + Math.max(enemyStr, enemyDex);
