@@ -423,7 +423,13 @@ export function breakConcentration(
   // but pansori MVP treats incapacitated PCs as not acting, which
   // closely matches "lose your turn".
   const wasHaste = char.concentrating_on.spellId === 'haste';
-  let newChar: Character = { ...char, concentrating_on: null };
+  // SRD Ranger Hunter's Mark — dropping concentration clears the marked target.
+  const wasHuntersMark = char.concentrating_on.spellId === 'hunters_mark';
+  let newChar: Character = {
+    ...char,
+    concentrating_on: null,
+    ...(wasHuntersMark ? { hunters_mark_target_id: undefined } : {}),
+  };
   // Strip the linked enemy condition (Hold Person etc.)
   let newSt: GameState =
     condition && st.entities

@@ -398,6 +398,16 @@ export function resolveOneAttack(
       ? rageDamageBonus(pc.char.level)
       : 0;
 
+  // SRD Ranger Hunter's Mark — +1d6 Force on a hit against the marked target;
+  // the die becomes d10 at Ranger L20 (Foe Slayer). Doubled on a crit.
+  const huntersMarkDie = getClassLevel(pc.char, 'ranger') >= 20 ? '1d10' : '1d6';
+  const huntersMarkDmg =
+    atk.hit && pc.char.hunters_mark_target_id === targetId
+      ? isCrit
+        ? rollCritical(huntersMarkDie)
+        : rollDice(huntersMarkDie)
+      : 0;
+
   // ── Divine Smite (2024 PHB) ─────────────────────────────────────
   // Pre-buff from the bonus-action `divine_smite_spell` cast.
   // Consumes `divine_smite_dice` on the next weapon hit and rolls
@@ -435,7 +445,7 @@ export function resolveOneAttack(
   // weapon's own dice, not this feature rider.
   const brutalStrikeDmg =
     brutalStrikeApplies && atk.hit ? (isCrit ? rollCritical('1d10') : rollDice('1d10')) : 0;
-  const rawDmg = baseHit + sneakDmg + rageBonus + brutalStrikeDmg;
+  const rawDmg = baseHit + sneakDmg + rageBonus + brutalStrikeDmg + huntersMarkDmg;
   // SRD Monk Empowered Strikes (L6) — unarmed strikes can deal Force damage.
   // pansori auto-picks Force (it bypasses most resistances); only when unarmed
   // (no weaponItem). Otherwise the weapon's own type stands.
@@ -473,6 +483,9 @@ export function resolveOneAttack(
     const saExpr = sneakAttackDice(getClassLevel(pc.char, 'rogue'));
     const saLabel = isCrit ? `${parseInt(saExpr) * 2}d6 (crit)` : saExpr;
     hitBonuses.push({ label: `Sneak Attack ${saLabel}: +${sneakDmg}` });
+  }
+  if (huntersMarkDmg > 0) {
+    hitBonuses.push({ label: `Hunter's Mark ${huntersMarkDie}: +${huntersMarkDmg} force` });
   }
   if (rageBonus > 0) {
     hitBonuses.push({ label: `Rage: +${rageBonus}` });

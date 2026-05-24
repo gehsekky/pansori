@@ -16,7 +16,16 @@ import { concentrationRoundsFor } from './utils.js';
 export function runUtilitySpell(ctx: ActionContext, spell: Spell, slotNote: string): boolean {
   if (ctx.actor.kind !== 'pc') return false;
   const { char } = ctx.actor;
-  if (spell.damage || spell.savingThrow || spell.attackRoll || spell.condition) {
+  // Hunter's Mark has no damage/save/attack/condition but is NOT a utility
+  // spell — it marks a target enemy and is resolved in the offensive pipeline
+  // (castSpell/index.ts interception), so let it fall through.
+  if (
+    spell.damage ||
+    spell.savingThrow ||
+    spell.attackRoll ||
+    spell.condition ||
+    spell.id === 'hunters_mark'
+  ) {
     return false;
   }
 
