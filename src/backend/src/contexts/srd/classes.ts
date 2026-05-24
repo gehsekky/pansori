@@ -132,7 +132,7 @@ export const SRD_WEAPON_MASTERY_SLOTS: Record<string, number> = {
 export const SRD_CLASS_FEATURES: Record<string, string[]> = {
   Fighter: ['extra_attack', 'second_wind'],
   Rogue: ['sneak_attack', 'cunning_action'],
-  Wizard: ['spellcasting'],
+  Wizard: ['spellcasting', 'arcane_recovery'],
   Cleric: ['spellcasting', 'channel_divinity'],
   Ranger: ['extra_attack', 'favored_enemy'],
   Paladin: ['divine_smite', 'lay_on_hands'],
