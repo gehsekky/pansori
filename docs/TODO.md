@@ -483,11 +483,44 @@ Bonus(char, st)`: a creature within 10 ft of a conscious L6+ Paladin (the
       enemy-attack integration (slashing halved, Force not, no-condition
       control). With this the Monk is SRD-feature-complete bar Slow Fall
       (narrative — no falling-damage model) and higher Open Hand grades.
+- [x] **Arcane Recovery (done 2026-05-24)** — Wizard L1: on finishing a short
+      rest, recover expended spell slots totaling ≤ ⌈Wizard level / 2⌉ combined
+      levels, none level 6+; once per long rest. Implemented as a wizard branch
+      in `handleShortRest` mirroring the Land Druid Natural Recovery greedy loop
+      (lowest-level slots first, maximizing count) with a `l <= 5` carve-out and
+      gated on `hasClass(next, 'wizard') && !arcane_recovery_used`; the flag rides
+      on `class_resource_uses.arcane_recovery_used` and is cleared on a long rest
+      (`handleLongRest`). Added `'arcane_recovery'` to `SRD_CLASS_FEATURES.Wizard`
+      for parity. Spec: budget math + lowest-first, the L6+ exclusion, once-per-
+      long-rest (2nd short rest no-ops), long-rest reset, non-wizard control.
+      **Auto-resolve policy** (consistent with the codebase): RAW lets the player
+      choose which slots — the engine auto-picks lowest-first. Deferred: the
+      interactive slot-choice surface.
+- [x] **Bard SRD-complete — Words of Creation + Magical Secrets (done 2026-05-24).**
+      **Words of Creation** (L20 capstone): the bard always has Power Word Heal +
+      Power Word Kill prepared and may target a second creature within 10 ft when
+      casting either. Authored both L9 spells (`power_word_heal`: full heal via a
+      new `healFull` flag + the SRD condition cleanse through the existing
+      `removeConditions`, V-only; `power_word_kill`: ≤100 HP → dies outright via
+      `runPowerWordKill`, else 12d12 psychic — the death branch sets
+      `bypassResistance` on `applySingleTargetDamage` since "dies" isn't damage).
+      Capstone grant adds both ids to `spells_known` at Bard L20 in
+      `applyLevelUpForClass` (beside Primal Champion / Body and Mind). The
+      second-target rider is gated on `hasWordsOfCreation` (Bard L20): in heal.ts
+      for Power Word Heal (most-injured other ally within 10 ft; off-grid =
+      party-together) and powerWords.ts for Power Word Kill (nearest other living
+      enemy within 10 ft). Spec: PWK death vs 12d12, WoC dual-target both spells
+      (L20 hits two / out-of-range survives, L19 hits one), PW Heal full+cleanse,
+      capstone grant. **Magical Secrets** (L10) needs **no engine work** — pansori
+      has no spell-list gating (a character casts from `spells_known`, which
+      campaign content authors freely, so a Bard can already know Cleric/Druid/
+      Wizard spells); spell selection isn't a gated build step, so there is no
+      restriction for the feature to lift. Documented as already-permitted.
 
 | Class     | Implemented (approx)                                                                                                                                                                                                                       | Major SRD gaps to fill                                                                                                   |
 | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
 | Barbarian | Rage, Reckless (L1–2), Frenzy (L3), Danger Sense (L2), Extra Attack (L5), Fast Movement (L5), Feral Instinct (L7), Relentless Rage (L11), Persistent Rage (L15), Indomitable Might (L18), Brutal Strike (L9), Primal Champion (L20)        | **SRD-complete** (exhaustion-on-rage-end is 2014-only, out of scope)                                                     |
-| Bard      | Bardic Inspiration (L1), Cutting Words (L3), Jack of All Trades (L2), Expertise (L2/9), Font of Inspiration (L5), Countercharm (L7), Superior Inspiration (L18)                                                                            | Magical Secrets, capstone                                                                                                |
+| Bard      | Bardic Inspiration (L1), Cutting Words (L3), Jack of All Trades (L2), Expertise (L2/9), Font of Inspiration (L5), Countercharm (L7), Superior Inspiration (L18), Words of Creation (L20)                                                    | **SRD-complete** (Magical Secrets is a no-op — pansori has no spell-list gating to lift)                                  |
 | Cleric    | Channel Divinity, Turn/Sear Undead, Preserve Life (Life)                                                                                                                                                                                   | Blessed Strikes, Divine Intervention, improved Channel uses, higher Life-domain grades                                   |
 | Druid     | Wild Shape (L2, CR L4/8), Land's Aid                                                                                                                                                                                                       | Wild Companion, full Circle of the Land grades, Wild Shape improvements, Beast Spells, Archdruid                         |
 | Fighter   | Second Wind, Action Surge (L2), Extra Attack (2/3/4), Indomitable (L9), Tactical Master (L9)                                                                                                                                               | Champion grades (Remarkable Athlete, Additional Style, Superior Critical, Survivor)                                      |
@@ -497,7 +530,7 @@ Bonus(char, st)`: a creature within 10 ft of a conscious L6+ Paladin (the
 | Rogue     | Expertise (L1/6), Cunning Action (L2), Cunning Strike (L5), Sneak Attack, Uncanny Dodge, Steady Aim (L3), Evasion (L7), Reliable Talent (L7), Slippery Mind (L15), Elusive (L18), Stroke of Luck (L20)                                     | Assassin grades                                                                                                          |
 | Sorcerer  | Metamagic (L3–5), sorcery points                                                                                                                                                                                                           | Innate Sorcery, Sorcerous Restoration, SP↔slot conversion completeness, full Draconic grades, capstone                   |
 | Warlock   | Agonizing Blast (passive)                                                                                                                                                                                                                  | Eldritch Blast beam scaling, Pact Boon, more invocations, Mystic Arcanum, Magical Cunning, Fiend grades, Eldritch Master |
-| Wizard    | cantrips only (Arcane Ward partial)                                                                                                                                                                                                        | Arcane Recovery, Scholar, Memorize Spell, Spell Mastery, Signature Spells, full Evoker grades                            |
+| Wizard    | cantrips only (Arcane Ward partial), Arcane Recovery (L1)                                                                                                                                                                                   | Scholar, Memorize Spell, Spell Mastery, Signature Spells, full Evoker grades                                            |
 
 #### RE-3: Character-build systems (small, high RAW payoff)
 

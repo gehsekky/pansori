@@ -27,15 +27,18 @@ export function applySingleTargetDamage(
   spellTarget: Enemy,
   spellTargetId: string,
   spell: Spell,
-  spellDmgIn: number
+  spellDmgIn: number,
+  opts?: { bypassResistance?: boolean }
 ): void {
   if (ctx.actor.kind !== 'pc') return;
   const { char } = ctx.actor;
-  const { damage: effSpellDmg, note: spellDmgNote } = applyDamageMultiplier(
-    spellDmgIn,
-    spell.damageType,
-    spellTarget
-  );
+  // `bypassResistance` — used by Power Word Kill's instant-death branch:
+  // the target simply dies, which is not damage, so resistance /
+  // vulnerability must not scale it. The 12d12-psychic fallback for
+  // high-HP targets does run through the multiplier (it IS damage).
+  const { damage: effSpellDmg, note: spellDmgNote } = opts?.bypassResistance
+    ? { damage: spellDmgIn, note: '' }
+    : applyDamageMultiplier(spellDmgIn, spell.damageType, spellTarget);
   if (spellDmgNote) ctx.narrative += spellDmgNote;
   const spellDmg = effSpellDmg;
   const enemyEntSpell = ctx.st.entities?.find((e) => e.id === spellTargetId && e.isEnemy);

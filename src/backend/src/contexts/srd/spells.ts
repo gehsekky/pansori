@@ -752,6 +752,66 @@ export const SRD_SPELLS: Record<string, Spell> = {
     },
     spellList: ['divine'],
   },
+  // SRD: Power Word Heal — L9 Enchantment (Bard, Cleric). Verbal only
+  // (no somatic). Restores all of one creature's HP and ends Charmed /
+  // Frightened / Paralyzed / Poisoned / Stunned; a Prone target stands
+  // (pansori auto-resolves the RAW optional reaction by clearing prone).
+  // `heal: '0'` is a placeholder — `healFull` fills the target to max.
+  // A Bard's L20 Words of Creation adds a second target within 10 ft
+  // (handled in the heal branch).
+  power_word_heal: {
+    id: 'power_word_heal',
+    name: 'Power Word Heal',
+    level: 9,
+    castTime: 'action',
+    targetType: 'ally',
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    heal: '0',
+    healFull: true,
+    removeConditions: ['charmed', 'frightened', 'paralyzed', 'poisoned', 'stunned', 'prone'],
+    verbal: true,
+    somatic: false,
+    desc:
+      'A wave of healing energy restores all of one creature’s Hit Points within 60 ft and ends ' +
+      'the Charmed, Frightened, Paralyzed, Poisoned, and Stunned conditions; a prone target stands.',
+    narratives: {
+      cast: [
+        '{name} speaks a word of life over {target} — wounds knit shut and shackles of the mind fall away',
+        "{name}'s word of creation washes over {target}, restoring them whole",
+      ],
+    },
+    spellList: ['arcane', 'divine'],
+  },
+  // SRD: Power Word Kill — L9 Enchantment (Bard, Sorcerer, Warlock,
+  // Wizard). Verbal only. If the target has 100 HP or fewer it dies
+  // outright (no save, no damage); otherwise it takes 12d12 Psychic
+  // damage. The instant-death branch ignores damage resistance (it is
+  // not damage). A Bard's L20 Words of Creation adds a second target
+  // within 10 ft. Resolved by `runPowerWordKill` (intercepted in the
+  // castSpell orchestrator), not the generic auto-hit branch.
+  power_word_kill: {
+    id: 'power_word_kill',
+    name: 'Power Word Kill',
+    level: 9,
+    castTime: 'action',
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    damage: '12d12',
+    damageType: 'psychic',
+    verbal: true,
+    somatic: false,
+    desc:
+      'You compel one creature you can see within 60 ft to die. If it has 100 HP or fewer it dies; ' +
+      'otherwise it takes 12d12 psychic damage.',
+    narratives: {
+      cast: [
+        '{name} utters a word of death at {target}',
+        "{name}'s word of creation tolls like a bell — {target}'s life answers",
+      ],
+    },
+    spellList: ['arcane'],
+  },
   // SRD: Beacon of Hope — Cleric L3 Abjuration, concentration.
   // Targets in 30 ft gain advantage on WIS saves + death saves +
   // max heal on any healing. Pansori wires the `hopeful` condition
