@@ -3516,6 +3516,30 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         action: { type: 'use_class_feature', featureId: 'metamagic_empowered' },
         kind: 'class_feature',
       });
+    if (spLeft >= 1)
+      choices.push({
+        label: `Metamagic: Distant Spell — double the next spell's range (1 SP, ${spLeft} left)`,
+        action: { type: 'use_class_feature', featureId: 'metamagic_distant' },
+        kind: 'class_feature',
+      });
+    if (spLeft >= 1)
+      choices.push({
+        label: `Metamagic: Subtle Spell — no verbal/somatic components (1 SP, ${spLeft} left)`,
+        action: { type: 'use_class_feature', featureId: 'metamagic_subtle' },
+        kind: 'class_feature',
+      });
+    if (spLeft >= 1)
+      choices.push({
+        label: `Metamagic: Extended Spell — double concentration duration (1 SP, ${spLeft} left)`,
+        action: { type: 'use_class_feature', featureId: 'metamagic_extended' },
+        kind: 'class_feature',
+      });
+    if (spLeft >= 2)
+      choices.push({
+        label: `Metamagic: Heightened Spell — one target has Disadvantage on its save (2 SP, ${spLeft} left)`,
+        action: { type: 'use_class_feature', featureId: 'metamagic_heightened' },
+        kind: 'class_feature',
+      });
   }
 
   // ── Warlock: Invocations ─────────────────────────────────────────────────────

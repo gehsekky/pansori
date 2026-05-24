@@ -67,6 +67,16 @@ export interface ActionContext {
   fragments: NarrativeFragment[];
 
   /**
+   * Sorcerer Metamagic active for THIS cast — captured by `runPrecast`
+   * from `st.metamagic_active` (set by the prior metamagic activation),
+   * which it then clears so the modifier applies to exactly one spell.
+   * Cast-pipeline branches read it (Distant range, Subtle components,
+   * Heightened save, Extended duration, Empowered/Twinned/Transmuted/
+   * Seeking/Careful). Undefined when no metamagic is active.
+   */
+  metamagic?: string;
+
+  /**
    * EE-2 side-channel — the `enemy_attack` handler reports its
    * `resolveEnemySubAttack` outcome (paused / killed-massive / done +
    * the updated target) here, since `DispatchResult` can't carry it.

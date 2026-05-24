@@ -62,6 +62,35 @@ export function handleCasterFeature(ctx: ActionContext, fid: string): boolean {
     return true;
   }
 
+  // Simple Metamagic options: spend Sorcery Points and stage the modifier on
+  // `metamagic_active` (consumed by the next cast in runPrecast). Quickened
+  // (action economy), Twinned, and Empowered have their own blocks below.
+  const SIMPLE_METAMAGIC: Record<string, { cost: number; label: string }> = {
+    metamagic_distant: { cost: 1, label: 'Distant Spell — double range' },
+    metamagic_subtle: { cost: 1, label: 'Subtle Spell — no verbal/somatic components' },
+    metamagic_extended: { cost: 1, label: 'Extended Spell — double concentration duration' },
+    metamagic_heightened: {
+      cost: 2,
+      label: 'Heightened Spell — one target has Disadvantage on its save',
+    },
+  };
+  if (SIMPLE_METAMAGIC[fid]) {
+    if (!hasClass(char, 'sorcerer')) {
+      ctx.narrative = 'Only Sorcerers have Metamagic.';
+      return true;
+    }
+    const { cost, label } = SIMPLE_METAMAGIC[fid];
+    const sp = char.class_resource_uses?.sorcery_points ?? getClassLevel(char, 'sorcerer');
+    if (sp < cost) {
+      ctx.narrative = `Not enough sorcery points (need ${cost}).`;
+      return true;
+    }
+    char.class_resource_uses = { ...(char.class_resource_uses ?? {}), sorcery_points: sp - cost };
+    ctx.st = { ...ctx.st, metamagic_active: fid.replace('metamagic_', '') };
+    ctx.narrative = `${char.name} — Metamagic: ${label}. (${sp - cost} sorcery points remaining)`;
+    return true;
+  }
+
   if (fid === 'metamagic_twinned') {
     if (!hasClass(char, 'sorcerer')) {
       ctx.narrative = 'Only Sorcerers have Metamagic.';

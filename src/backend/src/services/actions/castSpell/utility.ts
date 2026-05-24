@@ -44,7 +44,7 @@ export function runUtilitySpell(ctx: ActionContext, spell: Spell, slotNote: stri
     // `char` reference is what gets written back to state.
     char.concentrating_on = {
       spellId: 'bless',
-      rounds_left: concentrationRoundsFor(spell),
+      rounds_left: concentrationRoundsFor(spell) * (ctx.metamagic === 'extended' ? 2 : 1),
     };
     // Pick the targets: caster (always) + up to 2 living allies.
     const blessTargets: string[] = [char.id];
@@ -100,7 +100,7 @@ export function runUtilitySpell(ctx: ActionContext, spell: Spell, slotNote: stri
   if (spell.id === 'beacon_of_hope') {
     char.concentrating_on = {
       spellId: 'beacon_of_hope',
-      rounds_left: concentrationRoundsFor(spell),
+      rounds_left: concentrationRoundsFor(spell) * (ctx.metamagic === 'extended' ? 2 : 1),
     };
     const hopefulTargets: string[] = [char.id];
     for (const c of ctx.st.characters) {
