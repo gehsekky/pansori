@@ -1,4 +1,5 @@
 import type { ActionHandler } from './types.js';
+import { updatePcActor } from './actor.js';
 
 /**
  * `pass`: skip the rest of the turn. RAW (PHB p.189) — a character can
@@ -8,15 +9,16 @@ import type { ActionHandler } from './types.js';
  * action used so the next turn doesn't get an extra bite at the apple.
  */
 export const handlePass: ActionHandler<{ type: 'pass' }> = (ctx) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can pass a turn.' };
+  const { char } = ctx.actor;
   const cond =
-    ctx.char.conditions.find((c) => c === 'stunned' || c === 'paralyzed') ?? ctx.char.conditions[0];
+    char.conditions.find((c) => c === 'stunned' || c === 'paralyzed') ?? char.conditions[0];
   ctx.narrative = cond
-    ? `${ctx.char.name} is ${cond} and cannot act. Turn passed.`
-    : `${ctx.char.name} passes their turn.`;
-  ctx.char = {
-    ...ctx.char,
-    turn_actions: { ...ctx.char.turn_actions, action_used: true, bonus_action_used: true },
-  };
+    ? `${char.name} is ${cond} and cannot act. Turn passed.`
+    : `${char.name} passes their turn.`;
+  updatePcActor(ctx, {
+    turn_actions: { ...char.turn_actions, action_used: true, bonus_action_used: true },
+  });
   ctx.usedInitiative = true;
 };
 
@@ -27,6 +29,8 @@ export const handlePass: ActionHandler<{ type: 'pass' }> = (ctx) => {
  * action but with leftover movement.
  */
 export const handleEndTurn: ActionHandler<{ type: 'end_turn' }> = (ctx) => {
-  ctx.narrative = `${ctx.char.name} ends their turn.`;
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can end a turn.' };
+  const { char } = ctx.actor;
+  ctx.narrative = `${char.name} ends their turn.`;
   ctx.usedInitiative = true;
 };
