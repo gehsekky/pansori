@@ -21,6 +21,7 @@ import {
   pick,
   splitEncounterXp,
 } from '../../gameEngine.js';
+import { consumeStrokeOfLuck, strokeOfLuckAvailable } from '../../strokeOfLuck.js';
 import { extraAttackCountForChar, getClassLevel, hasClass } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import type { ToHitContext } from './toHit.js';
@@ -177,6 +178,20 @@ export function resolveOneAttack(
     }
     baneNote = ` ☠ Bane: -${baneRoll} (1d4)`;
   }
+  // SRD Rogue Stroke of Luck (L20) — if the attack (still) missed, turn the die
+  // into a natural 20: an auto-hit and a critical. A nat 20 always hits, so it
+  // always rescues a miss (including a fumble). Once per short/long rest.
+  let strokeNote = '';
+  if (!atk.hit && strokeOfLuckAvailable(pc.char)) {
+    atk.total = 20 + (atk.total - atk.roll);
+    atk.roll = 20;
+    atk.fumble = false;
+    atk.hit = true;
+    atk.critical = true;
+    if (weaponDamage) atk.damage = Math.max(1, rollWeaponCrit(weaponDamage) + atk.atkMod);
+    updatePcActor(ctx, consumeStrokeOfLuck(pc.char));
+    strokeNote = ' ✦ Stroke of Luck — a natural 20!';
+  }
   // Unconscious or Assassin-surprised: force crit on hit
   const autoCritCheck =
     (enemyUnconscious &&
@@ -229,7 +244,7 @@ export function resolveOneAttack(
   const atkNote =
     ' ' +
     fmt.note(
-      `(${label}d20 ${atk.roll}+${atk.atkMod} ${atk.atkStat}+${atk.prof} prof${bonusNote} = ${atk.total} vs AC ${effectiveEnemyAc}${coverNote}${disadvNote}${versatileNote})${noProfNote}${biNote}${blessNote}${baneNote}`
+      `(${label}d20 ${atk.roll}+${atk.atkMod} ${atk.atkStat}+${atk.prof} prof${bonusNote} = ${atk.total} vs AC ${effectiveEnemyAc}${coverNote}${disadvNote}${versatileNote})${noProfNote}${biNote}${blessNote}${baneNote}${strokeNote}`
     );
 
   if (atk.fumble) {

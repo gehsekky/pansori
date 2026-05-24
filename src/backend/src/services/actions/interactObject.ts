@@ -4,6 +4,7 @@ import {
   consumeInspirationForCheck,
   consumeLuckForCheck,
 } from '../gameEngine.js';
+import { consumeStrokeOfLuck, strokeOfLuckAvailable } from '../strokeOfLuck.js';
 import type { ActionHandler } from './types.js';
 import { hasReliableTalent } from '../multiclass.js';
 import { randomUUID } from 'crypto';
@@ -77,8 +78,10 @@ export const handleInteractObject: ActionHandler<{
     false,
     inspAdv || luckAdv,
     nextChar.species === 'halfling',
-    hasReliableTalent(nextChar)
+    hasReliableTalent(nextChar),
+    strokeOfLuckAvailable(nextChar)
   );
+  if (check.strokeOfLuckUsed) nextChar = consumeStrokeOfLuck(nextChar);
 
   let narrative: string;
   if (check.success) {

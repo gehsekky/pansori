@@ -6,6 +6,7 @@ import {
   inflictCondition,
   isHeavilyEncumbered,
 } from '../../gameEngine.js';
+import { consumeStrokeOfLuck, strokeOfLuckAvailable } from '../../strokeOfLuck.js';
 import { effectiveLightFor, passivePerceptionDcInLight, skillCheck } from '../../rulesEngine.js';
 import { getClassLevel, hasClass, hasReliableTalent } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
@@ -145,8 +146,10 @@ export function handleRogueFeature(ctx: ActionContext, fid: string): boolean {
       false,
       inspAdvHide || luckAdvHide,
       pc.char.species === 'halfling',
-      hasReliableTalent(pc.char)
+      hasReliableTalent(pc.char),
+      strokeOfLuckAvailable(pc.char)
     );
+    if (hideCheck.strokeOfLuckUsed) updatePcActor(ctx, consumeStrokeOfLuck(pc.char));
     pc.char.turn_actions = { ...pc.char.turn_actions, bonus_action_used: true };
     if (hideCheck.success) {
       updatePcActor(ctx, inflictCondition(pc.char, 'invisible'));

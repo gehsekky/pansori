@@ -74,6 +74,7 @@ import {
 } from './multiclass.js';
 import { composeFragments, enemyAttackFragmentEvent } from './narrative/compose.js';
 import { consumeIndomitable, indomitableBonus, tryIndomitableReroll } from './indomitable.js';
+import { consumeStrokeOfLuck, strokeOfLuckAvailable } from './strokeOfLuck.js';
 import { enemyActor, pcActor } from './actions/actor.js';
 import { fmt, stripForLlm } from './narrativeFmt.js';
 import { COMBAT_LOG_MAX } from '../types.js';
@@ -607,6 +608,16 @@ export function checkConcentration(
       st,
       note: ` [Concentration hold: ✦ Indomitable reroll vs DC ${dc}]`,
     };
+  // SRD Rogue Stroke of Luck — turn the failed CON save into a 20 if it holds.
+  if (strokeOfLuckAvailable(char)) {
+    const mods = abilityMod(char.con) - reviveD20Penalty(char) + auraOfProtectionBonus(char, st);
+    if (20 + mods >= dc)
+      return {
+        char: consumeStrokeOfLuck(char),
+        st,
+        note: ` [Concentration hold: ✦ Stroke of Luck vs DC ${dc}]`,
+      };
+  }
   const spellName = char.concentrating_on.spellId;
   const { char: nc, st: ns } = breakConcentration(char, st, context);
   return {
@@ -733,6 +744,7 @@ function conditionSavingThrow(
   applied: boolean;
   inspirationConsumed: boolean;
   indomitableConsumed: boolean;
+  strokeOfLuckConsumed: boolean;
   luckConsumed: boolean;
   bardicInspirationConsumed: boolean;
   bardicRoll: number;
@@ -806,10 +818,33 @@ function conditionSavingThrow(
       indomitableConsumed = true;
     }
   }
+  // SRD Rogue Stroke of Luck — if the save still failed, turn the die into a
+  // 20 (tested via rollConditionSave's forceD20) when that 20 would pass.
+  let strokeOfLuckConsumed = false;
+  if (applied && strokeOfLuckAvailable(char)) {
+    const passesWith20 = !rollConditionSave(
+      effect.ability,
+      char[effect.ability] ?? 10,
+      dcAdjusted,
+      proficient,
+      char.level,
+      0,
+      char.conditions ?? [],
+      speciesAdv,
+      enc,
+      reviveD20Penalty(char),
+      20
+    );
+    if (passesWith20) {
+      applied = false;
+      strokeOfLuckConsumed = true;
+    }
+  }
   return {
     applied,
     inspirationConsumed: inspirationActive,
     indomitableConsumed,
+    strokeOfLuckConsumed,
     luckConsumed: luckActive,
     bardicInspirationConsumed: !!biDie,
     bardicRoll,
@@ -974,6 +1009,10 @@ function computeEnemyAttack(
       if (csResult.indomitableConsumed) {
         updatedChar = consumeIndomitable(updatedChar);
         narrative += ` ✦ Indomitable — rerolled the save!`;
+      }
+      if (csResult.strokeOfLuckConsumed) {
+        updatedChar = consumeStrokeOfLuck(updatedChar);
+        narrative += ` ✦ Stroke of Luck — the save becomes a 20!`;
       }
       if (csResult.luckConsumed) {
         luckConsumed = true;
@@ -4756,8 +4795,9 @@ export function resolveEnemySpell(args: {
     const dc = enemy.spellSaveDC ?? 8 + Math.floor((enemy.toHit + 5) / 2);
     const save = rollDice('1d20') + abilityMod(saveScore) + auraOfProtectionBonus(target, args.st);
     let saved = save >= dc;
-    // SRD Fighter Indomitable — reroll the failed save with +Fighter level.
     let workingTarget = target;
+    let rescueNote = '';
+    // SRD Fighter Indomitable — reroll the failed save with +Fighter level.
     if (!saved) {
       const indo = tryIndomitableReroll(target, () => {
         const reroll =
@@ -4770,9 +4810,18 @@ export function resolveEnemySpell(args: {
       if (indo.used && indo.saved) {
         saved = true;
         workingTarget = consumeIndomitable(target);
+        rescueNote = ' ✦ Indomitable';
       }
     }
-    const indoNote = workingTarget !== target ? ' ✦ Indomitable' : '';
+    // SRD Rogue Stroke of Luck — turn the failed save into a 20 when it rescues.
+    if (!saved && strokeOfLuckAvailable(target)) {
+      const mods = abilityMod(saveScore) + auraOfProtectionBonus(target, args.st);
+      if (20 + mods >= dc) {
+        saved = true;
+        workingTarget = consumeStrokeOfLuck(target);
+        rescueNote = ' ✦ Stroke of Luck';
+      }
+    }
     // SRD Evasion (Rogue/Monk L7): on a DEX save-for-half, take no damage
     // on a success and half on a failure (vs the normal half / full).
     const evasion =
@@ -4790,7 +4839,7 @@ export function resolveEnemySpell(args: {
     }
     const evasionNote = evasion ? ' ✦ Evasion' : '';
     newTarget = { ...workingTarget, hp: Math.max(0, workingTarget.hp - dmg) };
-    narrative += ` ${enemy.name} casts ${spell.name}! ${target.name} ${fmt.save(spell.savingThrow.toUpperCase(), save)} vs ${fmt.dc(dc)} — ${saved ? 'saves' : 'fails'}, ${fmt.dmg(dmg)} ${spell.damageType ?? 'damage'}.${indoNote}${evasionNote}`;
+    narrative += ` ${enemy.name} casts ${spell.name}! ${target.name} ${fmt.save(spell.savingThrow.toUpperCase(), save)} vs ${fmt.dc(dc)} — ${saved ? 'saves' : 'fails'}, ${fmt.dmg(dmg)} ${spell.damageType ?? 'damage'}.${rescueNote}${evasionNote}`;
   } else {
     newTarget = { ...target, hp: Math.max(0, target.hp - dmgRoll) };
     narrative += ` ${enemy.name} casts ${spell.name}! ${target.name} takes ${fmt.dmg(dmgRoll)} ${spell.damageType ?? 'damage'}.`;
