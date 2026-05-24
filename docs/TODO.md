@@ -49,19 +49,31 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 > `kind !== 'pc'` guard (the Phase-4 enemy-action slot). What's left is
 > the payoff, below.
 
-- [ ] **Phase 4** — wire enemy turns through `dispatchAction` with an
-  `enemyActor`; turn the extracted `runEnemyMultiattackLoop` /
-  `attemptEnemyApproach` / `attemptEnemySpellCast` / etc. into registered
-  handlers, and migrate the shared-ability handlers (`attack/`,
-  `castSpell/`, `classFeature/`, `reaction.ts`, `twoWeaponAttack`,
-  `hasteExtraAction`, `landsAid`) so one implementation runs for PCs and
-  monsters. This is the seam that unblocks **summoned creatures +
-  companions** (Find Familiar, Spiritual Weapon, conjure spells, full
-  Beastmaster companion) — all narrative-only today. Hot-path combat
-  code; **design pass:** [re1-phase4-design.md](re1-phase4-design.md) —
-  recommends the lower-risk path (drive summons/companions through the
-  generalized enemy-turn loop, deferring the full PC/enemy attack-handler
-  merge). Awaiting review.
+- [ ] **Phase 4 — summons & companions as combatants** (plan of record:
+  [re1-phase4-design.md](re1-phase4-design.md); pragmatic path approved
+  2026-05-23). Generalize the enemy-turn loop to drive any non-player
+  combatant via a `side: 'pc'|'enemy'|'ally'` tag + stat-block actors,
+  reusing `computeEnemyAttack` rather than merging it with the PC
+  `resolveOneAttack` (still fully SRD-compliant — monster stat blocks
+  pre-bake what PCs compute; see the design doc). Unblocks **summons +
+  companions** (Beastmaster companion, Spiritual Weapon, Find Familiar,
+  conjure) — narrative-only today. Decisions: RAW player-command control
+  model; Beastmaster companion is the first content slice. Slices
+  (P4.1 — `CombatEntity.side` + side-keyed `selectTarget` — shipped):
+  - [ ] **P4.2** — parameterize `attemptEnemyApproach` /
+    `runEnemyMultiattackLoop` / `computeEnemyAttack` on the acting stat
+    block vs target entity (enemy → generic combatant). Behavior-preserving.
+  - [ ] **P4.3** — drive `side: 'ally'` entities through the loop (target
+    nearest hostile; reuse approach + multiattack).
+  - [ ] **P4.4** — summon lifecycle: insert/remove ally entities;
+    concentration sweep in `breakConcentration`.
+  - [ ] **P4.5** — content: Beastmaster companion (RAW player-command) →
+    Spiritual Weapon → Find Familiar / conjure.
+
+  Deferred (not required for SRD compliance — see design doc): merging the
+  PC/enemy attack handlers, routing enemy turns through `dispatchAction`,
+  and NPC spellcasting via the shared `castSpell` pipeline (additive
+  follow-up).
 - [ ] **Phase 5** — drop `ctx.char` / `ctx.safeIdx` once every handler
   reads from `ctx.actor`.
 
