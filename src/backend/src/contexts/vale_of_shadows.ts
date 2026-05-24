@@ -12,6 +12,64 @@ import {
   SRD_SPELLS,
 } from './srd/index.js';
 import type { Context } from '../types.js';
+import type { EnemyTemplate } from '../types.js';
+
+// Shared Crypt Lord stat block. Used both as the roguelike-pool template and
+// (spread with an `id`) as the campaign throne boss, so a balance change can't
+// silently diverge between the two copies again. `multiattack: 2` is the
+// L4-party-tuned value — the third attack pushed the boss's DPR past the
+// party's effective HP/round, especially with the frighten-on-hit cascade.
+const CRYPT_LORD_BASE: EnemyTemplate = {
+  name: 'Crypt Lord',
+  cr: 5,
+  hp: 97,
+  ac: 17,
+  damage: '2d6+4',
+  toHit: 7,
+  xp: 1800,
+  str: 18,
+  dex: 10,
+  con: 18,
+  int: 11,
+  wis: 10,
+  cha: 16,
+  multiattack: 2,
+  resistances: ['bludgeoning', 'piercing', 'slashing'],
+  immunities: ['poison', 'necrotic'],
+  condition_immunities: ['charmed', 'exhaustion', 'frightened', 'paralyzed', 'poisoned'],
+  onHitEffect: { condition: 'frightened', ability: 'wis', dc: 13 },
+  damageType: 'necrotic',
+  // Two-phase fight. At 50% hp the lich shifts to a darker rage — higher
+  // to-hit, harder fear DC. At 25% hp it cracks open its phylactery for a
+  // one-shot heal + crit-grade damage.
+  phases: [
+    {
+      hpPct: 50,
+      name: 'Wrath of the Sealed Tomb',
+      narrative:
+        "Bone splinters erupt from the floor around the Crypt Lord — its eye-sockets blaze. 'You will not silence me again!'",
+      effects: [
+        { kind: 'set_to_hit', value: 9 },
+        { kind: 'set_damage', dice: '2d8+4' },
+        {
+          kind: 'set_on_hit_effect',
+          effect: { condition: 'frightened', ability: 'wis', dc: 15 },
+        },
+      ],
+    },
+    {
+      hpPct: 25,
+      name: 'Phylactery Crack',
+      narrative:
+        'A black gem in its breastplate fractures. Necrotic light pours into the Crypt Lord — its wounds knit closed and it lunges with renewed fury.',
+      effects: [
+        { kind: 'heal', amount: 25 },
+        { kind: 'set_damage', dice: '3d6+4' },
+        { kind: 'set_ac', value: 18 },
+      ],
+    },
+  ],
+};
 
 // ─── Vale of Shadows — First Adventure Module ─────────────────────────────────
 //
@@ -140,61 +198,7 @@ export const context: Context = {
     SRD_MONSTERS.shadow,
     // SRD bandit renamed for the local Lantern District flavor.
     { ...SRD_MONSTERS.bandit, name: 'Bandit Ruffian' },
-    {
-      name: 'Crypt Lord',
-      cr: 5,
-      hp: 97,
-      ac: 17,
-      damage: '2d6+4',
-      toHit: 7,
-      xp: 1800,
-      str: 18,
-      dex: 10,
-      con: 18,
-      int: 11,
-      wis: 10,
-      cha: 16,
-      // Multiattack 2 (was 3). At L4-party tier the third attack pushed the
-      // boss's DPR past the party's effective HP per round, especially
-      // combined with the frighten-on-hit cascade. Two attacks still hurts
-      // (2× 2d6+4) and lets the boss apply frighten reliably.
-      multiattack: 2,
-      resistances: ['bludgeoning', 'piercing', 'slashing'],
-      immunities: ['poison', 'necrotic'],
-      condition_immunities: ['charmed', 'exhaustion', 'frightened', 'paralyzed', 'poisoned'],
-      onHitEffect: { condition: 'frightened', ability: 'wis', dc: 13 },
-      damageType: 'necrotic',
-      // Two-phase fight. At 50% hp the lich shifts to a darker rage —
-      // higher to-hit, harder fear DC. At 25% hp it cracks open its
-      // phylactery for a one-shot heal + crit-grade damage.
-      phases: [
-        {
-          hpPct: 50,
-          name: 'Wrath of the Sealed Tomb',
-          narrative:
-            "Bone splinters erupt from the floor around the Crypt Lord — its eye-sockets blaze. 'You will not silence me again!'",
-          effects: [
-            { kind: 'set_to_hit', value: 9 },
-            { kind: 'set_damage', dice: '2d8+4' },
-            {
-              kind: 'set_on_hit_effect',
-              effect: { condition: 'frightened', ability: 'wis', dc: 15 },
-            },
-          ],
-        },
-        {
-          hpPct: 25,
-          name: 'Phylactery Crack',
-          narrative:
-            'A black gem in its breastplate fractures. Necrotic light pours into the Crypt Lord — its wounds knit closed and it lunges with renewed fury.',
-          effects: [
-            { kind: 'heal', amount: 25 },
-            { kind: 'set_damage', dice: '3d6+4' },
-            { kind: 'set_ac', value: 18 },
-          ],
-        },
-      ],
-    },
+    CRYPT_LORD_BASE,
   ],
 
   // ─── Loot table ───────────────────────────────────────────────────────────────
@@ -1080,47 +1084,7 @@ export const context: Context = {
         },
       ],
       dungeon_crypt_throne: [
-        {
-          id: 'dungeon_crypt_throne#0',
-          name: 'Crypt Lord',
-          hp: 97,
-          ac: 17,
-          damage: '2d6+4',
-          toHit: 7,
-          xp: 1800,
-          multiattack: 3,
-          resistances: ['bludgeoning', 'piercing', 'slashing'],
-          immunities: ['poison', 'necrotic'],
-          condition_immunities: ['charmed', 'exhaustion', 'frightened', 'paralyzed', 'poisoned'],
-          onHitEffect: { condition: 'frightened', ability: 'wis', dc: 13 },
-          phases: [
-            {
-              hpPct: 50,
-              name: 'Wrath of the Sealed Tomb',
-              narrative:
-                "Bone splinters erupt from the floor around the Crypt Lord — its eye-sockets blaze. 'You will not silence me again!'",
-              effects: [
-                { kind: 'set_to_hit', value: 9 },
-                { kind: 'set_damage', dice: '2d8+4' },
-                {
-                  kind: 'set_on_hit_effect',
-                  effect: { condition: 'frightened', ability: 'wis', dc: 15 },
-                },
-              ],
-            },
-            {
-              hpPct: 25,
-              name: 'Phylactery Crack',
-              narrative:
-                'A black gem in its breastplate fractures. Necrotic light pours into the Crypt Lord — its wounds knit closed and it lunges with renewed fury.',
-              effects: [
-                { kind: 'heal', amount: 25 },
-                { kind: 'set_damage', dice: '3d6+4' },
-                { kind: 'set_ac', value: 18 },
-              ],
-            },
-          ],
-        },
+        { ...CRYPT_LORD_BASE, id: 'dungeon_crypt_throne#0' },
         // Boss-room minion. A single Skeleton Warrior flanks the Crypt Lord
         // — two was over-tuned for an L4 party of 3 (the boss alone deals
         // 3× 2d6+4 with frighten-on-hit; adding two minions made the math
