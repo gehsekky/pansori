@@ -21,6 +21,7 @@ import {
 } from './compose.js';
 import { makeChar, makeEnemy, makeMinimalContext } from '../../test-fixtures.js';
 import type { ActionContext } from '../actions/types.js';
+import { pcActor } from '../actions/actor.js';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -56,7 +57,7 @@ function fixtureCtx(charOverrides: Partial<Character> = {}): ActionContext {
     combat_active: true,
   } as unknown as GameState;
   return {
-    char,
+    actor: pcActor(char, 0),
     st,
     context: makeMinimalContext(),
     narrative: '',

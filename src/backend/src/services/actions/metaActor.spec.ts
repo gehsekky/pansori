@@ -60,13 +60,12 @@ describe('meta + quest handlers reject non-PC actors (Phase-4 seam)', () => {
   });
 });
 
-describe('meta PC path keeps ctx.char and ctx.actor.char in lockstep', () => {
+describe('meta PC path writes through ctx.actor.char', () => {
   it('select_subclass writes through the actor', () => {
     const char = makeChar({ id: 'pc-1' });
     const ctx = ctxWith(pcActor(char, 0), char);
     handleSelectSubclass(ctx, { type: 'select_subclass', subclass: 'champion' });
-    expect(ctx.char.subclass).toBe('champion');
     if (ctx.actor.kind !== 'pc') throw new Error('expected pc actor');
-    expect(ctx.actor.char).toBe(ctx.char);
+    expect(ctx.actor.char.subclass).toBe('champion');
   });
 });

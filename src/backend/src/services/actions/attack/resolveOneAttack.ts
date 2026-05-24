@@ -25,6 +25,7 @@ import type { ToHitContext } from './toHit.js';
 import { composeNow } from '../../narrative/compose.js';
 import { fmt } from '../../narrativeFmt.js';
 import { posEqual } from '../../gridEngine.js';
+import { updatePcActor } from '../actor.js';
 
 /**
  * Bundles the per-attack resolved state that resolveOneAttack reads —
@@ -52,7 +53,7 @@ export interface AttackContext {
 /**
  * Resolves one attack roll and applies it to enemy HP / narrative.
  * Returns true if the enemy was killed (so the caller can break early
- * from the Extra Attack loop). Mutates ctx.char, ctx.st, ctx.narrative,
+ * from the Extra Attack loop). Mutates pc.char, ctx.st, ctx.narrative,
  * ctx.usedInitiative directly.
  *
  * Extracted from `attack/index.ts` (PR series 30) — was a ~615-line
@@ -64,6 +65,8 @@ export function resolveOneAttack(
   atkCtx: AttackContext,
   label: string
 ): boolean {
+  if (ctx.actor.kind !== 'pc') return false;
+  const pc = ctx.actor;
   const { target, targetId, weaponItem, weaponDamage, isVersatile, weaponLabel, toHit } = atkCtx;
   const {
     weaponProficient,
@@ -88,9 +91,9 @@ export function resolveOneAttack(
   const slowedAcPenalty = targetEntForSlow?.conditions.includes('slowed') ? 2 : 0;
   const effectiveEnemyAc = target.ac + coverAcBonus - slowedAcPenalty;
   const assassinAutoCrit =
-    ctx.char.subclass === 'assassin' && (ctx.st.surprised ?? []).includes(targetId);
+    pc.char.subclass === 'assassin' && (ctx.st.surprised ?? []).includes(targetId);
   const atk = resolvePlayerAttack(
-    { str: ctx.char.str, dex: ctx.char.dex, level: ctx.char.level },
+    { str: pc.char.str, dex: pc.char.dex, level: pc.char.level },
     weaponDamage,
     effectiveEnemyAc,
     weaponItem?.finesse ?? false,
@@ -100,7 +103,7 @@ export function resolveOneAttack(
     weaponItem?.range === 'ranged',
     critThresh,
     totalAttackBonus,
-    ctx.char.species === 'halfling',
+    pc.char.species === 'halfling',
     atkCtx.forceD20
   );
   // Side-channel for callers: stash the attack result on ctx so the
@@ -122,21 +125,21 @@ export function resolveOneAttack(
   // miss into a hit, atk.hit flips AND we need to roll damage
   // (resolvePlayerAttack returned 0 damage on the original miss).
   let biNote = '';
-  if (ctx.char.bardic_inspiration_die && !atk.fumble) {
-    const biRoll = rollDice(`1${ctx.char.bardic_inspiration_die}`);
+  if (pc.char.bardic_inspiration_die && !atk.fumble) {
+    const biRoll = rollDice(`1${pc.char.bardic_inspiration_die}`);
     atk.total += biRoll;
     const newHit = atk.roll === 20 || atk.total >= effectiveEnemyAc;
     if (!atk.hit && newHit) {
       atk.hit = true;
       atk.damage = Math.max(1, rollDice(weaponDamage ?? '1d4') + atk.atkMod);
     }
-    biNote = ` ✦ Bardic Inspiration: +${biRoll} (${ctx.char.bardic_inspiration_die})`;
-    ctx.char = { ...ctx.char, bardic_inspiration_die: undefined };
+    biNote = ` ✦ Bardic Inspiration: +${biRoll} (${pc.char.bardic_inspiration_die})`;
+    updatePcActor(ctx, { bardic_inspiration_die: undefined });
   }
   // Bless (PHB p.219): +1d4 to attack rolls. Same miss-to-hit
   // damage-roll concern as BI above.
   let blessNote = '';
-  if ((ctx.char.conditions ?? []).includes('blessed') && !atk.fumble) {
+  if ((pc.char.conditions ?? []).includes('blessed') && !atk.fumble) {
     const blessRoll = rollDice('1d4');
     atk.total += blessRoll;
     const newHit = atk.roll === 20 || atk.total >= effectiveEnemyAc;
@@ -150,7 +153,7 @@ export function resolveOneAttack(
   // A hit-becomes-miss on subtraction stays a hit (RAW: the d20
   // value alone settled it; this just shifts the total down).
   let baneNote = '';
-  if ((ctx.char.conditions ?? []).includes('baned') && !atk.fumble) {
+  if ((pc.char.conditions ?? []).includes('baned') && !atk.fumble) {
     const baneRoll = rollDice('1d4');
     atk.total -= baneRoll;
     // Hit-to-miss on a non-natural-20: re-check the threshold and
@@ -166,7 +169,7 @@ export function resolveOneAttack(
     (enemyUnconscious &&
       (!ctx.st.entities ||
         (() => {
-          const charEnt = ctx.st.entities?.find((e) => e.id === ctx.char.id);
+          const charEnt = ctx.st.entities?.find((e) => e.id === pc.char.id);
           const enmEnt = ctx.st.entities?.find((e) => e.id === targetId);
           return charEnt && enmEnt
             ? posEqual(
@@ -185,7 +188,7 @@ export function resolveOneAttack(
     ? isCrit && !atk.critical
       ? Math.max(1, rollCritical(weaponDamage) + atk.atkMod)
       : atk.damage
-    : Math.max(1, unarmedDamage(ctx.char.str));
+    : Math.max(1, unarmedDamage(pc.char.str));
 
   // 2024 PHB Savage Attacker origin feat — once per turn, on a
   // weapon-damage hit, reroll the damage and use the higher total.
@@ -196,17 +199,16 @@ export function resolveOneAttack(
   if (
     atk.hit &&
     weaponDamage &&
-    (ctx.char.feats ?? []).includes('savage_attacker') &&
-    !ctx.char.turn_actions.savage_attacker_used
+    (pc.char.feats ?? []).includes('savage_attacker') &&
+    !pc.char.turn_actions.savage_attacker_used
   ) {
     const reroll = isCrit
       ? Math.max(1, rollCritical(weaponDamage) + atk.atkMod)
       : Math.max(1, rollDice(weaponDamage) + atk.atkMod);
     if (reroll > baseHit) baseHit = reroll;
-    ctx.char = {
-      ...ctx.char,
-      turn_actions: { ...ctx.char.turn_actions, savage_attacker_used: true },
-    };
+    updatePcActor(ctx, {
+      turn_actions: { ...pc.char.turn_actions, savage_attacker_used: true },
+    });
   }
   const versatileNote = isVersatile ? ' (versatile)' : '';
   const coverNote = coverAcBonus > 0 ? ` +${coverAcBonus} cover` : '';
@@ -221,18 +223,18 @@ export function resolveOneAttack(
     // 2024 PHB — a Nat 1 on a d20 grants Heroic Inspiration. Failure
     // becomes the seed of next turn's success.
     const bonuses: { label: string }[] = [];
-    if (!ctx.char.inspiration) {
-      ctx.char = { ...ctx.char, inspiration: true };
+    if (!pc.char.inspiration) {
+      updatePcActor(ctx, { inspiration: true });
       // Inspiration grant is conceptually a narrative aside, not a
       // mechanical bracket — but routing it through bonuses keeps
       // LLM input free of the ✦ symbol and keeps the composer as
       // the single source of fragment prose.
-      bonuses.push({ label: `✦ Heroic Inspiration granted (${ctx.char.name}).` });
+      bonuses.push({ label: `✦ Heroic Inspiration granted (${pc.char.name}).` });
     }
     composeNow(ctx, {
       kind: 'attack_miss',
-      attackerId: ctx.char.id,
-      attackerName: ctx.char.name,
+      attackerId: pc.char.id,
+      attackerName: pc.char.name,
       target,
       weaponLabel,
       toHit: atk.total,
@@ -247,8 +249,8 @@ export function resolveOneAttack(
     const bonuses: { label: string }[] = [];
     // 2024 PHB Fighter L13 — Studied Attacks. On miss, mark the target
     // so this Fighter's next attack against them has advantage.
-    if (hasClass(ctx.char, 'fighter') && getClassLevel(ctx.char, 'fighter') >= 13) {
-      const tag = `studied_by_${ctx.char.id}`;
+    if (hasClass(pc.char, 'fighter') && getClassLevel(pc.char, 'fighter') >= 13) {
+      const tag = `studied_by_${pc.char.id}`;
       ctx.st = {
         ...ctx.st,
         entities: (ctx.st.entities ?? []).map((e) =>
@@ -268,9 +270,9 @@ export function resolveOneAttack(
     // miss, deal STR mod damage (DEX for Finesse weapons). Floor at 0.
     if (
       weaponItem?.mastery === 'graze' &&
-      (ctx.char.weapon_masteries ?? []).includes(weaponItem.id)
+      (pc.char.weapon_masteries ?? []).includes(weaponItem.id)
     ) {
-      const grazeMod = weaponItem.finesse ? abilityMod(ctx.char.dex) : abilityMod(ctx.char.str);
+      const grazeMod = weaponItem.finesse ? abilityMod(pc.char.dex) : abilityMod(pc.char.str);
       const grazeDmg = Math.max(0, grazeMod);
       if (grazeDmg > 0) {
         const grazedHp = Math.max(0, target.hp - grazeDmg);
@@ -287,8 +289,8 @@ export function resolveOneAttack(
     }
     composeNow(ctx, {
       kind: 'attack_miss',
-      attackerId: ctx.char.id,
-      attackerName: ctx.char.name,
+      attackerId: pc.char.id,
+      attackerName: pc.char.name,
       target,
       weaponLabel,
       toHit: atk.total,
@@ -308,7 +310,7 @@ export function resolveOneAttack(
   // only the PC's PRIMARY class). Dice scale below uses
   // `getClassLevel(char, 'rogue')` for the same reason.
   let sneakDmg = 0;
-  if (hasClass(ctx.char, 'rogue') && !ctx.char.turn_actions.sneak_attack_used) {
+  if (hasClass(pc.char, 'rogue') && !pc.char.turn_actions.sneak_attack_used) {
     const isFinesseOrRanged = (weaponItem?.finesse ?? false) || weaponItem?.range === 'ranged';
     let allyAdjacent = false;
     if (ctx.st.entities) {
@@ -317,36 +319,35 @@ export function resolveOneAttack(
         allyAdjacent = ctx.st.entities.some(
           (e) =>
             !e.isEnemy &&
-            e.id !== ctx.char.id &&
+            e.id !== pc.char.id &&
             e.hp > 0 &&
             Math.max(Math.abs(e.pos.x - targetEnt.pos.x), Math.abs(e.pos.y - targetEnt.pos.y)) <= 1
         );
       }
     } else {
-      allyAdjacent = ctx.st.characters.some((c) => !c.dead && c.id !== ctx.char.id);
+      allyAdjacent = ctx.st.characters.some((c) => !c.dead && c.id !== pc.char.id);
     }
     const hasAdv = advantage && !disadvantage;
     const triggers = (hasAdv || allyAdjacent) && !disadvantage;
     if (isFinesseOrRanged && triggers) {
-      const saExpr = sneakAttackDice(getClassLevel(ctx.char, 'rogue'));
+      const saExpr = sneakAttackDice(getClassLevel(pc.char, 'rogue'));
       sneakDmg = isCrit ? rollCritical(saExpr) : rollDice(saExpr);
       // 2024 PHB Cunning Strike: if the player pre-committed an effect,
       // subtract one die from the SA roll (average 3.5 on 1d6).
-      if (ctx.char.turn_actions.cunning_strike_pending) {
+      if (pc.char.turn_actions.cunning_strike_pending) {
         sneakDmg = Math.max(0, sneakDmg - rollDice('1d6'));
       }
       // SRD 5.2.1 — once per turn. Mark spent so Extra Attack /
       // two-weapon follow-up attacks don't re-trigger SA.
-      ctx.char = {
-        ...ctx.char,
-        turn_actions: { ...ctx.char.turn_actions, sneak_attack_used: true },
-      };
+      updatePcActor(ctx, {
+        turn_actions: { ...pc.char.turn_actions, sneak_attack_used: true },
+      });
     }
   }
 
   const rageBonus =
     features.includes('rage') && isRaging && atk.atkStat === 'STR'
-      ? rageDamageBonus(ctx.char.level)
+      ? rageDamageBonus(pc.char.level)
       : 0;
 
   // ── Divine Smite (2024 PHB) ─────────────────────────────────────
@@ -357,11 +358,11 @@ export function resolveOneAttack(
   // together" — 2024 PHB Divine Smite).
   let smiteDmg = 0;
   let smiteDice = 0;
-  if ((ctx.char.divine_smite_dice ?? 0) > 0 && (weaponItem || hasClass(ctx.char, 'monk'))) {
-    smiteDice = ctx.char.divine_smite_dice!;
+  if ((pc.char.divine_smite_dice ?? 0) > 0 && (weaponItem || hasClass(pc.char, 'monk'))) {
+    smiteDice = pc.char.divine_smite_dice!;
     const expr = `${smiteDice}d8`;
     smiteDmg = isCrit ? rollCritical(expr) : rollDice(expr);
-    ctx.char.divine_smite_dice = undefined;
+    pc.char.divine_smite_dice = undefined;
   }
 
   // ── Improved Divine Smite (Paladin L11+) ────────────────────────
@@ -372,8 +373,8 @@ export function resolveOneAttack(
   // the gating differs between the two.
   let improvedSmiteDmg = 0;
   if (
-    hasClass(ctx.char, 'paladin') &&
-    getClassLevel(ctx.char, 'paladin') >= 11 &&
+    hasClass(pc.char, 'paladin') &&
+    getClassLevel(pc.char, 'paladin') >= 11 &&
     weaponItem &&
     weaponItem.range !== 'ranged'
   ) {
@@ -413,7 +414,7 @@ export function resolveOneAttack(
     hitBonuses.push({ label: `Sacred Weapon: +${sacredWeaponBonus} to hit` });
   }
   if (sneakDmg > 0) {
-    const saExpr = sneakAttackDice(getClassLevel(ctx.char, 'rogue'));
+    const saExpr = sneakAttackDice(getClassLevel(pc.char, 'rogue'));
     const saLabel = isCrit ? `${parseInt(saExpr) * 2}d6 (crit)` : saExpr;
     hitBonuses.push({ label: `Sneak Attack ${saLabel}: +${sneakDmg}` });
   }
@@ -437,8 +438,8 @@ export function resolveOneAttack(
   }
   composeNow(ctx, {
     kind: 'attack_hit',
-    attackerId: ctx.char.id,
-    attackerName: ctx.char.name,
+    attackerId: pc.char.id,
+    attackerName: pc.char.name,
     target,
     weapon: weaponItem ?? null,
     damage: totalDmg,
@@ -451,13 +452,12 @@ export function resolveOneAttack(
   });
 
   // ── 2024 PHB Cunning Strike effect application ───────────────────────
-  if (ctx.char.turn_actions.cunning_strike_pending && sneakDmg > 0 && newEnemyHp > 0) {
-    const csEffect = ctx.char.turn_actions.cunning_strike_pending;
-    const csDc = 8 + profBonus(ctx.char.level) + abilityMod(ctx.char.dex);
-    ctx.char = {
-      ...ctx.char,
-      turn_actions: { ...ctx.char.turn_actions, cunning_strike_pending: undefined },
-    };
+  if (pc.char.turn_actions.cunning_strike_pending && sneakDmg > 0 && newEnemyHp > 0) {
+    const csEffect = pc.char.turn_actions.cunning_strike_pending;
+    const csDc = 8 + profBonus(pc.char.level) + abilityMod(pc.char.dex);
+    updatePcActor(ctx, {
+      turn_actions: { ...pc.char.turn_actions, cunning_strike_pending: undefined },
+    });
     if (csEffect === 'trip') {
       const enemyDex = (target.dex ?? 10) as number;
       const dexSave = rollDice('1d20') + abilityMod(enemyDex);
@@ -513,11 +513,10 @@ export function resolveOneAttack(
         ctx.narrative += ` ${fmt.note(`[Cunning Strike — Poison: CON ${conSave} vs DC ${csDc} — resists]`)}`;
       }
     } else if (csEffect === 'withdraw') {
-      ctx.char = {
-        ...ctx.char,
-        turn_actions: { ...ctx.char.turn_actions, disengaged: true },
-      };
-      ctx.narrative += ` ${fmt.note(`[Cunning Strike — Withdraw: ${ctx.char.name} disengages without provoking OAs]`)}`;
+      updatePcActor(ctx, {
+        turn_actions: { ...pc.char.turn_actions, disengaged: true },
+      });
+      ctx.narrative += ` ${fmt.note(`[Cunning Strike — Withdraw: ${pc.char.name} disengages without provoking OAs]`)}`;
     } else if (csEffect === 'disarm') {
       ctx.st = {
         ...ctx.st,
@@ -545,22 +544,21 @@ export function resolveOneAttack(
   if (
     weaponItem?.mastery &&
     newEnemyHp > 0 &&
-    (ctx.char.weapon_masteries ?? []).includes(weaponItem.id)
+    (pc.char.weapon_masteries ?? []).includes(weaponItem.id)
   ) {
     // 2024 PHB Fighter L9 Tactical Master — pre-armed swap wins over the
     // weapon's printed mastery for this one attack.
     let mastery = weaponItem.mastery;
-    if (ctx.char.turn_actions.tactical_master_mastery) {
-      mastery = ctx.char.turn_actions.tactical_master_mastery;
-      ctx.char = {
-        ...ctx.char,
-        turn_actions: { ...ctx.char.turn_actions, tactical_master_mastery: undefined },
-      };
+    if (pc.char.turn_actions.tactical_master_mastery) {
+      mastery = pc.char.turn_actions.tactical_master_mastery;
+      updatePcActor(ctx, {
+        turn_actions: { ...pc.char.turn_actions, tactical_master_mastery: undefined },
+      });
       ctx.narrative += ` ${fmt.note(`[Tactical Master: applying ${mastery.toUpperCase()}]`)}`;
     }
-    const weaponDc = 8 + profBonus(ctx.char.level) + abilityMod(ctx.char.str);
+    const weaponDc = 8 + profBonus(pc.char.level) + abilityMod(pc.char.str);
     if (mastery === 'vex') {
-      const tag = `vexed_by_${ctx.char.id}`;
+      const tag = `vexed_by_${pc.char.id}`;
       ctx.st = {
         ...ctx.st,
         entities: (ctx.st.entities ?? []).map((e) =>
@@ -597,7 +595,7 @@ export function resolveOneAttack(
         ctx.narrative += ` ${fmt.note(`[Topple: CON ${conSave} vs DC ${weaponDc} — resists]`)}`;
       }
     } else if (mastery === 'push') {
-      const charEnt = ctx.st.entities?.find((e) => e.id === ctx.char.id);
+      const charEnt = ctx.st.entities?.find((e) => e.id === pc.char.id);
       const targetEnt = ctx.st.entities?.find((e) => e.id === targetId && e.isEnemy);
       if (charEnt && targetEnt) {
         const dx = Math.sign(targetEnt.pos.x - charEnt.pos.x);
@@ -677,10 +675,10 @@ export function resolveOneAttack(
           ctx.narrative += ` ${fmt.note(`[Cleave: ${cleaveName} also takes ${cleaveDmg} damage!${cleaveDmgNote}${cleaveNewHp <= 0 ? ' (killed)' : ''}]`)}`;
           if (cleaveNewHp <= 0) {
             const cleaveXp = getEnemyById(ctx.seed, cleaveTarget.id)?.xp ?? 0;
-            const cleaveSplit = splitEncounterXp(ctx.st, ctx.char.id, cleaveXp);
+            const cleaveSplit = splitEncounterXp(ctx.st, pc.char.id, cleaveXp);
             ctx.st = cleaveSplit.st;
-            ctx.char = { ...ctx.char, xp: (ctx.char.xp || 0) + cleaveSplit.share };
-            ctx.narrative += applyPartyLevelUps(ctx.st, ctx.char, ctx.context);
+            updatePcActor(ctx, { xp: (pc.char.xp || 0) + cleaveSplit.share });
+            ctx.narrative += applyPartyLevelUps(ctx.st, pc.char, ctx.context);
           }
         }
       }
@@ -689,10 +687,10 @@ export function resolveOneAttack(
 
   if (newEnemyHp <= 0) {
     const xpGain = target.xp ?? 10 + (target.hp || 8);
-    const killSplit = splitEncounterXp(ctx.st, ctx.char.id, xpGain);
+    const killSplit = splitEncounterXp(ctx.st, pc.char.id, xpGain);
     ctx.st = killSplit.st;
     const xpShare = killSplit.share;
-    ctx.char = { ...ctx.char, xp: (ctx.char.xp || 0) + xpShare };
+    updatePcActor(ctx, { xp: (pc.char.xp || 0) + xpShare });
     ctx.st = {
       ...ctx.st,
       entities: (ctx.st.entities ?? []).map((e) =>
@@ -700,14 +698,13 @@ export function resolveOneAttack(
       ),
       enemies_killed: [...ctx.st.enemies_killed, targetId],
     };
-    ctx.narrative += grantDarkOnesBlessing(ctx.char);
+    ctx.narrative += grantDarkOnesBlessing(pc.char);
     // Only end combat once every enemy in the room is down
     if (isRoomCleared(ctx.st, ctx.seed, ctx.roomId)) {
       ctx.st = endCombatState(ctx.st);
-      ctx.char = {
-        ...ctx.char,
-        conditions: ctx.char.conditions.filter((c) => c !== 'raging'),
-      };
+      updatePcActor(ctx, {
+        conditions: pc.char.conditions.filter((c) => c !== 'raging'),
+      });
     }
     const killProse =
       ' ' +
@@ -716,14 +713,14 @@ export function resolveOneAttack(
         .replace('{xp}', String(xpShare));
     composeNow(ctx, {
       kind: 'attack_kill',
-      attackerId: ctx.char.id,
-      attackerName: ctx.char.name,
+      attackerId: pc.char.id,
+      attackerName: pc.char.name,
       victimId: targetId,
       victimName: target.name,
       xp: xpShare,
       killProse,
     });
-    ctx.narrative += applyPartyLevelUps(ctx.st, ctx.char, ctx.context);
+    ctx.narrative += applyPartyLevelUps(ctx.st, pc.char, ctx.context);
     ctx.usedInitiative = true;
     return true;
   }

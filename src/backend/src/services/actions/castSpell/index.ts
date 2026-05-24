@@ -57,6 +57,8 @@ export const handleCastSpell: ActionHandler<{
   spellId: string;
   slotLevel: number;
 }> = (ctx, action) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can cast spells.' };
+  const pc = ctx.actor;
   const { spellId, slotLevel } = action;
   const spell = ctx.context.spellTable?.[spellId];
   if (!spell) {
@@ -81,10 +83,10 @@ export const handleCastSpell: ActionHandler<{
   if (spell.id === 'divine_smite_spell') {
     const upcastBonus = Math.max(0, slotLevel - 1);
     const dice = 2 + upcastBonus;
-    ctx.char.divine_smite_dice = dice;
+    pc.char.divine_smite_dice = dice;
     composeNow(ctx, {
       kind: 'spell_utility',
-      prose: `${ctx.char.name} channels divine power${slotNote}! Their next weapon hit will deal an additional ${dice}d8 radiant damage.`,
+      prose: `${pc.char.name} channels divine power${slotNote}! Their next weapon hit will deal an additional ${dice}d8 radiant damage.`,
     });
     return;
   }
@@ -177,10 +179,10 @@ export const handleCastSpell: ActionHandler<{
   // a no-op.
   //
   // Three integration concerns:
-  //   1. precast mutated ctx.char (slot spent, action_used, gold, etc.)
-  //      but those mutations live on the local ctx.char reference;
+  //   1. precast mutated pc.char (slot spent, action_used, gold, etc.)
+  //      but those mutations live on the local pc.char reference;
   //      they aren't in ctx.st.characters yet. runCombatStart rebuilds
-  //      ctx.char from `ctx.st.characters` (line ~44, freshChar
+  //      pc.char from `ctx.st.characters` (line ~44, freshChar
   //      lookup) — without `commitChar()` first, the rebuild reverts
   //      every precast mutation. Commit before the call so they stick.
   //   2. combatStart overwrites `ctx.narrative` — save + prepend so
@@ -189,7 +191,7 @@ export const handleCastSpell: ActionHandler<{
   //      `action_used` (or `bonus_action_used`) precast just set. Save
   //      the precast turn_actions and restore after the call.
   const precastNarrative = ctx.narrative;
-  const precastTurnActions = ctx.char.turn_actions;
+  const precastTurnActions = pc.char.turn_actions;
   ctx.commitChar();
   runCombatStart(ctx, spellTarget);
   if (precastNarrative) {

@@ -63,11 +63,11 @@ export const handleStandUp: ActionHandler<{ type: 'stand_up' }> = (ctx) => {
  * applies the modifier in attack resolution.
  *
  * **Architecture audit #5 phase 2 pilot.** Reads + writes route
- * through `ctx.actor` (narrowed to PC) instead of `ctx.char`. The
- * `updatePcActor` helper keeps `ctx.char` mirrored so downstream
- * single-source-of-truth code paths (`commitChar`, post-handler
- * epilogue) see the same Character. This is the canonical migration
- * shape future handlers should follow.
+ * through `ctx.actor` (narrowed to PC) instead of the legacy
+ * `ActionContext.char` field. The `updatePcActor` helper keeps that
+ * field mirrored so downstream single-source-of-truth code paths
+ * (`commitChar`, post-handler epilogue) see the same Character. This
+ * is the canonical migration shape future handlers should follow.
  */
 export const handleDodge: ActionHandler<{ type: 'dodge' }> = (ctx) => {
   if (!ctx.st.combat_active) return { rejected: 'You can only dodge in combat.' };

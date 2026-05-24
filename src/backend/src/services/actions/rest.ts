@@ -139,6 +139,7 @@ export const handleShortRest: ActionHandler<{ type: 'short_rest' }> = (ctx) => {
  */
 export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
   if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can take a long rest.' };
+  const { safeIdx } = ctx.actor;
   if (ctx.st.combat_active) {
     ctx.narrative = 'You cannot rest while in combat.';
     return;
@@ -227,7 +228,7 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
     return refreshed;
   });
   ctx.st = { ...ctx.st, characters: restedChars, long_rested: true };
-  updatePcActor(ctx, { ...restedChars[ctx.safeIdx] });
+  updatePcActor(ctx, { ...restedChars[safeIdx] });
   const longRestFlavor = ctx.context.narratives.longRest
     ? pick(ctx.context.narratives.longRest).replace(/{party}/g, restLines.join('; ')) + ' '
     : '';

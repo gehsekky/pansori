@@ -12,6 +12,7 @@ import { coverBonus, distanceFeet, isFlankingPosition } from '../../gridEngine.j
 import { getClassLevel, hasClass } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import { isHeavilyEncumbered } from '../../gameEngine.js';
+import { updatePcActor } from '../actor.js';
 
 /**
  * Everything resolveOneAttack needs once the target + weapon are
@@ -66,22 +67,40 @@ export function computeToHitContext(
     weaponItem: (LootItem & InventoryItem) | null;
   }
 ): ToHitContext {
+  if (ctx.actor.kind !== 'pc') {
+    return {
+      weaponProficient: false,
+      armorProficient: false,
+      equippedArmorLootItem: undefined,
+      advantage: false,
+      disadvantage: false,
+      disadvNote: '',
+      noProfNote: '',
+      coverAcBonus: 0,
+      enemyUnconscious: false,
+      critThresh: 20,
+      sacredWeaponBonus: 0,
+      totalAttackBonus: 0,
+      features: [],
+      isRaging: false,
+    };
+  }
+  const pc = ctx.actor;
   const { target, targetId, weaponItem } = pre;
 
   // Armor proficiency check (PHB p.144): non-proficient armor → disadv on
   // STR/DEX attack rolls.
-  const equippedArmorLootItem = ctx.char.equipped_armor
+  const equippedArmorLootItem = pc.char.equipped_armor
     ? ctx.context.lootTable.find(
-        (l) =>
-          l.id === ctx.char.inventory?.find((i) => i.instance_id === ctx.char.equipped_armor)?.id
+        (l) => l.id === pc.char.inventory?.find((i) => i.instance_id === pc.char.equipped_armor)?.id
       )
     : undefined;
   const armorProficient = hasArmorProficiency(
-    ctx.char.armor_proficiencies ?? [],
+    pc.char.armor_proficiencies ?? [],
     equippedArmorLootItem?.armorCategory
   );
   const weaponProficient = hasWeaponProficiency(
-    ctx.char.weapon_proficiencies ?? [],
+    pc.char.weapon_proficiencies ?? [],
     weaponItem?.weaponType
   );
 
@@ -95,7 +114,7 @@ export function computeToHitContext(
   // penalty is opt-in.
   let rangedInMelee = false;
   if (weaponItem?.range === 'ranged' && ctx.st.entities) {
-    const charEnt = ctx.st.entities.find((e) => e.id === ctx.char.id);
+    const charEnt = ctx.st.entities.find((e) => e.id === pc.char.id);
     if (charEnt) {
       rangedInMelee = ctx.st.entities.some(
         (e) =>
@@ -106,12 +125,12 @@ export function computeToHitContext(
       );
     }
   }
-  const conditionDisadv = ctx.char.conditions.some((c) => DISADV_CONDITIONS.has(c));
-  const exhaustionDisadv = (ctx.char.exhaustion_level ?? 0) >= 3;
-  const heavyEncumberedDisadv = isHeavilyEncumbered(ctx.char);
-  const smallSpecies = ctx.char.species ? SRD_SPECIES[ctx.char.species]?.size === 'small' : false;
+  const conditionDisadv = pc.char.conditions.some((c) => DISADV_CONDITIONS.has(c));
+  const exhaustionDisadv = (pc.char.exhaustion_level ?? 0) >= 3;
+  const heavyEncumberedDisadv = isHeavilyEncumbered(pc.char);
+  const smallSpecies = pc.char.species ? SRD_SPECIES[pc.char.species]?.size === 'small' : false;
   const heavyWeaponSmallDisadv = !!(weaponItem?.heavy && smallSpecies);
-  const conditionAdv = ctx.char.conditions.some((c) => PLAYER_ADV_CONDITIONS.has(c));
+  const conditionAdv = pc.char.conditions.some((c) => PLAYER_ADV_CONDITIONS.has(c));
   const enemyEntity2 = ctx.st.entities?.find((e) => e.id === targetId && e.isEnemy);
   const enemyGrappled = enemyEntity2?.conditions.includes('grappled') ?? false;
   const enemyProne = enemyEntity2?.conditions.includes('prone') ?? false;
@@ -126,7 +145,7 @@ export function computeToHitContext(
   // Thrown weapon beyond normal range: disadvantage (PHB p.147)
   let thrownLongRangeDisadv = false;
   if (weaponItem?.thrown && ctx.st.entities) {
-    const charEnt = ctx.st.entities.find((e) => e.id === ctx.char.id);
+    const charEnt = ctx.st.entities.find((e) => e.id === pc.char.id);
     const enemyEnt = ctx.st.entities.find((e) => e.id === targetId && e.isEnemy);
     if (charEnt && enemyEnt) {
       const dist = distanceFeet(charEnt.pos, enemyEnt.pos);
@@ -137,12 +156,12 @@ export function computeToHitContext(
   let coverAcBonus = 0;
   let flankingAdv = false;
   if (ctx.st.entities) {
-    const charEntity = ctx.st.entities.find((e) => e.id === ctx.char.id);
+    const charEntity = ctx.st.entities.find((e) => e.id === pc.char.id);
     const enemyEntity = ctx.st.entities.find((e) => e.id === targetId && e.isEnemy);
     if (charEntity && enemyEntity) {
       const obstacles = [
         ...ctx.st.entities
-          .filter((e) => e.id !== ctx.char.id && e.id !== targetId)
+          .filter((e) => e.id !== pc.char.id && e.id !== targetId)
           .map((e) => e.pos),
         ...ctx.roomObstacleCells,
       ];
@@ -150,34 +169,34 @@ export function computeToHitContext(
       const flankingAlly = ctx.st.entities.find(
         (e) =>
           !e.isEnemy &&
-          e.id !== ctx.char.id &&
+          e.id !== pc.char.id &&
           isFlankingPosition(charEntity.pos, e.pos, enemyEntity.pos)
       );
       if (flankingAlly) flankingAdv = true;
     }
   }
 
-  const helpAdv = ctx.st.help_target_id === ctx.char.id;
+  const helpAdv = ctx.st.help_target_id === pc.char.id;
   if (helpAdv) ctx.st = { ...ctx.st, help_target_id: undefined };
 
   // Assassin: advantage vs creatures who haven't acted (surprised list or first round)
   const assassinAdv =
-    ctx.char.subclass === 'assassin' &&
-    hasClass(ctx.char, 'rogue') &&
+    pc.char.subclass === 'assassin' &&
+    hasClass(pc.char, 'rogue') &&
     ((ctx.st.surprised ?? []).includes(targetId) || (ctx.st.round ?? 1) === 1);
 
-  const recklessAdv = !!ctx.char.turn_actions.reckless && weaponItem?.range !== 'ranged';
+  const recklessAdv = !!pc.char.turn_actions.reckless && weaponItem?.range !== 'ranged';
 
   let packTacticsAdv = false;
-  if (ctx.char.conditions.includes('wild_shaped') && ctx.char.wild_shape_form) {
-    const form = BEAST_FORMS[ctx.char.wild_shape_form];
+  if (pc.char.conditions.includes('wild_shaped') && pc.char.wild_shape_form) {
+    const form = BEAST_FORMS[pc.char.wild_shape_form];
     if (form?.packTactics && ctx.st.entities) {
       const targetEnt = ctx.st.entities.find((e) => e.id === targetId && e.isEnemy);
       if (targetEnt) {
         packTacticsAdv = ctx.st.entities.some(
           (e) =>
             !e.isEnemy &&
-            e.id !== ctx.char.id &&
+            e.id !== pc.char.id &&
             e.hp > 0 &&
             Math.max(Math.abs(e.pos.x - targetEnt.pos.x), Math.abs(e.pos.y - targetEnt.pos.y)) <= 1
         );
@@ -189,7 +208,7 @@ export function computeToHitContext(
   // char on this target grants advantage on the next attack. Consume the
   // tag immediately (RAW: lasts until end of your next turn, but for our
   // single-attack action model, one-shot is closer to what players expect).
-  const vexTag = `vexed_by_${ctx.char.id}`;
+  const vexTag = `vexed_by_${pc.char.id}`;
   const vexAdv = !!ctx.st.entities?.find(
     (e) => e.id === targetId && e.isEnemy && e.conditions.includes(vexTag)
   );
@@ -206,7 +225,7 @@ export function computeToHitContext(
 
   // 2024 PHB Fighter L13 Studied Attacks — same shape as Vex but seeded by
   // a *miss* on a prior turn (mark applied in the miss branch below).
-  const studyTag = `studied_by_${ctx.char.id}`;
+  const studyTag = `studied_by_${pc.char.id}`;
   const studyAdv = !!ctx.st.entities?.find(
     (e) => e.id === targetId && e.isEnemy && e.conditions.includes(studyTag)
   );
@@ -231,21 +250,19 @@ export function computeToHitContext(
     proneDisadv ||
     thrownLongRangeDisadv;
 
-  const inspirationAdv = !!ctx.char.turn_actions.inspiration_pending;
+  const inspirationAdv = !!pc.char.turn_actions.inspiration_pending;
   if (inspirationAdv) {
-    ctx.char = {
-      ...ctx.char,
-      turn_actions: { ...ctx.char.turn_actions, inspiration_pending: false },
+    updatePcActor(ctx, {
+      turn_actions: { ...pc.char.turn_actions, inspiration_pending: false },
       inspiration: false,
-    };
+    });
   }
 
-  const luckAdv = !!ctx.char.turn_actions.luck_pending;
+  const luckAdv = !!pc.char.turn_actions.luck_pending;
   if (luckAdv) {
-    ctx.char = {
-      ...ctx.char,
-      turn_actions: { ...ctx.char.turn_actions, luck_pending: false },
-    };
+    updatePcActor(ctx, {
+      turn_actions: { ...pc.char.turn_actions, luck_pending: false },
+    });
   }
 
   const advantage =
@@ -266,7 +283,7 @@ export function computeToHitContext(
 
   const disadvReasons = [
     rangedInMelee ? 'ranged in melee' : '',
-    conditionDisadv ? ctx.char.conditions.filter((c) => DISADV_CONDITIONS.has(c)).join(', ') : '',
+    conditionDisadv ? pc.char.conditions.filter((c) => DISADV_CONDITIONS.has(c)).join(', ') : '',
     exhaustionDisadv ? 'exhaustion' : '',
     heavyEncumberedDisadv ? 'heavily encumbered' : '',
     heavyWeaponSmallDisadv ? 'heavy weapon — Small creature' : '',
@@ -283,22 +300,22 @@ export function computeToHitContext(
       : '';
   const noProfNote = !weaponProficient ? ` [no weapon proficiency — prof bonus omitted]` : '';
 
-  const features = ctx.context.classFeatures?.[ctx.char.character_class] ?? [];
-  const isRaging = ctx.char.conditions.includes('raging');
+  const features = ctx.context.classFeatures?.[pc.char.character_class] ?? [];
+  const isRaging = pc.char.conditions.includes('raging');
 
   // Champion: Improved Critical — crit on 19–20 at level 3+
   const critThresh =
-    ctx.char.subclass === 'champion' &&
-    hasClass(ctx.char, 'fighter') &&
-    getClassLevel(ctx.char, 'fighter') >= 3
+    pc.char.subclass === 'champion' &&
+    hasClass(pc.char, 'fighter') &&
+    getClassLevel(pc.char, 'fighter') >= 3
       ? 19
       : 20;
   const sacredWeaponBonus =
-    (ctx.char.class_resource_uses?.sacred_weapon_active ?? 0) > 0 ? abilityMod(ctx.char.cha) : 0;
+    (pc.char.class_resource_uses?.sacred_weapon_active ?? 0) > 0 ? abilityMod(pc.char.cha) : 0;
   // SRD Raise Dead / Resurrection — recently-revived PCs take a
   // −N penalty on D20 Tests (attacks, saves, checks) until it
   // decays off via long rest. Subtracted from the attack bonus.
-  const revivePenalty = reviveD20Penalty(ctx.char);
+  const revivePenalty = reviveD20Penalty(pc.char);
   const totalAttackBonus = sacredWeaponBonus - revivePenalty;
 
   // Silence linter: target is part of the signature but referenced via the

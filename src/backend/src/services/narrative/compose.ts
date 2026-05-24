@@ -36,16 +36,17 @@ import type { ActionContext } from '../actions/types.js';
 import { fmt } from '../narrativeFmt.js';
 
 function lookupAttacker(attackerId: string, ctx: ActionContext): Character {
-  if (ctx.char.id === attackerId) return ctx.char;
+  const active = ctx.actor.kind === 'pc' ? ctx.actor.char : ctx.st.characters[0];
+  if (active.id === attackerId) return active;
   const c = ctx.st.characters.find((c) => c.id === attackerId);
   if (!c) {
     // Defensive: fragments are pushed by handlers running inside
     // takeAction; the attacker is the active char. If a future
     // emission site fires a fragment for a non-active character
     // (e.g. opportunity-attack composed across PCs) and that char
-    // isn't in state, fall through to ctx.char so the composer
+    // isn't in state, fall through to the active char so the composer
     // doesn't crash a session.
-    return ctx.char;
+    return active;
   }
   return c;
 }

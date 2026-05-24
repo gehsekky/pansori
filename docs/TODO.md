@@ -25,11 +25,11 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 ## 5e SRD remaining gaps
 
 > **Edition alignment** — Pansori targets SRD 5.2.1 only. The core
-> rules *frameworks* are largely shipped (attack/damage pipelines,
+> rules _frameworks_ are largely shipped (attack/damage pipelines,
 > conditions, grid/tactical combat, spell slots + concentration +
 > components + AoE shapes + saves, reactions, rest/death, the
 > bring-from-dead ladder, weapon masteries, 12 SRD-iconic subclasses
-> at their L3 feature). The remaining work to a *complete* engine is
+> at their L3 feature). The remaining work to a _complete_ engine is
 > overwhelmingly **breadth on top of those frameworks** — the
 > prioritized gaps live in the rules-engine roadmap immediately below.
 
@@ -50,46 +50,46 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 > the payoff, below.
 
 - [ ] **Phase 4 — summons & companions as combatants** (plan of record:
-  [re1-phase4-design.md](re1-phase4-design.md); pragmatic path approved
-  2026-05-23). Generalize the enemy-turn loop to drive any non-player
-  combatant via a `side: 'pc'|'enemy'|'ally'` tag + stat-block actors,
-  reusing `computeEnemyAttack` rather than merging it with the PC
-  `resolveOneAttack` (still fully SRD-compliant — monster stat blocks
-  pre-bake what PCs compute; see the design doc). Unblocks **SRD summons**
-  (Animate Dead, Spiritual Weapon, Find Familiar, conjure) — narrative-only
-  today. (Beast Master is PHB-only / out of scope — the SRD's iconic
-  Ranger subclass is Hunter; summon *spells* are the content.) Decisions:
-  RAW player-command control model; **Animate Dead** is the first content
-  slice. Slices P4.1 (side tagging), P4.2/3 (ally turn path with movement —
-  `runAllyTurn` selects the nearest enemy, approaches it taking OA, and
-  attacks via the simple `resolveEnemyAttack` + `applyDamageToEntity`),
-  P4.4 (summon lifecycle — `addAllyCombatant` / `removeCombatant` + the
-  `breakConcentration` summon sweep), and the P4.5 **combat-start bridge**
-  (`state.summoned_allies` + `seedSummonedAllies` materialize persistent
-  summons into entities + initiative after the owner) have all shipped.
-  Remaining is content:
+      [re1-phase4-design.md](re1-phase4-design.md); pragmatic path approved
+      2026-05-23). Generalize the enemy-turn loop to drive any non-player
+      combatant via a `side: 'pc'|'enemy'|'ally'` tag + stat-block actors,
+      reusing `computeEnemyAttack` rather than merging it with the PC
+      `resolveOneAttack` (still fully SRD-compliant — monster stat blocks
+      pre-bake what PCs compute; see the design doc). Unblocks **SRD summons**
+      (Animate Dead, Spiritual Weapon, Find Familiar, conjure) — narrative-only
+      today. (Beast Master is PHB-only / out of scope — the SRD's iconic
+      Ranger subclass is Hunter; summon _spells_ are the content.) Decisions:
+      RAW player-command control model; **Animate Dead** is the first content
+      slice. Slices P4.1 (side tagging), P4.2/3 (ally turn path with movement —
+      `runAllyTurn` selects the nearest enemy, approaches it taking OA, and
+      attacks via the simple `resolveEnemyAttack` + `applyDamageToEntity`),
+      P4.4 (summon lifecycle — `addAllyCombatant` / `removeCombatant` + the
+      `breakConcentration` summon sweep), and the P4.5 **combat-start bridge**
+      (`state.summoned_allies` + `seedSummonedAllies` materialize persistent
+      summons into entities + initiative after the owner) have all shipped.
+      Remaining is content:
   - [ ] **P4.5 — SRD summon content (Animate Dead shipped 2026-05-23).**
-    Animate Dead raises a Skeleton ally: out-of-combat cast (gated in
-    precast) → `runSummonSpell` records it on `summoned_allies` →
-    `seedSummonedAllies` materializes it at combat start → it fights via
-    the AI-default `runAllyTurn`. The owner can also override its target
-    on their own turn via the bonus-action `command_summon`
-    (shipped 2026-05-23: sets `commanded_target_id`, which
-    `selectTarget` prefers while that enemy lives). The Zombie variant +
-    upcast multi-raise shipped 2026-05-24 (`summon.variants` /
-    `countPerUpcastLevel`; the cast menu offers Skeleton/Zombie per slot
-    level, raising +2 per level above 3rd — SRD-verified stat blocks).
-    Animate Dead is **content-complete** for the creature-summon model.
+        Animate Dead raises a Skeleton ally: out-of-combat cast (gated in
+        precast) → `runSummonSpell` records it on `summoned_allies` →
+        `seedSummonedAllies` materializes it at combat start → it fights via
+        the AI-default `runAllyTurn`. The owner can also override its target
+        on their own turn via the bonus-action `command_summon`
+        (shipped 2026-05-23: sets `commanded_target_id`, which
+        `selectTarget` prefers while that enemy lives). The Zombie variant +
+        upcast multi-raise shipped 2026-05-24 (`summon.variants` /
+        `countPerUpcastLevel`; the cast menu offers Skeleton/Zombie per slot
+        level, raising +2 per level above 3rd — SRD-verified stat blocks).
+        Animate Dead is **content-complete** for the creature-summon model.
 
     The creature-summon-as-ally infrastructure cleanly covers stat-blocked
     summons only. The other 2024-SRD "summon" spells are mechanically
     different and each need their own model (NOT drop-in stat blocks) —
     deferred as separate slices:
-    - **Spiritual Weapon** (L2): a floating *force* with no HP; a
+    - **Spiritual Weapon** (L2): a floating _force_ with no HP; a
       bonus-action melee spell attack you re-issue each turn. Model as a
       persistent bonus-action attack effect, not an ally combatant.
     - **Conjure Animals** (L3) and the other 2024 conjure spells: a
-      concentration *damage zone* (spectral spirits; DEX save, scaling
+      concentration _damage zone_ (spectral spirits; DEX save, scaling
       dice), closer to a moving AoE/hazard than a summoned creature.
     - **Find Familiar**: a non-combatant utility companion (familiars
       can't take the Attack action RAW) — a scouting/aid model, not the
@@ -99,28 +99,17 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
   PC/enemy attack handlers, routing enemy turns through `dispatchAction`,
   and NPC spellcasting via the shared `castSpell` pipeline (additive
   follow-up).
-- [ ] **Phase 5** — drop `ctx.char` / `ctx.safeIdx` once every handler
-  reads from `ctx.actor`. In progress (started 2026-05-24):
-  - **5a (done):** migrated the read-only / in-place-mutation handler
-    files to a locally-bound `const { char } = ctx.actor` (guarded
-    `ctx.actor.kind !== 'pc'`): all `classFeature/*` + the `castSpell/*`
-    branch helpers (utility/buff/save/multiTarget/attackRoll/aoe).
-    Converted the cast-pipeline `ctx.char = …` reassignments
-    (`castSpell/index`, `precast`, `heal`, `attack/combatStart`) to
-    `updatePcActor` so `ctx.char` and `ctx.actor.char` stay in lockstep
-    — the invariant the migrated readers depend on. ~305 of 734
-    `ctx.char` refs migrated; field still present.
-  - **5b (next):** the remaining reassignment-heavy files —
-    `reaction`, `attack/{resolveOneAttack,toHit,preattack,index}`,
-    `twoWeaponAttack`, `landsAid`, `classFeature/{rogue,species}`,
-    `hasteExtraAction`, plus the `castSpell` stragglers
-    (`autoHit`/`applyDamage`/`revive`/`summon`). Each `ctx.char = X`
-    becomes `updatePcActor(ctx, X)`; reads move to a local `char`.
-  - **5c (final):** once zero `ctx.char` reads remain, drop `char` +
-    `safeIdx` from `ActionContext` (gameEngine ctx build + `commitChar`
-    → `this.actor.char`; epilogue `char = ctx.actor.char`;
-    `updatePcActor` stops writing `ctx.char`; `ctx.safeIdx` →
-    `ctx.actor.safeIdx`; dispatcher `deductCost`).
+
+- [x] **Phase 5 (done 2026-05-24)** — dropped `ctx.char` / `ctx.safeIdx`
+      from `ActionContext`; every handler now reads the acting character via
+      `ctx.actor` (narrow `ctx.actor.kind === 'pc'` → `ctx.actor.char`, mutate
+      through `updatePcActor`). All 734 `ctx.char` refs migrated across ~30
+      files; `updatePcActor` is the single write path, `commitChar` /
+      takeAction epilogue / dispatcher `deductCost` read `ctx.actor.char`.
+      Surfaced + fixed a latent divergence bug along the way (a direct
+      `ctx.char =` on every cast broke the concentration-save spells). With
+      this, RE-1's actor seam is fully landed: PC and (future) monster
+      handlers can share one implementation.
 
 #### RE-2: Class + subclass feature progression to L20
 
@@ -132,69 +121,69 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 > per class. The "gaps" column is a pointer, not an authoritative level
 > table — grep the SRD per class before implementing.
 
-| Class | Implemented (approx) | Major SRD gaps to fill |
-|---|---|---|
-| Barbarian | Rage, Reckless (L1–2), Frenzy (L3) | Danger Sense, Extra Attack, Fast Movement, Feral Instinct, Brutal Strike, Relentless Rage, Persistent Rage, Indomitable Might, capstone; exhaustion-on-rage-end |
-| Bard | Bardic Inspiration (L1), Cutting Words (L3) | Expertise, Jack of All Trades, Font of Inspiration, Countercharm, Magical Secrets, Superior Inspiration, capstone |
-| Cleric | Channel Divinity, Turn/Sear Undead, Preserve Life (Life) | Blessed Strikes, Divine Intervention, improved Channel uses, higher Life-domain grades |
-| Druid | Wild Shape (L2, CR L4/8), Land's Aid | Wild Companion, full Circle of the Land grades, Wild Shape improvements, Beast Spells, Archdruid |
-| Fighter | Second Wind, Action Surge (L2), Tactical Master (L9) | Fighting style, Extra Attack 2/3/4, Indomitable, Champion grades (Remarkable Athlete, Additional Style, Superior Critical, Survivor) |
-| Monk | Martial Arts, Flurry/Patient/Step (L2), Stunning Strike (L5) | Deflect Attacks, Slow Fall, Stillness of Mind, Evasion, Self-Restoration, Disciplined Survivor, Empty Body, Body & Mind, higher Open Hand grades |
-| Paladin | Sacred Weapon (Devotion L3) | Fighting style, Extra Attack, Aura of Protection (L6), Aura of Courage, Faithful Steed, Divine-Smite-as-feature, Devotion grades, capstone |
-| Ranger | Colossus Slayer (Hunter L3) | Fighting style, spellcasting integration, Extra Attack, Roving, Expertise, Tireless, Nature's Veil, Hunter grades |
-| Rogue | Cunning Action (L2), Cunning Strike (L5), Sneak Attack, Uncanny Dodge | Steady Aim, Evasion, Reliable Talent, Slippery Mind, Elusive, Stroke of Luck, Assassin grades |
-| Sorcerer | Metamagic (L3–5), sorcery points | Innate Sorcery, Sorcerous Restoration, SP↔slot conversion completeness, full Draconic grades, capstone |
-| Warlock | Agonizing Blast (passive) | Eldritch Blast beam scaling, Pact Boon, more invocations, Mystic Arcanum, Magical Cunning, Fiend grades, Eldritch Master |
-| Wizard | cantrips only (Arcane Ward partial) | Arcane Recovery, Scholar, Memorize Spell, Spell Mastery, Signature Spells, full Evoker grades |
+| Class     | Implemented (approx)                                                  | Major SRD gaps to fill                                                                                                                                          |
+| --------- | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Barbarian | Rage, Reckless (L1–2), Frenzy (L3)                                    | Danger Sense, Extra Attack, Fast Movement, Feral Instinct, Brutal Strike, Relentless Rage, Persistent Rage, Indomitable Might, capstone; exhaustion-on-rage-end |
+| Bard      | Bardic Inspiration (L1), Cutting Words (L3)                           | Expertise, Jack of All Trades, Font of Inspiration, Countercharm, Magical Secrets, Superior Inspiration, capstone                                               |
+| Cleric    | Channel Divinity, Turn/Sear Undead, Preserve Life (Life)              | Blessed Strikes, Divine Intervention, improved Channel uses, higher Life-domain grades                                                                          |
+| Druid     | Wild Shape (L2, CR L4/8), Land's Aid                                  | Wild Companion, full Circle of the Land grades, Wild Shape improvements, Beast Spells, Archdruid                                                                |
+| Fighter   | Second Wind, Action Surge (L2), Tactical Master (L9)                  | Fighting style, Extra Attack 2/3/4, Indomitable, Champion grades (Remarkable Athlete, Additional Style, Superior Critical, Survivor)                            |
+| Monk      | Martial Arts, Flurry/Patient/Step (L2), Stunning Strike (L5)          | Deflect Attacks, Slow Fall, Stillness of Mind, Evasion, Self-Restoration, Disciplined Survivor, Empty Body, Body & Mind, higher Open Hand grades                |
+| Paladin   | Sacred Weapon (Devotion L3)                                           | Fighting style, Extra Attack, Aura of Protection (L6), Aura of Courage, Faithful Steed, Divine-Smite-as-feature, Devotion grades, capstone                      |
+| Ranger    | Colossus Slayer (Hunter L3)                                           | Fighting style, spellcasting integration, Extra Attack, Roving, Expertise, Tireless, Nature's Veil, Hunter grades                                               |
+| Rogue     | Cunning Action (L2), Cunning Strike (L5), Sneak Attack, Uncanny Dodge | Steady Aim, Evasion, Reliable Talent, Slippery Mind, Elusive, Stroke of Luck, Assassin grades                                                                   |
+| Sorcerer  | Metamagic (L3–5), sorcery points                                      | Innate Sorcery, Sorcerous Restoration, SP↔slot conversion completeness, full Draconic grades, capstone                                                          |
+| Warlock   | Agonizing Blast (passive)                                             | Eldritch Blast beam scaling, Pact Boon, more invocations, Mystic Arcanum, Magical Cunning, Fiend grades, Eldritch Master                                        |
+| Wizard    | cantrips only (Arcane Ward partial)                                   | Arcane Recovery, Scholar, Memorize Spell, Spell Mastery, Signature Spells, full Evoker grades                                                                   |
 
 #### RE-3: Character-build systems (small, high RAW payoff)
 
 - [ ] **Fighting styles** — SRD 5.2.1 has 4: Archery, Defense, Great
-  Weapon Fighting, Two-Weapon Fighting. None implemented. Needed by
-  Fighter / Paladin / Ranger.
+      Weapon Fighting, Two-Weapon Fighting. None implemented. Needed by
+      Fighter / Paladin / Ranger.
 - [ ] **Epic boons** (L19+ feat options) — SRD has 7: Combat Prowess,
-  Dimensional Travel, Fate, Irresistible Offense, Spell Recall, the
-  Night Spirit, Truesight. Slot into the existing `take_feat` surface.
+      Dimensional Travel, Fate, Irresistible Offense, Spell Recall, the
+      Night Spirit, Truesight. Slot into the existing `take_feat` surface.
 - [ ] **Exhaustion (2024 model)** — replace the binary-disadvantage-at-L3
-  approximation with the RAW **−2 to all d20 tests per level** and
-  **−5 ft speed per level**. `reviveD20Penalty` already shows the
-  per-d20 numeric-penalty threading pattern.
+      approximation with the RAW **−2 to all d20 tests per level** and
+      **−5 ft speed per level**. `reviveD20Penalty` already shows the
+      per-d20 numeric-penalty threading pattern.
 - [ ] **Ability-score generation** — standard array / point buy at
-  character creation (scores are effectively hard-coded today).
+      character creation (scores are effectively hard-coded today).
 
 #### RE-4: Combat / exploration subsystems (bounded)
 
 - [ ] **Wall/terrain spells as real grid blockers** — transient grid
-  obstacles that expire on concentration drop (Wall of Fire / Force).
+      obstacles that expire on concentration drop (Wall of Fire / Force).
 - [ ] **Mounted combat** — `mount_id` exists but isn't enforced (forced
-  dismount on damage, reach, ranged-while-mounted rules).
+      dismount on damage, reach, ranged-while-mounted rules).
 - [ ] **Underwater combat** — non-piercing melee disadvantage, ranged
-  rules, fire resistance.
+      rules, fire resistance.
 - [ ] **Jumping** (long = STR ft, high = 3 + STR mod ft) — also flagged
-  under architectural blockers.
+      under architectural blockers.
 - [ ] **Line-of-sight / vision blocking by walls** — Bresenham LoS
-  respecting obstacles (pairs with the FE grid-fog item).
+      respecting obstacles (pairs with the FE grid-fog item).
 - [ ] **Massive-damage instant death** (single hit ≥ max HP).
 
 #### RE-5: Condition + spellcasting fidelity (cleanups)
 
 - [ ] Register **Deafened**; add **Petrified** damage resistance + save
-  advantage; **Charmed** CHA-check disadvantage; **Slow** end-of-turn
-  recurring save; make concentration's **incapacitation** gate explicit.
+      advantage; **Charmed** CHA-check disadvantage; **Slow** end-of-turn
+      recurring save; make concentration's **incapacitation** gate explicit.
 - [ ] **Choice-UX mechanics** that auto-resolve today: Polymorph beast
-  pick, Greater Restoration "pick one effect," multi-target picker
-  (Bless / Bane / upcast +1 target). Part engine, part FE.
+      pick, Greater Restoration "pick one effect," multi-target picker
+      (Bless / Bane / upcast +1 target). Part engine, part FE.
 - [ ] **Multiclass edge cases** — ASI spacing validation, skill/tool
-  grants on multiclass entry, warlock pact-slot pool separation,
-  second-class subclass features.
+      grants on multiclass entry, warlock pact-slot pool separation,
+      second-class subclass features.
 
 #### RE-6: Content (data on existing patterns, not engine)
 
 - [ ] **Spells** — ~112 of ~330 SRD spells. Most remaining categories
-  are already representable (data entry); summons depend on RE-1, a few
-  "pick an option" spells on RE-5's picker.
+      are already representable (data entry); summons depend on RE-1, a few
+      "pick an option" spells on RE-5's picker.
 - [ ] **Monsters** — stat-block content; legendary/lair effects can use
-  the shipped scaffolding (see boss-wiring item under Content & playtest).
+      the shipped scaffolding (see boss-wiring item under Content & playtest).
 - [ ] **Magic items** — content; attunement + curse infra is shipped.
 
 ### Remaining subsystem follow-ups
@@ -205,27 +194,27 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 > roadmap above; the rest:
 
 - [ ] **Magic / Utilize action-category tags** — category wrappers
-  (cast_spell + magic-item-use + magical features = Magic; mundane
-  item-use + interact_object = Utilize). Only needed for Action Surge's
-  "extra action, except the Magic action" rule once a martial
-  multiclasses into a caster. Bundle with multiclass UX.
+      (cast_spell + magic-item-use + magical features = Magic; mundane
+      item-use + interact_object = Utilize). Only needed for Action Surge's
+      "extra action, except the Magic action" rule once a martial
+      multiclasses into a caster. Bundle with multiclass UX.
 - [ ] **Magic-item attunement — remaining** — short-rest attune gating
-  per RAW, Remove Curse ↔ `de_attune` interaction, and cursed items in
-  seed loot tables (only spec fixtures carry them today).
+      per RAW, Remove Curse ↔ `de_attune` interaction, and cursed items in
+      seed loot tables (only spec fixtures carry them today).
 - [ ] **Lighting — remaining** — cell-grained lighting (torchlight
-  cones, darkness spells), auto-apply Blinded in dark rooms, and
-  lighting-adjusted active Perception (search). The room-grained
-  Stealth/Perception path already shipped.
+      cones, darkness spells), auto-apply Blinded in dark rooms, and
+      lighting-adjusted active Perception (search). The room-grained
+      Stealth/Perception path already shipped.
 - [ ] **Somatic spell components** — RAW requires a free hand; needs a
-  hand-state model (weapon + shield = both hands, two-handed = both).
-  No spell carries a `somatic` flag yet. Also unlocks the
-  focus-substitutes-for-material rule.
+      hand-state model (weapon + shield = both hands, two-handed = both).
+      No spell carries a `somatic` flag yet. Also unlocks the
+      focus-substitutes-for-material rule.
 - [ ] **Battleaxe mastery: Flex → Topple** — sandbox tags Battleaxe with
-  the homebrew `flex` mastery; RAW 2024 assigns Topple. Audit the other
-  Flex-tagged weapons and either retire `flex` or document it as a
-  pansori variant.
+      the homebrew `flex` mastery; RAW 2024 assigns Topple. Audit the other
+      Flex-tagged weapons and either retire `flex` or document it as a
+      pansori variant.
 - [ ] **Out-of-combat systems** — Downtime activities, Bastions,
-  Crafting (potions / scrolls / items), Vehicles. Lowest urgency.
+      Crafting (potions / scrolls / items), Vehicles. Lowest urgency.
 
 ### Subclass coverage (2026-05-23 — 12 SRD-iconic, one per class)
 
@@ -284,12 +273,12 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 - [~] **4. Narrative pipeline — structured fragments** (multi-stage
   migration; attack + spell + enemy-side paths shipped). Remaining:
   - [ ] `twoWeaponAttack` fragment migration — needs a `two_weapon_hit`
-    kind or prose alignment; off-hand outcomes emit no `CombatEvent` today.
+        kind or prose alignment; off-hand outcomes emit no `CombatEvent` today.
   - [ ] Cleave-hit fragment — secondary-target damage emits no event.
   - [ ] `resolveTarget(ctx, action)` helper to dedupe target resolution
-    across ~5 sites.
+        across ~5 sites.
   - [ ] `cleric.ts` Divine Spark auto-hit → `spell_auto_hit` fragment
-    (defer until a Divine Spark rework).
+        (defer until a Divine Spark rework).
 
 - [~] **5. Monsters as first-class action subjects** (extraction +
   type-seam + Phase-3 handler migration shipped; dispatcher integration

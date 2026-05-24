@@ -18,18 +18,20 @@ export function runAutoHitSpell(
   slotLevel: number,
   slotNote: string
 ): { spellDmg: number } {
+  if (ctx.actor.kind !== 'pc') return { spellDmg: 0 };
+  const { char } = ctx.actor;
   const autoHitExpr =
-    spell.level === 0 ? cantripDamageDice(spell, ctx.char.level) : upcastDamage(spell, slotLevel);
+    spell.level === 0 ? cantripDamageDice(spell, char.level) : upcastDamage(spell, slotLevel);
   const spellDmg = rollDice(autoHitExpr || spell.damage || '0');
   composeNow(ctx, {
     kind: 'spell_auto_hit',
-    attackerId: ctx.char.id,
-    attackerName: ctx.char.name,
+    attackerId: char.id,
+    attackerName: char.name,
     target: spellTarget,
     spellId: spell.id,
     spellName: spell.name,
     castPrefix: pickCastPrefix(spell, {
-      name: ctx.char.name,
+      name: char.name,
       spell: spell.name,
       slotNote,
     }),

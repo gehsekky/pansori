@@ -5442,7 +5442,6 @@ export async function takeAction({
     context,
     state,
     worldName,
-    safeIdx,
     prevRoomId,
     roomId,
     roomObstacleCells,
@@ -5454,14 +5453,13 @@ export async function takeAction({
     adjacent,
     seed,
     st,
-    char,
     actor: pcActor(char, safeIdx),
     narrative,
     escaped,
     usedInitiative,
     fragments: [],
     commitChar() {
-      this.st = commitCharacter(this.st, this.char);
+      if (this.actor.kind === 'pc') this.st = commitCharacter(this.st, this.actor.char);
     },
   };
 
@@ -5492,7 +5490,7 @@ export async function takeAction({
     composeFragments(ctx);
     seed = ctx.seed;
     st = ctx.st;
-    char = ctx.char;
+    if (ctx.actor.kind === 'pc') char = ctx.actor.char;
     narrative = ctx.narrative;
     escaped = ctx.escaped;
     usedInitiative = ctx.usedInitiative;

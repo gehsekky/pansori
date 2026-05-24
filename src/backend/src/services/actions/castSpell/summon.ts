@@ -22,6 +22,8 @@ export function runSummonSpell(
   slotLevel: number,
   summonVariant?: string
 ): boolean {
+  if (ctx.actor.kind !== 'pc') return false;
+  const { char } = ctx.actor;
   if (!spell.summon) return false;
   const base = spell.summon;
   const chosen = [base, ...(base.variants ?? [])].find((o) => o.name === summonVariant) ?? base;
@@ -31,7 +33,7 @@ export function runSummonSpell(
 
   const raised = Array.from({ length: count }, () => ({
     id: `summon-${randomUUID()}`,
-    ownerId: ctx.char.id,
+    ownerId: char.id,
     name: chosen.name,
     ac: chosen.ac,
     maxHp: chosen.maxHp,
@@ -45,6 +47,6 @@ export function runSummonSpell(
   const crew = count === 1 ? `a ${chosen.name}` : `${count} ${chosen.name}s`;
   ctx.narrative =
     (ctx.narrative ?? '') +
-    `${ctx.char.name} casts ${spell.name}${slotNote} — ${crew} rise${count === 1 ? 's' : ''} to fight at the party's side, joining the next battle.`;
+    `${char.name} casts ${spell.name}${slotNote} — ${crew} rise${count === 1 ? 's' : ''} to fight at the party's side, joining the next battle.`;
   return true;
 }

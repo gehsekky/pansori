@@ -13,7 +13,7 @@ import { buildArrivalNarrative } from '../gameEngine.js';
  */
 export const handleMove: ActionHandler<{ type: 'move'; roomId: string }> = (ctx, action) => {
   if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can move between rooms.' };
-  const { char } = ctx.actor;
+  const { char, safeIdx } = ctx.actor;
   const target = ctx.seed.rooms.find((r) => r.id === action.roomId);
   if (!target || !ctx.adjacent.find((r) => r.id === target.id)) {
     ctx.narrative = 'The path loops back on itself. You cannot get there from here.';
@@ -45,7 +45,7 @@ export const handleMove: ActionHandler<{ type: 'move'; roomId: string }> = (ctx,
       target.id,
       {
         ...ctx.st,
-        characters: ctx.st.characters.map((c, i) => (i === ctx.safeIdx ? char : c)),
+        characters: ctx.st.characters.map((c, i) => (i === safeIdx ? char : c)),
       },
       ctx.seed,
       ctx.context

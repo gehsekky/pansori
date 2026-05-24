@@ -119,7 +119,7 @@ export const handleUse: ActionHandler<{
   targetCharId?: string;
 }> = (ctx, action) => {
   if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can use items.' };
-  const { char } = ctx.actor;
+  const { char, safeIdx } = ctx.actor;
   const held = char.inventory?.find((i) => i.id === action.itemId);
   if (!held) {
     ctx.narrative = "You search your pack — you don't have that.";
@@ -145,10 +145,8 @@ export const handleUse: ActionHandler<{
       const bonusNote = healBonus > 0 ? ` (+${healBonus} medicine)` : '';
 
       const targetId = action.targetCharId;
-      const targetIdx = targetId
-        ? nextSt.characters.findIndex((c) => c.id === targetId)
-        : ctx.safeIdx;
-      const isSelf = !targetId || targetIdx === ctx.safeIdx;
+      const targetIdx = targetId ? nextSt.characters.findIndex((c) => c.id === targetId) : safeIdx;
+      const isSelf = !targetId || targetIdx === safeIdx;
 
       if (!isSelf && targetIdx >= 0) {
         const target = nextSt.characters[targetIdx];

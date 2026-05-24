@@ -20,6 +20,8 @@ export function runHealSpell(
   castingScore: number,
   slotNote: string
 ): void {
+  if (ctx.actor.kind !== 'pc') return;
+  const pc = ctx.actor;
   const healMod = Math.max(0, Math.floor((castingScore - 10) / 2));
   // Upcast scaling — Cure Wounds at slot 2 rolls 2d8 (base) + 2d8
   // (upcastBonus × 1 extra level) = 4d8 + mod. Previously the
@@ -32,7 +34,7 @@ export function runHealSpell(
   const baseHealed = rollDice(healDice) + healMod;
   // Life Cleric: Disciple of Life — healing spells restore extra 2 + spell level HP
   const discipleBonus =
-    ctx.char.subclass === 'life' && hasClass(ctx.char, 'cleric') ? 2 + (spell.level ?? 1) : 0;
+    pc.char.subclass === 'life' && hasClass(pc.char, 'cleric') ? 2 + (spell.level ?? 1) : 0;
   const healed = baseHealed + discipleBonus;
 
   // 2024 PHB Mass Healing Word (L3) / Mass Cure Wounds (L5) — apply the
@@ -49,9 +51,9 @@ export function runHealSpell(
     const perTargetLines: string[] = [];
     let updatedChars = ctx.st.characters;
     let updatedEntities = ctx.st.entities ?? [];
-    let casterAfter = ctx.char;
+    let casterAfter = pc.char;
     for (const member of livingParty) {
-      const isMemberCaster = member.id === ctx.char.id;
+      const isMemberCaster = member.id === pc.char.id;
       const target = isMemberCaster ? casterAfter : member;
       const prevHp = target.hp;
       const newHp = Math.min(target.max_hp, prevHp + healed);
@@ -75,7 +77,7 @@ export function runHealSpell(
       kind: 'spell_utility',
       prose:
         pickCastPrefix(spell, {
-          name: ctx.char.name,
+          name: pc.char.name,
           spell: spell.name,
           slotNote,
         }) + ` — ${healed} HP to each: ${perTargetLines.join(', ')}.${bonusSuffix}`,
@@ -85,10 +87,10 @@ export function runHealSpell(
 
   // Target the most injured party member (excluding the caster, unless only one)
   const injured = ctx.st.characters.filter(
-    (c) => !c.dead && c.hp < c.max_hp && c.id !== ctx.char.id
+    (c) => !c.dead && c.hp < c.max_hp && c.id !== pc.char.id
   );
-  const target = injured.length > 0 ? injured.reduce((a, b) => (a.hp < b.hp ? a : b)) : ctx.char;
-  const isSelf = target.id === ctx.char.id;
+  const target = injured.length > 0 ? injured.reduce((a, b) => (a.hp < b.hp ? a : b)) : pc.char;
+  const isSelf = target.id === pc.char.id;
   const healBonusList: Array<{ label: string }> = [];
   if (discipleBonus > 0) healBonusList.push({ label: `Disciple of Life: +${discipleBonus}` });
   const healBonuses = healBonusList.length > 0 ? healBonusList : undefined;
@@ -103,12 +105,12 @@ export function runHealSpell(
   const stripFrom = (conditions: string[]): string[] =>
     stripList.length > 0 ? conditions.filter((c) => !stripList.includes(c)) : conditions;
   if (isSelf) {
-    const prevHp = ctx.char.hp;
-    ctx.char.hp = Math.min(ctx.char.max_hp, ctx.char.hp + healed);
-    targetNewHp = ctx.char.hp;
+    const prevHp = pc.char.hp;
+    pc.char.hp = Math.min(pc.char.max_hp, pc.char.hp + healed);
+    targetNewHp = pc.char.hp;
     actualHealed = targetNewHp - prevHp;
     if (stripList.length > 0) {
-      ctx.char.conditions = stripFrom(ctx.char.conditions);
+      pc.char.conditions = stripFrom(pc.char.conditions);
     }
   } else {
     const prevHp = target.hp;
@@ -133,7 +135,7 @@ export function runHealSpell(
   composeNow(ctx, {
     kind: 'spell_heal',
     castPrefix: pickCastPrefix(spell, {
-      name: ctx.char.name,
+      name: pc.char.name,
       spell: spell.name,
       slotNote,
       target: isSelf ? undefined : target.name,

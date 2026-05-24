@@ -16,6 +16,7 @@ import { abilityMod, profBonus, rollDice } from '../rulesEngine.js';
 import { getClassLevel, hasClass } from '../multiclass.js';
 import type { ActionHandler } from './types.js';
 import { composeNow } from '../narrative/compose.js';
+import { updatePcActor } from './actor.js';
 
 const MAX_USES = 2;
 
@@ -25,30 +26,32 @@ export const handleLandsAid: ActionHandler<{
   targetCharId?: string;
   targetEnemyId?: string;
 }> = (ctx, action) => {
-  if (!hasClass(ctx.char, 'druid') || ctx.char.subclass !== 'land') {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can do that.' };
+  const pc = ctx.actor;
+  if (!hasClass(pc.char, 'druid') || pc.char.subclass !== 'land') {
     return { rejected: "Land's Aid is a Land Druid feature." };
   }
-  const druidLvl = getClassLevel(ctx.char, 'druid');
+  const druidLvl = getClassLevel(pc.char, 'druid');
   if (druidLvl < 3) {
     return { rejected: "Land's Aid unlocks at Druid level 3." };
   }
-  const used = ctx.char.class_resource_uses?.lands_aid_used ?? 0;
+  const used = pc.char.class_resource_uses?.lands_aid_used ?? 0;
   if (used >= MAX_USES) {
     return { rejected: "No Land's Aid uses remaining (2/long rest)." };
   }
-  if (ctx.char.turn_actions.bonus_action_used) {
+  if (pc.char.turn_actions.bonus_action_used) {
     return { rejected: 'Bonus action already used this turn.' };
   }
 
-  const wisMod = abilityMod(ctx.char.wis);
+  const wisMod = abilityMod(pc.char.wis);
   ctx.usedInitiative = true;
 
   if (action.variant === 'heal') {
     // Target an ally or self (default to most-injured ally,
     // self if no injured ally exists).
-    let target = ctx.char;
+    let target = pc.char;
     let isSelf = true;
-    if (action.targetCharId && action.targetCharId !== ctx.char.id) {
+    if (action.targetCharId && action.targetCharId !== pc.char.id) {
       const ally = ctx.st.characters.find((c) => c.id === action.targetCharId && !c.dead);
       if (ally) {
         target = ally;
@@ -56,7 +59,7 @@ export const handleLandsAid: ActionHandler<{
       }
     } else {
       const injured = ctx.st.characters.filter(
-        (c) => !c.dead && c.hp < c.max_hp && c.id !== ctx.char.id
+        (c) => !c.dead && c.hp < c.max_hp && c.id !== pc.char.id
       );
       if (injured.length > 0) {
         target = injured.reduce((a, b) => (a.hp < b.hp ? a : b));
@@ -68,7 +71,7 @@ export const handleLandsAid: ActionHandler<{
     const newHp = Math.min(target.max_hp, target.hp + heal);
     const actualHealed = newHp - prevHp;
     if (isSelf) {
-      ctx.char = { ...ctx.char, hp: newHp };
+      updatePcActor(ctx, { hp: newHp });
     } else {
       ctx.st = {
         ...ctx.st,
@@ -78,15 +81,14 @@ export const handleLandsAid: ActionHandler<{
         ),
       };
     }
-    ctx.char = {
-      ...ctx.char,
-      turn_actions: { ...ctx.char.turn_actions, bonus_action_used: true },
+    updatePcActor(ctx, {
+      turn_actions: { ...pc.char.turn_actions, bonus_action_used: true },
       class_resource_uses: {
-        ...(ctx.char.class_resource_uses ?? {}),
+        ...(pc.char.class_resource_uses ?? {}),
         lands_aid_used: used + 1,
       },
-    };
-    ctx.narrative = `🌿 Land's Aid — ${ctx.char.name} channels nature: ${actualHealed} HP restored to ${target.name} (now ${newHp}/${target.max_hp}). (${MAX_USES - used - 1}/${MAX_USES} uses left)`;
+    });
+    ctx.narrative = `🌿 Land's Aid — ${pc.char.name} channels nature: ${actualHealed} HP restored to ${target.name} (now ${newHp}/${target.max_hp}). (${MAX_USES - used - 1}/${MAX_USES} uses left)`;
     return;
   }
 
@@ -99,7 +101,7 @@ export const handleLandsAid: ActionHandler<{
     return { rejected: 'No enemy to target.' };
   }
   const dmgType = action.variant === 'harm_necrotic' ? 'necrotic' : 'radiant';
-  const dc = 8 + profBonus(ctx.char.level) + wisMod;
+  const dc = 8 + profBonus(pc.char.level) + wisMod;
   const enemyCon = (enemyData as unknown as Record<string, number>)?.con ?? 10;
   const save = rollDice('1d20') + abilityMod(enemyCon);
   const fullDmg = rollDice('2d6') + druidLvl;
@@ -124,13 +126,12 @@ export const handleLandsAid: ActionHandler<{
       e.id === enemyData.id && e.isEnemy ? { ...e, hp: newHp } : e
     ),
   };
-  ctx.char = {
-    ...ctx.char,
-    turn_actions: { ...ctx.char.turn_actions, bonus_action_used: true },
+  updatePcActor(ctx, {
+    turn_actions: { ...pc.char.turn_actions, bonus_action_used: true },
     class_resource_uses: {
-      ...(ctx.char.class_resource_uses ?? {}),
+      ...(pc.char.class_resource_uses ?? {}),
       lands_aid_used: used + 1,
     },
-  };
-  ctx.narrative = `🌿 Land's Aid — ${ctx.char.name} channels nature: ${enemyData.name} CON ${save} vs DC ${dc} — ${dmg} ${dmgType}${save >= dc ? ' (half)' : ''}. (${MAX_USES - used - 1}/${MAX_USES} uses left)`;
+  });
+  ctx.narrative = `🌿 Land's Aid — ${pc.char.name} channels nature: ${enemyData.name} CON ${save} vs DC ${dc} — ${dmg} ${dmgType}${save >= dc ? ' (half)' : ''}. (${MAX_USES - used - 1}/${MAX_USES} uses left)`;
 };

@@ -15,6 +15,7 @@ import type { ActionHandler } from './types.js';
 import type { EnemyAttackHitFragment } from '../narrative/fragments.js';
 import { enemyAttackFragmentEvent } from '../narrative/compose.js';
 import { resolveOneAttack } from './attack/resolveOneAttack.js';
+import { updatePcActor } from './actor.js';
 
 /**
  * `use_reaction`: trigger the readied action stored from a prior
@@ -37,21 +38,23 @@ import { resolveOneAttack } from './attack/resolveOneAttack.js';
  * extracted.
  */
 export const handleUseReaction: ActionHandler<{ type: 'use_reaction' }> = (ctx) => {
-  const readied = ctx.char.turn_actions.readied_action;
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs have reactions.' };
+  const pc = ctx.actor;
+  const readied = pc.char.turn_actions.readied_action;
   if (!readied) {
     return { rejected: 'You have no readied action.' };
   }
   // Dispatcher post-deducts `reaction_used` after the delegateTo
   // resolves (use_reaction's declared cost is 'reaction').
-  ctx.char = {
-    ...ctx.char,
+  updatePcActor(ctx, {
+    ...pc.char,
     turn_actions: {
-      ...ctx.char.turn_actions,
+      ...pc.char.turn_actions,
       readied_action: undefined,
     },
-  };
+  });
   ctx.commitChar();
-  ctx.narrative = `${ctx.char.name} triggers their readied action! `;
+  ctx.narrative = `${pc.char.name} triggers their readied action! `;
   return { delegateTo: readied.action };
 };
 
@@ -80,6 +83,8 @@ export const handleResolveReaction: ActionHandler<{
   accept: boolean;
   replacementIndex?: number;
 }> = (ctx, action) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs have reactions.' };
+  const pc = ctx.actor;
   const rx = ctx.st.pending_reaction;
   if (!rx) {
     ctx.narrative = 'No reaction pending.';
@@ -88,7 +93,7 @@ export const handleResolveReaction: ActionHandler<{
   // 2024 PHB PC-turn d20 reactions (Heroic Inspiration etc.) carry
   // `rollerCharId` instead of the enemy-attack-base `targetCharId`.
   const reactionOwnerId = rx.kind === 'pc_d20' ? rx.rollerCharId : rx.targetCharId;
-  if (ctx.char.id !== reactionOwnerId) {
+  if (pc.char.id !== reactionOwnerId) {
     ctx.narrative = 'This reaction belongs to another character.';
     return;
   }
@@ -117,10 +122,10 @@ export const handleResolveReaction: ActionHandler<{
     const blob = rx.attackContext as AttackContextBlob;
     if (action.accept) {
       // Rewind to pre-attack state on ctx.
-      ctx.char = blob.preAttackChar;
+      updatePcActor(ctx, blob.preAttackChar);
       ctx.st = { ...blob.preAttackSt, pending_reaction: undefined };
       // Inspiration is spent regardless of outcome.
-      ctx.char = { ...ctx.char, inspiration: false };
+      updatePcActor(ctx, { ...pc.char, inspiration: false });
       // Roll the new d20 (RAW: "you must use the new roll").
       const newD20 = Math.floor(Math.random() * 20) + 1;
       // Re-run the same attack with the forced d20 baked into the
@@ -135,10 +140,10 @@ export const handleResolveReaction: ActionHandler<{
       resolveOneAttack(ctx, rerunCtx, '');
       // Action is consumed (the original attack was the action; the
       // reroll just resolves it).
-      ctx.char = {
-        ...ctx.char,
-        turn_actions: { ...ctx.char.turn_actions, action_used: true },
-      };
+      updatePcActor(ctx, {
+        ...pc.char,
+        turn_actions: { ...pc.char.turn_actions, action_used: true },
+      });
       ctx.usedInitiative = true;
     } else {
       // Decline — commit the proposed (miss) snapshot. Inspiration
@@ -147,12 +152,12 @@ export const handleResolveReaction: ActionHandler<{
       // miss branch).
       const proposedChar = rx.pendingProposedChar as Character;
       const proposedSt = rx.pendingProposedSt as GameState;
-      ctx.char = proposedChar;
+      updatePcActor(ctx, proposedChar);
       ctx.st = { ...proposedSt, pending_reaction: undefined };
-      ctx.char = {
-        ...ctx.char,
-        turn_actions: { ...ctx.char.turn_actions, action_used: true },
-      };
+      updatePcActor(ctx, {
+        ...pc.char,
+        turn_actions: { ...pc.char.turn_actions, action_used: true },
+      });
       ctx.narrative += '\n\n[Heroic Inspiration declined.] ';
       ctx.usedInitiative = true;
     }
@@ -175,19 +180,19 @@ export const handleResolveReaction: ActionHandler<{
       ctx.st = {
         ...ctx.st,
         characters: pendingProposedSt.characters.map((c) =>
-          c.id === ctx.char.id ? pendingProposedChar : c
+          c.id === pc.char.id ? pendingProposedChar : c
         ),
         entities: (pendingProposedSt.entities ?? ctx.st.entities ?? []).map((e) =>
-          e.id === ctx.char.id && !e.isEnemy ? { ...e, hp: pendingProposedChar.hp } : e
+          e.id === pc.char.id && !e.isEnemy ? { ...e, hp: pendingProposedChar.hp } : e
         ),
         pending_reaction: undefined,
       };
-      ctx.char = pendingProposedChar;
+      updatePcActor(ctx, pendingProposedChar);
       ctx.st = pushEvent(ctx.st, enemyAttackFragmentEvent(pendingFragment, ctx.st.round ?? 1));
     };
     if (action.accept) {
-      const slotsMax = ctx.char.spell_slots_max ?? {};
-      const slotsUsed = ctx.char.spell_slots_used ?? {};
+      const slotsMax = pc.char.spell_slots_max ?? {};
+      const slotsUsed = pc.char.spell_slots_used ?? {};
       const lvl = Object.keys(slotsMax)
         .map(Number)
         .filter((n) => n >= 1 && (slotsMax[n] ?? 0) > (slotsUsed[n] ?? 0))
@@ -202,21 +207,21 @@ export const handleResolveReaction: ActionHandler<{
         // The proposed snapshot (including any concentration save) is
         // DISCARDED — no damage landed, so concentration was never
         // actually tested per RAW.
-        ctx.char = {
-          ...ctx.char,
+        updatePcActor(ctx, {
+          ...pc.char,
           spell_slots_used: { ...slotsUsed, [lvl]: (slotsUsed[lvl] ?? 0) + 1 },
-          turn_actions: { ...ctx.char.turn_actions, reaction_used: true },
-          conditions: [...ctx.char.conditions.filter((c) => c !== 'shield_spell'), 'shield_spell'],
+          turn_actions: { ...pc.char.turn_actions, reaction_used: true },
+          conditions: [...pc.char.conditions.filter((c) => c !== 'shield_spell'), 'shield_spell'],
           condition_durations: {
-            ...(ctx.char.condition_durations ?? {}),
+            ...(pc.char.condition_durations ?? {}),
             shield_spell: 1,
           },
-          ac: ctx.char.ac + 5,
-        };
-        ctx.narrative = `🛡️ ${ctx.char.name} casts SHIELD as a reaction (lvl ${lvl} slot)! +5 AC until the start of their next turn — the ${pendingFragment.attackerName}'s strike bounces off the shimmering barrier.`;
+          ac: pc.char.ac + 5,
+        });
+        ctx.narrative = `🛡️ ${pc.char.name} casts SHIELD as a reaction (lvl ${lvl} slot)! +5 AC until the start of their next turn — the ${pendingFragment.attackerName}'s strike bounces off the shimmering barrier.`;
         ctx.st = {
           ...ctx.st,
-          characters: ctx.st.characters.map((c) => (c.id === ctx.char.id ? ctx.char : c)),
+          characters: ctx.st.characters.map((c) => (c.id === pc.char.id ? pc.char : c)),
           pending_reaction: undefined,
         };
       }
@@ -227,14 +232,14 @@ export const handleResolveReaction: ActionHandler<{
     }
   } else if (rx.kind === 'hellish_rebuke') {
     if (action.accept) {
-      const slotsMax = ctx.char.spell_slots_max ?? {};
-      const slotsUsed = ctx.char.spell_slots_used ?? {};
+      const slotsMax = pc.char.spell_slots_max ?? {};
+      const slotsUsed = pc.char.spell_slots_used ?? {};
       // 2024 PHB Tiefling Infernal Legacy — 1/long-rest free racial slot
       // at L3+. Prefer it over a real spell slot.
       const isTieflingInnate =
-        ctx.char.species === 'tiefling' &&
-        ctx.char.level >= 3 &&
-        !ctx.char.class_resource_uses?.tiefling_rebuke_used;
+        pc.char.species === 'tiefling' &&
+        pc.char.level >= 3 &&
+        !pc.char.class_resource_uses?.tiefling_rebuke_used;
       let slotLvl: number | undefined;
       if (isTieflingInnate) {
         slotLvl = 1;
@@ -249,23 +254,23 @@ export const handleResolveReaction: ActionHandler<{
         ctx.st = { ...ctx.st, pending_reaction: undefined };
       } else {
         if (isTieflingInnate) {
-          ctx.char = {
-            ...ctx.char,
+          updatePcActor(ctx, {
+            ...pc.char,
             class_resource_uses: {
-              ...(ctx.char.class_resource_uses ?? {}),
+              ...(pc.char.class_resource_uses ?? {}),
               tiefling_rebuke_used: 1,
             },
-          };
+          });
         } else {
-          ctx.char = {
-            ...ctx.char,
+          updatePcActor(ctx, {
+            ...pc.char,
             spell_slots_used: { ...slotsUsed, [slotLvl]: (slotsUsed[slotLvl] ?? 0) + 1 },
-          };
+          });
         }
-        ctx.char = {
-          ...ctx.char,
-          turn_actions: { ...ctx.char.turn_actions, reaction_used: true },
-        };
+        updatePcActor(ctx, {
+          ...pc.char,
+          turn_actions: { ...pc.char.turn_actions, reaction_used: true },
+        });
         // Upcast: 2d10 base + 1d10 per slot above 1st.
         const upcastDice = Math.max(0, slotLvl - 1);
         const baseRoll = rollDice('2d10');
@@ -273,7 +278,7 @@ export const handleResolveReaction: ActionHandler<{
         const fullDmg = baseRoll + upcastRoll;
         const enemyData = getEnemyById(ctx.seed, rx.attackerEnemyId);
         const enemyDex = enemyData?.dex ?? 10;
-        const dc = 8 + profBonus(ctx.char.level) + abilityMod(ctx.char.cha);
+        const dc = 8 + profBonus(pc.char.level) + abilityMod(pc.char.cha);
         const saveRoll = rollDice('1d20') + abilityMod(enemyDex);
         const saved = saveRoll >= dc;
         const finalDmg = saved ? Math.floor(fullDmg / 2) : fullDmg;
@@ -284,31 +289,31 @@ export const handleResolveReaction: ActionHandler<{
           entities: ctx.st.entities?.map((e) =>
             e.id === rx.attackerEnemyId && e.isEnemy ? { ...e, hp: newEnemyHp } : e
           ),
-          characters: ctx.st.characters.map((c) => (c.id === ctx.char.id ? ctx.char : c)),
+          characters: ctx.st.characters.map((c) => (c.id === pc.char.id ? pc.char : c)),
           pending_reaction: undefined,
         };
         const enemyName = enemyData?.name ?? 'the attacker';
-        ctx.narrative = `🔥 ${ctx.char.name} casts HELLISH REBUKE (lvl ${slotLvl} slot)! Hellish flames engulf ${enemyName}. DEX save ${saveRoll} vs DC ${dc} — ${saved ? 'half' : 'full'} damage: ${finalDmg} fire (${baseRoll}${upcastRoll > 0 ? ` + ${upcastRoll} upcast` : ''}).`;
+        ctx.narrative = `🔥 ${pc.char.name} casts HELLISH REBUKE (lvl ${slotLvl} slot)! Hellish flames engulf ${enemyName}. DEX save ${saveRoll} vs DC ${dc} — ${saved ? 'half' : 'full'} damage: ${finalDmg} fire (${baseRoll}${upcastRoll > 0 ? ` + ${upcastRoll} upcast` : ''}).`;
         if (newEnemyHp <= 0) {
           const xpGain = enemyData?.xp ?? 10;
-          const split = splitEncounterXp(ctx.st, ctx.char.id, xpGain);
+          const split = splitEncounterXp(ctx.st, pc.char.id, xpGain);
           ctx.st = split.st;
           const xpShare = split.share;
-          ctx.char = { ...ctx.char, xp: (ctx.char.xp || 0) + xpShare };
+          updatePcActor(ctx, { ...pc.char, xp: (pc.char.xp || 0) + xpShare });
           ctx.st = {
             ...ctx.st,
             enemies_killed: [...(ctx.st.enemies_killed ?? []), rx.attackerEnemyId],
-            characters: ctx.st.characters.map((c) => (c.id === ctx.char.id ? ctx.char : c)),
+            characters: ctx.st.characters.map((c) => (c.id === pc.char.id ? pc.char : c)),
           };
           ctx.narrative += ` ${enemyName} is consumed by the rebuke! (+${xpShare} XP)`;
-          ctx.narrative += applyPartyLevelUps(ctx.st, ctx.char, ctx.context);
+          ctx.narrative += applyPartyLevelUps(ctx.st, pc.char, ctx.context);
           if (isRoomCleared(ctx.st, ctx.seed, ctx.st.current_room)) {
             ctx.st = endCombatState(ctx.st);
           }
         }
       }
     } else {
-      ctx.narrative = `${ctx.char.name} declines to retaliate.`;
+      ctx.narrative = `${pc.char.name} declines to retaliate.`;
       ctx.st = { ...ctx.st, pending_reaction: undefined };
     }
   } else if (rx.kind === 'counterspell') {
@@ -316,8 +321,8 @@ export const handleResolveReaction: ActionHandler<{
     // spell level auto-counters; otherwise an ability check vs
     // DC 10 + spell level. Decline = enemy spell resolves.
     if (action.accept) {
-      const slotsMax = ctx.char.spell_slots_max ?? {};
-      const slotsUsed = ctx.char.spell_slots_used ?? {};
+      const slotsMax = pc.char.spell_slots_max ?? {};
+      const slotsUsed = pc.char.spell_slots_used ?? {};
       const slotLvl = Object.keys(slotsMax)
         .map(Number)
         .filter((n) => n >= 3 && (slotsMax[n] ?? 0) > (slotsUsed[n] ?? 0))
@@ -326,43 +331,43 @@ export const handleResolveReaction: ActionHandler<{
         ctx.narrative = 'No 3rd-level or higher slot — Counterspell fizzles.';
         ctx.st = { ...ctx.st, pending_reaction: undefined };
       } else {
-        ctx.char = {
-          ...ctx.char,
+        updatePcActor(ctx, {
+          ...pc.char,
           spell_slots_used: { ...slotsUsed, [slotLvl]: (slotsUsed[slotLvl] ?? 0) + 1 },
-          turn_actions: { ...ctx.char.turn_actions, reaction_used: true },
-        };
+          turn_actions: { ...pc.char.turn_actions, reaction_used: true },
+        });
         const autoCounter = slotLvl >= rx.enemySpellLevel;
         let success = autoCounter;
         let checkDetail = '';
         if (!autoCounter) {
-          const castingAbility = (ctx.context.spellcastingAbility?.[ctx.char.character_class] ??
-            ctx.context.classPrimaryStats[ctx.char.character_class] ??
+          const castingAbility = (ctx.context.spellcastingAbility?.[pc.char.character_class] ??
+            ctx.context.classPrimaryStats[pc.char.character_class] ??
             'int') as 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha';
-          const score = ctx.char[castingAbility] ?? 10;
+          const score = pc.char[castingAbility] ?? 10;
           const dc = 10 + rx.enemySpellLevel;
-          const checkRoll = rollDice('1d20') + abilityMod(score) + profBonus(ctx.char.level);
+          const checkRoll = rollDice('1d20') + abilityMod(score) + profBonus(pc.char.level);
           success = checkRoll >= dc;
           checkDetail = ` ${castingAbility.toUpperCase()} check ${checkRoll} vs DC ${dc} — ${success ? 'success' : 'failed'}.`;
         }
         if (success) {
-          ctx.narrative = `⚡ ${ctx.char.name} casts COUNTERSPELL (lvl ${slotLvl} slot)!${checkDetail} ${rx.enemySpellName} is unraveled — no effect.`;
+          ctx.narrative = `⚡ ${pc.char.name} casts COUNTERSPELL (lvl ${slotLvl} slot)!${checkDetail} ${rx.enemySpellName} is unraveled — no effect.`;
         } else {
           const damage = applyEnemySpellDamage(ctx.st, rx, ctx.context);
           if (damage) {
             ctx.st = damage.st;
             // If the reactor IS the spell target, sync char so the final
             // commitChar doesn't overwrite the damage.
-            if (rx.intendedTargetPcId === ctx.char.id) {
-              ctx.char = { ...ctx.char, hp: damage.targetHp };
+            if (rx.intendedTargetPcId === pc.char.id) {
+              updatePcActor(ctx, { ...pc.char, hp: damage.targetHp });
             }
-            ctx.narrative = `⚡ ${ctx.char.name} casts COUNTERSPELL (lvl ${slotLvl} slot)!${checkDetail} ${rx.enemySpellName} bursts through — ${damage.targetName} takes ${damage.dmgRoll} ${damage.damageType}.`;
+            ctx.narrative = `⚡ ${pc.char.name} casts COUNTERSPELL (lvl ${slotLvl} slot)!${checkDetail} ${rx.enemySpellName} bursts through — ${damage.targetName} takes ${damage.dmgRoll} ${damage.damageType}.`;
           } else {
-            ctx.narrative = `${ctx.char.name} fails to counter ${rx.enemySpellName}. The spell resolves.`;
+            ctx.narrative = `${pc.char.name} fails to counter ${rx.enemySpellName}. The spell resolves.`;
           }
         }
         ctx.st = {
           ...ctx.st,
-          characters: ctx.st.characters.map((c) => (c.id === ctx.char.id ? ctx.char : c)),
+          characters: ctx.st.characters.map((c) => (c.id === pc.char.id ? pc.char : c)),
           pending_reaction: undefined,
         };
       }
@@ -370,12 +375,12 @@ export const handleResolveReaction: ActionHandler<{
       const damage = applyEnemySpellDamage(ctx.st, rx, ctx.context);
       if (damage) {
         ctx.st = damage.st;
-        if (rx.intendedTargetPcId === ctx.char.id) {
-          ctx.char = { ...ctx.char, hp: damage.targetHp };
+        if (rx.intendedTargetPcId === pc.char.id) {
+          updatePcActor(ctx, { ...pc.char, hp: damage.targetHp });
         }
-        ctx.narrative = `${ctx.char.name} declines to counter. ${rx.enemySpellName} resolves — ${damage.targetName} takes ${damage.dmgRoll} ${damage.damageType}.`;
+        ctx.narrative = `${pc.char.name} declines to counter. ${rx.enemySpellName} resolves — ${damage.targetName} takes ${damage.dmgRoll} ${damage.damageType}.`;
       } else {
-        ctx.narrative = `${ctx.char.name} declines to counter. ${rx.enemySpellName} resolves.`;
+        ctx.narrative = `${pc.char.name} declines to counter. ${rx.enemySpellName} resolves.`;
       }
       ctx.st = { ...ctx.st, pending_reaction: undefined };
     }
@@ -398,32 +403,32 @@ export const handleResolveReaction: ActionHandler<{
       ctx.st = {
         ...ctx.st,
         characters: pendingProposedSt.characters.map((c) =>
-          c.id === ctx.char.id ? charAfterHalve : c
+          c.id === pc.char.id ? charAfterHalve : c
         ),
         entities: (pendingProposedSt.entities ?? ctx.st.entities ?? []).map((e) =>
-          e.id === ctx.char.id && !e.isEnemy ? { ...e, hp: charAfterHalve.hp } : e
+          e.id === pc.char.id && !e.isEnemy ? { ...e, hp: charAfterHalve.hp } : e
         ),
         pending_reaction: undefined,
       };
-      ctx.char = charAfterHalve;
+      updatePcActor(ctx, charAfterHalve);
       ctx.st = pushEvent(
         ctx.st,
         enemyAttackFragmentEvent({ ...pendingFragment, damage: halved }, ctx.st.round ?? 1)
       );
-      ctx.narrative = `🌀 ${ctx.char.name} uses Uncanny Dodge! ${pendingFragment.prose} — but only ${halved} damage lands (saved ${dmgSaved}).`;
+      ctx.narrative = `🌀 ${pc.char.name} uses Uncanny Dodge! ${pendingFragment.prose} — but only ${halved} damage lands (saved ${dmgSaved}).`;
     } else {
       // Decline — commit the full-damage proposed snapshot.
       ctx.st = {
         ...ctx.st,
         characters: pendingProposedSt.characters.map((c) =>
-          c.id === ctx.char.id ? pendingProposedChar : c
+          c.id === pc.char.id ? pendingProposedChar : c
         ),
         entities: (pendingProposedSt.entities ?? ctx.st.entities ?? []).map((e) =>
-          e.id === ctx.char.id && !e.isEnemy ? { ...e, hp: pendingProposedChar.hp } : e
+          e.id === pc.char.id && !e.isEnemy ? { ...e, hp: pendingProposedChar.hp } : e
         ),
         pending_reaction: undefined,
       };
-      ctx.char = pendingProposedChar;
+      updatePcActor(ctx, pendingProposedChar);
       ctx.st = pushEvent(ctx.st, enemyAttackFragmentEvent(pendingFragment, ctx.st.round ?? 1));
       ctx.narrative = `${pendingFragment.prose} (Uncanny Dodge declined.)`;
     }

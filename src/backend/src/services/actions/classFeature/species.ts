@@ -9,6 +9,7 @@ import {
 import type { ActionContext } from '../types.js';
 import { SRD_SPECIES } from '../../../contexts/srd/index.js';
 import { entitiesInCone } from '../../gridEngine.js';
+import { updatePcActor } from '../actor.js';
 
 /**
  * 2024 PHB species (formerly "racial") features. Three classes
@@ -24,72 +25,74 @@ import { entitiesInCone } from '../../gridEngine.js';
  *    bucket)d10. 1/short rest.
  */
 export function handleSpeciesFeature(ctx: ActionContext, fid: string): boolean {
+  if (ctx.actor.kind !== 'pc') return false;
+  const pc = ctx.actor;
   if (fid === 'adrenaline_rush') {
-    if (ctx.char.species !== 'orc') {
+    if (pc.char.species !== 'orc') {
       ctx.narrative = 'Only Orcs have Adrenaline Rush.';
       return true;
     }
-    if (ctx.char.class_resource_uses?.adrenaline_rush_used === 1) {
+    if (pc.char.class_resource_uses?.adrenaline_rush_used === 1) {
       ctx.narrative = 'Adrenaline Rush already used this short rest.';
       return true;
     }
-    if (ctx.char.turn_actions.bonus_action_used) {
+    if (pc.char.turn_actions.bonus_action_used) {
       ctx.narrative = 'Bonus action already used this turn.';
       return true;
     }
-    const arSpeed = effectiveSpeed(ctx.char);
+    const arSpeed = effectiveSpeed(pc.char);
     ctx.st = {
       ...ctx.st,
       movement_used: {
         ...(ctx.st.movement_used ?? {}),
-        [ctx.char.id]: Math.max(0, (ctx.st.movement_used?.[ctx.char.id] ?? 0) - arSpeed),
+        [pc.char.id]: Math.max(0, (ctx.st.movement_used?.[pc.char.id] ?? 0) - arSpeed),
       },
     };
-    const arTemp = profBonus(ctx.char.level);
-    const newTemp = Math.max(ctx.char.temp_hp ?? 0, arTemp);
-    ctx.char.temp_hp = newTemp;
-    ctx.char.class_resource_uses = {
-      ...(ctx.char.class_resource_uses ?? {}),
+    const arTemp = profBonus(pc.char.level);
+    const newTemp = Math.max(pc.char.temp_hp ?? 0, arTemp);
+    pc.char.temp_hp = newTemp;
+    pc.char.class_resource_uses = {
+      ...(pc.char.class_resource_uses ?? {}),
       adrenaline_rush_used: 1,
     };
-    ctx.char.turn_actions = { ...ctx.char.turn_actions, bonus_action_used: true };
-    ctx.narrative = `🪓 ${ctx.char.name} — Adrenaline Rush! +${arSpeed} ft movement (Dash) and ${arTemp} temp HP.`;
+    pc.char.turn_actions = { ...pc.char.turn_actions, bonus_action_used: true };
+    ctx.narrative = `🪓 ${pc.char.name} — Adrenaline Rush! +${arSpeed} ft movement (Dash) and ${arTemp} temp HP.`;
     ctx.usedInitiative = true;
     return true;
   }
 
   if (fid === 'large_form') {
-    if (ctx.char.species !== 'goliath') {
+    if (pc.char.species !== 'goliath') {
       ctx.narrative = 'Only Goliaths have Large Form.';
       return true;
     }
-    if (ctx.char.class_resource_uses?.large_form_used === 1) {
+    if (pc.char.class_resource_uses?.large_form_used === 1) {
       ctx.narrative = 'Large Form already used this short rest.';
       return true;
     }
-    if (ctx.char.turn_actions.bonus_action_used) {
+    if (pc.char.turn_actions.bonus_action_used) {
       ctx.narrative = 'Bonus action already used this turn.';
       return true;
     }
-    ctx.char.class_resource_uses = {
-      ...(ctx.char.class_resource_uses ?? {}),
+    pc.char.class_resource_uses = {
+      ...(pc.char.class_resource_uses ?? {}),
       large_form_used: 1,
     };
-    ctx.char.turn_actions = { ...ctx.char.turn_actions, bonus_action_used: true };
-    ctx.char = inflictCondition(ctx.char, 'large_form');
-    if (!ctx.char.condition_durations) ctx.char.condition_durations = {};
-    ctx.char.condition_durations = { ...ctx.char.condition_durations, large_form: 10 };
-    ctx.narrative = `🗿 ${ctx.char.name} swells to Large size! +10 ft speed and advantage on STR checks for 10 rounds.`;
+    pc.char.turn_actions = { ...pc.char.turn_actions, bonus_action_used: true };
+    updatePcActor(ctx, inflictCondition(pc.char, 'large_form'));
+    if (!pc.char.condition_durations) pc.char.condition_durations = {};
+    pc.char.condition_durations = { ...pc.char.condition_durations, large_form: 10 };
+    ctx.narrative = `🗿 ${pc.char.name} swells to Large size! +10 ft speed and advantage on STR checks for 10 rounds.`;
     ctx.usedInitiative = true;
     return true;
   }
 
   if (fid === 'breath_weapon') {
-    if (ctx.char.species !== 'dragonborn') {
+    if (pc.char.species !== 'dragonborn') {
       ctx.narrative = 'Only Dragonborn have a Breath Weapon.';
       return true;
     }
-    if (ctx.char.class_resource_uses?.breath_weapon_used === 1) {
+    if (pc.char.class_resource_uses?.breath_weapon_used === 1) {
       ctx.narrative = 'Breath Weapon already used — recovers on a short rest.';
       return true;
     }
@@ -97,15 +100,14 @@ export function handleSpeciesFeature(ctx: ActionContext, fid: string): boolean {
       ctx.narrative = 'No living target to direct your breath at.';
       return true;
     }
-    const selfEntBW = ctx.st.entities?.find((e) => e.id === ctx.char.id);
+    const selfEntBW = ctx.st.entities?.find((e) => e.id === pc.char.id);
     const targetEntBW = ctx.st.entities?.find((e) => e.id === ctx.enemy!.id && e.isEnemy);
     if (!selfEntBW || !targetEntBW) {
       ctx.narrative = 'Breath Weapon needs a grid position to project the cone.';
       return true;
     }
-    const bwDice =
-      ctx.char.level >= 17 ? 4 : ctx.char.level >= 11 ? 3 : ctx.char.level >= 5 ? 2 : 1;
-    const bwDC = 8 + profBonus(ctx.char.level) + abilityMod(ctx.char.con);
+    const bwDice = pc.char.level >= 17 ? 4 : pc.char.level >= 11 ? 3 : pc.char.level >= 5 ? 2 : 1;
+    const bwDC = 8 + profBonus(pc.char.level) + abilityMod(pc.char.con);
     const bwDmgType = SRD_SPECIES.dragonborn?.resistances?.[0] ?? 'fire';
     const cone = entitiesInCone(selfEntBW.pos, targetEntBW.pos, 15, ctx.st.entities ?? []);
     const lines: string[] = [];
@@ -127,14 +129,14 @@ export function handleSpeciesFeature(ctx: ActionContext, fid: string): boolean {
       );
     }
     ctx.st = { ...ctx.st, entities: updatedEntities };
-    ctx.char.class_resource_uses = {
-      ...(ctx.char.class_resource_uses ?? {}),
+    pc.char.class_resource_uses = {
+      ...(pc.char.class_resource_uses ?? {}),
       breath_weapon_used: 1,
     };
     ctx.narrative =
       lines.length > 0
-        ? `🐲 ${ctx.char.name}'s Breath Weapon (${bwDice}d10 ${bwDmgType}, 15-ft cone)! ${lines.join(' · ')}`
-        : `${ctx.char.name} exhales a cone of ${bwDmgType} but no enemies are caught in it.`;
+        ? `🐲 ${pc.char.name}'s Breath Weapon (${bwDice}d10 ${bwDmgType}, 15-ft cone)! ${lines.join(' · ')}`
+        : `${pc.char.name} exhales a cone of ${bwDmgType} but no enemies are caught in it.`;
     ctx.usedInitiative = true;
     if (isRoomCleared(ctx.st, ctx.seed, ctx.roomId)) {
       ctx.st = endCombatState(ctx.st);
