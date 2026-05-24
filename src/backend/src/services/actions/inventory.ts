@@ -8,6 +8,7 @@ import {
 import type { ActionHandler } from './types.js';
 import { applyDamage } from '../damage.js';
 import { fmt } from '../narrativeFmt.js';
+import { updatePcActor } from './actor.js';
 
 /**
  * `attune`: PHB p.138 — bind to a magic item that requires
@@ -19,12 +20,14 @@ export const handleAttune: ActionHandler<{ type: 'attune'; instanceId: string }>
   ctx,
   action
 ) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can attune to items.' };
+  const { char } = ctx.actor;
   if (ctx.st.combat_active) {
     ctx.narrative = 'You cannot attune to items during combat.';
     return;
   }
   const instanceId = action.instanceId;
-  const invItem = ctx.char.inventory.find((i) => i.instance_id === instanceId);
+  const invItem = char.inventory.find((i) => i.instance_id === instanceId);
   if (!invItem) {
     ctx.narrative = "You don't have that item.";
     return;
@@ -34,7 +37,7 @@ export const handleAttune: ActionHandler<{ type: 'attune'; instanceId: string }>
     ctx.narrative = `The ${invItem.name} doesn't require attunement.`;
     return;
   }
-  const attunedList = ctx.char.attuned_items ?? [];
+  const attunedList = char.attuned_items ?? [];
   if (attunedList.includes(instanceId)) {
     ctx.narrative = `You are already attuned to the ${invItem.name}.`;
     return;
@@ -44,7 +47,7 @@ export const handleAttune: ActionHandler<{ type: 'attune'; instanceId: string }>
       'You can only be attuned to 3 items at a time (PHB p.138). De-attune one first.';
     return;
   }
-  ctx.char = { ...ctx.char, attuned_items: [...attunedList, instanceId] };
+  updatePcActor(ctx, { attuned_items: [...attunedList, instanceId] });
   let narrative = `You spend a moment focusing on the ${invItem.name}, attuning yourself to its magic. (${attunedList.length + 1}/3 attuned items)`;
   // Cursed items reveal on attunement (PHB p.214). The curse text is
   // appended so the player learns about the curse and knows they're
@@ -67,16 +70,18 @@ export const handleDeAttune: ActionHandler<{ type: 'de_attune'; instanceId: stri
   ctx,
   action
 ) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can end attunement.' };
+  const { char } = ctx.actor;
   if (ctx.st.combat_active) {
     ctx.narrative = 'You cannot end attunement during combat.';
     return;
   }
-  const attunedList = ctx.char.attuned_items ?? [];
+  const attunedList = char.attuned_items ?? [];
   if (!attunedList.includes(action.instanceId)) {
     ctx.narrative = 'You are not attuned to that item.';
     return;
   }
-  const invItem = ctx.char.inventory.find((i) => i.instance_id === action.instanceId);
+  const invItem = char.inventory.find((i) => i.instance_id === action.instanceId);
   const lootItem = invItem ? ctx.context.lootTable.find((l) => l.id === invItem.id) : undefined;
   if (lootItem?.cursed) {
     ctx.narrative = `The curse on the ${invItem?.name ?? 'item'} prevents voluntary de-attunement. You'll need Remove Curse magic to break this bond.`;
@@ -85,7 +90,7 @@ export const handleDeAttune: ActionHandler<{ type: 'de_attune'; instanceId: stri
   // De-attuning a currently-equipped attunement-required item also
   // implicitly unequips it (since the equip check gates on attunement).
   let next = {
-    ...ctx.char,
+    ...char,
     attuned_items: attunedList.filter((id) => id !== action.instanceId),
   };
   if (lootItem?.requiresAttunement) {
@@ -93,7 +98,7 @@ export const handleDeAttune: ActionHandler<{ type: 'de_attune'; instanceId: stri
     if (next.equipped_armor === action.instanceId) next = { ...next, equipped_armor: null };
     if (next.equipped_shield === action.instanceId) next = { ...next, equipped_shield: null };
   }
-  ctx.char = next;
+  updatePcActor(ctx, next);
   ctx.narrative = `You release your attunement to the ${invItem?.name ?? 'item'}.`;
 };
 
@@ -113,15 +118,17 @@ export const handleUse: ActionHandler<{
   itemId: string;
   targetCharId?: string;
 }> = (ctx, action) => {
-  const held = ctx.char.inventory?.find((i) => i.id === action.itemId);
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can use items.' };
+  const { char } = ctx.actor;
+  const held = char.inventory?.find((i) => i.id === action.itemId);
   if (!held) {
     ctx.narrative = "You search your pack — you don't have that.";
     return;
   }
   const itemData = getItemData(held, ctx.context);
-  const firstIdx = ctx.char.inventory.findIndex((i) => i.id === held.id);
+  const firstIdx = char.inventory.findIndex((i) => i.id === held.id);
 
-  let nextChar = ctx.char;
+  let nextChar = char;
   let nextSt = ctx.st;
   let narrative: string;
 
@@ -209,7 +216,7 @@ export const handleUse: ActionHandler<{
       },
     };
   }
-  ctx.char = nextChar;
+  updatePcActor(ctx, nextChar);
   ctx.st = nextSt;
   ctx.narrative = narrative;
 };
