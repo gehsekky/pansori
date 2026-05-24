@@ -393,6 +393,27 @@ export function hasJackOfAllTrades(char: Character): boolean {
 }
 
 /**
+ * SRD 5.2.1 Expertise (Rogue L1 + L6, Bard L2 + L9): the number of skills the
+ * character may hold Expertise in (double proficiency bonus). Each class grants
+ * 2 then 2 more; multiclass grants are independent, so they sum. (RE-2.)
+ */
+export function expertiseSlots(char: Character): number {
+  const bard = getClassLevel(char, 'bard');
+  const rogue = getClassLevel(char, 'rogue');
+  const bardSlots = bard >= 9 ? 4 : bard >= 2 ? 2 : 0;
+  const rogueSlots = rogue >= 6 ? 4 : rogue >= 1 ? 2 : 0;
+  return bardSlots + rogueSlots;
+}
+
+/**
+ * True when `char` has chosen Expertise in `skill` (case-insensitive). The
+ * doubled proficiency is applied by `skillCheck` when it is also proficient. (RE-2.)
+ */
+export function hasExpertise(char: Character, skill: string): boolean {
+  return (char.expertise_skills ?? []).some((s) => s.toLowerCase() === skill.toLowerCase());
+}
+
+/**
  * SRD 5.2.1 Paladin Lay on Hands (L1): HP remaining in the healing pool —
  * 5 × Paladin level minus points already spent (`class_resource_uses
  * .lay_on_hands`, replenished on a long rest). 0 for non-paladins. (RE-2.)

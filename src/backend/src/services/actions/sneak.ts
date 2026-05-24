@@ -14,7 +14,7 @@ import {
   pick,
 } from '../gameEngine.js';
 import { consumeStrokeOfLuck, strokeOfLuckAvailable } from '../strokeOfLuck.js';
-import { hasJackOfAllTrades, hasReliableTalent } from '../multiclass.js';
+import { hasExpertise, hasJackOfAllTrades, hasReliableTalent } from '../multiclass.js';
 import type { ActionHandler } from './types.js';
 import { updatePcActor } from './actor.js';
 
@@ -68,7 +68,7 @@ export const handleSneak: ActionHandler<{ type: 'sneak' }> = (ctx) => {
       proficient,
       member.level,
       checkDisadv,
-      false,
+      hasExpertise(member, 'Stealth'),
       hasJackOfAllTrades(member),
       inspAdv || luckAdv,
       member.species === 'halfling',

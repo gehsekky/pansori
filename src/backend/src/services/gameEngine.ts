@@ -64,6 +64,7 @@ import { applyExpiryHooks, getConditionDuration } from './conditions/registry.js
 import {
   applyMulticlassProfGrants,
   canRitualCast,
+  expertiseSlots,
   getClassLevel,
   hasClass,
   hasElusive,
@@ -2672,6 +2673,25 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         choices.push({
           label: `Choose Fighting Style: ${FIGHTING_STYLE_LABELS[fs]}`,
           action: { type: 'choose_fighting_style', style: fs },
+        });
+      }
+    }
+  }
+
+  // ── Expertise picks (Rogue L1/L6, Bard L2/L9) ──────────────────────────────
+  // Double proficiency in a chosen skill. RAW level-up choice, surfaced out of
+  // combat like Fighting Style; offered per still-unchosen skill proficiency
+  // while a slot is open. (RE-2.)
+  if (!state.combat_active) {
+    const expChosen = char.expertise_skills ?? [];
+    if (expChosen.length < expertiseSlots(char)) {
+      const chosenLower = new Set(expChosen.map((s) => s.toLowerCase()));
+      for (const skill of char.skill_proficiencies ?? []) {
+        if (chosenLower.has(skill.toLowerCase())) continue;
+        if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+        choices.push({
+          label: `Choose Expertise: ${skill} (double proficiency)`,
+          action: { type: 'choose_expertise', skill },
         });
       }
     }

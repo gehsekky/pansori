@@ -348,6 +348,10 @@ export type StructuredAction =
   // SRD 5.2.1 Fighting Style feat pick, granted by class features (Fighter
   // L1/L7, Paladin/Ranger L2). Out-of-combat, no action cost. (RE-2.)
   | { type: 'choose_fighting_style'; style: string }
+  // SRD 5.2.1 Expertise pick (Rogue L1/L6, Bard L2/L9): double proficiency in a
+  // chosen skill proficiency. `skill` matches a `skill_proficiencies` entry.
+  // Out-of-combat, no action cost. (RE-2.)
+  | { type: 'choose_expertise'; skill: string }
   // SRD 5.2.1 Paladin Lay on Hands (L1): bonus-action touch heal drawing from
   // a pool of 5 × Paladin level HP. `targetCharId` is the healed party member
   // (may be the paladin). (RE-2.)

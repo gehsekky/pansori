@@ -11,6 +11,7 @@ import { effectiveLightFor, passivePerceptionDcInLight, skillCheck } from '../..
 import {
   getClassLevel,
   hasClass,
+  hasExpertise,
   hasJackOfAllTrades,
   hasReliableTalent,
 } from '../../multiclass.js';
@@ -147,7 +148,7 @@ export function handleRogueFeature(ctx: ActionContext, fid: string): boolean {
       hideProf,
       pc.char.level,
       isHeavilyEncumbered(pc.char),
-      false,
+      hasExpertise(pc.char, 'Stealth'),
       hasJackOfAllTrades(pc.char),
       inspAdvHide || luckAdvHide,
       pc.char.species === 'halfling',
