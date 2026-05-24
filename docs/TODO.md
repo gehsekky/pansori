@@ -444,6 +444,15 @@ Bonus(char, st)`: a creature within 10 ft of a conscious L6+ Paladin (the
       eligible condition (Frightened cleared, Blinded kept). (The "no exhaustion
       from forgoing food/drink" clause is narrative — pansori doesn't model
       starvation exhaustion.)
+- [x] **Deflect Attacks (done 2026-05-24)** — Monk L3: when a Bludgeoning/
+      Piercing/Slashing attack hits you, a Reaction reduces the damage by 1d10 +
+      DEX + Monk level. Auto-resolved in `computeEnemyAttack` (player-favorable,
+      like the other reaction features): applied when the monk has a Reaction and
+      the hit is B/P/S, reducing the post-resistance damage and spending the
+      reaction (set on the proposed char). Spec: L3 slashing reduced + reaction
+      spent vs L2 (no reduction) vs fire (not B/P/S) vs reaction-already-spent,
+      via the dispatched `enemy_attack` handler. Deferred: the L13 Deflect Energy
+      upgrade (any damage type) and the optional Focus-Point redirect attack.
 
 | Class     | Implemented (approx)                                                                                                                                                                                                                | Major SRD gaps to fill                                                                                                   |
 | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
@@ -452,7 +461,7 @@ Bonus(char, st)`: a creature within 10 ft of a conscious L6+ Paladin (the
 | Cleric    | Channel Divinity, Turn/Sear Undead, Preserve Life (Life)                                                                                                                                                                            | Blessed Strikes, Divine Intervention, improved Channel uses, higher Life-domain grades                                   |
 | Druid     | Wild Shape (L2, CR L4/8), Land's Aid                                                                                                                                                                                                | Wild Companion, full Circle of the Land grades, Wild Shape improvements, Beast Spells, Archdruid                         |
 | Fighter   | Second Wind, Action Surge (L2), Extra Attack (2/3/4), Indomitable (L9), Tactical Master (L9)                                                                                                                                        | Champion grades (Remarkable Athlete, Additional Style, Superior Critical, Survivor)                                      |
-| Monk      | Martial Arts, Flurry/Patient/Step (L2), Uncanny Metabolism (L2), Stunning Strike (L5), Extra Attack (L5), Evasion (L7), Self-Restoration (L10)                                                                                      | Deflect Attacks, Slow Fall, Disciplined Survivor, Empty Body, Body & Mind, higher Open Hand grades                       |
+| Monk      | Martial Arts, Flurry/Patient/Step (L2), Uncanny Metabolism (L2), Deflect Attacks (L3), Stunning Strike (L5), Extra Attack (L5), Evasion (L7), Self-Restoration (L10)                                                                | Slow Fall, Disciplined Survivor, Empty Body, Body & Mind, higher Open Hand grades                                        |
 | Paladin   | Sacred Weapon (Devotion L3), Fighting Style (L2), Extra Attack (L5), Lay on Hands (L1), Aura of Protection (L6)                                                                                                                     | Aura of Courage, Faithful Steed, Divine-Smite-as-feature, Devotion grades, capstone                                      |
 | Ranger    | Colossus Slayer (Hunter L3), Fighting Style (L2), Extra Attack (L5)                                                                                                                                                                 | spellcasting integration, Roving, Expertise, Tireless, Nature's Veil, Hunter grades                                      |
 | Rogue     | Expertise (L1/6), Cunning Action (L2), Cunning Strike (L5), Sneak Attack, Uncanny Dodge, Steady Aim (L3), Evasion (L7), Reliable Talent (L7), Slippery Mind (L15), Elusive (L18), Stroke of Luck (L20)                              | Assassin grades                                                                                                          |

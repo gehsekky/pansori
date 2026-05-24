@@ -1015,11 +1015,34 @@ function computeEnemyAttack(
     const wardNote = '';
     const charAfterWard = char;
     const postWardDmg = postResistDmg;
+    // SRD Monk Deflect Attacks (L3): when hit by Bludgeoning/Piercing/Slashing,
+    // a Reaction reduces the damage by 1d10 + DEX + Monk level. Auto-resolved
+    // (player-favorable, like the other reaction features): spent when the monk
+    // has a Reaction and the hit deals B/P/S damage. (The optional Focus-Point
+    // redirect is deferred — tracked in docs/TODO.md.)
+    const monkDeflectLvl = getClassLevel(char, 'monk');
+    const isBPS = ['bludgeoning', 'piercing', 'slashing'].includes(
+      enemy.damageType ?? 'bludgeoning'
+    );
+    let deflectNote = '';
+    let deflectUsed = false;
+    let postDeflectDmg = postWardDmg;
+    if (monkDeflectLvl >= 3 && isBPS && !char.turn_actions?.reaction_used && postWardDmg > 0) {
+      const reduction = rollDice('1d10') + abilityMod(char.dex) + monkDeflectLvl;
+      postDeflectDmg = Math.max(0, postWardDmg - reduction);
+      deflectUsed = true;
+      deflectNote = ` 🥋 Deflect Attacks: ${fmt.dmg(postWardDmg)} → ${fmt.dmg(postDeflectDmg)} (−${reduction})`;
+    }
     // Universal damage application — temp_hp absorption, exhaustion-4 max-HP
     // clamp, knock-out detection, and the SRD concentration save all flow
     // through `applyDamage`. (PR-2's deferred enemy-attack migration.)
-    const dmgResult = applyDamage(charAfterWard, st, postWardDmg);
-    let updatedChar = dmgResult.char;
+    const dmgResult = applyDamage(charAfterWard, st, postDeflectDmg);
+    let updatedChar = deflectUsed
+      ? {
+          ...dmgResult.char,
+          turn_actions: { ...dmgResult.char.turn_actions, reaction_used: true },
+        }
+      : dmgResult.char;
     let newSt = dmgResult.st;
     const hpLost = dmgResult.amountDealt;
     const tempHpNote =
@@ -1033,6 +1056,7 @@ function computeEnemyAttack(
       .replace('{dmg}', fmt.dmg(hpLost));
     narrative += ` ${char.name} takes ${fmt.dmg(hpLost)} damage.`;
     narrative += rageNote + petrNote + beastNote + speciesNote + wardNote + tempHpNote;
+    narrative += deflectNote;
     narrative += dmgResult.concentrationNote;
 
     let inspirationConsumed = false;
