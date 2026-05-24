@@ -3094,6 +3094,39 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         if (injured.length === 0) continue;
       }
 
+      // Summon spells (Animate Dead): emit one cast choice per available
+      // slot level × creature variant (Skeleton / Zombie). RAW multi-raise
+      // scales the count by slot level above base (countPerUpcastLevel).
+      // Handled here so we skip the generic per-slot emission below.
+      // (RE-1 Phase 4.5.)
+      if (spell.summon) {
+        const sBase = spell.level ?? 1;
+        const sMax = Math.max(
+          sBase,
+          ...Object.keys(slots)
+            .map(Number)
+            .filter((l) => l >= sBase)
+        );
+        const variants = [spell.summon, ...(spell.summon.variants ?? [])];
+        const perUpcast = spell.summon.countPerUpcastLevel ?? 0;
+        for (let sl = sBase; sl <= sMax; sl++) {
+          const avail = (slots[sl] ?? 0) - (slotsUsed[sl] ?? 0);
+          if (avail <= 0) continue;
+          const count = Math.max(1, 1 + perUpcast * (sl - sBase));
+          const slotLabel = sl === sBase ? `Lvl ${sl}` : `${ordinal(sl)} slot`;
+          for (const v of variants) {
+            if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+            const crew = count === 1 ? v.name : `${count} ${v.name}s`;
+            choices.push({
+              label: `Cast ${spell.name} (${slotLabel}) — raise ${crew} (${avail} slot${avail === 1 ? '' : 's'} left)`,
+              action: { type: 'cast_spell', spellId, slotLevel: sl, summonVariant: v.name },
+              kind: 'cast_spell',
+            });
+          }
+        }
+        continue;
+      }
+
       // Optional AoE preview metadata for the grid renderer.
       const aoePreview = spell.blastRadius
         ? {

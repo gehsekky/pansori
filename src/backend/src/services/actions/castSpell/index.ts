@@ -136,7 +136,15 @@ export const handleCastSpell: ActionHandler<{
   // ── Summon spells (Animate Dead) — out-of-combat, add a persistent
   // ally to summoned_allies; seeded into combat by seedSummonedAllies.
   // Runs before runUtilitySpell so it isn't swallowed as a no-op.
-  if (runSummonSpell(ctx, spell, slotNote)) {
+  if (
+    runSummonSpell(
+      ctx,
+      spell,
+      slotNote,
+      slotLevel,
+      (action as { summonVariant?: string }).summonVariant
+    )
+  ) {
     return;
   }
 

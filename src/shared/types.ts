@@ -283,6 +283,10 @@ export type StructuredAction =
       //     party member to be restored. Required for revive spells;
       //     the handler errors out when missing.
       targetCharId?: string;
+      // Summon spells (Animate Dead): which creature variant to raise
+      // (e.g. 'Skeleton' or 'Zombie'). Omitted = the spell's base block.
+      // (RE-1 Phase 4.5.)
+      summonVariant?: string;
     }
   | { type: 'disarm_trap' }
   | { type: 'interact_object'; objectId: string }

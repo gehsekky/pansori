@@ -75,9 +75,25 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
     the AI-default `runAllyTurn`. The owner can also override its target
     on their own turn via the bonus-action `command_summon`
     (shipped 2026-05-23: sets `commanded_target_id`, which
-    `selectTarget` prefers while that enemy lives). Remaining:
-    - Zombie variant + multi-raise (MVP raises one Skeleton).
-    - More summons: Spiritual Weapon, Find Familiar, conjure.
+    `selectTarget` prefers while that enemy lives). The Zombie variant +
+    upcast multi-raise shipped 2026-05-24 (`summon.variants` /
+    `countPerUpcastLevel`; the cast menu offers Skeleton/Zombie per slot
+    level, raising +2 per level above 3rd — SRD-verified stat blocks).
+    Animate Dead is **content-complete** for the creature-summon model.
+
+    The creature-summon-as-ally infrastructure cleanly covers stat-blocked
+    summons only. The other 2024-SRD "summon" spells are mechanically
+    different and each need their own model (NOT drop-in stat blocks) —
+    deferred as separate slices:
+    - **Spiritual Weapon** (L2): a floating *force* with no HP; a
+      bonus-action melee spell attack you re-issue each turn. Model as a
+      persistent bonus-action attack effect, not an ally combatant.
+    - **Conjure Animals** (L3) and the other 2024 conjure spells: a
+      concentration *damage zone* (spectral spirits; DEX save, scaling
+      dice), closer to a moving AoE/hazard than a summoned creature.
+    - **Find Familiar**: a non-combatant utility companion (familiars
+      can't take the Attack action RAW) — a scouting/aid model, not the
+      ally-turn AI.
 
   Deferred (not required for SRD compliance — see design doc): merging the
   PC/enemy attack handlers, routing enemy turns through `dispatchAction`,
