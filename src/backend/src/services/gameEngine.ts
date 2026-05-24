@@ -711,14 +711,19 @@ export function hasSaveProficiency(
   );
 }
 
+// SRD Paladin aura radius — 10 ft, expanding to 30 ft at L18 (Aura Expansion).
+function paladinAuraRangeFt(p: Character): number {
+  return getClassLevel(p, 'paladin') >= 18 ? 30 : 10;
+}
+
 /**
  * SRD Aura of Protection (Paladin L6): a creature gains a bonus to saving
  * throws equal to the Charisma modifier (minimum +1) of a Paladin L6+ within
- * 10 ft — the Paladin always benefits from their own aura. Inactive while
+ * the aura — the Paladin always benefits from their own aura. Inactive while
  * that Paladin is Incapacitated (or Unconscious). With multiple auras a
- * creature benefits from only one (the best). Off the grid (out of combat)
- * the party is assumed to travel together. Returns 0 when no aura covers
- * `char`. (RE-2.)
+ * creature benefits from only one (the best). The aura is 10 ft, growing to
+ * 30 ft at L18 (Aura Expansion). Off the grid (out of combat) the party is
+ * assumed to travel together. Returns 0 when no aura covers `char`. (RE-2.)
  */
 export function auraOfProtectionBonus(char: Character, st: GameState): number {
   const charEnt = st.entities?.find((e) => e.id === char.id);
@@ -730,13 +735,40 @@ export function auraOfProtectionBonus(char: Character, st: GameState): number {
     let inRange = p.id === char.id;
     if (!inRange) {
       const pEnt = st.entities?.find((e) => e.id === p.id);
-      inRange = charEnt && pEnt ? distanceFeet(charEnt.pos, pEnt.pos) <= 10 : true;
+      inRange = charEnt && pEnt ? distanceFeet(charEnt.pos, pEnt.pos) <= paladinAuraRangeFt(p) : true;
     }
     if (!inRange) continue;
     const bonus = Math.max(1, abilityMod(p.cha));
     if (bonus > best) best = bonus;
   }
   return best;
+}
+
+/**
+ * SRD Paladin Aura of Courage (L10) and Oath of Devotion's Aura of Devotion
+ * (L7): a creature within a conscious paladin's aura can't be Frightened
+ * (Courage) / Charmed (Devotion), and an existing such condition ends. Returns
+ * the set of conditions `char` is immune to via any qualifying aura in range.
+ * Shares the aura range (incl. L18 Aura Expansion) and the conscious/in-range
+ * rules with auraOfProtectionBonus. (RE-2.)
+ */
+export function auraConditionImmunity(char: Character, st: GameState): Set<string> {
+  const out = new Set<string>();
+  const charEnt = st.entities?.find((e) => e.id === char.id);
+  for (const p of st.characters) {
+    if (p.dead) continue;
+    if ((p.conditions ?? []).some((c) => c === 'incapacitated' || c === 'unconscious')) continue;
+    if (getClassLevel(p, 'paladin') < 7) continue; // earliest aura immunity is Devotion L7
+    let inRange = p.id === char.id;
+    if (!inRange) {
+      const pEnt = st.entities?.find((e) => e.id === p.id);
+      inRange = charEnt && pEnt ? distanceFeet(charEnt.pos, pEnt.pos) <= paladinAuraRangeFt(p) : true;
+    }
+    if (!inRange) continue;
+    if (getClassLevel(p, 'paladin') >= 10) out.add('frightened'); // Aura of Courage
+    if (p.subclass === 'devotion' && getClassLevel(p, 'paladin') >= 7) out.add('charmed'); // Aura of Devotion
+  }
+  return out;
 }
 
 function conditionSavingThrow(
@@ -759,6 +791,20 @@ function conditionSavingThrow(
   // spent a Reaction to reroll this Charmed/Frightened save with Advantage.
   countercharmBardId?: string;
 } {
+  // SRD Paladin Aura of Courage / Aura of Devotion — a creature within the
+  // aura is immune to Frightened / Charmed, so the condition never lands (no
+  // save needed). Checked before any roll.
+  if (effect.condition && auraConditionImmunity(char, st).has(effect.condition)) {
+    return {
+      applied: false,
+      inspirationConsumed: false,
+      indomitableConsumed: false,
+      strokeOfLuckConsumed: false,
+      luckConsumed: false,
+      bardicInspirationConsumed: false,
+      bardicRoll: 0,
+    };
+  }
   const proficient = hasSaveProficiency(char, effect.ability, context);
   // 2024 PHB — Heroic Inspiration can be spent on any d20 test. If the
   // player armed it via spend_inspiration, the save gets advantage and
@@ -6224,6 +6270,25 @@ export async function takeAction({
           };
           st = { ...st, characters: st.characters.map((c, i) => (i === endIdx ? cleaned : c)) };
           narrative += ` ${fmt.note(`[Self-Restoration: ${ending.name} shakes off ${toRemove}]`)}`;
+        }
+      }
+
+      // SRD Paladin Aura of Courage / Devotion — Frightened / Charmed ends on
+      // a creature within the aura (the immunity in conditionSavingThrow blocks
+      // new applications; this clears one applied before the creature entered).
+      const aIdx = st.characters.findIndex((c) => c.id === endingEntry.id);
+      const a = aIdx >= 0 ? st.characters[aIdx] : undefined;
+      if (a && !a.dead) {
+        const immune = auraConditionImmunity(a, st);
+        const cleared = (a.conditions ?? []).filter((c) => immune.has(c));
+        if (cleared.length > 0) {
+          const freed = {
+            ...a,
+            conditions: a.conditions.filter((c) => !immune.has(c)),
+            ...(cleared.includes('charmed') ? { charmer_id: undefined } : {}),
+          };
+          st = { ...st, characters: st.characters.map((c, i) => (i === aIdx ? freed : c)) };
+          narrative += ` ${fmt.note(`[Aura: ${a.name} is freed from ${cleared.join(', ')}]`)}`;
         }
       }
     }
