@@ -29,6 +29,39 @@ import { abilityMod } from '../../rulesEngine.js';
 export function handleCasterFeature(ctx: ActionContext, fid: string): boolean {
   if (ctx.actor.kind !== 'pc') return false;
   const { char } = ctx.actor;
+  if (fid === 'innate_sorcery') {
+    // SRD Sorcerer Innate Sorcery (L1): Bonus Action, for 1 minute gain +1
+    // spell save DC and Advantage on Sorcerer spell attacks; twice per long
+    // rest. Modeled as a self-buff condition cleared at combat end (the
+    // "lasts the encounter" simplification used by Superior Defense); the
+    // 2/long-rest cap is the real limiter.
+    if (!hasClass(char, 'sorcerer')) {
+      ctx.narrative = 'Only Sorcerers have Innate Sorcery.';
+      return true;
+    }
+    if (char.turn_actions.bonus_action_used) {
+      ctx.narrative = 'Bonus action already used this turn.';
+      return true;
+    }
+    if (char.conditions.includes('innate_sorcery')) {
+      ctx.narrative = 'Innate Sorcery is already active.';
+      return true;
+    }
+    const isUsed = char.class_resource_uses?.innate_sorcery_used ?? 0;
+    if (isUsed >= 2) {
+      ctx.narrative = 'Innate Sorcery is expended (2/2 used). Recovers on a long rest.';
+      return true;
+    }
+    char.conditions = [...char.conditions, 'innate_sorcery'];
+    char.class_resource_uses = {
+      ...(char.class_resource_uses ?? {}),
+      innate_sorcery_used: isUsed + 1,
+    };
+    char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
+    ctx.narrative = `${char.name} unleashes Innate Sorcery — +1 spell save DC and Advantage on spell attacks this encounter. (${1 - isUsed}/2 remaining)`;
+    return true;
+  }
+
   if (fid === 'metamagic_twinned') {
     if (!hasClass(char, 'sorcerer')) {
       ctx.narrative = 'Only Sorcerers have Metamagic.';

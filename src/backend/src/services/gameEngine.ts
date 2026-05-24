@@ -1881,11 +1881,15 @@ export function endCombatState(st: GameState): GameState {
     characters: st.characters.map((c) => ({
       ...c,
       turn_actions: { ...FRESH_TURN },
-      // Rage / Monk Superior Defense end when combat ends.
-      conditions: c.conditions.filter((cond) => cond !== 'raging' && cond !== 'superior_defense'),
+      // Rage / Monk Superior Defense / Sorcerer Innate Sorcery end when combat
+      // ends (the "lasts the encounter" buff-duration simplification).
+      conditions: c.conditions.filter(
+        (cond) =>
+          cond !== 'raging' && cond !== 'superior_defense' && cond !== 'innate_sorcery'
+      ),
       condition_durations: Object.fromEntries(
         Object.entries(c.condition_durations ?? {}).filter(
-          ([k]) => k !== 'raging' && k !== 'superior_defense'
+          ([k]) => k !== 'raging' && k !== 'superior_defense' && k !== 'innate_sorcery'
         )
       ),
       // Totem Warrior totem clears with rage at combat end.
@@ -3471,6 +3475,23 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         kind: 'class_feature',
       });
     }
+  }
+
+  // ── Sorcerer: Innate Sorcery (L1) ───────────────────────────────────────────
+  if (
+    state.combat_active &&
+    hasClass(char, 'sorcerer') &&
+    !char.turn_actions.bonus_action_used &&
+    !char.conditions.includes('innate_sorcery') &&
+    (char.class_resource_uses?.innate_sorcery_used ?? 0) < 2
+  ) {
+    const isLeft = 2 - (char.class_resource_uses?.innate_sorcery_used ?? 0);
+    choices.push({
+      label: `Innate Sorcery — +1 spell DC + Advantage on spell attacks (bonus action, ${isLeft} left)`,
+      action: { type: 'use_class_feature', featureId: 'innate_sorcery' },
+      kind: 'class_feature',
+      requiresBonusAction: true,
+    });
   }
 
   // ── Sorcerer: Metamagic ─────────────────────────────────────────────────────

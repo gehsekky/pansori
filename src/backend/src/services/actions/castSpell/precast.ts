@@ -221,7 +221,9 @@ export function runPrecast(
   ) as AbilityKey;
   const castingScore = (pc.char[castingAbility] ?? 10) as number;
   const slotNote = spell.level > 0 ? ` (level-${slotLevel} slot)` : ' (cantrip)';
-  const dc = spellSaveDC(pc.char.level, castingScore);
+  // SRD Sorcerer Innate Sorcery (L1): +1 spell save DC while active.
+  const innateDcBonus = pc.char.conditions.includes('innate_sorcery') ? 1 : 0;
+  const dc = spellSaveDC(pc.char.level, castingScore) + innateDcBonus;
 
   return {
     done: false,

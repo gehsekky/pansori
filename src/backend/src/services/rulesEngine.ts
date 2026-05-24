@@ -919,10 +919,13 @@ export function spellSaveDC(level: number, castingAbilityScore: number): number 
 export function resolveSpellAttack(
   level: number,
   castingAbilityScore: number,
-  enemyAc: number
+  enemyAc: number,
+  // SRD Sorcerer Innate Sorcery (L1) grants Advantage on Sorcerer spell attack
+  // rolls while active — roll two d20 and keep the higher.
+  advantage = false
 ): { hit: boolean; critical: boolean; roll: number; bonus: number; total: number } {
   const bonus = spellAttackBonus(level, castingAbilityScore);
-  const roll = d(20);
+  const roll = advantage ? Math.max(d(20), d(20)) : d(20);
   if (roll === 1) return { hit: false, critical: false, roll, bonus, total: roll + bonus };
   if (roll === 20) return { hit: true, critical: true, roll, bonus, total: roll + bonus };
   const total = roll + bonus;

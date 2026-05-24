@@ -214,6 +214,7 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
     if (charFeatures.includes('wild_shape')) restoredUses.wild_shape = 2;
     delete restoredUses.natural_recovery_used;
     if (charFeatures.includes('sorcery_points')) restoredUses.sorcery_points = c.level;
+    delete restoredUses.innate_sorcery_used; // Sorcerer Innate Sorcery — 2 uses back on a long rest
     if (charFeatures.includes('ki')) restoredUses.ki_points = c.level;
     if (charFeatures.includes('channel_divinity'))
       restoredUses.channel_divinity = c.level >= 6 ? 2 : 1;
