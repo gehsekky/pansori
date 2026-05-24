@@ -162,24 +162,41 @@ follow-up. The engine work below is identical either way.
 
 ## Implementation plan (vertical slices, each shippable + tested)
 
-- **P4.1 — Side tagging.** Add `CombatEntity.side` (derive from `isEnemy`);
-  tag `initiative_order`. `selectEnemyMeleeTarget` → `selectTarget` keyed on
-  side. Behavior-preserving for enemies. *Tests: enemy targeting unchanged.*
-- **P4.2 — Combatant-agnostic attack helpers.** Rename/parameterize
-  `attemptEnemyApproach` / `runEnemyMultiattackLoop` / `computeEnemyAttack`
-  from `enemy` → generic acting stat block vs target entity.
-  Behavior-preserving for enemies. *Tests: full enemy-turn specs green.*
-- **P4.3 — Ally turn driver.** `runEnemyTurns` also drives `side: 'ally'`
-  entities (target nearest hostile, reuse approach + multiattack). *Test:
-  hand-inserted ally entity takes a turn and damages an enemy.*
+- **P4.1 — Side tagging (✅ shipped 2026-05-23).** `CombatEntity.side`
+  (derived from `isEnemy`/`isCompanion` via `entitySide()`);
+  `selectEnemyMeleeTarget` → side-keyed `selectTarget`. Behavior-preserving
+  for enemies.
+- **P4.2 + P4.3 — Ally turn path (merged after reading the helpers).**
+  *Implementation finding (2026-05-23):* the enemy-turn attack helpers
+  (`computeEnemyAttack` / `runEnemyMultiattackLoop`) are inherently
+  **enemy→PC**-shaped — they produce a `proposedChar: Character` and drive
+  the PC reaction windows (Shield / Uncanny Dodge / Hellish Rebuke), Orc
+  Relentless Endurance, and massive-damage death. An **ally attacking an
+  enemy** fits none of that and needs none of it (pansori enemies have no
+  reactions). So a standalone "parameterize the helpers" slice would be
+  mostly cosmetic, and routing allies through `computeEnemyAttack` is the
+  wrong shape. Instead, build the ally turn path **directly**, reusing the
+  *simple* primitives — each generalized only where a real ally exercises
+  it (no speculative refactor):
+  - target selection: `selectTarget` (P4.1, already side-keyed);
+  - approach/movement: generalize `attemptEnemyApproach` to a side-agnostic
+    mover (positional; opportunity attacks come from the opposite side);
+  - attack resolution: the **simple** `resolveEnemyAttack` (rulesEngine —
+    fixed `toHit`/`damage`) + a new shared `applyDamageToEntity` (damage to
+    a non-PC combatant), **not** `computeEnemyAttack`.
+
+  `runEnemyTurns` then also drives `side: 'ally'` entities. *Test: a
+  hand-inserted ally takes a turn, moves, and damages an enemy; enemy turns
+  unchanged.*
 - **P4.4 — Summon lifecycle.** Insert/remove ally entities; concentration
   sweep in `breakConcentration`. *Tests: summon appears in initiative,
   vanishes on concentration drop.*
 - **P4.5 — Content.** Beastmaster companion → Spiritual Weapon → Find
   Familiar / conjure. Each is data + a spawn hook on the existing patterns.
 
-Each slice is independently revertible, behavior-preserving until P4.3, and
-follows the session's commit-per-increment + guard-spec rhythm.
+Each slice is independently revertible, behavior-preserving until the
+ally-turn slice (P4.2/3) introduces allies acting, and follows the
+session's commit-per-increment + spec rhythm.
 
 ## Explicitly deferred (NOT Phase 4)
 
