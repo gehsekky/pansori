@@ -358,6 +358,25 @@ export function layOnHandsRemaining(char: Character): number {
   return Math.max(0, max - used);
 }
 
+/**
+ * SRD 5.2.1 Fighter Indomitable (L9): the number of failed-save rerolls
+ * available before a long rest — 1 at L9, 2 at L13, 3 at L17. 0 for a
+ * character with no Fighter levels. (RE-2.)
+ */
+export function indomitableMaxUses(char: Character): number {
+  const lvl = getClassLevel(char, 'fighter');
+  return lvl >= 17 ? 3 : lvl >= 13 ? 2 : lvl >= 9 ? 1 : 0;
+}
+
+/**
+ * Rerolls left this long rest (max minus `class_resource_uses.indomitable`,
+ * the count of uses spent). (RE-2.)
+ */
+export function indomitableRemaining(char: Character): number {
+  const used = char.class_resource_uses?.indomitable ?? 0;
+  return Math.max(0, indomitableMaxUses(char) - used);
+}
+
 // Maps a class to the spell list(s) it draws from. Used to match a
 // PC's classes against a spell's `spellList` tag so multiclass
 // casters can use the right casting ability per spell.
