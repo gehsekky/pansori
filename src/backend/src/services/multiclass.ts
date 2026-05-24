@@ -478,6 +478,41 @@ export function applyIndomitableMight(char: Character, strCheckTotal: number): n
   return getClassLevel(char, 'barbarian') >= 18 ? Math.max(strCheckTotal, char.str) : strCheckTotal;
 }
 
+/**
+ * SRD Ranger Hunter "feature option" picks. Each Hunter's-Prey-style feature
+ * grants ONE of two options at the gate level, swappable on a rest. The picker
+ * (`choose_hunter_option`) + generateChoices read these definitions. (RE-2.)
+ */
+export const hunterFeatureOptions: Record<
+  'hunters_prey' | 'defensive_tactics',
+  { feature: string; level: number; options: string[]; labels: Record<string, string> }
+> = {
+  hunters_prey: {
+    feature: "Hunter's Prey",
+    level: 3,
+    options: ['colossus_slayer', 'horde_breaker'],
+    labels: {
+      colossus_slayer: 'Colossus Slayer — +1d8 once/turn vs a wounded foe',
+      horde_breaker: 'Horde Breaker — once/turn, an extra attack vs a nearby foe',
+    },
+  },
+  defensive_tactics: {
+    feature: 'Defensive Tactics',
+    level: 7,
+    options: ['escape_the_horde', 'multiattack_defense'],
+    labels: {
+      escape_the_horde: 'Escape the Horde — opportunity attacks vs you have disadvantage',
+      multiattack_defense: "Multiattack Defense — an attacker that hits you has disadvantage on its other attacks vs you",
+    },
+  },
+};
+
+/** The Hunter's Prey option in effect (defaults to colossus_slayer, the
+ *  pre-picker behavior). Only meaningful for a Hunter Ranger. */
+export function huntersPrey(char: Character): 'colossus_slayer' | 'horde_breaker' {
+  return char.hunters_prey ?? 'colossus_slayer';
+}
+
 export function hasDangerSense(char: Character): boolean {
   if (
     (char.conditions ?? []).some((c) =>

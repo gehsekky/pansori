@@ -1,6 +1,6 @@
 import { abilityMod, rollDice } from '../../rulesEngine.js';
 import { endCombatState, isRoomCleared } from '../../gameEngine.js';
-import { getClassLevel, hasClass } from '../../multiclass.js';
+import { getClassLevel, hasClass, huntersPrey } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import { fmt } from '../../narrativeFmt.js';
 
@@ -70,6 +70,10 @@ export function handlePaladinRangerBardFeature(ctx: ActionContext, fid: string):
   if (fid === 'colossus_slayer') {
     if (char.subclass !== 'hunter') {
       ctx.narrative = 'Only Hunter Rangers have Colossus Slayer.';
+      return true;
+    }
+    if (huntersPrey(char) === 'horde_breaker') {
+      ctx.narrative = 'You have chosen Horde Breaker as your Hunter’s Prey, not Colossus Slayer.';
       return true;
     }
     const csTarget = ctx.st.entities?.find((e) => e.id === ctx.enemy?.id && e.isEnemy);

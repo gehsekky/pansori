@@ -73,6 +73,8 @@ import {
   hasElusive,
   hasEvasion,
   hasSlipperyMind,
+  hunterFeatureOptions,
+  huntersPrey,
   layOnHandsRemaining,
   spellSlotsForChar,
 } from './multiclass.js';
@@ -2909,6 +2911,26 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     }
   }
 
+  // ── Ranger Hunter feature-option picks (swappable on a rest) ───────────────
+  // Generic picker over hunterFeatureOptions; offers the option(s) the Hunter
+  // hasn't currently chosen (Hunter's Prey defaults to Colossus Slayer). Only
+  // Hunter's Prey (L3) is surfaced today — Defensive Tactics (L7) lands with
+  // its effects. (RE-2.)
+  if (!state.combat_active && char.subclass === 'hunter' && hasClass(char, 'ranger')) {
+    const prey = hunterFeatureOptions.hunters_prey;
+    if (getClassLevel(char, 'ranger') >= prey.level) {
+      const current = huntersPrey(char);
+      for (const option of prey.options) {
+        if (option === current) continue;
+        if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+        choices.push({
+          label: `${prey.feature}: ${prey.labels[option]}`,
+          action: { type: 'choose_hunter_option', feature: 'hunters_prey', option },
+        });
+      }
+    }
+  }
+
   // ── Expertise picks (Rogue L1/L6, Bard L2/L9) ──────────────────────────────
   // Double proficiency in a chosen skill. RAW level-up choice, surfaced out of
   // combat like Fighting Style; offered per still-unchosen skill proficiency
@@ -3512,10 +3534,12 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       });
     }
 
-    // Hunter Ranger: Colossus Slayer
+    // Hunter Ranger: Colossus Slayer (the Hunter's Prey option in effect;
+    // suppressed when the ranger has chosen Horde Breaker instead).
     if (
       char.subclass === 'hunter' &&
       hasClass(char, 'ranger') &&
+      huntersPrey(char) === 'colossus_slayer' &&
       !char.class_resource_uses?.colossus_slayer_used
     ) {
       choices.push({

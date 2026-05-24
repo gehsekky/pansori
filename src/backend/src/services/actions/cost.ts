@@ -67,6 +67,7 @@ export const ACTION_COSTS: Record<StructuredAction['type'], ActionCost> = {
   select_subclass: 'managed',
   choose_fighting_style: 'managed',
   choose_expertise: 'managed',
+  choose_hunter_option: 'managed',
   // Lay on Hands self-manages its bonus-action cost (in combat only) so it
   // stays usable out of combat regardless of a lingering bonus_action_used.
   lay_on_hands: 'managed',
