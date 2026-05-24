@@ -1493,6 +1493,11 @@ export function effectiveSpeed(char: Character, lootTable: LootItem[] = []): num
   // Applied to the base before the Haste/Slow multipliers — it's a permanent
   // Speed increase. Needs the loot table to read the equipped armor's category.
   if (getClassLevel(char, 'barbarian') >= 5 && !wearingHeavyArmor(char, lootTable)) base += 10;
+  // SRD Ranger Roving (L6): +10 ft while not wearing Heavy armor. A distinct
+  // feature from Fast Movement, so a Barbarian/Ranger multiclass stacks both.
+  // (Roving's "Climb/Swim Speed = Speed" half is deferred — no vertical/liquid
+  // traversal model.)
+  if (getClassLevel(char, 'ranger') >= 6 && !wearingHeavyArmor(char, lootTable)) base += 10;
   // 2024 PHB Haste — "the target's Speed is doubled." Multiplies the
   // post-Goliath / post-Mobile base; encumbrance still reduces after.
   // Applies to both walking and any future modes that derive from this
