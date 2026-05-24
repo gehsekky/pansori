@@ -67,6 +67,7 @@ import {
   getClassLevel,
   hasClass,
   hasEvasion,
+  hasSlipperyMind,
   layOnHandsRemaining,
   spellSlotsForChar,
 } from './multiclass.js';
@@ -671,6 +672,7 @@ function getWorldName(seed: Seed): string {
  *   - Feat-granted save proficiency (Resilient — recorded on
  *     feat_choices.<featId>.saveProficiencies; the walk is generic
  *     so future feats with the same shape just work).
+ *   - Rogue Slippery Mind (L15) — WIS + CHA saving throws.
  *
  * Exported for any save site that needs the full picture (lair
  * action AoE saves, future legendary-action saves, etc.). The
@@ -678,12 +680,14 @@ function getWorldName(seed: Seed): string {
  * and trusts the caller — this is how callers compute it.
  */
 export function hasSaveProficiency(
-  char: Pick<Character, 'character_class' | 'feat_choices'>,
+  char: Character,
   ability: AbilityKey,
   context: Context
 ): boolean {
   const classProf = context.classSavingThrows?.[char.character_class]?.includes(ability) ?? false;
   if (classProf) return true;
+  // SRD Rogue Slippery Mind (L15): proficiency in WIS + CHA saves.
+  if ((ability === 'wis' || ability === 'cha') && hasSlipperyMind(char)) return true;
   return Object.values(char.feat_choices ?? {}).some((c) =>
     c?.saveProficiencies?.includes(ability)
   );
