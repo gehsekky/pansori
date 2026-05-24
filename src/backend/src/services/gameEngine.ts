@@ -63,6 +63,7 @@ import {
 import { applyExpiryHooks, getConditionDuration } from './conditions/registry.js';
 import {
   applyMulticlassProfGrants,
+  canCountercharm,
   canRitualCast,
   expertiseSlots,
   getClassLevel,
@@ -737,6 +738,7 @@ export function auraOfProtectionBonus(char: Character, st: GameState): number {
 function conditionSavingThrow(
   effect: OnHitEffect,
   char: Character,
+  st: GameState,
   context: Context,
   // SRD Aura of Protection bonus, folded in by lowering the effective DC
   // (same mechanism as the Bardic Inspiration roll above). 0 when no aura.
@@ -749,6 +751,9 @@ function conditionSavingThrow(
   luckConsumed: boolean;
   bardicInspirationConsumed: boolean;
   bardicRoll: number;
+  // SRD Bard Countercharm — id of the bard (self or ally within 30 ft) who
+  // spent a Reaction to reroll this Charmed/Frightened save with Advantage.
+  countercharmBardId?: string;
 } {
   const proficient = hasSaveProficiency(char, effect.ability, context);
   // 2024 PHB — Heroic Inspiration can be spent on any d20 test. If the
@@ -841,6 +846,39 @@ function conditionSavingThrow(
       strokeOfLuckConsumed = true;
     }
   }
+  // SRD Bard Countercharm — if a Charmed/Frightened save still failed, a Bard
+  // L7+ within 30 ft (self or ally) with a Reaction available can make the save
+  // be rerolled with Advantage. Auto-resolve (like Indomitable/Stroke of Luck):
+  // only spent when the advantaged reroll rescues it, so the reaction isn't
+  // wasted. Returns the reactor's id so the caller spends that bard's reaction.
+  let countercharmBardId: string | undefined;
+  if (applied && (effect.condition === 'charmed' || effect.condition === 'frightened')) {
+    const charEnt = st.entities?.find((e) => e.id === char.id);
+    const bard = (st.characters ?? []).find((p) => {
+      if (!canCountercharm(p)) return false;
+      if (p.id === char.id) return true; // self
+      const pEnt = st.entities?.find((e) => e.id === p.id);
+      return charEnt && pEnt ? distanceFeet(charEnt.pos, pEnt.pos) <= 30 : true;
+    });
+    if (bard) {
+      const rescued = !rollConditionSave(
+        effect.ability,
+        char[effect.ability] ?? 10,
+        dcAdjusted,
+        proficient,
+        char.level,
+        0,
+        char.conditions ?? [],
+        true, // Countercharm grants Advantage on the reroll
+        enc,
+        reviveD20Penalty(char)
+      );
+      if (rescued) {
+        applied = false;
+        countercharmBardId = bard.id;
+      }
+    }
+  }
   return {
     applied,
     inspirationConsumed: inspirationActive,
@@ -849,6 +887,7 @@ function conditionSavingThrow(
     luckConsumed: luckActive,
     bardicInspirationConsumed: !!biDie,
     bardicRoll,
+    countercharmBardId,
   };
 }
 
@@ -978,7 +1017,7 @@ function computeEnemyAttack(
     // through `applyDamage`. (PR-2's deferred enemy-attack migration.)
     const dmgResult = applyDamage(charAfterWard, st, postWardDmg);
     let updatedChar = dmgResult.char;
-    const newSt = dmgResult.st;
+    let newSt = dmgResult.st;
     const hpLost = dmgResult.amountDealt;
     const tempHpNote =
       dmgResult.tempHpAbsorbed > 0
@@ -1000,6 +1039,7 @@ function computeEnemyAttack(
       const csResult = conditionSavingThrow(
         enemy.onHitEffect,
         updatedChar,
+        st,
         context,
         auraOfProtectionBonus(updatedChar, st)
       );
@@ -1014,6 +1054,25 @@ function computeEnemyAttack(
       if (csResult.strokeOfLuckConsumed) {
         updatedChar = consumeStrokeOfLuck(updatedChar);
         narrative += ` ✦ Stroke of Luck — the save becomes a 20!`;
+      }
+      if (csResult.countercharmBardId) {
+        const bardId = csResult.countercharmBardId;
+        const spendReaction = (c: Character) => ({
+          ...c,
+          turn_actions: { ...c.turn_actions, reaction_used: true },
+        });
+        if (bardId === updatedChar.id) {
+          // Self-Countercharm — the saver is the bard; spend their reaction.
+          updatedChar = spendReaction(updatedChar);
+        } else {
+          // An ally bard reacts — spend their reaction in the proposed state.
+          newSt = {
+            ...newSt,
+            characters: newSt.characters.map((c) => (c.id === bardId ? spendReaction(c) : c)),
+          };
+        }
+        const bardName = newSt.characters.find((c) => c.id === bardId)?.name ?? 'A bard';
+        narrative += ` ✦ Countercharm — ${bardName} disrupts the effect (reroll with advantage)!`;
       }
       if (csResult.luckConsumed) {
         luckConsumed = true;
