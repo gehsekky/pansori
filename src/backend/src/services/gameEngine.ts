@@ -1848,6 +1848,23 @@ export function applyLevelUpForClass(char: Character, className: string, context
     out += ` ${className} level ${newClassLevel}: choose an Ability Score Improvement!`;
   }
 
+  // SRD Barbarian Primal Champion (L20 capstone): Strength and Constitution
+  // each increase by 4, to a maximum of 30. The CON increase raises max HP
+  // retroactively (same convention as an ASI CON bump). hpRoll above already
+  // used the pre-boost CON, so this adds only the delta from the +4.
+  if (cls === 'barbarian' && newClassLevel === 20) {
+    const oldCon = char.con;
+    char.str = Math.min(30, char.str + 4);
+    char.con = Math.min(30, char.con + 4);
+    const conModGain = abilityMod(char.con) - abilityMod(oldCon);
+    if (conModGain > 0) {
+      const hpGain = conModGain * char.level;
+      char.max_hp += hpGain;
+      char.hp += hpGain;
+    }
+    out += ` ⚔️ Primal Champion! ${char.name}'s Strength and Constitution surge (+4 each, max 30).`;
+  }
+
   // First multiclass level: narrow proficiency grants per 2024 PHB.
   if (isFirstLevelInClass && cls !== char.character_class.toLowerCase()) {
     const profNote = applyMulticlassProfGrants(char, cls);
