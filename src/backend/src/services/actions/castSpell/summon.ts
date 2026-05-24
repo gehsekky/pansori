@@ -4,32 +4,47 @@ import { randomUUID } from 'crypto';
 
 /**
  * Summon spells (Animate Dead, etc.). The precast out-of-combat gate
- * guarantees this runs out of combat, so we append a persistent ally to
- * `state.summoned_allies` carrying the spell's `summon` stat block;
- * `seedSummonedAllies` materializes it as a side:'ally' combatant at the
- * next combat start, where `runAllyTurn` drives it. Returns true when
+ * guarantees this runs out of combat, so we append persistent allies to
+ * `state.summoned_allies` carrying the chosen stat block;
+ * `seedSummonedAllies` materializes them as side:'ally' combatants at the
+ * next combat start, where `runAllyTurn` drives them. Returns true when
  * handled (the spell had a `summon`). (RE-1 Phase 4.)
+ *
+ * RAW variant + multi-raise (Animate Dead): `summonVariant` picks the
+ * creature (Skeleton base, or a `variants[]` alternate like Zombie), and
+ * `summon.countPerUpcastLevel` raises that many extra per slot level above
+ * the spell's base level. (RE-1 Phase 4.5.)
  */
-export function runSummonSpell(ctx: ActionContext, spell: Spell, slotNote: string): boolean {
+export function runSummonSpell(
+  ctx: ActionContext,
+  spell: Spell,
+  slotNote: string,
+  slotLevel: number,
+  summonVariant?: string
+): boolean {
   if (!spell.summon) return false;
-  const s = spell.summon;
+  const base = spell.summon;
+  const chosen = [base, ...(base.variants ?? [])].find((o) => o.name === summonVariant) ?? base;
+  const baseLevel = spell.level ?? 1;
+  const perUpcast = base.countPerUpcastLevel ?? 0;
+  const count = Math.max(1, 1 + perUpcast * Math.max(0, slotLevel - baseLevel));
+
+  const raised = Array.from({ length: count }, () => ({
+    id: `summon-${randomUUID()}`,
+    ownerId: ctx.char.id,
+    name: chosen.name,
+    ac: chosen.ac,
+    maxHp: chosen.maxHp,
+    toHit: chosen.toHit,
+    damage: chosen.damage,
+  }));
   ctx.st = {
     ...ctx.st,
-    summoned_allies: [
-      ...(ctx.st.summoned_allies ?? []),
-      {
-        id: `summon-${randomUUID()}`,
-        ownerId: ctx.char.id,
-        name: s.name,
-        ac: s.ac,
-        maxHp: s.maxHp,
-        toHit: s.toHit,
-        damage: s.damage,
-      },
-    ],
+    summoned_allies: [...(ctx.st.summoned_allies ?? []), ...raised],
   };
+  const crew = count === 1 ? `a ${chosen.name}` : `${count} ${chosen.name}s`;
   ctx.narrative =
     (ctx.narrative ?? '') +
-    `${ctx.char.name} casts ${spell.name}${slotNote} — a ${s.name} rises to fight at the party's side, joining the next battle.`;
+    `${ctx.char.name} casts ${spell.name}${slotNote} — ${crew} rise${count === 1 ? 's' : ''} to fight at the party's side, joining the next battle.`;
   return true;
 }

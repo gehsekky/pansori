@@ -485,6 +485,14 @@ export interface Spell {
     maxHp: number;
     toHit: number;
     damage: string; // dice expression, e.g. '1d6+3'
+    // Alternate stat blocks the caster chooses among at cast time (e.g.
+    // Animate Dead: Skeleton [the base block above] or Zombie). The cast
+    // surface offers the base plus each variant. (RE-1 Phase 4.5.)
+    variants?: Array<{ name: string; ac: number; maxHp: number; toHit: number; damage: string }>;
+    // Extra creatures raised per slot level above the spell's base level
+    // (Animate Dead: 2 — RAW "two additional Undead for each slot level
+    // above 3"). Omitted / 0 ⇒ always one. (RE-1 Phase 4.5.)
+    countPerUpcastLevel?: number;
   };
   // Long casting time (1 min+) — rejected in combat (before slot spend).
   outOfCombatOnly?: boolean;
