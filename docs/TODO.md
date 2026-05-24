@@ -126,12 +126,16 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
       `resolveEnemySubAttack` (tagged `paused` / `killed-massive` / `done`
       result). Makes the per-attack core reusable by the dispatched handler.
       Suite 1046 green.
-- [ ] **EE-2** — `enemy_attack` action + `handleEnemyAttack` (wraps
-      `resolveEnemySubAttack`); route `runEnemyMultiattackLoop` through
-      `dispatchAction(ctx{actor: enemyActor(rm, ent)}, …)`. Makes the loop +
-      `runEnemyTurns` async (ripple to `takeAction` — already async — and
-      `handleResolveReaction`). Pause is signalled via `st.pending_reaction`
-      (no new `DispatchResult` variant needed).
+- [x] **EE-2 (done 2026-05-24)** — `enemy_attack` action + `handleEnemyAttack`
+      (wraps `resolveEnemySubAttack`); `runEnemyMultiattackLoop` now routes each
+      swing through `dispatchAction(ctx{actor: enemyActor(rm, ent)}, …)` via a
+      `buildEnemyActionCtx` helper. The loop + `runEnemyTurns` went async
+      (awaited in `takeAction` and `handleResolveReaction`). The handler reports
+      its tagged outcome on a new `ctx.enemySubAttack` side-channel (the loop
+      reads it); the post-swing death-save + commit stay in `runEnemyTurns`.
+      No new `DispatchResult` variant needed — pause flows through
+      `st.pending_reaction` as before. Suite 1049 green (incl. all reaction /
+      death-save specs unchanged).
 - [ ] **EE-3** — route enemy spellcasting (`attemptEnemySpellCast`) through
       the shared `castSpell` pipeline / a dispatched cast action.
 - [ ] **EE-4** — fold the enemy approach + per-turn orchestration in, so a

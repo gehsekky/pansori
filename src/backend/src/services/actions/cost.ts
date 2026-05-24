@@ -103,6 +103,10 @@ export const ACTION_COSTS: Record<StructuredAction['type'], ActionCost> = {
   // RAW player-command for a summon — the bonus action is the cost; the
   // handler just records the commanded target on the summon entity.
   command_summon: 'bonusAction',
+  // BE-internal enemy sub-attack — no PC action economy (the enemy-turn
+  // loop owns the multiattack budget); the dispatcher's PC-only
+  // checkBudget/deductCost no-op for enemy actors anyway.
+  enemy_attack: 'managed',
 };
 
 const BUDGET_ERRORS: Record<Exclude<ActionCost, 'managed'>, string> = {

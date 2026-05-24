@@ -9,6 +9,7 @@ import type {
   StructuredAction,
 } from '../../types.js';
 import type { Actor } from './actor.js';
+import type { EnemySubAttackResult } from '../gameEngine.js';
 import type { NarrativeFragment } from '../narrative/fragments.js';
 
 /**
@@ -64,6 +65,15 @@ export interface ActionContext {
    * and the composer is a no-op for them.
    */
   fragments: NarrativeFragment[];
+
+  /**
+   * EE-2 side-channel — the `enemy_attack` handler reports its
+   * `resolveEnemySubAttack` outcome (paused / killed-massive / done +
+   * the updated target) here, since `DispatchResult` can't carry it.
+   * The enemy multiattack loop reads it after `dispatchAction`. Only
+   * set by `handleEnemyAttack`.
+   */
+  enemySubAttack?: EnemySubAttackResult;
 
   /**
    * 2024 PHB PC-turn d20 reaction window — side-channel for the

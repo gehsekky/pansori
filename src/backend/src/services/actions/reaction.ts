@@ -82,7 +82,7 @@ export const handleResolveReaction: ActionHandler<{
   type: 'resolve_reaction';
   accept: boolean;
   replacementIndex?: number;
-}> = (ctx, action) => {
+}> = async (ctx, action) => {
   if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs have reactions.' };
   const pc = ctx.actor;
   const rx = ctx.st.pending_reaction;
@@ -439,7 +439,7 @@ export const handleResolveReaction: ActionHandler<{
   // usedInitiative) would normally drive enemy turns, but we're mid-loop
   // here — we have to advance the cursor ourselves before any of the
   // outer epilogue runs.
-  const resume = runEnemyTurns({
+  const resume = await runEnemyTurns({
     st: ctx.st,
     seed: ctx.seed,
     context: ctx.context,

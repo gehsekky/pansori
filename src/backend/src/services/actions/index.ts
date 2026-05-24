@@ -38,6 +38,7 @@ import { handleCastSpell } from './castSpell/index.js';
 import { handleCommandSummon } from './commandSummon.js';
 import { handleDeathSave } from './deathSave.js';
 import { handleDisarmTrap } from './disarmTrap.js';
+import { handleEnemyAttack } from './enemyAttack.js';
 import { handleEscape } from './escape.js';
 import { handleExamine } from './examineDefault.js';
 import { handleGridMove } from './gridMove.js';
@@ -108,6 +109,7 @@ const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   use_class_feature: handleUseClassFeature as ActionHandler,
   haste_extra_action: handleHasteExtraAction as ActionHandler,
   command_summon: handleCommandSummon as ActionHandler,
+  enemy_attack: handleEnemyAttack as ActionHandler,
 };
 
 /**

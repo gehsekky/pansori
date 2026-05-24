@@ -347,6 +347,11 @@ export type StructuredAction =
   // upcoming turn. Records `commanded_target_id` on the summon entity; the
   // ally-turn AI prefers it while the target lives. (RE-1 Phase 4.5.)
   | { type: 'command_summon'; summonId: string; targetEnemyId: string }
+  // BE-internal (never sent by the FE): one enemy sub-attack against a PC,
+  // dispatched with an `enemyActor` so the enemy turn runs through the same
+  // dispatcher as PC actions. `advIdx` / `multiattackIdx` feed the
+  // reaction-window resume coords. (EE-2 — dispatcher-integrated enemy turns.)
+  | { type: 'enemy_attack'; targetCharId: string; advIdx: number; multiattackIdx: number }
   // Out-of-combat only: switch which PC is the "lead" / active character
   // for subsequent narrative attribution + skill checks. RAW has no
   // notion of initiative outside combat — the party operates as a unit
