@@ -71,6 +71,7 @@ import {
   spellSlotsForChar,
 } from './multiclass.js';
 import { composeFragments, enemyAttackFragmentEvent } from './narrative/compose.js';
+import { consumeIndomitable, indomitableBonus, tryIndomitableReroll } from './indomitable.js';
 import { enemyActor, pcActor } from './actions/actor.js';
 import { fmt, stripForLlm } from './narrativeFmt.js';
 import { COMBAT_LOG_MAX } from '../types.js';
@@ -588,6 +589,22 @@ export function checkConcentration(
       st,
       note: ` [Concentration hold: ${save} vs DC ${dc}]`,
     };
+  // SRD Fighter Indomitable — reroll the failed CON save with +Fighter level.
+  const indo = tryIndomitableReroll(char, () => {
+    const reroll =
+      d(20) +
+      abilityMod(char.con) -
+      reviveD20Penalty(char) +
+      auraOfProtectionBonus(char, st) +
+      indomitableBonus(char);
+    return reroll >= dc;
+  });
+  if (indo.used && indo.saved)
+    return {
+      char: consumeIndomitable(char),
+      st,
+      note: ` [Concentration hold: ✦ Indomitable reroll vs DC ${dc}]`,
+    };
   const spellName = char.concentrating_on.spellId;
   const { char: nc, st: ns } = breakConcentration(char, st, context);
   return {
@@ -702,25 +719,7 @@ export function auraOfProtectionBonus(char: Character, st: GameState): number {
 
 function conditionSavingThrow(
   effect: OnHitEffect,
-  char: Pick<
-    Character,
-    | 'str'
-    | 'dex'
-    | 'con'
-    | 'int'
-    | 'wis'
-    | 'cha'
-    | 'level'
-    | 'character_class'
-    | 'conditions'
-    | 'turn_actions'
-    | 'inspiration'
-    | 'bardic_inspiration_die'
-    | 'inventory'
-    | 'species'
-    | 'feat_choices'
-    | 'revive_d20_penalty'
-  >,
+  char: Character,
   context: Context,
   // SRD Aura of Protection bonus, folded in by lowering the effective DC
   // (same mechanism as the Bardic Inspiration roll above). 0 when no aura.
@@ -728,6 +727,7 @@ function conditionSavingThrow(
 ): {
   applied: boolean;
   inspirationConsumed: boolean;
+  indomitableConsumed: boolean;
   luckConsumed: boolean;
   bardicInspirationConsumed: boolean;
   bardicRoll: number;
@@ -762,7 +762,7 @@ function conditionSavingThrow(
     (effect.condition === 'charmed' && (speciesId === 'elf' || speciesId === 'drow')) ||
     (effect.condition === 'frightened' && speciesId === 'halfling') ||
     (effect.condition === 'poisoned' && speciesId === 'dwarf');
-  const applied = rollConditionSave(
+  let applied = rollConditionSave(
     effect.ability,
     char[effect.ability] ?? 10,
     dcAdjusted,
@@ -774,9 +774,37 @@ function conditionSavingThrow(
     enc,
     reviveD20Penalty(char)
   );
+  // SRD Fighter Indomitable — reroll the failed save with +Fighter level
+  // (folded in by lowering the DC). The one-shot Inspiration/Luck advantage
+  // was spent on the first roll, so only the standing species advantage
+  // carries to the reroll. Returns `applied === true` when the save failed.
+  let indomitableConsumed = false;
+  if (applied) {
+    const indo = tryIndomitableReroll(
+      char,
+      () =>
+        !rollConditionSave(
+          effect.ability,
+          char[effect.ability] ?? 10,
+          dcAdjusted - indomitableBonus(char),
+          proficient,
+          char.level,
+          0,
+          char.conditions ?? [],
+          speciesAdv,
+          enc,
+          reviveD20Penalty(char)
+        )
+    );
+    if (indo.used && indo.saved) {
+      applied = false;
+      indomitableConsumed = true;
+    }
+  }
   return {
     applied,
     inspirationConsumed: inspirationActive,
+    indomitableConsumed,
     luckConsumed: luckActive,
     bardicInspirationConsumed: !!biDie,
     bardicRoll,
@@ -931,6 +959,10 @@ function computeEnemyAttack(
       if (csResult.inspirationConsumed) {
         inspirationConsumed = true;
         narrative += ` ✦ Heroic Inspiration spent on the save!`;
+      }
+      if (csResult.indomitableConsumed) {
+        updatedChar = consumeIndomitable(updatedChar);
+        narrative += ` ✦ Indomitable — rerolled the save!`;
       }
       if (csResult.luckConsumed) {
         luckConsumed = true;
@@ -4697,7 +4729,24 @@ export function resolveEnemySpell(args: {
     const saveScore = (target[spell.savingThrow] ?? 10) as number;
     const dc = enemy.spellSaveDC ?? 8 + Math.floor((enemy.toHit + 5) / 2);
     const save = rollDice('1d20') + abilityMod(saveScore) + auraOfProtectionBonus(target, args.st);
-    const saved = save >= dc;
+    let saved = save >= dc;
+    // SRD Fighter Indomitable — reroll the failed save with +Fighter level.
+    let workingTarget = target;
+    if (!saved) {
+      const indo = tryIndomitableReroll(target, () => {
+        const reroll =
+          rollDice('1d20') +
+          abilityMod(saveScore) +
+          auraOfProtectionBonus(target, args.st) +
+          indomitableBonus(target);
+        return reroll >= dc;
+      });
+      if (indo.used && indo.saved) {
+        saved = true;
+        workingTarget = consumeIndomitable(target);
+      }
+    }
+    const indoNote = workingTarget !== target ? ' ✦ Indomitable' : '';
     // SRD Evasion (Rogue/Monk L7): on a DEX save-for-half, take no damage
     // on a success and half on a failure (vs the normal half / full).
     const evasion =
@@ -4714,8 +4763,8 @@ export function resolveEnemySpell(args: {
             : dmgRoll;
     }
     const evasionNote = evasion ? ' ✦ Evasion' : '';
-    newTarget = { ...target, hp: Math.max(0, target.hp - dmg) };
-    narrative += ` ${enemy.name} casts ${spell.name}! ${target.name} ${fmt.save(spell.savingThrow.toUpperCase(), save)} vs ${fmt.dc(dc)} — ${saved ? 'saves' : 'fails'}, ${fmt.dmg(dmg)} ${spell.damageType ?? 'damage'}.${evasionNote}`;
+    newTarget = { ...workingTarget, hp: Math.max(0, workingTarget.hp - dmg) };
+    narrative += ` ${enemy.name} casts ${spell.name}! ${target.name} ${fmt.save(spell.savingThrow.toUpperCase(), save)} vs ${fmt.dc(dc)} — ${saved ? 'saves' : 'fails'}, ${fmt.dmg(dmg)} ${spell.damageType ?? 'damage'}.${indoNote}${evasionNote}`;
   } else {
     newTarget = { ...target, hp: Math.max(0, target.hp - dmgRoll) };
     narrative += ` ${enemy.name} casts ${spell.name}! ${target.name} takes ${fmt.dmg(dmgRoll)} ${spell.damageType ?? 'damage'}.`;
