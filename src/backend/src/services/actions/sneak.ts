@@ -14,6 +14,7 @@ import {
   pick,
 } from '../gameEngine.js';
 import type { ActionHandler } from './types.js';
+import { updatePcActor } from './actor.js';
 
 /**
  * `sneak`: SRD p.6 group ability check. Every living party member
@@ -27,6 +28,8 @@ import type { ActionHandler } from './types.js';
  * room. Always consumes the action and ends the combat turn.
  */
 export const handleSneak: ActionHandler<{ type: 'sneak' }> = (ctx) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can sneak.' };
+  const { char } = ctx.actor;
   if (!ctx.enemyAlive || !ctx.enemy) {
     return { rejected: 'Nothing to sneak past. You move freely.' };
   }
@@ -43,12 +46,12 @@ export const handleSneak: ActionHandler<{ type: 'sneak' }> = (ctx) => {
   const sneakDC = passivePerceptionDcInLight(enemy.wis ?? 10, enemyEffectiveLight);
   const livingParty = ctx.st.characters
     .filter((c) => !c.dead)
-    .map((c) => (c.id === ctx.char.id ? ctx.char : c));
+    .map((c) => (c.id === char.id ? char : c));
   // The active PC's char may mutate (inspiration consumption) — track it
   // through the map so we can write the post-roll state back.
-  let activeChar = ctx.char;
+  let activeChar = char;
   const rolls = livingParty.map((member) => {
-    const isActive = member.id === ctx.char.id;
+    const isActive = member.id === char.id;
     const proficient =
       ctx.context.classSkills[member.character_class]?.includes('stealth') ?? false;
     const exhaustionDisadv1 = (member.exhaustion_level ?? 0) >= 1;
@@ -70,7 +73,7 @@ export const handleSneak: ActionHandler<{ type: 'sneak' }> = (ctx) => {
     );
     return { name: member.name, check, mod: abilityMod(member.dex) };
   });
-  ctx.char = activeChar;
+  updatePcActor(ctx, activeChar);
   const successes = rolls.filter((r) => r.check.success).length;
   const groupPasses = 2 * successes >= livingParty.length;
   const detailLines = rolls
@@ -90,7 +93,7 @@ export const handleSneak: ActionHandler<{ type: 'sneak' }> = (ctx) => {
       const target = ctx.adjacent[0];
       if (ctx.st.combat_active) {
         ctx.st = endCombatState(ctx.st);
-        ctx.char = { ...ctx.char, conditions: [] };
+        updatePcActor(ctx, { conditions: [] });
       }
       ctx.st = {
         ...ctx.st,

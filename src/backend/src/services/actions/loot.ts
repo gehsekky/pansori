@@ -2,6 +2,7 @@ import type { ActionHandler } from './types.js';
 import { fmt } from '../narrativeFmt.js';
 import { pick } from '../gameEngine.js';
 import { randomUUID } from 'crypto';
+import { updatePcActor } from './actor.js';
 
 /**
  * `loot`: pick up the room's loot entry. Idempotent — repeated calls
@@ -11,6 +12,8 @@ import { randomUUID } from 'crypto';
  * land unidentified unless the picker has Arcana or Investigation.
  */
 export const handleLoot: ActionHandler<{ type: 'loot' }> = (ctx) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can loot.' };
+  const { char } = ctx.actor;
   if (!ctx.loot) {
     ctx.narrative = pick(ctx.context.narratives.noLoot);
     return;
@@ -24,10 +27,9 @@ export const handleLoot: ActionHandler<{ type: 'loot' }> = (ctx) => {
     return;
   }
   const loot = ctx.loot;
-  ctx.char = {
-    ...ctx.char,
-    inventory: [...(ctx.char.inventory || []), { ...loot, instance_id: randomUUID() }],
-  };
+  updatePcActor(ctx, {
+    inventory: [...(char.inventory || []), { ...loot, instance_id: randomUUID() }],
+  });
   // Track BOTH the roomId (lootAvail gate) and the item id (quest
   // conditions like `loot_taken contains 'guild_ledger'`).
   ctx.st = {
@@ -37,7 +39,7 @@ export const handleLoot: ActionHandler<{ type: 'loot' }> = (ctx) => {
   let narrative = pick(ctx.context.narratives.lootPickedUp).replace(/{item}/g, loot.name);
   const isMagicMisc = loot.type === 'misc' && !!loot.requiresAttunement;
   const hasIdentify =
-    ctx.context.classSkills[ctx.char.character_class]?.some((s) =>
+    ctx.context.classSkills[char.character_class]?.some((s) =>
       ['arcana', 'investigation'].includes(s)
     ) ?? false;
   if (isMagicMisc && !hasIdentify) {
