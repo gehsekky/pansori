@@ -473,6 +473,16 @@ Bonus(char, st)`: a creature within 10 ft of a conscious L6+ Paladin (the
       monk) + integration both ways (Perfect Focus when Uncanny is spent;
       defers to Uncanny when available). (Note: the gap list's "Empty Body" was
       a stale 2014 name — the 2024 SRD Monk L18 feature is Superior Defense.)
+- [x] **Superior Defense (done 2026-05-24)** — Monk L18: spend 3 Focus Points
+      to gain Resistance to all damage except Force for the encounter (or until
+      Incapacitated). Activated via the `superior_defense` Monk feature handler
+      (spends 3 ki, sets a `superior_defense` condition); honored in
+      `computeEnemyAttack` (folds into `anyResist` so the damage halves, with a
+      Force carve-out + incapacitated check) and cleared in `endCombatState`.
+      Spec: handler (L18 spends 3 ki + sets the condition; gates L17 / low-ki) +
+      enemy-attack integration (slashing halved, Force not, no-condition
+      control). With this the Monk is SRD-feature-complete bar Slow Fall
+      (narrative — no falling-damage model) and higher Open Hand grades.
 
 | Class     | Implemented (approx)                                                                                                                                                                                                                       | Major SRD gaps to fill                                                                                                   |
 | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
@@ -481,7 +491,7 @@ Bonus(char, st)`: a creature within 10 ft of a conscious L6+ Paladin (the
 | Cleric    | Channel Divinity, Turn/Sear Undead, Preserve Life (Life)                                                                                                                                                                                   | Blessed Strikes, Divine Intervention, improved Channel uses, higher Life-domain grades                                   |
 | Druid     | Wild Shape (L2, CR L4/8), Land's Aid                                                                                                                                                                                                       | Wild Companion, full Circle of the Land grades, Wild Shape improvements, Beast Spells, Archdruid                         |
 | Fighter   | Second Wind, Action Surge (L2), Extra Attack (2/3/4), Indomitable (L9), Tactical Master (L9)                                                                                                                                               | Champion grades (Remarkable Athlete, Additional Style, Superior Critical, Survivor)                                      |
-| Monk      | Martial Arts, Flurry/Patient/Step (L2), Uncanny Metabolism (L2), Deflect Attacks (L3), Stunning Strike (L5), Extra Attack (L5), Evasion (L7), Self-Restoration (L10), Disciplined Survivor (L14), Perfect Focus (L15), Body and Mind (L20) | Slow Fall (narrative — no falling-damage model), Superior Defense (L18), higher Open Hand grades                         |
+| Monk      | Martial Arts, Flurry/Patient/Step (L2), Uncanny Metabolism (L2), Deflect Attacks (L3), Stunning Strike (L5), Extra Attack (L5), Evasion (L7), Self-Restoration (L10), Disciplined Survivor (L14), Perfect Focus (L15), Superior Defense (L18), Body and Mind (L20) | Slow Fall (narrative — no falling-damage model), higher Open Hand grades                                                 |
 | Paladin   | Sacred Weapon (Devotion L3), Fighting Style (L2), Extra Attack (L5), Lay on Hands (L1), Aura of Protection (L6)                                                                                                                            | Aura of Courage, Faithful Steed, Divine-Smite-as-feature, Devotion grades, capstone                                      |
 | Ranger    | Colossus Slayer (Hunter L3), Fighting Style (L2), Extra Attack (L5)                                                                                                                                                                        | spellcasting integration, Roving, Expertise, Tireless, Nature's Veil, Hunter grades                                      |
 | Rogue     | Expertise (L1/6), Cunning Action (L2), Cunning Strike (L5), Sneak Attack, Uncanny Dodge, Steady Aim (L3), Evasion (L7), Reliable Talent (L7), Slippery Mind (L15), Elusive (L18), Stroke of Luck (L20)                                     | Assassin grades                                                                                                          |

@@ -1001,7 +1001,16 @@ function computeEnemyAttack(
     const speciesData = char.species ? SRD_SPECIES[char.species] : undefined;
     const speciesResist =
       enemy.damageType && speciesData?.resistances?.includes(enemy.damageType) === true;
-    const anyResist = isRaging || isPetrified || beastResist || speciesResist;
+    // SRD Monk Superior Defense (L18): Resistance to all damage except Force
+    // (while active and not Incapacitated).
+    const superiorDefenseActive =
+      char.conditions.includes('superior_defense') &&
+      (enemy.damageType ?? 'bludgeoning') !== 'force' &&
+      !char.conditions.some((c) =>
+        ['incapacitated', 'paralyzed', 'stunned', 'unconscious', 'petrified'].includes(c)
+      );
+    const anyResist =
+      isRaging || isPetrified || beastResist || speciesResist || superiorDefenseActive;
     const postResistDmg = anyResist ? Math.ceil(result.damage / 2) : result.damage;
     const rageNote = isRaging ? ` (Rage resistance: ${result.damage}→${postResistDmg})` : '';
     const petrNote = isPetrified
@@ -1014,6 +1023,10 @@ function computeEnemyAttack(
     const speciesNote =
       speciesResist && !isRaging && !isPetrified && !beastResist
         ? ` (${speciesData?.name} ${enemy.damageType} resistance: ${result.damage}→${postResistDmg})`
+        : '';
+    const superiorDefNote =
+      superiorDefenseActive && !isRaging && !isPetrified && !beastResist && !speciesResist
+        ? ` (Superior Defense resistance: ${result.damage}→${postResistDmg})`
         : '';
     const wardNote = '';
     const charAfterWard = char;
@@ -1058,7 +1071,8 @@ function computeEnemyAttack(
       .replace('{target}', char.name)
       .replace('{dmg}', fmt.dmg(hpLost));
     narrative += ` ${char.name} takes ${fmt.dmg(hpLost)} damage.`;
-    narrative += rageNote + petrNote + beastNote + speciesNote + wardNote + tempHpNote;
+    narrative +=
+      rageNote + petrNote + beastNote + speciesNote + superiorDefNote + wardNote + tempHpNote;
     narrative += deflectNote;
     narrative += dmgResult.concentrationNote;
 
@@ -1754,10 +1768,12 @@ export function endCombatState(st: GameState): GameState {
     characters: st.characters.map((c) => ({
       ...c,
       turn_actions: { ...FRESH_TURN },
-      // Rage ends when combat ends (PHB p.48)
-      conditions: c.conditions.filter((cond) => cond !== 'raging'),
+      // Rage / Monk Superior Defense end when combat ends.
+      conditions: c.conditions.filter((cond) => cond !== 'raging' && cond !== 'superior_defense'),
       condition_durations: Object.fromEntries(
-        Object.entries(c.condition_durations ?? {}).filter(([k]) => k !== 'raging')
+        Object.entries(c.condition_durations ?? {}).filter(
+          ([k]) => k !== 'raging' && k !== 'superior_defense'
+        )
       ),
       // Totem Warrior totem clears with rage at combat end.
       totem_spirit: undefined,
@@ -3239,6 +3255,14 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         choices.push({
           label: `Stunning Strike — once/turn after a hit, CON save DC ${8 + profBonus(char.level) + abilityMod(char.wis ?? 10)} (1 DP, ${kiLeft} left)`,
           action: { type: 'use_class_feature', featureId: 'stunning_strike' },
+          kind: 'class_feature',
+        });
+      }
+      // Superior Defense (L18): spend 3 DP for Resistance to all but force.
+      if (monkLvl >= 18 && kiLeft >= 3 && !char.conditions.includes('superior_defense')) {
+        choices.push({
+          label: `Superior Defense — Resistance to all damage but force this combat (3 DP, ${kiLeft} left)`,
+          action: { type: 'use_class_feature', featureId: 'superior_defense' },
           kind: 'class_feature',
         });
       }

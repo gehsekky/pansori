@@ -344,5 +344,25 @@ export function handleMonkFeature(ctx: ActionContext, fid: string): boolean {
     return true;
   }
 
+  if (fid === 'superior_defense') {
+    if (!hasClass(char, 'monk') || getClassLevel(char, 'monk') < 18) {
+      ctx.narrative = 'Superior Defense requires Monk level 18.';
+      return true;
+    }
+    if (char.conditions.includes('superior_defense')) {
+      ctx.narrative = 'Superior Defense is already active.';
+      return true;
+    }
+    const sdKi = char.class_resource_uses?.ki_points ?? getClassLevel(char, 'monk');
+    if (sdKi < 3) {
+      ctx.narrative = 'Superior Defense needs 3 Discipline Points (recover on a short rest).';
+      return true;
+    }
+    char.class_resource_uses = { ...(char.class_resource_uses ?? {}), ki_points: sdKi - 3 };
+    char.conditions = [...char.conditions, 'superior_defense'];
+    ctx.narrative = `${char.name} steels into Superior Defense — Resistance to all damage except force this combat. (${sdKi - 3} ki remaining)`;
+    return true;
+  }
+
   return false;
 }
