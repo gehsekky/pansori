@@ -126,6 +126,6 @@ Iconography:
 
 ## License
 
-GPL v3 — see [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE).
 
 This project uses material from the System Reference Document 5.2.1 by Wizards of the Coast LLC, licensed under the [Creative Commons Attribution 4.0 International License](https://creativecommons.org/licenses/by/4.0/). See [LEGAL.md](LEGAL.md) for the full attribution.
