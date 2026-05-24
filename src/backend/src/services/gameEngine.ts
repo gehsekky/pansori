@@ -3014,6 +3014,11 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       const bonusBlocked = isBonusAction && char.turn_actions.bonus_action_used;
       if (actionBlocked || bonusBlocked) continue;
 
+      // Out-of-combat-only spells (long cast, e.g. Animate Dead) aren't
+      // castable mid-fight — the cast site rejects them, so don't surface
+      // them in the combat cast menu.
+      if (spell.outOfCombatOnly && state.combat_active) continue;
+
       // Restrict offensive/condition spells to when an enemy is alive; heal spells when injured
       const isOffensive = !!(spell.damage || spell.condition);
       const isHeal = !!spell.heal;

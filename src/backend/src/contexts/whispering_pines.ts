@@ -1445,6 +1445,7 @@ export const context: Context = {
       'spiritual_weapon',
       'healing_word',
       'hold_person',
+      'animate_dead',
     ],
     Wizard: [
       'fire_bolt',
@@ -1454,6 +1455,7 @@ export const context: Context = {
       'misty_step',
       'fireball',
       'hold_person',
+      'animate_dead',
     ],
     Paladin: ['divine_smite_spell', 'cure_wounds', 'bless'],
     Bard: ['bardic_inspiration_spell', 'cure_wounds', 'healing_word', 'charm_person', 'sleep'],

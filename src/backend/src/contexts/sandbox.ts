@@ -127,7 +127,7 @@ export const context: Context = {
   featTable: { ...SRD_FEATS },
 
   classSpells: {
-    Wizard: ['fire_bolt', 'magic_missile', 'thunderwave', 'misty_step', 'fireball'],
+    Wizard: ['fire_bolt', 'magic_missile', 'thunderwave', 'misty_step', 'fireball', 'animate_dead'],
     Cleric: [
       'sacred_flame',
       'cure_wounds',
@@ -135,6 +135,7 @@ export const context: Context = {
       'hold_person',
       'bless',
       'spiritual_weapon',
+      'animate_dead',
     ],
     Druid: ['shillelagh', 'entangle', 'cure_wounds', 'healing_word'],
     Sorcerer: ['fire_bolt', 'sleep', 'burning_hands', 'misty_step', 'fireball'],
