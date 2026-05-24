@@ -202,6 +202,16 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
       chosen party member or self, syncing the ally's grid-entity HP. Surfaced
       in generateChoices per injured party member (in + out of combat). The
       5-point poison-cure use is a deferred follow-up.
+- [x] **Aura of Protection (done 2026-05-24)** — Paladin L6. `auraOfProtection
+    Bonus(char, st)`: a creature within 10 ft of a conscious L6+ Paladin (the
+      paladin always benefits) gains +CHA mod (min +1) to saving throws; best
+      aura when several overlap; off-grid (out of combat) the party is assumed
+      together. Wired into all three PC save sites — enemy-spell saves
+      (`resolveEnemySpell`), on-hit condition saves (`conditionSavingThrow`, via
+      a DC reduction like the Bardic roll), and concentration saves
+      (`checkConcentration`). Spec covers self/ally/range/incapacitated/
+      multi-paladin/off-grid. Deferred: the L18 30-ft upgrade and the
+      manual "choose which aura" when two overlap (engine auto-picks best).
 
 | Class     | Implemented (approx)                                                  | Major SRD gaps to fill                                                                                                                                          |
 | --------- | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
