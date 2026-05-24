@@ -370,10 +370,19 @@ Bonus(char, st)`: a creature within 10 ft of a conscious L6+ Paladin (the
       and enemy damage-spell saves (`resolveEnemySpell`, rolls 2d20-take-max).
       Spec: helper + a DEX-save A/B through `resolveEnemySpell` (L2 saves where
       L1 fails on the same rolls).
+- [x] **Relentless Rage (done 2026-05-24)** — Barbarian L11: if you drop to 0
+      HP while raging (and aren't killed outright), a CON save — DC 10, +5 per
+      prior use this rest — leaves you at 2× Barbarian level HP instead. Wired
+      into the enemy-attack knockout path (`resolveEnemySubAttack`), beside Orc
+      Relentless Endurance; tracked on `class_resource_uses.relentless_rage_used`
+      and reset on a short **or** long rest (DC back to 10). Spec: pass / fail /
+      escalating-DC / not-raging control via the dispatched `enemy_attack`
+      handler. Deferred: knockouts from enemy spells / lair AoEs (same path-
+      scoping limitation as Orc Relentless Endurance — only the attack path).
 
 | Class     | Implemented (approx)                                                                                                                                                                                   | Major SRD gaps to fill                                                                                                                  |
 | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
-| Barbarian | Rage, Reckless (L1–2), Frenzy (L3), Danger Sense (L2), Extra Attack (L5), Feral Instinct (L7)                                                                                                          | Fast Movement, Brutal Strike, Relentless Rage, Persistent Rage, Indomitable Might, capstone; exhaustion-on-rage-end                     |
+| Barbarian | Rage, Reckless (L1–2), Frenzy (L3), Danger Sense (L2), Extra Attack (L5), Feral Instinct (L7), Relentless Rage (L11)                                                                                   | Fast Movement, Brutal Strike, Persistent Rage, Indomitable Might, capstone; exhaustion-on-rage-end                                      |
 | Bard      | Bardic Inspiration (L1), Cutting Words (L3), Jack of All Trades (L2), Expertise (L2/9), Font of Inspiration (L5), Countercharm (L7), Superior Inspiration (L18)                                        | Magical Secrets, capstone                                                                                                               |
 | Cleric    | Channel Divinity, Turn/Sear Undead, Preserve Life (Life)                                                                                                                                               | Blessed Strikes, Divine Intervention, improved Channel uses, higher Life-domain grades                                                  |
 | Druid     | Wild Shape (L2, CR L4/8), Land's Aid                                                                                                                                                                   | Wild Companion, full Circle of the Land grades, Wild Shape improvements, Beast Spells, Archdruid                                        |

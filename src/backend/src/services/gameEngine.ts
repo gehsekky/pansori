@@ -4619,9 +4619,41 @@ export function resolveEnemySubAttack(args: {
   } else {
     target = computed.proposedChar;
   }
+  // SRD Barbarian Relentless Rage (L11): if you drop to 0 HP while raging (and
+  // aren't killed outright), a CON save — DC 10, +5 per prior use this rest —
+  // leaves you at 2× Barbarian level HP instead. Doesn't stack with the Orc
+  // bump (which already kept the target up). Scoped to the enemy-attack
+  // knockout path, like Orc Relentless Endurance.
+  let relentlessRageFired = false;
+  if (
+    !orcSaveFired &&
+    prevHp > 0 &&
+    target.hp === 0 &&
+    (target.conditions ?? []).includes('raging') &&
+    getClassLevel(target, 'barbarian') >= 11 &&
+    !isMassiveDamageDeath(prevHp, computed.hpLost, target.max_hp)
+  ) {
+    const used = target.class_resource_uses?.relentless_rage_used ?? 0;
+    const dc = 10 + 5 * used;
+    const conSave = rollDice('1d20') + abilityMod(target.con) - reviveD20Penalty(target);
+    if (conSave >= dc) {
+      relentlessRageFired = true;
+      target = {
+        ...target,
+        hp: 2 * getClassLevel(target, 'barbarian'),
+        class_resource_uses: {
+          ...(target.class_resource_uses ?? {}),
+          relentless_rage_used: used + 1,
+        },
+      };
+    }
+  }
   st = computed.proposedSt;
   if (orcSaveFired) {
     narrative += ` 🪓 Relentless Endurance! ${target.name} stays standing at ${fmt.hp(1)} HP.`;
+  }
+  if (relentlessRageFired) {
+    narrative += ` 🪓 Relentless Rage! ${target.name} refuses to fall — back up at ${fmt.hp(target.hp)} HP.`;
   }
   narrative += ` ${computed.fragment.prose}`;
   st = pushEvent(st, enemyAttackFragmentEvent(computed.fragment, st.round ?? 1));
