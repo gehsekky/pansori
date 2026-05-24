@@ -476,6 +476,18 @@ export interface Spell {
     windowRounds: number;
     materialCost: number;
   };
+  // RE-1 Phase 4 — summon spell. Casting (out of combat) adds a
+  // persistent ally to `state.summoned_allies` with this stat block;
+  // `seedSummonedAllies` materializes it at the next combat start.
+  summon?: {
+    name: string;
+    ac: number;
+    maxHp: number;
+    toHit: number;
+    damage: string; // dice expression, e.g. '1d6+3'
+  };
+  // Long casting time (1 min+) — rejected in combat (before slot spend).
+  outOfCombatOnly?: boolean;
 }
 
 // ─── Beast Forms (2024 PHB Wild Shape) ───────────────────────────────────────
