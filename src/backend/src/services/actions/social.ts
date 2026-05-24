@@ -7,6 +7,7 @@ import {
 } from '../gameEngine.js';
 import type { ActionHandler } from './types.js';
 import { randomUUID } from 'crypto';
+import { updatePcActor } from './actor.js';
 
 /**
  * `talk`: open dialogue with the NPC in the current room. Indifferent
@@ -16,6 +17,8 @@ import { randomUUID } from 'crypto';
  * UI button format).
  */
 export const handleTalk: ActionHandler<{ type: 'talk' }> = (ctx) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can talk.' };
+  const { char } = ctx.actor;
   const npc = ctx.seed.npcs?.[ctx.roomId];
   if (!npc) {
     ctx.narrative = 'There is no one to talk to here.';
@@ -34,8 +37,8 @@ export const handleTalk: ActionHandler<{ type: 'talk' }> = (ctx) => {
   let narrative: string;
   if (attitude === 'indifferent') {
     const dc = npc.persuasionDC ?? 12;
-    const chaMod = abilityMod(ctx.char.cha);
-    const roll = rollDice('1d20') + chaMod + profBonus(ctx.char.level);
+    const chaMod = abilityMod(char.cha);
+    const roll = rollDice('1d20') + chaMod + profBonus(char.level);
     const success = roll >= dc;
     if (success) {
       ctx.st = {
@@ -58,7 +61,7 @@ export const handleTalk: ActionHandler<{ type: 'talk' }> = (ctx) => {
     narrative += ' [' + npc.responses.map((r) => `<To ${npc.name}> ${r.label}`).join(' | ') + ']';
   }
   if (ctx.st.combat_active) {
-    ctx.char = { ...ctx.char, turn_actions: { ...ctx.char.turn_actions, action_used: true } };
+    updatePcActor(ctx, { turn_actions: { ...char.turn_actions, action_used: true } });
   }
   ctx.narrative = narrative;
 };
@@ -72,6 +75,8 @@ export const handleTalkResponse: ActionHandler<{
   type: 'talk_response';
   responseIdx: number;
 }> = (ctx, action) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can respond in dialogue.' };
+  const { char } = ctx.actor;
   const npc = ctx.seed.npcs?.[ctx.roomId];
   if (!npc) {
     ctx.narrative = 'There is no one here.';
@@ -86,7 +91,7 @@ export const handleTalkResponse: ActionHandler<{
   if (response.consequences?.length) {
     const narrativeParts: string[] = [];
     for (const c of response.consequences) {
-      ctx.st = applyConsequence(c, ctx.st, ctx.seed, ctx.char.id, narrativeParts, ctx.context);
+      ctx.st = applyConsequence(c, ctx.st, ctx.seed, char.id, narrativeParts, ctx.context);
     }
     if (narrativeParts.length) narrative += ' ' + narrativeParts.join(' ');
   }
@@ -105,6 +110,8 @@ export const handleBuy: ActionHandler<{
   itemId: string;
   price: number;
 }> = (ctx, action) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can buy.' };
+  const { char } = ctx.actor;
   const npc = ctx.seed.npcs?.[ctx.roomId];
   if (!npc) {
     ctx.narrative = 'There is no one to buy from.';
@@ -114,8 +121,8 @@ export const handleBuy: ActionHandler<{
     ctx.narrative = `${npc.name} won't trade with you right now.`;
     return;
   }
-  if (ctx.char.gold < action.price) {
-    ctx.narrative = `You can't afford that — you only have ${ctx.char.gold}cr.`;
+  if (char.gold < action.price) {
+    ctx.narrative = `You can't afford that — you only have ${char.gold}cr.`;
     return;
   }
   const lootEntry = ctx.context.lootTable.find((l) => l.id === action.itemId);
@@ -123,11 +130,10 @@ export const handleBuy: ActionHandler<{
     ctx.narrative = 'That item is not available.';
     return;
   }
-  ctx.char = {
-    ...ctx.char,
-    gold: ctx.char.gold - action.price,
-    inventory: [...ctx.char.inventory, { ...lootEntry, instance_id: randomUUID() }],
-  };
+  updatePcActor(ctx, {
+    gold: char.gold - action.price,
+    inventory: [...char.inventory, { ...lootEntry, instance_id: randomUUID() }],
+  });
   ctx.narrative = `You hand over ${action.price}cr and receive ${lootEntry.name}. ${npc.name} pockets the credits with a nod.`;
 };
 
@@ -199,6 +205,8 @@ export const handleInfluence: ActionHandler<{
   targetNpcRoomId?: string;
   targetEnemyId?: string;
 }> = (ctx, action) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can use the Influence action.' };
+  const { char } = ctx.actor;
   // Resolve target: prefer explicit npc room, then explicit enemy,
   // then current-room npc if either is omitted.
   const npcRoomId = action.targetNpcRoomId ?? ctx.roomId;
@@ -220,14 +228,14 @@ export const handleInfluence: ActionHandler<{
     : (npc?.persuasionDC ?? 12);
   const dc = Math.max(15, targetIntScore);
 
-  const chaMod = abilityMod(ctx.char.cha);
+  const chaMod = abilityMod(char.cha);
   const skillName = action.skill; // 'persuasion' | 'deception' | 'intimidation'
-  const profMod = ctx.char.skill_proficiencies?.includes(skillName) ? profBonus(ctx.char.level) : 0;
+  const profMod = char.skill_proficiencies?.includes(skillName) ? profBonus(char.level) : 0;
   // Lucky feat — queued via `use_luck` grants advantage (roll 2d20,
   // take higher). Same pattern as Heroic Inspiration for ad-hoc d20s.
-  const luckActive = consumeLuckForCheck(ctx.char);
+  const luckActive = consumeLuckForCheck(char);
   const d20 = luckActive ? Math.max(rollDice('1d20'), rollDice('1d20')) : rollDice('1d20');
-  const total = d20 + chaMod + profMod - reviveD20Penalty(ctx.char);
+  const total = d20 + chaMod + profMod - reviveD20Penalty(char);
   const success = total >= dc;
 
   const skillLabel = {
@@ -240,10 +248,7 @@ export const handleInfluence: ActionHandler<{
   // The check is committed effort; failure still costs the action slot.
   const inCombat = ctx.st.combat_active === true;
   if (inCombat) {
-    ctx.char = {
-      ...ctx.char,
-      turn_actions: { ...ctx.char.turn_actions, action_used: true },
-    };
+    updatePcActor(ctx, { turn_actions: { ...char.turn_actions, action_used: true } });
   }
 
   if (success) {
@@ -253,7 +258,7 @@ export const handleInfluence: ActionHandler<{
         ...ctx.st,
         enemies_killed: [...ctx.st.enemies_killed, enemy.id],
       };
-      ctx.narrative = `${ctx.char.name} attempts a ${skillLabel} check on ${enemy.name} (${total} vs DC ${dc}) — success! ${enemy.name} yields and retreats from the fight.`;
+      ctx.narrative = `${char.name} attempts a ${skillLabel} check on ${enemy.name} (${total} vs DC ${dc}) — success! ${enemy.name} yields and retreats from the fight.`;
     } else if (npc) {
       const currentAttitude = ctx.st.npc_attitudes?.[npcRoomId] ?? npc.attitude;
       const nextAttitude =
@@ -266,11 +271,11 @@ export const handleInfluence: ActionHandler<{
         ...ctx.st,
         npc_attitudes: { ...ctx.st.npc_attitudes, [npcRoomId]: nextAttitude },
       };
-      ctx.narrative = `${ctx.char.name} uses ${skillLabel} on ${npc.name} (${total} vs DC ${dc}) — success! ${npc.name}'s attitude shifts to ${nextAttitude}.`;
+      ctx.narrative = `${char.name} uses ${skillLabel} on ${npc.name} (${total} vs DC ${dc}) — success! ${npc.name}'s attitude shifts to ${nextAttitude}.`;
     }
   } else {
     const targetName = enemy ? enemy.name : (npc?.name ?? 'them');
-    ctx.narrative = `${ctx.char.name} tries to ${skillLabel.toLowerCase()} ${targetName} (${total} vs DC ${dc}) — fails. ${targetName} is unmoved.`;
+    ctx.narrative = `${char.name} tries to ${skillLabel.toLowerCase()} ${targetName} (${total} vs DC ${dc}) — fails. ${targetName} is unmoved.`;
   }
   ctx.usedInitiative = inCombat;
 };
@@ -306,6 +311,8 @@ export const handleStudy: ActionHandler<{
   targetEnemyId?: string;
   loreTopic?: string;
 }> = (ctx, action) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can use the Study action.' };
+  const { char } = ctx.actor;
   const enemy = action.targetEnemyId
     ? ctx.livingEnemiesInRoom.find((e) => e.id === action.targetEnemyId)
     : null;
@@ -313,7 +320,7 @@ export const handleStudy: ActionHandler<{
   // lore + object analysis bounce off with a narrative-only message.
   if (!enemy) {
     if (action.loreTopic) {
-      ctx.narrative = `${ctx.char.name} contemplates "${action.loreTopic}", but the engine doesn't yet model freeform lore recall.`;
+      ctx.narrative = `${char.name} contemplates "${action.loreTopic}", but the engine doesn't yet model freeform lore recall.`;
       return;
     }
     return { rejected: 'No valid creature to study here.' };
@@ -321,13 +328,13 @@ export const handleStudy: ActionHandler<{
 
   const enemyCr = (enemy as unknown as Record<string, number>).cr ?? 0;
   const dc = 15 + Math.floor(enemyCr);
-  const intMod = abilityMod(ctx.char.int);
+  const intMod = abilityMod(char.int);
   const skillName = action.skill;
-  const profMod = ctx.char.skill_proficiencies?.includes(skillName) ? profBonus(ctx.char.level) : 0;
+  const profMod = char.skill_proficiencies?.includes(skillName) ? profBonus(char.level) : 0;
   // Lucky feat — same pattern as Influence above.
-  const studyLuckActive = consumeLuckForCheck(ctx.char);
+  const studyLuckActive = consumeLuckForCheck(char);
   const d20 = studyLuckActive ? Math.max(rollDice('1d20'), rollDice('1d20')) : rollDice('1d20');
-  const total = d20 + intMod + profMod - reviveD20Penalty(ctx.char);
+  const total = d20 + intMod + profMod - reviveD20Penalty(char);
   const success = total >= dc;
 
   const skillLabel = {
@@ -340,14 +347,11 @@ export const handleStudy: ActionHandler<{
 
   const inCombat = ctx.st.combat_active === true;
   if (inCombat) {
-    ctx.char = {
-      ...ctx.char,
-      turn_actions: { ...ctx.char.turn_actions, action_used: true },
-    };
+    updatePcActor(ctx, { turn_actions: { ...char.turn_actions, action_used: true } });
   }
 
   if (!success) {
-    ctx.narrative = `${ctx.char.name} studies ${enemy.name} (INT ${skillLabel} ${total} vs DC ${dc}) — fails to recall anything useful.`;
+    ctx.narrative = `${char.name} studies ${enemy.name} (INT ${skillLabel} ${total} vs DC ${dc}) — fails to recall anything useful.`;
     ctx.usedInitiative = inCombat;
     return;
   }
@@ -366,6 +370,6 @@ export const handleStudy: ActionHandler<{
     facts.push(`cannot be ${enemy.condition_immunities.join(' / ')}`);
   }
   const summary = facts.length > 0 ? facts.join('; ') : 'no notable weaknesses or strengths';
-  ctx.narrative = `${ctx.char.name} studies ${enemy.name} (INT ${skillLabel} ${total} vs DC ${dc}) — success! ${enemy.name} is ${summary}.`;
+  ctx.narrative = `${char.name} studies ${enemy.name} (INT ${skillLabel} ${total} vs DC ${dc}) — success! ${enemy.name} is ${summary}.`;
   ctx.usedInitiative = inCombat;
 };
