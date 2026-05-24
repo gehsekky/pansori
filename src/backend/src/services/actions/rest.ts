@@ -9,6 +9,7 @@ import { canRestInRoom, pick } from '../gameEngine.js';
 import { getClassLevel, hasClass } from '../multiclass.js';
 import type { ActionHandler } from './types.js';
 import { resetFeatLongRestResources } from '../feats.js';
+import { updatePcActor } from './actor.js';
 
 /**
  * `short_rest`: PHB p.196 — spend Hit Dice to recover HP, refresh
@@ -24,6 +25,8 @@ import { resetFeatLongRestResources } from '../feats.js';
  * Dragonborn breath weapon, Goliath large form, Orc adrenaline rush.
  */
 export const handleShortRest: ActionHandler<{ type: 'short_rest' }> = (ctx) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can take a short rest.' };
+  const { char } = ctx.actor;
   if (ctx.st.combat_active) {
     ctx.narrative = 'You cannot rest while in combat.';
     return;
@@ -36,18 +39,18 @@ export const handleShortRest: ActionHandler<{ type: 'short_rest' }> = (ctx) => {
     ctx.narrative = 'You have already rested in this room.';
     return;
   }
-  if ((ctx.char.hit_dice_remaining ?? 0) <= 0) {
+  if ((char.hit_dice_remaining ?? 0) <= 0) {
     ctx.narrative = 'You have no hit dice remaining.';
     return;
   }
-  if (ctx.char.hp >= ctx.char.max_hp) {
+  if (char.hp >= char.max_hp) {
     ctx.narrative = 'You are already at full health.';
     return;
   }
 
-  const hdRoll = rollDice(`1d${ctx.char.hit_die ?? 8}`) + abilityMod(ctx.char.con);
+  const hdRoll = rollDice(`1d${char.hit_die ?? 8}`) + abilityMod(char.con);
   const hdHealed = Math.max(1, hdRoll);
-  const next = { ...ctx.char };
+  const next = { ...char };
   next.hp = Math.min(next.max_hp, next.hp + hdHealed);
   next.hit_dice_remaining = Math.max(0, (next.hit_dice_remaining ?? 1) - 1);
   ctx.st = {
@@ -110,7 +113,7 @@ export const handleShortRest: ActionHandler<{ type: 'short_rest' }> = (ctx) => {
     next.spell_slots_used = {};
   }
   next.class_resource_uses = srUses;
-  ctx.char = next;
+  updatePcActor(ctx, next);
 
   const hdRemain = next.hit_dice_remaining;
   const shortRestFlavor = ctx.context.narratives.shortRest
@@ -135,6 +138,7 @@ export const handleShortRest: ActionHandler<{ type: 'short_rest' }> = (ctx) => {
  * Inspiration; orc/tiefling racial 1/long-rest uses reset.
  */
 export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can take a long rest.' };
   if (ctx.st.combat_active) {
     ctx.narrative = 'You cannot rest while in combat.';
     return;
@@ -223,7 +227,7 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
     return refreshed;
   });
   ctx.st = { ...ctx.st, characters: restedChars, long_rested: true };
-  ctx.char = { ...restedChars[ctx.safeIdx] };
+  updatePcActor(ctx, { ...restedChars[ctx.safeIdx] });
   const longRestFlavor = ctx.context.narratives.longRest
     ? pick(ctx.context.narratives.longRest).replace(/{party}/g, restLines.join('; ')) + ' '
     : '';
