@@ -77,6 +77,10 @@ export function handleCasterFeature(ctx: ActionContext, fid: string): boolean {
       cost: 1,
       label: 'Seeking Spell — reroll a missed spell attack',
     },
+    metamagic_careful: {
+      cost: 1,
+      label: 'Careful Spell — allies in the area auto-succeed and take no damage',
+    },
   };
   if (SIMPLE_METAMAGIC[fid]) {
     if (!hasClass(char, 'sorcerer')) {

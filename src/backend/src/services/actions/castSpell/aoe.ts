@@ -136,8 +136,11 @@ export function runAoeSpell(
         }
       }
     } else if (targetChar && !target.isEnemy) {
-      // Allies in blast: Evoker Sculpt Spells lets them auto-succeed (PHB p.117)
-      const autoSucceed = isEvoker;
+      // Allies in blast auto-succeed (and take no damage) via Evoker Sculpt
+      // Spells or Sorcerer Metamagic Careful Spell (pansori auto-protects all
+      // allies in the blast; RAW caps Careful at CHA-mod chosen creatures).
+      const carefulActive = ctx.metamagic === 'careful';
+      const autoSucceed = isEvoker || carefulActive;
       if (!autoSucceed && spell.saveEffect !== 'negates') {
         const allyScore = (targetChar[spell.savingThrow as keyof Character] as number) ?? 10;
         let allyCover = 0;
@@ -176,7 +179,7 @@ export function runAoeSpell(
           ctx.narrative += ` ${targetChar.name}: ${allyFailed ? 'fails' : 'succeeds'} save — ${effDmg} dmg.`;
         }
       } else if (autoSucceed) {
-        ctx.narrative += ` ${targetChar.name}: auto-succeeds (Sculpt Spells).`;
+        ctx.narrative += ` ${targetChar.name}: auto-succeeds (${carefulActive ? 'Careful Spell' : 'Sculpt Spells'}).`;
       }
     }
   }
