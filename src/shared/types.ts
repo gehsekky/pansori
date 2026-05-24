@@ -347,6 +347,10 @@ export type StructuredAction =
   // chosen skill proficiency. `skill` matches a `skill_proficiencies` entry.
   // Out-of-combat, no action cost. (RE-2.)
   | { type: 'choose_expertise'; skill: string }
+  // SRD 5.2.1 Ranger Hunter "feature option" pick (Hunter's Prey L3, Defensive
+  // Tactics L7): choose one of two options, swappable on a rest. Out-of-combat,
+  // no action cost. (RE-2.)
+  | { type: 'choose_hunter_option'; feature: 'hunters_prey' | 'defensive_tactics'; option: string }
   // SRD 5.2.1 Paladin Lay on Hands (L1): bonus-action touch heal drawing from
   // a pool of 5 × Paladin level HP. `targetCharId` is the healed party member
   // (may be the paladin). (RE-2.)

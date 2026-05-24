@@ -343,6 +343,10 @@ export interface TurnActions {
   // Hunter's Mark damage to the marked target you also deal that extra damage
   // to a second creature within 30 ft. This marks the per-turn use.
   superior_hunters_prey_used?: boolean;
+  // SRD Ranger Horde Breaker (Hunter's Prey option) — once per turn, an extra
+  // weapon attack vs a different creature within 5 ft of the original target.
+  // This marks the per-turn use.
+  horde_breaker_used?: boolean;
 }
 
 export interface DeathSaves {
@@ -692,6 +696,12 @@ export interface Character {
   // Set when the spell is cast, cleared on breakConcentration. The caster's
   // attack rolls vs this target deal +1d6 Force (d10 at Ranger L20, Foe Slayer).
   hunters_mark_target_id?: string;
+  // SRD Ranger Hunter "feature option" picks (swappable on a rest):
+  //   Hunter's Prey (L3): 'colossus_slayer' | 'horde_breaker' (defaults to
+  //     colossus_slayer when unset, preserving the pre-picker behavior).
+  //   Defensive Tactics (L7): 'escape_the_horde' | 'multiattack_defense'.
+  hunters_prey?: 'colossus_slayer' | 'horde_breaker';
+  defensive_tactics?: 'escape_the_horde' | 'multiattack_defense';
   // Extended 5e fields
   subclass?: string; // e.g. 'champion', 'evoker', 'thief'
   // SRD 5.2.1 Fighting Style feats chosen via class features (Fighter L1 +

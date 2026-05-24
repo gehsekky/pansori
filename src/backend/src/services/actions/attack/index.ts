@@ -3,6 +3,7 @@ import {
   extraAttackCountForChar,
   resolveOneAttack,
 } from './resolveOneAttack.js';
+import { getClassLevel, huntersPrey } from '../../multiclass.js';
 import type { ActionHandler } from '../types.js';
 import { computeToHitContext } from './toHit.js';
 import { runCombatStart } from './combatStart.js';
@@ -159,6 +160,49 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
       if ((ctx.st.entities?.find((e) => e.id === targetId && e.isEnemy)?.hp ?? 0) <= 0) break;
       const killedExtra = resolveOneAttack(ctx, atkCtx, `Attack ${ei + 2} — `);
       if (killedExtra) break;
+    }
+  }
+
+  // ── Ranger Horde Breaker (Hunter's Prey option) ────────────────────────
+  // Once per turn, an extra attack with the same weapon against a different
+  // creature within 5 ft of the original target (a separate attack roll).
+  if (
+    weaponItem &&
+    huntersPrey(pc.char) === 'horde_breaker' &&
+    pc.char.subclass === 'hunter' &&
+    getClassLevel(pc.char, 'ranger') >= 3 &&
+    !pc.char.turn_actions.horde_breaker_used
+  ) {
+    const origEnt = ctx.st.entities?.find((e) => e.id === targetId && e.isEnemy);
+    const hbEnt = origEnt
+      ? (ctx.st.entities ?? []).find(
+          (e) =>
+            e.isEnemy &&
+            e.hp > 0 &&
+            e.id !== targetId &&
+            Math.max(Math.abs(e.pos.x - origEnt.pos.x), Math.abs(e.pos.y - origEnt.pos.y)) <= 1
+        )
+      : undefined;
+    const hbEnemy = hbEnt ? ctx.livingEnemiesInRoom.find((en) => en.id === hbEnt.id) : undefined;
+    if (hbEnt && hbEnemy) {
+      updatePcActor(ctx, {
+        turn_actions: { ...pc.char.turn_actions, horde_breaker_used: true },
+      });
+      const hbToHit = computeToHitContext(ctx, {
+        target: hbEnemy,
+        targetId: hbEnt.id,
+        weaponItem,
+      });
+      const hbAtkCtx: AttackContext = {
+        target: hbEnemy,
+        targetId: hbEnt.id,
+        weaponItem,
+        weaponDamage,
+        isVersatile,
+        weaponLabel,
+        toHit: hbToHit,
+      };
+      resolveOneAttack(ctx, hbAtkCtx, 'Horde Breaker — ');
     }
   }
 

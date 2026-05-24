@@ -7,7 +7,13 @@ import {
 } from '../fightingStyle.js';
 import { applyFeatTake, canTakeFeat, getFeat } from '../feats.js';
 import { applyLevelUpForClass, preparedSpellsCap } from '../gameEngine.js';
-import { canMulticlassInto, expertiseSlots, getClassLevel, hasClass } from '../multiclass.js';
+import {
+  canMulticlassInto,
+  expertiseSlots,
+  getClassLevel,
+  hasClass,
+  hunterFeatureOptions,
+} from '../multiclass.js';
 import type { AbilityKey } from '../../types.js';
 import type { ActionHandler } from './types.js';
 import { updatePcActor } from './actor.js';
@@ -110,6 +116,38 @@ export const handleChooseFightingStyle: ActionHandler<{
   }
   updatePcActor(ctx, patch);
   ctx.narrative = `${char.name} adopts the ${FIGHTING_STYLE_LABELS[style] ?? style} Fighting Style.`;
+};
+
+/**
+ * `choose_hunter_option`: pick one of the two options for a Ranger Hunter
+ * "feature option" feature — Hunter's Prey (L3: Colossus Slayer / Horde
+ * Breaker) or Defensive Tactics (L7: Escape the Horde / Multiattack Defense).
+ * Swappable on a rest, so it's an always-available out-of-combat choice.
+ * Validates the Hunter subclass + gate level + the option id. (RE-2.)
+ */
+export const handleChooseHunterOption: ActionHandler<{
+  type: 'choose_hunter_option';
+  feature: 'hunters_prey' | 'defensive_tactics';
+  option: string;
+}> = (ctx, action) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can choose a Hunter option.' };
+  const { char } = ctx.actor;
+  const def = hunterFeatureOptions[action.feature];
+  if (!def) return { rejected: `Unknown Hunter feature: ${action.feature}.` };
+  if (char.subclass !== 'hunter' || getClassLevel(char, 'ranger') < def.level) {
+    ctx.narrative = `${def.feature} requires a Hunter Ranger of level ${def.level}.`;
+    return;
+  }
+  if (!def.options.includes(action.option)) {
+    return { rejected: `Unknown ${def.feature} option: ${action.option}.` };
+  }
+  updatePcActor(
+    ctx,
+    action.feature === 'hunters_prey'
+      ? { hunters_prey: action.option as 'colossus_slayer' | 'horde_breaker' }
+      : { defensive_tactics: action.option as 'escape_the_horde' | 'multiattack_defense' }
+  );
+  ctx.narrative = `${char.name} adopts ${def.labels[action.option] ?? action.option}.`;
 };
 
 /**
