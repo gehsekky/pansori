@@ -2857,6 +2857,21 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       });
     }
 
+    // 2024 PHB Rogue L3+: Steady Aim — bonus action for advantage on the next
+    // attack, only if you haven't moved this turn (and your Speed drops to 0).
+    if (
+      hasClass(char, 'rogue') &&
+      getClassLevel(char, 'rogue') >= 3 &&
+      (state.movement_used?.[char.id] ?? 0) === 0
+    ) {
+      choices.push({
+        label: 'Steady Aim — advantage on your next attack (Speed 0 this turn)',
+        action: { type: 'use_class_feature', featureId: 'steady_aim' },
+        kind: 'class_feature',
+        requiresBonusAction: true,
+      });
+    }
+
     // 2024 PHB Rogue L5+: Cunning Strike. Pre-commit an effect that fires
     // on the next Sneak Attack hit. Each effect costs 1 SA die (subtracted
     // from the SA damage roll). Setting a Cunning Strike is free — no

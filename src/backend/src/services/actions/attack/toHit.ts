@@ -266,6 +266,15 @@ export function computeToHitContext(
     });
   }
 
+  // Rogue Steady Aim (L3) — advantage on the next attack this turn. One-shot:
+  // consumed here so only the first swing of the turn benefits.
+  const steadyAimAdv = !!pc.char.turn_actions.steady_aim_pending;
+  if (steadyAimAdv) {
+    updatePcActor(ctx, {
+      turn_actions: { ...pc.char.turn_actions, steady_aim_pending: false },
+    });
+  }
+
   const advantage =
     conditionAdv ||
     enemyGrappled ||
@@ -280,7 +289,8 @@ export function computeToHitContext(
     vexAdv ||
     studyAdv ||
     packTacticsAdv ||
-    luckAdv;
+    luckAdv ||
+    steadyAimAdv;
 
   const disadvReasons = [
     rangedInMelee ? 'ranged in melee' : '',
