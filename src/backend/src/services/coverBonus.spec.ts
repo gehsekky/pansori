@@ -95,3 +95,37 @@ describe('coverBonus — attacker-direction filtering', () => {
     expect(coverBonus({ x: 5, y: 5 }, { x: 5, y: 5 }, [{ x: 6, y: 5 }])).toBe(0);
   });
 });
+
+describe('coverBonus — adjacent source grants no cover', () => {
+  // Regression for the Vale of Shadows log: a melee Fighter standing next
+  // to the Crypt Lord (AC 17) saw "vs AC 22 +5 cover" while the Rogue
+  // attacking from a clear angle saw "vs AC 17". Cause: cover was charged
+  // for the walls/creatures BESIDE the target (its near-side cardinals)
+  // even though the attacker was adjacent — no square is between them.
+
+  it('diagonally adjacent attacker with both near-cardinals blocked → no cover (was +5)', () => {
+    // Attacker NE of target at Chebyshev distance 1. The E (6,5) and N
+    // (5,4) cardinals are walls — pre-fix this was a +5 corner pocket.
+    const obstacles = [
+      { x: 6, y: 5 },
+      { x: 5, y: 4 },
+    ];
+    expect(coverBonus({ x: 6, y: 4 }, { x: 5, y: 5 }, obstacles)).toBe(0);
+  });
+
+  it('cardinally adjacent attacker surrounded by occupied squares → no cover', () => {
+    // Attacker directly west, target hemmed in by creatures on every other
+    // side. Adjacency wins — no cover on the in-your-face strike.
+    const obstacles = [
+      { x: 5, y: 4 },
+      { x: 5, y: 6 },
+      { x: 6, y: 5 },
+    ];
+    expect(coverBonus({ x: 4, y: 5 }, { x: 5, y: 5 }, obstacles)).toBe(0);
+  });
+
+  it('reach attacker at distance 2 still gets cover (guard does not over-reach)', () => {
+    // Attacker two squares east; (6,5) is between it and the target.
+    expect(coverBonus({ x: 7, y: 5 }, { x: 5, y: 5 }, [{ x: 6, y: 5 }])).toBe(2);
+  });
+});

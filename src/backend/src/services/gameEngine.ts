@@ -1972,6 +1972,39 @@ export function seenKeyForAction(action: StructuredAction, state: GameState): st
   }
 }
 
+// English ordinal suffix for spell-slot labels (1st / 2nd / 3rd / 4th …).
+// Slots only run 1–9 but the standard rule (teens take "th") is kept for
+// correctness.
+export function ordinal(n: number): string {
+  const v = n % 100;
+  if (v >= 11 && v <= 13) return `${n}th`;
+  switch (n % 10) {
+    case 1:
+      return `${n}st`;
+    case 2:
+      return `${n}nd`;
+    case 3:
+      return `${n}rd`;
+    default:
+      return `${n}th`;
+  }
+}
+
+// Scale an upcast die expression by the number of slot levels above base.
+// `upcastBonus` is the per-level bonus (e.g. "2d8" for Cure Wounds), so 2
+// levels above base = "4d8". Earlier code pasted the level delta in front of
+// the unscaled string ("1" + "2d8" → "+12d8"); this multiplies the dice
+// count instead. Non-"NdM" shapes (flat numbers, "1d4+1") fall through to a
+// best-effort: flat numbers scale, anything else shows the per-level bonus.
+export function scaleUpcastDice(upcastBonus: string, levels: number): string {
+  if (levels <= 1) return upcastBonus;
+  const dice = /^(\d+)d(\d+)(.*)$/.exec(upcastBonus);
+  if (dice) return `${Number(dice[1]) * levels}d${dice[2]}${dice[3]}`;
+  const flat = /^(\d+)$/.exec(upcastBonus);
+  if (flat) return `${Number(flat[1]) * levels}`;
+  return upcastBonus;
+}
+
 export function generateChoices(state: GameState, seed: Seed, context: Context): GameChoice[] {
   const char =
     state.characters.find((c) => c.id === state.active_character_id) ?? state.characters[0];
@@ -3123,7 +3156,9 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
           emittedAny = true;
           const isUpcast = sl > baseLevel;
           const upcastPart =
-            isUpcast && spell.upcastBonus ? ` — upcast +${sl - baseLevel}${spell.upcastBonus}` : '';
+            isUpcast && spell.upcastBonus
+              ? ` — upcast +${scaleUpcastDice(spell.upcastBonus, sl - baseLevel)}`
+              : '';
           const slotNote = isBonusAction ? ', bonus action' : '';
           if (emitPerEnemy) {
             // Per-enemy basic choices at this slot level. `enemyDisambig`
@@ -3140,7 +3175,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
               if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
               const suffix = slotDisambig(en);
               choices.push({
-                label: `Cast ${spell.name} (${sl === baseLevel ? `Lvl ${sl}` : `${sl}th slot`}${slotNote}${upcastPart}) → ${en.name}${suffix}`,
+                label: `Cast ${spell.name} (${sl === baseLevel ? `Lvl ${sl}` : `${ordinal(sl)} slot`}${slotNote}${upcastPart}) → ${en.name}${suffix}`,
                 action: { type: 'cast_spell', spellId, slotLevel: sl, targetEnemyId: en.id },
                 requiresBonusAction: isBonusAction || undefined,
                 aoePreview: aoePreview ? { ...aoePreview, targetEnemyId: en.id } : undefined,
@@ -3150,7 +3185,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
           } else {
             const targetId = isOffensive ? livingEnemies[0]?.id : undefined;
             choices.push({
-              label: `Cast ${spell.name} (${sl === baseLevel ? `Lvl ${sl}` : `${sl}th slot`}${slotNote}${upcastPart} — ${avail} slot${avail === 1 ? '' : 's'} left)`,
+              label: `Cast ${spell.name} (${sl === baseLevel ? `Lvl ${sl}` : `${ordinal(sl)} slot`}${slotNote}${upcastPart} — ${avail} slot${avail === 1 ? '' : 's'} left)`,
               action: { type: 'cast_spell', spellId, slotLevel: sl, targetEnemyId: targetId },
               requiresBonusAction: isBonusAction || undefined,
               aoePreview: aoePreview ? { ...aoePreview, targetEnemyId: targetId } : undefined,
@@ -3164,7 +3199,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
             const dartCount = 2 + sl; // 3 at L1 slot, 4 at L2, etc.
             for (const e of livingEnemies) {
               choices.push({
-                label: `Cast ${spell.name} (${sl === baseLevel ? `Lvl ${sl}` : `${sl}th slot`}) — focus fire ${dartCount} darts → ${e.name}`,
+                label: `Cast ${spell.name} (${sl === baseLevel ? `Lvl ${sl}` : `${ordinal(sl)} slot`}) — focus fire ${dartCount} darts → ${e.name}`,
                 action: {
                   type: 'cast_spell',
                   spellId,
@@ -3186,7 +3221,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
               .map((e) => e.name)
               .join(', ');
             choices.push({
-              label: `Cast ${spell.name} (${sl === baseLevel ? `Lvl ${sl}` : `${sl}th slot`}) — spread ${dartCount} darts across ${names}`,
+              label: `Cast ${spell.name} (${sl === baseLevel ? `Lvl ${sl}` : `${ordinal(sl)} slot`}) — spread ${dartCount} darts across ${names}`,
               action: {
                 type: 'cast_spell',
                 spellId,
