@@ -68,6 +68,7 @@ import {
   expertiseSlots,
   getClassLevel,
   hasClass,
+  hasDangerSense,
   hasElusive,
   hasEvasion,
   hasSlipperyMind,
@@ -785,6 +786,8 @@ function conditionSavingThrow(
     (effect.condition === 'charmed' && (speciesId === 'elf' || speciesId === 'drow')) ||
     (effect.condition === 'frightened' && speciesId === 'halfling') ||
     (effect.condition === 'poisoned' && speciesId === 'dwarf');
+  // SRD Barbarian Danger Sense (L2): Advantage on DEX saves.
+  const dangerSenseAdv = effect.ability === 'dex' && hasDangerSense(char);
   let applied = rollConditionSave(
     effect.ability,
     char[effect.ability] ?? 10,
@@ -793,7 +796,7 @@ function conditionSavingThrow(
     char.level,
     0,
     char.conditions ?? [],
-    inspirationActive || luckActive || speciesAdv,
+    inspirationActive || luckActive || speciesAdv || dangerSenseAdv,
     enc,
     reviveD20Penalty(char)
   );
@@ -1506,6 +1509,9 @@ function fireLairAction(
       // and a PC with Resilient (CON) saves with proficiency on a
       // CON-save lair AoE. Previously hardcoded `false`.
       const proficient = hasSaveProficiency(origC, scoreKey, context);
+      // SRD Barbarian Danger Sense (L2): Advantage on DEX saves (e.g. a
+      // dexterity-save lair AoE).
+      const dangerSenseAdv = scoreKey === 'dex' && hasDangerSense(origC);
       const saveFailed = rollConditionSave(
         scoreKey,
         score,
@@ -1514,7 +1520,7 @@ function fireLairAction(
         origC.level,
         0,
         origC.conditions ?? [],
-        false,
+        dangerSenseAdv,
         false,
         reviveD20Penalty(origC)
       );
@@ -4875,7 +4881,12 @@ export function resolveEnemySpell(args: {
   if (spell.savingThrow) {
     const saveScore = (target[spell.savingThrow] ?? 10) as number;
     const dc = enemy.spellSaveDC ?? 8 + Math.floor((enemy.toHit + 5) / 2);
-    const save = rollDice('1d20') + abilityMod(saveScore) + auraOfProtectionBonus(target, args.st);
+    // SRD Barbarian Danger Sense (L2): Advantage on DEX saves.
+    const dangerSenseAdv = spell.savingThrow === 'dex' && hasDangerSense(target);
+    const saveD20 = dangerSenseAdv
+      ? Math.max(rollDice('1d20'), rollDice('1d20'))
+      : rollDice('1d20');
+    const save = saveD20 + abilityMod(saveScore) + auraOfProtectionBonus(target, args.st);
     let saved = save >= dc;
     let workingTarget = target;
     let rescueNote = '';
