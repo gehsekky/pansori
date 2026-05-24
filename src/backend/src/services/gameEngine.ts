@@ -2555,6 +2555,39 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
 
   // Class feature bonus actions — shown only during combat while bonus action is still available
   if (state.combat_active && !char.turn_actions.bonus_action_used) {
+    // RAW player-command for summoned creatures (Animate Dead, etc.): direct
+    // one of your summons to attack a chosen enemy as a bonus action. The
+    // summon otherwise fights on its AI-default (nearest enemy). Sets a
+    // commanded target the ally-turn AI honors while that enemy lives.
+    // (RE-1 Phase 4.5.)
+    const ownedSummons = (state.entities ?? []).filter(
+      (e) => e.summoned_by === char.id && entitySide(e) === 'ally' && e.hp > 0
+    );
+    if (ownedSummons.length > 0) {
+      const cmdFoes = (state.entities ?? []).filter(
+        (e) => entitySide(e) === 'enemy' && e.hp > 0 && !state.enemies_killed.includes(e.id)
+      );
+      const foeNameCounts: Record<string, number> = {};
+      for (const f of cmdFoes) {
+        const n = getEnemyById(seed, f.id)?.name ?? 'Enemy';
+        foeNameCounts[n] = (foeNameCounts[n] ?? 0) + 1;
+      }
+      for (const sm of ownedSummons) {
+        const smName = sm.companionName ?? 'Summon';
+        const seenFoe: Record<string, number> = {};
+        for (const foe of cmdFoes) {
+          const fName = getEnemyById(seed, foe.id)?.name ?? 'Enemy';
+          const suffix =
+            foeNameCounts[fName] > 1 ? ` #${(seenFoe[fName] = (seenFoe[fName] ?? 0) + 1)}` : '';
+          choices.push({
+            label: `Command ${smName} to attack ${fName}${suffix} (bonus action)`,
+            action: { type: 'command_summon', summonId: sm.id, targetEnemyId: foe.id },
+            requiresBonusAction: true,
+          });
+        }
+      }
+    }
+
     const features = context.classFeatures?.[char.character_class] ?? [];
     if (features.includes('rage') && !char.conditions.includes('raging')) {
       const rageUses =
@@ -4565,9 +4598,18 @@ export function selectTarget(
 } {
   const actorEnt = st.entities?.find((e) => e.id === actorId);
   const targetSides: EntitySide[] = actorEnt ? hostileTargetSides(entitySide(actorEnt)) : ['pc'];
-  const targetEnt = st.entities
-    ?.filter((e) => targetSides.includes(entitySide(e)) && e.hp > 0)
-    .sort((a, b) => {
+  const candidates = (st.entities ?? []).filter(
+    (e) => targetSides.includes(entitySide(e)) && e.hp > 0
+  );
+  // RAW player-command (summons): honor an explicit commanded target while
+  // it's alive and still a valid hostile; otherwise fall back to the
+  // AI-default nearest enemy. (RE-1 Phase 4.5.)
+  const commanded = actorEnt?.commanded_target_id
+    ? candidates.find((e) => e.id === actorEnt.commanded_target_id)
+    : undefined;
+  const targetEnt =
+    commanded ??
+    [...candidates].sort((a, b) => {
       if (!actorEnt) return 0;
       return distanceFeet(actorEnt.pos, a.pos) - distanceFeet(actorEnt.pos, b.pos);
     })[0];

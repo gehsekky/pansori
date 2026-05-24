@@ -35,6 +35,7 @@ import { handleResolveReaction, handleUseReaction } from './reaction.js';
 import type { StructuredAction } from '../../types.js';
 import { handleAttack } from './attack/index.js';
 import { handleCastSpell } from './castSpell/index.js';
+import { handleCommandSummon } from './commandSummon.js';
 import { handleDeathSave } from './deathSave.js';
 import { handleDisarmTrap } from './disarmTrap.js';
 import { handleEscape } from './escape.js';
@@ -106,6 +107,7 @@ const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   cast_spell: handleCastSpell as ActionHandler,
   use_class_feature: handleUseClassFeature as ActionHandler,
   haste_extra_action: handleHasteExtraAction as ActionHandler,
+  command_summon: handleCommandSummon as ActionHandler,
 };
 
 /**
