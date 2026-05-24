@@ -23,6 +23,7 @@ import {
   abilityMod,
   extraAttackCount,
   rageUsesMax,
+  rollDice,
   spellSlotsForCasterLevel,
   spellSlotsForClassLevel,
 } from './rulesEngine.js';
@@ -488,6 +489,34 @@ export function persistentRageTopUp(char: Character): Character {
       ...(char.class_resource_uses ?? {}),
       rage_uses: max,
       persistent_rage_used: 1,
+    },
+  };
+}
+
+/**
+ * SRD 5.2.1 Uncanny Metabolism (Monk L2): when you roll Initiative, regain all
+ * expended Focus Points (ki) and heal Monk level + a Martial Arts die roll.
+ * Once per long rest. Applied in runCombatStart. Only fires when there's
+ * something to regain (expended ki or missing HP), so the once-per-rest use
+ * isn't wasted. No-op below L2. (RE-2.)
+ */
+export function uncannyMetabolismRefresh(char: Character): Character {
+  const monk = getClassLevel(char, 'monk');
+  if (monk < 2) return char;
+  if (char.class_resource_uses?.uncanny_metabolism_used) return char;
+  const kiMax = monk;
+  const kiCurrent = char.class_resource_uses?.ki_points ?? kiMax;
+  const injured = char.hp < char.max_hp;
+  if (kiCurrent >= kiMax && !injured) return char; // nothing to regain
+  const die = monk >= 17 ? 12 : monk >= 11 ? 10 : monk >= 5 ? 8 : 6;
+  const heal = monk + rollDice(`1d${die}`);
+  return {
+    ...char,
+    hp: Math.min(char.max_hp, char.hp + heal),
+    class_resource_uses: {
+      ...(char.class_resource_uses ?? {}),
+      ki_points: kiMax,
+      uncanny_metabolism_used: 1,
     },
   };
 }

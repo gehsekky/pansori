@@ -180,6 +180,7 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
     delete restoredUses.stroke_of_luck; // Rogue Stroke of Luck resets on a long rest too
     delete restoredUses.relentless_rage_used; // Barbarian Relentless Rage DC resets on a long rest too
     delete restoredUses.persistent_rage_used; // Barbarian Persistent Rage refresh available again after a long rest
+    delete restoredUses.uncanny_metabolism_used; // Monk Uncanny Metabolism refresh available again after a long rest
     const newExhaustion = Math.max(0, (c.exhaustion_level ?? 0) - 1);
     const humanGrant = c.species === 'human';
     if (c.species === 'orc') delete restoredUses.relentless_endurance_used;
