@@ -1016,7 +1016,7 @@ function computeEnemyAttack(
  * happened, and adding 2 failures every turn would silently double-
  * penalize them whenever any enemy is alive in the room.
  */
-function processDeathSave(
+export function processDeathSave(
   char: Character,
   enemy: Enemy | null | undefined,
   context: Context,
@@ -1024,6 +1024,33 @@ function processDeathSave(
   enemyAttackContext: boolean = false,
   currentRound: number = 1
 ): { narrative: string; newChar: Character; died: boolean; endedCombat: boolean } {
+  // SRD 5.2.1 p.197 — an enemy that hits an Unconscious creature within 5 ft
+  // auto-crits, and that hit counts as 2 death save failures. This is NOT a
+  // death save the downed PC rolls — they only roll at the start of their own
+  // turn — so short-circuit BEFORE rollDeathSave: apply the 2 failures and
+  // check for death. (Previously this path also rolled a spurious d20 death
+  // save on the enemy's turn.)
+  if (enemyAttackContext && enemy) {
+    const failures = Math.min(3, (char.death_saves?.failures ?? 0) + 2);
+    const attacked: Character = {
+      ...char,
+      death_saves: { successes: char.death_saves?.successes ?? 0, failures },
+    };
+    let narrative = `The ${enemy.name} attacks your prone form — 2 death save failures (${failures}/3)!`;
+    if (failures >= 3) {
+      attacked.dead = true;
+      attacked.died_at_round = currentRound;
+      narrative +=
+        ' ' +
+        pick(context.narratives.deathLines)
+          .replace(/{name}/g, char.name)
+          .replace('{enemy}', enemy.name)
+          .replace(/{world}/g, worldName);
+      return { narrative, newChar: attacked, died: true, endedCombat: false };
+    }
+    return { narrative, newChar: attacked, died: false, endedCombat: false };
+  }
+
   // SRD Beacon of Hope — death saves rolled with advantage while
   // the dying PC has the `hopeful` condition. SRD revive penalty
   // (Raise Dead / Resurrection) subtracts from the d20 threshold.
@@ -1092,34 +1119,6 @@ function processDeathSave(
         .replace('{enemy}', enemy?.name ?? 'your wounds')
         .replace(/{world}/g, worldName);
       return { narrative, newChar, died: true, endedCombat: false };
-  }
-
-  // SRD 5.2.1 p.197 — when an enemy hits an Unconscious creature
-  // within 5 ft, the attack is a Critical Hit AND counts as 2 death
-  // save failures. Only fire here when the death save is being
-  // rolled as a follow-up to the attack that just landed (the
-  // multiattack-loop call path). The PC-invokes-`death_save` action
-  // path passes `enemyAttackContext = false` so a downed PC rolling
-  // their own save on their turn doesn't eat a phantom 2-failure
-  // penalty for every nearby enemy.
-  if (enemyAttackContext && enemy && !newChar.dead) {
-    const attackSaves = {
-      successes: newChar.death_saves.successes,
-      failures: Math.min(3, newChar.death_saves.failures + 2),
-    };
-    newChar.death_saves = attackSaves;
-    narrative += ` The ${enemy.name} attacks your prone form — 2 death save failures (${attackSaves.failures}/3)!`;
-    if (attackSaves.failures >= 3) {
-      newChar.dead = true;
-      newChar.died_at_round = currentRound;
-      narrative +=
-        ' ' +
-        pick(context.narratives.deathLines)
-          .replace(/{name}/g, char.name)
-          .replace('{enemy}', enemy.name)
-          .replace(/{world}/g, worldName);
-      return { narrative, newChar, died: true, endedCombat: false };
-    }
   }
 
   return { narrative, newChar, died: false, endedCombat };
