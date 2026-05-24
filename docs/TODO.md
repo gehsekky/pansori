@@ -253,21 +253,33 @@ Bonus(char, st)`: a creature within 10 ft of a conscious L6+ Paladin (the
       `combatTactical`, social Persuasion) roll raw `d(20)+mod` without
       `skillCheck` (and without a proficiency bonus today), so RT doesn't reach
       them yet — folding those into `skillCheck` is a separate correctness pass.
+- [x] **Slippery Mind (done 2026-05-24)** — Rogue L15: proficiency in Wisdom
+      and Charisma saving throws. `hasSlipperyMind` (multiclass.ts) wired into
+      `hasSaveProficiency` (the central save-prof helper), so it flows through
+      every save path that consults it — on-hit condition saves
+      (`conditionSavingThrow`) and lair-AoE saves. `hasSaveProficiency`'s param
+      was widened from a `Pick` to `Character` (both callers already pass one)
+      so it can read the Rogue level. Spec: helper + the WIS/CHA grant, the
+      L14 cutoff, STR/CON exclusion, and class-prof (DEX/INT) regression.
+      Note: enemy damage-spell saves (`resolveEnemySpell`) don't model save
+      proficiency for _any_ class yet (no prof bonus added there), so Slippery
+      Mind — like every save-prof source — doesn't affect that path; that's a
+      separate general gap, not Slippery-Mind-specific.
 
-| Class     | Implemented (approx)                                                                                            | Major SRD gaps to fill                                                                                                                            |
-| --------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Barbarian | Rage, Reckless (L1–2), Frenzy (L3), Extra Attack (L5)                                                           | Danger Sense, Fast Movement, Feral Instinct, Brutal Strike, Relentless Rage, Persistent Rage, Indomitable Might, capstone; exhaustion-on-rage-end |
-| Bard      | Bardic Inspiration (L1), Cutting Words (L3)                                                                     | Expertise, Jack of All Trades, Font of Inspiration, Countercharm, Magical Secrets, Superior Inspiration, capstone                                 |
-| Cleric    | Channel Divinity, Turn/Sear Undead, Preserve Life (Life)                                                        | Blessed Strikes, Divine Intervention, improved Channel uses, higher Life-domain grades                                                            |
-| Druid     | Wild Shape (L2, CR L4/8), Land's Aid                                                                            | Wild Companion, full Circle of the Land grades, Wild Shape improvements, Beast Spells, Archdruid                                                  |
-| Fighter   | Second Wind, Action Surge (L2), Extra Attack (2/3/4), Indomitable (L9), Tactical Master (L9)                    | Champion grades (Remarkable Athlete, Additional Style, Superior Critical, Survivor)                                                               |
-| Monk      | Martial Arts, Flurry/Patient/Step (L2), Stunning Strike (L5), Extra Attack (L5), Evasion (L7)                   | Deflect Attacks, Slow Fall, Stillness of Mind, Self-Restoration, Disciplined Survivor, Empty Body, Body & Mind, higher Open Hand grades           |
-| Paladin   | Sacred Weapon (Devotion L3), Fighting Style (L2), Extra Attack (L5), Lay on Hands (L1), Aura of Protection (L6) | Aura of Courage, Faithful Steed, Divine-Smite-as-feature, Devotion grades, capstone                                                               |
-| Ranger    | Colossus Slayer (Hunter L3), Fighting Style (L2), Extra Attack (L5)                                             | spellcasting integration, Roving, Expertise, Tireless, Nature's Veil, Hunter grades                                                               |
-| Rogue     | Cunning Action (L2), Cunning Strike (L5), Sneak Attack, Uncanny Dodge, Evasion (L7), Reliable Talent (L7)       | Steady Aim, Slippery Mind, Elusive, Stroke of Luck, Assassin grades                                                                               |
-| Sorcerer  | Metamagic (L3–5), sorcery points                                                                                | Innate Sorcery, Sorcerous Restoration, SP↔slot conversion completeness, full Draconic grades, capstone                                            |
-| Warlock   | Agonizing Blast (passive)                                                                                       | Eldritch Blast beam scaling, Pact Boon, more invocations, Mystic Arcanum, Magical Cunning, Fiend grades, Eldritch Master                          |
-| Wizard    | cantrips only (Arcane Ward partial)                                                                             | Arcane Recovery, Scholar, Memorize Spell, Spell Mastery, Signature Spells, full Evoker grades                                                     |
+| Class     | Implemented (approx)                                                                                                           | Major SRD gaps to fill                                                                                                                            |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Barbarian | Rage, Reckless (L1–2), Frenzy (L3), Extra Attack (L5)                                                                          | Danger Sense, Fast Movement, Feral Instinct, Brutal Strike, Relentless Rage, Persistent Rage, Indomitable Might, capstone; exhaustion-on-rage-end |
+| Bard      | Bardic Inspiration (L1), Cutting Words (L3)                                                                                    | Expertise, Jack of All Trades, Font of Inspiration, Countercharm, Magical Secrets, Superior Inspiration, capstone                                 |
+| Cleric    | Channel Divinity, Turn/Sear Undead, Preserve Life (Life)                                                                       | Blessed Strikes, Divine Intervention, improved Channel uses, higher Life-domain grades                                                            |
+| Druid     | Wild Shape (L2, CR L4/8), Land's Aid                                                                                           | Wild Companion, full Circle of the Land grades, Wild Shape improvements, Beast Spells, Archdruid                                                  |
+| Fighter   | Second Wind, Action Surge (L2), Extra Attack (2/3/4), Indomitable (L9), Tactical Master (L9)                                   | Champion grades (Remarkable Athlete, Additional Style, Superior Critical, Survivor)                                                               |
+| Monk      | Martial Arts, Flurry/Patient/Step (L2), Stunning Strike (L5), Extra Attack (L5), Evasion (L7)                                  | Deflect Attacks, Slow Fall, Stillness of Mind, Self-Restoration, Disciplined Survivor, Empty Body, Body & Mind, higher Open Hand grades           |
+| Paladin   | Sacred Weapon (Devotion L3), Fighting Style (L2), Extra Attack (L5), Lay on Hands (L1), Aura of Protection (L6)                | Aura of Courage, Faithful Steed, Divine-Smite-as-feature, Devotion grades, capstone                                                               |
+| Ranger    | Colossus Slayer (Hunter L3), Fighting Style (L2), Extra Attack (L5)                                                            | spellcasting integration, Roving, Expertise, Tireless, Nature's Veil, Hunter grades                                                               |
+| Rogue     | Cunning Action (L2), Cunning Strike (L5), Sneak Attack, Uncanny Dodge, Evasion (L7), Reliable Talent (L7), Slippery Mind (L15) | Steady Aim, Elusive, Stroke of Luck, Assassin grades                                                                                              |
+| Sorcerer  | Metamagic (L3–5), sorcery points                                                                                               | Innate Sorcery, Sorcerous Restoration, SP↔slot conversion completeness, full Draconic grades, capstone                                            |
+| Warlock   | Agonizing Blast (passive)                                                                                                      | Eldritch Blast beam scaling, Pact Boon, more invocations, Mystic Arcanum, Magical Cunning, Fiend grades, Eldritch Master                          |
+| Wizard    | cantrips only (Arcane Ward partial)                                                                                            | Arcane Recovery, Scholar, Memorize Spell, Spell Mastery, Signature Spells, full Evoker grades                                                     |
 
 #### RE-3: Character-build systems (small, high RAW payoff)
 

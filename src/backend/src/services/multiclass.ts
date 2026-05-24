@@ -358,6 +358,15 @@ export function hasReliableTalent(char: Character): boolean {
 }
 
 /**
+ * SRD 5.2.1 Slippery Mind (Rogue L15): the rogue gains proficiency in Wisdom
+ * and Charisma saving throws. Applied at the `hasSaveProficiency` site so it
+ * flows through every save path that consults it. (RE-2.)
+ */
+export function hasSlipperyMind(char: Character): boolean {
+  return getClassLevel(char, 'rogue') >= 15;
+}
+
+/**
  * SRD 5.2.1 Paladin Lay on Hands (L1): HP remaining in the healing pool —
  * 5 × Paladin level minus points already spent (`class_resource_uses
  * .lay_on_hands`, replenished on a long rest). 0 for non-paladins. (RE-2.)
