@@ -72,12 +72,11 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
     Animate Dead raises a Skeleton ally: out-of-combat cast (gated in
     precast) → `runSummonSpell` records it on `summoned_allies` →
     `seedSummonedAllies` materializes it at combat start → it fights via
-    the AI-default `runAllyTurn`. Remaining:
-    - **Bonus-action player-command** — direct the summon's target/action
-      on the owner's turn (RAW); the AI-default attack works meanwhile.
+    the AI-default `runAllyTurn`. The owner can also override its target
+    on their own turn via the bonus-action `command_summon`
+    (shipped 2026-05-23: sets `commanded_target_id`, which
+    `selectTarget` prefers while that enemy lives). Remaining:
     - Zombie variant + multi-raise (MVP raises one Skeleton).
-    - Surface Animate Dead in-game: add it to Cleric/Wizard prepared/
-      known lists + the cast menu (it's table-only today).
     - More summons: Spiritual Weapon, Find Familiar, conjure.
 
   Deferred (not required for SRD compliance — see design doc): merging the

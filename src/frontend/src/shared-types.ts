@@ -171,6 +171,11 @@ export interface CombatEntity {
   // as opposed to persistent ones (e.g. Find Familiar).
   summoned_by?: string;
   summon_concentration?: boolean;
+  // RAW player-command (e.g. Animate Dead): the enemy entity id this summon
+  // has been ordered to attack. `selectTarget`/`runAllyTurn` prefer it while
+  // that enemy lives, else fall back to the AI-default nearest enemy. Set by
+  // the owner's `command_summon` bonus action. (RE-1 Phase 4.5.)
+  commanded_target_id?: string;
   // SRD 5.2.1 — when grappled, records the id of the grappler so we can end the
   // condition if the grappler dies/is incapacitated, and so the contested escape
   // check has a target's mod to roll against.
@@ -338,6 +343,11 @@ export type StructuredAction =
   | { type: 'select_subclass'; subclass: string }
   | { type: 'prepare_spells'; spellIds: string[] }
   | { type: 'resolve_reaction'; accept: boolean }
+  // RAW player-command for a summoned creature (Animate Dead, etc.). On the
+  // owner's turn, spend a bonus action to direct one summon's target for its
+  // upcoming turn. Records `commanded_target_id` on the summon entity; the
+  // ally-turn AI prefers it while the target lives. (RE-1 Phase 4.5.)
+  | { type: 'command_summon'; summonId: string; targetEnemyId: string }
   // Out-of-combat only: switch which PC is the "lead" / active character
   // for subsequent narrative attribution + skill checks. RAW has no
   // notion of initiative outside combat — the party operates as a unit

@@ -100,6 +100,9 @@ export const ACTION_COSTS: Record<StructuredAction['type'], ActionCost> = {
   // action_used for the inner action). The inner action pays its
   // own cost during the nested dispatchAction call.
   haste_extra_action: 'managed',
+  // RAW player-command for a summon — the bonus action is the cost; the
+  // handler just records the commanded target on the summon entity.
+  command_summon: 'bonusAction',
 };
 
 const BUDGET_ERRORS: Record<Exclude<ActionCost, 'managed'>, string> = {

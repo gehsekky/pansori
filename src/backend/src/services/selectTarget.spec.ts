@@ -102,4 +102,43 @@ describe('selectTarget', () => {
     const result = selectTarget('goblin-1', st);
     expect(result.actorEnt?.pos).toEqual({ x: 7, y: 7 });
   });
+
+  it('honors a summon’s commanded target over the nearest enemy (RAW player-command)', () => {
+    const st: GameState = {
+      ...makeState({ id: 'pc-1' }),
+      characters: [makeChar({ id: 'pc-1' })],
+      entities: [
+        ent({
+          id: 'summon-1',
+          side: 'ally',
+          summoned_by: 'pc-1',
+          pos: { x: 0, y: 0 },
+          commanded_target_id: 'orc-far',
+        }),
+        ent({ id: 'orc-near', isEnemy: true, side: 'enemy', pos: { x: 1, y: 1 }, hp: 8, maxHp: 8 }),
+        ent({ id: 'orc-far', isEnemy: true, side: 'enemy', pos: { x: 9, y: 9 }, hp: 8, maxHp: 8 }),
+      ],
+    };
+    expect(selectTarget('summon-1', st).targetEnt?.id).toBe('orc-far'); // commanded, not nearest
+  });
+
+  it('falls back to nearest when the commanded target is dead / gone', () => {
+    const st: GameState = {
+      ...makeState({ id: 'pc-1' }),
+      characters: [makeChar({ id: 'pc-1' })],
+      entities: [
+        ent({
+          id: 'summon-1',
+          side: 'ally',
+          summoned_by: 'pc-1',
+          pos: { x: 0, y: 0 },
+          commanded_target_id: 'orc-far',
+        }),
+        ent({ id: 'orc-near', isEnemy: true, side: 'enemy', pos: { x: 1, y: 1 }, hp: 8, maxHp: 8 }),
+        // commanded target down → excluded from candidates → nearest wins
+        ent({ id: 'orc-far', isEnemy: true, side: 'enemy', pos: { x: 9, y: 9 }, hp: 0, maxHp: 8 }),
+      ],
+    };
+    expect(selectTarget('summon-1', st).targetEnt?.id).toBe('orc-near');
+  });
 });
