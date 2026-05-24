@@ -38,6 +38,7 @@ import type {
   OnHitEffect,
   PlacedNpc,
   Seed,
+  Spell,
   StructuredAction,
   Trap,
   TurnActions,
@@ -4588,7 +4589,47 @@ function attemptEnemyApproach(args: {
  * it gives the closure a clean three-way dispatch and exposes the
  * outcome surface for direct tests.
  */
-function attemptEnemySpellCast(args: {
+/**
+ * Resolve an enemy's damage spell against a PC: roll damage, apply the
+ * saving throw (half / negates / full), reduce HP, and commit. Extracted
+ * from `attemptEnemySpellCast` so the resolution runs through the dispatched
+ * `enemy_cast` handler (EE-3) while the cast DECISION + Counterspell window
+ * stay in the orchestrator. The enemy spell model is the stripped-down
+ * `{ damage, savingThrow, saveEffect, damageType }` — distinct from the PC
+ * `castSpell` pipeline by design (same split as the EE-2 attack resolvers).
+ */
+export function resolveEnemySpell(args: {
+  enemy: Enemy;
+  spell: Spell;
+  target: Character;
+  st: GameState;
+  narrative: string;
+}): { st: GameState; target: Character; narrative: string } {
+  const { enemy, spell, target } = args;
+  let narrative = args.narrative;
+  const dmgRoll = rollDice(spell.damage ?? '0');
+  let newTarget: Character;
+  if (spell.savingThrow) {
+    const saveScore = (target[spell.savingThrow] ?? 10) as number;
+    const dc = enemy.spellSaveDC ?? 8 + Math.floor((enemy.toHit + 5) / 2);
+    const save = rollDice('1d20') + abilityMod(saveScore);
+    const saved = save >= dc;
+    const dmg =
+      saved && spell.saveEffect === 'half'
+        ? Math.floor(dmgRoll / 2)
+        : saved && spell.saveEffect === 'negates'
+          ? 0
+          : dmgRoll;
+    newTarget = { ...target, hp: Math.max(0, target.hp - dmg) };
+    narrative += ` ${enemy.name} casts ${spell.name}! ${target.name} ${fmt.save(spell.savingThrow.toUpperCase(), save)} vs ${fmt.dc(dc)} — ${saved ? 'saves' : 'fails'}, ${fmt.dmg(dmg)} ${spell.damageType ?? 'damage'}.`;
+  } else {
+    newTarget = { ...target, hp: Math.max(0, target.hp - dmgRoll) };
+    narrative += ` ${enemy.name} casts ${spell.name}! ${target.name} takes ${fmt.dmg(dmgRoll)} ${spell.damageType ?? 'damage'}.`;
+  }
+  return { st: commitCharacter(args.st, newTarget), target: newTarget, narrative };
+}
+
+async function attemptEnemySpellCast(args: {
   enemy: Enemy;
   enemyId: string;
   enemyEnt: CombatEntity | undefined;
@@ -4600,10 +4641,13 @@ function attemptEnemySpellCast(args: {
   advIdx: number;
   orderLen: number;
   narrative: string;
-}):
+  seed: Seed;
+  worldName: string;
+}): Promise<
   | { kind: 'no-cast' }
   | { kind: 'counterspell-pending'; st: GameState; narrative: string }
-  | { kind: 'spell-resolved'; st: GameState; target: Character; narrative: string } {
+  | { kind: 'spell-resolved'; st: GameState; target: Character; narrative: string }
+> {
   const {
     enemy,
     enemyId,
@@ -4661,32 +4705,24 @@ function attemptEnemySpellCast(args: {
     return { kind: 'counterspell-pending', st: stagedSt, narrative };
   }
 
-  // No counterspeller — resolve the spell now.
-  const dmgRoll = rollDice(spell.damage);
-  let newTarget = target;
-  if (spell.savingThrow) {
-    const saveScore = (target[spell.savingThrow] ?? 10) as number;
-    const dc = enemy.spellSaveDC ?? 8 + Math.floor((enemy.toHit + 5) / 2);
-    const save = rollDice('1d20') + abilityMod(saveScore);
-    const saved = save >= dc;
-    const dmg =
-      saved && spell.saveEffect === 'half'
-        ? Math.floor(dmgRoll / 2)
-        : saved && spell.saveEffect === 'negates'
-          ? 0
-          : dmgRoll;
-    newTarget = { ...target, hp: Math.max(0, target.hp - dmg) };
-    narrative += ` ${enemy.name} casts ${spell.name}! ${target.name} ${fmt.save(spell.savingThrow.toUpperCase(), save)} vs ${fmt.dc(dc)} — ${saved ? 'saves' : 'fails'}, ${fmt.dmg(dmg)} ${spell.damageType ?? 'damage'}.`;
-  } else {
-    newTarget = { ...target, hp: Math.max(0, target.hp - dmgRoll) };
-    narrative += ` ${enemy.name} casts ${spell.name}! ${target.name} takes ${fmt.dmg(dmgRoll)} ${spell.damageType ?? 'damage'}.`;
-  }
-  void targetCharIdx;
+  // No counterspeller — resolve the spell through the dispatcher with an
+  // enemy actor (EE-3). The handler runs `resolveEnemySpell` and commits the
+  // damaged target into ctx.st; we read it back by index for the caller.
+  const castCtx = buildEnemyActionCtx({
+    st,
+    seed: args.seed,
+    context,
+    worldName: args.worldName,
+    enemy,
+    ent: enemyEnt,
+    narrative,
+  });
+  await dispatchAction(castCtx, { type: 'enemy_cast', spellId, targetCharId: target.id });
   return {
     kind: 'spell-resolved',
-    st: commitCharacter(st, newTarget),
-    target: newTarget,
-    narrative,
+    st: castCtx.st,
+    target: castCtx.st.characters[targetCharIdx] ?? target,
+    narrative: castCtx.narrative,
   };
 }
 
@@ -5168,7 +5204,7 @@ export async function runEnemyTurns(args: {
         }
         if (!target.dead && target.hp > 0) {
           // ── Spell-cast intent ─ delegated to `attemptEnemySpellCast` ──────
-          const spellResult = attemptEnemySpellCast({
+          const spellResult = await attemptEnemySpellCast({
             enemy: rm,
             enemyId: eEntry.id,
             enemyEnt: eEnt,
@@ -5180,6 +5216,8 @@ export async function runEnemyTurns(args: {
             advIdx,
             orderLen,
             narrative,
+            seed: args.seed,
+            worldName: args.worldName,
           });
           if (spellResult.kind === 'counterspell-pending') {
             return {
