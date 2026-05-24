@@ -69,6 +69,9 @@ export function runSaveSpell(
     }
   }
   const targetEntForCond = ctx.st.entities?.find((e) => e.id === spellTargetId && e.isEnemy);
+  // SRD Metamagic Heightened Spell — the target rolls this save with
+  // Disadvantage.
+  const heightened = ctx.metamagic === 'heightened';
   const saveFailed = rollConditionSave(
     saveAbility,
     enemyScore,
@@ -76,7 +79,9 @@ export function runSaveSpell(
     false,
     char.level,
     saveCoverDexBonus,
-    targetEntForCond?.conditions ?? []
+    targetEntForCond?.conditions ?? [],
+    false,
+    heightened
   );
   const saveLabel = saveAbility.toUpperCase();
 

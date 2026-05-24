@@ -121,9 +121,11 @@ export function runBuffSpell(
   }
 
   if (spell.concentration) {
+    // SRD Metamagic Extended Spell — double the concentration duration.
+    const extendMult = ctx.metamagic === 'extended' ? 2 : 1;
     char.concentrating_on = {
       spellId,
-      rounds_left: concentrationRoundsFor(spell),
+      rounds_left: concentrationRoundsFor(spell) * extendMult,
     };
   }
 

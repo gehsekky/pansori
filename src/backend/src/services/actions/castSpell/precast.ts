@@ -39,6 +39,13 @@ export function runPrecast(
   const { spellId, slotLevel } = action;
   const isRitualCast = action.ritual ?? false;
 
+  // Sorcerer Metamagic — capture the modifier set by the prior activation and
+  // clear it from state so it applies to exactly this one cast. Done first so
+  // it's consumed even if a downstream gate aborts the cast.
+  ctx.metamagic = ctx.st.metamagic_active;
+  if (ctx.st.metamagic_active) ctx.st = { ...ctx.st, metamagic_active: undefined };
+  const isSubtle = ctx.metamagic === 'subtle';
+
   // PHB p.144: cannot cast spells while wearing armor you are not proficient with
   const spellArmorItem = pc.char.equipped_armor
     ? ctx.context.lootTable.find(
@@ -53,8 +60,9 @@ export function runPrecast(
     return { done: true };
   }
 
-  // Deafened: cannot cast spells with verbal components
-  if (pc.char.conditions.includes('deafened') && (spell as { verbal?: boolean }).verbal) {
+  // Deafened: cannot cast spells with verbal components (Subtle Spell removes
+  // the verbal component, so it bypasses this gate).
+  if (!isSubtle && pc.char.conditions.includes('deafened') && (spell as { verbal?: boolean }).verbal) {
     ctx.narrative = `You cannot cast ${spell.name} while deafened — it requires a verbal component.`;
     return { done: true };
   }
@@ -170,7 +178,7 @@ export function runPrecast(
   // itself (which is the spell that got "modified"). We detect the
   // quickened cast via ctx.st.metamagic_active === 'quickened' being still
   // active at the start of resolution.
-  const isQuickenedCast = ctx.st.metamagic_active === 'quickened';
+  const isQuickenedCast = ctx.metamagic === 'quickened';
   if (spell.level > 0 && !isRitualCast && pc.char.turn_actions.quickened_used && !isQuickenedCast) {
     ctx.narrative = 'You used Quickened Spell this turn — you cannot cast another level 1+ spell.';
     return { done: true };
@@ -195,7 +203,8 @@ export function runPrecast(
   // Fires AFTER slot + action-economy consumption per RAW (the slot
   // is gone whether or not the spell fizzles). `somatic` defaults to
   // true if unspecified — virtually every SRD spell has S.
-  const hasSomatic = (spell as { somatic?: boolean }).somatic ?? true;
+  // Subtle Spell removes the somatic component, so Slow can't disrupt it.
+  const hasSomatic = !isSubtle && ((spell as { somatic?: boolean }).somatic ?? true);
   if (pc.char.conditions.includes('slowed') && hasSomatic) {
     const fizzleRoll = d(20);
     if (fizzleRoll < 11) {
@@ -257,7 +266,11 @@ export function isSpellOutOfRange(
   if (!casterEnt || !targetEnt) return false;
 
   const distFt = distanceFeet(casterEnt.pos, targetEnt.pos);
-  const maxFt = spell.rangeKind === 'touch' ? 5 : (spell.rangeFt ?? 0);
+  // SRD Metamagic Distant Spell — double a ranged spell's range, or make a
+  // touch spell reach 30 ft.
+  const distant = ctx.metamagic === 'distant';
+  const baseMaxFt = spell.rangeKind === 'touch' ? 5 : (spell.rangeFt ?? 0);
+  const maxFt = distant ? (spell.rangeKind === 'touch' ? 30 : baseMaxFt * 2) : baseMaxFt;
   if (distFt <= maxFt) return false;
 
   ctx.narrative =

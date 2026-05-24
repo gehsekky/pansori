@@ -1,0 +1,124 @@
+// RE-2 — Sorcerer Metamagic subsystem (Commit A): the per-cast pipeline
+// (capture + clear `metamagic_active` in runPrecast) plus the clean single-hook
+// options: Distant (range), Subtle (components), Extended (duration),
+// Heightened (target save disadvantage). Empowered/Twinned (fix) + Transmuted/
+// Careful/Seeking land in follow-up commits.
+
+import type { Enemy, GameState, Seed, Spell } from '../types.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { makeChar, makeState } from '../test-fixtures.js';
+import type { ActionContext } from './actions/types.js';
+import { context as ctx } from '../contexts/sandbox.js';
+import { isSpellOutOfRange } from './actions/castSpell/precast.js';
+import { pcActor } from './actions/actor.js';
+import { takeAction } from './gameEngine.js';
+
+afterEach(() => vi.restoreAllMocks());
+
+const ENEMY = `${ctx.startRoomId}#0`;
+const seed = (hp = 60, ac = 12): Seed =>
+  ({
+    context_id: ctx.id,
+    world_name: 'MM',
+    ship_name: 'MM',
+    intro: '',
+    seed_id: 'mm',
+    rooms: [{ id: ctx.startRoomId, name: 'S', desc: '' }],
+    connections: { [ctx.startRoomId]: [] },
+    enemies: { [ctx.startRoomId]: [{ id: ENEMY, name: 'Dummy', hp, ac, damage: '1d4', toHit: 3, xp: 50, wis: 8 } as unknown as Enemy] },
+    loot: {},
+    npcs: {},
+  }) as Seed;
+
+function sorcCombat(over: Partial<ReturnType<typeof makeChar>> = {}, enemyHp = 60): GameState {
+  const sorc = makeChar({
+    id: 'pc-1', character_class: 'Sorcerer', level: 9, cha: 16,
+    spell_slots_max: { 1: 4, 2: 3, 9: 1 }, spell_slots_used: {},
+    spells_known: ['fire_bolt', 'hold_person', 'power_word_kill', 'shield_of_faith'],
+    ...over,
+  });
+  return {
+    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    characters: [sorc],
+    active_character_id: 'pc-1',
+    initiative_order: [{ id: 'pc-1', roll: 18, is_enemy: false }, { id: ENEMY, roll: 5, is_enemy: true }],
+    initiative_idx: 0,
+    entities: [
+      { id: 'pc-1', isEnemy: false, pos: { x: 4, y: 5 }, hp: 30, maxHp: 30, conditions: [], condition_durations: {} },
+      { id: ENEMY, isEnemy: true, pos: { x: 5, y: 5 }, hp: enemyHp, maxHp: enemyHp, conditions: [], condition_durations: {} },
+    ],
+  } as unknown as GameState;
+}
+
+describe('Metamagic foundation — applies once then clears', () => {
+  it('metamagic_active is cleared after the next cast', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    const state = sorcCombat();
+    state.metamagic_active = 'empowered';
+    const r = await takeAction({ action: { type: 'cast_spell', spellId: 'fire_bolt', slotLevel: 0, targetEnemyId: ENEMY }, history: [], state, seed: seed(), context: ctx });
+    expect(r.newState.metamagic_active).toBeUndefined();
+  });
+});
+
+describe('Distant Spell — double range', () => {
+  const fireBolt = { name: 'Fire Bolt', level: 0, rangeKind: 'ranged', rangeFt: 120 } as unknown as Spell;
+  const rangeCtx = (metamagic?: string): ActionContext =>
+    ({
+      actor: pcActor(makeChar({ id: 'pc-1', spell_slots_used: {} }), 0),
+      metamagic,
+      narrative: '',
+      st: { entities: [
+        { id: 'pc-1', isEnemy: false, pos: { x: 1, y: 1 }, hp: 10, maxHp: 10, conditions: [], condition_durations: {} },
+        { id: ENEMY, isEnemy: true, pos: { x: 1, y: 31 }, hp: 10, maxHp: 10, conditions: [], condition_durations: {} }, // 150 ft
+      ] },
+    }) as unknown as ActionContext;
+
+  it('a target at 150 ft is out of base 120 ft range', () => {
+    expect(isSpellOutOfRange(rangeCtx(), fireBolt, ENEMY, 'Dummy', 0, false)).toBe(true);
+  });
+  it('Distant Spell brings it into the doubled 240 ft range', () => {
+    expect(isSpellOutOfRange(rangeCtx('distant'), fireBolt, ENEMY, 'Dummy', 0, false)).toBe(false);
+  });
+});
+
+describe('Subtle Spell — no components (bypasses Deafened)', () => {
+  it('a deafened Sorcerer can cast a verbal spell with Subtle, but not without', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    // power_word_kill is verbal; deafened normally blocks it.
+    const withSubtle = sorcCombat({ conditions: ['deafened'] }, 50);
+    withSubtle.metamagic_active = 'subtle';
+    const r1 = await takeAction({ action: { type: 'cast_spell', spellId: 'power_word_kill', slotLevel: 9, targetEnemyId: ENEMY }, history: [], state: withSubtle, seed: seed(50), context: ctx });
+    expect(r1.newState.enemies_killed).toContain(ENEMY); // cast resolved (≤100 HP dies)
+
+    const noSubtle = sorcCombat({ conditions: ['deafened'] }, 50);
+    const r2 = await takeAction({ action: { type: 'cast_spell', spellId: 'power_word_kill', slotLevel: 9, targetEnemyId: ENEMY }, history: [], state: noSubtle, seed: seed(50), context: ctx });
+    expect(r2.narrative).toMatch(/deafened/i); // blocked
+    expect(r2.newState.enemies_killed).not.toContain(ENEMY);
+  });
+});
+
+describe('Extended Spell — double concentration duration', () => {
+  it('doubles rounds_left on a concentration buff', async () => {
+    const base = makeState({ id: 'pc-1', character_class: 'Sorcerer', level: 9, cha: 16, spell_slots_max: { 1: 4 }, spell_slots_used: {}, spells_known: ['shield_of_faith'] }, { combat_active: false });
+    base.metamagic_active = 'extended';
+    const r = await takeAction({ action: { type: 'cast_spell', spellId: 'shield_of_faith', slotLevel: 1 }, history: [], state: base, seed: seed(), context: ctx });
+    expect(r.newState.characters[0].concentrating_on?.rounds_left).toBe(20); // base 10 → 20
+  });
+});
+
+describe('Heightened Spell — target save Disadvantage', () => {
+  it('forces the target to roll its save with Disadvantage (it fails where it would succeed)', async () => {
+    // Save rolls: with Heightened (disadvantage) → 2d20 take the low (2) → fail;
+    // without → single high (20) → succeed.
+    const heightened = sorcCombat({}, 60);
+    heightened.metamagic_active = 'heightened';
+    vi.spyOn(Math, 'random').mockReturnValue(0.05); // every d20 low; disadvantage min is low → fail
+    const r1 = await takeAction({ action: { type: 'cast_spell', spellId: 'hold_person', slotLevel: 2, targetEnemyId: ENEMY }, history: [], state: heightened, seed: seed(), context: ctx });
+    expect(r1.newState.entities?.find((e) => e.id === ENEMY)?.conditions).toContain('paralyzed');
+
+    vi.restoreAllMocks();
+    vi.spyOn(Math, 'random').mockReturnValue(0.95); // single d20 = 20 → save succeeds
+    const r2 = await takeAction({ action: { type: 'cast_spell', spellId: 'hold_person', slotLevel: 2, targetEnemyId: ENEMY }, history: [], state: sorcCombat({}, 60), seed: seed(), context: ctx });
+    expect(r2.newState.entities?.find((e) => e.id === ENEMY)?.conditions ?? []).not.toContain('paralyzed');
+  });
+});
