@@ -363,10 +363,17 @@ Bonus(char, st)`: a creature within 10 ft of a conscious L6+ Paladin (the
       max of two rolls for a Barbarian L7+), beside the Alert feat's flat bonus.
       Spec: a Barbarian L7 takes the higher of two d20s; L6 and non-Barbarians
       roll a single d20.
+- [x] **Danger Sense (done 2026-05-24)** — Barbarian L2: Advantage on Dexterity
+      saving throws unless Incapacitated. `hasDangerSense` (Barbarian L2+, not
+      under an incapacitating condition) folds Advantage into all three DEX-save
+      sites: on-hit condition saves (`conditionSavingThrow`), lair-AoE saves,
+      and enemy damage-spell saves (`resolveEnemySpell`, rolls 2d20-take-max).
+      Spec: helper + a DEX-save A/B through `resolveEnemySpell` (L2 saves where
+      L1 fails on the same rolls).
 
 | Class     | Implemented (approx)                                                                                                                                                                                   | Major SRD gaps to fill                                                                                                                  |
 | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
-| Barbarian | Rage, Reckless (L1–2), Frenzy (L3), Extra Attack (L5), Feral Instinct (L7)                                                                                                                             | Danger Sense, Fast Movement, Brutal Strike, Relentless Rage, Persistent Rage, Indomitable Might, capstone; exhaustion-on-rage-end       |
+| Barbarian | Rage, Reckless (L1–2), Frenzy (L3), Danger Sense (L2), Extra Attack (L5), Feral Instinct (L7)                                                                                                          | Fast Movement, Brutal Strike, Relentless Rage, Persistent Rage, Indomitable Might, capstone; exhaustion-on-rage-end                     |
 | Bard      | Bardic Inspiration (L1), Cutting Words (L3), Jack of All Trades (L2), Expertise (L2/9), Font of Inspiration (L5), Countercharm (L7), Superior Inspiration (L18)                                        | Magical Secrets, capstone                                                                                                               |
 | Cleric    | Channel Divinity, Turn/Sear Undead, Preserve Life (Life)                                                                                                                                               | Blessed Strikes, Divine Intervention, improved Channel uses, higher Life-domain grades                                                  |
 | Druid     | Wild Shape (L2, CR L4/8), Land's Aid                                                                                                                                                                   | Wild Companion, full Circle of the Land grades, Wild Shape improvements, Beast Spells, Archdruid                                        |

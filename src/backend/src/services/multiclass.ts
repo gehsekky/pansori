@@ -442,6 +442,22 @@ export function canCountercharm(char: Character): boolean {
  * it regains *expended* uses. No-op below L18 or when already at/above the
  * target. (RE-2.)
  */
+/**
+ * SRD 5.2.1 Danger Sense (Barbarian L2): Advantage on Dexterity saving throws
+ * unless Incapacitated (incl. the conditions that impose it). Applied wherever
+ * the barbarian rolls a DEX save. (RE-2.)
+ */
+export function hasDangerSense(char: Character): boolean {
+  if (
+    (char.conditions ?? []).some((c) =>
+      ['incapacitated', 'paralyzed', 'stunned', 'unconscious', 'petrified'].includes(c)
+    )
+  ) {
+    return false;
+  }
+  return getClassLevel(char, 'barbarian') >= 2;
+}
+
 export function superiorInspirationTopUp(char: Character): Character {
   if (getClassLevel(char, 'bard') < 18) return char;
   const max = Math.max(1, abilityMod(char.cha));
