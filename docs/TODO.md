@@ -100,7 +100,27 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
   and NPC spellcasting via the shared `castSpell` pipeline (additive
   follow-up).
 - [ ] **Phase 5** — drop `ctx.char` / `ctx.safeIdx` once every handler
-  reads from `ctx.actor`.
+  reads from `ctx.actor`. In progress (started 2026-05-24):
+  - **5a (done):** migrated the read-only / in-place-mutation handler
+    files to a locally-bound `const { char } = ctx.actor` (guarded
+    `ctx.actor.kind !== 'pc'`): all `classFeature/*` + the `castSpell/*`
+    branch helpers (utility/buff/save/multiTarget/attackRoll/aoe).
+    Converted the cast-pipeline `ctx.char = …` reassignments
+    (`castSpell/index`, `precast`, `heal`, `attack/combatStart`) to
+    `updatePcActor` so `ctx.char` and `ctx.actor.char` stay in lockstep
+    — the invariant the migrated readers depend on. ~305 of 734
+    `ctx.char` refs migrated; field still present.
+  - **5b (next):** the remaining reassignment-heavy files —
+    `reaction`, `attack/{resolveOneAttack,toHit,preattack,index}`,
+    `twoWeaponAttack`, `landsAid`, `classFeature/{rogue,species}`,
+    `hasteExtraAction`, plus the `castSpell` stragglers
+    (`autoHit`/`applyDamage`/`revive`/`summon`). Each `ctx.char = X`
+    becomes `updatePcActor(ctx, X)`; reads move to a local `char`.
+  - **5c (final):** once zero `ctx.char` reads remain, drop `char` +
+    `safeIdx` from `ActionContext` (gameEngine ctx build + `commitChar`
+    → `this.actor.char`; epilogue `char = ctx.actor.char`;
+    `updatePcActor` stops writing `ctx.char`; `ctx.safeIdx` →
+    `ctx.actor.safeIdx`; dispatcher `deductCost`).
 
 #### RE-2: Class + subclass feature progression to L20
 

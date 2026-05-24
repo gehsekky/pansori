@@ -2,6 +2,7 @@ import type { CombatEntity, Enemy } from '../../../types.js';
 import { FRESH_TURN, abilityMod, profBonus, rollDice } from '../../rulesEngine.js';
 import { buildInitiativeOrder, pick, seedSummonedAllies } from '../../gameEngine.js';
 import type { ActionContext } from '../types.js';
+import { updatePcActor } from '../actor.js';
 
 /**
  * Combat-start phase. Only runs on the FIRST attack of an encounter
@@ -41,8 +42,8 @@ export function runCombatStart(ctx: ActionContext, target: Enemy): void {
 
   // Refresh char from updated characters array
   const freshChar = updatedCharsForInit.find((c) => c.id === ctx.char.id);
-  if (freshChar) ctx.char = { ...freshChar };
-  ctx.char = { ...ctx.char, turn_actions: { ...FRESH_TURN } };
+  if (freshChar) updatePcActor(ctx, freshChar);
+  updatePcActor(ctx, { turn_actions: { ...FRESH_TURN } });
 
   // ── Initialize grid entities at combat start ────────────────────────
   if (!ctx.st.entities) {

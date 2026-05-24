@@ -4,6 +4,7 @@ import { hasClass, resolveCastingAbility } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import { breakConcentration } from '../../gameEngine.js';
 import { distanceFeet } from '../../gridEngine.js';
+import { updatePcActor } from '../actor.js';
 
 /**
  * Pre-cast gating, slot consumption, action economy bookkeeping, and
@@ -96,7 +97,7 @@ export function runPrecast(
   // Break existing concentration if this spell also requires concentration (PHB p.203)
   if (spell.concentration && ctx.char.concentrating_on) {
     const { char: nc, st: ns } = breakConcentration(ctx.char, ctx.st, ctx.context);
-    ctx.char = nc;
+    updatePcActor(ctx, nc);
     ctx.st = ns;
   }
 

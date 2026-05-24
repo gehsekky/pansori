@@ -45,6 +45,8 @@ export function runAoeSpell(
   dc: number,
   spellDmg: number
 ): boolean {
+  if (ctx.actor.kind !== 'pc') return false;
+  const { char } = ctx.actor;
   const aoeBR = (spell as { blastRadius?: number }).blastRadius;
   const aoeShape =
     (spell as { aoeShape?: 'sphere' | 'cone' | 'cube' | 'line' }).aoeShape ?? 'sphere';
@@ -58,7 +60,7 @@ export function runAoeSpell(
   const epicenter =
     ctx.st.entities.find((e) => e.id === aoeAnchor && e.isEnemy)?.pos ??
     ctx.st.entities.find((e) => e.isEnemy)?.pos;
-  const casterPos = ctx.st.entities.find((e) => e.id === ctx.char.id)?.pos;
+  const casterPos = ctx.st.entities.find((e) => e.id === char.id)?.pos;
   if (!epicenter) return false;
 
   const blastTargets =
@@ -71,10 +73,10 @@ export function runAoeSpell(
           : aoeShape === 'line' && casterPos
             ? entitiesInLine(casterPos, epicenter, aoeBR, ctx.st.entities)
             : entitiesInBlast(epicenter, aoeBR, ctx.st.entities);
-  const isEvoker = ctx.char.subclass === 'evoker';
+  const isEvoker = char.subclass === 'evoker';
   ctx.narrative += ` ${fmt.note(`[AOE ${aoeBR}ft ${aoeShape}]`)}`;
   for (const target of blastTargets) {
-    if (target.id === ctx.char.id) continue;
+    if (target.id === char.id) continue;
     const targetEnemy = target.isEnemy ? getEnemyById(ctx.seed, target.id) : null;
     const targetChar = !target.isEnemy ? ctx.st.characters.find((c) => c.id === target.id) : null;
 
@@ -100,7 +102,7 @@ export function runAoeSpell(
         tScore,
         dc,
         false,
-        ctx.char.level,
+        char.level,
         tCover,
         targetEntCond
       );
@@ -117,9 +119,9 @@ export function runAoeSpell(
       };
       ctx.narrative += ` ${targetEnemy.name}: ${tFailed ? 'fails' : 'succeeds'} save — ${resDmg} dmg${newHp <= 0 ? ' (killed)' : ''}.`;
       if (newHp <= 0) {
-        const split = splitEncounterXp(ctx.st, ctx.char.id, targetEnemy.xp ?? 10);
+        const split = splitEncounterXp(ctx.st, char.id, targetEnemy.xp ?? 10);
         ctx.st = split.st;
-        ctx.char.xp = (ctx.char.xp || 0) + split.share;
+        char.xp = (char.xp || 0) + split.share;
         ctx.st = {
           ...ctx.st,
           entities: (ctx.st.entities ?? []).map((e) =>
@@ -127,8 +129,8 @@ export function runAoeSpell(
           ),
         };
         ctx.st.enemies_killed = [...ctx.st.enemies_killed, target.id];
-        ctx.narrative += grantDarkOnesBlessing(ctx.char);
-        ctx.narrative += applyPartyLevelUps(ctx.st, ctx.char, ctx.context);
+        ctx.narrative += grantDarkOnesBlessing(char);
+        ctx.narrative += applyPartyLevelUps(ctx.st, char, ctx.context);
         if (isRoomCleared(ctx.st, ctx.seed, ctx.roomId)) {
           ctx.st = endCombatState(ctx.st);
         }
@@ -153,7 +155,7 @@ export function runAoeSpell(
           allyScore,
           dc,
           false,
-          ctx.char.level,
+          char.level,
           allyCover,
           targetChar.conditions ?? []
         );

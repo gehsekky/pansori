@@ -4,6 +4,7 @@ import type { Spell } from '../../../types.js';
 import { composeNow } from '../../narrative/compose.js';
 import { hasClass } from '../../multiclass.js';
 import { pickCastPrefix } from './utils.js';
+import { updatePcActor } from '../actor.js';
 
 /**
  * Heal spell branch. Picks the most-injured non-caster ally (falls back
@@ -65,7 +66,7 @@ export function runHealSpell(
         );
       }
     }
-    ctx.char = casterAfter;
+    updatePcActor(ctx, casterAfter);
     ctx.st = { ...ctx.st, characters: updatedChars, entities: updatedEntities };
     const bonusNote: string[] = [];
     if (discipleBonus > 0) bonusNote.push(`Disciple of Life: +${discipleBonus}`);

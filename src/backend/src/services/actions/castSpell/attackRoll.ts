@@ -29,11 +29,13 @@ export function runAttackRollSpell(
   castingScore: number,
   slotNote: string
 ): { done: boolean; spellDmg: number; spellHit: boolean } {
-  const atk = resolveSpellAttack(ctx.char.level, castingScore, spellTarget.ac);
+  if (ctx.actor.kind !== 'pc') return { done: true, spellDmg: 0, spellHit: false };
+  const { char } = ctx.actor;
+  const atk = resolveSpellAttack(char.level, castingScore, spellTarget.ac);
   const spellHit = atk.hit;
   const atkNote = ` (spell attack ${atk.roll}+${atk.bonus}=${atk.total} vs AC ${spellTarget.ac})`;
   const castPrefix = pickCastPrefix(spell, {
-    name: ctx.char.name,
+    name: char.name,
     spell: spell.name,
     slotNote,
     target: spellTarget.name,
@@ -41,8 +43,8 @@ export function runAttackRollSpell(
   if (!spellHit) {
     composeNow(ctx, {
       kind: 'spell_attack_miss',
-      attackerId: ctx.char.id,
-      attackerName: ctx.char.name,
+      attackerId: char.id,
+      attackerName: char.name,
       target: spellTarget,
       spellId: spell.id,
       spellName: spell.name,
@@ -54,18 +56,18 @@ export function runAttackRollSpell(
     return { done: true, spellDmg: 0, spellHit: false };
   }
   const atkDmgExpr =
-    spell.level === 0 ? cantripDamageDice(spell, ctx.char.level) : upcastDamage(spell, slotLevel);
+    spell.level === 0 ? cantripDamageDice(spell, char.level) : upcastDamage(spell, slotLevel);
   let spellDmg = atk.critical ? rollCritical(atkDmgExpr || null) : rollDice(atkDmgExpr || '1d4');
   // Agonizing Blast: Warlock invocation — add CHA mod to Eldritch Blast damage
   const agonizingBonus =
-    spell.id === 'eldritch_blast' && (ctx.char.feats ?? []).includes('agonizing_blast')
-      ? Math.max(0, abilityMod(ctx.char.cha))
+    spell.id === 'eldritch_blast' && (char.feats ?? []).includes('agonizing_blast')
+      ? Math.max(0, abilityMod(char.cha))
       : 0;
   spellDmg += agonizingBonus;
   composeNow(ctx, {
     kind: 'spell_attack_hit',
-    attackerId: ctx.char.id,
-    attackerName: ctx.char.name,
+    attackerId: char.id,
+    attackerName: char.name,
     target: spellTarget,
     spellId: spell.id,
     spellName: spell.name,

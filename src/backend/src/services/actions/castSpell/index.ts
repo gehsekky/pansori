@@ -16,6 +16,7 @@ import { runReviveSpell } from './revive.js';
 import { runSaveSpell } from './save.js';
 import { runSummonSpell } from './summon.js';
 import { runUtilitySpell } from './utility.js';
+import { updatePcActor } from '../actor.js';
 
 // `pickCastPrefix` is consumed by the spec + future call sites that
 // want to build cast-narrative prefixes outside the handler. Lives
@@ -194,7 +195,7 @@ export const handleCastSpell: ActionHandler<{
   if (precastNarrative) {
     ctx.narrative = precastNarrative + ctx.narrative;
   }
-  ctx.char = { ...ctx.char, turn_actions: precastTurnActions };
+  updatePcActor(ctx, { turn_actions: precastTurnActions });
   ctx.commitChar();
 
   // SRD 5.2.1 — enforce spell range against the grid when entities exist.

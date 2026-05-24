@@ -22,6 +22,8 @@ export function runBuffSpell(
   slotLevel: number,
   slotNote: string
 ): boolean {
+  if (ctx.actor.kind !== 'pc') return false;
+  const { char } = ctx.actor;
   const targetType =
     (spell as { targetType?: 'self' | 'ally' | 'enemy' | 'self_or_ally' }).targetType ?? 'enemy';
   if (targetType !== 'self' && targetType !== 'ally' && targetType !== 'self_or_ally') {
@@ -30,22 +32,22 @@ export function runBuffSpell(
 
   const spellId = action.spellId;
   const buffTargetCharId = action.targetCharId;
-  let buffTarget = ctx.char;
+  let buffTarget = char;
   if (targetType === 'ally' || (targetType === 'self_or_ally' && buffTargetCharId)) {
     const explicit = ctx.st.characters.find((c) => c.id === buffTargetCharId && !c.dead);
     if (explicit) buffTarget = explicit;
   }
-  const isCasterTarget = buffTarget.id === ctx.char.id;
+  const isCasterTarget = buffTarget.id === char.id;
 
   // Apply condition if specified.
   const buffCondition = spell.condition;
   if (buffCondition) {
     if (isCasterTarget) {
-      if (!(ctx.char.conditions ?? []).includes(buffCondition)) {
-        ctx.char.conditions = [...(ctx.char.conditions ?? []), buffCondition];
+      if (!(char.conditions ?? []).includes(buffCondition)) {
+        char.conditions = [...(char.conditions ?? []), buffCondition];
         if (spell.conditionDuration) {
-          ctx.char.condition_durations = {
-            ...(ctx.char.condition_durations ?? {}),
+          char.condition_durations = {
+            ...(char.condition_durations ?? {}),
             [buffCondition]: spell.conditionDuration,
           };
         }
@@ -85,8 +87,8 @@ export function runBuffSpell(
   if (spell.tempHpGrant) {
     const grant = spell.tempHpGrant;
     if (isCasterTarget) {
-      const prev = ctx.char.temp_hp ?? 0;
-      if (grant > prev) ctx.char.temp_hp = grant;
+      const prev = char.temp_hp ?? 0;
+      if (grant > prev) char.temp_hp = grant;
     } else {
       ctx.st = {
         ...ctx.st,
@@ -103,8 +105,8 @@ export function runBuffSpell(
     const extra = Math.max(0, slotLevel - (spell.level ?? 1));
     const totalBonus = baseBonus + (spell.upcastMaxHpBonus ?? 0) * extra;
     if (isCasterTarget) {
-      ctx.char.max_hp += totalBonus;
-      ctx.char.hp += totalBonus;
+      char.max_hp += totalBonus;
+      char.hp += totalBonus;
     } else {
       ctx.st = {
         ...ctx.st,
@@ -118,7 +120,7 @@ export function runBuffSpell(
   }
 
   if (spell.concentration) {
-    ctx.char.concentrating_on = {
+    char.concentrating_on = {
       spellId,
       rounds_left: concentrationRoundsFor(spell),
     };
@@ -150,9 +152,9 @@ export function runBuffSpell(
         spell.id === 'haste' || (c.conditions ?? []).includes('hasted')
       );
     if (isCasterTarget) {
-      if (spell.id === 'mage_armor') ctx.char.mage_armor_active = true;
-      if (spell.id === 'shield_of_faith') ctx.char.shield_of_faith_active = true;
-      ctx.char.ac = recomputeAcFor(ctx.char);
+      if (spell.id === 'mage_armor') char.mage_armor_active = true;
+      if (spell.id === 'shield_of_faith') char.shield_of_faith_active = true;
+      char.ac = recomputeAcFor(char);
     } else {
       ctx.st = {
         ...ctx.st,
@@ -185,7 +187,7 @@ export function runBuffSpell(
     const stripFrom = (conditions: string[]): string[] =>
       conditions.filter((c) => !stripList.includes(c));
     if (isCasterTarget) {
-      ctx.char.conditions = stripFrom(ctx.char.conditions);
+      char.conditions = stripFrom(char.conditions);
     } else {
       ctx.st = {
         ...ctx.st,
@@ -205,7 +207,7 @@ export function runBuffSpell(
   // spell being cast; the "pick one of five effects" UX is deferred.
   if (spell.id === 'greater_restoration') {
     if (isCasterTarget) {
-      ctx.char.exhaustion_level = Math.max(0, (ctx.char.exhaustion_level ?? 0) - 1);
+      char.exhaustion_level = Math.max(0, (char.exhaustion_level ?? 0) - 1);
     } else {
       ctx.st = {
         ...ctx.st,
@@ -223,7 +225,7 @@ export function runBuffSpell(
   // 0; the flag clears there on consumption.
   if (spell.id === 'death_ward') {
     if (isCasterTarget) {
-      ctx.char.death_ward_active = true;
+      char.death_ward_active = true;
     } else {
       ctx.st = {
         ...ctx.st,
@@ -237,7 +239,7 @@ export function runBuffSpell(
   if (spell.id === 'fly' || spell.id === 'levitate') {
     const flyFt = spell.id === 'fly' ? 60 : 20;
     if (isCasterTarget) {
-      ctx.char.fly_speed_ft = flyFt;
+      char.fly_speed_ft = flyFt;
     } else {
       ctx.st = {
         ...ctx.st,
@@ -250,10 +252,10 @@ export function runBuffSpell(
 
   const buffProse =
     pickCastPrefix(spell, {
-      name: ctx.char.name,
+      name: char.name,
       spell: spell.name,
       slotNote,
-      target: isCasterTarget ? ctx.char.name : buffTarget.name,
+      target: isCasterTarget ? char.name : buffTarget.name,
     }) + '.';
   composeNow(ctx, { kind: 'spell_utility', prose: buffProse });
   return true;

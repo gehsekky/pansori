@@ -34,62 +34,64 @@ import type { InventoryItem } from '../../../types.js';
  *    as a bonus action. Exhaustion-on-rage-end is deferred.
  */
 export function handleBarbarianFeature(ctx: ActionContext, fid: string): boolean {
-  const features = ctx.context.classFeatures?.[ctx.char.character_class] ?? [];
+  if (ctx.actor.kind !== 'pc') return false;
+  const { char } = ctx.actor;
+  const features = ctx.context.classFeatures?.[char.character_class] ?? [];
 
   if (fid === 'rage') {
     if (!features.includes('rage')) {
-      ctx.narrative = `${ctx.char.character_class} does not have Rage.`;
+      ctx.narrative = `${char.character_class} does not have Rage.`;
       return true;
     }
-    if (ctx.char.conditions.includes('raging')) {
+    if (char.conditions.includes('raging')) {
       ctx.narrative = 'You are already raging!';
       return true;
     }
     // Rage uses + damage scale with BARBARIAN level (not total level).
-    const barbLvl = getClassLevel(ctx.char, 'barbarian');
-    const rageUses = ctx.char.class_resource_uses?.rage_uses ?? rageUsesMax(barbLvl);
+    const barbLvl = getClassLevel(char, 'barbarian');
+    const rageUses = char.class_resource_uses?.rage_uses ?? rageUsesMax(barbLvl);
     if (rageUses <= 0) {
       ctx.narrative = 'No rage uses remaining. They recover on a long rest.';
       return true;
     }
-    ctx.char.conditions = [...ctx.char.conditions, 'raging'];
-    ctx.char.class_resource_uses = {
-      ...(ctx.char.class_resource_uses ?? {}),
+    char.conditions = [...char.conditions, 'raging'];
+    char.class_resource_uses = {
+      ...(char.class_resource_uses ?? {}),
       rage_uses: rageUses - 1,
     };
-    ctx.char.turn_actions = { ...ctx.char.turn_actions, bonus_action_used: true };
-    ctx.narrative = `${ctx.char.name} RAGES! +${rageDamageBonus(barbLvl)} bonus STR melee damage, resistance to physical attacks. (${rageUses - 1} use${rageUses - 1 === 1 ? '' : 's'} remaining)`;
+    char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
+    ctx.narrative = `${char.name} RAGES! +${rageDamageBonus(barbLvl)} bonus STR melee damage, resistance to physical attacks. (${rageUses - 1} use${rageUses - 1 === 1 ? '' : 's'} remaining)`;
     return true;
   }
 
   if (fid === 'reckless_attack') {
-    if (!hasClass(ctx.char, 'barbarian')) {
+    if (!hasClass(char, 'barbarian')) {
       ctx.narrative = 'Only Barbarians have Reckless Attack.';
       return true;
     }
-    if (getClassLevel(ctx.char, 'barbarian') < 2) {
+    if (getClassLevel(char, 'barbarian') < 2) {
       ctx.narrative = 'Reckless Attack requires Barbarian level 2.';
       return true;
     }
-    if (ctx.char.turn_actions.reckless) {
+    if (char.turn_actions.reckless) {
       ctx.narrative = 'You are already attacking recklessly this turn.';
       return true;
     }
-    ctx.char.turn_actions = { ...ctx.char.turn_actions, reckless: true };
-    ctx.narrative = `${ctx.char.name} attacks recklessly! Advantage on STR melee attacks this turn — but enemies have advantage against you until your next turn.`;
+    char.turn_actions = { ...char.turn_actions, reckless: true };
+    ctx.narrative = `${char.name} attacks recklessly! Advantage on STR melee attacks this turn — but enemies have advantage against you until your next turn.`;
     return true;
   }
 
   if (fid === 'frenzy_attack') {
-    if (ctx.char.subclass !== 'berserker' || !hasClass(ctx.char, 'barbarian')) {
+    if (char.subclass !== 'berserker' || !hasClass(char, 'barbarian')) {
       ctx.narrative = 'Only Berserker Barbarians have Frenzy.';
       return true;
     }
-    if (!ctx.char.conditions.includes('raging')) {
+    if (!char.conditions.includes('raging')) {
       ctx.narrative = 'You must be raging to use Frenzy.';
       return true;
     }
-    if (ctx.char.turn_actions.bonus_action_used) {
+    if (char.turn_actions.bonus_action_used) {
       ctx.narrative = 'Bonus action already used this turn.';
       return true;
     }
@@ -97,11 +99,9 @@ export function handleBarbarianFeature(ctx: ActionContext, fid: string): boolean
       ctx.narrative = 'No enemy to Frenzy attack.';
       return true;
     }
-    const frWeapon = ctx.char.equipped_weapon
+    const frWeapon = char.equipped_weapon
       ? getItemData(
-          ctx.char.inventory?.find(
-            (i) => i.instance_id === ctx.char.equipped_weapon
-          ) as InventoryItem,
+          char.inventory?.find((i) => i.instance_id === char.equipped_weapon) as InventoryItem,
           ctx.context
         )
       : null;
@@ -109,16 +109,14 @@ export function handleBarbarianFeature(ctx: ActionContext, fid: string): boolean
       ctx.narrative = 'Frenzy requires a melee weapon.';
       return true;
     }
-    ctx.char.turn_actions = { ...ctx.char.turn_actions, bonus_action_used: true };
+    char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
     const frTarget = ctx.livingEnemiesInRoom[0] ?? ctx.enemy;
-    const frToHit = rollDice('1d20') + abilityMod(ctx.char.str) + profBonus(ctx.char.level);
+    const frToHit = rollDice('1d20') + abilityMod(char.str) + profBonus(char.level);
     if (frToHit >= (frTarget.ac ?? 10)) {
       const dmgDice = frWeapon?.damage ?? '1d4';
       const frDmg = Math.max(
         1,
-        rollDice(dmgDice) +
-          abilityMod(ctx.char.str) +
-          rageDamageBonus(getClassLevel(ctx.char, 'barbarian'))
+        rollDice(dmgDice) + abilityMod(char.str) + rageDamageBonus(getClassLevel(char, 'barbarian'))
       );
       const curHp = ctx.st.entities?.find((e) => e.id === frTarget.id && e.isEnemy)?.hp ?? 0;
       const newHp = Math.max(0, curHp - frDmg);
@@ -128,20 +126,20 @@ export function handleBarbarianFeature(ctx: ActionContext, fid: string): boolean
           e.id === frTarget.id && e.isEnemy ? { ...e, hp: newHp } : e
         ),
       };
-      ctx.narrative = `💢 ${ctx.char.name} — Frenzy! (${frToHit} hits AC ${frTarget.ac}) ${frDmg} ${frWeapon?.damageType ?? 'bludgeoning'}${newHp <= 0 ? ` — ${frTarget.name} falls!` : ''}`;
+      ctx.narrative = `💢 ${char.name} — Frenzy! (${frToHit} hits AC ${frTarget.ac}) ${frDmg} ${frWeapon?.damageType ?? 'bludgeoning'}${newHp <= 0 ? ` — ${frTarget.name} falls!` : ''}`;
       if (newHp <= 0) {
-        const split = splitEncounterXp(ctx.st, ctx.char.id, frTarget.xp ?? 10);
+        const split = splitEncounterXp(ctx.st, char.id, frTarget.xp ?? 10);
         ctx.st = split.st;
-        ctx.char.xp = (ctx.char.xp || 0) + split.share;
-        ctx.narrative += applyPartyLevelUps(ctx.st, ctx.char, ctx.context);
+        char.xp = (char.xp || 0) + split.share;
+        ctx.narrative += applyPartyLevelUps(ctx.st, char, ctx.context);
         ctx.st.enemies_killed = [...ctx.st.enemies_killed, frTarget.id];
         if (isRoomCleared(ctx.st, ctx.seed, ctx.roomId)) {
           ctx.st = endCombatState(ctx.st);
-          ctx.char.conditions = ctx.char.conditions.filter((c) => c !== 'raging');
+          char.conditions = char.conditions.filter((c) => c !== 'raging');
         }
       }
     } else {
-      ctx.narrative = `💢 ${ctx.char.name} — Frenzy! (${frToHit} vs AC ${frTarget.ac}) — miss.`;
+      ctx.narrative = `💢 ${char.name} — Frenzy! (${frToHit} vs AC ${frTarget.ac}) — miss.`;
     }
     return true;
   }
