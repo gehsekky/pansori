@@ -122,3 +122,41 @@ describe('Heightened Spell — target save Disadvantage', () => {
     expect(r2.newState.entities?.find((e) => e.id === ENEMY)?.conditions ?? []).not.toContain('paralyzed');
   });
 });
+
+// Level-1 sorcerer → Fire Bolt is a clean 1d10 (single die). Spell attack
+// bonus = prof(2) + CHA mod(3) = +5 vs the Dummy's AC 12.
+const lowSorc = () => sorcCombat({ level: 1 });
+
+describe('Empowered Spell — reroll low damage dice', () => {
+  it('rerolls a low die into a high one (10 dmg, not 1)', async () => {
+    // d20 0.7 → 15 (hit, no crit); 1d10 0.0 → 1; reroll 0.99 → 10.
+    vi.spyOn(Math, 'random').mockReturnValueOnce(0.7).mockReturnValueOnce(0.0).mockReturnValueOnce(0.99).mockReturnValue(0.5);
+    const state = lowSorc();
+    state.metamagic_active = 'empowered';
+    const r = await takeAction({ action: { type: 'cast_spell', spellId: 'fire_bolt', slotLevel: 0, targetEnemyId: ENEMY }, history: [], state, seed: seed(), context: ctx });
+    expect(r.newState.entities?.find((e) => e.id === ENEMY)?.hp).toBe(50); // 60 - 10
+  });
+
+  it('control: the low die stands without Empowered (1 dmg)', async () => {
+    vi.spyOn(Math, 'random').mockReturnValueOnce(0.7).mockReturnValueOnce(0.0).mockReturnValue(0.5);
+    const r = await takeAction({ action: { type: 'cast_spell', spellId: 'fire_bolt', slotLevel: 0, targetEnemyId: ENEMY }, history: [], state: lowSorc(), seed: seed(), context: ctx });
+    expect(r.newState.entities?.find((e) => e.id === ENEMY)?.hp).toBe(59); // 60 - 1
+  });
+});
+
+describe('Seeking Spell — reroll a missed spell attack', () => {
+  it('a missed attack is rerolled into a hit', async () => {
+    // d20 0.1 → 3 (miss); reroll 0.9 → 19 (hit); then damage.
+    vi.spyOn(Math, 'random').mockReturnValueOnce(0.1).mockReturnValueOnce(0.9).mockReturnValue(0.5);
+    const state = lowSorc();
+    state.metamagic_active = 'seeking';
+    const r = await takeAction({ action: { type: 'cast_spell', spellId: 'fire_bolt', slotLevel: 0, targetEnemyId: ENEMY }, history: [], state, seed: seed(), context: ctx });
+    expect(r.newState.entities?.find((e) => e.id === ENEMY)!.hp).toBeLessThan(60); // reroll landed
+  });
+
+  it('control: a miss stays a miss without Seeking', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.1); // d20 = 3 → miss, no reroll
+    const r = await takeAction({ action: { type: 'cast_spell', spellId: 'fire_bolt', slotLevel: 0, targetEnemyId: ENEMY }, history: [], state: lowSorc(), seed: seed(), context: ctx });
+    expect(r.newState.entities?.find((e) => e.id === ENEMY)!.hp).toBe(60); // untouched
+  });
+});

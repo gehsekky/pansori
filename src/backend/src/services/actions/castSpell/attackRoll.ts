@@ -5,6 +5,7 @@ import {
   resolveSpellAttack,
   rollCritical,
   rollDice,
+  rollDiceEmpowered,
   upcastDamage,
 } from '../../rulesEngine.js';
 import type { ActionContext } from '../types.js';
@@ -34,9 +35,15 @@ export function runAttackRollSpell(
   // SRD Sorcerer Innate Sorcery (L1): Advantage on Sorcerer spell attack rolls
   // while active.
   const innateAdv = char.conditions.includes('innate_sorcery');
-  const atk = resolveSpellAttack(char.level, castingScore, spellTarget.ac, innateAdv);
+  let atk = resolveSpellAttack(char.level, castingScore, spellTarget.ac, innateAdv);
+  // SRD Metamagic Seeking Spell — on a miss, reroll the d20 once (use the new).
+  let seekingNote = '';
+  if (!atk.hit && ctx.metamagic === 'seeking') {
+    atk = resolveSpellAttack(char.level, castingScore, spellTarget.ac, innateAdv);
+    seekingNote = ' 🎯 Seeking Spell (reroll)';
+  }
   const spellHit = atk.hit;
-  const atkNote = ` (spell attack ${atk.roll}+${atk.bonus}=${atk.total} vs AC ${spellTarget.ac})`;
+  const atkNote = ` (spell attack ${atk.roll}+${atk.bonus}=${atk.total} vs AC ${spellTarget.ac})${seekingNote}`;
   const castPrefix = pickCastPrefix(spell, {
     name: char.name,
     spell: spell.name,
@@ -60,7 +67,14 @@ export function runAttackRollSpell(
   }
   const atkDmgExpr =
     spell.level === 0 ? cantripDamageDice(spell, char.level) : upcastDamage(spell, slotLevel);
-  let spellDmg = atk.critical ? rollCritical(atkDmgExpr || null) : rollDice(atkDmgExpr || '1d4');
+  // SRD Metamagic Empowered Spell — reroll up to CHA-mod of the lowest damage
+  // dice, keeping the new rolls.
+  const empowered = ctx.metamagic === 'empowered';
+  let spellDmg = empowered
+    ? rollDiceEmpowered(atkDmgExpr || '1d4', Math.max(1, abilityMod(char.cha)), atk.critical)
+    : atk.critical
+      ? rollCritical(atkDmgExpr || null)
+      : rollDice(atkDmgExpr || '1d4');
   // Agonizing Blast: Warlock invocation — add CHA mod to Eldritch Blast damage
   const agonizingBonus =
     spell.id === 'eldritch_blast' && (char.feats ?? []).includes('agonizing_blast')
