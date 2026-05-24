@@ -2,6 +2,7 @@ import { SQUARE_SIZE, findPath, opportunityAttackTriggers, posEqual } from '../g
 import { effectiveSpeed, getEnemyById } from '../gameEngine.js';
 import type { ActionHandler } from './types.js';
 import { applyDamage } from '../damage.js';
+import { hasEscapeTheHorde } from '../multiclass.js';
 import { resolveEnemyAttack } from '../rulesEngine.js';
 import { updatePcActor } from './actor.js';
 
@@ -153,7 +154,9 @@ export const handleGridMove: ActionHandler<{
       !nextSt.enemies_killed.includes(oaEntity.id) &&
       !nextChar.turn_actions?.disengaged
     ) {
-      const oaResult = resolveEnemyAttack(oaEnemy, nextChar.ac, false, false);
+      // SRD Ranger Escape the Horde (Defensive Tactics L7) — opportunity
+      // attacks against you have Disadvantage.
+      const oaResult = resolveEnemyAttack(oaEnemy, nextChar.ac, false, hasEscapeTheHorde(nextChar));
       if (oaResult.hit) {
         const rawDmg = oaResult.damage;
         // Route through applyDamage so the OA respects every PC-side
