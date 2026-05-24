@@ -145,8 +145,22 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
       branch. The enemy spell model (`{ damage, savingThrow, saveEffect }`)
       stays distinct from the PC `castSpell` pipeline by design — same
       shared-entry/distinct-resolver split as EE-2. Suite 1053 + handler spec.
-- [ ] **EE-4** — fold the enemy approach + per-turn orchestration in, so a
-      whole enemy turn is a sequence of dispatched actions.
+- [x] **EE-4 (done 2026-05-24)** — the enemy approach/move step now routes
+      through a dispatched `enemy_move` action (`enemyActor`), wrapping
+      `attemptEnemyApproach` (path-plan + opportunity attacks + position
+      commit) and reporting proceed-to-attack / skip-turn via a
+      `ctx.enemyApproach` side-channel. Suite 1057 + handler spec.
+
+  **EE epic complete.** A whole enemy turn now runs as a sequence of
+  dispatched actions with an `enemyActor` — `enemy_move` → (`enemy_cast`
+  | `enemy_attack`×N) — through the same `dispatchAction` path as PC
+  actions. `runEnemyTurns` is now an orchestrator over the AI/perception
+  decisions that aren't actions (target selection, hide check, turn-skip
+  conditions, the Counterspell/reaction pause windows). The PC and enemy
+  attack/spell _resolvers_ stay deliberately distinct (PC equipment +
+  slots vs monster stat-block math); what's unified is the dispatch
+  entry, so shared PC↔monster abilities can hook in from one place.
+  Deferred (genuinely not worth it): merging the resolvers themselves.
 
 #### RE-2: Class + subclass feature progression to L20
 

@@ -4480,7 +4480,7 @@ async function runEnemyMultiattackLoop(args: {
  *
  * Extracted from `runEnemyTurns` (architecture audit #5).
  */
-function attemptEnemyApproach(args: {
+export function attemptEnemyApproach(args: {
   enemy: Enemy;
   enemyId: string;
   target: Character;
@@ -5243,19 +5243,25 @@ export async function runEnemyTurns(args: {
           // spellResult.kind === 'no-cast' → fall through to melee.
 
           // ── Tactical movement step ─ delegated to `attemptEnemyApproach` ───
-          const approach = attemptEnemyApproach({
-            enemy: rm,
-            enemyId: eEntry.id,
-            target,
+          // ── Approach/move step ─ dispatched as `enemy_move` (EE-4) ────────
+          const moveCtx = buildEnemyActionCtx({
             st,
-            resumeMi,
+            seed: args.seed,
             context: args.context,
-            roomObstacleCells,
+            worldName: args.worldName,
+            enemy: rm,
+            ent: eEnt,
             narrative,
           });
-          if (approach.kind === 'skip-turn') {
-            st = approach.st;
-            narrative = approach.narrative;
+          await dispatchAction(moveCtx, {
+            type: 'enemy_move',
+            targetCharId: target.id,
+            resumeMi,
+          });
+          st = moveCtx.st;
+          narrative = moveCtx.narrative;
+          const approach = moveCtx.enemyApproach;
+          if (!approach || approach.kind === 'skip-turn') {
             resumeMi = 0;
             const prevAdvIdxMove = advIdx;
             advIdx = (advIdx + 1) % orderLen;
@@ -5263,8 +5269,6 @@ export async function runEnemyTurns(args: {
             if (advIdx === args.initialCurrentIdx) break;
             continue;
           }
-          st = approach.st;
-          narrative = approach.narrative;
           const movementHeaderPrinted = approach.movementHeaderPrinted;
           const attackCount = rm.multiattack ?? 1;
           if (resumeMi === 0 && !movementHeaderPrinted) {

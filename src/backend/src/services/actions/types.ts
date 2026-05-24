@@ -76,6 +76,14 @@ export interface ActionContext {
   enemySubAttack?: EnemySubAttackResult;
 
   /**
+   * EE-4 side-channel — the `enemy_move` handler reports its approach
+   * outcome here (proceed-to-attack vs skip-turn, and whether the
+   * `[Name's turn]` header was already printed). The enemy-turn loop reads
+   * it after `dispatchAction`. Only set by `handleEnemyMove`.
+   */
+  enemyApproach?: { kind: 'proceed-to-attack' | 'skip-turn'; movementHeaderPrinted: boolean };
+
+  /**
    * 2024 PHB PC-turn d20 reaction window — side-channel for the
    * attack-handler orchestrator to detect hit/miss + capture the
    * inputs needed to re-resolve on Heroic Inspiration reroll. Set by

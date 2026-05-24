@@ -109,6 +109,8 @@ export const ACTION_COSTS: Record<StructuredAction['type'], ActionCost> = {
   enemy_attack: 'managed',
   // BE-internal enemy spell resolution — same rationale as enemy_attack.
   enemy_cast: 'managed',
+  // BE-internal enemy approach/move — same rationale as enemy_attack.
+  enemy_move: 'managed',
 };
 
 const BUDGET_ERRORS: Record<Exclude<ActionCost, 'managed'>, string> = {

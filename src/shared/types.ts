@@ -356,6 +356,10 @@ export type StructuredAction =
   // Counterspell window, handled by the orchestrator). Dispatched with an
   // `enemyActor`. (EE-3 — dispatcher-integrated enemy spellcasting.)
   | { type: 'enemy_cast'; spellId: string; targetCharId: string }
+  // BE-internal: an enemy's approach/move step toward a PC before its attack
+  // (path-plan + opportunity attacks + position commit). Dispatched with an
+  // `enemyActor`. `resumeMi` skips the move mid-multiattack. (EE-4.)
+  | { type: 'enemy_move'; targetCharId: string; resumeMi: number }
   // Out-of-combat only: switch which PC is the "lead" / active character
   // for subsequent narrative attribution + skill checks. RAW has no
   // notion of initiative outside combat — the party operates as a unit
