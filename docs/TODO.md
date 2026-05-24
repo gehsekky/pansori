@@ -60,11 +60,12 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
   conjure) — narrative-only today. Decisions: RAW player-command control
   model; Beastmaster companion is the first content slice. Slices
   (P4.1 — `CombatEntity.side` + side-keyed `selectTarget` — shipped):
-  - [ ] **P4.2** — parameterize `attemptEnemyApproach` /
-    `runEnemyMultiattackLoop` / `computeEnemyAttack` on the acting stat
-    block vs target entity (enemy → generic combatant). Behavior-preserving.
-  - [ ] **P4.3** — drive `side: 'ally'` entities through the loop (target
-    nearest hostile; reuse approach + multiattack).
+  - [ ] **P4.2/3** — ally turn path: `runEnemyTurns` drives `side: 'ally'`
+    entities (target nearest hostile via `selectTarget`; side-agnostic
+    approach; attack via the simple `resolveEnemyAttack` + a new shared
+    `applyDamageToEntity`, **not** the PC-target `computeEnemyAttack`).
+    P4.2/P4.3 merged — the enemy→PC helpers don't fit ally→enemy (see the
+    design doc's implementation finding).
   - [ ] **P4.4** — summon lifecycle: insert/remove ally entities;
     concentration sweep in `breakConcentration`.
   - [ ] **P4.5** — content: Beastmaster companion (RAW player-command) →
