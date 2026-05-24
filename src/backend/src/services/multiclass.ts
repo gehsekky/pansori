@@ -533,6 +533,12 @@ export function hasMultiattackDefense(char: Character): boolean {
   );
 }
 
+/** SRD Ranger Superior Hunter's Defense (L15) — a Reaction grants Resistance to
+ *  the triggering damage type until the end of the turn. Only Hunter Rangers. */
+export function hasSuperiorHuntersDefense(char: Character): boolean {
+  return char.subclass === 'hunter' && getClassLevel(char, 'ranger') >= 15;
+}
+
 export function hasDangerSense(char: Character): boolean {
   if (
     (char.conditions ?? []).some((c) =>
