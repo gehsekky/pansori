@@ -298,6 +298,11 @@ export interface TurnActions {
   // (which also zeroes remaining movement), cleared on the next attack
   // (one-shot) or at end of turn via FRESH_TURN.
   steady_aim_pending?: boolean;
+  // Barbarian Brutal Strike (L9) — pre-committed rider for the next STR
+  // melee attack while Reckless: forgoes the Reckless advantage and, on a
+  // hit, deals +1d10 and applies the chosen effect. Consumed on the next
+  // qualifying attack; cleared at end of turn via FRESH_TURN otherwise.
+  brutal_strike_pending?: 'forceful' | 'hamstring';
   // Savage Attacker feat (2024 PHB origin) — once per turn, on a
   // weapon-damage hit, reroll damage and take the higher. This flag
   // marks the reroll as already spent this turn so multi-hit turns

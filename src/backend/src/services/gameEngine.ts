@@ -3114,6 +3114,28 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     });
   }
 
+  // ── Barbarian Brutal Strike (L9): pre-commit a rider while Reckless ──────────
+  if (
+    state.combat_active &&
+    hasClass(char, 'barbarian') &&
+    getClassLevel(char, 'barbarian') >= 9 &&
+    char.turn_actions.reckless &&
+    !char.turn_actions.brutal_strike_pending &&
+    !char.turn_actions.action_used
+  ) {
+    choices.push({
+      label:
+        'Brutal Strike: Forceful Blow — forgo advantage; on hit +1d10 and push 15 ft, then close in',
+      action: { type: 'use_class_feature', featureId: 'brutal_strike_forceful' },
+      kind: 'class_feature',
+    });
+    choices.push({
+      label: 'Brutal Strike: Hamstring Blow — forgo advantage; on hit +1d10 and −15 ft Speed',
+      action: { type: 'use_class_feature', featureId: 'brutal_strike_hamstring' },
+      kind: 'class_feature',
+    });
+  }
+
   // ── Monk choices ────────────────────────────────────────────────────────────
   // 2024 PHB renames Ki Points to Discipline Points; the internal storage
   // key stays `ki_points` so existing tests + state continue to work, but
@@ -4832,7 +4854,9 @@ export function attemptEnemyApproach(args: {
   const targetEntPreMove = st.entities?.find((e) => e.id === target.id);
   const enemyImmobile =
     enemyEntPreMove?.conditions?.some((c) => c === 'grappled' || c === 'restrained') ?? false;
-  const effectiveEnemySpeedFt = enemyImmobile ? 0 : baseSpeedFt;
+  // SRD Barbarian Hamstring Blow (Brutal Strike) — −15 ft Speed.
+  const hamstrungFt = enemyEntPreMove?.conditions?.includes('hamstrung') ? 15 : 0;
+  const effectiveEnemySpeedFt = enemyImmobile ? 0 : Math.max(0, baseSpeedFt - hamstrungFt);
   const needsToMove =
     !!enemyEntPreMove &&
     !!targetEntPreMove &&
@@ -6143,6 +6167,13 @@ export async function takeAction({
         movement_used: {},
         surprised: [],
         characters: st.characters.map((c) => ({ ...c, turn_actions: { ...FRESH_TURN } })),
+        // Brutal Strike Hamstring lasts "until the start of your next turn" —
+        // approximated as one full round; cleared on round wrap.
+        entities: (st.entities ?? []).map((e) =>
+          e.conditions.includes('hamstrung')
+            ? { ...e, conditions: e.conditions.filter((c) => c !== 'hamstrung') }
+            : e
+        ),
       };
       // SRD p.221 — lair action fires on round start (init count 20).
       const lairRes = fireLairAction(st, seed, context);
