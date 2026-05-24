@@ -1,5 +1,6 @@
 import { abilityMod, d, profBonus } from '../rulesEngine.js';
 import type { ActionHandler } from './types.js';
+import { applyIndomitableMight } from '../multiclass.js';
 import { composeNow } from '../narrative/compose.js';
 import { distanceFeet } from '../gridEngine.js';
 import { getEnemyById } from '../gameEngine.js';
@@ -41,7 +42,10 @@ export const handleGrapple: ActionHandler<{
     return;
   }
   const athProf = (ctx.context.classSkills[char.character_class] ?? []).includes('athletics');
-  const playerRoll = d(20) + abilityMod(char.str) + (athProf ? profBonus(char.level) : 0);
+  const playerRoll = applyIndomitableMight(
+    char,
+    d(20) + abilityMod(char.str) + (athProf ? profBonus(char.level) : 0)
+  );
   const enemyStr = abilityMod(target.toHit);
   const enemyDex = abilityMod(target.dex ?? 10);
   const enemyRoll = d(20) + Math.max(enemyStr, enemyDex);
@@ -100,7 +104,10 @@ export const handleTryEscapeGrapple: ActionHandler<{ type: 'try_escape_grapple' 
 
   const athProf = (ctx.context.classSkills[char.character_class] ?? []).includes('athletics');
   const acrProf = (ctx.context.classSkills[char.character_class] ?? []).includes('acrobatics');
-  const athRoll = d(20) + abilityMod(char.str) + (athProf ? profBonus(char.level) : 0);
+  const athRoll = applyIndomitableMight(
+    char,
+    d(20) + abilityMod(char.str) + (athProf ? profBonus(char.level) : 0)
+  );
   const acrRoll = d(20) + abilityMod(char.dex) + (acrProf ? profBonus(char.level) : 0);
   const myRoll = Math.max(athRoll, acrRoll);
   const skillUsed = athRoll >= acrRoll ? 'Athletics' : 'Acrobatics';
@@ -158,7 +165,10 @@ export const handleShove: ActionHandler<{
     return;
   }
   const athProf = (ctx.context.classSkills[char.character_class] ?? []).includes('athletics');
-  const playerRoll = d(20) + abilityMod(char.str) + (athProf ? profBonus(char.level) : 0);
+  const playerRoll = applyIndomitableMight(
+    char,
+    d(20) + abilityMod(char.str) + (athProf ? profBonus(char.level) : 0)
+  );
   const enemyStr = abilityMod(target.toHit);
   const enemyDex = abilityMod(target.dex ?? 10);
   const enemyRoll = d(20) + Math.max(enemyStr, enemyDex);
