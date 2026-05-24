@@ -119,9 +119,22 @@ export interface GridPos {
   y: number;
 }
 
+/**
+ * Which combat side an entity fights for: PCs and their allies
+ * (companions, summons) oppose enemies. Derived from `isEnemy` /
+ * `isCompanion` when an entity's `side` is unset — see `entitySide()`.
+ */
+export type EntitySide = 'pc' | 'enemy' | 'ally';
+
 export interface CombatEntity {
   id: string; // character.id for PCs, enemy instance id for enemies, owner.id + ':companion' for animal companions
   isEnemy: boolean;
+  /**
+   * Combat side (RE-1 Phase 4). Optional + back-compat: when unset,
+   * derived from `isEnemy` / `isCompanion` via `entitySide()`. Summons
+   * and companions set this to `'ally'` explicitly as Phase 4 lands.
+   */
+  side?: EntitySide;
   pos: GridPos;
   /**
    * Current HP.

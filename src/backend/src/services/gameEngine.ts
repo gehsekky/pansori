@@ -27,6 +27,7 @@ import type {
   Context,
   DeathSaves,
   Enemy,
+  EntitySide,
   GameChoice,
   GameConsequence,
   GameState,
@@ -4475,23 +4476,53 @@ function attemptEnemySpellCast(args: {
  * lowest-HP PC, target the cleric first, etc.) without touching the
  * surrounding closure.
  */
-export function selectEnemyMeleeTarget(
-  enemyId: string,
+/**
+ * The combat side an entity fights for. Falls back to `isEnemy` /
+ * `isCompanion` when `side` is unset (back-compat for entities created
+ * before the field existed). (RE-1 Phase 4.)
+ */
+export function entitySide(e: CombatEntity): EntitySide {
+  return e.side ?? (e.isEnemy ? 'enemy' : e.isCompanion ? 'ally' : 'pc');
+}
+
+/**
+ * Sides an actor on `side` will attack. Enemies target PCs only for now
+ * — companions / summons (`'ally'`) become valid enemy targets in P4.3
+ * (a deliberate behavior change with its own tests). Today's enemy
+ * targeting (nearest PC, skipping companions) is preserved.
+ */
+export function hostileTargetSides(side: EntitySide): EntitySide[] {
+  return side === 'enemy' ? ['pc'] : ['enemy'];
+}
+
+/**
+ * Nearest living hostile combatant to the actor, keyed on `side`
+ * (generalizes the enemy-only `selectEnemyMeleeTarget`). `targetCharIdx`
+ * is the `st.characters` index when the target is a PC, else -1.
+ *
+ * Extracted from `runEnemyTurns` (architecture audit #5) and generalized
+ * to any actor side for RE-1 Phase 4. Behavior-preserving for enemies:
+ * `hostileTargetSides('enemy')` is `['pc']`, equivalent to the prior
+ * `!isEnemy && !isCompanion` filter.
+ */
+export function selectTarget(
+  actorId: string,
   st: GameState
 ): {
-  enemyEnt: CombatEntity | undefined;
+  actorEnt: CombatEntity | undefined;
   targetEnt: CombatEntity | undefined;
   targetCharIdx: number;
 } {
-  const enemyEnt = st.entities?.find((e) => e.id === enemyId && e.isEnemy);
+  const actorEnt = st.entities?.find((e) => e.id === actorId);
+  const targetSides: EntitySide[] = actorEnt ? hostileTargetSides(entitySide(actorEnt)) : ['pc'];
   const targetEnt = st.entities
-    ?.filter((e) => !e.isEnemy && !e.isCompanion && e.hp > 0)
+    ?.filter((e) => targetSides.includes(entitySide(e)) && e.hp > 0)
     .sort((a, b) => {
-      if (!enemyEnt) return 0;
-      return distanceFeet(enemyEnt.pos, a.pos) - distanceFeet(enemyEnt.pos, b.pos);
+      if (!actorEnt) return 0;
+      return distanceFeet(actorEnt.pos, a.pos) - distanceFeet(actorEnt.pos, b.pos);
     })[0];
   const targetCharIdx = st.characters.findIndex((c) => c.id === targetEnt?.id && !c.dead);
-  return { enemyEnt, targetEnt, targetCharIdx };
+  return { actorEnt, targetEnt, targetCharIdx };
 }
 
 /**
@@ -4652,7 +4683,7 @@ export function runEnemyTurns(args: {
       // SRD p.221 — legendary action pool refreshes at the start of the
       // legendary creature's own turn.
       if (rm.legendary_actions?.length) refreshLegendaryPool(args.seed, rm.id);
-      const { enemyEnt: eEnt, targetCharIdx } = selectEnemyMeleeTarget(eEntry.id, st);
+      const { actorEnt: eEnt, targetCharIdx } = selectTarget(eEntry.id, st);
       if (targetCharIdx >= 0) {
         let target = st.characters[targetCharIdx];
         // 2024 PHB Hide DC tracking — delegated to `resolveEnemyHideCheck`.
