@@ -328,11 +328,18 @@ Bonus(char, st)`: a creature within 10 ft of a conscious L6+ Paladin (the
       L1/L2/L6/L9 (today it's an always-available choice while a slot is open);
       Expertise on the inline contested checks (same `skillCheck`-routing
       boundary as Reliable Talent / Jack of All Trades).
+- [x] **Font of Inspiration (verified 2026-05-24)** — Bard L5: regain all
+      expended Bardic Inspiration on a **short** rest (not just a long rest).
+      Already implemented in rest.ts (the short-rest path deletes the
+      `class_resource_uses.bardic_inspiration` counter for Bard L5+, so it
+      defaults back to full CHA-mod uses). Added an end-to-end spec proving a
+      Bard L5 regains BI on a short rest and a Bard L4 does not. No source
+      change needed.
 
 | Class     | Implemented (approx)                                                                                                                                                                                   | Major SRD gaps to fill                                                                                                                            |
 | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Barbarian | Rage, Reckless (L1–2), Frenzy (L3), Extra Attack (L5)                                                                                                                                                  | Danger Sense, Fast Movement, Feral Instinct, Brutal Strike, Relentless Rage, Persistent Rage, Indomitable Might, capstone; exhaustion-on-rage-end |
-| Bard      | Bardic Inspiration (L1), Cutting Words (L3), Jack of All Trades (L2), Expertise (L2/9)                                                                                                                 | Font of Inspiration, Countercharm, Magical Secrets, Superior Inspiration, capstone                                                                |
+| Bard      | Bardic Inspiration (L1), Cutting Words (L3), Jack of All Trades (L2), Expertise (L2/9), Font of Inspiration (L5)                                                                                       | Countercharm, Magical Secrets, Superior Inspiration, capstone                                                                                     |
 | Cleric    | Channel Divinity, Turn/Sear Undead, Preserve Life (Life)                                                                                                                                               | Blessed Strikes, Divine Intervention, improved Channel uses, higher Life-domain grades                                                            |
 | Druid     | Wild Shape (L2, CR L4/8), Land's Aid                                                                                                                                                                   | Wild Companion, full Circle of the Land grades, Wild Shape improvements, Beast Spells, Archdruid                                                  |
 | Fighter   | Second Wind, Action Surge (L2), Extra Attack (2/3/4), Indomitable (L9), Tactical Master (L9)                                                                                                           | Champion grades (Remarkable Athlete, Additional Style, Superior Critical, Survivor)                                                               |
