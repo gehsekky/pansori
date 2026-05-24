@@ -1,8 +1,8 @@
 import type { CombatEntity, Enemy } from '../../../types.js';
 import { FRESH_TURN, abilityMod, profBonus, rollDice } from '../../rulesEngine.js';
 import { buildInitiativeOrder, pick, seedSummonedAllies } from '../../gameEngine.js';
+import { persistentRageTopUp, superiorInspirationTopUp } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
-import { superiorInspirationTopUp } from '../../multiclass.js';
 import { updatePcActor } from '../actor.js';
 
 /**
@@ -40,9 +40,11 @@ export function runCombatStart(ctx: ActionContext, target: Enemy): void {
   const updatedCharsForInit = ctx.st.characters.map((c) => {
     // SRD Bard Superior Inspiration (L18): rolling Initiative tops Bardic
     // Inspiration back up to 2 if the bard has fewer (no-op otherwise).
-    const withInspiration = superiorInspirationTopUp(c);
+    // SRD Barbarian Persistent Rage (L15): rolling Initiative regains all
+    // expended Rage uses (once per long rest).
+    const refreshed = persistentRageTopUp(superiorInspirationTopUp(c));
     const entry = order.find((e) => e.id === c.id);
-    return entry ? { ...withInspiration, initiative_roll: entry.roll } : withInspiration;
+    return entry ? { ...refreshed, initiative_roll: entry.roll } : refreshed;
   });
   ctx.st = { ...ctx.st, characters: updatedCharsForInit, initiative_order: order };
 
