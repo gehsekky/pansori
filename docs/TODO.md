@@ -58,15 +58,20 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
   pre-bake what PCs compute; see the design doc). Unblocks **summons +
   companions** (Beastmaster companion, Spiritual Weapon, Find Familiar,
   conjure) — narrative-only today. Decisions: RAW player-command control
-  model; Beastmaster companion is the first content slice. Slices
-  (P4.1 side tagging + P4.2/3 ally turn path with movement — shipped:
-  `runEnemyTurns` drives `side: 'ally'` entities via `runAllyTurn`, which
-  selects the nearest enemy, approaches it (taking OA from enemies), and
-  attacks with the simple `resolveEnemyAttack` + `applyDamageToEntity`):
-  - [ ] **P4.4** — summon lifecycle: insert/remove ally entities;
-    concentration sweep in `breakConcentration`.
+  model; Beastmaster companion is the first content slice. Slices P4.1
+  (side tagging), P4.2/3 (ally turn path with movement — `runAllyTurn`
+  selects the nearest enemy, approaches it taking OA, and attacks via the
+  simple `resolveEnemyAttack` + `applyDamageToEntity`), and P4.4 (summon
+  lifecycle — `addAllyCombatant` / `removeCombatant` + the
+  `breakConcentration` summon sweep) have all shipped. The engine can now
+  drive an ally end-to-end and spawn/despawn one; what remains is content:
   - [ ] **P4.5** — content: Beastmaster companion (RAW player-command) →
-    Spiritual Weapon → Find Familiar / conjure.
+    Spiritual Weapon → Find Familiar / conjure. Each spawns an ally via
+    `addAllyCombatant` with a stat block; concentration summons set
+    `summon_concentration` so `breakConcentration` removes them.
+    **Integration note:** inserting/removing an initiative slot mid-combat
+    shifts indices — the spawn/despawn caller must re-derive any in-flight
+    `initiative_idx`.
 
   Deferred (not required for SRD compliance — see design doc): merging the
   PC/enemy attack handlers, routing enemy turns through `dispatchAction`,
