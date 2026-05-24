@@ -188,6 +188,12 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
       `resolvePlayerAttack`; two-handed = heavy melee or versatile-used-2H).
       Note: GWF on opportunity attacks deferred (the `gameEngine` PC-OA
       `resolvePlayerAttack` call defaults `gwf=false`).
+- [x] **Evasion (done 2026-05-24)** — Rogue L7 / Monk L7 passive (`hasEvasion`
+      in multiclass.ts). On a DEX save-for-half effect: no damage on a success,
+      half on a failure; unavailable while Incapacitated. Applied in
+      `resolveEnemySpell` (the enemy damage-spell save path — the only place a
+      PC takes enemy save-for-half damage today). Spec covers the helper +
+      both damage outcomes vs the non-Evasion baseline.
 
 | Class     | Implemented (approx)                                                  | Major SRD gaps to fill                                                                                                                                          |
 | --------- | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |

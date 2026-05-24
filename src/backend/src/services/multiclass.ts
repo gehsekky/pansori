@@ -337,6 +337,16 @@ export function extraAttackCountForChar(char: Character): number {
   return best;
 }
 
+/**
+ * SRD 5.2.1 Evasion (Rogue L7, Monk L7): on a Dexterity save-for-half
+ * effect, take no damage on a success and half on a failure. Unavailable
+ * while Incapacitated. (RE-2.)
+ */
+export function hasEvasion(char: Character): boolean {
+  if ((char.conditions ?? []).includes('incapacitated')) return false;
+  return getClassLevel(char, 'rogue') >= 7 || getClassLevel(char, 'monk') >= 7;
+}
+
 // Maps a class to the spell list(s) it draws from. Used to match a
 // PC's classes against a spell's `spellList` tag so multiclass
 // casters can use the right casting ability per spell.

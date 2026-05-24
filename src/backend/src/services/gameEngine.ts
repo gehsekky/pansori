@@ -66,6 +66,7 @@ import {
   canRitualCast,
   getClassLevel,
   hasClass,
+  hasEvasion,
   spellSlotsForChar,
 } from './multiclass.js';
 import { composeFragments, enemyAttackFragmentEvent } from './narrative/compose.js';
@@ -4638,14 +4639,24 @@ export function resolveEnemySpell(args: {
     const dc = enemy.spellSaveDC ?? 8 + Math.floor((enemy.toHit + 5) / 2);
     const save = rollDice('1d20') + abilityMod(saveScore);
     const saved = save >= dc;
-    const dmg =
-      saved && spell.saveEffect === 'half'
-        ? Math.floor(dmgRoll / 2)
-        : saved && spell.saveEffect === 'negates'
-          ? 0
-          : dmgRoll;
+    // SRD Evasion (Rogue/Monk L7): on a DEX save-for-half, take no damage
+    // on a success and half on a failure (vs the normal half / full).
+    const evasion =
+      spell.savingThrow === 'dex' && spell.saveEffect === 'half' && hasEvasion(target);
+    let dmg: number;
+    if (evasion) {
+      dmg = saved ? 0 : Math.floor(dmgRoll / 2);
+    } else {
+      dmg =
+        saved && spell.saveEffect === 'half'
+          ? Math.floor(dmgRoll / 2)
+          : saved && spell.saveEffect === 'negates'
+            ? 0
+            : dmgRoll;
+    }
+    const evasionNote = evasion ? ' ✦ Evasion' : '';
     newTarget = { ...target, hp: Math.max(0, target.hp - dmg) };
-    narrative += ` ${enemy.name} casts ${spell.name}! ${target.name} ${fmt.save(spell.savingThrow.toUpperCase(), save)} vs ${fmt.dc(dc)} — ${saved ? 'saves' : 'fails'}, ${fmt.dmg(dmg)} ${spell.damageType ?? 'damage'}.`;
+    narrative += ` ${enemy.name} casts ${spell.name}! ${target.name} ${fmt.save(spell.savingThrow.toUpperCase(), save)} vs ${fmt.dc(dc)} — ${saved ? 'saves' : 'fails'}, ${fmt.dmg(dmg)} ${spell.damageType ?? 'damage'}.${evasionNote}`;
   } else {
     newTarget = { ...target, hp: Math.max(0, target.hp - dmgRoll) };
     narrative += ` ${enemy.name} casts ${spell.name}! ${target.name} takes ${fmt.dmg(dmgRoll)} ${spell.damageType ?? 'damage'}.`;
