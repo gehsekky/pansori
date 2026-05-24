@@ -684,6 +684,10 @@ export interface Character {
     condition?: string;
     rounds_left?: number;
   } | null;
+  // SRD Ranger Hunter's Mark — the id of the currently-marked enemy entity.
+  // Set when the spell is cast, cleared on breakConcentration. The caster's
+  // attack rolls vs this target deal +1d6 Force (d10 at Ranger L20, Foe Slayer).
+  hunters_mark_target_id?: string;
   // Extended 5e fields
   subclass?: string; // e.g. 'champion', 'evoker', 'thief'
   // SRD 5.2.1 Fighting Style feats chosen via class features (Fighter L1 +

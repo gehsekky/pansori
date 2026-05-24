@@ -812,6 +812,35 @@ export const SRD_SPELLS: Record<string, Spell> = {
     },
     spellList: ['arcane'],
   },
+  // SRD: Hunter's Mark — L1 Divination (Ranger). Bonus action, V only,
+  // Concentration up to 1 hour. Marks one creature within 90 ft; the caster's
+  // attack-roll hits vs it deal +1d6 Force (d10 at Ranger L20 — Foe Slayer).
+  // Resolved by a cast-pipeline interception that sets hunters_mark_target_id
+  // + concentration (no immediate damage); the +damage rider lives in
+  // resolveOneAttack. The "move the mark on a kill" + WIS-check advantage and
+  // the Favored Enemy free-cast accounting are deferred follow-ups.
+  hunters_mark: {
+    id: 'hunters_mark',
+    name: "Hunter's Mark",
+    level: 1,
+    castTime: 'bonus_action',
+    concentration: true,
+    durationRounds: 600, // 1 hour
+    rangeKind: 'ranged',
+    rangeFt: 90,
+    verbal: true,
+    somatic: false,
+    desc:
+      'Bonus action, Concentration up to 1 hour: mark one creature within 90 ft. Your attack-roll ' +
+      'hits against it deal an extra 1d6 Force damage (1d10 at Ranger 20).',
+    narratives: {
+      cast: [
+        '{name} marks {target} as quarry — every strike will bite deeper',
+        "{name}'s gaze locks onto {target}; the hunter's mark is set",
+      ],
+    },
+    spellList: ['primal'],
+  },
   // SRD: Beacon of Hope — Cleric L3 Abjuration, concentration.
   // Targets in 30 ft gain advantage on WIS saves + death saves +
   // max heal on any healing. Pansori wires the `hopeful` condition

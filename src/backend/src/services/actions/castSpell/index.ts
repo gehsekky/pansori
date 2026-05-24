@@ -209,6 +209,27 @@ export const handleCastSpell: ActionHandler<{
     return;
   }
 
+  // SRD Hunter's Mark (L1) — mark the target enemy: set the tracked id +
+  // concentration, no immediate damage. The +1d6/+1d10 Force rider on the
+  // caster's hits lives in resolveOneAttack.
+  if (spell.id === 'hunters_mark') {
+    updatePcActor(ctx, {
+      hunters_mark_target_id: spellTargetId,
+      concentrating_on: { spellId: 'hunters_mark', rounds_left: spell.durationRounds ?? 600 },
+    });
+    ctx.narrative =
+      (ctx.narrative ?? '') +
+      pickCastPrefix(spell, {
+        name: pc.char.name,
+        spell: spell.name,
+        slotNote,
+        target: spellTarget.name,
+      }) +
+      '.';
+    ctx.usedInitiative = true;
+    return;
+  }
+
   // SRD Power Word Kill (L9) — instant death if the target has ≤100 HP,
   // else 12d12 psychic; a L20 Bard's Words of Creation adds a second
   // target within 10 ft. Owns its own kill resolution, so it short-
