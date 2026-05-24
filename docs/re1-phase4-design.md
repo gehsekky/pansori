@@ -111,6 +111,40 @@ merged in. That neutralizes all three risks:
 3. **Find Familiar / conjure spells** — cast inserts the `ally` entity;
    concentration sweep removes it.
 
+## Does the pragmatic path still reach full SRD 5.2.1 compliance?
+
+**Yes.** The two-path structure isn't a compromise — it *mirrors the SRD's
+own design*. PCs build attacks from ability scores + proficiency + class
+features; monster stat blocks **pre-bake** those into fixed `toHit` /
+`damage`. No SRD mechanic requires one unified attack implementation,
+because the rules themselves don't unify the two. Concretely:
+
+- Monster attacks / multiattack / on-hit riders, recharge abilities, and
+  legendary + lair actions are all stat-block **data** — no PC code path.
+- Summons (Conjure Animals, Animate Dead, Beastmaster companion) are
+  creature stat blocks → `ally` entities.
+- Spiritual Weapon's attack derives from the *caster's* spell attack bonus
+  — snapshot that number into the summon's stat block at spawn time.
+- A PC who Wild Shapes or is Polymorphed stays a **PC actor with overridden
+  stats** (already how pansori models it) — not a separate creature path.
+- The shared **plumbing** — damage multipliers (resist / vuln / immune),
+  temp HP, concentration, the condition registry, saving throws — is
+  *already* shared by both paths via `applyDamage` + the conditions
+  registry, regardless of which attack resolver ran.
+
+**One thing to share later (additive, not blocked): NPC spellcasting
+fidelity.** For enemies/summons to cast the full SRD catalog with correct
+save DCs / AoE shapes / conditions, enemy spell resolution
+(`attemptEnemySpellCast`, currently a thin path) should eventually route
+through the same `castSpell` save/AoE resolution PCs use. That's
+*spell-pipeline* sharing — distinct from the attack-handler merge — and the
+pragmatic path enables it incrementally, without the turn-loop relocation.
+
+**The pragmatic path forecloses nothing.** It's strictly additive (`side` +
+generalized helpers); a future full dispatcher-merge (path A) stays possible
+if a concrete shared PC+monster ability ever demands it. We defer it, we
+don't prevent it.
+
 ## Companion control model (layered on top — not blocking)
 
 2024 RAW companions are **player-commanded** (the beast Dodges unless you
