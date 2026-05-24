@@ -339,6 +339,10 @@ export interface TurnActions {
   // still only ONCE per turn. This flag marks the per-turn use; the
   // per-rest cap is tracked on class_resource_uses.action_surge.
   action_surge_used?: boolean;
+  // SRD Ranger Superior Hunter's Prey (L11) — once per turn, when you deal
+  // Hunter's Mark damage to the marked target you also deal that extra damage
+  // to a second creature within 30 ft. This marks the per-turn use.
+  superior_hunters_prey_used?: boolean;
 }
 
 export interface DeathSaves {
