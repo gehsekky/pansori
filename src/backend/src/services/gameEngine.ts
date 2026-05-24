@@ -589,6 +589,11 @@ export function checkConcentration(
   context?: Context
 ): { char: Character; st: GameState; note: string } {
   if (!char.concentrating_on || dmgTaken <= 0) return { char, st, note: '' };
+  // SRD Ranger Relentless Hunter (L13): taking damage can't break your
+  // Concentration on Hunter's Mark — the save is skipped and the spell holds.
+  if (char.concentrating_on.spellId === 'hunters_mark' && getClassLevel(char, 'ranger') >= 13) {
+    return { char, st, note: ` [Relentless Hunter: Hunter's Mark holds]` };
+  }
   // SRD 5.2.1 p.203 — Concentration DC is 10 or half damage taken, whichever
   // is higher; capped at 30. The cap basically only matters at >60 dmg.
   const dc = Math.min(30, Math.max(10, Math.floor(dmgTaken / 2)));

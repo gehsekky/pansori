@@ -180,6 +180,11 @@ export function computeToHitContext(
   const helpAdv = ctx.st.help_target_id === pc.char.id;
   if (helpAdv) ctx.st = { ...ctx.st, help_target_id: undefined };
 
+  // SRD Ranger Precise Hunter (L17): Advantage on attack rolls vs your
+  // Hunter's Mark target.
+  const preciseHunterAdv =
+    getClassLevel(pc.char, 'ranger') >= 17 && pc.char.hunters_mark_target_id === targetId;
+
   const recklessAdv = !!pc.char.turn_actions.reckless && weaponItem?.range !== 'ranged';
 
   let packTacticsAdv = false;
@@ -277,6 +282,7 @@ export function computeToHitContext(
     enemyFaerieFired ||
     flankingAdv ||
     helpAdv ||
+    preciseHunterAdv ||
     recklessAdv ||
     inspirationAdv ||
     vexAdv ||
