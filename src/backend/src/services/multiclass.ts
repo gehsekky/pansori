@@ -347,6 +347,17 @@ export function hasEvasion(char: Character): boolean {
   return getClassLevel(char, 'rogue') >= 7 || getClassLevel(char, 'monk') >= 7;
 }
 
+/**
+ * SRD 5.2.1 Paladin Lay on Hands (L1): HP remaining in the healing pool —
+ * 5 × Paladin level minus points already spent (`class_resource_uses
+ * .lay_on_hands`, replenished on a long rest). 0 for non-paladins. (RE-2.)
+ */
+export function layOnHandsRemaining(char: Character): number {
+  const max = getClassLevel(char, 'paladin') * 5;
+  const used = char.class_resource_uses?.lay_on_hands ?? 0;
+  return Math.max(0, max - used);
+}
+
 // Maps a class to the spell list(s) it draws from. Used to match a
 // PC's classes against a spell's `spellList` tag so multiclass
 // casters can use the right casting ability per spell.

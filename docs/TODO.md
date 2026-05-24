@@ -194,6 +194,14 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
       `resolveEnemySpell` (the enemy damage-spell save path — the only place a
       PC takes enemy save-for-half damage today). Spec covers the helper +
       both damage outcomes vs the non-Evasion baseline.
+- [x] **Lay on Hands (done 2026-05-24)** — Paladin L1. Pool = 5 × Paladin
+      level (`layOnHandsRemaining`), tracked as points used on
+      `class_resource_uses.lay_on_hands`, replenished on a long rest. New
+      `lay_on_hands` action/handler: a bonus-action (self-managed, in-combat
+      only — usable out of combat) touch heal of `min(missing HP, pool)` for a
+      chosen party member or self, syncing the ally's grid-entity HP. Surfaced
+      in generateChoices per injured party member (in + out of combat). The
+      5-point poison-cure use is a deferred follow-up.
 
 | Class     | Implemented (approx)                                                  | Major SRD gaps to fill                                                                                                                                          |
 | --------- | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |

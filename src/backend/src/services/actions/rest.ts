@@ -173,6 +173,7 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
     delete restoredUses.second_wind;
     delete restoredUses.colossus_slayer_used;
     delete restoredUses.sacred_weapon_active;
+    delete restoredUses.lay_on_hands; // Paladin pool replenishes on a long rest
     const newExhaustion = Math.max(0, (c.exhaustion_level ?? 0) - 1);
     const humanGrant = c.species === 'human';
     if (c.species === 'orc') delete restoredUses.relentless_endurance_used;
