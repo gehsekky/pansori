@@ -95,10 +95,8 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
       can't take the Attack action RAW) — a scouting/aid model, not the
       ally-turn AI.
 
-  Deferred (not required for SRD compliance — see design doc): merging the
-  PC/enemy attack handlers, routing enemy turns through `dispatchAction`,
-  and NPC spellcasting via the shared `castSpell` pipeline (additive
-  follow-up).
+  Deferred → now in progress as **EE (dispatcher-integrated enemy turns)**,
+  below.
 
 - [x] **Phase 5 (done 2026-05-24)** — dropped `ctx.char` / `ctx.safeIdx`
       from `ActionContext`; every handler now reads the acting character via
@@ -110,6 +108,34 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
       `ctx.char =` on every cast broke the concentration-save spells). With
       this, RE-1's actor seam is fully landed: PC and (future) monster
       handlers can share one implementation.
+
+#### EE: Dispatcher-integrated enemy turns (full path, multi-commit)
+
+> Started 2026-05-24. Routes the enemy turn through `dispatchAction` with
+> an `enemyActor`, so enemy attacks/spells run through registered handlers
+> (the seam that lets PC + monster share abilities). The PC/enemy attack
+> _resolvers_ stay distinct (PC equipment math vs monster stat-block math
+> are legitimately different) — what unifies is the dispatch _entry_.
+> Combat-critical (proposed-snapshot reaction windows + pause/resume), so
+> landed as small, full-suite-gated commits.
+
+- [x] **EE-1 (done 2026-05-24)** — behavior-preserving extraction of the
+      single-sub-attack core (`computeEnemyAttack` + Shield / Uncanny Dodge
+      / Hellish Rebuke reaction windows + Orc Relentless Endurance + massive
+      -damage death) out of `runEnemyMultiattackLoop` into
+      `resolveEnemySubAttack` (tagged `paused` / `killed-massive` / `done`
+      result). Makes the per-attack core reusable by the dispatched handler.
+      Suite 1046 green.
+- [ ] **EE-2** — `enemy_attack` action + `handleEnemyAttack` (wraps
+      `resolveEnemySubAttack`); route `runEnemyMultiattackLoop` through
+      `dispatchAction(ctx{actor: enemyActor(rm, ent)}, …)`. Makes the loop +
+      `runEnemyTurns` async (ripple to `takeAction` — already async — and
+      `handleResolveReaction`). Pause is signalled via `st.pending_reaction`
+      (no new `DispatchResult` variant needed).
+- [ ] **EE-3** — route enemy spellcasting (`attemptEnemySpellCast`) through
+      the shared `castSpell` pipeline / a dispatched cast action.
+- [ ] **EE-4** — fold the enemy approach + per-turn orchestration in, so a
+      whole enemy turn is a sequence of dispatched actions.
 
 #### RE-2: Class + subclass feature progression to L20
 
