@@ -1,7 +1,11 @@
 import type { CombatEntity, Enemy } from '../../../types.js';
 import { FRESH_TURN, abilityMod, profBonus, rollDice } from '../../rulesEngine.js';
 import { buildInitiativeOrder, pick, seedSummonedAllies } from '../../gameEngine.js';
-import { persistentRageTopUp, superiorInspirationTopUp } from '../../multiclass.js';
+import {
+  persistentRageTopUp,
+  superiorInspirationTopUp,
+  uncannyMetabolismRefresh,
+} from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import { updatePcActor } from '../actor.js';
 
@@ -41,8 +45,9 @@ export function runCombatStart(ctx: ActionContext, target: Enemy): void {
     // SRD Bard Superior Inspiration (L18): rolling Initiative tops Bardic
     // Inspiration back up to 2 if the bard has fewer (no-op otherwise).
     // SRD Barbarian Persistent Rage (L15): rolling Initiative regains all
-    // expended Rage uses (once per long rest).
-    const refreshed = persistentRageTopUp(superiorInspirationTopUp(c));
+    // expended Rage uses (once per long rest). SRD Monk Uncanny Metabolism
+    // (L2): rolling Initiative regains Focus Points + heals (once per long rest).
+    const refreshed = uncannyMetabolismRefresh(persistentRageTopUp(superiorInspirationTopUp(c)));
     const entry = order.find((e) => e.id === c.id);
     return entry ? { ...refreshed, initiative_roll: entry.roll } : refreshed;
   });
