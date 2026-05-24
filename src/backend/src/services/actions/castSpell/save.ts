@@ -1,9 +1,11 @@
 import type { Enemy, Spell } from '../../../types.js';
 import {
+  abilityMod,
   applyDamageMultiplier,
   cantripDamageDice,
   rollConditionSave,
   rollDice,
+  rollDiceEmpowered,
   upcastDamage,
 } from '../../rulesEngine.js';
 import {
@@ -96,7 +98,11 @@ export function runSaveSpell(
   if (spell.damage) {
     const saveDmgExpr =
       spell.level === 0 ? cantripDamageDice(spell, char.level) : upcastDamage(spell, slotLevel);
-    const fullDmg = rollDice(saveDmgExpr || spell.damage);
+    // SRD Metamagic Empowered Spell — reroll up to CHA-mod of the lowest dice.
+    const fullDmg =
+      ctx.metamagic === 'empowered'
+        ? rollDiceEmpowered(saveDmgExpr || spell.damage, Math.max(1, abilityMod(char.cha)))
+        : rollDice(saveDmgExpr || spell.damage);
     spellDmg = saveFailed ? fullDmg : spell.saveEffect === 'half' ? Math.floor(fullDmg / 2) : 0;
     composeNow(ctx, {
       kind: 'spell_save_damage',

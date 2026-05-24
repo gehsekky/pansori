@@ -1,5 +1,5 @@
 import type { Enemy, Spell } from '../../../types.js';
-import { cantripDamageDice, rollDice, upcastDamage } from '../../rulesEngine.js';
+import { abilityMod, cantripDamageDice, rollDice, rollDiceEmpowered, upcastDamage } from '../../rulesEngine.js';
 import type { ActionContext } from '../types.js';
 import { composeNow } from '../../narrative/compose.js';
 import { pickCastPrefix } from './utils.js';
@@ -22,7 +22,11 @@ export function runAutoHitSpell(
   const { char } = ctx.actor;
   const autoHitExpr =
     spell.level === 0 ? cantripDamageDice(spell, char.level) : upcastDamage(spell, slotLevel);
-  const spellDmg = rollDice(autoHitExpr || spell.damage || '0');
+  // SRD Metamagic Empowered Spell — reroll up to CHA-mod of the lowest dice.
+  const spellDmg =
+    ctx.metamagic === 'empowered'
+      ? rollDiceEmpowered(autoHitExpr || spell.damage || '0', Math.max(1, abilityMod(char.cha)))
+      : rollDice(autoHitExpr || spell.damage || '0');
   composeNow(ctx, {
     kind: 'spell_auto_hit',
     attackerId: char.id,

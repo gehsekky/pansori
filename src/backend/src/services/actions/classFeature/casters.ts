@@ -73,6 +73,10 @@ export function handleCasterFeature(ctx: ActionContext, fid: string): boolean {
       cost: 2,
       label: 'Heightened Spell — one target has Disadvantage on its save',
     },
+    metamagic_seeking: {
+      cost: 1,
+      label: 'Seeking Spell — reroll a missed spell attack',
+    },
   };
   if (SIMPLE_METAMAGIC[fid]) {
     if (!hasClass(char, 'sorcerer')) {

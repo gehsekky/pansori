@@ -50,6 +50,32 @@ export function rollDiceGwf(expr: string | number | null | undefined): number {
   return total;
 }
 
+/**
+ * SRD Sorcerer Metamagic — Empowered Spell. Rolls the damage expression and
+ * rerolls up to `maxRerolls` of the lowest dice, keeping the new values
+ * (player-favorable resolution of "reroll up to N dice, use the new rolls"
+ * — rerolling the lowest dice is always the optimal choice). `crit` doubles
+ * the dice count first (the flat bonus is added once, matching rollCritical).
+ */
+export function rollDiceEmpowered(
+  expr: string | number | null | undefined,
+  maxRerolls: number,
+  crit = false
+): number {
+  if (!expr) return 0;
+  const m = String(expr).match(/(\d+)d(\d+)(?:\+(\d+))?/);
+  if (!m) return rollDice(expr); // flat / unparseable — nothing to reroll
+  const count = parseInt(m[1], 10) * (crit ? 2 : 1);
+  const sides = parseInt(m[2], 10);
+  const flat = parseInt(m[3] ?? '0', 10);
+  const dice = Array.from({ length: count }, () => d(sides));
+  // Reroll the lowest `maxRerolls` dice (capped at the dice count).
+  const rerolls = Math.max(0, Math.min(maxRerolls, count));
+  const lowestFirst = dice.map((v, i) => ({ v, i })).sort((a, b) => a.v - b.v);
+  for (let k = 0; k < rerolls; k++) dice[lowestFirst[k].i] = d(sides);
+  return dice.reduce((s, v) => s + v, 0) + flat;
+}
+
 export function rollCriticalGwf(expr: string | null | undefined): number {
   if (!expr) return gwfDie(4) + gwfDie(4);
   const m = String(expr).match(/(\d+)d(\d+)(?:\+(\d+))?/);
