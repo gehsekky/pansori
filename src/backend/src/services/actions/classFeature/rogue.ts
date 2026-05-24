@@ -8,7 +8,12 @@ import {
 } from '../../gameEngine.js';
 import { consumeStrokeOfLuck, strokeOfLuckAvailable } from '../../strokeOfLuck.js';
 import { effectiveLightFor, passivePerceptionDcInLight, skillCheck } from '../../rulesEngine.js';
-import { getClassLevel, hasClass, hasReliableTalent } from '../../multiclass.js';
+import {
+  getClassLevel,
+  hasClass,
+  hasJackOfAllTrades,
+  hasReliableTalent,
+} from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import { updatePcActor } from '../actor.js';
 
@@ -143,7 +148,7 @@ export function handleRogueFeature(ctx: ActionContext, fid: string): boolean {
       pc.char.level,
       isHeavilyEncumbered(pc.char),
       false,
-      false,
+      hasJackOfAllTrades(pc.char),
       inspAdvHide || luckAdvHide,
       pc.char.species === 'halfling',
       hasReliableTalent(pc.char),
