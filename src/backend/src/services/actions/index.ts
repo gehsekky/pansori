@@ -48,6 +48,7 @@ import { handleGridMove } from './gridMove.js';
 import { handleHasteExtraAction } from './hasteExtraAction.js';
 import { handleInteractObject } from './interactObject.js';
 import { handleLandsAid } from './landsAid.js';
+import { handleLayOnHands } from './layOnHands.js';
 import { handleLoot } from './loot.js';
 import { handleMove } from './move.js';
 import { handleSneak } from './sneak.js';
@@ -75,6 +76,7 @@ const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   take_feat: handleTakeFeat as ActionHandler,
   select_subclass: handleSelectSubclass as ActionHandler,
   choose_fighting_style: handleChooseFightingStyle as ActionHandler,
+  lay_on_hands: handleLayOnHands as ActionHandler,
   set_active_character: handleSetActiveCharacter as ActionHandler,
   prepare_spells: handlePrepareSpells as ActionHandler,
   escape: handleEscape as ActionHandler,

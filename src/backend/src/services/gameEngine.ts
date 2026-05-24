@@ -67,6 +67,7 @@ import {
   getClassLevel,
   hasClass,
   hasEvasion,
+  layOnHandsRemaining,
   spellSlotsForChar,
 } from './multiclass.js';
 import { composeFragments, enemyAttackFragmentEvent } from './narrative/compose.js';
@@ -2552,6 +2553,27 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         choices.push({
           label: `Choose Fighting Style: ${FIGHTING_STYLE_LABELS[fs]}`,
           action: { type: 'choose_fighting_style', style: fs },
+        });
+      }
+    }
+  }
+
+  // ── Paladin Lay on Hands (L1) — bonus-action touch heal from the pool ──────
+  // Works in combat (bonus action) and out of combat. One choice per injured
+  // party member (including self). (RE-2.)
+  {
+    const lohPool = layOnHandsRemaining(char);
+    const lohReady = lohPool > 0 && (!state.combat_active || !char.turn_actions.bonus_action_used);
+    if (lohReady) {
+      for (const member of state.characters) {
+        if (member.dead || member.hp >= member.max_hp) continue;
+        if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+        const selfTag = member.id === char.id ? ' (self)' : '';
+        choices.push({
+          label: `Lay on Hands${selfTag} → ${member.name} (${lohPool} HP in pool)`,
+          action: { type: 'lay_on_hands', targetCharId: member.id },
+          kind: 'class_feature',
+          requiresBonusAction: state.combat_active || undefined,
         });
       }
     }

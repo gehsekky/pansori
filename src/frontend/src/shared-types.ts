@@ -348,6 +348,10 @@ export type StructuredAction =
   // SRD 5.2.1 Fighting Style feat pick, granted by class features (Fighter
   // L1/L7, Paladin/Ranger L2). Out-of-combat, no action cost. (RE-2.)
   | { type: 'choose_fighting_style'; style: string }
+  // SRD 5.2.1 Paladin Lay on Hands (L1): bonus-action touch heal drawing from
+  // a pool of 5 × Paladin level HP. `targetCharId` is the healed party member
+  // (may be the paladin). (RE-2.)
+  | { type: 'lay_on_hands'; targetCharId: string }
   | { type: 'prepare_spells'; spellIds: string[] }
   | { type: 'resolve_reaction'; accept: boolean }
   // RAW player-command for a summoned creature (Animate Dead, etc.). On the
