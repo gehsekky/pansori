@@ -6,7 +6,9 @@ import {
   rageDamageBonus,
   resolvePlayerAttack,
   rollCritical,
+  rollCriticalGwf,
   rollDice,
+  rollDiceGwf,
   sneakAttackDice,
   unarmedDamage,
 } from '../../rulesEngine.js';
@@ -24,6 +26,7 @@ import type { ActionContext } from '../types.js';
 import type { ToHitContext } from './toHit.js';
 import { composeNow } from '../../narrative/compose.js';
 import { fmt } from '../../narrativeFmt.js';
+import { hasFightingStyle } from '../../fightingStyle.js';
 import { posEqual } from '../../gridEngine.js';
 import { updatePcActor } from '../actor.js';
 
@@ -92,6 +95,15 @@ export function resolveOneAttack(
   const effectiveEnemyAc = target.ac + coverAcBonus - slowedAcPenalty;
   const assassinAutoCrit =
     pc.char.subclass === 'assassin' && (ctx.st.surprised ?? []).includes(targetId);
+  // SRD Fighting Style: Great Weapon Fighting — applies to a two-handed melee
+  // weapon (a heavy two-handed weapon, or a versatile weapon used two-handed).
+  const gwfApplies =
+    !!weaponItem &&
+    weaponItem.range !== 'ranged' &&
+    hasFightingStyle(pc.char, 'great_weapon') &&
+    (isVersatile || weaponItem.heavy === true);
+  const rollWeaponDmg = gwfApplies ? rollDiceGwf : rollDice;
+  const rollWeaponCrit = gwfApplies ? rollCriticalGwf : rollCritical;
   const atk = resolvePlayerAttack(
     { str: pc.char.str, dex: pc.char.dex, level: pc.char.level },
     weaponDamage,
@@ -104,7 +116,8 @@ export function resolveOneAttack(
     critThresh,
     totalAttackBonus,
     pc.char.species === 'halfling',
-    atkCtx.forceD20
+    atkCtx.forceD20,
+    gwfApplies
   );
   // Side-channel for callers: stash the attack result on ctx so the
   // outer attack/index.ts orchestrator can detect hit/miss without
@@ -131,7 +144,7 @@ export function resolveOneAttack(
     const newHit = atk.roll === 20 || atk.total >= effectiveEnemyAc;
     if (!atk.hit && newHit) {
       atk.hit = true;
-      atk.damage = Math.max(1, rollDice(weaponDamage ?? '1d4') + atk.atkMod);
+      atk.damage = Math.max(1, rollWeaponDmg(weaponDamage ?? '1d4') + atk.atkMod);
     }
     biNote = ` ✦ Bardic Inspiration: +${biRoll} (${pc.char.bardic_inspiration_die})`;
     updatePcActor(ctx, { bardic_inspiration_die: undefined });
@@ -145,7 +158,7 @@ export function resolveOneAttack(
     const newHit = atk.roll === 20 || atk.total >= effectiveEnemyAc;
     if (!atk.hit && newHit) {
       atk.hit = true;
-      atk.damage = Math.max(1, rollDice(weaponDamage ?? '1d4') + atk.atkMod);
+      atk.damage = Math.max(1, rollWeaponDmg(weaponDamage ?? '1d4') + atk.atkMod);
     }
     blessNote = ` ✦ Bless: +${blessRoll} (1d4)`;
   }
@@ -186,7 +199,7 @@ export function resolveOneAttack(
   const isCrit = atk.critical || (autoCritCheck && atk.hit);
   let baseHit = weaponDamage
     ? isCrit && !atk.critical
-      ? Math.max(1, rollCritical(weaponDamage) + atk.atkMod)
+      ? Math.max(1, rollWeaponCrit(weaponDamage) + atk.atkMod)
       : atk.damage
     : Math.max(1, unarmedDamage(pc.char.str));
 
@@ -203,8 +216,8 @@ export function resolveOneAttack(
     !pc.char.turn_actions.savage_attacker_used
   ) {
     const reroll = isCrit
-      ? Math.max(1, rollCritical(weaponDamage) + atk.atkMod)
-      : Math.max(1, rollDice(weaponDamage) + atk.atkMod);
+      ? Math.max(1, rollWeaponCrit(weaponDamage) + atk.atkMod)
+      : Math.max(1, rollWeaponDmg(weaponDamage) + atk.atkMod);
     if (reroll > baseHit) baseHit = reroll;
     updatePcActor(ctx, {
       turn_actions: { ...pc.char.turn_actions, savage_attacker_used: true },

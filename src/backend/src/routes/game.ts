@@ -46,6 +46,7 @@ import {
 import { broadcastParticipantChange, broadcastSessionState } from '../services/broadcast.js';
 import type { AuthedRequest } from '../auth/middleware.js';
 import { applyFeatTake } from '../services/feats.js';
+import { defenseAcBonus } from '../services/fightingStyle.js';
 import { generateSeed } from '../services/procgen.js';
 import { loadContexts } from '../services/contextLoader.js';
 import { pool } from '../db/pool.js';
@@ -575,15 +576,16 @@ gameRouter.post('/session/:id/equip', async (req: Request, res: Response) => {
       }
       const toggling = char.equipped_shield === iid;
       char.equipped_shield = toggling ? null : iid;
-      char.ac = computeTotalAc(
-        char.dex,
-        char.equipped_armor,
-        char.equipped_shield,
-        char.inventory,
-        ctx.lootTable,
-        char.mage_armor_active ?? false,
-        char.shield_of_faith_active ?? false
-      );
+      char.ac =
+        computeTotalAc(
+          char.dex,
+          char.equipped_armor,
+          char.equipped_shield,
+          char.inventory,
+          ctx.lootTable,
+          char.mage_armor_active ?? false,
+          char.shield_of_faith_active ?? false
+        ) + defenseAcBonus(char, ctx.lootTable);
     } else if (loot.slot === 'armor') {
       const toggling = char.equipped_armor === iid;
       const check = canDonArmor(combatActive, loot.armorCategory ?? 'light');
@@ -592,15 +594,16 @@ gameRouter.post('/session/:id/equip', async (req: Request, res: Response) => {
         return;
       }
       char.equipped_armor = toggling ? null : iid;
-      char.ac = computeTotalAc(
-        char.dex,
-        char.equipped_armor,
-        char.equipped_shield,
-        char.inventory,
-        ctx.lootTable,
-        char.mage_armor_active ?? false,
-        char.shield_of_faith_active ?? false
-      );
+      char.ac =
+        computeTotalAc(
+          char.dex,
+          char.equipped_armor,
+          char.equipped_shield,
+          char.inventory,
+          ctx.lootTable,
+          char.mage_armor_active ?? false,
+          char.shield_of_faith_active ?? false
+        ) + defenseAcBonus(char, ctx.lootTable);
     } else if (loot.damage) {
       const toggling = char.equipped_weapon === iid;
       const check = canEquipWeapon(combatActive, turnActions);

@@ -29,6 +29,37 @@ export function rollCritical(expr: string | null | undefined): number {
   return total;
 }
 
+// SRD Fighting Style: Great Weapon Fighting — "treat any 1 or 2 on a damage
+// die as a 3." `gwfDie` rolls one die and applies that floor; the two rollers
+// below mirror `rollDice` / `rollCritical` but use it for the weapon's damage
+// dice (the flat `+N` modifier is untouched). Used only for two-handed melee
+// weapon damage in resolveOneAttack.
+function gwfDie(sides: number): number {
+  const r = d(sides);
+  return r <= 2 ? 3 : r;
+}
+
+export function rollDiceGwf(expr: string | number | null | undefined): number {
+  if (!expr) return gwfDie(4);
+  const flat = parseInt(String(expr), 10);
+  if (!isNaN(flat) && !String(expr).includes('d')) return flat;
+  const m = String(expr).match(/(\d+)d(\d+)(?:\+(\d+))?/);
+  if (!m) return gwfDie(4);
+  let total = parseInt(m[3] ?? '0', 10);
+  for (let i = 0; i < parseInt(m[1], 10); i++) total += gwfDie(parseInt(m[2], 10));
+  return total;
+}
+
+export function rollCriticalGwf(expr: string | null | undefined): number {
+  if (!expr) return gwfDie(4) + gwfDie(4);
+  const m = String(expr).match(/(\d+)d(\d+)(?:\+(\d+))?/);
+  if (!m) return gwfDie(4) + gwfDie(4);
+  const count = parseInt(m[1], 10) * 2;
+  let total = parseInt(m[3] ?? '0', 10);
+  for (let i = 0; i < count; i++) total += gwfDie(parseInt(m[2], 10));
+  return total;
+}
+
 // ─── Ability scores ───────────────────────────────────────────────────────────
 
 export function abilityMod(score: number | undefined): number {
@@ -145,7 +176,10 @@ export function resolvePlayerAttack(
   // "you must use the new roll" — no advantage/disadvantage logic,
   // no Halfling Lucky retry on the reroll. The first-roll path is
   // unchanged.
-  forceRoll1?: number
+  forceRoll1?: number,
+  // SRD Fighting Style: Great Weapon Fighting — roll the weapon's damage
+  // dice treating 1s/2s as 3s. Caller sets this only for two-handed melee.
+  gwf = false
 ): AttackResult {
   const strMod = abilityMod(player.str);
   const dexMod = abilityMod(player.dex);
@@ -188,7 +222,10 @@ export function resolvePlayerAttack(
       critical: true,
       roll,
       total,
-      damage: Math.max(1, rollCritical(weaponDamage) + atkMod),
+      damage: Math.max(
+        1,
+        (gwf ? rollCriticalGwf(weaponDamage) : rollCritical(weaponDamage)) + atkMod
+      ),
       atkMod,
       atkStat,
       prof,
@@ -200,7 +237,7 @@ export function resolvePlayerAttack(
       critical: false,
       roll,
       total,
-      damage: Math.max(1, rollDice(weaponDamage) + atkMod),
+      damage: Math.max(1, (gwf ? rollDiceGwf(weaponDamage) : rollDice(weaponDamage)) + atkMod),
       atkMod,
       atkStat,
       prof,

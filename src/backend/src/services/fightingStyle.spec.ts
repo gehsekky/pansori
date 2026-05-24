@@ -4,9 +4,11 @@
 // are small additions to the attack pipelines, covered by the broader
 // attack suite staying green.
 
-import { describe, expect, it } from 'vitest';
-import { fightingStyleSlots, hasFightingStyle } from './fightingStyle.js';
+import { defenseAcBonus, fightingStyleSlots, hasFightingStyle } from './fightingStyle.js';
+import { describe, expect, it, vi } from 'vitest';
+import { rollCriticalGwf, rollDiceGwf } from './rulesEngine.js';
 import type { ActionContext } from './actions/types.js';
+import type { LootItem } from '../types.js';
 import { handleChooseFightingStyle } from './actions/meta.js';
 import { makeChar } from '../test-fixtures.js';
 import { pcActor } from './actions/actor.js';
@@ -99,5 +101,84 @@ describe('handleChooseFightingStyle', () => {
     expect(
       handleChooseFightingStyle(ctx, { type: 'choose_fighting_style', style: 'archery' })
     ).toMatchObject({ rejected: expect.stringContaining('PC') });
+  });
+});
+
+const lootTable = [
+  { id: 'chainmail', armorAcBase: 16 },
+  { id: 'shield', ac_bonus: 2 },
+] as unknown as LootItem[];
+
+describe('defenseAcBonus', () => {
+  const armored = (styles: string[]) =>
+    makeChar({
+      fighting_styles: styles,
+      equipped_armor: 'armor-1',
+      inventory: [{ instance_id: 'armor-1', id: 'chainmail', name: 'Chain Mail', quantity: 1 }],
+    });
+
+  it('+1 with Defense while wearing body armor', () => {
+    expect(defenseAcBonus(armored(['defense']), lootTable)).toBe(1);
+  });
+
+  it('0 without the Defense style', () => {
+    expect(defenseAcBonus(armored(['archery']), lootTable)).toBe(0);
+  });
+
+  it('0 when unarmored even with the style', () => {
+    expect(
+      defenseAcBonus(makeChar({ fighting_styles: ['defense'], equipped_armor: null }), lootTable)
+    ).toBe(0);
+  });
+
+  it('0 with only a shield (no body armor)', () => {
+    const c = makeChar({
+      fighting_styles: ['defense'],
+      equipped_armor: 'shield-1',
+      inventory: [{ instance_id: 'shield-1', id: 'shield', name: 'Shield', quantity: 1 }],
+    });
+    expect(defenseAcBonus(c, lootTable)).toBe(0);
+  });
+});
+
+describe('Great Weapon Fighting rollers (treat 1s/2s as 3)', () => {
+  it('rollDiceGwf floors each die at 3', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0); // every d(n) → 1 → bumped to 3
+    expect(rollDiceGwf('2d6')).toBe(6); // 3 + 3
+    expect(rollDiceGwf('1d12+4')).toBe(7); // 3 + flat 4
+    vi.restoreAllMocks();
+  });
+
+  it('rollCriticalGwf doubles the dice and floors each at 3', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0); // every die → 1 → 3
+    expect(rollCriticalGwf('2d6')).toBe(12); // 4 dice × 3
+    vi.restoreAllMocks();
+  });
+
+  it('does not touch dice that already roll above 2', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99); // d(6) → 6, untouched
+    expect(rollDiceGwf('1d6')).toBe(6);
+    vi.restoreAllMocks();
+  });
+});
+
+describe('handleChooseFightingStyle — Defense bumps AC immediately', () => {
+  it('+1 AC on picking Defense while armored', () => {
+    const char = makeChar({
+      character_class: 'Fighter',
+      level: 1,
+      ac: 16,
+      equipped_armor: 'armor-1',
+      inventory: [{ instance_id: 'armor-1', id: 'chainmail', name: 'Chain Mail', quantity: 1 }],
+    });
+    const ctx = {
+      actor: pcActor(char, 0),
+      st: { characters: [char] },
+      context: { lootTable },
+      narrative: '',
+    } as unknown as ActionContext;
+    handleChooseFightingStyle(ctx, { type: 'choose_fighting_style', style: 'defense' });
+    if (ctx.actor.kind !== 'pc') throw new Error('expected pc actor');
+    expect(ctx.actor.char.ac).toBe(17); // 16 + 1
   });
 });

@@ -8,6 +8,7 @@ import {
 import { canRestInRoom, pick } from '../gameEngine.js';
 import { getClassLevel, hasClass } from '../multiclass.js';
 import type { ActionHandler } from './types.js';
+import { defenseAcBonus } from '../fightingStyle.js';
 import { resetFeatLongRestResources } from '../feats.js';
 import { updatePcActor } from './actor.js';
 
@@ -216,15 +217,16 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
     };
     // Recompute AC after clearing the magical buffs so the stored
     // `ac` field reflects the post-rest state.
-    refreshed.ac = computeTotalAc(
-      refreshed.dex,
-      refreshed.equipped_armor,
-      refreshed.equipped_shield,
-      refreshed.inventory ?? [],
-      ctx.context.lootTable,
-      false,
-      false
-    );
+    refreshed.ac =
+      computeTotalAc(
+        refreshed.dex,
+        refreshed.equipped_armor,
+        refreshed.equipped_shield,
+        refreshed.inventory ?? [],
+        ctx.context.lootTable,
+        false,
+        false
+      ) + defenseAcBonus(refreshed, ctx.context.lootTable);
     return refreshed;
   });
   ctx.st = { ...ctx.st, characters: restedChars, long_rested: true };

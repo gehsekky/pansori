@@ -8,18 +8,22 @@
 // twice). The chosen ids live on `Character.fighting_styles`; the
 // passive effects are applied in the attack/AC pipelines.
 
-import type { Character } from '../types.js';
+import type { Character, LootItem } from '../types.js';
 import { getClassLevel } from './multiclass.js';
 
 export const FIGHTING_STYLE_IDS = ['archery', 'defense', 'great_weapon', 'two_weapon'] as const;
 export type FightingStyleId = (typeof FIGHTING_STYLE_IDS)[number];
 
-// Styles the choice surface currently offers. The two single-pipeline-point
-// passives (Archery → ranged to-hit, Two-Weapon → off-hand damage) ship
-// first. Defense (+1 AC while armored) needs AC-recompute wiring and Great
-// Weapon Fighting needs a per-die roller + two-handed-weapon detection;
-// both land in the follow-up commit.
-export const OFFERED_FIGHTING_STYLE_IDS: FightingStyleId[] = ['archery', 'two_weapon'];
+// Styles the choice surface offers — all four SRD Fighting Styles are now
+// wired (Archery → ranged to-hit, Two-Weapon → off-hand damage, Defense →
+// +1 AC while armored, Great Weapon Fighting → reroll 1s/2s on two-handed
+// melee damage).
+export const OFFERED_FIGHTING_STYLE_IDS: FightingStyleId[] = [
+  'archery',
+  'defense',
+  'great_weapon',
+  'two_weapon',
+];
 
 export const FIGHTING_STYLE_LABELS: Record<string, string> = {
   archery: 'Archery (+2 to ranged attack rolls)',
@@ -45,4 +49,22 @@ export function fightingStyleSlots(char: Character): number {
 
 export function hasFightingStyle(char: Character, style: FightingStyleId): boolean {
   return (char.fighting_styles ?? []).includes(style);
+}
+
+/**
+ * Defense Fighting Style AC bonus: +1 while wearing body armor (Light /
+ * Medium / Heavy), else 0. Applied as a post-step at each
+ * `char.ac = computeTotalAc(...)` site (kept out of computeTotalAc to
+ * avoid threading a flag through its many call sites).
+ */
+export function defenseAcBonus(
+  char: Pick<Character, 'fighting_styles' | 'equipped_armor' | 'inventory'>,
+  lootTable: LootItem[]
+): number {
+  if (!(char.fighting_styles ?? []).includes('defense')) return 0;
+  if (!char.equipped_armor) return 0;
+  const armorItemId = char.inventory?.find((i) => i.instance_id === char.equipped_armor)?.id;
+  const armor = armorItemId ? lootTable.find((l) => l.id === armorItemId) : undefined;
+  // Body armor sets `armorAcBase`; shields / unarmored don't.
+  return armor?.armorAcBase !== undefined ? 1 : 0;
 }

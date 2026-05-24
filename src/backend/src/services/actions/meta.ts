@@ -2,6 +2,7 @@ import {
   FIGHTING_STYLE_IDS,
   FIGHTING_STYLE_LABELS,
   type FightingStyleId,
+  defenseAcBonus,
   fightingStyleSlots,
 } from '../fightingStyle.js';
 import { applyFeatTake, canTakeFeat, getFeat } from '../feats.js';
@@ -98,7 +99,16 @@ export const handleChooseFightingStyle: ActionHandler<{
     ctx.narrative = 'You have no Fighting Style choice available right now.';
     return;
   }
-  updatePcActor(ctx, { fighting_styles: [...current, style] });
+  const nextStyles = [...current, style];
+  const patch: { fighting_styles: string[]; ac?: number } = { fighting_styles: nextStyles };
+  // Defense (+1 AC while armored) feeds computeTotalAc post-steps; recompute
+  // the stored AC now so the change shows immediately on pick.
+  if (style === 'defense') {
+    patch.ac =
+      (char.ac ?? 10) +
+      defenseAcBonus({ ...char, fighting_styles: nextStyles }, ctx.context.lootTable);
+  }
+  updatePcActor(ctx, patch);
   ctx.narrative = `${char.name} adopts the ${FIGHTING_STYLE_LABELS[style] ?? style} Fighting Style.`;
 };
 
