@@ -11,6 +11,7 @@ import type { Enemy, InventoryItem, LootItem } from '../../../types.js';
 import { coverBonus, distanceFeet, isFlankingPosition } from '../../gridEngine.js';
 import { getClassLevel, hasClass } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
+import { hasFightingStyle } from '../../fightingStyle.js';
 import { isHeavilyEncumbered } from '../../gameEngine.js';
 import { updatePcActor } from '../actor.js';
 
@@ -312,11 +313,14 @@ export function computeToHitContext(
       : 20;
   const sacredWeaponBonus =
     (pc.char.class_resource_uses?.sacred_weapon_active ?? 0) > 0 ? abilityMod(pc.char.cha) : 0;
+  // SRD Fighting Style: Archery — +2 to attack rolls with Ranged weapons.
+  const archeryBonus =
+    weaponItem?.range === 'ranged' && hasFightingStyle(pc.char, 'archery') ? 2 : 0;
   // SRD Raise Dead / Resurrection — recently-revived PCs take a
   // −N penalty on D20 Tests (attacks, saves, checks) until it
   // decays off via long rest. Subtracted from the attack bonus.
   const revivePenalty = reviveD20Penalty(pc.char);
-  const totalAttackBonus = sacredWeaponBonus - revivePenalty;
+  const totalAttackBonus = sacredWeaponBonus - revivePenalty + archeryBonus;
 
   // Silence linter: target is part of the signature but referenced via the
   // returned ToHitContext (resolveOneAttack reads target via the closure).

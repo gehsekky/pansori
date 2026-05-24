@@ -54,6 +54,11 @@ import {
   posEqual,
 } from './gridEngine.js';
 import type { EnemyAttackHitFragment, EnemyAttackMissFragment } from './narrative/fragments.js';
+import {
+  FIGHTING_STYLE_LABELS,
+  OFFERED_FIGHTING_STYLE_IDS,
+  fightingStyleSlots,
+} from './fightingStyle.js';
 import { applyExpiryHooks, getConditionDuration } from './conditions/registry.js';
 import {
   applyMulticlassProfGrants,
@@ -2527,6 +2532,22 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         choices.push({
           label: `Choose subclass: ${sc.replace(/_/g, ' ')}`,
           action: { type: 'select_subclass', subclass: sc },
+        });
+      }
+    }
+  }
+
+  // ── Fighting Style picks (Fighter L1/L7, Paladin/Ranger L2) ────────────────
+  // RAW level-up choices, surfaced out of combat like subclass. (RE-2.)
+  if (!state.combat_active) {
+    const fsChosen = char.fighting_styles ?? [];
+    if (fsChosen.length < fightingStyleSlots(char)) {
+      for (const fs of OFFERED_FIGHTING_STYLE_IDS) {
+        if (fsChosen.includes(fs)) continue;
+        if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+        choices.push({
+          label: `Choose Fighting Style: ${FIGHTING_STYLE_LABELS[fs]}`,
+          action: { type: 'choose_fighting_style', style: fs },
         });
       }
     }

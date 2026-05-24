@@ -14,6 +14,7 @@ import {
 } from '../gameEngine.js';
 import type { ActionHandler } from './types.js';
 import type { GameState } from '../../types.js';
+import { hasFightingStyle } from '../fightingStyle.js';
 import { updatePcActor } from './actor.js';
 
 /**
@@ -119,8 +120,11 @@ export const handleTwoWeaponAttack: ActionHandler<{
   // type. Previously the raw `atk.damage` was written straight to
   // entity HP — a slashing-resistant enemy took full damage from an
   // off-hand shortsword.
+  // SRD Fighting Style: Two-Weapon Fighting — add the ability modifier to
+  // the off-hand attack's damage (off-hand normally adds none).
+  const twfBonus = hasFightingStyle(pc.char, 'two_weapon') ? atk.atkMod : 0;
   const { damage: effDmg, note: dmgNote } = applyDamageMultiplier(
-    atk.damage,
+    Math.max(0, atk.damage + twfBonus),
     offhandLoot.damageType,
     enemyInRoom
   );
