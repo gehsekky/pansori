@@ -2,6 +2,7 @@ import { disarmTrap, reviveD20Penalty, rollDice } from '../rulesEngine.js';
 import { getRoomTrap, partyDetectsTrap, trapSpent } from '../gameEngine.js';
 import type { ActionHandler } from './types.js';
 import { applyDamage } from '../damage.js';
+import { updatePcActor } from './actor.js';
 
 /**
  * `disarm_trap`: must have already detected the trap (passive
@@ -14,6 +15,8 @@ import { applyDamage } from '../damage.js';
  * is marked triggered. Always consumes the action either way.
  */
 export const handleDisarmTrap: ActionHandler<{ type: 'disarm_trap' }> = (ctx) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can disarm traps.' };
+  const { char } = ctx.actor;
   const trap = getRoomTrap(ctx.roomId, ctx.seed, ctx.context);
   if (!trap || trapSpent(ctx.st, ctx.roomId)) {
     return { rejected: 'There is no trap here to disarm.' };
@@ -22,18 +25,18 @@ export const handleDisarmTrap: ActionHandler<{ type: 'disarm_trap' }> = (ctx) =>
     return { rejected: 'You have not located the trap.' };
   }
   const hasToolProf =
-    ctx.char.tool_proficiencies?.some(
+    char.tool_proficiencies?.some(
       (t) => t.toLowerCase().includes('thieves') || t.toLowerCase().includes('hacking')
     ) ?? false;
-  const exhaustionDisadv1 = (ctx.char.exhaustion_level ?? 0) >= 1;
-  const revivePen = reviveD20Penalty(ctx.char);
-  const attempt1 = disarmTrap(ctx.char.dex, ctx.char.level, hasToolProf, revivePen);
+  const exhaustionDisadv1 = (char.exhaustion_level ?? 0) >= 1;
+  const revivePen = reviveD20Penalty(char);
+  const attempt1 = disarmTrap(char.dex, char.level, hasToolProf, revivePen);
   const attempt2 = exhaustionDisadv1
-    ? disarmTrap(ctx.char.dex, ctx.char.level, hasToolProf, revivePen)
+    ? disarmTrap(char.dex, char.level, hasToolProf, revivePen)
     : attempt1;
   const { roll, total } = attempt1.total <= attempt2.total ? attempt1 : attempt2;
   const profNote = hasToolProf ? ` (tool proficiency)` : '';
-  let next = ctx.char;
+  let next = char;
   let nextSt = ctx.st;
   let narrative: string;
   if (total >= trap.dc) {
@@ -61,7 +64,7 @@ export const handleDisarmTrap: ActionHandler<{ type: 'disarm_trap' }> = (ctx) =>
       };
     }
   }
-  ctx.char = next;
+  updatePcActor(ctx, next);
   ctx.st = nextSt;
   ctx.narrative = narrative;
 };

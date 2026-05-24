@@ -12,12 +12,14 @@ import { buildArrivalNarrative } from '../gameEngine.js';
  * the arrival narrative for the new room.
  */
 export const handleMove: ActionHandler<{ type: 'move'; roomId: string }> = (ctx, action) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can move between rooms.' };
+  const { char } = ctx.actor;
   const target = ctx.seed.rooms.find((r) => r.id === action.roomId);
   if (!target || !ctx.adjacent.find((r) => r.id === target.id)) {
     ctx.narrative = 'The path loops back on itself. You cannot get there from here.';
     return;
   }
-  const immobilizer = ctx.char.conditions.find((c) => ['grappled', 'restrained'].includes(c));
+  const immobilizer = char.conditions.find((c) => ['grappled', 'restrained'].includes(c));
   if (immobilizer) {
     ctx.narrative = `You are ${immobilizer} and cannot move.`;
     return;
@@ -43,7 +45,7 @@ export const handleMove: ActionHandler<{ type: 'move'; roomId: string }> = (ctx,
       target.id,
       {
         ...ctx.st,
-        characters: ctx.st.characters.map((c, i) => (i === ctx.safeIdx ? ctx.char : c)),
+        characters: ctx.st.characters.map((c, i) => (i === ctx.safeIdx ? char : c)),
       },
       ctx.seed,
       ctx.context

@@ -11,10 +11,12 @@ import { fmt } from '../narrativeFmt.js';
  * registered yet.
  */
 export const handleExamine: ActionHandler<{ type: 'examine' }> = (ctx) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can examine.' };
+  const { char } = ctx.actor;
   let narrative = buildArrivalNarrative(ctx.roomId, ctx.st, ctx.seed, ctx.context);
   if (ctx.st.combat_active) narrative += ` You are in combat!`;
-  if (ctx.char.conditions.length > 0) {
-    narrative += ` ${fmt.note(`[Conditions: ${ctx.char.conditions.join(', ')}]`)}`;
+  if (char.conditions.length > 0) {
+    narrative += ` ${fmt.note(`[Conditions: ${char.conditions.join(', ')}]`)}`;
   }
   ctx.narrative = narrative;
 };
