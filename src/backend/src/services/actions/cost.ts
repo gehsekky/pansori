@@ -65,6 +65,7 @@ export const ACTION_COSTS: Record<StructuredAction['type'], ActionCost> = {
   apply_asi: 'managed',
   take_feat: 'managed',
   select_subclass: 'managed',
+  choose_fighting_style: 'managed',
   set_active_character: 'managed',
   prepare_spells: 'managed',
   escape: 'managed',

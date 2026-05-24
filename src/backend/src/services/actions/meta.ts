@@ -1,3 +1,9 @@
+import {
+  FIGHTING_STYLE_IDS,
+  FIGHTING_STYLE_LABELS,
+  type FightingStyleId,
+  fightingStyleSlots,
+} from '../fightingStyle.js';
 import { applyFeatTake, canTakeFeat, getFeat } from '../feats.js';
 import { applyLevelUpForClass, preparedSpellsCap } from '../gameEngine.js';
 import { canMulticlassInto, getClassLevel, hasClass } from '../multiclass.js';
@@ -65,6 +71,35 @@ export const handleSelectSubclass: ActionHandler<{ type: 'select_subclass'; subc
   }
   updatePcActor(ctx, next);
   ctx.narrative = narrative;
+};
+
+/**
+ * `choose_fighting_style`: pick a SRD Fighting Style feat granted by a
+ * class feature (Fighter L1/L7, Paladin/Ranger L2). Validates the style
+ * id, rejects duplicates, and enforces the per-character slot count
+ * (`fightingStyleSlots`). Out-of-combat, no action cost. (RE-2.)
+ */
+export const handleChooseFightingStyle: ActionHandler<{
+  type: 'choose_fighting_style';
+  style: string;
+}> = (ctx, action) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can choose a Fighting Style.' };
+  const { char } = ctx.actor;
+  const style = action.style as FightingStyleId;
+  if (!FIGHTING_STYLE_IDS.includes(style)) {
+    return { rejected: `Unknown Fighting Style: ${action.style}.` };
+  }
+  const current = char.fighting_styles ?? [];
+  if (current.includes(style)) {
+    ctx.narrative = `You already have the ${FIGHTING_STYLE_LABELS[style] ?? style} Fighting Style.`;
+    return;
+  }
+  if (current.length >= fightingStyleSlots(char)) {
+    ctx.narrative = 'You have no Fighting Style choice available right now.';
+    return;
+  }
+  updatePcActor(ctx, { fighting_styles: [...current, style] });
+  ctx.narrative = `${char.name} adopts the ${FIGHTING_STYLE_LABELS[style] ?? style} Fighting Style.`;
 };
 
 /**
