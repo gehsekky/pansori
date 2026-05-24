@@ -60,6 +60,13 @@ export function coverBonus(attacker: GridPos, target: GridPos, obstacles: GridPo
   const dx = attacker.x - target.x;
   const dy = attacker.y - target.y;
   if (dx === 0 && dy === 0) return 0;
+  // Adjacent source (Chebyshev distance 1, including diagonals): no square
+  // lies between it and the target, so RAW grants no cover. SRD 5.2.1: "A
+  // target benefits from cover only when an obstacle is between it and the
+  // source of the attack." Without this, a melee attacker in a scrum was
+  // charged cover for the walls/creatures BESIDE the target (the target's
+  // near-side cardinals), silently inflating AC by +2/+5 on adjacent strikes.
+  if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) return 0;
   const candidates: GridPos[] = [];
   if (dx > 0) candidates.push({ x: target.x + 1, y: target.y });
   if (dx < 0) candidates.push({ x: target.x - 1, y: target.y });
