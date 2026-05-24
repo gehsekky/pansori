@@ -335,11 +335,26 @@ Bonus(char, st)`: a creature within 10 ft of a conscious L6+ Paladin (the
       defaults back to full CHA-mod uses). Added an end-to-end spec proving a
       Bard L5 regains BI on a short rest and a Bard L4 does not. No source
       change needed.
+- [x] **Countercharm (done 2026-05-24)** — Bard L7: when a creature within 30 ft
+      fails a save against an effect applying Charmed or Frightened, the bard may
+      use a Reaction to make it reroll with Advantage. `canCountercharm` (Bard
+      L7+, reaction available, not incapacitated) + a Countercharm pass in
+      `conditionSavingThrow` (now takes `st`): on a still-failed charmed/
+      frightened save it finds a qualifying bard (self or ally within 30 ft via
+      `distanceFeet`, off-grid = in range), rerolls with Advantage, and on a
+      rescue returns `countercharmBardId`. `computeEnemyAttack` spends that
+      bard's reaction — on the proposed saver (self) or in the proposed state
+      (ally). Auto-resolve (player-favorable, like Indomitable/Stroke of Luck):
+      the reaction is spent only when the advantaged reroll succeeds. Spec: the
+      predicate + self / ally / control integration through the dispatched
+      `enemy_attack` handler. Deferred: an interactive reaction prompt so the
+      bard's player chooses whether to spend the reaction (today it auto-fires
+      on the first rescuable charmed/frightened save).
 
 | Class     | Implemented (approx)                                                                                                                                                                                   | Major SRD gaps to fill                                                                                                                            |
 | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Barbarian | Rage, Reckless (L1–2), Frenzy (L3), Extra Attack (L5)                                                                                                                                                  | Danger Sense, Fast Movement, Feral Instinct, Brutal Strike, Relentless Rage, Persistent Rage, Indomitable Might, capstone; exhaustion-on-rage-end |
-| Bard      | Bardic Inspiration (L1), Cutting Words (L3), Jack of All Trades (L2), Expertise (L2/9), Font of Inspiration (L5)                                                                                       | Countercharm, Magical Secrets, Superior Inspiration, capstone                                                                                     |
+| Bard      | Bardic Inspiration (L1), Cutting Words (L3), Jack of All Trades (L2), Expertise (L2/9), Font of Inspiration (L5), Countercharm (L7)                                                                    | Magical Secrets, Superior Inspiration, capstone                                                                                                   |
 | Cleric    | Channel Divinity, Turn/Sear Undead, Preserve Life (Life)                                                                                                                                               | Blessed Strikes, Divine Intervention, improved Channel uses, higher Life-domain grades                                                            |
 | Druid     | Wild Shape (L2, CR L4/8), Land's Aid                                                                                                                                                                   | Wild Companion, full Circle of the Land grades, Wild Shape improvements, Beast Spells, Archdruid                                                  |
 | Fighter   | Second Wind, Action Surge (L2), Extra Attack (2/3/4), Indomitable (L9), Tactical Master (L9)                                                                                                           | Champion grades (Remarkable Athlete, Additional Style, Superior Critical, Survivor)                                                               |

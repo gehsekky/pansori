@@ -414,6 +414,26 @@ export function hasExpertise(char: Character, skill: string): boolean {
 }
 
 /**
+ * SRD 5.2.1 Countercharm (Bard L7): when a creature within 30 ft fails a save
+ * against an effect applying Charmed or Frightened, the bard may use a Reaction
+ * to make that creature reroll with Advantage. This predicate gates the bard
+ * (the reactor): Bard L7+, a reaction still available, and not Incapacitated
+ * (incl. the conditions that impose it). The 30-ft range + condition check live
+ * at the save site. (RE-2.)
+ */
+export function canCountercharm(char: Character): boolean {
+  if (char.turn_actions?.reaction_used) return false;
+  if (
+    (char.conditions ?? []).some((c) =>
+      ['incapacitated', 'paralyzed', 'stunned', 'unconscious', 'petrified'].includes(c)
+    )
+  ) {
+    return false;
+  }
+  return getClassLevel(char, 'bard') >= 7;
+}
+
+/**
  * SRD 5.2.1 Paladin Lay on Hands (L1): HP remaining in the healing pool —
  * 5 × Paladin level minus points already spent (`class_resource_uses
  * .lay_on_hands`, replenished on a long rest). 0 for non-paladins. (RE-2.)
