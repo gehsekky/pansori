@@ -107,6 +107,8 @@ export const ACTION_COSTS: Record<StructuredAction['type'], ActionCost> = {
   // loop owns the multiattack budget); the dispatcher's PC-only
   // checkBudget/deductCost no-op for enemy actors anyway.
   enemy_attack: 'managed',
+  // BE-internal enemy spell resolution — same rationale as enemy_attack.
+  enemy_cast: 'managed',
 };
 
 const BUDGET_ERRORS: Record<Exclude<ActionCost, 'managed'>, string> = {

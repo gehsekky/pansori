@@ -39,6 +39,7 @@ import { handleCommandSummon } from './commandSummon.js';
 import { handleDeathSave } from './deathSave.js';
 import { handleDisarmTrap } from './disarmTrap.js';
 import { handleEnemyAttack } from './enemyAttack.js';
+import { handleEnemyCast } from './enemyCast.js';
 import { handleEscape } from './escape.js';
 import { handleExamine } from './examineDefault.js';
 import { handleGridMove } from './gridMove.js';
@@ -110,6 +111,7 @@ const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   haste_extra_action: handleHasteExtraAction as ActionHandler,
   command_summon: handleCommandSummon as ActionHandler,
   enemy_attack: handleEnemyAttack as ActionHandler,
+  enemy_cast: handleEnemyCast as ActionHandler,
 };
 
 /**

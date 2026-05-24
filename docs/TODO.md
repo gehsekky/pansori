@@ -136,8 +136,15 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
       No new `DispatchResult` variant needed — pause flows through
       `st.pending_reaction` as before. Suite 1049 green (incl. all reaction /
       death-save specs unchanged).
-- [ ] **EE-3** — route enemy spellcasting (`attemptEnemySpellCast`) through
-      the shared `castSpell` pipeline / a dispatched cast action.
+- [x] **EE-3 (done 2026-05-24)** — enemy spell resolution now routes through a
+      dispatched `enemy_cast` action (`enemyActor`). Extracted `resolveEnemySpell`
+      (the roll-damage + saving-throw + commit core) out of
+      `attemptEnemySpellCast`; the orchestrator keeps the cast DECISION
+      (castChance / spell pick) + the Counterspell pause window, and `await`s
+      `dispatchAction(..., { type: 'enemy_cast', … })` for the no-counterspeller
+      branch. The enemy spell model (`{ damage, savingThrow, saveEffect }`)
+      stays distinct from the PC `castSpell` pipeline by design — same
+      shared-entry/distinct-resolver split as EE-2. Suite 1053 + handler spec.
 - [ ] **EE-4** — fold the enemy approach + per-turn orchestration in, so a
       whole enemy turn is a sequence of dispatched actions.
 

@@ -352,6 +352,10 @@ export type StructuredAction =
   // dispatcher as PC actions. `advIdx` / `multiattackIdx` feed the
   // reaction-window resume coords. (EE-2 — dispatcher-integrated enemy turns.)
   | { type: 'enemy_attack'; targetCharId: string; advIdx: number; multiattackIdx: number }
+  // BE-internal: an enemy damage spell resolving against a PC (after the
+  // Counterspell window, handled by the orchestrator). Dispatched with an
+  // `enemyActor`. (EE-3 — dispatcher-integrated enemy spellcasting.)
+  | { type: 'enemy_cast'; spellId: string; targetCharId: string }
   // Out-of-combat only: switch which PC is the "lead" / active character
   // for subsequent narrative attribution + skill checks. RAW has no
   // notion of initiative outside combat — the party operates as a unit
