@@ -49,7 +49,7 @@ export function handleRogueFeature(ctx: ActionContext, fid: string): boolean {
       ctx.narrative = 'Bonus action already used this turn.';
       return true;
     }
-    const caSpeed = effectiveSpeed(pc.char);
+    const caSpeed = effectiveSpeed(pc.char, ctx.context.lootTable);
     pc.char.turn_actions = { ...pc.char.turn_actions, bonus_action_used: true };
     ctx.st = {
       ...ctx.st,
@@ -109,7 +109,7 @@ export function handleRogueFeature(ctx: ActionContext, fid: string): boolean {
       ...ctx.st,
       movement_used: {
         ...(ctx.st.movement_used ?? {}),
-        [pc.char.id]: effectiveSpeed(pc.char),
+        [pc.char.id]: effectiveSpeed(pc.char, ctx.context.lootTable),
       },
     };
     ctx.narrative = `${pc.char.name} uses Steady Aim — advantage on the next attack this turn (Speed drops to 0).`;

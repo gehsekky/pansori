@@ -38,7 +38,7 @@ export const handleStandUp: ActionHandler<{ type: 'stand_up' }> = (ctx) => {
     ctx.narrative = 'You are not prone.';
     return;
   }
-  const speedFt = effectiveSpeed(char);
+  const speedFt = effectiveSpeed(char, ctx.context.lootTable);
   const standCost = Math.floor(speedFt / 2);
   const usedFt = (ctx.st.movement_used ?? {})[char.id] ?? 0;
   if (usedFt + standCost > speedFt) {
@@ -110,7 +110,7 @@ export const handleDash: ActionHandler<{ type: 'dash' }> = (ctx) => {
   if (!ctx.st.combat_active) return { rejected: 'Dash is a combat action.' };
   if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can take the Dash action.' };
   const { char } = ctx.actor;
-  const dashSpeed = effectiveSpeed(char);
+  const dashSpeed = effectiveSpeed(char, ctx.context.lootTable);
   ctx.st = {
     ...ctx.st,
     movement_used: {

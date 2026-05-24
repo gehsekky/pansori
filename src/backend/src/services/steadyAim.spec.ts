@@ -18,6 +18,7 @@ afterEach(() => vi.restoreAllMocks());
 function rogueCtx(char: ReturnType<typeof makeChar>, movedFt = 0): ActionContext {
   return {
     actor: pcActor(char, 0),
+    context: { lootTable: [] }, // effectiveSpeed (Fast Movement) reads the loot table
     st: {
       combat_active: true,
       characters: [char],

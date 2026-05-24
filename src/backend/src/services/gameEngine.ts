@@ -1398,10 +1398,14 @@ export function tickConditions(char: Character): Character {
 // > 5×STR, ≤ 10×STR: -10 ft (encumbered)
 // > 10×STR, ≤ 15×STR: -20 ft (heavily encumbered)
 // > 15×STR: speed 0 (overloaded)
-export function effectiveSpeed(char: Character): number {
+export function effectiveSpeed(char: Character, lootTable: LootItem[] = []): number {
   let base = char.speed ?? DEFAULT_SPEED_FEET;
   // 2024 PHB Goliath Large Form — +10 ft speed while the condition is active.
   if (char.conditions?.includes('large_form')) base += 10;
+  // SRD Barbarian Fast Movement (L5): +10 ft while not wearing Heavy armor.
+  // Applied to the base before the Haste/Slow multipliers — it's a permanent
+  // Speed increase. Needs the loot table to read the equipped armor's category.
+  if (getClassLevel(char, 'barbarian') >= 5 && !wearingHeavyArmor(char, lootTable)) base += 10;
   // 2024 PHB Haste — "the target's Speed is doubled." Multiplies the
   // post-Goliath / post-Mobile base; encumbrance still reduces after.
   // Applies to both walking and any future modes that derive from this
@@ -1421,6 +1425,16 @@ export function effectiveSpeed(char: Character): number {
   if (weight > str * 10) return Math.max(0, base - 20);
   if (weight > str * 5) return Math.max(0, base - 10);
   return base;
+}
+
+// True when `char` has Heavy armor equipped (looked up via the loot table).
+// Used by Barbarian Fast Movement. With an empty loot table the category can't
+// be resolved, so it returns false (the unarmored common case is unaffected).
+function wearingHeavyArmor(char: Character, lootTable: LootItem[]): boolean {
+  if (!char.equipped_armor) return false;
+  const armorId = (char.inventory ?? []).find((i) => i.instance_id === char.equipped_armor)?.id;
+  if (!armorId) return false;
+  return lootTable.find((l) => l.id === armorId)?.armorCategory === 'heavy';
 }
 
 function charCarriedWeight(char: Pick<Character, 'inventory'>): number {
@@ -2586,7 +2600,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   if (state.combat_active && !char.turn_actions.action_used) {
     // Dash
     choices.push({
-      label: `Dash — double movement this turn (${effectiveSpeed(char)} extra ft)`,
+      label: `Dash — double movement this turn (${effectiveSpeed(char, context.lootTable)} extra ft)`,
       action: { type: 'dash' },
       kind: 'dash',
     });
@@ -3706,7 +3720,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
 
   // Stand up from prone — SRD 5.2.1 p.187: costs half the creature's speed.
   if (state.combat_active && char.conditions.includes('prone')) {
-    const speedFt = effectiveSpeed(char);
+    const speedFt = effectiveSpeed(char, context.lootTable);
     const standCost = Math.floor(speedFt / 2);
     const usedFt = (state.movement_used ?? {})[char.id] ?? 0;
     if (speedFt - usedFt >= standCost) {
@@ -3783,7 +3797,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   if (state.entities && state.combat_active && !isImmobilized) {
     const charEntity = state.entities.find((e) => e.id === char.id);
     if (charEntity) {
-      const speedFt = effectiveSpeed(char);
+      const speedFt = effectiveSpeed(char, context.lootTable);
       const usedFt = (state.movement_used ?? {})[char.id] ?? 0;
       const remaining = speedFt - usedFt;
       const gw = context.gridWidth ?? 10;
@@ -6052,7 +6066,7 @@ export async function takeAction({
   if (st.combat_active && !usedInitiative && st.characters[safeIdx].turn_actions.action_used) {
     const activeChar = st.characters[safeIdx];
     const hasBonusChoices = generateChoices(st, seed, context).some((c) => c.requiresBonusAction);
-    const speedFt = effectiveSpeed(activeChar);
+    const speedFt = effectiveSpeed(activeChar, context.lootTable);
     const usedFt = st.movement_used?.[activeChar.id] ?? 0;
     const hasMovementLeft = !!st.entities && usedFt < speedFt;
     // SRD Haste — when the PC is Hasted and hasn't yet spent the

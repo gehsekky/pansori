@@ -78,7 +78,7 @@ export const handleGridMove: ActionHandler<{
   // the FE's isReachable). Static obstacles (columns, walls, debris) do.
   const currentRoomForMove = ctx.seed.rooms.find((r) => r.id === ctx.roomId);
   const roomObstacles = currentRoomForMove?.obstacles ?? [];
-  const walkSpeedFt = effectiveSpeed(char);
+  const walkSpeedFt = effectiveSpeed(char, ctx.context.lootTable);
   // 2024 PHB flying movement — when the PC has a fly speed ≥ their
   // walking speed, the path may pass over obstacle cells (boulders,
   // columns, debris) and difficult-terrain cells without the 2× cost.
