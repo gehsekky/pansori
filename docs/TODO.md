@@ -55,23 +55,24 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
   combatant via a `side: 'pc'|'enemy'|'ally'` tag + stat-block actors,
   reusing `computeEnemyAttack` rather than merging it with the PC
   `resolveOneAttack` (still fully SRD-compliant — monster stat blocks
-  pre-bake what PCs compute; see the design doc). Unblocks **summons +
-  companions** (Beastmaster companion, Spiritual Weapon, Find Familiar,
-  conjure) — narrative-only today. Decisions: RAW player-command control
-  model; Beastmaster companion is the first content slice. Slices P4.1
-  (side tagging), P4.2/3 (ally turn path with movement — `runAllyTurn`
-  selects the nearest enemy, approaches it taking OA, and attacks via the
-  simple `resolveEnemyAttack` + `applyDamageToEntity`), and P4.4 (summon
-  lifecycle — `addAllyCombatant` / `removeCombatant` + the
-  `breakConcentration` summon sweep) have all shipped. The engine can now
-  drive an ally end-to-end and spawn/despawn one; what remains is content:
-  - [ ] **P4.5** — content: Beastmaster companion (RAW player-command) →
-    Spiritual Weapon → Find Familiar / conjure. Each spawns an ally via
-    `addAllyCombatant` with a stat block; concentration summons set
-    `summon_concentration` so `breakConcentration` removes them.
-    **Integration note:** inserting/removing an initiative slot mid-combat
-    shifts indices — the spawn/despawn caller must re-derive any in-flight
-    `initiative_idx`.
+  pre-bake what PCs compute; see the design doc). Unblocks **SRD summons**
+  (Animate Dead, Spiritual Weapon, Find Familiar, conjure) — narrative-only
+  today. (Beast Master is PHB-only / out of scope — the SRD's iconic
+  Ranger subclass is Hunter; summon *spells* are the content.) Decisions:
+  RAW player-command control model; **Animate Dead** is the first content
+  slice. Slices P4.1 (side tagging), P4.2/3 (ally turn path with movement —
+  `runAllyTurn` selects the nearest enemy, approaches it taking OA, and
+  attacks via the simple `resolveEnemyAttack` + `applyDamageToEntity`),
+  P4.4 (summon lifecycle — `addAllyCombatant` / `removeCombatant` + the
+  `breakConcentration` summon sweep), and the P4.5 **combat-start bridge**
+  (`state.summoned_allies` + `seedSummonedAllies` materialize persistent
+  summons into entities + initiative after the owner) have all shipped.
+  Remaining is content:
+  - [ ] **P4.5 — SRD summon content.** Animate Dead first (cast out of
+    combat raises a Skeleton/Zombie ally onto `summoned_allies`;
+    bonus-action player-command is a follow-up — the AI-default attack
+    works now), then Spiritual Weapon, Find Familiar / conjure. Each adds
+    a summon via the shipped lifecycle/bridge.
 
   Deferred (not required for SRD compliance — see design doc): merging the
   PC/enemy attack handlers, routing enemy turns through `dispatchAction`,

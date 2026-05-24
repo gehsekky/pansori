@@ -1,6 +1,6 @@
 import type { CombatEntity, Enemy } from '../../../types.js';
 import { FRESH_TURN, abilityMod, profBonus, rollDice } from '../../rulesEngine.js';
-import { buildInitiativeOrder, pick } from '../../gameEngine.js';
+import { buildInitiativeOrder, pick, seedSummonedAllies } from '../../gameEngine.js';
 import type { ActionContext } from '../types.js';
 
 /**
@@ -89,6 +89,12 @@ export function runCombatStart(ctx: ActionContext, target: Enemy): void {
     ctx.st = { ...ctx.st, surprised: enemiesForInit.map((e) => e.id) };
   }
 
+  // RE-1 Phase 4 — materialize persistent ally summons (Animate Dead
+  // skeletons, etc.) into entities + initiative now that PC entities and
+  // the initiative order exist. initiative_idx is recomputed below from
+  // the resulting order so the inserted ally slots don't desync it.
+  ctx.st = seedSummonedAllies(ctx.st);
+
   const orderText = order
     .map((e) => {
       const name = e.is_enemy
@@ -107,10 +113,11 @@ export function runCombatStart(ctx: ActionContext, target: Enemy): void {
     : 'Combat begins! ';
   ctx.narrative = `${combatPrefix}Initiative: ${orderText}.${surpriseNote} `;
 
-  const myInitIdx = order.findIndex((e) => e.id === ctx.char.id);
+  const finalOrder = ctx.st.initiative_order;
+  const myInitIdx = finalOrder.findIndex((e) => e.id === ctx.char.id);
   ctx.st.initiative_idx = myInitIdx >= 0 ? myInitIdx : 0;
 
-  const myRoll = order.find((e) => e.id === ctx.char.id)?.roll ?? 0;
+  const myRoll = finalOrder.find((e) => e.id === ctx.char.id)?.roll ?? 0;
   // The triggering PC's attack runs immediately — they had the element of
   // surprise on the encounter even if their initiative wasn't highest.
   // After this opening swing, play returns to the initiative order at the

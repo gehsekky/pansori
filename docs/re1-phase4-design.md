@@ -1,9 +1,18 @@
 # RE-1 Phase 4 — Design Pass
 
-> Status: **proposal, for review.** Phases 1–3 of the actor migration
-> shipped (the `Actor` type seam + all isolated PC-state handlers read/
-> write via `ctx.actor`). This doc designs Phase 4 before any hot-path
-> combat code is touched. See [TODO.md](TODO.md) → RE-1.
+> Status: **largely implemented.** The actor migration (Phases 1–3) and
+> the Phase-4 engine (side tagging, the ally turn path, summon lifecycle,
+> and the combat-start bridge) have shipped; what remains is SRD summon
+> *content*. See [TODO.md](TODO.md) → RE-1.
+>
+> **Correction (2026-05-23):** this doc originally named the **Beast Master
+> companion** as the first content slice — that was an error. Beast Master
+> is **PHB-only and out of scope** (the SRD's iconic Ranger subclass is
+> Hunter; verified absent from the SRD text). The first content is instead
+> **Animate Dead** (an SRD L3 spell that raises a Skeleton/Zombie ally,
+> commanded via a bonus action — matching the chosen control model). Treat
+> the "Beastmaster companion" mentions below as superseded by "an SRD
+> summon spell."
 
 ## Goal (what success looks like)
 
@@ -121,8 +130,8 @@ because the rules themselves don't unify the two. Concretely:
 
 - Monster attacks / multiattack / on-hit riders, recharge abilities, and
   legendary + lair actions are all stat-block **data** — no PC code path.
-- Summons (Conjure Animals, Animate Dead, Beastmaster companion) are
-  creature stat blocks → `ally` entities.
+- SRD summons (Conjure Animals, Animate Dead's Skeleton/Zombie, Find
+  Familiar) are creature stat blocks → `ally` entities.
 - Spiritual Weapon's attack derives from the *caster's* spell attack bonus
   — snapshot that number into the summon's stat block at spawn time.
 - A PC who Wild Shapes or is Polymorphed stays a **PC actor with overridden
