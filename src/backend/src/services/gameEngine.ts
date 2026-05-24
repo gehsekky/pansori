@@ -57,6 +57,7 @@ import type { EnemyAttackHitFragment, EnemyAttackMissFragment } from './narrativ
 import {
   FIGHTING_STYLE_LABELS,
   OFFERED_FIGHTING_STYLE_IDS,
+  defenseAcBonus,
   fightingStyleSlots,
 } from './fightingStyle.js';
 import { applyExpiryHooks, getConditionDuration } from './conditions/registry.js';
@@ -502,16 +503,17 @@ export function breakConcentration(
           incapacitated: 1,
         },
       };
-      next.ac = computeTotalAc(
-        next.dex,
-        next.equipped_armor,
-        next.equipped_shield,
-        next.inventory ?? [],
-        context.lootTable,
-        next.mage_armor_active ?? false,
-        next.shield_of_faith_active ?? false,
-        false
-      );
+      next.ac =
+        computeTotalAc(
+          next.dex,
+          next.equipped_armor,
+          next.equipped_shield,
+          next.inventory ?? [],
+          context.lootTable,
+          next.mage_armor_active ?? false,
+          next.shield_of_faith_active ?? false,
+          false
+        ) + defenseAcBonus(next, context.lootTable);
       return next;
     };
     newSt = {
@@ -536,15 +538,16 @@ export function breakConcentration(
     const recomputeFor = (c: Character): Character => {
       if (!c.shield_of_faith_active) return c;
       const cleared: Character = { ...c, shield_of_faith_active: false };
-      cleared.ac = computeTotalAc(
-        cleared.dex,
-        cleared.equipped_armor,
-        cleared.equipped_shield,
-        cleared.inventory ?? [],
-        context.lootTable,
-        cleared.mage_armor_active ?? false,
-        false
-      );
+      cleared.ac =
+        computeTotalAc(
+          cleared.dex,
+          cleared.equipped_armor,
+          cleared.equipped_shield,
+          cleared.inventory ?? [],
+          context.lootTable,
+          cleared.mage_armor_active ?? false,
+          false
+        ) + defenseAcBonus(cleared, context.lootTable);
       return cleared;
     };
     newSt = { ...newSt, characters: newSt.characters.map(recomputeFor) };

@@ -3,6 +3,7 @@ import type { ActionContext } from '../types.js';
 import type { Spell } from '../../../types.js';
 import { composeNow } from '../../narrative/compose.js';
 import { computeTotalAc } from '../../rulesEngine.js';
+import { defenseAcBonus } from '../../fightingStyle.js';
 
 /**
  * Self / ally / self_or_ally buff branch. Handles spells where the
@@ -150,7 +151,7 @@ export function runBuffSpell(
         // pass true when this is the Haste cast OR when the target
         // already had the condition from a prior cast.
         spell.id === 'haste' || (c.conditions ?? []).includes('hasted')
-      );
+      ) + defenseAcBonus(c, ctx.context.lootTable);
     if (isCasterTarget) {
       if (spell.id === 'mage_armor') char.mage_armor_active = true;
       if (spell.id === 'shield_of_faith') char.shield_of_faith_active = true;

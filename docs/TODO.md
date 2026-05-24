@@ -174,17 +174,20 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
 > 2026-05-24: the table is already partly stale — e.g. Extra Attack is
 > fully done, 2/3/4 scaling via `extraAttackCount`.)
 
-- [ ] **Fighting Style** (Fighter L1/L7, Paladin/Ranger L2) — _in progress,
-      started 2026-05-24._ SRD has exactly 4 (Archery / Defense / Great Weapon /
-      Two-Weapon; Dueling/Protection are PHB-only). Framework shipped: the
-      `Character.fighting_styles` field, the `choose_fighting_style` action +
-      handler (`fightingStyleSlots` slot accounting, distinct-pick enforcement),
-      and the out-of-combat choice surface. **Archery** (+2 ranged to-hit, in
-      `toHit`) and **Two-Weapon** (off-hand ability mod, in `twoWeaponAttack`)
-      are wired + offered. Remaining (next commit): **Defense** (+1 AC while
-      armored — needs the `computeTotalAc` recompute sites) and **Great Weapon
-      Fighting** (reroll 1s/2s on two-handed melee damage — needs a per-die
-      roller + two-handed-weapon detection); then offer all 4.
+- [x] **Fighting Style (done 2026-05-24)** — all four SRD 5.2.1 styles
+      (Archery / Defense / Great Weapon / Two-Weapon; Dueling/Protection are
+      PHB-only and excluded). Granted by class features (Fighter L1 + L7,
+      Paladin/Ranger L2). `Character.fighting_styles` + `choose_fighting_style`
+      action/handler (`fightingStyleSlots` accounting, multiclass-summed,
+      distinct picks) + out-of-combat choice surface. Effects: Archery (+2
+      ranged to-hit, `toHit`), Two-Weapon (off-hand ability mod,
+      `twoWeaponAttack`), Defense (+1 AC while armored — `defenseAcBonus`
+      post-step at every `computeTotalAc` recompute site + immediate AC bump
+      on pick), Great Weapon Fighting (reroll 1s/2s on two-handed melee
+      damage — `rollDiceGwf`/`rollCriticalGwf` threaded through
+      `resolvePlayerAttack`; two-handed = heavy melee or versatile-used-2H).
+      Note: GWF on opportunity attacks deferred (the `gameEngine` PC-OA
+      `resolvePlayerAttack` call defaults `gwf=false`).
 
 | Class     | Implemented (approx)                                                  | Major SRD gaps to fill                                                                                                                                          |
 | --------- | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
