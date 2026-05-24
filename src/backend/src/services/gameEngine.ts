@@ -1889,6 +1889,14 @@ export function applyLevelUpForClass(char: Character, className: string, context
     out += ` ⚔️ Primal Champion! ${char.name}'s Strength and Constitution surge (+4 each, max 30).`;
   }
 
+  // SRD Monk Body and Mind (L20 capstone): Dexterity and Wisdom each increase
+  // by 4, to a maximum of 25. (Neither affects max HP, so no retroactive bump.)
+  if (cls === 'monk' && newClassLevel === 20) {
+    char.dex = Math.min(25, char.dex + 4);
+    char.wis = Math.min(25, char.wis + 4);
+    out += ` 🧘 Body and Mind! ${char.name}'s Dexterity and Wisdom surge (+4 each, max 25).`;
+  }
+
   // First multiclass level: narrow proficiency grants per 2024 PHB.
   if (isFirstLevelInClass && cls !== char.character_class.toLowerCase()) {
     const profNote = applyMulticlassProfGrants(char, cls);
