@@ -544,6 +544,16 @@ export function breakConcentration(
     newSt = { ...newSt, characters: newSt.characters.map(recomputeFor) };
     newChar = recomputeFor(newChar);
   }
+  // RE-1 Phase 4 — concentration summons (Conjure Animals etc.) vanish
+  // when the caster's concentration drops. `summon_concentration` flags
+  // the ones tied to concentration; persistent summons (Find Familiar)
+  // stay. Removing them also drops their initiative slot.
+  const summonIds = (newSt.entities ?? [])
+    .filter((e) => e.summoned_by === char.id && e.summon_concentration)
+    .map((e) => e.id);
+  for (const sid of summonIds) {
+    newSt = removeCombatant(newSt, sid);
+  }
   return { char: newChar, st: newSt };
 }
 
@@ -4537,6 +4547,47 @@ export function applyDamageToEntity(st: GameState, entityId: string, dmg: number
     entities: (st.entities ?? []).map((e) =>
       e.id === entityId ? { ...e, hp: Math.max(0, e.hp - dmg) } : e
     ),
+  };
+}
+
+/**
+ * Spawn an ally combatant (companion / summon) into combat: add the
+ * entity to `entities` and an `is_enemy: false` slot to
+ * `initiative_order` (placed right after `afterId` — e.g. the summoning
+ * caster — so it acts alongside its owner, else appended). The caller
+ * builds the `CombatEntity` (side: 'ally', stat block, `summoned_by`,
+ * `summon_concentration`). (RE-1 Phase 4.)
+ */
+export function addAllyCombatant(
+  st: GameState,
+  ally: CombatEntity,
+  opts?: { initiativeRoll?: number; afterId?: string }
+): GameState {
+  const entry = { id: ally.id, roll: opts?.initiativeRoll ?? 0, is_enemy: false };
+  const order = st.initiative_order ?? [];
+  const afterIdx = opts?.afterId ? order.findIndex((e) => e.id === opts.afterId) : -1;
+  const nextOrder =
+    afterIdx >= 0
+      ? [...order.slice(0, afterIdx + 1), entry, ...order.slice(afterIdx + 1)]
+      : [...order, entry];
+  return {
+    ...st,
+    entities: [...(st.entities ?? []), ally],
+    initiative_order: nextOrder,
+  };
+}
+
+/**
+ * Remove a combatant (typically an ally / summon) from combat: drop it
+ * from both `entities` and `initiative_order`. Note: removing an
+ * initiative slot shifts later indices, so callers mid-turn-loop must
+ * re-derive any in-flight `initiative_idx`. (RE-1 Phase 4.)
+ */
+export function removeCombatant(st: GameState, entityId: string): GameState {
+  return {
+    ...st,
+    entities: (st.entities ?? []).filter((e) => e.id !== entityId),
+    initiative_order: (st.initiative_order ?? []).filter((e) => e.id !== entityId),
   };
 }
 

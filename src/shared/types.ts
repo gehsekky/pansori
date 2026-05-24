@@ -158,6 +158,12 @@ export interface CombatEntity {
   ac?: number; // companion AC (PCs use character.ac, enemies use Enemy.ac)
   toHit?: number; // companion attack bonus
   damage?: string; // companion damage dice expression (e.g. '2d4+2')
+  // RE-1 Phase 4 — summon lifecycle. `summoned_by` is the summoning
+  // caster's character id; `summon_concentration` marks summons that
+  // vanish when that caster's concentration drops (e.g. Conjure Animals),
+  // as opposed to persistent ones (e.g. Find Familiar).
+  summoned_by?: string;
+  summon_concentration?: boolean;
   // SRD 5.2.1 — when grappled, records the id of the grappler so we can end the
   // condition if the grappler dies/is incapacitated, and so the contested escape
   // check has a target's mod to roll against.
