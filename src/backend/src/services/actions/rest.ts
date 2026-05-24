@@ -127,6 +127,24 @@ export const handleShortRest: ActionHandler<{ type: 'short_rest' }> = (ctx) => {
       arcaneRecoveryNarr = ` 📖 Arcane Recovery — restored ${recovered.length} slot(s) [${recovered.join(', ')}].`;
     }
   }
+  let sorcerousRestNarr = '';
+  if (
+    hasClass(next, 'sorcerer') &&
+    getClassLevel(next, 'sorcerer') >= 5 &&
+    !(srUses.sorcerous_restoration_used ?? 0)
+  ) {
+    // SRD: Sorcerous Restoration (Sorcerer L5) — on a short rest, regain
+    // expended Sorcery Points up to ⌊Sorcerer level / 2⌋; once per long rest.
+    // SP max = Sorcerer level (the long-rest refill value).
+    const sorcLvl = getClassLevel(next, 'sorcerer');
+    const cur = srUses.sorcery_points ?? 0;
+    const regain = Math.min(Math.floor(sorcLvl / 2), Math.max(0, sorcLvl - cur));
+    if (regain > 0) {
+      srUses.sorcery_points = cur + regain;
+      srUses.sorcerous_restoration_used = 1;
+      sorcerousRestNarr = ` ✨ Sorcerous Restoration — regained ${regain} sorcery point(s).`;
+    }
+  }
   if (hasClass(next, 'cleric') || hasClass(next, 'paladin')) {
     // Channel Divinity scales with cleric/paladin level (use the higher
     // of the two for multi-class).
@@ -154,7 +172,7 @@ export const handleShortRest: ActionHandler<{ type: 'short_rest' }> = (ctx) => {
         .replace(/{hpNow}/g, String(next.hp))
         .replace(/{hpMax}/g, String(next.max_hp)) + ' '
     : '';
-  ctx.narrative = `${shortRestFlavor}${next.name} takes a short rest, spending a d${next.hit_die ?? 8} — ${hdHealed} HP recovered (${hdRemain} hit ${hdRemain === 1 ? 'die' : 'dice'} remaining, now ${next.hp}/${next.max_hp}).${naturalRecoveryNarr}${arcaneRecoveryNarr}`;
+  ctx.narrative = `${shortRestFlavor}${next.name} takes a short rest, spending a d${next.hit_die ?? 8} — ${hdHealed} HP recovered (${hdRemain} hit ${hdRemain === 1 ? 'die' : 'dice'} remaining, now ${next.hp}/${next.max_hp}).${naturalRecoveryNarr}${arcaneRecoveryNarr}${sorcerousRestNarr}`;
 };
 
 /**
@@ -210,6 +228,7 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
     delete restoredUses.persistent_rage_used; // Barbarian Persistent Rage refresh available again after a long rest
     delete restoredUses.uncanny_metabolism_used; // Monk Uncanny Metabolism refresh available again after a long rest
     delete restoredUses.arcane_recovery_used; // Wizard Arcane Recovery available again after a long rest
+    delete restoredUses.sorcerous_restoration_used; // Sorcerer Sorcerous Restoration available again after a long rest
     const newExhaustion = Math.max(0, (c.exhaustion_level ?? 0) - 1);
     const humanGrant = c.species === 'human';
     if (c.species === 'orc') delete restoredUses.relentless_endurance_used;
