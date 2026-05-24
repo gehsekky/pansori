@@ -45,7 +45,7 @@ open http://localhost:5173
 ├── docker-compose.yml
 ├── docker-compose.prod.yml
 ├── .env
-├── docs/                       ← TODO, AUTHORING, DEPLOY, 2024-MIGRATION
+├── docs/                       ← TODO, AUTHORING, DEPLOY, srd-only-audit, srd-5.2.1.txt
 ├── tests/e2e/                  ← Playwright smoke tests
 └── src/
     ├── backend/                ← TypeScript; tsx in dev, tsc → dist in prod
@@ -57,7 +57,7 @@ open http://localhost:5173
     │       │   └── srd/        ← classes, spells, monsters, species, beast_forms
     │       ├── db/             ← pool.ts
     │       ├── routes/         ← game.ts (REST API) + schemas.ts (Zod)
-    │       └── services/       ← gameEngine, gridEngine, rulesEngine, procgen, campaignEngine, migrationRunner, llmProvider
+    │       └── services/       ← gameEngine, rulesEngine, gridEngine, damage, multiclass, conditions/, narrative/, procgen, campaignEngine, migrationRunner, llmProvider, and actions/ (one handler per player action, dispatched via actions/index.ts)
     └── frontend/               ← React + Vite (TypeScript)
         └── src/
             ├── App.tsx         ← 3-zone game UI shell
@@ -90,19 +90,20 @@ Procgen uses BFS from the start room to scale enemy CR by distance — early roo
 
 The SRD pack under `src/backend/src/contexts/srd/` (classes, spells, monsters, species, beast forms) is shared by every context.
 
-## Rules engine (2024 PHB / SRD 5.2.1)
+## Rules engine (SRD 5.2.1, strict)
 
-Pansori targets the 2024 PHB / SRD 5.2.1 ruleset. The engine is a mix of pure functions in `rulesEngine.ts` (attack/save/skill resolution) and `gameEngine.ts` (turn flow, action handlers, reaction windows), with grid math in `gridEngine.ts`.
+Pansori is a **strict SRD 5.2.1 build** — the 2024-compatible System Reference Document only, with **no PHB- or DMG-exclusive content** (subclasses, feats, species, or spells). See [docs/srd-only-audit.md](docs/srd-only-audit.md) for the scope and migration record, and [CLAUDE.md](CLAUDE.md) for the contribution rule. The engine is a mix of pure functions in `rulesEngine.ts` (attack/save/skill resolution), turn flow + reaction windows in `gameEngine.ts`, per-action handlers under `services/actions/` (each dispatched against an `ActionContext`), and grid math in `gridEngine.ts`.
 
 Highlights of what's implemented:
 
 - **Tactical grid combat** — BFS pathfinding, opportunity attacks (with reach-weapon override), cover (`coverBonus`), flanking (optional rule), difficult terrain, and Chebyshev distance / diagonal-cost-1 rule. Enemies must close to their `attackReachFt` before they can melee.
 - **Action economy** — action, bonus action, reaction, free interaction; reaction windows pause the engine and route prompts to the eligible PC.
-- **Reactive spells / interrupts** — Shield, Counterspell, Hellish Rebuke. `pending_reaction` discriminated union; enemy spell-casting (Frost Acolyte fire_bolt) exists to exercise Counterspell.
-- **Weapon Masteries (all 9)** — Vex, Topple, Push, Sap, Slow, Nick, Cleave, Graze, Flex; per-class slot table (`SRD_WEAPON_MASTERY_SLOTS`).
+- **Reactions / interrupts** — Shield, Counterspell, Hellish Rebuke, Uncanny Dodge, readied actions, opportunity attacks, and a post-roll Heroic Inspiration reroll window. `pending_reaction` discriminated union; enemy spell-casting (Frost Acolyte fire_bolt) exercises Counterspell.
+- **Weapon Masteries** — the 8 SRD masteries (Cleave, Graze, Nick, Push, Sap, Slow, Topple, Vex) plus pansori's `flex` variant; per-class slot table (`SRD_WEAPON_MASTERY_SLOTS`).
 - **Multi-target spell allocation** — Magic Missile per-dart, Eldritch Blast per-beam (L5+). Choice gen emits focus-fire + spread variants.
 - **Class features (12 classes, ≥1 subclass each)** — Cleric Divine Spark/Turn Undead/Sear Undead; Fighter Second Wind (multi-use), Tactical Master, Studied Attacks; Monk Discipline Points / Patient Defense / Stunning Strike cap; Rogue Cunning Strike; Druid Wild Shape (2024 Beast Forms); Barbarian Rage (2024 progression); plus full feature kits for Paladin, Ranger, Wizard, Sorcerer, Warlock, Bard.
-- **Species (2024)** — 10 species in `contexts/srd/species.ts` with full mechanical traits (Halfling Lucky, Dwarven Toughness, Dragonborn Breath Weapon, Tiefling Infernal Legacy, Orc Relentless Endurance / Adrenaline Rush, Goliath Powerful Build / Large Form, etc.).
+- **Multiclassing** — per-class levels (`class_levels`), the multiclass spell-slot table, ability prerequisites, proficiency grants on class entry, and feature gating by per-class level.
+- **Species** — the 9 SRD species in `contexts/srd/species.ts` (Dragonborn, Dwarf, Elf, Gnome, Goliath, Halfling, Human, Orc, Tiefling) with mechanical traits (Halfling Lucky, Dwarven Toughness, Dragonborn Breath Weapon, Tiefling Infernal Legacy, Orc Relentless Endurance / Adrenaline Rush, Goliath Powerful Build / Large Form, etc.).
 - **Inspiration** — Heroic Inspiration auto-granted on Nat 1; Heroic + Bardic Inspiration spendable on any d20 (attack / save / ability check).
 - **Hide DC tracking** — successful Hide stores the stealth total; enemies roll passive Perception first, then an active Search action that costs their turn.
 - **Conditions with source attribution** — `condition_sources` map tracks who Frightened or Charmed a PC, so movement restrictions and "can't attack your charmer" guards have a target.
@@ -111,8 +112,8 @@ Highlights of what's implemented:
 
 ## Tests
 
-- **Backend**: `npm run test:be` — Vitest, ~420 tests across `gameEngine.spec.ts`, `rulesEngine.spec.ts`, `gridEngine.spec.ts`, `procgen.spec.ts`, `narrativeFmt.spec.ts`, `narrativePlaceholders.spec.ts`, `migrationRunner.spec.ts`, and per-campaign specs.
-- **Frontend**: `npm run test:fe` — Vitest in jsdom (~67 tests across component + integration specs).
+- **Backend**: `npm run test:be` — Vitest, ~1000 tests across the engine specs (`gameEngine.*`, `rulesEngine`, `gridEngine`, `damage`, `multiclass`, `procgen`, `conditions/`, …) and per-action handler specs under `services/actions/`.
+- **Frontend**: `npm run test:fe` — Vitest in jsdom (~110 tests across component + integration specs).
 - **Shared types**: `npm run sync-types:check` — verifies `src/backend/src/shared-types.ts` and `src/frontend/src/shared-types.ts` are in sync with the source of truth at `src/shared/types.ts`. CI gate; `npm run sync-types` regenerates locally.
 - **E2E**: `npm run test:e2e` — Playwright (`tests/e2e/`) covers login → BEGIN ADVENTURE, session resume, and a sandbox combat loop. Gates production deploys in CI.
 
