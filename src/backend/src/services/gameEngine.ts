@@ -4526,6 +4526,71 @@ export function selectTarget(
 }
 
 /**
+ * Apply damage to a non-PC combatant entity (enemy or ally / summon),
+ * clamping HP to >= 0. PCs route damage through `applyDamage` +
+ * `commitCharacter` instead (temp HP, concentration, exhaustion clamp);
+ * non-PC combatants have only an entity HP pool. (RE-1 Phase 4.)
+ */
+export function applyDamageToEntity(st: GameState, entityId: string, dmg: number): GameState {
+  return {
+    ...st,
+    entities: (st.entities ?? []).map((e) =>
+      e.id === entityId ? { ...e, hp: Math.max(0, e.hp - dmg) } : e
+    ),
+  };
+}
+
+/**
+ * One AI-default turn for an ally combatant (companion / summon): pick
+ * the nearest enemy via `selectTarget` and make a single stat-block
+ * melee attack when within reach. Uses the simple `resolveEnemyAttack`
+ * roll + `applyDamageToEntity` — NOT the PC-target `computeEnemyAttack`,
+ * whose proposed-snapshot + PC reaction windows allies don't trigger.
+ * Movement (approach) and the RAW player-command override are follow-up
+ * slices; an uncommanded ally that's out of reach simply waits.
+ * Returns the new state + the action narrative (the caller owns the
+ * `[<name>'s turn]` header). (RE-1 Phase 4.)
+ */
+export function runAllyTurn(args: { allyEnt: CombatEntity; st: GameState; seed: Seed }): {
+  st: GameState;
+  narrative: string;
+} {
+  const { allyEnt, seed } = args;
+  let st = args.st;
+  const allyName = allyEnt.companionName ?? 'Ally';
+  const { targetEnt } = selectTarget(allyEnt.id, st);
+  if (!targetEnt) return { st, narrative: '' };
+  const foe = getEnemyById(seed, targetEnt.id);
+  const foeName = foe?.name ?? 'the enemy';
+  const foeAc = foe?.ac ?? targetEnt.ac ?? 10;
+  if (distanceFeet(allyEnt.pos, targetEnt.pos) > 5) {
+    return { st, narrative: ` ${allyName} can't reach ${foeName} this turn.` };
+  }
+  const res = resolveEnemyAttack(
+    { toHit: allyEnt.toHit ?? 0, damage: allyEnt.damage ?? '1d4' },
+    foeAc
+  );
+  if (!res.hit) {
+    return {
+      st,
+      narrative: ` ${allyName} attacks ${foeName} — ${fmt.roll(res.total)} vs ${fmt.ac(foeAc)}, miss.`,
+    };
+  }
+  st = applyDamageToEntity(st, targetEnt.id, res.damage);
+  let narrative = ` ${allyName} attacks ${foeName} — ${fmt.roll(res.total)} vs ${fmt.ac(foeAc)}, ${fmt.dmg(res.damage)} damage!`;
+  const slain = (st.entities?.find((e) => e.id === targetEnt.id)?.hp ?? 0) <= 0;
+  if (slain) {
+    st = { ...st, enemies_killed: [...st.enemies_killed, targetEnt.id] };
+    narrative += ` ${foeName} is slain!`;
+    const anyEnemyLeft = (st.entities ?? []).some(
+      (e) => entitySide(e) === 'enemy' && e.hp > 0 && !st.enemies_killed.includes(e.id)
+    );
+    if (!anyEnemyLeft) st = endCombatState(st);
+  }
+  return { st, narrative };
+}
+
+/**
  * Hide DC check for an enemy attacking an invisible PC. The 2024 PHB
  * Hide rules use a stable hide DC (rolled at Hide-action time and
  * stashed on the character); enemies check against it via passive
@@ -4628,10 +4693,30 @@ export function runEnemyTurns(args: {
     st.combat_active &&
     st.initiative_order[advIdx] &&
     (st.initiative_order[advIdx].is_enemy ||
+      st.entities?.some(
+        (e) => e.id === st.initiative_order[advIdx].id && entitySide(e) === 'ally' && e.hp > 0
+      ) ||
       (st.characters.find((c) => c.id === st.initiative_order[advIdx].id)?.dead ?? false))
   ) {
     const eEntry = st.initiative_order[advIdx];
     const rm = getEnemyById(args.seed, eEntry.id);
+    // RE-1 Phase 4 — ally (companion / summon) AI-default turn. Fires when
+    // this initiative entry is a living side:'ally' entity. Delegated to
+    // `runAllyTurn`; the loop only owns the turn header + advance.
+    const allyEnt = st.entities?.find((e) => e.id === eEntry.id);
+    if (allyEnt && entitySide(allyEnt) === 'ally' && allyEnt.hp > 0) {
+      const allyTurn = runAllyTurn({ allyEnt, st, seed: args.seed });
+      st = allyTurn.st;
+      if (allyTurn.narrative) {
+        narrative += `\n\n[${allyEnt.companionName ?? 'Ally'}'s turn]${allyTurn.narrative}`;
+      }
+      resumeMi = 0;
+      const prevAdvIdxAlly = advIdx;
+      advIdx = (advIdx + 1) % orderLen;
+      if (advIdx === 0 && prevAdvIdxAlly !== 0) roundWrapped = true;
+      if (advIdx === args.initialCurrentIdx) break;
+      continue;
+    }
     if (rm && !st.enemies_killed.includes(eEntry.id)) {
       // Surprised creatures skip their first turn entirely (2014 PHB
       // p.189 — Pansori's chosen surprise model; PC-side handling mirrors
