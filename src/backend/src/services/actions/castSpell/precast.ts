@@ -70,6 +70,14 @@ export function runPrecast(
     // No slot consumed for ritual casting
   }
 
+  // Long-cast spells (1 minute+, e.g. Animate Dead) can't be cast in
+  // combat. Gated before slot spend so an in-combat attempt doesn't
+  // waste a slot.
+  if (spell.outOfCombatOnly && ctx.st.combat_active) {
+    ctx.narrative = `${spell.name} has a long casting time — cast it out of combat.`;
+    return { done: true };
+  }
+
   // Spell preparation check (Cleric, Paladin, Druid). Multi-class
   // characters with ANY prep class are subject to prep enforcement.
   const prepClasses = ['cleric', 'paladin', 'druid'];

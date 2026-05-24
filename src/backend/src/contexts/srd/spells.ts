@@ -1429,6 +1429,22 @@ export const SRD_SPELLS: Record<string, Spell> = {
   // tracks the death-window via `died_at_round` (set when `dead`
   // flips to true) and gates the cast against the spell's
   // `revive.windowRounds` (1 minute = 10 combat rounds).
+  // SRD: Animate Dead — out of combat, raise a Skeleton from bones to
+  // fight at your side (commanded as a Bonus Action). Pansori models the
+  // 1-minute cast as out-of-combat-only; the Skeleton joins the next
+  // battle via the summon lifecycle (RE-1 Phase 4). MVP raises one
+  // Skeleton (SRD stat block); the Zombie variant + multi-raise are
+  // follow-ups.
+  animate_dead: {
+    id: 'animate_dead',
+    name: 'Animate Dead',
+    level: 3,
+    castTime: 'action',
+    desc: 'Out of combat, raise a Skeleton (SRD stat block: AC 14, 13 HP, +5 to hit, 1d6+3) from a pile of bones. It fights at your side and joins your next battle; command it as a Bonus Action.',
+    spellList: ['arcane', 'divine'],
+    outOfCombatOnly: true,
+    summon: { name: 'Skeleton', ac: 14, maxHp: 13, toHit: 5, damage: '1d6+3' },
+  },
   revivify: {
     id: 'revivify',
     name: 'Revivify',

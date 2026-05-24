@@ -14,6 +14,7 @@ import { runHealSpell } from './heal.js';
 import { runMultiTargetSpell } from './multiTarget.js';
 import { runReviveSpell } from './revive.js';
 import { runSaveSpell } from './save.js';
+import { runSummonSpell } from './summon.js';
 import { runUtilitySpell } from './utility.js';
 
 // `pickCastPrefix` is consumed by the spec + future call sites that
@@ -129,6 +130,13 @@ export const handleCastSpell: ActionHandler<{
       slotNote
     )
   ) {
+    return;
+  }
+
+  // ── Summon spells (Animate Dead) — out-of-combat, add a persistent
+  // ally to summoned_allies; seeded into combat by seedSummonedAllies.
+  // Runs before runUtilitySpell so it isn't swallowed as a no-op.
+  if (runSummonSpell(ctx, spell, slotNote)) {
     return;
   }
 

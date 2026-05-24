@@ -68,11 +68,17 @@ Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign s
   (`state.summoned_allies` + `seedSummonedAllies` materialize persistent
   summons into entities + initiative after the owner) have all shipped.
   Remaining is content:
-  - [ ] **P4.5 — SRD summon content.** Animate Dead first (cast out of
-    combat raises a Skeleton/Zombie ally onto `summoned_allies`;
-    bonus-action player-command is a follow-up — the AI-default attack
-    works now), then Spiritual Weapon, Find Familiar / conjure. Each adds
-    a summon via the shipped lifecycle/bridge.
+  - [ ] **P4.5 — SRD summon content (Animate Dead shipped 2026-05-23).**
+    Animate Dead raises a Skeleton ally: out-of-combat cast (gated in
+    precast) → `runSummonSpell` records it on `summoned_allies` →
+    `seedSummonedAllies` materializes it at combat start → it fights via
+    the AI-default `runAllyTurn`. Remaining:
+    - **Bonus-action player-command** — direct the summon's target/action
+      on the owner's turn (RAW); the AI-default attack works meanwhile.
+    - Zombie variant + multi-raise (MVP raises one Skeleton).
+    - Surface Animate Dead in-game: add it to Cleric/Wizard prepared/
+      known lists + the cast menu (it's table-only today).
+    - More summons: Spiritual Weapon, Find Familiar, conjure.
 
   Deferred (not required for SRD compliance — see design doc): merging the
   PC/enemy attack handlers, routing enemy turns through `dispatchAction`,
