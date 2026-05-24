@@ -580,7 +580,8 @@ export function checkConcentration(
   const dc = Math.min(30, Math.max(10, Math.floor(dmgTaken / 2)));
   // SRD revive penalty applies to the concentration CON save like
   // any other D20 Test.
-  const save = d(20) + abilityMod(char.con) - reviveD20Penalty(char);
+  const save =
+    d(20) + abilityMod(char.con) - reviveD20Penalty(char) + auraOfProtectionBonus(char, st);
   if (save >= dc)
     return {
       char,
@@ -671,6 +672,34 @@ export function hasSaveProficiency(
   );
 }
 
+/**
+ * SRD Aura of Protection (Paladin L6): a creature gains a bonus to saving
+ * throws equal to the Charisma modifier (minimum +1) of a Paladin L6+ within
+ * 10 ft — the Paladin always benefits from their own aura. Inactive while
+ * that Paladin is Incapacitated (or Unconscious). With multiple auras a
+ * creature benefits from only one (the best). Off the grid (out of combat)
+ * the party is assumed to travel together. Returns 0 when no aura covers
+ * `char`. (RE-2.)
+ */
+export function auraOfProtectionBonus(char: Character, st: GameState): number {
+  const charEnt = st.entities?.find((e) => e.id === char.id);
+  let best = 0;
+  for (const p of st.characters) {
+    if (p.dead) continue;
+    if ((p.conditions ?? []).some((c) => c === 'incapacitated' || c === 'unconscious')) continue;
+    if (getClassLevel(p, 'paladin') < 6) continue;
+    let inRange = p.id === char.id;
+    if (!inRange) {
+      const pEnt = st.entities?.find((e) => e.id === p.id);
+      inRange = charEnt && pEnt ? distanceFeet(charEnt.pos, pEnt.pos) <= 10 : true;
+    }
+    if (!inRange) continue;
+    const bonus = Math.max(1, abilityMod(p.cha));
+    if (bonus > best) best = bonus;
+  }
+  return best;
+}
+
 function conditionSavingThrow(
   effect: OnHitEffect,
   char: Pick<
@@ -692,7 +721,10 @@ function conditionSavingThrow(
     | 'feat_choices'
     | 'revive_d20_penalty'
   >,
-  context: Context
+  context: Context,
+  // SRD Aura of Protection bonus, folded in by lowering the effective DC
+  // (same mechanism as the Bardic Inspiration roll above). 0 when no aura.
+  auraBonus = 0
 ): {
   applied: boolean;
   inspirationConsumed: boolean;
@@ -714,7 +746,7 @@ function conditionSavingThrow(
   // roll it, then check if the d20 + mods + bi-roll meets the DC.
   const biDie = char.bardic_inspiration_die;
   const bardicRoll = biDie ? rollDice(`1${biDie}`) : 0;
-  const dcAdjusted = effect.dc - bardicRoll;
+  const dcAdjusted = effect.dc - bardicRoll - auraBonus;
   // 2024 PHB: heavy encumbrance imposes disadvantage on STR/DEX/CON saves
   // (and checks, and attacks). Apply here so onHit-effect saves account for it.
   const enc =
@@ -890,7 +922,12 @@ function computeEnemyAttack(
     let luckConsumed = false;
     let bardicConsumed = false;
     if (enemy.onHitEffect) {
-      const csResult = conditionSavingThrow(enemy.onHitEffect, updatedChar, context);
+      const csResult = conditionSavingThrow(
+        enemy.onHitEffect,
+        updatedChar,
+        context,
+        auraOfProtectionBonus(updatedChar, st)
+      );
       if (csResult.inspirationConsumed) {
         inspirationConsumed = true;
         narrative += ` ✦ Heroic Inspiration spent on the save!`;
@@ -4659,7 +4696,7 @@ export function resolveEnemySpell(args: {
   if (spell.savingThrow) {
     const saveScore = (target[spell.savingThrow] ?? 10) as number;
     const dc = enemy.spellSaveDC ?? 8 + Math.floor((enemy.toHit + 5) / 2);
-    const save = rollDice('1d20') + abilityMod(saveScore);
+    const save = rollDice('1d20') + abilityMod(saveScore) + auraOfProtectionBonus(target, args.st);
     const saved = save >= dc;
     // SRD Evasion (Rogue/Monk L7): on a DEX save-for-half, take no damage
     // on a success and half on a failure (vs the normal half / full).
