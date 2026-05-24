@@ -119,8 +119,16 @@ export const context: Context = {
   spellTable: { ...SRD_SPELLS },
   featTable: { ...SRD_FEATS },
   classSpells: {
-    Cleric: ['sacred_flame', 'cure_wounds', 'guiding_bolt', 'healing_word', 'hold_person', 'bless'],
-    Wizard: ['fire_bolt', 'magic_missile', 'thunderwave', 'misty_step', 'shield'],
+    Cleric: [
+      'sacred_flame',
+      'cure_wounds',
+      'guiding_bolt',
+      'healing_word',
+      'hold_person',
+      'bless',
+      'animate_dead',
+    ],
+    Wizard: ['fire_bolt', 'magic_missile', 'thunderwave', 'misty_step', 'shield', 'animate_dead'],
     // Druid spell list (the campaign's focus): shillelagh for melee buff,
     // entangle for grove fights, healing_word + cure_wounds for support.
     Druid: ['shillelagh', 'entangle', 'cure_wounds', 'healing_word', 'thunderwave'],
