@@ -9,19 +9,20 @@ import { updatePcActor } from './actor.js';
  * already queued.
  */
 export const handleSpendInspiration: ActionHandler<{ type: 'spend_inspiration' }> = (ctx) => {
-  if (!ctx.char.inspiration) {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs have Heroic Inspiration.' };
+  const { char } = ctx.actor;
+  if (!char.inspiration) {
     ctx.narrative = 'You have no Heroic Inspiration to spend.';
     return;
   }
-  if (ctx.char.turn_actions.inspiration_pending) {
+  if (char.turn_actions.inspiration_pending) {
     ctx.narrative = 'Inspiration already queued for your next d20 roll.';
     return;
   }
-  ctx.char = {
-    ...ctx.char,
-    turn_actions: { ...ctx.char.turn_actions, inspiration_pending: true },
-  };
-  ctx.narrative = `${ctx.char.name} steels themselves — Heroic Inspiration queued: advantage on your next d20 (attack, save, or check).`;
+  updatePcActor(ctx, {
+    turn_actions: { ...char.turn_actions, inspiration_pending: true },
+  });
+  ctx.narrative = `${char.name} steels themselves — Heroic Inspiration queued: advantage on your next d20 (attack, save, or check).`;
 };
 
 /**
@@ -31,26 +32,28 @@ export const handleSpendInspiration: ActionHandler<{ type: 'spend_inspiration' }
  * mid-turn stand-up after a partial move can't exceed the cap.
  */
 export const handleStandUp: ActionHandler<{ type: 'stand_up' }> = (ctx) => {
-  if (!ctx.char.conditions.includes('prone')) {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can take the Stand Up action.' };
+  const { char } = ctx.actor;
+  if (!char.conditions.includes('prone')) {
     ctx.narrative = 'You are not prone.';
     return;
   }
-  const speedFt = effectiveSpeed(ctx.char);
+  const speedFt = effectiveSpeed(char);
   const standCost = Math.floor(speedFt / 2);
-  const usedFt = (ctx.st.movement_used ?? {})[ctx.char.id] ?? 0;
+  const usedFt = (ctx.st.movement_used ?? {})[char.id] ?? 0;
   if (usedFt + standCost > speedFt) {
     ctx.narrative = `Not enough movement to stand up. (${speedFt - usedFt} ft remaining, ${standCost} ft needed)`;
     return;
   }
-  ctx.char = { ...ctx.char, conditions: ctx.char.conditions.filter((c) => c !== 'prone') };
+  updatePcActor(ctx, { conditions: char.conditions.filter((c) => c !== 'prone') });
   ctx.st = {
     ...ctx.st,
-    movement_used: { ...ctx.st.movement_used, [ctx.char.id]: usedFt + standCost },
+    movement_used: { ...ctx.st.movement_used, [char.id]: usedFt + standCost },
     entities: (ctx.st.entities ?? []).map((e) =>
-      e.id === ctx.char.id ? { ...e, conditions: e.conditions.filter((c) => c !== 'prone') } : e
+      e.id === char.id ? { ...e, conditions: e.conditions.filter((c) => c !== 'prone') } : e
     ),
   };
-  ctx.narrative = `${ctx.char.name} stands up. (${standCost} ft of movement used)`;
+  ctx.narrative = `${char.name} stands up. (${standCost} ft of movement used)`;
 };
 
 /**
@@ -89,12 +92,13 @@ export const handleDodge: ActionHandler<{ type: 'dodge' }> = (ctx) => {
  */
 export const handleDisengage: ActionHandler<{ type: 'disengage' }> = (ctx) => {
   if (!ctx.st.combat_active) return { rejected: 'You can only disengage in combat.' };
-  ctx.char = {
-    ...ctx.char,
-    turn_actions: { ...ctx.char.turn_actions, disengaged: true },
-  };
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can take the Disengage action.' };
+  const { char } = ctx.actor;
+  updatePcActor(ctx, {
+    turn_actions: { ...char.turn_actions, disengaged: true },
+  });
   ctx.usedInitiative = true;
-  ctx.narrative = `${ctx.char.name} takes the Disengage action — your next movement this turn won't trigger opportunity attacks.`;
+  ctx.narrative = `${char.name} takes the Disengage action — your next movement this turn won't trigger opportunity attacks.`;
 };
 
 /**
@@ -104,15 +108,17 @@ export const handleDisengage: ActionHandler<{ type: 'disengage' }> = (ctx) => {
  */
 export const handleDash: ActionHandler<{ type: 'dash' }> = (ctx) => {
   if (!ctx.st.combat_active) return { rejected: 'Dash is a combat action.' };
-  const dashSpeed = effectiveSpeed(ctx.char);
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can take the Dash action.' };
+  const { char } = ctx.actor;
+  const dashSpeed = effectiveSpeed(char);
   ctx.st = {
     ...ctx.st,
     movement_used: {
       ...(ctx.st.movement_used ?? {}),
-      [ctx.char.id]: Math.max(0, (ctx.st.movement_used?.[ctx.char.id] ?? 0) - dashSpeed),
+      [char.id]: Math.max(0, (ctx.st.movement_used?.[char.id] ?? 0) - dashSpeed),
     },
   };
-  ctx.narrative = `${ctx.char.name} Dashes — gaining an extra ${dashSpeed} ft of movement this turn.`;
+  ctx.narrative = `${char.name} Dashes — gaining an extra ${dashSpeed} ft of movement this turn.`;
 };
 
 /**
@@ -122,10 +128,12 @@ export const handleDash: ActionHandler<{ type: 'dash' }> = (ctx) => {
  */
 export const handleHelp: ActionHandler<{ type: 'help'; targetId: string }> = (ctx, action) => {
   if (!ctx.st.combat_active) return { rejected: 'Help is a combat action.' };
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can take the Help action.' };
+  const { char } = ctx.actor;
   const helpTarget = ctx.st.characters.find((c) => c.id === action.targetId && !c.dead);
   if (!helpTarget) return { rejected: 'Target not found.' };
   ctx.st = { ...ctx.st, help_target_id: action.targetId };
-  ctx.narrative = `${ctx.char.name} helps ${helpTarget.name} — they have advantage on their next attack roll this turn.`;
+  ctx.narrative = `${char.name} helps ${helpTarget.name} — they have advantage on their next attack roll this turn.`;
   ctx.usedInitiative = true;
 };
 
@@ -141,13 +149,14 @@ export const handleReady: ActionHandler<{
   action: import('../../types.js').StructuredAction;
 }> = (ctx, action) => {
   if (!ctx.st.combat_active) return { rejected: 'Ready is a combat action.' };
-  ctx.char = {
-    ...ctx.char,
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can take the Ready action.' };
+  const { char } = ctx.actor;
+  updatePcActor(ctx, {
     turn_actions: {
-      ...ctx.char.turn_actions,
+      ...char.turn_actions,
       readied_action: { trigger: action.trigger, action: action.action },
     },
-  };
-  ctx.narrative = `${ctx.char.name} readies an action: "${action.trigger}". Use 'Trigger readied action' when the trigger occurs.`;
+  });
+  ctx.narrative = `${char.name} readies an action: "${action.trigger}". Use 'Trigger readied action' when the trigger occurs.`;
   ctx.usedInitiative = true;
 };
