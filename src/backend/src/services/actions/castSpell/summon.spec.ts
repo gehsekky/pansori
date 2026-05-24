@@ -31,12 +31,14 @@ const animateDead = {
   },
 } as unknown as Spell;
 
-const ctxWith = () =>
-  ({
-    char: { id: 'pc-1', name: 'Necro' },
+const ctxWith = () => {
+  const char = { id: 'pc-1', name: 'Necro' };
+  return {
+    actor: { kind: 'pc', char, safeIdx: 0 },
     st: { summoned_allies: [] },
     narrative: '',
-  }) as unknown as ActionContext;
+  } as unknown as ActionContext;
+};
 
 describe('runSummonSpell', () => {
   it('records the summon on state.summoned_allies and reports it', () => {

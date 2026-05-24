@@ -1,4 +1,5 @@
 import type { ActionHandler } from './types.js';
+import { updatePcActor } from './actor.js';
 
 /**
  * SRD 5.2.1 Haste — "It gains an additional action on each of its
@@ -40,20 +41,21 @@ export const handleHasteExtraAction: ActionHandler<{
     | { type: 'sneak' }
     | { type: 'interact_object'; objectId: string };
 }> = (ctx, action) => {
-  if (!ctx.char.conditions.includes('hasted')) {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can do that.' };
+  const pc = ctx.actor;
+  if (!pc.char.conditions.includes('hasted')) {
     return { rejected: 'You are not Hasted.' };
   }
-  if (ctx.char.turn_actions.haste_extra_action_used) {
+  if (pc.char.turn_actions.haste_extra_action_used) {
     return { rejected: 'You have already used your Haste extra action this turn.' };
   }
-  ctx.char = {
-    ...ctx.char,
+  updatePcActor(ctx, {
     turn_actions: {
-      ...ctx.char.turn_actions,
+      ...pc.char.turn_actions,
       action_used: false,
       haste_extra_action_used: true,
     },
-  };
-  ctx.narrative = `${ctx.char.name} surges with Haste — extra action! `;
+  });
+  ctx.narrative = `${pc.char.name} surges with Haste — extra action! `;
   return { delegateTo: action.inner };
 };

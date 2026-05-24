@@ -29,7 +29,7 @@ import { updatePcActor } from './actor.js';
  */
 export const handleSneak: ActionHandler<{ type: 'sneak' }> = (ctx) => {
   if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can sneak.' };
-  const { char } = ctx.actor;
+  const { char, safeIdx } = ctx.actor;
   if (!ctx.enemyAlive || !ctx.enemy) {
     return { rejected: 'Nothing to sneak past. You move freely.' };
   }
@@ -108,7 +108,7 @@ export const handleSneak: ActionHandler<{ type: 'sneak' }> = (ctx) => {
           target.id,
           {
             ...ctx.st,
-            characters: ctx.st.characters.map((c, i) => (i === ctx.safeIdx ? ctx.char : c)),
+            characters: ctx.st.characters.map((c, i) => (i === safeIdx ? char : c)),
           },
           ctx.seed,
           ctx.context

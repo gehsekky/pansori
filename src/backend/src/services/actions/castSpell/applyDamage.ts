@@ -29,6 +29,8 @@ export function applySingleTargetDamage(
   spell: Spell,
   spellDmgIn: number
 ): void {
+  if (ctx.actor.kind !== 'pc') return;
+  const { char } = ctx.actor;
   const { damage: effSpellDmg, note: spellDmgNote } = applyDamageMultiplier(
     spellDmgIn,
     spell.damageType,
@@ -47,10 +49,10 @@ export function applySingleTargetDamage(
   };
   if (newEnemyHpSpell <= 0) {
     const xpGain = spellTarget.xp ?? 10;
-    const split = splitEncounterXp(ctx.st, ctx.char.id, xpGain);
+    const split = splitEncounterXp(ctx.st, char.id, xpGain);
     ctx.st = split.st;
     const xpShare = split.share;
-    ctx.char.xp = (ctx.char.xp || 0) + xpShare;
+    char.xp = (char.xp || 0) + xpShare;
     ctx.st = {
       ...ctx.st,
       entities: (ctx.st.entities ?? []).map((e) =>
@@ -58,7 +60,7 @@ export function applySingleTargetDamage(
       ),
     };
     ctx.st.enemies_killed = [...ctx.st.enemies_killed, spellTargetId];
-    ctx.narrative += grantDarkOnesBlessing(ctx.char);
+    ctx.narrative += grantDarkOnesBlessing(char);
     if (isRoomCleared(ctx.st, ctx.seed, ctx.roomId)) {
       ctx.st = endCombatState(ctx.st);
     }
@@ -67,7 +69,7 @@ export function applySingleTargetDamage(
       pick(ctx.context.narratives.killShot)
         .replace('{enemy}', spellTarget.name)
         .replace('{xp}', String(xpShare));
-    ctx.narrative += applyPartyLevelUps(ctx.st, ctx.char, ctx.context);
+    ctx.narrative += applyPartyLevelUps(ctx.st, char, ctx.context);
   } else {
     ctx.narrative += ` The ${spellTarget.name} has ${fmt.hp(newEnemyHpSpell)} HP remaining.`;
   }

@@ -59,14 +59,13 @@ describe('combatUtility handlers reject non-PC actors (Phase-4 seam)', () => {
   });
 });
 
-describe('combatUtility PC path keeps ctx.char and ctx.actor.char in lockstep', () => {
+describe('combatUtility PC path writes through ctx.actor.char', () => {
   it('disengage flags the active PC via updatePcActor', () => {
     const char = makeChar({ id: 'pc-1' });
     const ctx = ctxWith(pcActor(char, 0), char);
     handleDisengage(ctx, { type: 'disengage' });
-    expect(ctx.char.turn_actions.disengaged).toBe(true);
     if (ctx.actor.kind !== 'pc') throw new Error('expected pc actor');
-    expect(ctx.actor.char).toBe(ctx.char);
+    expect(ctx.actor.char.turn_actions.disengaged).toBe(true);
     expect(ctx.usedInitiative).toBe(true);
   });
 
@@ -74,8 +73,7 @@ describe('combatUtility PC path keeps ctx.char and ctx.actor.char in lockstep', 
     const char = makeChar({ id: 'pc-1', inspiration: true });
     const ctx = ctxWith(pcActor(char, 0), char);
     handleSpendInspiration(ctx, { type: 'spend_inspiration' });
-    expect(ctx.char.turn_actions.inspiration_pending).toBe(true);
     if (ctx.actor.kind !== 'pc') throw new Error('expected pc actor');
-    expect(ctx.actor.char).toBe(ctx.char);
+    expect(ctx.actor.char.turn_actions.inspiration_pending).toBe(true);
   });
 });

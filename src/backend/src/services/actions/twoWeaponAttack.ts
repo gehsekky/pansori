@@ -14,6 +14,7 @@ import {
 } from '../gameEngine.js';
 import type { ActionHandler } from './types.js';
 import type { GameState } from '../../types.js';
+import { updatePcActor } from './actor.js';
 
 /**
  * `two_weapon_attack`: PHB p.195 off-hand strike. No ability mod to
@@ -30,13 +31,15 @@ export const handleTwoWeaponAttack: ActionHandler<{
   type: 'two_weapon_attack';
   targetEnemyId?: string;
 }> = (ctx, action) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can do that.' };
+  const pc = ctx.actor;
   if (!ctx.st.combat_active) {
     ctx.narrative = 'No enemy to attack.';
     return;
   }
   // SRD 5.2.1 — off-hand must be a Light weapon.
-  const mainWpnInstanceId = ctx.char.equipped_weapon;
-  const offhandInvItem = ctx.char.inventory
+  const mainWpnInstanceId = pc.char.equipped_weapon;
+  const offhandInvItem = pc.char.inventory
     .filter((i) => i.instance_id !== mainWpnInstanceId)
     .find((i) => {
       const l = ctx.context.lootTable.find((ll) => ll.id === i.id);
@@ -51,15 +54,15 @@ export const handleTwoWeaponAttack: ActionHandler<{
 
   const nickFree =
     offhandLoot.mastery === 'nick' &&
-    (ctx.char.weapon_masteries ?? []).includes(offhandLoot.id) &&
-    ctx.char.turn_actions.action_used;
-  if (!nickFree && ctx.char.turn_actions.bonus_action_used) {
+    (pc.char.weapon_masteries ?? []).includes(offhandLoot.id) &&
+    pc.char.turn_actions.action_used;
+  if (!nickFree && pc.char.turn_actions.bonus_action_used) {
     ctx.narrative = 'Bonus action already used this turn.';
     return;
   }
 
   const offhandProficient = hasWeaponProficiency(
-    ctx.char.weapon_proficiencies ?? [],
+    pc.char.weapon_proficiencies ?? [],
     offhandLoot.weaponType
   );
   const targetId: string = action.targetEnemyId ?? ctx.enemy?.id ?? '';
@@ -69,20 +72,19 @@ export const handleTwoWeaponAttack: ActionHandler<{
     return;
   }
   const targetEntityId = enemyInRoom.id;
-  const condDisadv = ctx.char.conditions.some((c) => DISADV_CONDITIONS.has(c));
-  const armorLootItem = ctx.char.equipped_armor
+  const condDisadv = pc.char.conditions.some((c) => DISADV_CONDITIONS.has(c));
+  const armorLootItem = pc.char.equipped_armor
     ? ctx.context.lootTable.find(
-        (l) =>
-          l.id === ctx.char.inventory.find((i) => i.instance_id === ctx.char.equipped_armor)?.id
+        (l) => l.id === pc.char.inventory.find((i) => i.instance_id === pc.char.equipped_armor)?.id
       )
     : null;
   const armorProf = hasArmorProficiency(
-    ctx.char.armor_proficiencies ?? [],
+    pc.char.armor_proficiencies ?? [],
     armorLootItem?.armorCategory
   );
   const disadv = condDisadv || !armorProf;
   const atk = resolveOffHandAttack(
-    { str: ctx.char.str, dex: ctx.char.dex, level: ctx.char.level },
+    { str: pc.char.str, dex: pc.char.dex, level: pc.char.level },
     offhandLoot.damage,
     enemyInRoom.ac,
     offhandLoot.finesse ?? false,
@@ -92,7 +94,7 @@ export const handleTwoWeaponAttack: ActionHandler<{
     offhandLoot.range === 'ranged'
   );
 
-  let nextChar = ctx.char;
+  let nextChar = pc.char;
   if (!nickFree) {
     nextChar = {
       ...nextChar,
@@ -102,12 +104,12 @@ export const handleTwoWeaponAttack: ActionHandler<{
   ctx.usedInitiative = true;
 
   if (atk.fumble) {
-    ctx.char = nextChar;
+    updatePcActor(ctx, nextChar);
     ctx.narrative = `Off-hand fumble! The ${offhandLoot.name} slips from your grip. (d20: 1)`;
     return;
   }
   if (!atk.hit) {
-    ctx.char = nextChar;
+    updatePcActor(ctx, nextChar);
     ctx.narrative = `Off-hand attack with ${offhandLoot.name} misses. (${atk.roll}+${atk.atkMod}+${atk.prof}=${atk.total} vs AC ${enemyInRoom.ac})`;
     return;
   }
@@ -150,7 +152,7 @@ export const handleTwoWeaponAttack: ActionHandler<{
       nextSt = endCombatState(nextSt);
     }
   }
-  ctx.char = nextChar;
+  updatePcActor(ctx, nextChar);
   ctx.st = nextSt;
   ctx.narrative = narrative;
 };

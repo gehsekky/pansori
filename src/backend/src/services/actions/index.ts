@@ -153,7 +153,7 @@ export async function dispatchAction(
   // when the budget is exhausted so handlers don't repeat the check.
   // 'managed' handlers (variable cost, free actions, transformers) opt out.
   const cost = ACTION_COSTS[action.type] ?? 'managed';
-  const budgetErr = checkBudget(ctx.char, cost);
+  const budgetErr = ctx.actor.kind === 'pc' ? checkBudget(ctx.actor.char, cost) : null;
   if (budgetErr) {
     ctx.narrative = budgetErr;
     return { handled: true };
@@ -190,12 +190,12 @@ export async function dispatchAction(
     ctx.narrative = prefix + ctx.narrative;
     // Outer cost (e.g. 'reaction' for use_reaction) still deducts; the
     // inner action paid its own cost during the nested dispatch.
-    ctx.char = deductCost(ctx.char, cost);
+    if (ctx.actor.kind === 'pc') ctx.actor.char = deductCost(ctx.actor.char, cost);
     return { handled: true };
   }
 
   // Leaf handler returned void — deduct the declared cost (no-op for 'managed').
-  ctx.char = deductCost(ctx.char, cost);
+  if (ctx.actor.kind === 'pc') ctx.actor.char = deductCost(ctx.actor.char, cost);
   return { handled: true };
 }
 

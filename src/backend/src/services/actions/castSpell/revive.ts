@@ -26,13 +26,15 @@ export function runReviveSpell(
   spell: Spell,
   slotNote: string
 ): boolean {
+  if (ctx.actor.kind !== 'pc') return false;
+  const { char } = ctx.actor;
   if (!spell.revive) return false;
 
   const targetCharId = action.targetCharId;
-  // Revive needs an explicit dead PC target. The default `ctx.char`
+  // Revive needs an explicit dead PC target. The default `char`
   // is the caster — never revive yourself (you can't cast while
   // dead). Surface a clear error rather than silently succeeding.
-  if (!targetCharId || targetCharId === ctx.char.id) {
+  if (!targetCharId || targetCharId === char.id) {
     ctx.narrative =
       (ctx.narrative ?? '') +
       `${spell.name} needs a fallen ally as its target — name the body to be raised.`;
@@ -138,7 +140,7 @@ export function runReviveSpell(
     kind: 'spell_utility',
     prose:
       pickCastPrefix(spell, {
-        name: ctx.char.name,
+        name: char.name,
         spell: spell.name,
         slotNote,
         target: target.name,

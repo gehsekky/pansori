@@ -3,6 +3,7 @@ import { getItemData, pick } from '../../gameEngine.js';
 import type { ActionContext } from '../types.js';
 import { BEAST_FORMS } from '../../../contexts/srd/index.js';
 import { inRange } from '../../gridEngine.js';
+import { updatePcActor } from '../actor.js';
 
 /**
  * Pre-attack phase output. `done: true` means the handler should
@@ -51,6 +52,8 @@ export function runPreattack(
   ctx: ActionContext,
   action: { targetEnemyId?: string }
 ): PreattackResult {
+  if (ctx.actor.kind !== 'pc') return { done: true };
+  const pc = ctx.actor;
   if (!ctx.enemy) {
     ctx.narrative = pick(ctx.context.narratives.noEnemy);
     return { done: true };
@@ -67,13 +70,13 @@ export function runPreattack(
 
   // Grid range check — only applies when combat entities are tracked on the grid
   if (ctx.st.entities) {
-    const charEntity = ctx.st.entities.find((e) => e.id === ctx.char.id);
+    const charEntity = ctx.st.entities.find((e) => e.id === pc.char.id);
     const enemyEntity = ctx.st.entities.find((e) => e.id === targetId && e.isEnemy);
     if (charEntity && enemyEntity) {
-      const equippedWeaponItem = ctx.char.equipped_weapon
+      const equippedWeaponItem = pc.char.equipped_weapon
         ? getItemData(
-            ctx.char.inventory?.find(
-              (i) => i.instance_id === ctx.char.equipped_weapon
+            pc.char.inventory?.find(
+              (i) => i.instance_id === pc.char.equipped_weapon
             ) as InventoryItem,
             ctx.context
           )
@@ -87,9 +90,9 @@ export function runPreattack(
 
   // Charmed: cannot attack the charmer
   if (
-    ctx.char.conditions.includes('charmed') &&
-    ctx.char.charmer_id &&
-    ctx.char.charmer_id === targetId
+    pc.char.conditions.includes('charmed') &&
+    pc.char.charmer_id &&
+    pc.char.charmer_id === targetId
   ) {
     ctx.narrative = `You are charmed by the ${target.name} and cannot bring yourself to attack them.`;
     return { done: true };
@@ -97,17 +100,15 @@ export function runPreattack(
 
   // Incapacitation is handled upstream in generateChoices (pass action);
   // guard here as a safety net.
-  if (ctx.char.conditions.includes('paralyzed') || ctx.char.conditions.includes('stunned')) {
-    ctx.narrative = `You cannot act while ${ctx.char.conditions.find((c) => c === 'stunned' || c === 'paralyzed')}.`;
+  if (pc.char.conditions.includes('paralyzed') || pc.char.conditions.includes('stunned')) {
+    ctx.narrative = `You cannot act while ${pc.char.conditions.find((c) => c === 'stunned' || c === 'paralyzed')}.`;
     ctx.usedInitiative = true;
     return { done: true };
   }
 
-  const weaponItem = ctx.char.equipped_weapon
+  const weaponItem = pc.char.equipped_weapon
     ? getItemData(
-        ctx.char.inventory?.find(
-          (i) => i.instance_id === ctx.char.equipped_weapon
-        ) as InventoryItem,
+        pc.char.inventory?.find((i) => i.instance_id === pc.char.equipped_weapon) as InventoryItem,
         ctx.context
       )
     : null;
@@ -117,18 +118,18 @@ export function runPreattack(
   // (STR/DEX + prof) still applies — the form's RAW attack bonus is
   // similar in magnitude so the engine's calculated to-hit is a
   // reasonable proxy.
-  if (ctx.char.conditions.includes('wild_shaped') && ctx.char.wild_shape_form) {
-    const form = BEAST_FORMS[ctx.char.wild_shape_form];
+  if (pc.char.conditions.includes('wild_shaped') && pc.char.wild_shape_form) {
+    const form = BEAST_FORMS[pc.char.wild_shape_form];
     if (form) weaponDamage = form.attackDamage;
   }
   // Versatile: use two-handed damage when no shield is equipped. 2024
   // PHB Flex mastery (longsword, battleaxe, warhammer) lets a trained
   // wielder use the versatile die EVEN with a shield equipped.
   const hasFlexMastery =
-    weaponItem?.mastery === 'flex' && (ctx.char.weapon_masteries ?? []).includes(weaponItem.id);
+    weaponItem?.mastery === 'flex' && (pc.char.weapon_masteries ?? []).includes(weaponItem.id);
   const isVersatile = !!(
     weaponItem?.versatileDamage &&
-    (!ctx.char.equipped_shield || hasFlexMastery)
+    (!pc.char.equipped_shield || hasFlexMastery)
   );
   if (isVersatile) {
     weaponDamage = weaponItem!.versatileDamage!;
@@ -147,25 +148,23 @@ export function runPreattack(
     };
     const wepKey = Object.keys(ammoTypes).find((k) => weaponItem.id.includes(k)) ?? 'arrow';
     const ammoIds = ammoTypes[wepKey] ?? ['arrow', 'arrows'];
-    const ammoIdx = ctx.char.inventory.findIndex((i) => ammoIds.some((a) => i.id.includes(a)));
+    const ammoIdx = pc.char.inventory.findIndex((i) => ammoIds.some((a) => i.id.includes(a)));
     if (ammoIdx === -1) {
       ctx.narrative = `You have no ammunition for your ${weaponItem.name}.`;
       return { done: true };
     }
-    const ammoItem = ctx.char.inventory[ammoIdx];
+    const ammoItem = pc.char.inventory[ammoIdx];
     const ammoCount = (ammoItem.count as number | undefined) ?? 1;
     if (ammoCount <= 1) {
-      ctx.char = {
-        ...ctx.char,
-        inventory: ctx.char.inventory.filter((_, i) => i !== ammoIdx),
-      };
+      updatePcActor(ctx, {
+        inventory: pc.char.inventory.filter((_, i) => i !== ammoIdx),
+      });
     } else {
-      ctx.char = {
-        ...ctx.char,
-        inventory: ctx.char.inventory.map((item, i) =>
+      updatePcActor(ctx, {
+        inventory: pc.char.inventory.map((item, i) =>
           i === ammoIdx ? { ...item, count: ammoCount - 1 } : item
         ),
-      };
+      });
     }
   }
 

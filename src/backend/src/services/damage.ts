@@ -34,8 +34,8 @@ import { rollDice } from './rulesEngine.js';
  *     enemy damage.
  *
  * Caller writes the returned char + st into its working bindings:
- *   const result = applyDamage(ctx.char, ctx.st, dmg);
- *   ctx.char = result.char;
+ *   const result = applyDamage(pc.char, ctx.st, dmg);
+ *   updatePcActor(ctx, result.char);
  *   ctx.st = result.st;
  *   ctx.narrative += result.concentrationNote;
  *

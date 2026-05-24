@@ -47,15 +47,12 @@ describe('enemyActor', () => {
 });
 
 describe('updatePcActor', () => {
-  it('keeps ctx.char and ctx.actor.char in lockstep after a patch', () => {
+  it('rewrites ctx.actor.char with the patched character', () => {
     const char = makeChar({ id: 'pc-1', hp: 10 });
-    const ctx = { char, actor: pcActor(char, 0) };
+    const ctx = { actor: pcActor(char, 0) };
     updatePcActor(ctx, { hp: 7 });
-    expect(ctx.char.hp).toBe(7);
     if (ctx.actor.kind !== 'pc') throw new Error('expected pc actor');
     expect(ctx.actor.char.hp).toBe(7);
-    // Same reference — single Character object.
-    expect(ctx.actor.char).toBe(ctx.char);
   });
 
   it('is a no-op for enemy actors', () => {

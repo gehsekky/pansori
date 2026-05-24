@@ -7,6 +7,7 @@ import type { ActionHandler } from '../types.js';
 import { computeToHitContext } from './toHit.js';
 import { runCombatStart } from './combatStart.js';
 import { runPreattack } from './preattack.js';
+import { updatePcActor } from '../actor.js';
 
 /**
  * `attack`: the core melee/ranged combat resolution. Pansori's biggest
@@ -38,6 +39,8 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
   ctx,
   action
 ) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can attack.' };
+  const pc = ctx.actor;
   // ── Pre-attack: target resolution, range/charm/incapacitation gates,
   //    weapon resolution (Beast Form override, Versatile/Flex), and
   //    ranged-ammo consumption. The runPreattack function mutates ctx
@@ -77,7 +80,7 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
   // 2024 PHB Heroic Inspiration post-roll reaction window — snapshot
   // the pre-attack state so the reaction resolver can rewind on accept
   // (the resolver re-runs this attack with a forced d20).
-  const preAttackChar = ctx.char;
+  const preAttackChar = pc.char;
   const preAttackSt = ctx.st;
 
   // ── First attack ─────────────────────────────────────────────────────
@@ -100,8 +103,8 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
     !!lastResult &&
     !lastResult.hit &&
     !lastResult.fumble &&
-    !!ctx.char.inspiration &&
-    !ctx.char.turn_actions?.inspiration_pending;
+    !!pc.char.inspiration &&
+    !pc.char.turn_actions?.inspiration_pending;
 
   if (shouldPauseForInspiration && lastResult) {
     // Stash the proposed snapshot (post-miss) + pre-attack snapshot
@@ -112,12 +115,12 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
       pending_reaction: {
         kind: 'pc_d20',
         source: 'inspiration',
-        rollerCharId: ctx.char.id,
+        rollerCharId: pc.char.id,
         rollContext: 'attack',
         originalD20: lastResult.d20,
         originalTotal: lastResult.total,
         originalHit: lastResult.hit,
-        eligibleCharIds: [ctx.char.id],
+        eligibleCharIds: [pc.char.id],
         // BE-only narrowing of the attack-context blob — FE just
         // round-trips this and reads kind/source/d20 for the choice
         // label.
@@ -126,7 +129,7 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
           preAttackSt,
           atkCtx,
         },
-        pendingProposedChar: ctx.char,
+        pendingProposedChar: pc.char,
         pendingProposedSt: ctx.st,
         resumeFromInitiativeIdx: ctx.st.initiative_idx,
       },
@@ -150,8 +153,8 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
     // doesn't add together — a Fighter 5 / Ranger 5 gets 1 extra
     // (not 2). The Fighter L11/20 cap only applies when the PC
     // actually has 11+ fighter levels.
-    const isHasteExtra = ctx.char.turn_actions.haste_extra_action_used;
-    const extraCount = weaponItem?.loading || isHasteExtra ? 0 : extraAttackCountForChar(ctx.char);
+    const isHasteExtra = pc.char.turn_actions.haste_extra_action_used;
+    const extraCount = weaponItem?.loading || isHasteExtra ? 0 : extraAttackCountForChar(pc.char);
     for (let ei = 0; ei < extraCount; ei++) {
       if ((ctx.st.entities?.find((e) => e.id === targetId && e.isEnemy)?.hp ?? 0) <= 0) break;
       const killedExtra = resolveOneAttack(ctx, atkCtx, `Attack ${ei + 2} — `);
@@ -162,5 +165,5 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
   // Action consumed. Initiative advances unless a bonus-action choice is
   // available (checked after commitChar — see auto-advance block below
   // the switch).
-  ctx.char = { ...ctx.char, turn_actions: { ...ctx.char.turn_actions, action_used: true } };
+  updatePcActor(ctx, { turn_actions: { ...pc.char.turn_actions, action_used: true } });
 };

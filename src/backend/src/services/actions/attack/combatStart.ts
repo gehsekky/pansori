@@ -29,6 +29,8 @@ import { updatePcActor } from '../actor.js';
  */
 export function runCombatStart(ctx: ActionContext, target: Enemy): void {
   if (ctx.st.combat_active) return;
+  if (ctx.actor.kind !== 'pc') return;
+  const pc = ctx.actor;
 
   const enemiesForInit = ctx.livingEnemiesInRoom;
   const order = buildInitiativeOrder(ctx.st.characters, enemiesForInit);
@@ -41,7 +43,7 @@ export function runCombatStart(ctx: ActionContext, target: Enemy): void {
   ctx.st = { ...ctx.st, characters: updatedCharsForInit, initiative_order: order };
 
   // Refresh char from updated characters array
-  const freshChar = updatedCharsForInit.find((c) => c.id === ctx.char.id);
+  const freshChar = updatedCharsForInit.find((c) => c.id === pc.char.id);
   if (freshChar) updatePcActor(ctx, freshChar);
   updatePcActor(ctx, { turn_actions: { ...FRESH_TURN } });
 
@@ -115,16 +117,16 @@ export function runCombatStart(ctx: ActionContext, target: Enemy): void {
   ctx.narrative = `${combatPrefix}Initiative: ${orderText}.${surpriseNote} `;
 
   const finalOrder = ctx.st.initiative_order;
-  const myInitIdx = finalOrder.findIndex((e) => e.id === ctx.char.id);
+  const myInitIdx = finalOrder.findIndex((e) => e.id === pc.char.id);
   ctx.st.initiative_idx = myInitIdx >= 0 ? myInitIdx : 0;
 
-  const myRoll = finalOrder.find((e) => e.id === ctx.char.id)?.roll ?? 0;
+  const myRoll = finalOrder.find((e) => e.id === pc.char.id)?.roll ?? 0;
   // The triggering PC's attack runs immediately — they had the element of
   // surprise on the encounter even if their initiative wasn't highest.
   // After this opening swing, play returns to the initiative order at the
   // slot just past them (handled by the post-attack initiative advance).
   const isHighestInit = myInitIdx === 0;
   ctx.narrative += isHighestInit
-    ? `${ctx.char.name} acts first (initiative ${myRoll})! `
-    : `${ctx.char.name} strikes with the opening blow (initiative ${myRoll})! `;
+    ? `${pc.char.name} acts first (initiative ${myRoll})! `
+    : `${pc.char.name} strikes with the opening blow (initiative ${myRoll})! `;
 }

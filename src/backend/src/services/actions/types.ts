@@ -1,5 +1,4 @@
 import type {
-  Character,
   Context,
   Enemy,
   GameState,
@@ -25,7 +24,6 @@ export interface ActionContext {
   /** Pre-action world snapshot. Use `st` for the live working state. */
   readonly state: GameState;
   readonly worldName: string;
-  readonly safeIdx: number;
   readonly prevRoomId: string;
 
   // Derived once from initial state. Stale after a room change — handlers
@@ -43,19 +41,14 @@ export interface ActionContext {
   /** Reassigned only by the `travel` handler. */
   seed: Seed;
   st: GameState;
-  char: Character;
   /**
-   * Polymorphic actor reference (architecture audit #5 follow-up).
-   * Today every dispatched action is PC-initiated, so this is always
-   * `{kind: 'pc', char, safeIdx}` — a tagged mirror of `ctx.char` +
-   * `ctx.safeIdx`. The field exists ahead of the enemy-turn migration
-   * so handlers can begin reading actor data from one polymorphic
-   * source instead of assuming PC-shape via `ctx.char`. See
-   * `services/actions/actor.ts` for the migration roadmap.
-   *
-   * **For now:** handlers can continue to use `ctx.char`. New
-   * handlers should prefer `ctx.actor` to make eventual PC/enemy
-   * sharing trivial.
+   * Polymorphic actor reference — the sole source of truth for who is
+   * acting. For PC turns this is `{ kind: 'pc', char, safeIdx }`; read
+   * the character via `ctx.actor.char` after narrowing
+   * `ctx.actor.kind === 'pc'` (or bind `const { char } = ctx.actor`),
+   * and mutate it through `updatePcActor(ctx, patch)`. The legacy
+   * `ctx.char` / `ctx.safeIdx` mirror fields were removed in RE-1
+   * Phase 5. See `services/actions/actor.ts`.
    */
   actor: Actor;
   narrative: string;
@@ -93,7 +86,7 @@ export interface ActionContext {
   };
 
   /**
-   * Write `char` back into `st.characters[safeIdx]` and sync HP /
+   * Write the PC actor's `char` back into `st.characters` and sync HP /
    * conditions into the grid entity when one exists. Mutates `this.st`.
    */
   commitChar(): void;
