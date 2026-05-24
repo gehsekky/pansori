@@ -3546,6 +3546,12 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         action: { type: 'use_class_feature', featureId: 'metamagic_seeking' },
         kind: 'class_feature',
       });
+    if (spLeft >= 1)
+      choices.push({
+        label: `Metamagic: Careful Spell — allies in the area auto-succeed their save (1 SP, ${spLeft} left)`,
+        action: { type: 'use_class_feature', featureId: 'metamagic_careful' },
+        kind: 'class_feature',
+      });
   }
 
   // ── Warlock: Invocations ─────────────────────────────────────────────────────

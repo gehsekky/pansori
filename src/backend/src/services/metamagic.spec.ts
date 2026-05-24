@@ -160,3 +160,39 @@ describe('Seeking Spell — reroll a missed spell attack', () => {
     expect(r.newState.entities?.find((e) => e.id === ENEMY)!.hp).toBe(60); // untouched
   });
 });
+
+// Fireball (20-ft sphere, DEX save, half-on-save) with an ally PC standing in
+// the blast next to the target enemy.
+function carefulState(): GameState {
+  const sorc = makeChar({ id: 'pc-1', character_class: 'Sorcerer', level: 5, cha: 16, spell_slots_max: { 3: 2 }, spell_slots_used: {}, spells_known: ['fireball'] });
+  const ally = makeChar({ id: 'pc-2', character_class: 'Fighter', level: 5, hp: 40, max_hp: 40, dex: 10 });
+  return {
+    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    characters: [sorc, ally],
+    active_character_id: 'pc-1',
+    initiative_order: [{ id: 'pc-1', roll: 18, is_enemy: false }, { id: 'pc-2', roll: 12, is_enemy: false }, { id: ENEMY, roll: 5, is_enemy: true }],
+    initiative_idx: 0,
+    entities: [
+      { id: 'pc-1', isEnemy: false, pos: { x: 1, y: 1 }, hp: 25, maxHp: 25, conditions: [], condition_durations: {} },
+      { id: 'pc-2', isEnemy: false, pos: { x: 10, y: 11 }, hp: 40, maxHp: 40, conditions: [], condition_durations: {} }, // in the blast
+      { id: ENEMY, isEnemy: true, pos: { x: 10, y: 10 }, hp: 80, maxHp: 80, conditions: [], condition_durations: {} },
+    ],
+  } as unknown as GameState;
+}
+
+describe('Careful Spell — allies in the area auto-succeed and take no damage', () => {
+  it('an ally in the Fireball blast takes no damage with Careful', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const state = carefulState();
+    state.metamagic_active = 'careful';
+    const r = await takeAction({ action: { type: 'cast_spell', spellId: 'fireball', slotLevel: 3, targetEnemyId: ENEMY }, history: [], state, seed: seed(80), context: ctx });
+    expect(r.newState.characters.find((c) => c.id === 'pc-2')!.hp).toBe(40); // untouched
+    expect(r.narrative).toMatch(/Careful Spell/);
+  });
+
+  it('control: the ally takes (at least half) damage without Careful', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const r = await takeAction({ action: { type: 'cast_spell', spellId: 'fireball', slotLevel: 3, targetEnemyId: ENEMY }, history: [], state: carefulState(), seed: seed(80), context: ctx });
+    expect(r.newState.characters.find((c) => c.id === 'pc-2')!.hp).toBeLessThan(40); // caught in the blast
+  });
+});
