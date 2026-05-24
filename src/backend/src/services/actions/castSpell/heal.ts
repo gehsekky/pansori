@@ -1,8 +1,9 @@
 import { addDice, multiplyDice, rollDice } from '../../rulesEngine.js';
+import { hasClass, hasWordsOfCreation } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import type { Spell } from '../../../types.js';
 import { composeNow } from '../../narrative/compose.js';
-import { hasClass } from '../../multiclass.js';
+import { distanceFeet } from '../../gridEngine.js';
 import { pickCastPrefix } from './utils.js';
 import { updatePcActor } from '../actor.js';
 
@@ -35,7 +36,9 @@ export function runHealSpell(
   // Life Cleric: Disciple of Life — healing spells restore extra 2 + spell level HP
   const discipleBonus =
     pc.char.subclass === 'life' && hasClass(pc.char, 'cleric') ? 2 + (spell.level ?? 1) : 0;
-  const healed = baseHealed + discipleBonus;
+  // SRD Power Word Heal restores ALL HP — a huge value floors every target
+  // to its own max via the per-target `Math.min(max_hp, …)` caps below.
+  const healed = spell.healFull ? Number.MAX_SAFE_INTEGER : baseHealed + discipleBonus;
 
   // 2024 PHB Mass Healing Word (L3) / Mass Cure Wounds (L5) — apply the
   // rolled heal to EVERY living party member instead of just the most-
@@ -151,4 +154,59 @@ export function runHealSpell(
     targetMaxHp: target.max_hp,
     bonuses: healBonuses,
   });
+
+  // SRD Words of Creation (Bard L20) — Power Word Heal also affects a
+  // second creature within 10 ft of the first target. Picks the most-
+  // injured other living ally in range (off-grid = party assumed
+  // together) that is hurt or carries a condition this spell ends.
+  if (spell.id === 'power_word_heal' && hasWordsOfCreation(pc.char)) {
+    const entities = ctx.st.entities ?? [];
+    const primaryPos = entities.find((e) => e.id === target.id && !e.isEnemy)?.pos;
+    const eligible = ctx.st.characters.filter((c) => {
+      if (c.dead || c.id === target.id) return false;
+      const needsHeal = c.hp < c.max_hp;
+      const needsCleanse = stripList.some((s) => c.conditions.includes(s));
+      if (!needsHeal && !needsCleanse) return false;
+      if (primaryPos) {
+        const pos = entities.find((e) => e.id === c.id && !e.isEnemy)?.pos;
+        if (!pos || distanceFeet(primaryPos, pos) > 10) return false;
+      }
+      return true;
+    });
+    if (eligible.length > 0) {
+      const second = eligible.reduce((a, b) => (a.hp < b.hp ? a : b));
+      const isSecondSelf = second.id === pc.char.id;
+      let secondPrevHp: number;
+      let secondNewHp: number;
+      if (isSecondSelf) {
+        secondPrevHp = pc.char.hp;
+        pc.char.hp = Math.min(pc.char.max_hp, pc.char.hp + healed);
+        pc.char.conditions = stripFrom(pc.char.conditions);
+        secondNewHp = pc.char.hp;
+      } else {
+        secondPrevHp = second.hp;
+        secondNewHp = Math.min(second.max_hp, second.hp + healed);
+        ctx.st = {
+          ...ctx.st,
+          characters: ctx.st.characters.map((c) =>
+            c.id === second.id ? { ...c, hp: secondNewHp, conditions: stripFrom(c.conditions) } : c
+          ),
+          entities: (ctx.st.entities ?? []).map((e) =>
+            e.id === second.id && !e.isEnemy
+              ? { ...e, hp: secondNewHp, conditions: stripFrom(e.conditions) }
+              : e
+          ),
+        };
+      }
+      composeNow(ctx, {
+        kind: 'spell_heal',
+        castPrefix: `Words of Creation echo to ${second.name}: `,
+        healed: secondNewHp - secondPrevHp,
+        targetName: second.name,
+        isSelf: isSecondSelf,
+        targetNewHp: secondNewHp,
+        targetMaxHp: second.max_hp,
+      });
+    }
+  }
 }

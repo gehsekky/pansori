@@ -1916,6 +1916,20 @@ export function applyLevelUpForClass(char: Character, className: string, context
     out += ` 🧘 Body and Mind! ${char.name}'s Dexterity and Wisdom surge (+4 each, max 25).`;
   }
 
+  // SRD Bard Words of Creation (L20 capstone): the bard always has Power Word
+  // Heal and Power Word Kill prepared. pansori casts from `spells_known`, so
+  // the grant just adds the two ids (idempotent). The second-target-within-
+  // 10ft rider lives in the cast pipeline (heal.ts / powerWords.ts), gated on
+  // `hasWordsOfCreation`.
+  if (cls === 'bard' && newClassLevel === 20) {
+    const known = new Set(char.spells_known ?? []);
+    const before = known.size;
+    known.add('power_word_heal');
+    known.add('power_word_kill');
+    if (known.size > before) char.spells_known = [...known];
+    out += ` ✨ Words of Creation! ${char.name} always has Power Word Heal and Power Word Kill prepared.`;
+  }
+
   // First multiclass level: narrow proficiency grants per 2024 PHB.
   if (isFirstLevelInClass && cls !== char.character_class.toLowerCase()) {
     const profNote = applyMulticlassProfGrants(char, cls);

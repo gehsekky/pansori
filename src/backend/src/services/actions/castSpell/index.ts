@@ -12,6 +12,7 @@ import { runBuffSpell } from './buff.js';
 import { runCombatStart } from '../attack/combatStart.js';
 import { runHealSpell } from './heal.js';
 import { runMultiTargetSpell } from './multiTarget.js';
+import { runPowerWordKill } from './powerWords.js';
 import { runReviveSpell } from './revive.js';
 import { runSaveSpell } from './save.js';
 import { runSummonSpell } from './summon.js';
@@ -205,6 +206,16 @@ export const handleCastSpell: ActionHandler<{
   // 'touch' = adjacent only (≤ 1 grid square / 5 ft).
   // 'ranged' = up to spell.rangeFt feet of grid distance.
   if (isSpellOutOfRange(ctx, spell, spellTargetId, spellTarget.name, slotLevel, isRitualCast)) {
+    return;
+  }
+
+  // SRD Power Word Kill (L9) — instant death if the target has ≤100 HP,
+  // else 12d12 psychic; a L20 Bard's Words of Creation adds a second
+  // target within 10 ft. Owns its own kill resolution, so it short-
+  // circuits the generic auto-hit / single-target damage path below.
+  if (spell.id === 'power_word_kill') {
+    runPowerWordKill(ctx, spellTarget, spellTargetId, spell, slotNote);
+    ctx.usedInitiative = true;
     return;
   }
 

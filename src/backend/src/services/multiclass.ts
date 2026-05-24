@@ -406,6 +406,16 @@ export function hasJackOfAllTrades(char: Character): boolean {
 }
 
 /**
+ * SRD 5.2.1 Words of Creation (Bard L20 capstone): the bard always has Power
+ * Word Heal and Power Word Kill prepared, and when casting either may target a
+ * second creature within 10 ft of the first. This predicate drives that
+ * dual-target rider in the cast pipeline. (RE-2.)
+ */
+export function hasWordsOfCreation(char: Character): boolean {
+  return getClassLevel(char, 'bard') >= 20;
+}
+
+/**
  * SRD 5.2.1 Expertise (Rogue L1 + L6, Bard L2 + L9): the number of skills the
  * character may hold Expertise in (double proficiency bonus). Each class grants
  * 2 then 2 more; multiclass grants are independent, so they sum. (RE-2.)

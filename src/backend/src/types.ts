@@ -468,6 +468,10 @@ export interface Spell {
   // from `char.conditions` after the HP restore. Single-target only
   // — mass-heal path doesn't apply per-target condition strips today.
   removeConditions?: string[];
+  // SRD Power Word Heal — restores ALL of the target's Hit Points (no
+  // dice). When set, the heal branch fills the target to max HP instead
+  // of rolling `heal`. Combine with `removeConditions` for the cleanse.
+  healFull?: boolean;
   // Bring-from-dead. When set, the spell targets a *dead* PC (not a
   // living enemy/ally) and routes through the revive branch in
   // castSpell. `hpRestored` is the HP value the target wakes up at:
