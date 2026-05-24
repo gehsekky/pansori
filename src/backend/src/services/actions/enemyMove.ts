@@ -36,6 +36,7 @@ export const handleEnemyMove: ActionHandler<{
   ctx.narrative = result.narrative;
   ctx.enemyApproach = {
     kind: result.kind,
-    movementHeaderPrinted: result.kind === 'proceed-to-attack' ? result.movementHeaderPrinted : false,
+    movementHeaderPrinted:
+      result.kind === 'proceed-to-attack' ? result.movementHeaderPrinted : false,
   };
 };
