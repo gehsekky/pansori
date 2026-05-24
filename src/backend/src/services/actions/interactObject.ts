@@ -6,6 +6,7 @@ import {
 } from '../gameEngine.js';
 import type { ActionHandler } from './types.js';
 import { randomUUID } from 'crypto';
+import { updatePcActor } from './actor.js';
 
 /**
  * `interact_object`: search a room object (chest, body, altar, etc.).
@@ -24,6 +25,8 @@ export const handleInteractObject: ActionHandler<{
   type: 'interact_object';
   objectId: string;
 }> = (ctx, action) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can search objects.' };
+  const { char } = ctx.actor;
   const currentSeedRoom = ctx.seed.rooms.find((r) => r.id === ctx.roomId);
   const obj = currentSeedRoom?.objects?.find((o) => o.id === action.objectId);
   if (!obj) {
@@ -37,7 +40,7 @@ export const handleInteractObject: ActionHandler<{
     return;
   }
 
-  let nextChar = ctx.char;
+  let nextChar = char;
   let nextSt = ctx.st;
 
   if (nextSt.combat_active) {
@@ -47,7 +50,7 @@ export const handleInteractObject: ActionHandler<{
 
   if (!obj.searchable || !obj.lootIds?.length) {
     nextSt = { ...nextSt, objects_searched: [...(nextSt.objects_searched ?? []), searchKey] };
-    ctx.char = nextChar;
+    updatePcActor(ctx, nextChar);
     ctx.st = nextSt;
     ctx.narrative = obj.interactText;
     return;
@@ -99,7 +102,7 @@ export const handleInteractObject: ActionHandler<{
   } else {
     narrative = `${obj.interactText} (Investigation: ${check.roll}+${abilityMod(nextChar.int)}=${check.total} vs DC ${obj.searchDC ?? 12} — fail.) ${obj.emptyText ?? 'You can try again.'}`;
   }
-  ctx.char = nextChar;
+  updatePcActor(ctx, nextChar);
   ctx.st = nextSt;
   ctx.narrative = narrative;
 };
