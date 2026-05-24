@@ -531,6 +531,24 @@ export function uncannyMetabolismRefresh(char: Character): Character {
   };
 }
 
+/**
+ * SRD 5.2.1 Perfect Focus (Monk L15): when you roll Initiative and don't use
+ * Uncanny Metabolism, regain Focus Points until you have 4 (if you have 3 or
+ * fewer). Applied in runCombatStart AFTER `uncannyMetabolismRefresh` — if that
+ * fired, ki is already at max (≥4 at L15+), so the `> 3` gate here makes this a
+ * no-op, which is exactly the "don't use Uncanny Metabolism" fallback. No-op
+ * below L15. (RE-2.)
+ */
+export function perfectFocusRefresh(char: Character): Character {
+  if (getClassLevel(char, 'monk') < 15) return char;
+  const current = char.class_resource_uses?.ki_points ?? getClassLevel(char, 'monk');
+  if (current > 3) return char;
+  return {
+    ...char,
+    class_resource_uses: { ...(char.class_resource_uses ?? {}), ki_points: 4 },
+  };
+}
+
 export function superiorInspirationTopUp(char: Character): Character {
   if (getClassLevel(char, 'bard') < 18) return char;
   const max = Math.max(1, abilityMod(char.cha));
