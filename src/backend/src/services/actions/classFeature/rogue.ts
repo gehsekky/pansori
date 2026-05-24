@@ -73,6 +73,42 @@ export function handleRogueFeature(ctx: ActionContext, fid: string): boolean {
     return true;
   }
 
+  if (fid === 'steady_aim') {
+    if (!hasClass(pc.char, 'rogue')) {
+      ctx.narrative = 'Only Rogues have Steady Aim.';
+      return true;
+    }
+    if (getClassLevel(pc.char, 'rogue') < 3) {
+      ctx.narrative = 'Steady Aim requires Rogue level 3.';
+      return true;
+    }
+    if (pc.char.turn_actions.bonus_action_used) {
+      ctx.narrative = 'Bonus action already used this turn.';
+      return true;
+    }
+    // SRD: usable only if you haven't moved this turn.
+    if ((ctx.st.movement_used?.[pc.char.id] ?? 0) > 0) {
+      ctx.narrative = 'Steady Aim needs a still aim — you have already moved this turn.';
+      return true;
+    }
+    pc.char.turn_actions = {
+      ...pc.char.turn_actions,
+      bonus_action_used: true,
+      steady_aim_pending: true,
+    };
+    // SRD: your Speed is 0 until the end of the turn — spend all remaining
+    // movement so grid_move blocks any further step.
+    ctx.st = {
+      ...ctx.st,
+      movement_used: {
+        ...(ctx.st.movement_used ?? {}),
+        [pc.char.id]: effectiveSpeed(pc.char),
+      },
+    };
+    ctx.narrative = `${pc.char.name} uses Steady Aim — advantage on the next attack this turn (Speed drops to 0).`;
+    return true;
+  }
+
   if (fid === 'cunning_action_hide') {
     if (!hasClass(pc.char, 'rogue')) {
       ctx.narrative = 'Only Rogues have Cunning Action.';

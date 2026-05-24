@@ -293,6 +293,11 @@ export interface TurnActions {
   // sources or use Lucky without burning their Heroic Inspiration.
   // Set by `use_luck`, cleared on consumption (one-shot).
   luck_pending?: boolean;
+  // Rogue Steady Aim (L3) — bonus action that grants advantage on the
+  // next attack roll this turn. Set by the `steady_aim` class feature
+  // (which also zeroes remaining movement), cleared on the next attack
+  // (one-shot) or at end of turn via FRESH_TURN.
+  steady_aim_pending?: boolean;
   // Savage Attacker feat (2024 PHB origin) — once per turn, on a
   // weapon-damage hit, reroll damage and take the higher. This flag
   // marks the reroll as already spent this turn so multi-hit turns
