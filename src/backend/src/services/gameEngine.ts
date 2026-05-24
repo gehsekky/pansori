@@ -69,6 +69,7 @@ import {
   getClassLevel,
   hasClass,
   hasDangerSense,
+  hasDisciplinedSurvivor,
   hasElusive,
   hasEvasion,
   hasSlipperyMind,
@@ -701,6 +702,8 @@ export function hasSaveProficiency(
 ): boolean {
   const classProf = context.classSavingThrows?.[char.character_class]?.includes(ability) ?? false;
   if (classProf) return true;
+  // SRD Monk Disciplined Survivor (L14): proficiency in all saving throws.
+  if (hasDisciplinedSurvivor(char)) return true;
   // SRD Rogue Slippery Mind (L15): proficiency in WIS + CHA saves.
   if ((ability === 'wis' || ability === 'cha') && hasSlipperyMind(char)) return true;
   return Object.values(char.feat_choices ?? {}).some((c) =>
