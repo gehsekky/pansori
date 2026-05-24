@@ -62,6 +62,7 @@ import {
   spellSlotsForChar,
 } from './multiclass.js';
 import { composeFragments, enemyAttackFragmentEvent } from './narrative/compose.js';
+import { enemyActor, pcActor } from './actions/actor.js';
 import { fmt, stripForLlm } from './narrativeFmt.js';
 import { COMBAT_LOG_MAX } from '../types.js';
 import { Engine } from 'json-rules-engine';
@@ -69,7 +70,6 @@ import { applyDamage } from './damage.js';
 import { applyStateMigrations } from './stateSchema.js';
 import { factionShopPrice } from './campaignEngine.js';
 import { llmProvider } from './llmProvider.js';
-import { pcActor } from './actions/actor.js';
 import { randomUUID } from 'crypto';
 
 // Append a CombatEvent to state.combat_log, trimming to COMBAT_LOG_MAX so the
@@ -4190,6 +4190,49 @@ function applyPcOpportunityAttacks(args: {
  * Extracted from `runEnemyTurns` (architecture audit #5).
  */
 /**
+ * Build an enemy-actor `ActionContext` for routing a single enemy action
+ * (e.g. `enemy_attack`) through `dispatchAction`. Only the fields the
+ * enemy path actually reads are meaningful — actor / st / context /
+ * narrative; the room-derived fields are inert placeholders since the
+ * enemy-attack handler never reads them. (EE-2.)
+ */
+function buildEnemyActionCtx(args: {
+  st: GameState;
+  seed: Seed;
+  context: Context;
+  worldName: string;
+  enemy: Enemy;
+  ent: CombatEntity | undefined;
+  narrative: string;
+}): ActionContext {
+  const { st, seed, context, worldName, enemy, ent, narrative } = args;
+  return {
+    context,
+    state: st,
+    worldName,
+    prevRoomId: st.current_room,
+    roomId: st.current_room,
+    roomObstacleCells: [],
+    livingEnemiesInRoom: [],
+    enemy: undefined,
+    enemyAlive: false,
+    loot: undefined,
+    lootAvail: false,
+    adjacent: [],
+    seed,
+    st,
+    actor: enemyActor(enemy, ent),
+    narrative,
+    escaped: false,
+    usedInitiative: false,
+    fragments: [],
+    commitChar() {
+      if (this.actor.kind === 'pc') this.st = commitCharacter(this.st, this.actor.char);
+    },
+  };
+}
+
+/**
  * Resolve a SINGLE enemy sub-attack against `target` (one swing of a
  * multiattack). Extracted from `runEnemyMultiattackLoop` so the same
  * per-attack core can be driven both by the inline loop and (Phase
@@ -4206,12 +4249,12 @@ function applyPcOpportunityAttacks(args: {
  * `mi` / `advIdx` only feed the pause resume coords; behavior is
  * otherwise independent of the surrounding loop.
  */
-type EnemySubAttackResult =
+export type EnemySubAttackResult =
   | { outcome: 'paused'; st: GameState; narrative: string }
   | { outcome: 'killed-massive'; st: GameState; target: Character; narrative: string }
   | { outcome: 'done'; st: GameState; target: Character; narrative: string };
 
-function resolveEnemySubAttack(args: {
+export function resolveEnemySubAttack(args: {
   enemy: Enemy;
   enemyId: string;
   enemyEnt: CombatEntity | undefined;
@@ -4347,7 +4390,7 @@ function resolveEnemySubAttack(args: {
   return { outcome: 'done', st, target, narrative };
 }
 
-function runEnemyMultiattackLoop(args: {
+async function runEnemyMultiattackLoop(args: {
   enemy: Enemy;
   enemyId: string;
   enemyEnt: CombatEntity | undefined;
@@ -4358,7 +4401,9 @@ function runEnemyMultiattackLoop(args: {
   advIdx: number;
   context: Context;
   narrative: string;
-}):
+  seed: Seed;
+  worldName: string;
+}): Promise<
   | {
       kind: 'paused';
       st: GameState;
@@ -4370,26 +4415,38 @@ function runEnemyMultiattackLoop(args: {
       target: Character;
       narrative: string;
       massiveDeath: boolean;
-    } {
+    }
+> {
   const { attackCount } = args;
   let st = args.st;
   let target = args.target;
   let narrative = args.narrative;
   let massiveDeath = false;
   for (let mi = args.resumeMi; mi < attackCount && target.hp > 0; mi++) {
-    const sub = resolveEnemySubAttack({
-      enemy: args.enemy,
-      enemyId: args.enemyId,
-      enemyEnt: args.enemyEnt,
-      target,
+    // EE-2 — route each swing through the dispatcher with an enemy actor.
+    // The handler resolves the swing (via resolveEnemySubAttack) and
+    // reports its tagged outcome back on ctx.enemySubAttack.
+    const ctx = buildEnemyActionCtx({
       st,
+      seed: args.seed,
       context: args.context,
-      advIdx: args.advIdx,
-      mi,
+      worldName: args.worldName,
+      enemy: args.enemy,
+      ent: args.enemyEnt,
       narrative,
     });
-    st = sub.st;
-    narrative = sub.narrative;
+    await dispatchAction(ctx, {
+      type: 'enemy_attack',
+      targetCharId: target.id,
+      advIdx: args.advIdx,
+      multiattackIdx: mi,
+    });
+    st = ctx.st;
+    narrative = ctx.narrative;
+    const sub = ctx.enemySubAttack;
+    // Defensive: the handler always sets this for an enemy actor; bail
+    // safely (treat as turn-ending) if it somehow didn't.
+    if (!sub) break;
     if (sub.outcome === 'paused') return { kind: 'paused', st, narrative };
     target = sub.target;
     if (sub.outcome === 'killed-massive') {
@@ -4986,7 +5043,7 @@ export function resolveEnemyHideCheck(
   };
 }
 
-export function runEnemyTurns(args: {
+export async function runEnemyTurns(args: {
   st: GameState;
   seed: Seed;
   context: Context;
@@ -4995,7 +5052,7 @@ export function runEnemyTurns(args: {
   startMultiattackIdx: number; // 0 = haven't started; N = N sub-attacks already done
   startRoundWrapped: boolean;
   initialCurrentIdx: number; // anchor for the safety "loop back to start" break
-}): EnemyTurnResult {
+}): Promise<EnemyTurnResult> {
   let st = args.st;
   let narrative = '';
   let advIdx = args.startAdvIdx;
@@ -5177,7 +5234,7 @@ export function runEnemyTurns(args: {
             narrative += `\n\n[${rm.name}'s turn]`;
           }
           // ── Multiattack loop ─ delegated to `runEnemyMultiattackLoop` ─────
-          const multi = runEnemyMultiattackLoop({
+          const multi = await runEnemyMultiattackLoop({
             enemy: rm,
             enemyId: eEntry.id,
             enemyEnt: eEnt,
@@ -5188,6 +5245,8 @@ export function runEnemyTurns(args: {
             advIdx,
             context: args.context,
             narrative,
+            seed: args.seed,
+            worldName: args.worldName,
           });
           if (multi.kind === 'paused') {
             return {
@@ -5639,7 +5698,7 @@ export async function takeAction({
     st = legendaryRes.st;
     narrative += legendaryRes.narrative;
 
-    const turnRes = runEnemyTurns({
+    const turnRes = await runEnemyTurns({
       st,
       seed,
       context,
