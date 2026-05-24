@@ -1824,6 +1824,46 @@ describe('class features', () => {
     expect(result.narrative).not.toMatch(/Attack 2/i);
   });
 
+  // SRD 5.2.1 Fighter Extra Attack tiers — 3 attacks at L11, 4 at L20. Every
+  // swing (even a miss) prints its "Attack N — " roll-detail label, so forcing
+  // all attacks to miss (d20 = 1) keeps the enemy alive through the whole loop
+  // and lets us count the labels exactly.
+  it('Fighter at level 11 makes 3 attacks (Attack 3 label, no Attack 4)', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0); // every d20 → 1: all miss, enemy survives
+    const state = makeState(
+      { character_class: 'Fighter', level: 11 },
+      { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] }
+    );
+    const result = await takeAction({
+      action: { type: 'attack' },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    expect(result.narrative).toMatch(/Attack 2 — /);
+    expect(result.narrative).toMatch(/Attack 3 — /);
+    expect(result.narrative).not.toMatch(/Attack 4/);
+  });
+
+  it('Fighter at level 20 makes 4 attacks (Attack 4 label, no Attack 5)', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0); // every d20 → 1: all miss, enemy survives
+    const state = makeState(
+      { character_class: 'Fighter', level: 20 },
+      { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] }
+    );
+    const result = await takeAction({
+      action: { type: 'attack' },
+      history: [],
+      state,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    expect(result.narrative).toMatch(/Attack 3 — /);
+    expect(result.narrative).toMatch(/Attack 4 — /);
+    expect(result.narrative).not.toMatch(/Attack 5/);
+  });
+
   // ── Rage (Warrior — tested via ctxWithRage) ──────────────────────────────────
 
   it('use_class_feature rage activates raging condition and spends a use', async () => {
