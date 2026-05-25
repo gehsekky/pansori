@@ -365,6 +365,10 @@ export type StructuredAction =
   // SRD 5.2.1 Cleric Blessed Strikes (L7): choose Divine Strike or Potent
   // Spellcasting. Out-of-combat, no action cost. (RE-2.)
   | { type: 'choose_blessed_strikes'; option: 'divine_strike' | 'potent_spellcasting' }
+  // SRD 5.2.1 Cleric Divine Order (L1): choose Protector (Martial + Heavy
+  // training) or Thaumaturge (extra Cleric cantrip via `cantrip` + WIS to
+  // Arcana/Religion). Out-of-combat, no action cost. (RE-2.)
+  | { type: 'choose_divine_order'; option: 'protector' | 'thaumaturge'; cantrip?: string }
   // SRD 5.2.1 Paladin Lay on Hands (L1): bonus-action touch heal drawing from
   // a pool of 5 × Paladin level HP. `targetCharId` is the healed party member
   // (may be the paladin). (RE-2.)
