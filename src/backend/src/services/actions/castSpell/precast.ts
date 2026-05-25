@@ -42,6 +42,7 @@ export function runPrecast(
     ritual?: boolean;
     divineIntervention?: boolean;
     overchannel?: boolean;
+    mysticArcanum?: boolean;
   },
   spell: Spell
 ): PrecastResult {
@@ -166,6 +167,27 @@ export function runPrecast(
       usedSignature = true;
     }
   }
+  // SRD Warlock Mystic Arcanum (L11/13/15/17) — the chosen L6-9 spell for its
+  // tier casts once per long rest without a slot.
+  let usedMysticArcanum = false;
+  if (action.mysticArcanum && !isRitualCast && spell.level >= 6 && spell.level <= 9) {
+    const tierGate: Record<number, number> = { 6: 11, 7: 13, 8: 15, 9: 17 };
+    if (getClassLevel(pc.char, 'warlock') < (tierGate[spell.level] ?? 99)) {
+      ctx.narrative = `Mystic Arcanum (level ${spell.level}) requires a higher Warlock level.`;
+      return { done: true };
+    }
+    if (pc.char.mystic_arcanum?.[spell.level] !== spellId) {
+      ctx.narrative = `${spell.name} is not your level-${spell.level} Mystic Arcanum.`;
+      return { done: true };
+    }
+    const arcKey = `mystic_arcanum_${spell.level}`;
+    if ((pc.char.class_resource_uses?.[arcKey] ?? 0) > 0) {
+      ctx.narrative = `Your level-${spell.level} Mystic Arcanum is spent — it returns after a long rest.`;
+      return { done: true };
+    }
+    pc.char.class_resource_uses = { ...(pc.char.class_resource_uses ?? {}), [arcKey]: 1 };
+    usedMysticArcanum = true;
+  }
 
   // Long-cast spells (1 minute+, e.g. Animate Dead) can't be cast in
   // combat. Gated before slot spend so an in-combat attempt doesn't
@@ -245,7 +267,8 @@ export function runPrecast(
     !usedMagicInitiateFree &&
     !usedDivineIntervention &&
     !usedSpellMastery &&
-    !usedSignature
+    !usedSignature &&
+    !usedMysticArcanum
   ) {
     if (slotLevel < spell.level) {
       ctx.narrative = `${spell.name} requires at least a level-${spell.level} slot.`;
@@ -359,13 +382,15 @@ export function runPrecast(
   const castingScore = (pc.char[castingAbility] ?? 10) as number;
   const slotNote = usedDivineIntervention
     ? ' (Divine Intervention)'
-    : usedSpellMastery
-      ? ' (Spell Mastery)'
-      : usedSignature
-        ? ' (Signature Spell)'
-        : spell.level > 0
-          ? ` (level-${slotLevel} slot)`
-          : ' (cantrip)';
+    : usedMysticArcanum
+      ? ' (Mystic Arcanum)'
+      : usedSpellMastery
+        ? ' (Spell Mastery)'
+        : usedSignature
+          ? ' (Signature Spell)'
+          : spell.level > 0
+            ? ` (level-${slotLevel} slot)`
+            : ' (cantrip)';
   // SRD Sorcerer Innate Sorcery (L1): +1 spell save DC while active.
   const innateDcBonus = pc.char.conditions.includes('innate_sorcery') ? 1 : 0;
   const dc = spellSaveDC(pc.char.level, castingScore) + innateDcBonus;
@@ -377,7 +402,12 @@ export function runPrecast(
     slotNote,
     dc,
     isRitualCast,
-    freeCast: usedDivineIntervention || usedMagicInitiateFree || usedSpellMastery || usedSignature,
+    freeCast:
+      usedDivineIntervention ||
+      usedMagicInitiateFree ||
+      usedSpellMastery ||
+      usedSignature ||
+      usedMysticArcanum,
   };
 }
 

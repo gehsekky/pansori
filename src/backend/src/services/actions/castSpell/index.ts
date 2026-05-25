@@ -77,6 +77,7 @@ export const handleCastSpell: ActionHandler<{
       ritual?: boolean;
       divineIntervention?: boolean;
       overchannel?: boolean;
+      mysticArcanum?: boolean;
     },
     spell
   );

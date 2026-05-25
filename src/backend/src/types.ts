@@ -751,6 +751,10 @@ export interface Character {
   // SRD Fiend Warlock L10 — Fiendish Resilience: the chosen damage type the
   // warlock currently has Resistance to (re-chooseable on a short/long rest).
   fiendish_resilience?: string;
+  // SRD Warlock Mystic Arcanum (L11/13/15/17) — chosen spell per arcanum tier
+  // (spell level 6/7/8/9 → spell id). Each is cast once per long rest without a
+  // slot (tracked as class_resource_uses.mystic_arcanum_<level>).
+  mystic_arcanum?: Record<number, string>;
   // SRD Multiattack Defense bookkeeping — enemy entity id → the combat round
   // in which that enemy hit this PC. While the stamp equals the current round,
   // that enemy's further attacks vs this PC roll with Disadvantage. The round
