@@ -59,6 +59,7 @@ import { handleExamine } from './examineDefault.js';
 import { handleGridMove } from './gridMove.js';
 import { handleHasteExtraAction } from './hasteExtraAction.js';
 import { handleInteractObject } from './interactObject.js';
+import { handleJump } from './jump.js';
 import { handleLandsAid } from './landsAid.js';
 import { handleLayOnHands } from './layOnHands.js';
 import { handleLoot } from './loot.js';
@@ -133,6 +134,7 @@ const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   two_weapon_attack: handleTwoWeaponAttack as ActionHandler,
   use_lands_aid: handleLandsAid as ActionHandler,
   grid_move: handleGridMove as ActionHandler,
+  jump: handleJump as ActionHandler,
   resolve_reaction: handleResolveReaction as ActionHandler,
   attack: handleAttack as ActionHandler,
   cast_spell: handleCastSpell as ActionHandler,
