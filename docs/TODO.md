@@ -601,20 +601,25 @@ Bonus(char, st)`: a creature within 10 ft of a conscious L6+ Paladin (the
       old binary-Disadvantage model and the 2014 L4 HP-halving were removed.
 - [ ] **Ability-score generation** — standard array / point buy at
       character creation (scores are effectively hard-coded today).
-- [ ] **Class skill selection** — today the skill *system* is real
-      (`skill_proficiencies` drives proficiency + Expertise + Jack of All
-      Trades + Reliable Talent through `skillCheck`), but class skills are
-      **auto-granted, not chosen**: creation hands a character its full curated
-      `SRD_CLASS_SKILLS[class]` list + background + species skills
-      (`routes/game.ts:289`), with no "choose N from [options]" step. Two RAW
-      gaps to close: (1) a creation-time choose-your-class-skills step against
-      the real (longer) SRD option lists, replacing the curated 3–4-skill
-      hardcode in `contexts/srd/classes.ts:151`; (2) a central skill→ability
-      map — checks pick the ability ad-hoc per site today, and the contested
-      checks (grapple/shove Athletics-Acrobatics, social Persuasion) still roll
-      raw `d20+mod` without routing through `skillCheck`, so they get no
-      proficiency bonus and miss Reliable Talent (also noted under RE-2's
-      Reliable Talent deferral).
+- [~] **Class skill selection + skill→ability map** — *partially done
+      (2026-05-25).*
+      - [x] **skill→ability map** — `SKILL_ABILITY` (all 18 SRD skills) +
+            `abilityForSkill` in rulesEngine: the single source of truth for a
+            skill's governing ability.
+      - [x] **Social Influence routed through `skillCheck`** — Persuasion /
+            Deception / Intimidation now gain Expertise / Jack of All Trades /
+            Reliable Talent / Halfling Lucky (previously rolled raw d20 + CHA +
+            proficiency).
+      - [ ] **Route the remaining bypassers through `skillCheck`** — grapple/
+            shove escape (`combatTactical`, complicated by Barbarian Indomitable
+            Might) and the `study` action (Thaumaturge bonus). Both currently
+            add proficiency but miss Reliable Talent / Expertise.
+      - [ ] **Creation choose-your-class-skills step** — replace the
+            auto-granted curated `SRD_CLASS_SKILLS[class]` list
+            (`routes/game.ts:289`, `contexts/srd/classes.ts:151`) with a
+            "choose N from [the full SRD option list]" build step. FE-coupled:
+            the engine needs to accept + validate a chosen list (the client
+            sends only ability scores today).
 
 #### RE-4: Combat / exploration subsystems (bounded)
 
