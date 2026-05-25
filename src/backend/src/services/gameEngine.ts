@@ -65,6 +65,7 @@ import {
   applyMulticlassProfGrants,
   canCountercharm,
   canRitualCast,
+  elementalAffinityType,
   expertiseSlots,
   getClassLevel,
   hasClass,
@@ -1079,8 +1080,17 @@ function computeEnemyAttack(
       !char.conditions.some((c) =>
         ['incapacitated', 'paralyzed', 'stunned', 'unconscious', 'petrified'].includes(c)
       );
+    // SRD Draconic Sorcery Elemental Affinity (L6) — Resistance to the chosen
+    // damage type.
+    const affinityResist =
+      !!enemy.damageType && elementalAffinityType(char) === enemy.damageType;
     const anyResist =
-      isRaging || isPetrified || beastResist || speciesResist || superiorDefenseActive;
+      isRaging ||
+      isPetrified ||
+      beastResist ||
+      speciesResist ||
+      superiorDefenseActive ||
+      affinityResist;
     const postResistDmg = anyResist ? Math.ceil(result.damage / 2) : result.damage;
     const rageNote = isRaging ? ` (Rage resistance: ${result.damage}→${postResistDmg})` : '';
     const petrNote = isPetrified
@@ -1097,6 +1107,10 @@ function computeEnemyAttack(
     const superiorDefNote =
       superiorDefenseActive && !isRaging && !isPetrified && !beastResist && !speciesResist
         ? ` (Superior Defense resistance: ${result.damage}→${postResistDmg})`
+        : '';
+    const affinityNote =
+      affinityResist && !isRaging && !isPetrified && !beastResist && !speciesResist && !superiorDefenseActive
+        ? ` (Elemental Affinity ${enemy.damageType} resistance: ${result.damage}→${postResistDmg})`
         : '';
     const wardNote = '';
     const charAfterWard = char;
@@ -1171,7 +1185,14 @@ function computeEnemyAttack(
       .replace('{dmg}', fmt.dmg(hpLost));
     narrative += ` ${char.name} takes ${fmt.dmg(hpLost)} damage.`;
     narrative +=
-      rageNote + petrNote + beastNote + speciesNote + superiorDefNote + wardNote + tempHpNote;
+      rageNote +
+      petrNote +
+      beastNote +
+      speciesNote +
+      superiorDefNote +
+      affinityNote +
+      wardNote +
+      tempHpNote;
     narrative += deflectNote;
     narrative += shdNote;
     narrative += dmgResult.concentrationNote;
@@ -3523,6 +3544,22 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       kind: 'class_feature',
       requiresBonusAction: true,
     });
+  }
+
+  // ── Draconic Sorcery: Elemental Affinity (L6) ───────────────────────────────
+  if (
+    !state.combat_active &&
+    char.subclass === 'draconic' &&
+    getClassLevel(char, 'sorcerer') >= 6 &&
+    !char.elemental_affinity
+  ) {
+    for (const t of ['acid', 'cold', 'fire', 'lightning', 'poison'] as const) {
+      if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+      choices.push({
+        label: `Elemental Affinity: ${t} (resistance + CHA to ${t} spell damage)`,
+        action: { type: 'choose_elemental_affinity', damageType: t },
+      });
+    }
   }
 
   // ── Sorcerer: Metamagic ─────────────────────────────────────────────────────

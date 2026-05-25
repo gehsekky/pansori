@@ -569,6 +569,22 @@ export function knowsMetamagic(char: Character, id: string): boolean {
   return (char.metamagics_known ?? []).includes(id);
 }
 
+/** SRD Draconic Sorcery Elemental Affinity (L6) — the chosen affinity damage
+ *  type, or undefined if not a Draconic Sorcerer L6+ with a choice made. */
+export function elementalAffinityType(char: Character): string | undefined {
+  return char.subclass === 'draconic' && getClassLevel(char, 'sorcerer') >= 6
+    ? char.elemental_affinity
+    : undefined;
+}
+
+/** Elemental Affinity bonus damage: CHA mod added to one damage roll of a spell
+ *  whose damage type matches the chosen affinity. 0 otherwise. */
+export function elementalAffinityBonus(char: Character, damageType: string | undefined): number {
+  return damageType && elementalAffinityType(char) === damageType
+    ? Math.max(0, abilityMod(char.cha))
+    : 0;
+}
+
 export function hasDangerSense(char: Character): boolean {
   if (
     (char.conditions ?? []).some((c) =>

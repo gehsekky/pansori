@@ -705,6 +705,9 @@ export interface Character {
   // SRD Sorcerer Metamagic — the option ids the sorcerer has learned (2 at L2,
   // +2 at L10/L17). A metamagic must be known to be activated.
   metamagics_known?: string[];
+  // SRD Draconic Sorcery Elemental Affinity (L6) — the chosen damage type. The
+  // sorcerer resists it and adds CHA to one damage roll of that type per spell.
+  elemental_affinity?: 'acid' | 'cold' | 'fire' | 'lightning' | 'poison';
   // SRD Multiattack Defense bookkeeping — enemy entity id → the combat round
   // in which that enemy hit this PC. While the stamp equals the current round,
   // that enemy's further attacks vs this PC roll with Disadvantage. The round

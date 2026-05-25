@@ -20,6 +20,7 @@ import { concentrationRoundsFor, pickCastPrefix } from './utils.js';
 import type { ActionContext } from '../types.js';
 import { composeNow } from '../../narrative/compose.js';
 import { coverBonus } from '../../gridEngine.js';
+import { elementalAffinityBonus } from '../../multiclass.js';
 import { fmt } from '../../narrativeFmt.js';
 
 /**
@@ -98,11 +99,13 @@ export function runSaveSpell(
   if (spell.damage) {
     const saveDmgExpr =
       spell.level === 0 ? cantripDamageDice(spell, char.level) : upcastDamage(spell, slotLevel);
-    // SRD Metamagic Empowered Spell — reroll up to CHA-mod of the lowest dice.
+    // SRD Metamagic Empowered Spell — reroll up to CHA-mod of the lowest dice;
+    // Draconic Elemental Affinity — +CHA to the damage roll of the affinity type
+    // (added to the full roll, so it's halved on a successful save per RAW).
     const fullDmg =
-      ctx.metamagic === 'empowered'
+      (ctx.metamagic === 'empowered'
         ? rollDiceEmpowered(saveDmgExpr || spell.damage, Math.max(1, abilityMod(char.cha)))
-        : rollDice(saveDmgExpr || spell.damage);
+        : rollDice(saveDmgExpr || spell.damage)) + elementalAffinityBonus(char, spell.damageType);
     spellDmg = saveFailed ? fullDmg : spell.saveEffect === 'half' ? Math.floor(fullDmg / 2) : 0;
     composeNow(ctx, {
       kind: 'spell_save_damage',
