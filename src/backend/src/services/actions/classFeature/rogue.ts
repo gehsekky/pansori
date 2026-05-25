@@ -1,29 +1,7 @@
-import {
-  abilityMod,
-  d20TestPenalty,
-  effectiveLightFor,
-  passivePerceptionDcInLight,
-  skillCheck,
-} from '../../rulesEngine.js';
-import {
-  consumeBardicForCheck,
-  consumeInspirationForCheck,
-  consumeLuckForCheck,
-  effectiveSpeed,
-  inflictCondition,
-  isHeavilyEncumbered,
-} from '../../gameEngine.js';
-import { consumeStrokeOfLuck, strokeOfLuckAvailable } from '../../strokeOfLuck.js';
-import {
-  getClassLevel,
-  hasClass,
-  hasExpertise,
-  hasJackOfAllTrades,
-  hasReliableTalent,
-  peerlessSkillDie,
-} from '../../multiclass.js';
+import { getClassLevel, hasClass } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
-import { updatePcActor } from '../actor.js';
+import { effectiveSpeed } from '../../gameEngine.js';
+import { resolveHideAttempt } from '../hide.js';
 
 /**
  * Rogue features. All gated by class === 'rogue' and level >= 2 (Cunning
@@ -33,10 +11,13 @@ import { updatePcActor } from '../actor.js';
  *    this turn (refunds movement_used by speed).
  *  - `cunning_action_disengage`: bonus action, sets `disengaged` so
  *    grid_move skips opportunity-attack triggers this turn.
- *  - `cunning_action_hide`: bonus action, Stealth check vs enemy passive
- *    Perception. Success sets `invisible` and stores hide_dc for enemies
- *    to beat with Perception/Search. Heavy encumbrance applies disadv;
- *    Halfling species gets the Lucky reroll.
+ *  - `cunning_action_hide`: bonus action. SRD 5.2.1 Hide [Action] — gated on
+ *    the obscurement/cover + out-of-line-of-sight prerequisite
+ *    (`canAttemptHide`), then a flat DC 15 Dexterity (Stealth) check (NOT
+ *    contested vs passive Perception — that was the 2014 model). Success sets
+ *    `invisible` and stores hide_dc (the check total) for enemies to beat with
+ *    Perception/Search. Heavy encumbrance applies disadv; Halfling species
+ *    gets the Lucky reroll.
  *  - `cunning_strike_{trip|poison|withdraw|disarm}`: L5+. Pre-commits
  *    an effect on the next Sneak Attack (consumed in attack.ts).
  */
@@ -136,54 +117,16 @@ export function handleRogueFeature(ctx: ActionContext, fid: string): boolean {
       ctx.narrative = 'Bonus action already used this turn.';
       return true;
     }
-    // 2024 PHB lighting affects the observer's passive Perception:
-    // dim → -5, dark → effective 0. Cunning Action Hide reads the
-    // room's lighting via the same path as the sneak action.
-    const cunningRoomLighting =
-      ctx.seed.rooms.find((r) => r.id === ctx.roomId)?.lighting ?? 'bright';
-    const cunningEnemyLight = effectiveLightFor(cunningRoomLighting, 0);
-    const sneakHideDC = ctx.enemyAlive
-      ? passivePerceptionDcInLight(ctx.enemy!.wis ?? 10, cunningEnemyLight)
-      : 10;
-    const hideProf = pc.char.skill_proficiencies?.includes('Stealth') ?? false;
-    const inspAdvHide = consumeInspirationForCheck(pc.char);
-    const luckAdvHide = consumeLuckForCheck(pc.char);
-    const bardicHideRoll = consumeBardicForCheck(pc.char);
-    const peerlessRollHide = peerlessSkillDie(pc.char);
-    const hideCheck = skillCheck(
-      pc.char.dex,
-      sneakHideDC - bardicHideRoll,
-      hideProf,
-      pc.char.level,
-      isHeavilyEncumbered(pc.char),
-      hasExpertise(pc.char, 'Stealth'),
-      hasJackOfAllTrades(pc.char),
-      inspAdvHide || luckAdvHide,
-      pc.char.species === 'halfling',
-      hasReliableTalent(pc.char),
-      strokeOfLuckAvailable(pc.char),
-      d20TestPenalty(pc.char),
-      peerlessRollHide
-    );
-    if (hideCheck.strokeOfLuckUsed) updatePcActor(ctx, consumeStrokeOfLuck(pc.char));
-    else if (hideCheck.peerlessSkillUsed) {
-      const biHide = pc.char.class_resource_uses?.bardic_inspiration ?? abilityMod(pc.char.cha);
-      updatePcActor(ctx, {
-        class_resource_uses: {
-          ...(pc.char.class_resource_uses ?? {}),
-          bardic_inspiration: Math.max(0, biHide - 1),
-        },
-      });
+    // Cunning Action grants Hide as a Bonus Action; the SRD Hide [Action]
+    // resolution itself (prerequisite + flat DC 15 Stealth check) is shared
+    // with the general `hide` action via resolveHideAttempt. A failed
+    // prerequisite (rogue in plain view) doesn't spend the bonus action.
+    const result = resolveHideAttempt(ctx);
+    if (!result.ok) {
+      ctx.narrative = `${pc.char.name} can't hide — ${result.reason}.`;
+      return true;
     }
     pc.char.turn_actions = { ...pc.char.turn_actions, bonus_action_used: true };
-    if (hideCheck.success) {
-      updatePcActor(ctx, inflictCondition(pc.char, 'invisible'));
-      pc.char.hide_dc = hideCheck.total;
-      ctx.narrative = `${pc.char.name} hides! (Stealth ${hideCheck.total} vs DC ${sneakHideDC} — success.) Hide DC = ${hideCheck.total}.`;
-    } else {
-      pc.char.hide_dc = undefined;
-      ctx.narrative = `${pc.char.name} tries to hide but fails. (Stealth ${hideCheck.total} vs DC ${sneakHideDC})`;
-    }
     return true;
   }
 

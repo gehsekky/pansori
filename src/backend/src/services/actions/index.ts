@@ -58,6 +58,7 @@ import { handleEscape } from './escape.js';
 import { handleExamine } from './examineDefault.js';
 import { handleGridMove } from './gridMove.js';
 import { handleHasteExtraAction } from './hasteExtraAction.js';
+import { handleHide } from './hide.js';
 import { handleInteractObject } from './interactObject.js';
 import { handleJump } from './jump.js';
 import { handleLandsAid } from './landsAid.js';
@@ -70,9 +71,9 @@ import { handleUseClassFeature } from './classFeature/index.js';
 
 /**
  * Registry of per-action-type handlers. Populated incrementally as the
- * monolithic switch in `takeAction` is decomposed (see docs/CRPG.md for
- * the rationale). PRs land one handler at a time; an action type missing
- * from the registry falls through to the legacy switch in gameEngine.ts.
+ * monolithic switch in `takeAction` is decomposed. PRs land one handler
+ * at a time; an action type missing from the registry falls through to
+ * the legacy switch in gameEngine.ts.
  */
 const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   pass: handlePass as ActionHandler,
@@ -81,6 +82,7 @@ const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   stand_up: handleStandUp as ActionHandler,
   dodge: handleDodge as ActionHandler,
   disengage: handleDisengage as ActionHandler,
+  hide: handleHide as ActionHandler,
   dash: handleDash as ActionHandler,
   help: handleHelp as ActionHandler,
   ready: handleReady as ActionHandler,

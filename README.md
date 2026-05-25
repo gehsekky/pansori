@@ -45,7 +45,7 @@ open http://localhost:5173
 ├── docker-compose.yml
 ├── docker-compose.prod.yml
 ├── .env
-├── docs/                       ← TODO, AUTHORING, DEPLOY, srd-only-audit, srd-5.2.1.txt
+├── docs/                       ← TODO, AUTHORING, DEPLOY, srd-5.2.1.txt
 ├── tests/e2e/                  ← Playwright smoke tests
 └── src/
     ├── backend/                ← TypeScript; tsx in dev, tsc → dist in prod
@@ -92,7 +92,7 @@ The SRD pack under `src/backend/src/contexts/srd/` (classes, spells, monsters, s
 
 ## Rules engine (SRD 5.2.1, strict)
 
-Pansori is a **strict SRD 5.2.1 build** — the 2024-compatible System Reference Document only, with **no PHB- or DMG-exclusive content** (subclasses, feats, species, or spells). See [docs/srd-only-audit.md](docs/srd-only-audit.md) for the scope and migration record, and [CLAUDE.md](CLAUDE.md) for the contribution rule. The engine is a mix of pure functions in `rulesEngine.ts` (attack/save/skill resolution), turn flow + reaction windows in `gameEngine.ts`, per-action handlers under `services/actions/` (each dispatched against an `ActionContext`), and grid math in `gridEngine.ts`.
+Pansori is a **strict SRD 5.2.1 build** — the 2024-compatible System Reference Document only, with **no PHB- or DMG-exclusive content** (subclasses, feats, species, or spells). See [LEGAL.md](LEGAL.md) for the SRD attribution and scope statement, and [CLAUDE.md](CLAUDE.md) for the contribution rule. The engine is a mix of pure functions in `rulesEngine.ts` (attack/save/skill resolution), turn flow + reaction windows in `gameEngine.ts`, per-action handlers under `services/actions/` (each dispatched against an `ActionContext`), and grid math in `gridEngine.ts`.
 
 Highlights of what's implemented:
 
@@ -105,14 +105,14 @@ Highlights of what's implemented:
 - **Multiclassing** — per-class levels (`class_levels`), the multiclass spell-slot table, ability prerequisites, proficiency grants on class entry, and feature gating by per-class level.
 - **Species** — the 9 SRD species in `contexts/srd/species.ts` (Dragonborn, Dwarf, Elf, Gnome, Goliath, Halfling, Human, Orc, Tiefling) with mechanical traits (Halfling Lucky, Dwarven Toughness, Dragonborn Breath Weapon, Tiefling Infernal Legacy, Orc Relentless Endurance / Adrenaline Rush, Goliath Powerful Build / Large Form, etc.).
 - **Inspiration** — Heroic Inspiration auto-granted on Nat 1; Heroic + Bardic Inspiration spendable on any d20 (attack / save / ability check).
-- **Hide DC tracking** — successful Hide stores the stealth total; enemies roll passive Perception first, then an active Search action that costs their turn.
+- **Hide action (2024 RAW)** — a general Action any class can take in combat (Rogues also get it as a Bonus Action via Cunning Action; both share one resolver). Gated on the SRD prerequisite (Heavily Obscured or behind Three-Quarters/Total Cover, and out of every enemy's line of sight) via `canAttemptHide`, resolved on a flat DC 15 Stealth check (not a 2014-style contest vs passive Perception). On success the check total is stored as the find DC; enemies roll passive Perception first, then an active Search action that costs their turn.
 - **Conditions with source attribution** — `condition_sources` map tracks who Frightened or Charmed a PC, so movement restrictions and "can't attack your charmer" guards have a target.
 - **Encumbrance** — heavy load (> 10× STR, doubled for Powerful Build) applies disadvantage to STR/DEX/CON checks, saves, and attacks.
 - **Boss phases** — HP-threshold phase transitions (`EnemyTemplate.phases`) with set_multiattack / set_damage / set_to_hit / set_ac / set_on_hit_effect / add_resistance / heal effects.
 
 ## Tests
 
-- **Backend**: `npm run test:be` — Vitest, ~1000 tests across the engine specs (`gameEngine.*`, `rulesEngine`, `gridEngine`, `damage`, `multiclass`, `procgen`, `conditions/`, …) and per-action handler specs under `services/actions/`.
+- **Backend**: `npm run test:be` — Vitest, ~1570 tests across 184 files spanning the engine specs (`gameEngine.*`, `rulesEngine`, `gridEngine`, `damage`, `multiclass`, `procgen`, `conditions/`, …) and per-action handler specs under `services/actions/`.
 - **Frontend**: `npm run test:fe` — Vitest in jsdom (~110 tests across component + integration specs).
 - **Shared types**: `npm run sync-types:check` — verifies `src/backend/src/shared-types.ts` and `src/frontend/src/shared-types.ts` are in sync with the source of truth at `src/shared/types.ts`. CI gate; `npm run sync-types` regenerates locally.
 - **E2E**: `npm run test:e2e` — Playwright (`tests/e2e/`) covers login → BEGIN ADVENTURE, session resume, and a sandbox combat loop. Gates production deploys in CI.

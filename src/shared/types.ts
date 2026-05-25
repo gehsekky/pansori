@@ -327,6 +327,9 @@ export type StructuredAction =
   | { type: 'shove'; targetEnemyId?: string }
   | { type: 'dodge' }
   | { type: 'disengage' }
+  // SRD 5.2.1 Hide [Action] — the general action available to any class
+  // (Rogues also get it as a Bonus Action via Cunning Action).
+  | { type: 'hide' }
   | { type: 'grid_move'; entityId: string; to: GridPos }
   | { type: 'jump'; to: GridPos } // SRD Long Jump — leap up to STR ft over terrain/obstacles
   | { type: 'travel'; locationId: string }
@@ -444,6 +447,7 @@ export type ChoiceKind =
   | 'dash'
   | 'disengage'
   | 'dodge'
+  | 'hide'
   | 'ready'
   | 'attack'
   | 'grapple'

@@ -21,8 +21,7 @@ narrative pools, and custom items in the Whispering Pines / Vale
 of Shadows / sandbox contexts). PHB-only content (non-iconic
 subclasses, Lucky / Sharpshooter / Sentinel / Polearm Master /
 etc. feats, Aasimar species, PHB-only spells like Absorb Elements
-and Silvery Barbs) has been audited and removed — see
-[docs/srd-only-audit.md](docs/srd-only-audit.md).
+and Silvery Barbs) has been audited out of the codebase.
 
 Pansori is not published, endorsed, or specifically approved by
 Wizards of the Coast.

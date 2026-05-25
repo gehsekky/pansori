@@ -1,887 +1,321 @@
 # TODO
 
-<!-- Completed items pruned. See git history for what's already shipped. -->
+> **Status snapshot — verified 2026-05-25.** The top section is the
+> authoritative implementation status, re-grounded in a fresh code survey
+> (not the prior changelog). The backlog below it lists only remaining
+> work. Shipped-feature completion logs were removed — `git log` is the
+> record of what already landed.
 
 ## End-goal target
 
-Browser-based, D&D 5e SRD-compliant engine capable of running complex campaign scripts as a full RPG experience.
+Browser-based, D&D 5e **SRD 5.2.1**-compliant engine capable of running
+complex campaign scripts as a full RPG experience. Strict SRD-only — no
+PHB/DMG-exclusive content (subclasses, feats, species, spells). See
+[CLAUDE.md](../CLAUDE.md) for the contribution rule and
+[LEGAL.md](../LEGAL.md) for the SRD attribution + scope statement.
 
 ---
 
-> **⚠ SRD-only scope reset (2026-05-23):** Pansori was refactored to
-> strict SRD 5.2.1 — non-iconic subclasses, PHB-only feats, Aasimar,
-> and PHB-only spells were all removed. See
-> [srd-only-audit.md](srd-only-audit.md) for the migration record.
->
-> Entries that referenced now-removed PHB-only features (Lucky,
-> Sharpshooter, Sentinel, GWM, Polearm Master, Battle Master
-> maneuvers, Stars Druid constellations, Aasimar Celestial
-> Revelation, Silvery Barbs, etc.) have been pruned from this file.
-> See [srd-only-audit.md](srd-only-audit.md) for the full removal
-> record.
->
-> Net-new content additions should grep `docs/srd-5.2.1.txt` first.
+## Implementation status (code-verified 2026-05-25)
 
-## 5e SRD remaining gaps
+Grounded in a code survey + the full backend suite: **1572 tests across
+184 files, all green** (lint + typecheck clean).
 
-> **Edition alignment** — Pansori targets SRD 5.2.1 only. The core
-> rules _frameworks_ are largely shipped (attack/damage pipelines,
-> conditions, grid/tactical combat, spell slots + concentration +
-> components + AoE shapes + saves, reactions, rest/death, the
-> bring-from-dead ladder, weapon masteries, 12 SRD-iconic subclasses
-> at their L3 feature). The remaining work to a _complete_ engine is
-> overwhelmingly **breadth on top of those frameworks** — the
-> prioritized gaps live in the rules-engine roadmap immediately below.
+### Done — rules-engine frameworks
 
-### Rules-engine completeness roadmap (2026-05-23)
+- **Attack / damage pipeline** — to-hit, advantage/disadvantage stacking,
+  crits, resistance/vulnerability/immunity multipliers, dual-damage spells,
+  massive-damage instant death.
+- **Tactical grid combat** — BFS pathfinding, opportunity attacks (reach
+  override), cover, flanking (optional), difficult terrain, Chebyshev
+  distance; line-of-sight blocking by wall obstacles (ranged + offensive
+  spell targeting).
+- **Conditions** with source attribution; **concentration** (saves +
+  break sweep); **spell slots / components / AoE shapes / saves**;
+  **reactions** (Shield, Counterspell, Hellish Rebuke, Uncanny Dodge,
+  readied actions, OAs, Heroic-Inspiration reroll window — discriminated
+  `pending_reaction` with pause/resume); **rest / death-save / revive
+  ladder**; **weapon masteries** (8 SRD + the `flex` variant).
+- **Dispatcher-integrated enemy turns** — a whole enemy turn runs as
+  `enemy_move` → (`enemy_cast` | `enemy_attack`×N) through the same
+  `dispatchAction` path as PC actions, via an `enemyActor`. PC vs monster
+  attack/spell _resolvers_ stay deliberately distinct; the dispatch
+  _entry_ is unified so shared abilities hook in from one place.
+- **Summon-as-ally infrastructure** — `side` tagging, the ally turn AI
+  (`runAllyTurn`), summon lifecycle, and the combat-start bridge
+  (`seedSummonedAllies`). **Animate Dead** is content-complete (Skeleton/
+  Zombie variants, upcast multi-raise, bonus-action `command_summon`).
 
-> Derived from a full code survey on 2026-05-23. The frameworks exist;
-> what's left is mostly feature/content breadth plus a handful of
-> bounded subsystems. Ordered by leverage. Per the project workflow,
-> grep `docs/srd-5.2.1.txt` for the canonical feature list before
-> implementing any item here.
+### Done — character build
 
-#### RE-1: Monsters as first-class action subjects (unblocks the most)
+- **All 12 classes + their iconic SRD subclass, implemented through L20.**
+  Full feature kits per class, each spec-covered. Subclasses: Berserker,
+  College of Lore, Life Domain, Circle of the Land, Champion, Open Hand,
+  Oath of Devotion, Hunter, Thief, Draconic Sorcery, Fiend, Evoker.
+- **9 SRD species** with mechanical traits; **6 origin feats** + **7 SRD
+  epic boons** (backend-wired); **4 SRD fighting styles** (Archery,
+  Defense, Great Weapon, Two-Weapon).
+- **Multiclassing** — per-class levels, multiclass spell-slot table,
+  ability prerequisites, proficiency grants on entry, per-class feature
+  gating.
+- **2024 exhaustion** (−2/level to d20 tests, −5 ft/level speed, lethal at
+  6); **ability-score generation** validation (point buy / standard array,
+  backend) + background ASIs applied; **skill→ability map** with all
+  contested/social checks routed through `skillCheck`.
 
-> Phases 1–3 shipped (2026-05-23, the `refactor(re-1):` commit series):
-> the `Actor` type seam, the `updatePcActor` helper, and all isolated
-> PC-state handlers now read/write via `ctx.actor` with a
-> `kind !== 'pc'` guard (the Phase-4 enemy-action slot). What's left is
-> the payoff, below.
+### Content counts (the breadth that remains)
 
-- [ ] **Phase 4 — summons & companions as combatants** (plan of record:
-      [re1-phase4-design.md](re1-phase4-design.md); pragmatic path approved
-      2026-05-23). Generalize the enemy-turn loop to drive any non-player
-      combatant via a `side: 'pc'|'enemy'|'ally'` tag + stat-block actors,
-      reusing `computeEnemyAttack` rather than merging it with the PC
-      `resolveOneAttack` (still fully SRD-compliant — monster stat blocks
-      pre-bake what PCs compute; see the design doc). Unblocks **SRD summons**
-      (Animate Dead, Spiritual Weapon, Find Familiar, conjure) — narrative-only
-      today. (Beast Master is PHB-only / out of scope — the SRD's iconic
-      Ranger subclass is Hunter; summon _spells_ are the content.) Decisions:
-      RAW player-command control model; **Animate Dead** is the first content
-      slice. Slices P4.1 (side tagging), P4.2/3 (ally turn path with movement —
-      `runAllyTurn` selects the nearest enemy, approaches it taking OA, and
-      attacks via the simple `resolveEnemyAttack` + `applyDamageToEntity`),
-      P4.4 (summon lifecycle — `addAllyCombatant` / `removeCombatant` + the
-      `breakConcentration` summon sweep), and the P4.5 **combat-start bridge**
-      (`state.summoned_allies` + `seedSummonedAllies` materialize persistent
-      summons into entities + initiative after the owner) have all shipped.
-      Remaining is content:
-  - [ ] **P4.5 — SRD summon content (Animate Dead shipped 2026-05-23).**
-        Animate Dead raises a Skeleton ally: out-of-combat cast (gated in
-        precast) → `runSummonSpell` records it on `summoned_allies` →
-        `seedSummonedAllies` materializes it at combat start → it fights via
-        the AI-default `runAllyTurn`. The owner can also override its target
-        on their own turn via the bonus-action `command_summon`
-        (shipped 2026-05-23: sets `commanded_target_id`, which
-        `selectTarget` prefers while that enemy lives). The Zombie variant +
-        upcast multi-raise shipped 2026-05-24 (`summon.variants` /
-        `countPerUpcastLevel`; the cast menu offers Skeleton/Zombie per slot
-        level, raising +2 per level above 3rd — SRD-verified stat blocks).
-        Animate Dead is **content-complete** for the creature-summon model.
+| Category | In pansori | SRD universe |
+|---|---|---|
+| Spells | **142** (20 cantrips + 122 leveled, through L9) | ~330 |
+| Shared SRD monster pool | **12** (`SRD_MONSTERS`) + per-campaign templates | hundreds |
+| Species | 9 | 9 standalone + Drow lineage |
+| Classes | 12 | 12 |
+| Subclasses | 12 iconic (1 / class) | 1 iconic / class in SRD |
+| Origin feats / epic boons | 6 / 7 | 4 (+Magic Initiate variants) / 7 |
 
-    The creature-summon-as-ally infrastructure cleanly covers stat-blocked
-    summons only. The other 2024-SRD "summon" spells are mechanically
-    different and each need their own model (NOT drop-in stat blocks) —
-    deferred as separate slices:
-    - **Spiritual Weapon** (L2): a floating _force_ with no HP; a
-      bonus-action melee spell attack you re-issue each turn. Model as a
-      persistent bonus-action attack effect, not an ally combatant.
-    - **Conjure Animals** (L3) and the other 2024 conjure spells: a
-      concentration _damage zone_ (spectral spirits; DEX save, scaling
-      dice), closer to a moving AoE/hazard than a summoned creature.
-    - **Find Familiar**: a non-combatant utility companion (familiars
-      can't take the Attack action RAW) — a scouting/aid model, not the
-      ally-turn AI.
+**Bottom line:** the rules-engine frameworks and the entire class/subclass
+progression are done. What remains is overwhelmingly **content breadth**
+on existing patterns, **frontend creation/choice surfaces** that finished
+backend features are waiting on, and a handful of **bounded subsystems**.
 
-  Deferred → now in progress as **EE (dispatcher-integrated enemy turns)**,
-  below.
+---
 
-- [x] **Phase 5 (done 2026-05-24)** — dropped `ctx.char` / `ctx.safeIdx`
-      from `ActionContext`; every handler now reads the acting character via
-      `ctx.actor` (narrow `ctx.actor.kind === 'pc'` → `ctx.actor.char`, mutate
-      through `updatePcActor`). All 734 `ctx.char` refs migrated across ~30
-      files; `updatePcActor` is the single write path, `commitChar` /
-      takeAction epilogue / dispatcher `deductCost` read `ctx.actor.char`.
-      Surfaced + fixed a latent divergence bug along the way (a direct
-      `ctx.char =` on every cast broke the concentration-save spells). With
-      this, RE-1's actor seam is fully landed: PC and (future) monster
-      handlers can share one implementation.
+## Remaining work
 
-#### EE: Dispatcher-integrated enemy turns (full path, multi-commit)
+### Content breadth — data on existing patterns (RE-6)
 
-> Started 2026-05-24. Routes the enemy turn through `dispatchAction` with
-> an `enemyActor`, so enemy attacks/spells run through registered handlers
-> (the seam that lets PC + monster share abilities). The PC/enemy attack
-> _resolvers_ stay distinct (PC equipment math vs monster stat-block math
-> are legitimately different) — what unifies is the dispatch _entry_.
-> Combat-critical (proposed-snapshot reaction windows + pause/resume), so
-> landed as small, full-suite-gated commits.
+- [ ] **Spells** — ~142 / ~330 SRD. Most remaining categories are already
+      representable (data entry). Exceptions needing a model first: the
+      alternate "summon" spells, each mechanically distinct from the
+      stat-block ally model —
+  - [ ] **Spiritual Weapon** (L2) — a floating force with no HP; a
+        bonus-action melee spell attack re-issued each turn. Model as a
+        persistent bonus-action attack effect, not an ally combatant.
+  - [ ] **Conjure Animals** (L3) + other 2024 conjure spells — a
+        concentration _damage zone_ (DEX save, scaling dice); closer to a
+        moving AoE/hazard than a summoned creature.
+  - [ ] **Find Familiar** — a non-combatant utility companion (can't take
+        the Attack action RAW); a scouting/aid model, not the ally-turn AI.
+- [ ] **Monsters** — stat-block content. Legendary + lair scaffolding is
+      shipped (`legendary_actions` point pool; `lair_actions` round-wrap
+      AoE) but not wired to any current boss (per-encounter balance was
+      tuned without them). Effects shipped: `extra_attack`, `aoe_save_damage`.
+- [ ] **Magic items** — content; attunement + curse infra is shipped.
 
-- [x] **EE-1 (done 2026-05-24)** — behavior-preserving extraction of the
-      single-sub-attack core (`computeEnemyAttack` + Shield / Uncanny Dodge
-      / Hellish Rebuke reaction windows + Orc Relentless Endurance + massive
-      -damage death) out of `runEnemyMultiattackLoop` into
-      `resolveEnemySubAttack` (tagged `paused` / `killed-massive` / `done`
-      result). Makes the per-attack core reusable by the dispatched handler.
-      Suite 1046 green.
-- [x] **EE-2 (done 2026-05-24)** — `enemy_attack` action + `handleEnemyAttack`
-      (wraps `resolveEnemySubAttack`); `runEnemyMultiattackLoop` now routes each
-      swing through `dispatchAction(ctx{actor: enemyActor(rm, ent)}, …)` via a
-      `buildEnemyActionCtx` helper. The loop + `runEnemyTurns` went async
-      (awaited in `takeAction` and `handleResolveReaction`). The handler reports
-      its tagged outcome on a new `ctx.enemySubAttack` side-channel (the loop
-      reads it); the post-swing death-save + commit stay in `runEnemyTurns`.
-      No new `DispatchResult` variant needed — pause flows through
-      `st.pending_reaction` as before. Suite 1049 green (incl. all reaction /
-      death-save specs unchanged).
-- [x] **EE-3 (done 2026-05-24)** — enemy spell resolution now routes through a
-      dispatched `enemy_cast` action (`enemyActor`). Extracted `resolveEnemySpell`
-      (the roll-damage + saving-throw + commit core) out of
-      `attemptEnemySpellCast`; the orchestrator keeps the cast DECISION
-      (castChance / spell pick) + the Counterspell pause window, and `await`s
-      `dispatchAction(..., { type: 'enemy_cast', … })` for the no-counterspeller
-      branch. The enemy spell model (`{ damage, savingThrow, saveEffect }`)
-      stays distinct from the PC `castSpell` pipeline by design — same
-      shared-entry/distinct-resolver split as EE-2. Suite 1053 + handler spec.
-- [x] **EE-4 (done 2026-05-24)** — the enemy approach/move step now routes
-      through a dispatched `enemy_move` action (`enemyActor`), wrapping
-      `attemptEnemyApproach` (path-plan + opportunity attacks + position
-      commit) and reporting proceed-to-attack / skip-turn via a
-      `ctx.enemyApproach` side-channel. Suite 1057 + handler spec.
+### Frontend creation / choice surfaces (backend ready, FE pending)
 
-  **EE epic complete.** A whole enemy turn now runs as a sequence of
-  dispatched actions with an `enemyActor` — `enemy_move` → (`enemy_cast`
-  | `enemy_attack`×N) — through the same `dispatchAction` path as PC
-  actions. `runEnemyTurns` is now an orchestrator over the AI/perception
-  decisions that aren't actions (target selection, hide check, turn-skip
-  conditions, the Counterspell/reaction pause windows). The PC and enemy
-  attack/spell _resolvers_ stay deliberately distinct (PC equipment +
-  slots vs monster stat-block math); what's unified is the dispatch
-  entry, so shared PC↔monster abilities can hook in from one place.
-  Deferred (genuinely not worth it): merging the resolvers themselves.
+> Several backend features auto-resolve today because the picker UI
+> doesn't exist yet. The engine work is done; these are FE follow-ups.
 
-#### RE-2: Class + subclass feature progression to L20 — ✅ COMPLETE (2026-05-25)
+- [ ] **Epic-boon L19 pick** — surface the boon choice at the L19 ASI.
+- [ ] **Ability-score method picker** — let the player choose point buy /
+      standard array / manual and (for the +2/+1 RAW split) which abilities.
+      Backend applies the "all three +1" option today.
+- [ ] **Choose-your-class-skills step** — replace the auto-granted curated
+      `SRD_CLASS_SKILLS[class]` list with "choose N from [SRD options]";
+      engine must accept + validate the chosen list.
+- [ ] **Interactive reaction prompts** — Indomitable, Stroke of Luck,
+      Countercharm, Deflect Attacks auto-resolve player-favorably; let the
+      player choose _when_ to spend.
+- [ ] **Slot-choice surfaces** — Arcane Recovery / Natural Recovery
+      auto-pick lowest-first; let the player choose which slots.
+- [ ] **Multi-target / option pickers** — Bless/Bane/upcast +1 target,
+      Polymorph beast pick, Greater Restoration "pick one effect" (RE-5).
 
-> **Done.** All 12 SRD classes + their iconic subclass are now implemented
-> through L20. Tracked at 1491 backend tests, lint/typecheck/full-suite green.
-> The historical per-feature notes below are the implementation record; the
-> per-class completion summary follows immediately. A handful of features are
-> intentionally deferred because they depend on content pansori doesn't carry
-> (see "Documented deferrals" below) — those are honest engine-model gaps, not
-> skipped work.
->
-> (Original framing, kept for context: most classes once implemented features
-> only through ~L3–L5; subclasses carried just their L3 feature; Wizard had
-> almost no class features. The resource-pool + handler machinery made the rest
-> a data + dispatcher pattern, parallelized per class.)
+### Documented engine deferrals (depend on missing content / infra)
 
-**Per-class completion (class + iconic SRD subclass, to L20):**
+- [ ] **Greater Divine Intervention** (Cleric L20) — needs a Wish spell.
+- [ ] **Dragon Companion** (Draconic L18) — needs a Summon Dragon spell.
+- [ ] **Contact Patron** (Warlock L9) — needs a Contact Other Plane spell.
+- [ ] **Holy Ward half** (Devotion L20) — save sites don't carry the
+      attacker's creature type yet (the Radiant aura ships).
+- [ ] **Save-proficiency on enemy damage-spell saves** — `resolveEnemySpell`
+      adds no proficiency bonus for any class, so Slippery Mind / Disciplined
+      Survivor / Resilient don't reach that path. General gap, not feature-
+      specific.
+- [ ] **Truesight / Dimensional Travel / Night Spirit boons** — the +1
+      ability lands; no see-Invisible substrate, concrete positioning, or
+      lighting/Invisible-lifecycle to wire the effects to. Narrated only.
+- Minor markers: Devious Strikes' Daze restriction, Use Magic Device
+  scroll/charge sub-features, Thief Jumper, Lay on Hands poison-cure use,
+  Deflect Energy (Monk L13) — pending broader enforcement/item/jump infra.
 
-- [x] **Barbarian / Path of the Berserker** — Frenzy, Mindless Rage,
-      Retaliation (L10), Intimidating Presence (L14); Brutal Strike, Relentless/
-      Persistent Rage, Indomitable Might, Primal Champion.
-- [x] **Bard / College of Lore** — Cutting Words, Magical Discoveries,
-      Peerless Skill (L14); Countercharm, Words of Creation. (Magical Secrets is
-      satisfied by the list-agnostic spell model — a Bard casts cross-list
-      spells with CHA, no enforcement to lift.)
-- [x] **Cleric / Life Domain** — Divine Order (L1), Blessed Strikes +
-      Improved (L7/L14), Divine Intervention (L10); Disciple of Life, Blessed
-      Healer (L6), Supreme Healing (L17).
-- [x] **Druid / Circle of the Land** — complete (Land is sparse by SRD design).
-- [x] **Fighter / Champion** — Improved/Superior Critical, Remarkable Athlete,
-      Heroic Warrior (L10), Survivor; Action Surge, Indomitable, Extra Attack
-      2/3/4, Tactical Master/Mind/Shift.
-- [x] **Monk / Warrior of the Open Hand** — Open Hand Technique, Wholeness of
-      Body (L6), Fleet Step (L11), Quivering Palm (L17).
-- [x] **Paladin / Oath of Devotion** — Sacred Weapon, Aura of Devotion (L7),
-      Smite of Protection (L15), Holy Nimbus (L20); Lay on Hands, Aura of
-      Protection/Courage, Radiant Strikes, Restoring Touch.
-- [x] **Ranger / Hunter** — Hunter's Prey, Defensive Tactics, Superior Hunter's
-      Prey (L11) / Defense (L15), Feral Senses (L18); Hunter's Mark → Foe Slayer.
-- [x] **Rogue / Thief** — Fast Hands, Second-Story Work (L3), Supreme Sneak
-      (L9), Use Magic Device attunement (L13); Cunning Strike + Devious Strikes
-      (L14), Reliable Talent, Slippery Mind, Elusive, Stroke of Luck.
-- [x] **Sorcerer / Draconic Sorcery** — Innate Sorcery, Metamagic, Sorcery
-      Incarnate (L7), Arcane Apotheosis (L20); Draconic Resilience, Elemental
-      Affinity (L6), Dragon Wings (L14).
-- [x] **Warlock / Fiend Patron** — Dark One's Blessing, Dark One's Own Luck
-      (L6), Fiendish Resilience (L10), Hurl Through Hell (L14); Magical Cunning
-      (L2), Mystic Arcanum (L11–17), Eldritch Master (L20).
-- [x] **Wizard / Evoker** — Scholar (L2), Memorize Spell (L5) + the 2024
-      prepared-spell model, Spell Mastery (L18), Signature Spells (L20);
-      Evocation Savant + Potent Cantrip (L3), Sculpt Spells (L6), Empowered
-      Evocation (L10), Overchannel (L14), Arcane Recovery.
+### Combat / exploration subsystems (bounded) — RE-4
 
-**Documented deferrals** (depend on missing content / broader infra):
-
-- Greater Divine Intervention (Cleric L20) — needs a Wish spell.
-- Dragon Companion (Draconic L18) — needs a Summon Dragon spell.
-- Contact Patron (Warlock L9) — needs a Contact Other Plane spell.
-- Holy Nimbus (Devotion L20): the Holy Ward save-advantage half — save sites
-      don't carry the attacker's creature type yet (the Radiant aura ships).
-- Devious Strikes' Daze restriction, Use Magic Device's scroll/charge
-      sub-features, Thief Jumper — carried as markers pending broader
-      enforcement / item / jump infra.
-- Dark One's Own Luck — wired on on-hit condition saves; the ability-check +
-      concentration/AoE-save paths reuse the same helper as a follow-up.
-
-- [x] **Fighting Style (done 2026-05-24)** — all four SRD 5.2.1 styles
-      (Archery / Defense / Great Weapon / Two-Weapon; Dueling/Protection are
-      PHB-only and excluded). Granted by class features (Fighter L1 + L7,
-      Paladin/Ranger L2). `Character.fighting_styles` + `choose_fighting_style`
-      action/handler (`fightingStyleSlots` accounting, multiclass-summed,
-      distinct picks) + out-of-combat choice surface. Effects: Archery (+2
-      ranged to-hit, `toHit`), Two-Weapon (off-hand ability mod,
-      `twoWeaponAttack`), Defense (+1 AC while armored — `defenseAcBonus`
-      post-step at every `computeTotalAc` recompute site + immediate AC bump
-      on pick), Great Weapon Fighting (reroll 1s/2s on two-handed melee
-      damage — `rollDiceGwf`/`rollCriticalGwf` threaded through
-      `resolvePlayerAttack`; two-handed = heavy melee or versatile-used-2H).
-      Note: GWF on opportunity attacks deferred (the `gameEngine` PC-OA
-      `resolvePlayerAttack` call defaults `gwf=false`).
-- [x] **Evasion (done 2026-05-24)** — Rogue L7 / Monk L7 passive (`hasEvasion`
-      in multiclass.ts). On a DEX save-for-half effect: no damage on a success,
-      half on a failure; unavailable while Incapacitated. Applied in
-      `resolveEnemySpell` (the enemy damage-spell save path — the only place a
-      PC takes enemy save-for-half damage today). Spec covers the helper +
-      both damage outcomes vs the non-Evasion baseline.
-- [x] **Lay on Hands (done 2026-05-24)** — Paladin L1. Pool = 5 × Paladin
-      level (`layOnHandsRemaining`), tracked as points used on
-      `class_resource_uses.lay_on_hands`, replenished on a long rest. New
-      `lay_on_hands` action/handler: a bonus-action (self-managed, in-combat
-      only — usable out of combat) touch heal of `min(missing HP, pool)` for a
-      chosen party member or self, syncing the ally's grid-entity HP. Surfaced
-      in generateChoices per injured party member (in + out of combat). The
-      5-point poison-cure use is a deferred follow-up.
-- [x] **Aura of Protection (done 2026-05-24)** — Paladin L6. `auraOfProtection
-Bonus(char, st)`: a creature within 10 ft of a conscious L6+ Paladin (the
-      paladin always benefits) gains +CHA mod (min +1) to saving throws; best
-      aura when several overlap; off-grid (out of combat) the party is assumed
-      together. Wired into all three PC save sites — enemy-spell saves
-      (`resolveEnemySpell`), on-hit condition saves (`conditionSavingThrow`, via
-      a DC reduction like the Bardic roll), and concentration saves
-      (`checkConcentration`). Spec covers self/ally/range/incapacitated/
-      multi-paladin/off-grid. Deferred: the L18 30-ft upgrade and the
-      manual "choose which aura" when two overlap (engine auto-picks best).
-- [x] **Indomitable (done 2026-05-24)** — Fighter L9. `indomitableMaxUses`/
-      `indomitableRemaining` (1/2/3 uses at L9/13/17, tracked as uses spent on
-      `class_resource_uses.indomitable`, reset on a long rest). Reroll-on-fail
-      mechanics in `indomitable.ts` (`indomitableBonus` = Fighter level,
-      `consumeIndomitable`, `tryIndomitableReroll`). Wired into the same three
-      PC save sites Aura touches — enemy-spell saves (`resolveEnemySpell`),
-      on-hit condition saves (`conditionSavingThrow` → `indomitableConsumed`
-      threaded to `computeEnemyAttack`), and concentration saves
-      (`checkConcentration`). **Auto-resolve policy** (saves resolve inline on
-      enemy turns, no interactive prompt yet): the engine rerolls a failed save
-      only when a use remains and spends the use _only if the reroll succeeds_,
-      so a daily use is never wasted — and since it only triggers on an
-      already-failed save, taking the new roll never costs the player anything.
-      Spec covers use counts, the policy, and both integration paths. Deferred:
-      surfacing it as an interactive reaction (let the player choose _when_ to
-      spend); applying it to failed death saves (separate `processDeathSave`
-      path).
-- [x] **Extra Attack 2/3/4 (verified 2026-05-24)** — the scaling was already
-      implemented (`extraAttackCount` returns 1/2/3 extra at Fighter L5/11/20;
-      Ranger/Paladin/Barbarian/Monk get 1 at L5; `extraAttackCountForChar` takes
-      the max across classes per RAW) and the attack handler loops that many
-      extra swings. The gap was test coverage: the count helper was unit-tested
-      through L20 but only the L5 tier was exercised end-to-end. Added
-      dispatch-level integration tests proving an Attack action emits exactly 3
-      "Attack N — " swings at L11 and 4 at L20 (all-miss rolls keep the enemy
-      alive through the loop). No source change needed.
-- [x] **Reliable Talent (done 2026-05-24)** — Rogue **L7** (SRD 5.2.1 moved it
-      earlier from the 2014 L11). Treat a d20 of 9 or lower as a 10 on a check
-      using a skill/tool proficiency. `hasReliableTalent` (multiclass.ts) +
-      a `reliableTalent` flag on the shared `skillCheck` resolver that floors
-      the post-reroll die at 10, gated on `proficient` so it only fires on a
-      proficient check (RAW). Threaded from all three `skillCheck` callers —
-      search/Investigation (`interactObject`), group Stealth (`sneak`), and the
-      Rogue hide (`classFeature/rogue`). Spec covers the helper + the floor /
-      not-proficient / no-feature / post-Halfling-Lucky-reroll cases. Deferred:
-      the inline contested checks (grapple/shove Athletics-Acrobatics in
-      `combatTactical`, social Persuasion) roll raw `d(20)+mod` without
-      `skillCheck` (and without a proficiency bonus today), so RT doesn't reach
-      them yet — folding those into `skillCheck` is a separate correctness pass.
-- [x] **Slippery Mind (done 2026-05-24)** — Rogue L15: proficiency in Wisdom
-      and Charisma saving throws. `hasSlipperyMind` (multiclass.ts) wired into
-      `hasSaveProficiency` (the central save-prof helper), so it flows through
-      every save path that consults it — on-hit condition saves
-      (`conditionSavingThrow`) and lair-AoE saves. `hasSaveProficiency`'s param
-      was widened from a `Pick` to `Character` (both callers already pass one)
-      so it can read the Rogue level. Spec: helper + the WIS/CHA grant, the
-      L14 cutoff, STR/CON exclusion, and class-prof (DEX/INT) regression.
-      Note: enemy damage-spell saves (`resolveEnemySpell`) don't model save
-      proficiency for _any_ class yet (no prof bonus added there), so Slippery
-      Mind — like every save-prof source — doesn't affect that path; that's a
-      separate general gap, not Slippery-Mind-specific.
-- [x] **Elusive (done 2026-05-24)** — Rogue L18: no attack roll can have
-      Advantage against the rogue unless they're Incapacitated. `hasElusive`
-      (multiclass.ts) forces the enemy-attack advantage flag to `false` in
-      `computeEnemyAttack` (the single site where an enemy attack vs a PC
-      derives advantage — the OA paths already pass `false`). It overrides every
-      advantage source (prone/blinded/restrained, Reckless, etc.) and returns
-      false under any condition that imposes Incapacitated (paralyzed/stunned/
-      unconscious/petrified) — which also grant attackers advantage — so the
-      advantage correctly stands then. Spec: helper (level gate, multiclass,
-      incapacitation-off, non-incapacitating-on) + an integration test where a
-      prone Rogue L18 is missed on rolls that hit a prone non-Rogue (advantage
-      suppressed), driven through the dispatched `enemy_attack` handler.
-- [x] **Steady Aim (done 2026-05-24)** — Rogue L3: a Bonus Action granting
-      Advantage on your next attack this turn, usable only if you haven't moved,
-      after which your Speed is 0 for the rest of the turn. New `steady_aim`
-      branch in `classFeature/rogue.ts` (gated on Rogue L3 + bonus action
-      available + `movement_used == 0`); sets `turn_actions.steady_aim_pending`
-      and spends all remaining movement. The to-hit consumes the flag as a
-      one-shot advantage source (beside Inspiration/Luck). Surfaced in
-      `generateChoices` for Rogue L3+ when not yet moved. Spec: handler gates +
-      an integration test (with control) that the flag yields `(advantage)` on
-      the next attack and is consumed. Also fixes a doc regression from the
-      Elusive commit that collapsed the class gap table into the list item.
-- [x] **Stroke of Luck (done 2026-05-24)** — Rogue L20 capstone: once per short
-      or long rest, turn a failed D20 Test into a 20. Wired into all three D20-
-      Test categories. `strokeOfLuck.ts` (`strokeOfLuckAvailable` /
-      `consumeStrokeOfLuck`, tracked on `class_resource_uses.stroke_of_luck`,
-      reset on short **and** long rest in rest.ts). Hooks: **attacks** —
-      `resolveOneAttack` turns a missed swing into a natural 20 (auto-hit +
-      crit, fumble cleared); **ability checks** — a `strokeOfLuck` flag on
-      `skillCheck` floors a failed check to 20 when that passes, signalled back
-      via `strokeOfLuckUsed` and spent by the three callers (search / sneak /
-      hide; only the active PC in the group sneak); **saving throws** —
-      `conditionSavingThrow` (via a new `forceD20` param on `rollConditionSave`),
-      `resolveEnemySpell`, and `checkConcentration`, after the Indomitable
-      attempt. Auto-resolve policy (player-favorable, like Indomitable): applied
-      on the first failed test where a 20 rescues it, then spent. Specs:
-      strokeOfLuck.spec.ts (helper + checks + saves) + strokeOfLuckAttack.spec.ts
-      (the auto-crit). Deferred: death saves (separate `processDeathSave` path);
-      an interactive "use it now?" surface for timing control.
-- [x] **Jack of All Trades (done 2026-05-24)** — Bard L2: add half the
-      proficiency bonus (round down) to any ability check using a skill the bard
-      is NOT proficient in. `hasJackOfAllTrades` (Bard L2+) threaded as the
-      `jackOfAllTrades` flag through the three `skillCheck` callers (search /
-      sneak / hide); `skillCheck` already applied the half-prof when set and the
-      check is non-proficient — this just turns the flag on. Spec: helper +
-      skillCheck math (half-prof when unproficient, full prof when proficient,
-      nothing when off). Note: the inline contested checks (grapple/shove,
-      social) don't route through `skillCheck`, same boundary as Reliable Talent.
-- [x] **Expertise (done 2026-05-24)** — Rogue L1/L6, Bard L2/L9: double the
-      proficiency bonus on chosen skill proficiencies (2, then 2 more). New
-      `choose_expertise` action/handler (`handleChooseExpertise` in meta.ts) —
-      validates the skill is one you're proficient in, rejects duplicates, and
-      enforces `expertiseSlots` (multiclass grants sum). Surfaced in
-      `generateChoices` out of combat per still-unchosen proficiency while a
-      slot is open. `skillCheck`'s existing `expertise` param (×2 prof on a
-      proficient check) is now driven by `hasExpertise(char, skill)` from the
-      three callers (search → Investigation, sneak/hide → Stealth). Spec:
-      slots/helper, handler validation (proficiency / dup / slot-cap / non-PC),
-      and the ×2-prof math. Deferred: a level-up prompt that forces the pick at
-      L1/L2/L6/L9 (today it's an always-available choice while a slot is open);
-      Expertise on the inline contested checks (same `skillCheck`-routing
-      boundary as Reliable Talent / Jack of All Trades).
-- [x] **Font of Inspiration (verified 2026-05-24)** — Bard L5: regain all
-      expended Bardic Inspiration on a **short** rest (not just a long rest).
-      Already implemented in rest.ts (the short-rest path deletes the
-      `class_resource_uses.bardic_inspiration` counter for Bard L5+, so it
-      defaults back to full CHA-mod uses). Added an end-to-end spec proving a
-      Bard L5 regains BI on a short rest and a Bard L4 does not. No source
-      change needed.
-- [x] **Countercharm (done 2026-05-24)** — Bard L7: when a creature within 30 ft
-      fails a save against an effect applying Charmed or Frightened, the bard may
-      use a Reaction to make it reroll with Advantage. `canCountercharm` (Bard
-      L7+, reaction available, not incapacitated) + a Countercharm pass in
-      `conditionSavingThrow` (now takes `st`): on a still-failed charmed/
-      frightened save it finds a qualifying bard (self or ally within 30 ft via
-      `distanceFeet`, off-grid = in range), rerolls with Advantage, and on a
-      rescue returns `countercharmBardId`. `computeEnemyAttack` spends that
-      bard's reaction — on the proposed saver (self) or in the proposed state
-      (ally). Auto-resolve (player-favorable, like Indomitable/Stroke of Luck):
-      the reaction is spent only when the advantaged reroll succeeds. Spec: the
-      predicate + self / ally / control integration through the dispatched
-      `enemy_attack` handler. Deferred: an interactive reaction prompt so the
-      bard's player chooses whether to spend the reaction (today it auto-fires
-      on the first rescuable charmed/frightened save).
-- [x] **Superior Inspiration (done 2026-05-24)** — Bard L18: when you roll
-      Initiative, regain expended Bardic Inspiration until you have two (if
-      fewer). `superiorInspirationTopUp` (multiclass.ts) applied to every PC in
-      `runCombatStart` (the single initiative-roll path, shared by attack + cast
-      combat starts). Tops `class_resource_uses.bardic_inspiration` up to
-      `min(2, max)` — capped at the bard's normal max (CHA mod) since it only
-      regains expended uses. Spec: helper (top-up from 0/1, no-op at 2+, low-CHA
-      cap, sub-L18/non-bard) + a combat-start integration.
-- [x] **Feral Instinct (done 2026-05-24)** — Barbarian L7: Advantage on
-      Initiative rolls. Applied in `buildInitiativeOrder` (the d20 becomes the
-      max of two rolls for a Barbarian L7+), beside the Alert feat's flat bonus.
-      Spec: a Barbarian L7 takes the higher of two d20s; L6 and non-Barbarians
-      roll a single d20.
-- [x] **Danger Sense (done 2026-05-24)** — Barbarian L2: Advantage on Dexterity
-      saving throws unless Incapacitated. `hasDangerSense` (Barbarian L2+, not
-      under an incapacitating condition) folds Advantage into all three DEX-save
-      sites: on-hit condition saves (`conditionSavingThrow`), lair-AoE saves,
-      and enemy damage-spell saves (`resolveEnemySpell`, rolls 2d20-take-max).
-      Spec: helper + a DEX-save A/B through `resolveEnemySpell` (L2 saves where
-      L1 fails on the same rolls).
-- [x] **Relentless Rage (done 2026-05-24)** — Barbarian L11: if you drop to 0
-      HP while raging (and aren't killed outright), a CON save — DC 10, +5 per
-      prior use this rest — leaves you at 2× Barbarian level HP instead. Wired
-      into the enemy-attack knockout path (`resolveEnemySubAttack`), beside Orc
-      Relentless Endurance; tracked on `class_resource_uses.relentless_rage_used`
-      and reset on a short **or** long rest (DC back to 10). Spec: pass / fail /
-      escalating-DC / not-raging control via the dispatched `enemy_attack`
-      handler. Deferred: knockouts from enemy spells / lair AoEs (same path-
-      scoping limitation as Orc Relentless Endurance — only the attack path).
-- [x] **Persistent Rage (done 2026-05-24)** — Barbarian L15: when you roll
-      Initiative, regain all expended uses of Rage (once per long rest).
-      `persistentRageTopUp` (multiclass.ts) applied to every PC in
-      `runCombatStart`, beside Superior Inspiration — refreshes `rage_uses` to
-      `rageUsesMax` and sets a `persistent_rage_used` flag (reset on a long
-      rest), only when uses are expended. The "Rage lasts 10 minutes / no need
-      to extend it" clause is already pansori's behavior (Rage persists for the
-      encounter, clearing only at combat end). Spec: helper (refresh, used-flag
-      no-op, full-uses no-op, sub-L15/non-barb) + a combat-start integration.
-      (Note: "exhaustion-on-rage-end" in the gap list is a 2014 rule — 2024 SRD
-      Rage imposes no exhaustion, so it's out of scope.)
-- [x] **Fast Movement (done 2026-05-24)** — Barbarian L5: +10 ft Speed while not
-      wearing Heavy armor. `effectiveSpeed` now takes the loot table and reads
-      the equipped armor's category via `wearingHeavyArmor`, so unarmored and
-      light/medium-armored barbarians get +10 while Heavy-armored ones don't
-      (applied to base before Haste/Slow). The loot table was threaded through
-      all of `effectiveSpeed`'s call sites (gridMove, Cunning Action Dash, Dodge/
-      Dash utility, Step of the Wind, generateChoices, auto-advance). Spec:
-      unarmored / medium-armor (+10) vs Heavy (no bonus), L4 gate, non-Barbarian.
-- [x] **Primal Champion (done 2026-05-24)** — Barbarian L20 capstone: Strength
-      and Constitution each increase by 4, to a maximum of 30. Applied at the
-      L20 milestone in `applyLevelUpForClass`; the CON increase raises max HP
-      retroactively (same convention as an ASI CON bump — `conModGain × level`).
-      Spec: +4/+4 with HP bump at L20, the 30 cap, no-fire before L20, and
-      no-fire for a non-Barbarian reaching L20.
-- [x] **Indomitable Might (done 2026-05-24)** — Barbarian L18: if your total for
-      a Strength check is less than your Strength score, use the score instead.
-      `applyIndomitableMight(char, total)` floors the total at the STR score
-      (L18+), wired into the STR(Athletics) contests in `combatTactical` —
-      grapple, shove, and the escape-grapple Athletics roll (the Acrobatics
-      option stays DEX-based, untouched). Spec: helper (floor / no-floor /
-      sub-L18 / non-barb) + a grapple integration where an L18 wins a contest an
-      L17 loses on the same rolls. (Other STR checks would benefit too once they
-      route through this helper; grapple/shove are the STR checks pansori models.)
-- [x] **Brutal Strike (done 2026-05-24)** — Barbarian L9. While Reckless, a
-      pre-committed rider (`use_class_feature` `brutal_strike_forceful` /
-      `brutal_strike_hamstring` → `turn_actions.brutal_strike_pending`, offered
-      in generateChoices when Reckless) is consumed on the next STR **melee**
-      attack that isn't at disadvantage: `resolveOneAttack` **forgoes the
-      Reckless advantage** for that swing, and on a hit deals **+1d10** (weapon's
-      damage type, inside the resistance multiplier; doubled on a crit) plus the
-      rider — **Forceful Blow** (real 15-ft push reusing the entity shove, then
-      the attacker closes up to half Speed straight toward the target, no OAs —
-      direct entity move) or **Hamstring Blow** (a `hamstrung` entity condition
-      that `attemptEnemyApproach` honors as −15 ft Speed, cleared on round wrap
-      ≈ "until your next turn"). Spec: handler gates (L9 / Reckless) + both
-      riders end-to-end through the attack (Forceful pushes the target 3 squares
-      and consumes the rider; Hamstring applies the condition). **Barbarian is
-      now SRD-feature-complete.**
-- [x] **Uncanny Metabolism (done 2026-05-24)** — Monk L2: when you roll
-      Initiative, regain all expended Focus Points (ki) and heal Monk level + a
-      Martial Arts die roll; once per long rest. `uncannyMetabolismRefresh`
-      (multiclass.ts) applied to every PC in `runCombatStart`, beside Persistent
-      Rage / Superior Inspiration — restores `ki_points` to max, heals, and sets
-      `uncanny_metabolism_used` (reset on a long rest), only when ki is expended
-      or HP is missing. Spec: helper (regain+heal, full no-op, used no-op,
-      sub-L2/non-monk) + a combat-start integration.
-- [x] **Self-Restoration (done 2026-05-24)** — Monk L10: at the end of each of
-      your turns, remove one of Charmed / Frightened / Poisoned from yourself.
-      Applied in the turn-advance epilogue to the PC whose turn is ending (the
-      slot at `currentIdx`, before initiative advances), Monk L10+. Spec: sheds
-      Frightened at turn end (L10) vs not (L9 control) vs removes only an
-      eligible condition (Frightened cleared, Blinded kept). (The "no exhaustion
-      from forgoing food/drink" clause is narrative — pansori doesn't model
-      starvation exhaustion.)
-- [x] **Deflect Attacks (done 2026-05-24)** — Monk L3: when a Bludgeoning/
-      Piercing/Slashing attack hits you, a Reaction reduces the damage by 1d10 +
-      DEX + Monk level. Auto-resolved in `computeEnemyAttack` (player-favorable,
-      like the other reaction features): applied when the monk has a Reaction and
-      the hit is B/P/S, reducing the post-resistance damage and spending the
-      reaction (set on the proposed char). Spec: L3 slashing reduced + reaction
-      spent vs L2 (no reduction) vs fire (not B/P/S) vs reaction-already-spent,
-      via the dispatched `enemy_attack` handler. Deferred: the L13 Deflect Energy
-      upgrade (any damage type) and the optional Focus-Point redirect attack.
-- [x] **Body and Mind (done 2026-05-24)** — Monk L20 capstone: Dexterity and
-      Wisdom each increase by 4, to a maximum of 25. Applied at the L20 milestone
-      in `applyLevelUpForClass`, beside the Barbarian Primal Champion capstone
-      (neither stat affects max HP, so no retroactive bump). Spec: +4/+4 at L20,
-      the 25 cap, no-fire before L20, no-fire for a non-Monk.
-- [x] **Disciplined Survivor (done 2026-05-24)** — Monk L14: proficiency in all
-      saving throws. `hasDisciplinedSurvivor` (Monk L14+) wired into
-      `hasSaveProficiency` (returns true for any ability), so it flows through
-      every save path. Spec: helper + all-six-saves proficient at L14 vs only
-      the class saves (STR/DEX) at L13. Deferred: the Focus-Point reroll-a-
-      failed-save half (an Indomitable-style reroll spending ki).
-- [x] **Perfect Focus (done 2026-05-24)** — Monk L15: when you roll Initiative
-      and don't use Uncanny Metabolism, regain Focus Points until you have 4 (if
-      3 or fewer). `perfectFocusRefresh` (multiclass.ts) runs in `runCombatStart`
-      _after_ `uncannyMetabolismRefresh`, so when Uncanny fired (ki already at
-      max ≥4) the `> 3` gate makes this a no-op — exactly the "don't use Uncanny
-      Metabolism" fallback. Spec: helper (top-to-4, 4+ untouched, sub-L15/non-
-      monk) + integration both ways (Perfect Focus when Uncanny is spent;
-      defers to Uncanny when available). (Note: the gap list's "Empty Body" was
-      a stale 2014 name — the 2024 SRD Monk L18 feature is Superior Defense.)
-- [x] **Superior Defense (done 2026-05-24)** — Monk L18: spend 3 Focus Points
-      to gain Resistance to all damage except Force for the encounter (or until
-      Incapacitated). Activated via the `superior_defense` Monk feature handler
-      (spends 3 ki, sets a `superior_defense` condition); honored in
-      `computeEnemyAttack` (folds into `anyResist` so the damage halves, with a
-      Force carve-out + incapacitated check) and cleared in `endCombatState`.
-      Spec: handler (L18 spends 3 ki + sets the condition; gates L17 / low-ki) +
-      enemy-attack integration (slashing halved, Force not, no-condition
-      control). With this the Monk is SRD-feature-complete bar Slow Fall
-      (narrative — no falling-damage model) and higher Open Hand grades.
-- [x] **Arcane Recovery (done 2026-05-24)** — Wizard L1: on finishing a short
-      rest, recover expended spell slots totaling ≤ ⌈Wizard level / 2⌉ combined
-      levels, none level 6+; once per long rest. Implemented as a wizard branch
-      in `handleShortRest` mirroring the Land Druid Natural Recovery greedy loop
-      (lowest-level slots first, maximizing count) with a `l <= 5` carve-out and
-      gated on `hasClass(next, 'wizard') && !arcane_recovery_used`; the flag rides
-      on `class_resource_uses.arcane_recovery_used` and is cleared on a long rest
-      (`handleLongRest`). Added `'arcane_recovery'` to `SRD_CLASS_FEATURES.Wizard`
-      for parity. Spec: budget math + lowest-first, the L6+ exclusion, once-per-
-      long-rest (2nd short rest no-ops), long-rest reset, non-wizard control.
-      **Auto-resolve policy** (consistent with the codebase): RAW lets the player
-      choose which slots — the engine auto-picks lowest-first. Deferred: the
-      interactive slot-choice surface.
-- [x] **Bard SRD-complete — Words of Creation + Magical Secrets (done 2026-05-24).**
-      **Words of Creation** (L20 capstone): the bard always has Power Word Heal +
-      Power Word Kill prepared and may target a second creature within 10 ft when
-      casting either. Authored both L9 spells (`power_word_heal`: full heal via a
-      new `healFull` flag + the SRD condition cleanse through the existing
-      `removeConditions`, V-only; `power_word_kill`: ≤100 HP → dies outright via
-      `runPowerWordKill`, else 12d12 psychic — the death branch sets
-      `bypassResistance` on `applySingleTargetDamage` since "dies" isn't damage).
-      Capstone grant adds both ids to `spells_known` at Bard L20 in
-      `applyLevelUpForClass` (beside Primal Champion / Body and Mind). The
-      second-target rider is gated on `hasWordsOfCreation` (Bard L20): in heal.ts
-      for Power Word Heal (most-injured other ally within 10 ft; off-grid =
-      party-together) and powerWords.ts for Power Word Kill (nearest other living
-      enemy within 10 ft). Spec: PWK death vs 12d12, WoC dual-target both spells
-      (L20 hits two / out-of-range survives, L19 hits one), PW Heal full+cleanse,
-      capstone grant. **Magical Secrets** (L10) needs **no engine work** — pansori
-      has no spell-list gating (a character casts from `spells_known`, which
-      campaign content authors freely, so a Bard can already know Cleric/Druid/
-      Wizard spells); spell selection isn't a gated build step, so there is no
-      restriction for the feature to lift. Documented as already-permitted.
-
-> ⚠️ **Superseded (2026-05-25).** The "Major SRD gaps to fill" column below is
-> historical — every listed gap has since shipped. See the per-class completion
-> summary at the top of RE-2 for the authoritative state. Table retained as the
-> original scoping snapshot.
-
-| Class     | Implemented (approx)                                                                                                                                                                                                                       | Major SRD gaps to fill                                                                                                   |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| Barbarian | Rage, Reckless (L1–2), Frenzy (L3), Danger Sense (L2), Extra Attack (L5), Fast Movement (L5), Feral Instinct (L7), Relentless Rage (L11), Persistent Rage (L15), Indomitable Might (L18), Brutal Strike (L9), Primal Champion (L20)        | **SRD-complete** (exhaustion-on-rage-end is 2014-only, out of scope)                                                     |
-| Bard      | Bardic Inspiration (L1), Cutting Words (L3), Jack of All Trades (L2), Expertise (L2/9), Font of Inspiration (L5), Countercharm (L7), Superior Inspiration (L18), Words of Creation (L20)                                                    | **SRD-complete** (Magical Secrets is a no-op — pansori has no spell-list gating to lift)                                  |
-| Cleric    | Channel Divinity, Turn/Sear Undead, Preserve Life (Life)                                                                                                                                                                                   | Blessed Strikes, Divine Intervention, improved Channel uses, higher Life-domain grades                                   |
-| Druid     | Wild Shape (L2, CR L4/8), Land's Aid                                                                                                                                                                                                       | Wild Companion, full Circle of the Land grades, Wild Shape improvements, Beast Spells, Archdruid                         |
-| Fighter   | Second Wind, Action Surge (L2), Extra Attack (2/3/4), Indomitable (L9), Tactical Master (L9)                                                                                                                                               | Champion grades (Remarkable Athlete, Additional Style, Superior Critical, Survivor)                                      |
-| Monk      | Martial Arts, Flurry/Patient/Step (L2), Uncanny Metabolism (L2), Deflect Attacks (L3), Stunning Strike (L5), Extra Attack (L5), Evasion (L7), Self-Restoration (L10), Disciplined Survivor (L14), Perfect Focus (L15), Superior Defense (L18), Body and Mind (L20) | Slow Fall (narrative — no falling-damage model), higher Open Hand grades                                                 |
-| Paladin   | Sacred Weapon (Devotion L3), Fighting Style (L2), Extra Attack (L5), Lay on Hands (L1), Aura of Protection (L6)                                                                                                                            | Aura of Courage, Faithful Steed, Divine-Smite-as-feature, Devotion grades, capstone                                      |
-| Ranger    | Colossus Slayer (Hunter L3), Fighting Style (L2), Extra Attack (L5)                                                                                                                                                                        | spellcasting integration, Roving, Expertise, Tireless, Nature's Veil, Hunter grades                                      |
-| Rogue     | Expertise (L1/6), Cunning Action (L2), Cunning Strike (L5), Sneak Attack, Uncanny Dodge, Steady Aim (L3), Evasion (L7), Reliable Talent (L7), Slippery Mind (L15), Elusive (L18), Stroke of Luck (L20)                                     | Assassin grades                                                                                                          |
-| Sorcerer  | Metamagic (L3–5), sorcery points                                                                                                                                                                                                           | Innate Sorcery, Sorcerous Restoration, SP↔slot conversion completeness, full Draconic grades, capstone                   |
-| Warlock   | Agonizing Blast (passive)                                                                                                                                                                                                                  | Eldritch Blast beam scaling, Pact Boon, more invocations, Mystic Arcanum, Magical Cunning, Fiend grades, Eldritch Master |
-| Wizard    | cantrips only (Arcane Ward partial), Arcane Recovery (L1)                                                                                                                                                                                   | Scholar, Memorize Spell, Spell Mastery, Signature Spells, full Evoker grades                                            |
-
-#### RE-3: Character-build systems (small, high RAW payoff)
-
-- [~] **Epic boons** (L19+ feat options) — *backend done (2026-05-25).*
-      All 7 SRD boons (Combat Prowess, Dimensional Travel, Fate,
-      Irresistible Offense, Spell Recall, the Night Spirit, Truesight)
-      live in `contexts/srd/feats.ts` under the new `epic-boon` category
-      and slot into the existing `take_feat` surface. (The 2024 PHB has
-      more epic boons — Energy Resistance, Recovery, Speed, etc. — but
-      those are PHB-only; the SRD defines exactly these 7.)
-      - [x] **Foundation** — `epic-boon` FeatEffect variant; +1 ability
-            capped at 30; level-19 prerequisite; `take_feat` consumes the
-            L19 ASI for epic boons; `Character.truesight_ft`.
-      - [x] **Irresistible Offense** — Overcome Defenses (B/P/S ignores
-            Resistance via `applyDamageMultiplier`'s `ignoreResistance`)
-            + Overwhelming Strike (nat-20 extra damage = boosted score).
-      - [x] **Combat Prowess** — Peerless Aim (miss→hit, 1/turn) as a
-            last-resort rescue in `resolveOneAttack`.
-      - [x] **Spell Recall** — Free Casting (1d4 slot refund on L1–4
-            casts) in precast's slot-consumption block.
-      - [x] **Fate** — Improve Fate (±2d4 save rescue, 1/Initiative-or-
-            rest) mirroring Dark One's Own Luck. RAW's check/attack/ally/
-            penalty surfaces aren't modeled.
-      - [~] **Truesight / Dimensional Travel / Night Spirit** — honest
-            markers: the +1 ability lands, but the engine has no
-            see-Invisible substrate (Truesight), no concrete positioning
-            (Blink Steps), and no enemy-attack-path lighting / Invisible-
-            lifecycle (Night Spirit). Narrated, not mechanically wired.
-      - [ ] **Selection UI** — surfacing the L19 epic-boon pick is an FE
-            follow-up (same as the other RE-3 creation/choice surfaces).
-- [x] **Exhaustion (2024 model) — done 2026-05-25** — RAW **−2 to all d20
-      tests per level** + **−5 ft speed per level**, no max-HP reduction,
-      lethal at 6. `reviveD20Penalty` was renamed `d20TestPenalty` and now
-      carries both the revive penalty and Exhaustion (already threaded into
-      attacks/saves/checks/passives); `effectiveSpeed` drops 5 ft/level; the
-      old binary-Disadvantage model and the 2014 L4 HP-halving were removed.
-- [~] **Ability-score generation** — *backend done (2026-05-25).*
-      - [x] **Point buy / standard array validation** — pure helpers in
-            `services/abilityScores.ts` (`pointBuyTotalCost`,
-            `isValidPointBuy`, `isStandardArray`, `isValidForMethod`).
-            `POST /session/new` 400s on an illegal declared spread via the
-            new optional `generation_method` enum on `CharacterInputSchema`;
-            omitted / `'manual'` trusts the client (backward compatible).
-      - [x] **Background ability-score increases applied** —
-            `applyAbilityScoreIncreases` adds +1 per listed background
-            ability before `conMod`/`maxHp` derive from the scores. (These
-            were defined on `Background` but silently never applied at
-            creation — a real correctness gap, now closed.)
-      - [ ] **Creation UI** — let the player pick the method and (for the
-            +2/+1 RAW split) which two abilities; FE follow-up. Backend
-            applies the "all three by +1" option today.
-- [~] **Class skill selection + skill→ability map** — *partially done
-      (2026-05-25).*
-      - [x] **skill→ability map** — `SKILL_ABILITY` (all 18 SRD skills) +
-            `abilityForSkill` in rulesEngine: the single source of truth for a
-            skill's governing ability.
-      - [x] **All contested/social checks routed through `skillCheck`** —
-            Influence (Persuasion/Deception/Intimidation), the grapple + shove
-            attempts, the grapple escape, and the study action now gain
-            Expertise / Jack of All Trades / Reliable Talent / Halfling Lucky +
-            the exhaustion penalty. Indomitable Might still floors the STR
-            (Athletics) total; the escape picks the better of Athletics/
-            Acrobatics by modifier (RAW choice); the Thaumaturge bonus folds
-            into the study DC.
-      - [ ] **Creation choose-your-class-skills step** — replace the
-            auto-granted curated `SRD_CLASS_SKILLS[class]` list
-            (`routes/game.ts:289`, `contexts/srd/classes.ts:151`) with a
-            "choose N from [the full SRD option list]" build step. FE-coupled:
-            the engine needs to accept + validate a chosen list (the client
-            sends only ability scores today).
-
-#### RE-4: Combat / exploration subsystems (bounded)
-
-- [~] **Wall/terrain spells as real grid blockers** — *Wall of Fire done
-      (2026-05-25).* `GameState.spell_walls` holds transient per-room wall
-      cells (owner + blocksMovement + blocksLineOfSight); `wallObstacleCells`
-      merges them into the LoS/cover and movement obstacle sets. Wall of
-      Fire raises an opaque (sight-blocking) wall on cast, bound to the
-      caster's concentration and cleared by `breakConcentration`. Wall of
-      Force is deferred — it needs point/orientation targeting that
-      pansori's enemy-only targeting doesn't express yet (the
-      movement-blocking path via `blocksMovement` is already in place).
 - [ ] **Mounted combat** — `mount_id` exists but isn't enforced (forced
       dismount on damage, reach, ranged-while-mounted rules).
 - [ ] **Underwater combat** — non-piercing melee disadvantage, ranged
       rules, fire resistance.
-- [~] **Jumping** (long = STR ft, high = 3 + STR mod ft) — *Long Jump done
-      (2026-05-25).* `services/jump.ts` has the pure distance helpers; the
-      new `jump` action leaps straight over obstacle / difficult-terrain
-      cells up to the long-jump distance (full with a ≥10-ft run-up, half
-      standing), costs the jumped feet of movement, provokes OAs, and forces
-      a DC 10 Acrobatics check (or Prone) on a difficult-terrain landing.
-      High Jump is helper-only — verticality is the architectural gap (the
-      grid is flat, no elevation/ledges to leap to).
-- [~] **Line-of-sight / vision blocking by walls** — *targeting done
-      (2026-05-25).* `gridEngine.hasLineOfSight` (supercover `cellsOnLine`)
-      blocks ranged attacks (preattack) and offensive spell targeting
-      (isSpellOutOfRange) when a solid room obstacle lies strictly between
-      attacker and a non-adjacent target. Adjacent targets are exempt
-      (matches coverBonus). Remaining: FE grid-fog / vision reveal pairs
-      with this on the frontend.
-- [x] **Massive-damage instant death** (single hit ≥ max HP) — *done.*
-      `isMassiveDamageDeath` (gameEngine.ts) implements SRD 5.2.1 Massive
-      Damage (reduced to 0 with leftover ≥ HP max → dies outright, no death
-      saves) and is wired into the enemy-attack resolution path.
+- [ ] **High Jump / verticality** — Long Jump shipped; High Jump is
+      helper-only. Verticality is the architectural gap (flat grid, no
+      elevation/ledges).
+- [ ] **Wall of Force** — needs point/orientation targeting that pansori's
+      enemy-only targeting doesn't express yet (Wall of Fire shipped; the
+      `blocksMovement` path is in place).
+- [ ] **FE grid-fog / vision reveal** — pairs with the shipped LoS blocking
+      on the frontend (ghost-tint unseen cells, suppress enemy tokens).
 
-#### RE-5: Condition + spellcasting fidelity (cleanups)
+### Condition + spellcasting fidelity (cleanups) — RE-5
 
 - [ ] Register **Deafened**; add **Petrified** damage resistance + save
       advantage; **Charmed** CHA-check disadvantage; **Slow** end-of-turn
       recurring save; make concentration's **incapacitation** gate explicit.
-- [ ] **Choice-UX mechanics** that auto-resolve today: Polymorph beast
-      pick, Greater Restoration "pick one effect," multi-target picker
-      (Bless / Bane / upcast +1 target). Part engine, part FE.
-- [ ] **Multiclass edge cases** — ASI spacing validation, skill/tool
-      grants on multiclass entry, warlock pact-slot pool separation,
-      second-class subclass features.
+- [ ] **Multiclass edge cases** — ASI spacing validation, skill/tool grants
+      on multiclass entry, warlock pact-slot pool separation, second-class
+      subclass features.
 
-#### RE-6: Content (data on existing patterns, not engine)
+### Subsystem follow-ups
 
-- [ ] **Spells** — ~112 of ~330 SRD spells. Most remaining categories
-      are already representable (data entry); summons depend on RE-1, a few
-      "pick an option" spells on RE-5's picker.
-- [ ] **Monsters** — stat-block content; legendary/lair effects can use
-      the shipped scaffolding (see boss-wiring item under Content & playtest).
-- [ ] **Magic items** — content; attunement + curse infra is shipped.
-
-### Remaining subsystem follow-ups
-
-> Open items from the earlier (2026-05-21) mechanics roadmap whose
-> frameworks have shipped. Mounted combat, jumping, multiclass edge
-> cases, and somatic-component enforcement now live in the RE-1…RE-6
-> roadmap above; the rest:
-
-- [ ] **Magic / Utilize action-category tags** — category wrappers
-      (cast_spell + magic-item-use + magical features = Magic; mundane
-      item-use + interact_object = Utilize). Only needed for Action Surge's
-      "extra action, except the Magic action" rule once a martial
+- [ ] **Magic / Utilize action-category tags** — only needed for Action
+      Surge's "extra action, except the Magic action" once a martial
       multiclasses into a caster. Bundle with multiclass UX.
-- [ ] **Magic-item attunement — remaining** — short-rest attune gating
-      per RAW, Remove Curse ↔ `de_attune` interaction, and cursed items in
-      seed loot tables (only spec fixtures carry them today).
-- [ ] **Lighting — remaining** — cell-grained lighting (torchlight
-      cones, darkness spells), auto-apply Blinded in dark rooms, and
-      lighting-adjusted active Perception (search). The room-grained
-      Stealth/Perception path already shipped.
+- [ ] **Magic-item attunement — remaining** — short-rest attune gating,
+      Remove Curse ↔ `de_attune` interaction, cursed items in seed loot.
+- [ ] **Lighting — remaining** — cell-grained lighting (torchlight cones,
+      darkness spells), auto-Blinded in dark rooms, lighting-adjusted active
+      Perception. Room-grained Stealth/Perception already ships.
 - [ ] **Somatic spell components** — RAW requires a free hand; needs a
-      hand-state model (weapon + shield = both hands, two-handed = both).
-      No spell carries a `somatic` flag yet. Also unlocks the
-      focus-substitutes-for-material rule.
-- [ ] **Battleaxe mastery: Flex → Topple** — sandbox tags Battleaxe with
-      the homebrew `flex` mastery; RAW 2024 assigns Topple. Audit the other
-      Flex-tagged weapons and either retire `flex` or document it as a
-      pansori variant.
-- [ ] **Out-of-combat systems** — Downtime activities, Bastions,
-      Crafting (potions / scrolls / items), Vehicles. Lowest urgency.
+      hand-state model. No spell carries a `somatic` flag yet. Also unlocks
+      focus-substitutes-for-material.
+- [ ] **Battleaxe mastery: Flex → Topple** — sandbox tags Battleaxe with the
+      homebrew `flex`; RAW 2024 assigns Topple. Audit other Flex-tagged
+      weapons; retire `flex` or document it as a pansori variant.
+- [ ] **Out-of-combat systems** — Downtime, Bastions, Crafting (potions /
+      scrolls / items), Vehicles. Lowest urgency.
 
-### Subclass coverage (2026-05-23 — 12 SRD-iconic, one per class)
+### Narrative pipeline — structured fragments (partial)
 
-> The SRD-only reset removed all non-iconic subclasses (and the
-> Aasimar species + its Healing Hands / Celestial Revelation
-> actions). The 12 iconic subclasses that remain — one per class —
-> are each selectable with their iconic L3 feature wired + tested:
-> Berserker, College of Lore, Life Domain, Circle of the Land,
-> Champion, Open Hand, Oath of Devotion, Hunter, Assassin, Draconic
-> Sorcery, Fiend, Evoker. See [srd-only-audit.md](srd-only-audit.md)
-> for the full subclass + species removal record.
+- [ ] `twoWeaponAttack` fragment — off-hand outcomes emit no `CombatEvent`
+      (needs a `two_weapon_hit` kind or prose alignment).
+- [ ] Cleave-hit fragment — secondary-target damage emits no event.
+- [ ] `resolveTarget(ctx, action)` helper to dedupe target resolution
+      across ~5 sites.
+- [ ] `cleric.ts` Divine Spark auto-hit → `spell_auto_hit` fragment (defer
+      to a Divine Spark rework).
 
 ---
 
 ## Content & playtest
 
-- [ ] **Boss legendary + lair actions — wire to actual bosses** — engine scaffolding (`EnemyTemplate.legendary_actions` + per-round point pool refreshing on the legendary's own turn; `EnemyTemplate.lair_actions` firing on round-wrap as AoE save-for-half damage) is in place with test coverage. Effects shipped: `extra_attack` (legendary) and `aoe_save_damage` (lair). Not wired to any current boss because per-encounter balance was tuned without them. A future boss (fourth-campaign showcase, or after Crypt Lord re-balance settles) is a better fit. More effect kinds (terrain shift, debuff aura, summon, multi-attack legendary) can be added as content demands them.
-- [ ] **Party line-of-sight indicators on the grid** — Phase 2 of the grid-detail pass needs Bresenham LoS that respects the obstacles we just shipped. Visual: ghost-tint cells the active PC can't see; suppress enemy tokens in those cells beyond the existing `dark`-illum fog. ~1 day. Was in phase-2 but deferred to its own commit since it needs LoS-blocking through obstacles.
-- [ ] **Fourth campaign module (opportunistic)** — coastal pirate town, desert ruin, planar city, etc. Stress-tests the format further. Not on the critical path.
+- [ ] **Wire boss legendary + lair actions to an actual boss** — scaffolding
+      + tests exist; unwired pending a fitting boss (fourth-campaign showcase
+      or post Crypt Lord re-balance). More effect kinds (terrain shift,
+      debuff aura, summon, multi-attack legendary) as content demands.
+- [ ] **Party line-of-sight indicators on the grid** — Bresenham LoS that
+      respects the shipped obstacles; ghost-tint cells the active PC can't
+      see, suppress enemy tokens beyond the existing `dark`-illum fog. ~1 day.
+- [ ] **Fourth campaign module (opportunistic)** — coastal pirate town,
+      desert ruin, planar city, etc. Not on the critical path.
 
 ---
 
 ## Type-share infrastructure
 
-- [ ] **Phase 3 of type-share** (remaining workspace-local: Character, GameState, Seed, Trap, Room, OnHitEffect, BossPhase, EnemyTemplate, Enemy, Spell, BeastForm, InventoryItem, TurnActions, DeathSaves, Context/FrontendContext, Location, GameRule, RuleFacts, CampaignFacts) — these either depend on BE-only types that would cascade-share (Seed → Enemy → BossPhase → OnHitEffect; Location → Room → Trap), have FE-vs-BE structural differences requiring reconciliation (Character / GameState — FE has slim versions, BE has rich), or are intentionally separate (FrontendContext vs Context). Defer until there's a concrete reason to share each one.
+- [ ] **Phase 3 of type-share** (remaining workspace-local: Character,
+      GameState, Seed, Trap, Room, OnHitEffect, BossPhase, EnemyTemplate,
+      Enemy, Spell, BeastForm, InventoryItem, TurnActions, DeathSaves,
+      Context/FrontendContext, Location, GameRule, RuleFacts, CampaignFacts).
+      These cascade-share, need FE↔BE reconciliation, or are intentionally
+      separate. Defer until there's a concrete reason to share each one.
 
 ---
 
 ## UX & polish
 
-- [ ] **Tutorial / onboarding** (deferred-to-launch per user instruction). 2-room intro covering the action choice loop, grid combat, inventory modal. New players have nowhere to learn the controls today. Held until the engine surface stabilizes near launch — building this now means rebuilding every time a UI surface changes.
-- [ ] **Dynamic room/encounter image generation** — Google Imagen behind `IMAGE_PROVIDER` flag, off by default.
-- [ ] **Sound effects** — ambient audio per location type; combat sound cues.
-- [ ] **LLM enhancement cost guards** (deferred-to-launch per user instruction). Per-session token budget, short-event skip threshold, `LLM_ENHANCEMENT=off` kill switch. Held until launch volume justifies it.
+- [ ] **Tutorial / onboarding** (deferred-to-launch) — 2-room intro covering
+      the action loop, grid combat, inventory modal. Held until the engine
+      surface stabilizes near launch.
+- [ ] **Dynamic room/encounter image generation** — Google Imagen behind
+      `IMAGE_PROVIDER` flag, off by default.
+- [ ] **Sound effects** — ambient audio per location type; combat cues.
+- [ ] **LLM enhancement cost guards** (deferred-to-launch) — per-session
+      token budget, short-event skip threshold, `LLM_ENHANCEMENT=off` kill
+      switch.
 
 ---
 
 ## Engine & infrastructure
 
-- [ ] **Save/state persistence across redeploys (manual verify)** — `normalizeState` specs assert that a JSONB state row missing post-rollout fields loads cleanly and survives a `takeAction` call without crashing. Still TODO: actual end-to-end manual exercise — start a session, redeploy the backend container, resume the session, confirm parity. ~30 min.
-- [ ] **Difficulty tuning from playtest data** — once playtests happen, capture damage/HP/encounter telemetry to inform tuning passes. Real fights are starting to expose where the math is off (Crypt Lord TPK was the first big signal). ~3-4h to wire telemetry; ongoing to tune.
-- [ ] **Regression-spec coverage gaps** — add targeted specs for Bless on 4+-member parties, Monk Flurry kill-on-first-strike, Frenzy with no enemy in range, and the unknown-feature fallback (gaps surfaced during the action-handler refactor). ~2-3h.
+- [ ] **Save/state persistence across redeploys (manual verify)** —
+      `normalizeState` specs assert a state row missing post-rollout fields
+      loads + survives a `takeAction`. Still TODO: actual end-to-end exercise
+      (start → redeploy → resume → confirm parity). ~30 min.
+- [ ] **Difficulty tuning from playtest data** — capture damage/HP/encounter
+      telemetry to inform tuning (Crypt Lord TPK was the first signal).
+      ~3-4h to wire telemetry; ongoing to tune.
+- [ ] **Regression-spec coverage gaps** — Bless on 4+-member parties, Monk
+      Flurry kill-on-first-strike, Frenzy with no enemy in range, the
+      unknown-feature fallback. ~2-3h.
+- [ ] **Pre-commit hook (Husky + lint-staged)** — auto-run eslint + prettier
+      on staged files; catches prettier-dirty code before CI. ~30 min;
+      bypassable with `--no-verify`. CI lint stays the gate.
 
-- [ ] **Pre-commit hook (Husky + lint-staged)** — auto-run eslint + prettier on staged files before commit. Catches the class of bug where prettier-dirty code reaches CI and fails the build. ~30 min setup; bypassable with `--no-verify`. CI lint stays as the gate.
+### Lower urgency (flag now, defer)
 
-### Architecture audit follow-ups
-
-> **2026-05-21 architecture review** identified the rules/state seams that
-> will make adding 5.5e features (more conditions, more spells, more
-> monster abilities) progressively harder. Priority order below is by
-> leverage — items 1-3 pay for themselves within 2-3 features and
-> compound; 4-7 are medium-leverage; 8-9 are flagged but deferred.
-
-#### Medium leverage
-
-- [~] **4. Narrative pipeline — structured fragments** (multi-stage
-  migration; attack + spell + enemy-side paths shipped). Remaining:
-  - [ ] `twoWeaponAttack` fragment migration — needs a `two_weapon_hit`
-        kind or prose alignment; off-hand outcomes emit no `CombatEvent` today.
-  - [ ] Cleave-hit fragment — secondary-target damage emits no event.
-  - [ ] `resolveTarget(ctx, action)` helper to dedupe target resolution
-        across ~5 sites.
-  - [ ] `cleric.ts` Divine Spark auto-hit → `spell_auto_hit` fragment
-        (defer until a Divine Spark rework).
-
-- [~] **5. Monsters as first-class action subjects** (extraction +
-  type-seam + Phase-3 handler migration shipped; dispatcher integration
-  is **RE-1** above). `runEnemyTurns` is decomposed into named handlers;
-  the `Actor` union + `ctx.actor` seam is in place; all isolated PC-state
-  handlers now read/write via `ctx.actor`. Remaining = phases 4–5: wire
-  enemy turns through `dispatchAction` so shared abilities (Stunning
-  Strike, smites, …) run for PCs and monsters from one path, then drop
-  `ctx.char` / `ctx.safeIdx`.
-
-#### Lower urgency (flag now, defer)
-
-- [ ] **8. Multiplayer delta protocol** — full-state replace per action
-      is fine at current scale. Once campaign state grows (more PCs,
-      larger maps, persistent NPCs) broadcast size will hurt. Don't
-      prebuild — wait until measured pain.
-
-- [ ] **9. Spell-slot / HP / action-budget server-side invariants** —
-      `castSpell` checks slots before decrementing only as a permission
-      gate that returns an error narrative; stale-state actions get
-      accepted. With `turn_seq` already on the wire, server-side
-      assertions can reject with 409 (same path the FE already handles)
-      for `spell_slots_used <= max`, `hp <= max_hp`, action-economy
-      budget. Tighten when an exploit surfaces.
-
-#### Pre-existing (kept for reference)
-
-- [ ] **Observability** (needs-input) — only `console.log` today. Sentry / structured logging / error tracking would surface prod issues. Requires choosing a service (paid SaaS or self-hosted).
-- [ ] **CHANGELOG.md** (needs-input) — no user-visible change log. Should we keep one? Format (Keep-a-Changelog, conventional commits, etc.)?
-- [ ] **Post-deploy health check + rollback** (needs-input) — CI deploys via SSM but doesn't poll `/api/health` after to verify, nor roll back on failure. Bad deploys 500 prod until manual intervention. ~2-3h to wire properly.
+- [ ] **Multiplayer delta protocol** — full-state replace per action is fine
+      at current scale; revisit when broadcast size hurts (more PCs, larger
+      maps, persistent NPCs). Don't prebuild.
+- [ ] **Server-side invariants** — `castSpell` checks slots only as a
+      permission gate; stale-state actions get accepted. With `turn_seq` on
+      the wire, assert `spell_slots_used <= max`, `hp <= max_hp`, action
+      budget and reject with 409. Tighten when an exploit surfaces.
+- [ ] **Observability** (needs-input) — only `console.log` today; Sentry /
+      structured logging would surface prod issues. Requires choosing a service.
+- [ ] **CHANGELOG.md** (needs-input) — no user-visible change log. Keep one?
+      Which format?
+- [ ] **Post-deploy health check + rollback** (needs-input) — CI deploys via
+      SSM but doesn't poll `/api/health` or roll back on failure. ~2-3h.
 
 ---
 
-## Accessibility audit (2026-05-21)
+## Accessibility audit
 
-> Code-survey pass focused on WCAG 2.1 AA. The engine is already strong
-> on focus-visible outlines (global `:focus-visible` rule), aria-labels
-> on icon-only buttons (MoveDPad/SpellBar/CombatActionBar), tablist
-> semantics + arrow-key navigation on ContextPanel, focus-trap +
-> Esc-close on Dialog, aria-live polite on the combat narrative, and
-> proper `<button>` elements for clickable party tiles. Items below are
-> the gaps the survey found; manual screen-reader + keyboard-only
-> validation is the next step.
+> Code-survey pass (WCAG 2.1 AA). Already strong: focus-visible outlines,
+> aria-labels on icon buttons, tablist semantics + arrow-key nav, focus-trap
+> + Esc-close dialogs, aria-live combat narrative, real `<button>` party
+> tiles. Gaps below; manual SR + keyboard-only validation is the next step.
 
-### Remaining
-
-- [ ] **fieldset/legend on grouped form controls** — CharScreen's `PORTRAIT` and `ABILITY SCORES` "labels" are group descriptors (govern multiple buttons) but use plain `<label>` without an `htmlFor`. The right HTML is `<fieldset><legend>` (or `<div role="group" aria-labelledby="...">`). Larger refactor than the simple-label htmlFor pass already shipped.
-- [ ] **HP / condition live-region updates** — the combat narrative has `aria-live="polite"` so SR users hear what happened, but HP-bar fills and condition badges update silently. An off-screen `aria-live` summary of the most recent delta (`Fighter HP 18, conditions: frightened`) would help SR users track state without re-listening to the full narrative. Needs UX tuning on when to announce vs. when to stay quiet.
-- [ ] **Manual SR + keyboard-only validation** — code survey done; next step is exercising the app with VoiceOver / NVDA / JAWS and Tab-only to find the things the code review missed.
+- [ ] **fieldset/legend on grouped form controls** — CharScreen's `PORTRAIT`
+      / `ABILITY SCORES` group descriptors use plain `<label>`; the right
+      HTML is `<fieldset><legend>` (or `role="group"` + `aria-labelledby`).
+- [ ] **HP / condition live-region updates** — HP bars + condition badges
+      update silently; an off-screen `aria-live` delta summary would help SR
+      users track state. Needs UX tuning on when to announce.
+- [ ] **Manual SR + keyboard-only validation** — exercise with VoiceOver /
+      NVDA / JAWS and Tab-only to find what the code review missed.
 
 ---
 
-## Security audit (2026-05-21)
+## Security audit
 
-> Code-survey pass focused on OWASP Top 10 and multiplayer-readiness.
-> Solid foundation already: helmet headers, CORS pinned to FRONTEND_URL,
-> Postgres-backed sessions with httpOnly + secure + sameSite cookies,
-> rate-limit on `/api/auth/*`, `trust proxy 1` for nginx, all DB queries
-> parameterized ($1/$2 placeholders), passport+Google OAuth. The single-
-> tenant model masks several issues that will bite when session_participants
-> lands.
+> Solid foundation: helmet headers, CORS pinned to `FRONTEND_URL`, Postgres
+> sessions with httpOnly + secure + sameSite cookies, auth rate-limit, all
+> queries parameterized, passport + Google OAuth. The single-tenant model
+> masks issues that bite when `session_participants` lands.
 
-### Remaining
-
-- [ ] **No CSRF protection on state-changing endpoints** — cookies use `sameSite: 'none'` in prod (required for cross-origin SPA + API), so the browser sends the session cookie on cross-origin POSTs. A malicious site could trigger `POST /api/game/session/:id/action` via a logged-in user. Options: (a) tighten to `sameSite: 'lax'` if cross-origin isn't actually needed — confirm the prod FE + API domain layout; (b) add a double-submit CSRF token; (c) require a custom header like `X-Requested-With: XMLHttpRequest` (lightweight but defense-in-depth only). **Needs design call before implementation.**
-- [ ] **Multiplayer: session ownership + turn enforcement** (already in main TODO) — `game_sessions.user_id` is single-tenant; `takeAction` doesn't verify `req.user.id === characters[active].owner_user_id`. Documented above under Multiplayer; flagged here so the security pass references it.
-- [ ] **`npm audit` in CI** — no automated dependency-vuln check. Add a job to PR builds that fails on `high` or `critical`. ~15 min YAML edit; ongoing maintenance to triage findings.
-- [ ] **CSP for any future HTML-serving paths** — helmet's CSP is disabled (`contentSecurityPolicy: false`) because the API doesn't return HTML. If we ever serve uploaded files or generated images directly, re-enable CSP with a tight `script-src 'self'` policy.
-- [ ] **Session fixation protection** — `express-session` doesn't rotate the session id on login. Passport regenerates by default but worth confirming. Tested by logging in, copying the cookie, logging out, logging in again — should produce a new cookie.
+- [ ] **CSRF on state-changing endpoints** — prod cookies use
+      `sameSite: 'none'`, so the session cookie rides cross-origin POSTs.
+      Options: tighten to `lax` if cross-origin isn't needed; double-submit
+      token; or `X-Requested-With` header. **Needs a design call first.**
+- [ ] **Multiplayer: session ownership + turn enforcement** —
+      `game_sessions.user_id` is single-tenant; `takeAction` doesn't verify
+      `req.user.id === characters[active].owner_user_id`.
+- [ ] **`npm audit` in CI** — fail PR builds on `high`/`critical`. ~15 min
+      YAML; ongoing triage.
+- [ ] **CSP for any future HTML-serving paths** — helmet CSP is off (API
+      returns no HTML); re-enable with tight `script-src 'self'` if we ever
+      serve files/images directly.
+- [ ] **Session fixation protection** — confirm `express-session` rotates
+      the session id on login (passport regenerates by default).
 
 ---
 
 ## Deployment reference
 
-Already shipped: ECR, EC2, RDS, ALB-less direct EC2 + nginx, Let's Encrypt with certbot webroot auto-renew, GitHub Actions → SSM SendCommand deploy, Google OAuth, Docker Compose prod. The required `/opt/pansori/.env` vars on EC2:
+Shipped: ECR, EC2, RDS, direct EC2 + nginx, Let's Encrypt (certbot webroot
+auto-renew), GitHub Actions → SSM SendCommand deploy, Google OAuth, Docker
+Compose prod. Required `/opt/pansori/.env` vars on EC2:
 
 - `POSTGRES_PASSWORD`, `POSTGRES_USER` (`pansori`), `POSTGRES_DB` (`pansori_db`)
 - `SESSION_SECRET` (64-char random)

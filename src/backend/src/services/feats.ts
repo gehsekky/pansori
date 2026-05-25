@@ -6,8 +6,8 @@
 //
 // Pansori is an SRD-only build; the feat catalog is limited to the
 // Origin Feats in SRD 5.2.1 (Alert, Magic Initiate × 3 spell-list
-// variants, Savage Attacker, Skilled). PHB-only feats were removed
-// in the SRD-only refactor — see docs/srd-only-audit.md.
+// variants, Savage Attacker, Skilled) plus the SRD epic boons. PHB-only
+// feats are out of scope — see CLAUDE.md for the contribution rule.
 
 import type { AbilityKey, Character, Context, Feat } from '../types.js';
 

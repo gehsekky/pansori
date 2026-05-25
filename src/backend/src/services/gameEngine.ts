@@ -48,8 +48,10 @@ import { BEAST_FORMS, SRD_SPECIES, availableBeastForms } from '../contexts/srd/i
 import {
   DEFAULT_SPEED_FEET,
   SQUARE_SIZE,
+  coverBonus,
   distanceFeet,
   findPath,
+  hasLineOfSight,
   opportunityAttackTriggers,
   posEqual,
 } from './gridEngine.js';
@@ -3673,12 +3675,16 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         kind: 'class_feature',
         requiresBonusAction: true,
       });
-      choices.push({
-        label: 'Cunning Action: Hide — stealth check as bonus action',
-        action: { type: 'use_class_feature', featureId: 'cunning_action_hide' },
-        kind: 'class_feature',
-        requiresBonusAction: true,
-      });
+      // SRD Hide [Action] prerequisite — only offer Hide when the rogue is
+      // Heavily Obscured or behind heavy cover and out of enemy line of sight.
+      if (canAttemptHide(char, state, seed).allowed) {
+        choices.push({
+          label: 'Cunning Action: Hide — DC 15 Stealth check as bonus action',
+          action: { type: 'use_class_feature', featureId: 'cunning_action_hide' },
+          kind: 'class_feature',
+          requiresBonusAction: true,
+        });
+      }
     }
 
     // 2024 PHB Rogue L3+: Steady Aim — bonus action for advantage on the next
@@ -4736,6 +4742,16 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       action: { type: 'disengage' },
       kind: 'disengage',
     });
+    // SRD 5.2.1 Hide [Action] — any class, as an Action, when the
+    // obscurement/cover + out-of-line-of-sight prerequisite is met. (Rogues
+    // also get Hide as a Bonus Action via Cunning Action, offered separately.)
+    if (canAttemptHide(char, state, seed).allowed) {
+      choices.push({
+        label: 'Hide — DC 15 Stealth check (gain the Invisible condition on a success)',
+        action: { type: 'hide' },
+        kind: 'hide',
+      });
+    }
   }
 
   // Attune choices — out of combat, for unnattuned items that require attunement
@@ -6397,6 +6413,56 @@ export function runAllyTurn(args: {
     if (!anyEnemyLeft) st = endCombatState(st);
   }
   return { st, narrative };
+}
+
+/**
+ * SRD 5.2.1 Hide [Action] prerequisite. RAW: you can attempt to Hide only
+ * while you're **Heavily Obscured or behind Three-Quarters / Total Cover**,
+ * **and** you must be **out of any enemy's line of sight**. Modelled on the
+ * combat grid:
+ *   - A **dark** room is Heavily Obscured. Pansori enemies have no darkvision
+ *     (see `effectiveLightFor` / the sneak path), so darkness satisfies the
+ *     prerequisite outright — no enemy can see you.
+ *   - Otherwise, for **every** living enemy on the grid the PC must either be
+ *     out of that enemy's line of sight (a solid obstacle between them = Total
+ *     Cover) or have at least **Three-Quarters Cover** (`coverBonus` === 5).
+ *     Half cover and open ground don't qualify — RAW.
+ *
+ * Dim light is only *lightly* obscured (Disadvantage on the searcher's sight
+ * Perception, handled on the find side), so it does NOT by itself permit
+ * Hiding. Degrades to allowed when off-grid (no tracked entities) — there's no
+ * position to verify, so the attempt is trusted.
+ */
+export function canAttemptHide(
+  char: Character,
+  st: GameState,
+  seed: Seed
+): { allowed: boolean; reason: string } {
+  const lighting = seed.rooms.find((r) => r.id === st.current_room)?.lighting ?? 'bright';
+  if (lighting === 'dark') return { allowed: true, reason: '' };
+  if (!st.entities) return { allowed: true, reason: '' };
+  const self = st.entities.find((e) => e.id === char.id);
+  if (!self) return { allowed: true, reason: '' };
+  const enemies = st.entities.filter((e) => e.isEnemy && e.hp > 0);
+  if (enemies.length === 0) return { allowed: true, reason: '' };
+  const obstacles = [
+    ...(seed.rooms.find((r) => r.id === st.current_room)?.obstacles ?? []),
+    ...wallObstacleCells(st, st.current_room, 'los'),
+  ];
+  // A watcher is any living enemy that can plainly see the PC: clear line of
+  // sight AND less than Three-Quarters Cover. If one exists, Hide is illegal.
+  const watcher = enemies.some(
+    (en) =>
+      hasLineOfSight(en.pos, self.pos, obstacles) && coverBonus(en.pos, self.pos, obstacles) < 5
+  );
+  if (watcher) {
+    return {
+      allowed: false,
+      reason:
+        'you are in the open — without Heavy Obscurement or at least three-quarters cover, a watching enemy can still see you',
+    };
+  }
+  return { allowed: true, reason: '' };
 }
 
 /**
