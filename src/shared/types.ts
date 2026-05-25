@@ -292,6 +292,10 @@ export type StructuredAction =
       // Set by the Divine Intervention choice surface; precast validates
       // eligibility and bypasses the prep/slot/material gates.
       divineIntervention?: boolean;
+      // Evoker L14 Overchannel — maximize this damaging spell's dice (level
+      // 1-5 slot). First use/long rest is free; later uses deal escalating
+      // Necrotic self-damage. Validated in precast.
+      overchannel?: boolean;
     }
   | { type: 'disarm_trap' }
   | { type: 'interact_object'; objectId: string }

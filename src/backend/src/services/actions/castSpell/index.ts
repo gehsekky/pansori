@@ -76,6 +76,7 @@ export const handleCastSpell: ActionHandler<{
       slotLevel: number;
       ritual?: boolean;
       divineIntervention?: boolean;
+      overchannel?: boolean;
     },
     spell
   );

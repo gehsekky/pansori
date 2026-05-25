@@ -1,5 +1,12 @@
 import type { Enemy, Spell } from '../../../types.js';
-import { abilityMod, cantripDamageDice, rollDice, rollDiceEmpowered, upcastDamage } from '../../rulesEngine.js';
+import {
+  abilityMod,
+  cantripDamageDice,
+  maxDice,
+  rollDice,
+  rollDiceEmpowered,
+  upcastDamage,
+} from '../../rulesEngine.js';
 import {
   elementalAffinityBonus,
   empoweredEvocationBonus,
@@ -30,9 +37,11 @@ export function runAutoHitSpell(
   // SRD Metamagic Empowered Spell — reroll up to CHA-mod of the lowest dice;
   // Draconic Elemental Affinity — +CHA to the damage roll of the affinity type.
   const spellDmg =
-    (ctx.metamagic?.includes('empowered')
-      ? rollDiceEmpowered(autoHitExpr || spell.damage || '0', Math.max(1, abilityMod(char.cha)))
-      : rollDice(autoHitExpr || spell.damage || '0')) +
+    (ctx.overchannel
+      ? maxDice(autoHitExpr || spell.damage || '0')
+      : ctx.metamagic?.includes('empowered')
+        ? rollDiceEmpowered(autoHitExpr || spell.damage || '0', Math.max(1, abilityMod(char.cha)))
+        : rollDice(autoHitExpr || spell.damage || '0')) +
     elementalAffinityBonus(char, spell.damageType) +
     potentSpellcastingBonus(char, spell) +
     empoweredEvocationBonus(char, spell);

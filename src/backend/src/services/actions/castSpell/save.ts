@@ -3,6 +3,7 @@ import {
   abilityMod,
   applyDamageMultiplier,
   cantripDamageDice,
+  maxDice,
   rollConditionSave,
   rollDice,
   rollDiceEmpowered,
@@ -109,9 +110,11 @@ export function runSaveSpell(
     // Draconic Elemental Affinity — +CHA to the damage roll of the affinity type
     // (added to the full roll, so it's halved on a successful save per RAW).
     const fullDmg =
-      (ctx.metamagic?.includes('empowered')
-        ? rollDiceEmpowered(saveDmgExpr || spell.damage, Math.max(1, abilityMod(char.cha)))
-        : rollDice(saveDmgExpr || spell.damage)) +
+      (ctx.overchannel
+        ? maxDice(saveDmgExpr || spell.damage)
+        : ctx.metamagic?.includes('empowered')
+          ? rollDiceEmpowered(saveDmgExpr || spell.damage, Math.max(1, abilityMod(char.cha)))
+          : rollDice(saveDmgExpr || spell.damage)) +
       elementalAffinityBonus(char, spell.damageType) +
       potentSpellcastingBonus(char, spell) +
       empoweredEvocationBonus(char, spell);

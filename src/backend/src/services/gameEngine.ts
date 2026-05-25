@@ -4104,6 +4104,40 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     }
   }
 
+  // ── Evoker Overchannel (L14) ───────────────────────────────────────────────
+  // Offer a maximize-damage variant of each damaging spell the evoker can cast
+  // with a level 1-5 slot. The first use per long rest is free; later uses deal
+  // escalating Necrotic backlash (handled in precast). (RE-2.)
+  if (
+    context.spellTable &&
+    char.subclass === 'evoker' &&
+    getClassLevel(char, 'wizard') >= 14 &&
+    !char.turn_actions.action_used
+  ) {
+    const ocSlots = char.spell_slots_max ?? {};
+    const ocSlotsUsed = char.spell_slots_used ?? {};
+    for (const spellId of char.spells_known ?? []) {
+      if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+      const spell = context.spellTable[spellId];
+      if (!spell || !spell.damage || spell.level < 1 || spell.level > 5) continue;
+      if (spell.castTime === 'reaction') continue;
+      if ((ocSlots[spell.level] ?? 0) - (ocSlotsUsed[spell.level] ?? 0) <= 0) continue;
+      const isOffensive = !!(spell.damage || spell.condition);
+      if (isOffensive && !enemyAlive) continue;
+      choices.push({
+        label: `Overchannel — cast ${spell.name} (Lvl ${spell.level}, maximum damage)`,
+        action: {
+          type: 'cast_spell',
+          spellId,
+          slotLevel: spell.level,
+          targetEnemyId: isOffensive ? livingEnemies[0]?.id : undefined,
+          overchannel: true,
+        },
+        kind: 'cast_spell',
+      });
+    }
+  }
+
   // Two-weapon fighting bonus action: both weapons must be light
   if (
     state.combat_active &&

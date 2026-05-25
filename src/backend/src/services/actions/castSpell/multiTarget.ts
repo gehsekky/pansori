@@ -1,6 +1,7 @@
 import {
   abilityMod,
   applyDamageMultiplier,
+  maxDice,
   resolveSpellAttack,
   rollCritical,
   rollDice,
@@ -88,7 +89,7 @@ export function runMultiTargetSpell(
         continue;
       }
       const dmgRoll =
-        (atkE.critical ? rollCritical(perShot) : rollDice(perShot)) +
+        (ctx.overchannel ? maxDice(perShot) : atkE.critical ? rollCritical(perShot) : rollDice(perShot)) +
         agonizingBonusPerBeam +
         empoweredBonus;
       empoweredBonus = 0;
@@ -121,7 +122,7 @@ export function runMultiTargetSpell(
       }
     } else {
       // Magic Missile — auto-hit, no attack roll.
-      const dmgRoll = rollDice(perShot) + empoweredBonus;
+      const dmgRoll = (ctx.overchannel ? maxDice(perShot) : rollDice(perShot)) + empoweredBonus;
       empoweredBonus = 0;
       const { damage: effDmg, note } = applyDamageMultiplier(dmgRoll, spell.damageType, tgtEnemy);
       const newHp = Math.max(0, tgtEnt.hp - effDmg);

@@ -1,5 +1,5 @@
 import type { AbilityKey, Spell } from '../../../types.js';
-import { d, hasArmorProficiency, spellSaveDC } from '../../rulesEngine.js';
+import { d, hasArmorProficiency, rollDice, spellSaveDC } from '../../rulesEngine.js';
 import { getClassLevel, hasClass, resolveCastingAbility } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import { breakConcentration } from '../../gameEngine.js';
@@ -41,6 +41,7 @@ export function runPrecast(
     slotLevel: number;
     ritual?: boolean;
     divineIntervention?: boolean;
+    overchannel?: boolean;
   },
   spell: Spell
 ): PrecastResult {
@@ -117,6 +118,27 @@ export function runPrecast(
     };
     usedDivineIntervention = true;
   }
+
+  // SRD Evoker Overchannel (L14) — maximize a damaging spell cast with a
+  // level 1-5 slot (the damage-roll sites read `ctx.overchannel`). Validated
+  // here; the escalating Necrotic self-damage is applied below once the cast
+  // is committed (slot + action spent).
+  const useOverchannel = action.overchannel === true;
+  if (useOverchannel) {
+    if (!(pc.char.subclass === 'evoker' && getClassLevel(pc.char, 'wizard') >= 14)) {
+      ctx.narrative = 'Overchannel requires an Evoker of level 14.';
+      return { done: true };
+    }
+    if (slotLevel < 1 || slotLevel > 5) {
+      ctx.narrative = 'Overchannel works only on spells cast with a level 1-5 slot.';
+      return { done: true };
+    }
+    if (!spell.damage) {
+      ctx.narrative = 'Overchannel only affects a spell that deals damage.';
+      return { done: true };
+    }
+  }
+  ctx.overchannel = useOverchannel;
 
   // Long-cast spells (1 minute+, e.g. Animate Dead) can't be cast in
   // combat. Gated before slot spend so an in-combat attempt doesn't
@@ -258,6 +280,32 @@ export function runPrecast(
         (ctx.narrative ?? '') +
         `${pc.char.name} tries to cast ${spell.name}${' (level-' + slotLevel + ' slot)'} but Slow disrupts the somatic gesture — the spell fizzles (rolled ${fizzleRoll}, needed 11+). The slot is spent.`;
       return { done: true };
+    }
+  }
+
+  // Overchannel escalating cost (SRD) — the first use per long rest is free;
+  // each later use deals (uses + 1)d12 Necrotic per slot level, ignoring
+  // Resistance / Immunity. Applied now that the cast is committed.
+  if (useOverchannel) {
+    const priorUses = pc.char.class_resource_uses?.overchannel_uses ?? 0;
+    pc.char.class_resource_uses = {
+      ...(pc.char.class_resource_uses ?? {}),
+      overchannel_uses: priorUses + 1,
+    };
+    if (priorUses >= 1) {
+      const backlash = rollDice(`${(priorUses + 1) * slotLevel}d12`);
+      pc.char.hp = Math.max(0, pc.char.hp - backlash);
+      ctx.st = {
+        ...ctx.st,
+        entities: (ctx.st.entities ?? []).map((e) =>
+          e.id === pc.char.id && !e.isEnemy ? { ...e, hp: pc.char.hp } : e
+        ),
+      };
+      ctx.narrative =
+        (ctx.narrative ?? '') +
+        `${pc.char.name} overchannels for maximum damage — ${backlash} Necrotic backlash (now ${pc.char.hp} HP). `;
+    } else {
+      ctx.narrative = (ctx.narrative ?? '') + `${pc.char.name} overchannels for maximum damage! `;
     }
   }
 
