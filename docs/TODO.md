@@ -590,9 +590,33 @@ Bonus(char, st)`: a creature within 10 ft of a conscious L6+ Paladin (the
 
 #### RE-3: Character-build systems (small, high RAW payoff)
 
-- [ ] **Epic boons** (L19+ feat options) — SRD has 7: Combat Prowess,
-      Dimensional Travel, Fate, Irresistible Offense, Spell Recall, the
-      Night Spirit, Truesight. Slot into the existing `take_feat` surface.
+- [~] **Epic boons** (L19+ feat options) — *backend done (2026-05-25).*
+      All 7 SRD boons (Combat Prowess, Dimensional Travel, Fate,
+      Irresistible Offense, Spell Recall, the Night Spirit, Truesight)
+      live in `contexts/srd/feats.ts` under the new `epic-boon` category
+      and slot into the existing `take_feat` surface. (The 2024 PHB has
+      more epic boons — Energy Resistance, Recovery, Speed, etc. — but
+      those are PHB-only; the SRD defines exactly these 7.)
+      - [x] **Foundation** — `epic-boon` FeatEffect variant; +1 ability
+            capped at 30; level-19 prerequisite; `take_feat` consumes the
+            L19 ASI for epic boons; `Character.truesight_ft`.
+      - [x] **Irresistible Offense** — Overcome Defenses (B/P/S ignores
+            Resistance via `applyDamageMultiplier`'s `ignoreResistance`)
+            + Overwhelming Strike (nat-20 extra damage = boosted score).
+      - [x] **Combat Prowess** — Peerless Aim (miss→hit, 1/turn) as a
+            last-resort rescue in `resolveOneAttack`.
+      - [x] **Spell Recall** — Free Casting (1d4 slot refund on L1–4
+            casts) in precast's slot-consumption block.
+      - [x] **Fate** — Improve Fate (±2d4 save rescue, 1/Initiative-or-
+            rest) mirroring Dark One's Own Luck. RAW's check/attack/ally/
+            penalty surfaces aren't modeled.
+      - [~] **Truesight / Dimensional Travel / Night Spirit** — honest
+            markers: the +1 ability lands, but the engine has no
+            see-Invisible substrate (Truesight), no concrete positioning
+            (Blink Steps), and no enemy-attack-path lighting / Invisible-
+            lifecycle (Night Spirit). Narrated, not mechanically wired.
+      - [ ] **Selection UI** — surfacing the L19 epic-boon pick is an FE
+            follow-up (same as the other RE-3 creation/choice surfaces).
 - [x] **Exhaustion (2024 model) — done 2026-05-25** — RAW **−2 to all d20
       tests per level** + **−5 ft speed per level**, no max-HP reduction,
       lethal at 6. `reviveD20Penalty` was renamed `d20TestPenalty` and now
