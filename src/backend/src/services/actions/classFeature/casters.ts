@@ -42,6 +42,35 @@ export function handleCasterFeature(ctx: ActionContext, fid: string): boolean {
       return true;
     }
   }
+  if (fid === 'dragon_wings') {
+    // SRD Draconic Sorcery Dragon Wings (L14): Bonus Action — sprout wings for
+    // a Fly Speed of 60 ft (1 hour). Once per long rest, or spend 3 Sorcery
+    // Points to restore the use.
+    if (!hasClass(char, 'sorcerer') || char.subclass !== 'draconic' || getClassLevel(char, 'sorcerer') < 14) {
+      ctx.narrative = 'Dragon Wings requires a Draconic Sorcerer of level 14.';
+      return true;
+    }
+    if (char.turn_actions.bonus_action_used) {
+      ctx.narrative = 'Bonus action already used this turn.';
+      return true;
+    }
+    const dwUsed = char.class_resource_uses?.dragon_wings_used ?? 0;
+    const dwSp = char.class_resource_uses?.sorcery_points ?? getClassLevel(char, 'sorcerer');
+    if (dwUsed >= 1 && dwSp < 3) {
+      ctx.narrative = 'Dragon Wings is expended — restore it for 3 sorcery points (not enough).';
+      return true;
+    }
+    char.class_resource_uses = {
+      ...(char.class_resource_uses ?? {}),
+      dragon_wings_used: 1,
+      ...(dwUsed >= 1 ? { sorcery_points: dwSp - 3 } : {}),
+    };
+    char.fly_speed_ft = 60;
+    char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
+    ctx.narrative = `${char.name} unfurls draconic wings — Fly Speed 60 ft.${dwUsed >= 1 ? ' (3 sorcery points spent to restore the use)' : ''}`;
+    return true;
+  }
+
   if (fid === 'innate_sorcery') {
     // SRD Sorcerer Innate Sorcery (L1): Bonus Action, for 1 minute gain +1
     // spell save DC and Advantage on Sorcerer spell attacks; twice per long
