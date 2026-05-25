@@ -19,3 +19,4 @@ export { SRD_MONSTERS } from './monsters.js';
 export { REINCARNATE_SPECIES, SRD_SPECIES } from './species.js';
 export type { Species } from './species.js';
 export { SRD_FEATS } from './feats.js';
+export { SRD_ITEMS, ALL_SRD_ITEM_IDS, srdItems } from './items.js';
