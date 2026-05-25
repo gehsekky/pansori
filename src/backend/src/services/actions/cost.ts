@@ -43,6 +43,7 @@ export const ACTION_COSTS: Record<StructuredAction['type'], ActionCost> = {
   // return void so the cost lands (RAW: the action was committed).
   dodge: 'action',
   disengage: 'action',
+  hide: 'action',
   dash: 'action',
   help: 'action',
   ready: 'action',

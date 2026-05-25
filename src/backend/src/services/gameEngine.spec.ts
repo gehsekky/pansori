@@ -2445,7 +2445,15 @@ describe('Hide action — DC tracking (2024)', () => {
       action: { type: 'use_class_feature', featureId: 'cunning_action_hide' },
       history: [],
       state,
-      seed: seedWithEnemy,
+      // SRD Hide [Action] prerequisite: a dark room is Heavily Obscured, so the
+      // rogue may hide even adjacent to the enemy (pansori enemies lack
+      // darkvision). See canAttemptHide.
+      seed: {
+        ...seedWithEnemy,
+        rooms: seedWithEnemy.rooms.map((r) =>
+          r.id === CORRIDOR_ID ? { ...r, lighting: 'dark' as const } : r
+        ),
+      },
       context: ctx,
     });
     expect(result.narrative).toMatch(/Hide DC/);
@@ -2998,7 +3006,14 @@ describe('Heavy encumbrance disadvantage (2024 variant)', () => {
       action: { type: 'use_class_feature', featureId: 'cunning_action_hide' },
       history: [],
       state,
-      seed: seedWithEnemy,
+      // Dark room satisfies the Hide prerequisite so the Stealth check actually
+      // runs (and then fails on the worst-roll-with-disadvantage mock).
+      seed: {
+        ...seedWithEnemy,
+        rooms: seedWithEnemy.rooms.map((r) =>
+          r.id === CORRIDOR_ID ? { ...r, lighting: 'dark' as const } : r
+        ),
+      },
       context: ctx,
     });
     // Hide check with disadv on worst-roll mock should fail.

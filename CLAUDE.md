@@ -6,9 +6,8 @@ Pansori is a strict SRD 5.2.1 build. **No PHB-only content** —
 not subclasses, feats, species, or spells. If you find yourself
 wanting to add Lucky / Sharpshooter / Sentinel / Polearm Master /
 Battle Master / Aasimar / Absorb Elements / etc., the answer is
-**no**. See [docs/srd-only-audit.md](docs/srd-only-audit.md) for
-the rationale and the audit that walked back the prior PHB-derived
-content.
+**no**. See [LEGAL.md](LEGAL.md) for the SRD attribution and the
+strict-SRD scope statement.
 
 When unsure whether a feature is SRD or PHB, grep the SRD txt
 first (see below). If it's not there, it doesn't belong in pansori.
