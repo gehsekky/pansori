@@ -1,19 +1,21 @@
-// Six lighter subclass exposures. Each is selectable; mechanical
-// features are mostly deferred. Diviner Wizard gets a starter
-// Portent dice roll on long rest (interception deferred).
+// SRD 5.2.1 publishes exactly one subclass per class, so there's no choice to
+// make — the engine auto-assigns it at level 3 (see applySubclass /
+// applyLevelUpForClass). These tests lock that the auto-assignment fires (with
+// the Draconic Sorcerer side effects) and that the old player-facing picker is
+// no longer surfaced.
 
+import { applyLevelUpForClass, generateChoices } from './gameEngine.js';
 import { describe, expect, it } from 'vitest';
 import { makeChar, makeState } from '../test-fixtures.js';
 import type { Seed } from '../types.js';
 import { context as ctx } from '../contexts/sandbox.js';
-import { generateChoices } from './gameEngine.js';
 
 const seed: Seed = {
   context_id: ctx.id,
-  world_name: 'Subclass Picker Test',
-  ship_name: 'Subclass Picker Test',
+  world_name: 'Subclass Test',
+  ship_name: 'Subclass Test',
   intro: '',
-  seed_id: 'subclass-picker',
+  seed_id: 'subclass',
   rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
   connections: { [ctx.startRoomId]: [] },
   enemies: {},
@@ -21,25 +23,50 @@ const seed: Seed = {
   npcs: {},
 };
 
-function buildState(pc: ReturnType<typeof makeChar>) {
-  return {
-    ...makeState({ id: pc.id }, { current_room: ctx.startRoomId }),
-    characters: [pc],
-    active_character_id: pc.id,
-  };
-}
+describe('Subclass — auto-assigned at level 3 (SRD-only)', () => {
+  it('a Wizard reaching level 3 is auto-assigned Evoker, with a narrative note', () => {
+    const pc = makeChar({ id: 'pc', character_class: 'Wizard', level: 2 });
+    expect(pc.subclass).toBeFalsy();
+    const note = applyLevelUpForClass(pc, 'Wizard', ctx);
+    expect(pc.level).toBe(3);
+    expect(pc.subclass).toBe('evoker');
+    expect(note).toMatch(/path of the evoker/i);
+  });
 
-function pickerOffers(pc: ReturnType<typeof makeChar>): string[] {
-  const state = buildState(pc);
-  return generateChoices(state, seed, ctx)
-    .filter((c) => c.action.type === 'select_subclass')
-    .map((c) => (c.action.type === 'select_subclass' ? c.action.subclass : ''))
-    .filter(Boolean);
-}
+  it('does not assign before level 3', () => {
+    const pc = makeChar({ id: 'pc', character_class: 'Barbarian', level: 1 });
+    applyLevelUpForClass(pc, 'Barbarian', ctx); // -> L2
+    expect(pc.subclass).toBeFalsy();
+    const note = applyLevelUpForClass(pc, 'Barbarian', ctx); // -> L3
+    expect(pc.subclass).toBe('berserker');
+    expect(note).toMatch(/berserker/i);
+  });
 
-describe('Subclass picker — SRD-only baseline', () => {
-  it('Wizard L3 offers evoker', () => {
+  it('Sorcerer auto-assigns Draconic and applies Draconic Resilience HP', () => {
+    const pc = makeChar({
+      id: 'pc',
+      character_class: 'Sorcerer',
+      level: 2,
+      class_levels: { sorcerer: 2 },
+    });
+    const hpBefore = pc.max_hp;
+    const note = applyLevelUpForClass(pc, 'Sorcerer', ctx);
+    expect(pc.subclass).toBe('draconic');
+    // L3 HP roll (no draconic bonus that level) + retroactive +3 (sorcerer level).
+    expect(pc.max_hp).toBeGreaterThan(hpBefore + 3);
+    expect(note).toMatch(/Draconic Resilience/);
+  });
+
+  it('the level-up picker no longer offers select_subclass', () => {
     const pc = makeChar({ id: 'pc', character_class: 'Wizard', level: 3 });
-    expect(pickerOffers(pc)).toContain('evoker');
+    const state = {
+      ...makeState({ id: pc.id }, { current_room: ctx.startRoomId }),
+      characters: [pc],
+      active_character_id: pc.id,
+    };
+    const offered = generateChoices(state, seed, ctx).filter(
+      (c) => c.action.type === 'select_subclass'
+    );
+    expect(offered).toHaveLength(0);
   });
 });

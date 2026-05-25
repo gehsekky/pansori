@@ -71,10 +71,13 @@ describe('Draconic Spells — granted on select + level-up', () => {
     expect(char.spells_known).toEqual(expect.arrayContaining(['chromatic_orb', 'fear', 'fly']));
   });
 
-  it('a non-Draconic Sorcerer gains no Draconic spells on level-up', () => {
+  it('a Sorcerer below level 3 (no subclass yet) gains no Draconic spells on level-up', () => {
+    // Past L3 every Sorcerer is auto-assigned Draconic, so a subclass-less
+    // Sorcerer only exists below L3 — verify no Draconic spells leak in early.
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
-    const char = sorc({ level: 4, class_levels: { sorcerer: 4 }, spells_known: [] });
-    applyLevelUpForClass(char, 'sorcerer', ctx);
+    const char = sorc({ level: 1, class_levels: { sorcerer: 1 }, spells_known: [] });
+    applyLevelUpForClass(char, 'sorcerer', ctx); // -> L2, still subclass-less
+    expect(char.subclass).toBeFalsy();
     expect(char.spells_known).toEqual([]);
   });
 });

@@ -6,7 +6,7 @@ import {
   fightingStyleSlots,
 } from '../fightingStyle.js';
 import { applyFeatTake, canTakeFeat, getFeat } from '../feats.js';
-import { applyLevelUpForClass, mergeDraconicSpells, preparedSpellsCap } from '../gameEngine.js';
+import { applyLevelUpForClass, applySubclass, preparedSpellsCap } from '../gameEngine.js';
 import {
   canMulticlassInto,
   evocationSavantBudget,
@@ -73,21 +73,13 @@ export const handleSelectSubclass: ActionHandler<{ type: 'select_subclass'; subc
     ctx.narrative = `You have already chosen the ${char.subclass} subclass.`;
     return;
   }
-  const next = { ...char, subclass: action.subclass };
-  let narrative = `${next.name} follows the path of the ${action.subclass}!`;
-  if (action.subclass === 'draconic' && hasClass(next, 'sorcerer')) {
-    // Draconic Resilience scales with Sorcerer level only.
-    const sorcLvl = getClassLevel(next, 'sorcerer');
-    next.max_hp += sorcLvl;
-    next.hp += sorcLvl;
-    narrative += ` Draconic Resilience: +${sorcLvl} max HP (now ${next.hp}/${next.max_hp}).`;
-    // Draconic Spells — grant the always-prepared spells for the current level.
-    const before = (next.spells_known ?? []).length;
-    next.spells_known = mergeDraconicSpells(next);
-    if (next.spells_known.length > before) narrative += ` 🐉 Draconic Spells added.`;
-  }
+  // Normally the subclass is auto-assigned at level 3 (SRD-only = one option);
+  // this action remains for explicit assignment (tests / FE) and shares the
+  // same effect path, including the Draconic Sorcerer side effects.
+  const next = { ...char };
+  const narrative = applySubclass(next, action.subclass);
   updatePcActor(ctx, next);
-  ctx.narrative = narrative;
+  ctx.narrative = narrative.trim();
 };
 
 /**

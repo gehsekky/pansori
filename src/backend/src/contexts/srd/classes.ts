@@ -162,3 +162,21 @@ export const SRD_CLASS_SKILLS: Record<string, string[]> = {
   Monk: ['athletics', 'stealth', 'acrobatics'],
   Barbarian: ['athletics', 'intimidation', 'survival'],
 };
+
+// The single SRD-iconic subclass each class gains at level 3 (SRD 5.2.1
+// publishes exactly one subclass per class). Keyed by lowercased class name.
+// The engine auto-assigns this at level 3 — there's no choice to make.
+export const SRD_SUBCLASS_FOR_CLASS: Record<string, string> = {
+  fighter: 'champion',
+  rogue: 'thief',
+  wizard: 'evoker',
+  cleric: 'life',
+  ranger: 'hunter',
+  paladin: 'devotion',
+  bard: 'lore',
+  sorcerer: 'draconic',
+  warlock: 'fiend',
+  druid: 'land',
+  monk: 'open_hand',
+  barbarian: 'berserker',
+};
