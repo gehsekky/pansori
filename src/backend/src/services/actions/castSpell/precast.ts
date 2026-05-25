@@ -4,6 +4,7 @@ import { getClassLevel, hasClass, resolveCastingAbility } from '../../multiclass
 import type { ActionContext } from '../types.js';
 import { breakConcentration } from '../../gameEngine.js';
 import { distanceFeet } from '../../gridEngine.js';
+import { spellRecallKeepsSlot } from '../../feats.js';
 import { updatePcActor } from '../actor.js';
 
 /**
@@ -280,10 +281,20 @@ export function runPrecast(
       ctx.narrative = `No level-${slotLevel} spell slots remaining (recovered on long rest).`;
       return { done: true };
     }
-    pc.char.spell_slots_used = {
-      ...(pc.char.spell_slots_used ?? {}),
-      [slotLevel]: slotsUsed + 1,
-    };
+    // SRD Boon of Spell Recall — Free Casting: roll 1d4 as the level 1–4 slot is
+    // about to be spent; on a match to the slot's level the slot is kept (the
+    // cast still happens). You still need an available slot to cast — only the
+    // expenditure is refunded.
+    if (spellRecallKeepsSlot(pc.char, slotLevel, d(4))) {
+      ctx.narrative =
+        (ctx.narrative ?? '') +
+        `${pc.char.name}'s Spell Recall holds the level-${slotLevel} slot — it isn't expended! `;
+    } else {
+      pc.char.spell_slots_used = {
+        ...(pc.char.spell_slots_used ?? {}),
+        [slotLevel]: slotsUsed + 1,
+      };
+    }
   }
 
   // Deduct the material cost now that slot + affordability are both

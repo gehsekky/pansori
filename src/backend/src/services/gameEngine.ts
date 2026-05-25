@@ -92,6 +92,7 @@ import {
 } from './multiclass.js';
 import { composeFragments, enemyAttackFragmentEvent } from './narrative/compose.js';
 import { consumeDarkOnesLuck, tryDarkOnesLuck } from './darkOnesOwnLuck.js';
+import { consumeImproveFate, tryImproveFate } from './improveFate.js';
 import { consumeIndomitable, indomitableBonus, tryIndomitableReroll } from './indomitable.js';
 import { consumeStrokeOfLuck, strokeOfLuckAvailable } from './strokeOfLuck.js';
 import { enemyActor, pcActor } from './actions/actor.js';
@@ -841,6 +842,8 @@ function conditionSavingThrow(
   // SRD Fiend Warlock Dark One's Own Luck — set when the 1d10 rescued the save
   // (optional: only the main resolution path sets it).
   darkOnesLuckConsumed?: boolean;
+  // SRD Boon of Fate — Improve Fate: set when the 2d4 rescued the save.
+  improveFateConsumed?: boolean;
   // SRD Bard Countercharm — id of the bard (self or ally within 30 ft) who
   // spent a Reaction to reroll this Charmed/Frightened save with Advantage.
   countercharmBardId?: string;
@@ -975,6 +978,30 @@ function conditionSavingThrow(
       darkOnesLuckConsumed = true;
     }
   }
+  // SRD Boon of Fate — Improve Fate: if the save still failed, add 2d4 (modeled
+  // as a reroll with the DC lowered by the roll) when it rescues it. Once per
+  // Initiative / Short or Long Rest.
+  let improveFateConsumed = false;
+  if (applied) {
+    const fate = tryImproveFate(char, () =>
+      !rollConditionSave(
+        effect.ability,
+        char[effect.ability] ?? 10,
+        dcAdjusted - rollDice('2d4'),
+        proficient,
+        char.level,
+        0,
+        char.conditions ?? [],
+        speciesAdv,
+        enc,
+        d20TestPenalty(char)
+      )
+    );
+    if (fate.used && fate.saved) {
+      applied = false;
+      improveFateConsumed = true;
+    }
+  }
   // SRD Bard Countercharm — if a Charmed/Frightened save still failed, a Bard
   // L7+ within 30 ft (self or ally) with a Reaction available can make the save
   // be rerolled with Advantage. Auto-resolve (like Indomitable/Stroke of Luck):
@@ -1018,6 +1045,7 @@ function conditionSavingThrow(
     bardicRoll,
     countercharmBardId,
     darkOnesLuckConsumed,
+    improveFateConsumed,
   };
 }
 
@@ -1290,6 +1318,10 @@ function computeEnemyAttack(
       if (csResult.darkOnesLuckConsumed) {
         updatedChar = consumeDarkOnesLuck(updatedChar);
         narrative += ` ✦ Dark One's Own Luck — fate twists the save!`;
+      }
+      if (csResult.improveFateConsumed) {
+        updatedChar = consumeImproveFate(updatedChar);
+        narrative += ` ✦ Improve Fate — 2d4 turns the save!`;
       }
       if (csResult.countercharmBardId) {
         const bardId = csResult.countercharmBardId;
