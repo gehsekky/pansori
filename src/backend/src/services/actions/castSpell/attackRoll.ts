@@ -8,9 +8,9 @@ import {
   rollDiceEmpowered,
   upcastDamage,
 } from '../../rulesEngine.js';
+import { elementalAffinityBonus, potentSpellcastingBonus } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import { composeNow } from '../../narrative/compose.js';
-import { elementalAffinityBonus } from '../../multiclass.js';
 import { pickCastPrefix } from './utils.js';
 
 /**
@@ -84,6 +84,8 @@ export function runAttackRollSpell(
   spellDmg += agonizingBonus;
   // SRD Draconic Elemental Affinity — +CHA to one damage roll of the affinity type.
   spellDmg += elementalAffinityBonus(char, spell.damageType);
+  // SRD Cleric Potent Spellcasting — +WIS to Cleric cantrip damage.
+  spellDmg += potentSpellcastingBonus(char, spell);
   composeNow(ctx, {
     kind: 'spell_attack_hit',
     attackerId: char.id,

@@ -362,6 +362,9 @@ export type StructuredAction =
   // SRD 5.2.1 Draconic Sorcery Elemental Affinity (L6): choose the affinity
   // damage type (acid/cold/fire/lightning/poison). Out-of-combat. (RE-2.)
   | { type: 'choose_elemental_affinity'; damageType: 'acid' | 'cold' | 'fire' | 'lightning' | 'poison' }
+  // SRD 5.2.1 Cleric Blessed Strikes (L7): choose Divine Strike or Potent
+  // Spellcasting. Out-of-combat, no action cost. (RE-2.)
+  | { type: 'choose_blessed_strikes'; option: 'divine_strike' | 'potent_spellcasting' }
   // SRD 5.2.1 Paladin Lay on Hands (L1): bonus-action touch heal drawing from
   // a pool of 5 × Paladin level HP. `targetCharId` is the healed party member
   // (may be the paladin). (RE-2.)

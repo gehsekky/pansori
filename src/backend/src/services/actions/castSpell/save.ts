@@ -17,10 +17,10 @@ import {
   splitEncounterXp,
 } from '../../gameEngine.js';
 import { concentrationRoundsFor, pickCastPrefix } from './utils.js';
+import { elementalAffinityBonus, potentSpellcastingBonus } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import { composeNow } from '../../narrative/compose.js';
 import { coverBonus } from '../../gridEngine.js';
-import { elementalAffinityBonus } from '../../multiclass.js';
 import { fmt } from '../../narrativeFmt.js';
 
 /**
@@ -105,7 +105,9 @@ export function runSaveSpell(
     const fullDmg =
       (ctx.metamagic?.includes('empowered')
         ? rollDiceEmpowered(saveDmgExpr || spell.damage, Math.max(1, abilityMod(char.cha)))
-        : rollDice(saveDmgExpr || spell.damage)) + elementalAffinityBonus(char, spell.damageType);
+        : rollDice(saveDmgExpr || spell.damage)) +
+      elementalAffinityBonus(char, spell.damageType) +
+      potentSpellcastingBonus(char, spell);
     spellDmg = saveFailed ? fullDmg : spell.saveEffect === 'half' ? Math.floor(fullDmg / 2) : 0;
     composeNow(ctx, {
       kind: 'spell_save_damage',
