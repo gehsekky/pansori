@@ -2,6 +2,7 @@ import type { CombatEntity, Enemy } from '../../../types.js';
 import { FRESH_TURN, abilityMod, profBonus, rollDice } from '../../rulesEngine.js';
 import { buildInitiativeOrder, pick, seedSummonedAllies } from '../../gameEngine.js';
 import {
+  heroicWarriorTopUp,
   perfectFocusRefresh,
   persistentRageTopUp,
   superiorInspirationTopUp,
@@ -51,7 +52,7 @@ export function runCombatStart(ctx: ActionContext, target: Enemy): void {
     // SRD Monk Perfect Focus (L15): tops Focus Points up to 4 if you didn't use
     // Uncanny Metabolism (applied after it, so it's a no-op when that fired).
     const refreshed = perfectFocusRefresh(
-      uncannyMetabolismRefresh(persistentRageTopUp(superiorInspirationTopUp(c)))
+      uncannyMetabolismRefresh(persistentRageTopUp(superiorInspirationTopUp(heroicWarriorTopUp(c))))
     );
     const entry = order.find((e) => e.id === c.id);
     return entry ? { ...refreshed, initiative_roll: entry.roll } : refreshed;

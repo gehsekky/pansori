@@ -822,6 +822,19 @@ export function indomitableRemaining(char: Character): number {
   return Math.max(0, indomitableMaxUses(char) - used);
 }
 
+/** SRD Champion Heroic Warrior (Fighter L10) — during combat, the champion
+ *  gives themselves Heroic Inspiration at the start of any turn they lack it. */
+export function hasHeroicWarrior(char: Character): boolean {
+  return char.subclass === 'champion' && getClassLevel(char, 'fighter') >= 10;
+}
+
+/** Combat-start top-up for Champion Heroic Warrior — grants Heroic Inspiration
+ *  if the champion lacks it, covering the first turn (subsequent turns are
+ *  handled by the start-of-turn grant). Mirrors the other initiative top-ups. */
+export function heroicWarriorTopUp(char: Character): Character {
+  return hasHeroicWarrior(char) && !char.inspiration ? { ...char, inspiration: true } : char;
+}
+
 // Maps a class to the spell list(s) it draws from. Used to match a
 // PC's classes against a spell's `spellList` tag so multiclass
 // casters can use the right casting ability per spell.

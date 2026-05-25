@@ -3,6 +3,7 @@
 
 import type { Character, Enemy, GameState, Seed } from '../types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { hasHeroicWarrior, heroicWarriorTopUp } from './multiclass.js';
 import { makeChar, makeState } from '../test-fixtures.js';
 import type { ActionContext } from './actions/types.js';
 import { context as ctx } from '../contexts/sandbox.js';
@@ -143,5 +144,44 @@ describe('Champion Superior Critical (L15)', () => {
     });
     const hit = (r.newState.combat_log ?? []).find((e) => e.kind === 'attack_hit');
     expect(hit && hit.kind === 'attack_hit' && hit.isCrit).toBe(false);
+  });
+});
+
+describe('Champion Heroic Warrior (L10)', () => {
+  it('hasHeroicWarrior gates on Champion L10+', () => {
+    expect(hasHeroicWarrior(makeChar({ character_class: 'Fighter', subclass: 'champion', level: 10 }))).toBe(true);
+    expect(hasHeroicWarrior(makeChar({ character_class: 'Fighter', subclass: 'champion', level: 9 }))).toBe(false);
+    expect(hasHeroicWarrior(makeChar({ character_class: 'Fighter', level: 10 }))).toBe(false);
+  });
+
+  it('heroicWarriorTopUp grants Heroic Inspiration only when lacking it', () => {
+    const champ = makeChar({ character_class: 'Fighter', subclass: 'champion', level: 10, inspiration: false });
+    expect(heroicWarriorTopUp(champ).inspiration).toBe(true);
+    const fighter = makeChar({ character_class: 'Fighter', level: 10, inspiration: false });
+    expect(heroicWarriorTopUp(fighter).inspiration ?? false).toBe(false);
+  });
+
+  it('a L10 Champion regains Heroic Inspiration when their next turn begins', async () => {
+    const r = await takeAction({
+      action: { type: 'end_turn' },
+      history: [],
+      state: championState(10),
+      seed,
+      context: ctx,
+    });
+    expect(r.newState.characters[0].inspiration).toBe(true);
+    expect(r.narrative).toMatch(/Heroic Warrior/);
+  });
+
+  it('does not grant below Fighter L10', async () => {
+    const r = await takeAction({
+      action: { type: 'end_turn' },
+      history: [],
+      state: championState(9),
+      seed,
+      context: ctx,
+    });
+    expect(r.newState.characters[0].inspiration ?? false).toBe(false);
+    expect(r.narrative).not.toMatch(/Heroic Warrior/);
   });
 });
