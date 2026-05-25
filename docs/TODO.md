@@ -67,7 +67,7 @@ Grounded in a code survey + the full backend suite: **1572 tests across
 
 | Category | In pansori | SRD universe |
 |---|---|---|
-| Spells | **174** (26 cantrips + 148 leveled, through L9) | ~330 |
+| Spells | **176** (26 cantrips + 150 leveled, through L9) | ~330 |
 | Shared SRD monster pool | **12** (`SRD_MONSTERS`) + per-campaign templates | hundreds |
 | Species | 9 | 9 standalone + Drow lineage |
 | Classes | 12 | 12 |
@@ -85,10 +85,19 @@ backend features are waiting on, and a handful of **bounded subsystems**.
 
 ### Content breadth — data on existing patterns (RE-6)
 
-- [ ] **Spells** — ~174 / ~330 SRD. Most remaining categories are already
-      representable (data entry). Exceptions needing a model first: the
-      alternate "summon" spells, each mechanically distinct from the
-      stat-block ally model —
+- [ ] **Spells** — ~176 / ~330 SRD. Most remaining categories are already
+      representable (data entry).
+  - [~] **Persistent damage zones** — foundation shipped (RE-4): `GameState.spell_zones`
+        + `SpellZone`, the `persistentZone` spell flag, cast-time `runZoneSpell`
+        (stamp + concentration link + tick-on-cast), the round-wrap tick
+        (`fireSpellZones` → `applyZoneTick`, save-for-half or auto), and
+        concentration cleanup. **Moonbeam** + **Flaming Sphere** ship on it.
+        Remaining: zones are **stationary** (RAW repositioning — Flaming Sphere
+        bonus-action roll, Moonbeam/Call Lightning move actions — is deferred);
+        add **Call Lightning** / **Spike Growth** (movement-triggered) and
+        consider upgrading **Spirit Guardians** to a caster-following zone.
+      Exceptions still needing a model first: the alternate "summon" spells,
+      each mechanically distinct from the stat-block ally model —
   - [ ] **Spiritual Weapon** (L2) — a floating force with no HP; a
         bonus-action melee spell attack re-issued each turn. Model as a
         persistent bonus-action attack effect, not an ally combatant.

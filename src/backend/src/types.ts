@@ -463,6 +463,12 @@ export interface Spell {
   //   cube:   blastRadius = side length of cube emanating from caster
   //   line:   blastRadius = length (5 ft wide), from caster outward
   aoeShape?: 'sphere' | 'cone' | 'cube' | 'line';
+  // RE-4 — persistent damage zone (Cloud of Daggers, Moonbeam, …). On cast the
+  // spell stamps a `SpellZone` onto `GameState.spell_zones` (footprint sized by
+  // `blastRadius`, centered on the target), ticks once immediately, then deals
+  // `damage` (save-for-half if `savingThrow` is set) to hostiles standing in it
+  // on each round wrap, until the caster's concentration ends.
+  persistentZone?: boolean;
   ritualCasting?: boolean; // castable as ritual (no slot cost, only out of combat)
   verbal?: boolean; // has verbal component (blocked when deafened)
   // SRD Slow — "When the creature attempts to cast a spell with a
@@ -966,6 +972,25 @@ export interface SpellWall {
   blocksLineOfSight: boolean;
 }
 
+// RE-4 — a persistent damage zone (Cloud of Daggers, Moonbeam, …) the caster
+// concentrates on. Occupies grid cells and deals `damage` to hostile creatures
+// standing in them on each round wrap (and once on cast). `savingThrow`
+// undefined = automatic (no save). Removed when the caster's concentration ends
+// (see `breakConcentration`). Stored per-room on GameState.spell_zones.
+export interface SpellZone {
+  id: string;
+  casterId: string;
+  spellId: string;
+  name: string;
+  roomId: string;
+  cells: GridPos[];
+  damage: string; // dice expr per tick, e.g. '4d4'
+  damageType: string;
+  savingThrow?: AbilityKey; // omitted = automatic damage (no save)
+  saveEffect?: 'half' | 'negates';
+  saveDC?: number; // the caster's spell save DC, captured at cast time
+}
+
 export interface GameState {
   // Schema version. `normalizeState` stamps this with
   // `CURRENT_SCHEMA_VERSION` on every load; older saves (or saves
@@ -1020,6 +1045,7 @@ export interface GameState {
   entities?: CombatEntity[];
   movement_used?: Record<string, number>; // entityId → feet moved this turn
   spell_walls?: SpellWall[]; // transient wall/terrain-spell obstacles (Wall of Fire/Force)
+  spell_zones?: SpellZone[]; // transient persistent damage zones (Cloud of Daggers, …)
   help_target_id?: string; // char id receiving Help action advantage
   surprised?: string[]; // entity ids surprised at combat start (skip first turn)
   metamagic_active?: string[]; // active Metamagic modifier ids for the next cast (Sorcery Incarnate allows 2)

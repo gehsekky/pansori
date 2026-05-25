@@ -1,0 +1,165 @@
+// RE-4 — persistent damage zones (Moonbeam, Flaming Sphere). A zone stamps grid
+// cells on cast, ticks once immediately, then deals damage to hostiles standing
+// in it on each round wrap, until the caster's concentration ends. Tests cover
+// the footprint helper, the shared tick (save / no-save / out-of-zone / kill),
+// the Moonbeam cast, and concentration cleanup.
+
+import type { GameState, Seed, SpellZone } from '../types.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { applyZoneTick, breakConcentration, takeAction, zoneCells } from './gameEngine.js';
+import { makeChar, makeState } from '../test-fixtures.js';
+import { context as ctx } from '../contexts/sandbox.js';
+
+afterEach(() => vi.restoreAllMocks());
+
+const ENEMY = `${ctx.startRoomId}#0`;
+
+const seed: Seed = {
+  context_id: ctx.id,
+  world_name: 'Spell Zone Test',
+  ship_name: 'Spell Zone Test',
+  intro: '',
+  seed_id: 'zone',
+  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  connections: { [ctx.startRoomId]: [] },
+  enemies: {
+    [ctx.startRoomId]: [
+      { id: ENEMY, name: 'Ogre', hp: 100, ac: 10, damage: '1d6', toHit: 3, xp: 50, con: 8, dex: 8 },
+    ],
+  },
+  loot: {},
+  npcs: {},
+};
+
+function combatState(enemyPos: { x: number; y: number }, enemyHp = 100): GameState {
+  const druid = makeChar({
+    id: 'pc-1',
+    character_class: 'Druid',
+    level: 5,
+    wis: 18,
+    spells_known: ['moonbeam'],
+    prepared_spells: ['moonbeam'],
+    spell_slots_max: { 1: 4, 2: 3 },
+    spell_slots_used: {},
+  });
+  return {
+    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    characters: [druid],
+    active_character_id: 'pc-1',
+    initiative_order: [
+      { id: 'pc-1', roll: 18, is_enemy: false },
+      { id: ENEMY, roll: 5, is_enemy: true },
+    ],
+    initiative_idx: 0,
+    entities: [
+      {
+        id: 'pc-1',
+        isEnemy: false,
+        pos: { x: 1, y: 1 },
+        hp: 40,
+        maxHp: 40,
+        conditions: [],
+        condition_durations: {},
+      },
+      {
+        id: ENEMY,
+        isEnemy: true,
+        pos: enemyPos,
+        hp: enemyHp,
+        maxHp: 100,
+        conditions: [],
+        condition_durations: {},
+      },
+    ],
+  };
+}
+
+const zone = (over: Partial<SpellZone> = {}): SpellZone => ({
+  id: 'z1',
+  casterId: 'pc-1',
+  spellId: 'moonbeam',
+  name: 'Moonbeam',
+  roomId: ctx.startRoomId,
+  cells: [{ x: 5, y: 5 }],
+  damage: '2d10',
+  damageType: 'radiant',
+  savingThrow: 'con',
+  saveEffect: 'half',
+  saveDC: 99, // unbeatably high → save always fails in these tests
+  ...over,
+});
+
+describe('zoneCells footprint', () => {
+  it('a 5-ft radius is the single center cell; 10-ft is a 3×3', () => {
+    expect(zoneCells({ x: 3, y: 3 }, 5, 8, 8)).toHaveLength(1);
+    expect(zoneCells({ x: 3, y: 3 }, 10, 8, 8)).toHaveLength(9);
+  });
+
+  it('clips the footprint to the grid bounds', () => {
+    expect(zoneCells({ x: 0, y: 0 }, 10, 8, 8).length).toBeLessThan(9);
+  });
+});
+
+describe('applyZoneTick', () => {
+  it('damages an enemy standing in the zone (CON save for half)', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.01); // enemy save roll fails
+    const res = applyZoneTick(combatState({ x: 5, y: 5 }), zone(), seed, ctx);
+    expect(res.st.entities?.find((e) => e.id === ENEMY)?.hp).toBeLessThan(100);
+  });
+
+  it('does not touch an enemy outside the zone cells', () => {
+    const res = applyZoneTick(combatState({ x: 2, y: 2 }), zone(), seed, ctx);
+    expect(res.st.entities?.find((e) => e.id === ENEMY)?.hp).toBe(100);
+  });
+
+  it('auto-damages (no save) when savingThrow is undefined', () => {
+    const res = applyZoneTick(
+      combatState({ x: 5, y: 5 }),
+      zone({ savingThrow: undefined, saveEffect: undefined, damage: '4d4' }),
+      seed,
+      ctx
+    );
+    expect(res.st.entities?.find((e) => e.id === ENEMY)?.hp).toBeLessThan(100);
+  });
+
+  it('resolves a kill (marks enemies_killed) when the tick drops the enemy', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99); // max damage
+    const res = applyZoneTick(combatState({ x: 5, y: 5 }, 3), zone(), seed, ctx);
+    // The lone enemy dies → enemies_killed records it (and the room clears,
+    // which ends combat and tears down entities — so we assert the kill marker).
+    expect(res.st.enemies_killed).toContain(ENEMY);
+  });
+});
+
+describe('Moonbeam — cast creates a concentration-linked zone and ticks once', () => {
+  it('stamps spell_zones, links concentration, and damages the target on cast', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.01); // enemy fails the on-cast save
+    const r = await takeAction({
+      action: { type: 'cast_spell', spellId: 'moonbeam', slotLevel: 2, targetEnemyId: ENEMY },
+      history: [],
+      state: combatState({ x: 2, y: 2 }), // enemy is where Moonbeam is centered
+      seed,
+      context: ctx,
+    });
+    expect(r.newState.spell_zones?.length).toBe(1);
+    expect(r.newState.spell_zones?.[0].spellId).toBe('moonbeam');
+    expect(r.newState.characters[0].concentrating_on?.spellId).toBe('moonbeam');
+    expect(r.newState.entities?.find((e) => e.id === ENEMY)?.hp).toBeLessThan(100);
+  });
+});
+
+describe('breakConcentration clears the caster’s zones', () => {
+  it('removes spell_zones owned by the caster', () => {
+    const caster = makeChar({
+      id: 'pc-1',
+      concentrating_on: { spellId: 'moonbeam', rounds_left: 10 },
+    });
+    const st = {
+      ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId }),
+      characters: [caster],
+      spell_zones: [zone()],
+    };
+    const res = breakConcentration(caster, st, ctx);
+    expect(res.st.spell_zones).toHaveLength(0);
+  });
+});
