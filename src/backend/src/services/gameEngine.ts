@@ -3098,6 +3098,51 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     });
   }
 
+  // ── Wizard Spell Mastery (L18) + Signature Spells (L20) ────────────────────
+  // One-time picks surfaced out of combat. Spell Mastery designates a L1 and a
+  // L2 action spell for slot-free casting; Signature Spells designates two L3
+  // spells for a free L3 cast each rest. Offered per still-open slot. (RE-2.)
+  if (!state.combat_active && context.spellTable && getClassLevel(char, 'wizard') >= 18) {
+    const known = char.spells_known ?? [];
+    if (!char.spell_mastery_l1) {
+      for (const id of known) {
+        if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+        const s = context.spellTable[id];
+        if (s?.level === 1 && s.castTime === 'action') {
+          choices.push({
+            label: `Spell Mastery (L1): master ${s.name} (cast at will, no slot)`,
+            action: { type: 'choose_spell_mastery', tier: 1, spellId: id },
+          });
+        }
+      }
+    }
+    if (!char.spell_mastery_l2) {
+      for (const id of known) {
+        if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+        const s = context.spellTable[id];
+        if (s?.level === 2 && s.castTime === 'action') {
+          choices.push({
+            label: `Spell Mastery (L2): master ${s.name} (cast at will, no slot)`,
+            action: { type: 'choose_spell_mastery', tier: 2, spellId: id },
+          });
+        }
+      }
+    }
+    if (getClassLevel(char, 'wizard') >= 20 && (char.signature_spells ?? []).length < 2) {
+      const sig = new Set(char.signature_spells ?? []);
+      for (const id of known) {
+        if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+        const s = context.spellTable[id];
+        if (s?.level === 3 && !sig.has(id)) {
+          choices.push({
+            label: `Signature Spell: ${s.name} (free L3 cast each rest)`,
+            action: { type: 'choose_signature_spell', spellId: id },
+          });
+        }
+      }
+    }
+  }
+
   // ── Paladin Lay on Hands (L1) — bonus-action touch heal from the pool ──────
   // Works in combat (bonus action) and out of combat. One choice per injured
   // party member (including self). (RE-2.)

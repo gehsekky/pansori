@@ -293,6 +293,75 @@ export const handleChooseDivineOrder: ActionHandler<{
 };
 
 /**
+ * `choose_spell_mastery`: SRD Wizard (L18) — designate a level-1 (tier 1) or
+ * level-2 (tier 2) spell with a casting time of an action as mastered; it can
+ * then be cast at its base level without a slot. Gated to a Wizard L18.
+ * Out-of-combat, no action cost. (RE-2.)
+ */
+export const handleChooseSpellMastery: ActionHandler<{
+  type: 'choose_spell_mastery';
+  tier: 1 | 2;
+  spellId: string;
+}> = (ctx, action) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can choose Spell Mastery.' };
+  const { char } = ctx.actor;
+  if (!hasClass(char, 'wizard') || getClassLevel(char, 'wizard') < 18) {
+    ctx.narrative = 'Spell Mastery requires a Wizard of level 18.';
+    return;
+  }
+  const spell = ctx.context.spellTable?.[action.spellId];
+  if (!spell || spell.level !== action.tier) {
+    return { rejected: `${action.spellId} isn't a level-${action.tier} spell.` };
+  }
+  if (spell.castTime !== 'action') {
+    return { rejected: `${spell.name} must have a casting time of an action for Spell Mastery.` };
+  }
+  if (!(char.spells_known ?? []).includes(action.spellId)) {
+    return { rejected: `${spell.name} isn't in your spellbook.` };
+  }
+  updatePcActor(
+    ctx,
+    action.tier === 1 ? { spell_mastery_l1: action.spellId } : { spell_mastery_l2: action.spellId }
+  );
+  ctx.narrative = `${char.name} masters ${spell.name} — castable at level ${action.tier} without a slot.`;
+};
+
+/**
+ * `choose_signature_spell`: SRD Wizard (L20) — designate a level-3 spell as a
+ * signature spell (up to two). Each can be cast once at level 3 without a slot,
+ * recharging on a short/long rest. Gated to a Wizard L20. Out-of-combat. (RE-2.)
+ */
+export const handleChooseSignatureSpell: ActionHandler<{
+  type: 'choose_signature_spell';
+  spellId: string;
+}> = (ctx, action) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can choose Signature Spells.' };
+  const { char } = ctx.actor;
+  if (!hasClass(char, 'wizard') || getClassLevel(char, 'wizard') < 20) {
+    ctx.narrative = 'Signature Spells requires a Wizard of level 20.';
+    return;
+  }
+  const spell = ctx.context.spellTable?.[action.spellId];
+  if (!spell || spell.level !== 3) {
+    return { rejected: `${action.spellId} isn't a level-3 spell.` };
+  }
+  if (!(char.spells_known ?? []).includes(action.spellId)) {
+    return { rejected: `${spell.name} isn't in your spellbook.` };
+  }
+  const current = char.signature_spells ?? [];
+  if (current.includes(action.spellId)) {
+    ctx.narrative = `${spell.name} is already a signature spell.`;
+    return;
+  }
+  if (current.length >= 2) {
+    ctx.narrative = 'You already have two signature spells.';
+    return;
+  }
+  updatePcActor(ctx, { signature_spells: [...current, action.spellId] });
+  ctx.narrative = `${char.name} marks ${spell.name} as a signature spell — a free level-3 cast each rest.`;
+};
+
+/**
  * `choose_expertise`: pick a skill proficiency to gain Expertise in (double
  * proficiency bonus). Granted by Rogue (L1 + L6) and Bard (L2 + L9). Validates
  * that the skill is one the character is proficient in, isn't already an

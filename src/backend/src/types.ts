@@ -722,6 +722,14 @@ export interface Character {
   // Martial weapon + Heavy armor training; Thaumaturge knows an extra Cleric
   // cantrip and adds WIS (min +1) to Intelligence (Arcana/Religion) checks.
   divine_order?: 'protector' | 'thaumaturge';
+  // SRD Wizard Spell Mastery (L18) — a chosen L1 and L2 action spell that can
+  // be cast at its base level without expending a slot.
+  spell_mastery_l1?: string;
+  spell_mastery_l2?: string;
+  // SRD Wizard Signature Spells (L20) — two chosen L3 spells, each castable
+  // once at level 3 without a slot (recharges on a short/long rest; the spent
+  // state is tracked under class_resource_uses as `signature_used_<id>`).
+  signature_spells?: string[];
   // SRD Multiattack Defense bookkeeping — enemy entity id → the combat round
   // in which that enemy hit this PC. While the stamp equals the current round,
   // that enemy's further attacks vs this PC roll with Disadvantage. The round

@@ -378,6 +378,12 @@ export type StructuredAction =
   // training) or Thaumaturge (extra Cleric cantrip via `cantrip` + WIS to
   // Arcana/Religion). Out-of-combat, no action cost. (RE-2.)
   | { type: 'choose_divine_order'; option: 'protector' | 'thaumaturge'; cantrip?: string }
+  // SRD 5.2.1 Wizard Spell Mastery (L18): designate a L1 (tier 1) or L2
+  // (tier 2) action spell to cast at will with no slot. Out-of-combat. (RE-2.)
+  | { type: 'choose_spell_mastery'; tier: 1 | 2; spellId: string }
+  // SRD 5.2.1 Wizard Signature Spells (L20): designate a L3 spell as a
+  // signature spell (free L3 cast, 1/short-or-long rest). Out-of-combat. (RE-2.)
+  | { type: 'choose_signature_spell'; spellId: string }
   // SRD 5.2.1 Paladin Lay on Hands (L1): bonus-action touch heal drawing from
   // a pool of 5 × Paladin level HP. `targetCharId` is the healed party member
   // (may be the paladin). (RE-2.)
