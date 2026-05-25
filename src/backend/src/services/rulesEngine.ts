@@ -17,6 +17,21 @@ export function rollDice(expr: string | number | null | undefined): number {
   return total;
 }
 
+// Maximizes a dice expression instead of rolling it — every die yields its
+// top face. `maxDice('2d8')` → 16, `maxDice('4d8+2')` → 34, `maxDice('70')`
+// → 70. Used by Life Cleric Supreme Healing (SRD: "use the highest number
+// possible for each die"). Mirrors rollDice's single-term `XdY+Z` grammar.
+export function maxDice(expr: string | number | null | undefined): number {
+  if (!expr) return 0;
+  if (!String(expr).includes('d')) {
+    const flat = parseInt(String(expr), 10);
+    return isNaN(flat) ? 0 : flat;
+  }
+  const m = String(expr).match(/(\d+)d(\d+)(?:\+(\d+))?/);
+  if (!m) return 0;
+  return parseInt(m[1], 10) * parseInt(m[2], 10) + parseInt(m[3] ?? '0', 10);
+}
+
 // Exported so bonus dice (sneak attack, divine smite) can also be doubled on crits
 export function rollCritical(expr: string | null | undefined): number {
   // Critical hit: damage dice rolled twice, modifier added once
