@@ -1,8 +1,8 @@
 import { SQUARE_SIZE, findPath, opportunityAttackTriggers, posEqual } from '../gridEngine.js';
 import { effectiveSpeed, getEnemyById } from '../gameEngine.js';
+import { hasEscapeTheHorde, hasSecondStoryWork } from '../multiclass.js';
 import type { ActionHandler } from './types.js';
 import { applyDamage } from '../damage.js';
-import { hasEscapeTheHorde } from '../multiclass.js';
 import { resolveEnemyAttack } from '../rulesEngine.js';
 import { updatePcActor } from './actor.js';
 
@@ -117,7 +117,9 @@ export const handleGridMove: ActionHandler<{
   const difficultTerrain = currentRoomForMove?.difficultTerrain ?? [];
   const climbTerrain = currentRoomForMove?.climbTerrain ?? [];
   const swimTerrain = currentRoomForMove?.swimTerrain ?? [];
-  const hasClimbSpeed = (char.climb_speed_ft ?? 0) > 0;
+  // SRD Thief Second-Story Work (L3) — Climb Speed equal to Speed (climbing
+  // costs no extra movement), in addition to any innate/granted climb speed.
+  const hasClimbSpeed = (char.climb_speed_ft ?? 0) > 0 || hasSecondStoryWork(char);
   const hasSwimSpeed = (char.swim_speed_ft ?? 0) > 0;
   const costFeet = path.reduce((acc, pos) => {
     if (isFlying) return acc + SQUARE_SIZE;
