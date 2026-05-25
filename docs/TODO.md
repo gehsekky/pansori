@@ -599,6 +599,20 @@ Bonus(char, st)`: a creature within 10 ft of a conscious L6+ Paladin (the
       per-d20 numeric-penalty threading pattern.
 - [ ] **Ability-score generation** — standard array / point buy at
       character creation (scores are effectively hard-coded today).
+- [ ] **Class skill selection** — today the skill *system* is real
+      (`skill_proficiencies` drives proficiency + Expertise + Jack of All
+      Trades + Reliable Talent through `skillCheck`), but class skills are
+      **auto-granted, not chosen**: creation hands a character its full curated
+      `SRD_CLASS_SKILLS[class]` list + background + species skills
+      (`routes/game.ts:289`), with no "choose N from [options]" step. Two RAW
+      gaps to close: (1) a creation-time choose-your-class-skills step against
+      the real (longer) SRD option lists, replacing the curated 3–4-skill
+      hardcode in `contexts/srd/classes.ts:151`; (2) a central skill→ability
+      map — checks pick the ability ad-hoc per site today, and the contested
+      checks (grapple/shove Athletics-Acrobatics, social Persuasion) still roll
+      raw `d20+mod` without routing through `skillCheck`, so they get no
+      proficiency bonus and miss Reliable Talent (also noted under RE-2's
+      Reliable Talent deferral).
 
 #### RE-4: Combat / exploration subsystems (bounded)
 
