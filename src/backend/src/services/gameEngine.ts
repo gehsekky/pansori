@@ -75,6 +75,7 @@ import {
   hasDisciplinedSurvivor,
   hasElusive,
   hasEvasion,
+  hasHeroicWarrior,
   hasMultiattackDefense,
   hasSlipperyMind,
   hasSuperiorHuntersDefense,
@@ -6815,12 +6816,18 @@ export async function takeAction({
           // Reset movement for this character's new turn
           st = { ...st, movement_used: { ...(st.movement_used ?? {}), [currentEntry.id]: 0 } };
           const withFreshTurn = { ...st.characters[nextCharIdx], turn_actions: { ...FRESH_TURN } };
-          const ticked = tickConditions(withFreshTurn);
+          let ticked = tickConditions(withFreshTurn);
           if (ticked.conditions.length !== st.characters[nextCharIdx].conditions.length) {
             const expired = st.characters[nextCharIdx].conditions.filter(
               (c) => !ticked.conditions.includes(c)
             );
             narrative += ` ${fmt.note(`[${ticked.name}] Condition${expired.length > 1 ? 's' : ''} cleared: ${expired.join(', ')}.`)}`;
+          }
+          // SRD Champion Heroic Warrior (L10) — gain Heroic Inspiration at the
+          // start of a combat turn whenever you lack it.
+          if (hasHeroicWarrior(ticked) && !ticked.inspiration) {
+            ticked = { ...ticked, inspiration: true };
+            narrative += ` ${fmt.note(`[Heroic Warrior] ${ticked.name} gains Heroic Inspiration.`)}`;
           }
           st = { ...st, characters: st.characters.map((c, i) => (i === nextCharIdx ? ticked : c)) };
           st.active_character_id = ticked.id;
