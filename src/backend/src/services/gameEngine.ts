@@ -3511,6 +3511,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       seeking: 'Seeking Spell — reroll a missed spell attack',
       subtle: 'Subtle Spell — no verbal/somatic components',
       transmuted: "Transmuted Spell — change the spell's damage type",
+      twinned: 'Twinned Spell — also strike a second creature',
     };
     // USE: offer each KNOWN, affordable Metamagic option.
     for (const [id, def] of Object.entries(metamagicOptions)) {
