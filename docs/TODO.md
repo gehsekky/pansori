@@ -606,14 +606,14 @@ Bonus(char, st)`: a creature within 10 ft of a conscious L6+ Paladin (the
       - [x] **skill→ability map** — `SKILL_ABILITY` (all 18 SRD skills) +
             `abilityForSkill` in rulesEngine: the single source of truth for a
             skill's governing ability.
-      - [x] **Social Influence routed through `skillCheck`** — Persuasion /
-            Deception / Intimidation now gain Expertise / Jack of All Trades /
-            Reliable Talent / Halfling Lucky (previously rolled raw d20 + CHA +
-            proficiency).
-      - [ ] **Route the remaining bypassers through `skillCheck`** — grapple/
-            shove escape (`combatTactical`, complicated by Barbarian Indomitable
-            Might) and the `study` action (Thaumaturge bonus). Both currently
-            add proficiency but miss Reliable Talent / Expertise.
+      - [x] **All contested/social checks routed through `skillCheck`** —
+            Influence (Persuasion/Deception/Intimidation), the grapple + shove
+            attempts, the grapple escape, and the study action now gain
+            Expertise / Jack of All Trades / Reliable Talent / Halfling Lucky +
+            the exhaustion penalty. Indomitable Might still floors the STR
+            (Athletics) total; the escape picks the better of Athletics/
+            Acrobatics by modifier (RAW choice); the Thaumaturge bonus folds
+            into the study DC.
       - [ ] **Creation choose-your-class-skills step** — replace the
             auto-granted curated `SRD_CLASS_SKILLS[class]` list
             (`routes/game.ts:289`, `contexts/srd/classes.ts:151`) with a
