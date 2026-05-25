@@ -26,7 +26,7 @@ export function runAutoHitSpell(
   // SRD Metamagic Empowered Spell — reroll up to CHA-mod of the lowest dice;
   // Draconic Elemental Affinity — +CHA to the damage roll of the affinity type.
   const spellDmg =
-    (ctx.metamagic === 'empowered'
+    (ctx.metamagic?.includes('empowered')
       ? rollDiceEmpowered(autoHitExpr || spell.damage || '0', Math.max(1, abilityMod(char.cha)))
       : rollDice(autoHitExpr || spell.damage || '0')) + elementalAffinityBonus(char, spell.damageType);
   composeNow(ctx, {

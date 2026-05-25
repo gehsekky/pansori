@@ -258,7 +258,7 @@ export const handleCastSpell: ActionHandler<{
   // favorable one for this cast. A typed copy is threaded through the damage
   // branches + resistance multiplier (the rest of the spell is unchanged).
   const dmgSpell =
-    ctx.metamagic === 'transmuted' && spell.damageType
+    ctx.metamagic?.includes('transmuted') && spell.damageType
       ? { ...spell, damageType: transmutedDamageType(spellTarget, spell.damageType) }
       : spell;
 
@@ -267,7 +267,7 @@ export const handleCastSpell: ActionHandler<{
   // path below is untouched. Resolves the spell against the primary AND a 2nd
   // living enemy, each fully (a per-target miss doesn't skip the other).
   // Doesn't apply to AoE spells (RAW: Twinned needs a single-target spell).
-  if (ctx.metamagic === 'twinned' && !spell.blastRadius) {
+  if (ctx.metamagic?.includes('twinned') && !spell.blastRadius) {
     const resolveTwin = (tgt: Enemy, tgtId: string): void => {
       let dmg = 0;
       let hit = true;

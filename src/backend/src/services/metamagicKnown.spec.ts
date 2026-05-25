@@ -70,7 +70,7 @@ describe('Metamagic activation gate — must be known', () => {
 
     const known = featCtx(makeChar({ character_class: 'Sorcerer', level: 5, cha: 16, metamagics_known: ['empowered'], class_resource_uses: { sorcery_points: 5 }, turn_actions: { action_used: false, bonus_action_used: false, reaction_used: false, free_interaction_used: false } }));
     handleCasterFeature(known, 'metamagic_empowered');
-    expect(known.st.metamagic_active).toBe('empowered');
+    expect(known.st.metamagic_active).toEqual(['empowered']);
     expect(pcChar(known).class_resource_uses?.sorcery_points).toBe(4);
   });
 });

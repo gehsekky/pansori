@@ -42,9 +42,9 @@ export function runPrecast(
   // Sorcerer Metamagic — capture the modifier set by the prior activation and
   // clear it from state so it applies to exactly this one cast. Done first so
   // it's consumed even if a downstream gate aborts the cast.
-  ctx.metamagic = ctx.st.metamagic_active;
+  ctx.metamagic = ctx.st.metamagic_active ?? [];
   if (ctx.st.metamagic_active) ctx.st = { ...ctx.st, metamagic_active: undefined };
-  const isSubtle = ctx.metamagic === 'subtle';
+  const isSubtle = ctx.metamagic.includes('subtle');
 
   // PHB p.144: cannot cast spells while wearing armor you are not proficient with
   const spellArmorItem = pc.char.equipped_armor
@@ -178,7 +178,7 @@ export function runPrecast(
   // itself (which is the spell that got "modified"). We detect the
   // quickened cast via ctx.st.metamagic_active === 'quickened' being still
   // active at the start of resolution.
-  const isQuickenedCast = ctx.metamagic === 'quickened';
+  const isQuickenedCast = ctx.metamagic.includes('quickened');
   if (spell.level > 0 && !isRitualCast && pc.char.turn_actions.quickened_used && !isQuickenedCast) {
     ctx.narrative = 'You used Quickened Spell this turn — you cannot cast another level 1+ spell.';
     return { done: true };
@@ -268,7 +268,7 @@ export function isSpellOutOfRange(
   const distFt = distanceFeet(casterEnt.pos, targetEnt.pos);
   // SRD Metamagic Distant Spell — double a ranged spell's range, or make a
   // touch spell reach 30 ft.
-  const distant = ctx.metamagic === 'distant';
+  const distant = !!ctx.metamagic?.includes('distant');
   const baseMaxFt = spell.rangeKind === 'touch' ? 5 : (spell.rangeFt ?? 0);
   const maxFt = distant ? (spell.rangeKind === 'touch' ? 30 : baseMaxFt * 2) : baseMaxFt;
   if (distFt <= maxFt) return false;

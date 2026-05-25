@@ -74,7 +74,7 @@ export function runSaveSpell(
   const targetEntForCond = ctx.st.entities?.find((e) => e.id === spellTargetId && e.isEnemy);
   // SRD Metamagic Heightened Spell — the target rolls this save with
   // Disadvantage.
-  const heightened = ctx.metamagic === 'heightened';
+  const heightened = !!ctx.metamagic?.includes('heightened');
   const saveFailed = rollConditionSave(
     saveAbility,
     enemyScore,
@@ -103,7 +103,7 @@ export function runSaveSpell(
     // Draconic Elemental Affinity — +CHA to the damage roll of the affinity type
     // (added to the full roll, so it's halved on a successful save per RAW).
     const fullDmg =
-      (ctx.metamagic === 'empowered'
+      (ctx.metamagic?.includes('empowered')
         ? rollDiceEmpowered(saveDmgExpr || spell.damage, Math.max(1, abilityMod(char.cha)))
         : rollDice(saveDmgExpr || spell.damage)) + elementalAffinityBonus(char, spell.damageType);
     spellDmg = saveFailed ? fullDmg : spell.saveEffect === 'half' ? Math.floor(fullDmg / 2) : 0;
