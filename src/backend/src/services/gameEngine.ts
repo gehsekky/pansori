@@ -1936,7 +1936,21 @@ export function applyZoneTick(
   context: Context
 ): { st: GameState; narrative: string } {
   if (!st.entities) return { st, narrative: '' };
-  const cellSet = new Set(zone.cells.map((c) => `${c.x},${c.y}`));
+  // Caster-following auras (Spirit Guardians) recompute their footprint from
+  // the caster's CURRENT cell each tick, so the aura moves with the caster.
+  let cells = zone.cells;
+  if (zone.followsCaster) {
+    const casterEnt = st.entities.find((e) => e.id === zone.casterId);
+    if (casterEnt) {
+      cells = zoneCells(
+        casterEnt.pos,
+        zone.radiusFt ?? 15,
+        context.gridWidth ?? 8,
+        context.gridHeight ?? 8
+      );
+    }
+  }
+  const cellSet = new Set(cells.map((c) => `${c.x},${c.y}`));
   const enemies = getLivingRoomEnemies(st, seed, zone.roomId);
   let workingSt = st;
   let narrative = '';

@@ -24,12 +24,24 @@ export function runZoneSpell(
 ): boolean {
   if (ctx.actor.kind !== 'pc' || !ctx.st.entities) return false;
   const pc = ctx.actor;
-  const targetEnt = ctx.st.entities.find((e) => e.id === targetId && e.isEnemy);
-  if (!targetEnt) return false;
+  // A `rangeKind: 'self'` zone (Spirit Guardians) is a caster-centered aura that
+  // follows the caster; anything else is placed on the target enemy's cell.
+  const follows = spell.rangeKind === 'self';
+  const casterEnt = ctx.st.entities.find((e) => e.id === pc.char.id);
+  let center;
+  if (follows) {
+    if (!casterEnt) return false;
+    center = casterEnt.pos;
+  } else {
+    const targetEnt = ctx.st.entities.find((e) => e.id === targetId && e.isEnemy);
+    if (!targetEnt) return false;
+    center = targetEnt.pos;
+  }
 
   const gridW = ctx.context.gridWidth ?? 8;
   const gridH = ctx.context.gridHeight ?? 8;
-  const cells = zoneCells(targetEnt.pos, spell.blastRadius ?? 5, gridW, gridH);
+  const radiusFt = spell.blastRadius ?? 5;
+  const cells = zoneCells(center, radiusFt, gridW, gridH);
   const zone: SpellZone = {
     id: randomUUID(),
     casterId: pc.char.id,
@@ -43,6 +55,8 @@ export function runZoneSpell(
     savingThrow: spell.savingThrow,
     saveEffect: spell.saveEffect,
     saveDC: dc,
+    followsCaster: follows,
+    radiusFt,
   };
   ctx.st = { ...ctx.st, spell_zones: [...(ctx.st.spell_zones ?? []), zone] };
   // Most zone spells are Concentration; the damage path doesn't stamp it, so

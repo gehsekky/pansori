@@ -989,6 +989,11 @@ export interface SpellZone {
   savingThrow?: AbilityKey; // omitted = automatic damage (no save)
   saveEffect?: 'half' | 'negates';
   saveDC?: number; // the caster's spell save DC, captured at cast time
+  // Caster-following aura (Spirit Guardians): the footprint is recomputed from
+  // the caster's CURRENT cell on each tick using `radiusFt`, so the zone moves
+  // with the caster. `cells` holds the cast-time footprint as a fallback.
+  followsCaster?: boolean;
+  radiusFt?: number;
 }
 
 export interface GameState {

@@ -148,6 +148,71 @@ describe('Moonbeam — cast creates a concentration-linked zone and ticks once',
   });
 });
 
+describe('Spirit Guardians — caster-following aura', () => {
+  // combatState places the caster at (1,1); enemy near it should be hit even
+  // though the zone's stored `cells` are stale, because a followsCaster zone
+  // recomputes its footprint from the caster's current cell.
+  const auraZone = (over: Partial<SpellZone> = {}): SpellZone =>
+    zone({
+      spellId: 'spirit_guardians',
+      name: 'Spirit Guardians',
+      cells: [{ x: 0, y: 0 }], // deliberately stale — should be ignored
+      followsCaster: true,
+      radiusFt: 15,
+      damage: '3d8',
+      ...over,
+    });
+
+  it('damages an enemy within the aura recomputed from the caster’s position', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.01); // enemy save fails
+    // Enemy at (3,3) is 2 squares from the caster at (1,1) → inside the 15-ft aura.
+    const res = applyZoneTick(combatState({ x: 3, y: 3 }), auraZone(), seed, ctx);
+    expect(res.st.entities?.find((e) => e.id === ENEMY)?.hp).toBeLessThan(100);
+  });
+
+  it('a non-following zone with the same stale cells would miss that enemy', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.01);
+    const res = applyZoneTick(
+      combatState({ x: 3, y: 3 }),
+      auraZone({ followsCaster: false }), // uses the stale [{0,0}] cells
+      seed,
+      ctx
+    );
+    expect(res.st.entities?.find((e) => e.id === ENEMY)?.hp).toBe(100);
+  });
+
+  it('cast stamps a caster-following, concentration-linked zone', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.01);
+    const cleric = makeChar({
+      id: 'pc-1',
+      character_class: 'Cleric',
+      level: 5,
+      wis: 18,
+      spells_known: ['spirit_guardians'],
+      prepared_spells: ['spirit_guardians'],
+      spell_slots_max: { 1: 4, 2: 3, 3: 2 },
+      spell_slots_used: {},
+    });
+    const st = combatState({ x: 2, y: 2 }); // enemy adjacent to caster at (1,1)
+    st.characters = [cleric];
+    const r = await takeAction({
+      action: {
+        type: 'cast_spell',
+        spellId: 'spirit_guardians',
+        slotLevel: 3,
+        targetEnemyId: ENEMY,
+      },
+      history: [],
+      state: st,
+      seed,
+      context: ctx,
+    });
+    expect(r.newState.spell_zones?.[0].followsCaster).toBe(true);
+    expect(r.newState.characters[0].concentrating_on?.spellId).toBe('spirit_guardians');
+    expect(r.newState.entities?.find((e) => e.id === ENEMY)?.hp).toBeLessThan(100);
+  });
+});
+
 describe('breakConcentration clears the caster’s zones', () => {
   it('removes spell_zones owned by the caster', () => {
     const caster = makeChar({
