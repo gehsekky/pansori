@@ -8,7 +8,12 @@ import {
   rollDiceEmpowered,
   upcastDamage,
 } from '../../rulesEngine.js';
-import { elementalAffinityBonus, hasPotentCantrip, potentSpellcastingBonus } from '../../multiclass.js';
+import {
+  elementalAffinityBonus,
+  empoweredEvocationBonus,
+  hasPotentCantrip,
+  potentSpellcastingBonus,
+} from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import { composeNow } from '../../narrative/compose.js';
 import { fmt } from '../../narrativeFmt.js';
@@ -95,6 +100,8 @@ export function runAttackRollSpell(
   spellDmg += elementalAffinityBonus(char, spell.damageType);
   // SRD Cleric Potent Spellcasting — +WIS to Cleric cantrip damage.
   spellDmg += potentSpellcastingBonus(char, spell);
+  // SRD Evoker Empowered Evocation — +INT to one damage roll of an Evocation spell.
+  spellDmg += empoweredEvocationBonus(char, spell);
   composeNow(ctx, {
     kind: 'spell_attack_hit',
     attackerId: char.id,

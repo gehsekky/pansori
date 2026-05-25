@@ -1,6 +1,10 @@
 import type { Enemy, Spell } from '../../../types.js';
 import { abilityMod, cantripDamageDice, rollDice, rollDiceEmpowered, upcastDamage } from '../../rulesEngine.js';
-import { elementalAffinityBonus, potentSpellcastingBonus } from '../../multiclass.js';
+import {
+  elementalAffinityBonus,
+  empoweredEvocationBonus,
+  potentSpellcastingBonus,
+} from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import { composeNow } from '../../narrative/compose.js';
 import { pickCastPrefix } from './utils.js';
@@ -30,7 +34,8 @@ export function runAutoHitSpell(
       ? rollDiceEmpowered(autoHitExpr || spell.damage || '0', Math.max(1, abilityMod(char.cha)))
       : rollDice(autoHitExpr || spell.damage || '0')) +
     elementalAffinityBonus(char, spell.damageType) +
-    potentSpellcastingBonus(char, spell);
+    potentSpellcastingBonus(char, spell) +
+    empoweredEvocationBonus(char, spell);
   composeNow(ctx, {
     kind: 'spell_auto_hit',
     attackerId: char.id,

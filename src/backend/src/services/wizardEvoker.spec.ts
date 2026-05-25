@@ -107,3 +107,41 @@ describe('Potent Cantrip (L3) — save cantrip half damage on a successful save'
     expect(r.narrative).toMatch(/Potent Cantrip/);
   });
 });
+
+describe('Empowered Evocation (L10) — +INT to one evocation damage roll', () => {
+  // Low-AC enemy so the spell attack always lands (isolates the damage bonus).
+  const hitSeed: Seed = {
+    ...seed,
+    enemies: {
+      [ctx.startRoomId]: [
+        { id: ENEMY, name: 'Dummy', hp: 80, ac: 5, damage: '1d4', toHit: 3, xp: 50, dex: 8 } as unknown as Enemy,
+      ],
+    },
+  };
+  const fireBolt = async (state: GameState) =>
+    takeAction({
+      action: { type: 'cast_spell', spellId: 'fire_bolt', slotLevel: 0, targetEnemyId: ENEMY },
+      history: [],
+      state,
+      seed: hitSeed,
+      context: ctx,
+    });
+
+  it('adds INT mod to Fire Bolt damage on a hit', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5); // d20 = 11 → hit (not crit); dice fixed
+    const withEmp = await fireBolt(evokerCombat({ level: 10 }));
+    const without = await fireBolt(evokerCombat({ level: 10, subclass: undefined }));
+    const hpWith = (withEmp.newState.entities ?? []).find((e) => e.id === ENEMY)!.hp;
+    const hpWithout = (without.newState.entities ?? []).find((e) => e.id === ENEMY)!.hp;
+    expect(hpWithout - hpWith).toBe(3); // +INT mod (16 → +3)
+  });
+
+  it('does not apply below Evoker L10', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const lowLevel = await fireBolt(evokerCombat({ level: 9 }));
+    const plain = await fireBolt(evokerCombat({ level: 9, subclass: undefined }));
+    const hpEvoker = (lowLevel.newState.entities ?? []).find((e) => e.id === ENEMY)!.hp;
+    const hpPlain = (plain.newState.entities ?? []).find((e) => e.id === ENEMY)!.hp;
+    expect(hpEvoker).toBe(hpPlain); // no bonus yet
+  });
+});

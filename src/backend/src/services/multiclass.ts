@@ -657,6 +657,21 @@ export function hasPotentCantrip(char: Character): boolean {
   return char.subclass === 'evoker' && getClassLevel(char, 'wizard') >= 3;
 }
 
+/** SRD Evoker Empowered Evocation (L10) — add INT mod to one damage roll of an
+ *  Evocation spell. Returns the bonus (0 if not an Evoker L10+, or the spell
+ *  isn't a damaging Evocation spell). Added once per cast at the damage site. */
+export function empoweredEvocationBonus(
+  char: Character,
+  spell: { id: string; damage?: string }
+): number {
+  return char.subclass === 'evoker' &&
+    getClassLevel(char, 'wizard') >= 10 &&
+    !!spell.damage &&
+    isEvocationSpell(spell)
+    ? Math.max(0, abilityMod(char.int))
+    : 0;
+}
+
 export function hasDangerSense(char: Character): boolean {
   if (
     (char.conditions ?? []).some((c) =>
