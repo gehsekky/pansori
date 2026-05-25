@@ -433,6 +433,33 @@ export const handleChooseFiendishResilience: ActionHandler<{
 };
 
 /**
+ * `choose_mystic_arcanum`: SRD Warlock (L11/13/15/17) — designate a level 6-9
+ * spell as the arcanum for its tier; it can then be cast once per long rest
+ * without a slot. Gated to the Warlock level for that tier (11/13/15/17).
+ * Out-of-combat, no action cost. (RE-2.)
+ */
+export const handleChooseMysticArcanum: ActionHandler<{
+  type: 'choose_mystic_arcanum';
+  spellId: string;
+}> = (ctx, action) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can choose a Mystic Arcanum.' };
+  const { char } = ctx.actor;
+  const spell = ctx.context.spellTable?.[action.spellId];
+  if (!spell || spell.level < 6 || spell.level > 9) {
+    return { rejected: `${action.spellId} isn't a level 6-9 spell.` };
+  }
+  const tierGate: Record<number, number> = { 6: 11, 7: 13, 8: 15, 9: 17 };
+  if (getClassLevel(char, 'warlock') < (tierGate[spell.level] ?? 99)) {
+    ctx.narrative = `A level-${spell.level} Mystic Arcanum requires a higher Warlock level.`;
+    return;
+  }
+  updatePcActor(ctx, {
+    mystic_arcanum: { ...(char.mystic_arcanum ?? {}), [spell.level]: action.spellId },
+  });
+  ctx.narrative = `${char.name} inscribes ${spell.name} as their level-${spell.level} Mystic Arcanum — castable once per long rest without a slot.`;
+};
+
+/**
  * `memorize_spell`: SRD Wizard (L5) — during a rest, replace one prepared
  * level-1+ spell with another level-1+ spell from the spellbook. Gated to a
  * Wizard L5, out of combat. (RE-2.)

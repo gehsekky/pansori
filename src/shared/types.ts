@@ -296,6 +296,9 @@ export type StructuredAction =
       // 1-5 slot). First use/long rest is free; later uses deal escalating
       // Necrotic self-damage. Validated in precast.
       overchannel?: boolean;
+      // Warlock Mystic Arcanum (L11/13/15/17) — cast this chosen L6-9 spell
+      // once per long rest without a slot. Validated in precast.
+      mysticArcanum?: boolean;
     }
   | { type: 'disarm_trap' }
   | { type: 'interact_object'; objectId: string }
@@ -388,6 +391,9 @@ export type StructuredAction =
   // SRD 5.2.1 Fiend Warlock Fiendish Resilience (L10): choose a damage type
   // (not Force) to gain Resistance to until re-chosen. Out-of-combat. (RE-2.)
   | { type: 'choose_fiendish_resilience'; damageType: string }
+  // SRD 5.2.1 Warlock Mystic Arcanum (L11/13/15/17): designate a L6-9 spell as
+  // the arcanum for its tier (free 1/long-rest cast). Out-of-combat. (RE-2.)
+  | { type: 'choose_mystic_arcanum'; spellId: string }
   // SRD 5.2.1 Paladin Lay on Hands (L1): bonus-action touch heal drawing from
   // a pool of 5 × Paladin level HP. `targetCharId` is the healed party member
   // (may be the paladin). (RE-2.)

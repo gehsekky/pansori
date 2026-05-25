@@ -5,7 +5,10 @@
 import type { Character, Enemy, GameState, Seed } from '../types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { makeChar, makeState } from '../test-fixtures.js';
+import type { ActionContext } from './actions/types.js';
 import { context as ctx } from '../contexts/sandbox.js';
+import { handleChooseMysticArcanum } from './actions/meta.js';
+import { pcActor } from './actions/actor.js';
 import { takeAction } from './gameEngine.js';
 
 afterEach(() => vi.restoreAllMocks());
@@ -88,5 +91,49 @@ describe('Eldritch Master (L20)', () => {
     );
     expect(r.newState.characters[0].spell_slots_used?.[5]).toBe(0); // all four back
     expect(r.narrative).toMatch(/Eldritch Master|all of them/);
+  });
+});
+
+function arcanumCtx(char: Character): ActionContext {
+  return { actor: pcActor(char, 0), context: ctx, narrative: '' } as unknown as ActionContext;
+}
+const arcChar = (c: ActionContext) => {
+  if (c.actor.kind !== 'pc') throw new Error('expected pc actor');
+  return c.actor.char;
+};
+
+describe('Mystic Arcanum (L11/13/15/17)', () => {
+  it('designates a level-6 spell as the L11 arcanum', () => {
+    const c = arcanumCtx(makeChar({ character_class: 'Warlock', subclass: 'fiend', level: 11 }));
+    handleChooseMysticArcanum(c, { type: 'choose_mystic_arcanum', spellId: 'heal' });
+    expect(arcChar(c).mystic_arcanum?.[6]).toBe('heal');
+  });
+
+  it('a level-7 arcanum requires Warlock L13', () => {
+    const c = arcanumCtx(makeChar({ character_class: 'Warlock', subclass: 'fiend', level: 11 }));
+    handleChooseMysticArcanum(c, { type: 'choose_mystic_arcanum', spellId: 'resurrection' });
+    expect(arcChar(c).mystic_arcanum?.[7]).toBeUndefined();
+  });
+
+  it('casts the designated arcanum with no slot, once per long rest', async () => {
+    const state = warlockCombat({
+      level: 11,
+      hp: 10,
+      max_hp: 90,
+      spell_slots_max: {},
+      spell_slots_used: {},
+      mystic_arcanum: { 6: 'heal' },
+    });
+    const r = await takeAction({
+      action: { type: 'cast_spell', spellId: 'heal', slotLevel: 6, mysticArcanum: true },
+      history: [],
+      state,
+      seed,
+      context: ctx,
+    });
+    const after = r.newState.characters[0];
+    expect(after.hp).toBeGreaterThan(10); // Heal landed (self)
+    expect(after.class_resource_uses?.mystic_arcanum_6).toBe(1); // tier spent
+    expect(r.narrative).toMatch(/Mystic Arcanum/);
   });
 });

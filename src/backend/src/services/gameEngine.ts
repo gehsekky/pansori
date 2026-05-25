@@ -3253,6 +3253,49 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     }
   }
 
+  // ── Warlock Mystic Arcanum (L11/13/15/17) ──────────────────────────────────
+  // Pick a L6-9 spell as the arcanum for each tier the warlock qualifies for
+  // (out of combat), and cast a chosen arcanum once per long rest with no slot.
+  if (context.spellTable && getClassLevel(char, 'warlock') >= 11) {
+    const wlLevel = getClassLevel(char, 'warlock');
+    const tierGate: Record<number, number> = { 6: 11, 7: 13, 8: 15, 9: 17 };
+    // Pick surface (out of combat) — offer eligible spells for unfilled tiers.
+    if (!state.combat_active) {
+      for (const s of Object.values(context.spellTable)) {
+        if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+        if (s.level < 6 || s.level > 9) continue;
+        if (wlLevel < (tierGate[s.level] ?? 99)) continue;
+        if (char.mystic_arcanum?.[s.level] === s.id) continue;
+        choices.push({
+          label: `Mystic Arcanum (Lvl ${s.level}): designate ${s.name}`,
+          action: { type: 'choose_mystic_arcanum', spellId: s.id },
+        });
+      }
+    }
+    // Cast surface — each chosen arcanum not yet spent this long rest.
+    for (const [lvlStr, spellId] of Object.entries(char.mystic_arcanum ?? {})) {
+      if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+      const lvl = Number(lvlStr);
+      if (wlLevel < (tierGate[lvl] ?? 99)) continue;
+      if ((char.class_resource_uses?.[`mystic_arcanum_${lvl}`] ?? 0) > 0) continue;
+      const s = context.spellTable[spellId];
+      if (!s) continue;
+      const isOffensive = !!(s.damage || s.condition);
+      if (isOffensive && !enemyAlive) continue;
+      choices.push({
+        label: `Mystic Arcanum — cast ${s.name} (Lvl ${lvl}, no slot)`,
+        action: {
+          type: 'cast_spell',
+          spellId,
+          slotLevel: lvl,
+          targetEnemyId: isOffensive ? livingEnemies[0]?.id : undefined,
+          mysticArcanum: true,
+        },
+        kind: 'cast_spell',
+      });
+    }
+  }
+
   // ── Wizard Memorize Spell (L5) — short-rest prepared-spell swap ────────────
   // Replace one prepared level-1+ spell with another from the spellbook. Only
   // surfaces when the wizard has prepared spells AND unprepared known spells to

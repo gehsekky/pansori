@@ -241,6 +241,10 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
     delete restoredUses.intimidating_presence_used; // Berserker Intimidating Presence — free use back after a long rest
     delete restoredUses.dark_ones_luck; // Fiend Warlock Dark One's Own Luck — uses reset after a long rest
     delete restoredUses.magical_cunning_used; // Warlock Magical Cunning — available again after a long rest
+    // Warlock Mystic Arcanum — each tier's free cast returns after a long rest.
+    for (const k of Object.keys(restoredUses)) {
+      if (k.startsWith('mystic_arcanum_')) delete restoredUses[k];
+    }
     // Wizard Signature Spells — free L3 casts recharge on a long rest too.
     for (const k of Object.keys(restoredUses)) {
       if (k.startsWith('signature_used_')) delete restoredUses[k];
