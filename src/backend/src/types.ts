@@ -343,6 +343,9 @@ export interface TurnActions {
   // Hunter's Mark damage to the marked target you also deal that extra damage
   // to a second creature within 30 ft. This marks the per-turn use.
   superior_hunters_prey_used?: boolean;
+  // SRD Sorcerer Arcane Apotheosis (L20) — one Metamagic option per turn is free
+  // while Innate Sorcery is active. Marks that the free use is spent this turn.
+  metamagic_free_used?: boolean;
   // SRD Ranger Horde Breaker (Hunter's Prey option) — once per turn, an extra
   // weapon attack vs a different creature within 5 ft of the original target.
   // This marks the per-turn use.
@@ -930,7 +933,7 @@ export interface GameState {
   movement_used?: Record<string, number>; // entityId → feet moved this turn
   help_target_id?: string; // char id receiving Help action advantage
   surprised?: string[]; // entity ids surprised at combat start (skip first turn)
-  metamagic_active?: string; // active Metamagic modifier for Sorcerer
+  metamagic_active?: string[]; // active Metamagic modifier ids for the next cast (Sorcery Incarnate allows 2)
   cutting_words_penalty?: number; // Lore Bard Cutting Words penalty to apply
   round?: number; // current combat round (1-indexed)
 

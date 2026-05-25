@@ -39,7 +39,7 @@ export function runAttackRollSpell(
   let atk = resolveSpellAttack(char.level, castingScore, spellTarget.ac, innateAdv);
   // SRD Metamagic Seeking Spell — on a miss, reroll the d20 once (use the new).
   let seekingNote = '';
-  if (!atk.hit && ctx.metamagic === 'seeking') {
+  if (!atk.hit && ctx.metamagic?.includes('seeking')) {
     atk = resolveSpellAttack(char.level, castingScore, spellTarget.ac, innateAdv);
     seekingNote = ' 🎯 Seeking Spell (reroll)';
   }
@@ -70,7 +70,7 @@ export function runAttackRollSpell(
     spell.level === 0 ? cantripDamageDice(spell, char.level) : upcastDamage(spell, slotLevel);
   // SRD Metamagic Empowered Spell — reroll up to CHA-mod of the lowest damage
   // dice, keeping the new rolls.
-  const empowered = ctx.metamagic === 'empowered';
+  const empowered = !!ctx.metamagic?.includes('empowered');
   let spellDmg = empowered
     ? rollDiceEmpowered(atkDmgExpr || '1d4', Math.max(1, abilityMod(char.cha)), atk.critical)
     : atk.critical

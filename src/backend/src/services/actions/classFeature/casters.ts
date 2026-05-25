@@ -1,6 +1,27 @@
 import { getClassLevel, hasClass, knowsMetamagic } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
+import type { Character } from '../../../types.js';
 import { abilityMod } from '../../rulesEngine.js';
+
+// SRD Sorcery Incarnate (L7) — while Innate Sorcery is active, up to TWO
+// Metamagic options can be stacked on one spell. Returns the next
+// metamagic_active list after adding `id` (stacks onto exactly one existing).
+function addMetamagic(char: Character, current: string[], id: string): string[] {
+  const incarnate =
+    char.conditions.includes('innate_sorcery') && getClassLevel(char, 'sorcerer') >= 7;
+  return incarnate && current.length === 1 ? [...current, id] : [id];
+}
+
+// SRD Arcane Apotheosis (L20) — one Metamagic option per turn is free while
+// Innate Sorcery is active. Returns the effective Sorcery-Point cost and
+// whether the free use was consumed (caller sets metamagic_free_used).
+function metamagicCost(char: Character, base: number): { cost: number; free: boolean } {
+  const apotheosis =
+    char.conditions.includes('innate_sorcery') &&
+    getClassLevel(char, 'sorcerer') >= 20 &&
+    !char.turn_actions.metamagic_free_used;
+  return apotheosis ? { cost: 0, free: true } : { cost: base, free: false };
+}
 
 /**
  * Caster features for Sorcerer, Warlock, and Wizard. Bundled because
@@ -90,17 +111,29 @@ export function handleCasterFeature(ctx: ActionContext, fid: string): boolean {
       return true;
     }
     const isUsed = char.class_resource_uses?.innate_sorcery_used ?? 0;
+    const sp = char.class_resource_uses?.sorcery_points ?? getClassLevel(char, 'sorcerer');
+    // SRD Sorcery Incarnate (L7): when out of free uses, activate by spending
+    // 2 Sorcery Points instead.
+    const incarnateAvailable = getClassLevel(char, 'sorcerer') >= 7 && sp >= 2;
+    let incarnateNote = '';
+    const usesPatch: Record<string, number> = { ...(char.class_resource_uses ?? {}) };
     if (isUsed >= 2) {
-      ctx.narrative = 'Innate Sorcery is expended (2/2 used). Recovers on a long rest.';
-      return true;
+      if (!incarnateAvailable) {
+        ctx.narrative =
+          getClassLevel(char, 'sorcerer') >= 7
+            ? 'Innate Sorcery is expended — spend 2 sorcery points to activate it (not enough).'
+            : 'Innate Sorcery is expended (2/2 used). Recovers on a long rest.';
+        return true;
+      }
+      usesPatch.sorcery_points = sp - 2;
+      incarnateNote = ' (Sorcery Incarnate: 2 sorcery points)';
+    } else {
+      usesPatch.innate_sorcery_used = isUsed + 1;
     }
     char.conditions = [...char.conditions, 'innate_sorcery'];
-    char.class_resource_uses = {
-      ...(char.class_resource_uses ?? {}),
-      innate_sorcery_used: isUsed + 1,
-    };
+    char.class_resource_uses = usesPatch;
     char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
-    ctx.narrative = `${char.name} unleashes Innate Sorcery — +1 spell save DC and Advantage on spell attacks this encounter. (${1 - isUsed}/2 remaining)`;
+    ctx.narrative = `${char.name} unleashes Innate Sorcery — +1 spell save DC and Advantage on spell attacks this encounter.${incarnateNote || ` (${1 - isUsed}/2 remaining)`}`;
     return true;
   }
 
@@ -129,15 +162,20 @@ export function handleCasterFeature(ctx: ActionContext, fid: string): boolean {
     },
   };
   if (SIMPLE_METAMAGIC[fid]) {
-    const { cost, label } = SIMPLE_METAMAGIC[fid];
+    const { cost: base, label } = SIMPLE_METAMAGIC[fid];
     const sp = char.class_resource_uses?.sorcery_points ?? getClassLevel(char, 'sorcerer');
+    const { cost, free } = metamagicCost(char, base);
     if (sp < cost) {
       ctx.narrative = `Not enough sorcery points (need ${cost}).`;
       return true;
     }
     char.class_resource_uses = { ...(char.class_resource_uses ?? {}), sorcery_points: sp - cost };
-    ctx.st = { ...ctx.st, metamagic_active: fid.replace('metamagic_', '') };
-    ctx.narrative = `${char.name} — Metamagic: ${label}. (${sp - cost} sorcery points remaining)`;
+    if (free) char.turn_actions = { ...char.turn_actions, metamagic_free_used: true };
+    ctx.st = {
+      ...ctx.st,
+      metamagic_active: addMetamagic(char, ctx.st.metamagic_active ?? [], fid.replace('metamagic_', '')),
+    };
+    ctx.narrative = `${char.name} — Metamagic: ${label}.${free ? ' (free — Arcane Apotheosis)' : ` (${sp - cost} sorcery points remaining)`}`;
     return true;
   }
 
@@ -148,16 +186,18 @@ export function handleCasterFeature(ctx: ActionContext, fid: string): boolean {
     }
     // Sorcery points scale with Sorcerer level.
     const spPool = char.class_resource_uses?.sorcery_points ?? getClassLevel(char, 'sorcerer');
-    if (spPool < 1) {
+    const { cost, free } = metamagicCost(char, 1);
+    if (spPool < cost) {
       ctx.narrative = 'Not enough sorcery points (need 1).';
       return true;
     }
     char.class_resource_uses = {
       ...(char.class_resource_uses ?? {}),
-      sorcery_points: spPool - 1,
+      sorcery_points: spPool - cost,
     };
-    ctx.st = { ...ctx.st, metamagic_active: 'twinned' };
-    ctx.narrative = `${char.name} — Metamagic: Twinned Spell! Your next spell will target a second creature. (${spPool - 1} sorcery points remaining)`;
+    if (free) char.turn_actions = { ...char.turn_actions, metamagic_free_used: true };
+    ctx.st = { ...ctx.st, metamagic_active: addMetamagic(char, ctx.st.metamagic_active ?? [], 'twinned') };
+    ctx.narrative = `${char.name} — Metamagic: Twinned Spell! Your next spell will target a second creature.${free ? ' (free — Arcane Apotheosis)' : ` (${spPool - cost} sorcery points remaining)`}`;
     return true;
   }
 
@@ -178,22 +218,24 @@ export function handleCasterFeature(ctx: ActionContext, fid: string): boolean {
       return true;
     }
     const spPool2 = char.class_resource_uses?.sorcery_points ?? getClassLevel(char, 'sorcerer');
-    if (spPool2 < 2) {
+    const { cost: qCost, free: qFree } = metamagicCost(char, 2);
+    if (spPool2 < qCost) {
       ctx.narrative = 'Not enough sorcery points (need 2).';
       return true;
     }
     char.class_resource_uses = {
       ...(char.class_resource_uses ?? {}),
-      sorcery_points: spPool2 - 2,
+      sorcery_points: spPool2 - qCost,
     };
     char.turn_actions = {
       ...char.turn_actions,
       bonus_action_used: true,
       action_used: false,
       quickened_used: true,
+      ...(qFree ? { metamagic_free_used: true } : {}),
     };
-    ctx.st = { ...ctx.st, metamagic_active: 'quickened' };
-    ctx.narrative = `${char.name} — Metamagic: Quickened Spell! Cast your next spell as a bonus action. (${spPool2 - 2} sorcery points remaining)`;
+    ctx.st = { ...ctx.st, metamagic_active: addMetamagic(char, ctx.st.metamagic_active ?? [], 'quickened') };
+    ctx.narrative = `${char.name} — Metamagic: Quickened Spell! Cast your next spell as a bonus action.${qFree ? ' (free — Arcane Apotheosis)' : ` (${spPool2 - qCost} sorcery points remaining)`}`;
     return true;
   }
 
@@ -203,16 +245,18 @@ export function handleCasterFeature(ctx: ActionContext, fid: string): boolean {
       return true;
     }
     const spPool3 = char.class_resource_uses?.sorcery_points ?? getClassLevel(char, 'sorcerer');
-    if (spPool3 < 1) {
+    const { cost: eCost, free: eFree } = metamagicCost(char, 1);
+    if (spPool3 < eCost) {
       ctx.narrative = 'Not enough sorcery points (need 1).';
       return true;
     }
     char.class_resource_uses = {
       ...(char.class_resource_uses ?? {}),
-      sorcery_points: spPool3 - 1,
+      sorcery_points: spPool3 - eCost,
     };
-    ctx.st = { ...ctx.st, metamagic_active: 'empowered' };
-    ctx.narrative = `${char.name} — Metamagic: Empowered Spell! You may reroll up to ${abilityMod(char.cha)} damage dice on your next spell. (${spPool3 - 1} sorcery points remaining)`;
+    if (eFree) char.turn_actions = { ...char.turn_actions, metamagic_free_used: true };
+    ctx.st = { ...ctx.st, metamagic_active: addMetamagic(char, ctx.st.metamagic_active ?? [], 'empowered') };
+    ctx.narrative = `${char.name} — Metamagic: Empowered Spell! You may reroll up to ${abilityMod(char.cha)} damage dice on your next spell.${eFree ? ' (free — Arcane Apotheosis)' : ` (${spPool3 - eCost} sorcery points remaining)`}`;
     return true;
   }
 

@@ -139,7 +139,7 @@ export function runAoeSpell(
       // Allies in blast auto-succeed (and take no damage) via Evoker Sculpt
       // Spells or Sorcerer Metamagic Careful Spell (pansori auto-protects all
       // allies in the blast; RAW caps Careful at CHA-mod chosen creatures).
-      const carefulActive = ctx.metamagic === 'careful';
+      const carefulActive = !!ctx.metamagic?.includes('careful');
       const autoSucceed = isEvoker || carefulActive;
       if (!autoSucceed && spell.saveEffect !== 'negates') {
         const allyScore = (targetChar[spell.savingThrow as keyof Character] as number) ?? 10;

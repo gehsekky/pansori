@@ -74,7 +74,7 @@ export interface ActionContext {
    * Heightened save, Extended duration, Empowered/Twinned/Transmuted/
    * Seeking/Careful). Undefined when no metamagic is active.
    */
-  metamagic?: string;
+  metamagic?: string[];
 
   /**
    * EE-2 side-channel — the `enemy_attack` handler reports its

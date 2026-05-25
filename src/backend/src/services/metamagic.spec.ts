@@ -54,7 +54,7 @@ describe('Metamagic foundation — applies once then clears', () => {
   it('metamagic_active is cleared after the next cast', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.99);
     const state = sorcCombat();
-    state.metamagic_active = 'empowered';
+    state.metamagic_active = ['empowered'];
     const r = await takeAction({ action: { type: 'cast_spell', spellId: 'fire_bolt', slotLevel: 0, targetEnemyId: ENEMY }, history: [], state, seed: seed(), context: ctx });
     expect(r.newState.metamagic_active).toBeUndefined();
   });
@@ -62,7 +62,7 @@ describe('Metamagic foundation — applies once then clears', () => {
 
 describe('Distant Spell — double range', () => {
   const fireBolt = { name: 'Fire Bolt', level: 0, rangeKind: 'ranged', rangeFt: 120 } as unknown as Spell;
-  const rangeCtx = (metamagic?: string): ActionContext =>
+  const rangeCtx = (metamagic: string[] = []): ActionContext =>
     ({
       actor: pcActor(makeChar({ id: 'pc-1', spell_slots_used: {} }), 0),
       metamagic,
@@ -77,7 +77,7 @@ describe('Distant Spell — double range', () => {
     expect(isSpellOutOfRange(rangeCtx(), fireBolt, ENEMY, 'Dummy', 0, false)).toBe(true);
   });
   it('Distant Spell brings it into the doubled 240 ft range', () => {
-    expect(isSpellOutOfRange(rangeCtx('distant'), fireBolt, ENEMY, 'Dummy', 0, false)).toBe(false);
+    expect(isSpellOutOfRange(rangeCtx(['distant']), fireBolt, ENEMY, 'Dummy', 0, false)).toBe(false);
   });
 });
 
@@ -86,7 +86,7 @@ describe('Subtle Spell — no components (bypasses Deafened)', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
     // power_word_kill is verbal; deafened normally blocks it.
     const withSubtle = sorcCombat({ conditions: ['deafened'] }, 50);
-    withSubtle.metamagic_active = 'subtle';
+    withSubtle.metamagic_active = ['subtle'];
     const r1 = await takeAction({ action: { type: 'cast_spell', spellId: 'power_word_kill', slotLevel: 9, targetEnemyId: ENEMY }, history: [], state: withSubtle, seed: seed(50), context: ctx });
     expect(r1.newState.enemies_killed).toContain(ENEMY); // cast resolved (≤100 HP dies)
 
@@ -100,7 +100,7 @@ describe('Subtle Spell — no components (bypasses Deafened)', () => {
 describe('Extended Spell — double concentration duration', () => {
   it('doubles rounds_left on a concentration buff', async () => {
     const base = makeState({ id: 'pc-1', character_class: 'Sorcerer', level: 9, cha: 16, spell_slots_max: { 1: 4 }, spell_slots_used: {}, spells_known: ['shield_of_faith'] }, { combat_active: false });
-    base.metamagic_active = 'extended';
+    base.metamagic_active = ['extended'];
     const r = await takeAction({ action: { type: 'cast_spell', spellId: 'shield_of_faith', slotLevel: 1 }, history: [], state: base, seed: seed(), context: ctx });
     expect(r.newState.characters[0].concentrating_on?.rounds_left).toBe(20); // base 10 → 20
   });
@@ -111,7 +111,7 @@ describe('Heightened Spell — target save Disadvantage', () => {
     // Save rolls: with Heightened (disadvantage) → 2d20 take the low (2) → fail;
     // without → single high (20) → succeed.
     const heightened = sorcCombat({}, 60);
-    heightened.metamagic_active = 'heightened';
+    heightened.metamagic_active = ['heightened'];
     vi.spyOn(Math, 'random').mockReturnValue(0.05); // every d20 low; disadvantage min is low → fail
     const r1 = await takeAction({ action: { type: 'cast_spell', spellId: 'hold_person', slotLevel: 2, targetEnemyId: ENEMY }, history: [], state: heightened, seed: seed(), context: ctx });
     expect(r1.newState.entities?.find((e) => e.id === ENEMY)?.conditions).toContain('paralyzed');
@@ -132,7 +132,7 @@ describe('Empowered Spell — reroll low damage dice', () => {
     // d20 0.7 → 15 (hit, no crit); 1d10 0.0 → 1; reroll 0.99 → 10.
     vi.spyOn(Math, 'random').mockReturnValueOnce(0.7).mockReturnValueOnce(0.0).mockReturnValueOnce(0.99).mockReturnValue(0.5);
     const state = lowSorc();
-    state.metamagic_active = 'empowered';
+    state.metamagic_active = ['empowered'];
     const r = await takeAction({ action: { type: 'cast_spell', spellId: 'fire_bolt', slotLevel: 0, targetEnemyId: ENEMY }, history: [], state, seed: seed(), context: ctx });
     expect(r.newState.entities?.find((e) => e.id === ENEMY)?.hp).toBe(50); // 60 - 10
   });
@@ -149,7 +149,7 @@ describe('Seeking Spell — reroll a missed spell attack', () => {
     // d20 0.1 → 3 (miss); reroll 0.9 → 19 (hit); then damage.
     vi.spyOn(Math, 'random').mockReturnValueOnce(0.1).mockReturnValueOnce(0.9).mockReturnValue(0.5);
     const state = lowSorc();
-    state.metamagic_active = 'seeking';
+    state.metamagic_active = ['seeking'];
     const r = await takeAction({ action: { type: 'cast_spell', spellId: 'fire_bolt', slotLevel: 0, targetEnemyId: ENEMY }, history: [], state, seed: seed(), context: ctx });
     expect(r.newState.entities?.find((e) => e.id === ENEMY)!.hp).toBeLessThan(60); // reroll landed
   });
@@ -184,7 +184,7 @@ describe('Careful Spell — allies in the area auto-succeed and take no damage',
   it('an ally in the Fireball blast takes no damage with Careful', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
     const state = carefulState();
-    state.metamagic_active = 'careful';
+    state.metamagic_active = ['careful'];
     const r = await takeAction({ action: { type: 'cast_spell', spellId: 'fireball', slotLevel: 3, targetEnemyId: ENEMY }, history: [], state, seed: seed(80), context: ctx });
     expect(r.newState.characters.find((c) => c.id === 'pc-2')!.hp).toBe(40); // untouched
     expect(r.narrative).toMatch(/Careful Spell/);
@@ -209,7 +209,7 @@ describe('Transmuted Spell — change damage type to dodge resistance', () => {
     // d20 0.7 → 15 (hit); 1d10 0.5 → 6. Transmuted → acid (not resisted) → 6.
     vi.spyOn(Math, 'random').mockReturnValueOnce(0.7).mockReturnValueOnce(0.5).mockReturnValue(0.5);
     const state = lowSorc();
-    state.metamagic_active = 'transmuted';
+    state.metamagic_active = ['transmuted'];
     const r = await takeAction({ action: { type: 'cast_spell', spellId: 'fire_bolt', slotLevel: 0, targetEnemyId: ENEMY }, history: [], state, seed: fireResistSeed, context: ctx });
     expect(r.newState.entities?.find((e) => e.id === ENEMY)!.hp).toBe(54); // 60 - 6 full
   });
@@ -245,7 +245,7 @@ describe('Twinned Spell — strike a second creature', () => {
   it('a single-target spell also hits a 2nd enemy', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.7); // d20 15 (hit), 1d10 → 8
     const state = twinState();
-    state.metamagic_active = 'twinned';
+    state.metamagic_active = ['twinned'];
     const r = await takeAction({ action: { type: 'cast_spell', spellId: 'fire_bolt', slotLevel: 0, targetEnemyId: ENEMY }, history: [], state, seed: twinSeed, context: ctx });
     expect(r.newState.entities?.find((e) => e.id === ENEMY)!.hp).toBeLessThan(60);
     expect(r.newState.entities?.find((e) => e.id === E2)!.hp).toBeLessThan(60);
