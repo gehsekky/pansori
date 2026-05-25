@@ -63,7 +63,15 @@ function killState(
     ],
     initiative_idx: 0,
     entities: [
-      { id: 'pc-1', isEnemy: false, pos: { x: 3, y: 5 }, hp: 30, maxHp: 30, conditions: [], condition_durations: {} },
+      {
+        id: 'pc-1',
+        isEnemy: false,
+        pos: { x: 3, y: 5 },
+        hp: 30,
+        maxHp: 30,
+        conditions: [],
+        condition_durations: {},
+      },
       ...enemyEntities.map((e) => ({
         id: e.id,
         isEnemy: true,
@@ -116,7 +124,11 @@ describe('Power Word Kill — Words of Creation second target', () => {
     { id: E2, hp: 80, pos: { x: 6, y: 5 } }, // 10 ft from E1 → in WoC range
     { id: E3, hp: 80, pos: { x: 15, y: 5 } }, // far → out of range
   ];
-  const seed = killSeed([enemy(E1, 'Skeleton', 80), enemy(E2, 'Zombie', 80), enemy(E3, 'Ghoul', 80)]);
+  const seed = killSeed([
+    enemy(E1, 'Skeleton', 80),
+    enemy(E2, 'Zombie', 80),
+    enemy(E3, 'Ghoul', 80),
+  ]);
 
   it('a L20 Bard kills a second enemy within 10 ft (but not one out of range)', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
@@ -151,12 +163,32 @@ describe('Power Word Kill — Words of Creation second target', () => {
 // off-grid the party is assumed together so WoC range is auto-satisfied).
 function healState(bardLevel: number): GameState {
   const bard = makeChar({
-    id: 'pc-1', name: 'Lyra', character_class: 'Bard', level: bardLevel, cha: 18,
-    hp: 30, max_hp: 30, spell_slots_max: { 9: 1 }, spell_slots_used: {},
+    id: 'pc-1',
+    name: 'Lyra',
+    character_class: 'Bard',
+    level: bardLevel,
+    cha: 18,
+    hp: 30,
+    max_hp: 30,
+    spell_slots_max: { 9: 1 },
+    spell_slots_used: {},
     spells_known: ['power_word_heal', 'power_word_kill'],
   });
-  const ally1 = makeChar({ id: 'pc-2', name: 'Doran', character_class: 'Fighter', hp: 5, max_hp: 30, conditions: ['frightened'] });
-  const ally2 = makeChar({ id: 'pc-3', name: 'Mira', character_class: 'Rogue', hp: 12, max_hp: 30 });
+  const ally1 = makeChar({
+    id: 'pc-2',
+    name: 'Doran',
+    character_class: 'Fighter',
+    hp: 5,
+    max_hp: 30,
+    conditions: ['frightened'],
+  });
+  const ally2 = makeChar({
+    id: 'pc-3',
+    name: 'Mira',
+    character_class: 'Rogue',
+    hp: 12,
+    max_hp: 30,
+  });
   return {
     ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: false }),
     characters: [bard, ally1, ally2],
@@ -204,7 +236,12 @@ describe('Power Word Heal — full heal + cleanse + Words of Creation', () => {
 
 describe('Words of Creation — L20 capstone grant', () => {
   it('grants both Power Words to spells_known on reaching Bard L20', () => {
-    const bard = makeChar({ character_class: 'Bard', level: 19, class_levels: { bard: 19 }, spells_known: ['vicious_mockery'] });
+    const bard = makeChar({
+      character_class: 'Bard',
+      level: 19,
+      class_levels: { bard: 19 },
+      spells_known: ['vicious_mockery'],
+    });
     const note = applyLevelUpForClass(bard, 'bard', ctx);
     expect(bard.level).toBe(20);
     expect(bard.spells_known).toContain('power_word_heal');
@@ -213,7 +250,12 @@ describe('Words of Creation — L20 capstone grant', () => {
   });
 
   it('does not grant them before L20', () => {
-    const bard = makeChar({ character_class: 'Bard', level: 17, class_levels: { bard: 17 }, spells_known: [] });
+    const bard = makeChar({
+      character_class: 'Bard',
+      level: 17,
+      class_levels: { bard: 17 },
+      spells_known: [],
+    });
     applyLevelUpForClass(bard, 'bard', ctx);
     expect(bard.spells_known).not.toContain('power_word_kill');
   });

@@ -803,7 +803,8 @@ export function auraOfProtectionBonus(char: Character, st: GameState): number {
     let inRange = p.id === char.id;
     if (!inRange) {
       const pEnt = st.entities?.find((e) => e.id === p.id);
-      inRange = charEnt && pEnt ? distanceFeet(charEnt.pos, pEnt.pos) <= paladinAuraRangeFt(p) : true;
+      inRange =
+        charEnt && pEnt ? distanceFeet(charEnt.pos, pEnt.pos) <= paladinAuraRangeFt(p) : true;
     }
     if (!inRange) continue;
     const bonus = Math.max(1, abilityMod(p.cha));
@@ -853,7 +854,8 @@ export function auraConditionImmunity(char: Character, st: GameState): Set<strin
     let inRange = p.id === char.id;
     if (!inRange) {
       const pEnt = st.entities?.find((e) => e.id === p.id);
-      inRange = charEnt && pEnt ? distanceFeet(charEnt.pos, pEnt.pos) <= paladinAuraRangeFt(p) : true;
+      inRange =
+        charEnt && pEnt ? distanceFeet(charEnt.pos, pEnt.pos) <= paladinAuraRangeFt(p) : true;
     }
     if (!inRange) continue;
     if (getClassLevel(p, 'paladin') >= 10) out.add('frightened'); // Aura of Courage
@@ -998,19 +1000,21 @@ function conditionSavingThrow(
   // (modeled as a reroll with the DC lowered by the roll) when it rescues it.
   let darkOnesLuckConsumed = false;
   if (applied) {
-    const luck = tryDarkOnesLuck(char, () =>
-      !rollConditionSave(
-        effect.ability,
-        char[effect.ability] ?? 10,
-        dcAdjusted - rollDice('1d10'),
-        proficient,
-        char.level,
-        0,
-        char.conditions ?? [],
-        speciesAdv,
-        enc,
-        d20TestPenalty(char)
-      )
+    const luck = tryDarkOnesLuck(
+      char,
+      () =>
+        !rollConditionSave(
+          effect.ability,
+          char[effect.ability] ?? 10,
+          dcAdjusted - rollDice('1d10'),
+          proficient,
+          char.level,
+          0,
+          char.conditions ?? [],
+          speciesAdv,
+          enc,
+          d20TestPenalty(char)
+        )
     );
     if (luck.used && luck.saved) {
       applied = false;
@@ -1022,19 +1026,21 @@ function conditionSavingThrow(
   // Initiative / Short or Long Rest.
   let improveFateConsumed = false;
   if (applied) {
-    const fate = tryImproveFate(char, () =>
-      !rollConditionSave(
-        effect.ability,
-        char[effect.ability] ?? 10,
-        dcAdjusted - rollDice('2d4'),
-        proficient,
-        char.level,
-        0,
-        char.conditions ?? [],
-        speciesAdv,
-        enc,
-        d20TestPenalty(char)
-      )
+    const fate = tryImproveFate(
+      char,
+      () =>
+        !rollConditionSave(
+          effect.ability,
+          char[effect.ability] ?? 10,
+          dcAdjusted - rollDice('2d4'),
+          proficient,
+          char.level,
+          0,
+          char.conditions ?? [],
+          speciesAdv,
+          enc,
+          d20TestPenalty(char)
+        )
     );
     if (fate.used && fate.saved) {
       applied = false;
@@ -1212,8 +1218,7 @@ function computeEnemyAttack(
       );
     // SRD Draconic Sorcery Elemental Affinity (L6) — Resistance to the chosen
     // damage type.
-    const affinityResist =
-      !!enemy.damageType && elementalAffinityType(char) === enemy.damageType;
+    const affinityResist = !!enemy.damageType && elementalAffinityType(char) === enemy.damageType;
     // SRD Fiend Warlock Fiendish Resilience (L10) — Resistance to the chosen
     // damage type (cannot be Force; enforced at selection).
     const fiendishResist = !!enemy.damageType && char.fiendish_resilience === enemy.damageType;
@@ -1248,7 +1253,12 @@ function computeEnemyAttack(
         ? ` (Superior Defense resistance: ${result.damage}→${postResistDmg})`
         : '';
     const affinityNote =
-      affinityResist && !isRaging && !isPetrified && !beastResist && !speciesResist && !superiorDefenseActive
+      affinityResist &&
+      !isRaging &&
+      !isPetrified &&
+      !beastResist &&
+      !speciesResist &&
+      !superiorDefenseActive
         ? ` (Elemental Affinity ${enemy.damageType} resistance: ${result.damage}→${postResistDmg})`
         : '';
     const wardNote = '';
@@ -2066,7 +2076,10 @@ export function endCombatState(st: GameState): GameState {
       condition_durations: Object.fromEntries(
         Object.entries(c.condition_durations ?? {}).filter(
           ([k]) =>
-            k !== 'raging' && k !== 'superior_defense' && k !== 'innate_sorcery' && k !== 'holy_nimbus'
+            k !== 'raging' &&
+            k !== 'superior_defense' &&
+            k !== 'innate_sorcery' &&
+            k !== 'holy_nimbus'
         )
       ),
       // Totem Warrior totem clears with rage at combat end.
@@ -3239,7 +3252,12 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
 
   // ── Cleric Blessed Strikes (L7) — Divine Strike / Potent Spellcasting ──────
   // One-time choice surfaced out of combat once the cleric reaches L7. (RE-2.)
-  if (!state.combat_active && hasClass(char, 'cleric') && getClassLevel(char, 'cleric') >= 7 && !char.blessed_strikes) {
+  if (
+    !state.combat_active &&
+    hasClass(char, 'cleric') &&
+    getClassLevel(char, 'cleric') >= 7 &&
+    !char.blessed_strikes
+  ) {
     choices.push({
       label: 'Blessed Strikes: Divine Strike (+1d8 radiant on a weapon hit, once/turn)',
       action: { type: 'choose_blessed_strikes', option: 'divine_strike' },
@@ -3323,7 +3341,16 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   // ── Fiend Warlock Fiendish Resilience (L10) ────────────────────────────────
   // Choose a damage type (not Force) to resist; re-chooseable out of combat.
   if (!state.combat_active && char.subclass === 'fiend' && getClassLevel(char, 'warlock') >= 10) {
-    for (const dt of ['acid', 'cold', 'fire', 'lightning', 'necrotic', 'poison', 'psychic', 'thunder']) {
+    for (const dt of [
+      'acid',
+      'cold',
+      'fire',
+      'lightning',
+      'necrotic',
+      'poison',
+      'psychic',
+      'thunder',
+    ]) {
       if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
       if (char.fiendish_resilience === dt) continue;
       choices.push({

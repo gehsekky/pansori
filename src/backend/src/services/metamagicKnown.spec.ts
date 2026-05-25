@@ -14,7 +14,12 @@ import { pcActor } from './actions/actor.js';
 afterEach(() => vi.restoreAllMocks());
 
 function featCtx(char: Character): ActionContext {
-  return { actor: pcActor(char, 0), context: { classFeatures: {} }, narrative: '', st: {} } as unknown as ActionContext;
+  return {
+    actor: pcActor(char, 0),
+    context: { classFeatures: {} },
+    narrative: '',
+    st: {},
+  } as unknown as ActionContext;
 }
 const pcChar = (c: ActionContext) => {
   if (c.actor.kind !== 'pc') throw new Error('expected pc actor');
@@ -23,7 +28,8 @@ const pcChar = (c: ActionContext) => {
 
 describe('metamagicSlots', () => {
   it('is 0/2/4/6 at sorcerer L1/L2/L10/L17', () => {
-    const at = (lvl: number) => metamagicSlots(makeChar({ character_class: 'Sorcerer', level: lvl }));
+    const at = (lvl: number) =>
+      metamagicSlots(makeChar({ character_class: 'Sorcerer', level: lvl }));
     expect(at(1)).toBe(0);
     expect(at(2)).toBe(2);
     expect(at(9)).toBe(2);
@@ -47,13 +53,17 @@ describe('choose_metamagic — learning options', () => {
   });
 
   it('rejects when no slot is open (2 known at L2)', () => {
-    const c = featCtx(makeChar({ character_class: 'Sorcerer', level: 2, metamagics_known: ['empowered', 'subtle'] }));
+    const c = featCtx(
+      makeChar({ character_class: 'Sorcerer', level: 2, metamagics_known: ['empowered', 'subtle'] })
+    );
     handleChooseMetamagic(c, { type: 'choose_metamagic', option: 'distant' });
     expect(pcChar(c).metamagics_known).toEqual(['empowered', 'subtle']); // unchanged
   });
 
   it('rejects a duplicate and an unknown option', () => {
-    const c = featCtx(makeChar({ character_class: 'Sorcerer', level: 10, metamagics_known: ['empowered'] }));
+    const c = featCtx(
+      makeChar({ character_class: 'Sorcerer', level: 10, metamagics_known: ['empowered'] })
+    );
     handleChooseMetamagic(c, { type: 'choose_metamagic', option: 'empowered' });
     expect(c.narrative).toMatch(/already know/);
     const r = handleChooseMetamagic(c, { type: 'choose_metamagic', option: 'nonsense' });
@@ -63,12 +73,39 @@ describe('choose_metamagic — learning options', () => {
 
 describe('Metamagic activation gate — must be known', () => {
   it("an unknown option can't be activated, a known one can", () => {
-    const unknown = featCtx(makeChar({ character_class: 'Sorcerer', level: 5, cha: 16, class_resource_uses: { sorcery_points: 5 }, turn_actions: { action_used: false, bonus_action_used: false, reaction_used: false, free_interaction_used: false } }));
+    const unknown = featCtx(
+      makeChar({
+        character_class: 'Sorcerer',
+        level: 5,
+        cha: 16,
+        class_resource_uses: { sorcery_points: 5 },
+        turn_actions: {
+          action_used: false,
+          bonus_action_used: false,
+          reaction_used: false,
+          free_interaction_used: false,
+        },
+      })
+    );
     handleCasterFeature(unknown, 'metamagic_empowered');
     expect(unknown.narrative).toMatch(/haven't learned/);
     expect(unknown.st.metamagic_active).toBeUndefined();
 
-    const known = featCtx(makeChar({ character_class: 'Sorcerer', level: 5, cha: 16, metamagics_known: ['empowered'], class_resource_uses: { sorcery_points: 5 }, turn_actions: { action_used: false, bonus_action_used: false, reaction_used: false, free_interaction_used: false } }));
+    const known = featCtx(
+      makeChar({
+        character_class: 'Sorcerer',
+        level: 5,
+        cha: 16,
+        metamagics_known: ['empowered'],
+        class_resource_uses: { sorcery_points: 5 },
+        turn_actions: {
+          action_used: false,
+          bonus_action_used: false,
+          reaction_used: false,
+          free_interaction_used: false,
+        },
+      })
+    );
     handleCasterFeature(known, 'metamagic_empowered');
     expect(known.st.metamagic_active).toEqual(['empowered']);
     expect(pcChar(known).class_resource_uses?.sorcery_points).toBe(4);

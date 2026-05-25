@@ -193,7 +193,10 @@ export function handleBarbarianFeature(ctx: ActionContext, fid: string): boolean
     const ipLines: string[] = [];
     for (const e of ctx.st.entities ?? []) {
       if (!e.isEnemy || e.hp <= 0 || !selfEntIP) continue;
-      const dist = Math.max(Math.abs(e.pos.x - selfEntIP.pos.x), Math.abs(e.pos.y - selfEntIP.pos.y));
+      const dist = Math.max(
+        Math.abs(e.pos.x - selfEntIP.pos.x),
+        Math.abs(e.pos.y - selfEntIP.pos.y)
+      );
       if (dist > 6) continue; // 30 ft = 6 squares
       const enemyData = getEnemyById(ctx.seed, e.id);
       const wisScore = (enemyData as unknown as Record<string, number>)?.wis ?? 10;
@@ -210,7 +213,10 @@ export function handleBarbarianFeature(ctx: ActionContext, fid: string): boolean
         ...ctx.st,
         entities: (ctx.st.entities ?? []).map((e) =>
           frightenedIds.includes(e.id)
-            ? { ...e, conditions: [...e.conditions.filter((c) => c !== 'frightened'), 'frightened'] }
+            ? {
+                ...e,
+                conditions: [...e.conditions.filter((c) => c !== 'frightened'), 'frightened'],
+              }
             : e
         ),
       };

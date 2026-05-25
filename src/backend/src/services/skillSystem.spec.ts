@@ -37,7 +37,17 @@ const seed: Seed = {
   // int 17 → Influence DC = max(15, 17) = 17; cr 2 → Study DC = 15 + 2 = 17.
   enemies: {
     [ctx.startRoomId]: [
-      { id: ENEMY, name: 'Zealot', hp: 40, ac: 12, damage: '1d6', toHit: 3, xp: 30, int: 17, cr: 2 } as unknown as Enemy,
+      {
+        id: ENEMY,
+        name: 'Zealot',
+        hp: 40,
+        ac: 12,
+        damage: '1d6',
+        toHit: 3,
+        xp: 30,
+        int: 17,
+        cr: 2,
+      } as unknown as Enemy,
     ],
   },
   loot: {},
@@ -64,8 +74,24 @@ function bardState(expert: boolean): GameState {
     ],
     initiative_idx: 0,
     entities: [
-      { id: 'pc-1', isEnemy: false, pos: { x: 4, y: 5 }, hp: 30, maxHp: 30, conditions: [], condition_durations: {} },
-      { id: ENEMY, isEnemy: true, pos: { x: 5, y: 5 }, hp: 40, maxHp: 40, conditions: [], condition_durations: {} },
+      {
+        id: 'pc-1',
+        isEnemy: false,
+        pos: { x: 4, y: 5 },
+        hp: 30,
+        maxHp: 30,
+        conditions: [],
+        condition_durations: {},
+      },
+      {
+        id: ENEMY,
+        isEnemy: true,
+        pos: { x: 5, y: 5 },
+        hp: 40,
+        maxHp: 40,
+        conditions: [],
+        condition_durations: {},
+      },
     ],
   } as unknown as GameState;
 }
@@ -113,8 +139,24 @@ function wizardStudyState(expert: boolean): GameState {
     ],
     initiative_idx: 0,
     entities: [
-      { id: 'pc-1', isEnemy: false, pos: { x: 4, y: 5 }, hp: 30, maxHp: 30, conditions: [], condition_durations: {} },
-      { id: ENEMY, isEnemy: true, pos: { x: 5, y: 5 }, hp: 40, maxHp: 40, conditions: [], condition_durations: {} },
+      {
+        id: 'pc-1',
+        isEnemy: false,
+        pos: { x: 4, y: 5 },
+        hp: 30,
+        maxHp: 30,
+        conditions: [],
+        condition_durations: {},
+      },
+      {
+        id: ENEMY,
+        isEnemy: true,
+        pos: { x: 5, y: 5 },
+        hp: 40,
+        maxHp: 40,
+        conditions: [],
+        condition_durations: {},
+      },
     ],
   } as unknown as GameState;
 }

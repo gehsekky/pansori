@@ -35,7 +35,10 @@ describe('Fiendish Resilience — choice', () => {
 
   it('cannot choose Force', () => {
     const c = featCtx(fiend());
-    const res = handleChooseFiendishResilience(c, { type: 'choose_fiendish_resilience', damageType: 'force' });
+    const res = handleChooseFiendishResilience(c, {
+      type: 'choose_fiendish_resilience',
+      damageType: 'force',
+    });
     expect(res).toEqual({ rejected: expect.stringMatching(/cannot be set to Force/) });
   });
 
@@ -74,7 +77,8 @@ describe('Fiendish Resilience — resistance in combat', () => {
     const target = fiend({ id: 'w', ac: 5, hp: 40, max_hp: 40, fiendish_resilience: 'fire' });
     const c = attackCtx(target);
     handleEnemyAttack(c, { ...enemyAttack, targetCharId: 'w' });
-    if (c.enemySubAttack?.outcome === 'done') expect(c.enemySubAttack.target.hp).toBe(36); // 40 − 4 (8 halved)
+    if (c.enemySubAttack?.outcome === 'done')
+      expect(c.enemySubAttack.target.hp).toBe(36); // 40 − 4 (8 halved)
     else throw new Error('expected a resolved attack');
   });
 
@@ -83,7 +87,8 @@ describe('Fiendish Resilience — resistance in combat', () => {
     const target = fiend({ id: 'w', ac: 5, hp: 40, max_hp: 40 }); // no resilience set
     const c = attackCtx(target);
     handleEnemyAttack(c, { ...enemyAttack, targetCharId: 'w' });
-    if (c.enemySubAttack?.outcome === 'done') expect(c.enemySubAttack.target.hp).toBe(32); // 40 − 8
+    if (c.enemySubAttack?.outcome === 'done')
+      expect(c.enemySubAttack.target.hp).toBe(32); // 40 − 8
     else throw new Error('expected a resolved attack');
   });
 });
@@ -99,7 +104,16 @@ const hhSeed: Seed = {
   connections: { [ctx.startRoomId]: [] },
   enemies: {
     [ctx.startRoomId]: [
-      { id: HHENEMY, name: 'Bandit', hp: 100, ac: 13, damage: '1d6', toHit: 3, xp: 50, cha: 10 } as unknown as Enemy,
+      {
+        id: HHENEMY,
+        name: 'Bandit',
+        hp: 100,
+        ac: 13,
+        damage: '1d6',
+        toHit: 3,
+        xp: 50,
+        cha: 10,
+      } as unknown as Enemy,
     ],
   },
   loot: {},
@@ -118,14 +132,36 @@ function hhCombat(over: Partial<Character> = {}): GameState {
     ],
     initiative_idx: 0,
     entities: [
-      { id: 'pc-1', isEnemy: false, pos: { x: 4, y: 5 }, hp: 90, maxHp: 90, conditions: [], condition_durations: {} },
-      { id: HHENEMY, isEnemy: true, pos: { x: 5, y: 5 }, hp: 100, maxHp: 100, conditions: [], condition_durations: {} },
+      {
+        id: 'pc-1',
+        isEnemy: false,
+        pos: { x: 4, y: 5 },
+        hp: 90,
+        maxHp: 90,
+        conditions: [],
+        condition_durations: {},
+      },
+      {
+        id: HHENEMY,
+        isEnemy: true,
+        pos: { x: 5, y: 5 },
+        hp: 100,
+        maxHp: 100,
+        conditions: [],
+        condition_durations: {},
+      },
     ],
   } as unknown as GameState;
 }
 
 const useHH = async (state: GameState) =>
-  takeAction({ action: { type: 'use_class_feature', featureId: 'hurl_through_hell' }, history: [], state, seed: hhSeed, context: ctx });
+  takeAction({
+    action: { type: 'use_class_feature', featureId: 'hurl_through_hell' },
+    history: [],
+    state,
+    seed: hhSeed,
+    context: ctx,
+  });
 
 describe('Hurl Through Hell (L14)', () => {
   it('on a failed CHA save: Psychic damage + a hurl through the Lower Planes', async () => {
@@ -146,12 +182,22 @@ describe('Dark One’s Own Luck (L6)', () => {
   it('grants CHA-mod uses for a Fiend Warlock L6, else 0', () => {
     expect(darkOnesLuckMaxUses(fiend({ level: 6, cha: 16 }))).toBe(3); // +3 CHA
     expect(darkOnesLuckMaxUses(fiend({ level: 5, cha: 16 }))).toBe(0);
-    expect(darkOnesLuckMaxUses(makeChar({ character_class: 'Wizard', level: 20, cha: 18 }))).toBe(0);
+    expect(darkOnesLuckMaxUses(makeChar({ character_class: 'Wizard', level: 20, cha: 18 }))).toBe(
+      0
+    );
   });
 
   it('tracks remaining uses against the spent count', () => {
-    expect(darkOnesLuckRemaining(fiend({ level: 6, cha: 16, class_resource_uses: { dark_ones_luck: 1 } }))).toBe(2);
-    expect(darkOnesLuckRemaining(fiend({ level: 6, cha: 16, class_resource_uses: { dark_ones_luck: 3 } }))).toBe(0);
+    expect(
+      darkOnesLuckRemaining(
+        fiend({ level: 6, cha: 16, class_resource_uses: { dark_ones_luck: 1 } })
+      )
+    ).toBe(2);
+    expect(
+      darkOnesLuckRemaining(
+        fiend({ level: 6, cha: 16, class_resource_uses: { dark_ones_luck: 3 } })
+      )
+    ).toBe(0);
   });
 
   it('spends a use only when the 1d10 rescues the roll', () => {

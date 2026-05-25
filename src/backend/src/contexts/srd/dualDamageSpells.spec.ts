@@ -40,7 +40,17 @@ const seed: Seed = {
   connections: { [ctx.startRoomId]: [] },
   enemies: {
     [ctx.startRoomId]: [
-      { id: ENEMY, name: 'Ogre', hp: 400, ac: 10, damage: '1d6', toHit: 3, xp: 50, dex: 10, wis: 10 },
+      {
+        id: ENEMY,
+        name: 'Ogre',
+        hp: 400,
+        ac: 10,
+        damage: '1d6',
+        toHit: 3,
+        xp: 50,
+        dex: 10,
+        wis: 10,
+      },
     ],
   },
   loot: {},
@@ -73,8 +83,24 @@ function casterState() {
     ],
     initiative_idx: 0,
     entities: [
-      { id: 'pc-1', isEnemy: false, pos: { x: 2, y: 2 }, hp: 60, maxHp: 60, conditions: [], condition_durations: {} },
-      { id: ENEMY, isEnemy: true, pos: { x: 3, y: 3 }, hp: 400, maxHp: 400, conditions: [], condition_durations: {} },
+      {
+        id: 'pc-1',
+        isEnemy: false,
+        pos: { x: 2, y: 2 },
+        hp: 60,
+        maxHp: 60,
+        conditions: [],
+        condition_durations: {},
+      },
+      {
+        id: ENEMY,
+        isEnemy: true,
+        pos: { x: 3, y: 3 },
+        hp: 400,
+        maxHp: 400,
+        conditions: [],
+        condition_durations: {},
+      },
     ],
   };
 }
@@ -112,7 +138,12 @@ describe('Phantasmal Killer — Frightened on a failed save', () => {
   it('applies Frightened and deals psychic damage when the save fails', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.0); // WIS save rolls 1 → fails
     const r = await takeAction({
-      action: { type: 'cast_spell', spellId: 'phantasmal_killer', slotLevel: 4, targetEnemyId: ENEMY },
+      action: {
+        type: 'cast_spell',
+        spellId: 'phantasmal_killer',
+        slotLevel: 4,
+        targetEnemyId: ENEMY,
+      },
       history: [],
       state: casterState(),
       seed,

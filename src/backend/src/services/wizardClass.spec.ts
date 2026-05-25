@@ -96,7 +96,16 @@ const combatSeed: Seed = {
   ...seed,
   enemies: {
     [ctx.startRoomId]: [
-      { id: ENEMY, name: 'Dummy', hp: 80, ac: 12, damage: '1d4', toHit: 3, xp: 50, dex: 8 } as unknown as Enemy,
+      {
+        id: ENEMY,
+        name: 'Dummy',
+        hp: 80,
+        ac: 12,
+        damage: '1d4',
+        toHit: 3,
+        xp: 50,
+        dex: 8,
+      } as unknown as Enemy,
     ],
   },
 };
@@ -120,26 +129,75 @@ function combat(over: Partial<Character>): GameState {
     ],
     initiative_idx: 0,
     entities: [
-      { id: 'pc-1', isEnemy: false, pos: { x: 1, y: 1 }, hp: 40, maxHp: 40, conditions: [], condition_durations: {} },
-      { id: ENEMY, isEnemy: true, pos: { x: 10, y: 10 }, hp: 80, maxHp: 80, conditions: [], condition_durations: {} },
+      {
+        id: 'pc-1',
+        isEnemy: false,
+        pos: { x: 1, y: 1 },
+        hp: 40,
+        maxHp: 40,
+        conditions: [],
+        condition_durations: {},
+      },
+      {
+        id: ENEMY,
+        isEnemy: true,
+        pos: { x: 10, y: 10 },
+        hp: 80,
+        maxHp: 80,
+        conditions: [],
+        condition_durations: {},
+      },
     ],
   } as unknown as GameState;
 }
 
 describe('Spell Mastery (L18)', () => {
   it('designates a L1/L2 action spell as mastered', () => {
-    const c1 = featCtx(makeChar({ id: 'pc-1', character_class: 'Wizard', level: 18, spells_known: ['magic_missile'] }));
-    handleChooseSpellMastery(c1, { type: 'choose_spell_mastery', tier: 1, spellId: 'magic_missile' });
+    const c1 = featCtx(
+      makeChar({
+        id: 'pc-1',
+        character_class: 'Wizard',
+        level: 18,
+        spells_known: ['magic_missile'],
+      })
+    );
+    handleChooseSpellMastery(c1, {
+      type: 'choose_spell_mastery',
+      tier: 1,
+      spellId: 'magic_missile',
+    });
     expect(pcChar(c1).spell_mastery_l1).toBe('magic_missile');
 
-    const c2 = featCtx(makeChar({ id: 'pc-1', character_class: 'Wizard', level: 18, spells_known: ['scorching_ray'] }));
-    handleChooseSpellMastery(c2, { type: 'choose_spell_mastery', tier: 2, spellId: 'scorching_ray' });
+    const c2 = featCtx(
+      makeChar({
+        id: 'pc-1',
+        character_class: 'Wizard',
+        level: 18,
+        spells_known: ['scorching_ray'],
+      })
+    );
+    handleChooseSpellMastery(c2, {
+      type: 'choose_spell_mastery',
+      tier: 2,
+      spellId: 'scorching_ray',
+    });
     expect(pcChar(c2).spell_mastery_l2).toBe('scorching_ray');
   });
 
   it('rejects a spell of the wrong level', () => {
-    const c = featCtx(makeChar({ id: 'pc-1', character_class: 'Wizard', level: 18, spells_known: ['scorching_ray'] }));
-    const res = handleChooseSpellMastery(c, { type: 'choose_spell_mastery', tier: 1, spellId: 'scorching_ray' });
+    const c = featCtx(
+      makeChar({
+        id: 'pc-1',
+        character_class: 'Wizard',
+        level: 18,
+        spells_known: ['scorching_ray'],
+      })
+    );
+    const res = handleChooseSpellMastery(c, {
+      type: 'choose_spell_mastery',
+      tier: 1,
+      spellId: 'scorching_ray',
+    });
     expect(res).toEqual({ rejected: expect.stringMatching(/isn't a level-1 spell/) });
   });
 
@@ -166,7 +224,14 @@ describe('Spell Mastery (L18)', () => {
 
 describe('Signature Spells (L20)', () => {
   it('designates up to two L3 spells', () => {
-    const c = featCtx(makeChar({ id: 'pc-1', character_class: 'Wizard', level: 20, spells_known: ['fireball', 'lightning_bolt'] }));
+    const c = featCtx(
+      makeChar({
+        id: 'pc-1',
+        character_class: 'Wizard',
+        level: 20,
+        spells_known: ['fireball', 'lightning_bolt'],
+      })
+    );
     handleChooseSignatureSpell(c, { type: 'choose_signature_spell', spellId: 'fireball' });
     handleChooseSignatureSpell(c, { type: 'choose_signature_spell', spellId: 'lightning_bolt' });
     expect(pcChar(c).signature_spells).toEqual(['fireball', 'lightning_bolt']);
@@ -194,7 +259,9 @@ describe('Signature Spells (L20)', () => {
   });
 
   it('requires a Wizard of level 20', () => {
-    const c = featCtx(makeChar({ id: 'pc-1', character_class: 'Wizard', level: 19, spells_known: ['fireball'] }));
+    const c = featCtx(
+      makeChar({ id: 'pc-1', character_class: 'Wizard', level: 19, spells_known: ['fireball'] })
+    );
     handleChooseSignatureSpell(c, { type: 'choose_signature_spell', spellId: 'fireball' });
     expect(pcChar(c).signature_spells ?? []).not.toContain('fireball');
   });
@@ -213,25 +280,41 @@ describe('Memorize Spell (L5)', () => {
 
   it('swaps a prepared spell for another from the spellbook', () => {
     const c = featCtx(studious());
-    handleMemorizeSpell(c, { type: 'memorize_spell', swapOut: 'fireball', swapIn: 'lightning_bolt' });
+    handleMemorizeSpell(c, {
+      type: 'memorize_spell',
+      swapOut: 'fireball',
+      swapIn: 'lightning_bolt',
+    });
     expect(pcChar(c).prepared_spells).toEqual(['magic_missile', 'lightning_bolt']);
   });
 
   it('rejects swapping out a spell that is not prepared', () => {
     const c = featCtx(studious());
-    const res = handleMemorizeSpell(c, { type: 'memorize_spell', swapOut: 'lightning_bolt', swapIn: 'magic_missile' });
+    const res = handleMemorizeSpell(c, {
+      type: 'memorize_spell',
+      swapOut: 'lightning_bolt',
+      swapIn: 'magic_missile',
+    });
     expect(res).toEqual({ rejected: expect.stringMatching(/isn't one of your prepared spells/) });
   });
 
   it('rejects swapping in a spell not in the spellbook', () => {
     const c = featCtx(studious({ spells_known: ['fireball', 'magic_missile'] }));
-    const res = handleMemorizeSpell(c, { type: 'memorize_spell', swapOut: 'fireball', swapIn: 'cone_of_cold' });
+    const res = handleMemorizeSpell(c, {
+      type: 'memorize_spell',
+      swapOut: 'fireball',
+      swapIn: 'cone_of_cold',
+    });
     expect(res).toEqual({ rejected: expect.stringMatching(/isn't in your spellbook/) });
   });
 
   it('requires a Wizard of level 5', () => {
     const c = featCtx(studious({ level: 4 }));
-    handleMemorizeSpell(c, { type: 'memorize_spell', swapOut: 'fireball', swapIn: 'lightning_bolt' });
+    handleMemorizeSpell(c, {
+      type: 'memorize_spell',
+      swapOut: 'fireball',
+      swapIn: 'lightning_bolt',
+    });
     expect(pcChar(c).prepared_spells).toEqual(['fireball', 'magic_missile']); // unchanged
   });
 });

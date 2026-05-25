@@ -56,7 +56,15 @@ const enemyAttack = { type: 'enemy_attack' as const, advIdx: 0, multiattackIdx: 
 describe('Feral Senses — enemy-attack advantage suppression', () => {
   it('a Blinded non-Ranger is hit: Blinded grants advantage → higher die (control)', () => {
     pinRolls();
-    const fighter = makeChar({ id: 'f', character_class: 'Fighter', level: 18, ac: 12, hp: 20, max_hp: 20, conditions: ['blinded'] });
+    const fighter = makeChar({
+      id: 'f',
+      character_class: 'Fighter',
+      level: 18,
+      ac: 12,
+      hp: 20,
+      max_hp: 20,
+      conditions: ['blinded'],
+    });
     const c = ctxFor(fighter);
     handleEnemyAttack(c, { ...enemyAttack, targetCharId: 'f' });
     expect(c.enemySubAttack?.outcome).toBe('done'); // advantage → max(8,15)=15 ≥ 12 → hit
@@ -65,7 +73,15 @@ describe('Feral Senses — enemy-attack advantage suppression', () => {
 
   it('a Blinded Ranger L18 is missed: Feral Senses suppresses the advantage', () => {
     pinRolls();
-    const ranger = makeChar({ id: 'r', character_class: 'Ranger', level: 18, ac: 12, hp: 20, max_hp: 20, conditions: ['blinded'] });
+    const ranger = makeChar({
+      id: 'r',
+      character_class: 'Ranger',
+      level: 18,
+      ac: 12,
+      hp: 20,
+      max_hp: 20,
+      conditions: ['blinded'],
+    });
     const c = ctxFor(ranger);
     handleEnemyAttack(c, { ...enemyAttack, targetCharId: 'r' });
     expect(c.enemySubAttack?.outcome).toBe('done'); // no advantage → roll1 8 < 12 → miss
@@ -85,7 +101,16 @@ const seed: Seed = {
   connections: { [ctx.startRoomId]: [] },
   enemies: {
     [ctx.startRoomId]: [
-      { id: ENEMY, name: 'Dummy', hp: 60, ac: 12, damage: '1d4', toHit: 2, xp: 30, dex: 10 } as unknown as Enemy,
+      {
+        id: ENEMY,
+        name: 'Dummy',
+        hp: 60,
+        ac: 12,
+        damage: '1d4',
+        toHit: 2,
+        xp: 30,
+        dex: 10,
+      } as unknown as Enemy,
     ],
   },
   loot: {},
@@ -113,14 +138,36 @@ function blindRangerCombat(level: number): GameState {
     ],
     initiative_idx: 0,
     entities: [
-      { id: 'pc-1', isEnemy: false, pos: { x: 4, y: 5 }, hp: 40, maxHp: 40, conditions: ['blinded'], condition_durations: {} },
-      { id: ENEMY, isEnemy: true, pos: { x: 5, y: 5 }, hp: 60, maxHp: 60, conditions: [], condition_durations: {} },
+      {
+        id: 'pc-1',
+        isEnemy: false,
+        pos: { x: 4, y: 5 },
+        hp: 40,
+        maxHp: 40,
+        conditions: ['blinded'],
+        condition_durations: {},
+      },
+      {
+        id: ENEMY,
+        isEnemy: true,
+        pos: { x: 5, y: 5 },
+        hp: 60,
+        maxHp: 60,
+        conditions: [],
+        condition_durations: {},
+      },
     ],
   } as unknown as GameState;
 }
 
 const attackEnemy = async (state: GameState) =>
-  takeAction({ action: { type: 'attack', targetEnemyId: ENEMY }, history: [], state, seed, context: ctx });
+  takeAction({
+    action: { type: 'attack', targetEnemyId: ENEMY },
+    history: [],
+    state,
+    seed,
+    context: ctx,
+  });
 
 describe('Feral Senses — no self-attack disadvantage while Blinded', () => {
   it('a Blinded Ranger L18 attacks without disadvantage', async () => {

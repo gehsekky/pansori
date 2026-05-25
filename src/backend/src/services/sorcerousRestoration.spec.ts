@@ -69,7 +69,9 @@ describe('Sorcerous Restoration — short-rest sorcery point recovery', () => {
 
   it('resets on a long rest (flag cleared, points refilled to level)', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.99);
-    const spent = sorcerer(10, 4, { class_resource_uses: { sorcery_points: 4, sorcerous_restoration_used: 1 } });
+    const spent = sorcerer(10, 4, {
+      class_resource_uses: { sorcery_points: 4, sorcerous_restoration_used: 1 },
+    });
     const r = await takeAction({
       action: { type: 'long_rest' },
       history: [],
@@ -77,6 +79,8 @@ describe('Sorcerous Restoration — short-rest sorcery point recovery', () => {
       seed,
       context: ctx,
     });
-    expect(r.newState.characters[0].class_resource_uses?.sorcerous_restoration_used).toBeUndefined();
+    expect(
+      r.newState.characters[0].class_resource_uses?.sorcerous_restoration_used
+    ).toBeUndefined();
   });
 });

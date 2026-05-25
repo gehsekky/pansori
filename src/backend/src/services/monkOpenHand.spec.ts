@@ -14,7 +14,11 @@ import { takeAction } from './gameEngine.js';
 afterEach(() => vi.restoreAllMocks());
 
 function featCtx(char: Character): ActionContext {
-  return { actor: pcActor(char, 0), context: { classFeatures: {} }, narrative: '' } as unknown as ActionContext;
+  return {
+    actor: pcActor(char, 0),
+    context: { classFeatures: {} },
+    narrative: '',
+  } as unknown as ActionContext;
 }
 const pcChar = (c: ActionContext) => {
   if (c.actor.kind !== 'pc') throw new Error('expected pc actor');
@@ -107,7 +111,15 @@ const seed: Seed = {
   connections: { [ctx.startRoomId]: [] },
   enemies: {
     [ctx.startRoomId]: [
-      { id: ENEMY, name: 'Dummy', hp: 200, ac: 5, damage: '1d6', toHit: 3, xp: 50 } as unknown as Enemy,
+      {
+        id: ENEMY,
+        name: 'Dummy',
+        hp: 200,
+        ac: 5,
+        damage: '1d6',
+        toHit: 3,
+        xp: 50,
+      } as unknown as Enemy,
     ],
   },
   loot: {},
@@ -134,8 +146,24 @@ function monkState(level: number): GameState {
     ],
     initiative_idx: 0,
     entities: [
-      { id: 'pc-1', isEnemy: false, pos: { x: 4, y: 5 }, hp: 30, maxHp: 30, conditions: [], condition_durations: {} },
-      { id: ENEMY, isEnemy: true, pos: { x: 5, y: 5 }, hp: 200, maxHp: 200, conditions: [], condition_durations: {} },
+      {
+        id: 'pc-1',
+        isEnemy: false,
+        pos: { x: 4, y: 5 },
+        hp: 30,
+        maxHp: 30,
+        conditions: [],
+        condition_durations: {},
+      },
+      {
+        id: ENEMY,
+        isEnemy: true,
+        pos: { x: 5, y: 5 },
+        hp: 200,
+        maxHp: 200,
+        conditions: [],
+        condition_durations: {},
+      },
     ],
   } as unknown as GameState;
 }
@@ -174,12 +202,23 @@ function monkWith(level: number, over: Partial<Character>): GameState {
   return s;
 }
 const useFeat = async (state: GameState, featureId: string) =>
-  takeAction({ action: { type: 'use_class_feature', featureId }, history: [], state, seed, context: ctx });
+  takeAction({
+    action: { type: 'use_class_feature', featureId },
+    history: [],
+    state,
+    seed,
+    context: ctx,
+  });
 
 describe('Fleet Step (Open Hand L11)', () => {
   it('grants a free Step of the Wind after a bonus action', async () => {
     const state = monkWith(11, {
-      turn_actions: { action_used: false, bonus_action_used: true, reaction_used: false, free_interaction_used: false },
+      turn_actions: {
+        action_used: false,
+        bonus_action_used: true,
+        reaction_used: false,
+        free_interaction_used: false,
+      },
     });
     const r = await useFeat(state, 'fleet_step_dash');
     const after = r.newState.characters[0];
@@ -196,7 +235,12 @@ describe('Fleet Step (Open Hand L11)', () => {
 
   it('does not apply below Open Hand L11', async () => {
     const state = monkWith(10, {
-      turn_actions: { action_used: false, bonus_action_used: true, reaction_used: false, free_interaction_used: false },
+      turn_actions: {
+        action_used: false,
+        bonus_action_used: true,
+        reaction_used: false,
+        free_interaction_used: false,
+      },
     });
     const r = await useFeat(state, 'fleet_step_dash');
     expect(r.narrative).toMatch(/requires a Warrior of the Open Hand of level 11/);
@@ -205,15 +249,23 @@ describe('Fleet Step (Open Hand L11)', () => {
 
 describe('Quivering Palm (Open Hand L17)', () => {
   it('sets the vibrations and spends 4 Focus', async () => {
-    const r = await useFeat(monkWith(17, { class_resource_uses: { ki_points: 10 } }), 'quivering_palm');
+    const r = await useFeat(
+      monkWith(17, { class_resource_uses: { ki_points: 10 } }),
+      'quivering_palm'
+    );
     const after = r.newState.characters[0];
     expect(after.quivering_palm_target).toBe(ENEMY);
     expect(after.class_resource_uses?.ki_points).toBe(6);
-    expect((r.newState.entities ?? []).find((e) => e.id === ENEMY)!.conditions).toContain('quivering_palm');
+    expect((r.newState.entities ?? []).find((e) => e.id === ENEMY)!.conditions).toContain(
+      'quivering_palm'
+    );
   });
 
   it('needs 4 Focus Points', async () => {
-    const r = await useFeat(monkWith(17, { class_resource_uses: { ki_points: 3 } }), 'quivering_palm');
+    const r = await useFeat(
+      monkWith(17, { class_resource_uses: { ki_points: 3 } }),
+      'quivering_palm'
+    );
     expect(r.newState.characters[0].quivering_palm_target).toBeUndefined();
     expect(r.narrative).toMatch(/needs 4 Focus/);
   });
@@ -230,7 +282,10 @@ describe('Quivering Palm (Open Hand L17)', () => {
   });
 
   it('requires Open Hand L17 to set', async () => {
-    const r = await useFeat(monkWith(16, { class_resource_uses: { ki_points: 10 } }), 'quivering_palm');
+    const r = await useFeat(
+      monkWith(16, { class_resource_uses: { ki_points: 10 } }),
+      'quivering_palm'
+    );
     expect(r.newState.characters[0].quivering_palm_target).toBeUndefined();
     expect(r.narrative).toMatch(/requires a Warrior of the Open Hand of level 17/);
   });

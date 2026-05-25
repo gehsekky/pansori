@@ -72,7 +72,13 @@ describe('Blessed Healer (Life L6)', () => {
   it('heals the cleric 2 + slot level after a slot-spell heals an ally', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
     const pc = lifeCleric({ hp: 10 });
-    const ally = makeChar({ id: 'ally-1', character_class: 'Fighter', level: 6, hp: 5, max_hp: 50 });
+    const ally = makeChar({
+      id: 'ally-1',
+      character_class: 'Fighter',
+      level: 6,
+      hp: 5,
+      max_hp: 50,
+    });
     const r = await cast1(buildState(pc, ally));
     const after = r.newState.characters.find((c) => c.id === 'pc-1');
     // Cure Wounds is a 1st-level slot → Blessed Healer restores 2 + 1 = 3.
@@ -83,7 +89,13 @@ describe('Blessed Healer (Life L6)', () => {
   it('does NOT fire below Cleric L6', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
     const pc = lifeCleric({ level: 5, hp: 10 });
-    const ally = makeChar({ id: 'ally-1', character_class: 'Fighter', level: 5, hp: 5, max_hp: 50 });
+    const ally = makeChar({
+      id: 'ally-1',
+      character_class: 'Fighter',
+      level: 5,
+      hp: 5,
+      max_hp: 50,
+    });
     const r = await cast1(buildState(pc, ally));
     const after = r.newState.characters.find((c) => c.id === 'pc-1');
     expect(after?.hp).toBe(10); // unchanged — caster wasn't the heal target
@@ -94,7 +106,13 @@ describe('Blessed Healer (Life L6)', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
     // Caster injured, ally at full → the only valid heal target is the caster.
     const pc = lifeCleric({ hp: 10 });
-    const ally = makeChar({ id: 'ally-1', character_class: 'Fighter', level: 6, hp: 50, max_hp: 50 });
+    const ally = makeChar({
+      id: 'ally-1',
+      character_class: 'Fighter',
+      level: 6,
+      hp: 50,
+      max_hp: 50,
+    });
     const r = await cast1(buildState(pc, ally));
     expect(r.narrative).not.toMatch(/Blessed Healer/);
   });
@@ -106,7 +124,13 @@ describe('Supreme Healing (Life L17)', () => {
     // Supreme Healing must instead yield 16 (2×8), proving maximization.
     vi.spyOn(Math, 'random').mockReturnValue(0);
     const pc = lifeCleric({ level: 17, hp: 30 }); // at max so Blessed Healer can't muddy the ally delta
-    const ally = makeChar({ id: 'ally-1', character_class: 'Fighter', level: 17, hp: 5, max_hp: 80 });
+    const ally = makeChar({
+      id: 'ally-1',
+      character_class: 'Fighter',
+      level: 17,
+      hp: 5,
+      max_hp: 80,
+    });
     const r = await cast1(buildState(pc, ally));
     const afterAlly = r.newState.characters.find((c) => c.id === 'ally-1');
     // 16 (maxed 2d8) + 3 (WIS) + 3 (Disciple of Life: 2 + spell level 1) = 22.

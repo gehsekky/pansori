@@ -24,7 +24,15 @@ const seed: Seed = {
   connections: { [ctx.startRoomId]: [] },
   enemies: {
     [ctx.startRoomId]: [
-      { id: ENEMY, name: 'Cultist', hp: 40, ac: 12, damage: '1d6', toHit: 3, xp: 30 } as unknown as Enemy,
+      {
+        id: ENEMY,
+        name: 'Cultist',
+        hp: 40,
+        ac: 12,
+        damage: '1d6',
+        toHit: 3,
+        xp: 30,
+      } as unknown as Enemy,
     ],
   },
   loot: {},
@@ -54,14 +62,36 @@ function warlockCombat(over: Partial<Character> = {}): GameState {
     ],
     initiative_idx: 0,
     entities: [
-      { id: 'pc-1', isEnemy: false, pos: { x: 4, y: 5 }, hp: 40, maxHp: 40, conditions: [], condition_durations: {} },
-      { id: ENEMY, isEnemy: true, pos: { x: 5, y: 5 }, hp: 40, maxHp: 40, conditions: [], condition_durations: {} },
+      {
+        id: 'pc-1',
+        isEnemy: false,
+        pos: { x: 4, y: 5 },
+        hp: 40,
+        maxHp: 40,
+        conditions: [],
+        condition_durations: {},
+      },
+      {
+        id: ENEMY,
+        isEnemy: true,
+        pos: { x: 5, y: 5 },
+        hp: 40,
+        maxHp: 40,
+        conditions: [],
+        condition_durations: {},
+      },
     ],
   } as unknown as GameState;
 }
 
 const useMC = async (state: GameState) =>
-  takeAction({ action: { type: 'use_class_feature', featureId: 'magical_cunning' }, history: [], state, seed, context: ctx });
+  takeAction({
+    action: { type: 'use_class_feature', featureId: 'magical_cunning' },
+    history: [],
+    state,
+    seed,
+    context: ctx,
+  });
 
 describe('Magical Cunning (L2)', () => {
   it('regains half (round up) of the expended Pact Magic slots', async () => {

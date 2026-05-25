@@ -15,7 +15,12 @@ import {
   pick,
 } from '../gameEngine.js';
 import { consumeStrokeOfLuck, strokeOfLuckAvailable } from '../strokeOfLuck.js';
-import { hasExpertise, hasJackOfAllTrades, hasReliableTalent, peerlessSkillDie } from '../multiclass.js';
+import {
+  hasExpertise,
+  hasJackOfAllTrades,
+  hasReliableTalent,
+  peerlessSkillDie,
+} from '../multiclass.js';
 import type { ActionHandler } from './types.js';
 import { updatePcActor } from './actor.js';
 

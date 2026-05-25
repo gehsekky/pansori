@@ -22,7 +22,16 @@ const seed: Seed = {
   connections: { [ctx.startRoomId]: [] },
   enemies: {
     [ctx.startRoomId]: [
-      { id: ENEMY, name: 'Goblin', hp: 30, ac: 13, damage: '1d6', toHit: 3, xp: 50, wis: 10 } as unknown as Enemy,
+      {
+        id: ENEMY,
+        name: 'Goblin',
+        hp: 30,
+        ac: 13,
+        damage: '1d6',
+        toHit: 3,
+        xp: 50,
+        wis: 10,
+      } as unknown as Enemy,
     ],
   },
   loot: {},
@@ -50,8 +59,24 @@ function zerkCombat(over: Partial<Character> = {}): GameState {
     ],
     initiative_idx: 0,
     entities: [
-      { id: 'pc-1', isEnemy: false, pos: { x: 4, y: 5 }, hp: 120, maxHp: 120, conditions: [], condition_durations: {} },
-      { id: ENEMY, isEnemy: true, pos: { x: 5, y: 5 }, hp: 30, maxHp: 30, conditions: [], condition_durations: {} },
+      {
+        id: 'pc-1',
+        isEnemy: false,
+        pos: { x: 4, y: 5 },
+        hp: 120,
+        maxHp: 120,
+        conditions: [],
+        condition_durations: {},
+      },
+      {
+        id: ENEMY,
+        isEnemy: true,
+        pos: { x: 5, y: 5 },
+        hp: 30,
+        maxHp: 30,
+        conditions: [],
+        condition_durations: {},
+      },
     ],
   } as unknown as GameState;
 }
@@ -78,7 +103,9 @@ describe('Intimidating Presence (L14)', () => {
   it('requires a Berserker of level 14', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.05);
     const r = await useIP(zerkCombat({ level: 13 }));
-    expect((r.newState.entities ?? []).find((e) => e.id === ENEMY)!.conditions).not.toContain('frightened');
+    expect((r.newState.entities ?? []).find((e) => e.id === ENEMY)!.conditions).not.toContain(
+      'frightened'
+    );
     expect(r.narrative).toMatch(/requires a Berserker of level 14/);
   });
 
@@ -97,7 +124,9 @@ describe('Intimidating Presence (L14)', () => {
     const r = await useIP(
       zerkCombat({ class_resource_uses: { intimidating_presence_used: 1, rage_uses: 0 } })
     );
-    expect((r.newState.entities ?? []).find((e) => e.id === ENEMY)!.conditions).not.toContain('frightened');
+    expect((r.newState.entities ?? []).find((e) => e.id === ENEMY)!.conditions).not.toContain(
+      'frightened'
+    );
     expect(r.narrative).toMatch(/spent/);
   });
 });
@@ -127,8 +156,24 @@ function retalCombat(over: Partial<Character> = {}): GameState {
     ],
     initiative_idx: 0,
     entities: [
-      { id: 'pc-1', isEnemy: false, pos: { x: 4, y: 5 }, hp: 120, maxHp: 120, conditions: [], condition_durations: {} },
-      { id: ENEMY, isEnemy: true, pos: { x: 5, y: 5 }, hp: 30, maxHp: 30, conditions: [], condition_durations: {} },
+      {
+        id: 'pc-1',
+        isEnemy: false,
+        pos: { x: 4, y: 5 },
+        hp: 120,
+        maxHp: 120,
+        conditions: [],
+        condition_durations: {},
+      },
+      {
+        id: ENEMY,
+        isEnemy: true,
+        pos: { x: 5, y: 5 },
+        hp: 30,
+        maxHp: 30,
+        conditions: [],
+        condition_durations: {},
+      },
     ],
   } as unknown as GameState;
 }

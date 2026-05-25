@@ -53,9 +53,33 @@ function hunterState(level: number): GameState {
     ],
     initiative_idx: 0,
     entities: [
-      { id: 'pc-1', isEnemy: false, pos: { x: 4, y: 5 }, hp: 30, maxHp: 30, conditions: [], condition_durations: {} },
-      { id: E1, isEnemy: true, pos: { x: 5, y: 5 }, hp: 120, maxHp: 120, conditions: [], condition_durations: {} },
-      { id: E2, isEnemy: true, pos: { x: 7, y: 5 }, hp: 120, maxHp: 120, conditions: [], condition_durations: {} }, // 10 ft from E1
+      {
+        id: 'pc-1',
+        isEnemy: false,
+        pos: { x: 4, y: 5 },
+        hp: 30,
+        maxHp: 30,
+        conditions: [],
+        condition_durations: {},
+      },
+      {
+        id: E1,
+        isEnemy: true,
+        pos: { x: 5, y: 5 },
+        hp: 120,
+        maxHp: 120,
+        conditions: [],
+        condition_durations: {},
+      },
+      {
+        id: E2,
+        isEnemy: true,
+        pos: { x: 7, y: 5 },
+        hp: 120,
+        maxHp: 120,
+        conditions: [],
+        condition_durations: {},
+      }, // 10 ft from E1
     ],
   } as unknown as GameState;
 }

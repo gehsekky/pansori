@@ -19,17 +19,30 @@ const sorc = (over: Partial<Character> = {}) =>
 describe('mergeDraconicSpells', () => {
   it('grants Chromatic Orb at L3, + Fear/Fly at L5', () => {
     expect(mergeDraconicSpells(sorc({ level: 3 }))).toEqual(['chromatic_orb']);
-    expect(mergeDraconicSpells(sorc({ level: 5 })).sort()).toEqual(['chromatic_orb', 'fear', 'fly']);
+    expect(mergeDraconicSpells(sorc({ level: 5 })).sort()).toEqual([
+      'chromatic_orb',
+      'fear',
+      'fly',
+    ]);
   });
 
   it('grants nothing below L3 and preserves existing known spells', () => {
-    expect(mergeDraconicSpells(sorc({ level: 2, spells_known: ['fire_bolt'] }))).toEqual(['fire_bolt']);
-    expect(mergeDraconicSpells(sorc({ level: 3, spells_known: ['fire_bolt'] })).sort()).toEqual(['chromatic_orb', 'fire_bolt']);
+    expect(mergeDraconicSpells(sorc({ level: 2, spells_known: ['fire_bolt'] }))).toEqual([
+      'fire_bolt',
+    ]);
+    expect(mergeDraconicSpells(sorc({ level: 3, spells_known: ['fire_bolt'] })).sort()).toEqual([
+      'chromatic_orb',
+      'fire_bolt',
+    ]);
   });
 });
 
 function featCtx(char: Character): ActionContext {
-  return { actor: pcActor(char, 0), context: { classFeatures: {} }, narrative: '' } as unknown as ActionContext;
+  return {
+    actor: pcActor(char, 0),
+    context: { classFeatures: {} },
+    narrative: '',
+  } as unknown as ActionContext;
 }
 const pcChar = (c: ActionContext) => {
   if (c.actor.kind !== 'pc') throw new Error('expected pc actor');
@@ -40,12 +53,19 @@ describe('Draconic Spells — granted on select + level-up', () => {
   it('selecting Draconic at L5 grants the L3 + L5 spells', () => {
     const c = featCtx(sorc({ level: 5 }));
     handleSelectSubclass(c, { type: 'select_subclass', subclass: 'draconic' });
-    expect(pcChar(c).spells_known).toEqual(expect.arrayContaining(['chromatic_orb', 'fear', 'fly']));
+    expect(pcChar(c).spells_known).toEqual(
+      expect.arrayContaining(['chromatic_orb', 'fear', 'fly'])
+    );
   });
 
   it('a Draconic Sorcerer leveling 4→5 gains Fear + Fly', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
-    const char = sorc({ level: 4, subclass: 'draconic', class_levels: { sorcerer: 4 }, spells_known: ['chromatic_orb'] });
+    const char = sorc({
+      level: 4,
+      subclass: 'draconic',
+      class_levels: { sorcerer: 4 },
+      spells_known: ['chromatic_orb'],
+    });
     applyLevelUpForClass(char, 'sorcerer', ctx);
     expect(char.level).toBe(5);
     expect(char.spells_known).toEqual(expect.arrayContaining(['chromatic_orb', 'fear', 'fly']));

@@ -519,7 +519,8 @@ export const hunterFeatureOptions: Record<
     options: ['escape_the_horde', 'multiattack_defense'],
     labels: {
       escape_the_horde: 'Escape the Horde — opportunity attacks vs you have disadvantage',
-      multiattack_defense: "Multiattack Defense — an attacker that hits you has disadvantage on its other attacks vs you",
+      multiattack_defense:
+        'Multiattack Defense — an attacker that hits you has disadvantage on its other attacks vs you',
     },
   },
 };

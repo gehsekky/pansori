@@ -121,7 +121,8 @@ describe('Stoneskin — resistance in combat', () => {
     });
     const c = attackCtx(target);
     handleEnemyAttack(c, { ...enemyAttack, targetCharId: 'w' });
-    if (c.enemySubAttack?.outcome === 'done') expect(c.enemySubAttack.target.hp).toBe(36); // 40 − 4 (8 halved)
+    if (c.enemySubAttack?.outcome === 'done')
+      expect(c.enemySubAttack.target.hp).toBe(36); // 40 − 4 (8 halved)
     else throw new Error('expected a resolved attack');
   });
 
@@ -130,7 +131,8 @@ describe('Stoneskin — resistance in combat', () => {
     const target = makeChar({ id: 'w', ac: 5, hp: 40, max_hp: 40 });
     const c = attackCtx(target);
     handleEnemyAttack(c, { ...enemyAttack, targetCharId: 'w' });
-    if (c.enemySubAttack?.outcome === 'done') expect(c.enemySubAttack.target.hp).toBe(32); // 40 − 8
+    if (c.enemySubAttack?.outcome === 'done')
+      expect(c.enemySubAttack.target.hp).toBe(32); // 40 − 8
     else throw new Error('expected a resolved attack');
   });
 });

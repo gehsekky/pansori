@@ -209,7 +209,10 @@ export function handleRogueFeature(ctx: ActionContext, fid: string): boolean {
       return true;
     }
     // SRD Supreme Sneak (Thief L9) — Stealth Attack keeps your Hide.
-    if (effect === 'stealth_attack' && !(pc.char.subclass === 'thief' && getClassLevel(pc.char, 'rogue') >= 9)) {
+    if (
+      effect === 'stealth_attack' &&
+      !(pc.char.subclass === 'thief' && getClassLevel(pc.char, 'rogue') >= 9)
+    ) {
       ctx.narrative = 'Stealth Attack requires a Thief of level 9.';
       return true;
     }

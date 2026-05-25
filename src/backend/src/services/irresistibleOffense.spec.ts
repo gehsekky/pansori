@@ -25,9 +25,9 @@ describe('applyDamageMultiplier — ignoreResistance', () => {
   const resistant = { resistances: ['slashing'] };
   it('bypasses Resistance when the flag is set, otherwise halves', () => {
     expect(applyDamageMultiplier(10, 'slashing', resistant).damage).toBe(5);
-    expect(applyDamageMultiplier(10, 'slashing', resistant, { ignoreResistance: true }).damage).toBe(
-      10
-    );
+    expect(
+      applyDamageMultiplier(10, 'slashing', resistant, { ignoreResistance: true }).damage
+    ).toBe(10);
   });
   it('still applies Immunity and Vulnerability with the flag set', () => {
     expect(
