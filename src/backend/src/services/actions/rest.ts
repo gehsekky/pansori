@@ -240,6 +240,7 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
     delete restoredUses.holy_nimbus_used; // Paladin Holy Nimbus — available again after a long rest
     delete restoredUses.intimidating_presence_used; // Berserker Intimidating Presence — free use back after a long rest
     delete restoredUses.dark_ones_luck; // Fiend Warlock Dark One's Own Luck — uses reset after a long rest
+    delete restoredUses.magical_cunning_used; // Warlock Magical Cunning — available again after a long rest
     // Wizard Signature Spells — free L3 casts recharge on a long rest too.
     for (const k of Object.keys(restoredUses)) {
       if (k.startsWith('signature_used_')) delete restoredUses[k];
