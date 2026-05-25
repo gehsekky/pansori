@@ -77,7 +77,10 @@ import {
   hasSuperiorHuntersDefense,
   hunterFeatureOptions,
   huntersPrey,
+  knowsMetamagic,
   layOnHandsRemaining,
+  metamagicOptions,
+  metamagicSlots,
   spellSlotsForChar,
 } from './multiclass.js';
 import { composeFragments, enemyAttackFragmentEvent } from './narrative/compose.js';
@@ -3495,63 +3498,40 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   }
 
   // ── Sorcerer: Metamagic ─────────────────────────────────────────────────────
-  if (hasClass(char, 'sorcerer') && getClassLevel(char, 'sorcerer') >= 3) {
+  if (hasClass(char, 'sorcerer')) {
     const sorcLvl = getClassLevel(char, 'sorcerer');
     const spLeft = char.class_resource_uses?.sorcery_points ?? sorcLvl;
-    if (spLeft >= 1)
+    const metamagicUseLabels: Record<string, string> = {
+      careful: 'Careful Spell — allies in the area auto-succeed their save',
+      distant: "Distant Spell — double the next spell's range",
+      empowered: `Empowered Spell — reroll up to ${Math.max(1, abilityMod(char.cha ?? 10))} damage dice`,
+      extended: 'Extended Spell — double concentration duration',
+      heightened: 'Heightened Spell — one target has Disadvantage on its save',
+      quickened: 'Quickened Spell — cast as a bonus action',
+      seeking: 'Seeking Spell — reroll a missed spell attack',
+      subtle: 'Subtle Spell — no verbal/somatic components',
+    };
+    // USE: offer each KNOWN, affordable Metamagic option.
+    for (const [id, def] of Object.entries(metamagicOptions)) {
+      if (!knowsMetamagic(char, id) || spLeft < def.cost) continue;
+      if (id === 'quickened' && char.turn_actions.bonus_action_used) continue;
       choices.push({
-        label: `Metamagic: Twinned Spell — next spell hits 2 targets (1 SP, ${spLeft} left)`,
-        action: { type: 'use_class_feature', featureId: 'metamagic_twinned' },
+        label: `Metamagic: ${metamagicUseLabels[id] ?? def.label} (${def.cost} SP, ${spLeft} left)`,
+        action: { type: 'use_class_feature', featureId: `metamagic_${id}` },
         kind: 'class_feature',
       });
-    if (spLeft >= 2 && !char.turn_actions.bonus_action_used)
-      choices.push({
-        label: `Metamagic: Quickened Spell — cast as bonus action (2 SP, ${spLeft} left)`,
-        action: { type: 'use_class_feature', featureId: 'metamagic_quickened' },
-        kind: 'class_feature',
-      });
-    if (spLeft >= 1)
-      choices.push({
-        label: `Metamagic: Empowered Spell — reroll up to ${abilityMod(char.cha ?? 10)} damage dice (1 SP, ${spLeft} left)`,
-        action: { type: 'use_class_feature', featureId: 'metamagic_empowered' },
-        kind: 'class_feature',
-      });
-    if (spLeft >= 1)
-      choices.push({
-        label: `Metamagic: Distant Spell — double the next spell's range (1 SP, ${spLeft} left)`,
-        action: { type: 'use_class_feature', featureId: 'metamagic_distant' },
-        kind: 'class_feature',
-      });
-    if (spLeft >= 1)
-      choices.push({
-        label: `Metamagic: Subtle Spell — no verbal/somatic components (1 SP, ${spLeft} left)`,
-        action: { type: 'use_class_feature', featureId: 'metamagic_subtle' },
-        kind: 'class_feature',
-      });
-    if (spLeft >= 1)
-      choices.push({
-        label: `Metamagic: Extended Spell — double concentration duration (1 SP, ${spLeft} left)`,
-        action: { type: 'use_class_feature', featureId: 'metamagic_extended' },
-        kind: 'class_feature',
-      });
-    if (spLeft >= 2)
-      choices.push({
-        label: `Metamagic: Heightened Spell — one target has Disadvantage on its save (2 SP, ${spLeft} left)`,
-        action: { type: 'use_class_feature', featureId: 'metamagic_heightened' },
-        kind: 'class_feature',
-      });
-    if (spLeft >= 1)
-      choices.push({
-        label: `Metamagic: Seeking Spell — reroll a missed spell attack (1 SP, ${spLeft} left)`,
-        action: { type: 'use_class_feature', featureId: 'metamagic_seeking' },
-        kind: 'class_feature',
-      });
-    if (spLeft >= 1)
-      choices.push({
-        label: `Metamagic: Careful Spell — allies in the area auto-succeed their save (1 SP, ${spLeft} left)`,
-        action: { type: 'use_class_feature', featureId: 'metamagic_careful' },
-        kind: 'class_feature',
-      });
+    }
+    // LEARN: pick a new Metamagic option out of combat while a slot is open.
+    if (!state.combat_active && (char.metamagics_known?.length ?? 0) < metamagicSlots(char)) {
+      for (const [id, def] of Object.entries(metamagicOptions)) {
+        if (knowsMetamagic(char, id)) continue;
+        if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+        choices.push({
+          label: `Learn Metamagic: ${def.label}`,
+          action: { type: 'choose_metamagic', option: id },
+        });
+      }
+    }
   }
 
   // ── Warlock: Invocations ─────────────────────────────────────────────────────

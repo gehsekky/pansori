@@ -539,6 +539,35 @@ export function hasSuperiorHuntersDefense(char: Character): boolean {
   return char.subclass === 'hunter' && getClassLevel(char, 'ranger') >= 15;
 }
 
+/**
+ * SRD Sorcerer Metamagic options the player can learn + use. Each maps the
+ * short id (stored in `metamagics_known` and `metamagic_active`) to its label
+ * and Sorcery-Point cost. (Twinned + Transmuted are deferred — not yet
+ * functional — so they're excluded from the learnable list for now.) (RE-2.)
+ */
+export const metamagicOptions: Record<string, { label: string; cost: number }> = {
+  careful: { label: 'Careful Spell', cost: 1 },
+  distant: { label: 'Distant Spell', cost: 1 },
+  empowered: { label: 'Empowered Spell', cost: 1 },
+  extended: { label: 'Extended Spell', cost: 1 },
+  heightened: { label: 'Heightened Spell', cost: 2 },
+  quickened: { label: 'Quickened Spell', cost: 2 },
+  seeking: { label: 'Seeking Spell', cost: 1 },
+  subtle: { label: 'Subtle Spell', cost: 1 },
+};
+
+/** SRD Sorcerer Metamagic — number of options known: 2 at L2, +2 at L10, +2 at
+ *  L17 (multiclass uses the Sorcerer level). */
+export function metamagicSlots(char: Character): number {
+  const lvl = getClassLevel(char, 'sorcerer');
+  return lvl >= 17 ? 6 : lvl >= 10 ? 4 : lvl >= 2 ? 2 : 0;
+}
+
+/** True when the Sorcerer has learned the given Metamagic option id. */
+export function knowsMetamagic(char: Character, id: string): boolean {
+  return (char.metamagics_known ?? []).includes(id);
+}
+
 export function hasDangerSense(char: Character): boolean {
   if (
     (char.conditions ?? []).some((c) =>

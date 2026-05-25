@@ -1,4 +1,4 @@
-import { getClassLevel, hasClass } from '../../multiclass.js';
+import { getClassLevel, hasClass, knowsMetamagic } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import { abilityMod } from '../../rulesEngine.js';
 
@@ -29,6 +29,19 @@ import { abilityMod } from '../../rulesEngine.js';
 export function handleCasterFeature(ctx: ActionContext, fid: string): boolean {
   if (ctx.actor.kind !== 'pc') return false;
   const { char } = ctx.actor;
+  // SRD Metamagic — gate every metamagic activation on being a Sorcerer who
+  // has LEARNED that option (2/4/6 known at L2/10/17). Covers the simple
+  // options + Twinned/Quickened/Empowered below.
+  if (fid.startsWith('metamagic_')) {
+    if (!hasClass(char, 'sorcerer')) {
+      ctx.narrative = 'Only Sorcerers have Metamagic.';
+      return true;
+    }
+    if (!knowsMetamagic(char, fid.replace('metamagic_', ''))) {
+      ctx.narrative = "You haven't learned that Metamagic option.";
+      return true;
+    }
+  }
   if (fid === 'innate_sorcery') {
     // SRD Sorcerer Innate Sorcery (L1): Bonus Action, for 1 minute gain +1
     // spell save DC and Advantage on Sorcerer spell attacks; twice per long
@@ -83,10 +96,6 @@ export function handleCasterFeature(ctx: ActionContext, fid: string): boolean {
     },
   };
   if (SIMPLE_METAMAGIC[fid]) {
-    if (!hasClass(char, 'sorcerer')) {
-      ctx.narrative = 'Only Sorcerers have Metamagic.';
-      return true;
-    }
     const { cost, label } = SIMPLE_METAMAGIC[fid];
     const sp = char.class_resource_uses?.sorcery_points ?? getClassLevel(char, 'sorcerer');
     if (sp < cost) {
