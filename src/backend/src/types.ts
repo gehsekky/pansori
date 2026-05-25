@@ -931,6 +931,21 @@ export interface SummonedAlly {
   damage: string; // dice expression, e.g. '1d6+3'
 }
 
+// SRD wall/terrain spells (Wall of Fire, Wall of Force) — a transient set of
+// grid cells the spell occupies while the caster concentrates. Blocks movement
+// and/or line of sight; removed when the caster's concentration ends (see
+// `breakConcentration`). Stored per-room on GameState.spell_walls.
+export interface SpellWall {
+  id: string;
+  casterId: string;
+  spellId: string;
+  name: string;
+  roomId: string;
+  cells: GridPos[];
+  blocksMovement: boolean;
+  blocksLineOfSight: boolean;
+}
+
 export interface GameState {
   // Schema version. `normalizeState` stamps this with
   // `CURRENT_SCHEMA_VERSION` on every load; older saves (or saves
@@ -984,6 +999,7 @@ export interface GameState {
   // Grid combat (campaign dungeons only)
   entities?: CombatEntity[];
   movement_used?: Record<string, number>; // entityId → feet moved this turn
+  spell_walls?: SpellWall[]; // transient wall/terrain-spell obstacles (Wall of Fire/Force)
   help_target_id?: string; // char id receiving Help action advantage
   surprised?: string[]; // entity ids surprised at combat start (skip first turn)
   metamagic_active?: string[]; // active Metamagic modifier ids for the next cast (Sorcery Incarnate allows 2)
