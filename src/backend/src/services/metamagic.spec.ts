@@ -196,3 +196,27 @@ describe('Careful Spell — allies in the area auto-succeed and take no damage',
     expect(r.newState.characters.find((c) => c.id === 'pc-2')!.hp).toBeLessThan(40); // caught in the blast
   });
 });
+
+// A fire-resistant enemy: Fire Bolt (fire) is halved normally, but Transmuted
+// can change the type to one it doesn't resist.
+const fireResistSeed: Seed = {
+  ...seed(),
+  enemies: { [ctx.startRoomId]: [{ id: ENEMY, name: 'Salamander', hp: 60, ac: 12, damage: '1d4', toHit: 3, xp: 50, resistances: ['fire'] } as unknown as Enemy] },
+};
+
+describe('Transmuted Spell — change damage type to dodge resistance', () => {
+  it('a fire-resistant enemy takes FULL damage when Fire Bolt is transmuted', async () => {
+    // d20 0.7 → 15 (hit); 1d10 0.5 → 6. Transmuted → acid (not resisted) → 6.
+    vi.spyOn(Math, 'random').mockReturnValueOnce(0.7).mockReturnValueOnce(0.5).mockReturnValue(0.5);
+    const state = lowSorc();
+    state.metamagic_active = 'transmuted';
+    const r = await takeAction({ action: { type: 'cast_spell', spellId: 'fire_bolt', slotLevel: 0, targetEnemyId: ENEMY }, history: [], state, seed: fireResistSeed, context: ctx });
+    expect(r.newState.entities?.find((e) => e.id === ENEMY)!.hp).toBe(54); // 60 - 6 full
+  });
+
+  it('control: fire damage is halved by the resistance without Transmuted', async () => {
+    vi.spyOn(Math, 'random').mockReturnValueOnce(0.7).mockReturnValueOnce(0.5).mockReturnValue(0.5);
+    const r = await takeAction({ action: { type: 'cast_spell', spellId: 'fire_bolt', slotLevel: 0, targetEnemyId: ENEMY }, history: [], state: lowSorc(), seed: fireResistSeed, context: ctx });
+    expect(r.newState.entities?.find((e) => e.id === ENEMY)!.hp).toBe(57); // 60 - 3 (fire halved)
+  });
+});

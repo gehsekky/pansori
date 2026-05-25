@@ -76,6 +76,23 @@ export function rollDiceEmpowered(
   return dice.reduce((s, v) => s + v, 0) + flat;
 }
 
+// SRD Sorcerer Metamagic — Transmuted Spell: change a spell's damage type to
+// one of these. pansori auto-picks the most favorable: a type the target is
+// Vulnerable to, else one it doesn't resist or shrug off, else the base type.
+export const TRANSMUTE_TYPES = ['acid', 'cold', 'fire', 'lightning', 'poison', 'thunder'] as const;
+
+export function transmutedDamageType(
+  target: { resistances?: string[]; vulnerabilities?: string[]; immunities?: string[] },
+  baseType: string
+): string {
+  const vuln = TRANSMUTE_TYPES.find((t) => target.vulnerabilities?.includes(t));
+  if (vuln) return vuln;
+  const clean = TRANSMUTE_TYPES.find(
+    (t) => !target.immunities?.includes(t) && !target.resistances?.includes(t)
+  );
+  return clean ?? baseType;
+}
+
 export function rollCriticalGwf(expr: string | null | undefined): number {
   if (!expr) return gwfDie(4) + gwfDie(4);
   const m = String(expr).match(/(\d+)d(\d+)(?:\+(\d+))?/);
