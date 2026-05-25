@@ -66,6 +66,7 @@ import {
   canCountercharm,
   canRitualCast,
   elementalAffinityType,
+  expertiseEligibleSkills,
   expertiseSlots,
   getClassLevel,
   hasClass,
@@ -3037,15 +3038,16 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     }
   }
 
-  // ── Expertise picks (Rogue L1/L6, Bard L2/L9) ──────────────────────────────
+  // ── Expertise picks (Rogue L1/L6, Bard L2/L9, Wizard Scholar L2) ───────────
   // Double proficiency in a chosen skill. RAW level-up choice, surfaced out of
-  // combat like Fighting Style; offered per still-unchosen skill proficiency
-  // while a slot is open. (RE-2.)
+  // combat like Fighting Style; offered per still-unchosen eligible skill while
+  // a slot is open. Wizard's Scholar restricts the pool to knowledge skills via
+  // `expertiseEligibleSkills`. (RE-2.)
   if (!state.combat_active) {
     const expChosen = char.expertise_skills ?? [];
     if (expChosen.length < expertiseSlots(char)) {
       const chosenLower = new Set(expChosen.map((s) => s.toLowerCase()));
-      for (const skill of char.skill_proficiencies ?? []) {
+      for (const skill of expertiseEligibleSkills(char)) {
         if (chosenLower.has(skill.toLowerCase())) continue;
         if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
         choices.push({
