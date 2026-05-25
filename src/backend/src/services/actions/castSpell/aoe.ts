@@ -6,6 +6,7 @@ import {
   rollConditionSave,
   rollDice,
   upcastDamage,
+  upcastDamage2,
 } from '../../rulesEngine.js';
 import {
   applyPartyLevelUps,
@@ -41,6 +42,26 @@ import { fmt } from '../../narrativeFmt.js';
  * when the grid isn't populated so the caller falls through to the
  * single-target damage block.
  */
+
+// Second damage component for a dual-type AoE spell (Flame Strike's radiant,
+// Ice Storm's cold). Rolled and saved-for-half exactly like the primary, and
+// resisted per its own type when a resist target is supplied. Returns 0 for a
+// single-type spell.
+function secondaryAoeDamage(
+  spell: Spell,
+  slotLevel: number,
+  failed: boolean,
+  overchannel: boolean,
+  resistTarget?: { resistances?: string[]; vulnerabilities?: string[]; immunities?: string[] }
+): number {
+  if (!spell.damage2) return 0;
+  const expr = upcastDamage2(spell, slotLevel);
+  const base = overchannel ? maxDice(expr) : rollDice(expr);
+  const eff = failed ? base : spell.saveEffect === 'half' ? Math.floor(base / 2) : 0;
+  if (eff <= 0) return 0;
+  return resistTarget ? applyDamageMultiplier(eff, spell.damageType2, resistTarget).damage : eff;
+}
+
 export function runAoeSpell(
   ctx: ActionContext,
   spell: Spell,
@@ -125,7 +146,10 @@ export function runAoeSpell(
         (ctx.overchannel ? maxDice(aoeExpr) : rollDice(aoeExpr)) +
         empoweredEvocationBonus(char, spell);
       const effDmg = tFailed ? baseDmg : spell.saveEffect === 'half' ? Math.floor(baseDmg / 2) : 0;
-      const { damage: resDmg } = applyDamageMultiplier(effDmg, spell.damageType, targetEnemy);
+      let resDmg = applyDamageMultiplier(effDmg, spell.damageType, targetEnemy).damage;
+      // Dual-damage spells (Flame Strike, Ice Storm) — add the second component,
+      // saved-for-half the same way and resisted per its own type.
+      resDmg += secondaryAoeDamage(spell, slotLevel, tFailed, !!ctx.overchannel, targetEnemy);
       const curHp = ctx.st.entities?.find((e) => e.id === target.id && e.isEnemy)?.hp ?? 0;
       const newHp = curHp - resDmg;
       ctx.st = {
@@ -180,11 +204,13 @@ export function runAoeSpell(
           targetChar.conditions ?? []
         );
         const baseDmg = rollDice(upcastDamage(spell, slotLevel) || (spell.damage ?? '0'));
-        const effDmg = allyFailed
+        let effDmg = allyFailed
           ? baseDmg
           : spell.saveEffect === 'half'
             ? Math.floor(baseDmg / 2)
             : 0;
+        // Dual-damage second component (no per-ally resistance modeled here).
+        effDmg += secondaryAoeDamage(spell, slotLevel, allyFailed, false);
         if (effDmg > 0) {
           const newAllyHp = Math.max(0, targetChar.hp - effDmg);
           ctx.st = {
