@@ -660,8 +660,15 @@ Bonus(char, st)`: a creature within 10 ft of a conscious L6+ Paladin (the
 
 #### RE-4: Combat / exploration subsystems (bounded)
 
-- [ ] **Wall/terrain spells as real grid blockers** — transient grid
-      obstacles that expire on concentration drop (Wall of Fire / Force).
+- [~] **Wall/terrain spells as real grid blockers** — *Wall of Fire done
+      (2026-05-25).* `GameState.spell_walls` holds transient per-room wall
+      cells (owner + blocksMovement + blocksLineOfSight); `wallObstacleCells`
+      merges them into the LoS/cover and movement obstacle sets. Wall of
+      Fire raises an opaque (sight-blocking) wall on cast, bound to the
+      caster's concentration and cleared by `breakConcentration`. Wall of
+      Force is deferred — it needs point/orientation targeting that
+      pansori's enemy-only targeting doesn't express yet (the
+      movement-blocking path via `blocksMovement` is already in place).
 - [ ] **Mounted combat** — `mount_id` exists but isn't enforced (forced
       dismount on damage, reach, ranged-while-mounted rules).
 - [ ] **Underwater combat** — non-piercing melee disadvantage, ranged
