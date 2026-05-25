@@ -10,6 +10,7 @@ import {
   SRD_MONSTERS,
   SRD_SPELLCASTING_ABILITY,
   SRD_SPELLS,
+  srdBackgrounds,
   srdItems,
 } from './srd/index.js';
 import type { Context } from '../types.js';
@@ -66,60 +67,7 @@ export const context: Context = {
   },
 
   // ─── Backgrounds ──────────────────────────────────────────────────────────────
-  backgrounds: [
-    {
-      id: 'soldier',
-      name: 'Soldier',
-      desc: 'You have served in an organized military force.',
-      skillProficiencies: ['athletics', 'intimidation'],
-      toolProficiency: 'Gaming set',
-      feature: 'Military Rank',
-      featureDesc: 'Soldiers and veterans recognize your authority.',
-      abilityScoreIncreases: ['str', 'dex', 'con'],
-      originFeat: 'savage_attacker',
-      language: 'Common',
-    },
-    {
-      id: 'criminal',
-      name: 'Criminal',
-      desc: 'You have a history of breaking the law.',
-      skillProficiencies: ['stealth', 'deception'],
-      toolProficiency: "Thieves' Tools",
-      feature: 'Criminal Contact',
-      featureDesc: 'You have a contact who can help you find information or fences stolen goods.',
-      abilityScoreIncreases: ['dex', 'con', 'int'],
-      originFeat: 'alert',
-      language: "Thieves' Cant",
-    },
-    {
-      id: 'sage',
-      name: 'Sage',
-      desc: 'You spent years learning the lore of the multiverse.',
-      skillProficiencies: ['arcana', 'history'],
-      toolProficiency: "Calligrapher's Tools",
-      feature: 'Researcher',
-      featureDesc: 'If you do not know information, you know where to find it.',
-      abilityScoreIncreases: ['con', 'int', 'wis'],
-      // 2024 PHB: Sage gets Magic Initiate (Wizard / Arcane list).
-      // Cantrips + L1 choice come from the FE spell picker at
-      // character creation; the BE re-validates the picks.
-      originFeat: 'magic_initiate_arcane',
-      language: 'Common',
-    },
-    {
-      id: 'acolyte',
-      name: 'Acolyte',
-      desc: 'You have spent your life in service to a temple.',
-      skillProficiencies: ['religion', 'insight'],
-      toolProficiency: "Calligrapher's Tools",
-      feature: 'Shelter of the Faithful',
-      featureDesc: 'You and your companions can receive healing and care at temples.',
-      abilityScoreIncreases: ['int', 'wis', 'cha'],
-      // 2024 PHB: Acolyte gets Magic Initiate (Cleric / Divine list).
-      originFeat: 'magic_initiate_divine',
-      language: 'Celestial',
-    },
-  ],
+  backgrounds: srdBackgrounds(),
 
   // ─── Spell system ─────────────────────────────────────────────────────────────
   spellTable: { ...SRD_SPELLS },
@@ -144,17 +92,6 @@ export const context: Context = {
     Bard: ['charm_person', 'healing_word', 'sleep', 'hold_person'],
     Paladin: ['bless', 'cure_wounds', 'guiding_bolt'],
     Ranger: ['cure_wounds', 'entangle'],
-  },
-
-  classSpellSlots: {
-    Wizard: [{ 1: 2, 2: 1, 3: 1 }],
-    Cleric: [{ 1: 2, 2: 1, 3: 1 }],
-    Druid: [{ 1: 2, 2: 1 }],
-    Sorcerer: [{ 1: 2, 2: 1, 3: 1 }],
-    Warlock: [{ 1: 1 }],
-    Bard: [{ 1: 2, 2: 1 }],
-    Paladin: [{ 1: 2 }],
-    Ranger: [{ 1: 2 }],
   },
 
   spellcastingAbility: { ...SRD_SPELLCASTING_ABILITY },

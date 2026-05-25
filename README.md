@@ -54,7 +54,7 @@ open http://localhost:5173
     │       ├── types.ts        ← shared interfaces (GameState, Seed, Context, …)
     │       ├── auth/           ← Google OAuth + session middleware
     │       ├── contexts/       ← sandbox.ts, vale_of_shadows.ts, whispering_pines.ts, grove_of_thorns.ts
-    │       │   └── srd/        ← classes, spells, monsters, species, beast_forms, items
+    │       │   └── srd/        ← classes, spells, monsters, species, beast_forms, items, backgrounds
     │       ├── db/             ← pool.ts
     │       ├── routes/         ← game.ts (REST API) + schemas.ts (Zod)
     │       └── services/       ← gameEngine, rulesEngine, gridEngine, damage, multiclass, conditions/, narrative/, procgen, campaignEngine, migrationRunner, llmProvider, and actions/ (one handler per player action, dispatched via actions/index.ts)
@@ -88,7 +88,7 @@ Each context file defines a complete game setting:
 
 Procgen uses BFS from the start room to scale enemy CR by distance — early rooms draw from CR ≤ 1 templates, mid rooms from CR ≤ 5, far rooms from the full pool.
 
-The SRD pack under `src/backend/src/contexts/srd/` (classes, spells, monsters, species, beast forms, items) is shared by every context. Equipment lives in `items.ts` as a single canonical `SRD_ITEMS` catalog; contexts select from it via `srdItems(...ids)` so the same weapon/armor doesn't drift between campaigns, while still defining their own custom items and limiting which SRD items a campaign offers.
+The SRD pack under `src/backend/src/contexts/srd/` (classes, spells, monsters, species, beast forms, items, backgrounds) is shared by every context. Equipment lives in `items.ts` as a single canonical `SRD_ITEMS` catalog; contexts select from it via `srdItems(...ids)` so the same weapon/armor doesn't drift between campaigns, while still defining their own custom items and limiting which SRD items a campaign offers. Backgrounds work the same way — `srdBackgrounds(...)` supplies the canonical mechanics (skills, tool, origin feat, ability options) and campaigns pass only per-background flavor (`desc` / `featureDesc`). Spell-slot progression is owned by the engine (`spellSlotsForChar`), not declared per context.
 
 ## Rules engine (SRD 5.2.1, strict)
 

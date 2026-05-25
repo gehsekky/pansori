@@ -1154,8 +1154,8 @@ export interface Context {
   // choice at character creation / level-up. Keys match `Character.feats`.
   featTable?: Record<string, Feat>;
   classSpells?: Record<string, string[]>; // class → spell IDs
-  // classSpellSlots[class][level-1] → Record<spellLevel, maxSlots>
-  classSpellSlots?: Record<string, Array<Record<number, number>>>;
+  // (Spell-slot progression is owned by the engine — `spellSlotsForChar` /
+  // `spellSlotsForClassLevel` in rulesEngine — not declared per context.)
   spellcastingAbility?: Record<string, AbilityKey>; // class → casting ability
   enemyTemplates: EnemyTemplate[];
   introTexts: string[];

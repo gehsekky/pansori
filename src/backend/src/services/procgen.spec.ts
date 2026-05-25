@@ -356,10 +356,9 @@ describe('campaign feature parity', () => {
         }
       });
 
-      it('Druid / Sorcerer / Warlock have spell lists and slot tables', () => {
+      it('Druid / Sorcerer / Warlock have spell lists and a casting ability', () => {
         for (const caster of ['Druid', 'Sorcerer', 'Warlock'] as const) {
           expect(ctx.classSpells?.[caster]?.length).toBeGreaterThan(0);
-          expect(ctx.classSpellSlots?.[caster]?.length).toBeGreaterThan(0);
           expect(ctx.spellcastingAbility?.[caster]).toBeDefined();
         }
       });

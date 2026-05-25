@@ -24,6 +24,7 @@ import {
   SRD_MONSTERS,
   SRD_SPELLCASTING_ABILITY,
   SRD_SPELLS,
+  srdBackgrounds,
   srdItems,
 } from './srd/index.js';
 import type { Context } from '../types.js';
@@ -71,41 +72,24 @@ export const context: Context = {
 
   // ─── Backgrounds (campaign-flavored) ─────────────────────────────────────────
 
-  backgrounds: [
-    {
-      id: 'soldier',
-      name: 'Soldier',
+  backgrounds: srdBackgrounds({
+    soldier: {
       desc: 'You served Pinegate Watch before the grove went silent.',
-      skillProficiencies: ['athletics', 'intimidation'],
-      feature: 'Military Rank',
       featureDesc: 'Pinegate guards and ex-soldiers recognise your authority.',
     },
-    {
-      id: 'criminal',
-      name: 'Criminal',
+    criminal: {
       desc: 'You poached the grove for years. You know its hidden paths.',
-      skillProficiencies: ['stealth', 'deception'],
-      toolProficiency: "Thieves' Tools",
-      feature: 'Criminal Contact',
       featureDesc: 'A discreet contact who can fence rare grove herbs.',
     },
-    {
-      id: 'sage',
-      name: 'Sage',
+    sage: {
       desc: 'You studied old fey lore — exactly the wrong kind of knowledge that suddenly matters.',
-      skillProficiencies: ['arcana', 'history'],
-      feature: 'Researcher',
       featureDesc: 'If you do not know information, you know where to find it.',
     },
-    {
-      id: 'acolyte',
-      name: 'Acolyte',
+    acolyte: {
       desc: 'You spent years at a forest shrine to the Wild Mother.',
-      skillProficiencies: ['religion', 'insight'],
-      feature: 'Shelter of the Faithful',
       featureDesc: 'You and your companions receive healing and care at temples.',
     },
-  ],
+  }),
 
   introTexts: [
     `Pinegate is the last village before the Verdant Reach. Two weeks ago, Mother Mareth — the Circle's druid — went silent. Trappers come back wounded or not at all. The villagers are afraid to enter the grove. You arrive at the bridge over the Thornwater with steel and spellcraft.`,
@@ -138,16 +122,6 @@ export const context: Context = {
     Bard: ['bardic_inspiration_spell', 'charm_person', 'healing_word', 'cure_wounds'],
     Paladin: ['divine_smite_spell', 'cure_wounds', 'bless'],
     Ranger: ['cure_wounds', 'entangle'],
-  },
-  classSpellSlots: {
-    Druid: [{ 1: 2 }, { 1: 3 }, { 1: 4, 2: 2 }, { 1: 4, 2: 3 }, { 1: 4, 2: 3, 3: 2 }],
-    Cleric: [{ 1: 2 }, { 1: 3 }, { 1: 4, 2: 2 }, { 1: 4, 2: 3 }, { 1: 4, 2: 3, 3: 2 }],
-    Wizard: [{ 1: 2 }, { 1: 3 }, { 1: 4, 2: 2 }, { 1: 4, 2: 3 }, { 1: 4, 2: 3, 3: 2 }],
-    Sorcerer: [{ 1: 2 }, { 1: 3 }, { 1: 4, 2: 2 }, { 1: 4, 2: 3 }, { 1: 4, 2: 3, 3: 2 }],
-    Bard: [{ 1: 2 }, { 1: 3 }, { 1: 4, 2: 2 }, { 1: 4, 2: 3 }, { 1: 4, 2: 3, 3: 2 }],
-    Paladin: [{ 1: 2 }, { 1: 2 }, { 1: 3 }, { 1: 3 }, { 1: 4, 2: 2 }],
-    Ranger: [{ 1: 2 }, { 1: 3 }, { 1: 4 }, { 1: 4, 2: 2 }, { 1: 4, 2: 3 }],
-    Warlock: [{ 1: 1 }, { 1: 2 }, { 2: 2 }, { 2: 2 }, { 3: 2 }],
   },
   spellcastingAbility: { ...SRD_SPELLCASTING_ABILITY },
 
