@@ -3,6 +3,7 @@ import {
   applyPartyLevelUps,
   effectiveSpeed,
   endCombatState,
+  getEnemyById,
   isRoomCleared,
   splitEncounterXp,
 } from '../../gameEngine.js';
@@ -391,6 +392,116 @@ export function handleMonkFeature(ctx: ActionContext, fid: string): boolean {
     char.class_resource_uses = { ...(char.class_resource_uses ?? {}), ki_points: sdKi - 3 };
     char.conditions = [...char.conditions, 'superior_defense'];
     ctx.narrative = `${char.name} steels into Superior Defense — Resistance to all damage except force this combat. (${sdKi - 3} ki remaining)`;
+    return true;
+  }
+
+  // SRD Open Hand Fleet Step (L11) — a free Step of the Wind (Dash +
+  // Disengage) after another bonus action this turn. pansori offers it as an
+  // extra free use once your bonus action is spent (the RAW "other than Step
+  // of the Wind" nuance is simplified). Once per turn.
+  if (fid === 'fleet_step_dash' || fid === 'fleet_step_disengage') {
+    if (char.subclass !== 'open_hand' || getClassLevel(char, 'monk') < 11) {
+      ctx.narrative = 'Fleet Step requires a Warrior of the Open Hand of level 11.';
+      return true;
+    }
+    if (!char.turn_actions.bonus_action_used) {
+      ctx.narrative = 'Fleet Step follows another bonus action — use one first.';
+      return true;
+    }
+    if (char.turn_actions.fleet_step_used) {
+      ctx.narrative = 'Fleet Step already used this turn.';
+      return true;
+    }
+    char.turn_actions = { ...char.turn_actions, fleet_step_used: true, disengaged: true };
+    const fsSpeed = effectiveSpeed(char, ctx.context.lootTable);
+    ctx.st = {
+      ...ctx.st,
+      movement_used: {
+        ...(ctx.st.movement_used ?? {}),
+        [char.id]: Math.max(0, (ctx.st.movement_used?.[char.id] ?? 0) - fsSpeed),
+      },
+    };
+    ctx.narrative = `${char.name} — Fleet Step! A free Step of the Wind: Dash +${fsSpeed} ft and Disengage.`;
+    return true;
+  }
+
+  // SRD Open Hand Quivering Palm (L17) — set lethal vibrations on an unarmed
+  // hit (4 Focus Points; one creature at a time). Harmless until detonated.
+  if (fid === 'quivering_palm') {
+    if (char.subclass !== 'open_hand' || getClassLevel(char, 'monk') < 17) {
+      ctx.narrative = 'Quivering Palm requires a Warrior of the Open Hand of level 17.';
+      return true;
+    }
+    if (!ctx.enemyAlive || !ctx.enemy) {
+      ctx.narrative = 'No living target for Quivering Palm.';
+      return true;
+    }
+    const qpKi = char.class_resource_uses?.ki_points ?? getClassLevel(char, 'monk');
+    if (qpKi < 4) {
+      ctx.narrative = 'Quivering Palm needs 4 Focus Points (recover on a short rest).';
+      return true;
+    }
+    char.class_resource_uses = { ...(char.class_resource_uses ?? {}), ki_points: qpKi - 4 };
+    char.quivering_palm_target = ctx.enemy.id;
+    ctx.st = {
+      ...ctx.st,
+      entities: (ctx.st.entities ?? []).map((e) =>
+        e.id === ctx.enemy?.id && e.isEnemy
+          ? { ...e, conditions: [...e.conditions.filter((c) => c !== 'quivering_palm'), 'quivering_palm'] }
+          : e
+      ),
+    };
+    ctx.narrative = `${char.name} sets lethal vibrations in ${ctx.enemy.name} — Quivering Palm primed. (${qpKi - 4} Focus remaining)`;
+    return true;
+  }
+
+  // SRD Open Hand Quivering Palm — detonate (an action): the marked creature
+  // makes a CON save, taking 10d12 Force (half on a success).
+  if (fid === 'quivering_palm_detonate') {
+    if (!char.quivering_palm_target) {
+      ctx.narrative = 'No creature is under your Quivering Palm.';
+      return true;
+    }
+    if (char.turn_actions.action_used) {
+      ctx.narrative = 'Action already used this turn.';
+      return true;
+    }
+    const qpTargetId = char.quivering_palm_target;
+    const qpEnt = ctx.st.entities?.find((e) => e.id === qpTargetId && e.isEnemy);
+    const qpEnemy = getEnemyById(ctx.seed, qpTargetId);
+    if (!qpEnt || qpEnt.hp <= 0 || !qpEnemy) {
+      char.quivering_palm_target = undefined;
+      ctx.narrative = 'The creature under your Quivering Palm is no longer here — the vibrations fade.';
+      return true;
+    }
+    char.turn_actions = { ...char.turn_actions, action_used: true };
+    char.quivering_palm_target = undefined;
+    const qpDC = 8 + profBonus(char.level) + abilityMod(char.wis);
+    const qpSave =
+      rollDice('1d20') + abilityMod((qpEnemy as unknown as Record<string, number>)?.con ?? 10);
+    const qpFull = rollDice('10d12');
+    const qpDmg = qpSave >= qpDC ? Math.floor(qpFull / 2) : qpFull;
+    const qpNewHp = Math.max(0, qpEnt.hp - qpDmg);
+    ctx.st = {
+      ...ctx.st,
+      entities: (ctx.st.entities ?? []).map((e) =>
+        e.id === qpTargetId && e.isEnemy
+          ? { ...e, hp: qpNewHp, conditions: e.conditions.filter((c) => c !== 'quivering_palm') }
+          : e
+      ),
+    };
+    ctx.usedInitiative = true;
+    let qpNarr = `${char.name} ends the Quivering Palm! ${qpEnemy.name}: CON ${qpSave} vs DC ${qpDC} — ${qpDmg} force${qpSave >= qpDC ? ' (half)' : ''}.`;
+    if (qpNewHp <= 0) {
+      const split = splitEncounterXp(ctx.st, char.id, qpEnemy.xp ?? 0);
+      ctx.st = split.st;
+      char.xp = (char.xp || 0) + split.share;
+      ctx.st.enemies_killed = [...ctx.st.enemies_killed, qpTargetId];
+      qpNarr += ` ${qpEnemy.name} is destroyed!`;
+      if (isRoomCleared(ctx.st, ctx.seed, ctx.roomId)) ctx.st = endCombatState(ctx.st);
+      qpNarr += applyPartyLevelUps(ctx.st, char, ctx.context);
+    }
+    ctx.narrative = qpNarr;
     return true;
   }
 

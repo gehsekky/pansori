@@ -331,6 +331,9 @@ export interface TurnActions {
   // 2024 PHB Monk L5 — Stunning Strike is once per turn (was per-hit in
   // 2014). Set when the monk has already taken their stun shot this turn.
   monk_stunning_strike_used?: boolean;
+  // SRD Open Hand Monk L11 — Fleet Step grants a free Step of the Wind after
+  // another bonus action; this marks that extra use as spent this turn.
+  fleet_step_used?: boolean;
   // 2024 PHB Fighter L9 — Tactical Master. When attacking with any weapon
   // whose mastery you've trained, the Fighter may swap in Push, Sap, or
   // Slow for that attack. Cleared when the attack resolves.
@@ -730,6 +733,10 @@ export interface Character {
   // once at level 3 without a slot (recharges on a short/long rest; the spent
   // state is tracked under class_resource_uses as `signature_used_<id>`).
   signature_spells?: string[];
+  // SRD Open Hand Monk L17 — Quivering Palm: the enemy id currently carrying
+  // the lethal vibrations (one creature at a time). Set when the monk spends 4
+  // Focus Points on an unarmed hit; cleared when detonated.
+  quivering_palm_target?: string;
   // SRD Multiattack Defense bookkeeping — enemy entity id → the combat round
   // in which that enemy hit this PC. While the stamp equals the current round,
   // that enemy's further attacks vs this PC roll with Disadvantage. The round

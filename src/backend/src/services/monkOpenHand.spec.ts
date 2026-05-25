@@ -167,3 +167,71 @@ describe('Empowered Strikes (Monk L6) — unarmed Force damage', () => {
     expect(hit && hit.kind === 'attack_hit' && hit.damageType).not.toBe('force');
   });
 });
+
+function monkWith(level: number, over: Partial<Character>): GameState {
+  const s = monkState(level);
+  s.characters[0] = { ...s.characters[0], ...over } as Character;
+  return s;
+}
+const useFeat = async (state: GameState, featureId: string) =>
+  takeAction({ action: { type: 'use_class_feature', featureId }, history: [], state, seed, context: ctx });
+
+describe('Fleet Step (Open Hand L11)', () => {
+  it('grants a free Step of the Wind after a bonus action', async () => {
+    const state = monkWith(11, {
+      turn_actions: { action_used: false, bonus_action_used: true, reaction_used: false, free_interaction_used: false },
+    });
+    const r = await useFeat(state, 'fleet_step_dash');
+    const after = r.newState.characters[0];
+    expect(after.turn_actions.fleet_step_used).toBe(true);
+    expect(after.turn_actions.disengaged).toBe(true);
+    expect(r.narrative).toMatch(/Fleet Step/);
+  });
+
+  it('requires a bonus action to have been used first', async () => {
+    const r = await useFeat(monkWith(11, {}), 'fleet_step_dash');
+    expect(r.newState.characters[0].turn_actions.fleet_step_used ?? false).toBe(false);
+    expect(r.narrative).toMatch(/follows another bonus action/);
+  });
+
+  it('does not apply below Open Hand L11', async () => {
+    const state = monkWith(10, {
+      turn_actions: { action_used: false, bonus_action_used: true, reaction_used: false, free_interaction_used: false },
+    });
+    const r = await useFeat(state, 'fleet_step_dash');
+    expect(r.narrative).toMatch(/requires a Warrior of the Open Hand of level 11/);
+  });
+});
+
+describe('Quivering Palm (Open Hand L17)', () => {
+  it('sets the vibrations and spends 4 Focus', async () => {
+    const r = await useFeat(monkWith(17, { class_resource_uses: { ki_points: 10 } }), 'quivering_palm');
+    const after = r.newState.characters[0];
+    expect(after.quivering_palm_target).toBe(ENEMY);
+    expect(after.class_resource_uses?.ki_points).toBe(6);
+    expect((r.newState.entities ?? []).find((e) => e.id === ENEMY)!.conditions).toContain('quivering_palm');
+  });
+
+  it('needs 4 Focus Points', async () => {
+    const r = await useFeat(monkWith(17, { class_resource_uses: { ki_points: 3 } }), 'quivering_palm');
+    expect(r.newState.characters[0].quivering_palm_target).toBeUndefined();
+    expect(r.narrative).toMatch(/needs 4 Focus/);
+  });
+
+  it('detonates for Force damage and clears the mark', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.05); // enemy fails the CON save → full damage
+    const r = await useFeat(
+      monkWith(17, { quivering_palm_target: ENEMY, class_resource_uses: { ki_points: 6 } }),
+      'quivering_palm_detonate'
+    );
+    expect((r.newState.entities ?? []).find((e) => e.id === ENEMY)!.hp).toBeLessThan(200);
+    expect(r.newState.characters[0].quivering_palm_target).toBeUndefined();
+    expect(r.narrative).toMatch(/Quivering Palm/);
+  });
+
+  it('requires Open Hand L17 to set', async () => {
+    const r = await useFeat(monkWith(16, { class_resource_uses: { ki_points: 10 } }), 'quivering_palm');
+    expect(r.newState.characters[0].quivering_palm_target).toBeUndefined();
+    expect(r.narrative).toMatch(/requires a Warrior of the Open Hand of level 17/);
+  });
+});
