@@ -1,6 +1,6 @@
 import type { AbilityKey, Spell } from '../../../types.js';
 import { d, hasArmorProficiency, spellSaveDC } from '../../rulesEngine.js';
-import { hasClass, resolveCastingAbility } from '../../multiclass.js';
+import { getClassLevel, hasClass, resolveCastingAbility } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import { breakConcentration } from '../../gameEngine.js';
 import { distanceFeet } from '../../gridEngine.js';
@@ -27,11 +27,21 @@ export type PrecastResult =
       slotNote: string;
       dc: number;
       isRitualCast: boolean;
+      // True when the cast spent no slot (Divine Intervention or Magic
+      // Initiate free cast). The out-of-range refund path reads this to
+      // avoid crediting back a slot that was never consumed.
+      freeCast: boolean;
     };
 
 export function runPrecast(
   ctx: ActionContext,
-  action: { type: 'cast_spell'; spellId: string; slotLevel: number; ritual?: boolean },
+  action: {
+    type: 'cast_spell';
+    spellId: string;
+    slotLevel: number;
+    ritual?: boolean;
+    divineIntervention?: boolean;
+  },
   spell: Spell
 ): PrecastResult {
   if (ctx.actor.kind !== 'pc') return { done: true };
@@ -80,6 +90,34 @@ export function runPrecast(
     // No slot consumed for ritual casting
   }
 
+  // SRD Divine Intervention (Cleric L10) — as a Magic action, cast any
+  // Cleric spell of level 5 or lower that doesn't require a Reaction,
+  // without expending a slot or Material components, 1/Long Rest. The
+  // choice surface only offers eligible spells; this re-validates and,
+  // on success, bypasses the prep / slot / material gates below.
+  let usedDivineIntervention = false;
+  if (action.divineIntervention) {
+    if (getClassLevel(pc.char, 'cleric') < 10) {
+      ctx.narrative = 'Divine Intervention requires Cleric level 10.';
+      return { done: true };
+    }
+    if ((pc.char.class_resource_uses?.divine_intervention_used ?? 0) > 0) {
+      ctx.narrative = 'Divine Intervention is spent — it returns after a long rest.';
+      return { done: true };
+    }
+    const onClericList =
+      (spell as { spellList?: ReadonlyArray<string> }).spellList?.includes('divine') ?? false;
+    if (!onClericList || spell.level === 0 || spell.level > 5 || spell.castTime === 'reaction') {
+      ctx.narrative = `${spell.name} can't be chosen for Divine Intervention — it must be a Cleric spell of level 1-5 that isn't a Reaction.`;
+      return { done: true };
+    }
+    pc.char.class_resource_uses = {
+      ...(pc.char.class_resource_uses ?? {}),
+      divine_intervention_used: 1,
+    };
+    usedDivineIntervention = true;
+  }
+
   // Long-cast spells (1 minute+, e.g. Animate Dead) can't be cast in
   // combat. Gated before slot spend so an in-combat attempt doesn't
   // waste a slot.
@@ -91,7 +129,12 @@ export function runPrecast(
   // Spell preparation check (Cleric, Paladin, Druid). Multi-class
   // characters with ANY prep class are subject to prep enforcement.
   const prepClasses = ['cleric', 'paladin', 'druid'];
-  if (prepClasses.some((c) => hasClass(pc.char, c)) && spell.level > 0 && !isRitualCast) {
+  if (
+    prepClasses.some((c) => hasClass(pc.char, c)) &&
+    spell.level > 0 &&
+    !isRitualCast &&
+    !usedDivineIntervention
+  ) {
     const prepared = pc.char.prepared_spells ?? [];
     if (prepared.length > 0 && !prepared.includes(spellId)) {
       // Reachable only as a safety net — the choice generator now
@@ -117,7 +160,7 @@ export function runPrecast(
   // other spell. Recognized by walking `feat_choices` for any feat
   // entry whose `magicInitiateL1` matches the spell being cast.
   let usedMagicInitiateFree = false;
-  if (spell.level > 0 && !isRitualCast) {
+  if (spell.level > 0 && !isRitualCast && !usedDivineIntervention) {
     const choices = pc.char.feat_choices ?? {};
     const matched = Object.values(choices).some((c) => c?.magicInitiateL1 === spellId);
     if (matched && (pc.char.class_resource_uses?.magic_initiate_l1_used ?? 0) === 0) {
@@ -138,15 +181,16 @@ export function runPrecast(
   // the cast if the caster can't afford it; deduct from gold otherwise.
   // Checked BEFORE slot deduction so a missing diamond doesn't waste a
   // slot — RAW treats slot + material as a single cast-initiation event.
-  if (spell.materialCost && spell.materialCost > 0) {
+  if (spell.materialCost && spell.materialCost > 0 && !usedDivineIntervention) {
     if ((pc.char.gold ?? 0) < spell.materialCost) {
       ctx.narrative = `${spell.name} requires a ${spell.materialCost} gp material component you don't have.`;
       return { done: true };
     }
   }
 
-  // Expend a slot for non-cantrips (unless ritual or Magic-Initiate free cast)
-  if (spell.level > 0 && !isRitualCast && !usedMagicInitiateFree) {
+  // Expend a slot for non-cantrips (unless ritual, Magic-Initiate free cast,
+  // or Divine Intervention — the latter two cast without a slot)
+  if (spell.level > 0 && !isRitualCast && !usedMagicInitiateFree && !usedDivineIntervention) {
     if (slotLevel < spell.level) {
       ctx.narrative = `${spell.name} requires at least a level-${spell.level} slot.`;
       return { done: true };
@@ -168,7 +212,7 @@ export function runPrecast(
   // even if a downstream gate (e.g. Revivify's death-window check)
   // later fails — RAW: the diamond is gone the moment you start
   // casting, not when the spell resolves.
-  if (spell.materialCost && spell.materialCost > 0) {
+  if (spell.materialCost && spell.materialCost > 0 && !usedDivineIntervention) {
     pc.char.gold = (pc.char.gold ?? 0) - spell.materialCost;
     ctx.narrative = `${pc.char.name} expends a ${spell.materialCost} gp component. `;
   }
@@ -184,8 +228,10 @@ export function runPrecast(
     return { done: true };
   }
 
-  // Mark action economy
-  if (spell.castTime === 'bonus_action') {
+  // Mark action economy. Divine Intervention is itself a Magic action, so
+  // it always costs the action regardless of the chosen spell's normal
+  // cast time (a bonus-action spell cast via DI still costs your action).
+  if (spell.castTime === 'bonus_action' && !usedDivineIntervention) {
     pc.char.turn_actions = { ...pc.char.turn_actions, bonus_action_used: true };
   } else {
     pc.char.turn_actions = { ...pc.char.turn_actions, action_used: true };
@@ -229,7 +275,11 @@ export function runPrecast(
     primaryCastingAbility
   ) as AbilityKey;
   const castingScore = (pc.char[castingAbility] ?? 10) as number;
-  const slotNote = spell.level > 0 ? ` (level-${slotLevel} slot)` : ' (cantrip)';
+  const slotNote = usedDivineIntervention
+    ? ' (Divine Intervention)'
+    : spell.level > 0
+      ? ` (level-${slotLevel} slot)`
+      : ' (cantrip)';
   // SRD Sorcerer Innate Sorcery (L1): +1 spell save DC while active.
   const innateDcBonus = pc.char.conditions.includes('innate_sorcery') ? 1 : 0;
   const dc = spellSaveDC(pc.char.level, castingScore) + innateDcBonus;
@@ -241,6 +291,7 @@ export function runPrecast(
     slotNote,
     dc,
     isRitualCast,
+    freeCast: usedDivineIntervention || usedMagicInitiateFree,
   };
 }
 
@@ -256,7 +307,8 @@ export function isSpellOutOfRange(
   spellTargetId: string,
   spellTargetName: string,
   slotLevel: number,
-  isRitualCast: boolean
+  isRitualCast: boolean,
+  freeCast = false
 ): boolean {
   if (ctx.actor.kind !== 'pc') return false;
   const pc = ctx.actor;
@@ -277,8 +329,9 @@ export function isSpellOutOfRange(
     spell.rangeKind === 'touch'
       ? `${spell.name} requires a touch — the ${spellTargetName} is ${distFt} ft away.`
       : `${spell.name} is out of range (${distFt} ft to target, max ${maxFt} ft).`;
-  // Refund the slot we just spent
-  if (spell.level > 0 && !isRitualCast) {
+  // Refund the slot we just spent (free casts — Divine Intervention,
+  // Magic Initiate — never spent one, so there's nothing to credit back)
+  if (spell.level > 0 && !isRitualCast && !freeCast) {
     const slotsUsedRefund = pc.char.spell_slots_used?.[slotLevel] ?? 1;
     pc.char.spell_slots_used = {
       ...(pc.char.spell_slots_used ?? {}),
