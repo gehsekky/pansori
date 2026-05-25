@@ -2551,6 +2551,165 @@ export const SRD_SPELLS: Record<string, Spell> = {
     rangeFt: 120,
     spellList: ['arcane'],
   },
+  // SRD: Chain Lightning (L6) — a lightning bolt strikes one target (DEX save
+  // for half of 10d8 lightning). RAW it arcs to up to three more creatures
+  // within 30 ft of the first; the arcing isn't modeled — pansori resolves the
+  // primary bolt.
+  chain_lightning: {
+    id: 'chain_lightning',
+    name: 'Chain Lightning',
+    level: 6,
+    castTime: 'action',
+    damage: '10d8',
+    damageType: 'lightning',
+    savingThrow: 'dex',
+    saveEffect: 'half',
+    desc: 'A lightning bolt leaps at a target (DEX save for half of 10d8 lightning). RAW it then arcs to up to three more creatures within 30 ft; pansori resolves the primary bolt only.',
+    rangeKind: 'ranged',
+    rangeFt: 150,
+    spellList: ['arcane'],
+  },
+  // SRD: Circle of Death (L6) — negative energy in a 60-ft sphere; CON save for
+  // half of 8d6 necrotic. (+2d8 per slot above 6th.)
+  circle_of_death: {
+    id: 'circle_of_death',
+    name: 'Circle of Death',
+    level: 6,
+    castTime: 'action',
+    damage: '8d6',
+    damageType: 'necrotic',
+    savingThrow: 'con',
+    saveEffect: 'half',
+    upcastBonus: '2d8',
+    blastRadius: 60,
+    aoeShape: 'sphere',
+    desc: 'Negative energy ripples out in a 60-ft-radius sphere; each creature makes a CON save, taking 8d6 necrotic on a failure or half on a success (+2d8 per slot above 6th).',
+    rangeKind: 'ranged',
+    rangeFt: 150,
+    spellList: ['arcane'],
+  },
+  // SRD: Eyebite (L6) — a creature within 60 ft makes a WIS save or is afflicted
+  // for the duration (Concentration, up to 1 minute). RAW offers Asleep /
+  // Panicked / Sickened; pansori models the Panicked (Frightened) effect. Pure
+  // condition spell (no damage).
+  eyebite: {
+    id: 'eyebite',
+    name: 'Eyebite',
+    level: 6,
+    castTime: 'action',
+    savingThrow: 'wis',
+    saveEffect: 'negates',
+    condition: 'frightened',
+    conditionDuration: 10,
+    concentration: true,
+    durationRounds: 10,
+    desc: 'Your eyes become an inky void. A creature within 60 ft makes a WIS save or, on a failure, is Frightened of you for the duration (Concentration, up to 1 minute). RAW also offers Asleep and Sickened modes; pansori models the Panicked (Frightened) effect.',
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    spellList: ['arcane'],
+  },
+  // SRD: Fire Storm (L7) — up to ten contiguous 10-ft cubes of flame; DEX save
+  // for half of 7d10 fire. Modeled as a single cube-shaped blast.
+  fire_storm: {
+    id: 'fire_storm',
+    name: 'Fire Storm',
+    level: 7,
+    castTime: 'action',
+    damage: '7d10',
+    damageType: 'fire',
+    savingThrow: 'dex',
+    saveEffect: 'half',
+    blastRadius: 20,
+    aoeShape: 'cube',
+    desc: 'A storm of fire fills the area; each creature makes a DEX save, taking 7d10 fire on a failure or half on a success.',
+    rangeKind: 'ranged',
+    rangeFt: 150,
+    spellList: ['divine', 'primal', 'arcane'],
+  },
+  // SRD: Delayed Blast Fireball (L7) — a glowing bead detonates in a 20-ft
+  // sphere; DEX save for half of 12d6 fire (+1d6 per slot above 7th). RAW the
+  // bead can be delayed, gaining 1d6 per round; pansori detonates it on cast.
+  delayed_blast_fireball: {
+    id: 'delayed_blast_fireball',
+    name: 'Delayed Blast Fireball',
+    level: 7,
+    castTime: 'action',
+    damage: '12d6',
+    damageType: 'fire',
+    savingThrow: 'dex',
+    saveEffect: 'half',
+    upcastBonus: '1d6',
+    blastRadius: 20,
+    aoeShape: 'sphere',
+    desc: 'A glowing bead detonates in a 20-ft-radius sphere; each creature makes a DEX save, taking 12d6 fire on a failure or half on a success (+1d6 per slot above 7th). RAW the bead can be held to gather 1d6 per round; pansori detonates it on cast.',
+    rangeKind: 'ranged',
+    rangeFt: 150,
+    spellList: ['arcane'],
+  },
+  // SRD: Sunburst (L8) — brilliant light in a 60-ft sphere; CON save for half of
+  // 12d6 radiant. RAW a failed save also inflicts Blinded (1 min, save ends);
+  // the Blinded rider is deferred because pansori's AoE path resolves damage for
+  // all targets but applies a condition only to a single target — keeping the
+  // full-area damage is the better fidelity here. Also dispels magical Darkness.
+  sunburst: {
+    id: 'sunburst',
+    name: 'Sunburst',
+    level: 8,
+    castTime: 'action',
+    damage: '12d6',
+    damageType: 'radiant',
+    savingThrow: 'con',
+    saveEffect: 'half',
+    blastRadius: 60,
+    aoeShape: 'sphere',
+    desc: 'Brilliant sunlight flashes in a 60-ft-radius sphere (and dispels magical Darkness there); each creature makes a CON save, taking 12d6 radiant on a failure or half on a success. (RAW a failed save also Blinds for 1 minute; that rider is deferred so the full-area damage resolves.)',
+    rangeKind: 'ranged',
+    rangeFt: 150,
+    spellList: ['divine', 'primal', 'arcane'],
+  },
+  // SRD: Meteor Swarm (L9) — blazing orbs at four points; each creature in a
+  // 40-ft sphere makes a DEX save for half of 20d6 fire + 20d6 bludgeoning
+  // (dual damage, like Flame Strike / Ice Storm). Modeled as one blast.
+  meteor_swarm: {
+    id: 'meteor_swarm',
+    name: 'Meteor Swarm',
+    level: 9,
+    castTime: 'action',
+    damage: '20d6',
+    damageType: 'fire',
+    damage2: '20d6',
+    damageType2: 'bludgeoning',
+    savingThrow: 'dex',
+    saveEffect: 'half',
+    blastRadius: 40,
+    aoeShape: 'sphere',
+    desc: 'Blazing orbs plummet from the sky; each creature in the area makes a DEX save, taking 20d6 fire and 20d6 bludgeoning on a failure or half on a success. (RAW four separate spheres; pansori resolves one blast.)',
+    rangeKind: 'ranged',
+    rangeFt: 1000,
+    spellList: ['arcane'],
+  },
+  // SRD: Weird (L9) — illusory terrors in a 30-ft sphere; WIS save for half of
+  // 10d10 psychic (Concentration, up to 1 minute). RAW a failed save also
+  // inflicts Frightened (with recurring 5d10 psychic); that rider is deferred
+  // for the same AoE-path reason as Sunburst, keeping the full-area damage.
+  weird: {
+    id: 'weird',
+    name: 'Weird',
+    level: 9,
+    castTime: 'action',
+    damage: '10d10',
+    damageType: 'psychic',
+    savingThrow: 'wis',
+    saveEffect: 'half',
+    concentration: true,
+    durationRounds: 10,
+    blastRadius: 30,
+    aoeShape: 'sphere',
+    desc: 'Illusory terrors assail each chosen creature in a 30-ft-radius sphere: WIS save for half of 10d10 psychic (Concentration, up to 1 minute). (RAW a failed save also Frightens, with recurring psychic damage; that rider is deferred so the full-area damage resolves.)',
+    rangeKind: 'ranged',
+    rangeFt: 120,
+    spellList: ['arcane'],
+  },
 
   // ─── Defensive buffs ─────────────────────────────────────────────────
   stoneskin: {
