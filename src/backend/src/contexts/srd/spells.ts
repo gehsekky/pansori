@@ -2406,4 +2406,45 @@ export const SRD_SPELLS: Record<string, Spell> = {
     rangeFt: 120,
     spellList: ['arcane'],
   },
+
+  // ─── Defensive buffs ─────────────────────────────────────────────────
+  stoneskin: {
+    id: 'stoneskin',
+    name: 'Stoneskin',
+    level: 4,
+    castTime: 'action',
+    targetType: 'self_or_ally',
+    grantResistances: ['bludgeoning', 'piercing', 'slashing'],
+    concentration: true,
+    durationRounds: 600,
+    materialCost: 100,
+    rangeKind: 'touch',
+    desc: 'A willing creature you touch gains Resistance to bludgeoning, piercing, and slashing damage until the spell ends (Concentration). Consumes 100 gp of diamond dust.',
+    narratives: {
+      cast: [
+        "{name}'s skin hardens like stone — {spell} turns aside blade and bludgeon",
+        '{name} rubs diamond dust over {target}; their flesh takes on a granite sheen',
+      ],
+    },
+    spellList: ['primal', 'arcane'],
+  },
+  false_life: {
+    id: 'false_life',
+    name: 'False Life',
+    level: 1,
+    castTime: 'action',
+    targetType: 'self',
+    // RAW 2d4 + 4; pansori grants a fixed value at the average (the buff path
+    // takes a number, not a dice roll). The +5/slot upcast isn't modeled.
+    tempHpGrant: 9,
+    rangeKind: 'self',
+    desc: 'A necromantic glimmer of life wards you, granting temporary Hit Points (RAW 2d4 + 4; pansori grants a fixed 9).',
+    narratives: {
+      cast: [
+        '{name} siphons a flicker of unlife — a grey aura hardens into temporary vigor',
+        '{name} whispers {spell}; a cold resilience settles over them',
+      ],
+    },
+    spellList: ['arcane'],
+  },
 };

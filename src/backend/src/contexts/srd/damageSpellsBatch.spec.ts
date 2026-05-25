@@ -4,7 +4,7 @@
 // damage through the real cast path.
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { makeChar, makeState, mockRandom } from '../../test-fixtures.js';
+import { makeChar, makeState } from '../../test-fixtures.js';
 import { SRD_SPELLS } from './spells.js';
 import type { Seed } from '../../types.js';
 import { context as ctx } from '../sandbox.js';
@@ -85,7 +85,7 @@ function casterState() {
 describe('damage-spell batch — resolves and deals damage', () => {
   for (const s of BATCH) {
     it(`${s.id} damages the target on a failed save`, async () => {
-      mockRandom(0.01); // enemy rolls ~1 on its save → fails → takes damage
+      vi.spyOn(Math, 'random').mockReturnValue(0.01); // enemy save rolls 1 → fails → takes damage
       const result = await takeAction({
         action: { type: 'cast_spell', spellId: s.id, slotLevel: s.level, targetEnemyId: ENEMY },
         history: [],

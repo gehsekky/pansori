@@ -604,6 +604,19 @@ export function breakConcentration(
   if (newSt.spell_walls?.some((w) => w.casterId === char.id)) {
     newSt = { ...newSt, spell_walls: newSt.spell_walls.filter((w) => w.casterId !== char.id) };
   }
+  // Buff-granted Resistance (Stoneskin / Protection from Energy) ends with its
+  // concentration. The grant can sit on the caster or a touched ally, so sweep
+  // every PC (MVP: one resistance buff active at a time). Only acts when the
+  // ended spell actually granted resistances.
+  const wasResistanceBuff =
+    !!context?.spellTable?.[char.concentrating_on.spellId]?.grantResistances?.length;
+  if (wasResistanceBuff) {
+    newChar = { ...newChar, spell_resistances: [] };
+    newSt = {
+      ...newSt,
+      characters: newSt.characters.map((c) => ({ ...c, spell_resistances: [] })),
+    };
+  }
   return { char: newChar, st: newSt };
 }
 
@@ -1204,6 +1217,10 @@ function computeEnemyAttack(
     // SRD Fiend Warlock Fiendish Resilience (L10) — Resistance to the chosen
     // damage type (cannot be Force; enforced at selection).
     const fiendishResist = !!enemy.damageType && char.fiendish_resilience === enemy.damageType;
+    // Buff-granted Resistance (Stoneskin → B/P/S, Protection from Energy → an
+    // element). Cleared when the granting spell's concentration ends.
+    const spellResist =
+      !!enemy.damageType && (char.spell_resistances ?? []).includes(enemy.damageType);
     const anyResist =
       isRaging ||
       isPetrified ||
@@ -1211,7 +1228,8 @@ function computeEnemyAttack(
       speciesResist ||
       superiorDefenseActive ||
       affinityResist ||
-      fiendishResist;
+      fiendishResist ||
+      spellResist;
     const postResistDmg = anyResist ? Math.ceil(result.damage / 2) : result.damage;
     const rageNote = isRaging ? ` (Rage resistance: ${result.damage}→${postResistDmg})` : '';
     const petrNote = isPetrified

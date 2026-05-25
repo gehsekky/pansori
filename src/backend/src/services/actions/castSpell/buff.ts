@@ -175,6 +175,25 @@ export function runBuffSpell(
     }
   }
 
+  // Resistance buff (Stoneskin → B/P/S, Protection from Energy → an element):
+  // grant the damage-type resistances to the target for the duration. Cleared
+  // when the spell's concentration ends (see breakConcentration).
+  if (spell.grantResistances && spell.grantResistances.length > 0) {
+    const types = spell.grantResistances;
+    if (isCasterTarget) {
+      char.spell_resistances = [...new Set([...(char.spell_resistances ?? []), ...types])];
+    } else {
+      ctx.st = {
+        ...ctx.st,
+        characters: ctx.st.characters.map((c) =>
+          c.id === buffTarget.id
+            ? { ...c, spell_resistances: [...new Set([...(c.spell_resistances ?? []), ...types])] }
+            : c
+        ),
+      };
+    }
+  }
+
   // 2024 PHB Fly + Levitate: set fly_speed_ft on the target. The
   // movement-mode pipeline (gridMove obstacle bypass + difficult-
   // terrain ignore) keys off this field. Concentration drop in
