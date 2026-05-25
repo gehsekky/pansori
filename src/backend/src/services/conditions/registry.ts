@@ -137,6 +137,10 @@ const defs: ConditionDef[] = [
     autoFailSaves: ['str', 'dex'],
   },
   { id: 'incapacitated', duration: 1 },
+  // SRD Thief Devious Strikes (Daze) — the target can take only one of move /
+  // action / bonus action on its next turn. pansori carries it as a marker for
+  // narrative + future enforcement (the per-turn restriction isn't gated yet).
+  { id: 'dazed', duration: 1 },
   { id: 'grappled', duration: 1, blocksMovement: true },
   // 2024 PHB Banishment — target removed from combat to a harmless
   // demiplane. Duration is concentration-linked (cleared by the

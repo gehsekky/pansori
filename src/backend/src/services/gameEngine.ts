@@ -3528,6 +3528,32 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         action: { type: 'use_class_feature', featureId: 'cunning_strike_disarm' },
         kind: 'class_feature',
       });
+      // SRD Devious Strikes (L14): Daze / Knock Out / Obscure.
+      if (getClassLevel(char, 'rogue') >= 14) {
+        choices.push({
+          label: 'Cunning Strike: Daze — CON save or dazed next turn (2 SA dice)',
+          action: { type: 'use_class_feature', featureId: 'cunning_strike_daze' },
+          kind: 'class_feature',
+        });
+        choices.push({
+          label: 'Cunning Strike: Knock Out — CON save or unconscious (6 SA dice)',
+          action: { type: 'use_class_feature', featureId: 'cunning_strike_knock_out' },
+          kind: 'class_feature',
+        });
+        choices.push({
+          label: 'Cunning Strike: Obscure — the target is blinded (3 SA dice)',
+          action: { type: 'use_class_feature', featureId: 'cunning_strike_obscure' },
+          kind: 'class_feature',
+        });
+      }
+      // SRD Supreme Sneak (Thief L9): Stealth Attack — keep your Hide.
+      if (char.subclass === 'thief' && getClassLevel(char, 'rogue') >= 9) {
+        choices.push({
+          label: 'Cunning Strike: Stealth Attack — stay hidden after the strike (1 SA die)',
+          action: { type: 'use_class_feature', featureId: 'cunning_strike_stealth_attack' },
+          kind: 'class_feature',
+        });
+      }
     }
 
     // Bard: Bardic Inspiration (bonus action)

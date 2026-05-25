@@ -10,6 +10,7 @@ import { hasSecondStoryWork, maxAttunement } from './multiclass.js';
 import type { ActionContext } from './actions/types.js';
 import { context as ctx } from '../contexts/sandbox.js';
 import { handleAttune } from './actions/inventory.js';
+import { handleRogueFeature } from './actions/classFeature/rogue.js';
 import { pcActor } from './actions/actor.js';
 
 afterEach(() => vi.restoreAllMocks());
@@ -150,5 +151,82 @@ describe('Use Magic Device (L13) — attune to four items', () => {
     handleAttune(c, { type: 'attune', instanceId: 'item-4' });
     expect(attCharOf(c).attuned_items ?? []).not.toContain('item-4');
     expect(c.narrative).toMatch(/only be attuned to 3/);
+  });
+});
+
+function rfCtx(char: Character): ActionContext {
+  return { actor: pcActor(char, 0), narrative: '' } as unknown as ActionContext;
+}
+
+describe('Devious Strikes (L14) + Supreme Sneak (L9) — Cunning Strike gating', () => {
+  it('Devious Strikes options require Rogue L14', () => {
+    const lo = rfCtx(thief({ level: 13 }));
+    handleRogueFeature(lo, 'cunning_strike_knock_out');
+    expect(attCharOf(lo).turn_actions.cunning_strike_pending).toBeUndefined();
+
+    const hi = rfCtx(thief({ level: 14 }));
+    handleRogueFeature(hi, 'cunning_strike_knock_out');
+    expect(attCharOf(hi).turn_actions.cunning_strike_pending).toBe('knock_out');
+  });
+
+  it('Stealth Attack requires a Thief L9', () => {
+    const lo = rfCtx(thief({ level: 8 }));
+    handleRogueFeature(lo, 'cunning_strike_stealth_attack');
+    expect(attCharOf(lo).turn_actions.cunning_strike_pending).toBeUndefined();
+
+    const hi = rfCtx(thief({ level: 9 }));
+    handleRogueFeature(hi, 'cunning_strike_stealth_attack');
+    expect(attCharOf(hi).turn_actions.cunning_strike_pending).toBe('stealth_attack');
+  });
+});
+
+// Obscure has no save — a Sneak Attack hit applies Blinded. Assert on the
+// narrative (the condition may tick off over the following enemy turn).
+function obscureState(): GameState {
+  const char = makeChar({
+    id: 'pc-1',
+    character_class: 'Rogue',
+    subclass: 'thief',
+    level: 14,
+    dex: 16,
+    equipped_weapon: 'dg-1',
+    inventory: [{ instance_id: 'dg-1', id: 'dagger', name: 'Dagger' }],
+    weapon_proficiencies: ['simple', 'martial'],
+    turn_actions: {
+      action_used: false,
+      bonus_action_used: false,
+      reaction_used: false,
+      free_interaction_used: false,
+      cunning_strike_pending: 'obscure',
+    },
+  });
+  return {
+    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    characters: [char],
+    active_character_id: 'pc-1',
+    initiative_order: [
+      { id: 'pc-1', roll: 18, is_enemy: false },
+      { id: ENEMY, roll: 5, is_enemy: true },
+    ],
+    initiative_idx: 0,
+    entities: [
+      { id: 'pc-1', isEnemy: false, pos: { x: 4, y: 5 }, hp: 30, maxHp: 30, conditions: [], condition_durations: {} },
+      { id: ENEMY, isEnemy: true, pos: { x: 5, y: 5 }, hp: 200, maxHp: 200, conditions: ['prone'], condition_durations: {} },
+    ],
+  } as unknown as GameState;
+}
+
+describe('Devious Strikes — Obscure on a Sneak Attack', () => {
+  it('a Sneak Attack hit applies the Obscure (Blinded) effect', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99); // advantage (prone) → hit + Sneak Attack
+    const r = await takeAction({
+      action: { type: 'attack', targetEnemyId: ENEMY },
+      history: [],
+      state: obscureState(),
+      seed,
+      context: ctx,
+    });
+    expect(r.narrative).toMatch(/Obscure/);
+    expect(r.narrative).toMatch(/blinded/i);
   });
 });
