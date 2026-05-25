@@ -71,6 +71,7 @@ export const ACTION_COSTS: Record<StructuredAction['type'], ActionCost> = {
   choose_metamagic: 'managed',
   choose_elemental_affinity: 'managed',
   choose_blessed_strikes: 'managed',
+  choose_divine_order: 'managed',
   // Lay on Hands self-manages its bonus-action cost (in combat only) so it
   // stays usable out of combat regardless of a lingering bonus_action_used.
   lay_on_hands: 'managed',

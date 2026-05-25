@@ -3056,6 +3056,33 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     }
   }
 
+  // ── Cleric Divine Order (L1) — Protector / Thaumaturge ─────────────────────
+  // One-time choice surfaced out of combat. Thaumaturge grants a concrete
+  // extra Cleric cantrip (the first learnable one) plus the Arcana/Religion
+  // bonus; RAW lets the player pick the cantrip — a dedicated pick is a
+  // follow-up. (RE-2.)
+  if (!state.combat_active && hasClass(char, 'cleric') && !char.divine_order) {
+    choices.push({
+      label: 'Divine Order: Protector (train with Martial weapons + Heavy armor)',
+      action: { type: 'choose_divine_order', option: 'protector' },
+    });
+    const knownSet = new Set(char.spells_known ?? []);
+    const extraCantrip = context.spellTable
+      ? Object.values(context.spellTable).find(
+          (s) =>
+            s.level === 0 &&
+            ((s as { spellList?: ReadonlyArray<string> }).spellList?.includes('divine') ?? false) &&
+            !knownSet.has(s.id)
+        )
+      : undefined;
+    choices.push({
+      label: extraCantrip
+        ? `Divine Order: Thaumaturge (learn ${extraCantrip.name}; +WIS to Arcana/Religion)`
+        : 'Divine Order: Thaumaturge (+WIS to Arcana/Religion checks)',
+      action: { type: 'choose_divine_order', option: 'thaumaturge', cantrip: extraCantrip?.id },
+    });
+  }
+
   // ── Cleric Blessed Strikes (L7) — Divine Strike / Potent Spellcasting ──────
   // One-time choice surfaced out of combat once the cleric reaches L7. (RE-2.)
   if (!state.combat_active && hasClass(char, 'cleric') && getClassLevel(char, 'cleric') >= 7 && !char.blessed_strikes) {

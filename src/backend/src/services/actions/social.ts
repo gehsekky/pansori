@@ -334,7 +334,13 @@ export const handleStudy: ActionHandler<{
   // Lucky feat — same pattern as Influence above.
   const studyLuckActive = consumeLuckForCheck(char);
   const d20 = studyLuckActive ? Math.max(rollDice('1d20'), rollDice('1d20')) : rollDice('1d20');
-  const total = d20 + intMod + profMod - reviveD20Penalty(char);
+  // SRD Cleric Divine Order (Thaumaturge) — add WIS (min +1) to Intelligence
+  // (Arcana/Religion) checks. `divine_order` is only ever set on a Cleric.
+  const thaumaturgeBonus =
+    char.divine_order === 'thaumaturge' && (skillName === 'arcana' || skillName === 'religion')
+      ? Math.max(1, abilityMod(char.wis))
+      : 0;
+  const total = d20 + intMod + profMod + thaumaturgeBonus - reviveD20Penalty(char);
   const success = total >= dc;
 
   const skillLabel = {

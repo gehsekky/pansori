@@ -718,6 +718,10 @@ export interface Character {
   // radiant on a weapon hit, once/turn) or Potent Spellcasting (+WIS to cantrip
   // damage). Improves at L14.
   blessed_strikes?: 'divine_strike' | 'potent_spellcasting';
+  // SRD Cleric Divine Order (L1) — the chosen sacred role. Protector grants
+  // Martial weapon + Heavy armor training; Thaumaturge knows an extra Cleric
+  // cantrip and adds WIS (min +1) to Intelligence (Arcana/Religion) checks.
+  divine_order?: 'protector' | 'thaumaturge';
   // SRD Multiattack Defense bookkeeping — enemy entity id → the combat round
   // in which that enemy hit this PC. While the stamp equals the current round,
   // that enemy's further attacks vs this PC roll with Disadvantage. The round

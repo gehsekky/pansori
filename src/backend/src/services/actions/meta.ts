@@ -236,6 +236,62 @@ export const handleChooseBlessedStrikes: ActionHandler<{
 };
 
 /**
+ * `choose_divine_order`: SRD Cleric (L1) — choose Protector (gain Martial
+ * weapon + Heavy armor training) or Thaumaturge (learn an extra Cleric cantrip
+ * via `cantrip` + add WIS, min +1, to Intelligence (Arcana/Religion) checks).
+ * Gated to a Cleric. Out-of-combat, no action cost. (RE-2.)
+ */
+export const handleChooseDivineOrder: ActionHandler<{
+  type: 'choose_divine_order';
+  option: 'protector' | 'thaumaturge';
+  cantrip?: string;
+}> = (ctx, action) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can choose Divine Order.' };
+  const { char } = ctx.actor;
+  if (!hasClass(char, 'cleric')) {
+    ctx.narrative = 'Only Clerics have Divine Order.';
+    return;
+  }
+  if (action.option === 'protector') {
+    const weapons = char.weapon_proficiencies.includes('martial')
+      ? char.weapon_proficiencies
+      : [...char.weapon_proficiencies, 'martial'];
+    const armor = char.armor_proficiencies.includes('heavy')
+      ? char.armor_proficiencies
+      : [...char.armor_proficiencies, 'heavy'];
+    updatePcActor(ctx, {
+      divine_order: 'protector',
+      weapon_proficiencies: weapons,
+      armor_proficiencies: armor,
+    });
+    ctx.narrative = `${char.name} takes the Protector order — trained with Martial weapons and Heavy armor.`;
+    return;
+  }
+  if (action.option === 'thaumaturge') {
+    let learned: string | undefined;
+    if (action.cantrip) {
+      const spell = ctx.context.spellTable?.[action.cantrip];
+      const isClericCantrip =
+        spell?.level === 0 &&
+        ((spell as { spellList?: ReadonlyArray<string> }).spellList?.includes('divine') ?? false);
+      if (!isClericCantrip) {
+        return { rejected: `${action.cantrip} isn't a Cleric cantrip.` };
+      }
+      if (!(char.spells_known ?? []).includes(action.cantrip)) learned = action.cantrip;
+    }
+    updatePcActor(ctx, {
+      divine_order: 'thaumaturge',
+      spells_known: learned ? [...(char.spells_known ?? []), learned] : char.spells_known,
+    });
+    ctx.narrative = learned
+      ? `${char.name} takes the Thaumaturge order — learns ${ctx.context.spellTable![action.cantrip!].name} and adds WIS to Arcana/Religion checks.`
+      : `${char.name} takes the Thaumaturge order — adds WIS to Arcana/Religion checks.`;
+    return;
+  }
+  return { rejected: `Unknown Divine Order option: ${action.option}.` };
+};
+
+/**
  * `choose_expertise`: pick a skill proficiency to gain Expertise in (double
  * proficiency bonus). Granted by Rogue (L1 + L6) and Bard (L2 + L9). Validates
  * that the skill is one the character is proficient in, isn't already an
