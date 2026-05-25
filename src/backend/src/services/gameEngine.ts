@@ -3682,6 +3682,40 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
           kind: 'class_feature',
         });
       }
+      // Open Hand Fleet Step (L11): a free Step of the Wind after a bonus action.
+      if (
+        char.subclass === 'open_hand' &&
+        monkLvl >= 11 &&
+        char.turn_actions.bonus_action_used &&
+        !char.turn_actions.fleet_step_used
+      ) {
+        choices.push({
+          label: 'Fleet Step — free Step of the Wind (Dash + Disengage)',
+          action: { type: 'use_class_feature', featureId: 'fleet_step_dash' },
+          kind: 'class_feature',
+        });
+      }
+      // Open Hand Quivering Palm (L17): set lethal vibrations after an unarmed hit.
+      if (char.subclass === 'open_hand' && monkLvl >= 17 && enemyAlive && kiLeft >= 4) {
+        choices.push({
+          label: `Quivering Palm — set lethal vibrations after an unarmed hit (4 Focus, ${kiLeft} left)`,
+          action: { type: 'use_class_feature', featureId: 'quivering_palm' },
+          kind: 'class_feature',
+        });
+      }
+      // Open Hand Quivering Palm — detonate the marked creature (an action).
+      if (
+        char.subclass === 'open_hand' &&
+        monkLvl >= 17 &&
+        char.quivering_palm_target &&
+        !char.turn_actions.action_used
+      ) {
+        choices.push({
+          label: 'Quivering Palm — detonate (action): 10d12 force, CON save for half',
+          action: { type: 'use_class_feature', featureId: 'quivering_palm_detonate' },
+          kind: 'class_feature',
+        });
+      }
     }
     // SRD Warrior of the Open Hand Wholeness of Body (L6): bonus-action
     // self-heal, WIS-mod uses per long rest. Usable in and out of combat
