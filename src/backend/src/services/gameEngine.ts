@@ -1950,6 +1950,27 @@ export function splitEncounterXp(
  *   - Multiclass prof grants when this is the **first** level in a
  *     non-primary class (`applyMulticlassProfGrants`).
  */
+// SRD Draconic Sorcery — Draconic Spells: always-prepared spells gained at
+// sorcerer levels 3/5/7/9. pansori casts from `spells_known`, so they're merged
+// in (idempotent) on subclass-select + level-up. Only the spells pansori has
+// today are listed; higher tiers (Command, Dragon's Breath, Alter Self, Arcane
+// Eye, Charm Monster, Legend Lore, Summon Dragon) await spell content.
+const DRACONIC_SPELL_TABLE: Array<{ level: number; spells: string[] }> = [
+  { level: 3, spells: ['chromatic_orb'] },
+  { level: 5, spells: ['fear', 'fly'] },
+];
+
+/** Returns `char.spells_known` with the Draconic always-prepared spells the
+ *  sorcerer's level grants merged in (a Draconic Sorcerer; idempotent). */
+export function mergeDraconicSpells(char: Character): string[] {
+  const lvl = getClassLevel(char, 'sorcerer');
+  const known = new Set(char.spells_known ?? []);
+  for (const tier of DRACONIC_SPELL_TABLE) {
+    if (lvl >= tier.level) tier.spells.forEach((s) => known.add(s));
+  }
+  return [...known];
+}
+
 export function applyLevelUpForClass(char: Character, className: string, context: Context): string {
   const cls = className.toLowerCase();
   // Backfill class_levels for legacy single-class fixtures that skip
@@ -2048,6 +2069,13 @@ export function applyLevelUpForClass(char: Character, className: string, context
     known.add('power_word_kill');
     if (known.size > before) char.spells_known = [...known];
     out += ` ✨ Words of Creation! ${char.name} always has Power Word Heal and Power Word Kill prepared.`;
+  }
+
+  // SRD Draconic Sorcery — gain newly-unlocked always-prepared Draconic spells.
+  if (cls === 'sorcerer' && char.subclass === 'draconic') {
+    const before = (char.spells_known ?? []).length;
+    char.spells_known = mergeDraconicSpells(char);
+    if (char.spells_known.length > before) out += ` 🐉 Draconic Spells expanded.`;
   }
 
   // First multiclass level: narrow proficiency grants per 2024 PHB.
