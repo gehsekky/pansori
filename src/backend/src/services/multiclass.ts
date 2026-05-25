@@ -604,6 +604,16 @@ export function potentSpellcastingBonus(char: Character, spell: { level?: number
     : 0;
 }
 
+/** SRD Improved Blessed Strikes (Cleric L14, Potent Spellcasting) — when a
+ *  Cleric cantrip deals damage, grant 2 × WIS mod Temporary Hit Points to
+ *  yourself or an ally. Returns the temp-HP amount (0 if the cleric hasn't
+ *  taken Potent Spellcasting, is below L14, or has a non-positive WIS mod). */
+export function improvedPotentTempHp(char: Character): number {
+  if (char.blessed_strikes !== 'potent_spellcasting') return 0;
+  if (getClassLevel(char, 'cleric') < 14) return 0;
+  return 2 * Math.max(0, abilityMod(char.wis));
+}
+
 export function hasDangerSense(char: Character): boolean {
   if (
     (char.conditions ?? []).some((c) =>
