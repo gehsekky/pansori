@@ -140,6 +140,33 @@ export function runPrecast(
   }
   ctx.overchannel = useOverchannel;
 
+  // SRD Wizard Spell Mastery (L18) — a designated L1/L2 action spell is cast at
+  // its base level without a slot (the bonus cast; upcasting still needs one).
+  let usedSpellMastery = false;
+  if (spell.level > 0 && !isRitualCast && slotLevel === spell.level) {
+    if (
+      (spell.level === 1 && pc.char.spell_mastery_l1 === spellId) ||
+      (spell.level === 2 && pc.char.spell_mastery_l2 === spellId)
+    ) {
+      usedSpellMastery = true;
+    }
+  }
+  // SRD Wizard Signature Spells (L20) — a designated L3 spell is cast once at
+  // level 3 without a slot, recharging on a short/long rest.
+  let usedSignature = false;
+  if (
+    spell.level === 3 &&
+    !isRitualCast &&
+    slotLevel === 3 &&
+    (pc.char.signature_spells ?? []).includes(spellId)
+  ) {
+    const sigKey = `signature_used_${spellId}`;
+    if ((pc.char.class_resource_uses?.[sigKey] ?? 0) === 0) {
+      pc.char.class_resource_uses = { ...(pc.char.class_resource_uses ?? {}), [sigKey]: 1 };
+      usedSignature = true;
+    }
+  }
+
   // Long-cast spells (1 minute+, e.g. Animate Dead) can't be cast in
   // combat. Gated before slot spend so an in-combat attempt doesn't
   // waste a slot.
@@ -210,9 +237,16 @@ export function runPrecast(
     }
   }
 
-  // Expend a slot for non-cantrips (unless ritual, Magic-Initiate free cast,
-  // or Divine Intervention — the latter two cast without a slot)
-  if (spell.level > 0 && !isRitualCast && !usedMagicInitiateFree && !usedDivineIntervention) {
+  // Expend a slot for non-cantrips (unless ritual, or a slot-free cast —
+  // Magic Initiate, Divine Intervention, Spell Mastery, Signature Spell)
+  if (
+    spell.level > 0 &&
+    !isRitualCast &&
+    !usedMagicInitiateFree &&
+    !usedDivineIntervention &&
+    !usedSpellMastery &&
+    !usedSignature
+  ) {
     if (slotLevel < spell.level) {
       ctx.narrative = `${spell.name} requires at least a level-${spell.level} slot.`;
       return { done: true };
@@ -325,9 +359,13 @@ export function runPrecast(
   const castingScore = (pc.char[castingAbility] ?? 10) as number;
   const slotNote = usedDivineIntervention
     ? ' (Divine Intervention)'
-    : spell.level > 0
-      ? ` (level-${slotLevel} slot)`
-      : ' (cantrip)';
+    : usedSpellMastery
+      ? ' (Spell Mastery)'
+      : usedSignature
+        ? ' (Signature Spell)'
+        : spell.level > 0
+          ? ` (level-${slotLevel} slot)`
+          : ' (cantrip)';
   // SRD Sorcerer Innate Sorcery (L1): +1 spell save DC while active.
   const innateDcBonus = pc.char.conditions.includes('innate_sorcery') ? 1 : 0;
   const dc = spellSaveDC(pc.char.level, castingScore) + innateDcBonus;
@@ -339,7 +377,7 @@ export function runPrecast(
     slotNote,
     dc,
     isRitualCast,
-    freeCast: usedDivineIntervention || usedMagicInitiateFree,
+    freeCast: usedDivineIntervention || usedMagicInitiateFree || usedSpellMastery || usedSignature,
   };
 }
 

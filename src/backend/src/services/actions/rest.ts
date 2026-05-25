@@ -152,6 +152,9 @@ export const handleShortRest: ActionHandler<{ type: 'short_rest' }> = (ctx) => {
     srUses.channel_divinity = cdLvl >= 6 ? 2 : 1;
   }
   delete srUses.colossus_slayer_used;
+  // SRD Wizard Signature Spells — each free L3 cast recharges on a short OR
+  // long rest. Keys are `signature_used_<spellId>`.
+  for (const k of Object.keys(srUses)) if (k.startsWith('signature_used_')) delete srUses[k];
   if (hasClass(next, 'rogue')) delete srUses.stroke_of_luck; // Stroke of Luck — short OR long rest
   if (hasClass(next, 'barbarian')) delete srUses.relentless_rage_used; // Relentless Rage DC resets to 10
   if (hasClass(next, 'warlock')) {
@@ -234,6 +237,10 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
     delete restoredUses.wholeness_of_body_used; // Monk Open Hand Wholeness of Body refreshes on a long rest
     delete restoredUses.divine_intervention_used; // Cleric Divine Intervention available again after a long rest
     delete restoredUses.overchannel_uses; // Evoker Overchannel — free first use resets after a long rest
+    // Wizard Signature Spells — free L3 casts recharge on a long rest too.
+    for (const k of Object.keys(restoredUses)) {
+      if (k.startsWith('signature_used_')) delete restoredUses[k];
+    }
     const newExhaustion = Math.max(0, (c.exhaustion_level ?? 0) - 1);
     const humanGrant = c.species === 'human';
     if (c.species === 'orc') delete restoredUses.relentless_endurance_used;
