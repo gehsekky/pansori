@@ -4,9 +4,9 @@
 
 import type { Character, Enemy, GameState, Seed } from '../types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { baseSandboxSeed, makeChar, makeState } from '../test-fixtures.js';
-import { generateChoices, takeAction } from './gameEngine.js';
+import { applyLevelUpForClass, takeAction } from './gameEngine.js';
 import { hasSecondStoryWork, maxAttunement } from './multiclass.js';
+import { makeChar, makeState } from '../test-fixtures.js';
 import type { ActionContext } from './actions/types.js';
 import { context as ctx } from '../contexts/sandbox.js';
 import { handleAttune } from './actions/inventory.js';
@@ -16,17 +16,13 @@ import { pcActor } from './actions/actor.js';
 afterEach(() => vi.restoreAllMocks());
 
 describe('Rogue subclass is Thief (SRD), not Assassin', () => {
-  it('offers the Thief subclass choice to a Rogue L3 out of combat', () => {
-    const rogue = makeChar({ id: 'pc-1', character_class: 'Rogue', level: 3 });
-    const state = makeState({}, { characters: [rogue], active_character_id: 'pc-1' });
-    const subclassChoices = generateChoices(state, baseSandboxSeed, ctx).filter(
-      (c) => c.action.type === 'select_subclass'
-    );
-    const picks = subclassChoices.map((c) =>
-      c.action.type === 'select_subclass' ? c.action.subclass : ''
-    );
-    expect(picks).toContain('thief');
-    expect(picks).not.toContain('assassin');
+  it('auto-assigns the Thief subclass (never Assassin) when a Rogue reaches level 3', () => {
+    const rogue = makeChar({ id: 'pc-1', character_class: 'Rogue', level: 2 });
+    const note = applyLevelUpForClass(rogue, 'Rogue', ctx);
+    expect(rogue.level).toBe(3);
+    expect(rogue.subclass).toBe('thief');
+    expect(rogue.subclass).not.toBe('assassin');
+    expect(note).toMatch(/thief/i);
   });
 });
 

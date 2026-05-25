@@ -44,7 +44,12 @@ import type {
   TurnActions,
 } from '../types.js';
 import { type ActionContext, dispatchAction } from './actions/index.js';
-import { BEAST_FORMS, SRD_SPECIES, availableBeastForms } from '../contexts/srd/index.js';
+import {
+  BEAST_FORMS,
+  SRD_SPECIES,
+  SRD_SUBCLASS_FOR_CLASS,
+  availableBeastForms,
+} from '../contexts/srd/index.js';
 import {
   DEFAULT_SPEED_FEET,
   SQUARE_SIZE,
@@ -2160,6 +2165,29 @@ export function mergeDraconicSpells(char: Character): string[] {
   return [...known];
 }
 
+/**
+ * Assign a subclass to a character (mutates in place) and return the narrative
+ * note. SRD 5.2.1 gives each class exactly one subclass, so this is normally
+ * auto-applied at level 3 by `applyLevelUpForClass` — no player choice. Shared
+ * with the `select_subclass` handler (used by tests / FE). Applies the Draconic
+ * Sorcerer side effects (retroactive Draconic Resilience HP + always-prepared
+ * Draconic spells) since those are subclass-on-pick effects.
+ */
+export function applySubclass(char: Character, subclassId: string): string {
+  char.subclass = subclassId;
+  let note = ` ${char.name} follows the path of the ${subclassId.replace(/_/g, ' ')}!`;
+  if (subclassId === 'draconic' && hasClass(char, 'sorcerer')) {
+    const sorcLvl = getClassLevel(char, 'sorcerer');
+    char.max_hp += sorcLvl;
+    char.hp += sorcLvl;
+    note += ` Draconic Resilience: +${sorcLvl} max HP (now ${char.hp}/${char.max_hp}).`;
+    const before = (char.spells_known ?? []).length;
+    char.spells_known = mergeDraconicSpells(char);
+    if ((char.spells_known?.length ?? 0) > before) note += ` 🐉 Draconic Spells added.`;
+  }
+  return note;
+}
+
 export function applyLevelUpForClass(char: Character, className: string, context: Context): string {
   const cls = className.toLowerCase();
   // Backfill class_levels for legacy single-class fixtures that skip
@@ -2271,6 +2299,17 @@ export function applyLevelUpForClass(char: Character, className: string, context
   if (isFirstLevelInClass && cls !== char.character_class.toLowerCase()) {
     const profNote = applyMulticlassProfGrants(char, cls);
     if (profNote) out += profNote;
+  }
+
+  // SRD 5.2.1 subclass — every class gains its single iconic subclass at
+  // level 3. Since there's exactly one option, auto-assign it the moment the
+  // primary class reaches L3 rather than surfacing a one-item choice. (Must
+  // run AFTER the HP roll above so Draconic Resilience is applied retroactively
+  // by applySubclass, not double-counted in this level's roll.)
+  const primaryCls = char.character_class.toLowerCase();
+  if (!char.subclass && (char.class_levels[primaryCls] ?? 0) >= 3) {
+    const sub = SRD_SUBCLASS_FOR_CLASS[primaryCls];
+    if (sub) out += applySubclass(char, sub);
   }
 
   return out;
@@ -3116,57 +3155,10 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     });
   }
 
-  // ── Subclass selection ─────────────────────────────────────────────────────
-  if (!char.subclass) {
-    const cls = char.character_class.toLowerCase();
-    // SRD 5.2.1 standardized EVERY class's subclass choice to level 3 (the
-    // 2014 PHB granted Cleric/Sorcerer/Warlock at L1 and Druid/Wizard at L2;
-    // the 2024 rules moved them all to L3 — verified against the class tables
-    // in docs/srd-5.2.1.txt, e.g. "3 +2 Cleric Subclass"). The map is kept
-    // explicit for readability even though every value is now 3.
-    const subclassLevels: Record<string, number> = {
-      fighter: 3,
-      rogue: 3,
-      wizard: 3,
-      cleric: 3,
-      ranger: 3,
-      paladin: 3,
-      bard: 3,
-      druid: 3,
-      sorcerer: 3,
-      warlock: 3,
-      monk: 3,
-      barbarian: 3,
-    };
-    const subclassChoices: Record<string, string[]> = {
-      fighter: ['champion'],
-      rogue: ['thief'],
-      wizard: ['evoker'],
-      cleric: ['life'],
-      ranger: ['hunter'],
-      paladin: ['devotion'],
-      bard: ['lore'],
-      sorcerer: ['draconic'],
-      warlock: ['fiend'],
-      druid: ['land'],
-      monk: ['open_hand'],
-      barbarian: ['berserker'],
-    };
-    const reqLevel = subclassLevels[cls] ?? 3;
-    // RAW: subclass is acquired at level-up (a long-rest milestone), not as an
-    // in-combat action. Gating to !combat_active keeps the pick from getting
-    // caught in the post-action auto-advance and from looking like it costs
-    // an action.
-    if (!state.combat_active && char.level >= reqLevel && subclassChoices[cls]) {
-      for (const sc of subclassChoices[cls]) {
-        if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
-        choices.push({
-          label: `Choose subclass: ${sc.replace(/_/g, ' ')}`,
-          action: { type: 'select_subclass', subclass: sc },
-        });
-      }
-    }
-  }
+  // ── Subclass ────────────────────────────────────────────────────────────────
+  // No player choice: SRD 5.2.1 gives each class one subclass, auto-assigned at
+  // level 3 by `applyLevelUpForClass` (see `applySubclass`). The `select_subclass`
+  // action still exists for tests / explicit assignment, but it's not surfaced.
 
   // ── Fighting Style picks (Fighter L1/L7, Paladin/Ranger L2) ────────────────
   // RAW level-up choices, surfaced out of combat like subclass. (RE-2.)
