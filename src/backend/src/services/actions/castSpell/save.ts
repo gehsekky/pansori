@@ -17,7 +17,12 @@ import {
   splitEncounterXp,
 } from '../../gameEngine.js';
 import { concentrationRoundsFor, pickCastPrefix } from './utils.js';
-import { elementalAffinityBonus, improvedPotentTempHp, potentSpellcastingBonus } from '../../multiclass.js';
+import {
+  elementalAffinityBonus,
+  hasPotentCantrip,
+  improvedPotentTempHp,
+  potentSpellcastingBonus,
+} from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import { composeNow } from '../../narrative/compose.js';
 import { coverBonus } from '../../gridEngine.js';
@@ -108,7 +113,17 @@ export function runSaveSpell(
         : rollDice(saveDmgExpr || spell.damage)) +
       elementalAffinityBonus(char, spell.damageType) +
       potentSpellcastingBonus(char, spell);
-    spellDmg = saveFailed ? fullDmg : spell.saveEffect === 'half' ? Math.floor(fullDmg / 2) : 0;
+    // SRD Evoker Potent Cantrip (L3) — a damaging cantrip deals half damage
+    // even on a successful save (upgrading a 'negates' cantrip to 'half').
+    const potentHalf = spell.level === 0 && hasPotentCantrip(char);
+    spellDmg = saveFailed
+      ? fullDmg
+      : spell.saveEffect === 'half' || potentHalf
+        ? Math.floor(fullDmg / 2)
+        : 0;
+    if (!saveFailed && potentHalf && spell.saveEffect !== 'half') {
+      ctx.narrative += ` ${fmt.note('[Potent Cantrip: half damage on a save]')}`;
+    }
     composeNow(ctx, {
       kind: 'spell_save_damage',
       attackerId: char.id,
