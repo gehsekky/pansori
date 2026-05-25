@@ -3,6 +3,7 @@ import type { ActionContext, ActionHandler } from './types.js';
 import { handleAcceptQuest, handleCompleteQuest } from './quest.js';
 import {
   handleApplyAsi,
+  handleChooseBlessedStrikes,
   handleChooseElementalAffinity,
   handleChooseExpertise,
   handleChooseFightingStyle,
@@ -84,6 +85,7 @@ const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   choose_hunter_option: handleChooseHunterOption as ActionHandler,
   choose_metamagic: handleChooseMetamagic as ActionHandler,
   choose_elemental_affinity: handleChooseElementalAffinity as ActionHandler,
+  choose_blessed_strikes: handleChooseBlessedStrikes as ActionHandler,
   lay_on_hands: handleLayOnHands as ActionHandler,
   set_active_character: handleSetActiveCharacter as ActionHandler,
   prepare_spells: handlePrepareSpells as ActionHandler,

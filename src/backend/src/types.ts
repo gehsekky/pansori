@@ -346,6 +346,9 @@ export interface TurnActions {
   // SRD Sorcerer Arcane Apotheosis (L20) — one Metamagic option per turn is free
   // while Innate Sorcery is active. Marks that the free use is spent this turn.
   metamagic_free_used?: boolean;
+  // SRD Cleric Divine Strike (Blessed Strikes) — the extra radiant/necrotic
+  // damage applies once per turn. Marks that this turn's strike is spent.
+  divine_strike_used?: boolean;
   // SRD Ranger Horde Breaker (Hunter's Prey option) — once per turn, an extra
   // weapon attack vs a different creature within 5 ft of the original target.
   // This marks the per-turn use.
@@ -711,6 +714,10 @@ export interface Character {
   // SRD Draconic Sorcery Elemental Affinity (L6) — the chosen damage type. The
   // sorcerer resists it and adds CHA to one damage roll of that type per spell.
   elemental_affinity?: 'acid' | 'cold' | 'fire' | 'lightning' | 'poison';
+  // SRD Cleric Blessed Strikes (L7) — the chosen option: Divine Strike (extra
+  // radiant on a weapon hit, once/turn) or Potent Spellcasting (+WIS to cantrip
+  // damage). Improves at L14.
+  blessed_strikes?: 'divine_strike' | 'potent_spellcasting';
   // SRD Multiattack Defense bookkeeping — enemy entity id → the combat round
   // in which that enemy hit this PC. While the stamp equals the current round,
   // that enemy's further attacks vs this PC roll with Disadvantage. The round

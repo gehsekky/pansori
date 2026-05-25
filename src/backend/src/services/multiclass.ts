@@ -585,6 +585,25 @@ export function elementalAffinityBonus(char: Character, damageType: string | und
     : 0;
 }
 
+/** SRD Cleric Blessed Strikes — Divine Strike: the extra-damage die on a weapon
+ *  hit (once/turn). '1d8' at Cleric L7, '2d8' at L14 (Improved); null if the
+ *  cleric didn't choose Divine Strike or is below L7. */
+export function divineStrikeDie(char: Character): string | null {
+  if (char.blessed_strikes !== 'divine_strike') return null;
+  const lvl = getClassLevel(char, 'cleric');
+  return lvl >= 14 ? '2d8' : lvl >= 7 ? '1d8' : null;
+}
+
+/** SRD Cleric Blessed Strikes — Potent Spellcasting: +WIS to Cleric cantrip
+ *  damage (Cleric L7+ who chose Potent Spellcasting). 0 otherwise. */
+export function potentSpellcastingBonus(char: Character, spell: { level?: number }): number {
+  return spell.level === 0 &&
+    char.blessed_strikes === 'potent_spellcasting' &&
+    getClassLevel(char, 'cleric') >= 7
+    ? Math.max(0, abilityMod(char.wis))
+    : 0;
+}
+
 export function hasDangerSense(char: Character): boolean {
   if (
     (char.conditions ?? []).some((c) =>

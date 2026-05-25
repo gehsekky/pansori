@@ -211,6 +211,31 @@ export const handleChooseElementalAffinity: ActionHandler<{
 };
 
 /**
+ * `choose_blessed_strikes`: SRD Cleric (L7) — choose Divine Strike (extra
+ * radiant/necrotic on a weapon hit, once/turn) or Potent Spellcasting (+WIS to
+ * Cleric cantrip damage). Gated to a Cleric L7+. Out-of-combat. (RE-2.)
+ */
+export const handleChooseBlessedStrikes: ActionHandler<{
+  type: 'choose_blessed_strikes';
+  option: 'divine_strike' | 'potent_spellcasting';
+}> = (ctx, action) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can choose Blessed Strikes.' };
+  const { char } = ctx.actor;
+  if (!hasClass(char, 'cleric') || getClassLevel(char, 'cleric') < 7) {
+    ctx.narrative = 'Blessed Strikes requires a Cleric of level 7.';
+    return;
+  }
+  if (action.option !== 'divine_strike' && action.option !== 'potent_spellcasting') {
+    return { rejected: `Unknown Blessed Strikes option: ${action.option}.` };
+  }
+  updatePcActor(ctx, { blessed_strikes: action.option });
+  ctx.narrative =
+    action.option === 'divine_strike'
+      ? `${char.name} channels Divine Strike — weapon hits deal extra radiant damage once per turn.`
+      : `${char.name} channels Potent Spellcasting — Cleric cantrips deal +WIS damage.`;
+};
+
+/**
  * `choose_expertise`: pick a skill proficiency to gain Expertise in (double
  * proficiency bonus). Granted by Rogue (L1 + L6) and Bard (L2 + L9). Validates
  * that the skill is one the character is proficient in, isn't already an

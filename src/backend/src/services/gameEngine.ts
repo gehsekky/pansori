@@ -3056,6 +3056,19 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     }
   }
 
+  // ── Cleric Blessed Strikes (L7) — Divine Strike / Potent Spellcasting ──────
+  // One-time choice surfaced out of combat once the cleric reaches L7. (RE-2.)
+  if (!state.combat_active && hasClass(char, 'cleric') && getClassLevel(char, 'cleric') >= 7 && !char.blessed_strikes) {
+    choices.push({
+      label: 'Blessed Strikes: Divine Strike (+1d8 radiant on a weapon hit, once/turn)',
+      action: { type: 'choose_blessed_strikes', option: 'divine_strike' },
+    });
+    choices.push({
+      label: 'Blessed Strikes: Potent Spellcasting (+WIS to Cleric cantrip damage)',
+      action: { type: 'choose_blessed_strikes', option: 'potent_spellcasting' },
+    });
+  }
+
   // ── Paladin Lay on Hands (L1) — bonus-action touch heal from the pool ──────
   // Works in combat (bonus action) and out of combat. One choice per injured
   // party member (including self). (RE-2.)

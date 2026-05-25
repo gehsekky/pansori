@@ -24,7 +24,7 @@ import {
   splitEncounterXp,
 } from '../../gameEngine.js';
 import { consumeStrokeOfLuck, strokeOfLuckAvailable } from '../../strokeOfLuck.js';
-import { extraAttackCountForChar, getClassLevel, hasClass } from '../../multiclass.js';
+import { divineStrikeDie, extraAttackCountForChar, getClassLevel, hasClass } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import type { ToHitContext } from './toHit.js';
 import { composeNow } from '../../narrative/compose.js';
@@ -439,6 +439,19 @@ export function resolveOneAttack(
     improvedSmiteDmg = isCrit ? rollCritical('1d8') : rollDice('1d8');
   }
 
+  // ── Cleric Divine Strike (Blessed Strikes, L7 / 2d8 at L14) ─────────────
+  // Once per turn, a weapon hit deals an extra 1d8 (2d8 at L14) radiant. Rides
+  // on top of the weapon multiplier like the Smite riders. Once-per-turn via
+  // turn_actions.divine_strike_used.
+  let divineStrikeDmg = 0;
+  const dsDie = divineStrikeDie(pc.char);
+  if (dsDie && weaponItem && atk.hit && !pc.char.turn_actions.divine_strike_used) {
+    divineStrikeDmg = isCrit ? rollCritical(dsDie) : rollDice(dsDie);
+    updatePcActor(ctx, {
+      turn_actions: { ...pc.char.turn_actions, divine_strike_used: true },
+    });
+  }
+
   // Brutal Strike +1d10 (weapon's damage type, so it rides inside rawDmg and
   // shares the weapon's resistance/vulnerability multiplier). Doubled on a crit
   // like the rest of the attack's dice. Plain d10 — GWF only rerolls the
@@ -460,7 +473,7 @@ export function resolveOneAttack(
   // resistant to the weapon's damage type still takes full radiant).
   // RAW radiant-resistant creatures would halve this too — TODO:
   // separate multiplier check for radiant.
-  const radiantRider = smiteDmg + improvedSmiteDmg;
+  const radiantRider = smiteDmg + improvedSmiteDmg + divineStrikeDmg;
   const totalDmg = finalDmg + radiantRider;
   const enemyEnt = ctx.st.entities?.find((e) => e.id === targetId && e.isEnemy);
   const curEnemyHp = enemyEnt?.hp ?? 0;
@@ -509,6 +522,9 @@ export function resolveOneAttack(
   if (improvedSmiteDmg > 0) {
     const expr = isCrit ? '2d8 (crit)' : '1d8';
     hitBonuses.push({ label: `Improved Divine Smite ${expr}: +${improvedSmiteDmg} radiant` });
+  }
+  if (divineStrikeDmg > 0) {
+    hitBonuses.push({ label: `Divine Strike ${dsDie}: +${divineStrikeDmg} radiant` });
   }
   composeNow(ctx, {
     kind: 'attack_hit',
