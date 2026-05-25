@@ -67,7 +67,7 @@ Grounded in a code survey + the full backend suite: **1572 tests across
 
 | Category | In pansori | SRD universe |
 |---|---|---|
-| Spells | **158** (26 cantrips + 132 leveled, through L9) | ~330 |
+| Spells | **166** (26 cantrips + 140 leveled, through L9) | ~330 |
 | Shared SRD monster pool | **12** (`SRD_MONSTERS`) + per-campaign templates | hundreds |
 | Species | 9 | 9 standalone + Drow lineage |
 | Classes | 12 | 12 |
@@ -85,7 +85,7 @@ backend features are waiting on, and a handful of **bounded subsystems**.
 
 ### Content breadth — data on existing patterns (RE-6)
 
-- [ ] **Spells** — ~158 / ~330 SRD. Most remaining categories are already
+- [ ] **Spells** — ~166 / ~330 SRD. Most remaining categories are already
       representable (data entry). Exceptions needing a model first: the
       alternate "summon" spells, each mechanically distinct from the
       stat-block ally model —

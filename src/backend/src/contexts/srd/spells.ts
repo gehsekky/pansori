@@ -2933,4 +2933,116 @@ export const SRD_SPELLS: Record<string, Spell> = {
       '{name} attunes to the wild — the nearest of its kind reveals itself to their senses.',
     spellList: ['arcane', 'primal'],
   },
+  // SRD: Fog Cloud (L1) — a 20-ft-radius sphere of fog that Heavily Obscures
+  // its area (Concentration, up to 1 hour). The area-obscurement isn't applied
+  // mechanically (pansori models obscurement at room scope); narrative.
+  fog_cloud: {
+    id: 'fog_cloud',
+    name: 'Fog Cloud',
+    level: 1,
+    castTime: 'action',
+    concentration: true,
+    durationRounds: 600,
+    rangeKind: 'ranged',
+    rangeFt: 120,
+    desc: 'A 20-ft-radius sphere of fog spreads around a point in range, Heavily Obscuring its area (Concentration, up to 1 hour). A wind disperses it.',
+    narrative: '{name} breathes out a roiling bank of fog that swallows the area from sight.',
+    spellList: ['primal', 'arcane'],
+  },
+  // SRD: Jump (L1) — a touched creature's jump distance triples for the
+  // duration. The grid jump action isn't buffed mechanically; narrative.
+  jump: {
+    id: 'jump',
+    name: 'Jump',
+    level: 1,
+    castTime: 'bonus_action',
+    rangeKind: 'touch',
+    desc: 'A willing creature you touch has its jump distance tripled for 1 minute.',
+    narrative: '{name} touches the leaper — their legs coil with sudden spring.',
+    spellList: ['primal', 'arcane'],
+  },
+  // SRD: Expeditious Retreat (L1) — lets you Dash as a Bonus Action each turn
+  // (Concentration, up to 10 minutes). The recurring Dash isn't wired; narrative.
+  expeditious_retreat: {
+    id: 'expeditious_retreat',
+    name: 'Expeditious Retreat',
+    level: 1,
+    castTime: 'bonus_action',
+    concentration: true,
+    durationRounds: 100,
+    rangeKind: 'self',
+    desc: 'You move with unnatural speed: take the Dash action as a Bonus Action this turn and on each of your turns until the spell ends (Concentration, up to 10 minutes).',
+    narrative: '{name} blurs into motion, fleet-footed beyond reason.',
+    spellList: ['arcane'],
+  },
+  // SRD: Spider Climb (L2) — a touched creature can climb walls and ceilings,
+  // hands free, gaining a Climb Speed (Concentration, up to 1 hour). The climb
+  // speed isn't granted as a movement mode mechanically; narrative.
+  spider_climb: {
+    id: 'spider_climb',
+    name: 'Spider Climb',
+    level: 2,
+    castTime: 'action',
+    concentration: true,
+    durationRounds: 600,
+    rangeKind: 'touch',
+    desc: 'A willing creature you touch can move up, down, and across vertical surfaces and ceilings while leaving its hands free, gaining a Climb Speed equal to its Speed (Concentration, up to 1 hour).',
+    narrative: "{name}'s touch lets the climber cling to sheer stone like a spider.",
+    spellList: ['arcane'],
+  },
+  // SRD: Darkvision (L2) — grants a willing creature Darkvision (150 ft) for
+  // 8 hours. Lighting is room-grained in pansori; narrative.
+  darkvision: {
+    id: 'darkvision',
+    name: 'Darkvision',
+    level: 2,
+    castTime: 'action',
+    rangeKind: 'touch',
+    desc: 'A willing creature you touch gains Darkvision out to 150 feet for 8 hours.',
+    narrative: "{name} anoints the creature's eyes — the dark resolves into shades of grey.",
+    spellList: ['primal', 'arcane'],
+  },
+  // SRD: Gaseous Form (L3) — a willing creature becomes a misty cloud that can
+  // seep through small gaps and gains a Fly Speed (Concentration, up to 1 hour).
+  // The form's movement/defenses aren't modeled; narrative.
+  gaseous_form: {
+    id: 'gaseous_form',
+    name: 'Gaseous Form',
+    level: 3,
+    castTime: 'action',
+    concentration: true,
+    durationRounds: 600,
+    rangeKind: 'touch',
+    desc: 'A willing creature you touch (and its gear) becomes a misty cloud that can pass through narrow gaps and has a Fly Speed of 10 ft, with Resistance to nonmagical damage (Concentration, up to 1 hour). It cannot attack or cast spells while gaseous.',
+    narrative: '{name} dissolves the target into a drifting bank of mist.',
+    spellList: ['arcane'],
+  },
+  // SRD: Clairvoyance (L3) — an invisible sensor at a known/visible location
+  // lets you see or hear there (Concentration, up to 10 minutes). The remote
+  // sensor isn't modeled mechanically; narrative.
+  clairvoyance: {
+    id: 'clairvoyance',
+    name: 'Clairvoyance',
+    level: 3,
+    castTime: 'action',
+    concentration: true,
+    durationRounds: 100,
+    rangeKind: 'self',
+    desc: 'You create an invisible sensor at a location you can picture or have seen, perceiving sight or sound there as if present (Concentration, up to 10 minutes). The remote-sensing link is not modeled mechanically.',
+    narrative: '{name} casts their senses outward — a distant place opens to sight and sound.',
+    spellList: ['arcane', 'divine'],
+  },
+  // SRD: Create Food and Water (L3) — conjures a day's food and water for up to
+  // ten people (or feed for mounts). Provisioning is narrative in pansori.
+  create_food_and_water: {
+    id: 'create_food_and_water',
+    name: 'Create Food and Water',
+    level: 3,
+    castTime: 'action',
+    rangeKind: 'ranged',
+    rangeFt: 30,
+    desc: 'You conjure 45 pounds of food and 30 gallons of water on the ground or in containers within range — enough to sustain up to ten people (or three mounts) for 24 hours.',
+    narrative: '{name} calls forth a spread of plain food and clean water from the air.',
+    spellList: ['divine'],
+  },
 };
