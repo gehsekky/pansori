@@ -177,7 +177,7 @@ export function runPrecast(
 
   // Spell preparation check (Cleric, Paladin, Druid). Multi-class
   // characters with ANY prep class are subject to prep enforcement.
-  const prepClasses = ['cleric', 'paladin', 'druid'];
+  const prepClasses = ['cleric', 'paladin', 'druid', 'wizard'];
   if (
     prepClasses.some((c) => hasClass(pc.char, c)) &&
     spell.level > 0 &&

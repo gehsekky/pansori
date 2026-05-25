@@ -10,6 +10,7 @@ import {
   handleChooseExpertise,
   handleChooseSignatureSpell,
   handleChooseSpellMastery,
+  handleMemorizeSpell,
 } from './actions/meta.js';
 import { makeChar, makeState } from '../test-fixtures.js';
 import { context as ctx } from '../contexts/sandbox.js';
@@ -43,6 +44,7 @@ function featCtx(char: Character) {
   return {
     actor: pcActor(char, 0),
     context: ctx,
+    st: { combat_active: false },
     narrative: '',
   } as unknown as Parameters<typeof handleChooseExpertise>[0];
 }
@@ -195,5 +197,41 @@ describe('Signature Spells (L20)', () => {
     const c = featCtx(makeChar({ id: 'pc-1', character_class: 'Wizard', level: 19, spells_known: ['fireball'] }));
     handleChooseSignatureSpell(c, { type: 'choose_signature_spell', spellId: 'fireball' });
     expect(pcChar(c).signature_spells ?? []).not.toContain('fireball');
+  });
+});
+
+describe('Memorize Spell (L5)', () => {
+  const studious = (over: Partial<Character> = {}) =>
+    makeChar({
+      id: 'pc-1',
+      character_class: 'Wizard',
+      level: 5,
+      spells_known: ['fireball', 'magic_missile', 'lightning_bolt'],
+      prepared_spells: ['fireball', 'magic_missile'],
+      ...over,
+    });
+
+  it('swaps a prepared spell for another from the spellbook', () => {
+    const c = featCtx(studious());
+    handleMemorizeSpell(c, { type: 'memorize_spell', swapOut: 'fireball', swapIn: 'lightning_bolt' });
+    expect(pcChar(c).prepared_spells).toEqual(['magic_missile', 'lightning_bolt']);
+  });
+
+  it('rejects swapping out a spell that is not prepared', () => {
+    const c = featCtx(studious());
+    const res = handleMemorizeSpell(c, { type: 'memorize_spell', swapOut: 'lightning_bolt', swapIn: 'magic_missile' });
+    expect(res).toEqual({ rejected: expect.stringMatching(/isn't one of your prepared spells/) });
+  });
+
+  it('rejects swapping in a spell not in the spellbook', () => {
+    const c = featCtx(studious({ spells_known: ['fireball', 'magic_missile'] }));
+    const res = handleMemorizeSpell(c, { type: 'memorize_spell', swapOut: 'fireball', swapIn: 'cone_of_cold' });
+    expect(res).toEqual({ rejected: expect.stringMatching(/isn't in your spellbook/) });
+  });
+
+  it('requires a Wizard of level 5', () => {
+    const c = featCtx(studious({ level: 4 }));
+    handleMemorizeSpell(c, { type: 'memorize_spell', swapOut: 'fireball', swapIn: 'lightning_bolt' });
+    expect(pcChar(c).prepared_spells).toEqual(['fireball', 'magic_missile']); // unchanged
   });
 });
