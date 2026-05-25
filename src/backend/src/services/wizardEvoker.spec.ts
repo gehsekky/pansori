@@ -145,3 +145,59 @@ describe('Empowered Evocation (L10) — +INT to one evocation damage roll', () =
     expect(hpEvoker).toBe(hpPlain); // no bonus yet
   });
 });
+
+// Fireball (20-ft sphere, DEX save) with an ally PC standing one square from
+// the target enemy — inside the blast.
+function sculptState(level: number): GameState {
+  const evoker = makeChar({
+    id: 'pc-1',
+    character_class: 'Wizard',
+    subclass: 'evoker',
+    level,
+    int: 16,
+    spells_known: ['fireball'],
+    spell_slots_max: { 3: 2 },
+    spell_slots_used: {},
+  });
+  const ally = makeChar({ id: 'pc-2', character_class: 'Fighter', level, hp: 40, max_hp: 40, dex: 10 });
+  return {
+    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    characters: [evoker, ally],
+    active_character_id: 'pc-1',
+    initiative_order: [
+      { id: 'pc-1', roll: 18, is_enemy: false },
+      { id: 'pc-2', roll: 12, is_enemy: false },
+      { id: ENEMY, roll: 5, is_enemy: true },
+    ],
+    initiative_idx: 0,
+    entities: [
+      { id: 'pc-1', isEnemy: false, pos: { x: 1, y: 1 }, hp: 25, maxHp: 25, conditions: [], condition_durations: {} },
+      { id: 'pc-2', isEnemy: false, pos: { x: 10, y: 11 }, hp: 40, maxHp: 40, conditions: [], condition_durations: {} },
+      { id: ENEMY, isEnemy: true, pos: { x: 10, y: 10 }, hp: 80, maxHp: 80, conditions: [], condition_durations: {} },
+    ],
+  } as unknown as GameState;
+}
+
+const castFireball = async (state: GameState) =>
+  takeAction({
+    action: { type: 'cast_spell', spellId: 'fireball', slotLevel: 3, targetEnemyId: ENEMY },
+    history: [],
+    state,
+    seed,
+    context: ctx,
+  });
+
+describe('Sculpt Spells (L6) — allies auto-succeed and take no damage', () => {
+  it('an ally in an Evoker L6 Fireball takes no damage', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const r = await castFireball(sculptState(6));
+    expect(r.newState.characters.find((c) => c.id === 'pc-2')!.hp).toBe(40);
+    expect(r.narrative).toMatch(/Sculpt Spells/);
+  });
+
+  it('is not available below Wizard L6 — the ally is caught in the blast', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const r = await castFireball(sculptState(5));
+    expect(r.newState.characters.find((c) => c.id === 'pc-2')!.hp).toBeLessThan(40);
+  });
+});

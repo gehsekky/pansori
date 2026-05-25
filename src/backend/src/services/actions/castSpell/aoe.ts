@@ -1,5 +1,6 @@
 import type { Character, Spell } from '../../../types.js';
 import {
+  abilityMod,
   applyDamageMultiplier,
   rollConditionSave,
   rollDice,
@@ -21,8 +22,8 @@ import {
   entitiesInLine,
   posEqual,
 } from '../../gridEngine.js';
+import { empoweredEvocationBonus, getClassLevel } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
-import { empoweredEvocationBonus } from '../../multiclass.js';
 import { fmt } from '../../narrativeFmt.js';
 
 /**
@@ -75,6 +76,14 @@ export function runAoeSpell(
             ? entitiesInLine(casterPos, epicenter, aoeBR, ctx.st.entities)
             : entitiesInBlast(epicenter, aoeBR, ctx.st.entities);
   const isEvoker = char.subclass === 'evoker';
+  // SRD Evoker Sculpt Spells (L6) — choose 1 + the spell's (slot) level
+  // creatures to auto-succeed their save and take no damage. Sorcerer
+  // Metamagic Careful Spell protects CHA-mod creatures. pansori auto-protects
+  // the first N allies in the blast, up to the larger of the two budgets.
+  const carefulActive = !!ctx.metamagic?.includes('careful');
+  const sculptCap = isEvoker && getClassLevel(char, 'wizard') >= 6 ? 1 + slotLevel : 0;
+  const carefulCap = carefulActive ? Math.max(1, abilityMod(char.cha)) : 0;
+  let protectBudget = Math.max(sculptCap, carefulCap);
   ctx.narrative += ` ${fmt.note(`[AOE ${aoeBR}ft ${aoeShape}]`)}`;
   for (const target of blastTargets) {
     if (target.id === char.id) continue;
@@ -142,10 +151,10 @@ export function runAoeSpell(
       }
     } else if (targetChar && !target.isEnemy) {
       // Allies in blast auto-succeed (and take no damage) via Evoker Sculpt
-      // Spells or Sorcerer Metamagic Careful Spell (pansori auto-protects all
-      // allies in the blast; RAW caps Careful at CHA-mod chosen creatures).
-      const carefulActive = !!ctx.metamagic?.includes('careful');
-      const autoSucceed = isEvoker || carefulActive;
+      // Spells or Sorcerer Metamagic Careful Spell, up to the protection
+      // budget computed above. Beyond the budget, allies roll normally.
+      const autoSucceed = protectBudget > 0;
+      if (autoSucceed) protectBudget -= 1;
       if (!autoSucceed && spell.saveEffect !== 'negates') {
         const allyScore = (targetChar[spell.savingThrow as keyof Character] as number) ?? 10;
         let allyCover = 0;
