@@ -702,6 +702,9 @@ export interface Character {
   //   Defensive Tactics (L7): 'escape_the_horde' | 'multiattack_defense'.
   hunters_prey?: 'colossus_slayer' | 'horde_breaker';
   defensive_tactics?: 'escape_the_horde' | 'multiattack_defense';
+  // SRD Sorcerer Metamagic — the option ids the sorcerer has learned (2 at L2,
+  // +2 at L10/L17). A metamagic must be known to be activated.
+  metamagics_known?: string[];
   // SRD Multiattack Defense bookkeeping — enemy entity id → the combat round
   // in which that enemy hit this PC. While the stamp equals the current round,
   // that enemy's further attacks vs this PC roll with Disadvantage. The round

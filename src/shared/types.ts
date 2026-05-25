@@ -351,6 +351,9 @@ export type StructuredAction =
   // Tactics L7): choose one of two options, swappable on a rest. Out-of-combat,
   // no action cost. (RE-2.)
   | { type: 'choose_hunter_option'; feature: 'hunters_prey' | 'defensive_tactics'; option: string }
+  // SRD 5.2.1 Sorcerer Metamagic option pick (learn one of the options; 2/4/6
+  // known at sorcerer L2/10/17). Out-of-combat, no action cost. (RE-2.)
+  | { type: 'choose_metamagic'; option: string }
   // SRD 5.2.1 Paladin Lay on Hands (L1): bonus-action touch heal drawing from
   // a pool of 5 × Paladin level HP. `targetCharId` is the healed party member
   // (may be the paladin). (RE-2.)

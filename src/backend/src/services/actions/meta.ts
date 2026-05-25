@@ -13,6 +13,9 @@ import {
   getClassLevel,
   hasClass,
   hunterFeatureOptions,
+  knowsMetamagic,
+  metamagicOptions,
+  metamagicSlots,
 } from '../multiclass.js';
 import type { AbilityKey } from '../../types.js';
 import type { ActionHandler } from './types.js';
@@ -148,6 +151,37 @@ export const handleChooseHunterOption: ActionHandler<{
       : { defensive_tactics: action.option as 'escape_the_horde' | 'multiattack_defense' }
   );
   ctx.narrative = `${char.name} adopts ${def.labels[action.option] ?? action.option}.`;
+};
+
+/**
+ * `choose_metamagic`: learn a Sorcerer Metamagic option. Validates the
+ * Sorcerer class + that a known-slot is open (2/4/6 at sorcerer L2/10/17) +
+ * the option id + no duplicate. Out-of-combat, no action cost. (RE-2.)
+ */
+export const handleChooseMetamagic: ActionHandler<{ type: 'choose_metamagic'; option: string }> = (
+  ctx,
+  action
+) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can learn Metamagic.' };
+  const { char } = ctx.actor;
+  if (!hasClass(char, 'sorcerer')) {
+    ctx.narrative = 'Only Sorcerers have Metamagic.';
+    return;
+  }
+  if (!metamagicOptions[action.option]) {
+    return { rejected: `Unknown Metamagic option: ${action.option}.` };
+  }
+  if (knowsMetamagic(char, action.option)) {
+    ctx.narrative = `You already know ${metamagicOptions[action.option].label}.`;
+    return;
+  }
+  const known = char.metamagics_known ?? [];
+  if (known.length >= metamagicSlots(char)) {
+    ctx.narrative = 'You have no Metamagic option to learn right now.';
+    return;
+  }
+  updatePcActor(ctx, { metamagics_known: [...known, action.option] });
+  ctx.narrative = `${char.name} learns ${metamagicOptions[action.option].label} Metamagic.`;
 };
 
 /**
