@@ -308,6 +308,10 @@ export interface TurnActions {
   // marks the reroll as already spent this turn so multi-hit turns
   // (Extra Attack, two-weapon) only benefit once.
   savage_attacker_used?: boolean;
+  // SRD Boon of Combat Prowess (epic) — Peerless Aim turns a miss into a hit
+  // once per turn. This flag marks it spent until the start of the next turn
+  // (reset via FRESH_TURN like the other per-turn riders).
+  peerless_aim_used?: boolean;
   // Sneak Attack (Rogue) — once per turn. Without this gate, a
   // multiclass Rogue with Extra Attack (Fighter/Ranger/Paladin/
   // Barbarian/Monk multiclass) or any Rogue using Two-Weapon
