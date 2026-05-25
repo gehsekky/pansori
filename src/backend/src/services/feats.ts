@@ -226,6 +226,37 @@ export function getFeat(featId: string, context: Context): Feat | undefined {
   return context.featTable?.[featId];
 }
 
+// ─── Epic Boon runtime helpers ───────────────────────────────────────────
+
+/** SRD Boon of Irresistible Offense (epic) — true when the PC holds the boon. */
+export function hasIrresistibleOffense(char: Character): boolean {
+  return (char.feats ?? []).includes('boon_irresistible_offense');
+}
+
+/**
+ * SRD Boon of Irresistible Offense — Overcome Defenses: the holder's
+ * bludgeoning, piercing, and slashing damage ignores Resistance. Returns true
+ * when the boon applies to this damage type.
+ */
+export function overcomeDefensesApplies(char: Character, damageType: string | undefined): boolean {
+  return (
+    hasIrresistibleOffense(char) &&
+    damageType !== undefined &&
+    ['bludgeoning', 'piercing', 'slashing'].includes(damageType)
+  );
+}
+
+/**
+ * SRD Boon of Irresistible Offense — Overwhelming Strike: on a natural 20, deal
+ * extra damage (same type as the attack) equal to the ability score the boon
+ * increased. Returns 0 when the boon isn't held or the d20 wasn't a 20.
+ */
+export function overwhelmingStrikeDamage(char: Character, naturalRoll: number): number {
+  if (!hasIrresistibleOffense(char) || naturalRoll !== 20) return 0;
+  const ab = char.feat_choices?.boon_irresistible_offense?.abilityBonus;
+  return ab ? (char[ab] ?? 10) : 0;
+}
+
 /**
  * Reset per-long-rest feat resources to their max values. Walks the
  * character's feats, looks each one up in the context's feat table,

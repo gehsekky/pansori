@@ -174,7 +174,10 @@ export const FRESH_TURN: TurnActions = {
 export function applyDamageMultiplier(
   raw: number,
   damageType: string | undefined,
-  enemy: { resistances?: string[]; vulnerabilities?: string[]; immunities?: string[] }
+  enemy: { resistances?: string[]; vulnerabilities?: string[]; immunities?: string[] },
+  // SRD Boon of Irresistible Offense (Overcome Defenses) sets this for B/P/S
+  // damage — Resistance is ignored, but Immunity and Vulnerability still apply.
+  opts?: { ignoreResistance?: boolean }
 ): { damage: number; note: string } {
   if (!damageType) return { damage: raw, note: '' };
   if (enemy.immunities?.includes(damageType))
@@ -182,7 +185,7 @@ export function applyDamageMultiplier(
   // SRD 5.2.1 p.17 — order is: adjustments → resistance → vulnerability.
   // If a creature has both (rare), resistance halves first then vulnerability
   // doubles → net unchanged.
-  const hasResist = enemy.resistances?.includes(damageType) ?? false;
+  const hasResist = (enemy.resistances?.includes(damageType) ?? false) && !opts?.ignoreResistance;
   const hasVuln = enemy.vulnerabilities?.includes(damageType) ?? false;
   let dmg = raw;
   const notes: string[] = [];

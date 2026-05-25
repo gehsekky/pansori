@@ -31,6 +31,7 @@ import {
   hasClass,
   peerlessSkillDie,
 } from '../../multiclass.js';
+import { overcomeDefensesApplies, overwhelmingStrikeDamage } from '../../feats.js';
 import type { ActionContext } from '../types.js';
 import type { ToHitContext } from './toHit.js';
 import { composeNow } from '../../narrative/compose.js';
@@ -485,16 +486,27 @@ export function resolveOneAttack(
   // weapon's own dice, not this feature rider.
   const brutalStrikeDmg =
     brutalStrikeApplies && atk.hit ? (isCrit ? rollCritical('1d10') : rollDice('1d10')) : 0;
-  const rawDmg = baseHit + sneakDmg + rageBonus + brutalStrikeDmg + huntersMarkDmg;
+  // SRD Boon of Irresistible Offense — Overwhelming Strike: on a natural 20,
+  // add flat extra damage (the attack's type) equal to the boosted ability
+  // score. Folded into rawDmg so it shares the weapon's damage type and its
+  // (Overcome-Defenses-adjusted) resistance treatment; it is not crit-doubled
+  // (the dice were already doubled above).
+  const overwhelmingStrikeDmg = atk.hit ? overwhelmingStrikeDamage(pc.char, atk.roll) : 0;
+  const rawDmg =
+    baseHit + sneakDmg + rageBonus + brutalStrikeDmg + huntersMarkDmg + overwhelmingStrikeDmg;
   // SRD Monk Empowered Strikes (L6) — unarmed strikes can deal Force damage.
   // pansori auto-picks Force (it bypasses most resistances); only when unarmed
   // (no weaponItem). Otherwise the weapon's own type stands.
   const empoweredStrikes = !weaponItem && getClassLevel(pc.char, 'monk') >= 6;
   const effectiveDamageType = weaponItem?.damageType ?? (empoweredStrikes ? 'force' : undefined);
+  // SRD Boon of Irresistible Offense — Overcome Defenses: B/P/S damage ignores
+  // Resistance (Immunity / Vulnerability still apply).
+  const overcomeResist = overcomeDefensesApplies(pc.char, effectiveDamageType);
   const { damage: finalDmg, note: dmgNote } = applyDamageMultiplier(
     rawDmg,
     effectiveDamageType,
-    target
+    target,
+    { ignoreResistance: overcomeResist }
   );
   // Radiant damage rides on top of the weapon multiplier (a creature
   // resistant to the weapon's damage type still takes full radiant).
@@ -534,6 +546,12 @@ export function resolveOneAttack(
     hitBonuses.push({
       label: `Brutal Strike ${isCrit ? '2d10 (crit)' : '1d10'}: +${brutalStrikeDmg}`,
     });
+  }
+  if (overwhelmingStrikeDmg > 0) {
+    hitBonuses.push({ label: `Overwhelming Strike (nat 20): +${overwhelmingStrikeDmg}` });
+  }
+  if (overcomeResist && (target.resistances ?? []).includes(effectiveDamageType ?? '')) {
+    hitBonuses.push({ label: `Overcome Defenses: ignores ${effectiveDamageType} Resistance` });
   }
   if (dmgNote) {
     // dmgNote arrives as " [resistant: 6 → 3]" — strip leading space and
