@@ -14,6 +14,7 @@ import {
 import type { ActionContext } from '../types.js';
 import type { Spell } from '../../../types.js';
 import { composeNow } from '../../narrative/compose.js';
+import { empoweredEvocationBonus } from '../../multiclass.js';
 import { pickCastPrefix } from './utils.js';
 
 /**
@@ -58,6 +59,10 @@ export function runMultiTargetSpell(
       : 0;
   const isAttackRollMulti = spell.id === 'eldritch_blast' || spell.id === 'scorching_ray';
   let totalDealt = 0;
+  // SRD Evoker Empowered Evocation — +INT to ONE damage roll of an Evocation
+  // spell (Magic Missile / Scorching Ray are Evocation). Applied to the first
+  // shot that lands, then cleared so it isn't added to every dart.
+  let empoweredBonus = empoweredEvocationBonus(char, spell);
   const lines: string[] = [];
   const hits: Array<{
     enemyId: string;
@@ -82,9 +87,11 @@ export function runMultiTargetSpell(
         lines.push(`${i + 1}: ${tgtEnemy.name} — MISS (${atkE.total} vs AC ${tgtEnemy.ac}).`);
         continue;
       }
-      const dmgRoll = atkE.critical
-        ? rollCritical(perShot) + agonizingBonusPerBeam
-        : rollDice(perShot) + agonizingBonusPerBeam;
+      const dmgRoll =
+        (atkE.critical ? rollCritical(perShot) : rollDice(perShot)) +
+        agonizingBonusPerBeam +
+        empoweredBonus;
+      empoweredBonus = 0;
       const { damage: effDmg, note } = applyDamageMultiplier(dmgRoll, spell.damageType, tgtEnemy);
       const newHp = Math.max(0, tgtEnt.hp - effDmg);
       ctx.st = {
@@ -114,7 +121,8 @@ export function runMultiTargetSpell(
       }
     } else {
       // Magic Missile — auto-hit, no attack roll.
-      const dmgRoll = rollDice(perShot);
+      const dmgRoll = rollDice(perShot) + empoweredBonus;
+      empoweredBonus = 0;
       const { damage: effDmg, note } = applyDamageMultiplier(dmgRoll, spell.damageType, tgtEnemy);
       const newHp = Math.max(0, tgtEnt.hp - effDmg);
       ctx.st = {

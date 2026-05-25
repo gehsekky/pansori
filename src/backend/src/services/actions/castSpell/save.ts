@@ -19,6 +19,7 @@ import {
 import { concentrationRoundsFor, pickCastPrefix } from './utils.js';
 import {
   elementalAffinityBonus,
+  empoweredEvocationBonus,
   hasPotentCantrip,
   improvedPotentTempHp,
   potentSpellcastingBonus,
@@ -112,7 +113,8 @@ export function runSaveSpell(
         ? rollDiceEmpowered(saveDmgExpr || spell.damage, Math.max(1, abilityMod(char.cha)))
         : rollDice(saveDmgExpr || spell.damage)) +
       elementalAffinityBonus(char, spell.damageType) +
-      potentSpellcastingBonus(char, spell);
+      potentSpellcastingBonus(char, spell) +
+      empoweredEvocationBonus(char, spell);
     // SRD Evoker Potent Cantrip (L3) — a damaging cantrip deals half damage
     // even on a successful save (upgrading a 'negates' cantrip to 'half').
     const potentHalf = spell.level === 0 && hasPotentCantrip(char);
