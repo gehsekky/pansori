@@ -25,6 +25,7 @@ import {
 } from '../services/rulesEngine.js';
 import { Request, Response, Router } from 'express';
 import { SRD_SPECIES, SRD_WEAPON_MASTERY_SLOTS } from '../contexts/srd/index.js';
+import { applyAbilityScoreIncreases, isValidForMethod } from '../services/abilityScores.js';
 import {
   applyConsequence,
   backfillOwnership,
@@ -254,6 +255,18 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
   if (!parsed) return;
   const { characters, context_id } = parsed;
 
+  // RE-3 — when a character declares how its `stats` were generated, validate
+  // the spread (point buy = all 8–15 totalling 27; standard array = a
+  // permutation of 15/14/13/12/10/8). 'manual'/omitted trusts the client.
+  for (const c of characters) {
+    if (c.stats && !isValidForMethod(c.stats, c.generation_method)) {
+      res.status(400).json({
+        error: `${c.name}'s ability scores are not a valid ${c.generation_method} spread.`,
+      });
+      return;
+    }
+  }
+
   const ctx = CONTEXTS[context_id ?? ''] ?? DEFAULT_CONTEXT;
   const seed = generateSeed(ctx, characters.length);
   const client = await pool.connect();
@@ -262,7 +275,7 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
 
     const hostUserId = authedUserId(req);
     const partyChars: Character[] = characters.map((c, _charIdx) => {
-      const base = c.stats
+      let base = c.stats
         ? {
             str: c.stats.str,
             dex: c.stats.dex,
@@ -273,6 +286,9 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
           }
         : { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 };
       const bg = ctx.backgrounds?.find((b) => b.id === c.background_id) ?? null;
+      // 2024 PHB — ability-score increases come from the background (the three
+      // listed abilities each get +1; the +2/+1 split is a deferred UI choice).
+      base = applyAbilityScoreIncreases(base, bg?.abilityScoreIncreases ?? []);
       const classSkills = ctx.classSkills?.[c.character_class] ?? [];
       // 2024 PHB species traits — speed, darkvision, resistances, innate
       // cantrips. Defaults to Human when missing/unknown.

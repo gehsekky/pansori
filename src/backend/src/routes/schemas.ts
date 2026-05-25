@@ -51,6 +51,9 @@ const CharacterInputSchema = z
     character_class: z.string().min(1).max(40),
     background_id: z.string().min(1).max(40).optional(),
     stats: StatsSchema.optional(),
+    // How `stats` were generated, so the server can validate the spread.
+    // Omitted (or 'manual') = trust the client (backward compatible).
+    generation_method: z.enum(['point_buy', 'standard_array', 'manual']).optional(),
     portrait_url: z.string().max(2048).optional(),
     subclass: z.string().min(1).max(40).optional(),
     species: z.string().min(1).max(40).optional(),
