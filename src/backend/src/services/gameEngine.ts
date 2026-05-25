@@ -3546,6 +3546,28 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     });
   }
 
+  // ── Draconic Sorcery: Dragon Wings (L14) ────────────────────────────────────
+  if (
+    char.subclass === 'draconic' &&
+    getClassLevel(char, 'sorcerer') >= 14 &&
+    !char.turn_actions.bonus_action_used &&
+    !char.fly_speed_ft
+  ) {
+    const dwUsed = char.class_resource_uses?.dragon_wings_used ?? 0;
+    const dwSp = char.class_resource_uses?.sorcery_points ?? getClassLevel(char, 'sorcerer');
+    if (dwUsed < 1 || dwSp >= 3) {
+      choices.push({
+        label:
+          dwUsed < 1
+            ? 'Dragon Wings — Fly Speed 60 ft (bonus action, 1/long rest)'
+            : `Dragon Wings — Fly Speed 60 ft (bonus action, 3 SP, ${dwSp} left)`,
+        action: { type: 'use_class_feature', featureId: 'dragon_wings' },
+        kind: 'class_feature',
+        requiresBonusAction: true,
+      });
+    }
+  }
+
   // ── Draconic Sorcery: Elemental Affinity (L6) ───────────────────────────────
   if (
     !state.combat_active &&
