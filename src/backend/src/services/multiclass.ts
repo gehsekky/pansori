@@ -542,8 +542,7 @@ export function hasSuperiorHuntersDefense(char: Character): boolean {
 /**
  * SRD Sorcerer Metamagic options the player can learn + use. Each maps the
  * short id (stored in `metamagics_known` and `metamagic_active`) to its label
- * and Sorcery-Point cost. (Twinned + Transmuted are deferred — not yet
- * functional — so they're excluded from the learnable list for now.) (RE-2.)
+ * and Sorcery-Point cost. All ten SRD options are present + functional. (RE-2.)
  */
 export const metamagicOptions: Record<string, { label: string; cost: number }> = {
   careful: { label: 'Careful Spell', cost: 1 },
@@ -555,6 +554,7 @@ export const metamagicOptions: Record<string, { label: string; cost: number }> =
   seeking: { label: 'Seeking Spell', cost: 1 },
   subtle: { label: 'Subtle Spell', cost: 1 },
   transmuted: { label: 'Transmuted Spell', cost: 1 },
+  twinned: { label: 'Twinned Spell', cost: 1 },
 };
 
 /** SRD Sorcerer Metamagic — number of options known: 2 at L2, +2 at L10, +2 at

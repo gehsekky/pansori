@@ -220,3 +220,42 @@ describe('Transmuted Spell — change damage type to dodge resistance', () => {
     expect(r.newState.entities?.find((e) => e.id === ENEMY)!.hp).toBe(57); // 60 - 3 (fire halved)
   });
 });
+
+const E2 = `${ctx.startRoomId}#1`;
+const twinSeed: Seed = {
+  ...seed(),
+  enemies: {
+    [ctx.startRoomId]: [
+      { id: ENEMY, name: 'A', hp: 60, ac: 12, damage: '1d4', toHit: 3, xp: 50 } as unknown as Enemy,
+      { id: E2, name: 'B', hp: 60, ac: 12, damage: '1d4', toHit: 3, xp: 50 } as unknown as Enemy,
+    ],
+  },
+};
+function twinState(): GameState {
+  const s = lowSorc();
+  s.entities = [
+    ...(s.entities ?? []),
+    { id: E2, isEnemy: true, pos: { x: 6, y: 5 }, hp: 60, maxHp: 60, conditions: [], condition_durations: {} },
+  ];
+  s.initiative_order = [...s.initiative_order, { id: E2, roll: 4, is_enemy: true }];
+  return s;
+}
+
+describe('Twinned Spell — strike a second creature', () => {
+  it('a single-target spell also hits a 2nd enemy', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.7); // d20 15 (hit), 1d10 → 8
+    const state = twinState();
+    state.metamagic_active = 'twinned';
+    const r = await takeAction({ action: { type: 'cast_spell', spellId: 'fire_bolt', slotLevel: 0, targetEnemyId: ENEMY }, history: [], state, seed: twinSeed, context: ctx });
+    expect(r.newState.entities?.find((e) => e.id === ENEMY)!.hp).toBeLessThan(60);
+    expect(r.newState.entities?.find((e) => e.id === E2)!.hp).toBeLessThan(60);
+    expect(r.narrative).toMatch(/Twinned Spell/);
+  });
+
+  it('control: without Twinned only the primary is hit', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.7);
+    const r = await takeAction({ action: { type: 'cast_spell', spellId: 'fire_bolt', slotLevel: 0, targetEnemyId: ENEMY }, history: [], state: twinState(), seed: twinSeed, context: ctx });
+    expect(r.newState.entities?.find((e) => e.id === ENEMY)!.hp).toBeLessThan(60);
+    expect(r.newState.entities?.find((e) => e.id === E2)!.hp).toBe(60); // untouched
+  });
+});

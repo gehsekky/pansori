@@ -262,6 +262,44 @@ export const handleCastSpell: ActionHandler<{
       ? { ...spell, damageType: transmutedDamageType(spellTarget, spell.damageType) }
       : spell;
 
+  // SRD Metamagic Twinned Spell — a single-target spell also strikes a second
+  // creature. Fully gated behind metamagic === 'twinned' so the normal cast
+  // path below is untouched. Resolves the spell against the primary AND a 2nd
+  // living enemy, each fully (a per-target miss doesn't skip the other).
+  // Doesn't apply to AoE spells (RAW: Twinned needs a single-target spell).
+  if (ctx.metamagic === 'twinned' && !spell.blastRadius) {
+    const resolveTwin = (tgt: Enemy, tgtId: string): void => {
+      let dmg = 0;
+      let hit = true;
+      if (spell.attackRoll) {
+        const r = runAttackRollSpell(ctx, tgt, dmgSpell, slotLevel, castingScore, slotNote);
+        if (r.done) return; // miss — fragment emitted, no damage to apply
+        dmg = r.spellDmg;
+        hit = r.spellHit;
+      } else if (spell.savingThrow) {
+        const r = runSaveSpell(ctx, tgt, tgtId, dmgSpell, slotLevel, slotNote, dc);
+        if (r.done) return; // condition-save path handled it inline
+        dmg = r.spellDmg;
+        hit = r.spellHit;
+      } else if (spell.damage) {
+        dmg = runAutoHitSpell(ctx, tgt, dmgSpell, slotLevel, slotNote).spellDmg;
+      }
+      if (dmg > 0 || hit) applySingleTargetDamage(ctx, tgt, tgtId, dmgSpell, dmg);
+    };
+    resolveTwin(spellTarget, spellTargetId);
+    const twin = ctx.livingEnemiesInRoom.find(
+      (e) =>
+        e.id !== spellTargetId &&
+        (ctx.st.entities?.find((en) => en.id === e.id && en.isEnemy)?.hp ?? 0) > 0
+    );
+    if (twin) {
+      ctx.narrative += ' [Twinned Spell]';
+      resolveTwin(twin, twin.id);
+    }
+    ctx.usedInitiative = true;
+    return;
+  }
+
   // Per-shape resolution. Each branch sets spellDmg + spellHit for
   // the AOE / single-target damage block. The save branch may return
   // done:true when the condition+damage path handles kill resolution
