@@ -670,7 +670,10 @@ Bonus(char, st)`: a creature within 10 ft of a conscious L6+ Paladin (the
       under architectural blockers.
 - [ ] **Line-of-sight / vision blocking by walls** — Bresenham LoS
       respecting obstacles (pairs with the FE grid-fog item).
-- [ ] **Massive-damage instant death** (single hit ≥ max HP).
+- [x] **Massive-damage instant death** (single hit ≥ max HP) — *done.*
+      `isMassiveDamageDeath` (gameEngine.ts) implements SRD 5.2.1 Massive
+      Damage (reduced to 0 with leftover ≥ HP max → dies outright, no death
+      saves) and is wired into the enemy-attack resolution path.
 
 #### RE-5: Condition + spellcasting fidelity (cleanups)
 

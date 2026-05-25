@@ -1,9 +1,9 @@
 import type { AbilityKey, Spell } from '../../../types.js';
+import { SQUARE_SIZE, distanceFeet, hasLineOfSight } from '../../gridEngine.js';
 import { d, hasArmorProficiency, rollDice, spellSaveDC } from '../../rulesEngine.js';
 import { getClassLevel, hasClass, resolveCastingAbility } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import { breakConcentration } from '../../gameEngine.js';
-import { distanceFeet } from '../../gridEngine.js';
 import { spellRecallKeepsSlot } from '../../feats.js';
 import { updatePcActor } from '../actor.js';
 
@@ -450,10 +450,20 @@ export function isSpellOutOfRange(
   const distant = !!ctx.metamagic?.includes('distant');
   const baseMaxFt = spell.rangeKind === 'touch' ? 5 : (spell.rangeFt ?? 0);
   const maxFt = distant ? (spell.rangeKind === 'touch' ? 30 : baseMaxFt * 2) : baseMaxFt;
-  if (distFt <= maxFt) return false;
+  // SRD line of sight — most offensive spells target "a creature you can see".
+  // A solid obstacle strictly between caster and target blocks the cast (the
+  // slot + action economy already spent are refunded below, same as range).
+  // Adjacent targets (distFt ≤ one square) are exempt, matching the attack
+  // path and coverBonus — a corner can't block a point-blank cast.
+  const blockedLoS =
+    distFt <= maxFt &&
+    distFt > SQUARE_SIZE &&
+    !hasLineOfSight(casterEnt.pos, targetEnt.pos, ctx.roomObstacleCells ?? []);
+  if (distFt <= maxFt && !blockedLoS) return false;
 
-  ctx.narrative =
-    spell.rangeKind === 'touch'
+  ctx.narrative = blockedLoS
+    ? `${spell.name} has no line of sight to the ${spellTargetName} — something solid blocks the way.`
+    : spell.rangeKind === 'touch'
       ? `${spell.name} requires a touch — the ${spellTargetName} is ${distFt} ft away.`
       : `${spell.name} is out of range (${distFt} ft to target, max ${maxFt} ft).`;
   // Refund the slot we just spent (free casts — Divine Intervention,
