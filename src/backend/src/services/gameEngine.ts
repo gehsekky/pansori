@@ -91,6 +91,7 @@ import {
   spellSlotsForChar,
 } from './multiclass.js';
 import { composeFragments, enemyAttackFragmentEvent } from './narrative/compose.js';
+import { consumeDarkOnesLuck, tryDarkOnesLuck } from './darkOnesOwnLuck.js';
 import { consumeIndomitable, indomitableBonus, tryIndomitableReroll } from './indomitable.js';
 import { consumeStrokeOfLuck, strokeOfLuckAvailable } from './strokeOfLuck.js';
 import { enemyActor, pcActor } from './actions/actor.js';
@@ -835,6 +836,9 @@ function conditionSavingThrow(
   luckConsumed: boolean;
   bardicInspirationConsumed: boolean;
   bardicRoll: number;
+  // SRD Fiend Warlock Dark One's Own Luck — set when the 1d10 rescued the save
+  // (optional: only the main resolution path sets it).
+  darkOnesLuckConsumed?: boolean;
   // SRD Bard Countercharm — id of the bard (self or ally within 30 ft) who
   // spent a Reaction to reroll this Charmed/Frightened save with Advantage.
   countercharmBardId?: string;
@@ -946,6 +950,29 @@ function conditionSavingThrow(
       strokeOfLuckConsumed = true;
     }
   }
+  // SRD Fiend Warlock Dark One's Own Luck — if the save still failed, add 1d10
+  // (modeled as a reroll with the DC lowered by the roll) when it rescues it.
+  let darkOnesLuckConsumed = false;
+  if (applied) {
+    const luck = tryDarkOnesLuck(char, () =>
+      !rollConditionSave(
+        effect.ability,
+        char[effect.ability] ?? 10,
+        dcAdjusted - rollDice('1d10'),
+        proficient,
+        char.level,
+        0,
+        char.conditions ?? [],
+        speciesAdv,
+        enc,
+        reviveD20Penalty(char)
+      )
+    );
+    if (luck.used && luck.saved) {
+      applied = false;
+      darkOnesLuckConsumed = true;
+    }
+  }
   // SRD Bard Countercharm — if a Charmed/Frightened save still failed, a Bard
   // L7+ within 30 ft (self or ally) with a Reaction available can make the save
   // be rerolled with Advantage. Auto-resolve (like Indomitable/Stroke of Luck):
@@ -988,6 +1015,7 @@ function conditionSavingThrow(
     bardicInspirationConsumed: !!biDie,
     bardicRoll,
     countercharmBardId,
+    darkOnesLuckConsumed,
   };
 }
 
@@ -1256,6 +1284,10 @@ function computeEnemyAttack(
       if (csResult.strokeOfLuckConsumed) {
         updatedChar = consumeStrokeOfLuck(updatedChar);
         narrative += ` ✦ Stroke of Luck — the save becomes a 20!`;
+      }
+      if (csResult.darkOnesLuckConsumed) {
+        updatedChar = consumeDarkOnesLuck(updatedChar);
+        narrative += ` ✦ Dark One's Own Luck — fate twists the save!`;
       }
       if (csResult.countercharmBardId) {
         const bardId = csResult.countercharmBardId;
