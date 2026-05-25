@@ -74,11 +74,13 @@ const grappledOrc = (ctx: ActionContext) =>
   ctx.st.entities?.find((e) => e.id === 'orc-1')?.conditions.includes('grappled');
 
 describe('Indomitable Might — grapple contest (integration)', () => {
-  // player d20 → 1 (raw 1 + 5 STR mod = 6); enemy d20 → 15. Without the floor
-  // the grapple fails (6 < 15); with it the total becomes STR 20 > 15.
+  // The grapple now resolves the enemy's d20 first (it's the skillCheck DC),
+  // then the player's. enemy d20 → 15; player d20 → 1 (raw total well under 15).
+  // Without the floor the grapple fails; with it the player's total becomes
+  // STR 20 > 15.
   function pinRolls() {
     const spy = vi.spyOn(Math, 'random').mockReturnValue(0.5);
-    spy.mockReturnValueOnce(0).mockReturnValueOnce(0.7);
+    spy.mockReturnValueOnce(0.7).mockReturnValueOnce(0);
   }
 
   it('a Barbarian L18 grapples on a roll that would otherwise lose', () => {
