@@ -8,6 +8,7 @@ import {
 import {
   applyPartyLevelUps,
   endCombatState,
+  getEnemyById,
   getItemData,
   isRoomCleared,
   splitEncounterXp,
@@ -160,6 +161,64 @@ export function handleBarbarianFeature(ctx: ActionContext, fid: string): boolean
         ? 'Forceful Blow (push 15 ft, then close in)'
         : 'Hamstring Blow (−15 ft Speed)';
     ctx.narrative = `${char.name} readies a Brutal Strike — ${label}. The next Strength melee attack forgoes advantage; on a hit it deals +1d10 and applies the effect.`;
+    return true;
+  }
+
+  if (fid === 'intimidating_presence') {
+    if (char.subclass !== 'berserker' || getClassLevel(char, 'barbarian') < 14) {
+      ctx.narrative = 'Intimidating Presence requires a Berserker of level 14.';
+      return true;
+    }
+    if (char.turn_actions.bonus_action_used) {
+      ctx.narrative = 'Bonus action already used this turn.';
+      return true;
+    }
+    // 1/long rest, or spend a Rage use to use it again.
+    const ipUsed = char.class_resource_uses?.intimidating_presence_used ?? 0;
+    const rageLeft =
+      char.class_resource_uses?.rage_uses ?? rageUsesMax(getClassLevel(char, 'barbarian'));
+    if (ipUsed > 0 && rageLeft <= 0) {
+      ctx.narrative =
+        'Intimidating Presence is spent — it returns after a long rest (or expend a Rage use).';
+      return true;
+    }
+    char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
+    char.class_resource_uses =
+      ipUsed === 0
+        ? { ...(char.class_resource_uses ?? {}), intimidating_presence_used: 1 }
+        : { ...(char.class_resource_uses ?? {}), rage_uses: rageLeft - 1 };
+    const ipDC = 8 + abilityMod(char.str) + profBonus(char.level);
+    const selfEntIP = ctx.st.entities?.find((e) => e.id === char.id);
+    const frightenedIds: string[] = [];
+    const ipLines: string[] = [];
+    for (const e of ctx.st.entities ?? []) {
+      if (!e.isEnemy || e.hp <= 0 || !selfEntIP) continue;
+      const dist = Math.max(Math.abs(e.pos.x - selfEntIP.pos.x), Math.abs(e.pos.y - selfEntIP.pos.y));
+      if (dist > 6) continue; // 30 ft = 6 squares
+      const enemyData = getEnemyById(ctx.seed, e.id);
+      const wisScore = (enemyData as unknown as Record<string, number>)?.wis ?? 10;
+      const save = rollDice('1d20') + abilityMod(wisScore);
+      if (save < ipDC) {
+        frightenedIds.push(e.id);
+        ipLines.push(`${enemyData?.name ?? 'enemy'}: WIS ${save} vs DC ${ipDC} — frightened!`);
+      } else {
+        ipLines.push(`${enemyData?.name ?? 'enemy'}: WIS ${save} vs DC ${ipDC} — resists.`);
+      }
+    }
+    if (frightenedIds.length > 0) {
+      ctx.st = {
+        ...ctx.st,
+        entities: (ctx.st.entities ?? []).map((e) =>
+          frightenedIds.includes(e.id)
+            ? { ...e, conditions: [...e.conditions.filter((c) => c !== 'frightened'), 'frightened'] }
+            : e
+        ),
+      };
+    }
+    ctx.narrative =
+      ipLines.length > 0
+        ? `😱 ${char.name}'s Intimidating Presence! ${ipLines.join(' ')}`
+        : `${char.name} unleashes Intimidating Presence — no creatures within 30 ft.`;
     return true;
   }
 

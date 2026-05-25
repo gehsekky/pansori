@@ -860,6 +860,13 @@ export function hasHeroicWarrior(char: Character): boolean {
   return char.subclass === 'champion' && getClassLevel(char, 'fighter') >= 10;
 }
 
+/** SRD Berserker Retaliation (Barbarian L10) — taking damage from a creature
+ *  within 5 ft lets the barbarian use its Reaction to make a melee attack
+ *  back against that creature. */
+export function hasRetaliation(char: Character): boolean {
+  return char.subclass === 'berserker' && getClassLevel(char, 'barbarian') >= 10;
+}
+
 /** Combat-start top-up for Champion Heroic Warrior — grants Heroic Inspiration
  *  if the champion lacks it, covering the first turn (subsequent turns are
  *  handled by the start-of-turn grant). Mirrors the other initiative top-ups. */
