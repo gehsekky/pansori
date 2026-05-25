@@ -8,6 +8,7 @@ import {
 import type { ActionHandler } from './types.js';
 import { applyDamage } from '../damage.js';
 import { fmt } from '../narrativeFmt.js';
+import { maxAttunement } from '../multiclass.js';
 import { updatePcActor } from './actor.js';
 
 /**
@@ -42,13 +43,14 @@ export const handleAttune: ActionHandler<{ type: 'attune'; instanceId: string }>
     ctx.narrative = `You are already attuned to the ${invItem.name}.`;
     return;
   }
-  if (attunedList.length >= 3) {
-    ctx.narrative =
-      'You can only be attuned to 3 items at a time (PHB p.138). De-attune one first.';
+  // SRD Thief Use Magic Device (L13) raises the cap to 4; otherwise 3.
+  const attuneCap = maxAttunement(char);
+  if (attunedList.length >= attuneCap) {
+    ctx.narrative = `You can only be attuned to ${attuneCap} items at a time. De-attune one first.`;
     return;
   }
   updatePcActor(ctx, { attuned_items: [...attunedList, instanceId] });
-  let narrative = `You spend a moment focusing on the ${invItem.name}, attuning yourself to its magic. (${attunedList.length + 1}/3 attuned items)`;
+  let narrative = `You spend a moment focusing on the ${invItem.name}, attuning yourself to its magic. (${attunedList.length + 1}/${attuneCap} attuned items)`;
   // Cursed items reveal on attunement (PHB p.214). The curse text is
   // appended so the player learns about the curse and knows they're
   // bound until remove-curse or equivalent.

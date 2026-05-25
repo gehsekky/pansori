@@ -867,6 +867,18 @@ export function hasRetaliation(char: Character): boolean {
   return char.subclass === 'berserker' && getClassLevel(char, 'barbarian') >= 10;
 }
 
+/** SRD Thief Second-Story Work (Rogue L3) — Climber: a Climb Speed equal to
+ *  your Speed (so climbing costs no extra movement). */
+export function hasSecondStoryWork(char: Character): boolean {
+  return char.subclass === 'thief' && getClassLevel(char, 'rogue') >= 3;
+}
+
+/** Maximum number of attuned magic items — 3 normally, 4 for a Thief Rogue
+ *  L13+ (SRD Use Magic Device: Attunement). */
+export function maxAttunement(char: Character): number {
+  return char.subclass === 'thief' && getClassLevel(char, 'rogue') >= 13 ? 4 : 3;
+}
+
 /** Combat-start top-up for Champion Heroic Warrior — grants Heroic Inspiration
  *  if the champion lacks it, covering the first turn (subsequent turns are
  *  handled by the start-of-turn grant). Mirrors the other initiative top-ups. */

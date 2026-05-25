@@ -2,11 +2,15 @@
 // Thief (not the PHB-only Assassin). The PHB Assassinate auto-crit / advantage-
 // vs-surprised mechanics are removed; the subclass list offers 'thief'.
 
-import type { Enemy, GameState, Seed } from '../types.js';
+import type { Character, Enemy, GameState, Seed } from '../types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { baseSandboxSeed, makeChar, makeState } from '../test-fixtures.js';
 import { generateChoices, takeAction } from './gameEngine.js';
+import { hasSecondStoryWork, maxAttunement } from './multiclass.js';
+import type { ActionContext } from './actions/types.js';
 import { context as ctx } from '../contexts/sandbox.js';
+import { handleAttune } from './actions/inventory.js';
+import { pcActor } from './actions/actor.js';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -86,5 +90,65 @@ describe('Assassinate is gone — no auto-crit vs a surprised target', () => {
     const hit = (r.newState.combat_log ?? []).find((e) => e.kind === 'attack_hit');
     expect(hit && hit.kind === 'attack_hit' && hit.isCrit).toBe(false);
     expect(r.narrative).not.toMatch(/Assassinate/i);
+  });
+});
+
+const thief = (over: Partial<Character> = {}) =>
+  makeChar({ character_class: 'Rogue', subclass: 'thief', level: 13, ...over });
+
+describe('Thief passives — helper gating', () => {
+  it('hasSecondStoryWork: Thief L3+, not below, not other subclasses', () => {
+    expect(hasSecondStoryWork(thief({ level: 3 }))).toBe(true);
+    expect(hasSecondStoryWork(thief({ level: 2 }))).toBe(false);
+    expect(hasSecondStoryWork(makeChar({ character_class: 'Rogue', level: 5 }))).toBe(false);
+  });
+
+  it('maxAttunement: 4 for a Thief L13, otherwise 3', () => {
+    expect(maxAttunement(thief({ level: 13 }))).toBe(4);
+    expect(maxAttunement(thief({ level: 12 }))).toBe(3);
+    expect(maxAttunement(makeChar({ character_class: 'Fighter', level: 20 }))).toBe(3);
+  });
+});
+
+// An attunement item from the sandbox loot table.
+const attuneItem = ctx.lootTable.find((l) => l.requiresAttunement)!;
+
+function attuneCtx(char: Character): ActionContext {
+  return {
+    actor: pcActor(char, 0),
+    context: ctx,
+    st: { combat_active: false },
+    narrative: '',
+  } as unknown as ActionContext;
+}
+const attCharOf = (c: ActionContext) => {
+  if (c.actor.kind !== 'pc') throw new Error('expected pc actor');
+  return c.actor.char;
+};
+
+describe('Use Magic Device (L13) — attune to four items', () => {
+  it('a Thief L13 can attune a fourth item', () => {
+    const c = attuneCtx(
+      thief({
+        inventory: [{ instance_id: 'item-4', id: attuneItem.id, name: attuneItem.name }],
+        attuned_items: ['a', 'b', 'c'], // already at the normal cap of 3
+      })
+    );
+    handleAttune(c, { type: 'attune', instanceId: 'item-4' });
+    expect(attCharOf(c).attuned_items).toContain('item-4');
+  });
+
+  it('a non-Thief is capped at three', () => {
+    const c = attuneCtx(
+      makeChar({
+        character_class: 'Wizard',
+        level: 20,
+        inventory: [{ instance_id: 'item-4', id: attuneItem.id, name: attuneItem.name }],
+        attuned_items: ['a', 'b', 'c'],
+      })
+    );
+    handleAttune(c, { type: 'attune', instanceId: 'item-4' });
+    expect(attCharOf(c).attuned_items ?? []).not.toContain('item-4');
+    expect(c.narrative).toMatch(/only be attuned to 3/);
   });
 });
