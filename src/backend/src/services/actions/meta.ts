@@ -189,6 +189,28 @@ export const handleChooseMetamagic: ActionHandler<{ type: 'choose_metamagic'; op
 };
 
 /**
+ * `choose_elemental_affinity`: SRD Draconic Sorcery (L6) — pick the affinity
+ * damage type (the sorcerer resists it + adds CHA to one damage roll of it).
+ * One-time choice; validated to a Draconic Sorcerer L6+. Out-of-combat. (RE-2.)
+ */
+export const handleChooseElementalAffinity: ActionHandler<{
+  type: 'choose_elemental_affinity';
+  damageType: 'acid' | 'cold' | 'fire' | 'lightning' | 'poison';
+}> = (ctx, action) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can choose Elemental Affinity.' };
+  const { char } = ctx.actor;
+  if (char.subclass !== 'draconic' || getClassLevel(char, 'sorcerer') < 6) {
+    ctx.narrative = 'Elemental Affinity requires a Draconic Sorcerer of level 6.';
+    return;
+  }
+  if (!['acid', 'cold', 'fire', 'lightning', 'poison'].includes(action.damageType)) {
+    return { rejected: `Invalid Elemental Affinity type: ${action.damageType}.` };
+  }
+  updatePcActor(ctx, { elemental_affinity: action.damageType });
+  ctx.narrative = `${char.name} attunes to ${action.damageType} — Elemental Affinity: resistance to ${action.damageType}, and +CHA to one ${action.damageType} damage roll per spell.`;
+};
+
+/**
  * `choose_expertise`: pick a skill proficiency to gain Expertise in (double
  * proficiency bonus). Granted by Rogue (L1 + L6) and Bard (L2 + L9). Validates
  * that the skill is one the character is proficient in, isn't already an

@@ -2,6 +2,7 @@ import type { Enemy, Spell } from '../../../types.js';
 import { abilityMod, cantripDamageDice, rollDice, rollDiceEmpowered, upcastDamage } from '../../rulesEngine.js';
 import type { ActionContext } from '../types.js';
 import { composeNow } from '../../narrative/compose.js';
+import { elementalAffinityBonus } from '../../multiclass.js';
 import { pickCastPrefix } from './utils.js';
 
 /**
@@ -22,11 +23,12 @@ export function runAutoHitSpell(
   const { char } = ctx.actor;
   const autoHitExpr =
     spell.level === 0 ? cantripDamageDice(spell, char.level) : upcastDamage(spell, slotLevel);
-  // SRD Metamagic Empowered Spell — reroll up to CHA-mod of the lowest dice.
+  // SRD Metamagic Empowered Spell — reroll up to CHA-mod of the lowest dice;
+  // Draconic Elemental Affinity — +CHA to the damage roll of the affinity type.
   const spellDmg =
-    ctx.metamagic === 'empowered'
+    (ctx.metamagic === 'empowered'
       ? rollDiceEmpowered(autoHitExpr || spell.damage || '0', Math.max(1, abilityMod(char.cha)))
-      : rollDice(autoHitExpr || spell.damage || '0');
+      : rollDice(autoHitExpr || spell.damage || '0')) + elementalAffinityBonus(char, spell.damageType);
   composeNow(ctx, {
     kind: 'spell_auto_hit',
     attackerId: char.id,

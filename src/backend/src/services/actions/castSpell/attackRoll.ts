@@ -10,6 +10,7 @@ import {
 } from '../../rulesEngine.js';
 import type { ActionContext } from '../types.js';
 import { composeNow } from '../../narrative/compose.js';
+import { elementalAffinityBonus } from '../../multiclass.js';
 import { pickCastPrefix } from './utils.js';
 
 /**
@@ -81,6 +82,8 @@ export function runAttackRollSpell(
       ? Math.max(0, abilityMod(char.cha))
       : 0;
   spellDmg += agonizingBonus;
+  // SRD Draconic Elemental Affinity — +CHA to one damage roll of the affinity type.
+  spellDmg += elementalAffinityBonus(char, spell.damageType);
   composeNow(ctx, {
     kind: 'spell_attack_hit',
     attackerId: char.id,
