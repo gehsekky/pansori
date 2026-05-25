@@ -15,7 +15,11 @@ import { pcActor } from './actions/actor.js';
 afterEach(() => vi.restoreAllMocks());
 
 function featCtx(char: Character): ActionContext {
-  return { actor: pcActor(char, 0), context: { classFeatures: {} }, narrative: '' } as unknown as ActionContext;
+  return {
+    actor: pcActor(char, 0),
+    context: { classFeatures: {} },
+    narrative: '',
+  } as unknown as ActionContext;
 }
 const pcChar = (c: ActionContext) => {
   if (c.actor.kind !== 'pc') throw new Error('expected pc actor');
@@ -25,26 +29,42 @@ const pcChar = (c: ActionContext) => {
 describe('choose_hunter_option — Hunter’s Prey picker', () => {
   it('a Hunter L3 can choose Horde Breaker', () => {
     const c = featCtx(makeChar({ character_class: 'Ranger', subclass: 'hunter', level: 3 }));
-    handleChooseHunterOption(c, { type: 'choose_hunter_option', feature: 'hunters_prey', option: 'horde_breaker' });
+    handleChooseHunterOption(c, {
+      type: 'choose_hunter_option',
+      feature: 'hunters_prey',
+      option: 'horde_breaker',
+    });
     expect(pcChar(c).hunters_prey).toBe('horde_breaker');
   });
 
   it('rejects a non-Hunter ranger', () => {
     const c = featCtx(makeChar({ character_class: 'Ranger', level: 3 }));
-    handleChooseHunterOption(c, { type: 'choose_hunter_option', feature: 'hunters_prey', option: 'horde_breaker' });
+    handleChooseHunterOption(c, {
+      type: 'choose_hunter_option',
+      feature: 'hunters_prey',
+      option: 'horde_breaker',
+    });
     expect(pcChar(c).hunters_prey).toBeUndefined();
     expect(c.narrative).toMatch(/Hunter Ranger/);
   });
 
   it('requires level 3', () => {
     const c = featCtx(makeChar({ character_class: 'Ranger', subclass: 'hunter', level: 2 }));
-    handleChooseHunterOption(c, { type: 'choose_hunter_option', feature: 'hunters_prey', option: 'horde_breaker' });
+    handleChooseHunterOption(c, {
+      type: 'choose_hunter_option',
+      feature: 'hunters_prey',
+      option: 'horde_breaker',
+    });
     expect(pcChar(c).hunters_prey).toBeUndefined();
   });
 
   it('rejects an unknown option', () => {
     const c = featCtx(makeChar({ character_class: 'Ranger', subclass: 'hunter', level: 3 }));
-    const r = handleChooseHunterOption(c, { type: 'choose_hunter_option', feature: 'hunters_prey', option: 'nonsense' });
+    const r = handleChooseHunterOption(c, {
+      type: 'choose_hunter_option',
+      feature: 'hunters_prey',
+      option: 'nonsense',
+    });
     expect(r && 'rejected' in r).toBe(true);
   });
 
@@ -72,7 +92,15 @@ const seed: Seed = {
   enemies: {
     [ctx.startRoomId]: [
       { id: E1, name: 'Wolf', hp: 90, ac: 5, damage: '1d6', toHit: 3, xp: 50 } as unknown as Enemy,
-      { id: E2, name: 'Jackal', hp: 90, ac: 5, damage: '1d6', toHit: 3, xp: 50 } as unknown as Enemy,
+      {
+        id: E2,
+        name: 'Jackal',
+        hp: 90,
+        ac: 5,
+        damage: '1d6',
+        toHit: 3,
+        xp: 50,
+      } as unknown as Enemy,
     ],
   },
   loot: {},
@@ -102,9 +130,33 @@ function hordeState(): GameState {
     ],
     initiative_idx: 0,
     entities: [
-      { id: 'pc-1', isEnemy: false, pos: { x: 4, y: 5 }, hp: 30, maxHp: 30, conditions: [], condition_durations: {} },
-      { id: E1, isEnemy: true, pos: { x: 5, y: 5 }, hp: 90, maxHp: 90, conditions: [], condition_durations: {} },
-      { id: E2, isEnemy: true, pos: { x: 6, y: 5 }, hp: 90, maxHp: 90, conditions: [], condition_durations: {} }, // 5 ft from E1
+      {
+        id: 'pc-1',
+        isEnemy: false,
+        pos: { x: 4, y: 5 },
+        hp: 30,
+        maxHp: 30,
+        conditions: [],
+        condition_durations: {},
+      },
+      {
+        id: E1,
+        isEnemy: true,
+        pos: { x: 5, y: 5 },
+        hp: 90,
+        maxHp: 90,
+        conditions: [],
+        condition_durations: {},
+      },
+      {
+        id: E2,
+        isEnemy: true,
+        pos: { x: 6, y: 5 },
+        hp: 90,
+        maxHp: 90,
+        conditions: [],
+        condition_durations: {},
+      }, // 5 ft from E1
     ],
   } as unknown as GameState;
 }

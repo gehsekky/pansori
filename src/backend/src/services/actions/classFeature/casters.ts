@@ -74,7 +74,11 @@ export function handleCasterFeature(ctx: ActionContext, fid: string): boolean {
     // SRD Draconic Sorcery Dragon Wings (L14): Bonus Action — sprout wings for
     // a Fly Speed of 60 ft (1 hour). Once per long rest, or spend 3 Sorcery
     // Points to restore the use.
-    if (!hasClass(char, 'sorcerer') || char.subclass !== 'draconic' || getClassLevel(char, 'sorcerer') < 14) {
+    if (
+      !hasClass(char, 'sorcerer') ||
+      char.subclass !== 'draconic' ||
+      getClassLevel(char, 'sorcerer') < 14
+    ) {
       ctx.narrative = 'Dragon Wings requires a Draconic Sorcerer of level 14.';
       return true;
     }
@@ -180,7 +184,11 @@ export function handleCasterFeature(ctx: ActionContext, fid: string): boolean {
     if (free) char.turn_actions = { ...char.turn_actions, metamagic_free_used: true };
     ctx.st = {
       ...ctx.st,
-      metamagic_active: addMetamagic(char, ctx.st.metamagic_active ?? [], fid.replace('metamagic_', '')),
+      metamagic_active: addMetamagic(
+        char,
+        ctx.st.metamagic_active ?? [],
+        fid.replace('metamagic_', '')
+      ),
     };
     ctx.narrative = `${char.name} — Metamagic: ${label}.${free ? ' (free — Arcane Apotheosis)' : ` (${sp - cost} sorcery points remaining)`}`;
     return true;
@@ -203,7 +211,10 @@ export function handleCasterFeature(ctx: ActionContext, fid: string): boolean {
       sorcery_points: spPool - cost,
     };
     if (free) char.turn_actions = { ...char.turn_actions, metamagic_free_used: true };
-    ctx.st = { ...ctx.st, metamagic_active: addMetamagic(char, ctx.st.metamagic_active ?? [], 'twinned') };
+    ctx.st = {
+      ...ctx.st,
+      metamagic_active: addMetamagic(char, ctx.st.metamagic_active ?? [], 'twinned'),
+    };
     ctx.narrative = `${char.name} — Metamagic: Twinned Spell! Your next spell will target a second creature.${free ? ' (free — Arcane Apotheosis)' : ` (${spPool - cost} sorcery points remaining)`}`;
     return true;
   }
@@ -241,7 +252,10 @@ export function handleCasterFeature(ctx: ActionContext, fid: string): boolean {
       quickened_used: true,
       ...(qFree ? { metamagic_free_used: true } : {}),
     };
-    ctx.st = { ...ctx.st, metamagic_active: addMetamagic(char, ctx.st.metamagic_active ?? [], 'quickened') };
+    ctx.st = {
+      ...ctx.st,
+      metamagic_active: addMetamagic(char, ctx.st.metamagic_active ?? [], 'quickened'),
+    };
     ctx.narrative = `${char.name} — Metamagic: Quickened Spell! Cast your next spell as a bonus action.${qFree ? ' (free — Arcane Apotheosis)' : ` (${spPool2 - qCost} sorcery points remaining)`}`;
     return true;
   }
@@ -262,7 +276,10 @@ export function handleCasterFeature(ctx: ActionContext, fid: string): boolean {
       sorcery_points: spPool3 - eCost,
     };
     if (eFree) char.turn_actions = { ...char.turn_actions, metamagic_free_used: true };
-    ctx.st = { ...ctx.st, metamagic_active: addMetamagic(char, ctx.st.metamagic_active ?? [], 'empowered') };
+    ctx.st = {
+      ...ctx.st,
+      metamagic_active: addMetamagic(char, ctx.st.metamagic_active ?? [], 'empowered'),
+    };
     ctx.narrative = `${char.name} — Metamagic: Empowered Spell! You may reroll up to ${abilityMod(char.cha)} damage dice on your next spell.${eFree ? ' (free — Arcane Apotheosis)' : ` (${spPool3 - eCost} sorcery points remaining)`}`;
     return true;
   }

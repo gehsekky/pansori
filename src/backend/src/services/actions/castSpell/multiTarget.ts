@@ -89,7 +89,11 @@ export function runMultiTargetSpell(
         continue;
       }
       const dmgRoll =
-        (ctx.overchannel ? maxDice(perShot) : atkE.critical ? rollCritical(perShot) : rollDice(perShot)) +
+        (ctx.overchannel
+          ? maxDice(perShot)
+          : atkE.critical
+            ? rollCritical(perShot)
+            : rollDice(perShot)) +
         agonizingBonusPerBeam +
         empoweredBonus;
       empoweredBonus = 0;

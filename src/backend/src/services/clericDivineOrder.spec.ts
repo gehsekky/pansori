@@ -29,7 +29,9 @@ const pcChar = (c: ReturnType<typeof featCtx>) => {
 
 describe('Divine Order — Protector', () => {
   it('grants Martial weapon + Heavy armor training', () => {
-    const c = featCtx(cleric({ weapon_proficiencies: ['simple'], armor_proficiencies: ['light', 'medium'] }));
+    const c = featCtx(
+      cleric({ weapon_proficiencies: ['simple'], armor_proficiencies: ['light', 'medium'] })
+    );
     handleChooseDivineOrder(c, { type: 'choose_divine_order', option: 'protector' });
     const char = pcChar(c);
     expect(char.divine_order).toBe('protector');
@@ -38,7 +40,9 @@ describe('Divine Order — Protector', () => {
   });
 
   it('does not duplicate already-held proficiencies', () => {
-    const c = featCtx(cleric({ weapon_proficiencies: ['simple', 'martial'], armor_proficiencies: ['heavy'] }));
+    const c = featCtx(
+      cleric({ weapon_proficiencies: ['simple', 'martial'], armor_proficiencies: ['heavy'] })
+    );
     handleChooseDivineOrder(c, { type: 'choose_divine_order', option: 'protector' });
     const char = pcChar(c);
     expect(char.weapon_proficiencies.filter((w) => w === 'martial')).toHaveLength(1);
@@ -49,7 +53,11 @@ describe('Divine Order — Protector', () => {
 describe('Divine Order — Thaumaturge', () => {
   it('learns the chosen Cleric cantrip', () => {
     const c = featCtx(cleric({ spells_known: ['sacred_flame'] }));
-    handleChooseDivineOrder(c, { type: 'choose_divine_order', option: 'thaumaturge', cantrip: 'guidance' });
+    handleChooseDivineOrder(c, {
+      type: 'choose_divine_order',
+      option: 'thaumaturge',
+      cantrip: 'guidance',
+    });
     const char = pcChar(c);
     expect(char.divine_order).toBe('thaumaturge');
     expect(char.spells_known).toContain('guidance');

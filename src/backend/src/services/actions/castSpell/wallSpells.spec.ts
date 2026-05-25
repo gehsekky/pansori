@@ -44,8 +44,13 @@ describe('wallObstacleCells', () => {
 
 describe('breakConcentration — removes the caster wall', () => {
   it('drops walls owned by the caster whose concentration ended', () => {
-    const char = makeChar({ id: 'pc-1', concentrating_on: { spellId: 'wall_of_fire', rounds_left: 5 } });
-    const st = { spell_walls: [wall(), wall({ id: 'w2', casterId: 'pc-2' })] } as unknown as GameState;
+    const char = makeChar({
+      id: 'pc-1',
+      concentrating_on: { spellId: 'wall_of_fire', rounds_left: 5 },
+    });
+    const st = {
+      spell_walls: [wall(), wall({ id: 'w2', casterId: 'pc-2' })],
+    } as unknown as GameState;
     const { st: after } = breakConcentration(char, st);
     expect(after.spell_walls?.map((w) => w.id)).toEqual(['w2']); // pc-1's wall gone, pc-2's kept
   });
@@ -91,8 +96,24 @@ function casterState() {
     ],
     initiative_idx: 0,
     entities: [
-      { id: 'pc-1', isEnemy: false, pos: { x: 1, y: 1 }, hp: 40, maxHp: 40, conditions: [], condition_durations: {} },
-      { id: ENEMY, isEnemy: true, pos: { x: 1, y: 5 }, hp: 60, maxHp: 60, conditions: [], condition_durations: {} },
+      {
+        id: 'pc-1',
+        isEnemy: false,
+        pos: { x: 1, y: 1 },
+        hp: 40,
+        maxHp: 40,
+        conditions: [],
+        condition_durations: {},
+      },
+      {
+        id: ENEMY,
+        isEnemy: true,
+        pos: { x: 1, y: 5 },
+        hp: 60,
+        maxHp: 60,
+        conditions: [],
+        condition_durations: {},
+      },
     ],
   };
 }
@@ -144,10 +165,34 @@ describe('a standing wall blocks a ranged attack through it', () => {
       ],
       // Enemy beyond the wall row (y=5): at (1,7).
       entities: [
-        { id: 'pc-1', isEnemy: false, pos: { x: 1, y: 1 }, hp: 40, maxHp: 40, conditions: [], condition_durations: {} },
-        { id: ENEMY, isEnemy: true, pos: { x: 1, y: 7 }, hp: 60, maxHp: 60, conditions: [], condition_durations: {} },
+        {
+          id: 'pc-1',
+          isEnemy: false,
+          pos: { x: 1, y: 1 },
+          hp: 40,
+          maxHp: 40,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: ENEMY,
+          isEnemy: true,
+          pos: { x: 1, y: 7 },
+          hp: 60,
+          maxHp: 60,
+          conditions: [],
+          condition_durations: {},
+        },
       ],
-      spell_walls: [wall({ cells: [{ x: 0, y: 5 }, { x: 1, y: 5 }, { x: 2, y: 5 }] })],
+      spell_walls: [
+        wall({
+          cells: [
+            { x: 0, y: 5 },
+            { x: 1, y: 5 },
+            { x: 2, y: 5 },
+          ],
+        }),
+      ],
     };
     const result = await takeAction({
       action: { type: 'attack', targetEnemyId: ENEMY },

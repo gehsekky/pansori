@@ -85,7 +85,15 @@ const seed: Seed = {
   connections: { [ctx.startRoomId]: [] },
   enemies: {
     [ctx.startRoomId]: [
-      { id: ENEMY, name: 'Golem', hp: 200, ac: 12, damage: '1d6', toHit: 3, xp: 50 } as unknown as Enemy,
+      {
+        id: ENEMY,
+        name: 'Golem',
+        hp: 200,
+        ac: 12,
+        damage: '1d6',
+        toHit: 3,
+        xp: 50,
+      } as unknown as Enemy,
     ],
   },
   loot: {},
@@ -113,8 +121,24 @@ function championState(level: number): GameState {
     ],
     initiative_idx: 0,
     entities: [
-      { id: 'pc-1', isEnemy: false, pos: { x: 4, y: 5 }, hp: 40, maxHp: 40, conditions: [], condition_durations: {} },
-      { id: ENEMY, isEnemy: true, pos: { x: 5, y: 5 }, hp: 200, maxHp: 200, conditions: [], condition_durations: {} },
+      {
+        id: 'pc-1',
+        isEnemy: false,
+        pos: { x: 4, y: 5 },
+        hp: 40,
+        maxHp: 40,
+        conditions: [],
+        condition_durations: {},
+      },
+      {
+        id: ENEMY,
+        isEnemy: true,
+        pos: { x: 5, y: 5 },
+        hp: 200,
+        maxHp: 200,
+        conditions: [],
+        condition_durations: {},
+      },
     ],
   } as unknown as GameState;
 }
@@ -149,13 +173,22 @@ describe('Champion Superior Critical (L15)', () => {
 
 describe('Champion Heroic Warrior (L10)', () => {
   it('hasHeroicWarrior gates on Champion L10+', () => {
-    expect(hasHeroicWarrior(makeChar({ character_class: 'Fighter', subclass: 'champion', level: 10 }))).toBe(true);
-    expect(hasHeroicWarrior(makeChar({ character_class: 'Fighter', subclass: 'champion', level: 9 }))).toBe(false);
+    expect(
+      hasHeroicWarrior(makeChar({ character_class: 'Fighter', subclass: 'champion', level: 10 }))
+    ).toBe(true);
+    expect(
+      hasHeroicWarrior(makeChar({ character_class: 'Fighter', subclass: 'champion', level: 9 }))
+    ).toBe(false);
     expect(hasHeroicWarrior(makeChar({ character_class: 'Fighter', level: 10 }))).toBe(false);
   });
 
   it('heroicWarriorTopUp grants Heroic Inspiration only when lacking it', () => {
-    const champ = makeChar({ character_class: 'Fighter', subclass: 'champion', level: 10, inspiration: false });
+    const champ = makeChar({
+      character_class: 'Fighter',
+      subclass: 'champion',
+      level: 10,
+      inspiration: false,
+    });
     expect(heroicWarriorTopUp(champ).inspiration).toBe(true);
     const fighter = makeChar({ character_class: 'Fighter', level: 10, inspiration: false });
     expect(heroicWarriorTopUp(fighter).inspiration ?? false).toBe(false);

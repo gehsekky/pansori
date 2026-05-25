@@ -216,7 +216,15 @@ export const handleCastSpell: ActionHandler<{
   // 'touch' = adjacent only (≤ 1 grid square / 5 ft).
   // 'ranged' = up to spell.rangeFt feet of grid distance.
   if (
-    isSpellOutOfRange(ctx, spell, spellTargetId, spellTarget.name, slotLevel, isRitualCast, freeCast)
+    isSpellOutOfRange(
+      ctx,
+      spell,
+      spellTargetId,
+      spellTarget.name,
+      slotLevel,
+      isRitualCast,
+      freeCast
+    )
   ) {
     return;
   }

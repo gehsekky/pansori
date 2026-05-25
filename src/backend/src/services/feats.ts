@@ -215,7 +215,9 @@ export function applyFeatTake(
           // resolution where Shadowy Form's resistance would apply — and the
           // "Invisible until your next action" lifecycle of Merge with Shadows
           // isn't modeled. The +1 ability lands; the benefits are narrated.
-          narrativeParts.push('Merge with Shadows and Shadowy Form while in Dim Light or Darkness.');
+          narrativeParts.push(
+            'Merge with Shadows and Shadowy Form while in Dim Light or Darkness.'
+          );
           break;
       }
       break;

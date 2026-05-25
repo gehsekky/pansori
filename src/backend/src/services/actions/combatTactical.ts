@@ -150,9 +150,7 @@ export const handleTryEscapeGrapple: ActionHandler<{ type: 'try_escape_grapple' 
     false,
     d20TestPenalty(char)
   );
-  const myRoll = useAthletics
-    ? applyIndomitableMight(char, escapeCheck.total)
-    : escapeCheck.total;
+  const myRoll = useAthletics ? applyIndomitableMight(char, escapeCheck.total) : escapeCheck.total;
   const skillUsed = useAthletics ? 'Athletics' : 'Acrobatics';
 
   ctx.usedInitiative = true;

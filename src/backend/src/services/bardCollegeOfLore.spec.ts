@@ -27,9 +27,13 @@ describe('Peerless Skill helpers', () => {
 
   it('peerlessSkillDie rolls a die when a BI use remains, else 0', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
-    expect(peerlessSkillDie(lore({ class_resource_uses: { bardic_inspiration: 2 } }))).toBeGreaterThan(0);
+    expect(
+      peerlessSkillDie(lore({ class_resource_uses: { bardic_inspiration: 2 } }))
+    ).toBeGreaterThan(0);
     expect(peerlessSkillDie(lore({ class_resource_uses: { bardic_inspiration: 0 } }))).toBe(0);
-    expect(peerlessSkillDie(lore({ level: 13, class_resource_uses: { bardic_inspiration: 2 } }))).toBe(0);
+    expect(
+      peerlessSkillDie(lore({ level: 13, class_resource_uses: { bardic_inspiration: 2 } }))
+    ).toBe(0);
   });
 });
 
@@ -62,7 +66,16 @@ const seed: Seed = {
   connections: { [ctx.startRoomId]: [] },
   enemies: {
     [ctx.startRoomId]: [
-      { id: ENEMY, name: 'Dummy', hp: 50, ac: 20, damage: '1d4', toHit: 2, xp: 30, dex: 10 } as unknown as Enemy,
+      {
+        id: ENEMY,
+        name: 'Dummy',
+        hp: 50,
+        ac: 20,
+        damage: '1d4',
+        toHit: 2,
+        xp: 30,
+        dex: 10,
+      } as unknown as Enemy,
     ],
   },
   loot: {},
@@ -89,14 +102,36 @@ function loreCombat(over: Partial<Character> = {}): GameState {
     ],
     initiative_idx: 0,
     entities: [
-      { id: 'pc-1', isEnemy: false, pos: { x: 4, y: 5 }, hp: 60, maxHp: 60, conditions: [], condition_durations: {} },
-      { id: ENEMY, isEnemy: true, pos: { x: 5, y: 5 }, hp: 50, maxHp: 50, conditions: [], condition_durations: {} },
+      {
+        id: 'pc-1',
+        isEnemy: false,
+        pos: { x: 4, y: 5 },
+        hp: 60,
+        maxHp: 60,
+        conditions: [],
+        condition_durations: {},
+      },
+      {
+        id: ENEMY,
+        isEnemy: true,
+        pos: { x: 5, y: 5 },
+        hp: 50,
+        maxHp: 50,
+        conditions: [],
+        condition_durations: {},
+      },
     ],
   } as unknown as GameState;
 }
 
 const attack = async (state: GameState) =>
-  takeAction({ action: { type: 'attack', targetEnemyId: ENEMY }, history: [], state, seed, context: ctx });
+  takeAction({
+    action: { type: 'attack', targetEnemyId: ENEMY },
+    history: [],
+    state,
+    seed,
+    context: ctx,
+  });
 
 describe('Peerless Skill — missed attack converted to a hit', () => {
   it('a Lore Bard L14 spends a BI use to turn a miss into a hit', async () => {

@@ -75,7 +75,11 @@ export function runPrecast(
 
   // Deafened: cannot cast spells with verbal components (Subtle Spell removes
   // the verbal component, so it bypasses this gate).
-  if (!isSubtle && pc.char.conditions.includes('deafened') && (spell as { verbal?: boolean }).verbal) {
+  if (
+    !isSubtle &&
+    pc.char.conditions.includes('deafened') &&
+    (spell as { verbal?: boolean }).verbal
+  ) {
     ctx.narrative = `You cannot cast ${spell.name} while deafened — it requires a verbal component.`;
     return { done: true };
   }

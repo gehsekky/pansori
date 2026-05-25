@@ -80,7 +80,11 @@ export const handleJump: ActionHandler<{ type: 'jump'; to: { x: number; y: numbe
   let oaNarrative = '';
   for (const oaEntity of oaTargets) {
     const oaEnemy = getEnemyById(ctx.seed, oaEntity.id);
-    if (oaEnemy && !nextSt.enemies_killed.includes(oaEntity.id) && !nextChar.turn_actions?.disengaged) {
+    if (
+      oaEnemy &&
+      !nextSt.enemies_killed.includes(oaEntity.id) &&
+      !nextChar.turn_actions?.disengaged
+    ) {
       const oaResult = resolveEnemyAttack(oaEnemy, nextChar.ac, false, hasEscapeTheHorde(nextChar));
       if (oaResult.hit) {
         const dmgResult = applyDamage(nextChar, nextSt, oaResult.damage);

@@ -348,7 +348,11 @@ export function handleMonkFeature(ctx: ActionContext, fid: string): boolean {
   if (fid === 'wholeness_of_body') {
     // SRD Warrior of the Open Hand L6 — bonus action: heal a Martial Arts
     // die + WIS mod (min 1 HP). Uses = WIS mod (min 1) per long rest.
-    if (!hasClass(char, 'monk') || char.subclass !== 'open_hand' || getClassLevel(char, 'monk') < 6) {
+    if (
+      !hasClass(char, 'monk') ||
+      char.subclass !== 'open_hand' ||
+      getClassLevel(char, 'monk') < 6
+    ) {
       ctx.narrative = 'Wholeness of Body requires an Open Hand Monk of level 6.';
       return true;
     }
@@ -447,7 +451,10 @@ export function handleMonkFeature(ctx: ActionContext, fid: string): boolean {
       ...ctx.st,
       entities: (ctx.st.entities ?? []).map((e) =>
         e.id === ctx.enemy?.id && e.isEnemy
-          ? { ...e, conditions: [...e.conditions.filter((c) => c !== 'quivering_palm'), 'quivering_palm'] }
+          ? {
+              ...e,
+              conditions: [...e.conditions.filter((c) => c !== 'quivering_palm'), 'quivering_palm'],
+            }
           : e
       ),
     };
@@ -471,7 +478,8 @@ export function handleMonkFeature(ctx: ActionContext, fid: string): boolean {
     const qpEnemy = getEnemyById(ctx.seed, qpTargetId);
     if (!qpEnt || qpEnt.hp <= 0 || !qpEnemy) {
       char.quivering_palm_target = undefined;
-      ctx.narrative = 'The creature under your Quivering Palm is no longer here — the vibrations fade.';
+      ctx.narrative =
+        'The creature under your Quivering Palm is no longer here — the vibrations fade.';
       return true;
     }
     char.turn_actions = { ...char.turn_actions, action_used: true };

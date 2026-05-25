@@ -22,7 +22,16 @@ const seed: Seed = {
   connections: { [ctx.startRoomId]: [] },
   enemies: {
     [ctx.startRoomId]: [
-      { id: ENEMY, name: 'Dummy', hp: 80, ac: 5, damage: '1d4', toHit: 3, xp: 50, dex: 10 } as unknown as Enemy,
+      {
+        id: ENEMY,
+        name: 'Dummy',
+        hp: 80,
+        ac: 5,
+        damage: '1d4',
+        toHit: 3,
+        xp: 50,
+        dex: 10,
+      } as unknown as Enemy,
     ],
   },
   loot: {},
@@ -53,8 +62,24 @@ function clericCombat(over: Partial<Character> = {}): GameState {
     ],
     initiative_idx: 0,
     entities: [
-      { id: 'pc-1', isEnemy: false, pos: { x: 4, y: 5 }, hp: 40, maxHp: 40, conditions: [], condition_durations: {} },
-      { id: ENEMY, isEnemy: true, pos: { x: 5, y: 5 }, hp: 80, maxHp: 80, conditions: [], condition_durations: {} },
+      {
+        id: 'pc-1',
+        isEnemy: false,
+        pos: { x: 4, y: 5 },
+        hp: 40,
+        maxHp: 40,
+        conditions: [],
+        condition_durations: {},
+      },
+      {
+        id: ENEMY,
+        isEnemy: true,
+        pos: { x: 5, y: 5 },
+        hp: 80,
+        maxHp: 80,
+        conditions: [],
+        condition_durations: {},
+      },
     ],
   } as unknown as GameState;
 }
@@ -145,7 +170,9 @@ describe('Divine Intervention — gating', () => {
       seed: restSeed,
       context: ctx,
     });
-    expect(rested.newState.characters[0].class_resource_uses?.divine_intervention_used).toBeUndefined();
+    expect(
+      rested.newState.characters[0].class_resource_uses?.divine_intervention_used
+    ).toBeUndefined();
   });
 });
 

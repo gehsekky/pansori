@@ -21,7 +21,15 @@ const seed: Seed = {
   connections: { [ctx.startRoomId]: [] },
   enemies: {
     [ctx.startRoomId]: [
-      { id: ENEMY, name: 'Stag', hp: 120, ac: 5, damage: '1d6', toHit: 3, xp: 50 } as unknown as Enemy,
+      {
+        id: ENEMY,
+        name: 'Stag',
+        hp: 120,
+        ac: 5,
+        damage: '1d6',
+        toHit: 3,
+        xp: 50,
+      } as unknown as Enemy,
     ],
   },
   loot: {},
@@ -53,8 +61,24 @@ function rangerState(level: number, marked = false): GameState {
     ],
     initiative_idx: 0,
     entities: [
-      { id: 'pc-1', isEnemy: false, pos: { x: 4, y: 5 }, hp: 30, maxHp: 30, conditions: [], condition_durations: {} },
-      { id: ENEMY, isEnemy: true, pos: { x: 5, y: 5 }, hp: 120, maxHp: 120, conditions: [], condition_durations: {} },
+      {
+        id: 'pc-1',
+        isEnemy: false,
+        pos: { x: 4, y: 5 },
+        hp: 30,
+        maxHp: 30,
+        conditions: [],
+        condition_durations: {},
+      },
+      {
+        id: ENEMY,
+        isEnemy: true,
+        pos: { x: 5, y: 5 },
+        hp: 120,
+        maxHp: 120,
+        conditions: [],
+        condition_durations: {},
+      },
     ],
   } as unknown as GameState;
 }

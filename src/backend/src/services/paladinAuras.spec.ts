@@ -67,10 +67,14 @@ describe('auraConditionImmunity — Courage (L10) + Devotion (L7)', () => {
     const pal = makeChar({ id: 'pal', character_class: 'Paladin', level: 10, cha: 16 });
     const a = ally();
     expect(
-      auraConditionImmunity(a, gs([pal, a], [ent('pal', 1, 1), ent('ally', 2, 2)])).has('frightened')
+      auraConditionImmunity(a, gs([pal, a], [ent('pal', 1, 1), ent('ally', 2, 2)])).has(
+        'frightened'
+      )
     ).toBe(true); // 5 ft
     expect(
-      auraConditionImmunity(a, gs([pal, a], [ent('pal', 1, 1), ent('ally', 6, 6)])).has('frightened')
+      auraConditionImmunity(a, gs([pal, a], [ent('pal', 1, 1), ent('ally', 6, 6)])).has(
+        'frightened'
+      )
     ).toBe(false); // 25 ft
   });
 

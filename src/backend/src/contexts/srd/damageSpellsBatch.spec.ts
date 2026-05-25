@@ -76,8 +76,24 @@ function casterState() {
     ],
     initiative_idx: 0,
     entities: [
-      { id: 'pc-1', isEnemy: false, pos: { x: 1, y: 1 }, hp: 50, maxHp: 50, conditions: [], condition_durations: {} },
-      { id: ENEMY, isEnemy: true, pos: { x: 2, y: 2 }, hp: 400, maxHp: 400, conditions: [], condition_durations: {} },
+      {
+        id: 'pc-1',
+        isEnemy: false,
+        pos: { x: 1, y: 1 },
+        hp: 50,
+        maxHp: 50,
+        conditions: [],
+        condition_durations: {},
+      },
+      {
+        id: ENEMY,
+        isEnemy: true,
+        pos: { x: 2, y: 2 },
+        hp: 400,
+        maxHp: 400,
+        conditions: [],
+        condition_durations: {},
+      },
     ],
   };
 }

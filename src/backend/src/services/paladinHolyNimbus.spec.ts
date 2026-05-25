@@ -22,7 +22,16 @@ const seed: Seed = {
   connections: { [ctx.startRoomId]: [] },
   enemies: {
     [ctx.startRoomId]: [
-      { id: ENEMY, name: 'Fiend', hp: 50, ac: 14, damage: '1d4', toHit: 2, xp: 50, dex: 10 } as unknown as Enemy,
+      {
+        id: ENEMY,
+        name: 'Fiend',
+        hp: 50,
+        ac: 14,
+        damage: '1d4',
+        toHit: 2,
+        xp: 50,
+        dex: 10,
+      } as unknown as Enemy,
     ],
   },
   loot: {},
@@ -51,8 +60,24 @@ function nimbusCombat(over: Partial<Character> = {}): GameState {
     ],
     initiative_idx: 0,
     entities: [
-      { id: 'pc-1', isEnemy: false, pos: { x: 4, y: 5 }, hp: 90, maxHp: 90, conditions: [], condition_durations: {} },
-      { id: ENEMY, isEnemy: true, pos: { x: 5, y: 5 }, hp: 50, maxHp: 50, conditions: [], condition_durations: {} },
+      {
+        id: 'pc-1',
+        isEnemy: false,
+        pos: { x: 4, y: 5 },
+        hp: 90,
+        maxHp: 90,
+        conditions: [],
+        condition_durations: {},
+      },
+      {
+        id: ENEMY,
+        isEnemy: true,
+        pos: { x: 5, y: 5 },
+        hp: 50,
+        maxHp: 50,
+        conditions: [],
+        condition_durations: {},
+      },
     ],
   } as unknown as GameState;
 }

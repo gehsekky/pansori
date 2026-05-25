@@ -31,12 +31,8 @@ describe('cellsOnLine', () => {
   });
 
   it('is symmetric in the set of cells touched (order aside)', () => {
-    const ab = cellsOnLine(p(1, 1), p(4, 3))
-      .map(key)
-      .sort();
-    const ba = cellsOnLine(p(4, 3), p(1, 1))
-      .map(key)
-      .sort();
+    const ab = cellsOnLine(p(1, 1), p(4, 3)).map(key).sort();
+    const ba = cellsOnLine(p(4, 3), p(1, 1)).map(key).sort();
     expect(ab).toEqual(ba);
   });
 });

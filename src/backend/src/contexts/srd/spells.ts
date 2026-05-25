@@ -2457,7 +2457,8 @@ export const SRD_SPELLS: Record<string, Spell> = {
     ritualCasting: true,
     rangeKind: 'self',
     desc: 'You ward an area for 8 hours; an audible or mental alarm alerts you whenever a creature you did not designate touches or enters it.',
-    narrative: '{name} sets a subtle ward — the air hums faintly, ready to cry out at any intruder.',
+    narrative:
+      '{name} sets a subtle ward — the air hums faintly, ready to cry out at any intruder.',
     spellList: ['primal', 'arcane'],
   },
   unseen_servant: {
@@ -2468,7 +2469,8 @@ export const SRD_SPELLS: Record<string, Spell> = {
     ritualCasting: true,
     rangeKind: 'self',
     desc: 'You conjure an invisible, mindless force that fetches, carries, and performs simple chores at your command until the spell ends.',
-    narrative: '{name} conjures an invisible helper — unseen hands take up the work without a word.',
+    narrative:
+      '{name} conjures an invisible helper — unseen hands take up the work without a word.',
     spellList: ['arcane'],
   },
   rope_trick: {
@@ -2478,7 +2480,8 @@ export const SRD_SPELLS: Record<string, Spell> = {
     castTime: 'action',
     rangeKind: 'touch',
     desc: 'A length of rope rises and vanishes into an extradimensional space that hides up to eight creatures for 1 hour; the rope can be pulled up out of reach.',
-    narrative: '{name} touches a rope — it stiffens skyward and its end disappears into a hidden pocket of space.',
+    narrative:
+      '{name} touches a rope — it stiffens skyward and its end disappears into a hidden pocket of space.',
     spellList: ['arcane'],
   },
   water_breathing: {
@@ -2576,7 +2579,8 @@ export const SRD_SPELLS: Record<string, Spell> = {
     durationRounds: 600,
     rangeKind: 'self',
     desc: 'For up to 1 hour you sense the direction to a creature familiar to you, or to the nearest creature of a kind you name, while it is within range.',
-    narrative: '{name} fixes the quarry in their mind — a pull, like a compass needle, points the way.',
+    narrative:
+      '{name} fixes the quarry in their mind — a pull, like a compass needle, points the way.',
     spellList: ['arcane', 'divine', 'primal'],
   },
   commune: {
@@ -2621,7 +2625,8 @@ export const SRD_SPELLS: Record<string, Spell> = {
     ritualCasting: true,
     rangeKind: 'self',
     desc: 'You name a specific kind of beast or plant and sense the direction and distance to the nearest one within range.',
-    narrative: '{name} attunes to the wild — the nearest of its kind reveals itself to their senses.',
+    narrative:
+      '{name} attunes to the wild — the nearest of its kind reveals itself to their senses.',
     spellList: ['arcane', 'primal'],
   },
 };

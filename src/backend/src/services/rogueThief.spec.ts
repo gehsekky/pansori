@@ -41,7 +41,15 @@ const seed: Seed = {
   connections: { [ctx.startRoomId]: [] },
   enemies: {
     [ctx.startRoomId]: [
-      { id: ENEMY, name: 'Guard', hp: 80, ac: 10, damage: '1d6', toHit: 3, xp: 50 } as unknown as Enemy,
+      {
+        id: ENEMY,
+        name: 'Guard',
+        hp: 80,
+        ac: 10,
+        damage: '1d6',
+        toHit: 3,
+        xp: 50,
+      } as unknown as Enemy,
     ],
   },
   loot: {},
@@ -72,8 +80,24 @@ function thiefState(): GameState {
     ],
     initiative_idx: 0,
     entities: [
-      { id: 'pc-1', isEnemy: false, pos: { x: 4, y: 5 }, hp: 30, maxHp: 30, conditions: [], condition_durations: {} },
-      { id: ENEMY, isEnemy: true, pos: { x: 5, y: 5 }, hp: 80, maxHp: 80, conditions: [], condition_durations: {} },
+      {
+        id: 'pc-1',
+        isEnemy: false,
+        pos: { x: 4, y: 5 },
+        hp: 30,
+        maxHp: 30,
+        conditions: [],
+        condition_durations: {},
+      },
+      {
+        id: ENEMY,
+        isEnemy: true,
+        pos: { x: 5, y: 5 },
+        hp: 80,
+        maxHp: 80,
+        conditions: [],
+        condition_durations: {},
+      },
     ],
   } as unknown as GameState;
 }
@@ -210,8 +234,24 @@ function obscureState(): GameState {
     ],
     initiative_idx: 0,
     entities: [
-      { id: 'pc-1', isEnemy: false, pos: { x: 4, y: 5 }, hp: 30, maxHp: 30, conditions: [], condition_durations: {} },
-      { id: ENEMY, isEnemy: true, pos: { x: 5, y: 5 }, hp: 200, maxHp: 200, conditions: ['prone'], condition_durations: {} },
+      {
+        id: 'pc-1',
+        isEnemy: false,
+        pos: { x: 4, y: 5 },
+        hp: 30,
+        maxHp: 30,
+        conditions: [],
+        condition_durations: {},
+      },
+      {
+        id: ENEMY,
+        isEnemy: true,
+        pos: { x: 5, y: 5 },
+        hp: 200,
+        maxHp: 200,
+        conditions: ['prone'],
+        condition_durations: {},
+      },
     ],
   } as unknown as GameState;
 }

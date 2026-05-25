@@ -24,7 +24,16 @@ const seed: Seed = {
   // AC 20 so a mediocre spell-attack roll misses (exercising Potent Cantrip).
   enemies: {
     [ctx.startRoomId]: [
-      { id: ENEMY, name: 'Dummy', hp: 80, ac: 20, damage: '1d4', toHit: 3, xp: 50, dex: 8 } as unknown as Enemy,
+      {
+        id: ENEMY,
+        name: 'Dummy',
+        hp: 80,
+        ac: 20,
+        damage: '1d4',
+        toHit: 3,
+        xp: 50,
+        dex: 8,
+      } as unknown as Enemy,
     ],
   },
   loot: {},
@@ -53,8 +62,24 @@ function evokerCombat(over: Partial<Character> = {}): GameState {
     ],
     initiative_idx: 0,
     entities: [
-      { id: 'pc-1', isEnemy: false, pos: { x: 4, y: 5 }, hp: 30, maxHp: 30, conditions: [], condition_durations: {} },
-      { id: ENEMY, isEnemy: true, pos: { x: 5, y: 5 }, hp: 80, maxHp: 80, conditions: [], condition_durations: {} },
+      {
+        id: 'pc-1',
+        isEnemy: false,
+        pos: { x: 4, y: 5 },
+        hp: 30,
+        maxHp: 30,
+        conditions: [],
+        condition_durations: {},
+      },
+      {
+        id: ENEMY,
+        isEnemy: true,
+        pos: { x: 5, y: 5 },
+        hp: 80,
+        maxHp: 80,
+        conditions: [],
+        condition_durations: {},
+      },
     ],
   } as unknown as GameState;
 }
@@ -117,7 +142,16 @@ describe('Empowered Evocation (L10) — +INT to one evocation damage roll', () =
     ...seed,
     enemies: {
       [ctx.startRoomId]: [
-        { id: ENEMY, name: 'Dummy', hp: 80, ac: 5, damage: '1d4', toHit: 3, xp: 50, dex: 8 } as unknown as Enemy,
+        {
+          id: ENEMY,
+          name: 'Dummy',
+          hp: 80,
+          ac: 5,
+          damage: '1d4',
+          toHit: 3,
+          xp: 50,
+          dex: 8,
+        } as unknown as Enemy,
       ],
     },
   };
@@ -162,7 +196,14 @@ function sculptState(level: number): GameState {
     spell_slots_max: { 3: 2 },
     spell_slots_used: {},
   });
-  const ally = makeChar({ id: 'pc-2', character_class: 'Fighter', level, hp: 40, max_hp: 40, dex: 10 });
+  const ally = makeChar({
+    id: 'pc-2',
+    character_class: 'Fighter',
+    level,
+    hp: 40,
+    max_hp: 40,
+    dex: 10,
+  });
   return {
     ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
     characters: [evoker, ally],
@@ -174,9 +215,33 @@ function sculptState(level: number): GameState {
     ],
     initiative_idx: 0,
     entities: [
-      { id: 'pc-1', isEnemy: false, pos: { x: 1, y: 1 }, hp: 25, maxHp: 25, conditions: [], condition_durations: {} },
-      { id: 'pc-2', isEnemy: false, pos: { x: 10, y: 11 }, hp: 40, maxHp: 40, conditions: [], condition_durations: {} },
-      { id: ENEMY, isEnemy: true, pos: { x: 10, y: 10 }, hp: 80, maxHp: 80, conditions: [], condition_durations: {} },
+      {
+        id: 'pc-1',
+        isEnemy: false,
+        pos: { x: 1, y: 1 },
+        hp: 25,
+        maxHp: 25,
+        conditions: [],
+        condition_durations: {},
+      },
+      {
+        id: 'pc-2',
+        isEnemy: false,
+        pos: { x: 10, y: 11 },
+        hp: 40,
+        maxHp: 40,
+        conditions: [],
+        condition_durations: {},
+      },
+      {
+        id: ENEMY,
+        isEnemy: true,
+        pos: { x: 10, y: 10 },
+        hp: 80,
+        maxHp: 80,
+        conditions: [],
+        condition_durations: {},
+      },
     ],
   } as unknown as GameState;
 }
@@ -210,7 +275,16 @@ describe('Overchannel (L14) — maximize a damaging spell, escalating cost', () 
     ...seed,
     enemies: {
       [ctx.startRoomId]: [
-        { id: ENEMY, name: 'Dummy', hp: 80, ac: 5, damage: '1d4', toHit: 3, xp: 50, dex: 8 } as unknown as Enemy,
+        {
+          id: ENEMY,
+          name: 'Dummy',
+          hp: 80,
+          ac: 5,
+          damage: '1d4',
+          toHit: 3,
+          xp: 50,
+          dex: 8,
+        } as unknown as Enemy,
       ],
     },
   };
@@ -218,7 +292,13 @@ describe('Overchannel (L14) — maximize a damaging spell, escalating cost', () 
   // Empowered Evocation (+INT). Maximized: 4×6 = 24, +3 INT = 27.
   const overchannelGuidingBolt = (over: Partial<Character> = {}) =>
     takeAction({
-      action: { type: 'cast_spell', spellId: 'guiding_bolt', slotLevel: 1, targetEnemyId: ENEMY, overchannel: true },
+      action: {
+        type: 'cast_spell',
+        spellId: 'guiding_bolt',
+        slotLevel: 1,
+        targetEnemyId: ENEMY,
+        overchannel: true,
+      },
       history: [],
       state: evokerCombat({
         level: 14,
@@ -284,7 +364,9 @@ describe('Evocation Savant (L3) — free spellbook additions', () => {
 
   it('budget is 2 at L3 and grows with new slot levels', () => {
     expect(evocationSavantBudget(savant())).toBe(2); // max slot 2 → 2
-    expect(evocationSavantBudget(savant({ level: 5, spell_slots_max: { 1: 4, 2: 3, 3: 2 } }))).toBe(3);
+    expect(evocationSavantBudget(savant({ level: 5, spell_slots_max: { 1: 4, 2: 3, 3: 2 } }))).toBe(
+      3
+    );
     expect(evocationSavantBudget(makeChar({ character_class: 'Wizard', level: 3 }))).toBe(0); // not an evoker
   });
 
@@ -302,8 +384,13 @@ describe('Evocation Savant (L3) — free spellbook additions', () => {
 
   it('rejects a non-Evocation spell', () => {
     const c = featCtx(savant());
-    const res = handleChooseEvocationSavant(c, { type: 'choose_evocation_savant', spellId: 'charm_person' });
-    expect(res).toEqual({ rejected: expect.stringMatching(/isn't an eligible Wizard Evocation spell/) });
+    const res = handleChooseEvocationSavant(c, {
+      type: 'choose_evocation_savant',
+      spellId: 'charm_person',
+    });
+    expect(res).toEqual({
+      rejected: expect.stringMatching(/isn't an eligible Wizard Evocation spell/),
+    });
   });
 
   it('stops once the budget is spent', () => {

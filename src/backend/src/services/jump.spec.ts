@@ -49,7 +49,15 @@ function jumpState(opts: {
     speed: 30,
   });
   const entities = [
-    { id: 'pc-1', isEnemy: false, pos: { x: 1, y: 1 }, hp: 30, maxHp: 30, conditions: [], condition_durations: {} },
+    {
+      id: 'pc-1',
+      isEnemy: false,
+      pos: { x: 1, y: 1 },
+      hp: 30,
+      maxHp: 30,
+      conditions: [],
+      condition_durations: {},
+    },
   ];
   if (opts.blockerAt) {
     entities.push({

@@ -14,7 +14,7 @@ afterEach(() => vi.restoreAllMocks());
 const wizard = (
   level: number,
   slots: { max: Record<number, number>; used: Record<number, number> },
-  extra: Record<string, unknown> = {},
+  extra: Record<string, unknown> = {}
 ) =>
   makeState({
     character_class: 'Wizard',
@@ -74,9 +74,13 @@ describe('Arcane Recovery — short-rest slot recovery', () => {
 
   it('resets on a long rest (flag cleared, slots already full)', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.99);
-    const spent = wizard(4, { max: { 1: 2 }, used: { 1: 1 } }, {
-      class_resource_uses: { arcane_recovery_used: 1 },
-    });
+    const spent = wizard(
+      4,
+      { max: { 1: 2 }, used: { 1: 1 } },
+      {
+        class_resource_uses: { arcane_recovery_used: 1 },
+      }
+    );
     const r = await takeAction({
       action: { type: 'long_rest' },
       history: [],

@@ -21,7 +21,15 @@ const seed: Seed = {
   connections: { [ctx.startRoomId]: [] },
   enemies: {
     [ctx.startRoomId]: [
-      { id: ENEMY, name: 'Stag', hp: 120, ac: 12, damage: '1d6', toHit: 3, xp: 50 } as unknown as Enemy,
+      {
+        id: ENEMY,
+        name: 'Stag',
+        hp: 120,
+        ac: 12,
+        damage: '1d6',
+        toHit: 3,
+        xp: 50,
+      } as unknown as Enemy,
     ],
   },
   loot: {},
@@ -49,8 +57,24 @@ function markedRanger(level: number): GameState {
     ],
     initiative_idx: 0,
     entities: [
-      { id: 'pc-1', isEnemy: false, pos: { x: 4, y: 5 }, hp: 30, maxHp: 30, conditions: [], condition_durations: {} },
-      { id: ENEMY, isEnemy: true, pos: { x: 5, y: 5 }, hp: 120, maxHp: 120, conditions: [], condition_durations: {} },
+      {
+        id: 'pc-1',
+        isEnemy: false,
+        pos: { x: 4, y: 5 },
+        hp: 30,
+        maxHp: 30,
+        conditions: [],
+        condition_durations: {},
+      },
+      {
+        id: ENEMY,
+        isEnemy: true,
+        pos: { x: 5, y: 5 },
+        hp: 120,
+        maxHp: 120,
+        conditions: [],
+        condition_durations: {},
+      },
     ],
   } as unknown as GameState;
 }
@@ -93,7 +117,11 @@ describe('Relentless Hunter (L13) — Hunter’s Mark concentration holds', () =
 
   it('a L13 Ranger never rolls — the mark holds through damage', () => {
     const char = concentratingRanger(13);
-    const { char: after, note } = checkConcentration(char, makeState({}, { characters: [char] }), 40);
+    const { char: after, note } = checkConcentration(
+      char,
+      makeState({}, { characters: [char] }),
+      40
+    );
     expect(note).toMatch(/Relentless Hunter/);
     expect(after.concentrating_on?.spellId).toBe('hunters_mark');
   });

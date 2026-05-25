@@ -16,9 +16,19 @@ afterEach(() => vi.restoreAllMocks());
 
 describe('hasSuperiorHuntersDefense', () => {
   it('gates on Hunter subclass + L15', () => {
-    expect(hasSuperiorHuntersDefense(makeChar({ character_class: 'Ranger', subclass: 'hunter', level: 15 }))).toBe(true);
-    expect(hasSuperiorHuntersDefense(makeChar({ character_class: 'Ranger', subclass: 'hunter', level: 14 }))).toBe(false);
-    expect(hasSuperiorHuntersDefense(makeChar({ character_class: 'Ranger', level: 15 }))).toBe(false); // no subclass
+    expect(
+      hasSuperiorHuntersDefense(
+        makeChar({ character_class: 'Ranger', subclass: 'hunter', level: 15 })
+      )
+    ).toBe(true);
+    expect(
+      hasSuperiorHuntersDefense(
+        makeChar({ character_class: 'Ranger', subclass: 'hunter', level: 14 })
+      )
+    ).toBe(false);
+    expect(hasSuperiorHuntersDefense(makeChar({ character_class: 'Ranger', level: 15 }))).toBe(
+      false
+    ); // no subclass
   });
 });
 
@@ -41,12 +51,26 @@ function enemyCtx(target: Character): ActionContext {
   } as unknown as ActionContext;
 }
 const swing = (ctx: ActionContext, mi: number) =>
-  handleEnemyAttack(ctx, { type: 'enemy_attack', targetCharId: 'pc-1', advIdx: 0, multiattackIdx: mi });
+  handleEnemyAttack(ctx, {
+    type: 'enemy_attack',
+    targetCharId: 'pc-1',
+    advIdx: 0,
+    multiattackIdx: mi,
+  });
 const after = (ctx: ActionContext, fallback: Character) =>
   ctx.enemySubAttack?.outcome === 'done' ? ctx.enemySubAttack.target : fallback;
 
 const hunter15 = (over: Partial<Character> = {}) =>
-  makeChar({ id: 'pc-1', character_class: 'Ranger', subclass: 'hunter', level: 15, hp: 30, max_hp: 30, ac: 13, ...over });
+  makeChar({
+    id: 'pc-1',
+    character_class: 'Ranger',
+    subclass: 'hunter',
+    level: 15,
+    hp: 30,
+    max_hp: 30,
+    ac: 13,
+    ...over,
+  });
 
 describe('Superior Hunter’s Defense — integration', () => {
   it('halves the first hit and spends the reaction, then halves the same type free', () => {
