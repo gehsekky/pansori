@@ -3619,6 +3619,23 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       });
     }
 
+    // SRD Warlock Magical Cunning (L2) — bonus action: regain expended Pact
+    // Magic slots (half, or all at L20 Eldritch Master), 1/long rest.
+    if (
+      hasClass(char, 'warlock') &&
+      getClassLevel(char, 'warlock') >= 2 &&
+      !char.turn_actions.bonus_action_used &&
+      !(char.class_resource_uses?.magical_cunning_used ?? 0) &&
+      Object.values(char.spell_slots_used ?? {}).reduce((a, b) => a + b, 0) > 0
+    ) {
+      choices.push({
+        label: 'Magical Cunning — bonus action: regain expended Pact Magic slots (1/long rest)',
+        action: { type: 'use_class_feature', featureId: 'magical_cunning' },
+        kind: 'class_feature',
+        requiresBonusAction: true,
+      });
+    }
+
     // Bard: Bardic Inspiration (bonus action)
     if (hasClass(char, 'bard')) {
       const biUses =

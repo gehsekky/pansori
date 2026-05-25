@@ -297,6 +297,46 @@ export function handleCasterFeature(ctx: ActionContext, fid: string): boolean {
     return true;
   }
 
+  // SRD Warlock Magical Cunning (L2) — as a Bonus Action, regain expended Pact
+  // Magic slots up to half your max (round up), 1/Long Rest. SRD Eldritch
+  // Master (L20) upgrades this to regain ALL expended Pact Magic slots.
+  if (fid === 'magical_cunning') {
+    if (!hasClass(char, 'warlock') || getClassLevel(char, 'warlock') < 2) {
+      ctx.narrative = 'Magical Cunning requires a Warlock of level 2.';
+      return true;
+    }
+    if ((char.class_resource_uses?.magical_cunning_used ?? 0) > 0) {
+      ctx.narrative = 'Magical Cunning is spent — it returns after a long rest.';
+      return true;
+    }
+    if (char.turn_actions.bonus_action_used) {
+      ctx.narrative = 'Bonus action already used this turn.';
+      return true;
+    }
+    const maxSlots = Object.values(char.spell_slots_max ?? {}).reduce((a, b) => a + b, 0);
+    const usedTotal = Object.values(char.spell_slots_used ?? {}).reduce((a, b) => a + b, 0);
+    if (usedTotal <= 0) {
+      ctx.narrative = 'No expended Pact Magic slots to regain.';
+      return true;
+    }
+    const eldritchMaster = getClassLevel(char, 'warlock') >= 20;
+    let regain = eldritchMaster ? usedTotal : Math.ceil(maxSlots / 2);
+    const newUsed: Record<number, number> = { ...(char.spell_slots_used ?? {}) };
+    for (const key of Object.keys(newUsed)) {
+      if (regain <= 0) break;
+      const lvl = Number(key);
+      const take = Math.min(newUsed[lvl], regain);
+      newUsed[lvl] -= take;
+      regain -= take;
+    }
+    char.spell_slots_used = newUsed;
+    char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
+    char.class_resource_uses = { ...(char.class_resource_uses ?? {}), magical_cunning_used: 1 };
+    const regained = usedTotal - Object.values(newUsed).reduce((a, b) => a + b, 0);
+    ctx.narrative = `${char.name} — Magical Cunning! Regains ${regained} expended Pact Magic slot${regained === 1 ? '' : 's'}${eldritchMaster ? ' (Eldritch Master: all of them)' : ''}.`;
+    return true;
+  }
+
   // SRD Fiend Warlock Hurl Through Hell (L14) — once per turn, after hitting a
   // creature: it makes a CHA save vs your spell DC or takes 8d10 Psychic (if
   // not a Fiend) and is Incapacitated until the end of your next turn.
