@@ -1,5 +1,5 @@
 import { SQUARE_SIZE, findPath, opportunityAttackTriggers, posEqual } from '../gridEngine.js';
-import { effectiveSpeed, getEnemyById } from '../gameEngine.js';
+import { effectiveSpeed, getEnemyById, wallObstacleCells } from '../gameEngine.js';
 import { hasEscapeTheHorde, hasSecondStoryWork } from '../multiclass.js';
 import type { ActionHandler } from './types.js';
 import { applyDamage } from '../damage.js';
@@ -89,9 +89,14 @@ export const handleGridMove: ActionHandler<{
   // an empty space — flying doesn't let you land in a wall.
   const flySpeedFt = char.fly_speed_ft ?? 0;
   const isFlying = flySpeedFt > 0 && flySpeedFt >= walkSpeedFt;
+  // Transient wall spells that block movement (Wall of Force) stop everyone,
+  // including flyers — nothing physically passes through. Opaque-only walls
+  // (Wall of Fire) don't set blocksMovement, so they aren't here.
+  const wallMoveCells = wallObstacleCells(ctx.st, ctx.roomId, 'movement');
   const blocked = [
     ...ctx.st.entities.filter((e) => e.id !== char.id && e.hp > 0).map((e) => e.pos),
     ...(isFlying ? [] : roomObstacles),
+    ...wallMoveCells,
   ];
 
   const path = findPath(charEntity.pos, action.to, blocked, gridW, gridH);

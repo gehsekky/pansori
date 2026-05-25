@@ -17,6 +17,7 @@ import { runReviveSpell } from './revive.js';
 import { runSaveSpell } from './save.js';
 import { runSummonSpell } from './summon.js';
 import { runUtilitySpell } from './utility.js';
+import { runWallOfFire } from './wall.js';
 import { transmutedDamageType } from '../../rulesEngine.js';
 import { updatePcActor } from '../actor.js';
 
@@ -329,6 +330,16 @@ export const handleCastSpell: ActionHandler<{
   } else if (spell.damage && !spell.savingThrow && !spell.attackRoll) {
     const r = runAutoHitSpell(ctx, spellTarget, dmgSpell, slotLevel, slotNote);
     spellDmg = r.spellDmg;
+  }
+
+  // ── Wall/terrain spells ───────────────────────────────────────────────
+  // Wall of Fire deals its line damage and then raises a transient opaque
+  // barrier (blocks line of sight) tied to the caster's concentration.
+  if (
+    spell.id === 'wall_of_fire' &&
+    runWallOfFire(ctx, dmgSpell, slotLevel, dc, spellDmg, spellTargetId)
+  ) {
+    return;
   }
 
   // ── AOE spells on grid ────────────────────────────────────────────────

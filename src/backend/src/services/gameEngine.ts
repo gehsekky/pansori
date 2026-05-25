@@ -597,7 +597,33 @@ export function breakConcentration(
   for (const sid of summonIds) {
     newSt = removeCombatant(newSt, sid);
   }
+  // RE-4 — transient wall/terrain spells (Wall of Fire/Force) vanish when the
+  // caster's concentration ends. Walls are keyed by caster, so this clears
+  // them regardless of which spell dropped (voluntary, damage, or expiry —
+  // the expiry path routes through here too).
+  if (newSt.spell_walls?.some((w) => w.casterId === char.id)) {
+    newSt = { ...newSt, spell_walls: newSt.spell_walls.filter((w) => w.casterId !== char.id) };
+  }
   return { char: newChar, st: newSt };
+}
+
+// RE-4 — cells occupied by transient wall/terrain spells in `roomId`, filtered
+// by what they obstruct. Merged into the obstacle set used for line of sight /
+// cover (`kind: 'los'`) and into the blocked set for movement
+// (`kind: 'movement'`).
+export function wallObstacleCells(
+  st: GameState,
+  roomId: string,
+  kind: 'los' | 'movement'
+): GridPos[] {
+  const cells: GridPos[] = [];
+  for (const wall of st.spell_walls ?? []) {
+    if (wall.roomId !== roomId) continue;
+    if (kind === 'los' ? wall.blocksLineOfSight : wall.blocksMovement) {
+      cells.push(...wall.cells);
+    }
+  }
+  return cells;
 }
 
 export function checkConcentration(
@@ -6424,8 +6450,13 @@ export async function runEnemyTurns(args: {
   const orderLen = st.initiative_order.length;
   let resumeMi = args.startMultiattackIdx;
   // Static obstacles in the current room — pathfinding for enemy approach
-  // must route around these the same way PC movement does.
-  const roomObstacleCells = args.seed.rooms.find((r) => r.id === st.current_room)?.obstacles ?? [];
+  // must route around these the same way PC movement does. Includes transient
+  // wall spells: their cells block both enemy movement and line of sight.
+  const roomObstacleCells = [
+    ...(args.seed.rooms.find((r) => r.id === st.current_room)?.obstacles ?? []),
+    ...wallObstacleCells(st, st.current_room, 'movement'),
+    ...wallObstacleCells(st, st.current_room, 'los'),
+  ];
 
   while (
     st.combat_active &&
@@ -6821,10 +6852,14 @@ export async function takeAction({
 
   const worldName = getWorldName(seed);
   const roomId = st.current_room;
-  // Static obstacle cells (columns, walls, debris) in the current room.
-  // Combined with entity positions when computing cover bonuses below so
-  // the grid feels tactically real.
-  const roomObstacleCells = seed.rooms.find((r) => r.id === roomId)?.obstacles ?? [];
+  // Static obstacle cells (columns, walls, debris) in the current room, plus
+  // any transient sight-blocking wall spell (Wall of Fire/Force). Combined
+  // with entity positions when computing cover / line of sight below so the
+  // grid feels tactically real.
+  const roomObstacleCells = [
+    ...(seed.rooms.find((r) => r.id === roomId)?.obstacles ?? []),
+    ...wallObstacleCells(st, roomId, 'los'),
+  ];
   // Living enemies in this room (multi-enemy support). For legacy narrative use,
   // `enemy` is the first living enemy; resolution code should target a specific
   // enemy via `action.targetEnemyId`. Banished enemies (Banishment spell) are
