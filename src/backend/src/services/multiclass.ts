@@ -614,6 +614,49 @@ export function improvedPotentTempHp(char: Character): number {
   return 2 * Math.max(0, abilityMod(char.wis));
 }
 
+// SRD 5.2.1 — spells of the Evocation school present in pansori. School is
+// intrinsic to a spell, but pansori only needs the Evocation set today (the
+// Evoker subclass is its sole consumer), so we maintain it as a verified list
+// rather than tagging every spell. Spans class lists — an Evoker casts only
+// the arcane ones, but the school is the same regardless of caster.
+const EVOCATION_SPELL_IDS = new Set<string>([
+  // Cantrips
+  'fire_bolt',
+  'ray_of_frost',
+  'shocking_grasp',
+  'light',
+  'dancing_lights',
+  'sacred_flame',
+  'eldritch_blast',
+  // Leveled
+  'magic_missile',
+  'guiding_bolt',
+  'hellish_rebuke',
+  'chromatic_orb',
+  'thunderwave',
+  'burning_hands',
+  'shatter',
+  'acid_arrow',
+  'scorching_ray',
+  'continual_flame',
+  'daylight',
+  'fireball',
+  'lightning_bolt',
+  'cone_of_cold',
+  'wall_of_fire',
+]);
+
+/** True if the spell belongs to the Evocation school (SRD 5.2.1). */
+export function isEvocationSpell(spell: { id: string }): boolean {
+  return EVOCATION_SPELL_IDS.has(spell.id);
+}
+
+/** SRD Evoker Potent Cantrip (L3) — the evoker's damaging cantrips deal half
+ *  damage even on a miss / successful save (instead of none). */
+export function hasPotentCantrip(char: Character): boolean {
+  return char.subclass === 'evoker' && getClassLevel(char, 'wizard') >= 3;
+}
+
 export function hasDangerSense(char: Character): boolean {
   if (
     (char.conditions ?? []).some((c) =>

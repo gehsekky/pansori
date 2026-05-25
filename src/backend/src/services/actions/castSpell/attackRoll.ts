@@ -8,9 +8,10 @@ import {
   rollDiceEmpowered,
   upcastDamage,
 } from '../../rulesEngine.js';
-import { elementalAffinityBonus, potentSpellcastingBonus } from '../../multiclass.js';
+import { elementalAffinityBonus, hasPotentCantrip, potentSpellcastingBonus } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import { composeNow } from '../../narrative/compose.js';
+import { fmt } from '../../narrativeFmt.js';
 import { pickCastPrefix } from './utils.js';
 
 /**
@@ -64,6 +65,14 @@ export function runAttackRollSpell(
       targetAc: spellTarget.ac,
       atkNote,
     });
+    // SRD Evoker Potent Cantrip (L3) — a damaging cantrip that misses still
+    // deals half its damage (no other effect). Return done:false so the
+    // orchestrator's single-target applicator lands the halved damage.
+    if (hasPotentCantrip(char) && spell.level === 0 && spell.damage) {
+      const missHalf = Math.floor(rollDice(cantripDamageDice(spell, char.level) || '1d4') / 2);
+      ctx.narrative += ` ${fmt.note(`[Potent Cantrip: half damage on a miss — ${missHalf}]`)}`;
+      return { done: false, spellDmg: missHalf, spellHit: false };
+    }
     return { done: true, spellDmg: 0, spellHit: false };
   }
   const atkDmgExpr =
