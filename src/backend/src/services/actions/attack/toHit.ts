@@ -9,7 +9,7 @@ import {
 } from '../../rulesEngine.js';
 import type { Enemy, InventoryItem, LootItem } from '../../../types.js';
 import { coverBonus, distanceFeet, isFlankingPosition } from '../../gridEngine.js';
-import { getClassLevel, hasClass } from '../../multiclass.js';
+import { getClassLevel, hasClass, hasFeralSenses } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import { hasFightingStyle } from '../../fightingStyle.js';
 import { isHeavilyEncumbered } from '../../gameEngine.js';
@@ -126,7 +126,12 @@ export function computeToHitContext(
       );
     }
   }
-  const conditionDisadv = pc.char.conditions.some((c) => DISADV_CONDITIONS.has(c));
+  // SRD Ranger Feral Senses (L18) — Blindsight; the ranger ignores Blinded
+  // for its own attack rolls (other disadvantage conditions still apply).
+  const ignoreBlinded = hasFeralSenses(pc.char);
+  const conditionDisadv = pc.char.conditions.some(
+    (c) => DISADV_CONDITIONS.has(c) && !(c === 'blinded' && ignoreBlinded)
+  );
   const exhaustionDisadv = (pc.char.exhaustion_level ?? 0) >= 3;
   const heavyEncumberedDisadv = isHeavilyEncumbered(pc.char);
   const smallSpecies = pc.char.species ? SRD_SPECIES[pc.char.species]?.size === 'small' : false;
@@ -293,7 +298,11 @@ export function computeToHitContext(
 
   const disadvReasons = [
     rangedInMelee ? 'ranged in melee' : '',
-    conditionDisadv ? pc.char.conditions.filter((c) => DISADV_CONDITIONS.has(c)).join(', ') : '',
+    conditionDisadv
+      ? pc.char.conditions
+          .filter((c) => DISADV_CONDITIONS.has(c) && !(c === 'blinded' && ignoreBlinded))
+          .join(', ')
+      : '',
     exhaustionDisadv ? 'exhaustion' : '',
     heavyEncumberedDisadv ? 'heavily encumbered' : '',
     heavyWeaponSmallDisadv ? 'heavy weapon — Small creature' : '',
