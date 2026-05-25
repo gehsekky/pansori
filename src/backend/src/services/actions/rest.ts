@@ -237,6 +237,7 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
     delete restoredUses.wholeness_of_body_used; // Monk Open Hand Wholeness of Body refreshes on a long rest
     delete restoredUses.divine_intervention_used; // Cleric Divine Intervention available again after a long rest
     delete restoredUses.overchannel_uses; // Evoker Overchannel — free first use resets after a long rest
+    delete restoredUses.holy_nimbus_used; // Paladin Holy Nimbus — available again after a long rest
     // Wizard Signature Spells — free L3 casts recharge on a long rest too.
     for (const k of Object.keys(restoredUses)) {
       if (k.startsWith('signature_used_')) delete restoredUses[k];
