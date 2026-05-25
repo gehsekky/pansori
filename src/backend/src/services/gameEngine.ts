@@ -78,6 +78,7 @@ import {
   hasFeralSenses,
   hasHeroicWarrior,
   hasMultiattackDefense,
+  hasRetaliation,
   hasSlipperyMind,
   hasSuperiorHuntersDefense,
   hunterFeatureOptions,
@@ -3336,6 +3337,23 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       });
     }
 
+    // SRD Berserker Intimidating Presence (L14) — bonus action: a 30-ft WIS-save
+    // fear, 1/long rest or by expending a Rage use.
+    if (
+      char.subclass === 'berserker' &&
+      getClassLevel(char, 'barbarian') >= 14 &&
+      !char.turn_actions.bonus_action_used &&
+      ((char.class_resource_uses?.intimidating_presence_used ?? 0) === 0 ||
+        (char.class_resource_uses?.rage_uses ?? rageUsesMax(getClassLevel(char, 'barbarian'))) > 0)
+    ) {
+      choices.push({
+        label: 'Intimidating Presence — bonus action: 30-ft fear (WIS save)',
+        action: { type: 'use_class_feature', featureId: 'intimidating_presence' },
+        kind: 'class_feature',
+        requiresBonusAction: true,
+      });
+    }
+
     // Path of the Berserker — Frenzy (PHB p.49): while raging, make a
     // single melee weapon attack as a bonus action each turn. RAW also
     // imposes exhaustion when the rage ends; deferred to keep MVP scope.
@@ -5105,6 +5123,78 @@ function applyPcOpportunityAttacks(args: {
 }
 
 /**
+ * SRD Berserker Retaliation (Barbarian L10) — after the barbarian takes damage
+ * from an adjacent creature, it uses its Reaction to make one melee attack back
+ * against that creature. A single-attacker analogue of
+ * `applyPcOpportunityAttacks`: rolls a melee swing, consumes the reaction, and
+ * applies damage + kill. (Rage damage bonus isn't added — matching the
+ * simplified OA attack profile.)
+ */
+function applyBarbarianRetaliation(args: {
+  st: GameState;
+  barbarianId: string;
+  enemyId: string;
+  enemyAc: number;
+  enemyName: string;
+  context: Context;
+}): { st: GameState; narrative: string } {
+  let st = args.st;
+  const pcIdx = st.characters.findIndex((c) => c.id === args.barbarianId);
+  if (pcIdx < 0) return { st, narrative: '' };
+  const pc = st.characters[pcIdx];
+  const weaponInstance = pc.equipped_weapon
+    ? pc.inventory?.find((i) => i.instance_id === pc.equipped_weapon)
+    : null;
+  const weaponItem = weaponInstance
+    ? args.context.lootTable.find((l) => l.id === weaponInstance.id)
+    : null;
+  // Retaliation is a melee attack — a ranged-only weapon can't make it.
+  if (weaponItem?.range === 'ranged' && !weaponItem.thrown) return { st, narrative: '' };
+  const weaponProficient = hasWeaponProficiency(
+    pc.weapon_proficiencies ?? [],
+    weaponItem?.weaponType
+  );
+  const atk = resolvePlayerAttack(
+    { str: pc.str, dex: pc.dex, level: pc.level },
+    weaponItem?.damage ?? null,
+    args.enemyAc,
+    weaponItem?.finesse ?? false,
+    false,
+    false,
+    weaponProficient,
+    false,
+    20,
+    0,
+    pc.species === 'halfling'
+  );
+  st = {
+    ...st,
+    characters: st.characters.map((c, i) =>
+      i === pcIdx ? { ...c, turn_actions: { ...c.turn_actions, reaction_used: true } } : c
+    ),
+  };
+  if (!atk.hit) {
+    return { st, narrative: ` 💢 ${pc.name} retaliates against ${args.enemyName} — but misses.` };
+  }
+  const enemyHpNow = Math.max(
+    0,
+    (st.entities?.find((e) => e.id === args.enemyId && e.isEnemy)?.hp ?? 0) - atk.damage
+  );
+  st = {
+    ...st,
+    entities: (st.entities ?? []).map((e) =>
+      e.id === args.enemyId && e.isEnemy ? { ...e, hp: enemyHpNow } : e
+    ),
+  };
+  let narrative = ` 💢 ${pc.name} retaliates against ${args.enemyName} for ${fmt.dmg(atk.damage)}!`;
+  if (enemyHpNow <= 0) {
+    st = { ...st, enemies_killed: [...st.enemies_killed, args.enemyId] };
+    narrative += ` ${args.enemyName} drops!`;
+  }
+  return { st, narrative };
+}
+
+/**
  * Run an enemy's multiattack sequence against a PC target. Each
  * iteration calls `computeEnemyAttack` to roll the attack + damage
  * into a proposed snapshot, then checks for two reaction windows
@@ -6333,6 +6423,7 @@ export async function runEnemyTurns(args: {
             narrative += `\n\n[${rm.name}'s turn]`;
           }
           // ── Multiattack loop ─ delegated to `runEnemyMultiattackLoop` ─────
+          const targetHpBeforeAtk = target.hp; // for Berserker Retaliation
           const multi = await runEnemyMultiattackLoop({
             enemy: rm,
             enemyId: eEntry.id,
@@ -6384,6 +6475,42 @@ export async function runEnemyTurns(args: {
             if (allDead) st = endCombatState(st);
           }
           st = commitCharacter(st, target);
+
+          // SRD Berserker Retaliation (L10) — the barbarian took damage from
+          // this enemy; if it's adjacent and a reaction is available, strike
+          // back. Auto-resolves (mirrors the auto OA / save policies).
+          const retalBarb = st.characters[targetCharIdx];
+          if (
+            retalBarb &&
+            hasRetaliation(retalBarb) &&
+            canReact(retalBarb) &&
+            !retalBarb.dead &&
+            retalBarb.hp > 0 &&
+            retalBarb.hp < targetHpBeforeAtk &&
+            !st.enemies_killed.includes(eEntry.id)
+          ) {
+            const enemyEntRetal = st.entities?.find((e) => e.id === eEntry.id && e.isEnemy);
+            const barbEntRetal = st.entities?.find((e) => e.id === retalBarb.id && !e.isEnemy);
+            const adjacent =
+              enemyEntRetal && barbEntRetal
+                ? Math.max(
+                    Math.abs(enemyEntRetal.pos.x - barbEntRetal.pos.x),
+                    Math.abs(enemyEntRetal.pos.y - barbEntRetal.pos.y)
+                  ) <= 1
+                : true; // off the grid: assume the melee attacker is adjacent
+            if (adjacent && (enemyEntRetal?.hp ?? 0) > 0) {
+              const retal = applyBarbarianRetaliation({
+                st,
+                barbarianId: retalBarb.id,
+                enemyId: eEntry.id,
+                enemyAc: rm.ac,
+                enemyName: rm.name,
+                context: args.context,
+              });
+              st = retal.st;
+              narrative += retal.narrative;
+            }
+          }
         }
       }
     }
