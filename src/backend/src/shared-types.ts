@@ -748,6 +748,23 @@ export type FeatEffect =
       // `char.skill_proficiencies`.
       kind: 'skill-proficiencies';
       count: number;
+    }
+  | {
+      // Epic Boon feats (SRD 5.2.1, L19+). Every boon grants +1 to an
+      // ability (via `abilityBonus`, capped at 30 for epic boons) plus a
+      // signature benefit keyed by `boon`. Take-time applies only passive
+      // grants (e.g. Truesight's range); the active benefits fire from
+      // their own runtime hooks (attack resolution, casting, the D20-test
+      // reaction path, the damage-resistance chain).
+      kind: 'epic-boon';
+      boon:
+        | 'combat-prowess' // Peerless Aim — turn a miss into a hit, 1/turn
+        | 'dimensional-travel' // Blink Steps — teleport 30 ft after Attack/Magic
+        | 'fate' // Improve Fate — ±2d4 to a D20 Test within 60 ft, 1/rest
+        | 'irresistible-offense' // Overcome Defenses + Overwhelming Strike
+        | 'spell-recall' // Free Casting — 1d4 slot refund on L1–4 casts
+        | 'night-spirit' // Merge with Shadows + Shadowy Form
+        | 'truesight'; // Truesight 60 ft
     };
 
 /**

@@ -690,9 +690,11 @@ export const handleTakeFeat: ActionHandler<{
     cantripChoices: action.cantripChoices,
     l1Choice: action.l1Choice,
   });
-  // ASI-slot consumption — only when an ASI was pending (general-feat
-  // path). Origin feats from background don't gate on asi_pending.
-  const consumeAsi = char.asi_pending && feat.category === 'general';
+  // ASI-slot consumption — only when an ASI was pending and the feat is
+  // taken in lieu of it: general feats at any milestone, or an epic boon at
+  // level 19+. Origin feats from a background don't gate on asi_pending.
+  const consumeAsi =
+    char.asi_pending && (feat.category === 'general' || feat.category === 'epic-boon');
   updatePcActor(ctx, consumeAsi ? { ...newChar, asi_pending: false } : newChar);
   ctx.narrative = narrative;
 };
