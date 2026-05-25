@@ -599,8 +599,21 @@ Bonus(char, st)`: a creature within 10 ft of a conscious L6+ Paladin (the
       carries both the revive penalty and Exhaustion (already threaded into
       attacks/saves/checks/passives); `effectiveSpeed` drops 5 ft/level; the
       old binary-Disadvantage model and the 2014 L4 HP-halving were removed.
-- [ ] **Ability-score generation** — standard array / point buy at
-      character creation (scores are effectively hard-coded today).
+- [~] **Ability-score generation** — *backend done (2026-05-25).*
+      - [x] **Point buy / standard array validation** — pure helpers in
+            `services/abilityScores.ts` (`pointBuyTotalCost`,
+            `isValidPointBuy`, `isStandardArray`, `isValidForMethod`).
+            `POST /session/new` 400s on an illegal declared spread via the
+            new optional `generation_method` enum on `CharacterInputSchema`;
+            omitted / `'manual'` trusts the client (backward compatible).
+      - [x] **Background ability-score increases applied** —
+            `applyAbilityScoreIncreases` adds +1 per listed background
+            ability before `conMod`/`maxHp` derive from the scores. (These
+            were defined on `Background` but silently never applied at
+            creation — a real correctness gap, now closed.)
+      - [ ] **Creation UI** — let the player pick the method and (for the
+            +2/+1 RAW split) which two abilities; FE follow-up. Backend
+            applies the "all three by +1" option today.
 - [~] **Class skill selection + skill→ability map** — *partially done
       (2026-05-25).*
       - [x] **skill→ability map** — `SKILL_ABILITY` (all 18 SRD skills) +
