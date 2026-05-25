@@ -2,6 +2,7 @@ import type { Enemy, Spell } from '../../../types.js';
 import {
   abilityMod,
   cantripDamageDice,
+  maxDice,
   resolveSpellAttack,
   rollCritical,
   rollDice,
@@ -83,13 +84,15 @@ export function runAttackRollSpell(
   const atkDmgExpr =
     spell.level === 0 ? cantripDamageDice(spell, char.level) : upcastDamage(spell, slotLevel);
   // SRD Metamagic Empowered Spell — reroll up to CHA-mod of the lowest damage
-  // dice, keeping the new rolls.
+  // dice, keeping the new rolls. SRD Evoker Overchannel — maximize the dice.
   const empowered = !!ctx.metamagic?.includes('empowered');
-  let spellDmg = empowered
-    ? rollDiceEmpowered(atkDmgExpr || '1d4', Math.max(1, abilityMod(char.cha)), atk.critical)
-    : atk.critical
-      ? rollCritical(atkDmgExpr || null)
-      : rollDice(atkDmgExpr || '1d4');
+  let spellDmg = ctx.overchannel
+    ? maxDice(atkDmgExpr || '1d4')
+    : empowered
+      ? rollDiceEmpowered(atkDmgExpr || '1d4', Math.max(1, abilityMod(char.cha)), atk.critical)
+      : atk.critical
+        ? rollCritical(atkDmgExpr || null)
+        : rollDice(atkDmgExpr || '1d4');
   // Agonizing Blast: Warlock invocation — add CHA mod to Eldritch Blast damage
   const agonizingBonus =
     spell.id === 'eldritch_blast' && (char.feats ?? []).includes('agonizing_blast')

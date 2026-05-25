@@ -201,3 +201,57 @@ describe('Sculpt Spells (L6) — allies auto-succeed and take no damage', () => 
     expect(r.newState.characters.find((c) => c.id === 'pc-2')!.hp).toBeLessThan(40);
   });
 });
+
+describe('Overchannel (L14) — maximize a damaging spell, escalating cost', () => {
+  const hitSeed: Seed = {
+    ...seed,
+    enemies: {
+      [ctx.startRoomId]: [
+        { id: ENEMY, name: 'Dummy', hp: 80, ac: 5, damage: '1d4', toHit: 3, xp: 50, dex: 8 } as unknown as Enemy,
+      ],
+    },
+  };
+  // Guiding Bolt: 4d6 radiant, spell attack, Evocation. L14 Evoker also has
+  // Empowered Evocation (+INT). Maximized: 4×6 = 24, +3 INT = 27.
+  const overchannelGuidingBolt = (over: Partial<Character> = {}) =>
+    takeAction({
+      action: { type: 'cast_spell', spellId: 'guiding_bolt', slotLevel: 1, targetEnemyId: ENEMY, overchannel: true },
+      history: [],
+      state: evokerCombat({
+        level: 14,
+        hp: 60,
+        max_hp: 60,
+        spells_known: ['guiding_bolt'],
+        spell_slots_max: { 1: 4 },
+        spell_slots_used: {},
+        ...over,
+      }),
+      seed: hitSeed,
+      context: ctx,
+    });
+
+  it('first use is free and deals maximum damage', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5); // d20 = 11 → hit (not crit); dice maximized regardless
+    const r = await overchannelGuidingBolt();
+    const enemyHp = (r.newState.entities ?? []).find((e) => e.id === ENEMY)!.hp;
+    expect(80 - enemyHp).toBe(27); // 24 (max 4d6) + 3 (Empowered INT)
+    expect(r.newState.characters[0].class_resource_uses?.overchannel_uses).toBe(1);
+    expect(r.narrative).not.toMatch(/Necrotic backlash/); // first use is free
+    expect(r.narrative).toMatch(/maximum damage/);
+  });
+
+  it('a second use before a long rest deals escalating Necrotic backlash', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const r = await overchannelGuidingBolt({ class_resource_uses: { overchannel_uses: 1 } });
+    // 2nd use: (1+1) × slot level 1 = 2d12 Necrotic, ignoring resistance.
+    expect(r.newState.characters[0].class_resource_uses?.overchannel_uses).toBe(2);
+    expect(r.narrative).toMatch(/Necrotic backlash/);
+  });
+
+  it('requires an Evoker of level 14', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const r = await overchannelGuidingBolt({ level: 13 });
+    expect(r.narrative).toMatch(/requires an Evoker of level 14/);
+    expect((r.newState.entities ?? []).find((e) => e.id === ENEMY)!.hp).toBe(80); // nothing cast
+  });
+});

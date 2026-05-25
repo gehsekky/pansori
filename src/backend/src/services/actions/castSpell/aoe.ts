@@ -2,6 +2,7 @@ import type { Character, Spell } from '../../../types.js';
 import {
   abilityMod,
   applyDamageMultiplier,
+  maxDice,
   rollConditionSave,
   rollDice,
   upcastDamage,
@@ -118,8 +119,10 @@ export function runAoeSpell(
       );
       // SRD Evoker Empowered Evocation — +INT to the evocation's damage roll
       // (RAW: one roll applied to all targets, so every target shares the +INT).
+      // SRD Evoker Overchannel — maximize the spell's damage dice.
+      const aoeExpr = upcastDamage(spell, slotLevel) || (spell.damage ?? '0');
       const baseDmg =
-        rollDice(upcastDamage(spell, slotLevel) || (spell.damage ?? '0')) +
+        (ctx.overchannel ? maxDice(aoeExpr) : rollDice(aoeExpr)) +
         empoweredEvocationBonus(char, spell);
       const effDmg = tFailed ? baseDmg : spell.saveEffect === 'half' ? Math.floor(baseDmg / 2) : 0;
       const { damage: resDmg } = applyDamageMultiplier(effDmg, spell.damageType, targetEnemy);

@@ -77,6 +77,13 @@ export interface ActionContext {
   metamagic?: string[];
 
   /**
+   * Evoker Overchannel active for THIS cast — set by `runPrecast` when the
+   * `overchannel` action flag passes its gates (Evoker L14, level 1-5 slot,
+   * damaging spell). The damage-roll sites maximize their dice when true.
+   */
+  overchannel?: boolean;
+
+  /**
    * EE-2 side-channel — the `enemy_attack` handler reports its
    * `resolveEnemySubAttack` outcome (paused / killed-massive / done +
    * the updated target) here, since `DispatchResult` can't carry it.
