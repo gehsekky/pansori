@@ -196,7 +196,23 @@ export function handleRogueFeature(ctx: ActionContext, fid: string): boolean {
       ctx.narrative = 'Cunning Strike requires Rogue level 5.';
       return true;
     }
-    const effect = fid.replace('cunning_strike_', '') as 'trip' | 'poison' | 'withdraw' | 'disarm';
+    const effect = fid.replace('cunning_strike_', '') as NonNullable<
+      typeof pc.char.turn_actions.cunning_strike_pending
+    >;
+    // SRD Devious Strikes (Rogue L14) — Daze / Knock Out / Obscure are extra
+    // Cunning Strike options unlocked at L14.
+    if (
+      (effect === 'daze' || effect === 'knock_out' || effect === 'obscure') &&
+      getClassLevel(pc.char, 'rogue') < 14
+    ) {
+      ctx.narrative = 'Devious Strikes (Daze / Knock Out / Obscure) requires Rogue level 14.';
+      return true;
+    }
+    // SRD Supreme Sneak (Thief L9) — Stealth Attack keeps your Hide.
+    if (effect === 'stealth_attack' && !(pc.char.subclass === 'thief' && getClassLevel(pc.char, 'rogue') >= 9)) {
+      ctx.narrative = 'Stealth Attack requires a Thief of level 9.';
+      return true;
+    }
     pc.char.turn_actions = { ...pc.char.turn_actions, cunning_strike_pending: effect };
     ctx.narrative = `${pc.char.name} readies a Cunning Strike (${effect}) on the next Sneak Attack.`;
     return true;

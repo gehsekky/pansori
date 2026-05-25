@@ -317,7 +317,15 @@ export interface TurnActions {
   // 2024 PHB Rogue Cunning Strike (L5+) — when set, the next Sneak Attack
   // spends 1 die for the chosen effect (trip, poison, withdraw, disarm)
   // and one SA die is removed from the damage roll. Cleared after applied.
-  cunning_strike_pending?: 'trip' | 'poison' | 'withdraw' | 'disarm';
+  cunning_strike_pending?:
+    | 'trip'
+    | 'poison'
+    | 'withdraw'
+    | 'disarm'
+    | 'daze'
+    | 'knock_out'
+    | 'obscure'
+    | 'stealth_attack';
   movement_budget_remaining?: number; // feet remaining this turn; initialized to speed at turn start
   readied_action?: {
     trigger: string;

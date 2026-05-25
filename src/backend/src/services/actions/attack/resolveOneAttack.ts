@@ -750,6 +750,62 @@ export function resolveOneAttack(
         source: 'Cunning Strike: Disarm',
         prose: ` ${fmt.note(`[Cunning Strike — Disarm: ${target.name} drops their weapon!]`)}`,
       });
+    } else if (csEffect === 'daze' || csEffect === 'knock_out') {
+      // SRD Devious Strikes (L14) — Daze (CON save or dazed) / Knock Out (CON
+      // save or unconscious 1 min).
+      const enemyCon = (target.con ?? 10) as number;
+      const conSave = rollDice('1d20') + abilityMod(enemyCon);
+      const applied = csEffect === 'daze' ? 'dazed' : 'unconscious';
+      const label = csEffect === 'daze' ? 'Daze' : 'Knock Out';
+      if (conSave < csDc) {
+        ctx.st = {
+          ...ctx.st,
+          entities: (ctx.st.entities ?? []).map((e) =>
+            e.id === targetId && e.isEnemy
+              ? { ...e, conditions: [...e.conditions.filter((c) => c !== applied), applied] }
+              : e
+          ),
+        };
+        composeNow(ctx, {
+          kind: 'condition_applied',
+          targetId,
+          targetName: target.name,
+          condition: applied,
+          source: `Cunning Strike: ${label}`,
+          prose: ` ${fmt.note(`[Cunning Strike — ${label}: CON ${conSave} vs DC ${csDc} — ${target.name} is ${applied}!]`)}`,
+        });
+      } else {
+        ctx.narrative += ` ${fmt.note(`[Cunning Strike — ${label}: CON ${conSave} vs DC ${csDc} — resists]`)}`;
+      }
+    } else if (csEffect === 'obscure') {
+      // SRD Devious Strikes (L14) — Obscure: the target is Blinded until the
+      // end of its next turn (no save).
+      ctx.st = {
+        ...ctx.st,
+        entities: (ctx.st.entities ?? []).map((e) =>
+          e.id === targetId && e.isEnemy
+            ? { ...e, conditions: [...e.conditions.filter((c) => c !== 'blinded'), 'blinded'] }
+            : e
+        ),
+      };
+      composeNow(ctx, {
+        kind: 'condition_applied',
+        targetId,
+        targetName: target.name,
+        condition: 'blinded',
+        source: 'Cunning Strike: Obscure',
+        prose: ` ${fmt.note(`[Cunning Strike — Obscure: ${target.name} is blinded!]`)}`,
+      });
+    } else if (csEffect === 'stealth_attack') {
+      // SRD Supreme Sneak (Thief L9) — Stealth Attack: keep your Hide
+      // (Invisible) after the strike. (pansori doesn't drop Invisible on an
+      // attack, so this reaffirms it.)
+      updatePcActor(ctx, {
+        conditions: pc.char.conditions.includes('invisible')
+          ? pc.char.conditions
+          : [...pc.char.conditions, 'invisible'],
+      });
+      ctx.narrative += ` ${fmt.note(`[Cunning Strike — Stealth Attack: ${pc.char.name} stays hidden]`)}`;
     }
   }
 
