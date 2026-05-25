@@ -593,10 +593,12 @@ Bonus(char, st)`: a creature within 10 ft of a conscious L6+ Paladin (the
 - [ ] **Epic boons** (L19+ feat options) — SRD has 7: Combat Prowess,
       Dimensional Travel, Fate, Irresistible Offense, Spell Recall, the
       Night Spirit, Truesight. Slot into the existing `take_feat` surface.
-- [ ] **Exhaustion (2024 model)** — replace the binary-disadvantage-at-L3
-      approximation with the RAW **−2 to all d20 tests per level** and
-      **−5 ft speed per level**. `reviveD20Penalty` already shows the
-      per-d20 numeric-penalty threading pattern.
+- [x] **Exhaustion (2024 model) — done 2026-05-25** — RAW **−2 to all d20
+      tests per level** + **−5 ft speed per level**, no max-HP reduction,
+      lethal at 6. `reviveD20Penalty` was renamed `d20TestPenalty` and now
+      carries both the revive penalty and Exhaustion (already threaded into
+      attacks/saves/checks/passives); `effectiveSpeed` drops 5 ft/level; the
+      old binary-Disadvantage model and the 2014 L4 HP-halving were removed.
 - [ ] **Ability-score generation** — standard array / point buy at
       character creation (scores are effectively hard-coded today).
 - [ ] **Class skill selection** — today the skill *system* is real
