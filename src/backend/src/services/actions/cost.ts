@@ -75,6 +75,7 @@ export const ACTION_COSTS: Record<StructuredAction['type'], ActionCost> = {
   choose_spell_mastery: 'managed',
   choose_signature_spell: 'managed',
   choose_evocation_savant: 'managed',
+  memorize_spell: 'managed',
   // Lay on Hands self-manages its bonus-action cost (in combat only) so it
   // stays usable out of combat regardless of a lingering bonus_action_used.
   lay_on_hands: 'managed',

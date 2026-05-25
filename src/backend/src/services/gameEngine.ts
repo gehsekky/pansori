@@ -3170,6 +3170,29 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     }
   }
 
+  // ── Wizard Memorize Spell (L5) — short-rest prepared-spell swap ────────────
+  // Replace one prepared level-1+ spell with another from the spellbook. Only
+  // surfaces when the wizard has prepared spells AND unprepared known spells to
+  // swap between (MAX_CHOICES caps the swap matrix). (RE-2.)
+  if (!state.combat_active && context.spellTable && getClassLevel(char, 'wizard') >= 5) {
+    const preparedSet = new Set(char.prepared_spells ?? []);
+    const preparedLeveled = (char.prepared_spells ?? []).filter(
+      (id) => (context.spellTable![id]?.level ?? 0) >= 1
+    );
+    const knownUnprepared = (char.spells_known ?? []).filter(
+      (id) => (context.spellTable![id]?.level ?? 0) >= 1 && !preparedSet.has(id)
+    );
+    for (const out of preparedLeveled) {
+      for (const inId of knownUnprepared) {
+        if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+        choices.push({
+          label: `Memorize Spell: swap ${context.spellTable[out]!.name} → ${context.spellTable[inId]!.name}`,
+          action: { type: 'memorize_spell', swapOut: out, swapIn: inId },
+        });
+      }
+    }
+  }
+
   // ── Paladin Lay on Hands (L1) — bonus-action touch heal from the pool ──────
   // Works in combat (bonus action) and out of combat. One choice per injured
   // party member (including self). (RE-2.)
@@ -3193,7 +3216,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
 
   // ── Prepare spells (out of combat, prep-class only) ────────────────────────
   if (!state.combat_active) {
-    const prepClasses = ['cleric', 'paladin', 'druid'];
+    const prepClasses = ['cleric', 'paladin', 'druid', 'wizard'];
     if (prepClasses.some((c) => hasClass(char, c)) && (char.spells_known ?? []).length > 0) {
       const cap = preparedSpellsCap(char, context);
       // Cantrips are always known, not prepared (PHB p.234) — exclude

@@ -411,6 +411,48 @@ export const handleChooseEvocationSavant: ActionHandler<{
 };
 
 /**
+ * `memorize_spell`: SRD Wizard (L5) — during a rest, replace one prepared
+ * level-1+ spell with another level-1+ spell from the spellbook. Gated to a
+ * Wizard L5, out of combat. (RE-2.)
+ */
+export const handleMemorizeSpell: ActionHandler<{
+  type: 'memorize_spell';
+  swapOut: string;
+  swapIn: string;
+}> = (ctx, action) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can memorize spells.' };
+  const { char } = ctx.actor;
+  if (!hasClass(char, 'wizard') || getClassLevel(char, 'wizard') < 5) {
+    ctx.narrative = 'Memorize Spell requires a Wizard of level 5.';
+    return;
+  }
+  if (ctx.st.combat_active) {
+    ctx.narrative = 'You can only study your spellbook during a rest, not in combat.';
+    return;
+  }
+  const prepared = char.prepared_spells ?? [];
+  if (!prepared.includes(action.swapOut)) {
+    return { rejected: `${action.swapOut} isn't one of your prepared spells.` };
+  }
+  const outSpell = ctx.context.spellTable?.[action.swapOut];
+  const inSpell = ctx.context.spellTable?.[action.swapIn];
+  if (!inSpell || inSpell.level < 1) {
+    return { rejected: `${action.swapIn} isn't a level 1+ spell.` };
+  }
+  if (!(char.spells_known ?? []).includes(action.swapIn)) {
+    return { rejected: `${inSpell.name} isn't in your spellbook.` };
+  }
+  if (prepared.includes(action.swapIn)) {
+    ctx.narrative = `${inSpell.name} is already prepared.`;
+    return;
+  }
+  updatePcActor(ctx, {
+    prepared_spells: [...prepared.filter((s) => s !== action.swapOut), action.swapIn],
+  });
+  ctx.narrative = `${char.name} studies the spellbook — swaps ${outSpell?.name ?? action.swapOut} for ${inSpell.name}.`;
+};
+
+/**
  * `choose_expertise`: pick a skill proficiency to gain Expertise in (double
  * proficiency bonus). Granted by Rogue (L1 + L6) and Bard (L2 + L9). Validates
  * that the skill is one the character is proficient in, isn't already an
