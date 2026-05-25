@@ -668,8 +668,13 @@ Bonus(char, st)`: a creature within 10 ft of a conscious L6+ Paladin (the
       rules, fire resistance.
 - [ ] **Jumping** (long = STR ft, high = 3 + STR mod ft) — also flagged
       under architectural blockers.
-- [ ] **Line-of-sight / vision blocking by walls** — Bresenham LoS
-      respecting obstacles (pairs with the FE grid-fog item).
+- [~] **Line-of-sight / vision blocking by walls** — *targeting done
+      (2026-05-25).* `gridEngine.hasLineOfSight` (supercover `cellsOnLine`)
+      blocks ranged attacks (preattack) and offensive spell targeting
+      (isSpellOutOfRange) when a solid room obstacle lies strictly between
+      attacker and a non-adjacent target. Adjacent targets are exempt
+      (matches coverBonus). Remaining: FE grid-fog / vision reveal pairs
+      with this on the frontend.
 - [x] **Massive-damage instant death** (single hit ≥ max HP) — *done.*
       `isMassiveDamageDeath` (gameEngine.ts) implements SRD 5.2.1 Massive
       Damage (reduced to 0 with leftover ≥ HP max → dies outright, no death
