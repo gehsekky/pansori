@@ -9,6 +9,7 @@ import { applyFeatTake, canTakeFeat, getFeat } from '../feats.js';
 import { applyLevelUpForClass, mergeDraconicSpells, preparedSpellsCap } from '../gameEngine.js';
 import {
   canMulticlassInto,
+  expertiseEligibleSkills,
   expertiseSlots,
   getClassLevel,
   hasClass,
@@ -310,6 +311,14 @@ export const handleChooseExpertise: ActionHandler<{
   if (!match) {
     return {
       rejected: `You aren't proficient in ${action.skill}, so you can't gain Expertise in it.`,
+    };
+  }
+  // SRD Wizard Scholar (L2) restricts Expertise to a knowledge skill; Rogue/
+  // Bard Expertise allows any proficient skill. `expertiseEligibleSkills`
+  // encodes the per-character rule.
+  if (!expertiseEligibleSkills(char).some((s) => s.toLowerCase() === match.toLowerCase())) {
+    return {
+      rejected: `${match} isn't an eligible Expertise skill for you (Scholar is limited to a knowledge skill).`,
     };
   }
   const current = char.expertise_skills ?? [];

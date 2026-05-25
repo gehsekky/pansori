@@ -423,9 +423,26 @@ export function hasWordsOfCreation(char: Character): boolean {
 export function expertiseSlots(char: Character): number {
   const bard = getClassLevel(char, 'bard');
   const rogue = getClassLevel(char, 'rogue');
+  const wizard = getClassLevel(char, 'wizard');
   const bardSlots = bard >= 9 ? 4 : bard >= 2 ? 2 : 0;
   const rogueSlots = rogue >= 6 ? 4 : rogue >= 1 ? 2 : 0;
-  return bardSlots + rogueSlots;
+  // SRD Wizard Scholar (L2) — a single Expertise pick in a knowledge skill.
+  const wizardSlots = wizard >= 2 ? 1 : 0;
+  return bardSlots + rogueSlots + wizardSlots;
+}
+
+// SRD knowledge skills the Wizard's Scholar (L2) Expertise must be chosen from.
+const SCHOLAR_SKILLS = ['Arcana', 'History', 'Investigation', 'Medicine', 'Nature', 'Religion'];
+
+/** Skill proficiencies eligible for an Expertise pick. Rogue/Bard Expertise
+ *  allows any proficient skill; the Wizard's Scholar (L2) restricts to the
+ *  knowledge skills. A character with a Rogue/Bard pool gets the broad rule
+ *  (it dominates the Scholar restriction for the uncommon multiclass case). */
+export function expertiseEligibleSkills(char: Character): string[] {
+  const profs = char.skill_proficiencies ?? [];
+  const broad = getClassLevel(char, 'rogue') >= 1 || getClassLevel(char, 'bard') >= 2;
+  if (broad) return profs;
+  return profs.filter((s) => SCHOLAR_SKILLS.some((k) => k.toLowerCase() === s.toLowerCase()));
 }
 
 /**
