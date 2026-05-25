@@ -1,10 +1,11 @@
-import { abilityMod, d20TestPenalty, profBonus, rollDice } from '../rulesEngine.js';
+import { abilityMod, d20TestPenalty, profBonus, rollDice, skillCheck } from '../rulesEngine.js';
 import {
   applyConsequence,
   consumeLuckForCheck,
   getNpcAttitude,
   npcIsKilled,
 } from '../gameEngine.js';
+import { hasExpertise, hasJackOfAllTrades, hasReliableTalent } from '../multiclass.js';
 import type { ActionHandler } from './types.js';
 import { randomUUID } from 'crypto';
 import { updatePcActor } from './actor.js';
@@ -228,15 +229,27 @@ export const handleInfluence: ActionHandler<{
     : (npc?.persuasionDC ?? 12);
   const dc = Math.max(15, targetIntScore);
 
-  const chaMod = abilityMod(char.cha);
-  const skillName = action.skill; // 'persuasion' | 'deception' | 'intimidation'
-  const profMod = char.skill_proficiencies?.includes(skillName) ? profBonus(char.level) : 0;
-  // Lucky feat — queued via `use_luck` grants advantage (roll 2d20,
-  // take higher). Same pattern as Heroic Inspiration for ad-hoc d20s.
+  const skillName = action.skill; // 'persuasion' | 'deception' | 'intimidation' (all CHA)
+  // Lucky feat — queued via `use_luck` grants advantage on the check.
   const luckActive = consumeLuckForCheck(char);
-  const d20 = luckActive ? Math.max(rollDice('1d20'), rollDice('1d20')) : rollDice('1d20');
-  const total = d20 + chaMod + profMod - d20TestPenalty(char);
-  const success = total >= dc;
+  // Routed through skillCheck so social checks gain Expertise / Jack of All
+  // Trades / Reliable Talent / Halfling Lucky, consistent with other skills.
+  const check = skillCheck(
+    char.cha,
+    dc,
+    char.skill_proficiencies?.includes(skillName) ?? false,
+    char.level,
+    false,
+    hasExpertise(char, skillName),
+    hasJackOfAllTrades(char),
+    luckActive,
+    char.species === 'halfling',
+    hasReliableTalent(char),
+    false,
+    d20TestPenalty(char)
+  );
+  const total = check.total;
+  const success = check.success;
 
   const skillLabel = {
     persuasion: 'Persuasion',
