@@ -232,6 +232,7 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
     delete restoredUses.arcane_recovery_used; // Wizard Arcane Recovery available again after a long rest
     delete restoredUses.sorcerous_restoration_used; // Sorcerer Sorcerous Restoration available again after a long rest
     delete restoredUses.wholeness_of_body_used; // Monk Open Hand Wholeness of Body refreshes on a long rest
+    delete restoredUses.divine_intervention_used; // Cleric Divine Intervention available again after a long rest
     const newExhaustion = Math.max(0, (c.exhaustion_level ?? 0) - 1);
     const humanGrant = c.species === 'human';
     if (c.species === 'orc') delete restoredUses.relentless_endurance_used;

@@ -4038,6 +4038,45 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     }
   }
 
+  // SRD Divine Intervention (Cleric L10) — a Magic action, 1/Long Rest:
+  // cast a Cleric spell (level 1-5, non-Reaction) with no slot or Material
+  // components. We surface one free-cast choice per eligible PREPARED Cleric
+  // spell. (RAW allows the entire Cleric list; pansori offers the prepared
+  // subset to keep the menu bounded and reuse prep data — the value DI adds
+  // here is the slot-free cast.) Greater Divine Intervention (L20, the Wish
+  // option) is deferred: pansori implements no Wish spell.
+  if (
+    context.spellTable &&
+    getClassLevel(char, 'cleric') >= 10 &&
+    !(char.class_resource_uses?.divine_intervention_used ?? 0) &&
+    !char.turn_actions.action_used
+  ) {
+    for (const spellId of char.prepared_spells ?? []) {
+      if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+      const spell = context.spellTable[spellId];
+      if (!spell) continue;
+      const onClericList =
+        (spell as { spellList?: ReadonlyArray<string> }).spellList?.includes('divine') ?? false;
+      if (!onClericList || spell.level === 0 || spell.level > 5) continue;
+      if (spell.castTime === 'reaction' || spell.summon || spell.revive) continue;
+      if (spell.outOfCombatOnly && state.combat_active) continue;
+      const isOffensive = !!(spell.damage || spell.condition);
+      if (isOffensive && !enemyAlive) continue;
+      if (spell.heal && state.characters.every((c) => c.dead || c.hp >= c.max_hp)) continue;
+      choices.push({
+        label: `Divine Intervention — cast ${spell.name} (no slot)`,
+        action: {
+          type: 'cast_spell',
+          spellId,
+          slotLevel: spell.level,
+          targetEnemyId: isOffensive ? livingEnemies[0]?.id : undefined,
+          divineIntervention: true,
+        },
+        kind: 'cast_spell',
+      });
+    }
+  }
+
   // Two-weapon fighting bonus action: both weapons must be light
   if (
     state.combat_active &&

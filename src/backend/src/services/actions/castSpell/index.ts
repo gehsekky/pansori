@@ -70,11 +70,17 @@ export const handleCastSpell: ActionHandler<{
 
   const precast = runPrecast(
     ctx,
-    action as { type: 'cast_spell'; spellId: string; slotLevel: number; ritual?: boolean },
+    action as {
+      type: 'cast_spell';
+      spellId: string;
+      slotLevel: number;
+      ritual?: boolean;
+      divineIntervention?: boolean;
+    },
     spell
   );
   if (precast.done) return;
-  const { castingScore, slotNote, dc, isRitualCast } = precast;
+  const { castingScore, slotNote, dc, isRitualCast, freeCast } = precast;
 
   // ── Divine Smite (2024 PHB) ────────────────────────────────────────────
   // Bonus-action pre-buff: queues 2d8 radiant on the caster's next
@@ -206,7 +212,9 @@ export const handleCastSpell: ActionHandler<{
   // 'self' spells need no target check (they originate from the caster).
   // 'touch' = adjacent only (≤ 1 grid square / 5 ft).
   // 'ranged' = up to spell.rangeFt feet of grid distance.
-  if (isSpellOutOfRange(ctx, spell, spellTargetId, spellTarget.name, slotLevel, isRitualCast)) {
+  if (
+    isSpellOutOfRange(ctx, spell, spellTargetId, spellTarget.name, slotLevel, isRitualCast, freeCast)
+  ) {
     return;
   }
 

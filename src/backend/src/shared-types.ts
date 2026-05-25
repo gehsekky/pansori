@@ -292,6 +292,11 @@ export type StructuredAction =
       // (e.g. 'Skeleton' or 'Zombie'). Omitted = the spell's base block.
       // (RE-1 Phase 4.5.)
       summonVariant?: string;
+      // Cleric L10 Divine Intervention — cast this Cleric spell (level ≤5,
+      // non-Reaction) without a slot or Material components, 1/Long Rest.
+      // Set by the Divine Intervention choice surface; precast validates
+      // eligibility and bypasses the prep/slot/material gates.
+      divineIntervention?: boolean;
     }
   | { type: 'disarm_trap' }
   | { type: 'interact_object'; objectId: string }
