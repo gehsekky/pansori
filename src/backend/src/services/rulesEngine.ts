@@ -747,7 +747,12 @@ export function skillCheck(
   strokeOfLuck = false,
   // SRD Raise Dead / Resurrection — −N penalty to D20 Tests until
   // long-rested off. Subtracted from the final total.
-  reviveD20Pen = 0
+  reviveD20Pen = 0,
+  // SRD Bard Peerless Skill (Lore L14) — a pre-rolled Bardic Inspiration die
+  // the caller supplies (0 = not attempting). Added to a failed check only
+  // when it would convert it to a success; the result flags `peerlessSkillUsed`
+  // so the caller spends the BI use (a still-fail refunds it).
+  peerlessDieRoll = 0
 ) {
   const roll1 = d(20);
   const netAdv = advantage && !disadvantage;
@@ -770,7 +775,13 @@ export function skillCheck(
     total = 20 + mods;
     strokeOfLuckUsed = true;
   }
-  return { roll, total, success: total >= dc, strokeOfLuckUsed };
+  // Peerless Skill — add the rolled BI die to a failed check when it rescues it.
+  let peerlessSkillUsed = false;
+  if (peerlessDieRoll > 0 && !strokeOfLuckUsed && total < dc && total + peerlessDieRoll >= dc) {
+    total += peerlessDieRoll;
+    peerlessSkillUsed = true;
+  }
+  return { roll, total, success: total >= dc, strokeOfLuckUsed, peerlessSkillUsed };
 }
 
 // ─── Death saves ──────────────────────────────────────────────────────────────

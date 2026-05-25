@@ -788,6 +788,30 @@ export function perfectFocusRefresh(char: Character): Character {
   };
 }
 
+/** Bardic Inspiration die size by Bard level (d6 → d12). */
+export function bardicInspirationDieSize(char: Character): 'd6' | 'd8' | 'd10' | 'd12' {
+  const lvl = getClassLevel(char, 'bard');
+  return lvl >= 15 ? 'd12' : lvl >= 10 ? 'd10' : lvl >= 5 ? 'd8' : 'd6';
+}
+
+/** SRD Bard Peerless Skill (College of Lore L14) — on a failed ability check
+ *  or attack roll, expend a Bardic Inspiration use to add the BI die (refunded
+ *  if it still fails). True for a Lore Bard L14+. */
+export function hasPeerlessSkill(char: Character): boolean {
+  return char.subclass === 'lore' && getClassLevel(char, 'bard') >= 14;
+}
+
+/** Rolls the Peerless Skill Bardic Inspiration die if the char can use it
+ *  (Lore Bard L14+ with a Bardic Inspiration use remaining), else 0. The
+ *  caller adds it to a failed d20 and decrements `bardic_inspiration` only
+ *  when the boost converts the failure into a success. */
+export function peerlessSkillDie(char: Character): number {
+  if (!hasPeerlessSkill(char)) return 0;
+  const uses = char.class_resource_uses?.bardic_inspiration ?? Math.max(0, abilityMod(char.cha));
+  if (uses <= 0) return 0;
+  return rollDice(`1${bardicInspirationDieSize(char)}`);
+}
+
 export function superiorInspirationTopUp(char: Character): Character {
   if (getClassLevel(char, 'bard') < 18) return char;
   const max = Math.max(1, abilityMod(char.cha));

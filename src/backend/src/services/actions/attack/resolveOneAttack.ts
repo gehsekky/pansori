@@ -24,7 +24,13 @@ import {
   splitEncounterXp,
 } from '../../gameEngine.js';
 import { consumeStrokeOfLuck, strokeOfLuckAvailable } from '../../strokeOfLuck.js';
-import { divineStrikeDie, extraAttackCountForChar, getClassLevel, hasClass } from '../../multiclass.js';
+import {
+  divineStrikeDie,
+  extraAttackCountForChar,
+  getClassLevel,
+  hasClass,
+  peerlessSkillDie,
+} from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import type { ToHitContext } from './toHit.js';
 import { composeNow } from '../../narrative/compose.js';
@@ -204,6 +210,27 @@ export function resolveOneAttack(
     updatePcActor(ctx, consumeStrokeOfLuck(pc.char));
     strokeNote = ' ✦ Stroke of Luck — a natural 20!';
   }
+  // SRD Bard Peerless Skill (Lore L14) — if the attack (still) missed, add a
+  // rolled Bardic Inspiration die; if it now meets AC it's a hit and a BI use
+  // is spent. A still-miss refunds the use (no decrement). After Bless/Bane so
+  // those passive shifts settle first.
+  let peerlessNote = '';
+  if (!atk.hit && !atk.fumble) {
+    const peerlessRoll = peerlessSkillDie(pc.char);
+    if (peerlessRoll > 0 && atk.total + peerlessRoll >= effectiveEnemyAc) {
+      atk.total += peerlessRoll;
+      atk.hit = true;
+      atk.damage = Math.max(1, rollWeaponDmg(weaponDamage ?? '1d4') + atk.atkMod);
+      const biUsesP = pc.char.class_resource_uses?.bardic_inspiration ?? abilityMod(pc.char.cha);
+      updatePcActor(ctx, {
+        class_resource_uses: {
+          ...(pc.char.class_resource_uses ?? {}),
+          bardic_inspiration: Math.max(0, biUsesP - 1),
+        },
+      });
+      peerlessNote = ` ✦ Peerless Skill: +${peerlessRoll} — a hit!`;
+    }
+  }
   // Brutal Strike: the chosen swing is now resolving — consume the rider
   // (the advantage was already forgone above) regardless of hit/miss.
   let brutalNote = '';
@@ -264,7 +291,7 @@ export function resolveOneAttack(
   const atkNote =
     ' ' +
     fmt.note(
-      `(${label}d20 ${atk.roll}+${atk.atkMod} ${atk.atkStat}+${atk.prof} prof${bonusNote} = ${atk.total} vs AC ${effectiveEnemyAc}${coverNote}${disadvNote}${versatileNote})${noProfNote}${biNote}${blessNote}${baneNote}${strokeNote}${brutalNote}`
+      `(${label}d20 ${atk.roll}+${atk.atkMod} ${atk.atkStat}+${atk.prof} prof${bonusNote} = ${atk.total} vs AC ${effectiveEnemyAc}${coverNote}${disadvNote}${versatileNote})${noProfNote}${biNote}${blessNote}${baneNote}${strokeNote}${peerlessNote}${brutalNote}`
     );
 
   if (atk.fumble) {
