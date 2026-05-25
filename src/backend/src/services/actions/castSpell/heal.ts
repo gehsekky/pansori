@@ -1,5 +1,5 @@
-import { addDice, multiplyDice, rollDice } from '../../rulesEngine.js';
-import { hasClass, hasWordsOfCreation } from '../../multiclass.js';
+import { addDice, maxDice, multiplyDice, rollDice } from '../../rulesEngine.js';
+import { getClassLevel, hasWordsOfCreation } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import type { Spell } from '../../../types.js';
 import { composeNow } from '../../narrative/compose.js';
@@ -32,10 +32,36 @@ export function runHealSpell(
     spell.upcastBonus && extraLevels > 0
       ? addDice(spell.heal ?? '', multiplyDice(spell.upcastBonus, extraLevels))
       : (spell.heal ?? '');
-  const baseHealed = rollDice(healDice) + healMod;
+  const clericLvl = getClassLevel(pc.char, 'cleric');
+  const isLifeCleric = pc.char.subclass === 'life' && clericLvl > 0;
+  // Life Cleric: Supreme Healing (L17) — when a slot-spell heal would roll
+  // dice, take each die's top face instead of rolling (SRD: Supreme Healing).
+  const supremeHealing = isLifeCleric && clericLvl >= 17 && slotLevel >= 1;
+  const baseHealed = (supremeHealing ? maxDice(healDice) : rollDice(healDice)) + healMod;
   // Life Cleric: Disciple of Life — healing spells restore extra 2 + spell level HP
-  const discipleBonus =
-    pc.char.subclass === 'life' && hasClass(pc.char, 'cleric') ? 2 + (spell.level ?? 1) : 0;
+  const discipleBonus = isLifeCleric ? 2 + (spell.level ?? 1) : 0;
+  // Life Cleric: Blessed Healer (L6) — immediately after a spell cast with a
+  // slot restores HP to one or more creatures OTHER than the caster, the
+  // cleric regains 2 + the slot's level HP (SRD: Blessed Healer). Closure so
+  // both the mass-heal and single-target branches can fire it once.
+  const blessedHealerActive = isLifeCleric && clericLvl >= 6 && slotLevel >= 1;
+  const applyBlessedHealer = (): void => {
+    if (!blessedHealerActive) return;
+    const prev = pc.char.hp;
+    const next = Math.min(pc.char.max_hp, prev + 2 + slotLevel);
+    if (next === prev) return;
+    pc.char.hp = next;
+    ctx.st = {
+      ...ctx.st,
+      entities: (ctx.st.entities ?? []).map((e) =>
+        e.id === pc.char.id && !e.isEnemy ? { ...e, hp: next } : e
+      ),
+    };
+    composeNow(ctx, {
+      kind: 'spell_utility',
+      prose: ` Blessed Healer restores ${next - prev} HP to ${pc.char.name} (now ${next}/${pc.char.max_hp}).`,
+    });
+  };
   // SRD Power Word Heal restores ALL HP — a huge value floors every target
   // to its own max via the per-target `Math.min(max_hp, …)` caps below.
   const healed = spell.healFull ? Number.MAX_SAFE_INTEGER : baseHealed + discipleBonus;
@@ -55,6 +81,7 @@ export function runHealSpell(
     let updatedChars = ctx.st.characters;
     let updatedEntities = ctx.st.entities ?? [];
     let casterAfter = pc.char;
+    let healedOther = false;
     for (const member of livingParty) {
       const isMemberCaster = member.id === pc.char.id;
       const target = isMemberCaster ? casterAfter : member;
@@ -65,6 +92,7 @@ export function runHealSpell(
       if (isMemberCaster) {
         casterAfter = { ...casterAfter, hp: newHp };
       } else {
+        if (delta > 0) healedOther = true;
         updatedChars = updatedChars.map((c) => (c.id === member.id ? { ...c, hp: newHp } : c));
         updatedEntities = updatedEntities.map((e) =>
           e.id === member.id && !e.isEnemy ? { ...e, hp: newHp } : e
@@ -85,6 +113,7 @@ export function runHealSpell(
           slotNote,
         }) + ` — ${healed} HP to each: ${perTargetLines.join(', ')}.${bonusSuffix}`,
     });
+    if (healedOther) applyBlessedHealer();
     return;
   }
 
@@ -154,6 +183,8 @@ export function runHealSpell(
     targetMaxHp: target.max_hp,
     bonuses: healBonuses,
   });
+
+  if (!isSelf && actualHealed > 0) applyBlessedHealer();
 
   // SRD Words of Creation (Bard L20) — Power Word Heal also affects a
   // second creature within 10 ft of the first target. Picks the most-
