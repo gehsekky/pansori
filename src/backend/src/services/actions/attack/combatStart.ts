@@ -9,6 +9,7 @@ import {
   uncannyMetabolismRefresh,
 } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
+import { improveFateRefresh } from '../../improveFate.js';
 import { updatePcActor } from '../actor.js';
 
 /**
@@ -51,8 +52,13 @@ export function runCombatStart(ctx: ActionContext, target: Enemy): void {
     // (L2): rolling Initiative regains Focus Points + heals (once per long rest).
     // SRD Monk Perfect Focus (L15): tops Focus Points up to 4 if you didn't use
     // Uncanny Metabolism (applied after it, so it's a no-op when that fired).
-    const refreshed = perfectFocusRefresh(
-      uncannyMetabolismRefresh(persistentRageTopUp(superiorInspirationTopUp(heroicWarriorTopUp(c))))
+    // SRD Boon of Fate: Improve Fate recharges when you roll Initiative.
+    const refreshed = improveFateRefresh(
+      perfectFocusRefresh(
+        uncannyMetabolismRefresh(
+          persistentRageTopUp(superiorInspirationTopUp(heroicWarriorTopUp(c)))
+        )
+      )
     );
     const entry = order.find((e) => e.id === c.id);
     return entry ? { ...refreshed, initiative_roll: entry.roll } : refreshed;

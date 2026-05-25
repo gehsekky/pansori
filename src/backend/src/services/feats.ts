@@ -209,6 +209,12 @@ export function applyFeatTake(
           narrativeParts.push('Free Casting: a level 1–4 slot may not be expended (1d4 per cast).');
           break;
         case 'night-spirit':
+          // Documented-thin: both benefits gate on the holder being in Dim
+          // Light or Darkness, but per-encounter lighting is threaded only
+          // through the stealth paths (sneak / rogue), not the enemy-attack
+          // resolution where Shadowy Form's resistance would apply — and the
+          // "Invisible until your next action" lifecycle of Merge with Shadows
+          // isn't modeled. The +1 ability lands; the benefits are narrated.
           narrativeParts.push('Merge with Shadows and Shadowy Form while in Dim Light or Darkness.');
           break;
       }
@@ -242,6 +248,20 @@ export function peerlessAimAvailable(char: Character): boolean {
 /** SRD Boon of Irresistible Offense (epic) — true when the PC holds the boon. */
 export function hasIrresistibleOffense(char: Character): boolean {
   return (char.feats ?? []).includes('boon_irresistible_offense');
+}
+
+/**
+ * SRD Boon of Spell Recall (epic) — Free Casting: when a spell is cast with a
+ * level 1–4 slot, roll 1d4; if it matches the slot's level, the slot isn't
+ * expended. Pure check given the rolled d4 (the caller rolls).
+ */
+export function spellRecallKeepsSlot(char: Character, slotLevel: number, d4Roll: number): boolean {
+  return (
+    (char.feats ?? []).includes('boon_spell_recall') &&
+    slotLevel >= 1 &&
+    slotLevel <= 4 &&
+    d4Roll === slotLevel
+  );
 }
 
 /**
