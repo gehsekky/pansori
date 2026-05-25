@@ -1,7 +1,14 @@
+import { abilityMod, profBonus, rollDice } from '../../rulesEngine.js';
+import {
+  applyPartyLevelUps,
+  endCombatState,
+  isRoomCleared,
+  splitEncounterXp,
+} from '../../gameEngine.js';
 import { getClassLevel, hasClass, knowsMetamagic } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import type { Character } from '../../../types.js';
-import { abilityMod } from '../../rulesEngine.js';
+import { composeNow } from '../../narrative/compose.js';
 
 // SRD Sorcery Incarnate (L7) — while Innate Sorcery is active, up to TWO
 // Metamagic options can be stacked on one spell. Returns the next
@@ -287,6 +294,69 @@ export function handleCasterFeature(ctx: ActionContext, fid: string): boolean {
     }
     char.feats = [...(char.feats ?? []), 'devils_sight'];
     ctx.narrative = `${char.name} gains Devil's Sight — you can see normally in magical darkness.`;
+    return true;
+  }
+
+  // SRD Fiend Warlock Hurl Through Hell (L14) — once per turn, after hitting a
+  // creature: it makes a CHA save vs your spell DC or takes 8d10 Psychic (if
+  // not a Fiend) and is Incapacitated until the end of your next turn.
+  if (fid === 'hurl_through_hell') {
+    if (!(char.subclass === 'fiend' && getClassLevel(char, 'warlock') >= 14)) {
+      ctx.narrative = 'Hurl Through Hell requires a Fiend Warlock of level 14.';
+      return true;
+    }
+    if (!ctx.enemyAlive || !ctx.enemy) {
+      ctx.narrative = 'No living target to hurl through the Lower Planes.';
+      return true;
+    }
+    if (char.turn_actions.hurl_through_hell_used) {
+      ctx.narrative = 'Hurl Through Hell already used this turn.';
+      return true;
+    }
+    char.turn_actions = { ...char.turn_actions, hurl_through_hell_used: true };
+    const hthDC = 8 + profBonus(char.level) + abilityMod(char.cha);
+    const hthEnemy = ctx.enemy;
+    const hthEnt = ctx.st.entities?.find((e) => e.id === hthEnemy.id && e.isEnemy);
+    const hthSave =
+      rollDice('1d20') + abilityMod((hthEnemy as unknown as Record<string, number>).cha ?? 10);
+    if (hthSave >= hthDC) {
+      ctx.narrative = `${char.name} tries to Hurl ${hthEnemy.name} through hell — CHA ${hthSave} vs DC ${hthDC}, it resists.`;
+      return true;
+    }
+    // A Fiend is unaffected by the Psychic damage but is still displaced.
+    const isFiend = /fiend|devil|demon|imp|balor|hell/i.test(hthEnemy.name);
+    const hthDmg = isFiend ? 0 : rollDice('8d10');
+    const hthNewHp = Math.max(0, (hthEnt?.hp ?? hthEnemy.hp) - hthDmg);
+    ctx.st = {
+      ...ctx.st,
+      entities: (ctx.st.entities ?? []).map((e) =>
+        e.id === hthEnemy.id && e.isEnemy
+          ? {
+              ...e,
+              hp: hthNewHp,
+              conditions: [...e.conditions.filter((c) => c !== 'incapacitated'), 'incapacitated'],
+            }
+          : e
+      ),
+    };
+    composeNow(ctx, {
+      kind: 'condition_applied',
+      targetId: hthEnemy.id,
+      targetName: hthEnemy.name,
+      condition: 'incapacitated',
+      source: 'Hurl Through Hell',
+      prose: ` ${char.name} hurls ${hthEnemy.name} through the Lower Planes! CHA ${hthSave} vs DC ${hthDC} — ${hthDmg} psychic${isFiend ? ' (Fiend: immune to the damage)' : ''}, Incapacitated.`,
+    });
+    if (hthNewHp <= 0) {
+      const split = splitEncounterXp(ctx.st, char.id, hthEnemy.xp ?? 0);
+      ctx.st = split.st;
+      char.xp = (char.xp || 0) + split.share;
+      ctx.st.enemies_killed = [...ctx.st.enemies_killed, hthEnemy.id];
+      ctx.narrative += ` ${hthEnemy.name} does not return.`;
+      if (isRoomCleared(ctx.st, ctx.seed, ctx.roomId)) ctx.st = endCombatState(ctx.st);
+      ctx.narrative += applyPartyLevelUps(ctx.st, char, ctx.context);
+    }
+    ctx.usedInitiative = true;
     return true;
   }
 

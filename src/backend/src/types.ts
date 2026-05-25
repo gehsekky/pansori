@@ -342,6 +342,9 @@ export interface TurnActions {
   // SRD Open Hand Monk L11 — Fleet Step grants a free Step of the Wind after
   // another bonus action; this marks that extra use as spent this turn.
   fleet_step_used?: boolean;
+  // SRD Fiend Warlock L14 — Hurl Through Hell is usable once per turn on a hit;
+  // this marks it spent for the current turn.
+  hurl_through_hell_used?: boolean;
   // 2024 PHB Fighter L9 — Tactical Master. When attacking with any weapon
   // whose mastery you've trained, the Fighter may swap in Push, Sap, or
   // Slow for that attack. Cleared when the attack resolves.
