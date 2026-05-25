@@ -447,6 +447,15 @@ export interface Spell {
   // true. Defaults to 10 if unspecified.
   durationRounds?: number;
   upcastBonus?: string; // extra dice per slot above base level, e.g. '1d6'
+  // Dual-damage spells (Flame Strike = fire + radiant, Ice Storm = bludgeoning
+  // + cold). The second component is rolled and saved-for-half exactly like the
+  // primary, with resistance applied per its own type. Currently honored by the
+  // AoE save path (every SRD dual-damage spell is an AoE). `upcastBonus2` scales
+  // it on a higher slot (Flame Strike's radiant +1d6/level); omit when only the
+  // primary scales (Ice Storm's cold doesn't).
+  damage2?: string;
+  damageType2?: string;
+  upcastBonus2?: string;
   blastRadius?: number; // AOE radius in feet; undefined = single target
   // SRD 5.2.1 p.193 — Areas of Effect. Default is 'sphere' (radius from a point).
   //   sphere: blastRadius = radius

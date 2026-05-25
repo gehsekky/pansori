@@ -918,6 +918,15 @@ export function upcastDamage(spell: Spell, slotLevel: number): string {
   return addDice(spell.damage ?? '0', multiplyDice(spell.upcastBonus, extraLevels));
 }
 
+// Upcast expression for a dual-damage spell's SECOND component (e.g. Flame
+// Strike's radiant half). Mirrors upcastDamage against damage2 / upcastBonus2.
+export function upcastDamage2(spell: Spell, slotLevel: number): string {
+  const base = spell.damage2 ?? '0';
+  const extraLevels = Math.max(0, slotLevel - (spell.level ?? 1));
+  if (!spell.upcastBonus2 || extraLevels === 0) return base;
+  return addDice(base, multiplyDice(spell.upcastBonus2, extraLevels));
+}
+
 // Returns cantrip damage dice scaled by character level (PHB cantrip progression).
 export function cantripDamageDice(spell: Spell, charLevel: number): string {
   const bonus = charLevel >= 17 ? 3 : charLevel >= 11 ? 2 : charLevel >= 5 ? 1 : 0;
