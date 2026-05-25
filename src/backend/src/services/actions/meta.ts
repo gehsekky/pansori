@@ -9,11 +9,13 @@ import { applyFeatTake, canTakeFeat, getFeat } from '../feats.js';
 import { applyLevelUpForClass, mergeDraconicSpells, preparedSpellsCap } from '../gameEngine.js';
 import {
   canMulticlassInto,
+  evocationSavantBudget,
   expertiseEligibleSkills,
   expertiseSlots,
   getClassLevel,
   hasClass,
   hunterFeatureOptions,
+  isEvocationSpell,
   knowsMetamagic,
   metamagicOptions,
   metamagicSlots,
@@ -359,6 +361,53 @@ export const handleChooseSignatureSpell: ActionHandler<{
   }
   updatePcActor(ctx, { signature_spells: [...current, action.spellId] });
   ctx.narrative = `${char.name} marks ${spell.name} as a signature spell — a free level-3 cast each rest.`;
+};
+
+/**
+ * `choose_evocation_savant`: SRD Evoker (L3) — add a free Wizard Evocation
+ * spell to the spellbook. Budget is 2 at L3 + 1 per new spell-slot level
+ * (`evocationSavantBudget`), tracked against `evocation_savant_claimed`. The
+ * spell must be an arcane Evocation spell of a level the wizard has slots for.
+ * Out-of-combat, no action cost. (RE-2.)
+ */
+export const handleChooseEvocationSavant: ActionHandler<{
+  type: 'choose_evocation_savant';
+  spellId: string;
+}> = (ctx, action) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can choose Evocation Savant.' };
+  const { char } = ctx.actor;
+  if (!(char.subclass === 'evoker' && getClassLevel(char, 'wizard') >= 3)) {
+    ctx.narrative = 'Evocation Savant requires an Evoker of level 3.';
+    return;
+  }
+  const claimed = char.class_resource_uses?.evocation_savant_claimed ?? 0;
+  if (claimed >= evocationSavantBudget(char)) {
+    ctx.narrative = 'No free Evocation spells available right now.';
+    return;
+  }
+  const spell = ctx.context.spellTable?.[action.spellId];
+  const maxSlot = Math.max(0, ...Object.keys(char.spell_slots_max ?? {}).map(Number));
+  const eligible =
+    !!spell &&
+    spell.level >= 1 &&
+    spell.level <= maxSlot &&
+    isEvocationSpell(spell) &&
+    ((spell as { spellList?: ReadonlyArray<string> }).spellList?.includes('arcane') ?? false);
+  if (!eligible) {
+    return { rejected: `${action.spellId} isn't an eligible Wizard Evocation spell.` };
+  }
+  if ((char.spells_known ?? []).includes(action.spellId)) {
+    ctx.narrative = `${spell!.name} is already in your spellbook.`;
+    return;
+  }
+  updatePcActor(ctx, {
+    spells_known: [...(char.spells_known ?? []), action.spellId],
+    class_resource_uses: {
+      ...(char.class_resource_uses ?? {}),
+      evocation_savant_claimed: claimed + 1,
+    },
+  });
+  ctx.narrative = `${char.name} inscribes ${spell!.name} into the spellbook (Evocation Savant).`;
 };
 
 /**

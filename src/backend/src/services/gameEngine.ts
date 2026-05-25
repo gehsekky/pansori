@@ -66,6 +66,7 @@ import {
   canCountercharm,
   canRitualCast,
   elementalAffinityType,
+  evocationSavantBudget,
   expertiseEligibleSkills,
   expertiseSlots,
   getClassLevel,
@@ -79,6 +80,7 @@ import {
   hasSuperiorHuntersDefense,
   hunterFeatureOptions,
   huntersPrey,
+  isEvocationSpell,
   knowsMetamagic,
   layOnHandsRemaining,
   metamagicOptions,
@@ -3140,6 +3142,31 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
           });
         }
       }
+    }
+  }
+
+  // ── Evoker Evocation Savant (L3) ───────────────────────────────────────────
+  // Add free Wizard Evocation spells to the spellbook, up to the earned budget
+  // (2 at L3 + 1 per new slot level). Offered out of combat. (RE-2.)
+  if (
+    !state.combat_active &&
+    context.spellTable &&
+    char.subclass === 'evoker' &&
+    getClassLevel(char, 'wizard') >= 3 &&
+    (char.class_resource_uses?.evocation_savant_claimed ?? 0) < evocationSavantBudget(char)
+  ) {
+    const maxSlot = Math.max(0, ...Object.keys(char.spell_slots_max ?? {}).map(Number));
+    const known = new Set(char.spells_known ?? []);
+    for (const s of Object.values(context.spellTable)) {
+      if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+      if (s.level < 1 || s.level > maxSlot || known.has(s.id) || !isEvocationSpell(s)) continue;
+      if (!((s as { spellList?: ReadonlyArray<string> }).spellList?.includes('arcane') ?? false)) {
+        continue;
+      }
+      choices.push({
+        label: `Evocation Savant: learn ${s.name} (Lvl ${s.level}, free)`,
+        action: { type: 'choose_evocation_savant', spellId: s.id },
+      });
     }
   }
 
