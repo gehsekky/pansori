@@ -92,10 +92,12 @@ backend features are waiting on, and a handful of **bounded subsystems**.
         (stamp + concentration link + tick-on-cast), the round-wrap tick
         (`fireSpellZones` → `applyZoneTick`, save-for-half or auto), and
         concentration cleanup. **Moonbeam** + **Flaming Sphere** ship on it.
-        Remaining: zones are **stationary** (RAW repositioning — Flaming Sphere
-        bonus-action roll, Moonbeam/Call Lightning move actions — is deferred);
-        add **Call Lightning** / **Spike Growth** (movement-triggered) and
-        consider upgrading **Spirit Guardians** to a caster-following zone.
+        **Spirit Guardians** now rides this as a caster-following aura
+        (`followsCaster` — footprint recomputed from the caster's cell each
+        tick). Remaining: placed zones are **stationary** (RAW repositioning —
+        Flaming Sphere bonus-action roll, Moonbeam/Call Lightning move actions —
+        is deferred); add **Call Lightning** / **Spike Growth**
+        (movement-triggered).
       Exceptions still needing a model first: the alternate "summon" spells,
       each mechanically distinct from the stat-block ally model —
   - [ ] **Spiritual Weapon** (L2) — a floating force with no HP; a

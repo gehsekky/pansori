@@ -1983,21 +1983,24 @@ export const SRD_SPELLS: Record<string, Spell> = {
     name: 'Spirit Guardians',
     level: 3,
     castTime: 'action',
-    // 2024 PHB Cleric L3 — 15-ft radius aura around caster. Hostile creatures
-    // moving inside (or starting their turn in) the area take 3d8 radiant/
-    // necrotic; WIS save halves. Concentration, up to 10 min. Engine treats
-    // as an AoE sphere centered on caster — runs on cast and on any enemy
-    // turn-start tick is left as future scope.
+    // 2024 PHB Cleric L3 — a 15-ft radius aura around the caster. Hostile
+    // creatures in the area take 3d8 radiant (WIS save halves). Now a RE-4
+    // caster-following persistent zone: the aura is centered on the caster and
+    // recomputed from their cell each round (so it moves with them), ticking on
+    // cast and on every round wrap until concentration ends. (`rangeKind: self`
+    // signals the caster-centered placement in runZoneSpell.)
+    persistentZone: true,
     damage: '3d8',
     damageType: 'radiant',
     savingThrow: 'wis',
     saveEffect: 'half',
     upcastBonus: '1d8',
     concentration: true,
+    durationRounds: 100, // Concentration, up to 10 minutes
     blastRadius: 15,
     aoeShape: 'sphere',
     rangeKind: 'self',
-    desc: 'Concentration. Spirits surround you in a 15-ft radius. Hostiles in the area make a WIS save or take 3d8 radiant damage (half on success).',
+    desc: 'Concentration, up to 10 minutes. Spirits surround you in a 15-ft radius that moves with you. Each round, hostiles in the area make a WIS save or take 3d8 radiant damage (half on success; +1d8 per slot above 3rd).',
     spellList: ['divine'],
   },
   cone_of_cold: {
