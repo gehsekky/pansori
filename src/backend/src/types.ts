@@ -497,6 +497,12 @@ export interface Spell {
   // Buff-spell payloads. Numeric where possible (no roll needed at cast
   // time for most buffs). Dice-expression form would land if a future buff
   // spell randomizes the grant.
+  // Buff that grants the target Resistance to one or more damage types for the
+  // duration (Stoneskin → bludgeoning/piercing/slashing; Protection from Energy
+  // → a chosen element). Applied to `Character.spell_resistances`; halves
+  // matching enemy damage in the attack-resolution chain. Cleared when the
+  // caster's concentration ends.
+  grantResistances?: string[];
   tempHpGrant?: number; // Heroism gives mod-equal temp HP each turn; MVP grants once on cast.
   maxHpBonus?: number; // Aid bumps target's max HP (and current HP).
   upcastMaxHpBonus?: number; // extra max HP per slot above base (Aid: +5 per slot).
@@ -764,6 +770,11 @@ export interface Character {
   // SRD Fiend Warlock L10 — Fiendish Resilience: the chosen damage type the
   // warlock currently has Resistance to (re-chooseable on a short/long rest).
   fiendish_resilience?: string;
+  // Damage types this PC currently resists from an active buff spell (Stoneskin
+  // → B/P/S, Protection from Energy → an element). Granted by the buff path,
+  // cleared when the granting spell's concentration ends. You can only
+  // concentrate on one spell, so this safely reflects a single active buff.
+  spell_resistances?: string[];
   // SRD Warlock Mystic Arcanum (L11/13/15/17) — chosen spell per arcanum tier
   // (spell level 6/7/8/9 → spell id). Each is cast once per long rest without a
   // slot (tracked as class_resource_uses.mystic_arcanum_<level>).

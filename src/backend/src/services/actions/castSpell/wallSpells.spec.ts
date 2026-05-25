@@ -99,7 +99,9 @@ function casterState() {
 
 describe('Wall of Fire — raises a concentration-bound opaque wall', () => {
   it('creates a sight-blocking wall and starts concentration on cast', async () => {
-    mockRandom(0.5);
+    // Constant high rolls: the caster keeps concentration through the ensuing
+    // enemy turn (a failed CON save would otherwise tear the wall down).
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
     const result = await takeAction({
       action: { type: 'cast_spell', spellId: 'wall_of_fire', slotLevel: 4, targetEnemyId: ENEMY },
       history: [],
