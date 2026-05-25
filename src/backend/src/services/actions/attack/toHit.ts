@@ -3,9 +3,9 @@ import {
   DISADV_CONDITIONS,
   PLAYER_ADV_CONDITIONS,
   abilityMod,
+  d20TestPenalty,
   hasArmorProficiency,
   hasWeaponProficiency,
-  reviveD20Penalty,
 } from '../../rulesEngine.js';
 import type { Enemy, InventoryItem, LootItem } from '../../../types.js';
 import { coverBonus, distanceFeet, isFlankingPosition } from '../../gridEngine.js';
@@ -56,8 +56,8 @@ export interface ToHitContext {
  *   + ally within 5 ft), luckAdv (Lucky feat, queued via `use_luck`).
  *
  * Disadvantage sources:
- *   rangedInMelee, conditionDisadv, exhaustionDisadv (lvl 3+),
- *   heavyEncumberedDisadv, heavyWeaponSmallDisadv, !armorProficient,
+ *   rangedInMelee, conditionDisadv, heavyEncumberedDisadv,
+ *   heavyWeaponSmallDisadv, !armorProficient,
  *   proneDisadv (ranged vs prone), thrownLongRangeDisadv.
  */
 export function computeToHitContext(
@@ -132,7 +132,8 @@ export function computeToHitContext(
   const conditionDisadv = pc.char.conditions.some(
     (c) => DISADV_CONDITIONS.has(c) && !(c === 'blinded' && ignoreBlinded)
   );
-  const exhaustionDisadv = (pc.char.exhaustion_level ?? 0) >= 3;
+  // 2024 Exhaustion is a flat −2/level penalty on the attack roll (folded into
+  // `d20TestPenalty` → `totalAttackBonus`), not Disadvantage.
   const heavyEncumberedDisadv = isHeavilyEncumbered(pc.char);
   const smallSpecies = pc.char.species ? SRD_SPECIES[pc.char.species]?.size === 'small' : false;
   const heavyWeaponSmallDisadv = !!(weaponItem?.heavy && smallSpecies);
@@ -248,7 +249,6 @@ export function computeToHitContext(
   const disadvantage =
     rangedInMelee ||
     conditionDisadv ||
-    exhaustionDisadv ||
     heavyEncumberedDisadv ||
     heavyWeaponSmallDisadv ||
     !armorProficient ||
@@ -303,7 +303,6 @@ export function computeToHitContext(
           .filter((c) => DISADV_CONDITIONS.has(c) && !(c === 'blinded' && ignoreBlinded))
           .join(', ')
       : '',
-    exhaustionDisadv ? 'exhaustion' : '',
     heavyEncumberedDisadv ? 'heavily encumbered' : '',
     heavyWeaponSmallDisadv ? 'heavy weapon — Small creature' : '',
     !armorProficient ? `not proficient with ${equippedArmorLootItem?.name ?? 'armor'}` : '',
@@ -335,7 +334,7 @@ export function computeToHitContext(
   // SRD Raise Dead / Resurrection — recently-revived PCs take a
   // −N penalty on D20 Tests (attacks, saves, checks) until it
   // decays off via long rest. Subtracted from the attack bonus.
-  const revivePenalty = reviveD20Penalty(pc.char);
+  const revivePenalty = d20TestPenalty(pc.char);
   const totalAttackBonus = sacredWeaponBonus - revivePenalty + archeryBonus;
 
   // Silence linter: target is part of the signature but referenced via the

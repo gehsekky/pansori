@@ -91,19 +91,11 @@ describe('applyDamage — temp HP absorption', () => {
   });
 });
 
-describe('applyDamage — exhaustion-4 max-HP clamp', () => {
-  it('clamps HP below floor(max_hp / 2) at exhaustion level 4', () => {
-    // max_hp 20 → cap at 10. Damage 5 from full hp 20 would leave 15, but
-    // cap forces it down to 10 — reporting 10 actual HP lost.
+describe('applyDamage — exhaustion (2024 model has no max-HP clamp)', () => {
+  it('does not clamp HP at exhaustion level 4 (2024 has no HP-maximum reduction)', () => {
+    // 2024 Exhaustion is −2/level on D20 Tests + −5 ft/level Speed, lethal at 6
+    // — no max-HP halving. Damage 5 from 20 leaves 15 even at level 4.
     const char = fixtureChar({ hp: 20, max_hp: 20, exhaustion_level: 4 });
-    const st = fixtureState(char);
-    const result = applyDamage(char, st, 5);
-    expect(result.char.hp).toBe(10);
-    expect(result.amountDealt).toBe(10);
-  });
-
-  it('exhaustion < 4 does not clamp', () => {
-    const char = fixtureChar({ hp: 20, max_hp: 20, exhaustion_level: 3 });
     const st = fixtureState(char);
     const result = applyDamage(char, st, 5);
     expect(result.char.hp).toBe(15);
