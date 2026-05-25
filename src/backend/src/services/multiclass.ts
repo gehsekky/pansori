@@ -689,6 +689,16 @@ export function empoweredEvocationBonus(
     : 0;
 }
 
+/** SRD Evoker Evocation Savant (L3) — free Evocation spells added to the
+ *  spellbook: 2 at L3, plus 1 each time the wizard unlocks a new spell-slot
+ *  level. Returns the total free additions earned; the claimed count lives in
+ *  class_resource_uses.evocation_savant_claimed. */
+export function evocationSavantBudget(char: Character): number {
+  if (char.subclass !== 'evoker' || getClassLevel(char, 'wizard') < 3) return 0;
+  const maxSlot = Math.max(0, ...Object.keys(char.spell_slots_max ?? {}).map(Number));
+  return 2 + Math.max(0, maxSlot - 2);
+}
+
 export function hasDangerSense(char: Character): boolean {
   if (
     (char.conditions ?? []).some((c) =>

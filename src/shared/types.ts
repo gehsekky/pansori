@@ -379,6 +379,9 @@ export type StructuredAction =
   // SRD 5.2.1 Wizard Signature Spells (L20): designate a L3 spell as a
   // signature spell (free L3 cast, 1/short-or-long rest). Out-of-combat. (RE-2.)
   | { type: 'choose_signature_spell'; spellId: string }
+  // SRD 5.2.1 Evoker Evocation Savant (L3): add a free Wizard Evocation spell
+  // to the spellbook (budget: 2 + one per new slot level). Out-of-combat. (RE-2.)
+  | { type: 'choose_evocation_savant'; spellId: string }
   // SRD 5.2.1 Paladin Lay on Hands (L1): bonus-action touch heal drawing from
   // a pool of 5 × Paladin level HP. `targetCharId` is the healed party member
   // (may be the paladin). (RE-2.)

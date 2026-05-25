@@ -3,8 +3,11 @@
 
 import type { Character, Enemy, GameState, Seed } from '../types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { evocationSavantBudget, isEvocationSpell } from './multiclass.js';
 import { makeChar, makeState } from '../test-fixtures.js';
 import { context as ctx } from '../contexts/sandbox.js';
+import { handleChooseEvocationSavant } from './actions/meta.js';
+import { pcActor } from './actions/actor.js';
 import { takeAction } from './gameEngine.js';
 
 afterEach(() => vi.restoreAllMocks());
@@ -253,5 +256,59 @@ describe('Overchannel (L14) — maximize a damaging spell, escalating cost', () 
     const r = await overchannelGuidingBolt({ level: 13 });
     expect(r.narrative).toMatch(/requires an Evoker of level 14/);
     expect((r.newState.entities ?? []).find((e) => e.id === ENEMY)!.hp).toBe(80); // nothing cast
+  });
+});
+
+describe('Evocation Savant (L3) — free spellbook additions', () => {
+  const savant = (over: Partial<Character> = {}) =>
+    makeChar({
+      id: 'pc-1',
+      character_class: 'Wizard',
+      subclass: 'evoker',
+      level: 3,
+      spells_known: [],
+      spell_slots_max: { 1: 4, 2: 2 },
+      ...over,
+    });
+  function featCtx(char: Character) {
+    return {
+      actor: pcActor(char, 0),
+      context: ctx,
+      narrative: '',
+    } as unknown as Parameters<typeof handleChooseEvocationSavant>[0];
+  }
+  const pcChar = (c: ReturnType<typeof featCtx>) => {
+    if (c.actor.kind !== 'pc') throw new Error('expected pc actor');
+    return c.actor.char;
+  };
+
+  it('budget is 2 at L3 and grows with new slot levels', () => {
+    expect(evocationSavantBudget(savant())).toBe(2); // max slot 2 → 2
+    expect(evocationSavantBudget(savant({ level: 5, spell_slots_max: { 1: 4, 2: 3, 3: 2 } }))).toBe(3);
+    expect(evocationSavantBudget(makeChar({ character_class: 'Wizard', level: 3 }))).toBe(0); // not an evoker
+  });
+
+  it('confirms burning_hands is Evocation but charm_person is not', () => {
+    expect(isEvocationSpell({ id: 'burning_hands' })).toBe(true);
+    expect(isEvocationSpell({ id: 'charm_person' })).toBe(false);
+  });
+
+  it('adds an eligible Evocation spell to the spellbook and tracks the claim', () => {
+    const c = featCtx(savant());
+    handleChooseEvocationSavant(c, { type: 'choose_evocation_savant', spellId: 'burning_hands' });
+    expect(pcChar(c).spells_known).toContain('burning_hands');
+    expect(pcChar(c).class_resource_uses?.evocation_savant_claimed).toBe(1);
+  });
+
+  it('rejects a non-Evocation spell', () => {
+    const c = featCtx(savant());
+    const res = handleChooseEvocationSavant(c, { type: 'choose_evocation_savant', spellId: 'charm_person' });
+    expect(res).toEqual({ rejected: expect.stringMatching(/isn't an eligible Wizard Evocation spell/) });
+  });
+
+  it('stops once the budget is spent', () => {
+    const c = featCtx(savant({ class_resource_uses: { evocation_savant_claimed: 2 } }));
+    handleChooseEvocationSavant(c, { type: 'choose_evocation_savant', spellId: 'burning_hands' });
+    expect(pcChar(c).spells_known ?? []).not.toContain('burning_hands');
   });
 });
