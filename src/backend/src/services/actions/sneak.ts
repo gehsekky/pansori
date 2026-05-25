@@ -2,6 +2,7 @@ import {
   abilityMod,
   effectiveLightFor,
   passivePerceptionDcInLight,
+  reviveD20Penalty,
   skillCheck,
 } from '../rulesEngine.js';
 import {
@@ -14,7 +15,7 @@ import {
   pick,
 } from '../gameEngine.js';
 import { consumeStrokeOfLuck, strokeOfLuckAvailable } from '../strokeOfLuck.js';
-import { hasExpertise, hasJackOfAllTrades, hasReliableTalent } from '../multiclass.js';
+import { hasExpertise, hasJackOfAllTrades, hasReliableTalent, peerlessSkillDie } from '../multiclass.js';
 import type { ActionHandler } from './types.js';
 import { updatePcActor } from './actor.js';
 
@@ -62,6 +63,7 @@ export const handleSneak: ActionHandler<{ type: 'sneak' }> = (ctx) => {
     const luckAdv = isActive ? consumeLuckForCheck(member) : false;
     const bardicRoll = isActive ? consumeBardicForCheck(member) : 0;
     if (isActive) activeChar = member;
+    const peerlessRollSneak = isActive ? peerlessSkillDie(member) : 0;
     const check = skillCheck(
       member.dex,
       sneakDC - bardicRoll,
@@ -73,11 +75,24 @@ export const handleSneak: ActionHandler<{ type: 'sneak' }> = (ctx) => {
       inspAdv || luckAdv,
       member.species === 'halfling',
       hasReliableTalent(member),
-      isActive && strokeOfLuckAvailable(member)
+      isActive && strokeOfLuckAvailable(member),
+      reviveD20Penalty(member),
+      peerlessRollSneak
     );
     // Only the active PC auto-spends a once-per-rest resource (same policy as
-    // Inspiration/Luck/Bardic above).
+    // Inspiration/Luck/Bardic above). Stroke of Luck and Peerless Skill are
+    // mutually exclusive (skillCheck only fires Peerless when SoL didn't).
     if (isActive && check.strokeOfLuckUsed) activeChar = consumeStrokeOfLuck(member);
+    else if (isActive && check.peerlessSkillUsed) {
+      const biSneak = member.class_resource_uses?.bardic_inspiration ?? abilityMod(member.cha);
+      activeChar = {
+        ...member,
+        class_resource_uses: {
+          ...(member.class_resource_uses ?? {}),
+          bardic_inspiration: Math.max(0, biSneak - 1),
+        },
+      };
+    }
     return { name: member.name, check, mod: abilityMod(member.dex) };
   });
   updatePcActor(ctx, activeChar);

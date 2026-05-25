@@ -1,4 +1,11 @@
 import {
+  abilityMod,
+  effectiveLightFor,
+  passivePerceptionDcInLight,
+  reviveD20Penalty,
+  skillCheck,
+} from '../../rulesEngine.js';
+import {
   consumeBardicForCheck,
   consumeInspirationForCheck,
   consumeLuckForCheck,
@@ -7,13 +14,13 @@ import {
   isHeavilyEncumbered,
 } from '../../gameEngine.js';
 import { consumeStrokeOfLuck, strokeOfLuckAvailable } from '../../strokeOfLuck.js';
-import { effectiveLightFor, passivePerceptionDcInLight, skillCheck } from '../../rulesEngine.js';
 import {
   getClassLevel,
   hasClass,
   hasExpertise,
   hasJackOfAllTrades,
   hasReliableTalent,
+  peerlessSkillDie,
 } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import { updatePcActor } from '../actor.js';
@@ -142,6 +149,7 @@ export function handleRogueFeature(ctx: ActionContext, fid: string): boolean {
     const inspAdvHide = consumeInspirationForCheck(pc.char);
     const luckAdvHide = consumeLuckForCheck(pc.char);
     const bardicHideRoll = consumeBardicForCheck(pc.char);
+    const peerlessRollHide = peerlessSkillDie(pc.char);
     const hideCheck = skillCheck(
       pc.char.dex,
       sneakHideDC - bardicHideRoll,
@@ -153,9 +161,20 @@ export function handleRogueFeature(ctx: ActionContext, fid: string): boolean {
       inspAdvHide || luckAdvHide,
       pc.char.species === 'halfling',
       hasReliableTalent(pc.char),
-      strokeOfLuckAvailable(pc.char)
+      strokeOfLuckAvailable(pc.char),
+      reviveD20Penalty(pc.char),
+      peerlessRollHide
     );
     if (hideCheck.strokeOfLuckUsed) updatePcActor(ctx, consumeStrokeOfLuck(pc.char));
+    else if (hideCheck.peerlessSkillUsed) {
+      const biHide = pc.char.class_resource_uses?.bardic_inspiration ?? abilityMod(pc.char.cha);
+      updatePcActor(ctx, {
+        class_resource_uses: {
+          ...(pc.char.class_resource_uses ?? {}),
+          bardic_inspiration: Math.max(0, biHide - 1),
+        },
+      });
+    }
     pc.char.turn_actions = { ...pc.char.turn_actions, bonus_action_used: true };
     if (hideCheck.success) {
       updatePcActor(ctx, inflictCondition(pc.char, 'invisible'));

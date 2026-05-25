@@ -1,11 +1,11 @@
-import { abilityMod, skillCheck } from '../rulesEngine.js';
+import { abilityMod, reviveD20Penalty, skillCheck } from '../rulesEngine.js';
 import {
   consumeBardicForCheck,
   consumeInspirationForCheck,
   consumeLuckForCheck,
 } from '../gameEngine.js';
 import { consumeStrokeOfLuck, strokeOfLuckAvailable } from '../strokeOfLuck.js';
-import { hasExpertise, hasJackOfAllTrades, hasReliableTalent } from '../multiclass.js';
+import { hasExpertise, hasJackOfAllTrades, hasReliableTalent, peerlessSkillDie } from '../multiclass.js';
 import type { ActionHandler } from './types.js';
 import { randomUUID } from 'crypto';
 import { updatePcActor } from './actor.js';
@@ -79,9 +79,21 @@ export const handleInteractObject: ActionHandler<{
     inspAdv || luckAdv,
     nextChar.species === 'halfling',
     hasReliableTalent(nextChar),
-    strokeOfLuckAvailable(nextChar)
+    strokeOfLuckAvailable(nextChar),
+    reviveD20Penalty(nextChar),
+    peerlessSkillDie(nextChar)
   );
   if (check.strokeOfLuckUsed) nextChar = consumeStrokeOfLuck(nextChar);
+  if (check.peerlessSkillUsed) {
+    const biUses = nextChar.class_resource_uses?.bardic_inspiration ?? abilityMod(nextChar.cha);
+    nextChar = {
+      ...nextChar,
+      class_resource_uses: {
+        ...(nextChar.class_resource_uses ?? {}),
+        bardic_inspiration: Math.max(0, biUses - 1),
+      },
+    };
+  }
 
   let narrative: string;
   if (check.success) {
