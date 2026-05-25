@@ -75,6 +75,7 @@ import {
   hasDisciplinedSurvivor,
   hasElusive,
   hasEvasion,
+  hasFeralSenses,
   hasHeroicWarrior,
   hasMultiattackDefense,
   hasSlipperyMind,
@@ -1036,9 +1037,13 @@ function computeEnemyAttack(
   // rogue unless they're Incapacitated — overrides every advantage source
   // (prone/blinded/restrained, Reckless, etc.). `hasElusive` already returns
   // false when the rogue is under an incapacitating condition.
-  const hasAdvantage = hasElusive(char)
-    ? false
-    : char.conditions.some((c) => ADVANTAGE_CONDITIONS.has(c)) || isReckless;
+  // SRD Ranger Feral Senses (L18) — Blindsight; the ranger being Blinded no
+  // longer grants attackers Advantage (other advantage-granting conditions
+  // still apply).
+  const advFromConditions = char.conditions.some(
+    (c) => ADVANTAGE_CONDITIONS.has(c) && !(c === 'blinded' && hasFeralSenses(char))
+  );
+  const hasAdvantage = hasElusive(char) ? false : advFromConditions || isReckless;
   const baseDisadvantage = char.conditions.some((c) => ENEMY_DISADV_CONDITIONS.has(c)) || isDodging;
   // SRD Ranger Multiattack Defense (L7) — once this enemy has hit the PC this
   // round, its further attacks against them roll with Disadvantage (the mark

@@ -556,6 +556,14 @@ export function hasSuperiorHuntersDefense(char: Character): boolean {
   return char.subclass === 'hunter' && getClassLevel(char, 'ranger') >= 15;
 }
 
+/** SRD Ranger Feral Senses (L18) — Blindsight 30 ft. In pansori's model the
+ *  only "can't see" condition is Blinded, so a Feral Senses ranger ignores
+ *  Blinded for attack-roll purposes: no Disadvantage on its own attacks and
+ *  no Advantage granted to attackers. */
+export function hasFeralSenses(char: Character): boolean {
+  return getClassLevel(char, 'ranger') >= 18;
+}
+
 /**
  * SRD Sorcerer Metamagic options the player can learn + use. Each maps the
  * short id (stored in `metamagics_known` and `metamagic_active`) to its label
