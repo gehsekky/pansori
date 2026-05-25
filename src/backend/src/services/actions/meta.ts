@@ -6,7 +6,7 @@ import {
   fightingStyleSlots,
 } from '../fightingStyle.js';
 import { applyFeatTake, canTakeFeat, getFeat } from '../feats.js';
-import { applyLevelUpForClass, preparedSpellsCap } from '../gameEngine.js';
+import { applyLevelUpForClass, mergeDraconicSpells, preparedSpellsCap } from '../gameEngine.js';
 import {
   canMulticlassInto,
   expertiseSlots,
@@ -78,6 +78,10 @@ export const handleSelectSubclass: ActionHandler<{ type: 'select_subclass'; subc
     next.max_hp += sorcLvl;
     next.hp += sorcLvl;
     narrative += ` Draconic Resilience: +${sorcLvl} max HP (now ${next.hp}/${next.max_hp}).`;
+    // Draconic Spells — grant the always-prepared spells for the current level.
+    const before = (next.spells_known ?? []).length;
+    next.spells_known = mergeDraconicSpells(next);
+    if (next.spells_known.length > before) narrative += ` 🐉 Draconic Spells added.`;
   }
   updatePcActor(ctx, next);
   ctx.narrative = narrative;
