@@ -411,6 +411,28 @@ export const handleChooseEvocationSavant: ActionHandler<{
 };
 
 /**
+ * `choose_fiendish_resilience`: SRD Fiend Warlock (L10) — gain Resistance to a
+ * chosen damage type (anything but Force), re-chooseable on a rest. Gated to a
+ * Fiend Warlock L10. Out-of-combat, no action cost. (RE-2.)
+ */
+export const handleChooseFiendishResilience: ActionHandler<{
+  type: 'choose_fiendish_resilience';
+  damageType: string;
+}> = (ctx, action) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can choose Fiendish Resilience.' };
+  const { char } = ctx.actor;
+  if (!(char.subclass === 'fiend' && getClassLevel(char, 'warlock') >= 10)) {
+    ctx.narrative = 'Fiendish Resilience requires a Fiend Warlock of level 10.';
+    return;
+  }
+  if (action.damageType === 'force') {
+    return { rejected: 'Fiendish Resilience cannot be set to Force damage.' };
+  }
+  updatePcActor(ctx, { fiendish_resilience: action.damageType });
+  ctx.narrative = `${char.name} hardens against ${action.damageType} — Resistance to ${action.damageType} damage until they choose otherwise.`;
+};
+
+/**
  * `memorize_spell`: SRD Wizard (L5) — during a rest, replace one prepared
  * level-1+ spell with another level-1+ spell from the spellbook. Gated to a
  * Wizard L5, out of combat. (RE-2.)

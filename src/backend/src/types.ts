@@ -745,6 +745,9 @@ export interface Character {
   // the lethal vibrations (one creature at a time). Set when the monk spends 4
   // Focus Points on an unarmed hit; cleared when detonated.
   quivering_palm_target?: string;
+  // SRD Fiend Warlock L10 — Fiendish Resilience: the chosen damage type the
+  // warlock currently has Resistance to (re-chooseable on a short/long rest).
+  fiendish_resilience?: string;
   // SRD Multiattack Defense bookkeeping — enemy entity id → the combat round
   // in which that enemy hit this PC. While the stamp equals the current round,
   // that enemy's further attacks vs this PC roll with Disadvantage. The round
