@@ -97,3 +97,32 @@ describe('Potent Spellcasting — +WIS to Cleric cantrip damage', () => {
     expect(hpWithout - hpWith).toBe(3); // +WIS mod
   });
 });
+
+describe('Improved Blessed Strikes (L14) — Potent Spellcasting temp HP', () => {
+  it('a damaging Cleric cantrip grants 2×WIS temporary HP to the caster', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5); // enemy fails the DEX save
+    const r = await takeAction({
+      action: { type: 'cast_spell', spellId: 'sacred_flame', slotLevel: 0, targetEnemyId: ENEMY },
+      history: [],
+      state: clericCombat({ level: 14, blessed_strikes: 'potent_spellcasting' }),
+      seed,
+      context: ctx,
+    });
+    // The enemy turn can chip the temp HP, so assert the granted amount from
+    // the (deterministic) cast narrative: 2 × WIS mod (+3) = 6.
+    expect(r.narrative).toMatch(/gains 6 temporary HP/);
+    expect(r.newState.characters[0].temp_hp ?? 0).toBeGreaterThan(0);
+  });
+
+  it('does not grant temp HP below L14', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const r = await takeAction({
+      action: { type: 'cast_spell', spellId: 'sacred_flame', slotLevel: 0, targetEnemyId: ENEMY },
+      history: [],
+      state: clericCombat({ level: 7, blessed_strikes: 'potent_spellcasting' }),
+      seed,
+      context: ctx,
+    });
+    expect(r.newState.characters[0].temp_hp ?? 0).toBe(0);
+  });
+});

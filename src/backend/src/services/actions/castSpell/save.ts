@@ -17,7 +17,7 @@ import {
   splitEncounterXp,
 } from '../../gameEngine.js';
 import { concentrationRoundsFor, pickCastPrefix } from './utils.js';
-import { elementalAffinityBonus, potentSpellcastingBonus } from '../../multiclass.js';
+import { elementalAffinityBonus, improvedPotentTempHp, potentSpellcastingBonus } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import { composeNow } from '../../narrative/compose.js';
 import { coverBonus } from '../../gridEngine.js';
@@ -124,6 +124,20 @@ export function runSaveSpell(
       damageType: spell.damageType ?? '',
       halfOnSave: spell.saveEffect === 'half',
     });
+    // SRD Improved Blessed Strikes (Cleric L14, Potent Spellcasting) —
+    // dealing cantrip damage grants 2 × WIS Temporary Hit Points (RAW: to
+    // yourself or an ally within 60 ft; pansori MVP grants to the caster).
+    const potentTemp = improvedPotentTempHp(char);
+    if (spell.level === 0 && spellDmg > 0 && potentTemp > (char.temp_hp ?? 0)) {
+      char.temp_hp = potentTemp;
+      ctx.st = {
+        ...ctx.st,
+        entities: (ctx.st.entities ?? []).map((e) =>
+          e.id === char.id && !e.isEnemy ? { ...e, temp_hp: potentTemp } : e
+        ),
+      };
+      ctx.narrative += ` ${fmt.note(`[Potent Spellcasting: ${char.name} gains ${potentTemp} temporary HP]`)}`;
+    }
   } else {
     composeNow(ctx, {
       kind: 'spell_save_condition',
