@@ -21,6 +21,14 @@ const BATCH = [
   { id: 'arcane_lock', level: 2, ritual: false },
   { id: 'silence', level: 2, ritual: true },
   { id: 'nondetection', level: 3, ritual: false },
+  { id: 'magic_mouth', level: 2, ritual: true },
+  { id: 'phantom_steed', level: 3, ritual: true },
+  { id: 'find_traps', level: 2, ritual: false },
+  { id: 'locate_creature', level: 4, ritual: false },
+  { id: 'commune', level: 5, ritual: true },
+  { id: 'divination', level: 4, ritual: true },
+  { id: 'scrying', level: 5, ritual: false },
+  { id: 'locate_animals_or_plants', level: 2, ritual: true },
 ] as const;
 
 describe('utility-spell batch — catalog', () => {
@@ -91,5 +99,17 @@ describe('utility-spell batch — casts resolve', () => {
     });
     expect(r.narrative).toBeTruthy();
     expect(r.newState.characters[0].spell_slots_used?.[2]).toBe(1);
+  });
+
+  it('Locate Creature (a divination utility) resolves cleanly', async () => {
+    const r = await takeAction({
+      action: { type: 'cast_spell', spellId: 'locate_creature', slotLevel: 4 },
+      history: [],
+      state: casterState('locate_creature', 4),
+      seed,
+      context: ctx,
+    });
+    expect(r.narrative).toBeTruthy();
+    expect(r.narrative).not.toMatch(/Unknown spell|cannot|not prepared/i);
   });
 });
