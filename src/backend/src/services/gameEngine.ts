@@ -769,6 +769,29 @@ export function auraOfProtectionBonus(char: Character, st: GameState): number {
 }
 
 /**
+ * SRD Paladin Holy Nimbus (Oath of Devotion L20) — the Radiant damage an enemy
+ * takes when it starts its turn within an active nimbus paladin's aura: CHA +
+ * Proficiency Bonus of the best such paladin in range (0 if none). The nimbus
+ * is active while the paladin carries the `holy_nimbus` marker and isn't
+ * Incapacitated. Off the grid the party is assumed together. (RE-2.)
+ */
+export function holyNimbusRadiant(enemyId: string, st: GameState): number {
+  const enemyEnt = st.entities?.find((e) => e.id === enemyId && e.isEnemy);
+  let best = 0;
+  for (const p of st.characters) {
+    if (p.dead || !p.conditions.includes('holy_nimbus')) continue;
+    if (p.conditions.some((c) => c === 'incapacitated' || c === 'unconscious')) continue;
+    if (getClassLevel(p, 'paladin') < 20) continue;
+    let inRange = true;
+    const pEnt = st.entities?.find((e) => e.id === p.id);
+    if (enemyEnt && pEnt) inRange = distanceFeet(pEnt.pos, enemyEnt.pos) <= paladinAuraRangeFt(p);
+    if (!inRange) continue;
+    best = Math.max(best, abilityMod(p.cha) + profBonus(p.level));
+  }
+  return best;
+}
+
+/**
  * SRD Paladin Aura of Courage (L10) and Oath of Devotion's Aura of Devotion
  * (L7): a creature within a conscious paladin's aura can't be Frightened
  * (Courage) / Charmed (Devotion), and an existing such condition ends. Returns
@@ -1914,15 +1937,19 @@ export function endCombatState(st: GameState): GameState {
     characters: st.characters.map((c) => ({
       ...c,
       turn_actions: { ...FRESH_TURN },
-      // Rage / Monk Superior Defense / Sorcerer Innate Sorcery end when combat
-      // ends (the "lasts the encounter" buff-duration simplification).
+      // Rage / Monk Superior Defense / Sorcerer Innate Sorcery / Paladin Holy
+      // Nimbus end when combat ends (the "lasts the encounter" simplification).
       conditions: c.conditions.filter(
         (cond) =>
-          cond !== 'raging' && cond !== 'superior_defense' && cond !== 'innate_sorcery'
+          cond !== 'raging' &&
+          cond !== 'superior_defense' &&
+          cond !== 'innate_sorcery' &&
+          cond !== 'holy_nimbus'
       ),
       condition_durations: Object.fromEntries(
         Object.entries(c.condition_durations ?? {}).filter(
-          ([k]) => k !== 'raging' && k !== 'superior_defense' && k !== 'innate_sorcery'
+          ([k]) =>
+            k !== 'raging' && k !== 'superior_defense' && k !== 'innate_sorcery' && k !== 'holy_nimbus'
         )
       ),
       // Totem Warrior totem clears with rage at combat end.
@@ -3288,6 +3315,25 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
           requiresBonusAction: true,
         });
       }
+    }
+
+    // SRD Paladin Holy Nimbus (Oath of Devotion L20) — bonus action, 1/long
+    // rest: imbue the aura so enemies starting their turn in it take Radiant
+    // damage (CHA + prof). (Holy Ward's save advantage vs Fiends/Undead is
+    // narrated but not yet wired — the save sites don't carry attacker type.)
+    if (
+      char.subclass === 'devotion' &&
+      getClassLevel(char, 'paladin') >= 20 &&
+      !char.conditions.includes('holy_nimbus') &&
+      !(char.class_resource_uses?.holy_nimbus_used ?? 0) &&
+      !char.turn_actions.bonus_action_used
+    ) {
+      choices.push({
+        label: 'Holy Nimbus — bonus action: radiant aura, 1/long rest',
+        action: { type: 'use_class_feature', featureId: 'holy_nimbus' },
+        kind: 'class_feature',
+        requiresBonusAction: true,
+      });
     }
 
     // Path of the Berserker — Frenzy (PHB p.49): while raging, make a
@@ -6153,6 +6199,44 @@ export async function runEnemyTurns(args: {
         if (advIdx === 0 && prevAdvIdxPoly !== 0) roundWrapped = true;
         if (advIdx === args.initialCurrentIdx) break;
         continue;
+      }
+      // SRD Paladin Holy Nimbus (Devotion L20) — an enemy that starts its turn
+      // within an active nimbus aura takes Radiant damage (CHA + prof). Resolved
+      // before the enemy acts; a kill ends its turn (and combat if room clears).
+      const nimbusDmg = holyNimbusRadiant(eEntry.id, st);
+      if (nimbusDmg > 0) {
+        const nEnt = st.entities?.find((e) => e.id === eEntry.id && e.isEnemy);
+        const newHp = Math.max(0, (nEnt?.hp ?? rm.hp) - nimbusDmg);
+        st = {
+          ...st,
+          entities: (st.entities ?? []).map((e) =>
+            e.id === eEntry.id && e.isEnemy ? { ...e, hp: newHp } : e
+          ),
+        };
+        narrative += `\n\n[Holy Nimbus] ${rm.name} starts its turn in the radiant aura — ${nimbusDmg} radiant${newHp <= 0 ? ' (destroyed!)' : ` (${newHp} HP left)`}.`;
+        if (newHp <= 0) {
+          const nimbusPc = st.characters.find(
+            (c) => c.conditions.includes('holy_nimbus') && getClassLevel(c, 'paladin') >= 20
+          );
+          if (nimbusPc) {
+            const split = splitEncounterXp(st, nimbusPc.id, rm.xp ?? 0);
+            st = split.st;
+            st = {
+              ...st,
+              characters: st.characters.map((c) =>
+                c.id === nimbusPc.id ? { ...c, xp: (c.xp || 0) + split.share } : c
+              ),
+            };
+          }
+          st.enemies_killed = [...st.enemies_killed, eEntry.id];
+          if (isRoomCleared(st, args.seed, st.current_room)) st = endCombatState(st);
+          resumeMi = 0;
+          const prevAdvIdxNimbus = advIdx;
+          advIdx = (advIdx + 1) % orderLen;
+          if (advIdx === 0 && prevAdvIdxNimbus !== 0) roundWrapped = true;
+          if (advIdx === args.initialCurrentIdx) break;
+          continue;
+        }
       }
       // SRD p.221 — legendary action pool refreshes at the start of the
       // legendary creature's own turn.

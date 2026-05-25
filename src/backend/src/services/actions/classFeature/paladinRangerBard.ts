@@ -1,4 +1,4 @@
-import { abilityMod, rollDice } from '../../rulesEngine.js';
+import { abilityMod, profBonus, rollDice } from '../../rulesEngine.js';
 import { endCombatState, isRoomCleared } from '../../gameEngine.js';
 import { getClassLevel, hasClass, huntersPrey } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
@@ -133,6 +133,28 @@ export function handlePaladinRangerBardFeature(ctx: ActionContext, fid: string):
     };
     const chaMod = abilityMod(char.cha);
     ctx.narrative = `${char.name} — Sacred Weapon! +${chaMod} to attack rolls for 1 minute (10 rounds). Your weapon gleams with divine light. (${cdUsesDev - 1} Channel Divinity remaining)`;
+    return true;
+  }
+
+  if (fid === 'holy_nimbus') {
+    if (char.subclass !== 'devotion' || getClassLevel(char, 'paladin') < 20) {
+      ctx.narrative = 'Holy Nimbus requires a Devotion Paladin of level 20.';
+      return true;
+    }
+    if ((char.class_resource_uses?.holy_nimbus_used ?? 0) > 0) {
+      ctx.narrative = 'Holy Nimbus is spent — it returns after a long rest.';
+      return true;
+    }
+    if (char.turn_actions.bonus_action_used) {
+      ctx.narrative = 'Bonus action already used this turn.';
+      return true;
+    }
+    char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
+    char.class_resource_uses = { ...(char.class_resource_uses ?? {}), holy_nimbus_used: 1 };
+    // Encounter-long marker condition (like raging) — cleared by endCombatState.
+    char.conditions = [...char.conditions.filter((c) => c !== 'holy_nimbus'), 'holy_nimbus'];
+    const nimbusDmg = abilityMod(char.cha) + profBonus(char.level);
+    ctx.narrative = `${char.name} blazes with a Holy Nimbus! Enemies that start their turn in the aura take ${nimbusDmg} radiant damage, and ${char.name} has advantage on saves forced by Fiends and Undead.`;
     return true;
   }
 
