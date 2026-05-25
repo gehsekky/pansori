@@ -1,8 +1,8 @@
 import type { Enemy, InventoryItem, LootItem } from '../../../types.js';
+import { chebyshev, hasLineOfSight, inRange } from '../../gridEngine.js';
 import { getItemData, pick } from '../../gameEngine.js';
 import type { ActionContext } from '../types.js';
 import { BEAST_FORMS } from '../../../contexts/srd/index.js';
-import { inRange } from '../../gridEngine.js';
 import { updatePcActor } from '../actor.js';
 
 /**
@@ -83,6 +83,18 @@ export function runPreattack(
         : null;
       if (!inRange(charEntity.pos, enemyEntity.pos, equippedWeaponItem)) {
         ctx.narrative = `Out of range. Move closer before attacking.`;
+        return { done: true };
+      }
+      // SRD line of sight — a solid obstacle (wall / pillar) strictly between
+      // attacker and target blocks the attack. Adjacent targets are exempt: a
+      // melee reach can't be blocked by a corner, and the supercover diagonal
+      // would otherwise clip the shared corner cell (matches coverBonus, which
+      // also exempts adjacency).
+      if (
+        chebyshev(charEntity.pos, enemyEntity.pos) > 1 &&
+        !hasLineOfSight(charEntity.pos, enemyEntity.pos, ctx.roomObstacleCells ?? [])
+      ) {
+        ctx.narrative = `No line of sight — something solid blocks the way to the ${target.name}.`;
         return { done: true };
       }
     }

@@ -78,6 +78,52 @@ export function coverBonus(attacker: GridPos, target: GridPos, obstacles: GridPo
   return 0;
 }
 
+// Every grid cell the straight segment from `a` to `b` passes through,
+// endpoints included. Supercover walk (steps one axis at a time, n = 1 + dx +
+// dy cells), so the returned set is 4-connected and catches every cell the
+// line touches — on a perfect diagonal it routes through one shared corner
+// cell, the conservative choice for line-of-sight. Used by `hasLineOfSight`.
+export function cellsOnLine(a: GridPos, b: GridPos): GridPos[] {
+  const cells: GridPos[] = [];
+  let x = a.x;
+  let y = a.y;
+  let dx = Math.abs(b.x - a.x);
+  let dy = Math.abs(b.y - a.y);
+  const xInc = b.x > a.x ? 1 : -1;
+  const yInc = b.y > a.y ? 1 : -1;
+  let n = 1 + dx + dy;
+  let error = dx - dy;
+  dx *= 2;
+  dy *= 2;
+  for (; n > 0; n--) {
+    cells.push({ x, y });
+    if (error > 0) {
+      x += xInc;
+      error -= dy;
+    } else {
+      y += yInc;
+      error += dx;
+    }
+  }
+  return cells;
+}
+
+// Line of sight between two squares: true unless a blocking cell (a wall /
+// solid obstacle) lies strictly between them. The endpoints never block — the
+// source's own square and the target's own square don't obscure the target.
+// SRD 5.2.1 "Cover": a creature behind Total Cover can't be targeted directly;
+// pass only the solid room obstacles as `blockers` (creatures grant cover but
+// aren't total cover, so you can still target past them).
+export function hasLineOfSight(a: GridPos, b: GridPos, blockers: GridPos[]): boolean {
+  if (posEqual(a, b) || blockers.length === 0) return true;
+  const blocked = new Set(blockers.map((p) => `${p.x},${p.y}`));
+  for (const cell of cellsOnLine(a, b)) {
+    if (posEqual(cell, a) || posEqual(cell, b)) continue;
+    if (blocked.has(`${cell.x},${cell.y}`)) return false;
+  }
+  return true;
+}
+
 // Returns true when attacker and ally are on directly opposite squares of
 // target's perimeter (DMG 2014 optional flanking rule — grants advantage
 // on melee attacks). RAW requires BOTH the attacker and the ally to be
