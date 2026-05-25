@@ -1,8 +1,8 @@
 import {
   abilityMod,
+  d20TestPenalty,
   effectiveLightFor,
   passivePerceptionDcInLight,
-  reviveD20Penalty,
   skillCheck,
 } from '../../rulesEngine.js';
 import {
@@ -162,7 +162,7 @@ export function handleRogueFeature(ctx: ActionContext, fid: string): boolean {
       pc.char.species === 'halfling',
       hasReliableTalent(pc.char),
       strokeOfLuckAvailable(pc.char),
-      reviveD20Penalty(pc.char),
+      d20TestPenalty(pc.char),
       peerlessRollHide
     );
     if (hideCheck.strokeOfLuckUsed) updatePcActor(ctx, consumeStrokeOfLuck(pc.char));

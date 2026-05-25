@@ -11,7 +11,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { makeChar, makeState } from '../../test-fixtures.js';
 import type { Seed } from '../../types.js';
 import { context as ctx } from '../../contexts/sandbox.js';
-import { reviveD20Penalty } from '../rulesEngine.js';
+import { d20TestPenalty } from '../rulesEngine.js';
 import { takeAction } from '../gameEngine.js';
 
 afterEach(() => vi.restoreAllMocks());
@@ -60,14 +60,14 @@ function buildReviveParty(spellsKnown: string[], casterGold: number) {
   };
 }
 
-describe('reviveD20Penalty helper', () => {
+describe('d20TestPenalty helper', () => {
   it('returns 0 when the field is unset or zero', () => {
-    expect(reviveD20Penalty({})).toBe(0);
-    expect(reviveD20Penalty({ revive_d20_penalty: 0 })).toBe(0);
+    expect(d20TestPenalty({})).toBe(0);
+    expect(d20TestPenalty({ revive_d20_penalty: 0 })).toBe(0);
   });
   it('returns the magnitude (always non-negative) when set', () => {
-    expect(reviveD20Penalty({ revive_d20_penalty: 4 })).toBe(4);
-    expect(reviveD20Penalty({ revive_d20_penalty: 2 })).toBe(2);
+    expect(d20TestPenalty({ revive_d20_penalty: 4 })).toBe(4);
+    expect(d20TestPenalty({ revive_d20_penalty: 2 })).toBe(2);
   });
 });
 

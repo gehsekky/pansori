@@ -1,4 +1,4 @@
-import { abilityMod, reviveD20Penalty, skillCheck } from '../rulesEngine.js';
+import { abilityMod, d20TestPenalty, skillCheck } from '../rulesEngine.js';
 import {
   consumeBardicForCheck,
   consumeInspirationForCheck,
@@ -62,9 +62,8 @@ export const handleInteractObject: ActionHandler<{
     nextChar.skill_proficiencies?.some(
       (s) => s.toLowerCase() === 'investigation' || s.toLowerCase() === 'perception'
     ) ?? false;
-  // INT (Investigation) — heavy encumbrance affects only STR/DEX/CON in 2024
-  // RAW, so we only honour exhaustion here.
-  const exhaustionDisadv1 = (nextChar.exhaustion_level ?? 0) >= 1;
+  // INT (Investigation). 2024 Exhaustion is a flat −2/level penalty (folded
+  // into d20TestPenalty below), not Disadvantage.
   const inspAdv = consumeInspirationForCheck(nextChar);
   const luckAdv = consumeLuckForCheck(nextChar);
   const bardicRoll = consumeBardicForCheck(nextChar);
@@ -73,14 +72,14 @@ export const handleInteractObject: ActionHandler<{
     (obj.searchDC ?? 12) - bardicRoll,
     proficient,
     nextChar.level,
-    exhaustionDisadv1,
+    false,
     hasExpertise(nextChar, 'Investigation'),
     hasJackOfAllTrades(nextChar),
     inspAdv || luckAdv,
     nextChar.species === 'halfling',
     hasReliableTalent(nextChar),
     strokeOfLuckAvailable(nextChar),
-    reviveD20Penalty(nextChar),
+    d20TestPenalty(nextChar),
     peerlessSkillDie(nextChar)
   );
   if (check.strokeOfLuckUsed) nextChar = consumeStrokeOfLuck(nextChar);

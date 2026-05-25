@@ -124,13 +124,18 @@ export function abilityMod(score: number | undefined): number {
   return Math.floor(((score ?? 10) - 10) / 2);
 }
 
-// SRD Raise Dead / Resurrection — "The target takes a −4 penalty to
-// D20 Tests. Every time the target finishes a Long Rest, the penalty
-// is reduced by 1 until it becomes 0." Returns a non-negative magnitude;
-// callers subtract it. Reads `revive_d20_penalty` off the character;
-// missing or zero = no penalty.
-export function reviveD20Penalty(char: { revive_d20_penalty?: number }): number {
-  return Math.max(0, char.revive_d20_penalty ?? 0);
+// Combined penalty subtracted from every D20 Test (attack rolls, ability
+// checks, saving throws) and passive score. Two SRD sources:
+//   - Raise Dead / Resurrection: a −4 penalty that drops by 1 per Long Rest
+//     (`revive_d20_penalty`).
+//   - 2024 Exhaustion: −2 per Exhaustion level (`exhaustion_level`). Exhaustion
+//     also cuts Speed by 5 ft/level (see `effectiveSpeed`) and is lethal at 6.
+// Returns a non-negative magnitude; callers subtract it.
+export function d20TestPenalty(char: {
+  revive_d20_penalty?: number;
+  exhaustion_level?: number;
+}): number {
+  return Math.max(0, char.revive_d20_penalty ?? 0) + 2 * Math.max(0, char.exhaustion_level ?? 0);
 }
 
 // SRD Slow — "It can't take reactions." Combine with the existing
@@ -566,7 +571,7 @@ export function rollConditionSave(
   advantage = false,
   extraDisadvantage = false,
   // SRD Raise Dead / Resurrection — −N penalty to D20 Tests until
-  // long-rested off. Caller passes `reviveD20Penalty(char)`; the
+  // long-rested off. Caller passes `d20TestPenalty(char)`; the
   // save subtracts it from the final roll, same shape as the Bane
   // and Slow penalties below.
   reviveD20Pen = 0,

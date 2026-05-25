@@ -1,4 +1,4 @@
-import { disarmTrap, reviveD20Penalty, rollDice } from '../rulesEngine.js';
+import { d20TestPenalty, disarmTrap, rollDice } from '../rulesEngine.js';
 import { getRoomTrap, partyDetectsTrap, trapSpent } from '../gameEngine.js';
 import type { ActionHandler } from './types.js';
 import { applyDamage } from '../damage.js';
@@ -28,13 +28,9 @@ export const handleDisarmTrap: ActionHandler<{ type: 'disarm_trap' }> = (ctx) =>
     char.tool_proficiencies?.some(
       (t) => t.toLowerCase().includes('thieves') || t.toLowerCase().includes('hacking')
     ) ?? false;
-  const exhaustionDisadv1 = (char.exhaustion_level ?? 0) >= 1;
-  const revivePen = reviveD20Penalty(char);
-  const attempt1 = disarmTrap(char.dex, char.level, hasToolProf, revivePen);
-  const attempt2 = exhaustionDisadv1
-    ? disarmTrap(char.dex, char.level, hasToolProf, revivePen)
-    : attempt1;
-  const { roll, total } = attempt1.total <= attempt2.total ? attempt1 : attempt2;
+  // 2024 Exhaustion is a flat −2/level penalty (folded into d20TestPenalty),
+  // not Disadvantage.
+  const { roll, total } = disarmTrap(char.dex, char.level, hasToolProf, d20TestPenalty(char));
   const profNote = hasToolProf ? ` (tool proficiency)` : '';
   let next = char;
   let nextSt = ctx.st;

@@ -6,13 +6,13 @@ import {
   canReact,
   computeTotalAc,
   d,
+  d20TestPenalty,
   hasWeaponProficiency,
   passivePerception,
   profBonus,
   rageUsesMax,
   resolveEnemyAttack,
   resolvePlayerAttack,
-  reviveD20Penalty,
   rollConditionSave,
   rollDeathSave,
   rollDice,
@@ -344,9 +344,11 @@ export function hpTier(char: Character): 'healthy' | 'hurt' | 'critical' {
   return 'critical';
 }
 
-// Exhaustion 4: effective max HP is halved (PHB p.291)
-export function clampHpForExhaustion(hp: number, maxHp: number, exhaustionLevel: number): number {
-  if (exhaustionLevel >= 4) return Math.min(hp, Math.floor(maxHp / 2));
+// 2024 Exhaustion has no HP-maximum reduction (that was the 2014 L4 rule).
+// The model is now a flat −2/level on D20 Tests (see `d20TestPenalty`) and
+// −5 ft/level Speed (see `effectiveSpeed`), lethal at level 6. Kept as a no-op
+// passthrough so existing call sites don't need to change.
+export function clampHpForExhaustion(hp: number, _maxHp: number, _exhaustionLevel: number): number {
   return hp;
 }
 
@@ -615,7 +617,7 @@ export function checkConcentration(
   // SRD revive penalty applies to the concentration CON save like
   // any other D20 Test.
   const save =
-    d(20) + abilityMod(char.con) - reviveD20Penalty(char) + auraOfProtectionBonus(char, st);
+    d(20) + abilityMod(char.con) - d20TestPenalty(char) + auraOfProtectionBonus(char, st);
   if (save >= dc)
     return {
       char,
@@ -627,7 +629,7 @@ export function checkConcentration(
     const reroll =
       d(20) +
       abilityMod(char.con) -
-      reviveD20Penalty(char) +
+      d20TestPenalty(char) +
       auraOfProtectionBonus(char, st) +
       indomitableBonus(char);
     return reroll >= dc;
@@ -640,7 +642,7 @@ export function checkConcentration(
     };
   // SRD Rogue Stroke of Luck — turn the failed CON save into a 20 if it holds.
   if (strokeOfLuckAvailable(char)) {
-    const mods = abilityMod(char.con) - reviveD20Penalty(char) + auraOfProtectionBonus(char, st);
+    const mods = abilityMod(char.con) - d20TestPenalty(char) + auraOfProtectionBonus(char, st);
     if (20 + mods >= dc)
       return {
         char: consumeStrokeOfLuck(char),
@@ -899,7 +901,7 @@ function conditionSavingThrow(
     char.conditions ?? [],
     inspirationActive || luckActive || speciesAdv || dangerSenseAdv,
     enc,
-    reviveD20Penalty(char)
+    d20TestPenalty(char)
   );
   // SRD Fighter Indomitable — reroll the failed save with +Fighter level
   // (folded in by lowering the DC). The one-shot Inspiration/Luck advantage
@@ -920,7 +922,7 @@ function conditionSavingThrow(
           char.conditions ?? [],
           speciesAdv,
           enc,
-          reviveD20Penalty(char)
+          d20TestPenalty(char)
         )
     );
     if (indo.used && indo.saved) {
@@ -942,7 +944,7 @@ function conditionSavingThrow(
       char.conditions ?? [],
       speciesAdv,
       enc,
-      reviveD20Penalty(char),
+      d20TestPenalty(char),
       20
     );
     if (passesWith20) {
@@ -965,7 +967,7 @@ function conditionSavingThrow(
         char.conditions ?? [],
         speciesAdv,
         enc,
-        reviveD20Penalty(char)
+        d20TestPenalty(char)
       )
     );
     if (luck.used && luck.saved) {
@@ -998,7 +1000,7 @@ function conditionSavingThrow(
         char.conditions ?? [],
         true, // Countercharm grants Advantage on the reroll
         enc,
-        reviveD20Penalty(char)
+        d20TestPenalty(char)
       );
       if (rescued) {
         applied = false;
@@ -1492,7 +1494,7 @@ export function processDeathSave(
   const save = rollDeathSave(
     char.death_saves,
     (char.conditions ?? []).includes('hopeful'),
-    reviveD20Penalty(char)
+    d20TestPenalty(char)
   );
   const newChar = { ...char, death_saves: save.saves };
   let narrative = '';
@@ -1663,6 +1665,8 @@ export function effectiveSpeed(char: Character, lootTable: LootItem[] = []): num
   // and slowed are somehow stacked (RAW: cancel adv/disadv style), they
   // multiplicatively offset — pansori MVP applies both in sequence.
   if (char.conditions?.includes('slowed')) base = Math.floor(base / 2);
+  // 2024 PHB Exhaustion — Speed is reduced by 5 ft per Exhaustion level.
+  base = Math.max(0, base - 5 * (char.exhaustion_level ?? 0));
   const weight = charCarriedWeight(char);
   // 2024 PHB Goliath Powerful Build: count as one size larger for carrying
   // capacity. Mechanically: double the effective STR-based thresholds.
@@ -1783,7 +1787,7 @@ function fireLairAction(
         origC.conditions ?? [],
         dangerSenseAdv,
         false,
-        reviveD20Penalty(origC)
+        d20TestPenalty(origC)
       );
       const dealt = saveFailed ? fullDmg : Math.floor(fullDmg / 2);
       const dmgResult = applyDamage(origC, workingSt, dealt);
@@ -5583,7 +5587,7 @@ export function resolveEnemySubAttack(args: {
   ) {
     const used = target.class_resource_uses?.relentless_rage_used ?? 0;
     const dc = 10 + 5 * used;
-    const conSave = rollDice('1d20') + abilityMod(target.con) - reviveD20Penalty(target);
+    const conSave = rollDice('1d20') + abilityMod(target.con) - d20TestPenalty(target);
     if (conSave >= dc) {
       relentlessRageFired = true;
       target = {

@@ -656,7 +656,7 @@ export interface Character {
   // Reincarnate also skips per RAW (the new body emerges whole).
   // Threaded into toHit, rollConditionSave, rollDeathSave,
   // checkConcentration, and the ad-hoc skill-check sites via the
-  // `reviveD20Penalty(char)` helper.
+  // `d20TestPenalty(char)` helper.
   revive_d20_penalty?: number;
   turn_actions: TurnActions;
   initiative_roll: number | null;

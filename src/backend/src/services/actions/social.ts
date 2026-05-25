@@ -1,4 +1,4 @@
-import { abilityMod, profBonus, reviveD20Penalty, rollDice } from '../rulesEngine.js';
+import { abilityMod, d20TestPenalty, profBonus, rollDice } from '../rulesEngine.js';
 import {
   applyConsequence,
   consumeLuckForCheck,
@@ -235,7 +235,7 @@ export const handleInfluence: ActionHandler<{
   // take higher). Same pattern as Heroic Inspiration for ad-hoc d20s.
   const luckActive = consumeLuckForCheck(char);
   const d20 = luckActive ? Math.max(rollDice('1d20'), rollDice('1d20')) : rollDice('1d20');
-  const total = d20 + chaMod + profMod - reviveD20Penalty(char);
+  const total = d20 + chaMod + profMod - d20TestPenalty(char);
   const success = total >= dc;
 
   const skillLabel = {
@@ -340,7 +340,7 @@ export const handleStudy: ActionHandler<{
     char.divine_order === 'thaumaturge' && (skillName === 'arcana' || skillName === 'religion')
       ? Math.max(1, abilityMod(char.wis))
       : 0;
-  const total = d20 + intMod + profMod + thaumaturgeBonus - reviveD20Penalty(char);
+  const total = d20 + intMod + profMod + thaumaturgeBonus - d20TestPenalty(char);
   const success = total >= dc;
 
   const skillLabel = {

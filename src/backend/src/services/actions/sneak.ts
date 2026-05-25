@@ -1,8 +1,8 @@
 import {
   abilityMod,
+  d20TestPenalty,
   effectiveLightFor,
   passivePerceptionDcInLight,
-  reviveD20Penalty,
   skillCheck,
 } from '../rulesEngine.js';
 import {
@@ -57,8 +57,9 @@ export const handleSneak: ActionHandler<{ type: 'sneak' }> = (ctx) => {
     const isActive = member.id === char.id;
     const proficient =
       ctx.context.classSkills[member.character_class]?.includes('stealth') ?? false;
-    const exhaustionDisadv1 = (member.exhaustion_level ?? 0) >= 1;
-    const checkDisadv = exhaustionDisadv1 || isHeavilyEncumbered(member);
+    // 2024 Exhaustion is a flat −2/level penalty (folded into d20TestPenalty),
+    // not Disadvantage.
+    const checkDisadv = isHeavilyEncumbered(member);
     const inspAdv = isActive ? consumeInspirationForCheck(member) : false;
     const luckAdv = isActive ? consumeLuckForCheck(member) : false;
     const bardicRoll = isActive ? consumeBardicForCheck(member) : 0;
@@ -76,7 +77,7 @@ export const handleSneak: ActionHandler<{ type: 'sneak' }> = (ctx) => {
       member.species === 'halfling',
       hasReliableTalent(member),
       isActive && strokeOfLuckAvailable(member),
-      reviveD20Penalty(member),
+      d20TestPenalty(member),
       peerlessRollSneak
     );
     // Only the active PC auto-spends a once-per-rest resource (same policy as
