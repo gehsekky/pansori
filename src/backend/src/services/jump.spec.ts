@@ -69,7 +69,7 @@ function jumpState(opts: {
     initiative_order: [{ id: 'pc-1', roll: 18, is_enemy: false }],
     initiative_idx: 0,
     entities,
-    movement_used: opts.movementUsed ? { 'pc-1': opts.movementUsed } : {},
+    movement_used: { 'pc-1': opts.movementUsed ?? 0 } as Record<string, number>,
   };
 }
 
