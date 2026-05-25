@@ -1,6 +1,11 @@
-import { abilityMod, d, profBonus } from '../rulesEngine.js';
+import { abilityMod, d, d20TestPenalty, profBonus, skillCheck } from '../rulesEngine.js';
+import {
+  applyIndomitableMight,
+  hasExpertise,
+  hasJackOfAllTrades,
+  hasReliableTalent,
+} from '../multiclass.js';
 import type { ActionHandler } from './types.js';
-import { applyIndomitableMight } from '../multiclass.js';
 import { composeNow } from '../narrative/compose.js';
 import { distanceFeet } from '../gridEngine.js';
 import { getEnemyById } from '../gameEngine.js';
@@ -41,14 +46,28 @@ export const handleGrapple: ActionHandler<{
     ctx.usedInitiative = true;
     return;
   }
-  const athProf = (ctx.context.classSkills[char.character_class] ?? []).includes('athletics');
-  const playerRoll = applyIndomitableMight(
-    char,
-    d(20) + abilityMod(char.str) + (athProf ? profBonus(char.level) : 0)
-  );
   const enemyStr = abilityMod(target.toHit);
   const enemyDex = abilityMod(target.dex ?? 10);
   const enemyRoll = d(20) + Math.max(enemyStr, enemyDex);
+  // STR (Athletics) check routed through skillCheck so it picks up Expertise /
+  // Jack of All Trades / Reliable Talent / Halfling Lucky + the exhaustion
+  // penalty; Indomitable Might (Barbarian L18) floors the total at STR after.
+  const athProf = (char.skill_proficiencies ?? []).some((s) => s.toLowerCase() === 'athletics');
+  const grappleCheck = skillCheck(
+    char.str,
+    enemyRoll + 1,
+    athProf,
+    char.level,
+    false,
+    hasExpertise(char, 'athletics'),
+    hasJackOfAllTrades(char),
+    false,
+    char.species === 'halfling',
+    hasReliableTalent(char),
+    false,
+    d20TestPenalty(char)
+  );
+  const playerRoll = applyIndomitableMight(char, grappleCheck.total);
   ctx.usedInitiative = true;
   if (playerRoll > enemyRoll) {
     ctx.st = {
@@ -102,15 +121,39 @@ export const handleTryEscapeGrapple: ActionHandler<{ type: 'try_escape_grapple' 
   const grapplerStrMod = grapplerEnemy ? abilityMod(grapplerEnemy.toHit) : 0;
   const grapplerRoll = d(20) + grapplerStrMod;
 
-  const athProf = (ctx.context.classSkills[char.character_class] ?? []).includes('athletics');
-  const acrProf = (ctx.context.classSkills[char.character_class] ?? []).includes('acrobatics');
-  const athRoll = applyIndomitableMight(
-    char,
-    d(20) + abilityMod(char.str) + (athProf ? profBonus(char.level) : 0)
+  // Pick the better of STR (Athletics) / DEX (Acrobatics) by modifier (RAW lets
+  // the grappled creature choose), then resolve once through skillCheck so the
+  // escape gains Expertise / Jack of All Trades / Reliable Talent / Halfling
+  // Lucky + the exhaustion penalty. Indomitable Might floors a STR check after.
+  const prof = profBonus(char.level);
+  const isProf = (skill: string) =>
+    (char.skill_proficiencies ?? []).some((s) => s.toLowerCase() === skill);
+  const athProf = isProf('athletics');
+  const acrProf = isProf('acrobatics');
+  const athMod =
+    abilityMod(char.str) + (athProf ? prof : 0) + (hasExpertise(char, 'athletics') ? prof : 0);
+  const acrMod =
+    abilityMod(char.dex) + (acrProf ? prof : 0) + (hasExpertise(char, 'acrobatics') ? prof : 0);
+  const useAthletics = athMod >= acrMod;
+  const escapeSkill = useAthletics ? 'athletics' : 'acrobatics';
+  const escapeCheck = skillCheck(
+    useAthletics ? char.str : char.dex,
+    grapplerRoll + 1,
+    useAthletics ? athProf : acrProf,
+    char.level,
+    false,
+    hasExpertise(char, escapeSkill),
+    hasJackOfAllTrades(char),
+    false,
+    char.species === 'halfling',
+    hasReliableTalent(char),
+    false,
+    d20TestPenalty(char)
   );
-  const acrRoll = d(20) + abilityMod(char.dex) + (acrProf ? profBonus(char.level) : 0);
-  const myRoll = Math.max(athRoll, acrRoll);
-  const skillUsed = athRoll >= acrRoll ? 'Athletics' : 'Acrobatics';
+  const myRoll = useAthletics
+    ? applyIndomitableMight(char, escapeCheck.total)
+    : escapeCheck.total;
+  const skillUsed = useAthletics ? 'Athletics' : 'Acrobatics';
 
   ctx.usedInitiative = true;
   if (myRoll > grapplerRoll) {
@@ -164,14 +207,28 @@ export const handleShove: ActionHandler<{
     ctx.usedInitiative = true;
     return;
   }
-  const athProf = (ctx.context.classSkills[char.character_class] ?? []).includes('athletics');
-  const playerRoll = applyIndomitableMight(
-    char,
-    d(20) + abilityMod(char.str) + (athProf ? profBonus(char.level) : 0)
-  );
   const enemyStr = abilityMod(target.toHit);
   const enemyDex = abilityMod(target.dex ?? 10);
   const enemyRoll = d(20) + Math.max(enemyStr, enemyDex);
+  // STR (Athletics) check routed through skillCheck so it picks up Expertise /
+  // Jack of All Trades / Reliable Talent / Halfling Lucky + the exhaustion
+  // penalty; Indomitable Might (Barbarian L18) floors the total at STR after.
+  const athProf = (char.skill_proficiencies ?? []).some((s) => s.toLowerCase() === 'athletics');
+  const grappleCheck = skillCheck(
+    char.str,
+    enemyRoll + 1,
+    athProf,
+    char.level,
+    false,
+    hasExpertise(char, 'athletics'),
+    hasJackOfAllTrades(char),
+    false,
+    char.species === 'halfling',
+    hasReliableTalent(char),
+    false,
+    d20TestPenalty(char)
+  );
+  const playerRoll = applyIndomitableMight(char, grappleCheck.total);
   ctx.usedInitiative = true;
   if (playerRoll > enemyRoll) {
     ctx.st = {

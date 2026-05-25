@@ -341,20 +341,33 @@ export const handleStudy: ActionHandler<{
 
   const enemyCr = (enemy as unknown as Record<string, number>).cr ?? 0;
   const dc = 15 + Math.floor(enemyCr);
-  const intMod = abilityMod(char.int);
   const skillName = action.skill;
-  const profMod = char.skill_proficiencies?.includes(skillName) ? profBonus(char.level) : 0;
-  // Lucky feat — same pattern as Influence above.
   const studyLuckActive = consumeLuckForCheck(char);
-  const d20 = studyLuckActive ? Math.max(rollDice('1d20'), rollDice('1d20')) : rollDice('1d20');
   // SRD Cleric Divine Order (Thaumaturge) — add WIS (min +1) to Intelligence
   // (Arcana/Religion) checks. `divine_order` is only ever set on a Cleric.
   const thaumaturgeBonus =
     char.divine_order === 'thaumaturge' && (skillName === 'arcana' || skillName === 'religion')
       ? Math.max(1, abilityMod(char.wis))
       : 0;
-  const total = d20 + intMod + profMod + thaumaturgeBonus - d20TestPenalty(char);
-  const success = total >= dc;
+  // Routed through skillCheck (Study skills are all INT) so it gains Expertise /
+  // Jack of All Trades / Reliable Talent / Halfling Lucky. The Thaumaturge bonus
+  // folds into the DC (lowered by it), mirroring how Bardic dice are handled.
+  const studyCheck = skillCheck(
+    char.int,
+    dc - thaumaturgeBonus,
+    char.skill_proficiencies?.includes(skillName) ?? false,
+    char.level,
+    false,
+    hasExpertise(char, skillName),
+    hasJackOfAllTrades(char),
+    studyLuckActive,
+    char.species === 'halfling',
+    hasReliableTalent(char),
+    false,
+    d20TestPenalty(char)
+  );
+  const total = studyCheck.total + thaumaturgeBonus;
+  const success = studyCheck.success;
 
   const skillLabel = {
     arcana: 'Arcana',

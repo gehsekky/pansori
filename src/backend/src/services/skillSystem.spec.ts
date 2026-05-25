@@ -34,10 +34,10 @@ const seed: Seed = {
   seed_id: 'skill',
   rooms: [{ id: ctx.startRoomId, name: 'S', desc: '' }],
   connections: { [ctx.startRoomId]: [] },
-  // int 17 → Influence DC = max(15, 17) = 17.
+  // int 17 → Influence DC = max(15, 17) = 17; cr 2 → Study DC = 15 + 2 = 17.
   enemies: {
     [ctx.startRoomId]: [
-      { id: ENEMY, name: 'Zealot', hp: 40, ac: 12, damage: '1d6', toHit: 3, xp: 30, int: 17 } as unknown as Enemy,
+      { id: ENEMY, name: 'Zealot', hp: 40, ac: 12, damage: '1d6', toHit: 3, xp: 30, int: 17, cr: 2 } as unknown as Enemy,
     ],
   },
   loot: {},
@@ -90,5 +90,54 @@ describe('Influence now routes through skillCheck (Expertise applies)', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
     const plain = await influence(bardState(false));
     expect(plain.narrative).toMatch(/fails/);
+  });
+});
+
+function wizardStudyState(expert: boolean): GameState {
+  const c = makeChar({
+    id: 'pc-1',
+    character_class: 'Wizard',
+    subclass: 'evoker',
+    level: 3, // prof +2
+    int: 16, // +3
+    skill_proficiencies: ['arcana'],
+    expertise_skills: expert ? ['arcana'] : [],
+  });
+  return {
+    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    characters: [c],
+    active_character_id: 'pc-1',
+    initiative_order: [
+      { id: 'pc-1', roll: 18, is_enemy: false },
+      { id: ENEMY, roll: 5, is_enemy: true },
+    ],
+    initiative_idx: 0,
+    entities: [
+      { id: 'pc-1', isEnemy: false, pos: { x: 4, y: 5 }, hp: 30, maxHp: 30, conditions: [], condition_durations: {} },
+      { id: ENEMY, isEnemy: true, pos: { x: 5, y: 5 }, hp: 40, maxHp: 40, conditions: [], condition_durations: {} },
+    ],
+  } as unknown as GameState;
+}
+
+const study = async (state: GameState) =>
+  takeAction({
+    action: { type: 'study', skill: 'arcana', targetEnemyId: ENEMY },
+    history: [],
+    state,
+    seed,
+    context: ctx,
+  });
+
+describe('Study now routes through skillCheck (Expertise applies)', () => {
+  it('a Wizard with Expertise in Arcana succeeds where a non-expert fails', async () => {
+    // d20 = 11. Non-expert: 11 + 3 INT + 2 prof = 16 < DC 17 → fail.
+    // Expert (double prof): 11 + 3 + 4 = 18 ≥ 17 → success.
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const expert = await study(wizardStudyState(true));
+    expect(expert.narrative).not.toMatch(/fails to recall/);
+
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const plain = await study(wizardStudyState(false));
+    expect(plain.narrative).toMatch(/fails to recall/);
   });
 });
