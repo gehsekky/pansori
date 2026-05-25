@@ -328,6 +328,7 @@ export type StructuredAction =
   | { type: 'dodge' }
   | { type: 'disengage' }
   | { type: 'grid_move'; entityId: string; to: GridPos }
+  | { type: 'jump'; to: GridPos } // SRD Long Jump — leap up to STR ft over terrain/obstacles
   | { type: 'travel'; locationId: string }
   | { type: 'enter_district'; districtId: string }
   | { type: 'accept_quest'; questId: string }
