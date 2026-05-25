@@ -3,6 +3,7 @@ import {
   ENEMY_DISADV_CONDITIONS,
   FRESH_TURN,
   abilityMod,
+  applyDamageMultiplier,
   canReact,
   computeTotalAc,
   d,
@@ -39,6 +40,7 @@ import type {
   PlacedNpc,
   Seed,
   Spell,
+  SpellZone,
   StructuredAction,
   Trap,
   TurnActions,
@@ -610,6 +612,11 @@ export function breakConcentration(
   // the expiry path routes through here too).
   if (newSt.spell_walls?.some((w) => w.casterId === char.id)) {
     newSt = { ...newSt, spell_walls: newSt.spell_walls.filter((w) => w.casterId !== char.id) };
+  }
+  // RE-4 — persistent damage zones (Cloud of Daggers, …) likewise vanish when
+  // the caster's concentration ends. Keyed by caster, same as walls.
+  if (newSt.spell_zones?.some((z) => z.casterId === char.id)) {
+    newSt = { ...newSt, spell_zones: newSt.spell_zones.filter((z) => z.casterId !== char.id) };
   }
   // Buff-granted Resistance (Stoneskin / Protection from Energy) ends with its
   // concentration. The grant can sit on the caster or a touched ally, so sweep
@@ -1895,6 +1902,104 @@ function fireLairAction(
     return { st: workingSt, narrative, fired: true };
   }
   return { st, narrative: '', fired: false };
+}
+
+// RE-4 — persistent damage zone footprint. Cells within
+// floor((radiusFt - 1) / SQUARE_SIZE) Chebyshev squares of the center, clipped
+// to the grid: a 5-ft cube/radius → the single center cell, 10-ft → 3×3, etc.
+export function zoneCells(
+  center: GridPos,
+  radiusFt: number,
+  gridW: number,
+  gridH: number
+): GridPos[] {
+  const r = Math.max(0, Math.floor((radiusFt - 1) / SQUARE_SIZE));
+  const cells: GridPos[] = [];
+  for (let dx = -r; dx <= r; dx++) {
+    for (let dy = -r; dy <= r; dy++) {
+      const x = center.x + dx;
+      const y = center.y + dy;
+      if (x >= 0 && x < gridW && y >= 0 && y < gridH) cells.push({ x, y });
+    }
+  }
+  return cells;
+}
+
+// RE-4 — apply one tick of a persistent damage zone to every hostile standing
+// in its cells: roll `damage` (save-for-half if `savingThrow`), apply
+// resistance, and resolve kills (XP split + room-clear). Shared by the on-cast
+// tick and the round-wrap tick. Returns the updated state + a narrative add-on.
+export function applyZoneTick(
+  st: GameState,
+  zone: SpellZone,
+  seed: Seed,
+  context: Context
+): { st: GameState; narrative: string } {
+  if (!st.entities) return { st, narrative: '' };
+  const cellSet = new Set(zone.cells.map((c) => `${c.x},${c.y}`));
+  const enemies = getLivingRoomEnemies(st, seed, zone.roomId);
+  let workingSt = st;
+  let narrative = '';
+  for (const enemy of enemies) {
+    const ent = workingSt.entities?.find((e) => e.id === enemy.id && e.isEnemy);
+    if (!ent || ent.hp <= 0 || !cellSet.has(`${ent.pos.x},${ent.pos.y}`)) continue;
+    let dmg = rollDice(zone.damage);
+    let saveTag = '';
+    if (zone.savingThrow) {
+      const score = (enemy as unknown as Record<string, number>)[zone.savingThrow] ?? 10;
+      const failed = rollConditionSave(
+        zone.savingThrow,
+        score,
+        zone.saveDC ?? 10,
+        false,
+        1,
+        0,
+        ent.conditions ?? []
+      );
+      dmg = failed ? dmg : zone.saveEffect === 'half' ? Math.floor(dmg / 2) : 0;
+      saveTag = ` (${zone.savingThrow.toUpperCase()} ${failed ? 'fail' : 'save'})`;
+    }
+    const resisted = applyDamageMultiplier(dmg, zone.damageType, enemy).damage;
+    const newHp = Math.max(0, ent.hp - resisted);
+    workingSt = {
+      ...workingSt,
+      entities: (workingSt.entities ?? []).map((e) =>
+        e.id === ent.id && e.isEnemy ? { ...e, hp: newHp } : e
+      ),
+    };
+    narrative += ` ${enemy.name} takes ${resisted} ${zone.damageType}${saveTag}.`;
+    if (newHp <= 0 && !workingSt.enemies_killed.includes(enemy.id)) {
+      workingSt = { ...workingSt, enemies_killed: [...workingSt.enemies_killed, enemy.id] };
+      const split = splitEncounterXp(workingSt, zone.casterId, enemy.xp ?? 10);
+      workingSt = split.st;
+      const killer = workingSt.characters.find((c) => c.id === zone.casterId);
+      if (killer) {
+        killer.xp = (killer.xp || 0) + split.share;
+        narrative += applyPartyLevelUps(workingSt, killer, context);
+      }
+      narrative += ` ${enemy.name} is destroyed!`;
+      if (isRoomCleared(workingSt, seed, zone.roomId)) workingSt = endCombatState(workingSt);
+    }
+  }
+  return { st: workingSt, narrative };
+}
+
+// RE-4 — round-wrap tick for every persistent zone in the current room.
+function fireSpellZones(
+  st: GameState,
+  seed: Seed,
+  context: Context
+): { st: GameState; narrative: string } {
+  if (!st.combat_active || !st.spell_zones?.length) return { st, narrative: '' };
+  let workingSt = st;
+  let narrative = '';
+  for (const zone of st.spell_zones) {
+    if (zone.roomId !== st.current_room) continue;
+    const res = applyZoneTick(workingSt, zone, seed, context);
+    workingSt = res.st;
+    if (res.narrative) narrative += ` 🌀 ${zone.name}:${res.narrative}`;
+  }
+  return { st: workingSt, narrative };
 }
 
 // SRD p.221 — legendary actions. Fire AT MOST ONE after another creature's
@@ -7366,6 +7471,13 @@ export async function takeAction({
       const lairRes = fireLairAction(st, seed, context);
       st = lairRes.st;
       narrative += lairRes.narrative;
+      // RE-4 — persistent damage zones (Cloud of Daggers, …) tick on round wrap,
+      // damaging hostiles standing in them. Runs before the concentration tick
+      // so a zone whose concentration is about to expire still deals its final
+      // round of damage.
+      const zoneRes = fireSpellZones(st, seed, context);
+      st = zoneRes.st;
+      narrative += zoneRes.narrative;
       // Concentration timers tick once per full round (SRD 5.2.1 — round
       // = 6 sec). Spells whose budget reaches 0 end cleanly via
       // breakConcentration so linked conditions (Bless's `blessed`, Hold

@@ -2711,6 +2711,55 @@ export const SRD_SPELLS: Record<string, Spell> = {
     spellList: ['arcane'],
   },
 
+  // ─── Persistent damage zones (RE-4) ──────────────────────────────────
+  // Stamp a SpellZone on cast that ticks each round wrap until concentration
+  // ends (see castSpell/zone.ts + fireSpellZones). Movement (RAW repositioning)
+  // is deferred — the zones are stationary for now.
+  // SRD: Moonbeam (L2) — a 5-ft-radius cylinder of searing moonlight. A creature
+  // in it makes a CON save for half of 2d10 radiant, each round it remains.
+  moonbeam: {
+    id: 'moonbeam',
+    name: 'Moonbeam',
+    level: 2,
+    castTime: 'action',
+    persistentZone: true,
+    concentration: true,
+    durationRounds: 10,
+    damage: '2d10',
+    damageType: 'radiant',
+    savingThrow: 'con',
+    saveEffect: 'half',
+    upcastBonus: '1d10',
+    blastRadius: 5,
+    aoeShape: 'sphere',
+    rangeKind: 'ranged',
+    rangeFt: 120,
+    desc: 'A 5-ft-radius beam of moonlight (Concentration, up to 1 minute). A creature in the beam makes a CON save, taking 2d10 radiant on a failure or half on a success, again each round it remains (+1d10 per slot above 2nd). RAW the beam can be moved 60 ft on later turns — repositioning is deferred, so pansori’s beam is stationary.',
+    spellList: ['primal'],
+  },
+  // SRD: Flaming Sphere (L2) — a rolling ball of fire. Creatures within 5 ft of
+  // it make a DEX save for half of 2d6 fire, each round it persists.
+  flaming_sphere: {
+    id: 'flaming_sphere',
+    name: 'Flaming Sphere',
+    level: 2,
+    castTime: 'action',
+    persistentZone: true,
+    concentration: true,
+    durationRounds: 10,
+    damage: '2d6',
+    damageType: 'fire',
+    savingThrow: 'dex',
+    saveEffect: 'half',
+    upcastBonus: '1d6',
+    blastRadius: 10,
+    aoeShape: 'sphere',
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    desc: 'A 5-ft sphere of fire; creatures within 5 ft of it make a DEX save, taking 2d6 fire on a failure or half on a success, each round it persists (Concentration, up to 1 minute; +1d6 per slot above 2nd). RAW you can roll it 30 ft as a Bonus Action — movement is deferred, so the sphere is stationary.',
+    spellList: ['primal', 'arcane'],
+  },
+
   // ─── Defensive buffs ─────────────────────────────────────────────────
   stoneskin: {
     id: 'stoneskin',

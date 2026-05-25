@@ -18,6 +18,7 @@ import { runSaveSpell } from './save.js';
 import { runSummonSpell } from './summon.js';
 import { runUtilitySpell } from './utility.js';
 import { runWallOfFire } from './wall.js';
+import { runZoneSpell } from './zone.js';
 import { transmutedDamageType } from '../../rulesEngine.js';
 import { updatePcActor } from '../actor.js';
 
@@ -316,6 +317,14 @@ export const handleCastSpell: ActionHandler<{
       resolveTwin(twin, twin.id);
     }
     ctx.usedInitiative = true;
+    return;
+  }
+
+  // RE-4 — persistent damage zone spells (Cloud of Daggers, …) own their full
+  // resolution: stamp the zone on the target's cell, bind concentration, and
+  // tick once. No per-target attack/save roll here — the zone tick (now and on
+  // each round wrap) applies the damage.
+  if (spell.persistentZone && runZoneSpell(ctx, dmgSpell, slotLevel, dc, spellTargetId)) {
     return;
   }
 
