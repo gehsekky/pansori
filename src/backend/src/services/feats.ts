@@ -228,6 +228,17 @@ export function getFeat(featId: string, context: Context): Feat | undefined {
 
 // ─── Epic Boon runtime helpers ───────────────────────────────────────────
 
+/**
+ * SRD Boon of Combat Prowess (epic) — Peerless Aim: once per turn, a miss can
+ * become a hit. Available when the PC holds the boon and hasn't spent it yet
+ * this turn (`turn_actions.peerless_aim_used` resets at the start of the turn).
+ */
+export function peerlessAimAvailable(char: Character): boolean {
+  return (
+    (char.feats ?? []).includes('boon_combat_prowess') && !char.turn_actions?.peerless_aim_used
+  );
+}
+
 /** SRD Boon of Irresistible Offense (epic) — true when the PC holds the boon. */
 export function hasIrresistibleOffense(char: Character): boolean {
   return (char.feats ?? []).includes('boon_irresistible_offense');

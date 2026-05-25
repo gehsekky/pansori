@@ -31,7 +31,11 @@ import {
   hasClass,
   peerlessSkillDie,
 } from '../../multiclass.js';
-import { overcomeDefensesApplies, overwhelmingStrikeDamage } from '../../feats.js';
+import {
+  overcomeDefensesApplies,
+  overwhelmingStrikeDamage,
+  peerlessAimAvailable,
+} from '../../feats.js';
 import type { ActionContext } from '../types.js';
 import type { ToHitContext } from './toHit.js';
 import { composeNow } from '../../narrative/compose.js';
@@ -232,6 +236,21 @@ export function resolveOneAttack(
       peerlessNote = ` ✦ Peerless Skill: +${peerlessRoll} — a hit!`;
     }
   }
+  // SRD Boon of Combat Prowess — Peerless Aim: if the attack still missed (a
+  // Nat 1 is still a miss, so it rescues fumbles too), turn it into a hit. No
+  // roll — it auto-succeeds; a hit, not a crit. Once per turn. Runs last so it
+  // only spends when the cheaper rescues (Stroke of Luck, Peerless Skill)
+  // couldn't save the swing.
+  let peerlessAimNote = '';
+  if (!atk.hit && peerlessAimAvailable(pc.char)) {
+    atk.hit = true;
+    atk.fumble = false;
+    atk.damage = Math.max(1, rollWeaponDmg(weaponDamage ?? '1d4') + atk.atkMod);
+    updatePcActor(ctx, {
+      turn_actions: { ...pc.char.turn_actions, peerless_aim_used: true },
+    });
+    peerlessAimNote = ' ✦ Peerless Aim — a miss becomes a hit!';
+  }
   // Brutal Strike: the chosen swing is now resolving — consume the rider
   // (the advantage was already forgone above) regardless of hit/miss.
   let brutalNote = '';
@@ -292,7 +311,7 @@ export function resolveOneAttack(
   const atkNote =
     ' ' +
     fmt.note(
-      `(${label}d20 ${atk.roll}+${atk.atkMod} ${atk.atkStat}+${atk.prof} prof${bonusNote} = ${atk.total} vs AC ${effectiveEnemyAc}${coverNote}${disadvNote}${versatileNote})${noProfNote}${biNote}${blessNote}${baneNote}${strokeNote}${peerlessNote}${brutalNote}`
+      `(${label}d20 ${atk.roll}+${atk.atkMod} ${atk.atkStat}+${atk.prof} prof${bonusNote} = ${atk.total} vs AC ${effectiveEnemyAc}${coverNote}${disadvNote}${versatileNote})${noProfNote}${biNote}${blessNote}${baneNote}${strokeNote}${peerlessNote}${peerlessAimNote}${brutalNote}`
     );
 
   if (atk.fumble) {
