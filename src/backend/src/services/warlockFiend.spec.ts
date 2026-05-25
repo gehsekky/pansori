@@ -4,6 +4,7 @@
 
 import type { Character, Enemy, GameState, Seed } from '../types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { darkOnesLuckMaxUses, darkOnesLuckRemaining, tryDarkOnesLuck } from './darkOnesOwnLuck.js';
 import { enemyActor, pcActor } from './actions/actor.js';
 import { makeChar, makeState } from '../test-fixtures.js';
 import type { ActionContext } from './actions/types.js';
@@ -138,5 +139,27 @@ describe('Hurl Through Hell (L14)', () => {
     const r = await useHH(hhCombat({ level: 13 }));
     expect((r.newState.entities ?? []).find((e) => e.id === HHENEMY)!.hp).toBe(100);
     expect(r.narrative).toMatch(/requires a Fiend Warlock of level 14/);
+  });
+});
+
+describe('Dark One’s Own Luck (L6)', () => {
+  it('grants CHA-mod uses for a Fiend Warlock L6, else 0', () => {
+    expect(darkOnesLuckMaxUses(fiend({ level: 6, cha: 16 }))).toBe(3); // +3 CHA
+    expect(darkOnesLuckMaxUses(fiend({ level: 5, cha: 16 }))).toBe(0);
+    expect(darkOnesLuckMaxUses(makeChar({ character_class: 'Wizard', level: 20, cha: 18 }))).toBe(0);
+  });
+
+  it('tracks remaining uses against the spent count', () => {
+    expect(darkOnesLuckRemaining(fiend({ level: 6, cha: 16, class_resource_uses: { dark_ones_luck: 1 } }))).toBe(2);
+    expect(darkOnesLuckRemaining(fiend({ level: 6, cha: 16, class_resource_uses: { dark_ones_luck: 3 } }))).toBe(0);
+  });
+
+  it('spends a use only when the 1d10 rescues the roll', () => {
+    const char = fiend({ level: 6, cha: 16 });
+    expect(tryDarkOnesLuck(char, () => true)).toEqual({ saved: true, used: true });
+    expect(tryDarkOnesLuck(char, () => false)).toEqual({ saved: false, used: false });
+    // No uses left → the luck die is never rolled.
+    const spent = fiend({ level: 6, cha: 16, class_resource_uses: { dark_ones_luck: 3 } });
+    expect(tryDarkOnesLuck(spent, () => true)).toEqual({ saved: false, used: false });
   });
 });
