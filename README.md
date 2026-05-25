@@ -54,7 +54,7 @@ open http://localhost:5173
     │       ├── types.ts        ← shared interfaces (GameState, Seed, Context, …)
     │       ├── auth/           ← Google OAuth + session middleware
     │       ├── contexts/       ← sandbox.ts, vale_of_shadows.ts, whispering_pines.ts, grove_of_thorns.ts
-    │       │   └── srd/        ← classes, spells, monsters, species, beast_forms
+    │       │   └── srd/        ← classes, spells, monsters, species, beast_forms, items
     │       ├── db/             ← pool.ts
     │       ├── routes/         ← game.ts (REST API) + schemas.ts (Zod)
     │       └── services/       ← gameEngine, rulesEngine, gridEngine, damage, multiclass, conditions/, narrative/, procgen, campaignEngine, migrationRunner, llmProvider, and actions/ (one handler per player action, dispatched via actions/index.ts)
@@ -82,13 +82,13 @@ Each context file defines a complete game setting:
 | `mapType` | `'roguelike'` (procgen) or `'campaign'` (fixed map) |
 | `classSkills` | Per-class skill proficiencies (e.g. Rogue gets stealth) |
 | `enemyTemplates` | Stat blocks with CR, HP, AC, toHit, XP, ability scores, multi-attack, boss phases, and `attackReachFt` / `speedFt` for tactical grid combat |
-| `lootTable` | Items with slot, finesse, range, weapon mastery, armor category, and effect fields |
+| `lootTable` | Items with slot, finesse, range, weapon mastery, armor category, and effect fields. Compose from the shared SRD catalog with `srdItems('dagger', 'longsword', …)` (which also limits what's available) plus campaign-specific custom items |
 | `narratives` | All flavour text pools used by the game engine |
 | `campaign` | Fixed locations + rooms for campaign maps (Vale of Shadows, Whispering Pines, Grove of Thorns) |
 
 Procgen uses BFS from the start room to scale enemy CR by distance — early rooms draw from CR ≤ 1 templates, mid rooms from CR ≤ 5, far rooms from the full pool.
 
-The SRD pack under `src/backend/src/contexts/srd/` (classes, spells, monsters, species, beast forms) is shared by every context.
+The SRD pack under `src/backend/src/contexts/srd/` (classes, spells, monsters, species, beast forms, items) is shared by every context. Equipment lives in `items.ts` as a single canonical `SRD_ITEMS` catalog; contexts select from it via `srdItems(...ids)` so the same weapon/armor doesn't drift between campaigns, while still defining their own custom items and limiting which SRD items a campaign offers.
 
 ## Rules engine (SRD 5.2.1, strict)
 
