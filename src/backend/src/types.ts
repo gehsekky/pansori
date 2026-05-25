@@ -825,6 +825,11 @@ export interface Character {
   // (typically 60 ft for elves/dwarves/halflings/etc.). Default 0 = no
   // darkvision (typical human).
   darkvision_ft?: number;
+  // SRD: Boon of Truesight (epic boon) — Truesight range in feet (0/absent =
+  // none). RAW Truesight sees in Darkness, sees Invisible creatures and
+  // objects, and is immune to visual illusions; pansori records the range for
+  // narration today (the see-Invisible substrate isn't modeled yet).
+  truesight_ft?: number;
   // SRD 5.2.1 p.17–18: Temporary Hit Points. Absorb damage before HP. Don't
   // stack with themselves (replace if higher); expire on a Long Rest.
   temp_hp?: number;

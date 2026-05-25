@@ -78,12 +78,13 @@ export function applyFeatTake(
   let next: Character = { ...char, feats: [...(char.feats ?? []), feat.id] };
   const narrativeParts: string[] = [`${next.name} gains the ${feat.name} feat!`];
 
-  // Half-feat ability bonus (kept generic; SRD feats don't use it but
-  // the seam is here for any future SRD feat that does).
+  // Half-feat / epic-boon ability bonus. Epic boons raise an ability by 1 to
+  // a maximum of 30; ordinary half-feats cap at the usual 20.
   if (feat.abilityBonus) {
     const ab = 'fixed' in feat.abilityBonus ? feat.abilityBonus.fixed : opts.abilityChoice;
     if (ab) {
-      next = { ...next, [ab]: (next[ab] ?? 10) + 1 };
+      const cap = feat.category === 'epic-boon' ? 30 : 20;
+      next = { ...next, [ab]: Math.min(cap, (next[ab] ?? 10) + 1) };
       narrativeParts.push(`+1 ${ab.toUpperCase()} (now ${next[ab]}).`);
       next = {
         ...next,
@@ -177,6 +178,39 @@ export function applyFeatTake(
         narrativeParts.push(
           `May choose ${feat.effect.count} skill proficiencies (no choices supplied yet).`
         );
+      }
+      break;
+    }
+    case 'epic-boon': {
+      // Epic boons (L19+). The +1 ability bump is already applied above; here
+      // we apply each boon's take-time grant. Most boons' signature benefit is
+      // a runtime hook (attack/cast/reaction/resistance) that reads
+      // `char.feats`, so they need no take-time state.
+      switch (feat.effect.boon) {
+        case 'truesight':
+          next = { ...next, truesight_ft: 60 };
+          narrativeParts.push('Gains Truesight out to 60 feet.');
+          break;
+        case 'combat-prowess':
+          narrativeParts.push('Peerless Aim: once per turn, a miss can become a hit.');
+          break;
+        case 'dimensional-travel':
+          narrativeParts.push('Blink Steps: teleport 30 ft after the Attack or Magic action.');
+          break;
+        case 'fate':
+          narrativeParts.push('Improve Fate: ±2d4 to a D20 Test within 60 ft, once per rest.');
+          break;
+        case 'irresistible-offense':
+          narrativeParts.push(
+            'Overcome Defenses (B/P/S ignores Resistance) and Overwhelming Strike on a natural 20.'
+          );
+          break;
+        case 'spell-recall':
+          narrativeParts.push('Free Casting: a level 1–4 slot may not be expended (1d4 per cast).');
+          break;
+        case 'night-spirit':
+          narrativeParts.push('Merge with Shadows and Shadowy Form while in Dim Light or Darkness.');
+          break;
       }
       break;
     }
