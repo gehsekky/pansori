@@ -7507,7 +7507,16 @@ export async function takeAction({
     // attacking does NOT drop the condition. We approximate by reading
     // `concentrating_on.spellId`.
     const concSpellId = char.concentrating_on?.spellId;
+    // Casting an invisibility-GRANTING spell (Invisibility / Greater
+    // Invisibility) must not strip the condition it applies on the very same
+    // cast — only a SUBSEQUENT attack/cast reveals the caster. A later regular-
+    // Invisibility cast/attack still breaks it (concSpellId isn't in the keep
+    // set), while Greater Invisibility persists via that set.
+    const grantsInvisible = castSpellId
+      ? context.spellTable?.[castSpellId]?.condition === 'invisible'
+      : false;
     const keepsInvisible =
+      grantsInvisible ||
       (castSpellId && SPELLS_THAT_KEEP_INVISIBILITY.has(castSpellId)) ||
       (concSpellId && SPELLS_THAT_KEEP_INVISIBILITY.has(concSpellId));
     if (attackActions.has(action.type) && !keepsInvisible) {

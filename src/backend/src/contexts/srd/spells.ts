@@ -318,6 +318,106 @@ export const SRD_SPELLS: Record<string, Spell> = {
     rangeKind: 'touch',
     spellList: ['divine', 'primal'],
   },
+  // SRD: Acid Splash — an acidic bubble bursts in a 5-ft-radius Sphere;
+  // each creature there makes a DEX save or takes 1d6 acid. Cantrip
+  // scaling on the standard ladder.
+  acid_splash: {
+    id: 'acid_splash',
+    name: 'Acid Splash',
+    level: 0,
+    castTime: 'action',
+    damage: '1d6',
+    damageType: 'acid',
+    savingThrow: 'dex',
+    saveEffect: 'negates',
+    upcastBonus: '1d6',
+    blastRadius: 5,
+    aoeShape: 'sphere',
+    desc: 'An acidic bubble bursts in a 5-ft-radius sphere; each creature makes a Dexterity save or takes 1d6 acid damage (scales with level).',
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    spellList: ['arcane'],
+  },
+  // SRD: Produce Flame — a flame in your hand sheds light and can be
+  // hurled at a target within 60 ft (ranged spell attack, 1d8 fire). The
+  // light is flavor in pansori's room-grained lighting; the hurl is the
+  // combat payload. Cantrip scaling on the standard ladder.
+  produce_flame: {
+    id: 'produce_flame',
+    name: 'Produce Flame',
+    level: 0,
+    castTime: 'action',
+    damage: '1d8',
+    damageType: 'fire',
+    attackRoll: true,
+    upcastBonus: '1d8',
+    desc: 'A flame springs to your hand, shedding light, then is hurled at a target. Ranged spell attack; 1d8 fire damage on a hit (scales with level).',
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    spellList: ['primal'],
+  },
+  // SRD: Starry Wisp — launch a mote of light (ranged spell attack, 1d8
+  // radiant). RAW it also lights the target and denies it the Invisible
+  // condition until your next turn; that reveal rider is narrated (pansori
+  // has no see-Invisible substrate). Cantrip scaling on the standard ladder.
+  starry_wisp: {
+    id: 'starry_wisp',
+    name: 'Starry Wisp',
+    level: 0,
+    castTime: 'action',
+    damage: '1d8',
+    damageType: 'radiant',
+    attackRoll: true,
+    upcastBonus: '1d8',
+    desc: 'A mote of starlight streaks at a target. Ranged spell attack; 1d8 radiant damage on a hit, and the target sheds dim light and cannot benefit from being Invisible until your next turn (scales with level).',
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    spellList: ['arcane', 'primal'],
+  },
+  // SRD: Message — whisper to one creature within 120 ft; it (and only it)
+  // hears and can reply in a whisper. Narrative utility cantrip (somatic +
+  // material only, no verbal component).
+  message: {
+    id: 'message',
+    name: 'Message',
+    level: 0,
+    castTime: 'action',
+    verbal: false,
+    narrative: '{name} points and whispers — the words carry to one ear alone.',
+    desc: 'Whisper a short message to one creature within range; only it hears, and it can whisper a reply only you hear (1 round).',
+    rangeKind: 'ranged',
+    rangeFt: 120,
+    spellList: ['arcane', 'primal'],
+  },
+  // SRD: Minor Illusion — create a sound or a small static image within
+  // 30 ft for 1 minute. A creature that Studies it can disbelieve with an
+  // Investigation check vs your save DC. Narrative utility cantrip (somatic
+  // + material only, no verbal component).
+  minor_illusion: {
+    id: 'minor_illusion',
+    name: 'Minor Illusion',
+    level: 0,
+    castTime: 'action',
+    verbal: false,
+    narrative: '{name} shapes a brief illusion — a phantom sound or image flickers into being.',
+    desc: 'Create an illusory sound or a static image of an object (no larger than a 5-ft cube) within range for 1 minute. A creature that studies it may disbelieve with an Investigation check vs your spell save DC.',
+    rangeKind: 'ranged',
+    rangeFt: 30,
+    spellList: ['arcane'],
+  },
+  // SRD: Elementalism (2024) — a minor control effect over air, earth,
+  // fire, or water within 30 ft. Narrative utility cantrip.
+  elementalism: {
+    id: 'elementalism',
+    name: 'Elementalism',
+    level: 0,
+    castTime: 'action',
+    narrative: '{name} flexes a hand and the elements answer in some small way.',
+    desc: 'A minor elemental effect within range: stir a breeze, raise dust or sand, kindle or snuff a tiny flame, or part a thin sheet of water.',
+    rangeKind: 'ranged',
+    rangeFt: 30,
+    spellList: ['arcane', 'primal'],
+  },
 
   // ─── Level 1 ────────────────────────────────────────────────────────────────
   // SRD: Goodberry — conjure 10 magical berries that each restore
@@ -1128,6 +1228,26 @@ export const SRD_SPELLS: Record<string, Spell> = {
     rangeKind: 'self',
     spellList: ['primal'],
   },
+  // SRD: Grease — nonflammable grease coats a 10-ft square (Difficult
+  // Terrain for 1 minute); each creature caught in it makes a DEX save or
+  // has the Prone condition. The lingering difficult terrain is narrated
+  // (pansori doesn't persist spell-made terrain); the save-or-Prone is
+  // mechanical.
+  grease: {
+    id: 'grease',
+    name: 'Grease',
+    level: 1,
+    castTime: 'action',
+    savingThrow: 'dex',
+    saveEffect: 'negates',
+    condition: 'prone',
+    blastRadius: 10,
+    aoeShape: 'cube',
+    desc: 'Slick grease coats a 10-ft square, turning it into difficult terrain; each creature caught in it must succeed on a Dexterity save or fall Prone.',
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    spellList: ['arcane'],
+  },
 
   // ─── Level 2 ────────────────────────────────────────────────────────────────
   // SRD: Barkskin — touch a willing creature; their AC becomes 17
@@ -1449,6 +1569,31 @@ export const SRD_SPELLS: Record<string, Spell> = {
     rangeFt: 60,
     desc: 'A floating spectral weapon makes melee attacks.',
     spellList: ['divine'],
+  },
+  // SRD: Invisibility — a creature you touch gains the Invisible condition
+  // (Concentration, up to 1 hour). Ends early when the target attacks, deals
+  // damage, or casts a spell — pansori's default break-on-attack handles this
+  // (this id is NOT in the keep-invisibility set, unlike Greater Invisibility).
+  // Upcast (+1 target/slot) isn't modeled (single target).
+  invisibility: {
+    id: 'invisibility',
+    name: 'Invisibility',
+    level: 2,
+    castTime: 'action',
+    concentration: true,
+    durationRounds: 600,
+    targetType: 'self_or_ally',
+    condition: 'invisible',
+    conditionDuration: 600,
+    rangeKind: 'touch',
+    desc: 'A willing creature you touch becomes Invisible until the spell ends (Concentration, up to 1 hour). The effect ends early if the target attacks, deals damage, or casts a spell.',
+    narratives: {
+      cast: [
+        '{name} traces {spell}{slotNote} over {target}, who fades from view',
+        '{name} murmurs {spell}{slotNote} and {target} melts into the air',
+      ],
+    },
+    spellList: ['arcane'],
   },
 
   // ─── Level 3 ────────────────────────────────────────────────────────────────
