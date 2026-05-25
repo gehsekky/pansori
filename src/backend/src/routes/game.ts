@@ -22,6 +22,7 @@ import {
   canDonShield,
   canEquipWeapon,
   computeTotalAc,
+  spellSlotsForClassLevel,
 } from '../services/rulesEngine.js';
 import { Request, Response, Router } from 'express';
 import { SRD_SPECIES, SRD_WEAPON_MASTERY_SLOTS } from '../contexts/srd/index.js';
@@ -386,7 +387,11 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
         background_id: bg?.id ?? null,
         skill_proficiencies: skillProfs,
         tool_proficiencies: toolProfs,
-        spell_slots_max: ctx.classSpellSlots?.[c.character_class]?.[0] ?? {},
+        // Level-1 spell slots from the canonical SRD table (full casters {1:2},
+        // half-casters none until L2, Warlock Pact Magic {1:1}). Slots are
+        // recomputed by spellSlotsForChar on every level-up; this just seeds
+        // creation, replacing the old per-context classSpellSlots table.
+        spell_slots_max: spellSlotsForClassLevel(c.character_class.toLowerCase(), 1),
         spell_slots_used: {},
         spells_known: ctx.classSpells?.[c.character_class] ?? [],
         armor_proficiencies: armorProfs,

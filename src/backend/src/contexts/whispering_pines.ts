@@ -21,6 +21,7 @@ import {
   SRD_MONSTERS,
   SRD_SPELLCASTING_ABILITY,
   SRD_SPELLS,
+  srdBackgrounds,
   srdItems,
 } from './srd/index.js';
 import type { Context } from '../types.js';
@@ -71,41 +72,24 @@ export const context: Context = {
 
   // ─── Backgrounds ──────────────────────────────────────────────────────────────
 
-  backgrounds: [
-    {
-      id: 'soldier',
-      name: 'Soldier',
+  backgrounds: srdBackgrounds({
+    soldier: {
       desc: 'You served with the Pine Wardens or another mountain garrison.',
-      skillProficiencies: ['athletics', 'intimidation'],
-      feature: 'Military Rank',
       featureDesc: 'Wardens and ex-soldiers recognise your authority.',
     },
-    {
-      id: 'criminal',
-      name: 'Criminal',
+    criminal: {
       desc: 'You have a history of breaking the law — smuggling, perhaps, in the high passes.',
-      skillProficiencies: ['stealth', 'deception'],
-      toolProficiency: "Thieves' Tools",
-      feature: 'Criminal Contact',
       featureDesc: 'A reliable contact across the snow line handles rumour and fenced goods.',
     },
-    {
-      id: 'sage',
-      name: 'Sage',
+    sage: {
       desc: 'You spent years studying lore — particularly cold-weather magic and ancient cults.',
-      skillProficiencies: ['arcana', 'history'],
-      feature: 'Researcher',
       featureDesc: 'If you do not know information, you know where to find it.',
     },
-    {
-      id: 'acolyte',
-      name: 'Acolyte',
+    acolyte: {
       desc: 'You once served at a Selûnite shrine before taking up the pass road.',
-      skillProficiencies: ['religion', 'insight'],
-      feature: 'Shelter of the Faithful',
       featureDesc: 'You and your companions receive healing and care at temples.',
     },
-  ],
+  }),
 
   // ─── Intro texts ──────────────────────────────────────────────────────────────
 
@@ -1185,16 +1169,6 @@ export const context: Context = {
     Druid: ['shillelagh', 'entangle', 'cure_wounds', 'healing_word'],
     Sorcerer: ['fire_bolt', 'sleep', 'burning_hands', 'misty_step', 'fireball'],
     Warlock: ['eldritch_blast', 'hex', 'charm_person'],
-  },
-
-  classSpellSlots: {
-    Cleric: [{ 1: 2 }, { 1: 3 }, { 1: 4, 2: 2 }, { 1: 4, 2: 3 }, { 1: 4, 2: 3, 3: 2 }],
-    Wizard: [{ 1: 2 }, { 1: 3 }, { 1: 4, 2: 2 }, { 1: 4, 2: 3 }, { 1: 4, 2: 3, 3: 2 }],
-    Paladin: [{ 1: 2 }, { 1: 2 }, { 1: 3, 2: 0 }, { 1: 3, 2: 0 }, { 1: 4, 2: 2 }],
-    Bard: [{ 1: 2 }, { 1: 3 }, { 1: 4, 2: 2 }, { 1: 4, 2: 3 }, { 1: 4, 2: 3, 3: 2 }],
-    Druid: [{ 1: 2 }, { 1: 3 }, { 1: 4, 2: 2 }, { 1: 4, 2: 3 }, { 1: 4, 2: 3, 3: 2 }],
-    Sorcerer: [{ 1: 2 }, { 1: 3 }, { 1: 4, 2: 2 }, { 1: 4, 2: 3 }, { 1: 4, 2: 3, 3: 2 }],
-    Warlock: [{ 1: 1 }, { 1: 2 }, { 2: 2 }, { 2: 2 }, { 3: 2 }],
   },
 
   // ─── Script-engine rules ─────────────────────────────────────────────────────
