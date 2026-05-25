@@ -1,4 +1,4 @@
-import type { DeathSaves, LootItem, Spell, TurnActions } from '../types.js';
+import type { AbilityKey, DeathSaves, LootItem, Spell, TurnActions } from '../types.js';
 
 // ─── Dice ─────────────────────────────────────────────────────────────────────
 
@@ -551,6 +551,36 @@ export {
   ENEMY_DISADV_CONDITIONS,
 } from './conditions/registry.js';
 import { autoFailsSave, disadvantageOnSave } from './conditions/registry.js';
+
+// SRD 5.2.1 skill → governing ability. Keys are pansori's lowercase snake-case
+// skill ids (as in SRD_CLASS_SKILLS / `skill_proficiencies`). The single source
+// of truth for which ability a skill check rolls.
+export const SKILL_ABILITY: Record<string, AbilityKey> = {
+  athletics: 'str',
+  acrobatics: 'dex',
+  sleight_of_hand: 'dex',
+  stealth: 'dex',
+  arcana: 'int',
+  history: 'int',
+  investigation: 'int',
+  nature: 'int',
+  religion: 'int',
+  animal_handling: 'wis',
+  insight: 'wis',
+  medicine: 'wis',
+  perception: 'wis',
+  survival: 'wis',
+  deception: 'cha',
+  intimidation: 'cha',
+  performance: 'cha',
+  persuasion: 'cha',
+};
+
+/** The governing ability for a skill (case-insensitive on the skill name);
+ *  defaults to INT for an unknown skill. */
+export function abilityForSkill(skill: string): AbilityKey {
+  return SKILL_ABILITY[skill.toLowerCase()] ?? 'int';
+}
 
 // On-hit saving throw: returns true if the save FAILS (condition is applied).
 // Pass proficient=true when the character has saving throw proficiency in this ability.
