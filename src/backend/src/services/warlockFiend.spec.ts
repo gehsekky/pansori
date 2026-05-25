@@ -1,14 +1,16 @@
-// RE-2 — Fiend Warlock: Fiendish Resilience (L10) — Resistance to a chosen
-// damage type (not Force), re-chooseable on a rest.
+// RE-2 — Fiend Warlock: Fiendish Resilience (L10, Resistance to a chosen
+// damage type) and Hurl Through Hell (L14, post-hit CHA save → 8d10 Psychic +
+// Incapacitated).
 
-import type { Character, Enemy } from '../types.js';
+import type { Character, Enemy, GameState, Seed } from '../types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { enemyActor, pcActor } from './actions/actor.js';
+import { makeChar, makeState } from '../test-fixtures.js';
 import type { ActionContext } from './actions/types.js';
 import { context as ctx } from '../contexts/sandbox.js';
 import { handleChooseFiendishResilience } from './actions/meta.js';
 import { handleEnemyAttack } from './actions/enemyAttack.js';
-import { makeChar } from '../test-fixtures.js';
+import { takeAction } from './gameEngine.js';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -82,5 +84,59 @@ describe('Fiendish Resilience — resistance in combat', () => {
     handleEnemyAttack(c, { ...enemyAttack, targetCharId: 'w' });
     if (c.enemySubAttack?.outcome === 'done') expect(c.enemySubAttack.target.hp).toBe(32); // 40 − 8
     else throw new Error('expected a resolved attack');
+  });
+});
+
+const HHENEMY = `${ctx.startRoomId}#0`;
+const hhSeed: Seed = {
+  context_id: ctx.id,
+  world_name: 'HH',
+  ship_name: 'HH',
+  intro: '',
+  seed_id: 'hh',
+  rooms: [{ id: ctx.startRoomId, name: 'S', desc: '' }],
+  connections: { [ctx.startRoomId]: [] },
+  enemies: {
+    [ctx.startRoomId]: [
+      { id: HHENEMY, name: 'Bandit', hp: 100, ac: 13, damage: '1d6', toHit: 3, xp: 50, cha: 10 } as unknown as Enemy,
+    ],
+  },
+  loot: {},
+  npcs: {},
+};
+
+function hhCombat(over: Partial<Character> = {}): GameState {
+  const c = fiend({ id: 'pc-1', level: 14, hp: 90, max_hp: 90, ...over });
+  return {
+    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    characters: [c],
+    active_character_id: 'pc-1',
+    initiative_order: [
+      { id: 'pc-1', roll: 18, is_enemy: false },
+      { id: HHENEMY, roll: 5, is_enemy: true },
+    ],
+    initiative_idx: 0,
+    entities: [
+      { id: 'pc-1', isEnemy: false, pos: { x: 4, y: 5 }, hp: 90, maxHp: 90, conditions: [], condition_durations: {} },
+      { id: HHENEMY, isEnemy: true, pos: { x: 5, y: 5 }, hp: 100, maxHp: 100, conditions: [], condition_durations: {} },
+    ],
+  } as unknown as GameState;
+}
+
+const useHH = async (state: GameState) =>
+  takeAction({ action: { type: 'use_class_feature', featureId: 'hurl_through_hell' }, history: [], state, seed: hhSeed, context: ctx });
+
+describe('Hurl Through Hell (L14)', () => {
+  it('on a failed CHA save: Psychic damage + a hurl through the Lower Planes', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.05); // enemy fails the CHA save
+    const r = await useHH(hhCombat());
+    expect((r.newState.entities ?? []).find((e) => e.id === HHENEMY)!.hp).toBeLessThan(100);
+    expect(r.narrative).toMatch(/hurls|Hell/);
+  });
+
+  it('requires a Fiend Warlock of level 14', async () => {
+    const r = await useHH(hhCombat({ level: 13 }));
+    expect((r.newState.entities ?? []).find((e) => e.id === HHENEMY)!.hp).toBe(100);
+    expect(r.narrative).toMatch(/requires a Fiend Warlock of level 14/);
   });
 });

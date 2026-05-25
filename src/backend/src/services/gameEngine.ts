@@ -3573,6 +3573,20 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       }
     }
 
+    // SRD Fiend Warlock Hurl Through Hell (L14) — once/turn after a hit.
+    if (
+      char.subclass === 'fiend' &&
+      getClassLevel(char, 'warlock') >= 14 &&
+      enemyAlive &&
+      !char.turn_actions.hurl_through_hell_used
+    ) {
+      choices.push({
+        label: 'Hurl Through Hell — after a hit: CHA save or 8d10 psychic + Incapacitated (1/turn)',
+        action: { type: 'use_class_feature', featureId: 'hurl_through_hell' },
+        kind: 'class_feature',
+      });
+    }
+
     // Bard: Bardic Inspiration (bonus action)
     if (hasClass(char, 'bard')) {
       const biUses =
