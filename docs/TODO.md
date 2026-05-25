@@ -673,8 +673,14 @@ Bonus(char, st)`: a creature within 10 ft of a conscious L6+ Paladin (the
       dismount on damage, reach, ranged-while-mounted rules).
 - [ ] **Underwater combat** — non-piercing melee disadvantage, ranged
       rules, fire resistance.
-- [ ] **Jumping** (long = STR ft, high = 3 + STR mod ft) — also flagged
-      under architectural blockers.
+- [~] **Jumping** (long = STR ft, high = 3 + STR mod ft) — *Long Jump done
+      (2026-05-25).* `services/jump.ts` has the pure distance helpers; the
+      new `jump` action leaps straight over obstacle / difficult-terrain
+      cells up to the long-jump distance (full with a ≥10-ft run-up, half
+      standing), costs the jumped feet of movement, provokes OAs, and forces
+      a DC 10 Acrobatics check (or Prone) on a difficult-terrain landing.
+      High Jump is helper-only — verticality is the architectural gap (the
+      grid is flat, no elevation/ledges to leap to).
 - [~] **Line-of-sight / vision blocking by walls** — *targeting done
       (2026-05-25).* `gridEngine.hasLineOfSight` (supercover `cellsOnLine`)
       blocks ranged attacks (preattack) and offensive spell targeting
