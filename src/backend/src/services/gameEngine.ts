@@ -3510,6 +3510,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       quickened: 'Quickened Spell — cast as a bonus action',
       seeking: 'Seeking Spell — reroll a missed spell attack',
       subtle: 'Subtle Spell — no verbal/somatic components',
+      transmuted: "Transmuted Spell — change the spell's damage type",
     };
     // USE: offer each KNOWN, affordable Metamagic option.
     for (const [id, def] of Object.entries(metamagicOptions)) {

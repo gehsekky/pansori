@@ -554,6 +554,7 @@ export const metamagicOptions: Record<string, { label: string; cost: number }> =
   quickened: { label: 'Quickened Spell', cost: 2 },
   seeking: { label: 'Seeking Spell', cost: 1 },
   subtle: { label: 'Subtle Spell', cost: 1 },
+  transmuted: { label: 'Transmuted Spell', cost: 1 },
 };
 
 /** SRD Sorcerer Metamagic — number of options known: 2 at L2, +2 at L10, +2 at

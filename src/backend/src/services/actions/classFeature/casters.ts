@@ -94,6 +94,10 @@ export function handleCasterFeature(ctx: ActionContext, fid: string): boolean {
       cost: 1,
       label: 'Careful Spell — allies in the area auto-succeed and take no damage',
     },
+    metamagic_transmuted: {
+      cost: 1,
+      label: 'Transmuted Spell — change the spell’s damage type',
+    },
   };
   if (SIMPLE_METAMAGIC[fid]) {
     const { cost, label } = SIMPLE_METAMAGIC[fid];

@@ -17,6 +17,7 @@ import { runReviveSpell } from './revive.js';
 import { runSaveSpell } from './save.js';
 import { runSummonSpell } from './summon.js';
 import { runUtilitySpell } from './utility.js';
+import { transmutedDamageType } from '../../rulesEngine.js';
 import { updatePcActor } from '../actor.js';
 
 // `pickCastPrefix` is consumed by the spec + future call sites that
@@ -253,6 +254,14 @@ export const handleCastSpell: ActionHandler<{
     return;
   }
 
+  // SRD Metamagic Transmuted Spell — change the spell's damage type to a
+  // favorable one for this cast. A typed copy is threaded through the damage
+  // branches + resistance multiplier (the rest of the spell is unchanged).
+  const dmgSpell =
+    ctx.metamagic === 'transmuted' && spell.damageType
+      ? { ...spell, damageType: transmutedDamageType(spellTarget, spell.damageType) }
+      : spell;
+
   // Per-shape resolution. Each branch sets spellDmg + spellHit for
   // the AOE / single-target damage block. The save branch may return
   // done:true when the condition+damage path handles kill resolution
@@ -260,30 +269,30 @@ export const handleCastSpell: ActionHandler<{
   let spellDmg = 0;
   let spellHit = true;
   if (spell.attackRoll) {
-    const r = runAttackRollSpell(ctx, spellTarget, spell, slotLevel, castingScore, slotNote);
+    const r = runAttackRollSpell(ctx, spellTarget, dmgSpell, slotLevel, castingScore, slotNote);
     if (r.done) return;
     spellDmg = r.spellDmg;
     spellHit = r.spellHit;
   } else if (spell.savingThrow) {
-    const r = runSaveSpell(ctx, spellTarget, spellTargetId, spell, slotLevel, slotNote, dc);
+    const r = runSaveSpell(ctx, spellTarget, spellTargetId, dmgSpell, slotLevel, slotNote, dc);
     if (r.done) return;
     spellDmg = r.spellDmg;
     spellHit = r.spellHit;
   } else if (spell.damage && !spell.savingThrow && !spell.attackRoll) {
-    const r = runAutoHitSpell(ctx, spellTarget, spell, slotLevel, slotNote);
+    const r = runAutoHitSpell(ctx, spellTarget, dmgSpell, slotLevel, slotNote);
     spellDmg = r.spellDmg;
   }
 
   // ── AOE spells on grid ────────────────────────────────────────────────
   // If the spell has a blastRadius and grid entities exist, resolve
   // against all entities in the blast instead of the single-target path.
-  if (runAoeSpell(ctx, spell, slotLevel, dc, spellDmg)) {
+  if (runAoeSpell(ctx, dmgSpell, slotLevel, dc, spellDmg)) {
     return;
   }
 
   // Apply damage to single enemy target
   if (spellDmg > 0 || spellHit) {
-    applySingleTargetDamage(ctx, spellTarget, spellTargetId, spell, spellDmg);
+    applySingleTargetDamage(ctx, spellTarget, spellTargetId, dmgSpell, spellDmg);
   }
 
   ctx.usedInitiative = true;
