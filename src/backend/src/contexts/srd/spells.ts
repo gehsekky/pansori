@@ -3045,4 +3045,113 @@ export const SRD_SPELLS: Record<string, Spell> = {
     narrative: '{name} calls forth a spread of plain food and clean water from the air.',
     spellList: ['divine'],
   },
+  // SRD: Silent Image (L1) — a purely visual, moving illusion up to a 15-ft
+  // cube within 60 ft (Concentration). A creature that Studies it disbelieves
+  // with an Investigation check vs your save DC.
+  silent_image: {
+    id: 'silent_image',
+    name: 'Silent Image',
+    level: 1,
+    castTime: 'action',
+    concentration: true,
+    durationRounds: 100,
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    desc: 'Create a silent, moving visual illusion no larger than a 15-ft cube within range (Concentration, up to 10 minutes). A creature that studies it may disbelieve with an Investigation check vs your spell save DC.',
+    narrative: '{name} sculpts light into a convincing phantom image.',
+    spellList: ['arcane'],
+  },
+  // SRD: Create or Destroy Water (L1) — conjure up to 10 gallons of water (or
+  // a fog bank) in range, or destroy that much. Utility.
+  create_or_destroy_water: {
+    id: 'create_or_destroy_water',
+    name: 'Create or Destroy Water',
+    level: 1,
+    castTime: 'action',
+    rangeKind: 'ranged',
+    rangeFt: 30,
+    desc: 'Create up to 10 gallons of clean water (or a fog bank) in an open container or space within range, or destroy that much water or fog.',
+    narrative: '{name} calls water out of the air — or banishes it just as fast.',
+    spellList: ['divine', 'primal'],
+  },
+  // SRD: Purify Food and Drink (L1, ritual) — rid food and drink in a 5-ft
+  // sphere of poison and spoilage. Utility.
+  purify_food_and_drink: {
+    id: 'purify_food_and_drink',
+    name: 'Purify Food and Drink',
+    level: 1,
+    castTime: 'action',
+    ritualCasting: true,
+    rangeKind: 'ranged',
+    rangeFt: 10,
+    desc: 'All nonmagical food and drink within a 5-ft-radius sphere is purified and rendered free of poison and disease (also castable as a ritual).',
+    narrative: '{name} blesses the provisions — taint and rot melt away.',
+    spellList: ['divine', 'primal'],
+  },
+  // SRD: See Invisibility (L2) — for 1 hour you see Invisible creatures/objects
+  // and into the Ethereal Plane. pansori has no see-Invisible substrate yet, so
+  // the reveal is narrated.
+  see_invisibility: {
+    id: 'see_invisibility',
+    name: 'See Invisibility',
+    level: 2,
+    castTime: 'action',
+    rangeKind: 'self',
+    desc: 'For 1 hour you can see Invisible creatures and objects (and into the Ethereal Plane) as if they were visible. The reveal is narrated, not modeled mechanically.',
+    narrative: '{name} blinks, and the unseen swims into focus.',
+    spellList: ['arcane'],
+  },
+  // SRD: Zone of Truth (L2) — creatures in a 15-ft sphere that fail a CHA save
+  // cannot knowingly lie for 10 minutes. The social effect is narrated.
+  zone_of_truth: {
+    id: 'zone_of_truth',
+    name: 'Zone of Truth',
+    level: 2,
+    castTime: 'action',
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    desc: 'Create a 15-ft-radius zone for 10 minutes; a creature in it that fails a Charisma save cannot speak a deliberate lie while there (it knows it is affected). The social effect is narrated.',
+    narrative: '{name} sanctifies the area — within it, falsehood catches in the throat.',
+    spellList: ['arcane', 'divine'],
+  },
+  // SRD: Alter Self (L2) — change your appearance, gain aquatic adaptation, or
+  // grow natural weapons (Concentration, up to 1 hour). Cosmetic/utility.
+  alter_self: {
+    id: 'alter_self',
+    name: 'Alter Self',
+    level: 2,
+    castTime: 'action',
+    concentration: true,
+    durationRounds: 600,
+    rangeKind: 'self',
+    desc: 'You transform your own form (Concentration, up to 1 hour): change your appearance, adapt to breathe water and swim, or grow natural weapons. The cosmetic/utility effects are narrated.',
+    narrative: '{name} reshapes their own flesh at will.',
+    spellList: ['arcane'],
+  },
+  // SRD: Arcane Eye (L4) — an invisible flying sensor you see through and move
+  // 30 ft each turn (Concentration, up to 1 hour). Scouting; narrated.
+  arcane_eye: {
+    id: 'arcane_eye',
+    name: 'Arcane Eye',
+    level: 4,
+    castTime: 'action',
+    concentration: true,
+    durationRounds: 600,
+    rangeKind: 'self',
+    desc: 'You create an invisible, flying magical eye that you can see through and move up to 30 ft on each of your turns (Concentration, up to 1 hour). The remote scouting is narrated.',
+    narrative: '{name} conjures an unseen eye and sends it drifting ahead.',
+    spellList: ['arcane'],
+  },
+  // SRD: Stone Shape (L4) — reshape a Medium-or-smaller section of stone you
+  // touch into any form (a door, a weapon, crude features). Utility.
+  stone_shape: {
+    id: 'stone_shape',
+    name: 'Stone Shape',
+    level: 4,
+    castTime: 'action',
+    rangeKind: 'touch',
+    desc: 'You reshape a section of stone you touch (up to a 5-ft cube) into any form you like — a door, a weapon, or a passage with crude features.',
+    narrative: '{name} presses a hand to the stone and it flows like clay.',
+    spellList: ['divine', 'primal', 'arcane'],
+  },
 };
