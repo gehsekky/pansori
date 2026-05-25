@@ -385,6 +385,9 @@ export type StructuredAction =
   // SRD 5.2.1 Wizard Memorize Spell (L5): on a short rest, replace one prepared
   // level-1+ spell (`swapOut`) with another from the spellbook (`swapIn`). (RE-2.)
   | { type: 'memorize_spell'; swapOut: string; swapIn: string }
+  // SRD 5.2.1 Fiend Warlock Fiendish Resilience (L10): choose a damage type
+  // (not Force) to gain Resistance to until re-chosen. Out-of-combat. (RE-2.)
+  | { type: 'choose_fiendish_resilience'; damageType: string }
   // SRD 5.2.1 Paladin Lay on Hands (L1): bonus-action touch heal drawing from
   // a pool of 5 × Paladin level HP. `targetCharId` is the healed party member
   // (may be the paladin). (RE-2.)

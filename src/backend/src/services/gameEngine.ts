@@ -1117,13 +1117,17 @@ function computeEnemyAttack(
     // damage type.
     const affinityResist =
       !!enemy.damageType && elementalAffinityType(char) === enemy.damageType;
+    // SRD Fiend Warlock Fiendish Resilience (L10) — Resistance to the chosen
+    // damage type (cannot be Force; enforced at selection).
+    const fiendishResist = !!enemy.damageType && char.fiendish_resilience === enemy.damageType;
     const anyResist =
       isRaging ||
       isPetrified ||
       beastResist ||
       speciesResist ||
       superiorDefenseActive ||
-      affinityResist;
+      affinityResist ||
+      fiendishResist;
     const postResistDmg = anyResist ? Math.ceil(result.damage / 2) : result.damage;
     const rageNote = isRaging ? ` (Rage resistance: ${result.damage}→${postResistDmg})` : '';
     const petrNote = isPetrified
@@ -3200,6 +3204,19 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       choices.push({
         label: `Evocation Savant: learn ${s.name} (Lvl ${s.level}, free)`,
         action: { type: 'choose_evocation_savant', spellId: s.id },
+      });
+    }
+  }
+
+  // ── Fiend Warlock Fiendish Resilience (L10) ────────────────────────────────
+  // Choose a damage type (not Force) to resist; re-chooseable out of combat.
+  if (!state.combat_active && char.subclass === 'fiend' && getClassLevel(char, 'warlock') >= 10) {
+    for (const dt of ['acid', 'cold', 'fire', 'lightning', 'necrotic', 'poison', 'psychic', 'thunder']) {
+      if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+      if (char.fiendish_resilience === dt) continue;
+      choices.push({
+        label: `Fiendish Resilience: resist ${dt} damage`,
+        action: { type: 'choose_fiendish_resilience', damageType: dt },
       });
     }
   }
