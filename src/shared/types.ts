@@ -124,7 +124,12 @@ export type ConditionName =
   // control. On its turn the enemy loop drives it to attack the nearest OTHER
   // enemy (it fights for the party). Concentration; cleared by
   // breakConcentration. (On-damage re-save + manual command surface deferred.)
-  | 'dominated';
+  | 'dominated'
+  // SRD: Blur — the caster's body is blurred; any creature has Disadvantage on
+  // attack rolls against them. Self-buff under Concentration; read via
+  // `ENEMY_DISADV_CONDITIONS` (imposesDisadvantageOnAttackers) in the enemy
+  // attack path, like `invisible`. Cleared by breakConcentration.
+  | 'blurred';
 
 export type NpcAttitude = 'friendly' | 'indifferent' | 'hostile';
 

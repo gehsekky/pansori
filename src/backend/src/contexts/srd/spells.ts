@@ -3689,4 +3689,164 @@ export const SRD_SPELLS: Record<string, Spell> = {
     desc: 'A dazzling 15-ft cone of light. Each creature in it makes a CON save or is Blinded until the end of your next turn (attacks against it have Advantage; its own attacks have Disadvantage).',
     spellList: ['arcane'],
   },
+
+  // ─── Spell batch: Blur + AoE damage + narrative utility ─────────────────────
+
+  // SRD: Blur (L2 Illusion, Sorcerer/Wizard) — Self, Concentration up to 1
+  // minute. Any creature has Disadvantage on attack rolls against you. Modeled
+  // as a self-buff that applies the `blurred` condition (read by the enemy
+  // attack path via ENEMY_DISADV_CONDITIONS); cleared on concentration end.
+  blur: {
+    id: 'blur',
+    name: 'Blur',
+    level: 2,
+    castTime: 'action',
+    targetType: 'self',
+    rangeKind: 'self',
+    condition: 'blurred',
+    concentration: true,
+    durationRounds: 10,
+    desc: 'Your body blurs (Concentration, up to 1 minute) — any creature has Disadvantage on attack rolls against you. (Blindsight / Truesight ignore it — not modeled.)',
+    narrative: "{name}'s outline smears into a shifting, hard-to-strike blur.",
+    spellList: ['arcane'],
+  },
+
+  // SRD: Incendiary Cloud (L8 Conjuration, Druid/Sorcerer/Wizard) — a swirling
+  // 20-ft-radius ember cloud. Each creature in it makes a DEX save, taking 10d8
+  // fire (half on a success). Mirrors Cloudkill's one-shot AoE shape: the
+  // drifting cloud + per-turn re-damage + heavy obscurement are not modeled —
+  // damage resolves once on cast.
+  incendiary_cloud: {
+    id: 'incendiary_cloud',
+    name: 'Incendiary Cloud',
+    level: 8,
+    castTime: 'action',
+    damage: '10d8',
+    damageType: 'fire',
+    savingThrow: 'dex',
+    saveEffect: 'half',
+    blastRadius: 20,
+    aoeShape: 'sphere',
+    concentration: true,
+    durationRounds: 10,
+    rangeKind: 'ranged',
+    rangeFt: 150,
+    desc: 'A 20-ft-radius cloud of embers. Each creature there makes a DEX save, taking 10d8 fire damage (half on a success). The drifting cloud + per-turn re-damage are narrated.',
+    spellList: ['primal', 'arcane'],
+  },
+
+  // SRD: Sunbeam (L6 Evocation, Cleric/Druid/Sorcerer/Wizard) — a 60-ft line of
+  // searing light. Each creature in the line makes a CON save, taking 6d8
+  // radiant (half on a success) and is Blinded until the start of your next turn
+  // on a failure. Models the on-cast line damage (mirrors Lightning Bolt);
+  // the per-turn re-fire as an action and the Blinded rider are deferred.
+  sunbeam: {
+    id: 'sunbeam',
+    name: 'Sunbeam',
+    level: 6,
+    castTime: 'action',
+    damage: '6d8',
+    damageType: 'radiant',
+    savingThrow: 'con',
+    saveEffect: 'half',
+    blastRadius: 60,
+    aoeShape: 'line',
+    concentration: true,
+    durationRounds: 10,
+    rangeKind: 'self',
+    desc: 'A 60-ft line of sunlight. Each creature in it makes a CON save, taking 6d8 radiant damage (half on a success). The Blinded rider and per-turn re-fire are narrated.',
+    spellList: ['divine', 'primal', 'arcane'],
+  },
+
+  // ── Narrative-utility spells (exploration / divination; no combat mechanics) ──
+
+  // SRD: Commune with Nature (L5 Divination, Druid/Ranger) — ritual; learn the
+  // lay of the surrounding land.
+  commune_with_nature: {
+    id: 'commune_with_nature',
+    name: 'Commune with Nature',
+    level: 5,
+    castTime: 'action',
+    ritualCasting: true,
+    outOfCombatOnly: true,
+    rangeKind: 'self',
+    desc: 'You commune with nearby nature spirits and learn facts about the surrounding terrain — water, prey, plants, settlements, and the like (3 miles outdoors, 300 ft underground).',
+    narrative: '{name} stills, and the land murmurs its secrets in reply.',
+    spellList: ['primal'],
+  },
+
+  // SRD: Find the Path (L6 Divination, Bard/Cleric/Druid) — sense the most
+  // direct route to a familiar location.
+  find_the_path: {
+    id: 'find_the_path',
+    name: 'Find the Path',
+    level: 6,
+    castTime: 'action',
+    outOfCombatOnly: true,
+    materialCost: 100,
+    rangeKind: 'self',
+    desc: 'You sense the shortest, most direct physical route to a location you name and are familiar with on this plane, knowing its direction for the duration.',
+    narrative: '{name} traces a path no map shows; the way ahead feels suddenly certain.',
+    spellList: ['arcane', 'divine', 'primal'],
+  },
+
+  // SRD: Legend Lore (L5 Divination, Bard/Cleric/Wizard) — recall significant
+  // lore about a famous person, place, or object.
+  legend_lore: {
+    id: 'legend_lore',
+    name: 'Legend Lore',
+    level: 5,
+    castTime: 'action',
+    outOfCombatOnly: true,
+    materialCost: 250,
+    rangeKind: 'self',
+    desc: 'Name or describe a famous person, place, or object; the spell brings to mind a summary of the significant lore about it.',
+    narrative:
+      '{name} sifts the weight of history; half-remembered legends surface, clear and ordered.',
+    spellList: ['arcane', 'divine'],
+  },
+
+  // SRD: Meld into Stone (L3 Transmutation, Cleric/Druid/Ranger) — ritual; step
+  // into a stone surface large enough to contain you.
+  meld_into_stone: {
+    id: 'meld_into_stone',
+    name: 'Meld into Stone',
+    level: 3,
+    castTime: 'action',
+    ritualCasting: true,
+    rangeKind: 'touch',
+    desc: 'You step into a stone object or surface large enough to hold you, merging with it (and your gear) for up to 8 hours — hidden and sheltered within the stone.',
+    narrative: '{name} presses into the rock and is gone, swallowed by the stone.',
+    spellList: ['divine', 'primal'],
+  },
+
+  // SRD: Animal Messenger (L2 Enchantment, Bard/Druid/Ranger) — ritual; send a
+  // Tiny beast to carry a short message.
+  animal_messenger: {
+    id: 'animal_messenger',
+    name: 'Animal Messenger',
+    level: 2,
+    castTime: 'action',
+    ritualCasting: true,
+    rangeKind: 'ranged',
+    rangeFt: 30,
+    desc: 'A Tiny beast you can see carries a short message to a place you have visited, seeking out a recipient you describe and delivering your words.',
+    narrative: '{name} whispers to a small creature, which darts off bearing the message.',
+    spellList: ['arcane', 'primal'],
+  },
+
+  // SRD: Tiny Hut (L3 Evocation, Bard/Wizard) — ritual; a sheltering dome over
+  // the party for 8 hours.
+  tiny_hut: {
+    id: 'tiny_hut',
+    name: 'Tiny Hut',
+    level: 3,
+    castTime: 'action',
+    ritualCasting: true,
+    outOfCombatOnly: true,
+    rangeKind: 'self',
+    desc: 'A 10-ft dome of force springs up around you and your companions for up to 8 hours — weatherproof, impassable to other creatures and effects, and free passage only for those inside.',
+    narrative: '{name} raises a shimmering dome; the night and its dangers stay outside.',
+    spellList: ['arcane'],
+  },
 };

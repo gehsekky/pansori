@@ -456,6 +456,8 @@ export function breakConcentration(
   const wasHaste = char.concentrating_on.spellId === 'haste';
   // SRD Ranger Hunter's Mark — dropping concentration clears the marked target.
   const wasHuntersMark = char.concentrating_on.spellId === 'hunters_mark';
+  // SRD Blur — dropping concentration clears the `blurred` self-buff.
+  const wasBlur = char.concentrating_on.spellId === 'blur';
   // SRD Divine Favor / smites — concentration drop ends the per-attack weapon
   // rider (and any still-armed one-shot smite) tied to this spell.
   const wasWeaponRider = char.weapon_rider?.spellId === char.concentrating_on.spellId;
@@ -519,6 +521,18 @@ export function breakConcentration(
     if (newChar.fly_speed_ft) {
       newChar = { ...newChar, fly_speed_ft: undefined };
     }
+  }
+  // SRD Blur — clear the `blurred` self-buff from the caster (+ entity mirror).
+  if (wasBlur) {
+    newChar = { ...newChar, conditions: (newChar.conditions ?? []).filter((c) => c !== 'blurred') };
+    newSt = {
+      ...newSt,
+      entities: (newSt.entities ?? []).map((e) =>
+        e.id === newChar.id && !e.isEnemy
+          ? { ...e, conditions: e.conditions.filter((c) => c !== 'blurred') }
+          : e
+      ),
+    };
   }
   if (wasPolymorph && newSt.entities) {
     // 2024 PHB Polymorph rewrite — form HP lives on `temp_hp`, not a

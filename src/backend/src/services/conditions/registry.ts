@@ -127,6 +127,11 @@ const defs: ConditionDef[] = [
   // on it). Registered for completeness so tickConditions gives it a duration;
   // pansori models no hearing-gated checks, so the auto-fail half is narration.
   { id: 'deafened', duration: 1 },
+  // SRD Blur — attackers have Disadvantage against the blurred creature (same
+  // attacker-side gate as Invisible). Concentration-linked (cleared on the
+  // caster's concentration drop), so 'permanent' here keeps tickConditions from
+  // auto-expiring it.
+  { id: 'blurred', duration: 'permanent', imposesDisadvantageOnAttackers: true },
   // Unconscious + petrified: no auto-expire; cleared by death-save recovery
   // / Restoration. Saves auto-fail while present. The pre-registry code
   // omitted them from CONDITION_DURATION (treated as permanent) and from

@@ -18,8 +18,8 @@ PHB/DMG-exclusive content (subclasses, feats, species, spells). See
 
 ## Implementation status (code-verified 2026-05-26)
 
-Grounded in a code survey + the full backend suite: **1797 tests across
-209 files, all green** (lint + typecheck clean).
+Grounded in a code survey + the full backend suite: **1806 tests across
+210 files, all green** (lint + typecheck clean).
 
 ### Done — rules-engine frameworks
 
@@ -67,7 +67,7 @@ Grounded in a code survey + the full backend suite: **1797 tests across
 
 | Category                  | In pansori                                       | SRD universe                     |
 | ------------------------- | ------------------------------------------------ | -------------------------------- |
-| Spells                    | **198** (26 cantrips + 172 leveled, through L9)  | ~330                             |
+| Spells                    | **207** (26 cantrips + 181 leveled, through L9)  | ~330                             |
 | Shared SRD monster pool   | **12** (`SRD_MONSTERS`) + per-campaign templates | hundreds                         |
 | Species                   | 9                                                | 9 standalone + Drow lineage      |
 | Classes                   | 12                                               | 12                               |
@@ -85,12 +85,17 @@ backend features are waiting on, and a handful of **bounded subsystems**.
 
 ### Content breadth — data on existing patterns (RE-6)
 
-- [ ] **Spells** — ~198 / ~330 SRD. Most remaining categories are already
+- [ ] **Spells** — ~207 / ~330 SRD. Most remaining categories are already
       representable (data entry). Data-only batch (`rawSpellsBatch.spec.ts`):
       Dissonant Whispers, Mind Spike, Vitriolic Sphere, Freezing Sphere
       (save-for-half damage), Charm Monster (WIS save → charmed, save
       Advantage), Protection from Poison (touch ward: strip Poisoned + poison
-      Resistance).
+      Resistance). Later batch (`spellsBatch5.spec.ts`): **Blur** (self buff →
+      new `blurred` condition: attackers roll at Disadvantage, like Invisible),
+      **Incendiary Cloud** + **Sunbeam** (AoE save-for-half damage, mirroring
+      Cloudkill / Lightning Bolt; per-turn re-damage + Sunbeam's Blinded rider
+      deferred), and six narrative-utility spells (Commune with Nature, Find the
+      Path, Legend Lore, Meld into Stone, Animal Messenger, Tiny Hut).
   - [x] **Timed enemy conditions** — shipped (`timedEnemyConditions.spec.ts`).
         Enemies had no per-turn condition tick (the PC analogue runs at each
         PC's turn start), so finite enemy conditions never expired. Added
