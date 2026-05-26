@@ -99,6 +99,10 @@ function selectSpellBarChoices(choices: GameChoice[]): GameChoice[] {
 // living hostiles), no choices are filtered out.
 function filterByTarget(c: GameChoice, selectedEnemyId: string | null): boolean {
   if (!selectedEnemyId) return true;
+  // Picker choices (Bless allies, Bane enemies) open their own target dialog —
+  // they're not bound to the EnemySelector's single selection, so never hide
+  // them. Their `targetEnemyId` is only a placeholder for the auto-pick path.
+  if (c.pickTargets) return true;
   const action = c.action as { targetEnemyId?: string; targetEnemyIds?: string[] };
   if (Array.isArray(action.targetEnemyIds)) return true;
   if (!action.targetEnemyId) return true;
@@ -932,7 +936,9 @@ export default function App() {
                   return (
                     <TargetPickerDialog
                       title={targetPicker.label.replace(/\s*\(.*$/, '')}
-                      prompt={side === 'ally' ? 'Choose allies to affect' : 'Choose targets'}
+                      prompt={
+                        side === 'ally' ? 'Choose allies to affect' : 'Choose enemies to affect'
+                      }
                       candidates={candidates}
                       max={max}
                       onCancel={() => setTargetPicker(null)}

@@ -18,8 +18,8 @@ PHB/DMG-exclusive content (subclasses, feats, species, spells). See
 
 ## Implementation status (code-verified 2026-05-26)
 
-Grounded in a code survey + the full backend suite: **1812 tests across
-211 files, all green** (lint + typecheck clean).
+Grounded in a code survey + the full backend suite: **1815 tests across
+212 files, all green** (lint + typecheck clean).
 
 ### Done — rules-engine frameworks
 
@@ -287,9 +287,12 @@ backend features are waiting on, and a handful of **bounded subsystems**.
   `targetCharIds` (ally) / `targetEnemyIds` (enemy); the cast path validates
   and falls back to auto when absent. **Bless** ships on it (ally multi-
   select, up to 3 +1/slot — `blessTargetPicker.spec.ts` +
-  `TargetPickerDialog.spec.tsx`). Remaining, reusing the same pattern:
-  **Bane** (enemy side — needs the multi-enemy CHA-save loop backend-side),
-  **Polymorph** beast pick, **Greater Restoration** "pick one effect".
+  `TargetPickerDialog.spec.tsx`). **Bane** ships too
+  (`baneTargetPicker.spec.ts`): a single picker choice (not the per-enemy
+  spread), and the cast path applies `baned` to each chosen enemy that fails its
+  CHA save under one concentration (the multi-target save loop reuses the
+  single-target resolver). Remaining, reusing the same pattern: **Polymorph**
+  beast pick, **Greater Restoration** "pick one effect" (single-select).
 
 ### Documented engine deferrals (depend on missing content / infra)
 

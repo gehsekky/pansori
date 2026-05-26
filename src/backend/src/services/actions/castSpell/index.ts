@@ -363,6 +363,29 @@ export const handleCastSpell: ActionHandler<{
     return;
   }
 
+  // Multi-target save-condition spells (Bane): the FE picker supplies the chosen
+  // enemies in `targetEnemyIds`. Resolve the save+condition independently for
+  // each (reusing the single-target save resolver), so each enemy rolls its own
+  // CHA save and the `baned` condition + concentration apply per failure. Only
+  // for explicit-list spells (no blastRadius / aoeCondition); absent the list,
+  // it falls through to the single-target branch below (back-compat).
+  const multiTargetIds = (action as { targetEnemyIds?: string[] }).targetEnemyIds;
+  if (
+    spell.savingThrow &&
+    spell.condition &&
+    !spell.blastRadius &&
+    !spell.aoeCondition &&
+    Array.isArray(multiTargetIds) &&
+    multiTargetIds.length > 0
+  ) {
+    for (const tid of multiTargetIds) {
+      const tgt = ctx.livingEnemiesInRoom.find((e) => e.id === tid);
+      if (tgt) runSaveSpell(ctx, tgt, tid, dmgSpell, slotLevel, slotNote, dc);
+    }
+    ctx.usedInitiative = true;
+    return;
+  }
+
   // Per-shape resolution. Each branch sets spellDmg + spellHit for
   // the AOE / single-target damage block. The save branch may return
   // done:true when the condition+damage path handles kill resolution
