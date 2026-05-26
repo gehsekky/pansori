@@ -67,7 +67,7 @@ Grounded in a code survey + the full backend suite: **1572 tests across
 
 | Category | In pansori | SRD universe |
 |---|---|---|
-| Spells | **185** (26 cantrips + 159 leveled, through L9) | ~330 |
+| Spells | **186** (26 cantrips + 160 leveled, through L9) | ~330 |
 | Shared SRD monster pool | **12** (`SRD_MONSTERS`) + per-campaign templates | hundreds |
 | Species | 9 | 9 standalone + Drow lineage |
 | Classes | 12 | 12 |
@@ -85,8 +85,17 @@ backend features are waiting on, and a handful of **bounded subsystems**.
 
 ### Content breadth — data on existing patterns (RE-6)
 
-- [ ] **Spells** — ~185 / ~330 SRD. Most remaining categories are already
+- [ ] **Spells** — ~186 / ~330 SRD. Most remaining categories are already
       representable (data entry).
+  - [~] **Forced displacement** — shipped (RE-4): the `pushFt` spell flag +
+        `pushEntityAway` (pushes a creature directly away from the caster up to
+        the distance, pathed via `planEnemyApproach` toward the away-edge so it
+        stops at grid edges / blockers), wired into the AoE save path after
+        damage on a failed save. **Thunderwave** (now a proper 15-ft cube: 2d8
+        thunder + push 10 ft) and **Gust of Wind** (60-ft line, STR save, push
+        15 ft, no damage) ride it. Deferred: Gust's per-turn re-push for
+        creatures ending their turn in the line + its toward-caster movement
+        tax (on-cast push only; concentration flag is honored).
   - [~] **Persistent damage zones** — foundation shipped (RE-4): `GameState.spell_zones`
         + `SpellZone`, the `persistentZone` spell flag, cast-time `runZoneSpell`
         (stamp + concentration link + tick-on-cast), the round-wrap tick

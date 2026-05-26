@@ -496,6 +496,10 @@ export interface Spell {
   // true in combat, where pansori spells are cast). Threaded into the
   // single-target save roll. Cancels with Heightened-Spell disadvantage.
   saveAdvantage?: boolean;
+  // RE-4 — forced displacement. On a failed save, each affected creature in the
+  // AoE is pushed this many feet directly away from the caster (Thunderwave 10,
+  // Gust of Wind 15), stopping at grid edges / blockers. Resolved after damage.
+  pushFt?: number;
   ritualCasting?: boolean; // castable as ritual (no slot cost, only out of combat)
   verbal?: boolean; // has verbal component (blocked when deafened)
   // SRD Slow — "When the creature attempts to cast a spell with a

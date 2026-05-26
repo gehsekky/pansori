@@ -6395,6 +6395,59 @@ export function applyDamageToEntity(st: GameState, entityId: string, dmg: number
 }
 
 /**
+ * SRD forced displacement (Thunderwave, Gust of Wind). Push `entityId`
+ * `pushFt` feet directly away from `fromPos` (the caster), stopping at the
+ * grid edge or the first blocker — pathed via `planEnemyApproach` toward the
+ * away-edge with the push distance as the movement budget (the same primitive
+ * Compulsion's stagger uses). Returns the new state + how far the creature
+ * was actually moved (0 if cornered).
+ */
+export function pushEntityAway(
+  st: GameState,
+  entityId: string,
+  fromPos: GridPos,
+  pushFt: number,
+  context: Context,
+  roomId: string,
+  roomObstacles: GridPos[] = []
+): { st: GameState; pushedFt: number } {
+  const ent = st.entities?.find((e) => e.id === entityId);
+  if (!ent || pushFt <= 0) return { st, pushedFt: 0 };
+  const epos = ent.pos;
+  const locGrid = context.campaign?.locations?.find((l) => l.rooms?.some((r) => r.id === roomId));
+  const gw = locGrid?.gridWidth ?? context.gridWidth ?? 10;
+  const gh = locGrid?.gridHeight ?? context.gridHeight ?? 10;
+  const dy = Math.sign(epos.y - fromPos.y);
+  let dx = Math.sign(epos.x - fromPos.x);
+  if (dx === 0 && dy === 0) dx = 1; // overlapping — pick a direction
+  const awayTarget = {
+    x: Math.max(0, Math.min(gw - 1, epos.x + dx * gw)),
+    y: Math.max(0, Math.min(gh - 1, epos.y + dy * gh)),
+  };
+  const plan = planEnemyApproach({
+    st,
+    enemyId: entityId,
+    enemyPos: epos,
+    targetPos: awayTarget,
+    reachFt: 0,
+    speedFt: pushFt,
+    context,
+    roomId,
+    roomObstacles,
+  });
+  if (!plan || plan.pathSquares.length === 0) return { st, pushedFt: 0 };
+  return {
+    st: {
+      ...st,
+      entities: (st.entities ?? []).map((e) =>
+        e.id === entityId ? { ...e, pos: plan.newPos } : e
+      ),
+    },
+    pushedFt: plan.pathSquares.length * SQUARE_SIZE,
+  };
+}
+
+/**
  * SRD Dominate — "Whenever the target takes damage, it repeats the save,
  * ending the spell on itself on a success." Call (with the active
  * `ActionContext`) after a `dominated` enemy survives an instance of damage:
