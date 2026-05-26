@@ -912,6 +912,30 @@ export const SRD_SPELLS: Record<string, Spell> = {
     },
     spellList: ['arcane'],
   },
+  // SRD: Power Word Stun (L8 Enchantment, Bard/Sorcerer/Warlock/Wizard) — V only.
+  // No save or attack on cast: a target with ≤150 HP is Stunned (CON save at the
+  // end of each of its turns ends it); a tougher target's Speed drops to 0 until
+  // your next turn. Resolved by `runPowerWordStun` (dispatcher interception); the
+  // Stun rides the generic save-ends hook (`save_ends`). The >150-HP Speed-0
+  // branch is narrated (no per-enemy speed-0-until-X primitive).
+  power_word_stun: {
+    id: 'power_word_stun',
+    name: 'Power Word Stun',
+    level: 8,
+    castTime: 'action',
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    verbal: true,
+    somatic: false,
+    desc: 'You hurl a word of power at one creature you can see within 60 ft. If it has 150 HP or fewer it is Stunned (CON save at the end of each of its turns to recover); otherwise its Speed is 0 until your next turn.',
+    narratives: {
+      cast: [
+        '{name} hurls a word of power at {target}',
+        "{name} speaks a syllable that slams into {target}'s mind",
+      ],
+    },
+    spellList: ['arcane'],
+  },
   // SRD: Hunter's Mark — L1 Divination (Ranger). Bonus action, V only,
   // Concentration up to 1 hour. Marks one creature within 90 ft; the caster's
   // attack-roll hits vs it deal +1d6 Force (d10 at Ranger L20 — Foe Slayer).
@@ -1237,6 +1261,73 @@ export const SRD_SPELLS: Record<string, Spell> = {
     rangeKind: 'self',
     // Paladin-only.
     spellList: ['divine'],
+  },
+  // SRD: Divine Favor (L1 Transmutation, Paladin) — Bonus Action, Self, 1 minute
+  // (NOT concentration in 2024). A persistent per-attack weapon rider: every
+  // weapon hit deals +1d4 Radiant for the duration. Modeled via
+  // `Character.weapon_rider` (set by the buff path); cleared at combat end.
+  divine_favor: {
+    id: 'divine_favor',
+    name: 'Divine Favor',
+    level: 1,
+    castTime: 'bonus_action',
+    targetType: 'self',
+    rangeKind: 'self',
+    weaponRider: { dice: '1d4', damageType: 'radiant', persistent: true },
+    desc: 'Bonus action. For 1 minute, your weapon attacks each deal an extra 1d4 radiant damage on a hit.',
+    narrative: '{name} channels divine radiance into their weapon.',
+    spellList: ['divine'],
+  },
+  // SRD: Searing Smite (L1 Evocation, Paladin) — Bonus Action, Self, 1 minute
+  // (not concentration). Arms the next melee hit for +1d6 Fire. The ongoing
+  // start-of-turn 1d6 fire + CON save-ends is deferred (pansori models the
+  // on-hit burst); the strike is consumed on the next melee hit.
+  searing_smite: {
+    id: 'searing_smite',
+    name: 'Searing Smite',
+    level: 1,
+    castTime: 'bonus_action',
+    targetType: 'self',
+    rangeKind: 'self',
+    weaponRider: { dice: '1d6', damageType: 'fire' },
+    desc: 'Bonus action. Your next melee weapon hit deals an extra 1d6 fire damage. (The lingering per-turn fire is narrated.)',
+    narrative: "{name}'s weapon kindles with searing flame.",
+    spellList: ['divine'],
+  },
+  // SRD: Shining Smite (L2 Transmutation, Paladin) — Bonus Action, Self,
+  // Concentration up to 1 minute. Arms the next melee hit for +2d6 Radiant and
+  // wreathes the target in light: attack rolls against it have Advantage
+  // (modeled via the existing `faerie_fired` primitive, capped at ~1 minute).
+  shining_smite: {
+    id: 'shining_smite',
+    name: 'Shining Smite',
+    level: 2,
+    castTime: 'bonus_action',
+    targetType: 'self',
+    rangeKind: 'self',
+    concentration: true,
+    durationRounds: 10,
+    weaponRider: { dice: '2d6', damageType: 'radiant', appliesFaerieFire: true },
+    desc: 'Bonus action (Concentration, 1 min). Your next melee weapon hit deals an extra 2d6 radiant damage and wreathes the target in light — attacks against it have Advantage.',
+    narrative: "{name}'s weapon blazes with searing light.",
+    spellList: ['divine'],
+  },
+  // SRD: Ensnaring Strike (L1 Conjuration, Ranger) — Bonus Action, Self,
+  // Concentration up to 1 minute. Arms the next hit: grasping vines, STR save or
+  // Restrained (save-ends, STR). The per-turn 1d6 piercing is deferred.
+  ensnaring_strike: {
+    id: 'ensnaring_strike',
+    name: 'Ensnaring Strike',
+    level: 1,
+    castTime: 'bonus_action',
+    targetType: 'self',
+    rangeKind: 'self',
+    concentration: true,
+    durationRounds: 10,
+    weaponRider: { appliesCondition: 'restrained', conditionSave: 'str' },
+    desc: 'Bonus action (Concentration, 1 min). On your next weapon hit, grasping vines snare the target — STR save or Restrained (it repeats the save at the end of each of its turns). The per-turn piercing damage is narrated.',
+    narrative: '{name} conjures grasping vines along their weapon.',
+    spellList: ['primal'],
   },
   // SRD: Speak with Animals — for 10 minutes the caster can
   // comprehend beasts. Action or ritual. Narrative-only in pansori
@@ -2525,7 +2616,10 @@ export const SRD_SPELLS: Record<string, Spell> = {
     saveEffect: 'negates',
     condition: 'slowed',
     conditionDuration: 100,
-    desc: 'Up to six creatures in a 40 ft cube make a WIS save or are slowed for 1 minute: Speed halved, -2 AC, -2 Dex saves.',
+    // 2024 PHB — the target repeats the WIS save at the end of each of its turns,
+    // ending the spell on itself on a success.
+    conditionSaveEnds: true,
+    desc: 'Up to six creatures in a 40 ft cube make a WIS save or are slowed for 1 minute (Speed halved, -2 AC, -2 Dex saves). Each repeats the save at the end of its turn, ending it on a success.',
     narrative: '{name} weaves the rune of stilled time — {target} drags as if through mud.',
     rangeKind: 'ranged',
     rangeFt: 120,
@@ -3439,5 +3533,160 @@ export const SRD_SPELLS: Record<string, Spell> = {
     desc: 'You reshape a section of stone you touch (up to a 5-ft cube) into any form you like — a door, a weapon, or a passage with crude features.',
     narrative: '{name} presses a hand to the stone and it flows like clay.',
     spellList: ['divine', 'primal', 'arcane'],
+  },
+
+  // ─── RAW spell batch: save-damage + control + ward ──────────────────────────
+  // Six SRD 5.2.1 spells that map onto existing dispatch shapes (single-target
+  // save-for-half, AoE sphere save-for-half, WIS-save charm, and a touch ward
+  // via the resistance/condition-strip buff path). No new engine code.
+
+  // SRD: Dissonant Whispers (L1 Enchantment, Bard) — a discordant melody only
+  // the target hears. WIS save; 3d6 psychic, half on a success. The fail-rider
+  // (the target must use its Reaction to flee by the safest route) is deferred
+  // — pansori models the damage core; the forced-flee reaction isn't wired.
+  dissonant_whispers: {
+    id: 'dissonant_whispers',
+    name: 'Dissonant Whispers',
+    level: 1,
+    castTime: 'action',
+    damage: '3d6',
+    damageType: 'psychic',
+    savingThrow: 'wis',
+    saveEffect: 'half',
+    upcastBonus: '1d6',
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    verbal: true,
+    somatic: false, // V only
+    desc: 'A creature hears a discordant melody in its mind. WIS save or take 3d6 psychic damage (half on a success; +1d6 per slot above 1st). The forced-flee reaction on a failure is narrated.',
+    spellList: ['arcane'],
+  },
+
+  // SRD: Mind Spike (L2 Divination, Sorcerer/Warlock/Wizard) — a spike of
+  // psionic energy. WIS save; 3d8 psychic, half on a success. RAW it is a
+  // Concentration spell whose only ongoing effect is knowing the target's
+  // location (it can't hide / benefit from Invisible against you). Pansori has
+  // no hidden/invisible-tracking substrate, so the location rider is narrated
+  // and the spell resolves as instantaneous damage — no concentration tie-up
+  // for an effect we don't model.
+  mind_spike: {
+    id: 'mind_spike',
+    name: 'Mind Spike',
+    level: 2,
+    castTime: 'action',
+    damage: '3d8',
+    damageType: 'psychic',
+    savingThrow: 'wis',
+    saveEffect: 'half',
+    upcastBonus: '1d8',
+    rangeKind: 'ranged',
+    rangeFt: 120,
+    desc: "A spike of psionic energy drives into a creature's mind. WIS save or take 3d8 psychic damage (half on a success; +1d8 per slot above 2nd). The location-tracking rider is narrated.",
+    spellList: ['arcane'],
+  },
+
+  // SRD: Vitriolic Sphere (L4 Evocation, Sorcerer/Wizard) — a ball of acid
+  // bursting in a 20-ft-radius sphere. DEX save; 10d4 acid, half on a success.
+  // The "another 5d4 at the end of its next turn" rider is deferred (pansori
+  // has no end-of-next-turn delayed follow-up on a save-damage spell yet).
+  vitriolic_sphere: {
+    id: 'vitriolic_sphere',
+    name: 'Vitriolic Sphere',
+    level: 4,
+    castTime: 'action',
+    damage: '10d4',
+    damageType: 'acid',
+    savingThrow: 'dex',
+    saveEffect: 'half',
+    upcastBonus: '2d4',
+    blastRadius: 20,
+    aoeShape: 'sphere',
+    rangeKind: 'ranged',
+    rangeFt: 150,
+    desc: 'A ball of acid streaks to a point and explodes in a 20-ft-radius sphere. Each creature there makes a DEX save, taking 10d4 acid damage (half on a success; +2d4 per slot above 4th). The lingering 5d4 next-turn splash is narrated.',
+    spellList: ['arcane'],
+  },
+
+  // SRD: Freezing Sphere (L6 Evocation, Sorcerer/Wizard) — a frigid globe that
+  // explodes in a 60-ft-radius sphere. CON save; 10d6 cold, half on a success.
+  // The water-freezing + held-globe utility clauses are flavour, not modeled.
+  freezing_sphere: {
+    id: 'freezing_sphere',
+    name: 'Freezing Sphere',
+    level: 6,
+    castTime: 'action',
+    damage: '10d6',
+    damageType: 'cold',
+    savingThrow: 'con',
+    saveEffect: 'half',
+    blastRadius: 60,
+    aoeShape: 'sphere',
+    rangeKind: 'ranged',
+    rangeFt: 300,
+    desc: 'A frigid globe streaks to a point and bursts in a 60-ft-radius sphere. Each creature there makes a CON save, taking 10d6 cold damage (half on a success). Freezing open water is narrated.',
+    spellList: ['arcane'],
+  },
+
+  // SRD: Charm Monster (L4 Enchantment) — like Charm Person but works on any
+  // creature. WIS save, rolled with Advantage while you or your allies are
+  // fighting it (`saveAdvantage`); on a failure the target is Charmed (Friendly
+  // to you) for 1 hour. Upcast (+1 target per slot) is deferred; damaging the
+  // charmed creature ends the charm RAW — also deferred (mirrors Charm Person).
+  charm_monster: {
+    id: 'charm_monster',
+    name: 'Charm Monster',
+    level: 4,
+    castTime: 'action',
+    savingThrow: 'wis',
+    saveEffect: 'negates',
+    saveAdvantage: true, // RAW: Advantage on the save while it's fighting you
+    condition: 'charmed',
+    conditionDuration: 10,
+    rangeKind: 'ranged',
+    rangeFt: 30,
+    desc: 'One creature you can see makes a WIS save (with Advantage if it is fighting you). On a failure it is Charmed and Friendly to you for 1 hour. The +1-target upcast and damage-ends-the-charm rider are deferred.',
+    // Bard / Druid / Sorcerer / Warlock / Wizard (2024 PHB).
+    spellList: ['arcane', 'primal'],
+  },
+
+  // SRD: Protection from Poison (L2 Abjuration, Cleric/Druid/Paladin/Ranger) —
+  // a touch ward. Ends the Poisoned condition on the target and grants
+  // Resistance to poison damage for the duration (1 hour). The "Advantage on
+  // saves to avoid/end Poisoned" rider is deferred — pansori has no save-
+  // advantage-vs-condition substrate. Non-concentration: the granted poison
+  // resistance persists like other non-concentration buffs (e.g. Mage Armor).
+  protection_from_poison: {
+    id: 'protection_from_poison',
+    name: 'Protection from Poison',
+    level: 2,
+    castTime: 'action',
+    targetType: 'self_or_ally',
+    rangeKind: 'touch',
+    removeConditions: ['poisoned'],
+    grantResistances: ['poison'],
+    desc: 'Touch a creature to end the Poisoned condition on it and grant Resistance to poison damage for 1 hour. The Advantage-on-poison-saves rider is deferred.',
+    spellList: ['divine', 'primal'],
+  },
+
+  // SRD: Color Spray (L1 Illusion, Bard/Sorcerer/Wizard) — a dazzling 15-ft cone
+  // of light. Each creature in it makes a CON save or is Blinded until the end of
+  // your next turn. Rides the AoE-condition path (now cone-aware): every failed-
+  // save hostile in the cone is Blinded with a 1-round stamped duration, so it
+  // expires on the round-wrap enemy-condition tick. Non-concentration.
+  color_spray: {
+    id: 'color_spray',
+    name: 'Color Spray',
+    level: 1,
+    castTime: 'action',
+    savingThrow: 'con',
+    saveEffect: 'negates',
+    condition: 'blinded',
+    conditionDuration: 1, // "until the end of its next turn" ≈ one round
+    aoeCondition: true,
+    blastRadius: 15,
+    aoeShape: 'cone',
+    rangeKind: 'self',
+    desc: 'A dazzling 15-ft cone of light. Each creature in it makes a CON save or is Blinded until the end of your next turn (attacks against it have Advantage; its own attacks have Disadvantage).',
+    spellList: ['arcane'],
   },
 };

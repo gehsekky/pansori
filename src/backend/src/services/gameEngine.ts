@@ -455,10 +455,16 @@ export function breakConcentration(
   const wasHaste = char.concentrating_on.spellId === 'haste';
   // SRD Ranger Hunter's Mark — dropping concentration clears the marked target.
   const wasHuntersMark = char.concentrating_on.spellId === 'hunters_mark';
+  // SRD Divine Favor / smites — concentration drop ends the per-attack weapon
+  // rider (and any still-armed one-shot smite) tied to this spell.
+  const wasWeaponRider = char.weapon_rider?.spellId === char.concentrating_on.spellId;
+  const wasPendingSmite = char.pending_smite?.spellId === char.concentrating_on.spellId;
   let newChar: Character = {
     ...char,
     concentrating_on: null,
     ...(wasHuntersMark ? { hunters_mark_target_id: undefined } : {}),
+    ...(wasWeaponRider ? { weapon_rider: undefined } : {}),
+    ...(wasPendingSmite ? { pending_smite: undefined } : {}),
     // RE-4 — a concentration-based recurring spell attack (Vampiric Touch) ends
     // when the caster's concentration drops.
     ...(char.recurring_attack?.concentration ? { recurring_attack: null } : {}),
@@ -1198,7 +1204,16 @@ function computeEnemyAttack(
   const multiattackDefenseDisadv =
     hasMultiattackDefense(char) &&
     (char.multiattack_defense_marks?.[enemy.id] ?? -1) === (st.round ?? 1);
-  const hasDisadvantage = baseDisadvantage || forceDisadvantage || multiattackDefenseDisadv;
+  // SRD Blinded / Frightened — a Blinded creature's attacks have Disadvantage,
+  // and a Frightened creature's do too while it can see the source of its fear
+  // (LoS approximated as "always in sight"). The attacker's conditions live on
+  // its grid entity (Color Spray / Blindness / Cunning Strike, Fear).
+  const attackerSelfDisadv =
+    st.entities
+      ?.find((e) => e.id === enemy.id && e.isEnemy)
+      ?.conditions.some((c) => c === 'blinded' || c === 'frightened') ?? false;
+  const hasDisadvantage =
+    baseDisadvantage || forceDisadvantage || multiattackDefenseDisadv || attackerSelfDisadv;
   const result = resolveEnemyAttack(enemy, char.ac, hasAdvantage, hasDisadvantage);
   // Equipped-armor lookup. `equipped_armor` stores an `instance_id`
   // (see routes/game.ts character creation), not a loot id — the
@@ -1743,6 +1758,64 @@ export function tickConditions(char: Character): Character {
   return withExpiryHooks;
 }
 
+// Conditions with a bespoke lifecycle in the enemy turn loop (consumed /
+// re-saved / cleared there, or governed by the caster's concentration) — the
+// generic timed mechanism must NOT stamp or tick these. 'commanded' is the
+// one-shot skip the loop consumes itself; the other three are concentration-
+// linked control conditions cleared by breakConcentration.
+export const TURN_LOOP_MANAGED_CONDITIONS: ReadonlySet<string> = new Set([
+  'commanded',
+  'confused',
+  'compelled',
+  'dominated',
+]);
+
+// Round-wrap tick for ENEMY entities' timed conditions. The PC analogue
+// (`tickConditions`) decrements at the start of each PC's turn; enemies have no
+// per-turn hook, so their finite conditions are decremented once per full round
+// on round wrap (SRD 5.2.1 — 1 round = 6 sec), mirroring the concentration /
+// spell-zone ticks.
+//
+// Only conditions carrying a numeric `condition_durations` entry are touched.
+// Concentration-governed enemy conditions (banished / polymorphed / dominated /
+// confused / compelled, and condition spells like Hold Person / Fear) are
+// applied WITHOUT a duration entry — their timer is the caster's concentration —
+// so this tick leaves them alone. Cast paths stamp a finite duration only for
+// non-concentration condition spells (Charm Person/Monster, Blindness, Color
+// Spray) via `spell.conditionDuration`; those are the entries that expire here.
+export function tickEnemyConditions(st: GameState): { st: GameState; narrative: string } {
+  if (!st.entities) return { st, narrative: '' };
+  let narrative = '';
+  const entities = st.entities.map((e) => {
+    if (!e.isEnemy) return e;
+    const durations = e.condition_durations ?? {};
+    if (Object.keys(durations).length === 0) return e;
+    const newDurations: Record<string, number> = {};
+    const expired: string[] = [];
+    for (const [cond, left] of Object.entries(durations)) {
+      // Turn-loop-managed conditions keep their entry untouched (defense in
+      // depth — the cast paths also refuse to stamp them).
+      if (TURN_LOOP_MANAGED_CONDITIONS.has(cond)) {
+        newDurations[cond] = left;
+        continue;
+      }
+      const remaining = left - 1;
+      if (remaining <= 0) expired.push(cond);
+      else newDurations[cond] = remaining;
+    }
+    if (expired.length > 0) {
+      narrative += ` ${fmt.note(`[${e.id} recovers: ${expired.join(', ')} ends.]`)}`;
+    }
+    return {
+      ...e,
+      conditions:
+        expired.length > 0 ? e.conditions.filter((c) => !expired.includes(c)) : e.conditions,
+      condition_durations: newDurations,
+    };
+  });
+  return { st: { ...st, entities }, narrative };
+}
+
 // SRD 5.2.1 p.178 (Variant Encumbrance) — speed reductions tied to carried weight.
 // ≤ 5×STR: normal speed
 // > 5×STR, ≤ 10×STR: -10 ft (encumbered)
@@ -2216,6 +2289,11 @@ export function endCombatState(st: GameState): GameState {
       ),
       // Totem Warrior totem clears with rage at combat end.
       totem_spirit: undefined,
+      // Per-attack weapon riders (Divine Favor, the smites) last ~1 minute ≈ an
+      // encounter; clear them when combat ends (the non-concentration ones —
+      // Divine Favor / Searing Smite — have no other teardown).
+      weapon_rider: undefined,
+      pending_smite: undefined,
     })),
   };
 }
@@ -6101,9 +6179,17 @@ export function attemptEnemyApproach(args: {
   const targetEntPreMove = st.entities?.find((e) => e.id === target.id);
   const enemyImmobile =
     enemyEntPreMove?.conditions?.some((c) => c === 'grappled' || c === 'restrained') ?? false;
+  // SRD Frightened — a Frightened creature can't willingly move closer to the
+  // source of its fear. When the target it would approach IS that source, it's
+  // held in place (can still attack at Disadvantage if already in reach).
+  const fearHeld =
+    !!enemyEntPreMove?.conditions?.includes('frightened') &&
+    !!enemyEntPreMove?.frightened_by &&
+    target.id === enemyEntPreMove.frightened_by;
   // SRD Barbarian Hamstring Blow (Brutal Strike) — −15 ft Speed.
   const hamstrungFt = enemyEntPreMove?.conditions?.includes('hamstrung') ? 15 : 0;
-  const effectiveEnemySpeedFt = enemyImmobile ? 0 : Math.max(0, baseSpeedFt - hamstrungFt);
+  const effectiveEnemySpeedFt =
+    enemyImmobile || fearHeld ? 0 : Math.max(0, baseSpeedFt - hamstrungFt);
   const needsToMove =
     !!enemyEntPreMove &&
     !!targetEntPreMove &&
@@ -6129,9 +6215,11 @@ export function attemptEnemyApproach(args: {
   });
   const distBefore = distanceFeet(enemyEntPreMove.pos, targetEntPreMove.pos);
   if (!plan || plan.pathSquares.length === 0) {
-    narrative += enemyImmobile
-      ? ` ${enemy.name} is held in place (${enemyEntPreMove.conditions.includes('restrained') ? 'restrained' : 'grappled'}) and can't reach ${target.name} this turn.`
-      : ` ${enemy.name} can't find a path to ${target.name} this turn.`;
+    narrative += fearHeld
+      ? ` ${enemy.name} is too frightened to advance on ${target.name} this turn.`
+      : enemyImmobile
+        ? ` ${enemy.name} is held in place (${enemyEntPreMove.conditions.includes('restrained') ? 'restrained' : 'grappled'}) and can't reach ${target.name} this turn.`
+        : ` ${enemy.name} can't find a path to ${target.name} this turn.`;
     return { kind: 'skip-turn', st, narrative };
   }
 
@@ -6426,8 +6514,12 @@ export function selectTarget(
 } {
   const actorEnt = st.entities?.find((e) => e.id === actorId);
   const targetSides: EntitySide[] = actorEnt ? hostileTargetSides(entitySide(actorEnt)) : ['pc'];
+  // SRD Charmed — a Charmed creature can't attack its charmer. Drop the charmer
+  // from the candidate pool; if that leaves no target, the creature stands down
+  // (the caller's `targetCharIdx < 0` gate ends its turn).
+  const charmerId = actorEnt?.conditions?.includes('charmed') ? actorEnt.charmer_id : undefined;
   const candidates = (st.entities ?? []).filter(
-    (e) => targetSides.includes(entitySide(e)) && e.hp > 0
+    (e) => targetSides.includes(entitySide(e)) && e.hp > 0 && e.id !== charmerId
   );
   // RAW player-command (summons): honor an explicit commanded target while
   // it's alive and still a valid hostile; otherwise fall back to the
@@ -7011,6 +7103,70 @@ export async function runEnemyTurns(args: {
         const prevAdvIdxCmd = advIdx;
         advIdx = (advIdx + 1) % orderLen;
         if (advIdx === 0 && prevAdvIdxCmd !== 0) roundWrapped = true;
+        if (advIdx === args.initialCurrentIdx) break;
+        continue;
+      }
+      // SRD "save ends" conditions (Power Word Stun's Stunned, Slow's slowed):
+      // the creature repeats the save at the END of each of its turns. Modeled
+      // at turn start (like Confusion): each condition gets ≥1 full afflicted
+      // turn (gated by `save_ends_acted`), then re-saves on each subsequent turn
+      // — a success clears it. Runs before the incapacitation skip below so a
+      // creature that shakes off Stunned can act this turn.
+      const seEnt = st.entities?.find((e) => e.id === eEntry.id && e.isEnemy);
+      if (seEnt?.save_ends && Object.keys(seEnt.save_ends).length > 0) {
+        const acted = new Set(seEnt.save_ends_acted ?? []);
+        const nextActed = new Set(acted);
+        const cleared: string[] = [];
+        for (const [cond, info] of Object.entries(seEnt.save_ends)) {
+          if (!acted.has(cond)) {
+            nextActed.add(cond); // first afflicted turn — no save yet
+            continue;
+          }
+          const score = (rm as unknown as Record<string, number>)[info.ability] ?? 10;
+          const failed = rollConditionSave(
+            info.ability,
+            score,
+            info.dc,
+            false,
+            1,
+            0,
+            seEnt.conditions
+          );
+          if (!failed) cleared.push(cond);
+        }
+        if (cleared.length > 0 || nextActed.size !== acted.size) {
+          st = {
+            ...st,
+            entities: (st.entities ?? []).map((e) => {
+              if (e.id !== eEntry.id || !e.isEnemy) return e;
+              const nextSaveEnds = { ...(e.save_ends ?? {}) };
+              for (const c of cleared) delete nextSaveEnds[c];
+              return {
+                ...e,
+                conditions: e.conditions.filter((c) => !cleared.includes(c)),
+                save_ends: nextSaveEnds,
+                save_ends_acted: [...nextActed].filter((c) => !cleared.includes(c)),
+              };
+            }),
+          };
+          if (cleared.length > 0) {
+            narrative += `\n\n[${rm.name} shakes off ${cleared.join(', ')}.]`;
+          }
+        }
+      }
+      // SRD — a creature with an incapacitating condition can't take actions,
+      // move, or react: it loses its turn. (Hold Person/Monster's paralyzed,
+      // Sleep's unconscious, Power Word Stun / Stunning Strike's stunned, Flesh
+      // to Stone's petrified.) Evaluated after the save-ends re-save above.
+      const incapConds = ['stunned', 'paralyzed', 'incapacitated', 'unconscious', 'petrified'];
+      const incapEnt = st.entities?.find((e) => e.id === eEntry.id && e.isEnemy);
+      const incapCond = incapEnt?.conditions.find((c) => incapConds.includes(c));
+      if (incapCond) {
+        narrative += `\n\n[${rm.name} is ${incapCond} and can't act this turn.]`;
+        resumeMi = 0;
+        const prevAdvIdxIncap = advIdx;
+        advIdx = (advIdx + 1) % orderLen;
+        if (advIdx === 0 && prevAdvIdxIncap !== 0) roundWrapped = true;
         if (advIdx === args.initialCurrentIdx) break;
         continue;
       }
@@ -8039,6 +8195,11 @@ export async function takeAction({
             : e
         ),
       };
+      // Tick enemy timed conditions (Charm Person/Monster, Blindness, Color
+      // Spray): decrement their stamped durations and expire those reaching 0.
+      const enemyCondRes = tickEnemyConditions(st);
+      st = enemyCondRes.st;
+      narrative += enemyCondRes.narrative;
       // SRD p.221 — lair action fires on round start (init count 20).
       const lairRes = fireLairAction(st, seed, context);
       st = lairRes.st;
