@@ -243,14 +243,51 @@ backend features are waiting on, and a handful of **bounded subsystems**.
   **Bloodied Frenzy** (`bloodiedFrenzy` — Advantage while the attacker is ≤ ½
   HP; berserker), and **bonus on-hit damage** (`bonusDamage`/`bonusDamageType`,
   halved if the target resists the bonus type — ghast/wight necrotic, cultist
-  ritual sickle). Still deferred (need new infra — see the design notes):
-  Undead Fortitude (central enemy-damage hook), Life Drain max-HP reduction,
-  monster auras (Stench), enemy reactions (Parry), conditional extra actions
-  (Rampage), Sunlight Sensitivity (lighting model). Legendary + lair scaffolding
-  is shipped (`legendary_actions` pool; `lair_actions` round-wrap AoE) but not
-  wired to a current boss. Other effects shipped: `extra_attack`,
-  `aoe_save_damage`. Remaining: more breadth + the deferred specials above.
+  ritual sickle). Several per-monster specials still need new infrastructure —
+  tracked in **Monster-ability infrastructure** below. Legendary + lair
+  scaffolding is shipped (`legendary_actions` pool; `lair_actions` round-wrap
+  AoE) but not wired to a current boss. Other effects shipped: `extra_attack`,
+  `aoe_save_damage`. Remaining: more breadth + the infra gaps below.
 - [ ] **Magic items** — content; attunement + curse infra is shipped.
+
+### Monster-ability infrastructure (deferred — each needs new engine support)
+
+> The shared bestiary's stat lines are in; these are the per-monster _special_
+> abilities the current engine can't yet express. Ordered cheapest-first.
+> (Shipped already: Pack Tactics, Bloodied Frenzy, bonus on-hit damage — all in
+> `computeEnemyAttack`; see the Monsters item above.)
+
+- [ ] **Central enemy-damage hook** → **Undead Fortitude** (Zombie). Enemy kill
+      resolution is duplicated across ~28 sites; fold them into one
+      `applyDamageToEnemy` choke point, then add the "would drop to 0 → CON save
+      (DC 5 + damage), unless Radiant or a Crit → drop to 1" check. The refactor
+      also gives future on-damage / on-death traits (troll Regeneration,
+      Rakshasa, etc.) a single home. Medium.
+- [ ] **Max-HP-reduction mechanic** → **Life Drain** (Specter, Wight). A
+      `max_hp_reduction` tracker on `Character`, cleared on a Long Rest, applied
+      on the draining hit. Closes a loop with the Greater Restoration picker —
+      RAW GR removes "a reduction to Hit Point maximum," so add it as a 4th GR
+      effect option. Medium.
+- [ ] **Monster auras (emanations)** → **Stench** (Ghast). Generalize the
+      start-of-turn `holyNimbusRadiant` hook into a reusable "save-or-condition /
+      damage to creatures within N ft" aura, ticked at turn-start / round-wrap.
+      Covers Stench + future aura monsters. Medium.
+- [ ] **Enemy reactions** → **Parry** (Bandit Captain). The `pending_reaction`
+      system is PC-only; add a defending-monster reaction window in the PC-attack
+      resolver (mirror Shield's pause/resume). Interim cheap version: a passive
+      "+2 AC vs the first melee hit each round." Medium–large.
+- [ ] **Conditional extra actions** → **Rampage** (Gnoll: bonus move + bite
+      after dropping a Bloodied creature). Needs the enemy bonus-action / extra-
+      attack-after-kill economy — the same turn-flow gap as Haste's extra action.
+      Larger.
+- [ ] **Lighting / illumination model** → **Sunlight Sensitivity** (Kobold,
+      Specter — Disadvantage in sunlight). No illumination substrate exists; this
+      is the same architectural gap that blocks the Truesight / see-Invisible
+      boons. Architectural; low priority for a dungeon-centric engine.
+- [ ] **Grapple-on-hit** → **Griffon** (and constrictors). `onHitEffect` already
+      accepts `grappled` (blocks movement, tracks `grappled_by`); the only gap is
+      confirming a PC can escape a _monster's_ grapple via the existing contested
+      check. Near-free — verify + wire.
 
 ### Frontend creation / choice surfaces (backend ready, FE pending)
 
