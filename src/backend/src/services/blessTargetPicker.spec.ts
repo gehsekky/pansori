@@ -2,8 +2,8 @@
 // player-chosen `targetCharIds` (the FE collects them via the GameChoice
 // `pickTargets` hint), instead of always auto-picking caster + nearest allies.
 
-import { ctxWithRage, makeChar, makeState, spellSeed } from '../test-fixtures.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { ctxWithRage, makeChar, makeState, spellSeed } from '../test-fixtures.js';
 import { generateChoices, takeAction } from './gameEngine.js';
 import type { GameState } from '../types.js';
 import { context as ctx } from '../contexts/sandbox.js';
