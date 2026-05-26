@@ -475,6 +475,16 @@ export interface Spell {
   // economy it costs. Omitted ⇒ the zone is stationary (Spike Growth).
   zoneMoveFt?: number;
   zoneMoveCost?: 'action' | 'bonus_action';
+  // RE-4 — recurring spell attack (Spiritual Weapon, Vampiric Touch): on cast,
+  // make a spell attack and set up `Character.recurring_attack` so the caster
+  // can re-issue it each turn (cost = `recurringAttackCost`).
+  // `recurringAddSpellMod` adds the spellcasting modifier to the damage
+  // (Spiritual Weapon); `recurringHealFraction` heals the caster that fraction
+  // of the damage dealt (Vampiric Touch).
+  recurringAttack?: boolean;
+  recurringAttackCost?: 'action' | 'bonus_action';
+  recurringAddSpellMod?: boolean;
+  recurringHealFraction?: number;
   ritualCasting?: boolean; // castable as ritual (no slot cost, only out of combat)
   verbal?: boolean; // has verbal component (blocked when deafened)
   // SRD Slow — "When the creature attempts to cast a spell with a
@@ -742,6 +752,22 @@ export interface Character {
     spellId: string;
     condition?: string;
     rounds_left?: number;
+  } | null;
+  // RE-4 — a recurring spell attack the caster repeats on later turns
+  // (Spiritual Weapon: a floating force re-attacked as a Bonus Action;
+  // Vampiric Touch: a Magic-action melee spell attack that heals the caster).
+  // Set on cast, re-issued via the `recurring_spell_attack` action, and cleared
+  // when its duration ends or (for concentration spells) concentration drops.
+  recurring_attack?: {
+    spellId: string;
+    name: string;
+    damage: string; // upcast-baked dice expr (incl. +spellcasting mod where RAW)
+    damageType: string;
+    castingScore: number; // casting-ability score, for the spell attack bonus
+    cost: 'action' | 'bonus_action'; // re-issue cost
+    healFraction?: number; // Vampiric Touch heals this fraction of damage dealt
+    rounds_left: number; // duration; decremented on round wrap, cleared at 0
+    concentration?: boolean; // cleared by breakConcentration when set
   } | null;
   // SRD Ranger Hunter's Mark — the id of the currently-marked enemy entity.
   // Set when the spell is cast, cleared on breakConcentration. The caster's

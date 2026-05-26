@@ -456,6 +456,9 @@ export function breakConcentration(
     ...char,
     concentrating_on: null,
     ...(wasHuntersMark ? { hunters_mark_target_id: undefined } : {}),
+    // RE-4 — a concentration-based recurring spell attack (Vampiric Touch) ends
+    // when the caster's concentration drops.
+    ...(char.recurring_attack?.concentration ? { recurring_attack: null } : {}),
   };
   // Strip the linked enemy condition (Hold Person etc.)
   let newSt: GameState =
@@ -4894,6 +4897,26 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     }
   }
 
+  // ── Re-issue a recurring spell attack (Spiritual Weapon / Vampiric Touch) at
+  // a target, for the spell's recurring cost, when that slot is free. (RE-4.)
+  if (state.combat_active && char.recurring_attack && livingEnemies.length > 0) {
+    const ra = char.recurring_attack;
+    const slotFree =
+      ra.cost === 'bonus_action'
+        ? !char.turn_actions.bonus_action_used
+        : !char.turn_actions.action_used;
+    if (slotFree) {
+      for (const en of livingEnemies) {
+        if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+        choices.push({
+          label: `${ra.name}: attack the ${en.name} (${ra.cost === 'bonus_action' ? 'bonus action' : 'action'})`,
+          action: { type: 'recurring_spell_attack', targetEnemyId: en.id },
+          kind: 'recurring_spell_attack',
+        });
+      }
+    }
+  }
+
   // Attune choices — out of combat, for unnattuned items that require attunement
   if (!state.combat_active) {
     const attuned = char.attuned_items ?? [];
@@ -7528,6 +7551,20 @@ export async function takeAction({
       const concRes = tickConcentrationDurations(st, context);
       st = concRes.st;
       narrative += concRes.narrative;
+      // RE-4 — non-concentration recurring spell attacks (Spiritual Weapon)
+      // expire on their own round timer. (Concentration ones — Vampiric Touch —
+      // are governed by the concentration tick + breakConcentration above.)
+      st = {
+        ...st,
+        characters: st.characters.map((c) => {
+          const ra = c.recurring_attack;
+          if (!ra || ra.concentration) return c;
+          const left = ra.rounds_left - 1;
+          return left <= 0
+            ? { ...c, recurring_attack: null }
+            : { ...c, recurring_attack: { ...ra, rounds_left: left } };
+        }),
+      };
     }
 
     // Pause path: runEnemyTurns already set initiative_idx and active_character_id

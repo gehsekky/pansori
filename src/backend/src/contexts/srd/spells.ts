@@ -1557,18 +1557,46 @@ export const SRD_SPELLS: Record<string, Spell> = {
     // Sorcerer / Warlock / Wizard (2024 PHB). Druid also has it.
     spellList: ['arcane', 'primal'],
   },
+  // SRD: Spiritual Weapon (L2) — a floating force weapon (1 minute, NO
+  // concentration). RE-4 recurring spell attack: on cast and as a Bonus Action
+  // each later turn, it makes a melee spell attack for 1d8 + spellcasting mod
+  // force. Re-issued via `recurring_spell_attack`.
   spiritual_weapon: {
     id: 'spiritual_weapon',
     name: 'Spiritual Weapon',
     level: 2,
     castTime: 'bonus_action',
+    recurringAttack: true,
+    recurringAttackCost: 'bonus_action',
+    recurringAddSpellMod: true,
     damage: '1d8',
     damageType: 'force',
     upcastBonus: '1d8',
+    durationRounds: 10, // 1 minute, no concentration
     rangeKind: 'ranged',
     rangeFt: 60,
-    desc: 'A floating spectral weapon makes melee attacks.',
+    desc: 'Summon a floating spectral weapon for 1 minute (no concentration). On cast, and as a Bonus Action on later turns, it makes a melee spell attack for 1d8 + your spellcasting modifier Force damage (+1d8 per two slots above 2nd).',
     spellList: ['divine'],
+  },
+  // SRD: Vampiric Touch (L3) — a shadow-wreathed melee spell attack (3d6
+  // necrotic) that heals the caster half the damage dealt (Concentration). RE-4
+  // recurring spell attack: re-attack each turn as a Magic action.
+  vampiric_touch: {
+    id: 'vampiric_touch',
+    name: 'Vampiric Touch',
+    level: 3,
+    castTime: 'action',
+    recurringAttack: true,
+    recurringAttackCost: 'action',
+    recurringHealFraction: 0.5,
+    concentration: true,
+    durationRounds: 10, // Concentration, up to 1 minute
+    damage: '3d6',
+    damageType: 'necrotic',
+    upcastBonus: '1d6',
+    rangeKind: 'self',
+    desc: 'A shadow-wreathed melee spell attack deals 3d6 necrotic and heals you for half the damage dealt. As a Magic action on later turns you can attack again (Concentration, up to 1 minute; +1d6 per slot above 3rd).',
+    spellList: ['arcane'],
   },
   // SRD: Invisibility — a creature you touch gains the Invisible condition
   // (Concentration, up to 1 hour). Ends early when the target attacks, deals
