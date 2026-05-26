@@ -172,6 +172,57 @@ function skillLabel(id: string): string {
     .join(' ');
 }
 
+// SRD: Skills — each skill's governing ability + a one-line example of use
+// (paraphrased). Shown as a hover tooltip on the class-skill picker.
+const SKILL_INFO: Record<string, { ability: string; desc: string }> = {
+  acrobatics: { ability: 'Dexterity', desc: 'Keep your footing or pull off nimble stunts.' },
+  animal_handling: {
+    ability: 'Wisdom',
+    desc: 'Calm, train, or read the intentions of an animal.',
+  },
+  arcana: {
+    ability: 'Intelligence',
+    desc: 'Recall lore about spells, magic items, and the planes.',
+  },
+  athletics: { ability: 'Strength', desc: 'Climb, jump, swim, or muscle through physical feats.' },
+  deception: { ability: 'Charisma', desc: 'Mislead with a convincing lie or disguise.' },
+  history: { ability: 'Intelligence', desc: 'Recall events, people, nations, and cultures.' },
+  insight: { ability: 'Wisdom', desc: "Read a creature's mood, motives, and honesty." },
+  intimidation: {
+    ability: 'Charisma',
+    desc: 'Bend someone to your will through threats or menace.',
+  },
+  investigation: {
+    ability: 'Intelligence',
+    desc: 'Find clues, search for hidden things, and deduce how things work.',
+  },
+  medicine: {
+    ability: 'Wisdom',
+    desc: 'Stabilize the dying, diagnose ailments, and treat wounds.',
+  },
+  nature: {
+    ability: 'Intelligence',
+    desc: 'Recall lore about terrain, plants, animals, and weather.',
+  },
+  perception: { ability: 'Wisdom', desc: 'Notice hidden creatures, sounds, and details.' },
+  performance: { ability: 'Charisma', desc: 'Entertain a crowd with music, acting, or dance.' },
+  persuasion: { ability: 'Charisma', desc: 'Win someone over with tact, charm, and good faith.' },
+  religion: { ability: 'Intelligence', desc: 'Recall lore about gods, rites, and holy symbols.' },
+  sleight_of_hand: {
+    ability: 'Dexterity',
+    desc: 'Pick pockets, palm objects, and pull off light-fingered tricks.',
+  },
+  stealth: { ability: 'Dexterity', desc: 'Move unseen and unheard; hide from notice.' },
+  survival: { ability: 'Wisdom', desc: 'Track, forage, navigate, and endure the wilds.' },
+};
+
+// Tooltip text for a skill: "Dexterity — Keep your footing…". Falls back to
+// the plain label if the skill isn't in the table.
+function skillTitle(id: string): string {
+  const info = SKILL_INFO[id];
+  return info ? `${info.ability} — ${info.desc}` : skillLabel(id);
+}
+
 // Per-context localStorage key for the saved party draft. We key on the
 // context id (vale_of_shadows / whispering_pines / sandbox / etc.) so
 // each campaign carries its own "last party" — switching to Pines
@@ -651,6 +702,7 @@ function CharScreen({
                                 type="button"
                                 aria-pressed={on}
                                 disabled={disabled}
+                                title={skillTitle(sk)}
                                 onClick={() => {
                                   const next = on
                                     ? selected.filter((s) => s !== sk)
