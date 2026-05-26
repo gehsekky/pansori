@@ -82,6 +82,8 @@ export function runSaveSpell(
   // SRD Metamagic Heightened Spell — the target rolls this save with
   // Disadvantage.
   const heightened = !!ctx.metamagic?.includes('heightened');
+  // SRD Dominate — the target saves with Advantage while the party fights it.
+  const saveAdvantage = !!spell.saveAdvantage;
   const saveFailed = rollConditionSave(
     saveAbility,
     enemyScore,
@@ -90,7 +92,7 @@ export function runSaveSpell(
     char.level,
     saveCoverDexBonus,
     targetEntForCond?.conditions ?? [],
-    false,
+    saveAdvantage,
     heightened
   );
   const saveLabel = saveAbility.toUpperCase();

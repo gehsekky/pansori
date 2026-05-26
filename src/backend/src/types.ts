@@ -491,6 +491,11 @@ export interface Spell {
   // migrated. Confusion uses this for its 10-ft `confused` sphere; the
   // enemy turn loop then runs Confusion's 1d10 behavior table per creature.
   aoeCondition?: boolean;
+  // RE-4 — the target rolls its save with Advantage (Dominate Beast/Person/
+  // Monster: "Advantage on the save if you or your allies are fighting it" —
+  // true in combat, where pansori spells are cast). Threaded into the
+  // single-target save roll. Cancels with Heightened-Spell disadvantage.
+  saveAdvantage?: boolean;
   ritualCasting?: boolean; // castable as ritual (no slot cost, only out of combat)
   verbal?: boolean; // has verbal component (blocked when deafened)
   // SRD Slow — "When the creature attempts to cast a spell with a

@@ -1529,6 +1529,32 @@ export const SRD_SPELLS: Record<string, Spell> = {
     // SRD: Bard / Druid / Sorcerer / Wizard.
     spellList: ['arcane', 'primal'],
   },
+  compulsion: {
+    id: 'compulsion',
+    name: 'Compulsion',
+    level: 4,
+    castTime: 'action',
+    concentration: true,
+    // SRD: Compulsion — each creature in range (30 ft) makes a WIS save or is
+    // driven to flee. pansori applies `compelled` to all failed-save creatures
+    // in a 30-ft sphere (via `aoeCondition`); each turn the enemy loop forces
+    // it to use its full movement staggering away from the caster (no action),
+    // then it re-saves. Simplification: the direction is fixed to "away from
+    // caster" (RAW lets the caster pick a horizontal direction as a Bonus
+    // Action each turn) and the effect auto-applies without that bonus action.
+    condition: 'compelled',
+    conditionDuration: 10,
+    aoeCondition: true,
+    savingThrow: 'wis',
+    saveEffect: 'negates',
+    blastRadius: 30,
+    aoeShape: 'sphere',
+    desc: 'Creatures within 30 ft make a WIS save or are compelled (Concentration, 1 min): each turn the target must use all its movement to stagger away from you (no action), then re-saves to break free.',
+    rangeKind: 'ranged',
+    rangeFt: 30,
+    // SRD: Bard.
+    spellList: ['arcane'],
+  },
   hold_person: {
     id: 'hold_person',
     name: 'Hold Person',
@@ -1544,6 +1570,64 @@ export const SRD_SPELLS: Record<string, Spell> = {
     rangeFt: 60,
     // Bard / Cleric / Druid / Sorcerer / Warlock / Wizard (2024 PHB).
     spellList: ['arcane', 'divine', 'primal'],
+  },
+  // SRD: Dominate Beast / Person / Monster — one creature makes a WIS save (with
+  // Advantage while the party fights it) or is `dominated`: the enemy loop drives
+  // it to attack the nearest OTHER enemy on its turn (it fights for the party).
+  // Concentration. Deferred from RAW: the on-damage re-save and the telepathic
+  // command surface (pansori auto-pilots the dominated creature, attacking the
+  // nearest foe — the RAW "acts to protect itself" fallback). The variants are
+  // mechanically identical, differing only in level / target restriction / list.
+  dominate_beast: {
+    id: 'dominate_beast',
+    name: 'Dominate Beast',
+    level: 4,
+    castTime: 'action',
+    concentration: true,
+    condition: 'dominated',
+    conditionDuration: 10,
+    savingThrow: 'wis',
+    saveEffect: 'negates',
+    saveAdvantage: true,
+    desc: 'A beast within 60 ft makes a WIS save (Advantage while you fight it) or is dominated (Concentration, 1 min): on its turn it attacks the nearest other enemy on your behalf.',
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    // SRD: Druid / Ranger / Sorcerer.
+    spellList: ['primal', 'arcane'],
+  },
+  dominate_person: {
+    id: 'dominate_person',
+    name: 'Dominate Person',
+    level: 5,
+    castTime: 'action',
+    concentration: true,
+    condition: 'dominated',
+    conditionDuration: 10,
+    savingThrow: 'wis',
+    saveEffect: 'negates',
+    saveAdvantage: true,
+    desc: 'A humanoid within 60 ft makes a WIS save (Advantage while you fight it) or is dominated (Concentration, 1 min): on its turn it attacks the nearest other enemy on your behalf.',
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    // SRD: Bard / Sorcerer / Wizard.
+    spellList: ['arcane'],
+  },
+  dominate_monster: {
+    id: 'dominate_monster',
+    name: 'Dominate Monster',
+    level: 8,
+    castTime: 'action',
+    concentration: true,
+    condition: 'dominated',
+    conditionDuration: 10,
+    savingThrow: 'wis',
+    saveEffect: 'negates',
+    saveAdvantage: true,
+    desc: 'A creature within 60 ft makes a WIS save (Advantage while you fight it) or is dominated (Concentration, 1 min): on its turn it attacks the nearest other enemy on your behalf.',
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    // SRD: Bard / Sorcerer / Warlock / Wizard.
+    spellList: ['arcane'],
   },
   web: {
     id: 'web',

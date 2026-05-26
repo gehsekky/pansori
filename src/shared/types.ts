@@ -113,7 +113,18 @@ export type ConditionName =
   // re-saves each turn to shake the effect; cleared by the caster's
   // concentration ending. Applied to all failed-save targets via the
   // opt-in `aoeCondition` cast path.
-  | 'confused';
+  | 'confused'
+  // SRD: Compulsion — the target failed its Wisdom save and is magically
+  // driven to flee. On its turn the enemy loop forces it to use its full
+  // movement to stagger away from the caster (no action), then it re-saves;
+  // success ends the effect. Concentration; cleared by breakConcentration.
+  | 'compelled'
+  // SRD: Dominate (Beast/Person/Monster) — the target failed its Wisdom save
+  // (rolled with Advantage while the party fights it) and is under the caster's
+  // control. On its turn the enemy loop drives it to attack the nearest OTHER
+  // enemy (it fights for the party). Concentration; cleared by
+  // breakConcentration. (On-damage re-save + manual command surface deferred.)
+  | 'dominated';
 
 export type NpcAttitude = 'friendly' | 'indifferent' | 'hostile';
 

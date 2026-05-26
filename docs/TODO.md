@@ -67,7 +67,7 @@ Grounded in a code survey + the full backend suite: **1572 tests across
 
 | Category | In pansori | SRD universe |
 |---|---|---|
-| Spells | **181** (26 cantrips + 155 leveled, through L9) | ~330 |
+| Spells | **185** (26 cantrips + 159 leveled, through L9) | ~330 |
 | Shared SRD monster pool | **12** (`SRD_MONSTERS`) + per-campaign templates | hundreds |
 | Species | 9 | 9 standalone + Drow lineage |
 | Classes | 12 | 12 |
@@ -85,7 +85,7 @@ backend features are waiting on, and a handful of **bounded subsystems**.
 
 ### Content breadth — data on existing patterns (RE-6)
 
-- [ ] **Spells** — ~181 / ~330 SRD. Most remaining categories are already
+- [ ] **Spells** — ~185 / ~330 SRD. Most remaining categories are already
       representable (data entry).
   - [~] **Persistent damage zones** — foundation shipped (RE-4): `GameState.spell_zones`
         + `SpellZone`, the `persistentZone` spell flag, cast-time `runZoneSpell`
@@ -121,13 +121,23 @@ backend features are waiting on, and a handful of **bounded subsystems**.
         normally) ride it. Confusion's re-save is RAW-faithful: a creature
         stays confused for at least its first full turn (`CombatEntity.confused_acted`
         gates the end-of-turn save, evaluated at the start of each subsequent
-        turn). Next on this base: **Compulsion** (forced movement) and
-        **Dominate** (full enemy control). Simplifications: Command's upcast
-        (+1 target per slot ≥ 2) and other command words collapse to "Halt";
-        Confusion's 7-8 targets allies-only (party never hit on that result)
-        and the sphere radius is fixed (no upcast widening). Note: the older
-        AoE-condition spells (Hypnotic Pattern, Web) still condition only the
-        primary target until migrated onto `aoeCondition`.
+        turn). **Compulsion** (L4, 30-ft sphere, WIS save → `compelled`: each
+        turn the creature staggers its full movement away from the caster — no
+        action — then re-saves) and **Dominate Beast/Person/Monster** (L4/L5/L8,
+        WIS save rolled with Advantage via `Spell.saveAdvantage` → `dominated`:
+        on its turn the creature attacks the nearest OTHER enemy, fighting for
+        the party) round out the family. The four control conditions
+        (`commanded`/`confused`/`compelled`/`dominated`) all resolve in the
+        enemy turn loop's behavior block and clear via breakConcentration; the
+        forced-move + dominated-attack paths reuse `planEnemyApproach` /
+        `resolveEnemyAttack` / `applyDamageToEntity`. Simplifications: Command's
+        upcast (+1 target/slot) and command words collapse to "Halt"; Confusion's
+        7-8 targets allies-only + fixed radius; Compulsion's direction is fixed
+        to "away from caster" and auto-applies (no per-turn Bonus Action);
+        Dominate defers the on-damage re-save + manual command surface
+        (auto-pilots the creature) and a dominated foe still counts as an enemy
+        for room-clear. Note: older AoE-condition spells (Hypnotic Pattern, Web)
+        still condition only the primary target until migrated onto `aoeCondition`.
       Exceptions still needing a model first: the alternate "summon" spells,
       each mechanically distinct from the stat-block ally model —
   - [ ] **Conjure Animals** (L3) + other 2024 conjure spells — a
