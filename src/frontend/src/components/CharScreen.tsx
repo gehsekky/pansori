@@ -120,26 +120,6 @@ const STANDARD_ARRAY: StatBlock = {
   cha: 8,
 };
 
-// PHB subclass timing: classes with the * here pick their subclass at L1
-// (required at character creation) so they don't miss class features keyed
-// on the subclass. The L2/L3 classes pick later via the in-game choice when
-// they hit the appropriate level. The subclass IDs mirror what gameEngine.ts
-// actually handles in its `case 'select_subclass'` dispatch + feature checks.
-const L1_SUBCLASS_OPTIONS: Record<string, { id: string; label: string }[]> = {
-  Cleric: [
-    { id: 'life', label: 'Life Domain (Disciple of Life — bonus healing)' },
-    { id: 'war', label: 'War Domain (War Priest + Guided Strike)' },
-  ],
-  Sorcerer: [
-    { id: 'draconic', label: 'Draconic Bloodline (Draconic Resilience — +1 HP/level)' },
-    { id: 'wild_magic', label: 'Wild Magic (Wild Magic Surge — chaotic effects on cast)' },
-  ],
-  Warlock: [
-    { id: 'fiend', label: "The Fiend (Dark One's Blessing — temp HP on kill)" },
-    { id: 'archfey', label: 'The Archfey (Fey Presence — frighten enemies in 10 ft)' },
-  ],
-};
-
 // Fallback compositions when a campaign doesn't override. Mirrors the 5e
 // "iconic four" — Fighter (tank), Cleric (heal), Wizard (magic), Rogue (utility).
 // Roles taken from DMG p.83: Defender / Healer / Controller / Striker.
@@ -162,9 +142,6 @@ interface CharDraft {
   statMethod: 'roll' | 'array';
   portrait: string | null;
   rollCount: number;
-  // Required for Cleric / Sorcerer / Warlock (when their subclasses are
-  // authored); ignored for other classes (they pick later at level 2/3).
-  subclass?: string;
   // Origin-feat picks for backgrounds whose feat needs player input
   // (currently only Magic Initiate variants). Persisted in the per-
   // context party draft so the player doesn't lose picks on reload.
@@ -206,22 +183,16 @@ function savePartyDraft(ctxId: string, party: CharDraft[]): void {
 }
 
 // Coerce a saved draft into something the current context can render
-// without crashing. If the saved class / background / subclass don't
-// exist in this context (e.g. the campaign authoring removed them
-// since last save), fall back to the context's first available value.
-// Stats + names + species are left alone.
+// without crashing. If the saved class / background don't exist in this
+// context (e.g. the campaign authoring removed them since last save),
+// fall back to the context's first available value. Stats + names +
+// species are left alone.
 function sanitizeDraft(d: CharDraft, ctx: FrontendContext): CharDraft {
   const classIds = new Set(ctx.classes.map((c) => c.id));
   const bgIds = new Set((ctx.backgrounds ?? []).map((b) => b.id));
   const validCls = classIds.has(d.cls) ? d.cls : (ctx.classes[0]?.id ?? d.cls);
   const validBg = bgIds.has(d.backgroundId) ? d.backgroundId : (ctx.backgrounds?.[0]?.id ?? '');
-  // Subclass: keep only if the class still requires/supports one with the
-  // saved id; otherwise drop so the player re-picks (handle() blocks
-  // start until subclass is picked when required).
-  const subclassOpts = L1_SUBCLASS_OPTIONS[validCls] ?? [];
-  const validSubclass =
-    d.subclass && subclassOpts.some((o) => o.id === d.subclass) ? d.subclass : undefined;
-  return { ...d, cls: validCls, backgroundId: validBg, subclass: validSubclass };
+  return { ...d, cls: validCls, backgroundId: validBg };
 }
 
 function CharScreen({
@@ -423,9 +394,6 @@ function CharScreen({
         portrait: null,
         rollCount: 1,
         statMethod: 'roll',
-        // Auto-pick the first L1-required subclass option (player can change
-        // before starting). Without this, autofill creates an invalid Cleric.
-        subclass: L1_SUBCLASS_OPTIONS[cls]?.[0]?.id,
       }))
     );
   }
@@ -434,14 +402,6 @@ function CharScreen({
     const leader = party[0];
     if (!leader.name.trim()) return setError('Enter a name for your first hero');
     if (party.some((d) => !d.name.trim())) return setError('All party members must have a name');
-    // Cleric / Sorcerer / Warlock pick subclass at L1 (PHB). Block start
-    // until they've made a selection.
-    const missingSubclass = party.find((d) => L1_SUBCLASS_OPTIONS[d.cls]?.length && !d.subclass);
-    if (missingSubclass) {
-      return setError(
-        `${missingSubclass.name || missingSubclass.cls} must choose a ${missingSubclass.cls} subclass before starting`
-      );
-    }
     // Magic Initiate backgrounds need the player to have completed the
     // spell picker. Without choices, BE silently emits a "may learn..."
     // narrative + grants nothing — block start so the player notices.
@@ -470,7 +430,6 @@ function CharScreen({
           background_id: d.backgroundId || undefined,
           stats: d.stats,
           portrait_url: d.portrait ?? undefined,
-          subclass: d.subclass || undefined,
           species: d.speciesId || undefined,
           feat_choices: d.featChoices,
         })),
@@ -564,12 +523,7 @@ function CharScreen({
                   className={styles.formInp}
                   style={{ cursor: 'pointer' }}
                   value={draft.cls}
-                  onChange={(e) => {
-                    // Switching class clears any previously-chosen subclass —
-                    // it only applies to the old class. The user re-picks if
-                    // the new class is L1-required.
-                    updateDraft(idx, { cls: e.target.value, subclass: undefined });
-                  }}
+                  onChange={(e) => updateDraft(idx, { cls: e.target.value })}
                 >
                   {classes.map((c) => (
                     <option key={c.id} value={c.id}>
@@ -577,32 +531,6 @@ function CharScreen({
                     </option>
                   ))}
                 </select>
-
-                {L1_SUBCLASS_OPTIONS[draft.cls]?.length && (
-                  <>
-                    <label
-                      className={styles.formLbl}
-                      style={{ marginTop: 12 }}
-                      htmlFor={`char-${idx}-subclass`}
-                    >
-                      SUBCLASS (required at level 1)
-                    </label>
-                    <select
-                      id={`char-${idx}-subclass`}
-                      className={styles.formInp}
-                      style={{ cursor: 'pointer' }}
-                      value={draft.subclass ?? ''}
-                      onChange={(e) => updateDraft(idx, { subclass: e.target.value || undefined })}
-                    >
-                      <option value="">— pick a subclass —</option>
-                      {L1_SUBCLASS_OPTIONS[draft.cls].map((sc) => (
-                        <option key={sc.id} value={sc.id}>
-                          {sc.label}
-                        </option>
-                      ))}
-                    </select>
-                  </>
-                )}
 
                 <div className={styles.classDesc}>
                   <span style={{ color: 'var(--t-mid)' }}>
