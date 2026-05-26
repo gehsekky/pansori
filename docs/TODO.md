@@ -65,14 +65,14 @@ Grounded in a code survey + the full backend suite: **1572 tests across
 
 ### Content counts (the breadth that remains)
 
-| Category | In pansori | SRD universe |
-|---|---|---|
-| Spells | **186** (26 cantrips + 160 leveled, through L9) | ~330 |
-| Shared SRD monster pool | **12** (`SRD_MONSTERS`) + per-campaign templates | hundreds |
-| Species | 9 | 9 standalone + Drow lineage |
-| Classes | 12 | 12 |
-| Subclasses | 12 iconic (1 / class) | 1 iconic / class in SRD |
-| Origin feats / epic boons | 6 / 7 | 4 (+Magic Initiate variants) / 7 |
+| Category                  | In pansori                                       | SRD universe                     |
+| ------------------------- | ------------------------------------------------ | -------------------------------- |
+| Spells                    | **186** (26 cantrips + 160 leveled, through L9)  | ~330                             |
+| Shared SRD monster pool   | **12** (`SRD_MONSTERS`) + per-campaign templates | hundreds                         |
+| Species                   | 9                                                | 9 standalone + Drow lineage      |
+| Classes                   | 12                                               | 12                               |
+| Subclasses                | 12 iconic (1 / class)                            | 1 iconic / class in SRD          |
+| Origin feats / epic boons | 6 / 7                                            | 4 (+Magic Initiate variants) / 7 |
 
 **Bottom line:** the rules-engine frameworks and the entire class/subclass
 progression are done. What remains is overwhelmingly **content breadth**
@@ -88,75 +88,73 @@ backend features are waiting on, and a handful of **bounded subsystems**.
 - [ ] **Spells** — ~186 / ~330 SRD. Most remaining categories are already
       representable (data entry).
   - [~] **Forced displacement** — shipped (RE-4): the `pushFt` spell flag +
-        `pushEntityAway` (pushes a creature directly away from the caster up to
-        the distance, pathed via `planEnemyApproach` toward the away-edge so it
-        stops at grid edges / blockers), wired into the AoE save path after
-        damage on a failed save. **Thunderwave** (now a proper 15-ft cube: 2d8
-        thunder + push 10 ft) and **Gust of Wind** (60-ft line, STR save, push
-        15 ft, no damage) ride it. Deferred: Gust's per-turn re-push for
-        creatures ending their turn in the line + its toward-caster movement
-        tax (on-cast push only; concentration flag is honored).
-  - [~] **Persistent damage zones** — foundation shipped (RE-4): `GameState.spell_zones`
-        + `SpellZone`, the `persistentZone` spell flag, cast-time `runZoneSpell`
-        (stamp + concentration link + tick-on-cast), the round-wrap tick
-        (`fireSpellZones` → `applyZoneTick`, save-for-half or auto), and
-        concentration cleanup. **Moonbeam** + **Flaming Sphere** ship on it.
-        **Spirit Guardians** rides this as a caster-following aura
-        (`followsCaster` — footprint recomputed from the caster's cell each
-        tick); **Call Lightning** (DEX-save bolt) and **Spike Growth** (the
-        first no-save zone) ship as placed zones. Placed zones are
-        **repositionable** via the `move_zone` action (`zoneMoveFt` +
-        `zoneMoveCost`): Flaming Sphere rolls 30 ft as a Bonus Action, Moonbeam
-        (60 ft) and Call Lightning (120 ft) re-aim as a Magic action; the move
-        recomputes the footprint and ticks at the new spot. Remaining: Spike
-        Growth's per-5-ft-moved damage + difficult terrain are approximated as
-        a flat per-round tick.
-  - [~] **Recurring spell attacks** — shipped (RE-4): `Character.recurring_attack`
-        + the `recurring_spell_attack` action, `resolveRecurringAttack` (spell
-        attack vs AC → damage + optional heal), cast-time setup
-        (`runRecurringAttackSpell`), round-wrap expiry + concentration cleanup.
-        **Spiritual Weapon** (Bonus-Action force attack, +spellcasting mod, no
-        concentration) and **Vampiric Touch** (Magic-action necrotic that heals
-        half, concentration) ride it.
+    `pushEntityAway` (pushes a creature directly away from the caster up to
+    the distance, pathed via `planEnemyApproach` toward the away-edge so it
+    stops at grid edges / blockers), wired into the AoE save path after
+    damage on a failed save. **Thunderwave** (now a proper 15-ft cube: 2d8
+    thunder + push 10 ft) and **Gust of Wind** (60-ft line, STR save, push
+    15 ft, no damage) ride it. Deferred: Gust's per-turn re-push for
+    creatures ending their turn in the line + its toward-caster movement
+    tax (on-cast push only; concentration flag is honored).
+  - [~] **Persistent damage zones** — foundation shipped (RE-4): `GameState.spell_zones` + `SpellZone`, the `persistentZone` spell flag, cast-time `runZoneSpell`
+    (stamp + concentration link + tick-on-cast), the round-wrap tick
+    (`fireSpellZones` → `applyZoneTick`, save-for-half or auto), and
+    concentration cleanup. **Moonbeam** + **Flaming Sphere** ship on it.
+    **Spirit Guardians** rides this as a caster-following aura
+    (`followsCaster` — footprint recomputed from the caster's cell each
+    tick); **Call Lightning** (DEX-save bolt) and **Spike Growth** (the
+    first no-save zone) ship as placed zones. Placed zones are
+    **repositionable** via the `move_zone` action (`zoneMoveFt` +
+    `zoneMoveCost`): Flaming Sphere rolls 30 ft as a Bonus Action, Moonbeam
+    (60 ft) and Call Lightning (120 ft) re-aim as a Magic action; the move
+    recomputes the footprint and ticks at the new spot. Remaining: Spike
+    Growth's per-5-ft-moved damage + difficult terrain are approximated as
+    a flat per-round tick.
+  - [~] **Recurring spell attacks** — shipped (RE-4): `Character.recurring_attack` + the `recurring_spell_attack` action, `resolveRecurringAttack` (spell
+    attack vs AC → damage + optional heal), cast-time setup
+    (`runRecurringAttackSpell`), round-wrap expiry + concentration cleanup.
+    **Spiritual Weapon** (Bonus-Action force attack, +spellcasting mod, no
+    concentration) and **Vampiric Touch** (Magic-action necrotic that heals
+    half, concentration) ride it.
   - [~] **Enchantment control** — shipped (RE-4): the `commanded` + `confused`
-        conditions, an enemy-turn skip/behavior block, and an opt-in
-        **AoE-condition-to-all** cast path (`aoeCondition` → `runAoeConditionSpell`,
-        applies a condition to every failed-save hostile in the blast +
-        stamps the save DC on the concentration link). **Command** (L1, WIS
-        save → "Halt": lose your next turn, one-shot) and **Confusion** (L4,
-        10-ft sphere, WIS save → `confused`; each turn the creature re-saves,
-        then 1d10: 1-6 waste the turn, 7-8 attack a random creature in reach —
-        ally, summon, OR a nearby PC (RAW; PC hits route through `applyDamage`
-        so they trigger the victim's concentration save / knockout), 9-10 act
-        normally) ride it. Confusion's re-save is RAW-faithful: a creature
-        stays confused for at least its first full turn (`CombatEntity.confused_acted`
-        gates the end-of-turn save, evaluated at the start of each subsequent
-        turn). **Compulsion** (L4, 30-ft sphere, WIS save → `compelled`: each
-        turn the creature staggers its full movement away from the caster — no
-        action — then re-saves) and **Dominate Beast/Person/Monster** (L4/L5/L8,
-        WIS save rolled with Advantage via `Spell.saveAdvantage` → `dominated`:
-        on its turn the creature attacks the nearest OTHER enemy, fighting for
-        the party; taking damage triggers an on-damage re-save via
-        `dominatedDamageReSave`, hooked into the spell/AoE/weapon damage paths)
-        round out the family. The four control conditions
-        (`commanded`/`confused`/`compelled`/`dominated`) all resolve in the
-        enemy turn loop's behavior block and clear via breakConcentration; the
-        forced-move + dominated-attack paths reuse `planEnemyApproach` /
-        `resolveEnemyAttack` / `applyDamageToEntity`. Simplifications: Command's
-        upcast (+1 target/slot) and command words collapse to "Halt"; Confusion's
-        fixed radius (no upcast widening); Compulsion's direction is fixed
-        to "away from caster" and auto-applies (no per-turn Bonus Action);
-        Dominate defers only the manual command surface (auto-pilots the
-        creature) and a dominated foe still counts as an enemy for room-clear.
-        The Dominate on-damage re-save uses the caster's stamped spell save DC
-        (`save_dc` recorded on the concentration link by both the AoE-condition
-        and single-target save cast paths) and fires on party spell / AoE /
-        weapon damage AND on Confusion friendly fire; only enemy-caster AoE
-        onto a dominated creature is still un-hooked. Note: older AoE-condition
-        spells (Hypnotic Pattern, Web) still condition only the primary target
-        until migrated onto `aoeCondition`.
-      Exceptions still needing a model first: the alternate "summon" spells,
-      each mechanically distinct from the stat-block ally model —
+    conditions, an enemy-turn skip/behavior block, and an opt-in
+    **AoE-condition-to-all** cast path (`aoeCondition` → `runAoeConditionSpell`,
+    applies a condition to every failed-save hostile in the blast +
+    stamps the save DC on the concentration link). **Command** (L1, WIS
+    save → "Halt": lose your next turn, one-shot) and **Confusion** (L4,
+    10-ft sphere, WIS save → `confused`; each turn the creature re-saves,
+    then 1d10: 1-6 waste the turn, 7-8 attack a random creature in reach —
+    ally, summon, OR a nearby PC (RAW; PC hits route through `applyDamage`
+    so they trigger the victim's concentration save / knockout), 9-10 act
+    normally) ride it. Confusion's re-save is RAW-faithful: a creature
+    stays confused for at least its first full turn (`CombatEntity.confused_acted`
+    gates the end-of-turn save, evaluated at the start of each subsequent
+    turn). **Compulsion** (L4, 30-ft sphere, WIS save → `compelled`: each
+    turn the creature staggers its full movement away from the caster — no
+    action — then re-saves) and **Dominate Beast/Person/Monster** (L4/L5/L8,
+    WIS save rolled with Advantage via `Spell.saveAdvantage` → `dominated`:
+    on its turn the creature attacks the nearest OTHER enemy, fighting for
+    the party; taking damage triggers an on-damage re-save via
+    `dominatedDamageReSave`, hooked into the spell/AoE/weapon damage paths)
+    round out the family. The four control conditions
+    (`commanded`/`confused`/`compelled`/`dominated`) all resolve in the
+    enemy turn loop's behavior block and clear via breakConcentration; the
+    forced-move + dominated-attack paths reuse `planEnemyApproach` /
+    `resolveEnemyAttack` / `applyDamageToEntity`. Simplifications: Command's
+    upcast (+1 target/slot) and command words collapse to "Halt"; Confusion's
+    fixed radius (no upcast widening); Compulsion's direction is fixed
+    to "away from caster" and auto-applies (no per-turn Bonus Action);
+    Dominate defers only the manual command surface (auto-pilots the
+    creature) and a dominated foe still counts as an enemy for room-clear.
+    The Dominate on-damage re-save uses the caster's stamped spell save DC
+    (`save_dc` recorded on the concentration link by both the AoE-condition
+    and single-target save cast paths) and fires on party spell / AoE /
+    weapon damage AND on Confusion friendly fire; only enemy-caster AoE
+    onto a dominated creature is still un-hooked. Note: older AoE-condition
+    spells (Hypnotic Pattern, Web) still condition only the primary target
+    until migrated onto `aoeCondition`.
+    Exceptions still needing a model first: the alternate "summon" spells,
+    each mechanically distinct from the stat-block ally model —
   - [ ] **Conjure Animals** (L3) + other 2024 conjure spells — a
         concentration _damage zone_ (DEX save, scaling dice); closer to a
         moving AoE/hazard than a summoned creature.
@@ -289,8 +287,7 @@ backend features are waiting on, and a handful of **bounded subsystems**.
 
 ## Content & playtest
 
-- [ ] **Wire boss legendary + lair actions to an actual boss** — scaffolding
-      + tests exist; unwired pending a fitting boss (fourth-campaign showcase
+- [ ] **Wire boss legendary + lair actions to an actual boss** — scaffolding + tests exist; unwired pending a fitting boss (fourth-campaign showcase
       or post Crypt Lord re-balance). More effect kinds (terrain shift,
       debuff aura, summon, multi-attack legendary) as content demands.
 - [ ] **Party line-of-sight indicators on the grid** — Bresenham LoS that
@@ -364,8 +361,9 @@ backend features are waiting on, and a handful of **bounded subsystems**.
 
 > Code-survey pass (WCAG 2.1 AA). Already strong: focus-visible outlines,
 > aria-labels on icon buttons, tablist semantics + arrow-key nav, focus-trap
-> + Esc-close dialogs, aria-live combat narrative, real `<button>` party
-> tiles. Gaps below; manual SR + keyboard-only validation is the next step.
+>
+> - Esc-close dialogs, aria-live combat narrative, real `<button>` party
+>   tiles. Gaps below; manual SR + keyboard-only validation is the next step.
 
 - [ ] **fieldset/legend on grouped form controls** — CharScreen's `PORTRAIT`
       / `ABILITY SCORES` group descriptors use plain `<label>`; the right
