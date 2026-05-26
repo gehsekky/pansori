@@ -219,6 +219,10 @@ export function runSaveSpell(
           spellId: spell.id,
           condition: condToApply,
           rounds_left: concentrationRoundsFor(spell),
+          // Stamp the DC so effects that re-roll a save away from the cast
+          // site read the caster's real spell save DC (Dominate's on-damage
+          // re-save), not the fallback.
+          save_dc: dc,
         };
       }
     }

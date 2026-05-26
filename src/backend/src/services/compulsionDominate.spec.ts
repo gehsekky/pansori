@@ -249,6 +249,10 @@ describe('Dominate — cast + control', () => {
     });
     expect(r.newState.entities?.find((e) => e.id === E0)?.conditions).toContain('dominated');
     expect(r.newState.characters[0].concentrating_on?.condition).toBe('dominated');
+    // The real cast must stamp the caster's actual spell save DC on the
+    // concentration link — otherwise the on-damage re-save falls back to a
+    // hardcoded DC. Level-9 Wizard, INT 18 → 8 + prof(4) + mod(4) = 16.
+    expect(r.newState.characters[0].concentrating_on?.save_dc).toBe(16);
   });
 
   it('a successful save (Advantage) leaves the target free', async () => {

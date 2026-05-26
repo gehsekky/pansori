@@ -6988,7 +6988,7 @@ export async function runEnemyTurns(args: {
                     narrative += `\n\n[${rm.name} is confused and swings wildly at ${pcVictim.name} — miss.]`;
                   }
                 } else {
-                  // Attack another combatant entity (enemy ally or summon).
+                  // Attack another combatant entity (enemy, or a party ally / summon).
                   const victimStats = getEnemyById(args.seed, victim.id);
                   const victimAc = victimStats?.ac ?? victim.ac ?? 10;
                   const victimName = victimStats?.name ?? victim.companionName ?? 'a creature';
@@ -7000,9 +7000,26 @@ export async function runEnemyTurns(args: {
                     st = applyDamageToEntity(st, victim.id, res.damage);
                     narrative += `\n\n[${rm.name} is confused and turns on ${victimName} — ${res.damage} damage!]`;
                     if ((st.entities?.find((e) => e.id === victim.id)?.hp ?? 0) <= 0) {
-                      st.enemies_killed = [...st.enemies_killed, victim.id];
                       narrative += ` ${victimName} is slain!`;
-                      if (isRoomCleared(st, args.seed, st.current_room)) st = endCombatState(st);
+                      // Only enemies count as defeated foes (XP / room-clear) — a
+                      // slain party ally or summon must not be logged as a kill.
+                      if (victim.isEnemy) {
+                        st.enemies_killed = [...st.enemies_killed, victim.id];
+                        if (isRoomCleared(st, args.seed, st.current_room)) st = endCombatState(st);
+                      }
+                    } else if (victim.isEnemy) {
+                      // SRD Dominate — a dominated enemy caught by friendly fire
+                      // takes damage and so repeats its save to break free.
+                      const drCtx = {
+                        st,
+                        seed: args.seed,
+                        context: args.context,
+                        narrative: '',
+                        actor: { kind: 'enemy' as const },
+                      };
+                      dominatedDamageReSave(drCtx, victim.id, victimName);
+                      st = drCtx.st;
+                      narrative += drCtx.narrative;
                     }
                   } else {
                     narrative += `\n\n[${rm.name} is confused and swings wildly at ${victimName} — miss.]`;

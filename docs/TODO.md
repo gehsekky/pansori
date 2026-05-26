@@ -139,10 +139,13 @@ backend features are waiting on, and a handful of **bounded subsystems**.
         to "away from caster" and auto-applies (no per-turn Bonus Action);
         Dominate defers only the manual command surface (auto-pilots the
         creature) and a dominated foe still counts as an enemy for room-clear.
-        The Dominate on-damage re-save fires on party spell / AoE / weapon
-        damage; enemy-on-enemy (friendly-fire) damage to a dominated creature
-        doesn't trigger it. Note: older AoE-condition spells (Hypnotic Pattern,
-        Web) still condition only the primary target until migrated onto `aoeCondition`.
+        The Dominate on-damage re-save uses the caster's stamped spell save DC
+        (`save_dc` recorded on the concentration link by both the AoE-condition
+        and single-target save cast paths) and fires on party spell / AoE /
+        weapon damage AND on Confusion friendly fire; only enemy-caster AoE
+        onto a dominated creature is still un-hooked. Note: older AoE-condition
+        spells (Hypnotic Pattern, Web) still condition only the primary target
+        until migrated onto `aoeCondition`.
       Exceptions still needing a model first: the alternate "summon" spells,
       each mechanically distinct from the stat-block ally model —
   - [ ] **Conjure Animals** (L3) + other 2024 conjure spells — a
