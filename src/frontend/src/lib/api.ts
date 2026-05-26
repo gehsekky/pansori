@@ -80,6 +80,9 @@ export type CharacterInput = {
   // 2024 PHB Species (formerly "race"). Optional — engine defaults to
   // Human when omitted.
   species?: string;
+  // 2024 background ability-score increase. Omitted = +1 to all three of the
+  // background's listed abilities; supplied = +2 to `plus2` and +1 to `plus1`.
+  ability_bonus?: { plus2: string; plus1: string };
   // Origin-feat choices that need player input at character creation.
   // Today only Magic Initiate variants populate this — the player picks
   // 2 cantrips + 1 L1 spell. BE validates the shape AND that each picked
@@ -109,6 +112,8 @@ export interface BackendContextSummary {
     feature: string;
     featureDesc: string;
     originFeat: string | null;
+    // The three abilities this background can boost (for the +2/+1 split UI).
+    abilityScoreIncreases: string[];
   }>;
   featTable: Record<
     string,

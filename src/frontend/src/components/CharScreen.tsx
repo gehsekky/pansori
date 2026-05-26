@@ -154,6 +154,10 @@ interface CharDraft {
     cantripChoices?: string[];
     l1Choice?: string;
   };
+  // 2024 background ability-score increase. Undefined = +1 to all three of the
+  // background's listed abilities; set = +2 to `plus2` and +1 to `plus1`.
+  // Cleared on background change (the eligible abilities differ).
+  abilityBonus?: { plus2: keyof StatBlock; plus1: keyof StatBlock };
 }
 
 // Per-context localStorage key for the saved party draft. We key on the
@@ -466,6 +470,7 @@ function CharScreen({
           portrait_url: d.portrait ?? undefined,
           species: d.speciesId || undefined,
           feat_choices: d.featChoices,
+          ability_bonus: d.abilityBonus,
         })),
         contextId
       );
@@ -674,12 +679,13 @@ function CharScreen({
                       style={{ cursor: 'pointer' }}
                       value={draft.backgroundId}
                       onChange={(e) =>
-                        // Clear feat picks on background swap — the next
-                        // background's origin feat may not need them, or
-                        // may need a different spell list.
+                        // Clear feat picks + the ability-bonus split on background
+                        // swap — the next background's origin feat may not need
+                        // picks, and its eligible abilities differ.
                         updateDraft(idx, {
                           backgroundId: e.target.value,
                           featChoices: undefined,
+                          abilityBonus: undefined,
                         })
                       }
                     >
@@ -747,6 +753,139 @@ function CharScreen({
                             ? `✓ ${inputs.featName} — ${cantripsPicked} cantrips + ${l1Picked ? '1' : '0'} L1 chosen (click to change)`
                             : `⚠ ${inputs.featName} — pick ${inputs.cantripCount} cantrips${inputs.l1Count > 0 ? ' + 1 L1 spell' : ''}`}
                         </button>
+                      );
+                    })()}
+                    {/* 2024 background ability-score increase: +1 to all three
+                        listed abilities, or a +2/+1 split across two of them.
+                        Eligible abilities come from the BE context summary. */}
+                    {(() => {
+                      const beBg = beContexts[contextId]?.backgrounds.find(
+                        (b) => b.id === draft.backgroundId
+                      );
+                      const eligible = (beBg?.abilityScoreIncreases ?? []) as (keyof StatBlock)[];
+                      if (eligible.length < 2) return null;
+                      const split = draft.abilityBonus;
+                      const usingSplit = !!split;
+                      const toggleStyle = (active: boolean) => ({
+                        fontSize: '0.7rem',
+                        padding: '0.25rem 0.6rem',
+                        letterSpacing: '0.08em',
+                        background: active ? 'var(--t-separator)' : 'transparent',
+                        border: `1px solid ${active ? 'var(--t-primary)' : 'var(--t-border)'}`,
+                        color: active ? 'var(--t-primary)' : 'var(--t-dim)',
+                        cursor: 'pointer',
+                        fontFamily: 'inherit',
+                      });
+                      const selStyle = {
+                        fontFamily: 'inherit',
+                        fontSize: '0.8rem',
+                        padding: '0.2rem 0.4rem',
+                        background: 'var(--t-card)',
+                        border: '1px solid var(--t-border)',
+                        color: 'var(--t-primary)',
+                        cursor: 'pointer',
+                      };
+                      return (
+                        <div style={{ marginTop: 10 }}>
+                          <label className={styles.formLbl}>ABILITY BONUS (background)</label>
+                          <div
+                            style={{
+                              display: 'flex',
+                              gap: 6,
+                              margin: '4px 0 6px',
+                              flexWrap: 'wrap',
+                            }}
+                          >
+                            <button
+                              type="button"
+                              data-testid={`ability-bonus-spread-${idx}`}
+                              onClick={() => updateDraft(idx, { abilityBonus: undefined })}
+                              style={toggleStyle(!usingSplit)}
+                            >
+                              +1 TO ALL THREE
+                            </button>
+                            <button
+                              type="button"
+                              data-testid={`ability-bonus-split-${idx}`}
+                              onClick={() =>
+                                updateDraft(idx, {
+                                  abilityBonus: { plus2: eligible[0], plus1: eligible[1] },
+                                })
+                              }
+                              style={toggleStyle(usingSplit)}
+                            >
+                              +2 / +1
+                            </button>
+                          </div>
+                          {usingSplit && split ? (
+                            <div
+                              style={{
+                                display: 'flex',
+                                gap: 10,
+                                alignItems: 'center',
+                                flexWrap: 'wrap',
+                                fontSize: '0.75rem',
+                                color: 'var(--t-dim)',
+                              }}
+                            >
+                              <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                +2
+                                <select
+                                  style={selStyle}
+                                  value={split.plus2}
+                                  onChange={(e) => {
+                                    const p2 = e.target.value as keyof StatBlock;
+                                    const p1 =
+                                      split.plus1 === p2
+                                        ? (eligible.find((a) => a !== p2) ?? split.plus1)
+                                        : split.plus1;
+                                    updateDraft(idx, { abilityBonus: { plus2: p2, plus1: p1 } });
+                                  }}
+                                >
+                                  {eligible.map((a) => (
+                                    <option key={a} value={a}>
+                                      {STAT_LABEL[a]}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                              <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                +1
+                                <select
+                                  style={selStyle}
+                                  value={split.plus1}
+                                  onChange={(e) =>
+                                    updateDraft(idx, {
+                                      abilityBonus: {
+                                        plus2: split.plus2,
+                                        plus1: e.target.value as keyof StatBlock,
+                                      },
+                                    })
+                                  }
+                                >
+                                  {eligible
+                                    .filter((a) => a !== split.plus2)
+                                    .map((a) => (
+                                      <option key={a} value={a}>
+                                        {STAT_LABEL[a]}
+                                      </option>
+                                    ))}
+                                </select>
+                              </label>
+                            </div>
+                          ) : (
+                            <p
+                              style={{
+                                fontSize: '0.75rem',
+                                color: 'var(--t-mid)',
+                                margin: 0,
+                                letterSpacing: '0.05em',
+                              }}
+                            >
+                              {eligible.map((a) => `${STAT_LABEL[a]} +1`).join(' · ')}
+                            </p>
+                          )}
+                        </div>
                       );
                     })()}
                   </>

@@ -52,11 +52,35 @@ describe('isValidForMethod', () => {
 });
 
 describe('applyAbilityScoreIncreases (background ASI)', () => {
+  const base = scores(10, 10, 10, 10, 10, 10);
+  const listed = ['str', 'dex', 'con'];
+
   it('adds +1 to each listed ability (case-insensitive), ignoring unknowns', () => {
-    const out = applyAbilityScoreIncreases(scores(10, 10, 10, 10, 10, 10), ['str', 'DEX', 'con']);
-    expect(out).toEqual(scores(11, 11, 11, 10, 10, 10));
-    expect(applyAbilityScoreIncreases(scores(10, 10, 10, 10, 10, 10), ['bogus'])).toEqual(
-      scores(10, 10, 10, 10, 10, 10)
+    expect(applyAbilityScoreIncreases(base, ['str', 'DEX', 'con'])).toEqual(
+      scores(11, 11, 11, 10, 10, 10)
+    );
+    expect(applyAbilityScoreIncreases(base, ['bogus'])).toEqual(base);
+  });
+
+  it('applies the +2/+1 split across two listed abilities', () => {
+    expect(applyAbilityScoreIncreases(base, listed, { plus2: 'str', plus1: 'con' })).toEqual(
+      scores(12, 10, 11, 10, 10, 10)
+    );
+    // Case-insensitive on the split too.
+    expect(applyAbilityScoreIncreases(base, listed, { plus2: 'DEX', plus1: 'STR' })).toEqual(
+      scores(11, 12, 10, 10, 10, 10)
+    );
+  });
+
+  it('falls back to +1-to-all for an invalid split', () => {
+    const plus1All = scores(11, 11, 11, 10, 10, 10);
+    // Same ability for +2 and +1.
+    expect(applyAbilityScoreIncreases(base, listed, { plus2: 'str', plus1: 'str' })).toEqual(
+      plus1All
+    );
+    // An ability the background doesn't offer.
+    expect(applyAbilityScoreIncreases(base, listed, { plus2: 'str', plus1: 'cha' })).toEqual(
+      plus1All
     );
   });
 });
