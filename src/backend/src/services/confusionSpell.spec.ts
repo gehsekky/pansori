@@ -41,6 +41,10 @@ function makeConfusedState(opts: {
   confusedIds?: string[];
   saveDc?: number; // stamped on the caster's concentration for the per-turn re-save
   withConcentration?: boolean;
+  // Mark confused creatures as having already taken a confused turn, so the
+  // end-of-turn re-save fires at the start of THIS turn (RAW: a creature is
+  // confused for its first full turn before its first re-save).
+  acted?: boolean;
 }): GameState {
   const wiz = makeChar({
     id: 'pc-1',
@@ -91,6 +95,7 @@ function makeConfusedState(opts: {
         maxHp: 120,
         conditions: opts.confusedIds?.includes(E0) ? ['confused'] : [],
         condition_durations: {},
+        ...(opts.confusedIds?.includes(E0) && opts.acted ? { confused_acted: true } : {}),
       },
       {
         id: E1,
@@ -100,6 +105,7 @@ function makeConfusedState(opts: {
         maxHp: 50,
         conditions: opts.confusedIds?.includes(E1) ? ['confused'] : [],
         condition_durations: {},
+        ...(opts.confusedIds?.includes(E1) && opts.acted ? { confused_acted: true } : {}),
       },
     ],
   };
@@ -180,7 +186,7 @@ describe('Confusion — per-turn behavior', () => {
     expect(r.newState.entities?.find((e) => e.id === E1)?.hp).toBeLessThan(50); // ally took the hit
   });
 
-  it('a confused creature that succeeds on its re-save shakes off the effect', async () => {
+  it('a confused creature that has already acted shakes off on a successful re-save', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.9); // high re-save roll vs DC 1 -> succeeds
     const r = await takeAction({
       action: { type: 'end_turn' },
@@ -190,12 +196,37 @@ describe('Confusion — per-turn behavior', () => {
         confusedIds: [E0],
         withConcentration: true,
         saveDc: 1, // re-save always succeeds -> recovers
+        acted: true, // already spent a confused turn -> the re-save fires now
       }),
       seed,
       context: ctx,
     });
     expect(r.narrative).toMatch(/shakes off the confusion/i);
     expect(r.newState.entities?.find((e) => e.id === E0)?.conditions).not.toContain('confused');
+  });
+
+  it('RAW: no re-save on the first confused turn — the creature stays confused that turn', async () => {
+    // An impossible-to-fail re-save DC (1) would free the creature instantly
+    // if a re-save were rolled; because this is its FIRST confused turn, the
+    // re-save is skipped and it acts confused (and is flagged for next turn).
+    vi.spyOn(Math, 'random').mockReturnValue(0.1); // d10 -> 2 (waste)
+    const r = await takeAction({
+      action: { type: 'end_turn' },
+      history: [],
+      state: makeConfusedState({
+        initiativeEnemyIds: [E0],
+        confusedIds: [E0],
+        withConcentration: true,
+        saveDc: 1, // trivially-passable, but no re-save happens this turn
+        // acted: false (default) -> first confused turn
+      }),
+      seed,
+      context: ctx,
+    });
+    expect(r.narrative).not.toMatch(/shakes off/i);
+    const e0 = r.newState.entities?.find((e) => e.id === E0);
+    expect(e0?.conditions).toContain('confused'); // still confused after its first turn
+    expect(e0?.confused_acted).toBe(true); // flagged so next turn re-saves
   });
 });
 
