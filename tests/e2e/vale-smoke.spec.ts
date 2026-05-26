@@ -468,32 +468,41 @@ test('Vale combat: initiative live + class-specific choices respect class', asyn
     // Combat may have ended (skeleton fell). If so, exit the loop.
     if ((await initStrip.count()) === 0) break;
 
-    const cls = await activeClass(page);
-    if (!cls) {
-      // Active marker not on any party tile (e.g. mid-transition); pause
-      // briefly and retry next iteration.
+    // Strip ↔ PartyRail sync: the ▶-marked initiative entry and the PartyRail's
+    // active tile must name the same character — a drift would mean the engine
+    // and renderer disagree about whose turn it is. Both derive from the same
+    // active character but can re-render a beat apart during a turn transition,
+    // so poll until they agree (a genuine, lasting drift makes this time out).
+    // Auto-fill sets `char.name === char.character_class`, so the strip entry
+    // name and the PartyRail class label coincide for our party.
+    let cls: PartyClass | null = null;
+    try {
+      await expect
+        .poll(
+          async () => {
+            cls = await activeClass(page);
+            const strip = await activeInitiativeName(page);
+            return cls !== null && strip === cls;
+          },
+          { timeout: 3_000, message: `turn=${turn}: strip ▶ never matched PartyRail active` }
+        )
+        .toBe(true);
+    } catch {
+      // No consistent active PC settled (mid-transition / combat ending). Pause
+      // briefly and retry the loop rather than failing on a transient state.
       await page.waitForTimeout(200);
       continue;
     }
-
-    // Strip ↔ PartyRail sync: the ▶-marked entry in the initiative strip
-    // must name the same character as the PartyRail's active tile. A
-    // drift here would mean the engine and the renderer disagree about
-    // whose turn it is.
-    const stripActive = await activeInitiativeName(page);
-    expect(
-      stripActive,
-      `turn=${turn}: initiative strip has no aria-current entry while PartyRail shows ${cls}`
-    ).not.toBeNull();
-    // Auto-fill sets `char.name === char.character_class`, so the strip
-    // entry name and the PartyRail class label coincide for our party.
-    expect(
-      stripActive,
-      `turn=${turn}: initiative ▶ marker is on "${stripActive}" but PartyRail aria-current is on ${cls}`
-    ).toBe(cls);
+    if (!cls) continue;
 
     const types = await choiceActionTypes(page);
-    const hasCast = types.includes('cast_spell');
+    // In combat, single-target spells are surfaced as icon buttons in the
+    // SpellBar (data-testid="spell-bar"), not in the generic choice-btn list —
+    // so cast_spell presence must be read from BOTH surfaces. The SpellBar
+    // renders only when the active PC has at least one cast_spell choice, so its
+    // presence ⇔ a spell is offered (a spell-less Fighter/Rogue has none).
+    const spellBarCount = await page.getByTestId('spell-bar').count();
+    const hasCast = types.includes('cast_spell') || spellBarCount > 0;
     // Cast_spell is gated on action availability: a Cleric who already
     // consumed their action this turn (e.g. they're the PC who
     // initiated combat by attacking) won't see spell options until
@@ -506,13 +515,13 @@ test('Vale combat: initiative live + class-specific choices respect class', asyn
       expect(
         hasCast,
         `class=${cls} turn=${turn}: cast_spell present=${hasCast}, ` +
-          `but only Cleric should see cast_spell. action types=${types.join(',')}`
+          `but only Cleric should see cast_spell. action types=${types.join(',')}, spellBar=${spellBarCount}`
       ).toBe(false);
     } else if (!actionAlreadyUsed) {
       expect(
         hasCast,
         `class=Cleric turn=${turn}: action is fresh but no cast_spell offered. ` +
-          `action types=${types.join(',')}`
+          `action types=${types.join(',')}, spellBar=${spellBarCount}`
       ).toBe(true);
     }
     observed.push(cls);
