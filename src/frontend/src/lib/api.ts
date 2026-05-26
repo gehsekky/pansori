@@ -86,6 +86,9 @@ export type CharacterInput = {
   // 2024 class skill proficiencies — the player's chosen "N from the class
   // list". Omitted/invalid = the curated default. Re-validated server-side.
   class_skills?: string[];
+  // 2024 starting-equipment package id ('A' / 'B' / 'C'). Omitted = the default
+  // package. Re-validated server-side.
+  starting_equipment?: string;
   // Origin-feat choices that need player input at character creation.
   // Today only Magic Initiate variants populate this — the player picks
   // 2 cantrips + 1 L1 spell. BE validates the shape AND that each picked
@@ -109,6 +112,12 @@ export interface BackendContextSummary {
   // Per-class "choose N from options" skill proficiencies + the curated
   // default selection, for the creation-screen skill picker.
   classSkillChoices: Record<string, { count: number; options: string[]; default: string[] }>;
+  // Per-class starting-equipment packages (item display names + GP) for the
+  // creation-screen picker.
+  classStartingEquipment: Record<
+    string,
+    Array<{ id: string; label: string; gold: number; items: string[] }>
+  >;
   backgrounds: Array<{
     id: string;
     name: string;

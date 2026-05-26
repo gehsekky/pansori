@@ -6,6 +6,7 @@ import {
   SRD_CLASS_SAVING_THROWS,
   SRD_CLASS_SKILLS,
   SRD_CLASS_SKILL_CHOICES,
+  SRD_CLASS_STARTING_EQUIPMENT,
   SRD_CLASS_WEAPON_PROFICIENCIES,
   SRD_FEATS,
   SRD_MONSTERS,
@@ -53,6 +54,7 @@ export const context: Context = {
   classFeatures: { ...SRD_CLASS_FEATURES },
 
   // Per-class starting gear — auto-equipped at session start
+  classStartingEquipment: { ...SRD_CLASS_STARTING_EQUIPMENT },
   classStartingLoot: {
     Fighter: ['longsword', 'chain_mail', 'shield'],
     Rogue: ['shortsword', 'dagger', 'leather_armor'],

@@ -61,6 +61,9 @@ const CharacterInputSchema = z
     // list". Re-validated server-side against the class's options; an invalid
     // or omitted list falls back to the curated default.
     class_skills: z.array(z.string().min(1).max(40)).max(18).optional(),
+    // 2024 starting-equipment package id ('A' / 'B' / 'C'). The server resolves
+    // it to items + GP; an invalid/omitted id falls back to the default package.
+    starting_equipment: z.string().min(1).max(4).optional(),
     feat_choices: FeatChoicesSchema.optional(),
     // 2024 background ability-score increase. Omitted = +1 to all three of the
     // background's listed abilities; supplied = +2 to `plus2` and +1 to `plus1`
