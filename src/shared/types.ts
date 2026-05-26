@@ -331,6 +331,9 @@ export type StructuredAction =
   // (Rogues also get it as a Bonus Action via Cunning Action).
   | { type: 'hide' }
   | { type: 'grid_move'; entityId: string; to: GridPos }
+  // RE-4 — reposition a persistent damage zone (Flaming Sphere roll, Moonbeam /
+  // Call Lightning re-aim) onto a cell within the spell's move range.
+  | { type: 'move_zone'; zoneId: string; to: GridPos }
   | { type: 'jump'; to: GridPos } // SRD Long Jump — leap up to STR ft over terrain/obstacles
   | { type: 'travel'; locationId: string }
   | { type: 'enter_district'; districtId: string }
@@ -444,6 +447,7 @@ export type ChoiceDirection = 'N' | 'NE' | 'E' | 'SE' | 'S' | 'SW' | 'W' | 'NW';
 // default-action universals). New kinds can be added incrementally.
 export type ChoiceKind =
   | 'grid_move'
+  | 'move_zone'
   | 'dash'
   | 'disengage'
   | 'dodge'

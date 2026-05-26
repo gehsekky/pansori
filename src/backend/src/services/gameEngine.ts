@@ -4865,6 +4865,35 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     }
   }
 
+  // ── Reposition a placed damage zone (Flaming Sphere / Moonbeam / Call
+  // Lightning) onto an enemy within the spell's move range. Offered per zone
+  // the active PC owns, when the move's action-economy slot is free. (RE-4.)
+  if (state.combat_active && (state.spell_zones?.length ?? 0) > 0 && state.entities) {
+    for (const z of state.spell_zones ?? []) {
+      if (z.casterId !== char.id || z.followsCaster || !z.center) continue;
+      const zoneSpell = context.spellTable?.[z.spellId];
+      const moveFt = zoneSpell?.zoneMoveFt;
+      const moveCost = zoneSpell?.zoneMoveCost;
+      if (!moveFt || !moveCost) continue;
+      const slotFree =
+        moveCost === 'bonus_action'
+          ? !char.turn_actions.bonus_action_used
+          : !char.turn_actions.action_used;
+      if (!slotFree) continue;
+      const center = z.center;
+      for (const en of livingEnemies) {
+        if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+        const ent = state.entities.find((e) => e.id === en.id && e.isEnemy);
+        if (!ent || distanceFeet(center, ent.pos) > moveFt) continue;
+        choices.push({
+          label: `Move ${z.name} onto the ${en.name} (${moveCost === 'bonus_action' ? 'bonus action' : 'action'})`,
+          action: { type: 'move_zone', zoneId: z.id, to: ent.pos },
+          kind: 'move_zone',
+        });
+      }
+    }
+  }
+
   // Attune choices — out of combat, for unnattuned items that require attunement
   if (!state.combat_active) {
     const attuned = char.attuned_items ?? [];

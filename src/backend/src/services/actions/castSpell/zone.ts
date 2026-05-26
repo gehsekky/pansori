@@ -57,6 +57,8 @@ export function runZoneSpell(
     saveDC: dc,
     followsCaster: follows,
     radiusFt,
+    // Placed zones track their center for repositioning; follower auras don't.
+    center: follows ? undefined : center,
   };
   ctx.st = { ...ctx.st, spell_zones: [...(ctx.st.spell_zones ?? []), zone] };
   // Most zone spells are Concentration; the damage path doesn't stamp it, so

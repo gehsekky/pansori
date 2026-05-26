@@ -2716,8 +2716,9 @@ export const SRD_SPELLS: Record<string, Spell> = {
 
   // ─── Persistent damage zones (RE-4) ──────────────────────────────────
   // Stamp a SpellZone on cast that ticks each round wrap until concentration
-  // ends (see castSpell/zone.ts + fireSpellZones). Movement (RAW repositioning)
-  // is deferred — the zones are stationary for now.
+  // ends (see castSpell/zone.ts + fireSpellZones). Movable zones declare
+  // `zoneMoveFt` + `zoneMoveCost` and are repositioned via the `move_zone`
+  // action (see moveZone.ts); Spike Growth is stationary.
   // SRD: Moonbeam (L2) — a 5-ft-radius cylinder of searing moonlight. A creature
   // in it makes a CON save for half of 2d10 radiant, each round it remains.
   moonbeam: {
@@ -2726,6 +2727,8 @@ export const SRD_SPELLS: Record<string, Spell> = {
     level: 2,
     castTime: 'action',
     persistentZone: true,
+    zoneMoveFt: 60,
+    zoneMoveCost: 'action',
     concentration: true,
     durationRounds: 10,
     damage: '2d10',
@@ -2737,7 +2740,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     aoeShape: 'sphere',
     rangeKind: 'ranged',
     rangeFt: 120,
-    desc: 'A 5-ft-radius beam of moonlight (Concentration, up to 1 minute). A creature in the beam makes a CON save, taking 2d10 radiant on a failure or half on a success, again each round it remains (+1d10 per slot above 2nd). RAW the beam can be moved 60 ft on later turns — repositioning is deferred, so pansori’s beam is stationary.',
+    desc: 'A 5-ft-radius beam of moonlight (Concentration, up to 1 minute). A creature in the beam makes a CON save, taking 2d10 radiant on a failure or half on a success, again each round it remains (+1d10 per slot above 2nd). The beam can be repositioned up to 60 ft as a Magic action.',
     spellList: ['primal'],
   },
   // SRD: Flaming Sphere (L2) — a rolling ball of fire. Creatures within 5 ft of
@@ -2748,6 +2751,8 @@ export const SRD_SPELLS: Record<string, Spell> = {
     level: 2,
     castTime: 'action',
     persistentZone: true,
+    zoneMoveFt: 30,
+    zoneMoveCost: 'bonus_action',
     concentration: true,
     durationRounds: 10,
     damage: '2d6',
@@ -2759,19 +2764,21 @@ export const SRD_SPELLS: Record<string, Spell> = {
     aoeShape: 'sphere',
     rangeKind: 'ranged',
     rangeFt: 60,
-    desc: 'A 5-ft sphere of fire; creatures within 5 ft of it make a DEX save, taking 2d6 fire on a failure or half on a success, each round it persists (Concentration, up to 1 minute; +1d6 per slot above 2nd). RAW you can roll it 30 ft as a Bonus Action — movement is deferred, so the sphere is stationary.',
+    desc: 'A 5-ft sphere of fire; creatures within 5 ft of it make a DEX save, taking 2d6 fire on a failure or half on a success, each round it persists (Concentration, up to 1 minute; +1d6 per slot above 2nd). You can roll the sphere up to 30 ft as a Bonus Action.',
     spellList: ['primal', 'arcane'],
   },
   // SRD: Call Lightning (L3) — a storm cloud calls a bolt down at a point each
   // round (Concentration). Creatures at the strike point make a DEX save for
-  // half of 3d10 lightning. RAW you re-aim the bolt each turn — repositioning
-  // is deferred, so the bolt falls on the same point.
+  // half of 3d10 lightning. You re-aim the bolt to a new point as a Magic
+  // action (`move_zone`).
   call_lightning: {
     id: 'call_lightning',
     name: 'Call Lightning',
     level: 3,
     castTime: 'action',
     persistentZone: true,
+    zoneMoveFt: 120,
+    zoneMoveCost: 'action',
     concentration: true,
     durationRounds: 100,
     damage: '3d10',
@@ -2783,7 +2790,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     aoeShape: 'sphere',
     rangeKind: 'ranged',
     rangeFt: 120,
-    desc: 'A storm cloud calls a lightning bolt down at a point each round (Concentration, up to 10 minutes). A creature at the strike point makes a DEX save, taking 3d10 lightning on a failure or half on a success (+1d10 per slot above 3rd). RAW you re-aim the bolt each turn — repositioning is deferred, so it strikes the same point.',
+    desc: 'A storm cloud calls a lightning bolt down at a point each round (Concentration, up to 10 minutes). A creature at the strike point makes a DEX save, taking 3d10 lightning on a failure or half on a success (+1d10 per slot above 3rd). You can re-aim the bolt to a new point (up to 120 ft) as a Magic action.',
     spellList: ['primal'],
   },
   // SRD: Spike Growth (L2) — a 20-ft-radius field of spikes + Difficult Terrain
