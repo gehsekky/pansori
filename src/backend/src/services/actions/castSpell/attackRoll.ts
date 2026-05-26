@@ -121,5 +121,27 @@ export function runAttackRollSpell(
     atkNote,
     bonuses: agonizingBonus > 0 ? [{ label: `Agonizing Blast: +${agonizingBonus}` }] : undefined,
   });
+  // SRD attack-roll spells that also impose a condition on a hit (Ray of
+  // Sickness → Poisoned). No save — the hit lands it; honors the target's
+  // condition immunities. Stamped on the grid entity with its duration so the
+  // round-wrap enemy-condition tick expires it. (A no-op for every existing
+  // attack-roll spell — none carry a `condition`.)
+  if (spell.condition && !spellTarget.condition_immunities?.includes(spell.condition)) {
+    const cond = spell.condition;
+    const dur = spell.conditionDuration ?? 1;
+    ctx.st = {
+      ...ctx.st,
+      entities: (ctx.st.entities ?? []).map((e) =>
+        e.id === spellTarget.id && e.isEnemy
+          ? {
+              ...e,
+              conditions: [...e.conditions.filter((c) => c !== cond), cond],
+              condition_durations: { ...e.condition_durations, [cond]: dur },
+            }
+          : e
+      ),
+    };
+    ctx.narrative += ` ${fmt.note(`[${spellTarget.name} is ${cond}!]`)}`;
+  }
   return { done: false, spellDmg, spellHit: true };
 }

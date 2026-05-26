@@ -148,6 +148,7 @@ export const handleCastSpell: ActionHandler<{
         slotLevel: number;
         targetCharId?: string;
         restorationEffect?: string;
+        resistType?: string;
       },
       spell,
       slotLevel,

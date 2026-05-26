@@ -4731,7 +4731,19 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
                   { id: 'hp_max', label: 'Restore drained Hit Point maximum' },
                 ],
               }
-            : undefined;
+            : spellId === 'protection_from_energy'
+              ? {
+                  param: 'resistType',
+                  title: 'Protection from Energy — choose a damage type to resist',
+                  options: [
+                    { id: 'acid', label: 'Acid' },
+                    { id: 'cold', label: 'Cold' },
+                    { id: 'fire', label: 'Fire' },
+                    { id: 'lightning', label: 'Lightning' },
+                    { id: 'thunder', label: 'Thunder' },
+                  ],
+                }
+              : undefined;
 
       if (spell.level === 0) {
         // Cantrip: no slot needed

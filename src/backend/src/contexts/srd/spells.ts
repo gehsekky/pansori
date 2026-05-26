@@ -15,6 +15,124 @@ import type { Spell } from '../../types.js';
 // upcast formulas follow RAW unless a flavour note documents the change.
 
 export const SRD_SPELLS: Record<string, Spell> = {
+  // ─── Spell batch: walls, a poison ray, energy ward, a corpse ritual ─────────
+  // SRD: Blade Barrier — a wall of whirling force. Modeled as the initial-area
+  // DEX save-for-half damage (the persistent cover / difficult-terrain wall and
+  // its per-turn re-save on entry are not modeled — like our other walls).
+  blade_barrier: {
+    id: 'blade_barrier',
+    name: 'Blade Barrier',
+    level: 6,
+    castTime: 'action',
+    concentration: true,
+    durationRounds: 100, // 10 minutes
+    damage: '6d10',
+    damageType: 'force',
+    savingThrow: 'dex',
+    saveEffect: 'half',
+    blastRadius: 100, // a 100-ft wall
+    aoeShape: 'line',
+    rangeKind: 'ranged',
+    rangeFt: 90,
+    desc: 'A wall of spinning force blades. Each creature in the line makes a DEX save, taking 6d10 force on a failure or half on a success. Concentration.',
+    narratives: {
+      cast: [
+        '{name} carves the air into a curtain of whirling blades{slotNote}',
+        '{name} speaks a war-word and a wall of razor light springs up',
+      ],
+    },
+    spellList: ['divine'],
+  },
+  // SRD: Wind Wall — a wall of strong wind. Modeled as the initial-area STR
+  // save-for-half damage (the projectile-deflection and gas-barring effects are
+  // narrative, not modeled).
+  wind_wall: {
+    id: 'wind_wall',
+    name: 'Wind Wall',
+    level: 3,
+    castTime: 'action',
+    concentration: true,
+    durationRounds: 10, // 1 minute
+    damage: '4d8',
+    damageType: 'bludgeoning',
+    savingThrow: 'str',
+    saveEffect: 'half',
+    blastRadius: 50, // a 50-ft wall
+    aoeShape: 'line',
+    rangeKind: 'ranged',
+    rangeFt: 120,
+    desc: 'A wall of roaring wind rises from the ground. Each creature in the area makes a STR save, taking 4d8 bludgeoning on a failure or half on a success. Concentration.',
+    narratives: {
+      cast: [
+        '{name} sweeps a hand upward and a howling wall of wind erupts{slotNote}',
+        '{name} whistles a rising note; the air hardens into a gale',
+      ],
+    },
+    spellList: ['primal'],
+  },
+  // SRD: Ray of Sickness — a greenish ray of poison. Ranged spell attack;
+  // on a hit, 2d8 poison and Poisoned until the end of your next turn.
+  ray_of_sickness: {
+    id: 'ray_of_sickness',
+    name: 'Ray of Sickness',
+    level: 1,
+    castTime: 'action',
+    attackRoll: true,
+    damage: '2d8',
+    damageType: 'poison',
+    upcastBonus: '1d8',
+    condition: 'poisoned',
+    conditionDuration: 1, // until the end of your next turn ≈ 1 round
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    desc: 'A ray of sickly green light. Spell attack roll; on a hit, 2d8 poison (+1d8 per slot above 1st) and the target is Poisoned until the end of your next turn.',
+    narratives: {
+      cast: [
+        '{name} flings a sickly green ray at {target}{slotNote}',
+        '{name} points, and a ray of nauseating light lances toward {target}',
+      ],
+    },
+    spellList: ['arcane'],
+  },
+  // SRD: Protection from Energy — Resistance to one chosen damage type (Acid,
+  // Cold, Fire, Lightning, or Thunder) for the duration. The element is picked
+  // at cast time; defaults to Fire when unspecified.
+  protection_from_energy: {
+    id: 'protection_from_energy',
+    name: 'Protection from Energy',
+    level: 3,
+    castTime: 'action',
+    targetType: 'self_or_ally',
+    grantResistances: ['fire'],
+    concentration: true,
+    durationRounds: 600, // 1 hour
+    rangeKind: 'touch',
+    desc: 'A willing creature you touch gains Resistance to one damage type of your choice — Acid, Cold, Fire, Lightning, or Thunder — until the spell ends (Concentration).',
+    narratives: {
+      cast: [
+        '{name} traces a warding sigil over {target}; the chosen element will slough away{slotNote}',
+        '{name} lays a hand on {target} — a shimmer of protection settles over their skin',
+      ],
+    },
+    spellList: ['arcane', 'primal', 'divine'],
+  },
+  // SRD: Gentle Repose — preserves a corpse from decay and prevents it rising as
+  // Undead, and extends the window for raise-from-death spells. Narrative-only
+  // ritual in pansori (the multi-day raise window isn't tracked).
+  gentle_repose: {
+    id: 'gentle_repose',
+    name: 'Gentle Repose',
+    level: 2,
+    castTime: 'action',
+    ritualCasting: true,
+    rangeKind: 'ranged',
+    rangeFt: 5,
+    desc: 'You touch a corpse: for 10 days it is protected from decay and cannot become Undead, and the time limit on raising it from the dead is effectively extended.',
+    narrative:
+      '{name} rests two coins on the body and murmurs a rite of stillness; the remains will not turn or rot.',
+    spellList: ['divine', 'arcane'],
+  },
+
   // ─── Cantrips (level 0) ────────────────────────────────────────────────────
   sacred_flame: {
     id: 'sacred_flame',
