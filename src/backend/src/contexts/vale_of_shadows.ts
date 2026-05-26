@@ -43,6 +43,10 @@ const CRYPT_LORD_BASE: EnemyTemplate = {
   condition_immunities: ['charmed', 'exhaustion', 'frightened', 'paralyzed', 'poisoned'],
   onHitEffect: { condition: 'frightened', ability: 'wis', dc: 13 },
   damageType: 'necrotic',
+  // The lich's grave-hoard — gold + a couple of potions for the victors. (The
+  // Moonstone Amulet is placed as room loot on the throne dais.)
+  goldDrop: 120,
+  drops: ['healing_potion', 'healing_potion'],
   // Two-phase fight. At 50% hp the lich shifts to a darker rage — higher
   // to-hit, harder fear DC. At 25% hp it cracks open its phylactery for a
   // one-shot heal + crit-grade damage.
@@ -206,6 +210,7 @@ export const context: Context = {
       'quarterstaff',
       'longbow',
       'leather_armor',
+      'studded_leather',
       'scale_mail',
       'chain_mail',
       'shield',
@@ -253,6 +258,19 @@ export const context: Context = {
       effect: '+1_wis_save',
       requiresAttunement: true,
       aliases: ['amulet', 'moonstone'],
+    },
+    {
+      id: 'stolen_shipment',
+      name: 'Stolen Guild Cargo',
+      weight: 6,
+      desc: "A crate stamped with the Merchant Guild's mark — part of the shipment raided from the Old Road. Aldric will want this back.",
+      type: 'misc',
+      slot: null,
+      damage: null,
+      ac_bonus: null,
+      heal: null,
+      effect: null,
+      aliases: ['cargo', 'crate', 'shipment', 'goods'],
     },
   ],
 
@@ -681,6 +699,21 @@ export const context: Context = {
         name: 'Hidden Passage',
         desc: 'A narrow shaft cuts upward through the rock, emerging near the crypt entrance above.',
       },
+
+      // Bandit Camp (off the Old Road — the raiders behind the missing wagons)
+      {
+        id: 'bandit_camp',
+        name: 'Bandit Camp',
+        desc: 'A clearing ringed with crude tents and a smoldering cookfire. A half-stripped merchant wagon lists against a stump, Guild crates scattered around it. Lookouts turn at your approach.',
+        lighting: 'dim',
+      },
+      {
+        id: 'bandit_tent',
+        name: "Captain's Tent",
+        desc: "A larger oilcloth tent at the camp's heart. A war-map and a strongbox sit on a crate table. The Bandit Captain rises, hand on hilt.",
+        lighting: 'dim',
+        canRest: false,
+      },
     ],
 
     // Room connections
@@ -691,7 +724,7 @@ export const context: Context = {
       millhaven_market: ['millhaven_square', 'millhaven_garrison'],
       millhaven_slums: ['millhaven_square', 'millhaven_garrison'],
       millhaven_garrison: ['millhaven_market', 'millhaven_slums'],
-      road_north: ['millhaven_square', 'dungeon_crypt_entrance'],
+      road_north: ['millhaven_square', 'dungeon_crypt_entrance', 'bandit_camp'],
 
       // Dungeon (linear + some loops)
       dungeon_crypt_entrance: ['road_north', 'dungeon_antechamber'],
@@ -706,6 +739,10 @@ export const context: Context = {
       dungeon_ossuary: ['dungeon_offering_chamber', 'dungeon_crypt_throne'],
       dungeon_crypt_throne: ['dungeon_shadow_gallery', 'dungeon_ossuary', 'dungeon_crypt_exit'],
       dungeon_crypt_exit: ['dungeon_crypt_throne'],
+
+      // Bandit camp
+      bandit_camp: ['road_north', 'bandit_tent'],
+      bandit_tent: ['bandit_camp'],
     },
 
     // Enemy placements (roomId → Enemy[])
@@ -723,6 +760,7 @@ export const context: Context = {
           vulnerabilities: ['bludgeoning'],
           immunities: ['poison'],
           condition_immunities: ['poisoned', 'exhaustion'],
+          goldDrop: 3,
         },
       ],
       dungeon_charnel_hall: [
@@ -738,6 +776,7 @@ export const context: Context = {
           vulnerabilities: ['bludgeoning'],
           immunities: ['poison'],
           condition_immunities: ['poisoned', 'exhaustion'],
+          goldDrop: 3,
         },
         {
           id: 'dungeon_charnel_hall#1',
@@ -751,6 +790,7 @@ export const context: Context = {
           vulnerabilities: ['bludgeoning'],
           immunities: ['poison'],
           condition_immunities: ['poisoned', 'exhaustion'],
+          goldDrop: 3,
         },
       ],
       dungeon_offering_chamber: [
@@ -764,6 +804,7 @@ export const context: Context = {
           xp: 200,
           onHitEffect: { condition: 'paralyzed', ability: 'con', dc: 10 },
           condition_immunities: ['poisoned', 'charmed'],
+          goldDrop: 8,
         },
       ],
       dungeon_shadow_gallery: [
@@ -809,6 +850,7 @@ export const context: Context = {
           xp: 200,
           onHitEffect: { condition: 'paralyzed', ability: 'con', dc: 10 },
           condition_immunities: ['poisoned', 'charmed'],
+          goldDrop: 8,
         },
       ],
       dungeon_crypt_throne: [
@@ -829,6 +871,7 @@ export const context: Context = {
           vulnerabilities: ['bludgeoning'],
           immunities: ['poison'],
           condition_immunities: ['poisoned', 'exhaustion'],
+          goldDrop: 3,
         },
       ],
       road_north: [
@@ -840,6 +883,8 @@ export const context: Context = {
           damage: '1d6+1',
           toHit: 3,
           xp: 25,
+          goldDrop: 8,
+          drops: ['dagger'],
         },
         {
           id: 'road_north#1',
@@ -849,6 +894,77 @@ export const context: Context = {
           damage: '1d6+1',
           toHit: 3,
           xp: 25,
+          goldDrop: 8,
+          drops: ['dagger'],
+        },
+      ],
+
+      // Bandit camp — a three-ruffian skirmish, then the Captain + a guard.
+      bandit_camp: [
+        {
+          id: 'bandit_camp#0',
+          name: 'Bandit Ruffian',
+          hp: 11,
+          ac: 12,
+          damage: '1d6+1',
+          toHit: 3,
+          xp: 25,
+          goldDrop: 9,
+          drops: ['dagger'],
+        },
+        {
+          id: 'bandit_camp#1',
+          name: 'Bandit Ruffian',
+          hp: 11,
+          ac: 12,
+          damage: '1d6+1',
+          toHit: 3,
+          xp: 25,
+          goldDrop: 9,
+          drops: ['dagger'],
+        },
+        {
+          id: 'bandit_camp#2',
+          name: 'Bandit Bowman',
+          hp: 11,
+          ac: 13,
+          damage: '1d8+1',
+          toHit: 4,
+          xp: 50,
+          attackReachFt: 80,
+          goldDrop: 10,
+          drops: ['shortsword'],
+        },
+      ],
+      bandit_tent: [
+        {
+          // Sub-boss: the raid leader on Captain Vane's payroll. Multiattack +
+          // solid HP make this a step up from the road skirmishers, but well
+          // short of the Crypt Lord — a mid-campaign spike.
+          id: 'bandit_tent#0',
+          name: 'Bandit Captain',
+          hp: 52,
+          ac: 15,
+          damage: '1d8+3',
+          toHit: 5,
+          xp: 450,
+          str: 15,
+          dex: 16,
+          con: 14,
+          multiattack: 2,
+          goldDrop: 60,
+          drops: ['studded_leather', 'healing_potion'],
+        },
+        {
+          id: 'bandit_tent#1',
+          name: 'Bandit Ruffian',
+          hp: 11,
+          ac: 12,
+          damage: '1d6+1',
+          toHit: 3,
+          xp: 25,
+          goldDrop: 9,
+          drops: ['dagger'],
         },
       ],
     },
@@ -907,6 +1023,32 @@ export const context: Context = {
         effect: '+1_wis_save',
         requiresAttunement: true,
         aliases: ['amulet'],
+      },
+      bandit_camp: {
+        id: 'healing_potion',
+        name: 'Healing Potion',
+        weight: 4,
+        desc: 'A crimson vial, looted from the wagon.',
+        type: 'consumable',
+        slot: null,
+        damage: null,
+        ac_bonus: null,
+        heal: '2d4+2',
+        effect: null,
+        aliases: ['potion'],
+      },
+      bandit_tent: {
+        id: 'stolen_shipment',
+        name: 'Stolen Guild Cargo',
+        weight: 6,
+        desc: "A crate stamped with the Merchant Guild's mark — the raided Old Road shipment.",
+        type: 'misc',
+        slot: null,
+        damage: null,
+        ac_bonus: null,
+        heal: null,
+        effect: null,
+        aliases: ['cargo', 'crate', 'shipment', 'goods'],
       },
     },
 
@@ -1062,9 +1204,20 @@ export const context: Context = {
         type: 'wilderness',
         desc: 'A rutted track through sparse woodland. Bandits have been raiding caravans here.',
         centralRoomId: 'road_north',
-        connections: ['town_millhaven', 'dungeon_shattered_crypt'],
+        connections: ['town_millhaven', 'dungeon_shattered_crypt', 'wilderness_bandit_camp'],
         encounterTable: ['Bandit Ruffian'],
         encounterChance: 0.4,
+      },
+      {
+        id: 'wilderness_bandit_camp',
+        name: 'Bandit Camp',
+        type: 'dungeon',
+        desc: 'The raiders behind the Old Road wagon thefts hole up here, in a clearing strewn with stolen Guild crates.',
+        centralRoomId: 'bandit_camp',
+        gridWidth: 10,
+        gridHeight: 10,
+        rooms: [], // Rooms live in campaign.rooms / campaign.connections above.
+        connections: ['wilderness_old_road'],
       },
       {
         id: 'dungeon_shattered_crypt',
