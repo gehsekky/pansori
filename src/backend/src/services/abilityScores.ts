@@ -62,13 +62,38 @@ export function isValidForMethod(
 }
 
 /** Apply the 2024 background ability-score increases to a base score set. The
- *  background lists up to three eligible abilities; pansori applies +1 to each
- *  (the "all three by 1" option). RAW also allows +2/+1 across two of them —
- *  that split is a player choice deferred to a creation-UI follow-up. */
-export function applyAbilityScoreIncreases(base: Scores, increases: readonly string[]): Scores {
+ *  background lists up to three eligible abilities. RAW gives the player two
+ *  options:
+ *    - `split` supplied: +2 to `split.plus2` and +1 to `split.plus1` (both must
+ *      be among the background's listed abilities, and distinct), or
+ *    - `split` omitted / invalid: +1 to each of the listed abilities.
+ *  An invalid split falls back to the +1-to-all option rather than erroring. */
+export function applyAbilityScoreIncreases(
+  base: Scores,
+  increases: readonly string[],
+  split?: { plus2: string; plus1: string } | null
+): Scores {
   const out = { ...base };
-  for (const a of increases) {
-    const key = a.toLowerCase() as AbilityKey;
+  const eligible = increases.map((a) => a.toLowerCase());
+  if (split) {
+    const p2 = split.plus2.toLowerCase() as AbilityKey;
+    const p1 = split.plus1.toLowerCase() as AbilityKey;
+    const valid =
+      p2 !== p1 &&
+      ABILITIES.includes(p2) &&
+      ABILITIES.includes(p1) &&
+      eligible.includes(p2) &&
+      eligible.includes(p1);
+    if (valid) {
+      out[p2] = (out[p2] ?? 10) + 2;
+      out[p1] = (out[p1] ?? 10) + 1;
+      return out;
+    }
+    // Invalid split (unknown ability, duplicate, or not offered by the
+    // background) — fall through to the safe +1-to-all default.
+  }
+  for (const a of eligible) {
+    const key = a as AbilityKey;
     if (ABILITIES.includes(key)) out[key] = (out[key] ?? 10) + 1;
   }
   return out;

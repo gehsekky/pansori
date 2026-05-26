@@ -157,6 +157,9 @@ gameRouter.get('/contexts', (_req, res) => {
         feature: b.feature,
         featureDesc: b.featureDesc,
         originFeat: b.originFeat ?? null,
+        // The three abilities this background can boost — the creation UI uses
+        // them to offer the +2/+1 split.
+        abilityScoreIncreases: b.abilityScoreIncreases ?? [],
       })),
       featTable: c.featTable
         ? Object.fromEntries(
@@ -287,9 +290,10 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
           }
         : { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 };
       const bg = ctx.backgrounds?.find((b) => b.id === c.background_id) ?? null;
-      // 2024 PHB — ability-score increases come from the background (the three
-      // listed abilities each get +1; the +2/+1 split is a deferred UI choice).
-      base = applyAbilityScoreIncreases(base, bg?.abilityScoreIncreases ?? []);
+      // 2024 PHB — ability-score increases come from the background. The player
+      // picks either +2/+1 across two of the three listed abilities (`ability_bonus`)
+      // or +1 to all three (omitted); the helper re-validates the split.
+      base = applyAbilityScoreIncreases(base, bg?.abilityScoreIncreases ?? [], c.ability_bonus);
       const classSkills = ctx.classSkills?.[c.character_class] ?? [];
       // 2024 PHB species traits — speed, darkvision, resistances, innate
       // cantrips. Defaults to Human when missing/unknown.

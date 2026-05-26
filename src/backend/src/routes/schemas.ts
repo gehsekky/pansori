@@ -58,6 +58,16 @@ const CharacterInputSchema = z
     subclass: z.string().min(1).max(40).optional(),
     species: z.string().min(1).max(40).optional(),
     feat_choices: FeatChoicesSchema.optional(),
+    // 2024 background ability-score increase. Omitted = +1 to all three of the
+    // background's listed abilities; supplied = +2 to `plus2` and +1 to `plus1`
+    // (both must be among the background's three; the server re-validates).
+    ability_bonus: z
+      .object({
+        plus2: z.enum(['str', 'dex', 'con', 'int', 'wis', 'cha']),
+        plus1: z.enum(['str', 'dex', 'con', 'int', 'wis', 'cha']),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 
