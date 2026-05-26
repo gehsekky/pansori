@@ -13,7 +13,10 @@ export {
   SRD_WEAPON_MASTERY_SLOTS,
   SRD_CLASS_FEATURES,
   SRD_CLASS_SKILLS,
+  SRD_CLASS_SKILL_CHOICES,
   SRD_SUBCLASS_FOR_CLASS,
+  resolveClassSkills,
+  defaultClassSkills,
 } from './classes.js';
 export { BEAST_FORMS, maxBeastCRForLevel, availableBeastForms } from './beast_forms.js';
 export { SRD_MONSTERS } from './monsters.js';

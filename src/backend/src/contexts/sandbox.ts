@@ -5,6 +5,7 @@ import {
   SRD_CLASS_PRIMARY_STATS,
   SRD_CLASS_SAVING_THROWS,
   SRD_CLASS_SKILLS,
+  SRD_CLASS_SKILL_CHOICES,
   SRD_CLASS_WEAPON_PROFICIENCIES,
   SRD_FEATS,
   SRD_MONSTERS,
@@ -41,6 +42,7 @@ export const context: Context = {
   classHitDie: { ...SRD_CLASS_HIT_DIE },
 
   classSkills: { ...SRD_CLASS_SKILLS },
+  classSkillChoices: { ...SRD_CLASS_SKILL_CHOICES },
 
   classArmorProficiencies: { ...SRD_CLASS_ARMOR_PROFICIENCIES },
 

@@ -57,6 +57,10 @@ const CharacterInputSchema = z
     portrait_url: z.string().max(2048).optional(),
     subclass: z.string().min(1).max(40).optional(),
     species: z.string().min(1).max(40).optional(),
+    // 2024 class skill proficiencies — the player's chosen "N from the class
+    // list". Re-validated server-side against the class's options; an invalid
+    // or omitted list falls back to the curated default.
+    class_skills: z.array(z.string().min(1).max(40)).max(18).optional(),
     feat_choices: FeatChoicesSchema.optional(),
     // 2024 background ability-score increase. Omitted = +1 to all three of the
     // background's listed abilities; supplied = +2 to `plus2` and +1 to `plus1`

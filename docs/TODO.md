@@ -181,9 +181,12 @@ backend features are waiting on, and a handful of **bounded subsystems**.
       across two of the background's three abilities and +1 to all three);
       `applyAbilityScoreIncreases` takes the chosen split and re-validates it,
       falling back to +1-to-all when invalid.
-- [ ] **Choose-your-class-skills step** — replace the auto-granted curated
-      `SRD_CLASS_SKILLS[class]` list with "choose N from [SRD options]";
-      engine must accept + validate the chosen list.
+- [x] **Choose-your-class-skills step** — CharScreen offers each class's RAW
+      "choose N from [options]" skill list (`SRD_CLASS_SKILL_CHOICES`; Bard =
+      any 3, Rogue 4, Ranger 3, rest 2), pre-seeded with the curated default
+      (`defaultClassSkills`, trimmed to N) and gated to exactly N. The server
+      re-validates the chosen list (`resolveClassSkills`) and falls back to the
+      default on anything invalid; options are surfaced via the context summary.
 - [ ] **Interactive reaction prompts** — Indomitable, Stroke of Luck,
       Countercharm, Deflect Attacks auto-resolve player-favorably; let the
       player choose _when_ to spend.
