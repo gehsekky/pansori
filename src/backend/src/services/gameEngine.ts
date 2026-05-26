@@ -51,6 +51,8 @@ import {
   SRD_SPECIES,
   SRD_SUBCLASS_FOR_CLASS,
   availableBeastForms,
+  masterableWeapons,
+  weaponMasterySlotsForLevel,
 } from '../contexts/srd/index.js';
 import {
   DEFAULT_SPEED_FEET,
@@ -2372,6 +2374,17 @@ export function applyLevelUpForClass(char: Character, className: string, context
     out += ` ${className} level ${newClassLevel}: choose an Ability Score Improvement!`;
   }
 
+  // 2024 Weapon Mastery slot growth — Fighter (L4/10/16) and Barbarian (L4/10)
+  // master more weapons as they level. Surface the new pick(s) as a pending
+  // choice resolved via `choose_weapon_mastery`.
+  const newMasterySlots = weaponMasterySlotsForLevel(className, newClassLevel);
+  const currentMasteryCount = (char.weapon_masteries ?? []).length;
+  if (newMasterySlots > currentMasteryCount) {
+    const gained = newMasterySlots - currentMasteryCount;
+    char.weapon_mastery_pending = (char.weapon_mastery_pending ?? 0) + gained;
+    out += ` ${className} level ${newClassLevel}: Weapon Mastery — choose ${gained} more weapon${gained === 1 ? '' : 's'} to master!`;
+  }
+
   // SRD Barbarian Primal Champion (L20 capstone): Strength and Constitution
   // each increase by 4, to a maximum of 30. The CON increase raises max HP
   // retroactively (same convention as an ASI CON bump). hpRoll above already
@@ -2933,6 +2946,29 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       }
     }
     return asiChoices;
+  }
+
+  // 2024 Weapon Mastery slot growth — a level-up granted new mastery slot(s).
+  // Surface a pick of any masterable weapon the character isn't already
+  // mastering (resolved out of combat, before other choices).
+  if ((char.weapon_mastery_pending ?? 0) > 0) {
+    const profs = context.classWeaponProficiencies?.[char.character_class] ?? [];
+    const already = new Set(char.weapon_masteries ?? []);
+    const options = masterableWeapons(profs, context.lootTable).filter((w) => !already.has(w.id));
+    if (options.length === 0) {
+      // Nothing left to master (shouldn't normally happen) — clear the pending
+      // so the player isn't stuck.
+      return [
+        {
+          label: 'No further weapons to master — continue.',
+          action: { type: 'choose_weapon_mastery', weaponId: '' },
+        },
+      ];
+    }
+    return options.map((w) => ({
+      label: `Weapon Mastery: master ${w.name} (${w.mastery})`,
+      action: { type: 'choose_weapon_mastery' as const, weaponId: w.id },
+    }));
   }
 
   const healItems = context.lootTable.filter((i) => i.heal);

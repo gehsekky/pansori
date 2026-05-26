@@ -7,6 +7,7 @@ import {
   defaultWeaponMasteries,
   masterableWeapons,
   resolveWeaponMasteries,
+  weaponMasterySlotsForLevel,
 } from './classes.js';
 import { describe, expect, it } from 'vitest';
 
@@ -89,5 +90,30 @@ describe('resolveWeaponMasteries', () => {
     for (const [cls, picks] of Object.entries(SRD_DEFAULT_WEAPON_MASTERIES)) {
       expect(picks.length, cls).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('weaponMasterySlotsForLevel', () => {
+  it('scales the Fighter: 3 → 4 (L4) → 5 (L10) → 6 (L16)', () => {
+    expect(
+      [1, 3, 4, 9, 10, 15, 16, 20].map((l) => weaponMasterySlotsForLevel('Fighter', l))
+    ).toEqual([3, 3, 4, 4, 5, 5, 6, 6]);
+  });
+
+  it('scales the Barbarian: 2 → 3 (L4) → 4 (L10)', () => {
+    expect([1, 3, 4, 9, 10, 20].map((l) => weaponMasterySlotsForLevel('Barbarian', l))).toEqual([
+      2, 2, 3, 3, 4, 4,
+    ]);
+  });
+
+  it('keeps Paladin / Ranger / Rogue fixed at 2', () => {
+    for (const cls of ['Paladin', 'Ranger', 'Rogue']) {
+      expect([1, 5, 11, 20].map((l) => weaponMasterySlotsForLevel(cls, l))).toEqual([2, 2, 2, 2]);
+    }
+  });
+
+  it('returns 0 for classes without the feature', () => {
+    expect(weaponMasterySlotsForLevel('Wizard', 20)).toBe(0);
+    expect(weaponMasterySlotsForLevel('Cleric', 8)).toBe(0);
   });
 });

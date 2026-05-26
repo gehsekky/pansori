@@ -23,6 +23,7 @@ export {
   masterableWeapons,
   defaultClassSkills,
   defaultWeaponMasteries,
+  weaponMasterySlotsForLevel,
 } from './classes.js';
 export type { EquipmentPackage } from './classes.js';
 export { BEAST_FORMS, maxBeastCRForLevel, availableBeastForms } from './beast_forms.js';

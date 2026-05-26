@@ -404,6 +404,10 @@ export type StructuredAction =
   // chosen skill proficiency. `skill` matches a `skill_proficiencies` entry.
   // Out-of-combat, no action cost. (RE-2.)
   | { type: 'choose_expertise'; skill: string }
+  // 2024 Weapon Mastery slot growth — on level-up the player picks a new weapon
+  // to master (Fighter L4/10/16, Barbarian L4/10). `weaponId` is the chosen
+  // weapon. Out-of-combat, no action cost.
+  | { type: 'choose_weapon_mastery'; weaponId: string }
   // SRD 5.2.1 Ranger Hunter "feature option" pick (Hunter's Prey L3, Defensive
   // Tactics L7): choose one of two options, swappable on a rest. Out-of-combat,
   // no action cost. (RE-2.)
