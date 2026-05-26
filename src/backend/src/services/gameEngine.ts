@@ -110,6 +110,7 @@ import { COMBAT_LOG_MAX } from '../types.js';
 import { Engine } from 'json-rules-engine';
 import { applyDamage } from './damage.js';
 import { applyStateMigrations } from './stateSchema.js';
+import { canTakeFeat } from './feats.js';
 import { factionShopPrice } from './campaignEngine.js';
 import { llmProvider } from './llmProvider.js';
 import { randomUUID } from 'crypto';
@@ -2889,7 +2890,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     }
   }
 
-  // Pending ASI: only show stat-boost choices until resolved
+  // Pending ASI: only show ability-boost / feat choices until resolved.
   if (char.asi_pending) {
     const statLabels: Record<string, string> = {
       str: 'STR',
@@ -2899,10 +2900,39 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       wis: 'WIS',
       cha: 'CHA',
     };
-    return (Object.keys(statLabels) as AbilityKey[]).map((stat) => ({
+    const asiChoices: GameChoice[] = (Object.keys(statLabels) as AbilityKey[]).map((stat) => ({
       label: `Ability Score Improvement: +2 ${statLabels[stat]} (currently ${char[stat]})`,
       action: { type: 'apply_asi' as const, stat },
     }));
+    // SRD level-19 Epic Boon feature — take an Epic Boon feat in place of the
+    // ASI. Offer each boon the character qualifies for and doesn't already
+    // have; the +1 ability bump auto-targets their best eligible score (the
+    // boon's signature power is the meaningful choice). `take_feat` applies it
+    // and consumes the ASI slot.
+    if ((char.level ?? 1) >= 19) {
+      const isCaster = Object.keys(char.spell_slots_max ?? {}).length > 0;
+      for (const feat of Object.values(context.featTable ?? {})) {
+        if (feat.category !== 'epic-boon') continue;
+        if (canTakeFeat(char, feat) !== '') continue; // already taken / prereq unmet
+        // SRD: Boon of Spell Recall needs a Spellcasting feature.
+        if (feat.effect.kind === 'epic-boon' && feat.effect.boon === 'spell-recall' && !isCaster) {
+          continue;
+        }
+        const eligible =
+          feat.abilityBonus && 'choices' in feat.abilityBonus
+            ? (feat.abilityBonus.choices as AbilityKey[])
+            : (['str'] as AbilityKey[]);
+        const ability = eligible.reduce(
+          (best, a) => ((char[a] ?? 10) > (char[best] ?? 10) ? a : best),
+          eligible[0]
+        );
+        asiChoices.push({
+          label: `Epic Boon: ${feat.name} (+1 ${statLabels[ability]})`,
+          action: { type: 'take_feat' as const, featId: feat.id, abilityChoice: ability },
+        });
+      }
+    }
+    return asiChoices;
   }
 
   const healItems = context.lootTable.filter((i) => i.heal);

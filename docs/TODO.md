@@ -173,7 +173,11 @@ backend features are waiting on, and a handful of **bounded subsystems**.
 > Several backend features auto-resolve today because the picker UI
 > doesn't exist yet. The engine work is done; these are FE follow-ups.
 
-- [ ] **Epic-boon L19 pick** — surface the boon choice at the L19 ASI.
+- [x] **Epic-boon L19 pick** — at an ASI milestone of level 19+, `generateChoices`
+      surfaces each qualifying Epic Boon feat as a `take_feat` choice alongside
+      the +2 ASI (the +1 auto-targets the best eligible ability; Spell Recall is
+      gated on spellcasting). `handleTakeFeat`/`applyFeatTake` already apply the
+      boon + consume the ASI slot.
 - [x] **Ability-score method picker** — CharScreen offers Roll 4d6 / Standard
       Array / **Point Buy** (27-point, 8–15, live budget + steppers) / **Manual**
       (free entry 3–20); point-buy math in `lib/pointBuy.ts`. The background
