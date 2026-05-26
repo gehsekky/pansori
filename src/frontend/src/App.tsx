@@ -1,7 +1,7 @@
 import { type AuthUser, type CharacterInput, api } from './lib/api.ts';
 import { FactionsView, QuestsView } from './components/CampaignPanel.tsx';
 import type { FrontendContext, GameChoice, Seed, SessionSummary } from './types.ts';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import AdventureLogPanel from './components/AdventureLogPanel.tsx';
 import CharScreen from './components/CharScreen.tsx';
 import ClassAbilityBar from './components/ClassAbilityBar.tsx';
@@ -22,6 +22,7 @@ import PartyRail from './components/PartyRail.tsx';
 import RoomArtPanel from './components/RoomArtPanel.tsx';
 import SessionsScreen from './components/SessionScreen.tsx';
 import SpellBar from './components/SpellBar.tsx';
+import TargetPickerDialog from './components/TargetPickerDialog.tsx';
 import WaitingForPlayer from './components/WaitingForPlayer.tsx';
 import WorldMap from './components/WorldMap.tsx';
 import { applyTheme } from './lib/theme.ts';
@@ -134,6 +135,9 @@ export default function App() {
   // button per action. Defaults to the first living enemy; resets when
   // the enemy roster changes.
   const [selectedEnemyId, setSelectedEnemyId] = useState<string | null>(null);
+  // A cast choice waiting on a target pick (GameChoice.pickTargets) — e.g.
+  // Bless. The TargetPickerDialog collects the targets and re-sends the action.
+  const [targetPicker, setTargetPicker] = useState<GameChoice | null>(null);
   const narrativeRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -158,6 +162,16 @@ export default function App() {
 
   const ctx = getCtx(seed);
   const worldName = seed?.world_name || seed?.ship_name || '???';
+
+  // Choice dispatch with the target-picker interception: a choice carrying a
+  // `pickTargets` hint (Bless) opens the dialog; everything else casts directly.
+  const chooseWithPicker = useCallback(
+    (c: GameChoice) => {
+      if (c.pickTargets) setTargetPicker(c);
+      else handleChoice(c);
+    },
+    [handleChoice]
+  );
 
   useEffect(() => {
     applyTheme(ctx.theme);
@@ -272,7 +286,7 @@ export default function App() {
       if (inventoryOpen || mapOpen) return;
       const idx = parseInt(e.key, 10);
       const numbered = choices.filter((c) => !ICONIZED_KINDS.has(c.kind ?? ''));
-      if (!isNaN(idx) && idx >= 1 && idx <= numbered.length) handleChoice(numbered[idx - 1]);
+      if (!isNaN(idx) && idx >= 1 && idx <= numbered.length) chooseWithPicker(numbered[idx - 1]);
     }
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
@@ -280,7 +294,7 @@ export default function App() {
     // it in the dep list, a stale closure would dispatch with frozen
     // history after the player takes several non-keyboard actions.
     // Re-registering the listener on each render is cheap (one DOM op).
-  }, [view, loading, escaped, gameState, choices, inventoryOpen, mapOpen, handleChoice]);
+  }, [view, loading, escaped, gameState, choices, inventoryOpen, mapOpen, chooseWithPicker]);
 
   async function wrappedResumeSession(id: string) {
     await handleResumeSession(id);
@@ -763,7 +777,7 @@ export default function App() {
                                               >
                                                 <SpellBar
                                                   choices={spellBarChoices}
-                                                  onChoose={handleChoice}
+                                                  onChoose={chooseWithPicker}
                                                 />
                                                 {hasSpells && hasAbilities && (
                                                   <span
@@ -804,7 +818,7 @@ export default function App() {
                                             data-action-type={c.action.type}
                                             data-seen={seen ? 'true' : undefined}
                                             className={`${styles.choiceBtn} ${seen ? styles.choiceBtnSeen : ''}`}
-                                            onClick={() => handleChoice(c)}
+                                            onClick={() => chooseWithPicker(c)}
                                             onMouseEnter={() => c.aoePreview && setHoveredChoice(c)}
                                             onMouseLeave={() => setHoveredChoice(null)}
                                             aria-keyshortcuts={i < 9 ? `${i + 1}` : undefined}
@@ -884,6 +898,53 @@ export default function App() {
                           label: `${target.name} levels up: ${className.charAt(0).toUpperCase() + className.slice(1)}`,
                           action: { type: 'level_up_class', className },
                         });
+                      }}
+                    />
+                  );
+                })()}
+
+              {targetPicker &&
+                targetPicker.pickTargets &&
+                gameState &&
+                (() => {
+                  const { side, max } = targetPicker.pickTargets;
+                  let candidates;
+                  if (side === 'ally') {
+                    candidates = gameState.characters
+                      .filter((c) => !c.dead)
+                      .map((c) => ({
+                        id: c.id,
+                        name: c.name,
+                        sub: `${c.character_class} · HP ${c.hp}/${c.max_hp}`,
+                      }));
+                  } else {
+                    const names = new Map<string, string>();
+                    for (const e of seed?.enemies?.[gameState.current_room] ?? [])
+                      names.set(e.id, e.name);
+                    candidates = (gameState.entities ?? [])
+                      .filter((e) => e.isEnemy && e.hp > 0)
+                      .map((e) => ({
+                        id: e.id,
+                        name: names.get(e.id) ?? 'Enemy',
+                        sub: `HP ${e.hp}/${e.maxHp}`,
+                      }));
+                  }
+                  return (
+                    <TargetPickerDialog
+                      title={targetPicker.label.replace(/\s*\(.*$/, '')}
+                      prompt={side === 'ally' ? 'Choose allies to affect' : 'Choose targets'}
+                      candidates={candidates}
+                      max={max}
+                      onCancel={() => setTargetPicker(null)}
+                      onConfirm={(ids) => {
+                        handleChoice({
+                          ...targetPicker,
+                          action: {
+                            ...targetPicker.action,
+                            ...(side === 'ally' ? { targetCharIds: ids } : { targetEnemyIds: ids }),
+                          },
+                        });
+                        setTargetPicker(null);
                       }}
                     />
                   );

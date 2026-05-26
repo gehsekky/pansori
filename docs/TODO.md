@@ -18,8 +18,8 @@ PHB/DMG-exclusive content (subclasses, feats, species, spells). See
 
 ## Implementation status (code-verified 2026-05-26)
 
-Grounded in a code survey + the full backend suite: **1806 tests across
-210 files, all green** (lint + typecheck clean).
+Grounded in a code survey + the full backend suite: **1812 tests across
+211 files, all green** (lint + typecheck clean).
 
 ### Done — rules-engine frameworks
 
@@ -280,8 +280,16 @@ backend features are waiting on, and a handful of **bounded subsystems**.
       player choose _when_ to spend.
 - [ ] **Slot-choice surfaces** — Arcane Recovery / Natural Recovery
       auto-pick lowest-first; let the player choose which slots.
-- [ ] **Multi-target / option pickers** — Bless/Bane/upcast +1 target,
-      Polymorph beast pick, Greater Restoration "pick one effect" (RE-5).
+- [~] **Multi-target / option pickers** (RE-5). A generic mechanism shipped:
+  `GameChoice.pickTargets { side, max }` marks a cast choice as needing a
+  target pick; the FE's `TargetPickerDialog` (multi-select, 1..max, defaults
+  to the prior auto-pick) collects the targets and re-sends the action with
+  `targetCharIds` (ally) / `targetEnemyIds` (enemy); the cast path validates
+  and falls back to auto when absent. **Bless** ships on it (ally multi-
+  select, up to 3 +1/slot — `blessTargetPicker.spec.ts` +
+  `TargetPickerDialog.spec.tsx`). Remaining, reusing the same pattern:
+  **Bane** (enemy side — needs the multi-enemy CHA-save loop backend-side),
+  **Polymorph** beast pick, **Greater Restoration** "pick one effect".
 
 ### Documented engine deferrals (depend on missing content / infra)
 

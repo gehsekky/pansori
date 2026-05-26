@@ -13,7 +13,16 @@ import { concentrationRoundsFor } from './utils.js';
  * Returns `true` when handled, `false` when the spell falls through
  * to the offensive pipeline.
  */
-export function runUtilitySpell(ctx: ActionContext, spell: Spell, slotNote: string): boolean {
+export function runUtilitySpell(
+  ctx: ActionContext,
+  spell: Spell,
+  slotNote: string,
+  // SRD Bless — the party members the caster chose (via the FE target picker).
+  // When provided, Bless affects this validated subset instead of the auto-pick;
+  // `slotLevel` sets the cap (3 + slots above 1st).
+  targetCharIds?: string[],
+  slotLevel?: number
+): boolean {
   if (ctx.actor.kind !== 'pc') return false;
   const { char } = ctx.actor;
   // A few spells have no damage/save/attack/condition but are NOT utility —
@@ -48,16 +57,23 @@ export function runUtilitySpell(ctx: ActionContext, spell: Spell, slotNote: stri
       spellId: 'bless',
       rounds_left: concentrationRoundsFor(spell) * (ctx.metamagic?.includes('extended') ? 2 : 1),
     };
-    // Pick the targets: caster (always) + up to 2 living allies.
-    const blessTargets: string[] = [char.id];
-    for (const c of ctx.st.characters) {
-      // Cap at 3 targets per RAW. (PR 15 sed regression: had `return`
-      // here, which exited the whole handler before the bless effect
-      // ever applied. Tests didn't catch it because no test hits the
-      // exact 4+-party-member path. Restored to `break`.)
-      if (blessTargets.length >= 3) break;
-      if (c.id === char.id || c.dead) continue;
-      blessTargets.push(c.id);
+    // SRD Bless — up to 3 creatures (+1 per slot above 1st). When the player
+    // chose targets via the picker, honor that validated subset (living party
+    // members, capped at the slot's max); otherwise auto-pick caster + the
+    // first living allies.
+    const blessMax = 3 + Math.max(0, (slotLevel ?? spell.level ?? 1) - (spell.level ?? 1));
+    let blessTargets: string[];
+    const livingIds = new Set(ctx.st.characters.filter((c) => !c.dead).map((c) => c.id));
+    const chosen = (targetCharIds ?? []).filter((id) => livingIds.has(id));
+    if (chosen.length > 0) {
+      blessTargets = [...new Set(chosen)].slice(0, blessMax);
+    } else {
+      blessTargets = [char.id];
+      for (const c of ctx.st.characters) {
+        if (blessTargets.length >= blessMax) break;
+        if (c.id === char.id || c.dead) continue;
+        blessTargets.push(c.id);
+      }
     }
     const targetSet = new Set(blessTargets);
     ctx.st = {
@@ -80,8 +96,9 @@ export function runUtilitySpell(ctx: ActionContext, spell: Spell, slotNote: stri
         };
       }),
     };
-    // Apply blessed to the caster's local ref too.
-    if (!(char.conditions ?? []).includes('blessed')) {
+    // Apply blessed to the caster's local ref too — only when the caster is one
+    // of the chosen targets (the player may have picked allies but not self).
+    if (targetSet.has(char.id) && !(char.conditions ?? []).includes('blessed')) {
       char.conditions = [...(char.conditions ?? []), 'blessed'];
       char.condition_sources = {
         ...(char.condition_sources ?? {}),
