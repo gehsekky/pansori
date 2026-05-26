@@ -444,6 +444,91 @@ export function resolveStartingEquipment(
   return { items: [...fallbackIds], gold: 5 };
 }
 
+// ─── Weapon Mastery selection (2024 SRD) ─────────────────────────────────────
+// A class with the Weapon Mastery feature masters `SRD_WEAPON_MASTERY_SLOTS`
+// weapons it's proficient with that have a Mastery property. The curated picks
+// below are the default selection; the creation flow lets the player choose
+// any valid subset.
+export const SRD_DEFAULT_WEAPON_MASTERIES: Record<string, string[]> = {
+  Fighter: ['longsword', 'shortbow', 'greataxe'],
+  Paladin: ['longsword', 'warhammer'],
+  Ranger: ['longbow', 'shortsword'],
+  Barbarian: ['greataxe', 'handaxe'],
+  Rogue: ['shortsword'],
+};
+
+// Minimal weapon shape the mastery helpers need (a subset of LootItem).
+interface MasterableWeapon {
+  id: string;
+  name: string;
+  mastery?: string;
+  weaponType?: string;
+}
+
+/**
+ * The weapons a class may master: those carrying a Mastery property that the
+ * class is proficient with — either by weapon category (`weaponType` in the
+ * class's `simple`/`martial` list) or by a specifically-named weapon
+ * proficiency (e.g. Monk's shortsword).
+ */
+export function masterableWeapons(
+  weaponProficiencies: readonly string[],
+  weapons: readonly MasterableWeapon[]
+): Array<{ id: string; name: string; mastery: string }> {
+  const profs = new Set(weaponProficiencies.map((p) => p.toLowerCase()));
+  return weapons
+    .filter(
+      (w) =>
+        !!w.mastery &&
+        (profs.has((w.weaponType ?? '').toLowerCase()) || profs.has(w.id.toLowerCase()))
+    )
+    .map((w) => ({ id: w.id, name: w.name, mastery: w.mastery as string }));
+}
+
+/**
+ * The default mastery selection — exactly `count` weapons, preferring the
+ * curated picks (filtered to the available options) and topping up from the
+ * options. Mirrors `defaultClassSkills`.
+ */
+export function defaultWeaponMasteries(
+  curated: readonly string[],
+  optionIds: readonly string[],
+  count: number
+): string[] {
+  if (count <= 0) return [];
+  const opts = optionIds.map((s) => s.toLowerCase());
+  const out: string[] = [];
+  const add = (w: string) => {
+    if (out.length < count && opts.includes(w) && !out.includes(w)) out.push(w);
+  };
+  curated.map((s) => s.toLowerCase()).forEach(add);
+  opts.forEach(add);
+  return out;
+}
+
+/**
+ * Resolve a character's mastered weapons. A valid player choice (every entry
+ * an offered option, no duplicates, exactly `count`) is used; otherwise we
+ * fall back to the count-trimmed default.
+ */
+export function resolveWeaponMasteries(
+  chosen: readonly string[] | undefined,
+  optionIds: readonly string[],
+  count: number,
+  curated: readonly string[]
+): string[] {
+  if (count <= 0) return [];
+  if (chosen) {
+    const lowered = chosen.map((s) => s.toLowerCase());
+    const distinct = new Set(lowered);
+    const opts = new Set(optionIds.map((s) => s.toLowerCase()));
+    const valid =
+      lowered.length === count && distinct.size === count && lowered.every((w) => opts.has(w));
+    if (valid) return [...distinct];
+  }
+  return defaultWeaponMasteries(curated, optionIds, count);
+}
+
 // The single SRD-iconic subclass each class gains at level 3 (SRD 5.2.1
 // publishes exactly one subclass per class). Keyed by lowercased class name.
 // The engine auto-assigns this at level 3 — there's no choice to make.

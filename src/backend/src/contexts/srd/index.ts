@@ -15,10 +15,14 @@ export {
   SRD_CLASS_SKILLS,
   SRD_CLASS_SKILL_CHOICES,
   SRD_CLASS_STARTING_EQUIPMENT,
+  SRD_DEFAULT_WEAPON_MASTERIES,
   SRD_SUBCLASS_FOR_CLASS,
   resolveClassSkills,
   resolveStartingEquipment,
+  resolveWeaponMasteries,
+  masterableWeapons,
   defaultClassSkills,
+  defaultWeaponMasteries,
 } from './classes.js';
 export type { EquipmentPackage } from './classes.js';
 export { BEAST_FORMS, maxBeastCRForLevel, availableBeastForms } from './beast_forms.js';

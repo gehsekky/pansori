@@ -89,6 +89,9 @@ export type CharacterInput = {
   // 2024 starting-equipment package id ('A' / 'B' / 'C'). Omitted = the default
   // package. Re-validated server-side.
   starting_equipment?: string;
+  // 2024 Weapon Mastery picks (weapon ids). Omitted/invalid = the default.
+  // Re-validated server-side.
+  weapon_masteries?: string[];
   // Origin-feat choices that need player input at character creation.
   // Today only Magic Initiate variants populate this — the player picks
   // 2 cantrips + 1 L1 spell. BE validates the shape AND that each picked
@@ -117,6 +120,16 @@ export interface BackendContextSummary {
   classStartingEquipment: Record<
     string,
     Array<{ id: string; label: string; gold: number; items: string[] }>
+  >;
+  // Per-class Weapon Mastery options (masterable weapons + slot count + default
+  // picks) for the creation-screen picker. Only classes with the feature appear.
+  weaponMasteryChoices: Record<
+    string,
+    {
+      count: number;
+      options: Array<{ id: string; name: string; mastery: string }>;
+      default: string[];
+    }
   >;
   backgrounds: Array<{
     id: string;

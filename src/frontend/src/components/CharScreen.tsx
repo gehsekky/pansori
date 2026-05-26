@@ -165,6 +165,9 @@ interface CharDraft {
   // 2024 starting-equipment package id ('A' / 'B' / 'C'). Undefined = the
   // default (first) package. Cleared on class change.
   startingEquipment?: string;
+  // 2024 Weapon Mastery picks (weapon ids). Undefined = the default selection
+  // (shown pre-selected). Cleared on class change (the options differ).
+  weaponMasteries?: string[];
 }
 
 // 'sleight_of_hand' → 'Sleight of Hand'. Skill ids are snake_case.
@@ -218,6 +221,22 @@ const SKILL_INFO: Record<string, { ability: string; desc: string }> = {
   stealth: { ability: 'Dexterity', desc: 'Move unseen and unheard; hide from notice.' },
   survival: { ability: 'Wisdom', desc: 'Track, forage, navigate, and endure the wilds.' },
 };
+
+// SRD: Weapon Mastery properties — what each one does (paraphrased). Shown as a
+// hover tooltip on the weapon-mastery picker.
+const MASTERY_INFO: Record<string, string> = {
+  cleave: 'On a hit, a second creature within 5 ft of the target takes the weapon damage.',
+  graze: "On a miss, the target still takes damage equal to the weapon's ability modifier.",
+  nick: 'The extra Light-weapon attack comes as part of the Attack action — no Bonus Action.',
+  push: 'On a hit, push the target up to 10 ft away (if Large or smaller).',
+  sap: 'On a hit, the target has Disadvantage on its next attack before your next turn.',
+  slow: "On a hit, reduce the target's Speed by 10 ft until the start of your next turn.",
+  topple: 'On a hit, the target makes a CON save or is knocked Prone.',
+  vex: 'On a hit, you have Advantage on your next attack against that target.',
+};
+const masteryLabel = (m: string) => m.charAt(0).toUpperCase() + m.slice(1);
+const masteryTitle = (m: string) =>
+  `${masteryLabel(m)} — ${MASTERY_INFO[m] ?? 'Weapon mastery property.'}`;
 
 // Tooltip text for a skill: "Dexterity — Keep your footing…". Falls back to
 // the plain label if the skill isn't in the table.
@@ -538,6 +557,19 @@ function CharScreen({
         `${d.name || `Hero ${badSkills + 1}`} must choose exactly ${choice.count} class skill${choice.count === 1 ? '' : 's'}`
       );
     }
+    // Classes with Weapon Mastery must have exactly their slot count chosen.
+    const badMastery = party.findIndex((d) => {
+      const choice = beCtx?.weaponMasteryChoices?.[d.cls];
+      if (!choice) return false;
+      return (d.weaponMasteries ?? choice.default).length !== choice.count;
+    });
+    if (badMastery >= 0) {
+      const d = party[badMastery];
+      const choice = beCtx!.weaponMasteryChoices[d.cls];
+      return setError(
+        `${d.name || `Hero ${badMastery + 1}`} must choose exactly ${choice.count} weapon master${choice.count === 1 ? 'y' : 'ies'}`
+      );
+    }
     setError('');
     localStorage.setItem('operative_name', leader.name.trim());
     try {
@@ -553,6 +585,7 @@ function CharScreen({
           ability_bonus: d.abilityBonus,
           class_skills: d.classSkills,
           starting_equipment: d.startingEquipment,
+          weapon_masteries: d.weaponMasteries,
         })),
         contextId
       );
@@ -651,6 +684,7 @@ function CharScreen({
                         cls: e.target.value,
                         classSkills: undefined,
                         startingEquipment: undefined,
+                        weaponMasteries: undefined,
                       })
                     }
                   >
@@ -783,6 +817,72 @@ function CharScreen({
                                 {' · '}
                                 {p.items.length > 0 ? p.items.join(', ') : 'no gear'}
                                 {p.gold > 0 ? ` · ${p.gold} gp` : ''}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* 2024 Weapon Mastery — choose N weapons (the class may
+                      master) to gain their mastery property. Options + default
+                      come from the BE context summary. */}
+                  {(() => {
+                    const choice = beContexts[contextId]?.weaponMasteryChoices?.[draft.cls];
+                    if (!choice || choice.options.length === 0) return null;
+                    const selected = draft.weaponMasteries ?? choice.default;
+                    const atCap = selected.length >= choice.count;
+                    const complete = selected.length === choice.count;
+                    return (
+                      <div style={{ marginTop: 12 }}>
+                        <label className={styles.formLbl}>
+                          WEAPON MASTERY — CHOOSE {choice.count}{' '}
+                          <span
+                            style={{ color: complete ? 'var(--t-primary)' : 'var(--t-hp-mid)' }}
+                            data-testid={`weapon-mastery-count-${idx}`}
+                          >
+                            ({selected.length}/{choice.count})
+                          </span>
+                        </label>
+                        <div
+                          style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}
+                          data-testid={`weapon-masteries-${idx}`}
+                        >
+                          {choice.options.map((w) => {
+                            const on = selected.includes(w.id);
+                            const disabled = !on && atCap;
+                            return (
+                              <button
+                                key={w.id}
+                                type="button"
+                                aria-pressed={on}
+                                disabled={disabled}
+                                title={masteryTitle(w.mastery)}
+                                onClick={() => {
+                                  const next = on
+                                    ? selected.filter((s) => s !== w.id)
+                                    : [...selected, w.id];
+                                  updateDraft(idx, { weaponMasteries: next });
+                                }}
+                                style={{
+                                  fontSize: '0.7rem',
+                                  padding: '0.25rem 0.55rem',
+                                  letterSpacing: '0.04em',
+                                  background: on ? 'var(--t-separator)' : 'transparent',
+                                  border: `1px solid ${on ? 'var(--t-primary)' : 'var(--t-border)'}`,
+                                  color: on
+                                    ? 'var(--t-primary)'
+                                    : disabled
+                                      ? 'var(--t-separator)'
+                                      : 'var(--t-dim)',
+                                  cursor: disabled ? 'default' : 'pointer',
+                                  fontFamily: 'inherit',
+                                }}
+                              >
+                                {on ? '✓ ' : ''}
+                                {w.name}{' '}
+                                <span style={{ opacity: 0.7 }}>({masteryLabel(w.mastery)})</span>
                               </button>
                             );
                           })}
