@@ -137,9 +137,10 @@ describe('condition registry — derived Sets (compat shim)', () => {
     );
   });
 
-  it('PLAYER_ADV_CONDITIONS and ENEMY_DISADV_CONDITIONS both = {invisible}', () => {
+  it('PLAYER_ADV_CONDITIONS = {invisible}; ENEMY_DISADV_CONDITIONS = {invisible, blurred}', () => {
+    // Blur added `blurred` (attackers have Disadvantage) alongside Invisible.
     expect([...PLAYER_ADV_CONDITIONS]).toEqual(['invisible']);
-    expect([...ENEMY_DISADV_CONDITIONS]).toEqual(['invisible']);
+    expect([...ENEMY_DISADV_CONDITIONS].sort()).toEqual(['blurred', 'invisible'].sort());
   });
 });
 
