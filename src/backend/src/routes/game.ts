@@ -26,11 +26,15 @@ import {
 } from '../services/rulesEngine.js';
 import { Request, Response, Router } from 'express';
 import {
+  SRD_DEFAULT_WEAPON_MASTERIES,
   SRD_SPECIES,
   SRD_WEAPON_MASTERY_SLOTS,
   defaultClassSkills,
+  defaultWeaponMasteries,
+  masterableWeapons,
   resolveClassSkills,
   resolveStartingEquipment,
+  resolveWeaponMasteries,
 } from '../contexts/srd/index.js';
 import { applyAbilityScoreIncreases, isValidForMethod } from '../services/abilityScores.js';
 import {
@@ -120,19 +124,6 @@ async function fetchSessionForParticipant(
   return rows[0] ?? null;
 }
 
-function defaultWeaponMasteriesFor(charClass: string): string[] {
-  const map: Record<string, string[]> = {
-    Fighter: ['longsword', 'shortbow', 'greataxe'],
-    Paladin: ['longsword', 'warhammer'],
-    Ranger: ['longbow', 'shortsword'],
-    Barbarian: ['greataxe', 'handaxe'],
-    Rogue: ['shortsword'],
-  };
-  const picks = map[charClass] ?? [];
-  const cap = SRD_WEAPON_MASTERY_SLOTS[charClass] ?? 0;
-  return picks.slice(0, cap);
-}
-
 export const gameRouter = Router();
 
 // List all available game contexts (id + display metadata only — no rules/loot).
@@ -178,6 +169,29 @@ gameRouter.get('/contexts', (_req, res) => {
             items: p.items.map((id) => c.lootTable.find((l) => l.id === id)?.name ?? id),
           })),
         ])
+      ),
+      // Weapon Mastery options per class with the feature (the weapons it may
+      // master + slot count + default picks), for the creation-screen picker.
+      weaponMasteryChoices: Object.fromEntries(
+        Object.keys(c.classPrimaryStats)
+          .map((cls) => {
+            const count = SRD_WEAPON_MASTERY_SLOTS[cls] ?? 0;
+            if (count <= 0) return null;
+            const options = masterableWeapons(c.classWeaponProficiencies?.[cls] ?? [], c.lootTable);
+            return [
+              cls,
+              {
+                count,
+                options,
+                default: defaultWeaponMasteries(
+                  SRD_DEFAULT_WEAPON_MASTERIES[cls] ?? [],
+                  options.map((o) => o.id),
+                  count
+                ),
+              },
+            ] as const;
+          })
+          .filter((e): e is NonNullable<typeof e> => e !== null)
       ),
       backgrounds: (c.backgrounds ?? []).map((b) => ({
         id: b.id,
@@ -399,6 +413,18 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
         ctx.lootTable
       );
 
+      // 2024 Weapon Mastery — the player's chosen masteries (validated against
+      // the weapons this class may master), or the curated default, trimmed to
+      // the class's slot count.
+      const masteryCount = SRD_WEAPON_MASTERY_SLOTS[c.character_class] ?? 0;
+      const masteryOptionIds = masterableWeapons(weaponProfs, ctx.lootTable).map((w) => w.id);
+      const weaponMasteries = resolveWeaponMasteries(
+        c.weapon_masteries,
+        masteryOptionIds,
+        masteryCount,
+        SRD_DEFAULT_WEAPON_MASTERIES[c.character_class] ?? []
+      );
+
       const builtChar: Character = {
         id: randomUUID(),
         name: c.name,
@@ -444,9 +470,9 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
         spells_known: ctx.classSpells?.[c.character_class] ?? [],
         armor_proficiencies: armorProfs,
         weapon_proficiencies: weaponProfs,
-        // 2024 PHB Weapon Mastery — classes that get the feature start with
-        // an initial mastered weapon list. Other classes get 0.
-        weapon_masteries: defaultWeaponMasteriesFor(c.character_class),
+        // 2024 PHB Weapon Mastery — the player-chosen (or default) mastered
+        // weapons. Classes without the feature get an empty list.
+        weapon_masteries: weaponMasteries,
         attuned_items: [],
         // 2024 SRD: every class chooses its subclass at level 3, and pansori's
         // strict-SRD build has exactly one subclass per class — so creation no

@@ -64,6 +64,9 @@ const CharacterInputSchema = z
     // 2024 starting-equipment package id ('A' / 'B' / 'C'). The server resolves
     // it to items + GP; an invalid/omitted id falls back to the default package.
     starting_equipment: z.string().min(1).max(4).optional(),
+    // 2024 Weapon Mastery picks (weapon ids). Re-validated against the weapons
+    // the class may master; an invalid/omitted list falls back to the default.
+    weapon_masteries: z.array(z.string().min(1).max(40)).max(8).optional(),
     feat_choices: FeatChoicesSchema.optional(),
     // 2024 background ability-score increase. Omitted = +1 to all three of the
     // background's listed abilities; supplied = +2 to `plus2` and +1 to `plus1`
