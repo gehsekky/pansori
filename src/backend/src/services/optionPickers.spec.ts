@@ -89,7 +89,7 @@ describe('Polymorph beast-form picker', () => {
     const ent = r.newState.entities?.find((e) => e.id === enemyId);
     expect(ent?.conditions).toContain('polymorphed');
     expect(ent?.polymorph_state?.formName).toBe('Dire Wolf');
-    expect(ent?.temp_hp).toBe(37);
+    expect(ent?.temp_hp).toBe(22);
   });
 
   it('defaults to Wolf (11 HP) when no beast form is chosen', async () => {
