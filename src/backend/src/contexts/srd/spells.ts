@@ -1484,6 +1484,27 @@ export const SRD_SPELLS: Record<string, Spell> = {
     rangeFt: 90,
     spellList: ['arcane'],
   },
+  command: {
+    id: 'command',
+    name: 'Command',
+    level: 1,
+    castTime: 'action',
+    // SRD: Command — one-word command; on a failed WIS save the target
+    // obeys on its next turn. Pansori resolves the "Halt" command: the
+    // creature loses its next turn (no move or action). The `commanded`
+    // condition is consumed by the enemy turn loop on the skip, so the
+    // effect lasts exactly one turn (no concentration). RAW upcast adds
+    // one extra target per slot above 1st — deferred (single-target cast).
+    condition: 'commanded',
+    conditionDuration: 1,
+    savingThrow: 'wis',
+    saveEffect: 'negates',
+    desc: 'Bark a one-word command at a creature within 60 ft. On a failed WIS save it is compelled to halt — losing its next turn (no move or action).',
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    // SRD: Bard / Cleric / Paladin.
+    spellList: ['arcane', 'divine'],
+  },
   hold_person: {
     id: 'hold_person',
     name: 'Hold Person',

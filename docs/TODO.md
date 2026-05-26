@@ -67,7 +67,7 @@ Grounded in a code survey + the full backend suite: **1572 tests across
 
 | Category | In pansori | SRD universe |
 |---|---|---|
-| Spells | **179** (26 cantrips + 153 leveled, through L9) | ~330 |
+| Spells | **180** (26 cantrips + 154 leveled, through L9) | ~330 |
 | Shared SRD monster pool | **12** (`SRD_MONSTERS`) + per-campaign templates | hundreds |
 | Species | 9 | 9 standalone + Drow lineage |
 | Classes | 12 | 12 |
@@ -85,7 +85,7 @@ backend features are waiting on, and a handful of **bounded subsystems**.
 
 ### Content breadth — data on existing patterns (RE-6)
 
-- [ ] **Spells** — ~179 / ~330 SRD. Most remaining categories are already
+- [ ] **Spells** — ~180 / ~330 SRD. Most remaining categories are already
       representable (data entry).
   - [~] **Persistent damage zones** — foundation shipped (RE-4): `GameState.spell_zones`
         + `SpellZone`, the `persistentZone` spell flag, cast-time `runZoneSpell`
@@ -109,6 +109,15 @@ backend features are waiting on, and a handful of **bounded subsystems**.
         **Spiritual Weapon** (Bonus-Action force attack, +spellcasting mod, no
         concentration) and **Vampiric Touch** (Magic-action necrotic that heals
         half, concentration) ride it.
+  - [~] **Enchantment control** — foundation shipped (RE-4): the `commanded`
+        condition + an enemy-turn skip block (the creature loses its turn and
+        the condition is consumed). **Command** (L1, WIS save → "Halt": lose
+        your next turn) rides it. Next on this base: **Confusion** (AoE +
+        random-behavior re-save — needs the AoE-condition-to-all fix below),
+        **Compulsion** (forced movement), and **Dominate** (full enemy control).
+        Command's RAW upcast (one extra target per slot ≥ 2) is deferred
+        (single-target cast); other command words (Approach/Flee/Grovel/Drop)
+        collapse to the "Halt" turn-loss model.
       Exceptions still needing a model first: the alternate "summon" spells,
       each mechanically distinct from the stat-block ally model —
   - [ ] **Conjure Animals** (L3) + other 2024 conjure spells — a

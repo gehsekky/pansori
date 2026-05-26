@@ -97,7 +97,15 @@ export type ConditionName =
   // and death saves for the spell's concentration duration.
   // rollConditionSave reads this for WIS-save advantage; the death-
   // save handler reads it for advantage on the d20.
-  | 'hopeful';
+  | 'hopeful'
+  // SRD: Command — the target failed its Wisdom save and is compelled
+  // to obey a one-word command on its next turn. Pansori models the
+  // "Halt" command (the most general "lose your turn" outcome): the
+  // enemy turn loop skips a commanded creature's next turn, then
+  // consumes the condition (the command applies for one turn only, so
+  // the creature acts normally the round after). Single-target, no
+  // concentration — distinct from the lasting incapacitating conditions.
+  | 'commanded';
 
 export type NpcAttitude = 'friendly' | 'indifferent' | 'hostile';
 
