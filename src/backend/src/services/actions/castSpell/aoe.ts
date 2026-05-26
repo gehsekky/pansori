@@ -29,6 +29,7 @@ import {
 import { empoweredEvocationBonus, getClassLevel } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import { fmt } from '../../narrativeFmt.js';
+import { grantEnemyDrops } from '../enemyDrops.js';
 
 /**
  * AOE-on-grid branch. Resolves area-of-effect spells against every
@@ -175,6 +176,7 @@ export function runAoeSpell(
         };
         ctx.st.enemies_killed = [...ctx.st.enemies_killed, target.id];
         ctx.narrative += grantDarkOnesBlessing(char);
+        grantEnemyDrops(ctx, targetEnemy);
         ctx.narrative += applyPartyLevelUps(ctx.st, char, ctx.context);
         if (isRoomCleared(ctx.st, ctx.seed, ctx.roomId)) {
           ctx.st = endCombatState(ctx.st);

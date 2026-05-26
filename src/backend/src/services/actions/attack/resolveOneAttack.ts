@@ -41,6 +41,7 @@ import type { ActionContext } from '../types.js';
 import type { ToHitContext } from './toHit.js';
 import { composeNow } from '../../narrative/compose.js';
 import { fmt } from '../../narrativeFmt.js';
+import { grantEnemyDrops } from '../enemyDrops.js';
 import { hasFightingStyle } from '../../fightingStyle.js';
 import { updatePcActor } from '../actor.js';
 
@@ -1027,6 +1028,7 @@ export function resolveOneAttack(
       xp: xpShare,
       killProse,
     });
+    grantEnemyDrops(ctx, target);
     ctx.narrative += applyPartyLevelUps(ctx.st, pc.char, ctx.context);
     ctx.usedInitiative = true;
     return true;

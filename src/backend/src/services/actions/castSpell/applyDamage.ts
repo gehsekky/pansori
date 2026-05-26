@@ -11,6 +11,7 @@ import {
 import type { ActionContext } from '../types.js';
 import { applyDamageMultiplier } from '../../rulesEngine.js';
 import { fmt } from '../../narrativeFmt.js';
+import { grantEnemyDrops } from '../enemyDrops.js';
 
 /**
  * Single-target damage applicator for the attack-roll, save-with-
@@ -73,6 +74,7 @@ export function applySingleTargetDamage(
       pick(ctx.context.narratives.killShot)
         .replace('{enemy}', spellTarget.name)
         .replace('{xp}', String(xpShare));
+    grantEnemyDrops(ctx, spellTarget);
     ctx.narrative += applyPartyLevelUps(ctx.st, char, ctx.context);
   } else {
     ctx.narrative += ` The ${spellTarget.name} has ${fmt.hp(newEnemyHpSpell)} HP remaining.`;

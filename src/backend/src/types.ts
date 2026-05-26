@@ -188,6 +188,12 @@ export interface EnemyTemplate {
   legendary_actions?: LegendaryAction[];
   legendary_pool?: number; // points per round; default 3 if legendary_actions set
   lair_actions?: LairAction[];
+  // Loot dropped to the killer on death: `drops` are item ids (resolved from
+  // the campaign's lootTable, added to the slayer's inventory) and `goldDrop`
+  // is coins added to their purse. Both optional; enemies with neither drop
+  // nothing (XP only, as before).
+  drops?: string[];
+  goldDrop?: number;
 }
 
 export interface Enemy {
@@ -243,6 +249,10 @@ export interface Enemy {
   legendary_pool?: number;
   legendary_action_points?: number;
   lair_actions?: LairAction[];
+  // Loot dropped to the killer on death (item ids + gold). Mirrors
+  // EnemyTemplate; carried through procgen / seed placement.
+  drops?: string[];
+  goldDrop?: number;
 }
 
 export interface Seed {
