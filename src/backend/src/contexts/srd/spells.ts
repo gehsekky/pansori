@@ -973,10 +973,35 @@ export const SRD_SPELLS: Record<string, Spell> = {
     damage: '2d8',
     savingThrow: 'con',
     saveEffect: 'half',
-    desc: 'A wave of thunderous force erupts from you. CON save or take 2d8 thunder, half on success.',
+    // SRD: 15-ft cube from the caster — CON save for half; on a failed save the
+    // creature also takes the full 2d8 and is pushed 10 ft away from the caster.
+    blastRadius: 15,
+    aoeShape: 'cube',
+    pushFt: 10,
+    desc: 'A 15-ft cube of thunderous force erupts from you. Each creature makes a CON save — 2d8 thunder (half on a success); on a failure it is also pushed 10 ft away.',
     rangeKind: 'self',
     // Bard / Druid / Sorcerer / Wizard (2024 PHB).
     spellList: ['arcane', 'primal'],
+  },
+  gust_of_wind: {
+    id: 'gust_of_wind',
+    name: 'Gust of Wind',
+    level: 2,
+    castTime: 'action',
+    concentration: true,
+    // SRD: a 60-ft line, 10 ft wide. Each creature in the line makes a STR save
+    // or is pushed 15 ft away from the caster. pansori models the on-cast push;
+    // the per-turn re-push for creatures ending their turn in the line and the
+    // "2 ft per 1 ft toward you" movement tax are deferred.
+    savingThrow: 'str',
+    saveEffect: 'negates',
+    blastRadius: 60,
+    aoeShape: 'line',
+    pushFt: 15,
+    desc: 'A 60-ft line of strong wind blasts from you. Each creature in the line makes a STR save or is pushed 15 ft away (Concentration, up to 1 min).',
+    rangeKind: 'self',
+    // Druid / Ranger / Sorcerer / Wizard (2024 PHB).
+    spellList: ['primal', 'arcane'],
   },
   burning_hands: {
     id: 'burning_hands',

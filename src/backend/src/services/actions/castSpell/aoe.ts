@@ -15,6 +15,7 @@ import {
   getEnemyById,
   grantDarkOnesBlessing,
   isRoomCleared,
+  pushEntityAway,
   splitEncounterXp,
 } from '../../gameEngine.js';
 import {
@@ -159,7 +160,9 @@ export function runAoeSpell(
           e.id === target.id && e.isEnemy ? { ...e, hp: Math.max(0, newHp) } : e
         ),
       };
-      ctx.narrative += ` ${targetEnemy.name}: ${tFailed ? 'fails' : 'succeeds'} save — ${resDmg} dmg${newHp <= 0 ? ' (killed)' : ''}.`;
+      // Push-only spells (Gust of Wind) carry no damage — drop the "N dmg" tail.
+      const dmgPart = spell.damage ? ` — ${resDmg} dmg${newHp <= 0 ? ' (killed)' : ''}` : '';
+      ctx.narrative += ` ${targetEnemy.name}: ${tFailed ? 'fails' : 'succeeds'} save${dmgPart}.`;
       if (newHp <= 0) {
         const split = splitEncounterXp(ctx.st, char.id, targetEnemy.xp ?? 10);
         ctx.st = split.st;
@@ -179,6 +182,25 @@ export function runAoeSpell(
       } else if (resDmg > 0) {
         // SRD Dominate — a dominated creature caught in the blast re-saves.
         dominatedDamageReSave(ctx, target.id, targetEnemy.name);
+      }
+      // SRD forced displacement (Thunderwave, Gust of Wind) — a creature that
+      // failed its save and is still standing is pushed away from the caster.
+      if (
+        spell.pushFt &&
+        tFailed &&
+        (ctx.st.entities?.find((e) => e.id === target.id && e.isEnemy)?.hp ?? 0) > 0
+      ) {
+        const pr = pushEntityAway(
+          ctx.st,
+          target.id,
+          casterPos ?? epicenter,
+          spell.pushFt,
+          ctx.context,
+          ctx.roomId,
+          ctx.roomObstacleCells
+        );
+        ctx.st = pr.st;
+        if (pr.pushedFt > 0) ctx.narrative += ` ${targetEnemy.name} is pushed ${pr.pushedFt} ft.`;
       }
     } else if (targetChar && !target.isEnemy) {
       // Allies in blast auto-succeed (and take no damage) via Evoker Sculpt
