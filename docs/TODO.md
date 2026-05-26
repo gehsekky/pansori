@@ -67,7 +67,7 @@ Grounded in a code survey + the full backend suite: **1572 tests across
 
 | Category | In pansori | SRD universe |
 |---|---|---|
-| Spells | **176** (26 cantrips + 150 leveled, through L9) | ~330 |
+| Spells | **178** (26 cantrips + 152 leveled, through L9) | ~330 |
 | Shared SRD monster pool | **12** (`SRD_MONSTERS`) + per-campaign templates | hundreds |
 | Species | 9 | 9 standalone + Drow lineage |
 | Classes | 12 | 12 |
@@ -85,19 +85,21 @@ backend features are waiting on, and a handful of **bounded subsystems**.
 
 ### Content breadth — data on existing patterns (RE-6)
 
-- [ ] **Spells** — ~176 / ~330 SRD. Most remaining categories are already
+- [ ] **Spells** — ~178 / ~330 SRD. Most remaining categories are already
       representable (data entry).
   - [~] **Persistent damage zones** — foundation shipped (RE-4): `GameState.spell_zones`
         + `SpellZone`, the `persistentZone` spell flag, cast-time `runZoneSpell`
         (stamp + concentration link + tick-on-cast), the round-wrap tick
         (`fireSpellZones` → `applyZoneTick`, save-for-half or auto), and
         concentration cleanup. **Moonbeam** + **Flaming Sphere** ship on it.
-        **Spirit Guardians** now rides this as a caster-following aura
+        **Spirit Guardians** rides this as a caster-following aura
         (`followsCaster` — footprint recomputed from the caster's cell each
-        tick). Remaining: placed zones are **stationary** (RAW repositioning —
-        Flaming Sphere bonus-action roll, Moonbeam/Call Lightning move actions —
-        is deferred); add **Call Lightning** / **Spike Growth**
-        (movement-triggered).
+        tick); **Call Lightning** (DEX-save bolt) and **Spike Growth** (the
+        first no-save zone) ship as placed zones. Remaining: placed zones are
+        **stationary** (RAW repositioning — Flaming Sphere bonus-action roll,
+        Moonbeam/Call Lightning move actions — is deferred), and Spike Growth's
+        per-5-ft-moved damage + difficult terrain are approximated as a flat
+        per-round tick.
       Exceptions still needing a model first: the alternate "summon" spells,
       each mechanically distinct from the stat-block ally model —
   - [ ] **Spiritual Weapon** (L2) — a floating force with no HP; a

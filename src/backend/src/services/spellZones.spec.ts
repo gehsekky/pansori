@@ -213,6 +213,52 @@ describe('Spirit Guardians — caster-following aura', () => {
   });
 });
 
+describe('Call Lightning + Spike Growth — placed zones', () => {
+  function druidWith(spellId: string, enemyPos: { x: number; y: number }): GameState {
+    const druid = makeChar({
+      id: 'pc-1',
+      character_class: 'Druid',
+      level: 5,
+      wis: 18,
+      spells_known: [spellId],
+      prepared_spells: [spellId],
+      spell_slots_max: { 1: 4, 2: 3, 3: 2 },
+      spell_slots_used: {},
+    });
+    const st = combatState(enemyPos);
+    st.characters = [druid];
+    return st;
+  }
+
+  it('Call Lightning strikes the target point (DEX-save zone)', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.01); // enemy fails its DEX save
+    const r = await takeAction({
+      action: { type: 'cast_spell', spellId: 'call_lightning', slotLevel: 3, targetEnemyId: ENEMY },
+      history: [],
+      state: druidWith('call_lightning', { x: 2, y: 2 }),
+      seed,
+      context: ctx,
+    });
+    expect(r.newState.spell_zones?.[0].spellId).toBe('call_lightning');
+    expect(r.newState.spell_zones?.[0].savingThrow).toBe('dex');
+    expect(r.newState.entities?.find((e) => e.id === ENEMY)?.hp).toBeLessThan(100);
+  });
+
+  it('Spike Growth auto-damages hostiles in the field (no save)', async () => {
+    const r = await takeAction({
+      action: { type: 'cast_spell', spellId: 'spike_growth', slotLevel: 2, targetEnemyId: ENEMY },
+      history: [],
+      state: druidWith('spike_growth', { x: 3, y: 3 }),
+      seed,
+      context: ctx,
+    });
+    const z = r.newState.spell_zones?.[0];
+    expect(z?.spellId).toBe('spike_growth');
+    expect(z?.savingThrow).toBeUndefined(); // automatic — no save
+    expect(r.newState.entities?.find((e) => e.id === ENEMY)?.hp).toBeLessThan(100);
+  });
+});
+
 describe('breakConcentration clears the caster’s zones', () => {
   it('removes spell_zones owned by the caster', () => {
     const caster = makeChar({

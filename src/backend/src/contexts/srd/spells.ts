@@ -2762,6 +2762,51 @@ export const SRD_SPELLS: Record<string, Spell> = {
     desc: 'A 5-ft sphere of fire; creatures within 5 ft of it make a DEX save, taking 2d6 fire on a failure or half on a success, each round it persists (Concentration, up to 1 minute; +1d6 per slot above 2nd). RAW you can roll it 30 ft as a Bonus Action — movement is deferred, so the sphere is stationary.',
     spellList: ['primal', 'arcane'],
   },
+  // SRD: Call Lightning (L3) — a storm cloud calls a bolt down at a point each
+  // round (Concentration). Creatures at the strike point make a DEX save for
+  // half of 3d10 lightning. RAW you re-aim the bolt each turn — repositioning
+  // is deferred, so the bolt falls on the same point.
+  call_lightning: {
+    id: 'call_lightning',
+    name: 'Call Lightning',
+    level: 3,
+    castTime: 'action',
+    persistentZone: true,
+    concentration: true,
+    durationRounds: 100,
+    damage: '3d10',
+    damageType: 'lightning',
+    savingThrow: 'dex',
+    saveEffect: 'half',
+    upcastBonus: '1d10',
+    blastRadius: 5,
+    aoeShape: 'sphere',
+    rangeKind: 'ranged',
+    rangeFt: 120,
+    desc: 'A storm cloud calls a lightning bolt down at a point each round (Concentration, up to 10 minutes). A creature at the strike point makes a DEX save, taking 3d10 lightning on a failure or half on a success (+1d10 per slot above 3rd). RAW you re-aim the bolt each turn — repositioning is deferred, so it strikes the same point.',
+    spellList: ['primal'],
+  },
+  // SRD: Spike Growth (L2) — a 20-ft-radius field of spikes + Difficult Terrain
+  // (Concentration). RAW deals 2d4 piercing per 5 ft moved through it (no save);
+  // pansori ticks 2d4 to hostiles in the field each round (the per-5-ft
+  // accounting + the difficult terrain are deferred). First no-save zone.
+  spike_growth: {
+    id: 'spike_growth',
+    name: 'Spike Growth',
+    level: 2,
+    castTime: 'action',
+    persistentZone: true,
+    concentration: true,
+    durationRounds: 100,
+    damage: '2d4',
+    damageType: 'piercing',
+    blastRadius: 20,
+    aoeShape: 'sphere',
+    rangeKind: 'ranged',
+    rangeFt: 150,
+    desc: 'The ground in a 20-ft-radius sphere sprouts spikes, becoming difficult terrain (Concentration, up to 10 minutes). RAW a creature takes 2d4 piercing per 5 ft it moves through the area (no save); pansori ticks 2d4 to hostiles in the field each round (the per-5-ft accounting and difficult terrain are deferred).',
+    spellList: ['primal'],
+  },
 
   // ─── Defensive buffs ─────────────────────────────────────────────────
   stoneskin: {
