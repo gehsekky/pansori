@@ -6944,6 +6944,164 @@ export async function runEnemyTurns(args: {
           narrative += `\n\n[${rm.name} acts with purpose despite its confusion.]`;
         }
       }
+      // SRD Compulsion — a compelled creature is driven to flee: it uses its
+      // full movement to stagger away from the caster (no action), then
+      // re-saves (RAW: "after moving in this way, repeat the save"). The
+      // direction is fixed to "away from the caster" (pansori simplification).
+      // Cleared on a successful re-save or when the caster's concentration drops.
+      const compelledEnt = st.entities?.find((e) => e.id === eEntry.id && e.isEnemy);
+      if (compelledEnt && compelledEnt.conditions.includes('compelled')) {
+        const compelCaster = st.characters.find(
+          (c) => c.concentrating_on?.condition === 'compelled' && !c.dead
+        );
+        const casterEnt = compelCaster
+          ? st.entities?.find((e) => e.id === compelCaster.id && !e.isEnemy)
+          : undefined;
+        const epos = compelledEnt.pos;
+        if (casterEnt) {
+          // Aim at the grid edge in the direction away from the caster and path
+          // toward it, so the creature moves as far from the caster as its speed
+          // allows. The target must stay on-grid or the pathfinder finds no
+          // destination cell.
+          const locGrid = args.context.campaign?.locations?.find((l) =>
+            l.rooms?.some((rr) => rr.id === st.current_room)
+          );
+          const gw = locGrid?.gridWidth ?? args.context.gridWidth ?? 10;
+          const gh = locGrid?.gridHeight ?? args.context.gridHeight ?? 10;
+          const vx = epos.x - casterEnt.pos.x;
+          const vy = epos.y - casterEnt.pos.y;
+          const awayTarget = {
+            x: Math.max(0, Math.min(gw - 1, epos.x + (vx === 0 ? 1 : Math.sign(vx)) * gw)),
+            y: Math.max(0, Math.min(gh - 1, epos.y + (vy === 0 ? 1 : Math.sign(vy)) * gh)),
+          };
+          const plan = planEnemyApproach({
+            st,
+            enemyId: eEntry.id,
+            enemyPos: epos,
+            targetPos: awayTarget,
+            reachFt: 0,
+            speedFt: (rm as unknown as Record<string, number>).speedFt ?? DEFAULT_SPEED_FEET,
+            context: args.context,
+            roomId: st.current_room,
+            roomObstacles: roomObstacleCells,
+          });
+          if (plan && plan.pathSquares.length > 0) {
+            st = {
+              ...st,
+              entities: (st.entities ?? []).map((e) =>
+                e.id === eEntry.id && e.isEnemy ? { ...e, pos: plan.newPos } : e
+              ),
+            };
+            narrative += `\n\n[${rm.name} is compelled to stagger ${plan.pathSquares.length * SQUARE_SIZE} ft away.]`;
+          } else {
+            narrative += `\n\n[${rm.name} is compelled but cornered — it can't move away.]`;
+          }
+        }
+        // Re-save after the forced movement.
+        const compelDc = compelCaster?.concentrating_on?.save_dc ?? 13;
+        const compelWis = (rm as unknown as Record<string, number>).wis ?? 10;
+        const compelReSaveFailed = rollConditionSave(
+          'wis',
+          compelWis,
+          compelDc,
+          false,
+          1,
+          0,
+          compelledEnt.conditions
+        );
+        if (!compelReSaveFailed) {
+          narrative += ` ${rm.name} shakes off the compulsion.`;
+          st = {
+            ...st,
+            entities: (st.entities ?? []).map((e) =>
+              e.id === eEntry.id && e.isEnemy
+                ? { ...e, conditions: e.conditions.filter((c) => c !== 'compelled') }
+                : e
+            ),
+          };
+        }
+        resumeMi = 0;
+        const prevAdvIdxCompel = advIdx;
+        advIdx = (advIdx + 1) % orderLen;
+        if (advIdx === 0 && prevAdvIdxCompel !== 0) roundWrapped = true;
+        if (advIdx === args.initialCurrentIdx) break;
+        continue;
+      }
+      // SRD Dominate — a dominated creature fights for the party: on its turn
+      // it approaches and attacks the nearest OTHER living enemy. If none
+      // remain it stands guard. Cleared when the caster's concentration drops.
+      // (On-damage re-save + manual command surface deferred — pansori
+      // auto-pilots the creature, the RAW "acts to protect itself" fallback.)
+      const dominatedEnt = st.entities?.find((e) => e.id === eEntry.id && e.isEnemy);
+      if (dominatedEnt && dominatedEnt.conditions.includes('dominated')) {
+        const foes = (st.entities ?? []).filter(
+          (e) =>
+            e.isEnemy &&
+            e.id !== eEntry.id &&
+            e.hp > 0 &&
+            !st.enemies_killed.includes(e.id) &&
+            !e.conditions.includes('dominated')
+        );
+        if (foes.length > 0) {
+          let pos = dominatedEnt.pos;
+          const victim = [...foes].sort(
+            (a, b) => distanceFeet(pos, a.pos) - distanceFeet(pos, b.pos)
+          )[0];
+          const victimStats = getEnemyById(args.seed, victim.id);
+          const victimAc = victimStats?.ac ?? victim.ac ?? 10;
+          const victimName = victimStats?.name ?? 'the enemy';
+          if (distanceFeet(pos, victim.pos) > 5) {
+            const plan = planEnemyApproach({
+              st,
+              enemyId: eEntry.id,
+              enemyPos: pos,
+              targetPos: victim.pos,
+              reachFt: 5,
+              speedFt: (rm as unknown as Record<string, number>).speedFt ?? DEFAULT_SPEED_FEET,
+              context: args.context,
+              roomId: st.current_room,
+              roomObstacles: roomObstacleCells,
+            });
+            if (plan && plan.pathSquares.length > 0) {
+              pos = plan.newPos;
+              st = {
+                ...st,
+                entities: (st.entities ?? []).map((e) =>
+                  e.id === eEntry.id && e.isEnemy ? { ...e, pos: plan.newPos } : e
+                ),
+              };
+              narrative += `\n\n[${rm.name} (dominated) advances on ${victimName}.]`;
+            }
+          }
+          if (distanceFeet(pos, victim.pos) <= 5) {
+            const res = resolveEnemyAttack(
+              { toHit: rm.toHit ?? 0, damage: rm.damage ?? '1d4' },
+              victimAc
+            );
+            if (res.hit) {
+              st = applyDamageToEntity(st, victim.id, res.damage);
+              narrative += `\n\n[${rm.name} (dominated) strikes ${victimName} — ${res.damage} damage!]`;
+              if ((st.entities?.find((e) => e.id === victim.id)?.hp ?? 0) <= 0) {
+                st.enemies_killed = [...st.enemies_killed, victim.id];
+                narrative += ` ${victimName} is slain!`;
+                if (isRoomCleared(st, args.seed, st.current_room)) st = endCombatState(st);
+              }
+            } else {
+              narrative += `\n\n[${rm.name} (dominated) attacks ${victimName} — miss.]`;
+            }
+          } else {
+            narrative += `\n\n[${rm.name} (dominated) can't reach ${victimName} this turn.]`;
+          }
+        } else {
+          narrative += `\n\n[${rm.name} (dominated) stands guard — no other enemy to attack.]`;
+        }
+        resumeMi = 0;
+        const prevAdvIdxDom = advIdx;
+        advIdx = (advIdx + 1) % orderLen;
+        if (advIdx === 0 && prevAdvIdxDom !== 0) roundWrapped = true;
+        if (advIdx === args.initialCurrentIdx) break;
+        continue;
+      }
       // SRD Paladin Holy Nimbus (Devotion L20) — an enemy that starts its turn
       // within an active nimbus aura takes Radiant damage (CHA + prof). Resolved
       // before the enemy acts; a kill ends its turn (and combat if room clears).

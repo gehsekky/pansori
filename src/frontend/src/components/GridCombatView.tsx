@@ -74,6 +74,8 @@ function conditionBadges(conditions: string[]): string {
     incapacitated: 'I',
     commanded: 'Cmd',
     confused: 'Cf',
+    compelled: 'Cp',
+    dominated: 'Dm',
     raging: 'RG',
     dodging: 'Dg',
   };
