@@ -162,6 +162,9 @@ interface CharDraft {
   // list". Undefined = the curated default (shown pre-selected). Cleared on
   // class change (the options differ).
   classSkills?: string[];
+  // 2024 starting-equipment package id ('A' / 'B' / 'C'). Undefined = the
+  // default (first) package. Cleared on class change.
+  startingEquipment?: string;
 }
 
 // 'sleight_of_hand' → 'Sleight of Hand'. Skill ids are snake_case.
@@ -549,6 +552,7 @@ function CharScreen({
           feat_choices: d.featChoices,
           ability_bonus: d.abilityBonus,
           class_skills: d.classSkills,
+          starting_equipment: d.startingEquipment,
         })),
         contextId
       );
@@ -641,9 +645,13 @@ function CharScreen({
                     style={{ cursor: 'pointer' }}
                     value={draft.cls}
                     onChange={(e) =>
-                      // Reset the class-skill picks — the new class offers a
-                      // different list.
-                      updateDraft(idx, { cls: e.target.value, classSkills: undefined })
+                      // Reset the class-skill + equipment picks — the new class
+                      // offers different options.
+                      updateDraft(idx, {
+                        cls: e.target.value,
+                        classSkills: undefined,
+                        startingEquipment: undefined,
+                      })
                     }
                   >
                     {classes.map((c) => (
@@ -726,6 +734,55 @@ function CharScreen({
                               >
                                 {on ? '✓ ' : ''}
                                 {skillLabel(sk)}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* 2024 starting-equipment package ("Choose A/B/C"). Options +
+                      item names come from the BE context summary; the first
+                      package is the default. */}
+                  {(() => {
+                    const packages = beContexts[contextId]?.classStartingEquipment?.[draft.cls];
+                    if (!packages || packages.length === 0) return null;
+                    const selectedId = draft.startingEquipment ?? packages[0].id;
+                    return (
+                      <div style={{ marginTop: 12 }}>
+                        <label className={styles.formLbl}>STARTING EQUIPMENT</label>
+                        <div
+                          style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}
+                          data-testid={`starting-equipment-${idx}`}
+                        >
+                          {packages.map((p) => {
+                            const on = p.id === selectedId;
+                            return (
+                              <button
+                                key={p.id}
+                                type="button"
+                                aria-pressed={on}
+                                onClick={() => updateDraft(idx, { startingEquipment: p.id })}
+                                style={{
+                                  textAlign: 'left',
+                                  fontFamily: 'inherit',
+                                  fontSize: '0.72rem',
+                                  lineHeight: 1.4,
+                                  padding: '0.35rem 0.55rem',
+                                  background: on ? 'var(--t-separator)' : 'transparent',
+                                  border: `1px solid ${on ? 'var(--t-primary)' : 'var(--t-border)'}`,
+                                  color: on ? 'var(--t-primary)' : 'var(--t-dim)',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                <span style={{ fontWeight: 'bold' }}>
+                                  {on ? '✓ ' : ''}
+                                  {p.label}
+                                </span>
+                                {' · '}
+                                {p.items.length > 0 ? p.items.join(', ') : 'no gear'}
+                                {p.gold > 0 ? ` · ${p.gold} gp` : ''}
                               </button>
                             );
                           })}

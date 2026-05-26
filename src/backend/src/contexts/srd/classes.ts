@@ -325,6 +325,125 @@ export function resolveClassSkills(
   return defaultClassSkills(className, fallback);
 }
 
+// ─── Starting equipment (2024 SRD "Choose A, B, or C") ───────────────────────
+// Each class offers a few starting-equipment packages: a gear loadout (+ a
+// little gold) or a gold-only option to buy your own. pansori's combat-focused
+// catalog doesn't model packs / focuses / ammo / tools, so those are dropped
+// (the gold compensates) and a few weapons are mapped to the nearest item we
+// carry: greatsword→greataxe, flail→mace, javelin→handaxe, scimitar→shortsword,
+// spear→quarterstaff, sickle→dagger. GP amounts are taken from the SRD.
+export interface EquipmentPackage {
+  id: string; // 'A' | 'B' | 'C'
+  label: string; // short human descriptor for the picker
+  items: string[]; // SRD_ITEMS ids (duplicates → multiple instances)
+  gold: number; // starting GP for this package
+}
+
+export const SRD_CLASS_STARTING_EQUIPMENT: Record<string, EquipmentPackage[]> = {
+  Barbarian: [
+    { id: 'A', label: 'Greataxe & handaxes', items: ['greataxe', 'handaxe', 'handaxe'], gold: 15 },
+    { id: 'B', label: 'Gold only', items: [], gold: 75 },
+  ],
+  Bard: [
+    { id: 'A', label: 'Leather & daggers', items: ['leather_armor', 'dagger', 'dagger'], gold: 19 },
+    { id: 'B', label: 'Gold only', items: [], gold: 90 },
+  ],
+  Cleric: [
+    {
+      id: 'A',
+      label: 'Chain shirt, shield & mace',
+      items: ['chain_shirt', 'shield', 'mace'],
+      gold: 7,
+    },
+    { id: 'B', label: 'Gold only', items: [], gold: 110 },
+  ],
+  Druid: [
+    {
+      id: 'A',
+      label: 'Leather, shield & staff',
+      items: ['leather_armor', 'shield', 'quarterstaff', 'dagger'],
+      gold: 9,
+    },
+    { id: 'B', label: 'Gold only', items: [], gold: 50 },
+  ],
+  Fighter: [
+    {
+      id: 'A',
+      label: 'Heavy melee',
+      items: ['chain_mail', 'greataxe', 'mace', 'handaxe'],
+      gold: 4,
+    },
+    {
+      id: 'B',
+      label: 'Skirmisher',
+      items: ['studded_leather', 'shortsword', 'shortsword', 'longbow'],
+      gold: 11,
+    },
+    { id: 'C', label: 'Gold only', items: [], gold: 155 },
+  ],
+  Monk: [
+    { id: 'A', label: 'Staff & daggers', items: ['quarterstaff', 'dagger', 'dagger'], gold: 11 },
+    { id: 'B', label: 'Gold only', items: [], gold: 50 },
+  ],
+  Paladin: [
+    {
+      id: 'A',
+      label: 'Chain mail, shield & sword',
+      items: ['chain_mail', 'shield', 'longsword', 'handaxe'],
+      gold: 9,
+    },
+    { id: 'B', label: 'Gold only', items: [], gold: 150 },
+  ],
+  Ranger: [
+    {
+      id: 'A',
+      label: 'Studded leather & bow',
+      items: ['studded_leather', 'shortsword', 'shortsword', 'longbow'],
+      gold: 7,
+    },
+    { id: 'B', label: 'Gold only', items: [], gold: 150 },
+  ],
+  Rogue: [
+    {
+      id: 'A',
+      label: 'Leather, blades & bow',
+      items: ['leather_armor', 'dagger', 'dagger', 'shortsword', 'shortbow'],
+      gold: 8,
+    },
+    { id: 'B', label: 'Gold only', items: [], gold: 100 },
+  ],
+  Sorcerer: [
+    { id: 'A', label: 'Staff & daggers', items: ['quarterstaff', 'dagger', 'dagger'], gold: 28 },
+    { id: 'B', label: 'Gold only', items: [], gold: 50 },
+  ],
+  Warlock: [
+    { id: 'A', label: 'Leather & daggers', items: ['leather_armor', 'dagger', 'dagger'], gold: 15 },
+    { id: 'B', label: 'Gold only', items: [], gold: 100 },
+  ],
+  Wizard: [
+    { id: 'A', label: 'Staff & daggers', items: ['quarterstaff', 'dagger', 'dagger'], gold: 5 },
+    { id: 'B', label: 'Gold only', items: [], gold: 55 },
+  ],
+};
+
+/**
+ * Resolve a character's starting equipment. With class packages defined, use
+ * the one matching `choiceId` (else the first/default package). Without
+ * packages (e.g. a campaign that only sets `classStartingLoot`), fall back to
+ * the legacy item list + the default 5 GP.
+ */
+export function resolveStartingEquipment(
+  packages: EquipmentPackage[] | undefined,
+  choiceId: string | undefined,
+  fallbackIds: readonly string[]
+): { items: string[]; gold: number } {
+  if (packages && packages.length > 0) {
+    const pkg = (choiceId && packages.find((p) => p.id === choiceId)) || packages[0];
+    return { items: [...pkg.items], gold: pkg.gold };
+  }
+  return { items: [...fallbackIds], gold: 5 };
+}
+
 // The single SRD-iconic subclass each class gains at level 3 (SRD 5.2.1
 // publishes exactly one subclass per class). Keyed by lowercased class name.
 // The engine auto-assigns this at level 3 — there's no choice to make.

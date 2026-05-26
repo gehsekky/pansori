@@ -30,6 +30,7 @@ import {
   SRD_WEAPON_MASTERY_SLOTS,
   defaultClassSkills,
   resolveClassSkills,
+  resolveStartingEquipment,
 } from '../contexts/srd/index.js';
 import { applyAbilityScoreIncreases, isValidForMethod } from '../services/abilityScores.js';
 import {
@@ -163,6 +164,19 @@ gameRouter.get('/contexts', (_req, res) => {
             options: choice.options,
             default: defaultClassSkills(cls, c.classSkills?.[cls] ?? []),
           },
+        ])
+      ),
+      // Starting-equipment packages with item display names resolved, for the
+      // creation-screen picker.
+      classStartingEquipment: Object.fromEntries(
+        Object.entries(c.classStartingEquipment ?? {}).map(([cls, pkgs]) => [
+          cls,
+          pkgs.map((p) => ({
+            id: p.id,
+            label: p.label,
+            gold: p.gold,
+            items: p.items.map((id) => c.lootTable.find((l) => l.id === id)?.name ?? id),
+          })),
         ])
       ),
       backgrounds: (c.backgrounds ?? []).map((b) => ({
@@ -346,9 +360,15 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
       // single SRD subclass auto-applies at level 3 — not at creation.
       const maxHp = Math.max(1, hitDie + conMod + dwarfHpBonus);
 
-      // Build starting inventory from classStartingLoot or campaign.startingLoot
-      const startingIds =
-        ctx.classStartingLoot?.[c.character_class] ?? ctx.campaign?.startingLoot ?? [];
+      // 2024 starting equipment — the player's chosen "Choose A/B/C" package
+      // (items + GP), or the default package / legacy classStartingLoot when
+      // none is supplied.
+      const startingEq = resolveStartingEquipment(
+        ctx.classStartingEquipment?.[c.character_class],
+        c.starting_equipment,
+        ctx.classStartingLoot?.[c.character_class] ?? ctx.campaign?.startingLoot ?? []
+      );
+      const startingIds = startingEq.items;
       const startingInventory = startingIds
         .map((id) => {
           const item = ctx.lootTable.find((l) => l.id === id);
@@ -395,7 +415,7 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
         ...base,
         xp: 0,
         level: 1,
-        gold: 5,
+        gold: startingEq.gold,
         inventory: startingInventory,
         equipped_weapon: equippedWeapon,
         equipped_armor: equippedArmor,

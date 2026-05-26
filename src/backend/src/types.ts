@@ -1236,6 +1236,12 @@ export interface Context {
   classFeatures?: Record<string, string[]>;
   // Per-class starting gear — auto-equipped at session start
   classStartingLoot?: Record<string, string[]>; // class → item IDs given at session start
+  // 2024 SRD "Choose A/B/C" starting equipment packages per class (items + GP).
+  // The creation flow offers these; falls back to `classStartingLoot` when unset.
+  classStartingEquipment?: Record<
+    string,
+    { id: string; label: string; items: string[]; gold: number }[]
+  >;
   // Backgrounds — optional list; if present, player picks one at character creation
   backgrounds?: Background[];
   // Spell system — optional; only present for contexts with spellcasting classes

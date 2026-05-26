@@ -14,10 +14,13 @@ export {
   SRD_CLASS_FEATURES,
   SRD_CLASS_SKILLS,
   SRD_CLASS_SKILL_CHOICES,
+  SRD_CLASS_STARTING_EQUIPMENT,
   SRD_SUBCLASS_FOR_CLASS,
   resolveClassSkills,
+  resolveStartingEquipment,
   defaultClassSkills,
 } from './classes.js';
+export type { EquipmentPackage } from './classes.js';
 export { BEAST_FORMS, maxBeastCRForLevel, availableBeastForms } from './beast_forms.js';
 export { SRD_MONSTERS } from './monsters.js';
 export { REINCARNATE_SPECIES, SRD_SPECIES } from './species.js';
