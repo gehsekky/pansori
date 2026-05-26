@@ -118,6 +118,12 @@ import { factionShopPrice } from './campaignEngine.js';
 import { llmProvider } from './llmProvider.js';
 import { randomUUID } from 'crypto';
 
+// Central enemy-damage floor (Undead Fortitude + future on-"reduced to 0"
+// traits). Re-exported here so combat handlers pull it from the same module
+// they already import the kill-resolution helpers (splitEncounterXp,
+// isRoomCleared, …) from. See services/enemyDamage.ts.
+export { enemyHpAfterDamage } from './enemyDamage.js';
+
 // Append a CombatEvent to state.combat_log, trimming to COMBAT_LOG_MAX so the
 // buffer doesn't grow unbounded across long sessions. Pure function — returns
 // new state, doesn't mutate. Callers should reassign: `st = pushEvent(st, e)`.

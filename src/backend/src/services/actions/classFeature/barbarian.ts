@@ -8,6 +8,7 @@ import {
 import {
   applyPartyLevelUps,
   endCombatState,
+  enemyHpAfterDamage,
   getEnemyById,
   getItemData,
   isRoomCleared,
@@ -120,14 +121,17 @@ export function handleBarbarianFeature(ctx: ActionContext, fid: string): boolean
         rollDice(dmgDice) + abilityMod(char.str) + rageDamageBonus(getClassLevel(char, 'barbarian'))
       );
       const curHp = ctx.st.entities?.find((e) => e.id === frTarget.id && e.isEnemy)?.hp ?? 0;
-      const newHp = Math.max(0, curHp - frDmg);
+      // Central enemy-damage floor — Undead Fortitude can avert the drop to 0.
+      const { hp: newHp, note: fortNote } = enemyHpAfterDamage(frTarget, curHp, frDmg, {
+        damageType: frWeapon?.damageType ?? 'bludgeoning',
+      });
       ctx.st = {
         ...ctx.st,
         entities: (ctx.st.entities ?? []).map((e) =>
           e.id === frTarget.id && e.isEnemy ? { ...e, hp: newHp } : e
         ),
       };
-      ctx.narrative = `💢 ${char.name} — Frenzy! (${frToHit} hits AC ${frTarget.ac}) ${frDmg} ${frWeapon?.damageType ?? 'bludgeoning'}${newHp <= 0 ? ` — ${frTarget.name} falls!` : ''}`;
+      ctx.narrative = `💢 ${char.name} — Frenzy! (${frToHit} hits AC ${frTarget.ac}) ${frDmg} ${frWeapon?.damageType ?? 'bludgeoning'}${newHp <= 0 ? ` — ${frTarget.name} falls!` : ''}${fortNote}`;
       if (newHp <= 0) {
         const split = splitEncounterXp(ctx.st, char.id, frTarget.xp ?? 10);
         ctx.st = split.st;

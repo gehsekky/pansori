@@ -64,6 +64,11 @@ describe('SRD bestiary additions — effect fields', () => {
     expect(SRD_MONSTERS.animated_armor.condition_immunities).toContain('frightened');
   });
 
+  it('Zombie carries Undead Fortitude and CON 16 for the DC-5+damage save', () => {
+    expect(SRD_MONSTERS.zombie.undeadFortitude).toBe(true);
+    expect(SRD_MONSTERS.zombie.con).toBe(16);
+  });
+
   it('flyers carry their flight speed', () => {
     expect(SRD_MONSTERS.griffon.speedFt).toBe(80);
     expect(SRD_MONSTERS.worg.speedFt).toBe(50);

@@ -3,6 +3,7 @@ import {
   TURN_LOOP_MANAGED_CONDITIONS,
   applyPartyLevelUps,
   endCombatState,
+  enemyHpAfterDamage,
   grantDarkOnesBlessing,
   isRoomCleared,
   pick,
@@ -273,11 +274,18 @@ export function runSaveSpell(
     if (condDmgNote) ctx.narrative += condDmgNote;
     const enemyEntCond = ctx.st.entities?.find((e) => e.id === spellTargetId && e.isEnemy);
     const curHpCond = enemyEntCond?.hp ?? 0;
-    const newEnemyHp = curHpCond - effCondDmg;
+    // Central enemy-damage floor — Undead Fortitude (a save spell can't crit;
+    // only the Radiant exemption applies). A no-op for non-undead.
+    const { hp: newEnemyHp, note: fortNote } = enemyHpAfterDamage(
+      spellTarget,
+      curHpCond,
+      effCondDmg,
+      { damageType: spell.damageType }
+    );
     ctx.st = {
       ...ctx.st,
       entities: (ctx.st.entities ?? []).map((e) =>
-        e.id === spellTargetId && e.isEnemy ? { ...e, hp: Math.max(0, newEnemyHp) } : e
+        e.id === spellTargetId && e.isEnemy ? { ...e, hp: newEnemyHp } : e
       ),
     };
     if (newEnemyHp <= 0) {
@@ -305,6 +313,7 @@ export function runSaveSpell(
           .replace('{xp}', String(xpShare));
       ctx.narrative += applyPartyLevelUps(ctx.st, char, ctx.context);
     }
+    ctx.narrative += fortNote;
     ctx.usedInitiative = true;
     return { done: true, spellDmg, spellHit: true };
   }

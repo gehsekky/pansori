@@ -211,6 +211,7 @@ export function generateRoguelikeSeed(context: Context, partySize = 1): Seed {
           bloodiedFrenzy: template.bloodiedFrenzy,
           bonusDamage: template.bonusDamage,
           bonusDamageType: template.bonusDamageType,
+          undeadFortitude: template.undeadFortitude,
           legendary_actions: template.legendary_actions,
           legendary_pool: template.legendary_pool,
           legendary_action_points: template.legendary_actions

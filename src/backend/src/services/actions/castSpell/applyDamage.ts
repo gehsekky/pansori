@@ -3,6 +3,7 @@ import {
   applyPartyLevelUps,
   dominatedDamageReSave,
   endCombatState,
+  enemyHpAfterDamage,
   grantDarkOnesBlessing,
   isRoomCleared,
   pick,
@@ -45,7 +46,16 @@ export function applySingleTargetDamage(
   const spellDmg = effSpellDmg;
   const enemyEntSpell = ctx.st.entities?.find((e) => e.id === spellTargetId && e.isEnemy);
   const curEnemyHpSpell = enemyEntSpell?.hp ?? 0;
-  const newEnemyHpSpell = curEnemyHpSpell - spellDmg;
+  // Central enemy-damage floor — Undead Fortitude can avert the drop to 0.
+  // Spell-attack crits aren't plumbed to this helper, so a crit cantrip still
+  // offers the save (a minor RAW over-generosity vs the far commoner save /
+  // auto-hit branches, which never crit).
+  const { hp: newEnemyHpSpell, note: fortitudeNote } = enemyHpAfterDamage(
+    spellTarget,
+    curEnemyHpSpell,
+    spellDmg,
+    { damageType: spell.damageType }
+  );
   ctx.st = {
     ...ctx.st,
     entities: (ctx.st.entities ?? []).map((e) =>
@@ -77,6 +87,7 @@ export function applySingleTargetDamage(
     grantEnemyDrops(ctx, spellTarget);
     ctx.narrative += applyPartyLevelUps(ctx.st, char, ctx.context);
   } else {
+    ctx.narrative += fortitudeNote;
     ctx.narrative += ` The ${spellTarget.name} has ${fmt.hp(newEnemyHpSpell)} HP remaining.`;
     // SRD Dominate — taking damage lets the target re-save to break free.
     dominatedDamageReSave(ctx, spellTargetId, spellTarget.name);
