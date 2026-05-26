@@ -67,6 +67,10 @@ const CharacterInputSchema = z
     // 2024 Weapon Mastery picks (weapon ids). Re-validated against the weapons
     // the class may master; an invalid/omitted list falls back to the default.
     weapon_masteries: z.array(z.string().min(1).max(40)).max(8).optional(),
+    // 2024 Fighting Style for the class's level-1 slot (Fighter). Re-validated;
+    // invalid/omitted falls back to the default. Later picks (Fighter L7,
+    // Paladin/Ranger L2) are made in-game.
+    fighting_style: z.string().min(1).max(40).optional(),
     feat_choices: FeatChoicesSchema.optional(),
     // 2024 background ability-score increase. Omitted = +1 to all three of the
     // background's listed abilities; supplied = +2 to `plus2` and +1 to `plus1`

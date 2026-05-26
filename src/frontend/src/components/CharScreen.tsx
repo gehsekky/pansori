@@ -168,6 +168,9 @@ interface CharDraft {
   // 2024 Weapon Mastery picks (weapon ids). Undefined = the default selection
   // (shown pre-selected). Cleared on class change (the options differ).
   weaponMasteries?: string[];
+  // 2024 Fighting Style (Fighter's level-1 slot). Undefined = the default
+  // (shown pre-selected). Cleared on class change.
+  fightingStyle?: string;
 }
 
 // 'sleight_of_hand' → 'Sleight of Hand'. Skill ids are snake_case.
@@ -586,6 +589,7 @@ function CharScreen({
           class_skills: d.classSkills,
           starting_equipment: d.startingEquipment,
           weapon_masteries: d.weaponMasteries,
+          fighting_style: d.fightingStyle,
         })),
         contextId
       );
@@ -685,6 +689,7 @@ function CharScreen({
                         classSkills: undefined,
                         startingEquipment: undefined,
                         weaponMasteries: undefined,
+                        fightingStyle: undefined,
                       })
                     }
                   >
@@ -883,6 +888,50 @@ function CharScreen({
                                 {on ? '✓ ' : ''}
                                 {w.name}{' '}
                                 <span style={{ opacity: 0.7 }}>({masteryLabel(w.mastery)})</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* 2024 Fighting Style — the Fighter's level-1 pick (single
+                      select). Paladin/Ranger gain theirs in-game at L2, so the
+                      picker only appears for classes with a level-1 slot. */}
+                  {(() => {
+                    const choice = beContexts[contextId]?.fightingStyleChoices?.[draft.cls];
+                    if (!choice || choice.options.length === 0) return null;
+                    const selectedId = draft.fightingStyle ?? choice.default;
+                    return (
+                      <div style={{ marginTop: 12 }}>
+                        <label className={styles.formLbl}>FIGHTING STYLE</label>
+                        <div
+                          style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}
+                          data-testid={`fighting-style-${idx}`}
+                        >
+                          {choice.options.map((o) => {
+                            const on = o.id === selectedId;
+                            return (
+                              <button
+                                key={o.id}
+                                type="button"
+                                aria-pressed={on}
+                                onClick={() => updateDraft(idx, { fightingStyle: o.id })}
+                                style={{
+                                  textAlign: 'left',
+                                  fontFamily: 'inherit',
+                                  fontSize: '0.72rem',
+                                  lineHeight: 1.4,
+                                  padding: '0.35rem 0.55rem',
+                                  background: on ? 'var(--t-separator)' : 'transparent',
+                                  border: `1px solid ${on ? 'var(--t-primary)' : 'var(--t-border)'}`,
+                                  color: on ? 'var(--t-primary)' : 'var(--t-dim)',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                {on ? '✓ ' : ''}
+                                {o.label}
                               </button>
                             );
                           })}
