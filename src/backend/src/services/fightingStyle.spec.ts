@@ -4,7 +4,13 @@
 // are small additions to the attack pipelines, covered by the broader
 // attack suite staying green.
 
-import { defenseAcBonus, fightingStyleSlots, hasFightingStyle } from './fightingStyle.js';
+import {
+  defenseAcBonus,
+  fightingStyleSlots,
+  fightingStyleSlotsForClassLevel,
+  hasFightingStyle,
+  resolveCreationFightingStyles,
+} from './fightingStyle.js';
 import { describe, expect, it, vi } from 'vitest';
 import { rollCriticalGwf, rollDiceGwf } from './rulesEngine.js';
 import type { ActionContext } from './actions/types.js';
@@ -180,5 +186,31 @@ describe('handleChooseFightingStyle — Defense bumps AC immediately', () => {
     handleChooseFightingStyle(ctx, { type: 'choose_fighting_style', style: 'defense' });
     if (ctx.actor.kind !== 'pc') throw new Error('expected pc actor');
     expect(ctx.actor.char.ac).toBe(17); // 16 + 1
+  });
+});
+
+describe('fightingStyleSlotsForClassLevel', () => {
+  it('Fighter: 1 at L1, 2 at L7; Paladin/Ranger: 1 at L2; others 0', () => {
+    expect([1, 6, 7].map((l) => fightingStyleSlotsForClassLevel('Fighter', l))).toEqual([1, 1, 2]);
+    expect([1, 2].map((l) => fightingStyleSlotsForClassLevel('Paladin', l))).toEqual([0, 1]);
+    expect([1, 2].map((l) => fightingStyleSlotsForClassLevel('Ranger', l))).toEqual([0, 1]);
+    expect(fightingStyleSlotsForClassLevel('Wizard', 20)).toBe(0);
+  });
+});
+
+describe('resolveCreationFightingStyles', () => {
+  it('gives a Fighter the chosen style (validated)', () => {
+    expect(resolveCreationFightingStyles('Fighter', 'archery')).toEqual(['archery']);
+  });
+
+  it('falls back to the default for an omitted or invalid choice', () => {
+    expect(resolveCreationFightingStyles('Fighter', undefined)).toEqual(['defense']);
+    expect(resolveCreationFightingStyles('Fighter', 'dueling')).toEqual(['defense']); // PHB-only
+  });
+
+  it('is empty for classes without a level-1 style (Paladin/Ranger pick at L2)', () => {
+    expect(resolveCreationFightingStyles('Paladin', 'defense')).toEqual([]);
+    expect(resolveCreationFightingStyles('Ranger', 'archery')).toEqual([]);
+    expect(resolveCreationFightingStyles('Wizard', 'archery')).toEqual([]);
   });
 });

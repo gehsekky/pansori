@@ -17,6 +17,14 @@ import type {
   StructuredAction,
 } from '../types.js';
 import {
+  DEFAULT_FIGHTING_STYLE,
+  FIGHTING_STYLE_LABELS,
+  OFFERED_FIGHTING_STYLE_IDS,
+  defenseAcBonus,
+  fightingStyleSlotsForClassLevel,
+  resolveCreationFightingStyles,
+} from '../services/fightingStyle.js';
+import {
   FRESH_TURN,
   canDonArmor,
   canDonShield,
@@ -58,7 +66,6 @@ import {
 import { broadcastParticipantChange, broadcastSessionState } from '../services/broadcast.js';
 import type { AuthedRequest } from '../auth/middleware.js';
 import { applyFeatTake } from '../services/feats.js';
-import { defenseAcBonus } from '../services/fightingStyle.js';
 import { generateSeed } from '../services/procgen.js';
 import { loadContexts } from '../services/contextLoader.js';
 import { pool } from '../db/pool.js';
@@ -188,6 +195,27 @@ gameRouter.get('/contexts', (_req, res) => {
                   options.map((o) => o.id),
                   count
                 ),
+              },
+            ] as const;
+          })
+          .filter((e): e is NonNullable<typeof e> => e !== null)
+      ),
+      // Fighting Style options for classes that grant one at level 1 (Fighter),
+      // for the creation-screen picker. Later picks are made in-game.
+      fightingStyleChoices: Object.fromEntries(
+        Object.keys(c.classPrimaryStats)
+          .map((cls) => {
+            const count = fightingStyleSlotsForClassLevel(cls, 1);
+            if (count <= 0) return null;
+            return [
+              cls,
+              {
+                count,
+                options: OFFERED_FIGHTING_STYLE_IDS.map((id) => ({
+                  id,
+                  label: FIGHTING_STYLE_LABELS[id] ?? id,
+                })),
+                default: DEFAULT_FIGHTING_STYLE,
               },
             ] as const;
           })
@@ -473,6 +501,9 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
         // 2024 PHB Weapon Mastery — the player-chosen (or default) mastered
         // weapons. Classes without the feature get an empty list.
         weapon_masteries: weaponMasteries,
+        // 2024 Fighting Style — the Fighter's level-1 pick (chosen or default).
+        // Other classes start empty (Paladin/Ranger pick theirs in-game at L2).
+        fighting_styles: resolveCreationFightingStyles(c.character_class, c.fighting_style),
         attuned_items: [],
         // 2024 SRD: every class chooses its subclass at level 3, and pansori's
         // strict-SRD build has exactly one subclass per class — so creation no

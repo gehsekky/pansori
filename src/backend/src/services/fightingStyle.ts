@@ -32,19 +32,45 @@ export const FIGHTING_STYLE_LABELS: Record<string, string> = {
   two_weapon: 'Two-Weapon Fighting (add your ability modifier to off-hand damage)',
 };
 
+// Default pre-selection for the creation picker (a safe, universal pick).
+export const DEFAULT_FIGHTING_STYLE = 'defense';
+
 /**
- * How many Fighting Style feats this character is entitled to, summed
- * across the granting classes (each pick must be a distinct style):
- * Fighter L1 (+1 again at L7), Paladin L2, Ranger L2.
+ * Fighting Style slots a single class grants by a given class level: Fighter
+ * gets one at L1 and a second at L7 ("Additional Fighting Style"); Paladin and
+ * Ranger each get one at L2. Other classes get none.
+ */
+export function fightingStyleSlotsForClassLevel(className: string, classLevel: number): number {
+  const cls = className.toLowerCase();
+  if (cls === 'fighter') return classLevel >= 7 ? 2 : classLevel >= 1 ? 1 : 0;
+  if (cls === 'paladin' || cls === 'ranger') return classLevel >= 2 ? 1 : 0;
+  return 0;
+}
+
+/**
+ * How many Fighting Style feats this character is entitled to, summed across
+ * the granting classes (each pick must be a distinct style).
  */
 export function fightingStyleSlots(char: Character): number {
-  let slots = 0;
-  const fighter = getClassLevel(char, 'fighter');
-  if (fighter >= 1) slots += 1;
-  if (fighter >= 7) slots += 1; // Additional Fighting Style
-  if (getClassLevel(char, 'paladin') >= 2) slots += 1;
-  if (getClassLevel(char, 'ranger') >= 2) slots += 1;
-  return slots;
+  return (['fighter', 'paladin', 'ranger'] as const).reduce(
+    (sum, cls) => sum + fightingStyleSlotsForClassLevel(cls, getClassLevel(char, cls)),
+    0
+  );
+}
+
+/**
+ * The Fighting Style(s) a freshly-created (level-1) character of `className`
+ * starts with — the player's chosen style (validated) or the default — for
+ * the one class that grants a style at level 1 (Fighter). Empty for classes
+ * that only gain it later (Paladin/Ranger at L2), which pick in-game.
+ */
+export function resolveCreationFightingStyles(
+  className: string,
+  chosen: string | undefined
+): string[] {
+  if (fightingStyleSlotsForClassLevel(className, 1) <= 0) return [];
+  const valid = chosen && OFFERED_FIGHTING_STYLE_IDS.includes(chosen as FightingStyleId);
+  return [valid ? (chosen as string) : DEFAULT_FIGHTING_STYLE];
 }
 
 export function hasFightingStyle(char: Character, style: FightingStyleId): boolean {

@@ -92,6 +92,9 @@ export type CharacterInput = {
   // 2024 Weapon Mastery picks (weapon ids). Omitted/invalid = the default.
   // Re-validated server-side.
   weapon_masteries?: string[];
+  // 2024 Fighting Style for the class's level-1 slot (Fighter). Omitted/invalid
+  // = the default. Re-validated server-side.
+  fighting_style?: string;
   // Origin-feat choices that need player input at character creation.
   // Today only Magic Initiate variants populate this — the player picks
   // 2 cantrips + 1 L1 spell. BE validates the shape AND that each picked
@@ -130,6 +133,12 @@ export interface BackendContextSummary {
       options: Array<{ id: string; name: string; mastery: string }>;
       default: string[];
     }
+  >;
+  // Per-class Fighting Style options for classes that grant one at level 1
+  // (Fighter), for the creation-screen picker.
+  fightingStyleChoices: Record<
+    string,
+    { count: number; options: Array<{ id: string; label: string }>; default: string }
   >;
   backgrounds: Array<{
     id: string;
