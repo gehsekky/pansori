@@ -22,6 +22,7 @@ import {
 } from '../multiclass.js';
 import type { AbilityKey } from '../../types.js';
 import type { ActionHandler } from './types.js';
+import { masterableWeapons } from '../../contexts/srd/index.js';
 import { updatePcActor } from './actor.js';
 
 /**
@@ -533,6 +534,42 @@ export const handleChooseExpertise: ActionHandler<{
   }
   updatePcActor(ctx, { expertise_skills: [...current, match] });
   ctx.narrative = `${char.name} gains Expertise in ${match} (double proficiency bonus).`;
+};
+
+/**
+ * `choose_weapon_mastery`: spend one pending Weapon Mastery slot (granted on a
+ * Fighter/Barbarian level-up) on a weapon the class may master and isn't
+ * already mastering. Out-of-combat, no action cost.
+ */
+export const handleChooseWeaponMastery: ActionHandler<{
+  type: 'choose_weapon_mastery';
+  weaponId: string;
+}> = (ctx, action) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can choose Weapon Mastery.' };
+  const { char } = ctx.actor;
+  if ((char.weapon_mastery_pending ?? 0) <= 0) {
+    return { rejected: 'You have no Weapon Mastery choice available right now.' };
+  }
+  const remaining = Math.max(0, (char.weapon_mastery_pending ?? 1) - 1);
+  // Empty weaponId is the "nothing left to master" escape — just clear a slot.
+  if (!action.weaponId) {
+    updatePcActor(ctx, { weapon_mastery_pending: remaining });
+    ctx.narrative = `${char.name} has no further weapons to master.`;
+    return;
+  }
+  const profs = ctx.context.classWeaponProficiencies?.[char.character_class] ?? [];
+  const weapon = masterableWeapons(profs, ctx.context.lootTable).find(
+    (w) => w.id === action.weaponId
+  );
+  if (!weapon) return { rejected: 'That weapon cannot be mastered by your class.' };
+  if ((char.weapon_masteries ?? []).includes(action.weaponId)) {
+    return { rejected: `${weapon.name} is already mastered.` };
+  }
+  updatePcActor(ctx, {
+    weapon_masteries: [...(char.weapon_masteries ?? []), action.weaponId],
+    weapon_mastery_pending: remaining,
+  });
+  ctx.narrative = `${char.name} masters the ${weapon.name} — ${weapon.mastery} property unlocked.`;
 };
 
 /**

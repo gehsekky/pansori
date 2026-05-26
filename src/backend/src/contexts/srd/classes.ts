@@ -120,8 +120,25 @@ export const SRD_WEAPON_MASTERY_SLOTS: Record<string, number> = {
   Fighter: 3,
   Paladin: 2,
   Ranger: 2,
-  Rogue: 1,
+  Rogue: 2, // SRD Rogue Weapon Mastery: "two kinds of weapons".
 };
+
+/**
+ * Number of weapons a class masters at a given class level (2024 SRD). Fighter
+ * (4/10/16) and Barbarian (4/10) gain more slots as they level; Paladin /
+ * Ranger / Rogue stay at their level-1 count. 0 for classes without the feature.
+ */
+export function weaponMasterySlotsForLevel(className: string, classLevel: number): number {
+  const base = SRD_WEAPON_MASTERY_SLOTS[className] ?? 0;
+  if (base <= 0) return 0;
+  if (className === 'Fighter') {
+    return classLevel >= 16 ? 6 : classLevel >= 10 ? 5 : classLevel >= 4 ? 4 : 3;
+  }
+  if (className === 'Barbarian') {
+    return classLevel >= 10 ? 4 : classLevel >= 4 ? 3 : 2;
+  }
+  return base; // Paladin / Ranger / Rogue — fixed at their level-1 count.
+}
 
 // ─── Class Features ──────────────────────────────────────────────────────────
 // Feature ids that the gameEngine recognizes. These drive the choice

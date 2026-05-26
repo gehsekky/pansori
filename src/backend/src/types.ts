@@ -750,6 +750,11 @@ export interface Character {
   // Wizard/Druid/Bard get 0 by default. Wielding a weapon NOT in this list
   // doesn't grant its mastery property even if the weapon has one.
   weapon_masteries?: string[];
+  // 2024 Weapon Mastery slot growth — set on level-up when the class's mastery
+  // count increases (Fighter L4/10/16, Barbarian L4/10). The number of new
+  // weapons the player must still pick; generateChoices surfaces the picks and
+  // `choose_weapon_mastery` decrements it.
+  weapon_mastery_pending?: number;
   // Bardic Inspiration die granted by a Bard (PHB p.53 / 2024 p.52). The
   // die is stored as a dice expression ('d6', 'd8', ...) and consumed on
   // the next d20 test (attack/save/check). 2024 PHB expands what the die
