@@ -24,6 +24,7 @@ export function runBuffSpell(
     slotLevel: number;
     targetCharId?: string;
     restorationEffect?: string;
+    resistType?: string;
   },
   spell: Spell,
   slotLevel: number,
@@ -185,7 +186,12 @@ export function runBuffSpell(
   // grant the damage-type resistances to the target for the duration. Cleared
   // when the spell's concentration ends (see breakConcentration).
   if (spell.grantResistances && spell.grantResistances.length > 0) {
-    const types = spell.grantResistances;
+    // Protection from Energy — the caster picks one element (acid/cold/fire/
+    // lightning/thunder); apply that instead of the spell's default list.
+    const types =
+      spell.id === 'protection_from_energy' && action.resistType
+        ? [action.resistType]
+        : spell.grantResistances;
     if (isCasterTarget) {
       char.spell_resistances = [...new Set([...(char.spell_resistances ?? []), ...types])];
     } else {

@@ -18,8 +18,8 @@ PHB/DMG-exclusive content (subclasses, feats, species, spells). See
 
 ## Implementation status (code-verified 2026-05-26)
 
-Grounded in a code survey + the full backend suite: **1872 tests across
-217 files, all green** (lint + typecheck clean).
+Grounded in a code survey + the full backend suite: **1883 tests across
+218 files, all green** (lint + typecheck clean).
 
 ### Done — rules-engine frameworks
 
@@ -67,7 +67,7 @@ Grounded in a code survey + the full backend suite: **1872 tests across
 
 | Category                  | In pansori                                       | SRD universe                     |
 | ------------------------- | ------------------------------------------------ | -------------------------------- |
-| Spells                    | **207** (26 cantrips + 181 leveled, through L9)  | ~330                             |
+| Spells                    | **212** (26 cantrips + 186 leveled, through L9)  | ~330                             |
 | Shared SRD monster pool   | **31** (`SRD_MONSTERS`) + per-campaign templates | hundreds                         |
 | Species                   | 9                                                | 9 standalone + Drow lineage      |
 | Classes                   | 12                                               | 12                               |
@@ -85,8 +85,14 @@ backend features are waiting on, and a handful of **bounded subsystems**.
 
 ### Content breadth — data on existing patterns (RE-6)
 
-- [ ] **Spells** — ~207 / ~330 SRD. Most remaining categories are already
-      representable (data entry). Data-only batch (`rawSpellsBatch.spec.ts`):
+- [ ] **Spells** — ~212 / ~330 SRD. Most remaining categories are already
+      representable (data entry). Latest batch (`spellsBatch6.spec.ts`): **Blade
+      Barrier** + **Wind Wall** (save-for-half wall AoEs, data-only), **Ray of
+      Sickness** (attack-roll poison ray — generalized `runAttackRollSpell` to
+      stamp an on-hit `condition`, honoring condition immunities), **Protection
+      from Energy** (resistance buff with a new `resistType` element picker
+      wired through buff.ts), and **Gentle Repose** (narrative ritual). Data-only
+      batch (`rawSpellsBatch.spec.ts`):
       Dissonant Whispers, Mind Spike, Vitriolic Sphere, Freezing Sphere
       (save-for-half damage), Charm Monster (WIS save → charmed, save
       Advantage), Protection from Poison (touch ward: strip Poisoned + poison

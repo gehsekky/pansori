@@ -363,8 +363,12 @@ export type StructuredAction =
       // Polymorph — the chosen beast form id (BEAST_FORMS). Omitted = auto-Wolf.
       beastForm?: string;
       // Greater Restoration — the single effect to remove (option picker):
-      // 'exhaustion' | 'charmed' | 'petrified'. Omitted = the default bundle.
+      // 'exhaustion' | 'charmed' | 'petrified' | 'hp_max'. Omitted = default bundle.
       restorationEffect?: string;
+      // Protection from Energy — the chosen damage type to resist (option
+      // picker): 'acid' | 'cold' | 'fire' | 'lightning' | 'thunder'. Omitted =
+      // the spell's default (fire).
+      resistType?: string;
       // Cleric L10 Divine Intervention — cast this Cleric spell (level ≤5,
       // non-Reaction) without a slot or Material components, 1/Long Rest.
       // Set by the Divine Intervention choice surface; precast validates
