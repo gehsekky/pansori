@@ -6836,42 +6836,63 @@ export async function runEnemyTurns(args: {
         if (advIdx === args.initialCurrentIdx) break;
         continue;
       }
-      // SRD Confusion — a confused creature behaves erratically. First it
-      // re-saves (WIS vs the caster's DC) to shake the effect; pansori rolls
-      // this at the START of the turn (RAW: end of turn), so a success lets it
-      // recover and act normally this turn. If it stays confused, 1d10 decides:
-      // 1-6 it loses the turn; 7-8 it lashes out at a random ally within reach
-      // (friendly fire — RAW any creature in reach, narrowed to allies so the
-      // party is never hit on this result); 9-10 it acts normally anyway.
-      // Cleared for all targets when the caster's concentration drops.
+      // SRD Confusion — a confused creature behaves erratically and re-saves
+      // at the END of each of its turns. So it stays confused for at least its
+      // first full turn: the loop skips the re-save on that first turn
+      // (`confused_acted` unset) and evaluates the end-of-turn save at the
+      // START of each subsequent turn (`confused_acted` set) — functionally
+      // identical, since nothing affects the creature between its turn's end
+      // and its next start. While still confused, 1d10 decides the turn: 1-6
+      // lose the turn; 7-8 lash out at a random ally within reach (friendly
+      // fire — RAW any creature in reach, narrowed to allies so the party is
+      // never hit on this result); 9-10 act normally. Cleared for all targets
+      // when the caster's concentration drops.
       const confusedEnt = st.entities?.find((e) => e.id === eEntry.id && e.isEnemy);
       if (confusedEnt && confusedEnt.conditions.includes('confused')) {
-        const confCaster = st.characters.find(
-          (c) => c.concentrating_on?.condition === 'confused' && !c.dead
-        );
-        const confDc = confCaster?.concentrating_on?.save_dc ?? 13;
-        const confWis = (rm as unknown as Record<string, number>).wis ?? 10;
-        const reSaveFailed = rollConditionSave(
-          'wis',
-          confWis,
-          confDc,
-          false,
-          1,
-          0,
-          confusedEnt.conditions
-        );
-        if (!reSaveFailed) {
-          narrative += `\n\n[${rm.name} shakes off the confusion.]`;
+        let stillConfused = true;
+        if (confusedEnt.confused_acted) {
+          // Deferred end-of-(previous-)turn re-save.
+          const confCaster = st.characters.find(
+            (c) => c.concentrating_on?.condition === 'confused' && !c.dead
+          );
+          const confDc = confCaster?.concentrating_on?.save_dc ?? 13;
+          const confWis = (rm as unknown as Record<string, number>).wis ?? 10;
+          const reSaveFailed = rollConditionSave(
+            'wis',
+            confWis,
+            confDc,
+            false,
+            1,
+            0,
+            confusedEnt.conditions
+          );
+          if (!reSaveFailed) {
+            stillConfused = false;
+            narrative += `\n\n[${rm.name} shakes off the confusion.]`;
+            st = {
+              ...st,
+              entities: (st.entities ?? []).map((e) =>
+                e.id === eEntry.id && e.isEnemy
+                  ? {
+                      ...e,
+                      conditions: e.conditions.filter((c) => c !== 'confused'),
+                      confused_acted: false,
+                    }
+                  : e
+              ),
+            };
+            // fall through — the recovered creature takes its normal turn.
+          }
+        }
+        if (stillConfused) {
+          // Mark that the creature has now spent a turn confused (this gates
+          // its end-of-turn re-save, evaluated at the start of its next turn).
           st = {
             ...st,
             entities: (st.entities ?? []).map((e) =>
-              e.id === eEntry.id && e.isEnemy
-                ? { ...e, conditions: e.conditions.filter((c) => c !== 'confused') }
-                : e
+              e.id === eEntry.id && e.isEnemy ? { ...e, confused_acted: true } : e
             ),
           };
-          // fall through — the recovered creature takes its normal turn.
-        } else {
           const behavior = rollDice('1d10');
           if (behavior <= 8) {
             if (behavior >= 7) {

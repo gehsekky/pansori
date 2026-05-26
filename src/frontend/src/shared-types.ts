@@ -217,6 +217,14 @@ export interface CombatEntity {
   // when depleted, the polymorph form drops (if `polymorph_state`
   // is set) and excess damage carries over to `hp` (per RAW).
   temp_hp?: number;
+  // SRD Confusion — set once the creature has taken a full turn while
+  // `confused`. RAW re-saves at the END of each turn, so a creature is
+  // confused for at least its first turn; the enemy loop skips the re-save
+  // on that first turn (this flag false/undefined) and rolls it at the
+  // start of each subsequent turn (flag true) — functionally identical to
+  // the end-of-turn save, since nothing affects the creature in between.
+  // Reset when the `confused` condition is (re)applied or cleared.
+  confused_acted?: boolean;
 }
 
 // ─── Structured actions ──────────────────────────────────────────────

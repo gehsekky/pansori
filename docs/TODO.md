@@ -118,14 +118,16 @@ backend features are waiting on, and a handful of **bounded subsystems**.
         10-ft sphere, WIS save → `confused`; each turn the creature re-saves,
         then 1d10: 1-6 waste the turn, 7-8 attack a random ally in reach
         (friendly fire via `resolveEnemyAttack`/`applyDamageToEntity`), 9-10 act
-        normally) ride it. Next on this base: **Compulsion** (forced movement)
-        and **Dominate** (full enemy control). Simplifications: Command's upcast
+        normally) ride it. Confusion's re-save is RAW-faithful: a creature
+        stays confused for at least its first full turn (`CombatEntity.confused_acted`
+        gates the end-of-turn save, evaluated at the start of each subsequent
+        turn). Next on this base: **Compulsion** (forced movement) and
+        **Dominate** (full enemy control). Simplifications: Command's upcast
         (+1 target per slot ≥ 2) and other command words collapse to "Halt";
-        Confusion's re-save is rolled at the start of the turn (RAW: end),
-        7-8 targets allies-only (party never hit on that result), and the
-        sphere radius is fixed (no upcast widening). Note: the older AoE-condition
-        spells (Hypnotic Pattern, Web) still condition only the primary target
-        until migrated onto `aoeCondition`.
+        Confusion's 7-8 targets allies-only (party never hit on that result)
+        and the sphere radius is fixed (no upcast widening). Note: the older
+        AoE-condition spells (Hypnotic Pattern, Web) still condition only the
+        primary target until migrated onto `aoeCondition`.
       Exceptions still needing a model first: the alternate "summon" spells,
       each mechanically distinct from the stat-block ally model —
   - [ ] **Conjure Animals** (L3) + other 2024 conjure spells — a

@@ -61,7 +61,13 @@ export function runAoeConditionSpell(ctx: ActionContext, spell: Spell, dc: numbe
       ...ctx.st,
       entities: (ctx.st.entities ?? []).map((e) =>
         e.id === target.id && e.isEnemy
-          ? { ...e, conditions: [...e.conditions.filter((c) => c !== cond), cond] }
+          ? {
+              ...e,
+              conditions: [...e.conditions.filter((c) => c !== cond), cond],
+              // Confusion: a freshly-confused creature hasn't taken a confused
+              // turn yet, so its first turn skips the end-of-turn re-save.
+              ...(cond === 'confused' ? { confused_acted: false } : {}),
+            }
           : e
       ),
     };
