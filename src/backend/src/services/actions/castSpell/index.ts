@@ -13,6 +13,7 @@ import { runCombatStart } from '../attack/combatStart.js';
 import { runHealSpell } from './heal.js';
 import { runMultiTargetSpell } from './multiTarget.js';
 import { runPowerWordKill } from './powerWords.js';
+import { runRecurringAttackSpell } from '../recurringSpellAttack.js';
 import { runReviveSpell } from './revive.js';
 import { runSaveSpell } from './save.js';
 import { runSummonSpell } from './summon.js';
@@ -325,6 +326,14 @@ export const handleCastSpell: ActionHandler<{
   // tick once. No per-target attack/save roll here — the zone tick (now and on
   // each round wrap) applies the damage.
   if (spell.persistentZone && runZoneSpell(ctx, dmgSpell, slotLevel, dc, spellTargetId)) {
+    return;
+  }
+
+  // RE-4 — recurring spell-attack spells (Spiritual Weapon, Vampiric Touch):
+  // make the first spell attack and record `recurring_attack` so the caster can
+  // re-issue it each turn (`recurring_spell_attack`).
+  if (spell.recurringAttack) {
+    runRecurringAttackSpell(ctx, dmgSpell, slotLevel, castingScore, spellTargetId);
     return;
   }
 

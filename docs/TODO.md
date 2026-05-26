@@ -67,7 +67,7 @@ Grounded in a code survey + the full backend suite: **1572 tests across
 
 | Category | In pansori | SRD universe |
 |---|---|---|
-| Spells | **178** (26 cantrips + 152 leveled, through L9) | ~330 |
+| Spells | **179** (26 cantrips + 153 leveled, through L9) | ~330 |
 | Shared SRD monster pool | **12** (`SRD_MONSTERS`) + per-campaign templates | hundreds |
 | Species | 9 | 9 standalone + Drow lineage |
 | Classes | 12 | 12 |
@@ -85,7 +85,7 @@ backend features are waiting on, and a handful of **bounded subsystems**.
 
 ### Content breadth — data on existing patterns (RE-6)
 
-- [ ] **Spells** — ~178 / ~330 SRD. Most remaining categories are already
+- [ ] **Spells** — ~179 / ~330 SRD. Most remaining categories are already
       representable (data entry).
   - [~] **Persistent damage zones** — foundation shipped (RE-4): `GameState.spell_zones`
         + `SpellZone`, the `persistentZone` spell flag, cast-time `runZoneSpell`
@@ -102,11 +102,15 @@ backend features are waiting on, and a handful of **bounded subsystems**.
         recomputes the footprint and ticks at the new spot. Remaining: Spike
         Growth's per-5-ft-moved damage + difficult terrain are approximated as
         a flat per-round tick.
+  - [~] **Recurring spell attacks** — shipped (RE-4): `Character.recurring_attack`
+        + the `recurring_spell_attack` action, `resolveRecurringAttack` (spell
+        attack vs AC → damage + optional heal), cast-time setup
+        (`runRecurringAttackSpell`), round-wrap expiry + concentration cleanup.
+        **Spiritual Weapon** (Bonus-Action force attack, +spellcasting mod, no
+        concentration) and **Vampiric Touch** (Magic-action necrotic that heals
+        half, concentration) ride it.
       Exceptions still needing a model first: the alternate "summon" spells,
       each mechanically distinct from the stat-block ally model —
-  - [ ] **Spiritual Weapon** (L2) — a floating force with no HP; a
-        bonus-action melee spell attack re-issued each turn. Model as a
-        persistent bonus-action attack effect, not an ally combatant.
   - [ ] **Conjure Animals** (L3) + other 2024 conjure spells — a
         concentration _damage zone_ (DEX save, scaling dice); closer to a
         moving AoE/hazard than a summoned creature.

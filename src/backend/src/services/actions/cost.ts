@@ -111,6 +111,9 @@ export const ACTION_COSTS: Record<StructuredAction['type'], ActionCost> = {
   // RE-4 — move_zone self-manages its cost (bonus action OR action per the
   // spell's zoneMoveCost), so the dispatcher leaves the economy to the handler.
   move_zone: 'managed',
+  // RE-4 — recurring_spell_attack self-manages its cost (bonus action for
+  // Spiritual Weapon, action for Vampiric Touch).
+  recurring_spell_attack: 'managed',
   jump: 'managed',
   resolve_reaction: 'managed',
   attack: 'managed',

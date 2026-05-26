@@ -334,6 +334,9 @@ export type StructuredAction =
   // RE-4 — reposition a persistent damage zone (Flaming Sphere roll, Moonbeam /
   // Call Lightning re-aim) onto a cell within the spell's move range.
   | { type: 'move_zone'; zoneId: string; to: GridPos }
+  // RE-4 — re-issue a recurring spell attack (Spiritual Weapon / Vampiric Touch)
+  // at a target on a later turn, for the spell's recurring cost.
+  | { type: 'recurring_spell_attack'; targetEnemyId?: string }
   | { type: 'jump'; to: GridPos } // SRD Long Jump — leap up to STR ft over terrain/obstacles
   | { type: 'travel'; locationId: string }
   | { type: 'enter_district'; districtId: string }
@@ -448,6 +451,7 @@ export type ChoiceDirection = 'N' | 'NE' | 'E' | 'SE' | 'S' | 'SW' | 'W' | 'NW';
 export type ChoiceKind =
   | 'grid_move'
   | 'move_zone'
+  | 'recurring_spell_attack'
   | 'dash'
   | 'disengage'
   | 'dodge'
