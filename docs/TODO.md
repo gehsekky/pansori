@@ -18,8 +18,8 @@ PHB/DMG-exclusive content (subclasses, feats, species, spells). See
 
 ## Implementation status (code-verified 2026-05-26)
 
-Grounded in a code survey + the full backend suite: **1846 tests across
-214 files, all green** (lint + typecheck clean).
+Grounded in a code survey + the full backend suite: **1852 tests across
+215 files, all green** (lint + typecheck clean).
 
 ### Done — rules-engine frameworks
 
@@ -237,12 +237,19 @@ backend features are waiting on, and a handful of **bounded subsystems**.
   bear, dire wolf, specter, animated armor, bandit captain, berserker,
   ghast, griffon, owlbear, manticore, wight) using the supported fields
   (multiattack, onHitEffect, resistances/immunities/condition-immunities,
-  speedFt). Per-monster specials are deferred where unsupported (Pack
-  Tactics, Undead Fortitude, Life Drain max-HP reduction, Parry/Rampage,
-  Stench). Legendary + lair scaffolding is shipped (`legendary_actions`
-  point pool; `lair_actions` round-wrap AoE) but not wired to any current
-  boss. Effects shipped: `extra_attack`, `aoe_save_damage`. Remaining: more
-  breadth + wiring legendary/lair to an actual boss.
+  speedFt). Three ability hooks then shipped (`monsterAbilities.spec.ts`),
+  all in `computeEnemyAttack`: **Pack Tactics** (`packTactics` — Advantage when
+  an ally is within 5 ft of the target; wolf/kobold/giant rat/worg/dire wolf),
+  **Bloodied Frenzy** (`bloodiedFrenzy` — Advantage while the attacker is ≤ ½
+  HP; berserker), and **bonus on-hit damage** (`bonusDamage`/`bonusDamageType`,
+  halved if the target resists the bonus type — ghast/wight necrotic, cultist
+  ritual sickle). Still deferred (need new infra — see the design notes):
+  Undead Fortitude (central enemy-damage hook), Life Drain max-HP reduction,
+  monster auras (Stench), enemy reactions (Parry), conditional extra actions
+  (Rampage), Sunlight Sensitivity (lighting model). Legendary + lair scaffolding
+  is shipped (`legendary_actions` pool; `lair_actions` round-wrap AoE) but not
+  wired to a current boss. Other effects shipped: `extra_attack`,
+  `aoe_save_damage`. Remaining: more breadth + the deferred specials above.
 - [ ] **Magic items** — content; attunement + curse infra is shipped.
 
 ### Frontend creation / choice surfaces (backend ready, FE pending)

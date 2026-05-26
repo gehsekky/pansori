@@ -93,6 +93,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     int: 3,
     wis: 12,
     cha: 6,
+    packTactics: true,
     damageType: 'piercing',
   },
   giant_spider: {
@@ -274,6 +275,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     int: 8,
     wis: 7,
     cha: 8,
+    packTactics: true,
     damageType: 'piercing',
   },
   guard: {
@@ -307,6 +309,8 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     wis: 11,
     cha: 10,
     damageType: 'slashing',
+    bonusDamage: '1', // Ritual Sickle: +1 Necrotic
+    bonusDamageType: 'necrotic',
   },
   giant_rat: {
     name: 'Giant Rat',
@@ -322,6 +326,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     int: 2,
     wis: 10,
     cha: 4,
+    packTactics: true,
     damageType: 'piercing',
   },
 
@@ -379,6 +384,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     wis: 11,
     cha: 8,
     speedFt: 50,
+    packTactics: true,
     damageType: 'piercing',
   },
   gnoll: {
@@ -431,6 +437,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     wis: 12,
     cha: 7,
     speedFt: 50,
+    packTactics: true,
     damageType: 'piercing',
   },
   specter: {
@@ -535,8 +542,8 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     int: 9,
     wis: 11,
     cha: 9,
+    bloodiedFrenzy: true,
     damageType: 'slashing',
-    // Bloodied Frenzy (advantage while bloodied) deferred.
   },
   ghast: {
     name: 'Ghast',
@@ -557,7 +564,9 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     immunities: ['poison'],
     condition_immunities: ['charmed', 'exhaustion', 'poisoned'],
     damageType: 'slashing',
-    // Stench aura + the bite's bonus necrotic deferred.
+    bonusDamage: '2d8', // claw rider ≈ the bite's necrotic
+    bonusDamageType: 'necrotic',
+    // Stench aura deferred.
   },
   griffon: {
     name: 'Griffon',
@@ -633,6 +642,8 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     immunities: ['poison'],
     condition_immunities: ['exhaustion', 'poisoned'],
     damageType: 'slashing',
-    // Life Drain (max-HP reduction) + the sword's bonus necrotic deferred.
+    bonusDamage: '1d8', // Necrotic Sword rider
+    bonusDamageType: 'necrotic',
+    // Life Drain (max-HP reduction) deferred.
   },
 };
