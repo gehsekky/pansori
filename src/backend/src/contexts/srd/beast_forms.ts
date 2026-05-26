@@ -45,7 +45,7 @@ export const BEAST_FORMS: Record<string, BeastForm> = {
   },
   spider: {
     id: 'spider',
-    hp: 26,
+    hp: 13,
     name: 'Giant Spider',
     cr: 0.25,
     attackName: 'Bite',
@@ -86,7 +86,7 @@ export const BEAST_FORMS: Record<string, BeastForm> = {
   },
   dire_wolf: {
     id: 'dire_wolf',
-    hp: 37,
+    hp: 22,
     name: 'Dire Wolf',
     cr: 1,
     attackName: 'Bite',

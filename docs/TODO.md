@@ -18,8 +18,8 @@ PHB/DMG-exclusive content (subclasses, feats, species, spells). See
 
 ## Implementation status (code-verified 2026-05-26)
 
-Grounded in a code survey + the full backend suite: **1822 tests across
-213 files, all green** (lint + typecheck clean).
+Grounded in a code survey + the full backend suite: **1846 tests across
+214 files, all green** (lint + typecheck clean).
 
 ### Done — rules-engine frameworks
 
@@ -68,7 +68,7 @@ Grounded in a code survey + the full backend suite: **1822 tests across
 | Category                  | In pansori                                       | SRD universe                     |
 | ------------------------- | ------------------------------------------------ | -------------------------------- |
 | Spells                    | **207** (26 cantrips + 181 leveled, through L9)  | ~330                             |
-| Shared SRD monster pool   | **12** (`SRD_MONSTERS`) + per-campaign templates | hundreds                         |
+| Shared SRD monster pool   | **31** (`SRD_MONSTERS`) + per-campaign templates | hundreds                         |
 | Species                   | 9                                                | 9 standalone + Drow lineage      |
 | Classes                   | 12                                               | 12                               |
 | Subclasses                | 12 iconic (1 / class)                            | 1 iconic / class in SRD          |
@@ -231,10 +231,18 @@ backend features are waiting on, and a handful of **bounded subsystems**.
         moving AoE/hazard than a summoned creature.
   - [ ] **Find Familiar** — a non-combatant utility companion (can't take
         the Attack action RAW); a scouting/aid model, not the ally-turn AI.
-- [ ] **Monsters** — stat-block content. Legendary + lair scaffolding is
-      shipped (`legendary_actions` point pool; `lair_actions` round-wrap
-      AoE) but not wired to any current boss (per-encounter balance was
-      tuned without them). Effects shipped: `extra_attack`, `aoe_save_damage`.
+- [~] **Monsters** — stat-block content. The shared pool grew 12 → 31
+  (`monsters.spec.ts`): a CR 1/8–3 spread of SRD 5.2.1 bestiary entries
+  (kobold, guard, cultist, giant rat, zombie, scout, worg, gnoll, black
+  bear, dire wolf, specter, animated armor, bandit captain, berserker,
+  ghast, griffon, owlbear, manticore, wight) using the supported fields
+  (multiattack, onHitEffect, resistances/immunities/condition-immunities,
+  speedFt). Per-monster specials are deferred where unsupported (Pack
+  Tactics, Undead Fortitude, Life Drain max-HP reduction, Parry/Rampage,
+  Stench). Legendary + lair scaffolding is shipped (`legendary_actions`
+  point pool; `lair_actions` round-wrap AoE) but not wired to any current
+  boss. Effects shipped: `extra_attack`, `aoe_save_damage`. Remaining: more
+  breadth + wiring legendary/lair to an actual boss.
 - [ ] **Magic items** — content; attunement + curse infra is shipped.
 
 ### Frontend creation / choice surfaces (backend ready, FE pending)
