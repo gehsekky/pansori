@@ -1,5 +1,14 @@
 import type { Enemy, Spell } from '../../../types.js';
 import {
+  TURN_LOOP_MANAGED_CONDITIONS,
+  applyPartyLevelUps,
+  endCombatState,
+  grantDarkOnesBlessing,
+  isRoomCleared,
+  pick,
+  splitEncounterXp,
+} from '../../gameEngine.js';
+import {
   abilityMod,
   applyDamageMultiplier,
   cantripDamageDice,
@@ -9,14 +18,6 @@ import {
   rollDiceEmpowered,
   upcastDamage,
 } from '../../rulesEngine.js';
-import {
-  applyPartyLevelUps,
-  endCombatState,
-  grantDarkOnesBlessing,
-  isRoomCleared,
-  pick,
-  splitEncounterXp,
-} from '../../gameEngine.js';
 import { concentrationRoundsFor, pickCastPrefix } from './utils.js';
 import {
   elementalAffinityBonus,
@@ -188,6 +189,22 @@ export function runSaveSpell(
       // condition). Pansori MVP auto-picks Wolf regardless of target
       // CR; RAW lets the caster pick any beast ≤ target level.
       const isPolymorph = spell.id === 'polymorph';
+      // Stamp a finite duration only for non-concentration condition spells
+      // (Charm Person/Monster, Blindness). Concentration spells (Hold Person,
+      // Fear, Dominate, …) leave the duration unset — concentration is their
+      // timer — so the round-wrap enemy tick won't expire them early. Turn-loop-
+      // managed conditions (Command's one-shot `commanded`) are also excluded —
+      // the loop owns their lifecycle.
+      const stampDuration =
+        !spell.concentration &&
+        spell.conditionDuration &&
+        !TURN_LOOP_MANAGED_CONDITIONS.has(condToApply)
+          ? spell.conditionDuration
+          : undefined;
+      // SRD "save ends" (Slow): stamp the recurring end-of-turn save so the
+      // enemy loop lets the creature shake the condition. The save ability is
+      // the spell's own save; DC is the caster's spell save DC.
+      const stampSaveEnds = spell.conditionSaveEnds && spell.savingThrow;
       ctx.st = {
         ...ctx.st,
         entities: (ctx.st.entities ?? []).map((e) => {
@@ -195,6 +212,23 @@ export function runSaveSpell(
           const next = {
             ...e,
             conditions: [...e.conditions.filter((c) => c !== condToApply), condToApply],
+            ...(stampDuration !== undefined
+              ? { condition_durations: { ...e.condition_durations, [condToApply]: stampDuration } }
+              : {}),
+            ...(stampSaveEnds
+              ? {
+                  save_ends: {
+                    ...e.save_ends,
+                    [condToApply]: { ability: spell.savingThrow!, dc },
+                  },
+                  save_ends_acted: (e.save_ends_acted ?? []).filter((c) => c !== condToApply),
+                }
+              : {}),
+            // SRD Charmed / Frightened — record the caster as the source so the
+            // enemy AI can avoid attacking the charmer / keep distance from the
+            // fear source.
+            ...(condToApply === 'charmed' ? { charmer_id: char.id } : {}),
+            ...(condToApply === 'frightened' ? { frightened_by: char.id } : {}),
           };
           if (isPolymorph && !next.polymorph_state) {
             return {

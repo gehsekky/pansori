@@ -1,9 +1,14 @@
+import { TURN_LOOP_MANAGED_CONDITIONS, getEnemyById } from '../../gameEngine.js';
+import {
+  entitiesInBlast,
+  entitiesInCone,
+  entitiesInCube,
+  entitiesInLine,
+} from '../../gridEngine.js';
 import type { ActionContext } from '../types.js';
 import type { Spell } from '../../../types.js';
 import { concentrationRoundsFor } from './utils.js';
-import { entitiesInBlast } from '../../gridEngine.js';
 import { fmt } from '../../narrativeFmt.js';
-import { getEnemyById } from '../../gameEngine.js';
 import { rollConditionSave } from '../../rulesEngine.js';
 
 /**
@@ -25,15 +30,33 @@ export function runAoeConditionSpell(ctx: ActionContext, spell: Spell, dc: numbe
   const cond = spell.condition;
   if (!aoeBR || !ctx.st.entities || !cond || !spell.savingThrow) return false;
 
-  // Sphere centered on the targeted enemy's cell (Confusion: a point you choose
-  // within range — pansori anchors it on the primary target).
+  // Epicenter: the targeted enemy's cell (Confusion's 10-ft sphere anchors on
+  // the primary target; a Cone/Cube/Line extends from the caster toward it).
   const epicenter =
     ctx.st.entities.find((e) => e.id === ctx.enemy?.id && e.isEnemy)?.pos ??
     ctx.st.entities.find((e) => e.isEnemy)?.pos;
   if (!epicenter) return false;
+  const casterPos = ctx.st.entities.find((e) => e.id === char.id)?.pos;
 
-  const blastTargets = entitiesInBlast(epicenter, aoeBR, ctx.st.entities);
-  ctx.narrative += ` ${fmt.note(`[AOE ${aoeBR}ft sphere]`)}`;
+  // Same shape resolution as the AoE damage branch (Color Spray is a Cone from
+  // the caster; Confusion a Sphere on the target).
+  const aoeShape = spell.aoeShape ?? 'sphere';
+  const blastTargets =
+    aoeShape === 'cone' && casterPos
+      ? entitiesInCone(casterPos, epicenter, aoeBR, ctx.st.entities)
+      : aoeShape === 'cube' && casterPos
+        ? entitiesInCube(casterPos, epicenter, aoeBR, ctx.st.entities)
+        : aoeShape === 'line' && casterPos
+          ? entitiesInLine(casterPos, epicenter, aoeBR, ctx.st.entities)
+          : entitiesInBlast(epicenter, aoeBR, ctx.st.entities);
+  ctx.narrative += ` ${fmt.note(`[AOE ${aoeBR}ft ${aoeShape}]`)}`;
+  // Stamp a finite duration only for non-concentration AoE-condition spells
+  // (Color Spray's 1-round Blinded). Concentration ones (Confusion) leave it
+  // unset — concentration is their timer — as do turn-loop-managed conditions.
+  const stampDuration =
+    !spell.concentration && spell.conditionDuration && !TURN_LOOP_MANAGED_CONDITIONS.has(cond)
+      ? spell.conditionDuration
+      : undefined;
   const affected: string[] = [];
   for (const target of blastTargets) {
     if (!target.isEnemy) continue; // pansori MVP conditions only enemies
@@ -64,6 +87,22 @@ export function runAoeConditionSpell(ctx: ActionContext, spell: Spell, dc: numbe
           ? {
               ...e,
               conditions: [...e.conditions.filter((c) => c !== cond), cond],
+              ...(stampDuration !== undefined
+                ? { condition_durations: { ...e.condition_durations, [cond]: stampDuration } }
+                : {}),
+              // SRD "save ends" (a future AoE save-ends condition): stamp the
+              // recurring end-of-turn save (ability = the spell's save, DC = the
+              // caster's spell save DC).
+              ...(spell.conditionSaveEnds && spell.savingThrow
+                ? {
+                    save_ends: { ...e.save_ends, [cond]: { ability: spell.savingThrow, dc } },
+                    save_ends_acted: (e.save_ends_acted ?? []).filter((c) => c !== cond),
+                  }
+                : {}),
+              // SRD Charmed / Frightened — record the caster as the source for
+              // the enemy AI (avoid the charmer / keep distance from the fear).
+              ...(cond === 'charmed' ? { charmer_id: char.id } : {}),
+              ...(cond === 'frightened' ? { frightened_by: char.id } : {}),
               // Confusion: a freshly-confused creature hasn't taken a confused
               // turn yet, so its first turn skips the end-of-turn re-save.
               ...(cond === 'confused' ? { confused_acted: false } : {}),

@@ -18,8 +18,8 @@ PHB/DMG-exclusive content (subclasses, feats, species, spells). See
 
 ## Implementation status (code-verified 2026-05-26)
 
-Grounded in a code survey + the full backend suite: **1744 tests across
-203 files, all green** (lint + typecheck clean).
+Grounded in a code survey + the full backend suite: **1790 tests across
+208 files, all green** (lint + typecheck clean).
 
 ### Done — rules-engine frameworks
 
@@ -67,7 +67,7 @@ Grounded in a code survey + the full backend suite: **1744 tests across
 
 | Category                  | In pansori                                       | SRD universe                     |
 | ------------------------- | ------------------------------------------------ | -------------------------------- |
-| Spells                    | **186** (26 cantrips + 160 leveled, through L9)  | ~330                             |
+| Spells                    | **198** (26 cantrips + 172 leveled, through L9)  | ~330                             |
 | Shared SRD monster pool   | **12** (`SRD_MONSTERS`) + per-campaign templates | hundreds                         |
 | Species                   | 9                                                | 9 standalone + Drow lineage      |
 | Classes                   | 12                                               | 12                               |
@@ -85,8 +85,75 @@ backend features are waiting on, and a handful of **bounded subsystems**.
 
 ### Content breadth — data on existing patterns (RE-6)
 
-- [ ] **Spells** — ~186 / ~330 SRD. Most remaining categories are already
-      representable (data entry).
+- [ ] **Spells** — ~198 / ~330 SRD. Most remaining categories are already
+      representable (data entry). Data-only batch (`rawSpellsBatch.spec.ts`):
+      Dissonant Whispers, Mind Spike, Vitriolic Sphere, Freezing Sphere
+      (save-for-half damage), Charm Monster (WIS save → charmed, save
+      Advantage), Protection from Poison (touch ward: strip Poisoned + poison
+      Resistance).
+  - [x] **Timed enemy conditions** — shipped (`timedEnemyConditions.spec.ts`).
+        Enemies had no per-turn condition tick (the PC analogue runs at each
+        PC's turn start), so finite enemy conditions never expired. Added
+        `tickEnemyConditions` (round-wrap decrement + expiry, mirroring the
+        zone / concentration ticks) and cast-time stamping of
+        `spell.conditionDuration` onto enemies in the single-target save path +
+        the AoE-condition path — guarded to non-concentration spells and
+        skipping the turn-loop-managed control conditions
+        (`TURN_LOOP_MANAGED_CONDITIONS` = commanded/confused/compelled/
+        dominated). This makes Charm Person/Monster + Blindness/Deafness expire
+        RAW. **Blinded** is now mechanically live: attacks vs a Blinded enemy
+        roll with Advantage (`toHit`), and a Blinded enemy's own attacks roll
+        with Disadvantage (`computeEnemyAttack`) — which also activates Rogue
+        Cunning Strike: Obscure (now stamps a 1-round blind). **Color Spray**
+        (L1, 15-ft cone, CON save → Blinded until end of your next turn) ships
+        on it; `runAoeConditionSpell` is now cone/cube/line-aware (reuses the
+        AoE damage branch's shape helpers). Deferred: a blinded enemy's
+        own-disadvantage now also covers `frightened` (see the charm/fear AI
+        item below); poisoned/restrained self-disadvantage on enemies is the
+        remaining broader follow-up.
+  - [x] **Enemy charm / fear AI** — shipped (`charmFearAI.spec.ts`). The
+        conditions previously applied + expired but didn't change enemy
+        behavior. Now the cast paths record the source on the enemy entity
+        (`charmer_id` / `frightened_by`). A **Charmed** enemy can't attack its
+        charmer — `selectTarget` drops the charmer from its candidates (turns on
+        another PC, or stands down if the charmer is the only target). A
+        **Frightened** enemy attacks with Disadvantage (`computeEnemyAttack`,
+        LoS approximated as always-in-sight) and can't advance on its fear
+        source (`attemptEnemyApproach` zeroes its Speed toward `frightened_by`,
+        like the grappled/restrained hold). Makes Charm Person/Monster + Fear
+        mechanically real. Deferred: Charm Monster's full "Friendly to you"
+        (only the no-attack-charmer half is modeled); a Frightened creature may
+        still advance on a non-source PC (the geometric "no closer to the
+        source" rule is simplified to "held when targeting the source").
+  - [x] **End-of-turn "save ends" hook + incapacitation skip** — shipped
+        (`saveEndsConditions.spec.ts`). `CombatEntity.save_ends` maps a condition
+        to its recurring save `{ ability, dc }`; the enemy turn loop evaluates it
+        at turn start (gated by `save_ends_acted` so the effect lasts ≥1 turn,
+        mirroring `confused_acted`) and clears the condition on a success. A new
+        flag `Spell.conditionSaveEnds` stamps it from the save / AoE-condition
+        cast paths. Companion fix: **incapacitating conditions (stunned /
+        paralyzed / incapacitated / unconscious / petrified) now make an enemy
+        skip its turn** — a real pre-existing gap (a paralyzed enemy used to act
+        normally), so Hold Person/Monster, Sleep, and Stunning Strike all gained
+        teeth too. **Power Word Stun** (L8: ≤150 HP → Stunned w/ CON save-ends; >150 HP → Speed-0 narrated) and **Slow** (WIS save-ends added) ride the
+        hook. Deferred: the >150-HP Power Word Stun Speed-0 branch is narrated
+        (no per-enemy speed-0-until-X primitive).
+  - [x] **Per-attack weapon riders** — shipped (`weaponRiderSpells.spec.ts`).
+        New `Spell.weaponRider` + `Character.weapon_rider` (persistent) /
+        `pending_smite` (one-shot), set by the buff cast path and read in
+        `resolveOneAttack` (riding on top of the weapon multiplier like the
+        radiant Smite riders). **Divine Favor** (+1d4 radiant on every weapon
+        hit, 1 min, non-concentration) rides `weapon_rider`; the smites arm the
+        next melee hit via `pending_smite`: **Searing Smite** (+1d6 fire),
+        **Shining Smite** (+2d6 radiant + `faerie_fired` so attacks vs the
+        target gain Advantage — reuses the timed-condition cap), **Ensnaring
+        Strike** (STR save → Restrained, riding the save-ends hook). Teardown:
+        breakConcentration (concentration smites) + endCombatState (the
+        non-concentration riders). Deferred: Searing's per-turn fire DoT and
+        Ensnaring's per-turn piercing DoT are narrated, not ticked; smites are
+        melee-only (Ensnaring's RAW any-weapon is simplified).
+  - [ ] Remaining engine-gated spells: Ray of Sickness (attack-roll + condition
+        rider), Sorcerous Burst (per-cast damage-type pick).
   - [~] **Forced displacement** — shipped (RE-4): the `pushFt` spell flag +
     `pushEntityAway` (pushes a creature directly away from the caster up to
     the distance, pathed via `planEnemyApproach` toward the away-edge so it
@@ -248,8 +315,11 @@ backend features are waiting on, and a handful of **bounded subsystems**.
 ### Condition + spellcasting fidelity (cleanups) — RE-5
 
 - [ ] Register **Deafened**; add **Petrified** damage resistance + save
-      advantage; **Charmed** CHA-check disadvantage; **Slow** end-of-turn
-      recurring save; make concentration's **incapacitation** gate explicit.
+      advantage; **Charmed** CHA-check disadvantage; make concentration's
+      **incapacitation** gate explicit. (**Slow**'s end-of-turn recurring save
+      shipped via the generic save-ends hook — see the Spells section; enemy
+      **incapacitation skip** for stunned/paralyzed/unconscious also shipped
+      there.)
 - [ ] **Multiclass edge cases** — ASI spacing validation, skill/tool grants
       on multiclass entry, warlock pact-slot pool separation, second-class
       subclass features.

@@ -202,6 +202,15 @@ export interface CombatEntity {
   // condition if the grappler dies/is incapacitated, and so the contested escape
   // check has a target's mod to roll against.
   grappled_by?: string;
+  // SRD Charmed (enemy charmed by a PC, e.g. Charm Person/Monster) — the
+  // charmer's character id. A Charmed creature can't attack its charmer, so
+  // `selectTarget` drops the charmer from this enemy's candidate targets.
+  charmer_id?: string;
+  // SRD Frightened (enemy frightened by a PC, e.g. Fear) — the fear source's
+  // character id. A Frightened creature attacks with Disadvantage and can't
+  // willingly move closer to the source while it can see it; the enemy turn
+  // loop reads this for both (LoS approximated as "always in sight").
+  frightened_by?: string;
   // Boss-phase tracking. Counts how many phases the boss has entered. The
   // engine re-applies effects 0..phase_index-1 on every takeAction so the
   // seed's runtime Enemy fields reflect the current phase. A 0 (or undefined)
@@ -231,6 +240,19 @@ export interface CombatEntity {
   // the end-of-turn save, since nothing affects the creature in between.
   // Reset when the `confused` condition is (re)applied or cleared.
   confused_acted?: boolean;
+  // SRD "save ends" conditions on an enemy (Power Word Stun's Stunned, Slow's
+  // slowed): the creature repeats a saving throw at the end of each of its
+  // turns, ending the condition on a success. Maps the condition to the ability
+  // + DC of that recurring save. The enemy turn loop evaluates these at the
+  // start of each turn (modelling the prior turn's end, like `confused_acted`);
+  // a success removes the condition and its entry here. Stamped on cast by the
+  // save / AoE-condition paths (for `spell.conditionSaveEnds` spells) or by a
+  // bespoke handler (Power Word Stun). The DC is the caster's spell save DC.
+  save_ends?: Record<string, { ability: AbilityKey; dc: number }>;
+  // Conditions in `save_ends` for which this creature has completed ≥1 afflicted
+  // turn — gates the recurring save so the effect always lasts at least its
+  // first turn (RAW), mirroring `confused_acted` but per-condition.
+  save_ends_acted?: string[];
 }
 
 // ─── Structured actions ──────────────────────────────────────────────

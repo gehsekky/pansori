@@ -242,6 +242,44 @@ export function runBuffSpell(
     }
   }
 
+  // SRD per-attack weapon riders (Divine Favor, the smites). Self-cast: arm the
+  // caster's weapon hits. `persistent` → every hit (Divine Favor); otherwise the
+  // next melee hit (Searing/Shining/Ensnaring Strike). resolveOneAttack reads
+  // these; breakConcentration clears them when the buff ends.
+  if (spell.weaponRider) {
+    const wr = spell.weaponRider;
+    if (wr.persistent) {
+      buffTarget.weapon_rider = {
+        dice: wr.dice ?? '1d4',
+        damageType: wr.damageType ?? 'force',
+        spellId,
+      };
+    } else {
+      buffTarget.pending_smite = {
+        spellId,
+        dice: wr.dice,
+        damageType: wr.damageType,
+        appliesFaerieFire: wr.appliesFaerieFire,
+        appliesCondition: wr.appliesCondition,
+        conditionSave: wr.conditionSave,
+      };
+    }
+    if (!isCasterTarget) {
+      ctx.st = {
+        ...ctx.st,
+        characters: ctx.st.characters.map((c) =>
+          c.id === buffTarget.id
+            ? {
+                ...c,
+                weapon_rider: buffTarget.weapon_rider,
+                pending_smite: buffTarget.pending_smite,
+              }
+            : c
+        ),
+      };
+    }
+  }
+
   // SRD Death Ward — set the one-shot flag on the target. The
   // interception logic lives in `applyDamage` where HP would hit
   // 0; the flag clears there on consumption.

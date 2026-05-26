@@ -23,6 +23,71 @@ import { rollDice } from '../../rulesEngine.js';
  * range gates, so it owns kill resolution for both targets via
  * `applySingleTargetDamage`.
  */
+/**
+ * SRD Power Word Stun (L8 Enchantment) — "If the target has 150 Hit Points or
+ * fewer, it has the Stunned condition. Otherwise, its Speed is 0 until the start
+ * of your next turn. The Stunned target makes a Constitution saving throw at the
+ * end of each of its turns, ending the condition on itself on a success." No
+ * save on cast, no attack roll.
+ *
+ * The ≤150-HP Stun rides the generic save-ends hook: it stamps
+ * `save_ends.stunned = { ability: 'con', dc }` so the enemy loop runs the
+ * recurring CON save (and the incapacitation skip makes the Stun cost turns).
+ * The >150-HP "Speed 0 until your next turn" branch is narrated — pansori has no
+ * per-enemy speed-0-until-X primitive distinct from the incapacitating set.
+ */
+export function runPowerWordStun(
+  ctx: ActionContext,
+  spellTarget: Enemy,
+  spellTargetId: string,
+  spell: Spell,
+  slotNote: string,
+  dc: number
+): void {
+  if (ctx.actor.kind !== 'pc') return;
+  const { char } = ctx.actor;
+  const ent = ctx.st.entities?.find((e) => e.id === spellTargetId && e.isEnemy);
+  const curHp = ent?.hp ?? 0;
+  if (curHp <= 0) return;
+  const castPrefix = pickCastPrefix(spell, {
+    name: char.name,
+    spell: spell.name,
+    slotNote,
+    target: spellTarget.name,
+  });
+  if (spellTarget.condition_immunities?.includes('stunned')) {
+    composeNow(ctx, {
+      kind: 'spell_utility',
+      prose: `${castPrefix}! ${spellTarget.name} is immune to being Stunned — the word washes over it.`,
+    });
+    return;
+  }
+  if (curHp <= 150) {
+    ctx.st = {
+      ...ctx.st,
+      entities: (ctx.st.entities ?? []).map((e) =>
+        e.id === spellTargetId && e.isEnemy
+          ? {
+              ...e,
+              conditions: [...e.conditions.filter((c) => c !== 'stunned'), 'stunned'],
+              save_ends: { ...e.save_ends, stunned: { ability: 'con', dc } },
+              save_ends_acted: (e.save_ends_acted ?? []).filter((c) => c !== 'stunned'),
+            }
+          : e
+      ),
+    };
+    composeNow(ctx, {
+      kind: 'spell_utility',
+      prose: `${castPrefix}! A word of power overwhelms ${spellTarget.name} (≤150 HP) — it is Stunned (CON save at the end of each of its turns to recover).`,
+    });
+  } else {
+    composeNow(ctx, {
+      kind: 'spell_utility',
+      prose: `${castPrefix}! ${spellTarget.name} has more than 150 HP — it resists the worst, but its Speed drops to 0 until your next turn.`,
+    });
+  }
+}
+
 export function runPowerWordKill(
   ctx: ActionContext,
   spellTarget: Enemy,

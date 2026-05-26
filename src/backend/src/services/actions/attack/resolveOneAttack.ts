@@ -513,6 +513,23 @@ export function resolveOneAttack(
   // (Overcome-Defenses-adjusted) resistance treatment; it is not crit-doubled
   // (the dice were already doubled above).
   const overwhelmingStrikeDmg = atk.hit ? overwhelmingStrikeDamage(pc.char, atk.roll) : 0;
+
+  // ── SRD per-attack weapon riders (Divine Favor + the smites) ────────────
+  // Divine Favor: a persistent rider that adds its dice to EVERY weapon hit for
+  // the duration. The smites (Searing/Shining/Ensnaring) arm the NEXT melee hit.
+  // Both ride on top of the weapon multiplier (like the radiant Smite riders).
+  let weaponRiderDmg = 0;
+  const weaponRider = pc.char.weapon_rider;
+  if (weaponRider && atk.hit && weaponItem) {
+    weaponRiderDmg = isCrit ? rollCritical(weaponRider.dice) : rollDice(weaponRider.dice);
+  }
+  const pendingSmite = pc.char.pending_smite;
+  const smiteHits = !!pendingSmite && atk.hit && !!weaponItem && weaponItem.range !== 'ranged';
+  let smiteRiderDmg = 0;
+  if (smiteHits && pendingSmite?.dice) {
+    smiteRiderDmg = isCrit ? rollCritical(pendingSmite.dice) : rollDice(pendingSmite.dice);
+  }
+
   const rawDmg =
     baseHit + sneakDmg + rageBonus + brutalStrikeDmg + huntersMarkDmg + overwhelmingStrikeDmg;
   // SRD Monk Empowered Strikes (L6) — unarmed strikes can deal Force damage.
@@ -534,7 +551,10 @@ export function resolveOneAttack(
   // RAW radiant-resistant creatures would halve this too — TODO:
   // separate multiplier check for radiant.
   const radiantRider = smiteDmg + improvedSmiteDmg + divineStrikeDmg;
-  const totalDmg = finalDmg + radiantRider;
+  // Divine Favor / smite riders also ride on top of the weapon multiplier (same
+  // resistance simplification as the radiant riders above).
+  const spellWeaponRider = weaponRiderDmg + smiteRiderDmg;
+  const totalDmg = finalDmg + radiantRider + spellWeaponRider;
   const enemyEnt = ctx.st.entities?.find((e) => e.id === targetId && e.isEnemy);
   const curEnemyHp = enemyEnt?.hp ?? 0;
   // 2024 PHB enemy temp HP — currently only set by Polymorph. Absorb
@@ -559,6 +579,17 @@ export function resolveOneAttack(
   }
   if (huntersMarkDmg > 0) {
     hitBonuses.push({ label: `Hunter's Mark ${huntersMarkDie}: +${huntersMarkDmg} force` });
+  }
+  if (weaponRiderDmg > 0 && weaponRider) {
+    hitBonuses.push({
+      label: `${weaponRider.spellId === 'divine_favor' ? 'Divine Favor' : 'Weapon rider'} ${weaponRider.dice}: +${weaponRiderDmg} ${weaponRider.damageType}`,
+    });
+  }
+  if (smiteRiderDmg > 0 && pendingSmite?.dice) {
+    hitBonuses.push({
+      label:
+        `Smite ${pendingSmite.dice}: +${smiteRiderDmg} ${pendingSmite.damageType ?? ''}`.trim(),
+    });
   }
   if (rageBonus > 0) {
     hitBonuses.push({ label: `Rage: +${rageBonus}` });
@@ -703,6 +734,56 @@ export function resolveOneAttack(
     }
   }
 
+  // ── SRD smite secondary effect (Shining / Ensnaring Strike) ──────────
+  // The armed strike is spent on this hit regardless of the target's fate; the
+  // on-hit effect lands only if the target survives. Both effects expire via the
+  // timed-condition hook (1-minute cap) — Ensnaring also via its STR save-ends.
+  if (smiteHits && pendingSmite) {
+    pc.char.pending_smite = undefined;
+    if (newEnemyHp > 0 && pendingSmite.appliesFaerieFire) {
+      ctx.st = {
+        ...ctx.st,
+        entities: (ctx.st.entities ?? []).map((e) =>
+          e.id === targetId && e.isEnemy
+            ? {
+                ...e,
+                conditions: [...e.conditions.filter((c) => c !== 'faerie_fired'), 'faerie_fired'],
+                condition_durations: { ...e.condition_durations, faerie_fired: 10 },
+              }
+            : e
+        ),
+      };
+      ctx.narrative += ` ${fmt.note(`[${target.name} is wreathed in light — attacks against it have Advantage]`)}`;
+    }
+    if (newEnemyHp > 0 && pendingSmite.appliesCondition && pendingSmite.conditionSave) {
+      const cond = pendingSmite.appliesCondition;
+      const saveAbility = pendingSmite.conditionSave;
+      const smiteDc = 8 + profBonus(pc.char.level) + abilityMod(pc.char.cha);
+      const targetStat = ((target as unknown as Record<string, number>)[saveAbility] ??
+        10) as number;
+      const saved = rollDice('1d20') + abilityMod(targetStat) >= smiteDc;
+      if (saved) {
+        ctx.narrative += ` ${fmt.note(`[${target.name} resists — ${saveAbility.toUpperCase()} save vs ${cond}]`)}`;
+      } else if (!target.condition_immunities?.includes(cond)) {
+        ctx.st = {
+          ...ctx.st,
+          entities: (ctx.st.entities ?? []).map((e) =>
+            e.id === targetId && e.isEnemy
+              ? {
+                  ...e,
+                  conditions: [...e.conditions.filter((c) => c !== cond), cond],
+                  condition_durations: { ...e.condition_durations, [cond]: 10 },
+                  save_ends: { ...e.save_ends, [cond]: { ability: saveAbility, dc: smiteDc } },
+                  save_ends_acted: (e.save_ends_acted ?? []).filter((c) => c !== cond),
+                }
+              : e
+          ),
+        };
+        ctx.narrative += ` ${fmt.note(`[${target.name} is ${cond}! (${saveAbility.toUpperCase()} save ends)]`)}`;
+      }
+    }
+  }
+
   // ── 2024 PHB Cunning Strike effect application ───────────────────────
   if (pc.char.turn_actions.cunning_strike_pending && sneakDmg > 0 && newEnemyHp > 0) {
     const csEffect = pc.char.turn_actions.cunning_strike_pending;
@@ -823,7 +904,13 @@ export function resolveOneAttack(
         ...ctx.st,
         entities: (ctx.st.entities ?? []).map((e) =>
           e.id === targetId && e.isEnemy
-            ? { ...e, conditions: [...e.conditions.filter((c) => c !== 'blinded'), 'blinded'] }
+            ? {
+                ...e,
+                conditions: [...e.conditions.filter((c) => c !== 'blinded'), 'blinded'],
+                // Blinded until the end of its next turn ≈ one round; the
+                // round-wrap enemy tick expires it.
+                condition_durations: { ...e.condition_durations, blinded: 1 },
+              }
             : e
         ),
       };

@@ -446,6 +446,32 @@ export interface Spell {
   heal?: string; // dice expr for healing
   condition?: ConditionName;
   conditionDuration?: number; // rounds; undefined = permanent until cleared
+  // SRD "save ends" conditions (Slow's slowed, Power Word Stun's stunned): the
+  // afflicted creature repeats the save (`savingThrow`) at the end of each of
+  // its turns, ending the condition on a success. When set, the cast paths stamp
+  // `CombatEntity.save_ends[condition] = { ability: savingThrow, dc }` onto the
+  // enemy and the enemy turn loop runs the recurring save. Independent of
+  // `conditionDuration` (a save-ends condition has no fixed timer) and of
+  // concentration (which, when present, also clears the condition on break).
+  conditionSaveEnds?: boolean;
+  // SRD per-attack weapon riders (Divine Favor, Searing/Shining/Ensnaring
+  // Strike). A self-cast buff that augments the caster's weapon hits:
+  //   - `persistent: true` (Divine Favor) → every weapon hit for the duration
+  //     adds `dice` damage of `damageType` (set on `Character.weapon_rider`).
+  //   - otherwise (the smites) → arms the NEXT melee-weapon hit
+  //     (`Character.pending_smite`): adds `dice`/`damageType` damage (optional)
+  //     plus an on-hit effect — `appliesFaerieFire` (Shining Smite: attacks vs
+  //     the target gain Advantage) or `appliesCondition` + `conditionSave`
+  //     (Ensnaring Strike: STR save or Restrained, save-ends).
+  // The buff cast path reads this; concentration governs the duration.
+  weaponRider?: {
+    dice?: string;
+    damageType?: string;
+    persistent?: boolean;
+    appliesFaerieFire?: boolean;
+    appliesCondition?: ConditionName;
+    conditionSave?: AbilityKey;
+  };
   narrative?: string; // override text for utility spells (single-string;
   //                     for richer per-stage flavor use `narratives` below)
   narratives?: SpellNarrative;
@@ -769,6 +795,24 @@ export interface Character {
    * turn, per RAW — duration tracking is a follow-up).
    */
   divine_smite_dice?: number;
+  // SRD per-attack weapon damage rider (Divine Favor) — every weapon hit for the
+  // duration deals extra `dice` damage of `damageType`. Set by the buff cast
+  // path from `Spell.weaponRider` (persistent), read in resolveOneAttack, and
+  // cleared when the caster's concentration ends.
+  weapon_rider?: { dice: string; damageType: string; spellId: string };
+  // SRD one-shot smite (Searing / Shining / Ensnaring Strike) — armed on cast,
+  // consumed by the NEXT melee-weapon hit: adds `dice` damage (optional) and an
+  // on-hit effect (Faerie-Fire-style advantage, or a saved condition that ends
+  // on the target's save). Concentration governs the lingering effect; the
+  // armed strike itself clears on consumption (or when concentration ends).
+  pending_smite?: {
+    spellId: string;
+    dice?: string;
+    damageType?: string;
+    appliesFaerieFire?: boolean;
+    appliesCondition?: ConditionName;
+    conditionSave?: AbilityKey;
+  };
   // 2024 PHB Wild Shape — id of the active BeastForm while wild_shaped.
   // Cleared on dismiss_wild_shape.
   wild_shape_form?: string;

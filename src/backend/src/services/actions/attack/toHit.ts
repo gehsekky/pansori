@@ -146,6 +146,9 @@ export function computeToHitContext(
   // 2024 PHB Faerie Fire — attacks against an outlined creature
   // have advantage.
   const enemyFaerieFired = enemyEntity2?.conditions.includes('faerie_fired') ?? false;
+  // SRD Blinded — attack rolls against a Blinded creature have Advantage
+  // (Blindness/Deafness, Color Spray, Rogue Cunning Strike: Obscure).
+  const enemyBlinded = enemyEntity2?.conditions.includes('blinded') ?? false;
   const proneAdv = enemyProne && weaponItem?.range !== 'ranged';
   const proneDisadv = enemyProne && weaponItem?.range === 'ranged';
 
@@ -285,6 +288,7 @@ export function computeToHitContext(
     proneAdv ||
     enemyParalyzed ||
     enemyFaerieFired ||
+    enemyBlinded ||
     flankingAdv ||
     helpAdv ||
     preciseHunterAdv ||

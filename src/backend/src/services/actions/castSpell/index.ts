@@ -1,4 +1,5 @@
 import { isSpellOutOfRange, runPrecast } from './precast.js';
+import { runPowerWordKill, runPowerWordStun } from './powerWords.js';
 import type { ActionHandler } from '../types.js';
 import type { Enemy } from '../../../types.js';
 import { applySingleTargetDamage } from './applyDamage.js';
@@ -13,7 +14,6 @@ import { runBuffSpell } from './buff.js';
 import { runCombatStart } from '../attack/combatStart.js';
 import { runHealSpell } from './heal.js';
 import { runMultiTargetSpell } from './multiTarget.js';
-import { runPowerWordKill } from './powerWords.js';
 import { runRecurringAttackSpell } from '../recurringSpellAttack.js';
 import { runReviveSpell } from './revive.js';
 import { runSaveSpell } from './save.js';
@@ -259,6 +259,15 @@ export const handleCastSpell: ActionHandler<{
   // circuits the generic auto-hit / single-target damage path below.
   if (spell.id === 'power_word_kill') {
     runPowerWordKill(ctx, spellTarget, spellTargetId, spell, slotNote);
+    ctx.usedInitiative = true;
+    return;
+  }
+
+  // SRD Power Word Stun (L8) — Stuns a target with ≤150 HP (CON save-ends each
+  // turn), else drops its Speed to 0. No save/attack on cast; owns its own
+  // resolution, so it short-circuits the generic damage path below.
+  if (spell.id === 'power_word_stun') {
+    runPowerWordStun(ctx, spellTarget, spellTargetId, spell, slotNote, dc);
     ctx.usedInitiative = true;
     return;
   }
