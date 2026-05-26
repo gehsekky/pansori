@@ -1,6 +1,7 @@
 import type { Enemy, Spell } from '../../../types.js';
 import {
   applyPartyLevelUps,
+  dominatedDamageReSave,
   endCombatState,
   grantDarkOnesBlessing,
   isRoomCleared,
@@ -75,5 +76,7 @@ export function applySingleTargetDamage(
     ctx.narrative += applyPartyLevelUps(ctx.st, char, ctx.context);
   } else {
     ctx.narrative += ` The ${spellTarget.name} has ${fmt.hp(newEnemyHpSpell)} HP remaining.`;
+    // SRD Dominate — taking damage lets the target re-save to break free.
+    dominatedDamageReSave(ctx, spellTargetId, spellTarget.name);
   }
 }

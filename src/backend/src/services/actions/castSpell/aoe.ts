@@ -10,6 +10,7 @@ import {
 } from '../../rulesEngine.js';
 import {
   applyPartyLevelUps,
+  dominatedDamageReSave,
   endCombatState,
   getEnemyById,
   grantDarkOnesBlessing,
@@ -175,6 +176,9 @@ export function runAoeSpell(
         if (isRoomCleared(ctx.st, ctx.seed, ctx.roomId)) {
           ctx.st = endCombatState(ctx.st);
         }
+      } else if (resDmg > 0) {
+        // SRD Dominate — a dominated creature caught in the blast re-saves.
+        dominatedDamageReSave(ctx, target.id, targetEnemy.name);
       }
     } else if (targetChar && !target.isEnemy) {
       // Allies in blast auto-succeed (and take no damage) via Evoker Sculpt

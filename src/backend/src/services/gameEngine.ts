@@ -6395,6 +6395,65 @@ export function applyDamageToEntity(st: GameState, entityId: string, dmg: number
 }
 
 /**
+ * SRD Dominate — "Whenever the target takes damage, it repeats the save,
+ * ending the spell on itself on a success." Call (with the active
+ * `ActionContext`) after a `dominated` enemy survives an instance of damage:
+ * roll the enemy's WIS save against the controlling caster's stamped DC, and
+ * on success drop the caster's concentration (which strips `dominated` from
+ * the entity) and append a break-free note. No-op when the target isn't
+ * dominated or is already down. Mutates `ctx.st`/`ctx.narrative` (and the
+ * caster's actor clone when the dominator is the acting PC, so the
+ * end-of-action commit doesn't restore the concentration).
+ */
+export function dominatedDamageReSave(
+  ctx: {
+    st: GameState;
+    seed: Seed;
+    context?: Context;
+    narrative: string;
+    actor: { kind: string; char?: Character };
+  },
+  targetId: string,
+  targetName: string
+): void {
+  const ent = ctx.st.entities?.find((e) => e.id === targetId && e.isEnemy);
+  if (!ent || ent.hp <= 0 || !ent.conditions.includes('dominated')) return;
+  const caster = ctx.st.characters.find(
+    (c) => c.concentrating_on?.condition === 'dominated' && !c.dead
+  );
+  const dc = caster?.concentrating_on?.save_dc ?? 13;
+  const stats = getEnemyById(ctx.seed, targetId);
+  const wis = (stats as unknown as Record<string, number>)?.wis ?? 10;
+  const failed = rollConditionSave('wis', wis, dc, false, 1, 0, ent.conditions);
+  if (failed) return;
+  // Save succeeded — the spell ends on the target. For single-target Dominate
+  // that means the caster's concentration drops (which clears `dominated`).
+  if (caster) {
+    const res = breakConcentration(caster, ctx.st, ctx.context);
+    ctx.st = {
+      ...res.st,
+      characters: res.st.characters.map((c) => (c.id === caster.id ? res.char : c)),
+    };
+    // If the dominator is the acting PC, clear the concentration on the actor
+    // clone too — otherwise the end-of-action commit writes the stale value back.
+    if (ctx.actor.kind === 'pc' && ctx.actor.char?.id === caster.id) {
+      ctx.actor.char = { ...ctx.actor.char, concentrating_on: null };
+    }
+  } else {
+    // No caster found (defensive) — just clear the condition off the entity.
+    ctx.st = {
+      ...ctx.st,
+      entities: (ctx.st.entities ?? []).map((e) =>
+        e.id === targetId && e.isEnemy
+          ? { ...e, conditions: e.conditions.filter((c) => c !== 'dominated') }
+          : e
+      ),
+    };
+  }
+  ctx.narrative += ` The ${targetName} breaks free of domination!`;
+}
+
+/**
  * Spawn an ally combatant (companion / summon) into combat: add the
  * entity to `entities` and an `is_enemy: false` slot to
  * `initiative_order` (placed right after `afterId` — e.g. the summoning
@@ -6896,11 +6955,13 @@ export async function runEnemyTurns(args: {
           const behavior = rollDice('1d10');
           if (behavior <= 8) {
             if (behavior >= 7) {
-              // 7-8: attack a random ally within melee reach (friendly fire).
+              // 7-8: melee attack a random creature within reach (RAW). The
+              // pool is ANY adjacent creature — other enemies, allies/summons,
+              // AND the party — so a confused creature can turn on its own side
+              // or lash out at a nearby PC.
               const confPos = confusedEnt.pos;
               const reachable = (st.entities ?? []).filter(
                 (e) =>
-                  e.isEnemy &&
                   e.id !== eEntry.id &&
                   e.hp > 0 &&
                   !st.enemies_killed.includes(e.id) &&
@@ -6908,23 +6969,44 @@ export async function runEnemyTurns(args: {
               );
               if (reachable.length > 0) {
                 const victim = reachable[Math.floor(Math.random() * reachable.length)];
-                const victimStats = getEnemyById(args.seed, victim.id);
-                const victimAc = victimStats?.ac ?? victim.ac ?? 10;
-                const victimName = victimStats?.name ?? 'an ally';
-                const res = resolveEnemyAttack(
-                  { toHit: rm.toHit ?? 0, damage: rm.damage ?? '1d4' },
-                  victimAc
-                );
-                if (res.hit) {
-                  st = applyDamageToEntity(st, victim.id, res.damage);
-                  narrative += `\n\n[${rm.name} is confused and turns on ${victimName} — ${res.damage} damage!]`;
-                  if ((st.entities?.find((e) => e.id === victim.id)?.hp ?? 0) <= 0) {
-                    st.enemies_killed = [...st.enemies_killed, victim.id];
-                    narrative += ` ${victimName} is slain!`;
-                    if (isRoomCleared(st, args.seed, st.current_room)) st = endCombatState(st);
+                const pcVictim = st.characters.find((c) => c.id === victim.id && !c.dead);
+                if (pcVictim) {
+                  // Attack a party member: roll vs the PC's AC and route damage
+                  // through the canonical PC path (temp HP, concentration save,
+                  // knockout) — so a hit on the caster can break their own spell.
+                  const res = resolveEnemyAttack(
+                    { toHit: rm.toHit ?? 0, damage: rm.damage ?? '1d4' },
+                    pcVictim.ac ?? 10
+                  );
+                  if (res.hit) {
+                    const dmgRes = applyDamage(pcVictim, st, res.damage, { context: args.context });
+                    st = commitCharacter(dmgRes.st, dmgRes.char);
+                    narrative += `\n\n[${rm.name} is confused and turns on ${pcVictim.name} — ${res.damage} damage!]`;
+                    if (dmgRes.concentrationNote) narrative += ` ${dmgRes.concentrationNote}`;
+                    if (dmgRes.knockedOut) narrative += ` ${pcVictim.name} is knocked unconscious!`;
+                  } else {
+                    narrative += `\n\n[${rm.name} is confused and swings wildly at ${pcVictim.name} — miss.]`;
                   }
                 } else {
-                  narrative += `\n\n[${rm.name} is confused and swings wildly at ${victimName} — miss.]`;
+                  // Attack another combatant entity (enemy ally or summon).
+                  const victimStats = getEnemyById(args.seed, victim.id);
+                  const victimAc = victimStats?.ac ?? victim.ac ?? 10;
+                  const victimName = victimStats?.name ?? victim.companionName ?? 'a creature';
+                  const res = resolveEnemyAttack(
+                    { toHit: rm.toHit ?? 0, damage: rm.damage ?? '1d4' },
+                    victimAc
+                  );
+                  if (res.hit) {
+                    st = applyDamageToEntity(st, victim.id, res.damage);
+                    narrative += `\n\n[${rm.name} is confused and turns on ${victimName} — ${res.damage} damage!]`;
+                    if ((st.entities?.find((e) => e.id === victim.id)?.hp ?? 0) <= 0) {
+                      st.enemies_killed = [...st.enemies_killed, victim.id];
+                      narrative += ` ${victimName} is slain!`;
+                      if (isRoomCleared(st, args.seed, st.current_room)) st = endCombatState(st);
+                    }
+                  } else {
+                    narrative += `\n\n[${rm.name} is confused and swings wildly at ${victimName} — miss.]`;
+                  }
                 }
               } else {
                 narrative += `\n\n[${rm.name} is confused and flails at nothing.]`;

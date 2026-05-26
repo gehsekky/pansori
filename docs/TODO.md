@@ -116,8 +116,9 @@ backend features are waiting on, and a handful of **bounded subsystems**.
         stamps the save DC on the concentration link). **Command** (L1, WIS
         save → "Halt": lose your next turn, one-shot) and **Confusion** (L4,
         10-ft sphere, WIS save → `confused`; each turn the creature re-saves,
-        then 1d10: 1-6 waste the turn, 7-8 attack a random ally in reach
-        (friendly fire via `resolveEnemyAttack`/`applyDamageToEntity`), 9-10 act
+        then 1d10: 1-6 waste the turn, 7-8 attack a random creature in reach —
+        ally, summon, OR a nearby PC (RAW; PC hits route through `applyDamage`
+        so they trigger the victim's concentration save / knockout), 9-10 act
         normally) ride it. Confusion's re-save is RAW-faithful: a creature
         stays confused for at least its first full turn (`CombatEntity.confused_acted`
         gates the end-of-turn save, evaluated at the start of each subsequent
@@ -126,18 +127,22 @@ backend features are waiting on, and a handful of **bounded subsystems**.
         action — then re-saves) and **Dominate Beast/Person/Monster** (L4/L5/L8,
         WIS save rolled with Advantage via `Spell.saveAdvantage` → `dominated`:
         on its turn the creature attacks the nearest OTHER enemy, fighting for
-        the party) round out the family. The four control conditions
+        the party; taking damage triggers an on-damage re-save via
+        `dominatedDamageReSave`, hooked into the spell/AoE/weapon damage paths)
+        round out the family. The four control conditions
         (`commanded`/`confused`/`compelled`/`dominated`) all resolve in the
         enemy turn loop's behavior block and clear via breakConcentration; the
         forced-move + dominated-attack paths reuse `planEnemyApproach` /
         `resolveEnemyAttack` / `applyDamageToEntity`. Simplifications: Command's
         upcast (+1 target/slot) and command words collapse to "Halt"; Confusion's
-        7-8 targets allies-only + fixed radius; Compulsion's direction is fixed
+        fixed radius (no upcast widening); Compulsion's direction is fixed
         to "away from caster" and auto-applies (no per-turn Bonus Action);
-        Dominate defers the on-damage re-save + manual command surface
-        (auto-pilots the creature) and a dominated foe still counts as an enemy
-        for room-clear. Note: older AoE-condition spells (Hypnotic Pattern, Web)
-        still condition only the primary target until migrated onto `aoeCondition`.
+        Dominate defers only the manual command surface (auto-pilots the
+        creature) and a dominated foe still counts as an enemy for room-clear.
+        The Dominate on-damage re-save fires on party spell / AoE / weapon
+        damage; enemy-on-enemy (friendly-fire) damage to a dominated creature
+        doesn't trigger it. Note: older AoE-condition spells (Hypnotic Pattern,
+        Web) still condition only the primary target until migrated onto `aoeCondition`.
       Exceptions still needing a model first: the alternate "summon" spells,
       each mechanically distinct from the stat-block ally model —
   - [ ] **Conjure Animals** (L3) + other 2024 conjure spells — a
