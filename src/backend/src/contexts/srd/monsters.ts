@@ -447,7 +447,8 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     cr: 1,
     hp: 22,
     ac: 12,
-    // Life Drain — necrotic damage only (its max-HP reduction rider is deferred).
+    // Life Drain — all-necrotic attack; the necrotic damage also reduces the
+    // target's Hit Point maximum by that amount (see `lifeDrain` below).
     damage: '3d6',
     toHit: 4,
     xp: 200,
@@ -481,6 +482,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     ],
     speedFt: 50, // hovering flight
     damageType: 'necrotic',
+    lifeDrain: true,
   },
   animated_armor: {
     name: 'Animated Armor',
@@ -646,6 +648,8 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     damageType: 'slashing',
     bonusDamage: '1d8', // Necrotic Sword rider
     bonusDamageType: 'necrotic',
-    // Life Drain (max-HP reduction) deferred.
+    // Life Drain — the necrotic portion of the hit also reduces the target's
+    // Hit Point maximum by that amount.
+    lifeDrain: true,
   },
 };

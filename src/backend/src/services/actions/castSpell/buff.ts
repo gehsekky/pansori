@@ -218,7 +218,7 @@ export function runBuffSpell(
   const restorationEffect =
     spell.id === 'greater_restoration' ? action.restorationEffect : undefined;
   const stripList = restorationEffect
-    ? restorationEffect === 'exhaustion'
+    ? restorationEffect === 'exhaustion' || restorationEffect === 'hp_max'
       ? []
       : [restorationEffect]
     : (spell.removeConditions ?? []);
@@ -255,6 +255,25 @@ export function runBuffSpell(
         characters: ctx.st.characters.map((c) =>
           c.id === buffTarget.id
             ? { ...c, exhaustion_level: Math.max(0, (c.exhaustion_level ?? 0) - 1) }
+            : c
+        ),
+      };
+    }
+  }
+
+  // SRD Greater Restoration — remove any reduction to the target's Hit Point
+  // maximum (Life Drain). Restores `max_hp` by the tracked amount; per RAW it
+  // only lifts the cap, so current HP is left as-is.
+  if (spell.id === 'greater_restoration' && restorationEffect === 'hp_max') {
+    if (isCasterTarget) {
+      char.max_hp += char.life_drain_reduction ?? 0;
+      char.life_drain_reduction = 0;
+    } else {
+      ctx.st = {
+        ...ctx.st,
+        characters: ctx.st.characters.map((c) =>
+          c.id === buffTarget.id
+            ? { ...c, max_hp: c.max_hp + (c.life_drain_reduction ?? 0), life_drain_reduction: 0 }
             : c
         ),
       };
