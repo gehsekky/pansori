@@ -74,8 +74,8 @@ function baseState(opts: {
     wis: opts.ability.wis ?? 10,
     hp: 50,
     max_hp: 50,
-    spells_known: [opts.spellId],
-    prepared_spells: [opts.spellId],
+    spells_known: [opts.spellId, 'fire_bolt'],
+    prepared_spells: [opts.spellId, 'fire_bolt'],
     spell_slots_max: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 2, 6: 1, 7: 1, 8: 1 },
     spell_slots_used: {},
     concentrating_on: opts.concentration
@@ -289,6 +289,48 @@ describe('Dominate — cast + control', () => {
     });
     expect(r.narrative).toMatch(/dominated\) strikes Goblin/i);
     expect(r.newState.entities?.find((e) => e.id === E1)?.hp).toBeLessThan(60);
+  });
+
+  it('taking damage lets a dominated creature re-save and break free (RAW)', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.95); // Fire Bolt hits; re-save passes vs DC 1
+    const r = await takeAction({
+      action: { type: 'cast_spell', spellId: 'fire_bolt', slotLevel: 0, targetEnemyId: E0 },
+      history: [],
+      state: baseState({
+        charClass: 'Wizard',
+        ability: { int: 18 },
+        spellId: 'dominate_person',
+        e0Pos: { x: 4, y: 4 },
+        initiativeEnemyIds: [], // PC-only so we inspect the post-damage state cleanly
+        e0Conditions: ['dominated'],
+        concentration: { condition: 'dominated', save_dc: 1 }, // trivially-passable re-save
+      }),
+      seed,
+      context: ctx,
+    });
+    expect(r.narrative).toMatch(/breaks free of domination/i);
+    expect(r.newState.entities?.find((e) => e.id === E0)?.conditions).not.toContain('dominated');
+    expect(r.newState.characters[0].concentrating_on).toBeFalsy(); // concentration ended
+  });
+
+  it('a dominated creature that fails the on-damage re-save stays controlled', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.95); // Fire Bolt hits; re-save fails vs DC 30
+    const r = await takeAction({
+      action: { type: 'cast_spell', spellId: 'fire_bolt', slotLevel: 0, targetEnemyId: E0 },
+      history: [],
+      state: baseState({
+        charClass: 'Wizard',
+        ability: { int: 18 },
+        spellId: 'dominate_person',
+        e0Pos: { x: 4, y: 4 },
+        initiativeEnemyIds: [],
+        e0Conditions: ['dominated'],
+        concentration: { condition: 'dominated', save_dc: 30 }, // impossible re-save
+      }),
+      seed,
+      context: ctx,
+    });
+    expect(r.newState.entities?.find((e) => e.id === E0)?.conditions).toContain('dominated');
   });
 });
 

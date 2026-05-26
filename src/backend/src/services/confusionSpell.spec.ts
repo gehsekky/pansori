@@ -45,12 +45,16 @@ function makeConfusedState(opts: {
   // end-of-turn re-save fires at the start of THIS turn (RAW: a creature is
   // confused for its first full turn before its first re-save).
   acted?: boolean;
+  pcPos?: { x: number; y: number }; // override the PC's cell (default far corner)
+  pcAc?: number;
+  e1Pos?: { x: number; y: number }; // override E1's cell (default adjacent to E0)
 }): GameState {
   const wiz = makeChar({
     id: 'pc-1',
     character_class: 'Wizard',
     level: 7,
     int: 18,
+    ac: opts.pcAc ?? 14,
     hp: 40,
     max_hp: 40,
     spells_known: ['confusion'],
@@ -81,7 +85,7 @@ function makeConfusedState(opts: {
       {
         id: 'pc-1',
         isEnemy: false,
-        pos: { x: 1, y: 1 },
+        pos: opts.pcPos ?? { x: 1, y: 1 },
         hp: 40,
         maxHp: 40,
         conditions: [],
@@ -100,7 +104,7 @@ function makeConfusedState(opts: {
       {
         id: E1,
         isEnemy: true,
-        pos: { x: 5, y: 4 }, // 5 ft from E0 (in friendly-fire reach)
+        pos: opts.e1Pos ?? { x: 5, y: 4 }, // default 5 ft from E0 (friendly-fire reach)
         hp: 50,
         maxHp: 50,
         conditions: opts.confusedIds?.includes(E1) ? ['confused'] : [],
@@ -184,6 +188,27 @@ describe('Confusion — per-turn behavior', () => {
     });
     expect(r.narrative).toMatch(/turns on Goblin/i);
     expect(r.newState.entities?.find((e) => e.id === E1)?.hp).toBeLessThan(50); // ally took the hit
+  });
+
+  it('7-8: a confused creature can attack an adjacent PC (RAW: any creature in reach)', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.7); // d10 -> 8 (attack in reach); attack hits
+    const r = await takeAction({
+      action: { type: 'end_turn' },
+      history: [],
+      state: makeConfusedState({
+        initiativeEnemyIds: [E0],
+        confusedIds: [E0],
+        withConcentration: true,
+        saveDc: 30,
+        pcPos: { x: 3, y: 4 }, // adjacent to the confused Ogre at (4,4)
+        pcAc: 5, // low AC so the swing connects
+        e1Pos: { x: 9, y: 9 }, // far away so the PC is the only creature in reach
+      }),
+      seed,
+      context: ctx,
+    });
+    expect(r.narrative).toMatch(/turns on Test Hero/i);
+    expect(r.newState.characters[0].hp).toBeLessThan(40); // the party member took the hit
   });
 
   it('a confused creature that has already acted shakes off on a successful re-save', async () => {

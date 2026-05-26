@@ -15,6 +15,7 @@ import {
 } from '../../rulesEngine.js';
 import {
   applyPartyLevelUps,
+  dominatedDamageReSave,
   effectiveSpeed,
   endCombatState,
   getEnemyById,
@@ -1059,6 +1060,8 @@ export function resolveOneAttack(
     ctx.narrative += ` The ${formName} form shatters — ${target.name} returns to themselves!`;
   }
   ctx.narrative += ` The ${target.name} has ${fmt.hp(newEnemyHp)} HP remaining. `;
+  // SRD Dominate — taking damage lets the target re-save to break free.
+  dominatedDamageReSave(ctx, targetId, target.name);
   return false;
 }
 
