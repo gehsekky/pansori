@@ -79,98 +79,56 @@ function SpellPickerDialog({
       width="min(640px, calc(100vw - 1.5rem))"
       testId="spell-picker-dialog"
     >
-      <p
-        style={{
-          color: 'var(--t-mid)',
-          fontSize: '0.85rem',
-          marginTop: 0,
-          marginBottom: '0.5rem',
-        }}
-      >
-        Pick {cantripCount} cantrip{cantripCount === 1 ? '' : 's'}
-        {l1Count > 0 ? ` and ${l1Count} level-1 spell` : ''} from the{' '}
-        <span style={{ color: 'var(--t-primary)' }}>{spellList}</span> spell list. The level-1 spell
-        can be cast once per long rest without expending a slot.
-      </p>
+      <div className={styles.spellPickerScroll}>
+        <p
+          style={{
+            color: 'var(--t-mid)',
+            fontSize: '0.85rem',
+            marginTop: 0,
+            marginBottom: '0.5rem',
+          }}
+        >
+          Pick {cantripCount} cantrip{cantripCount === 1 ? '' : 's'}
+          {l1Count > 0 ? ` and ${l1Count} level-1 spell` : ''} from the{' '}
+          <span style={{ color: 'var(--t-primary)' }}>{spellList}</span> spell list. The level-1
+          spell can be cast once per long rest without expending a slot.
+        </p>
 
-      <h3
-        style={{
-          margin: '1rem 0 0.5rem',
-          fontSize: '0.78rem',
-          color: 'var(--t-primary)',
-          letterSpacing: '0.08em',
-          textTransform: 'uppercase',
-        }}
-      >
-        Cantrips ({cantrips.length}/{cantripCount})
-      </h3>
-      <div className={styles.invBody}>
-        {cantripOptions.length === 0 ? (
-          <p className={styles.campaignEmpty}>No cantrips available on the {spellList} list.</p>
-        ) : (
-          cantripOptions.map((s) => {
-            const picked = cantrips.includes(s.id);
-            const limitHit = !picked && cantrips.length >= cantripCount;
-            return (
-              <div
-                key={s.id}
-                className={styles.invItem}
-                data-testid={`spell-picker-cantrip-${s.id}`}
-                style={limitHit ? { opacity: 0.55 } : undefined}
-              >
-                <label
-                  style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}
-                  className={styles.invItemHeader}
+        <h3
+          style={{
+            margin: '1rem 0 0.5rem',
+            fontSize: '0.78rem',
+            color: 'var(--t-primary)',
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+          }}
+        >
+          Cantrips ({cantrips.length}/{cantripCount})
+        </h3>
+        <div className={styles.invBody}>
+          {cantripOptions.length === 0 ? (
+            <p className={styles.campaignEmpty}>No cantrips available on the {spellList} list.</p>
+          ) : (
+            cantripOptions.map((s) => {
+              const picked = cantrips.includes(s.id);
+              const limitHit = !picked && cantrips.length >= cantripCount;
+              return (
+                <div
+                  key={s.id}
+                  className={styles.invItem}
+                  data-testid={`spell-picker-cantrip-${s.id}`}
+                  style={limitHit ? { opacity: 0.55 } : undefined}
                 >
-                  <input
-                    type="checkbox"
-                    checked={picked}
-                    disabled={limitHit}
-                    onChange={() => toggleCantrip(s.id)}
-                    data-testid={`spell-picker-cantrip-input-${s.id}`}
-                  />
-                  <span style={{ flex: 1 }}>
-                    <span className={styles.invItemName}>{s.name}</span>
-                    <div className={styles.invItemDesc}>{s.desc}</div>
-                  </span>
-                </label>
-              </div>
-            );
-          })
-        )}
-      </div>
-
-      {l1Count > 0 && (
-        <>
-          <h3
-            style={{
-              margin: '1rem 0 0.5rem',
-              fontSize: '0.78rem',
-              color: 'var(--t-primary)',
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase',
-            }}
-          >
-            Level-1 spell ({l1 ? '1' : '0'}/{l1Count})
-          </h3>
-          <div className={styles.invBody}>
-            {l1Options.length === 0 ? (
-              <p className={styles.campaignEmpty}>
-                No level-1 spells available on the {spellList} list.
-              </p>
-            ) : (
-              l1Options.map((s) => (
-                <div key={s.id} className={styles.invItem} data-testid={`spell-picker-l1-${s.id}`}>
                   <label
                     style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}
                     className={styles.invItemHeader}
                   >
                     <input
-                      type="radio"
-                      name="spell-picker-l1"
-                      checked={l1 === s.id}
-                      onChange={() => setL1(s.id)}
-                      data-testid={`spell-picker-l1-input-${s.id}`}
+                      type="checkbox"
+                      checked={picked}
+                      disabled={limitHit}
+                      onChange={() => toggleCantrip(s.id)}
+                      data-testid={`spell-picker-cantrip-input-${s.id}`}
                     />
                     <span style={{ flex: 1 }}>
                       <span className={styles.invItemName}>{s.name}</span>
@@ -178,11 +136,59 @@ function SpellPickerDialog({
                     </span>
                   </label>
                 </div>
-              ))
-            )}
-          </div>
-        </>
-      )}
+              );
+            })
+          )}
+        </div>
+
+        {l1Count > 0 && (
+          <>
+            <h3
+              style={{
+                margin: '1rem 0 0.5rem',
+                fontSize: '0.78rem',
+                color: 'var(--t-primary)',
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+              }}
+            >
+              Level-1 spell ({l1 ? '1' : '0'}/{l1Count})
+            </h3>
+            <div className={styles.invBody}>
+              {l1Options.length === 0 ? (
+                <p className={styles.campaignEmpty}>
+                  No level-1 spells available on the {spellList} list.
+                </p>
+              ) : (
+                l1Options.map((s) => (
+                  <div
+                    key={s.id}
+                    className={styles.invItem}
+                    data-testid={`spell-picker-l1-${s.id}`}
+                  >
+                    <label
+                      style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}
+                      className={styles.invItemHeader}
+                    >
+                      <input
+                        type="radio"
+                        name="spell-picker-l1"
+                        checked={l1 === s.id}
+                        onChange={() => setL1(s.id)}
+                        data-testid={`spell-picker-l1-input-${s.id}`}
+                      />
+                      <span style={{ flex: 1 }}>
+                        <span className={styles.invItemName}>{s.name}</span>
+                        <div className={styles.invItemDesc}>{s.desc}</div>
+                      </span>
+                    </label>
+                  </div>
+                ))
+              )}
+            </div>
+          </>
+        )}
+      </div>
 
       <div
         style={{

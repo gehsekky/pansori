@@ -1739,6 +1739,18 @@
   overflow-y: auto;
 }
 
+/* Spell picker: stacking two .invBody lists (cantrips + L1) overflows short
+   screens, so the whole picker body is one scroll region (buttons pinned
+   below it) and the inner lists flow instead of scrolling on their own. */
+.spellPickerScroll {
+  max-height: min(58vh, 520px);
+  overflow-y: auto;
+}
+.spellPickerScroll .invBody {
+  max-height: none;
+  overflow-y: visible;
+}
+
 .invItem {
   padding: 0.5rem 0;
   border-bottom: 1px solid var(--t-separator);
