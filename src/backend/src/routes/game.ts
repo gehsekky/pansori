@@ -312,11 +312,11 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
 
       const hitDie = ctx.classHitDie[c.character_class] ?? 8;
       const conMod = Math.floor(((base.con ?? 10) - 10) / 2);
-      // PHB: max hit die + CON mod at level 1. Sorcerer Draconic Bloodline
-      // adds +1 HP per Sorcerer level (here, +1 at L1) via Draconic Resilience.
-      // Dwarven Toughness adds +1 max HP per level.
-      const draconicBonus = c.character_class === 'Sorcerer' && c.subclass === 'draconic' ? 1 : 0;
-      const maxHp = Math.max(1, hitDie + conMod + draconicBonus + dwarfHpBonus);
+      // 2024 PHB: max hit die + CON mod at level 1. Dwarven Toughness adds +1
+      // max HP per level. Subclass HP riders (e.g. Sorcerer Draconic
+      // Resilience) are granted retroactively by `applySubclass` when the
+      // single SRD subclass auto-applies at level 3 — not at creation.
+      const maxHp = Math.max(1, hitDie + conMod + dwarfHpBonus);
 
       // Build starting inventory from classStartingLoot or campaign.startingLoot
       const startingIds =
@@ -400,9 +400,11 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
         // an initial mastered weapon list. Other classes get 0.
         weapon_masteries: defaultWeaponMasteriesFor(c.character_class),
         attuned_items: [],
-        // PHB: Cleric/Sorcerer/Warlock pick subclass at L1 (creation).
-        // Other classes pick later via the in-game select_subclass choice.
-        subclass: c.subclass,
+        // 2024 SRD: every class chooses its subclass at level 3, and pansori's
+        // strict-SRD build has exactly one subclass per class — so creation no
+        // longer takes a subclass. The single SRD subclass auto-applies at L3
+        // via `applyLevelUpForClass` → `applySubclass`. Heroes start L1 with none.
+        subclass: undefined,
         // 2024 PHB species — seed mechanical traits from the catalog.
         species: speciesId,
         speed: speciesData.speedFt,

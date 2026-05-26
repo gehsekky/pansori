@@ -75,10 +75,8 @@ export type CharacterInput = {
   background_id?: string;
   stats?: StatBlock;
   portrait_url?: string;
-  // PHB: Cleric/Sorcerer/Warlock pick subclass at level 1 — required at
-  // creation. Other classes pick later (L2 Wizard/Druid, L3 the rest) so
-  // this stays optional and is supplied via the in-game choice for them.
-  subclass?: string;
+  // No subclass at creation: the 2024 SRD picks subclasses at level 3, and
+  // pansori's strict-SRD build has exactly one per class — auto-applied at L3.
   // 2024 PHB Species (formerly "race"). Optional — engine defaults to
   // Human when omitted.
   species?: string;
