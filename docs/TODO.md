@@ -18,8 +18,8 @@ PHB/DMG-exclusive content (subclasses, feats, species, spells). See
 
 ## Implementation status (code-verified 2026-05-26)
 
-Grounded in a code survey + the full backend suite: **1790 tests across
-208 files, all green** (lint + typecheck clean).
+Grounded in a code survey + the full backend suite: **1797 tests across
+209 files, all green** (lint + typecheck clean).
 
 ### Done — rules-engine frameworks
 
@@ -107,10 +107,9 @@ backend features are waiting on, and a handful of **bounded subsystems**.
         Cunning Strike: Obscure (now stamps a 1-round blind). **Color Spray**
         (L1, 15-ft cone, CON save → Blinded until end of your next turn) ships
         on it; `runAoeConditionSpell` is now cone/cube/line-aware (reuses the
-        AoE damage branch's shape helpers). Deferred: a blinded enemy's
-        own-disadvantage now also covers `frightened` (see the charm/fear AI
-        item below); poisoned/restrained self-disadvantage on enemies is the
-        remaining broader follow-up.
+        AoE damage branch's shape helpers). The blinded enemy's own-disadvantage
+        was later generalized to the full `DISADV_CONDITIONS` set
+        (frightened/poisoned/restrained/prone) — see the condition-fidelity pass.
   - [x] **Enemy charm / fear AI** — shipped (`charmFearAI.spec.ts`). The
         conditions previously applied + expired but didn't change enemy
         behavior. Now the cast paths record the source on the enemy entity
@@ -314,12 +313,21 @@ backend features are waiting on, and a handful of **bounded subsystems**.
 
 ### Condition + spellcasting fidelity (cleanups) — RE-5
 
-- [ ] Register **Deafened**; add **Petrified** damage resistance + save
-      advantage; **Charmed** CHA-check disadvantage; make concentration's
-      **incapacitation** gate explicit. (**Slow**'s end-of-turn recurring save
-      shipped via the generic save-ends hook — see the Spells section; enemy
-      **incapacitation skip** for stunned/paralyzed/unconscious also shipped
-      there.)
+- [x] **Condition-fidelity pass** — shipped (`conditionFidelity.spec.ts`).
+      **Deafened** registered in the condition registry. **Petrified** carries
+      its combat flags (attackers have Advantage, can't move, auto-fail STR/DEX;
+      added to `ADVANTAGE_CONDITIONS`). Enemy self-disadvantage generalized to
+      the full `DISADV_CONDITIONS` set — **poisoned / restrained / prone**
+      enemies now attack at Disadvantage (joining blinded/frightened), which
+      matters via Web / Entangle / Ensnaring Strike / Shove / Topple.
+      Concentration's **incapacitation** gate was already explicit (the
+      post-action sweep breaks concentration for any incapacitated/0-HP/dead
+      caster) — now locked with a regression test. (**Slow**'s end-of-turn save + the enemy **incapacitation skip** shipped earlier — see the Spells
+      section.) Deferred: **Petrified "Resistance to all damage"** (the damage
+      pipeline keys off a type-list, and no SRD content in pansori applies
+      Petrified yet, so it has no live trigger); **Charmed CHA-check** advantage
+      for the charmer (needs social-check-site plumbing to identify
+      charmer↔target — no clean surface today).
 - [ ] **Multiclass edge cases** — ASI spacing validation, skill/tool grants
       on multiclass entry, warlock pact-slot pool separation, second-class
       subclass features.

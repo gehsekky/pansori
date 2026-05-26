@@ -1,5 +1,6 @@
 import {
   ADVANTAGE_CONDITIONS,
+  DISADV_CONDITIONS,
   ENEMY_DISADV_CONDITIONS,
   FRESH_TURN,
   abilityMod,
@@ -1204,14 +1205,17 @@ function computeEnemyAttack(
   const multiattackDefenseDisadv =
     hasMultiattackDefense(char) &&
     (char.multiattack_defense_marks?.[enemy.id] ?? -1) === (st.round ?? 1);
-  // SRD Blinded / Frightened — a Blinded creature's attacks have Disadvantage,
-  // and a Frightened creature's do too while it can see the source of its fear
-  // (LoS approximated as "always in sight"). The attacker's conditions live on
-  // its grid entity (Color Spray / Blindness / Cunning Strike, Fear).
+  // SRD — conditions that impose Disadvantage on the afflicted creature's own
+  // attacks (Blinded, Frightened, Poisoned, Restrained, Prone) all apply to an
+  // enemy attacker too, read from the registry's `DISADV_CONDITIONS` set. The
+  // attacker's conditions live on its grid entity (Color Spray / Blindness /
+  // Cunning Strike, Fear, Web / Entangle / Ensnaring Strike, Shove / Topple).
+  // Frightened's "while it can see the source" caveat is approximated as
+  // always-in-sight.
   const attackerSelfDisadv =
     st.entities
       ?.find((e) => e.id === enemy.id && e.isEnemy)
-      ?.conditions.some((c) => c === 'blinded' || c === 'frightened') ?? false;
+      ?.conditions.some((c) => DISADV_CONDITIONS.has(c)) ?? false;
   const hasDisadvantage =
     baseDisadvantage || forceDisadvantage || multiattackDefenseDisadv || attackerSelfDisadv;
   const result = resolveEnemyAttack(enemy, char.ac, hasAdvantage, hasDisadvantage);

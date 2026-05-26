@@ -121,6 +121,12 @@ const defs: ConditionDef[] = [
     imposesDisadvantageOnAttackers: true,
     grantsAdvantageOnSelfAttacks: true,
   },
+  // SRD Deafened — the creature can't hear and auto-fails any ability check that
+  // requires hearing. No attack/save modifiers (deafened ≠ silenced; it doesn't
+  // block Verbal spell components RAW, though pansori's precast currently gates
+  // on it). Registered for completeness so tickConditions gives it a duration;
+  // pansori models no hearing-gated checks, so the auto-fail half is narration.
+  { id: 'deafened', duration: 1 },
   // Unconscious + petrified: no auto-expire; cleared by death-save recovery
   // / Restoration. Saves auto-fail while present. The pre-registry code
   // omitted them from CONDITION_DURATION (treated as permanent) and from
@@ -134,7 +140,15 @@ const defs: ConditionDef[] = [
   {
     id: 'petrified',
     duration: 'permanent',
+    // SRD Petrified — Incapacitated (the enemy-turn skip + concentration gate
+    // read the incap set), attacks against it have Advantage, auto-fails STR/DEX
+    // saves, can't move. Deferred: "Resistance to all damage" — the damage
+    // pipeline keys off a type-list `resistances`, not conditions, and no SRD
+    // content in pansori applies Petrified yet (no Flesh to Stone), so it has no
+    // live trigger; wire an all-type resistance when a petrify source ships.
+    grantsAdvantageToAttackers: true,
     autoFailSaves: ['str', 'dex'],
+    blocksMovement: true,
   },
   { id: 'incapacitated', duration: 1 },
   // SRD Thief Devious Strikes (Daze) — the target can take only one of move /
