@@ -1,4 +1,14 @@
 import { type AuthUser, type BackendContextSummary, type CharacterInput, api } from '../lib/api';
+import {
+  MANUAL_MAX,
+  MANUAL_MIN,
+  POINT_BUY_BUDGET,
+  POINT_BUY_COST,
+  POINT_BUY_MAX,
+  POINT_BUY_MIN,
+  STANDARD_ARRAY,
+  pointBuySpent,
+} from '../lib/pointBuy';
 import { useEffect, useState } from 'react';
 import type { FrontendContext } from '../types';
 import { SPECIES } from '../data/species';
@@ -109,16 +119,9 @@ function assignStatsForClass(rolled: StatBlock, ctx: FrontendContext, cls: strin
   return out;
 }
 
-// PHB p.13 — the deterministic alternative to rolling. Assign these six
-// values to whichever ability scores the player prefers.
-const STANDARD_ARRAY: StatBlock = {
-  str: 15,
-  dex: 14,
-  con: 13,
-  int: 12,
-  wis: 10,
-  cha: 8,
-};
+// The four stat-generation methods offered at creation: 4d6-drop-lowest,
+// the standard array, 27-point buy, and free manual entry.
+type StatMethod = 'roll' | 'array' | 'pointbuy' | 'manual';
 
 // Fallback compositions when a campaign doesn't override. Mirrors the 5e
 // "iconic four" — Fighter (tank), Cleric (heal), Wizard (magic), Rogue (utility).
@@ -139,7 +142,7 @@ interface CharDraft {
   // PHB p.12-13 — 'roll' = 4d6-drop-lowest six times, 'array' = the
   // 15/14/13/12/10/8 standard array assigned to abilities. Either way the
   // player can swap values between ability slots.
-  statMethod: 'roll' | 'array';
+  statMethod: StatMethod;
   portrait: string | null;
   rollCount: number;
   // Origin-feat picks for backgrounds whose feat needs player input
@@ -288,19 +291,50 @@ function CharScreen({
     setSwapFrom(null);
   }
 
-  function setStatMethod(partyIdx: number, method: 'roll' | 'array') {
+  function setStatMethod(partyIdx: number, method: StatMethod) {
     setSwapFrom(null);
+    const ctxForMethod = availableContexts.find((c) => c.id === contextId) ?? availableContexts[0];
     setParty((prev) =>
-      prev.map((d, i) =>
-        i === partyIdx
-          ? {
-              ...d,
-              statMethod: method,
-              stats: method === 'array' ? { ...STANDARD_ARRAY } : rollStatBlock(),
-              rollCount: 1,
-            }
-          : d
-      )
+      prev.map((d, i) => {
+        if (i !== partyIdx) return d;
+        // roll → fresh 4d6 spread; array / point buy → the standard array
+        // arranged for the class (a valid 27-point build the player can then
+        // redistribute under point buy); manual → keep the current scores so
+        // the player edits from where they are.
+        const stats =
+          method === 'roll'
+            ? rollStatBlock()
+            : method === 'manual'
+              ? { ...d.stats }
+              : ctxForMethod
+                ? assignStatsForClass(STANDARD_ARRAY, ctxForMethod, d.cls)
+                : { ...STANDARD_ARRAY };
+        return { ...d, statMethod: method, stats, rollCount: 1 };
+      })
+    );
+  }
+
+  // Step one ability up/down for the point-buy and manual methods. Point buy
+  // clamps to 8–15 and rejects an increment the budget can't afford; manual
+  // clamps to MANUAL_MIN..MANUAL_MAX.
+  function adjustStat(partyIdx: number, key: keyof StatBlock, delta: number) {
+    setParty((prev) =>
+      prev.map((d, i) => {
+        if (i !== partyIdx) return d;
+        const cur = d.stats[key];
+        if (d.statMethod === 'pointbuy') {
+          const next = cur + delta;
+          if (next < POINT_BUY_MIN || next > POINT_BUY_MAX) return d;
+          const candidate = { ...d.stats, [key]: next };
+          if (pointBuySpent(candidate) > POINT_BUY_BUDGET) return d; // can't afford
+          return { ...d, stats: candidate };
+        }
+        if (d.statMethod === 'manual') {
+          const next = Math.max(MANUAL_MIN, Math.min(MANUAL_MAX, cur + delta));
+          return { ...d, stats: { ...d.stats, [key]: next } };
+        }
+        return d;
+      })
     );
   }
 
@@ -773,11 +807,20 @@ function CharScreen({
                 <label className={styles.formLbl} style={{ marginTop: 12 }}>
                   ABILITY SCORES
                 </label>
-                {/* Method toggle: 4d6-drop-lowest (PHB p.12) vs the standard
-                    array 15/14/13/12/10/8 (PHB p.13). */}
-                <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
-                  {(['roll', 'array'] as const).map((m) => {
+                {/* Generation method: 4d6-drop-lowest (PHB p.12), the standard
+                    array 15/14/13/12/10/8 (PHB p.13), 27-point buy, or free
+                    manual entry. */}
+                <div style={{ display: 'flex', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
+                  {(['roll', 'array', 'pointbuy', 'manual'] as const).map((m) => {
                     const active = draft.statMethod === m;
+                    const label =
+                      m === 'roll'
+                        ? 'ROLL 4d6'
+                        : m === 'array'
+                          ? 'ARRAY'
+                          : m === 'pointbuy'
+                            ? 'POINT BUY'
+                            : 'MANUAL';
                     return (
                       <button
                         key={m}
@@ -794,15 +837,117 @@ function CharScreen({
                           fontFamily: 'inherit',
                         }}
                       >
-                        {m === 'roll' ? 'ROLL 4d6' : 'STANDARD ARRAY'}
+                        {label}
                       </button>
                     );
                   })}
                 </div>
+                {draft.statMethod === 'pointbuy' &&
+                  (() => {
+                    const remaining = POINT_BUY_BUDGET - pointBuySpent(draft.stats);
+                    return (
+                      <p
+                        style={{
+                          fontSize: '0.7rem',
+                          marginBottom: 6,
+                          letterSpacing: '0.05em',
+                          color: 'var(--t-mid)',
+                        }}
+                        data-testid={`point-buy-remaining-${idx}`}
+                      >
+                        POINTS:{' '}
+                        <span style={{ color: 'var(--t-primary)', fontWeight: 'bold' }}>
+                          {remaining}
+                        </span>{' '}
+                        / {POINT_BUY_BUDGET} remaining · scores 8–15
+                      </p>
+                    );
+                  })()}
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                   {STAT_KEYS.map((key) => {
                     const val = draft.stats[key];
                     const isPrimary = key === primaryStat;
+                    const usesSteppers =
+                      draft.statMethod === 'pointbuy' || draft.statMethod === 'manual';
+
+                    if (usesSteppers) {
+                      const isPb = draft.statMethod === 'pointbuy';
+                      const canDec = val > (isPb ? POINT_BUY_MIN : MANUAL_MIN);
+                      const canInc = isPb
+                        ? val < POINT_BUY_MAX &&
+                          pointBuySpent({ ...draft.stats, [key]: val + 1 }) <= POINT_BUY_BUDGET
+                        : val < MANUAL_MAX;
+                      const stepBtn = (enabled: boolean) => ({
+                        fontFamily: 'inherit',
+                        fontSize: '0.85rem',
+                        lineHeight: 1,
+                        width: 20,
+                        height: 18,
+                        padding: 0,
+                        background: 'transparent',
+                        border: `1px solid ${enabled ? 'var(--t-border)' : 'var(--t-separator)'}`,
+                        color: enabled ? 'var(--t-primary)' : 'var(--t-separator)',
+                        cursor: enabled ? 'pointer' : 'default',
+                      });
+                      return (
+                        <div
+                          key={key}
+                          style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            padding: '4px 6px',
+                            minWidth: 42,
+                            border: `2px solid ${isPrimary ? 'var(--t-primary)' : 'var(--t-border)'}`,
+                            background: isPrimary ? 'var(--t-separator)' : 'transparent',
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: '0.75rem',
+                              color: isPrimary ? 'var(--t-primary)' : 'var(--t-dim)',
+                              letterSpacing: '0.1em',
+                            }}
+                          >
+                            {STAT_LABEL[key]}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: '0.95rem',
+                              fontWeight: 'bold',
+                              color: isPrimary ? 'var(--t-primary)' : 'var(--t-mid)',
+                            }}
+                          >
+                            {val}
+                          </span>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--t-dim)' }}>
+                            {fmtMod(val)}
+                          </span>
+                          <div style={{ display: 'flex', gap: 3, marginTop: 3 }}>
+                            <button
+                              type="button"
+                              aria-label={`Decrease ${STAT_LABEL[key]}`}
+                              disabled={!canDec}
+                              onClick={() => adjustStat(idx, key, -1)}
+                              style={stepBtn(canDec)}
+                            >
+                              −
+                            </button>
+                            <button
+                              type="button"
+                              aria-label={`Increase ${STAT_LABEL[key]}`}
+                              disabled={!canInc}
+                              onClick={() => adjustStat(idx, key, +1)}
+                              style={stepBtn(canInc)}
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    // roll / array — click-to-swap to rearrange the fixed values.
                     const isSwapSelected = swapFrom?.partyIdx === idx && swapFrom?.key === key;
                     const borderColor = isSwapSelected
                       ? 'var(--t-hp-high)'
@@ -867,19 +1012,34 @@ function CharScreen({
                     </button>
                   )}
                 </div>
-                {swapFrom?.partyIdx === idx && (
+                {(draft.statMethod === 'pointbuy' || draft.statMethod === 'manual') && (
                   <p
                     style={{
                       fontSize: '0.7rem',
-                      color: 'var(--t-hp-high)',
+                      color: 'var(--t-dim)',
                       marginTop: 4,
                       letterSpacing: '0.05em',
                     }}
                   >
-                    Click another ability to swap its value with {STAT_LABEL[swapFrom.key]} (
-                    {draft.stats[swapFrom.key]}). Click the highlighted box again to cancel.
+                    {draft.statMethod === 'pointbuy'
+                      ? 'Spend up to 27 points across your abilities (8–15 each).'
+                      : `Set any score from ${MANUAL_MIN} to ${MANUAL_MAX}.`}
                   </p>
                 )}
+                {(draft.statMethod === 'roll' || draft.statMethod === 'array') &&
+                  swapFrom?.partyIdx === idx && (
+                    <p
+                      style={{
+                        fontSize: '0.7rem',
+                        color: 'var(--t-hp-high)',
+                        marginTop: 4,
+                        letterSpacing: '0.05em',
+                      }}
+                    >
+                      Click another ability to swap its value with {STAT_LABEL[swapFrom.key]} (
+                      {draft.stats[swapFrom.key]}). Click the highlighted box again to cancel.
+                    </p>
+                  )}
               </div>
             );
           })}

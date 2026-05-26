@@ -174,9 +174,12 @@ backend features are waiting on, and a handful of **bounded subsystems**.
 > doesn't exist yet. The engine work is done; these are FE follow-ups.
 
 - [ ] **Epic-boon L19 pick** — surface the boon choice at the L19 ASI.
-- [ ] **Ability-score method picker** — let the player choose point buy /
-      standard array / manual and (for the +2/+1 RAW split) which abilities.
-      Backend applies the "all three +1" option today.
+- [~] **Ability-score method picker** — shipped: CharScreen offers Roll 4d6 /
+      Standard Array / **Point Buy** (27-point, 8–15, with a live budget readout
+      + steppers) / **Manual** (free entry 3–20). Point-buy math lives in
+      `lib/pointBuy.ts` (spec'd). Still deferred: letting the player choose the
+      background **+2/+1 ability split** (backend applies the "all three +1"
+      option today).
 - [ ] **Choose-your-class-skills step** — replace the auto-granted curated
       `SRD_CLASS_SKILLS[class]` list with "choose N from [SRD options]";
       engine must accept + validate the chosen list.
