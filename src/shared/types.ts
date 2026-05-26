@@ -355,6 +355,11 @@ export type StructuredAction =
       // (e.g. 'Skeleton' or 'Zombie'). Omitted = the spell's base block.
       // (RE-1 Phase 4.5.)
       summonVariant?: string;
+      // Polymorph — the chosen beast form id (BEAST_FORMS). Omitted = auto-Wolf.
+      beastForm?: string;
+      // Greater Restoration — the single effect to remove (option picker):
+      // 'exhaustion' | 'charmed' | 'petrified'. Omitted = the default bundle.
+      restorationEffect?: string;
       // Cleric L10 Divine Intervention — cast this Cleric spell (level ≤5,
       // non-Reaction) without a slot or Material components, 1/Long Rest.
       // Set by the Divine Intervention choice surface; precast validates
@@ -569,6 +574,15 @@ export interface GameChoice {
   pickTargets?: {
     side: 'ally' | 'enemy';
     max: number;
+  };
+  // Optional UI hint: this choice opens a single-select OPTION picker before it
+  // is sent — Polymorph's beast form, Greater Restoration's effect. The FE shows
+  // `options`, and on confirm sets `action[param]` to the chosen id and re-sends
+  // (the backend honors it, falling back to its default when absent).
+  pickOption?: {
+    param: string;
+    title: string;
+    options: { id: string; label: string; sub?: string }[];
   };
 }
 

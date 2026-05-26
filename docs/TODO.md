@@ -18,8 +18,8 @@ PHB/DMG-exclusive content (subclasses, feats, species, spells). See
 
 ## Implementation status (code-verified 2026-05-26)
 
-Grounded in a code survey + the full backend suite: **1815 tests across
-212 files, all green** (lint + typecheck clean).
+Grounded in a code survey + the full backend suite: **1822 tests across
+213 files, all green** (lint + typecheck clean).
 
 ### Done — rules-engine frameworks
 
@@ -280,19 +280,21 @@ backend features are waiting on, and a handful of **bounded subsystems**.
       player choose _when_ to spend.
 - [ ] **Slot-choice surfaces** — Arcane Recovery / Natural Recovery
       auto-pick lowest-first; let the player choose which slots.
-- [~] **Multi-target / option pickers** (RE-5). A generic mechanism shipped:
-  `GameChoice.pickTargets { side, max }` marks a cast choice as needing a
-  target pick; the FE's `TargetPickerDialog` (multi-select, 1..max, defaults
-  to the prior auto-pick) collects the targets and re-sends the action with
-  `targetCharIds` (ally) / `targetEnemyIds` (enemy); the cast path validates
-  and falls back to auto when absent. **Bless** ships on it (ally multi-
-  select, up to 3 +1/slot — `blessTargetPicker.spec.ts` +
-  `TargetPickerDialog.spec.tsx`). **Bane** ships too
-  (`baneTargetPicker.spec.ts`): a single picker choice (not the per-enemy
-  spread), and the cast path applies `baned` to each chosen enemy that fails its
-  CHA save under one concentration (the multi-target save loop reuses the
-  single-target resolver). Remaining, reusing the same pattern: **Polymorph**
-  beast pick, **Greater Restoration** "pick one effect" (single-select).
+- [x] **Multi-target / option pickers** (RE-5) — shipped. Two generic
+      GameChoice hints + their FE dialogs: **`pickTargets { side, max }`** →
+      `TargetPickerDialog` (multi-select 1..max, defaults to the prior auto-pick;
+      re-sends `targetCharIds`/`targetEnemyIds`), and **`pickOption { param, title,
+options }`** → `OptionPickerDialog` (single-select; re-sends `action[param]`).
+      Every cast path validates the choice and falls back to its auto-pick when
+      absent. Riders: **Bless** (ally targets, `blessTargetPicker.spec.ts`),
+      **Bane** (enemy targets — a single picker choice, not the per-enemy spread;
+      cast applies `baned` per failed CHA save under one concentration,
+      `baneTargetPicker.spec.ts`), **Polymorph** (beast-form option — the chosen
+      form's HP becomes the polymorph Temp HP pool; beast forms gained an `hp`
+      field), **Greater Restoration** (effect option: exhaustion / charmed /
+      petrified — applies exactly one) — `optionPickers.spec.ts` +
+      `OptionPickerDialog.spec.tsx`. Deferred: Greater Restoration's ally-target
+      selection (the effect picker is self/auto-targeted for now).
 
 ### Documented engine deferrals (depend on missing content / infra)
 

@@ -18,7 +18,13 @@ import { defenseAcBonus } from '../../fightingStyle.js';
  */
 export function runBuffSpell(
   ctx: ActionContext,
-  action: { type: 'cast_spell'; spellId: string; slotLevel: number; targetCharId?: string },
+  action: {
+    type: 'cast_spell';
+    spellId: string;
+    slotLevel: number;
+    targetCharId?: string;
+    restorationEffect?: string;
+  },
   spell: Spell,
   slotLevel: number,
   slotNote: string
@@ -204,7 +210,18 @@ export function runBuffSpell(
   // Greater: charmed/petrified/stunned). Mirrors the heal path's
   // `removeConditions` strip but in the buff branch since
   // restoration has no HP heal.
-  const stripList = spell.removeConditions ?? [];
+  // SRD Greater Restoration — RAW removes exactly ONE effect. When the player
+  // picked one (`restorationEffect`), apply only that: a condition id strips
+  // that condition (and no exhaustion); 'exhaustion' strips no condition. Absent
+  // a pick, fall back to the spell's full `removeConditions` bundle (back-compat
+  // + Lesser Restoration, which has no picker).
+  const restorationEffect =
+    spell.id === 'greater_restoration' ? action.restorationEffect : undefined;
+  const stripList = restorationEffect
+    ? restorationEffect === 'exhaustion'
+      ? []
+      : [restorationEffect]
+    : (spell.removeConditions ?? []);
   if (stripList.length > 0) {
     const stripFrom = (conditions: string[]): string[] =>
       conditions.filter((c) => !stripList.includes(c));
@@ -223,11 +240,13 @@ export function runBuffSpell(
     }
   }
 
-  // SRD Greater Restoration — reduce target's exhaustion level by 1
-  // (clamped to 0). One of the spell's selectable effects. Pansori
-  // MVP applies it unconditionally when Greater Restoration is the
-  // spell being cast; the "pick one of five effects" UX is deferred.
-  if (spell.id === 'greater_restoration') {
+  // SRD Greater Restoration — reduce target's exhaustion level by 1 (clamped to
+  // 0). Applied when the player chose the 'exhaustion' effect, or (back-compat)
+  // when no effect was picked.
+  if (
+    spell.id === 'greater_restoration' &&
+    (!restorationEffect || restorationEffect === 'exhaustion')
+  ) {
     if (isCasterTarget) {
       char.exhaustion_level = Math.max(0, (char.exhaustion_level ?? 0) - 1);
     } else {

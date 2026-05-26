@@ -18,6 +18,7 @@ import LevelUpDialog from './components/LevelUpDialog.tsx';
 import LoginScreen from './components/LoginScreen.tsx';
 import MoveDPad from './components/MoveDPad.tsx';
 import NarrativeText from './components/NarrativeText.tsx';
+import OptionPickerDialog from './components/OptionPickerDialog.tsx';
 import PartyRail from './components/PartyRail.tsx';
 import RoomArtPanel from './components/RoomArtPanel.tsx';
 import SessionsScreen from './components/SessionScreen.tsx';
@@ -142,6 +143,9 @@ export default function App() {
   // A cast choice waiting on a target pick (GameChoice.pickTargets) — e.g.
   // Bless. The TargetPickerDialog collects the targets and re-sends the action.
   const [targetPicker, setTargetPicker] = useState<GameChoice | null>(null);
+  // A cast choice waiting on an option pick (GameChoice.pickOption) — e.g.
+  // Polymorph's beast form, Greater Restoration's effect.
+  const [optionPicker, setOptionPicker] = useState<GameChoice | null>(null);
   const narrativeRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -167,11 +171,13 @@ export default function App() {
   const ctx = getCtx(seed);
   const worldName = seed?.world_name || seed?.ship_name || '???';
 
-  // Choice dispatch with the target-picker interception: a choice carrying a
-  // `pickTargets` hint (Bless) opens the dialog; everything else casts directly.
+  // Choice dispatch with picker interception: a choice carrying a `pickTargets`
+  // hint (Bless/Bane) opens the target dialog, `pickOption` (Polymorph / Greater
+  // Restoration) the option dialog; everything else casts directly.
   const chooseWithPicker = useCallback(
     (c: GameChoice) => {
       if (c.pickTargets) setTargetPicker(c);
+      else if (c.pickOption) setOptionPicker(c);
       else handleChoice(c);
     },
     [handleChoice]
@@ -951,6 +957,26 @@ export default function App() {
                           },
                         });
                         setTargetPicker(null);
+                      }}
+                    />
+                  );
+                })()}
+
+              {optionPicker &&
+                optionPicker.pickOption &&
+                (() => {
+                  const { param, title, options } = optionPicker.pickOption;
+                  return (
+                    <OptionPickerDialog
+                      title={title}
+                      options={options}
+                      onCancel={() => setOptionPicker(null)}
+                      onConfirm={(id) => {
+                        handleChoice({
+                          ...optionPicker,
+                          action: { ...optionPicker.action, [param]: id },
+                        });
+                        setOptionPicker(null);
                       }}
                     />
                   );
