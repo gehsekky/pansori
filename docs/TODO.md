@@ -1,6 +1,6 @@
 # TODO
 
-> **Status snapshot — verified 2026-05-25.** The top section is the
+> **Status snapshot — verified 2026-05-26.** The top section is the
 > authoritative implementation status, re-grounded in a fresh code survey
 > (not the prior changelog). The backlog below it lists only remaining
 > work. Shipped-feature completion logs were removed — `git log` is the
@@ -16,10 +16,10 @@ PHB/DMG-exclusive content (subclasses, feats, species, spells). See
 
 ---
 
-## Implementation status (code-verified 2026-05-25)
+## Implementation status (code-verified 2026-05-26)
 
-Grounded in a code survey + the full backend suite: **1572 tests across
-184 files, all green** (lint + typecheck clean).
+Grounded in a code survey + the full backend suite: **1744 tests across
+203 files, all green** (lint + typecheck clean).
 
 ### Done — rules-engine frameworks
 
