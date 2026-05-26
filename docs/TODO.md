@@ -191,6 +191,21 @@ backend features are waiting on, and a handful of **bounded subsystems**.
       (`defaultClassSkills`, trimmed to N) and gated to exactly N. The server
       re-validates the chosen list (`resolveClassSkills`) and falls back to the
       default on anything invalid; options are surfaced via the context summary.
+- [x] **Starting-equipment package choice** — CharScreen offers each class's
+      RAW equipment packages (A / B / C with item lists + GP);
+      `SRD_CLASS_STARTING_EQUIPMENT` + `resolveStartingEquipment` re-validate
+      the chosen package id server-side, defaulting on anything invalid.
+- [x] **Weapon-mastery picker + level-up scaling** — CharScreen offers the
+      "choose N masterable weapons" grid (filtered by class proficiency),
+      pre-seeded with `SRD_DEFAULT_WEAPON_MASTERIES` and gated to N;
+      `resolveWeaponMasteries` re-validates. Slot count now scales with class
+      level (`weaponMasterySlotsForLevel`: Fighter 3→4@4→5@10→6@16, Barbarian
+      2→3@4→4@10, others fixed); `applyLevelUpForClass` raises
+      `weapon_mastery_pending` and `generateChoices` surfaces the extra pick.
+- [x] **Fighting-style picker (Fighter)** — CharScreen offers the 4 SRD styles
+      for the Fighter's level-1 slot (`fightingStyleSlotsForClassLevel`),
+      pre-seeded with the default; `resolveCreationFightingStyles` re-validates.
+      Later grants (Fighter L7, Paladin/Ranger L2) are still picked in-game.
 - [ ] **Interactive reaction prompts** — Indomitable, Stroke of Luck,
       Countercharm, Deflect Attacks auto-resolve player-favorably; let the
       player choose _when_ to spend.
