@@ -108,6 +108,9 @@ export const ACTION_COSTS: Record<StructuredAction['type'], ActionCost> = {
   two_weapon_attack: 'managed',
   use_lands_aid: 'managed',
   grid_move: 'managed',
+  // RE-4 — move_zone self-manages its cost (bonus action OR action per the
+  // spell's zoneMoveCost), so the dispatcher leaves the economy to the handler.
+  move_zone: 'managed',
   jump: 'managed',
   resolve_reaction: 'managed',
   attack: 'managed',

@@ -6,7 +6,13 @@
 
 import type { GameState, Seed, SpellZone } from '../types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { applyZoneTick, breakConcentration, takeAction, zoneCells } from './gameEngine.js';
+import {
+  applyZoneTick,
+  breakConcentration,
+  generateChoices,
+  takeAction,
+  zoneCells,
+} from './gameEngine.js';
 import { makeChar, makeState } from '../test-fixtures.js';
 import { context as ctx } from '../contexts/sandbox.js';
 
@@ -46,10 +52,11 @@ function combatState(enemyPos: { x: number; y: number }, enemyHp = 100): GameSta
     ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
     characters: [druid],
     active_character_id: 'pc-1',
-    initiative_order: [
-      { id: 'pc-1', roll: 18, is_enemy: false },
-      { id: ENEMY, roll: 5, is_enemy: true },
-    ],
+    // PC-only initiative: an action-cost zone cast/move advances the turn, and
+    // we don't want the enemy's counterattack (which could randomly break
+    // concentration and tear down the zone) to make these tests flaky. The
+    // round wrap — and thus the zone's round-wrap tick — still fires.
+    initiative_order: [{ id: 'pc-1', roll: 18, is_enemy: false }],
     initiative_idx: 0,
     entities: [
       {
@@ -256,6 +263,85 @@ describe('Call Lightning + Spike Growth — placed zones', () => {
     expect(z?.spellId).toBe('spike_growth');
     expect(z?.savingThrow).toBeUndefined(); // automatic — no save
     expect(r.newState.entities?.find((e) => e.id === ENEMY)?.hp).toBeLessThan(100);
+  });
+});
+
+describe('move_zone — repositioning placed zones', () => {
+  const placedZone = (over: Partial<SpellZone>): SpellZone =>
+    zone({ center: { x: 2, y: 2 }, cells: [{ x: 2, y: 2 }], radiusFt: 10, ...over });
+
+  it('Flaming Sphere rolls (bonus action) onto an enemy and damages it there', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.01); // enemy fails its DEX save
+    const st = combatState({ x: 4, y: 4 }, 100); // enemy 2 squares from the zone center
+    st.spell_zones = [
+      placedZone({
+        spellId: 'flaming_sphere',
+        name: 'Flaming Sphere',
+        damageType: 'fire',
+        savingThrow: 'dex',
+      }),
+    ];
+    const r = await takeAction({
+      action: { type: 'move_zone', zoneId: 'z1', to: { x: 4, y: 4 } },
+      history: [],
+      state: st,
+      seed,
+      context: ctx,
+    });
+    expect(r.newState.spell_zones?.[0].center).toEqual({ x: 4, y: 4 });
+    expect(r.newState.characters[0].turn_actions.bonus_action_used).toBe(true);
+    expect(r.newState.entities?.find((e) => e.id === ENEMY)?.hp).toBeLessThan(100);
+  });
+
+  it('Moonbeam re-aims as a Magic action and repositions the beam', async () => {
+    // An action-cost move ends the PC's turn (usedInitiative) — the turn then
+    // advances, so we assert the durable outcome: the zone moved to the new cell.
+    const st = combatState({ x: 5, y: 5 });
+    st.spell_zones = [placedZone({ spellId: 'moonbeam', radiusFt: 5 })];
+    const r = await takeAction({
+      action: { type: 'move_zone', zoneId: 'z1', to: { x: 4, y: 4 } },
+      history: [],
+      state: st,
+      seed,
+      context: ctx,
+    });
+    expect(r.newState.spell_zones?.[0].center).toEqual({ x: 4, y: 4 });
+  });
+
+  it('rejects a move beyond the spell’s range (and leaves the zone in place)', async () => {
+    const st = combatState({ x: 7, y: 7 });
+    st.spell_zones = [
+      placedZone({ spellId: 'flaming_sphere', center: { x: 0, y: 0 }, cells: [{ x: 0, y: 0 }] }),
+    ];
+    const r = await takeAction({
+      action: { type: 'move_zone', zoneId: 'z1', to: { x: 7, y: 7 } }, // 35 ft > 30
+      history: [],
+      state: st,
+      seed,
+      context: ctx,
+    });
+    expect(r.narrative).toMatch(/at most 30 ft/i);
+    expect(r.newState.spell_zones?.[0].center).toEqual({ x: 0, y: 0 });
+  });
+
+  it('rejects repositioning a stationary zone (Spike Growth)', async () => {
+    const st = combatState({ x: 2, y: 2 });
+    st.spell_zones = [placedZone({ spellId: 'spike_growth', savingThrow: undefined })];
+    const r = await takeAction({
+      action: { type: 'move_zone', zoneId: 'z1', to: { x: 2, y: 2 } },
+      history: [],
+      state: st,
+      seed,
+      context: ctx,
+    });
+    expect(r.narrative).toMatch(/can't be repositioned/i);
+  });
+
+  it('generateChoices offers a move for a movable zone with an enemy in range', () => {
+    const st = combatState({ x: 3, y: 3 });
+    st.spell_zones = [placedZone({ spellId: 'flaming_sphere', name: 'Flaming Sphere' })];
+    const offered = generateChoices(st, seed, ctx).filter((c) => c.action.type === 'move_zone');
+    expect(offered.length).toBeGreaterThan(0);
   });
 });
 

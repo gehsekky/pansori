@@ -95,11 +95,13 @@ backend features are waiting on, and a handful of **bounded subsystems**.
         **Spirit Guardians** rides this as a caster-following aura
         (`followsCaster` — footprint recomputed from the caster's cell each
         tick); **Call Lightning** (DEX-save bolt) and **Spike Growth** (the
-        first no-save zone) ship as placed zones. Remaining: placed zones are
-        **stationary** (RAW repositioning — Flaming Sphere bonus-action roll,
-        Moonbeam/Call Lightning move actions — is deferred), and Spike Growth's
-        per-5-ft-moved damage + difficult terrain are approximated as a flat
-        per-round tick.
+        first no-save zone) ship as placed zones. Placed zones are
+        **repositionable** via the `move_zone` action (`zoneMoveFt` +
+        `zoneMoveCost`): Flaming Sphere rolls 30 ft as a Bonus Action, Moonbeam
+        (60 ft) and Call Lightning (120 ft) re-aim as a Magic action; the move
+        recomputes the footprint and ticks at the new spot. Remaining: Spike
+        Growth's per-5-ft-moved damage + difficult terrain are approximated as
+        a flat per-round tick.
       Exceptions still needing a model first: the alternate "summon" spells,
       each mechanically distinct from the stat-block ally model —
   - [ ] **Spiritual Weapon** (L2) — a floating force with no HP; a

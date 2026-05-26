@@ -469,6 +469,12 @@ export interface Spell {
   // `damage` (save-for-half if `savingThrow` is set) to hostiles standing in it
   // on each round wrap, until the caster's concentration ends.
   persistentZone?: boolean;
+  // RE-4 — a placed zone the caster can reposition (Flaming Sphere rolls 30 ft
+  // as a Bonus Action; Moonbeam / Call Lightning re-aim as a Magic action).
+  // `zoneMoveFt` is the max reposition distance; `zoneMoveCost` is the action
+  // economy it costs. Omitted ⇒ the zone is stationary (Spike Growth).
+  zoneMoveFt?: number;
+  zoneMoveCost?: 'action' | 'bonus_action';
   ritualCasting?: boolean; // castable as ritual (no slot cost, only out of combat)
   verbal?: boolean; // has verbal component (blocked when deafened)
   // SRD Slow — "When the creature attempts to cast a spell with a
@@ -994,6 +1000,9 @@ export interface SpellZone {
   // with the caster. `cells` holds the cast-time footprint as a fallback.
   followsCaster?: boolean;
   radiusFt?: number;
+  // Center cell of a PLACED zone (where it was cast / last repositioned to).
+  // Used to measure reposition distance and recompute the footprint on a move.
+  center?: GridPos;
 }
 
 export interface GameState {
