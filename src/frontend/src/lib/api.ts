@@ -83,6 +83,9 @@ export type CharacterInput = {
   // 2024 background ability-score increase. Omitted = +1 to all three of the
   // background's listed abilities; supplied = +2 to `plus2` and +1 to `plus1`.
   ability_bonus?: { plus2: string; plus1: string };
+  // 2024 class skill proficiencies — the player's chosen "N from the class
+  // list". Omitted/invalid = the curated default. Re-validated server-side.
+  class_skills?: string[];
   // Origin-feat choices that need player input at character creation.
   // Today only Magic Initiate variants populate this — the player picks
   // 2 cantrips + 1 L1 spell. BE validates the shape AND that each picked
@@ -103,6 +106,9 @@ export interface BackendContextSummary {
   displayName: string;
   mapType: string;
   classes: string[];
+  // Per-class "choose N from options" skill proficiencies + the curated
+  // default selection, for the creation-screen skill picker.
+  classSkillChoices: Record<string, { count: number; options: string[]; default: string[] }>;
   backgrounds: Array<{
     id: string;
     name: string;

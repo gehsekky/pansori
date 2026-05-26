@@ -1221,7 +1221,12 @@ export interface Context {
   gridHeight?: number; // default combat grid height (squares)
   campaign?: CampaignData;
   classPrimaryStats: Record<string, 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha'>;
+  // The curated default skill picks per class (also the fallback when no valid
+  // player choice is supplied).
   classSkills: Record<string, string[]>;
+  // 2024 SRD "choose N from options" class skill proficiencies. The creation
+  // flow offers these; `classSkills` is the default selection.
+  classSkillChoices?: Record<string, { count: number; options: string[] }>;
   classHitDie: Record<string, number>;
   classArmorProficiencies?: Record<string, string[]>; // class → ['light','medium','heavy','shield']
   classWeaponProficiencies?: Record<string, string[]>; // class → ['simple','martial']

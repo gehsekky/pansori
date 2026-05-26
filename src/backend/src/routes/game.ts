@@ -25,7 +25,12 @@ import {
   spellSlotsForClassLevel,
 } from '../services/rulesEngine.js';
 import { Request, Response, Router } from 'express';
-import { SRD_SPECIES, SRD_WEAPON_MASTERY_SLOTS } from '../contexts/srd/index.js';
+import {
+  SRD_SPECIES,
+  SRD_WEAPON_MASTERY_SLOTS,
+  defaultClassSkills,
+  resolveClassSkills,
+} from '../contexts/srd/index.js';
 import { applyAbilityScoreIncreases, isValidForMethod } from '../services/abilityScores.js';
 import {
   applyConsequence,
@@ -148,6 +153,18 @@ gameRouter.get('/contexts', (_req, res) => {
       displayName: c.worldNoun,
       mapType: c.mapType,
       classes: Object.keys(c.classPrimaryStats),
+      // Per-class "choose N from options" skill proficiencies + the curated
+      // default selection — drives the creation-screen skill picker.
+      classSkillChoices: Object.fromEntries(
+        Object.entries(c.classSkillChoices ?? {}).map(([cls, choice]) => [
+          cls,
+          {
+            count: choice.count,
+            options: choice.options,
+            default: defaultClassSkills(cls, c.classSkills?.[cls] ?? []),
+          },
+        ])
+      ),
       backgrounds: (c.backgrounds ?? []).map((b) => ({
         id: b.id,
         name: b.name,
@@ -294,7 +311,14 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
       // picks either +2/+1 across two of the three listed abilities (`ability_bonus`)
       // or +1 to all three (omitted); the helper re-validates the split.
       base = applyAbilityScoreIncreases(base, bg?.abilityScoreIncreases ?? [], c.ability_bonus);
-      const classSkills = ctx.classSkills?.[c.character_class] ?? [];
+      // 2024 class skill proficiencies — the player's chosen "N from the class
+      // list", re-validated against the class options (falls back to the
+      // curated default on an invalid/omitted choice).
+      const classSkills = resolveClassSkills(
+        c.character_class,
+        c.class_skills,
+        ctx.classSkills?.[c.character_class] ?? []
+      );
       // 2024 PHB species traits — speed, darkvision, resistances, innate
       // cantrips. Defaults to Human when missing/unknown.
       const speciesId = c.species && SRD_SPECIES[c.species] ? c.species : 'human';

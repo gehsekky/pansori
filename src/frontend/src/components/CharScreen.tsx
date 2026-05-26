@@ -158,6 +158,18 @@ interface CharDraft {
   // background's listed abilities; set = +2 to `plus2` and +1 to `plus1`.
   // Cleared on background change (the eligible abilities differ).
   abilityBonus?: { plus2: keyof StatBlock; plus1: keyof StatBlock };
+  // 2024 class skill proficiencies — the player's chosen "N from the class
+  // list". Undefined = the curated default (shown pre-selected). Cleared on
+  // class change (the options differ).
+  classSkills?: string[];
+}
+
+// 'sleight_of_hand' → 'Sleight of Hand'. Skill ids are snake_case.
+function skillLabel(id: string): string {
+  return id
+    .split('_')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
 }
 
 // Per-context localStorage key for the saved party draft. We key on the
@@ -458,6 +470,20 @@ function CharScreen({
         `${d.name || `Hero ${missingSpellPicks + 1}`} must finish picking Magic Initiate spells before starting`
       );
     }
+    // Each class must have exactly its `count` skill proficiencies chosen.
+    // (Skipped until the BE summary loads — then the server applies the default.)
+    const badSkills = party.findIndex((d) => {
+      const choice = beCtx?.classSkillChoices?.[d.cls];
+      if (!choice) return false;
+      return (d.classSkills ?? choice.default).length !== choice.count;
+    });
+    if (badSkills >= 0) {
+      const d = party[badSkills];
+      const choice = beCtx!.classSkillChoices[d.cls];
+      return setError(
+        `${d.name || `Hero ${badSkills + 1}`} must choose exactly ${choice.count} class skill${choice.count === 1 ? '' : 's'}`
+      );
+    }
     setError('');
     localStorage.setItem('operative_name', leader.name.trim());
     try {
@@ -471,6 +497,7 @@ function CharScreen({
           species: d.speciesId || undefined,
           feat_choices: d.featChoices,
           ability_bonus: d.abilityBonus,
+          class_skills: d.classSkills,
         })),
         contextId
       );
@@ -494,7 +521,6 @@ function CharScreen({
             const primaryStat = selectedCtx?.classPrimaryStats[draft.cls]?.toLowerCase() as
               | keyof StatBlock
               | undefined;
-            const skills = selectedCtx?.classSkills[draft.cls] ?? [];
             const backgrounds = selectedCtx?.backgrounds ?? [];
             const selectedBg = backgrounds.find((b) => b.id === draft.backgroundId);
             const portraits = [
@@ -562,7 +588,11 @@ function CharScreen({
                   className={styles.formInp}
                   style={{ cursor: 'pointer' }}
                   value={draft.cls}
-                  onChange={(e) => updateDraft(idx, { cls: e.target.value })}
+                  onChange={(e) =>
+                    // Reset the class-skill picks — the new class offers a
+                    // different list.
+                    updateDraft(idx, { cls: e.target.value, classSkills: undefined })
+                  }
                 >
                   {classes.map((c) => (
                     <option key={c.id} value={c.id}>
@@ -581,18 +611,73 @@ function CharScreen({
                         PRIMARY STAT:{' '}
                       </span>
                       <span style={{ color: 'var(--t-primary)' }}>{primaryStat.toUpperCase()}</span>
-                      {skills.length > 0 && (
-                        <>
-                          <span style={{ color: 'var(--t-dim)', letterSpacing: '0.08em' }}>
-                            {' '}
-                            · PROFICIENT:{' '}
-                          </span>
-                          <span style={{ color: 'var(--t-mid)' }}>{skills.join(', ')}</span>
-                        </>
-                      )}
                     </div>
                   )}
                 </div>
+
+                {/* 2024 class skill proficiencies — choose N from the class
+                    list. Options + the curated default come from the BE
+                    context summary; the default is pre-selected. */}
+                {(() => {
+                  const choice = beContexts[contextId]?.classSkillChoices?.[draft.cls];
+                  if (!choice || choice.options.length === 0) return null;
+                  const selected = draft.classSkills ?? choice.default;
+                  const atCap = selected.length >= choice.count;
+                  const complete = selected.length === choice.count;
+                  return (
+                    <div style={{ marginTop: 12 }}>
+                      <label className={styles.formLbl}>
+                        CLASS SKILLS — CHOOSE {choice.count}{' '}
+                        <span
+                          style={{ color: complete ? 'var(--t-primary)' : 'var(--t-hp-mid)' }}
+                          data-testid={`class-skill-count-${idx}`}
+                        >
+                          ({selected.length}/{choice.count})
+                        </span>
+                      </label>
+                      <div
+                        style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}
+                        data-testid={`class-skills-${idx}`}
+                      >
+                        {choice.options.map((sk) => {
+                          const on = selected.includes(sk);
+                          const disabled = !on && atCap;
+                          return (
+                            <button
+                              key={sk}
+                              type="button"
+                              aria-pressed={on}
+                              disabled={disabled}
+                              onClick={() => {
+                                const next = on
+                                  ? selected.filter((s) => s !== sk)
+                                  : [...selected, sk];
+                                updateDraft(idx, { classSkills: next });
+                              }}
+                              style={{
+                                fontSize: '0.7rem',
+                                padding: '0.25rem 0.55rem',
+                                letterSpacing: '0.04em',
+                                background: on ? 'var(--t-separator)' : 'transparent',
+                                border: `1px solid ${on ? 'var(--t-primary)' : 'var(--t-border)'}`,
+                                color: on
+                                  ? 'var(--t-primary)'
+                                  : disabled
+                                    ? 'var(--t-separator)'
+                                    : 'var(--t-dim)',
+                                cursor: disabled ? 'default' : 'pointer',
+                                fontFamily: 'inherit',
+                              }}
+                            >
+                              {on ? '✓ ' : ''}
+                              {skillLabel(sk)}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 <label
                   className={styles.formLbl}

@@ -163,6 +163,168 @@ export const SRD_CLASS_SKILLS: Record<string, string[]> = {
   Barbarian: ['athletics', 'intimidation', 'survival'],
 };
 
+// The 18 SRD skills (snake_case ids) — Bard chooses any 3 of these.
+export const ALL_SKILLS: readonly string[] = [
+  'acrobatics',
+  'animal_handling',
+  'arcana',
+  'athletics',
+  'deception',
+  'history',
+  'insight',
+  'intimidation',
+  'investigation',
+  'medicine',
+  'nature',
+  'perception',
+  'performance',
+  'persuasion',
+  'religion',
+  'sleight_of_hand',
+  'stealth',
+  'survival',
+];
+
+// 2024 SRD class skill proficiencies — "choose `count` from `options`". The
+// curated picks in SRD_CLASS_SKILLS double as the default selection; the
+// creation flow lets the player pick any valid subset of `options`.
+export const SRD_CLASS_SKILL_CHOICES: Record<string, { count: number; options: string[] }> = {
+  Barbarian: {
+    count: 2,
+    options: ['animal_handling', 'athletics', 'intimidation', 'nature', 'perception', 'survival'],
+  },
+  Bard: { count: 3, options: [...ALL_SKILLS] },
+  Cleric: { count: 2, options: ['history', 'insight', 'medicine', 'persuasion', 'religion'] },
+  Druid: {
+    count: 2,
+    options: [
+      'animal_handling',
+      'arcana',
+      'insight',
+      'medicine',
+      'nature',
+      'perception',
+      'religion',
+      'survival',
+    ],
+  },
+  Fighter: {
+    count: 2,
+    options: [
+      'acrobatics',
+      'animal_handling',
+      'athletics',
+      'history',
+      'insight',
+      'intimidation',
+      'persuasion',
+      'perception',
+      'survival',
+    ],
+  },
+  Monk: {
+    count: 2,
+    options: ['acrobatics', 'athletics', 'history', 'insight', 'religion', 'stealth'],
+  },
+  Paladin: {
+    count: 2,
+    options: ['athletics', 'insight', 'intimidation', 'medicine', 'persuasion', 'religion'],
+  },
+  Ranger: {
+    count: 3,
+    options: [
+      'animal_handling',
+      'athletics',
+      'insight',
+      'investigation',
+      'nature',
+      'perception',
+      'stealth',
+      'survival',
+    ],
+  },
+  Rogue: {
+    count: 4,
+    options: [
+      'acrobatics',
+      'athletics',
+      'deception',
+      'insight',
+      'intimidation',
+      'investigation',
+      'perception',
+      'persuasion',
+      'sleight_of_hand',
+      'stealth',
+    ],
+  },
+  Sorcerer: {
+    count: 2,
+    options: ['arcana', 'deception', 'insight', 'intimidation', 'persuasion', 'religion'],
+  },
+  Warlock: {
+    count: 2,
+    options: [
+      'arcana',
+      'deception',
+      'history',
+      'intimidation',
+      'investigation',
+      'nature',
+      'religion',
+    ],
+  },
+  Wizard: {
+    count: 2,
+    options: ['arcana', 'history', 'insight', 'investigation', 'medicine', 'nature', 'religion'],
+  },
+};
+
+/**
+ * The default "choose N" selection for a class — exactly `count` skills,
+ * preferring the curated recommendations (`SRD_CLASS_SKILLS[class]`, which is
+ * generous and may list more than `count`) and topping up from the class
+ * options when the curated list runs short. Falls back to the raw curated
+ * list for classes with no choice table. Used both as the creation-screen
+ * pre-selection and as the server-side fallback.
+ */
+export function defaultClassSkills(className: string, curated: readonly string[]): string[] {
+  const choice = SRD_CLASS_SKILL_CHOICES[className];
+  if (!choice) return [...curated];
+  const out: string[] = [];
+  const add = (s: string) => {
+    if (out.length < choice.count && choice.options.includes(s) && !out.includes(s)) out.push(s);
+  };
+  curated.map((s) => s.toLowerCase()).forEach(add); // curated picks first
+  choice.options.forEach(add); // then top up from the offered options
+  return out;
+}
+
+/**
+ * Resolve a character's class skill proficiencies. If `chosen` is a valid
+ * selection for the class — every entry an offered option, no duplicates, and
+ * exactly `count` of them — it's used (lowercased); otherwise we fall back to
+ * the count-trimmed default for the class.
+ */
+export function resolveClassSkills(
+  className: string,
+  chosen: readonly string[] | undefined,
+  fallback: readonly string[]
+): string[] {
+  const choice = SRD_CLASS_SKILL_CHOICES[className];
+  if (!choice) return [...fallback];
+  if (chosen) {
+    const lowered = chosen.map((s) => s.toLowerCase());
+    const distinct = new Set(lowered);
+    const valid =
+      lowered.length === choice.count &&
+      distinct.size === choice.count &&
+      lowered.every((s) => choice.options.includes(s));
+    if (valid) return [...distinct];
+  }
+  return defaultClassSkills(className, fallback);
+}
+
 // The single SRD-iconic subclass each class gains at level 3 (SRD 5.2.1
 // publishes exactly one subclass per class). Keyed by lowercased class name.
 // The engine auto-assigns this at level 3 — there's no choice to make.
