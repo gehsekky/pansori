@@ -485,6 +485,12 @@ export interface Spell {
   recurringAttackCost?: 'action' | 'bonus_action';
   recurringAddSpellMod?: boolean;
   recurringHealFraction?: number;
+  // RE-4 — apply `condition` to EVERY hostile in the AoE that fails the save
+  // (not just the primary target). Opt-in so existing AoE-condition spells
+  // (Hypnotic Pattern, Web) keep their primary-target-only behavior until
+  // migrated. Confusion uses this for its 10-ft `confused` sphere; the
+  // enemy turn loop then runs Confusion's 1d10 behavior table per creature.
+  aoeCondition?: boolean;
   ritualCasting?: boolean; // castable as ritual (no slot cost, only out of combat)
   verbal?: boolean; // has verbal component (blocked when deafened)
   // SRD Slow — "When the creature attempts to cast a spell with a
@@ -752,6 +758,10 @@ export interface Character {
     spellId: string;
     condition?: string;
     rounds_left?: number;
+    // The spell save DC, stamped for effects whose ongoing resolution
+    // re-rolls a save away from the cast site (Confusion: each confused
+    // creature re-saves against this DC on its turn to shake the effect).
+    save_dc?: number;
   } | null;
   // RE-4 — a recurring spell attack the caster repeats on later turns
   // (Spiritual Weapon: a floating force re-attacked as a Bonus Action;

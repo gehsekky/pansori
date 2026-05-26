@@ -5,6 +5,7 @@ import { applySingleTargetDamage } from './applyDamage.js';
 import { composeNow } from '../../narrative/compose.js';
 import { pick } from '../../gameEngine.js';
 import { pickCastPrefix } from './utils.js';
+import { runAoeConditionSpell } from './aoeCondition.js';
 import { runAoeSpell } from './aoe.js';
 import { runAttackRollSpell } from './attackRoll.js';
 import { runAutoHitSpell } from './autoHit.js';
@@ -334,6 +335,13 @@ export const handleCastSpell: ActionHandler<{
   // re-issue it each turn (`recurring_spell_attack`).
   if (spell.recurringAttack) {
     runRecurringAttackSpell(ctx, dmgSpell, slotLevel, castingScore, spellTargetId);
+    return;
+  }
+
+  // RE-4 — AoE condition spells (Confusion): apply the condition to every
+  // hostile in the blast that fails the save (the single-target save branch
+  // below only conditions the primary target). Opt-in via `aoeCondition`.
+  if (spell.aoeCondition && runAoeConditionSpell(ctx, spell, dc)) {
     return;
   }
 

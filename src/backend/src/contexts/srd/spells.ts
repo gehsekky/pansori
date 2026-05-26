@@ -1505,6 +1505,30 @@ export const SRD_SPELLS: Record<string, Spell> = {
     // SRD: Bard / Cleric / Paladin.
     spellList: ['arcane', 'divine'],
   },
+  confusion: {
+    id: 'confusion',
+    name: 'Confusion',
+    level: 4,
+    castTime: 'action',
+    concentration: true,
+    // SRD: Confusion — 10-ft sphere, WIS save. Failed-save creatures become
+    // `confused` (applied to all via `aoeCondition`). Each confused creature's
+    // turn rolls 1d10 in the enemy loop: lose the turn, lash out at a random
+    // ally in reach (friendly fire), or act normally; it re-saves each turn to
+    // shake the effect. RAW upcast widens the sphere — deferred (fixed radius).
+    condition: 'confused',
+    conditionDuration: 10,
+    aoeCondition: true,
+    savingThrow: 'wis',
+    saveEffect: 'negates',
+    blastRadius: 10,
+    aoeShape: 'sphere',
+    desc: 'Each creature in a 10-ft sphere makes a WIS save or is confused (Concentration, 1 min): each turn it may lose its turn, attack a random creature within reach, or act normally, re-saving each turn to recover.',
+    rangeKind: 'ranged',
+    rangeFt: 90,
+    // SRD: Bard / Druid / Sorcerer / Wizard.
+    spellList: ['arcane', 'primal'],
+  },
   hold_person: {
     id: 'hold_person',
     name: 'Hold Person',
