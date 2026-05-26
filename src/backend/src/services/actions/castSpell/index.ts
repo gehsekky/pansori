@@ -1,6 +1,7 @@
 import { isSpellOutOfRange, runPrecast } from './precast.js';
 import { runPowerWordKill, runPowerWordStun } from './powerWords.js';
 import type { ActionHandler } from '../types.js';
+import { BEAST_FORMS } from '../../../contexts/srd/index.js';
 import type { Enemy } from '../../../types.js';
 import { applySingleTargetDamage } from './applyDamage.js';
 import { composeNow } from '../../narrative/compose.js';
@@ -141,7 +142,13 @@ export const handleCastSpell: ActionHandler<{
   if (
     runBuffSpell(
       ctx,
-      action as { type: 'cast_spell'; spellId: string; slotLevel: number; targetCharId?: string },
+      action as {
+        type: 'cast_spell';
+        spellId: string;
+        slotLevel: number;
+        targetCharId?: string;
+        restorationEffect?: string;
+      },
       spell,
       slotLevel,
       slotNote
@@ -398,7 +405,21 @@ export const handleCastSpell: ActionHandler<{
     spellDmg = r.spellDmg;
     spellHit = r.spellHit;
   } else if (spell.savingThrow) {
-    const r = runSaveSpell(ctx, spellTarget, spellTargetId, dmgSpell, slotLevel, slotNote, dc);
+    // Polymorph — resolve the player-chosen beast form (else the resolver
+    // defaults to Wolf). The form's HP becomes the polymorph Temp HP pool.
+    const beastFormId = (action as { beastForm?: string }).beastForm;
+    const form = beastFormId ? BEAST_FORMS[beastFormId] : undefined;
+    const polymorphForm = form ? { name: form.name, hp: form.hp ?? 11 } : undefined;
+    const r = runSaveSpell(
+      ctx,
+      spellTarget,
+      spellTargetId,
+      dmgSpell,
+      slotLevel,
+      slotNote,
+      dc,
+      polymorphForm
+    );
     if (r.done) return;
     spellDmg = r.spellDmg;
     spellHit = r.spellHit;

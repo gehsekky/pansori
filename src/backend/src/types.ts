@@ -659,6 +659,10 @@ export interface BeastForm {
   physicalResistance?: boolean; // resistance to non-magical bludgeoning/piercing/slashing
   speedFt?: number; // movement speed override (default 30)
   descriptor: string; // short flavor for narratives
+  // 2024 PHB Polymorph — the beast's Hit Points. The polymorphed creature's HP
+  // is replaced by this (modeled as `temp_hp`); when it depletes, the form
+  // drops. Wild Shape ignores this (it derives temp HP from druid level).
+  hp?: number;
 }
 
 // ─── Structured actions ───────────────────────────────────────────────────────

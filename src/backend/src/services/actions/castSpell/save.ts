@@ -55,7 +55,9 @@ export function runSaveSpell(
   spell: Spell,
   slotLevel: number,
   slotNote: string,
-  dc: number
+  dc: number,
+  // Polymorph — the player-chosen beast form (name + HP pool). Omitted ⇒ Wolf.
+  polymorphForm?: { name: string; hp: number }
 ): { done: boolean; spellDmg: number; spellHit: boolean } {
   if (ctx.actor.kind !== 'pc') return { done: true, spellDmg: 0, spellHit: false };
   const { char } = ctx.actor;
@@ -231,10 +233,13 @@ export function runSaveSpell(
             ...(condToApply === 'frightened' ? { frightened_by: char.id } : {}),
           };
           if (isPolymorph && !next.polymorph_state) {
+            // The chosen beast form's HP becomes the form's Temp HP pool; when
+            // it depletes the form drops. Defaults to Wolf (11) when unpicked.
+            const form = polymorphForm ?? { name: 'Wolf', hp: 11 };
             return {
               ...next,
-              polymorph_state: { formName: 'Wolf' },
-              temp_hp: 11,
+              polymorph_state: { formName: form.name },
+              temp_hp: form.hp,
             };
           }
           return next;

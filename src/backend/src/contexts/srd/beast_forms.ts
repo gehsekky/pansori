@@ -18,6 +18,7 @@ export const BEAST_FORMS: Record<string, BeastForm> = {
   // ── CR 0 — accessible to every druid at L1 ──────────────────────────────
   hawk: {
     id: 'hawk',
+    hp: 3,
     name: 'Hawk',
     cr: 0,
     attackName: 'Talons',
@@ -31,6 +32,7 @@ export const BEAST_FORMS: Record<string, BeastForm> = {
   // ── CR 1/4 — accessible at L1 (base) / L1 (moon won't use these much) ──
   wolf: {
     id: 'wolf',
+    hp: 11,
     name: 'Wolf',
     cr: 0.25,
     attackName: 'Bite',
@@ -43,6 +45,7 @@ export const BEAST_FORMS: Record<string, BeastForm> = {
   },
   spider: {
     id: 'spider',
+    hp: 26,
     name: 'Giant Spider',
     cr: 0.25,
     attackName: 'Bite',
@@ -56,6 +59,7 @@ export const BEAST_FORMS: Record<string, BeastForm> = {
   // ── CR 1/2 — base druid L4+, Moon L3+ ───────────────────────────────────
   black_bear: {
     id: 'black_bear',
+    hp: 19,
     name: 'Black Bear',
     cr: 0.5,
     attackName: 'Claws',
@@ -69,6 +73,7 @@ export const BEAST_FORMS: Record<string, BeastForm> = {
   // ── CR 1 — base druid L8+, Moon L3+ ─────────────────────────────────────
   brown_bear: {
     id: 'brown_bear',
+    hp: 34,
     name: 'Brown Bear',
     cr: 1,
     attackName: 'Bite + Claw',
@@ -81,6 +86,7 @@ export const BEAST_FORMS: Record<string, BeastForm> = {
   },
   dire_wolf: {
     id: 'dire_wolf',
+    hp: 37,
     name: 'Dire Wolf',
     cr: 1,
     attackName: 'Bite',

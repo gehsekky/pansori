@@ -4627,6 +4627,32 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         !isEnemyTargetPicker &&
         livingEnemies.length >= 2;
 
+      // Option pickers (single-select): Polymorph's beast form, Greater
+      // Restoration's effect. Tagged on the cast choice so the FE opens an
+      // option dialog; the cast path honors the chosen id (else its default).
+      const pickOption: GameChoice['pickOption'] =
+        spellId === 'polymorph'
+          ? {
+              param: 'beastForm',
+              title: 'Polymorph — choose a beast form',
+              options: Object.values(BEAST_FORMS).map((f) => ({
+                id: f.id,
+                label: f.name,
+                sub: `CR ${f.cr} · ${f.hp ?? 11} HP`,
+              })),
+            }
+          : spellId === 'greater_restoration'
+            ? {
+                param: 'restorationEffect',
+                title: 'Greater Restoration — choose an effect to remove',
+                options: [
+                  { id: 'exhaustion', label: 'Reduce Exhaustion by 1' },
+                  { id: 'charmed', label: 'End the Charmed condition' },
+                  { id: 'petrified', label: 'End the Petrified condition' },
+                ],
+              }
+            : undefined;
+
       if (spell.level === 0) {
         // Cantrip: no slot needed
         const slotNote = isBonusAction ? ', bonus action' : '';
@@ -4711,6 +4737,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
                 requiresBonusAction: isBonusAction || undefined,
                 aoePreview: aoePreview ? { ...aoePreview, targetEnemyId: en.id } : undefined,
                 kind: 'cast_spell',
+                pickOption,
               });
             }
           } else {
@@ -4732,6 +4759,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
               aoePreview: aoePreview ? { ...aoePreview, targetEnemyId: targetId } : undefined,
               kind: 'cast_spell',
               pickTargets,
+              pickOption,
             });
           }
           // 2024 PHB Magic Missile multi-target: when there are 2+ living
