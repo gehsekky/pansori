@@ -166,7 +166,16 @@ export const handleCastSpell: ActionHandler<{
   }
 
   // ── Utility spells (no damage, no save, no attack, no condition) ─────
-  if (runUtilitySpell(ctx, spell, slotNote)) {
+  // Bless reads the player-chosen `targetCharIds` (else auto-picks).
+  if (
+    runUtilitySpell(
+      ctx,
+      spell,
+      slotNote,
+      (action as { targetCharIds?: string[] }).targetCharIds,
+      slotLevel
+    )
+  ) {
     return;
   }
 

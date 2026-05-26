@@ -4711,12 +4711,20 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
             }
           } else {
             const targetId = isOffensive ? livingEnemies[0]?.id : undefined;
+            // SRD Bless — the caster chooses up to 3 creatures (+1 per slot above
+            // 1st). Tag the choice so the FE opens an ally target picker; the
+            // cast path honors the chosen `targetCharIds` (else auto-picks).
+            const pickTargets =
+              spellId === 'bless'
+                ? { side: 'ally' as const, max: 3 + (sl - baseLevel) }
+                : undefined;
             choices.push({
               label: `Cast ${spell.name} (${sl === baseLevel ? `Lvl ${sl}` : `${ordinal(sl)} slot`}${slotNote}${upcastPart} — ${avail} slot${avail === 1 ? '' : 's'} left)`,
               action: { type: 'cast_spell', spellId, slotLevel: sl, targetEnemyId: targetId },
               requiresBonusAction: isBonusAction || undefined,
               aoePreview: aoePreview ? { ...aoePreview, targetEnemyId: targetId } : undefined,
               kind: 'cast_spell',
+              pickTargets,
             });
           }
           // 2024 PHB Magic Missile multi-target: when there are 2+ living

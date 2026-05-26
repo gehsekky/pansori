@@ -345,6 +345,12 @@ export type StructuredAction =
       //     party member to be restored. Required for revive spells;
       //     the handler errors out when missing.
       targetCharId?: string;
+      // Multi-target ally buff (Bless): the party members the caster chooses to
+      // affect (up to 3, +1 per slot above the spell's base). Omitted = the
+      // backend auto-picks (caster + nearest allies). The FE collects these via
+      // the target picker (GameChoice.pickTargets). Enemy multi-target debuffs
+      // (Bane) reuse `targetEnemyIds` above.
+      targetCharIds?: string[];
       // Summon spells (Animate Dead): which creature variant to raise
       // (e.g. 'Skeleton' or 'Zombie'). Omitted = the spell's base block.
       // (RE-1 Phase 4.5.)
@@ -555,6 +561,15 @@ export interface GameChoice {
   // so e.g. two different "Inspect Dirty Chest" objects get distinct keys.
   // Absent on choices that don't benefit from dimming (movement, combat).
   seenKey?: string;
+  // Optional UI hint: this choice opens a target picker before it is sent.
+  // The FE collects 1..`max` targets of the given side and re-sends the action
+  // with `targetCharIds` (ally) / `targetEnemyIds` (enemy) populated; the
+  // backend validates the chosen targets and falls back to its auto-pick when
+  // they're absent. Used by Bless (ally) — Bane (enemy) and others follow.
+  pickTargets?: {
+    side: 'ally' | 'enemy';
+    max: number;
+  };
 }
 
 // ─── Combat-log events (parallel to prose narrative) ─────────────────
