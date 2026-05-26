@@ -6814,6 +6814,28 @@ export async function runEnemyTurns(args: {
         if (advIdx === args.initialCurrentIdx) break;
         continue;
       }
+      // SRD Command ("Halt") — a commanded creature is compelled to lose
+      // its turn (no move or action). The condition is consumed here on
+      // the skip, so the command applies for exactly one turn ("on its
+      // next turn") and the creature acts normally the round after.
+      const commandedEnt = st.entities?.find((e) => e.id === eEntry.id && e.isEnemy);
+      if (commandedEnt && commandedEnt.conditions.includes('commanded')) {
+        narrative += `\n\n[${rm.name} is compelled to halt — losing their turn.]`;
+        st = {
+          ...st,
+          entities: (st.entities ?? []).map((e) =>
+            e.id === eEntry.id && e.isEnemy
+              ? { ...e, conditions: e.conditions.filter((c) => c !== 'commanded') }
+              : e
+          ),
+        };
+        resumeMi = 0;
+        const prevAdvIdxCmd = advIdx;
+        advIdx = (advIdx + 1) % orderLen;
+        if (advIdx === 0 && prevAdvIdxCmd !== 0) roundWrapped = true;
+        if (advIdx === args.initialCurrentIdx) break;
+        continue;
+      }
       // SRD Paladin Holy Nimbus (Devotion L20) — an enemy that starts its turn
       // within an active nimbus aura takes Radiant damage (CHA + prof). Resolved
       // before the enemy acts; a kill ends its turn (and combat if room clears).
