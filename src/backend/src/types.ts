@@ -182,6 +182,11 @@ export interface EnemyTemplate {
   // specific reductions; halved only if the target resists `bonusDamageType`.
   bonusDamage?: string; // dice expr, e.g. '2d8'
   bonusDamageType?: string;
+  // SRD Undead Fortitude (Zombie) — when damage would drop this creature to
+  // 0 HP, it makes a CON save (DC 5 + the damage taken) and drops to 1 HP on a
+  // success, UNLESS the damage is Radiant or from a Critical Hit. Routed
+  // through the central `enemyHpAfterDamage` floor.
+  undeadFortitude?: boolean;
   // Spell-casting (see Enemy.spells for runtime behaviour).
   spells?: string[];
   castChance?: number;
@@ -239,6 +244,7 @@ export interface Enemy {
   bloodiedFrenzy?: boolean;
   bonusDamage?: string;
   bonusDamageType?: string;
+  undeadFortitude?: boolean;
   // Spell-casting enemies (e.g. cultists, acolytes, mages). On their turn,
   // they roll castChance (0–1) to decide cast vs attack; if cast wins, one
   // spell from `spells` is picked. Spells must exist in context.spellTable

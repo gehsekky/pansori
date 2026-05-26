@@ -348,7 +348,9 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     immunities: ['poison'],
     condition_immunities: ['poisoned', 'exhaustion'],
     damageType: 'bludgeoning',
-    // Undead Fortitude (drop to 1 HP on a CON save) deferred.
+    // Undead Fortitude — a non-Radiant, non-Crit hit that would drop it to 0
+    // HP lets it make a CON save (DC 5 + damage) to cling to 1 HP instead.
+    undeadFortitude: true,
   },
 
   // ─── More CR 1/2 ─────────────────────────────────────────────────────────────

@@ -12,6 +12,7 @@ import {
   applyPartyLevelUps,
   dominatedDamageReSave,
   endCombatState,
+  enemyHpAfterDamage,
   getEnemyById,
   grantDarkOnesBlessing,
   isRoomCleared,
@@ -154,16 +155,20 @@ export function runAoeSpell(
       // saved-for-half the same way and resisted per its own type.
       resDmg += secondaryAoeDamage(spell, slotLevel, tFailed, !!ctx.overchannel, targetEnemy);
       const curHp = ctx.st.entities?.find((e) => e.id === target.id && e.isEnemy)?.hp ?? 0;
-      const newHp = curHp - resDmg;
+      // Central enemy-damage floor — Undead Fortitude (a save spell can't crit,
+      // so only the Radiant exemption is in play here). A no-op for non-undead.
+      const { hp: newHp, note: fortNote } = enemyHpAfterDamage(targetEnemy, curHp, resDmg, {
+        damageType: spell.damageType,
+      });
       ctx.st = {
         ...ctx.st,
         entities: (ctx.st.entities ?? []).map((e) =>
-          e.id === target.id && e.isEnemy ? { ...e, hp: Math.max(0, newHp) } : e
+          e.id === target.id && e.isEnemy ? { ...e, hp: newHp } : e
         ),
       };
       // Push-only spells (Gust of Wind) carry no damage — drop the "N dmg" tail.
       const dmgPart = spell.damage ? ` — ${resDmg} dmg${newHp <= 0 ? ' (killed)' : ''}` : '';
-      ctx.narrative += ` ${targetEnemy.name}: ${tFailed ? 'fails' : 'succeeds'} save${dmgPart}.`;
+      ctx.narrative += ` ${targetEnemy.name}: ${tFailed ? 'fails' : 'succeeds'} save${dmgPart}.${fortNote}`;
       if (newHp <= 0) {
         const split = splitEncounterXp(ctx.st, char.id, targetEnemy.xp ?? 10);
         ctx.st = split.st;

@@ -18,8 +18,8 @@ PHB/DMG-exclusive content (subclasses, feats, species, spells). See
 
 ## Implementation status (code-verified 2026-05-26)
 
-Grounded in a code survey + the full backend suite: **1852 tests across
-215 files, all green** (lint + typecheck clean).
+Grounded in a code survey + the full backend suite: **1864 tests across
+216 files, all green** (lint + typecheck clean).
 
 ### Done — rules-engine frameworks
 
@@ -255,14 +255,25 @@ backend features are waiting on, and a handful of **bounded subsystems**.
 > The shared bestiary's stat lines are in; these are the per-monster _special_
 > abilities the current engine can't yet express. Ordered cheapest-first.
 > (Shipped already: Pack Tactics, Bloodied Frenzy, bonus on-hit damage — all in
-> `computeEnemyAttack`; see the Monsters item above.)
+> `computeEnemyAttack`; see the Monsters item above. Plus the central
+> enemy-damage hook below.)
 
-- [ ] **Central enemy-damage hook** → **Undead Fortitude** (Zombie). Enemy kill
-      resolution is duplicated across ~28 sites; fold them into one
-      `applyDamageToEnemy` choke point, then add the "would drop to 0 → CON save
-      (DC 5 + damage), unless Radiant or a Crit → drop to 1" check. The refactor
-      also gives future on-damage / on-death traits (troll Regeneration,
-      Rakshasa, etc.) a single home. Medium.
+- [x] **Central enemy-damage hook** → **Undead Fortitude** (Zombie) — shipped
+      (`services/enemyDamage.ts`, `enemyDamage.spec.ts`). Rather than fold the
+      ~28 kill sites into one resolver (their XP/drops/level-up/room-clear
+      tails differ), extracted the one decision they all share — "what HP does
+      this damage instance leave the enemy at" — into `enemyHpAfterDamage`, the
+      single floor every PC-damage path routes through. It hosts Undead
+      Fortitude (drop to 0 → CON save DC 5 + damage → cling to 1 HP, unless
+      Radiant or a Crit) and is a **provable no-op for every enemy without the
+      flag**, so the 31 existing monsters are unchanged. Wired into:
+      resolveOneAttack (weapon, real crit flag), applySingleTargetDamage, AoE,
+      save-with-damage, multi-target (Magic Missile / rays), Barbarian Frenzy,
+      Monk Flurry, Colossus Slayer. Future on-"reduced to 0" traits (Troll
+      Regeneration, damage thresholds, death triggers) hook here too.
+      _Not yet routed_ (follow-ups): PC opportunity attacks (the OA helper has
+      no seed access), Hurl Through Hell, and enemy-on-enemy / summoned-ally
+      damage. Quivering Palm is correctly exempt (save-or-die, not damage).
 - [ ] **Max-HP-reduction mechanic** → **Life Drain** (Specter, Wight). A
       `max_hp_reduction` tracker on `Character`, cleared on a Long Rest, applied
       on the draining hit. Closes a loop with the Greater Restoration picker —

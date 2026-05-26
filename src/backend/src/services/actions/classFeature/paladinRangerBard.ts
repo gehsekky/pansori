@@ -1,5 +1,5 @@
 import { abilityMod, profBonus, rollDice } from '../../rulesEngine.js';
-import { endCombatState, isRoomCleared } from '../../gameEngine.js';
+import { endCombatState, enemyHpAfterDamage, isRoomCleared } from '../../gameEngine.js';
 import { getClassLevel, hasClass, huntersPrey } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import { fmt } from '../../narrativeFmt.js';
@@ -96,14 +96,17 @@ export function handlePaladinRangerBardFeature(ctx: ActionContext, fid: string):
       ...(char.class_resource_uses ?? {}),
       colossus_slayer_used: 1,
     };
-    const csHp = csTarget.hp - csDmg;
+    // Central enemy-damage floor — Undead Fortitude can avert the drop to 0.
+    const { hp: csHp, note: fortNote } = enemyHpAfterDamage(ctx.enemy, csTarget.hp, csDmg, {
+      damageType: 'piercing',
+    });
     ctx.st = {
       ...ctx.st,
       entities: (ctx.st.entities ?? []).map((e) =>
-        e.id === ctx.enemy?.id && e.isEnemy ? { ...e, hp: Math.max(0, csHp) } : e
+        e.id === ctx.enemy?.id && e.isEnemy ? { ...e, hp: csHp } : e
       ),
     };
-    ctx.narrative = `Colossus Slayer! +${fmt.dmg(csDmg)} piercing damage on a bloodied foe (${csHp <= 0 ? 'killed' : `${fmt.hp(Math.max(0, csHp))} HP remaining`}).`;
+    ctx.narrative = `Colossus Slayer! +${fmt.dmg(csDmg)} piercing damage on a bloodied foe (${csHp <= 0 ? 'killed' : `${fmt.hp(csHp)} HP remaining`}).${fortNote}`;
     if (csHp <= 0) {
       ctx.st.enemies_killed = [...ctx.st.enemies_killed, ctx.enemy.id];
       // Only end combat once every enemy in the room is down — matches

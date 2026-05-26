@@ -3,6 +3,7 @@ import {
   applyPartyLevelUps,
   effectiveSpeed,
   endCombatState,
+  enemyHpAfterDamage,
   getEnemyById,
   isRoomCleared,
   splitEncounterXp,
@@ -68,14 +69,17 @@ export function handleMonkFeature(ctx: ActionContext, fid: string): boolean {
       if (toHit >= (ctx.enemy?.ac ?? 10)) {
         const dmg = Math.max(1, rollDice(`1d${martialDie}`) + abilityMod(char.dex));
         const curHp = ctx.st.entities?.find((e) => e.id === ctx.enemy?.id && e.isEnemy)?.hp ?? 0;
-        const newHp = curHp - dmg;
+        // Central enemy-damage floor — Undead Fortitude can avert the drop to 0.
+        const { hp: newHp, note: fortNote } = enemyHpAfterDamage(ctx.enemy, curHp, dmg, {
+          damageType: 'bludgeoning',
+        });
         ctx.st = {
           ...ctx.st,
           entities: (ctx.st.entities ?? []).map((e) =>
-            e.id === ctx.enemy?.id && e.isEnemy ? { ...e, hp: Math.max(0, newHp) } : e
+            e.id === ctx.enemy?.id && e.isEnemy ? { ...e, hp: newHp } : e
           ),
         };
-        flurryNarrative += ` Strike ${i + 1}: hit (${toHit}) — ${dmg} bludgeoning.${newHp <= 0 ? ' (killed)' : ''}`;
+        flurryNarrative += ` Strike ${i + 1}: hit (${toHit}) — ${dmg} bludgeoning.${newHp <= 0 ? ' (killed)' : ''}${fortNote}`;
         if (isOpenHand && newHp > 0) {
           const enemyDex = (ctx.enemy?.dex ?? 10) as number;
           const dexSave = rollDice('1d20') + abilityMod(enemyDex);

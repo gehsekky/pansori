@@ -9,6 +9,7 @@ import {
 import {
   applyPartyLevelUps,
   endCombatState,
+  enemyHpAfterDamage,
   isRoomCleared,
   splitEncounterXp,
 } from '../../gameEngine.js';
@@ -98,7 +99,11 @@ export function runMultiTargetSpell(
         empoweredBonus;
       empoweredBonus = 0;
       const { damage: effDmg, note } = applyDamageMultiplier(dmgRoll, spell.damageType, tgtEnemy);
-      const newHp = Math.max(0, tgtEnt.hp - effDmg);
+      // Central enemy-damage floor — Undead Fortitude (a crit ray is exempt).
+      const { hp: newHp, note: fortNote } = enemyHpAfterDamage(tgtEnemy, tgtEnt.hp, effDmg, {
+        damageType: spell.damageType,
+        isCrit: atkE.critical,
+      });
       ctx.st = {
         ...ctx.st,
         entities: (ctx.st.entities ?? []).map((e) =>
@@ -108,7 +113,7 @@ export function runMultiTargetSpell(
       totalDealt += effDmg;
       const killed = newHp <= 0;
       lines.push(
-        `${i + 1}: ${tgtEnemy.name} — HIT ${effDmg}${atkE.critical ? ' CRIT' : ''}${note ?? ''}${killed ? ' (killed)' : ''}.`
+        `${i + 1}: ${tgtEnemy.name} — HIT ${effDmg}${atkE.critical ? ' CRIT' : ''}${note ?? ''}${killed ? ' (killed)' : ''}.${fortNote}`
       );
       hits.push({
         enemyId: tid,
@@ -129,7 +134,10 @@ export function runMultiTargetSpell(
       const dmgRoll = (ctx.overchannel ? maxDice(perShot) : rollDice(perShot)) + empoweredBonus;
       empoweredBonus = 0;
       const { damage: effDmg, note } = applyDamageMultiplier(dmgRoll, spell.damageType, tgtEnemy);
-      const newHp = Math.max(0, tgtEnt.hp - effDmg);
+      // Central enemy-damage floor — Undead Fortitude (auto-hit darts never crit).
+      const { hp: newHp, note: fortNote } = enemyHpAfterDamage(tgtEnemy, tgtEnt.hp, effDmg, {
+        damageType: spell.damageType,
+      });
       ctx.st = {
         ...ctx.st,
         entities: (ctx.st.entities ?? []).map((e) =>
@@ -139,7 +147,7 @@ export function runMultiTargetSpell(
       totalDealt += effDmg;
       const killed = newHp <= 0;
       lines.push(
-        `dart ${i + 1} → ${tgtEnemy.name}: ${effDmg}${note ?? ''}${killed ? ' (killed)' : ''}.`
+        `dart ${i + 1} → ${tgtEnemy.name}: ${effDmg}${note ?? ''}${killed ? ' (killed)' : ''}.${fortNote}`
       );
       hits.push({
         enemyId: tid,

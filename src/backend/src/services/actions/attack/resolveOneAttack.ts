@@ -18,6 +18,7 @@ import {
   dominatedDamageReSave,
   effectiveSpeed,
   endCombatState,
+  enemyHpAfterDamage,
   getEnemyById,
   grantDarkOnesBlessing,
   isRoomCleared,
@@ -566,7 +567,15 @@ export function resolveOneAttack(
   const damageToHp = totalDmg - tempHpAbsorbed;
   const newEnemyTempHp = curEnemyTempHp - tempHpAbsorbed;
   const polymorphFormDrops = enemyEnt?.polymorph_state && newEnemyTempHp <= 0;
-  const newEnemyHp = curEnemyHp - damageToHp;
+  // Central enemy-damage floor — Undead Fortitude (Zombie) can avert a
+  // drop to 0 here. A no-op for every non-undead target. The weapon's
+  // damage type + the real crit flag feed the Radiant/Crit exemptions.
+  const { hp: newEnemyHp, note: fortitudeNote } = enemyHpAfterDamage(
+    target,
+    curEnemyHp,
+    damageToHp,
+    { damageType: effectiveDamageType, isCrit }
+  );
 
   const hitBonuses: { label: string }[] = [];
   if (sacredWeaponBonus > 0) {
@@ -1148,6 +1157,7 @@ export function resolveOneAttack(
     const formName = enemyEnt?.polymorph_state?.formName ?? 'the beast form';
     ctx.narrative += ` The ${formName} form shatters — ${target.name} returns to themselves!`;
   }
+  ctx.narrative += fortitudeNote;
   ctx.narrative += ` The ${target.name} has ${fmt.hp(newEnemyHp)} HP remaining. `;
   // SRD Dominate — taking damage lets the target re-save to break free.
   dominatedDamageReSave(ctx, targetId, target.name);
