@@ -169,6 +169,19 @@ export interface EnemyTemplate {
   immunities?: string[]; // damage types that deal no damage
   condition_immunities?: string[]; // conditions that cannot be applied
   damageType?: string; // primary damage type for this enemy's attack
+  // SRD Pack Tactics — Advantage on attack rolls when an ally is within 5 ft of
+  // the target. Read in `computeEnemyAttack` (gated by Rogue Elusive like other
+  // advantage sources).
+  packTactics?: boolean;
+  // SRD Bloodied Frenzy / "while Bloodied" traits — Advantage on attack rolls
+  // while this creature is at ≤ half its max HP. (The save-advantage half is a
+  // follow-up.)
+  bloodiedFrenzy?: boolean;
+  // A secondary damage rider on each hit (Ghast's bite +2d8 Necrotic, Wight's
+  // sword +1d8 Necrotic). Rolled and added after the primary hit's B/P/S-
+  // specific reductions; halved only if the target resists `bonusDamageType`.
+  bonusDamage?: string; // dice expr, e.g. '2d8'
+  bonusDamageType?: string;
   // Spell-casting (see Enemy.spells for runtime behaviour).
   spells?: string[];
   castChance?: number;
@@ -220,6 +233,12 @@ export interface Enemy {
   // EnemyTemplate.damageType; carries through procgen so PCs with species
   // resistance to a given type can take half damage RAW.
   damageType?: string;
+  // SRD Pack Tactics / Bloodied Frenzy / bonus on-hit damage. Mirror the
+  // EnemyTemplate fields; read in `computeEnemyAttack`. (See EnemyTemplate.)
+  packTactics?: boolean;
+  bloodiedFrenzy?: boolean;
+  bonusDamage?: string;
+  bonusDamageType?: string;
   // Spell-casting enemies (e.g. cultists, acolytes, mages). On their turn,
   // they roll castChance (0–1) to decide cast vs attack; if cast wins, one
   // spell from `spells` is picked. Spells must exist in context.spellTable

@@ -1211,7 +1211,27 @@ function computeEnemyAttack(
   const advFromConditions = char.conditions.some(
     (c) => ADVANTAGE_CONDITIONS.has(c) && !(c === 'blinded' && hasFeralSenses(char))
   );
-  const hasAdvantage = hasElusive(char) ? false : advFromConditions || isReckless;
+  const attackerEnt = st.entities?.find((e) => e.id === enemy.id && e.isEnemy);
+  // SRD Pack Tactics — Advantage when at least one ally (another living enemy)
+  // is within 5 ft of the target. Reads the target's + allies' grid positions.
+  const packTacticsAdv =
+    !!enemy.packTactics &&
+    (() => {
+      const targetEnt = st.entities?.find((e) => e.id === char.id && !e.isEnemy);
+      if (!targetEnt) return false;
+      return (st.entities ?? []).some(
+        (e) => e.isEnemy && e.id !== enemy.id && e.hp > 0 && distanceFeet(e.pos, targetEnt.pos) <= 5
+      );
+    })();
+  // SRD Bloodied Frenzy — Advantage while the attacker is Bloodied (≤ half HP).
+  // (The matching save-advantage half is a follow-up.)
+  const bloodiedFrenzyAdv =
+    !!enemy.bloodiedFrenzy &&
+    !!attackerEnt &&
+    attackerEnt.hp <= (attackerEnt.maxHp ?? attackerEnt.hp) / 2;
+  const hasAdvantage = hasElusive(char)
+    ? false
+    : advFromConditions || isReckless || packTacticsAdv || bloodiedFrenzyAdv;
   const baseDisadvantage = char.conditions.some((c) => ENEMY_DISADV_CONDITIONS.has(c)) || isDodging;
   // SRD Ranger Multiattack Defense (L7) — once this enemy has hit the PC this
   // round, its further attacks against them roll with Disadvantage (the mark
@@ -1226,10 +1246,7 @@ function computeEnemyAttack(
   // Cunning Strike, Fear, Web / Entangle / Ensnaring Strike, Shove / Topple).
   // Frightened's "while it can see the source" caveat is approximated as
   // always-in-sight.
-  const attackerSelfDisadv =
-    st.entities
-      ?.find((e) => e.id === enemy.id && e.isEnemy)
-      ?.conditions.some((c) => DISADV_CONDITIONS.has(c)) ?? false;
+  const attackerSelfDisadv = attackerEnt?.conditions.some((c) => DISADV_CONDITIONS.has(c)) ?? false;
   const hasDisadvantage =
     baseDisadvantage || forceDisadvantage || multiattackDefenseDisadv || attackerSelfDisadv;
   const result = resolveEnemyAttack(enemy, char.ac, hasAdvantage, hasDisadvantage);
@@ -1363,7 +1380,24 @@ function computeEnemyAttack(
     // Universal damage application — temp_hp absorption, exhaustion-4 max-HP
     // clamp, knock-out detection, and the SRD concentration save all flow
     // through `applyDamage`. (PR-2's deferred enemy-attack migration.)
-    const dmgResult = applyDamage(charAfterWard, st, postShdDmg);
+    // SRD bonus on-hit damage rider (Ghast bite +2d8 Necrotic, Wight sword
+    // +1d8 Necrotic). Rolled fresh and added after the primary hit's B/P/S-
+    // specific reductions (Deflect / Superior Hunter's Defense don't apply to
+    // it); halved only if the target resists the bonus type (or is Petrified →
+    // all damage).
+    let bonusDmg = 0;
+    let bonusNote = '';
+    if (enemy.bonusDamage) {
+      const bt = enemy.bonusDamageType;
+      const rolled = rollDice(enemy.bonusDamage);
+      const resistsBonus =
+        isPetrified ||
+        (!!bt && (char.spell_resistances ?? []).includes(bt)) ||
+        speciesData?.resistances?.includes(bt ?? '') === true;
+      bonusDmg = resistsBonus ? Math.ceil(rolled / 2) : rolled;
+      if (bonusDmg > 0) bonusNote = ` (plus ${fmt.dmg(bonusDmg)} ${bt ?? ''})`.replace(' )', ')');
+    }
+    const dmgResult = applyDamage(charAfterWard, st, postShdDmg + bonusDmg);
     let updatedChar = dmgResult.char;
     if (deflectUsed || shdReactionUsed) {
       updatedChar = {
@@ -1386,6 +1420,7 @@ function computeEnemyAttack(
       .replace('{target}', char.name)
       .replace('{dmg}', fmt.dmg(hpLost));
     narrative += ` ${char.name} takes ${fmt.dmg(hpLost)} damage.`;
+    narrative += bonusNote;
     narrative +=
       rageNote +
       petrNote +
