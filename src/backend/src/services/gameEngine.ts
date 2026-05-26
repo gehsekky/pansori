@@ -6836,6 +6836,93 @@ export async function runEnemyTurns(args: {
         if (advIdx === args.initialCurrentIdx) break;
         continue;
       }
+      // SRD Confusion — a confused creature behaves erratically. First it
+      // re-saves (WIS vs the caster's DC) to shake the effect; pansori rolls
+      // this at the START of the turn (RAW: end of turn), so a success lets it
+      // recover and act normally this turn. If it stays confused, 1d10 decides:
+      // 1-6 it loses the turn; 7-8 it lashes out at a random ally within reach
+      // (friendly fire — RAW any creature in reach, narrowed to allies so the
+      // party is never hit on this result); 9-10 it acts normally anyway.
+      // Cleared for all targets when the caster's concentration drops.
+      const confusedEnt = st.entities?.find((e) => e.id === eEntry.id && e.isEnemy);
+      if (confusedEnt && confusedEnt.conditions.includes('confused')) {
+        const confCaster = st.characters.find(
+          (c) => c.concentrating_on?.condition === 'confused' && !c.dead
+        );
+        const confDc = confCaster?.concentrating_on?.save_dc ?? 13;
+        const confWis = (rm as unknown as Record<string, number>).wis ?? 10;
+        const reSaveFailed = rollConditionSave(
+          'wis',
+          confWis,
+          confDc,
+          false,
+          1,
+          0,
+          confusedEnt.conditions
+        );
+        if (!reSaveFailed) {
+          narrative += `\n\n[${rm.name} shakes off the confusion.]`;
+          st = {
+            ...st,
+            entities: (st.entities ?? []).map((e) =>
+              e.id === eEntry.id && e.isEnemy
+                ? { ...e, conditions: e.conditions.filter((c) => c !== 'confused') }
+                : e
+            ),
+          };
+          // fall through — the recovered creature takes its normal turn.
+        } else {
+          const behavior = rollDice('1d10');
+          if (behavior <= 8) {
+            if (behavior >= 7) {
+              // 7-8: attack a random ally within melee reach (friendly fire).
+              const confPos = confusedEnt.pos;
+              const reachable = (st.entities ?? []).filter(
+                (e) =>
+                  e.isEnemy &&
+                  e.id !== eEntry.id &&
+                  e.hp > 0 &&
+                  !st.enemies_killed.includes(e.id) &&
+                  distanceFeet(e.pos, confPos) <= 5
+              );
+              if (reachable.length > 0) {
+                const victim = reachable[Math.floor(Math.random() * reachable.length)];
+                const victimStats = getEnemyById(args.seed, victim.id);
+                const victimAc = victimStats?.ac ?? victim.ac ?? 10;
+                const victimName = victimStats?.name ?? 'an ally';
+                const res = resolveEnemyAttack(
+                  { toHit: rm.toHit ?? 0, damage: rm.damage ?? '1d4' },
+                  victimAc
+                );
+                if (res.hit) {
+                  st = applyDamageToEntity(st, victim.id, res.damage);
+                  narrative += `\n\n[${rm.name} is confused and turns on ${victimName} — ${res.damage} damage!]`;
+                  if ((st.entities?.find((e) => e.id === victim.id)?.hp ?? 0) <= 0) {
+                    st.enemies_killed = [...st.enemies_killed, victim.id];
+                    narrative += ` ${victimName} is slain!`;
+                    if (isRoomCleared(st, args.seed, st.current_room)) st = endCombatState(st);
+                  }
+                } else {
+                  narrative += `\n\n[${rm.name} is confused and swings wildly at ${victimName} — miss.]`;
+                }
+              } else {
+                narrative += `\n\n[${rm.name} is confused and flails at nothing.]`;
+              }
+            } else {
+              // 1-6: the creature loses its turn.
+              narrative += `\n\n[${rm.name} is confused and wastes its turn.]`;
+            }
+            resumeMi = 0;
+            const prevAdvIdxConf = advIdx;
+            advIdx = (advIdx + 1) % orderLen;
+            if (advIdx === 0 && prevAdvIdxConf !== 0) roundWrapped = true;
+            if (advIdx === args.initialCurrentIdx) break;
+            continue;
+          }
+          // 9-10: acts normally despite the confusion — fall through.
+          narrative += `\n\n[${rm.name} acts with purpose despite its confusion.]`;
+        }
+      }
       // SRD Paladin Holy Nimbus (Devotion L20) — an enemy that starts its turn
       // within an active nimbus aura takes Radiant damage (CHA + prof). Resolved
       // before the enemy acts; a kill ends its turn (and combat if room clears).

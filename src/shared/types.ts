@@ -105,7 +105,15 @@ export type ConditionName =
   // consumes the condition (the command applies for one turn only, so
   // the creature acts normally the round after). Single-target, no
   // concentration — distinct from the lasting incapacitating conditions.
-  | 'commanded';
+  | 'commanded'
+  // SRD: Confusion — the target failed its Wisdom save against the 10-ft
+  // sphere and behaves erratically. The enemy turn loop rolls 1d10 for a
+  // confused creature each turn: it loses the turn, lashes out at a random
+  // ally in reach (friendly fire), or (rarely) acts normally. The creature
+  // re-saves each turn to shake the effect; cleared by the caster's
+  // concentration ending. Applied to all failed-save targets via the
+  // opt-in `aoeCondition` cast path.
+  | 'confused';
 
 export type NpcAttitude = 'friendly' | 'indifferent' | 'hostile';
 

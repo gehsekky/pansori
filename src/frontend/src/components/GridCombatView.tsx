@@ -73,6 +73,7 @@ function conditionBadges(conditions: string[]): string {
     unconscious: 'U',
     incapacitated: 'I',
     commanded: 'Cmd',
+    confused: 'Cf',
     raging: 'RG',
     dodging: 'Dg',
   };

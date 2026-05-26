@@ -67,7 +67,7 @@ Grounded in a code survey + the full backend suite: **1572 tests across
 
 | Category | In pansori | SRD universe |
 |---|---|---|
-| Spells | **180** (26 cantrips + 154 leveled, through L9) | ~330 |
+| Spells | **181** (26 cantrips + 155 leveled, through L9) | ~330 |
 | Shared SRD monster pool | **12** (`SRD_MONSTERS`) + per-campaign templates | hundreds |
 | Species | 9 | 9 standalone + Drow lineage |
 | Classes | 12 | 12 |
@@ -85,7 +85,7 @@ backend features are waiting on, and a handful of **bounded subsystems**.
 
 ### Content breadth — data on existing patterns (RE-6)
 
-- [ ] **Spells** — ~180 / ~330 SRD. Most remaining categories are already
+- [ ] **Spells** — ~181 / ~330 SRD. Most remaining categories are already
       representable (data entry).
   - [~] **Persistent damage zones** — foundation shipped (RE-4): `GameState.spell_zones`
         + `SpellZone`, the `persistentZone` spell flag, cast-time `runZoneSpell`
@@ -109,15 +109,23 @@ backend features are waiting on, and a handful of **bounded subsystems**.
         **Spiritual Weapon** (Bonus-Action force attack, +spellcasting mod, no
         concentration) and **Vampiric Touch** (Magic-action necrotic that heals
         half, concentration) ride it.
-  - [~] **Enchantment control** — foundation shipped (RE-4): the `commanded`
-        condition + an enemy-turn skip block (the creature loses its turn and
-        the condition is consumed). **Command** (L1, WIS save → "Halt": lose
-        your next turn) rides it. Next on this base: **Confusion** (AoE +
-        random-behavior re-save — needs the AoE-condition-to-all fix below),
-        **Compulsion** (forced movement), and **Dominate** (full enemy control).
-        Command's RAW upcast (one extra target per slot ≥ 2) is deferred
-        (single-target cast); other command words (Approach/Flee/Grovel/Drop)
-        collapse to the "Halt" turn-loss model.
+  - [~] **Enchantment control** — shipped (RE-4): the `commanded` + `confused`
+        conditions, an enemy-turn skip/behavior block, and an opt-in
+        **AoE-condition-to-all** cast path (`aoeCondition` → `runAoeConditionSpell`,
+        applies a condition to every failed-save hostile in the blast +
+        stamps the save DC on the concentration link). **Command** (L1, WIS
+        save → "Halt": lose your next turn, one-shot) and **Confusion** (L4,
+        10-ft sphere, WIS save → `confused`; each turn the creature re-saves,
+        then 1d10: 1-6 waste the turn, 7-8 attack a random ally in reach
+        (friendly fire via `resolveEnemyAttack`/`applyDamageToEntity`), 9-10 act
+        normally) ride it. Next on this base: **Compulsion** (forced movement)
+        and **Dominate** (full enemy control). Simplifications: Command's upcast
+        (+1 target per slot ≥ 2) and other command words collapse to "Halt";
+        Confusion's re-save is rolled at the start of the turn (RAW: end),
+        7-8 targets allies-only (party never hit on that result), and the
+        sphere radius is fixed (no upcast widening). Note: the older AoE-condition
+        spells (Hypnotic Pattern, Web) still condition only the primary target
+        until migrated onto `aoeCondition`.
       Exceptions still needing a model first: the alternate "summon" spells,
       each mechanically distinct from the stat-block ally model —
   - [ ] **Conjure Animals** (L3) + other 2024 conjure spells — a
