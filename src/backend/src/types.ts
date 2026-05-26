@@ -187,6 +187,11 @@ export interface EnemyTemplate {
   // success, UNLESS the damage is Radiant or from a Critical Hit. Routed
   // through the central `enemyHpAfterDamage` floor.
   undeadFortitude?: boolean;
+  // SRD Life Drain (Specter, Wight) — on a hit, the Necrotic damage dealt also
+  // reduces the target's Hit Point maximum by that amount (Specter: the whole
+  // attack; Wight: the necrotic `bonusDamage` rider). Read in
+  // `computeEnemyAttack`.
+  lifeDrain?: boolean;
   // Spell-casting (see Enemy.spells for runtime behaviour).
   spells?: string[];
   castChance?: number;
@@ -245,6 +250,7 @@ export interface Enemy {
   bonusDamage?: string;
   bonusDamageType?: string;
   undeadFortitude?: boolean;
+  lifeDrain?: boolean;
   // Spell-casting enemies (e.g. cultists, acolytes, mages). On their turn,
   // they roll castChance (0–1) to decide cast vs attack; if cast wins, one
   // spell from `spells` is picked. Spells must exist in context.spellTable
@@ -741,6 +747,12 @@ export interface Character {
   portrait_url: string | null;
   hp: number;
   max_hp: number;
+  // SRD Life Drain (Specter, Wight) — cumulative reduction to this character's
+  // Hit Point maximum. `max_hp` is lowered directly (so every heal / clamp
+  // honors it automatically); this field tracks how much to give back. Removed
+  // by a Long Rest or Greater Restoration. The character dies if a drain brings
+  // `max_hp` to 0.
+  life_drain_reduction?: number;
   ac: number;
   str: number;
   dex: number;

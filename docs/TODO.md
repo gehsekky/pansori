@@ -18,8 +18,8 @@ PHB/DMG-exclusive content (subclasses, feats, species, spells). See
 
 ## Implementation status (code-verified 2026-05-26)
 
-Grounded in a code survey + the full backend suite: **1864 tests across
-216 files, all green** (lint + typecheck clean).
+Grounded in a code survey + the full backend suite: **1872 tests across
+217 files, all green** (lint + typecheck clean).
 
 ### Done — rules-engine frameworks
 
@@ -274,11 +274,17 @@ backend features are waiting on, and a handful of **bounded subsystems**.
       _Not yet routed_ (follow-ups): PC opportunity attacks (the OA helper has
       no seed access), Hurl Through Hell, and enemy-on-enemy / summoned-ally
       damage. Quivering Palm is correctly exempt (save-or-die, not damage).
-- [ ] **Max-HP-reduction mechanic** → **Life Drain** (Specter, Wight). A
-      `max_hp_reduction` tracker on `Character`, cleared on a Long Rest, applied
-      on the draining hit. Closes a loop with the Greater Restoration picker —
-      RAW GR removes "a reduction to Hit Point maximum," so add it as a 4th GR
-      effect option. Medium.
+- [x] **Max-HP-reduction mechanic** → **Life Drain** (Specter, Wight) — shipped
+      (`lifeDrain.spec.ts`). On a hit, the Necrotic damage dealt also lowers the
+      target's `max_hp` directly (so every heal/clamp honors it) while
+      `life_drain_reduction` on `Character` tracks the restorable total. Specter
+      drains its whole all-necrotic attack; the Wight drains only its necrotic
+      `bonusDamage` rider (not the slashing primary). The target dies outright if
+      a drain brings its maximum to 0. A Long Rest restores the maximum (and
+      heals to it); Greater Restoration gained a 4th picker effect, `hp_max`,
+      that lifts the cap without healing. `commitCharacter` now also mirrors
+      `max_hp` onto the PC grid entity. (Deferred: the Wight's
+      humanoid-rises-as-a-zombie clause — a campaign-timeline mechanic.)
 - [ ] **Monster auras (emanations)** → **Stench** (Ghast). Generalize the
       start-of-turn `holyNimbusRadiant` hook into a reusable "save-or-condition /
       damage to creatures within N ft" aura, ticked at turn-start / round-wrap.

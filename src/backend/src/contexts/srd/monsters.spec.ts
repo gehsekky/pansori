@@ -69,6 +69,15 @@ describe('SRD bestiary additions — effect fields', () => {
     expect(SRD_MONSTERS.zombie.con).toBe(16);
   });
 
+  it('Specter and Wight carry Life Drain (necrotic max-HP reduction)', () => {
+    // Specter: all-necrotic attack drains the full damage.
+    expect(SRD_MONSTERS.specter.lifeDrain).toBe(true);
+    expect(SRD_MONSTERS.specter.damageType).toBe('necrotic');
+    // Wight: only the necrotic bonus rider drains; the primary is slashing.
+    expect(SRD_MONSTERS.wight.lifeDrain).toBe(true);
+    expect(SRD_MONSTERS.wight.bonusDamageType).toBe('necrotic');
+  });
+
   it('flyers carry their flight speed', () => {
     expect(SRD_MONSTERS.griffon.speedFt).toBe(80);
     expect(SRD_MONSTERS.worg.speedFt).toBe(50);

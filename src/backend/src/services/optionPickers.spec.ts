@@ -188,7 +188,7 @@ describe('Greater Restoration effect picker', () => {
     );
     expect(gr?.pickOption?.param).toBe('restorationEffect');
     expect(gr?.pickOption?.options.map((o) => o.id).sort()).toEqual(
-      ['charmed', 'exhaustion', 'petrified'].sort()
+      ['charmed', 'exhaustion', 'hp_max', 'petrified'].sort()
     );
   });
 });

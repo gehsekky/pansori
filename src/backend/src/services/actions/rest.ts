@@ -262,9 +262,14 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
       delete restoredUses.lands_aid_used;
     }
     const restoredUsesWithFeats = resetFeatLongRestResources(c, ctx.context, restoredUses);
+    // SRD Life Drain — a Long Rest removes any reduction to the Hit Point
+    // maximum, restoring `max_hp` and bringing the character to that full value.
+    const restoredMaxHp = c.max_hp + (c.life_drain_reduction ?? 0);
     const refreshed = {
       ...c,
-      hp: c.max_hp,
+      max_hp: restoredMaxHp,
+      life_drain_reduction: 0,
+      hp: restoredMaxHp,
       temp_hp: 0,
       hit_dice_remaining: newHd,
       conditions: [],

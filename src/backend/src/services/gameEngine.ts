@@ -151,7 +151,9 @@ export function commitCharacter(st: GameState, char: Character): GameState {
   if (idx < 0) return st;
   const updatedChars = st.characters.map((c, i) => (i === idx ? char : c));
   const updatedEntities = st.entities?.map((e) =>
-    e.id === char.id && !e.isEnemy ? { ...e, hp: char.hp, conditions: char.conditions } : e
+    e.id === char.id && !e.isEnemy
+      ? { ...e, hp: char.hp, maxHp: char.max_hp, conditions: char.conditions }
+      : e
   );
   return { ...st, characters: updatedChars, entities: updatedEntities };
 }
@@ -1421,6 +1423,41 @@ function computeEnemyAttack(
         ? ` (Temp HP absorbed ${dmgResult.tempHpAbsorbed} — temp HP: ${dmgResult.tempHpRemaining})`
         : '';
 
+    // SRD Life Drain (Specter, Wight) — the Necrotic damage dealt also reduces
+    // the target's Hit Point maximum by that amount (Specter: the all-necrotic
+    // attack; Wight: its necrotic `bonusDamage` rider). The reduction lasts
+    // until a Long Rest or Greater Restoration. `max_hp` is lowered directly so
+    // every heal/clamp honors it; `life_drain_reduction` tracks the restorable
+    // total. The target dies outright if this brings its maximum to 0.
+    let lifeDrainNote = '';
+    if (enemy.lifeDrain) {
+      const necroticDealt =
+        (enemy.damageType === 'necrotic' ? postShdDmg : 0) +
+        (enemy.bonusDamageType === 'necrotic' ? bonusDmg : 0);
+      if (necroticDealt > 0) {
+        const newMax = Math.max(0, updatedChar.max_hp - necroticDealt);
+        const removed = updatedChar.max_hp - newMax;
+        updatedChar = {
+          ...updatedChar,
+          max_hp: newMax,
+          life_drain_reduction: (updatedChar.life_drain_reduction ?? 0) + removed,
+          hp: Math.min(updatedChar.hp, newMax),
+        };
+        if (newMax <= 0) {
+          updatedChar = {
+            ...updatedChar,
+            hp: 0,
+            dead: true,
+            stable: false,
+            died_at_round: st.round ?? 1,
+          };
+          lifeDrainNote = ` 💀 Life Drain: ${char.name}'s Hit Point maximum is drained to nothing — they die!`;
+        } else {
+          lifeDrainNote = ` 💀 Life Drain: ${char.name}'s Hit Point maximum drops by ${removed} (now ${newMax}).`;
+        }
+      }
+    }
+
     let narrative = pick(context.narratives.enemyAttacks)
       .replace('{enemy}', enemy.name)
       .replace('{target}', char.name)
@@ -1438,6 +1475,7 @@ function computeEnemyAttack(
       tempHpNote;
     narrative += deflectNote;
     narrative += shdNote;
+    narrative += lifeDrainNote;
     narrative += dmgResult.concentrationNote;
 
     let inspirationConsumed = false;
@@ -4690,6 +4728,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
                   { id: 'exhaustion', label: 'Reduce Exhaustion by 1' },
                   { id: 'charmed', label: 'End the Charmed condition' },
                   { id: 'petrified', label: 'End the Petrified condition' },
+                  { id: 'hp_max', label: 'Restore drained Hit Point maximum' },
                 ],
               }
             : undefined;

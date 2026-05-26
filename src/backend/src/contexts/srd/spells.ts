@@ -651,9 +651,9 @@ export const SRD_SPELLS: Record<string, Spell> = {
     rangeKind: 'touch',
     removeConditions: ['charmed', 'petrified', 'stunned'],
     desc:
-      'Touch: end Charmed / Petrified / Stunned on the target and reduce exhaustion by 1. ' +
-      'Consumes 100 gp of diamond dust. (RAW curse / ability-score / max-HP reduction ' +
-      "removal deferred — those effects aren't modeled in pansori.)",
+      'Touch: remove one effect — end Charmed or Petrified, reduce exhaustion by 1, ' +
+      'or restore a drained Hit Point maximum (Life Drain). Consumes 100 gp of diamond ' +
+      "dust. (RAW curse / ability-score reduction removal deferred — pansori doesn't model those.)",
     narratives: {
       cast: [
         '{name} sprinkles diamond dust over {target}, and the curse breaks like brittle ice',
