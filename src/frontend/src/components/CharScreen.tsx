@@ -517,540 +517,347 @@ function CharScreen({
             REGISTER YOUR PARTY — UP TO 4 HEROES
           </p>
 
-          {party.map((draft, idx) => {
-            const primaryStat = selectedCtx?.classPrimaryStats[draft.cls]?.toLowerCase() as
-              | keyof StatBlock
-              | undefined;
-            const backgrounds = selectedCtx?.backgrounds ?? [];
-            const selectedBg = backgrounds.find((b) => b.id === draft.backgroundId);
-            const portraits = [
-              ...(idx === 0 && user?.avatar_url ? [user.avatar_url] : []),
-              `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><rect width="40" height="40" fill="#1a1a2e"/><circle cx="20" cy="14" r="7" fill="#4a9eff"/><ellipse cx="20" cy="34" rx="10" ry="7" fill="#4a9eff"/></svg>')}`,
-              `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><rect width="40" height="40" fill="#1a1a2e"/><circle cx="20" cy="14" r="7" fill="#ff6b6b"/><ellipse cx="20" cy="34" rx="10" ry="7" fill="#ff6b6b"/></svg>')}`,
-              `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><rect width="40" height="40" fill="#1a1a2e"/><circle cx="20" cy="14" r="7" fill="#ffd93d"/><ellipse cx="20" cy="34" rx="10" ry="7" fill="#ffd93d"/></svg>')}`,
-              `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><rect width="40" height="40" fill="#1a1a2e"/><circle cx="20" cy="14" r="7" fill="#6bcb77"/><ellipse cx="20" cy="34" rx="10" ry="7" fill="#6bcb77"/></svg>')}`,
-            ] as string[];
+          <div className={styles.charPartyRow}>
+            {party.map((draft, idx) => {
+              const primaryStat = selectedCtx?.classPrimaryStats[draft.cls]?.toLowerCase() as
+                | keyof StatBlock
+                | undefined;
+              const backgrounds = selectedCtx?.backgrounds ?? [];
+              const selectedBg = backgrounds.find((b) => b.id === draft.backgroundId);
+              const portraits = [
+                ...(idx === 0 && user?.avatar_url ? [user.avatar_url] : []),
+                `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><rect width="40" height="40" fill="#1a1a2e"/><circle cx="20" cy="14" r="7" fill="#4a9eff"/><ellipse cx="20" cy="34" rx="10" ry="7" fill="#4a9eff"/></svg>')}`,
+                `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><rect width="40" height="40" fill="#1a1a2e"/><circle cx="20" cy="14" r="7" fill="#ff6b6b"/><ellipse cx="20" cy="34" rx="10" ry="7" fill="#ff6b6b"/></svg>')}`,
+                `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><rect width="40" height="40" fill="#1a1a2e"/><circle cx="20" cy="14" r="7" fill="#ffd93d"/><ellipse cx="20" cy="34" rx="10" ry="7" fill="#ffd93d"/></svg>')}`,
+                `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><rect width="40" height="40" fill="#1a1a2e"/><circle cx="20" cy="14" r="7" fill="#6bcb77"/><ellipse cx="20" cy="34" rx="10" ry="7" fill="#6bcb77"/></svg>')}`,
+              ] as string[];
 
-            return (
-              <div
-                key={idx}
-                className={styles.card}
-                style={{ marginBottom: '1rem', position: 'relative' }}
-              >
-                {party.length > 1 && (
-                  <button
-                    onClick={() => removeMember(idx)}
-                    style={{
-                      position: 'absolute',
-                      top: 8,
-                      right: 8,
-                      background: 'transparent',
-                      border: 'none',
-                      color: 'var(--t-dim)',
-                      cursor: 'pointer',
-                      fontSize: '0.85rem',
-                      padding: 2,
-                    }}
-                    title="Remove this hero"
-                    aria-label="Remove this hero"
-                  >
-                    <span aria-hidden="true">✕</span>
-                  </button>
-                )}
-                <p
-                  style={{
-                    fontSize: '0.75rem',
-                    color: 'var(--t-dim)',
-                    letterSpacing: '0.12em',
-                    marginBottom: 8,
-                  }}
+              return (
+                <div
+                  key={idx}
+                  className={`${styles.card} ${styles.charHeroCard}`}
+                  style={{ position: 'relative' }}
                 >
-                  {idx === 0 ? 'PARTY LEADER' : `HERO ${idx + 1}`}
-                </p>
-
-                <label className={styles.formLbl} htmlFor={`char-${idx}-name`}>
-                  HERO NAME
-                </label>
-                <input
-                  id={`char-${idx}-name`}
-                  className={styles.formInp}
-                  value={draft.name}
-                  onChange={(e) => updateDraft(idx, { name: e.target.value })}
-                  placeholder="e.g. Buck Starling"
-                  autoFocus={idx === 0}
-                />
-
-                <label className={styles.formLbl} htmlFor={`char-${idx}-class`}>
-                  CLASS
-                </label>
-                <select
-                  id={`char-${idx}-class`}
-                  className={styles.formInp}
-                  style={{ cursor: 'pointer' }}
-                  value={draft.cls}
-                  onChange={(e) =>
-                    // Reset the class-skill picks — the new class offers a
-                    // different list.
-                    updateDraft(idx, { cls: e.target.value, classSkills: undefined })
-                  }
-                >
-                  {classes.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.id}
-                    </option>
-                  ))}
-                </select>
-
-                <div className={styles.classDesc}>
-                  <span style={{ color: 'var(--t-mid)' }}>
-                    {classes.find((c) => c.id === draft.cls)?.desc}
-                  </span>
-                  {primaryStat && (
-                    <div style={{ marginTop: 4 }}>
-                      <span style={{ color: 'var(--t-dim)', letterSpacing: '0.08em' }}>
-                        PRIMARY STAT:{' '}
-                      </span>
-                      <span style={{ color: 'var(--t-primary)' }}>{primaryStat.toUpperCase()}</span>
-                    </div>
+                  {party.length > 1 && (
+                    <button
+                      onClick={() => removeMember(idx)}
+                      style={{
+                        position: 'absolute',
+                        top: 8,
+                        right: 8,
+                        background: 'transparent',
+                        border: 'none',
+                        color: 'var(--t-dim)',
+                        cursor: 'pointer',
+                        fontSize: '0.85rem',
+                        padding: 2,
+                      }}
+                      title="Remove this hero"
+                      aria-label="Remove this hero"
+                    >
+                      <span aria-hidden="true">✕</span>
+                    </button>
                   )}
-                </div>
+                  <p
+                    style={{
+                      fontSize: '0.75rem',
+                      color: 'var(--t-dim)',
+                      letterSpacing: '0.12em',
+                      marginBottom: 8,
+                    }}
+                  >
+                    {idx === 0 ? 'PARTY LEADER' : `HERO ${idx + 1}`}
+                  </p>
 
-                {/* 2024 class skill proficiencies — choose N from the class
+                  <label className={styles.formLbl} htmlFor={`char-${idx}-name`}>
+                    HERO NAME
+                  </label>
+                  <input
+                    id={`char-${idx}-name`}
+                    className={styles.formInp}
+                    value={draft.name}
+                    onChange={(e) => updateDraft(idx, { name: e.target.value })}
+                    placeholder="e.g. Buck Starling"
+                    autoFocus={idx === 0}
+                  />
+
+                  <label className={styles.formLbl} htmlFor={`char-${idx}-class`}>
+                    CLASS
+                  </label>
+                  <select
+                    id={`char-${idx}-class`}
+                    className={styles.formInp}
+                    style={{ cursor: 'pointer' }}
+                    value={draft.cls}
+                    onChange={(e) =>
+                      // Reset the class-skill picks — the new class offers a
+                      // different list.
+                      updateDraft(idx, { cls: e.target.value, classSkills: undefined })
+                    }
+                  >
+                    {classes.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.id}
+                      </option>
+                    ))}
+                  </select>
+
+                  <div className={styles.classDesc}>
+                    <span style={{ color: 'var(--t-mid)' }}>
+                      {classes.find((c) => c.id === draft.cls)?.desc}
+                    </span>
+                    {primaryStat && (
+                      <div style={{ marginTop: 4 }}>
+                        <span style={{ color: 'var(--t-dim)', letterSpacing: '0.08em' }}>
+                          PRIMARY STAT:{' '}
+                        </span>
+                        <span style={{ color: 'var(--t-primary)' }}>
+                          {primaryStat.toUpperCase()}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 2024 class skill proficiencies — choose N from the class
                     list. Options + the curated default come from the BE
                     context summary; the default is pre-selected. */}
-                {(() => {
-                  const choice = beContexts[contextId]?.classSkillChoices?.[draft.cls];
-                  if (!choice || choice.options.length === 0) return null;
-                  const selected = draft.classSkills ?? choice.default;
-                  const atCap = selected.length >= choice.count;
-                  const complete = selected.length === choice.count;
-                  return (
-                    <div style={{ marginTop: 12 }}>
-                      <label className={styles.formLbl}>
-                        CLASS SKILLS — CHOOSE {choice.count}{' '}
-                        <span
-                          style={{ color: complete ? 'var(--t-primary)' : 'var(--t-hp-mid)' }}
-                          data-testid={`class-skill-count-${idx}`}
+                  {(() => {
+                    const choice = beContexts[contextId]?.classSkillChoices?.[draft.cls];
+                    if (!choice || choice.options.length === 0) return null;
+                    const selected = draft.classSkills ?? choice.default;
+                    const atCap = selected.length >= choice.count;
+                    const complete = selected.length === choice.count;
+                    return (
+                      <div style={{ marginTop: 12 }}>
+                        <label className={styles.formLbl}>
+                          CLASS SKILLS — CHOOSE {choice.count}{' '}
+                          <span
+                            style={{ color: complete ? 'var(--t-primary)' : 'var(--t-hp-mid)' }}
+                            data-testid={`class-skill-count-${idx}`}
+                          >
+                            ({selected.length}/{choice.count})
+                          </span>
+                        </label>
+                        <div
+                          style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}
+                          data-testid={`class-skills-${idx}`}
                         >
-                          ({selected.length}/{choice.count})
-                        </span>
-                      </label>
-                      <div
-                        style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}
-                        data-testid={`class-skills-${idx}`}
-                      >
-                        {choice.options.map((sk) => {
-                          const on = selected.includes(sk);
-                          const disabled = !on && atCap;
-                          return (
-                            <button
-                              key={sk}
-                              type="button"
-                              aria-pressed={on}
-                              disabled={disabled}
-                              onClick={() => {
-                                const next = on
-                                  ? selected.filter((s) => s !== sk)
-                                  : [...selected, sk];
-                                updateDraft(idx, { classSkills: next });
-                              }}
-                              style={{
-                                fontSize: '0.7rem',
-                                padding: '0.25rem 0.55rem',
-                                letterSpacing: '0.04em',
-                                background: on ? 'var(--t-separator)' : 'transparent',
-                                border: `1px solid ${on ? 'var(--t-primary)' : 'var(--t-border)'}`,
-                                color: on
-                                  ? 'var(--t-primary)'
-                                  : disabled
-                                    ? 'var(--t-separator)'
-                                    : 'var(--t-dim)',
-                                cursor: disabled ? 'default' : 'pointer',
-                                fontFamily: 'inherit',
-                              }}
-                            >
-                              {on ? '✓ ' : ''}
-                              {skillLabel(sk)}
-                            </button>
-                          );
-                        })}
+                          {choice.options.map((sk) => {
+                            const on = selected.includes(sk);
+                            const disabled = !on && atCap;
+                            return (
+                              <button
+                                key={sk}
+                                type="button"
+                                aria-pressed={on}
+                                disabled={disabled}
+                                onClick={() => {
+                                  const next = on
+                                    ? selected.filter((s) => s !== sk)
+                                    : [...selected, sk];
+                                  updateDraft(idx, { classSkills: next });
+                                }}
+                                style={{
+                                  fontSize: '0.7rem',
+                                  padding: '0.25rem 0.55rem',
+                                  letterSpacing: '0.04em',
+                                  background: on ? 'var(--t-separator)' : 'transparent',
+                                  border: `1px solid ${on ? 'var(--t-primary)' : 'var(--t-border)'}`,
+                                  color: on
+                                    ? 'var(--t-primary)'
+                                    : disabled
+                                      ? 'var(--t-separator)'
+                                      : 'var(--t-dim)',
+                                  cursor: disabled ? 'default' : 'pointer',
+                                  fontFamily: 'inherit',
+                                }}
+                              >
+                                {on ? '✓ ' : ''}
+                                {skillLabel(sk)}
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })()}
+                    );
+                  })()}
 
-                <label
-                  className={styles.formLbl}
-                  style={{ marginTop: 12 }}
-                  htmlFor={`char-${idx}-species`}
-                >
-                  SPECIES
-                </label>
-                <select
-                  id={`char-${idx}-species`}
-                  className={styles.formInp}
-                  style={{ cursor: 'pointer' }}
-                  value={draft.speciesId}
-                  onChange={(e) => updateDraft(idx, { speciesId: e.target.value })}
-                  data-testid={`species-select-${idx}`}
-                >
-                  {SPECIES.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
-                {(() => {
-                  const sp = SPECIES.find((s) => s.id === draft.speciesId);
-                  if (!sp) return null;
-                  return (
-                    <div className={styles.classDesc}>
-                      <span style={{ color: 'var(--t-mid)' }}>{sp.desc}</span>
-                      <div style={{ marginTop: 4, fontSize: '0.7rem' }}>
-                        <span style={{ color: 'var(--t-dim)', letterSpacing: '0.08em' }}>
-                          SIZE:{' '}
-                        </span>
-                        <span style={{ color: 'var(--t-mid)' }}>{sp.size.toUpperCase()}</span>
-                        <span style={{ color: 'var(--t-dim)' }}> · </span>
-                        <span style={{ color: 'var(--t-dim)' }}>SPEED: </span>
-                        <span style={{ color: 'var(--t-mid)' }}>{sp.speedFt} ft</span>
-                        {sp.darkvisionFt && (
-                          <>
-                            <span style={{ color: 'var(--t-dim)' }}> · </span>
-                            <span style={{ color: 'var(--t-dim)' }}>DARKVISION: </span>
-                            <span style={{ color: 'var(--t-mid)' }}>{sp.darkvisionFt} ft</span>
-                          </>
-                        )}
-                        {sp.resistances && sp.resistances.length > 0 && (
-                          <>
-                            <span style={{ color: 'var(--t-dim)' }}> · </span>
-                            <span style={{ color: 'var(--t-dim)' }}>RESIST: </span>
-                            <span style={{ color: 'var(--t-mid)' }}>
-                              {sp.resistances.join(', ')}
-                            </span>
-                          </>
-                        )}
-                      </div>
-                      {sp.traits.length > 0 && (
-                        <ul
-                          style={{
-                            margin: '4px 0 0',
-                            paddingLeft: '1rem',
-                            color: 'var(--t-mid)',
-                            fontSize: '0.7rem',
-                          }}
-                        >
-                          {sp.traits.map((t, i) => (
-                            <li key={i}>{t}</li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                  );
-                })()}
-
-                {backgrounds.length > 0 && (
-                  <>
-                    <label
-                      className={styles.formLbl}
-                      style={{ marginTop: 12 }}
-                      htmlFor={`char-${idx}-background`}
-                    >
-                      BACKGROUND
-                    </label>
-                    <select
-                      id={`char-${idx}-background`}
-                      className={styles.formInp}
-                      style={{ cursor: 'pointer' }}
-                      value={draft.backgroundId}
-                      onChange={(e) =>
-                        // Clear feat picks + the ability-bonus split on background
-                        // swap — the next background's origin feat may not need
-                        // picks, and its eligible abilities differ.
-                        updateDraft(idx, {
-                          backgroundId: e.target.value,
-                          featChoices: undefined,
-                          abilityBonus: undefined,
-                        })
-                      }
-                    >
-                      {backgrounds.map((b) => (
-                        <option key={b.id} value={b.id}>
-                          {b.name}
-                        </option>
-                      ))}
-                    </select>
-                    {selectedBg && (
+                  <label
+                    className={styles.formLbl}
+                    style={{ marginTop: 12 }}
+                    htmlFor={`char-${idx}-species`}
+                  >
+                    SPECIES
+                  </label>
+                  <select
+                    id={`char-${idx}-species`}
+                    className={styles.formInp}
+                    style={{ cursor: 'pointer' }}
+                    value={draft.speciesId}
+                    onChange={(e) => updateDraft(idx, { speciesId: e.target.value })}
+                    data-testid={`species-select-${idx}`}
+                  >
+                    {SPECIES.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                  {(() => {
+                    const sp = SPECIES.find((s) => s.id === draft.speciesId);
+                    if (!sp) return null;
+                    return (
                       <div className={styles.classDesc}>
-                        <span style={{ color: 'var(--t-mid)' }}>{selectedBg.desc}</span>
-                        <div style={{ marginTop: 4 }}>
+                        <span style={{ color: 'var(--t-mid)' }}>{sp.desc}</span>
+                        <div style={{ marginTop: 4, fontSize: '0.7rem' }}>
                           <span style={{ color: 'var(--t-dim)', letterSpacing: '0.08em' }}>
-                            SKILLS:{' '}
+                            SIZE:{' '}
                           </span>
-                          <span style={{ color: 'var(--t-mid)' }}>
-                            {selectedBg.skillProficiencies.join(', ')}
-                          </span>
-                          {selectedBg.toolProficiency && (
+                          <span style={{ color: 'var(--t-mid)' }}>{sp.size.toUpperCase()}</span>
+                          <span style={{ color: 'var(--t-dim)' }}> · </span>
+                          <span style={{ color: 'var(--t-dim)' }}>SPEED: </span>
+                          <span style={{ color: 'var(--t-mid)' }}>{sp.speedFt} ft</span>
+                          {sp.darkvisionFt && (
                             <>
                               <span style={{ color: 'var(--t-dim)' }}> · </span>
+                              <span style={{ color: 'var(--t-dim)' }}>DARKVISION: </span>
+                              <span style={{ color: 'var(--t-mid)' }}>{sp.darkvisionFt} ft</span>
+                            </>
+                          )}
+                          {sp.resistances && sp.resistances.length > 0 && (
+                            <>
+                              <span style={{ color: 'var(--t-dim)' }}> · </span>
+                              <span style={{ color: 'var(--t-dim)' }}>RESIST: </span>
                               <span style={{ color: 'var(--t-mid)' }}>
-                                {selectedBg.toolProficiency}
+                                {sp.resistances.join(', ')}
                               </span>
                             </>
                           )}
                         </div>
-                        <div>
-                          <span style={{ color: 'var(--t-dim)', letterSpacing: '0.08em' }}>
-                            FEATURE:{' '}
-                          </span>
-                          <span style={{ color: 'var(--t-primary)' }}>{selectedBg.feature}</span>
-                          <span style={{ color: 'var(--t-dim)' }}> — {selectedBg.featureDesc}</span>
-                        </div>
-                      </div>
-                    )}
-                    {(() => {
-                      const inputs = getMagicInitiatePickerInputs(
-                        beContexts[contextId],
-                        draft.backgroundId
-                      );
-                      if (!inputs) return null;
-                      const picks = draft.featChoices ?? {};
-                      const cantripsPicked = picks.cantripChoices?.length ?? 0;
-                      const l1Picked = !!picks.l1Choice;
-                      const complete =
-                        cantripsPicked === inputs.cantripCount &&
-                        (inputs.l1Count === 0 || l1Picked);
-                      return (
-                        <button
-                          type="button"
-                          className={styles.formInp}
-                          style={{
-                            cursor: 'pointer',
-                            marginTop: 8,
-                            color: complete ? 'var(--t-primary)' : 'var(--t-hp-mid)',
-                            borderColor: complete ? 'var(--t-primary)' : 'var(--t-hp-mid)',
-                            textAlign: 'left',
-                          }}
-                          onClick={() => setSpellPickerIdx(idx)}
-                          data-testid={`magic-initiate-trigger-${idx}`}
-                        >
-                          {complete
-                            ? `✓ ${inputs.featName} — ${cantripsPicked} cantrips + ${l1Picked ? '1' : '0'} L1 chosen (click to change)`
-                            : `⚠ ${inputs.featName} — pick ${inputs.cantripCount} cantrips${inputs.l1Count > 0 ? ' + 1 L1 spell' : ''}`}
-                        </button>
-                      );
-                    })()}
-                    {/* 2024 background ability-score increase: +1 to all three
-                        listed abilities, or a +2/+1 split across two of them.
-                        Eligible abilities come from the BE context summary. */}
-                    {(() => {
-                      const beBg = beContexts[contextId]?.backgrounds.find(
-                        (b) => b.id === draft.backgroundId
-                      );
-                      const eligible = (beBg?.abilityScoreIncreases ?? []) as (keyof StatBlock)[];
-                      if (eligible.length < 2) return null;
-                      const split = draft.abilityBonus;
-                      const usingSplit = !!split;
-                      const toggleStyle = (active: boolean) => ({
-                        fontSize: '0.7rem',
-                        padding: '0.25rem 0.6rem',
-                        letterSpacing: '0.08em',
-                        background: active ? 'var(--t-separator)' : 'transparent',
-                        border: `1px solid ${active ? 'var(--t-primary)' : 'var(--t-border)'}`,
-                        color: active ? 'var(--t-primary)' : 'var(--t-dim)',
-                        cursor: 'pointer',
-                        fontFamily: 'inherit',
-                      });
-                      const selStyle = {
-                        fontFamily: 'inherit',
-                        fontSize: '0.8rem',
-                        padding: '0.2rem 0.4rem',
-                        background: 'var(--t-card)',
-                        border: '1px solid var(--t-border)',
-                        color: 'var(--t-primary)',
-                        cursor: 'pointer',
-                      };
-                      return (
-                        <div style={{ marginTop: 10 }}>
-                          <label className={styles.formLbl}>ABILITY BONUS (background)</label>
-                          <div
+                        {sp.traits.length > 0 && (
+                          <ul
                             style={{
-                              display: 'flex',
-                              gap: 6,
-                              margin: '4px 0 6px',
-                              flexWrap: 'wrap',
+                              margin: '4px 0 0',
+                              paddingLeft: '1rem',
+                              color: 'var(--t-mid)',
+                              fontSize: '0.7rem',
                             }}
                           >
-                            <button
-                              type="button"
-                              data-testid={`ability-bonus-spread-${idx}`}
-                              onClick={() => updateDraft(idx, { abilityBonus: undefined })}
-                              style={toggleStyle(!usingSplit)}
-                            >
-                              +1 TO ALL THREE
-                            </button>
-                            <button
-                              type="button"
-                              data-testid={`ability-bonus-split-${idx}`}
-                              onClick={() =>
-                                updateDraft(idx, {
-                                  abilityBonus: { plus2: eligible[0], plus1: eligible[1] },
-                                })
-                              }
-                              style={toggleStyle(usingSplit)}
-                            >
-                              +2 / +1
-                            </button>
-                          </div>
-                          {usingSplit && split ? (
-                            <div
-                              style={{
-                                display: 'flex',
-                                gap: 10,
-                                alignItems: 'center',
-                                flexWrap: 'wrap',
-                                fontSize: '0.75rem',
-                                color: 'var(--t-dim)',
-                              }}
-                            >
-                              <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                +2
-                                <select
-                                  style={selStyle}
-                                  value={split.plus2}
-                                  onChange={(e) => {
-                                    const p2 = e.target.value as keyof StatBlock;
-                                    const p1 =
-                                      split.plus1 === p2
-                                        ? (eligible.find((a) => a !== p2) ?? split.plus1)
-                                        : split.plus1;
-                                    updateDraft(idx, { abilityBonus: { plus2: p2, plus1: p1 } });
-                                  }}
-                                >
-                                  {eligible.map((a) => (
-                                    <option key={a} value={a}>
-                                      {STAT_LABEL[a]}
-                                    </option>
-                                  ))}
-                                </select>
-                              </label>
-                              <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                +1
-                                <select
-                                  style={selStyle}
-                                  value={split.plus1}
-                                  onChange={(e) =>
-                                    updateDraft(idx, {
-                                      abilityBonus: {
-                                        plus2: split.plus2,
-                                        plus1: e.target.value as keyof StatBlock,
-                                      },
-                                    })
-                                  }
-                                >
-                                  {eligible
-                                    .filter((a) => a !== split.plus2)
-                                    .map((a) => (
-                                      <option key={a} value={a}>
-                                        {STAT_LABEL[a]}
-                                      </option>
-                                    ))}
-                                </select>
-                              </label>
-                            </div>
-                          ) : (
-                            <p
-                              style={{
-                                fontSize: '0.75rem',
-                                color: 'var(--t-mid)',
-                                margin: 0,
-                                letterSpacing: '0.05em',
-                              }}
-                            >
-                              {eligible.map((a) => `${STAT_LABEL[a]} +1`).join(' · ')}
-                            </p>
-                          )}
-                        </div>
-                      );
-                    })()}
-                  </>
-                )}
-
-                <label className={styles.formLbl} style={{ marginTop: 12 }}>
-                  PORTRAIT
-                </label>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                  {portraits.map((src, i) => {
-                    const sel = draft.portrait === src;
-                    return (
-                      <button
-                        key={i}
-                        onClick={() => updateDraft(idx, { portrait: src })}
-                        style={{
-                          padding: 0,
-                          border: `2px solid ${sel ? 'var(--t-primary)' : 'var(--t-border)'}`,
-                          background: 'none',
-                          cursor: 'pointer',
-                          borderRadius: '50%',
-                          boxShadow: sel ? '0 0 6px var(--t-primary)' : 'none',
-                        }}
-                      >
-                        <img
-                          src={src}
-                          alt=""
-                          style={{
-                            width: 36,
-                            height: 36,
-                            borderRadius: '50%',
-                            display: 'block',
-                            objectFit: 'cover',
-                          }}
-                        />
-                      </button>
+                            {sp.traits.map((t, i) => (
+                              <li key={i}>{t}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
                     );
-                  })}
-                  <button
-                    onClick={() => updateDraft(idx, { portrait: null })}
-                    style={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: '50%',
-                      border: `2px solid ${draft.portrait === null ? 'var(--t-primary)' : 'var(--t-border)'}`,
-                      background: 'var(--t-separator)',
-                      cursor: 'pointer',
-                      color: 'var(--t-dim)',
-                      fontSize: '0.75rem',
-                      letterSpacing: '0.05em',
-                      fontFamily: 'inherit',
-                    }}
-                  >
-                    NONE
-                  </button>
-                </div>
+                  })()}
 
-                <label className={styles.formLbl} style={{ marginTop: 12 }}>
-                  ABILITY SCORES
-                </label>
-                {/* Generation method: 4d6-drop-lowest (PHB p.12), the standard
-                    array 15/14/13/12/10/8 (PHB p.13), 27-point buy, or free
-                    manual entry. */}
-                <div style={{ display: 'flex', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
-                  {(['roll', 'array', 'pointbuy', 'manual'] as const).map((m) => {
-                    const active = draft.statMethod === m;
-                    const label =
-                      m === 'roll'
-                        ? 'ROLL 4d6'
-                        : m === 'array'
-                          ? 'ARRAY'
-                          : m === 'pointbuy'
-                            ? 'POINT BUY'
-                            : 'MANUAL';
-                    return (
-                      <button
-                        key={m}
-                        type="button"
-                        onClick={() => setStatMethod(idx, m)}
-                        style={{
+                  {backgrounds.length > 0 && (
+                    <>
+                      <label
+                        className={styles.formLbl}
+                        style={{ marginTop: 12 }}
+                        htmlFor={`char-${idx}-background`}
+                      >
+                        BACKGROUND
+                      </label>
+                      <select
+                        id={`char-${idx}-background`}
+                        className={styles.formInp}
+                        style={{ cursor: 'pointer' }}
+                        value={draft.backgroundId}
+                        onChange={(e) =>
+                          // Clear feat picks + the ability-bonus split on background
+                          // swap — the next background's origin feat may not need
+                          // picks, and its eligible abilities differ.
+                          updateDraft(idx, {
+                            backgroundId: e.target.value,
+                            featChoices: undefined,
+                            abilityBonus: undefined,
+                          })
+                        }
+                      >
+                        {backgrounds.map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {b.name}
+                          </option>
+                        ))}
+                      </select>
+                      {selectedBg && (
+                        <div className={styles.classDesc}>
+                          <span style={{ color: 'var(--t-mid)' }}>{selectedBg.desc}</span>
+                          <div style={{ marginTop: 4 }}>
+                            <span style={{ color: 'var(--t-dim)', letterSpacing: '0.08em' }}>
+                              SKILLS:{' '}
+                            </span>
+                            <span style={{ color: 'var(--t-mid)' }}>
+                              {selectedBg.skillProficiencies.join(', ')}
+                            </span>
+                            {selectedBg.toolProficiency && (
+                              <>
+                                <span style={{ color: 'var(--t-dim)' }}> · </span>
+                                <span style={{ color: 'var(--t-mid)' }}>
+                                  {selectedBg.toolProficiency}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                          <div>
+                            <span style={{ color: 'var(--t-dim)', letterSpacing: '0.08em' }}>
+                              FEATURE:{' '}
+                            </span>
+                            <span style={{ color: 'var(--t-primary)' }}>{selectedBg.feature}</span>
+                            <span style={{ color: 'var(--t-dim)' }}>
+                              {' '}
+                              — {selectedBg.featureDesc}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                      {(() => {
+                        const inputs = getMagicInitiatePickerInputs(
+                          beContexts[contextId],
+                          draft.backgroundId
+                        );
+                        if (!inputs) return null;
+                        const picks = draft.featChoices ?? {};
+                        const cantripsPicked = picks.cantripChoices?.length ?? 0;
+                        const l1Picked = !!picks.l1Choice;
+                        const complete =
+                          cantripsPicked === inputs.cantripCount &&
+                          (inputs.l1Count === 0 || l1Picked);
+                        return (
+                          <button
+                            type="button"
+                            className={styles.formInp}
+                            style={{
+                              cursor: 'pointer',
+                              marginTop: 8,
+                              color: complete ? 'var(--t-primary)' : 'var(--t-hp-mid)',
+                              borderColor: complete ? 'var(--t-primary)' : 'var(--t-hp-mid)',
+                              textAlign: 'left',
+                            }}
+                            onClick={() => setSpellPickerIdx(idx)}
+                            data-testid={`magic-initiate-trigger-${idx}`}
+                          >
+                            {complete
+                              ? `✓ ${inputs.featName} — ${cantripsPicked} cantrips + ${l1Picked ? '1' : '0'} L1 chosen (click to change)`
+                              : `⚠ ${inputs.featName} — pick ${inputs.cantripCount} cantrips${inputs.l1Count > 0 ? ' + 1 L1 spell' : ''}`}
+                          </button>
+                        );
+                      })()}
+                      {/* 2024 background ability-score increase: +1 to all three
+                        listed abilities, or a +2/+1 split across two of them.
+                        Eligible abilities come from the BE context summary. */}
+                      {(() => {
+                        const beBg = beContexts[contextId]?.backgrounds.find(
+                          (b) => b.id === draft.backgroundId
+                        );
+                        const eligible = (beBg?.abilityScoreIncreases ?? []) as (keyof StatBlock)[];
+                        if (eligible.length < 2) return null;
+                        const split = draft.abilityBonus;
+                        const usingSplit = !!split;
+                        const toggleStyle = (active: boolean) => ({
                           fontSize: '0.7rem',
                           padding: '0.25rem 0.6rem',
                           letterSpacing: '0.08em',
@@ -1059,71 +866,344 @@ function CharScreen({
                           color: active ? 'var(--t-primary)' : 'var(--t-dim)',
                           cursor: 'pointer',
                           fontFamily: 'inherit',
-                        }}
-                      >
-                        {label}
-                      </button>
-                    );
-                  })}
-                </div>
-                {draft.statMethod === 'pointbuy' &&
-                  (() => {
-                    const remaining = POINT_BUY_BUDGET - pointBuySpent(draft.stats);
-                    return (
-                      <p
-                        style={{
-                          fontSize: '0.7rem',
-                          marginBottom: 6,
-                          letterSpacing: '0.05em',
-                          color: 'var(--t-mid)',
-                        }}
-                        data-testid={`point-buy-remaining-${idx}`}
-                      >
-                        POINTS:{' '}
-                        <span style={{ color: 'var(--t-primary)', fontWeight: 'bold' }}>
-                          {remaining}
-                        </span>{' '}
-                        / {POINT_BUY_BUDGET} remaining · scores 8–15
-                      </p>
-                    );
-                  })()}
-                <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                  {STAT_KEYS.map((key) => {
-                    const val = draft.stats[key];
-                    const isPrimary = key === primaryStat;
-                    const usesSteppers =
-                      draft.statMethod === 'pointbuy' || draft.statMethod === 'manual';
+                        });
+                        const selStyle = {
+                          fontFamily: 'inherit',
+                          fontSize: '0.8rem',
+                          padding: '0.2rem 0.4rem',
+                          background: 'var(--t-card)',
+                          border: '1px solid var(--t-border)',
+                          color: 'var(--t-primary)',
+                          cursor: 'pointer',
+                        };
+                        return (
+                          <div style={{ marginTop: 10 }}>
+                            <label className={styles.formLbl}>ABILITY BONUS (background)</label>
+                            <div
+                              style={{
+                                display: 'flex',
+                                gap: 6,
+                                margin: '4px 0 6px',
+                                flexWrap: 'wrap',
+                              }}
+                            >
+                              <button
+                                type="button"
+                                data-testid={`ability-bonus-spread-${idx}`}
+                                onClick={() => updateDraft(idx, { abilityBonus: undefined })}
+                                style={toggleStyle(!usingSplit)}
+                              >
+                                +1 TO ALL THREE
+                              </button>
+                              <button
+                                type="button"
+                                data-testid={`ability-bonus-split-${idx}`}
+                                onClick={() =>
+                                  updateDraft(idx, {
+                                    abilityBonus: { plus2: eligible[0], plus1: eligible[1] },
+                                  })
+                                }
+                                style={toggleStyle(usingSplit)}
+                              >
+                                +2 / +1
+                              </button>
+                            </div>
+                            {usingSplit && split ? (
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  gap: 10,
+                                  alignItems: 'center',
+                                  flexWrap: 'wrap',
+                                  fontSize: '0.75rem',
+                                  color: 'var(--t-dim)',
+                                }}
+                              >
+                                <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                  +2
+                                  <select
+                                    style={selStyle}
+                                    value={split.plus2}
+                                    onChange={(e) => {
+                                      const p2 = e.target.value as keyof StatBlock;
+                                      const p1 =
+                                        split.plus1 === p2
+                                          ? (eligible.find((a) => a !== p2) ?? split.plus1)
+                                          : split.plus1;
+                                      updateDraft(idx, { abilityBonus: { plus2: p2, plus1: p1 } });
+                                    }}
+                                  >
+                                    {eligible.map((a) => (
+                                      <option key={a} value={a}>
+                                        {STAT_LABEL[a]}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </label>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                  +1
+                                  <select
+                                    style={selStyle}
+                                    value={split.plus1}
+                                    onChange={(e) =>
+                                      updateDraft(idx, {
+                                        abilityBonus: {
+                                          plus2: split.plus2,
+                                          plus1: e.target.value as keyof StatBlock,
+                                        },
+                                      })
+                                    }
+                                  >
+                                    {eligible
+                                      .filter((a) => a !== split.plus2)
+                                      .map((a) => (
+                                        <option key={a} value={a}>
+                                          {STAT_LABEL[a]}
+                                        </option>
+                                      ))}
+                                  </select>
+                                </label>
+                              </div>
+                            ) : (
+                              <p
+                                style={{
+                                  fontSize: '0.75rem',
+                                  color: 'var(--t-mid)',
+                                  margin: 0,
+                                  letterSpacing: '0.05em',
+                                }}
+                              >
+                                {eligible.map((a) => `${STAT_LABEL[a]} +1`).join(' · ')}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </>
+                  )}
 
-                    if (usesSteppers) {
-                      const isPb = draft.statMethod === 'pointbuy';
-                      const canDec = val > (isPb ? POINT_BUY_MIN : MANUAL_MIN);
-                      const canInc = isPb
-                        ? val < POINT_BUY_MAX &&
-                          pointBuySpent({ ...draft.stats, [key]: val + 1 }) <= POINT_BUY_BUDGET
-                        : val < MANUAL_MAX;
-                      const stepBtn = (enabled: boolean) => ({
-                        fontFamily: 'inherit',
-                        fontSize: '0.85rem',
-                        lineHeight: 1,
-                        width: 20,
-                        height: 18,
-                        padding: 0,
-                        background: 'transparent',
-                        border: `1px solid ${enabled ? 'var(--t-border)' : 'var(--t-separator)'}`,
-                        color: enabled ? 'var(--t-primary)' : 'var(--t-separator)',
-                        cursor: enabled ? 'pointer' : 'default',
-                      });
+                  <label className={styles.formLbl} style={{ marginTop: 12 }}>
+                    PORTRAIT
+                  </label>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                    {portraits.map((src, i) => {
+                      const sel = draft.portrait === src;
                       return (
-                        <div
+                        <button
+                          key={i}
+                          onClick={() => updateDraft(idx, { portrait: src })}
+                          style={{
+                            padding: 0,
+                            border: `2px solid ${sel ? 'var(--t-primary)' : 'var(--t-border)'}`,
+                            background: 'none',
+                            cursor: 'pointer',
+                            borderRadius: '50%',
+                            boxShadow: sel ? '0 0 6px var(--t-primary)' : 'none',
+                          }}
+                        >
+                          <img
+                            src={src}
+                            alt=""
+                            style={{
+                              width: 36,
+                              height: 36,
+                              borderRadius: '50%',
+                              display: 'block',
+                              objectFit: 'cover',
+                            }}
+                          />
+                        </button>
+                      );
+                    })}
+                    <button
+                      onClick={() => updateDraft(idx, { portrait: null })}
+                      style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: '50%',
+                        border: `2px solid ${draft.portrait === null ? 'var(--t-primary)' : 'var(--t-border)'}`,
+                        background: 'var(--t-separator)',
+                        cursor: 'pointer',
+                        color: 'var(--t-dim)',
+                        fontSize: '0.75rem',
+                        letterSpacing: '0.05em',
+                        fontFamily: 'inherit',
+                      }}
+                    >
+                      NONE
+                    </button>
+                  </div>
+
+                  <label className={styles.formLbl} style={{ marginTop: 12 }}>
+                    ABILITY SCORES
+                  </label>
+                  {/* Generation method: 4d6-drop-lowest (PHB p.12), the standard
+                    array 15/14/13/12/10/8 (PHB p.13), 27-point buy, or free
+                    manual entry. */}
+                  <div style={{ display: 'flex', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
+                    {(['roll', 'array', 'pointbuy', 'manual'] as const).map((m) => {
+                      const active = draft.statMethod === m;
+                      const label =
+                        m === 'roll'
+                          ? 'ROLL 4d6'
+                          : m === 'array'
+                            ? 'ARRAY'
+                            : m === 'pointbuy'
+                              ? 'POINT BUY'
+                              : 'MANUAL';
+                      return (
+                        <button
+                          key={m}
+                          type="button"
+                          onClick={() => setStatMethod(idx, m)}
+                          style={{
+                            fontSize: '0.7rem',
+                            padding: '0.25rem 0.6rem',
+                            letterSpacing: '0.08em',
+                            background: active ? 'var(--t-separator)' : 'transparent',
+                            border: `1px solid ${active ? 'var(--t-primary)' : 'var(--t-border)'}`,
+                            color: active ? 'var(--t-primary)' : 'var(--t-dim)',
+                            cursor: 'pointer',
+                            fontFamily: 'inherit',
+                          }}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {draft.statMethod === 'pointbuy' &&
+                    (() => {
+                      const remaining = POINT_BUY_BUDGET - pointBuySpent(draft.stats);
+                      return (
+                        <p
+                          style={{
+                            fontSize: '0.7rem',
+                            marginBottom: 6,
+                            letterSpacing: '0.05em',
+                            color: 'var(--t-mid)',
+                          }}
+                          data-testid={`point-buy-remaining-${idx}`}
+                        >
+                          POINTS:{' '}
+                          <span style={{ color: 'var(--t-primary)', fontWeight: 'bold' }}>
+                            {remaining}
+                          </span>{' '}
+                          / {POINT_BUY_BUDGET} remaining · scores 8–15
+                        </p>
+                      );
+                    })()}
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                    {STAT_KEYS.map((key) => {
+                      const val = draft.stats[key];
+                      const isPrimary = key === primaryStat;
+                      const usesSteppers =
+                        draft.statMethod === 'pointbuy' || draft.statMethod === 'manual';
+
+                      if (usesSteppers) {
+                        const isPb = draft.statMethod === 'pointbuy';
+                        const canDec = val > (isPb ? POINT_BUY_MIN : MANUAL_MIN);
+                        const canInc = isPb
+                          ? val < POINT_BUY_MAX &&
+                            pointBuySpent({ ...draft.stats, [key]: val + 1 }) <= POINT_BUY_BUDGET
+                          : val < MANUAL_MAX;
+                        const stepBtn = (enabled: boolean) => ({
+                          fontFamily: 'inherit',
+                          fontSize: '0.85rem',
+                          lineHeight: 1,
+                          width: 20,
+                          height: 18,
+                          padding: 0,
+                          background: 'transparent',
+                          border: `1px solid ${enabled ? 'var(--t-border)' : 'var(--t-separator)'}`,
+                          color: enabled ? 'var(--t-primary)' : 'var(--t-separator)',
+                          cursor: enabled ? 'pointer' : 'default',
+                        });
+                        return (
+                          <div
+                            key={key}
+                            style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              padding: '4px 6px',
+                              minWidth: 42,
+                              border: `2px solid ${isPrimary ? 'var(--t-primary)' : 'var(--t-border)'}`,
+                              background: isPrimary ? 'var(--t-separator)' : 'transparent',
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: '0.75rem',
+                                color: isPrimary ? 'var(--t-primary)' : 'var(--t-dim)',
+                                letterSpacing: '0.1em',
+                              }}
+                            >
+                              {STAT_LABEL[key]}
+                            </span>
+                            <span
+                              style={{
+                                fontSize: '0.95rem',
+                                fontWeight: 'bold',
+                                color: isPrimary ? 'var(--t-primary)' : 'var(--t-mid)',
+                              }}
+                            >
+                              {val}
+                            </span>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--t-dim)' }}>
+                              {fmtMod(val)}
+                            </span>
+                            <div style={{ display: 'flex', gap: 3, marginTop: 3 }}>
+                              <button
+                                type="button"
+                                aria-label={`Decrease ${STAT_LABEL[key]}`}
+                                disabled={!canDec}
+                                onClick={() => adjustStat(idx, key, -1)}
+                                style={stepBtn(canDec)}
+                              >
+                                −
+                              </button>
+                              <button
+                                type="button"
+                                aria-label={`Increase ${STAT_LABEL[key]}`}
+                                disabled={!canInc}
+                                onClick={() => adjustStat(idx, key, +1)}
+                                style={stepBtn(canInc)}
+                              >
+                                +
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      // roll / array — click-to-swap to rearrange the fixed values.
+                      const isSwapSelected = swapFrom?.partyIdx === idx && swapFrom?.key === key;
+                      const borderColor = isSwapSelected
+                        ? 'var(--t-hp-high)'
+                        : isPrimary
+                          ? 'var(--t-primary)'
+                          : 'var(--t-border)';
+                      return (
+                        <button
                           key={key}
+                          type="button"
+                          onClick={() => handleStatClick(idx, key)}
+                          title={
+                            swapFrom?.partyIdx === idx && !isSwapSelected
+                              ? `Click to swap with ${STAT_LABEL[swapFrom.key]} (${draft.stats[swapFrom.key]})`
+                              : 'Click to swap with another ability'
+                          }
                           style={{
                             display: 'flex',
                             flexDirection: 'column',
                             alignItems: 'center',
-                            padding: '4px 6px',
+                            padding: '4px 8px',
                             minWidth: 42,
-                            border: `2px solid ${isPrimary ? 'var(--t-primary)' : 'var(--t-border)'}`,
+                            border: `2px solid ${borderColor}`,
                             background: isPrimary ? 'var(--t-separator)' : 'transparent',
+                            cursor: 'pointer',
+                            fontFamily: 'inherit',
                           }}
                         >
                           <span
@@ -1147,199 +1227,135 @@ function CharScreen({
                           <span style={{ fontSize: '0.75rem', color: 'var(--t-dim)' }}>
                             {fmtMod(val)}
                           </span>
-                          <div style={{ display: 'flex', gap: 3, marginTop: 3 }}>
-                            <button
-                              type="button"
-                              aria-label={`Decrease ${STAT_LABEL[key]}`}
-                              disabled={!canDec}
-                              onClick={() => adjustStat(idx, key, -1)}
-                              style={stepBtn(canDec)}
-                            >
-                              −
-                            </button>
-                            <button
-                              type="button"
-                              aria-label={`Increase ${STAT_LABEL[key]}`}
-                              disabled={!canInc}
-                              onClick={() => adjustStat(idx, key, +1)}
-                              style={stepBtn(canInc)}
-                            >
-                              +
-                            </button>
-                          </div>
-                        </div>
+                        </button>
                       );
-                    }
-
-                    // roll / array — click-to-swap to rearrange the fixed values.
-                    const isSwapSelected = swapFrom?.partyIdx === idx && swapFrom?.key === key;
-                    const borderColor = isSwapSelected
-                      ? 'var(--t-hp-high)'
-                      : isPrimary
-                        ? 'var(--t-primary)'
-                        : 'var(--t-border)';
-                    return (
+                    })}
+                    {draft.statMethod === 'roll' && (
                       <button
-                        key={key}
-                        type="button"
-                        onClick={() => handleStatClick(idx, key)}
-                        title={
-                          swapFrom?.partyIdx === idx && !isSwapSelected
-                            ? `Click to swap with ${STAT_LABEL[swapFrom.key]} (${draft.stats[swapFrom.key]})`
-                            : 'Click to swap with another ability'
-                        }
+                        className={styles.sendBtn}
                         style={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          padding: '4px 8px',
-                          minWidth: 42,
-                          border: `2px solid ${borderColor}`,
-                          background: isPrimary ? 'var(--t-separator)' : 'transparent',
-                          cursor: 'pointer',
-                          fontFamily: 'inherit',
+                          fontSize: '0.75rem',
+                          padding: '0.3rem 0.6rem',
+                          alignSelf: 'center',
                         }}
+                        onClick={() =>
+                          updateDraft(idx, {
+                            stats: rollStatBlock(),
+                            rollCount: draft.rollCount + 1,
+                          })
+                        }
                       >
-                        <span
-                          style={{
-                            fontSize: '0.75rem',
-                            color: isPrimary ? 'var(--t-primary)' : 'var(--t-dim)',
-                            letterSpacing: '0.1em',
-                          }}
-                        >
-                          {STAT_LABEL[key]}
-                        </span>
-                        <span
-                          style={{
-                            fontSize: '0.95rem',
-                            fontWeight: 'bold',
-                            color: isPrimary ? 'var(--t-primary)' : 'var(--t-mid)',
-                          }}
-                        >
-                          {val}
-                        </span>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--t-dim)' }}>
-                          {fmtMod(val)}
-                        </span>
+                        REROLL
                       </button>
-                    );
-                  })}
-                  {draft.statMethod === 'roll' && (
-                    <button
-                      className={styles.sendBtn}
-                      style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem', alignSelf: 'center' }}
-                      onClick={() =>
-                        updateDraft(idx, { stats: rollStatBlock(), rollCount: draft.rollCount + 1 })
-                      }
-                    >
-                      REROLL
-                    </button>
-                  )}
-                </div>
-                {(draft.statMethod === 'pointbuy' || draft.statMethod === 'manual') && (
-                  <p
-                    style={{
-                      fontSize: '0.7rem',
-                      color: 'var(--t-dim)',
-                      marginTop: 4,
-                      letterSpacing: '0.05em',
-                    }}
-                  >
-                    {draft.statMethod === 'pointbuy'
-                      ? 'Spend up to 27 points across your abilities (8–15 each).'
-                      : `Set any score from ${MANUAL_MIN} to ${MANUAL_MAX}.`}
-                  </p>
-                )}
-                {(draft.statMethod === 'roll' || draft.statMethod === 'array') &&
-                  swapFrom?.partyIdx === idx && (
+                    )}
+                  </div>
+                  {(draft.statMethod === 'pointbuy' || draft.statMethod === 'manual') && (
                     <p
                       style={{
                         fontSize: '0.7rem',
-                        color: 'var(--t-hp-high)',
+                        color: 'var(--t-dim)',
                         marginTop: 4,
                         letterSpacing: '0.05em',
                       }}
                     >
-                      Click another ability to swap its value with {STAT_LABEL[swapFrom.key]} (
-                      {draft.stats[swapFrom.key]}). Click the highlighted box again to cancel.
+                      {draft.statMethod === 'pointbuy'
+                        ? 'Spend up to 27 points across your abilities (8–15 each).'
+                        : `Set any score from ${MANUAL_MIN} to ${MANUAL_MAX}.`}
                     </p>
                   )}
-              </div>
-            );
-          })}
+                  {(draft.statMethod === 'roll' || draft.statMethod === 'array') &&
+                    swapFrom?.partyIdx === idx && (
+                      <p
+                        style={{
+                          fontSize: '0.7rem',
+                          color: 'var(--t-hp-high)',
+                          marginTop: 4,
+                          letterSpacing: '0.05em',
+                        }}
+                      >
+                        Click another ability to swap its value with {STAT_LABEL[swapFrom.key]} (
+                        {draft.stats[swapFrom.key]}). Click the highlighted box again to cancel.
+                      </p>
+                    )}
+                </div>
+              );
+            })}
+          </div>
 
-          {party.length < 4 && (
-            <button
-              className={styles.submit}
-              style={{
-                marginTop: 0,
-                marginBottom: '0.5rem',
-                background: 'transparent',
-                border: '1px dashed var(--t-border)',
-                color: 'var(--t-dim)',
-              }}
-              onClick={addMember}
-            >
-              + ADD PARTY MEMBER
-            </button>
-          )}
-
-          {selectedCtxForInit?.recommendedPartySize !== undefined && (
-            <button
-              className={styles.submit}
-              style={{
-                marginTop: 0,
-                marginBottom: '1rem',
-                background: 'transparent',
-                border: '1px dashed var(--t-primary)',
-                color: 'var(--t-primary)',
-              }}
-              onClick={autoFillParty}
-              data-testid="auto-fill-party-btn"
-              title={(
-                selectedCtxForInit.recommendedComposition ??
-                DEFAULT_COMPOSITION_BY_SIZE[selectedCtxForInit.recommendedPartySize] ??
-                []
-              ).join(' / ')}
-            >
-              <span aria-hidden="true">★ </span>AUTO-FILL RECOMMENDED PARTY (
-              {(
-                selectedCtxForInit.recommendedComposition ??
-                DEFAULT_COMPOSITION_BY_SIZE[selectedCtxForInit.recommendedPartySize] ??
-                []
-              ).join(' / ')}
-              )
-            </button>
-          )}
-
-          {selectedCtxForInit?.recommendedPartySize !== undefined &&
-            party.length !== selectedCtxForInit.recommendedPartySize && (
-              <p
+          <div className={styles.charPartyControls}>
+            {party.length < 4 && (
+              <button
+                className={styles.submit}
                 style={{
-                  fontSize: '0.75rem',
-                  color: 'var(--t-mid)',
-                  marginBottom: '1rem',
-                  letterSpacing: '0.05em',
+                  marginTop: 0,
+                  marginBottom: '0.5rem',
+                  background: 'transparent',
+                  border: '1px dashed var(--t-border)',
+                  color: 'var(--t-dim)',
                 }}
+                onClick={addMember}
               >
-                ⚠ {selectedCtxForInit.displayName} is tuned for a party of{' '}
-                {selectedCtxForInit.recommendedPartySize}. You can play with {party.length}, but
-                encounters may feel{' '}
-                {party.length < selectedCtxForInit.recommendedPartySize ? 'harder' : 'easier'} than
-                intended.
-              </p>
+                + ADD PARTY MEMBER
+              </button>
             )}
 
-          {error && <p className={styles.err}>{error}</p>}
+            {selectedCtxForInit?.recommendedPartySize !== undefined && (
+              <button
+                className={styles.submit}
+                style={{
+                  marginTop: 0,
+                  marginBottom: '1rem',
+                  background: 'transparent',
+                  border: '1px dashed var(--t-primary)',
+                  color: 'var(--t-primary)',
+                }}
+                onClick={autoFillParty}
+                data-testid="auto-fill-party-btn"
+                title={(
+                  selectedCtxForInit.recommendedComposition ??
+                  DEFAULT_COMPOSITION_BY_SIZE[selectedCtxForInit.recommendedPartySize] ??
+                  []
+                ).join(' / ')}
+              >
+                <span aria-hidden="true">★ </span>AUTO-FILL RECOMMENDED PARTY (
+                {(
+                  selectedCtxForInit.recommendedComposition ??
+                  DEFAULT_COMPOSITION_BY_SIZE[selectedCtxForInit.recommendedPartySize] ??
+                  []
+                ).join(' / ')}
+                )
+              </button>
+            )}
 
-          <button
-            data-testid="begin-adventure-btn"
-            className={styles.submit}
-            onClick={handle}
-            disabled={loading}
-          >
-            {loading ? 'LAUNCHING ADVENTURE...' : 'BEGIN ADVENTURE'}
-          </button>
+            {selectedCtxForInit?.recommendedPartySize !== undefined &&
+              party.length !== selectedCtxForInit.recommendedPartySize && (
+                <p
+                  style={{
+                    fontSize: '0.75rem',
+                    color: 'var(--t-mid)',
+                    marginBottom: '1rem',
+                    letterSpacing: '0.05em',
+                  }}
+                >
+                  ⚠ {selectedCtxForInit.displayName} is tuned for a party of{' '}
+                  {selectedCtxForInit.recommendedPartySize}. You can play with {party.length}, but
+                  encounters may feel{' '}
+                  {party.length < selectedCtxForInit.recommendedPartySize ? 'harder' : 'easier'}{' '}
+                  than intended.
+                </p>
+              )}
+
+            {error && <p className={styles.err}>{error}</p>}
+
+            <button
+              data-testid="begin-adventure-btn"
+              className={styles.submit}
+              onClick={handle}
+              disabled={loading}
+            >
+              {loading ? 'LAUNCHING ADVENTURE...' : 'BEGIN ADVENTURE'}
+            </button>
+          </div>
         </div>
 
         <div className={styles.charWorldCol}>
@@ -1350,12 +1366,13 @@ function CharScreen({
             SELECT YOUR GAME WORLD
           </p>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <div className={styles.charWorldRow}>
             {availableContexts.map((c) => {
               const selected = c.id === contextId;
               return (
                 <button
                   key={c.id}
+                  className={styles.charWorldCard}
                   data-testid={`world-picker-${c.id}`}
                   onClick={() => setContextId(c.id)}
                   style={{
@@ -1367,7 +1384,8 @@ function CharScreen({
                     cursor: 'pointer',
                     textAlign: 'left',
                     display: 'flex',
-                    gap: '1rem',
+                    flexDirection: 'column',
+                    gap: '0.5rem',
                     alignItems: 'flex-start',
                     transition: 'border-color 0.15s, background 0.15s',
                     boxShadow: selected ? '0 0 8px var(--t-border)' : 'none',
@@ -1376,9 +1394,11 @@ function CharScreen({
                   <pre
                     style={{
                       margin: 0,
-                      flexShrink: 0,
-                      fontSize: '0.6rem',
-                      lineHeight: 1.35,
+                      alignSelf: 'center',
+                      maxWidth: '100%',
+                      overflow: 'hidden',
+                      fontSize: '0.5rem',
+                      lineHeight: 1.3,
                       color: selected ? 'var(--t-primary)' : 'var(--t-dim)',
                       fontFamily: 'inherit',
                       userSelect: 'none',

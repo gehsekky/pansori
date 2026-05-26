@@ -1117,20 +1117,54 @@
 
 .charInner {
   display: flex;
+  flex-direction: column;
   gap: 2rem;
-  align-items: flex-start;
   width: 100%;
-  max-width: 900px;
-  margin: 4rem auto;
+  max-width: 1080px;
+  margin: 3rem auto;
+}
+
+/* World type sits on top, hero registry below. DOM order is party-then-world,
+   so CSS `order` flips them without relocating the large party block. */
+.charWorldCol {
+  order: 0;
+  width: 100%;
+  min-width: 0;
 }
 
 .charPartyCol {
-  flex: 0 0 360px;
+  order: 1;
+  width: 100%;
 }
 
-.charWorldCol {
-  flex: 1;
-  min-width: 0;
+/* Both sections lay their items out in a wrapping row. */
+.charWorldRow,
+.charPartyRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+/* A world option in the row — a card that wraps on narrow screens. The
+   preview art is clipped to the card so wide art can't blow out the row. */
+.charWorldCard {
+  flex: 1 1 240px;
+  max-width: 320px;
+  overflow: hidden;
+}
+
+/* A hero card in the row. */
+.charHeroCard {
+  flex: 1 1 320px;
+  max-width: 360px;
+}
+
+/* The trailing party controls (add / auto-fill / begin) shouldn't stretch
+   the full width of the wide container. */
+.charPartyControls {
+  max-width: 520px;
+  margin-top: 1.25rem;
 }
 
 .classDesc {
