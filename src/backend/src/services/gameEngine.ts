@@ -4617,10 +4617,14 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       })();
       const hasOwnMultiTargetVariants =
         spellId === 'magic_missile' || (spellId === 'eldritch_blast' && char.level >= 5);
+      // SRD Bane — the caster chooses up to 3 enemies (a target picker), so it
+      // gets ONE choice (tagged `pickTargets`) rather than the per-enemy spread.
+      const isEnemyTargetPicker = spellId === 'bane';
       const emitPerEnemy =
         isOffensive &&
         !spell.blastRadius &&
         !hasOwnMultiTargetVariants &&
+        !isEnemyTargetPicker &&
         livingEnemies.length >= 2;
 
       if (spell.level === 0) {
@@ -4711,13 +4715,16 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
             }
           } else {
             const targetId = isOffensive ? livingEnemies[0]?.id : undefined;
-            // SRD Bless — the caster chooses up to 3 creatures (+1 per slot above
-            // 1st). Tag the choice so the FE opens an ally target picker; the
-            // cast path honors the chosen `targetCharIds` (else auto-picks).
+            // SRD Bless / Bane — the caster chooses up to 3 creatures (+1 per
+            // slot above 1st). Tag the choice so the FE opens a target picker;
+            // the cast path honors the chosen targets (else auto-picks). Bless
+            // affects allies; Bane affects enemies.
             const pickTargets =
               spellId === 'bless'
                 ? { side: 'ally' as const, max: 3 + (sl - baseLevel) }
-                : undefined;
+                : spellId === 'bane'
+                  ? { side: 'enemy' as const, max: 3 + (sl - baseLevel) }
+                  : undefined;
             choices.push({
               label: `Cast ${spell.name} (${sl === baseLevel ? `Lvl ${sl}` : `${ordinal(sl)} slot`}${slotNote}${upcastPart} — ${avail} slot${avail === 1 ? '' : 's'} left)`,
               action: { type: 'cast_spell', spellId, slotLevel: sl, targetEnemyId: targetId },
