@@ -228,6 +228,9 @@ export interface EnemyTemplate {
   // only when the +2 would actually flip a hit to a miss (a Nat 20 can't be
   // parried). Read in `resolveOneAttack`; the reaction refreshes on round wrap.
   parry?: boolean;
+  // The AC bonus Parry grants — equals the creature's proficiency bonus in the
+  // SRD (Bandit Captain +2, Gladiator +3). Defaults to 2 when `parry` is set.
+  parryBonus?: number;
   // SRD Gnoll Rampage (1/Day) — immediately after one of the creature's swings
   // deals damage to an already-Bloodied target (its HP was ≤ half its max BEFORE
   // the hit), it moves up to half its Speed and makes one extra attack. Once per
@@ -299,6 +302,7 @@ export interface Enemy {
   // SRD Parry reaction — see EnemyTemplate.parry. Mirrored here + carried
   // through procgen; read in `resolveOneAttack`.
   parry?: boolean;
+  parryBonus?: number;
   // SRD Gnoll Rampage (1/Day) — see EnemyTemplate.rampage. Read in
   // `runEnemyMultiattackLoop`.
   rampage?: boolean;

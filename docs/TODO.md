@@ -68,7 +68,7 @@ Grounded in a code survey + the full backend suite: **1912 tests across
 | Category                  | In pansori                                       | SRD universe                     |
 | ------------------------- | ------------------------------------------------ | -------------------------------- |
 | Spells                    | **216** (27 cantrips + 189 leveled, through L9)  | ~330                             |
-| Shared SRD monster pool   | **39** (`SRD_MONSTERS`) + per-campaign templates | hundreds                         |
+| Shared SRD monster pool   | **44** (`SRD_MONSTERS`) + per-campaign templates | hundreds                         |
 | Species                   | 9                                                | 9 standalone + Drow lineage      |
 | Classes                   | 12                                               | 12                               |
 | Subclasses                | 12 iconic (1 / class)                            | 1 iconic / class in SRD          |
@@ -246,22 +246,29 @@ backend features are waiting on, and a handful of **bounded subsystems**.
         moving AoE/hazard than a summoned creature.
   - [ ] **Find Familiar** — a non-combatant utility companion (can't take
         the Attack action RAW); a scouting/aid model, not the ally-turn AI.
-- [~] **Monsters** — stat-block content. The shared pool grew 12 → 31 → **39**
-  (`monsters.spec.ts`): a CR 1/8–**5** spread of SRD 5.2.1 bestiary entries
+- [~] **Monsters** — stat-block content. The shared pool grew 12 → 31 → 39 → **44**
+  (`monsters.spec.ts`): a CR 1/8–**6** spread of SRD 5.2.1 bestiary entries
   (kobold, guard, cultist, giant rat, zombie, scout, worg, gnoll, black
   bear, dire wolf, specter, animated armor, bandit captain, berserker,
-  ghast, griffon, owlbear, manticore, wight, **hippogriff, giant eagle, lion,
-  bugbear warrior, saber-toothed tiger, giant boar, mummy, hill giant**) using
+  ghast, griffon, owlbear, manticore, wight, hippogriff, giant eagle, lion,
+  bugbear warrior, saber-toothed tiger, giant boar, mummy, hill giant,
+  **ettin, gladiator, wraith, fire elemental, wyvern**) using
   the supported fields (multiattack, onHitEffect incl. the grapple-on-hit
   escapeDc, resistances/vulnerabilities/immunities/condition-immunities,
-  bonusDamage, packTactics, bloodiedFrenzy, speedFt, attackReachFt). The latest
-  batch extends the range to the first **CR 5** (Hill Giant), gives a second
-  grapple-on-hit (Bugbear Warrior, escape DC 12), a full undead kit (Mummy:
-  fire-vulnerable, necrotic/poison + condition immunities, +3d6 necrotic, WIS-
-  save Frighten on hit), bonus-radiant + resistances (Giant Eagle), Pack Tactics
-  (Lion), and Bloodied Fury (Giant Boar). Per-monster specials deferred:
-  Flyby (no fly-OA model), Lion Roar, the boar/giant charge + auto-Prone riders,
-  and the Mummy's Rotting Curse (no-heal + max-HP decay). Three ability hooks then shipped (`monsterAbilities.spec.ts`),
+  bonusDamage, packTactics, bloodiedFrenzy, lifeDrain, aura, parry/parryBonus,
+  speedFt, attackReachFt). The CR 1–5 batch added the first **CR 5** (Hill
+  Giant), a second grapple-on-hit (Bugbear Warrior, escape DC 12), a full undead
+  kit (Mummy), bonus-radiant + resistances (Giant Eagle), Pack Tactics (Lion),
+  and Bloodied Fury (Giant Boar). The **CR 4–6** batch then added: Ettin (CR 4,
+  condition-immune brute), Gladiator (CR 5, multiattack 3 + **Parry +3** — the
+  Parry AC bonus was generalized to a `parryBonus` field, default 2), Wraith
+  (CR 5, Life Drain + full incorporeal resistance/immunity suite), Fire Elemental
+  (CR 5, fire/poison-immune + a 10-ft Fire Aura via the PC-turn-start hook), and
+  the first **CR 6** — Wyvern (poison Sting: +7d6 poison + CON-save Poisoned).
+  Per-monster specials deferred: Flyby, Lion Roar, the boar/giant/ettin charge +
+  auto-Prone/Disadvantage riders, the Mummy's Rotting Curse, the Wyvern's bite +
+  RAW no-save auto-poison, the Wraith's Create Specter, and the Fire Elemental's
+  end-of-its-turn aura timing (approximated as PC-turn-start). Three ability hooks then shipped (`monsterAbilities.spec.ts`),
   all in `computeEnemyAttack`: **Pack Tactics** (`packTactics` — Advantage when
   an ally is within 5 ft of the target; wolf/kobold/giant rat/worg/dire wolf),
   **Bloodied Frenzy** (`bloodiedFrenzy` — Advantage while the attacker is ≤ ½

@@ -33,6 +33,11 @@ const NEW_MONSTERS: Array<[string, number, number, number, string, number, numbe
   ['giant_boar', 2, 42, 13, '2d6+3', 5, 450],
   ['mummy', 3, 58, 11, '1d10+3', 5, 700, 2],
   ['hill_giant', 5, 105, 13, '3d8+5', 8, 1800, 2],
+  ['ettin', 4, 85, 12, '2d8+5', 7, 1100, 2],
+  ['gladiator', 5, 112, 16, '2d6+4', 7, 1800, 3],
+  ['wraith', 5, 67, 13, '4d8+3', 6, 1800],
+  ['fire_elemental', 5, 93, 13, '2d6+3', 6, 1800, 2],
+  ['wyvern', 6, 127, 14, '2d6+4', 7, 2300],
 ];
 
 describe('SRD bestiary additions — core stat lines', () => {
@@ -137,7 +142,52 @@ describe('SRD bestiary additions — effect fields', () => {
     expect(SRD_MONSTERS.hill_giant.attackReachFt).toBe(10);
   });
 
+  it('Gladiator parries with a +3 AC bonus (its proficiency bonus)', () => {
+    expect(SRD_MONSTERS.gladiator.parry).toBe(true);
+    expect(SRD_MONSTERS.gladiator.parryBonus).toBe(3);
+  });
+
+  it('Wraith carries Life Drain with the full incorporeal resistance suite', () => {
+    expect(SRD_MONSTERS.wraith.lifeDrain).toBe(true);
+    expect(SRD_MONSTERS.wraith.resistances).toContain('slashing');
+    expect(SRD_MONSTERS.wraith.immunities).toEqual(['necrotic', 'poison']);
+    expect(SRD_MONSTERS.wraith.condition_immunities).toContain('grappled');
+  });
+
+  it('Fire Elemental is fire/poison-immune with a 10-ft fire aura', () => {
+    expect(SRD_MONSTERS.fire_elemental.immunities).toEqual(['fire', 'poison']);
+    expect(SRD_MONSTERS.fire_elemental.resistances).toEqual(['bludgeoning', 'piercing', 'slashing']);
+    expect(SRD_MONSTERS.fire_elemental.aura).toMatchObject({
+      radiusFt: 10,
+      damage: '1d10',
+      damageType: 'fire',
+    });
+  });
+
+  it('Wyvern stings for bonus poison and a CON save vs Poisoned at 10 ft', () => {
+    expect(SRD_MONSTERS.wyvern.cr).toBe(6);
+    expect(SRD_MONSTERS.wyvern.bonusDamage).toBe('7d6');
+    expect(SRD_MONSTERS.wyvern.bonusDamageType).toBe('poison');
+    expect(SRD_MONSTERS.wyvern.attackReachFt).toBe(10);
+    expect(SRD_MONSTERS.wyvern.onHitEffect).toEqual({
+      condition: 'poisoned',
+      ability: 'con',
+      dc: 14,
+    });
+  });
+
+  it('Ettin is immune to a suite of sense/turn-loss conditions', () => {
+    expect(SRD_MONSTERS.ettin.condition_immunities).toEqual([
+      'blinded',
+      'charmed',
+      'deafened',
+      'frightened',
+      'stunned',
+      'unconscious',
+    ]);
+  });
+
   it('the shared pool grew well past the original 12', () => {
-    expect(Object.keys(SRD_MONSTERS).length).toBeGreaterThanOrEqual(38);
+    expect(Object.keys(SRD_MONSTERS).length).toBeGreaterThanOrEqual(44);
   });
 });
