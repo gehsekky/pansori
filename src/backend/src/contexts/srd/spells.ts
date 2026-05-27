@@ -388,10 +388,11 @@ export const SRD_SPELLS: Record<string, Spell> = {
     rangeKind: 'touch',
     spellList: ['arcane'],
   },
-  // SRD: Light — touch an object; it sheds Bright Light 20 ft + Dim
-  // Light 20 ft for 1 hour. Pure narrative cantrip; no mechanical
-  // hooks beyond the lighting-pipeline (which is room-grained in
-  // pansori, so the spell's effect is flavor-only at the room scope).
+  // SRD: Light — touch an object; it sheds Bright Light 20 ft + Dim Light 20 ft
+  // for 1 hour. In pansori the caster becomes the light source (their grid
+  // entity gets `light_radius_ft: 20`); in a dark room that illuminated area
+  // lets creatures be SEEN, negating the darkness blind-combat penalty. See the
+  // Light/Daylight branch in castSpell/utility.ts + `isIlluminated`.
   light: {
     id: 'light',
     name: 'Light',
@@ -2393,10 +2394,11 @@ export const SRD_SPELLS: Record<string, Spell> = {
     desc: '30-ft cube WIS save or charmed (concentration, 1 minute). Damage breaks the charm — deferred.',
     spellList: ['arcane'],
   },
-  // SRD: Daylight — creates a 60-ft sphere of bright sunlight for
-  // 1 hour. Bright Light + 60 ft of Dim Light beyond. Narrative
-  // spell in pansori (room-grained lighting model); the spell
-  // can also be cast on an object to make it a sun-source.
+  // SRD: Daylight — a 60-ft sphere of bright sunlight (+ 60 ft Dim beyond) for
+  // 1 hour. Like Light but larger: the caster becomes a 60-ft light source
+  // (`light_radius_ft: 60`), illuminating the room so creatures can be seen in
+  // the dark (see castSpell/utility.ts). The "counters magical Darkness" clause
+  // is deferred with the Darkness spell itself.
   daylight: {
     id: 'daylight',
     name: 'Daylight',

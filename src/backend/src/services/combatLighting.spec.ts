@@ -9,11 +9,12 @@
 // vs "(advantage)"); the enemy side via a pinned dice sequence where the
 // darkness Advantage flips a miss into a hit.
 
-import type { Character, Enemy, GameState, Seed } from '../types.js';
+import type { Character, CombatEntity, Enemy, GameState, Seed } from '../types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { makeChar, makeState } from '../test-fixtures.js';
 import { SRD_MONSTERS } from '../contexts/srd/monsters.js';
 import { context as ctx } from '../contexts/sandbox.js';
+import { isIlluminated } from './gridEngine.js';
 import { takeAction } from './gameEngine.js';
 
 afterEach(() => vi.restoreAllMocks());
@@ -64,8 +65,9 @@ function seedWith(lighting: 'bright' | 'dim' | 'dark', enemy: Partial<Enemy>): S
   };
 }
 
-// PC adjacent to the enemy. `darkvisionFt` lets a test give the PC darkvision.
-function pcState(charOverrides: Partial<Character> = {}): GameState {
+// PC adjacent to the enemy. `darkvisionFt` lets a test give the PC darkvision;
+// `pcLightRadius` makes the PC a light source (as if it cast Light).
+function pcState(charOverrides: Partial<Character> = {}, pcLightRadius?: number): GameState {
   const pc = makeChar({
     id: 'pc-1',
     character_class: 'Fighter',
@@ -91,7 +93,7 @@ function pcState(charOverrides: Partial<Character> = {}): GameState {
     initiative_idx: 0,
     round: 1,
     entities: [
-      { id: 'pc-1', isEnemy: false, pos: { x: 4, y: 5 }, hp: 30, maxHp: 30, conditions: [], condition_durations: {} },
+      { id: 'pc-1', isEnemy: false, pos: { x: 4, y: 5 }, hp: 30, maxHp: 30, conditions: [], condition_durations: {}, light_radius_ft: pcLightRadius },
       { id: ENEMY_ID, isEnemy: true, pos: { x: 5, y: 5 }, hp: 40, maxHp: 40, conditions: [], condition_durations: {} },
     ],
   } as unknown as GameState;
@@ -177,5 +179,96 @@ describe('enemy attacks — darkness visibility', () => {
     });
     const pc = r.newState.characters[0];
     expect(pc.hp).toBe(30); // the lone low roll missed
+  });
+});
+
+// ── Light sources — counterplay to darkness ──────────────────────────────────
+function lightSource(x: number, y: number, brightFt: number): CombatEntity {
+  return {
+    id: 'src',
+    isEnemy: false,
+    pos: { x, y },
+    hp: 1,
+    maxHp: 1,
+    conditions: [],
+    condition_durations: {},
+    light_radius_ft: brightFt,
+  };
+}
+
+describe('isIlluminated', () => {
+  it('a cell within 2x the bright radius (bright + dim) is lit; beyond is not', () => {
+    const ents = [lightSource(5, 5, 20)]; // 20 ft bright (4 cells) + 20 ft dim → reach 40 ft
+    expect(isIlluminated({ x: 5, y: 5 }, ents)).toBe(true); // at the source
+    expect(isIlluminated({ x: 13, y: 5 }, ents)).toBe(true); // 8 cells = 40 ft (edge of dim)
+    expect(isIlluminated({ x: 14, y: 5 }, ents)).toBe(false); // 9 cells = 45 ft — dark
+  });
+
+  it('returns false with no light sources', () => {
+    expect(isIlluminated({ x: 5, y: 5 }, [lightSource(5, 5, 0)])).toBe(false);
+    expect(isIlluminated({ x: 5, y: 5 }, [])).toBe(false);
+  });
+});
+
+describe('Light cantrip — cast in combat', () => {
+  it('makes the caster a light source (sheds 20 ft bright)', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const wizard = makeChar({
+      id: 'pc-1',
+      character_class: 'Wizard',
+      level: 3,
+      spells_known: ['light'],
+      prepared_spells: ['light'],
+    });
+    const state: GameState = {
+      ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+      characters: [wizard],
+      active_character_id: 'pc-1',
+      entities: [
+        { id: 'pc-1', isEnemy: false, pos: { x: 4, y: 5 }, hp: 20, maxHp: 20, conditions: [], condition_durations: {} },
+      ],
+    } as unknown as GameState;
+    const r = await takeAction({
+      action: { type: 'cast_spell', spellId: 'light', slotLevel: 0 },
+      history: [],
+      state,
+      seed: seedWith('dark', {}),
+      context: ctx,
+    });
+    const pcEnt = r.newState.entities?.find((e) => e.id === 'pc-1');
+    expect(pcEnt?.light_radius_ft).toBe(20);
+    expect(r.narrative).toMatch(/sheds light/);
+  });
+});
+
+describe('light negates the darkness combat penalty', () => {
+  it('a no-darkvision PC in its own light has no disadvantage vs an adjacent enemy', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    // PC carries Light (20 ft); the adjacent enemy is in the lit area → seen.
+    const r = await takeAction({
+      action: { type: 'attack', targetEnemyId: ENEMY_ID },
+      history: [],
+      state: pcState({}, 20), // no darkvision, but a light source
+      seed: seedWith('dark', {}),
+      context: ctx,
+    });
+    expect(r.narrative).not.toMatch(/darkness/);
+    expect(r.narrative).not.toMatch(/disadvantage/);
+  });
+
+  it("the PC's light reveals it to a blind enemy — no advantage on the enemy's attack", async () => {
+    // Mirror of the enemy-advantage test, but the PC carries Light, so the enemy
+    // (adjacent, in the lit area) is illuminated → the PC is seen → no advantage,
+    // and the same low first die misses.
+    vi.spyOn(Math, 'random').mockReturnValue(0.5).mockReturnValueOnce(0.05).mockReturnValueOnce(0.9);
+    const r = await takeAction({
+      action: { type: 'end_turn' },
+      history: [],
+      state: pcState({}, 20), // no darkvision, but a light source
+      seed: seedWith('dark', {}),
+      context: ctx,
+    });
+    const pc = r.newState.characters[0];
+    expect(pc.hp).toBe(30); // no advantage → the lone low roll missed
   });
 });

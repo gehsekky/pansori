@@ -45,6 +45,22 @@ export function runUtilitySpell(
     : `${char.name} casts ${spell.name}${slotNote}.`;
   composeNow(ctx, { kind: 'spell_utility', prose: utilityProse });
 
+  // SRD Vision & Light — Light (20 ft bright) / Daylight (60 ft bright) make the
+  // caster a light source: their grid entity sheds bright light to that radius
+  // (dim for the same again), so allies/enemies within it can be SEEN in a dark
+  // room — counterplay to the darkness blind-combat penalties. Stamped on the
+  // caster's entity (read via `isIlluminated`); narrative-only off the grid.
+  if ((spell.id === 'light' || spell.id === 'daylight') && ctx.st.entities) {
+    const brightRadiusFt = spell.id === 'daylight' ? 60 : 20;
+    ctx.st = {
+      ...ctx.st,
+      entities: ctx.st.entities.map((e) =>
+        e.id === char.id ? { ...e, light_radius_ft: brightRadiusFt } : e
+      ),
+    };
+    ctx.narrative += ` ${char.name} now sheds light (${brightRadiusFt} ft bright).`;
+  }
+
   // Bless (PHB p.219) — caster picks up to 3 creatures (RAW). Pansori
   // simplifies: caster + first 2 living non-caster party members are
   // blessed. Each gets +1d4 to attack rolls (saves are a follow-up).

@@ -63,6 +63,7 @@ import {
   distanceFeet,
   findPath,
   hasLineOfSight,
+  isIlluminated,
   opportunityAttackTriggers,
   posEqual,
 } from './gridEngine.js';
@@ -1313,16 +1314,23 @@ function computeEnemyAttack(
     !!attackerEnt &&
     attackerEnt.hp <= (attackerEnt.maxHp ?? attackerEnt.hp) / 2;
   // SRD Vision & Light — darkness (Heavily Obscured). The enemy attacking a
-  // target it can't see (no darkvision/blindsight) is at Disadvantage; a target
-  // that can't see the enemy is attacked at Advantage. Enemies default to 60 ft
-  // darkvision; the target's blindsight comes from Feral Senses / Devil's Sight.
+  // target it can't see is at Disadvantage; a target that can't see the enemy is
+  // attacked at Advantage. "Can see X" = darkvision/blindsight OR X stands in an
+  // illuminated cell (Light/Daylight/torch overrides the dark). Enemies default
+  // to 60 ft darkvision; the target's blindsight comes from Feral Senses /
+  // Devil's Sight.
   const darkRoom = roomLighting === 'dark';
+  const lightEnts = st.entities ?? [];
+  const pcEntForLight = lightEnts.find((e) => e.id === char.id && !e.isEnemy);
+  const enemyCellLit = !!attackerEnt && isIlluminated(attackerEnt.pos, lightEnts);
+  const pcCellLit = !!pcEntForLight && isIlluminated(pcEntForLight.pos, lightEnts);
   const enemySeesInDark = seesInDarkness(enemy.darkvision_ft ?? 60, false);
   const targetBlindsight =
     hasFeralSenses(char) || (char.feats?.includes('devils_sight') ?? false);
   const targetSeesInDark = seesInDarkness(char.darkvision_ft ?? 0, targetBlindsight);
-  const darknessDisadv = darkRoom && !enemySeesInDark;
-  const darknessAdv = darkRoom && !targetSeesInDark;
+  // Enemy can't see the PC → Disadvantage; PC can't see the enemy → Advantage.
+  const darknessDisadv = darkRoom && !(enemySeesInDark || pcCellLit);
+  const darknessAdv = darkRoom && !(targetSeesInDark || enemyCellLit);
   const hasAdvantage = hasElusive(char)
     ? false
     : advFromConditions || isReckless || packTacticsAdv || bloodiedFrenzyAdv || darknessAdv;
