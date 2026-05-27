@@ -18,8 +18,8 @@ PHB/DMG-exclusive content (subclasses, feats, species, spells). See
 
 ## Implementation status (code-verified 2026-05-26)
 
-Grounded in a code survey + the full backend suite: **1904 tests across
-220 files, all green** (lint + typecheck clean).
+Grounded in a code survey + the full backend suite: **1912 tests across
+221 files, all green** (lint + typecheck clean).
 
 ### Done — rules-engine frameworks
 
@@ -302,10 +302,16 @@ backend features are waiting on, and a handful of **bounded subsystems**.
       that lifts the cap without healing. `commitCharacter` now also mirrors
       `max_hp` onto the PC grid entity. (Deferred: the Wight's
       humanoid-rises-as-a-zombie clause — a campaign-timeline mechanic.)
-- [ ] **Monster auras (emanations)** → **Stench** (Ghast). Generalize the
-      start-of-turn `holyNimbusRadiant` hook into a reusable "save-or-condition /
-      damage to creatures within N ft" aura, ticked at turn-start / round-wrap.
-      Covers Stench + future aura monsters. Medium.
+- [x] **Monster auras (emanations)** → **Stench** (Ghast) — shipped
+      (`monsterAuras.spec.ts`). A reusable `MonsterAura` on the enemy template
+      (radius, optional save, condition, duration, damage), applied by
+      `applyMonsterAuras` when a PC starts its turn within range: a plain save
+      (proficiency + Aura of Protection; Inspiration NOT auto-spent, so a
+      recurring aura can't drain it), then the condition and/or damage. Hooked
+      into the PC turn-advance beside Holy Nimbus. The Ghast's Stench = CON save
+      DC 10 → Poisoned within 5 ft. (Deferred: the 24-hour immunity on a success
+      — the PC re-saves each turn; enemy-side aura ticks; Dwarven-Resilience-
+      style save advantages on the aura save.)
 - [ ] **Enemy reactions** → **Parry** (Bandit Captain). The `pending_reaction`
       system is PC-only; add a defending-monster reaction window in the PC-attack
       resolver (mirror Shield's pause/resume). Interim cheap version: a passive
