@@ -64,6 +64,7 @@ import {
   saveCampaignState,
 } from '../services/campaignEngine.js';
 import { broadcastParticipantChange, broadcastSessionState } from '../services/broadcast.js';
+import { expertiseSlotsForClassLevel, resolveCreationExpertise } from '../services/multiclass.js';
 import type { AuthedRequest } from '../auth/middleware.js';
 import { applyFeatTake } from '../services/feats.js';
 import { generateSeed } from '../services/procgen.js';
@@ -218,6 +219,18 @@ gameRouter.get('/contexts', (_req, res) => {
                 default: DEFAULT_FIGHTING_STYLE,
               },
             ] as const;
+          })
+          .filter((e): e is NonNullable<typeof e> => e !== null)
+      ),
+      // SRD Expertise slots a class grants at level 1 (Rogue: 2), for the
+      // creation picker. Only the count travels — the eligible skills are the
+      // character's proficiencies (class + background + species), which the
+      // creation screen assembles from the live draft.
+      expertiseChoices: Object.fromEntries(
+        Object.keys(c.classPrimaryStats)
+          .map((cls) => {
+            const count = expertiseSlotsForClassLevel(cls, 1);
+            return count > 0 ? ([cls, { count }] as const) : null;
           })
           .filter((e): e is NonNullable<typeof e> => e !== null)
       ),
@@ -504,6 +517,13 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
         // 2024 Fighting Style — the Fighter's level-1 pick (chosen or default).
         // Other classes start empty (Paladin/Ranger pick theirs in-game at L2).
         fighting_styles: resolveCreationFightingStyles(c.character_class, c.fighting_style),
+        // SRD Expertise — the Rogue's two level-1 picks (chosen or default).
+        // Other classes start empty (Bard/Wizard gain Expertise in-game at L2).
+        expertise_skills: resolveCreationExpertise(
+          c.character_class,
+          c.rogue_expertise,
+          skillProfs
+        ),
         attuned_items: [],
         // 2024 SRD: every class chooses its subclass at level 3, and pansori's
         // strict-SRD build has exactly one subclass per class — so creation no

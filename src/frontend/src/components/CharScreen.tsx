@@ -171,6 +171,10 @@ interface CharDraft {
   // 2024 Fighting Style (Fighter's level-1 slot). Undefined = the default
   // (shown pre-selected). Cleared on class change.
   fightingStyle?: string;
+  // SRD Expertise (Rogue's two level-1 slots). Undefined = the default (the
+  // first proficiencies, shown pre-selected). Cleared on class change; stale
+  // picks are filtered against the live proficiency pool.
+  rogueExpertise?: string[];
 }
 
 // 'sleight_of_hand' → 'Sleight of Hand'. Skill ids are snake_case.
@@ -246,6 +250,29 @@ const masteryTitle = (m: string) =>
 function skillTitle(id: string): string {
   const info = SKILL_INFO[id];
   return info ? `${info.ability} — ${info.desc}` : skillLabel(id);
+}
+
+// Skill proficiencies a species grants at creation. Mirrors the species skill
+// grants applied server-side in routes/game.ts — Elf / Drow gain Perception
+// (Keen Senses); Human gains Athletics (Skillful). Returned as snake_case ids
+// to match the class / background skill format so the pool dedups cleanly
+// (the server matches Expertise picks case-insensitively regardless).
+function speciesSkillGrants(speciesId: string): string[] {
+  if (speciesId === 'elf' || speciesId === 'drow') return ['perception'];
+  if (speciesId === 'human') return ['athletics'];
+  return [];
+}
+
+// The skills a draft character is proficient in at level 1 = chosen (or
+// default) class skills ∪ background skills ∪ species grant. This is the pool
+// the Rogue's Expertise picker draws from (SRD: Expertise = any proficient
+// skill). Recomputed from the live draft so it tracks class / background /
+// species edits; the picker filters stale picks against it.
+function expertisePool(draft: CharDraft, ctx: BackendContextSummary | undefined): string[] {
+  const classSkills = draft.classSkills ?? ctx?.classSkillChoices?.[draft.cls]?.default ?? [];
+  const bgSkills =
+    ctx?.backgrounds.find((b) => b.id === draft.backgroundId)?.skillProficiencies ?? [];
+  return Array.from(new Set([...classSkills, ...bgSkills, ...speciesSkillGrants(draft.speciesId)]));
 }
 
 // Per-context localStorage key for the saved party draft. We key on the
@@ -573,6 +600,22 @@ function CharScreen({
         `${d.name || `Hero ${badMastery + 1}`} must choose exactly ${choice.count} weapon master${choice.count === 1 ? 'y' : 'ies'}`
       );
     }
+    // Classes with level-1 Expertise (Rogue) must have exactly their slot count
+    // chosen from the character's proficiency pool.
+    const badExpertise = party.findIndex((d) => {
+      const choice = beCtx?.expertiseChoices?.[d.cls];
+      if (!choice) return false;
+      const pool = expertisePool(d, beCtx);
+      const sel = (d.rogueExpertise ?? pool.slice(0, choice.count)).filter((s) => pool.includes(s));
+      return sel.length !== choice.count;
+    });
+    if (badExpertise >= 0) {
+      const d = party[badExpertise];
+      const choice = beCtx!.expertiseChoices[d.cls];
+      return setError(
+        `${d.name || `Hero ${badExpertise + 1}`} must choose exactly ${choice.count} Expertise skill${choice.count === 1 ? '' : 's'}`
+      );
+    }
     setError('');
     localStorage.setItem('operative_name', leader.name.trim());
     try {
@@ -590,6 +633,7 @@ function CharScreen({
           starting_equipment: d.startingEquipment,
           weapon_masteries: d.weaponMasteries,
           fighting_style: d.fightingStyle,
+          rogue_expertise: d.rogueExpertise,
         })),
         contextId
       );
@@ -690,6 +734,7 @@ function CharScreen({
                         startingEquipment: undefined,
                         weaponMasteries: undefined,
                         fightingStyle: undefined,
+                        rogueExpertise: undefined,
                       })
                     }
                   >
@@ -755,6 +800,77 @@ function CharScreen({
                                     ? selected.filter((s) => s !== sk)
                                     : [...selected, sk];
                                   updateDraft(idx, { classSkills: next });
+                                }}
+                                style={{
+                                  fontSize: '0.7rem',
+                                  padding: '0.25rem 0.55rem',
+                                  letterSpacing: '0.04em',
+                                  background: on ? 'var(--t-separator)' : 'transparent',
+                                  border: `1px solid ${on ? 'var(--t-primary)' : 'var(--t-border)'}`,
+                                  color: on
+                                    ? 'var(--t-primary)'
+                                    : disabled
+                                      ? 'var(--t-separator)'
+                                      : 'var(--t-dim)',
+                                  cursor: disabled ? 'default' : 'pointer',
+                                  fontFamily: 'inherit',
+                                }}
+                              >
+                                {on ? '✓ ' : ''}
+                                {skillLabel(sk)}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* SRD Expertise — classes that grant it at level 1 (Rogue)
+                      pick N skills from their proficiencies (class + background
+                      + species) for double proficiency. The slot count comes
+                      from the BE context; the eligible skills are computed from
+                      the live draft. Mirrors the class-skill picker. */}
+                  {(() => {
+                    const choice = beContexts[contextId]?.expertiseChoices?.[draft.cls];
+                    if (!choice) return null;
+                    const pool = expertisePool(draft, beContexts[contextId]);
+                    if (pool.length === 0) return null;
+                    const selected = (draft.rogueExpertise ?? pool.slice(0, choice.count)).filter(
+                      (s) => pool.includes(s)
+                    );
+                    const atCap = selected.length >= choice.count;
+                    const complete = selected.length === choice.count;
+                    return (
+                      <div style={{ marginTop: 12 }}>
+                        <label className={styles.formLbl}>
+                          EXPERTISE — CHOOSE {choice.count}{' '}
+                          <span
+                            style={{ color: complete ? 'var(--t-primary)' : 'var(--t-hp-mid)' }}
+                            data-testid={`expertise-count-${idx}`}
+                          >
+                            ({selected.length}/{choice.count})
+                          </span>
+                        </label>
+                        <div
+                          style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}
+                          data-testid={`expertise-skills-${idx}`}
+                        >
+                          {pool.map((sk) => {
+                            const on = selected.includes(sk);
+                            const disabled = !on && atCap;
+                            return (
+                              <button
+                                key={sk}
+                                type="button"
+                                aria-pressed={on}
+                                disabled={disabled}
+                                title={skillTitle(sk)}
+                                onClick={() => {
+                                  const next = on
+                                    ? selected.filter((s) => s !== sk)
+                                    : [...selected, sk];
+                                  updateDraft(idx, { rogueExpertise: next });
                                 }}
                                 style={{
                                   fontSize: '0.7rem',

@@ -71,6 +71,10 @@ const CharacterInputSchema = z
     // invalid/omitted falls back to the default. Later picks (Fighter L7,
     // Paladin/Ranger L2) are made in-game.
     fighting_style: z.string().min(1).max(40).optional(),
+    // SRD Expertise picks chosen at creation (Rogue's two level-1 slots). Each
+    // must be one of the character's proficient skills; re-validated server-
+    // side, with an invalid/omitted list falling back to the first proficiencies.
+    rogue_expertise: z.array(z.string().min(1).max(40)).max(8).optional(),
     feat_choices: FeatChoicesSchema.optional(),
     // 2024 background ability-score increase. Omitted = +1 to all three of the
     // background's listed abilities; supplied = +2 to `plus2` and +1 to `plus1`
