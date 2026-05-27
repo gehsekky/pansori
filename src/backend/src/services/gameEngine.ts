@@ -6382,6 +6382,13 @@ async function runEnemyMultiattackLoop(args: {
     if (sub.outcome === 'paused') return { kind: 'paused', st, narrative };
     target = sub.target;
     if (wasBloodied && target.hp < preHitHp) rampageTriggered = true;
+    // Commit each swing's result into st before the next one. The dispatcher
+    // re-reads the target from st.characters by id, so without this commit a
+    // Multiattack's later swings recompute from the pre-turn HP and only the
+    // last swing's damage (and any conditions it applied) would stick. Mid-turn
+    // commit also lets a condition applied by an earlier swing (e.g. Paralyzed)
+    // inform later swings, as RAW intends.
+    st = commitCharacter(st, target);
     if (sub.outcome === 'killed-massive') {
       massiveDeath = true;
       break;
@@ -6410,11 +6417,8 @@ async function runEnemyMultiattackLoop(args: {
         e.id === args.enemyId && e.isEnemy ? { ...e, rampage_used: true } : e
       ),
     };
-    // Commit the post-multiattack target HP into st.characters so the extra
-    // swing (which the dispatcher re-reads from st.characters by id) stacks on
-    // the damage already dealt this turn rather than recomputing from the
-    // pre-turn HP.
-    st = commitCharacter(st, target);
+    // (The loop already committed `target` into st.characters after the final
+    // swing, so the extra Rend stacks on the damage dealt this turn.)
     narrative += ` 🐺 Rampage! The ${args.enemy.name} surges in for an extra attack.`;
     const ctx = buildEnemyActionCtx({
       st,

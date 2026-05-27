@@ -334,15 +334,19 @@ backend features are waiting on, and a handful of **bounded subsystems**.
       bonus half-Speed move + the kill-then-retarget-another-creature case are
       deferred. Covered: catalog flag, extra-Rend-vs-Bloodied, no-trigger-when-
       healthy, 1/day gate, no-op without the flag.
-  - [ ] **Multiattack HP non-accumulation (found during Rampage)** — in the
-        dispatcher-routed enemy turn, each swing of a Multiattack re-reads the
-        target from `st.characters` (which `computeEnemyAttack`/`applyDamage`
-        never commit between swings), so a 2-attack monster nets only ONE swing's
-        HP loss (the last `commitCharacter`), though the narrative prints each
-        hit. Rampage works around it locally (commits the target before its extra
-        swing). The root fix — commit `target` inside the loop each iteration —
-        is deferred: it changes damage output for every Multiattack monster and
-        needs a balance pass + an audit of the end-of-turn integration specs.
+  - [x] **Multiattack HP non-accumulation (found during Rampage)** — fixed
+        (`multiattackAccumulation.spec.ts`). In the dispatcher-routed enemy turn,
+        each swing of a Multiattack re-reads the target from `st.characters`
+        (which `computeEnemyAttack`/`applyDamage` never commit between swings), so
+        a 2-attack monster used to net only ONE swing's HP loss (the last
+        `commitCharacter`), though the narrative printed each hit.
+        `runEnemyMultiattackLoop` now commits `target` after every swing, so
+        later swings stack on the damage already dealt (and a condition applied by
+        an earlier swing — e.g. Paralyzed — informs the later ones, as RAW
+        intends). **Balance note:** this raises effective damage for every
+        Multiattack monster; the full suite stayed green (no spec had encoded the
+        old under-damaging behavior — damage specs use single sub-attacks), but
+        encounters are now meaningfully harder and may want a tuning pass.
 - [ ] **Lighting / illumination model** → **Sunlight Sensitivity** (Kobold,
       Specter — Disadvantage in sunlight). No illumination substrate exists; this
       is the same architectural gap that blocks the Truesight / see-Invisible
