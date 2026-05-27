@@ -69,6 +69,14 @@ describe('SRD bestiary additions — effect fields', () => {
     expect(SRD_MONSTERS.zombie.con).toBe(16);
   });
 
+  it('Ghast carries the Stench aura (CON save → Poisoned within 5 ft)', () => {
+    expect(SRD_MONSTERS.ghast.aura).toMatchObject({
+      radiusFt: 5,
+      save: { ability: 'con', dc: 10 },
+      condition: 'poisoned',
+    });
+  });
+
   it('Specter and Wight carry Life Drain (necrotic max-HP reduction)', () => {
     // Specter: all-necrotic attack drains the full damage.
     expect(SRD_MONSTERS.specter.lifeDrain).toBe(true);

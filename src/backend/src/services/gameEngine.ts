@@ -886,6 +886,74 @@ export function holyNimbusRadiant(enemyId: string, st: GameState): number {
 }
 
 /**
+ * SRD monster auras / emanations (Ghast Stench, …) — applied when a PC starts
+ * its turn. For each living enemy carrying an `aura`, if the PC is within the
+ * aura's radius (off-grid: assumed in range, like Holy Nimbus), the PC makes
+ * the aura's save (with save proficiency + Aura of Protection); on a failure
+ * (or with no save) it takes the aura's `damage` and/or gains its `condition`.
+ * Returns the updated character + state + a narrative fragment.
+ *
+ * Heroic Inspiration / Indomitable are deliberately NOT auto-spent here — a
+ * recurring aura would drain them every turn. Species save advantages (e.g.
+ * Dwarven Resilience vs poison) on the aura save are not yet applied.
+ */
+export function applyMonsterAuras(
+  char: Character,
+  st: GameState,
+  seed: Seed,
+  context: Context
+): { char: Character; st: GameState; narrative: string } {
+  if (char.dead || char.hp <= 0) return { char, st, narrative: '' };
+  let updated = char;
+  let workingSt = st;
+  let narrative = '';
+  const charEnt = st.entities?.find((e) => e.id === char.id && !e.isEnemy);
+  for (const ent of st.entities ?? []) {
+    if (!ent.isEnemy || ent.hp <= 0 || workingSt.enemies_killed.includes(ent.id)) continue;
+    const aura = getEnemyById(seed, ent.id)?.aura;
+    if (!aura) continue;
+    // Range — off-grid (no PC position) assumes in range, like Holy Nimbus.
+    const inRange = !charEnt ? true : distanceFeet(charEnt.pos, ent.pos) <= aura.radiusFt;
+    if (!inRange) continue;
+    const label = aura.name ?? 'aura';
+    if (aura.save) {
+      const ability = aura.save.ability;
+      const proficient = hasSaveProficiency(updated, ability, context);
+      const score = (updated as unknown as Record<string, number>)[ability] ?? 10;
+      const roll =
+        d(20) +
+        abilityMod(score) +
+        (proficient ? profBonus(updated.level) : 0) +
+        auraOfProtectionBonus(updated, workingSt) -
+        d20TestPenalty(updated);
+      if (roll >= aura.save.dc) {
+        narrative += ` ${fmt.note(`[${label}] ${updated.name} resists (${ability.toUpperCase()} ${roll} vs DC ${aura.save.dc}).`)}`;
+        continue;
+      }
+    }
+    if (aura.damage) {
+      const dmg = rollDice(aura.damage);
+      const res = applyDamage(updated, workingSt, dmg);
+      updated = res.char;
+      workingSt = res.st;
+      narrative += ` ${fmt.note(`[${label}] ${updated.name} takes ${fmt.dmg(dmg)}${aura.damageType ? ' ' + aura.damageType : ''} damage.`)}`;
+    }
+    if (aura.condition && !updated.conditions.includes(aura.condition)) {
+      updated = {
+        ...updated,
+        conditions: [...updated.conditions, aura.condition],
+        condition_durations: {
+          ...updated.condition_durations,
+          [aura.condition]: aura.conditionDuration ?? 1,
+        },
+      };
+      narrative += ` ${fmt.note(`[${label}] ${updated.name} is ${aura.condition}!`)}`;
+    }
+  }
+  return { char: updated, st: workingSt, narrative };
+}
+
+/**
  * SRD Paladin Aura of Courage (L10) and Oath of Devotion's Aura of Devotion
  * (L7): a creature within a conscious paladin's aura can't be Frightened
  * (Courage) / Charmed (Devotion), and an existing such condition ends. Returns
@@ -8414,6 +8482,12 @@ export async function takeAction({
             ticked = { ...ticked, inspiration: true };
             narrative += ` ${fmt.note(`[Heroic Warrior] ${ticked.name} gains Heroic Inspiration.`)}`;
           }
+          // SRD monster auras / emanations (Ghast Stench) — a PC that starts its
+          // turn within an enemy aura makes the aura's save or suffers its effect.
+          const auraRes = applyMonsterAuras(ticked, st, seed, context);
+          ticked = auraRes.char;
+          st = auraRes.st;
+          narrative += auraRes.narrative;
           st = { ...st, characters: st.characters.map((c, i) => (i === nextCharIdx ? ticked : c)) };
           st.active_character_id = ticked.id;
         }

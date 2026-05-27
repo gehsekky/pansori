@@ -570,7 +570,17 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     damageType: 'slashing',
     bonusDamage: '2d8', // claw rider ≈ the bite's necrotic
     bonusDamageType: 'necrotic',
-    // Stench aura deferred.
+    // Stench — a creature that starts its turn within 5 ft makes a CON save
+    // (DC 10) or is Poisoned until the start of its next turn. (The RAW
+    // 24-hour immunity on a success is not tracked — the target re-saves
+    // each turn it begins in the emanation.)
+    aura: {
+      radiusFt: 5,
+      save: { ability: 'con', dc: 10 },
+      condition: 'poisoned',
+      conditionDuration: 1,
+      name: 'Stench',
+    },
   },
   griffon: {
     name: 'Griffon',

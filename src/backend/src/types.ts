@@ -148,6 +148,26 @@ export type LairAction = {
   narrative: string; // pre-effect description (e.g. "The walls shake...")
 };
 
+/**
+ * SRD monster aura / emanation (Ghast Stench, etc.) — a recurring effect on
+ * every creature that starts its turn within `radiusFt` of the source. On a
+ * failed save (or with no save), the creature takes `damage` and/or gains
+ * `condition`. Applied to PCs at their turn start (see `applyMonsterAuras`).
+ */
+export interface MonsterAura {
+  radiusFt: number;
+  // Optional saving throw; on a success the creature is unaffected this turn.
+  save?: { ability: AbilityKey; dc: number };
+  // Condition inflicted on a failed save (e.g. Stench → poisoned).
+  condition?: ConditionName;
+  conditionDuration?: number; // rounds; default 1
+  // Optional recurring damage (dice expr) for damaging auras.
+  damage?: string;
+  damageType?: string;
+  // Display label for the narrative (e.g. 'Stench').
+  name?: string;
+}
+
 export interface EnemyTemplate {
   name: string;
   cr: number;
@@ -192,6 +212,9 @@ export interface EnemyTemplate {
   // attack; Wight: the necrotic `bonusDamage` rider). Read in
   // `computeEnemyAttack`.
   lifeDrain?: boolean;
+  // SRD aura / emanation (Ghast Stench) — recurring effect on creatures that
+  // start their turn within range. Applied to PCs in `applyMonsterAuras`.
+  aura?: MonsterAura;
   // Spell-casting (see Enemy.spells for runtime behaviour).
   spells?: string[];
   castChance?: number;
@@ -251,6 +274,7 @@ export interface Enemy {
   bonusDamageType?: string;
   undeadFortitude?: boolean;
   lifeDrain?: boolean;
+  aura?: MonsterAura;
   // Spell-casting enemies (e.g. cultists, acolytes, mages). On their turn,
   // they roll castChance (0–1) to decide cast vs attack; if cast wins, one
   // spell from `spells` is picked. Spells must exist in context.spellTable
