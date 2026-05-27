@@ -84,3 +84,11 @@ Never cite PHB pages — pansori doesn't carry PHB content.
 3. **Test before commit.** Each new mechanical addition gets a
    matching `.spec.ts`; lint, tsc, and the full test suite must
    pass.
+
+## CI / agent behavior
+
+- **Don't block on CI.** After pushing, do NOT poll or `gh run
+  watch` the GitHub Actions CI/Deploy job. Push, tell me it's
+  pushed, and let me watch it — I'll flag any failure. (The local
+  gate — lint + tsc + the full test suite — is what you're
+  responsible for; CI is mine to monitor.)
