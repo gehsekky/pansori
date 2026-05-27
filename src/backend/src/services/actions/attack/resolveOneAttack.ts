@@ -263,6 +263,38 @@ export function resolveOneAttack(
     });
     brutalNote = ' 💥 Brutal Strike (advantage forgone)';
   }
+  // ── SRD Parry (enemy reaction) ──────────────────────────────────────────
+  // Bandit Captain et al.: when hit by a melee attack roll while holding a
+  // weapon, the creature adds 2 to its AC against that attack, possibly turning
+  // the hit into a miss. AI-spent — only when the +2 would actually flip THIS
+  // hit to a miss, once per round (a Nat 20 always hits, so it can't be
+  // parried). Runs after every miss-to-hit rescue so the final hit status is
+  // settled. Melee only; unarmed strikes count (range undefined).
+  let parryNote = '';
+  if (
+    atk.hit &&
+    atk.roll !== 20 &&
+    target.parry &&
+    weaponItem?.range !== 'ranged' &&
+    atk.total < effectiveEnemyAc + 2
+  ) {
+    const parryEnt = ctx.st.entities?.find((e) => e.id === targetId && e.isEnemy);
+    // With a grid, gate on the entity's once-per-round reaction; without one
+    // (entity-less combat), allow the parry but there's nothing to track.
+    if (!ctx.st.entities || (parryEnt && !parryEnt.reaction_used)) {
+      atk.hit = false;
+      atk.damage = 0;
+      if (ctx.st.entities) {
+        ctx.st = {
+          ...ctx.st,
+          entities: ctx.st.entities.map((e) =>
+            e.id === targetId && e.isEnemy ? { ...e, reaction_used: true } : e
+          ),
+        };
+      }
+      parryNote = ` 🛡 Parry — ${target.name} deflects the blow (+2 AC → ${effectiveEnemyAc + 2})`;
+    }
+  }
   // Unconscious target within 5 ft: an attack that hits is a crit (SRD).
   const autoCritCheck =
     enemyUnconscious &&
@@ -314,7 +346,7 @@ export function resolveOneAttack(
   const atkNote =
     ' ' +
     fmt.note(
-      `(${label}d20 ${atk.roll}+${atk.atkMod} ${atk.atkStat}+${atk.prof} prof${bonusNote} = ${atk.total} vs AC ${effectiveEnemyAc}${coverNote}${disadvNote}${versatileNote})${noProfNote}${biNote}${blessNote}${baneNote}${strokeNote}${peerlessNote}${peerlessAimNote}${brutalNote}`
+      `(${label}d20 ${atk.roll}+${atk.atkMod} ${atk.atkStat}+${atk.prof} prof${bonusNote} = ${atk.total} vs AC ${effectiveEnemyAc}${coverNote}${disadvNote}${versatileNote})${noProfNote}${biNote}${blessNote}${baneNote}${strokeNote}${peerlessNote}${peerlessAimNote}${brutalNote}${parryNote}`
     );
 
   if (atk.fumble) {

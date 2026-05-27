@@ -222,6 +222,12 @@ export interface EnemyTemplate {
   // attack; Wight: the necrotic `bonusDamage` rider). Read in
   // `computeEnemyAttack`.
   lifeDrain?: boolean;
+  // SRD Parry (Bandit Captain reaction) — when hit by a melee attack roll while
+  // holding a weapon, the creature adds 2 to its AC against that attack,
+  // possibly turning the hit into a miss. Once per round; the engine spends it
+  // only when the +2 would actually flip a hit to a miss (a Nat 20 can't be
+  // parried). Read in `resolveOneAttack`; the reaction refreshes on round wrap.
+  parry?: boolean;
   // SRD aura / emanation (Ghast Stench) — recurring effect on creatures that
   // start their turn within range. Applied to PCs in `applyMonsterAuras`.
   aura?: MonsterAura;
@@ -284,6 +290,9 @@ export interface Enemy {
   bonusDamageType?: string;
   undeadFortitude?: boolean;
   lifeDrain?: boolean;
+  // SRD Parry reaction — see EnemyTemplate.parry. Mirrored here + carried
+  // through procgen; read in `resolveOneAttack`.
+  parry?: boolean;
   aura?: MonsterAura;
   // Spell-casting enemies (e.g. cultists, acolytes, mages). On their turn,
   // they roll castChance (0–1) to decide cast vs attack; if cast wins, one

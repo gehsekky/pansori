@@ -225,6 +225,10 @@ export interface CombatEntity {
   // contested check vs the grappler. Stamped by the enemy attack's auto-apply
   // onHitEffect path; cleared alongside `grappled_by` on escape/incapacitation.
   grapple_escape_dc?: number;
+  // SRD enemy reaction economy — set when a monster spends its one reaction
+  // this round (e.g. Bandit Captain Parry). Refreshed (cleared) on round wrap,
+  // mirroring "you regain your reaction at the start of each of your turns".
+  reaction_used?: boolean;
   // SRD Charmed (enemy charmed by a PC, e.g. Charm Person/Monster) — the
   // charmer's character id. A Charmed creature can't attack its charmer, so
   // `selectTarget` drops the charmer from this enemy's candidate targets.
