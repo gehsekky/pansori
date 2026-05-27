@@ -22,6 +22,11 @@ export const handleEnemyAttack: ActionHandler<{
   const target = ctx.st.characters.find((c) => c.id === action.targetCharId);
   if (!target) return { rejected: 'enemy_attack: target not found.' };
 
+  // SRD Vision & Light — pass the current room's light level so darkness can
+  // impose Disadvantage / grant Advantage on the swing (resolved downstream).
+  const roomLighting =
+    ctx.seed?.rooms?.find((r) => r.id === ctx.st.current_room)?.lighting ?? 'bright';
+
   const result = resolveEnemySubAttack({
     enemy,
     enemyId: enemy.id,
@@ -32,6 +37,7 @@ export const handleEnemyAttack: ActionHandler<{
     advIdx: action.advIdx,
     mi: action.multiattackIdx,
     narrative: ctx.narrative,
+    roomLighting,
   });
   ctx.st = result.st;
   ctx.narrative = result.narrative;

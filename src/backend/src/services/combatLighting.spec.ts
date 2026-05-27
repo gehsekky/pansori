@@ -1,0 +1,181 @@
+// SRD 5.2.1 Vision & Light — darkness in combat. In a Heavily Obscured ('dark')
+// room a creature that can't see (no Darkvision / Blindsight) is effectively
+// Blinded: its attack rolls have Disadvantage and attack rolls against it have
+// Advantage. Dim light is only Lightly Obscured (Perception, not combat).
+// Enemies default to 60 ft darkvision; the explicit no-darkvision monsters
+// (humans, a few beasts/giants) carry darkvision_ft: 0.
+//
+// PC side is asserted via the attack note ("(disadvantage — ... darkness ...)"
+// vs "(advantage)"); the enemy side via a pinned dice sequence where the
+// darkness Advantage flips a miss into a hit.
+
+import type { Character, Enemy, GameState, Seed } from '../types.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { makeChar, makeState } from '../test-fixtures.js';
+import { SRD_MONSTERS } from '../contexts/srd/monsters.js';
+import { context as ctx } from '../contexts/sandbox.js';
+import { takeAction } from './gameEngine.js';
+
+afterEach(() => vi.restoreAllMocks());
+
+const ENEMY_ID = `${ctx.startRoomId}#0`;
+
+describe('darkvision catalog', () => {
+  it('humans carry darkvision_ft 0; monsters default to seeing in the dark', () => {
+    expect(SRD_MONSTERS.bandit.darkvision_ft).toBe(0);
+    expect(SRD_MONSTERS.guard.darkvision_ft).toBe(0);
+    expect(SRD_MONSTERS.giant_eagle.darkvision_ft).toBe(0);
+    expect(SRD_MONSTERS.hill_giant.darkvision_ft).toBe(0);
+    expect(SRD_MONSTERS.wyvern.darkvision_ft).toBe(120);
+    // Most monsters leave it unset (→ 60 default in the combat check).
+    expect(SRD_MONSTERS.goblin.darkvision_ft).toBeUndefined();
+  });
+});
+
+function seedWith(lighting: 'bright' | 'dim' | 'dark', enemy: Partial<Enemy>): Seed {
+  return {
+    context_id: ctx.id,
+    world_name: 'Light Test',
+    ship_name: 'Light Test',
+    intro: '',
+    seed_id: 'light',
+    rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '', lighting }],
+    connections: { [ctx.startRoomId]: [] },
+    enemies: {
+      [ctx.startRoomId]: [
+        {
+          id: ENEMY_ID,
+          name: 'Foe',
+          hp: 40,
+          ac: 13,
+          damage: '1d6+1',
+          toHit: 4,
+          xp: 50,
+          str: 12,
+          dex: 12,
+          con: 12,
+          damageType: 'slashing',
+          ...enemy,
+        } as Enemy,
+      ],
+    },
+    loot: {},
+    npcs: {},
+  };
+}
+
+// PC adjacent to the enemy. `darkvisionFt` lets a test give the PC darkvision.
+function pcState(charOverrides: Partial<Character> = {}): GameState {
+  const pc = makeChar({
+    id: 'pc-1',
+    character_class: 'Fighter',
+    level: 1,
+    str: 16,
+    dex: 12,
+    ac: 13,
+    hp: 30,
+    max_hp: 30,
+    inventory: [{ instance_id: 'ss-1', id: 'shortsword', name: 'Shortsword' }],
+    equipped_weapon: 'ss-1',
+    weapon_proficiencies: ['simple', 'martial'],
+    ...charOverrides,
+  });
+  return {
+    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    characters: [pc],
+    active_character_id: 'pc-1',
+    initiative_order: [
+      { id: 'pc-1', roll: 18, is_enemy: false },
+      { id: ENEMY_ID, roll: 5, is_enemy: true },
+    ],
+    initiative_idx: 0,
+    round: 1,
+    entities: [
+      { id: 'pc-1', isEnemy: false, pos: { x: 4, y: 5 }, hp: 30, maxHp: 30, conditions: [], condition_durations: {} },
+      { id: ENEMY_ID, isEnemy: true, pos: { x: 5, y: 5 }, hp: 40, maxHp: 40, conditions: [], condition_durations: {} },
+    ],
+  } as unknown as GameState;
+}
+
+describe('PC attacks — darkness visibility', () => {
+  it('a PC without darkvision attacks at disadvantage in a dark room', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const r = await takeAction({
+      action: { type: 'attack', targetEnemyId: ENEMY_ID },
+      history: [],
+      state: pcState(), // no darkvision
+      seed: seedWith('dark', {}), // enemy defaults to 60 ft DV → it can see the PC
+      context: ctx,
+    });
+    expect(r.narrative).toMatch(/disadvantage/);
+    expect(r.narrative).toMatch(/darkness/);
+  });
+
+  it('a PC WITH darkvision is unaffected by a dark room', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const r = await takeAction({
+      action: { type: 'attack', targetEnemyId: ENEMY_ID },
+      history: [],
+      state: pcState({ darkvision_ft: 60 }),
+      seed: seedWith('dark', {}),
+      context: ctx,
+    });
+    expect(r.narrative).not.toMatch(/darkness/);
+  });
+
+  it('dim light does not affect attack rolls (Perception only)', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const r = await takeAction({
+      action: { type: 'attack', targetEnemyId: ENEMY_ID },
+      history: [],
+      state: pcState(), // no darkvision
+      seed: seedWith('dim', {}),
+      context: ctx,
+    });
+    expect(r.narrative).not.toMatch(/darkness/);
+    expect(r.narrative).not.toMatch(/disadvantage/);
+  });
+
+  it('a PC with darkvision attacking a blind (no-DV) enemy in the dark has advantage', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const r = await takeAction({
+      action: { type: 'attack', targetEnemyId: ENEMY_ID },
+      history: [],
+      state: pcState({ darkvision_ft: 60 }), // PC sees → no disadvantage
+      seed: seedWith('dark', { darkvision_ft: 0 }), // enemy can't see the PC → advantage
+      context: ctx,
+    });
+    expect(r.narrative).toMatch(/advantage/);
+    expect(r.narrative).not.toMatch(/disadvantage/);
+  });
+});
+
+describe('enemy attacks — darkness visibility', () => {
+  it('a seeing enemy gains advantage attacking a no-darkvision PC in the dark', async () => {
+    // Advantage rolls two d20s and takes the higher. Sequence: first die low
+    // (d20 2 → would miss), second die high (d20 19 → hits); rest 0.5.
+    vi.spyOn(Math, 'random').mockReturnValue(0.5).mockReturnValueOnce(0.05).mockReturnValueOnce(0.9);
+    const r = await takeAction({
+      action: { type: 'end_turn' },
+      history: [],
+      state: pcState(), // PC has no darkvision → enemy (60 ft DV) sees it → advantage
+      seed: seedWith('dark', {}),
+      context: ctx,
+    });
+    const pc = r.newState.characters[0];
+    expect(pc.hp).toBeLessThan(30); // the high die (advantage) connected
+  });
+
+  it('the same low first roll misses a darkvision PC (no advantage)', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5).mockReturnValueOnce(0.05).mockReturnValueOnce(0.9);
+    const r = await takeAction({
+      action: { type: 'end_turn' },
+      history: [],
+      state: pcState({ darkvision_ft: 60 }), // PC sees the enemy → no advantage → single low die
+      seed: seedWith('dark', {}),
+      context: ctx,
+    });
+    const pc = r.newState.characters[0];
+    expect(pc.hp).toBe(30); // the lone low roll missed
+  });
+});

@@ -6,6 +6,7 @@ import {
   d20TestPenalty,
   hasArmorProficiency,
   hasWeaponProficiency,
+  seesInDarkness,
 } from '../../rulesEngine.js';
 import type { Enemy, InventoryItem, LootItem } from '../../../types.js';
 import { coverBonus, distanceFeet, isFlankingPosition } from '../../gridEngine.js';
@@ -249,6 +250,18 @@ export function computeToHitContext(
     };
   }
 
+  // SRD Vision & Light — in a Heavily Obscured (dark) room a creature that can't
+  // see (no Darkvision / Blindsight) is effectively Blinded: it attacks at
+  // Disadvantage, and attacks against an unseen target have Disadvantage too /
+  // attacks against it have Advantage. Dim light is only Lightly Obscured
+  // (Perception, not combat). Enemies default to 60 ft darkvision.
+  const roomLighting = ctx.seed?.rooms?.find((r) => r.id === ctx.roomId)?.lighting ?? 'bright';
+  const pcBlindsight = hasFeralSenses(pc.char) || (pc.char.feats?.includes('devils_sight') ?? false);
+  const darknessDisadv =
+    roomLighting === 'dark' && !seesInDarkness(pc.char.darkvision_ft ?? 0, pcBlindsight);
+  const darknessAdv =
+    roomLighting === 'dark' && !seesInDarkness(target.darkvision_ft ?? 60, false);
+
   const disadvantage =
     rangedInMelee ||
     conditionDisadv ||
@@ -256,7 +269,8 @@ export function computeToHitContext(
     heavyWeaponSmallDisadv ||
     !armorProficient ||
     proneDisadv ||
-    thrownLongRangeDisadv;
+    thrownLongRangeDisadv ||
+    darknessDisadv;
 
   const inspirationAdv = !!pc.char.turn_actions.inspiration_pending;
   if (inspirationAdv) {
@@ -298,7 +312,8 @@ export function computeToHitContext(
     studyAdv ||
     packTacticsAdv ||
     luckAdv ||
-    steadyAimAdv;
+    steadyAimAdv ||
+    darknessAdv;
 
   const disadvReasons = [
     rangedInMelee ? 'ranged in melee' : '',
@@ -312,6 +327,7 @@ export function computeToHitContext(
     !armorProficient ? `not proficient with ${equippedArmorLootItem?.name ?? 'armor'}` : '',
     proneDisadv ? 'prone (ranged)' : '',
     thrownLongRangeDisadv ? 'thrown beyond normal range' : '',
+    darknessDisadv ? 'darkness — you can\'t see' : '',
   ]
     .filter(Boolean)
     .join(', ');

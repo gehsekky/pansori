@@ -30,6 +30,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   // ─── CR 1/8 ────────────────────────────────────────────────────────────────
   bandit: {
     name: 'Bandit',
+    darkvision_ft: 0, // human — no darkvision
     cr: 0.125,
     hp: 11,
     ac: 12,
@@ -227,6 +228,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   // ─── CR 2 ──────────────────────────────────────────────────────────────────
   cult_fanatic: {
     name: 'Cult Fanatic',
+    darkvision_ft: 0, // human — no darkvision
     cr: 2,
     hp: 33,
     ac: 13,
@@ -280,6 +282,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   guard: {
     name: 'Guard',
+    darkvision_ft: 0, // human — no darkvision
     cr: 0.125,
     hp: 11,
     ac: 16,
@@ -296,6 +299,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   cultist: {
     name: 'Cultist',
+    darkvision_ft: 0, // human — no darkvision
     cr: 0.125,
     hp: 9,
     ac: 12,
@@ -356,6 +360,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   // ─── More CR 1/2 ─────────────────────────────────────────────────────────────
   scout: {
     name: 'Scout',
+    darkvision_ft: 0, // human — no darkvision
     cr: 0.5,
     hp: 16,
     ac: 13,
@@ -519,6 +524,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   // ─── More CR 2 ───────────────────────────────────────────────────────────────
   bandit_captain: {
     name: 'Bandit Captain',
+    darkvision_ft: 0, // human — no darkvision
     cr: 2,
     hp: 52,
     ac: 15,
@@ -538,6 +544,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   berserker: {
     name: 'Berserker',
+    darkvision_ft: 0, // human — no darkvision
     cr: 2,
     hp: 67,
     ac: 13,
@@ -677,6 +684,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   // actions are noted as deferred where the engine can't yet express them.
   hippogriff: {
     name: 'Hippogriff',
+    darkvision_ft: 0, // relies on sight — no darkvision
     cr: 1,
     hp: 26,
     ac: 11,
@@ -696,6 +704,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   giant_eagle: {
     name: 'Giant Eagle',
+    darkvision_ft: 0, // relies on sight — no darkvision
     cr: 1,
     hp: 26,
     ac: 13,
@@ -777,6 +786,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   giant_boar: {
     name: 'Giant Boar',
+    darkvision_ft: 0, // no darkvision
     cr: 2,
     hp: 42,
     ac: 13,
@@ -825,6 +835,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   hill_giant: {
     name: 'Hill Giant',
+    darkvision_ft: 0, // no darkvision
     cr: 5,
     hp: 105,
     ac: 13,
@@ -870,6 +881,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   gladiator: {
     name: 'Gladiator',
+    darkvision_ft: 0, // human — no darkvision
     cr: 5,
     hp: 112,
     ac: 16,
@@ -959,6 +971,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   wyvern: {
     name: 'Wyvern',
+    darkvision_ft: 120,
     cr: 6,
     hp: 127,
     ac: 14,
