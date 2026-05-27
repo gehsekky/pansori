@@ -162,6 +162,30 @@ export const SRD_SPELLS: Record<string, Spell> = {
     rangeFt: 120,
     spellList: ['arcane'],
   },
+  // SRD: Sorcerous Burst — a Sorcerer cantrip. Ranged spell attack; 1d8 of a
+  // chosen type (scales to 4d8). Each d8 that rolls an 8 explodes into another
+  // d8, up to spellcasting-mod added dice (rollSorcerousBurst). The damage-type
+  // choice is not modeled (cast as fire), like Chromatic Orb.
+  sorcerous_burst: {
+    id: 'sorcerous_burst',
+    name: 'Sorcerous Burst',
+    level: 0,
+    castTime: 'action',
+    damage: '1d8',
+    damageType: 'fire',
+    attackRoll: true,
+    upcastBonus: '1d8',
+    desc: 'Spell attack roll: 1d8 damage (your choice of Acid, Cold, Fire, Lightning, Poison, Psychic, or Thunder; cast as fire here — chosen-type picker deferred). Each 8 rolled explodes into another d8, up to your spellcasting modifier in added dice. Scales to 2d8/3d8/4d8 at levels 5/11/17.',
+    narratives: {
+      cast: [
+        '{name} flings a crackling mote of raw sorcery at {target}',
+        "{name}'s bloodline flares — a burst of wild magic lances toward {target}",
+      ],
+    },
+    rangeKind: 'ranged',
+    rangeFt: 120,
+    spellList: ['arcane'],
+  },
   eldritch_blast: {
     id: 'eldritch_blast',
     name: 'Eldritch Blast',
