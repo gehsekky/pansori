@@ -68,7 +68,7 @@ Grounded in a code survey + the full backend suite: **1912 tests across
 | Category                  | In pansori                                       | SRD universe                     |
 | ------------------------- | ------------------------------------------------ | -------------------------------- |
 | Spells                    | **216** (27 cantrips + 189 leveled, through L9)  | ~330                             |
-| Shared SRD monster pool   | **31** (`SRD_MONSTERS`) + per-campaign templates | hundreds                         |
+| Shared SRD monster pool   | **39** (`SRD_MONSTERS`) + per-campaign templates | hundreds                         |
 | Species                   | 9                                                | 9 standalone + Drow lineage      |
 | Classes                   | 12                                               | 12                               |
 | Subclasses                | 12 iconic (1 / class)                            | 1 iconic / class in SRD          |
@@ -246,13 +246,22 @@ backend features are waiting on, and a handful of **bounded subsystems**.
         moving AoE/hazard than a summoned creature.
   - [ ] **Find Familiar** — a non-combatant utility companion (can't take
         the Attack action RAW); a scouting/aid model, not the ally-turn AI.
-- [~] **Monsters** — stat-block content. The shared pool grew 12 → 31
-  (`monsters.spec.ts`): a CR 1/8–3 spread of SRD 5.2.1 bestiary entries
+- [~] **Monsters** — stat-block content. The shared pool grew 12 → 31 → **39**
+  (`monsters.spec.ts`): a CR 1/8–**5** spread of SRD 5.2.1 bestiary entries
   (kobold, guard, cultist, giant rat, zombie, scout, worg, gnoll, black
   bear, dire wolf, specter, animated armor, bandit captain, berserker,
-  ghast, griffon, owlbear, manticore, wight) using the supported fields
-  (multiattack, onHitEffect, resistances/immunities/condition-immunities,
-  speedFt). Three ability hooks then shipped (`monsterAbilities.spec.ts`),
+  ghast, griffon, owlbear, manticore, wight, **hippogriff, giant eagle, lion,
+  bugbear warrior, saber-toothed tiger, giant boar, mummy, hill giant**) using
+  the supported fields (multiattack, onHitEffect incl. the grapple-on-hit
+  escapeDc, resistances/vulnerabilities/immunities/condition-immunities,
+  bonusDamage, packTactics, bloodiedFrenzy, speedFt, attackReachFt). The latest
+  batch extends the range to the first **CR 5** (Hill Giant), gives a second
+  grapple-on-hit (Bugbear Warrior, escape DC 12), a full undead kit (Mummy:
+  fire-vulnerable, necrotic/poison + condition immunities, +3d6 necrotic, WIS-
+  save Frighten on hit), bonus-radiant + resistances (Giant Eagle), Pack Tactics
+  (Lion), and Bloodied Fury (Giant Boar). Per-monster specials deferred:
+  Flyby (no fly-OA model), Lion Roar, the boar/giant charge + auto-Prone riders,
+  and the Mummy's Rotting Curse (no-heal + max-HP decay). Three ability hooks then shipped (`monsterAbilities.spec.ts`),
   all in `computeEnemyAttack`: **Pack Tactics** (`packTactics` — Advantage when
   an ally is within 5 ft of the target; wolf/kobold/giant rat/worg/dire wolf),
   **Bloodied Frenzy** (`bloodiedFrenzy` — Advantage while the attacker is ≤ ½
