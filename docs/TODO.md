@@ -524,11 +524,17 @@ options }`** → `OptionPickerDialog` (single-select; re-sends `action[param]`).
       `computeToHitContext` (PC side) and `computeEnemyAttack` (enemy side, room
       light threaded through `resolveEnemySubAttack` / `handleEnemyAttack` /
       `fireLegendaryAction`); the `seesInDarkness` helper centralizes the rule.
-      **Remaining:** cell-grained lighting (torchlight radius, the Light /
-      Darkness spells creating local bright/dark inside a room), a distinct
-      "sunlight" state for Sunlight Sensitivity, auto-Blinded narration, and
-      lighting-adjusted active Perception. (Room-grained Stealth/Perception
-      already shipped.)
+      **Light-source counterplay shipped** (same spec): the grid entity carries a
+      `light_radius_ft`; the **Light** cantrip (20 ft bright) and **Daylight**
+      (60 ft) make the caster a light source, and `isIlluminated(pos, entities)`
+      treats a cell within 2× the bright radius (bright + dim) as lit. The
+      combat-visibility check is now per-cell — "can see X" = darkvision/blindsight
+      OR X stands in a lit cell — so a no-darkvision party can cast Light / carry a
+      torch to fight without the darkness penalty (and a light-bearer is revealed
+      to blind foes). **Remaining:** the **Darkness** spell (the inverse — a dark
+      zone that overrides light and blinds even darkvision); obstacles blocking
+      light (LoS); a distinct "sunlight" state for Sunlight Sensitivity;
+      auto-Blinded narration; and lighting-adjusted active Perception.
 - [ ] **Somatic spell components** — RAW requires a free hand; needs a
       hand-state model. No spell carries a `somatic` flag yet. Also unlocks
       focus-substitutes-for-material.

@@ -9,7 +9,7 @@ import {
   seesInDarkness,
 } from '../../rulesEngine.js';
 import type { Enemy, InventoryItem, LootItem } from '../../../types.js';
-import { coverBonus, distanceFeet, isFlankingPosition } from '../../gridEngine.js';
+import { coverBonus, distanceFeet, isFlankingPosition, isIlluminated } from '../../gridEngine.js';
 import { getClassLevel, hasClass, hasFeralSenses } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import { hasFightingStyle } from '../../fightingStyle.js';
@@ -251,16 +251,22 @@ export function computeToHitContext(
   }
 
   // SRD Vision & Light — in a Heavily Obscured (dark) room a creature that can't
-  // see (no Darkvision / Blindsight) is effectively Blinded: it attacks at
-  // Disadvantage, and attacks against an unseen target have Disadvantage too /
-  // attacks against it have Advantage. Dim light is only Lightly Obscured
-  // (Perception, not combat). Enemies default to 60 ft darkvision.
+  // see is effectively Blinded: it attacks at Disadvantage, and attacks against
+  // it have Advantage. "Can see X" = darkvision/blindsight, OR X stands in an
+  // illuminated cell (a light source — Light/Daylight/torch — overrides the
+  // dark). Dim light is only Lightly Obscured (Perception, not combat). Enemies
+  // default to 60 ft darkvision.
   const roomLighting = ctx.seed?.rooms?.find((r) => r.id === ctx.roomId)?.lighting ?? 'bright';
   const pcBlindsight = hasFeralSenses(pc.char) || (pc.char.feats?.includes('devils_sight') ?? false);
+  const litEntities = ctx.st.entities ?? [];
+  const pcEntForLight = litEntities.find((e) => e.id === pc.char.id);
+  const enemyCellLit = !!enemyEntity2 && isIlluminated(enemyEntity2.pos, litEntities);
+  const pcCellLit = !!pcEntForLight && isIlluminated(pcEntForLight.pos, litEntities);
   const darknessDisadv =
-    roomLighting === 'dark' && !seesInDarkness(pc.char.darkvision_ft ?? 0, pcBlindsight);
+    roomLighting === 'dark' &&
+    !(seesInDarkness(pc.char.darkvision_ft ?? 0, pcBlindsight) || enemyCellLit);
   const darknessAdv =
-    roomLighting === 'dark' && !seesInDarkness(target.darkvision_ft ?? 60, false);
+    roomLighting === 'dark' && !(seesInDarkness(target.darkvision_ft ?? 60, false) || pcCellLit);
 
   const disadvantage =
     rangedInMelee ||

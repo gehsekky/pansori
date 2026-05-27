@@ -14,6 +14,22 @@ export function distanceFeet(a: GridPos, b: GridPos): number {
   return chebyshev(a, b) * SQUARE_SIZE;
 }
 
+/**
+ * SRD 5.2.1 Vision & Light — whether `pos` is illuminated by any light source
+ * on the grid. A source sheds bright light to `light_radius_ft` and dim light
+ * for the same distance beyond, so a cell within 2× the bright radius is at
+ * least dimly lit. A creature in such a cell can be SEEN even by an observer
+ * without darkvision, so the darkness blind-combat penalties don't apply to it.
+ * (Obstacles don't yet block light — a refinement.) Returns false when there
+ * are no light sources, so darkness reduces to the room-level rule.
+ */
+export function isIlluminated(pos: GridPos, entities: CombatEntity[]): boolean {
+  return entities.some((e) => {
+    const r = e.light_radius_ft ?? 0;
+    return r > 0 && distanceFeet(e.pos, pos) <= r * 2;
+  });
+}
+
 export function adjacentPositions(pos: GridPos): GridPos[] {
   const out: GridPos[] = [];
   for (let dx = -1; dx <= 1; dx++) {

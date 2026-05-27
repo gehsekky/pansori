@@ -233,6 +233,13 @@ export interface CombatEntity {
   // attack this encounter. Unlike `reaction_used` this is NOT refreshed on round
   // wrap (1/day ≈ once per combat); it clears only when entities are re-seeded.
   rampage_used?: boolean;
+  // SRD Vision & Light — bright-light radius (ft) this entity sheds as a light
+  // source (the Light cantrip / a torch on a PC, Daylight, etc.). A cell within
+  // this radius is brightly lit, and within 2× it is at least dimly lit — either
+  // way a creature there is illuminated and can be SEEN in a dark room, dodging
+  // the darkness blind-combat penalties. 0/undefined = not a light source. Set
+  // by the Light/Daylight cast paths; read via `isIlluminated`.
+  light_radius_ft?: number;
   // SRD Charmed (enemy charmed by a PC, e.g. Charm Person/Monster) — the
   // charmer's character id. A Charmed creature can't attack its charmer, so
   // `selectTarget` drops the charmer from this enemy's candidate targets.
