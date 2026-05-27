@@ -89,8 +89,18 @@ export interface Room {
 
 export interface OnHitEffect {
   condition: ConditionName;
-  ability: 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha';
-  dc: number;
+  // Save to avoid the condition. Omit BOTH `ability` and `dc` for an automatic
+  // on-hit application that allows no save (e.g. the Griffon's Rend grapple,
+  // which lands on any hit). When present, the struck PC rolls this save to
+  // negate the condition.
+  ability?: AbilityKey;
+  dc?: number;
+  // SRD monster grapples specify a fixed escape DC rather than a contested
+  // check. With `condition: 'grappled'`, this DC is stamped onto the struck
+  // PC's grid entity as `grapple_escape_dc`; `try_escape_grapple` then rolls a
+  // STR(Athletics)/DEX(Acrobatics) check against it. (SRD: Griffon — escape
+  // DC 14 from both front claws.)
+  escapeDc?: number;
 }
 
 // Boss phase changes. When the boss's hp drops below `hpPct` of its max,

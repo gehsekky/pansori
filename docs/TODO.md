@@ -322,10 +322,20 @@ backend features are waiting on, and a handful of **bounded subsystems**.
       Specter — Disadvantage in sunlight). No illumination substrate exists; this
       is the same architectural gap that blocks the Truesight / see-Invisible
       boons. Architectural; low priority for a dungeon-centric engine.
-- [ ] **Grapple-on-hit** → **Griffon** (and constrictors). `onHitEffect` already
-      accepts `grappled` (blocks movement, tracks `grappled_by`); the only gap is
-      confirming a PC can escape a _monster's_ grapple via the existing contested
-      check. Near-free — verify + wire.
+- [x] **Grapple-on-hit** → **Griffon** — shipped (`griffonGrapple.spec.ts`).
+      `OnHitEffect.ability`/`dc` are now optional: omitting both means an
+      **auto-apply** (no-save) on-hit effect, the shape the Griffon's Rend needs
+      (grapple lands on any hit). A new `OnHitEffect.escapeDc` carries the SRD
+      monster-grapple escape DC; the enemy-attack path stamps `grappled_by` +
+      `grapple_escape_dc` on the struck PC's grid entity (adding `grappled`
+      with no duration entry so it persists until escape / incapacitation, not
+      the per-turn tick). `try_escape_grapple` now rolls a STR(Athletics)/
+      DEX(Acrobatics) check against the **fixed escape DC 14** when present —
+      _not_ the prior contested check, which used `abilityMod(toHit)` (a STR mod
+      of −2 for the Griffon) and let a PC escape trivially. The existing
+      grapple-release sweep already clears a PC's grapple when the grappler is
+      incapacitated. (Constrictors/other monster grapples now reuse the same
+      `{ condition: 'grappled', escapeDc }` shape.)
 
 ### Frontend creation / choice surfaces (backend ready, FE pending)
 
