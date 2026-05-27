@@ -229,6 +229,10 @@ export interface CombatEntity {
   // this round (e.g. Bandit Captain Parry). Refreshed (cleared) on round wrap,
   // mirroring "you regain your reaction at the start of each of your turns".
   reaction_used?: boolean;
+  // SRD Gnoll Rampage (1/Day) — set once the creature has taken its bonus Rampage
+  // attack this encounter. Unlike `reaction_used` this is NOT refreshed on round
+  // wrap (1/day ≈ once per combat); it clears only when entities are re-seeded.
+  rampage_used?: boolean;
   // SRD Charmed (enemy charmed by a PC, e.g. Charm Person/Monster) — the
   // charmer's character id. A Charmed creature can't attack its charmer, so
   // `selectTarget` drops the charmer from this enemy's candidate targets.

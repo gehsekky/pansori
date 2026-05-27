@@ -228,6 +228,12 @@ export interface EnemyTemplate {
   // only when the +2 would actually flip a hit to a miss (a Nat 20 can't be
   // parried). Read in `resolveOneAttack`; the reaction refreshes on round wrap.
   parry?: boolean;
+  // SRD Gnoll Rampage (1/Day) — immediately after one of the creature's swings
+  // deals damage to an already-Bloodied target (its HP was ≤ half its max BEFORE
+  // the hit), it moves up to half its Speed and makes one extra attack. Once per
+  // encounter; tracked on the entity as `rampage_used`. Handled in
+  // `runEnemyMultiattackLoop`.
+  rampage?: boolean;
   // SRD aura / emanation (Ghast Stench) — recurring effect on creatures that
   // start their turn within range. Applied to PCs in `applyMonsterAuras`.
   aura?: MonsterAura;
@@ -293,6 +299,9 @@ export interface Enemy {
   // SRD Parry reaction — see EnemyTemplate.parry. Mirrored here + carried
   // through procgen; read in `resolveOneAttack`.
   parry?: boolean;
+  // SRD Gnoll Rampage (1/Day) — see EnemyTemplate.rampage. Read in
+  // `runEnemyMultiattackLoop`.
+  rampage?: boolean;
   aura?: MonsterAura;
   // Spell-casting enemies (e.g. cultists, acolytes, mages). On their turn,
   // they roll castChance (0–1) to decide cast vs attack; if cast wins, one
