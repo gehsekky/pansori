@@ -129,9 +129,13 @@ export function runSaveSpell(
     const potentHalf = spell.level === 0 && hasPotentCantrip(char);
     spellDmg = saveFailed
       ? fullDmg
-      : spell.saveEffect === 'half' || potentHalf
-        ? Math.floor(fullDmg / 2)
-        : 0;
+      : // SRD Heat Metal — the damage lands in full even on a successful save;
+        // only the rider condition is gated by it.
+        spell.damageIgnoresSave
+        ? fullDmg
+        : spell.saveEffect === 'half' || potentHalf
+          ? Math.floor(fullDmg / 2)
+          : 0;
     if (!saveFailed && potentHalf && spell.saveEffect !== 'half') {
       ctx.narrative += ` ${fmt.note('[Potent Cantrip: half damage on a save]')}`;
     }

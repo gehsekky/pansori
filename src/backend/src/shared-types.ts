@@ -134,7 +134,15 @@ export type ConditionName =
   // attack rolls against them. Self-buff under Concentration; read via
   // `ENEMY_DISADV_CONDITIONS` (imposesDisadvantageOnAttackers) in the enemy
   // attack path, like `invisible`. Cleared by breakConcentration.
-  | 'blurred';
+  | 'blurred'
+  // SRD: Bestow Curse — a generic hindering curse; the cursed creature attacks
+  // at Disadvantage (`imposesDisadvantageOnSelfAttacks`). Concentration-linked,
+  // cleared by breakConcentration. (RAW's choice of curse effects is abstracted
+  // to this one debuff.)
+  | 'cursed'
+  // SRD: Heat Metal — a creature seared by the superheated metal attacks at
+  // Disadvantage until the start of the caster's next turn (≈ 1 round).
+  | 'heat_seared';
 
 export type NpcAttitude = 'friendly' | 'indifferent' | 'hostile';
 

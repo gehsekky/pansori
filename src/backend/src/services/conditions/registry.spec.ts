@@ -131,9 +131,9 @@ describe('condition registry — derived Sets (compat shim)', () => {
     );
   });
 
-  it('DISADV_CONDITIONS matches pre-registry membership', () => {
+  it('DISADV_CONDITIONS — self-attack-disadvantage conditions (+ cursed / heat_seared)', () => {
     expect([...DISADV_CONDITIONS].sort()).toEqual(
-      ['blinded', 'frightened', 'poisoned', 'prone', 'restrained'].sort()
+      ['blinded', 'cursed', 'frightened', 'heat_seared', 'poisoned', 'prone', 'restrained'].sort()
     );
   });
 

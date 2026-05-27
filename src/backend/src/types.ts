@@ -473,6 +473,10 @@ export interface Spell {
   damageType?: string;
   savingThrow?: AbilityKey;
   saveEffect?: 'half' | 'negates';
+  // SRD Heat Metal — the damage is dealt in full regardless of the save; only
+  // the rider `condition` is gated by it. When true, `runSaveSpell` applies the
+  // full rolled damage on a success too (overriding `saveEffect`).
+  damageIgnoresSave?: boolean;
   attackRoll?: boolean; // true = uses spell attack roll vs enemy AC
   heal?: string; // dice expr for healing
   condition?: ConditionName;

@@ -133,6 +133,86 @@ export const SRD_SPELLS: Record<string, Spell> = {
     spellList: ['divine', 'arcane'],
   },
 
+  // ─── Spell batch: control & debuff (Sleet Storm, Heat Metal, Bestow Curse) ──
+  // SRD: Sleet Storm — freezing sleet fills a 20-ft-radius area; creatures in it
+  // make a DEX save or fall Prone. Modeled as the initial knockdown burst (the
+  // lingering difficult terrain / heavy obscurement / dousing flames and the
+  // spell's Concentration are not modeled).
+  sleet_storm: {
+    id: 'sleet_storm',
+    name: 'Sleet Storm',
+    level: 3,
+    castTime: 'action',
+    savingThrow: 'dex',
+    saveEffect: 'negates',
+    condition: 'prone',
+    conditionDuration: 1,
+    aoeCondition: true,
+    blastRadius: 20,
+    aoeShape: 'sphere',
+    rangeKind: 'ranged',
+    rangeFt: 150,
+    desc: 'Freezing sleet lashes a 20-ft-radius area. Each creature in it makes a DEX save or is knocked Prone. (The lingering difficult terrain, obscurement, and Concentration are not modeled — pansori applies the initial knockdown.)',
+    narratives: {
+      cast: [
+        '{name} calls down a stinging curtain of sleet over the area',
+        '{name} sweeps a hand and freezing rain hammers the ground to ice',
+      ],
+    },
+    spellList: ['primal', 'arcane'],
+  },
+  // SRD: Heat Metal — a metal weapon or piece of armor glows red-hot. The
+  // target takes 2d8 fire damage (no save reduces it) and, on a failed CON
+  // save, attacks at Disadvantage until the start of your next turn. (The
+  // metal-object requirement + the sustained bonus-action re-damage are not
+  // modeled — a single searing burst.)
+  heat_metal: {
+    id: 'heat_metal',
+    name: 'Heat Metal',
+    level: 2,
+    castTime: 'action',
+    damage: '2d8',
+    damageType: 'fire',
+    upcastBonus: '1d8',
+    savingThrow: 'con',
+    damageIgnoresSave: true,
+    condition: 'heat_seared',
+    conditionDuration: 1,
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    desc: 'Metal a creature wears or wields glows red-hot: 2d8 fire damage (+1d8 per slot above 2nd), which no save reduces, and on a failed CON save the creature attacks at Disadvantage until the start of your next turn.',
+    narratives: {
+      cast: [
+        "{name} points at {target}'s gear and the metal flares searing red",
+        '{name} speaks a word of heat — {target}’s armor begins to smoke',
+      ],
+    },
+    spellList: ['arcane', 'primal'],
+  },
+  // SRD: Bestow Curse — touch a creature; on a failed WIS save it is Cursed for
+  // the duration. RAW offers a choice of curse effects; pansori applies one
+  // hindering curse — the cursed creature attacks at Disadvantage (Concentration).
+  bestow_curse: {
+    id: 'bestow_curse',
+    name: 'Bestow Curse',
+    level: 3,
+    castTime: 'action',
+    savingThrow: 'wis',
+    saveEffect: 'negates',
+    condition: 'cursed',
+    concentration: true,
+    durationRounds: 10,
+    rangeKind: 'touch',
+    desc: 'You touch a creature: it makes a WIS save or is Cursed for the duration, attacking at Disadvantage (Concentration, up to 1 minute). RAW lets the caster pick from several curse effects; pansori applies this one hindering curse.',
+    narratives: {
+      cast: [
+        '{name} lays a hand on {target} and speaks a word of ruin',
+        '{name} marks {target} with a curse that drags at every strike',
+      ],
+    },
+    spellList: ['arcane', 'divine'],
+  },
+
   // ─── Cantrips (level 0) ────────────────────────────────────────────────────
   sacred_flame: {
     id: 'sacred_flame',

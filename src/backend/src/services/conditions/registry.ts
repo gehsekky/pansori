@@ -186,6 +186,16 @@ const defs: ConditionDef[] = [
   // recurring save (deferred). Permanent duration here means
   // tickConditions doesn't auto-expire; concentration is the timer.
   { id: 'slowed', duration: 'permanent' },
+  // SRD Bestow Curse — a generic hindering curse. RAW lets the caster choose
+  // one of several effects; pansori models the common debuff: the cursed
+  // creature attacks at Disadvantage. Concentration-linked (duration up to 1
+  // min), so 'permanent' here keeps tickConditions from auto-expiring it — the
+  // caster's concentration is the timer (breakConcentration strips it).
+  { id: 'cursed', duration: 'permanent', imposesDisadvantageOnSelfAttacks: true },
+  // SRD Heat Metal — a creature seared by the hot metal has Disadvantage on its
+  // attacks until the start of the caster's next turn (≈ 1 round). The round-
+  // wrap tick expires it.
+  { id: 'heat_seared', duration: 1, imposesDisadvantageOnSelfAttacks: true },
   // Engine-internal: Shield spell bumps AC +5 on cast (in reaction.ts);
   // ticking the condition off must reverse the bump.
   {
