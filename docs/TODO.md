@@ -173,8 +173,6 @@ backend features are waiting on, and a handful of **bounded subsystems**.
         non-concentration riders). Deferred: Searing's per-turn fire DoT and
         Ensnaring's per-turn piercing DoT are narrated, not ticked; smites are
         melee-only (Ensnaring's RAW any-weapon is simplified).
-  - [ ] Remaining engine-gated spells: Ray of Sickness (attack-roll + condition
-        rider), Sorcerous Burst (per-cast damage-type pick).
   - [~] **Forced displacement** — shipped (RE-4): the `pushFt` spell flag +
     `pushEntityAway` (pushes a creature directly away from the caster up to
     the distance, pathed via `planEnemyApproach` toward the away-edge so it
