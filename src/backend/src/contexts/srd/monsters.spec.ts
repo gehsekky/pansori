@@ -25,6 +25,14 @@ const NEW_MONSTERS: Array<[string, number, number, number, string, number, numbe
   ['owlbear', 3, 59, 13, '2d8+5', 7, 700, 2],
   ['manticore', 3, 68, 14, '1d8+3', 5, 700, 3],
   ['wight', 3, 82, 14, '1d8+2', 4, 700, 2],
+  ['hippogriff', 1, 26, 11, '1d8+3', 5, 200, 2],
+  ['giant_eagle', 1, 26, 13, '1d4+3', 5, 200, 2],
+  ['lion', 1, 22, 12, '1d8+3', 5, 200, 2],
+  ['bugbear_warrior', 1, 33, 14, '2d6+2', 4, 200],
+  ['saber_toothed_tiger', 2, 52, 13, '2d6+4', 6, 450, 2],
+  ['giant_boar', 2, 42, 13, '2d6+3', 5, 450],
+  ['mummy', 3, 58, 11, '1d10+3', 5, 700, 2],
+  ['hill_giant', 5, 105, 13, '3d8+5', 8, 1800, 2],
 ];
 
 describe('SRD bestiary additions — core stat lines', () => {
@@ -89,9 +97,47 @@ describe('SRD bestiary additions — effect fields', () => {
   it('flyers carry their flight speed', () => {
     expect(SRD_MONSTERS.griffon.speedFt).toBe(80);
     expect(SRD_MONSTERS.worg.speedFt).toBe(50);
+    expect(SRD_MONSTERS.giant_eagle.speedFt).toBe(80);
+    expect(SRD_MONSTERS.hippogriff.speedFt).toBe(60);
+  });
+
+  it('Bugbear Warrior grapples on a hit (escape DC 12) at 10 ft reach', () => {
+    expect(SRD_MONSTERS.bugbear_warrior.onHitEffect).toMatchObject({
+      condition: 'grappled',
+      escapeDc: 12,
+    });
+    expect(SRD_MONSTERS.bugbear_warrior.attackReachFt).toBe(10);
+  });
+
+  it('Giant Eagle deals bonus radiant and resists necrotic/radiant', () => {
+    expect(SRD_MONSTERS.giant_eagle.bonusDamage).toBe('1d6');
+    expect(SRD_MONSTERS.giant_eagle.bonusDamageType).toBe('radiant');
+    expect(SRD_MONSTERS.giant_eagle.resistances).toEqual(['necrotic', 'radiant']);
+  });
+
+  it('Lion has Pack Tactics; Giant Boar has Bloodied Fury', () => {
+    expect(SRD_MONSTERS.lion.packTactics).toBe(true);
+    expect(SRD_MONSTERS.giant_boar.bloodiedFrenzy).toBe(true);
+  });
+
+  it('Mummy: fire-vulnerable, necrotic/poison-immune, condition-immune, frightens on hit', () => {
+    expect(SRD_MONSTERS.mummy.vulnerabilities).toEqual(['fire']);
+    expect(SRD_MONSTERS.mummy.immunities).toEqual(['necrotic', 'poison']);
+    expect(SRD_MONSTERS.mummy.condition_immunities).toContain('frightened');
+    expect(SRD_MONSTERS.mummy.bonusDamageType).toBe('necrotic');
+    expect(SRD_MONSTERS.mummy.onHitEffect).toEqual({
+      condition: 'frightened',
+      ability: 'wis',
+      dc: 11,
+    });
+  });
+
+  it('Hill Giant is the first CR 5, with 10 ft reach', () => {
+    expect(SRD_MONSTERS.hill_giant.cr).toBe(5);
+    expect(SRD_MONSTERS.hill_giant.attackReachFt).toBe(10);
   });
 
   it('the shared pool grew well past the original 12', () => {
-    expect(Object.keys(SRD_MONSTERS).length).toBeGreaterThanOrEqual(30);
+    expect(Object.keys(SRD_MONSTERS).length).toBeGreaterThanOrEqual(38);
   });
 });
