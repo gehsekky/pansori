@@ -404,6 +404,9 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     wis: 10,
     cha: 7,
     damageType: 'piercing',
+    // SRD: Rampage (1/Day) — after damaging an already-Bloodied target, move up
+    // to half Speed and make one extra Rend.
+    rampage: true,
   },
   black_bear: {
     name: 'Black Bear',

@@ -322,10 +322,27 @@ backend features are waiting on, and a handful of **bounded subsystems**.
       which always hits); melee only (unarmed counts). Covered: deflect-within-2,
       no-parry-when-margin≥2, once-per-round gate, no-op without the flag, and the
       round-wrap refresh.
-- [ ] **Conditional extra actions** → **Rampage** (Gnoll: bonus move + bite
-      after dropping a Bloodied creature). Needs the enemy bonus-action / extra-
-      attack-after-kill economy — the same turn-flow gap as Haste's extra action.
-      Larger.
+- [x] **Conditional extra actions** → **Rampage** (Gnoll) — shipped
+      (`gnollRampage.spec.ts`). RAW SRD 5.2.1 Rampage (1/Day) = "immediately after
+      dealing damage to a creature that is **already Bloodied**, the gnoll moves
+      up to half its Speed and makes one Rend attack" — not the 2014 "after
+      dropping a creature to 0" wording. New `EnemyTemplate/Enemy.rampage` flag +
+      a per-entity `rampage_used` (1/day → NOT refreshed on round wrap, unlike
+      `reaction_used`). In `runEnemyMultiattackLoop`: a swing that damages a
+      target whose pre-hit HP was ≤ half its max sets a trigger; after the loop,
+      the gnoll appends one extra Rend at the same (still-living) target. The
+      bonus half-Speed move + the kill-then-retarget-another-creature case are
+      deferred. Covered: catalog flag, extra-Rend-vs-Bloodied, no-trigger-when-
+      healthy, 1/day gate, no-op without the flag.
+  - [ ] **Multiattack HP non-accumulation (found during Rampage)** — in the
+        dispatcher-routed enemy turn, each swing of a Multiattack re-reads the
+        target from `st.characters` (which `computeEnemyAttack`/`applyDamage`
+        never commit between swings), so a 2-attack monster nets only ONE swing's
+        HP loss (the last `commitCharacter`), though the narrative prints each
+        hit. Rampage works around it locally (commits the target before its extra
+        swing). The root fix — commit `target` inside the loop each iteration —
+        is deferred: it changes damage output for every Multiattack monster and
+        needs a balance pass + an audit of the end-of-turn integration specs.
 - [ ] **Lighting / illumination model** → **Sunlight Sensitivity** (Kobold,
       Specter — Disadvantage in sunlight). No illumination substrate exists; this
       is the same architectural gap that blocks the Truesight / see-Invisible

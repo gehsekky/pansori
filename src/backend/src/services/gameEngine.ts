@@ -6349,7 +6349,12 @@ async function runEnemyMultiattackLoop(args: {
   let target = args.target;
   let narrative = args.narrative;
   let massiveDeath = false;
+  // SRD Gnoll Rampage (1/Day) — set when a swing this turn deals damage to a
+  // target that was ALREADY Bloodied (HP ≤ half its max BEFORE the hit).
+  let rampageTriggered = false;
   for (let mi = args.resumeMi; mi < attackCount && target.hp > 0; mi++) {
+    const preHitHp = target.hp;
+    const wasBloodied = preHitHp <= Math.floor(target.max_hp / 2);
     // EE-2 — route each swing through the dispatcher with an enemy actor.
     // The handler resolves the swing (via resolveEnemySubAttack) and
     // reports its tagged outcome back on ctx.enemySubAttack.
@@ -6376,9 +6381,63 @@ async function runEnemyMultiattackLoop(args: {
     if (!sub) break;
     if (sub.outcome === 'paused') return { kind: 'paused', st, narrative };
     target = sub.target;
+    if (wasBloodied && target.hp < preHitHp) rampageTriggered = true;
     if (sub.outcome === 'killed-massive') {
       massiveDeath = true;
       break;
+    }
+  }
+
+  // ── SRD Gnoll Rampage (1/Day) ──────────────────────────────────────────
+  // Immediately after a swing damaged an already-Bloodied target, the gnoll
+  // moves up to half its Speed and makes one extra attack. Once per encounter
+  // (1/day), tracked on the entity. Fires only while the same target still
+  // stands; the kill-then-move-and-retarget case (and the half-Speed move
+  // itself, unneeded for an adjacent re-attack) are deferred.
+  const gnollEnt = st.entities?.find((e) => e.id === args.enemyId && e.isEnemy);
+  if (
+    rampageTriggered &&
+    args.enemy.rampage &&
+    gnollEnt &&
+    !gnollEnt.rampage_used &&
+    target.hp > 0 &&
+    !massiveDeath
+  ) {
+    // Mark the 1/day use BEFORE the extra swing so it can't recurse.
+    st = {
+      ...st,
+      entities: (st.entities ?? []).map((e) =>
+        e.id === args.enemyId && e.isEnemy ? { ...e, rampage_used: true } : e
+      ),
+    };
+    // Commit the post-multiattack target HP into st.characters so the extra
+    // swing (which the dispatcher re-reads from st.characters by id) stacks on
+    // the damage already dealt this turn rather than recomputing from the
+    // pre-turn HP.
+    st = commitCharacter(st, target);
+    narrative += ` 🐺 Rampage! The ${args.enemy.name} surges in for an extra attack.`;
+    const ctx = buildEnemyActionCtx({
+      st,
+      seed: args.seed,
+      context: args.context,
+      worldName: args.worldName,
+      enemy: args.enemy,
+      ent: args.enemyEnt,
+      narrative,
+    });
+    await dispatchAction(ctx, {
+      type: 'enemy_attack',
+      targetCharId: target.id,
+      advIdx: args.advIdx,
+      multiattackIdx: attackCount, // a fresh index past the normal swings
+    });
+    st = ctx.st;
+    narrative = ctx.narrative;
+    const sub = ctx.enemySubAttack;
+    if (sub) {
+      if (sub.outcome === 'paused') return { kind: 'paused', st, narrative };
+      target = sub.target;
+      if (sub.outcome === 'killed-massive') massiveDeath = true;
     }
   }
   return { kind: 'completed', st, target, narrative, massiveDeath };

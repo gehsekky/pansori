@@ -214,6 +214,7 @@ export function generateRoguelikeSeed(context: Context, partySize = 1): Seed {
           undeadFortitude: template.undeadFortitude,
           lifeDrain: template.lifeDrain,
           parry: template.parry,
+          rampage: template.rampage,
           aura: template.aura,
           legendary_actions: template.legendary_actions,
           legendary_pool: template.legendary_pool,
