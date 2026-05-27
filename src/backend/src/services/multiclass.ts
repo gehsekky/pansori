@@ -431,6 +431,49 @@ export function expertiseSlots(char: Character): number {
   return bardSlots + rogueSlots + wizardSlots;
 }
 
+/**
+ * Expertise slots a SINGLE-class character of `className` has at `level` —
+ * the class-level view of `expertiseSlots` (which sums a multiclass build).
+ * Used by the creation screen (level 1) to decide whether to offer the
+ * Expertise picker and for how many skills.
+ */
+export function expertiseSlotsForClassLevel(className: string, level: number): number {
+  switch (className.toLowerCase()) {
+    case 'rogue':
+      return level >= 6 ? 4 : level >= 1 ? 2 : 0;
+    case 'bard':
+      return level >= 9 ? 4 : level >= 2 ? 2 : 0;
+    case 'wizard':
+      return level >= 2 ? 1 : 0;
+    default:
+      return 0;
+  }
+}
+
+/**
+ * Resolve the Expertise skills chosen at character creation. Returns the
+ * validated picks for a class that grants Expertise at level 1 (Rogue), or
+ * `[]` for any class that doesn't. A valid choice must be exactly the slot
+ * count, distinct, and drawn from the character's proficient skills; an
+ * invalid or omitted choice falls back to the first N proficiencies. Picks are
+ * normalized to the canonical casing of `proficientSkills`.
+ */
+export function resolveCreationExpertise(
+  className: string,
+  chosen: string[] | undefined,
+  proficientSkills: string[]
+): string[] {
+  const slots = expertiseSlotsForClassLevel(className, 1);
+  if (slots <= 0) return [];
+  const canonical = (s: string) =>
+    proficientSkills.find((p) => p.toLowerCase() === s.toLowerCase());
+  const picks = chosen?.map(canonical).filter((s): s is string => !!s) ?? [];
+  const distinct = new Set(picks.map((s) => s.toLowerCase()));
+  if (picks.length === slots && distinct.size === slots) return picks;
+  // Fallback: the first `slots` proficiencies (Rogue Expertise allows any).
+  return proficientSkills.slice(0, slots);
+}
+
 // SRD knowledge skills the Wizard's Scholar (L2) Expertise must be chosen from.
 const SCHOLAR_SKILLS = ['Arcana', 'History', 'Investigation', 'Medicine', 'Nature', 'Religion'];
 

@@ -18,7 +18,7 @@ PHB/DMG-exclusive content (subclasses, feats, species, spells). See
 
 ## Implementation status (code-verified 2026-05-26)
 
-Grounded in a code survey + the full backend suite: **1890 tests across
+Grounded in a code survey + the full backend suite: **1895 tests across
 219 files, all green** (lint + typecheck clean).
 
 ### Done — rules-engine frameworks
@@ -354,6 +354,14 @@ backend features are waiting on, and a handful of **bounded subsystems**.
       for the Fighter's level-1 slot (`fightingStyleSlotsForClassLevel`),
       pre-seeded with the default; `resolveCreationFightingStyles` re-validates.
       Later grants (Fighter L7, Paladin/Ranger L2) are still picked in-game.
+- [x] **Expertise picker (Rogue)** — CharScreen offers a "choose 2" grid for the
+      Rogue's level-1 Expertise (`expertiseSlotsForClassLevel`), drawn from the
+      character's live proficiency pool (chosen class skills ∪ background ∪
+      species grant), pre-seeded with the first two and gated to exactly 2.
+      `resolveCreationExpertise` re-validates server-side (subset of profs,
+      distinct, correct count) with a first-proficiencies fallback and seeds
+      `expertise_skills`. Bard/Wizard still gain Expertise in-game (L2) via the
+      existing `choose_expertise` flow.
 - [ ] **Interactive reaction prompts** — Indomitable, Stroke of Luck,
       Countercharm, Deflect Attacks auto-resolve player-favorably; let the
       player choose _when_ to spend.

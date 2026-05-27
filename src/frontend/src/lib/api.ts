@@ -95,6 +95,10 @@ export type CharacterInput = {
   // 2024 Fighting Style for the class's level-1 slot (Fighter). Omitted/invalid
   // = the default. Re-validated server-side.
   fighting_style?: string;
+  // SRD Expertise picks chosen at creation (Rogue's two level-1 slots). Each
+  // must be one of the character's proficient skills. Omitted/invalid = the
+  // first proficiencies. Re-validated server-side.
+  rogue_expertise?: string[];
   // Origin-feat choices that need player input at character creation.
   // Today only Magic Initiate variants populate this — the player picks
   // 2 cantrips + 1 L1 spell. BE validates the shape AND that each picked
@@ -140,6 +144,10 @@ export interface BackendContextSummary {
     string,
     { count: number; options: Array<{ id: string; label: string }>; default: string }
   >;
+  // Per-class Expertise slot count at level 1 (Rogue: 2), for the creation
+  // picker. The eligible skills are the character's own proficiencies, so the
+  // screen assembles the options from the live draft rather than the server.
+  expertiseChoices: Record<string, { count: number }>;
   backgrounds: Array<{
     id: string;
     name: string;

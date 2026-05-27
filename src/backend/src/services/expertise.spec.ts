@@ -6,7 +6,12 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { enemyActor, pcActor } from './actions/actor.js';
-import { expertiseSlots, hasExpertise } from './multiclass.js';
+import {
+  expertiseSlots,
+  expertiseSlotsForClassLevel,
+  hasExpertise,
+  resolveCreationExpertise,
+} from './multiclass.js';
 import { makeChar, mockRandom } from '../test-fixtures.js';
 import type { ActionContext } from './actions/types.js';
 import type { Enemy } from '../types.js';
@@ -35,6 +40,55 @@ describe('expertiseSlots', () => {
         makeChar({ character_class: 'Rogue', level: 3, class_levels: { rogue: 1, bard: 2 } })
       )
     ).toBe(4); // 2 (Rogue L1) + 2 (Bard L2)
+  });
+});
+
+describe('expertiseSlotsForClassLevel — single-class creation view', () => {
+  it('Rogue grants 2 at level 1 (4 at 6); only Rogue grants any at level 1', () => {
+    expect(expertiseSlotsForClassLevel('Rogue', 1)).toBe(2);
+    expect(expertiseSlotsForClassLevel('rogue', 6)).toBe(4);
+    expect(expertiseSlotsForClassLevel('Bard', 1)).toBe(0); // Bard waits for L2
+    expect(expertiseSlotsForClassLevel('Wizard', 1)).toBe(0); // Scholar at L2
+    expect(expertiseSlotsForClassLevel('Fighter', 1)).toBe(0);
+  });
+});
+
+describe('resolveCreationExpertise — Rogue level-1 picks', () => {
+  const profs = ['stealth', 'perception', 'sleight_of_hand', 'athletics'];
+
+  it('keeps a valid 2-skill pick drawn from the proficiencies', () => {
+    expect(resolveCreationExpertise('Rogue', ['stealth', 'perception'], profs)).toEqual([
+      'stealth',
+      'perception',
+    ]);
+  });
+
+  it('normalizes picks to the canonical proficiency casing', () => {
+    expect(resolveCreationExpertise('Rogue', ['STEALTH', 'Perception'], profs)).toEqual([
+      'stealth',
+      'perception',
+    ]);
+  });
+
+  it('falls back to the first proficiencies on an invalid / wrong-count / off-list pick', () => {
+    expect(resolveCreationExpertise('Rogue', undefined, profs)).toEqual(['stealth', 'perception']);
+    expect(resolveCreationExpertise('Rogue', ['stealth'], profs)).toEqual([
+      'stealth',
+      'perception',
+    ]); // too few
+    expect(resolveCreationExpertise('Rogue', ['stealth', 'arcana'], profs)).toEqual([
+      'stealth',
+      'perception',
+    ]); // arcana not proficient
+    expect(resolveCreationExpertise('Rogue', ['stealth', 'stealth'], profs)).toEqual([
+      'stealth',
+      'perception',
+    ]); // not distinct
+  });
+
+  it('returns [] for a class without level-1 Expertise', () => {
+    expect(resolveCreationExpertise('Fighter', ['stealth', 'perception'], profs)).toEqual([]);
+    expect(resolveCreationExpertise('Bard', ['stealth', 'perception'], profs)).toEqual([]);
   });
 });
 
