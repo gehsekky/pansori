@@ -530,7 +530,8 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     cha: 14,
     multiattack: 2,
     damageType: 'slashing',
-    // Parry reaction deferred.
+    // SRD: Parry — reaction, +2 AC vs one melee attack that hits while armed.
+    parry: true,
   },
   berserker: {
     name: 'Berserker',

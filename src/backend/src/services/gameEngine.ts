@@ -8436,12 +8436,15 @@ export async function takeAction({
         surprised: [],
         characters: st.characters.map((c) => ({ ...c, turn_actions: { ...FRESH_TURN } })),
         // Brutal Strike Hamstring lasts "until the start of your next turn" —
-        // approximated as one full round; cleared on round wrap.
-        entities: (st.entities ?? []).map((e) =>
-          e.conditions.includes('hamstrung')
-            ? { ...e, conditions: e.conditions.filter((c) => c !== 'hamstrung') }
-            : e
-        ),
+        // approximated as one full round; cleared on round wrap. Enemy
+        // reactions (Bandit Captain Parry) also refresh here.
+        entities: (st.entities ?? []).map((e) => {
+          const conditions = e.conditions.includes('hamstrung')
+            ? e.conditions.filter((c) => c !== 'hamstrung')
+            : e.conditions;
+          if (conditions === e.conditions && !e.reaction_used) return e;
+          return { ...e, conditions, reaction_used: false };
+        }),
       };
       // Tick enemy timed conditions (Charm Person/Monster, Blindness, Color
       // Spray): decrement their stamped durations and expire those reaching 0.

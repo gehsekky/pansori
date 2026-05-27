@@ -310,10 +310,18 @@ backend features are waiting on, and a handful of **bounded subsystems**.
       DC 10 → Poisoned within 5 ft. (Deferred: the 24-hour immunity on a success
       — the PC re-saves each turn; enemy-side aura ticks; Dwarven-Resilience-
       style save advantages on the aura save.)
-- [ ] **Enemy reactions** → **Parry** (Bandit Captain). The `pending_reaction`
-      system is PC-only; add a defending-monster reaction window in the PC-attack
-      resolver (mirror Shield's pause/resume). Interim cheap version: a passive
-      "+2 AC vs the first melee hit each round." Medium–large.
+- [x] **Enemy reactions** → **Parry** (Bandit Captain) — shipped (`parry.spec.ts`).
+      No PC-style `pending_reaction` pause was needed: the captain is AI-driven,
+      so the reaction resolves synchronously in `resolveOneAttack` after every
+      miss-to-hit rescue settles the final hit. RAW SRD 5.2.1 Parry = a reaction
+      that adds **+2 AC against one melee attack that hits while armed, possibly
+      causing it to miss** (not damage reduction). New `EnemyTemplate/Enemy.parry`
+      flag + a per-entity `reaction_used` (refreshed on round wrap, beside the
+      hamstrung reset). The engine spends it only when the +2 would actually flip
+      THIS hit to a miss (so it isn't wasted on a hit it can't stop or a Nat 20,
+      which always hits); melee only (unarmed counts). Covered: deflect-within-2,
+      no-parry-when-margin≥2, once-per-round gate, no-op without the flag, and the
+      round-wrap refresh.
 - [ ] **Conditional extra actions** → **Rampage** (Gnoll: bonus move + bite
       after dropping a Bloodied creature). Needs the enemy bonus-action / extra-
       attack-after-kill economy — the same turn-flow gap as Haste's extra action.
