@@ -215,6 +215,11 @@ export interface CombatEntity {
   // condition if the grappler dies/is incapacitated, and so the contested escape
   // check has a target's mod to roll against.
   grappled_by?: string;
+  // Fixed escape DC for a monster's grapple-on-hit (e.g. Griffon Rend, escape
+  // DC 14). When set, `try_escape_grapple` rolls against this DC instead of a
+  // contested check vs the grappler. Stamped by the enemy attack's auto-apply
+  // onHitEffect path; cleared alongside `grappled_by` on escape/incapacitation.
+  grapple_escape_dc?: number;
   // SRD Charmed (enemy charmed by a PC, e.g. Charm Person/Monster) — the
   // charmer's character id. A Charmed creature can't attack its charmer, so
   // `selectTarget` drops the charmer from this enemy's candidate targets.

@@ -117,9 +117,16 @@ export const handleTryEscapeGrapple: ActionHandler<{ type: 'try_escape_grapple' 
     return;
   }
   const grappler = ctx.st.entities?.find((e) => e.id === grapplerId);
+  // SRD monster grapples (e.g. Griffon Rend) specify a fixed escape DC; the
+  // grappled creature beats that static DC rather than making a contested
+  // check. Fall back to the contested STR(Athletics) check vs the grappler
+  // (the PC-grapple path) when no escape DC is stamped.
+  const escapeDc = myEntity?.grapple_escape_dc;
   const grapplerEnemy = grappler?.isEnemy ? getEnemyById(ctx.seed, grapplerId) : null;
   const grapplerStrMod = grapplerEnemy ? abilityMod(grapplerEnemy.toHit) : 0;
-  const grapplerRoll = d(20) + grapplerStrMod;
+  // The target number the escape check must EXCEED: a fixed DC means "meet or
+  // beat", so subtract 1 (the `>` comparison below then matches "≥ DC").
+  const grapplerRoll = escapeDc != null ? escapeDc - 1 : d(20) + grapplerStrMod;
 
   // Pick the better of STR (Athletics) / DEX (Acrobatics) by modifier (RAW lets
   // the grappled creature choose), then resolve once through skillCheck so the
@@ -152,6 +159,9 @@ export const handleTryEscapeGrapple: ActionHandler<{ type: 'try_escape_grapple' 
   );
   const myRoll = useAthletics ? applyIndomitableMight(char, escapeCheck.total) : escapeCheck.total;
   const skillUsed = useAthletics ? 'Athletics' : 'Acrobatics';
+  // Display the target as a static DC for a monster grapple, or the grappler's
+  // contested roll otherwise.
+  const target = escapeDc != null ? `DC ${escapeDc}` : `${grapplerRoll}`;
 
   ctx.usedInitiative = true;
   if (myRoll > grapplerRoll) {
@@ -164,13 +174,14 @@ export const handleTryEscapeGrapple: ActionHandler<{ type: 'try_escape_grapple' 
               ...e,
               conditions: e.conditions.filter((c) => c !== 'grappled'),
               grappled_by: undefined,
+              grapple_escape_dc: undefined,
             }
           : e
       ),
     };
-    ctx.narrative = `You break free of the grapple! (${skillUsed} ${myRoll} vs ${grapplerRoll})`;
+    ctx.narrative = `You break free of the grapple! (${skillUsed} ${myRoll} vs ${target})`;
   } else {
-    ctx.narrative = `You strain against the grapple but cannot escape. (${skillUsed} ${myRoll} vs ${grapplerRoll})`;
+    ctx.narrative = `You strain against the grapple but cannot escape. (${skillUsed} ${myRoll} vs ${target})`;
   }
 };
 

@@ -982,7 +982,9 @@ export function auraConditionImmunity(char: Character, st: GameState): Set<strin
 }
 
 function conditionSavingThrow(
-  effect: OnHitEffect,
+  // Only the save-based onHitEffect path reaches here (the caller branches on
+  // `ability`/`dc` being present), so they are non-optional in this scope.
+  effect: OnHitEffect & { ability: AbilityKey; dc: number },
   char: Character,
   st: GameState,
   context: Context,
@@ -1549,9 +1551,34 @@ function computeEnemyAttack(
     let inspirationConsumed = false;
     let luckConsumed = false;
     let bardicConsumed = false;
-    if (enemy.onHitEffect) {
+    // Auto-apply onHitEffect (no save) — e.g. the Griffon's Rend grapple,
+    // which lands on any hit and is escaped via a fixed DC, not a save. Handled
+    // separately from the save-based path below.
+    if (enemy.onHitEffect && !(enemy.onHitEffect.ability && enemy.onHitEffect.dc)) {
+      const cond = enemy.onHitEffect.condition;
+      if (!updatedChar.conditions.includes(cond)) {
+        // Add WITHOUT a condition_durations entry so the grapple persists until
+        // cleared by game logic (escape action / grappler incapacitation), not
+        // the per-turn tick. (PCs carry no grapple immunity to gate on.)
+        updatedChar = { ...updatedChar, conditions: [...updatedChar.conditions, cond] };
+        narrative += ` ${char.name} is ${cond}!`;
+        if (cond === 'grappled') {
+          // Stamp the grappler + escape DC on the PC's grid entity so
+          // `try_escape_grapple` rolls against the fixed DC and the
+          // grapple-release sweep can end it when the Griffon is incapacitated.
+          newSt = {
+            ...newSt,
+            entities: (newSt.entities ?? []).map((e) =>
+              e.id === updatedChar.id && !e.isEnemy
+                ? { ...e, grappled_by: enemy.id, grapple_escape_dc: enemy.onHitEffect!.escapeDc }
+                : e
+            ),
+          };
+        }
+      }
+    } else if (enemy.onHitEffect) {
       const csResult = conditionSavingThrow(
-        enemy.onHitEffect,
+        enemy.onHitEffect as OnHitEffect & { ability: AbilityKey; dc: number },
         updatedChar,
         st,
         context,

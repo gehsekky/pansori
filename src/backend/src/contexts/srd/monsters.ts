@@ -599,6 +599,10 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     multiattack: 2,
     speedFt: 80, // flight
     damageType: 'piercing',
+    // SRD: Griffon — Rend grapples a Medium-or-smaller target on a hit (no save,
+    // escape DC 14) from both front claws. All PCs are Medium/Small, so the
+    // size gate always allows it. Auto-apply onHitEffect (omitted save).
+    onHitEffect: { condition: 'grappled', escapeDc: 14 },
   },
 
   // ─── More CR 3 ───────────────────────────────────────────────────────────────
