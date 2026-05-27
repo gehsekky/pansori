@@ -744,6 +744,18 @@ export function effectiveLightFor(roomLighting: LightLevel, darkvisionFt: number
 }
 
 /**
+ * SRD 5.2.1 Vision & Light — whether a creature can see in a Heavily Obscured
+ * (dark / 'dark' room) area. Darkvision renders Darkness as Dim Light (well
+ * enough to act normally in pansori's room-grained model) and Blindsight ignores
+ * light entirely. A creature that can't see is effectively Blinded: its attack
+ * rolls have Disadvantage and attack rolls against it have Advantage. (Dim light
+ * is only Lightly Obscured — Perception, not combat — so it never reaches here.)
+ */
+export function seesInDarkness(darkvisionFt: number, blindsight: boolean): boolean {
+  return darkvisionFt > 0 || blindsight;
+}
+
+/**
  * Light-adjusted passive Perception DC. Dim light gives the observer
  * Disadvantage on sight-based Perception (-5 to passive). Dark light
  * heavily obscures — observer effectively auto-fails sight Perception;

@@ -363,10 +363,13 @@ backend features are waiting on, and a handful of **bounded subsystems**.
         Multiattack monster; the full suite stayed green (no spec had encoded the
         old under-damaging behavior — damage specs use single sub-attacks), but
         encounters are now meaningfully harder and may want a tuning pass.
-- [ ] **Lighting / illumination model** → **Sunlight Sensitivity** (Kobold,
-      Specter — Disadvantage in sunlight). No illumination substrate exists; this
-      is the same architectural gap that blocks the Truesight / see-Invisible
-      boons. Architectural; low priority for a dungeon-centric engine.
+- [ ] **Sunlight Sensitivity** (Kobold, Specter — Disadvantage in sunlight).
+      The combat-visibility substrate now exists (see "Lighting — combat darkness
+      shipped"); this just needs a distinct **bright-sunlight** light state (rooms
+      are bright/dim/dark, with no "sunlight" tier) plus the per-creature
+      `sunlightSensitivity` flag → Disadvantage on attacks (and Perception) while
+      in it. Low priority for a dungeon-centric engine, but no longer blocked on
+      the whole illumination model.
 - [x] **Grapple-on-hit** → **Griffon** — shipped (`griffonGrapple.spec.ts`).
       `OnHitEffect.ability`/`dc` are now optional: omitting both means an
       **auto-apply** (no-save) on-hit effect, the shape the Griffon's Rend needs
@@ -510,9 +513,22 @@ options }`** → `OptionPickerDialog` (single-select; re-sends `action[param]`).
       multiclasses into a caster. Bundle with multiclass UX.
 - [ ] **Magic-item attunement — remaining** — short-rest attune gating,
       Remove Curse ↔ `de_attune` interaction, cursed items in seed loot.
-- [ ] **Lighting — remaining** — cell-grained lighting (torchlight cones,
-      darkness spells), auto-Blinded in dark rooms, lighting-adjusted active
-      Perception. Room-grained Stealth/Perception already ships.
+- [~] **Lighting — combat darkness shipped** (`combatLighting.spec.ts`).
+      Room-grained `dark` light now drives combat visibility: a creature that
+      can't see (darkvision 0 + no blindsight) is effectively Blinded — its
+      attacks roll at Disadvantage and attacks against it at Advantage (the two
+      cancel when both sides are blind, per RAW). Enemies gained an explicit
+      `darkvision_ft` (default 60; humans + a few beasts/giants set to 0;
+      Wyvern 120); PCs use `darkvision_ft` + blindsight (Feral Senses / Devil's
+      Sight). `dim` is unchanged (Lightly Obscured → Perception only). Wired into
+      `computeToHitContext` (PC side) and `computeEnemyAttack` (enemy side, room
+      light threaded through `resolveEnemySubAttack` / `handleEnemyAttack` /
+      `fireLegendaryAction`); the `seesInDarkness` helper centralizes the rule.
+      **Remaining:** cell-grained lighting (torchlight radius, the Light /
+      Darkness spells creating local bright/dark inside a room), a distinct
+      "sunlight" state for Sunlight Sensitivity, auto-Blinded narration, and
+      lighting-adjusted active Perception. (Room-grained Stealth/Perception
+      already shipped.)
 - [ ] **Somatic spell components** — RAW requires a free hand; needs a
       hand-state model. No spell carries a `somatic` flag yet. Also unlocks
       focus-substitutes-for-material.

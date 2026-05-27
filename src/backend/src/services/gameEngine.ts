@@ -18,6 +18,7 @@ import {
   rollConditionSave,
   rollDeathSave,
   rollDice,
+  seesInDarkness,
 } from './rulesEngine.js';
 import type {
   AbilityKey,
@@ -1252,7 +1253,11 @@ function computeEnemyAttack(
   // spent a luck point to impose Disadvantage on this attack roll.
   // Combines with any existing adv/disadv per RAW (single advantage
   // + single disadvantage cancel to a normal roll).
-  forceDisadvantage = false
+  forceDisadvantage = false,
+  // SRD Vision & Light — the room's light level. In a 'dark' room a creature
+  // that can't see (no darkvision/blindsight) attacks at Disadvantage and is
+  // attacked at Advantage. 'dim'/'bright' don't affect attack rolls.
+  roomLighting: 'bright' | 'dim' | 'dark' = 'bright'
 ): {
   /** Updated character — HP, temp_hp, conditions, condition_durations,
    *  class_resource_uses, concentrating_on, inspiration, and
@@ -1307,9 +1312,20 @@ function computeEnemyAttack(
     !!enemy.bloodiedFrenzy &&
     !!attackerEnt &&
     attackerEnt.hp <= (attackerEnt.maxHp ?? attackerEnt.hp) / 2;
+  // SRD Vision & Light — darkness (Heavily Obscured). The enemy attacking a
+  // target it can't see (no darkvision/blindsight) is at Disadvantage; a target
+  // that can't see the enemy is attacked at Advantage. Enemies default to 60 ft
+  // darkvision; the target's blindsight comes from Feral Senses / Devil's Sight.
+  const darkRoom = roomLighting === 'dark';
+  const enemySeesInDark = seesInDarkness(enemy.darkvision_ft ?? 60, false);
+  const targetBlindsight =
+    hasFeralSenses(char) || (char.feats?.includes('devils_sight') ?? false);
+  const targetSeesInDark = seesInDarkness(char.darkvision_ft ?? 0, targetBlindsight);
+  const darknessDisadv = darkRoom && !enemySeesInDark;
+  const darknessAdv = darkRoom && !targetSeesInDark;
   const hasAdvantage = hasElusive(char)
     ? false
-    : advFromConditions || isReckless || packTacticsAdv || bloodiedFrenzyAdv;
+    : advFromConditions || isReckless || packTacticsAdv || bloodiedFrenzyAdv || darknessAdv;
   const baseDisadvantage = char.conditions.some((c) => ENEMY_DISADV_CONDITIONS.has(c)) || isDodging;
   // SRD Ranger Multiattack Defense (L7) — once this enemy has hit the PC this
   // round, its further attacks against them roll with Disadvantage (the mark
@@ -1326,7 +1342,11 @@ function computeEnemyAttack(
   // always-in-sight.
   const attackerSelfDisadv = attackerEnt?.conditions.some((c) => DISADV_CONDITIONS.has(c)) ?? false;
   const hasDisadvantage =
-    baseDisadvantage || forceDisadvantage || multiattackDefenseDisadv || attackerSelfDisadv;
+    baseDisadvantage ||
+    forceDisadvantage ||
+    multiattackDefenseDisadv ||
+    attackerSelfDisadv ||
+    darknessDisadv;
   const result = resolveEnemyAttack(enemy, char.ac, hasAdvantage, hasDisadvantage);
   // Equipped-armor lookup. `equipped_armor` stores an `instance_id`
   // (see routes/game.ts character creation), not a loot id — the
@@ -2335,7 +2355,8 @@ function fireLegendaryAction(
     const targetCharIdx = st.characters.findIndex((c) => c.id === nearestPcEnt.id && !c.dead);
     if (targetCharIdx < 0) return { st, narrative, fired: true };
     const target = st.characters[targetCharIdx];
-    const computed = computeEnemyAttack(legendary, target, st, context);
+    const legendaryLighting = seed?.rooms?.find((r) => r.id === roomId)?.lighting ?? 'bright';
+    const computed = computeEnemyAttack(legendary, target, st, context, false, legendaryLighting);
     narrative += ` ${computed.fragment.prose}`;
     // Legendary actions skip the Shield-pause path — they're meant to be
     // a fast follow-up beat. Commit immediately: write proposed state
@@ -6159,13 +6180,23 @@ export function resolveEnemySubAttack(args: {
   advIdx: number;
   mi: number;
   narrative: string;
+  // SRD Vision & Light — current room light level (threaded from the caller,
+  // which has the seed). Defaults to 'bright'.
+  roomLighting?: 'bright' | 'dim' | 'dark';
 }): EnemySubAttackResult {
   const { enemy, enemyId, enemyEnt, context, advIdx, mi } = args;
   let st = args.st;
   let target = args.target;
   let narrative = args.narrative;
   const prevHp = target.hp;
-  const computed = computeEnemyAttack(enemy, target, st, context);
+  const computed = computeEnemyAttack(
+    enemy,
+    target,
+    st,
+    context,
+    false,
+    args.roomLighting ?? 'bright'
+  );
   // Shield reaction window — pause before committing the proposed snapshot.
   if (computed.hit && isShieldEligible(target, computed.atkTotal, target.ac, context)) {
     st = {

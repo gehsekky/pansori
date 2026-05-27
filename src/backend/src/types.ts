@@ -250,6 +250,13 @@ export interface EnemyTemplate {
   // larger/faster monsters.
   attackReachFt?: number;
   speedFt?: number;
+  // SRD 5.2.1 Vision & Light — darkvision range in feet. Drives combat
+  // visibility in a Heavily Obscured (dark) room: a creature that can't see
+  // (darkvision 0 and no blindsight) attacks at Disadvantage and is attacked at
+  // Advantage. **Undefined defaults to 60** (the SRD norm for dungeon monsters);
+  // set 0 explicitly for sightless-in-dark creatures (most Humanoids, a few
+  // beasts/giants). Read in `computeEnemyAttack` / `computeToHitContext`.
+  darkvision_ft?: number;
   // HP-threshold phase transitions for boss encounters. Order does not
   // matter — engine sorts by descending hpPct internally.
   phases?: BossPhase[];
@@ -306,6 +313,9 @@ export interface Enemy {
   // SRD Gnoll Rampage (1/Day) — see EnemyTemplate.rampage. Read in
   // `runEnemyMultiattackLoop`.
   rampage?: boolean;
+  // SRD darkvision range (ft) — see EnemyTemplate.darkvision_ft. Undefined
+  // defaults to 60 in the combat-visibility check; carried through procgen.
+  darkvision_ft?: number;
   aura?: MonsterAura;
   // Spell-casting enemies (e.g. cultists, acolytes, mages). On their turn,
   // they roll castChance (0–1) to decide cast vs attack; if cast wins, one
