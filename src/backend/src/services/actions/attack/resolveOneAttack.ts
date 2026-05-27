@@ -264,19 +264,21 @@ export function resolveOneAttack(
     brutalNote = ' 💥 Brutal Strike (advantage forgone)';
   }
   // ── SRD Parry (enemy reaction) ──────────────────────────────────────────
-  // Bandit Captain et al.: when hit by a melee attack roll while holding a
-  // weapon, the creature adds 2 to its AC against that attack, possibly turning
-  // the hit into a miss. AI-spent — only when the +2 would actually flip THIS
+  // Bandit Captain / Gladiator: when hit by a melee attack roll while holding a
+  // weapon, the creature adds its proficiency bonus to AC against that attack
+  // (parryBonus — +2 Bandit Captain, +3 Gladiator; default 2), possibly turning
+  // the hit into a miss. AI-spent — only when the bonus would actually flip THIS
   // hit to a miss, once per round (a Nat 20 always hits, so it can't be
   // parried). Runs after every miss-to-hit rescue so the final hit status is
   // settled. Melee only; unarmed strikes count (range undefined).
   let parryNote = '';
+  const parryBonus = target.parryBonus ?? 2;
   if (
     atk.hit &&
     atk.roll !== 20 &&
     target.parry &&
     weaponItem?.range !== 'ranged' &&
-    atk.total < effectiveEnemyAc + 2
+    atk.total < effectiveEnemyAc + parryBonus
   ) {
     const parryEnt = ctx.st.entities?.find((e) => e.id === targetId && e.isEnemy);
     // With a grid, gate on the entity's once-per-round reaction; without one
@@ -292,7 +294,7 @@ export function resolveOneAttack(
           ),
         };
       }
-      parryNote = ` 🛡 Parry — ${target.name} deflects the blow (+2 AC → ${effectiveEnemyAc + 2})`;
+      parryNote = ` 🛡 Parry — ${target.name} deflects the blow (+${parryBonus} AC → ${effectiveEnemyAc + parryBonus})`;
     }
   }
   // Unconscious target within 5 ft: an attack that hits is a crit (SRD).

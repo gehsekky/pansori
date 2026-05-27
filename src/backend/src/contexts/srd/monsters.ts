@@ -845,4 +845,140 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     // auto-prone every hit is punishing without a stand-up budget model); the
     // ranged Trash Lob (+ Poisoned) collapses to this melee profile.
   },
+
+  // ─── High-end SRD bestiary (CR 4–6) ──────────────────────────────────────────
+  ettin: {
+    name: 'Ettin',
+    cr: 4,
+    hp: 85,
+    ac: 12,
+    damage: '2d8+5',
+    toHit: 7,
+    xp: 1100,
+    str: 21,
+    dex: 8,
+    con: 17,
+    int: 6,
+    wis: 10,
+    cha: 8,
+    multiattack: 2, // Battleaxe + Morningstar
+    speedFt: 40,
+    damageType: 'slashing',
+    // SRD: two heads — immune to a suite of "lose your senses/turn" conditions.
+    condition_immunities: ['blinded', 'charmed', 'deafened', 'frightened', 'stunned', 'unconscious'],
+    // SRD: Battleaxe Prone rider + Morningstar's Disadvantage rider deferred.
+  },
+  gladiator: {
+    name: 'Gladiator',
+    cr: 5,
+    hp: 112,
+    ac: 16,
+    damage: '2d6+4',
+    toHit: 7,
+    xp: 1800,
+    str: 18,
+    dex: 15,
+    con: 16,
+    int: 10,
+    wis: 12,
+    cha: 15,
+    multiattack: 3, // three Spear attacks
+    speedFt: 30,
+    damageType: 'piercing',
+    // SRD: Parry reaction adds +3 AC (its proficiency bonus) vs one melee hit.
+    parry: true,
+    parryBonus: 3,
+    // SRD: Shield Bash (STR save → damage + Prone) collapses to a Spear attack.
+  },
+  wraith: {
+    name: 'Wraith',
+    cr: 5,
+    hp: 67,
+    ac: 13,
+    damage: '4d8+3',
+    toHit: 6,
+    xp: 1800,
+    str: 6,
+    dex: 16,
+    con: 16,
+    int: 12,
+    wis: 14,
+    cha: 15,
+    speedFt: 60, // fly (hover)
+    damageType: 'necrotic',
+    // SRD: incorporeal — resists physical + several elements, full undead suite.
+    resistances: ['acid', 'bludgeoning', 'cold', 'fire', 'piercing', 'slashing'],
+    immunities: ['necrotic', 'poison'],
+    condition_immunities: [
+      'charmed',
+      'exhaustion',
+      'grappled',
+      'paralyzed',
+      'petrified',
+      'poisoned',
+      'prone',
+      'restrained',
+      'unconscious',
+    ],
+    // SRD: Life Drain — the necrotic hit also lowers the target's HP maximum.
+    lifeDrain: true,
+    // SRD: Sunlight Sensitivity + Create Specter deferred (no lighting model).
+  },
+  fire_elemental: {
+    name: 'Fire Elemental',
+    cr: 5,
+    hp: 93,
+    ac: 13,
+    damage: '2d6+3',
+    toHit: 6,
+    xp: 1800,
+    str: 10,
+    dex: 17,
+    con: 16,
+    int: 6,
+    wis: 10,
+    cha: 7,
+    multiattack: 2, // two Burn attacks
+    speedFt: 50,
+    damageType: 'fire',
+    resistances: ['bludgeoning', 'piercing', 'slashing'],
+    immunities: ['fire', 'poison'],
+    condition_immunities: [
+      'exhaustion',
+      'grappled',
+      'paralyzed',
+      'petrified',
+      'poisoned',
+      'prone',
+      'restrained',
+      'unconscious',
+    ],
+    // SRD: Fire Aura — 10-ft emanation, 1d10 Fire. Modeled via the PC-turn-start
+    // aura hook (the RAW end-of-its-turn timing is approximated, like Stench).
+    aura: { radiusFt: 10, damage: '1d10', damageType: 'fire', name: 'Fire Aura' },
+  },
+  wyvern: {
+    name: 'Wyvern',
+    cr: 6,
+    hp: 127,
+    ac: 14,
+    damage: '2d6+4',
+    toHit: 7,
+    xp: 2300,
+    str: 19,
+    dex: 10,
+    con: 16,
+    int: 5,
+    wis: 12,
+    cha: 6,
+    speedFt: 80, // fly
+    attackReachFt: 10, // the Sting
+    damageType: 'piercing',
+    // SRD: Sting modeled as the wyvern's signature attack — +7d6 Poison and a
+    // CON save vs Poisoned. (RAW the 2024 Sting auto-poisons with no save and the
+    // wyvern also Bites; the bite + no-save-with-duration are deferred.)
+    bonusDamage: '7d6',
+    bonusDamageType: 'poison',
+    onHitEffect: { condition: 'poisoned', ability: 'con', dc: 14 },
+  },
 };

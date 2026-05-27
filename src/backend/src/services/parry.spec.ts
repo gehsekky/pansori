@@ -167,4 +167,16 @@ describe('Parry — wired into the weapon-attack path', () => {
     expect(r.newState.round).toBe(2); // a full round elapsed
     expect(cap?.reaction_used).toBe(false); // reaction refreshed for the new round
   });
+
+  it('uses the creature parryBonus — a Gladiator (+3) deflects a hit a +2 could not', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.55); // d20 12 + 6 = 18 vs AC 16: a hit by 2
+    // +2 would leave AC 18 (18 still hits); the Gladiator's +3 → AC 19, a miss.
+    const gladiator = captainSeed({ name: 'Gladiator', ac: 16, parry: true, parryBonus: 3 });
+    const r = await swing(gladiator, attackState());
+    const g = r.newState.entities?.find((e) => e.id === CAPTAIN_ID);
+    expect(g?.hp).toBe(52); // unchanged — deflected by the +3 AC
+    expect(g?.reaction_used).toBe(true);
+    expect(r.narrative).toMatch(/Parry/);
+    expect(r.narrative).toMatch(/\+3 AC/);
+  });
 });
