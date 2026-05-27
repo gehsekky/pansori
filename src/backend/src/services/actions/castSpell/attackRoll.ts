@@ -7,6 +7,7 @@ import {
   rollCritical,
   rollDice,
   rollDiceEmpowered,
+  rollSorcerousBurst,
   upcastDamage,
 } from '../../rulesEngine.js';
 import {
@@ -86,13 +87,26 @@ export function runAttackRollSpell(
   // SRD Metamagic Empowered Spell — reroll up to CHA-mod of the lowest damage
   // dice, keeping the new rolls. SRD Evoker Overchannel — maximize the dice.
   const empowered = !!ctx.metamagic?.includes('empowered');
-  let spellDmg = ctx.overchannel
-    ? maxDice(atkDmgExpr || '1d4')
-    : empowered
-      ? rollDiceEmpowered(atkDmgExpr || '1d4', Math.max(1, abilityMod(char.cha)), atk.critical)
-      : atk.critical
-        ? rollCritical(atkDmgExpr || null)
-        : rollDice(atkDmgExpr || '1d4');
+  // SRD Sorcerous Burst — exploding d8s capped at the caster's spellcasting
+  // modifier. Replaces the generic cantrip roll: the cantrip-scaled die count
+  // (1/2/3/4 d8s) is doubled on a crit, and each 8 chains another d8 up to
+  // `cap` added dice. (Overchannel maximizes; Empowered's reroll isn't applied
+  // to the explosion — an accepted simplification.)
+  let spellDmg: number;
+  if (spell.id === 'sorcerous_burst') {
+    const baseDice = parseInt(atkDmgExpr || '1', 10) || 1;
+    const n = atk.critical ? baseDice * 2 : baseDice;
+    const cap = Math.max(0, abilityMod(castingScore));
+    spellDmg = ctx.overchannel ? n * 8 : rollSorcerousBurst(n, cap);
+  } else {
+    spellDmg = ctx.overchannel
+      ? maxDice(atkDmgExpr || '1d4')
+      : empowered
+        ? rollDiceEmpowered(atkDmgExpr || '1d4', Math.max(1, abilityMod(char.cha)), atk.critical)
+        : atk.critical
+          ? rollCritical(atkDmgExpr || null)
+          : rollDice(atkDmgExpr || '1d4');
+  }
   // Agonizing Blast: Warlock invocation — add CHA mod to Eldritch Blast damage
   const agonizingBonus =
     spell.id === 'eldritch_blast' && (char.feats ?? []).includes('agonizing_blast')

@@ -44,6 +44,31 @@ export function rollCritical(expr: string | null | undefined): number {
   return total;
 }
 
+/**
+ * SRD Sorcerous Burst — roll `numDice` d8s; each d8 that rolls an 8 lets you
+ * add one more exploding d8 (those can chain too), up to `maxExtra` ADDED dice
+ * in total (the caster's spellcasting modifier). The base dice are never capped
+ * — only the extras spawned by 8s are. Returns the summed total.
+ */
+export function rollSorcerousBurst(numDice: number, maxExtra: number): number {
+  let total = 0;
+  let toRoll = Math.max(0, numDice);
+  const cap = Math.max(0, maxExtra);
+  let extraUsed = 0;
+  while (toRoll > 0) {
+    let eights = 0;
+    for (let i = 0; i < toRoll; i++) {
+      const r = d(8);
+      total += r;
+      if (r === 8) eights++;
+    }
+    // Each 8 may spawn one more exploding d8, limited by the remaining cap.
+    toRoll = Math.min(eights, cap - extraUsed);
+    extraUsed += toRoll;
+  }
+  return total;
+}
+
 // SRD Fighting Style: Great Weapon Fighting — "treat any 1 or 2 on a damage
 // die as a 3." `gwfDie` rolls one die and applies that floor; the two rollers
 // below mirror `rollDice` / `rollCritical` but use it for the weapon's damage
