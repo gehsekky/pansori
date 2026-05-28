@@ -614,6 +614,51 @@ describe('Darkness spell', () => {
     expect(r.narrative).toMatch(/advantage/);
     expect(r.narrative).not.toMatch(/disadvantage/);
   });
+
+  it('a Truesight PC (epic boon) pierces magical darkness like Devil\'s Sight', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    // Same setup as the Devil's Sight case, but the PC's sight comes from the
+    // Boon of Truesight (truesight_ft) — it should pierce the magical darkness:
+    // no disadvantage for the PC, advantage vs the blinded enemy inside it.
+    const state = pcState({ truesight_ft: 60 });
+    state.spell_zones = [
+      {
+        id: 'd1',
+        casterId: 'pc-1',
+        spellId: 'darkness',
+        name: 'Darkness',
+        roomId: ctx.startRoomId,
+        cells: [{ x: 5, y: 5 }],
+        damage: '0',
+        damageType: 'none',
+        blocksSight: true,
+      },
+    ];
+    const r = await takeAction({
+      action: { type: 'attack', targetEnemyId: ENEMY_ID },
+      history: [],
+      state,
+      seed: seedWith('bright', {}),
+      context: ctx,
+    });
+    expect(r.narrative).toMatch(/advantage/);
+    expect(r.narrative).not.toMatch(/disadvantage/);
+  });
+});
+
+describe('Truesight in a dark room', () => {
+  it('a Truesight PC sees in nonmagical darkness — no disadvantage', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const r = await takeAction({
+      action: { type: 'attack', targetEnemyId: ENEMY_ID },
+      history: [],
+      state: pcState({ truesight_ft: 60 }), // no darkvision, but Truesight
+      seed: seedWith('dark', {}),
+      context: ctx,
+    });
+    expect(r.narrative).not.toMatch(/darkness/);
+    expect(r.narrative).not.toMatch(/disadvantage/);
+  });
 });
 
 // ── Sunlight Sensitivity (Kobold / Specter / Wight / Wraith) ─────────────────

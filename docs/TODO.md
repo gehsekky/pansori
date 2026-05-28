@@ -18,7 +18,7 @@ PHB/DMG-exclusive content (subclasses, feats, species, spells). See
 
 ## Implementation status (code-verified 2026-05-28)
 
-Grounded in a code survey + the full backend suite: **1998 tests across
+Grounded in a code survey + the full backend suite: **2004 tests across
 226 files, all green** (lint + typecheck clean).
 
 ### Done — rules-engine frameworks
@@ -469,13 +469,17 @@ options }`** → `OptionPickerDialog` (single-select; re-sends `action[param]`).
       adds no proficiency bonus for any class, so Slippery Mind / Disciplined
       Survivor / Resilient don't reach that path. General gap, not feature-
       specific.
-- [ ] **Truesight / Dimensional Travel / Night Spirit boons** — the +1
-      ability lands. The **lighting substrate now exists** (darkvision,
-      blindsight, magical darkness, Devil's-Sight pierce) so Truesight's
-      "sees through magical darkness" half is wirable as a per-creature flag
-      that joins the `observerPiercesMagicalDarkness` branch of
-      `canSeeTarget`. **Remaining:** see-Invisible (no Invisible-lifecycle on
-      the grid yet) and concrete positioning for Dimensional Travel. Narrated.
+- [~] **Truesight / Dimensional Travel / Night Spirit boons** — the +1
+      ability lands. **Truesight's "sees through magical darkness" half shipped**
+      (`combatLighting.spec.ts`, `multiclass.spec.ts`): a new
+      `piercesMagicalDarkness(char)` helper (Blindsight / Devil's Sight /
+      `truesight_ft`, deliberately excluding darkvision) now drives both
+      `seesInDarkness` and `canSeeTarget`'s `observerPiercesMagicalDarkness` on
+      the PC side (`computeToHitContext` + `computeEnemyAttack`), so a Truesight
+      PC sees in nonmagical darkness AND through a Darkness spell's zone.
+      **Remaining:** Truesight's see-Invisible / shapechanger halves (no
+      Invisible-lifecycle on the grid yet); concrete positioning for Dimensional
+      Travel; and Night Spirit. Narrated.
 - Minor markers: Devious Strikes' Daze restriction, Use Magic Device
   scroll/charge sub-features, Thief Jumper, Lay on Hands poison-cure use,
   Deflect Energy (Monk L13) — pending broader enforcement/item/jump infra.

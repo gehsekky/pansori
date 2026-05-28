@@ -16,7 +16,7 @@ import {
   isFlankingPosition,
   magicalDarknessCells,
 } from '../../gridEngine.js';
-import { getClassLevel, hasClass, hasFeralSenses } from '../../multiclass.js';
+import { getClassLevel, hasClass, hasFeralSenses, piercesMagicalDarkness } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import { hasFightingStyle } from '../../fightingStyle.js';
 import { isHeavilyEncumbered } from '../../gameEngine.js';
@@ -264,7 +264,9 @@ export function computeToHitContext(
   // default to 60 ft darkvision.
   const roomLighting = ctx.seed?.rooms?.find((r) => r.id === ctx.roomId)?.lighting ?? 'bright';
   const roomDark = roomLighting === 'dark';
-  const pcBlindsight = hasFeralSenses(pc.char) || (pc.char.feats?.includes('devils_sight') ?? false);
+  // Blindsight / Devil's Sight / Truesight all let the PC see in the dark and
+  // pierce magical Darkness (see `piercesMagicalDarkness`).
+  const pcBlindsight = piercesMagicalDarkness(pc.char);
   const litEntities = ctx.st.entities ?? [];
   const darknessCells = magicalDarknessCells(ctx.st.spell_zones);
   const pcPos = litEntities.find((e) => e.id === pc.char.id)?.pos;
