@@ -3,15 +3,18 @@
 // rolls against. Dark light effectively guarantees the sneak succeeds
 // (DC 0); dim light makes it 5 points easier.
 
+import type { Enemy, Seed } from '../../types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { makeChar, makeState } from '../../test-fixtures.js';
-import type { Seed } from '../../types.js';
 import { context as ctx } from '../../contexts/sandbox.js';
 import { takeAction } from '../gameEngine.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-function seedWithLighting(lighting: 'bright' | 'dim' | 'dark'): Seed {
+function seedWithLighting(
+  lighting: 'bright' | 'dim' | 'dark' | 'sunlight',
+  enemyExtra: Partial<Enemy> = {}
+): Seed {
   return {
     context_id: ctx.id,
     world_name: 'Lighting Sneak Test',
@@ -34,7 +37,8 @@ function seedWithLighting(lighting: 'bright' | 'dim' | 'dark'): Seed {
           toHit: 4,
           wis: 8, // -1 mod → passive Perception DC 9 in bright
           xp: 10,
-        },
+          ...enemyExtra,
+        } as Enemy,
       ],
     },
     loot: {},
@@ -127,5 +131,36 @@ describe('Sneak in dim light', () => {
       context: ctx,
     });
     expect(result.newState.current_room).toBe('next-room');
+  });
+});
+
+describe('Sneak past a Sunlight-Sensitive observer in sunlight', () => {
+  // A sunlight-sensitive goblin (WIS 8 → bright DC 9) standing in a sunlit room
+  // has Disadvantage on its sight Perception → DC 4. d20 = 5 beats 4 → the party
+  // slips past, where a normal goblin (DC 9) would have caught them.
+  it('Sunlight Sensitivity drops the sneak DC by 5', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.2); // d20 = 5
+    const pc = makeChar({ id: 'pc-1', character_class: 'Fighter', level: 5, dex: 10 });
+    const seed = seedWithLighting('sunlight', { sunlightSensitivity: true });
+    const state = {
+      ...makeState({ id: pc.id }, { current_room: ctx.startRoomId }),
+      characters: [pc],
+      active_character_id: pc.id,
+    };
+    const result = await takeAction({ action: { type: 'sneak' }, history: [], state, seed, context: ctx });
+    expect(result.newState.current_room).toBe('next-room');
+  });
+
+  it('the same goblin WITHOUT the flag catches the party in sunlight (DC unchanged)', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.2); // d20 = 5 < DC 9
+    const pc = makeChar({ id: 'pc-1', character_class: 'Fighter', level: 5, dex: 10 });
+    const seed = seedWithLighting('sunlight', {}); // no sensitivity → bright-equivalent DC 9
+    const state = {
+      ...makeState({ id: pc.id }, { current_room: ctx.startRoomId }),
+      characters: [pc],
+      active_character_id: pc.id,
+    };
+    const result = await takeAction({ action: { type: 'sneak' }, history: [], state, seed, context: ctx });
+    expect(result.newState.current_room).toBe(ctx.startRoomId); // didn't move
   });
 });

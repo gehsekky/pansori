@@ -761,15 +761,21 @@ export function seesInDarkness(darkvisionFt: number, blindsight: boolean): boole
  * heavily obscures — observer effectively auto-fails sight Perception;
  * we model this as DC = 0 so any roll succeeds (the caller can detect
  * the `dark` case explicitly if it wants a different short-circuit).
+ *
+ * `sightDisadvantage` imposes an additional −5 (a second source of
+ * Disadvantage on the sight check, e.g. an SRD Sunlight-Sensitive creature
+ * standing in sunlight). RAW Disadvantage doesn't stack, so it never drops the
+ * passive below the dim-light floor of −5; the result is clamped at ≥ 0.
  */
 export function passivePerceptionDcInLight(
   enemyWisdom: number,
-  effectiveLight: LightLevel
+  effectiveLight: LightLevel,
+  sightDisadvantage = false
 ): number {
   const base = passivePerceptionDC(enemyWisdom);
-  if (effectiveLight === 'dim') return Math.max(0, base - 5);
   if (effectiveLight === 'dark') return 0;
-  return base;
+  const disadvantaged = effectiveLight === 'dim' || sightDisadvantage;
+  return Math.max(0, base - (disadvantaged ? 5 : 0));
 }
 
 // Passive Perception score for trap detection: 10 + WIS mod + prof if proficient in Perception

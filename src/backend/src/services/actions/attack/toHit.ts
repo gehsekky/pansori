@@ -357,14 +357,18 @@ export function computeToHitContext(
     !armorProficient ? `not proficient with ${equippedArmorLootItem?.name ?? 'armor'}` : '',
     proneDisadv ? 'prone (ranged)' : '',
     thrownLongRangeDisadv ? 'thrown beyond normal range' : '',
-    darknessDisadv ? 'darkness — you can\'t see' : '',
+    darknessDisadv ? 'Blinded by darkness — you can\'t see your target' : '',
   ]
     .filter(Boolean)
     .join(', ');
   const disadvNote = disadvReasons
     ? ` (disadvantage — ${disadvReasons})`
     : advantage && !disadvantage
-      ? ' (advantage)'
+      ? // SRD Vision & Light — when the only/least edge is the foe being Blinded
+        // by darkness, say so; otherwise the generic advantage note.
+        darknessAdv
+        ? ' (advantage — your target is Blinded by darkness)'
+        : ' (advantage)'
       : '';
   const noProfNote = !weaponProficient ? ` [no weapon proficiency — prof bonus omitted]` : '';
 

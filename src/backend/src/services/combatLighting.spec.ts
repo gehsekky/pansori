@@ -182,6 +182,69 @@ describe('enemy attacks — darkness visibility', () => {
   });
 });
 
+// ── Auto-Blinded narration ───────────────────────────────────────────────────
+describe('auto-Blinded narration', () => {
+  it('a PC who can\'t see its target reads as Blinded by darkness', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const r = await takeAction({
+      action: { type: 'attack', targetEnemyId: ENEMY_ID },
+      history: [],
+      state: pcState(), // no darkvision → can't see the enemy in the dark
+      seed: seedWith('dark', {}),
+      context: ctx,
+    });
+    expect(r.narrative).toMatch(/Blinded by darkness/);
+  });
+
+  it("a PC with darkvision attacking a no-darkvision enemy reads the foe as Blinded", async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const r = await takeAction({
+      action: { type: 'attack', targetEnemyId: ENEMY_ID },
+      history: [],
+      state: pcState({ darkvision_ft: 60 }), // PC sees → advantage, no disadvantage
+      seed: seedWith('dark', { darkvision_ft: 0 }), // enemy can't see the PC
+      context: ctx,
+    });
+    expect(r.narrative).toMatch(/Blinded by darkness/);
+  });
+
+  it("an enemy attack narrates the PC as Blinded when the PC can't see it", async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const r = await takeAction({
+      action: { type: 'end_turn' },
+      history: [],
+      state: pcState(), // no darkvision → PC is the blind one (enemy gets advantage)
+      seed: seedWith('dark', {}),
+      context: ctx,
+    });
+    expect(r.narrative).toMatch(/is Blinded by the darkness/);
+  });
+
+  it('a no-darkvision enemy narrates ITSELF as Blinded attacking a seeing PC', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const r = await takeAction({
+      action: { type: 'end_turn' },
+      history: [],
+      state: pcState({ darkvision_ft: 60 }), // PC sees the enemy
+      seed: seedWith('dark', { darkvision_ft: 0 }), // enemy is the blind one
+      context: ctx,
+    });
+    expect(r.narrative).toMatch(/Foe is Blinded by the darkness/);
+  });
+
+  it('a bright room produces no Blinded narration', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const r = await takeAction({
+      action: { type: 'attack', targetEnemyId: ENEMY_ID },
+      history: [],
+      state: pcState(),
+      seed: seedWith('bright', {}),
+      context: ctx,
+    });
+    expect(r.narrative).not.toMatch(/Blinded by/);
+  });
+});
+
 // ── Light sources — counterplay to darkness ──────────────────────────────────
 function lightSource(x: number, y: number, brightFt: number): CombatEntity {
   return {

@@ -18,7 +18,7 @@ PHB/DMG-exclusive content (subclasses, feats, species, spells). See
 
 ## Implementation status (code-verified 2026-05-28)
 
-Grounded in a code survey + the full backend suite: **1985 tests across
+Grounded in a code survey + the full backend suite: **1998 tests across
 226 files, all green** (lint + typecheck clean).
 
 ### Done — rules-engine frameworks
@@ -371,9 +371,11 @@ backend features are waiting on, and a handful of **bounded subsystems**.
       source with `light_spell_level === 3`; the Light cantrip's ordinary glow
       doesn't qualify). The per-creature `sunlightSensitivity` flag (Kobold,
       Specter, Wight, Wraith) → Disadvantage on the attacker's rolls in
-      `computeEnemyAttack`. Makes Daylight real counterplay vs these monsters.
-      Deferred: the sight-based-Perception half (enemy Perception isn't a combat
-      factor) and a PC-side flag (no SRD PC species in pansori has the trait).
+      `computeEnemyAttack`. The **sight-based-Perception half** now ships too: a
+      sunlight-sensitive observer in sunlight takes Disadvantage on its passive
+      Perception (−5 to the sneak DC). Makes Daylight real counterplay vs these
+      monsters. Deferred: a PC-side flag (no SRD PC species in pansori has the
+      trait).
 - [x] **Grapple-on-hit** → **Griffon** — shipped (`griffonGrapple.spec.ts`).
       `OnHitEffect.ability`/`dc` are now optional: omitting both means an
       **auto-apply** (no-save) on-hit effect, the shape the Griffon's Rend needs
@@ -521,7 +523,7 @@ options }`** → `OptionPickerDialog` (single-select; re-sends `action[param]`).
       multiclasses into a caster. Bundle with multiclass UX.
 - [ ] **Magic-item attunement — remaining** — short-rest attune gating,
       Remove Curse ↔ `de_attune` interaction, cursed items in seed loot.
-- [~] **Lighting — combat darkness shipped** (`combatLighting.spec.ts`).
+- [x] **Lighting — combat darkness + light/vision model** (`combatLighting.spec.ts`).
       Room-grained `dark` light now drives combat visibility: a creature that
       can't see (darkvision 0 + no blindsight) is effectively Blinded — its
       attacks roll at Disadvantage and attacks against it at Advantage (the two
@@ -561,9 +563,17 @@ options }`** → `OptionPickerDialog` (single-select; re-sends `action[param]`).
       Obscured. Threaded into both attack paths (`computeToHitContext`; and
       `computeEnemyAttack` ← `resolveEnemySubAttack` / `handleEnemyAttack` /
       `fireLegendaryAction`, with `buildEnemyActionCtx` now populating
-      `roomObstacleCells`). **Remaining:** auto-Blinded narration; the sight-based
-      Perception half of Sunlight Sensitivity; and lighting-adjusted active
-      Perception.
+      `roomObstacleCells`). **Polish shipped** (same spec + `lighting.spec.ts` /
+      `sneakLighting.spec.ts`): **auto-Blinded narration** — both attack paths now
+      name the effectively-Blinded combatant ("X is Blinded by the darkness");
+      **Sunlight Sensitivity's Perception half** — a sunlight-sensitive observer
+      in sunlight takes Disadvantage on its passive Perception (−5 to the sneak
+      DC, via a new `sightDisadvantage` arg to `passivePerceptionDcInLight`); and
+      **lighting-adjusted active search** — `interact_object` rolls at Disadvantage
+      in dim/dark light (darkvision shifts one step brighter, so a darkvision
+      searcher is only hindered in true Heavily-Obscured dark). Only the FE
+      grid-fog / vision-reveal follow-up remains (tracked separately under
+      "Combat / exploration subsystems").
 - [ ] **Somatic spell components** — RAW requires a free hand; needs a
       hand-state model. No spell carries a `somatic` flag yet. Also unlocks
       focus-substitutes-for-material.
