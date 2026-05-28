@@ -208,6 +208,14 @@ describe('isIlluminated', () => {
     expect(isIlluminated({ x: 5, y: 5 }, [lightSource(5, 5, 0)])).toBe(false);
     expect(isIlluminated({ x: 5, y: 5 }, [])).toBe(false);
   });
+
+  it('a solid wall between the source and the cell blocks the light', () => {
+    const ents = [lightSource(5, 5, 20)];
+    expect(isIlluminated({ x: 8, y: 5 }, ents)).toBe(true); // clear line
+    expect(isIlluminated({ x: 8, y: 5 }, ents, [{ x: 7, y: 5 }])).toBe(false); // wall between
+    // A wall NOT between source and cell doesn't block.
+    expect(isIlluminated({ x: 8, y: 5 }, ents, [{ x: 1, y: 1 }])).toBe(true);
+  });
 });
 
 describe('Light cantrip — cast in combat', () => {
@@ -270,6 +278,23 @@ describe('light negates the darkness combat penalty', () => {
     });
     const pc = r.newState.characters[0];
     expect(pc.hp).toBe(30); // no advantage → the lone low roll missed
+  });
+});
+
+describe('canSeeTarget — walls block light in the dark', () => {
+  it('a wall between the light source and the target leaves the target unseen', () => {
+    const lit = [lightSource(5, 5, 20)]; // the source lights its surroundings
+    const base = {
+      observerPos: { x: 0, y: 0 },
+      targetPos: { x: 8, y: 5 }, // within the lit area
+      observerCanSeeInDark: false, // no darkvision
+      observerPiercesMagicalDarkness: false,
+      roomDark: true,
+      entities: lit,
+      darknessCells: new Set<string>(),
+    };
+    expect(canSeeTarget(base)).toBe(true); // clear line → target is lit → seen
+    expect(canSeeTarget({ ...base, obstacles: [{ x: 7, y: 5 }] })).toBe(false); // wall shadows it
   });
 });
 

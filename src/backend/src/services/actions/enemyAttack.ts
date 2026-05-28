@@ -38,6 +38,8 @@ export const handleEnemyAttack: ActionHandler<{
     mi: action.multiattackIdx,
     narrative: ctx.narrative,
     roomLighting,
+    // Solid walls block a light source from revealing a target behind them.
+    roomObstacles: ctx.roomObstacleCells,
   });
   ctx.st = result.st;
   ctx.narrative = result.narrative;
