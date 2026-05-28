@@ -492,8 +492,16 @@ options }`** → `OptionPickerDialog` (single-select; re-sends `action[param]`).
 - [ ] **Wall of Force** — needs point/orientation targeting that pansori's
       enemy-only targeting doesn't express yet (Wall of Fire shipped; the
       `blocksMovement` path is in place).
-- [ ] **FE grid-fog / vision reveal** — pairs with the shipped LoS blocking
-      on the frontend (ghost-tint unseen cells, suppress enemy tokens).
+- [x] **FE grid-fog / vision reveal** — shipped (`GridCombatView.spec.tsx`).
+      `GridCombatView`'s `cellLight` now LoS-gates each PC's vision through a FE
+      `cellsOnLine`/`hasLoS` mirror of the backend `hasLineOfSight`, so a cell no
+      living PC can see (behind a static obstacle) is fogged and its enemy/corpse
+      tokens are suppressed. Cells hidden ONLY by a wall (would otherwise be lit)
+      get a distinct cool "out of sight" ghost tint + aria-label, vs the existing
+      dark/dim lighting fog; a legend entry appears when the room has obstacles.
+      `'sunlight'` rooms render as Bright Light. Obstacle-free rooms are
+      unchanged (LoS always clear). See also the now-done "Party line-of-sight
+      indicators" item below.
 
 ### Condition + spellcasting fidelity (cleanups) — RE-5
 
@@ -600,9 +608,10 @@ options }`** → `OptionPickerDialog` (single-select; re-sends `action[param]`).
 - [ ] **Wire boss legendary + lair actions to an actual boss** — scaffolding + tests exist; unwired pending a fitting boss (fourth-campaign showcase
       or post Crypt Lord re-balance). More effect kinds (terrain shift,
       debuff aura, summon, multi-attack legendary) as content demands.
-- [ ] **Party line-of-sight indicators on the grid** — Bresenham LoS that
-      respects the shipped obstacles; ghost-tint cells the active PC can't
-      see, suppress enemy tokens beyond the existing `dark`-illum fog. ~1 day.
+- [x] **Party line-of-sight indicators on the grid** — shipped with the FE
+      grid-fog / vision-reveal item above (`GridCombatView` LoS-gates party
+      vision against the shipped static obstacles; ghost-tints out-of-sight cells
+      and suppresses enemy tokens beyond the existing `dark`-illum fog).
 - [ ] **Fourth campaign module (opportunistic)** — coastal pirate town,
       desert ruin, planar city, etc. Not on the critical path.
 

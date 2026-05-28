@@ -45,6 +45,34 @@ function chebyshev(a: GridPos, b: GridPos): number {
   return Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
 }
 
+// Every grid cell the straight segment from `a` to `b` passes through, endpoints
+// included. Mirror of the backend `cellsOnLine` (supercover walk) so the FE
+// line-of-sight fog matches the engine's `hasLineOfSight` targeting/vision rule.
+function cellsOnLine(a: GridPos, b: GridPos): GridPos[] {
+  const cells: GridPos[] = [];
+  let x = a.x;
+  let y = a.y;
+  let dx = Math.abs(b.x - a.x);
+  let dy = Math.abs(b.y - a.y);
+  const xInc = b.x > a.x ? 1 : -1;
+  const yInc = b.y > a.y ? 1 : -1;
+  let n = 1 + dx + dy;
+  let error = dx - dy;
+  dx *= 2;
+  dy *= 2;
+  for (; n > 0; n--) {
+    cells.push({ x, y });
+    if (error > 0) {
+      x += xInc;
+      error -= dy;
+    } else {
+      y += yInc;
+      error += dx;
+    }
+  }
+  return cells;
+}
+
 function tokenLabel(name: string): string {
   const first = name.trim()[0] ?? '?';
   return first.toUpperCase();
@@ -140,7 +168,10 @@ function GridCombatView({
   // Determine the current room's ambient lighting from the seed. Default
   // 'bright' (no fog of war) when unspecified.
   const currentRoom = seed.rooms.find((r) => r.id === state.current_room);
-  const roomLighting: Illum = currentRoom?.lighting ?? 'bright';
+  // 'sunlight' is Bright Light for vision (it only differs from 'bright' for
+  // Sunlight Sensitivity, a backend-only combat rule), so collapse it here.
+  const rawLighting = currentRoom?.lighting ?? 'bright';
+  const roomLighting: Illum = rawLighting === 'sunlight' ? 'bright' : rawLighting;
   // Static obstacles (columns/walls/debris) — block movement, render as
   // distinct cell content, contribute to cover on the backend.
   const obstacleSet = new Set<string>((currentRoom?.obstacles ?? []).map((o) => `${o.x},${o.y}`));
@@ -157,40 +188,61 @@ function GridCombatView({
     return difficultSet.has(`${x},${y}`);
   }
 
+  // SRD 5.2.1 "Cover" — line of sight from `a` to `b` is blocked only when a
+  // solid obstacle (wall) lies STRICTLY between them; endpoints never block.
+  // Mirror of the backend `hasLineOfSight` so the fog matches what the engine
+  // lets a creature see / target. Creatures don't block sight (only Total Cover
+  // does), so only static obstacles are consulted.
+  function hasLoS(a: GridPos, b: GridPos): boolean {
+    if ((a.x === b.x && a.y === b.y) || obstacleSet.size === 0) return true;
+    for (const c of cellsOnLine(a, b)) {
+      if ((c.x === a.x && c.y === a.y) || (c.x === b.x && c.y === b.y)) continue;
+      if (obstacleSet.has(`${c.x},${c.y}`)) return false;
+    }
+    return true;
+  }
+
   // Per-cell illumination from the party's collective vision. PCs (not
   // companions, not enemies) carry torches and contribute light + darkvision.
-  function cellLight(x: number, y: number): Illum {
-    if (roomLighting === 'bright') return 'bright';
-
-    // Base ambient
-    let best: Illum = roomLighting === 'dim' ? 'dim' : 'dark';
+  // When `respectLoS` is set, a PC only lights a cell it has unobstructed line
+  // of sight to — so walls cast shadow/fog. Passing `false` yields the "lit if
+  // you could see it" level, used to ghost-tint cells hidden only by a wall.
+  function cellLight(x: number, y: number, respectLoS: boolean): Illum {
+    const target = { x, y };
+    let best: Illum = roomLighting === 'bright' ? 'dark' : roomLighting === 'dim' ? 'dim' : 'dark';
+    // In a dim/dark room the AMBIENT (dim/dark) already fills cells regardless of
+    // any PC — but a wall still blocks sight of what's beyond it. So the ambient
+    // floor only stands for cells some living PC can see; otherwise it's unseen.
+    let anyLoS = false;
 
     for (const pc of entities) {
       if (pc.isEnemy || pc.isCompanion) continue;
       if (pc.hp <= 0) continue;
-      const dist = chebyshev(pc.pos, { x, y });
-      // PC's own square always counts as bright (sight from their hex)
+      if (respectLoS && !hasLoS(pc.pos, target)) continue;
+      anyLoS = true;
+      const dist = chebyshev(pc.pos, target);
+      // PC's own square always counts as bright (sight from their hex).
       if (dist === 0) return 'bright';
 
-      if (roomLighting === 'dim') {
-        // Whole room is dim ambient; nothing dims it further. Torch still
-        // creates a bright pool around each PC.
-        if (dist <= TORCH_BRIGHT_SQ) best = brighter(best, 'bright');
-        continue;
-      }
-
-      // roomLighting === 'dark'
-      const charDef = state.characters.find((c) => c.id === pc.id);
-      const dvFt = charDef?.darkvision_ft ?? 0;
-      const dvSq = dvFt / SQUARE_SIZE_FT;
       let here: Illum = 'dark';
-      if (dist <= TORCH_BRIGHT_SQ) here = 'bright';
-      else if (dist <= TORCH_DIM_SQ) here = 'dim';
-      // Darkvision bumps Darkness → Dim within the radius (PHB/SRD).
-      else if (dvSq > 0 && dist <= dvSq) here = 'dim';
+      if (roomLighting === 'bright') {
+        here = 'bright';
+      } else if (roomLighting === 'dim') {
+        // Whole room is dim ambient; a torch still creates a bright pool.
+        here = dist <= TORCH_BRIGHT_SQ ? 'bright' : 'dim';
+      } else {
+        // roomLighting === 'dark'
+        const charDef = state.characters.find((c) => c.id === pc.id);
+        const dvSq = (charDef?.darkvision_ft ?? 0) / SQUARE_SIZE_FT;
+        if (dist <= TORCH_BRIGHT_SQ) here = 'bright';
+        else if (dist <= TORCH_DIM_SQ) here = 'dim';
+        // Darkvision bumps Darkness → Dim within the radius (PHB/SRD).
+        else if (dvSq > 0 && dist <= dvSq) here = 'dim';
+      }
       best = brighter(best, here);
     }
-    return best;
+    // No PC can see this cell → it's unseen (fogged), whatever the ambient.
+    return anyLoS ? best : 'dark';
   }
 
   function entityAt(x: number, y: number): CombatEntity | undefined {
@@ -313,16 +365,27 @@ function GridCombatView({
       const difficult = !obstacle && isDifficult(x, y);
       const reachable = isReachable(x, y);
       const isActive = ent && ent.id === activeId && !ent.isEnemy;
-      const illum = cellLight(x, y);
+      // `illum` respects line of sight (walls cast shadow); `illum` 'dark' means
+      // the party can't see the cell. `litIllum` ignores walls — when a cell is
+      // unseen ONLY because a wall blocks it (it would otherwise be lit), we
+      // ghost-tint it to distinguish "around the corner" from "dark/empty".
+      const illum = cellLight(x, y, true);
+      const litIllum = cellLight(x, y, false);
+      const visible = illum !== 'dark';
+      const losBlocked = !visible && litIllum !== 'dark';
 
-      // Hide enemy tokens in cells the party can't see (heavily obscured).
-      // Party + companion tokens always show — you know where your own side is.
-      const hideEntity = ent?.isEnemy && illum === 'dark';
-      const hideCorpse = corpse?.isEnemy && illum === 'dark';
+      // Hide enemy tokens in cells the party can't see (heavily obscured OR out
+      // of line of sight). Party + companion tokens always show — you know where
+      // your own side is. The active PC's own cell is always visible.
+      const hideEntity = ent?.isEnemy && !visible && !isActive;
+      const hideCorpse = corpse?.isEnemy && !visible;
 
       let bg = 'transparent';
       if (illum === 'dim') bg = 'rgba(0, 0, 0, 0.30)';
       else if (illum === 'dark') bg = 'rgba(0, 0, 0, 0.70)';
+      // Out-of-sight ("ghost") cells: a cool blue-grey haze over the dark fog so
+      // the player reads them as "unknown / around a corner" rather than unlit.
+      if (losBlocked) bg = 'rgba(70, 90, 120, 0.55)';
       if (reachable) bg = 'rgba(120, 200, 255, 0.10)';
       // AoE preview tint wins over reachable highlight.
       if (aoeCells.has(`${x},${y}`)) bg = 'rgba(255, 140, 50, 0.30)';
@@ -437,6 +500,8 @@ function GridCombatView({
         ariaParts.push(`${displayName(corpse)}, corpse`);
       } else if (obstacle) {
         ariaParts.push('obstacle, blocks movement');
+      } else if (losBlocked) {
+        ariaParts.push('out of line of sight');
       } else if (illum === 'dark') {
         ariaParts.push('heavily obscured');
       } else if (illum === 'dim') {
@@ -620,9 +685,14 @@ function GridCombatView({
           <span className={styles.gridLegendReach} /> reachable this turn
         </span>
         {(currentRoom?.obstacles?.length ?? 0) > 0 && (
-          <span>
-            <span className={styles.gridLegendObstacle} /> obstacle (blocks movement)
-          </span>
+          <>
+            <span>
+              <span className={styles.gridLegendObstacle} /> obstacle (blocks movement)
+            </span>
+            <span>
+              <span className={styles.gridLegendFog} /> out of sight (behind a wall)
+            </span>
+          </>
         )}
         {(currentRoom?.difficultTerrain?.length ?? 0) > 0 && (
           <span>
