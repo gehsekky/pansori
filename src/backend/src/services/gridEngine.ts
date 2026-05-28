@@ -30,6 +30,18 @@ export function isIlluminated(pos: GridPos, entities: CombatEntity[]): boolean {
   });
 }
 
+/**
+ * SRD 5.2.1 Vision & Light — whether a single light-source entity's lit area
+ * (bright + dim, i.e. within 2× its bright radius) reaches any of `cells`.
+ * Used to detect overlap between a light source and a magical-darkness zone for
+ * the Darkness ↔ Light/Daylight dispel rules. Non-sources (radius 0) never reach.
+ */
+export function lightReaches(source: CombatEntity, cells: GridPos[]): boolean {
+  const r = source.light_radius_ft ?? 0;
+  if (r <= 0) return false;
+  return cells.some((c) => distanceFeet(source.pos, c) <= r * 2);
+}
+
 /** SRD Darkness — the set of cells (`"x,y"`) covered by a magical-darkness zone
  *  (a `SpellZone` with `blocksSight`). Cells here are Heavily Obscured and
  *  Darkvision can't pierce them. */

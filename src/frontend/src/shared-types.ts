@@ -240,6 +240,12 @@ export interface CombatEntity {
   // the darkness blind-combat penalties. 0/undefined = not a light source. Set
   // by the Light/Daylight cast paths; read via `isIlluminated`.
   light_radius_ft?: number;
+  // SRD Vision & Light — the spell level of the effect that made this a light
+  // source (Light cantrip = 0, Daylight = 3). Drives the RAW dispel cutoffs:
+  // the Darkness spell (L2) snuffs overlapping light created by a spell of level
+  // 2 or lower (so Light, not Daylight), and Daylight (L3) banishes overlapping
+  // Darkness (L2 ≤ 3). Undefined when not spell-made (e.g. a mundane torch).
+  light_spell_level?: number;
   // SRD Charmed (enemy charmed by a PC, e.g. Charm Person/Monster) — the
   // charmer's character id. A Charmed creature can't attack its charmer, so
   // `selectTarget` drops the charmer from this enemy's candidate targets.

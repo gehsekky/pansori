@@ -366,6 +366,137 @@ describe('Darkness spell', () => {
     expect(r.newState.characters[0].concentrating_on?.spellId).toBe('darkness');
   });
 
+  // SRD 5.2.1 dispel cutoffs — Darkness (L2) snuffs overlapping light from a
+  // spell of level ≤ 2; Daylight (L3) banishes overlapping Darkness (L2 ≤ 3).
+  function casterState(spellId: string, casterClass: string, level: number, slots: Record<number, number>): GameState {
+    const caster = makeChar({
+      id: 'pc-1',
+      character_class: casterClass,
+      level,
+      darkvision_ft: 60,
+      spells_known: [spellId],
+      prepared_spells: [spellId],
+      spell_slots_max: slots,
+      spell_slots_used: {},
+    });
+    return {
+      ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+      characters: [caster],
+      active_character_id: 'pc-1',
+      entities: [
+        { id: 'pc-1', isEnemy: false, pos: { x: 1, y: 5 }, hp: 25, maxHp: 25, conditions: [], condition_durations: {} },
+        { id: ENEMY_ID, isEnemy: true, pos: { x: 5, y: 5 }, hp: 40, maxHp: 40, conditions: [], condition_durations: {} },
+      ],
+    } as unknown as GameState;
+  }
+
+  it('Darkness snuffs an overlapping Light cantrip (spell level ≤ 2)', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const state = casterState('darkness', 'Wizard', 5, { 2: 1 });
+    // A lamp-bearer carrying the Light cantrip (level 0) inside the blast.
+    state.entities = [
+      ...(state.entities ?? []),
+      { id: 'lamp', isEnemy: false, pos: { x: 4, y: 5 }, hp: 10, maxHp: 10, conditions: [], condition_durations: {}, light_radius_ft: 20, light_spell_level: 0 },
+    ];
+    const r = await takeAction({
+      action: { type: 'cast_spell', spellId: 'darkness', slotLevel: 2, targetEnemyId: ENEMY_ID },
+      history: [],
+      state,
+      seed: seedWith('bright', {}),
+      context: ctx,
+    });
+    const lamp = r.newState.entities?.find((e) => e.id === 'lamp');
+    expect(lamp?.light_radius_ft).toBeUndefined();
+    expect(lamp?.light_spell_level).toBeUndefined();
+    expect(r.narrative).toMatch(/snuffs out overlapping magical light/);
+  });
+
+  it('Darkness does NOT dispel an overlapping Daylight (spell level 3)', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const state = casterState('darkness', 'Wizard', 5, { 2: 1 });
+    state.entities = [
+      ...(state.entities ?? []),
+      { id: 'sun', isEnemy: false, pos: { x: 4, y: 5 }, hp: 10, maxHp: 10, conditions: [], condition_durations: {}, light_radius_ft: 60, light_spell_level: 3 },
+    ];
+    const r = await takeAction({
+      action: { type: 'cast_spell', spellId: 'darkness', slotLevel: 2, targetEnemyId: ENEMY_ID },
+      history: [],
+      state,
+      seed: seedWith('bright', {}),
+      context: ctx,
+    });
+    const sun = r.newState.entities?.find((e) => e.id === 'sun');
+    expect(sun?.light_radius_ft).toBe(60); // Daylight (L3 > 2) survives
+    expect(r.narrative).not.toMatch(/snuffs out/);
+  });
+
+  it('Daylight banishes an overlapping Darkness zone and drops its concentration', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const state = casterState('daylight', 'Cleric', 5, { 3: 1 });
+    // An ally is concentrating on a Darkness zone overlapping the Daylight caster.
+    state.characters = [
+      ...state.characters,
+      makeChar({ id: 'pc-2', character_class: 'Warlock', level: 5, concentrating_on: { spellId: 'darkness', rounds_left: 100 } }),
+    ];
+    state.spell_zones = [
+      {
+        id: 'd1',
+        casterId: 'pc-2',
+        spellId: 'darkness',
+        name: 'Darkness',
+        roomId: ctx.startRoomId,
+        cells: [{ x: 1, y: 5 }, { x: 2, y: 5 }], // touches the Daylight caster at (1,5)
+        damage: '0',
+        damageType: 'none',
+        blocksSight: true,
+      },
+    ];
+    const r = await takeAction({
+      action: { type: 'cast_spell', spellId: 'daylight', slotLevel: 3 },
+      history: [],
+      state,
+      seed: seedWith('dark', {}),
+      context: ctx,
+    });
+    expect(r.newState.spell_zones?.some((z) => z.spellId === 'darkness')).toBe(false);
+    const warlock = r.newState.characters.find((c) => c.id === 'pc-2');
+    expect(warlock?.concentrating_on).toBeUndefined();
+    expect(r.narrative).toMatch(/Daylight banishes the magical darkness/);
+  });
+
+  it('Daylight leaves a non-overlapping Darkness zone alone', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const state = casterState('daylight', 'Cleric', 5, { 3: 1 });
+    state.characters = [
+      ...state.characters,
+      makeChar({ id: 'pc-2', character_class: 'Warlock', level: 5, concentrating_on: { spellId: 'darkness', rounds_left: 100 } }),
+    ];
+    state.spell_zones = [
+      {
+        id: 'd1',
+        casterId: 'pc-2',
+        spellId: 'darkness',
+        name: 'Darkness',
+        roomId: ctx.startRoomId,
+        cells: [{ x: 30, y: 30 }], // far outside the 60-ft (12-cell) Daylight reach from (1,5)
+        damage: '0',
+        damageType: 'none',
+        blocksSight: true,
+      },
+    ];
+    const r = await takeAction({
+      action: { type: 'cast_spell', spellId: 'daylight', slotLevel: 3 },
+      history: [],
+      state,
+      seed: seedWith('dark', {}),
+      context: ctx,
+    });
+    expect(r.newState.spell_zones?.some((z) => z.spellId === 'darkness')).toBe(true);
+    const warlock = r.newState.characters.find((c) => c.id === 'pc-2');
+    expect(warlock?.concentrating_on?.spellId).toBe('darkness');
+    expect(r.narrative).not.toMatch(/banishes/);
+  });
+
   it("a Devil's Sight PC gains advantage on an enemy stuck in its darkness", async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
     // Enemy at (5,5) sits in magical darkness; the PC (devil's sight, at (4,5))

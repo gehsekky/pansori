@@ -2,6 +2,7 @@ import type { Spell, SpellZone } from '../../../types.js';
 import type { ActionContext } from '../types.js';
 import { composeNow } from '../../narrative/compose.js';
 import { concentrationRoundsFor } from './utils.js';
+import { lightReaches } from '../../gridEngine.js';
 import { randomUUID } from 'crypto';
 import { zoneCells } from '../../gameEngine.js';
 
@@ -54,13 +55,50 @@ export function runUtilitySpell(
   // caster's entity (read via `isIlluminated`); narrative-only off the grid.
   if ((spell.id === 'light' || spell.id === 'daylight') && ctx.st.entities) {
     const brightRadiusFt = spell.id === 'daylight' ? 60 : 20;
+    const lightLevel = spell.level ?? 0;
     ctx.st = {
       ...ctx.st,
       entities: ctx.st.entities.map((e) =>
-        e.id === char.id ? { ...e, light_radius_ft: brightRadiusFt } : e
+        e.id === char.id
+          ? { ...e, light_radius_ft: brightRadiusFt, light_spell_level: lightLevel }
+          : e
       ),
     };
     ctx.narrative += ` ${char.name} now sheds light (${brightRadiusFt} ft bright).`;
+
+    // SRD Daylight (L3) — "If any of this spell's area overlaps with an area of
+    // Darkness created by a spell of level 3 or lower, that other spell is
+    // dispelled." Every magical-darkness zone in pansori is the L2 Darkness
+    // spell (≤ 3), so any darkness zone the new sunlight reaches is banished;
+    // its caster's concentration drops with it.
+    if (spell.id === 'daylight') {
+      const casterEnt = ctx.st.entities?.find((e) => e.id === char.id);
+      const zones = ctx.st.spell_zones ?? [];
+      const banished = casterEnt
+        ? zones.filter((z) => z.blocksSight && lightReaches(casterEnt, z.cells))
+        : [];
+      if (banished.length > 0) {
+        const banishedIds = new Set(banished.map((z) => z.id));
+        const banishedCasterIds = new Set(banished.map((z) => z.casterId));
+        ctx.st = {
+          ...ctx.st,
+          spell_zones: zones.filter((z) => !banishedIds.has(z.id)),
+          characters: ctx.st.characters.map((c) =>
+            c.id !== char.id &&
+            banishedCasterIds.has(c.id) &&
+            c.concentrating_on?.spellId === 'darkness'
+              ? { ...c, concentrating_on: undefined }
+              : c
+          ),
+        };
+        // If the Daylight caster was itself holding the dispelled Darkness, clear
+        // the in-place `char` ref too (the writeback prefers char's own fields).
+        if (banishedCasterIds.has(char.id) && char.concentrating_on?.spellId === 'darkness') {
+          char.concentrating_on = undefined;
+        }
+        ctx.narrative += ` Daylight banishes the magical darkness.`;
+      }
+    }
   }
 
   // SRD Darkness (L2) — a 15-ft-radius sphere of magical darkness. Its cells are
@@ -98,6 +136,24 @@ export function runUtilitySpell(
         rounds_left: concentrationRoundsFor(spell) * (ctx.metamagic?.includes('extended') ? 2 : 1),
       };
       ctx.narrative += ` Magical darkness floods the area — Darkvision can't pierce it.`;
+
+      // SRD Darkness (L2) — "If any of this spell's area overlaps with an area of
+      // Bright Light or Dim Light created by a spell of level 2 or lower, that
+      // other spell is dispelled." Snuff any light source whose lit area touches
+      // the new darkness AND whose source spell is level ≤ 2 (the Light cantrip),
+      // leaving higher-level light (Daylight, L3) untouched.
+      let snuffed = false;
+      ctx.st = {
+        ...ctx.st,
+        entities: (ctx.st.entities ?? []).map((e) => {
+          if ((e.light_spell_level ?? Infinity) <= 2 && lightReaches(e, zone.cells)) {
+            snuffed = true;
+            return { ...e, light_radius_ft: undefined, light_spell_level: undefined };
+          }
+          return e;
+        }),
+      };
+      if (snuffed) ctx.narrative += ` The darkness snuffs out overlapping magical light.`;
     }
   }
 
