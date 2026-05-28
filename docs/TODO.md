@@ -18,7 +18,7 @@ PHB/DMG-exclusive content (subclasses, feats, species, spells). See
 
 ## Implementation status (code-verified 2026-05-28)
 
-Grounded in a code survey + the full backend suite: **1983 tests across
+Grounded in a code survey + the full backend suite: **1985 tests across
 226 files, all green** (lint + typecheck clean).
 
 ### Done — rules-engine frameworks
@@ -554,8 +554,14 @@ options }`** → `OptionPickerDialog` (single-select; re-sends `action[param]`).
       carries the source spell's level (Light 0 / Daylight 3) to drive the RAW
       cutoffs; `lightReaches` computes light/zone overlap. **Sunlight Sensitivity
       shipped** too (a `'sunlight'` room tier + Daylight emanations impose
-      Disadvantage on those undead — see the monster-ability item). **Remaining:**
-      obstacles blocking light (LoS); auto-Blinded narration; the sight-based
+      Disadvantage on those undead — see the monster-ability item). **Walls block
+      light shipped** (same spec): `isIlluminated` / `canSeeTarget` now take the
+      room's solid obstacle cells and require LoS (`hasLineOfSight`) from the
+      light source to the cell, so a creature in a torch's shadow stays Heavily
+      Obscured. Threaded into both attack paths (`computeToHitContext`; and
+      `computeEnemyAttack` ← `resolveEnemySubAttack` / `handleEnemyAttack` /
+      `fireLegendaryAction`, with `buildEnemyActionCtx` now populating
+      `roomObstacleCells`). **Remaining:** auto-Blinded narration; the sight-based
       Perception half of Sunlight Sensitivity; and lighting-adjusted active
       Perception.
 - [ ] **Somatic spell components** — RAW requires a free hand; needs a

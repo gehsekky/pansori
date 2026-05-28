@@ -1261,7 +1261,10 @@ function computeEnemyAttack(
   // that can't see (no darkvision/blindsight) attacks at Disadvantage and is
   // attacked at Advantage. 'dim'/'bright' don't affect attack rolls. 'sunlight'
   // is Bright Light that triggers Sunlight Sensitivity.
-  roomLighting: 'bright' | 'dim' | 'dark' | 'sunlight' = 'bright'
+  roomLighting: 'bright' | 'dim' | 'dark' | 'sunlight' = 'bright',
+  // SRD Vision & Light — the room's solid obstacle cells (walls). A light source
+  // can't illuminate a target behind a wall, so darkness visibility honors LoS.
+  roomObstacles: GridPos[] = []
 ): {
   /** Updated character — HP, temp_hp, conditions, condition_durations,
    *  class_resource_uses, concentrating_on, inspiration, and
@@ -1336,6 +1339,7 @@ function computeEnemyAttack(
     roomDark: darkRoom,
     entities: lightEnts,
     darknessCells,
+    obstacles: roomObstacles,
   });
   const pcCanSeeEnemy = canSeeTarget({
     observerPos: pcPos,
@@ -1345,6 +1349,7 @@ function computeEnemyAttack(
     roomDark: darkRoom,
     entities: lightEnts,
     darknessCells,
+    obstacles: roomObstacles,
   });
   // Enemy can't see the PC → its attack at Disadvantage; PC can't see the enemy
   // → the enemy's attack at Advantage.
@@ -2392,7 +2397,16 @@ function fireLegendaryAction(
     if (targetCharIdx < 0) return { st, narrative, fired: true };
     const target = st.characters[targetCharIdx];
     const legendaryLighting = seed?.rooms?.find((r) => r.id === roomId)?.lighting ?? 'bright';
-    const computed = computeEnemyAttack(legendary, target, st, context, false, legendaryLighting);
+    const legendaryObstacles = seed?.rooms?.find((r) => r.id === roomId)?.obstacles ?? [];
+    const computed = computeEnemyAttack(
+      legendary,
+      target,
+      st,
+      context,
+      false,
+      legendaryLighting,
+      legendaryObstacles
+    );
     narrative += ` ${computed.fragment.prose}`;
     // Legendary actions skip the Shield-pause path — they're meant to be
     // a fast follow-up beat. Commit immediately: write proposed state
@@ -6145,8 +6159,9 @@ function applyBarbarianRetaliation(args: {
  * Build an enemy-actor `ActionContext` for routing a single enemy action
  * (e.g. `enemy_attack`) through `dispatchAction`. Only the fields the
  * enemy path actually reads are meaningful — actor / st / context /
- * narrative; the room-derived fields are inert placeholders since the
- * enemy-attack handler never reads them. (EE-2.)
+ * narrative + `roomObstacleCells` (read by `handleEnemyAttack` so walls
+ * block a light source from revealing a target). The rest are inert
+ * placeholders the enemy-attack handler never reads. (EE-2.)
  */
 function buildEnemyActionCtx(args: {
   st: GameState;
@@ -6164,7 +6179,10 @@ function buildEnemyActionCtx(args: {
     worldName,
     prevRoomId: st.current_room,
     roomId: st.current_room,
-    roomObstacleCells: [],
+    roomObstacleCells: [
+      ...(seed.rooms.find((r) => r.id === st.current_room)?.obstacles ?? []),
+      ...wallObstacleCells(st, st.current_room, 'los'),
+    ],
     livingEnemiesInRoom: [],
     enemy: undefined,
     enemyAlive: false,
@@ -6219,6 +6237,9 @@ export function resolveEnemySubAttack(args: {
   // SRD Vision & Light — current room light level (threaded from the caller,
   // which has the seed). Defaults to 'bright'.
   roomLighting?: 'bright' | 'dim' | 'dark' | 'sunlight';
+  // SRD Vision & Light — the room's solid obstacle cells (walls), threaded so a
+  // light source can't illuminate a target behind a wall.
+  roomObstacles?: GridPos[];
 }): EnemySubAttackResult {
   const { enemy, enemyId, enemyEnt, context, advIdx, mi } = args;
   let st = args.st;
@@ -6231,7 +6252,8 @@ export function resolveEnemySubAttack(args: {
     st,
     context,
     false,
-    args.roomLighting ?? 'bright'
+    args.roomLighting ?? 'bright',
+    args.roomObstacles ?? []
   );
   // Shield reaction window — pause before committing the proposed snapshot.
   if (computed.hit && isShieldEligible(target, computed.atkTotal, target.ac, context)) {

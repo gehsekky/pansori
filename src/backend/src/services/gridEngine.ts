@@ -20,13 +20,19 @@ export function distanceFeet(a: GridPos, b: GridPos): number {
  * for the same distance beyond, so a cell within 2× the bright radius is at
  * least dimly lit. A creature in such a cell can be SEEN even by an observer
  * without darkvision, so the darkness blind-combat penalties don't apply to it.
- * (Obstacles don't yet block light — a refinement.) Returns false when there
- * are no light sources, so darkness reduces to the room-level rule.
+ * A solid wall between the source and `pos` blocks the light (LoS via
+ * `obstacles` — pass the room's solid obstacle cells; creatures don't block
+ * light). Returns false when there are no light sources, so darkness reduces to
+ * the room-level rule.
  */
-export function isIlluminated(pos: GridPos, entities: CombatEntity[]): boolean {
+export function isIlluminated(
+  pos: GridPos,
+  entities: CombatEntity[],
+  obstacles: GridPos[] = []
+): boolean {
   return entities.some((e) => {
     const r = e.light_radius_ft ?? 0;
-    return r > 0 && distanceFeet(e.pos, pos) <= r * 2;
+    return r > 0 && distanceFeet(e.pos, pos) <= r * 2 && hasLineOfSight(e.pos, pos, obstacles);
   });
 }
 
@@ -92,6 +98,9 @@ export function canSeeTarget(opts: {
   roomDark: boolean;
   entities: CombatEntity[];
   darknessCells: Set<string>;
+  // Solid room obstacles (walls) — a light source can't illuminate a target
+  // behind one. Creatures don't block light, so don't include them here.
+  obstacles?: GridPos[];
 }): boolean {
   const { observerPos, targetPos, darknessCells } = opts;
   if (observerPos && targetPos && darknessCells.size > 0) {
@@ -102,7 +111,7 @@ export function canSeeTarget(opts: {
   }
   if (!opts.roomDark) return true;
   if (opts.observerCanSeeInDark) return true;
-  return !!targetPos && isIlluminated(targetPos, opts.entities);
+  return !!targetPos && isIlluminated(targetPos, opts.entities, opts.obstacles);
 }
 
 export function adjacentPositions(pos: GridPos): GridPos[] {

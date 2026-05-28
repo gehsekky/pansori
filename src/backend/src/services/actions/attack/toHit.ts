@@ -277,6 +277,7 @@ export function computeToHitContext(
     roomDark,
     entities: litEntities,
     darknessCells,
+    obstacles: ctx.roomObstacleCells,
   });
   const enemyCanSeePc = canSeeTarget({
     observerPos: enemyPos,
@@ -286,6 +287,7 @@ export function computeToHitContext(
     roomDark,
     entities: litEntities,
     darknessCells,
+    obstacles: ctx.roomObstacleCells,
   });
   const darknessDisadv = !pcCanSeeEnemy; // PC can't see the enemy → Disadvantage
   const darknessAdv = !enemyCanSeePc; // enemy can't see the PC → Advantage
