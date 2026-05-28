@@ -1761,12 +1761,12 @@ export const SRD_SPELLS: Record<string, Spell> = {
     rangeKind: 'self',
     spellList: ['divine', 'primal'],
   },
-  // SRD: Darkness — 15-ft radius sphere of magical darkness for 10
-  // minutes (concentration). Heavy obscurement; even darkvision
-  // can't see through. Narrative spell in pansori — the engine
-  // doesn't model per-tile lighting at the resolution Darkness
-  // operates on, so the spell is flavor-only. (Drow's racial
-  // Darkness in pansori's earlier build used the same shape.)
+  // SRD: Darkness — 15-ft radius sphere of magical darkness for 10 minutes
+  // (concentration). Heavily Obscured; Darkvision can't see through it. In
+  // pansori this places a `blocksSight` SpellZone (centered on the targeted
+  // enemy, else the caster); cells inside blind everyone without Blindsight /
+  // Devil's Sight for combat. See the darkness branch in castSpell/utility.ts
+  // + `canSeeTarget`. (Daylight-counters-Darkness + light-suppression deferred.)
   darkness: {
     id: 'darkness',
     name: 'Darkness',

@@ -9,7 +9,13 @@ import {
   seesInDarkness,
 } from '../../rulesEngine.js';
 import type { Enemy, InventoryItem, LootItem } from '../../../types.js';
-import { coverBonus, distanceFeet, isFlankingPosition, isIlluminated } from '../../gridEngine.js';
+import {
+  canSeeTarget,
+  coverBonus,
+  distanceFeet,
+  isFlankingPosition,
+  magicalDarknessCells,
+} from '../../gridEngine.js';
 import { getClassLevel, hasClass, hasFeralSenses } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import { hasFightingStyle } from '../../fightingStyle.js';
@@ -257,16 +263,32 @@ export function computeToHitContext(
   // dark). Dim light is only Lightly Obscured (Perception, not combat). Enemies
   // default to 60 ft darkvision.
   const roomLighting = ctx.seed?.rooms?.find((r) => r.id === ctx.roomId)?.lighting ?? 'bright';
+  const roomDark = roomLighting === 'dark';
   const pcBlindsight = hasFeralSenses(pc.char) || (pc.char.feats?.includes('devils_sight') ?? false);
   const litEntities = ctx.st.entities ?? [];
-  const pcEntForLight = litEntities.find((e) => e.id === pc.char.id);
-  const enemyCellLit = !!enemyEntity2 && isIlluminated(enemyEntity2.pos, litEntities);
-  const pcCellLit = !!pcEntForLight && isIlluminated(pcEntForLight.pos, litEntities);
-  const darknessDisadv =
-    roomLighting === 'dark' &&
-    !(seesInDarkness(pc.char.darkvision_ft ?? 0, pcBlindsight) || enemyCellLit);
-  const darknessAdv =
-    roomLighting === 'dark' && !(seesInDarkness(target.darkvision_ft ?? 60, false) || pcCellLit);
+  const darknessCells = magicalDarknessCells(ctx.st.spell_zones);
+  const pcPos = litEntities.find((e) => e.id === pc.char.id)?.pos;
+  const enemyPos = enemyEntity2?.pos;
+  const pcCanSeeEnemy = canSeeTarget({
+    observerPos: pcPos,
+    targetPos: enemyPos,
+    observerCanSeeInDark: seesInDarkness(pc.char.darkvision_ft ?? 0, pcBlindsight),
+    observerPiercesMagicalDarkness: pcBlindsight,
+    roomDark,
+    entities: litEntities,
+    darknessCells,
+  });
+  const enemyCanSeePc = canSeeTarget({
+    observerPos: enemyPos,
+    targetPos: pcPos,
+    observerCanSeeInDark: seesInDarkness(target.darkvision_ft ?? 60, false),
+    observerPiercesMagicalDarkness: false,
+    roomDark,
+    entities: litEntities,
+    darknessCells,
+  });
+  const darknessDisadv = !pcCanSeeEnemy; // PC can't see the enemy → Disadvantage
+  const darknessAdv = !enemyCanSeePc; // enemy can't see the PC → Advantage
 
   const disadvantage =
     rangedInMelee ||

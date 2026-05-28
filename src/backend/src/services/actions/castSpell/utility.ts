@@ -1,7 +1,9 @@
+import type { Spell, SpellZone } from '../../../types.js';
 import type { ActionContext } from '../types.js';
-import type { Spell } from '../../../types.js';
 import { composeNow } from '../../narrative/compose.js';
 import { concentrationRoundsFor } from './utils.js';
+import { randomUUID } from 'crypto';
+import { zoneCells } from '../../gameEngine.js';
 
 /**
  * Utility-spell branch — spells with no damage, no save, no attack
@@ -59,6 +61,44 @@ export function runUtilitySpell(
       ),
     };
     ctx.narrative += ` ${char.name} now sheds light (${brightRadiusFt} ft bright).`;
+  }
+
+  // SRD Darkness (L2) — a 15-ft-radius sphere of magical darkness. Its cells are
+  // Heavily Obscured: Darkvision can't see through them and nonmagical light
+  // can't illuminate them, so a creature inside (or peering in) is effectively
+  // Blinded for combat unless it has Blindsight / Devil's Sight. Placed as a
+  // `blocksSight` SpellZone centered on the targeted enemy (offensive) or the
+  // caster (defensive), bound to concentration; `breakConcentration` removes it.
+  if (spell.id === 'darkness' && ctx.st.entities) {
+    const casterEnt = ctx.st.entities.find((e) => e.id === char.id);
+    const targetEnt = ctx.enemy
+      ? ctx.st.entities.find((e) => e.id === ctx.enemy!.id && e.isEnemy && e.hp > 0)
+      : undefined;
+    const center = (targetEnt ?? casterEnt)?.pos;
+    if (center) {
+      const gridW = ctx.context.gridWidth ?? 8;
+      const gridH = ctx.context.gridHeight ?? 8;
+      const radiusFt = spell.blastRadius ?? 15;
+      const zone: SpellZone = {
+        id: randomUUID(),
+        casterId: char.id,
+        spellId: 'darkness',
+        name: 'Darkness',
+        roomId: ctx.st.current_room,
+        cells: zoneCells(center, radiusFt, gridW, gridH),
+        damage: '0',
+        damageType: 'none',
+        blocksSight: true,
+        radiusFt,
+        center,
+      };
+      ctx.st = { ...ctx.st, spell_zones: [...(ctx.st.spell_zones ?? []), zone] };
+      char.concentrating_on = {
+        spellId: 'darkness',
+        rounds_left: concentrationRoundsFor(spell) * (ctx.metamagic?.includes('extended') ? 2 : 1),
+      };
+      ctx.narrative += ` Magical darkness floods the area — Darkvision can't pierce it.`;
+    }
   }
 
   // Bless (PHB p.219) — caster picks up to 3 creatures (RAW). Pansori

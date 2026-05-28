@@ -1,4 +1,4 @@
-import type { CombatEntity, GridPos, LootItem } from '../types.js';
+import type { CombatEntity, GridPos, LootItem, SpellZone } from '../types.js';
 
 export const SQUARE_SIZE = 5; // feet per square
 export const DEFAULT_MELEE_REACH = SQUARE_SIZE;
@@ -28,6 +28,49 @@ export function isIlluminated(pos: GridPos, entities: CombatEntity[]): boolean {
     const r = e.light_radius_ft ?? 0;
     return r > 0 && distanceFeet(e.pos, pos) <= r * 2;
   });
+}
+
+/** SRD Darkness — the set of cells (`"x,y"`) covered by a magical-darkness zone
+ *  (a `SpellZone` with `blocksSight`). Cells here are Heavily Obscured and
+ *  Darkvision can't pierce them. */
+export function magicalDarknessCells(zones: SpellZone[] | undefined): Set<string> {
+  const set = new Set<string>();
+  for (const z of zones ?? []) {
+    if (z.blocksSight) for (const c of z.cells) set.add(`${c.x},${c.y}`);
+  }
+  return set;
+}
+
+/**
+ * SRD 5.2.1 Vision & Light — whether an observer can see a target for combat
+ * (drives the Blinded adv/disadv). Layered:
+ *   1. Magical Darkness — if EITHER the observer or the target stands in a
+ *      magical-darkness cell, normal sight AND darkvision fail; only Blindsight
+ *      / Devil's Sight (`observerPiercesMagicalDarkness`) sees.
+ *   2. Bright/Dim ambient (no magical darkness involved) — always seen.
+ *   3. Dark ambient — seen if the observer has darkvision/blindsight
+ *      (`observerCanSeeInDark`) OR the target stands in an illuminated cell.
+ * Missing positions (no grid) fall through to the ambient rule.
+ */
+export function canSeeTarget(opts: {
+  observerPos?: GridPos;
+  targetPos?: GridPos;
+  observerCanSeeInDark: boolean;
+  observerPiercesMagicalDarkness: boolean;
+  roomDark: boolean;
+  entities: CombatEntity[];
+  darknessCells: Set<string>;
+}): boolean {
+  const { observerPos, targetPos, darknessCells } = opts;
+  if (observerPos && targetPos && darknessCells.size > 0) {
+    const k = (p: GridPos) => `${p.x},${p.y}`;
+    if (darknessCells.has(k(observerPos)) || darknessCells.has(k(targetPos))) {
+      return opts.observerPiercesMagicalDarkness;
+    }
+  }
+  if (!opts.roomDark) return true;
+  if (opts.observerCanSeeInDark) return true;
+  return !!targetPos && isIlluminated(targetPos, opts.entities);
 }
 
 export function adjacentPositions(pos: GridPos): GridPos[] {

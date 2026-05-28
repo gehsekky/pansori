@@ -527,13 +527,20 @@ options }`** → `OptionPickerDialog` (single-select; re-sends `action[param]`).
       **Light-source counterplay shipped** (same spec): the grid entity carries a
       `light_radius_ft`; the **Light** cantrip (20 ft bright) and **Daylight**
       (60 ft) make the caster a light source, and `isIlluminated(pos, entities)`
-      treats a cell within 2× the bright radius (bright + dim) as lit. The
-      combat-visibility check is now per-cell — "can see X" = darkvision/blindsight
-      OR X stands in a lit cell — so a no-darkvision party can cast Light / carry a
-      torch to fight without the darkness penalty (and a light-bearer is revealed
-      to blind foes). **Remaining:** the **Darkness** spell (the inverse — a dark
-      zone that overrides light and blinds even darkvision); obstacles blocking
-      light (LoS); a distinct "sunlight" state for Sunlight Sensitivity;
+      treats a cell within 2× the bright radius (bright + dim) as lit.
+      **Magical Darkness shipped** (`combatLighting.spec.ts`): the **Darkness**
+      spell places a `blocksSight` `SpellZone` (reusing zone placement + the
+      concentration cleanup; `applyZoneTick` no-ops it). The combat-visibility
+      check now lives in one helper, **`canSeeTarget`**, layering: (1) magical
+      darkness — if either party is in a darkness cell, normal sight AND
+      darkvision fail, only Blindsight/Devil's Sight pierces; (2) bright/dim
+      ambient → seen; (3) dark ambient → darkvision/blindsight OR the target in a
+      lit cell. Both sides (`computeToHitContext`, `computeEnemyAttack`) call it.
+      So a Warlock with Devil's Sight in its own Darkness sees out and can't be
+      seen (advantage), while two ordinary creatures in darkness are mutually
+      blind (adv+disadv cancel). **Remaining:** obstacles blocking light (LoS);
+      light suppressed inside a darkness zone; the Daylight-counters-Darkness
+      level rule; a distinct "sunlight" state for Sunlight Sensitivity;
       auto-Blinded narration; and lighting-adjusted active Perception.
 - [ ] **Somatic spell components** — RAW requires a free hand; needs a
       hand-state model. No spell carries a `somatic` flag yet. Also unlocks
