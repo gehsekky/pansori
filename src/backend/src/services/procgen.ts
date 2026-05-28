@@ -206,6 +206,7 @@ export function generateRoguelikeSeed(context: Context, partySize = 1): Seed {
           attackReachFt: template.attackReachFt,
           speedFt: template.speedFt,
           darkvision_ft: template.darkvision_ft,
+          sunlightSensitivity: template.sunlightSensitivity,
           phases: template.phases,
           damageType: template.damageType,
           packTactics: template.packTactics,

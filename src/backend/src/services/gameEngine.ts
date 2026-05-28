@@ -64,6 +64,7 @@ import {
   distanceFeet,
   findPath,
   hasLineOfSight,
+  isInSunlight,
   magicalDarknessCells,
   opportunityAttackTriggers,
   posEqual,
@@ -1258,8 +1259,9 @@ function computeEnemyAttack(
   forceDisadvantage = false,
   // SRD Vision & Light — the room's light level. In a 'dark' room a creature
   // that can't see (no darkvision/blindsight) attacks at Disadvantage and is
-  // attacked at Advantage. 'dim'/'bright' don't affect attack rolls.
-  roomLighting: 'bright' | 'dim' | 'dark' = 'bright'
+  // attacked at Advantage. 'dim'/'bright' don't affect attack rolls. 'sunlight'
+  // is Bright Light that triggers Sunlight Sensitivity.
+  roomLighting: 'bright' | 'dim' | 'dark' | 'sunlight' = 'bright'
 ): {
   /** Updated character — HP, temp_hp, conditions, condition_durations,
    *  class_resource_uses, concentrating_on, inspiration, and
@@ -1366,12 +1368,18 @@ function computeEnemyAttack(
   // Frightened's "while it can see the source" caveat is approximated as
   // always-in-sight.
   const attackerSelfDisadv = attackerEnt?.conditions.some((c) => DISADV_CONDITIONS.has(c)) ?? false;
+  // SRD Sunlight Sensitivity (Kobold/Specter/Wight/Wraith) — Disadvantage on
+  // attack rolls while the attacker stands in sunlight (a 'sunlight' room or a
+  // Daylight emanation's bright radius). The Daylight counterplay made live.
+  const sunlightSensitivityDisadv =
+    !!enemy.sunlightSensitivity && !!enemyPos && isInSunlight(enemyPos, roomLighting, lightEnts);
   const hasDisadvantage =
     baseDisadvantage ||
     forceDisadvantage ||
     multiattackDefenseDisadv ||
     attackerSelfDisadv ||
-    darknessDisadv;
+    darknessDisadv ||
+    sunlightSensitivityDisadv;
   const result = resolveEnemyAttack(enemy, char.ac, hasAdvantage, hasDisadvantage);
   // Equipped-armor lookup. `equipped_armor` stores an `instance_id`
   // (see routes/game.ts character creation), not a loot id — the
@@ -6210,7 +6218,7 @@ export function resolveEnemySubAttack(args: {
   narrative: string;
   // SRD Vision & Light — current room light level (threaded from the caller,
   // which has the seed). Defaults to 'bright'.
-  roomLighting?: 'bright' | 'dim' | 'dark';
+  roomLighting?: 'bright' | 'dim' | 'dark' | 'sunlight';
 }): EnemySubAttackResult {
   const { enemy, enemyId, enemyEnt, context, advIdx, mi } = args;
   let st = args.st;

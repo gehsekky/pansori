@@ -18,7 +18,7 @@ PHB/DMG-exclusive content (subclasses, feats, species, spells). See
 
 ## Implementation status (code-verified 2026-05-28)
 
-Grounded in a code survey + the full backend suite: **1971 tests across
+Grounded in a code survey + the full backend suite: **1983 tests across
 226 files, all green** (lint + typecheck clean).
 
 ### Done — rules-engine frameworks
@@ -363,13 +363,17 @@ backend features are waiting on, and a handful of **bounded subsystems**.
         Multiattack monster; the full suite stayed green (no spec had encoded the
         old under-damaging behavior — damage specs use single sub-attacks), but
         encounters are now meaningfully harder and may want a tuning pass.
-- [ ] **Sunlight Sensitivity** (Kobold, Specter — Disadvantage in sunlight).
-      The combat-visibility substrate now exists (see "Lighting — combat darkness
-      shipped"); this just needs a distinct **bright-sunlight** light state (rooms
-      are bright/dim/dark, with no "sunlight" tier) plus the per-creature
-      `sunlightSensitivity` flag → Disadvantage on attacks (and Perception) while
-      in it. Low priority for a dungeon-centric engine, but no longer blocked on
-      the whole illumination model.
+- [x] **Sunlight Sensitivity** (Kobold, Specter, Wight, Wraith) — shipped
+      (`combatLighting.spec.ts`). Added a fourth room light tier, `'sunlight'`
+      (Bright Light that also counts as *sunlight*; combat visibility behaves like
+      `bright`), and `isInSunlight(pos, roomLighting, entities)` — true in a
+      sunlit room OR within a **Daylight** emanation's bright radius (a light
+      source with `light_spell_level === 3`; the Light cantrip's ordinary glow
+      doesn't qualify). The per-creature `sunlightSensitivity` flag (Kobold,
+      Specter, Wight, Wraith) → Disadvantage on the attacker's rolls in
+      `computeEnemyAttack`. Makes Daylight real counterplay vs these monsters.
+      Deferred: the sight-based-Perception half (enemy Perception isn't a combat
+      factor) and a PC-side flag (no SRD PC species in pansori has the trait).
 - [x] **Grapple-on-hit** → **Griffon** — shipped (`griffonGrapple.spec.ts`).
       `OnHitEffect.ability`/`dc` are now optional: omitting both means an
       **auto-apply** (no-save) on-hit effect, the shape the Griffon's Rend needs
@@ -542,10 +546,18 @@ options }`** → `OptionPickerDialog` (single-select; re-sends `action[param]`).
       lit cell. Both sides (`computeToHitContext`, `computeEnemyAttack`) call it.
       So a Warlock with Devil's Sight in its own Darkness sees out and can't be
       seen (advantage), while two ordinary creatures in darkness are mutually
-      blind (adv+disadv cancel). **Remaining:** obstacles blocking light (LoS);
-      light suppressed inside a darkness zone; the Daylight-counters-Darkness
-      level rule; a distinct "sunlight" state for Sunlight Sensitivity;
-      auto-Blinded narration; and lighting-adjusted active Perception.
+      blind (adv+disadv cancel). **Light ⇄ darkness dispel shipped** (same spec):
+      casting **Darkness** (L2) snuffs an overlapping light source made by a spell
+      of level ≤ 2 (the Light cantrip) but leaves higher-level light (Daylight)
+      alone; casting **Daylight** (L3) banishes overlapping Darkness zones (L2 ≤ 3)
+      and drops the darkness caster's concentration. `CombatEntity.light_spell_level`
+      carries the source spell's level (Light 0 / Daylight 3) to drive the RAW
+      cutoffs; `lightReaches` computes light/zone overlap. **Sunlight Sensitivity
+      shipped** too (a `'sunlight'` room tier + Daylight emanations impose
+      Disadvantage on those undead — see the monster-ability item). **Remaining:**
+      obstacles blocking light (LoS); auto-Blinded narration; the sight-based
+      Perception half of Sunlight Sensitivity; and lighting-adjusted active
+      Perception.
 - [ ] **Somatic spell components** — RAW requires a free hand; needs a
       hand-state model. No spell carries a `somatic` flag yet. Also unlocks
       focus-substitutes-for-material.

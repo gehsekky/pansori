@@ -50,7 +50,9 @@ export const handleSneak: ActionHandler<{ type: 'sneak' }> = (ctx) => {
   // sneaker side doesn't change the observer's view, so we don't
   // pass it here.
   const roomLighting = ctx.seed.rooms.find((r) => r.id === ctx.roomId)?.lighting ?? 'bright';
-  const enemyEffectiveLight = effectiveLightFor(roomLighting, 0);
+  // 'sunlight' is Bright Light for sight purposes (it only matters for Sunlight
+  // Sensitivity), so it collapses to 'bright' for the Perception math.
+  const enemyEffectiveLight = effectiveLightFor(roomLighting === 'sunlight' ? 'bright' : roomLighting, 0);
   const sneakDC = passivePerceptionDcInLight(enemy.wis ?? 10, enemyEffectiveLight);
   const livingParty = ctx.st.characters
     .filter((c) => !c.dead)
