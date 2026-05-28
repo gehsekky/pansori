@@ -93,8 +93,25 @@ function pcState(charOverrides: Partial<Character> = {}, pcLightRadius?: number)
     initiative_idx: 0,
     round: 1,
     entities: [
-      { id: 'pc-1', isEnemy: false, pos: { x: 4, y: 5 }, hp: 30, maxHp: 30, conditions: [], condition_durations: {}, light_radius_ft: pcLightRadius },
-      { id: ENEMY_ID, isEnemy: true, pos: { x: 5, y: 5 }, hp: 40, maxHp: 40, conditions: [], condition_durations: {} },
+      {
+        id: 'pc-1',
+        isEnemy: false,
+        pos: { x: 4, y: 5 },
+        hp: 30,
+        maxHp: 30,
+        conditions: [],
+        condition_durations: {},
+        light_radius_ft: pcLightRadius,
+      },
+      {
+        id: ENEMY_ID,
+        isEnemy: true,
+        pos: { x: 5, y: 5 },
+        hp: 40,
+        maxHp: 40,
+        conditions: [],
+        condition_durations: {},
+      },
     ],
   } as unknown as GameState;
 }
@@ -156,7 +173,10 @@ describe('enemy attacks — darkness visibility', () => {
   it('a seeing enemy gains advantage attacking a no-darkvision PC in the dark', async () => {
     // Advantage rolls two d20s and takes the higher. Sequence: first die low
     // (d20 2 → would miss), second die high (d20 19 → hits); rest 0.5.
-    vi.spyOn(Math, 'random').mockReturnValue(0.5).mockReturnValueOnce(0.05).mockReturnValueOnce(0.9);
+    vi.spyOn(Math, 'random')
+      .mockReturnValue(0.5)
+      .mockReturnValueOnce(0.05)
+      .mockReturnValueOnce(0.9);
     const r = await takeAction({
       action: { type: 'end_turn' },
       history: [],
@@ -169,7 +189,10 @@ describe('enemy attacks — darkness visibility', () => {
   });
 
   it('the same low first roll misses a darkvision PC (no advantage)', async () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0.5).mockReturnValueOnce(0.05).mockReturnValueOnce(0.9);
+    vi.spyOn(Math, 'random')
+      .mockReturnValue(0.5)
+      .mockReturnValueOnce(0.05)
+      .mockReturnValueOnce(0.9);
     const r = await takeAction({
       action: { type: 'end_turn' },
       history: [],
@@ -184,7 +207,7 @@ describe('enemy attacks — darkness visibility', () => {
 
 // ── Auto-Blinded narration ───────────────────────────────────────────────────
 describe('auto-Blinded narration', () => {
-  it('a PC who can\'t see its target reads as Blinded by darkness', async () => {
+  it("a PC who can't see its target reads as Blinded by darkness", async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
     const r = await takeAction({
       action: { type: 'attack', targetEnemyId: ENEMY_ID },
@@ -196,7 +219,7 @@ describe('auto-Blinded narration', () => {
     expect(r.narrative).toMatch(/Blinded by darkness/);
   });
 
-  it("a PC with darkvision attacking a no-darkvision enemy reads the foe as Blinded", async () => {
+  it('a PC with darkvision attacking a no-darkvision enemy reads the foe as Blinded', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
     const r = await takeAction({
       action: { type: 'attack', targetEnemyId: ENEMY_ID },
@@ -296,7 +319,15 @@ describe('Light cantrip — cast in combat', () => {
       characters: [wizard],
       active_character_id: 'pc-1',
       entities: [
-        { id: 'pc-1', isEnemy: false, pos: { x: 4, y: 5 }, hp: 20, maxHp: 20, conditions: [], condition_durations: {} },
+        {
+          id: 'pc-1',
+          isEnemy: false,
+          pos: { x: 4, y: 5 },
+          hp: 20,
+          maxHp: 20,
+          conditions: [],
+          condition_durations: {},
+        },
       ],
     } as unknown as GameState;
     const r = await takeAction({
@@ -331,7 +362,10 @@ describe('light negates the darkness combat penalty', () => {
     // Mirror of the enemy-advantage test, but the PC carries Light, so the enemy
     // (adjacent, in the lit area) is illuminated → the PC is seen → no advantage,
     // and the same low first die misses.
-    vi.spyOn(Math, 'random').mockReturnValue(0.5).mockReturnValueOnce(0.05).mockReturnValueOnce(0.9);
+    vi.spyOn(Math, 'random')
+      .mockReturnValue(0.5)
+      .mockReturnValueOnce(0.05)
+      .mockReturnValueOnce(0.9);
     const r = await takeAction({
       action: { type: 'end_turn' },
       history: [],
@@ -409,7 +443,13 @@ describe('magicalDarknessCells / canSeeTarget — magical darkness', () => {
 
   it('magicalDarknessCells collects only blocksSight zones', () => {
     const zones = [
-      { blocksSight: true, cells: [{ x: 5, y: 5 }, { x: 6, y: 5 }] },
+      {
+        blocksSight: true,
+        cells: [
+          { x: 5, y: 5 },
+          { x: 6, y: 5 },
+        ],
+      },
       { blocksSight: false, cells: [{ x: 1, y: 1 }] },
     ] as Parameters<typeof magicalDarknessCells>[0];
     const set = magicalDarknessCells(zones);
@@ -437,8 +477,24 @@ describe('Darkness spell', () => {
       characters: [wizard],
       active_character_id: 'pc-1',
       entities: [
-        { id: 'pc-1', isEnemy: false, pos: { x: 1, y: 5 }, hp: 25, maxHp: 25, conditions: [], condition_durations: {} },
-        { id: ENEMY_ID, isEnemy: true, pos: { x: 5, y: 5 }, hp: 40, maxHp: 40, conditions: [], condition_durations: {} },
+        {
+          id: 'pc-1',
+          isEnemy: false,
+          pos: { x: 1, y: 5 },
+          hp: 25,
+          maxHp: 25,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: ENEMY_ID,
+          isEnemy: true,
+          pos: { x: 5, y: 5 },
+          hp: 40,
+          maxHp: 40,
+          conditions: [],
+          condition_durations: {},
+        },
       ],
     } as unknown as GameState;
     const r = await takeAction({
@@ -456,7 +512,12 @@ describe('Darkness spell', () => {
 
   // SRD 5.2.1 dispel cutoffs — Darkness (L2) snuffs overlapping light from a
   // spell of level ≤ 2; Daylight (L3) banishes overlapping Darkness (L2 ≤ 3).
-  function casterState(spellId: string, casterClass: string, level: number, slots: Record<number, number>): GameState {
+  function casterState(
+    spellId: string,
+    casterClass: string,
+    level: number,
+    slots: Record<number, number>
+  ): GameState {
     const caster = makeChar({
       id: 'pc-1',
       character_class: casterClass,
@@ -472,8 +533,24 @@ describe('Darkness spell', () => {
       characters: [caster],
       active_character_id: 'pc-1',
       entities: [
-        { id: 'pc-1', isEnemy: false, pos: { x: 1, y: 5 }, hp: 25, maxHp: 25, conditions: [], condition_durations: {} },
-        { id: ENEMY_ID, isEnemy: true, pos: { x: 5, y: 5 }, hp: 40, maxHp: 40, conditions: [], condition_durations: {} },
+        {
+          id: 'pc-1',
+          isEnemy: false,
+          pos: { x: 1, y: 5 },
+          hp: 25,
+          maxHp: 25,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: ENEMY_ID,
+          isEnemy: true,
+          pos: { x: 5, y: 5 },
+          hp: 40,
+          maxHp: 40,
+          conditions: [],
+          condition_durations: {},
+        },
       ],
     } as unknown as GameState;
   }
@@ -484,7 +561,17 @@ describe('Darkness spell', () => {
     // A lamp-bearer carrying the Light cantrip (level 0) inside the blast.
     state.entities = [
       ...(state.entities ?? []),
-      { id: 'lamp', isEnemy: false, pos: { x: 4, y: 5 }, hp: 10, maxHp: 10, conditions: [], condition_durations: {}, light_radius_ft: 20, light_spell_level: 0 },
+      {
+        id: 'lamp',
+        isEnemy: false,
+        pos: { x: 4, y: 5 },
+        hp: 10,
+        maxHp: 10,
+        conditions: [],
+        condition_durations: {},
+        light_radius_ft: 20,
+        light_spell_level: 0,
+      },
     ];
     const r = await takeAction({
       action: { type: 'cast_spell', spellId: 'darkness', slotLevel: 2, targetEnemyId: ENEMY_ID },
@@ -504,7 +591,17 @@ describe('Darkness spell', () => {
     const state = casterState('darkness', 'Wizard', 5, { 2: 1 });
     state.entities = [
       ...(state.entities ?? []),
-      { id: 'sun', isEnemy: false, pos: { x: 4, y: 5 }, hp: 10, maxHp: 10, conditions: [], condition_durations: {}, light_radius_ft: 60, light_spell_level: 3 },
+      {
+        id: 'sun',
+        isEnemy: false,
+        pos: { x: 4, y: 5 },
+        hp: 10,
+        maxHp: 10,
+        conditions: [],
+        condition_durations: {},
+        light_radius_ft: 60,
+        light_spell_level: 3,
+      },
     ];
     const r = await takeAction({
       action: { type: 'cast_spell', spellId: 'darkness', slotLevel: 2, targetEnemyId: ENEMY_ID },
@@ -524,7 +621,12 @@ describe('Darkness spell', () => {
     // An ally is concentrating on a Darkness zone overlapping the Daylight caster.
     state.characters = [
       ...state.characters,
-      makeChar({ id: 'pc-2', character_class: 'Warlock', level: 5, concentrating_on: { spellId: 'darkness', rounds_left: 100 } }),
+      makeChar({
+        id: 'pc-2',
+        character_class: 'Warlock',
+        level: 5,
+        concentrating_on: { spellId: 'darkness', rounds_left: 100 },
+      }),
     ];
     state.spell_zones = [
       {
@@ -533,7 +635,10 @@ describe('Darkness spell', () => {
         spellId: 'darkness',
         name: 'Darkness',
         roomId: ctx.startRoomId,
-        cells: [{ x: 1, y: 5 }, { x: 2, y: 5 }], // touches the Daylight caster at (1,5)
+        cells: [
+          { x: 1, y: 5 },
+          { x: 2, y: 5 },
+        ], // touches the Daylight caster at (1,5)
         damage: '0',
         damageType: 'none',
         blocksSight: true,
@@ -557,7 +662,12 @@ describe('Darkness spell', () => {
     const state = casterState('daylight', 'Cleric', 5, { 3: 1 });
     state.characters = [
       ...state.characters,
-      makeChar({ id: 'pc-2', character_class: 'Warlock', level: 5, concentrating_on: { spellId: 'darkness', rounds_left: 100 } }),
+      makeChar({
+        id: 'pc-2',
+        character_class: 'Warlock',
+        level: 5,
+        concentrating_on: { spellId: 'darkness', rounds_left: 100 },
+      }),
     ];
     state.spell_zones = [
       {
@@ -615,7 +725,7 @@ describe('Darkness spell', () => {
     expect(r.narrative).not.toMatch(/disadvantage/);
   });
 
-  it('a Truesight PC (epic boon) pierces magical darkness like Devil\'s Sight', async () => {
+  it("a Truesight PC (epic boon) pierces magical darkness like Devil's Sight", async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
     // Same setup as the Devil's Sight case, but the PC's sight comes from the
     // Boon of Truesight (truesight_ft) — it should pierce the magical darkness:
@@ -710,7 +820,10 @@ describe('enemy attacks — Sunlight Sensitivity', () => {
   // Disadvantage rolls two d20s and takes the LOWER. Sequence: first die high
   // (would hit), second die low (misses); with Disadvantage the low die wins.
   it('a sunlight-sensitive enemy in a sunlit room attacks at disadvantage (drags a hit to a miss)', async () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0.5).mockReturnValueOnce(0.9).mockReturnValueOnce(0.05);
+    vi.spyOn(Math, 'random')
+      .mockReturnValue(0.5)
+      .mockReturnValueOnce(0.9)
+      .mockReturnValueOnce(0.05);
     const r = await takeAction({
       action: { type: 'end_turn' },
       history: [],

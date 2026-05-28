@@ -66,7 +66,13 @@ function strike(targetHp: number): { target: Character; st: GameState } {
   const griffon = { id: 'g1', ...SRD_MONSTERS.griffon } as unknown as Enemy;
   const target = makeChar({ id: 'pc', ac: 10, hp: targetHp, max_hp: targetHp });
   const attackerEnt = ent({ id: 'g1', pos: { x: 5, y: 6 } });
-  const pcEnt = ent({ id: 'pc', isEnemy: false, pos: { x: 5, y: 5 }, hp: targetHp, maxHp: targetHp });
+  const pcEnt = ent({
+    id: 'pc',
+    isEnemy: false,
+    pos: { x: 5, y: 5 },
+    hp: targetHp,
+    maxHp: targetHp,
+  });
   const c = {
     actor: enemyActor(griffon, attackerEnt),
     context: ctx,

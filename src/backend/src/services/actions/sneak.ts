@@ -53,7 +53,10 @@ export const handleSneak: ActionHandler<{ type: 'sneak' }> = (ctx) => {
   const roomLighting = ctx.seed.rooms.find((r) => r.id === ctx.roomId)?.lighting ?? 'bright';
   // 'sunlight' is Bright Light for sight purposes (it only matters for Sunlight
   // Sensitivity), so it collapses to 'bright' for the Perception math.
-  const enemyEffectiveLight = effectiveLightFor(roomLighting === 'sunlight' ? 'bright' : roomLighting, 0);
+  const enemyEffectiveLight = effectiveLightFor(
+    roomLighting === 'sunlight' ? 'bright' : roomLighting,
+    0
+  );
   // SRD Sunlight Sensitivity — a sunlight-sensitive observer in sunlight has
   // Disadvantage on its sight-based Perception, so the party slips past more
   // easily (−5 to the enemy's passive). A sunlit room counts everywhere; a

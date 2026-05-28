@@ -26,7 +26,7 @@ describe('piercesMagicalDarkness', () => {
     expect(piercesMagicalDarkness(makeChar({ darkvision_ft: 60 }))).toBe(false);
   });
 
-  it('is true with Devil\'s Sight', () => {
+  it("is true with Devil's Sight", () => {
     expect(piercesMagicalDarkness(makeChar({ feats: ['devils_sight'] }))).toBe(true);
   });
 

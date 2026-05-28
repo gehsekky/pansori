@@ -29,14 +29,18 @@ function build(opts: {
     ],
   } as unknown as GameState;
   const seed = {
-    rooms: [{ id: ROOM, name: 'Room', desc: '', lighting: opts.lighting, obstacles: opts.obstacles }],
+    rooms: [
+      { id: ROOM, name: 'Room', desc: '', lighting: opts.lighting, obstacles: opts.obstacles },
+    ],
     enemies: { [ROOM]: [{ id: `${ROOM}#0`, name: 'Goblin', hp: 15, ac: 12 }] },
   } as unknown as Seed;
   return { state, seed };
 }
 
 function cell(container: HTMLElement, x: number, y: number): HTMLElement {
-  const el = container.querySelector(`[aria-label^="Cell ${x}, ${y},"], [aria-label="Cell ${x}, ${y}"]`);
+  const el = container.querySelector(
+    `[aria-label^="Cell ${x}, ${y},"], [aria-label="Cell ${x}, ${y}"]`
+  );
   if (!el) throw new Error(`cell ${x},${y} not found`);
   return el as HTMLElement;
 }
