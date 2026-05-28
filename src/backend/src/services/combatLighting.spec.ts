@@ -11,7 +11,7 @@
 
 import type { Character, CombatEntity, Enemy, GameState, Seed } from '../types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { canSeeTarget, isIlluminated, magicalDarknessCells } from './gridEngine.js';
+import { canSeeTarget, isIlluminated, isInSunlight, magicalDarknessCells } from './gridEngine.js';
 import { makeChar, makeState } from '../test-fixtures.js';
 import { SRD_MONSTERS } from '../contexts/srd/monsters.js';
 import { context as ctx } from '../contexts/sandbox.js';
@@ -33,7 +33,7 @@ describe('darkvision catalog', () => {
   });
 });
 
-function seedWith(lighting: 'bright' | 'dim' | 'dark', enemy: Partial<Enemy>): Seed {
+function seedWith(lighting: 'bright' | 'dim' | 'dark' | 'sunlight', enemy: Partial<Enemy>): Seed {
   return {
     context_id: ctx.id,
     world_name: 'Light Test',
@@ -525,5 +525,90 @@ describe('Darkness spell', () => {
     });
     expect(r.narrative).toMatch(/advantage/);
     expect(r.narrative).not.toMatch(/disadvantage/);
+  });
+});
+
+// ── Sunlight Sensitivity (Kobold / Specter / Wight / Wraith) ─────────────────
+describe('isInSunlight', () => {
+  const daylightSource: CombatEntity = {
+    id: 'sun',
+    isEnemy: false,
+    pos: { x: 5, y: 5 },
+    hp: 1,
+    maxHp: 1,
+    conditions: [],
+    condition_durations: {},
+    light_radius_ft: 60,
+    light_spell_level: 3,
+  };
+
+  it('a sunlit room is sunlight everywhere', () => {
+    expect(isInSunlight({ x: 0, y: 0 }, 'sunlight', [])).toBe(true);
+  });
+
+  it('a Daylight emanation is sunlight within its bright radius only', () => {
+    expect(isInSunlight({ x: 5, y: 5 }, 'dark', [daylightSource])).toBe(true); // at the source
+    expect(isInSunlight({ x: 17, y: 5 }, 'dark', [daylightSource])).toBe(true); // 12 cells = 60 ft
+    expect(isInSunlight({ x: 18, y: 5 }, 'dark', [daylightSource])).toBe(false); // 65 ft — only dim
+  });
+
+  it('the Light cantrip (level 0) is not sunlight', () => {
+    const torch: CombatEntity = { ...daylightSource, light_radius_ft: 20, light_spell_level: 0 };
+    expect(isInSunlight({ x: 5, y: 5 }, 'dark', [torch])).toBe(false);
+  });
+
+  it('a plain bright/dim/dark room with no Daylight is not sunlight', () => {
+    expect(isInSunlight({ x: 5, y: 5 }, 'bright', [])).toBe(false);
+  });
+});
+
+describe('catalog — sunlight-sensitive undead/kobolds', () => {
+  it('Kobold, Specter, Wight, and Wraith carry the flag', () => {
+    expect(SRD_MONSTERS.kobold.sunlightSensitivity).toBe(true);
+    expect(SRD_MONSTERS.specter.sunlightSensitivity).toBe(true);
+    expect(SRD_MONSTERS.wight.sunlightSensitivity).toBe(true);
+    expect(SRD_MONSTERS.wraith.sunlightSensitivity).toBe(true);
+    // A daylight-loving mortal does not.
+    expect(SRD_MONSTERS.guard.sunlightSensitivity).toBeUndefined();
+  });
+});
+
+describe('enemy attacks — Sunlight Sensitivity', () => {
+  // Disadvantage rolls two d20s and takes the LOWER. Sequence: first die high
+  // (would hit), second die low (misses); with Disadvantage the low die wins.
+  it('a sunlight-sensitive enemy in a sunlit room attacks at disadvantage (drags a hit to a miss)', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5).mockReturnValueOnce(0.9).mockReturnValueOnce(0.05);
+    const r = await takeAction({
+      action: { type: 'end_turn' },
+      history: [],
+      state: pcState({ darkvision_ft: 60 }), // both see (sunlight is bright) → only sensitivity matters
+      seed: seedWith('sunlight', { sunlightSensitivity: true }),
+      context: ctx,
+    });
+    expect(r.newState.characters[0].hp).toBe(30); // disadvantage → the low die missed
+  });
+
+  it('the same enemy WITHOUT the flag hits with the single high roll', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5).mockReturnValueOnce(0.9);
+    const r = await takeAction({
+      action: { type: 'end_turn' },
+      history: [],
+      state: pcState({ darkvision_ft: 60 }),
+      seed: seedWith('sunlight', {}), // no sensitivity → single d20 → the high roll connects
+      context: ctx,
+    });
+    expect(r.newState.characters[0].hp).toBeLessThan(30);
+  });
+
+  it('a sunlight-sensitive enemy in a NON-sunlit room attacks normally', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5).mockReturnValueOnce(0.9);
+    const r = await takeAction({
+      action: { type: 'end_turn' },
+      history: [],
+      state: pcState({ darkvision_ft: 60 }),
+      seed: seedWith('bright', { sunlightSensitivity: true }), // bright ≠ sunlight → no penalty
+      context: ctx,
+    });
+    expect(r.newState.characters[0].hp).toBeLessThan(30); // single high roll hits
   });
 });

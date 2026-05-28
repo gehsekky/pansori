@@ -82,7 +82,10 @@ export interface Room {
   // whole room Lightly Obscured (Disadvantage on sight-based Perception).
   // 'dark' makes squares outside a PC's lit radius Heavily Obscured
   // (Blinded for sight), enabling true fog-of-war on the combat grid.
-  lighting?: 'bright' | 'dim' | 'dark';
+  // 'sunlight' is Bright Light that also counts as *sunlight* — combat
+  // visibility behaves like 'bright', but creatures with Sunlight
+  // Sensitivity attack at Disadvantage there (an outdoor / daylit room).
+  lighting?: 'bright' | 'dim' | 'dark' | 'sunlight';
 }
 
 // `ConditionName` is re-exported from ./shared-types (see src/shared/types.ts).
@@ -257,6 +260,11 @@ export interface EnemyTemplate {
   // set 0 explicitly for sightless-in-dark creatures (most Humanoids, a few
   // beasts/giants). Read in `computeEnemyAttack` / `computeToHitContext`.
   darkvision_ft?: number;
+  // SRD Sunlight Sensitivity (Kobold, Specter, Wight, Wraith) — while in
+  // sunlight the creature has Disadvantage on attack rolls (and sight-based
+  // Perception). "In sunlight" = a 'sunlight' room or within a Daylight
+  // emanation's bright radius. Read in `computeEnemyAttack`.
+  sunlightSensitivity?: boolean;
   // HP-threshold phase transitions for boss encounters. Order does not
   // matter — engine sorts by descending hpPct internally.
   phases?: BossPhase[];
@@ -316,6 +324,9 @@ export interface Enemy {
   // SRD darkvision range (ft) — see EnemyTemplate.darkvision_ft. Undefined
   // defaults to 60 in the combat-visibility check; carried through procgen.
   darkvision_ft?: number;
+  // SRD Sunlight Sensitivity — see EnemyTemplate.sunlightSensitivity. Mirrored
+  // here + carried through procgen; read in `computeEnemyAttack`.
+  sunlightSensitivity?: boolean;
   aura?: MonsterAura;
   // Spell-casting enemies (e.g. cultists, acolytes, mages). On their turn,
   // they roll castChance (0–1) to decide cast vs attack; if cast wins, one

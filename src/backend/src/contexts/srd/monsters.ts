@@ -279,6 +279,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     cha: 8,
     packTactics: true,
     damageType: 'piercing',
+    sunlightSensitivity: true,
   },
   guard: {
     name: 'Guard',
@@ -491,6 +492,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     speedFt: 50, // hovering flight
     damageType: 'necrotic',
     lifeDrain: true,
+    sunlightSensitivity: true,
   },
   animated_armor: {
     name: 'Animated Armor',
@@ -676,6 +678,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     // Life Drain — the necrotic portion of the hit also reduces the target's
     // Hit Point maximum by that amount.
     lifeDrain: true,
+    sunlightSensitivity: true,
   },
 
   // ─── More SRD bestiary (CR 1–5) ──────────────────────────────────────────────
@@ -934,7 +937,9 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     ],
     // SRD: Life Drain — the necrotic hit also lowers the target's HP maximum.
     lifeDrain: true,
-    // SRD: Sunlight Sensitivity + Create Specter deferred (no lighting model).
+    // SRD: Sunlight Sensitivity — Disadvantage on attacks while in sunlight.
+    // (Create Specter deferred — a campaign-timeline mechanic.)
+    sunlightSensitivity: true,
   },
   fire_elemental: {
     name: 'Fire Elemental',

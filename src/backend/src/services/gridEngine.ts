@@ -42,6 +42,26 @@ export function lightReaches(source: CombatEntity, cells: GridPos[]): boolean {
   return cells.some((c) => distanceFeet(source.pos, c) <= r * 2);
 }
 
+/**
+ * SRD 5.2.1 Vision & Light — whether `pos` stands in *sunlight* (which triggers
+ * Sunlight Sensitivity). True when the room itself is sunlit, or `pos` is within
+ * the *bright* radius of a Daylight emanation (a light source whose source spell
+ * is level 3). Unlike `isIlluminated`, only the bright radius counts — Daylight's
+ * dim outskirts are not sunlight — and only the L3 Daylight source qualifies (a
+ * Light cantrip / torch sheds ordinary light, not sunlight).
+ */
+export function isInSunlight(
+  pos: GridPos,
+  roomLighting: string | undefined,
+  entities: CombatEntity[]
+): boolean {
+  if (roomLighting === 'sunlight') return true;
+  return entities.some((e) => {
+    const r = e.light_radius_ft ?? 0;
+    return e.light_spell_level === 3 && r > 0 && distanceFeet(e.pos, pos) <= r;
+  });
+}
+
 /** SRD Darkness — the set of cells (`"x,y"`) covered by a magical-darkness zone
  *  (a `SpellZone` with `blocksSight`). Cells here are Heavily Obscured and
  *  Darkvision can't pierce them. */
