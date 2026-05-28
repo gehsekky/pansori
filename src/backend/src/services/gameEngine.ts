@@ -59,11 +59,12 @@ import {
 import {
   DEFAULT_SPEED_FEET,
   SQUARE_SIZE,
+  canSeeTarget,
   coverBonus,
   distanceFeet,
   findPath,
   hasLineOfSight,
-  isIlluminated,
+  magicalDarknessCells,
   opportunityAttackTriggers,
   posEqual,
 } from './gridEngine.js';
@@ -1321,16 +1322,32 @@ function computeEnemyAttack(
   // Devil's Sight.
   const darkRoom = roomLighting === 'dark';
   const lightEnts = st.entities ?? [];
-  const pcEntForLight = lightEnts.find((e) => e.id === char.id && !e.isEnemy);
-  const enemyCellLit = !!attackerEnt && isIlluminated(attackerEnt.pos, lightEnts);
-  const pcCellLit = !!pcEntForLight && isIlluminated(pcEntForLight.pos, lightEnts);
-  const enemySeesInDark = seesInDarkness(enemy.darkvision_ft ?? 60, false);
-  const targetBlindsight =
-    hasFeralSenses(char) || (char.feats?.includes('devils_sight') ?? false);
-  const targetSeesInDark = seesInDarkness(char.darkvision_ft ?? 0, targetBlindsight);
-  // Enemy can't see the PC → Disadvantage; PC can't see the enemy → Advantage.
-  const darknessDisadv = darkRoom && !(enemySeesInDark || pcCellLit);
-  const darknessAdv = darkRoom && !(targetSeesInDark || enemyCellLit);
+  const darknessCells = magicalDarknessCells(st.spell_zones);
+  const enemyPos = attackerEnt?.pos;
+  const pcPos = lightEnts.find((e) => e.id === char.id && !e.isEnemy)?.pos;
+  const targetBlindsight = hasFeralSenses(char) || (char.feats?.includes('devils_sight') ?? false);
+  const enemyCanSeePc = canSeeTarget({
+    observerPos: enemyPos,
+    targetPos: pcPos,
+    observerCanSeeInDark: seesInDarkness(enemy.darkvision_ft ?? 60, false),
+    observerPiercesMagicalDarkness: false,
+    roomDark: darkRoom,
+    entities: lightEnts,
+    darknessCells,
+  });
+  const pcCanSeeEnemy = canSeeTarget({
+    observerPos: pcPos,
+    targetPos: enemyPos,
+    observerCanSeeInDark: seesInDarkness(char.darkvision_ft ?? 0, targetBlindsight),
+    observerPiercesMagicalDarkness: targetBlindsight,
+    roomDark: darkRoom,
+    entities: lightEnts,
+    darknessCells,
+  });
+  // Enemy can't see the PC → its attack at Disadvantage; PC can't see the enemy
+  // → the enemy's attack at Advantage.
+  const darknessDisadv = !enemyCanSeePc;
+  const darknessAdv = !pcCanSeeEnemy;
   const hasAdvantage = hasElusive(char)
     ? false
     : advFromConditions || isReckless || packTacticsAdv || bloodiedFrenzyAdv || darknessAdv;
@@ -2235,6 +2252,9 @@ export function applyZoneTick(
   context: Context
 ): { st: GameState; narrative: string } {
   if (!st.entities) return { st, narrative: '' };
+  // SRD Darkness — a sight-blocking zone deals no damage; it only affects
+  // visibility (read via `magicalDarknessCells` / `canSeeTarget`). Nothing to tick.
+  if (zone.blocksSight) return { st, narrative: '' };
   // Caster-following auras (Spirit Guardians) recompute their footprint from
   // the caster's CURRENT cell each tick, so the aura moves with the caster.
   let cells = zone.cells;

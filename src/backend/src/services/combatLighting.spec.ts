@@ -11,10 +11,10 @@
 
 import type { Character, CombatEntity, Enemy, GameState, Seed } from '../types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { canSeeTarget, isIlluminated, magicalDarknessCells } from './gridEngine.js';
 import { makeChar, makeState } from '../test-fixtures.js';
 import { SRD_MONSTERS } from '../contexts/srd/monsters.js';
 import { context as ctx } from '../contexts/sandbox.js';
-import { isIlluminated } from './gridEngine.js';
 import { takeAction } from './gameEngine.js';
 
 afterEach(() => vi.restoreAllMocks());
@@ -270,5 +270,129 @@ describe('light negates the darkness combat penalty', () => {
     });
     const pc = r.newState.characters[0];
     expect(pc.hp).toBe(30); // no advantage → the lone low roll missed
+  });
+});
+
+// ── Magical Darkness (the Darkness spell) ────────────────────────────────────
+describe('magicalDarknessCells / canSeeTarget — magical darkness', () => {
+  const dark = new Set(['5,5']);
+
+  it('darkvision cannot pierce magical darkness (target inside is unseen)', () => {
+    expect(
+      canSeeTarget({
+        observerPos: { x: 4, y: 5 },
+        targetPos: { x: 5, y: 5 }, // in darkness
+        observerCanSeeInDark: true, // has darkvision — still blocked
+        observerPiercesMagicalDarkness: false,
+        roomDark: false,
+        entities: [],
+        darknessCells: dark,
+      })
+    ).toBe(false);
+  });
+
+  it("Blindsight / Devil's Sight pierces magical darkness", () => {
+    expect(
+      canSeeTarget({
+        observerPos: { x: 4, y: 5 },
+        targetPos: { x: 5, y: 5 },
+        observerCanSeeInDark: false,
+        observerPiercesMagicalDarkness: true,
+        roomDark: false,
+        entities: [],
+        darknessCells: dark,
+      })
+    ).toBe(true);
+  });
+
+  it('an observer standing in darkness is blinded looking out', () => {
+    expect(
+      canSeeTarget({
+        observerPos: { x: 5, y: 5 }, // in darkness
+        targetPos: { x: 8, y: 8 }, // outside
+        observerCanSeeInDark: true,
+        observerPiercesMagicalDarkness: false,
+        roomDark: false,
+        entities: [],
+        darknessCells: dark,
+      })
+    ).toBe(false);
+  });
+
+  it('magicalDarknessCells collects only blocksSight zones', () => {
+    const zones = [
+      { blocksSight: true, cells: [{ x: 5, y: 5 }, { x: 6, y: 5 }] },
+      { blocksSight: false, cells: [{ x: 1, y: 1 }] },
+    ] as Parameters<typeof magicalDarknessCells>[0];
+    const set = magicalDarknessCells(zones);
+    expect(set.has('5,5')).toBe(true);
+    expect(set.has('6,5')).toBe(true);
+    expect(set.has('1,1')).toBe(false);
+  });
+});
+
+describe('Darkness spell', () => {
+  it('cast places a sight-blocking zone bound to concentration', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const wizard = makeChar({
+      id: 'pc-1',
+      character_class: 'Wizard',
+      level: 5,
+      darkvision_ft: 60,
+      spells_known: ['darkness'],
+      prepared_spells: ['darkness'],
+      spell_slots_max: { 2: 1 },
+      spell_slots_used: {},
+    });
+    const state: GameState = {
+      ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+      characters: [wizard],
+      active_character_id: 'pc-1',
+      entities: [
+        { id: 'pc-1', isEnemy: false, pos: { x: 1, y: 5 }, hp: 25, maxHp: 25, conditions: [], condition_durations: {} },
+        { id: ENEMY_ID, isEnemy: true, pos: { x: 5, y: 5 }, hp: 40, maxHp: 40, conditions: [], condition_durations: {} },
+      ],
+    } as unknown as GameState;
+    const r = await takeAction({
+      action: { type: 'cast_spell', spellId: 'darkness', slotLevel: 2, targetEnemyId: ENEMY_ID },
+      history: [],
+      state,
+      seed: seedWith('bright', {}),
+      context: ctx,
+    });
+    const zone = r.newState.spell_zones?.find((z) => z.spellId === 'darkness');
+    expect(zone?.blocksSight).toBe(true);
+    expect(zone?.cells.some((c) => c.x === 5 && c.y === 5)).toBe(true); // centered on the enemy
+    expect(r.newState.characters[0].concentrating_on?.spellId).toBe('darkness');
+  });
+
+  it("a Devil's Sight PC gains advantage on an enemy stuck in its darkness", async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    // Enemy at (5,5) sits in magical darkness; the PC (devil's sight, at (4,5))
+    // sees through → no disadvantage, and the blinded enemy can't see the PC →
+    // advantage. Bright room, to show magical darkness works regardless of ambient.
+    const state = pcState({ feats: ['devils_sight'] });
+    state.spell_zones = [
+      {
+        id: 'd1',
+        casterId: 'pc-1',
+        spellId: 'darkness',
+        name: 'Darkness',
+        roomId: ctx.startRoomId,
+        cells: [{ x: 5, y: 5 }],
+        damage: '0',
+        damageType: 'none',
+        blocksSight: true,
+      },
+    ];
+    const r = await takeAction({
+      action: { type: 'attack', targetEnemyId: ENEMY_ID },
+      history: [],
+      state,
+      seed: seedWith('bright', {}),
+      context: ctx,
+    });
+    expect(r.narrative).toMatch(/advantage/);
+    expect(r.narrative).not.toMatch(/disadvantage/);
   });
 });

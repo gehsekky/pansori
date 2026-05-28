@@ -1218,6 +1218,11 @@ export interface SpellZone {
   // Center cell of a PLACED zone (where it was cast / last repositioned to).
   // Used to measure reposition distance and recompute the footprint on a move.
   center?: GridPos;
+  // SRD Darkness — a magical-darkness zone (no damage). Its cells are Heavily
+  // Obscured: Darkvision can't see through them and nonmagical light can't
+  // illuminate them, so only Blindsight / Devil's Sight pierces. `applyZoneTick`
+  // skips these (no damage); `magicalDarknessCells` / `canSeeTarget` read them.
+  blocksSight?: boolean;
 }
 
 export interface GameState {
