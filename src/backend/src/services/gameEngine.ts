@@ -104,6 +104,7 @@ import {
   layOnHandsRemaining,
   metamagicOptions,
   metamagicSlots,
+  piercesMagicalDarkness,
   spellSlotsForChar,
 } from './multiclass.js';
 import { composeFragments, enemyAttackFragmentEvent } from './narrative/compose.js';
@@ -1330,7 +1331,9 @@ function computeEnemyAttack(
   const darknessCells = magicalDarknessCells(st.spell_zones);
   const enemyPos = attackerEnt?.pos;
   const pcPos = lightEnts.find((e) => e.id === char.id && !e.isEnemy)?.pos;
-  const targetBlindsight = hasFeralSenses(char) || (char.feats?.includes('devils_sight') ?? false);
+  // Blindsight / Devil's Sight / Truesight — the PC sees in the dark and through
+  // magical Darkness (see `piercesMagicalDarkness`).
+  const targetBlindsight = piercesMagicalDarkness(char);
   const enemyCanSeePc = canSeeTarget({
     observerPos: enemyPos,
     targetPos: pcPos,

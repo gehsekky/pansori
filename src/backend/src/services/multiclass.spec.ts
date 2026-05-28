@@ -14,11 +14,30 @@ import {
   getPrimaryClass,
   getTotalLevel,
   hasClass,
+  piercesMagicalDarkness,
   spellSlotsForChar,
 } from './multiclass.js';
 import { describe, expect, it } from 'vitest';
 import { makeChar } from '../test-fixtures.js';
 import { spellSlotsForClassLevel } from './rulesEngine.js';
+
+describe('piercesMagicalDarkness', () => {
+  it('is false for an ordinary creature (even with darkvision)', () => {
+    expect(piercesMagicalDarkness(makeChar({ darkvision_ft: 60 }))).toBe(false);
+  });
+
+  it('is true with Devil\'s Sight', () => {
+    expect(piercesMagicalDarkness(makeChar({ feats: ['devils_sight'] }))).toBe(true);
+  });
+
+  it('is true with the Boon of Truesight (truesight_ft)', () => {
+    expect(piercesMagicalDarkness(makeChar({ truesight_ft: 60 }))).toBe(true);
+  });
+
+  it('is true for a Ranger with Feral Senses (L18 Blindsight)', () => {
+    expect(piercesMagicalDarkness(makeChar({ character_class: 'Ranger', level: 18 }))).toBe(true);
+  });
+});
 
 describe('getClassLevels — legacy single-class fallback', () => {
   it('derives a one-entry record from character_class + level', () => {

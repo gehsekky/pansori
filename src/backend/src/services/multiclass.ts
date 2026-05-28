@@ -609,6 +609,25 @@ export function hasFeralSenses(char: Character): boolean {
 }
 
 /**
+ * SRD Vision & Light — whether a creature's senses let it see WITHOUT light and
+ * THROUGH magical Darkness: Blindsight (Ranger Feral Senses), the Warlock's
+ * Devil's Sight, or Truesight (the epic Boon of Truesight, `truesight_ft`).
+ * Darkvision is deliberately excluded — it brightens nonmagical Darkness but
+ * cannot pierce the magical Darkness of the Darkness spell. Feeds both
+ * `seesInDarkness` (sees in the dark) and `canSeeTarget`'s
+ * `observerPiercesMagicalDarkness` (sees into a magical-darkness cell).
+ * (Truesight's see-Invisible / shapechanger halves are not modeled yet — no
+ * Invisible lifecycle on the grid.)
+ */
+export function piercesMagicalDarkness(char: Character): boolean {
+  return (
+    hasFeralSenses(char) ||
+    (char.feats?.includes('devils_sight') ?? false) ||
+    (char.truesight_ft ?? 0) > 0
+  );
+}
+
+/**
  * SRD Sorcerer Metamagic options the player can learn + use. Each maps the
  * short id (stored in `metamagics_known` and `metamagic_active`) to its label
  * and Sorcery-Point cost. All ten SRD options are present + functional. (RE-2.)
