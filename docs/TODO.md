@@ -1,6 +1,6 @@
 # TODO
 
-> **Status snapshot — verified 2026-05-26.** The top section is the
+> **Status snapshot — verified 2026-05-28.** The top section is the
 > authoritative implementation status, re-grounded in a fresh code survey
 > (not the prior changelog). The backlog below it lists only remaining
 > work. Shipped-feature completion logs were removed — `git log` is the
@@ -16,10 +16,10 @@ PHB/DMG-exclusive content (subclasses, feats, species, spells). See
 
 ---
 
-## Implementation status (code-verified 2026-05-26)
+## Implementation status (code-verified 2026-05-28)
 
-Grounded in a code survey + the full backend suite: **1912 tests across
-221 files, all green** (lint + typecheck clean).
+Grounded in a code survey + the full backend suite: **1971 tests across
+226 files, all green** (lint + typecheck clean).
 
 ### Done — rules-engine frameworks
 
@@ -464,8 +464,12 @@ options }`** → `OptionPickerDialog` (single-select; re-sends `action[param]`).
       Survivor / Resilient don't reach that path. General gap, not feature-
       specific.
 - [ ] **Truesight / Dimensional Travel / Night Spirit boons** — the +1
-      ability lands; no see-Invisible substrate, concrete positioning, or
-      lighting/Invisible-lifecycle to wire the effects to. Narrated only.
+      ability lands. The **lighting substrate now exists** (darkvision,
+      blindsight, magical darkness, Devil's-Sight pierce) so Truesight's
+      "sees through magical darkness" half is wirable as a per-creature flag
+      that joins the `observerPiercesMagicalDarkness` branch of
+      `canSeeTarget`. **Remaining:** see-Invisible (no Invisible-lifecycle on
+      the grid yet) and concrete positioning for Dimensional Travel. Narrated.
 - Minor markers: Devious Strikes' Daze restriction, Use Magic Device
   scroll/charge sub-features, Thief Jumper, Lay on Hands poison-cure use,
   Deflect Energy (Monk L13) — pending broader enforcement/item/jump infra.
