@@ -1355,6 +1355,16 @@ function computeEnemyAttack(
   // → the enemy's attack at Advantage.
   const darknessDisadv = !enemyCanSeePc;
   const darknessAdv = !pcCanSeeEnemy;
+  // SRD Vision & Light — surface the effective-Blinded state in the prose. When
+  // both combatants are blind the adv/disadv cancel, so just name them both.
+  const darknessNote =
+    darknessDisadv && darknessAdv
+      ? ` Both combatants are Blinded by the darkness.`
+      : darknessDisadv
+        ? ` The ${enemy.name} is Blinded by the darkness.`
+        : darknessAdv
+          ? ` ${char.name} is Blinded by the darkness.`
+          : '';
   const hasAdvantage = hasElusive(char)
     ? false
     : advFromConditions || isReckless || packTacticsAdv || bloodiedFrenzyAdv || darknessAdv;
@@ -1605,6 +1615,7 @@ function computeEnemyAttack(
     narrative += shdNote;
     narrative += lifeDrainNote;
     narrative += dmgResult.concentrationNote;
+    narrative += darknessNote;
 
     let inspirationConsumed = false;
     let luckConsumed = false;
@@ -1757,10 +1768,11 @@ function computeEnemyAttack(
     };
   }
   if (armorItem) {
-    const deflectedProse = pick(context.narratives.enemyDeflected)
-      .replace('{enemy}', enemy.name)
-      .replace('{target}', char.name)
-      .replace('{armor}', armorItem.name);
+    const deflectedProse =
+      pick(context.narratives.enemyDeflected)
+        .replace('{enemy}', enemy.name)
+        .replace('{target}', char.name)
+        .replace('{armor}', armorItem.name) + darknessNote;
     return {
       proposedChar: char,
       proposedSt: st,
@@ -1804,7 +1816,7 @@ function computeEnemyAttack(
       targetName: char.name,
       atkTotal: result.total,
       targetAc: char.ac,
-      prose: pick(missLines),
+      prose: pick(missLines) + darknessNote,
     },
     atkTotal: result.total,
     atkD20: result.roll,

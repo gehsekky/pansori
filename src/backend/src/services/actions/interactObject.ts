@@ -1,4 +1,4 @@
-import { abilityMod, d20TestPenalty, skillCheck } from '../rulesEngine.js';
+import { abilityMod, d20TestPenalty, effectiveLightFor, skillCheck } from '../rulesEngine.js';
 import {
   consumeBardicForCheck,
   consumeInspirationForCheck,
@@ -72,12 +72,22 @@ export const handleInteractObject: ActionHandler<{
   const inspAdv = consumeInspirationForCheck(nextChar);
   const luckAdv = consumeLuckForCheck(nextChar);
   const bardicRoll = consumeBardicForCheck(nextChar);
+  // SRD Vision & Light — searching by sight in a Lightly/Heavily Obscured room
+  // is at Disadvantage. Darkvision shifts the searcher one step brighter
+  // (`effectiveLightFor`), so a darkvision searcher is unhindered in the dark;
+  // 'sunlight' is just Bright Light here.
+  const roomLighting = currentSeedRoom?.lighting ?? 'bright';
+  const effectiveLight = effectiveLightFor(
+    roomLighting === 'sunlight' ? 'bright' : roomLighting,
+    nextChar.darkvision_ft ?? 0
+  );
+  const lowLightDisadv = effectiveLight !== 'bright';
   const check = skillCheck(
     nextChar.int,
     (obj.searchDC ?? 12) - bardicRoll,
     proficient,
     nextChar.level,
-    false,
+    lowLightDisadv,
     hasExpertise(nextChar, 'Investigation'),
     hasJackOfAllTrades(nextChar),
     inspAdv || luckAdv,

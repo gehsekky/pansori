@@ -22,6 +22,7 @@ import {
   peerlessSkillDie,
 } from '../multiclass.js';
 import type { ActionHandler } from './types.js';
+import { isInSunlight } from '../gridEngine.js';
 import { updatePcActor } from './actor.js';
 
 /**
@@ -53,7 +54,19 @@ export const handleSneak: ActionHandler<{ type: 'sneak' }> = (ctx) => {
   // 'sunlight' is Bright Light for sight purposes (it only matters for Sunlight
   // Sensitivity), so it collapses to 'bright' for the Perception math.
   const enemyEffectiveLight = effectiveLightFor(roomLighting === 'sunlight' ? 'bright' : roomLighting, 0);
-  const sneakDC = passivePerceptionDcInLight(enemy.wis ?? 10, enemyEffectiveLight);
+  // SRD Sunlight Sensitivity — a sunlight-sensitive observer in sunlight has
+  // Disadvantage on its sight-based Perception, so the party slips past more
+  // easily (−5 to the enemy's passive). A sunlit room counts everywhere; a
+  // Daylight emanation counts where the enemy's grid cell is lit.
+  const enemyEnt = ctx.st.entities?.find((e) => e.id === enemy.id && e.isEnemy);
+  const enemyInSunlight =
+    roomLighting === 'sunlight' ||
+    (enemyEnt ? isInSunlight(enemyEnt.pos, roomLighting, ctx.st.entities ?? []) : false);
+  const sneakDC = passivePerceptionDcInLight(
+    enemy.wis ?? 10,
+    enemyEffectiveLight,
+    !!enemy.sunlightSensitivity && enemyInSunlight
+  );
   const livingParty = ctx.st.characters
     .filter((c) => !c.dead)
     .map((c) => (c.id === char.id ? char : c));

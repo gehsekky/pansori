@@ -5125,6 +5125,89 @@ describe('interact_object retry on fail', () => {
   });
 });
 
+describe('interact_object — lighting-adjusted active search', () => {
+  function searchSeed(lighting?: 'bright' | 'dim' | 'dark' | 'sunlight'): Seed {
+    return {
+      context_id: ctx.id,
+      world_name: 'Search Light Test',
+      ship_name: 'Search Light Test',
+      intro: '',
+      seed_id: 'search-light',
+      rooms: [
+        {
+          id: 'test_room',
+          name: 'Test Room',
+          desc: '',
+          lighting,
+          objects: [
+            {
+              id: 'test_chest',
+              name: 'Test Chest',
+              desc: '',
+              interactText: 'You work the lock.',
+              searchable: true,
+              searchDC: 10,
+              lootIds: ['healing_potion'],
+              foundText: 'Inside: a potion!',
+              emptyText: 'The lock resists you. Try again.',
+            },
+          ],
+        },
+      ],
+      connections: { test_room: [] },
+      enemies: {},
+      loot: {},
+      npcs: {},
+    };
+  }
+
+  it('a dark room imposes Disadvantage — a would-be success rolls low and fails', async () => {
+    // Disadvantage rolls two d20s and takes the lower: 19 (would pass DC 10), then
+    // 1 (fails). No darkvision → the room stays Heavily Obscured for the search.
+    vi.spyOn(Math, 'random').mockReturnValue(0.5).mockReturnValueOnce(0.9).mockReturnValueOnce(0);
+    const st = makeState({ int: 10, darkvision_ft: 0 }, { current_room: 'test_room' });
+    const result = await takeAction({
+      action: { type: 'interact_object', objectId: 'test_chest' },
+      history: [],
+      state: st,
+      seed: searchSeed('dark'),
+      context: ctx,
+    });
+    expect(result.newState.objects_searched).toEqual([]); // failed → retryable
+    expect(result.newState.characters[0].inventory).toHaveLength(0);
+  });
+
+  it('a bright room lets the same high roll succeed (single d20)', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5).mockReturnValueOnce(0.9);
+    const st = makeState({ int: 10, darkvision_ft: 0 }, { current_room: 'test_room' });
+    const result = await takeAction({
+      action: { type: 'interact_object', objectId: 'test_chest' },
+      history: [],
+      state: st,
+      seed: searchSeed('bright'),
+      context: ctx,
+    });
+    expect(result.newState.objects_searched).toContain('test_room:test_chest');
+    expect(result.newState.characters[0].inventory.length).toBeGreaterThan(0);
+  });
+
+  it('darkvision negates the Disadvantage in DIM light (dim → bright for the searcher)', async () => {
+    // With darkvision, dim shifts to bright → no Disadvantage → the lone high roll
+    // is the only die drawn and it succeeds.
+    vi.spyOn(Math, 'random').mockReturnValue(0.5).mockReturnValueOnce(0.9);
+    const st = makeState({ int: 10, darkvision_ft: 60 }, { current_room: 'test_room' });
+    const result = await takeAction({
+      action: { type: 'interact_object', objectId: 'test_chest' },
+      history: [],
+      state: st,
+      seed: searchSeed('dim'),
+      context: ctx,
+    });
+    expect(result.newState.objects_searched).toContain('test_room:test_chest');
+    expect(result.newState.characters[0].inventory.length).toBeGreaterThan(0);
+  });
+});
+
 describe('normalizeState preserves seen_choices', () => {
   it('defaults to empty array when missing on a new-format state', () => {
     const st = makeState();

@@ -53,4 +53,18 @@ describe('passivePerceptionDcInLight', () => {
     // WIS 1 → mod -5 → base DC 5 → dim = 0 (floor)
     expect(passivePerceptionDcInLight(1, 'dim')).toBe(0);
   });
+
+  it('sightDisadvantage applies -5 in bright light (Sunlight Sensitivity)', () => {
+    const base = passivePerceptionDC(14); // 12
+    expect(passivePerceptionDcInLight(14, 'bright', true)).toBe(base - 5); // 7
+  });
+
+  it('sightDisadvantage does not stack below the dim floor (Disadvantage is not cumulative)', () => {
+    // dim already −5; the extra Disadvantage flag doesn't drop it another 5.
+    expect(passivePerceptionDcInLight(14, 'dim', true)).toBe(7);
+  });
+
+  it('dark stays DC 0 regardless of sightDisadvantage', () => {
+    expect(passivePerceptionDcInLight(14, 'dark', true)).toBe(0);
+  });
 });
