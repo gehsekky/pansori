@@ -156,7 +156,11 @@ describe('SRD bestiary additions — effect fields', () => {
 
   it('Fire Elemental is fire/poison-immune with a 10-ft fire aura', () => {
     expect(SRD_MONSTERS.fire_elemental.immunities).toEqual(['fire', 'poison']);
-    expect(SRD_MONSTERS.fire_elemental.resistances).toEqual(['bludgeoning', 'piercing', 'slashing']);
+    expect(SRD_MONSTERS.fire_elemental.resistances).toEqual([
+      'bludgeoning',
+      'piercing',
+      'slashing',
+    ]);
     expect(SRD_MONSTERS.fire_elemental.aura).toMatchObject({
       radiusFt: 10,
       damage: '1d10',

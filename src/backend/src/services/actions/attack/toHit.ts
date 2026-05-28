@@ -16,7 +16,12 @@ import {
   isFlankingPosition,
   magicalDarknessCells,
 } from '../../gridEngine.js';
-import { getClassLevel, hasClass, hasFeralSenses, piercesMagicalDarkness } from '../../multiclass.js';
+import {
+  getClassLevel,
+  hasClass,
+  hasFeralSenses,
+  piercesMagicalDarkness,
+} from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import { hasFightingStyle } from '../../fightingStyle.js';
 import { isHeavilyEncumbered } from '../../gameEngine.js';
@@ -359,7 +364,7 @@ export function computeToHitContext(
     !armorProficient ? `not proficient with ${equippedArmorLootItem?.name ?? 'armor'}` : '',
     proneDisadv ? 'prone (ranged)' : '',
     thrownLongRangeDisadv ? 'thrown beyond normal range' : '',
-    darknessDisadv ? 'Blinded by darkness — you can\'t see your target' : '',
+    darknessDisadv ? "Blinded by darkness — you can't see your target" : '',
   ]
     .filter(Boolean)
     .join(', ');

@@ -147,7 +147,13 @@ describe('Sneak past a Sunlight-Sensitive observer in sunlight', () => {
       characters: [pc],
       active_character_id: pc.id,
     };
-    const result = await takeAction({ action: { type: 'sneak' }, history: [], state, seed, context: ctx });
+    const result = await takeAction({
+      action: { type: 'sneak' },
+      history: [],
+      state,
+      seed,
+      context: ctx,
+    });
     expect(result.newState.current_room).toBe('next-room');
   });
 
@@ -160,7 +166,13 @@ describe('Sneak past a Sunlight-Sensitive observer in sunlight', () => {
       characters: [pc],
       active_character_id: pc.id,
     };
-    const result = await takeAction({ action: { type: 'sneak' }, history: [], state, seed, context: ctx });
+    const result = await takeAction({
+      action: { type: 'sneak' },
+      history: [],
+      state,
+      seed,
+      context: ctx,
+    });
     expect(result.newState.current_room).toBe(ctx.startRoomId); // didn't move
   });
 });

@@ -879,7 +879,14 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     speedFt: 40,
     damageType: 'slashing',
     // SRD: two heads — immune to a suite of "lose your senses/turn" conditions.
-    condition_immunities: ['blinded', 'charmed', 'deafened', 'frightened', 'stunned', 'unconscious'],
+    condition_immunities: [
+      'blinded',
+      'charmed',
+      'deafened',
+      'frightened',
+      'stunned',
+      'unconscious',
+    ],
     // SRD: Battleaxe Prone rider + Morningstar's Disadvantage rider deferred.
   },
   gladiator: {

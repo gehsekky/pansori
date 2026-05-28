@@ -53,7 +53,14 @@ function twoSwingSeed(): Seed {
 }
 
 function turnState(): GameState {
-  const pc = makeChar({ id: 'pc-1', character_class: 'Fighter', level: 3, ac: 10, hp: 40, max_hp: 40 });
+  const pc = makeChar({
+    id: 'pc-1',
+    character_class: 'Fighter',
+    level: 3,
+    ac: 10,
+    hp: 40,
+    max_hp: 40,
+  });
   return {
     ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
     characters: [{ ...pc, hp: 40, max_hp: 40 }],
