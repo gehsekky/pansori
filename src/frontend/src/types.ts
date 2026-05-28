@@ -323,7 +323,7 @@ export interface Seed {
     name: string;
     desc: string;
     objects?: RoomObject[];
-    lighting?: 'bright' | 'dim' | 'dark';
+    lighting?: 'bright' | 'dim' | 'dark' | 'sunlight';
     // Static obstacles (columns, walls, debris) — render-only on the FE,
     // the engine reads these from the matching BE Room for cover and to
     // block movement through these cells.

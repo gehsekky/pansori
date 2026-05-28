@@ -1439,12 +1439,19 @@
 .gridLegendReach,
 .gridLegendDim,
 .gridLegendDark,
+.gridLegendFog,
 .gridLegendObstacle,
 .gridLegendDifficult {
   display: inline-block;
   width: 10px;
   height: 10px;
   border-radius: 50%;
+}
+
+.gridLegendFog {
+  border-radius: 0;
+  background: rgba(70, 90, 120, 0.55);
+  border: 1px solid var(--t-border);
 }
 
 .gridLegendPC {
