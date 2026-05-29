@@ -18,8 +18,8 @@ PHB/DMG-exclusive content (subclasses, feats, species, spells). See
 
 ## Implementation status (code-verified 2026-05-28)
 
-Grounded in a code survey + the full backend suite: **2057 tests across
-235 files, all green** (lint + typecheck clean).
+Grounded in a code survey + the full backend suite: **2062 tests across
+236 files, all green** (lint + typecheck clean).
 
 ### Done — rules-engine frameworks
 
@@ -67,7 +67,7 @@ Grounded in a code survey + the full backend suite: **2057 tests across
 
 | Category                  | In pansori                                       | SRD universe                     |
 | ------------------------- | ------------------------------------------------ | -------------------------------- |
-| Spells                    | **243** (27 cantrips + 216 leveled, through L9)  | ~330                             |
+| Spells                    | **244** (27 cantrips + 217 leveled, through L9)  | ~330                             |
 | Shared SRD monster pool   | **44** (`SRD_MONSTERS`) + per-campaign templates | hundreds                         |
 | Species                   | 9                                                | 9 standalone + Drow lineage      |
 | Classes                   | 12                                               | 12                               |
@@ -85,12 +85,16 @@ backend features are waiting on, and a handful of **bounded subsystems**.
 
 ### Content breadth — data on existing patterns (RE-6)
 
-- [ ] **Spells** — ~243 / ~330 SRD. Most remaining categories are already
-      representable (data entry). **Telekinesis** (L5,
-      `telekinesis.spec.ts`) added single-target forced displacement: `runSaveSpell`
-      now honors `pushFt` on a failed save for non-AoE spells (reusing
-      `pushEntityAway`), shoving the target away from the caster (RAW Concentration
-      + repeatable each turn deferred to a one-shot shove). The **wall spells** (Force / Stone / Ice /
+- [ ] **Spells** — ~244 / ~330 SRD. Most remaining categories are already
+      representable (data entry). **Fire Shield** (L4, `fireShield.spec.ts`) added
+      a melee-retaliation mechanic: a self buff (`Character.fire_shield`) that
+      sears an adjacent attacker for 2d8 Fire after it hits the warded PC (in the
+      enemy-turn loop, beside Barbarian Retaliation) + Cold resistance; both clear
+      at combat end (`endCombatState` now also clears `spell_resistances`).
+      **Telekinesis** (L5, `telekinesis.spec.ts`) added single-target forced
+      displacement: `runSaveSpell` now honors `pushFt` on a failed save for non-AoE
+      spells (reusing `pushEntityAway`), shoving the target away from the caster
+      (RAW Concentration + repeatable each turn deferred to a one-shot shove). The **wall spells** (Force / Stone / Ice /
       Thorns) shipped on a generalized `spell.wall` path — see the Wall-spells
       item under "Combat / exploration subsystems". The **2024 conjure family** (6 spells) shipped
       on existing zone / recurring-attack / weapon-rider paths — see the

@@ -702,6 +702,10 @@ export interface Spell {
   // matching enemy damage in the attack-resolution chain. Cleared when the
   // caster's concentration ends.
   grantResistances?: string[];
+  // SRD Fire Shield — arm a melee-retaliation on the self-target (read by the
+  // buff path → `Character.fire_shield`). A creature that hits the warded
+  // character with a melee attack takes `dice` damage of `damageType`.
+  fireShield?: { dice: string; damageType: string };
   tempHpGrant?: number; // Heroism gives mod-equal temp HP each turn; MVP grants once on cast.
   maxHpBonus?: number; // Aid bumps target's max HP (and current HP).
   upcastMaxHpBonus?: number; // extra max HP per slot above base (Aid: +5 per slot).
@@ -940,6 +944,12 @@ export interface Character {
   // path from `Spell.weaponRider` (persistent), read in resolveOneAttack, and
   // cleared when the caster's concentration ends.
   weapon_rider?: { dice: string; damageType: string; spellId: string };
+  // SRD Fire Shield — while active, a creature that hits the warded character
+  // with a melee attack takes `dice` damage of `damageType` (a "warm" shield
+  // retaliates Fire; a "chill" shield, Cold). Set by the buff cast path, read in
+  // the enemy-turn loop after the character takes melee damage. Non-concentration
+  // (RAW 10 min); cleared at combat end + long rest, like the encounter buffs.
+  fire_shield?: { dice: string; damageType: string };
   // SRD one-shot smite (Searing / Shining / Ensnaring Strike) — armed on cast,
   // consumed by the NEXT melee-weapon hit: adds `dice` damage (optional) and an
   // on-hit effect (Faerie-Fire-style advantage, or a saved condition that ends
