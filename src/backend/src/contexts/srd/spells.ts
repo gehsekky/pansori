@@ -4190,4 +4190,138 @@ export const SRD_SPELLS: Record<string, Spell> = {
     },
     spellList: ['divine', 'primal'],
   },
+
+  // ─── Spell content batch B (RE-6) ───────────────────────────────────────────
+  // Five more SRD 5.2.1 spells on shipped paths: AoE save-for-half damage,
+  // single-target save→condition (save-ends), AoE-condition, and a concentration
+  // buff. One new registry condition (`enfeebled`, mirroring `cursed`).
+
+  // SRD: Tsunami (L8 Conjuration, Druid) — a 300-ft wall of water; each creature
+  // in the area makes a STR save for 6d10 Bludgeoning, half on a success. Rides
+  // the AoE save-for-half damage path (wall shape + per-round diminishing
+  // narrated). Concentration, up to 6 rounds.
+  tsunami: {
+    id: 'tsunami',
+    name: 'Tsunami',
+    level: 8,
+    castTime: 'action',
+    savingThrow: 'str',
+    saveEffect: 'half',
+    damage: '6d10',
+    damageType: 'bludgeoning',
+    concentration: true,
+    durationRounds: 6,
+    blastRadius: 60,
+    aoeShape: 'sphere',
+    rangeKind: 'ranged',
+    rangeFt: 120,
+    desc: 'A towering wall of water crashes down: each creature in the area makes a Strength save, taking 6d10 Bludgeoning damage (half on a success). Concentration, up to 6 rounds.',
+    spellList: ['primal'],
+  },
+
+  // SRD: Flesh to Stone (L6 Transmutation) — CON save or Restrained for the
+  // duration; a Restrained target re-saves at the end of each of its turns
+  // (save-ends), and sustained failures turn it to stone (narrated). Rides the
+  // single-target save→condition path + the save-ends hook. Concentration.
+  flesh_to_stone: {
+    id: 'flesh_to_stone',
+    name: 'Flesh to Stone',
+    level: 6,
+    castTime: 'action',
+    savingThrow: 'con',
+    saveEffect: 'negates',
+    condition: 'restrained',
+    conditionSaveEnds: true,
+    concentration: true,
+    durationRounds: 10,
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    desc: 'You begin turning a creature to stone: a Constitution save or Restrained, repeating the save at the end of each turn (sustained failures petrify it — narrated). Concentration, up to 1 minute.',
+    narratives: {
+      cast: [
+        '{name} points at {target}, whose limbs grind toward stone',
+        '{name} speaks a petrifying word; {target} stiffens',
+      ],
+    },
+    spellList: ['arcane', 'primal'],
+  },
+
+  // SRD: Ray of Enfeeblement (L2 Necromancy, Warlock/Wizard) — CON save or the
+  // target is Enfeebled: Disadvantage on Strength-based attacks (save-ends).
+  // Rides the single-target save→condition path; the RAW −1d8 weapon-damage
+  // rider is narrated. Concentration.
+  ray_of_enfeeblement: {
+    id: 'ray_of_enfeeblement',
+    name: 'Ray of Enfeeblement',
+    level: 2,
+    castTime: 'action',
+    savingThrow: 'con',
+    saveEffect: 'negates',
+    condition: 'enfeebled',
+    conditionSaveEnds: true,
+    concentration: true,
+    durationRounds: 10,
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    desc: 'A beam of enervating energy: a Constitution save or the target attacks at Disadvantage, repeating the save at the end of each turn (RAW also subtracts 1d8 from its damage — narrated). Concentration, up to 1 minute.',
+    narratives: {
+      cast: [
+        '{name} drains the strength from {target} with a sickly grey beam',
+        '{name} lances {target} with enervating energy',
+      ],
+    },
+    spellList: ['arcane'],
+  },
+
+  // SRD: Black Tentacles (L4 Conjuration, Wizard) — a 20-ft square of grasping
+  // tentacles; each creature makes a STR save or is Restrained (save-ends).
+  // Rides the AoE-condition path. RAW's 3d6 Bludgeoning + Difficult Terrain are
+  // narrated (the AoE-condition path is condition-only). Concentration.
+  black_tentacles: {
+    id: 'black_tentacles',
+    name: 'Black Tentacles',
+    level: 4,
+    castTime: 'action',
+    savingThrow: 'str',
+    condition: 'restrained',
+    aoeCondition: true,
+    conditionSaveEnds: true,
+    concentration: true,
+    durationRounds: 10,
+    blastRadius: 20,
+    aoeShape: 'sphere',
+    rangeKind: 'ranged',
+    rangeFt: 90,
+    desc: 'Squirming tentacles fill the area: each creature makes a Strength save or is Restrained, repeating the save at the end of each turn (RAW 3d6 Bludgeoning + Difficult Terrain narrated). Concentration, up to 1 minute.',
+    narratives: {
+      cast: [
+        '{name} calls writhing black tentacles up through the ground',
+        '{name} fills the ground with grasping, ebony tendrils',
+      ],
+    },
+    spellList: ['arcane'],
+  },
+
+  // SRD: Enhance Ability (L2 Transmutation) — Touch; the target has Advantage on
+  // ability checks using a chosen ability for the duration. Rides the
+  // concentration-buff path; the advantage on (mostly out-of-combat) ability
+  // checks is narrated, as pansori doesn't track a per-ability check buff.
+  enhance_ability: {
+    id: 'enhance_ability',
+    name: 'Enhance Ability',
+    level: 2,
+    castTime: 'action',
+    targetType: 'self_or_ally',
+    concentration: true,
+    durationRounds: 600, // Concentration, up to 1 hour
+    rangeKind: 'touch',
+    desc: 'You bolster a creature, granting Advantage on ability checks with one ability of your choice (narrated). Concentration, up to 1 hour.',
+    narratives: {
+      cast: [
+        '{name} touches {target}; latent talent surges to the surface',
+        "{name}'s blessing sharpens {target}'s every effort",
+      ],
+    },
+    spellList: ['arcane', 'divine', 'primal'],
+  },
 };
