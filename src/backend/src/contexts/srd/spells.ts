@@ -4324,4 +4324,82 @@ export const SRD_SPELLS: Record<string, Spell> = {
     },
     spellList: ['arcane', 'divine', 'primal'],
   },
+
+  // ─── Spell content batch C (RE-6) — environmental / travel utility ───────────
+  // Five SRD 5.2.1 exploration spells. No combat mechanics — they route through
+  // the utility (narrative) path and are gated out of combat (`outOfCombatOnly`),
+  // matching the existing narrated-utility spells (Tiny Hut, Find the Path).
+
+  // SRD: Plant Growth (L3 Transmutation) — the Overgrowth form chokes a wide area
+  // with hampering growth; the Enrichment form makes land bountiful for a year.
+  // (RAW Overgrowth difficult terrain is deferred — no dynamic terrain.)
+  plant_growth: {
+    id: 'plant_growth',
+    name: 'Plant Growth',
+    level: 3,
+    castTime: 'action',
+    outOfCombatOnly: true,
+    rangeKind: 'ranged',
+    rangeFt: 150,
+    desc: 'You channel growth into the land — either choking a wide area with hampering overgrowth, or enriching the soil so it yields a bountiful harvest for a year.',
+    narrative: '{name} calls on green and growing things; the land answers, lush and wild.',
+    spellList: ['arcane', 'primal'],
+  },
+
+  // SRD: Control Water (L4 Transmutation) — reshape a large body of water
+  // (flood, part, redirect the flow, or churn a whirlpool) for the duration.
+  control_water: {
+    id: 'control_water',
+    name: 'Control Water',
+    level: 4,
+    castTime: 'action',
+    outOfCombatOnly: true,
+    rangeKind: 'ranged',
+    rangeFt: 300,
+    desc: 'You seize control of a large body of water — parting it, raising a flood, redirecting its flow, or wrenching it into a whirlpool (Concentration, up to 10 minutes).',
+    narrative: '{name} sweeps a hand and the water heaves, bending to their will.',
+    spellList: ['arcane', 'divine', 'primal'],
+  },
+
+  // SRD: Tree Stride (L5 Conjuration) — step into one living tree and out of
+  // another of the same kind within 500 ft, once per turn for the duration.
+  tree_stride: {
+    id: 'tree_stride',
+    name: 'Tree Stride',
+    level: 5,
+    castTime: 'action',
+    outOfCombatOnly: true,
+    rangeKind: 'self',
+    desc: 'You gain the power to step into a living tree and emerge from another of the same kind up to 500 ft away (Concentration, up to 1 minute).',
+    narrative: '{name} melts into the bark of a nearby tree and is gone.',
+    spellList: ['primal'],
+  },
+
+  // SRD: Wind Walk (L6 Transmutation) — you and up to ten allies become wisps of
+  // cloud with a 300-ft Fly Speed for long-distance travel.
+  wind_walk: {
+    id: 'wind_walk',
+    name: 'Wind Walk',
+    level: 6,
+    castTime: 'action',
+    outOfCombatOnly: true,
+    rangeKind: 'self',
+    desc: 'You and up to ten willing companions become gaseous wisps of cloud with a 300-ft flying speed, streaking across the sky for up to 8 hours (the Fly Speed is not modeled in combat).',
+    narrative: '{name} and the party dissolve into streaming wisps of cloud and race skyward.',
+    spellList: ['primal'],
+  },
+
+  // SRD: Control Weather (L8 Transmutation) — over time, shift the weather in a
+  // wide area around you (precipitation, temperature, and wind) for the duration.
+  control_weather: {
+    id: 'control_weather',
+    name: 'Control Weather',
+    level: 8,
+    castTime: 'action',
+    outOfCombatOnly: true,
+    rangeKind: 'self',
+    desc: 'You take command of the sky, gradually shifting the precipitation, temperature, and wind across a wide area (Concentration, up to 8 hours).',
+    narrative: '{name} raises their arms; clouds gather and the wind turns to their command.',
+    spellList: ['arcane', 'divine', 'primal'],
+  },
 };
