@@ -18,8 +18,8 @@ PHB/DMG-exclusive content (subclasses, feats, species, spells). See
 
 ## Implementation status (code-verified 2026-05-28)
 
-Grounded in a code survey + the full backend suite: **2038 tests across
-231 files, all green** (lint + typecheck clean).
+Grounded in a code survey + the full backend suite: **2045 tests across
+232 files, all green** (lint + typecheck clean).
 
 ### Done — rules-engine frameworks
 
@@ -67,7 +67,7 @@ Grounded in a code survey + the full backend suite: **2038 tests across
 
 | Category                  | In pansori                                       | SRD universe                     |
 | ------------------------- | ------------------------------------------------ | -------------------------------- |
-| Spells                    | **232** (27 cantrips + 205 leveled, through L9)  | ~330                             |
+| Spells                    | **238** (27 cantrips + 211 leveled, through L9)  | ~330                             |
 | Shared SRD monster pool   | **44** (`SRD_MONSTERS`) + per-campaign templates | hundreds                         |
 | Species                   | 9                                                | 9 standalone + Drow lineage      |
 | Classes                   | 12                                               | 12                               |
@@ -85,8 +85,10 @@ backend features are waiting on, and a handful of **bounded subsystems**.
 
 ### Content breadth — data on existing patterns (RE-6)
 
-- [ ] **Spells** — ~232 / ~330 SRD. Most remaining categories are already
-      representable (data entry). **Guardian of Faith** (L4) shipped on the new
+- [ ] **Spells** — ~238 / ~330 SRD. Most remaining categories are already
+      representable (data entry). The **2024 conjure family** (6 spells) shipped
+      on existing zone / recurring-attack / weapon-rider paths — see the
+      conjure-spells item under RE-6 below. **Guardian of Faith** (L4) shipped on the new
       non-concentration zone teardown (see Persistent damage zones below).
       Content batch C (`spellContentBatchC.spec.ts`) —
       environmental/travel utility (narrative path, out-of-combat): **Plant
@@ -267,9 +269,20 @@ backend features are waiting on, and a handful of **bounded subsystems**.
     until migrated onto `aoeCondition`.
     Exceptions still needing a model first: the alternate "summon" spells,
     each mechanically distinct from the stat-block ally model —
-  - [ ] **Conjure Animals** (L3) + other 2024 conjure spells — a
-        concentration _damage zone_ (DEX save, scaling dice); closer to a
-        moving AoE/hazard than a summoned creature.
+  - [x] **Conjure Animals** (L3) + the 2024 conjure family — shipped
+        (`conjureFamily.spec.ts`). The 2024 conjure spells aren't stat-block
+        summons; they're concentration effects that ride shipped paths, no
+        ally-turn AI: **Conjure Animals** (L3, placed repositionable DEX-save
+        zone, 3d10), **Conjure Woodland Beings** (L4, caster-following WIS-save
+        aura, 5d8 — `rangeKind: 'self'`), **Conjure Elemental** (L5, placed
+        DEX-save zone, 8d8), **Conjure Celestial** (L7, placed radiant DEX-save
+        zone, 6d12) on the zone path; **Conjure Fey** (L6, 3d12 psychic) on the
+        recurring-spell-attack path; **Conjure Minor Elementals** (L4, +2d8 on
+        weapon hits) on the persistent weapon-rider path. Documented
+        simplifications: element pickers default to Fire; Conjure Elemental's
+        Restrained rider, Conjure Fey's on-hit Frightened, Conjure Celestial's
+        ally Healing-Light mode, and Minor Elementals' in-Emanation gate +
+        Difficult Terrain are narrated/deferred.
   - [ ] **Find Familiar** — a non-combatant utility companion (can't take
         the Attack action RAW); a scouting/aid model, not the ally-turn AI.
 - [~] **Monsters** — stat-block content. The shared pool grew 12 → 31 → 39 → **44**

@@ -4428,4 +4428,160 @@ export const SRD_SPELLS: Record<string, Spell> = {
     narrative: '{name} calls up a towering spectral guardian wreathed in radiant light.',
     spellList: ['divine'],
   },
+
+  // ─── Conjure-summon family (RE-6) — 2024 SRD ────────────────────────────────
+  // The 2024 conjure spells aren't stat-block summons; they're concentration
+  // effects (damage zones / emanations / a recurring strike). They ride the
+  // shipped zone / recurring-attack / weapon-rider paths — no ally-turn AI.
+
+  // SRD: Conjure Animals (L3) — a spectral pack (placed); a creature within 10 ft
+  // makes a DEX save or takes 3d10 Slashing (once/turn). Movable 30 ft when you
+  // move. Rides the placed, repositionable damage-zone path (Call Lightning).
+  // (STR-save Advantage near the pack is narrated.)
+  conjure_animals: {
+    id: 'conjure_animals',
+    name: 'Conjure Animals',
+    level: 3,
+    castTime: 'action',
+    persistentZone: true,
+    savingThrow: 'dex',
+    saveEffect: 'negates',
+    damage: '3d10',
+    damageType: 'slashing',
+    upcastBonus: '1d10',
+    concentration: true,
+    durationRounds: 100,
+    blastRadius: 10,
+    aoeShape: 'sphere',
+    zoneMoveFt: 30,
+    zoneMoveCost: 'bonus_action',
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    desc: 'A Large pack of spectral animals appears: a creature within 10 ft makes a Dexterity save or takes 3d10 Slashing (+1d10 per slot above 3rd). You can reposition the pack 30 ft. Concentration, up to 10 minutes.',
+    narrative: '{name} conjures a pack of spectral beasts that prowl the field.',
+    spellList: ['primal'],
+  },
+
+  // SRD: Conjure Minor Elementals (L4) — elemental spirits flit around you in a
+  // 15-ft Emanation: your attacks deal +2d8 (Acid/Cold/Fire/Lightning) to a
+  // creature in it. Rides the persistent weapon-rider path (Divine Favor).
+  // Simplified to a flat +2d8 on every hit (the in-Emanation gate + Difficult
+  // Terrain are deferred; element defaults to Fire — picker deferred).
+  conjure_minor_elementals: {
+    id: 'conjure_minor_elementals',
+    name: 'Conjure Minor Elementals',
+    level: 4,
+    castTime: 'action',
+    targetType: 'self',
+    rangeKind: 'self',
+    concentration: true,
+    durationRounds: 100,
+    weaponRider: { dice: '2d8', damageType: 'fire', persistent: true },
+    desc: 'Elemental spirits swirl around you (Concentration, up to 10 minutes): each of your weapon hits deals an extra 2d8 Fire damage. (RAW: only vs creatures in the 15-ft Emanation, your choice of Acid/Cold/Fire/Lightning, plus Difficult Terrain for enemies — simplified here.)',
+    narrative: '{name} is wreathed by darting elemental spirits.',
+    spellList: ['arcane', 'primal'],
+  },
+
+  // SRD: Conjure Woodland Beings (L4) — nature spirits flit around you in a 10-ft
+  // Emanation; a creature entering / ending its turn there makes a WIS save,
+  // taking 5d8 Force (half on a success). A `rangeKind: 'self'` zone → a
+  // caster-following aura (Spirit Guardians). (Disengage-as-Bonus is deferred.)
+  conjure_woodland_beings: {
+    id: 'conjure_woodland_beings',
+    name: 'Conjure Woodland Beings',
+    level: 4,
+    castTime: 'action',
+    persistentZone: true,
+    savingThrow: 'wis',
+    saveEffect: 'half',
+    damage: '5d8',
+    damageType: 'force',
+    upcastBonus: '1d8',
+    concentration: true,
+    durationRounds: 100,
+    blastRadius: 10,
+    aoeShape: 'sphere',
+    rangeKind: 'self',
+    desc: 'Nature spirits flit in a 10-ft aura around you: a creature that enters or ends its turn there makes a Wisdom save, taking 5d8 Force damage (half on a success; +1d8 per slot above 4th). Concentration, up to 10 minutes.',
+    narrative: '{name} is encircled by flitting woodland spirits.',
+    spellList: ['primal'],
+  },
+
+  // SRD: Conjure Elemental (L5) — a Large elemental spirit (placed); a creature
+  // entering / starting near it makes a DEX save or takes 8d8 of the spirit's
+  // type and is Restrained. Rides the placed damage-zone path. The Restrained
+  // (save-ends, 4d8/turn) rider + the element picker are deferred (defaults Fire).
+  conjure_elemental: {
+    id: 'conjure_elemental',
+    name: 'Conjure Elemental',
+    level: 5,
+    castTime: 'action',
+    persistentZone: true,
+    savingThrow: 'dex',
+    saveEffect: 'negates',
+    damage: '8d8',
+    damageType: 'fire',
+    upcastBonus: '1d8',
+    concentration: true,
+    durationRounds: 100,
+    blastRadius: 5,
+    aoeShape: 'sphere',
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    desc: 'A Large elemental spirit appears: a creature entering or starting near it makes a Dexterity save or takes 8d8 Fire damage (+1d8 per slot above 5th). (RAW: choose the element, and a failed save also Restrains — deferred here.) Concentration, up to 10 minutes.',
+    narrative: '{name} tears open a rift and a raging elemental spirit pours through.',
+    spellList: ['arcane', 'primal'],
+  },
+
+  // SRD: Conjure Fey (L6) — a Feywild spirit; on appearing (and as a Bonus Action
+  // on later turns, teleporting up to 30 ft) it makes a melee spell attack for
+  // 3d12 + spellcasting modifier Psychic. Rides the recurring-spell-attack path
+  // (Spiritual Weapon). The on-hit Frightened rider is deferred.
+  conjure_fey: {
+    id: 'conjure_fey',
+    name: 'Conjure Fey',
+    level: 6,
+    castTime: 'action',
+    recurringAttack: true,
+    recurringAttackCost: 'bonus_action',
+    recurringAddSpellMod: true,
+    damage: '3d12',
+    damageType: 'psychic',
+    upcastBonus: '1d12',
+    concentration: true,
+    durationRounds: 100,
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    desc: 'A Feywild spirit appears and strikes: a melee spell attack for 3d12 + your spellcasting modifier Psychic damage, repeatable each turn as a Bonus Action (+1d12 per slot above 6th). (RAW on-hit Frightened is narrated.) Concentration, up to 10 minutes.',
+    narrative: '{name} calls a capering fey spirit that lunges at the foe.',
+    spellList: ['primal'],
+  },
+
+  // SRD: Conjure Celestial (L7) — a pillar of light (movable 30 ft); a creature in
+  // it can be bathed in Searing Light (DEX save, 6d12 Radiant, half on a success)
+  // or Healing Light (heal allies). Rides the placed, repositionable damage-zone
+  // path (Searing Light vs enemies); the ally-healing mode is deferred.
+  conjure_celestial: {
+    id: 'conjure_celestial',
+    name: 'Conjure Celestial',
+    level: 7,
+    castTime: 'action',
+    persistentZone: true,
+    savingThrow: 'dex',
+    saveEffect: 'half',
+    damage: '6d12',
+    damageType: 'radiant',
+    upcastBonus: '1d12',
+    concentration: true,
+    durationRounds: 100,
+    blastRadius: 10,
+    aoeShape: 'sphere',
+    zoneMoveFt: 30,
+    zoneMoveCost: 'bonus_action',
+    rangeKind: 'ranged',
+    rangeFt: 90,
+    desc: 'A pillar of celestial light: a creature within it makes a Dexterity save, taking 6d12 Radiant damage (half on a success; +1d12 per slot above 7th). You can move the pillar 30 ft. (RAW Healing-Light mode for allies is deferred.) Concentration, up to 10 minutes.',
+    narrative: '{name} calls down a searing pillar of celestial light.',
+    spellList: ['divine'],
+  },
 };
