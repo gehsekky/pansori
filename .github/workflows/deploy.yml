@@ -20,6 +20,11 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      # Fail the build on known high/critical advisories across the dependency
+      # tree. `--audit-level=high` ignores low/moderate noise; bump or add
+      # `--omit=dev` here if dev-tooling advisories start blocking deploys.
+      - name: Security audit (npm audit)
+        run: npm audit --audit-level=high
       - name: Type-check backend
         run: npm run typecheck --workspace=pansori-backend
       - name: Type-check frontend
