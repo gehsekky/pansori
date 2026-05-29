@@ -196,6 +196,10 @@ const defs: ConditionDef[] = [
   // attacks until the start of the caster's next turn (≈ 1 round). The round-
   // wrap tick expires it.
   { id: 'heat_seared', duration: 1, imposesDisadvantageOnSelfAttacks: true },
+  // SRD Ray of Enfeeblement — an enervated creature attacks at Disadvantage.
+  // Save-ends + concentration govern the duration, so 'permanent' keeps
+  // tickConditions from auto-expiring it (like cursed).
+  { id: 'enfeebled', duration: 'permanent', imposesDisadvantageOnSelfAttacks: true },
   // Engine-internal: Shield spell bumps AC +5 on cast (in reaction.ts);
   // ticking the condition off must reverse the bump.
   {

@@ -18,8 +18,8 @@ PHB/DMG-exclusive content (subclasses, feats, species, spells). See
 
 ## Implementation status (code-verified 2026-05-28)
 
-Grounded in a code survey + the full backend suite: **2018 tests across
-228 files, all green** (lint + typecheck clean).
+Grounded in a code survey + the full backend suite: **2026 tests across
+229 files, all green** (lint + typecheck clean).
 
 ### Done — rules-engine frameworks
 
@@ -67,7 +67,7 @@ Grounded in a code survey + the full backend suite: **2018 tests across
 
 | Category                  | In pansori                                       | SRD universe                     |
 | ------------------------- | ------------------------------------------------ | -------------------------------- |
-| Spells                    | **221** (27 cantrips + 194 leveled, through L9)  | ~330                             |
+| Spells                    | **226** (27 cantrips + 199 leveled, through L9)  | ~330                             |
 | Shared SRD monster pool   | **44** (`SRD_MONSTERS`) + per-campaign templates | hundreds                         |
 | Species                   | 9                                                | 9 standalone + Drow lineage      |
 | Classes                   | 12                                               | 12                               |
@@ -85,8 +85,15 @@ backend features are waiting on, and a handful of **bounded subsystems**.
 
 ### Content breadth — data on existing patterns (RE-6)
 
-- [ ] **Spells** — ~221 / ~330 SRD. Most remaining categories are already
-      representable (data entry). Content batch (`spellContentBatch.spec.ts`):
+- [ ] **Spells** — ~226 / ~330 SRD. Most remaining categories are already
+      representable (data entry). Content batch B (`spellContentBatchB.spec.ts`):
+      **Tsunami** (L8, AoE STR save-for-half 6d10 bludgeoning), **Flesh to Stone**
+      (L6, CON save → Restrained, save-ends), **Ray of Enfeeblement** (L2, CON
+      save → new `enfeebled` condition: Disadvantage on attacks, save-ends;
+      mirrors `cursed`), **Black Tentacles** (L4, AoE STR save → Restrained via
+      `aoeCondition`; 3d6 + Difficult Terrain narrated), and **Enhance Ability**
+      (L2, concentration buff; advantage on chosen-ability checks narrated).
+      Content batch A (`spellContentBatch.spec.ts`):
       **Regenerate** (L7, single-target 4d8+15 heal), **Mass Heal** (L9, mass-heal
       path → every ally to full + Blinded/Deafened/Poisoned strip; added the
       condition-strip + `healFull` "full HP" narrative to the mass branch),

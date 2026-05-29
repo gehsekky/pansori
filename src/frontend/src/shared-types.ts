@@ -141,7 +141,11 @@ export type ConditionName =
   | 'cursed'
   // SRD: Heat Metal — a creature seared by the superheated metal attacks at
   // Disadvantage until the start of the caster's next turn (≈ 1 round).
-  | 'heat_seared';
+  | 'heat_seared'
+  // SRD: Ray of Enfeeblement — an enervated creature attacks at Disadvantage
+  // (`imposesDisadvantageOnSelfAttacks`); save-ends each turn, concentration-
+  // linked. (RAW's −1d8 weapon damage rider is narrated, not modeled.)
+  | 'enfeebled';
 
 export type NpcAttitude = 'friendly' | 'indifferent' | 'hostile';
 
