@@ -18,8 +18,8 @@ PHB/DMG-exclusive content (subclasses, feats, species, spells). See
 
 ## Implementation status (code-verified 2026-05-28)
 
-Grounded in a code survey + the full backend suite: **2004 tests across
-226 files, all green** (lint + typecheck clean).
+Grounded in a code survey + the full backend suite: **2011 tests across
+227 files, all green** (lint + typecheck clean).
 
 ### Done — rules-engine frameworks
 
@@ -465,10 +465,15 @@ options }`** → `OptionPickerDialog` (single-select; re-sends `action[param]`).
 - [ ] **Contact Patron** (Warlock L9) — needs a Contact Other Plane spell.
 - [ ] **Holy Ward half** (Devotion L20) — save sites don't carry the
       attacker's creature type yet (the Radiant aura ships).
-- [ ] **Save-proficiency on enemy damage-spell saves** — `resolveEnemySpell`
-      adds no proficiency bonus for any class, so Slippery Mind / Disciplined
-      Survivor / Resilient don't reach that path. General gap, not feature-
-      specific.
+- [x] **Save-proficiency on enemy damage-spell saves** — shipped
+      (`enemySaveProficiency.spec.ts`). `resolveEnemySpell` now adds the
+      proficiency bonus when the target is proficient in the save's ability,
+      reusing the existing `hasSaveProficiency` helper (class saving throws +
+      Resilient + Slippery Mind + Disciplined Survivor) and `profBonus(level)`.
+      Applied to the initial save, the Indomitable reroll, and the Stroke of
+      Luck rescue. `context` is threaded from `handleEnemyCast` (the only runtime
+      caller); it's optional, so the unit specs that pin other mechanics keep
+      their dice math (proficiency is skipped without `context`).
 - [~] **Truesight / Dimensional Travel / Night Spirit boons** — the +1
       ability lands. **Truesight's "sees through magical darkness" half shipped**
       (`combatLighting.spec.ts`, `multiclass.spec.ts`): a new

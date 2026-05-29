@@ -21,7 +21,14 @@ export const handleEnemyCast: ActionHandler<{
   const target = ctx.st.characters.find((c) => c.id === action.targetCharId);
   if (!target) return { rejected: 'enemy_cast: target not found.' };
 
-  const result = resolveEnemySpell({ enemy, spell, target, st: ctx.st, narrative: ctx.narrative });
+  const result = resolveEnemySpell({
+    enemy,
+    spell,
+    target,
+    st: ctx.st,
+    narrative: ctx.narrative,
+    context: ctx.context,
+  });
   ctx.st = result.st;
   ctx.narrative = result.narrative;
 };

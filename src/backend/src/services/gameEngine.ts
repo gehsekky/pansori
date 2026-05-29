@@ -6710,6 +6710,12 @@ export function resolveEnemySpell(args: {
   target: Character;
   st: GameState;
   narrative: string;
+  // SRD — a creature adds its proficiency bonus to saving throws it's
+  // proficient in. Threaded so this resolver can credit class save proficiency
+  // + the features that widen it (Resilient, Slippery Mind, Disciplined
+  // Survivor). Optional: when omitted (unit tests that pin other mechanics) the
+  // proficiency bonus is skipped, preserving their dice math.
+  context?: Context;
 }): { st: GameState; target: Character; narrative: string } {
   const { enemy, spell, target } = args;
   let narrative = args.narrative;
@@ -6718,12 +6724,21 @@ export function resolveEnemySpell(args: {
   if (spell.savingThrow) {
     const saveScore = (target[spell.savingThrow] ?? 10) as number;
     const dc = enemy.spellSaveDC ?? 8 + Math.floor((enemy.toHit + 5) / 2);
+    // SRD proficiency bonus on the save when the target is proficient in this
+    // ability's saving throw (class grant / Resilient / Slippery Mind /
+    // Disciplined Survivor). Without `context` we can't resolve class saves, so
+    // it's skipped.
+    const saveProf =
+      args.context && hasSaveProficiency(target, spell.savingThrow, args.context)
+        ? profBonus(target.level)
+        : 0;
     // SRD Barbarian Danger Sense (L2): Advantage on DEX saves.
     const dangerSenseAdv = spell.savingThrow === 'dex' && hasDangerSense(target);
     const saveD20 = dangerSenseAdv
       ? Math.max(rollDice('1d20'), rollDice('1d20'))
       : rollDice('1d20');
-    const save = saveD20 + abilityMod(saveScore) + auraOfProtectionBonus(target, args.st);
+    const save =
+      saveD20 + abilityMod(saveScore) + saveProf + auraOfProtectionBonus(target, args.st);
     let saved = save >= dc;
     let workingTarget = target;
     let rescueNote = '';
@@ -6733,6 +6748,7 @@ export function resolveEnemySpell(args: {
         const reroll =
           rollDice('1d20') +
           abilityMod(saveScore) +
+          saveProf +
           auraOfProtectionBonus(target, args.st) +
           indomitableBonus(target);
         return reroll >= dc;
@@ -6745,7 +6761,7 @@ export function resolveEnemySpell(args: {
     }
     // SRD Rogue Stroke of Luck — turn the failed save into a 20 when it rescues.
     if (!saved && strokeOfLuckAvailable(target)) {
-      const mods = abilityMod(saveScore) + auraOfProtectionBonus(target, args.st);
+      const mods = abilityMod(saveScore) + saveProf + auraOfProtectionBonus(target, args.st);
       if (20 + mods >= dc) {
         saved = true;
         workingTarget = consumeStrokeOfLuck(target);
