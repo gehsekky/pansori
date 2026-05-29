@@ -4073,4 +4073,121 @@ export const SRD_SPELLS: Record<string, Spell> = {
     narrative: '{name} raises a shimmering dome; the night and its dangers stay outside.',
     spellList: ['arcane'],
   },
+
+  // ─── Spell content batch (RE-6) ─────────────────────────────────────────────
+  // Six SRD 5.2.1 spells riding shipped dispatcher paths (heal / mass-heal /
+  // single-target save+condition / AoE-condition / recurring spell attack). No
+  // new mechanics — data only (+ a small mass-heal narrative/strip touch-up).
+
+  // SRD: Regenerate (L7 Transmutation) — Touch; the target regains 4d8 + 15 HP.
+  // Routes through the single-target heal path (auto-targets the most-injured
+  // ally). RAW also grants regen 1 HP / turn for 1 hour + regrows severed limbs
+  // — narrated, not ticked (no per-turn ally-heal primitive).
+  regenerate: {
+    id: 'regenerate',
+    name: 'Regenerate',
+    level: 7,
+    castTime: 'action',
+    heal: '4d8+15',
+    rangeKind: 'touch',
+    desc: 'A creature you touch regains 4d8 + 15 Hit Points and begins to mend (RAW: also regains 1 HP at the start of each of its turns for 1 hour and regrows lost limbs — narrated in pansori).',
+    spellList: ['divine', 'primal'],
+  },
+
+  // SRD: Mass Heal (L9 Abjuration, Cleric) — a flood of healing restores up to
+  // 700 HP split among creatures in range (pansori: every ally to full) and ends
+  // their Blinded, Deafened, and Poisoned conditions. Routes through the
+  // mass-heal path (`healFull` → each target to its own max).
+  mass_heal: {
+    id: 'mass_heal',
+    name: 'Mass Heal',
+    level: 9,
+    castTime: 'action',
+    heal: '0', // unused — `healFull` floors every target to its max HP
+    healFull: true,
+    removeConditions: ['blinded', 'deafened', 'poisoned'],
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    desc: 'A flood of healing energy restores all allies within 60 ft to full Hit Points and ends their Blinded, Deafened, and Poisoned conditions.',
+    spellList: ['divine'],
+  },
+
+  // SRD: Contagion (L5 Necromancy, Cleric/Druid) — Touch; CON save or take 11d8
+  // Necrotic damage and be Poisoned, repeating the save at the end of each turn
+  // (save-ends). Rides the single-target save path + the save-ends hook. RAW's
+  // disease ladder (3 successes/failures → worse) + the per-disease ability
+  // disadvantage are simplified to "Poisoned, save-ends".
+  contagion: {
+    id: 'contagion',
+    name: 'Contagion',
+    level: 5,
+    castTime: 'action',
+    savingThrow: 'con',
+    saveEffect: 'negates',
+    damage: '11d8',
+    damageType: 'necrotic',
+    condition: 'poisoned',
+    conditionSaveEnds: true,
+    rangeKind: 'touch',
+    desc: 'Your touch inflicts a magical contagion: a Constitution save or 11d8 Necrotic damage and Poisoned, repeating the save at the end of each turn to shake it off.',
+    narratives: {
+      cast: [
+        '{name} presses a hand to {target}; sickness blooms beneath the skin',
+        '{name} breathes a word of rot — disease races through {target}',
+      ],
+    },
+    spellList: ['divine', 'primal'],
+  },
+
+  // SRD: Flame Blade (L2 Evocation, Druid/Sorcerer) — Bonus Action to evoke a
+  // fiery scimitar (Concentration, 10 min); as a Magic action, a melee spell
+  // attack for 3d6 + spellcasting modifier Fire. Rides the recurring-spell-
+  // attack path (re-attack each turn as an action), mirroring Vampiric Touch.
+  // (pansori makes the first attack on cast, like the other recurring spells —
+  // a slight deviation from RAW's separate-action first swing.)
+  flame_blade: {
+    id: 'flame_blade',
+    name: 'Flame Blade',
+    level: 2,
+    castTime: 'bonus_action',
+    recurringAttack: true,
+    recurringAttackCost: 'action',
+    recurringAddSpellMod: true,
+    concentration: true,
+    durationRounds: 100, // Concentration, up to 10 minutes
+    damage: '3d6',
+    damageType: 'fire',
+    rangeKind: 'self',
+    desc: 'You evoke a fiery scimitar of flame. A melee spell attack deals 3d6 + your spellcasting modifier Fire damage, and you can strike again each turn (Concentration, up to 10 minutes).',
+    spellList: ['primal'],
+  },
+
+  // SRD: Earthquake (L8 Transmutation, Cleric/Druid/Sorcerer) — a 100-ft-radius
+  // tremor (Concentration, 1 min): each creature on the ground makes a DEX save
+  // or is knocked Prone. Rides the AoE-condition path. RAW's Difficult Terrain,
+  // structural collapse, and fissures are narrated; the per-turn re-save is
+  // simplified to the on-cast knockdown.
+  earthquake: {
+    id: 'earthquake',
+    name: 'Earthquake',
+    level: 8,
+    castTime: 'action',
+    savingThrow: 'dex',
+    condition: 'prone',
+    aoeCondition: true,
+    concentration: true,
+    durationRounds: 10, // Concentration, up to 1 minute
+    blastRadius: 100,
+    aoeShape: 'sphere',
+    rangeKind: 'ranged',
+    rangeFt: 120,
+    desc: 'An intense tremor rips through a 100-ft radius: every creature on the ground makes a Dexterity save or is knocked Prone (RAW Difficult Terrain, fissures, and structural collapse are narrated).',
+    narratives: {
+      cast: [
+        '{name} drives the ground into a heaving, splitting tremor',
+        '{name} calls up an earthquake — the floor bucks and cracks',
+      ],
+    },
+    spellList: ['divine', 'primal'],
+  },
 };
