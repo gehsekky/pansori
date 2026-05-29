@@ -39,6 +39,9 @@ export function runSummonSpell(
     maxHp: chosen.maxHp,
     toHit: chosen.toHit,
     damage: chosen.damage,
+    // Non-combatant flag lives on the base summon (Find Familiar), so it applies
+    // to every chosen form/variant.
+    noAttack: base.noAttack,
   }));
   ctx.st = {
     ...ctx.st,

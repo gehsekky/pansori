@@ -214,6 +214,11 @@ export interface CombatEntity {
   // as opposed to persistent ones (e.g. Find Familiar).
   summoned_by?: string;
   summon_concentration?: boolean;
+  // SRD Find Familiar — a non-combatant ally that "can't take the Attack action"
+  // but acts on its turn. `runAllyTurn` skips the attack and instead takes the
+  // Help action, granting its owner Advantage on their next attack
+  // (`help_target_id`). A scouting/aid companion, not an attacker.
+  noAttack?: boolean;
   // RAW player-command (e.g. Animate Dead): the enemy entity id this summon
   // has been ordered to attack. `selectTarget`/`runAllyTurn` prefer it while
   // that enemy lives, else fall back to the AI-default nearest enemy. Set by

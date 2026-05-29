@@ -749,6 +749,10 @@ export interface Spell {
     // (Animate Dead: 2 — RAW "two additional Undead for each slot level
     // above 3"). Omitted / 0 ⇒ always one. (RE-1 Phase 4.5.)
     countPerUpcastLevel?: number;
+    // SRD Find Familiar — the summon is a non-combatant (can't take the Attack
+    // action). Threaded to every raised ally + the grid entity; `runAllyTurn`
+    // then takes the Help action instead of attacking.
+    noAttack?: boolean;
   };
   // Long casting time (1 min+) — rejected in combat (before slot spend).
   outOfCombatOnly?: boolean;
@@ -1193,6 +1197,10 @@ export interface SummonedAlly {
   maxHp: number;
   toHit: number;
   damage: string; // dice expression, e.g. '1d6+3'
+  // SRD Find Familiar — a non-combatant ally (can't take the Attack action).
+  // Carried onto `CombatEntity.noAttack` by `seedSummonedAllies`; `runAllyTurn`
+  // takes the Help action instead of attacking.
+  noAttack?: boolean;
 }
 
 // SRD wall/terrain spells (Wall of Fire, Wall of Force) — a transient set of

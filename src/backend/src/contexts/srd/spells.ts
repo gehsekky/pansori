@@ -679,22 +679,37 @@ export const SRD_SPELLS: Record<string, Spell> = {
     rangeKind: 'touch',
     spellList: ['arcane', 'divine'],
   },
-  // SRD: Find Familiar — 1-hour ritual cast (10 gp material consumed).
-  // Summons a Tiny familiar that scouts and shares senses. Narrative
-  // spell in pansori — companion entities are out of scope (the
-  // Beastmaster companion was removed in Phase 2H). RAW lists the
-  // available animal forms (cat, owl, frog, etc.); we leave the
-  // form choice as flavor.
+  // SRD: Find Familiar (L1 Conjuration, Wizard) — a 1-hour ritual (10 GP incense
+  // consumed) that conjures a CR-0 spirit companion. RAW the familiar acts on its
+  // own turn and CAN'T take the Attack action. Rides the summon path with
+  // `noAttack: true`: it materializes as a non-combatant ally that takes the Help
+  // action each turn (granting its owner Advantage via `help_target_id`). Choose
+  // a form (Owl / Cat / Raven) — all mechanically identical (CR 0). The telepathy,
+  // see-through-its-eyes, and touch-spell delivery are narrated.
   find_familiar: {
     id: 'find_familiar',
     name: 'Find Familiar',
     level: 1,
     castTime: 'action',
-    narrative:
-      '{name} traces an intricate sigil; brass and incense crumble away, and a small familiar takes shape.',
-    desc: 'Ritual: summon a Tiny familiar. Narrative-only in pansori — the familiar accompanies the caster as flavor.',
+    ritualCasting: true,
+    outOfCombatOnly: true, // RAW 1-hour / ritual cast
+    materialCost: 10, // 10 GP incense, consumed
     rangeKind: 'ranged',
     rangeFt: 10,
+    summon: {
+      name: 'Owl',
+      ac: 11,
+      maxHp: 1,
+      toHit: 0,
+      damage: '0',
+      noAttack: true,
+      variants: [
+        { name: 'Cat', ac: 11, maxHp: 1, toHit: 0, damage: '0' },
+        { name: 'Raven', ac: 11, maxHp: 1, toHit: 0, damage: '0' },
+      ],
+    },
+    desc: 'A ritual that binds a spirit familiar (Owl, Cat, or Raven) to your service. It fights at your side but can’t attack — instead it takes the Help action each turn, granting you Advantage on your next attack. (Telepathy, seeing through its eyes, and delivering your touch spells are narrated.)',
+    narrative: '{name} burns the incense and a faithful spirit familiar coalesces at their side.',
     spellList: ['arcane'],
   },
   // SRD: Detect Evil and Good — concentration up to 10 minutes,
