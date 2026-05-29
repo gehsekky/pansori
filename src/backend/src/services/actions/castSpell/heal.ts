@@ -74,9 +74,15 @@ export function runHealSpell(
   const isMassHeal =
     spell.id === 'mass_healing_word' ||
     spell.id === 'mass_cure_wounds' ||
-    spell.id === 'prayer_of_healing';
+    spell.id === 'prayer_of_healing' ||
+    spell.id === 'mass_heal';
   if (isMassHeal) {
     const livingParty = ctx.st.characters.filter((c) => !c.dead);
+    // SRD Mass Heal also ends Blinded / Deafened / Poisoned on each target.
+    // Earlier mass heals carry no `removeConditions`, so this is a no-op for them.
+    const stripList = spell.removeConditions ?? [];
+    const strip = (conds: string[] | undefined) =>
+      stripList.length > 0 ? (conds ?? []).filter((c) => !stripList.includes(c)) : (conds ?? []);
     const perTargetLines: string[] = [];
     let updatedChars = ctx.st.characters;
     let updatedEntities = ctx.st.entities ?? [];
@@ -90,12 +96,16 @@ export function runHealSpell(
       const delta = newHp - prevHp;
       perTargetLines.push(`${target.name}: ${prevHp}→${newHp} (+${delta})`);
       if (isMemberCaster) {
-        casterAfter = { ...casterAfter, hp: newHp };
+        casterAfter = { ...casterAfter, hp: newHp, conditions: strip(casterAfter.conditions) };
       } else {
         if (delta > 0) healedOther = true;
-        updatedChars = updatedChars.map((c) => (c.id === member.id ? { ...c, hp: newHp } : c));
+        updatedChars = updatedChars.map((c) =>
+          c.id === member.id ? { ...c, hp: newHp, conditions: strip(c.conditions) } : c
+        );
         updatedEntities = updatedEntities.map((e) =>
-          e.id === member.id && !e.isEnemy ? { ...e, hp: newHp } : e
+          e.id === member.id && !e.isEnemy
+            ? { ...e, hp: newHp, conditions: strip(e.conditions) }
+            : e
         );
       }
     }
@@ -104,6 +114,9 @@ export function runHealSpell(
     const bonusNote: string[] = [];
     if (discipleBonus > 0) bonusNote.push(`Disciple of Life: +${discipleBonus}`);
     const bonusSuffix = bonusNote.length > 0 ? ` (${bonusNote.join(' · ')})` : '';
+    // `healFull` floors each target to its own max — print "full HP", not the
+    // Number.MAX_SAFE_INTEGER sentinel.
+    const eachLabel = spell.healFull ? 'full HP' : `${healed} HP`;
     composeNow(ctx, {
       kind: 'spell_utility',
       prose:
@@ -111,7 +124,7 @@ export function runHealSpell(
           name: pc.char.name,
           spell: spell.name,
           slotNote,
-        }) + ` — ${healed} HP to each: ${perTargetLines.join(', ')}.${bonusSuffix}`,
+        }) + ` — ${eachLabel} to each: ${perTargetLines.join(', ')}.${bonusSuffix}`,
     });
     if (healedOther) applyBlessedHealer();
     return;

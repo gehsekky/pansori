@@ -18,8 +18,8 @@ PHB/DMG-exclusive content (subclasses, feats, species, spells). See
 
 ## Implementation status (code-verified 2026-05-28)
 
-Grounded in a code survey + the full backend suite: **2011 tests across
-227 files, all green** (lint + typecheck clean).
+Grounded in a code survey + the full backend suite: **2018 tests across
+228 files, all green** (lint + typecheck clean).
 
 ### Done — rules-engine frameworks
 
@@ -67,7 +67,7 @@ Grounded in a code survey + the full backend suite: **2011 tests across
 
 | Category                  | In pansori                                       | SRD universe                     |
 | ------------------------- | ------------------------------------------------ | -------------------------------- |
-| Spells                    | **216** (27 cantrips + 189 leveled, through L9)  | ~330                             |
+| Spells                    | **221** (27 cantrips + 194 leveled, through L9)  | ~330                             |
 | Shared SRD monster pool   | **44** (`SRD_MONSTERS`) + per-campaign templates | hundreds                         |
 | Species                   | 9                                                | 9 standalone + Drow lineage      |
 | Classes                   | 12                                               | 12                               |
@@ -85,8 +85,16 @@ backend features are waiting on, and a handful of **bounded subsystems**.
 
 ### Content breadth — data on existing patterns (RE-6)
 
-- [ ] **Spells** — ~216 / ~330 SRD. Most remaining categories are already
-      representable (data entry). Control/debuff batch (`spellsBatch7.spec.ts`):
+- [ ] **Spells** — ~221 / ~330 SRD. Most remaining categories are already
+      representable (data entry). Content batch (`spellContentBatch.spec.ts`):
+      **Regenerate** (L7, single-target 4d8+15 heal), **Mass Heal** (L9, mass-heal
+      path → every ally to full + Blinded/Deafened/Poisoned strip; added the
+      condition-strip + `healFull` "full HP" narrative to the mass branch),
+      **Contagion** (L5, CON save → 11d8 necrotic + Poisoned, save-ends; disease
+      ladder simplified), **Flame Blade** (L2, recurring fire spell attack, 3d6 +
+      mod, mirrors Vampiric Touch), and **Earthquake** (L8, AoE DEX save → Prone;
+      Difficult Terrain / fissures / per-turn re-save narrated). Control/debuff
+      batch (`spellsBatch7.spec.ts`):
       **Sleet Storm** (AoE DEX save → Prone, via the existing `aoeCondition`
       path), **Heat Metal** (fire damage that ignores the save + CON save →
       Disadvantage; added a reusable `damageIgnoresSave` flag to `runSaveSpell`),
