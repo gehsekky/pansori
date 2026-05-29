@@ -3342,6 +3342,27 @@ export const SRD_SPELLS: Record<string, Spell> = {
     spellList: ['arcane'],
   },
 
+  // SRD: Fire Shield (L4 Evocation) — wispy flames wreathe you (10 min, NOT
+  // concentration). A "warm" shield grants Resistance to Cold and retaliates
+  // with Fire when a creature hits you in melee. Rides the buff path:
+  // `grantResistances` for the resistance + the new `fireShield` retaliate (read
+  // in the enemy-turn loop). pansori models the warm shield; the "chill" variant
+  // (resist Fire, retaliate Cold) is deferred.
+  fire_shield: {
+    id: 'fire_shield',
+    name: 'Fire Shield',
+    level: 4,
+    castTime: 'action',
+    targetType: 'self',
+    grantResistances: ['cold'],
+    fireShield: { dice: '2d8', damageType: 'fire' },
+    durationRounds: 100, // 10 minutes (non-concentration; cleared at combat end)
+    rangeKind: 'self',
+    desc: 'Flames wreathe you for 10 minutes: you have Resistance to Cold, and a creature that hits you with a melee attack takes 2d8 Fire damage. (RAW alternate "chill" shield — resist Fire, retaliate Cold — is deferred.)',
+    narrative: '{name} is wrapped in a curtain of protective flame.',
+    spellList: ['arcane', 'primal'],
+  },
+
   // ─── Persistent damage zones (RE-4) ──────────────────────────────────
   // Stamp a SpellZone on cast that ticks each round wrap until concentration
   // ends (see castSpell/zone.ts + fireSpellZones). Movable zones declare

@@ -206,6 +206,13 @@ export function runBuffSpell(
     }
   }
 
+  // SRD Fire Shield — arm the retaliation: a creature that hits the warded
+  // character with a melee attack takes the shield's damage (read in the
+  // enemy-turn loop). Self-target only in pansori (RAW range Self).
+  if (spell.fireShield && isCasterTarget) {
+    char.fire_shield = { dice: spell.fireShield.dice, damageType: spell.fireShield.damageType };
+  }
+
   // 2024 PHB Fly + Levitate: set fly_speed_ft on the target. The
   // movement-mode pipeline (gridMove obstacle bypass + difficult-
   // terrain ignore) keys off this field. Concentration drop in

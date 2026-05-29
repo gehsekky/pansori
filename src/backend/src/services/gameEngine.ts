@@ -2599,6 +2599,13 @@ export function endCombatState(st: GameState): GameState {
       // Divine Favor / Searing Smite — have no other teardown).
       weapon_rider: undefined,
       pending_smite: undefined,
+      // Fire Shield (retaliate) + resistance buffs (Fire Shield / Stoneskin /
+      // Protection from Energy) are ~1-minute / encounter effects; clear them at
+      // combat end so a non-concentration buff (Fire Shield) can't leak, and a
+      // concentration buff that outlived an unbroken-concentration combat-end
+      // doesn't linger.
+      fire_shield: undefined,
+      spell_resistances: undefined,
     })),
   };
 }
@@ -8171,6 +8178,41 @@ export async function runEnemyTurns(args: {
               });
               st = retal.st;
               narrative += retal.narrative;
+            }
+          }
+
+          // SRD Fire Shield — a creature that hit the warded PC with a melee
+          // attack this turn takes the shield's damage (auto, no roll/reaction).
+          // Modeled once per enemy turn (RAW per-hit) when the enemy is adjacent.
+          const shieldPc = st.characters[targetCharIdx];
+          if (
+            shieldPc?.fire_shield &&
+            !shieldPc.dead &&
+            shieldPc.hp > 0 &&
+            shieldPc.hp < targetHpBeforeAtk &&
+            !st.enemies_killed.includes(eEntry.id)
+          ) {
+            const fsEnemyEnt = st.entities?.find((e) => e.id === eEntry.id && e.isEnemy);
+            const fsPcEnt = st.entities?.find((e) => e.id === shieldPc.id && !e.isEnemy);
+            const fsAdjacent =
+              fsEnemyEnt && fsPcEnt
+                ? Math.max(
+                    Math.abs(fsEnemyEnt.pos.x - fsPcEnt.pos.x),
+                    Math.abs(fsEnemyEnt.pos.y - fsPcEnt.pos.y)
+                  ) <= 1
+                : true; // off the grid: assume the melee attacker is adjacent
+            if (fsAdjacent && (fsEnemyEnt?.hp ?? 0) > 0) {
+              const fsDmg = rollDice(shieldPc.fire_shield.dice);
+              st = applyDamageToEntity(st, eEntry.id, fsDmg);
+              narrative += ` 🔥 ${rm.name} is seared by ${shieldPc.name}'s Fire Shield for ${fmt.dmg(fsDmg)} ${shieldPc.fire_shield.damageType}!`;
+              if (
+                (st.entities?.find((e) => e.id === eEntry.id)?.hp ?? 1) <= 0 &&
+                !st.enemies_killed.includes(eEntry.id)
+              ) {
+                st = { ...st, enemies_killed: [...st.enemies_killed, eEntry.id] };
+                narrative += ` ${rm.name} is destroyed!`;
+                if (isRoomCleared(st, args.seed, st.current_room)) st = endCombatState(st);
+              }
             }
           }
         }
