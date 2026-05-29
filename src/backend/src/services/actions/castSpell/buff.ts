@@ -213,6 +213,12 @@ export function runBuffSpell(
     char.fire_shield = { dice: spell.fireShield.dice, damageType: spell.fireShield.damageType };
   }
 
+  // SRD Mirror Image — conjure duplicates on the self-target that absorb hits
+  // (read in the enemy-attack resolver). Self-target only (RAW range Self).
+  if (spell.mirrorImages && isCasterTarget) {
+    char.mirror_images = spell.mirrorImages;
+  }
+
   // 2024 PHB Fly + Levitate: set fly_speed_ft on the target. The
   // movement-mode pipeline (gridMove obstacle bypass + difficult-
   // terrain ignore) keys off this field. Concentration drop in
