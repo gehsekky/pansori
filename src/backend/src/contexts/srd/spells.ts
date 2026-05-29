@@ -2586,6 +2586,31 @@ export const SRD_SPELLS: Record<string, Spell> = {
     spellList: ['arcane', 'primal'],
   },
 
+  // SRD: Telekinesis (L5 Transmutation, Sorcerer/Wizard) — STR save or the
+  // caster shoves the creature around with the mind. Rides the single-target
+  // save path's new `pushFt` (forced displacement, reusing the AoE push). RAW is
+  // Concentration + repeatable each turn (any direction, up to 30 ft); pansori
+  // models a one-shot shove away from the caster on a failed save.
+  telekinesis: {
+    id: 'telekinesis',
+    name: 'Telekinesis',
+    level: 5,
+    castTime: 'action',
+    savingThrow: 'str',
+    saveEffect: 'negates',
+    pushFt: 30,
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    desc: 'You seize a creature with telekinetic force: a Strength save or it is hurled up to 30 ft away from you. (RAW: Concentration, repeatable each turn in any direction — pansori models a one-shot shove.)',
+    narratives: {
+      cast: [
+        '{name} clenches a fist and unseen force wrenches {target} backward',
+        '{name} hurls {target} away with a surge of telekinetic power',
+      ],
+    },
+    spellList: ['arcane'],
+  },
+
   // ─── Wall spells (RE-6) — barrier + formation-damage walls ──────────────────
   // Ride the SpellWall path (anchored on the target, perpendicular to the
   // caster→target approach). Point/orientation targeting is abstracted to that

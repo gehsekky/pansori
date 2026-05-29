@@ -7,6 +7,7 @@ import {
   grantDarkOnesBlessing,
   isRoomCleared,
   pick,
+  pushEntityAway,
   splitEncounterXp,
 } from '../../gameEngine.js';
 import {
@@ -320,6 +321,29 @@ export function runSaveSpell(
     ctx.narrative += fortNote;
     ctx.usedInitiative = true;
     return { done: true, spellDmg, spellHit: true };
+  }
+
+  // SRD single-target forced displacement (Telekinesis) — on a failed save the
+  // target is hurled away from the caster, reusing the AoE push primitive. (Only
+  // reached by no-condition save spells; condition spells return above.) Gated to
+  // non-AoE spells: blast spells (Thunderwave) push via the AoE path AFTER their
+  // damage — pushing here would move the target out of the blast first.
+  if (spell.pushFt && saveFailed && !spell.blastRadius && ctx.st.entities) {
+    const casterEntPush = ctx.st.entities.find((e) => e.id === char.id && !e.isEnemy);
+    const targetEntPush = ctx.st.entities.find((e) => e.id === spellTargetId && e.isEnemy);
+    if (casterEntPush && targetEntPush && targetEntPush.hp > 0) {
+      const pr = pushEntityAway(
+        ctx.st,
+        spellTargetId,
+        casterEntPush.pos,
+        spell.pushFt,
+        ctx.context,
+        ctx.roomId,
+        ctx.roomObstacleCells
+      );
+      ctx.st = pr.st;
+      if (pr.pushedFt > 0) ctx.narrative += ` ${spellTarget.name} is hurled ${pr.pushedFt} ft.`;
+    }
   }
 
   return { done: false, spellDmg, spellHit: true };
