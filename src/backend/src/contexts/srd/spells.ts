@@ -4402,4 +4402,30 @@ export const SRD_SPELLS: Record<string, Spell> = {
     narrative: '{name} raises their arms; clouds gather and the wind turns to their command.',
     spellList: ['arcane', 'divine', 'primal'],
   },
+
+  // SRD: Guardian of Faith (L4 Conjuration, Cleric) — a spectral guardian; a
+  // creature entering within 10 ft (or starting its turn there) makes a DEX save
+  // for 20 Radiant, half on a success. NOT concentration — it vanishes after
+  // dealing 60 total damage (or 8 hours). The first non-concentration persistent
+  // zone: rides the zone path with `zoneDamageCap` (→ removed at 60 damage) and
+  // the combat-end zone clear. (RAW friend-or-foe damage is enemy-only here.)
+  guardian_of_faith: {
+    id: 'guardian_of_faith',
+    name: 'Guardian of Faith',
+    level: 4,
+    castTime: 'action',
+    persistentZone: true,
+    zoneDamageCap: 60,
+    savingThrow: 'dex',
+    saveEffect: 'half',
+    damage: '20',
+    damageType: 'radiant',
+    blastRadius: 10,
+    aoeShape: 'sphere',
+    rangeKind: 'ranged',
+    rangeFt: 30,
+    desc: 'A Large spectral guardian appears: a creature that enters within 10 ft or starts its turn there makes a Dexterity save, taking 20 Radiant damage (half on a success). It fades after dealing 60 total damage.',
+    narrative: '{name} calls up a towering spectral guardian wreathed in radiant light.',
+    spellList: ['divine'],
+  },
 };

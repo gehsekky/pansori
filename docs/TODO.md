@@ -18,8 +18,8 @@ PHB/DMG-exclusive content (subclasses, feats, species, spells). See
 
 ## Implementation status (code-verified 2026-05-28)
 
-Grounded in a code survey + the full backend suite: **2032 tests across
-230 files, all green** (lint + typecheck clean).
+Grounded in a code survey + the full backend suite: **2038 tests across
+231 files, all green** (lint + typecheck clean).
 
 ### Done — rules-engine frameworks
 
@@ -67,7 +67,7 @@ Grounded in a code survey + the full backend suite: **2032 tests across
 
 | Category                  | In pansori                                       | SRD universe                     |
 | ------------------------- | ------------------------------------------------ | -------------------------------- |
-| Spells                    | **231** (27 cantrips + 204 leveled, through L9)  | ~330                             |
+| Spells                    | **232** (27 cantrips + 205 leveled, through L9)  | ~330                             |
 | Shared SRD monster pool   | **44** (`SRD_MONSTERS`) + per-campaign templates | hundreds                         |
 | Species                   | 9                                                | 9 standalone + Drow lineage      |
 | Classes                   | 12                                               | 12                               |
@@ -85,8 +85,10 @@ backend features are waiting on, and a handful of **bounded subsystems**.
 
 ### Content breadth — data on existing patterns (RE-6)
 
-- [ ] **Spells** — ~231 / ~330 SRD. Most remaining categories are already
-      representable (data entry). Content batch C (`spellContentBatchC.spec.ts`) —
+- [ ] **Spells** — ~232 / ~330 SRD. Most remaining categories are already
+      representable (data entry). **Guardian of Faith** (L4) shipped on the new
+      non-concentration zone teardown (see Persistent damage zones below).
+      Content batch C (`spellContentBatchC.spec.ts`) —
       environmental/travel utility (narrative path, out-of-combat): **Plant
       Growth** (L3), **Control Water** (L4), **Tree Stride** (L5), **Wind Walk**
       (L6), **Control Weather** (L8). Content batch B (`spellContentBatchB.spec.ts`):
@@ -211,9 +213,15 @@ backend features are waiting on, and a handful of **bounded subsystems**.
     **repositionable** via the `move_zone` action (`zoneMoveFt` +
     `zoneMoveCost`): Flaming Sphere rolls 30 ft as a Bonus Action, Moonbeam
     (60 ft) and Call Lightning (120 ft) re-aim as a Magic action; the move
-    recomputes the footprint and ticks at the new spot. Remaining: Spike
-    Growth's per-5-ft-moved damage + difficult terrain are approximated as
-    a flat per-round tick.
+    recomputes the footprint and ticks at the new spot. **Non-concentration
+    zone teardown shipped** (`nonConcentrationZone.spec.ts`): `SpellZone` now
+    carries `rounds_left` (round budget, decremented each `fireSpellZones` wrap)
+    and `damageCap`/`damageDealt` (cumulative-damage limit); `applyZoneTick`
+    returns the damage dealt so the cap accumulates, and `endCombatState` clears
+    any lingering zone. **Guardian of Faith** (L4, non-concentration radiant
+    zone, DEX save-for-half, vanishes after dealing 60 — `zoneDamageCap`) ships
+    on it. Remaining: Spike Growth's per-5-ft-moved damage + difficult terrain
+    are approximated as a flat per-round tick.
   - [~] **Recurring spell attacks** — shipped (RE-4): `Character.recurring_attack` + the `recurring_spell_attack` action, `resolveRecurringAttack` (spell
     attack vs AC → damage + optional heal), cast-time setup
     (`runRecurringAttackSpell`), round-wrap expiry + concentration cleanup.
