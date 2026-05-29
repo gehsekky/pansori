@@ -23,7 +23,8 @@
     "fresh": "docker compose down -v && docker compose up --build -d",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
-    "test:e2e:install": "playwright install --with-deps chromium"
+    "test:e2e:install": "playwright install --with-deps chromium",
+    "prepare": "husky || true"
   },
   "workspaces": [
     "src/frontend",
@@ -34,6 +35,8 @@
     "esbuild": "^0.25.0"
   },
   "devDependencies": {
-    "@playwright/test": "^1.60.0"
+    "@playwright/test": "^1.60.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0"
   }
 }

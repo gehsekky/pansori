@@ -658,9 +658,15 @@ options }`** → `OptionPickerDialog` (single-select; re-sends `action[param]`).
 - [ ] **Regression-spec coverage gaps** — Bless on 4+-member parties, Monk
       Flurry kill-on-first-strike, Frenzy with no enemy in range, the
       unknown-feature fallback. ~2-3h.
-- [ ] **Pre-commit hook (Husky + lint-staged)** — auto-run eslint + prettier
-      on staged files; catches prettier-dirty code before CI. ~30 min;
-      bypassable with `--no-verify`. CI lint stays the gate.
+- [x] **Pre-commit hook (Husky + lint-staged)** — shipped. `.husky/pre-commit`
+      runs `lint-staged` (`lint-staged.config.mjs`): `eslint --fix` per workspace
+      (cd-ing in, since the flat configs use typed linting with workspace-relative
+      tsconfig discovery) then `prettier --write` last on staged
+      `*.{ts,tsx,js,jsx}`, mirroring the CI Lint + Prettier-check gates so
+      dirty code can't reach CI. Root `prepare: "husky || true"` installs the
+      hook on `npm ci` (resilient when devDeps are omitted; the prod Docker
+      images build from the workspace package.json, which has no `prepare`).
+      Bypassable with `--no-verify`; CI stays the hard gate.
 
 ### Lower urgency (flag now, defer)
 
