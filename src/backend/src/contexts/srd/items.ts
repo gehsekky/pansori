@@ -21,8 +21,7 @@ import type { LootItem } from '../../types.js';
 // share the canonical definition so the mechanics stay consistent.
 //
 // Item IDs match the SRD 5.2.1 names. Mechanical fields (damage, mastery,
-// armor class, etc.) follow RAW; `mastery: 'flex'` on the Battleaxe is
-// pansori's documented variant (see docs/TODO.md).
+// armor class, etc.) follow RAW (Battleaxe = Topple, per the SRD weapon table).
 export const SRD_ITEMS: Record<string, LootItem> = {
   // ─── Simple melee weapons ──────────────────────────────────────────────────
   dagger: {
@@ -248,7 +247,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   battleaxe: {
     id: 'battleaxe',
     name: 'Battleaxe',
-    desc: '1d8 slashing (1d10 two-handed), versatile, Flex mastery',
+    desc: '1d8 slashing (1d10 two-handed), versatile, Topple mastery',
     weight: 4,
     type: 'weapon',
     slot: 'weapon',
@@ -261,7 +260,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
     aliases: ['battleaxe', 'battle axe', 'axe'],
     weaponType: 'martial',
     damageType: 'slashing',
-    mastery: 'flex',
+    mastery: 'topple',
   },
   greataxe: {
     id: 'greataxe',

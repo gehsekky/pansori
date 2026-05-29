@@ -380,7 +380,7 @@ describe('conditions — new types', () => {
       context: ctx,
     });
     // No mastery narrative chunk.
-    expect(result.narrative).not.toMatch(/\[(Vex|Topple|Push|Sap|Slow|Graze|Cleave|Flex):/);
+    expect(result.narrative).not.toMatch(/\[(Vex|Topple|Push|Sap|Slow|Graze|Cleave):/);
   });
 
   it('Graze mastery: missed greatsword swing still deals STR mod damage', async () => {
@@ -543,9 +543,18 @@ describe('conditions — new types', () => {
     expect(goblinB!.hp).toBeLessThan(50);
   });
 
-  it('Flex mastery: battleaxe with shield uses two-handed (1d10) damage die', async () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0.999);
-    const fighterId = 'f-flex';
+  it('Battleaxe: Topple mastery on hit, and a shield suppresses the versatile die (1d8)', async () => {
+    // RAW SRD 5.2.1: the Battleaxe carries Topple (the homebrew `flex` mastery was
+    // retired). With a shield equipped, versatile falls back to the one-handed
+    // 1d8 die. Sequence: attack d20 → 15 (hit, not a crit), damage 1d8 → 8,
+    // Topple CON save d20 → 1 (fail → prone).
+    const random = vi.spyOn(Math, 'random');
+    random
+      .mockReturnValueOnce(0.7) // attack d20 → 15 (hit vs AC 12, not a crit)
+      .mockReturnValueOnce(0.999) // damage 1d8 → 8
+      .mockReturnValueOnce(0) // enemy CON save d20 → 1 (fail Topple)
+      .mockReturnValue(0);
+    const fighterId = 'f-axe-topple';
     const axeInst = 'f-axe';
     const shieldInst = 'f-shield';
     const fighter = makeChar({
@@ -613,11 +622,14 @@ describe('conditions — new types', () => {
       seed: seedWithEnemy,
       context: ctx,
     });
-    // With Math.random=0.999, 1d10 rolls 10 + STR mod 3 = 13 damage; 1d8 only
-    // 8 + 3 = 11. Damage should be ≥ 13 (the two-handed die fired).
+    // Shield equipped → one-handed 1d8 (max 8) + STR mod 3 = 11 (NOT the 1d10
+    // the retired Flex mastery would have granted, which would be 13).
     const goblin = result.newState.entities?.find((e) => e.id === goblinId);
     const dmgDealt = 80 - (goblin?.hp ?? 80);
-    expect(dmgDealt).toBeGreaterThanOrEqual(13);
+    expect(dmgDealt).toBe(11);
+    // Topple fired: the goblin is knocked Prone, and the chunk is narrated.
+    expect(goblin?.conditions).toContain('prone');
+    expect(result.narrative).toMatch(/Topple/);
   });
 
   it('Nick mastery: two-weapon attack with dagger off-hand does not consume bonus action', async () => {
