@@ -10,6 +10,7 @@
     "predev": "npm run sync-types",
     "lint": "npm run lint   --workspace=src/frontend --workspace=src/backend",
     "format": "npm run format --workspace=src/frontend --workspace=src/backend",
+    "audit": "npm audit --audit-level=high",
     "test": "npm run test:be && npm run test:fe",
     "test:be": "vitest run --root src/backend",
     "test:fe": "vitest run --root src/frontend",

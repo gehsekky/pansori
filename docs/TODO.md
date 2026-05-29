@@ -786,13 +786,21 @@ options }`** → `OptionPickerDialog` (single-select; re-sends `action[param]`).
 - [ ] **Multiplayer: session ownership + turn enforcement** —
       `game_sessions.user_id` is single-tenant; `takeAction` doesn't verify
       `req.user.id === characters[active].owner_user_id`.
-- [ ] **`npm audit` in CI** — fail PR builds on `high`/`critical`. ~15 min
-      YAML; ongoing triage.
+- [x] **`npm audit` in CI** — shipped. The CI `test` job runs
+      `npm audit --audit-level=high` after `npm ci` (fails the build on
+      high/critical advisories across the tree; low/moderate are ignored). A
+      matching root `npm run audit` script reproduces it locally. Currently 0
+      vulnerabilities. (Add `--omit=dev` if dev-tooling advisories ever block a
+      deploy.)
 - [ ] **CSP for any future HTML-serving paths** — helmet CSP is off (API
       returns no HTML); re-enable with tight `script-src 'self'` if we ever
       serve files/images directly.
-- [ ] **Session fixation protection** — confirm `express-session` rotates
-      the session id on login (passport regenerates by default).
+- [x] **Session fixation protection** — confirmed. Passport 0.7.0 regenerates
+      the session on login by default (since 0.6.0), and the codebase never
+      passes `keepSessionInfo: true` (the OAuth callback + the `req.login` in the
+      E2E test-login both regenerate), so the session id rotates on login. The
+      session config is otherwise sound (httpOnly, `secure` in prod, PG-backed
+      store, `resave: false`, `saveUninitialized: false`).
 
 ---
 
