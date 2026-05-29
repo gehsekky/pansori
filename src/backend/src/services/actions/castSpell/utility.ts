@@ -37,6 +37,7 @@ export function runUtilitySpell(
     spell.savingThrow ||
     spell.attackRoll ||
     spell.condition ||
+    spell.wall || // barrier-only walls (Force / Stone) resolve in the wall path
     spell.id === 'hunters_mark' ||
     spell.id === 'power_word_stun'
   ) {

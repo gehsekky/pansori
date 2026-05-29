@@ -623,6 +623,14 @@ export interface Spell {
   // bound. The zone's round budget comes from `durationRounds` (→
   // `SpellZone.rounds_left`) and combat-end clears any leftover.
   zoneDamageCap?: number;
+  // SRD wall/terrain spells — raise a transient `SpellWall` (a barrier of grid
+  // cells) anchored on the target, perpendicular to the caster→target approach.
+  // `blocksMovement` walls (Force / Stone) halt pathing; `blocksLineOfSight`
+  // walls (Fire / Stone / Ice / Thorns) feed the LoS obstacle set. A wall spell
+  // that also carries `damage` + `savingThrow` deals its formation damage as a
+  // line AoE first (Wall of Fire / Ice / Thorns). Concentration-bound; removed
+  // by `breakConcentration`. Routed through `runWallSpell`.
+  wall?: { blocksMovement: boolean; blocksLineOfSight: boolean };
   // RE-4 — a placed zone the caster can reposition (Flaming Sphere rolls 30 ft
   // as a Bonus Action; Moonbeam / Call Lightning re-aim as a Magic action).
   // `zoneMoveFt` is the max reposition distance; `zoneMoveCost` is the action

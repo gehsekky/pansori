@@ -52,10 +52,12 @@ function perpendicularWallCells(
   return cells;
 }
 
-// Resolve Wall of Fire: deal the line damage via the AoE path, then raise the
-// opaque wall and bind it to the caster's concentration. Returns true when it
-// owned resolution (always, when grid entities exist).
-export function runWallOfFire(
+// Resolve a wall spell (`spell.wall`): if the spell carries formation damage
+// (Wall of Fire / Ice / Thorns), deal it as a line AoE first; then raise the
+// barrier — using the spell's `blocksMovement` / `blocksLineOfSight` flags —
+// anchored on the target, perpendicular to the caster→target approach, and bind
+// it to the caster's concentration. Returns true when it owned resolution.
+export function runWallSpell(
   ctx: ActionContext,
   spell: Spell,
   slotLevel: number,
@@ -63,14 +65,17 @@ export function runWallOfFire(
   spellDmg: number,
   targetId: string
 ): boolean {
-  if (ctx.actor.kind !== 'pc' || !ctx.st.entities) return false;
+  if (ctx.actor.kind !== 'pc' || !ctx.st.entities || !spell.wall) return false;
   const pc = ctx.actor;
   const casterEnt = ctx.st.entities.find((e) => e.id === pc.char.id);
   const targetEnt = ctx.st.entities.find((e) => e.id === targetId && e.isEnemy);
   if (!casterEnt || !targetEnt) return false;
 
-  // Line damage first (same path every other AoE-line spell uses).
-  runAoeSpell(ctx, spell, slotLevel, dc, spellDmg);
+  // Formation damage first (Wall of Fire / Ice / Thorns), via the AoE-line path
+  // every other AoE-line spell uses. Barrier-only walls (Force / Stone) skip it.
+  if (spell.damage && spell.savingThrow) {
+    runAoeSpell(ctx, spell, slotLevel, dc, spellDmg);
+  }
 
   const gridW = ctx.context.gridWidth ?? 8;
   const gridH = ctx.context.gridHeight ?? 8;
@@ -81,8 +86,8 @@ export function runWallOfFire(
     gridW,
     gridH
   );
-  // Wall of Fire is a Concentration spell, but its damage path doesn't stamp
-  // concentration — set it here so the wall's lifetime tracks it.
+  // Wall spells are Concentration but the damage path doesn't stamp it — set it
+  // here so the wall's lifetime tracks the caster's concentration.
   updatePcActor(ctx, {
     concentrating_on: { spellId: spell.id, rounds_left: concentrationRoundsFor(spell) },
   });
@@ -93,10 +98,14 @@ export function runWallOfFire(
     name: spell.name,
     roomId: ctx.st.current_room,
     cells,
-    blocksMovement: false, // RAW: a creature can enter it (taking damage)
-    blocksLineOfSight: true, // "The wall is opaque"
+    blocksMovement: spell.wall.blocksMovement,
+    blocksLineOfSight: spell.wall.blocksLineOfSight,
   };
   ctx.st = { ...ctx.st, spell_walls: [...(ctx.st.spell_walls ?? []), wall] };
+  if (!spell.damage) {
+    // Barrier-only walls have no damage prose; announce the wall instead.
+    ctx.narrative = (ctx.narrative ?? '') + ` ${pc.char.name} raises ${spell.name}!`;
+  }
   ctx.usedInitiative = true;
   return true;
 }

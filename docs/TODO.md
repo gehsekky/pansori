@@ -18,8 +18,8 @@ PHB/DMG-exclusive content (subclasses, feats, species, spells). See
 
 ## Implementation status (code-verified 2026-05-28)
 
-Grounded in a code survey + the full backend suite: **2049 tests across
-233 files, all green** (lint + typecheck clean).
+Grounded in a code survey + the full backend suite: **2054 tests across
+234 files, all green** (lint + typecheck clean).
 
 ### Done — rules-engine frameworks
 
@@ -67,7 +67,7 @@ Grounded in a code survey + the full backend suite: **2049 tests across
 
 | Category                  | In pansori                                       | SRD universe                     |
 | ------------------------- | ------------------------------------------------ | -------------------------------- |
-| Spells                    | **238** (27 cantrips + 211 leveled, through L9)  | ~330                             |
+| Spells                    | **242** (27 cantrips + 215 leveled, through L9)  | ~330                             |
 | Shared SRD monster pool   | **44** (`SRD_MONSTERS`) + per-campaign templates | hundreds                         |
 | Species                   | 9                                                | 9 standalone + Drow lineage      |
 | Classes                   | 12                                               | 12                               |
@@ -85,8 +85,10 @@ backend features are waiting on, and a handful of **bounded subsystems**.
 
 ### Content breadth — data on existing patterns (RE-6)
 
-- [ ] **Spells** — ~238 / ~330 SRD. Most remaining categories are already
-      representable (data entry). The **2024 conjure family** (6 spells) shipped
+- [ ] **Spells** — ~242 / ~330 SRD. Most remaining categories are already
+      representable (data entry). The **wall spells** (Force / Stone / Ice /
+      Thorns) shipped on a generalized `spell.wall` path — see the Wall-spells
+      item under "Combat / exploration subsystems". The **2024 conjure family** (6 spells) shipped
       on existing zone / recurring-attack / weapon-rider paths — see the
       conjure-spells item under RE-6 below. **Guardian of Faith** (L4) shipped on the new
       non-concentration zone teardown (see Persistent damage zones below).
@@ -544,9 +546,17 @@ options }`** → `OptionPickerDialog` (single-select; re-sends `action[param]`).
 - [ ] **High Jump / verticality** — Long Jump shipped; High Jump is
       helper-only. Verticality is the architectural gap (flat grid, no
       elevation/ledges).
-- [ ] **Wall of Force** — needs point/orientation targeting that pansori's
-      enemy-only targeting doesn't express yet (Wall of Fire shipped; the
-      `blocksMovement` path is in place).
+- [x] **Wall spells** — shipped (`wallSpellsBatch.spec.ts`). Generalized the
+      Wall-of-Fire path into a `spell.wall { blocksMovement, blocksLineOfSight }`
+      flag + `runWallSpell`: the barrier anchors on the target, perpendicular to
+      the caster→target approach (point/orientation targeting abstracted to that
+      anchor), and binds to concentration. **Wall of Force** (L5, impassable +
+      transparent) and **Wall of Stone** (L5, solid + opaque) are barrier-only;
+      **Wall of Ice** (L6, 10d6 Cold) and **Wall of Thorns** (L6, 7d8 Piercing,
+      passable difficult terrain) deal DEX-save formation damage as a line AoE
+      first. (Wall of Ice's HP/breach + frigid air, Wall of Thorns' move-through
+      slashing + difficult terrain are deferred/narrated.) Wall of Fire migrated
+      onto the same flag.
 - [x] **FE grid-fog / vision reveal** — shipped (`GridCombatView.spec.tsx`).
       `GridCombatView`'s `cellLight` now LoS-gates each PC's vision through a FE
       `cellsOnLine`/`hasLoS` mirror of the backend `hasLineOfSight`, so a cell no

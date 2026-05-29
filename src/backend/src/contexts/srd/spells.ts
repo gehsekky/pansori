@@ -2573,6 +2573,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     upcastBonus: '1d8',
     blastRadius: 60, // 60-ft line, 20 ft high, 1 ft thick
     aoeShape: 'line',
+    wall: { blocksMovement: false, blocksLineOfSight: true }, // opaque, but passable
     rangeKind: 'ranged',
     rangeFt: 120,
     desc: 'You create a 60-ft line of flame. Creatures in the area take 5d8 fire damage (DEX save halves). Concentration.',
@@ -2584,6 +2585,93 @@ export const SRD_SPELLS: Record<string, Spell> = {
     },
     spellList: ['arcane', 'primal'],
   },
+
+  // ─── Wall spells (RE-6) — barrier + formation-damage walls ──────────────────
+  // Ride the SpellWall path (anchored on the target, perpendicular to the
+  // caster→target approach). Point/orientation targeting is abstracted to that
+  // anchor. Concentration-bound; removed by breakConcentration.
+
+  // SRD: Wall of Force (L5 Wizard) — an invisible, impassable barrier. Blocks
+  // movement but not sight (it's invisible). No damage.
+  wall_of_force: {
+    id: 'wall_of_force',
+    name: 'Wall of Force',
+    level: 5,
+    castTime: 'action',
+    concentration: true,
+    durationRounds: 100, // 10 minutes
+    wall: { blocksMovement: true, blocksLineOfSight: false },
+    blastRadius: 30,
+    rangeKind: 'ranged',
+    rangeFt: 120,
+    desc: 'An invisible wall of force springs up, impassable to movement (but transparent). Concentration, up to 10 minutes. (RAW free orientation is abstracted to a barrier across the target.)',
+    spellList: ['arcane'],
+  },
+
+  // SRD: Wall of Stone (L5) — a solid stone barrier. Blocks movement and sight.
+  // No damage.
+  wall_of_stone: {
+    id: 'wall_of_stone',
+    name: 'Wall of Stone',
+    level: 5,
+    castTime: 'action',
+    concentration: true,
+    durationRounds: 100,
+    wall: { blocksMovement: true, blocksLineOfSight: true },
+    blastRadius: 60,
+    rangeKind: 'ranged',
+    rangeFt: 120,
+    desc: 'A solid wall of stone springs into existence, blocking movement and sight. Concentration, up to 10 minutes (RAW can become permanent).',
+    spellList: ['arcane', 'primal'],
+  },
+
+  // SRD: Wall of Ice (L6 Wizard) — a wall of ice; on formation a creature in its
+  // space makes a DEX save for 10d6 Cold (half). Blocks movement and sight. The
+  // wall's HP / breach-and-frigid-air follow-up is deferred.
+  wall_of_ice: {
+    id: 'wall_of_ice',
+    name: 'Wall of Ice',
+    level: 6,
+    castTime: 'action',
+    concentration: true,
+    durationRounds: 100,
+    damage: '10d6',
+    damageType: 'cold',
+    savingThrow: 'dex',
+    saveEffect: 'half',
+    blastRadius: 60,
+    aoeShape: 'line',
+    wall: { blocksMovement: true, blocksLineOfSight: true },
+    rangeKind: 'ranged',
+    rangeFt: 120,
+    desc: 'A wall of ice forms: creatures in its space make a DEX save, taking 10d6 Cold damage (half on a success). It blocks movement and sight. Concentration, up to 10 minutes. (Breaching the wall + the frigid-air follow-up are deferred.)',
+    spellList: ['arcane'],
+  },
+
+  // SRD: Wall of Thorns (L6 Druid) — a thorny barrier; on formation a creature in
+  // its area makes a DEX save for 7d8 Piercing (half). Blocks sight; it's
+  // passable difficult terrain (move-through slashing damage is narrated).
+  wall_of_thorns: {
+    id: 'wall_of_thorns',
+    name: 'Wall of Thorns',
+    level: 6,
+    castTime: 'action',
+    concentration: true,
+    durationRounds: 100,
+    damage: '7d8',
+    damageType: 'piercing',
+    savingThrow: 'dex',
+    saveEffect: 'half',
+    upcastBonus: '1d8',
+    blastRadius: 60,
+    aoeShape: 'line',
+    wall: { blocksMovement: false, blocksLineOfSight: true }, // passable difficult terrain
+    rangeKind: 'ranged',
+    rangeFt: 120,
+    desc: 'A wall of needle-sharp thorns erupts: creatures in its area make a DEX save, taking 7d8 Piercing damage (half on a success; +1d8 per slot above 6th). It blocks sight. Concentration, up to 10 minutes. (The move-through slashing damage + difficult terrain are narrated.)',
+    spellList: ['primal'],
+  },
+
   hold_monster: {
     id: 'hold_monster',
     name: 'Hold Monster',

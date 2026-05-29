@@ -20,7 +20,7 @@ import { runReviveSpell } from './revive.js';
 import { runSaveSpell } from './save.js';
 import { runSummonSpell } from './summon.js';
 import { runUtilitySpell } from './utility.js';
-import { runWallOfFire } from './wall.js';
+import { runWallSpell } from './wall.js';
 import { runZoneSpell } from './zone.js';
 import { transmutedDamageType } from '../../rulesEngine.js';
 import { updatePcActor } from '../actor.js';
@@ -430,12 +430,9 @@ export const handleCastSpell: ActionHandler<{
   }
 
   // ── Wall/terrain spells ───────────────────────────────────────────────
-  // Wall of Fire deals its line damage and then raises a transient opaque
-  // barrier (blocks line of sight) tied to the caster's concentration.
-  if (
-    spell.id === 'wall_of_fire' &&
-    runWallOfFire(ctx, dmgSpell, slotLevel, dc, spellDmg, spellTargetId)
-  ) {
+  // A wall spell deals any formation damage, then raises a transient barrier
+  // (blocks movement and/or line of sight) tied to the caster's concentration.
+  if (spell.wall && runWallSpell(ctx, dmgSpell, slotLevel, dc, spellDmg, spellTargetId)) {
     return;
   }
 
