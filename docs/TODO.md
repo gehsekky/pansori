@@ -18,8 +18,8 @@ PHB/DMG-exclusive content (subclasses, feats, species, spells). See
 
 ## Implementation status (code-verified 2026-05-28)
 
-Grounded in a code survey + the full backend suite: **2062 tests across
-236 files, all green** (lint + typecheck clean).
+Grounded in a code survey + the full backend suite: **2067 tests across
+237 files, all green** (lint + typecheck clean).
 
 ### Done — rules-engine frameworks
 
@@ -67,7 +67,7 @@ Grounded in a code survey + the full backend suite: **2062 tests across
 
 | Category                  | In pansori                                       | SRD universe                     |
 | ------------------------- | ------------------------------------------------ | -------------------------------- |
-| Spells                    | **244** (27 cantrips + 217 leveled, through L9)  | ~330                             |
+| Spells                    | **245** (27 cantrips + 218 leveled, through L9)  | ~330                             |
 | Shared SRD monster pool   | **44** (`SRD_MONSTERS`) + per-campaign templates | hundreds                         |
 | Species                   | 9                                                | 9 standalone + Drow lineage      |
 | Classes                   | 12                                               | 12                               |
@@ -85,8 +85,13 @@ backend features are waiting on, and a handful of **bounded subsystems**.
 
 ### Content breadth — data on existing patterns (RE-6)
 
-- [ ] **Spells** — ~244 / ~330 SRD. Most remaining categories are already
-      representable (data entry). **Fire Shield** (L4, `fireShield.spec.ts`) added
+- [ ] **Spells** — ~245 / ~330 SRD. Most remaining categories are already
+      representable (data entry). **Mirror Image** (L2, `mirrorImage.spec.ts`)
+      added a duplicate-absorb mechanic: a self buff (`Character.mirror_images`)
+      where, when an enemy HITS the warded PC, a d6 per remaining duplicate is
+      rolled and any 3+ shatters a duplicate instead of dealing damage (checked at
+      the top of the `result.hit` block in `computeEnemyAttack`); cleared at combat
+      end. **Fire Shield** (L4, `fireShield.spec.ts`) added
       a melee-retaliation mechanic: a self buff (`Character.fire_shield`) that
       sears an adjacent attacker for 2d8 Fire after it hits the warded PC (in the
       enemy-turn loop, beside Barbarian Retaliation) + Cold resistance; both clear

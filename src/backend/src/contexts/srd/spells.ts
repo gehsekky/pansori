@@ -3363,6 +3363,26 @@ export const SRD_SPELLS: Record<string, Spell> = {
     spellList: ['arcane', 'primal'],
   },
 
+  // SRD: Mirror Image (L2 Illusion) — three illusory duplicates (1 min, NOT
+  // concentration). When a creature hits you, a d6 per remaining duplicate is
+  // rolled; any 3+ means a duplicate takes the hit and is destroyed. Rides the
+  // buff path (`mirrorImages` → `Character.mirror_images`); the enemy-attack
+  // resolver burns them down. (Blinded/Blindsight/Truesight attacker exemption
+  // deferred.)
+  mirror_image: {
+    id: 'mirror_image',
+    name: 'Mirror Image',
+    level: 2,
+    castTime: 'action',
+    targetType: 'self',
+    mirrorImages: 3,
+    durationRounds: 10, // 1 minute (non-concentration; cleared at combat end)
+    rangeKind: 'self',
+    desc: 'Three illusory duplicates of you appear. When a creature hits you, roll a d6 per remaining duplicate; on any 3+, a duplicate is struck instead and shatters. The spell ends when all three are gone.',
+    narrative: '{name} blurs into a shifting cluster of identical duplicates.',
+    spellList: ['arcane'],
+  },
+
   // ─── Persistent damage zones (RE-4) ──────────────────────────────────
   // Stamp a SpellZone on cast that ticks each round wrap until concentration
   // ends (see castSpell/zone.ts + fireSpellZones). Movable zones declare

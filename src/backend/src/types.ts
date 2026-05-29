@@ -706,6 +706,9 @@ export interface Spell {
   // buff path → `Character.fire_shield`). A creature that hits the warded
   // character with a melee attack takes `dice` damage of `damageType`.
   fireShield?: { dice: string; damageType: string };
+  // SRD Mirror Image — the number of duplicates to conjure (3). The buff path
+  // sets `Character.mirror_images`; the enemy-attack resolver burns them down.
+  mirrorImages?: number;
   tempHpGrant?: number; // Heroism gives mod-equal temp HP each turn; MVP grants once on cast.
   maxHpBonus?: number; // Aid bumps target's max HP (and current HP).
   upcastMaxHpBonus?: number; // extra max HP per slot above base (Aid: +5 per slot).
@@ -950,6 +953,11 @@ export interface Character {
   // the enemy-turn loop after the character takes melee damage. Non-concentration
   // (RAW 10 min); cleared at combat end + long rest, like the encounter buffs.
   fire_shield?: { dice: string; damageType: string };
+  // SRD Mirror Image — the number of illusory duplicates still standing. When a
+  // creature HITS the warded character, a d6 is rolled per remaining duplicate;
+  // if any is 3+, a duplicate takes the hit (no damage) and is destroyed
+  // (decrementing this). Set by the buff cast path; cleared at 0 / combat end.
+  mirror_images?: number;
   // SRD one-shot smite (Searing / Shining / Ensnaring Strike) — armed on cast,
   // consumed by the NEXT melee-weapon hit: adds `dice` damage (optional) and an
   // on-hit effect (Faerie-Fire-style advantage, or a saved condition that ends

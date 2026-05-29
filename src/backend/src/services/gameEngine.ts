@@ -1411,6 +1411,37 @@ function computeEnemyAttack(
     : null;
 
   if (result.hit) {
+    // SRD Mirror Image — when a creature HITS the warded PC, roll a d6 per
+    // remaining duplicate; if any is 3+, a duplicate takes the hit instead (no
+    // damage) and is destroyed. (RAW exemption for a Blinded / Blindsight /
+    // Truesight attacker is deferred.)
+    const mImages = char.mirror_images ?? 0;
+    if (mImages > 0) {
+      const absorbed = Array.from({ length: mImages }, () => rollDice('1d6')).some((d) => d >= 3);
+      if (absorbed) {
+        const left = mImages - 1;
+        const updatedChar: Character = { ...char, mirror_images: left > 0 ? left : undefined };
+        return {
+          proposedChar: updatedChar,
+          proposedSt: st,
+          hpLost: 0,
+          fragment: {
+            kind: 'enemy_attack_miss',
+            attackerEnemyId: enemy.id,
+            attackerName: enemy.name,
+            targetCharId: char.id,
+            targetName: char.name,
+            atkTotal: result.total,
+            targetAc: char.ac,
+            prose: ` ${enemy.name}'s blow strikes one of ${char.name}'s mirror images — it shatters!${left > 0 ? ` (${left} left)` : ' (the last one)'}`,
+          },
+          atkTotal: result.total,
+          atkD20: result.roll,
+          hit: false,
+          hadAdvantage: hasAdvantage,
+        };
+      }
+    }
     // Rage resistance: halve physical damage while raging (PHB p.48)
     const isRaging = char.conditions.includes('raging');
     // Petrified: resistance to all damage (PHB p.291)
@@ -2606,6 +2637,8 @@ export function endCombatState(st: GameState): GameState {
       // doesn't linger.
       fire_shield: undefined,
       spell_resistances: undefined,
+      // Mirror Image duplicates (1 min ≈ encounter) don't carry to the next fight.
+      mirror_images: undefined,
     })),
   };
 }
