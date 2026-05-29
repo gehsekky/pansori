@@ -152,7 +152,8 @@ export const handleCastSpell: ActionHandler<{
       },
       spell,
       slotLevel,
-      slotNote
+      slotNote,
+      dc
     )
   ) {
     return;

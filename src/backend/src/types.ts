@@ -709,6 +709,9 @@ export interface Spell {
   // SRD Mirror Image — the number of duplicates to conjure (3). The buff path
   // sets `Character.mirror_images`; the enemy-attack resolver burns them down.
   mirrorImages?: number;
+  // SRD Sanctuary — ward the self/ally target; attackers must save vs the
+  // caster's DC. The buff path stamps `Character.sanctuary_dc`.
+  sanctuary?: boolean;
   tempHpGrant?: number; // Heroism gives mod-equal temp HP each turn; MVP grants once on cast.
   maxHpBonus?: number; // Aid bumps target's max HP (and current HP).
   upcastMaxHpBonus?: number; // extra max HP per slot above base (Aid: +5 per slot).
@@ -958,6 +961,12 @@ export interface Character {
   // if any is 3+, a duplicate takes the hit (no damage) and is destroyed
   // (decrementing this). Set by the buff cast path; cleared at 0 / combat end.
   mirror_images?: number;
+  // SRD Sanctuary — the warded creature is hard to attack: a creature that tries
+  // to attack it makes a Wisdom save (vs this stored caster spell DC) or must
+  // choose a new target / lose the attack. Read in `computeEnemyAttack`; cleared
+  // at combat end. (RAW: the ward ends when the warded creature attacks/casts —
+  // that break-on-action is deferred.)
+  sanctuary_dc?: number;
   // SRD one-shot smite (Searing / Shining / Ensnaring Strike) — armed on cast,
   // consumed by the NEXT melee-weapon hit: adds `dice` damage (optional) and an
   // on-hit effect (Faerie-Fire-style advantage, or a saved condition that ends
