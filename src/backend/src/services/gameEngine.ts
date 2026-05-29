@@ -1290,6 +1290,37 @@ function computeEnemyAttack(
    *  enemy-rolled-with-advantage. */
   hadAdvantage: boolean;
 } {
+  // SRD Sanctuary — before the attack resolves, a creature attacking the warded
+  // PC makes a Wisdom save vs the caster's spell DC; on a failure it can't bring
+  // itself to attack and the attack is lost. (On a success it attacks normally;
+  // the ward persists. RAW: the ward also ends when the warded creature attacks/
+  // casts — deferred.)
+  const sanctuaryDc = char.sanctuary_dc ?? 0;
+  if (sanctuaryDc > 0) {
+    const enemyWis = (enemy as unknown as Record<string, number>).wis ?? 10;
+    const sanctSave = rollDice('1d20') + abilityMod(enemyWis);
+    if (sanctSave < sanctuaryDc) {
+      return {
+        proposedChar: char,
+        proposedSt: st,
+        hpLost: 0,
+        fragment: {
+          kind: 'enemy_attack_miss',
+          attackerEnemyId: enemy.id,
+          attackerName: enemy.name,
+          targetCharId: char.id,
+          targetName: char.name,
+          atkTotal: sanctSave,
+          targetAc: char.ac,
+          prose: ` ${enemy.name} falters — Sanctuary turns its attack on ${char.name} aside (WIS ${fmt.roll(sanctSave)} vs DC ${sanctuaryDc}).`,
+        },
+        atkTotal: sanctSave,
+        atkD20: 0,
+        hit: false,
+        hadAdvantage: false,
+      };
+    }
+  }
   const isDodging = char.turn_actions?.dodging ?? false;
   const isReckless = char.turn_actions?.reckless ?? false;
   // SRD Rogue Elusive (L18): no attack roll can have Advantage against the
@@ -2639,6 +2670,8 @@ export function endCombatState(st: GameState): GameState {
       spell_resistances: undefined,
       // Mirror Image duplicates (1 min ≈ encounter) don't carry to the next fight.
       mirror_images: undefined,
+      // Sanctuary ward (1 min ≈ encounter) clears at combat end.
+      sanctuary_dc: undefined,
     })),
   };
 }

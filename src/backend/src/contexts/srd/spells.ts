@@ -3383,6 +3383,27 @@ export const SRD_SPELLS: Record<string, Spell> = {
     spellList: ['arcane'],
   },
 
+  // SRD: Sanctuary (L1 Abjuration) — Bonus Action, 1 min (not concentration). A
+  // creature that tries to attack the warded target makes a Wisdom save vs your
+  // spell DC or must pick a new target / lose the attack. Rides the buff path
+  // (`sanctuary` → `Character.sanctuary_dc`, the caster's DC); the enemy-attack
+  // resolver rolls the WIS save. (RAW: the ward ends when the warded creature
+  // attacks/casts — that break-on-action is deferred; self-or-ally targeting.)
+  sanctuary: {
+    id: 'sanctuary',
+    name: 'Sanctuary',
+    level: 1,
+    castTime: 'bonus_action',
+    targetType: 'self_or_ally',
+    sanctuary: true,
+    durationRounds: 10, // 1 minute (non-concentration; cleared at combat end)
+    rangeKind: 'ranged',
+    rangeFt: 30,
+    desc: 'You ward a creature: any creature that tries to attack it must succeed on a Wisdom save against your spell save DC or lose that attack. (RAW: the ward ends if the warded creature attacks or casts — deferred in pansori.)',
+    narrative: '{name} traces a sigil of protection over {target}.',
+    spellList: ['divine'],
+  },
+
   // ─── Persistent damage zones (RE-4) ──────────────────────────────────
   // Stamp a SpellZone on cast that ticks each round wrap until concentration
   // ends (see castSpell/zone.ts + fireSpellZones). Movable zones declare

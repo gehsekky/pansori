@@ -18,8 +18,8 @@ PHB/DMG-exclusive content (subclasses, feats, species, spells). See
 
 ## Implementation status (code-verified 2026-05-28)
 
-Grounded in a code survey + the full backend suite: **2067 tests across
-237 files, all green** (lint + typecheck clean).
+Grounded in a code survey + the full backend suite: **2072 tests across
+238 files, all green** (lint + typecheck clean).
 
 ### Done — rules-engine frameworks
 
@@ -67,7 +67,7 @@ Grounded in a code survey + the full backend suite: **2067 tests across
 
 | Category                  | In pansori                                       | SRD universe                     |
 | ------------------------- | ------------------------------------------------ | -------------------------------- |
-| Spells                    | **245** (27 cantrips + 218 leveled, through L9)  | ~330                             |
+| Spells                    | **246** (27 cantrips + 219 leveled, through L9)  | ~330                             |
 | Shared SRD monster pool   | **44** (`SRD_MONSTERS`) + per-campaign templates | hundreds                         |
 | Species                   | 9                                                | 9 standalone + Drow lineage      |
 | Classes                   | 12                                               | 12                               |
@@ -85,8 +85,12 @@ backend features are waiting on, and a handful of **bounded subsystems**.
 
 ### Content breadth — data on existing patterns (RE-6)
 
-- [ ] **Spells** — ~245 / ~330 SRD. Most remaining categories are already
-      representable (data entry). **Mirror Image** (L2, `mirrorImage.spec.ts`)
+- [ ] **Spells** — ~246 / ~330 SRD. Most remaining categories are already
+      representable (data entry). **Sanctuary** (L1, `sanctuary.spec.ts`) added a
+      ward mechanic: a self/ally buff stamps the caster's spell DC
+      (`Character.sanctuary_dc`); at the top of `computeEnemyAttack` an attacker
+      WIS-saves vs it or loses the attack (cleared at combat end; break-on-action
+      deferred). **Mirror Image** (L2, `mirrorImage.spec.ts`)
       added a duplicate-absorb mechanic: a self buff (`Character.mirror_images`)
       where, when an enemy HITS the warded PC, a d6 per remaining duplicate is
       rolled and any 3+ shatters a duplicate instead of dealing damage (checked at

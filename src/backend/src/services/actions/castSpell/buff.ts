@@ -28,7 +28,10 @@ export function runBuffSpell(
   },
   spell: Spell,
   slotLevel: number,
-  slotNote: string
+  slotNote: string,
+  // The caster's spell save DC for this cast (from precast). Used by buffs whose
+  // ward forces a SAVE on attackers (Sanctuary). Optional for back-compat.
+  dc?: number
 ): boolean {
   if (ctx.actor.kind !== 'pc') return false;
   const { char } = ctx.actor;
@@ -217,6 +220,21 @@ export function runBuffSpell(
   // (read in the enemy-attack resolver). Self-target only (RAW range Self).
   if (spell.mirrorImages && isCasterTarget) {
     char.mirror_images = spell.mirrorImages;
+  }
+
+  // SRD Sanctuary — ward the target so attackers must make a Wisdom save (vs the
+  // caster's spell DC) or be unable to attack it. Store the DC on the ward.
+  if (spell.sanctuary && dc !== undefined) {
+    if (isCasterTarget) {
+      char.sanctuary_dc = dc;
+    } else {
+      ctx.st = {
+        ...ctx.st,
+        characters: ctx.st.characters.map((c) =>
+          c.id === buffTarget.id ? { ...c, sanctuary_dc: dc } : c
+        ),
+      };
+    }
   }
 
   // 2024 PHB Fly + Levitate: set fly_speed_ft on the target. The
