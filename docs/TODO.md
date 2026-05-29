@@ -18,8 +18,8 @@ PHB/DMG-exclusive content (subclasses, feats, species, spells). See
 
 ## Implementation status (code-verified 2026-05-28)
 
-Grounded in a code survey + the full backend suite: **2045 tests across
-232 files, all green** (lint + typecheck clean).
+Grounded in a code survey + the full backend suite: **2049 tests across
+233 files, all green** (lint + typecheck clean).
 
 ### Done — rules-engine frameworks
 
@@ -283,8 +283,15 @@ backend features are waiting on, and a handful of **bounded subsystems**.
         Restrained rider, Conjure Fey's on-hit Frightened, Conjure Celestial's
         ally Healing-Light mode, and Minor Elementals' in-Emanation gate +
         Difficult Terrain are narrated/deferred.
-  - [ ] **Find Familiar** — a non-combatant utility companion (can't take
-        the Attack action RAW); a scouting/aid model, not the ally-turn AI.
+  - [x] **Find Familiar** — shipped (`findFamiliar.spec.ts`). Rides the summon
+        path with a new `noAttack` flag (on `Spell.summon` → `SummonedAlly` →
+        `CombatEntity`): the ritual (out-of-combat, 10 GP material) adds a CR-0
+        familiar to `summoned_allies` (Owl / Cat / Raven forms), and
+        `seedSummonedAllies` materializes it as a non-combatant ally. In
+        `runAllyTurn`, a `noAttack` ally takes the **Help** action instead of
+        attacking — granting its owner Advantage on their next attack
+        (`help_target_id`). Telepathy, see-through-its-eyes, and touch-spell
+        delivery are narrated. Closes the deferred summon-spell cluster.
 - [~] **Monsters** — stat-block content. The shared pool grew 12 → 31 → 39 → **44**
   (`monsters.spec.ts`): a CR 1/8–**6** spread of SRD 5.2.1 bestiary entries
   (kobold, guard, cultist, giant rat, zombie, scout, worg, gnoll, black

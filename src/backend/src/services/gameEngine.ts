@@ -7194,6 +7194,7 @@ export function seedSummonedAllies(st: GameState): GameState {
       damage: summon.damage,
       summoned_by: summon.ownerId,
       summon_concentration: false,
+      noAttack: summon.noAttack,
     };
     next = addAllyCombatant(next, ally, {
       afterId: summon.ownerId,
@@ -7232,6 +7233,23 @@ export function runAllyTurn(args: {
   const foe = getEnemyById(seed, targetEnt.id);
   const foeName = foe?.name ?? 'the enemy';
   const foeAc = foe?.ac ?? targetEnt.ac ?? 10;
+
+  // ── SRD Find Familiar — a non-combatant ally can't take the Attack action, so
+  // it takes the Help action instead: it harries the nearest foe, granting its
+  // owner Advantage on their next attack (`help_target_id`, consumed in
+  // `computeToHitContext`). Positioning is abstracted — the familiar flits in.
+  if (allyEnt.noAttack) {
+    const ownerId = allyEnt.summoned_by;
+    const owner = ownerId ? st.characters.find((c) => c.id === ownerId && !c.dead) : undefined;
+    if (owner) {
+      st = { ...st, help_target_id: owner.id };
+      return {
+        st,
+        narrative: ` ${allyName} harries ${foeName} (Help) — ${owner.name} has Advantage on their next attack.`,
+      };
+    }
+    return { st, narrative: ` ${allyName} scouts the fray but holds back.` };
+  }
 
   // ── Approach if out of melee reach (5 ft). ──────────────────────────
   let moverPos = allyEnt.pos;
