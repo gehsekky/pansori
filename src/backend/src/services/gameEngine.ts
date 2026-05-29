@@ -2278,11 +2278,11 @@ export function applyZoneTick(
   zone: SpellZone,
   seed: Seed,
   context: Context
-): { st: GameState; narrative: string } {
-  if (!st.entities) return { st, narrative: '' };
+): { st: GameState; narrative: string; dealt: number } {
+  if (!st.entities) return { st, narrative: '', dealt: 0 };
   // SRD Darkness — a sight-blocking zone deals no damage; it only affects
   // visibility (read via `magicalDarknessCells` / `canSeeTarget`). Nothing to tick.
-  if (zone.blocksSight) return { st, narrative: '' };
+  if (zone.blocksSight) return { st, narrative: '', dealt: 0 };
   // Caster-following auras (Spirit Guardians) recompute their footprint from
   // the caster's CURRENT cell each tick, so the aura moves with the caster.
   let cells = zone.cells;
@@ -2301,6 +2301,7 @@ export function applyZoneTick(
   const enemies = getLivingRoomEnemies(st, seed, zone.roomId);
   let workingSt = st;
   let narrative = '';
+  let dealt = 0;
   for (const enemy of enemies) {
     const ent = workingSt.entities?.find((e) => e.id === enemy.id && e.isEnemy);
     if (!ent || ent.hp <= 0 || !cellSet.has(`${ent.pos.x},${ent.pos.y}`)) continue;
@@ -2322,6 +2323,7 @@ export function applyZoneTick(
     }
     const resisted = applyDamageMultiplier(dmg, zone.damageType, enemy).damage;
     const newHp = Math.max(0, ent.hp - resisted);
+    dealt += ent.hp - newHp; // actual HP removed (counts toward a damage cap)
     workingSt = {
       ...workingSt,
       entities: (workingSt.entities ?? []).map((e) =>
@@ -2342,11 +2344,11 @@ export function applyZoneTick(
       if (isRoomCleared(workingSt, seed, zone.roomId)) workingSt = endCombatState(workingSt);
     }
   }
-  return { st: workingSt, narrative };
+  return { st: workingSt, narrative, dealt };
 }
 
 // RE-4 — round-wrap tick for every persistent zone in the current room.
-function fireSpellZones(
+export function fireSpellZones(
   st: GameState,
   seed: Seed,
   context: Context
@@ -2354,13 +2356,34 @@ function fireSpellZones(
   if (!st.combat_active || !st.spell_zones?.length) return { st, narrative: '' };
   let workingSt = st;
   let narrative = '';
+  let expiredNote = '';
+  // Survivors of this round wrap. Concentration zones (no `rounds_left`/
+  // `damageCap`) pass through untouched — `breakConcentration` is their timer.
+  // Non-concentration zones (Guardian of Faith) decrement their round budget
+  // and accumulate damage toward their cap, and are dropped when either runs out.
+  const survivors: SpellZone[] = [];
   for (const zone of st.spell_zones) {
-    if (zone.roomId !== st.current_room) continue;
+    if (zone.roomId !== workingSt.current_room) {
+      survivors.push(zone); // zones in other rooms aren't active here
+      continue;
+    }
     const res = applyZoneTick(workingSt, zone, seed, context);
     workingSt = res.st;
     if (res.narrative) narrative += ` 🌀 ${zone.name}:${res.narrative}`;
+    // A zone kill can clear the room (endCombatState wipes spell_zones); stop.
+    if (!workingSt.combat_active) return { st: workingSt, narrative };
+    const newDamageDealt = (zone.damageDealt ?? 0) + res.dealt;
+    const newRounds = zone.rounds_left !== undefined ? zone.rounds_left - 1 : undefined;
+    const expiredByTime = newRounds !== undefined && newRounds <= 0;
+    const expiredByCap = zone.damageCap !== undefined && newDamageDealt >= zone.damageCap;
+    if (expiredByTime || expiredByCap) {
+      expiredNote += ` ${zone.name} fades.`;
+      continue; // drop the zone
+    }
+    survivors.push({ ...zone, rounds_left: newRounds, damageDealt: newDamageDealt });
   }
-  return { st: workingSt, narrative };
+  workingSt = { ...workingSt, spell_zones: survivors };
+  return { st: workingSt, narrative: narrative + expiredNote };
 }
 
 // SRD p.221 — legendary actions. Fire AT MOST ONE after another creature's
@@ -2544,6 +2567,10 @@ export function endCombatState(st: GameState): GameState {
     initiative_idx: 0,
     entities: undefined,
     movement_used: undefined,
+    // Persistent damage zones are combat constructs; clear any that outlived the
+    // fight so a non-concentration zone (Guardian of Faith) can't leak into the
+    // next encounter. Concentration zones are already dropped by breakConcentration.
+    spell_zones: [],
     characters: st.characters.map((c) => ({
       ...c,
       turn_actions: { ...FRESH_TURN },

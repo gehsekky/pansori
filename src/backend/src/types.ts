@@ -617,6 +617,12 @@ export interface Spell {
   // `damage` (save-for-half if `savingThrow` is set) to hostiles standing in it
   // on each round wrap, until the caster's concentration ends.
   persistentZone?: boolean;
+  // SRD non-concentration zone (Guardian of Faith) — the persistent zone
+  // vanishes after dealing this much total damage. Stamped onto
+  // `SpellZone.damageCap`; only meaningful when the zone isn't concentration-
+  // bound. The zone's round budget comes from `durationRounds` (→
+  // `SpellZone.rounds_left`) and combat-end clears any leftover.
+  zoneDamageCap?: number;
   // RE-4 — a placed zone the caster can reposition (Flaming Sphere rolls 30 ft
   // as a Bonus Action; Moonbeam / Call Lightning re-aim as a Magic action).
   // `zoneMoveFt` is the max reposition distance; `zoneMoveCost` is the action
@@ -1229,6 +1235,20 @@ export interface SpellZone {
   // Center cell of a PLACED zone (where it was cast / last repositioned to).
   // Used to measure reposition distance and recompute the footprint on a move.
   center?: GridPos;
+  // SRD non-concentration zone teardown. Concentration zones are torn down by
+  // `breakConcentration`; these fields govern the lifetime of zones that AREN'T
+  // bound to concentration (Guardian of Faith):
+  //   - `rounds_left`: round budget; `fireSpellZones` decrements it each round
+  //     wrap and removes the zone at 0. Undefined ⇒ no round-based expiry (the
+  //     zone lasts until its damage cap or combat ends).
+  //   - `damageCap` / `damageDealt`: cumulative-damage limit. Each tick adds the
+  //     damage dealt to `damageDealt`; the zone is removed once it reaches
+  //     `damageCap` (Guardian of Faith vanishes after dealing 60). Undefined cap
+  //     ⇒ no damage limit.
+  // Any lingering zone is also cleared when combat ends (`endCombatState`).
+  rounds_left?: number;
+  damageCap?: number;
+  damageDealt?: number;
   // SRD Darkness — a magical-darkness zone (no damage). Its cells are Heavily
   // Obscured: Darkvision can't see through them and nonmagical light can't
   // illuminate them, so only Blindsight / Devil's Sight pierces. `applyZoneTick`

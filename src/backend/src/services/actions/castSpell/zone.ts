@@ -59,6 +59,12 @@ export function runZoneSpell(
     radiusFt,
     // Placed zones track their center for repositioning; follower auras don't.
     center: follows ? undefined : center,
+    // Non-concentration zones (Guardian of Faith) carry their own teardown: a
+    // round budget from `durationRounds` and/or a cumulative damage cap. (For
+    // concentration zones these stay undefined — concentration is the timer.)
+    rounds_left: spell.concentration ? undefined : spell.durationRounds,
+    damageCap: spell.zoneDamageCap,
+    damageDealt: 0,
   };
   ctx.st = { ...ctx.st, spell_zones: [...(ctx.st.spell_zones ?? []), zone] };
   // Most zone spells are Concentration; the damage path doesn't stamp it, so
@@ -73,6 +79,25 @@ export function runZoneSpell(
   const tick = applyZoneTick(ctx.st, zone, ctx.seed, ctx.context);
   ctx.st = tick.st;
   ctx.narrative += tick.narrative;
+  // Account the on-cast damage toward a non-concentration cap, and remove the
+  // zone immediately if that one tick already met it (combat may also have ended
+  // — endCombatState clears spell_zones, so the map/filter below is a safe no-op).
+  if (zone.damageCap !== undefined && tick.dealt > 0) {
+    const total = tick.dealt;
+    ctx.st = {
+      ...ctx.st,
+      spell_zones: (ctx.st.spell_zones ?? []).map((z) =>
+        z.id === zone.id ? { ...z, damageDealt: (z.damageDealt ?? 0) + total } : z
+      ),
+    };
+    if (total >= zone.damageCap) {
+      ctx.st = {
+        ...ctx.st,
+        spell_zones: (ctx.st.spell_zones ?? []).filter((z) => z.id !== zone.id),
+      };
+      ctx.narrative += ` ${spell.name} fades.`;
+    }
+  }
   ctx.usedInitiative = true;
   return true;
 }
