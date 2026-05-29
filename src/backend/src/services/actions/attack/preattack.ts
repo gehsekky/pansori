@@ -134,15 +134,11 @@ export function runPreattack(
     const form = BEAST_FORMS[pc.char.wild_shape_form];
     if (form) weaponDamage = form.attackDamage;
   }
-  // Versatile: use two-handed damage when no shield is equipped. 2024
-  // PHB Flex mastery (longsword, battleaxe, warhammer) lets a trained
-  // wielder use the versatile die EVEN with a shield equipped.
-  const hasFlexMastery =
-    weaponItem?.mastery === 'flex' && (pc.char.weapon_masteries ?? []).includes(weaponItem.id);
-  const isVersatile = !!(
-    weaponItem?.versatileDamage &&
-    (!pc.char.equipped_shield || hasFlexMastery)
-  );
+  // Versatile (SRD 5.2.1): use the larger two-handed damage die when no shield
+  // is equipped (both hands free). (The Battleaxe now carries the RAW Topple
+  // mastery; the old homebrew `flex` mastery — versatile die even with a shield
+  // — has been retired.)
+  const isVersatile = !!(weaponItem?.versatileDamage && !pc.char.equipped_shield);
   if (isVersatile) {
     weaponDamage = weaponItem!.versatileDamage!;
   }

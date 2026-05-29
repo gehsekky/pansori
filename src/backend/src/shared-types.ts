@@ -40,8 +40,7 @@ export type WeaponMastery =
   | 'slow' // target's speed -10 ft until your next turn
   | 'nick' // bonus-action TWF attack folded into Attack action
   | 'cleave' // hit second target in 5 ft on a hit
-  | 'graze' // missed attack still deals ability-mod damage
-  | 'flex'; // versatile two-handed damage one-handed if no shield
+  | 'graze'; // missed attack still deals ability-mod damage
 
 export type ConditionName =
   | 'paralyzed'

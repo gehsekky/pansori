@@ -35,7 +35,7 @@ Grounded in a code survey + the full backend suite: **2011 tests across
   **reactions** (Shield, Counterspell, Hellish Rebuke, Uncanny Dodge,
   readied actions, OAs, Heroic-Inspiration reroll window — discriminated
   `pending_reaction` with pause/resume); **rest / death-save / revive
-  ladder**; **weapon masteries** (8 SRD + the `flex` variant).
+  ladder**; **weapon masteries** (all 8 SRD).
 - **Dispatcher-integrated enemy turns** — a whole enemy turn runs as
   `enemy_move` → (`enemy_cast` | `enemy_attack`×N) through the same
   `dispatchAction` path as PC actions, via an `enemyActor`. PC vs monster
@@ -594,9 +594,15 @@ options }`** → `OptionPickerDialog` (single-select; re-sends `action[param]`).
 - [ ] **Somatic spell components** — RAW requires a free hand; needs a
       hand-state model. No spell carries a `somatic` flag yet. Also unlocks
       focus-substitutes-for-material.
-- [ ] **Battleaxe mastery: Flex → Topple** — sandbox tags Battleaxe with the
-      homebrew `flex`; RAW 2024 assigns Topple. Audit other Flex-tagged
-      weapons; retire `flex` or document it as a pansori variant.
+- [x] **Battleaxe mastery: Flex → Topple** — shipped. RAW SRD 5.2.1 assigns the
+      Battleaxe the **Topple** mastery (verified against the weapon table); it now
+      carries `mastery: 'topple'` (already implemented — CON save or Prone, shared
+      with the Quarterstaff). The Battleaxe was the only `flex`-tagged weapon, so
+      the homebrew `flex` mastery was **retired**: removed from the `WeaponMastery`
+      union and the versatile-die logic in `preattack.ts` (versatile is now simply
+      the two-handed die when no shield is equipped, per RAW). Spec rewritten in
+      `gameEngine.conditions.spec.ts` to assert the new behavior (1d8 with a
+      shield + Topple-on-hit).
 - [ ] **Out-of-combat systems** — Downtime, Bastions, Crafting (potions /
       scrolls / items), Vehicles. Lowest urgency.
 
