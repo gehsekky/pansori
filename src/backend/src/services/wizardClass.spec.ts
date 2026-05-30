@@ -25,7 +25,6 @@ const seed: Seed = {
   intro: '',
   seed_id: 'w',
   rooms: [{ id: ctx.startRoomId, name: 'S', desc: '' }],
-  connections: { [ctx.startRoomId]: [] },
   enemies: {},
   loot: {},
   npcs: {},

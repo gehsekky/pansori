@@ -4,7 +4,6 @@ import type {
   GameState,
   GridPos,
   LootItem,
-  Room,
   Seed,
   StructuredAction,
 } from '../../types.js';
@@ -36,7 +35,6 @@ export interface ActionContext {
   readonly enemyAlive: boolean;
   readonly loot: LootItem | undefined;
   readonly lootAvail: boolean | undefined;
-  readonly adjacent: Room[];
 
   // Working state — handlers mutate via wholesale replacement
   /** Reassigned only by the `travel` handler. */

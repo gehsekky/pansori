@@ -21,7 +21,6 @@ function seedWith(enemy: Partial<Enemy>): Seed {
     intro: '',
     seed_id: 'fs',
     rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-    connections: { [ctx.startRoomId]: [] },
     enemies: {
       [ctx.startRoomId]: [
         {

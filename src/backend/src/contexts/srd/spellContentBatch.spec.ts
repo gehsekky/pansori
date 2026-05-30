@@ -49,7 +49,6 @@ function seedWith(enemies: Array<Record<string, unknown>>): Seed {
     intro: '',
     seed_id: 'batch',
     rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-    connections: { [ctx.startRoomId]: [] },
     enemies: { [ctx.startRoomId]: enemies as unknown as NonNullable<Seed['enemies']>[string] },
     loot: {},
     npcs: {},

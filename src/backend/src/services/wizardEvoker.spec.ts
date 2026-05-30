@@ -20,7 +20,6 @@ const seed: Seed = {
   intro: '',
   seed_id: 'evoker',
   rooms: [{ id: ctx.startRoomId, name: 'S', desc: '' }],
-  connections: { [ctx.startRoomId]: [] },
   // AC 20 so a mediocre spell-attack roll misses (exercising Potent Cantrip).
   enemies: {
     [ctx.startRoomId]: [

@@ -18,7 +18,6 @@ const seed: Seed = {
   intro: '',
   seed_id: 'self-restoration',
   rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-  connections: { [ctx.startRoomId]: [] },
   enemies: {
     // Passive (low to-hit, no onHitEffect) so it can't re-apply a condition.
     [ctx.startRoomId]: [

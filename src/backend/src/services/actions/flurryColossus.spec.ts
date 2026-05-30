@@ -29,7 +29,6 @@ const seedWithOneGoblin: Seed = {
   intro: '',
   seed_id: 'bug-test',
   rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-  connections: { [ctx.startRoomId]: [] },
   enemies: {
     [ctx.startRoomId]: [
       { id: enemyId, name: 'Goblin', hp: 50, ac: 10, damage: '1d6', toHit: 3, xp: 20 },
@@ -46,7 +45,6 @@ const seedWithTwoGoblins: Seed = {
   intro: '',
   seed_id: 'bug-test',
   rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-  connections: { [ctx.startRoomId]: [] },
   enemies: {
     [ctx.startRoomId]: [
       // Make the first goblin frail so a single Flurry kills it; second is

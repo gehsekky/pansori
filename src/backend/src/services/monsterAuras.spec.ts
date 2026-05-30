@@ -38,7 +38,6 @@ function seedWithGhast(): Seed {
     intro: '',
     seed_id: 'aura',
     rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-    connections: { [ctx.startRoomId]: [] },
     enemies: { [ctx.startRoomId]: [{ id: 'g1', ...SRD_MONSTERS.ghast } as Enemy] },
     loot: {},
     npcs: {},

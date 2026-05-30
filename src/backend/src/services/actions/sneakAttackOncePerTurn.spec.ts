@@ -26,7 +26,6 @@ const seedWithGoblin: Seed = {
   intro: '',
   seed_id: 'sa-opt',
   rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-  connections: { [ctx.startRoomId]: [] },
   enemies: {
     [ctx.startRoomId]: [
       {

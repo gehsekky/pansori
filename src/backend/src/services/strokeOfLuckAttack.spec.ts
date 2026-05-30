@@ -21,7 +21,6 @@ const seedWithWall: Seed = {
   intro: '',
   seed_id: 'sol-attack',
   rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-  connections: { [ctx.startRoomId]: [] },
   enemies: {
     [ctx.startRoomId]: [makeEnemy({ id: enemyId, name: 'Iron Golem', hp: 200, ac: 25, toHit: 3 })],
   },

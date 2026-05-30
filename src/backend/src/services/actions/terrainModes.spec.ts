@@ -34,7 +34,6 @@ function seedWithTerrain(opts: {
         difficultTerrain: opts.difficult,
       },
     ],
-    connections: { [ctx.startRoomId]: [] },
     enemies: {},
     loot: {},
     npcs: {},

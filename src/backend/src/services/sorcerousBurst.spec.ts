@@ -62,7 +62,6 @@ function burstSeed(): Seed {
     intro: '',
     seed_id: 'sb',
     rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-    connections: { [ctx.startRoomId]: [] },
     enemies: {
       [ctx.startRoomId]: [
         { id: enemyId, name: 'Ogre', hp: 300, ac: 5, damage: '1d6', toHit: 3, xp: 50 } as Enemy,

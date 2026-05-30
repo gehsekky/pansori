@@ -109,7 +109,6 @@ function attackSeed(enemy: Partial<Enemy>): Seed {
     intro: '',
     seed_id: 'undead-fort',
     rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-    connections: { [ctx.startRoomId]: [] },
     enemies: {
       [ctx.startRoomId]: [
         {

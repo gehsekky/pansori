@@ -19,7 +19,6 @@ const seed: Seed = {
   intro: '',
   seed_id: 'shp',
   rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-  connections: { [ctx.startRoomId]: [] },
   enemies: {
     [ctx.startRoomId]: [
       { id: E1, name: 'Stag', hp: 120, ac: 5, damage: '1d6', toHit: 3, xp: 50 } as unknown as Enemy,

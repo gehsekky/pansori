@@ -28,7 +28,6 @@ function twoSwingSeed(): Seed {
     intro: '',
     seed_id: 'multi',
     rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-    connections: { [ctx.startRoomId]: [] },
     enemies: {
       [ctx.startRoomId]: [
         {

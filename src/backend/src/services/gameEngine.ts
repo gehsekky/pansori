@@ -6268,7 +6268,6 @@ function buildEnemyActionCtx(args: {
     enemyAlive: false,
     loot: undefined,
     lootAvail: false,
-    adjacent: [],
     seed,
     st,
     actor: enemyActor(enemy, ent),
@@ -8357,9 +8356,6 @@ export async function takeAction({
   const enemyAlive = livingEnemiesInRoom.length > 0;
   const loot = seed.loot?.[roomId];
   const lootAvail = loot && !st.loot_taken.includes(roomId);
-  const adjacent = (seed.connections[roomId] || [])
-    .map((id) => seed.rooms.find((r) => r.id === id))
-    .filter((r): r is NonNullable<typeof r> => r != null);
 
   let narrative = '';
   let escaped = false;
@@ -8528,7 +8524,6 @@ export async function takeAction({
     enemyAlive,
     loot,
     lootAvail,
-    adjacent,
     seed,
     st,
     actor: pcActor(char, safeIdx),

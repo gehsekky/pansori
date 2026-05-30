@@ -101,8 +101,6 @@ export const context: Context = {
     `Bells ring slow over Pinegate as you arrive. Smoke rises from the Verdant Hall — empty, you'll later learn. The grove past the river has gone too quiet.`,
   ],
 
-  roomPool: [], // unused in campaign mode but required
-
   // ─── Spell system ────────────────────────────────────────────────────────────
 
   spellTable: { ...SRD_SPELLS },
@@ -378,7 +376,6 @@ export const context: Context = {
 
     // Navigation is by the marker + room `exits` (3-level map); the old
     // room-adjacency graph is retired.
-    connections: {},
 
     // ── 3-level grid map ───────────────────────────────────────────────────────
     regions: [

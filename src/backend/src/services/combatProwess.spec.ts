@@ -35,7 +35,6 @@ const highAcSeed: Seed = {
   intro: '',
   seed_id: 'peerless-aim',
   rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-  connections: { [ctx.startRoomId]: [] },
   enemies: {
     [ctx.startRoomId]: [
       {

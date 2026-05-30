@@ -44,7 +44,6 @@ const seed: Seed = {
       },
     },
   ],
-  connections: { [trapRoom]: [] },
   enemies: {},
   loot: {},
   npcs: {},

@@ -104,7 +104,6 @@ export const context: Context = {
   ],
 
   // Roguelike room pool unused in campaign mode but required by type
-  roomPool: [],
 
   // ─── Enemy templates ──────────────────────────────────────────────────────────
 
@@ -395,8 +394,6 @@ export const context: Context = {
       ],
     },
   ],
-
-  npcSpawnChance: 0,
 
   // ─── Narratives ───────────────────────────────────────────────────────────────
 
@@ -760,7 +757,6 @@ export const context: Context = {
 
     // Navigation is by the marker + room `exits` (3-level map); the old
     // room-adjacency graph is retired.
-    connections: {},
 
     enemies: {
       pass_climb: [

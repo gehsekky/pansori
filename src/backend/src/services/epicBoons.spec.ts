@@ -89,7 +89,6 @@ describe('take_feat action — epic boon consumes the L19 ASI', () => {
         intro: '',
         seed_id: 'boon-test',
         rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-        connections: { [ctx.startRoomId]: [] },
         enemies: {},
         loot: {},
         npcs: {},

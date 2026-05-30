@@ -33,7 +33,6 @@ const seedWithGoblin: Seed = {
   intro: '',
   seed_id: 'death-save-test',
   rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-  connections: { [ctx.startRoomId]: [] },
   enemies: {
     [ctx.startRoomId]: [
       {

@@ -131,7 +131,6 @@ const seed: Seed = {
   intro: '',
   seed_id: 'blinded',
   rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-  connections: { [ctx.startRoomId]: [] },
   enemies: {
     [ctx.startRoomId]: [
       { id: enemyId, name: 'Goblin', hp: 50, ac: 18, damage: '1d6', toHit: 3, xp: 20 },

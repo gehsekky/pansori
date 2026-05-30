@@ -18,7 +18,6 @@ const minimalSeed: Seed = {
   intro: '',
   seed_id: 'lvlup-test',
   rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-  connections: { [ctx.startRoomId]: [] },
   enemies: {},
   loot: {},
   npcs: {},

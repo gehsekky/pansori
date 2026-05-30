@@ -30,7 +30,6 @@ function killSeed(enemies: Enemy[]): Seed {
     intro: '',
     seed_id: 'power-word',
     rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-    connections: { [ctx.startRoomId]: [] },
     enemies: { [ctx.startRoomId]: enemies },
     loot: {},
     npcs: {},

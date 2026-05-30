@@ -20,7 +20,6 @@ const noEnemySeed: Seed = {
   intro: '',
   seed_id: 'heal-display',
   rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-  connections: { [ctx.startRoomId]: [] },
   enemies: {},
   loot: {},
   npcs: {},

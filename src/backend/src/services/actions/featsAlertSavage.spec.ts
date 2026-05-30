@@ -44,7 +44,6 @@ const seedWithGoblin: Seed = {
   intro: '',
   seed_id: 'sa-test',
   rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-  connections: { [ctx.startRoomId]: [] },
   enemies: {
     [ctx.startRoomId]: [
       makeEnemy({ id: enemyId, name: 'Goblin', hp: 60, ac: 10, damage: '1d6', toHit: 3, xp: 20 }),

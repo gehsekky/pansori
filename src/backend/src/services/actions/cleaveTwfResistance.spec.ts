@@ -30,7 +30,6 @@ const cleaveSeed: Seed = {
   intro: '',
   seed_id: 'cleave-resist',
   rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-  connections: { [ctx.startRoomId]: [] },
   enemies: {
     [ctx.startRoomId]: [
       {
@@ -138,7 +137,6 @@ const twfSeed: Seed = {
   intro: '',
   seed_id: 'twf-resist',
   rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-  connections: { [ctx.startRoomId]: [] },
   enemies: {
     [ctx.startRoomId]: [
       {

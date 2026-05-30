@@ -22,10 +22,16 @@ function seedWithLighting(
     intro: '',
     seed_id: 'lighting-sneak',
     rooms: [
-      { id: ctx.startRoomId, name: 'Start', desc: '', lighting },
+      {
+        id: ctx.startRoomId,
+        name: 'Start',
+        desc: '',
+        lighting,
+        // 3-level map: sneaking past the enemy flees out this room exit.
+        exits: [{ pos: { x: 5, y: 5 }, toRoomId: 'next-room', entrancePos: { x: 0, y: 0 } }],
+      },
       { id: 'next-room', name: 'Next', desc: '' },
     ],
-    connections: { [ctx.startRoomId]: ['next-room'], 'next-room': [ctx.startRoomId] },
     enemies: {
       [ctx.startRoomId]: [
         {

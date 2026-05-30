@@ -64,7 +64,6 @@ const seed: Seed = {
   intro: '',
   seed_id: 'hi-dmg',
   rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-  connections: { [ctx.startRoomId]: [] },
   enemies: {
     [ctx.startRoomId]: [
       {

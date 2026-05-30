@@ -28,7 +28,6 @@ const campaign: CampaignData = {
   world_name: 'Enc',
   intro: '',
   rooms: [],
-  connections: {},
   regions: [
     {
       id: 'reg1',

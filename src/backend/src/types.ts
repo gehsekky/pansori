@@ -389,7 +389,6 @@ export interface Seed {
   ship_name: string;
   intro: string;
   rooms: Room[];
-  connections: Record<string, string[]>;
   enemies: Record<string, Enemy[]>;
   loot: Record<string, LootItem>;
   npcs: Record<string, PlacedNpc>;
@@ -1472,19 +1471,10 @@ export interface RuleFacts {
 
 // ─── Context (game theme/setting) ─────────────────────────────────────────────
 
-export interface RoomPoolEntry {
-  id: string;
-  name: string;
-  descs: string[];
-  trap?: Trap; // optional; if present, included in the generated Room for this entry
-  objects?: RoomObject[];
-}
-
 export interface CampaignData {
   world_name: string;
   intro: string;
   rooms: Room[];
-  connections: Record<string, string[]>;
   enemies?: Record<string, Enemy[]>;
   loot?: Record<string, LootItem>;
   // Author-placed NPCs keyed by roomId. The engine's NPC lookup is
@@ -1565,11 +1555,9 @@ export interface Context {
   spellcastingAbility?: Record<string, AbilityKey>; // class → casting ability
   enemyTemplates: EnemyTemplate[];
   introTexts: string[];
-  roomPool: RoomPoolEntry[];
   lootTable: LootItem[];
   rules?: GameRule[];
   npcTemplates?: NpcTemplate[];
-  npcSpawnChance?: number; // 0–1 chance per room in roguelike mode (default 0)
   narratives: {
     roomArrival: Record<string, string[]>;
     genericArrival: string[];

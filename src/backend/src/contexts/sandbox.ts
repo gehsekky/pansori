@@ -20,9 +20,7 @@ import type { Context } from '../types.js';
 export const context: Context = {
   id: 'sandbox',
   worldNoun: 'dungeon',
-  // Migrated off the roguelike model to a small defined grid campaign (the
-  // engine focuses on authored campaigns now). The roomPool below is retained
-  // only as a reference bank — campaign mode reads `campaign.rooms`.
+  // A small defined grid campaign (the engine focuses on authored campaigns).
   mapType: 'campaign',
   gridEnabled: true,
   gridWidth: 8,
@@ -112,116 +110,6 @@ export const context: Context = {
     SRD_MONSTERS.cult_fanatic,
     SRD_MONSTERS.ogre,
   ],
-
-  // ─── Room pool ─────────────────────────────────────────────────────────────────
-  roomPool: [
-    {
-      id: 'entry_hall',
-      name: 'Entry Hall',
-      descs: [
-        'A torchlit stone corridor. Crumbling archways lead deeper into the dungeon. A weapon rack on the wall holds a dusty blade.',
-        'Rough-hewn walls drip with moisture. The air smells of old stone and something worse. A rack of weapons stands near the entrance.',
-      ],
-      objects: [
-        {
-          id: 'weapon_rack',
-          name: 'Weapon Rack',
-          desc: 'A rusted iron rack holding an assortment of old weapons.',
-          interactText: 'You examine the weapon rack.',
-          searchable: true,
-          searchDC: 10,
-          lootIds: ['dagger'],
-          foundText: 'Beneath the rust, a serviceable dagger.',
-          emptyText: 'You miss it on the first pass. Look again.',
-        },
-      ],
-    },
-    {
-      id: 'guard_post',
-      name: 'Guard Post',
-      descs: [
-        'A crude goblin sentry post. Alarm bells hang from a string across the doorway. Crossbow bolts are scattered on the floor.',
-        'Bones and refuse mark this as a goblin lair. A watchtower of stacked crates overlooks the room.',
-      ],
-    },
-    {
-      id: 'archers_perch',
-      name: "Archer's Perch",
-      descs: [
-        'A raised platform with arrow slits cut into the stone wall. The perfect spot for ranged ambushes.',
-        'Stone steps lead to a firing position. Spent arrows litter the ground below.',
-      ],
-    },
-    {
-      id: 'bone_crypt',
-      name: 'Bone Crypt',
-      descs: [
-        'Shelves carved into the walls hold hundreds of bones. The air is deathly still.',
-        'Ancient burial niches line the walls. Something shifts in the shadows.',
-      ],
-      trap: {
-        id: 'pressure_plate',
-        name: 'Pressure Plate',
-        desc: 'A subtle depression in the floor stone, connected to a spring-loaded spear mechanism.',
-        dc: 13,
-        damage: '2d6',
-        damageType: 'piercing',
-        triggerNarrative:
-          'A plate depresses underfoot — spears erupt from the walls! {name} takes {dmg} piercing damage.',
-        detectNarrative:
-          'You spot a slight discoloration in the floor stones — a pressure plate. Stepping on it would be bad.',
-        disarmSuccess: 'With careful hands, you jam the mechanism. The trap is disabled.',
-        disarmFail:
-          'Your attempt to jam the mechanism fails — it triggers! Spears slam from the walls.',
-      },
-    },
-    {
-      id: 'great_hall',
-      name: 'Great Hall',
-      descs: [
-        'A cavernous chamber with a crumbling stone throne at one end. Something large patrols the center.',
-        'Pillars of cracked stone support a vaulted ceiling. The echo of heavy footsteps fills the room.',
-      ],
-    },
-    {
-      id: 'storage_room',
-      name: 'Storage Room',
-      descs: [
-        'Barrels and crates are stacked against the walls. The room is quiet — a rare moment of safety.',
-        'Supply crates labeled in an unknown script line the room. Dusty but undisturbed.',
-      ],
-      objects: [
-        {
-          id: 'supply_crate',
-          name: 'Supply Crate',
-          desc: 'A heavy wooden crate, sealed with iron bands.',
-          interactText: 'You pry open the crate.',
-          searchable: true,
-          searchDC: 10,
-          lootIds: ['healing_potion'],
-          foundText: 'Inside: a vial of red liquid. A healing potion.',
-          emptyText: 'The lid jams. Get a better grip and try again.',
-        },
-      ],
-    },
-    {
-      id: 'cultist_chamber',
-      name: 'Cultist Chamber',
-      descs: [
-        'Ritual candles surround a dark altar. A robed figure turns to face you, eyes wild with fervor.',
-        'Dark robes, arcane symbols scratched into the floor, and one very agitated fanatic.',
-      ],
-    },
-    {
-      id: 'exit_gate',
-      name: 'Exit Gate',
-      descs: [
-        'Iron-banded doors stand at the far end of the chamber. Freedom — if you can reach it.',
-        'A massive gate of black iron bars the way out. Something large blocks the path.',
-      ],
-    },
-  ],
-
   // ─── Loot table ───────────────────────────────────────────────────────────────
   lootTable: [
     // Shared SRD weapons, armor, and gear (canonical definitions).
@@ -472,7 +360,6 @@ export const context: Context = {
         ],
       },
     ],
-    connections: {},
     regions: [
       {
         id: 'sandbox_region',

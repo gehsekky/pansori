@@ -175,8 +175,6 @@ export const context: Context = {
 
   // ─── Room pool (roguelike — not used in campaign mode, but required by type) ─
 
-  roomPool: [],
-
   // ─── Enemy templates ──────────────────────────────────────────────────────────
 
   enemyTemplates: [
@@ -390,8 +388,6 @@ export const context: Context = {
       persuasionDC: 14,
     },
   ],
-
-  npcSpawnChance: 0, // NPCs are placed explicitly in campaign rooms
 
   // ─── Narratives ───────────────────────────────────────────────────────────────
 
@@ -919,7 +915,6 @@ export const context: Context = {
 
     // Navigation is by the marker + room `exits` (3-level map), so the old
     // room-adjacency graph is intentionally empty.
-    connections: {},
 
     // Enemy placements (roomId → Enemy[])
     enemies: {

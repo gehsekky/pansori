@@ -57,7 +57,6 @@ const testSeed: Seed = {
   intro: '',
   seed_id: 'attune-test',
   rooms: [{ id: testCtx.startRoomId, name: 'Start', desc: '' }],
-  connections: { [testCtx.startRoomId]: [] },
   enemies: {},
   loot: {},
   npcs: {},

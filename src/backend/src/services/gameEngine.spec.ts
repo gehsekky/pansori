@@ -52,11 +52,6 @@ const seed: Seed = {
     { id: CORRIDOR_ID, name: 'Guard Post', desc: 'A guard post.' },
     { id: ctx.escapeRoomId, name: 'Exit Gate', desc: 'The exit gate.' },
   ],
-  connections: {
-    [ctx.startRoomId]: [CORRIDOR_ID],
-    [CORRIDOR_ID]: [ctx.startRoomId, ctx.escapeRoomId],
-    [ctx.escapeRoomId]: [CORRIDOR_ID],
-  },
   enemies: {},
   loot: {},
   npcs: {},
@@ -1662,10 +1657,6 @@ describe('faction shop price modifiers', () => {
       { id: valeCtx.startRoomId, name: 'Town', desc: '' },
       { id: 'millhaven_market', name: 'Market', desc: '' },
     ],
-    connections: {
-      [valeCtx.startRoomId]: ['millhaven_market'],
-      millhaven_market: [valeCtx.startRoomId],
-    },
     enemies: {},
     loot: {},
     npcs: {
@@ -3766,7 +3757,6 @@ describe('deathLines placeholder substitution', () => {
       intro: '',
       seed_id: 'death-line-seed',
       rooms: [{ id: valeCtx.startRoomId, name: 'Crypt', desc: '' }],
-      connections: { [valeCtx.startRoomId]: [] },
       enemies: {},
       loot: {},
       npcs: {},
@@ -4885,7 +4875,6 @@ describe('interact_object retry on fail', () => {
           ],
         },
       ],
-      connections: { test_room: [] },
       enemies: {},
       loot: {},
       npcs: {},
@@ -4989,7 +4978,6 @@ describe('interact_object — lighting-adjusted active search', () => {
           ],
         },
       ],
-      connections: { test_room: [] },
       enemies: {},
       loot: {},
       npcs: {},
@@ -5248,7 +5236,6 @@ describe('Turn Undead — action economy + behavior', () => {
       intro: '',
       seed_id: 'turn-undead-test',
       rooms: [{ id: 'crypt', name: 'Crypt', desc: '' }],
-      connections: { crypt: [] },
       enemies: {
         crypt: [
           {

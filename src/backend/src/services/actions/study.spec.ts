@@ -21,7 +21,6 @@ const skeletonSeed: Seed = {
   intro: '',
   seed_id: 'study-test',
   rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-  connections: { [ctx.startRoomId]: [] },
   enemies: {
     [ctx.startRoomId]: [
       {
@@ -161,7 +160,6 @@ describe('study — creature analysis', () => {
         intro: '',
         seed_id: 'empty',
         rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-        connections: { [ctx.startRoomId]: [] },
         enemies: {},
         loot: {},
         npcs: {},
@@ -189,7 +187,6 @@ describe('study — creature analysis', () => {
         intro: '',
         seed_id: 'empty',
         rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-        connections: { [ctx.startRoomId]: [] },
         enemies: {},
         loot: {},
         npcs: {},

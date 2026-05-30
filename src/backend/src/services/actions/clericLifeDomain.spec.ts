@@ -20,7 +20,6 @@ const seed: Seed = {
   intro: '',
   seed_id: 'life-domain',
   rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-  connections: { [ctx.startRoomId]: [] },
   enemies: {},
   loot: {},
   npcs: {},
