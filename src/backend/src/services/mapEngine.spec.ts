@@ -4,8 +4,10 @@
 // region. Pure-function tests on CampaignData + rooms + GameState.
 
 import type { CampaignData, GameState, Room } from '../types.js';
-import { activeGrid, resolveMarkerMove } from './mapEngine.js';
-import { describe, expect, it } from 'vitest';
+import { activeGrid, initMapState, resolveMarkerMove } from './mapEngine.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+afterEach(() => vi.restoreAllMocks());
 
 const rooms: Room[] = [
   {
@@ -179,14 +181,88 @@ describe('resolveMarkerMove — descent / room change / ascent', () => {
     expect(st.marker_pos).toEqual({ x: 5, y: 0 });
   });
 
-  it('a plain move (no transition cell) just relocates the marker', () => {
+  it('a plain move (no transition cell) just relocates the marker + spends travel time', () => {
     const r = move(start(), 4, 4);
     expect(r.transitioned).toBe(false);
     expect(r.st.marker_pos).toEqual({ x: 4, y: 4 });
     expect(r.st.map_level).toBe('regional');
+    // 4 squares × 1 mile/square ÷ 3 mi/hr (Normal pace) ≈ 1.33 hr.
+    expect(r.elapsedHours).toBeCloseTo(4 / 3, 5);
+    expect(r.st.world_hour).toBeCloseTo(4 / 3, 5);
   });
 
   it('rejects an off-map destination', () => {
     expect(move(start(), 99, 99).rejected).toBeTruthy();
+  });
+});
+
+describe('initMapState', () => {
+  it('starts the party on the regional grid for a region campaign', () => {
+    const st = initMapState(campaign, { visited_rooms: [] } as unknown as GameState);
+    expect(st.map_level).toBe('regional');
+    expect(st.current_region_id).toBe('reg1');
+    expect(st.marker_pos).toEqual({ x: 0, y: 0 });
+  });
+
+  it('is a no-op without regions or when map state is already set', () => {
+    expect(
+      initMapState({ world_name: '', intro: '', rooms: [], connections: {} }, start()).map_level
+    ).toBe('regional');
+    const already = initMapState(campaign, { ...start(), map_level: 'town' } as GameState);
+    expect(already.map_level).toBe('town'); // untouched
+  });
+});
+
+describe('regional encounters', () => {
+  const encounterCampaign: CampaignData = {
+    world_name: 'Enc',
+    intro: '',
+    rooms,
+    connections: {},
+    regions: [
+      {
+        id: 'reg1',
+        name: 'Wilds',
+        feetPerSquare: 5280,
+        gridWidth: 12,
+        gridHeight: 12,
+        startPos: { x: 0, y: 0 },
+        sites: [{ id: 's', name: 'Keep', pos: { x: 3, y: 0 }, kind: 'town', townId: 'town1' }],
+        encounterTable: ['Bandit Ruffian'],
+        encounterChance: 1, // always triggers in the test
+      },
+    ],
+    towns: campaign.towns,
+  };
+
+  it('rolls a per-square encounter that interrupts travel (suppressing the transition)', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0); // < chance → encounter; index 0 → Bandit Ruffian
+    const st = {
+      map_level: 'regional',
+      current_region_id: 'reg1',
+      marker_pos: { x: 0, y: 0 },
+      visited_rooms: [],
+    } as unknown as GameState;
+    const r = resolveMarkerMove(encounterCampaign, rooms, st, { x: 3, y: 0 }); // would enter the town
+    expect(r.encounter).toBe('Bandit Ruffian');
+    expect(r.transitioned).toBe(false); // interrupted en route — didn't enter the town
+    expect(r.st.map_level).toBe('regional');
+  });
+
+  it('no encounter when the chance roll misses', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.999); // ≥ chance(1)? no — but use a 0-chance check
+    const noChance: CampaignData = {
+      ...encounterCampaign,
+      regions: [{ ...encounterCampaign.regions![0], encounterChance: 0 }],
+    };
+    const st = {
+      map_level: 'regional',
+      current_region_id: 'reg1',
+      marker_pos: { x: 0, y: 0 },
+      visited_rooms: [],
+    } as unknown as GameState;
+    const r = resolveMarkerMove(noChance, rooms, st, { x: 3, y: 0 });
+    expect(r.encounter).toBeUndefined();
+    expect(r.transitioned).toBe(true); // reached + entered the town
   });
 });

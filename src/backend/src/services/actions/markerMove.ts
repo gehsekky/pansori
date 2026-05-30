@@ -26,4 +26,13 @@ export const handleMarkerMove: ActionHandler<{ type: 'marker_move'; to: GridPos 
   }
   ctx.st = res.st;
   ctx.narrative = (ctx.narrative ?? '') + (res.narrative || ' The party moves across the map.');
+  // Regional travel-time flavor (whole-hour granularity reads cleanly).
+  if (res.elapsedHours >= 1) {
+    ctx.narrative += ` (${Math.round(res.elapsedHours)} hr of travel.)`;
+  }
+  // A random encounter interrupted the march. Dropping the party into a local
+  // encounter map (combat) is wired in a follow-up; surface it for now.
+  if (res.encounter) {
+    ctx.narrative += ` ⚔️ Ambush! A ${res.encounter} blocks the way.`;
+  }
 };
