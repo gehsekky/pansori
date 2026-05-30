@@ -231,36 +231,115 @@ export const context: Context = {
     intro:
       "Pinegate is the last village before the Verdant Reach. The Circle's druid Mareth has gone silent for two weeks; the grove's beasts turn savage. You stand at the bridge over the Thornwater. Steel won't be enough — but you have a chance.",
 
+    // ── Rooms (local grids) ──────────────────────────────────────────────────
+    // 3-level map model: Pinegate is a town (Village Square + the lodge as
+    // venues); the grove is a regional site whose rooms chain via per-cell
+    // `exits`. Navigation is by the party marker; `connections` is retired.
     rooms: [
+      // Pinegate town interiors (venues open these; each ascends back to town).
       {
         id: 'pinegate_square',
         name: 'Pinegate Village',
         desc: 'A small village square with a stone well at its center. Pine trees rise dark beyond the houses. Lanterns burn even at midday.',
+        gridWidth: 7,
+        gridHeight: 7,
+        entryPos: { x: 3, y: 6 },
+        exits: [{ pos: { x: 3, y: 0 }, ascends: true, label: 'Back into Pinegate' }],
       },
       {
         id: 'pinegate_lodge',
         name: 'The Burnt Stump (lodge)',
         desc: "A timber-frame lodge serving as inn, common-hall, and informal council seat. A fire crackles. Mareth's carved charm hangs on the wall.",
+        gridWidth: 7,
+        gridHeight: 7,
+        entryPos: { x: 3, y: 6 },
+        exits: [{ pos: { x: 3, y: 0 }, ascends: true, label: 'Back into Pinegate' }],
       },
+
+      // The Grove — a regional site. Entry room is the bridge; the path chains
+      // bridge → entrance → maze → oak → sanctum, and the sanctum ascends out.
       {
         id: 'thornwater_bridge',
         name: 'Thornwater Bridge',
         desc: 'A stone bridge across rushing water. The pines on the far bank stand too still. A faded Verdant Circle banner hangs from the rail.',
+        gridWidth: 8,
+        gridHeight: 6,
+        entryPos: { x: 0, y: 3 },
+        exits: [
+          {
+            pos: { x: 7, y: 3 },
+            toRoomId: 'grove_entrance',
+            entrancePos: { x: 0, y: 0 },
+            label: 'Cross into the grove',
+          },
+          { pos: { x: 0, y: 0 }, ascends: true, label: 'Back to the Verdant Reach' },
+        ],
       },
       {
         id: 'grove_entrance',
         name: 'Grove Entrance',
         desc: "The path widens into a clearing of standing stones. Wolf-eyes glow from the underbrush. The Circle's old gateway arch is here — and broken.",
+        gridWidth: 10,
+        gridHeight: 10,
+        entryPos: { x: 0, y: 0 },
+        exits: [
+          {
+            pos: { x: 0, y: 1 },
+            toRoomId: 'thornwater_bridge',
+            entrancePos: { x: 7, y: 3 },
+            label: 'Back to the bridge',
+          },
+          {
+            pos: { x: 9, y: 9 },
+            toRoomId: 'thornwood_maze',
+            entrancePos: { x: 0, y: 0 },
+            label: 'Into the Thornwood',
+          },
+        ],
       },
       {
         id: 'thornwood_maze',
         name: 'The Thornwood Maze',
         desc: 'A winding stretch of thorn-thicket where the path forks and rejoins. Webs glint between branches. Something many-legged moves overhead.',
+        gridWidth: 10,
+        gridHeight: 10,
+        entryPos: { x: 0, y: 0 },
+        exits: [
+          {
+            pos: { x: 0, y: 1 },
+            toRoomId: 'grove_entrance',
+            entrancePos: { x: 9, y: 9 },
+            label: 'Back to the entrance',
+          },
+          {
+            pos: { x: 9, y: 9 },
+            toRoomId: 'ancient_oak',
+            entrancePos: { x: 1, y: 1 },
+            label: 'To the Ancient Oak',
+          },
+        ],
       },
       {
         id: 'ancient_oak',
         name: 'The Ancient Oak',
         desc: "A vast, ancient oak at the grove's heart. Roots curl up from the earth in a circular dais, splitting the approach into braided paths. A figure in fey green stands at the trunk — the Trickster, with two trained bears flanking it.",
+        gridWidth: 10,
+        gridHeight: 10,
+        entryPos: { x: 1, y: 1 },
+        exits: [
+          {
+            pos: { x: 0, y: 9 },
+            toRoomId: 'thornwood_maze',
+            entrancePos: { x: 9, y: 9 },
+            label: 'Back into the maze',
+          },
+          {
+            pos: { x: 9, y: 9 },
+            toRoomId: 'grove_sanctum_exit',
+            entrancePos: { x: 0, y: 0 },
+            label: 'Into the sanctum',
+          },
+        ],
         // Gnarled roots arching up through the floor — split the approach so
         // the bears can't all converge at once.
         obstacles: [
@@ -282,17 +361,84 @@ export const context: Context = {
         id: 'grove_sanctum_exit',
         name: 'Grove Sanctum',
         desc: "A sunlit clearing past the Oak. Mareth's charm warms in your hand. The path back to Pinegate is open.",
+        gridWidth: 8,
+        gridHeight: 8,
+        entryPos: { x: 0, y: 0 },
+        exits: [
+          {
+            pos: { x: 0, y: 1 },
+            toRoomId: 'ancient_oak',
+            entrancePos: { x: 9, y: 9 },
+            label: 'Back to the Oak',
+          },
+          { pos: { x: 7, y: 7 }, ascends: true, label: 'Return to Pinegate' },
+        ],
       },
     ],
-    connections: {
-      pinegate_square: ['pinegate_lodge', 'thornwater_bridge'],
-      pinegate_lodge: ['pinegate_square'],
-      thornwater_bridge: ['pinegate_square', 'grove_entrance'],
-      grove_entrance: ['thornwater_bridge', 'thornwood_maze'],
-      thornwood_maze: ['grove_entrance', 'ancient_oak'],
-      ancient_oak: ['thornwood_maze', 'grove_sanctum_exit'],
-      grove_sanctum_exit: ['ancient_oak'],
-    },
+
+    // Navigation is by the marker + room `exits` (3-level map); the old
+    // room-adjacency graph is retired.
+    connections: {},
+
+    // ── 3-level grid map ───────────────────────────────────────────────────────
+    regions: [
+      {
+        id: 'verdant_reach',
+        name: 'The Verdant Reach',
+        desc: 'Pine-dark hills above Pinegate, and the silent grove beyond the Thornwater.',
+        feetPerSquare: 5280,
+        gridWidth: 10,
+        gridHeight: 6,
+        startPos: { x: 1, y: 3 },
+        sites: [
+          {
+            id: 'site_pinegate',
+            name: 'Pinegate',
+            pos: { x: 2, y: 3 },
+            kind: 'town',
+            townId: 'pinegate_town',
+          },
+          {
+            id: 'site_grove',
+            name: 'The Silent Grove',
+            pos: { x: 7, y: 2 },
+            kind: 'local',
+            entryRoomId: 'thornwater_bridge',
+          },
+        ],
+        encounterTable: ['Awakened Wolf'],
+        encounterChance: 0.08,
+      },
+    ],
+
+    towns: [
+      {
+        id: 'pinegate_town',
+        name: 'Pinegate',
+        desc: 'A lantern-lit village square ringed by pine — the well, the lodge, and worried faces.',
+        feetPerSquare: 25,
+        gridWidth: 6,
+        gridHeight: 6,
+        startPos: { x: 3, y: 4 },
+        venues: [
+          {
+            id: 'venue_square',
+            name: 'Village Square',
+            pos: { x: 1, y: 2 },
+            kind: 'interior',
+            entryRoomId: 'pinegate_square',
+          },
+          {
+            id: 'venue_lodge',
+            name: 'The Burnt Stump',
+            pos: { x: 4, y: 2 },
+            kind: 'interior',
+            entryRoomId: 'pinegate_lodge',
+          },
+          { id: 'venue_gate', name: 'Village Edge', pos: { x: 3, y: 5 }, kind: 'gate' },
+        ],
+      },
+    ],
 
     enemies: {
       grove_entrance: [
