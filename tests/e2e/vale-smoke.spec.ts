@@ -88,8 +88,8 @@ test('Vale of Shadows: login → character creation → begin adventure', async 
   expect(partyText).toContain('[Cleric');
   expect(partyText).toContain('[Rogue');
 
-  // 9. Initiative is not active in town — the strip only renders during
-  //    combat, and Vale starts in millhaven_square with no enemies.
+  // 9. Initiative is not active out of combat — the strip only renders during
+  //    combat, and Vale starts on the regional grid with no enemies.
   await expect(page.getByTestId('initiative-strip')).toHaveCount(0);
 
   // 10. Exactly one tile is marked active (aria-current="true"). Out-of-
@@ -348,11 +348,11 @@ test.skip('sandbox combat: enter a fight and resolve an attack', async ({ page, 
 //     buttons; the Cleric does (Sacred Flame cantrip is always available
 //     when an enemy is in range).
 //
-// Navigation path: millhaven_square → The Old Road (a Bandit Ruffian
-// patrols here, the first hostile the party encounters). The engine
-// suppresses Move choices while an enemy is alive in the room, so the
-// only forward step from road_north is Attack — which trips combat
-// initialization.
+// Navigation path (3-level grid map): the party starts on the regional
+// grid; "Enter The Old Road" is a marker_move onto that local site, where
+// two Bandit Ruffians wait — the first hostiles the party meets. The engine
+// blocks travelling on while a hostile is alive in the room, so the only
+// forward step from road_north is Attack — which trips combat initialization.
 
 const CLASS_NAMES = ['Fighter', 'Cleric', 'Rogue'] as const;
 type PartyClass = (typeof CLASS_NAMES)[number];
@@ -392,10 +392,11 @@ async function choiceActionTypes(page: Page): Promise<string[]> {
   return types;
 }
 
-async function clickMoveTo(page: Page, roomName: string): Promise<void> {
-  // Move-to-room buttons are labeled "Move to <Room Name>". Use a partial
-  // text match to tolerate trailing whitespace / future label tweaks.
-  const btn = page.getByTestId('choice-btn').filter({ hasText: `Move to ${roomName}` });
+async function clickTravelTo(page: Page, siteName: string): Promise<void> {
+  // 3-level map: travel/transition buttons are labeled by the destination
+  // (e.g. "Enter The Old Road", "Travel to Millhaven"). Match on the site name
+  // to tolerate the verb prefix + trailing whitespace.
+  const btn = page.getByTestId('choice-btn').filter({ hasText: siteName });
   await expect(btn).toBeVisible({ timeout: 5_000 });
   await btn.first().click();
   await page.waitForTimeout(300);
@@ -422,10 +423,10 @@ test('Vale combat: initiative live + class-specific choices respect class', asyn
   await page.getByTestId('begin-adventure-btn').click();
   await expect(page.getByTestId('game-narrative-panel')).toBeVisible({ timeout: 15_000 });
 
-  // 2. Navigate town → road_north. One move places the party in a
-  //    Bandit-Ruffian-occupied tile; the engine suppresses Move choices
-  //    while an enemy is alive, so Attack is the only forward path.
-  await clickMoveTo(page, 'The Old Road');
+  // 2. From the regional grid, enter The Old Road site — the party lands in a
+  //    Bandit-Ruffian-occupied room; the engine blocks travelling on while an
+  //    enemy is alive, so Attack is the only forward path.
+  await clickTravelTo(page, 'The Old Road');
 
   // 3. Trigger combat by attacking the first available enemy. The
   //    Attack verb is iconized in the CombatActionBar — one button per

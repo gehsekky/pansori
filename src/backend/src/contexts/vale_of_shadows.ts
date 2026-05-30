@@ -81,10 +81,13 @@ const CRYPT_LORD_BASE: EnemyTemplate = {
 
 // ─── Vale of Shadows — First Adventure Module ─────────────────────────────────
 //
-// Locations:
-//   town_millhaven   — hub town with 3 districts
-//   dungeon_crypt    — Shattered Crypt dungeon (8 rooms, 10×10 grid)
-//   wilderness_road  — The Old Road (travel connector with encounters)
+// 3-level grid map (regional → town → local):
+//   region `vale_region` — the overland map; the party is a single marker.
+//     sites: Millhaven (town), The Old Road, Bandit Camp, Shattered Crypt.
+//   town `millhaven_town` — venues: Temple, Merchant/Lantern districts,
+//     Garrison, and the gate back to the region.
+//   local rooms — the crypt (8 rooms), the camp (2 rooms), the road skirmish;
+//     connected by per-cell room `exits` (no more `connections` graph).
 //
 // Quests:
 //   quest_shipment   — The Missing Shipment  (Merchant Guild)
@@ -394,9 +397,10 @@ export const context: Context = {
 
   narratives: {
     roomArrival: {
+      // Opening frame only — the party begins on the regional grid (see
+      // initMapState), so this describes the vale map, not a room.
       millhaven_square: [
-        'You stand in the town square of Millhaven. Merchants hawk their wares, children dodge between market stalls, and the smell of bread mingles with woodsmoke.',
-        "Millhaven's market square bustles with nervous energy. People speak in hushed tones about the sounds from the hills.",
+        "The Old Road brings you to the edge of the Vale of Shadows. Millhaven's lantern-lit walls stand to the west; the wooded hills to the north and east hide the bandit camp and the Shattered Crypt. Your map of the vale lies open before you.",
       ],
       dungeon_crypt_entrance: [
         'Mossy steps lead down into the Shattered Crypt. Cold air breathes from the darkness below.',
@@ -560,33 +564,61 @@ export const context: Context = {
     intro:
       'The Vale of Shadows stretches before you — a land of ancient tombs, suspicious merchants, and shadows that move against the light.',
 
-    // Town rooms
+    // ── Rooms (local grids) ──────────────────────────────────────────────────
+    // 3-level map model: navigation is by the party marker on the regional /
+    // town grids (see `regions` / `towns` below) and per-cell room `exits` on
+    // local grids — NOT the old room `connections` graph (now empty). Each
+    // local room is a self-contained grid; `entryPos` is where the marker
+    // arrives, `exits` are the transition cells (room→room, or `ascends` to
+    // leave the site). Combat is unchanged — it deploys on the context combat
+    // grid, independent of these exploration-grid dims.
     rooms: [
+      // `millhaven_square` survives only as the opening-arrival frame: the party
+      // starts on the regional grid (current_room is cleared), so this room is
+      // never entered — its `roomArrival` text frames the vale map.
       {
         id: 'millhaven_square',
-        name: 'Market Square',
-        desc: 'The bustling heart of Millhaven. Merchant stalls, a central well, and the road north to the hills.',
+        name: 'The Vale of Shadows',
+        desc: 'The Old Road brings you to the edge of the vale. Millhaven lies to the west; the hills hide darker places.',
       },
+
+      // Millhaven interiors (town venues open these; each ascends back to town).
       {
         id: 'millhaven_temple',
         name: 'Temple of Selûne',
         desc: 'A modest stone temple, its silver crescent glinting above the door. Candles burn within.',
         canRest: true,
+        gridWidth: 7,
+        gridHeight: 7,
+        entryPos: { x: 3, y: 6 },
+        exits: [{ pos: { x: 3, y: 0 }, ascends: true, label: 'Step back into Millhaven' }],
       },
       {
         id: 'millhaven_market',
         name: 'Merchant District',
         desc: 'Guild warehouses and market stalls. Aldric the Merchant holds court here.',
+        gridWidth: 7,
+        gridHeight: 7,
+        entryPos: { x: 3, y: 6 },
+        exits: [{ pos: { x: 3, y: 0 }, ascends: true, label: 'Step back into Millhaven' }],
       },
       {
         id: 'millhaven_slums',
         name: 'Lantern District',
         desc: 'Narrow alleys and shuttered windows. Someone is watching from the shadows.',
+        gridWidth: 7,
+        gridHeight: 7,
+        entryPos: { x: 3, y: 6 },
+        exits: [{ pos: { x: 3, y: 0 }, ascends: true, label: 'Step back into Millhaven' }],
       },
       {
         id: 'millhaven_garrison',
         name: 'Garrison Office',
         desc: 'A stone building bearing the City Watch crest. A strongbox sits behind the desk.',
+        gridWidth: 7,
+        gridHeight: 7,
+        entryPos: { x: 3, y: 6 },
+        exits: [{ pos: { x: 3, y: 0 }, ascends: true, label: 'Step back into Millhaven' }],
         objects: [
           {
             id: 'captain_strongbox',
@@ -602,25 +634,67 @@ export const context: Context = {
           },
         ],
       },
+
+      // The Old Road — a regional site: a bandit skirmish on the way through.
       {
         id: 'road_north',
         name: 'The Old Road',
-        desc: 'A rutted track leading north through the hills. Fresh wagon tracks veer off near a stand of dead trees.',
+        desc: 'A rutted track through the hills. Fresh wagon tracks veer off near a stand of dead trees — and the men who made them are still here.',
+        gridWidth: 10,
+        gridHeight: 8,
+        entryPos: { x: 0, y: 4 },
+        exits: [{ pos: { x: 9, y: 4 }, ascends: true, label: 'Press on down the road' }],
       },
 
-      // Dungeon rooms (Shattered Crypt — 8 rooms)
+      // Shattered Crypt (8 rooms). The regional site drops the party at the
+      // entrance; exits chain the dungeon, and the Hidden Passage ascends out.
       {
         id: 'dungeon_crypt_entrance',
         name: 'Crypt Entrance',
         desc: 'Crumbling stone steps lead down. Crude graffiti warns: "Abandon hope." Torch brackets line the walls.',
         canRest: false,
         lighting: 'dim',
+        gridWidth: 10,
+        gridHeight: 10,
+        entryPos: { x: 0, y: 0 },
+        exits: [
+          {
+            pos: { x: 9, y: 0 },
+            toRoomId: 'dungeon_antechamber',
+            entrancePos: { x: 0, y: 0 },
+            label: 'Into the antechamber',
+          },
+          { pos: { x: 0, y: 9 }, ascends: true, label: 'Climb out to the Old Road' },
+        ],
       },
       {
         id: 'dungeon_antechamber',
         name: 'Antechamber',
         desc: 'A vaulted chamber of black stone. Funeral urns line the alcoves, some shattered. Bones litter the floor.',
         lighting: 'dark',
+        gridWidth: 10,
+        gridHeight: 10,
+        entryPos: { x: 0, y: 0 },
+        exits: [
+          {
+            pos: { x: 0, y: 9 },
+            toRoomId: 'dungeon_crypt_entrance',
+            entrancePos: { x: 9, y: 0 },
+            label: 'Back to the entrance',
+          },
+          {
+            pos: { x: 9, y: 0 },
+            toRoomId: 'dungeon_charnel_hall',
+            entrancePos: { x: 0, y: 0 },
+            label: 'Charnel Hall',
+          },
+          {
+            pos: { x: 9, y: 9 },
+            toRoomId: 'dungeon_offering_chamber',
+            entrancePos: { x: 0, y: 0 },
+            label: 'Chamber of Offerings',
+          },
+        ],
         objects: [
           {
             id: 'funeral_urns',
@@ -640,6 +714,23 @@ export const context: Context = {
         name: 'Charnel Hall',
         desc: 'A long corridor flanked by sealed burial niches. The seals on several niches have been broken from within. Loose flagstones in the middle of the hall give you pause.',
         lighting: 'dark',
+        gridWidth: 10,
+        gridHeight: 10,
+        entryPos: { x: 0, y: 0 },
+        exits: [
+          {
+            pos: { x: 0, y: 9 },
+            toRoomId: 'dungeon_antechamber',
+            entrancePos: { x: 9, y: 0 },
+            label: 'Back to the antechamber',
+          },
+          {
+            pos: { x: 9, y: 9 },
+            toRoomId: 'dungeon_shadow_gallery',
+            entrancePos: { x: 0, y: 0 },
+            label: 'Shadow Gallery',
+          },
+        ],
         trap: {
           id: 'charnel_hall_blade',
           name: 'Hidden Blade Plate',
@@ -660,24 +751,99 @@ export const context: Context = {
         name: 'Chamber of Offerings',
         desc: 'An altar to a forgotten death deity stands at the center. Coins and grave goods have been disturbed.',
         lighting: 'dark',
+        gridWidth: 10,
+        gridHeight: 10,
+        entryPos: { x: 0, y: 0 },
+        exits: [
+          {
+            pos: { x: 0, y: 9 },
+            toRoomId: 'dungeon_antechamber',
+            entrancePos: { x: 9, y: 9 },
+            label: 'Back to the antechamber',
+          },
+          {
+            pos: { x: 9, y: 9 },
+            toRoomId: 'dungeon_ossuary',
+            entrancePos: { x: 0, y: 0 },
+            label: 'Ossuary',
+          },
+        ],
       },
       {
         id: 'dungeon_shadow_gallery',
         name: 'Shadow Gallery',
         desc: 'Torchlight barely penetrates here. Paintings on the wall shift when you look away.',
         lighting: 'dark',
+        gridWidth: 10,
+        gridHeight: 10,
+        entryPos: { x: 0, y: 0 },
+        exits: [
+          {
+            pos: { x: 0, y: 9 },
+            toRoomId: 'dungeon_charnel_hall',
+            entrancePos: { x: 9, y: 9 },
+            label: 'Back to the Charnel Hall',
+          },
+          {
+            pos: { x: 9, y: 9 },
+            toRoomId: 'dungeon_crypt_throne',
+            entrancePos: { x: 1, y: 1 },
+            label: 'Throne of the Dead',
+          },
+        ],
       },
       {
         id: 'dungeon_ossuary',
         name: 'Ossuary',
         desc: 'Bones are stacked floor to ceiling in ornate patterns. The artistry is almost beautiful.',
         lighting: 'dark',
+        gridWidth: 10,
+        gridHeight: 10,
+        entryPos: { x: 0, y: 0 },
+        exits: [
+          {
+            pos: { x: 0, y: 9 },
+            toRoomId: 'dungeon_offering_chamber',
+            entrancePos: { x: 9, y: 9 },
+            label: 'Back to the Chamber of Offerings',
+          },
+          {
+            pos: { x: 9, y: 9 },
+            toRoomId: 'dungeon_crypt_throne',
+            entrancePos: { x: 1, y: 1 },
+            label: 'Throne of the Dead',
+          },
+        ],
       },
       {
         id: 'dungeon_crypt_throne',
         name: 'Throne of the Dead',
         desc: 'A massive chamber with a raised dais. An ancient throne of black stone dominates the room. Broken funeral pillars and piles of bone offer fragile cover. Something powerful waits here.',
         lighting: 'dim',
+        gridWidth: 10,
+        gridHeight: 10,
+        // Marker arrives top-left, clear of the mid-room pillars.
+        entryPos: { x: 1, y: 1 },
+        exits: [
+          {
+            pos: { x: 0, y: 9 },
+            toRoomId: 'dungeon_shadow_gallery',
+            entrancePos: { x: 9, y: 9 },
+            label: 'Back to the Shadow Gallery',
+          },
+          {
+            pos: { x: 9, y: 0 },
+            toRoomId: 'dungeon_ossuary',
+            entrancePos: { x: 9, y: 9 },
+            label: 'Back to the Ossuary',
+          },
+          {
+            pos: { x: 9, y: 9 },
+            toRoomId: 'dungeon_crypt_exit',
+            entrancePos: { x: 0, y: 0 },
+            label: 'A hidden passage in the dais',
+          },
+        ],
         // Broken pillars flanking the central approach + bone-rubble corners.
         // PCs spawn at row 1, enemies at row 8 — obstacles cluster mid-room
         // so the boss has to path around and the rogue gets LoS breaks.
@@ -698,14 +864,38 @@ export const context: Context = {
         id: 'dungeon_crypt_exit',
         name: 'Hidden Passage',
         desc: 'A narrow shaft cuts upward through the rock, emerging near the crypt entrance above.',
+        gridWidth: 8,
+        gridHeight: 8,
+        entryPos: { x: 0, y: 0 },
+        exits: [
+          {
+            pos: { x: 0, y: 1 },
+            toRoomId: 'dungeon_crypt_throne',
+            entrancePos: { x: 9, y: 9 },
+            label: 'Back down to the throne',
+          },
+          { pos: { x: 7, y: 7 }, ascends: true, label: 'Climb out to the surface' },
+        ],
       },
 
-      // Bandit Camp (off the Old Road — the raiders behind the missing wagons)
+      // Bandit Camp (a regional site — the raiders behind the missing wagons).
       {
         id: 'bandit_camp',
         name: 'Bandit Camp',
         desc: 'A clearing ringed with crude tents and a smoldering cookfire. A half-stripped merchant wagon lists against a stump, Guild crates scattered around it. Lookouts turn at your approach.',
         lighting: 'dim',
+        gridWidth: 10,
+        gridHeight: 10,
+        entryPos: { x: 0, y: 0 },
+        exits: [
+          {
+            pos: { x: 9, y: 9 },
+            toRoomId: 'bandit_tent',
+            entrancePos: { x: 0, y: 0 },
+            label: "The Captain's Tent",
+          },
+          { pos: { x: 0, y: 9 }, ascends: true, label: 'Leave the camp' },
+        ],
       },
       {
         id: 'bandit_tent',
@@ -713,37 +903,23 @@ export const context: Context = {
         desc: "A larger oilcloth tent at the camp's heart. A war-map and a strongbox sit on a crate table. The Bandit Captain rises, hand on hilt.",
         lighting: 'dim',
         canRest: false,
+        gridWidth: 8,
+        gridHeight: 8,
+        entryPos: { x: 0, y: 0 },
+        exits: [
+          {
+            pos: { x: 7, y: 7 },
+            toRoomId: 'bandit_camp',
+            entrancePos: { x: 9, y: 9 },
+            label: 'Back out to the camp',
+          },
+        ],
       },
     ],
 
-    // Room connections
-    connections: {
-      // Town navigation
-      millhaven_square: ['millhaven_temple', 'millhaven_market', 'millhaven_slums', 'road_north'],
-      millhaven_temple: ['millhaven_square'],
-      millhaven_market: ['millhaven_square', 'millhaven_garrison'],
-      millhaven_slums: ['millhaven_square', 'millhaven_garrison'],
-      millhaven_garrison: ['millhaven_market', 'millhaven_slums'],
-      road_north: ['millhaven_square', 'dungeon_crypt_entrance', 'bandit_camp'],
-
-      // Dungeon (linear + some loops)
-      dungeon_crypt_entrance: ['road_north', 'dungeon_antechamber'],
-      dungeon_antechamber: [
-        'dungeon_crypt_entrance',
-        'dungeon_charnel_hall',
-        'dungeon_offering_chamber',
-      ],
-      dungeon_charnel_hall: ['dungeon_antechamber', 'dungeon_shadow_gallery'],
-      dungeon_offering_chamber: ['dungeon_antechamber', 'dungeon_ossuary'],
-      dungeon_shadow_gallery: ['dungeon_charnel_hall', 'dungeon_crypt_throne'],
-      dungeon_ossuary: ['dungeon_offering_chamber', 'dungeon_crypt_throne'],
-      dungeon_crypt_throne: ['dungeon_shadow_gallery', 'dungeon_ossuary', 'dungeon_crypt_exit'],
-      dungeon_crypt_exit: ['dungeon_crypt_throne'],
-
-      // Bandit camp
-      bandit_camp: ['road_north', 'bandit_tent'],
-      bandit_tent: ['bandit_camp'],
-    },
+    // Navigation is by the marker + room `exits` (3-level map), so the old
+    // room-adjacency graph is intentionally empty.
+    connections: {},
 
     // Enemy placements (roomId → Enemy[])
     enemies: {
@@ -1167,68 +1343,101 @@ export const context: Context = {
 
     startingLoot: ['healing_potion'],
 
-    // ─── Locations ──────────────────────────────────────────────────────────────
+    // ─── 3-level grid map (regional → town → local) ───────────────────────────
+    // The party starts on the regional grid as a single marker (see
+    // initMapState). Sites open a town (Millhaven) or drop the party into a
+    // local site (the Old Road skirmish, the Bandit Camp, the Shattered Crypt).
+    // Wandering the road risks a per-square Bandit Ruffian ambush.
 
-    locations: [
+    regions: [
       {
-        id: 'town_millhaven',
-        name: 'Millhaven',
-        type: 'town',
-        desc: "A market town at the vale's edge. Three distinct districts serve different needs.",
-        centralRoomId: 'millhaven_square',
-        districts: [
+        id: 'vale_region',
+        name: 'The Vale of Shadows',
+        desc: 'A wooded vale of old tombs and bandit-haunted roads, ringed by hills.',
+        feetPerSquare: 5280, // 1 square = 1 mile (SRD Travel Pace scale)
+        gridWidth: 12,
+        gridHeight: 8,
+        startPos: { x: 1, y: 3 }, // the road just outside Millhaven
+        // A couple of impassable ridges; all sites stay reachable from start.
+        obstacles: [
+          { x: 6, y: 6 },
+          { x: 7, y: 6 },
+        ],
+        sites: [
           {
-            id: 'district_market',
-            name: 'Merchant District',
-            desc: 'Guild warehouses and merchant stalls. Guild members pay reduced prices.',
-            roomId: 'millhaven_market',
+            id: 'site_millhaven',
+            name: 'Millhaven',
+            pos: { x: 2, y: 3 },
+            kind: 'town',
+            townId: 'millhaven_town',
           },
           {
-            id: 'district_temple',
-            name: 'Temple District',
-            desc: 'The Temple of Selûne offers rest and healing.',
-            roomId: 'millhaven_temple',
+            id: 'site_old_road',
+            name: 'The Old Road',
+            pos: { x: 5, y: 1 },
+            kind: 'local',
+            entryRoomId: 'road_north',
           },
           {
-            id: 'district_lantern',
-            name: 'Lantern District',
-            desc: 'The rougher part of town. Information available for a price.',
-            roomId: 'millhaven_slums',
+            id: 'site_bandit_camp',
+            name: 'Bandit Camp',
+            pos: { x: 9, y: 2 },
+            kind: 'local',
+            entryRoomId: 'bandit_camp',
+          },
+          {
+            id: 'site_crypt',
+            name: 'Shattered Crypt',
+            pos: { x: 10, y: 5 },
+            kind: 'local',
+            entryRoomId: 'dungeon_crypt_entrance',
           },
         ],
-        connections: ['wilderness_old_road'],
-      },
-      {
-        id: 'wilderness_old_road',
-        name: 'The Old Road',
-        type: 'wilderness',
-        desc: 'A rutted track through sparse woodland. Bandits have been raiding caravans here.',
-        centralRoomId: 'road_north',
-        connections: ['town_millhaven', 'dungeon_shattered_crypt', 'wilderness_bandit_camp'],
         encounterTable: ['Bandit Ruffian'],
-        encounterChance: 0.4,
+        encounterChance: 0.1, // per mile-square crossed
       },
+    ],
+
+    towns: [
       {
-        id: 'wilderness_bandit_camp',
-        name: 'Bandit Camp',
-        type: 'dungeon',
-        desc: 'The raiders behind the Old Road wagon thefts hole up here, in a clearing strewn with stolen Guild crates.',
-        centralRoomId: 'bandit_camp',
-        gridWidth: 10,
-        gridHeight: 10,
-        rooms: [], // Rooms live in campaign.rooms / campaign.connections above.
-        connections: ['wilderness_old_road'],
-      },
-      {
-        id: 'dungeon_shattered_crypt',
-        name: 'Shattered Crypt',
-        type: 'dungeon',
-        desc: 'An ancient tomb complex, sealed for generations. Something powerful has broken those seals from within.',
-        centralRoomId: 'dungeon_crypt_entrance',
-        gridWidth: 10,
-        gridHeight: 10,
-        rooms: [], // Rooms are defined in campaign.rooms and campaign.connections above
-        connections: ['wilderness_old_road'],
+        id: 'millhaven_town',
+        name: 'Millhaven',
+        desc: "A market town at the vale's edge — temple, guild market, lantern-lit slums, and the Watch garrison.",
+        feetPerSquare: 25, // settlement scale
+        gridWidth: 8,
+        gridHeight: 8,
+        startPos: { x: 4, y: 6 }, // just inside the gate
+        venues: [
+          {
+            id: 'venue_temple',
+            name: 'Temple of Selûne',
+            pos: { x: 1, y: 2 },
+            kind: 'interior',
+            entryRoomId: 'millhaven_temple',
+          },
+          {
+            id: 'venue_market',
+            name: 'Merchant District',
+            pos: { x: 6, y: 2 },
+            kind: 'interior',
+            entryRoomId: 'millhaven_market',
+          },
+          {
+            id: 'venue_lantern',
+            name: 'Lantern District',
+            pos: { x: 1, y: 5 },
+            kind: 'interior',
+            entryRoomId: 'millhaven_slums',
+          },
+          {
+            id: 'venue_garrison',
+            name: 'Garrison Office',
+            pos: { x: 6, y: 5 },
+            kind: 'interior',
+            entryRoomId: 'millhaven_garrison',
+          },
+          { id: 'venue_gate', name: 'Town Gate', pos: { x: 4, y: 7 }, kind: 'gate' },
+        ],
       },
     ],
 
@@ -1271,11 +1480,13 @@ export const context: Context = {
           },
           {
             id: 'step_return_ledger',
-            desc: 'Return the ledger to Aldric in Millhaven.',
+            desc: 'Return the ledger to Aldric in the Merchant District.',
+            // 3-level map: "back in Millhaven" is now "in Aldric's venue room"
+            // (the old location_id fact is retired with the Location model).
             condition: {
               all: [
                 { fact: 'loot_taken', operator: 'contains', value: 'guild_ledger' },
-                { fact: 'location_id', operator: 'equal', value: 'town_millhaven' },
+                { fact: 'room_id', operator: 'equal', value: 'millhaven_market' },
               ],
             },
           },
