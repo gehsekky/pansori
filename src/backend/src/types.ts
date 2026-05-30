@@ -54,10 +54,32 @@ export interface Trap {
 
 // `RoomObject` is re-exported from ./shared-types (see src/shared/types.ts).
 
+// 3-level grid map model (regional → town → local). A `RoomExit` is a transition
+// cell on a local room grid: stepping onto `pos` moves the party to `toRoomId`,
+// arriving at that room's `entrancePos`; multiple exits make a room branch. An
+// `ascends` exit leaves the site back up to the town / region. (Replaces the
+// abstract `connections` room-adjacency graph.)
+export interface RoomExit {
+  pos: GridPos;
+  toRoomId?: string; // omitted when `ascends`
+  entrancePos?: GridPos; // arrival cell in `toRoomId` (defaults to that room's entryPos)
+  label?: string;
+  ascends?: boolean; // exit the site → return to the town grid / regional grid
+}
+
 export interface Room {
   id: string;
   name: string;
   desc: string;
+  // Local rooms are self-contained grids. `feetPerSquare` defaults to 5 (SRD
+  // tactical). `entryPos` is where the party marker arrives when entering this
+  // room from a site/venue (or an exit with no explicit entrancePos); defaults
+  // to the grid centre. `exits` are the per-cell room connections (see RoomExit).
+  gridWidth?: number;
+  gridHeight?: number;
+  feetPerSquare?: number;
+  entryPos?: GridPos;
+  exits?: RoomExit[];
   canRest?: boolean;
   trap?: Trap; // static trap defined in context; can be overridden per-room
   objects?: RoomObject[];
@@ -1374,6 +1396,15 @@ export interface GameState {
   // Campaign overlay (merged from CampaignState at session load)
   current_location_id?: string;
   current_district_id?: string;
+  // 3-level grid map position (regional → town → local). `map_level` is which
+  // grid the party is on; `marker_pos` is the single party-marker cell on the
+  // regional / town grid (and while exploring a local room out of combat).
+  // `current_room` (above) is the active local room. `current_region_id` /
+  // `current_town_id` scope the regional / town grids.
+  map_level?: MapLevel;
+  current_region_id?: string;
+  current_town_id?: string;
+  marker_pos?: GridPos;
   campaign_flags?: Record<string, boolean | string | number>;
   quest_progress?: QuestProgress[];
   faction_rep?: Record<string, number>; // factionId → numeric rep
@@ -1439,6 +1470,12 @@ export interface CampaignData {
   npcs?: Record<string, PlacedNpc>;
   startingLoot?: string[];
   locations?: Location[];
+  // 3-level grid map model (regional → town → local). Replaces `locations` for
+  // migrated campaigns: the overworld is one or more `regions` (grids of sites),
+  // `towns` are settlement grids of venues, and local rooms live in `rooms`
+  // (reached via a site/venue `entryRoomId` and navigated by room `exits`).
+  regions?: Region[];
+  towns?: Town[];
   quests?: Quest[];
   factions?: Faction[];
   // Authoring hint: the campaign is balanced for this many PCs. Enemy HP
@@ -1588,6 +1625,67 @@ export interface CampaignFacts {
 // `LocationType` is re-exported from ./shared-types (see src/shared/types.ts).
 
 // `District` is re-exported from ./shared-types (see src/shared/types.ts).
+
+// ─── 3-level grid map model (regional → town → local) ────────────────────────
+// Every level is a tile grid carrying a `feetPerSquare` scale, grounded in the
+// SRD: regional = 5280 (1 square = 1 mile, the Travel-Pace scale), town = 25,
+// local rooms = 5 (the tactical combat grid). The party is a SINGLE marker on
+// the regional + town grids and while exploring a local room; local combat
+// deploys the full party into PC tokens, then collapses back to the marker.
+// Each grid has "transition cells": regional `sites`, town `venues`, and a
+// room's `exits` — stepping onto one descends / ascends / moves rooms.
+
+export type MapLevel = 'regional' | 'town' | 'local';
+
+// A transition cell on the REGIONAL grid the party can enter.
+export interface MapSite {
+  id: string;
+  name: string;
+  pos: GridPos;
+  kind: 'town' | 'local';
+  townId?: string; // kind 'town' → the Town grid to open
+  entryRoomId?: string; // kind 'local' → the local room to drop into
+  desc?: string;
+}
+
+export interface Region {
+  id: string;
+  name: string;
+  desc?: string;
+  feetPerSquare: number; // 5280 (1 mile per square — SRD Travel Pace scale)
+  gridWidth: number;
+  gridHeight: number;
+  obstacles?: GridPos[]; // impassable terrain (mountains, deep water)
+  difficultTerrain?: GridPos[]; // 2× travel cost per square
+  startPos: GridPos; // where the party marker begins
+  sites: MapSite[];
+  // Random travel encounters: per square crossed, an `encounterChance` roll can
+  // drop the party into a local encounter map drawn from `encounterTable`.
+  encounterTable?: string[];
+  encounterChance?: number; // 0–1 per square moved
+}
+
+// A transition cell on a TOWN grid.
+export interface MapVenue {
+  id: string;
+  name: string;
+  pos: GridPos;
+  kind: 'interior' | 'gate'; // interior → local entry room; gate → back to the region
+  entryRoomId?: string; // kind 'interior'
+  desc?: string;
+}
+
+export interface Town {
+  id: string;
+  name: string;
+  desc?: string;
+  feetPerSquare: number; // 25 (settlement scale)
+  gridWidth: number;
+  gridHeight: number;
+  obstacles?: GridPos[];
+  startPos: GridPos;
+  venues: MapVenue[];
+}
 
 export interface Location {
   id: string;
