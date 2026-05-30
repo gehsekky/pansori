@@ -459,6 +459,12 @@ export type StructuredAction =
   | { type: 'jump'; to: GridPos } // SRD Long Jump — leap up to STR ft over terrain/obstacles
   | { type: 'travel'; locationId: string }
   | { type: 'enter_district'; districtId: string }
+  // 3-level grid map model — move the single party marker on the current grid
+  // (regional / town / local-exploration). Free pathfind out of combat; the
+  // regional grid additionally spends travel time + rolls encounters per square.
+  // Arriving on a transition cell (site / venue / room exit) resolves it
+  // (descend / ascend / change room).
+  | { type: 'marker_move'; to: GridPos }
   | { type: 'accept_quest'; questId: string }
   | { type: 'complete_quest'; questId: string }
   | { type: 'dash' }

@@ -1405,6 +1405,12 @@ export interface GameState {
   current_region_id?: string;
   current_town_id?: string;
   marker_pos?: GridPos;
+  // Return-cell bookmarks for ascending: the party's last cell on the regional
+  // grid (restored when leaving a town/site back to the region) and on the town
+  // grid (restored when leaving a venue interior back to the town). Set on
+  // descend, read on ascend.
+  region_marker_pos?: GridPos;
+  town_marker_pos?: GridPos;
   campaign_flags?: Record<string, boolean | string | number>;
   quest_progress?: QuestProgress[];
   faction_rep?: Record<string, number>; // factionId → numeric rep
