@@ -396,6 +396,11 @@ export interface Seed {
   loot: Record<string, LootItem>;
   npcs: Record<string, PlacedNpc>;
   seed_id: string;
+  // 3-level grid map definitions (copied from the campaign at seed time so the
+  // frontend — which only receives the seed, not the campaign — can resolve the
+  // active grid client-side). Absent for roguelike / non-map campaigns.
+  regions?: Region[];
+  towns?: Town[];
 }
 
 // ─── Game state ───────────────────────────────────────────────────────────────

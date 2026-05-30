@@ -1441,11 +1441,28 @@
 .gridLegendDark,
 .gridLegendFog,
 .gridLegendObstacle,
+.gridLegendTransition,
 .gridLegendDifficult {
   display: inline-block;
   width: 10px;
   height: 10px;
   border-radius: 50%;
+}
+
+/* Travel-point swatch — the amber tint used for transition cells (sites,
+   venues, room exits, ascents) on the exploration map. */
+.gridLegendTransition {
+  border-radius: 2px;
+  background: rgba(150, 120, 60, 0.55);
+  border: 1px solid var(--t-border);
+}
+
+/* The glyph drawn in a transition cell on the exploration map. */
+.gridMapGlyph {
+  color: var(--t-primary);
+  font-size: 0.95rem;
+  line-height: 1;
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.7);
 }
 
 .gridLegendFog {

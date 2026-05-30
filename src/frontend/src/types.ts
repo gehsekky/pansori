@@ -305,6 +305,15 @@ export interface GameState {
   quest_progress?: QuestProgress[];
   faction_rep?: Record<string, number>;
   world_day?: number;
+  world_hour?: number;
+
+  // 3-level grid map (regional → town → local). `map_level` is which grid the
+  // party is on; `marker_pos` is the single party-marker cell. Mirror of the BE
+  // GameState fields; the FE resolves the active grid from the seed + these.
+  map_level?: MapLevel;
+  current_region_id?: string;
+  current_town_id?: string;
+  marker_pos?: GridPos;
 
   // Choice-dimming memory — keys of choices already clicked this
   // adventure. Mirror of the backend field.
@@ -312,6 +321,94 @@ export interface GameState {
 }
 
 // `RoomObject` is re-exported from ./shared-types (see src/shared/types.ts).
+
+// ─── 3-level grid map (regional → town → local) ────────────────────────────────
+// Mirror of the backend map types (src/backend/src/types.ts). The FE only
+// receives the seed (not the campaign), so the seed carries the grid
+// definitions and the FE resolves the active grid client-side (lib/activeGrid).
+
+export type MapLevel = 'regional' | 'town' | 'local';
+
+// A per-cell room connection on a local grid.
+export interface RoomExit {
+  pos: GridPos;
+  toRoomId?: string; // omitted when `ascends`
+  entrancePos?: GridPos; // arrival cell in `toRoomId`
+  label?: string;
+  ascends?: boolean; // leave the site → back to town / region
+}
+
+// A transition cell on the regional grid.
+export interface MapSite {
+  id: string;
+  name: string;
+  pos: GridPos;
+  kind: 'town' | 'local';
+  townId?: string;
+  entryRoomId?: string;
+  desc?: string;
+}
+
+export interface Region {
+  id: string;
+  name: string;
+  desc?: string;
+  feetPerSquare: number;
+  gridWidth: number;
+  gridHeight: number;
+  obstacles?: GridPos[];
+  difficultTerrain?: GridPos[];
+  startPos: GridPos;
+  sites: MapSite[];
+  encounterTable?: string[];
+  encounterChance?: number;
+}
+
+// A transition cell on a town grid.
+export interface MapVenue {
+  id: string;
+  name: string;
+  pos: GridPos;
+  kind: 'interior' | 'gate';
+  entryRoomId?: string;
+  desc?: string;
+}
+
+export interface Town {
+  id: string;
+  name: string;
+  desc?: string;
+  feetPerSquare: number;
+  gridWidth: number;
+  gridHeight: number;
+  obstacles?: GridPos[];
+  startPos: GridPos;
+  venues: MapVenue[];
+}
+
+// The normalized grid the party marker is on (mirror of mapEngine.ActiveGrid),
+// computed by lib/activeGrid from the seed + state.
+export interface MapTransition {
+  pos: GridPos;
+  kind: 'site' | 'venue' | 'room_exit' | 'ascend';
+  label: string;
+  toTownId?: string;
+  toRoomId?: string;
+  entrancePos?: GridPos;
+  ascendTo?: 'town' | 'region';
+}
+
+export interface ActiveGrid {
+  level: MapLevel;
+  id: string;
+  name: string;
+  width: number;
+  height: number;
+  feetPerSquare: number;
+  obstacles: GridPos[];
+  transitions: MapTransition[];
+  startPos: GridPos;
+}
 
 export interface Seed {
   context_id: string;
@@ -329,11 +426,20 @@ export interface Seed {
     // block movement through these cells.
     obstacles?: GridPos[];
     difficultTerrain?: GridPos[];
+    // Local-room grid fields (3-level map). Mirror of the BE Room grid fields.
+    gridWidth?: number;
+    gridHeight?: number;
+    feetPerSquare?: number;
+    entryPos?: GridPos;
+    exits?: RoomExit[];
   }>;
   connections: Record<string, string[]>;
   enemies?: Record<string, Array<{ id: string; name: string; hp: number; ac: number }>>;
   loot?: Record<string, unknown>;
   npcs?: Record<string, PlacedNpc>;
+  // 3-level grid map definitions (copied from the campaign at seed time).
+  regions?: Region[];
+  towns?: Town[];
 }
 
 export interface Session {
