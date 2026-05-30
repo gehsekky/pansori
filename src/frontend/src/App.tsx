@@ -12,6 +12,7 @@ import type { ContextTab } from './components/ContextPanel.tsx';
 import DefaultActionBar from './components/DefaultActionBar.tsx';
 import EnemySelector from './components/EnemySelector.tsx';
 import GridCombatView from './components/GridCombatView.tsx';
+import GridMapView from './components/GridMapView.tsx';
 import InventoryModal from './components/InventoryModal.tsx';
 import InviteDialog from './components/InviteDialog.tsx';
 import LevelUpDialog from './components/LevelUpDialog.tsx';
@@ -26,6 +27,7 @@ import SpellBar from './components/SpellBar.tsx';
 import TargetPickerDialog from './components/TargetPickerDialog.tsx';
 import WaitingForPlayer from './components/WaitingForPlayer.tsx';
 import WorldMap from './components/WorldMap.tsx';
+import { activeGrid } from './lib/activeGrid.ts';
 import { applyTheme } from './lib/theme.ts';
 import artManifest from './art-manifest.json';
 import { context as groveContext } from './contexts/grove_of_thorns.tsx';
@@ -848,6 +850,29 @@ export default function App() {
                             })()}
                         </>
                       );
+                    // Out-of-combat exploration on the 3-level grid map: a single
+                    // party marker the player clicks to travel (marker_move). Local
+                    // combat falls through to GridCombatView below (PC tokens).
+                    if (!gameState?.combat_active && gameState?.map_level && seed) {
+                      const grid = activeGrid(seed, gameState);
+                      if (grid && gameState.marker_pos) {
+                        return (
+                          <div className={styles.combatRow}>
+                            <GridMapView
+                              grid={grid}
+                              markerPos={gameState.marker_pos}
+                              onMarkerMove={(to) =>
+                                handleChoice({
+                                  label: `Travel to (${to.x},${to.y})`,
+                                  action: { type: 'marker_move', to },
+                                })
+                              }
+                            />
+                            <div className={styles.combatActionCol}>{actionPanel}</div>
+                          </div>
+                        );
+                      }
+                    }
                     if (
                       gameState?.combat_active &&
                       gameState.entities &&

@@ -41,6 +41,8 @@ export function generateSeed(context: Context, partySize = 1): Seed {
       loot: c.loot ?? {},
       npcs: c.npcs ?? {},
       seed_id: randomUUID(),
+      regions: c.regions,
+      towns: c.towns,
     };
   }
   return generateRoguelikeSeed(context, partySize);
