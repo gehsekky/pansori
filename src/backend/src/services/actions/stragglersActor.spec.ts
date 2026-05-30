@@ -5,11 +5,10 @@ import { handleEndTurn, handlePass } from './utility.js';
 import type { ActionContext } from './types.js';
 import { handleDisarmTrap } from './disarmTrap.js';
 import { handleExamine } from './examineDefault.js';
-import { handleMove } from './move.js';
 import { makeChar } from '../../test-fixtures.js';
 
 // Phase-3 actor migration (final stragglers: disarm_trap, pass,
-// end_turn, move, examine). These PC-only handlers now read/write
+// end_turn, examine). These PC-only handlers now read/write
 // through `ctx.actor` (narrowed to PC) and reject non-PC actors — the
 // Phase-4 enemy-action seam. PC behavior stays covered by the full
 // suite; here we exercise the guard.
@@ -38,7 +37,6 @@ describe('Phase-3 straggler handlers reject non-PC actors (Phase-4 seam)', () =>
     ['disarm_trap', (ctx) => handleDisarmTrap(ctx, { type: 'disarm_trap' })],
     ['pass', (ctx) => handlePass(ctx, { type: 'pass' })],
     ['end_turn', (ctx) => handleEndTurn(ctx, { type: 'end_turn' })],
-    ['move', (ctx) => handleMove(ctx, { type: 'move', roomId: 'room-2' })],
     ['examine', (ctx) => handleExamine(ctx, { type: 'examine' })],
   ];
 

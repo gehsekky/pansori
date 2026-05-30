@@ -1523,7 +1523,9 @@ export interface Context {
   escapeTriggers: string[];
   escapeChoiceText: string;
   worldNames: string[];
-  mapType: 'roguelike' | 'campaign';
+  // Retained for back-compat in the session payload; the roguelike model was
+  // retired, so every context is a defined grid `campaign` now.
+  mapType: 'campaign';
   gridEnabled?: boolean; // enable grid-based combat for this context
   gridWidth?: number; // default combat grid width  (squares)
   gridHeight?: number; // default combat grid height (squares)

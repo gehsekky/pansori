@@ -65,7 +65,6 @@ import { handleLandsAid } from './landsAid.js';
 import { handleLayOnHands } from './layOnHands.js';
 import { handleLoot } from './loot.js';
 import { handleMarkerMove } from './markerMove.js';
-import { handleMove } from './move.js';
 import { handleMoveZone } from './moveZone.js';
 import { handleRecurringSpellAttack } from './recurringSpellAttack.js';
 import { handleSneak } from './sneak.js';
@@ -126,7 +125,6 @@ const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   grapple: handleGrapple as ActionHandler,
   try_escape_grapple: handleTryEscapeGrapple as ActionHandler,
   shove: handleShove as ActionHandler,
-  move: handleMove as ActionHandler,
   move_zone: handleMoveZone as ActionHandler,
   loot: handleLoot as ActionHandler,
   sneak: handleSneak as ActionHandler,

@@ -308,7 +308,6 @@ export interface CombatEntity {
 // ─── Structured actions ──────────────────────────────────────────────
 
 export type StructuredAction =
-  | { type: 'move'; roomId: string }
   | { type: 'attack'; targetEnemyId?: string }
   | { type: 'loot' }
   | { type: 'use'; itemId: string; targetCharId?: string }

@@ -32,32 +32,6 @@ describe('conditions — new types', () => {
     expect(choices[0].label).toMatch(/INCAPACITATED/);
   });
 
-  it('grappled character cannot move — gets a pass choice instead of move', () => {
-    const state = makeState({ conditions: ['grappled'], condition_durations: { grappled: 1 } });
-    const choices = generateChoices(state, seed, ctx);
-    expect(choices.every((c) => c.action.type !== 'move')).toBe(true);
-    expect(choices.some((c) => c.label.match(/GRAPPLED/))).toBe(true);
-  });
-
-  it('restrained character cannot move', () => {
-    const state = makeState({ conditions: ['restrained'], condition_durations: { restrained: 1 } });
-    const choices = generateChoices(state, seed, ctx);
-    expect(choices.every((c) => c.action.type !== 'move')).toBe(true);
-  });
-
-  it('move action is blocked in takeAction when grappled', async () => {
-    const state = makeState({ conditions: ['grappled'], condition_durations: { grappled: 1 } });
-    const result = await takeAction({
-      action: { type: 'move', roomId: CORRIDOR_ID },
-      history: [],
-      state,
-      seed,
-      context: ctx,
-    });
-    expect(result.newState.current_room).toBe(ctx.startRoomId); // did not move
-    expect(result.narrative).toMatch(/grappled/i);
-  });
-
   it('grid_move is blocked when the moving character is grappled', async () => {
     const state = makeState(
       { conditions: ['grappled'], condition_durations: { grappled: 1 } },

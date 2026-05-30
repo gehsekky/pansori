@@ -3161,12 +3161,6 @@ export function buildArrivalNarrative(
   const templates = context.narratives.roomArrival[targetId] || context.narratives.genericArrival;
   let text = pick(templates).replace(/{world}/g, getWorldName(seed));
 
-  const exitNames = (seed.connections[targetId] ?? [])
-    .map((id) => seed.rooms.find((r) => r.id === id)?.name)
-    .filter((n): n is string => Boolean(n))
-    .join(', ');
-  if (exitNames) text += ` Exits: ${exitNames}.`;
-
   const livingHere = getLivingRoomEnemies(state, seed, targetId);
   if (livingHere.length > 0) {
     const parts = livingHere.map((enemy) => {
@@ -3473,9 +3467,6 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   const enemyAlive = livingEnemies.length > 0;
   const loot = seed.loot?.[roomId];
   const lootAvail = loot && !state.loot_taken?.includes(roomId);
-  const adjacent = (seed.connections[roomId] || [])
-    .map((id) => seed.rooms.find((r) => r.id === id))
-    .filter((r): r is NonNullable<typeof r> => r != null);
 
   // Trap: offer disarm if trap is detected (party passive Perception
   // beat the DC) but not yet spent. Disarm is an Action (cost.ts) — in
@@ -5559,29 +5550,6 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
           });
         }
       }
-    }
-  } else if (!state.entities) {
-    if (!isImmobilized) {
-      // Out-of-combat room exits. SRD 5.2.1: there is no "Dash past" — a hostile
-      // creature in the room means engage (Attack) or evade (Sneak via Stealth);
-      // strolling past is not a RAW choice.
-      if (!enemyAlive) {
-        for (const adj of adjacent) {
-          if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
-          choices.push({ label: `Move to ${adj.name}`, action: { type: 'move', roomId: adj.id } });
-        }
-      }
-    } else {
-      const blocker = char.conditions.find((c) => ['grappled', 'restrained'].includes(c))!;
-      choices.push({ label: `${blocker.toUpperCase()} — cannot move`, action: { type: 'pass' } });
-    }
-  }
-
-  // Room exits are always available when not in active combat (grid or not)
-  if (!state.combat_active && !isImmobilized && state.entities) {
-    for (const adj of adjacent) {
-      if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
-      choices.push({ label: `Move to ${adj.name}`, action: { type: 'move', roomId: adj.id } });
     }
   }
   const sliced = MAX_CHOICES ? choices.slice(0, MAX_CHOICES) : choices;
@@ -8401,7 +8369,7 @@ export async function takeAction({
   // ── Undetected trap fires on first action in room ─────────────────────────
   // (Detected traps offer a 'disarm_trap' choice instead; this handles the case
   //  where no character's passive Perception beat the trap DC.)
-  if (action.type !== 'disarm_trap' && action.type !== 'move') {
+  if (action.type !== 'disarm_trap' && action.type !== 'marker_move') {
     const hiddenTrap = getRoomTrap(roomId, seed, context);
     if (hiddenTrap && !trapSpent(st, roomId) && !partyDetectsTrap(st.characters, hiddenTrap)) {
       st.traps_triggered = [...(st.traps_triggered ?? []), roomId];
