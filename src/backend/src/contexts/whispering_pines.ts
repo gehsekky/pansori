@@ -551,23 +551,40 @@ export const context: Context = {
     intro:
       'A frozen pass village where a missing trapper, a frost cult, and an ancient spire wait above the snow line.',
 
+    // ── Rooms (local grids) ──────────────────────────────────────────────────
+    // 3-level map model: the Pines is a town (tavern/lodge/warden as venues);
+    // the Frozen Pass and the Iceshard Spire are regional sites whose rooms
+    // chain via per-cell `exits`. Navigation is by the party marker;
+    // `connections` is retired.
     rooms: [
-      // Town rooms
+      // `pines_square` survives only as the opening-arrival frame — the party
+      // starts on the regional grid (current_room cleared), so it's never
+      // entered; the town grid is the village.
       {
         id: 'pines_square',
-        name: 'Village Square',
-        desc: "Whispering Pines: a snow-shrouded square with the Pine Tavern, the Trapper's Lodge, and the Warden Post.",
+        name: 'Whispering Pines',
+        desc: "A snow-shrouded village at the foot of the pass — the Pine Tavern, the Trapper's Lodge, and the Warden Post, and the cliff trail rising north.",
       },
+
+      // Village interiors (town venues open these; each ascends back to town).
       {
         id: 'pines_tavern',
         name: 'Pine Tavern',
         desc: 'A low-beamed inn smelling of woodsmoke and mulled spirits. Innkeeper Brann tends the bar.',
         canRest: true,
+        gridWidth: 7,
+        gridHeight: 7,
+        entryPos: { x: 3, y: 6 },
+        exits: [{ pos: { x: 3, y: 0 }, ascends: true, label: 'Back into the village' }],
       },
       {
         id: 'pines_lodge',
         name: "Trapper's Lodge",
         desc: "Marta's lodge — pelts hanging in racks, snowshoes and warhammers along the wall. A locked supply locker stands by the door.",
+        gridWidth: 7,
+        gridHeight: 7,
+        entryPos: { x: 3, y: 6 },
+        exits: [{ pos: { x: 3, y: 0 }, ascends: true, label: 'Back into the village' }],
         objects: [
           {
             id: 'trapper_locker',
@@ -586,28 +603,66 @@ export const context: Context = {
         id: 'pines_warden',
         name: 'Warden Post',
         desc: "Captain Riese's command — a stone hut warmed by a single brazier. A war map covers one wall.",
+        gridWidth: 7,
+        gridHeight: 7,
+        entryPos: { x: 3, y: 6 },
+        exits: [{ pos: { x: 3, y: 0 }, ascends: true, label: 'Back into the village' }],
       },
 
-      // Wilderness — the climb to the spire
+      // The Frozen Pass — a regional site (a Frost Wolf prowls the trail).
       {
         id: 'pass_climb',
         name: 'Frozen Pass',
         desc: 'A switchback trail along the cliff face. Wind carries the scent of woodsmoke from below and something colder from above.',
+        gridWidth: 10,
+        gridHeight: 8,
+        entryPos: { x: 0, y: 4 },
+        exits: [{ pos: { x: 9, y: 4 }, ascends: true, label: 'Back down the pass' }],
       },
 
-      // Dungeon — Iceshard Spire
+      // Iceshard Spire — a regional site; rooms chain entrance → hall → cult →
+      // apex → egress, and the Hidden Descent ascends out.
       {
         id: 'spire_entrance',
         name: 'Spire Entrance',
         desc: 'A black stone arch leans against the cliff. Old cult sigils mark the lintel. The air inside is colder than the wind.',
         canRest: false,
         lighting: 'dim',
+        gridWidth: 10,
+        gridHeight: 10,
+        entryPos: { x: 0, y: 0 },
+        exits: [
+          {
+            pos: { x: 9, y: 0 },
+            toRoomId: 'spire_frozen_hall',
+            entrancePos: { x: 0, y: 0 },
+            label: 'Into the Frozen Hall',
+          },
+          { pos: { x: 0, y: 9 }, ascends: true, label: 'Back out to the pass' },
+        ],
       },
       {
         id: 'spire_frozen_hall',
         name: 'Frozen Hall',
         desc: 'A long pillared hall sheathed in ice. Frost mephits glitter in the air like motes of dust. Heavy icicles hang from the vaulted ceiling — some look ready to fall.',
         lighting: 'dark',
+        gridWidth: 10,
+        gridHeight: 10,
+        entryPos: { x: 0, y: 0 },
+        exits: [
+          {
+            pos: { x: 0, y: 1 },
+            toRoomId: 'spire_entrance',
+            entrancePos: { x: 9, y: 0 },
+            label: 'Back to the entrance',
+          },
+          {
+            pos: { x: 9, y: 9 },
+            toRoomId: 'spire_cult_chamber',
+            entrancePos: { x: 0, y: 0 },
+            label: 'Into the Cult Chamber',
+          },
+        ],
         trap: {
           id: 'frozen_hall_icicle',
           name: 'Falling Icicle',
@@ -628,12 +683,46 @@ export const context: Context = {
         name: 'Cult Chamber',
         desc: 'A circular vault with a low altar of black ironwood. Frostspire cultists chant in unison around a captive form. (Old Halden lies bound near the altar, unconscious.)',
         lighting: 'dim',
+        gridWidth: 10,
+        gridHeight: 10,
+        entryPos: { x: 0, y: 0 },
+        exits: [
+          {
+            pos: { x: 0, y: 1 },
+            toRoomId: 'spire_frozen_hall',
+            entrancePos: { x: 9, y: 9 },
+            label: 'Back to the Frozen Hall',
+          },
+          {
+            pos: { x: 9, y: 9 },
+            toRoomId: 'spire_ritual_apex',
+            entrancePos: { x: 1, y: 1 },
+            label: 'Up to the Ritual Apex',
+          },
+        ],
       },
       {
         id: 'spire_ritual_apex',
         name: 'Ritual Apex',
         desc: "The spire's top chamber. A green flame burns above the broken vault. Shattered ice columns and frozen statuary line the approach. The Frost Acolyte stands at the apex, hands raised, runes blazing.",
         lighting: 'bright',
+        gridWidth: 10,
+        gridHeight: 10,
+        entryPos: { x: 1, y: 1 },
+        exits: [
+          {
+            pos: { x: 0, y: 9 },
+            toRoomId: 'spire_cult_chamber',
+            entrancePos: { x: 9, y: 9 },
+            label: 'Back to the Cult Chamber',
+          },
+          {
+            pos: { x: 9, y: 9 },
+            toRoomId: 'spire_egress',
+            entrancePos: { x: 0, y: 0 },
+            label: 'A hidden descent',
+          },
+        ],
         // Ice columns + frozen ritual statuary clustered around the approach
         // to the apex dais. Symmetric so neither flank is "the right side".
         obstacles: [
@@ -654,26 +743,24 @@ export const context: Context = {
         id: 'spire_egress',
         name: 'Hidden Descent',
         desc: 'A narrow stair cuts through the cliff back to the lower trail. Daylight shows below.',
+        gridWidth: 8,
+        gridHeight: 8,
+        entryPos: { x: 0, y: 0 },
+        exits: [
+          {
+            pos: { x: 0, y: 1 },
+            toRoomId: 'spire_ritual_apex',
+            entrancePos: { x: 9, y: 9 },
+            label: 'Back up to the apex',
+          },
+          { pos: { x: 7, y: 7 }, ascends: true, label: 'Descend to the pass' },
+        ],
       },
     ],
 
-    connections: {
-      // Town
-      pines_square: ['pines_tavern', 'pines_lodge', 'pines_warden', 'pass_climb'],
-      pines_tavern: ['pines_square'],
-      pines_lodge: ['pines_square'],
-      pines_warden: ['pines_square'],
-
-      // Wilderness ↔ dungeon
-      pass_climb: ['pines_square', 'spire_entrance'],
-
-      // Dungeon — mostly linear with the egress shortcut
-      spire_entrance: ['pass_climb', 'spire_frozen_hall'],
-      spire_frozen_hall: ['spire_entrance', 'spire_cult_chamber'],
-      spire_cult_chamber: ['spire_frozen_hall', 'spire_ritual_apex'],
-      spire_ritual_apex: ['spire_cult_chamber', 'spire_egress'],
-      spire_egress: ['spire_ritual_apex'],
-    },
+    // Navigation is by the marker + room `exits` (3-level map); the old
+    // room-adjacency graph is retired.
+    connections: {},
 
     enemies: {
       pass_climb: [
@@ -948,55 +1035,77 @@ export const context: Context = {
 
     // ─── Locations ──────────────────────────────────────────────────────────────
 
-    locations: [
+    // ── 3-level grid map ───────────────────────────────────────────────────────
+    regions: [
       {
-        id: 'town_pines',
-        name: 'Whispering Pines',
-        type: 'town',
-        desc: 'A snow-bound village at the foot of the pass.',
-        centralRoomId: 'pines_square',
-        districts: [
+        id: 'frostpass_region',
+        name: 'The Frozen Pass',
+        desc: 'A snow-bound vale below the Iceshard Spire — the village, the cliff trail, and the cult-haunted tower above.',
+        feetPerSquare: 5280,
+        gridWidth: 10,
+        gridHeight: 6,
+        startPos: { x: 1, y: 3 },
+        sites: [
           {
-            id: 'district_tavern',
-            name: 'Pine Tavern',
-            desc: 'Warmth, hearth, and Brann the innkeeper.',
-            roomId: 'pines_tavern',
+            id: 'site_pines',
+            name: 'Whispering Pines',
+            pos: { x: 2, y: 3 },
+            kind: 'town',
+            townId: 'pines_village',
           },
           {
-            id: 'district_lodge',
-            name: "Trapper's Lodge",
-            desc: "Marta's shop — fur cloaks, warhammers, elixirs.",
-            roomId: 'pines_lodge',
+            id: 'site_pass',
+            name: 'The Frozen Pass',
+            pos: { x: 6, y: 1 },
+            kind: 'local',
+            entryRoomId: 'pass_climb',
           },
           {
-            id: 'district_warden',
-            name: 'Warden Post',
-            desc: "Captain Riese's command. War map, brazier, hard answers.",
-            roomId: 'pines_warden',
+            id: 'site_spire',
+            name: 'Iceshard Spire',
+            pos: { x: 9, y: 4 },
+            kind: 'local',
+            entryRoomId: 'spire_entrance',
           },
         ],
-        connections: ['wilderness_pass'],
-      },
-      {
-        id: 'wilderness_pass',
-        name: 'The Frozen Pass',
-        type: 'wilderness',
-        desc: 'A cliff trail to the spire. Cold winds and worse company.',
-        centralRoomId: 'pass_climb',
-        connections: ['town_pines', 'dungeon_iceshard_spire'],
         encounterTable: ['Snowshrouded Bandit', 'Frost Wolf'],
-        encounterChance: 0.4,
+        encounterChance: 0.1,
       },
+    ],
+
+    towns: [
       {
-        id: 'dungeon_iceshard_spire',
-        name: 'Iceshard Spire',
-        type: 'dungeon',
-        desc: 'A black tower at the top of the pass, sheathed in ice.',
-        centralRoomId: 'spire_entrance',
-        gridWidth: 10,
-        gridHeight: 10,
-        rooms: [],
-        connections: ['wilderness_pass'],
+        id: 'pines_village',
+        name: 'Whispering Pines',
+        desc: 'A snow-shrouded square — the Pine Tavern, the Trapper’s Lodge, and the Warden Post.',
+        feetPerSquare: 25,
+        gridWidth: 6,
+        gridHeight: 6,
+        startPos: { x: 3, y: 3 },
+        venues: [
+          {
+            id: 'venue_tavern',
+            name: 'Pine Tavern',
+            pos: { x: 1, y: 1 },
+            kind: 'interior',
+            entryRoomId: 'pines_tavern',
+          },
+          {
+            id: 'venue_lodge',
+            name: "Trapper's Lodge",
+            pos: { x: 4, y: 1 },
+            kind: 'interior',
+            entryRoomId: 'pines_lodge',
+          },
+          {
+            id: 'venue_warden',
+            name: 'Warden Post',
+            pos: { x: 1, y: 4 },
+            kind: 'interior',
+            entryRoomId: 'pines_warden',
+          },
+          { id: 'venue_gate', name: 'Village Edge', pos: { x: 3, y: 5 }, kind: 'gate' },
+        ],
       },
     ],
 
@@ -1035,11 +1144,13 @@ export const context: Context = {
           },
           {
             id: 'step_return_locket',
-            desc: 'Return the locket to Innkeeper Brann in Whispering Pines.',
+            desc: 'Return the locket to Innkeeper Brann at the Pine Tavern.',
+            // 3-level map: "back in the Pines" is now "in Brann's venue room"
+            // (the old location_id fact retired with the Location model).
             condition: {
               all: [
                 { fact: 'loot_taken', operator: 'contains', value: 'halden_locket' },
-                { fact: 'location_id', operator: 'equal', value: 'town_pines' },
+                { fact: 'room_id', operator: 'equal', value: 'pines_tavern' },
               ],
             },
           },
