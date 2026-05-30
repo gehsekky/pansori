@@ -28,6 +28,7 @@ import {
 import { generateChoices, takeAction } from '../services/gameEngine.js';
 import { context as ctx } from './vale_of_shadows.js';
 import { generateSeed } from '../services/procgen.js';
+import { initMapState } from '../services/mapEngine.js';
 import { randomUUID } from 'crypto';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -112,7 +113,6 @@ function makeInitialState(party: Character[]): GameState {
     traps_disarmed: [],
     objects_searched: [],
     flags: {},
-    current_location_id: 'town_millhaven',
     quest_progress: [],
     faction_rep: {},
     world_day: 1,
@@ -124,7 +124,7 @@ function makeCampaignState(): CampaignState {
     campaign_id: ctx.id,
     user_id: 'test-user',
     world_day: 1,
-    current_location: 'town_millhaven',
+    current_location: '',
     flags: {},
     quests: [],
     faction_rep: {},
@@ -147,6 +147,9 @@ describe('Vale of Shadows — scripted playthrough', () => {
       makeChar('Brennan', 'Cleric', 999),
       makeChar('Wren', 'Rogue', 999),
     ]);
+    // 3-level map: start the party on the regional grid (single marker), as the
+    // session-new route does. Clears current_room and sets map_level/region.
+    state = { ...state, ...initMapState(ctx.campaign, state) };
     campaignState = makeCampaignState();
   });
 
@@ -248,125 +251,144 @@ describe('Vale of Shadows — scripted playthrough', () => {
     }
   }
 
-  it('walks the full Vale playthrough — town → crypt → 3 quests turned in', async () => {
-    // ── Stage 1: town setup ────────────────────────────────────────────────
-    // Starting position
-    expect(state.current_room).toBe('millhaven_square');
+  // Move the party marker to a cell (the 3-level map navigation primitive).
+  const markerMove = (x: number, y: number) => dispatch({ type: 'marker_move', to: { x, y } });
+
+  it('walks the full Vale playthrough — region → town → crypt → 3 quests turned in', async () => {
+    // ── Stage 0: regional grid start ───────────────────────────────────────
+    expect(state.map_level).toBe('regional');
+    expect(state.current_region_id).toBe('vale_region');
+    expect(state.marker_pos).toEqual({ x: 1, y: 3 }); // region.startPos
+    expect(state.current_room).toBe('');
     expect(state.characters.every((c) => c.hp > 0)).toBe(true);
 
-    // Talk to Aldric in the market
-    await dispatch({ type: 'move', roomId: 'millhaven_market' });
+    // ── Stage 1: enter Millhaven, accept the three quests ──────────────────
+    await markerMove(2, 3); // Millhaven site → town grid
+    expect(state.map_level).toBe('town');
+    expect(state.current_town_id).toBe('millhaven_town');
+
+    // Merchant District venue → Aldric → quest_shipment
+    await markerMove(6, 2);
     expect(state.current_room).toBe('millhaven_market');
     await dispatch({ type: 'talk' });
-    // Pick "I'll look into the missing shipment" — advance_quest consequence
     await dispatch({ type: 'talk_response', responseIdx: 0 });
-    // Explicitly accept the quest
     await dispatch({ type: 'accept_quest', questId: 'quest_shipment' });
     expect(state.quest_progress?.find((q) => q.questId === 'quest_shipment')?.status).toBe(
       'active'
     );
+    await markerMove(3, 0); // ascend exit → back to the town grid
+    expect(state.map_level).toBe('town');
 
-    // Talk to Sister Maren in the temple
-    await dispatch({ type: 'move', roomId: 'millhaven_square' });
-    await dispatch({ type: 'move', roomId: 'millhaven_temple' });
+    // Temple venue → Sister Maren → quest_crypt
+    await markerMove(1, 2);
+    expect(state.current_room).toBe('millhaven_temple');
     await dispatch({ type: 'talk' });
     await dispatch({ type: 'talk_response', responseIdx: 0 });
     await dispatch({ type: 'accept_quest', questId: 'quest_crypt' });
     expect(state.quest_progress?.find((q) => q.questId === 'quest_crypt')?.status).toBe('active');
+    await markerMove(3, 0);
 
-    // Talk to Dusk in the slums
-    await dispatch({ type: 'move', roomId: 'millhaven_square' });
-    await dispatch({ type: 'move', roomId: 'millhaven_slums' });
+    // Lantern District venue → Dusk → quest_shadow
+    await markerMove(1, 5);
+    expect(state.current_room).toBe('millhaven_slums');
     await dispatch({ type: 'talk' });
     await dispatch({ type: 'talk_response', responseIdx: 0 });
     await dispatch({ type: 'accept_quest', questId: 'quest_shadow' });
     expect(state.quest_progress?.find((q) => q.questId === 'quest_shadow')?.status).toBe('active');
+    await markerMove(3, 0);
 
-    // ── Stage 2: garrison — strongbox for shadow_evidence ─────────────────
-    await dispatch({ type: 'move', roomId: 'millhaven_garrison' });
-    // Interact with strongbox (object id is `captain_strongbox`)
+    // ── Stage 2: garrison strongbox → shadow_evidence, deliver to Dusk ─────
+    await markerMove(6, 5); // Garrison venue
+    expect(state.current_room).toBe('millhaven_garrison');
     await dispatch({ type: 'interact_object', objectId: 'captain_strongbox' });
     expect(state.loot_taken).toContain('shadow_evidence');
+    await markerMove(3, 0);
 
-    // Return to Dusk to deliver the letter
-    await dispatch({ type: 'move', roomId: 'millhaven_slums' });
-    // quest_shadow.step_deliver_letter checks loot_taken + room_id == millhaven_slums
-    // The arrival here should fire the step on the next action's evaluation.
+    // Back to the Lantern District to deliver the letter
+    await markerMove(1, 5);
+    expect(state.current_room).toBe('millhaven_slums');
     await dispatch({ type: 'talk' });
-    // After arriving in slums with the letter, the quest should auto-complete
-    // via evaluateQuestSteps.
     expect(
       state.quest_progress?.find((q) => q.questId === 'quest_shadow')?.completedSteps
     ).toContain('step_find_letter');
     expect(
       state.quest_progress?.find((q) => q.questId === 'quest_shadow')?.completedSteps
     ).toContain('step_deliver_letter');
+    await markerMove(3, 0);
 
-    // ── Stage 3: travel to crypt ──────────────────────────────────────────
-    await dispatch({ type: 'move', roomId: 'millhaven_square' });
-    await dispatch({ type: 'move', roomId: 'road_north' });
+    // Leave town through the gate → back to the regional grid
+    await markerMove(4, 7);
+    expect(state.map_level).toBe('regional');
+
+    // ── Stage 3: the Old Road skirmish (a regional local site) ─────────────
+    await markerMove(5, 1); // The Old Road site
+    expect(state.map_level).toBe('local');
     expect(state.current_room).toBe('road_north');
-    // Two bandits on the Old Road — initiate combat
     await dispatch({ type: 'attack', targetEnemyId: 'road_north#0' });
     await clearCombat();
     expect(state.enemies_killed).toContain('road_north#0');
     expect(state.enemies_killed).toContain('road_north#1');
+    await markerMove(9, 4); // ascend → back to the region
+    expect(state.map_level).toBe('regional');
 
-    // ── Stage 4: dungeon clear ────────────────────────────────────────────
-    await dispatch({ type: 'move', roomId: 'dungeon_crypt_entrance' });
+    // ── Stage 4: the Shattered Crypt ───────────────────────────────────────
+    await markerMove(10, 5); // Shattered Crypt site → entrance
+    expect(state.current_room).toBe('dungeon_crypt_entrance');
 
-    await dispatch({ type: 'move', roomId: 'dungeon_antechamber' });
+    await markerMove(9, 0); // exit → antechamber
+    expect(state.current_room).toBe('dungeon_antechamber');
     await dispatch({ type: 'attack', targetEnemyId: 'dungeon_antechamber#0' });
     await clearCombat();
     expect(state.enemies_killed).toContain('dungeon_antechamber#0');
 
-    await dispatch({ type: 'move', roomId: 'dungeon_charnel_hall' });
+    await markerMove(9, 0); // exit → charnel hall
+    expect(state.current_room).toBe('dungeon_charnel_hall');
     await dispatch({ type: 'attack', targetEnemyId: 'dungeon_charnel_hall#0' });
     await clearCombat();
     expect(state.enemies_killed).toContain('dungeon_charnel_hall#0');
     expect(state.enemies_killed).toContain('dungeon_charnel_hall#1');
 
-    // Detour to ossuary path for guild_ledger (it's in offering_chamber)
-    await dispatch({ type: 'move', roomId: 'dungeon_antechamber' });
-    await dispatch({ type: 'move', roomId: 'dungeon_offering_chamber' });
+    // Back to the antechamber, then down the offering-chamber branch for the ledger
+    await markerMove(0, 9); // charnel back-exit → antechamber (at {9,0})
+    expect(state.current_room).toBe('dungeon_antechamber');
+    await markerMove(9, 9); // antechamber → offering chamber
+    expect(state.current_room).toBe('dungeon_offering_chamber');
     await dispatch({ type: 'attack', targetEnemyId: 'dungeon_offering_chamber#0' });
     await clearCombat();
     expect(state.enemies_killed).toContain('dungeon_offering_chamber#0');
-    // Pick up the guild ledger
     await dispatch({ type: 'loot' });
     expect(state.loot_taken).toContain('dungeon_offering_chamber');
-    // The ledger should be in inventory
     const allInv = state.characters.flatMap((c) => c.inventory);
     expect(allInv.some((i) => i.id === 'guild_ledger')).toBe(true);
 
-    // Push through to throne room
-    await dispatch({ type: 'move', roomId: 'dungeon_ossuary' });
+    // Push through ossuary → throne
+    await markerMove(9, 9); // offering → ossuary
+    expect(state.current_room).toBe('dungeon_ossuary');
     await dispatch({ type: 'attack', targetEnemyId: 'dungeon_ossuary#0' });
     await clearCombat();
 
-    await dispatch({ type: 'move', roomId: 'dungeon_crypt_throne' });
+    await markerMove(9, 9); // ossuary → throne (arrives at {1,1})
+    expect(state.current_room).toBe('dungeon_crypt_throne');
     await dispatch({ type: 'attack', targetEnemyId: 'dungeon_crypt_throne#0' });
     await clearCombat();
     expect(state.enemies_killed).toContain('dungeon_crypt_throne#0'); // Crypt Lord
-    // Recover the moonstone amulet
     await dispatch({ type: 'loot' });
     expect(state.loot_taken).toContain('dungeon_crypt_throne');
     const allInv2 = state.characters.flatMap((c) => c.inventory);
     expect(allInv2.some((i) => i.id === 'moonstone_amulet')).toBe(true);
 
-    // ── Stage 5: return to town & turn in quests ──────────────────────────
-    // The escape room is the exit from the crypt
-    await dispatch({ type: 'move', roomId: 'dungeon_crypt_exit' });
+    // ── Stage 5: climb out and return to town to turn in the quests ────────
+    await markerMove(9, 9); // throne → hidden passage (crypt exit)
+    expect(state.current_room).toBe('dungeon_crypt_exit');
+    await markerMove(7, 7); // ascend → back to the regional grid (at the crypt site)
+    expect(state.map_level).toBe('regional');
 
-    // Travel back through the world to Millhaven. The escapeRoomId connects
-    // back to throne room; from there we walk back the way we came.
-    // (escape action would exit the dungeon entirely)
-    state.current_room = 'millhaven_market'; // teleport for the test — simpler
-    state.current_location_id = 'town_millhaven';
+    await markerMove(2, 3); // travel back to Millhaven
+    expect(state.map_level).toBe('town');
+    await markerMove(6, 2); // Merchant District → Aldric
+    expect(state.current_room).toBe('millhaven_market');
+    await dispatch({ type: 'talk' }); // fires the room_id + loot quest checks
 
-    await dispatch({ type: 'talk' });
-    // Quest shipment requires loot_taken contains guild_ledger AND location_id
-    // == town_millhaven. Once both are true, evaluateQuestSteps fires.
     expect(
       state.quest_progress?.find((q) => q.questId === 'quest_shipment')?.completedSteps
     ).toContain('step_find_ledger');
@@ -377,9 +399,6 @@ describe('Vale of Shadows — scripted playthrough', () => {
       'completed'
     );
 
-    // quest_crypt expects enemies_killed contains 'dungeon_crypt_throne' (the
-    // current condition value). The actual enemy id is `dungeon_crypt_throne#0`.
-    // This may surface a bug — if so, the assertion below will fail.
     expect(
       state.quest_progress?.find((q) => q.questId === 'quest_crypt')?.completedSteps
     ).toContain('step_recover_amulet');
@@ -389,7 +408,6 @@ describe('Vale of Shadows — scripted playthrough', () => {
 
     // ── Stage 6: choice generation sanity ─────────────────────────────────
     const finalChoices = generateChoices(state, seed, ctx);
-    // We should have at least one action available (talk, short rest, etc.)
     expect(finalChoices.length).toBeGreaterThan(0);
   }, 30_000);
 });

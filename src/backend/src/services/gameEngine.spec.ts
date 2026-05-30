@@ -37,6 +37,60 @@ import { context as valeCtx } from '../contexts/vale_of_shadows.js';
 
 afterEach(() => vi.restoreAllMocks());
 
+// Legacy-navigation fixture. Vale of Shadows migrated to the 3-level grid map
+// (regions/towns/room-exits), so it no longer carries the old Location/District
+// model + room `connections` these tests exercise. The `travel` /
+// `enter_district` / room-`move` handlers are still live for campaigns on the
+// legacy model (and slated for the cleanup phase), so we keep testing them
+// against a frozen legacy-shaped fixture rather than the migrated campaign.
+const legacyNavCtx: typeof valeCtx = {
+  ...valeCtx,
+  campaign: {
+    ...valeCtx.campaign!,
+    connections: {
+      millhaven_market: ['millhaven_square', 'millhaven_slums'],
+      millhaven_slums: ['millhaven_square', 'millhaven_market'],
+      dungeon_antechamber: ['dungeon_offering_chamber', 'dungeon_charnel_hall'],
+      dungeon_offering_chamber: ['dungeon_antechamber', 'dungeon_ossuary'],
+    },
+    locations: [
+      {
+        id: 'town_millhaven',
+        name: 'Millhaven',
+        type: 'town',
+        desc: '',
+        centralRoomId: 'millhaven_square',
+        districts: [
+          {
+            id: 'district_market',
+            name: 'Merchant District',
+            desc: '',
+            roomId: 'millhaven_market',
+          },
+          { id: 'district_lantern', name: 'Lantern District', desc: '', roomId: 'millhaven_slums' },
+        ],
+        connections: ['wilderness_old_road'],
+      },
+      {
+        id: 'wilderness_old_road',
+        name: 'The Old Road',
+        type: 'wilderness',
+        desc: '',
+        centralRoomId: 'road_north',
+        connections: ['town_millhaven', 'dungeon_shattered_crypt'],
+      },
+      {
+        id: 'dungeon_shattered_crypt',
+        name: 'Shattered Crypt',
+        type: 'dungeon',
+        desc: '',
+        centralRoomId: 'dungeon_crypt_entrance',
+        connections: ['wilderness_old_road'],
+      },
+    ],
+  },
+};
+
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
 const CORRIDOR_ID = 'guard_post';
@@ -1949,7 +2003,7 @@ describe('set_active_character (out-of-combat lead handoff)', () => {
 
 describe('enter_district moves current_room into the district roomId', () => {
   it('updates current_room and visited_rooms when entering a sibling district', async () => {
-    const ctx2 = valeCtx;
+    const ctx2 = legacyNavCtx;
     const seedPlaceholder: Seed = {
       ...seedWithEnemy,
       context_id: ctx2.id,
@@ -4965,7 +5019,7 @@ describe('travel updates current_room to destination central room', () => {
     // leave it stuck in millhaven_temple (where Sister Maren would keep
     // emitting talk_response choices).
     // Vale is a campaign context (empty roomPool) — use generateSeed.
-    const valeSeed = generateSeed(valeCtx, 1);
+    const valeSeed = generateSeed(legacyNavCtx, 1);
     const st = makeState(
       { id: 'pc-1', xp: 0 },
       {
@@ -4979,7 +5033,7 @@ describe('travel updates current_room to destination central room', () => {
       history: [],
       state: st,
       seed: valeSeed,
-      context: valeCtx,
+      context: legacyNavCtx,
     });
     expect(result.newState.current_location_id).toBe('wilderness_old_road');
     expect(result.newState.current_room).toBe('road_north');
@@ -5269,7 +5323,7 @@ describe('backfillOwnership', () => {
 
 describe('hostile in current room blocks travel / loot / move', () => {
   function valeSeedWithGhoulIn(room: string): Seed {
-    const base = generateSeed(valeCtx, 1);
+    const base = generateSeed(legacyNavCtx, 1);
     return {
       ...base,
       enemies: {
@@ -5311,7 +5365,7 @@ describe('hostile in current room blocks travel / loot / move', () => {
       history: [],
       state: st,
       seed,
-      context: valeCtx,
+      context: legacyNavCtx,
     });
     // Location unchanged; narrative explains.
     expect(result.newState.current_location_id).toBe('dungeon_shattered_crypt');
@@ -5349,7 +5403,7 @@ describe('hostile in current room blocks travel / loot / move', () => {
       history: [],
       state: st,
       seed,
-      context: valeCtx,
+      context: legacyNavCtx,
     });
     expect(result.newState.loot_taken).not.toContain('guild_ledger');
     expect(result.narrative).toMatch(/hostile/i);
@@ -5369,7 +5423,7 @@ describe('hostile in current room blocks travel / loot / move', () => {
       history: [],
       state: st,
       seed,
-      context: valeCtx,
+      context: legacyNavCtx,
     });
     expect(result.newState.current_room).toBe('dungeon_offering_chamber');
     expect(result.narrative).toMatch(/hostile/i);
@@ -5401,7 +5455,7 @@ describe('hostile in current room blocks travel / loot / move', () => {
         current_location_id: 'dungeon_shattered_crypt',
       }
     );
-    const choices = generateChoices(st, seed, valeCtx);
+    const choices = generateChoices(st, seed, legacyNavCtx);
     expect(choices.find((c) => c.action.type === 'travel')).toBeUndefined();
     expect(choices.find((c) => c.action.type === 'loot')).toBeUndefined();
     // Attack-the-ghoul should still surface so the player can engage.

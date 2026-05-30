@@ -30,6 +30,9 @@ export function initMapState(campaign: CampaignData | undefined, st: GameState):
     map_level: 'regional',
     current_region_id: region.id,
     marker_pos: region.startPos,
+    // The party is on the overland grid, not in any room — clear current_room
+    // so no stray room-level choices surface while travelling.
+    current_room: '',
   };
 }
 
@@ -261,6 +264,7 @@ export function resolveTransition(
         current_town_id: town.id,
         marker_pos: town.startPos,
         region_marker_pos: st.marker_pos, // bookmark the region cell for ascent
+        current_room: '', // on the town grid, not in any room
       },
       narrative: ` You enter ${town.name}.`,
     };

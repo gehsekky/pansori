@@ -2,6 +2,7 @@ import { ENCOUNTER_ROOM_ID, resolveMarkerMove, stageEncounter } from '../mapEngi
 import { materializeEnemy, scaleEnemyHp } from '../enemyFactory.js';
 import type { ActionHandler } from './types.js';
 import type { GridPos } from '../../types.js';
+import { buildArrivalNarrative } from '../gameEngine.js';
 
 /**
  * `marker_move`: move the single party marker on the current grid (regional /
@@ -20,13 +21,36 @@ export const handleMarkerMove: ActionHandler<{ type: 'marker_move'; to: GridPos 
     ctx.narrative = 'You cannot wander the map while in combat.';
     return;
   }
+  // RAW egress: a hostile in the current room means engage (Attack) or evade
+  // (Sneak) — you can't simply stroll past it onto a transition cell. Mirrors
+  // the old room `move` guard + the marker_move choice gating in generateChoices.
+  if (ctx.enemyAlive) {
+    ctx.narrative = 'A hostile is here — deal with it before you travel on.';
+    return;
+  }
+  const fromRoom = ctx.st.current_room;
   const res = resolveMarkerMove(ctx.context.campaign, ctx.seed.rooms, ctx.st, action.to);
   if (res.rejected) {
     ctx.narrative = res.rejected;
     return;
   }
   ctx.st = res.st;
-  ctx.narrative = (ctx.narrative ?? '') + (res.narrative || ' The party moves across the map.');
+
+  // Entering a new local room (a site interior or a room-exit passage): use the
+  // full arrival narrative so the party gets the room description, a "Hostile
+  // here" listing, passive trap detection, and loot-spotting — the same cues the
+  // old room `move` gave. Otherwise fall back to the terse transition / move text.
+  const enteredRoom =
+    res.transitioned &&
+    ctx.st.current_room &&
+    ctx.st.current_room !== fromRoom &&
+    ctx.seed.rooms.some((r) => r.id === ctx.st.current_room)
+      ? ctx.st.current_room
+      : undefined;
+  const arrival = enteredRoom
+    ? ' ' + buildArrivalNarrative(enteredRoom, ctx.st, ctx.seed, ctx.context)
+    : res.narrative || ' The party moves across the map.';
+  ctx.narrative = (ctx.narrative ?? '') + arrival;
   // Regional travel-time flavor (whole-hour granularity reads cleanly).
   if (res.elapsedHours >= 1) {
     ctx.narrative += ` (${Math.round(res.elapsedHours)} hr of travel.)`;
