@@ -1,6 +1,6 @@
 # TODO
 
-> **Status snapshot — verified 2026-05-28.** The top section is the
+> **Status snapshot — verified 2026-05-30.** The top section is the
 > authoritative implementation status, re-grounded in a fresh code survey
 > (not the prior changelog). The backlog below it lists only remaining
 > work. Shipped-feature completion logs were removed — `git log` is the
@@ -16,10 +16,34 @@ PHB/DMG-exclusive content (subclasses, feats, species, spells). See
 
 ---
 
-## Implementation status (code-verified 2026-05-28)
+## Implementation status (code-verified 2026-05-30)
 
-Grounded in a code survey + the full backend suite: **2072 tests across
-238 files, all green** (lint + typecheck clean).
+Grounded in a code survey + the full suite: **backend 2045 tests across
+242 files + frontend 136 across 23 files, all green** (lint + typecheck +
+prettier clean).
+
+### Done — world map / navigation
+
+- **3-level grid map (regional → town → local)** — the campaign navigation
+  model. The party is a single marker (`GameState.marker_pos`) on the
+  regional + town grids and while exploring a local room out of combat;
+  local combat deploys PC tokens, then collapses back to the marker. Every
+  level is a tile grid with an SRD `feetPerSquare` scale (regional 5280 /
+  town 25 / local 5). Movement is `marker_move` (free pathfinding out of
+  combat); the regional grid spends SRD travel time (Normal 3 mi/hr →
+  `world_hour`) and rolls a per-square random encounter that drops the party
+  into a transient local fight and marches them back. "Transition cells" —
+  region `sites`, town `venues`, room `exits` — descend / ascend / change
+  rooms (`mapEngine.ts`, `activeGrid` + `resolveMarkerMove`). Frontend
+  renders all three grids (`GridMapView`); the map overlay shows the active
+  grid read-only.
+- **All three campaigns run on the grid model** — Vale of Shadows,
+  Whispering Pines, Grove of Thorns (+ the sandbox dev campaign). Each has a
+  region with sites, a town with venues, and local rooms wired by exit cells.
+- **Legacy nav fully removed** — the old `Location` / `District` model, the
+  `travel` / `enter_district` / room-`move` actions, the room `connections`
+  graph, and the roguelike procedural generator (`generateRoguelikeSeed` /
+  `roomPool`) are gone. The engine runs only authored grid campaigns.
 
 ### Done — rules-engine frameworks
 
@@ -430,7 +454,7 @@ backend features are waiting on, and a handful of **bounded subsystems**.
         encounters are now meaningfully harder and may want a tuning pass.
 - [x] **Sunlight Sensitivity** (Kobold, Specter, Wight, Wraith) — shipped
       (`combatLighting.spec.ts`). Added a fourth room light tier, `'sunlight'`
-      (Bright Light that also counts as *sunlight*; combat visibility behaves like
+      (Bright Light that also counts as _sunlight_; combat visibility behaves like
       `bright`), and `isInSunlight(pos, roomLighting, entities)` — true in a
       sunlit room OR within a **Daylight** emanation's bright radius (a light
       source with `light_spell_level === 3`; the Light cantrip's ordinary glow
@@ -540,16 +564,16 @@ options }`** → `OptionPickerDialog` (single-select; re-sends `action[param]`).
       caller); it's optional, so the unit specs that pin other mechanics keep
       their dice math (proficiency is skipped without `context`).
 - [~] **Truesight / Dimensional Travel / Night Spirit boons** — the +1
-      ability lands. **Truesight's "sees through magical darkness" half shipped**
-      (`combatLighting.spec.ts`, `multiclass.spec.ts`): a new
-      `piercesMagicalDarkness(char)` helper (Blindsight / Devil's Sight /
-      `truesight_ft`, deliberately excluding darkvision) now drives both
-      `seesInDarkness` and `canSeeTarget`'s `observerPiercesMagicalDarkness` on
-      the PC side (`computeToHitContext` + `computeEnemyAttack`), so a Truesight
-      PC sees in nonmagical darkness AND through a Darkness spell's zone.
-      **Remaining:** Truesight's see-Invisible / shapechanger halves (no
-      Invisible-lifecycle on the grid yet); concrete positioning for Dimensional
-      Travel; and Night Spirit. Narrated.
+  ability lands. **Truesight's "sees through magical darkness" half shipped**
+  (`combatLighting.spec.ts`, `multiclass.spec.ts`): a new
+  `piercesMagicalDarkness(char)` helper (Blindsight / Devil's Sight /
+  `truesight_ft`, deliberately excluding darkvision) now drives both
+  `seesInDarkness` and `canSeeTarget`'s `observerPiercesMagicalDarkness` on
+  the PC side (`computeToHitContext` + `computeEnemyAttack`), so a Truesight
+  PC sees in nonmagical darkness AND through a Darkness spell's zone.
+  **Remaining:** Truesight's see-Invisible / shapechanger halves (no
+  Invisible-lifecycle on the grid yet); concrete positioning for Dimensional
+  Travel; and Night Spirit. Narrated.
 - Minor markers: Devious Strikes' Daze restriction, Use Magic Device
   scroll/charge sub-features, Thief Jumper, Lay on Hands poison-cure use,
   Deflect Energy (Monk L13) — pending broader enforcement/item/jump infra.
@@ -701,7 +725,9 @@ options }`** → `OptionPickerDialog` (single-select; re-sends `action[param]`).
       vision against the shipped static obstacles; ghost-tints out-of-sight cells
       and suppresses enemy tokens beyond the existing `dark`-illum fog).
 - [ ] **Fourth campaign module (opportunistic)** — coastal pirate town,
-      desert ruin, planar city, etc. Not on the critical path.
+      desert ruin, planar city, etc. Authored on the 3-level grid map
+      (region + sites / town + venues / local rooms with exit cells), like
+      the existing three. Not on the critical path.
 
 ---
 
@@ -710,7 +736,8 @@ options }`** → `OptionPickerDialog` (single-select; re-sends `action[param]`).
 - [ ] **Phase 3 of type-share** (remaining workspace-local: Character,
       GameState, Seed, Trap, Room, OnHitEffect, BossPhase, EnemyTemplate,
       Enemy, Spell, BeastForm, InventoryItem, TurnActions, DeathSaves,
-      Context/FrontendContext, Location, GameRule, RuleFacts, CampaignFacts).
+      Context/FrontendContext, GameRule, RuleFacts, CampaignFacts, and the
+      3-level map types Region/Town/MapSite/MapVenue/RoomExit/ActiveGrid).
       These cascade-share, need FE↔BE reconciliation, or are intentionally
       separate. Defer until there's a concrete reason to share each one.
 
