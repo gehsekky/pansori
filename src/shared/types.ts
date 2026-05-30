@@ -146,8 +146,6 @@ export type NpcAttitude = 'friendly' | 'indifferent' | 'hostile';
 
 export type CoverLevel = 'none' | 'half' | 'three_quarters' | 'full';
 
-export type LocationType = 'town' | 'dungeon' | 'wilderness';
-
 export type QuestStatus = 'available' | 'active' | 'completed' | 'failed';
 
 // ─── Grid + combat entity ────────────────────────────────────────────
@@ -457,8 +455,6 @@ export type StructuredAction =
   // at a target on a later turn, for the spell's recurring cost.
   | { type: 'recurring_spell_attack'; targetEnemyId?: string }
   | { type: 'jump'; to: GridPos } // SRD Long Jump — leap up to STR ft over terrain/obstacles
-  | { type: 'travel'; locationId: string }
-  | { type: 'enter_district'; districtId: string }
   // 3-level grid map model — move the single party marker on the current grid
   // (regional / town / local-exploration). Free pathfind out of combat; the
   // regional grid additionally spends travel time + rolls encounters per square.
@@ -781,13 +777,6 @@ export interface PlacedNpc extends NpcTemplate {
 }
 
 // ─── Campaign geography ──────────────────────────────────────────────
-
-export interface District {
-  id: string;
-  name: string;
-  desc: string;
-  roomId: string;
-}
 
 // ─── Quests + factions (skeleton) ────────────────────────────────────
 

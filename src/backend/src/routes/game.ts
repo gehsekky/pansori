@@ -60,7 +60,6 @@ import {
   loadCampaignState,
   mergeCampaignIntoGameState,
   resetCampaignState,
-  resolveLocationForRoom,
   saveCampaignState,
 } from '../services/campaignEngine.js';
 import { broadcastParticipantChange, broadcastSessionState } from '../services/broadcast.js';
@@ -571,19 +570,10 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
     });
 
     const leader = partyChars[0];
-    // For campaign sessions, resolve which location the start room
-    // belongs to (matches `Location.centralRoomId`). Without this, the
-    // party shows up "at Millhaven" via current_room but the engine's
-    // current_location_id stays empty, and any quest step gated on
-    // `location_id == 'town_millhaven'` never matches.
-    const initialLocation =
-      ctx.mapType === 'campaign' ? resolveLocationForRoom(ctx.campaign, ctx.startRoomId) : null;
     const initialState: GameState = {
       characters: partyChars,
       active_character_id: leader.id,
       current_room: ctx.startRoomId,
-      current_location_id: initialLocation?.locationId,
-      current_district_id: initialLocation?.districtId,
       visited_rooms: [ctx.startRoomId],
       enemies_killed: [],
       loot_taken: [],
@@ -663,7 +653,6 @@ function campaignMetaFor(ctx: Context | undefined) {
   return {
     quests: cmp.quests ?? [],
     factions: cmp.factions ?? [],
-    locations: cmp.locations ?? [],
   };
 }
 
@@ -1242,29 +1231,11 @@ gameRouter.post('/session/:id/action', async (req: Request, res: Response) => {
       const activeChar =
         result.newState.characters.find((c) => c.id === result.newState.active_character_id) ??
         result.newState.characters[0];
-      // Auto-heal stale state: if current_location_id isn't set but the
-      // current_room belongs to a known location/district, resolve it
-      // here AND persist it back so the quest engine sees the right
-      // location_id this turn. Fixes existing sessions that were
-      // created before centralRoomId was set on each Location.
-      let resolvedLocationId = result.newState.current_location_id;
-      let resolvedDistrictId = result.newState.current_district_id;
-      if (!resolvedLocationId) {
-        const found = resolveLocationForRoom(ctx.campaign, result.newState.current_room);
-        if (found) {
-          resolvedLocationId = found.locationId;
-          resolvedDistrictId = resolvedDistrictId ?? found.districtId;
-          result.newState = {
-            ...result.newState,
-            current_location_id: resolvedLocationId,
-            current_district_id: resolvedDistrictId,
-          };
-        }
-      }
       const facts: CampaignFacts = {
         action: action.type,
         room_id: result.newState.current_room,
-        location_id: resolvedLocationId ?? '',
+        // Retired with the Location model — quest conditions key on room_id now.
+        location_id: '',
         enemies_killed: result.newState.enemies_killed,
         loot_taken: result.newState.loot_taken,
         flags: result.newState.flags,

@@ -42,7 +42,6 @@ import {
   handleStandUp,
 } from './combatUtility.js';
 import { handleEndTurn, handlePass } from './utility.js';
-import { handleEnterDistrict, handleTravel } from './travel.js';
 import { handleGrapple, handleShove, handleTryEscapeGrapple } from './combatTactical.js';
 import { handleLongRest, handleShortRest } from './rest.js';
 import { handleResolveReaction, handleUseReaction } from './reaction.js';
@@ -121,8 +120,6 @@ const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   talk: handleTalk as ActionHandler,
   talk_response: handleTalkResponse as ActionHandler,
   buy: handleBuy as ActionHandler,
-  travel: handleTravel as ActionHandler,
-  enter_district: handleEnterDistrict as ActionHandler,
   marker_move: handleMarkerMove as ActionHandler,
   accept_quest: handleAcceptQuest as ActionHandler,
   complete_quest: handleCompleteQuest as ActionHandler,

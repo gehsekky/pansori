@@ -37,57 +37,18 @@ import { context as valeCtx } from '../contexts/vale_of_shadows.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-// Legacy-navigation fixture. Vale of Shadows migrated to the 3-level grid map
-// (regions/towns/room-exits), so it no longer carries the old Location/District
-// model + room `connections` these tests exercise. The `travel` /
-// `enter_district` / room-`move` handlers are still live for campaigns on the
-// legacy model (and slated for the cleanup phase), so we keep testing them
-// against a frozen legacy-shaped fixture rather than the migrated campaign.
+// Legacy room-`move` fixture. Vale of Shadows migrated to the 3-level grid map
+// (regions/towns/room-exits) with an empty `connections` graph, so the room
+// `move` handler — still live until its own teardown step — is tested against a
+// frozen connections-shaped fixture rather than the migrated campaign.
 const legacyNavCtx: typeof valeCtx = {
   ...valeCtx,
   campaign: {
     ...valeCtx.campaign!,
     connections: {
-      millhaven_market: ['millhaven_square', 'millhaven_slums'],
-      millhaven_slums: ['millhaven_square', 'millhaven_market'],
       dungeon_antechamber: ['dungeon_offering_chamber', 'dungeon_charnel_hall'],
       dungeon_offering_chamber: ['dungeon_antechamber', 'dungeon_ossuary'],
     },
-    locations: [
-      {
-        id: 'town_millhaven',
-        name: 'Millhaven',
-        type: 'town',
-        desc: '',
-        centralRoomId: 'millhaven_square',
-        districts: [
-          {
-            id: 'district_market',
-            name: 'Merchant District',
-            desc: '',
-            roomId: 'millhaven_market',
-          },
-          { id: 'district_lantern', name: 'Lantern District', desc: '', roomId: 'millhaven_slums' },
-        ],
-        connections: ['wilderness_old_road'],
-      },
-      {
-        id: 'wilderness_old_road',
-        name: 'The Old Road',
-        type: 'wilderness',
-        desc: '',
-        centralRoomId: 'road_north',
-        connections: ['town_millhaven', 'dungeon_shattered_crypt'],
-      },
-      {
-        id: 'dungeon_shattered_crypt',
-        name: 'Shattered Crypt',
-        type: 'dungeon',
-        desc: '',
-        centralRoomId: 'dungeon_crypt_entrance',
-        connections: ['wilderness_old_road'],
-      },
-    ],
   },
 };
 
@@ -1996,44 +1957,6 @@ describe('set_active_character (out-of-combat lead handoff)', () => {
 
 // ─── enter_district sync ─────────────────────────────────────────────────────
 //
-// Regression: enter_district used to set only current_district_id without
-// updating current_room. A player who "entered" the Lantern District from
-// the Merchant District kept Aldric (placed in millhaven_market) on their
-// choice list because current_room hadn't moved.
-
-describe('enter_district moves current_room into the district roomId', () => {
-  it('updates current_room and visited_rooms when entering a sibling district', async () => {
-    const ctx2 = legacyNavCtx;
-    const seedPlaceholder: Seed = {
-      ...seedWithEnemy,
-      context_id: ctx2.id,
-      rooms: [
-        { id: 'millhaven_market', name: 'Merchant District', desc: '' },
-        { id: 'millhaven_slums', name: 'Lantern District', desc: '' },
-      ],
-    };
-    const state: GameState = {
-      ...makeState(),
-      characters: [makeChar({ id: 'pc-1' })],
-      active_character_id: 'pc-1',
-      current_room: 'millhaven_market',
-      current_location_id: 'town_millhaven',
-      current_district_id: 'district_market',
-      visited_rooms: ['millhaven_square', 'millhaven_market'],
-      combat_active: false,
-    };
-    const result = await takeAction({
-      action: { type: 'enter_district', districtId: 'district_lantern' },
-      history: [],
-      state,
-      seed: seedPlaceholder,
-      context: ctx2,
-    });
-    expect(result.newState.current_district_id).toBe('district_lantern');
-    expect(result.newState.current_room).toBe('millhaven_slums');
-    expect(result.newState.visited_rooms).toContain('millhaven_slums');
-  });
-});
 
 // ─── 2024 PHB class feature audit ────────────────────────────────────────────
 
@@ -5011,71 +4934,6 @@ describe('generateChoices stamps seenKey on dim-tracked choices', () => {
   });
 });
 
-describe('travel updates current_room to destination central room', () => {
-  it('moving from a town to wilderness moves current_room to the location centralRoomId', async () => {
-    // Build a minimal vale-shaped state sitting in the temple. The vale
-    // campaign defines wilderness_old_road with centralRoomId road_north,
-    // so traveling there should land current_room on road_north — not
-    // leave it stuck in millhaven_temple (where Sister Maren would keep
-    // emitting talk_response choices).
-    // Vale is a campaign context (empty roomPool) — use generateSeed.
-    const valeSeed = generateSeed(legacyNavCtx, 1);
-    const st = makeState(
-      { id: 'pc-1', xp: 0 },
-      {
-        current_room: 'millhaven_temple',
-        current_location_id: 'town_millhaven',
-        active_character_id: 'pc-1',
-      }
-    );
-    const result = await takeAction({
-      action: { type: 'travel', locationId: 'wilderness_old_road' },
-      history: [],
-      state: st,
-      seed: valeSeed,
-      context: legacyNavCtx,
-    });
-    expect(result.newState.current_location_id).toBe('wilderness_old_road');
-    expect(result.newState.current_room).toBe('road_north');
-  });
-
-  it('preserves current_room when destination location has no centralRoomId', async () => {
-    // Synth a minimal context with one location that omits centralRoomId.
-    const ctxNoCentral = {
-      ...valeCtx,
-      campaign: {
-        ...valeCtx.campaign!,
-        locations: [
-          {
-            id: 'wilderness_test',
-            name: 'Test Wilderness',
-            type: 'wilderness' as const,
-            desc: '',
-            connections: [],
-          },
-        ],
-      },
-    };
-    const sd = generateSeed(valeCtx, 1);
-    const st = makeState(
-      { id: 'pc-1' },
-      {
-        current_room: 'millhaven_temple',
-        current_location_id: 'town_millhaven',
-        active_character_id: 'pc-1',
-      }
-    );
-    const result = await takeAction({
-      action: { type: 'travel', locationId: 'wilderness_test' },
-      history: [],
-      state: st,
-      seed: sd,
-      context: ctxNoCentral,
-    });
-    expect(result.newState.current_room).toBe('millhaven_temple');
-  });
-});
-
 describe('interact_object retry on fail', () => {
   function buildSearchableSeed(): Seed {
     return {
@@ -5321,7 +5179,7 @@ describe('backfillOwnership', () => {
 // strolling past. Guards added to travel/loot/move handlers + their choice
 // emits.
 
-describe('hostile in current room blocks travel / loot / move', () => {
+describe('hostile in current room blocks loot / move', () => {
   function valeSeedWithGhoulIn(room: string): Seed {
     const base = generateSeed(legacyNavCtx, 1);
     return {
@@ -5349,28 +5207,6 @@ describe('hostile in current room blocks travel / loot / move', () => {
       },
     };
   }
-
-  it('travel handler rejects when a hostile is in the current room', async () => {
-    const seed = valeSeedWithGhoulIn('dungeon_offering_chamber');
-    const st = makeState(
-      { id: 'pc-1' },
-      {
-        current_room: 'dungeon_offering_chamber',
-        current_location_id: 'dungeon_shattered_crypt',
-        active_character_id: 'pc-1',
-      }
-    );
-    const result = await takeAction({
-      action: { type: 'travel', locationId: 'town_millhaven' },
-      history: [],
-      state: st,
-      seed,
-      context: legacyNavCtx,
-    });
-    // Location unchanged; narrative explains.
-    expect(result.newState.current_location_id).toBe('dungeon_shattered_crypt');
-    expect(result.narrative).toMatch(/hostile/i);
-  });
 
   it('loot handler rejects when a hostile is in the current room', async () => {
     const seed = {
@@ -5429,7 +5265,7 @@ describe('hostile in current room blocks travel / loot / move', () => {
     expect(result.narrative).toMatch(/hostile/i);
   });
 
-  it('generateChoices suppresses Travel + Pick up while a hostile is in the room', () => {
+  it('generateChoices suppresses Pick up while a hostile is in the room', () => {
     const seed = {
       ...valeSeedWithGhoulIn('dungeon_offering_chamber'),
       loot: {
@@ -5456,7 +5292,6 @@ describe('hostile in current room blocks travel / loot / move', () => {
       }
     );
     const choices = generateChoices(st, seed, legacyNavCtx);
-    expect(choices.find((c) => c.action.type === 'travel')).toBeUndefined();
     expect(choices.find((c) => c.action.type === 'loot')).toBeUndefined();
     // Attack-the-ghoul should still surface so the player can engage.
     expect(choices.find((c) => c.action.type === 'attack')).toBeDefined();

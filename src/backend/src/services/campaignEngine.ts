@@ -44,34 +44,6 @@ export async function loadCampaignState(
   return blank;
 }
 
-// Resolve which campaign location a given room belongs to. Walks each
-// location's `centralRoomId` (the location's main/start room) and each
-// district's `roomId`. Returns null when the room isn't part of any
-// authored location (the engine then leaves current_location_id alone
-// so dungeon-room moves don't blank out the dungeon location_id set
-// by the original travel action).
-export function resolveLocationForRoom(
-  campaign:
-    | {
-        locations?: Array<{
-          id: string;
-          centralRoomId?: string;
-          districts?: Array<{ id: string; roomId: string }>;
-        }>;
-      }
-    | undefined,
-  roomId: string
-): { locationId: string; districtId?: string } | null {
-  if (!campaign?.locations) return null;
-  for (const loc of campaign.locations) {
-    if (loc.centralRoomId === roomId) return { locationId: loc.id };
-    for (const d of loc.districts ?? []) {
-      if (d.roomId === roomId) return { locationId: loc.id, districtId: d.id };
-    }
-  }
-  return null;
-}
-
 // Clear a user's persisted state for a campaign so the next session
 // starts with fresh quest progress / faction rep / world day. Called
 // when a new game session is created for a campaign context — without
