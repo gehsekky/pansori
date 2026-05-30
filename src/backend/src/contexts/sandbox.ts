@@ -20,7 +20,10 @@ import type { Context } from '../types.js';
 export const context: Context = {
   id: 'sandbox',
   worldNoun: 'dungeon',
-  mapType: 'roguelike',
+  // Migrated off the roguelike model to a small defined grid campaign (the
+  // engine focuses on authored campaigns now). The roomPool below is retained
+  // only as a reference bank — campaign mode reads `campaign.rooms`.
+  mapType: 'campaign',
   gridEnabled: true,
   gridWidth: 8,
   gridHeight: 8,
@@ -272,6 +275,252 @@ export const context: Context = {
       requiresAttunement: true,
     },
   ],
+
+  // ─── Campaign (3-level grid map) ───────────────────────────────────────────────
+  // A short defined dungeon: one regional site ("The Testing Grounds") whose
+  // rooms chain via per-cell `exits`. Deliberately compact — sandbox exists to
+  // exercise the rules engine, not to be a long adventure.
+  campaign: {
+    world_name: 'The Testing Grounds',
+    intro:
+      'A clinical stone dungeon built to stress-test every rule of combat. Step inside and begin.',
+    rooms: [
+      {
+        id: 'entry_hall',
+        name: 'Entry Hall',
+        desc: 'A torchlit stone corridor. Crumbling archways lead deeper into the dungeon. A weapon rack on the wall holds a dusty blade.',
+        gridWidth: 8,
+        gridHeight: 8,
+        entryPos: { x: 0, y: 0 },
+        exits: [
+          {
+            pos: { x: 7, y: 0 },
+            toRoomId: 'guard_post',
+            entrancePos: { x: 0, y: 0 },
+            label: 'Deeper in',
+          },
+          { pos: { x: 0, y: 7 }, ascends: true, label: 'Leave the dungeon' },
+        ],
+        objects: [
+          {
+            id: 'weapon_rack',
+            name: 'Weapon Rack',
+            desc: 'A rusted iron rack holding an assortment of old weapons.',
+            interactText: 'You examine the weapon rack.',
+            searchable: true,
+            searchDC: 10,
+            lootIds: ['dagger'],
+            foundText: 'Beneath the rust, a serviceable dagger.',
+            emptyText: 'You miss it on the first pass. Look again.',
+          },
+        ],
+      },
+      {
+        id: 'guard_post',
+        name: 'Guard Post',
+        desc: 'A crude goblin sentry post. Alarm bells hang from a string across the doorway. Crossbow bolts are scattered on the floor.',
+        gridWidth: 8,
+        gridHeight: 8,
+        entryPos: { x: 0, y: 0 },
+        exits: [
+          {
+            pos: { x: 0, y: 1 },
+            toRoomId: 'entry_hall',
+            entrancePos: { x: 7, y: 0 },
+            label: 'Back to the entry hall',
+          },
+          {
+            pos: { x: 7, y: 7 },
+            toRoomId: 'bone_crypt',
+            entrancePos: { x: 0, y: 0 },
+            label: 'Into the crypt',
+          },
+        ],
+      },
+      {
+        id: 'bone_crypt',
+        name: 'Bone Crypt',
+        desc: 'Shelves carved into the walls hold hundreds of bones. The air is deathly still.',
+        gridWidth: 8,
+        gridHeight: 8,
+        entryPos: { x: 0, y: 0 },
+        exits: [
+          {
+            pos: { x: 0, y: 1 },
+            toRoomId: 'guard_post',
+            entrancePos: { x: 7, y: 7 },
+            label: 'Back to the guard post',
+          },
+          {
+            pos: { x: 7, y: 7 },
+            toRoomId: 'storage_room',
+            entrancePos: { x: 0, y: 0 },
+            label: 'Through to storage',
+          },
+        ],
+        trap: {
+          id: 'pressure_plate',
+          name: 'Pressure Plate',
+          desc: 'A subtle depression in the floor stone, connected to a spring-loaded spear mechanism.',
+          dc: 13,
+          damage: '2d6',
+          damageType: 'piercing',
+          triggerNarrative:
+            'A plate depresses underfoot — spears erupt from the walls! {name} takes {dmg} piercing damage.',
+          detectNarrative:
+            'You spot a slight discoloration in the floor stones — a pressure plate. Stepping on it would be bad.',
+          disarmSuccess: 'With careful hands, you jam the mechanism. The trap is disabled.',
+          disarmFail:
+            'Your attempt to jam the mechanism fails — it triggers! Spears slam from the walls.',
+        },
+      },
+      {
+        id: 'storage_room',
+        name: 'Storage Room',
+        desc: 'Barrels and crates are stacked against the walls. The room is quiet — a rare moment of safety.',
+        canRest: true,
+        gridWidth: 8,
+        gridHeight: 8,
+        entryPos: { x: 0, y: 0 },
+        exits: [
+          {
+            pos: { x: 0, y: 1 },
+            toRoomId: 'bone_crypt',
+            entrancePos: { x: 7, y: 7 },
+            label: 'Back to the crypt',
+          },
+          {
+            pos: { x: 7, y: 7 },
+            toRoomId: 'great_hall',
+            entrancePos: { x: 0, y: 0 },
+            label: 'Into the great hall',
+          },
+        ],
+        objects: [
+          {
+            id: 'supply_crate',
+            name: 'Supply Crate',
+            desc: 'A heavy wooden crate, sealed with iron bands.',
+            interactText: 'You pry open the crate.',
+            searchable: true,
+            searchDC: 10,
+            lootIds: ['healing_potion'],
+            foundText: 'Inside: a vial of red liquid. A healing potion.',
+            emptyText: 'The lid jams. Get a better grip and try again.',
+          },
+        ],
+      },
+      {
+        id: 'great_hall',
+        name: 'Great Hall',
+        desc: 'A cavernous chamber with a crumbling stone throne at one end. Something large patrols the center.',
+        gridWidth: 8,
+        gridHeight: 8,
+        entryPos: { x: 0, y: 0 },
+        exits: [
+          {
+            pos: { x: 0, y: 1 },
+            toRoomId: 'storage_room',
+            entrancePos: { x: 7, y: 7 },
+            label: 'Back to storage',
+          },
+          {
+            pos: { x: 7, y: 7 },
+            toRoomId: 'cultist_chamber',
+            entrancePos: { x: 0, y: 0 },
+            label: 'To the cultist chamber',
+          },
+        ],
+      },
+      {
+        id: 'cultist_chamber',
+        name: 'Cultist Chamber',
+        desc: 'Ritual candles surround a dark altar. A robed figure turns to face you, eyes wild with fervor.',
+        gridWidth: 8,
+        gridHeight: 8,
+        entryPos: { x: 0, y: 0 },
+        exits: [
+          {
+            pos: { x: 0, y: 1 },
+            toRoomId: 'great_hall',
+            entrancePos: { x: 7, y: 7 },
+            label: 'Back to the great hall',
+          },
+          {
+            pos: { x: 7, y: 0 },
+            toRoomId: 'exit_gate',
+            entrancePos: { x: 0, y: 0 },
+            label: 'Toward the gate',
+          },
+        ],
+      },
+      {
+        id: 'exit_gate',
+        name: 'Exit Gate',
+        desc: 'Iron-banded doors stand at the far end of the chamber. Freedom — if you can reach it.',
+        gridWidth: 8,
+        gridHeight: 8,
+        entryPos: { x: 0, y: 0 },
+        exits: [
+          {
+            pos: { x: 0, y: 1 },
+            toRoomId: 'cultist_chamber',
+            entrancePos: { x: 7, y: 0 },
+            label: 'Back to the cultist chamber',
+          },
+          { pos: { x: 7, y: 7 }, ascends: true, label: 'Force the gate — leave the dungeon' },
+        ],
+      },
+    ],
+    connections: {},
+    regions: [
+      {
+        id: 'sandbox_region',
+        name: 'The Testing Grounds',
+        desc: 'A featureless approach to the dungeon mouth.',
+        feetPerSquare: 5280,
+        gridWidth: 6,
+        gridHeight: 5,
+        startPos: { x: 1, y: 2 },
+        sites: [
+          {
+            id: 'site_dungeon',
+            name: 'The Dungeon',
+            pos: { x: 3, y: 2 },
+            kind: 'local',
+            entryRoomId: 'entry_hall',
+          },
+        ],
+      },
+    ],
+    enemies: {
+      guard_post: [{ ...SRD_MONSTERS.goblin, id: 'guard_post#0' }],
+      bone_crypt: [{ ...SRD_MONSTERS.skeleton, id: 'bone_crypt#0' }],
+      great_hall: [{ ...SRD_MONSTERS.ogre, id: 'great_hall#0' }],
+      cultist_chamber: [{ ...SRD_MONSTERS.cult_fanatic, id: 'cultist_chamber#0' }],
+    },
+    loot: {
+      great_hall: {
+        id: 'plus1_longsword',
+        name: '+1 Longsword',
+        desc: '1d8+1 slashing (1d10+1 two-handed), magical',
+        weight: 6,
+        type: 'weapon',
+        slot: 'weapon',
+        damage: '1d8+1',
+        versatileDamage: '1d10+1',
+        finesse: false,
+        range: 'melee',
+        ac_bonus: null,
+        heal: null,
+        effect: null,
+        aliases: ['+1 longsword', 'magic sword', 'enchanted longsword'],
+        weaponType: 'martial',
+        damageType: 'slashing',
+        requiresAttunement: true,
+      },
+    },
+  },
 
   // ─── Intro texts ──────────────────────────────────────────────────────────────
   introTexts: [
