@@ -10,6 +10,23 @@ import { findPath, posEqual } from './gridEngine.js';
 
 const DEFAULT_LOCAL_GRID = 10;
 const DEFAULT_LOCAL_SCALE = 5;
+const FEET_PER_MILE = 5280;
+const NORMAL_MILES_PER_HOUR = 3; // SRD Travel Pace — Normal (3 mi/hr, 24 mi/day)
+
+/**
+ * Place the party on the regional grid at campaign start. No-op unless the
+ * campaign uses the new map model (`regions`) and map state isn't already set.
+ */
+export function initMapState(campaign: CampaignData | undefined, st: GameState): GameState {
+  const region = campaign?.regions?.[0];
+  if (!region || st.map_level) return st;
+  return {
+    ...st,
+    map_level: 'regional',
+    current_region_id: region.id,
+    marker_pos: region.startPos,
+  };
+}
 
 // A transition cell on the active grid — where stepping onto it does something.
 export interface MapTransition {
@@ -149,6 +166,11 @@ export interface MarkerMoveResult {
   squaresMoved: number;
   /** A transition was resolved at the destination (descend/ascend/room change). */
   transitioned: boolean;
+  /** Travel time the move cost in hours (regional grid only). */
+  elapsedHours: number;
+  /** A random encounter triggered en route — the rolled enemy template name.
+   *  The caller drops the party into a local encounter (combat). */
+  encounter?: string;
   rejected?: string;
 }
 
@@ -163,25 +185,49 @@ export function resolveMarkerMove(
   st: GameState,
   to: GridPos
 ): MarkerMoveResult {
+  const reject = (rejected: string): MarkerMoveResult => ({
+    st,
+    narrative: '',
+    squaresMoved: 0,
+    transitioned: false,
+    elapsedHours: 0,
+    rejected,
+  });
   const grid = activeGrid(campaign, rooms, st);
-  if (!grid)
-    return { st, narrative: '', squaresMoved: 0, transitioned: false, rejected: 'No map here.' };
+  if (!grid) return reject('No map here.');
   const from = st.marker_pos ?? grid.startPos;
-  if (posEqual(from, to)) {
-    return { st, narrative: '', squaresMoved: 0, transitioned: false, rejected: 'Already there.' };
-  }
-  if (to.x < 0 || to.x >= grid.width || to.y < 0 || to.y >= grid.height) {
-    return { st, narrative: '', squaresMoved: 0, transitioned: false, rejected: 'Off the map.' };
-  }
+  if (posEqual(from, to)) return reject('Already there.');
+  if (to.x < 0 || to.x >= grid.width || to.y < 0 || to.y >= grid.height)
+    return reject('Off the map.');
   const path = findPath(from, to, grid.obstacles, grid.width, grid.height);
-  if (!path || path.length === 0) {
-    return { st, narrative: '', squaresMoved: 0, transitioned: false, rejected: 'No path there.' };
-  }
+  if (!path || path.length === 0) return reject('No path there.');
+
   let next: GameState = { ...st, marker_pos: to };
   const squaresMoved = path.length;
   let narrative = '';
 
-  const transition = transitionAt(grid, to);
+  // ── Regional travel: spend SRD travel time + roll a per-square encounter ────
+  let elapsedHours = 0;
+  let encounter: string | undefined;
+  if (grid.level === 'regional') {
+    const region = regionById(campaign, st.current_region_id);
+    const milesPerSquare = grid.feetPerSquare / FEET_PER_MILE;
+    elapsedHours = (squaresMoved * milesPerSquare) / NORMAL_MILES_PER_HOUR;
+    next.world_hour = (st.world_hour ?? 0) + elapsedHours;
+    const chance = region?.encounterChance ?? 0;
+    const table = region?.encounterTable ?? [];
+    if (chance > 0 && table.length > 0) {
+      for (let i = 0; i < squaresMoved; i++) {
+        if (Math.random() < chance) {
+          encounter = table[Math.floor(Math.random() * table.length)];
+          break;
+        }
+      }
+    }
+  }
+
+  // ── Resolve a transition cell at the destination (descend/ascend/room) ──────
+  const transition = encounter ? undefined : transitionAt(grid, to);
   let transitioned = false;
   if (transition) {
     const res = resolveTransition(campaign, rooms, next, transition);
@@ -189,7 +235,7 @@ export function resolveMarkerMove(
     narrative = res.narrative;
     transitioned = true;
   }
-  return { st: next, narrative, squaresMoved, transitioned };
+  return { st: next, narrative, squaresMoved, transitioned, elapsedHours, encounter };
 }
 
 /** Apply a transition the marker stepped onto: descend / ascend / change room. */

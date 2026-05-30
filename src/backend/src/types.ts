@@ -1415,6 +1415,10 @@ export interface GameState {
   quest_progress?: QuestProgress[];
   faction_rep?: Record<string, number>; // factionId → numeric rep
   world_day?: number;
+  // Total elapsed travel time in hours (regional grid: marker movement spends
+  // SRD travel time — Normal pace 3 mi/hr — per square crossed). Campaigns can
+  // derive the day as floor(world_hour / 24).
+  world_hour?: number;
 
   // Choice-dimming memory. Each entry is a stable seenKey emitted by the
   // backend when the corresponding choice was clicked (talk_response,

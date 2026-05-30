@@ -116,6 +116,7 @@ import { enemyActor, pcActor } from './actions/actor.js';
 import { fmt, stripForLlm } from './narrativeFmt.js';
 import { COMBAT_LOG_MAX } from '../types.js';
 import { Engine } from 'json-rules-engine';
+import { activeGrid } from './mapEngine.js';
 import { applyDamage } from './damage.js';
 import { applyStateMigrations } from './stateSchema.js';
 import { canTakeFeat } from './feats.js';
@@ -3696,6 +3697,27 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
           action: { type: 'enter_district', districtId: d.id },
         });
       }
+    }
+  }
+
+  // 3-level grid map model — surface a `marker_move` choice for each transition
+  // cell on the current grid (region sites, town venues, room exits / ascend),
+  // out of combat. The FE grid additionally lets the player free-roam the marker;
+  // these discrete choices keep the map playable without it. (No-op until a
+  // campaign defines `regions`/`towns` and the party is on a map grid.)
+  if (!state.combat_active && !enemyAlive && state.map_level) {
+    const grid = activeGrid(context.campaign, seed.rooms, state);
+    for (const t of grid?.transitions ?? []) {
+      if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+      const verb =
+        t.kind === 'ascend'
+          ? 'Leave —'
+          : t.kind === 'site' && t.toTownId
+            ? 'Travel to'
+            : t.kind === 'site' || t.kind === 'venue'
+              ? 'Enter'
+              : 'Go to';
+      choices.push({ label: `${verb} ${t.label}`, action: { type: 'marker_move', to: t.pos } });
     }
   }
   // ── Combat action economy choices ─────────────────────────────────────────

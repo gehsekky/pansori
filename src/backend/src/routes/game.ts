@@ -68,6 +68,7 @@ import { expertiseSlotsForClassLevel, resolveCreationExpertise } from '../servic
 import type { AuthedRequest } from '../auth/middleware.js';
 import { applyFeatTake } from '../services/feats.js';
 import { generateSeed } from '../services/procgen.js';
+import { initMapState } from '../services/mapEngine.js';
 import { loadContexts } from '../services/contextLoader.js';
 import { pool } from '../db/pool.js';
 import { randomUUID } from 'crypto';
@@ -601,6 +602,11 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
       npc_attitudes: {},
       npc_talked: [],
     };
+
+    // 3-level grid map model — if the campaign defines `regions`, start the party
+    // on the regional grid (single marker at the region's start cell). No-op for
+    // campaigns still on the Location model.
+    Object.assign(initialState, initMapState(ctx.campaign, initialState));
 
     const startNarrative =
       seed.intro + ' ' + buildArrivalNarrative(ctx.startRoomId, initialState, seed, ctx);
