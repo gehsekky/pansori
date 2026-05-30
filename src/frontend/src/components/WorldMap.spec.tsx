@@ -19,12 +19,20 @@ const mockSeed: Seed = {
     { id: 'room-1', name: 'Start Room', desc: 'Initial room.' },
     { id: 'room-2', name: 'Hallway', desc: 'A transition.' },
   ],
-  connections: {
-    'room-1': ['room-2'],
-    'room-2': ['room-1'],
-  },
+  connections: {},
   enemies: {},
   loot: {},
+  regions: [
+    {
+      id: 'reg1',
+      name: 'The Wilds',
+      feetPerSquare: 5280,
+      gridWidth: 6,
+      gridHeight: 5,
+      startPos: { x: 0, y: 0 },
+      sites: [{ id: 's', name: 'Town', pos: { x: 3, y: 2 }, kind: 'town', townId: 't1' }],
+    },
+  ],
 };
 
 function makeChar(overrides: Partial<Character> = {}): Character {
@@ -109,39 +117,43 @@ function makeState(
   };
 }
 
+// On the regional grid: activeGrid resolves the region, so the map renders it.
+const regionalState = () =>
+  makeState(
+    {},
+    {
+      map_level: 'regional',
+      current_region_id: 'reg1',
+      marker_pos: { x: 0, y: 0 },
+      current_room: '',
+    }
+  );
+
 describe('WorldMap Component', () => {
-  it('renders correctly and displays the world name from the seed', () => {
-    render(<WorldMap seed={mockSeed} state={makeState()} onClose={() => {}} />);
-    // Verify the world name is rendered in the UI
+  it('displays the world name from the seed in the title', () => {
+    render(<WorldMap seed={mockSeed} state={regionalState()} onClose={() => {}} />);
     expect(screen.getByText(/The Testing Grounds/i)).toBeTruthy();
   });
 
-  it('renders room names defined in the seed', () => {
-    render(
-      <WorldMap
-        seed={mockSeed}
-        state={makeState({}, { visited_rooms: ['room-1', 'room-2'] })}
-        onClose={() => {}}
-      />
-    );
-    expect(screen.getByText(/start room/i)).toBeTruthy();
-    expect(screen.getByText(/hallway/i)).toBeTruthy();
+  it('renders the active grid (region name + travel points) when on a grid', () => {
+    render(<WorldMap seed={mockSeed} state={regionalState()} onClose={() => {}} />);
+    // GridMapView header shows the level + current grid name.
+    expect(screen.getByText(/REGION · The Wilds/i)).toBeTruthy();
+    // The town site is a labelled travel point on the grid.
+    expect(screen.getByTitle('Town')).toBeTruthy();
   });
 
   it('triggers the onClose callback when the close button is clicked', () => {
     const onClose = vi.fn();
-    render(<WorldMap seed={mockSeed} state={makeState()} onClose={onClose} />);
-
-    // Assumes the component contains a button with "Close" or an "✕" icon label
+    render(<WorldMap seed={mockSeed} state={regionalState()} onClose={onClose} />);
     const closeBtn = screen.getByRole('button', { name: /close|✕/i });
     fireEvent.click(closeBtn);
-
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('renders safely even with an empty room list', () => {
-    const emptySeed = { ...mockSeed, rooms: [] };
-    render(<WorldMap seed={emptySeed} state={makeState()} onClose={() => {}} />);
-    expect(screen.getByText(/The Testing Grounds/i)).toBeTruthy();
+  it('shows a fallback note when there is no resolvable grid (e.g. in combat)', () => {
+    // Default state has no map_level → activeGrid returns null.
+    render(<WorldMap seed={mockSeed} state={makeState()} onClose={() => {}} />);
+    expect(screen.getByText(/No map to show here/i)).toBeTruthy();
   });
 });

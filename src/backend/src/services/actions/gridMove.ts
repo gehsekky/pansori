@@ -70,11 +70,8 @@ export const handleGridMove: ActionHandler<{
     }
   }
 
-  const locationGrid = ctx.context.campaign?.locations?.find((l) =>
-    l.rooms?.some((r) => r.id === ctx.roomId)
-  );
-  const gridW = locationGrid?.gridWidth ?? ctx.context.gridWidth ?? 10;
-  const gridH = locationGrid?.gridHeight ?? ctx.context.gridHeight ?? 10;
+  const gridW = ctx.context.gridWidth ?? 10;
+  const gridH = ctx.context.gridHeight ?? 10;
   // Dead entities don't block — walking over a corpse is allowed (matches
   // the FE's isReachable). Static obstacles (columns, walls, debris) do.
   const currentRoomForMove = ctx.seed.rooms.find((r) => r.id === ctx.roomId);

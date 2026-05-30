@@ -278,11 +278,8 @@ export function runUtilitySpell(
   // movement). Willing-creature passenger deferred. No-op when the
   // grid isn't populated — narrative-only fallback.
   if (spell.id === 'dimension_door' && ctx.st.entities) {
-    const locationGrid = ctx.context.campaign?.locations?.find((l) =>
-      l.rooms?.some((r) => r.id === ctx.roomId)
-    );
-    const gridW = locationGrid?.gridWidth ?? ctx.context.gridWidth ?? 10;
-    const gridH = locationGrid?.gridHeight ?? ctx.context.gridHeight ?? 10;
+    const gridW = ctx.context.gridWidth ?? 10;
+    const gridH = ctx.context.gridHeight ?? 10;
     const currentRoomForDD = ctx.seed.rooms.find((r) => r.id === ctx.roomId);
     const roomObstacles = currentRoomForDD?.obstacles ?? [];
     const occupied = new Set(

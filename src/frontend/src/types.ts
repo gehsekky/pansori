@@ -15,12 +15,10 @@ import type {
   CombatEvent,
   ConditionName,
   CoverLevel,
-  District,
   Faction,
   FactionThresholds,
   GameChoice,
   GridPos,
-  LocationType,
   NpcAttitude,
   NpcTemplate,
   PendingReaction,
@@ -514,25 +512,9 @@ export interface SessionSummary {
 
 // ─── Locations ────────────────────────────────────────────────────────────────
 
-// `LocationType` is re-exported from ./shared-types (see src/shared/types.ts).
-
-// `District` is re-exported from ./shared-types (see src/shared/types.ts).
-
-export interface Location {
-  id: string;
-  name: string;
-  type: LocationType;
-  desc: string;
-  districts?: District[];
-  gridWidth?: number;
-  gridHeight?: number;
-  connections?: string[];
-}
-
 // ─── Campaign metadata (delivered alongside session payload) ─────────────────
 
 export interface CampaignMeta {
   quests: Quest[];
   factions: Faction[];
-  locations: Location[];
 }

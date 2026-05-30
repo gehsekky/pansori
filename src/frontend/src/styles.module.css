@@ -1300,6 +1300,17 @@
   letter-spacing: 0.08em;
 }
 
+/* Shown in the map overlay when the party is in a transient area (combat /
+   encounter) with no resolvable grid. */
+.mapEmptyNote {
+  color: var(--t-dim);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  max-width: 32ch;
+  margin: 1rem auto;
+  text-align: center;
+}
+
 /* ─── InitiativeStrip ───────────────────────────────────────────────────── */
 
 .initiativeStrip {

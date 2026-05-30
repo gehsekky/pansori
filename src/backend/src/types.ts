@@ -13,13 +13,11 @@ import type {
   CombatEntity,
   CombatEvent,
   ConditionName,
-  District,
   Faction,
   Feat,
   GameChoice,
   GameConsequence,
   GridPos,
-  LocationType,
   LootItem,
   NpcAttitude,
   NpcTemplate,
@@ -1494,9 +1492,8 @@ export interface CampaignData {
   // campaign-mode runs. Roguelike NPCs are still placed by procgen.
   npcs?: Record<string, PlacedNpc>;
   startingLoot?: string[];
-  locations?: Location[];
-  // 3-level grid map model (regional → town → local). Replaces `locations` for
-  // migrated campaigns: the overworld is one or more `regions` (grids of sites),
+  // 3-level grid map model (regional → town → local): the overworld is one or
+  // more `regions` (grids of sites),
   // `towns` are settlement grids of venues, and local rooms live in `rooms`
   // (reached via a site/venue `entryRoomId` and navigated by room `exits`).
   regions?: Region[];
@@ -1710,25 +1707,4 @@ export interface Town {
   obstacles?: GridPos[];
   startPos: GridPos;
   venues: MapVenue[];
-}
-
-export interface Location {
-  id: string;
-  name: string;
-  type: LocationType;
-  desc: string;
-  districts?: District[];
-  rooms?: Room[];
-  gridWidth?: number;
-  gridHeight?: number;
-  connections?: string[];
-  encounterTable?: string[];
-  encounterChance?: number;
-  // Anchor room for "you're at this location" — used to resolve
-  // current_location_id from current_room when the player hasn't
-  // explicitly travelled (e.g. the campaign starts the party at a
-  // town's central square; without this, quest steps gated on
-  // location_id never match because the engine had no way to know
-  // the party was in town).
-  centralRoomId?: string;
 }

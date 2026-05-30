@@ -3678,32 +3678,6 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     choices.push({ label: `Attack ${npc.name} (makes hostile)`, action: { type: 'attack_npc' } });
   }
 
-  // ── Town/district navigation choices ──────────────────────────────────────
-  // Emit travel choices for connected locations (out of combat only, and not
-  // with a hostile in the current room — RAW egress rule).
-  if (!state.combat_active && !enemyAlive && state.current_location_id) {
-    const here = context.campaign?.locations?.find((l) => l.id === state.current_location_id);
-    for (const connId of here?.connections ?? []) {
-      if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
-      const dest = context.campaign?.locations?.find((l) => l.id === connId);
-      if (!dest) continue;
-      choices.push({
-        label: `Travel to ${dest.name}`,
-        action: { type: 'travel', locationId: dest.id },
-      });
-    }
-    // District navigation: when in a town and no specific district selected, list districts
-    if (here?.districts?.length && !state.current_district_id) {
-      for (const d of here.districts) {
-        if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
-        choices.push({
-          label: `Enter ${d.name}`,
-          action: { type: 'enter_district', districtId: d.id },
-        });
-      }
-    }
-  }
-
   // 3-level grid map model — surface a `marker_move` choice for each transition
   // cell on the current grid (region sites, town venues, room exits / ascend),
   // out of combat. The FE grid additionally lets the player free-roam the marker;
@@ -6056,11 +6030,8 @@ function planEnemyApproach(args: {
   roomId: string;
   roomObstacles?: GridPos[];
 }): { newPos: GridPos; pathSquares: GridPos[]; reached: boolean } | null {
-  const locationGrid = args.context.campaign?.locations?.find((l) =>
-    l.rooms?.some((r) => r.id === args.roomId)
-  );
-  const gridW = locationGrid?.gridWidth ?? args.context.gridWidth ?? 10;
-  const gridH = locationGrid?.gridHeight ?? args.context.gridHeight ?? 10;
+  const gridW = args.context.gridWidth ?? 10;
+  const gridH = args.context.gridHeight ?? 10;
   const blocked = [
     ...(args.st.entities ?? []).filter((e) => e.id !== args.enemyId && e.hp > 0).map((e) => e.pos),
     ...(args.roomObstacles ?? []),
@@ -7129,9 +7100,8 @@ export function pushEntityAway(
   const ent = st.entities?.find((e) => e.id === entityId);
   if (!ent || pushFt <= 0) return { st, pushedFt: 0 };
   const epos = ent.pos;
-  const locGrid = context.campaign?.locations?.find((l) => l.rooms?.some((r) => r.id === roomId));
-  const gw = locGrid?.gridWidth ?? context.gridWidth ?? 10;
-  const gh = locGrid?.gridHeight ?? context.gridHeight ?? 10;
+  const gw = context.gridWidth ?? 10;
+  const gh = context.gridHeight ?? 10;
   const dy = Math.sign(epos.y - fromPos.y);
   let dx = Math.sign(epos.x - fromPos.x);
   if (dx === 0 && dy === 0) dx = 1; // overlapping — pick a direction
@@ -7912,11 +7882,8 @@ export async function runEnemyTurns(args: {
           // toward it, so the creature moves as far from the caster as its speed
           // allows. The target must stay on-grid or the pathfinder finds no
           // destination cell.
-          const locGrid = args.context.campaign?.locations?.find((l) =>
-            l.rooms?.some((rr) => rr.id === st.current_room)
-          );
-          const gw = locGrid?.gridWidth ?? args.context.gridWidth ?? 10;
-          const gh = locGrid?.gridHeight ?? args.context.gridHeight ?? 10;
+          const gw = args.context.gridWidth ?? 10;
+          const gh = args.context.gridHeight ?? 10;
           const vx = epos.x - casterEnt.pos.x;
           const vy = epos.y - casterEnt.pos.y;
           const awayTarget = {
