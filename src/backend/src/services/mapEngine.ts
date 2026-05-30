@@ -13,6 +13,11 @@ const DEFAULT_LOCAL_SCALE = 5;
 const FEET_PER_MILE = 5280;
 const NORMAL_MILES_PER_HOUR = 3; // SRD Travel Pace — Normal (3 mi/hr, 24 mi/day)
 
+// The transient room id a wilderness encounter fights in. Not an authored room —
+// `activeGrid` returns null for it (no marker movement mid-fight); combat uses the
+// campaign's default combat grid. Cleared on return.
+export const ENCOUNTER_ROOM_ID = '__encounter__';
+
 /**
  * Place the party on the regional grid at campaign start. No-op unless the
  * campaign uses the new map model (`regions`) and map state isn't already set.
@@ -329,4 +334,49 @@ export function resolveTransition(
     };
   }
   return { st, narrative: '' };
+}
+
+/**
+ * Drop the party off the map into a transient local combat (a rolled wilderness
+ * encounter). Bookmarks the current grid position in `encounter_return` so
+ * `returnFromEncounter` can march them back once the fight collapses, and puts
+ * the party in the encounter room. The caller seeds the actual enemy into
+ * `seed.enemies[ENCOUNTER_ROOM_ID]` (enemies live on the run seed, not state);
+ * combat then spins up the usual way (PC entities deploy on the first attack).
+ */
+export function stageEncounter(st: GameState): GameState {
+  return {
+    ...st,
+    encounter_return: {
+      level: st.map_level ?? 'regional',
+      region_id: st.current_region_id,
+      town_id: st.current_town_id,
+      pos: st.marker_pos ?? { x: 0, y: 0 },
+    },
+    map_level: 'local',
+    current_room: ENCOUNTER_ROOM_ID,
+    marker_pos: { x: 1, y: 1 },
+  };
+}
+
+/**
+ * Collapse a wilderness encounter once combat ends: march the party back to the
+ * grid cell they were travelling on (the `encounter_return` bookmark). No-op
+ * when the party isn't returning from an encounter. Called from
+ * `endCombatState` so every victory/flee path returns to the map. (The dead
+ * encounter enemy stays in `seed.enemies[ENCOUNTER_ROOM_ID]` flagged killed —
+ * harmless once `current_room` leaves it; a fresh encounter overwrites it.)
+ */
+export function returnFromEncounter(st: GameState): GameState {
+  const ret = st.encounter_return;
+  if (!ret) return st;
+  return {
+    ...st,
+    map_level: ret.level,
+    current_region_id: ret.region_id,
+    current_town_id: ret.town_id,
+    current_room: '',
+    marker_pos: ret.pos,
+    encounter_return: undefined,
+  };
 }
