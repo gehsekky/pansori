@@ -76,6 +76,7 @@ import {
   defenseAcBonus,
   fightingStyleSlots,
 } from './fightingStyle.js';
+import { activeGrid, returnFromEncounter } from './mapEngine.js';
 import { applyExpiryHooks, getConditionDuration } from './conditions/registry.js';
 import {
   applyMulticlassProfGrants,
@@ -116,7 +117,6 @@ import { enemyActor, pcActor } from './actions/actor.js';
 import { fmt, stripForLlm } from './narrativeFmt.js';
 import { COMBAT_LOG_MAX } from '../types.js';
 import { Engine } from 'json-rules-engine';
-import { activeGrid } from './mapEngine.js';
 import { applyDamage } from './damage.js';
 import { applyStateMigrations } from './stateSchema.js';
 import { canTakeFeat } from './feats.js';
@@ -2623,8 +2623,12 @@ export function buildInitiativeOrder(chars: Character[], enemies: Enemy[]): Init
 }
 
 export function endCombatState(st: GameState): GameState {
+  // A wilderness encounter collapses straight back onto the map — march the
+  // party to the cell they were travelling on and drop the transient encounter
+  // room. No-op for authored-room combat (encounter_return unset).
+  const collapsed = returnFromEncounter(st);
   return {
-    ...st,
+    ...collapsed,
     combat_active: false,
     initiative_order: [],
     initiative_idx: 0,

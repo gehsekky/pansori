@@ -1,6 +1,7 @@
+import { ENCOUNTER_ROOM_ID, resolveMarkerMove, stageEncounter } from '../mapEngine.js';
+import { materializeEnemy, scaleEnemyHp } from '../enemyFactory.js';
 import type { ActionHandler } from './types.js';
 import type { GridPos } from '../../types.js';
-import { resolveMarkerMove } from '../mapEngine.js';
 
 /**
  * `marker_move`: move the single party marker on the current grid (regional /
@@ -30,9 +31,25 @@ export const handleMarkerMove: ActionHandler<{ type: 'marker_move'; to: GridPos 
   if (res.elapsedHours >= 1) {
     ctx.narrative += ` (${Math.round(res.elapsedHours)} hr of travel.)`;
   }
-  // A random encounter interrupted the march. Dropping the party into a local
-  // encounter map (combat) is wired in a follow-up; surface it for now.
+  // A random encounter interrupted the march — drop the party off the map into
+  // a transient local combat against the rolled creature. Materialize it from
+  // the campaign bestiary (scaled to party size, like authored room enemies);
+  // `endCombatState` marches the party back to this cell once the fight ends.
   if (res.encounter) {
-    ctx.narrative += ` ⚔️ Ambush! A ${res.encounter} blocks the way.`;
+    const template = ctx.context.enemyTemplates.find((t) => t.name === res.encounter);
+    if (template) {
+      const partySize = Math.max(1, ctx.st.characters.filter((c) => !c.dead).length);
+      const hp = scaleEnemyHp(template.hp, partySize);
+      // Unique id per encounter so a repeat of the same creature isn't treated
+      // as already-killed (enemies_killed tracks ids).
+      const enemy = materializeEnemy(template, `${ENCOUNTER_ROOM_ID}#${Date.now()}`, hp);
+      ctx.seed.enemies = { ...(ctx.seed.enemies ?? {}), [ENCOUNTER_ROOM_ID]: [enemy] };
+      ctx.st = stageEncounter(ctx.st);
+      ctx.narrative += ` ⚔️ Ambush! A ${res.encounter} blocks the way — you have no choice but to fight.`;
+    } else {
+      // The encounter table named a creature absent from the bestiary — skip the
+      // drop rather than crash; the party simply presses on.
+      ctx.narrative += ` You sense danger nearby, but the way stays clear.`;
+    }
   }
 };

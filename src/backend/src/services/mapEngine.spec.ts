@@ -4,7 +4,14 @@
 // region. Pure-function tests on CampaignData + rooms + GameState.
 
 import type { CampaignData, GameState, Room } from '../types.js';
-import { activeGrid, initMapState, resolveMarkerMove } from './mapEngine.js';
+import {
+  ENCOUNTER_ROOM_ID,
+  activeGrid,
+  initMapState,
+  resolveMarkerMove,
+  returnFromEncounter,
+  stageEncounter,
+} from './mapEngine.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 afterEach(() => vi.restoreAllMocks());
@@ -247,6 +254,39 @@ describe('regional encounters', () => {
     expect(r.encounter).toBe('Bandit Ruffian');
     expect(r.transitioned).toBe(false); // interrupted en route — didn't enter the town
     expect(r.st.map_level).toBe('regional');
+  });
+
+  it('stage → return round-trips the party back to the travelling cell', () => {
+    const travelling = {
+      map_level: 'regional',
+      current_region_id: 'reg1',
+      marker_pos: { x: 4, y: 2 },
+      visited_rooms: [],
+    } as unknown as GameState;
+
+    // Drop off the map into the transient encounter room.
+    const staged = stageEncounter(travelling);
+    expect(staged.map_level).toBe('local');
+    expect(staged.current_room).toBe(ENCOUNTER_ROOM_ID);
+    expect(staged.encounter_return).toEqual({
+      level: 'regional',
+      region_id: 'reg1',
+      town_id: undefined,
+      pos: { x: 4, y: 2 },
+    });
+
+    // Combat collapses → march back to the exact cell we were travelling on.
+    const back = returnFromEncounter(staged);
+    expect(back.map_level).toBe('regional');
+    expect(back.current_region_id).toBe('reg1');
+    expect(back.marker_pos).toEqual({ x: 4, y: 2 });
+    expect(back.current_room).toBe('');
+    expect(back.encounter_return).toBeUndefined();
+  });
+
+  it('returnFromEncounter is a no-op when not returning from an encounter', () => {
+    const st = start();
+    expect(returnFromEncounter(st)).toBe(st);
   });
 
   it('no encounter when the chance roll misses', () => {

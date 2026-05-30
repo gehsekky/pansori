@@ -1,4 +1,5 @@
 import type { Context, Enemy, GridPos, LootItem, PlacedNpc, Room, Seed } from '../types.js';
+import { materializeEnemy, scaleEnemyHp } from './enemyFactory.js';
 import { randomUUID } from 'crypto';
 
 function roll(sides: number): number {
@@ -43,11 +44,6 @@ export function generateSeed(context: Context, partySize = 1): Seed {
     };
   }
   return generateRoguelikeSeed(context, partySize);
-}
-
-// HP scaling formula: 1× solo, 1.5× 2-player, 2× 3-player, 2.5× 4-player
-function scaleEnemyHp(baseHp: number, partySize: number): number {
-  return Math.max(1, Math.round(baseHp * (0.5 + partySize * 0.5)));
 }
 
 export function generateRoguelikeSeed(context: Context, partySize = 1): Seed {
@@ -177,56 +173,7 @@ export function generateRoguelikeSeed(context: Context, partySize = 1): Seed {
       const pool = context.enemyTemplates.filter((t) => t.cr <= maxCr);
       const template = pick(pool.length ? pool : context.enemyTemplates);
       const scaledHp = scaleEnemyHp(template.hp, partySize);
-      enemies[r.id] = [
-        {
-          id: `${r.id}#0`,
-          name: template.name,
-          hp: scaledHp,
-          maxHp: scaledHp,
-          ac: template.ac,
-          damage: template.damage,
-          toHit: template.toHit,
-          xp: template.xp,
-          str: template.str,
-          dex: template.dex,
-          con: template.con,
-          int: template.int,
-          wis: template.wis,
-          cha: template.cha,
-          onHitEffect: template.onHitEffect,
-          multiattack: template.multiattack,
-          resistances: template.resistances,
-          vulnerabilities: template.vulnerabilities,
-          immunities: template.immunities,
-          condition_immunities: template.condition_immunities,
-          spells: template.spells,
-          castChance: template.castChance,
-          spellSaveDC: template.spellSaveDC,
-          spellAttackBonus: template.spellAttackBonus,
-          attackReachFt: template.attackReachFt,
-          speedFt: template.speedFt,
-          darkvision_ft: template.darkvision_ft,
-          sunlightSensitivity: template.sunlightSensitivity,
-          phases: template.phases,
-          damageType: template.damageType,
-          packTactics: template.packTactics,
-          bloodiedFrenzy: template.bloodiedFrenzy,
-          bonusDamage: template.bonusDamage,
-          bonusDamageType: template.bonusDamageType,
-          undeadFortitude: template.undeadFortitude,
-          lifeDrain: template.lifeDrain,
-          parry: template.parry,
-          parryBonus: template.parryBonus,
-          rampage: template.rampage,
-          aura: template.aura,
-          legendary_actions: template.legendary_actions,
-          legendary_pool: template.legendary_pool,
-          legendary_action_points: template.legendary_actions
-            ? (template.legendary_pool ?? 3)
-            : undefined,
-          lair_actions: template.lair_actions,
-        },
-      ];
+      enemies[r.id] = [materializeEnemy(template, `${r.id}#0`, scaledHp)];
     }
     if (Math.random() < 0.5) {
       loot[r.id] = weightedPick(context.lootTable);

@@ -1411,6 +1411,16 @@ export interface GameState {
   // descend, read on ascend.
   region_marker_pos?: GridPos;
   town_marker_pos?: GridPos;
+  // A wilderness random encounter dropped the party off the map into a transient
+  // local combat. Bookmarks where to march back to once the fight collapses
+  // (`endCombatState`): the grid level + region/town id + marker cell the party
+  // was travelling on. Cleared on return.
+  encounter_return?: {
+    level: MapLevel;
+    region_id?: string;
+    town_id?: string;
+    pos: GridPos;
+  };
   campaign_flags?: Record<string, boolean | string | number>;
   quest_progress?: QuestProgress[];
   faction_rep?: Record<string, number>; // factionId → numeric rep
