@@ -31,26 +31,11 @@ import {
   seedWithEnemy,
   spellSeed,
 } from '../test-fixtures.js';
-import { generateRoguelikeSeed, generateSeed } from './procgen.js';
 import { context as ctx } from '../contexts/sandbox.js';
+import { generateSeed } from './procgen.js';
 import { context as valeCtx } from '../contexts/vale_of_shadows.js';
 
 afterEach(() => vi.restoreAllMocks());
-
-// Legacy room-`move` fixture. Vale of Shadows migrated to the 3-level grid map
-// (regions/towns/room-exits) with an empty `connections` graph, so the room
-// `move` handler — still live until its own teardown step — is tested against a
-// frozen connections-shaped fixture rather than the migrated campaign.
-const legacyNavCtx: typeof valeCtx = {
-  ...valeCtx,
-  campaign: {
-    ...valeCtx.campaign!,
-    connections: {
-      dungeon_antechamber: ['dungeon_offering_chamber', 'dungeon_charnel_hall'],
-      dungeon_offering_chamber: ['dungeon_antechamber', 'dungeon_ossuary'],
-    },
-  },
-};
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -329,11 +314,6 @@ describe('buildArrivalNarrative', () => {
     expect(text.length).toBeGreaterThan(0);
   });
 
-  it('includes the name of an adjacent room in the exits list', () => {
-    const text = buildArrivalNarrative(ctx.startRoomId, makeState(), seed, ctx);
-    expect(text).toContain('Guard Post');
-  });
-
   it('mentions a live enemy in the room', () => {
     const text = buildArrivalNarrative(
       CORRIDOR_ID,
@@ -389,12 +369,6 @@ describe('generateChoices', () => {
     expect(choices).toHaveLength(1);
     expect(choices[0].action.type).toBe('use');
     expect(choices[0].label).toBe('Use healing item');
-  });
-
-  it('includes a move option for each adjacent room', () => {
-    const choices = generateChoices(makeState(), seed, ctx);
-    expect(choices.some((c) => c.label.includes('Guard Post'))).toBe(true);
-    expect(choices.some((c) => c.action.type === 'move')).toBe(true);
   });
 
   it('includes attack option when an enemy is alive', () => {
@@ -478,21 +452,6 @@ describe('takeAction', () => {
     expect(result.dead).toBe(false);
   });
 
-  it('moving to an adjacent room updates current_room and room_log', async () => {
-    const result = await takeAction({
-      action: { type: 'move', roomId: CORRIDOR_ID },
-      history: [],
-      state: makeState(),
-      seed,
-      context: ctx,
-    });
-    expect(result.newState.current_room).toBe(CORRIDOR_ID);
-    expect(result.newState.visited_rooms).toContain(CORRIDOR_ID);
-    expect(result.newState.room_log).toHaveLength(1);
-    expect(result.newState.room_log[0].length).toBeGreaterThan(0);
-    expect(result.newState.room_log[0]).toMatch(/entry hall|exit gate|guard post/i);
-  });
-
   it('picking up loot adds item to inventory and marks loot_taken', async () => {
     const state = makeState(
       {},
@@ -510,44 +469,6 @@ describe('takeAction', () => {
     expect(char.inventory[0].id).toBe('medkit');
     expect(char.inventory[0].instance_id).toBeTruthy();
     expect(result.newState.loot_taken).toContain(CORRIDOR_ID);
-  });
-
-  // Test Case I — Grid combat blocks room movement
-  it('[Case I] moving out of a room during grid combat is blocked (use Disengage + grid_move)', async () => {
-    const state = makeState(
-      { hp: 20, max_hp: 20 },
-      {
-        current_room: CORRIDOR_ID,
-        visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
-        combat_active: true,
-        initiative_order: [
-          { id: 'char-1', roll: 15, is_enemy: false },
-          { id: CORRIDOR_ID, roll: 10, is_enemy: true },
-        ],
-        initiative_idx: 0,
-      }
-    );
-    const result = await takeAction({
-      action: { type: 'move', roomId: ctx.startRoomId },
-      history: [],
-      state,
-      seed: seedWithEnemy,
-      context: ctx,
-    });
-    // Move is blocked; player stays in room
-    expect(result.newState.current_room).toBe(CORRIDOR_ID);
-    expect(result.narrative.toLowerCase()).toMatch(/cannot flee|grid combat|disengage/);
-  });
-
-  it('[Case I] moving without an enemy present triggers no opportunity attack', async () => {
-    const result = await takeAction({
-      action: { type: 'move', roomId: CORRIDOR_ID },
-      history: [],
-      state: makeState(),
-      seed,
-      context: ctx,
-    });
-    expect(result.narrative.toLowerCase()).not.toMatch(/strikes as you go|opportunity/);
   });
 
   it('escape action at the escape room with no enemy sets escaped=true', async () => {
@@ -1145,7 +1066,7 @@ describe('runRules', () => {
       name: 'room_check',
       conditions: {
         all: [
-          { fact: 'action', operator: 'equal', value: 'move' },
+          { fact: 'action', operator: 'equal', value: 'marker_move' },
           { fact: 'room_id', operator: 'equal', value: CORRIDOR_ID },
         ],
       },
@@ -1155,7 +1076,7 @@ describe('runRules', () => {
     const result = await runRules(
       state,
       makeCtxWithRules([rule]),
-      { type: 'move', roomId: CORRIDOR_ID },
+      { type: 'marker_move', to: { x: 0, y: 0 } },
       ctx.startRoomId,
       seed
     );
@@ -1384,7 +1305,7 @@ describe('turn_actions lifecycle', () => {
 
 // ─── NPC actions ──────────────────────────────────────────────────────────────
 
-// (generateRoguelikeSeed is imported at the top of the file)
+// (generateSeed is imported at the top of the file)
 
 // ─── Ability Score Improvements ──────────────────────────────────────────────
 
@@ -1443,7 +1364,7 @@ describe('Ability Score Improvements', () => {
 
 describe('enemy HP scaling by party size', () => {
   it('1-player seed has unscaled enemy HP (1× base)', () => {
-    const s = generateRoguelikeSeed(ctx, 1);
+    const s = generateSeed(ctx, 1);
     for (const enemiesInRoom of Object.values(s.enemies)) {
       for (const enemy of enemiesInRoom) {
         // All enemies should have HP ≥ 1
@@ -1455,8 +1376,8 @@ describe('enemy HP scaling by party size', () => {
   it('2-player seed has ~1.5× the enemy HP of a 1-player seed for the same template', () => {
     // Fix random so both seeds pick the same enemy template
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
-    const s1 = generateRoguelikeSeed(ctx, 1);
-    const s2 = generateRoguelikeSeed(ctx, 2);
+    const s1 = generateSeed(ctx, 1);
+    const s2 = generateSeed(ctx, 2);
     const hps1 = Object.values(s1.enemies)
       .flat()
       .map((e) => e.hp);
@@ -4877,7 +4798,9 @@ describe('seenKeyForAction', () => {
 
   it('returns undefined for kinds that are not dim-tracked', () => {
     expect(seenKeyForAction({ type: 'attack' }, st)).toBeUndefined();
-    expect(seenKeyForAction({ type: 'move', roomId: 'foo' }, st)).toBeUndefined();
+    expect(
+      seenKeyForAction({ type: 'grid_move', entityId: 'c', to: { x: 0, y: 0 } }, st)
+    ).toBeUndefined();
     expect(seenKeyForAction({ type: 'dash' }, st)).toBeUndefined();
     expect(
       seenKeyForAction({ type: 'cast_spell', spellId: 'fire_bolt', slotLevel: 0 }, st)
@@ -4918,8 +4841,8 @@ describe('seenKeyForAction', () => {
 
 describe('generateChoices stamps seenKey on dim-tracked choices', () => {
   it('emitted talk_response / interact_object / loot choices carry a seenKey', () => {
-    // Use a procgen seed so we get a real room with possible loot/objects.
-    const sd = generateRoguelikeSeed(ctx);
+    // Use the campaign seed so we get a real room with possible loot/objects.
+    const sd = generateSeed(ctx);
     const startRoom = sd.rooms[0];
     const st = makeState({}, { current_room: startRoom.id });
     const choices = generateChoices(st, sd, ctx);
@@ -5181,7 +5104,7 @@ describe('backfillOwnership', () => {
 
 describe('hostile in current room blocks loot / move', () => {
   function valeSeedWithGhoulIn(room: string): Seed {
-    const base = generateSeed(legacyNavCtx, 1);
+    const base = generateSeed(valeCtx, 1);
     return {
       ...base,
       enemies: {
@@ -5239,27 +5162,29 @@ describe('hostile in current room blocks loot / move', () => {
       history: [],
       state: st,
       seed,
-      context: legacyNavCtx,
+      context: valeCtx,
     });
     expect(result.newState.loot_taken).not.toContain('guild_ledger');
     expect(result.narrative).toMatch(/hostile/i);
   });
 
-  it('move handler rejects when a hostile is in the current room', async () => {
+  it('marker_move is blocked when a hostile is in the current room', async () => {
     const seed = valeSeedWithGhoulIn('dungeon_offering_chamber');
     const st = makeState(
       { id: 'pc-1' },
       {
         current_room: 'dungeon_offering_chamber',
+        map_level: 'local',
+        marker_pos: { x: 0, y: 0 },
         active_character_id: 'pc-1',
       }
     );
     const result = await takeAction({
-      action: { type: 'move', roomId: 'dungeon_antechamber' },
+      action: { type: 'marker_move', to: { x: 5, y: 5 } },
       history: [],
       state: st,
       seed,
-      context: legacyNavCtx,
+      context: valeCtx,
     });
     expect(result.newState.current_room).toBe('dungeon_offering_chamber');
     expect(result.narrative).toMatch(/hostile/i);
@@ -5291,7 +5216,7 @@ describe('hostile in current room blocks loot / move', () => {
         current_location_id: 'dungeon_shattered_crypt',
       }
     );
-    const choices = generateChoices(st, seed, legacyNavCtx);
+    const choices = generateChoices(st, seed, valeCtx);
     expect(choices.find((c) => c.action.type === 'loot')).toBeUndefined();
     // Attack-the-ghoul should still surface so the player can engage.
     expect(choices.find((c) => c.action.type === 'attack')).toBeDefined();

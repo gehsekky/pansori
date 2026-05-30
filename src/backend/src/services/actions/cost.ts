@@ -97,7 +97,6 @@ export const ACTION_COSTS: Record<StructuredAction['type'], ActionCost> = {
   marker_move: 'managed', // out-of-combat map movement; no combat action economy
   accept_quest: 'managed',
   complete_quest: 'managed',
-  move: 'managed',
   loot: 'managed',
   use: 'managed',
   interact_object: 'managed',
