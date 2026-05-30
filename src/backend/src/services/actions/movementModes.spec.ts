@@ -32,7 +32,6 @@ const seed: Seed = {
       difficultTerrain: [{ x: 4, y: 6 }],
     },
   ],
-  connections: { [ctx.startRoomId]: [] },
   enemies: {},
   loot: {},
   npcs: {},

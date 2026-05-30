@@ -21,7 +21,6 @@ const polySeed: Seed = {
   intro: '',
   seed_id: 'poly',
   rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-  connections: { [ctx.startRoomId]: [] },
   enemies: {
     [ctx.startRoomId]: [
       { id: enemyId, name: 'Ogre', hp: 60, ac: 11, damage: '2d8+4', toHit: 6, wis: 7, xp: 100 },
@@ -124,7 +123,6 @@ const grSeed: Seed = {
   intro: '',
   seed_id: 'gr',
   rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-  connections: { [ctx.startRoomId]: [] },
   enemies: {},
   loot: {},
   npcs: {},

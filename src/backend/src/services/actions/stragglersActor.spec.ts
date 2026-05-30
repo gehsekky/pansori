@@ -25,7 +25,6 @@ function ctxWith(
     st: { combat_active: false, characters: [char] },
     seed: { rooms: [] },
     roomId: 'room-1',
-    adjacent: [],
     enemyAlive: false,
     narrative: '',
     usedInitiative: false,

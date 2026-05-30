@@ -55,7 +55,6 @@ describe('boss phase transitions', () => {
       rooms: [
         { id: 'r', name: 'Room', desc: 'A room.', exits: [], objects: [], traps: [] },
       ] as unknown as Seed['rooms'],
-      connections: { r: [] },
       enemies: { r: [boss] },
       loot: {},
       npcs: {},
@@ -253,7 +252,6 @@ describe('boss legendary + lair actions', () => {
       rooms: [
         { id: 'r', name: 'Room', desc: 'A room.', exits: [], objects: [], traps: [] },
       ] as unknown as Seed['rooms'],
-      connections: { r: [] },
       enemies: { r: [boss] },
       loot: {},
       npcs: {},

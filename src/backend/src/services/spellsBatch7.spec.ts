@@ -58,7 +58,6 @@ function seed(): Seed {
     intro: '',
     seed_id: 'b7',
     rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-    connections: { [ctx.startRoomId]: [] },
     enemies: {
       [ctx.startRoomId]: [
         {

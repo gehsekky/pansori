@@ -26,7 +26,6 @@ const seed: Seed = {
   intro: '',
   seed_id: 'cast-combat-start',
   rooms: [{ id: ctx.startRoomId, name: 'Apex', desc: '' }],
-  connections: { [ctx.startRoomId]: [] },
   enemies: {
     [ctx.startRoomId]: [
       {

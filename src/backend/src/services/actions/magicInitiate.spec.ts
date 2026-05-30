@@ -71,7 +71,6 @@ describe('Magic Initiate — free L1 cast at cast time', () => {
     intro: '',
     seed_id: 'mi-test',
     rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-    connections: { [ctx.startRoomId]: [] },
     enemies: {
       [ctx.startRoomId]: [
         {
@@ -223,7 +222,6 @@ describe('Magic Initiate — choice validation (take_feat action)', () => {
     intro: '',
     seed_id: 'mi-validate',
     rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-    connections: { [ctx.startRoomId]: [] },
     enemies: {},
     loot: {},
     npcs: {},

@@ -73,7 +73,6 @@ const slashResistSeed: Seed = {
   intro: '',
   seed_id: 'irresistible',
   rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-  connections: { [ctx.startRoomId]: [] },
   enemies: {
     [ctx.startRoomId]: [
       {

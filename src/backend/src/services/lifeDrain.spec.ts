@@ -153,7 +153,6 @@ const restSeed = {
   intro: '',
   seed_id: 'ld',
   rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-  connections: { [ctx.startRoomId]: [] },
   enemies: {},
   loot: {},
   npcs: {},

@@ -27,7 +27,6 @@ function seedWith(hp: number, con = 10): Seed {
     intro: '',
     seed_id: 'save-ends',
     rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-    connections: { [ctx.startRoomId]: [] },
     enemies: {
       [ctx.startRoomId]: [
         { id: enemyId, name: 'Ogre', hp, ac: 12, damage: '8', toHit: 5, xp: 50, con },

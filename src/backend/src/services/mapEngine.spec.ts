@@ -58,7 +58,6 @@ const campaign: CampaignData = {
   world_name: 'Map Test',
   intro: '',
   rooms,
-  connections: {},
   regions: [
     {
       id: 'reg1',
@@ -212,9 +211,9 @@ describe('initMapState', () => {
   });
 
   it('is a no-op without regions or when map state is already set', () => {
-    expect(
-      initMapState({ world_name: '', intro: '', rooms: [], connections: {} }, start()).map_level
-    ).toBe('regional');
+    expect(initMapState({ world_name: '', intro: '', rooms: [] }, start()).map_level).toBe(
+      'regional'
+    );
     const already = initMapState(campaign, { ...start(), map_level: 'town' } as GameState);
     expect(already.map_level).toBe('town'); // untouched
   });
@@ -225,7 +224,6 @@ describe('regional encounters', () => {
     world_name: 'Enc',
     intro: '',
     rooms,
-    connections: {},
     regions: [
       {
         id: 'reg1',

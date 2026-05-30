@@ -89,7 +89,6 @@ function jumpSeed(obstacles: GridPos[] = [], difficultTerrain: GridPos[] = []): 
     intro: '',
     seed_id: 'jump',
     rooms: [{ id: ROOM, name: 'Start', desc: '', obstacles, difficultTerrain }],
-    connections: { [ROOM]: [] },
     enemies: {},
     loot: {},
     npcs: {},

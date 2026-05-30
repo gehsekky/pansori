@@ -23,7 +23,6 @@ function losSeed(obstacle: GridPos): Seed {
     intro: '',
     seed_id: 'los',
     rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '', obstacles: [obstacle] }],
-    connections: { [ctx.startRoomId]: [] },
     enemies: {
       [ctx.startRoomId]: [
         { id: ENEMY, name: 'Goblin', hp: 30, ac: 10, damage: '1d6', toHit: 3, xp: 20 },

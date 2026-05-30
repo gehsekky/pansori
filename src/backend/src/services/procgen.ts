@@ -27,7 +27,6 @@ export function generateSeed(context: Context, partySize = 1): Seed {
     ship_name: c.world_name,
     intro: c.intro,
     rooms: c.rooms,
-    connections: c.connections,
     enemies: scaledEnemies,
     loot: c.loot ?? {},
     npcs: c.npcs ?? {},

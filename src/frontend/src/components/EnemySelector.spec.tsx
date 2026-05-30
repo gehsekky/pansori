@@ -24,7 +24,6 @@ function makeSeed(enemies: Array<{ id: string; name: string; hp: number; ac: num
     intro: '',
     seed_id: 't',
     rooms: [{ id: 'r', name: 'Room', desc: '' }],
-    connections: { r: [] },
     enemies: { r: enemies },
     loot: {},
     npcs: {},

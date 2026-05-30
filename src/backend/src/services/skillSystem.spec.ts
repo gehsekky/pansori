@@ -33,7 +33,6 @@ const seed: Seed = {
   intro: '',
   seed_id: 'skill',
   rooms: [{ id: ctx.startRoomId, name: 'S', desc: '' }],
-  connections: { [ctx.startRoomId]: [] },
   // int 17 → Influence DC = max(15, 17) = 17; cr 2 → Study DC = 15 + 2 = 17.
   enemies: {
     [ctx.startRoomId]: [

@@ -24,7 +24,6 @@ const seed = (hp = 60, ac = 12): Seed =>
     intro: '',
     seed_id: 'mm',
     rooms: [{ id: ctx.startRoomId, name: 'S', desc: '' }],
-    connections: { [ctx.startRoomId]: [] },
     enemies: {
       [ctx.startRoomId]: [
         {

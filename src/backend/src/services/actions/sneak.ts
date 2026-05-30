@@ -135,8 +135,14 @@ export const handleSneak: ActionHandler<{ type: 'sneak' }> = (ctx) => {
   if (groupPasses) {
     narrative = pick(ctx.context.narratives.sneakSuccess).replace('{enemy}', enemy.name);
     narrative += `${groupNote} (DC ${sneakDC}; ${detailLines})`;
-    if (ctx.adjacent.length > 0) {
-      const target = ctx.adjacent[0];
+    // Slip past the enemy out a room exit (3-level map: the room's first
+    // room-to-room `exit`, the marker-nav equivalent of the old adjacency flee).
+    const currentRoom = ctx.seed.rooms.find((r) => r.id === ctx.roomId);
+    const fleeExit = currentRoom?.exits?.find((e) => e.toRoomId);
+    const target = fleeExit?.toRoomId
+      ? ctx.seed.rooms.find((r) => r.id === fleeExit.toRoomId)
+      : undefined;
+    if (target) {
       if (ctx.st.combat_active) {
         ctx.st = endCombatState(ctx.st);
         updatePcActor(ctx, { conditions: [] });
@@ -144,6 +150,7 @@ export const handleSneak: ActionHandler<{ type: 'sneak' }> = (ctx) => {
       ctx.st = {
         ...ctx.st,
         current_room: target.id,
+        marker_pos: fleeExit?.entrancePos ?? target.entryPos ?? ctx.st.marker_pos,
         visited_rooms: ctx.st.visited_rooms.includes(target.id)
           ? ctx.st.visited_rooms
           : [...ctx.st.visited_rooms, target.id],

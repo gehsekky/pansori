@@ -19,7 +19,6 @@ const seed: Seed = {
   intro: '',
   seed_id: 'dimension-door',
   rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-  connections: { [ctx.startRoomId]: [] },
   enemies: {
     [ctx.startRoomId]: [
       {

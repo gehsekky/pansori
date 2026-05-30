@@ -83,7 +83,6 @@ const noEnemySeed: Seed = {
   intro: '',
   seed_id: 'blur',
   rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-  connections: { [ctx.startRoomId]: [] },
   enemies: {},
   loot: {},
   npcs: {},
@@ -170,7 +169,6 @@ const dmgSeed: Seed = {
   intro: '',
   seed_id: 'aoe',
   rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-  connections: { [ctx.startRoomId]: [] },
   enemies: {
     [ctx.startRoomId]: [
       {

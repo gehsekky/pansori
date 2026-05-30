@@ -91,7 +91,6 @@ export const mockSeed: Seed = {
     { id: 'room-1', name: 'Start Room', desc: 'Initial room.' },
     { id: 'room-2', name: 'Hallway', desc: 'A transition.' },
   ],
-  connections: { 'room-1': ['room-2'], 'room-2': ['room-1'] },
   enemies: {},
   loot: {},
 };

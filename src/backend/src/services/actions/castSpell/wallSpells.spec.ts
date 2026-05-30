@@ -65,7 +65,6 @@ const noEnemyBeyondSeed: Seed = {
   intro: '',
   seed_id: 'wall',
   rooms: [{ id: ROOM, name: 'Start', desc: '' }],
-  connections: { [ROOM]: [] },
   enemies: {
     [ROOM]: [{ id: ENEMY, name: 'Goblin', hp: 60, ac: 10, damage: '1d6', toHit: 3, xp: 20 }],
   },

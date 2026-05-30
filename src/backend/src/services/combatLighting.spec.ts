@@ -41,7 +41,6 @@ function seedWith(lighting: 'bright' | 'dim' | 'dark' | 'sunlight', enemy: Parti
     intro: '',
     seed_id: 'light',
     rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '', lighting }],
-    connections: { [ctx.startRoomId]: [] },
     enemies: {
       [ctx.startRoomId]: [
         {

@@ -54,7 +54,6 @@ const seed: Seed = {
   intro: '',
   seed_id: 'cantrip-batch',
   rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-  connections: { [ctx.startRoomId]: [] },
   enemies: {
     [ctx.startRoomId]: [
       { id: ENEMY, name: 'Ogre', hp: 200, ac: 10, damage: '1d6', toHit: 3, xp: 50, con: 8, dex: 8 },

@@ -22,7 +22,6 @@ const seedWithNpc: Seed = {
     { id: ctx.startRoomId, name: 'Start', desc: '' },
     { id: npcRoomId, name: 'Tavern', desc: '' },
   ],
-  connections: { [ctx.startRoomId]: [npcRoomId], [npcRoomId]: [ctx.startRoomId] },
   enemies: {},
   loot: {},
   npcs: {
@@ -250,7 +249,6 @@ describe('influence — no valid target', () => {
         intro: '',
         seed_id: 'empty',
         rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-        connections: { [ctx.startRoomId]: [] },
         enemies: {},
         loot: {},
         npcs: {},

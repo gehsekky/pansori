@@ -19,7 +19,6 @@ const noEnemySeed: Seed = {
   intro: '',
   seed_id: 'spell-batch',
   rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-  connections: { [ctx.startRoomId]: [] },
   enemies: {},
   loot: {},
   npcs: {},

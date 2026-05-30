@@ -33,7 +33,6 @@ function gnollSeed(enemy: Partial<Enemy> = {}): Seed {
     intro: '',
     seed_id: 'rampage',
     rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-    connections: { [ctx.startRoomId]: [] },
     enemies: {
       [ctx.startRoomId]: [
         {

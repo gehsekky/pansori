@@ -63,7 +63,6 @@ const dmgSeed: Seed = {
   intro: '',
   seed_id: 'wall',
   rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-  connections: { [ctx.startRoomId]: [] },
   enemies: {
     [ctx.startRoomId]: [
       {
@@ -277,7 +276,6 @@ const wardSeed: Seed = {
   intro: '',
   seed_id: 'ward',
   rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-  connections: { [ctx.startRoomId]: [] },
   enemies: {},
   loot: {},
   npcs: {},

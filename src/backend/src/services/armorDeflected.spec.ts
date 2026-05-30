@@ -27,7 +27,6 @@ const seedWithGoblin: Seed = {
   intro: '',
   seed_id: 'deflected-test',
   rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-  connections: { [ctx.startRoomId]: [] },
   enemies: {
     [ctx.startRoomId]: [
       {

@@ -41,7 +41,6 @@ const emptySeed: Seed = {
   intro: '',
   seed_id: 'gg',
   rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-  connections: { [ctx.startRoomId]: [] },
   enemies: {},
   loot: {},
   npcs: {},

@@ -19,7 +19,6 @@ const mockSeed: Seed = {
     { id: 'room-1', name: 'Start Room', desc: 'Initial room.' },
     { id: 'room-2', name: 'Hallway', desc: 'A transition.' },
   ],
-  connections: {},
   enemies: {},
   loot: {},
   regions: [

@@ -431,7 +431,6 @@ export interface Seed {
     entryPos?: GridPos;
     exits?: RoomExit[];
   }>;
-  connections: Record<string, string[]>;
   enemies?: Record<string, Array<{ id: string; name: string; hp: number; ac: number }>>;
   loot?: Record<string, unknown>;
   npcs?: Record<string, PlacedNpc>;

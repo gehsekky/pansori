@@ -181,11 +181,6 @@ export const baseSandboxSeed: Seed = {
     { id: CORRIDOR_ID, name: 'Guard Post', desc: 'A guard post.' },
     { id: sandboxCtx.escapeRoomId, name: 'Exit Gate', desc: 'The exit gate.' },
   ],
-  connections: {
-    [sandboxCtx.startRoomId]: [CORRIDOR_ID],
-    [CORRIDOR_ID]: [sandboxCtx.startRoomId, sandboxCtx.escapeRoomId],
-    [sandboxCtx.escapeRoomId]: [CORRIDOR_ID],
-  },
   enemies: {},
   loot: {},
   npcs: {},
@@ -229,11 +224,6 @@ export const dungeonSeedWithEnemy: Seed = {
     { id: CORRIDOR_ID, name: 'Guard Post', desc: 'Dark.' },
     { id: sandboxCtx.escapeRoomId, name: 'Exit Gate', desc: 'Exit.' },
   ],
-  connections: {
-    [sandboxCtx.startRoomId]: [CORRIDOR_ID],
-    [CORRIDOR_ID]: [sandboxCtx.startRoomId, sandboxCtx.escapeRoomId],
-    [sandboxCtx.escapeRoomId]: [CORRIDOR_ID],
-  },
   enemies: {
     [CORRIDOR_ID]: [
       {
@@ -267,11 +257,6 @@ export const spellSeed: Seed = {
     { id: CORRIDOR_ID, name: 'Burial', desc: 'A chamber.' },
     { id: sandboxCtx.escapeRoomId, name: 'Exit Shaft', desc: 'A shaft of light.' },
   ],
-  connections: {
-    [sandboxCtx.startRoomId]: [CORRIDOR_ID],
-    [CORRIDOR_ID]: [sandboxCtx.startRoomId, sandboxCtx.escapeRoomId],
-    [sandboxCtx.escapeRoomId]: [CORRIDOR_ID],
-  },
   enemies: {
     [CORRIDOR_ID]: [
       {

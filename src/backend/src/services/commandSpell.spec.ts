@@ -21,7 +21,6 @@ const seed: Seed = {
   intro: '',
   seed_id: 'command',
   rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-  connections: { [ctx.startRoomId]: [] },
   enemies: {
     [ctx.startRoomId]: [
       { id: ENEMY, name: 'Ogre', hp: 200, ac: 10, damage: '2d8', toHit: 6, xp: 50, wis: 6 },

@@ -55,7 +55,6 @@ const noEnemySeed: Seed = {
   intro: '',
   seed_id: 'rider',
   rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-  connections: { [ctx.startRoomId]: [] },
   enemies: {},
   loot: {},
   npcs: {},
@@ -137,7 +136,6 @@ const combatSeed: Seed = {
   intro: '',
   seed_id: 'rider-combat',
   rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-  connections: { [ctx.startRoomId]: [] },
   enemies: {
     [ctx.startRoomId]: [
       { id: enemyId, name: 'Ogre', hp: 200, ac: 5, damage: '1d6', toHit: 3, xp: 50, str: 6 },
