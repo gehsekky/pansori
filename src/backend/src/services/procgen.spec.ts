@@ -288,10 +288,15 @@ describe('generateSeed — Whispering Pines campaign', () => {
     expect(seed.loot?.spire_ritual_apex?.id).toBe('cult_idol');
   });
 
-  it('wilderness encounter table is reachable through Frozen Pass connections', () => {
-    // pass_climb is the wilderness room sitting between town and the spire
-    expect(seed.connections?.pass_climb).toContain('spire_entrance');
-    expect(seed.connections?.pass_climb).toContain('pines_square');
+  it('carries the 3-level map: region sites + the wilderness encounter table', () => {
+    // The seed copies the campaign's region/town definitions so the frontend
+    // can resolve the active grid. The region's encounter table drives wandering
+    // travel encounters (the old per-Location encounterTable).
+    const region = seed.regions?.[0];
+    expect(region?.id).toBe('frostpass_region');
+    expect(region?.encounterTable).toEqual(['Snowshrouded Bandit', 'Frost Wolf']);
+    expect(region?.sites.find((s) => s.entryRoomId === 'spire_entrance')).toBeTruthy();
+    expect(seed.towns?.find((t) => t.id === 'pines_village')).toBeTruthy();
   });
 });
 
