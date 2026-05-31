@@ -1,6 +1,6 @@
 # TODO
 
-> **Status snapshot — verified 2026-05-30.** The top section is the
+> **Status snapshot — verified 2026-05-31.** The top section is the
 > authoritative implementation status, re-grounded in a fresh code survey
 > (not the prior changelog). The backlog below it lists only remaining
 > work. Shipped-feature completion logs were removed — `git log` is the
@@ -16,10 +16,10 @@ PHB/DMG-exclusive content (subclasses, feats, species, spells). See
 
 ---
 
-## Implementation status (code-verified 2026-05-30)
+## Implementation status (code-verified 2026-05-31)
 
-Grounded in a code survey + the full suite: **backend 2045 tests across
-242 files + frontend 136 across 23 files, all green** (lint + typecheck +
+Grounded in a code survey + the full suite: **backend 2055 tests across
+243 files + frontend 138 across 24 files, all green** (lint + typecheck +
 prettier clean).
 
 ### Done — world map / navigation
@@ -43,7 +43,21 @@ prettier clean).
 - **Legacy nav fully removed** — the old `Location` / `District` model, the
   `travel` / `enter_district` / room-`move` actions, the room `connections`
   graph, and the roguelike procedural generator (`generateRoguelikeSeed` /
-  `roomPool`) are gone. The engine runs only authored grid campaigns.
+  `roomPool`) are gone. The engine runs only authored grid campaigns. The
+  roguelike **`escape` action** (the "leave at the exit room" choice + its
+  `escapeRoomId` / `escapeTriggers` / `escapeChoiceText` Context fields and
+  escape narratives) was removed too — it conflicted with the grid's ascend
+  exits. The `set_escape` consequence → `escaped` session-status path stays:
+  that's the legitimate "module complete, run ends" exit (fired by Grove of
+  Thorns on main-quest completion), not the room mechanic.
+- **NPC conversation mode** — "Talk to X" opens a dedicated dialogue window
+  (`GameState.active_conversation`) that, mirroring the `pending_reaction`
+  pattern, makes `generateChoices` early-return **only** the dialogue options
+  (the NPC's responses at the current node + Back when nested + End
+  conversation) until the player ends it. Responses **nest** arbitrarily
+  (`NpcDialogueResponse.responses`, walked by `responsesAtPath`); the FE
+  renders it as a `ConversationPanel`. Trade / Attack stay as normal choices,
+  reachable after ending the conversation.
 
 ### Done — rules-engine frameworks
 
@@ -526,11 +540,15 @@ backend features are waiting on, and a handful of **bounded subsystems**.
       distinct, correct count) with a first-proficiencies fallback and seeds
       `expertise_skills`. Bard/Wizard still gain Expertise in-game (L2) via the
       existing `choose_expertise` flow.
-- [ ] **Interactive reaction prompts** — Indomitable, Stroke of Luck,
-      Countercharm, Deflect Attacks auto-resolve player-favorably; let the
-      player choose _when_ to spend.
-- [ ] **Slot-choice surfaces** — Arcane Recovery / Natural Recovery
-      auto-pick lowest-first; let the player choose which slots.
+- [~] **Interactive reaction prompts** — let the player choose _when_ to
+  spend instead of auto-resolving player-favorably. **Stroke of Luck**
+  shipped (interactive `pending_reaction` window + FE reaction prompt).
+  Still auto-resolving: **Indomitable**, **Countercharm**, **Deflect
+  Attacks** — they reuse the same window/FE pattern.
+- [x] **Slot-choice surfaces** — Arcane Recovery / Natural Recovery now
+      surface a slot-choice picker instead of auto-picking lowest-first; the
+      cast path validates the chosen slots and falls back to the auto-pick
+      when absent.
 - [x] **Multi-target / option pickers** (RE-5) — shipped. Two generic
       GameChoice hints + their FE dialogs: **`pickTargets { side, max }`** →
       `TargetPickerDialog` (multi-select 1..max, defaults to the prior auto-pick;
