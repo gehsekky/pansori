@@ -1390,6 +1390,13 @@ export interface GameState {
   // reaction choices; the player resolves with `resolve_reaction`.
   pending_reaction?: PendingReaction;
 
+  // Active NPC conversation. While set (out of combat, in the NPC's room),
+  // generateChoices offers ONLY dialogue choices — the responses at the current
+  // node, a Back when nested, and End conversation. `path` indexes the nested
+  // response tree (root = []); `prompt` is the NPC's current line. Cleared by
+  // `end_conversation` or on leaving the room.
+  active_conversation?: { roomId: string; path: number[]; prompt: string };
+
   // Structured combat event log (circular buffer, capped at COMBAT_LOG_MAX).
   // Emitted in parallel to the narrative string for UI rendering of
   // mechanical events (hits, damage, conditions) separately from prose.

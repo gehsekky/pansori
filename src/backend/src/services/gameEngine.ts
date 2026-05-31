@@ -130,6 +130,7 @@ import { canTakeFeat } from './feats.js';
 import { factionShopPrice } from './campaignEngine.js';
 import { llmProvider } from './llmProvider.js';
 import { randomUUID } from 'crypto';
+import { responsesAtPath } from './conversation.js';
 
 // Central enemy-damage floor (Undead Fortitude + future on-"reduced to 0"
 // traits). Re-exported here so combat handlers pull it from the same module
@@ -3377,6 +3378,35 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     }
   }
 
+  // Active conversation — surface ONLY the dialogue options (the responses at
+  // the current node + Back when nested + End conversation) until the player
+  // ends it. Mirrors the pending_reaction early-return. Out of combat; a stale
+  // conversation (party left the room) falls through to the normal choices.
+  const conv = state.active_conversation;
+  if (conv && !state.combat_active && conv.roomId === state.current_room) {
+    const cnpc = seed.npcs?.[conv.roomId];
+    if (cnpc && !npcIsKilled(state, conv.roomId)) {
+      const convoChoices: GameChoice[] = responsesAtPath(cnpc, conv.path).map((r, i) => ({
+        label: `<To ${cnpc.name}> ${r.label}`,
+        action: { type: 'talk_response' as const, responseIdx: i },
+        kind: 'conversation' as const,
+      }));
+      if (conv.path.length > 0) {
+        convoChoices.push({
+          label: '↩ Back',
+          action: { type: 'conversation_back' as const },
+          kind: 'conversation' as const,
+        });
+      }
+      convoChoices.push({
+        label: '✕ End conversation',
+        action: { type: 'end_conversation' as const },
+        kind: 'conversation' as const,
+      });
+      return convoChoices;
+    }
+  }
+
   // Pending ASI: only show ability-boost / feat choices until resolved.
   if (char.asi_pending) {
     const statLabels: Record<string, string> = {
@@ -3655,28 +3685,10 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       label: `Talk to ${npc.name}${dcNote}${questNote}`,
       action: { type: 'talk' },
     });
-    // Dialogue responses become clickable once the party has greeted
-    // the NPC. The `talk` handler surfaces "[1. X | 2. Y | 3. Z]" in
-    // the narrative; without these matching choices the player saw
-    // the prompt but had no button to click it. The numbered label
-    // mirrors the inline hint so the player can match prompts to
-    // actions at a glance.
-    if (
-      (state.npc_talked ?? []).includes(roomId) &&
-      attitude !== 'indifferent' &&
-      npc.responses?.length
-    ) {
-      for (let i = 0; i < npc.responses.length; i++) {
-        if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
-        const resp = npc.responses[i];
-        // Stage-direction format: the button reads as the party
-        // speaking TO the NPC, not the NPC saying it.
-        choices.push({
-          label: `<To ${npc.name}> ${resp.label}`,
-          action: { type: 'talk_response', responseIdx: i },
-        });
-      }
-    }
+    // Dialogue responses are NOT surfaced here — `talk` opens conversation mode
+    // (sets `active_conversation`), and the conversation early-return above is
+    // the only place that lists responses. This keeps dialogue separate from the
+    // rest of the action surface.
     // The explicit "Accept quest" choice is gone — quests auto-activate
     // when their first step matches (typically a talk_response in the
     // giver's room). The route handler surfaces "✦ Quest accepted —"

@@ -1519,19 +1519,24 @@ describe('NPC actions', () => {
     expect(result.newState.flags['guide_helped']).toBe(true);
   });
 
-  it('talk_response buttons use the <To NPC> stage-direction format', () => {
-    // After the party has greeted the NPC once, the response buttons
-    // surface with labels framed as the party speaking TO the NPC
-    // rather than the NPC saying them.
-    const state = { ...makeNpcState(), npc_talked: [npcRoomId] };
+  it('conversation responses use the <To NPC> stage-direction format', () => {
+    // In conversation mode the response buttons surface framed as the party
+    // speaking TO the NPC. (Responses only appear while a conversation is
+    // active — never mixed into the normal choice list.)
+    const state = {
+      ...makeNpcState(),
+      npc_talked: [npcRoomId],
+      active_conversation: { roomId: npcRoomId, path: [], prompt: 'Greetings, traveller!' },
+    };
     const choices = generateChoices(state, seedWithNpc, ctx);
     const responseChoices = choices.filter((c) => c.action.type === 'talk_response');
     expect(responseChoices.length).toBe(2);
     expect(responseChoices[0].label).toBe('<To Friendly Guide> Ask about the area');
     expect(responseChoices[1].label).toBe('<To Friendly Guide> Ask for help');
+    expect(responseChoices.every((c) => c.kind === 'conversation')).toBe(true);
   });
 
-  it("talk handler's inline dialogue hint also uses the <To NPC> format", async () => {
+  it('talk opens a conversation (prompt = greeting); responses are not mixed into the list', async () => {
     const result = await takeAction({
       action: { type: 'talk' },
       history: [],
@@ -1539,9 +1544,13 @@ describe('NPC actions', () => {
       seed: seedWithNpc,
       context: ctx,
     });
-    // Inline hints reflect the same framing the buttons use.
-    expect(result.narrative).toMatch(/<To Friendly Guide> Ask about the area/);
-    expect(result.narrative).toMatch(/<To Friendly Guide> Ask for help/);
+    expect(result.newState.active_conversation).toMatchObject({
+      roomId: npcRoomId,
+      path: [],
+      prompt: 'Greetings, traveller!',
+    });
+    // No inline "<To NPC>" hint dumped into the narrative anymore.
+    expect(result.narrative).not.toMatch(/<To Friendly Guide>/);
   });
 
   it('buy deducts gold and adds item to inventory', async () => {

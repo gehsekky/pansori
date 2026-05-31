@@ -1283,6 +1283,20 @@ export const context: Context = {
             consequences: [
               { type: 'advance_quest', questId: 'quest_crypt', stepId: 'step_learn_crypt' },
             ],
+            // A nested branch — these follow-ups open a sub-conversation (with a
+            // Back option) rather than cluttering the top-level dialogue.
+            responses: [
+              {
+                label: 'Who was the lich in life?',
+                reply:
+                  'A noble of the Third Age who bargained with death to outlive his line. The bargain kept his body — not his soul.',
+              },
+              {
+                label: 'How do I destroy it?',
+                reply:
+                  "Strike down its body and the phylactery shatters with it. Bring radiance — the dead fear Selûne's light.",
+              },
+            ],
           },
           {
             label: 'I will clear the crypt.',

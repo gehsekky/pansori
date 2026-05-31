@@ -319,7 +319,12 @@ export type StructuredAction =
   // (omitted → the engine's default lowest-first plan).
   | { type: 'recover_slots'; recovery: 'arcane' | 'natural'; plan?: string }
   | { type: 'talk' }
+  // `responseIdx` is relative to the conversation's CURRENT node (resolved via
+  // `GameState.active_conversation.path`).
   | { type: 'talk_response'; responseIdx: number }
+  // Conversation navigation: step up a nested dialogue level / leave entirely.
+  | { type: 'conversation_back' }
+  | { type: 'end_conversation' }
   | { type: 'buy'; itemId: string; price: number }
   | { type: 'attack_npc' }
   | { type: 'use_class_feature'; featureId: string; targetEnemyId?: string }
@@ -591,7 +596,10 @@ export type ChoiceKind =
   | 'two_weapon_attack'
   | 'use_lands_aid'
   | 'cast_spell'
-  | 'class_feature';
+  | 'class_feature'
+  // Dialogue choices while a conversation is active (NPC responses, Back, End
+  // conversation). The frontend routes these to the dedicated ConversationPanel.
+  | 'conversation';
 
 export interface GameChoice {
   label: string;
@@ -773,6 +781,11 @@ export interface NpcDialogueResponse {
   label: string;
   reply?: string; // NPC's follow-up text after player picks this
   consequences?: GameConsequence[]; // applied when this response is chosen
+  // Nested follow-up options. A response WITH children is a branch: picking it
+  // descends a level (its `reply` becomes the new prompt, `responses` the new
+  // options) and a "Back" choice appears. A response WITHOUT children is a leaf:
+  // picking it plays its reply and keeps the current options.
+  responses?: NpcDialogueResponse[];
 }
 
 export interface PlacedNpc extends NpcTemplate {

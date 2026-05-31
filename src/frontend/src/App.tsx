@@ -9,6 +9,7 @@ import CombatActionBar from './components/CombatActionBar.tsx';
 import CombatLogPanel from './components/CombatLogPanel.tsx';
 import ContextPanel from './components/ContextPanel.tsx';
 import type { ContextTab } from './components/ContextPanel.tsx';
+import ConversationPanel from './components/ConversationPanel.tsx';
 import DefaultActionBar from './components/DefaultActionBar.tsx';
 import EnemySelector from './components/EnemySelector.tsx';
 import GridCombatView from './components/GridCombatView.tsx';
@@ -689,7 +690,9 @@ export default function App() {
                               );
                               const textListChoices = enemyFiltered
                                 .filter((c) => !ICONIZED_KINDS.has(c.kind ?? ''))
-                                .filter((c) => !spellBarSet.has(c));
+                                .filter((c) => !spellBarSet.has(c))
+                                // Dialogue choices render in the ConversationPanel, not the list.
+                                .filter((c) => c.kind !== 'conversation');
                               // Combat-controls container should render whenever
                               // at least one inner bar will. EnemySelector +
                               // MoveDPad + Default/Combat action bars all live
@@ -850,6 +853,24 @@ export default function App() {
                             })()}
                         </>
                       );
+                    // Active conversation: the dedicated dialogue panel replaces the
+                    // normal action area (only dialogue options + Back/End show).
+                    if (
+                      !gameState?.combat_active &&
+                      gameState?.active_conversation &&
+                      gameState.active_conversation.roomId === gameState.current_room &&
+                      seed
+                    ) {
+                      const conv = gameState.active_conversation;
+                      return (
+                        <ConversationPanel
+                          npcName={seed.npcs?.[conv.roomId]?.name ?? 'Someone'}
+                          prompt={conv.prompt}
+                          choices={choices.filter((c) => c.kind === 'conversation')}
+                          onChoose={handleChoice}
+                        />
+                      );
+                    }
                     // Out-of-combat exploration on the 3-level grid map: a single
                     // party marker the player clicks to travel (marker_move). Local
                     // combat falls through to GridCombatView below (PC tokens).

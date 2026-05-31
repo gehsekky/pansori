@@ -142,6 +142,68 @@
     opacity 0.15s;
 }
 
+/* ─── Conversation panel ─────────────────────────────────────────────────────
+   Dedicated NPC-dialogue surface — replaces the normal action area while a
+   conversation is active. Only dialogue options show; Back / End conversation
+   sit apart at the bottom. */
+.conversationPanel {
+  background: var(--t-card);
+  border: 1px solid var(--t-border);
+  padding: 0.85rem 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.conversationHeader {
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  color: var(--t-primary);
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.conversationPrompt {
+  color: var(--t-mid);
+  font-style: italic;
+  line-height: 1.5;
+  margin: 0 0 0.85rem;
+}
+
+.conversationChoices {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.conversationControls {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--t-separator);
+}
+
+.conversationControlBtn {
+  background: transparent;
+  border: 1px solid var(--t-border);
+  color: var(--t-dim);
+  padding: 0.3rem 0.7rem;
+  font-family: inherit;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
+}
+
+.conversationControlBtn:hover {
+  color: var(--t-primary);
+  border-color: var(--t-primary);
+}
+
 /* Invite dialog — wraps the standard Dialog with a copy-link row and an
    optional host-only "rotate" button. The input is readonly + click-to-
    select so a player can grab the URL with one tap. */

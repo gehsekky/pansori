@@ -8,6 +8,7 @@ import {
 import { hasExpertise, hasJackOfAllTrades, hasReliableTalent } from '../multiclass.js';
 import type { ActionHandler } from './types.js';
 import { randomUUID } from 'crypto';
+import { responsesAtPath } from '../conversation.js';
 import { updatePcActor } from './actor.js';
 
 /**
@@ -58,10 +59,16 @@ export const handleTalk: ActionHandler<{ type: 'talk' }> = (ctx) => {
   if (!ctx.st.npc_talked.includes(ctx.roomId)) {
     ctx.st = { ...ctx.st, npc_talked: [...ctx.st.npc_talked, ctx.roomId] };
   }
-  if (npc.responses.length > 0) {
-    narrative += ' [' + npc.responses.map((r) => `<To ${npc.name}> ${r.label}`).join(' | ') + ']';
-  }
-  if (ctx.st.combat_active) {
+  // Open conversation mode (out of combat only). generateChoices then surfaces
+  // ONLY the dialogue options (responses at the current node + End conversation,
+  // + Back when nested) until the player ends it. The dedicated FE panel renders
+  // `active_conversation.prompt` (the NPC's current line) + those choices.
+  if (!ctx.st.combat_active) {
+    ctx.st = {
+      ...ctx.st,
+      active_conversation: { roomId: ctx.roomId, path: [], prompt: npc.greeting },
+    };
+  } else {
     updatePcActor(ctx, { turn_actions: { ...char.turn_actions, action_used: true } });
   }
   ctx.narrative = narrative;
@@ -83,7 +90,12 @@ export const handleTalkResponse: ActionHandler<{
     ctx.narrative = 'There is no one here.';
     return;
   }
-  const response = npc.responses[action.responseIdx];
+  // `responseIdx` is relative to the conversation's current node (the path
+  // tracks the nested level); default to the root list for a direct dispatch.
+  const conv = ctx.st.active_conversation;
+  const path = conv?.path ?? [];
+  const node = responsesAtPath(npc, path);
+  const response = node[action.responseIdx];
   if (!response) {
     ctx.narrative = 'Invalid response.';
     return;
@@ -96,7 +108,56 @@ export const handleTalkResponse: ActionHandler<{
     }
     if (narrativeParts.length) narrative += ' ' + narrativeParts.join(' ');
   }
+  // Walk the conversation: a branch (has children) descends a level; a leaf
+  // keeps the current options. The prompt becomes the NPC's reply either way.
+  if (conv) {
+    const descend = (response.responses?.length ?? 0) > 0;
+    ctx.st = {
+      ...ctx.st,
+      active_conversation: {
+        ...conv,
+        path: descend ? [...path, action.responseIdx] : path,
+        prompt: response.reply ?? `${npc.name} nods.`,
+      },
+    };
+  }
   ctx.narrative = narrative;
+};
+
+/**
+ * `conversation_back`: step up one nested dialogue level. The prompt reverts to
+ * the parent branch's reply (or the greeting at the root).
+ */
+export const handleConversationBack: ActionHandler<{ type: 'conversation_back' }> = (ctx) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs converse.' };
+  const conv = ctx.st.active_conversation;
+  if (!conv) {
+    ctx.narrative = 'No conversation to step back from.';
+    return;
+  }
+  const npc = ctx.seed.npcs?.[conv.roomId];
+  const newPath = conv.path.slice(0, -1);
+  let prompt = npc?.greeting ?? '';
+  if (npc && newPath.length > 0) {
+    // The response that opened this (now-parent) level.
+    const parent = responsesAtPath(npc, newPath.slice(0, -1))[newPath[newPath.length - 1]];
+    prompt = parent?.reply ?? npc.greeting;
+  }
+  ctx.st = { ...ctx.st, active_conversation: { ...conv, path: newPath, prompt } };
+  ctx.narrative = prompt;
+};
+
+/**
+ * `end_conversation`: close the dialogue. generateChoices returns to the normal
+ * choice set (move / trade / attack / etc.).
+ */
+export const handleEndConversation: ActionHandler<{ type: 'end_conversation' }> = (ctx) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs converse.' };
+  const npc = ctx.st.active_conversation
+    ? ctx.seed.npcs?.[ctx.st.active_conversation.roomId]
+    : undefined;
+  ctx.st = { ...ctx.st, active_conversation: undefined };
+  ctx.narrative = npc ? `You end the conversation with ${npc.name}.` : 'You end the conversation.';
 };
 
 /**

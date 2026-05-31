@@ -26,6 +26,8 @@ import {
 import {
   handleAttackNpc,
   handleBuy,
+  handleConversationBack,
+  handleEndConversation,
   handleInfluence,
   handleStudy,
   handleTalk,
@@ -120,6 +122,8 @@ const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   death_save: handleDeathSave as ActionHandler,
   talk: handleTalk as ActionHandler,
   talk_response: handleTalkResponse as ActionHandler,
+  conversation_back: handleConversationBack as ActionHandler,
+  end_conversation: handleEndConversation as ActionHandler,
   buy: handleBuy as ActionHandler,
   marker_move: handleMarkerMove as ActionHandler,
   accept_quest: handleAcceptQuest as ActionHandler,

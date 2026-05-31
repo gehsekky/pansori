@@ -94,6 +94,8 @@ export const ACTION_COSTS: Record<StructuredAction['type'], ActionCost> = {
   death_save: 'managed',
   talk: 'managed',
   talk_response: 'managed',
+  conversation_back: 'managed',
+  end_conversation: 'managed',
   buy: 'managed',
   marker_move: 'managed', // out-of-combat map movement; no combat action economy
   accept_quest: 'managed',

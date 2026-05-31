@@ -293,6 +293,11 @@ export interface GameState {
   // Reactive spell window — see backend PendingReaction.
   pending_reaction?: PendingReaction;
 
+  // Active NPC conversation — see backend GameState. When set (out of combat,
+  // in the NPC's room), the dedicated ConversationPanel renders `prompt` + the
+  // `kind:'conversation'` choices. `path` indexes the nested response tree.
+  active_conversation?: { roomId: string; path: number[]; prompt: string };
+
   // Structured combat event log — see backend CombatEvent. Mirror of state.
   combat_log?: CombatEvent[];
 

@@ -36,6 +36,12 @@ export const handleMarkerMove: ActionHandler<{ type: 'marker_move'; to: GridPos 
   }
   ctx.st = res.st;
 
+  // Walking away from an NPC ends any conversation with them (the marker left
+  // their room) — so a stale conversation can't linger into the next room.
+  if (ctx.st.active_conversation && ctx.st.active_conversation.roomId !== ctx.st.current_room) {
+    ctx.st = { ...ctx.st, active_conversation: undefined };
+  }
+
   // Entering a new local room (a site interior or a room-exit passage): use the
   // full arrival narrative so the party gets the room description, a "Hostile
   // here" listing, passive trap detection, and loot-spotting — the same cues the
