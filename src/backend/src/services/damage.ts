@@ -49,6 +49,13 @@ export interface ApplyDamageOptions {
   /** Skip temp HP absorption (e.g. damage that bypasses resistances/buffers). */
   skipTempHp?: boolean;
   /**
+   * Defer a failed concentration save's Indomitable reroll + break to an
+   * interactive `save_reroll` window (the spell stays active; the caller opens
+   * the window and breaks it on decline / failed reroll). Only the enemy-attack
+   * path passes this — every other damage source keeps the auto behavior.
+   */
+  deferConcentrationIndomitable?: boolean;
+  /**
    * Game context. Passed through to breakConcentration so that
    * concentration-linked AC buffs (Shield of Faith) can clear the
    * shield_of_faith_active flag + recompute AC when the caster's
@@ -71,6 +78,10 @@ export interface ApplyDamageResult {
   concentrationNote: string;
   /** True if the save failed and the spell ended this call. */
   concentrationBroken: boolean;
+  /** Deferred interactive concentration reroll (set only with
+   *  `deferConcentrationIndomitable` + Indomitable available + a failed save).
+   *  The spell is left active; the caller opens a `save_reroll` window. */
+  concentrationSaveReroll?: import('./gameEngine.js').PendingSaveRerollInfo;
   /** True if HP dropped to 0 from this damage (caller handles death-save transition). */
   knockedOut: boolean;
 }
@@ -130,13 +141,21 @@ export function applyDamage(
   // doesn't trigger a save per RAW; only damage that actually hit HP).
   let concentrationNote = '';
   let concentrationBroken = false;
+  let concentrationSaveReroll: ApplyDamageResult['concentrationSaveReroll'];
   if (!opts.skipConcentration && amountDealt > 0) {
     const before = newChar.concentrating_on;
-    const conc = checkConcentration(newChar, newSt, amountDealt, opts.context);
+    const conc = checkConcentration(
+      newChar,
+      newSt,
+      amountDealt,
+      opts.context,
+      opts.deferConcentrationIndomitable
+    );
     newChar = conc.char;
     newSt = conc.st;
     concentrationNote = conc.note;
     concentrationBroken = before != null && conc.char.concentrating_on == null;
+    concentrationSaveReroll = conc.deferredReroll;
   }
 
   // 2024 PHB — a creature reduced to 0 HP without being killed
@@ -173,6 +192,7 @@ export function applyDamage(
     tempHpRemaining: newTempHp,
     concentrationNote,
     concentrationBroken,
+    concentrationSaveReroll,
     knockedOut,
   };
 }

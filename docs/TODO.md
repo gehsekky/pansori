@@ -18,8 +18,8 @@ PHB/DMG-exclusive content (subclasses, feats, species, spells). See
 
 ## Implementation status (code-verified 2026-05-31)
 
-Grounded in a code survey + the full suite: **backend 2055 tests across
-243 files + frontend 138 across 24 files, all green** (lint + typecheck +
+Grounded in a code survey + the full suite: **backend 2068 tests across
+244 files + frontend 138 across 24 files, all green** (lint + typecheck +
 prettier clean).
 
 ### Done — world map / navigation
@@ -540,11 +540,20 @@ backend features are waiting on, and a handful of **bounded subsystems**.
       distinct, correct count) with a first-proficiencies fallback and seeds
       `expertise_skills`. Bard/Wizard still gain Expertise in-game (L2) via the
       existing `choose_expertise` flow.
-- [~] **Interactive reaction prompts** — let the player choose _when_ to
-  spend instead of auto-resolving player-favorably. **Stroke of Luck**
-  shipped (interactive `pending_reaction` window + FE reaction prompt).
-  Still auto-resolving: **Indomitable**, **Countercharm**, **Deflect
-  Attacks** — they reuse the same window/FE pattern.
+- [x] **Interactive reaction prompts** — the player chooses _when_ to spend
+      instead of auto-resolving player-favorably. All wired through the
+      `pending_reaction` window + the auto-rendered reaction choices:
+      **Stroke of Luck** (attack-roll d20), **Deflect Attacks** (Monk L3 —
+      a `deflect_attacks` window mirroring Uncanny Dodge; the proposed snapshot
+      carries full B/P/S damage, the resolver rolls 1d10 + DEX + Monk level on
+      accept), and **Indomitable** (Fighter) + **Countercharm** (Bard) on a
+      generalized `save_reroll` window. The reroll outcome is pre-rolled at the
+      save site and deferred: condition saves (onHitEffect) strip the condition
+      on a winning accept, damage-spell saves (`resolveEnemySpell`) refund the
+      failed-minus-saved damage, and concentration saves (`checkConcentration`
+      via the enemy-attack path) **defer the break** — kept on a winning accept,
+      broken on decline / a failed reroll. Indomitable is a per-rest reroll (no
+      Reaction); Countercharm spends the bard's Reaction (charm/fear only).
 - [x] **Slot-choice surfaces** — Arcane Recovery / Natural Recovery now
       surface a slot-choice picker instead of auto-picking lowest-first; the
       cast path validates the chosen slots and falls back to the auto-pick

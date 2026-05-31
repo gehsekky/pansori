@@ -3,6 +3,7 @@ import { FRESH_TURN, abilityMod, profBonus, rollDice } from '../rulesEngine.js';
 import {
   applyEnemySpellDamage,
   applyPartyLevelUps,
+  breakConcentration,
   endCombatState,
   getEnemyById,
   isRoomCleared,
@@ -13,8 +14,10 @@ import {
 } from '../gameEngine.js';
 import type { ActionHandler } from './types.js';
 import type { EnemyAttackHitFragment } from '../narrative/fragments.js';
+import { consumeIndomitable } from '../indomitable.js';
 import { consumeStrokeOfLuck } from '../strokeOfLuck.js';
 import { enemyAttackFragmentEvent } from '../narrative/compose.js';
+import { getClassLevel } from '../multiclass.js';
 import { resolveOneAttack } from './attack/resolveOneAttack.js';
 import { updatePcActor } from './actor.js';
 
@@ -93,8 +96,15 @@ export const handleResolveReaction: ActionHandler<{
     return;
   }
   // 2024 PHB PC-turn d20 reactions (Heroic Inspiration etc.) carry
-  // `rollerCharId` instead of the enemy-attack-base `targetCharId`.
-  const reactionOwnerId = rx.kind === 'pc_d20' ? rx.rollerCharId : rx.targetCharId;
+  // `rollerCharId`; save-reroll (Indomitable / Countercharm) carries
+  // `reactorCharId` (the bard may differ from the condition-holder). The rest
+  // use the enemy-attack-base `targetCharId`.
+  const reactionOwnerId =
+    rx.kind === 'pc_d20'
+      ? rx.rollerCharId
+      : rx.kind === 'save_reroll'
+        ? rx.reactorCharId
+        : rx.targetCharId;
   if (pc.char.id !== reactionOwnerId) {
     ctx.narrative = 'This reaction belongs to another character.';
     return;
@@ -438,6 +448,150 @@ export const handleResolveReaction: ActionHandler<{
       ctx.st = pushEvent(ctx.st, enemyAttackFragmentEvent(pendingFragment, ctx.st.round ?? 1));
       ctx.narrative = `${pendingFragment.prose} (Uncanny Dodge declined.)`;
     }
+  } else if (rx.kind === 'deflect_attacks') {
+    // SRD Monk L3. Accept = roll 1d10 + DEX + Monk level and reduce the
+    // proposed damage by that much (the proposedChar already took full
+    // damage; back out the reduced amount). Decline = commit the full
+    // proposed snapshot. Mirrors Uncanny Dodge, but the reduction is a roll
+    // rather than a flat halving.
+    const pendingFragment = rx.pendingFragment as EnemyAttackHitFragment;
+    const pendingProposedChar = rx.pendingProposedChar as Character;
+    const pendingProposedSt = rx.pendingProposedSt as GameState;
+    if (action.accept) {
+      const reduction = rollDice('1d10') + abilityMod(pc.char.dex) + getClassLevel(pc.char, 'monk');
+      const reduced = Math.max(0, rx.proposedDamage - reduction);
+      const dmgSaved = rx.proposedDamage - reduced;
+      const charAfterDeflect: Character = {
+        ...pendingProposedChar,
+        hp: Math.min(pendingProposedChar.max_hp, pendingProposedChar.hp + dmgSaved),
+        turn_actions: { ...pendingProposedChar.turn_actions, reaction_used: true },
+      };
+      ctx.st = {
+        ...ctx.st,
+        characters: pendingProposedSt.characters.map((c) =>
+          c.id === pc.char.id ? charAfterDeflect : c
+        ),
+        entities: (pendingProposedSt.entities ?? ctx.st.entities ?? []).map((e) =>
+          e.id === pc.char.id && !e.isEnemy ? { ...e, hp: charAfterDeflect.hp } : e
+        ),
+        pending_reaction: undefined,
+      };
+      updatePcActor(ctx, charAfterDeflect);
+      ctx.st = pushEvent(
+        ctx.st,
+        enemyAttackFragmentEvent({ ...pendingFragment, damage: reduced }, ctx.st.round ?? 1)
+      );
+      ctx.narrative = `🥋 ${pc.char.name} uses Deflect Attacks! ${pendingFragment.prose} — reduced by ${dmgSaved} (only ${reduced} lands).`;
+    } else {
+      // Decline — commit the full-damage proposed snapshot.
+      ctx.st = {
+        ...ctx.st,
+        characters: pendingProposedSt.characters.map((c) =>
+          c.id === pc.char.id ? pendingProposedChar : c
+        ),
+        entities: (pendingProposedSt.entities ?? ctx.st.entities ?? []).map((e) =>
+          e.id === pc.char.id && !e.isEnemy ? { ...e, hp: pendingProposedChar.hp } : e
+        ),
+        pending_reaction: undefined,
+      };
+      updatePcActor(ctx, pendingProposedChar);
+      ctx.st = pushEvent(ctx.st, enemyAttackFragmentEvent(pendingFragment, ctx.st.round ?? 1));
+      ctx.narrative = `${pendingFragment.prose} (Deflect Attacks declined.)`;
+    }
+  } else if (rx.kind === 'save_reroll') {
+    // Fighter Indomitable / Bard Countercharm reroll of a failed onHitEffect
+    // condition save. The condition is already committed; accept spends the
+    // source (Indomitable = a per-rest reroll, not a Reaction; Countercharm =
+    // the bard's Reaction) and, when the pre-rolled reroll succeeds, strips the
+    // condition from the holder (which may differ from the reactor). Decline
+    // leaves the condition in place.
+    const verb = rx.source === 'indomitable' ? 'Indomitable' : 'Countercharm';
+    // Concentration path defers the BREAK (the spell is still active) — so a
+    // decline or a failed reroll must break it now.
+    const breakConc = (): void => {
+      const holder = ctx.st.characters.find((c) => c.id === rx.targetCharId);
+      if (!holder) return;
+      const { char: broken, st: brokenSt } = breakConcentration(holder, ctx.st, ctx.context);
+      ctx.st = {
+        ...brokenSt,
+        characters: brokenSt.characters.map((c) => (c.id === broken.id ? broken : c)),
+      };
+      if (pc.char.id === broken.id) updatePcActor(ctx, broken);
+    };
+    if (action.accept) {
+      // `pc` is the reactor (active_character_id was set to reactorCharId).
+      const reactor =
+        rx.source === 'indomitable'
+          ? consumeIndomitable(pc.char)
+          : { ...pc.char, turn_actions: { ...pc.char.turn_actions, reaction_used: true } };
+      updatePcActor(ctx, reactor);
+      ctx.st = {
+        ...ctx.st,
+        characters: ctx.st.characters.map((c) => (c.id === reactor.id ? reactor : c)),
+      };
+      if (rx.rerollSucceeds && rx.condition) {
+        // Condition-save path — a successful reroll strips the condition.
+        const cond = rx.condition;
+        const strip = (c: Character): Character => {
+          const { [cond]: _omit, ...durs } = c.condition_durations ?? {};
+          return {
+            ...c,
+            conditions: (c.conditions ?? []).filter((x) => x !== cond),
+            condition_durations: durs,
+            ...(cond === 'charmed' ? { charmer_id: undefined } : {}),
+          };
+        };
+        ctx.st = {
+          ...ctx.st,
+          characters: ctx.st.characters.map((c) => (c.id === rx.targetCharId ? strip(c) : c)),
+        };
+        if (pc.char.id === rx.targetCharId) updatePcActor(ctx, strip(pc.char));
+        ctx.narrative = `✦ ${rx.reactorName} uses ${verb} — the ${cond} effect is shaken off!`;
+      } else if (rx.rerollSucceeds && rx.damageRefund) {
+        // Damage-save path — a successful reroll refunds the failed-minus-saved
+        // damage (e.g. full Fireball → half). `damageRefund` is the HP delta.
+        const refund = rx.damageRefund;
+        const heal = (c: Character): Character => ({
+          ...c,
+          hp: Math.min(c.max_hp, c.hp + refund),
+        });
+        ctx.st = {
+          ...ctx.st,
+          characters: ctx.st.characters.map((c) => (c.id === rx.targetCharId ? heal(c) : c)),
+          entities: (ctx.st.entities ?? []).map((e) =>
+            e.id === rx.targetCharId && !e.isEnemy
+              ? { ...e, hp: Math.min(e.maxHp ?? e.hp, e.hp + refund) }
+              : e
+          ),
+        };
+        if (pc.char.id === rx.targetCharId) updatePcActor(ctx, heal(pc.char));
+        ctx.narrative = `✦ ${rx.reactorName} uses ${verb} — the save succeeds, shrugging off ${refund} damage!`;
+      } else if (rx.rerollSucceeds && rx.concentrationSpellId) {
+        // Concentration path — success keeps the spell (the break was deferred,
+        // so there's nothing to undo).
+        ctx.narrative = `✦ ${rx.reactorName} uses ${verb} — Concentration on ${rx.concentrationSpellId} holds!`;
+      } else {
+        // Accept but the reroll fails. For concentration, the deferred break
+        // happens now; condition/damage already stand.
+        if (rx.concentrationSpellId) breakConc();
+        const what = rx.condition
+          ? `${rx.condition} holds`
+          : rx.concentrationSpellId
+            ? `${rx.concentrationSpellId} ends`
+            : 'the damage stands';
+        ctx.narrative = `✦ ${rx.reactorName} uses ${verb}, but the reroll fails — ${what}.`;
+      }
+    } else {
+      // Decline. For concentration the deferred break happens now.
+      if (rx.concentrationSpellId) breakConc();
+      const what = rx.condition
+        ? `${rx.condition} holds`
+        : rx.concentrationSpellId
+          ? `${rx.concentrationSpellId} ends`
+          : 'the damage stands';
+      ctx.narrative = `${rx.reactorName} declines — ${what}.`;
+    }
+    ctx.st = { ...ctx.st, pending_reaction: undefined };
   }
 
   // Resume the enemy turn loop from the coords saved when this reaction

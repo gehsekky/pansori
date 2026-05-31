@@ -110,8 +110,8 @@ const fighter = (over = {}) =>
 const stFor = (char: ReturnType<typeof makeChar>) =>
   ({ characters: [char], entities: [] }) as unknown as GameState;
 
-describe('resolveEnemySpell — Indomitable on a failed save', () => {
-  it('rescues a failed save and spends one use', () => {
+describe('resolveEnemySpell — Indomitable defers to an interactive save_reroll', () => {
+  it('a failed save commits full damage and surfaces a winning reroll (use not yet spent)', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.55); // d20 → 12: 12<14 fails, 12+9=21 saves
     const r = resolveEnemySpell({
       enemy: lich,
@@ -120,13 +120,15 @@ describe('resolveEnemySpell — Indomitable on a failed save', () => {
       st: stFor(fighter()),
       narrative: '',
     });
-    expect(r.target.hp).toBe(25); // saved → half of 10
-    expect(r.target.class_resource_uses.indomitable).toBe(1);
-    expect(r.narrative).toContain('Indomitable');
+    expect(r.target.hp).toBe(20); // full 10 now — the window refunds on accept
+    expect(r.target.class_resource_uses.indomitable ?? 0).toBe(0); // deferred to the window
+    expect(r.pendingSaveReroll?.source).toBe('indomitable');
+    expect(r.pendingSaveReroll?.succeeds).toBe(true);
+    expect(r.pendingSaveReroll?.damageRefund).toBe(5); // full 10 − half 5
     vi.restoreAllMocks();
   });
 
-  it('does not spend a use when even the reroll fails', () => {
+  it('still surfaces the window when the reroll would fail (the player decides)', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0); // d20 → 1: 1<14 and 1+9=10<14 both fail
     const r = resolveEnemySpell({
       enemy: lich,
@@ -137,7 +139,7 @@ describe('resolveEnemySpell — Indomitable on a failed save', () => {
     });
     expect(r.target.hp).toBe(20); // failed → full 10
     expect(r.target.class_resource_uses.indomitable ?? 0).toBe(0);
-    expect(r.narrative).not.toContain('Indomitable');
+    expect(r.pendingSaveReroll?.succeeds).toBe(false);
     vi.restoreAllMocks();
   });
 

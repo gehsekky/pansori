@@ -1,9 +1,10 @@
 // RE-2 — Countercharm (SRD 5.2.1, Bard L7): when a creature within 30 ft fails
 // a save against an effect applying Charmed or Frightened, the bard may use a
-// Reaction to make that creature reroll with Advantage. Auto-resolved
-// (player-favorable, like Indomitable/Stroke of Luck): a qualifying bard (self
-// or ally) spends a reaction only when the advantaged reroll rescues the save.
-// Wired in conditionSavingThrow; the bard's reaction is spent by the caller.
+// Reaction to make that creature reroll with Advantage. Now INTERACTIVE: the
+// failed save lands the condition and opens a `save_reroll` reaction window
+// (pending_reaction) for a qualifying bard (self or ally); the player chooses
+// whether to spend the reaction. Resolution (accept/decline) is covered in
+// saveRerollReaction.spec.ts; here we cover canCountercharm + the window open.
 
 import type { Character, Enemy } from '../types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -77,8 +78,8 @@ function pinFailingSave() {
 const saver = (over = {}) =>
   makeChar({ id: 'pc-1', species: 'human', wis: 10, hp: 30, max_hp: 30, ...over });
 
-describe('Countercharm — reroll a failed Charmed/Frightened save (integration)', () => {
-  it('self: a Bard L7 rerolls their own failed save and spends their reaction', () => {
+describe('Countercharm — opens a save_reroll window on a failed Charmed/Frightened save', () => {
+  it('self: a Bard L7 failing the save opens the window (reaction not yet spent)', () => {
     pinFailingSave();
     const bard = saver({ character_class: 'Bard', level: 7 });
     const ctx = ctxFor([bard]);
@@ -88,14 +89,22 @@ describe('Countercharm — reroll a failed Charmed/Frightened save (integration)
       advIdx: 0,
       multiattackIdx: 0,
     });
-    expect(ctx.enemySubAttack?.outcome).toBe('done');
-    if (ctx.enemySubAttack?.outcome !== 'done') throw new Error('expected done');
-    expect(ctx.enemySubAttack.target.conditions).not.toContain('frightened');
-    expect(ctx.enemySubAttack.target.turn_actions.reaction_used).toBe(true);
+    expect(ctx.enemySubAttack?.outcome).toBe('paused');
+    const rx = ctx.st.pending_reaction;
+    expect(rx?.kind).toBe('save_reroll');
+    if (rx?.kind !== 'save_reroll') throw new Error('expected save_reroll');
+    expect(rx.source).toBe('countercharm');
+    expect(rx.condition).toBe('frightened');
+    expect(rx.reactorCharId).toBe('pc-1');
+    expect(rx.rerollSucceeds).toBe(true); // the advantaged reroll (0.99) would pass
+    // The condition is committed (the player hasn't decided yet) and the
+    // reaction is NOT pre-spent — that happens on accept.
+    expect(ctx.st.characters[0].conditions).toContain('frightened');
+    expect(ctx.st.characters[0].turn_actions.reaction_used).toBe(false);
     expect(ctx.narrative).toContain('Countercharm');
   });
 
-  it('ally: a Bard L7 protects a non-bard, spending the bard’s reaction', () => {
+  it('ally: a Bard L7 nearby a frightened non-bard becomes the reactor', () => {
     pinFailingSave();
     const fighter = saver({ id: 'fighter', character_class: 'Fighter', level: 1 });
     const bard = makeChar({ id: 'bard', character_class: 'Bard', level: 7, species: 'human' });
@@ -106,11 +115,12 @@ describe('Countercharm — reroll a failed Charmed/Frightened save (integration)
       advIdx: 0,
       multiattackIdx: 0,
     });
-    expect(ctx.enemySubAttack?.outcome).toBe('done');
-    if (ctx.enemySubAttack?.outcome !== 'done') throw new Error('expected done');
-    expect(ctx.enemySubAttack.target.conditions).not.toContain('frightened'); // fighter saved
-    expect(ctx.st.characters.find((c) => c.id === 'bard')?.turn_actions.reaction_used).toBe(true);
-    expect(ctx.narrative).toContain('Countercharm');
+    expect(ctx.enemySubAttack?.outcome).toBe('paused');
+    const rx = ctx.st.pending_reaction;
+    if (rx?.kind !== 'save_reroll') throw new Error('expected save_reroll');
+    expect(rx.source).toBe('countercharm');
+    expect(rx.targetCharId).toBe('fighter'); // the frightened holder
+    expect(rx.reactorCharId).toBe('bard'); // the ally bard reacts
   });
 
   it('control: a Bard L6 has no Countercharm — the save sticks', () => {

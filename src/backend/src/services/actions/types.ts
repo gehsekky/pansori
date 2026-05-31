@@ -7,8 +7,8 @@ import type {
   Seed,
   StructuredAction,
 } from '../../types.js';
+import type { EnemySubAttackResult, PendingSaveRerollInfo } from '../gameEngine.js';
 import type { Actor } from './actor.js';
-import type { EnemySubAttackResult } from '../gameEngine.js';
 import type { NarrativeFragment } from '../narrative/fragments.js';
 
 /**
@@ -89,6 +89,14 @@ export interface ActionContext {
    * set by `handleEnemyAttack`.
    */
   enemySubAttack?: EnemySubAttackResult;
+
+  /**
+   * EE-3 side-channel — the `enemy_cast` handler reports a deferred
+   * interactive Indomitable reroll (failed damage-spell save) here, so
+   * `attemptEnemySpellCast` → `runEnemyTurns` can open the `save_reroll`
+   * window with resume coords. Only set by `handleEnemyCast`.
+   */
+  enemyCastSaveReroll?: PendingSaveRerollInfo;
 
   /**
    * EE-4 side-channel — the `enemy_move` handler reports its approach

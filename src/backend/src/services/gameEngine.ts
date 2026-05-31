@@ -100,6 +100,7 @@ import {
   hasSuperiorHuntersDefense,
   hunterFeatureOptions,
   huntersPrey,
+  indomitableRemaining,
   isEvocationSpell,
   knowsMetamagic,
   layOnHandsRemaining,
@@ -706,8 +707,19 @@ export function checkConcentration(
   char: Character,
   st: GameState,
   dmgTaken: number,
-  context?: Context
-): { char: Character; st: GameState; note: string } {
+  context?: Context,
+  // When true, a failed save with Indomitable available is NOT auto-rerolled or
+  // broken here — instead the break is DEFERRED and a `deferredReroll` is
+  // returned so the caller can open an interactive `save_reroll` window. The
+  // spell stays active until the player decides (decline / failed reroll breaks
+  // it). Only the enemy-attack path (computeEnemyAttack) passes this.
+  deferIndomitable = false
+): {
+  char: Character;
+  st: GameState;
+  note: string;
+  deferredReroll?: PendingSaveRerollInfo;
+} {
   if (!char.concentrating_on || dmgTaken <= 0) return { char, st, note: '' };
   // SRD Ranger Relentless Hunter (L13): taking damage can't break your
   // Concentration on Hunter's Mark — the save is skipped and the spell holds.
@@ -727,6 +739,31 @@ export function checkConcentration(
       st,
       note: ` [Concentration hold: ${save} vs DC ${dc}]`,
     };
+  // Interactive Indomitable — defer the break to a `save_reroll` window. The
+  // spell stays active (the break is what we're deferring); the window keeps it
+  // on a successful reroll and breaks it on decline / a failed reroll.
+  if (deferIndomitable && indomitableRemaining(char) > 0) {
+    const reroll =
+      d(20) +
+      abilityMod(char.con) -
+      d20TestPenalty(char) +
+      auraOfProtectionBonus(char, st) +
+      indomitableBonus(char);
+    return {
+      char,
+      st,
+      note: ` [Concentration save failed: ${save} vs DC ${dc} — Indomitable available]`,
+      deferredReroll: {
+        source: 'indomitable',
+        reactorId: char.id,
+        reactorName: char.name,
+        succeeds: reroll >= dc,
+        saveAbility: 'con',
+        saveDc: dc,
+        concentrationSpellId: char.concentrating_on.spellId,
+      },
+    };
+  }
   // SRD Fighter Indomitable — reroll the failed CON save with +Fighter level.
   const indo = tryIndomitableReroll(char, () => {
     const reroll =
@@ -1004,7 +1041,15 @@ function conditionSavingThrow(
   context: Context,
   // SRD Aura of Protection bonus, folded in by lowering the effective DC
   // (same mechanism as the Bardic Inspiration roll above). 0 when no aura.
-  auraBonus = 0
+  auraBonus = 0,
+  // When true, the two INTERACTIVE reaction rerolls (Fighter Indomitable,
+  // Bard Countercharm) are NOT auto-applied — instead the function leaves the
+  // save failed and reports a single `deferredReroll` (priority: Indomitable,
+  // then Countercharm) with its pre-rolled outcome, so the caller can open an
+  // interactive `save_reroll` reaction window. All the non-reaction rerolls
+  // (Heroic Inspiration / Stroke of Luck / Lucky / Dark One's Luck / Improve
+  // Fate / Bardic Inspiration) still auto-resolve.
+  deferReactionRerolls = false
 ): {
   applied: boolean;
   inspirationConsumed: boolean;
@@ -1021,6 +1066,14 @@ function conditionSavingThrow(
   // SRD Bard Countercharm — id of the bard (self or ally within 30 ft) who
   // spent a Reaction to reroll this Charmed/Frightened save with Advantage.
   countercharmBardId?: string;
+  // Deferred interactive reroll (set only when `deferReactionRerolls` and the
+  // save failed and a reroll source is available). `succeeds` is pre-rolled.
+  deferredReroll?: {
+    source: 'indomitable' | 'countercharm';
+    reactorId: string;
+    reactorName: string;
+    succeeds: boolean;
+  };
 } {
   // SRD Paladin Aura of Courage / Aura of Devotion — a creature within the
   // aura is immune to Frightened / Charmed, so the condition never lands (no
@@ -1085,7 +1138,7 @@ function conditionSavingThrow(
   // was spent on the first roll, so only the standing species advantage
   // carries to the reroll. Returns `applied === true` when the save failed.
   let indomitableConsumed = false;
-  if (applied) {
+  if (applied && !deferReactionRerolls) {
     const indo = tryIndomitableReroll(
       char,
       () =>
@@ -1186,14 +1239,22 @@ function conditionSavingThrow(
   // only spent when the advantaged reroll rescues it, so the reaction isn't
   // wasted. Returns the reactor's id so the caller spends that bard's reaction.
   let countercharmBardId: string | undefined;
-  if (applied && (effect.condition === 'charmed' || effect.condition === 'frightened')) {
+  // Helper: find a Bard (self or ally within 30 ft) able to Countercharm `char`.
+  const findCountercharmBard = (): Character | undefined => {
     const charEnt = st.entities?.find((e) => e.id === char.id);
-    const bard = (st.characters ?? []).find((p) => {
+    return (st.characters ?? []).find((p) => {
       if (!canCountercharm(p)) return false;
       if (p.id === char.id) return true; // self
       const pEnt = st.entities?.find((e) => e.id === p.id);
       return charEnt && pEnt ? distanceFeet(charEnt.pos, pEnt.pos) <= 30 : true;
     });
+  };
+  if (
+    applied &&
+    !deferReactionRerolls &&
+    (effect.condition === 'charmed' || effect.condition === 'frightened')
+  ) {
+    const bard = findCountercharmBard();
     if (bard) {
       const rescued = !rollConditionSave(
         effect.ability,
@@ -1213,6 +1274,64 @@ function conditionSavingThrow(
       }
     }
   }
+
+  // Interactive deferral — the save still failed and the player should choose
+  // whether to spend Indomitable / Countercharm. Pre-roll a single source's
+  // outcome (Indomitable first — it isn't even a Reaction, just a per-rest
+  // reroll; then an ally/self Bard's Countercharm) so the caller can open a
+  // `save_reroll` window. `succeeds` is final: the dice are rolled here.
+  let deferredReroll:
+    | {
+        source: 'indomitable' | 'countercharm';
+        reactorId: string;
+        reactorName: string;
+        succeeds: boolean;
+      }
+    | undefined;
+  if (applied && deferReactionRerolls) {
+    if (indomitableRemaining(char) > 0) {
+      const succeeds = !rollConditionSave(
+        effect.ability,
+        char[effect.ability] ?? 10,
+        dcAdjusted - indomitableBonus(char),
+        proficient,
+        char.level,
+        0,
+        char.conditions ?? [],
+        speciesAdv,
+        enc,
+        d20TestPenalty(char)
+      );
+      deferredReroll = {
+        source: 'indomitable',
+        reactorId: char.id,
+        reactorName: char.name,
+        succeeds,
+      };
+    } else if (effect.condition === 'charmed' || effect.condition === 'frightened') {
+      const bard = findCountercharmBard();
+      if (bard) {
+        const succeeds = !rollConditionSave(
+          effect.ability,
+          char[effect.ability] ?? 10,
+          dcAdjusted,
+          proficient,
+          char.level,
+          0,
+          char.conditions ?? [],
+          true, // Countercharm grants Advantage on the reroll
+          enc,
+          d20TestPenalty(char)
+        );
+        deferredReroll = {
+          source: 'countercharm',
+          reactorId: bard.id,
+          reactorName: bard.name,
+          succeeds,
+        };
+      }
+    }
+  }
   return {
     applied,
     inspirationConsumed: inspirationActive,
@@ -1224,10 +1343,33 @@ function conditionSavingThrow(
     countercharmBardId,
     darkOnesLuckConsumed,
     improveFateConsumed,
+    deferredReroll,
   };
 }
 
 // ─── Enemy attack helper ──────────────────────────────────────────────────────
+
+// Interactive save-reroll info, deferred out of a save site (condition save in
+// `conditionSavingThrow`, or a damage-spell save in `resolveEnemySpell`) and
+// surfaced so the caller can open a `save_reroll` reaction window. `succeeds`
+// is pre-rolled at save time. A successful reroll either strips `condition`
+// (condition saves) or refunds `damageRefund` HP (damage saves) — exactly one
+// is set per info.
+export interface PendingSaveRerollInfo {
+  saveAbility: AbilityKey;
+  saveDc: number;
+  source: 'indomitable' | 'countercharm';
+  reactorId: string;
+  reactorName: string;
+  succeeds: boolean;
+  /** Condition a successful reroll removes (condition-save path). */
+  condition?: string;
+  /** HP a successful reroll refunds — full-minus-saved damage (damage-save path). */
+  damageRefund?: number;
+  /** Concentration spell whose break is DEFERRED to this window (concentration
+   *  path): a successful reroll keeps it, decline / failed reroll breaks it. */
+  concentrationSpellId?: string;
+}
 
 // SRD 5.2.1 p.17 — Massive Damage: when damage reduces a character to 0 HP
 // and the leftover damage equals or exceeds their HP maximum, the character
@@ -1298,6 +1440,10 @@ function computeEnemyAttack(
    *  Restore Balance reaction (Clockwork Soul Sorcerer) can gate on
    *  enemy-rolled-with-advantage. */
   hadAdvantage: boolean;
+  /** Set when a save-based onHitEffect condition landed AND the target/an ally
+   *  could reroll it interactively (Fighter Indomitable / Bard Countercharm).
+   *  `resolveEnemySubAttack` opens a `save_reroll` window from this. */
+  pendingSaveReroll?: PendingSaveRerollInfo;
 } {
   // SRD Sanctuary — before the attack resolves, a creature attacking the warded
   // PC makes a Wisdom save vs the caster's spell DC; on a failure it can't bring
@@ -1554,24 +1700,12 @@ function computeEnemyAttack(
     const wardNote = '';
     const charAfterWard = char;
     const postWardDmg = postResistDmg;
-    // SRD Monk Deflect Attacks (L3): when hit by Bludgeoning/Piercing/Slashing,
-    // a Reaction reduces the damage by 1d10 + DEX + Monk level. Auto-resolved
-    // (player-favorable, like the other reaction features): spent when the monk
-    // has a Reaction and the hit deals B/P/S damage. (The optional Focus-Point
-    // redirect is deferred — tracked in docs/TODO.md.)
-    const monkDeflectLvl = getClassLevel(char, 'monk');
-    const isBPS = ['bludgeoning', 'piercing', 'slashing'].includes(
-      enemy.damageType ?? 'bludgeoning'
-    );
-    let deflectNote = '';
-    let deflectUsed = false;
-    let postDeflectDmg = postWardDmg;
-    if (monkDeflectLvl >= 3 && isBPS && !char.turn_actions?.reaction_used && postWardDmg > 0) {
-      const reduction = rollDice('1d10') + abilityMod(char.dex) + monkDeflectLvl;
-      postDeflectDmg = Math.max(0, postWardDmg - reduction);
-      deflectUsed = true;
-      deflectNote = ` 🥋 Deflect Attacks: ${fmt.dmg(postWardDmg)} → ${fmt.dmg(postDeflectDmg)} (−${reduction})`;
-    }
+    // SRD Monk Deflect Attacks (L3) is now an INTERACTIVE reaction window —
+    // opened in `resolveEnemySubAttack` after this proposal is computed (mirrors
+    // Uncanny Dodge), so the proposed snapshot here carries the FULL B/P/S
+    // damage and the resolver applies the 1d10 + DEX + Monk-level reduction on
+    // accept. (The optional Focus-Point redirect is deferred — see docs/TODO.md.)
+    const postDeflectDmg = postWardDmg;
     // SRD Ranger Superior Hunter's Defense (L15): a Reaction grants Resistance
     // to the damage type until end of turn. Auto-resolved (player-favorable,
     // like Deflect Attacks): spend the reaction the first time a type lands this
@@ -1583,8 +1717,7 @@ function computeEnemyAttack(
         ? char.superior_hunters_def?.type
         : undefined;
     const shdAlready = shdActiveType === shdDmgType;
-    const shdTrigger =
-      hasSuperiorHuntersDefense(char) && !deflectUsed && !char.turn_actions?.reaction_used;
+    const shdTrigger = hasSuperiorHuntersDefense(char) && !char.turn_actions?.reaction_used;
     let shdNote = '';
     let shdStamp = char.superior_hunters_def;
     let shdReactionUsed = false;
@@ -1617,9 +1750,11 @@ function computeEnemyAttack(
       bonusDmg = resistsBonus ? Math.ceil(rolled / 2) : rolled;
       if (bonusDmg > 0) bonusNote = ` (plus ${fmt.dmg(bonusDmg)} ${bt ?? ''})`.replace(' )', ')');
     }
-    const dmgResult = applyDamage(charAfterWard, st, postShdDmg + bonusDmg);
+    const dmgResult = applyDamage(charAfterWard, st, postShdDmg + bonusDmg, {
+      deferConcentrationIndomitable: true,
+    });
     let updatedChar = dmgResult.char;
-    if (deflectUsed || shdReactionUsed) {
+    if (shdReactionUsed) {
       updatedChar = {
         ...updatedChar,
         turn_actions: { ...updatedChar.turn_actions, reaction_used: true },
@@ -1685,7 +1820,6 @@ function computeEnemyAttack(
       affinityNote +
       wardNote +
       tempHpNote;
-    narrative += deflectNote;
     narrative += shdNote;
     narrative += lifeDrainNote;
     narrative += dmgResult.concentrationNote;
@@ -1694,6 +1828,10 @@ function computeEnemyAttack(
     let inspirationConsumed = false;
     let luckConsumed = false;
     let bardicConsumed = false;
+    // Interactive Indomitable / Countercharm reroll deferred out of the save
+    // cascade — surfaced to `resolveEnemySubAttack` so it can open a
+    // `save_reroll` reaction window after the condition lands.
+    let pendingSaveReroll: PendingSaveRerollInfo | undefined;
     // Auto-apply onHitEffect (no save) — e.g. the Griffon's Rend grapple,
     // which lands on any hit and is escaped via a fixed DC, not a save. Handled
     // separately from the save-based path below.
@@ -1725,8 +1863,17 @@ function computeEnemyAttack(
         updatedChar,
         st,
         context,
-        auraOfProtectionBonus(updatedChar, st)
+        auraOfProtectionBonus(updatedChar, st),
+        true // defer Indomitable / Countercharm to an interactive save_reroll window
       );
+      if (csResult.deferredReroll) {
+        pendingSaveReroll = {
+          condition: enemy.onHitEffect.condition,
+          saveAbility: enemy.onHitEffect.ability as AbilityKey,
+          saveDc: enemy.onHitEffect.dc as number,
+          ...csResult.deferredReroll,
+        };
+      }
       if (csResult.inspirationConsumed) {
         inspirationConsumed = true;
         narrative += ` ✦ Heroic Inspiration spent on the save!`;
@@ -1807,6 +1954,11 @@ function computeEnemyAttack(
     if (bardicConsumed) {
       updatedChar = { ...updatedChar, bardic_inspiration_die: undefined };
     }
+    // Concentration Indomitable deferral falls back to the same window when no
+    // onHitEffect condition reroll already claimed it (one reaction per hit).
+    if (!pendingSaveReroll && dmgResult.concentrationSaveReroll) {
+      pendingSaveReroll = dmgResult.concentrationSaveReroll;
+    }
     const hitFragment: EnemyAttackHitFragment = {
       kind: 'enemy_attack_hit',
       attackerEnemyId: enemy.id,
@@ -1839,6 +1991,7 @@ function computeEnemyAttack(
       atkD20: result.roll,
       hit: true,
       hadAdvantage: hasAdvantage,
+      pendingSaveReroll,
     };
   }
   if (armorItem) {
@@ -3372,6 +3525,46 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         },
         {
           label: `Decline — let ${pending.enemySpellName} resolve`,
+          action: { type: 'resolve_reaction', accept: false },
+        },
+      ];
+    }
+    if (pending.kind === 'deflect_attacks') {
+      return [
+        {
+          label: `🥋 Deflect Attacks (reaction) — reduce the ${enemyForLabel}'s ${pending.proposedDamage} damage by 1d10 + DEX + Monk level`,
+          action: { type: 'resolve_reaction', accept: true },
+        },
+        {
+          label: `Decline — take the hit (${pending.proposedDamage} damage)`,
+          action: { type: 'resolve_reaction', accept: false },
+        },
+      ];
+    }
+    if (pending.kind === 'save_reroll') {
+      // What a successful reroll achieves: shake off a condition, or shrug off
+      // the failed-minus-saved damage on a damage-spell save.
+      const outcome = pending.condition
+        ? `the failed ${pending.condition} save`
+        : pending.concentrationSpellId
+          ? `the failed Concentration save (keep ${pending.concentrationSpellId})`
+          : `the failed ${pending.saveAbility.toUpperCase()} save (avoid ${pending.damageRefund ?? 0} damage)`;
+      const acceptLabel =
+        pending.source === 'indomitable'
+          ? `✦ Indomitable — reroll ${outcome} (once per long rest)`
+          : `✦ Countercharm — ${pending.reactorName} rerolls ${outcome} with advantage (reaction)`;
+      const declineLabel = pending.condition
+        ? `Decline — stay ${pending.condition}`
+        : pending.concentrationSpellId
+          ? `Decline — lose Concentration on ${pending.concentrationSpellId}`
+          : `Decline — take the full damage`;
+      return [
+        {
+          label: acceptLabel,
+          action: { type: 'resolve_reaction', accept: true },
+        },
+        {
+          label: declineLabel,
           action: { type: 'resolve_reaction', accept: false },
         },
       ];
@@ -5943,6 +6136,18 @@ function isUncannyDodgeEligible(target: Character): boolean {
   return true;
 }
 
+// Deflect Attacks (SRD Monk L3) — a Reaction that reduces the damage from a
+// Bludgeoning/Piercing/Slashing attack by 1d10 + DEX + Monk level. 2024 RAW
+// doesn't require seeing the attacker (unlike Uncanny Dodge), so there's no
+// blinded gate. Eligibility is checked AFTER the attack proposal so the window
+// only opens on a damaging B/P/S hit with a Reaction available.
+function isDeflectAttacksEligible(target: Character, damageType: string | undefined): boolean {
+  if (getClassLevel(target, 'monk') < 3) return false;
+  if (!canReact(target)) return false;
+  if (target.hp <= 0) return false;
+  return ['bludgeoning', 'piercing', 'slashing'].includes(damageType ?? 'bludgeoning');
+}
+
 // Hellish Rebuke (PHB p.252) — triggers AFTER damage applies. Requires the
 // PC to be conscious (target.hp > 0 after the hit), within 60 ft of the
 // attacker (we have grid positions), and Warlock-only since that's the spell
@@ -6439,7 +6644,35 @@ export function resolveEnemySubAttack(args: {
     narrative += ` ⚡ ${enemy.name} strikes ${target.name} for ${fmt.dmg(computed.hpLost)} — Uncanny Dodge available!`;
     return { outcome: 'paused', st, narrative };
   }
-  // No Shield / Uncanny Dodge window — commit the proposed character + state.
+
+  // Deflect Attacks reaction window (Monk L3+). Triggers BEFORE damage commits
+  // on a Bludgeoning/Piercing/Slashing hit. Same proposed-snapshot stash as
+  // Uncanny Dodge; the resolver reduces `proposedDamage` by 1d10 + DEX + Monk
+  // level before committing. Checked after Uncanny Dodge so a Rogue/Monk
+  // multiclass spends Uncanny Dodge first (both consume the single reaction).
+  if (computed.hit && computed.hpLost > 0 && isDeflectAttacksEligible(target, enemy.damageType)) {
+    st = {
+      ...st,
+      pending_reaction: {
+        kind: 'deflect_attacks',
+        attackerEnemyId: enemyId,
+        targetCharId: target.id,
+        atkTotal: computed.atkTotal,
+        proposedDamage: computed.hpLost,
+        pendingFragment: computed.fragment as EnemyAttackHitFragment,
+        pendingProposedChar: computed.proposedChar,
+        pendingProposedSt: { ...computed.proposedSt, pending_reaction: undefined },
+        resumeFromInitiativeIdx: advIdx,
+        resumeFromMultiattackIdx: mi + 1,
+        narrativeSoFar: narrative,
+        eligibleCharIds: [target.id],
+      },
+      active_character_id: target.id,
+    };
+    narrative += ` 🥋 ${enemy.name} strikes ${target.name} for ${fmt.dmg(computed.hpLost)} — Deflect Attacks available!`;
+    return { outcome: 'paused', st, narrative };
+  }
+  // No Shield / Uncanny Dodge / Deflect window — commit the proposed character + state.
   // Orc Relentless Endurance: when reduced to 0 HP (and not killed
   // outright by massive damage), the Orc drops to 1 HP instead.
   // 1/long rest.
@@ -6533,6 +6766,46 @@ export function resolveEnemySubAttack(args: {
       narrative += ` 🔥 ${target.name} could retaliate with Hellish Rebuke!`;
       return { outcome: 'paused', st, narrative };
     }
+  }
+
+  // Interactive save-reroll window (Fighter Indomitable / Bard Countercharm).
+  // A save-based onHitEffect condition just landed and the target (or an ally
+  // bard) can reroll it. Like Hellish Rebuke this opens AFTER damage commits, so
+  // we must commit `target` into state before pausing (the caller's normal
+  // post-attack commit is skipped on a pause). The reroll outcome is pre-rolled
+  // in `computeEnemyAttack`; accepting removes the condition when it succeeds.
+  if (computed.pendingSaveReroll && target.hp > 0) {
+    const srr = computed.pendingSaveReroll;
+    st = {
+      ...commitCharacter(st, target),
+      pending_reaction: {
+        kind: 'save_reroll',
+        attackerEnemyId: enemyId,
+        targetCharId: target.id,
+        reactorCharId: srr.reactorId,
+        reactorName: srr.reactorName,
+        source: srr.source,
+        condition: srr.condition,
+        damageRefund: srr.damageRefund,
+        concentrationSpellId: srr.concentrationSpellId,
+        saveAbility: srr.saveAbility,
+        saveDc: srr.saveDc,
+        rerollSucceeds: srr.succeeds,
+        resumeFromInitiativeIdx: advIdx,
+        resumeFromMultiattackIdx: mi + 1,
+        narrativeSoFar: narrative,
+        eligibleCharIds: [srr.reactorId],
+      },
+      active_character_id: srr.reactorId,
+    };
+    const verb = srr.source === 'indomitable' ? 'Indomitable' : 'Countercharm';
+    const what = srr.condition
+      ? `the failed ${srr.condition} save`
+      : srr.concentrationSpellId
+        ? `the failed Concentration save (${srr.concentrationSpellId})`
+        : 'the failed save';
+    narrative += ` ✦ ${srr.reactorName} could use ${verb} to reroll ${what}!`;
+    return { outcome: 'paused', st, narrative };
   }
   return { outcome: 'done', st, target, narrative };
 }
@@ -6832,11 +7105,20 @@ export function resolveEnemySpell(args: {
   // Survivor). Optional: when omitted (unit tests that pin other mechanics) the
   // proficiency bonus is skipped, preserving their dice math.
   context?: Context;
-}): { st: GameState; target: Character; narrative: string } {
+}): {
+  st: GameState;
+  target: Character;
+  narrative: string;
+  // Set when a failed damage-spell save deferred to an interactive Indomitable
+  // reroll; the caller (`attemptEnemySpellCast` → `runEnemyTurns`) opens the
+  // `save_reroll` window with resume coords.
+  pendingSaveReroll?: PendingSaveRerollInfo;
+} {
   const { enemy, spell, target } = args;
   let narrative = args.narrative;
   const dmgRoll = rollDice(spell.damage ?? '0');
   let newTarget: Character;
+  let pendingSaveReroll: PendingSaveRerollInfo | undefined;
   if (spell.savingThrow) {
     const saveScore = (target[spell.savingThrow] ?? 10) as number;
     const dc = enemy.spellSaveDC ?? 8 + Math.floor((enemy.toHit + 5) / 2);
@@ -6858,55 +7140,65 @@ export function resolveEnemySpell(args: {
     let saved = save >= dc;
     let workingTarget = target;
     let rescueNote = '';
-    // SRD Fighter Indomitable — reroll the failed save with +Fighter level.
-    if (!saved) {
-      const indo = tryIndomitableReroll(target, () => {
-        const reroll =
-          rollDice('1d20') +
-          abilityMod(saveScore) +
-          saveProf +
-          auraOfProtectionBonus(target, args.st) +
-          indomitableBonus(target);
-        return reroll >= dc;
-      });
-      if (indo.used && indo.saved) {
-        saved = true;
-        workingTarget = consumeIndomitable(target);
-        rescueNote = ' ✦ Indomitable';
-      }
+    // SRD Evasion (Rogue/Monk L7): on a DEX save-for-half, take no damage
+    // on a success and half on a failure (vs the normal half / full).
+    const evasion =
+      spell.savingThrow === 'dex' && spell.saveEffect === 'half' && hasEvasion(target);
+    // Damage for a given save outcome (used both for the committed damage and
+    // the interactive Indomitable refund = failed-minus-saved).
+    const dmgFor = (didSave: boolean): number => {
+      if (evasion) return didSave ? 0 : Math.floor(dmgRoll / 2);
+      if (didSave && spell.saveEffect === 'half') return Math.floor(dmgRoll / 2);
+      if (didSave && spell.saveEffect === 'negates') return 0;
+      return dmgRoll;
+    };
+    // SRD Fighter Indomitable — INTERACTIVE: a failed damage-spell save defers
+    // to a `save_reroll` window (the player chooses whether to spend the
+    // per-rest reroll). Pre-roll the outcome here; the window refunds the
+    // failed-minus-saved damage on an accept that succeeds.
+    if (!saved && indomitableRemaining(target) > 0) {
+      const reroll =
+        rollDice('1d20') +
+        abilityMod(saveScore) +
+        saveProf +
+        auraOfProtectionBonus(target, args.st) +
+        indomitableBonus(target);
+      pendingSaveReroll = {
+        source: 'indomitable',
+        reactorId: target.id,
+        reactorName: target.name,
+        succeeds: reroll >= dc,
+        saveAbility: spell.savingThrow,
+        saveDc: dc,
+        damageRefund: dmgFor(false) - dmgFor(true),
+      };
     }
-    // SRD Rogue Stroke of Luck — turn the failed save into a 20 when it rescues.
+    // SRD Rogue Stroke of Luck — auto (not an interactive prompt): turn the
+    // failed save into a 20 when it rescues. If it rescues, there's nothing for
+    // Indomitable to do, so drop the deferred window.
     if (!saved && strokeOfLuckAvailable(target)) {
       const mods = abilityMod(saveScore) + saveProf + auraOfProtectionBonus(target, args.st);
       if (20 + mods >= dc) {
         saved = true;
         workingTarget = consumeStrokeOfLuck(target);
         rescueNote = ' ✦ Stroke of Luck';
+        pendingSaveReroll = undefined;
       }
     }
-    // SRD Evasion (Rogue/Monk L7): on a DEX save-for-half, take no damage
-    // on a success and half on a failure (vs the normal half / full).
-    const evasion =
-      spell.savingThrow === 'dex' && spell.saveEffect === 'half' && hasEvasion(target);
-    let dmg: number;
-    if (evasion) {
-      dmg = saved ? 0 : Math.floor(dmgRoll / 2);
-    } else {
-      dmg =
-        saved && spell.saveEffect === 'half'
-          ? Math.floor(dmgRoll / 2)
-          : saved && spell.saveEffect === 'negates'
-            ? 0
-            : dmgRoll;
-    }
     const evasionNote = evasion ? ' ✦ Evasion' : '';
+    const dmg = dmgFor(saved);
     newTarget = { ...workingTarget, hp: Math.max(0, workingTarget.hp - dmg) };
     narrative += ` ${enemy.name} casts ${spell.name}! ${target.name} ${fmt.save(spell.savingThrow.toUpperCase(), save)} vs ${fmt.dc(dc)} — ${saved ? 'saves' : 'fails'}, ${fmt.dmg(dmg)} ${spell.damageType ?? 'damage'}.${rescueNote}${evasionNote}`;
   } else {
     newTarget = { ...target, hp: Math.max(0, target.hp - dmgRoll) };
     narrative += ` ${enemy.name} casts ${spell.name}! ${target.name} takes ${fmt.dmg(dmgRoll)} ${spell.damageType ?? 'damage'}.`;
   }
-  return { st: commitCharacter(args.st, newTarget), target: newTarget, narrative };
+  return {
+    st: commitCharacter(args.st, newTarget),
+    target: newTarget,
+    narrative,
+    pendingSaveReroll,
+  };
 }
 
 async function attemptEnemySpellCast(args: {
@@ -6926,7 +7218,13 @@ async function attemptEnemySpellCast(args: {
 }): Promise<
   | { kind: 'no-cast' }
   | { kind: 'counterspell-pending'; st: GameState; narrative: string }
-  | { kind: 'spell-resolved'; st: GameState; target: Character; narrative: string }
+  | {
+      kind: 'spell-resolved';
+      st: GameState;
+      target: Character;
+      narrative: string;
+      pendingSaveReroll?: PendingSaveRerollInfo;
+    }
 > {
   const {
     enemy,
@@ -7003,6 +7301,7 @@ async function attemptEnemySpellCast(args: {
     st: castCtx.st,
     target: castCtx.st.characters[targetCharIdx] ?? target,
     narrative: castCtx.narrative,
+    pendingSaveReroll: castCtx.enemyCastSaveReroll,
   };
 }
 
@@ -8127,6 +8426,37 @@ export async function runEnemyTurns(args: {
             st = spellResult.st;
             target = spellResult.target;
             narrative = spellResult.narrative;
+            // Interactive Indomitable on a failed damage-spell save — the spell
+            // already resolved (full damage committed); open a `save_reroll`
+            // window and pause. The spell IS the enemy's whole turn, so resume
+            // at the NEXT initiative entry after the reaction is decided.
+            const srr = spellResult.pendingSaveReroll;
+            if (srr) {
+              const resumeIdx = (advIdx + 1) % orderLen;
+              st = {
+                ...st,
+                pending_reaction: {
+                  kind: 'save_reroll',
+                  attackerEnemyId: eEntry.id,
+                  targetCharId: srr.reactorId,
+                  reactorCharId: srr.reactorId,
+                  reactorName: srr.reactorName,
+                  source: srr.source,
+                  condition: srr.condition,
+                  damageRefund: srr.damageRefund,
+                  saveAbility: srr.saveAbility,
+                  saveDc: srr.saveDc,
+                  rerollSucceeds: srr.succeeds,
+                  resumeFromInitiativeIdx: resumeIdx,
+                  resumeFromMultiattackIdx: 0,
+                  narrativeSoFar: narrative,
+                  eligibleCharIds: [srr.reactorId],
+                },
+                active_character_id: srr.reactorId,
+              };
+              narrative += ` ✦ ${srr.reactorName} could use Indomitable to reroll the failed ${srr.saveAbility.toUpperCase()} save!`;
+              return { st, narrative, exitAdvIdx: advIdx, roundWrapped, paused: true };
+            }
             // Skip the multi-attack — spell IS the action this turn.
             resumeMi = 0;
             const prevAdvIdx2 = advIdx;

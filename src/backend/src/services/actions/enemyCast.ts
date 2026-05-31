@@ -31,4 +31,5 @@ export const handleEnemyCast: ActionHandler<{
   });
   ctx.st = result.st;
   ctx.narrative = result.narrative;
+  ctx.enemyCastSaveReroll = result.pendingSaveReroll;
 };

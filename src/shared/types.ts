@@ -1112,6 +1112,47 @@ export interface PendingUncannyDodgeReaction extends PendingReactionBase {
   pendingProposedSt: unknown;
 }
 
+// Deflect Attacks (SRD Monk L3). Triggers BEFORE damage commits when a
+// Bludgeoning/Piercing/Slashing attack hits the Monk — accepting reduces the
+// damage by 1d10 + DEX mod + Monk level (rolled in the resolver). Same
+// pre-built proposed-snapshot stash as Uncanny Dodge: accept ⇒ reduce the
+// damage in the snapshot, commit; decline ⇒ commit the full-damage snapshot.
+export interface PendingDeflectReaction extends PendingReactionBase {
+  kind: 'deflect_attacks';
+  atkTotal: number;
+  /** Full proposed damage before reduction — for narrative display + the
+   *  resolver's reduction floor. */
+  proposedDamage: number;
+  pendingFragment: unknown;
+  pendingProposedChar: unknown;
+  pendingProposedSt: unknown;
+}
+
+// Save-reroll (SRD Fighter Indomitable / Bard Countercharm). Triggers AFTER a
+// save-based onHitEffect condition lands — accepting rerolls the failed save
+// (the outcome is pre-rolled at trigger time) and, on success, removes the
+// condition. Indomitable isn't a Reaction (just a per-rest reroll); Countercharm
+// spends the bard's Reaction. The reactor (`reactorCharId`) may differ from the
+// condition-holder (`targetCharId`) when an ally bard Countercharms.
+export interface PendingSaveRerollReaction extends PendingReactionBase {
+  kind: 'save_reroll';
+  source: 'indomitable' | 'countercharm';
+  /** Who spends the reroll (target for Indomitable, the bard for Countercharm). */
+  reactorCharId: string;
+  reactorName: string;
+  /** A successful reroll either removes `condition` from `targetCharId`
+   *  (condition-save path), refunds `damageRefund` HP (damage-save path), or
+   *  keeps the `concentrationSpellId` spell (concentration path — where the
+   *  break is deferred, so decline / a failed reroll breaks it). One is set. */
+  condition?: string;
+  damageRefund?: number;
+  concentrationSpellId?: string;
+  saveAbility: string;
+  saveDc: number;
+  /** Pre-rolled at trigger time — applied on accept. */
+  rerollSucceeds: boolean;
+}
+
 // Counterspell (PHB p.228). Triggers BEFORE the enemy spell resolves —
 // accepting consumes a slot on the PC and negates the enemy spell.
 export interface PendingCounterspellReaction extends PendingReactionBase {
@@ -1188,4 +1229,6 @@ export type PendingReaction =
   | PendingHellishRebukeReaction
   | PendingCounterspellReaction
   | PendingUncannyDodgeReaction
+  | PendingDeflectReaction
+  | PendingSaveRerollReaction
   | PendingPcD20Reaction;
