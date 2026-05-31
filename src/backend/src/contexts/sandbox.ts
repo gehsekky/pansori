@@ -26,9 +26,6 @@ export const context: Context = {
   gridWidth: 8,
   gridHeight: 8,
   startRoomId: 'entry_hall',
-  escapeRoomId: 'exit_gate',
-  escapeTriggers: ['escape', 'leave', 'exit', 'open the gate', 'go through the gate'],
-  escapeChoiceText: 'Force open the gate — ESCAPE THE DUNGEON',
 
   worldNames: [
     'The Testing Grounds',
@@ -496,13 +493,10 @@ export const context: Context = {
       'Slain by {enemy}. The dungeon claims another soul.',
       'The darkness of {world} takes you.',
     ],
-    escapeLines: ['You force the gate open and escape the dungeon. Adventure complete.'],
     enemyDeflected: [
       'The {enemy} swings — deflected by your {armor}!',
       "Your {armor} turns the {enemy}'s blow.",
     ],
     levelUp: ['Level up! You grow stronger.', 'You feel a surge of power — level gained.'],
-    noEscapeNearby: ["The exit isn't here."],
-    escapeBlocked: ['blocks your escape.'],
   },
 };

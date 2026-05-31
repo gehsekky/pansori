@@ -39,9 +39,6 @@ export const context: Context = {
   gridWidth: 10,
   gridHeight: 10,
   startRoomId: 'pinegate_square',
-  escapeRoomId: 'grove_sanctum_exit',
-  escapeTriggers: ['escape', 'leave', 'return to pinegate', 'descend'],
-  escapeChoiceText: 'Return to Pinegate — END THE QUEST',
 
   worldNames: ['The Verdant Reach', 'Pinegate and the Ancient Grove', 'The Old Wood'],
 
@@ -888,13 +885,10 @@ export const context: Context = {
       'The grove takes you back to the soil.',
       'Mareth — wherever she is — would have asked them to leave you whole.',
     ],
-    escapeLines: ['You walk back through the Thornwater toward Pinegate. The grove sleeps.'],
     enemyDeflected: [
       'The {enemy} strikes — your {armor} turns the blow.',
       "Your {armor} catches the {enemy}'s attack.",
     ],
     levelUp: ['Level up — you grow keener.', "The Wild Mother's favor settles on you."],
-    noEscapeNearby: ["You aren't at the grove's edge yet."],
-    escapeBlocked: ['stands between you and the path home.'],
   },
 };

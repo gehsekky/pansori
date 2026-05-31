@@ -85,7 +85,6 @@ export const ACTION_COSTS: Record<StructuredAction['type'], ActionCost> = {
   lay_on_hands: 'managed',
   set_active_character: 'managed',
   prepare_spells: 'managed',
-  escape: 'managed',
   attune: 'managed',
   de_attune: 'managed',
   short_rest: 'managed',

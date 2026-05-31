@@ -56,7 +56,6 @@ import { handleDisarmTrap } from './disarmTrap.js';
 import { handleEnemyAttack } from './enemyAttack.js';
 import { handleEnemyCast } from './enemyCast.js';
 import { handleEnemyMove } from './enemyMove.js';
-import { handleEscape } from './escape.js';
 import { handleExamine } from './examineDefault.js';
 import { handleGridMove } from './gridMove.js';
 import { handleHasteExtraAction } from './hasteExtraAction.js';
@@ -113,7 +112,6 @@ const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   lay_on_hands: handleLayOnHands as ActionHandler,
   set_active_character: handleSetActiveCharacter as ActionHandler,
   prepare_spells: handlePrepareSpells as ActionHandler,
-  escape: handleEscape as ActionHandler,
   attune: handleAttune as ActionHandler,
   de_attune: handleDeAttune as ActionHandler,
   short_rest: handleShortRest as ActionHandler,

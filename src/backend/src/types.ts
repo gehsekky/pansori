@@ -1516,9 +1516,6 @@ export interface Context {
   id: string;
   worldNoun: string;
   startRoomId: string;
-  escapeRoomId: string;
-  escapeTriggers: string[];
-  escapeChoiceText: string;
   worldNames: string[];
   // Retained for back-compat in the session payload; the roguelike model was
   // retired, so every context is a defined grid `campaign` now.
@@ -1584,11 +1581,8 @@ export interface Context {
     sneakSuccess: string[];
     sneakFail: string[];
     deathLines: string[];
-    escapeLines: string[];
     enemyDeflected: string[];
     levelUp: string[];
-    noEscapeNearby: string[];
-    escapeBlocked: string[];
     // Optional overrides for otherwise hard-coded engine text
     combatStart?: string[]; // prefix before "Initiative: X → Y"; {enemy} substituted
     shortRest?: string[]; // flavor before HP numbers; {name} {hpGained} {hpNow} {hpMax} substituted

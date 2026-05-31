@@ -3538,9 +3538,6 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     });
   }
 
-  if (state.current_room === context.escapeRoomId && !enemyAlive) {
-    choices.push({ label: context.escapeChoiceText, action: { type: 'escape' } });
-  }
   // Attack is the Action (PHB p.192). Don't offer it once the action is spent —
   // an unintended click on a stale Attack choice would otherwise pass through
   // the post-action auto-advance and end the turn (e.g. an out-of-range

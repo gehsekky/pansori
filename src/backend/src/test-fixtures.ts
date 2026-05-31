@@ -179,7 +179,7 @@ export const baseSandboxSeed: Seed = {
   rooms: [
     { id: sandboxCtx.startRoomId, name: 'Entry Hall', desc: 'The entry hall.' },
     { id: CORRIDOR_ID, name: 'Guard Post', desc: 'A guard post.' },
-    { id: sandboxCtx.escapeRoomId, name: 'Exit Gate', desc: 'The exit gate.' },
+    { id: 'exit_gate', name: 'Exit Gate', desc: 'The exit gate.' },
   ],
   enemies: {},
   loot: {},
@@ -222,7 +222,7 @@ export const dungeonSeedWithEnemy: Seed = {
   rooms: [
     { id: sandboxCtx.startRoomId, name: 'Entry Hall', desc: 'Entry.' },
     { id: CORRIDOR_ID, name: 'Guard Post', desc: 'Dark.' },
-    { id: sandboxCtx.escapeRoomId, name: 'Exit Gate', desc: 'Exit.' },
+    { id: 'exit_gate', name: 'Exit Gate', desc: 'Exit.' },
   ],
   enemies: {
     [CORRIDOR_ID]: [
@@ -255,7 +255,7 @@ export const spellSeed: Seed = {
   rooms: [
     { id: sandboxCtx.startRoomId, name: 'Crypt', desc: 'Cold stone.' },
     { id: CORRIDOR_ID, name: 'Burial', desc: 'A chamber.' },
-    { id: sandboxCtx.escapeRoomId, name: 'Exit Shaft', desc: 'A shaft of light.' },
+    { id: 'exit_shaft', name: 'Exit Shaft', desc: 'A shaft of light.' },
   ],
   enemies: {
     [CORRIDOR_ID]: [

@@ -50,7 +50,7 @@ const seed: Seed = {
   rooms: [
     { id: ctx.startRoomId, name: 'Entry Hall', desc: 'The entry hall.' },
     { id: CORRIDOR_ID, name: 'Guard Post', desc: 'A guard post.' },
-    { id: ctx.escapeRoomId, name: 'Exit Gate', desc: 'The exit gate.' },
+    { id: 'exit_gate', name: 'Exit Gate', desc: 'The exit gate.' },
   ],
   enemies: {},
   loot: {},
@@ -385,47 +385,6 @@ describe('generateChoices', () => {
     expect(choices.some((c) => c.action.type === 'loot')).toBe(true);
     expect(choices.some((c) => c.label.toLowerCase().includes('med-kit'))).toBe(true);
   });
-
-  it('includes escape choice at escape room when no enemy is alive', () => {
-    const state = makeState(
-      {},
-      {
-        current_room: ctx.escapeRoomId,
-        visited_rooms: [ctx.startRoomId, CORRIDOR_ID, ctx.escapeRoomId],
-      }
-    );
-    const choices = generateChoices(state, seed, ctx);
-    expect(choices.some((c) => c.action.type === 'escape')).toBe(true);
-    expect(choices.some((c) => c.label === ctx.escapeChoiceText)).toBe(true);
-  });
-
-  it('does not include escape choice when an enemy blocks the escape room', () => {
-    const blockedSeed: Seed = {
-      ...seed,
-      enemies: {
-        [ctx.escapeRoomId]: [
-          {
-            id: `${ctx.escapeRoomId}#0`,
-            name: 'Guard',
-            hp: 10,
-            ac: 12,
-            damage: '1d6',
-            toHit: 3,
-            xp: 10,
-          },
-        ],
-      },
-    };
-    const state = makeState(
-      {},
-      {
-        current_room: ctx.escapeRoomId,
-        visited_rooms: [ctx.startRoomId, CORRIDOR_ID, ctx.escapeRoomId],
-      }
-    );
-    const choices = generateChoices(state, blockedSeed, ctx);
-    expect(choices.every((c) => c.action.type !== 'escape')).toBe(true);
-  });
 });
 
 // ─── takeAction ──────────────────────────────────────────────────────────────
@@ -464,24 +423,6 @@ describe('takeAction', () => {
     expect(char.inventory[0].id).toBe('medkit');
     expect(char.inventory[0].instance_id).toBeTruthy();
     expect(result.newState.loot_taken).toContain(CORRIDOR_ID);
-  });
-
-  it('escape action at the escape room with no enemy sets escaped=true', async () => {
-    const state = makeState(
-      {},
-      {
-        current_room: ctx.escapeRoomId,
-        visited_rooms: [ctx.startRoomId, CORRIDOR_ID, ctx.escapeRoomId],
-      }
-    );
-    const result = await takeAction({
-      action: { type: 'escape' },
-      history: [],
-      state,
-      seed,
-      context: ctx,
-    });
-    expect(result.escaped).toBe(true);
   });
 
   it('first attack populates initiative_order with all party members and the enemy', async () => {

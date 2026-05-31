@@ -103,9 +103,6 @@ export const context: Context = {
   worldNoun: 'vale',
   mapType: 'campaign',
   startRoomId: 'millhaven_square',
-  escapeRoomId: 'dungeon_crypt_exit',
-  escapeTriggers: ['escape', 'leave', 'ascend', 'climb out', 'exit the crypt'],
-  escapeChoiceText: 'Climb out of the crypt — RETURN TO MILLHAVEN',
 
   worldNames: ['Vale of Shadows', 'The Darkened Vale', 'Millhaven and the Shattered Crypt'],
 
@@ -525,10 +522,6 @@ export const context: Context = {
       'A creak of leather betrays you.',
     ],
     deathLines: ['{name} falls, life fading...', '{name} collapses — not long now...'],
-    escapeLines: [
-      'You emerge from the crypt into the cool night air. Millhaven awaits.',
-      'You climb the ancient steps and breathe free air once more.',
-    ],
     enemyDeflected: [
       "{enemy}'s blow glances off your armor.",
       '{enemy} attacks but finds no opening.',
@@ -538,8 +531,6 @@ export const context: Context = {
       'Your trials have made you stronger — you have reached level {level}!',
       'Experience crystallizes into power — you advance to level {level}!',
     ],
-    noEscapeNearby: ['There is no way out from here.'],
-    escapeBlocked: ['An enemy stands between you and escape!'],
     combatStart: [
       '{enemy} bars your path — initiative is drawn!',
       'Combat begins! {enemy} readies for battle.',

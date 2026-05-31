@@ -33,9 +33,6 @@ export const context: Context = {
   worldNoun: 'pass',
   mapType: 'campaign',
   startRoomId: 'pines_square',
-  escapeRoomId: 'spire_egress',
-  escapeTriggers: ['escape', 'leave', 'descend', 'climb down', 'flee'],
-  escapeChoiceText: 'Descend the spire — RETURN TO WHISPERING PINES',
 
   worldNames: ['Whispering Pines', 'The Frozen Pass', 'Pines and the Iceshard Spire'],
 
@@ -513,10 +510,6 @@ export const context: Context = {
       'A drift collapses behind you. They heard.',
     ],
     deathLines: ['{name} sinks into the drift, fading...', '{name} falls — the cold takes them.'],
-    escapeLines: [
-      'You descend the pass and Whispering Pines welcomes you back.',
-      'The wind quiets as you reach the lower trail.',
-    ],
     enemyDeflected: [
       "{enemy}'s strike skids off your guard.",
       '{enemy} swings but finds no opening.',
@@ -525,8 +518,6 @@ export const context: Context = {
       'The cold tempered you — you are level {level} now.',
       'Hard-won experience crystallises — level {level}!',
     ],
-    noEscapeNearby: ['There is no descent from here.'],
-    escapeBlocked: ['An enemy stands between you and the trail down!'],
     combatStart: [
       '{enemy} bars your path — initiative is drawn!',
       'Combat begins — {enemy} ready!',

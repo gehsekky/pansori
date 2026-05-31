@@ -312,7 +312,6 @@ export type StructuredAction =
   | { type: 'loot' }
   | { type: 'use'; itemId: string; targetCharId?: string }
   | { type: 'sneak' }
-  | { type: 'escape' }
   | { type: 'examine' }
   | { type: 'death_save' }
   | { type: 'pass' }
