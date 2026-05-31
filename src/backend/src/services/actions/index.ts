@@ -66,6 +66,7 @@ import { handleLayOnHands } from './layOnHands.js';
 import { handleLoot } from './loot.js';
 import { handleMarkerMove } from './markerMove.js';
 import { handleMoveZone } from './moveZone.js';
+import { handleRecoverSlots } from './recoverSlots.js';
 import { handleRecurringSpellAttack } from './recurringSpellAttack.js';
 import { handleSneak } from './sneak.js';
 import { handleTwoWeaponAttack } from './twoWeaponAttack.js';
@@ -115,6 +116,7 @@ const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   de_attune: handleDeAttune as ActionHandler,
   short_rest: handleShortRest as ActionHandler,
   long_rest: handleLongRest as ActionHandler,
+  recover_slots: handleRecoverSlots as ActionHandler,
   death_save: handleDeathSave as ActionHandler,
   talk: handleTalk as ActionHandler,
   talk_response: handleTalkResponse as ActionHandler,

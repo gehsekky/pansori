@@ -90,6 +90,7 @@ export const ACTION_COSTS: Record<StructuredAction['type'], ActionCost> = {
   de_attune: 'managed',
   short_rest: 'managed',
   long_rest: 'managed',
+  recover_slots: 'managed',
   death_save: 'managed',
   talk: 'managed',
   talk_response: 'managed',

@@ -77,56 +77,12 @@ export const handleShortRest: ActionHandler<{ type: 'short_rest' }> = (ctx) => {
   }
   if (hasClass(next, 'monk')) delete srUses.ki_points;
   if (hasClass(next, 'druid')) srUses.wild_shape = 2;
-  let naturalRecoveryNarr = '';
-  if (hasClass(next, 'druid') && next.subclass === 'land' && !(srUses.natural_recovery_used ?? 0)) {
-    // Natural Recovery budget = ⌈Druid level / 2⌉ (Land Druid feature).
-    let budget = Math.ceil(getClassLevel(next, 'druid') / 2);
-    const slotsMax = next.spell_slots_max ?? {};
-    const slotsUsedSr = { ...(next.spell_slots_used ?? {}) };
-    const recovered: number[] = [];
-    for (const lvlKey of Object.keys(slotsMax)
-      .map(Number)
-      .sort((a, b) => a - b)) {
-      while (budget >= lvlKey && (slotsUsedSr[lvlKey] ?? 0) > 0) {
-        slotsUsedSr[lvlKey] = (slotsUsedSr[lvlKey] ?? 0) - 1;
-        budget -= lvlKey;
-        recovered.push(lvlKey);
-      }
-    }
-    if (recovered.length > 0) {
-      next.spell_slots_used = slotsUsedSr;
-      srUses.natural_recovery_used = 1;
-      naturalRecoveryNarr = ` 🌿 Natural Recovery — restored ${recovered.length} slot(s) [${recovered.join(', ')}].`;
-    }
-  }
-  let arcaneRecoveryNarr = '';
-  if (hasClass(next, 'wizard') && !(srUses.arcane_recovery_used ?? 0)) {
-    // SRD: Arcane Recovery (Wizard L1) — on finishing a short rest, recover
-    // expended spell slots totaling no more than ⌈Wizard level / 2⌉ combined
-    // levels, none of them level 6 or higher; once per long rest. Same greedy
-    // loop as the Land Druid's Natural Recovery (lowest-level slots first,
-    // maximizing the count recovered), with the level-6+ carve-out. The player
-    // chooses which slots RAW; pansori auto-resolves (see TODO RE-2).
-    let budget = Math.ceil(getClassLevel(next, 'wizard') / 2);
-    const slotsMax = next.spell_slots_max ?? {};
-    const slotsUsedAr = { ...(next.spell_slots_used ?? {}) };
-    const recovered: number[] = [];
-    for (const lvlKey of Object.keys(slotsMax)
-      .map(Number)
-      .filter((l) => l <= 5)
-      .sort((a, b) => a - b)) {
-      while (budget >= lvlKey && (slotsUsedAr[lvlKey] ?? 0) > 0) {
-        slotsUsedAr[lvlKey] = (slotsUsedAr[lvlKey] ?? 0) - 1;
-        budget -= lvlKey;
-        recovered.push(lvlKey);
-      }
-    }
-    if (recovered.length > 0) {
-      next.spell_slots_used = slotsUsedAr;
-      srUses.arcane_recovery_used = 1;
-      arcaneRecoveryNarr = ` 📖 Arcane Recovery — restored ${recovered.length} slot(s) [${recovered.join(', ')}].`;
-    }
-  }
+  // Arcane Recovery (Wizard) / Natural Recovery (Land Druid) are no longer
+  // auto-applied on a short rest — the player chooses which slots to recover via
+  // the interactive `recover_slots` action (surfaced as an out-of-combat choice
+  // while available; see slotRecovery.ts). The once-per-long-rest gate
+  // (`arcane_recovery_used` / `natural_recovery_used`) is stamped when used and
+  // cleared by a long rest.
   let sorcerousRestNarr = '';
   if (
     hasClass(next, 'sorcerer') &&
@@ -176,7 +132,7 @@ export const handleShortRest: ActionHandler<{ type: 'short_rest' }> = (ctx) => {
         .replace(/{hpNow}/g, String(next.hp))
         .replace(/{hpMax}/g, String(next.max_hp)) + ' '
     : '';
-  ctx.narrative = `${shortRestFlavor}${next.name} takes a short rest, spending a d${next.hit_die ?? 8} — ${hdHealed} HP recovered (${hdRemain} hit ${hdRemain === 1 ? 'die' : 'dice'} remaining, now ${next.hp}/${next.max_hp}).${naturalRecoveryNarr}${arcaneRecoveryNarr}${sorcerousRestNarr}`;
+  ctx.narrative = `${shortRestFlavor}${next.name} takes a short rest, spending a d${next.hit_die ?? 8} — ${hdHealed} HP recovered (${hdRemain} hit ${hdRemain === 1 ? 'die' : 'dice'} remaining, now ${next.hp}/${next.max_hp}).${sorcerousRestNarr}`;
 };
 
 /**

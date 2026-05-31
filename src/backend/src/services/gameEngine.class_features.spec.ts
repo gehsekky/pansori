@@ -295,8 +295,7 @@ describe('class features', () => {
     expect(result.newState.characters[0].conditions).not.toContain('wild_shaped');
   });
 
-  it('Circle of the Land — Natural Recovery refunds slot levels on short rest', async () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+  it('Circle of the Land — Natural Recovery refunds chosen slot levels (recover_slots)', async () => {
     const druidId = 'd-land';
     const druid = makeChar({
       id: druidId,
@@ -305,16 +304,15 @@ describe('class features', () => {
       level: 4, // budget = ceil(4/2) = 2 slot levels
       hp: 20,
       max_hp: 30,
-      hit_dice_remaining: 4,
       spell_slots_max: { 1: 4, 2: 3 },
-      // Use 2 L1s and 1 L2 — recovery prefers low levels, so 2× L1 = 2 levels
+      // Use 2 L1s and 1 L2 — default (lowest-first) plan recovers 2× L1 = 2 levels.
       spell_slots_used: { 1: 2, 2: 1 },
     });
     const state = makeState({}, { characters: [druid], active_character_id: druidId });
     state.characters = [druid];
     state.active_character_id = druidId;
     const result = await takeAction({
-      action: { type: 'short_rest' },
+      action: { type: 'recover_slots', recovery: 'natural' },
       history: [],
       state,
       seed,
@@ -328,8 +326,7 @@ describe('class features', () => {
     expect(result.narrative).toMatch(/Natural Recovery/);
   });
 
-  it('Circle of the Land — Natural Recovery only fires once per long rest', async () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+  it('Circle of the Land — Natural Recovery is rejected once already used this long rest', async () => {
     const druidId = 'd-land-twice';
     const druid = makeChar({
       id: druidId,
@@ -338,7 +335,6 @@ describe('class features', () => {
       level: 4,
       hp: 20,
       max_hp: 30,
-      hit_dice_remaining: 4,
       spell_slots_max: { 1: 4 },
       spell_slots_used: { 1: 3 },
       class_resource_uses: { natural_recovery_used: 1 }, // already used today
@@ -347,7 +343,7 @@ describe('class features', () => {
     state.characters = [druid];
     state.active_character_id = druidId;
     const result = await takeAction({
-      action: { type: 'short_rest' },
+      action: { type: 'recover_slots', recovery: 'natural' },
       history: [],
       state,
       seed,
@@ -356,7 +352,7 @@ describe('class features', () => {
     const newDruid = result.newState.characters[0];
     // Slots NOT refunded
     expect(newDruid.spell_slots_used?.[1]).toBe(3);
-    expect(result.narrative).not.toMatch(/Natural Recovery/);
+    expect(result.narrative).toMatch(/isn't available/i);
   });
 
   // ── Monk subclasses (PHB p.79-80) ───────────────────────────────────────────

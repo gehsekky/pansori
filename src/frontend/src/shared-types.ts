@@ -319,6 +319,10 @@ export type StructuredAction =
   | { type: 'end_turn' }
   | { type: 'short_rest' }
   | { type: 'long_rest' }
+  // Wizard Arcane Recovery / Land Druid Natural Recovery — recover expended
+  // spell slots up to the feature's budget; `plan` is the chosen allocation id
+  // (omitted → the engine's default lowest-first plan).
+  | { type: 'recover_slots'; recovery: 'arcane' | 'natural'; plan?: string }
   | { type: 'talk' }
   | { type: 'talk_response'; responseIdx: number }
   | { type: 'buy'; itemId: string; price: number }

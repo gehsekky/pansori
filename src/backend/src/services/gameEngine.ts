@@ -108,6 +108,13 @@ import {
   piercesMagicalDarkness,
   spellSlotsForChar,
 } from './multiclass.js';
+import {
+  availableRecoveries,
+  enumerateRecoveryPlans,
+  featureLabel,
+  planLabel,
+  planTotal,
+} from './slotRecovery.js';
 import { composeFragments, enemyAttackFragmentEvent } from './narrative/compose.js';
 import { consumeDarkOnesLuck, tryDarkOnesLuck } from './darkOnesOwnLuck.js';
 import { consumeImproveFate, tryImproveFate } from './improveFate.js';
@@ -3571,6 +3578,30 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       choices.push({
         label: 'Long Rest — full recovery (once per session)',
         action: { type: 'long_rest' },
+      });
+    }
+  }
+  // Spell-slot recovery (Wizard Arcane Recovery / Land Druid Natural Recovery) —
+  // a player-chosen slot allocation (once per long rest), surfaced via the option
+  // picker. Out of combat only; only when the feature is available + slots are
+  // expended (so `enumerateRecoveryPlans` returns at least one plan).
+  if (!state.combat_active && !enemyAlive) {
+    for (const spec of availableRecoveries(char)) {
+      if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+      const plans = enumerateRecoveryPlans(char, spec);
+      if (plans.length === 0) continue;
+      choices.push({
+        label: `${featureLabel[spec.feature]} — recover up to ${spec.budget} slot-level(s)`,
+        action: { type: 'recover_slots', recovery: spec.feature },
+        pickOption: {
+          param: 'plan',
+          title: featureLabel[spec.feature],
+          options: plans.map((p) => ({
+            id: p.id,
+            label: planLabel(p.levels),
+            sub: `${planTotal(p.levels)} of ${spec.budget} levels · ${p.levels.length} slot(s)`,
+          })),
+        },
       });
     }
   }
