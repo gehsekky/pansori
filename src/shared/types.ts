@@ -540,7 +540,7 @@ export type StructuredAction =
   // (may be the paladin). (RE-2.)
   | { type: 'lay_on_hands'; targetCharId: string }
   | { type: 'prepare_spells'; spellIds: string[] }
-  | { type: 'resolve_reaction'; accept: boolean }
+  | { type: 'resolve_reaction'; accept: boolean; source?: 'inspiration' | 'stroke_of_luck' }
   // RAW player-command for a summoned creature (Animate Dead, etc.). On the
   // owner's turn, spend a bonus action to direct one summon's target for its
   // upcoming turn. Records `commanded_target_id` on the summon entity; the
@@ -1133,8 +1133,9 @@ export interface PendingCounterspellReaction extends PendingReactionBase {
 // `decline` commits the proposed snapshot as-rolled.
 export interface PendingPcD20Reaction {
   kind: 'pc_d20';
-  /** Which feature is offering the reaction. */
-  source: 'inspiration';
+  /** The primary feature offering the reaction (informational — the choice
+   *  surface offers every feature the roller has available). */
+  source: 'inspiration' | 'stroke_of_luck';
   /** PC who rolled the original d20 + (initial scope) who reacts. */
   rollerCharId: string;
   /** What kind of d20 roll the PC made.

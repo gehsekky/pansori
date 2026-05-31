@@ -67,6 +67,10 @@ export interface AttackContext {
    *  granted the reroll BEFORE re-invoking, to prevent infinite-pause
    *  loops on a second miss. */
   forceD20?: number;
+  /** Suppress the inline Stroke of Luck auto-rescue on a miss. Set on the
+   *  first attack (and on reaction re-resolves) so the miss is offered to the
+   *  player as an interactive reaction instead of auto-converted. */
+  deferStrokeOfLuck?: boolean;
 }
 
 /**
@@ -208,7 +212,7 @@ export function resolveOneAttack(
   // into a natural 20: an auto-hit and a critical. A nat 20 always hits, so it
   // always rescues a miss (including a fumble). Once per short/long rest.
   let strokeNote = '';
-  if (!atk.hit && strokeOfLuckAvailable(pc.char)) {
+  if (!atk.hit && !atkCtx.deferStrokeOfLuck && strokeOfLuckAvailable(pc.char)) {
     atk.total = 20 + (atk.total - atk.roll);
     atk.roll = 20;
     atk.fumble = false;

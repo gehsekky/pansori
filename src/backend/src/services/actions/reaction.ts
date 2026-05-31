@@ -13,6 +13,7 @@ import {
 } from '../gameEngine.js';
 import type { ActionHandler } from './types.js';
 import type { EnemyAttackHitFragment } from '../narrative/fragments.js';
+import { consumeStrokeOfLuck } from '../strokeOfLuck.js';
 import { enemyAttackFragmentEvent } from '../narrative/compose.js';
 import { resolveOneAttack } from './attack/resolveOneAttack.js';
 import { updatePcActor } from './actor.js';
@@ -82,6 +83,7 @@ export const handleResolveReaction: ActionHandler<{
   type: 'resolve_reaction';
   accept: boolean;
   replacementIndex?: number;
+  source?: 'inspiration' | 'stroke_of_luck';
 }> = async (ctx, action) => {
   if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs have reactions.' };
   const pc = ctx.actor;
@@ -124,20 +126,24 @@ export const handleResolveReaction: ActionHandler<{
       // Rewind to pre-attack state on ctx.
       updatePcActor(ctx, blob.preAttackChar);
       ctx.st = { ...blob.preAttackSt, pending_reaction: undefined };
-      // Inspiration is spent regardless of outcome.
-      updatePcActor(ctx, { ...pc.char, inspiration: false });
-      // Roll the new d20 (RAW: "you must use the new roll").
-      const newD20 = Math.floor(Math.random() * 20) + 1;
-      // Re-run the same attack with the forced d20 baked into the
-      // AttackContext. resolveOneAttack reads atkCtx.forceD20 and
-      // passes it to resolvePlayerAttack as `forceRoll1`.
-      const rerunCtx = {
-        ...blob.atkCtx,
-        forceD20: newD20,
-      };
-      const inspirationNote = `\n\n[Heroic Inspiration: reroll d20 ${rx.originalD20} → ${newD20}.] `;
-      ctx.narrative += inspirationNote;
-      resolveOneAttack(ctx, rerunCtx, '');
+      const useStroke = action.source === 'stroke_of_luck';
+      if (useStroke) {
+        // Stroke of Luck (Rogue L20): turn the miss into a natural 20 — an
+        // auto-hit + crit. Spend the once-per-rest use, then re-resolve with a
+        // forced 20 (`deferStrokeOfLuck` so resolveOneAttack doesn't also
+        // auto-apply it). RAW it's a hit, not a crit; pansori treats it as a
+        // nat 20 (matching the prior inline behavior).
+        updatePcActor(ctx, consumeStrokeOfLuck(pc.char));
+        ctx.narrative += `\n\n[✦ Stroke of Luck: the miss (d20 ${rx.originalD20}) becomes a natural 20!] `;
+        resolveOneAttack(ctx, { ...blob.atkCtx, forceD20: 20, deferStrokeOfLuck: true }, '');
+      } else {
+        // Heroic Inspiration: reroll with a new d20 (RAW: "you must use the new
+        // roll" — no adv/disadv). Inspiration is spent regardless of outcome.
+        updatePcActor(ctx, { ...pc.char, inspiration: false });
+        const newD20 = Math.floor(Math.random() * 20) + 1;
+        ctx.narrative += `\n\n[Heroic Inspiration: reroll d20 ${rx.originalD20} → ${newD20}.] `;
+        resolveOneAttack(ctx, { ...blob.atkCtx, forceD20: newD20, deferStrokeOfLuck: true }, '');
+      }
       // Action is consumed (the original attack was the action; the
       // reroll just resolves it).
       updatePcActor(ctx, {

@@ -1,13 +1,15 @@
-// RE-2 — Stroke of Luck (SRD 5.2.1, Rogue L20) on the attack-roll D20 Test: a
-// missed attack is turned into a natural 20 (auto-hit + critical), once per
-// short/long rest. Wired in resolveOneAttack; the helper + save/check hooks are
-// covered in strokeOfLuck.spec.ts.
+// RE-2 — Stroke of Luck (SRD 5.2.1, Rogue L20) on the attack-roll D20 Test. A
+// missed first attack now opens an *interactive* reaction window (alongside
+// Heroic Inspiration): accepting Stroke of Luck turns the miss into a natural
+// 20 (auto-hit + critical) and spends the once-per-rest use; declining keeps
+// the miss + the use. Wired via the pc_d20 pending_reaction; the helper +
+// save/check hooks are covered in strokeOfLuck.spec.ts.
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { generateChoices, takeAction } from './gameEngine.js';
 import { makeChar, makeEnemy, makeState } from '../test-fixtures.js';
 import type { Seed } from '../types.js';
 import { context as ctx } from '../contexts/sandbox.js';
-import { takeAction } from './gameEngine.js';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -76,8 +78,8 @@ function buildCombatState(char: ReturnType<typeof makeChar>) {
   };
 }
 
-describe('Stroke of Luck — attack roll (integration)', () => {
-  it('turns a missed attack into a natural-20 crit and spends the use', async () => {
+describe('Stroke of Luck — attack roll (interactive)', () => {
+  it('a missed attack opens a reaction window without auto-spending the use', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.2); // every d20 → 5: a miss vs AC 25
     const r = await takeAction({
       action: { type: 'attack', targetEnemyId: enemyId },
@@ -86,11 +88,59 @@ describe('Stroke of Luck — attack roll (integration)', () => {
       seed: seedWithWall,
       context: ctx,
     });
+    // Paused, not auto-converted: the use is unspent + the Golem untouched.
+    expect(r.newState.pending_reaction?.kind).toBe('pc_d20');
+    expect(r.newState.characters[0].class_resource_uses.stroke_of_luck ?? 0).toBe(0);
+    expect(r.newState.entities?.find((e) => e.id === enemyId)?.hp).toBe(200);
+    // The window surfaces a Stroke of Luck choice.
+    const choices = generateChoices(r.newState, seedWithWall, ctx);
+    const strokeChoice = choices.find(
+      (c) => c.action.type === 'resolve_reaction' && c.action.source === 'stroke_of_luck'
+    );
+    expect(strokeChoice).toBeTruthy();
+  });
+
+  it('accepting Stroke of Luck forces a natural-20 crit and spends the use', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.2);
+    const paused = await takeAction({
+      action: { type: 'attack', targetEnemyId: enemyId },
+      history: [],
+      state: buildCombatState(rogue20()),
+      seed: seedWithWall,
+      context: ctx,
+    });
+    const r = await takeAction({
+      action: { type: 'resolve_reaction', accept: true, source: 'stroke_of_luck' },
+      history: [],
+      state: paused.newState,
+      seed: seedWithWall,
+      context: ctx,
+    });
     expect(r.narrative).toContain('Stroke of Luck');
     expect(r.newState.characters[0].class_resource_uses.stroke_of_luck).toBe(1);
-    // The Golem took crit damage despite the d20=5 miss.
+    expect(r.newState.pending_reaction).toBeUndefined();
     const golem = r.newState.entities?.find((e) => e.id === enemyId);
-    expect(golem && golem.hp < 200).toBe(true);
+    expect(golem && golem.hp < 200).toBe(true); // took crit damage
+  });
+
+  it('declining keeps the miss and retains the use', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.2);
+    const paused = await takeAction({
+      action: { type: 'attack', targetEnemyId: enemyId },
+      history: [],
+      state: buildCombatState(rogue20()),
+      seed: seedWithWall,
+      context: ctx,
+    });
+    const r = await takeAction({
+      action: { type: 'resolve_reaction', accept: false },
+      history: [],
+      state: paused.newState,
+      seed: seedWithWall,
+      context: ctx,
+    });
+    expect(r.newState.characters[0].class_resource_uses.stroke_of_luck ?? 0).toBe(0); // unspent
+    expect(r.newState.entities?.find((e) => e.id === enemyId)?.hp).toBe(200); // still a miss
   });
 
   it('a Rogue L19 simply misses (control)', async () => {

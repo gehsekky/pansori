@@ -3289,20 +3289,32 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     // instead). Branch early so the enemy-attack label lookup below
     // doesn't crash on the missing field.
     if (pending.kind === 'pc_d20') {
-      if (pending.source === 'inspiration') {
-        return [
-          {
-            label: `Spend Heroic Inspiration to reroll the d20 (was ${pending.originalD20}, MUST use new roll)`,
-            action: { type: 'resolve_reaction', accept: true },
-          },
-          {
-            label: `Decline — keep the missed attack (d20 ${pending.originalD20})`,
-            action: { type: 'resolve_reaction', accept: false },
-          },
-        ];
+      // Offer every d20-fixing feature the roller has available. Stroke of Luck
+      // (Rogue L20) rescues any miss incl. a fumble; Heroic Inspiration rerolls
+      // a non-fumble miss. (Future sources — Lucky-RAW, Restore Balance — plug
+      // in here.)
+      const d20Choices: GameChoice[] = [];
+      if (strokeOfLuckAvailable(char)) {
+        d20Choices.push({
+          label: `✦ Stroke of Luck — turn the miss (d20 ${pending.originalD20}) into a natural 20 (once per rest)`,
+          action: { type: 'resolve_reaction', accept: true, source: 'stroke_of_luck' },
+        });
       }
-      // Future sources (Lucky-RAW, Restore Balance) plug in here.
-      return [];
+      if (
+        char.inspiration &&
+        !char.turn_actions?.inspiration_pending &&
+        pending.originalD20 !== 1
+      ) {
+        d20Choices.push({
+          label: `Spend Heroic Inspiration to reroll the d20 (was ${pending.originalD20}, MUST use new roll)`,
+          action: { type: 'resolve_reaction', accept: true, source: 'inspiration' },
+        });
+      }
+      d20Choices.push({
+        label: `Decline — keep the missed attack (d20 ${pending.originalD20})`,
+        action: { type: 'resolve_reaction', accept: false },
+      });
+      return d20Choices;
     }
     const enemyForLabel =
       seed.enemies?.[state.current_room]?.find((e) => e.id === pending.attackerEnemyId)?.name ??

@@ -8,6 +8,7 @@ import type { ActionHandler } from '../types.js';
 import { computeToHitContext } from './toHit.js';
 import { runCombatStart } from './combatStart.js';
 import { runPreattack } from './preattack.js';
+import { strokeOfLuckAvailable } from '../../strokeOfLuck.js';
 import { updatePcActor } from '../actor.js';
 
 /**
@@ -76,6 +77,9 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
     isVersatile,
     weaponLabel,
     toHit,
+    // Defer Stroke of Luck — on a miss the first attack opens an interactive
+    // reaction window (below) instead of auto-converting the miss to a hit.
+    deferStrokeOfLuck: true,
   };
 
   // 2024 PHB Heroic Inspiration post-roll reaction window — snapshot
@@ -99,23 +103,25 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
   // applied and we don't surface the post-roll reaction (Inspiration
   // is already spent).
   const lastResult = ctx.lastAttackResult;
-  const shouldPauseForInspiration =
-    !killed &&
-    !!lastResult &&
-    !lastResult.hit &&
-    !lastResult.fumble &&
-    !!pc.char.inspiration &&
-    !pc.char.turn_actions?.inspiration_pending;
+  // Heroic Inspiration can reroll a non-fumble miss; Stroke of Luck (Rogue L20,
+  // 1/rest) can rescue ANY miss — including a fumble — by forcing a natural 20.
+  // Either makes a missed first attack pause for an interactive reaction.
+  const inspirationAvail =
+    !!pc.char.inspiration && !pc.char.turn_actions?.inspiration_pending && !lastResult?.fumble;
+  const strokeAvail = strokeOfLuckAvailable(pc.char);
+  const shouldPauseD20 =
+    !killed && !!lastResult && !lastResult.hit && (inspirationAvail || strokeAvail);
 
-  if (shouldPauseForInspiration && lastResult) {
+  if (shouldPauseD20 && lastResult) {
     // Stash the proposed snapshot (post-miss) + pre-attack snapshot
     // (for rewind) + attack-context (for re-resolve with forced d20).
-    // Resolver in reaction.ts consumes these.
+    // Resolver in reaction.ts consumes these. `source` records the primary
+    // available feature; generateChoices offers every available source.
     ctx.st = {
       ...ctx.st,
       pending_reaction: {
         kind: 'pc_d20',
-        source: 'inspiration',
+        source: inspirationAvail ? 'inspiration' : 'stroke_of_luck',
         rollerCharId: pc.char.id,
         rollContext: 'attack',
         originalD20: lastResult.d20,
