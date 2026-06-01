@@ -3,6 +3,11 @@ import styles from '../styles.module.css';
 
 const CELL_PX = 32;
 
+// Checkerboard tint for the "dark" squares — a low-alpha grey overlay
+// composited over `--t-bg` (works on any theme). Layered via a flat gradient
+// because a bare rgba() would blend with the board's gridline colour instead.
+const CHECKER_TINT = 'linear-gradient(rgba(127, 127, 127, 0.16), rgba(127, 127, 127, 0.16))';
+
 interface Props {
   grid: ActiveGrid;
   markerPos: GridPos;
@@ -58,7 +63,14 @@ function GridMapView({ grid, markerPos, onMarkerMove }: Props) {
       // non-obstacle cell that isn't the marker's own square is a valid target.
       const clickable = !isObstacle && !isMarker && !!onMarkerMove;
 
-      let cellBg = 'var(--t-page)';
+      // Checkerboard the plain cells so the grid squares read clearly on the
+      // large, sparse region/town maps — a single flat fill was
+      // indistinguishable from the 1px gridlines. Obstacle / transition cells
+      // keep their own tint (they already stand out + carry a glyph). The tint
+      // is a theme-agnostic grey overlay composited over the page background,
+      // so it works on light and dark themes alike.
+      const dark = (x + y) % 2 === 1;
+      let cellBg = dark ? `${CHECKER_TINT}, var(--t-bg)` : 'var(--t-bg)';
       if (isObstacle) cellBg = 'rgba(90, 85, 70, 0.7)';
       else if (transition) cellBg = 'rgba(150, 120, 60, 0.35)';
 
@@ -85,7 +97,9 @@ function GridMapView({ grid, markerPos, onMarkerMove }: Props) {
       cells.push(
         <div
           key={key}
-          className={styles.gridCell}
+          className={
+            clickable ? `${styles.gridCell} ${styles.gridMapCellClickable}` : styles.gridCell
+          }
           style={{ background: cellBg, cursor: clickable ? 'pointer' : 'default' }}
           aria-label={ariaParts.join(', ')}
           aria-current={isMarker ? 'location' : undefined}

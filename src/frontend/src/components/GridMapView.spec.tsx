@@ -56,4 +56,13 @@ describe('GridMapView', () => {
     fireEvent.click(cell(container, 0, 0));
     expect(onMarkerMove).not.toHaveBeenCalled();
   });
+
+  it('checkerboards plain cells so adjacent squares are distinguishable', () => {
+    const { container } = render(<GridMapView grid={grid} markerPos={{ x: 0, y: 0 }} />);
+    // (1,0) is an even square (x+y=1 → odd index gets the tint; 2,0 even).
+    const light = cell(container, 2, 0).style.background; // x+y=2 → plain --t-bg
+    const dark = cell(container, 1, 0).style.background; // x+y=1 → tinted
+    expect(light).not.toBe(dark);
+    expect(dark).toContain('linear-gradient'); // the checker tint overlay
+  });
 });
