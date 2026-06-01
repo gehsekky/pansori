@@ -224,7 +224,13 @@ export function resolveMarkerMove(
     next.world_hour = (st.world_hour ?? 0) + elapsedHours;
     const chance = region?.encounterChance ?? 0;
     const table = region?.encounterTable ?? [];
-    if (chance > 0 && table.length > 0) {
+    // E2E determinism: the test-login backend (E2E_TEST_LOGIN_ENABLED, never
+    // production) suppresses random wilderness encounters so a scripted journey
+    // reliably arrives at its destination site instead of being pre-empted by
+    // an ambush. Unit tests (vitest, no such env) still roll encounters.
+    const encountersDisabled =
+      process.env.NODE_ENV !== 'production' && process.env.E2E_TEST_LOGIN_ENABLED === 'true';
+    if (!encountersDisabled && chance > 0 && table.length > 0) {
       for (let i = 0; i < squaresMoved; i++) {
         if (Math.random() < chance) {
           encounter = table[Math.floor(Math.random() * table.length)];
