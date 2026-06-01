@@ -255,6 +255,9 @@ export interface GameState {
 
   // Combat (party-level)
   combat_active: boolean;
+  // When set, a fight just resolved — the FE shows a "Continue" gate instead of
+  // auto-switching back to exploration. Cleared by the `continue` action.
+  combat_over_pending?: boolean;
   initiative_order: Array<{ id: string; roll: number; is_enemy: boolean }>;
   initiative_idx: number;
 

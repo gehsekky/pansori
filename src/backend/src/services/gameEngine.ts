@@ -2796,9 +2796,15 @@ export function endCombatState(st: GameState): GameState {
   // party to the cell they were travelling on and drop the transient encounter
   // room. No-op for authored-room combat (encounter_return unset).
   const collapsed = returnFromEncounter(st);
+  // Gate the return to exploration behind a "Continue" choice instead of
+  // auto-switching the view the instant combat resolves — but only when the
+  // party survived (an all-dead party goes to the game-over screen, not a
+  // Continue prompt).
+  const partySurvived = st.characters.some((c) => !c.dead);
   return {
     ...collapsed,
     combat_active: false,
+    combat_over_pending: partySurvived,
     initiative_order: [],
     initiative_idx: 0,
     entities: undefined,
@@ -3447,6 +3453,13 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   if (!char) return [];
 
   if (char.dead) return [];
+
+  // Post-combat gate — a fight just resolved. Offer ONLY "Continue" so the view
+  // doesn't auto-switch straight back to exploration; the player acknowledges
+  // the outcome, then `continue` clears the flag and the normal choices return.
+  if (state.combat_over_pending && !state.combat_active) {
+    return [{ label: 'Continue', action: { type: 'continue' }, kind: 'continue' }];
+  }
 
   // Reaction window — only offer reaction-resolution choices until the
   // player decides. Suppresses everything else (attacks, movement, etc.).

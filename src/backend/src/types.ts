@@ -1360,6 +1360,10 @@ export interface GameState {
 
   // Combat (party-level)
   combat_active: boolean;
+  // Set by endCombatState when a fight resolves (and the party survived): the
+  // FE shows a "Continue" gate instead of auto-switching back to the
+  // out-of-combat view. Cleared by the `continue` action.
+  combat_over_pending?: boolean;
   initiative_order: Array<{ id: string; roll: number; is_enemy: boolean }>;
   initiative_idx: number;
   // RE-1 Phase 4 — persistent ally combatants (e.g. an Animate Dead

@@ -694,8 +694,9 @@ export default function App() {
                               const textListChoices = enemyFiltered
                                 .filter((c) => !ICONIZED_KINDS.has(c.kind ?? ''))
                                 .filter((c) => !spellBarSet.has(c))
-                                // Dialogue choices render in the ConversationPanel, not the list.
-                                .filter((c) => c.kind !== 'conversation');
+                                // Dialogue choices render in the ConversationPanel, and the
+                                // post-combat Continue renders in its own gate — not the list.
+                                .filter((c) => c.kind !== 'conversation' && c.kind !== 'continue');
                               // Combat-controls container should render whenever
                               // at least one inner bar will. EnemySelector +
                               // MoveDPad + Default/Combat action bars all live
@@ -856,6 +857,44 @@ export default function App() {
                             })()}
                         </>
                       );
+                    // Post-combat gate: a fight just resolved. Show a Continue
+                    // prompt instead of snapping straight back to exploration;
+                    // clicking it clears combat_over_pending and the normal view
+                    // returns. (Skipped when the party is dead — game-over wins.)
+                    if (gameState?.combat_over_pending && !allDead) {
+                      return (
+                        <div
+                          className={styles.card}
+                          style={{
+                            borderColor: 'var(--t-primary)',
+                            textAlign: 'center',
+                            padding: '1.5rem',
+                          }}
+                        >
+                          <h2
+                            style={{
+                              color: 'var(--t-primary)',
+                              fontSize: '1rem',
+                              letterSpacing: '0.2em',
+                              margin: '0 0 1rem',
+                              fontWeight: 'normal',
+                            }}
+                          >
+                            <span aria-hidden="true">⚔ </span>THE FIGHT IS OVER
+                          </h2>
+                          <button
+                            className={styles.submit}
+                            style={{ width: 'auto', padding: '0.6rem 2rem' }}
+                            data-testid="combat-continue"
+                            onClick={() =>
+                              handleChoice({ label: 'Continue', action: { type: 'continue' } })
+                            }
+                          >
+                            Continue
+                          </button>
+                        </div>
+                      );
+                    }
                     // Active conversation: the dedicated dialogue panel replaces the
                     // normal action area (only dialogue options + Back/End show).
                     if (

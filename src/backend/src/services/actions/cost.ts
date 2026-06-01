@@ -60,6 +60,7 @@ export const ACTION_COSTS: Record<StructuredAction['type'], ActionCost> = {
   // Free / variable / out-of-combat — handler manages itself.
   pass: 'managed',
   end_turn: 'managed',
+  continue: 'managed',
   spend_inspiration: 'managed',
   level_up_class: 'managed',
   stand_up: 'managed',

@@ -324,6 +324,9 @@ export type StructuredAction =
   // Conversation navigation: step up a nested dialogue level / leave entirely.
   | { type: 'conversation_back' }
   | { type: 'end_conversation' }
+  // Dismiss the post-combat "Continue" gate and return to exploration (combat
+  // no longer auto-switches straight back to the out-of-combat view).
+  | { type: 'continue' }
   | { type: 'buy'; itemId: string; price: number }
   | { type: 'attack_npc' }
   | { type: 'use_class_feature'; featureId: string; targetEnemyId?: string }
@@ -598,7 +601,10 @@ export type ChoiceKind =
   | 'class_feature'
   // Dialogue choices while a conversation is active (NPC responses, Back, End
   // conversation). The frontend routes these to the dedicated ConversationPanel.
-  | 'conversation';
+  | 'conversation'
+  // The post-combat "Continue" gate. The frontend renders a dedicated
+  // interstitial instead of listing it among the normal choices.
+  | 'continue';
 
 export interface GameChoice {
   label: string;

@@ -34,6 +34,7 @@ import {
   handleTalkResponse,
 } from './social.js';
 import { handleAttune, handleDeAttune, handleUse } from './inventory.js';
+import { handleContinue, handleEndTurn, handlePass } from './utility.js';
 import {
   handleDash,
   handleDisengage,
@@ -43,7 +44,6 @@ import {
   handleSpendInspiration,
   handleStandUp,
 } from './combatUtility.js';
-import { handleEndTurn, handlePass } from './utility.js';
 import { handleGrapple, handleShove, handleTryEscapeGrapple } from './combatTactical.js';
 import { handleLongRest, handleShortRest } from './rest.js';
 import { handleResolveReaction, handleUseReaction } from './reaction.js';
@@ -82,6 +82,7 @@ import { handleUseClassFeature } from './classFeature/index.js';
 const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   pass: handlePass as ActionHandler,
   end_turn: handleEndTurn as ActionHandler,
+  continue: handleContinue as ActionHandler,
   spend_inspiration: handleSpendInspiration as ActionHandler,
   stand_up: handleStandUp as ActionHandler,
   dodge: handleDodge as ActionHandler,

@@ -34,3 +34,14 @@ export const handleEndTurn: ActionHandler<{ type: 'end_turn' }> = (ctx) => {
   ctx.narrative = `${char.name} ends their turn.`;
   ctx.usedInitiative = true;
 };
+
+/**
+ * `continue`: dismiss the post-combat gate. `endCombatState` left
+ * `combat_over_pending` set so the FE showed a "Continue" prompt instead of
+ * snapping back to exploration; clearing it returns the normal choices. Pure
+ * out-of-combat acknowledgement — no turn economy, no narrative noise.
+ */
+export const handleContinue: ActionHandler<{ type: 'continue' }> = (ctx) => {
+  ctx.st = { ...ctx.st, combat_over_pending: false };
+  ctx.narrative = '';
+};
