@@ -17,6 +17,7 @@ function seedWithTerrain(opts: {
   climb?: { x: number; y: number }[];
   swim?: { x: number; y: number }[];
   difficult?: { x: number; y: number }[];
+  terrain?: Seed['rooms'][number]['terrain'];
 }): Seed {
   return {
     context_id: ctx.id,
@@ -32,6 +33,7 @@ function seedWithTerrain(opts: {
         climbTerrain: opts.climb,
         swimTerrain: opts.swim,
         difficultTerrain: opts.difficult,
+        terrain: opts.terrain,
       },
     ],
     enemies: {},
@@ -181,6 +183,44 @@ describe('Stacking rules', () => {
     });
     const used = result.newState.movement_used?.['pc-1'] ?? 0;
     expect(used).toBe(5); // flying ignores all penalties
+  });
+});
+
+describe('cosmetic room terrain has no mechanical effect', () => {
+  it('a cell painted "swamp"/"water" (terrain only) costs normal movement', async () => {
+    // The cell is painted as terrain but is NOT in difficultTerrain/swimTerrain,
+    // so it must cost the normal 5 ft — terrain is purely a render hint.
+    const seed = seedWithTerrain({
+      terrain: [
+        { pos: { x: 5, y: 5 }, type: 'swamp' },
+        { pos: { x: 4, y: 5 }, type: 'water' },
+      ],
+    });
+    const pc = makeChar({ id: 'pc-1', character_class: 'Fighter', level: 5, speed: 30 });
+    const state = buildGridState(pc);
+    const result = await takeAction({
+      action: { type: 'grid_move', entityId: 'pc-1', to: { x: 5, y: 5 } },
+      history: [],
+      state,
+      seed,
+      context: ctx,
+    });
+    expect(result.newState.movement_used?.['pc-1']).toBe(5); // no 2× penalty from paint
+  });
+
+  it('does not block movement onto a cell painted "mountain"/"water"', async () => {
+    // Impassable-looking paint must NOT gate pathing — only `obstacles` does.
+    const seed = seedWithTerrain({ terrain: [{ pos: { x: 5, y: 5 }, type: 'mountain' }] });
+    const pc = makeChar({ id: 'pc-1', character_class: 'Fighter', level: 5, speed: 30 });
+    const state = buildGridState(pc);
+    const result = await takeAction({
+      action: { type: 'grid_move', entityId: 'pc-1', to: { x: 5, y: 5 } },
+      history: [],
+      state,
+      seed,
+      context: ctx,
+    });
+    expect(result.newState.entities?.find((e) => e.id === 'pc-1')?.pos).toEqual({ x: 5, y: 5 });
   });
 });
 

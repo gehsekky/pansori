@@ -643,6 +643,25 @@ const context: Context = {
         gridHeight: 8,
         entryPos: { x: 0, y: 4 },
         exits: [{ pos: { x: 9, y: 4 }, ascends: true, label: 'Press on down the road' }],
+        // Cosmetic terrain paint only (no mechanics): the rutted road runs west
+        // to east; a stand of dead trees and hill-shoulders frame it.
+        terrain: [
+          ...terr(
+            'road',
+            [0, 4],
+            [1, 4],
+            [2, 4],
+            [3, 4],
+            [4, 4],
+            [5, 4],
+            [6, 4],
+            [7, 4],
+            [8, 4],
+            [9, 4]
+          ),
+          ...terr('forest', [3, 1], [4, 1], [4, 2], [7, 6], [8, 6]),
+          ...terr('hills', [0, 0], [9, 0], [0, 7], [9, 7]),
+        ],
       },
 
       // Shattered Crypt (8 rooms). The regional site drops the party at the

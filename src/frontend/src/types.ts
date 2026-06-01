@@ -438,6 +438,8 @@ export interface Seed {
     // block movement through these cells.
     obstacles?: GridPos[];
     difficultTerrain?: GridPos[];
+    // Cosmetic terrain paint for the combat grid — no mechanics (see BE Room.terrain).
+    terrain?: TerrainCell[];
     // Local-room grid fields (3-level map). Mirror of the BE Room grid fields.
     gridWidth?: number;
     gridHeight?: number;

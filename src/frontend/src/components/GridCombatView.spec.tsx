@@ -14,6 +14,7 @@ const ROOM = 'r1';
 function build(opts: {
   lighting?: 'bright' | 'dim' | 'dark' | 'sunlight';
   obstacles?: { x: number; y: number }[];
+  terrain?: Seed['rooms'][number]['terrain'];
   pcPos: { x: number; y: number };
   enemyPos: { x: number; y: number };
 }): { state: GameState; seed: Seed } {
@@ -30,7 +31,14 @@ function build(opts: {
   } as unknown as GameState;
   const seed = {
     rooms: [
-      { id: ROOM, name: 'Room', desc: '', lighting: opts.lighting, obstacles: opts.obstacles },
+      {
+        id: ROOM,
+        name: 'Room',
+        desc: '',
+        lighting: opts.lighting,
+        obstacles: opts.obstacles,
+        terrain: opts.terrain,
+      },
     ],
     enemies: { [ROOM]: [{ id: `${ROOM}#0`, name: 'Goblin', hp: 15, ac: 12 }] },
   } as unknown as Seed;
@@ -104,5 +112,20 @@ describe('GridCombatView — line-of-sight fog', () => {
     const label = cell(container, 9, 0).getAttribute('aria-label') ?? '';
     expect(label).not.toMatch(/Goblin/);
     expect(label).toMatch(/heavily obscured/);
+  });
+});
+
+describe('GridCombatView — cosmetic terrain paint', () => {
+  it('tints a cell from the room terrain layer and lists it in the legend', () => {
+    // A far, bright, unreachable cell so no dynamic overlay covers the tint.
+    const { state, seed } = build({
+      lighting: 'bright',
+      terrain: [{ pos: { x: 9, y: 9 }, type: 'swamp' }],
+      pcPos: { x: 0, y: 0 },
+      enemyPos: { x: 1, y: 0 },
+    });
+    const { container, getByText } = render(<GridCombatView state={state} seed={seed} />);
+    expect(cell(container, 9, 9).style.background).toContain('96, 112, 72'); // swamp tint
+    expect(getByText('swamp')).toBeTruthy(); // legend entry
   });
 });

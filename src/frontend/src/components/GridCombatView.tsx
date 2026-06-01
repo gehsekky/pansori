@@ -1,4 +1,6 @@
-import type { CombatEntity, GameState, GridPos, Seed } from '../types';
+import type { CombatEntity, GameState, GridPos, Seed, TerrainType } from '../types';
+import { TERRAIN } from '../types';
+import { TERRAIN_STYLE } from '../lib/terrainStyle';
 import styles from '../styles.module.css';
 
 const SQUARE_SIZE_FT = 5;
@@ -187,6 +189,15 @@ function GridCombatView({
   function isDifficult(x: number, y: number): boolean {
     return difficultSet.has(`${x},${y}`);
   }
+  // PURELY COSMETIC terrain paint (grass / stone / water …). Carries no rules —
+  // movement cost, cover, and passability stay on the mechanical arrays above.
+  // Rendered as a base tint beneath the dynamic combat overlays (lighting, fog,
+  // reachable, AoE) so live state still reads on top.
+  const terrainAt = new Map<string, TerrainType>();
+  for (const c of currentRoom?.terrain ?? []) terrainAt.set(`${c.pos.x},${c.pos.y}`, c.type);
+  const presentTerrain = [...new Set((currentRoom?.terrain ?? []).map((c) => c.type))].filter(
+    (t) => t !== 'plains'
+  );
 
   // SRD 5.2.1 "Cover" — line of sight from `a` to `b` is blocked only when a
   // solid obstacle (wall) lies STRICTLY between them; endpoints never block.
@@ -380,7 +391,10 @@ function GridCombatView({
       const hideEntity = ent?.isEnemy && !visible && !isActive;
       const hideCorpse = corpse?.isEnemy && !visible;
 
-      let bg = 'transparent';
+      // Cosmetic terrain tint is the base layer; the dynamic combat overlays
+      // (lighting, fog, reachable, AoE) replace it so live state reads on top.
+      const terrainType = terrainAt.get(`${x},${y}`);
+      let bg = (terrainType && TERRAIN_STYLE[terrainType].tint) || 'transparent';
       if (illum === 'dim') bg = 'rgba(0, 0, 0, 0.30)';
       else if (illum === 'dark') bg = 'rgba(0, 0, 0, 0.70)';
       // Out-of-sight ("ghost") cells: a cool blue-grey haze over the dark fog so
@@ -699,6 +713,15 @@ function GridCombatView({
             <span className={styles.gridLegendDifficult} /> difficult terrain (2× cost)
           </span>
         )}
+        {presentTerrain.map((t) => (
+          <span key={t}>
+            <span
+              className={styles.gridLegendTerrain}
+              style={{ background: TERRAIN_STYLE[t].tint ?? 'var(--t-bg)' }}
+            />{' '}
+            {TERRAIN[t].label}
+          </span>
+        ))}
         {roomLighting !== 'bright' && (
           <>
             <span>

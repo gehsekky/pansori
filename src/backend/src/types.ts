@@ -98,6 +98,12 @@ export interface Room {
   // count as cover for ranged attacks behind them. Seeded by procgen for
   // combat rooms, can also be authored in roomPool entries.
   obstacles?: GridPos[];
+  // PURELY COSMETIC. A visual paint layer for the combat grid (grass / stone /
+  // water / etc.) so a room reads as a place, not a bare grid. It carries NO
+  // rules: movement cost, cover, swim/climb, and passability stay entirely on
+  // the mechanical arrays above (difficultTerrain / climbTerrain / swimTerrain /
+  // coverPositions / obstacles). Nothing in the engine reads `terrain`.
+  terrain?: TerrainCell[];
   // Ambient lighting per SRD 5.2.1 p.11 "Vision and Light". Default 'bright'
   // (the room is well-lit; tactical fog-of-war is disabled). 'dim' makes the
   // whole room Lightly Obscured (Disadvantage on sight-based Perception).

@@ -1,23 +1,9 @@
 import type { ActiveGrid, GridPos, MapTransition, TerrainType } from '../types';
 import { TERRAIN } from '../types';
+import { TERRAIN_STYLE } from '../lib/terrainStyle';
 import styles from '../styles.module.css';
 
 const CELL_PX = 32;
-
-// Per-terrain rendering: a composited tint over the board background, and a
-// glyph for the impassable types (so water/mountains read at a glance). Passable
-// terrain (road / forest / hills / swamp) is tint-only. Plains is untinted (the
-// checkerboard shows through). Mechanics (passability/cost/encounters) live in
-// the shared TERRAIN spec; this is purely visual.
-const TERRAIN_STYLE: Record<TerrainType, { tint?: string; glyph?: string }> = {
-  plains: {},
-  road: { tint: 'rgba(198, 166, 104, 0.32)' },
-  forest: { tint: 'rgba(70, 130, 70, 0.32)' },
-  hills: { tint: 'rgba(150, 128, 86, 0.32)' },
-  swamp: { tint: 'rgba(96, 112, 72, 0.40)' },
-  water: { tint: 'rgba(70, 110, 185, 0.45)', glyph: '≈' },
-  mountain: { tint: 'rgba(95, 88, 70, 0.88)', glyph: '▲' },
-};
 
 // Checkerboard tint for the "dark" squares — a low-alpha grey overlay
 // composited over `--t-bg` (works on any theme). Layered via a flat gradient
