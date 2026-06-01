@@ -1,7 +1,23 @@
-import type { ActiveGrid, GridPos, MapTransition } from '../types';
+import type { ActiveGrid, GridPos, MapTransition, TerrainType } from '../types';
+import { TERRAIN } from '../types';
 import styles from '../styles.module.css';
 
 const CELL_PX = 32;
+
+// Per-terrain rendering: a composited tint over the board background, and a
+// glyph for the impassable types (so water/mountains read at a glance). Passable
+// terrain (road / forest / hills / swamp) is tint-only. Plains is untinted (the
+// checkerboard shows through). Mechanics (passability/cost/encounters) live in
+// the shared TERRAIN spec; this is purely visual.
+const TERRAIN_STYLE: Record<TerrainType, { tint?: string; glyph?: string }> = {
+  plains: {},
+  road: { tint: 'rgba(198, 166, 104, 0.32)' },
+  forest: { tint: 'rgba(70, 130, 70, 0.32)' },
+  hills: { tint: 'rgba(150, 128, 86, 0.32)' },
+  swamp: { tint: 'rgba(96, 112, 72, 0.40)' },
+  water: { tint: 'rgba(70, 110, 185, 0.45)', glyph: '≈' },
+  mountain: { tint: 'rgba(95, 88, 70, 0.88)', glyph: '▲' },
+};
 
 // Checkerboard tint for the "dark" squares — a low-alpha grey overlay
 // composited over `--t-bg` (works on any theme). Layered via a flat gradient
@@ -111,6 +127,9 @@ function GridMapView({ grid, markerPos, enemyPresent, onMarkerMove }: Props) {
   const obstacleSet = new Set(grid.obstacles.map((o) => `${o.x},${o.y}`));
   const transitionAt = new Map<string, MapTransition>();
   for (const t of grid.transitions) transitionAt.set(`${t.pos.x},${t.pos.y}`, t);
+  // Typed terrain by cell key; absent ⇒ plains.
+  const terrainAt = new Map<string, TerrainType>();
+  for (const c of grid.terrain) terrainAt.set(`${c.pos.x},${c.pos.y}`, c.type);
 
   // Single red enemy marker near the party when a hostile is present out of combat.
   const enemyCell = enemyPresent
@@ -122,6 +141,13 @@ function GridMapView({ grid, markerPos, enemyPresent, onMarkerMove }: Props) {
   const hasTown = grid.transitions.some((t) => t.kind === 'site' && t.toTownId);
   const hasLocalSite = grid.transitions.some((t) => t.kind === 'site' && !t.toTownId);
   const hasOtherTransition = grid.transitions.some((t) => t.kind !== 'site');
+  // Unique terrain types present (excluding plains) for the legend.
+  const presentTerrain = [...new Set(grid.terrain.map((c) => c.type))].filter(
+    (t) => t !== 'plains'
+  );
+  // Untyped legacy obstacles still get a generic swatch (terrain-typed maps
+  // surface their impassable cells via the terrain entries instead).
+  const hasLegacyObstacle = grid.obstacles.length > 0 && grid.terrain.length === 0;
 
   const cells: React.ReactNode[] = [];
   for (let y = 0; y < grid.height; y++) {
@@ -142,18 +168,22 @@ function GridMapView({ grid, markerPos, enemyPresent, onMarkerMove }: Props) {
       // is a theme-agnostic grey overlay composited over the page background,
       // so it works on light and dark themes alike.
       const dark = (x + y) % 2 === 1;
-      // At regional scale impassable cells are mountains/ridges; closer in
-      // (town / local) they're walls + debris. Tint them differently so the
-      // overland map reads as terrain, not dungeon scenery.
       const isRegional = grid.level === 'regional';
+      const terrainType = terrainAt.get(key);
+      const tStyle = terrainType ? TERRAIN_STYLE[terrainType] : undefined;
+      // Layer order: a transition's amber tint wins; else typed terrain's tint;
+      // else a legacy (untyped) obstacle's grey block; else the checkerboard.
       let cellBg = dark ? `${CHECKER_TINT}, var(--t-bg)` : 'var(--t-bg)';
-      if (isObstacle) cellBg = isRegional ? 'rgba(95, 88, 70, 0.85)' : 'rgba(90, 85, 70, 0.7)';
-      else if (transition) cellBg = 'rgba(150, 120, 60, 0.35)';
+      if (transition) cellBg = 'rgba(150, 120, 60, 0.35)';
+      else if (tStyle?.tint)
+        cellBg = `linear-gradient(${tStyle.tint}, ${tStyle.tint}), var(--t-bg)`;
+      else if (isObstacle) cellBg = isRegional ? 'rgba(95, 88, 70, 0.85)' : 'rgba(90, 85, 70, 0.7)';
 
       const ariaParts: string[] = [`${x},${y}`];
       if (isMarker) ariaParts.push('the party');
       if (isEnemyMarker) ariaParts.push('an enemy');
-      if (isObstacle) ariaParts.push('impassable');
+      if (terrainType) ariaParts.push(TERRAIN[terrainType].label);
+      else if (isObstacle) ariaParts.push('impassable');
       if (transition) ariaParts.push(transition.label);
 
       let token: React.ReactNode = null;
@@ -169,8 +199,15 @@ function GridMapView({ grid, markerPos, enemyPresent, onMarkerMove }: Props) {
             <span className={styles.gridTokenLetter}>!</span>
           </span>
         );
+      } else if (tStyle?.glyph) {
+        // Impassable typed terrain (mountains ▲, water ≈).
+        token = (
+          <span className={styles.gridMapObstacleGlyph} aria-hidden="true">
+            {tStyle.glyph}
+          </span>
+        );
       } else if (isObstacle && isRegional) {
-        // Regional impassable terrain reads as a mountain peak.
+        // Legacy (untyped) regional obstacle reads as a mountain peak.
         token = (
           <span className={styles.gridMapObstacleGlyph} aria-hidden="true">
             ▲
@@ -270,7 +307,16 @@ function GridMapView({ grid, markerPos, enemyPresent, onMarkerMove }: Props) {
             <span className={styles.gridLegendTransition} /> travel point (click to go)
           </span>
         )}
-        {grid.obstacles.length > 0 && (
+        {presentTerrain.map((t) => (
+          <span key={t}>
+            <span
+              className={styles.gridLegendTerrain}
+              style={{ background: TERRAIN_STYLE[t].tint ?? 'var(--t-bg)' }}
+            />{' '}
+            {TERRAIN[t].label}
+          </span>
+        ))}
+        {hasLegacyObstacle && (
           <span>
             <span className={styles.gridLegendObstacle} />{' '}
             {isRegionalGrid ? 'mountains' : 'impassable'}

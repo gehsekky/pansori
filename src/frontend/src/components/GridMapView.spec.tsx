@@ -14,12 +14,36 @@ const grid: ActiveGrid = {
   width: 4,
   height: 3,
   feetPerSquare: 5280,
+  terrain: [],
   obstacles: [{ x: 2, y: 2 }],
   startPos: { x: 0, y: 0 },
   transitions: [
     { pos: { x: 3, y: 0 }, kind: 'site', label: 'Millhaven', toTownId: 'town1' },
     { pos: { x: 0, y: 2 }, kind: 'site', label: 'Old Crypt' }, // local site (no toTownId)
   ],
+};
+
+// A region with typed terrain (impassable cells also folded into obstacles, as
+// the activeGrid builder does).
+const terrainGrid: ActiveGrid = {
+  level: 'regional',
+  id: 'reg2',
+  name: 'The Wilds',
+  width: 5,
+  height: 3,
+  feetPerSquare: 5280,
+  terrain: [
+    { pos: { x: 0, y: 1 }, type: 'road' },
+    { pos: { x: 2, y: 0 }, type: 'mountain' },
+    { pos: { x: 3, y: 1 }, type: 'water' },
+    { pos: { x: 1, y: 2 }, type: 'forest' },
+  ],
+  obstacles: [
+    { x: 2, y: 0 },
+    { x: 3, y: 1 },
+  ],
+  startPos: { x: 0, y: 0 },
+  transitions: [],
 };
 
 const cell = (c: HTMLElement, x: number, y: number) =>
@@ -99,6 +123,25 @@ describe('GridMapView', () => {
     const here = cell(container, 1, 1);
     expect(here.getAttribute('aria-current')).toBe('location');
     expect(here.className).toMatch(/gridMapCellCurrent/);
+  });
+
+  it('renders typed terrain: glyphs for impassable, tints + legend for the rest', () => {
+    const onMarkerMove = vi.fn();
+    const { container, getByText } = render(
+      <GridMapView grid={terrainGrid} markerPos={{ x: 0, y: 0 }} onMarkerMove={onMarkerMove} />
+    );
+    // Impassable terrain carries a glyph and is not clickable.
+    expect(cell(container, 2, 0).textContent).toContain('▲'); // mountain
+    expect(cell(container, 3, 1).textContent).toContain('≈'); // water
+    expect(cell(container, 2, 0).getAttribute('role')).toBe('gridcell');
+    expect(cell(container, 3, 1).getAttribute('role')).toBe('gridcell');
+    // Passable terrain (road) stays travel-able.
+    expect(cell(container, 0, 1).getAttribute('role')).toBe('button');
+    // Legend names each terrain type present.
+    expect(getByText('road')).toBeTruthy();
+    expect(getByText('water')).toBeTruthy();
+    expect(getByText('forest')).toBeTruthy();
+    expect(getByText('mountains')).toBeTruthy();
   });
 
   it('checkerboards plain cells so adjacent squares are distinguishable', () => {

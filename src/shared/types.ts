@@ -155,6 +155,43 @@ export interface GridPos {
   y: number;
 }
 
+// SRD overland terrain. The single source of truth for a region/town square:
+// passability, travel-time multiplier, and random-encounter multiplier are all
+// derived from the type (see `TERRAIN`). Replaces the old untyped
+// `obstacles[]` / `difficultTerrain[]` arrays on the overland map (those remain
+// honored for back-compat). Unlisted squares default to `plains`.
+export type TerrainType = 'plains' | 'road' | 'forest' | 'hills' | 'swamp' | 'water' | 'mountain';
+
+export interface TerrainCell {
+  pos: GridPos;
+  type: TerrainType;
+}
+
+// Behaviour table for each terrain type — shared so the backend (movement /
+// travel-time / encounter rolls) and the frontend (passability + rendering)
+// agree on one definition.
+//  - `passable`: false ⇒ the square blocks travel (water, mountains).
+//  - `travelMult`: per-square travel-time multiplier (roads are quick, forest /
+//    swamp are slow "difficult terrain").
+//  - `encounterMult`: scales the region's per-square encounter chance (roads
+//    are safe at 0; wild terrain is more dangerous).
+export interface TerrainSpec {
+  passable: boolean;
+  travelMult: number;
+  encounterMult: number;
+  label: string;
+}
+
+export const TERRAIN: Record<TerrainType, TerrainSpec> = {
+  plains: { passable: true, travelMult: 1, encounterMult: 1, label: 'plains' },
+  road: { passable: true, travelMult: 0.5, encounterMult: 0, label: 'road' },
+  forest: { passable: true, travelMult: 2, encounterMult: 1.5, label: 'forest' },
+  hills: { passable: true, travelMult: 1.5, encounterMult: 1.25, label: 'hills' },
+  swamp: { passable: true, travelMult: 2, encounterMult: 1.5, label: 'swamp' },
+  water: { passable: false, travelMult: 1, encounterMult: 0, label: 'water' },
+  mountain: { passable: false, travelMult: 1, encounterMult: 0, label: 'mountains' },
+};
+
 /**
  * Which combat side an entity fights for: PCs and their allies
  * (companions, summons) oppose enemies. Derived from `isEnemy` /

@@ -27,6 +27,7 @@ import type {
   QuestProgress,
   RoomObject,
   StructuredAction,
+  TerrainCell,
 } from './shared-types.js';
 
 // `LootItem` is re-exported from ./shared-types (see src/shared/types.ts).
@@ -1699,8 +1700,13 @@ export interface Region {
   feetPerSquare: number; // 5280 (1 mile per square — SRD Travel Pace scale)
   gridWidth: number;
   gridHeight: number;
-  obstacles?: GridPos[]; // impassable terrain (mountains, deep water)
-  difficultTerrain?: GridPos[]; // 2× travel cost per square
+  // SRD typed overland terrain (the unified model): passability, travel cost,
+  // and encounter rate are derived from each cell's type (see `TERRAIN`).
+  // Unlisted cells default to `plains`. Preferred over `obstacles` /
+  // `difficultTerrain`, which remain honored for legacy/back-compat.
+  terrain?: TerrainCell[];
+  obstacles?: GridPos[]; // (legacy) impassable terrain — superseded by `terrain`
+  difficultTerrain?: GridPos[]; // (legacy) 2× travel cost — superseded by `terrain`
   startPos: GridPos; // where the party marker begins
   sites: MapSite[];
   // Random travel encounters: per square crossed, an `encounterChance` roll can
@@ -1726,6 +1732,9 @@ export interface Town {
   feetPerSquare: number; // 25 (settlement scale)
   gridWidth: number;
   gridHeight: number;
+  // Typed terrain (see Region.terrain). Cells default to `plains`; `obstacles`
+  // stays honored for legacy maps.
+  terrain?: TerrainCell[];
   obstacles?: GridPos[];
   startPos: GridPos;
   venues: MapVenue[];

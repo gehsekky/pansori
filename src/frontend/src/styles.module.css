@@ -1524,6 +1524,7 @@
 .gridLegendFog,
 .gridLegendObstacle,
 .gridLegendTransition,
+.gridLegendTerrain,
 .gridLegendDifficult {
   display: inline-block;
   width: 10px;
@@ -1584,6 +1585,13 @@
     inset 0 0 0 2px rgba(70, 140, 220, 0.85),
     0 0 6px rgba(70, 140, 220, 0.45);
   z-index: 1;
+}
+
+/* Terrain swatch in the map legend — the inline background tint is set per
+   type from TERRAIN_STYLE. */
+.gridLegendTerrain {
+  border-radius: 2px;
+  border: 1px solid var(--t-border);
 }
 
 /* Inline glyph swatch in the map legend (⌂ town, ◈ site). */

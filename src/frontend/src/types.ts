@@ -29,6 +29,7 @@ import type {
   QuestStep,
   RoomObject,
   StructuredAction,
+  TerrainCell,
   WeaponMastery,
 } from './shared-types.js';
 import type { ReactNode } from 'react';
@@ -362,6 +363,7 @@ export interface Region {
   feetPerSquare: number;
   gridWidth: number;
   gridHeight: number;
+  terrain?: TerrainCell[];
   obstacles?: GridPos[];
   difficultTerrain?: GridPos[];
   startPos: GridPos;
@@ -387,6 +389,7 @@ export interface Town {
   feetPerSquare: number;
   gridWidth: number;
   gridHeight: number;
+  terrain?: TerrainCell[];
   obstacles?: GridPos[];
   startPos: GridPos;
   venues: MapVenue[];
@@ -411,6 +414,9 @@ export interface ActiveGrid {
   width: number;
   height: number;
   feetPerSquare: number;
+  // Typed terrain for the current grid (empty for grids that don't author it,
+  // e.g. local rooms). Impassable terrain is also folded into `obstacles`.
+  terrain: TerrainCell[];
   obstacles: GridPos[];
   transitions: MapTransition[];
   startPos: GridPos;

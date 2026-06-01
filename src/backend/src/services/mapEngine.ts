@@ -5,8 +5,33 @@
 // descends/ascends/changes rooms. This is the campaign navigation system that
 // replaces Location/District `travel` + the room `connections` graph.
 
-import type { CampaignData, GameState, GridPos, MapLevel, Region, Room, Town } from '../types.js';
+import {
+  type CampaignData,
+  type GameState,
+  type GridPos,
+  type MapLevel,
+  type Region,
+  type Room,
+  TERRAIN,
+  type TerrainCell,
+  type TerrainType,
+  type Town,
+} from '../types.js';
 import { findPath, posEqual } from './gridEngine.js';
+
+/** Impassable terrain cells folded into the obstacle set, plus any legacy obstacles. */
+function mergeObstacles(
+  legacy: GridPos[] | undefined,
+  terrain: TerrainCell[] | undefined
+): GridPos[] {
+  const impassable = (terrain ?? []).filter((c) => !TERRAIN[c.type].passable).map((c) => c.pos);
+  return [...(legacy ?? []), ...impassable];
+}
+
+/** Terrain type at a cell — defaults to `plains` for any unlisted square. */
+function terrainTypeAt(terrain: TerrainCell[] | undefined, pos: GridPos): TerrainType {
+  return terrain?.find((c) => posEqual(c.pos, pos))?.type ?? 'plains';
+}
 
 const DEFAULT_LOCAL_GRID = 10;
 const DEFAULT_LOCAL_SCALE = 5;
@@ -56,6 +81,9 @@ export interface ActiveGrid {
   width: number;
   height: number;
   feetPerSquare: number;
+  // Typed terrain for this grid (regions/towns author it; local rooms leave it
+  // empty). Impassable terrain is also folded into `obstacles` for pathfinding.
+  terrain: TerrainCell[];
   obstacles: GridPos[];
   transitions: MapTransition[];
   startPos: GridPos;
@@ -104,7 +132,8 @@ export function activeGrid(
       width: region.gridWidth,
       height: region.gridHeight,
       feetPerSquare: region.feetPerSquare,
-      obstacles: region.obstacles ?? [],
+      terrain: region.terrain ?? [],
+      obstacles: mergeObstacles(region.obstacles, region.terrain),
       startPos: region.startPos,
       transitions: region.sites.map((s) => ({
         pos: s.pos,
@@ -125,7 +154,8 @@ export function activeGrid(
       width: town.gridWidth,
       height: town.gridHeight,
       feetPerSquare: town.feetPerSquare,
-      obstacles: town.obstacles ?? [],
+      terrain: town.terrain ?? [],
+      obstacles: mergeObstacles(town.obstacles, town.terrain),
       startPos: town.startPos,
       transitions: town.venues.map((v) => ({
         pos: v.pos,
@@ -147,6 +177,7 @@ export function activeGrid(
       width: g.width,
       height: g.height,
       feetPerSquare: g.scale,
+      terrain: [], // local rooms use the combat-grid terrain model (deferred)
       obstacles: room.obstacles ?? [],
       startPos: g.entry,
       transitions: (room.exits ?? []).map((e) => ({
@@ -220,8 +251,6 @@ export function resolveMarkerMove(
   if (grid.level === 'regional') {
     const region = regionById(campaign, st.current_region_id);
     const milesPerSquare = grid.feetPerSquare / FEET_PER_MILE;
-    elapsedHours = (squaresMoved * milesPerSquare) / NORMAL_MILES_PER_HOUR;
-    next.world_hour = (st.world_hour ?? 0) + elapsedHours;
     const chance = region?.encounterChance ?? 0;
     const table = region?.encounterTable ?? [];
     // E2E determinism: the test-login backend (E2E_TEST_LOGIN_ENABLED, never
@@ -230,14 +259,21 @@ export function resolveMarkerMove(
     // an ambush. Unit tests (vitest, no such env) still roll encounters.
     const encountersDisabled =
       process.env.NODE_ENV !== 'production' && process.env.E2E_TEST_LOGIN_ENABLED === 'true';
-    if (!encountersDisabled && chance > 0 && table.length > 0) {
-      for (let i = 0; i < squaresMoved; i++) {
-        if (Math.random() < chance) {
-          encounter = table[Math.floor(Math.random() * table.length)];
-          break;
-        }
+    const rollEncounters = !encountersDisabled && chance > 0 && table.length > 0;
+    // Walk the crossed cells: terrain sets per-square travel time (roads quick,
+    // forest/swamp slow) and scales the encounter chance (roads are safe, wild
+    // terrain dangerous). With no authored terrain every cell is plains (mult
+    // 1), reproducing the old flat behaviour.
+    let weightedSquares = 0;
+    for (const cell of path) {
+      const spec = TERRAIN[terrainTypeAt(region?.terrain, cell)];
+      weightedSquares += spec.travelMult;
+      if (rollEncounters && !encounter && Math.random() < chance * spec.encounterMult) {
+        encounter = table[Math.floor(Math.random() * table.length)];
       }
     }
+    elapsedHours = (weightedSquares * milesPerSquare) / NORMAL_MILES_PER_HOUR;
+    next.world_hour = (st.world_hour ?? 0) + elapsedHours;
   }
 
   // ── Resolve a transition cell at the destination (descend/ascend/room) ──────

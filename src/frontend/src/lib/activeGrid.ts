@@ -6,10 +6,22 @@
 // exists only so the FE can render without an extra round-trip — the same
 // pattern as the chebyshev / cellsOnLine mirrors in GridCombatView.
 
-import type { ActiveGrid, GameState, MapTransition, Seed } from '../types';
+import type { ActiveGrid, GameState, GridPos, MapTransition, Seed, TerrainCell } from '../types';
+import { TERRAIN } from '../types';
 
 const DEFAULT_LOCAL_GRID = 10;
 const DEFAULT_LOCAL_SCALE = 5;
+
+// Impassable terrain cells folded into the obstacle set (+ any legacy obstacles)
+// — mirrors backend mapEngine.mergeObstacles so the FE marks the same cells
+// unreachable as the server will.
+function mergeObstacles(
+  legacy: GridPos[] | undefined,
+  terrain: TerrainCell[] | undefined
+): GridPos[] {
+  const impassable = (terrain ?? []).filter((c) => !TERRAIN[c.type].passable).map((c) => c.pos);
+  return [...(legacy ?? []), ...impassable];
+}
 
 type SeedRoom = Seed['rooms'][number];
 
@@ -48,7 +60,8 @@ export function activeGrid(seed: Seed | undefined, st: GameState): ActiveGrid | 
       width: region.gridWidth,
       height: region.gridHeight,
       feetPerSquare: region.feetPerSquare,
-      obstacles: region.obstacles ?? [],
+      terrain: region.terrain ?? [],
+      obstacles: mergeObstacles(region.obstacles, region.terrain),
       startPos: region.startPos,
       transitions: region.sites.map((s) => ({
         pos: s.pos,
@@ -70,7 +83,8 @@ export function activeGrid(seed: Seed | undefined, st: GameState): ActiveGrid | 
       width: town.gridWidth,
       height: town.gridHeight,
       feetPerSquare: town.feetPerSquare,
-      obstacles: town.obstacles ?? [],
+      terrain: town.terrain ?? [],
+      obstacles: mergeObstacles(town.obstacles, town.terrain),
       startPos: town.startPos,
       transitions: town.venues.map((v) => ({
         pos: v.pos,
@@ -105,6 +119,7 @@ export function activeGrid(seed: Seed | undefined, st: GameState): ActiveGrid | 
       width: g.width,
       height: g.height,
       feetPerSquare: g.scale,
+      terrain: [],
       obstacles: room.obstacles ?? [],
       startPos: g.entry,
       transitions,

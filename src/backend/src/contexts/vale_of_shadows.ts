@@ -15,11 +15,16 @@ import {
   srdBackgrounds,
   srdItems,
 } from './srd/index.js';
+import type { TerrainCell, TerrainType } from '../types.js';
 import type { Context } from '../types.js';
 import type { EnemyTemplate } from '../types.js';
 import type { MapSite } from '../types.js';
 import { groveContent } from './folded/grove_of_thorns.js';
 import { whisperingPinesContent } from './folded/whispering_pines.js';
+
+// Overland-map authoring sugar: build terrain cells of one type from [x,y] pairs.
+const terr = (type: TerrainType, ...cells: [number, number][]): TerrainCell[] =>
+  cells.map(([x, y]) => ({ pos: { x, y }, type }));
 
 // Shared Crypt Lord stat block. Used both as the roguelike-pool template and
 // (spread with an `id`) as the campaign throne boss, so a balance change can't
@@ -1365,10 +1370,37 @@ const context: Context = {
         gridWidth: 12,
         gridHeight: 8,
         startPos: { x: 1, y: 3 }, // the road just outside Millhaven
-        // A couple of impassable ridges; all sites stay reachable from start.
-        obstacles: [
-          { x: 6, y: 6 },
-          { x: 7, y: 6 },
+        // Typed overland terrain (unified model): passability, travel time, and
+        // encounter rate all derive from each cell's type. Roads are quick + safe
+        // (no random encounters); forest/swamp are slow + dangerous; mountains and
+        // water are impassable. Unlisted cells are plains. All sites stay
+        // reachable from start — the impassable terrain is in the SE/SW corners.
+        terrain: [
+          // Impassable SE ridge + a southern marsh-lake.
+          ...terr('mountain', [6, 6], [7, 6], [5, 7], [6, 7], [7, 7]),
+          ...terr('water', [3, 6], [4, 6], [4, 7]),
+          // The safe road network linking the start, Millhaven, and the sites.
+          ...terr(
+            'road',
+            [1, 3],
+            [3, 3],
+            [4, 3],
+            [4, 2],
+            [5, 2],
+            [5, 3],
+            [6, 3],
+            [7, 3],
+            [8, 3],
+            [8, 2],
+            [9, 4],
+            [10, 4]
+          ),
+          // Pine woods along the north edge + the western treeline.
+          ...terr('forest', [3, 0], [4, 0], [5, 0], [6, 0], [7, 0], [0, 5], [0, 6], [1, 6]),
+          // Boggy ground skirting the lake.
+          ...terr('swamp', [2, 5], [3, 5]),
+          // Rolling hills in the NE + a southern rise.
+          ...terr('hills', [9, 0], [10, 0], [10, 1], [2, 6]),
         ],
         sites: [
           {

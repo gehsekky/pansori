@@ -95,6 +95,29 @@ describe('activeGrid (FE port)', () => {
     expect(g.transitions.find((t) => t.kind === 'ascend')?.ascendTo).toBe('town');
   });
 
+  it('folds impassable terrain into obstacles and carries the terrain array', () => {
+    const terrainSeed = {
+      ...seed,
+      regions: [
+        {
+          ...(seed.regions as NonNullable<Seed['regions']>)[0],
+          terrain: [
+            { pos: { x: 1, y: 1 }, type: 'mountain' },
+            { pos: { x: 2, y: 2 }, type: 'road' },
+          ],
+        },
+      ],
+    } as unknown as Seed;
+    const g = activeGrid(terrainSeed, {
+      map_level: 'regional',
+      current_region_id: 'reg1',
+    } as GameState)!;
+    expect(g.terrain).toHaveLength(2);
+    expect(g.obstacles).toContainEqual({ x: 5, y: 5 }); // legacy obstacle preserved
+    expect(g.obstacles).toContainEqual({ x: 1, y: 1 }); // mountain folded in
+    expect(g.obstacles).not.toContainEqual({ x: 2, y: 2 }); // road stays passable
+  });
+
   it('returns null off the map model or for an unknown / transient room', () => {
     expect(activeGrid(seed, {} as GameState)).toBeNull();
     expect(at({ map_level: 'regional', current_region_id: 'nope' })).toBeNull();

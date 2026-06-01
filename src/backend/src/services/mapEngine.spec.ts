@@ -304,3 +304,73 @@ describe('regional encounters', () => {
     expect(r.transitioned).toBe(true); // reached + entered the town
   });
 });
+
+describe('typed overland terrain (unified model)', () => {
+  const terrainCampaign: CampaignData = {
+    world_name: 'Terr',
+    intro: '',
+    rooms,
+    regions: [
+      {
+        id: 'reg1',
+        name: 'Wilds',
+        feetPerSquare: 5280,
+        gridWidth: 10,
+        gridHeight: 10,
+        startPos: { x: 0, y: 0 },
+        sites: [],
+        encounterTable: ['Bandit Ruffian'],
+        encounterChance: 0.5,
+        terrain: [
+          { pos: { x: 2, y: 0 }, type: 'mountain' }, // impassable
+          { pos: { x: 0, y: 1 }, type: 'road' }, // quick + safe
+          { pos: { x: 0, y: 2 }, type: 'road' },
+          { pos: { x: 0, y: 3 }, type: 'forest' }, // slow + dangerous
+        ],
+      },
+    ],
+  };
+  const stAt = (x: number, y: number): GameState =>
+    ({
+      map_level: 'regional',
+      current_region_id: 'reg1',
+      marker_pos: { x, y },
+      visited_rooms: [],
+    }) as unknown as GameState;
+
+  it('folds impassable terrain into obstacles + carries the terrain array', () => {
+    const g = activeGrid(terrainCampaign, rooms, stAt(0, 0))!;
+    expect(g.terrain).toHaveLength(4);
+    expect(g.obstacles).toContainEqual({ x: 2, y: 0 }); // mountain blocks pathing
+    expect(g.obstacles).not.toContainEqual({ x: 0, y: 1 }); // road is passable
+  });
+
+  it('rejects moving onto an impassable (mountain) cell', () => {
+    expect(
+      resolveMarkerMove(terrainCampaign, rooms, stAt(0, 0), { x: 2, y: 0 }).rejected
+    ).toBeTruthy();
+  });
+
+  it('roads halve travel time; forest doubles it', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.999); // no encounter
+    // (0,1)+(0,2) both road (×0.5) ⇒ 1.0 weighted square ÷ 3 mi/hr.
+    expect(
+      resolveMarkerMove(terrainCampaign, rooms, stAt(0, 0), { x: 0, y: 2 }).elapsedHours
+    ).toBeCloseTo(1 / 3, 5);
+    // road + road + forest (0.5+0.5+2 = 3 weighted) ÷ 3 = 1.0 hr.
+    expect(
+      resolveMarkerMove(terrainCampaign, rooms, stAt(0, 0), { x: 0, y: 3 }).elapsedHours
+    ).toBeCloseTo(1, 5);
+  });
+
+  it('roads suppress encounters while forest is dangerous', () => {
+    // chance 0.5: road ×0 ⇒ never; forest ×1.5 ⇒ 0.75 effective. roll 0.6.
+    vi.spyOn(Math, 'random').mockReturnValue(0.6);
+    expect(
+      resolveMarkerMove(terrainCampaign, rooms, stAt(0, 0), { x: 0, y: 2 }).encounter
+    ).toBeUndefined(); // all-road journey is safe
+    expect(resolveMarkerMove(terrainCampaign, rooms, stAt(0, 0), { x: 0, y: 3 }).encounter).toBe(
+      'Bandit Ruffian'
+    ); // the forest cell rolls 0.6 < 0.75
+  });
+});
