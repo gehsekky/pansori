@@ -28,10 +28,10 @@ import {
   SRD_SPELLS,
   srdBackgrounds,
   srdItems,
-} from './srd/index.js';
-import type { Context } from '../types.js';
+} from '../srd/index.js';
+import type { Context } from '../../types.js';
 
-export const context: Context = {
+export const groveContent: Context = {
   id: 'grove_of_thorns',
   worldNoun: 'grove',
   mapType: 'campaign',
@@ -423,13 +423,13 @@ export const context: Context = {
             entryRoomId: 'pinegate_square',
           },
           {
-            id: 'venue_lodge',
+            id: 'venue_lodge_grove',
             name: 'The Burnt Stump',
             pos: { x: 4, y: 2 },
             kind: 'interior',
             entryRoomId: 'pinegate_lodge',
           },
-          { id: 'venue_gate', name: 'Village Edge', pos: { x: 3, y: 5 }, kind: 'gate' },
+          { id: 'venue_gate_grove', name: 'Village Edge', pos: { x: 3, y: 5 }, kind: 'gate' },
         ],
       },
     ],
@@ -641,7 +641,6 @@ export const context: Context = {
         id: 'quest_silent_grove',
         title: 'The Silent Grove',
         desc: "Old Elise needs someone to walk Mareth's path. Reach the Ancient Oak and find what silenced her.",
-        startActive: true, // the Grove's opening quest — active from the start
         giverNpcId: 'npc_mareth_elder',
         factionId: 'faction_verdant',
         repGain: 15,

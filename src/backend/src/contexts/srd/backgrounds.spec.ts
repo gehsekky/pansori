@@ -8,7 +8,6 @@
 
 import { ALL_SRD_BACKGROUND_IDS, SRD_BACKGROUNDS, srdBackgrounds } from './backgrounds.js';
 import { describe, expect, it } from 'vitest';
-import { context as grove } from '../grove_of_thorns.js';
 import { context as sandbox } from '../sandbox.js';
 import { context as vale } from '../vale_of_shadows.js';
 
@@ -59,7 +58,6 @@ describe('no drift — shipped contexts share the canonical background mechanics
   const contexts = [
     ['sandbox', sandbox],
     ['vale_of_shadows', vale],
-    ['grove_of_thorns', grove],
   ] as const;
 
   for (const [name, ctx] of contexts) {

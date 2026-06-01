@@ -8,7 +8,6 @@
 
 import { ALL_SRD_ITEM_IDS, SRD_ITEMS, srdItems } from './items.js';
 import { describe, expect, it } from 'vitest';
-import { context as grove } from '../grove_of_thorns.js';
 import { context as sandbox } from '../sandbox.js';
 import { context as vale } from '../vale_of_shadows.js';
 
@@ -57,7 +56,6 @@ describe('no drift — shipped contexts reuse the canonical SRD definitions', ()
   const contexts = [
     ['sandbox', sandbox],
     ['vale_of_shadows', vale],
-    ['grove_of_thorns', grove],
   ] as const;
 
   for (const [name, ctx] of contexts) {

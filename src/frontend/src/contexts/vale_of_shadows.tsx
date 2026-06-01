@@ -170,6 +170,12 @@ export const context: FrontendContext = {
     elixir_of_warmth: '🍶',
     halden_locket: '📿',
     cult_idol: '🗿',
+    // Folded-in Grove of Thorns items.
+    greataxe: '🪓',
+    dart: '🎯',
+    scale_mail: '🛡',
+    circle_charm: '🍂',
+    oak_heart: '🌱',
   },
 
   itemDescs: {
@@ -202,6 +208,12 @@ export const context: FrontendContext = {
     elixir_of_warmth: 'Mulled spirits — restores 1d4+2 HP',
     halden_locket: "A trapper's silver locket — proof of his fate",
     cult_idol: 'Black ironwood carved with a cult rune',
+    // Folded-in Grove of Thorns items.
+    greataxe: '1d12 slashing, heavy, two-handed',
+    dart: '1d4 piercing, finesse, thrown (20/60)',
+    scale_mail: 'AC 14 + DEX mod (max +2), medium armor',
+    circle_charm: "Mareth's carved acorn charm — the grove knows it as kin.",
+    oak_heart: "A fist-sized seedpod glowing with green light — the grove's heart restored.",
   },
 
   // No per-room art assets shipped yet for Vale. RoomArtPanel will render

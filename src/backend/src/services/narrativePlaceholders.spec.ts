@@ -25,7 +25,6 @@ import { describe, expect, it } from 'vitest';
 import { dirname, join } from 'path';
 import { readFileSync, readdirSync } from 'fs';
 import { fileURLToPath } from 'url';
-import { context as grove } from '../contexts/grove_of_thorns.js';
 import { context as sandbox } from '../contexts/sandbox.js';
 import { context as vale } from '../contexts/vale_of_shadows.js';
 
@@ -118,7 +117,6 @@ describe('narrative placeholder lint', () => {
   for (const [ctxName, ctx] of [
     ['sandbox', sandbox],
     ['vale_of_shadows', vale],
-    ['grove_of_thorns', grove],
   ] as const) {
     it(`every {token} is substituted at every inline reference in ${ctxName}.narratives`, () => {
       const required = tokensByPool(ctx.narratives);
@@ -151,7 +149,6 @@ describe('narrative placeholder lint', () => {
   for (const [ctxName, ctx] of [
     ['sandbox', sandbox],
     ['vale_of_shadows', vale],
-    ['grove_of_thorns', grove],
   ] as const) {
     it(`every {token} in ${ctxName}.narratives has a handler somewhere in the engine`, () => {
       const required = tokensByPool(ctx.narratives);

@@ -18,6 +18,7 @@ import {
 import type { Context } from '../types.js';
 import type { EnemyTemplate } from '../types.js';
 import type { MapSite } from '../types.js';
+import { groveContent } from './folded/grove_of_thorns.js';
 import { whisperingPinesContent } from './folded/whispering_pines.js';
 
 // Shared Crypt Lord stat block. Used both as the roguelike-pool template and
@@ -1773,5 +1774,25 @@ foldCampaign(
   ],
   ['pines_square']
 );
+
+// Grove of Thorns — Pinegate village + the Silent Grove, on free Vale-grid
+// cells. pinegate_square is kept (it's the village-square venue interior, not
+// just a start frame), so no rooms are dropped here.
+foldCampaign(context, groveContent, [
+  {
+    id: 'site_pinegate',
+    name: 'Pinegate',
+    pos: { x: 4, y: 7 },
+    kind: 'town',
+    townId: 'pinegate_town',
+  },
+  {
+    id: 'site_grove',
+    name: 'The Silent Grove',
+    pos: { x: 0, y: 6 },
+    kind: 'local',
+    entryRoomId: 'thornwater_bridge',
+  },
+]);
 
 export { context };
