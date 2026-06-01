@@ -870,6 +870,7 @@ export default function App() {
                           npcName={seed.npcs?.[conv.roomId]?.name ?? 'Someone'}
                           prompt={conv.prompt}
                           choices={choices.filter((c) => c.kind === 'conversation')}
+                          seenChoices={gameState.seen_choices ?? []}
                           onChoose={handleChoice}
                         />
                       );

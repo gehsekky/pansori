@@ -4747,9 +4747,19 @@ describe('seenKeyForAction', () => {
     ).toBeUndefined();
   });
 
-  it('talk_response folds the room id and response index', () => {
+  it('talk_response folds the room id, conversation path, and response index', () => {
+    // No active conversation → empty path segment.
     expect(seenKeyForAction({ type: 'talk_response', responseIdx: 2 }, st)).toBe(
-      'talk_response::crypt_room_a::2'
+      'talk_response::crypt_room_a::::2'
+    );
+    // A nested node's path is included, so the same index at different depths
+    // gets a distinct key (no false-positive dimming across levels).
+    const nested = {
+      ...st,
+      active_conversation: { roomId: 'crypt_room_a', path: [0, 1], prompt: '' },
+    };
+    expect(seenKeyForAction({ type: 'talk_response', responseIdx: 2 }, nested)).toBe(
+      'talk_response::crypt_room_a::0.1::2'
     );
   });
 

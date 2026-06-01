@@ -3387,8 +3387,14 @@ export function npcIsKilled(state: GameState, roomId: string): boolean {
 export function seenKeyForAction(action: StructuredAction, state: GameState): string | undefined {
   const room = state.current_room;
   switch (action.type) {
-    case 'talk_response':
-      return `talk_response::${room}::${action.responseIdx}`;
+    case 'talk_response': {
+      // Include the conversation path so the SAME response index at different
+      // nesting levels gets a distinct key (otherwise picking root option 0
+      // would dim a nested option 0). Path is the node the player is at when
+      // the choice is shown / clicked.
+      const path = (state.active_conversation?.path ?? []).join('.');
+      return `talk_response::${room}::${path}::${action.responseIdx}`;
+    }
     case 'interact_object':
       return `interact_object::${room}::${action.objectId}`;
     case 'accept_quest':
@@ -3587,11 +3593,17 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   if (conv && !state.combat_active && conv.roomId === state.current_room) {
     const cnpc = seed.npcs?.[conv.roomId];
     if (cnpc && !npcIsKilled(state, conv.roomId)) {
-      const convoChoices: GameChoice[] = responsesAtPath(cnpc, conv.path).map((r, i) => ({
-        label: `<To ${cnpc.name}> ${r.label}`,
-        action: { type: 'talk_response' as const, responseIdx: i },
-        kind: 'conversation' as const,
-      }));
+      const convoChoices: GameChoice[] = responsesAtPath(cnpc, conv.path).map((r, i) => {
+        const action = { type: 'talk_response' as const, responseIdx: i };
+        // This early-return bypasses the end-of-function seenKey pass, so stamp
+        // it here — lets the FE dim dialogue options the player already picked.
+        return {
+          label: `<To ${cnpc.name}> ${r.label}`,
+          action,
+          kind: 'conversation' as const,
+          seenKey: seenKeyForAction(action, state),
+        };
+      });
       if (conv.path.length > 0) {
         convoChoices.push({
           label: '↩ Back',

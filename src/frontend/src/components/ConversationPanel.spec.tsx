@@ -9,11 +9,13 @@ const choices: GameChoice[] = [
     label: '<To The Sage> Who built it?',
     action: { type: 'talk_response', responseIdx: 0 },
     kind: 'conversation',
+    seenKey: 'talk_response::parley::::0',
   },
   {
     label: '<To The Sage> I have heard enough',
     action: { type: 'talk_response', responseIdx: 1 },
     kind: 'conversation',
+    seenKey: 'talk_response::parley::::1',
   },
   { label: '↩ Back', action: { type: 'conversation_back' }, kind: 'conversation' },
   { label: '✕ End conversation', action: { type: 'end_conversation' }, kind: 'conversation' },
@@ -26,6 +28,7 @@ describe('ConversationPanel', () => {
         npcName="The Sage"
         prompt="It is old and cursed."
         choices={choices}
+        seenChoices={[]}
         onChoose={() => {}}
       />
     );
@@ -45,6 +48,7 @@ describe('ConversationPanel', () => {
         npcName="The Sage"
         prompt="It is old and cursed."
         choices={choices}
+        seenChoices={[]}
         onChoose={onChoose}
       />
     );
@@ -56,5 +60,21 @@ describe('ConversationPanel', () => {
     expect(onChoose).toHaveBeenLastCalledWith(
       expect.objectContaining({ action: { type: 'end_conversation' } })
     );
+  });
+
+  it('dims a response whose seenKey has already been clicked, not the others', () => {
+    const { getByText } = render(
+      <ConversationPanel
+        npcName="The Sage"
+        prompt="It is old and cursed."
+        choices={choices}
+        seenChoices={['talk_response::parley::::0']}
+        onChoose={() => {}}
+      />
+    );
+    const seenBtn = getByText(/Who built it\?/).closest('button')!;
+    const freshBtn = getByText(/I have heard enough/).closest('button')!;
+    expect(seenBtn.getAttribute('data-seen')).toBe('true');
+    expect(freshBtn.getAttribute('data-seen')).toBeNull();
   });
 });
