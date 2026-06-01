@@ -3,6 +3,7 @@ import { materializeEnemy, scaleEnemyHp } from '../enemyFactory.js';
 import type { ActionHandler } from './types.js';
 import type { GridPos } from '../../types.js';
 import { buildArrivalNarrative } from '../gameEngine.js';
+import { runCombatStart } from './attack/combatStart.js';
 
 /**
  * `marker_move`: move the single party marker on the current grid (regional /
@@ -75,7 +76,21 @@ export const handleMarkerMove: ActionHandler<{ type: 'marker_move'; to: GridPos 
       const enemy = materializeEnemy(template, `${ENCOUNTER_ROOM_ID}#${Date.now()}`, hp);
       ctx.seed.enemies = { ...(ctx.seed.enemies ?? {}), [ENCOUNTER_ROOM_ID]: [enemy] };
       ctx.st = stageEncounter(ctx.st);
-      ctx.narrative += ` ⚔️ Ambush! A ${res.encounter} blocks the way — you have no choice but to fight.`;
+      // Drop straight into the fight instead of arriving out of combat with an
+      // Attack button. stageEncounter moved the party into the encounter room,
+      // so refresh the ctx's room-enemy list (it was the pre-move room) and
+      // start combat now — runCombatStart deploys tokens + rolls initiative and
+      // puts the active PC on the clock so the player acts immediately.
+      const ambushLine = ` ⚔️ Ambush! A ${res.encounter} falls upon the party.`;
+      // runCombatStart reads `livingEnemiesInRoom` (read-only on the dispatched
+      // ctx, and stale for the pre-move room). Hand it the just-materialized
+      // encounter enemy via a shallow ctx copy; the actor is shared by
+      // reference (so PC updates land), and we copy the new st/narrative back.
+      const preCombatNarrative = ctx.narrative ?? '';
+      const combatCtx = { ...ctx, livingEnemiesInRoom: [enemy] };
+      runCombatStart(combatCtx, enemy);
+      ctx.st = combatCtx.st;
+      ctx.narrative = preCombatNarrative + ambushLine + ' ' + combatCtx.narrative;
     } else {
       // The encounter table named a creature absent from the bestiary — skip the
       // drop rather than crash; the party simply presses on.

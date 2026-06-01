@@ -58,7 +58,7 @@ function ctxFor(): ActionContext {
     actor: pcActor(char, 0),
     st,
     seed,
-    context: { campaign, enemyTemplates: [bandit] },
+    context: { campaign, enemyTemplates: [bandit], narratives: {} },
     narrative: '',
   } as unknown as ActionContext;
 }
@@ -81,7 +81,15 @@ describe('handleMarkerMove — wilderness encounter drop', () => {
     expect(enemies[0].name).toBe('Bandit Ruffian');
     expect(enemies[0].hp).toBeGreaterThan(0);
 
+    // Combat auto-starts — no out-of-combat "Attack" step. Tokens are deployed
+    // (the PC + the enemy) and initiative is rolled.
+    expect(ctx.st.combat_active).toBe(true);
+    expect(ctx.st.initiative_order.length).toBe(2);
+    expect(ctx.st.entities?.some((e) => e.isEnemy && e.id === enemies[0].id)).toBe(true);
+    expect(ctx.st.entities?.some((e) => !e.isEnemy && e.id === 'pc-1')).toBe(true);
+
     expect(ctx.narrative).toContain('Ambush');
+    expect(ctx.narrative).toContain('Initiative');
   });
 
   it('rejects a non-PC actor', () => {
