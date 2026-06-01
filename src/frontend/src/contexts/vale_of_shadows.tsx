@@ -3,20 +3,18 @@ import type { FrontendContext } from '../types.js';
 export const context: FrontendContext = {
   id: 'vale_of_shadows',
 
-  displayName: 'Vale of Shadows',
+  displayName: 'Duskenvale',
   tagline:
-    'A market town on the edge of the Vale. The old crypt stirs at night, and the Guild needs adventurers.',
+    'A shadowed frontier of pine and frost: Millhaven and its restless crypt, the Iceshard Spire above the Frozen Pass, and the Silent Grove beyond Pinegate.',
   recommendedPartySize: 3,
   recommendedComposition: ['Fighter', 'Cleric', 'Rogue'],
   previewArt: `
-   ╔═ VALE ═══════╗
-   ║ Millhaven    ║
-   ║ ▲ ▲ ▲ ▲ ▲    ║
-   ║   Old Road   ║
-   ║ ┌─Crypt─┐    ║
-   ║ │ ✚ ✚ ✚ │    ║
-   ║ └───────┘    ║
-   ╚══════════════╝`,
+   ╔═ DUSKENVALE ═════╗
+   ║ Millhaven · Crypt║
+   ║ ❄ The Frozen Pass║
+   ║ ◆ Iceshard Spire ║
+   ║ Pinegate · Grove ║
+   ╚══════════════════╝`,
 
   classes: [
     { id: 'Fighter', desc: 'Martial combatant. Extra attack at L5. Second Wind. Heavy armor.' },

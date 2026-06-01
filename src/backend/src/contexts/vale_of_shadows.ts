@@ -82,7 +82,7 @@ const CRYPT_LORD_BASE: EnemyTemplate = {
   ],
 };
 
-// ─── Vale of Shadows — First Adventure Module ─────────────────────────────────
+// ─── Duskenvale — First Adventure Module ─────────────────────────────────
 //
 // 3-level grid map (regional → town → local):
 //   region `vale_region` — the overland map; the party is a single marker.
@@ -107,7 +107,11 @@ const context: Context = {
   mapType: 'campaign',
   startRoomId: 'millhaven_square',
 
-  worldNames: ['Vale of Shadows', 'The Darkened Vale', 'Millhaven and the Shattered Crypt'],
+  worldNames: [
+    'Duskenvale',
+    'The Darkened Vale',
+    'Millhaven, the Frozen Pass, and the Silent Grove',
+  ],
 
   // ─── Classes ─────────────────────────────────────────────────────────────────
 
@@ -168,7 +172,7 @@ const context: Context = {
   // ─── Intro texts ──────────────────────────────────────────────────────────────
 
   introTexts: [
-    `You arrive in Millhaven, a market town nestled at the edge of the Vale of Shadows. Merchants hawk their wares in the square, but unease hangs in the air — the old crypt beyond the hills has been making sounds at night, and two of the Guild's supply wagons have gone missing on the Old Road.`,
+    `You arrive in Millhaven, a market town nestled at the edge of Duskenvale. Merchants hawk their wares in the square, but unease hangs in the air — the old crypt beyond the hills has been making sounds at night, and two of the Guild's supply wagons have gone missing on the Old Road.`,
     `The sun is setting over Millhaven as you ride in. The innkeeper greets you with a worried look — there's trouble in the vale, and coin to be made for those with sword or spell.`,
     `Rain patters on the cobblestones of Millhaven's market square. A priest from the Temple of Selûne approaches you the moment you dismount — they need capable adventurers, and word travels fast in small towns.`,
   ],
@@ -396,7 +400,7 @@ const context: Context = {
       // Opening frame only — the party begins on the regional grid (see
       // initMapState), so this describes the vale map, not a room.
       millhaven_square: [
-        "The Old Road brings you to the edge of the Vale of Shadows. Millhaven's lantern-lit walls stand to the west; the wooded hills to the north and east hide the bandit camp and the Shattered Crypt. Your map of the vale lies open before you.",
+        "The Old Road brings you to the edge of Duskenvale. Millhaven's lantern-lit walls stand to the west; the wooded hills to the north and east hide the bandit camp and the Shattered Crypt. Your map of the vale lies open before you.",
       ],
       dungeon_crypt_entrance: [
         'Mossy steps lead down into the Shattered Crypt. Cold air breathes from the darkness below.',
@@ -545,14 +549,14 @@ const context: Context = {
   // ─── Campaign data ────────────────────────────────────────────────────────────
 
   campaign: {
-    world_name: 'Vale of Shadows',
+    world_name: 'Duskenvale',
     // Three quests + 8-room crypt with a multi-attack lich boss — tuned for 3 PCs.
     recommendedPartySize: 3,
     // Charnel Hall blade trap + Garrison strongbox favor Rogue's Stealth /
     // Investigation / Cunning Action over a Wizard's blast spells here.
     recommendedComposition: ['Fighter', 'Cleric', 'Rogue'],
     intro:
-      'The Vale of Shadows stretches before you — a land of ancient tombs, suspicious merchants, and shadows that move against the light.',
+      'Duskenvale stretches before you — a shadowed frontier of ancient tombs, frozen spires, and silent groves, where suspicious folk eye every stranger who walks the pine-dark roads.',
 
     // ── Rooms (local grids) ──────────────────────────────────────────────────
     // 3-level map model: navigation is by the party marker on the regional /
@@ -568,8 +572,8 @@ const context: Context = {
       // never entered — its `roomArrival` text frames the vale map.
       {
         id: 'millhaven_square',
-        name: 'The Vale of Shadows',
-        desc: 'The Old Road brings you to the edge of the vale. Millhaven lies to the west; the hills hide darker places.',
+        name: 'Duskenvale',
+        desc: 'The Old Road brings you into Duskenvale. Millhaven lies to the west; the pine-dark hills hide darker places — and the pass and grove lie beyond.',
       },
 
       // Millhaven interiors (town venues open these; each ascends back to town).
@@ -1355,8 +1359,8 @@ const context: Context = {
     regions: [
       {
         id: 'vale_region',
-        name: 'The Vale of Shadows',
-        desc: 'A wooded vale of old tombs and bandit-haunted roads, ringed by hills.',
+        name: 'Duskenvale',
+        desc: 'The borderland of Duskenvale — a shadowed vale of old tombs, the frozen pass beneath the Iceshard Spire, and the silent grove beyond Pinegate, all ringed by pine-dark hills.',
         feetPerSquare: 5280, // 1 square = 1 mile (SRD Travel Pace scale)
         gridWidth: 12,
         gridHeight: 8,
