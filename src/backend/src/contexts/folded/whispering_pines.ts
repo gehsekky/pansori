@@ -25,10 +25,10 @@ import {
   SRD_SPELLS,
   srdBackgrounds,
   srdItems,
-} from './srd/index.js';
-import type { Context } from '../types.js';
+} from '../srd/index.js';
+import type { Context } from '../../types.js';
 
-export const context: Context = {
+export const whisperingPinesContent: Context = {
   id: 'whispering_pines',
   worldNoun: 'pass',
   mapType: 'campaign',
@@ -1091,7 +1091,7 @@ export const context: Context = {
             kind: 'interior',
             entryRoomId: 'pines_warden',
           },
-          { id: 'venue_gate', name: 'Village Edge', pos: { x: 3, y: 5 }, kind: 'gate' },
+          { id: 'venue_gate_pines', name: 'Village Edge', pos: { x: 3, y: 5 }, kind: 'gate' },
         ],
       },
     ],
@@ -1103,7 +1103,6 @@ export const context: Context = {
         id: 'quest_trapper',
         title: 'The Missing Trapper',
         desc: 'Old Halden the trapper has been missing three days. Innkeeper Brann wants him back — or proof of his fate. His silver locket should be enough.',
-        startActive: true, // Whispering Pines' opening quest — active from the start
         giverNpcId: 'npc_brann',
         factionId: 'faction_wardens',
         repGain: 10,

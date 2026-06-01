@@ -8,7 +8,6 @@ import type { Quest } from '../types.js';
 import { context as grove } from '../contexts/grove_of_thorns.js';
 import { starterQuestProgress } from './campaignEngine.js';
 import { context as vale } from '../contexts/vale_of_shadows.js';
-import { context as whispering } from '../contexts/whispering_pines.js';
 
 const quest = (id: string, startActive?: boolean): Quest => ({
   id,
@@ -35,11 +34,6 @@ describe('story campaigns each open with exactly one starter quest', () => {
   const cases: { name: string; quests: Quest[]; opener: string }[] = [
     { name: 'Vale of Shadows', quests: vale.campaign?.quests ?? [], opener: 'quest_shipment' },
     { name: 'Grove of Thorns', quests: grove.campaign?.quests ?? [], opener: 'quest_silent_grove' },
-    {
-      name: 'Whispering Pines',
-      quests: whispering.campaign?.quests ?? [],
-      opener: 'quest_trapper',
-    },
   ];
   for (const c of cases) {
     it(`${c.name} → ${c.opener} is the sole startActive quest`, () => {

@@ -17,6 +17,8 @@ import {
 } from './srd/index.js';
 import type { Context } from '../types.js';
 import type { EnemyTemplate } from '../types.js';
+import type { MapSite } from '../types.js';
+import { whisperingPinesContent } from './folded/whispering_pines.js';
 
 // Shared Crypt Lord stat block. Used both as the roguelike-pool template and
 // (spread with an `id`) as the campaign throne boss, so a balance change can't
@@ -98,7 +100,7 @@ const CRYPT_LORD_BASE: EnemyTemplate = {
 //   faction_guild    — Merchant Guild   (shop prices)
 //   faction_watch    — City Watch       (encounter frequency)
 
-export const context: Context = {
+const context: Context = {
   id: 'vale_of_shadows',
   worldNoun: 'vale',
   mapType: 'campaign',
@@ -1698,3 +1700,78 @@ export const context: Context = {
     },
   ],
 };
+
+// ── Folded-in campaigns ──────────────────────────────────────────────────────
+// Whispering Pines (and Grove of Thorns) are no longer standalone campaigns —
+// their content is folded into the Vale as additional areas of the same world,
+// reached via new sites on the regional map. Their data modules live under
+// contexts/folded/ (the context loader only scans top-level files in
+// contexts/, so the folded modules aren't registered as separate campaigns).
+//
+// Each fold appends the campaign's enemy templates, loot, NPC templates, rules,
+// rooms, NPCs, towns, quests, and factions onto the Vale, and drops new sites
+// onto the Vale's regional map that lead into the folded content. IDs are
+// already disjoint between campaigns (only `venue_gate` is renamed per town);
+// the opening-quest flag is stripped in the folded module so the Vale's own
+// "Missing Shipment" stays the sole starter and the others are discovered on
+// arrival.
+function foldCampaign(into: Context, content: Context, sites: MapSite[], dropRooms: string[] = []) {
+  const intoCamp = into.campaign!;
+  const fromCamp = content.campaign!;
+  const lootIds = new Set(into.lootTable.map((i) => i.id));
+  into.enemyTemplates.push(...content.enemyTemplates);
+  into.lootTable.push(...content.lootTable.filter((i) => !lootIds.has(i.id)));
+  (into.npcTemplates ??= []).push(...(content.npcTemplates ?? []));
+  (into.rules ??= []).push(...(content.rules ?? []));
+  const drop = new Set(dropRooms);
+  intoCamp.rooms.push(...fromCamp.rooms.filter((r) => !drop.has(r.id)));
+  intoCamp.npcs = { ...(intoCamp.npcs ?? {}), ...(fromCamp.npcs ?? {}) };
+  // Per-room enemy + loot placement maps (keyed by room id, disjoint across
+  // campaigns) — generateSeed reads these to populate the run seed.
+  intoCamp.enemies = { ...(intoCamp.enemies ?? {}), ...(fromCamp.enemies ?? {}) };
+  intoCamp.loot = { ...(intoCamp.loot ?? {}), ...(fromCamp.loot ?? {}) };
+  (intoCamp.towns ??= []).push(...(fromCamp.towns ?? []));
+  (intoCamp.quests ??= []).push(...(fromCamp.quests ?? []));
+  (intoCamp.factions ??= []).push(...(fromCamp.factions ?? []));
+  const region = intoCamp.regions![0];
+  region.sites.push(...sites);
+  region.encounterTable = [
+    ...(region.encounterTable ?? []),
+    ...(fromCamp.regions?.[0]?.encounterTable ?? []),
+  ];
+}
+
+// Whispering Pines — three new sites on the Vale's 12×8 regional map (clear of
+// the obstacles {6,6},{7,6} and the existing Vale sites). The town opens the
+// Pines village; the local sites drop into the frozen pass and the Iceshard
+// Spire. The old WP `pines_square` start-frame room is unreachable here.
+foldCampaign(
+  context,
+  whisperingPinesContent,
+  [
+    {
+      id: 'site_pines',
+      name: 'Whispering Pines',
+      pos: { x: 2, y: 6 },
+      kind: 'town',
+      townId: 'pines_village',
+    },
+    {
+      id: 'site_pass',
+      name: 'The Frozen Pass',
+      pos: { x: 8, y: 4 },
+      kind: 'local',
+      entryRoomId: 'pass_climb',
+    },
+    {
+      id: 'site_spire',
+      name: 'Iceshard Spire',
+      pos: { x: 11, y: 2 },
+      kind: 'local',
+      entryRoomId: 'spire_entrance',
+    },
+  ],
+  ['pines_square']
+);
+
+export { context };

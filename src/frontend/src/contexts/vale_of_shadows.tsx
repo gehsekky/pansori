@@ -164,6 +164,12 @@ export const context: FrontendContext = {
     moonstone_amulet: '🌙',
     guild_ledger: '📜',
     shadow_evidence: '✉',
+    // Folded-in Whispering Pines items.
+    warhammer: '🔨',
+    fur_cloak: '🧥',
+    elixir_of_warmth: '🍶',
+    halden_locket: '📿',
+    cult_idol: '🗿',
   },
 
   itemDescs: {
@@ -190,6 +196,12 @@ export const context: FrontendContext = {
     moonstone_amulet: '+1 to WIS saves while attuned',
     guild_ledger: 'A waterlogged ledger bearing the Guild stamp',
     shadow_evidence: "An incriminating letter with the Captain's seal",
+    // Folded-in Whispering Pines items.
+    warhammer: '1d8 bludgeoning (1d10 two-handed), versatile',
+    fur_cloak: 'A thick bearskin cloak — warm enough to ride the pass at night',
+    elixir_of_warmth: 'Mulled spirits — restores 1d4+2 HP',
+    halden_locket: "A trapper's silver locket — proof of his fate",
+    cult_idol: 'Black ironwood carved with a cult rune',
   },
 
   // No per-room art assets shipped yet for Vale. RoomArtPanel will render

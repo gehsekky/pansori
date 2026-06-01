@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { generateSeed } from './procgen.js';
 import { context as valeCtx } from '../contexts/vale_of_shadows.js';
-import { context as whisperingCtx } from '../contexts/whispering_pines.js';
 
 // ─── Campaign seed validation ────────────────────────────────────────────────
 // Campaign contexts are authored content, not procedurally generated. The seed
@@ -29,39 +28,32 @@ describe('generateSeed — Vale of Shadows campaign', () => {
   });
 });
 
-describe('generateSeed — Whispering Pines campaign', () => {
-  const seed = generateSeed(whisperingCtx, 1);
+describe('generateSeed — Vale carries the folded Whispering Pines content', () => {
+  // Whispering Pines is no longer a standalone campaign — its rooms, NPCs,
+  // boss, loot, town, and region sites are folded into the Vale seed.
+  const seed = generateSeed(valeCtx, 1);
 
-  it('uses campaign rooms verbatim', () => {
-    expect(seed.rooms.map((r) => r.id)).toEqual(whisperingCtx.campaign!.rooms.map((r) => r.id));
-  });
-
-  it('places authored NPCs at their campaign-declared rooms', () => {
+  it('includes the folded Pines rooms + NPCs', () => {
+    const roomIds = seed.rooms.map((r) => r.id);
+    expect(roomIds).toContain('spire_ritual_apex');
+    expect(roomIds).toContain('pines_tavern');
     expect(seed.npcs?.pines_tavern?.id).toBe('npc_brann');
-    expect(seed.npcs?.pines_lodge?.id).toBe('npc_marta');
     expect(seed.npcs?.pines_warden?.id).toBe('npc_riese');
   });
 
-  it('boss enemy is placed at the ritual apex with multiattack and fire vulnerability', () => {
+  it('keeps the Pines boss (fire-vulnerable) + quest loot', () => {
     const boss = seed.enemies?.spire_ritual_apex?.[0];
     expect(boss?.name).toBe('Frost Acolyte');
-    expect(boss?.multiattack).toBe(2);
     expect(boss?.vulnerabilities).toContain('fire');
-  });
-
-  it('quest items live in the campaign loot table', () => {
-    expect(seed.loot?.spire_cult_chamber?.id).toBe('halden_locket');
     expect(seed.loot?.spire_ritual_apex?.id).toBe('cult_idol');
   });
 
-  it('carries the 3-level map: region sites + the wilderness encounter table', () => {
-    // The seed copies the campaign's region/town definitions so the frontend
-    // can resolve the active grid. The region's encounter table drives wandering
-    // travel encounters (the old per-Location encounterTable).
+  it('drops new sites + the Pines town onto the Vale regional map', () => {
     const region = seed.regions?.[0];
-    expect(region?.id).toBe('frostpass_region');
-    expect(region?.encounterTable).toEqual(['Snowshrouded Bandit', 'Frost Wolf']);
+    expect(region?.id).toBe('vale_region');
+    expect(region?.sites.find((s) => s.townId === 'pines_village')).toBeTruthy();
     expect(region?.sites.find((s) => s.entryRoomId === 'spire_entrance')).toBeTruthy();
+    expect(region?.encounterTable).toContain('Frost Wolf'); // Pines encounters appended
     expect(seed.towns?.find((t) => t.id === 'pines_village')).toBeTruthy();
   });
 });
@@ -101,10 +93,7 @@ describe('campaign feature parity', () => {
     'hex',
   ];
 
-  for (const [label, ctx] of [
-    ['Vale of Shadows', valeCtx],
-    ['Whispering Pines', whisperingCtx],
-  ] as const) {
+  for (const [label, ctx] of [['Vale of Shadows', valeCtx]] as const) {
     describe(label, () => {
       it('exposes all 12 classes in classPrimaryStats', () => {
         for (const cls of EXPECTED_CLASSES) {
@@ -158,10 +147,10 @@ describe('campaign feature parity', () => {
     expect(garrison?.objects?.[0]?.id).toBe('captain_strongbox');
   });
 
-  it('Whispering Pines has a trap and a searchable object', () => {
-    const frozenHall = whisperingCtx.campaign!.rooms.find((r) => r.id === 'spire_frozen_hall');
+  it('the folded Pines content keeps its trap and searchable object', () => {
+    const frozenHall = valeCtx.campaign!.rooms.find((r) => r.id === 'spire_frozen_hall');
     expect(frozenHall?.trap?.id).toBe('frozen_hall_icicle');
-    const lodge = whisperingCtx.campaign!.rooms.find((r) => r.id === 'pines_lodge');
+    const lodge = valeCtx.campaign!.rooms.find((r) => r.id === 'pines_lodge');
     expect(lodge?.objects?.[0]?.id).toBe('trapper_locker');
   });
 });

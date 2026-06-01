@@ -11,7 +11,6 @@ import { describe, expect, it } from 'vitest';
 import { context as grove } from '../grove_of_thorns.js';
 import { context as sandbox } from '../sandbox.js';
 import { context as vale } from '../vale_of_shadows.js';
-import { context as whispering } from '../whispering_pines.js';
 
 // Mechanical fields that must be identical across every campaign.
 const MECHANICAL = [
@@ -60,7 +59,6 @@ describe('no drift — shipped contexts share the canonical background mechanics
   const contexts = [
     ['sandbox', sandbox],
     ['vale_of_shadows', vale],
-    ['whispering_pines', whispering],
     ['grove_of_thorns', grove],
   ] as const;
 
