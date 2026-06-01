@@ -886,6 +886,9 @@ export default function App() {
                             <GridMapView
                               grid={grid}
                               markerPos={gameState.marker_pos}
+                              // A surfaced Attack choice means a hostile is here
+                              // pre-combat — show the red enemy marker.
+                              enemyPresent={choices.some((c) => c.kind === 'attack')}
                               onMarkerMove={(to) =>
                                 handleChoice({
                                   label: `Travel to (${to.x},${to.y})`,

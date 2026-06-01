@@ -11,6 +11,11 @@ const CHECKER_TINT = 'linear-gradient(rgba(127, 127, 127, 0.16), rgba(127, 127, 
 interface Props {
   grid: ActiveGrid;
   markerPos: GridPos;
+  // A hostile is present in the current location but combat hasn't started.
+  // Out of combat an enemy has no real grid position, so we surface a SINGLE
+  // red marker near the party (mirroring the single party marker) — otherwise
+  // an "Attack" option appears with nothing on the map to explain it.
+  enemyPresent?: boolean;
   // Click-to-move: the parent dispatches a single `marker_move` action for the
   // clicked cell. The backend free-pathfinds out of combat (no movement budget)
   // and resolves any transition (site / venue / room exit / ascend) on arrival.
@@ -32,6 +37,47 @@ const TRANSITION_GLYPH: Record<MapTransition['kind'], string> = {
   ascend: '⤴', // leave the site / town back up a level
 };
 
+// Out of combat an enemy carries no grid position (positions are assigned only
+// when combat deploys tokens). Pick a single cell near the party for the red
+// "enemy here" marker: the first valid cell from a ring around the party
+// (in-bounds, not the party, not an obstacle/transition), falling back to any
+// in-bounds non-party cell on a cramped grid.
+function nearbyEnemyCell(
+  grid: ActiveGrid,
+  marker: GridPos,
+  obstacles: Set<string>,
+  transitions: Map<string, MapTransition>
+): GridPos {
+  const ring = [
+    { x: 2, y: 0 },
+    { x: 0, y: 2 },
+    { x: -2, y: 0 },
+    { x: 0, y: -2 },
+    { x: 1, y: 1 },
+    { x: -1, y: 1 },
+    { x: 1, y: -1 },
+    { x: -1, y: -1 },
+    { x: 1, y: 0 },
+    { x: 0, y: 1 },
+    { x: -1, y: 0 },
+    { x: 0, y: -1 },
+  ];
+  for (const d of ring) {
+    const x = marker.x + d.x;
+    const y = marker.y + d.y;
+    if (x < 0 || y < 0 || x >= grid.width || y >= grid.height) continue;
+    const k = `${x},${y}`;
+    if (obstacles.has(k) || transitions.has(k)) continue;
+    return { x, y };
+  }
+  for (let y = 0; y < grid.height; y++) {
+    for (let x = 0; x < grid.width; x++) {
+      if (x !== marker.x || y !== marker.y) return { x, y };
+    }
+  }
+  return marker; // degenerate 1×1 grid
+}
+
 function scaleLabel(feetPerSquare: number): string {
   if (feetPerSquare % 5280 === 0) {
     const mi = feetPerSquare / 5280;
@@ -47,16 +93,22 @@ function scaleLabel(feetPerSquare: number): string {
  * to travel to, and obstacles. (Local combat switches to GridCombatView, which
  * deploys the party into PC tokens.)
  */
-function GridMapView({ grid, markerPos, onMarkerMove }: Props) {
+function GridMapView({ grid, markerPos, enemyPresent, onMarkerMove }: Props) {
   const obstacleSet = new Set(grid.obstacles.map((o) => `${o.x},${o.y}`));
   const transitionAt = new Map<string, MapTransition>();
   for (const t of grid.transitions) transitionAt.set(`${t.pos.x},${t.pos.y}`, t);
+
+  // Single red enemy marker near the party when a hostile is present out of combat.
+  const enemyCell = enemyPresent
+    ? nearbyEnemyCell(grid, markerPos, obstacleSet, transitionAt)
+    : null;
 
   const cells: React.ReactNode[] = [];
   for (let y = 0; y < grid.height; y++) {
     for (let x = 0; x < grid.width; x++) {
       const key = `${x},${y}`;
       const isMarker = markerPos.x === x && markerPos.y === y;
+      const isEnemyMarker = !!enemyCell && enemyCell.x === x && enemyCell.y === y && !isMarker;
       const isObstacle = obstacleSet.has(key);
       const transition = transitionAt.get(key);
       // Out of combat the party moves freely (the backend pathfinds), so every
@@ -76,6 +128,7 @@ function GridMapView({ grid, markerPos, onMarkerMove }: Props) {
 
       const ariaParts: string[] = [`${x},${y}`];
       if (isMarker) ariaParts.push('the party');
+      if (isEnemyMarker) ariaParts.push('an enemy');
       if (isObstacle) ariaParts.push('impassable');
       if (transition) ariaParts.push(transition.label);
 
@@ -84,6 +137,12 @@ function GridMapView({ grid, markerPos, onMarkerMove }: Props) {
         token = (
           <span className={styles.gridToken} style={{ background: 'rgba(70, 140, 220, 0.9)' }}>
             <span className={styles.gridTokenLetter}>@</span>
+          </span>
+        );
+      } else if (isEnemyMarker) {
+        token = (
+          <span className={styles.gridToken} style={{ background: 'rgba(220, 70, 70, 0.9)' }}>
+            <span className={styles.gridTokenLetter}>!</span>
           </span>
         );
       } else if (transition) {
@@ -149,6 +208,11 @@ function GridMapView({ grid, markerPos, onMarkerMove }: Props) {
         <span>
           <span className={styles.gridLegendPC} /> party
         </span>
+        {enemyCell && (
+          <span>
+            <span className={styles.gridLegendEnemy} /> enemy
+          </span>
+        )}
         {grid.transitions.length > 0 && (
           <span>
             <span className={styles.gridLegendTransition} /> travel point (click to go)

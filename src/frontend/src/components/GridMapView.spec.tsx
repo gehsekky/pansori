@@ -57,6 +57,21 @@ describe('GridMapView', () => {
     expect(onMarkerMove).not.toHaveBeenCalled();
   });
 
+  it('shows a single red enemy marker near the party when an enemy is present', () => {
+    const { container, getByText, rerender } = render(
+      <GridMapView grid={grid} markerPos={{ x: 0, y: 0 }} enemyPresent />
+    );
+    const enemyCells = container.querySelectorAll('[aria-label*="an enemy"]');
+    expect(enemyCells.length).toBe(1); // exactly one red marker
+    expect(getByText('enemy')).toBeTruthy(); // legend entry
+    // It is not on the party's own cell.
+    expect(cell(container, 0, 0).getAttribute('aria-label')).not.toContain('an enemy');
+
+    // No enemy present → no marker, no legend entry.
+    rerender(<GridMapView grid={grid} markerPos={{ x: 0, y: 0 }} />);
+    expect(container.querySelectorAll('[aria-label*="an enemy"]').length).toBe(0);
+  });
+
   it('checkerboards plain cells so adjacent squares are distinguishable', () => {
     const { container } = render(<GridMapView grid={grid} markerPos={{ x: 0, y: 0 }} />);
     // (1,0) is an even square (x+y=1 → odd index gets the tint; 2,0 even).
