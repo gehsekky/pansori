@@ -72,6 +72,12 @@ export const handleGridMove: ActionHandler<{
 
   const gridW = ctx.context.gridWidth ?? 10;
   const gridH = ctx.context.gridHeight ?? 10;
+  // SRD Mounted Combat — a controlled mount moves on its rider's turn, carrying
+  // the rider with it. The pair shares a square, so the mount never blocks the
+  // rider's path, and the mount's Speed (not the rider's) sets the budget.
+  const mountEnt = charEntity.mount_id
+    ? ctx.st.entities.find((e) => e.id === charEntity.mount_id && e.hp > 0)
+    : undefined;
   // Dead entities don't block — walking over a corpse is allowed (matches
   // the FE's isReachable). Static obstacles (columns, walls, debris) do.
   const currentRoomForMove = ctx.seed.rooms.find((r) => r.id === ctx.roomId);
@@ -91,7 +97,9 @@ export const handleGridMove: ActionHandler<{
   // (Wall of Fire) don't set blocksMovement, so they aren't here.
   const wallMoveCells = wallObstacleCells(ctx.st, ctx.roomId, 'movement');
   const blocked = [
-    ...ctx.st.entities.filter((e) => e.id !== char.id && e.hp > 0).map((e) => e.pos),
+    ...ctx.st.entities
+      .filter((e) => e.id !== char.id && e.id !== mountEnt?.id && e.hp > 0)
+      .map((e) => e.pos),
     ...(isFlying ? [] : roomObstacles),
     ...wallMoveCells,
   ];
@@ -135,7 +143,14 @@ export const handleGridMove: ActionHandler<{
   // Use the larger of walking or flying speed as the movement budget
   // when flying — RAW the creature picks which mode per turn but
   // pansori models a single combined move per action.
-  const speedFt = isFlying ? Math.max(walkSpeedFt, flySpeedFt) : walkSpeedFt;
+  // While mounted, the mount's Speed is the movement budget (SRD: the mount
+  // moves as you direct it). Falls back to the rider's own speed if the mount
+  // carries none.
+  const speedFt = mountEnt
+    ? (mountEnt.speed_ft ?? walkSpeedFt)
+    : isFlying
+      ? Math.max(walkSpeedFt, flySpeedFt)
+      : walkSpeedFt;
   const usedFt = ctx.st.movement_used?.[char.id] ?? 0;
   if (usedFt + costFeet > speedFt) {
     const reasons: string[] = [];
@@ -181,10 +196,14 @@ export const handleGridMove: ActionHandler<{
 
   nextSt = {
     ...nextSt,
-    entities: (nextSt.entities ?? []).map((e) => (e.id === char.id ? { ...e, pos: action.to } : e)),
+    // The rider moves; a ridden mount moves with them to the same square.
+    entities: (nextSt.entities ?? []).map((e) =>
+      e.id === char.id || e.id === mountEnt?.id ? { ...e, pos: action.to } : e
+    ),
     movement_used: { ...nextSt.movement_used, [char.id]: usedFt + costFeet },
   };
   updatePcActor(ctx, nextChar);
   ctx.st = nextSt;
-  ctx.narrative = `${nextChar.name} moves to (${action.to.x}, ${action.to.y}).${oaNarrative}`;
+  const moveVerb = mountEnt ? `rides ${mountEnt.companionName ?? 'their mount'} to` : 'moves to';
+  ctx.narrative = `${nextChar.name} ${moveVerb} (${action.to.x}, ${action.to.y}).${oaNarrative}`;
 };

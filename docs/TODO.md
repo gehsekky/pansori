@@ -613,8 +613,19 @@ options }`** → `OptionPickerDialog` (single-select; re-sends `action[param]`).
 
 ### Combat / exploration subsystems (bounded) — RE-4
 
-- [ ] **Mounted combat** — `mount_id` exists but isn't enforced (forced
-      dismount on damage, reach, ranged-while-mounted rules).
+- [x] **Mounted combat** — shipped (`mount.spec.ts`). From scratch (there was
+      no `mount_id` despite the old note). `CombatEntity` gained
+      `mount_id`/`rider_id`/`speed_ft`; **Phantom Steed** now spawns a rideable
+      mount onto `summoned_allies` and combat start auto-mounts the caster
+      (shared square). `mount`/`dismount` actions cost half the rider's Speed;
+      a controlled mount shares the rider's space + turn (no independent turn —
+      `runEnemyTurns` skips a ridden mount) and the rider's `grid_move` carries
+      the mount along on the mount's Speed budget. SRD "falling off" DC 10 DEX
+      save (`checkMountFallOff`) fires when a rider/mount is knocked prone
+      (wired at the Shove site); Mount/Dismount surface in `generateChoices`.
+      Deferred: mount-death auto-dismount, force-move-triggered fall-off beyond
+      Shove, and ranged-while-mounted nuance (no live trigger yet — the player
+      is the only rider).
 - [ ] **Underwater combat** — non-piercing melee disadvantage, ranged
       rules, fire resistance.
 - [ ] **High Jump / verticality** — Long Jump shipped; High Jump is

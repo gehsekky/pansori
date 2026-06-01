@@ -42,11 +42,23 @@ export function runSummonSpell(
     // Non-combatant flag lives on the base summon (Find Familiar), so it applies
     // to every chosen form/variant.
     noAttack: base.noAttack,
+    // SRD Mounted Combat — a rideable mount (Phantom Steed) carries its mount
+    // flag + Speed so combat start auto-mounts the caster.
+    isMount: base.isMount,
+    speed: base.speed,
   }));
   ctx.st = {
     ...ctx.st,
     summoned_allies: [...(ctx.st.summoned_allies ?? []), ...raised],
   };
+  // Mounts read differently from a war-band of summons: you conjure one steed
+  // and ride it into the next fight.
+  if (base.isMount) {
+    ctx.narrative =
+      (ctx.narrative ?? '') +
+      `${char.name} casts ${spell.name}${slotNote} — a ${chosen.name} takes shape, ready to bear its rider into the next battle.`;
+    return true;
+  }
   const crew = count === 1 ? `a ${chosen.name}` : `${count} ${chosen.name}s`;
   ctx.narrative =
     (ctx.narrative ?? '') +

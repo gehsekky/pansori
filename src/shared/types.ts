@@ -217,6 +217,15 @@ export interface CombatEntity {
   // that enemy lives, else fall back to the AI-default nearest enemy. Set by
   // the owner's `command_summon` bonus action. (RE-1 Phase 4.5.)
   commanded_target_id?: string;
+  // SRD 5.2.1 Mounted Combat — a rider/mount pair binds these two ids: the
+  // rider entity carries `mount_id` (the creature it rides), and the mount
+  // entity carries `rider_id` (its rider). A ridden controlled mount shares
+  // the rider's space (same `pos`) and gets no independent turn — it moves on
+  // the rider's turn. `speed_ft` is the mount's own Speed, used as the rider's
+  // movement budget while mounted (Phantom Steed = 100 ft).
+  mount_id?: string;
+  rider_id?: string;
+  speed_ft?: number;
   // SRD 5.2.1 — when grappled, records the id of the grappler so we can end the
   // condition if the grappler dies/is incapacitated, and so the contested escape
   // check has a target's mod to roll against.
@@ -458,6 +467,10 @@ export type StructuredAction =
   // (Rogues also get it as a Bonus Action via Cunning Action).
   | { type: 'hide' }
   | { type: 'grid_move'; entityId: string; to: GridPos }
+  // SRD 5.2.1 Mounted Combat — climb onto a willing mount within 5 ft, or get
+  // off the one you're riding. Each costs half your Speed of movement.
+  | { type: 'mount'; mountId: string }
+  | { type: 'dismount' }
   // RE-4 — reposition a persistent damage zone (Flaming Sphere roll, Moonbeam /
   // Call Lightning re-aim) onto a cell within the spell's move range.
   | { type: 'move_zone'; zoneId: string; to: GridPos }
@@ -595,6 +608,8 @@ export type ChoiceKind =
   | 'attack'
   | 'grapple'
   | 'shove'
+  // SRD 5.2.1 Mounted Combat — Mount / Dismount movement options.
+  | 'mount'
   | 'two_weapon_attack'
   | 'use_lands_aid'
   | 'cast_spell'

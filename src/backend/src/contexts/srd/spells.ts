@@ -3657,6 +3657,20 @@ export const SRD_SPELLS: Record<string, Spell> = {
     desc: 'You conjure a quasi-real, horse-like steed that serves as a tireless mount for up to 1 hour, carrying its rider at a steady, swift pace.',
     narrative: '{name} calls up a steed of grey mist — it stamps once, solid enough to ride.',
     spellList: ['arcane'],
+    // SRD Phantom Steed — "functions as a controlled mount while you ride it."
+    // A swift (100 ft Speed) non-combatant; the caster is auto-mounted when the
+    // next battle starts. AC/HP are nominal (a hit dispels it; mount-death
+    // fall-off is a follow-up). noAttack — a steed bears its rider, it doesn't fight.
+    summon: {
+      name: 'Phantom Steed',
+      ac: 11,
+      maxHp: 1,
+      toHit: 0,
+      damage: '0',
+      noAttack: true,
+      isMount: true,
+      speed: 100,
+    },
   },
   find_traps: {
     id: 'find_traps',

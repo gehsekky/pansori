@@ -110,6 +110,11 @@ export const ACTION_COSTS: Record<StructuredAction['type'], ActionCost> = {
   two_weapon_attack: 'managed',
   use_lands_aid: 'managed',
   grid_move: 'managed',
+  // SRD Mounted Combat — mounting/dismounting costs half your Speed of
+  // movement, deducted from movement_used inside the handlers, so the action
+  // economy is self-managed (no action/bonus-action spend).
+  mount: 'managed',
+  dismount: 'managed',
   // RE-4 — move_zone self-manages its cost (bonus action OR action per the
   // spell's zoneMoveCost), so the dispatcher leaves the economy to the handler.
   move_zone: 'managed',

@@ -812,6 +812,11 @@ export interface Spell {
     // action). Threaded to every raised ally + the grid entity; `runAllyTurn`
     // then takes the Help action instead of attacking.
     noAttack?: boolean;
+    // SRD 5.2.1 Mounted Combat — the summon is a rideable mount (Phantom
+    // Steed). Carried onto the SummonedAlly so combat start auto-mounts the
+    // caster; `speed` is the mount's Speed (ft).
+    isMount?: boolean;
+    speed?: number;
   };
   // Long casting time (1 min+) — rejected in combat (before slot spend).
   outOfCombatOnly?: boolean;
@@ -1277,6 +1282,11 @@ export interface SummonedAlly {
   // Carried onto `CombatEntity.noAttack` by `seedSummonedAllies`; `runAllyTurn`
   // takes the Help action instead of attacking.
   noAttack?: boolean;
+  // SRD 5.2.1 Mounted Combat — this ally is a rideable mount (Phantom Steed).
+  // `seedSummonedAllies` auto-mounts its owner at combat start; `speed` is the
+  // mount's Speed (ft), carried onto the entity's `speed_ft`.
+  isMount?: boolean;
+  speed?: number;
 }
 
 // SRD wall/terrain spells (Wall of Fire, Wall of Force) — a transient set of

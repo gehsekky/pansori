@@ -44,6 +44,7 @@ import {
   handleSpendInspiration,
   handleStandUp,
 } from './combatUtility.js';
+import { handleDismount, handleMount } from './mount.js';
 import { handleGrapple, handleShove, handleTryEscapeGrapple } from './combatTactical.js';
 import { handleLongRest, handleShortRest } from './rest.js';
 import { handleResolveReaction, handleUseReaction } from './reaction.js';
@@ -144,6 +145,8 @@ const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   two_weapon_attack: handleTwoWeaponAttack as ActionHandler,
   use_lands_aid: handleLandsAid as ActionHandler,
   grid_move: handleGridMove as ActionHandler,
+  mount: handleMount as ActionHandler,
+  dismount: handleDismount as ActionHandler,
   jump: handleJump as ActionHandler,
   resolve_reaction: handleResolveReaction as ActionHandler,
   attack: handleAttack as ActionHandler,

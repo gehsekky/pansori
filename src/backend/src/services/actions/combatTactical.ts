@@ -6,6 +6,7 @@ import {
   hasReliableTalent,
 } from '../multiclass.js';
 import type { ActionHandler } from './types.js';
+import { checkMountFallOff } from './mount.js';
 import { composeNow } from '../narrative/compose.js';
 import { distanceFeet } from '../gridEngine.js';
 import { getEnemyById } from '../gameEngine.js';
@@ -256,6 +257,11 @@ export const handleShove: ActionHandler<{
       source: 'Shove',
       prose: `You shove the ${target.name} to the ground! (${playerRoll} vs ${enemyRoll}) They are PRONE — melee attacks against them have advantage, ranged attacks have disadvantage.`,
     });
+    // SRD Mounted Combat — if the shoved creature was a mount, its rider must
+    // make a DC 10 DEX save or fall off (no-op for an unmounted target).
+    const fallOff = checkMountFallOff(ctx.st, target.id);
+    ctx.st = fallOff.st;
+    if (fallOff.narrative) ctx.narrative = (ctx.narrative ?? '') + fallOff.narrative;
   } else {
     ctx.narrative = `The ${target.name} resists your shove. (${playerRoll} vs ${enemyRoll})`;
   }

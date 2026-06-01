@@ -5682,6 +5682,36 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     }
   }
 
+  // SRD Mounted Combat — Mount a willing ally mount within 5 ft, or Dismount
+  // the one you ride. Each costs half your Speed of movement. A rideable mount
+  // is an ally entity carrying a `speed_ft` (set for Phantom Steed at spawn).
+  if (state.combat_active && state.entities) {
+    const riderEnt = state.entities.find((e) => e.id === char.id);
+    const speedFt = effectiveSpeed(char, context.lootTable);
+    const moveCost = Math.floor(speedFt / 2);
+    const usedFt = (state.movement_used ?? {})[char.id] ?? 0;
+    const canAfford = speedFt - usedFt >= moveCost;
+    if (riderEnt?.mount_id) {
+      choices.push({
+        label: `Dismount — climb down (costs ${moveCost} ft of movement)`,
+        action: { type: 'dismount' },
+        kind: 'mount',
+      });
+    } else if (riderEnt && canAfford) {
+      for (const m of state.entities) {
+        if (m.isEnemy || m.hp <= 0 || m.rider_id || m.speed_ft === undefined) continue;
+        const adjacent =
+          Math.max(Math.abs(m.pos.x - riderEnt.pos.x), Math.abs(m.pos.y - riderEnt.pos.y)) <= 1;
+        if (!adjacent) continue;
+        choices.push({
+          label: `Mount ${m.companionName ?? 'the steed'} (costs ${moveCost} ft of movement)`,
+          action: { type: 'mount', mountId: m.id },
+          kind: 'mount',
+        });
+      }
+    }
+  }
+
   // Grapple/Shove choices — one per living enemy
   if (enemyAlive && !char.turn_actions.action_used) {
     const nameCounts = livingEnemies.reduce<Record<string, number>>((acc, e) => {
@@ -7613,7 +7643,14 @@ export function seedSummonedAllies(st: GameState): GameState {
     if (!owner) continue; // owner dead / not in this party → summon doesn't appear
     if (next.entities?.some((e) => e.id === summon.id)) continue; // already on the grid
     const ownerEnt = next.entities?.find((e) => e.id === summon.ownerId);
-    const pos = ownerEnt ? { x: ownerEnt.pos.x, y: ownerEnt.pos.y + 1 } : { x: 1, y: 2 };
+    // SRD Mounted Combat — a mount shares its rider's space; everything else
+    // tucks in just behind the owner.
+    const pos =
+      ownerEnt && summon.isMount
+        ? { x: ownerEnt.pos.x, y: ownerEnt.pos.y }
+        : ownerEnt
+          ? { x: ownerEnt.pos.x, y: ownerEnt.pos.y + 1 }
+          : { x: 1, y: 2 };
     const ally: CombatEntity = {
       id: summon.id,
       isEnemy: false,
@@ -7630,11 +7667,23 @@ export function seedSummonedAllies(st: GameState): GameState {
       summoned_by: summon.ownerId,
       summon_concentration: false,
       noAttack: summon.noAttack,
+      // SRD Mounted Combat — auto-mount: bind the steed to its owner. The
+      // rider's `mount_id` is stamped below (the owner entity already exists).
+      ...(summon.isMount ? { rider_id: summon.ownerId, speed_ft: summon.speed ?? 60 } : {}),
     };
     next = addAllyCombatant(next, ally, {
       afterId: summon.ownerId,
       initiativeRoll: owner.initiative_roll ?? 0,
     });
+    // Complete the rider→mount binding on the owner entity.
+    if (summon.isMount) {
+      next = {
+        ...next,
+        entities: (next.entities ?? []).map((e) =>
+          e.id === summon.ownerId ? { ...e, mount_id: summon.id } : e
+        ),
+      };
+    }
   }
   return next;
 }
@@ -7928,6 +7977,16 @@ export async function runEnemyTurns(args: {
     // this initiative entry is a living side:'ally' entity. Delegated to
     // `runAllyTurn`; the loop only owns the turn header + advance.
     const allyEnt = st.entities?.find((e) => e.id === eEntry.id);
+    // SRD Mounted Combat — a controlled mount that's currently ridden gets no
+    // independent turn; it moves on its rider's turn (handled in grid_move).
+    if (allyEnt && allyEnt.rider_id) {
+      resumeMi = 0;
+      const prevAdvIdxMount = advIdx;
+      advIdx = (advIdx + 1) % orderLen;
+      if (advIdx === 0 && prevAdvIdxMount !== 0) roundWrapped = true;
+      if (advIdx === args.initialCurrentIdx) break;
+      continue;
+    }
     if (allyEnt && entitySide(allyEnt) === 'ally' && allyEnt.hp > 0) {
       const allyTurn = runAllyTurn({
         allyEnt,
