@@ -31,11 +31,25 @@ const LEVEL_LABEL: Record<ActiveGrid['level'], string> = {
 // A short glyph per transition kind so the cell reads at a glance; the full
 // label rides in the title / aria-label.
 const TRANSITION_GLYPH: Record<MapTransition['kind'], string> = {
-  site: '◈', // a place on the regional map (town or local site)
+  site: '◈', // a local site / point of interest on the regional map (overridden for towns)
   venue: '⌂', // a building interior in a town
   room_exit: '⇲', // a passage to another local room
   ascend: '⤴', // leave the site / town back up a level
 };
+
+// A region "site" cell is either a town (carries `toTownId`) or a local point
+// of interest (a ruin, road, grove). Towns read as a settlement (⌂), local
+// sites as a place-marker (◈) — so the overland map distinguishes "a town you
+// can enter" from "a spot something happens".
+function transitionGlyph(t: MapTransition): string {
+  if (t.kind === 'site') return t.toTownId ? '⌂' : '◈';
+  return TRANSITION_GLYPH[t.kind];
+}
+
+// Destinations (towns, local sites, town venues) get an always-visible name
+// caption; the dense room-to-room exits/ascents stay glyph-only (their labels
+// ride in the tooltip) so local rooms don't get crowded.
+const LABELLED_KINDS = new Set<MapTransition['kind']>(['site', 'venue']);
 
 // Out of combat an enemy carries no grid position (positions are assigned only
 // when combat deploys tokens). Pick a single cell near the party for the red
@@ -103,6 +117,12 @@ function GridMapView({ grid, markerPos, enemyPresent, onMarkerMove }: Props) {
     ? nearbyEnemyCell(grid, markerPos, obstacleSet, transitionAt)
     : null;
 
+  // Legend composition — only show swatches for things actually on this grid.
+  const isRegionalGrid = grid.level === 'regional';
+  const hasTown = grid.transitions.some((t) => t.kind === 'site' && t.toTownId);
+  const hasLocalSite = grid.transitions.some((t) => t.kind === 'site' && !t.toTownId);
+  const hasOtherTransition = grid.transitions.some((t) => t.kind !== 'site');
+
   const cells: React.ReactNode[] = [];
   for (let y = 0; y < grid.height; y++) {
     for (let x = 0; x < grid.width; x++) {
@@ -122,8 +142,12 @@ function GridMapView({ grid, markerPos, enemyPresent, onMarkerMove }: Props) {
       // is a theme-agnostic grey overlay composited over the page background,
       // so it works on light and dark themes alike.
       const dark = (x + y) % 2 === 1;
+      // At regional scale impassable cells are mountains/ridges; closer in
+      // (town / local) they're walls + debris. Tint them differently so the
+      // overland map reads as terrain, not dungeon scenery.
+      const isRegional = grid.level === 'regional';
       let cellBg = dark ? `${CHECKER_TINT}, var(--t-bg)` : 'var(--t-bg)';
-      if (isObstacle) cellBg = 'rgba(90, 85, 70, 0.7)';
+      if (isObstacle) cellBg = isRegional ? 'rgba(95, 88, 70, 0.85)' : 'rgba(90, 85, 70, 0.7)';
       else if (transition) cellBg = 'rgba(150, 120, 60, 0.35)';
 
       const ariaParts: string[] = [`${x},${y}`];
@@ -145,20 +169,38 @@ function GridMapView({ grid, markerPos, enemyPresent, onMarkerMove }: Props) {
             <span className={styles.gridTokenLetter}>!</span>
           </span>
         );
+      } else if (isObstacle && isRegional) {
+        // Regional impassable terrain reads as a mountain peak.
+        token = (
+          <span className={styles.gridMapObstacleGlyph} aria-hidden="true">
+            ▲
+          </span>
+        );
       } else if (transition) {
         token = (
-          <span className={styles.gridMapGlyph} aria-hidden="true">
-            {TRANSITION_GLYPH[transition.kind]}
-          </span>
+          <>
+            <span className={styles.gridMapGlyph} aria-hidden="true">
+              {transitionGlyph(transition)}
+            </span>
+            {LABELLED_KINDS.has(transition.kind) && (
+              <span className={styles.gridMapLabel} aria-hidden="true">
+                {transition.label}
+              </span>
+            )}
+          </>
         );
       }
 
       cells.push(
         <div
           key={key}
-          className={
-            clickable ? `${styles.gridCell} ${styles.gridMapCellClickable}` : styles.gridCell
-          }
+          className={[
+            styles.gridCell,
+            clickable ? styles.gridMapCellClickable : '',
+            isMarker ? styles.gridMapCellCurrent : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
           style={{ background: cellBg, cursor: clickable ? 'pointer' : 'default' }}
           aria-label={ariaParts.join(', ')}
           aria-current={isMarker ? 'location' : undefined}
@@ -213,14 +255,25 @@ function GridMapView({ grid, markerPos, enemyPresent, onMarkerMove }: Props) {
             <span className={styles.gridLegendEnemy} /> enemy
           </span>
         )}
-        {grid.transitions.length > 0 && (
+        {hasTown && (
+          <span>
+            <span className={styles.gridLegendGlyph}>⌂</span> town
+          </span>
+        )}
+        {hasLocalSite && (
+          <span>
+            <span className={styles.gridLegendGlyph}>◈</span> site
+          </span>
+        )}
+        {hasOtherTransition && (
           <span>
             <span className={styles.gridLegendTransition} /> travel point (click to go)
           </span>
         )}
         {grid.obstacles.length > 0 && (
           <span>
-            <span className={styles.gridLegendObstacle} /> impassable
+            <span className={styles.gridLegendObstacle} />{' '}
+            {isRegionalGrid ? 'mountains' : 'impassable'}
           </span>
         )}
       </div>

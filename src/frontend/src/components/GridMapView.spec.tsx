@@ -16,7 +16,10 @@ const grid: ActiveGrid = {
   feetPerSquare: 5280,
   obstacles: [{ x: 2, y: 2 }],
   startPos: { x: 0, y: 0 },
-  transitions: [{ pos: { x: 3, y: 0 }, kind: 'site', label: 'Millhaven', toTownId: 'town1' }],
+  transitions: [
+    { pos: { x: 3, y: 0 }, kind: 'site', label: 'Millhaven', toTownId: 'town1' },
+    { pos: { x: 0, y: 2 }, kind: 'site', label: 'Old Crypt' }, // local site (no toTownId)
+  ],
 };
 
 const cell = (c: HTMLElement, x: number, y: number) =>
@@ -70,6 +73,32 @@ describe('GridMapView', () => {
     // No enemy present → no marker, no legend entry.
     rerender(<GridMapView grid={grid} markerPos={{ x: 0, y: 0 }} />);
     expect(container.querySelectorAll('[aria-label*="an enemy"]').length).toBe(0);
+  });
+
+  it('distinguishes a town (⌂) from a local site (◈) and shows their names', () => {
+    const { container, getByText } = render(<GridMapView grid={grid} markerPos={{ x: 0, y: 0 }} />);
+    // Town cell: house glyph + always-visible name.
+    expect(cell(container, 3, 0).textContent).toContain('⌂');
+    expect(getByText('Millhaven')).toBeTruthy();
+    // Local site cell: diamond glyph + name.
+    expect(cell(container, 0, 2).textContent).toContain('◈');
+    expect(getByText('Old Crypt')).toBeTruthy();
+    // Legend gains town + site entries.
+    expect(getByText('town')).toBeTruthy();
+    expect(getByText('site')).toBeTruthy();
+  });
+
+  it('renders regional impassable terrain as a mountain glyph + a "mountains" legend', () => {
+    const { container, getByText } = render(<GridMapView grid={grid} markerPos={{ x: 0, y: 0 }} />);
+    expect(cell(container, 2, 2).textContent).toContain('▲');
+    expect(getByText('mountains')).toBeTruthy();
+  });
+
+  it('highlights the party current cell with the current-cell class', () => {
+    const { container } = render(<GridMapView grid={grid} markerPos={{ x: 1, y: 1 }} />);
+    const here = cell(container, 1, 1);
+    expect(here.getAttribute('aria-current')).toBe('location');
+    expect(here.className).toMatch(/gridMapCellCurrent/);
   });
 
   it('checkerboards plain cells so adjacent squares are distinguishable', () => {
