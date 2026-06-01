@@ -61,6 +61,7 @@ import {
   mergeCampaignIntoGameState,
   resetCampaignState,
   saveCampaignState,
+  starterQuestProgress,
 } from '../services/campaignEngine.js';
 import { broadcastParticipantChange, broadcastSessionState } from '../services/broadcast.js';
 import { expertiseSlotsForClassLevel, resolveCreationExpertise } from '../services/multiclass.js';
@@ -591,6 +592,9 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
       flags: {},
       npc_attitudes: {},
       npc_talked: [],
+      // The campaign's opening quest(s) start active so the player begins with
+      // direction; every other quest stays hidden from the log until discovered.
+      quest_progress: starterQuestProgress(ctx.campaign?.quests),
     };
 
     // 3-level grid map model — if the campaign defines `regions`, start the party
@@ -598,8 +602,17 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
     // campaigns still on the Location model.
     Object.assign(initialState, initMapState(ctx.campaign, initialState));
 
+    // Announce the opening quest(s) in the intro so the player has immediate
+    // direction (they also appear in the quest log).
+    const starterQuestLine = (ctx.campaign?.quests ?? [])
+      .filter((q) => q.startActive)
+      .map((q) => `\n\n✦ Quest: ${q.title} — ${q.desc}`)
+      .join('');
     const startNarrative =
-      seed.intro + ' ' + buildArrivalNarrative(ctx.startRoomId, initialState, seed, ctx);
+      seed.intro +
+      ' ' +
+      buildArrivalNarrative(ctx.startRoomId, initialState, seed, ctx) +
+      starterQuestLine;
     initialState.run_log = [
       { character_id: leader.id, action: 'start', narrative: startNarrative },
     ];
@@ -634,6 +647,23 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
     // every quest from the prior Vale playthrough already marked done.
     if (ctx.mapType === 'campaign' && ctx.campaign) {
       await resetCampaignState(pool, authedUserId(req), ctx.id);
+      // Seed the fresh persisted campaign state with the opening quest(s) marked
+      // active, matching initialState.quest_progress — so the first action's
+      // quest-step evaluation treats the starter as already-active (rather than
+      // re-running its first step as an auto-accept).
+      const starters = starterQuestProgress(ctx.campaign.quests);
+      if (starters.length) {
+        await saveCampaignState(pool, {
+          campaign_id: ctx.id,
+          user_id: authedUserId(req),
+          world_day: 1,
+          current_location: '',
+          flags: {},
+          quests: starters,
+          faction_rep: {},
+          npc_attitudes: {},
+        });
+      }
     }
     res.json({ session, state: initialState, seed, campaignMeta: campaignMetaFor(ctx) });
   } catch (err) {

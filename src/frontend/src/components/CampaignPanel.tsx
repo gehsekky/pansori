@@ -94,18 +94,27 @@ function sortedQuestsForView(state: GameState, meta: CampaignMeta) {
     completed: 2,
     failed: 3,
   };
-  const sorted = [...meta.quests].sort((a, b) => {
-    const sa = progressById.get(a.id)?.status ?? 'available';
-    const sb = progressById.get(b.id)?.status ?? 'available';
-    return order[sa] - order[sb];
-  });
+  // Only show quests the player has actually discovered — those with a
+  // progress entry (the opening quest starts active; others appear once their
+  // first step fires). Undiscovered quests stay hidden from the log.
+  const sorted = meta.quests
+    .filter((q) => progressById.has(q.id))
+    .sort((a, b) => {
+      const sa = progressById.get(a.id)?.status ?? 'available';
+      const sb = progressById.get(b.id)?.status ?? 'available';
+      return order[sa] - order[sb];
+    });
   return { sorted, progressById };
 }
 
 export function QuestsView({ state, meta }: ViewProps) {
   const { sorted, progressById } = sortedQuestsForView(state, meta);
   if (sorted.length === 0) {
-    return <p className={styles.campaignEmpty}>No quests defined for this campaign.</p>;
+    return (
+      <p className={styles.campaignEmpty}>
+        No quests yet — explore the world and talk to people to find them.
+      </p>
+    );
   }
   return (
     <>

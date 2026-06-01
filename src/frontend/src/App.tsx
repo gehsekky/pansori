@@ -380,9 +380,12 @@ export default function App() {
             });
           }
           if (campaignMeta && gameState && campaignMeta.quests.length > 0) {
+            // Count only DISCOVERED quests (those with a progress entry) — the
+            // log hides quests the player hasn't found yet.
+            const discovered = gameState.quest_progress?.length ?? 0;
             contextTabs.push({
               id: 'quests',
-              label: `QUESTS (${campaignMeta.quests.length})`,
+              label: `QUESTS (${discovered})`,
               render: () => <QuestsView state={gameState} meta={campaignMeta} />,
             });
           }

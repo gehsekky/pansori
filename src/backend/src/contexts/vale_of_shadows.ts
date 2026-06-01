@@ -1448,6 +1448,7 @@ export const context: Context = {
         id: 'quest_shipment',
         title: 'The Missing Shipment',
         desc: "The Merchant Guild's supply wagons vanished on the Old Road. Find the Guild Ledger in the crypt and return it to Aldric.",
+        startActive: true, // the Vale's opening quest — active from the start
         giverNpcId: 'npc_aldric',
         factionId: 'faction_guild',
         repGain: 20,

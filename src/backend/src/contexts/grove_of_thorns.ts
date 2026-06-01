@@ -641,6 +641,7 @@ export const context: Context = {
         id: 'quest_silent_grove',
         title: 'The Silent Grove',
         desc: "Old Elise needs someone to walk Mareth's path. Reach the Ancient Oak and find what silenced her.",
+        startActive: true, // the Grove's opening quest — active from the start
         giverNpcId: 'npc_mareth_elder',
         factionId: 'faction_verdant',
         repGain: 15,

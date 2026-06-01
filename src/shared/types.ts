@@ -968,6 +968,10 @@ export interface Quest {
   rewards: GameConsequence[];
   factionId?: string;
   repGain?: number;
+  // The campaign's opening quest — seeded as `active` at session start so the
+  // player begins with direction. All other quests stay hidden from the quest
+  // log until discovered (their first step fires, auto-activating them).
+  startActive?: boolean;
 }
 
 export interface QuestProgress {

@@ -1103,6 +1103,7 @@ export const context: Context = {
         id: 'quest_trapper',
         title: 'The Missing Trapper',
         desc: 'Old Halden the trapper has been missing three days. Innkeeper Brann wants him back — or proof of his fate. His silver locket should be enough.',
+        startActive: true, // Whispering Pines' opening quest — active from the start
         giverNpcId: 'npc_brann',
         factionId: 'faction_wardens',
         repGain: 10,

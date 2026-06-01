@@ -5,6 +5,7 @@ import type {
   GameState,
   NpcAttitude,
   Quest,
+  QuestProgress,
   QuestStatus,
 } from '../types.js';
 import { Engine, type TopLevelCondition } from 'json-rules-engine';
@@ -42,6 +43,16 @@ export async function loadCampaignState(
     [userId, campaignId, JSON.stringify(blank)]
   );
   return blank;
+}
+
+// The campaign's opening quest(s) — those flagged `startActive` — seeded as
+// `active` so the player begins with direction. Used both to seed the initial
+// GameState.quest_progress and the fresh persisted CampaignState at session
+// creation, so the two stay consistent on the first action.
+export function starterQuestProgress(quests: Quest[] | undefined): QuestProgress[] {
+  return (quests ?? [])
+    .filter((q) => q.startActive)
+    .map((q) => ({ questId: q.id, status: 'active' as QuestStatus, completedSteps: [] }));
 }
 
 // Clear a user's persisted state for a campaign so the next session
