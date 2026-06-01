@@ -154,6 +154,10 @@ export function useGame(): UseGameReturn {
       setChoices(result.choices || []);
       setGameState(result.newState);
       setRoomLog(result.newState.room_log || []);
+      // Adopt the returned seed when present — a marker_move encounter
+      // materializes the rolled enemy into the seed, and the InitiativeStrip
+      // resolves enemy names from it (else the ambusher renders as "Enemy").
+      if (result.seed) setSeed(result.seed);
       if (result.escaped) setEscaped(true);
       if (typeof result.turn_seq === 'number') setTurnSeq(result.turn_seq);
     } catch (e) {

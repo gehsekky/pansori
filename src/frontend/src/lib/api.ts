@@ -41,6 +41,12 @@ export interface ActionResult {
   // after this action was applied. Clients send this back on their next
   // takeAction so the server can reject stale-state writes.
   turn_seq?: number;
+  // The (possibly mutated) seed. Most actions don't change it, but a
+  // wilderness encounter (marker_move) materializes the rolled enemy into
+  // `seed.enemies[__encounter__]` — the client must adopt the returned seed so
+  // the new combatant resolves its name (else the InitiativeStrip shows
+  // "Enemy"). Omitted ⇒ unchanged.
+  seed?: Seed;
 }
 
 export interface NewSessionResult {

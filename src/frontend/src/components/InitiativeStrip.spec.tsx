@@ -65,6 +65,30 @@ describe('InitiativeStrip', () => {
     expect(screen.getByText(/Xenomorph/)).toBeTruthy();
   });
 
+  it('names a wilderness-ambush enemy from the encounter room of the seed', () => {
+    // marker_move materializes the rolled enemy into seed.enemies['__encounter__']
+    // with id `__encounter__#<ts>` and drops the party into that room. Once the
+    // client adopts the returned seed (useGame), the strip must resolve the name
+    // (regression: previously the stale seed left it as "Enemy").
+    const seedWithEncounter = {
+      ...mockSeed,
+      enemies: {
+        __encounter__: [{ id: '__encounter__#1717', name: 'Bandit Ruffian', hp: 11, ac: 12 }],
+      },
+    };
+    const state = makeState(
+      {},
+      {
+        combat_active: true,
+        current_room: '__encounter__',
+        initiative_order: [{ id: '__encounter__#1717', roll: 9, is_enemy: true }],
+        initiative_idx: 0,
+      }
+    );
+    render(<InitiativeStrip state={state} seed={seedWithEncounter} />);
+    expect(screen.getByText(/Bandit Ruffian/)).toBeTruthy();
+  });
+
   it('falls back to "Enemy" when seed has no enemy name', () => {
     const state = makeState(
       {},
