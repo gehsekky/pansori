@@ -635,6 +635,23 @@ export interface Spell {
   //   cube:   blastRadius = side length of cube emanating from caster
   //   line:   blastRadius = length (5 ft wide), from caster outward
   aoeShape?: 'sphere' | 'cone' | 'cube' | 'line';
+  // SRD Ice Knife — an attack-roll spell that ALSO bursts in a small sphere
+  // centered on the target, hit or miss. After the primary spell attack
+  // resolves, this secondary save-for-half/negates AoE is applied to every
+  // hostile within `blastRadius` of the target (reusing the AoE path). Only
+  // meaningful alongside `attackRoll`.
+  secondaryAoe?: {
+    damage: string;
+    damageType: string;
+    savingThrow: AbilityKey;
+    saveEffect: 'half' | 'negates';
+    blastRadius: number;
+    upcastBonus?: string; // extra dice per slot level above the spell's base level
+  };
+  // SRD Enlarge/Reduce — a concentration buff/debuff whose effect is chosen by
+  // target: a party member (or self) is Enlarged (+1d4 weapon damage), an enemy
+  // is Reduced (-1d4 weapon damage). Dispatched by a dedicated branch.
+  enlargeReduce?: boolean;
   // RE-4 — persistent damage zone (Cloud of Daggers, Moonbeam, …). On cast the
   // spell stamps a `SpellZone` onto `GameState.spell_zones` (footprint sized by
   // `blastRadius`, centered on the target), ticks once immediately, then deals

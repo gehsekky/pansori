@@ -346,13 +346,28 @@ export function resolveOneAttack(
       turn_actions: { ...pc.char.turn_actions, savage_attacker_used: true },
     });
   }
+  // SRD Enlarge/Reduce — a weapon attack by an Enlarged creature deals +1d4;
+  // a Reduced creature deals -1d4 (floored at 1). Unarmed strikes count as
+  // weapon attacks for this; only skipped when there's no damage at all.
+  let enlargeReduceNote = '';
+  if (atk.hit) {
+    if (pc.char.conditions?.includes('enlarged')) {
+      const bonus = rollDice('1d4');
+      baseHit += bonus;
+      enlargeReduceNote = ` +${bonus} (Enlarged)`;
+    } else if (pc.char.conditions?.includes('reduced')) {
+      const penalty = rollDice('1d4');
+      baseHit = Math.max(1, baseHit - penalty);
+      enlargeReduceNote = ` -${penalty} (Reduced)`;
+    }
+  }
   const versatileNote = isVersatile ? ' (versatile)' : '';
   const coverNote = coverAcBonus > 0 ? ` +${coverAcBonus} cover` : '';
   const bonusNote = totalAttackBonus > 0 ? ` +${totalAttackBonus} bonus` : '';
   const atkNote =
     ' ' +
     fmt.note(
-      `(${label}d20 ${atk.roll}+${atk.atkMod} ${atk.atkStat}+${atk.prof} prof${bonusNote} = ${atk.total} vs AC ${effectiveEnemyAc}${coverNote}${disadvNote}${versatileNote})${noProfNote}${biNote}${blessNote}${baneNote}${strokeNote}${peerlessNote}${peerlessAimNote}${brutalNote}${parryNote}`
+      `(${label}d20 ${atk.roll}+${atk.atkMod} ${atk.atkStat}+${atk.prof} prof${bonusNote} = ${atk.total} vs AC ${effectiveEnemyAc}${coverNote}${disadvNote}${versatileNote})${noProfNote}${biNote}${blessNote}${baneNote}${strokeNote}${peerlessNote}${peerlessAimNote}${brutalNote}${parryNote}${enlargeReduceNote}`
     );
 
   if (atk.fumble) {

@@ -4063,6 +4063,96 @@ export const SRD_SPELLS: Record<string, Spell> = {
     spellList: ['arcane', 'primal'],
   },
 
+  // SRD: Enlarge/Reduce (L2 Transmutation, Bard/Druid/Sorcerer/Wizard) — a
+  // Concentration buff/debuff. pansori selects the effect from the target:
+  // a party member (or self) is Enlarged (+1d4 weapon damage), an enemy is
+  // Reduced (-1d4 weapon damage + Disadvantage on STR saves). Size changes,
+  // the STR-check Advantage, and the unwilling-target CON save are narrated.
+  enlarge_reduce: {
+    id: 'enlarge_reduce',
+    name: 'Enlarge/Reduce',
+    level: 2,
+    castTime: 'action',
+    enlargeReduce: true,
+    concentration: true,
+    durationRounds: 10,
+    rangeKind: 'ranged',
+    rangeFt: 30,
+    desc: 'You enlarge or reduce a creature for up to 1 minute (Concentration). A willing ally (or you) is Enlarged — weapon attacks deal +1d4 and Advantage on Strength checks/saves. An enemy is Reduced — weapon attacks deal -1d4 and Disadvantage on Strength saves.',
+    spellList: ['arcane', 'primal'],
+  },
+
+  // SRD: Ice Knife (L1 Conjuration, Druid/Sorcerer/Wizard) — a ranged spell
+  // attack for 1d10 piercing; then the shard explodes (hit or miss) in a 5-ft
+  // burst centered on the target, each creature there making a DEX save or
+  // taking 2d6 Cold (+1d6 per slot above 1st). The piercing is the primary
+  // attack-roll damage; the cold burst rides the new `secondaryAoe` path.
+  ice_knife: {
+    id: 'ice_knife',
+    name: 'Ice Knife',
+    level: 1,
+    castTime: 'action',
+    attackRoll: true,
+    damage: '1d10',
+    damageType: 'piercing',
+    secondaryAoe: {
+      damage: '2d6',
+      damageType: 'cold',
+      savingThrow: 'dex',
+      saveEffect: 'negates',
+      blastRadius: 5,
+      upcastBonus: '1d6',
+    },
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    desc: 'You fling a shard of ice: a ranged spell attack for 1d10 Piercing on a hit. Hit or miss, the shard explodes — each creature within 5 ft of the target makes a DEX save or takes 2d6 Cold (+1d6 per slot above 1st).',
+    spellList: ['arcane', 'primal'],
+  },
+
+  // SRD: Mass Suggestion (L6 Enchantment, Bard/Sorcerer/Wizard) — a WIS save
+  // or Charmed for up to 24 hours, no Concentration. RAW targets up to twelve
+  // creatures you can see within range; modeled here as every hostile in a
+  // 30-ft sphere via the aoe-condition path (the verbal 25-word suggestion +
+  // the full-day duration are narrated rather than tracked).
+  mass_suggestion: {
+    id: 'mass_suggestion',
+    name: 'Mass Suggestion',
+    level: 6,
+    castTime: 'action',
+    savingThrow: 'wis',
+    saveEffect: 'negates',
+    condition: 'charmed',
+    conditionDuration: 100,
+    aoeCondition: true,
+    blastRadius: 30,
+    aoeShape: 'sphere',
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    desc: 'You suggest a course of action to the creatures around a point you can see. Each hostile in a 30-ft sphere makes a WIS save or is Charmed (no Concentration). RAW targets up to twelve chosen creatures for 24 hours; the suggestion wording + duration are narrated.',
+    spellList: ['arcane'],
+  },
+
+  // SRD: Irresistible Dance (L6 Enchantment, Bard/Wizard) — one creature makes
+  // a WIS save or is Charmed (flailing in a comic dance) for the duration,
+  // repeating the save at the end of each turn. The dance-specific riders
+  // (Disadvantage on DEX saves, attacks against it have Advantage, all movement
+  // spent dancing) are narrated through the Charmed condition.
+  irresistible_dance: {
+    id: 'irresistible_dance',
+    name: 'Irresistible Dance',
+    level: 6,
+    castTime: 'action',
+    savingThrow: 'wis',
+    saveEffect: 'negates',
+    condition: 'charmed',
+    conditionSaveEnds: true,
+    concentration: true,
+    rangeKind: 'ranged',
+    rangeFt: 30,
+    desc: 'One creature you can see makes a WIS save or is Charmed for the duration (Concentration, up to 1 minute), flailing in a comic dance — it repeats the save at the end of each of its turns. The dance riders (Disadvantage on DEX saves, Advantage to attackers) are narrated.',
+    spellList: ['arcane'],
+  },
+
   // SRD: Protection from Poison (L2 Abjuration, Cleric/Druid/Paladin/Ranger) —
   // a touch ward. Ends the Poisoned condition on the target and grants
   // Resistance to poison damage for the duration (1 hour). The "Advantage on

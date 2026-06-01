@@ -1585,6 +1585,14 @@ function computeEnemyAttack(
     darknessDisadv ||
     sunlightSensitivityDisadv;
   const result = resolveEnemyAttack(enemy, char.ac, hasAdvantage, hasDisadvantage);
+  // SRD Enlarge/Reduce — a Reduced enemy's weapon attacks deal -1d4 (floored at
+  // 1), an Enlarged enemy's +1d4. Keyed off the attacker's grid-entity condition.
+  if (result.damage > 0) {
+    const erEnt = st.entities?.find((e) => e.id === enemy.id && e.isEnemy);
+    if (erEnt?.conditions?.includes('enlarged')) result.damage += rollDice('1d4');
+    else if (erEnt?.conditions?.includes('reduced'))
+      result.damage = Math.max(1, result.damage - rollDice('1d4'));
+  }
   // Equipped-armor lookup. `equipped_armor` stores an `instance_id`
   // (see routes/game.ts character creation), not a loot id — the
   // previous `i.id === ...` form silently never matched, leaving

@@ -200,6 +200,15 @@ const defs: ConditionDef[] = [
   // Save-ends + concentration govern the duration, so 'permanent' keeps
   // tickConditions from auto-expiring it (like cursed).
   { id: 'enfeebled', duration: 'permanent', imposesDisadvantageOnSelfAttacks: true },
+  // SRD Enlarge/Reduce — Enlarged: weapon attacks deal +1d4 damage (and
+  // Advantage on STR checks/saves, narrated). Reduced: weapon attacks deal
+  // -1d4 damage and Disadvantage on STR saves. The ±1d4 is applied at the
+  // weapon-damage sites (resolveOneAttack / computeEnemyAttack) by checking
+  // these condition ids. Concentration-linked, so 'permanent' keeps
+  // tickConditions from auto-expiring them (breakConcentration / combat end
+  // clears them, like cursed).
+  { id: 'enlarged', duration: 'permanent' },
+  { id: 'reduced', duration: 'permanent', disadvantageSaves: ['str'] },
   // Engine-internal: Shield spell bumps AC +5 on cast (in reaction.ts);
   // ticking the condition off must reverse the bump.
   {

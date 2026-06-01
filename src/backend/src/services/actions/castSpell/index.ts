@@ -1,8 +1,9 @@
+import type { ActionContext, ActionHandler } from '../types.js';
+import type { Enemy, Spell } from '../../../types.js';
 import { isSpellOutOfRange, runPrecast } from './precast.js';
+import { rollDice, transmutedDamageType } from '../../rulesEngine.js';
 import { runPowerWordKill, runPowerWordStun } from './powerWords.js';
-import type { ActionHandler } from '../types.js';
 import { BEAST_FORMS } from '../../../contexts/srd/index.js';
-import type { Enemy } from '../../../types.js';
 import { applySingleTargetDamage } from './applyDamage.js';
 import { composeNow } from '../../narrative/compose.js';
 import { pick } from '../../gameEngine.js';
@@ -13,6 +14,7 @@ import { runAttackRollSpell } from './attackRoll.js';
 import { runAutoHitSpell } from './autoHit.js';
 import { runBuffSpell } from './buff.js';
 import { runCombatStart } from '../attack/combatStart.js';
+import { runEnlargeReduce } from './enlargeReduce.js';
 import { runHealSpell } from './heal.js';
 import { runMultiTargetSpell } from './multiTarget.js';
 import { runRecurringAttackSpell } from '../recurringSpellAttack.js';
@@ -22,8 +24,40 @@ import { runSummonSpell } from './summon.js';
 import { runUtilitySpell } from './utility.js';
 import { runWallSpell } from './wall.js';
 import { runZoneSpell } from './zone.js';
-import { transmutedDamageType } from '../../rulesEngine.js';
 import { updatePcActor } from '../actor.js';
+
+/**
+ * SRD Ice Knife — apply the secondary cold burst centered on the target. Rolls
+ * the AoE damage (base + per-slot-level upcast), synthesizes a sphere save
+ * spell, and reuses `runAoeSpell` (epicenter = the targeted enemy). Fires on a
+ * hit OR a miss; a no-op when there are no grid entities.
+ */
+function runSecondaryAoeBurst(
+  ctx: ActionContext,
+  spell: Spell,
+  slotLevel: number,
+  dc: number
+): void {
+  const sa = spell.secondaryAoe;
+  if (!sa) return;
+  let dmg = rollDice(sa.damage);
+  if (sa.upcastBonus && slotLevel > spell.level) {
+    for (let i = 0; i < slotLevel - spell.level; i++) dmg += rollDice(sa.upcastBonus);
+  }
+  const synth: Spell = {
+    ...spell,
+    attackRoll: false,
+    damage: sa.damage,
+    damageType: sa.damageType,
+    savingThrow: sa.savingThrow,
+    saveEffect: sa.saveEffect,
+    blastRadius: sa.blastRadius,
+    aoeShape: 'sphere',
+    condition: undefined,
+    secondaryAoe: undefined,
+  };
+  runAoeSpell(ctx, synth, slotLevel, dc, dmg);
+}
 
 // `pickCastPrefix` is consumed by the spec + future call sites that
 // want to build cast-narrative prefixes outside the handler. Lives
@@ -154,6 +188,24 @@ export const handleCastSpell: ActionHandler<{
       slotLevel,
       slotNote,
       dc
+    )
+  ) {
+    return;
+  }
+
+  // ── Enlarge/Reduce — target-determined buff (ally→Enlarged) / debuff
+  // (enemy→Reduced), Concentration. Runs before the offensive enemy-required
+  // check so an ally/self target resolves without a living enemy.
+  if (
+    runEnlargeReduce(
+      ctx,
+      action as {
+        type: 'cast_spell';
+        spellId: string;
+        targetCharId?: string;
+        targetEnemyId?: string;
+      },
+      spell
     )
   ) {
     return;
@@ -403,6 +455,13 @@ export const handleCastSpell: ActionHandler<{
   let spellHit = true;
   if (spell.attackRoll) {
     const r = runAttackRollSpell(ctx, spellTarget, dmgSpell, slotLevel, castingScore, slotNote);
+    // SRD Ice Knife — the shard explodes whether the attack hit or missed,
+    // bursting a save-for-half/negates AoE centered on the target. Reuses the
+    // AoE path with a synthesized cold spell; runs before the hit/miss early
+    // return so it always fires.
+    if (spell.secondaryAoe) {
+      runSecondaryAoeBurst(ctx, spell, slotLevel, dc);
+    }
     if (r.done) return;
     spellDmg = r.spellDmg;
     spellHit = r.spellHit;
