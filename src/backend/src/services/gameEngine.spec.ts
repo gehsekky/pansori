@@ -404,6 +404,10 @@ describe('takeAction', () => {
     expect(result.newState.run_log).toHaveLength(1);
     expect(result.escaped).toBe(false);
     expect(result.dead).toBe(false);
+    // takeAction returns the seed so the route can persist in-place seed
+    // mutations (e.g. marker_move materializing a wilderness-encounter enemy).
+    expect(result.seed).toBeDefined();
+    expect(result.seed.enemies).toBeDefined();
   });
 
   it('picking up loot adds item to inventory and marks loot_taken', async () => {

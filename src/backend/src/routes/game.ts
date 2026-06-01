@@ -1382,9 +1382,13 @@ gameRouter.post('/session/:id/action', async (req: Request, res: Response) => {
 
     const newStatus = result.dead ? 'dead' : result.escaped ? 'escaped' : row.status;
     const nextTurnSeq = row.turn_seq + 1;
+    // Persist the seed too: most actions leave it untouched, but some mutate it
+    // in place (marker_move materializes a rolled encounter enemy into
+    // seed.enemies). Without saving it, that enemy is lost next request and the
+    // party is stuck in the empty encounter room.
     await pool.query(
-      'UPDATE game_sessions SET state = $1, status = $2, turn_seq = $3, updated_at = NOW() WHERE id = $4',
-      [JSON.stringify(result.newState), newStatus, nextTurnSeq, row.id]
+      'UPDATE game_sessions SET state = $1, seed = $2, status = $3, turn_seq = $4, updated_at = NOW() WHERE id = $5',
+      [JSON.stringify(result.newState), JSON.stringify(result.seed), newStatus, nextTurnSeq, row.id]
     );
 
     // Broadcast the new state + turn_seq to every socket joined to this

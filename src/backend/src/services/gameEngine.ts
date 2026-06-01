@@ -8874,11 +8874,12 @@ export async function takeAction({
             narrative,
             choices: st.last_choices,
             newState: st,
+            seed,
             escaped: false,
             dead: false,
           };
         }
-        return { narrative, choices: [], newState: st, escaped: false, dead: allDead };
+        return { narrative, choices: [], newState: st, seed, escaped: false, dead: allDead };
       }
     }
     commitChar();
@@ -8890,7 +8891,7 @@ export async function takeAction({
     }
     st.run_log = [...(st.run_log || []), { character_id: char.id, action: action.type, narrative }];
     st.last_choices = generateChoices(st, seed, context);
-    return { narrative, choices: st.last_choices, newState: st, escaped: false, dead: false };
+    return { narrative, choices: st.last_choices, newState: st, seed, escaped: false, dead: false };
   }
 
   // Exhaustion level 6 = death (PHB p.291)
@@ -8906,6 +8907,7 @@ export async function takeAction({
       narrative,
       choices: st.last_choices,
       newState: st,
+      seed,
       escaped: false,
       dead: allDeadExhaustion,
     };
@@ -9507,6 +9509,12 @@ export async function takeAction({
     narrative: finalNarrative,
     choices: st.last_choices,
     newState: st,
+    // The seed is normally immutable, but a few actions mutate it in place
+    // (e.g. `marker_move` materializes a rolled wilderness-encounter enemy into
+    // `seed.enemies`). Return it so the route persists the change — otherwise
+    // the encounter enemy vanishes next request and the party is stranded in
+    // the empty encounter room with only rest options.
+    seed,
     escaped,
     dead: allDead,
   };
