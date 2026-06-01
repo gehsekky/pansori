@@ -16,10 +16,10 @@ PHB/DMG-exclusive content (subclasses, feats, species, spells). See
 
 ---
 
-## Implementation status (code-verified 2026-05-31)
+## Implementation status (code-verified 2026-06-01)
 
-Grounded in a code survey + the full suite: **backend 2091 tests across
-246 files + frontend 138 across 24 files, all green** (lint + typecheck +
+Grounded in a code survey + the full suite: **backend 2079 tests across
+246 files + frontend 144 across 25 files, all green** (lint + typecheck +
 prettier clean).
 
 ### Done — world map / navigation
@@ -37,9 +37,15 @@ prettier clean).
   rooms (`mapEngine.ts`, `activeGrid` + `resolveMarkerMove`). Frontend
   renders all three grids (`GridMapView`); the map overlay shows the active
   grid read-only.
-- **All three campaigns run on the grid model** — Vale of Shadows,
-  Whispering Pines, Grove of Thorns (+ the sandbox dev campaign). Each has a
-  region with sites, a town with venues, and local rooms wired by exit cells.
+- **One authored campaign — Duskenvale — runs on the grid model** (+ the
+  sandbox dev campaign). Duskenvale began as Vale of Shadows and now folds in
+  the former Whispering Pines (the Frozen Pass + Iceshard Spire) and Grove of
+  Thorns (Pinegate + the Silent Grove) as additional sites on its regional map.
+  The folded campaigns' data lives under `contexts/folded/` (the context loader
+  only scans top-level `contexts/` files, so they aren't separate selectable
+  campaigns); `vale_of_shadows.ts` imports them and spreads their rooms / NPCs /
+  enemies / loot / quests / factions in via `foldCampaign()`. The internal
+  context id stays `vale_of_shadows`.
 - **Legacy nav fully removed** — the old `Location` / `District` model, the
   `travel` / `enter_district` / room-`move` actions, the room `connections`
   graph, and the roguelike procedural generator (`generateRoguelikeSeed` /
@@ -751,10 +757,11 @@ options }`** → `OptionPickerDialog` (single-select; re-sends `action[param]`).
       grid-fog / vision-reveal item above (`GridCombatView` LoS-gates party
       vision against the shipped static obstacles; ghost-tints out-of-sight cells
       and suppresses enemy tokens beyond the existing `dark`-illum fog).
-- [ ] **Fourth campaign module (opportunistic)** — coastal pirate town,
+- [ ] **Another campaign module (opportunistic)** — coastal pirate town,
       desert ruin, planar city, etc. Authored on the 3-level grid map
-      (region + sites / town + venues / local rooms with exit cells), like
-      the existing three. Not on the critical path.
+      (region + sites / town + venues / local rooms with exit cells), either
+      as a new standalone context or folded into Duskenvale like the Pines /
+      Grove areas. Not on the critical path.
 
 ---
 

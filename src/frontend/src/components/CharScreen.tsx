@@ -276,10 +276,9 @@ function expertisePool(draft: CharDraft, ctx: BackendContextSummary | undefined)
 }
 
 // Per-context localStorage key for the saved party draft. We key on the
-// context id (vale_of_shadows / whispering_pines / sandbox / etc.) so
-// each campaign carries its own "last party" — switching to Pines
-// doesn't clobber the Vale party setup, and coming back to Vale
-// restores names/classes/stats the player tuned for that campaign.
+// context id (vale_of_shadows / sandbox / etc.) so each campaign carries its
+// own "last party" — switching campaigns doesn't clobber another's party
+// setup, and coming back restores names/classes/stats the player tuned for it.
 const PARTY_DRAFT_KEY = (ctxId: string) => `pansori:party_draft:${ctxId}`;
 
 function loadPartyDraft(ctxId: string): CharDraft[] | null {

@@ -4,14 +4,19 @@ This is the reference for authoring a campaign module. A campaign is a
 TypeScript file in `src/backend/src/contexts/` that exports a `Context`.
 The engine auto-discovers it on backend startup.
 
-Pansori ships with two campaign modules + one procgen sandbox:
+Pansori ships with one authored campaign (Duskenvale) + one procgen sandbox:
 
-- `vale_of_shadows.ts` — a 3-quest module with a town hub, faction
-  reputation, and a crypt boss fight. Best reference for a campaign
-  with quests + NPCs + factions.
-- `whispering_pines.ts` — a wilderness/cult campaign with cold-damage
-  enemies and a paralyzing boss. Best reference for a different
-  thematic flavor on the same format.
+- `vale_of_shadows.ts` — **Duskenvale** (internal id `vale_of_shadows`): a
+  multi-area campaign with town hubs, faction reputation, and several boss
+  fights. It started as a single town-and-crypt module and now folds in two
+  more areas. Best reference for a campaign with quests + NPCs + factions, and
+  for the fold pattern (`foldCampaign()` at the bottom of the file).
+- `contexts/folded/whispering_pines.ts`, `contexts/folded/grove_of_thorns.ts` —
+  the former standalone Whispering Pines (cold/cult) and Grove of Thorns
+  (fey/forest) campaigns, now **data modules** folded into Duskenvale. They
+  live in the `folded/` subdir so the context loader (top-level scan only)
+  doesn't register them as separate selectable campaigns. Good references for
+  a different thematic flavor on the same format.
 - `sandbox.ts` — a roguelike-mode context that procedurally generates
   rooms. Best reference for the minimal field set; campaigns can
   ignore the procgen-specific fields.
