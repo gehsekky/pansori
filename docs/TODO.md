@@ -18,8 +18,8 @@ PHB/DMG-exclusive content (subclasses, feats, species, spells). See
 
 ## Implementation status (code-verified 2026-05-31)
 
-Grounded in a code survey + the full suite: **backend 2080 tests across
-245 files + frontend 138 across 24 files, all green** (lint + typecheck +
+Grounded in a code survey + the full suite: **backend 2091 tests across
+246 files + frontend 138 across 24 files, all green** (lint + typecheck +
 prettier clean).
 
 ### Done — world map / navigation
@@ -105,7 +105,7 @@ prettier clean).
 
 | Category                  | In pansori                                       | SRD universe                     |
 | ------------------------- | ------------------------------------------------ | -------------------------------- |
-| Spells                    | **250** (27 cantrips + 223 leveled, through L9)  | ~330                             |
+| Spells                    | **258** (27 cantrips + 231 leveled, through L9)  | ~330                             |
 | Shared SRD monster pool   | **44** (`SRD_MONSTERS`) + per-campaign templates | hundreds                         |
 | Species                   | 9                                                | 9 standalone + Drow lineage      |
 | Classes                   | 12                                               | 12                               |

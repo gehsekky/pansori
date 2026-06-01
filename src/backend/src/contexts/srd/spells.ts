@@ -4153,6 +4153,142 @@ export const SRD_SPELLS: Record<string, Spell> = {
     spellList: ['arcane'],
   },
 
+  // ─── SRD utility/narrative batch (RE-6) ─────────────────────────────────────
+  // Out-of-combat utility spells with no combat mechanics — they route through
+  // the utility (narrative) path and are gated out of combat (outOfCombatOnly).
+  // Their full effects (terrain reshaping, disguises, telepathy, etc.) are
+  // narrated rather than simulated.
+
+  // SRD: Tenser's Floating Disk (L1 Conjuration, Wizard) — a hovering disk that
+  // carries loads and follows you.
+  floating_disk: {
+    id: 'floating_disk',
+    name: 'Floating Disk',
+    level: 1,
+    castTime: 'action',
+    ritualCasting: true,
+    outOfCombatOnly: true,
+    rangeKind: 'ranged',
+    rangeFt: 30,
+    desc: 'You conjure a 3-ft-wide disk of force that hovers at waist height, carries up to 500 lb, and follows you for an hour — handy for hauling loot or a wounded companion.',
+    narrative:
+      '{name} conjures a shimmering disk of force; it hovers, patient, ready to bear a burden.',
+    spellList: ['arcane'],
+  },
+
+  // SRD: Magic Circle (L3 Abjuration, Cleric/Paladin/Warlock/Wizard) — a 10-ft
+  // cylinder warded against a chosen creature type.
+  magic_circle: {
+    id: 'magic_circle',
+    name: 'Magic Circle',
+    level: 3,
+    castTime: 'action',
+    outOfCombatOnly: true,
+    materialCost: 100,
+    rangeKind: 'ranged',
+    rangeFt: 10,
+    desc: 'You trace a 10-ft cylinder of binding sigils. A chosen kind of creature (celestials, fiends, undead, and the like) cannot willingly enter, and is hindered from harming or charming those within.',
+    narrative:
+      '{name} inscribes a ring of glowing sigils; the air inside it turns still and sacrosanct.',
+    spellList: ['arcane', 'divine'],
+  },
+
+  // SRD: Hallucinatory Terrain (L4 Illusion, Bard/Druid/Warlock/Wizard) — make
+  // natural terrain look, sound, and smell like another kind.
+  hallucinatory_terrain: {
+    id: 'hallucinatory_terrain',
+    name: 'Hallucinatory Terrain',
+    level: 4,
+    castTime: 'action',
+    outOfCombatOnly: true,
+    rangeKind: 'ranged',
+    rangeFt: 300,
+    desc: 'You make a wide stretch of natural terrain look, sound, and smell like another sort — a swamp as a meadow, a road as open field — for up to 24 hours. Only physical contact reveals the illusion.',
+    narrative:
+      '{name} gestures across the land; the terrain shimmers and wears a wholly different face.',
+    spellList: ['arcane', 'primal'],
+  },
+
+  // SRD: Fabricate (L4 Transmutation, Wizard) — convert raw material into a
+  // finished product.
+  fabricate: {
+    id: 'fabricate',
+    name: 'Fabricate',
+    level: 4,
+    castTime: 'action',
+    outOfCombatOnly: true,
+    rangeKind: 'ranged',
+    rangeFt: 120,
+    desc: 'You transform raw materials into finished products of the same substance — timber into a bridge, ore into a portcullis, cloth into clothes — shaping a large volume in an instant (work requiring fine craft is limited by your skill).',
+    narrative:
+      '{name} sweeps a hand over the raw stock; it folds and sets into a finished, purposeful form.',
+    spellList: ['arcane'],
+  },
+
+  // SRD: Awaken (L5 Transmutation, Bard/Druid) — grant Intelligence and speech
+  // to a beast or plant, which becomes charmed to you for a time.
+  awaken: {
+    id: 'awaken',
+    name: 'Awaken',
+    level: 5,
+    castTime: 'action',
+    outOfCombatOnly: true,
+    materialCost: 1000,
+    rangeKind: 'touch',
+    desc: 'Over a long ritual you touch a Beast or plant and kindle a mind in it: it gains the ability to reason and speak, and regards you as a friendly ally for 30 days.',
+    narrative:
+      '{name} whispers for hours, and something behind the creature’s eyes wakes — aware, and grateful.',
+    spellList: ['arcane', 'primal'],
+  },
+
+  // SRD: Seeming (L5 Illusion, Bard/Sorcerer/Wizard) — disguise the appearance
+  // of any number of willing creatures.
+  seeming: {
+    id: 'seeming',
+    name: 'Seeming',
+    level: 5,
+    castTime: 'action',
+    outOfCombatOnly: true,
+    rangeKind: 'ranged',
+    rangeFt: 30,
+    desc: 'You cloak any number of creatures within range in a convincing illusion, changing how each looks (and how their clothing and gear appear) for the duration. Only a successful inspection reveals the disguise.',
+    narrative:
+      '{name} sweeps a hand across the party; faces and finery blur and resettle into new guises.',
+    spellList: ['arcane'],
+  },
+
+  // SRD: Rary's Telepathic Bond (L5 Divination, Bard/Wizard) — link the minds
+  // of a group for silent communication.
+  telepathic_bond: {
+    id: 'telepathic_bond',
+    name: 'Telepathic Bond',
+    level: 5,
+    castTime: 'action',
+    ritualCasting: true,
+    outOfCombatOnly: true,
+    rangeKind: 'ranged',
+    rangeFt: 30,
+    desc: 'You forge a telepathic link among up to eight willing creatures for an hour: while bound, they can silently share words, ideas, and images with one another across any distance on the same plane.',
+    narrative:
+      '{name} touches each brow in turn; a quiet thread of shared thought draws the group together.',
+    spellList: ['arcane'],
+  },
+
+  // SRD: Move Earth (L6 Transmutation, Druid/Sorcerer/Wizard) — reshape dirt,
+  // sand, and clay across a large area.
+  move_earth: {
+    id: 'move_earth',
+    name: 'Move Earth',
+    level: 6,
+    castTime: 'action',
+    outOfCombatOnly: true,
+    rangeKind: 'ranged',
+    rangeFt: 120,
+    desc: 'You reshape loose earth, sand, and clay across a wide area — raising or sinking the ground, digging trenches, or building ramparts — slowly, over the course of the spell (Concentration, up to 2 hours). It can’t move stone or worked structures.',
+    narrative: '{name} rolls their hands, and the very ground heaves and flows like slow water.',
+    spellList: ['arcane', 'primal'],
+  },
+
   // SRD: Protection from Poison (L2 Abjuration, Cleric/Druid/Paladin/Ranger) —
   // a touch ward. Ends the Poisoned condition on the target and grants
   // Resistance to poison damage for the duration (1 hour). The "Advantage on
