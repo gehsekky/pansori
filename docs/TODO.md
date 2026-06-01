@@ -813,9 +813,13 @@ options }`** → `OptionPickerDialog` (single-select; re-sends `action[param]`).
 - [ ] **Difficulty tuning from playtest data** — capture damage/HP/encounter
       telemetry to inform tuning (Crypt Lord TPK was the first signal).
       ~3-4h to wire telemetry; ongoing to tune.
-- [ ] **Regression-spec coverage gaps** — Bless on 4+-member parties, Monk
-      Flurry kill-on-first-strike, Frenzy with no enemy in range, the
-      unknown-feature fallback. ~2-3h.
+- [x] **Regression-spec coverage gaps** — shipped
+      (`regressionCoverageGaps.spec.ts`). Bless auto-pick honors the slot cap on
+      a 5-member party (3 at slot 1, 4 upcast — not the whole party); Monk Flurry
+      whose first strike kills the sole enemy breaks before the second strike,
+      ends combat cleanly, and charges exactly 1 ki; Barbarian Frenzy with no
+      enemy in range rejects before spending the bonus action; the
+      unknown-class-feature fallback narrates and no-ops without throwing.
 - [x] **Pre-commit hook (Husky + lint-staged)** — shipped. `.husky/pre-commit`
       runs `lint-staged` (`lint-staged.config.mjs`): `eslint --fix` per workspace
       (cd-ing in, since the flat configs use typed linting with workspace-relative
