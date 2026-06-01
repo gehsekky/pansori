@@ -7,10 +7,10 @@
 // is structured (gameEngine.spec.ts).
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { generateChoices, takeAction } from '../gameEngine.js';
 import { makeChar, makeState } from '../../test-fixtures.js';
 import type { GameState } from '../../types.js';
 import { context as ctx } from '../../contexts/sandbox.js';
-import { takeAction } from '../gameEngine.js';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -164,5 +164,33 @@ describe('Uncanny Dodge — decline takes full damage', () => {
     expect(rogueAfter.hp).toBe(21);
     expect(result.narrative).toMatch(/Uncanny Dodge declined/);
     expect(result.newState.pending_reaction).toBeUndefined();
+  });
+});
+
+describe('Uncanny Dodge — generateChoices surfaces the reaction window', () => {
+  it('offers only accept (halve) / decline while the window is open', () => {
+    const state = buildPendingState({ accept: true, proposedDamage: 9, charHp: 30 });
+    const seed = {
+      context_id: ctx.id,
+      world_name: 'Uncanny Test',
+      ship_name: 'Uncanny Test',
+      intro: '',
+      seed_id: 'uncanny-choices',
+      rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+      enemies: { [ctx.startRoomId]: [] },
+      loot: {},
+      npcs: {},
+    } as unknown as Parameters<typeof generateChoices>[1];
+    const choices = generateChoices(state, seed, ctx);
+    // Exactly the two resolution choices — not the normal combat list (the bug
+    // was that uncanny_dodge had no generateChoices branch, so it leaked the
+    // normal choices and the player couldn't trigger the dodge).
+    expect(choices).toHaveLength(2);
+    expect(choices.every((c) => c.action.type === 'resolve_reaction')).toBe(true);
+    expect(choices.some((c) => c.action.type === 'resolve_reaction' && c.action.accept)).toBe(true);
+    expect(choices.some((c) => c.action.type === 'resolve_reaction' && !c.action.accept)).toBe(
+      true
+    );
+    expect(choices[0].label).toMatch(/Uncanny Dodge/);
   });
 });

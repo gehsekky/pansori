@@ -3568,6 +3568,18 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         },
       ];
     }
+    if (pending.kind === 'uncanny_dodge') {
+      return [
+        {
+          label: `🌀 Uncanny Dodge (reaction) — halve the ${enemyForLabel}'s ${pending.proposedDamage} damage`,
+          action: { type: 'resolve_reaction', accept: true },
+        },
+        {
+          label: `Decline — take the hit (${pending.proposedDamage} damage)`,
+          action: { type: 'resolve_reaction', accept: false },
+        },
+      ];
+    }
     if (pending.kind === 'save_reroll') {
       // What a successful reroll achieves: shake off a condition, or shrug off
       // the failed-minus-saved damage on a damage-spell save.
