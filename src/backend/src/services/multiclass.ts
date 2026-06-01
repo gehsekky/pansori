@@ -45,11 +45,19 @@ import type { Character } from '../types.js';
 type ProfGrant = {
   armor?: string[]; // 'light' | 'medium' | 'shield'
   weapon?: string[]; // 'simple' | 'martial' | 'martial-light'
+  // 2024 PHB multiclass entry also grants one skill (from the class's skill
+  // list) for Bard / Ranger / Rogue. We auto-pick the first option the
+  // character doesn't already have (no mid-game picker), like the creation
+  // defaults.
+  skillFromClass?: boolean;
+  // Flat tool proficiencies granted on entry (Rogue's Thieves' Tools, a Bard's
+  // musical instrument).
+  tools?: string[];
 };
 
 const MULTICLASS_PROF_GRANTS: Record<string, ProfGrant> = {
   barbarian: { armor: ['shield'], weapon: ['simple', 'martial'] },
-  bard: { armor: ['light'] },
+  bard: { armor: ['light'], skillFromClass: true, tools: ['Musical Instrument'] },
   cleric: { armor: ['light', 'medium', 'shield'] },
   druid: { armor: ['light', 'medium', 'shield'] },
   fighter: { armor: ['light', 'medium', 'shield'], weapon: ['simple', 'martial'] },
@@ -59,8 +67,12 @@ const MULTICLASS_PROF_GRANTS: Record<string, ProfGrant> = {
   // only is more conservative than RAW (slightly under-grants).
   monk: { weapon: ['simple'] },
   paladin: { armor: ['light', 'medium', 'shield'], weapon: ['simple', 'martial'] },
-  ranger: { armor: ['light', 'medium', 'shield'], weapon: ['simple', 'martial'] },
-  rogue: { armor: ['light'] },
+  ranger: {
+    armor: ['light', 'medium', 'shield'],
+    weapon: ['simple', 'martial'],
+    skillFromClass: true,
+  },
+  rogue: { armor: ['light'], skillFromClass: true, tools: ["Thieves' Tools"] },
   warlock: { armor: ['light'], weapon: ['simple'] },
 };
 
@@ -71,7 +83,13 @@ const MULTICLASS_PROF_GRANTS: Record<string, ProfGrant> = {
  * readable note for the level-up narrative, or empty if nothing
  * was granted.
  */
-export function applyMulticlassProfGrants(char: Character, className: string): string {
+export function applyMulticlassProfGrants(
+  char: Character,
+  className: string,
+  // The class's skill-choice options (context.classSkillChoices[class].options),
+  // used to auto-pick the entry skill for Bard / Ranger / Rogue.
+  skillOptions?: string[]
+): string {
   const grant = MULTICLASS_PROF_GRANTS[className.toLowerCase()];
   if (!grant) return '';
   const added: string[] = [];
@@ -94,6 +112,27 @@ export function applyMulticlassProfGrants(char: Character, className: string): s
       }
     }
     char.weapon_proficiencies = [...existing];
+  }
+  // One skill from the class's list (Bard / Ranger / Rogue) — auto-pick the
+  // first option the character doesn't already have.
+  if (grant.skillFromClass && skillOptions?.length) {
+    const have = new Set(char.skill_proficiencies ?? []);
+    const pick = skillOptions.find((s) => !have.has(s));
+    if (pick) {
+      char.skill_proficiencies = [...(char.skill_proficiencies ?? []), pick];
+      added.push(`${pick} (skill)`);
+    }
+  }
+  // Flat tool proficiencies (Thieves' Tools, a musical instrument).
+  if (grant.tools?.length) {
+    const have = new Set(char.tool_proficiencies ?? []);
+    for (const t of grant.tools) {
+      if (!have.has(t)) {
+        have.add(t);
+        added.push(t);
+      }
+    }
+    char.tool_proficiencies = [...have];
   }
   if (added.length === 0) return '';
   return ` Multiclass proficiency: ${added.join(', ')}.`;

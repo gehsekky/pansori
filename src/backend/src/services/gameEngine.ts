@@ -3067,9 +3067,12 @@ export function applyLevelUpForClass(char: Character, className: string, context
     if (char.spells_known.length > before) out += ` 🐉 Draconic Spells expanded.`;
   }
 
-  // First multiclass level: narrow proficiency grants per 2024 PHB.
+  // First multiclass level: narrow proficiency grants per 2024 PHB (armor /
+  // weapons, plus a class-list skill + tools for Bard / Ranger / Rogue). The
+  // entry skill auto-picks from the context's class skill-choice options.
   if (isFirstLevelInClass && cls !== char.character_class.toLowerCase()) {
-    const profNote = applyMulticlassProfGrants(char, cls);
+    const skillOptions = context.classSkillChoices?.[cls]?.options;
+    const profNote = applyMulticlassProfGrants(char, cls, skillOptions);
     if (profNote) out += profNote;
   }
 

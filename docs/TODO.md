@@ -659,9 +659,22 @@ options }`** → `OptionPickerDialog` (single-select; re-sends `action[param]`).
       Petrified yet, so it has no live trigger); **Charmed CHA-check** advantage
       for the charmer (needs social-check-site plumbing to identify
       charmer↔target — no clean surface today).
-- [ ] **Multiclass edge cases** — ASI spacing validation, skill/tool grants
-      on multiclass entry, warlock pact-slot pool separation, second-class
-      subclass features.
+- [~] **Multiclass edge cases** — DONE: per-class ASI spacing is locked with a
+      test (fires on the *class's own* 4/8/12/16/19, never on total level), and
+      multiclass-entry skill/tool grants now follow the 2024 PHB (Bard → a class
+      skill + Musical Instrument; Ranger → a class skill; Rogue → a class skill +
+      Thieves' Tools), threaded through `applyLevelUpForClass` via the context's
+      `classSkillChoices`. DEFERRED (larger model changes):
+      - **Warlock pact-slot pool separation** — slots are still a single merged
+        pool, so a multiclass Warlock's pact slots aren't tracked apart from
+        Spellcasting. Concrete bug to fix with this: `actions/rest.ts`
+        short-rest overwrites `spell_slots_max` to the pact-only value and
+        resets *all* `spell_slots_used` — wiping a multiclass Warlock's
+        other-class slot maximum. Needs a separate pact pool + casting +
+        short/long-rest recovery + FE.
+      - **Second-class subclass features** — subclass auto-assign only triggers
+        for the *primary* class at its level 3; a second class that reaches its
+        own subclass level gets nothing. Needs a per-class subclass model.
 
 ### Subsystem follow-ups
 
