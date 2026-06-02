@@ -110,6 +110,12 @@ function scaleLabel(feetPerSquare: number): string {
  * deploys the party into PC tokens.)
  */
 function GridMapView({ grid, markerPos, enemyPresent, onMarkerMove }: Props) {
+  // The overland (regional) map gets double-size squares so the larger, sparse
+  // grid reads more like a map; town / local exploration stay compact.
+  const cellPx = grid.level === 'regional' ? CELL_PX * 2 : CELL_PX;
+  // Scale the cell glyphs up to match the larger regional squares; town / local
+  // keep the CSS default (undefined ⇒ no inline override).
+  const glyphFont = grid.level === 'regional' ? '2.7rem' : undefined;
   const obstacleSet = new Set(grid.obstacles.map((o) => `${o.x},${o.y}`));
   const transitionAt = new Map<string, MapTransition>();
   for (const t of grid.transitions) transitionAt.set(`${t.pos.x},${t.pos.y}`, t);
@@ -188,21 +194,33 @@ function GridMapView({ grid, markerPos, enemyPresent, onMarkerMove }: Props) {
       } else if (tStyle?.glyph) {
         // Impassable typed terrain (mountains ▲, water ≈).
         token = (
-          <span className={styles.gridMapObstacleGlyph} aria-hidden="true">
+          <span
+            className={styles.gridMapObstacleGlyph}
+            aria-hidden="true"
+            style={{ fontSize: glyphFont }}
+          >
             {tStyle.glyph}
           </span>
         );
       } else if (isObstacle && isRegional) {
         // Legacy (untyped) regional obstacle reads as a mountain peak.
         token = (
-          <span className={styles.gridMapObstacleGlyph} aria-hidden="true">
+          <span
+            className={styles.gridMapObstacleGlyph}
+            aria-hidden="true"
+            style={{ fontSize: glyphFont }}
+          >
             ▲
           </span>
         );
       } else if (transition) {
         token = (
           <>
-            <span className={styles.gridMapGlyph} aria-hidden="true">
+            <span
+              className={styles.gridMapGlyph}
+              aria-hidden="true"
+              style={{ fontSize: glyphFont }}
+            >
               {transitionGlyph(transition)}
             </span>
             {LABELLED_KINDS.has(transition.kind) && (
@@ -224,7 +242,12 @@ function GridMapView({ grid, markerPos, enemyPresent, onMarkerMove }: Props) {
           ]
             .filter(Boolean)
             .join(' ')}
-          style={{ background: cellBg, cursor: clickable ? 'pointer' : 'default' }}
+          style={{
+            background: cellBg,
+            cursor: clickable ? 'pointer' : 'default',
+            width: cellPx,
+            height: cellPx,
+          }}
           aria-label={ariaParts.join(', ')}
           aria-current={isMarker ? 'location' : undefined}
           role={clickable ? 'button' : 'gridcell'}
@@ -262,8 +285,8 @@ function GridMapView({ grid, markerPos, enemyPresent, onMarkerMove }: Props) {
         <div
           className={styles.gridBoard}
           style={{
-            gridTemplateColumns: `repeat(${grid.width}, ${CELL_PX}px)`,
-            gridTemplateRows: `repeat(${grid.height}, ${CELL_PX}px)`,
+            gridTemplateColumns: `repeat(${grid.width}, ${cellPx}px)`,
+            gridTemplateRows: `repeat(${grid.height}, ${cellPx}px)`,
           }}
         >
           {cells}

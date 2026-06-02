@@ -1543,7 +1543,7 @@
 /* The glyph drawn in a transition cell on the exploration map. */
 .gridMapGlyph {
   color: var(--t-primary);
-  font-size: 0.95rem;
+  font-size: 1.35rem;
   line-height: 1;
   text-shadow: 0 0 2px rgba(0, 0, 0, 0.7);
 }
@@ -1573,7 +1573,7 @@
 /* Mountain glyph for impassable regional terrain — earthy, scenery-like. */
 .gridMapObstacleGlyph {
   color: rgba(60, 52, 40, 0.95);
-  font-size: 1rem;
+  font-size: 1.45rem;
   line-height: 1;
   text-shadow: 0 1px 0 rgba(220, 210, 190, 0.35);
 }
