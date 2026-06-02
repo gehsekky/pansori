@@ -311,6 +311,197 @@ export const quests: Quest[] = [
       },
     ],
   },
+
+  // ── Whispering Pines (folded) ────────────────────────────────────────────
+  {
+    id: 'quest_trapper',
+    title: 'The Missing Trapper',
+    desc: 'Old Halden the trapper has been missing three days. Innkeeper Brann wants him back — or proof of his fate. His silver locket should be enough.',
+    giverNpcId: 'npc_brann',
+    factionId: 'faction_wardens',
+    repGain: 10,
+    steps: [
+      {
+        id: 'step_talk_brann',
+        desc: 'Speak with Innkeeper Brann about the missing trapper.',
+        condition: {
+          all: [
+            { fact: 'room_id', operator: 'equal', value: 'pines_tavern' },
+            {
+              any: [
+                { fact: 'action', operator: 'equal', value: 'talk_response' },
+                { fact: 'action', operator: 'equal', value: 'accept_quest' },
+              ],
+            },
+          ],
+        },
+      },
+      {
+        id: 'step_find_locket',
+        desc: "Find Halden's locket in the Iceshard Spire.",
+        condition: {
+          all: [{ fact: 'loot_taken', operator: 'contains', value: 'halden_locket' }],
+        },
+      },
+      {
+        id: 'step_return_locket',
+        desc: 'Return the locket to Innkeeper Brann at the Pine Tavern.',
+        // Completes when the party is back in Brann's venue room with the locket.
+        condition: {
+          all: [
+            { fact: 'loot_taken', operator: 'contains', value: 'halden_locket' },
+            { fact: 'room_id', operator: 'equal', value: 'pines_tavern' },
+          ],
+        },
+      },
+    ],
+    rewards: [
+      { type: 'give_gold', amount: 80 },
+      { type: 'give_xp', amount: 250 },
+      // Faction rep bumped via `repGain: 10` above — route surfaces
+      // the narrative line.
+      {
+        type: 'add_narrative',
+        text: 'Brann presses a purse of 80 gold into your hand and bows his head. "His daughter will rest easier knowing."',
+      },
+    ],
+  },
+  {
+    id: 'quest_cult',
+    title: 'Silence the Spire',
+    desc: 'Captain Riese has charged you with breaking the Frostspire Cult: kill the Frost Acolyte and bring back their idol.',
+    giverNpcId: 'npc_riese',
+    factionId: 'faction_wardens',
+    repGain: 30,
+    steps: [
+      {
+        id: 'step_meet_riese',
+        desc: 'Speak with Captain Riese at the Warden Post.',
+        condition: {
+          all: [
+            { fact: 'room_id', operator: 'equal', value: 'pines_warden' },
+            {
+              any: [
+                { fact: 'action', operator: 'equal', value: 'talk_response' },
+                { fact: 'action', operator: 'equal', value: 'accept_quest' },
+              ],
+            },
+          ],
+        },
+      },
+      {
+        id: 'step_kill_acolyte',
+        desc: 'Defeat the Frost Acolyte at the Ritual Apex.',
+        condition: {
+          all: [
+            {
+              fact: 'enemies_killed',
+              operator: 'contains',
+              value: 'spire_ritual_apex#boss',
+            },
+          ],
+        },
+      },
+      {
+        id: 'step_recover_idol',
+        desc: 'Recover the Frostspire Idol.',
+        condition: {
+          all: [{ fact: 'loot_taken', operator: 'contains', value: 'cult_idol' }],
+        },
+      },
+    ],
+    rewards: [
+      { type: 'give_gold', amount: 250 },
+      { type: 'give_xp', amount: 1500 },
+      { type: 'modify_hp', amount: 15 },
+      // Faction rep bumped via `repGain: 30` above.
+      {
+        type: 'add_narrative',
+        text: 'Captain Riese turns the idol in her hands, then drops it into the brazier. "For a generation, then. Drink with us tonight."',
+      },
+    ],
+  },
+
+  // ── Grove of Thorns (folded) ─────────────────────────────────────────────
+  {
+    id: 'quest_silent_grove',
+    title: 'The Silent Grove',
+    desc: "Old Elise needs someone to walk Mareth's path. Reach the Ancient Oak and find what silenced her.",
+    giverNpcId: 'npc_elise_elder',
+    factionId: 'faction_verdant',
+    repGain: 15,
+    steps: [
+      {
+        id: 'step_talk_elise',
+        desc: 'Speak with Old Elise in Pinegate Square.',
+        condition: {
+          all: [
+            {
+              fact: 'flags',
+              path: '$.rule_fired_step_talk_elise',
+              operator: 'equal',
+              value: true,
+            },
+          ],
+        },
+      },
+      {
+        id: 'step_take_charm',
+        desc: "Take Mareth's Charm from the Burnt Stump lodge.",
+        condition: {
+          all: [{ fact: 'loot_taken', operator: 'contains', value: 'circle_charm' }],
+        },
+      },
+      {
+        id: 'step_reach_oak',
+        desc: "Reach the Ancient Oak at the grove's heart.",
+        condition: {
+          all: [{ fact: 'visited_rooms', operator: 'contains', value: 'ancient_oak' }],
+        },
+      },
+    ],
+    rewards: [
+      { type: 'give_gold', amount: 100 },
+      { type: 'give_xp', amount: 350 },
+      // Faction rep bumped via `repGain: 15` above.
+      {
+        type: 'add_narrative',
+        text: "Old Elise presses your hand in both of hers. 'The Verdant Circle remembers you.'",
+      },
+    ],
+  },
+  {
+    id: 'quest_break_trickster',
+    title: "Break the Trickster's Hold",
+    desc: "The Fey Trickster has bound the Ancient Oak. Defeat it and recover the Oak's heart.",
+    giverNpcId: 'npc_elise_elder',
+    factionId: 'faction_verdant',
+    repGain: 30,
+    steps: [
+      {
+        id: 'step_kill_trickster',
+        desc: 'Defeat the Fey Trickster at the Ancient Oak.',
+        condition: {
+          all: [{ fact: 'enemies_killed', operator: 'contains', value: 'ancient_oak#0' }],
+        },
+      },
+      {
+        id: 'step_take_heart',
+        desc: 'Recover the Heart of the Ancient Oak from the Grove Sanctum.',
+        condition: { all: [{ fact: 'loot_taken', operator: 'contains', value: 'oak_heart' }] },
+      },
+    ],
+    rewards: [
+      { type: 'give_gold', amount: 300 },
+      { type: 'give_xp', amount: 1500 },
+      // Faction rep bumped via `repGain: 30` above.
+      { type: 'set_escape' },
+      {
+        type: 'add_narrative',
+        text: 'The grove sighs — a long, green release. Pinegate will sleep easy tonight.',
+      },
+    ],
+  },
 ];
 
 export const factions: Faction[] = [
@@ -338,6 +529,34 @@ export const factions: Faction[] = [
       exalted: 1.0,
     },
   },
+
+  // ── Whispering Pines (folded) ────────────────────────────────────────────
+  {
+    id: 'faction_wardens',
+    name: 'Pine Wardens',
+    thresholds: { hostile: -50, unfriendly: -10, neutral: 0, friendly: 20, exalted: 60 },
+    shopPriceModifiers: {
+      hostile: 1.5,
+      unfriendly: 1.2,
+      neutral: 1.0,
+      friendly: 0.85,
+      exalted: 0.7,
+    },
+  },
+
+  // ── Grove of Thorns (folded) ─────────────────────────────────────────────
+  {
+    id: 'faction_verdant',
+    name: 'Verdant Circle',
+    thresholds: { hostile: -50, unfriendly: -10, neutral: 0, friendly: 20, exalted: 60 },
+    shopPriceModifiers: {
+      hostile: 1.5,
+      unfriendly: 1.2,
+      neutral: 1.0,
+      friendly: 0.85, // bigger discount than Vale — druids share with kin
+      exalted: 0.7,
+    },
+  },
 ];
 
 export const rules: GameRule[] = [
@@ -358,5 +577,64 @@ export const rules: GameRule[] = [
         text: "You recognise the Guild's stamp on the waterlogged ledger — this is what Aldric was looking for.",
       },
     ],
+  },
+
+  // ── Whispering Pines (folded) ────────────────────────────────────────────
+  {
+    name: 'halden_locket_found',
+    once: true,
+    priority: 5,
+    conditions: {
+      all: [
+        { fact: 'loot_taken', operator: 'contains', value: 'halden_locket' },
+        { fact: 'flags', operator: 'doesNotContain', value: 'rule_fired_halden_locket_found' },
+      ],
+    },
+    consequences: [
+      { type: 'advance_quest', questId: 'quest_trapper', stepId: 'step_find_locket' },
+      {
+        type: 'add_narrative',
+        text: "You recognise the engraving — Halden's daughter's name. The cult had him here.",
+      },
+    ],
+  },
+  {
+    name: 'cult_idol_recovered',
+    once: true,
+    priority: 5,
+    conditions: {
+      all: [
+        { fact: 'loot_taken', operator: 'contains', value: 'cult_idol' },
+        { fact: 'flags', operator: 'doesNotContain', value: 'rule_fired_cult_idol_recovered' },
+      ],
+    },
+    consequences: [
+      { type: 'advance_quest', questId: 'quest_cult', stepId: 'step_recover_idol' },
+      {
+        type: 'add_narrative',
+        text: 'The idol grows cold in your hand. Captain Riese will want to see this immediately.',
+      },
+    ],
+  },
+
+  // ── Grove of Thorns (folded) ─────────────────────────────────────────────
+  {
+    name: 'step_talk_elise',
+    conditions: {
+      all: [
+        {
+          any: [
+            { fact: 'action', operator: 'equal', value: 'talk_response' },
+            { fact: 'action', operator: 'equal', value: 'accept_quest' },
+          ],
+        },
+        { fact: 'room_id', operator: 'equal', value: 'pinegate_square' },
+      ],
+    },
+    // No consequence needed — `once` makes the engine set the
+    // `rule_fired_step_talk_elise` flag, which the quest step's condition
+    // checks. (Previously also set a dead `talked_elise` flag nothing read.)
+    consequences: [],
+    once: true,
   },
 ];

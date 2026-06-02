@@ -78,6 +78,144 @@ export const enemyTemplates: EnemyTemplate[] = [
   // SRD bandit renamed for the local Lantern District flavor.
   { ...SRD_MONSTERS.bandit, name: 'Bandit Ruffian' },
   CRYPT_LORD_BASE,
+
+  // ── Whispering Pines (folded) ────────────────────────────────────────────
+  // SRD wolf with a cold-resist coat.
+  { ...SRD_MONSTERS.wolf, name: 'Frost Wolf', resistances: ['cold'] },
+  // Pure SRD ice mephit.
+  SRD_MONSTERS.ice_mephit,
+  // SRD bandit with cold resist + slightly tougher kit. Higher AC + dmg
+  // than the baseline bandit reflects the harsher pass — they're better
+  // armed than a Lantern District ruffian.
+  {
+    ...SRD_MONSTERS.bandit,
+    name: 'Snowshrouded Bandit',
+    cr: 0.25,
+    hp: 11,
+    ac: 13,
+    damage: '1d6+2',
+    toHit: 4,
+    xp: 50,
+    str: 13,
+    dex: 13,
+    resistances: ['cold'],
+  },
+  {
+    name: 'Frost Cultist',
+    cr: 0.5,
+    hp: 17,
+    ac: 12,
+    damage: '1d8+1',
+    toHit: 3,
+    xp: 100,
+    str: 11,
+    dex: 12,
+    con: 12,
+    int: 10,
+    wis: 13,
+    cha: 11,
+    resistances: ['cold'],
+    damageType: 'cold',
+  },
+  {
+    name: 'Frost Acolyte',
+    // Boss — an Ice Mage. Vulnerable to fire to reward Burning Hands /
+    // Fire Bolt parties; multiattack of 2; paralyzing onHitEffect leans on
+    // the SRD STR/DEX auto-fail rule from §9.2.
+    cr: 4,
+    hp: 78,
+    ac: 15,
+    damage: '2d6+3',
+    toHit: 6,
+    xp: 1100,
+    str: 12,
+    dex: 14,
+    con: 16,
+    int: 17,
+    wis: 14,
+    cha: 13,
+    multiattack: 2,
+    resistances: ['cold'],
+    immunities: ['poison'],
+    vulnerabilities: ['fire'],
+    condition_immunities: ['frightened', 'paralyzed'],
+    onHitEffect: { condition: 'paralyzed', ability: 'con', dc: 13 },
+    damageType: 'cold',
+    // Spell-caster — the Acolyte sometimes hurls fire_bolt instead of
+    // melee, opening a Counterspell window for any L5+ caster in the party.
+    spells: ['fire_bolt'],
+    castChance: 0.4,
+    spellAttackBonus: 5,
+    spellSaveDC: 13,
+    // Two-phase fight. At 60% the Acolyte buys time with an ice-armor +
+    // ramped damage. At 30% it strips its frost cloak and casts more
+    // aggressively — castChance can't be raised through effects, but the
+    // damage spike compensates.
+    phases: [
+      {
+        hpPct: 60,
+        name: 'Ice Armor',
+        narrative:
+          'The Acolyte hisses a hard syllable and frost rimes their robes — blows skid off. Around them the ritual flame burns colder.',
+        effects: [
+          { kind: 'set_ac', value: 17 },
+          { kind: 'set_damage', dice: '2d8+3' },
+        ],
+      },
+      {
+        hpPct: 30,
+        name: 'Frostbinding',
+        narrative:
+          'The Acolyte tears off their frost cloak. Black ice spreads beneath their feet. Their staff lashes with bone-cold speed.',
+        effects: [
+          { kind: 'set_to_hit', value: 8 },
+          { kind: 'set_multiattack', value: 3 },
+          {
+            kind: 'set_on_hit_effect',
+            effect: { condition: 'paralyzed', ability: 'con', dc: 15 },
+          },
+        ],
+      },
+    ],
+  },
+
+  // ── Grove of Thorns (folded) ─────────────────────────────────────────────
+  // SRD wolf, magically awakened — int 10 (vs base 3) + stronger bite
+  // (2d4+2 vs 1d6+1). Reads as a wolf that thinks like a person.
+  {
+    ...SRD_MONSTERS.wolf,
+    name: 'Awakened Wolf',
+    damage: '2d4+2',
+    int: 10,
+  },
+  // Pure SRD entries — already themed for a fey grove.
+  SRD_MONSTERS.giant_spider,
+  SRD_MONSTERS.brown_bear,
+  {
+    name: 'Fey Trickster',
+    cr: 4,
+    hp: 60,
+    ac: 14,
+    damage: '1d6+3',
+    toHit: 5,
+    xp: 1100,
+    str: 10,
+    dex: 17,
+    con: 14,
+    int: 14,
+    wis: 13,
+    cha: 16,
+    multiattack: 2,
+    // Charms instead of paralyzes — boss flavor: it's not killing
+    // you, it's seducing you into the grove. Charmed PCs lose their
+    // turn (engine handles via the existing charmed condition).
+    onHitEffect: { condition: 'charmed', ability: 'wis', dc: 13 },
+    // Hexes a target ~30% of turns (its fey-curse motif).
+    spells: ['hex'],
+    castChance: 0.3,
+    spellSaveDC: 13,
+    damageType: 'piercing',
+  },
 ];
 
 export const enemies: Record<string, Enemy[]> = {
@@ -301,6 +439,228 @@ export const enemies: Record<string, Enemy[]> = {
       drops: ['dagger'],
     },
   ],
+
+  // ── Whispering Pines (folded) ────────────────────────────────────────────
+  pass_climb: [
+    {
+      id: 'pass_climb#0',
+      name: 'Frost Wolf',
+      hp: 11,
+      ac: 13,
+      damage: '1d6+1',
+      toHit: 4,
+      xp: 50,
+      resistances: ['cold'],
+    },
+    {
+      id: 'pass_climb#1',
+      name: 'Frost Wolf',
+      hp: 11,
+      ac: 13,
+      damage: '1d6+1',
+      toHit: 4,
+      xp: 50,
+      resistances: ['cold'],
+    },
+  ],
+  spire_frozen_hall: [
+    {
+      id: 'spire_frozen_hall#0',
+      name: 'Ice Mephit',
+      hp: 21,
+      ac: 11,
+      damage: '1d4+2',
+      toHit: 4,
+      xp: 100,
+      immunities: ['cold'],
+      vulnerabilities: ['fire'],
+      condition_immunities: ['poisoned'],
+    },
+    {
+      id: 'spire_frozen_hall#1',
+      name: 'Ice Mephit',
+      hp: 21,
+      ac: 11,
+      damage: '1d4+2',
+      toHit: 4,
+      xp: 100,
+      immunities: ['cold'],
+      vulnerabilities: ['fire'],
+      condition_immunities: ['poisoned'],
+    },
+  ],
+  spire_cult_chamber: [
+    {
+      id: 'spire_cult_chamber#0',
+      name: 'Frost Cultist',
+      hp: 17,
+      ac: 12,
+      damage: '1d8+1',
+      toHit: 3,
+      xp: 100,
+      resistances: ['cold'],
+    },
+    {
+      id: 'spire_cult_chamber#1',
+      name: 'Frost Cultist',
+      hp: 17,
+      ac: 12,
+      damage: '1d8+1',
+      toHit: 3,
+      xp: 100,
+      resistances: ['cold'],
+    },
+  ],
+  spire_ritual_apex: [
+    {
+      id: 'spire_ritual_apex#boss',
+      name: 'Frost Acolyte',
+      hp: 78,
+      ac: 15,
+      damage: '2d6+3',
+      toHit: 6,
+      xp: 1100,
+      multiattack: 2,
+      resistances: ['cold'],
+      immunities: ['poison'],
+      vulnerabilities: ['fire'],
+      condition_immunities: ['frightened', 'paralyzed'],
+      onHitEffect: { condition: 'paralyzed', ability: 'con', dc: 13 },
+      phases: [
+        {
+          hpPct: 60,
+          name: 'Ice Armor',
+          narrative:
+            'The Acolyte hisses a hard syllable and frost rimes their robes — blows skid off. Around them the ritual flame burns colder.',
+          effects: [
+            { kind: 'set_ac', value: 17 },
+            { kind: 'set_damage', dice: '2d8+3' },
+          ],
+        },
+        {
+          hpPct: 30,
+          name: 'Frostbinding',
+          narrative:
+            'The Acolyte tears off their frost cloak. Black ice spreads beneath their feet. Their staff lashes with bone-cold speed.',
+          effects: [
+            { kind: 'set_to_hit', value: 8 },
+            { kind: 'set_multiattack', value: 3 },
+            {
+              kind: 'set_on_hit_effect',
+              effect: { condition: 'paralyzed', ability: 'con', dc: 15 },
+            },
+          ],
+        },
+      ],
+    },
+  ],
+
+  // ── Grove of Thorns (folded) ─────────────────────────────────────────────
+  grove_entrance: [
+    {
+      id: 'grove_entrance#0',
+      name: 'Awakened Wolf',
+      hp: 11,
+      ac: 13,
+      damage: '2d4+2',
+      toHit: 4,
+      xp: 50,
+      str: 12,
+      dex: 15,
+      con: 12,
+      int: 10,
+      wis: 12,
+      cha: 8,
+    },
+    {
+      id: 'grove_entrance#1',
+      name: 'Awakened Wolf',
+      hp: 11,
+      ac: 13,
+      damage: '2d4+2',
+      toHit: 4,
+      xp: 50,
+      str: 12,
+      dex: 15,
+      con: 12,
+      int: 10,
+      wis: 12,
+      cha: 8,
+    },
+  ],
+  thornwood_maze: [
+    {
+      id: 'thornwood_maze#0',
+      name: 'Giant Spider',
+      hp: 13,
+      ac: 14,
+      damage: '1d8',
+      toHit: 5,
+      xp: 100,
+      str: 8,
+      dex: 16,
+      con: 11,
+      int: 2,
+      wis: 11,
+      cha: 4,
+      onHitEffect: { condition: 'poisoned', ability: 'con', dc: 11 },
+    },
+    {
+      id: 'thornwood_maze#1',
+      name: 'Giant Spider',
+      hp: 13,
+      ac: 14,
+      damage: '1d8',
+      toHit: 5,
+      xp: 100,
+      str: 8,
+      dex: 16,
+      con: 11,
+      int: 2,
+      wis: 11,
+      cha: 4,
+      onHitEffect: { condition: 'poisoned', ability: 'con', dc: 11 },
+    },
+  ],
+  ancient_oak: [
+    {
+      id: 'ancient_oak#0',
+      name: 'Fey Trickster',
+      hp: 60,
+      ac: 14,
+      damage: '1d6+3',
+      toHit: 5,
+      xp: 1100,
+      str: 10,
+      dex: 17,
+      con: 14,
+      int: 14,
+      wis: 13,
+      cha: 16,
+      multiattack: 2,
+      onHitEffect: { condition: 'charmed', ability: 'wis', dc: 13 },
+      spells: ['hex'],
+      castChance: 0.3,
+      spellSaveDC: 13,
+      damageType: 'piercing',
+    },
+    {
+      id: 'ancient_oak#1',
+      name: 'Brown Bear',
+      hp: 34,
+      ac: 11,
+      damage: '2d6+4',
+      toHit: 5,
+      xp: 200,
+      str: 19,
+      dex: 10,
+      con: 16,
+      int: 2,
+      wis: 13,
+      cha: 7,
+      multiattack: 2,
+    },
+  ],
 };
 
 export const npcs: Record<string, PlacedNpc> = {
@@ -422,5 +782,166 @@ export const npcs: Record<string, PlacedNpc> = {
       },
     ],
     persuasionDC: 14,
+  },
+
+  // ── Whispering Pines (folded) ────────────────────────────────────────────
+  pines_tavern: {
+    roomId: 'pines_tavern',
+    id: 'npc_brann',
+    name: 'Innkeeper Brann',
+    attitude: 'friendly',
+    factionId: 'faction_wardens',
+    hp: 6,
+    ac: 10,
+    damage: '1d4',
+    toHit: 0,
+    xp: 0,
+    greeting:
+      "Thank the gods you're here. Old Halden the trapper went up the pass three days back — never came down. Bring him back, or proof. I'll pay.",
+    responses: [
+      {
+        label: "I'll search the pass for Halden.",
+        reply:
+          "Bless you. His daughter's been crying herself to sleep. He carries a silver locket — bring it back if you find him.",
+      },
+      {
+        label: 'What about the spire?',
+        reply:
+          'Iceshard Spire. Cultists. Green fire in the topmost window. Captain Riese knows more.',
+      },
+      {
+        label: 'Supplies?',
+        reply: 'Mulled elixirs, fur cloaks. Anything heavier, ask Marta at the lodge.',
+      },
+    ],
+    persuasionDC: 10,
+    shop: [
+      { itemId: 'elixir_of_warmth', price: 20 },
+      { itemId: 'fur_cloak', price: 40 },
+    ],
+  },
+  pines_lodge: {
+    roomId: 'pines_lodge',
+    id: 'npc_marta',
+    name: 'Marta the Trapper',
+    attitude: 'friendly',
+    factionId: 'faction_wardens',
+    hp: 12,
+    ac: 13,
+    damage: '1d6+2',
+    toHit: 3,
+    xp: 0,
+    greeting:
+      'Halden was a friend. Take what you need — warhammers work better than blades on the mephits. Carry torches.',
+    responses: [
+      {
+        label: 'Show me your goods.',
+        reply: "Everything's marked. Warden discount if Riese's vouched for you.",
+      },
+      {
+        label: 'Tell me about the mephits.',
+        reply: 'Cold breath. Wear your cloak. They flee fire like cats from water.',
+      },
+    ],
+    persuasionDC: 11,
+    shop: [
+      { itemId: 'warhammer', price: 30 },
+      { itemId: 'longbow', price: 50 },
+      { itemId: 'leather_armor', price: 45 },
+      { itemId: 'elixir_of_warmth', price: 18 },
+    ],
+  },
+  pines_warden: {
+    roomId: 'pines_warden',
+    id: 'npc_riese',
+    name: 'Captain Riese',
+    attitude: 'indifferent',
+    hp: 22,
+    ac: 16,
+    damage: '1d8+3',
+    toHit: 5,
+    xp: 0,
+    greeting:
+      "Listen — the trapper's a sideshow. The real problem is the cult at Iceshard. Bring back their idol so I know how bad it's gotten. Kill their leader and we end this for a generation.",
+    responses: [
+      {
+        label: "I'll end the cult at the spire.",
+        reply: 'Good. The Acolyte will be at the top. Bring back the idol.',
+      },
+      {
+        label: 'What about the cult?',
+        reply: 'They worship something old in the ice. Take fire if you have it.',
+      },
+      {
+        label: 'A healer?',
+        reply: "We've a field medic, yes. It'll cost you, mind.",
+        consequences: [{ type: 'modify_hp', amount: 6 }],
+      },
+    ],
+    persuasionDC: 13,
+  },
+
+  // ── Grove of Thorns (folded) ─────────────────────────────────────────────
+  pinegate_square: {
+    roomId: 'pinegate_square',
+    id: 'npc_elise_elder',
+    name: 'Old Elise (village elder)',
+    attitude: 'friendly',
+    factionId: 'faction_verdant',
+    hp: 6,
+    ac: 10,
+    damage: '1d4',
+    toHit: 0,
+    xp: 0,
+    greeting:
+      'Mother Mareth went into the grove two weeks ago and never returned. The beasts have gone savage. We need someone — anyone — to walk the path she walked.',
+    responses: [
+      {
+        label: "We'll find Mareth and the grove's heart.",
+        reply:
+          'Bless you. Take her charm from the lodge — it will let the Oak know you are no enemy. Defeat the Fey Trickster at the heart and the grove will mend.',
+        consequences: [
+          { type: 'advance_quest', questId: 'quest_silent_grove', stepId: 'step_talk_elise' },
+        ],
+      },
+      {
+        label: 'What do you know about this Fey Trickster?',
+        reply:
+          "A Sidhe creature. It charms first, kills second. Don't look it in the eye. Mareth must have refused its bargain. Hex magic is its mark.",
+      },
+      {
+        label: 'Mareth made deals with fey before?',
+        reply:
+          'The Verdant Circle works with old powers, but this one came uninvited. Whatever pact it offered, Mareth refused — that is why the grove is in pain.',
+      },
+    ],
+    persuasionDC: 10,
+  },
+  pinegate_lodge: {
+    roomId: 'pinegate_lodge',
+    id: 'npc_tamsin_herbalist',
+    name: 'Tamsin the Herbalist',
+    attitude: 'friendly',
+    factionId: 'faction_verdant',
+    hp: 8,
+    ac: 11,
+    damage: '1d4',
+    toHit: 1,
+    xp: 0,
+    greeting:
+      'Welcome. The grove has not yielded medicine in weeks — what I have left, I sell. Circle-members get a fair price.',
+    responses: [
+      {
+        label: 'Show me your wares.',
+        reply: 'Take what you need — coin or rep.',
+      },
+      {
+        label: 'What can you tell me about the grove?',
+        reply:
+          'The Ancient Oak is at the heart. Mareth used to commune with it. If you reach it and the Oak still lives, plant her charm at its roots — the grove will know.',
+      },
+    ],
+    persuasionDC: 10,
+    shop: [{ itemId: 'healing_potion', price: 50 }],
   },
 };

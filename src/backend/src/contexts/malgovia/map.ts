@@ -365,6 +365,338 @@ export const rooms: Room[] = [
       },
     ],
   },
+
+  // ── Whispering Pines (folded) ────────────────────────────────────────────
+  // Village interiors (town venues open these; each ascends back to town).
+  {
+    id: 'pines_tavern',
+    name: 'Pine Tavern',
+    desc: 'A low-beamed inn smelling of woodsmoke and mulled spirits. Innkeeper Brann tends the bar.',
+    canRest: true,
+    gridWidth: 7,
+    gridHeight: 7,
+    entryPos: { x: 3, y: 6 },
+    exits: [{ pos: { x: 3, y: 0 }, ascends: true, label: 'Back into the village' }],
+  },
+  {
+    id: 'pines_lodge',
+    name: "Trapper's Lodge",
+    desc: "Marta's lodge — pelts hanging in racks, snowshoes and warhammers along the wall. A locked supply locker stands by the door.",
+    gridWidth: 7,
+    gridHeight: 7,
+    entryPos: { x: 3, y: 6 },
+    exits: [{ pos: { x: 3, y: 0 }, ascends: true, label: 'Back into the village' }],
+    objects: [
+      {
+        id: 'trapper_locker',
+        name: "Trapper's Locker",
+        desc: "Marta's supply locker, kept off the floor. The lock looks honest, not warded.",
+        interactText: 'You crouch by the locker and pick at the latch.',
+        searchable: true,
+        searchDC: 12,
+        lootIds: ['elixir_of_warmth'],
+        foundText: 'Inside: a wax-stoppered vial. An elixir of warmth.',
+        emptyText: 'The latch sticks. Brace it properly and try the lock again.',
+      },
+    ],
+  },
+  {
+    id: 'pines_warden',
+    name: 'Warden Post',
+    desc: "Captain Riese's command — a stone hut warmed by a single brazier. A war map covers one wall.",
+    gridWidth: 7,
+    gridHeight: 7,
+    entryPos: { x: 3, y: 6 },
+    exits: [{ pos: { x: 3, y: 0 }, ascends: true, label: 'Back into the village' }],
+  },
+
+  // The Frozen Pass — a regional site (a Frost Wolf prowls the trail).
+  {
+    id: 'pass_climb',
+    name: 'Frozen Pass',
+    desc: 'A switchback trail along the cliff face. Wind carries the scent of woodsmoke from below and something colder from above.',
+    gridWidth: 10,
+    gridHeight: 8,
+    entryPos: { x: 0, y: 4 },
+    exits: [{ pos: { x: 9, y: 4 }, ascends: true, label: 'Back down the pass' }],
+  },
+
+  // Iceshard Spire — a regional site; rooms chain entrance → hall → cult →
+  // apex → egress, and the Hidden Descent ascends out.
+  {
+    id: 'spire_entrance',
+    name: 'Spire Entrance',
+    desc: 'A black stone arch leans against the cliff. Old cult sigils mark the lintel. The air inside is colder than the wind.',
+    canRest: false,
+    lighting: 'dim',
+    gridWidth: 10,
+    gridHeight: 10,
+    entryPos: { x: 0, y: 0 },
+    exits: [
+      {
+        pos: { x: 9, y: 0 },
+        toRoomId: 'spire_frozen_hall',
+        entrancePos: { x: 0, y: 0 },
+        label: 'Into the Frozen Hall',
+      },
+      { pos: { x: 0, y: 9 }, ascends: true, label: 'Back out to the pass' },
+    ],
+  },
+  {
+    id: 'spire_frozen_hall',
+    name: 'Frozen Hall',
+    desc: 'A long pillared hall sheathed in ice. Frost mephits glitter in the air like motes of dust. Heavy icicles hang from the vaulted ceiling — some look ready to fall.',
+    lighting: 'dark',
+    gridWidth: 10,
+    gridHeight: 10,
+    entryPos: { x: 0, y: 0 },
+    exits: [
+      {
+        pos: { x: 0, y: 1 },
+        toRoomId: 'spire_entrance',
+        entrancePos: { x: 9, y: 0 },
+        label: 'Back to the entrance',
+      },
+      {
+        pos: { x: 9, y: 9 },
+        toRoomId: 'spire_cult_chamber',
+        entrancePos: { x: 0, y: 0 },
+        label: 'Into the Cult Chamber',
+      },
+    ],
+    trap: {
+      id: 'frozen_hall_icicle',
+      name: 'Falling Icicle',
+      desc: 'A spear-length icicle hangs over the hall, threaded with a thawing rune. Disturbance below shakes it loose.',
+      dc: 12,
+      damage: '2d6',
+      damageType: 'piercing',
+      triggerNarrative:
+        'The icicle plunges from the ceiling — {name} takes {dmg} piercing damage and a faceful of frost.',
+      detectNarrative:
+        'You spot the rune carved at the base of the icicle — pure ice, set to drop if the hall is disturbed.',
+      disarmSuccess: 'You snap the rune cleanly. The icicle slumps harmlessly.',
+      disarmFail: 'Your hand slips on the rime — the icicle plummets early!',
+    },
+  },
+  {
+    id: 'spire_cult_chamber',
+    name: 'Cult Chamber',
+    desc: 'A circular vault with a low altar of black ironwood. Frostspire cultists chant in unison around a captive form. (Old Halden lies bound near the altar, unconscious.)',
+    lighting: 'dim',
+    gridWidth: 10,
+    gridHeight: 10,
+    entryPos: { x: 0, y: 0 },
+    exits: [
+      {
+        pos: { x: 0, y: 1 },
+        toRoomId: 'spire_frozen_hall',
+        entrancePos: { x: 9, y: 9 },
+        label: 'Back to the Frozen Hall',
+      },
+      {
+        pos: { x: 9, y: 9 },
+        toRoomId: 'spire_ritual_apex',
+        entrancePos: { x: 1, y: 1 },
+        label: 'Up to the Ritual Apex',
+      },
+    ],
+  },
+  {
+    id: 'spire_ritual_apex',
+    name: 'Ritual Apex',
+    desc: "The spire's top chamber. A green flame burns above the broken vault. Shattered ice columns and frozen statuary line the approach. The Frost Acolyte stands at the apex, hands raised, runes blazing.",
+    lighting: 'bright',
+    gridWidth: 10,
+    gridHeight: 10,
+    entryPos: { x: 1, y: 1 },
+    exits: [
+      {
+        pos: { x: 0, y: 9 },
+        toRoomId: 'spire_cult_chamber',
+        entrancePos: { x: 9, y: 9 },
+        label: 'Back to the Cult Chamber',
+      },
+      {
+        pos: { x: 9, y: 9 },
+        toRoomId: 'spire_egress',
+        entrancePos: { x: 0, y: 0 },
+        label: 'A hidden descent',
+      },
+    ],
+    // Ice columns + frozen ritual statuary clustered around the approach
+    // to the apex dais. Symmetric so neither flank is "the right side".
+    obstacles: [
+      { x: 2, y: 4 },
+      { x: 8, y: 4 },
+      { x: 4, y: 6 },
+      { x: 6, y: 6 },
+      { x: 5, y: 3 },
+    ],
+    // Slick ice in the centre — slows the approach to the dais.
+    difficultTerrain: [
+      { x: 4, y: 4 },
+      { x: 5, y: 4 },
+      { x: 6, y: 4 },
+    ],
+  },
+  {
+    id: 'spire_egress',
+    name: 'Hidden Descent',
+    desc: 'A narrow stair cuts through the cliff back to the lower trail. Daylight shows below.',
+    gridWidth: 8,
+    gridHeight: 8,
+    entryPos: { x: 0, y: 0 },
+    exits: [
+      {
+        pos: { x: 0, y: 1 },
+        toRoomId: 'spire_ritual_apex',
+        entrancePos: { x: 9, y: 9 },
+        label: 'Back up to the apex',
+      },
+      { pos: { x: 7, y: 7 }, ascends: true, label: 'Descend to the pass' },
+    ],
+  },
+
+  // ── Grove of Thorns (folded) ─────────────────────────────────────────────
+  // Pinegate town interiors (venues open these; each ascends back to town).
+  {
+    id: 'pinegate_square',
+    name: 'Pinegate Village',
+    desc: 'A small village square with a stone well at its center. Pine trees rise dark beyond the houses. Lanterns burn even at midday.',
+    gridWidth: 7,
+    gridHeight: 7,
+    entryPos: { x: 3, y: 6 },
+    exits: [{ pos: { x: 3, y: 0 }, ascends: true, label: 'Back into Pinegate' }],
+  },
+  {
+    id: 'pinegate_lodge',
+    name: 'The Burnt Stump (lodge)',
+    desc: "A timber-frame lodge serving as inn, common-hall, and informal council seat. A fire crackles. Mareth's carved charm hangs on the wall.",
+    gridWidth: 7,
+    gridHeight: 7,
+    entryPos: { x: 3, y: 6 },
+    exits: [{ pos: { x: 3, y: 0 }, ascends: true, label: 'Back into Pinegate' }],
+  },
+
+  // The Grove — a regional site. Entry room is the bridge; the path chains
+  // bridge → entrance → maze → oak → sanctum, and the sanctum ascends out.
+  {
+    id: 'thornwater_bridge',
+    name: 'Thornwater Bridge',
+    desc: 'A stone bridge across rushing water. The pines on the far bank stand too still. A faded Verdant Circle banner hangs from the rail.',
+    gridWidth: 8,
+    gridHeight: 6,
+    entryPos: { x: 0, y: 3 },
+    exits: [
+      {
+        pos: { x: 7, y: 3 },
+        toRoomId: 'grove_entrance',
+        entrancePos: { x: 0, y: 0 },
+        label: 'Cross into the grove',
+      },
+      { pos: { x: 0, y: 0 }, ascends: true, label: 'Back to the Verdant Reach' },
+    ],
+  },
+  {
+    id: 'grove_entrance',
+    name: 'Grove Entrance',
+    desc: "The path widens into a clearing of standing stones. Wolf-eyes glow from the underbrush. The Circle's old gateway arch is here — and broken.",
+    gridWidth: 10,
+    gridHeight: 10,
+    entryPos: { x: 0, y: 0 },
+    exits: [
+      {
+        pos: { x: 0, y: 1 },
+        toRoomId: 'thornwater_bridge',
+        entrancePos: { x: 7, y: 3 },
+        label: 'Back to the bridge',
+      },
+      {
+        pos: { x: 9, y: 9 },
+        toRoomId: 'thornwood_maze',
+        entrancePos: { x: 0, y: 0 },
+        label: 'Into the Thornwood',
+      },
+    ],
+  },
+  {
+    id: 'thornwood_maze',
+    name: 'The Thornwood Maze',
+    desc: 'A winding stretch of thorn-thicket where the path forks and rejoins. Webs glint between branches. Something many-legged moves overhead.',
+    gridWidth: 10,
+    gridHeight: 10,
+    entryPos: { x: 0, y: 0 },
+    exits: [
+      {
+        pos: { x: 0, y: 1 },
+        toRoomId: 'grove_entrance',
+        entrancePos: { x: 9, y: 9 },
+        label: 'Back to the entrance',
+      },
+      {
+        pos: { x: 9, y: 9 },
+        toRoomId: 'ancient_oak',
+        entrancePos: { x: 1, y: 1 },
+        label: 'To the Ancient Oak',
+      },
+    ],
+  },
+  {
+    id: 'ancient_oak',
+    name: 'The Ancient Oak',
+    desc: "A vast, ancient oak at the grove's heart. Roots curl up from the earth in a circular dais, splitting the approach into braided paths. A figure in fey green stands at the trunk — the Trickster, with two trained bears flanking it.",
+    gridWidth: 10,
+    gridHeight: 10,
+    entryPos: { x: 1, y: 1 },
+    exits: [
+      {
+        pos: { x: 0, y: 9 },
+        toRoomId: 'thornwood_maze',
+        entrancePos: { x: 9, y: 9 },
+        label: 'Back into the maze',
+      },
+      {
+        pos: { x: 9, y: 9 },
+        toRoomId: 'grove_sanctum',
+        entrancePos: { x: 0, y: 0 },
+        label: 'Into the sanctum',
+      },
+    ],
+    // Gnarled roots arching up through the floor — split the approach so
+    // the bears can't all converge at once.
+    obstacles: [
+      { x: 4, y: 3 },
+      { x: 6, y: 3 },
+      { x: 3, y: 5 },
+      { x: 7, y: 5 },
+      { x: 5, y: 6 },
+    ],
+    // Thorned undergrowth in patches — slows movement near the dais.
+    difficultTerrain: [
+      { x: 4, y: 5 },
+      { x: 5, y: 5 },
+      { x: 6, y: 5 },
+      { x: 5, y: 4 },
+    ],
+  },
+  {
+    id: 'grove_sanctum',
+    name: 'Grove Sanctum',
+    desc: "A sunlit clearing past the Oak. Mareth's charm warms in your hand. The path back to Pinegate is open.",
+    gridWidth: 8,
+    gridHeight: 8,
+    entryPos: { x: 0, y: 0 },
+    exits: [
+      {
+        pos: { x: 0, y: 1 },
+        toRoomId: 'ancient_oak',
+        entrancePos: { x: 9, y: 9 },
+        label: 'Back to the Oak',
+      },
+      { pos: { x: 7, y: 7 }, ascends: true, label: 'Return to Pinegate' },
+    ],
+  },
 ];
 
 export const regions: Region[] = [
@@ -434,8 +766,47 @@ export const regions: Region[] = [
         kind: 'local',
         entryRoomId: 'dungeon_crypt_entrance',
       },
+      // ── Whispering Pines (folded) — three new sites in the frozen north ──
+      {
+        id: 'site_pines',
+        name: 'Whispering Pines',
+        pos: { x: 9, y: 1 }, // gateway town into the frozen north
+        kind: 'town',
+        townId: 'pines_village',
+      },
+      {
+        id: 'site_pass',
+        name: 'The Frozen Pass',
+        pos: { x: 5, y: 1 }, // snowy north, on the way west to the Spire
+        kind: 'local',
+        entryRoomId: 'pass_climb',
+      },
+      {
+        id: 'site_spire',
+        name: 'Iceshard Spire',
+        pos: { x: 1, y: 0 }, // climax, the frozen NW corner
+        kind: 'local',
+        entryRoomId: 'spire_entrance',
+      },
+      // ── Grove of Thorns (folded) — Pinegate + the Silent Grove ──
+      {
+        id: 'site_pinegate',
+        name: 'Pinegate',
+        pos: { x: 5, y: 7 }, // early, along the southern road
+        kind: 'town',
+        townId: 'pinegate_town',
+      },
+      {
+        id: 'site_grove',
+        name: 'The Silent Grove',
+        pos: { x: 6, y: 6 }, // just off the road, south-centre
+        kind: 'local',
+        entryRoomId: 'thornwater_bridge',
+      },
     ],
-    encounterTable: ['Bandit Ruffian'],
+    // Bandit Ruffian (Malgovia) + the folded modules' overland encounters
+    // (Whispering Pines: Snowshrouded Bandit, Frost Wolf; Grove: Awakened Wolf).
+    encounterTable: ['Bandit Ruffian', 'Snowshrouded Bandit', 'Frost Wolf', 'Awakened Wolf'],
     encounterChance: 0.1, // per mile-square crossed
   },
 ];
@@ -479,6 +850,69 @@ export const towns: Town[] = [
         entryRoomId: 'millhaven_garrison',
       },
       { id: 'venue_gate', name: 'Town Gate', pos: { x: 4, y: 7 }, kind: 'gate' },
+    ],
+  },
+
+  // ── Whispering Pines (folded) ────────────────────────────────────────────
+  {
+    id: 'pines_village',
+    name: 'Whispering Pines',
+    desc: 'A snow-shrouded square — the Pine Tavern, the Trapper’s Lodge, and the Warden Post.',
+    feetPerSquare: 25,
+    gridWidth: 6,
+    gridHeight: 6,
+    startPos: { x: 3, y: 3 },
+    venues: [
+      {
+        id: 'venue_tavern',
+        name: 'Pine Tavern',
+        pos: { x: 1, y: 1 },
+        kind: 'interior',
+        entryRoomId: 'pines_tavern',
+      },
+      {
+        id: 'venue_lodge',
+        name: "Trapper's Lodge",
+        pos: { x: 4, y: 1 },
+        kind: 'interior',
+        entryRoomId: 'pines_lodge',
+      },
+      {
+        id: 'venue_warden',
+        name: 'Warden Post',
+        pos: { x: 1, y: 4 },
+        kind: 'interior',
+        entryRoomId: 'pines_warden',
+      },
+      { id: 'venue_gate_pines', name: 'Village Edge', pos: { x: 3, y: 5 }, kind: 'gate' },
+    ],
+  },
+
+  // ── Grove of Thorns (folded) ─────────────────────────────────────────────
+  {
+    id: 'pinegate_town',
+    name: 'Pinegate',
+    desc: 'A lantern-lit village square ringed by pine — the well, the lodge, and worried faces.',
+    feetPerSquare: 25,
+    gridWidth: 6,
+    gridHeight: 6,
+    startPos: { x: 3, y: 4 },
+    venues: [
+      {
+        id: 'venue_square_grove',
+        name: 'Village Square',
+        pos: { x: 1, y: 2 },
+        kind: 'interior',
+        entryRoomId: 'pinegate_square',
+      },
+      {
+        id: 'venue_lodge_grove',
+        name: 'The Burnt Stump',
+        pos: { x: 4, y: 2 },
+        kind: 'interior',
+        entryRoomId: 'pinegate_lodge',
+      },
+      { id: 'venue_gate_grove', name: 'Village Edge', pos: { x: 3, y: 5 }, kind: 'gate' },
     ],
   },
 ];
