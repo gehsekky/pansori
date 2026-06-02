@@ -112,6 +112,13 @@ describe('GridMapView', () => {
     expect(getByText('site')).toBeTruthy();
   });
 
+  it('tooltips a non-POI square with its terrain type (POIs keep their name)', () => {
+    const { container } = render(<GridMapView grid={terrainGrid} markerPos={{ x: 0, y: 0 }} />);
+    expect(cell(container, 0, 1).getAttribute('title')).toBe('road'); // painted terrain
+    expect(cell(container, 3, 1).getAttribute('title')).toBe('water');
+    expect(cell(container, 4, 2).getAttribute('title')).toBe('plains'); // blank cell on a terrain grid
+  });
+
   it('renders regional impassable terrain as a mountain glyph + a "mountains" legend', () => {
     const { container, getByText } = render(<GridMapView grid={grid} markerPos={{ x: 0, y: 0 }} />);
     expect(cell(container, 2, 2).textContent).toContain('▲');
@@ -170,12 +177,12 @@ describe('GridMapView', () => {
     expect(c.getAttribute('role')).toBe('button'); // reachable
   });
 
-  it('checkerboards plain cells so adjacent squares are distinguishable', () => {
-    const { container } = render(<GridMapView grid={grid} markerPos={{ x: 0, y: 0 }} />);
-    // (1,0) is an even square (x+y=1 → odd index gets the tint; 2,0 even).
-    const light = cell(container, 2, 0).style.background; // x+y=2 → plain --t-bg
-    const dark = cell(container, 1, 0).style.background; // x+y=1 → tinted
-    expect(light).not.toBe(dark);
-    expect(dark).toContain('linear-gradient'); // the checker tint overlay
+  it('fills plains squares on a terrain map with the light-tan ground tint (no checkerboard)', () => {
+    const { container } = render(<GridMapView grid={terrainGrid} markerPos={{ x: 0, y: 0 }} />);
+    // (4,2) is an unpainted (plains) cell on a terrain-bearing grid → tan tint,
+    // applied uniformly (no light/dark checkerboard alternation).
+    expect(cell(container, 4, 2).style.background).toContain('208, 188, 146');
+    // A second plains cell of opposite parity carries the same fill.
+    expect(cell(container, 3, 2).style.background).toContain('208, 188, 146');
   });
 });

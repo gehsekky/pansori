@@ -5,11 +5,6 @@ import styles from '../styles.module.css';
 
 const CELL_PX = 32;
 
-// Checkerboard tint for the "dark" squares — a low-alpha grey overlay
-// composited over `--t-bg` (works on any theme). Layered via a flat gradient
-// because a bare rgba() would blend with the board's gridline colour instead.
-const CHECKER_TINT = 'linear-gradient(rgba(127, 127, 127, 0.16), rgba(127, 127, 127, 0.16))';
-
 interface Props {
   grid: ActiveGrid;
   markerPos: GridPos;
@@ -159,17 +154,19 @@ function GridMapView({ grid, markerPos, enemyPresent, onMarkerMove }: Props) {
       // keep their own tint (they already stand out + carry a glyph). The tint
       // is a theme-agnostic grey overlay composited over the page background,
       // so it works on light and dark themes alike.
-      const dark = (x + y) % 2 === 1;
       const isRegional = grid.level === 'regional';
       const terrainType = terrainAt.get(key);
       const tStyle = terrainType ? TERRAIN_STYLE[terrainType] : undefined;
-      // Layer order: a transition's amber tint wins; else typed terrain's tint;
-      // else a legacy (untyped) obstacle's grey block; else the checkerboard.
-      let cellBg = dark ? `${CHECKER_TINT}, var(--t-bg)` : 'var(--t-bg)';
+      // An unpainted cell on a terrain-bearing grid is plains (light tan). The
+      // tints + the 1px gridlines separate squares, so no checkerboard needed.
+      const plainsDefault = !terrainType && !isObstacle && grid.terrain.length > 0;
+      const fillTint = tStyle?.tint ?? (plainsDefault ? TERRAIN_STYLE.plains.tint : undefined);
+      let cellBg = fillTint
+        ? `linear-gradient(${fillTint}, ${fillTint}), var(--t-bg)`
+        : 'var(--t-bg)';
       if (transition) cellBg = 'rgba(150, 120, 60, 0.35)';
-      else if (tStyle?.tint)
-        cellBg = `linear-gradient(${tStyle.tint}, ${tStyle.tint}), var(--t-bg)`;
-      else if (isObstacle) cellBg = isRegional ? 'rgba(95, 88, 70, 0.85)' : 'rgba(90, 85, 70, 0.7)';
+      else if (isObstacle && !tStyle?.tint)
+        cellBg = isRegional ? 'rgba(95, 88, 70, 0.85)' : 'rgba(90, 85, 70, 0.7)';
 
       const ariaParts: string[] = [`${x},${y}`];
       if (isMarker) ariaParts.push('the party');
@@ -177,6 +174,20 @@ function GridMapView({ grid, markerPos, enemyPresent, onMarkerMove }: Props) {
       if (terrainType) ariaParts.push(TERRAIN[terrainType].label);
       else if (isObstacle) ariaParts.push('impassable');
       if (transition) ariaParts.push(transition.label);
+
+      // Hover tooltip: a destination shows its name; any other square shows its
+      // terrain type so the player can read the map. Blank cells on a
+      // terrain-bearing grid read as "plains"; grids with no authored terrain
+      // (town / local) keep no tooltip on empty cells.
+      const cellTitle = transition
+        ? transition.label
+        : terrainType
+          ? TERRAIN[terrainType].label
+          : isObstacle
+            ? 'impassable'
+            : grid.terrain.length > 0
+              ? 'plains'
+              : undefined;
 
       let token: React.ReactNode = null;
       if (isMarker) {
@@ -254,7 +265,7 @@ function GridMapView({ grid, markerPos, enemyPresent, onMarkerMove }: Props) {
           aria-current={isMarker ? 'location' : undefined}
           role={clickable ? 'button' : 'gridcell'}
           tabIndex={clickable ? 0 : undefined}
-          title={transition ? transition.label : undefined}
+          title={cellTitle}
           onClick={clickable ? () => onMarkerMove?.({ x, y }) : undefined}
           onKeyDown={
             clickable
