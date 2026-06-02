@@ -405,7 +405,7 @@ const context: Context = {
       // Opening frame only — the party begins on the regional grid (see
       // initMapState), so this describes the vale map, not a room.
       millhaven_square: [
-        "The Old Road brings you to the edge of Duskenvale. Millhaven's lantern-lit walls stand to the west; the wooded hills to the north and east hide the bandit camp and the Shattered Crypt. Your map of the vale lies open before you.",
+        "The Old Road brings you to the edge of Duskenvale. Millhaven's lantern-lit walls stand to the east; the wooded hills past it hide the bandit camp and the Shattered Crypt. Your map of the vale lies open before you.",
       ],
       dungeon_crypt_entrance: [
         'Mossy steps lead down into the Shattered Crypt. Cold air breathes from the darkness below.',
@@ -561,7 +561,7 @@ const context: Context = {
     // Investigation / Cunning Action over a Wizard's blast spells here.
     recommendedComposition: ['Fighter', 'Cleric', 'Rogue'],
     intro:
-      'Duskenvale stretches before you — a shadowed frontier of ancient tombs, frozen spires, and silent groves, where suspicious folk eye every stranger who walks the pine-dark roads.',
+      'Duskenvale stretches before you — a shadow of its former self. Years ago an arrogant mage thought he could control a powerful gateway spell but failed, leaving behind a shadowed frontier of dread-filled tombs, frozen spires, and silent groves, where suspicious folk eye every stranger who walks the pine-dark roads.',
 
     // ── Rooms (local grids) ──────────────────────────────────────────────────
     // 3-level map model: navigation is by the party marker on the regional /
@@ -1415,8 +1415,8 @@ const context: Context = {
           ...terr('mountain', [2, 0], [3, 0], [6, 0]),
           // Hilly approach to the frozen north on the east shoulder.
           ...terr('hills', [8, 0], [9, 0], [10, 0], [10, 1], [11, 1]),
-          // Woods along the south-east.
-          ...terr('forest', [7, 6], [8, 6], [9, 6], [8, 5], [9, 5]),
+          // Woods along the south-east, thickening around the Silent Grove.
+          ...terr('forest', [4, 6], [5, 6], [6, 5], [7, 5], [7, 6], [8, 6], [9, 6], [8, 5], [9, 5]),
         ],
         sites: [
           {
