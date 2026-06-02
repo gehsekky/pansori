@@ -76,7 +76,6 @@ import {
   defenseAcBonus,
   fightingStyleSlots,
 } from './fightingStyle.js';
-import { activeGrid, returnFromEncounter } from './mapEngine.js';
 import { applyExpiryHooks, getConditionDuration } from './conditions/registry.js';
 import {
   applyMulticlassProfGrants,
@@ -132,6 +131,7 @@ import { factionShopPrice } from './campaignEngine.js';
 import { llmProvider } from './llmProvider.js';
 import { randomUUID } from 'crypto';
 import { responsesAtPath } from './conversation.js';
+import { returnFromEncounter } from './mapEngine.js';
 
 // Central enemy-damage floor (Undead Fortitude + future on-"reduced to 0"
 // traits). Re-exported here so combat handlers pull it from the same module
@@ -3962,26 +3962,12 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     choices.push({ label: `Attack ${npc.name} (makes hostile)`, action: { type: 'attack_npc' } });
   }
 
-  // 3-level grid map model — surface a `marker_move` choice for each transition
-  // cell on the current grid (region sites, town venues, room exits / ascend),
-  // out of combat. The FE grid additionally lets the player free-roam the marker;
-  // these discrete choices keep the map playable without it. (No-op until a
-  // campaign defines `regions`/`towns` and the party is on a map grid.)
-  if (!state.combat_active && !enemyAlive && state.map_level) {
-    const grid = activeGrid(context.campaign, seed.rooms, state);
-    for (const t of grid?.transitions ?? []) {
-      if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
-      const verb =
-        t.kind === 'ascend'
-          ? 'Leave —'
-          : t.kind === 'site' && t.toTownId
-            ? 'Travel to'
-            : t.kind === 'site' || t.kind === 'venue'
-              ? 'Enter'
-              : 'Go to';
-      choices.push({ label: `${verb} ${t.label}`, action: { type: 'marker_move', to: t.pos } });
-    }
-  }
+  // 3-level grid map model — travel is map-driven: the FE renders the active
+  // grid (GridMapView) with every transition cell (region sites, town venues,
+  // room exits / ascend) clickable + labelled, dispatching `marker_move` on
+  // click. We no longer mirror those as redundant "Travel to / Enter / Leave"
+  // text choices — the map IS the travel surface. (The `marker_move` action +
+  // handler are unchanged; only the auto-generated duplicate choices are gone.)
   // ── Combat action economy choices ─────────────────────────────────────────
   if (state.combat_active && !char.turn_actions.action_used) {
     // Dash

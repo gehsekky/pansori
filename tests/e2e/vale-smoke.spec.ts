@@ -393,12 +393,13 @@ async function choiceActionTypes(page: Page): Promise<string[]> {
 }
 
 async function clickTravelTo(page: Page, siteName: string): Promise<void> {
-  // 3-level map: travel/transition buttons are labeled by the destination
-  // (e.g. "Enter The Old Road", "Travel to Millhaven"). Match on the site name
-  // to tolerate the verb prefix + trailing whitespace.
-  const btn = page.getByTestId('choice-btn').filter({ hasText: siteName });
-  await expect(btn).toBeVisible({ timeout: 5_000 });
-  await btn.first().click();
+  // Travel is map-driven: GridMapView renders each transition cell as a
+  // clickable, labelled square whose aria-label carries the destination name
+  // (e.g. "5,1, The Old Road"). Click that cell to dispatch the marker_move —
+  // the old "Travel to / Enter" text choices were removed as redundant.
+  const cellEl = page.locator(`[aria-label*="${siteName}"]`).first();
+  await expect(cellEl).toBeVisible({ timeout: 5_000 });
+  await cellEl.click();
   await page.waitForTimeout(300);
 }
 
