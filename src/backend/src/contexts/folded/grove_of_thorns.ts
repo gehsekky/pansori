@@ -359,7 +359,7 @@ export const groveContent: Context = {
       },
     ],
 
-    // Regional map (standalone-only — when folded into Duskenvale, the host
+    // Regional map (standalone-only — when folded into Malgovia, the host
     // re-declares these sites; only `encounterTable` is merged).
     regions: [
       {

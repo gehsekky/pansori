@@ -14,13 +14,13 @@ import {
   SRD_SPELLS,
   srdBackgrounds,
   srdItems,
-} from './srd/index.js';
-import type { TerrainCell, TerrainType } from '../types.js';
-import type { Context } from '../types.js';
-import type { EnemyTemplate } from '../types.js';
-import type { MapSite } from '../types.js';
-import { groveContent } from './folded/grove_of_thorns.js';
-import { whisperingPinesContent } from './folded/whispering_pines.js';
+} from '../srd/index.js';
+import type { TerrainCell, TerrainType } from '../../types.js';
+import type { Context } from '../../types.js';
+import type { EnemyTemplate } from '../../types.js';
+import type { MapSite } from '../../types.js';
+import { groveContent } from '../folded/grove_of_thorns.js';
+import { whisperingPinesContent } from '../folded/whispering_pines.js';
 
 // Overland-map authoring sugar: build terrain cells of one type from [x,y] pairs.
 const terr = (type: TerrainType, ...cells: [number, number][]): TerrainCell[] =>
@@ -87,7 +87,7 @@ const CRYPT_LORD_BASE: EnemyTemplate = {
   ],
 };
 
-// ─── Duskenvale — First Adventure Module ─────────────────────────────────
+// ─── Malgovia — First Adventure Module ─────────────────────────────────
 //
 // 3-level grid map (regional → town → local):
 //   region `vale_region` — the overland map; the party is a single marker.
@@ -107,7 +107,7 @@ const CRYPT_LORD_BASE: EnemyTemplate = {
 //   faction_watch    — City Watch       (encounter frequency)
 
 const context: Context = {
-  id: 'vale_of_shadows',
+  id: 'malgovia',
   displayNoun: 'vale',
 
   // ─── Classes ─────────────────────────────────────────────────────────────────
@@ -273,7 +273,7 @@ const context: Context = {
       // Opening frame only — the party begins on the regional grid (see
       // initMapState), so this describes the vale map, not a room.
       millhaven_square: [
-        "The Old Road brings you to the edge of Duskenvale. Millhaven's lantern-lit walls stand to the east; the wooded hills past it hide the bandit camp and the Shattered Crypt. Your map of the vale lies open before you.",
+        "The Old Road brings you to the edge of Malgovia. Millhaven's lantern-lit walls stand to the east; the wooded hills past it hide the bandit camp and the Shattered Crypt. Your map of the vale lies open before you.",
       ],
       dungeon_crypt_entrance: [
         'Mossy steps lead down into the Shattered Crypt. Cold air breathes from the darkness below.',
@@ -418,14 +418,14 @@ const context: Context = {
   // ─── Campaign data ────────────────────────────────────────────────────────────
 
   campaign: {
-    world_name: 'Duskenvale',
+    world_name: 'Malgovia',
     // Three quests + 8-room crypt with a multi-attack lich boss — tuned for 3 PCs.
     recommendedPartySize: 3,
     // Charnel Hall blade trap + Garrison strongbox favor Rogue's Stealth /
     // Investigation / Cunning Action over a Wizard's blast spells here.
     recommendedComposition: ['Fighter', 'Cleric', 'Rogue'],
     intro:
-      'Duskenvale stretches before you — a shadow of its former self. Years ago an arrogant mage thought he could control a powerful gateway spell but failed, leaving behind a shadowed frontier of dread-filled tombs, frozen spires, and silent groves, where suspicious folk eye every stranger who walks the pine-dark roads.',
+      'Malgovia stretches before you — a shadow of its former self. Years ago an arrogant mage thought he could control a powerful gateway spell but failed, leaving behind a shadowed frontier of dread-filled tombs, frozen spires, and silent groves, where suspicious folk eye every stranger who walks the pine-dark roads.',
 
     // ── Rooms (local grids) ──────────────────────────────────────────────────
     // 3-level map model: navigation is by the party marker on the regional /
@@ -441,8 +441,8 @@ const context: Context = {
       // never entered — its `roomArrival` text frames the vale map.
       {
         id: 'millhaven_square',
-        name: 'Duskenvale',
-        desc: 'The Old Road brings you into Duskenvale. Millhaven lies to the west; the pine-dark hills hide darker places — and the pass and grove lie beyond.',
+        name: 'Malgovia',
+        desc: 'The Old Road brings you into Malgovia. Millhaven lies to the west; the pine-dark hills hide darker places — and the pass and grove lie beyond.',
       },
 
       // Millhaven interiors (town venues open these; each ascends back to town).
@@ -1246,8 +1246,8 @@ const context: Context = {
     regions: [
       {
         id: 'vale_region',
-        name: 'Duskenvale',
-        desc: 'The borderland of Duskenvale — a shadowed vale of old tombs, the frozen pass beneath the Iceshard Spire, and the silent grove beyond Pinegate, all ringed by pine-dark hills.',
+        name: 'Malgovia',
+        desc: 'The borderland of Malgovia — a shadowed vale of old tombs, the frozen pass beneath the Iceshard Spire, and the silent grove beyond Pinegate, all ringed by pine-dark hills.',
         feetPerSquare: 5280, // 1 square = 1 mile (SRD Travel Pace scale)
         gridWidth: 12,
         gridHeight: 8,
@@ -1366,7 +1366,7 @@ const context: Context = {
         id: 'quest_shipment',
         title: 'The Missing Shipment',
         desc: "The Merchant Guild's supply wagons vanished on the Old Road. Find the Guild Ledger in the crypt and return it to Aldric.",
-        startActive: true, // the Vale's opening quest — active from the start
+        startActive: true, // the Malgovia's opening quest — active from the start
         giverNpcId: 'npc_aldric',
         factionId: 'faction_guild',
         repGain: 20,
@@ -1619,16 +1619,16 @@ const context: Context = {
 
 // ── Folded-in campaigns ──────────────────────────────────────────────────────
 // Whispering Pines (and Grove of Thorns) are no longer standalone campaigns —
-// their content is folded into the Vale as additional areas of the same world,
+// their content is folded into Malgovia as additional areas of the same world,
 // reached via new sites on the regional map. Their data modules live under
 // contexts/folded/ (the context loader only scans top-level files in
 // contexts/, so the folded modules aren't registered as separate campaigns).
 //
 // Each fold appends the campaign's enemy templates, loot, NPC templates, rules,
-// rooms, NPCs, towns, quests, and factions onto the Vale, and drops new sites
-// onto the Vale's regional map that lead into the folded content. IDs are
+// rooms, NPCs, towns, quests, and factions onto Malgovia, and drops new sites
+// onto the Malgovia's regional map that lead into the folded content. IDs are
 // already disjoint between campaigns (only `venue_gate` is renamed per town);
-// the opening-quest flag is stripped in the folded module so the Vale's own
+// the opening-quest flag is stripped in the folded module so the Malgovia's own
 // "Missing Shipment" stays the sole starter and the others are discovered on
 // arrival.
 function foldCampaign(into: Context, content: Context, sites: MapSite[], dropRooms: string[] = []) {
@@ -1656,7 +1656,7 @@ function foldCampaign(into: Context, content: Context, sites: MapSite[], dropRoo
   ];
 }
 
-// Whispering Pines — three new sites on the Vale's regional map. The town opens
+// Whispering Pines — three new sites on the Malgovia's regional map. The town opens
 // the Pines village; the local sites drop into the frozen pass and the Iceshard
 // Spire.
 foldCampaign(context, whisperingPinesContent, [
@@ -1683,7 +1683,7 @@ foldCampaign(context, whisperingPinesContent, [
   },
 ]);
 
-// Grove of Thorns — Pinegate village + the Silent Grove, on free Vale-grid
+// Grove of Thorns — Pinegate village + the Silent Grove, on free Malgovia-grid
 // cells. pinegate_square is kept (it's the village-square venue interior, not
 // just a start frame), so no rooms are dropped here.
 foldCampaign(context, groveContent, [

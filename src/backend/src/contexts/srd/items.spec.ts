@@ -9,7 +9,7 @@
 import { ALL_SRD_ITEM_IDS, SRD_ITEMS, srdItems } from './items.js';
 import { describe, expect, it } from 'vitest';
 import { context as sandbox } from '../sandbox.js';
-import { context as vale } from '../vale_of_shadows.js';
+import { context as vale } from '../malgovia/index.js';
 
 describe('SRD_ITEMS catalog integrity', () => {
   it('every entry key matches its item id', () => {
@@ -55,7 +55,7 @@ describe('srdItems selector', () => {
 describe('no drift — shipped contexts reuse the canonical SRD definitions', () => {
   const contexts = [
     ['sandbox', sandbox],
-    ['vale_of_shadows', vale],
+    ['malgovia', vale],
   ] as const;
 
   for (const [name, ctx] of contexts) {

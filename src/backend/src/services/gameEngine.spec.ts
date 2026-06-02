@@ -33,7 +33,7 @@ import {
 } from '../test-fixtures.js';
 import { context as ctx } from '../contexts/sandbox.js';
 import { generateSeed } from './procgen.js';
-import { context as valeCtx } from '../contexts/vale_of_shadows.js';
+import { context as valeCtx } from '../contexts/malgovia/index.js';
 
 afterEach(() => vi.restoreAllMocks());
 

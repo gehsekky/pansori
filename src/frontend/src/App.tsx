@@ -31,14 +31,14 @@ import WorldMap from './components/WorldMap.tsx';
 import { activeGrid } from './lib/activeGrid.ts';
 import { applyTheme } from './lib/theme.ts';
 import artManifest from './art-manifest.json';
+import { context as malgoviaContext } from './contexts/malgovia.tsx';
 import { context as sandboxContext } from './contexts/sandbox.tsx';
 import styles from './styles.module.css';
 import { useGame } from './hooks/useGame.ts';
-import { context as valeContext } from './contexts/vale_of_shadows.tsx';
 
 const CONTEXTS: Record<string, FrontendContext> = {
   sandbox: sandboxContext,
-  vale_of_shadows: valeContext,
+  malgovia: malgoviaContext,
 };
 // Choice kinds that get their own dedicated UI (D-pad / icon bar) and
 // therefore drop out of the numbered text-button column and its 1-9

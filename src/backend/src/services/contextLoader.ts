@@ -1,13 +1,13 @@
 import { dirname, join } from 'path';
+import { existsSync, readdirSync } from 'fs';
 import type { Context } from '../types.js';
 import { fileURLToPath } from 'url';
-import { readdirSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const CONTEXTS_DIR = join(__dirname, '../contexts');
 
-// Exported shape exposed by each context file
+// Exported shape exposed by each context module
 interface ContextModule {
   context: Context;
 }
@@ -21,12 +21,50 @@ function isContextModule(mod: unknown): mod is ContextModule {
   );
 }
 
+/**
+ * Discover campaign modules. Two layouts are supported:
+ *   - a single top-level file, e.g. `contexts/sandbox.ts`
+ *   - a campaign folder with an entry point, e.g. `contexts/malgovia/index.ts`
+ *     (the preferred layout — the campaign's data is split across sibling files
+ *     and assembled in index.ts).
+ * Library subfolders like `contexts/srd/` are scanned too but harmlessly
+ * skipped: their index doesn't export a `context`. Each candidate is paired
+ * with `isLeaf` so we only warn about a *top-level* file forgetting to export
+ * a context (a non-campaign folder index legitimately doesn't).
+ */
+function contextSpecifiers(): { specifier: string; label: string; isLeaf: boolean }[] {
+  const out: { specifier: string; label: string; isLeaf: boolean }[] = [];
+  const entries = readdirSync(CONTEXTS_DIR, { withFileTypes: true });
+  for (const entry of entries) {
+    if (
+      entry.isFile() &&
+      (entry.name.endsWith('.ts') || entry.name.endsWith('.js')) &&
+      !entry.name.endsWith('.spec.ts')
+    ) {
+      // tsx resolves .js imports to their .ts sources at runtime
+      out.push({
+        specifier: `../contexts/${entry.name.replace(/\.ts$/, '.js')}`,
+        label: entry.name,
+        isLeaf: true,
+      });
+    } else if (entry.isDirectory()) {
+      const dir = join(CONTEXTS_DIR, entry.name);
+      if (existsSync(join(dir, 'index.ts')) || existsSync(join(dir, 'index.js'))) {
+        out.push({
+          specifier: `../contexts/${entry.name}/index.js`,
+          label: `${entry.name}/index`,
+          isLeaf: false,
+        });
+      }
+    }
+  }
+  return out;
+}
+
 export async function loadContexts(): Promise<Record<string, Context>> {
-  let files: string[];
+  let candidates: ReturnType<typeof contextSpecifiers>;
   try {
-    files = readdirSync(CONTEXTS_DIR).filter(
-      (f) => (f.endsWith('.ts') || f.endsWith('.js')) && !f.endsWith('.spec.ts')
-    );
+    candidates = contextSpecifiers();
   } catch (err) {
     console.error('[contextLoader] Cannot read contexts directory:', err);
     return {};
@@ -34,24 +72,26 @@ export async function loadContexts(): Promise<Record<string, Context>> {
 
   const result: Record<string, Context> = {};
 
-  for (const file of files) {
-    // tsx resolves .js imports to their .ts sources at runtime
-    const specifier = `../contexts/${file.replace(/\.ts$/, '.js')}`;
+  for (const { specifier, label, isLeaf } of candidates) {
     try {
       const mod = (await import(specifier)) as unknown;
       if (!isContextModule(mod)) {
-        console.warn(`[contextLoader] ${file} does not export a valid context — skipping`);
+        // A campaign folder's index must export a context; a non-campaign
+        // subfolder (e.g. srd/) legitimately doesn't, so only flag leaf files.
+        if (isLeaf) {
+          console.warn(`[contextLoader] ${label} does not export a valid context — skipping`);
+        }
         continue;
       }
       const ctx = mod.context;
       if (result[ctx.id]) {
-        console.warn(`[contextLoader] Duplicate context id "${ctx.id}" in ${file} — skipping`);
+        console.warn(`[contextLoader] Duplicate context id "${ctx.id}" in ${label} — skipping`);
         continue;
       }
       result[ctx.id] = ctx;
       console.log(`[contextLoader] Loaded context: ${ctx.id}`);
     } catch (err) {
-      console.error(`[contextLoader] Failed to load ${file}:`, err);
+      console.error(`[contextLoader] Failed to load ${label}:`, err);
     }
   }
 

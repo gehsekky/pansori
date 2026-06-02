@@ -46,7 +46,7 @@ Currently one smoke test: `vale-smoke.spec.ts`.
 1. Auth bypass produces a working session.
 2. Sessions screen renders.
 3. + NEW ADVENTURE → character screen.
-4. World picker selects Vale of Shadows.
+4. World picker selects Malgovia.
 5. Auto-fill recommended party.
 6. BEGIN ADVENTURE transitions to game view.
 7. Narrative panel populates.

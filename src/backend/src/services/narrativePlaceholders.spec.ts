@@ -26,7 +26,7 @@ import { dirname, join } from 'path';
 import { readFileSync, readdirSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { context as sandbox } from '../contexts/sandbox.js';
-import { context as vale } from '../contexts/vale_of_shadows.js';
+import { context as vale } from '../contexts/malgovia/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -116,7 +116,7 @@ describe('narrative placeholder lint', () => {
   // Layer 1 — per-pool, per-reference strict check.
   for (const [ctxName, ctx] of [
     ['sandbox', sandbox],
-    ['vale_of_shadows', vale],
+    ['malgovia', vale],
   ] as const) {
     it(`every {token} is substituted at every inline reference in ${ctxName}.narratives`, () => {
       const required = tokensByPool(ctx.narratives);
@@ -148,7 +148,7 @@ describe('narrative placeholder lint', () => {
   // backstop for variable-indirected pools).
   for (const [ctxName, ctx] of [
     ['sandbox', sandbox],
-    ['vale_of_shadows', vale],
+    ['malgovia', vale],
   ] as const) {
     it(`every {token} in ${ctxName}.narratives has a handler somewhere in the engine`, () => {
       const required = tokensByPool(ctx.narratives);

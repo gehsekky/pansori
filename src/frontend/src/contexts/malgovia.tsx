@@ -1,15 +1,15 @@
 import type { FrontendContext } from '../types.js';
 
 export const context: FrontendContext = {
-  id: 'vale_of_shadows',
+  id: 'malgovia',
 
-  displayName: 'Duskenvale',
+  displayName: 'Malgovia',
   tagline:
     'A shadowed frontier of pine and frost: Millhaven and its restless crypt, the Iceshard Spire above the Frozen Pass, and the Silent Grove beyond Pinegate.',
   recommendedPartySize: 3,
   recommendedComposition: ['Fighter', 'Cleric', 'Rogue'],
   previewArt: `
-   ╔═ DUSKENVALE ═════╗
+   ╔═ MALGOVIA ═════╗
    ║ Millhaven · Crypt║
    ║ ❄ The Frozen Pass║
    ║ ◆ Iceshard Spire ║
@@ -132,7 +132,7 @@ export const context: FrontendContext = {
     hpHigh: '#7cb342',
     hpMid: '#e6a23c',
     hpLow: '#c93838',
-    title: 'VALE OF SHADOWS',
+    title: 'MALGOVIA',
     worldLabel: 'REGION',
   },
 

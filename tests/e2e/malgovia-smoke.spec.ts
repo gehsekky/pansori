@@ -1,6 +1,6 @@
 import { Page, expect, test } from '@playwright/test';
 
-// Vale of Shadows smoke test — covers backend + frontend + DB integration
+// Malgovia smoke test — covers backend + frontend + DB integration
 // from auth through adventure start. Validates the path that unit tests can't:
 // real HTTP, real session cookies, real DB writes, real UI rendering.
 //
@@ -12,10 +12,10 @@ import { Page, expect, test } from '@playwright/test';
 //   1. Test-login bypass produces a usable session.
 //   2. Sessions screen loads (empty state for fresh test user).
 //   3. + NEW ADVENTURE navigates to character creation.
-//   4. World picker selects Vale of Shadows.
+//   4. World picker selects Malgovia.
 //   5. Auto-fill recommended party populates the form.
 //   6. BEGIN ADVENTURE POSTs and transitions to the game view.
-//   7. The game narrative panel renders text from Vale's intro/arrival.
+//   7. The game narrative panel renders text from Malgovia's intro/arrival.
 //
 // What this does NOT cover (intentional — defer until smoke proves stable):
 //   - Combat resolution end-to-end
@@ -29,7 +29,7 @@ const BACKEND_URL = process.env.E2E_BACKEND_URL ?? 'http://localhost:3001';
 // Use a stable seed if you want to inspect prod-like state in the DB after.
 const TEST_EMAIL = `e2e-${Date.now()}@pansori.local`;
 
-test('Vale of Shadows: login → character creation → begin adventure', async ({ page, request }) => {
+test('Malgovia: login → character creation → begin adventure', async ({ page, request }) => {
   // 1. Auth bypass: POST /api/auth/test-login sets the session cookie on the
   //    request context. We then attach it to the browser context so the
   //    frontend's /api/auth/me call returns the test user.
@@ -51,8 +51,8 @@ test('Vale of Shadows: login → character creation → begin adventure', async 
   // 3. Click + NEW ADVENTURE.
   await page.getByTestId('new-adventure-btn').click();
 
-  // 4. Character screen — pick Vale of Shadows.
-  await page.getByTestId('world-picker-vale_of_shadows').click();
+  // 4. Character screen — pick Malgovia.
+  await page.getByTestId('world-picker-malgovia').click();
 
   // 5. Auto-fill recommended party.
   await page.getByTestId('auto-fill-party-btn').click();
@@ -67,13 +67,13 @@ test('Vale of Shadows: login → character creation → begin adventure', async 
   // 7. Game view should render with the narrative panel populated.
   const narrative = page.getByTestId('game-narrative-panel');
   await expect(narrative).toBeVisible({ timeout: 15_000 });
-  // The Vale intro mentions the world. Soft assertion so any future flavour
+  // The Malgovia intro mentions the world. Soft assertion so any future flavour
   // text change doesn't break the smoke test — the structure check above is
   // the load-bearing assertion.
   await expect(narrative).not.toBeEmpty();
 
   // 8. Party composition — auto-fill seeded a 3-PC Fighter/Cleric/Rogue
-  //    party (Vale's `recommendedComposition`). Verify the engine round-
+  //    party (Malgovia's `recommendedComposition`). Verify the engine round-
   //    tripped all three through to the rail.
   const partyTiles = page.getByTestId('party-tile');
   await expect(partyTiles).toHaveCount(3);
@@ -89,7 +89,7 @@ test('Vale of Shadows: login → character creation → begin adventure', async 
   expect(partyText).toContain('[Rogue');
 
   // 9. Initiative is not active out of combat — the strip only renders during
-  //    combat, and Vale starts on the regional grid with no enemies.
+  //    combat, and Malgovia starts on the regional grid with no enemies.
   await expect(page.getByTestId('initiative-strip')).toHaveCount(0);
 
   // 10. Exactly one tile is marked active (aria-current="true"). Out-of-
@@ -113,7 +113,7 @@ test('Vale of Shadows: login → character creation → begin adventure', async 
 
 // ── Combat coverage ─────────────────────────────────────────────────────────
 //
-// Drives the sandbox campaign (smaller than Vale, combat closer to start)
+// Drives the sandbox campaign (smaller than Malgovia, combat closer to start)
 // and clicks choices in priority order until a kill narrative appears. This
 // exercises:
 //   - Choice list rendering after each action.
@@ -311,7 +311,7 @@ test.skip('sandbox combat: enter a fight and resolve an attack', async ({ page, 
   await expect(narrative).toBeVisible({ timeout: 15_000 });
 
   // Drive the loop until a kill or the iteration cap. Bound generous enough
-  // to absorb procgen variance + d20 misses; the existing scripted Vale
+  // to absorb procgen variance + d20 misses; the existing scripted Malgovia
   // playthrough uses 300 — 80 is a middle ground for an E2E run.
   const result = await driveCombatLoop(page, 80);
 
@@ -403,14 +403,14 @@ async function clickTravelTo(page: Page, siteName: string): Promise<void> {
   await page.waitForTimeout(300);
 }
 
-test('Vale combat: initiative live + class-specific choices respect class', async ({
+test('Malgovia combat: initiative live + class-specific choices respect class', async ({
   page,
   request,
 }) => {
-  // 1. Fresh test user + Vale auto-fill (Fighter/Cleric/Rogue).
+  // 1. Fresh test user + Malgovia auto-fill (Fighter/Cleric/Rogue).
   const email = `e2e-vale-combat-${Date.now()}@pansori.local`;
   const loginRes = await request.post(`${BACKEND_URL}/api/auth/test-login`, {
-    data: { email, displayName: 'E2E Vale Combat User' },
+    data: { email, displayName: 'E2E Malgovia Combat User' },
   });
   expect(loginRes.ok()).toBe(true);
   const cookies = await request.storageState();
@@ -418,7 +418,7 @@ test('Vale combat: initiative live + class-specific choices respect class', asyn
   await page.goto('/');
   await expect(page.getByText(/NO ADVENTURES ON RECORD/i)).toBeVisible({ timeout: 10_000 });
   await page.getByTestId('new-adventure-btn').click();
-  await page.getByTestId('world-picker-vale_of_shadows').click();
+  await page.getByTestId('world-picker-malgovia').click();
   await page.getByTestId('auto-fill-party-btn').click();
   await expect(page.getByTestId('begin-adventure-btn')).toBeEnabled();
   await page.getByTestId('begin-adventure-btn').click();

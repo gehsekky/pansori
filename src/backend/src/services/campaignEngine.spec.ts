@@ -6,7 +6,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Quest } from '../types.js';
 import { starterQuestProgress } from './campaignEngine.js';
-import { context as vale } from '../contexts/vale_of_shadows.js';
+import { context as vale } from '../contexts/malgovia/index.js';
 
 const quest = (id: string, startActive?: boolean): Quest => ({
   id,

@@ -1,6 +1,6 @@
-// Scripted full-Vale-of-Shadows playthrough.
+// Scripted full-Malgovia-of-Shadows playthrough.
 //
-// Drives the game engine through every quest step in Vale of Shadows and asserts
+// Drives the game engine through every quest step in Malgovia and asserts
 // state transitions at milestones. The point is *not* to test combat balance —
 // PCs are bumped to 999 HP and Math.random is mocked to 0.99 so attacks always
 // crit and PCs survive everything. The point is to catch engine bugs in the
@@ -18,18 +18,18 @@ import type {
   GameState,
   Seed,
   StructuredAction,
-} from '../types.js';
-import { activeGrid, initMapState } from '../services/mapEngine.js';
+} from '../../types.js';
+import { activeGrid, initMapState } from '../../services/mapEngine.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   applyQuestCompletions,
   evaluateQuestSteps,
   extractCampaignDelta,
-} from '../services/campaignEngine.js';
-import { generateChoices, takeAction } from '../services/gameEngine.js';
-import { context as ctx } from './vale_of_shadows.js';
-import { findPath } from '../services/gridEngine.js';
-import { generateSeed } from '../services/procgen.js';
+} from '../../services/campaignEngine.js';
+import { generateChoices, takeAction } from '../../services/gameEngine.js';
+import { context as ctx } from './index.js';
+import { findPath } from '../../services/gridEngine.js';
+import { generateSeed } from '../../services/procgen.js';
 import { randomUUID } from 'crypto';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -135,7 +135,7 @@ function makeCampaignState(): CampaignState {
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
-describe('Vale of Shadows — scripted playthrough', () => {
+describe('Malgovia — scripted playthrough', () => {
   let seed: Seed;
   let state: GameState;
   let campaignState: CampaignState;
@@ -255,7 +255,7 @@ describe('Vale of Shadows — scripted playthrough', () => {
   // Move the party marker to a cell (the 3-level map navigation primitive).
   const markerMove = (x: number, y: number) => dispatch({ type: 'marker_move', to: { x, y } });
 
-  it('walks the full Vale playthrough — region → town → crypt → 3 quests turned in', async () => {
+  it('walks the full Malgovia playthrough — region → town → crypt → 3 quests turned in', async () => {
     // ── Stage 0: regional grid start ───────────────────────────────────────
     expect(state.map_level).toBe('regional');
     expect(state.current_region_id).toBe('vale_region');
@@ -413,7 +413,7 @@ describe('Vale of Shadows — scripted playthrough', () => {
   }, 30_000);
 });
 
-describe('Vale region layout — the linear arc', () => {
+describe('Malgovia region layout — the linear arc', () => {
   it('finds a path from the start to every site (the sea forces an arc, but nothing is walled off)', () => {
     const seed = generateSeed(ctx, 3);
     const st = initMapState(ctx.campaign, {
