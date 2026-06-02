@@ -1,6 +1,20 @@
 import type { Enemy, EnemyTemplate, PlacedNpc } from '../../types.js';
 import { SRD_MONSTERS } from '../srd/index.js';
 
+// Build a per-room placement from a shared template: spread the base stat
+// block, apply the room-specific overrides (id, goldDrop, drops, tweaked
+// hp, etc.), then drop any key set to `undefined`. Setting a key to
+// `undefined` in the override is how a placement opts OUT of a base field it
+// historically never carried (e.g. SRD ability scores on a minion), keeping
+// the assembled data identical to the hand-written placements it replaces.
+function place(base: EnemyTemplate, overrides: Partial<EnemyTemplate> & { id: string }): Enemy {
+  const merged: Record<string, unknown> = { ...base, ...overrides };
+  for (const key of Object.keys(merged)) {
+    if (merged[key] === undefined) delete merged[key];
+  }
+  return merged as unknown as Enemy;
+}
+
 // Shared Crypt Lord stat block. Used both as the `enemyTemplates` entry and
 // (spread with an `id`) as the campaign throne boss, so a balance change can't
 // silently diverge between the two copies again. `multiattack: 2` is the
@@ -62,26 +76,153 @@ const CRYPT_LORD_BASE: EnemyTemplate = {
   ],
 };
 
+// SRD skeleton with a sword + tomb-themed name. Piercing resist
+// because they're already bony, slashing dmg from the longsword.
+const SKELETON_WARRIOR_BASE: EnemyTemplate = {
+  ...SRD_MONSTERS.skeleton,
+  name: 'Skeleton Warrior',
+  resistances: ['piercing'],
+  damageType: 'slashing',
+};
+
+// SRD ghoul reskinned as a crypt-dweller.
+const CRYPT_GHOUL_BASE: EnemyTemplate = { ...SRD_MONSTERS.ghoul, name: 'Crypt Ghoul' };
+
+// SRD bandit renamed for the local Lantern District flavor.
+const BANDIT_RUFFIAN_BASE: EnemyTemplate = { ...SRD_MONSTERS.bandit, name: 'Bandit Ruffian' };
+
+// SRD wolf with a cold-resist coat.
+const FROST_WOLF_BASE: EnemyTemplate = {
+  ...SRD_MONSTERS.wolf,
+  name: 'Frost Wolf',
+  resistances: ['cold'],
+};
+
+const FROST_CULTIST_BASE: EnemyTemplate = {
+  name: 'Frost Cultist',
+  cr: 0.5,
+  hp: 17,
+  ac: 12,
+  damage: '1d8+1',
+  toHit: 3,
+  xp: 100,
+  str: 11,
+  dex: 12,
+  con: 12,
+  int: 10,
+  wis: 13,
+  cha: 11,
+  resistances: ['cold'],
+  damageType: 'cold',
+};
+
+const FROST_ACOLYTE_BASE: EnemyTemplate = {
+  name: 'Frost Acolyte',
+  // Boss — an Ice Mage. Vulnerable to fire to reward Burning Hands /
+  // Fire Bolt parties; multiattack of 2; paralyzing onHitEffect leans on
+  // the SRD STR/DEX auto-fail rule from §9.2.
+  cr: 4,
+  hp: 78,
+  ac: 15,
+  damage: '2d6+3',
+  toHit: 6,
+  xp: 1100,
+  str: 12,
+  dex: 14,
+  con: 16,
+  int: 17,
+  wis: 14,
+  cha: 13,
+  multiattack: 2,
+  resistances: ['cold'],
+  immunities: ['poison'],
+  vulnerabilities: ['fire'],
+  condition_immunities: ['frightened', 'paralyzed'],
+  onHitEffect: { condition: 'paralyzed', ability: 'con', dc: 13 },
+  damageType: 'cold',
+  // Spell-caster — the Acolyte sometimes hurls fire_bolt instead of
+  // melee, opening a Counterspell window for any L5+ caster in the party.
+  spells: ['fire_bolt'],
+  castChance: 0.4,
+  spellAttackBonus: 5,
+  spellSaveDC: 13,
+  // Two-phase fight. At 60% the Acolyte buys time with an ice-armor +
+  // ramped damage. At 30% it strips its frost cloak and casts more
+  // aggressively — castChance can't be raised through effects, but the
+  // damage spike compensates.
+  phases: [
+    {
+      hpPct: 60,
+      name: 'Ice Armor',
+      narrative:
+        'The Acolyte hisses a hard syllable and frost rimes their robes — blows skid off. Around them the ritual flame burns colder.',
+      effects: [
+        { kind: 'set_ac', value: 17 },
+        { kind: 'set_damage', dice: '2d8+3' },
+      ],
+    },
+    {
+      hpPct: 30,
+      name: 'Frostbinding',
+      narrative:
+        'The Acolyte tears off their frost cloak. Black ice spreads beneath their feet. Their staff lashes with bone-cold speed.',
+      effects: [
+        { kind: 'set_to_hit', value: 8 },
+        { kind: 'set_multiattack', value: 3 },
+        {
+          kind: 'set_on_hit_effect',
+          effect: { condition: 'paralyzed', ability: 'con', dc: 15 },
+        },
+      ],
+    },
+  ],
+};
+
+// SRD wolf, magically awakened — int 10 (vs base 3) + stronger bite
+// (2d4+2 vs 1d6+1). Reads as a wolf that thinks like a person.
+const AWAKENED_WOLF_BASE: EnemyTemplate = {
+  ...SRD_MONSTERS.wolf,
+  name: 'Awakened Wolf',
+  damage: '2d4+2',
+  int: 10,
+};
+
+const FEY_TRICKSTER_BASE: EnemyTemplate = {
+  name: 'Fey Trickster',
+  cr: 4,
+  hp: 60,
+  ac: 14,
+  damage: '1d6+3',
+  toHit: 5,
+  xp: 1100,
+  str: 10,
+  dex: 17,
+  con: 14,
+  int: 14,
+  wis: 13,
+  cha: 16,
+  multiattack: 2,
+  // Charms instead of paralyzes — boss flavor: it's not killing
+  // you, it's seducing you into the grove. Charmed PCs lose their
+  // turn (engine handles via the existing charmed condition).
+  onHitEffect: { condition: 'charmed', ability: 'wis', dc: 13 },
+  // Hexes a target ~30% of turns (its fey-curse motif).
+  spells: ['hex'],
+  castChance: 0.3,
+  spellSaveDC: 13,
+  damageType: 'piercing',
+};
+
 export const enemyTemplates: EnemyTemplate[] = [
-  // SRD skeleton with a sword + tomb-themed name. Piercing resist
-  // because they're already bony, slashing dmg from the longsword.
-  {
-    ...SRD_MONSTERS.skeleton,
-    name: 'Skeleton Warrior',
-    resistances: ['piercing'],
-    damageType: 'slashing',
-  },
-  // SRD ghoul reskinned as a crypt-dweller.
-  { ...SRD_MONSTERS.ghoul, name: 'Crypt Ghoul' },
+  SKELETON_WARRIOR_BASE,
+  CRYPT_GHOUL_BASE,
   // SRD shadow — already themed for this campaign.
   SRD_MONSTERS.shadow,
-  // SRD bandit renamed for the local Lantern District flavor.
-  { ...SRD_MONSTERS.bandit, name: 'Bandit Ruffian' },
+  BANDIT_RUFFIAN_BASE,
   CRYPT_LORD_BASE,
 
   // ── Whispering Pines (folded) ────────────────────────────────────────────
-  // SRD wolf with a cold-resist coat.
-  { ...SRD_MONSTERS.wolf, name: 'Frost Wolf', resistances: ['cold'] },
+  FROST_WOLF_BASE,
   // Pure SRD ice mephit.
   SRD_MONSTERS.ice_mephit,
   // SRD bandit with cold resist + slightly tougher kit. Higher AC + dmg
@@ -100,230 +241,98 @@ export const enemyTemplates: EnemyTemplate[] = [
     dex: 13,
     resistances: ['cold'],
   },
-  {
-    name: 'Frost Cultist',
-    cr: 0.5,
-    hp: 17,
-    ac: 12,
-    damage: '1d8+1',
-    toHit: 3,
-    xp: 100,
-    str: 11,
-    dex: 12,
-    con: 12,
-    int: 10,
-    wis: 13,
-    cha: 11,
-    resistances: ['cold'],
-    damageType: 'cold',
-  },
-  {
-    name: 'Frost Acolyte',
-    // Boss — an Ice Mage. Vulnerable to fire to reward Burning Hands /
-    // Fire Bolt parties; multiattack of 2; paralyzing onHitEffect leans on
-    // the SRD STR/DEX auto-fail rule from §9.2.
-    cr: 4,
-    hp: 78,
-    ac: 15,
-    damage: '2d6+3',
-    toHit: 6,
-    xp: 1100,
-    str: 12,
-    dex: 14,
-    con: 16,
-    int: 17,
-    wis: 14,
-    cha: 13,
-    multiattack: 2,
-    resistances: ['cold'],
-    immunities: ['poison'],
-    vulnerabilities: ['fire'],
-    condition_immunities: ['frightened', 'paralyzed'],
-    onHitEffect: { condition: 'paralyzed', ability: 'con', dc: 13 },
-    damageType: 'cold',
-    // Spell-caster — the Acolyte sometimes hurls fire_bolt instead of
-    // melee, opening a Counterspell window for any L5+ caster in the party.
-    spells: ['fire_bolt'],
-    castChance: 0.4,
-    spellAttackBonus: 5,
-    spellSaveDC: 13,
-    // Two-phase fight. At 60% the Acolyte buys time with an ice-armor +
-    // ramped damage. At 30% it strips its frost cloak and casts more
-    // aggressively — castChance can't be raised through effects, but the
-    // damage spike compensates.
-    phases: [
-      {
-        hpPct: 60,
-        name: 'Ice Armor',
-        narrative:
-          'The Acolyte hisses a hard syllable and frost rimes their robes — blows skid off. Around them the ritual flame burns colder.',
-        effects: [
-          { kind: 'set_ac', value: 17 },
-          { kind: 'set_damage', dice: '2d8+3' },
-        ],
-      },
-      {
-        hpPct: 30,
-        name: 'Frostbinding',
-        narrative:
-          'The Acolyte tears off their frost cloak. Black ice spreads beneath their feet. Their staff lashes with bone-cold speed.',
-        effects: [
-          { kind: 'set_to_hit', value: 8 },
-          { kind: 'set_multiattack', value: 3 },
-          {
-            kind: 'set_on_hit_effect',
-            effect: { condition: 'paralyzed', ability: 'con', dc: 15 },
-          },
-        ],
-      },
-    ],
-  },
+  FROST_CULTIST_BASE,
+  FROST_ACOLYTE_BASE,
 
   // ── Grove of Thorns (folded) ─────────────────────────────────────────────
-  // SRD wolf, magically awakened — int 10 (vs base 3) + stronger bite
-  // (2d4+2 vs 1d6+1). Reads as a wolf that thinks like a person.
-  {
-    ...SRD_MONSTERS.wolf,
-    name: 'Awakened Wolf',
-    damage: '2d4+2',
-    int: 10,
-  },
+  AWAKENED_WOLF_BASE,
   // Pure SRD entries — already themed for a fey grove.
   SRD_MONSTERS.giant_spider,
   SRD_MONSTERS.brown_bear,
-  {
-    name: 'Fey Trickster',
-    cr: 4,
-    hp: 60,
-    ac: 14,
-    damage: '1d6+3',
-    toHit: 5,
-    xp: 1100,
-    str: 10,
-    dex: 17,
-    con: 14,
-    int: 14,
-    wis: 13,
-    cha: 16,
-    multiattack: 2,
-    // Charms instead of paralyzes — boss flavor: it's not killing
-    // you, it's seducing you into the grove. Charmed PCs lose their
-    // turn (engine handles via the existing charmed condition).
-    onHitEffect: { condition: 'charmed', ability: 'wis', dc: 13 },
-    // Hexes a target ~30% of turns (its fey-curse motif).
-    spells: ['hex'],
-    castChance: 0.3,
-    spellSaveDC: 13,
-    damageType: 'piercing',
-  },
+  FEY_TRICKSTER_BASE,
 ];
 
 export const enemies: Record<string, Enemy[]> = {
   dungeon_antechamber: [
-    {
+    place(SKELETON_WARRIOR_BASE, {
       id: 'dungeon_antechamber#0',
-      name: 'Skeleton Warrior',
-      hp: 13,
-      ac: 13,
-      damage: '1d6+2',
-      toHit: 4,
-      xp: 50,
-      resistances: ['piercing'],
-      vulnerabilities: ['bludgeoning'],
-      immunities: ['poison'],
-      condition_immunities: ['poisoned', 'exhaustion'],
       goldDrop: 3,
-    },
+      cr: undefined,
+      str: undefined,
+      dex: undefined,
+      con: undefined,
+      int: undefined,
+      wis: undefined,
+      cha: undefined,
+      damageType: undefined,
+    }),
   ],
   dungeon_charnel_hall: [
-    {
+    place(SKELETON_WARRIOR_BASE, {
       id: 'dungeon_charnel_hall#0',
-      name: 'Skeleton Warrior',
-      hp: 13,
-      ac: 13,
-      damage: '1d6+2',
-      toHit: 4,
-      xp: 50,
-      resistances: ['piercing'],
-      vulnerabilities: ['bludgeoning'],
-      immunities: ['poison'],
-      condition_immunities: ['poisoned', 'exhaustion'],
       goldDrop: 3,
-    },
-    {
+      cr: undefined,
+      str: undefined,
+      dex: undefined,
+      con: undefined,
+      int: undefined,
+      wis: undefined,
+      cha: undefined,
+      damageType: undefined,
+    }),
+    place(SKELETON_WARRIOR_BASE, {
       id: 'dungeon_charnel_hall#1',
-      name: 'Skeleton Warrior',
-      hp: 13,
-      ac: 13,
-      damage: '1d6+2',
-      toHit: 4,
-      xp: 50,
-      resistances: ['piercing'],
-      vulnerabilities: ['bludgeoning'],
-      immunities: ['poison'],
-      condition_immunities: ['poisoned', 'exhaustion'],
       goldDrop: 3,
-    },
+      cr: undefined,
+      str: undefined,
+      dex: undefined,
+      con: undefined,
+      int: undefined,
+      wis: undefined,
+      cha: undefined,
+      damageType: undefined,
+    }),
   ],
   dungeon_offering_chamber: [
-    {
+    place(CRYPT_GHOUL_BASE, {
       id: 'dungeon_offering_chamber#0',
-      name: 'Crypt Ghoul',
-      hp: 22,
-      ac: 13,
-      damage: '2d6+2',
-      toHit: 4,
-      xp: 200,
-      onHitEffect: { condition: 'paralyzed', ability: 'con', dc: 10 },
-      condition_immunities: ['poisoned', 'charmed'],
       goldDrop: 8,
-    },
+      cr: undefined,
+      str: undefined,
+      dex: undefined,
+      con: undefined,
+      int: undefined,
+      wis: undefined,
+      cha: undefined,
+      damageType: undefined,
+    }),
   ],
   dungeon_shadow_gallery: [
-    {
+    place(SRD_MONSTERS.shadow, {
       id: 'dungeon_shadow_gallery#0',
-      name: 'Shadow',
-      hp: 16,
-      ac: 12,
-      damage: '2d6+2',
-      toHit: 4,
-      xp: 100,
-      resistances: [
-        'acid',
-        'fire',
-        'thunder',
-        'lightning',
-        'cold',
-        'bludgeoning',
-        'piercing',
-        'slashing',
-      ],
-      immunities: ['necrotic', 'poison'],
-      condition_immunities: [
-        'exhaustion',
-        'frightened',
-        'grappled',
-        'paralyzed',
-        'petrified',
-        'poisoned',
-        'prone',
-        'restrained',
-      ],
-    },
+      cr: undefined,
+      str: undefined,
+      dex: undefined,
+      con: undefined,
+      int: undefined,
+      wis: undefined,
+      cha: undefined,
+      damageType: undefined,
+    }),
   ],
   dungeon_ossuary: [
-    {
+    place(CRYPT_GHOUL_BASE, {
       id: 'dungeon_ossuary#0',
-      name: 'Crypt Ghoul',
-      hp: 22,
-      ac: 13,
-      damage: '2d6+2',
-      toHit: 4,
-      xp: 200,
-      onHitEffect: { condition: 'paralyzed', ability: 'con', dc: 10 },
-      condition_immunities: ['poisoned', 'charmed'],
       goldDrop: 8,
-    },
+      cr: undefined,
+      str: undefined,
+      dex: undefined,
+      con: undefined,
+      int: undefined,
+      wis: undefined,
+      cha: undefined,
+      damageType: undefined,
+    }),
   ],
   dungeon_crypt_throne: [
     { ...CRYPT_LORD_BASE, id: 'dungeon_crypt_throne#0' },
@@ -331,70 +340,80 @@ export const enemies: Record<string, Enemy[]> = {
     // — two was over-tuned for an L4 party of 3 (the boss alone deals
     // 3× 2d6+4 with frighten-on-hit; adding two minions made the math
     // unwinnable). One minion still gives the fight texture.
-    {
+    place(SKELETON_WARRIOR_BASE, {
       id: 'dungeon_crypt_throne#minion_a',
-      name: 'Skeleton Warrior',
-      hp: 13,
-      ac: 13,
-      damage: '1d6+2',
-      toHit: 4,
-      xp: 50,
-      resistances: ['piercing'],
-      vulnerabilities: ['bludgeoning'],
-      immunities: ['poison'],
-      condition_immunities: ['poisoned', 'exhaustion'],
       goldDrop: 3,
-    },
+      cr: undefined,
+      str: undefined,
+      dex: undefined,
+      con: undefined,
+      int: undefined,
+      wis: undefined,
+      cha: undefined,
+      damageType: undefined,
+    }),
   ],
   old_road: [
-    {
+    place(BANDIT_RUFFIAN_BASE, {
       id: 'old_road#0',
-      name: 'Bandit Ruffian',
-      hp: 11,
-      ac: 12,
-      damage: '1d6+1',
-      toHit: 3,
-      xp: 25,
       goldDrop: 8,
       drops: ['dagger'],
-    },
-    {
+      darkvision_ft: undefined,
+      cr: undefined,
+      str: undefined,
+      dex: undefined,
+      con: undefined,
+      int: undefined,
+      wis: undefined,
+      cha: undefined,
+      damageType: undefined,
+    }),
+    place(BANDIT_RUFFIAN_BASE, {
       id: 'old_road#1',
-      name: 'Bandit Ruffian',
-      hp: 11,
-      ac: 12,
-      damage: '1d6+1',
-      toHit: 3,
-      xp: 25,
       goldDrop: 8,
       drops: ['dagger'],
-    },
+      darkvision_ft: undefined,
+      cr: undefined,
+      str: undefined,
+      dex: undefined,
+      con: undefined,
+      int: undefined,
+      wis: undefined,
+      cha: undefined,
+      damageType: undefined,
+    }),
   ],
 
   // Bandit camp — a three-ruffian skirmish, then the Captain + a guard.
   bandit_camp: [
-    {
+    place(BANDIT_RUFFIAN_BASE, {
       id: 'bandit_camp#0',
-      name: 'Bandit Ruffian',
-      hp: 11,
-      ac: 12,
-      damage: '1d6+1',
-      toHit: 3,
-      xp: 25,
       goldDrop: 9,
       drops: ['dagger'],
-    },
-    {
+      darkvision_ft: undefined,
+      cr: undefined,
+      str: undefined,
+      dex: undefined,
+      con: undefined,
+      int: undefined,
+      wis: undefined,
+      cha: undefined,
+      damageType: undefined,
+    }),
+    place(BANDIT_RUFFIAN_BASE, {
       id: 'bandit_camp#1',
-      name: 'Bandit Ruffian',
-      hp: 11,
-      ac: 12,
-      damage: '1d6+1',
-      toHit: 3,
-      xp: 25,
       goldDrop: 9,
       drops: ['dagger'],
-    },
+      darkvision_ft: undefined,
+      cr: undefined,
+      str: undefined,
+      dex: undefined,
+      con: undefined,
+      int: undefined,
+      wis: undefined,
+      cha: undefined,
+      damageType: undefined,
+    }),
     {
       id: 'bandit_camp#2',
       name: 'Bandit Bowman',
@@ -427,239 +446,154 @@ export const enemies: Record<string, Enemy[]> = {
       goldDrop: 60,
       drops: ['studded_leather', 'healing_potion'],
     },
-    {
+    place(BANDIT_RUFFIAN_BASE, {
       id: 'bandit_tent#1',
-      name: 'Bandit Ruffian',
-      hp: 11,
-      ac: 12,
-      damage: '1d6+1',
-      toHit: 3,
-      xp: 25,
       goldDrop: 9,
       drops: ['dagger'],
-    },
+      darkvision_ft: undefined,
+      cr: undefined,
+      str: undefined,
+      dex: undefined,
+      con: undefined,
+      int: undefined,
+      wis: undefined,
+      cha: undefined,
+      damageType: undefined,
+    }),
   ],
 
   // ── Whispering Pines (folded) ────────────────────────────────────────────
   pass_climb: [
-    {
+    place(FROST_WOLF_BASE, {
       id: 'pass_climb#0',
-      name: 'Frost Wolf',
-      hp: 11,
-      ac: 13,
-      damage: '1d6+1',
-      toHit: 4,
-      xp: 50,
-      resistances: ['cold'],
-    },
-    {
+      cr: undefined,
+      str: undefined,
+      dex: undefined,
+      con: undefined,
+      int: undefined,
+      wis: undefined,
+      cha: undefined,
+      packTactics: undefined,
+      damageType: undefined,
+    }),
+    place(FROST_WOLF_BASE, {
       id: 'pass_climb#1',
-      name: 'Frost Wolf',
-      hp: 11,
-      ac: 13,
-      damage: '1d6+1',
-      toHit: 4,
-      xp: 50,
-      resistances: ['cold'],
-    },
+      cr: undefined,
+      str: undefined,
+      dex: undefined,
+      con: undefined,
+      int: undefined,
+      wis: undefined,
+      cha: undefined,
+      packTactics: undefined,
+      damageType: undefined,
+    }),
   ],
   spire_frozen_hall: [
-    {
+    place(SRD_MONSTERS.ice_mephit, {
       id: 'spire_frozen_hall#0',
-      name: 'Ice Mephit',
-      hp: 21,
-      ac: 11,
-      damage: '1d4+2',
-      toHit: 4,
-      xp: 100,
-      immunities: ['cold'],
-      vulnerabilities: ['fire'],
-      condition_immunities: ['poisoned'],
-    },
-    {
+      cr: undefined,
+      str: undefined,
+      dex: undefined,
+      con: undefined,
+      int: undefined,
+      wis: undefined,
+      cha: undefined,
+      damageType: undefined,
+    }),
+    place(SRD_MONSTERS.ice_mephit, {
       id: 'spire_frozen_hall#1',
-      name: 'Ice Mephit',
-      hp: 21,
-      ac: 11,
-      damage: '1d4+2',
-      toHit: 4,
-      xp: 100,
-      immunities: ['cold'],
-      vulnerabilities: ['fire'],
-      condition_immunities: ['poisoned'],
-    },
+      cr: undefined,
+      str: undefined,
+      dex: undefined,
+      con: undefined,
+      int: undefined,
+      wis: undefined,
+      cha: undefined,
+      damageType: undefined,
+    }),
   ],
   spire_cult_chamber: [
-    {
+    place(FROST_CULTIST_BASE, {
       id: 'spire_cult_chamber#0',
-      name: 'Frost Cultist',
-      hp: 17,
-      ac: 12,
-      damage: '1d8+1',
-      toHit: 3,
-      xp: 100,
-      resistances: ['cold'],
-    },
-    {
+      cr: undefined,
+      str: undefined,
+      dex: undefined,
+      con: undefined,
+      int: undefined,
+      wis: undefined,
+      cha: undefined,
+      damageType: undefined,
+    }),
+    place(FROST_CULTIST_BASE, {
       id: 'spire_cult_chamber#1',
-      name: 'Frost Cultist',
-      hp: 17,
-      ac: 12,
-      damage: '1d8+1',
-      toHit: 3,
-      xp: 100,
-      resistances: ['cold'],
-    },
+      cr: undefined,
+      str: undefined,
+      dex: undefined,
+      con: undefined,
+      int: undefined,
+      wis: undefined,
+      cha: undefined,
+      damageType: undefined,
+    }),
   ],
   spire_ritual_apex: [
-    {
+    place(FROST_ACOLYTE_BASE, {
       id: 'spire_ritual_apex#boss',
-      name: 'Frost Acolyte',
-      hp: 78,
-      ac: 15,
-      damage: '2d6+3',
-      toHit: 6,
-      xp: 1100,
-      multiattack: 2,
-      resistances: ['cold'],
-      immunities: ['poison'],
-      vulnerabilities: ['fire'],
-      condition_immunities: ['frightened', 'paralyzed'],
-      onHitEffect: { condition: 'paralyzed', ability: 'con', dc: 13 },
-      phases: [
-        {
-          hpPct: 60,
-          name: 'Ice Armor',
-          narrative:
-            'The Acolyte hisses a hard syllable and frost rimes their robes — blows skid off. Around them the ritual flame burns colder.',
-          effects: [
-            { kind: 'set_ac', value: 17 },
-            { kind: 'set_damage', dice: '2d8+3' },
-          ],
-        },
-        {
-          hpPct: 30,
-          name: 'Frostbinding',
-          narrative:
-            'The Acolyte tears off their frost cloak. Black ice spreads beneath their feet. Their staff lashes with bone-cold speed.',
-          effects: [
-            { kind: 'set_to_hit', value: 8 },
-            { kind: 'set_multiattack', value: 3 },
-            {
-              kind: 'set_on_hit_effect',
-              effect: { condition: 'paralyzed', ability: 'con', dc: 15 },
-            },
-          ],
-        },
-      ],
-    },
+      cr: undefined,
+      str: undefined,
+      dex: undefined,
+      con: undefined,
+      int: undefined,
+      wis: undefined,
+      cha: undefined,
+      damageType: undefined,
+      spells: undefined,
+      castChance: undefined,
+      spellAttackBonus: undefined,
+      spellSaveDC: undefined,
+    }),
   ],
 
   // ── Grove of Thorns (folded) ─────────────────────────────────────────────
   grove_entrance: [
-    {
+    place(AWAKENED_WOLF_BASE, {
       id: 'grove_entrance#0',
-      name: 'Awakened Wolf',
-      hp: 11,
-      ac: 13,
-      damage: '2d4+2',
-      toHit: 4,
-      xp: 50,
-      str: 12,
-      dex: 15,
-      con: 12,
-      int: 10,
-      wis: 12,
       cha: 8,
-    },
-    {
+      cr: undefined,
+      packTactics: undefined,
+      damageType: undefined,
+    }),
+    place(AWAKENED_WOLF_BASE, {
       id: 'grove_entrance#1',
-      name: 'Awakened Wolf',
-      hp: 11,
-      ac: 13,
-      damage: '2d4+2',
-      toHit: 4,
-      xp: 50,
-      str: 12,
-      dex: 15,
-      con: 12,
-      int: 10,
-      wis: 12,
       cha: 8,
-    },
+      cr: undefined,
+      packTactics: undefined,
+      damageType: undefined,
+    }),
   ],
   thornwood_maze: [
-    {
+    place(SRD_MONSTERS.giant_spider, {
       id: 'thornwood_maze#0',
-      name: 'Giant Spider',
-      hp: 13,
-      ac: 14,
-      damage: '1d8',
-      toHit: 5,
-      xp: 100,
-      str: 8,
-      dex: 16,
-      con: 11,
-      int: 2,
-      wis: 11,
-      cha: 4,
-      onHitEffect: { condition: 'poisoned', ability: 'con', dc: 11 },
-    },
-    {
+      cr: undefined,
+      damageType: undefined,
+    }),
+    place(SRD_MONSTERS.giant_spider, {
       id: 'thornwood_maze#1',
-      name: 'Giant Spider',
-      hp: 13,
-      ac: 14,
-      damage: '1d8',
-      toHit: 5,
-      xp: 100,
-      str: 8,
-      dex: 16,
-      con: 11,
-      int: 2,
-      wis: 11,
-      cha: 4,
-      onHitEffect: { condition: 'poisoned', ability: 'con', dc: 11 },
-    },
+      cr: undefined,
+      damageType: undefined,
+    }),
   ],
   ancient_oak: [
-    {
+    place(FEY_TRICKSTER_BASE, {
       id: 'ancient_oak#0',
-      name: 'Fey Trickster',
-      hp: 60,
-      ac: 14,
-      damage: '1d6+3',
-      toHit: 5,
-      xp: 1100,
-      str: 10,
-      dex: 17,
-      con: 14,
-      int: 14,
-      wis: 13,
-      cha: 16,
-      multiattack: 2,
-      onHitEffect: { condition: 'charmed', ability: 'wis', dc: 13 },
-      spells: ['hex'],
-      castChance: 0.3,
-      spellSaveDC: 13,
-      damageType: 'piercing',
-    },
-    {
+      cr: undefined,
+    }),
+    place(SRD_MONSTERS.brown_bear, {
       id: 'ancient_oak#1',
-      name: 'Brown Bear',
-      hp: 34,
-      ac: 11,
-      damage: '2d6+4',
-      toHit: 5,
-      xp: 200,
-      str: 19,
-      dex: 10,
-      con: 16,
-      int: 2,
-      wis: 13,
-      cha: 7,
-      multiattack: 2,
-    },
+      cr: undefined,
+      damageType: undefined,
+    }),
   ],
 };
 
