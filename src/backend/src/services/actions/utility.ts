@@ -1,4 +1,6 @@
+import { activeGrid, resolveTransition } from '../mapEngine.js';
 import type { ActionHandler } from './types.js';
+import { posEqual } from '../gridEngine.js';
 import { updatePcActor } from './actor.js';
 
 /**
@@ -44,4 +46,20 @@ export const handleEndTurn: ActionHandler<{ type: 'end_turn' }> = (ctx) => {
 export const handleContinue: ActionHandler<{ type: 'continue' }> = (ctx) => {
   ctx.st = { ...ctx.st, combat_over_pending: false };
   ctx.narrative = '';
+  // A wilderness ambush interrupts travel BEFORE the destination transition
+  // resolves (resolveMarkerMove skips the transition when an encounter fires),
+  // so the party returns from combat parked ON the site cell with no room
+  // entered — and can't re-enter it ("already there"). If the cell they were
+  // heading to is a transition (a town / POI / room exit), descend into it now
+  // so Continue lands them in the place they were travelling to.
+  if (ctx.st.map_level && !ctx.st.current_room && ctx.st.marker_pos) {
+    const grid = activeGrid(ctx.context.campaign, ctx.seed.rooms, ctx.st);
+    const marker = ctx.st.marker_pos;
+    const transition = grid?.transitions.find((t) => posEqual(t.pos, marker));
+    if (transition) {
+      const res = resolveTransition(ctx.context.campaign, ctx.seed.rooms, ctx.st, transition);
+      ctx.st = res.st;
+      ctx.narrative = res.narrative;
+    }
+  }
 };
