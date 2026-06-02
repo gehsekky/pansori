@@ -18,8 +18,8 @@ PHB/DMG-exclusive content (subclasses, feats, species, spells). See
 
 ## Implementation status (code-verified 2026-06-02)
 
-Grounded in a code survey + the full suite: **backend 2157 tests across
-254 files + frontend 153 across 25 files, all green** (lint + typecheck +
+Grounded in a code survey + the full suite: **backend 2165 tests across
+255 files + frontend 153 across 25 files, all green** (lint + typecheck +
 prettier clean).
 
 ### Done — world map / navigation
@@ -121,7 +121,7 @@ prettier clean).
 
 | Category                  | In pansori                                       | SRD universe                     |
 | ------------------------- | ------------------------------------------------ | -------------------------------- |
-| Spells                    | **263** (27 cantrips + 236 leveled, through L9)  | ~330                             |
+| Spells                    | **267** (27 cantrips + 240 leveled, through L9)  | ~330                             |
 | Shared SRD monster pool   | **50** (`SRD_MONSTERS`) + per-campaign templates | hundreds                         |
 | Species                   | 9                                                | 9 standalone + Drow lineage      |
 | Classes                   | 12                                               | 12                               |
@@ -139,11 +139,17 @@ backend features are waiting on, and a handful of **bounded subsystems**.
 
 ### Content breadth — data on existing patterns (RE-6)
 
-- [ ] **Spells** — **263** / ~330 SRD. Remaining gaps are overwhelmingly
+- [ ] **Spells** — **267** / ~330 SRD. Remaining gaps are overwhelmingly
       utility / illusion / planar (Blink, Dragon's Breath, Prismatic Spray,
       Dispel Magic, Teleport, Wish, etc.); the combat-relevant gaps are thinning.
       Most remaining categories are already
-      representable (data entry). Force/maze batch (`forceMazeBatch.spec.ts`):
+      representable (data entry). Animal/ward batch (`animalWardBatch.spec.ts`):
+      **Animal Friendship** (L1, WIS save → Charmed beast), **Giant Insect** (L4,
+      beast-ally summon with cosmetic wasp/spider/centipede forms), **Warding
+      Bond** (L2, ally buff → Resistance to all damage via `grantResistances`),
+      and **Aura of Life** (L4, self necrotic-resistance buff under
+      concentration; the party-wide emanation + HP-max/0-HP-revive halves are
+      simplified/narrated). Force/maze batch (`forceMazeBatch.spec.ts`):
       **Arcane Sword** (L7, recurring force-blade attack — gives arcane casters
       the Spiritual Weapon-style recurring attack), **Animate Objects** (L5,
       construct-crew summon; added a `countFromSpellMod` summon flag so the count

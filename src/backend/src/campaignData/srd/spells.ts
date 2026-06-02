@@ -5144,4 +5144,106 @@ export const SRD_SPELLS: Record<string, Spell> = {
     narrative: "{name} drives a spike of raw thought into {target}'s mind.",
     spellList: ['arcane', 'primal'],
   },
+
+  // ─── Spell batch: a beast charm, an insect summon, and two protective wards ──
+
+  // SRD: Animal Friendship — soothe a Beast (WIS save negates → Charmed for the
+  // duration; a charmed creature won't attack the caster). RAW targets only
+  // Beasts; pansori doesn't gate spell targets by creature type, so the
+  // beast-only restriction is narrated. Non-concentration (24-hour duration ≈
+  // the rest of the fight).
+  animal_friendship: {
+    id: 'animal_friendship',
+    name: 'Animal Friendship',
+    level: 1,
+    castTime: 'action',
+    savingThrow: 'wis',
+    saveEffect: 'negates',
+    condition: 'charmed',
+    conditionDuration: 100,
+    rangeKind: 'ranged',
+    rangeFt: 30,
+    desc: "Gentle a beast within 30 ft (WIS save negates). On a failure it is Charmed and won't attack you for the duration. (RAW targets only Beasts.)",
+    narrative: '{name} murmurs a gentling word; the {target} calms, no longer keen to attack.',
+    spellList: ['arcane', 'primal'],
+  },
+
+  // SRD: Giant Insect — summon a giant centipede, spider, or wasp. Pansori
+  // summon model: the insect joins your NEXT battle as a beast ally (Giant
+  // Insect stat block at 4th level — AC 15, 30 HP, Poison Jab 1d6+7 piercing).
+  // Cast before the fight; the form is a cosmetic variant. (RAW's multiattack,
+  // the +1d4 poison rider, and the Spider's Web Bolt are deferred/narrated.)
+  giant_insect: {
+    id: 'giant_insect',
+    name: 'Giant Insect',
+    level: 4,
+    castTime: 'action',
+    outOfCombatOnly: true,
+    desc: 'Out of combat, summon a giant insect — a beast ally (AC 15, 30 HP, Poison Jab 1d6+7 piercing) that fights at your side and joins your next battle.',
+    spellList: ['primal'],
+    summon: {
+      name: 'Giant Insect',
+      ac: 15,
+      maxHp: 30,
+      toHit: 6,
+      damage: '1d6+7',
+      variants: [
+        { name: 'Giant Wasp', ac: 15, maxHp: 30, toHit: 6, damage: '1d6+7' },
+        { name: 'Giant Spider', ac: 15, maxHp: 30, toHit: 6, damage: '1d6+7' },
+        { name: 'Giant Centipede', ac: 15, maxHp: 30, toHit: 6, damage: '1d6+7' },
+      ],
+    },
+  },
+
+  // SRD: Warding Bond — bond with a willing ally (touch): for the duration they
+  // gain Resistance to all damage. Non-concentration (1 hour ≈ the fight); the
+  // resistance clears at combat end. (RAW also grants +1 AC / +1 saves and
+  // shares half the ally's damage back to the caster — simplified/narrated; the
+  // worn platinum rings are a reusable focus, not consumed.)
+  warding_bond: {
+    id: 'warding_bond',
+    name: 'Warding Bond',
+    level: 2,
+    castTime: 'action',
+    targetType: 'self_or_ally',
+    grantResistances: [
+      'acid',
+      'bludgeoning',
+      'cold',
+      'fire',
+      'force',
+      'lightning',
+      'necrotic',
+      'piercing',
+      'poison',
+      'psychic',
+      'radiant',
+      'slashing',
+      'thunder',
+    ],
+    rangeKind: 'touch',
+    desc: 'Touch a willing ally to forge a warding bond: they gain Resistance to all damage for the fight.',
+    narrative: '{name} forges a warding bond — {target} is sheathed against all harm.',
+    spellList: ['divine'],
+  },
+
+  // SRD: Aura of Life — a life-warding aura (Concentration). You gain Resistance
+  // to Necrotic damage and your Hit Point maximum can't be reduced. (RAW the
+  // 30-ft emanation extends this to allies and revives a 0-HP ally to 1 HP each
+  // turn — simplified here to the caster's necrotic resistance; the HP-max and
+  // ally-revive halves are deferred/narrated.)
+  aura_of_life: {
+    id: 'aura_of_life',
+    name: 'Aura of Life',
+    level: 4,
+    castTime: 'action',
+    targetType: 'self',
+    concentration: true,
+    durationRounds: 100, // 10 minutes
+    grantResistances: ['necrotic'],
+    rangeKind: 'self',
+    desc: 'Kindle a warding aura of life: you gain Resistance to Necrotic damage for the duration. Concentration, up to 10 minutes.',
+    narrative: '{name} kindles a warding aura of life.',
+    spellList: ['divine'],
+  },
 };
