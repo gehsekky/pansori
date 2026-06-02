@@ -51,8 +51,8 @@ test('Malgovia: login → character creation → begin adventure', async ({ page
   // 3. Click + NEW ADVENTURE.
   await page.getByTestId('new-adventure-btn').click();
 
-  // 4. Character screen — pick Malgovia.
-  await page.getByTestId('world-picker-malgovia').click();
+  // 4. Character screen — Malgovia is the sole player-facing campaign, so the
+  // world picker is hidden and Malgovia is auto-selected.
 
   // 5. Auto-fill recommended party.
   await page.getByTestId('auto-fill-party-btn').click();
@@ -223,11 +223,13 @@ test('session resume: state survives a page reload', async ({ page, request }) =
   const cookies = await request.storageState();
   await page.context().addCookies(cookies.cookies);
 
-  // Start a fresh sandbox adventure.
-  await page.goto('/');
+  // Start a fresh sandbox adventure. Sandbox is a hidden internal-testing
+  // campaign, reachable only via the ?campaign= escape hatch (the param
+  // survives the client-side new-adventure transition since it doesn't touch
+  // the URL).
+  await page.goto('/?campaign=sandbox');
   await expect(page.getByText(/NO ADVENTURES ON RECORD/i)).toBeVisible({ timeout: 10_000 });
   await page.getByTestId('new-adventure-btn').click();
-  await page.getByTestId('world-picker-sandbox').click();
   await page.getByTestId('auto-fill-party-btn').click();
   await page.getByTestId('begin-adventure-btn').click();
 
@@ -298,10 +300,10 @@ test.skip('sandbox combat: enter a fight and resolve an attack', async ({ page, 
   const cookies = await request.storageState();
   await page.context().addCookies(cookies.cookies);
 
-  await page.goto('/');
+  // Sandbox is hidden — reach it via the ?campaign= escape hatch.
+  await page.goto('/?campaign=sandbox');
   await expect(page.getByText(/NO ADVENTURES ON RECORD/i)).toBeVisible({ timeout: 10_000 });
   await page.getByTestId('new-adventure-btn').click();
-  await page.getByTestId('world-picker-sandbox').click();
   await page.getByTestId('auto-fill-party-btn').click();
   await expect(page.getByTestId('begin-adventure-btn')).toBeEnabled();
   await page.getByTestId('begin-adventure-btn').click();
@@ -421,7 +423,7 @@ test('Malgovia combat: initiative live + class-specific choices respect class', 
   await page.goto('/');
   await expect(page.getByText(/NO ADVENTURES ON RECORD/i)).toBeVisible({ timeout: 10_000 });
   await page.getByTestId('new-adventure-btn').click();
-  await page.getByTestId('world-picker-malgovia').click();
+  // Malgovia auto-selected (world picker hidden with a single campaign).
   await page.getByTestId('auto-fill-party-btn').click();
   await expect(page.getByTestId('begin-adventure-btn')).toBeEnabled();
   await page.getByTestId('begin-adventure-btn').click();

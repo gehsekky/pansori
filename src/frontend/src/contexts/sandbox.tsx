@@ -2,6 +2,9 @@ import type { FrontendContext } from '../types.js';
 
 export const context: FrontendContext = {
   id: 'sandbox',
+  // Internal-testing campaign — hidden from the player picker (Malgovia is the
+  // sole player-facing campaign). Launch it via `/?campaign=sandbox`.
+  hidden: true,
 
   displayName: 'Sandbox',
   tagline: 'A development dungeon for testing mechanics. Every rule exercised.',

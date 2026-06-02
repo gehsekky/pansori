@@ -327,9 +327,19 @@ function CharScreen({
   availableContexts: FrontendContext[];
   user: AuthUser | null;
 }) {
-  const [contextId, setContextId] = useState(
-    () => localStorage.getItem('last_context_id') ?? availableContexts[0]?.id ?? ''
-  );
+  // Player-facing campaigns (sandbox + other test campaigns are `hidden`). The
+  // picker only renders when there's a real choice (>1 visible); with a single
+  // campaign we drop the selector and use it directly.
+  const visibleContexts = availableContexts.filter((c) => !c.hidden);
+  const [contextId, setContextId] = useState(() => {
+    // `?campaign=<id>` is the internal-testing escape hatch — it can select a
+    // hidden campaign (e.g. sandbox) that the picker doesn't list.
+    const override = new URLSearchParams(window.location.search).get('campaign');
+    if (override && availableContexts.some((c) => c.id === override)) return override;
+    const last = localStorage.getItem('last_context_id');
+    if (last && visibleContexts.some((c) => c.id === last)) return last;
+    return visibleContexts[0]?.id ?? availableContexts[0]?.id ?? '';
+  });
   const selectedCtxForInit =
     availableContexts.find((c) => c.id === contextId) ?? availableContexts[0];
   // Try to restore the per-context saved party. If none exists, fall
@@ -1731,100 +1741,102 @@ function CharScreen({
           </div>
         </div>
 
-        <div className={styles.charWorldCol}>
-          <h2 className={styles.title} style={{ fontSize: '1.1rem', marginBottom: 4 }}>
-            WORLD TYPE
-          </h2>
-          <p className={styles.sub} style={{ marginBottom: '2rem' }}>
-            SELECT YOUR GAME WORLD
-          </p>
+        {visibleContexts.length > 1 && (
+          <div className={styles.charWorldCol}>
+            <h2 className={styles.title} style={{ fontSize: '1.1rem', marginBottom: 4 }}>
+              WORLD TYPE
+            </h2>
+            <p className={styles.sub} style={{ marginBottom: '2rem' }}>
+              SELECT YOUR GAME WORLD
+            </p>
 
-          <div className={styles.charWorldRow}>
-            {availableContexts.map((c) => {
-              const selected = c.id === contextId;
-              return (
-                <button
-                  key={c.id}
-                  className={styles.charWorldCard}
-                  data-testid={`world-picker-${c.id}`}
-                  onClick={() => setContextId(c.id)}
-                  style={{
-                    background: selected ? 'var(--t-separator)' : 'var(--t-card)',
-                    border: `1px solid ${selected ? 'var(--t-primary)' : 'var(--t-border)'}`,
-                    color: 'var(--t-primary)',
-                    fontFamily: 'inherit',
-                    padding: '0.75rem 1rem',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '0.5rem',
-                    alignItems: 'flex-start',
-                    transition: 'border-color 0.15s, background 0.15s',
-                    boxShadow: selected ? '0 0 8px var(--t-border)' : 'none',
-                  }}
-                >
-                  <pre
+            <div className={styles.charWorldRow}>
+              {visibleContexts.map((c) => {
+                const selected = c.id === contextId;
+                return (
+                  <button
+                    key={c.id}
+                    className={styles.charWorldCard}
+                    data-testid={`world-picker-${c.id}`}
+                    onClick={() => setContextId(c.id)}
                     style={{
-                      margin: 0,
-                      alignSelf: 'center',
-                      maxWidth: '100%',
-                      overflow: 'hidden',
-                      fontSize: '0.5rem',
-                      lineHeight: 1.3,
-                      color: selected ? 'var(--t-primary)' : 'var(--t-dim)',
+                      background: selected ? 'var(--t-separator)' : 'var(--t-card)',
+                      border: `1px solid ${selected ? 'var(--t-primary)' : 'var(--t-border)'}`,
+                      color: 'var(--t-primary)',
                       fontFamily: 'inherit',
-                      userSelect: 'none',
-                      transition: 'color 0.15s',
+                      padding: '0.75rem 1rem',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.5rem',
+                      alignItems: 'flex-start',
+                      transition: 'border-color 0.15s, background 0.15s',
+                      boxShadow: selected ? '0 0 8px var(--t-border)' : 'none',
                     }}
                   >
-                    {c.previewArt}
-                  </pre>
-                  <div>
-                    <p
+                    <pre
                       style={{
-                        fontSize: '0.85rem',
-                        letterSpacing: '0.12em',
-                        fontWeight: 'bold',
-                        marginBottom: 4,
-                        color: selected ? 'var(--t-primary)' : 'var(--t-mid)',
+                        margin: 0,
+                        alignSelf: 'center',
+                        maxWidth: '100%',
+                        overflow: 'hidden',
+                        fontSize: '0.5rem',
+                        lineHeight: 1.3,
+                        color: selected ? 'var(--t-primary)' : 'var(--t-dim)',
+                        fontFamily: 'inherit',
+                        userSelect: 'none',
+                        transition: 'color 0.15s',
                       }}
                     >
-                      {c.displayName}
-                    </p>
-                    <p style={{ fontSize: '0.75rem', color: 'var(--t-dim)', lineHeight: 1.5 }}>
-                      {c.tagline}
-                    </p>
-                    {c.recommendedPartySize !== undefined && (
+                      {c.previewArt}
+                    </pre>
+                    <div>
                       <p
                         style={{
-                          marginTop: 6,
-                          fontSize: '0.7rem',
-                          color: 'var(--t-mid)',
-                          letterSpacing: '0.08em',
+                          fontSize: '0.85rem',
+                          letterSpacing: '0.12em',
+                          fontWeight: 'bold',
+                          marginBottom: 4,
+                          color: selected ? 'var(--t-primary)' : 'var(--t-mid)',
                         }}
                       >
-                        TUNED FOR PARTY OF {c.recommendedPartySize}
+                        {c.displayName}
                       </p>
-                    )}
-                    {selected && (
-                      <p
-                        style={{
-                          marginTop: 6,
-                          fontSize: '0.75rem',
-                          color: 'var(--t-primary)',
-                          letterSpacing: '0.1em',
-                        }}
-                      >
-                        <span aria-hidden="true">▶ </span>SELECTED
+                      <p style={{ fontSize: '0.75rem', color: 'var(--t-dim)', lineHeight: 1.5 }}>
+                        {c.tagline}
                       </p>
-                    )}
-                  </div>
-                </button>
-              );
-            })}
+                      {c.recommendedPartySize !== undefined && (
+                        <p
+                          style={{
+                            marginTop: 6,
+                            fontSize: '0.7rem',
+                            color: 'var(--t-mid)',
+                            letterSpacing: '0.08em',
+                          }}
+                        >
+                          TUNED FOR PARTY OF {c.recommendedPartySize}
+                        </p>
+                      )}
+                      {selected && (
+                        <p
+                          style={{
+                            marginTop: 6,
+                            fontSize: '0.75rem',
+                            color: 'var(--t-primary)',
+                            letterSpacing: '0.1em',
+                          }}
+                        >
+                          <span aria-hidden="true">▶ </span>SELECTED
+                        </p>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
       </div>
       {spellPickerIdx !== null &&
         (() => {
