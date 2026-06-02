@@ -13,7 +13,7 @@ import { context as ctx } from '../contexts/sandbox.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-const ENEMY = `${ctx.startRoomId}#0`;
+const ENEMY = `entry_hall#0`;
 
 const seed: Seed = {
   context_id: ctx.id,
@@ -21,9 +21,9 @@ const seed: Seed = {
   ship_name: 'Familiar Test',
   intro: '',
   seed_id: 'familiar',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       { id: ENEMY, name: 'Goblin', hp: 20, ac: 12, damage: '1d6', toHit: 3, xp: 10 },
     ],
   },
@@ -57,7 +57,7 @@ describe('Find Familiar — cast (ritual, out of combat)', () => {
       spell_slots_used: {},
     });
     const state = {
-      ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId }), // not in combat
+      ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall' }), // not in combat
       characters: [wiz],
       active_character_id: 'pc-1',
     };
@@ -79,7 +79,7 @@ describe('Find Familiar — combat behavior', () => {
   it('seedSummonedAllies materializes it as a non-attacking ally', () => {
     const wiz = makeChar({ id: 'pc-1', character_class: 'Wizard', level: 5, initiative_roll: 12 });
     const st = {
-      ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+      ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
       characters: [wiz],
       active_character_id: 'pc-1',
       initiative_order: [{ id: 'pc-1', roll: 12, is_enemy: false }],
@@ -116,7 +116,7 @@ describe('Find Familiar — combat behavior', () => {
 
   it('runAllyTurn: the familiar takes the Help action (owner gains advantage) and deals no damage', () => {
     const st = {
-      ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+      ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
       characters: [makeChar({ id: 'pc-1', name: 'Mage', character_class: 'Wizard', level: 5 })],
       active_character_id: 'pc-1',
       initiative_order: [

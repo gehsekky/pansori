@@ -12,7 +12,7 @@ import { context as ctx } from '../contexts/sandbox.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-const ENEMY = `${ctx.startRoomId}#0`;
+const ENEMY = `entry_hall#0`;
 
 const seed: Seed = {
   context_id: ctx.id,
@@ -20,9 +20,9 @@ const seed: Seed = {
   ship_name: 'Sanctuary Test',
   intro: '',
   seed_id: 'sanc',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       {
         id: ENEMY,
         name: 'Brute',
@@ -55,7 +55,7 @@ function stateWith(charOverrides: Partial<Character>): GameState {
     ...charOverrides,
   });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [pc],
     active_character_id: 'pc-1',
     initiative_order: [

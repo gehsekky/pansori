@@ -16,7 +16,7 @@ const seed: Seed = {
   ship_name: 'Subclass Test',
   intro: '',
   seed_id: 'subclass',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {},
   loot: {},
   npcs: {},
@@ -59,7 +59,7 @@ describe('Subclass — auto-assigned at level 3 (SRD-only)', () => {
   it('the level-up picker no longer offers select_subclass', () => {
     const pc = makeChar({ id: 'pc', character_class: 'Wizard', level: 3 });
     const state = {
-      ...makeState({ id: pc.id }, { current_room: ctx.startRoomId }),
+      ...makeState({ id: pc.id }, { current_room: 'entry_hall' }),
       characters: [pc],
       active_character_id: pc.id,
     };

@@ -17,16 +17,16 @@ import { context as ctx } from '../../contexts/sandbox.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-const enemyId = `${ctx.startRoomId}#0`;
+const enemyId = `entry_hall#0`;
 const seed: Seed = {
   context_id: ctx.id,
   world_name: 'Polymorph Test',
   ship_name: 'Polymorph Test',
   intro: '',
   seed_id: 'polymorph',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       {
         id: enemyId,
         name: 'Ogre',
@@ -45,7 +45,7 @@ const seed: Seed = {
 
 function buildState(pc: ReturnType<typeof makeChar>): GameState {
   return {
-    ...makeState({ id: pc.id }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: pc.id }, { current_room: 'entry_hall', combat_active: true }),
     characters: [pc],
     active_character_id: pc.id,
     initiative_order: [

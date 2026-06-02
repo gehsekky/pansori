@@ -96,8 +96,8 @@ function makeInitialState(party: Character[]): GameState {
   return {
     characters: party,
     active_character_id: party[0].id,
-    current_room: ctx.startRoomId,
-    visited_rooms: [ctx.startRoomId],
+    current_room: '',
+    visited_rooms: [],
     enemies_killed: [],
     loot_taken: [],
     combat_active: false,

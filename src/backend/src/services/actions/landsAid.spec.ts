@@ -10,7 +10,7 @@ import { context as ctx } from '../../contexts/sandbox.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-const enemyId = `${ctx.startRoomId}#0`;
+const enemyId = `entry_hall#0`;
 
 const seed: Seed = {
   context_id: ctx.id,
@@ -18,9 +18,9 @@ const seed: Seed = {
   ship_name: "Land's Aid Test",
   intro: '',
   seed_id: 'lands-aid',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       {
         id: enemyId,
         name: 'Goblin',
@@ -53,7 +53,7 @@ function buildDruid(opts: { subclass?: string; uses?: number } = {}) {
 function buildState(druid: ReturnType<typeof makeChar>, ally?: ReturnType<typeof makeChar>) {
   const chars = ally ? [druid, ally] : [druid];
   return {
-    ...makeState({ id: druid.id }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: druid.id }, { current_room: 'entry_hall', combat_active: true }),
     characters: chars,
     active_character_id: druid.id,
     initiative_order: [

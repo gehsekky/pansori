@@ -13,7 +13,7 @@ import { handleEnemyAttack } from './actions/enemyAttack.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-const enemyId = `${ctx.startRoomId}#0`;
+const enemyId = `entry_hall#0`;
 
 describe('spell batch — catalog', () => {
   it('Blur is a self, concentration buff applying the blurred condition', () => {
@@ -70,7 +70,7 @@ function selfCasterState(spellId: string, slot: number) {
     spell_slots_used: {},
   });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall' }),
     characters: [wiz],
     active_character_id: 'pc-1',
   };
@@ -82,7 +82,7 @@ const noEnemySeed: Seed = {
   ship_name: 'Blur Test',
   intro: '',
   seed_id: 'blur',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {},
   loot: {},
   npcs: {},
@@ -168,9 +168,9 @@ const dmgSeed: Seed = {
   ship_name: 'AoE Test',
   intro: '',
   seed_id: 'aoe',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       {
         id: enemyId,
         name: 'Ogre',
@@ -202,7 +202,7 @@ function dmgCasterState(spellId: string, slot: number) {
     spell_slots_used: {},
   });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [wiz],
     active_character_id: 'pc-1',
     initiative_order: [

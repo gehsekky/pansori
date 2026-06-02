@@ -1556,7 +1556,6 @@ export interface Context {
   // Single-word label for this context, shown on the character-creation screen
   // (e.g. "vale", "dungeon"). UI flavor only.
   displayNoun: string;
-  startRoomId: string;
   gridWidth?: number; // default combat grid width  (squares)
   gridHeight?: number; // default combat grid height (squares)
   campaign?: CampaignData;

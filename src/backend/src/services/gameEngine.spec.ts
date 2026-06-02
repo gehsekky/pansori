@@ -48,7 +48,7 @@ const seed: Seed = {
   intro: 'Test intro.',
   seed_id: 'test-seed-id',
   rooms: [
-    { id: ctx.startRoomId, name: 'Entry Hall', desc: 'The entry hall.' },
+    { id: 'entry_hall', name: 'Entry Hall', desc: 'The entry hall.' },
     { id: CORRIDOR_ID, name: 'Guard Post', desc: 'A guard post.' },
     { id: 'exit_gate', name: 'Exit Gate', desc: 'The exit gate.' },
   ],
@@ -110,8 +110,8 @@ describe('normalizeState', () => {
       equipped_weapon: null,
       equipped_armor: null,
       equipped_shield: null,
-      current_room: ctx.startRoomId,
-      visited_rooms: [ctx.startRoomId],
+      current_room: 'entry_hall',
+      visited_rooms: ['entry_hall'],
       enemies_killed: [],
       loot_taken: [],
       enemy_hp: {},
@@ -198,8 +198,8 @@ describe('normalizeState', () => {
         },
       ],
       active_character_id: 'c1',
-      current_room: ctx.startRoomId,
-      visited_rooms: [ctx.startRoomId],
+      current_room: 'entry_hall',
+      visited_rooms: ['entry_hall'],
       enemies_killed: [],
       loot_taken: [],
       combat_active: false,
@@ -274,8 +274,8 @@ describe('normalizeState', () => {
         },
       ],
       active_character_id: 'c1',
-      current_room: ctx.startRoomId,
-      visited_rooms: [ctx.startRoomId],
+      current_room: 'entry_hall',
+      visited_rooms: ['entry_hall'],
       enemies_killed: [],
       loot_taken: [],
       combat_active: false,
@@ -304,7 +304,7 @@ describe('normalizeState', () => {
 
 describe('buildArrivalNarrative', () => {
   it('returns a non-empty string', () => {
-    const text = buildArrivalNarrative(ctx.startRoomId, makeState(), seed, ctx);
+    const text = buildArrivalNarrative('entry_hall', makeState(), seed, ctx);
     expect(typeof text).toBe('string');
     expect(text.length).toBeGreaterThan(0);
   });
@@ -369,7 +369,7 @@ describe('generateChoices', () => {
   it('includes attack option when an enemy is alive', () => {
     const state = makeState(
       {},
-      { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] }
+      { current_room: CORRIDOR_ID, visited_rooms: ['entry_hall', CORRIDOR_ID] }
     );
     const choices = generateChoices(state, seedWithEnemy, ctx);
     expect(choices.some((c) => c.action.type === 'attack')).toBe(true);
@@ -379,7 +379,7 @@ describe('generateChoices', () => {
   it('includes loot pick-up option when loot is available', () => {
     const state = makeState(
       {},
-      { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] }
+      { current_room: CORRIDOR_ID, visited_rooms: ['entry_hall', CORRIDOR_ID] }
     );
     const choices = generateChoices(state, seedWithLoot, ctx);
     expect(choices.some((c) => c.action.type === 'loot')).toBe(true);
@@ -413,7 +413,7 @@ describe('takeAction', () => {
   it('picking up loot adds item to inventory and marks loot_taken', async () => {
     const state = makeState(
       {},
-      { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] }
+      { current_room: CORRIDOR_ID, visited_rooms: ['entry_hall', CORRIDOR_ID] }
     );
     const result = await takeAction({
       action: { type: 'loot' },
@@ -432,7 +432,7 @@ describe('takeAction', () => {
   it('first attack populates initiative_order with all party members and the enemy', async () => {
     const state = makeState(
       {},
-      { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] }
+      { current_room: CORRIDOR_ID, visited_rooms: ['entry_hall', CORRIDOR_ID] }
     );
     const result = await takeAction({
       action: { type: 'attack' },
@@ -453,7 +453,7 @@ describe('takeAction', () => {
   it('first attack sets initiative_idx to point at a player entry', async () => {
     const state = makeState(
       {},
-      { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] }
+      { current_room: CORRIDOR_ID, visited_rooms: ['entry_hall', CORRIDOR_ID] }
     );
     const result = await takeAction({
       action: { type: 'attack' },
@@ -473,7 +473,7 @@ describe('takeAction', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.99); // d20 → 20 (critical), always hits hard
     const state = makeState(
       { hp: 20, max_hp: 20 },
-      { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] }
+      { current_room: CORRIDOR_ID, visited_rooms: ['entry_hall', CORRIDOR_ID] }
     );
     const result = await takeAction({
       action: { type: 'attack' },
@@ -495,7 +495,7 @@ describe('takeAction', () => {
       characters: [char1, char2],
       active_character_id: 'c1',
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       enemies_killed: [],
       loot_taken: [],
       combat_active: false,
@@ -542,7 +542,7 @@ describe('takeAction', () => {
       { conditions: ['stunned'], condition_durations: { stunned: 1 } },
       {
         current_room: CORRIDOR_ID,
-        visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+        visited_rooms: ['entry_hall', CORRIDOR_ID],
       }
     );
     const choices = generateChoices(state, seedWithEnemy, ctx);
@@ -555,7 +555,7 @@ describe('takeAction', () => {
       { hp: 10, conditions: ['stunned'], condition_durations: { stunned: 1 } },
       {
         current_room: CORRIDOR_ID,
-        visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+        visited_rooms: ['entry_hall', CORRIDOR_ID],
         combat_active: true,
         initiative_order: [
           { id: 'char-1', roll: 5, is_enemy: false },
@@ -581,7 +581,7 @@ describe('takeAction', () => {
       { conditions: ['stunned'], condition_durations: { stunned: 1 } },
       {
         current_room: CORRIDOR_ID,
-        visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+        visited_rooms: ['entry_hall', CORRIDOR_ID],
         combat_active: true,
         initiative_order: [
           { id: 'char-1', roll: 5, is_enemy: false },
@@ -610,8 +610,8 @@ describe('takeAction', () => {
     const state: GameState = {
       characters: [char1, char2],
       active_character_id: 'c2',
-      current_room: ctx.startRoomId,
-      visited_rooms: [ctx.startRoomId],
+      current_room: 'entry_hall',
+      visited_rooms: ['entry_hall'],
       enemies_killed: [],
       loot_taken: [],
       combat_active: false,
@@ -657,13 +657,13 @@ describe('short_rest', () => {
     expect(char.hp).toBeGreaterThan(3);
     expect(char.hp).toBeLessThanOrEqual(10);
     expect(char.hit_dice_remaining).toBe(1);
-    expect(result.newState.short_rested_rooms).toContain(ctx.startRoomId);
+    expect(result.newState.short_rested_rooms).toContain('entry_hall');
   });
 
   it('cannot short rest twice in the same room', async () => {
     const state = makeState(
       { hp: 3, max_hp: 10, hit_die: 8, hit_dice_remaining: 2 },
-      { short_rested_rooms: [ctx.startRoomId] }
+      { short_rested_rooms: ['entry_hall'] }
     );
     const result = await takeAction({
       action: { type: 'short_rest' },
@@ -704,7 +704,7 @@ describe('short_rest', () => {
   it('cannot short rest while an enemy is alive in the room', async () => {
     const state = makeState(
       { hp: 3, max_hp: 10, hit_die: 8, hit_dice_remaining: 2 },
-      { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] }
+      { current_room: CORRIDOR_ID, visited_rooms: ['entry_hall', CORRIDOR_ID] }
     );
     const result = await takeAction({
       action: { type: 'short_rest' },
@@ -760,7 +760,7 @@ describe('long_rest', () => {
   it('cannot long rest while an enemy is alive in the room', async () => {
     const state = makeState(
       { hp: 3, max_hp: 10 },
-      { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] }
+      { current_room: CORRIDOR_ID, visited_rooms: ['entry_hall', CORRIDOR_ID] }
     );
     const result = await takeAction({
       action: { type: 'long_rest' },
@@ -818,7 +818,7 @@ const rulesSeed: Seed = {
 describe('runRules', () => {
   it('returns state unchanged when context has no rules', async () => {
     const state = makeState();
-    const result = await runRules(state, ctx, { type: 'examine' }, ctx.startRoomId, seed);
+    const result = await runRules(state, ctx, { type: 'examine' }, 'entry_hall', seed);
     expect(result.extraNarrative).toBe('');
     expect(result.state).toEqual(state);
   });
@@ -834,7 +834,7 @@ describe('runRules', () => {
       state,
       makeCtxWithRules([rule]),
       { type: 'examine' },
-      ctx.startRoomId,
+      'entry_hall',
       seed
     );
     expect(result.state.flags['triggered']).toBeUndefined();
@@ -851,7 +851,7 @@ describe('runRules', () => {
       state,
       makeCtxWithRules([rule]),
       { type: 'examine' },
-      ctx.startRoomId,
+      'entry_hall',
       seed
     );
     expect(result.state.flags['boss_defeated']).toBe(true);
@@ -868,7 +868,7 @@ describe('runRules', () => {
       state,
       makeCtxWithRules([rule]),
       { type: 'examine' },
-      ctx.startRoomId,
+      'entry_hall',
       seed
     );
     expect(result.extraNarrative).toContain('You sense danger.');
@@ -885,7 +885,7 @@ describe('runRules', () => {
       state,
       makeCtxWithRules([rule]),
       { type: 'examine' },
-      ctx.startRoomId,
+      'entry_hall',
       rulesSeed
     );
     expect(result.state.characters[0].inventory).toHaveLength(1);
@@ -903,7 +903,7 @@ describe('runRules', () => {
       state,
       makeCtxWithRules([rule]),
       { type: 'examine' },
-      ctx.startRoomId,
+      'entry_hall',
       seed
     );
     expect(result.state.characters[0].inventory).toHaveLength(0);
@@ -920,7 +920,7 @@ describe('runRules', () => {
       state,
       makeCtxWithRules([rule]),
       { type: 'examine' },
-      ctx.startRoomId,
+      'entry_hall',
       seed
     );
     expect(result.state.characters[0].hp).toBe(7);
@@ -937,7 +937,7 @@ describe('runRules', () => {
       state,
       makeCtxWithRules([rule]),
       { type: 'examine' },
-      ctx.startRoomId,
+      'entry_hall',
       seed
     );
     expect(result.state.characters[0].hp).toBe(10);
@@ -954,7 +954,7 @@ describe('runRules', () => {
       state,
       makeCtxWithRules([rule]),
       { type: 'examine' },
-      ctx.startRoomId,
+      'entry_hall',
       seed
     );
     expect(result.state.characters[0].hp).toBe(0);
@@ -971,7 +971,7 @@ describe('runRules', () => {
       state,
       makeCtxWithRules([rule]),
       { type: 'examine' },
-      ctx.startRoomId,
+      'entry_hall',
       seed
     );
     expect(result.state.flags['_rule_escape']).toBe(true);
@@ -987,12 +987,12 @@ describe('runRules', () => {
     const ctxWithRule = makeCtxWithRules([rule]);
     const state = makeState();
 
-    const first = await runRules(state, ctxWithRule, { type: 'examine' }, ctx.startRoomId, seed);
+    const first = await runRules(state, ctxWithRule, { type: 'examine' }, 'entry_hall', seed);
     const second = await runRules(
       first.state,
       ctxWithRule,
       { type: 'examine' },
-      ctx.startRoomId,
+      'entry_hall',
       seed
     );
 
@@ -1017,7 +1017,7 @@ describe('runRules', () => {
       state,
       makeCtxWithRules([rule]),
       { type: 'marker_move', to: { x: 0, y: 0 } },
-      ctx.startRoomId,
+      'entry_hall',
       seed
     );
     expect(result.state.flags['entered_corridor']).toBe(true);
@@ -1034,7 +1034,7 @@ describe('runRules', () => {
       state,
       makeCtxWithRules([rule]),
       { type: 'examine' },
-      ctx.startRoomId,
+      'entry_hall',
       seed
     );
     expect(result.extraNarrative).toContain('Boss is dead!');
@@ -1091,7 +1091,7 @@ describe('turn_actions lifecycle', () => {
       },
       {
         current_room: CORRIDOR_ID,
-        visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+        visited_rooms: ['entry_hall', CORRIDOR_ID],
         combat_active: true,
         initiative_order: [
           { id: 'char-1', roll: 15, is_enemy: false },
@@ -1117,7 +1117,7 @@ describe('turn_actions lifecycle', () => {
       characters: [char1, char2],
       active_character_id: 'c1',
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       enemies_killed: [],
       loot_taken: [],
       combat_active: true,
@@ -1168,7 +1168,7 @@ describe('turn_actions lifecycle', () => {
       characters: [char1, char2],
       active_character_id: 'c2',
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       enemies_killed: [`${CORRIDOR_ID}#0`],
       loot_taken: [],
       combat_active: true,
@@ -1210,7 +1210,7 @@ describe('turn_actions lifecycle', () => {
       characters: [char1, char2],
       active_character_id: 'c1',
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       enemies_killed: [`${CORRIDOR_ID}#0`],
       loot_taken: [],
       combat_active: true,
@@ -1375,7 +1375,7 @@ const seedWithNpc: Seed = {
 function makeNpcState(charOverrides: Partial<Character> = {}, npcAttitude = placedNpc.attitude) {
   return makeState(charOverrides, {
     current_room: npcRoomId,
-    visited_rooms: [ctx.startRoomId, npcRoomId],
+    visited_rooms: ['entry_hall', npcRoomId],
     npc_attitudes: npcAttitude !== placedNpc.attitude ? { [npcRoomId]: npcAttitude } : {},
     npc_talked: [],
   });
@@ -1578,7 +1578,7 @@ describe('faction shop price modifiers', () => {
       characters: [makeChar({ id: 'p1', character_class: 'Fighter' })],
       active_character_id: 'p1',
       current_room: 'millhaven_market',
-      visited_rooms: [valeCtx.startRoomId, 'millhaven_market'],
+      visited_rooms: ['millhaven_square', 'millhaven_market'],
       enemies_killed: [],
       loot_taken: [],
       combat_active: false,
@@ -1608,7 +1608,7 @@ describe('faction shop price modifiers', () => {
     intro: '',
     seed_id: 'vale-test-shop',
     rooms: [
-      { id: valeCtx.startRoomId, name: 'Town', desc: '' },
+      { id: 'millhaven_square', name: 'Town', desc: '' },
       { id: 'millhaven_market', name: 'Market', desc: '' },
     ],
     enemies: {},
@@ -1752,7 +1752,7 @@ describe('set_active_character (out-of-combat lead handoff)', () => {
       ...makeState(),
       characters: [pc1, pc2],
       active_character_id: 'pc-1',
-      current_room: ctx.startRoomId,
+      current_room: 'entry_hall',
       combat_active: false,
     };
   }
@@ -1845,8 +1845,8 @@ describe('Fighter Second Wind (2024 multi-use)', () => {
     return {
       characters: [fighter],
       active_character_id: fighter.id,
-      current_room: ctx.startRoomId,
-      visited_rooms: [ctx.startRoomId],
+      current_room: 'entry_hall',
+      visited_rooms: ['entry_hall'],
       enemies_killed: [],
       loot_taken: [],
       combat_active: true,
@@ -1923,7 +1923,7 @@ describe('Cleric universal Channel Divinity (2024)', () => {
       characters: [cleric],
       active_character_id: cleric.id,
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       enemies_killed: [],
       loot_taken: [],
       combat_active: true,
@@ -2059,7 +2059,7 @@ describe('Monk 2024 features', () => {
       characters: [monk],
       active_character_id: monk.id,
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       enemies_killed: [],
       loot_taken: [],
       combat_active: true,
@@ -2244,7 +2244,7 @@ describe('Hide action — DC tracking (2024)', () => {
       characters: [rogue],
       active_character_id: rogue.id,
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       enemies_killed: [],
       loot_taken: [],
       combat_active: true,
@@ -2328,7 +2328,7 @@ describe('Hide action — DC tracking (2024)', () => {
       characters: [rogue],
       active_character_id: rogue.id,
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       enemies_killed: [],
       loot_taken: [],
       combat_active: true,
@@ -2430,7 +2430,7 @@ describe('Magic Missile / Eldritch Blast multi-target (2024)', () => {
       characters: [wizard],
       active_character_id: wizard.id,
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       enemies_killed: [],
       loot_taken: [],
       combat_active: true,
@@ -2551,7 +2551,7 @@ describe('Heavy encumbrance disadvantage (2024 variant)', () => {
       characters: [fighter],
       active_character_id: fighter.id,
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       enemies_killed: [],
       loot_taken: [],
       combat_active: true,
@@ -2621,7 +2621,7 @@ describe('Heavy encumbrance disadvantage (2024 variant)', () => {
       characters: [rogue],
       active_character_id: rogue.id,
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       combat_active: false,
     };
     void enemyId;
@@ -2652,7 +2652,7 @@ describe('Heavy encumbrance disadvantage (2024 variant)', () => {
       characters: [fighter],
       active_character_id: fighter.id,
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       enemies_killed: [],
       loot_taken: [],
       combat_active: true,
@@ -2730,7 +2730,7 @@ describe('Heavy encumbrance disadvantage (2024 variant)', () => {
       characters: [pc],
       active_character_id: pc.id,
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       enemies_killed: [],
       loot_taken: [],
       combat_active: true,
@@ -2805,7 +2805,7 @@ describe('Heavy encumbrance disadvantage (2024 variant)', () => {
       characters: [rogue],
       active_character_id: rogue.id,
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       enemies_killed: [],
       loot_taken: [],
       combat_active: true,
@@ -2882,7 +2882,7 @@ describe('group ability check — sneak (SRD p.6)', () => {
       characters,
       active_character_id: 'pc-1',
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       combat_active: false,
       initiative_order: [{ id: enemyId, roll: 5, is_enemy: true }],
       initiative_idx: 0,
@@ -2999,7 +2999,7 @@ describe('Species damage resistance (2024)', () => {
       characters: [tiefling],
       active_character_id: tiefling.id,
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       enemies_killed: [],
       loot_taken: [],
       combat_active: true,
@@ -3110,7 +3110,7 @@ describe('Species damage resistance (2024)', () => {
       characters: [orc],
       active_character_id: orc.id,
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       enemies_killed: [],
       loot_taken: [],
       combat_active: true,
@@ -3192,7 +3192,7 @@ describe('Species damage resistance (2024)', () => {
       characters: [goliath],
       active_character_id: goliath.id,
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       enemies_killed: [],
       loot_taken: [],
       combat_active: true,
@@ -3283,7 +3283,7 @@ describe('Species damage resistance (2024)', () => {
       characters: [dragonborn],
       active_character_id: dragonborn.id,
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       enemies_killed: [],
       loot_taken: [],
       combat_active: true,
@@ -3369,7 +3369,7 @@ describe('Failed precondition actions do not consume the turn', () => {
       characters: [cleric],
       active_character_id: cleric.id,
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       enemies_killed: [],
       loot_taken: [],
       combat_active: true,
@@ -3571,7 +3571,7 @@ describe('narrative tokenization', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.99); // forces hit + max damage
     const state = makeState(
       { hp: 20, max_hp: 20 },
-      { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] }
+      { current_room: CORRIDOR_ID, visited_rooms: ['entry_hall', CORRIDOR_ID] }
     );
     const result = await takeAction({
       action: { type: 'attack' },
@@ -3625,7 +3625,7 @@ describe('narrative tokenization', () => {
       characters: [pc],
       active_character_id: pc.id,
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       enemies_killed: [],
       loot_taken: [],
       combat_active: true,
@@ -3710,7 +3710,7 @@ describe('deathLines placeholder substitution', () => {
       ship_name: 'Vale',
       intro: '',
       seed_id: 'death-line-seed',
-      rooms: [{ id: valeCtx.startRoomId, name: 'Crypt', desc: '' }],
+      rooms: [{ id: 'millhaven_square', name: 'Crypt', desc: '' }],
       enemies: {},
       loot: {},
       npcs: {},
@@ -3718,8 +3718,8 @@ describe('deathLines placeholder substitution', () => {
     const state: GameState = {
       characters: [downed],
       active_character_id: 'pc-dn',
-      current_room: valeCtx.startRoomId,
-      visited_rooms: [valeCtx.startRoomId],
+      current_room: 'millhaven_square',
+      visited_rooms: ['millhaven_square'],
       enemies_killed: [],
       loot_taken: [],
       combat_active: false,
@@ -3767,7 +3767,7 @@ describe('grid_move choice tagging', () => {
       characters: [pc],
       active_character_id: pc.id,
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       enemies_killed: [],
       loot_taken: [],
       combat_active: true,
@@ -3851,7 +3851,7 @@ describe('default-action choice tagging', () => {
       { hp: 20, max_hp: 20 },
       {
         current_room: CORRIDOR_ID,
-        visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+        visited_rooms: ['entry_hall', CORRIDOR_ID],
         combat_active: true,
         initiative_order: [
           { id: pc.id, roll: 20, is_enemy: false },
@@ -3899,7 +3899,7 @@ describe('default-action choice tagging', () => {
       { hp: 20, max_hp: 20 },
       {
         current_room: CORRIDOR_ID,
-        visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+        visited_rooms: ['entry_hall', CORRIDOR_ID],
         combat_active: true,
         initiative_order: [
           { id: pc.id, roll: 20, is_enemy: false },
@@ -3951,7 +3951,7 @@ describe('encounter XP distribution', () => {
       characters,
       active_character_id: 'pc-1',
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       enemies_killed: [],
       loot_taken: [],
       combat_active: true,
@@ -4174,7 +4174,7 @@ describe('speaker prefix (multi-PC narratives)', () => {
       characters,
       active_character_id: 'pc-1',
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       enemies_killed: [],
       loot_taken: [],
       combat_active: true,
@@ -4276,7 +4276,7 @@ describe('speaker prefix (multi-PC narratives)', () => {
         characters: [cleric],
         active_character_id: cleric.id,
         current_room: CORRIDOR_ID,
-        visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+        visited_rooms: ['entry_hall', CORRIDOR_ID],
       }
     );
     const choices = generateChoices(state, twoBanditSeed, ctx);
@@ -4319,7 +4319,7 @@ describe('speaker prefix (multi-PC narratives)', () => {
       characters: [fighter, cleric, rogue],
       active_character_id: fighter.id,
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       enemies_killed: [],
       loot_taken: [],
       combat_active: true,
@@ -4413,7 +4413,7 @@ describe('speaker prefix (multi-PC narratives)', () => {
       characters: [fighter, cleric],
       active_character_id: fighter.id,
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       enemies_killed: [],
       loot_taken: [],
       combat_active: true,
@@ -4478,7 +4478,7 @@ describe('speaker prefix (multi-PC narratives)', () => {
       characters: [fighter, cleric, rogue],
       active_character_id: fighter.id,
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       enemies_killed: [],
       loot_taken: [],
       combat_active: true,
@@ -4536,7 +4536,7 @@ describe('speaker prefix (multi-PC narratives)', () => {
         characters: [cleric],
         active_character_id: cleric.id,
         current_room: CORRIDOR_ID,
-        visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+        visited_rooms: ['entry_hall', CORRIDOR_ID],
       }
     );
     const choices = generateChoices(state, seedWithEnemy, ctx);
@@ -4565,7 +4565,7 @@ describe('speaker prefix (multi-PC narratives)', () => {
       characters: [char1, char2],
       active_character_id: 'c1',
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       enemies_killed: [],
       loot_taken: [],
       combat_active: false,

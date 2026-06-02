@@ -22,7 +22,7 @@ const noEnemySeed: Seed = {
   ship_name: 'Revive Penalty Test',
   intro: '',
   seed_id: 'revive-penalty',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {},
   loot: {},
   npcs: {},
@@ -52,7 +52,7 @@ function buildReviveParty(spellsKnown: string[], casterGold: number) {
     died_at_round: 1,
   });
   return {
-    ...makeState({ id: 'cleric-1' }, { current_room: ctx.startRoomId }),
+    ...makeState({ id: 'cleric-1' }, { current_room: 'entry_hall' }),
     characters: [cleric, fallen],
     active_character_id: 'cleric-1',
     round: 5000,
@@ -140,7 +140,7 @@ describe('Long rest — decrements the penalty by 1', () => {
       revive_d20_penalty: 4,
     });
     const state = {
-      ...makeState({ id: cleric.id }, { current_room: ctx.startRoomId }),
+      ...makeState({ id: cleric.id }, { current_room: 'entry_hall' }),
       characters: [cleric],
       active_character_id: cleric.id,
     };
@@ -163,7 +163,7 @@ describe('Long rest — decrements the penalty by 1', () => {
       revive_d20_penalty: 1,
     });
     const state = {
-      ...makeState({ id: cleric.id }, { current_room: ctx.startRoomId }),
+      ...makeState({ id: cleric.id }, { current_room: 'entry_hall' }),
       characters: [cleric],
       active_character_id: cleric.id,
     };
@@ -230,7 +230,7 @@ describe('Reincarnate — species reroll', () => {
       class_resource_uses: { relentless_endurance_used: 1, rage_uses: 2 },
     });
     const state = {
-      ...makeState({ id: 'cleric-1' }, { current_room: ctx.startRoomId }),
+      ...makeState({ id: 'cleric-1' }, { current_room: 'entry_hall' }),
       characters: [cleric, fallen],
       active_character_id: 'cleric-1',
       round: 5000,

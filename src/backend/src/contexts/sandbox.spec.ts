@@ -23,8 +23,8 @@ describe('Sandbox — 3-level map wiring', () => {
     state = {
       characters: party,
       active_character_id: 'pc-1',
-      current_room: ctx.startRoomId,
-      visited_rooms: [ctx.startRoomId],
+      current_room: 'entry_hall',
+      visited_rooms: ['entry_hall'],
       enemies_killed: [],
       loot_taken: [],
       combat_active: false,

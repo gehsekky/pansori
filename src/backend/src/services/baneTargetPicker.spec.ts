@@ -10,8 +10,8 @@ import { context as ctx } from '../contexts/sandbox.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-const E0 = `${ctx.startRoomId}#0`;
-const E1 = `${ctx.startRoomId}#1`;
+const E0 = `entry_hall#0`;
+const E1 = `entry_hall#1`;
 
 const seed: Seed = {
   context_id: ctx.id,
@@ -19,9 +19,9 @@ const seed: Seed = {
   ship_name: 'Bane Test',
   intro: '',
   seed_id: 'bane',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       { id: E0, name: 'Bandit', hp: 30, ac: 12, damage: '1d6', toHit: 3, xp: 10, cha: 8 },
       { id: E1, name: 'Bandit', hp: 30, ac: 12, damage: '1d6', toHit: 3, xp: 10, cha: 8 },
     ],
@@ -44,7 +44,7 @@ function casterState() {
     spell_slots_used: {},
   });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [cleric],
     active_character_id: 'pc-1',
     initiative_order: [

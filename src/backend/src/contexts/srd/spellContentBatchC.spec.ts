@@ -41,7 +41,7 @@ const seed: Seed = {
   ship_name: 'Batch C Test',
   intro: '',
   seed_id: 'batchC',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {},
   loot: {},
   npcs: {},
@@ -60,7 +60,7 @@ function druidState(spellId: string, slot: number) {
   });
   return {
     // No combat_active → out-of-combat, where these spells are castable.
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall' }),
     characters: [druid],
     active_character_id: 'pc-1',
   };

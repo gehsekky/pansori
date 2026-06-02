@@ -15,7 +15,7 @@ const seed: Seed = {
   ship_name: 'Epic Boon Test',
   intro: '',
   seed_id: 'epic-boon',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {},
   loot: {},
   npcs: {},
@@ -23,7 +23,7 @@ const seed: Seed = {
 
 function stateFor(char: ReturnType<typeof makeChar>): GameState {
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall' }),
     characters: [char],
     active_character_id: 'pc-1',
   };

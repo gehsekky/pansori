@@ -37,8 +37,8 @@ function seedWithGhast(): Seed {
     ship_name: 'Aura Test',
     intro: '',
     seed_id: 'aura',
-    rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-    enemies: { [ctx.startRoomId]: [{ id: 'g1', ...SRD_MONSTERS.ghast } as Enemy] },
+    rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
+    enemies: { ['entry_hall']: [{ id: 'g1', ...SRD_MONSTERS.ghast } as Enemy] },
     loot: {},
     npcs: {},
   };
@@ -100,7 +100,7 @@ describe('applyMonsterAuras — Ghast Stench at turn start', () => {
     const seed: Seed = {
       ...seedWithGhast(),
       enemies: {
-        [ctx.startRoomId]: [
+        ['entry_hall']: [
           { id: 'g1', name: 'Goblin', hp: 7, ac: 13, damage: '1d6', toHit: 4, xp: 25 } as Enemy,
         ],
       },
@@ -137,7 +137,7 @@ describe('Stench fires at the PC turn start (via takeAction)', () => {
       max_hp: 40,
     });
     const state: GameState = {
-      ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+      ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
       characters: [rogue],
       active_character_id: 'pc-1',
       initiative_order: [

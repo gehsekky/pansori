@@ -90,16 +90,16 @@ describe('Feral Senses — enemy-attack advantage suppression', () => {
 });
 
 // ── PC-side: a Blinded ranger doesn't suffer Disadvantage on its own attacks ──
-const ENEMY = `${ctx.startRoomId}#0`;
+const ENEMY = `entry_hall#0`;
 const seed: Seed = {
   context_id: ctx.id,
   world_name: 'FS',
   ship_name: 'FS',
   intro: '',
   seed_id: 'fs',
-  rooms: [{ id: ctx.startRoomId, name: 'S', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'S', desc: '' }],
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       {
         id: ENEMY,
         name: 'Dummy',
@@ -128,7 +128,7 @@ function blindRangerCombat(level: number): GameState {
     weapon_proficiencies: ['simple', 'martial'],
   });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [c],
     active_character_id: 'pc-1',
     initiative_order: [

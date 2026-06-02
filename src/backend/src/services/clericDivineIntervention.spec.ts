@@ -11,16 +11,16 @@ import { context as ctx } from '../contexts/sandbox.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-const ENEMY = `${ctx.startRoomId}#0`;
+const ENEMY = `entry_hall#0`;
 const seed: Seed = {
   context_id: ctx.id,
   world_name: 'DI',
   ship_name: 'DI',
   intro: '',
   seed_id: 'di',
-  rooms: [{ id: ctx.startRoomId, name: 'S', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'S', desc: '' }],
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       {
         id: ENEMY,
         name: 'Dummy',
@@ -52,7 +52,7 @@ function clericCombat(over: Partial<Character> = {}): GameState {
     ...over,
   });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [c],
     active_character_id: 'pc-1',
     initiative_order: [
@@ -150,12 +150,12 @@ describe('Divine Intervention — gating', () => {
     expect(r1.narrative).toMatch(/spent/);
 
     // A long rest clears the use (rest in an enemy-free seed).
-    const restSeed: Seed = { ...seed, enemies: { [ctx.startRoomId]: [] } };
+    const restSeed: Seed = { ...seed, enemies: { ['entry_hall']: [] } };
     const rested = await takeAction({
       action: { type: 'long_rest' },
       history: [],
       state: {
-        ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: false }),
+        ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: false }),
         characters: [
           makeChar({
             id: 'pc-1',

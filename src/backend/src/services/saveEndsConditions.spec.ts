@@ -17,7 +17,7 @@ import { takeAction } from './gameEngine.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-const enemyId = `${ctx.startRoomId}#0`;
+const enemyId = `entry_hall#0`;
 
 function seedWith(hp: number, con = 10): Seed {
   return {
@@ -26,9 +26,9 @@ function seedWith(hp: number, con = 10): Seed {
     ship_name: 'Save Ends Test',
     intro: '',
     seed_id: 'save-ends',
-    rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+    rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
     enemies: {
-      [ctx.startRoomId]: [
+      ['entry_hall']: [
         { id: enemyId, name: 'Ogre', hp, ac: 12, damage: '8', toHit: 5, xp: 50, con },
       ],
     },
@@ -70,7 +70,7 @@ function casterState(spellId: string, slot: number, enemyHp: number) {
   });
   const ally = makeChar({ id: 'pc-2', character_class: 'Fighter', level: 10, hp: 50, max_hp: 50 });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [wiz, ally],
     active_character_id: 'pc-1',
     initiative_order: [
@@ -171,7 +171,7 @@ describe('Slow — WIS save-ends stamped on cast', () => {
 function stunnedEnemyState(opts: { dc: number; acted: boolean }) {
   const pc = makeChar({ id: 'pc-1', character_class: 'Fighter', level: 10, hp: 60, max_hp: 60 });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [pc],
     active_character_id: 'pc-1',
     initiative_order: [

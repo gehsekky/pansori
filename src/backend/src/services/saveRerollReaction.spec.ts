@@ -81,8 +81,8 @@ const seed: Seed = {
   ship_name: 'Save Reroll Test',
   intro: '',
   seed_id: 'save-reroll-test',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-  enemies: { [ctx.startRoomId]: [] },
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
+  enemies: { ['entry_hall']: [] },
   loot: {},
   npcs: {},
 };

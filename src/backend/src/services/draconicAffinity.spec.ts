@@ -62,16 +62,16 @@ describe('choose_elemental_affinity', () => {
   });
 });
 
-const ENEMY = `${ctx.startRoomId}#0`;
+const ENEMY = `entry_hall#0`;
 const seed: Seed = {
   context_id: ctx.id,
   world_name: 'EA',
   ship_name: 'EA',
   intro: '',
   seed_id: 'ea',
-  rooms: [{ id: ctx.startRoomId, name: 'S', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'S', desc: '' }],
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       {
         id: ENEMY,
         name: 'Dummy',
@@ -96,7 +96,7 @@ function draconicCombat(affinity?: 'fire'): GameState {
     elemental_affinity: affinity,
   });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [s],
     active_character_id: 'pc-1',
     initiative_order: [

@@ -72,11 +72,11 @@ const slashResistSeed: Seed = {
   ship_name: 'Irresistible Test',
   intro: '',
   seed_id: 'irresistible',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       {
-        id: `${ctx.startRoomId}#0`,
+        id: `entry_hall#0`,
         name: 'Skeleton',
         hp: 200,
         ac: 10,
@@ -107,12 +107,12 @@ function boonFighterState(overrides: Partial<ReturnType<typeof makeChar>> = {}) 
     ...overrides,
   });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [pc],
     active_character_id: 'pc-1',
     initiative_order: [
       { id: 'pc-1', roll: 18, is_enemy: false },
-      { id: `${ctx.startRoomId}#0`, roll: 5, is_enemy: true },
+      { id: `entry_hall#0`, roll: 5, is_enemy: true },
     ],
     initiative_idx: 0,
     entities: [
@@ -126,7 +126,7 @@ function boonFighterState(overrides: Partial<ReturnType<typeof makeChar>> = {}) 
         condition_durations: {},
       },
       {
-        id: `${ctx.startRoomId}#0`,
+        id: `entry_hall#0`,
         isEnemy: true,
         pos: { x: 5, y: 5 },
         hp: 200,
@@ -143,7 +143,7 @@ describe('Overcome Defenses — through the attack path', () => {
     // d20 ≈ 11 (a hit, not a nat 20 → no Overwhelming Strike to muddy this).
     mockRandom(0.5);
     const result = await takeAction({
-      action: { type: 'attack', targetEnemyId: `${ctx.startRoomId}#0` },
+      action: { type: 'attack', targetEnemyId: `entry_hall#0` },
       history: [],
       state: boonFighterState(),
       seed: slashResistSeed,
@@ -159,7 +159,7 @@ describe('Overwhelming Strike — through the attack path', () => {
     // d20 = 20 → crit + nat 20.
     mockRandom(0.99);
     const result = await takeAction({
-      action: { type: 'attack', targetEnemyId: `${ctx.startRoomId}#0` },
+      action: { type: 'attack', targetEnemyId: `entry_hall#0` },
       history: [],
       state: boonFighterState(),
       seed: slashResistSeed,

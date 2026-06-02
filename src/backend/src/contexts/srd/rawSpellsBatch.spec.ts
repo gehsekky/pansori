@@ -13,7 +13,7 @@ import { takeAction } from '../../services/gameEngine.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-const ENEMY = `${ctx.startRoomId}#0`;
+const ENEMY = `entry_hall#0`;
 
 // The four save-for-half damage spells.
 const DAMAGE_BATCH = [
@@ -66,9 +66,9 @@ const seed: Seed = {
   ship_name: 'RAW Spell Test',
   intro: '',
   seed_id: 'raw-spells',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       { id: ENEMY, name: 'Ogre', hp: 400, ac: 10, damage: '1d6', toHit: 3, xp: 50, con: 8, dex: 8 },
     ],
   },
@@ -95,7 +95,7 @@ function casterState(conditions: string[] = []) {
     spell_slots_used: {},
   });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [wiz],
     active_character_id: 'pc-1',
     initiative_order: [

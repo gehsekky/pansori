@@ -12,17 +12,17 @@ import { takeAction } from './gameEngine.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-const ENEMY = `${ctx.startRoomId}#0`;
+const ENEMY = `entry_hall#0`;
 const seed: Seed = {
   context_id: ctx.id,
   world_name: 'Evoker',
   ship_name: 'Evoker',
   intro: '',
   seed_id: 'evoker',
-  rooms: [{ id: ctx.startRoomId, name: 'S', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'S', desc: '' }],
   // AC 20 so a mediocre spell-attack roll misses (exercising Potent Cantrip).
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       {
         id: ENEMY,
         name: 'Dummy',
@@ -52,7 +52,7 @@ function evokerCombat(over: Partial<Character> = {}): GameState {
     ...over,
   });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [c],
     active_character_id: 'pc-1',
     initiative_order: [
@@ -140,7 +140,7 @@ describe('Empowered Evocation (L10) — +INT to one evocation damage roll', () =
   const hitSeed: Seed = {
     ...seed,
     enemies: {
-      [ctx.startRoomId]: [
+      ['entry_hall']: [
         {
           id: ENEMY,
           name: 'Dummy',
@@ -204,7 +204,7 @@ function sculptState(level: number): GameState {
     dex: 10,
   });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [evoker, ally],
     active_character_id: 'pc-1',
     initiative_order: [
@@ -273,7 +273,7 @@ describe('Overchannel (L14) — maximize a damaging spell, escalating cost', () 
   const hitSeed: Seed = {
     ...seed,
     enemies: {
-      [ctx.startRoomId]: [
+      ['entry_hall']: [
         {
           id: ENEMY,
           name: 'Dummy',

@@ -30,7 +30,7 @@ describe('highJumpDistance', () => {
 
 // ── Integration through the jump action ──────────────────────────────────
 
-const ROOM = ctx.startRoomId;
+const ROOM = 'entry_hall';
 
 function jumpState(opts: {
   str?: number;

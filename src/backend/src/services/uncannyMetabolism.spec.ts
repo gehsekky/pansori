@@ -66,7 +66,7 @@ describe('Uncanny Metabolism — applied on rolling initiative (integration)', (
         max_hp: 40,
         class_resource_uses: { ki_points: 0 },
       },
-      { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] }
+      { current_room: CORRIDOR_ID, visited_rooms: ['entry_hall', CORRIDOR_ID] }
     );
     const result = await takeAction({
       action: { type: 'attack' },

@@ -15,7 +15,7 @@ import { takeAction } from './gameEngine.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-const enemyId = `${ctx.startRoomId}#0`;
+const enemyId = `entry_hall#0`;
 
 describe('rollSorcerousBurst — exploding d8s, capped by the modifier', () => {
   it('no 8s → just the sum of the base dice (no explosion)', () => {
@@ -61,9 +61,9 @@ function burstSeed(): Seed {
     ship_name: 'Sorcerous Burst Test',
     intro: '',
     seed_id: 'sb',
-    rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+    rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
     enemies: {
-      [ctx.startRoomId]: [
+      ['entry_hall']: [
         { id: enemyId, name: 'Ogre', hp: 300, ac: 5, damage: '1d6', toHit: 3, xp: 50 } as Enemy,
       ],
     },
@@ -84,7 +84,7 @@ function burstState(cha: number): GameState {
     prepared_spells: ['sorcerous_burst'],
   });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [sorc],
     active_character_id: 'pc-1',
     initiative_order: [

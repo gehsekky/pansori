@@ -55,16 +55,16 @@ describe('Peerless Skill — failed ability check (skillCheck)', () => {
 });
 
 // ── Peerless Skill on a missed attack ────────────────────────────────────────
-const ENEMY = `${ctx.startRoomId}#0`;
+const ENEMY = `entry_hall#0`;
 const seed: Seed = {
   context_id: ctx.id,
   world_name: 'Lore',
   ship_name: 'Lore',
   intro: '',
   seed_id: 'lore',
-  rooms: [{ id: ctx.startRoomId, name: 'S', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'S', desc: '' }],
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       {
         id: ENEMY,
         name: 'Dummy',
@@ -92,7 +92,7 @@ function loreCombat(over: Partial<Character> = {}): GameState {
     ...over,
   });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [c],
     active_character_id: 'pc-1',
     initiative_order: [

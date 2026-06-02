@@ -109,16 +109,16 @@ describe('Innate Sorcery — lifecycle', () => {
   });
 });
 
-const ENEMY = `${ctx.startRoomId}#0`;
+const ENEMY = `entry_hall#0`;
 const baseSeed = {
   context_id: ctx.id,
   world_name: 'IS',
   ship_name: 'IS',
   intro: '',
   seed_id: 'is',
-  rooms: [{ id: ctx.startRoomId, name: 'S', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'S', desc: '' }],
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       {
         id: ENEMY,
         name: 'Skeleton',
@@ -146,7 +146,7 @@ function sorcState(active: boolean): GameState {
     conditions: active ? ['innate_sorcery'] : [],
   });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [sorc],
     active_character_id: 'pc-1',
     initiative_order: [

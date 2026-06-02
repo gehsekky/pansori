@@ -17,14 +17,14 @@ const seed: Seed = {
   ship_name: 'Continue Gate Test',
   intro: '',
   seed_id: 'continue-gate',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {},
   loot: {},
   npcs: {},
 };
 
 const inCombat = (over: Partial<GameState> = {}): GameState => ({
-  ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+  ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
   characters: [makeChar({ id: 'pc-1', hp: 20, max_hp: 20 })],
   active_character_id: 'pc-1',
   ...over,

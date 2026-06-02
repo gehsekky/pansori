@@ -11,7 +11,7 @@ import { context as ctx } from '../contexts/sandbox.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-const enemyId = `${ctx.startRoomId}#0`;
+const enemyId = `entry_hall#0`;
 
 // ── Polymorph ─────────────────────────────────────────────────────────────────
 const polySeed: Seed = {
@@ -20,9 +20,9 @@ const polySeed: Seed = {
   ship_name: 'Poly Test',
   intro: '',
   seed_id: 'poly',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       { id: enemyId, name: 'Ogre', hp: 60, ac: 11, damage: '2d8+4', toHit: 6, wis: 7, xp: 100 },
     ],
   },
@@ -44,7 +44,7 @@ function polyState(): GameState {
     spell_slots_used: {},
   });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [wiz],
     active_character_id: 'pc-1',
     initiative_order: [
@@ -122,7 +122,7 @@ const grSeed: Seed = {
   ship_name: 'GR Test',
   intro: '',
   seed_id: 'gr',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {},
   loot: {},
   npcs: {},
@@ -143,7 +143,7 @@ function grState(): GameState {
     spell_slots_used: {},
   });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall' }),
     characters: [cleric],
     active_character_id: 'pc-1',
   };

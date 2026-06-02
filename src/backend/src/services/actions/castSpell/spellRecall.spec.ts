@@ -28,7 +28,7 @@ const noEnemySeed: Seed = {
   ship_name: 'Spell Recall Test',
   intro: '',
   seed_id: 'spell-recall',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {},
   loot: {},
   npcs: {},
@@ -47,7 +47,7 @@ function wizardState() {
     feats: ['boon_spell_recall'],
   });
   return {
-    ...makeState({ id: 'wiz-1' }, { current_room: ctx.startRoomId }),
+    ...makeState({ id: 'wiz-1' }, { current_room: 'entry_hall' }),
     characters: [wiz],
     active_character_id: 'wiz-1',
   };

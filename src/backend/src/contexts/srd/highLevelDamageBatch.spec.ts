@@ -16,7 +16,7 @@ import { takeAction } from '../../services/gameEngine.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-const ENEMY = `${ctx.startRoomId}#0`;
+const ENEMY = `entry_hall#0`;
 
 // Damage spells (single-target or AoE) that should reduce enemy HP on a failed save.
 const DAMAGE = [
@@ -63,9 +63,9 @@ const seed: Seed = {
   ship_name: 'High-Level Damage Test',
   intro: '',
   seed_id: 'hi-dmg',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       {
         id: ENEMY,
         name: 'Tarrasque',
@@ -98,7 +98,7 @@ function caster(spellId: string) {
     spell_slots_used: {},
   });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [wiz],
     active_character_id: 'pc-1',
     initiative_order: [

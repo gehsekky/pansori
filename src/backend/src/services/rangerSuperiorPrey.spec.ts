@@ -10,17 +10,17 @@ import { takeAction } from './gameEngine.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-const E1 = `${ctx.startRoomId}#0`;
-const E2 = `${ctx.startRoomId}#1`;
+const E1 = `entry_hall#0`;
+const E2 = `entry_hall#1`;
 const seed: Seed = {
   context_id: ctx.id,
   world_name: 'SHP Test',
   ship_name: 'SHP Test',
   intro: '',
   seed_id: 'shp',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       { id: E1, name: 'Stag', hp: 120, ac: 5, damage: '1d6', toHit: 3, xp: 50 } as unknown as Enemy,
       { id: E2, name: 'Boar', hp: 120, ac: 5, damage: '1d6', toHit: 3, xp: 50 } as unknown as Enemy,
     ],
@@ -42,7 +42,7 @@ function hunterState(level: number): GameState {
     weapon_proficiencies: ['simple', 'martial'],
   });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [char],
     active_character_id: 'pc-1',
     initiative_order: [

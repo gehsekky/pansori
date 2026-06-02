@@ -18,7 +18,7 @@ import { takeAction } from './gameEngine.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-const enemyId = `${ctx.startRoomId}#0`;
+const enemyId = `entry_hall#0`;
 
 describe('spell batch 7 — catalog', () => {
   it('Sleet Storm is an AoE DEX-save → Prone control spell', () => {
@@ -57,9 +57,9 @@ function seed(): Seed {
     ship_name: 'Batch7',
     intro: '',
     seed_id: 'b7',
-    rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+    rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
     enemies: {
-      [ctx.startRoomId]: [
+      ['entry_hall']: [
         {
           id: enemyId,
           name: 'Ogre',
@@ -98,7 +98,7 @@ function casterState(spellId: string, slot: number): GameState {
   });
   const ally = makeChar({ id: 'pc-2', character_class: 'Fighter', level: 11, hp: 80, max_hp: 80 });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [wiz, ally],
     active_character_id: 'pc-1',
     initiative_order: [

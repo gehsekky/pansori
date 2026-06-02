@@ -55,7 +55,7 @@ const seed: Seed = {
   ship_name: 'Batch 9 Test',
   intro: '',
   seed_id: 'batch9',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {},
   loot: {},
   npcs: {},
@@ -76,7 +76,7 @@ function casterState(spellId: string, slot: number) {
   });
   return {
     // No combat_active → out of combat, where these spells are castable.
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall' }),
     characters: [wiz],
     active_character_id: 'pc-1',
   };

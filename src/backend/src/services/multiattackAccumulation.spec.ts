@@ -18,7 +18,7 @@ import { takeAction } from './gameEngine.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-const E_ID = `${ctx.startRoomId}#0`;
+const E_ID = `entry_hall#0`;
 
 function twoSwingSeed(): Seed {
   return {
@@ -27,9 +27,9 @@ function twoSwingSeed(): Seed {
     ship_name: 'Multiattack Test',
     intro: '',
     seed_id: 'multi',
-    rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+    rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
     enemies: {
-      [ctx.startRoomId]: [
+      ['entry_hall']: [
         {
           id: E_ID,
           name: 'Brute',
@@ -61,7 +61,7 @@ function turnState(): GameState {
     max_hp: 40,
   });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [{ ...pc, hp: 40, max_hp: 40 }],
     active_character_id: 'pc-1',
     initiative_order: [

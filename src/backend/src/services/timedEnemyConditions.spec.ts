@@ -123,16 +123,16 @@ describe('Blinded enemy — attacks at Disadvantage', () => {
 });
 
 // ── PC attacks vs a Blinded enemy gain Advantage (narrative note) ─────────────
-const enemyId = `${ctx.startRoomId}#0`;
+const enemyId = `entry_hall#0`;
 const seed: Seed = {
   context_id: ctx.id,
   world_name: 'Blinded Test',
   ship_name: 'Blinded Test',
   intro: '',
   seed_id: 'blinded',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       { id: enemyId, name: 'Goblin', hp: 50, ac: 18, damage: '1d6', toHit: 3, xp: 20 },
     ],
   },
@@ -153,7 +153,7 @@ function fighterState(enemyConditions: string[]) {
     weapon_proficiencies: ['simple', 'martial'],
   });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [pc],
     active_character_id: 'pc-1',
     initiative_order: [
@@ -229,7 +229,7 @@ function casterState() {
   });
   const ally = makeChar({ id: 'pc-2', character_class: 'Fighter', level: 5, hp: 40, max_hp: 40 });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [wiz, ally],
     active_character_id: 'pc-1',
     initiative_order: [
@@ -306,7 +306,7 @@ describe('round-wrap tick — stamped duration decrements during a turn cycle', 
       spell_slots_used: {},
     });
     const state = {
-      ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+      ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
       characters: [wiz],
       active_character_id: 'pc-1',
       initiative_order: [

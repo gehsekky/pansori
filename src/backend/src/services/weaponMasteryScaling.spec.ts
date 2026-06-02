@@ -16,7 +16,7 @@ const seed: Seed = {
   ship_name: 'Mastery Test',
   intro: '',
   seed_id: 'mastery',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {},
   loot: {},
   npcs: {},
@@ -34,7 +34,7 @@ function fighterL3() {
 
 function stateFor(char: ReturnType<typeof makeChar>): GameState {
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall' }),
     characters: [char],
     active_character_id: 'pc-1',
   };

@@ -18,16 +18,16 @@ import { takeAction } from '../gameEngine.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-const enemyId = `${ctx.startRoomId}#boss`;
+const enemyId = `entry_hall#boss`;
 const seed: Seed = {
   context_id: ctx.id,
   world_name: 'Boss Cast Test',
   ship_name: 'Boss Cast Test',
   intro: '',
   seed_id: 'cast-combat-start',
-  rooms: [{ id: ctx.startRoomId, name: 'Apex', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Apex', desc: '' }],
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       {
         id: enemyId,
         name: 'Frost Acolyte',
@@ -47,7 +47,7 @@ function freshRoomState(pc: ReturnType<typeof makeChar>): GameState {
   // Mimic "just walked into the boss room": no combat_active, no
   // initiative_order, no entities.
   return {
-    ...makeState({ id: pc.id }, { current_room: ctx.startRoomId, combat_active: false }),
+    ...makeState({ id: pc.id }, { current_room: 'entry_hall', combat_active: false }),
     characters: [pc],
     active_character_id: pc.id,
     initiative_order: [],

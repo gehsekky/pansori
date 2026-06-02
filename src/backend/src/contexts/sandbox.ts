@@ -23,7 +23,6 @@ export const context: Context = {
   // A small defined grid campaign (the engine focuses on authored campaigns).
   gridWidth: 8,
   gridHeight: 8,
-  startRoomId: 'entry_hall',
 
   // ─── Classes ──────────────────────────────────────────────────────────────────
   classPrimaryStats: { ...SRD_CLASS_PRIMARY_STATS },

@@ -13,7 +13,7 @@ import { takeAction } from './gameEngine.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-const ENEMY = `${ctx.startRoomId}#0`;
+const ENEMY = `entry_hall#0`;
 
 const seed: Seed = {
   context_id: ctx.id,
@@ -21,9 +21,9 @@ const seed: Seed = {
   ship_name: 'Push Test',
   intro: '',
   seed_id: 'push',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       {
         id: ENEMY,
         name: 'Goblin',
@@ -55,7 +55,7 @@ function caster(spellId: string): GameState {
     spell_slots_used: {},
   });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [wiz],
     active_character_id: 'pc-1',
     // PC-only initiative: the cast resolves the push without an enemy turn

@@ -78,16 +78,16 @@ describe('handleRogueFeature — steady_aim', () => {
   });
 });
 
-const enemyId = `${ctx.startRoomId}#0`;
+const enemyId = `entry_hall#0`;
 const seedWithGoblin: Seed = {
   context_id: ctx.id,
   world_name: 'Steady Aim Test',
   ship_name: 'Steady Aim Test',
   intro: '',
   seed_id: 'steady-aim',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {
-    [ctx.startRoomId]: [makeEnemy({ id: enemyId, name: 'Goblin', hp: 60, ac: 10, toHit: 3 })],
+    ['entry_hall']: [makeEnemy({ id: enemyId, name: 'Goblin', hp: 60, ac: 10, toHit: 3 })],
   },
   loot: {},
   npcs: {},
@@ -116,7 +116,7 @@ function buildRogue(steadyAimPending: boolean) {
 
 function buildCombatState(char: ReturnType<typeof makeChar>) {
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [char],
     active_character_id: 'pc-1',
     initiative_order: [

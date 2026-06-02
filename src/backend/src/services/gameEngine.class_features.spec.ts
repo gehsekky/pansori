@@ -83,7 +83,7 @@ describe('class features', () => {
       characters: [wl],
       active_character_id: warlockId,
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       enemies_killed: [],
       loot_taken: [],
       combat_active: true,
@@ -157,7 +157,7 @@ describe('class features', () => {
       characters: [wl],
       active_character_id: warlockId,
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       enemies_killed: [],
       loot_taken: [],
       combat_active: true,
@@ -386,7 +386,7 @@ describe('class features', () => {
       characters: [monk],
       active_character_id: monkId,
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       enemies_killed: [],
       loot_taken: [],
       combat_active: true,
@@ -472,7 +472,7 @@ describe('class features', () => {
       characters: [barb],
       active_character_id: barbId,
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       enemies_killed: [],
       loot_taken: [],
       combat_active: true,
@@ -572,7 +572,7 @@ describe('class features', () => {
       characters: [fighter],
       active_character_id: charId,
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       enemies_killed: [],
       loot_taken: [],
       combat_active: true,
@@ -647,7 +647,7 @@ describe('class features', () => {
       characters: [fighter],
       active_character_id: charId,
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       enemies_killed: [],
       loot_taken: [],
       combat_active: true,
@@ -723,7 +723,7 @@ describe('class features', () => {
       characters: [monk],
       active_character_id: charId,
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       enemies_killed: [],
       loot_taken: [],
       combat_active: true,
@@ -816,7 +816,7 @@ describe('class features', () => {
       characters: [fighter],
       active_character_id: charId,
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       enemies_killed: [],
       loot_taken: [],
       combat_active: true,
@@ -899,7 +899,7 @@ describe('class features', () => {
       characters: [wiz],
       active_character_id: wizId,
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       enemies_killed: [],
       loot_taken: [],
       combat_active: true,
@@ -984,7 +984,7 @@ describe('class features', () => {
       characters: [wiz],
       active_character_id: wizId,
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       enemies_killed: [],
       loot_taken: [],
       combat_active: true,
@@ -1116,7 +1116,7 @@ describe('class features', () => {
       characters: [wiz],
       active_character_id: wizId,
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       enemies_killed: [],
       loot_taken: [],
       combat_active: true,
@@ -1245,7 +1245,7 @@ describe('class features', () => {
       characters: [wl],
       active_character_id: wlId,
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       enemies_killed: [],
       loot_taken: [],
       combat_active: true,
@@ -1333,7 +1333,7 @@ describe('class features', () => {
       characters: [wl],
       active_character_id: wlId,
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       enemies_killed: [],
       loot_taken: [],
       combat_active: true,
@@ -1421,7 +1421,7 @@ describe('class features', () => {
       characters: [wiz],
       active_character_id: wizId,
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       enemies_killed: [],
       loot_taken: [],
       combat_active: true,
@@ -1512,7 +1512,7 @@ describe('class features', () => {
       characters: [wiz],
       active_character_id: wizId,
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       enemies_killed: [],
       loot_taken: [],
       combat_active: true,
@@ -1602,7 +1602,7 @@ describe('class features', () => {
       characters: [wiz],
       active_character_id: wizId,
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       enemies_killed: [],
       loot_taken: [],
       combat_active: true,
@@ -1692,7 +1692,7 @@ describe('class features', () => {
       characters: [pilot, ally],
       active_character_id: 'p1',
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       enemies_killed: [],
       loot_taken: [],
       combat_active: true,
@@ -1760,7 +1760,7 @@ describe('class features', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.999);
     const state = makeState(
       { character_class: 'Fighter' },
-      { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] }
+      { current_room: CORRIDOR_ID, visited_rooms: ['entry_hall', CORRIDOR_ID] }
     );
     const result = await takeAction({
       action: { type: 'attack' },
@@ -1786,7 +1786,7 @@ describe('class features', () => {
 
     const state = makeState(
       { character_class: 'Fighter', level: 5 },
-      { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] }
+      { current_room: CORRIDOR_ID, visited_rooms: ['entry_hall', CORRIDOR_ID] }
     );
     const result = await takeAction({
       action: { type: 'attack' },
@@ -1808,7 +1808,7 @@ describe('class features', () => {
 
     const state = makeState(
       { character_class: 'Fighter', level: 4 },
-      { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] }
+      { current_room: CORRIDOR_ID, visited_rooms: ['entry_hall', CORRIDOR_ID] }
     );
     const result = await takeAction({
       action: { type: 'attack' },
@@ -1828,7 +1828,7 @@ describe('class features', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0); // every d20 → 1: all miss, enemy survives
     const state = makeState(
       { character_class: 'Fighter', level: 11 },
-      { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] }
+      { current_room: CORRIDOR_ID, visited_rooms: ['entry_hall', CORRIDOR_ID] }
     );
     const result = await takeAction({
       action: { type: 'attack' },
@@ -1846,7 +1846,7 @@ describe('class features', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0); // every d20 → 1: all miss, enemy survives
     const state = makeState(
       { character_class: 'Fighter', level: 20 },
-      { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] }
+      { current_room: CORRIDOR_ID, visited_rooms: ['entry_hall', CORRIDOR_ID] }
     );
     const result = await takeAction({
       action: { type: 'attack' },
@@ -1868,7 +1868,7 @@ describe('class features', () => {
         { character_class: 'Warrior', level: 1 },
         {
           current_room: CORRIDOR_ID,
-          visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+          visited_rooms: ['entry_hall', CORRIDOR_ID],
           combat_active: true,
           initiative_order: [
             { id: 'char-1', roll: 15, is_enemy: false },
@@ -1899,7 +1899,7 @@ describe('class features', () => {
         { character_class: 'Warrior', conditions: ['raging'] },
         {
           current_room: CORRIDOR_ID,
-          visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+          visited_rooms: ['entry_hall', CORRIDOR_ID],
           combat_active: true,
           initiative_order: [{ id: 'char-1', roll: 15, is_enemy: false }],
           initiative_idx: 0,
@@ -1938,7 +1938,7 @@ describe('class features', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.999); // always hit/crit
     const state = makeState(
       { character_class: 'Warrior', conditions: ['raging'] },
-      { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] }
+      { current_room: CORRIDOR_ID, visited_rooms: ['entry_hall', CORRIDOR_ID] }
     );
     const result = await takeAction({
       action: { type: 'attack' },
@@ -1976,7 +1976,7 @@ describe('class features', () => {
       { character_class: 'Warrior', level: 1, class_resource_uses: { rage_uses: 2 } },
       {
         current_room: CORRIDOR_ID,
-        visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+        visited_rooms: ['entry_hall', CORRIDOR_ID],
         combat_active: true,
         initiative_order: [
           { id: 'char-1', roll: 15, is_enemy: false },
@@ -1996,7 +1996,7 @@ describe('class features', () => {
       { character_class: 'Warrior', conditions: ['raging'] },
       {
         current_room: CORRIDOR_ID,
-        visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+        visited_rooms: ['entry_hall', CORRIDOR_ID],
         combat_active: true,
         initiative_order: [
           { id: 'char-1', roll: 15, is_enemy: false },

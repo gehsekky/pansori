@@ -17,7 +17,7 @@ import { takeAction } from './gameEngine.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-const GNOLL_ID = `${ctx.startRoomId}#0`;
+const GNOLL_ID = `entry_hall#0`;
 
 describe('Gnoll catalog — Rampage', () => {
   it('the template carries the rampage flag', () => {
@@ -32,9 +32,9 @@ function gnollSeed(enemy: Partial<Enemy> = {}): Seed {
     ship_name: 'Rampage Test',
     intro: '',
     seed_id: 'rampage',
-    rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+    rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
     enemies: {
-      [ctx.startRoomId]: [
+      ['entry_hall']: [
         {
           id: GNOLL_ID,
           name: 'Gnoll',
@@ -69,7 +69,7 @@ function turnState(pcHp: number, pcMax: number, rampageUsed = false): GameState 
     max_hp: pcMax,
   });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [{ ...pc, hp: pcHp, max_hp: pcMax }],
     active_character_id: 'pc-1',
     initiative_order: [

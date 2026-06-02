@@ -36,8 +36,6 @@ export const groveContent: Context = {
   displayNoun: 'grove',
   gridWidth: 10,
   gridHeight: 10,
-  // Unused once folded into Duskenvale (the host campaign's startRoomId wins).
-  startRoomId: 'pinegate_square',
 
   // ─── Classes (SRD spreads) ──────────────────────────────────────────────────
 

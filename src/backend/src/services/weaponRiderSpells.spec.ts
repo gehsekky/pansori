@@ -16,7 +16,7 @@ import { context as ctx } from '../contexts/sandbox.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-const enemyId = `${ctx.startRoomId}#0`;
+const enemyId = `entry_hall#0`;
 
 describe('weapon-rider spells — catalog', () => {
   it('Divine Favor is a persistent +1d4 radiant rider', () => {
@@ -54,7 +54,7 @@ const noEnemySeed: Seed = {
   ship_name: 'Rider Test',
   intro: '',
   seed_id: 'rider',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {},
   loot: {},
   npcs: {},
@@ -74,7 +74,7 @@ function casterState(spellId: string, slot: number) {
     spell_slots_used: {},
   });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall' }),
     characters: [pal],
     active_character_id: 'pc-1',
   };
@@ -135,9 +135,9 @@ const combatSeed: Seed = {
   ship_name: 'Rider Combat',
   intro: '',
   seed_id: 'rider-combat',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       { id: enemyId, name: 'Ogre', hp: 200, ac: 5, damage: '1d6', toHit: 3, xp: 50, str: 6 },
     ],
   },
@@ -161,7 +161,7 @@ function attackState(rider: Partial<ReturnType<typeof makeChar>>) {
   });
   const ally = makeChar({ id: 'pc-2', character_class: 'Fighter', level: 10, hp: 50, max_hp: 50 });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [pal, ally],
     active_character_id: 'pc-1',
     initiative_order: [

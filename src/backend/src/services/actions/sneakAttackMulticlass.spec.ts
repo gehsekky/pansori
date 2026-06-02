@@ -20,7 +20,7 @@ import { takeAction } from '../gameEngine.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-const enemyId = `${ctx.startRoomId}#0`;
+const enemyId = `entry_hall#0`;
 
 const seedWithGoblin: Seed = {
   context_id: ctx.id,
@@ -28,9 +28,9 @@ const seedWithGoblin: Seed = {
   ship_name: 'Sneak MC Test',
   intro: '',
   seed_id: 'sneak-mc',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       {
         id: enemyId,
         name: 'Goblin',
@@ -51,7 +51,7 @@ function buildState(pc: ReturnType<typeof makeChar>, allyPos?: { x: number; y: n
     ? [makeChar({ id: 'ally', name: 'Ally', character_class: 'Fighter' })]
     : [];
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [pc, ...allies],
     active_character_id: 'pc-1',
     initiative_order: [

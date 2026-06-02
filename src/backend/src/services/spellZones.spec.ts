@@ -18,7 +18,7 @@ import { context as ctx } from '../contexts/sandbox.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-const ENEMY = `${ctx.startRoomId}#0`;
+const ENEMY = `entry_hall#0`;
 
 const seed: Seed = {
   context_id: ctx.id,
@@ -26,9 +26,9 @@ const seed: Seed = {
   ship_name: 'Spell Zone Test',
   intro: '',
   seed_id: 'zone',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       { id: ENEMY, name: 'Ogre', hp: 100, ac: 10, damage: '1d6', toHit: 3, xp: 50, con: 8, dex: 8 },
     ],
   },
@@ -48,7 +48,7 @@ function combatState(enemyPos: { x: number; y: number }, enemyHp = 100): GameSta
     spell_slots_used: {},
   });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [druid],
     active_character_id: 'pc-1',
     // PC-only initiative: an action-cost zone cast/move advances the turn, and
@@ -85,7 +85,7 @@ const zone = (over: Partial<SpellZone> = {}): SpellZone => ({
   casterId: 'pc-1',
   spellId: 'moonbeam',
   name: 'Moonbeam',
-  roomId: ctx.startRoomId,
+  roomId: 'entry_hall',
   cells: [{ x: 5, y: 5 }],
   damage: '2d10',
   damageType: 'radiant',
@@ -351,7 +351,7 @@ describe('breakConcentration clears the caster’s zones', () => {
       concentrating_on: { spellId: 'moonbeam', rounds_left: 10 },
     });
     const st = {
-      ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId }),
+      ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall' }),
       characters: [caster],
       spell_zones: [zone()],
     };

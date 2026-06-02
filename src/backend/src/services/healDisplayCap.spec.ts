@@ -19,7 +19,7 @@ const noEnemySeed: Seed = {
   ship_name: 'Heal Display Test',
   intro: '',
   seed_id: 'heal-display',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {},
   loot: {},
   npcs: {},
@@ -48,7 +48,7 @@ describe('Heal narrative — actual amount applied (capped at max HP)', () => {
       max_hp: 8,
     });
     const state = {
-      ...makeState({ id: 'cleric-1' }, { current_room: ctx.startRoomId }),
+      ...makeState({ id: 'cleric-1' }, { current_room: 'entry_hall' }),
       characters: [cleric, fighter],
       active_character_id: 'cleric-1',
     };
@@ -88,7 +88,7 @@ describe('Heal narrative — actual amount applied (capped at max HP)', () => {
       max_hp: 100,
     });
     const state = {
-      ...makeState({ id: 'cleric-1' }, { current_room: ctx.startRoomId }),
+      ...makeState({ id: 'cleric-1' }, { current_room: 'entry_hall' }),
       characters: [cleric, wounded],
       active_character_id: 'cleric-1',
     };

@@ -11,16 +11,16 @@ import { takeAction } from '../gameEngine.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-const enemyId = `${ctx.startRoomId}#0`;
+const enemyId = `entry_hall#0`;
 const seed: Seed = {
   context_id: ctx.id,
   world_name: 'Dimension Door Test',
   ship_name: 'Dimension Door Test',
   intro: '',
   seed_id: 'dimension-door',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       {
         id: enemyId,
         name: 'Goblin',
@@ -38,7 +38,7 @@ const seed: Seed = {
 
 function buildGridState(pc: ReturnType<typeof makeChar>): GameState {
   return {
-    ...makeState({ id: pc.id }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: pc.id }, { current_room: 'entry_hall', combat_active: true }),
     characters: [pc],
     active_character_id: pc.id,
     initiative_order: [
@@ -140,7 +140,7 @@ describe('Dimension Door — auto-safe teleport', () => {
       spell_slots_used: { 4: 0 },
     });
     const state: GameState = {
-      ...makeState({ id: pc.id }, { current_room: ctx.startRoomId, combat_active: false }),
+      ...makeState({ id: pc.id }, { current_room: 'entry_hall', combat_active: false }),
       characters: [pc],
       active_character_id: pc.id,
       entities: undefined,

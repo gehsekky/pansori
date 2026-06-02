@@ -18,7 +18,7 @@ const noEnemySeed: Seed = {
   ship_name: 'AC Buff Test',
   intro: '',
   seed_id: 'ac-buff',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {},
   loot: {},
   npcs: {},
@@ -83,7 +83,7 @@ describe('Mage Armor — cast handler', () => {
       spell_slots_used: {},
     });
     const state = {
-      ...makeState({ id: 'wizard-1' }, { current_room: ctx.startRoomId }),
+      ...makeState({ id: 'wizard-1' }, { current_room: 'entry_hall' }),
       characters: [wizard],
       active_character_id: 'wizard-1',
     };
@@ -115,7 +115,7 @@ describe('Shield of Faith — cast handler + concentration drop', () => {
       spell_slots_used: {},
     });
     const state = {
-      ...makeState({ id: 'cleric-1' }, { current_room: ctx.startRoomId }),
+      ...makeState({ id: 'cleric-1' }, { current_room: 'entry_hall' }),
       characters: [cleric],
       active_character_id: 'cleric-1',
     };
@@ -144,7 +144,7 @@ describe('Shield of Faith — cast handler + concentration drop', () => {
       concentrating_on: { spellId: 'shield_of_faith', rounds_left: 10 },
     });
     const state = {
-      ...makeState({ id: 'cleric-1' }, { current_room: ctx.startRoomId }),
+      ...makeState({ id: 'cleric-1' }, { current_room: 'entry_hall' }),
       characters: [cleric],
       active_character_id: 'cleric-1',
     };

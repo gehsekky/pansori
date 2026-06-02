@@ -34,11 +34,11 @@ const highAcSeed: Seed = {
   ship_name: 'Peerless Aim Test',
   intro: '',
   seed_id: 'peerless-aim',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       {
-        id: `${ctx.startRoomId}#0`,
+        id: `entry_hall#0`,
         name: 'Iron Golem',
         hp: 200,
         ac: 25,
@@ -67,12 +67,12 @@ function prowessState(turnActions?: Record<string, unknown>) {
     ...(turnActions ? { turn_actions: { ...FRESH_TURN, ...turnActions } } : {}),
   });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [pc],
     active_character_id: 'pc-1',
     initiative_order: [
       { id: 'pc-1', roll: 18, is_enemy: false },
-      { id: `${ctx.startRoomId}#0`, roll: 5, is_enemy: true },
+      { id: `entry_hall#0`, roll: 5, is_enemy: true },
     ],
     initiative_idx: 0,
     entities: [
@@ -86,7 +86,7 @@ function prowessState(turnActions?: Record<string, unknown>) {
         condition_durations: {},
       },
       {
-        id: `${ctx.startRoomId}#0`,
+        id: `entry_hall#0`,
         isEnemy: true,
         pos: { x: 5, y: 5 },
         hp: 200,
@@ -103,7 +103,7 @@ describe('Peerless Aim — through the attack path', () => {
     // d20 = 2 (a miss vs AC 25, not a fumble).
     mockRandom(0.05);
     const result = await takeAction({
-      action: { type: 'attack', targetEnemyId: `${ctx.startRoomId}#0` },
+      action: { type: 'attack', targetEnemyId: `entry_hall#0` },
       history: [],
       state: prowessState(),
       seed: highAcSeed,
@@ -116,7 +116,7 @@ describe('Peerless Aim — through the attack path', () => {
   it('does not rescue when already spent this turn', async () => {
     mockRandom(0.05);
     const result = await takeAction({
-      action: { type: 'attack', targetEnemyId: `${ctx.startRoomId}#0` },
+      action: { type: 'attack', targetEnemyId: `entry_hall#0` },
       history: [],
       state: prowessState({ peerless_aim_used: true }),
       seed: highAcSeed,

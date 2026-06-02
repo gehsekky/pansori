@@ -20,7 +20,7 @@ import { takeAction } from './gameEngine.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-const enemyId = `${ctx.startRoomId}#0`;
+const enemyId = `entry_hall#0`;
 
 // Stun-on-hit goblin with a high DC. CON 10 (mod 0) PC needs a
 // 14+ on the d20 to pass without proficiency; with proficiency
@@ -31,9 +31,9 @@ const seedWithStunGoblin: Seed = {
   ship_name: 'Resilient Save Test',
   intro: '',
   seed_id: 'resilient-save',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       {
         id: enemyId,
         name: 'Stun Goblin',
@@ -68,7 +68,7 @@ function buildPc(opts: { resilient?: boolean }) {
 
 function buildState(pc: ReturnType<typeof makeChar>) {
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [pc],
     active_character_id: 'pc-1',
     initiative_order: [
@@ -142,9 +142,9 @@ describe('Resilient feat — save proficiency on conditionSavingThrow', () => {
     const intSeed: Seed = {
       ...seedWithStunGoblin,
       enemies: {
-        [ctx.startRoomId]: [
+        ['entry_hall']: [
           {
-            ...seedWithStunGoblin.enemies[ctx.startRoomId][0],
+            ...seedWithStunGoblin.enemies['entry_hall'][0],
             onHitEffect: { condition: 'stunned', ability: 'int', dc: 14 },
           },
         ],

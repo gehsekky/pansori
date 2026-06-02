@@ -46,7 +46,7 @@ describe('Bless — auto-pick honors the slot cap on a large party', () => {
       ...makeState(),
       characters: [cleric, ...allies],
       active_character_id: cleric.id,
-      current_room: ctx.startRoomId,
+      current_room: 'entry_hall',
       combat_active: false,
     };
   }

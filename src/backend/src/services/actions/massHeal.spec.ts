@@ -18,7 +18,7 @@ const seed: Seed = {
   ship_name: 'Mass Heal Test',
   intro: '',
   seed_id: 'mass-heal',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {},
   loot: {},
   npcs: {},
@@ -26,7 +26,7 @@ const seed: Seed = {
 
 function buildState(...chars: ReturnType<typeof makeChar>[]) {
   return {
-    ...makeState({ id: chars[0].id }, { current_room: ctx.startRoomId }),
+    ...makeState({ id: chars[0].id }, { current_room: 'entry_hall' }),
     characters: chars,
     active_character_id: chars[0].id,
   };

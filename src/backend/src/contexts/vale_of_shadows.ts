@@ -109,7 +109,6 @@ const CRYPT_LORD_BASE: EnemyTemplate = {
 const context: Context = {
   id: 'vale_of_shadows',
   displayNoun: 'vale',
-  startRoomId: 'millhaven_square',
 
   // ─── Classes ─────────────────────────────────────────────────────────────────
 

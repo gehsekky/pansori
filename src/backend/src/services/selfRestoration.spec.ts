@@ -10,17 +10,17 @@ import { takeAction } from './gameEngine.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-const enemyId = `${ctx.startRoomId}#0`;
+const enemyId = `entry_hall#0`;
 const seed: Seed = {
   context_id: ctx.id,
   world_name: 'Self-Restoration Test',
   ship_name: 'Self-Restoration Test',
   intro: '',
   seed_id: 'self-restoration',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {
     // Passive (low to-hit, no onHitEffect) so it can't re-apply a condition.
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       {
         id: enemyId,
         name: 'Shade',
@@ -38,7 +38,7 @@ const seed: Seed = {
 
 function buildState(monk: ReturnType<typeof makeChar>) {
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [monk],
     active_character_id: 'pc-1',
     initiative_order: [

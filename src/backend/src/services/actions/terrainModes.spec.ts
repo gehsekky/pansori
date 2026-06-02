@@ -27,7 +27,7 @@ function seedWithTerrain(opts: {
     seed_id: 'terrain-modes',
     rooms: [
       {
-        id: ctx.startRoomId,
+        id: 'entry_hall',
         name: 'Start',
         desc: '',
         climbTerrain: opts.climb,
@@ -44,7 +44,7 @@ function seedWithTerrain(opts: {
 
 function buildGridState(pc: ReturnType<typeof makeChar>) {
   return {
-    ...makeState({ id: pc.id }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: pc.id }, { current_room: 'entry_hall', combat_active: true }),
     characters: [pc],
     active_character_id: pc.id,
     initiative_order: [{ id: pc.id, roll: 18, is_enemy: false }],

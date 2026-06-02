@@ -23,7 +23,7 @@ function seedWithLighting(
     seed_id: 'lighting-sneak',
     rooms: [
       {
-        id: ctx.startRoomId,
+        id: 'entry_hall',
         name: 'Start',
         desc: '',
         lighting,
@@ -33,9 +33,9 @@ function seedWithLighting(
       { id: 'next-room', name: 'Next', desc: '' },
     ],
     enemies: {
-      [ctx.startRoomId]: [
+      ['entry_hall']: [
         {
-          id: `${ctx.startRoomId}#0`,
+          id: `entry_hall#0`,
           name: 'Goblin',
           hp: 7,
           ac: 12,
@@ -66,7 +66,7 @@ describe('Sneak in dark light', () => {
     });
     const seed = seedWithLighting('dark');
     const state = {
-      ...makeState({ id: pc.id }, { current_room: ctx.startRoomId }),
+      ...makeState({ id: pc.id }, { current_room: 'entry_hall' }),
       characters: [pc],
       active_character_id: pc.id,
     };
@@ -96,7 +96,7 @@ describe('Sneak in bright light', () => {
     });
     const seed = seedWithLighting('bright');
     const state = {
-      ...makeState({ id: pc.id }, { current_room: ctx.startRoomId }),
+      ...makeState({ id: pc.id }, { current_room: 'entry_hall' }),
       characters: [pc],
       active_character_id: pc.id,
     };
@@ -107,7 +107,7 @@ describe('Sneak in bright light', () => {
       seed,
       context: ctx,
     });
-    expect(result.newState.current_room).toBe(ctx.startRoomId); // didn't move
+    expect(result.newState.current_room).toBe('entry_hall'); // didn't move
   });
 });
 
@@ -125,7 +125,7 @@ describe('Sneak in dim light', () => {
     });
     const seed = seedWithLighting('dim');
     const state = {
-      ...makeState({ id: pc.id }, { current_room: ctx.startRoomId }),
+      ...makeState({ id: pc.id }, { current_room: 'entry_hall' }),
       characters: [pc],
       active_character_id: pc.id,
     };
@@ -149,7 +149,7 @@ describe('Sneak past a Sunlight-Sensitive observer in sunlight', () => {
     const pc = makeChar({ id: 'pc-1', character_class: 'Fighter', level: 5, dex: 10 });
     const seed = seedWithLighting('sunlight', { sunlightSensitivity: true });
     const state = {
-      ...makeState({ id: pc.id }, { current_room: ctx.startRoomId }),
+      ...makeState({ id: pc.id }, { current_room: 'entry_hall' }),
       characters: [pc],
       active_character_id: pc.id,
     };
@@ -168,7 +168,7 @@ describe('Sneak past a Sunlight-Sensitive observer in sunlight', () => {
     const pc = makeChar({ id: 'pc-1', character_class: 'Fighter', level: 5, dex: 10 });
     const seed = seedWithLighting('sunlight', {}); // no sensitivity → bright-equivalent DC 9
     const state = {
-      ...makeState({ id: pc.id }, { current_room: ctx.startRoomId }),
+      ...makeState({ id: pc.id }, { current_room: 'entry_hall' }),
       characters: [pc],
       active_character_id: pc.id,
     };
@@ -179,6 +179,6 @@ describe('Sneak past a Sunlight-Sensitive observer in sunlight', () => {
       seed,
       context: ctx,
     });
-    expect(result.newState.current_room).toBe(ctx.startRoomId); // didn't move
+    expect(result.newState.current_room).toBe('entry_hall'); // didn't move
   });
 });

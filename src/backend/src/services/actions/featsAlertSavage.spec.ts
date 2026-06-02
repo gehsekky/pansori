@@ -35,7 +35,7 @@ describe('Alert feat — Initiative bonus', () => {
   });
 });
 
-const enemyId = `${ctx.startRoomId}#0`;
+const enemyId = `entry_hall#0`;
 
 const seedWithGoblin: Seed = {
   context_id: ctx.id,
@@ -43,9 +43,9 @@ const seedWithGoblin: Seed = {
   ship_name: 'Savage Attacker Test',
   intro: '',
   seed_id: 'sa-test',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       makeEnemy({ id: enemyId, name: 'Goblin', hp: 60, ac: 10, damage: '1d6', toHit: 3, xp: 20 }),
     ],
   },
@@ -76,7 +76,7 @@ describe('Savage Attacker feat — once-per-turn damage reroll', () => {
 
   function buildState(char: ReturnType<typeof makeChar>) {
     return {
-      ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+      ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
       characters: [char],
       active_character_id: 'pc-1',
       initiative_order: [

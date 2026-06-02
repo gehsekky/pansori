@@ -19,8 +19,8 @@ import { takeAction } from '../gameEngine.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-const enemyId = `${ctx.startRoomId}#0`;
-const enemy2Id = `${ctx.startRoomId}#1`;
+const enemyId = `entry_hall#0`;
+const enemy2Id = `entry_hall#1`;
 
 const seedWithOneGoblin: Seed = {
   context_id: ctx.id,
@@ -28,9 +28,9 @@ const seedWithOneGoblin: Seed = {
   ship_name: 'Bug Test',
   intro: '',
   seed_id: 'bug-test',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       { id: enemyId, name: 'Goblin', hp: 50, ac: 10, damage: '1d6', toHit: 3, xp: 20 },
     ],
   },
@@ -44,9 +44,9 @@ const seedWithTwoGoblins: Seed = {
   ship_name: 'Bug Test',
   intro: '',
   seed_id: 'bug-test',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       // Make the first goblin frail so a single Flurry kills it; second is
       // bigger so the room isn't cleared.
       { id: enemyId, name: 'Goblin', hp: 5, ac: 10, damage: '1d6', toHit: 3, xp: 20 },
@@ -75,7 +75,7 @@ describe('Flurry of Blows — entity lookup uses ctx.enemy.id', () => {
       },
     });
     const state = {
-      ...makeState({ id: 'mk-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+      ...makeState({ id: 'mk-1' }, { current_room: 'entry_hall', combat_active: true }),
       characters: [monk],
       active_character_id: 'mk-1',
       initiative_order: [
@@ -134,7 +134,7 @@ describe('Flurry of Blows — entity lookup uses ctx.enemy.id', () => {
       },
     });
     const state = {
-      ...makeState({ id: 'mk-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+      ...makeState({ id: 'mk-1' }, { current_room: 'entry_hall', combat_active: true }),
       characters: [monk],
       active_character_id: 'mk-1',
       initiative_order: [
@@ -170,13 +170,13 @@ describe('Flurry of Blows — entity lookup uses ctx.enemy.id', () => {
       seed: {
         ...seedWithOneGoblin,
         enemies: {
-          [ctx.startRoomId]: [{ ...seedWithOneGoblin.enemies[ctx.startRoomId][0], hp: 5 }],
+          ['entry_hall']: [{ ...seedWithOneGoblin.enemies['entry_hall'][0], hp: 5 }],
         },
       },
       context: ctx,
     });
     expect(result.newState.enemies_killed).toContain(enemyId);
-    expect(result.newState.enemies_killed).not.toContain(ctx.startRoomId);
+    expect(result.newState.enemies_killed).not.toContain('entry_hall');
   });
 
   it('does NOT end combat when other enemies remain in the room', async () => {
@@ -195,7 +195,7 @@ describe('Flurry of Blows — entity lookup uses ctx.enemy.id', () => {
       },
     });
     const state = {
-      ...makeState({ id: 'mk-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+      ...makeState({ id: 'mk-1' }, { current_room: 'entry_hall', combat_active: true }),
       characters: [monk],
       active_character_id: 'mk-1',
       initiative_order: [

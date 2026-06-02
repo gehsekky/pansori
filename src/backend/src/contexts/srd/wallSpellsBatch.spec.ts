@@ -13,7 +13,7 @@ import { takeAction } from '../../services/gameEngine.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-const ENEMY = `${ctx.startRoomId}#0`;
+const ENEMY = `entry_hall#0`;
 
 describe('wall spells — catalog', () => {
   it('registers each wall with the expected barrier flags', () => {
@@ -45,9 +45,9 @@ const seed: Seed = {
   ship_name: 'Wall Batch Test',
   intro: '',
   seed_id: 'wall-batch',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       { id: ENEMY, name: 'Ogre', hp: 200, ac: 10, damage: '1d6', toHit: 3, xp: 50, dex: 8 },
     ],
   },
@@ -69,7 +69,7 @@ function casterState(): GameState {
     spell_slots_used: {},
   });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [wiz],
     active_character_id: 'pc-1',
     // PC-only initiative: the cast resolves without an enemy counterattack that

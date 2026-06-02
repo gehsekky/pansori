@@ -20,7 +20,7 @@ const seed: Seed = {
   ship_name: 'Haste Test',
   intro: '',
   seed_id: 'haste',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {},
   loot: {},
   npcs: {},
@@ -32,7 +32,7 @@ function buildState(
 ): GameState {
   const chars = ally ? [pc, ally] : [pc];
   return {
-    ...makeState({ id: pc.id }, { current_room: ctx.startRoomId }),
+    ...makeState({ id: pc.id }, { current_room: 'entry_hall' }),
     characters: chars,
     active_character_id: pc.id,
   };

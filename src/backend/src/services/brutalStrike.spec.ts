@@ -60,16 +60,16 @@ describe('handleBarbarianFeature — brutal_strike rider toggle', () => {
   });
 });
 
-const enemyId = `${ctx.startRoomId}#0`;
+const enemyId = `entry_hall#0`;
 const seed: Seed = {
   context_id: ctx.id,
   world_name: 'Brutal Strike Test',
   ship_name: 'Brutal Strike Test',
   intro: '',
   seed_id: 'brutal-strike',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       {
         id: enemyId,
         name: 'Ogre',
@@ -99,7 +99,7 @@ function barbState(rider: 'forceful' | 'hamstring') {
     turn_actions: { ...reckless, brutal_strike_pending: rider },
   });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [char],
     active_character_id: 'pc-1',
     initiative_order: [

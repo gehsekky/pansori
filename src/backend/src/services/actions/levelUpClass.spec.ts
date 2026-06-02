@@ -17,7 +17,7 @@ const minimalSeed: Seed = {
   ship_name: 'Level-up Test',
   intro: '',
   seed_id: 'lvlup-test',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {},
   loot: {},
   npcs: {},
@@ -27,7 +27,7 @@ describe('level_up_class — XP gating', () => {
   it('rejects when XP is below the next-level threshold', async () => {
     const pc = makeChar({ id: 'pc-1', character_class: 'Fighter', level: 3, xp: 200 });
     const state = {
-      ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId }),
+      ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall' }),
       characters: [pc],
       active_character_id: 'pc-1',
     };
@@ -46,7 +46,7 @@ describe('level_up_class — XP gating', () => {
   it('rejects when at the level cap (20)', async () => {
     const pc = makeChar({ id: 'pc-1', character_class: 'Fighter', level: 20, xp: 99999 });
     const state = {
-      ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId }),
+      ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall' }),
       characters: [pc],
       active_character_id: 'pc-1',
     };
@@ -63,7 +63,7 @@ describe('level_up_class — XP gating', () => {
   it('rejects mid-combat', async () => {
     const pc = makeChar({ id: 'pc-1', character_class: 'Fighter', level: 3, xp: 400 });
     const state = {
-      ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+      ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
       characters: [pc],
       active_character_id: 'pc-1',
     };
@@ -90,7 +90,7 @@ describe('level_up_class — multiclass prereqs', () => {
       dex: 10,
     });
     const state = {
-      ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId }),
+      ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall' }),
       characters: [pc],
       active_character_id: 'pc-1',
     };
@@ -114,7 +114,7 @@ describe('level_up_class — multiclass prereqs', () => {
       int: 10,
     });
     const state = {
-      ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId }),
+      ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall' }),
       characters: [pc],
       active_character_id: 'pc-1',
     };
@@ -138,7 +138,7 @@ describe('level_up_class — multiclass prereqs', () => {
       int: 13,
     });
     const state = {
-      ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId }),
+      ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall' }),
       characters: [pc],
       active_character_id: 'pc-1',
     };
@@ -165,7 +165,7 @@ describe('level_up_class — ASI gating', () => {
       class_levels: { fighter: 3 },
     });
     const state = {
-      ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId }),
+      ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall' }),
       characters: [pc],
       active_character_id: 'pc-1',
     };
@@ -191,7 +191,7 @@ describe('level_up_class — ASI gating', () => {
       class_levels: { fighter: 3 },
     });
     const state = {
-      ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId }),
+      ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall' }),
       characters: [pc],
       active_character_id: 'pc-1',
     };
@@ -220,7 +220,7 @@ describe('level_up_class — multiclass proficiency grants', () => {
       weapon_proficiencies: ['simple', 'martial'],
     });
     const state = {
-      ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId }),
+      ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall' }),
       characters: [pc],
       active_character_id: 'pc-1',
     };
@@ -251,7 +251,7 @@ describe('level_up_class — multiclass proficiency grants', () => {
       weapon_proficiencies: ['simple'],
     });
     const state = {
-      ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId }),
+      ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall' }),
       characters: [pc],
       active_character_id: 'pc-1',
     };
@@ -278,7 +278,7 @@ describe('level_up_class — multiclass proficiency grants', () => {
       armor_proficiencies: ['light', 'medium', 'heavy', 'shield'],
     });
     const state = {
-      ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId }),
+      ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall' }),
       characters: [pc],
       active_character_id: 'pc-1',
     };
@@ -307,7 +307,7 @@ describe('level_up_class — spell-slot recompute on multiclass', () => {
       spell_slots_max: { 1: 4, 2: 2 },
     });
     const state = {
-      ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId }),
+      ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall' }),
       characters: [pc],
       active_character_id: 'pc-1',
     };
@@ -335,7 +335,7 @@ describe('level_up_class — spell-slot recompute on multiclass', () => {
       spell_slots_max: { 1: 3 }, // half-caster L4 → caster level 2 row
     });
     const state = {
-      ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId }),
+      ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall' }),
       characters: [pc],
       active_character_id: 'pc-1',
     };

@@ -29,11 +29,11 @@ const cleaveSeed: Seed = {
   ship_name: 'Cleave Resist Test',
   intro: '',
   seed_id: 'cleave-resist',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       {
-        id: `${ctx.startRoomId}#0`,
+        id: `entry_hall#0`,
         name: 'Skeleton A',
         hp: 100,
         ac: 10,
@@ -43,7 +43,7 @@ const cleaveSeed: Seed = {
         resistances: ['slashing'],
       },
       {
-        id: `${ctx.startRoomId}#1`,
+        id: `entry_hall#1`,
         name: 'Skeleton B',
         hp: 100,
         ac: 10,
@@ -76,13 +76,13 @@ describe('Cleave damage — enemy resistance applied', () => {
       weapon_masteries: ['greataxe'],
     });
     const state = {
-      ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+      ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
       characters: [pc],
       active_character_id: 'pc-1',
       initiative_order: [
         { id: 'pc-1', roll: 18, is_enemy: false },
-        { id: `${ctx.startRoomId}#0`, roll: 5, is_enemy: true },
-        { id: `${ctx.startRoomId}#1`, roll: 4, is_enemy: true },
+        { id: `entry_hall#0`, roll: 5, is_enemy: true },
+        { id: `entry_hall#1`, roll: 4, is_enemy: true },
       ],
       initiative_idx: 0,
       entities: [
@@ -96,7 +96,7 @@ describe('Cleave damage — enemy resistance applied', () => {
           condition_durations: {},
         },
         {
-          id: `${ctx.startRoomId}#0`,
+          id: `entry_hall#0`,
           isEnemy: true,
           pos: { x: 5, y: 5 },
           hp: 100,
@@ -105,7 +105,7 @@ describe('Cleave damage — enemy resistance applied', () => {
           condition_durations: {},
         },
         {
-          id: `${ctx.startRoomId}#1`,
+          id: `entry_hall#1`,
           isEnemy: true,
           pos: { x: 5, y: 6 },
           hp: 100,
@@ -116,7 +116,7 @@ describe('Cleave damage — enemy resistance applied', () => {
       ],
     };
     const result = await takeAction({
-      action: { type: 'attack', targetEnemyId: `${ctx.startRoomId}#0` },
+      action: { type: 'attack', targetEnemyId: `entry_hall#0` },
       history: [],
       state,
       seed: cleaveSeed,
@@ -136,11 +136,11 @@ const twfSeed: Seed = {
   ship_name: 'TWF Resist Test',
   intro: '',
   seed_id: 'twf-resist',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       {
-        id: `${ctx.startRoomId}#0`,
+        id: `entry_hall#0`,
         name: 'Goblin',
         hp: 100,
         ac: 10,
@@ -181,12 +181,12 @@ describe('Two-Weapon off-hand damage — enemy resistance applied', () => {
       },
     });
     const state = {
-      ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+      ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
       characters: [pc],
       active_character_id: 'pc-1',
       initiative_order: [
         { id: 'pc-1', roll: 18, is_enemy: false },
-        { id: `${ctx.startRoomId}#0`, roll: 5, is_enemy: true },
+        { id: `entry_hall#0`, roll: 5, is_enemy: true },
       ],
       initiative_idx: 0,
       entities: [
@@ -200,7 +200,7 @@ describe('Two-Weapon off-hand damage — enemy resistance applied', () => {
           condition_durations: {},
         },
         {
-          id: `${ctx.startRoomId}#0`,
+          id: `entry_hall#0`,
           isEnemy: true,
           pos: { x: 5, y: 5 },
           hp: 100,
@@ -211,7 +211,7 @@ describe('Two-Weapon off-hand damage — enemy resistance applied', () => {
       ],
     };
     const result = await takeAction({
-      action: { type: 'two_weapon_attack', targetEnemyId: `${ctx.startRoomId}#0` },
+      action: { type: 'two_weapon_attack', targetEnemyId: `entry_hall#0` },
       history: [],
       state,
       seed: twfSeed,

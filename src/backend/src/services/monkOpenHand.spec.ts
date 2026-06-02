@@ -100,16 +100,16 @@ describe('Wholeness of Body (Open Hand L6)', () => {
 });
 
 // Unarmed Monk vs a high-HP dummy; an auto-hit roll, read the damage type.
-const ENEMY = `${ctx.startRoomId}#0`;
+const ENEMY = `entry_hall#0`;
 const seed: Seed = {
   context_id: ctx.id,
   world_name: 'Empowered Test',
   ship_name: 'Empowered Test',
   intro: '',
   seed_id: 'empowered',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       {
         id: ENEMY,
         name: 'Dummy',
@@ -136,7 +136,7 @@ function monkState(level: number): GameState {
     // no equipped_weapon → unarmed strike
   });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [char],
     active_character_id: 'pc-1',
     initiative_order: [

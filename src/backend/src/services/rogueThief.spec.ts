@@ -26,16 +26,16 @@ describe('Rogue subclass is Thief (SRD), not Assassin', () => {
   });
 });
 
-const ENEMY = `${ctx.startRoomId}#0`;
+const ENEMY = `entry_hall#0`;
 const seed: Seed = {
   context_id: ctx.id,
   world_name: 'Thief Test',
   ship_name: 'Thief Test',
   intro: '',
   seed_id: 'thief',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       {
         id: ENEMY,
         name: 'Guard',
@@ -64,7 +64,7 @@ function thiefState(): GameState {
     weapon_proficiencies: ['simple', 'martial'],
   });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [char],
     active_character_id: 'pc-1',
     surprised: [ENEMY], // the old Assassinate would auto-crit this
@@ -220,7 +220,7 @@ function obscureState(): GameState {
     },
   });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [char],
     active_character_id: 'pc-1',
     initiative_order: [

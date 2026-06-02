@@ -24,7 +24,7 @@ const seed: Seed = {
   ship_name: 'W',
   intro: '',
   seed_id: 'w',
-  rooms: [{ id: ctx.startRoomId, name: 'S', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'S', desc: '' }],
   enemies: {},
   loot: {},
   npcs: {},
@@ -67,7 +67,7 @@ describe('Scholar (L2) — expertise slots + eligible skills', () => {
 describe('Scholar (L2) — choice surface + handler', () => {
   it('offers Expertise in a knowledge skill out of combat', () => {
     const state = {
-      ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId }),
+      ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall' }),
       characters: [wizard()],
       active_character_id: 'pc-1',
     };
@@ -90,11 +90,11 @@ describe('Scholar (L2) — choice surface + handler', () => {
   });
 });
 
-const ENEMY = `${ctx.startRoomId}#0`;
+const ENEMY = `entry_hall#0`;
 const combatSeed: Seed = {
   ...seed,
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       {
         id: ENEMY,
         name: 'Dummy',
@@ -119,7 +119,7 @@ function combat(over: Partial<Character>): GameState {
     ...over,
   });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [c],
     active_character_id: 'pc-1',
     initiative_order: [

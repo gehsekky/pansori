@@ -61,7 +61,7 @@ describe('Persistent Rage — applied on rolling initiative (integration)', () =
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
     const state = makeState(
       { character_class: 'Barbarian', level: 15, class_resource_uses: { rage_uses: 1 } },
-      { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] }
+      { current_room: CORRIDOR_ID, visited_rooms: ['entry_hall', CORRIDOR_ID] }
     );
     const result = await takeAction({
       action: { type: 'attack' },

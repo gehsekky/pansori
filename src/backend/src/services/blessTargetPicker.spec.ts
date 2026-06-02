@@ -6,7 +6,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ctxWithRage, makeChar, makeState, spellSeed } from '../test-fixtures.js';
 import { generateChoices, takeAction } from './gameEngine.js';
 import type { GameState } from '../types.js';
-import { context as ctx } from '../contexts/sandbox.js';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -25,7 +24,7 @@ function party(): GameState {
     ...makeState(),
     characters: [cleric, fighter, rogue],
     active_character_id: cleric.id,
-    current_room: ctx.startRoomId,
+    current_room: 'entry_hall',
     combat_active: false,
   };
 }

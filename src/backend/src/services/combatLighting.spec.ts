@@ -19,7 +19,7 @@ import { takeAction } from './gameEngine.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-const ENEMY_ID = `${ctx.startRoomId}#0`;
+const ENEMY_ID = `entry_hall#0`;
 
 describe('darkvision catalog', () => {
   it('humans carry darkvision_ft 0; monsters default to seeing in the dark', () => {
@@ -40,9 +40,9 @@ function seedWith(lighting: 'bright' | 'dim' | 'dark' | 'sunlight', enemy: Parti
     ship_name: 'Light Test',
     intro: '',
     seed_id: 'light',
-    rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '', lighting }],
+    rooms: [{ id: 'entry_hall', name: 'Start', desc: '', lighting }],
     enemies: {
-      [ctx.startRoomId]: [
+      ['entry_hall']: [
         {
           id: ENEMY_ID,
           name: 'Foe',
@@ -82,7 +82,7 @@ function pcState(charOverrides: Partial<Character> = {}, pcLightRadius?: number)
     ...charOverrides,
   });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [pc],
     active_character_id: 'pc-1',
     initiative_order: [
@@ -314,7 +314,7 @@ describe('Light cantrip — cast in combat', () => {
       prepared_spells: ['light'],
     });
     const state: GameState = {
-      ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+      ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
       characters: [wizard],
       active_character_id: 'pc-1',
       entities: [
@@ -472,7 +472,7 @@ describe('Darkness spell', () => {
       spell_slots_used: {},
     });
     const state: GameState = {
-      ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+      ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
       characters: [wizard],
       active_character_id: 'pc-1',
       entities: [
@@ -528,7 +528,7 @@ describe('Darkness spell', () => {
       spell_slots_used: {},
     });
     return {
-      ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+      ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
       characters: [caster],
       active_character_id: 'pc-1',
       entities: [
@@ -633,7 +633,7 @@ describe('Darkness spell', () => {
         casterId: 'pc-2',
         spellId: 'darkness',
         name: 'Darkness',
-        roomId: ctx.startRoomId,
+        roomId: 'entry_hall',
         cells: [
           { x: 1, y: 5 },
           { x: 2, y: 5 },
@@ -674,7 +674,7 @@ describe('Darkness spell', () => {
         casterId: 'pc-2',
         spellId: 'darkness',
         name: 'Darkness',
-        roomId: ctx.startRoomId,
+        roomId: 'entry_hall',
         cells: [{ x: 30, y: 30 }], // far outside the 60-ft (12-cell) Daylight reach from (1,5)
         damage: '0',
         damageType: 'none',
@@ -706,7 +706,7 @@ describe('Darkness spell', () => {
         casterId: 'pc-1',
         spellId: 'darkness',
         name: 'Darkness',
-        roomId: ctx.startRoomId,
+        roomId: 'entry_hall',
         cells: [{ x: 5, y: 5 }],
         damage: '0',
         damageType: 'none',
@@ -736,7 +736,7 @@ describe('Darkness spell', () => {
         casterId: 'pc-1',
         spellId: 'darkness',
         name: 'Darkness',
-        roomId: ctx.startRoomId,
+        roomId: 'entry_hall',
         cells: [{ x: 5, y: 5 }],
         damage: '0',
         damageType: 'none',

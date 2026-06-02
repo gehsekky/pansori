@@ -74,7 +74,7 @@ describe('Superior Inspiration — applied on rolling initiative (integration)',
         cha: 20,
         class_resource_uses: { bardic_inspiration: 0 },
       },
-      { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] }
+      { current_room: CORRIDOR_ID, visited_rooms: ['entry_hall', CORRIDOR_ID] }
     );
     const result = await takeAction({
       action: { type: 'attack' },

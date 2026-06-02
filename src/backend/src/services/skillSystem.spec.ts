@@ -25,17 +25,17 @@ describe('skill → ability map', () => {
   });
 });
 
-const ENEMY = `${ctx.startRoomId}#0`;
+const ENEMY = `entry_hall#0`;
 const seed: Seed = {
   context_id: ctx.id,
   world_name: 'Skill',
   ship_name: 'Skill',
   intro: '',
   seed_id: 'skill',
-  rooms: [{ id: ctx.startRoomId, name: 'S', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'S', desc: '' }],
   // int 17 → Influence DC = max(15, 17) = 17; cr 2 → Study DC = 15 + 2 = 17.
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       {
         id: ENEMY,
         name: 'Zealot',
@@ -64,7 +64,7 @@ function bardState(expert: boolean): GameState {
     expertise_skills: expert ? ['persuasion'] : [],
   });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [c],
     active_character_id: 'pc-1',
     initiative_order: [
@@ -129,7 +129,7 @@ function wizardStudyState(expert: boolean): GameState {
     expertise_skills: expert ? ['arcana'] : [],
   });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [c],
     active_character_id: 'pc-1',
     initiative_order: [

@@ -74,16 +74,16 @@ describe('Fighter Action Surge — L17 second use', () => {
 });
 
 // Combat state: a Champion adjacent to a high-HP enemy; an 18 to-hit roll.
-const ENEMY = `${ctx.startRoomId}#0`;
+const ENEMY = `entry_hall#0`;
 const seed: Seed = {
   context_id: ctx.id,
   world_name: 'Champion Test',
   ship_name: 'Champion Test',
   intro: '',
   seed_id: 'champion',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       {
         id: ENEMY,
         name: 'Golem',
@@ -111,7 +111,7 @@ function championState(level: number): GameState {
     weapon_proficiencies: ['simple', 'martial'],
   });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [char],
     active_character_id: 'pc-1',
     initiative_order: [

@@ -79,17 +79,17 @@ describe('choose_hunter_option — Hunter’s Prey picker', () => {
   });
 });
 
-const E1 = `${ctx.startRoomId}#0`;
-const E2 = `${ctx.startRoomId}#1`;
+const E1 = `entry_hall#0`;
+const E2 = `entry_hall#1`;
 const seed: Seed = {
   context_id: ctx.id,
   world_name: "Hunter's Prey Test",
   ship_name: "Hunter's Prey Test",
   intro: '',
   seed_id: 'hunters-prey',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       { id: E1, name: 'Wolf', hp: 90, ac: 5, damage: '1d6', toHit: 3, xp: 50 } as unknown as Enemy,
       {
         id: E2,
@@ -119,7 +119,7 @@ function hordeState(): GameState {
     weapon_proficiencies: ['simple', 'martial'],
   });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [char],
     active_character_id: 'pc-1',
     initiative_order: [

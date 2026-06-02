@@ -178,7 +178,7 @@ describe('cast_spell — Cure Wounds (level 1, heal)', () => {
       characters: [cleric, rogue],
       active_character_id: cleric.id,
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       combat_active: true,
       initiative_order: [{ id: cleric.id, roll: 20, is_enemy: false }],
       initiative_idx: 0,
@@ -266,7 +266,7 @@ describe('cast_spell — Bless (level 1, concentration buff)', () => {
       ...makeState(),
       characters: [cleric, fighter, rogue],
       active_character_id: cleric.id,
-      current_room: ctx.startRoomId,
+      current_room: 'entry_hall',
       combat_active: false,
     };
     const result = await takeAction({
@@ -308,7 +308,7 @@ describe('cast_spell — Bless (level 1, concentration buff)', () => {
       characters: [fighter],
       active_character_id: fighter.id,
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       combat_active: true,
       initiative_order: [
         { id: fighter.id, roll: 18, is_enemy: false },
@@ -375,7 +375,7 @@ describe('cast_spell — Bless (level 1, concentration buff)', () => {
       characters: [cleric, rogue],
       active_character_id: cleric.id,
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       combat_active: true,
       initiative_order: [{ id: cleric.id, roll: 20, is_enemy: false }],
       initiative_idx: 0,
@@ -407,7 +407,7 @@ describe('cast_spell — Bless (level 1, concentration buff)', () => {
       ...makeState(),
       characters: [cleric],
       active_character_id: cleric.id,
-      current_room: ctx.startRoomId,
+      current_room: 'entry_hall',
       combat_active: false,
     };
     const result = await takeAction({
@@ -445,7 +445,7 @@ describe('cast_spell — Bless (level 1, concentration buff)', () => {
       characters: [cleric, rogue],
       active_character_id: cleric.id,
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       combat_active: true,
       initiative_order: [
         { id: cleric.id, roll: 20, is_enemy: false },
@@ -529,7 +529,7 @@ describe('cast_spell — Bless (level 1, concentration buff)', () => {
       characters: [fighter],
       active_character_id: fighter.id,
       current_room: CORRIDOR_ID,
-      visited_rooms: [ctx.startRoomId, CORRIDOR_ID],
+      visited_rooms: ['entry_hall', CORRIDOR_ID],
       combat_active: true,
       initiative_order: [{ id: fighter.id, roll: 18, is_enemy: false }],
       initiative_idx: 0,
@@ -572,10 +572,10 @@ describe('cast_spell — Bless (level 1, concentration buff)', () => {
 
 describe('spell slots — long rest resets used slots', () => {
   it('spell_slots_used is reset to {} after long rest', async () => {
-    // Must be in a room with no living enemy to rest; use startRoomId
+    // Must be in a room with no living enemy to rest; use the home room
     const state = {
       ...makeMageState({ spell_slots_used: { 1: 2, 2: 1 } }),
-      current_room: ctx.startRoomId,
+      current_room: 'entry_hall',
     };
     const result = await takeAction({
       action: { type: 'long_rest' },
@@ -597,7 +597,7 @@ describe('generateChoices — spell choices', () => {
   });
 
   it('does not include offensive spell choices when no enemy present', () => {
-    const state = { ...makeMageState(), current_room: ctx.startRoomId };
+    const state = { ...makeMageState(), current_room: 'entry_hall' };
     const choices = generateChoices(state, spellSeed, ctxWithRage);
     const offensiveSpells = choices.filter(
       (c) =>

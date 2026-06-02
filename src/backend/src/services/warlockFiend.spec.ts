@@ -93,16 +93,16 @@ describe('Fiendish Resilience — resistance in combat', () => {
   });
 });
 
-const HHENEMY = `${ctx.startRoomId}#0`;
+const HHENEMY = `entry_hall#0`;
 const hhSeed: Seed = {
   context_id: ctx.id,
   world_name: 'HH',
   ship_name: 'HH',
   intro: '',
   seed_id: 'hh',
-  rooms: [{ id: ctx.startRoomId, name: 'S', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'S', desc: '' }],
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       {
         id: HHENEMY,
         name: 'Bandit',
@@ -122,7 +122,7 @@ const hhSeed: Seed = {
 function hhCombat(over: Partial<Character> = {}): GameState {
   const c = fiend({ id: 'pc-1', level: 14, hp: 90, max_hp: 90, ...over });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [c],
     active_character_id: 'pc-1',
     initiative_order: [

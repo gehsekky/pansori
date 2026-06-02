@@ -23,7 +23,7 @@ function mountedCombat(opts: { mounted: boolean; steedPos?: { x: number; y: numb
   const rider = makeChar({ id: RIDER, character_class: 'Wizard', dex: 10, speed: 30 });
   const steedPos = opts.steedPos ?? { x: 2, y: 2 };
   return {
-    ...makeState({ id: RIDER }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: RIDER }, { current_room: 'entry_hall', combat_active: true }),
     characters: [rider],
     active_character_id: RIDER,
     initiative_order: [{ id: RIDER, roll: 15, is_enemy: false }],
@@ -74,7 +74,7 @@ describe('Phantom Steed — spawn + auto-mount', () => {
       ...makeState({ id: RIDER }),
       characters: [wizard],
       active_character_id: RIDER,
-      current_room: ctx.startRoomId,
+      current_room: 'entry_hall',
       combat_active: false,
     };
     const result = await takeAction({

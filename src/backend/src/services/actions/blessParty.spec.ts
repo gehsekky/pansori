@@ -25,7 +25,7 @@ const minimalSeed: Seed = {
   ship_name: 'Bless 4+ Test',
   intro: '',
   seed_id: 'bless-party',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {},
   loot: {},
   npcs: {},
@@ -47,7 +47,7 @@ describe('Bless — 4+-party member cap', () => {
       makeChar({ id, name: id, character_class: 'Fighter' })
     );
     const state = {
-      ...makeState({ id: 'cleric-1' }, { current_room: ctx.startRoomId }),
+      ...makeState({ id: 'cleric-1' }, { current_room: 'entry_hall' }),
       characters: [cleric, ...allies],
       active_character_id: 'cleric-1',
     };
@@ -82,7 +82,7 @@ describe('Bless — 4+-party member cap', () => {
       makeChar({ id, name: id, character_class: 'Fighter' })
     );
     const state = {
-      ...makeState({ id: 'cleric-1' }, { current_room: ctx.startRoomId }),
+      ...makeState({ id: 'cleric-1' }, { current_room: 'entry_hall' }),
       characters: [cleric, ...allies],
       active_character_id: 'cleric-1',
     };
@@ -125,7 +125,7 @@ describe('Bless — 4+-party member cap', () => {
       character_class: 'Fighter',
     });
     const state = {
-      ...makeState({ id: 'cleric-1' }, { current_room: ctx.startRoomId }),
+      ...makeState({ id: 'cleric-1' }, { current_room: 'entry_hall' }),
       // Insertion order matters — caster, two live, one dead, one extra live.
       characters: [cleric, livingAllies[0], deadAlly, livingAllies[1], liveSpare],
       active_character_id: 'cleric-1',

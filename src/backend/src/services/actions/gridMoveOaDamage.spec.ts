@@ -24,7 +24,7 @@ import { takeAction } from '../gameEngine.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-const enemyId = `${ctx.startRoomId}#0`;
+const enemyId = `entry_hall#0`;
 
 const seedWithGoblin: Seed = {
   context_id: ctx.id,
@@ -32,9 +32,9 @@ const seedWithGoblin: Seed = {
   ship_name: 'OA Damage Test',
   intro: '',
   seed_id: 'oa-test',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       {
         id: enemyId,
         name: 'Goblin',
@@ -68,7 +68,7 @@ describe('grid_move OA damage — routes through applyDamage', () => {
       speed: 30,
     });
     const state = {
-      ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+      ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
       characters: [pc],
       active_character_id: 'pc-1',
       initiative_order: [

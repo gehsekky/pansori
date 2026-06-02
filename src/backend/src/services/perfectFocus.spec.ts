@@ -55,7 +55,7 @@ describe('Perfect Focus — on rolling initiative (integration)', () => {
         // Uncanny Metabolism already spent this rest → Perfect Focus does the work.
         class_resource_uses: { ki_points: 1, uncanny_metabolism_used: 1 },
       },
-      { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] }
+      { current_room: CORRIDOR_ID, visited_rooms: ['entry_hall', CORRIDOR_ID] }
     );
     const r = await takeAction({
       action: { type: 'attack' },
@@ -71,7 +71,7 @@ describe('Perfect Focus — on rolling initiative (integration)', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
     const state = makeState(
       { character_class: 'Monk', level: 15, class_resource_uses: { ki_points: 1 } },
-      { current_room: CORRIDOR_ID, visited_rooms: [ctx.startRoomId, CORRIDOR_ID] }
+      { current_room: CORRIDOR_ID, visited_rooms: ['entry_hall', CORRIDOR_ID] }
     );
     const r = await takeAction({
       action: { type: 'attack' },

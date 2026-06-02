@@ -11,7 +11,7 @@ import { takeAction } from '../gameEngine.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-const ENEMY = `${ctx.startRoomId}#0`;
+const ENEMY = `entry_hall#0`;
 
 // PC at (1,1) with a shortbow; enemy at (1,5) — 4 squares away, well within
 // ranged reach. `obstacle` is placed on the room.
@@ -22,9 +22,9 @@ function losSeed(obstacle: GridPos): Seed {
     ship_name: 'LoS Test',
     intro: '',
     seed_id: 'los',
-    rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '', obstacles: [obstacle] }],
+    rooms: [{ id: 'entry_hall', name: 'Start', desc: '', obstacles: [obstacle] }],
     enemies: {
-      [ctx.startRoomId]: [
+      ['entry_hall']: [
         { id: ENEMY, name: 'Goblin', hp: 30, ac: 10, damage: '1d6', toHit: 3, xp: 20 },
       ],
     },
@@ -49,7 +49,7 @@ function archerState() {
     weapon_proficiencies: ['simple', 'martial'],
   });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [pc],
     active_character_id: 'pc-1',
     initiative_order: [

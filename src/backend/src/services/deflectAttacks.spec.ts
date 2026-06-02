@@ -106,8 +106,8 @@ const seed: Seed = {
   ship_name: 'Deflect Test',
   intro: '',
   seed_id: 'deflect-test',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-  enemies: { [ctx.startRoomId]: [] },
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
+  enemies: { ['entry_hall']: [] },
   loot: {},
   npcs: {},
 };

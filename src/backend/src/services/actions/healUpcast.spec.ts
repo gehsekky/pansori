@@ -26,7 +26,7 @@ const noEnemySeed: Seed = {
   ship_name: 'Heal Upcast Test',
   intro: '',
   seed_id: 'heal-upcast',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {},
   loot: {},
   npcs: {},
@@ -50,7 +50,7 @@ function buildHealParty(slot: number, slotsMax: Record<number, number>) {
     max_hp: 100,
   });
   return {
-    ...makeState({ id: 'cleric-1' }, { current_room: ctx.startRoomId }),
+    ...makeState({ id: 'cleric-1' }, { current_room: 'entry_hall' }),
     characters: [cleric, wounded],
     active_character_id: 'cleric-1',
     slot,

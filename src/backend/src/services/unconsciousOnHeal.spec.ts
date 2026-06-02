@@ -29,7 +29,7 @@ const seedNoEnemy: Seed = {
   ship_name: 'Heal Test',
   intro: '',
   seed_id: 'heal-test',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {},
   loot: {},
   npcs: {},
@@ -52,7 +52,7 @@ describe('Unconscious condition — cleared on heal from 0 HP', () => {
       ],
     });
     const state = {
-      ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId }),
+      ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall' }),
       characters: [pc],
       active_character_id: 'pc-1',
     };
@@ -86,7 +86,7 @@ describe('Unconscious condition — cleared on heal from 0 HP', () => {
       ],
     });
     const state = {
-      ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+      ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
       characters: [pc],
       active_character_id: 'pc-1',
       initiative_order: [{ id: 'pc-1', roll: 18, is_enemy: false }],

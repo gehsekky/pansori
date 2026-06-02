@@ -15,8 +15,8 @@ import { takeAction } from '../../services/gameEngine.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-const ENEMY = `${ctx.startRoomId}#0`;
-const ENEMY2 = `${ctx.startRoomId}#1`;
+const ENEMY = `entry_hall#0`;
+const ENEMY2 = `entry_hall#1`;
 
 describe('spell batch 8 — catalog', () => {
   it('Mass Suggestion is a no-Concentration aoe-condition charm (WIS save)', () => {
@@ -69,9 +69,9 @@ const seed: Seed = {
   ship_name: 'Batch 8 Test',
   intro: '',
   seed_id: 'batch8',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       { id: ENEMY, name: 'Cultist', hp: 80, ac: 10, damage: '1d6', toHit: 3, xp: 25, wis: 8 },
       { id: ENEMY2, name: 'Acolyte', hp: 80, ac: 10, damage: '1d6', toHit: 3, xp: 25, wis: 8 },
     ],
@@ -95,7 +95,7 @@ function casterState() {
     spell_slots_used: {},
   });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [bard],
     active_character_id: 'pc-1',
     initiative_order: [
@@ -282,7 +282,7 @@ describe('Enlarge/Reduce — target-determined buff/debuff', () => {
       weapon_proficiencies: ['simple', 'martial'],
     });
     const state = {
-      ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+      ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
       characters: [fighter],
       active_character_id: 'pc-1',
       initiative_order: [

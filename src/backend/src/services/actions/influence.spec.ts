@@ -19,7 +19,7 @@ const seedWithNpc: Seed = {
   intro: '',
   seed_id: 'influence-test',
   rooms: [
-    { id: ctx.startRoomId, name: 'Start', desc: '' },
+    { id: 'entry_hall', name: 'Start', desc: '' },
     { id: npcRoomId, name: 'Tavern', desc: '' },
   ],
   enemies: {},
@@ -97,11 +97,11 @@ describe('influence — NPC target out of combat', () => {
 describe('influence — Enemy target in combat', () => {
   it('success removes the enemy from the fight (yield) and consumes the Action', async () => {
     mockRandom(0.99); // d20 → 20
-    const enemyId = `${ctx.startRoomId}#0`;
+    const enemyId = `entry_hall#0`;
     const combatSeed: Seed = {
       ...seedWithNpc,
       enemies: {
-        [ctx.startRoomId]: [
+        ['entry_hall']: [
           {
             id: enemyId,
             name: 'Goblin',
@@ -123,7 +123,7 @@ describe('influence — Enemy target in combat', () => {
       skill_proficiencies: ['intimidation'],
     });
     const state = {
-      ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+      ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
       characters: [fighter],
       active_character_id: 'pc-1',
       initiative_order: [
@@ -168,11 +168,11 @@ describe('influence — Enemy target in combat', () => {
 
   it('failure costs the Action but leaves the enemy in the fight', async () => {
     mockRandom(0); // d20 → 1
-    const enemyId = `${ctx.startRoomId}#0`;
+    const enemyId = `entry_hall#0`;
     const combatSeed: Seed = {
       ...seedWithNpc,
       enemies: {
-        [ctx.startRoomId]: [
+        ['entry_hall']: [
           {
             id: enemyId,
             name: 'Goblin',
@@ -188,7 +188,7 @@ describe('influence — Enemy target in combat', () => {
     };
     const char = makeChar({ id: 'pc-1', cha: 10 });
     const state = {
-      ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+      ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
       characters: [char],
       active_character_id: 'pc-1',
       initiative_order: [
@@ -234,7 +234,7 @@ describe('influence — no valid target', () => {
   it('rejects when no NPC and no enemy match', async () => {
     const char = makeChar({ id: 'pc-1' });
     const state = {
-      ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId }),
+      ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall' }),
       characters: [char],
       active_character_id: 'pc-1',
     };
@@ -248,7 +248,7 @@ describe('influence — no valid target', () => {
         ship_name: 'Empty',
         intro: '',
         seed_id: 'empty',
-        rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+        rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
         enemies: {},
         loot: {},
         npcs: {},

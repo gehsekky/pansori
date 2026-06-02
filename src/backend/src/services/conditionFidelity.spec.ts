@@ -20,7 +20,7 @@ import { takeAction } from './gameEngine.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-const enemyId = `${ctx.startRoomId}#0`;
+const enemyId = `entry_hall#0`;
 
 // ── Registry hygiene ──────────────────────────────────────────────────────────
 describe('condition registry — Deafened + Petrified', () => {
@@ -107,9 +107,9 @@ const seed: Seed = {
   ship_name: 'Concentration Test',
   intro: '',
   seed_id: 'conc',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       { id: enemyId, name: 'Goblin', hp: 20, ac: 12, damage: '1d4', toHit: 2, xp: 10 },
     ],
   },
@@ -133,7 +133,7 @@ describe('Concentration — ends when the caster is incapacitated', () => {
       concentrating_on: { spellId: 'hold_person', condition: 'paralyzed', rounds_left: 10 },
     });
     const state = {
-      ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+      ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
       characters: [wiz],
       active_character_id: 'pc-1',
       initiative_order: [

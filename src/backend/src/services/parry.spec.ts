@@ -19,7 +19,7 @@ import { takeAction } from './gameEngine.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-const CAPTAIN_ID = `${ctx.startRoomId}#0`;
+const CAPTAIN_ID = `entry_hall#0`;
 
 describe('Bandit Captain catalog — Parry', () => {
   it('the template carries the parry reaction flag', () => {
@@ -34,9 +34,9 @@ function captainSeed(enemy: Partial<Enemy>): Seed {
     ship_name: 'Parry Test',
     intro: '',
     seed_id: 'parry',
-    rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+    rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
     enemies: {
-      [ctx.startRoomId]: [
+      ['entry_hall']: [
         {
           id: CAPTAIN_ID,
           name: 'Bandit Captain',
@@ -73,7 +73,7 @@ function attackState(reactionUsed = false): GameState {
     weapon_proficiencies: ['simple', 'martial'],
   });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [pc],
     active_character_id: 'pc-1',
     initiative_order: [

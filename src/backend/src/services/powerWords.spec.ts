@@ -14,9 +14,9 @@ import { context as ctx } from '../contexts/sandbox.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-const E1 = `${ctx.startRoomId}#0`;
-const E2 = `${ctx.startRoomId}#1`;
-const E3 = `${ctx.startRoomId}#2`;
+const E1 = `entry_hall#0`;
+const E2 = `entry_hall#1`;
+const E3 = `entry_hall#2`;
 
 function enemy(id: string, name: string, hp: number): Enemy {
   return { id, name, hp, ac: 10, damage: '1d6', toHit: 3, xp: 50 } as unknown as Enemy;
@@ -29,8 +29,8 @@ function killSeed(enemies: Enemy[]): Seed {
     ship_name: 'Power Word Test',
     intro: '',
     seed_id: 'power-word',
-    rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-    enemies: { [ctx.startRoomId]: enemies },
+    rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
+    enemies: { ['entry_hall']: enemies },
     loot: {},
     npcs: {},
   };
@@ -53,7 +53,7 @@ function killState(
     spells_known: ['power_word_kill', 'power_word_heal'],
   });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [bard],
     active_character_id: 'pc-1',
     initiative_order: [
@@ -189,7 +189,7 @@ function healState(bardLevel: number): GameState {
     max_hp: 30,
   });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: false }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: false }),
     characters: [bard, ally1, ally2],
     active_character_id: 'pc-1',
   } as unknown as GameState;

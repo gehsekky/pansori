@@ -19,7 +19,7 @@ const seed: Seed = {
   ship_name: 'Life Domain Test',
   intro: '',
   seed_id: 'life-domain',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {},
   loot: {},
   npcs: {},
@@ -43,7 +43,7 @@ const lifeCleric = (over: Partial<Character> = {}) =>
 
 function buildState(...chars: Character[]) {
   return {
-    ...makeState({ id: chars[0].id }, { current_room: ctx.startRoomId }),
+    ...makeState({ id: chars[0].id }, { current_room: 'entry_hall' }),
     characters: chars,
     active_character_id: chars[0].id,
   };

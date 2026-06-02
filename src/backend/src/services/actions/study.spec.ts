@@ -10,7 +10,7 @@ import { takeAction } from '../gameEngine.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-const enemyId = `${ctx.startRoomId}#0`;
+const enemyId = `entry_hall#0`;
 
 // Skeleton has `vulnerabilities: ['bludgeoning']` + `immunities: ['poison']`
 // + `condition_immunities: ['poisoned', 'exhaustion']` in SRD_MONSTERS.
@@ -20,9 +20,9 @@ const skeletonSeed: Seed = {
   ship_name: 'Study Test',
   intro: '',
   seed_id: 'study-test',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       {
         id: enemyId,
         name: 'Skeleton',
@@ -55,7 +55,7 @@ describe('study — creature analysis', () => {
       skill_proficiencies: ['arcana'],
     });
     const state = {
-      ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+      ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
       characters: [wizard],
       active_character_id: 'pc-1',
       initiative_order: [
@@ -101,7 +101,7 @@ describe('study — creature analysis', () => {
     mockRandom(0); // d20 → 1
     const wizard = makeChar({ id: 'pc-1', character_class: 'Wizard', int: 10 });
     const state = {
-      ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+      ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
       characters: [wizard],
       active_character_id: 'pc-1',
       initiative_order: [
@@ -145,7 +145,7 @@ describe('study — creature analysis', () => {
   it('rejects when no enemy targeted', async () => {
     const char = makeChar({ id: 'pc-1' });
     const state = {
-      ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId }),
+      ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall' }),
       characters: [char],
       active_character_id: 'pc-1',
     };
@@ -159,7 +159,7 @@ describe('study — creature analysis', () => {
         ship_name: 'Empty',
         intro: '',
         seed_id: 'empty',
-        rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+        rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
         enemies: {},
         loot: {},
         npcs: {},
@@ -172,7 +172,7 @@ describe('study — creature analysis', () => {
   it('accepts a loreTopic with no enemy but only acknowledges it', async () => {
     const char = makeChar({ id: 'pc-1' });
     const state = {
-      ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId }),
+      ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall' }),
       characters: [char],
       active_character_id: 'pc-1',
     };
@@ -186,7 +186,7 @@ describe('study — creature analysis', () => {
         ship_name: 'Empty',
         intro: '',
         seed_id: 'empty',
-        rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+        rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
         enemies: {},
         loot: {},
         npcs: {},

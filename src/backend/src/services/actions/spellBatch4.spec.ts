@@ -18,7 +18,7 @@ const noEnemySeed: Seed = {
   ship_name: 'Spell Batch Test',
   intro: '',
   seed_id: 'spell-batch',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {},
   loot: {},
   npcs: {},
@@ -27,7 +27,7 @@ const noEnemySeed: Seed = {
 function withEnemy(enemy: Enemy): Seed {
   return {
     ...noEnemySeed,
-    enemies: { [ctx.startRoomId]: [enemy] },
+    enemies: { ['entry_hall']: [enemy] },
   };
 }
 
@@ -36,7 +36,7 @@ function withEnemy(enemy: Enemy): Seed {
 // the in-combat spell tests below.
 function combatStateWith(pc: ReturnType<typeof makeChar>, enemy: Enemy) {
   return {
-    ...makeState({ id: pc.id }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: pc.id }, { current_room: 'entry_hall', combat_active: true }),
     characters: [pc],
     active_character_id: pc.id,
     initiative_order: [
@@ -82,7 +82,7 @@ describe('Lesser Restoration', () => {
       spell_slots_used: {},
     });
     const state = {
-      ...makeState({ id: cleric.id }, { current_room: ctx.startRoomId }),
+      ...makeState({ id: cleric.id }, { current_room: 'entry_hall' }),
       characters: [cleric],
       active_character_id: cleric.id,
     };
@@ -117,7 +117,7 @@ describe('Greater Restoration', () => {
       spell_slots_used: {},
     });
     const state = {
-      ...makeState({ id: cleric.id }, { current_room: ctx.startRoomId }),
+      ...makeState({ id: cleric.id }, { current_room: 'entry_hall' }),
       characters: [cleric],
       active_character_id: cleric.id,
     };
@@ -151,7 +151,7 @@ describe('Prayer of Healing', () => {
     });
     const ally = makeChar({ id: 'ally-1', hp: 10, max_hp: 30 });
     const state = {
-      ...makeState({ id: cleric.id }, { current_room: ctx.startRoomId }),
+      ...makeState({ id: cleric.id }, { current_room: 'entry_hall' }),
       characters: [cleric, ally],
       active_character_id: cleric.id,
     };
@@ -187,7 +187,7 @@ describe('Beacon of Hope', () => {
     const ally2 = makeChar({ id: 'ally-2' });
     const ally3 = makeChar({ id: 'ally-3' }); // RAW cap at 3 — should NOT get the buff
     const state = {
-      ...makeState({ id: cleric.id }, { current_room: ctx.startRoomId }),
+      ...makeState({ id: cleric.id }, { current_room: 'entry_hall' }),
       characters: [cleric, ally1, ally2, ally3],
       active_character_id: cleric.id,
     };
@@ -223,7 +223,7 @@ describe('Death Ward', () => {
       spell_slots_used: {},
     });
     const state = {
-      ...makeState({ id: cleric.id }, { current_room: ctx.startRoomId }),
+      ...makeState({ id: cleric.id }, { current_room: 'entry_hall' }),
       characters: [cleric],
       active_character_id: cleric.id,
     };
@@ -261,7 +261,7 @@ describe('Bane', () => {
       spell_slots_used: {},
     });
     const enemy: Enemy = {
-      id: `${ctx.startRoomId}#0`,
+      id: `entry_hall#0`,
       name: 'Goblin',
       ac: 12,
       hp: 8,
@@ -304,7 +304,7 @@ describe('Scorching Ray', () => {
       spell_slots_used: {},
     });
     const enemy: Enemy = {
-      id: `${ctx.startRoomId}#0`,
+      id: `entry_hall#0`,
       name: 'Goblin',
       ac: 8,
       hp: 80,
@@ -348,7 +348,7 @@ describe('Chromatic Orb', () => {
       spell_slots_used: {},
     });
     const enemy: Enemy = {
-      id: `${ctx.startRoomId}#0`,
+      id: `entry_hall#0`,
       name: 'Goblin',
       ac: 12,
       hp: 30,

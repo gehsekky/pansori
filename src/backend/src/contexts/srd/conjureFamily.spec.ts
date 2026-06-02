@@ -13,7 +13,7 @@ import { takeAction } from '../../services/gameEngine.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-const ENEMY = `${ctx.startRoomId}#0`;
+const ENEMY = `entry_hall#0`;
 
 describe('conjure family — catalog', () => {
   it('registers each conjure spell on the expected path', () => {
@@ -67,9 +67,9 @@ const seed: Seed = {
   ship_name: 'Conjure Test',
   intro: '',
   seed_id: 'conjure',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       { id: ENEMY, name: 'Ogre', hp: 300, ac: 10, damage: '1d6', toHit: 3, xp: 50, dex: 8, wis: 8 },
     ],
   },
@@ -105,7 +105,7 @@ function druidState(): GameState {
     spell_slots_used: {},
   });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [druid],
     active_character_id: 'pc-1',
     initiative_order: [

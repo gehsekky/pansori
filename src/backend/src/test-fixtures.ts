@@ -94,9 +94,8 @@ export function makeChar(overrides: Partial<Character> = {}): Character {
 /**
  * Canonical GameState fixture with one character. `charOverrides` are
  * forwarded to `makeChar`; `stateOverrides` customize state-level
- * fields. Default `current_room` / `visited_rooms` use the sandbox
- * context's `startRoomId` (matches the pre-extraction default in
- * gameEngine.spec.ts).
+ * fields. Default `current_room` / `visited_rooms` use the sandbox's
+ * home room id ('entry_hall').
  */
 export function makeState(
   charOverrides: Partial<Character> = {},
@@ -106,8 +105,8 @@ export function makeState(
   return {
     characters: [char],
     active_character_id: char.id,
-    current_room: sandboxCtx.startRoomId,
-    visited_rooms: [sandboxCtx.startRoomId],
+    current_room: 'entry_hall',
+    visited_rooms: ['entry_hall'],
     enemies_killed: [],
     loot_taken: [],
     combat_active: false,
@@ -177,7 +176,7 @@ export const baseSandboxSeed: Seed = {
   intro: 'Test intro.',
   seed_id: 'test-seed-id',
   rooms: [
-    { id: sandboxCtx.startRoomId, name: 'Entry Hall', desc: 'The entry hall.' },
+    { id: 'entry_hall', name: 'Entry Hall', desc: 'The entry hall.' },
     { id: CORRIDOR_ID, name: 'Guard Post', desc: 'A guard post.' },
     { id: 'exit_gate', name: 'Exit Gate', desc: 'The exit gate.' },
   ],
@@ -220,7 +219,7 @@ export const dungeonSeedWithEnemy: Seed = {
   intro: 'Test.',
   seed_id: 'dungeon-test-seed',
   rooms: [
-    { id: sandboxCtx.startRoomId, name: 'Entry Hall', desc: 'Entry.' },
+    { id: 'entry_hall', name: 'Entry Hall', desc: 'Entry.' },
     { id: CORRIDOR_ID, name: 'Guard Post', desc: 'Dark.' },
     { id: 'exit_gate', name: 'Exit Gate', desc: 'Exit.' },
   ],
@@ -253,7 +252,7 @@ export const spellSeed: Seed = {
   intro: 'Test.',
   seed_id: 'spell-seed-id',
   rooms: [
-    { id: sandboxCtx.startRoomId, name: 'Crypt', desc: 'Cold stone.' },
+    { id: 'entry_hall', name: 'Crypt', desc: 'Cold stone.' },
     { id: CORRIDOR_ID, name: 'Burial', desc: 'A chamber.' },
     { id: 'exit_shaft', name: 'Exit Shaft', desc: 'A shaft of light.' },
   ],
@@ -292,7 +291,7 @@ export function makeMageState(charOverrides: Partial<Character> = {}): GameState
     characters: [char],
     active_character_id: char.id,
     current_room: CORRIDOR_ID,
-    visited_rooms: [sandboxCtx.startRoomId, CORRIDOR_ID],
+    visited_rooms: ['entry_hall', CORRIDOR_ID],
     enemies_killed: [],
     loot_taken: [],
     combat_active: false,
@@ -329,7 +328,7 @@ export function makeClericState(charOverrides: Partial<Character> = {}): GameSta
     characters: [char],
     active_character_id: char.id,
     current_room: CORRIDOR_ID,
-    visited_rooms: [sandboxCtx.startRoomId, CORRIDOR_ID],
+    visited_rooms: ['entry_hall', CORRIDOR_ID],
     enemies_killed: [],
     loot_taken: [],
     combat_active: false,

@@ -12,8 +12,8 @@ import { takeAction } from '../../gameEngine.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-const ENEMY = `${ctx.startRoomId}#0`;
-const ROOM = ctx.startRoomId;
+const ENEMY = `entry_hall#0`;
+const ROOM = 'entry_hall';
 
 const wall = (over: Partial<SpellWall> = {}): SpellWall => ({
   id: 'w1',

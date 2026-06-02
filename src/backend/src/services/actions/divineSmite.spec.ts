@@ -12,7 +12,7 @@ import { takeAction } from '../gameEngine.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-const enemyId = `${ctx.startRoomId}#0`;
+const enemyId = `entry_hall#0`;
 
 const seedWithGoblin: Seed = {
   context_id: ctx.id,
@@ -20,9 +20,9 @@ const seedWithGoblin: Seed = {
   ship_name: 'Smite Test',
   intro: '',
   seed_id: 'smite-test',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       {
         id: enemyId,
         name: 'Goblin',
@@ -57,7 +57,7 @@ const buildPaladin = (opts: {
     divine_smite_dice: opts.smiteDice,
   });
   return {
-    ...makeState({ id: 'pal-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pal-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [pala],
     active_character_id: 'pal-1',
     initiative_order: [

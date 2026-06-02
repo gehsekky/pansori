@@ -23,7 +23,7 @@ const seed: Seed = {
   seed_id: 'movement-modes',
   rooms: [
     {
-      id: ctx.startRoomId,
+      id: 'entry_hall',
       name: 'Start',
       desc: '',
       // One obstacle at (5, 5) blocks the line between PC at (4,5)
@@ -39,7 +39,7 @@ const seed: Seed = {
 
 function buildGridState(pc: ReturnType<typeof makeChar>) {
   return {
-    ...makeState({ id: pc.id }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: pc.id }, { current_room: 'entry_hall', combat_active: true }),
     characters: [pc],
     active_character_id: pc.id,
     initiative_order: [{ id: pc.id, roll: 18, is_enemy: false }],
@@ -164,7 +164,7 @@ describe('Persistent move-mode grants', () => {
       climb_speed_ft: 30,
     });
     const state = {
-      ...makeState({ id: pc.id }, { current_room: ctx.startRoomId, combat_active: false }),
+      ...makeState({ id: pc.id }, { current_room: 'entry_hall', combat_active: false }),
       characters: [pc],
       active_character_id: pc.id,
     };
@@ -190,7 +190,7 @@ describe('Persistent move-mode grants', () => {
       swim_speed_ft: 30,
     });
     const state = {
-      ...makeState({ id: pc.id }, { current_room: ctx.startRoomId, combat_active: false }),
+      ...makeState({ id: pc.id }, { current_room: 'entry_hall', combat_active: false }),
       characters: [pc],
       active_character_id: pc.id,
     };

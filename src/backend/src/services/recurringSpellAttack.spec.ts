@@ -13,7 +13,7 @@ import { context as ctx } from '../contexts/sandbox.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-const ENEMY = `${ctx.startRoomId}#0`;
+const ENEMY = `entry_hall#0`;
 
 const seed: Seed = {
   context_id: ctx.id,
@@ -21,11 +21,9 @@ const seed: Seed = {
   ship_name: 'Recurring Attack Test',
   intro: '',
   seed_id: 'recurring',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {
-    [ctx.startRoomId]: [
-      { id: ENEMY, name: 'Ogre', hp: 200, ac: 5, damage: '1d6', toHit: 3, xp: 50 },
-    ],
+    ['entry_hall']: [{ id: ENEMY, name: 'Ogre', hp: 200, ac: 5, damage: '1d6', toHit: 3, xp: 50 }],
   },
   loot: {},
   npcs: {},
@@ -53,7 +51,7 @@ function casterState(
   return {
     // PC-only initiative so an action-cost cast's turn-advance doesn't draw a
     // concentration-breaking counterattack (keeps these tests deterministic).
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [caster],
     active_character_id: 'pc-1',
     initiative_order: [{ id: 'pc-1', roll: 18, is_enemy: false }],
@@ -162,7 +160,7 @@ describe('Vampiric Touch — recurring necrotic attack that heals (Magic action)
       },
     });
     const st = {
-      ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId }),
+      ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall' }),
       characters: [caster],
     };
     const res = breakConcentration(caster, st, ctx);

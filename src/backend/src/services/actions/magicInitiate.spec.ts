@@ -63,16 +63,16 @@ describe('Magic Initiate — take_feat side effects', () => {
 });
 
 describe('Magic Initiate — free L1 cast at cast time', () => {
-  const enemyId = `${ctx.startRoomId}#0`;
+  const enemyId = `entry_hall#0`;
   const seedWithGoblin: Seed = {
     context_id: ctx.id,
     world_name: 'MI Test',
     ship_name: 'MI Test',
     intro: '',
     seed_id: 'mi-test',
-    rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+    rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
     enemies: {
-      [ctx.startRoomId]: [
+      ['entry_hall']: [
         {
           id: enemyId,
           name: 'Goblin',
@@ -106,7 +106,7 @@ describe('Magic Initiate — free L1 cast at cast time', () => {
   it('casts the recorded L1 spell without consuming a slot when token is available', async () => {
     const pc = buildMagicInitiatePc();
     const state = {
-      ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+      ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
       characters: [pc],
       active_character_id: 'pc-1',
       initiative_order: [
@@ -160,7 +160,7 @@ describe('Magic Initiate — free L1 cast at cast time', () => {
     const pc = buildMagicInitiatePc();
     pc.class_resource_uses = { magic_initiate_l1_used: 1 };
     const state = {
-      ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+      ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
       characters: [pc],
       active_character_id: 'pc-1',
       initiative_order: [
@@ -221,7 +221,7 @@ describe('Magic Initiate — choice validation (take_feat action)', () => {
     ship_name: 'MI Validation Test',
     intro: '',
     seed_id: 'mi-validate',
-    rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+    rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
     enemies: {},
     loot: {},
     npcs: {},

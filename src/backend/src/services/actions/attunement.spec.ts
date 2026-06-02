@@ -56,7 +56,7 @@ const testSeed: Seed = {
   ship_name: 'Attune Test',
   intro: '',
   seed_id: 'attune-test',
-  rooms: [{ id: testCtx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {},
   loot: {},
   npcs: {},

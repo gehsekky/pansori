@@ -40,7 +40,7 @@ const emptySeed: Seed = {
   ship_name: 'Griffon Test',
   intro: '',
   seed_id: 'gg',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {},
   loot: {},
   npcs: {},

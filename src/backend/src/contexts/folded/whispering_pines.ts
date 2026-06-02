@@ -31,9 +31,6 @@ import type { Context } from '../../types.js';
 export const whisperingPinesContent: Context = {
   id: 'whispering_pines',
   displayNoun: 'pass',
-  // Unused once folded into Duskenvale (the host campaign's startRoomId wins);
-  // kept type-valid by pointing at a real room.
-  startRoomId: 'pines_tavern',
 
   // ─── Classes (shared with Vale; copied to keep contexts self-contained) ──────
 

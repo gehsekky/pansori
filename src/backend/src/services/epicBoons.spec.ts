@@ -88,7 +88,7 @@ describe('take_feat action — epic boon consumes the L19 ASI', () => {
         ship_name: 'Test',
         intro: '',
         seed_id: 'boon-test',
-        rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+        rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
         enemies: {},
         loot: {},
         npcs: {},

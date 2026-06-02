@@ -13,7 +13,7 @@ import { context as ctx } from '../contexts/sandbox.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-const enemyId = `${ctx.startRoomId}#0`;
+const enemyId = `entry_hall#0`;
 // AC 25 so the Rogue's d20 → 5 attack (total well under 25) always misses; only
 // a natural 20 lands. Big HP so the crit doesn't end the fight.
 const seedWithWall: Seed = {
@@ -22,9 +22,9 @@ const seedWithWall: Seed = {
   ship_name: 'Stroke of Luck Test',
   intro: '',
   seed_id: 'sol-attack',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {
-    [ctx.startRoomId]: [makeEnemy({ id: enemyId, name: 'Iron Golem', hp: 200, ac: 25, toHit: 3 })],
+    ['entry_hall']: [makeEnemy({ id: enemyId, name: 'Iron Golem', hp: 200, ac: 25, toHit: 3 })],
   },
   loot: {},
   npcs: {},
@@ -47,7 +47,7 @@ function rogue20(over = {}) {
 
 function buildCombatState(char: ReturnType<typeof makeChar>) {
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [char],
     active_character_id: 'pc-1',
     initiative_order: [

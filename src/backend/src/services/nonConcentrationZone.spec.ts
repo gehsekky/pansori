@@ -13,7 +13,7 @@ import { context as ctx } from '../contexts/sandbox.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-const ENEMY = `${ctx.startRoomId}#0`;
+const ENEMY = `entry_hall#0`;
 
 const seed: Seed = {
   context_id: ctx.id,
@@ -21,9 +21,9 @@ const seed: Seed = {
   ship_name: 'Zone Teardown Test',
   intro: '',
   seed_id: 'zone-teardown',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       { id: ENEMY, name: 'Ogre', hp: 500, ac: 10, damage: '1d6', toHit: 3, xp: 50, con: 8, dex: 8 },
     ],
   },
@@ -47,7 +47,7 @@ function stateWithZone(over: Partial<SpellZone> = {}): GameState {
     casterId: 'pc-1',
     spellId: 'guardian_of_faith',
     name: 'Guardian of Faith',
-    roomId: ctx.startRoomId,
+    roomId: 'entry_hall',
     cells: [{ x: 5, y: 5 }],
     damage: '20',
     damageType: 'radiant',
@@ -58,7 +58,7 @@ function stateWithZone(over: Partial<SpellZone> = {}): GameState {
     ...over,
   };
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [cleric],
     active_character_id: 'pc-1',
     initiative_order: [{ id: 'pc-1', roll: 18, is_enemy: false }],

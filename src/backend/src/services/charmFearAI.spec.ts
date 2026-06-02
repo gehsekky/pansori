@@ -34,7 +34,7 @@ function ent(overrides: Partial<CombatEntity>): CombatEntity {
 describe('Charmed enemy — selectTarget excludes the charmer', () => {
   it('targets another PC instead of the (nearer) charmer', () => {
     const st = {
-      current_room: ctx.startRoomId,
+      current_room: 'entry_hall',
       characters: [
         makeChar({ id: 'pc-1', hp: 30, max_hp: 30 }),
         makeChar({ id: 'pc-2', hp: 30, max_hp: 30 }),
@@ -51,7 +51,7 @@ describe('Charmed enemy — selectTarget excludes the charmer', () => {
 
   it('stands down when the charmer is the only candidate', () => {
     const st = {
-      current_room: ctx.startRoomId,
+      current_room: 'entry_hall',
       characters: [makeChar({ id: 'pc-1', hp: 30, max_hp: 30 })],
       entities: [
         ent({ id: 'e1', conditions: ['charmed'], charmer_id: 'pc-1' }),
@@ -65,7 +65,7 @@ describe('Charmed enemy — selectTarget excludes the charmer', () => {
 
   it('a non-charmed enemy still targets the nearest PC', () => {
     const st = {
-      current_room: ctx.startRoomId,
+      current_room: 'entry_hall',
       characters: [
         makeChar({ id: 'pc-1', hp: 30, max_hp: 30 }),
         makeChar({ id: 'pc-2', hp: 30, max_hp: 30 }),
@@ -143,7 +143,7 @@ const ghoul = {
 
 function approachState(frightened: boolean): GameState {
   return {
-    current_room: ctx.startRoomId,
+    current_room: 'entry_hall',
     characters: [makeChar({ id: 'pc-1', hp: 30, max_hp: 30 })],
     entities: [
       ent({

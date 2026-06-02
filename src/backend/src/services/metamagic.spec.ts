@@ -15,7 +15,7 @@ import { takeAction } from './gameEngine.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-const ENEMY = `${ctx.startRoomId}#0`;
+const ENEMY = `entry_hall#0`;
 const seed = (hp = 60, ac = 12): Seed =>
   ({
     context_id: ctx.id,
@@ -23,9 +23,9 @@ const seed = (hp = 60, ac = 12): Seed =>
     ship_name: 'MM',
     intro: '',
     seed_id: 'mm',
-    rooms: [{ id: ctx.startRoomId, name: 'S', desc: '' }],
+    rooms: [{ id: 'entry_hall', name: 'S', desc: '' }],
     enemies: {
-      [ctx.startRoomId]: [
+      ['entry_hall']: [
         {
           id: ENEMY,
           name: 'Dummy',
@@ -54,7 +54,7 @@ function sorcCombat(over: Partial<ReturnType<typeof makeChar>> = {}, enemyHp = 6
     ...over,
   });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [sorc],
     active_character_id: 'pc-1',
     initiative_order: [
@@ -329,7 +329,7 @@ function carefulState(): GameState {
     dex: 10,
   });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [sorc, ally],
     active_character_id: 'pc-1',
     initiative_order: [
@@ -404,7 +404,7 @@ describe('Careful Spell — allies in the area auto-succeed and take no damage',
 const fireResistSeed: Seed = {
   ...seed(),
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       {
         id: ENEMY,
         name: 'Salamander',
@@ -448,11 +448,11 @@ describe('Transmuted Spell — change damage type to dodge resistance', () => {
   });
 });
 
-const E2 = `${ctx.startRoomId}#1`;
+const E2 = `entry_hall#1`;
 const twinSeed: Seed = {
   ...seed(),
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       { id: ENEMY, name: 'A', hp: 60, ac: 12, damage: '1d4', toHit: 3, xp: 50 } as unknown as Enemy,
       { id: E2, name: 'B', hp: 60, ac: 12, damage: '1d4', toHit: 3, xp: 50 } as unknown as Enemy,
     ],

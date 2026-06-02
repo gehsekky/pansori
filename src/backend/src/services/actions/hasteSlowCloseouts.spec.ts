@@ -25,19 +25,19 @@ const baseSeed: Seed = {
   ship_name: 'Closeout Test',
   intro: '',
   seed_id: 'closeout',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {},
   loot: {},
   npcs: {},
 };
 
 function seedWithEnemy(enemy: Enemy): Seed {
-  return { ...baseSeed, enemies: { [ctx.startRoomId]: [enemy] } };
+  return { ...baseSeed, enemies: { ['entry_hall']: [enemy] } };
 }
 
 function combatStateWith(pc: ReturnType<typeof makeChar>, enemy: Enemy) {
   return {
-    ...makeState({ id: pc.id }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: pc.id }, { current_room: 'entry_hall', combat_active: true }),
     characters: [pc],
     active_character_id: pc.id,
     initiative_order: [
@@ -89,7 +89,7 @@ describe('Haste — one weapon attack only on the extra slot', () => {
       weapon_proficiencies: ['simple', 'martial'],
     });
     const enemy: Enemy = {
-      id: `${ctx.startRoomId}#0`,
+      id: `entry_hall#0`,
       name: 'Ogre',
       ac: 8,
       hp: 200,
@@ -127,7 +127,7 @@ describe('Haste — one weapon attack only on the extra slot', () => {
       weapon_proficiencies: ['simple', 'martial'],
     });
     const enemy: Enemy = {
-      id: `${ctx.startRoomId}#0`,
+      id: `entry_hall#0`,
       name: 'Ogre',
       ac: 8,
       hp: 200,
@@ -195,7 +195,7 @@ describe('Slow — reaction-cost actions rejected at dispatch', () => {
       },
     });
     const enemy: Enemy = {
-      id: `${ctx.startRoomId}#0`,
+      id: `entry_hall#0`,
       name: 'Goblin',
       ac: 10,
       hp: 8,
@@ -233,7 +233,7 @@ describe('Slow — 25% somatic-spell fail', () => {
     });
     const wounded = makeChar({ id: 'ally-1', hp: 5, max_hp: 30 });
     const state = {
-      ...makeState({ id: cleric.id }, { current_room: ctx.startRoomId }),
+      ...makeState({ id: cleric.id }, { current_room: 'entry_hall' }),
       characters: [cleric, wounded],
       active_character_id: cleric.id,
     };
@@ -268,7 +268,7 @@ describe('Slow — 25% somatic-spell fail', () => {
     });
     const wounded = makeChar({ id: 'ally-1', hp: 5, max_hp: 30 });
     const state = {
-      ...makeState({ id: cleric.id }, { current_room: ctx.startRoomId }),
+      ...makeState({ id: cleric.id }, { current_room: 'entry_hall' }),
       characters: [cleric, wounded],
       active_character_id: cleric.id,
     };
@@ -298,7 +298,7 @@ describe('Slow — 25% somatic-spell fail', () => {
     });
     const wounded = makeChar({ id: 'ally-1', hp: 5, max_hp: 30 });
     const state = {
-      ...makeState({ id: cleric.id }, { current_room: ctx.startRoomId }),
+      ...makeState({ id: cleric.id }, { current_room: 'entry_hall' }),
       characters: [cleric, wounded],
       active_character_id: cleric.id,
     };

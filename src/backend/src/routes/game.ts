@@ -48,7 +48,6 @@ import { applyAbilityScoreIncreases, isValidForMethod } from '../services/abilit
 import {
   applyConsequence,
   backfillOwnership,
-  buildArrivalNarrative,
   generateChoices,
   normalizeState,
   takeAction,
@@ -573,8 +572,10 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
     const initialState: GameState = {
       characters: partyChars,
       active_character_id: leader.id,
-      current_room: ctx.startRoomId,
-      visited_rooms: [ctx.startRoomId],
+      // The party starts on the regional grid (initMapState sets the marker +
+      // clears current_room below); no room until they enter a site.
+      current_room: '',
+      visited_rooms: [],
       enemies_killed: [],
       loot_taken: [],
       combat_active: false,
@@ -607,11 +608,7 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
       .filter((q) => q.startActive)
       .map((q) => `\n\n✦ Quest: ${q.title} — ${q.desc}`)
       .join('');
-    const startNarrative =
-      seed.intro +
-      ' ' +
-      buildArrivalNarrative(ctx.startRoomId, initialState, seed, ctx) +
-      starterQuestLine;
+    const startNarrative = seed.intro + starterQuestLine;
     initialState.run_log = [
       { character_id: leader.id, action: 'start', narrative: startNarrative },
     ];

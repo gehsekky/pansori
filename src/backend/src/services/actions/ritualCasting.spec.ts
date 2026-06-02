@@ -21,7 +21,7 @@ const seed: Seed = {
   ship_name: 'Ritual Casting Test',
   intro: '',
   seed_id: 'ritual-casting',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {},
   loot: {},
   npcs: {},
@@ -29,7 +29,7 @@ const seed: Seed = {
 
 function buildState(pc: ReturnType<typeof makeChar>, combat = false) {
   return {
-    ...makeState({ id: pc.id }, { current_room: ctx.startRoomId, combat_active: combat }),
+    ...makeState({ id: pc.id }, { current_room: 'entry_hall', combat_active: combat }),
     characters: [pc],
     active_character_id: pc.id,
   };

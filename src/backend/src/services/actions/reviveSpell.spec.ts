@@ -26,7 +26,7 @@ const noEnemySeed: Seed = {
   ship_name: 'Revive Test',
   intro: '',
   seed_id: 'revive-spell',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {},
   loot: {},
   npcs: {},
@@ -60,7 +60,7 @@ function buildReviveParty(
     ...fallenOverrides,
   });
   return {
-    ...makeState({ id: 'cleric-1' }, { current_room: ctx.startRoomId }),
+    ...makeState({ id: 'cleric-1' }, { current_room: 'entry_hall' }),
     characters: [cleric, fallen],
     active_character_id: 'cleric-1',
     round: 4,

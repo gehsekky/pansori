@@ -14,8 +14,8 @@ import { context as ctx } from '../contexts/sandbox.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-const E0 = `${ctx.startRoomId}#0`; // the confused creature in the turn-behavior tests
-const E1 = `${ctx.startRoomId}#1`; // a second creature (blast / friendly-fire victim)
+const E0 = `entry_hall#0`; // the confused creature in the turn-behavior tests
+const E1 = `entry_hall#1`; // a second creature (blast / friendly-fire victim)
 
 const seed: Seed = {
   context_id: ctx.id,
@@ -23,9 +23,9 @@ const seed: Seed = {
   ship_name: 'Confusion Test',
   intro: '',
   seed_id: 'confusion',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {
-    [ctx.startRoomId]: [
+    ['entry_hall']: [
       // E0 swings hard (for friendly fire); E1 is a soft secondary target.
       { id: E0, name: 'Ogre', hp: 120, ac: 10, damage: '2d8', toHit: 10, xp: 50, wis: 6 },
       { id: E1, name: 'Goblin', hp: 50, ac: 5, damage: '1d6', toHit: 3, xp: 10, wis: 6 },
@@ -75,7 +75,7 @@ function makeConfusedState(opts: {
     ...(opts.initiativeEnemyIds ?? []).map((id, i) => ({ id, roll: 20 - i, is_enemy: true })),
   ];
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [wiz],
     active_character_id: 'pc-1',
     initiative_order: initiative,
@@ -266,7 +266,7 @@ describe('Confusion — concentration', () => {
       },
     });
     const st = {
-      ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+      ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
       characters: [caster],
       entities: [
         {

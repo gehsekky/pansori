@@ -108,11 +108,11 @@ function attackSeed(enemy: Partial<Enemy>): Seed {
     ship_name: 'Undead Fortitude Test',
     intro: '',
     seed_id: 'undead-fort',
-    rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+    rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
     enemies: {
-      [ctx.startRoomId]: [
+      ['entry_hall']: [
         {
-          id: `${ctx.startRoomId}#0`,
+          id: `entry_hall#0`,
           name: 'Zombie',
           hp: 8,
           ac: 8,
@@ -142,12 +142,12 @@ function attackState() {
     weapon_proficiencies: ['simple', 'martial'],
   });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: [pc],
     active_character_id: 'pc-1',
     initiative_order: [
       { id: 'pc-1', roll: 18, is_enemy: false },
-      { id: `${ctx.startRoomId}#0`, roll: 5, is_enemy: true },
+      { id: `entry_hall#0`, roll: 5, is_enemy: true },
     ],
     initiative_idx: 0,
     entities: [
@@ -161,7 +161,7 @@ function attackState() {
         condition_durations: {},
       },
       {
-        id: `${ctx.startRoomId}#0`,
+        id: `entry_hall#0`,
         isEnemy: true,
         pos: { x: 5, y: 5 },
         hp: 8,
@@ -179,30 +179,30 @@ describe('Undead Fortitude — wired into the weapon-attack path', () => {
     // 8-HP zombie → 0; CON save 14 ≥ DC 13 → survives at 1.
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
     const result = await takeAction({
-      action: { type: 'attack', targetEnemyId: `${ctx.startRoomId}#0` },
+      action: { type: 'attack', targetEnemyId: `entry_hall#0` },
       history: [],
       state: attackState(),
       seed: attackSeed({ undeadFortitude: true }),
       context: ctx,
     });
-    const zombie = result.newState.entities?.find((e) => e.id === `${ctx.startRoomId}#0`);
+    const zombie = result.newState.entities?.find((e) => e.id === `entry_hall#0`);
     expect(zombie?.hp).toBe(1);
-    expect(result.newState.enemies_killed).not.toContain(`${ctx.startRoomId}#0`);
+    expect(result.newState.enemies_killed).not.toContain(`entry_hall#0`);
     expect(result.narrative).toMatch(/Undead Fortitude/);
   });
 
   it('without the trait the identical hit kills it (the floor is a no-op)', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
     const result = await takeAction({
-      action: { type: 'attack', targetEnemyId: `${ctx.startRoomId}#0` },
+      action: { type: 'attack', targetEnemyId: `entry_hall#0` },
       history: [],
       state: attackState(),
       seed: attackSeed({}), // no undeadFortitude
       context: ctx,
     });
     // A killed enemy is recorded in enemies_killed (its entity may be pruned).
-    expect(result.newState.enemies_killed).toContain(`${ctx.startRoomId}#0`);
-    const zombie = result.newState.entities?.find((e) => e.id === `${ctx.startRoomId}#0`);
+    expect(result.newState.enemies_killed).toContain(`entry_hall#0`);
+    const zombie = result.newState.entities?.find((e) => e.id === `entry_hall#0`);
     expect(zombie?.hp ?? 0).toBe(0);
     expect(result.narrative).not.toMatch(/Undead Fortitude/);
   });

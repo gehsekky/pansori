@@ -51,7 +51,7 @@ const seed: Seed = {
   ship_name: 'Utility Test',
   intro: '',
   seed_id: 'util',
-  rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
+  rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
   enemies: {},
   loot: {},
   npcs: {},
@@ -69,7 +69,7 @@ function casterState(spellId: string, slot: number) {
     spell_slots_used: {},
   });
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall' }),
     characters: [wiz],
     active_character_id: 'pc-1',
   };

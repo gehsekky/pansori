@@ -13,8 +13,8 @@ import { takeAction } from '../../services/gameEngine.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-const ENEMY = `${ctx.startRoomId}#0`;
-const ENEMY2 = `${ctx.startRoomId}#1`;
+const ENEMY = `entry_hall#0`;
+const ENEMY2 = `entry_hall#1`;
 
 describe('spell content batch — catalog', () => {
   it('registers each spell with the expected shape', () => {
@@ -48,8 +48,8 @@ function seedWith(enemies: Array<Record<string, unknown>>): Seed {
     ship_name: 'Batch Test',
     intro: '',
     seed_id: 'batch',
-    rooms: [{ id: ctx.startRoomId, name: 'Start', desc: '' }],
-    enemies: { [ctx.startRoomId]: enemies as unknown as NonNullable<Seed['enemies']>[string] },
+    rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
+    enemies: { ['entry_hall']: enemies as unknown as NonNullable<Seed['enemies']>[string] },
     loot: {},
     npcs: {},
   };
@@ -100,7 +100,7 @@ function combatState(
   extraEnemyEnts: Array<Record<string, unknown>> = []
 ): GameState {
   return {
-    ...makeState({ id: 'pc-1' }, { current_room: ctx.startRoomId, combat_active: true }),
+    ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
     characters: chars,
     active_character_id: 'pc-1',
     initiative_order: [
