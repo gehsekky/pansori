@@ -1036,8 +1036,9 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     darkvision_ft: 60,
   },
 
-  // SRD: Giant Ape (CR 7) — two Fist attacks at 10-ft reach (Boulder Toss +
-  // Leap deferred).
+  // SRD: Giant Ape (CR 7) — two Fist attacks at 10-ft reach + Boulder Toss
+  // (Recharge 6): a 5-ft-radius DEX-save burst for 7d6 bludgeoning. (Leap +
+  // the Boulder Toss Prone-on-fail rider deferred.)
   giant_ape: {
     name: 'Giant Ape',
     cr: 7,
@@ -1057,6 +1058,14 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     attackReachFt: 10,
     damageType: 'bludgeoning',
     darkvision_ft: 0, // beast — no darkvision
+    breathWeapon: {
+      name: 'Boulder Toss',
+      dice: '7d6',
+      damageType: 'bludgeoning',
+      savingThrow: 'dex',
+      saveDC: 17,
+      rechargeMin: 6, // Recharge 6
+    },
   },
 
   // SRD: Frost Giant (CR 8) — two Frost Axe attacks (slashing + 2d8 cold rider);
@@ -1137,8 +1146,9 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
 
   // SRD: Young Red Dragon (CR 10) — three Rend attacks (slashing + 1d6 fire
-  // rider); Fire-immune, Blindsight + Darkvision 120, 80-ft fly. The 30-ft-cone
-  // Fire Breath (DEX save DC 17, 16d6, Recharge 5–6) is deferred/narrated.
+  // rider) + Fire Breath (Recharge 5–6): a 30-ft cone, DEX save DC 17 for 16d6
+  // fire (half on a success). Fire-immune, Blindsight + Darkvision 120, 80-ft
+  // fly. (The cone geometry is abstracted to the whole party — see BreathWeapon.)
   young_red_dragon: {
     name: 'Young Red Dragon',
     cr: 10,
@@ -1161,5 +1171,13 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     bonusDamageType: 'fire',
     immunities: ['fire'],
     darkvision_ft: 120,
+    breathWeapon: {
+      name: 'Fire Breath',
+      dice: '16d6',
+      damageType: 'fire',
+      savingThrow: 'dex',
+      saveDC: 17,
+      rechargeMin: 5, // Recharge 5–6
+    },
   },
 };

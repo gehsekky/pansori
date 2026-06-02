@@ -207,6 +207,25 @@ export interface MonsterAura {
   name?: string;
 }
 
+// SRD recharge AoE attack (a dragon's Fire Breath, the Giant Ape's Boulder
+// Toss). On the creature's turn, when charged, it REPLACES the normal
+// attack/multiattack: every living PC makes `savingThrow` vs `saveDC`, taking
+// `dice` `damageType` damage (half on a success). It's then spent until it
+// recharges — at the start of each of the creature's turns, if spent, the
+// engine rolls a d6 and recharges on a roll ≥ `rechargeMin` (default 5 →
+// "Recharge 5–6"; set 6 for "Recharge 6"). Charge is tracked per-entity via
+// `CombatEntity.breath_charged`. The cone/line geometry is abstracted to "all
+// PCs in the room" (the lair-action AoE convention); precise positioning + any
+// rider condition (e.g. Boulder Toss's Prone) are deferred.
+export interface BreathWeapon {
+  name: string;
+  dice: string; // damage dice expr, e.g. '16d6'
+  damageType: string;
+  savingThrow: AbilityKey;
+  saveDC: number;
+  rechargeMin?: number; // recharge on a d6 ≥ this (default 5)
+}
+
 export interface EnemyTemplate {
   name: string;
   cr: number;
@@ -269,6 +288,9 @@ export interface EnemyTemplate {
   // SRD aura / emanation (Ghast Stench) — recurring effect on creatures that
   // start their turn within range. Applied to PCs in `applyMonsterAuras`.
   aura?: MonsterAura;
+  // SRD recharge AoE (Fire Breath, Boulder Toss) — fires as the whole turn when
+  // charged; see `BreathWeapon`.
+  breathWeapon?: BreathWeapon;
   // Spell-casting (see Enemy.spells for runtime behaviour).
   spells?: string[];
   castChance?: number;
@@ -347,6 +369,9 @@ export interface Enemy {
   // SRD Gnoll Rampage (1/Day) — see EnemyTemplate.rampage. Read in
   // `runEnemyMultiattackLoop`.
   rampage?: boolean;
+  // SRD recharge AoE (Fire Breath, Boulder Toss) — see EnemyTemplate.breathWeapon.
+  // Mirrored here + carried through procgen; fired in `runEnemyTurns`.
+  breathWeapon?: BreathWeapon;
   // SRD darkvision range (ft) — see EnemyTemplate.darkvision_ft. Undefined
   // defaults to 60 in the combat-visibility check; carried through procgen.
   darkvision_ft?: number;

@@ -294,6 +294,11 @@ export interface CombatEntity {
   // attack this encounter. Unlike `reaction_used` this is NOT refreshed on round
   // wrap (1/day ≈ once per combat); it clears only when entities are re-seeded.
   rampage_used?: boolean;
+  // SRD recharge attack (a dragon's Fire Breath) — the charge state for this
+  // entity's `breathWeapon`. `undefined` ⇒ available (fresh combat / re-seed);
+  // `false` ⇒ spent, re-rolled at the start of each of the creature's turns
+  // (recharge on a d6 ≥ the weapon's `rechargeMin`). Set `false` when fired.
+  breath_charged?: boolean;
   // SRD Vision & Light — bright-light radius (ft) this entity sheds as a light
   // source (the Light cantrip / a torch on a PC, Daylight, etc.). A cell within
   // this radius is brightly lit, and within 2× it is at least dimly lit — either

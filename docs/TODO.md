@@ -18,8 +18,8 @@ PHB/DMG-exclusive content (subclasses, feats, species, spells). See
 
 ## Implementation status (code-verified 2026-06-02)
 
-Grounded in a code survey + the full suite: **backend 2138 tests across
-253 files + frontend 153 across 25 files, all green** (lint + typecheck +
+Grounded in a code survey + the full suite: **backend 2157 tests across
+254 files + frontend 153 across 25 files, all green** (lint + typecheck +
 prettier clean).
 
 ### Done — world map / navigation
@@ -400,10 +400,19 @@ backend features are waiting on, and a handful of **bounded subsystems**.
   Giant Ape (CR 7), Frost Giant (CR 8, cold rider + Cold immunity), Fire Giant
   (CR 9, fire rider + Fire immunity), Cloud Giant (CR 9, thunder rider), and the
   first dragon + first **CR 10** — Young Red Dragon (3 Rend attacks + fire rider,
-  Fire-immune, Darkvision 120, 80-ft fly). Each giant's ranged option + the
-  recharge/bonus-action specials (Deflect Missile, War Cry, Boulder Toss, the
-  dragon's Fire Breath, Cloud Giant Spellcasting) are deferred/narrated — the
-  signature melee attack carries the entry, like the Wyvern's Sting.
+  Fire-immune, Darkvision 120, 80-ft fly). The **Breath Weapon** recharge AoE
+  then shipped (`breathWeapon.spec.ts`): a new `EnemyTemplate/Enemy.breathWeapon`
+  (`{ name, dice, damageType, savingThrow, saveDC, rechargeMin }`) that, when
+  charged, fires on the creature's turn as the WHOLE action — every PC saves vs
+  an AoE (`applyAoeSaveToParty`, the per-PC save loop extracted from the lair
+  action), then it's spent until a turn-start d6 recharge (≥ `rechargeMin`),
+  tracked per-entity via `CombatEntity.breath_charged`. The **Young Red Dragon's
+  Fire Breath** (16d6, Recharge 5–6) and the **Giant Ape's Boulder Toss** (7d6,
+  Recharge 6) ride it. (Cone/line geometry is abstracted to the whole party, like
+  the lair AoE; Boulder Toss's Prone rider is deferred.) Each giant's ranged
+  option + the other recharge/bonus-action specials (Deflect Missile, War Cry,
+  Cloud Giant Spellcasting) remain deferred/narrated — the signature melee attack
+  carries those entries, like the Wyvern's Sting.
   Per-monster specials deferred: Flyby, Lion Roar, the boar/giant/ettin charge +
   auto-Prone/Disadvantage riders, the Mummy's Rotting Curse, the Wyvern's bite +
   RAW no-save auto-poison, the Wraith's Create Specter, and the Fire Elemental's

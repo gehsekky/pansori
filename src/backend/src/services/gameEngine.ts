@@ -2418,6 +2418,116 @@ function getLivingRoomEnemies(state: GameState, seed: Seed, roomId: string): Ene
   return base;
 }
 
+/**
+ * Apply an AoE saving-throw attack to the whole living party — the shared core
+ * of the lair-action `aoe_save_damage` effect and monster Breath Weapons. Each
+ * living PC rolls `savingThrow` vs `saveDC` (save proficiency + Barbarian
+ * Danger Sense honored), taking `dice` `damageType` damage on a failure or half
+ * on a success; per-PC concentration checks accumulate into the returned state.
+ * Returns the new state + a per-PC narrative tail (the caller prepends the
+ * action header).
+ *
+ * The area is abstracted to "every PC in the room" — cone/line geometry isn't
+ * modeled (all PCs are assumed caught in the blast), matching the lair-action
+ * convention.
+ */
+export function applyAoeSaveToParty(
+  st: GameState,
+  context: Context,
+  opts: { dice: string; damageType: string; savingThrow: AbilityKey; saveDC: number }
+): { st: GameState; narrative: string } {
+  const fullDmg = rollDice(opts.dice);
+  const scoreKey = opts.savingThrow;
+  // Iterate so each PC's concentration check (and any concentration-break
+  // side-effects on st like Bless cleanup) accumulates into workingSt.
+  let workingSt = st;
+  let narrative = '';
+  for (const origC of st.characters) {
+    if (origC.dead) continue;
+    const score = (origC[scoreKey] ?? 10) as number;
+    // Pull save proficiency from class + feat sources (Wizard INT, Resilient,
+    // etc.) and grant Barbarian Danger Sense Advantage on DEX saves.
+    const proficient = hasSaveProficiency(origC, scoreKey, context);
+    const dangerSenseAdv = scoreKey === 'dex' && hasDangerSense(origC);
+    const saveFailed = rollConditionSave(
+      scoreKey,
+      score,
+      opts.saveDC,
+      proficient,
+      origC.level,
+      0,
+      origC.conditions ?? [],
+      dangerSenseAdv,
+      false,
+      d20TestPenalty(origC)
+    );
+    const dealt = saveFailed ? fullDmg : Math.floor(fullDmg / 2);
+    const dmgResult = applyDamage(origC, workingSt, dealt);
+    workingSt = {
+      ...dmgResult.st,
+      characters: dmgResult.st.characters.map((c) =>
+        c.id === dmgResult.char.id ? dmgResult.char : c
+      ),
+    };
+    narrative += ` ${origC.name}: ${scoreKey.toUpperCase()} save vs DC ${opts.saveDC} — ${saveFailed ? 'fails' : 'succeeds (half)'} (${dealt} ${opts.damageType}).${dmgResult.concentrationNote}`;
+  }
+  return { st: workingSt, narrative };
+}
+
+/**
+ * SRD recharge Breath Weapon resolution for one enemy's turn. When the
+ * creature's `breathWeapon` is charged (`breath_charged !== false`), it fires an
+ * AoE save vs the whole party (via `applyAoeSaveToParty`), is marked spent, and
+ * `fired: true` tells the turn loop to skip the normal attack/multiattack (the
+ * breath IS the action). When spent (`false`), the engine first rolls the
+ * recharge (a d6 ≥ `rechargeMin`); a failure returns `fired: false` so the
+ * creature falls through to its melee attack. A no-op for any enemy without a
+ * breath weapon (or one already at 0 HP).
+ */
+export function maybeFireBreathWeapon(args: {
+  enemy: Enemy;
+  enemyId: string;
+  st: GameState;
+  context: Context;
+  narrative: string;
+}): { fired: boolean; st: GameState; narrative: string } {
+  const breath = args.enemy.breathWeapon;
+  if (!breath) return { fired: false, st: args.st, narrative: args.narrative };
+  let st = args.st;
+  const ent = st.entities?.find((e) => e.id === args.enemyId && e.isEnemy);
+  if (!ent || ent.hp <= 0) return { fired: false, st, narrative: args.narrative };
+
+  let narrative = args.narrative;
+  let turnHeaderShown = false;
+  // Recharge: undefined ⇒ available (fresh combat); false ⇒ spent, roll a d6.
+  if (ent.breath_charged === false) {
+    const roll = rollDice('1d6');
+    if (roll < (breath.rechargeMin ?? 5)) {
+      return { fired: false, st, narrative }; // still spent — fall through to melee
+    }
+    narrative += `\n\n[${args.enemy.name}'s turn] ${breath.name} recharges!`;
+    turnHeaderShown = true;
+  }
+
+  const res = applyAoeSaveToParty(st, args.context, {
+    dice: breath.dice,
+    damageType: breath.damageType,
+    savingThrow: breath.savingThrow,
+    saveDC: breath.saveDC,
+  });
+  if (!turnHeaderShown) narrative += `\n\n[${args.enemy.name}'s turn]`;
+  narrative += ` 🔥 ${args.enemy.name} unleashes ${breath.name}!` + res.narrative;
+  st = res.st;
+  // Mark the breath spent on this entity (recharged at a later turn start).
+  st = {
+    ...st,
+    entities: (st.entities ?? []).map((e) =>
+      e.id === args.enemyId && e.isEnemy ? { ...e, breath_charged: false } : e
+    ),
+  };
+  return { fired: true, st, narrative };
+}
+
 // SRD p.221 — lair actions. Fire one randomly-picked action per round on
 // the round-wrap path. Only fires if a living enemy with `lair_actions`
 // is in the current room. Returns updated state, narrative addendum,
@@ -2435,47 +2545,17 @@ function fireLairAction(
   if (!lairBoss?.lair_actions?.length) return { st, narrative: '', fired: false };
   const action = pick(lairBoss.lair_actions);
   if (action.kind === 'aoe_save_damage') {
-    const dc = action.saveDC;
-    const fullDmg = rollDice(action.dice);
-    let narrative = ` 🌀 Lair action: ${action.name} — ${action.narrative}`;
-    // Iterate so each PC's concentration check (and any concentration-break
-    // side-effects on st like Bless cleanup) accumulates into workingSt.
-    let workingSt = st;
-    for (const origC of st.characters) {
-      if (origC.dead) continue;
-      const scoreKey = action.savingThrow as 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha';
-      const score = (origC[scoreKey] ?? 10) as number;
-      // Pull save proficiency from class + feat sources so a Wizard
-      // with INT class prof actually adds it on an INT-save lair AoE,
-      // and a PC with Resilient (CON) saves with proficiency on a
-      // CON-save lair AoE. Previously hardcoded `false`.
-      const proficient = hasSaveProficiency(origC, scoreKey, context);
-      // SRD Barbarian Danger Sense (L2): Advantage on DEX saves (e.g. a
-      // dexterity-save lair AoE).
-      const dangerSenseAdv = scoreKey === 'dex' && hasDangerSense(origC);
-      const saveFailed = rollConditionSave(
-        scoreKey,
-        score,
-        dc,
-        proficient,
-        origC.level,
-        0,
-        origC.conditions ?? [],
-        dangerSenseAdv,
-        false,
-        d20TestPenalty(origC)
-      );
-      const dealt = saveFailed ? fullDmg : Math.floor(fullDmg / 2);
-      const dmgResult = applyDamage(origC, workingSt, dealt);
-      workingSt = {
-        ...dmgResult.st,
-        characters: dmgResult.st.characters.map((c) =>
-          c.id === dmgResult.char.id ? dmgResult.char : c
-        ),
-      };
-      narrative += ` ${origC.name}: ${scoreKey.toUpperCase()} save vs DC ${dc} — ${saveFailed ? 'fails' : 'succeeds (half)'} (${dealt} ${action.damageType}).${dmgResult.concentrationNote}`;
-    }
-    return { st: workingSt, narrative, fired: true };
+    const res = applyAoeSaveToParty(st, context, {
+      dice: action.dice,
+      damageType: action.damageType,
+      savingThrow: action.savingThrow as AbilityKey,
+      saveDC: action.saveDC,
+    });
+    return {
+      st: res.st,
+      narrative: ` 🌀 Lair action: ${action.name} — ${action.narrative}` + res.narrative,
+      fired: true,
+    };
   }
   return { st, narrative: '', fired: false };
 }
@@ -8490,6 +8570,30 @@ export async function runEnemyTurns(args: {
           continue;
         }
         if (!target.dead && target.hp > 0) {
+          // ── Breath weapon (recharge AoE) ─ fires as the whole turn ────────
+          // A charged Breath Weapon (a dragon's Fire Breath) replaces the
+          // attack/multiattack: every PC saves vs an AoE. It then goes on
+          // cooldown until it recharges at a later turn start.
+          const breathRes = maybeFireBreathWeapon({
+            enemy: rm,
+            enemyId: eEntry.id,
+            st,
+            context: args.context,
+            narrative,
+          });
+          if (breathRes.fired) {
+            st = breathRes.st;
+            narrative = breathRes.narrative;
+            // The breath can drop the party — end combat on a TPK.
+            if (st.characters.every((c) => c.dead)) st = endCombatState(st);
+            resumeMi = 0;
+            const prevAdvIdxBreath = advIdx;
+            advIdx = (advIdx + 1) % orderLen;
+            if (advIdx === 0 && prevAdvIdxBreath !== 0) roundWrapped = true;
+            if (advIdx === args.initialCurrentIdx) break;
+            continue;
+          }
+
           // ── Spell-cast intent ─ delegated to `attemptEnemySpellCast` ──────
           const spellResult = await attemptEnemySpellCast({
             enemy: rm,
