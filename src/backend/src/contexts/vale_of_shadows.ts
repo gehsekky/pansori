@@ -1397,7 +1397,7 @@ const context: Context = {
         terrain: [
           // Impassable SE ridge + a southern marsh-lake.
           ...terr('mountain', [6, 6], [7, 6], [5, 7], [6, 7], [7, 7]),
-          ...terr('water', [3, 6], [4, 6], [4, 7]),
+          ...terr('water', [3, 6], [4, 6]),
           // The safe road network linking the start, Millhaven, and the sites.
           ...terr(
             'road',

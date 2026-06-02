@@ -144,6 +144,32 @@ describe('GridMapView', () => {
     expect(getByText('mountains')).toBeTruthy();
   });
 
+  it('shows the site glyph (not the terrain glyph) and stays clickable when terrain overlaps a site', () => {
+    // Regression: Pinegate is a town site painted with water terrain on the
+    // same cell. It must read as ⌂ (town), not ≈ (water), and stay travel-able
+    // (the builder keeps the site cell out of obstacles).
+    const overlap: ActiveGrid = {
+      level: 'regional',
+      id: 'reg3',
+      name: 'Overlap',
+      width: 4,
+      height: 3,
+      feetPerSquare: 5280,
+      terrain: [{ pos: { x: 1, y: 0 }, type: 'water' }],
+      obstacles: [], // builder excludes the site cell
+      startPos: { x: 0, y: 0 },
+      transitions: [{ pos: { x: 1, y: 0 }, kind: 'site', label: 'Pinegate', toTownId: 'town1' }],
+    };
+    const onMarkerMove = vi.fn();
+    const { container } = render(
+      <GridMapView grid={overlap} markerPos={{ x: 0, y: 0 }} onMarkerMove={onMarkerMove} />
+    );
+    const c = cell(container, 1, 0);
+    expect(c.textContent).toContain('⌂'); // town glyph wins
+    expect(c.textContent).not.toContain('≈'); // not the water glyph
+    expect(c.getAttribute('role')).toBe('button'); // reachable
+  });
+
   it('checkerboards plain cells so adjacent squares are distinguishable', () => {
     const { container } = render(<GridMapView grid={grid} markerPos={{ x: 0, y: 0 }} />);
     // (1,0) is an even square (x+y=1 → odd index gets the tint; 2,0 even).

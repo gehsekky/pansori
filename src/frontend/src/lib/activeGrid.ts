@@ -12,15 +12,18 @@ import { TERRAIN } from '../types';
 const DEFAULT_LOCAL_GRID = 10;
 const DEFAULT_LOCAL_SCALE = 5;
 
-// Impassable terrain cells folded into the obstacle set (+ any legacy obstacles)
-// — mirrors backend mapEngine.mergeObstacles so the FE marks the same cells
-// unreachable as the server will.
+// Impassable set = legacy obstacles + impassable terrain, MINUS travel
+// destinations (a site/venue/exit is never walled off by terrain painted on its
+// square). Mirrors backend mapEngine.mergeObstacles so the FE marks the same
+// cells unreachable as the server will.
 function mergeObstacles(
   legacy: GridPos[] | undefined,
-  terrain: TerrainCell[] | undefined
+  terrain: TerrainCell[] | undefined,
+  transitions: MapTransition[]
 ): GridPos[] {
   const impassable = (terrain ?? []).filter((c) => !TERRAIN[c.type].passable).map((c) => c.pos);
-  return [...(legacy ?? []), ...impassable];
+  const transitionKeys = new Set(transitions.map((t) => `${t.pos.x},${t.pos.y}`));
+  return [...(legacy ?? []), ...impassable].filter((o) => !transitionKeys.has(`${o.x},${o.y}`));
 }
 
 type SeedRoom = Seed['rooms'][number];
@@ -53,6 +56,13 @@ export function activeGrid(seed: Seed | undefined, st: GameState): ActiveGrid | 
   if (level === 'regional') {
     const region = seed.regions?.find((r) => r.id === st.current_region_id);
     if (!region) return null;
+    const transitions: MapTransition[] = region.sites.map((s) => ({
+      pos: s.pos,
+      kind: 'site' as const,
+      label: s.name,
+      toTownId: s.kind === 'town' ? s.townId : undefined,
+      toRoomId: s.kind === 'local' ? s.entryRoomId : undefined,
+    }));
     return {
       level,
       id: region.id,
@@ -61,21 +71,22 @@ export function activeGrid(seed: Seed | undefined, st: GameState): ActiveGrid | 
       height: region.gridHeight,
       feetPerSquare: region.feetPerSquare,
       terrain: region.terrain ?? [],
-      obstacles: mergeObstacles(region.obstacles, region.terrain),
+      obstacles: mergeObstacles(region.obstacles, region.terrain, transitions),
       startPos: region.startPos,
-      transitions: region.sites.map((s) => ({
-        pos: s.pos,
-        kind: 'site' as const,
-        label: s.name,
-        toTownId: s.kind === 'town' ? s.townId : undefined,
-        toRoomId: s.kind === 'local' ? s.entryRoomId : undefined,
-      })),
+      transitions,
     };
   }
 
   if (level === 'town') {
     const town = seed.towns?.find((t) => t.id === st.current_town_id);
     if (!town) return null;
+    const transitions: MapTransition[] = town.venues.map((v) => ({
+      pos: v.pos,
+      kind: v.kind === 'gate' ? ('ascend' as const) : ('venue' as const),
+      label: v.name,
+      toRoomId: v.kind === 'interior' ? v.entryRoomId : undefined,
+      ascendTo: v.kind === 'gate' ? ('region' as const) : undefined,
+    }));
     return {
       level,
       id: town.id,
@@ -84,15 +95,9 @@ export function activeGrid(seed: Seed | undefined, st: GameState): ActiveGrid | 
       height: town.gridHeight,
       feetPerSquare: town.feetPerSquare,
       terrain: town.terrain ?? [],
-      obstacles: mergeObstacles(town.obstacles, town.terrain),
+      obstacles: mergeObstacles(town.obstacles, town.terrain, transitions),
       startPos: town.startPos,
-      transitions: town.venues.map((v) => ({
-        pos: v.pos,
-        kind: v.kind === 'gate' ? ('ascend' as const) : ('venue' as const),
-        label: v.name,
-        toRoomId: v.kind === 'interior' ? v.entryRoomId : undefined,
-        ascendTo: v.kind === 'gate' ? ('region' as const) : undefined,
-      })),
+      transitions,
     };
   }
 

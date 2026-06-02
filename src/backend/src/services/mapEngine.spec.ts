@@ -363,6 +363,33 @@ describe('typed overland terrain (unified model)', () => {
     ).toBeCloseTo(1, 5);
   });
 
+  it('keeps a site reachable even when impassable terrain is painted on its cell', () => {
+    const overlap: CampaignData = {
+      world_name: 'Overlap',
+      intro: '',
+      rooms,
+      regions: [
+        {
+          id: 'reg1',
+          name: 'Wilds',
+          feetPerSquare: 5280,
+          gridWidth: 10,
+          gridHeight: 10,
+          startPos: { x: 0, y: 0 },
+          sites: [
+            { id: 's', name: 'Pinegate', pos: { x: 1, y: 0 }, kind: 'town', townId: 'town1' },
+          ],
+          terrain: [{ pos: { x: 1, y: 0 }, type: 'water' }], // painted on the site cell
+        },
+      ],
+      towns: campaign.towns,
+    };
+    // The site cell is NOT folded into obstacles despite the impassable paint…
+    expect(activeGrid(overlap, rooms, stAt(0, 0))!.obstacles).not.toContainEqual({ x: 1, y: 0 });
+    // …so the party can still travel to it (entering the town).
+    expect(resolveMarkerMove(overlap, rooms, stAt(0, 0), { x: 1, y: 0 }).rejected).toBeUndefined();
+  });
+
   it('roads suppress encounters while forest is dangerous', () => {
     // chance 0.5: road ×0 ⇒ never; forest ×1.5 ⇒ 0.75 effective. roll 0.6.
     vi.spyOn(Math, 'random').mockReturnValue(0.6);

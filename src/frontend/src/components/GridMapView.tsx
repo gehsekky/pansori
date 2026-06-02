@@ -191,6 +191,25 @@ function GridMapView({ grid, markerPos, enemyPresent, onMarkerMove }: Props) {
             <span className={styles.gridTokenLetter}>!</span>
           </span>
         );
+      } else if (transition) {
+        // A travel destination always shows its own glyph — even if terrain is
+        // painted on the same cell — so a site never hides behind a tint glyph.
+        token = (
+          <>
+            <span
+              className={styles.gridMapGlyph}
+              aria-hidden="true"
+              style={{ fontSize: glyphFont }}
+            >
+              {transitionGlyph(transition)}
+            </span>
+            {LABELLED_KINDS.has(transition.kind) && (
+              <span className={styles.gridMapLabel} aria-hidden="true">
+                {transition.label}
+              </span>
+            )}
+          </>
+        );
       } else if (tStyle?.glyph) {
         // Impassable typed terrain (mountains ▲, water ≈).
         token = (
@@ -212,23 +231,6 @@ function GridMapView({ grid, markerPos, enemyPresent, onMarkerMove }: Props) {
           >
             ▲
           </span>
-        );
-      } else if (transition) {
-        token = (
-          <>
-            <span
-              className={styles.gridMapGlyph}
-              aria-hidden="true"
-              style={{ fontSize: glyphFont }}
-            >
-              {transitionGlyph(transition)}
-            </span>
-            {LABELLED_KINDS.has(transition.kind) && (
-              <span className={styles.gridMapLabel} aria-hidden="true">
-                {transition.label}
-              </span>
-            )}
-          </>
         );
       }
 
