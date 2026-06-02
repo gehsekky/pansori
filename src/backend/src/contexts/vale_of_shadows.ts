@@ -26,7 +26,7 @@ import { whisperingPinesContent } from './folded/whispering_pines.js';
 const terr = (type: TerrainType, ...cells: [number, number][]): TerrainCell[] =>
   cells.map(([x, y]) => ({ pos: { x, y }, type }));
 
-// Shared Crypt Lord stat block. Used both as the roguelike-pool template and
+// Shared Crypt Lord stat block. Used both as the `enemyTemplates` entry and
 // (spread with an `id`) as the campaign throne boss, so a balance change can't
 // silently diverge between the two copies again. `multiattack: 2` is the
 // L4-party-tuned value — the third attack pushed the boss's DPR past the
@@ -95,7 +95,7 @@ const CRYPT_LORD_BASE: EnemyTemplate = {
 //   town `millhaven_town` — venues: Temple, Merchant/Lantern districts,
 //     Garrison, and the gate back to the region.
 //   local rooms — the crypt (8 rooms), the camp (2 rooms), the road skirmish;
-//     connected by per-cell room `exits` (no more `connections` graph).
+//     connected by per-cell room `exits`.
 //
 // Quests:
 //   quest_shipment   — The Missing Shipment  (Merchant Guild)
@@ -431,7 +431,7 @@ const context: Context = {
     // ── Rooms (local grids) ──────────────────────────────────────────────────
     // 3-level map model: navigation is by the party marker on the regional /
     // town grids (see `regions` / `towns` below) and per-cell room `exits` on
-    // local grids — NOT the old room `connections` graph (now empty). Each
+    // local grids. Each
     // local room is a self-contained grid; `entryPos` is where the marker
     // arrives, `exits` are the transition cells (room→room, or `ascends` to
     // leave the site). Combat is unchanged — it deploys on the context combat
@@ -467,7 +467,7 @@ const context: Context = {
         exits: [{ pos: { x: 3, y: 0 }, ascends: true, label: 'Step back into Millhaven' }],
       },
       {
-        id: 'millhaven_slums',
+        id: 'millhaven_lantern',
         name: 'Lantern District',
         desc: 'Narrow alleys and shuttered windows. Someone is watching from the shadows.',
         gridWidth: 7,
@@ -501,7 +501,7 @@ const context: Context = {
 
       // The Old Road — a regional site: a bandit skirmish on the way through.
       {
-        id: 'road_north',
+        id: 'old_road',
         name: 'The Old Road',
         desc: 'A rutted track through the hills. Fresh wagon tracks veer off near a stand of dead trees — and the men who made them are still here.',
         gridWidth: 10,
@@ -932,9 +932,9 @@ const context: Context = {
           goldDrop: 3,
         },
       ],
-      road_north: [
+      old_road: [
         {
-          id: 'road_north#0',
+          id: 'old_road#0',
           name: 'Bandit Ruffian',
           hp: 11,
           ac: 12,
@@ -945,7 +945,7 @@ const context: Context = {
           drops: ['dagger'],
         },
         {
-          id: 'road_north#1',
+          id: 'old_road#1',
           name: 'Bandit Ruffian',
           hp: 11,
           ac: 12,
@@ -1199,8 +1199,8 @@ const context: Context = {
         ],
         persuasionDC: 10,
       },
-      millhaven_slums: {
-        roomId: 'millhaven_slums',
+      millhaven_lantern: {
+        roomId: 'millhaven_lantern',
         id: 'npc_dusk',
         name: 'Dusk',
         attitude: 'indifferent',
@@ -1295,7 +1295,7 @@ const context: Context = {
             name: 'The Old Road',
             pos: { x: 3, y: 7 }, // early, along the southern road
             kind: 'local',
-            entryRoomId: 'road_north',
+            entryRoomId: 'old_road',
           },
           {
             id: 'site_bandit_camp',
@@ -1346,7 +1346,7 @@ const context: Context = {
             name: 'Lantern District',
             pos: { x: 1, y: 5 },
             kind: 'interior',
-            entryRoomId: 'millhaven_slums',
+            entryRoomId: 'millhaven_lantern',
           },
           {
             id: 'venue_garrison',
@@ -1401,8 +1401,7 @@ const context: Context = {
           {
             id: 'step_return_ledger',
             desc: 'Return the ledger to Aldric in the Merchant District.',
-            // 3-level map: "back in Millhaven" is now "in Aldric's venue room"
-            // (the old location_id fact is retired with the Location model).
+            // Completes when the party is back in Aldric's venue room with the ledger.
             condition: {
               all: [
                 { fact: 'loot_taken', operator: 'contains', value: 'guild_ledger' },
@@ -1428,8 +1427,9 @@ const context: Context = {
         title: 'Beneath the Surface',
         desc: 'Sister Maren of the Temple of Selûne needs the Crypt Lord destroyed and the Moonstone Amulet recovered.',
         giverNpcId: 'npc_sister_maren',
-        factionId: 'faction_guild',
-        repGain: 0,
+        // No faction reward — the Temple of Selûne isn't a tracked faction
+        // (only the Merchant Guild + City Watch are). Previously mis-tagged to
+        // faction_guild with repGain 0 (inert).
         steps: [
           {
             id: 'step_learn_crypt',
@@ -1490,7 +1490,7 @@ const context: Context = {
             desc: 'Meet Dusk in the Lantern District.',
             condition: {
               all: [
-                { fact: 'room_id', operator: 'equal', value: 'millhaven_slums' },
+                { fact: 'room_id', operator: 'equal', value: 'millhaven_lantern' },
                 {
                   any: [
                     { fact: 'action', operator: 'equal', value: 'talk_response' },
@@ -1513,7 +1513,7 @@ const context: Context = {
             condition: {
               all: [
                 { fact: 'loot_taken', operator: 'contains', value: 'shadow_evidence' },
-                { fact: 'room_id', operator: 'equal', value: 'millhaven_slums' },
+                { fact: 'room_id', operator: 'equal', value: 'millhaven_lantern' },
               ],
             },
           },
@@ -1657,38 +1657,32 @@ function foldCampaign(into: Context, content: Context, sites: MapSite[], dropRoo
   ];
 }
 
-// Whispering Pines — three new sites on the Vale's 12×8 regional map (clear of
-// the obstacles {6,6},{7,6} and the existing Vale sites). The town opens the
-// Pines village; the local sites drop into the frozen pass and the Iceshard
-// Spire. The old WP `pines_square` start-frame room is unreachable here.
-foldCampaign(
-  context,
-  whisperingPinesContent,
-  [
-    {
-      id: 'site_pines',
-      name: 'Whispering Pines',
-      pos: { x: 9, y: 1 }, // gateway town into the frozen north
-      kind: 'town',
-      townId: 'pines_village',
-    },
-    {
-      id: 'site_pass',
-      name: 'The Frozen Pass',
-      pos: { x: 5, y: 1 }, // snowy north, on the way west to the Spire
-      kind: 'local',
-      entryRoomId: 'pass_climb',
-    },
-    {
-      id: 'site_spire',
-      name: 'Iceshard Spire',
-      pos: { x: 1, y: 0 }, // climax, the frozen NW corner
-      kind: 'local',
-      entryRoomId: 'spire_entrance',
-    },
-  ],
-  ['pines_square']
-);
+// Whispering Pines — three new sites on the Vale's regional map. The town opens
+// the Pines village; the local sites drop into the frozen pass and the Iceshard
+// Spire.
+foldCampaign(context, whisperingPinesContent, [
+  {
+    id: 'site_pines',
+    name: 'Whispering Pines',
+    pos: { x: 9, y: 1 }, // gateway town into the frozen north
+    kind: 'town',
+    townId: 'pines_village',
+  },
+  {
+    id: 'site_pass',
+    name: 'The Frozen Pass',
+    pos: { x: 5, y: 1 }, // snowy north, on the way west to the Spire
+    kind: 'local',
+    entryRoomId: 'pass_climb',
+  },
+  {
+    id: 'site_spire',
+    name: 'Iceshard Spire',
+    pos: { x: 1, y: 0 }, // climax, the frozen NW corner
+    kind: 'local',
+    entryRoomId: 'spire_entrance',
+  },
+]);
 
 // Grove of Thorns — Pinegate village + the Silent Grove, on free Vale-grid
 // cells. pinegate_square is kept (it's the village-square venue interior, not

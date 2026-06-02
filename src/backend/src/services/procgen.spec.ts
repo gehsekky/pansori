@@ -18,7 +18,7 @@ describe('generateSeed — Vale of Shadows campaign', () => {
     // Vale binds Aldric (market), Sister Maren (temple), Dusk (slums).
     expect(seed.npcs?.millhaven_market?.id).toBe('npc_aldric');
     expect(seed.npcs?.millhaven_temple?.id).toBe('npc_sister_maren');
-    expect(seed.npcs?.millhaven_slums?.id).toBe('npc_dusk');
+    expect(seed.npcs?.millhaven_lantern?.id).toBe('npc_dusk');
   });
 
   it('rooms with placed NPCs are not enemy rooms', () => {

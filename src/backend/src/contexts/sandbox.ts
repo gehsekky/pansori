@@ -401,7 +401,6 @@ export const context: Context = {
     roomArrival: {
       entry_hall: ['You stand at the entrance. The dungeon awaits.'],
       guard_post: ['A goblin sentry spots you immediately.'],
-      archers_perch: ['A goblin archer draws back an arrow.'],
       bone_crypt: ['The dead stir as you enter.'],
       great_hall: ['Something large moves in the shadows.'],
       storage_room: ['Quiet. You can rest here.'],

@@ -291,7 +291,7 @@ describe('Vale of Shadows — scripted playthrough', () => {
 
     // Lantern District venue → Dusk → quest_shadow
     await markerMove(1, 5);
-    expect(state.current_room).toBe('millhaven_slums');
+    expect(state.current_room).toBe('millhaven_lantern');
     await dispatch({ type: 'talk' });
     await dispatch({ type: 'talk_response', responseIdx: 0 });
     await dispatch({ type: 'accept_quest', questId: 'quest_shadow' });
@@ -307,7 +307,7 @@ describe('Vale of Shadows — scripted playthrough', () => {
 
     // Back to the Lantern District to deliver the letter
     await markerMove(1, 5);
-    expect(state.current_room).toBe('millhaven_slums');
+    expect(state.current_room).toBe('millhaven_lantern');
     await dispatch({ type: 'talk' });
     expect(
       state.quest_progress?.find((q) => q.questId === 'quest_shadow')?.completedSteps
@@ -324,11 +324,11 @@ describe('Vale of Shadows — scripted playthrough', () => {
     // ── Stage 3: the Old Road skirmish (a regional local site) ─────────────
     await markerMove(3, 7); // The Old Road site
     expect(state.map_level).toBe('local');
-    expect(state.current_room).toBe('road_north');
-    await dispatch({ type: 'attack', targetEnemyId: 'road_north#0' });
+    expect(state.current_room).toBe('old_road');
+    await dispatch({ type: 'attack', targetEnemyId: 'old_road#0' });
     await clearCombat();
-    expect(state.enemies_killed).toContain('road_north#0');
-    expect(state.enemies_killed).toContain('road_north#1');
+    expect(state.enemies_killed).toContain('old_road#0');
+    expect(state.enemies_killed).toContain('old_road#1');
     await markerMove(9, 4); // ascend → back to the region
     expect(state.map_level).toBe('regional');
 

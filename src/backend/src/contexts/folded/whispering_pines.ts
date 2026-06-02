@@ -31,7 +31,9 @@ import type { Context } from '../../types.js';
 export const whisperingPinesContent: Context = {
   id: 'whispering_pines',
   displayNoun: 'pass',
-  startRoomId: 'pines_square',
+  // Unused once folded into Duskenvale (the host campaign's startRoomId wins);
+  // kept type-valid by pointing at a real room.
+  startRoomId: 'pines_tavern',
 
   // ─── Classes (shared with Vale; copied to keep contexts self-contained) ──────
 
@@ -88,8 +90,6 @@ export const whisperingPinesContent: Context = {
       featureDesc: 'You and your companions receive healing and care at temples.',
     },
   }),
-
-  // Roguelike room pool unused in campaign mode but required by type
 
   // ─── Enemy templates ──────────────────────────────────────────────────────────
 
@@ -279,10 +279,6 @@ export const whisperingPinesContent: Context = {
 
   narratives: {
     roomArrival: {
-      pines_square: [
-        'Snow falls thick over the square of Whispering Pines. Bells jingle on harness somewhere out of sight. A column of dark smoke rises from the inn.',
-        'Lantern-light spills onto fresh snow. The square is quiet — every footfall crunches loud.',
-      ],
       pass_climb: [
         'The trail switches back along the cliff face. Wind cuts through every gap in your cloak.',
         'Hoarfrost glitters on the boulders. The pass narrows ahead.',
@@ -421,18 +417,8 @@ export const whisperingPinesContent: Context = {
     // ── Rooms (local grids) ──────────────────────────────────────────────────
     // 3-level map model: the Pines is a town (tavern/lodge/warden as venues);
     // the Frozen Pass and the Iceshard Spire are regional sites whose rooms
-    // chain via per-cell `exits`. Navigation is by the party marker;
-    // `connections` is retired.
+    // chain via per-cell `exits`. Navigation is by the party marker.
     rooms: [
-      // `pines_square` survives only as the opening-arrival frame — the party
-      // starts on the regional grid (current_room cleared), so it's never
-      // entered; the town grid is the village.
-      {
-        id: 'pines_square',
-        name: 'Whispering Pines',
-        desc: "A snow-shrouded village at the foot of the pass — the Pine Tavern, the Trapper's Lodge, and the Warden Post, and the cliff trail rising north.",
-      },
-
       // Village interiors (town venues open these; each ascends back to town).
       {
         id: 'pines_tavern',
@@ -899,9 +885,8 @@ export const whisperingPinesContent: Context = {
 
     defaultStartingLoot: ['elixir_of_warmth'],
 
-    // ─── Locations ──────────────────────────────────────────────────────────────
-
-    // ── 3-level grid map ───────────────────────────────────────────────────────
+    // ── Regional map (standalone-only — when folded into Duskenvale, the host
+    // re-declares these sites; only `encounterTable` is merged) ──────────────
     regions: [
       {
         id: 'frostpass_region',
@@ -1011,8 +996,7 @@ export const whisperingPinesContent: Context = {
           {
             id: 'step_return_locket',
             desc: 'Return the locket to Innkeeper Brann at the Pine Tavern.',
-            // 3-level map: "back in the Pines" is now "in Brann's venue room"
-            // (the old location_id fact retired with the Location model).
+            // Completes when the party is back in Brann's venue room with the locket.
             condition: {
               all: [
                 { fact: 'loot_taken', operator: 'contains', value: 'halden_locket' },
@@ -1102,18 +1086,6 @@ export const whisperingPinesContent: Context = {
           neutral: 1.0,
           friendly: 0.85,
           exalted: 0.7,
-        },
-      },
-      {
-        id: 'faction_cult',
-        name: 'Frostspire Cult',
-        thresholds: { hostile: -50, unfriendly: -10, neutral: 0, friendly: 20, exalted: 60 },
-        shopPriceModifiers: {
-          hostile: 1.0,
-          unfriendly: 1.0,
-          neutral: 1.0,
-          friendly: 1.0,
-          exalted: 1.0,
         },
       },
     ],

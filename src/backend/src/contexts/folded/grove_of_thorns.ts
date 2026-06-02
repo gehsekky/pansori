@@ -36,6 +36,7 @@ export const groveContent: Context = {
   displayNoun: 'grove',
   gridWidth: 10,
   gridHeight: 10,
+  // Unused once folded into Duskenvale (the host campaign's startRoomId wins).
   startRoomId: 'pinegate_square',
 
   // ─── Classes (SRD spreads) ──────────────────────────────────────────────────
@@ -147,8 +148,7 @@ export const groveContent: Context = {
       // you, it's seducing you into the grove. Charmed PCs lose their
       // turn (engine handles via the existing charmed condition).
       onHitEffect: { condition: 'charmed', ability: 'wis', dc: 13 },
-      // Casts charm_person (cantrip-like flavor; engine resolves as
-      // damage spell with negates-save). Bursts a fey-charm 30% of turns.
+      // Hexes a target ~30% of turns (its fey-curse motif).
       spells: ['hex'],
       castChance: 0.3,
       spellSaveDC: 13,
@@ -219,7 +219,7 @@ export const groveContent: Context = {
     // ── Rooms (local grids) ──────────────────────────────────────────────────
     // 3-level map model: Pinegate is a town (Village Square + the lodge as
     // venues); the grove is a regional site whose rooms chain via per-cell
-    // `exits`. Navigation is by the party marker; `connections` is retired.
+    // `exits`. Navigation is by the party marker.
     rooms: [
       // Pinegate town interiors (venues open these; each ascends back to town).
       {
@@ -320,7 +320,7 @@ export const groveContent: Context = {
           },
           {
             pos: { x: 9, y: 9 },
-            toRoomId: 'grove_sanctum_exit',
+            toRoomId: 'grove_sanctum',
             entrancePos: { x: 0, y: 0 },
             label: 'Into the sanctum',
           },
@@ -343,7 +343,7 @@ export const groveContent: Context = {
         ],
       },
       {
-        id: 'grove_sanctum_exit',
+        id: 'grove_sanctum',
         name: 'Grove Sanctum',
         desc: "A sunlit clearing past the Oak. Mareth's charm warms in your hand. The path back to Pinegate is open.",
         gridWidth: 8,
@@ -361,10 +361,8 @@ export const groveContent: Context = {
       },
     ],
 
-    // Navigation is by the marker + room `exits` (3-level map); the old
-    // room-adjacency graph is retired.
-
-    // ── 3-level grid map ───────────────────────────────────────────────────────
+    // Regional map (standalone-only — when folded into Duskenvale, the host
+    // re-declares these sites; only `encounterTable` is merged).
     regions: [
       {
         id: 'verdant_reach',
@@ -406,7 +404,7 @@ export const groveContent: Context = {
         startPos: { x: 3, y: 4 },
         venues: [
           {
-            id: 'venue_square',
+            id: 'venue_square_grove',
             name: 'Village Square',
             pos: { x: 1, y: 2 },
             kind: 'interior',
@@ -511,6 +509,7 @@ export const groveContent: Context = {
           spells: ['hex'],
           castChance: 0.3,
           spellSaveDC: 13,
+          damageType: 'piercing',
         },
         {
           id: 'ancient_oak#1',
@@ -545,7 +544,7 @@ export const groveContent: Context = {
         effect: null,
         aliases: ['charm', 'acorn'],
       },
-      grove_sanctum_exit: {
+      grove_sanctum: {
         id: 'oak_heart',
         name: 'Heart of the Ancient Oak',
         weight: 2,
@@ -564,7 +563,7 @@ export const groveContent: Context = {
     npcs: {
       pinegate_square: {
         roomId: 'pinegate_square',
-        id: 'npc_mareth_elder',
+        id: 'npc_elise_elder',
         name: 'Old Elise (village elder)',
         attitude: 'friendly',
         factionId: 'faction_verdant',
@@ -631,7 +630,7 @@ export const groveContent: Context = {
         id: 'quest_silent_grove',
         title: 'The Silent Grove',
         desc: "Old Elise needs someone to walk Mareth's path. Reach the Ancient Oak and find what silenced her.",
-        giverNpcId: 'npc_mareth_elder',
+        giverNpcId: 'npc_elise_elder',
         factionId: 'faction_verdant',
         repGain: 15,
         steps: [
@@ -678,7 +677,7 @@ export const groveContent: Context = {
         id: 'quest_break_trickster',
         title: "Break the Trickster's Hold",
         desc: "The Fey Trickster has bound the Ancient Oak. Defeat it and recover the Oak's heart.",
-        giverNpcId: 'npc_mareth_elder',
+        giverNpcId: 'npc_elise_elder',
         factionId: 'faction_verdant',
         repGain: 30,
         steps: [
@@ -746,7 +745,10 @@ export const groveContent: Context = {
           { fact: 'room_id', operator: 'equal', value: 'pinegate_square' },
         ],
       },
-      consequences: [{ type: 'set_flag', key: 'talked_elise', value: true }],
+      // No consequence needed — `once` makes the engine set the
+      // `rule_fired_step_talk_elise` flag, which the quest step's condition
+      // checks. (Previously also set a dead `talked_elise` flag nothing read.)
+      consequences: [],
       once: true,
     },
   ],
@@ -779,7 +781,7 @@ export const groveContent: Context = {
         'The Ancient Oak rises ahead — its bark gone grey, its leaves curled. A figure in fey green stands at its trunk. Two trained bears flank it.',
         'A circle of upraised roots forms a dais around the Oak. The Trickster smiles too widely. The bears are ready.',
       ],
-      grove_sanctum_exit: [
+      grove_sanctum: [
         "The Oak's breath returns slow. The path to Pinegate is open. Mareth — if any of her is left — would be proud.",
       ],
     },
