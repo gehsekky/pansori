@@ -12,6 +12,7 @@ export const TERRAIN_STYLE: Record<TerrainType, { tint?: string; glyph?: string 
   forest: { tint: 'rgba(70, 130, 70, 0.32)' },
   hills: { tint: 'rgba(150, 128, 86, 0.32)' },
   swamp: { tint: 'rgba(96, 112, 72, 0.4)' },
+  snow: { tint: 'rgba(224, 234, 246, 0.55)' }, // pale icy white
   water: { tint: 'rgba(70, 110, 185, 0.45)', glyph: '≈' },
   mountain: { tint: 'rgba(95, 88, 70, 0.88)', glyph: '▲' },
 };

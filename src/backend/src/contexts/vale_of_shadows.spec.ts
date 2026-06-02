@@ -19,6 +19,7 @@ import type {
   Seed,
   StructuredAction,
 } from '../types.js';
+import { activeGrid, initMapState } from '../services/mapEngine.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   applyQuestCompletions,
@@ -27,8 +28,8 @@ import {
 } from '../services/campaignEngine.js';
 import { generateChoices, takeAction } from '../services/gameEngine.js';
 import { context as ctx } from './vale_of_shadows.js';
+import { findPath } from '../services/gridEngine.js';
 import { generateSeed } from '../services/procgen.js';
-import { initMapState } from '../services/mapEngine.js';
 import { randomUUID } from 'crypto';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -258,12 +259,12 @@ describe('Vale of Shadows — scripted playthrough', () => {
     // ── Stage 0: regional grid start ───────────────────────────────────────
     expect(state.map_level).toBe('regional');
     expect(state.current_region_id).toBe('vale_region');
-    expect(state.marker_pos).toEqual({ x: 1, y: 3 }); // region.startPos
+    expect(state.marker_pos).toEqual({ x: 0, y: 7 }); // region.startPos (bottom-left)
     expect(state.current_room).toBe('');
     expect(state.characters.every((c) => c.hp > 0)).toBe(true);
 
     // ── Stage 1: enter Millhaven, accept the three quests ──────────────────
-    await markerMove(2, 3); // Millhaven site → town grid
+    await markerMove(1, 7); // Millhaven site → town grid
     expect(state.map_level).toBe('town');
     expect(state.current_town_id).toBe('millhaven_town');
 
@@ -321,7 +322,7 @@ describe('Vale of Shadows — scripted playthrough', () => {
     expect(state.map_level).toBe('regional');
 
     // ── Stage 3: the Old Road skirmish (a regional local site) ─────────────
-    await markerMove(5, 1); // The Old Road site
+    await markerMove(3, 7); // The Old Road site
     expect(state.map_level).toBe('local');
     expect(state.current_room).toBe('road_north');
     await dispatch({ type: 'attack', targetEnemyId: 'road_north#0' });
@@ -332,7 +333,7 @@ describe('Vale of Shadows — scripted playthrough', () => {
     expect(state.map_level).toBe('regional');
 
     // ── Stage 4: the Shattered Crypt ───────────────────────────────────────
-    await markerMove(10, 5); // Shattered Crypt site → entrance
+    await markerMove(10, 3); // Shattered Crypt site → entrance
     expect(state.current_room).toBe('dungeon_crypt_entrance');
 
     await markerMove(9, 0); // exit → antechamber
@@ -383,7 +384,7 @@ describe('Vale of Shadows — scripted playthrough', () => {
     await markerMove(7, 7); // ascend → back to the regional grid (at the crypt site)
     expect(state.map_level).toBe('regional');
 
-    await markerMove(2, 3); // travel back to Millhaven
+    await markerMove(1, 7); // travel back to Millhaven
     expect(state.map_level).toBe('town');
     await markerMove(6, 2); // Merchant District → Aldric
     expect(state.current_room).toBe('millhaven_market');
@@ -410,4 +411,36 @@ describe('Vale of Shadows — scripted playthrough', () => {
     const finalChoices = generateChoices(state, seed, ctx);
     expect(finalChoices.length).toBeGreaterThan(0);
   }, 30_000);
+});
+
+describe('Vale region layout — the linear arc', () => {
+  it('finds a path from the start to every site (the sea forces an arc, but nothing is walled off)', () => {
+    const seed = generateSeed(ctx, 3);
+    const st = initMapState(ctx.campaign, {
+      visited_rooms: [],
+    } as unknown as GameState) as GameState;
+    const grid = activeGrid(ctx.campaign, seed.rooms, st)!;
+    expect(grid.level).toBe('regional');
+    // The sea actually blocks cells (so the arc is real, not cosmetic)…
+    expect(grid.obstacles.length).toBeGreaterThan(0);
+    // …yet every site (including the frozen NW behind the sea) is reachable.
+    for (const t of grid.transitions) {
+      const path = findPath(grid.startPos, t.pos, grid.obstacles, grid.width, grid.height);
+      expect(path, `no path from start to ${t.label} (${t.pos.x},${t.pos.y})`).toBeTruthy();
+    }
+  });
+
+  it('blocks the direct northern shortcut up the west side (must arc east)', () => {
+    const seed = generateSeed(ctx, 3);
+    const st = initMapState(ctx.campaign, {
+      visited_rooms: [],
+    } as unknown as GameState) as GameState;
+    const grid = activeGrid(ctx.campaign, seed.rooms, st)!;
+    // The Spire is top-left, the start bottom-left — a straight path up the west
+    // edge is impossible (the sea is in the way), so the route must detour east.
+    const spire = grid.transitions.find((t) => t.label === 'Iceshard Spire')!;
+    const path = findPath(grid.startPos, spire.pos, grid.obstacles, grid.width, grid.height)!;
+    const maxX = Math.max(...path.map((p) => p.x));
+    expect(maxX).toBeGreaterThan(6); // the path swings east of the sea before heading north
+  });
 });

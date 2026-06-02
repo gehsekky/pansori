@@ -165,7 +165,15 @@ export interface GridPos {
 // derived from the type (see `TERRAIN`). Replaces the old untyped
 // `obstacles[]` / `difficultTerrain[]` arrays on the overland map (those remain
 // honored for back-compat). Unlisted squares default to `plains`.
-export type TerrainType = 'plains' | 'road' | 'forest' | 'hills' | 'swamp' | 'water' | 'mountain';
+export type TerrainType =
+  | 'plains'
+  | 'road'
+  | 'forest'
+  | 'hills'
+  | 'swamp'
+  | 'snow'
+  | 'water'
+  | 'mountain';
 
 export interface TerrainCell {
   pos: GridPos;
@@ -193,6 +201,7 @@ export const TERRAIN: Record<TerrainType, TerrainSpec> = {
   forest: { passable: true, travelMult: 2, encounterMult: 1.5, label: 'forest' },
   hills: { passable: true, travelMult: 1.5, encounterMult: 1.25, label: 'hills' },
   swamp: { passable: true, travelMult: 2, encounterMult: 1.5, label: 'swamp' },
+  snow: { passable: true, travelMult: 1.5, encounterMult: 1, label: 'snow' },
   water: { passable: false, travelMult: 1, encounterMult: 0, label: 'water' },
   mountain: { passable: false, travelMult: 1, encounterMult: 0, label: 'mountains' },
 };

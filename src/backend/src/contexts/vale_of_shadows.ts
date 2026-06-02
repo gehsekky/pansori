@@ -1388,65 +1388,62 @@ const context: Context = {
         feetPerSquare: 5280, // 1 square = 1 mile (SRD Travel Pace scale)
         gridWidth: 12,
         gridHeight: 8,
-        startPos: { x: 1, y: 3 }, // the road just outside Millhaven
-        // Typed overland terrain (unified model): passability, travel time, and
-        // encounter rate all derive from each cell's type. Roads are quick + safe
-        // (no random encounters); forest/swamp are slow + dangerous; mountains and
-        // water are impassable. Unlisted cells are plains. All sites stay
-        // reachable from start — the impassable terrain is in the SE/SW corners.
+        startPos: { x: 0, y: 7 }, // the southern road, bottom-left of the vale
+        // A linear horseshoe: the party starts bottom-left, a frozen sea floods
+        // in from the west across the middle (impassable), so they must arc
+        // EAST along the southern road, up the open eastern lane, then WEST
+        // across the top into the snowy frozen north (the Frozen Pass + Iceshard
+        // Spire). Passability / travel time / encounter rate all derive from
+        // terrain type; unlisted cells are plains.
         terrain: [
-          // Impassable SE ridge + a southern marsh-lake.
-          ...terr('mountain', [6, 6], [7, 6], [5, 7], [6, 7], [7, 7]),
-          ...terr('water', [3, 6], [4, 6]),
-          // The safe road network linking the start, Millhaven, and the sites.
-          ...terr(
-            'road',
-            [1, 3],
-            [3, 3],
-            [4, 3],
-            [4, 2],
-            [5, 2],
-            [5, 3],
-            [6, 3],
-            [7, 3],
-            [8, 3],
-            [8, 2],
-            [9, 4],
-            [10, 4]
-          ),
-          // Pine woods along the north edge + the western treeline.
-          ...terr('forest', [3, 0], [4, 0], [5, 0], [6, 0], [7, 0], [0, 5], [0, 6], [1, 6]),
-          // Boggy ground skirting the lake.
-          ...terr('swamp', [2, 5], [3, 5]),
-          // Rolling hills in the NE + a southern rise.
-          ...terr('hills', [9, 0], [10, 0], [10, 1], [2, 6]),
+          // The sea pushing in from the west edge, covering the middle and
+          // blocking any straight northern route — the reason the road arcs east.
+          // Its eastern edge reaches x7 and its southern shore comes down to y6,
+          // right up against the y7 road; the start, road tiles, and Silent Grove
+          // (6,6) stay clear so the arc still works.
+          ...terr('water', [0, 2], [1, 2], [2, 2], [3, 2]),
+          ...terr('water', [0, 3], [1, 3], [2, 3], [3, 3], [4, 3], [5, 3], [6, 3], [7, 3]),
+          ...terr('water', [0, 4], [1, 4], [2, 4], [3, 4], [4, 4], [5, 4], [6, 4], [7, 4]),
+          ...terr('water', [0, 5], [1, 5], [2, 5], [3, 5], [4, 5], [5, 5]),
+          ...terr('water', [0, 6], [1, 6], [2, 6], [3, 6]),
+          // The southern road from the start east past the early sites.
+          ...terr('road', [2, 7], [4, 7], [6, 7], [7, 7], [8, 7], [9, 7], [10, 7]),
+          // Snowy frozen north (top band) — the Frozen Pass + Iceshard Spire sit
+          // in it; a couple of impassable peaks give the Spire its teeth.
+          ...terr('snow', [0, 0], [1, 0], [4, 0], [5, 0], [7, 0]),
+          ...terr('snow', [0, 1], [1, 1], [2, 1], [3, 1], [4, 1], [5, 1], [6, 1]),
+          ...terr('mountain', [2, 0], [3, 0], [6, 0]),
+          // Hilly approach to the frozen north on the east shoulder.
+          ...terr('hills', [8, 0], [9, 0], [10, 0], [10, 1], [11, 1]),
+          // Woods along the south-east.
+          ...terr('forest', [7, 6], [8, 6], [9, 6], [8, 5], [9, 5]),
         ],
         sites: [
           {
             id: 'site_millhaven',
             name: 'Millhaven',
-            pos: { x: 2, y: 3 },
+            pos: { x: 1, y: 7 }, // hub town, by the start
             kind: 'town',
             townId: 'millhaven_town',
           },
           {
             id: 'site_old_road',
             name: 'The Old Road',
-            pos: { x: 5, y: 1 },
+            pos: { x: 3, y: 7 }, // early, along the southern road
             kind: 'local',
             entryRoomId: 'road_north',
           },
           {
             id: 'site_bandit_camp',
             name: 'Bandit Camp',
-            pos: { x: 9, y: 2 },
+            pos: { x: 10, y: 4 }, // up the eastern lane
             kind: 'local',
             entryRoomId: 'bandit_camp',
           },
           {
             id: 'site_crypt',
             name: 'Shattered Crypt',
-            pos: { x: 10, y: 5 },
+            pos: { x: 10, y: 3 }, // up the eastern lane
             kind: 'local',
             entryRoomId: 'dungeon_crypt_entrance',
           },
@@ -1808,21 +1805,21 @@ foldCampaign(
     {
       id: 'site_pines',
       name: 'Whispering Pines',
-      pos: { x: 2, y: 6 },
+      pos: { x: 9, y: 1 }, // gateway town into the frozen north
       kind: 'town',
       townId: 'pines_village',
     },
     {
       id: 'site_pass',
       name: 'The Frozen Pass',
-      pos: { x: 8, y: 4 },
+      pos: { x: 5, y: 1 }, // snowy north, on the way west to the Spire
       kind: 'local',
       entryRoomId: 'pass_climb',
     },
     {
       id: 'site_spire',
       name: 'Iceshard Spire',
-      pos: { x: 11, y: 2 },
+      pos: { x: 1, y: 0 }, // climax, the frozen NW corner
       kind: 'local',
       entryRoomId: 'spire_entrance',
     },
@@ -1837,14 +1834,14 @@ foldCampaign(context, groveContent, [
   {
     id: 'site_pinegate',
     name: 'Pinegate',
-    pos: { x: 4, y: 7 },
+    pos: { x: 5, y: 7 }, // early, along the southern road
     kind: 'town',
     townId: 'pinegate_town',
   },
   {
     id: 'site_grove',
     name: 'The Silent Grove',
-    pos: { x: 0, y: 6 },
+    pos: { x: 6, y: 6 }, // just off the road, south-centre
     kind: 'local',
     entryRoomId: 'thornwater_bridge',
   },
