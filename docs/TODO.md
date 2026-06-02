@@ -122,7 +122,7 @@ prettier clean).
 | Category                  | In pansori                                       | SRD universe                     |
 | ------------------------- | ------------------------------------------------ | -------------------------------- |
 | Spells                    | **263** (27 cantrips + 236 leveled, through L9)  | ~330                             |
-| Shared SRD monster pool   | **44** (`SRD_MONSTERS`) + per-campaign templates | hundreds                         |
+| Shared SRD monster pool   | **50** (`SRD_MONSTERS`) + per-campaign templates | hundreds                         |
 | Species                   | 9                                                | 9 standalone + Drow lineage      |
 | Classes                   | 12                                               | 12                               |
 | Subclasses                | 12 iconic (1 / class)                            | 1 iconic / class in SRD          |
@@ -377,8 +377,8 @@ backend features are waiting on, and a handful of **bounded subsystems**.
         attacking — granting its owner Advantage on their next attack
         (`help_target_id`). Telepathy, see-through-its-eyes, and touch-spell
         delivery are narrated. Closes the deferred summon-spell cluster.
-- [~] **Monsters** — stat-block content. The shared pool grew 12 → 31 → 39 → **44**
-  (`monsters.spec.ts`): a CR 1/8–**6** spread of SRD 5.2.1 bestiary entries
+- [~] **Monsters** — stat-block content. The shared pool grew 12 → 31 → 39 → 44 → **50**
+  (`monsters.spec.ts`): a CR 1/8–**10** spread of SRD 5.2.1 bestiary entries
   (kobold, guard, cultist, giant rat, zombie, scout, worg, gnoll, black
   bear, dire wolf, specter, animated armor, bandit captain, berserker,
   ghast, griffon, owlbear, manticore, wight, hippogriff, giant eagle, lion,
@@ -396,6 +396,14 @@ backend features are waiting on, and a handful of **bounded subsystems**.
   (CR 5, Life Drain + full incorporeal resistance/immunity suite), Fire Elemental
   (CR 5, fire/poison-immune + a 10-ft Fire Aura via the PC-turn-start hook), and
   the first **CR 6** — Wyvern (poison Sting: +7d6 poison + CON-save Poisoned).
+  The **CR 7–10** batch extended the ceiling: Stone Giant (CR 7, 15-ft reach),
+  Giant Ape (CR 7), Frost Giant (CR 8, cold rider + Cold immunity), Fire Giant
+  (CR 9, fire rider + Fire immunity), Cloud Giant (CR 9, thunder rider), and the
+  first dragon + first **CR 10** — Young Red Dragon (3 Rend attacks + fire rider,
+  Fire-immune, Darkvision 120, 80-ft fly). Each giant's ranged option + the
+  recharge/bonus-action specials (Deflect Missile, War Cry, Boulder Toss, the
+  dragon's Fire Breath, Cloud Giant Spellcasting) are deferred/narrated — the
+  signature melee attack carries the entry, like the Wyvern's Sting.
   Per-monster specials deferred: Flyby, Lion Roar, the boar/giant/ettin charge +
   auto-Prone/Disadvantage riders, the Mummy's Rotting Curse, the Wyvern's bite +
   RAW no-save auto-poison, the Wraith's Create Specter, and the Fire Elemental's

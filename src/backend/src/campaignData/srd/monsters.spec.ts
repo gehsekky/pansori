@@ -38,6 +38,12 @@ const NEW_MONSTERS: Array<[string, number, number, number, string, number, numbe
   ['wraith', 5, 67, 13, '4d8+3', 6, 1800],
   ['fire_elemental', 5, 93, 13, '2d6+3', 6, 1800, 2],
   ['wyvern', 6, 127, 14, '2d6+4', 7, 2300],
+  ['stone_giant', 7, 126, 17, '3d10+6', 9, 2900, 2],
+  ['giant_ape', 7, 168, 12, '3d10+6', 9, 2900, 2],
+  ['frost_giant', 8, 149, 15, '2d12+6', 9, 3900, 2],
+  ['fire_giant', 9, 162, 18, '4d6+7', 11, 5000, 2],
+  ['cloud_giant', 9, 200, 14, '3d8+8', 12, 5000, 2],
+  ['young_red_dragon', 10, 178, 18, '2d6+6', 10, 5900, 3],
 ];
 
 describe('SRD bestiary additions — core stat lines', () => {
@@ -191,7 +197,41 @@ describe('SRD bestiary additions — effect fields', () => {
     ]);
   });
 
+  it('Stone Giant has 15-ft reach; the other giants reach 10 ft', () => {
+    expect(SRD_MONSTERS.stone_giant.attackReachFt).toBe(15);
+    expect(SRD_MONSTERS.frost_giant.attackReachFt).toBe(10);
+    expect(SRD_MONSTERS.fire_giant.attackReachFt).toBe(10);
+    expect(SRD_MONSTERS.cloud_giant.attackReachFt).toBe(10);
+  });
+
+  it('the elemental giants carry their damage rider + matching immunity', () => {
+    expect(SRD_MONSTERS.frost_giant.bonusDamageType).toBe('cold');
+    expect(SRD_MONSTERS.frost_giant.immunities).toEqual(['cold']);
+    expect(SRD_MONSTERS.fire_giant.bonusDamageType).toBe('fire');
+    expect(SRD_MONSTERS.fire_giant.immunities).toEqual(['fire']);
+    expect(SRD_MONSTERS.cloud_giant.bonusDamageType).toBe('thunder');
+  });
+
+  it('Young Red Dragon is the first CR 10: 3-attack, fire-immune, fast flyer with Darkvision 120', () => {
+    const d = SRD_MONSTERS.young_red_dragon;
+    expect(d.cr).toBe(10);
+    expect(d.multiattack).toBe(3);
+    expect(d.immunities).toEqual(['fire']);
+    expect(d.bonusDamageType).toBe('fire');
+    expect(d.speedFt).toBe(80);
+    expect(d.darkvision_ft).toBe(120);
+  });
+
+  it('the no-darkvision giants/ape are explicitly sightless in the dark', () => {
+    expect(SRD_MONSTERS.giant_ape.darkvision_ft).toBe(0);
+    expect(SRD_MONSTERS.frost_giant.darkvision_ft).toBe(0);
+    expect(SRD_MONSTERS.fire_giant.darkvision_ft).toBe(0);
+    expect(SRD_MONSTERS.cloud_giant.darkvision_ft).toBe(0);
+    // Stone Giant keeps its Darkvision 60.
+    expect(SRD_MONSTERS.stone_giant.darkvision_ft).toBe(60);
+  });
+
   it('the shared pool grew well past the original 12', () => {
-    expect(Object.keys(SRD_MONSTERS).length).toBeGreaterThanOrEqual(44);
+    expect(Object.keys(SRD_MONSTERS).length).toBeGreaterThanOrEqual(50);
   });
 });

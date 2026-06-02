@@ -1006,4 +1006,160 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     bonusDamageType: 'poison',
     onHitEffect: { condition: 'poisoned', ability: 'con', dc: 14 },
   },
+
+  // ─── CR 7–10 tier — giants, the giant ape, and the first dragon ─────────────
+  // The engine models one primary attack + a multiattack count; each giant's
+  // ranged option (Boulder / Great Bow / Hammer Throw / Thundercloud) and
+  // recharge/bonus-action specials (Deflect Missile, War Cry, Boulder Toss, the
+  // dragon's Fire Breath, Cloud Giant Spellcasting) are deferred/narrated — the
+  // melee attack is the signature, like the Wyvern's Sting.
+
+  // SRD: Stone Giant (CR 7) — two Stone Club attacks at 15-ft reach.
+  stone_giant: {
+    name: 'Stone Giant',
+    cr: 7,
+    hp: 126,
+    ac: 17,
+    damage: '3d10+6',
+    toHit: 9,
+    xp: 2900,
+    str: 23,
+    dex: 15,
+    con: 20,
+    int: 10,
+    wis: 12,
+    cha: 9,
+    multiattack: 2,
+    speedFt: 40,
+    attackReachFt: 15, // the Stone Club's long reach
+    damageType: 'bludgeoning',
+    darkvision_ft: 60,
+  },
+
+  // SRD: Giant Ape (CR 7) — two Fist attacks at 10-ft reach (Boulder Toss +
+  // Leap deferred).
+  giant_ape: {
+    name: 'Giant Ape',
+    cr: 7,
+    hp: 168,
+    ac: 12,
+    damage: '3d10+6',
+    toHit: 9,
+    xp: 2900,
+    str: 23,
+    dex: 14,
+    con: 18,
+    int: 5,
+    wis: 12,
+    cha: 7,
+    multiattack: 2,
+    speedFt: 40,
+    attackReachFt: 10,
+    damageType: 'bludgeoning',
+    darkvision_ft: 0, // beast — no darkvision
+  },
+
+  // SRD: Frost Giant (CR 8) — two Frost Axe attacks (slashing + 2d8 cold rider);
+  // Cold-immune. (Great Bow + War Cry bonus action deferred.)
+  frost_giant: {
+    name: 'Frost Giant',
+    cr: 8,
+    hp: 149,
+    ac: 15,
+    damage: '2d12+6',
+    toHit: 9,
+    xp: 3900,
+    str: 23,
+    dex: 9,
+    con: 21,
+    int: 9,
+    wis: 10,
+    cha: 12,
+    multiattack: 2,
+    speedFt: 40,
+    attackReachFt: 10,
+    damageType: 'slashing',
+    bonusDamage: '2d8',
+    bonusDamageType: 'cold',
+    immunities: ['cold'],
+    darkvision_ft: 0, // no darkvision in its stat block
+  },
+
+  // SRD: Fire Giant (CR 9) — two Flame Sword attacks (slashing + 3d6 fire rider);
+  // Fire-immune. (Hammer Throw deferred.)
+  fire_giant: {
+    name: 'Fire Giant',
+    cr: 9,
+    hp: 162,
+    ac: 18,
+    damage: '4d6+7',
+    toHit: 11,
+    xp: 5000,
+    str: 25,
+    dex: 9,
+    con: 23,
+    int: 10,
+    wis: 14,
+    cha: 13,
+    multiattack: 2,
+    speedFt: 30,
+    attackReachFt: 10,
+    damageType: 'slashing',
+    bonusDamage: '3d6',
+    bonusDamageType: 'fire',
+    immunities: ['fire'],
+    darkvision_ft: 0,
+  },
+
+  // SRD: Cloud Giant (CR 9) — two Thunderous Mace attacks (bludgeoning + 2d6
+  // thunder rider). (Thundercloud, Spellcasting + Misty Step deferred/narrated.)
+  cloud_giant: {
+    name: 'Cloud Giant',
+    cr: 9,
+    hp: 200,
+    ac: 14,
+    damage: '3d8+8',
+    toHit: 12,
+    xp: 5000,
+    str: 27,
+    dex: 10,
+    con: 22,
+    int: 12,
+    wis: 16,
+    cha: 16,
+    multiattack: 2,
+    speedFt: 40,
+    attackReachFt: 10,
+    damageType: 'bludgeoning',
+    bonusDamage: '2d6',
+    bonusDamageType: 'thunder',
+    darkvision_ft: 0,
+  },
+
+  // SRD: Young Red Dragon (CR 10) — three Rend attacks (slashing + 1d6 fire
+  // rider); Fire-immune, Blindsight + Darkvision 120, 80-ft fly. The 30-ft-cone
+  // Fire Breath (DEX save DC 17, 16d6, Recharge 5–6) is deferred/narrated.
+  young_red_dragon: {
+    name: 'Young Red Dragon',
+    cr: 10,
+    hp: 178,
+    ac: 18,
+    damage: '2d6+6',
+    toHit: 10,
+    xp: 5900,
+    str: 23,
+    dex: 10,
+    con: 21,
+    int: 14,
+    wis: 11,
+    cha: 19,
+    multiattack: 3,
+    speedFt: 80, // fly
+    attackReachFt: 10,
+    damageType: 'slashing',
+    bonusDamage: '1d6',
+    bonusDamageType: 'fire',
+    immunities: ['fire'],
+    darkvision_ft: 120,
+  },
 };
