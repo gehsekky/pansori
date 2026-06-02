@@ -43,7 +43,7 @@ import {
   resolveClassSkills,
   resolveStartingEquipment,
   resolveWeaponMasteries,
-} from '../contexts/srd/index.js';
+} from '../campaignData/srd/index.js';
 import { applyAbilityScoreIncreases, isValidForMethod } from '../services/abilityScores.js';
 import {
   applyConsequence,

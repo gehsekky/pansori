@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const CONTEXTS_DIR = join(__dirname, '../contexts');
+const CAMPAIGN_DATA_DIR = join(__dirname, '../campaignData');
 
 // Exported shape exposed by each context module
 interface ContextModule {
@@ -23,18 +23,18 @@ function isContextModule(mod: unknown): mod is ContextModule {
 
 /**
  * Discover campaign modules. Two layouts are supported:
- *   - a single top-level file, e.g. `contexts/sandbox.ts`
- *   - a campaign folder with an entry point, e.g. `contexts/malgovia/index.ts`
+ *   - a single top-level file, e.g. `campaignData/sandbox.ts`
+ *   - a campaign folder with an entry point, e.g. `campaignData/malgovia/index.ts`
  *     (the preferred layout — the campaign's data is split across sibling files
  *     and assembled in index.ts).
- * Library subfolders like `contexts/srd/` are scanned too but harmlessly
+ * Library subfolders like `campaignData/srd/` are scanned too but harmlessly
  * skipped: their index doesn't export a `context`. Each candidate is paired
  * with `isLeaf` so we only warn about a *top-level* file forgetting to export
  * a context (a non-campaign folder index legitimately doesn't).
  */
 function contextSpecifiers(): { specifier: string; label: string; isLeaf: boolean }[] {
   const out: { specifier: string; label: string; isLeaf: boolean }[] = [];
-  const entries = readdirSync(CONTEXTS_DIR, { withFileTypes: true });
+  const entries = readdirSync(CAMPAIGN_DATA_DIR, { withFileTypes: true });
   for (const entry of entries) {
     if (
       entry.isFile() &&
@@ -43,15 +43,15 @@ function contextSpecifiers(): { specifier: string; label: string; isLeaf: boolea
     ) {
       // tsx resolves .js imports to their .ts sources at runtime
       out.push({
-        specifier: `../contexts/${entry.name.replace(/\.ts$/, '.js')}`,
+        specifier: `../campaignData/${entry.name.replace(/\.ts$/, '.js')}`,
         label: entry.name,
         isLeaf: true,
       });
     } else if (entry.isDirectory()) {
-      const dir = join(CONTEXTS_DIR, entry.name);
+      const dir = join(CAMPAIGN_DATA_DIR, entry.name);
       if (existsSync(join(dir, 'index.ts')) || existsSync(join(dir, 'index.js'))) {
         out.push({
-          specifier: `../contexts/${entry.name}/index.js`,
+          specifier: `../campaignData/${entry.name}/index.js`,
           label: `${entry.name}/index`,
           isLeaf: false,
         });
@@ -66,7 +66,7 @@ export async function loadContexts(): Promise<Record<string, Context>> {
   try {
     candidates = contextSpecifiers();
   } catch (err) {
-    console.error('[contextLoader] Cannot read contexts directory:', err);
+    console.error('[contextLoader] Cannot read campaignData directory:', err);
     return {};
   }
 

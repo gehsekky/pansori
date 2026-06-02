@@ -4,7 +4,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { applyLevelUpForClass } from './gameEngine.js';
-import { context as ctx } from '../contexts/sandbox.js';
+import { context as ctx } from '../campaignData/sandbox.js';
 import { makeChar } from '../test-fixtures.js';
 
 afterEach(() => vi.restoreAllMocks());

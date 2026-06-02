@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { makeChar, makeState, mockRandom } from '../test-fixtures.js';
 import { FRESH_TURN } from './rulesEngine.js';
 import type { Seed } from '../types.js';
-import { context as ctx } from '../contexts/sandbox.js';
+import { context as ctx } from '../campaignData/sandbox.js';
 import { peerlessAimAvailable } from './feats.js';
 import { takeAction } from './gameEngine.js';
 

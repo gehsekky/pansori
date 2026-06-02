@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { hasHeroicWarrior, heroicWarriorTopUp } from './multiclass.js';
 import { makeChar, makeState } from '../test-fixtures.js';
 import type { ActionContext } from './actions/types.js';
-import { context as ctx } from '../contexts/sandbox.js';
+import { context as ctx } from '../campaignData/sandbox.js';
 import { handleFighterFeature } from './actions/classFeature/fighter.js';
 import { pcActor } from './actions/actor.js';
 import { takeAction } from './gameEngine.js';

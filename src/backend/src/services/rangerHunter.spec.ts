@@ -6,7 +6,7 @@ import type { Enemy, GameState, Seed } from '../types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { checkConcentration, takeAction } from './gameEngine.js';
 import { makeChar, makeState } from '../test-fixtures.js';
-import { context as ctx } from '../contexts/sandbox.js';
+import { context as ctx } from '../campaignData/sandbox.js';
 
 afterEach(() => vi.restoreAllMocks());
 

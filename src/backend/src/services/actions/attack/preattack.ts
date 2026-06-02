@@ -2,7 +2,7 @@ import type { Enemy, InventoryItem, LootItem } from '../../../types.js';
 import { chebyshev, hasLineOfSight, inRange } from '../../gridEngine.js';
 import { getItemData, pick } from '../../gameEngine.js';
 import type { ActionContext } from '../types.js';
-import { BEAST_FORMS } from '../../../contexts/srd/index.js';
+import { BEAST_FORMS } from '../../../campaignData/srd/index.js';
 import { updatePcActor } from '../actor.js';
 
 /**

@@ -7,7 +7,7 @@ import {
   isRoomCleared,
 } from '../../gameEngine.js';
 import type { ActionContext } from '../types.js';
-import { SRD_SPECIES } from '../../../contexts/srd/index.js';
+import { SRD_SPECIES } from '../../../campaignData/srd/index.js';
 import { entitiesInCone } from '../../gridEngine.js';
 import { updatePcActor } from '../actor.js';
 

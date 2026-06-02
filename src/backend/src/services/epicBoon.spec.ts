@@ -6,7 +6,7 @@
 import type { GameState, Seed } from '../types.js';
 import { describe, expect, it } from 'vitest';
 import { makeChar, makeState } from '../test-fixtures.js';
-import { context as ctx } from '../contexts/sandbox.js';
+import { context as ctx } from '../campaignData/sandbox.js';
 import { generateChoices } from './gameEngine.js';
 
 const seed: Seed = {

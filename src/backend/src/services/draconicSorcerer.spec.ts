@@ -10,7 +10,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { applyLevelUpForClass } from './gameEngine.js';
-import { context as ctx } from '../contexts/sandbox.js';
+import { context as ctx } from '../campaignData/sandbox.js';
 import { makeChar } from '../test-fixtures.js';
 
 describe('Draconic Sorcerer — Draconic Resilience', () => {

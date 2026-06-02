@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { availableRecoveries, enumerateRecoveryPlans, planLabel } from './slotRecovery.js';
 import { generateChoices, takeAction } from './gameEngine.js';
 import { makeState, baseSandboxSeed as seed } from '../test-fixtures.js';
-import { context as ctx } from '../contexts/sandbox.js';
+import { context as ctx } from '../campaignData/sandbox.js';
 
 afterEach(() => vi.restoreAllMocks());
 

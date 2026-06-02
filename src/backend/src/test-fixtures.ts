@@ -18,7 +18,7 @@
 // `damage.spec.ts`; lifted here so spec files share one definition.
 
 import type { Character, Context, Enemy, GameState, Seed } from './types.js';
-import { context as sandboxCtx } from './contexts/sandbox.js';
+import { context as sandboxCtx } from './campaignData/sandbox.js';
 import { vi } from 'vitest';
 
 /**

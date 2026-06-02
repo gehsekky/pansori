@@ -55,7 +55,7 @@ import {
   availableBeastForms,
   masterableWeapons,
   weaponMasterySlotsForLevel,
-} from '../contexts/srd/index.js';
+} from '../campaignData/srd/index.js';
 import {
   DEFAULT_SPEED_FEET,
   SQUARE_SIZE,

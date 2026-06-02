@@ -6,7 +6,7 @@
 
 import { CORRIDOR_ID, makeChar, makeState, mockRandom, seedWithEnemy } from '../test-fixtures.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { context as ctx } from '../contexts/sandbox.js';
+import { context as ctx } from '../campaignData/sandbox.js';
 import { takeAction } from './gameEngine.js';
 import { uncannyMetabolismRefresh } from './multiclass.js';
 

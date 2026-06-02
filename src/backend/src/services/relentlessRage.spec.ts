@@ -10,7 +10,7 @@ import type { ActionContext } from './actions/types.js';
 import { enemyActor } from './actions/actor.js';
 import { handleEnemyAttack } from './actions/enemyAttack.js';
 import { makeChar } from '../test-fixtures.js';
-import { context as sandboxCtx } from '../contexts/sandbox.js';
+import { context as sandboxCtx } from '../campaignData/sandbox.js';
 
 afterEach(() => vi.restoreAllMocks());
 

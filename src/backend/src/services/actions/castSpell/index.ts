@@ -3,7 +3,7 @@ import type { Enemy, Spell } from '../../../types.js';
 import { isSpellOutOfRange, runPrecast } from './precast.js';
 import { rollDice, transmutedDamageType } from '../../rulesEngine.js';
 import { runPowerWordKill, runPowerWordStun } from './powerWords.js';
-import { BEAST_FORMS } from '../../../contexts/srd/index.js';
+import { BEAST_FORMS } from '../../../campaignData/srd/index.js';
 import { applySingleTargetDamage } from './applyDamage.js';
 import { composeNow } from '../../narrative/compose.js';
 import { pick } from '../../gameEngine.js';

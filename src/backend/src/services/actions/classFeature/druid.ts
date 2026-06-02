@@ -1,6 +1,6 @@
 import { getClassLevel, hasClass } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
-import { BEAST_FORMS } from '../../../contexts/srd/index.js';
+import { BEAST_FORMS } from '../../../campaignData/srd/index.js';
 
 /**
  * Druid features (SRD-only build).

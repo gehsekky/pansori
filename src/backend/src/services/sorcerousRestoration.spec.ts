@@ -4,7 +4,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { makeState, baseSandboxSeed as seed } from '../test-fixtures.js';
-import { context as ctx } from '../contexts/sandbox.js';
+import { context as ctx } from '../campaignData/sandbox.js';
 import { takeAction } from './gameEngine.js';
 
 afterEach(() => vi.restoreAllMocks());

@@ -13,7 +13,7 @@ import {
   handleMemorizeSpell,
 } from './actions/meta.js';
 import { makeChar, makeState } from '../test-fixtures.js';
-import { context as ctx } from '../contexts/sandbox.js';
+import { context as ctx } from '../campaignData/sandbox.js';
 import { pcActor } from './actions/actor.js';
 
 afterEach(() => vi.restoreAllMocks());

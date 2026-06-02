@@ -31,9 +31,9 @@ import {
   seedWithEnemy,
   spellSeed,
 } from '../test-fixtures.js';
-import { context as ctx } from '../contexts/sandbox.js';
+import { context as ctx } from '../campaignData/sandbox.js';
 import { generateSeed } from './procgen.js';
-import { context as valeCtx } from '../contexts/malgovia/index.js';
+import { context as valeCtx } from '../campaignData/malgovia/index.js';
 
 afterEach(() => vi.restoreAllMocks());
 

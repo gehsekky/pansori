@@ -6,7 +6,7 @@
 import type { PlacedNpc, Seed } from '../types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { generateChoices, takeAction } from './gameEngine.js';
-import { context as ctx } from '../contexts/sandbox.js';
+import { context as ctx } from '../campaignData/sandbox.js';
 import { makeState } from '../test-fixtures.js';
 
 afterEach(() => vi.restoreAllMocks());

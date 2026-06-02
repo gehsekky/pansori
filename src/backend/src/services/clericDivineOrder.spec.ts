@@ -4,7 +4,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Character } from '../types.js';
-import { context as ctx } from '../contexts/sandbox.js';
+import { context as ctx } from '../campaignData/sandbox.js';
 import { handleChooseDivineOrder } from './actions/meta.js';
 import { makeChar } from '../test-fixtures.js';
 import { pcActor } from './actions/actor.js';

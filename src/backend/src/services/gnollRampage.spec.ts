@@ -11,8 +11,8 @@
 import type { Enemy, GameState, Seed } from '../types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { makeChar, makeState } from '../test-fixtures.js';
-import { SRD_MONSTERS } from '../contexts/srd/monsters.js';
-import { context as ctx } from '../contexts/sandbox.js';
+import { SRD_MONSTERS } from '../campaignData/srd/monsters.js';
+import { context as ctx } from '../campaignData/sandbox.js';
 import { takeAction } from './gameEngine.js';
 
 afterEach(() => vi.restoreAllMocks());

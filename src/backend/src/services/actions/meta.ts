@@ -22,7 +22,7 @@ import {
 } from '../multiclass.js';
 import type { AbilityKey } from '../../types.js';
 import type { ActionHandler } from './types.js';
-import { masterableWeapons } from '../../contexts/srd/index.js';
+import { masterableWeapons } from '../../campaignData/srd/index.js';
 import { updatePcActor } from './actor.js';
 
 /**

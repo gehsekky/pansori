@@ -7,7 +7,7 @@
 // (one square diagonal or two squares straight) away.
 
 import { describe, expect, it } from 'vitest';
-import { context as ctx } from '../contexts/sandbox.js';
+import { context as ctx } from '../campaignData/sandbox.js';
 import { inRange } from './gridEngine.js';
 
 describe('Polearm reach property', () => {

@@ -2,7 +2,7 @@
 // Both are data + small toHit hook (Faerie Fire only).
 
 import { describe, expect, it } from 'vitest';
-import { SRD_SPELLS } from '../contexts/srd/index.js';
+import { SRD_SPELLS } from '../campaignData/srd/index.js';
 
 describe('Lightning Bolt — data', () => {
   it('is registered with 8d6 lightning, line shape, dex-save-for-half', () => {

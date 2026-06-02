@@ -7,7 +7,7 @@ import type { Character, Enemy, GameState, Seed } from '../types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { makeChar, makeState } from '../test-fixtures.js';
 import type { ActionContext } from './actions/types.js';
-import { context as ctx } from '../contexts/sandbox.js';
+import { context as ctx } from '../campaignData/sandbox.js';
 import { enemyActor } from './actions/actor.js';
 import { handleEnemyAttack } from './actions/enemyAttack.js';
 import { hasFeralSenses } from './multiclass.js';

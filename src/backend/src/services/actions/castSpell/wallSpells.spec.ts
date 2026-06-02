@@ -7,7 +7,7 @@ import type { GameState, Seed, SpellWall } from '../../../types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { breakConcentration, wallObstacleCells } from '../../gameEngine.js';
 import { makeChar, makeState, mockRandom } from '../../../test-fixtures.js';
-import { context as ctx } from '../../../contexts/sandbox.js';
+import { context as ctx } from '../../../campaignData/sandbox.js';
 import { takeAction } from '../../gameEngine.js';
 
 afterEach(() => vi.restoreAllMocks());

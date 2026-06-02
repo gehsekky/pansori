@@ -2,7 +2,7 @@
 // spells (2024 PHB).
 
 import { describe, expect, it } from 'vitest';
-import { SRD_SPELLS } from '../contexts/srd/index.js';
+import { SRD_SPELLS } from '../campaignData/srd/index.js';
 
 describe('Cone of Cold', () => {
   it('L5 cone, 8d8 cold, CON-save-half', () => {

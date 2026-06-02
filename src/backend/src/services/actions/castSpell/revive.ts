@@ -1,4 +1,4 @@
-import { REINCARNATE_SPECIES, SRD_SPECIES } from '../../../contexts/srd/index.js';
+import { REINCARNATE_SPECIES, SRD_SPECIES } from '../../../campaignData/srd/index.js';
 import type { ActionContext } from '../types.js';
 import type { Spell } from '../../../types.js';
 import { composeNow } from '../../narrative/compose.js';

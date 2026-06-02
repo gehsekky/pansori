@@ -12,7 +12,7 @@
 import type { Enemy, GameState, Spell } from '../types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { makeChar, mockRandom } from '../test-fixtures.js';
-import { context as ctx } from '../contexts/sandbox.js';
+import { context as ctx } from '../campaignData/sandbox.js';
 import { resolveEnemySpell } from './gameEngine.js';
 
 afterEach(() => vi.restoreAllMocks());

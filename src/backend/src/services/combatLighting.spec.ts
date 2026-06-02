@@ -13,8 +13,8 @@ import type { Character, CombatEntity, Enemy, GameState, Seed } from '../types.j
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { canSeeTarget, isIlluminated, isInSunlight, magicalDarknessCells } from './gridEngine.js';
 import { makeChar, makeState } from '../test-fixtures.js';
-import { SRD_MONSTERS } from '../contexts/srd/monsters.js';
-import { context as ctx } from '../contexts/sandbox.js';
+import { SRD_MONSTERS } from '../campaignData/srd/monsters.js';
+import { context as ctx } from '../campaignData/sandbox.js';
 import { takeAction } from './gameEngine.js';
 
 afterEach(() => vi.restoreAllMocks());

@@ -1,6 +1,6 @@
 import { backgroundGrants, getBackground } from './backgrounds.js';
 import { describe, expect, it } from 'vitest';
-import { context as ctx } from '../contexts/sandbox.js';
+import { context as ctx } from '../campaignData/sandbox.js';
 
 describe('getBackground', () => {
   it('returns the background record by id', () => {

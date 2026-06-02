@@ -14,7 +14,7 @@
 //      or no class match.
 
 import { describe, expect, it } from 'vitest';
-import { SRD_SPELLCASTING_ABILITY } from '../contexts/srd/index.js';
+import { SRD_SPELLCASTING_ABILITY } from '../campaignData/srd/index.js';
 import { makeChar } from '../test-fixtures.js';
 import { resolveCastingAbility } from './multiclass.js';
 

@@ -3,7 +3,7 @@
 // castSpell; this spec pins the spell data shape.
 
 import { describe, expect, it } from 'vitest';
-import { SRD_SPELLS } from '../contexts/srd/index.js';
+import { SRD_SPELLS } from '../campaignData/srd/index.js';
 
 describe('Web', () => {
   it('L2 restrained AoE cube, DEX-save-negates, concentration', () => {

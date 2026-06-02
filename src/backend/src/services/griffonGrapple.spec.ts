@@ -13,8 +13,8 @@ import type { Character, CombatEntity, Enemy, GameState, Seed } from '../types.j
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { enemyActor, pcActor } from './actions/actor.js';
 import type { ActionContext } from './actions/types.js';
-import { SRD_MONSTERS } from '../contexts/srd/monsters.js';
-import { context as ctx } from '../contexts/sandbox.js';
+import { SRD_MONSTERS } from '../campaignData/srd/monsters.js';
+import { context as ctx } from '../campaignData/sandbox.js';
 import { handleEnemyAttack } from './actions/enemyAttack.js';
 import { handleTryEscapeGrapple } from './actions/combatTactical.js';
 import { makeChar } from '../test-fixtures.js';

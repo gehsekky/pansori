@@ -8,8 +8,8 @@ import type { GameState, Seed, SpellZone } from '../types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { endCombatState, fireSpellZones, takeAction } from './gameEngine.js';
 import { makeChar, makeState } from '../test-fixtures.js';
-import { SRD_SPELLS } from '../contexts/srd/spells.js';
-import { context as ctx } from '../contexts/sandbox.js';
+import { SRD_SPELLS } from '../campaignData/srd/spells.js';
+import { context as ctx } from '../campaignData/sandbox.js';
 
 afterEach(() => vi.restoreAllMocks());
 

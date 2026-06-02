@@ -4,7 +4,7 @@
 import type { Context, LootItem, Seed } from '../../types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { makeChar, makeState } from '../../test-fixtures.js';
-import { context as ctx } from '../../contexts/sandbox.js';
+import { context as ctx } from '../../campaignData/sandbox.js';
 import { takeAction } from '../gameEngine.js';
 
 afterEach(() => vi.restoreAllMocks());

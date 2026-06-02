@@ -1,4 +1,4 @@
-import { BEAST_FORMS, SRD_SPECIES } from '../../../contexts/srd/index.js';
+import { BEAST_FORMS, SRD_SPECIES } from '../../../campaignData/srd/index.js';
 import {
   DISADV_CONDITIONS,
   PLAYER_ADV_CONDITIONS,

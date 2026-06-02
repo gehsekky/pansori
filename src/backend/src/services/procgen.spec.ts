@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { generateSeed } from './procgen.js';
-import { context as valeCtx } from '../contexts/malgovia/index.js';
+import { context as valeCtx } from '../campaignData/malgovia/index.js';
 
 // ─── Campaign seed validation ────────────────────────────────────────────────
 // Campaign contexts are authored content, not procedurally generated. The seed
