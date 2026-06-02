@@ -6,8 +6,8 @@ export const context: FrontendContext = {
   displayName: 'Malgovia',
   tagline:
     'A shadowed frontier of pine and frost: Millhaven and its restless crypt, the Iceshard Spire above the Frozen Pass, and the Silent Grove beyond Pinegate.',
-  recommendedPartySize: 3,
-  recommendedComposition: ['Fighter', 'Cleric', 'Rogue'],
+  recommendedPartySize: 4,
+  recommendedComposition: ['Fighter', 'Cleric', 'Rogue', 'Wizard'],
   previewArt: `
    ╔═ MALGOVIA ═════╗
    ║ Millhaven · Crypt║

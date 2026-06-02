@@ -72,21 +72,21 @@ test('Malgovia: login → character creation → begin adventure', async ({ page
   // the load-bearing assertion.
   await expect(narrative).not.toBeEmpty();
 
-  // 8. Party composition — auto-fill seeded a 3-PC Fighter/Cleric/Rogue
+  // 8. Party composition — auto-fill seeded a 4-PC Fighter/Cleric/Rogue/Wizard
   //    party (Malgovia's `recommendedComposition`). Verify the engine round-
-  //    tripped all three through to the rail.
+  //    tripped all four through to the rail.
   const partyTiles = page.getByTestId('party-tile');
-  await expect(partyTiles).toHaveCount(3);
+  await expect(partyTiles).toHaveCount(4);
   const partyText = (await partyTiles.allTextContents()).join(' ');
   // Open-bracket prefix (not '[Cleric]') so the assertion works both
   // before and after a subclass is appended — Cleric picks Life Domain
-  // at L1 so its tile reads '[Cleric / Life]', not '[Cleric]'. Fighter
-  // and Rogue pick their subclass at L3, so they're still '[Fighter]' /
-  // '[Rogue]' at this point in the playthrough, but the looser match
-  // covers both forms.
+  // at L1 so its tile reads '[Cleric / Life]', not '[Cleric]'. The others
+  // pick their subclass at L3, so they're still '[Fighter]' / '[Rogue]' /
+  // '[Wizard]' at this point, but the looser match covers both forms.
   expect(partyText).toContain('[Fighter');
   expect(partyText).toContain('[Cleric');
   expect(partyText).toContain('[Rogue');
+  expect(partyText).toContain('[Wizard');
 
   // 9. Initiative is not active out of combat — the strip only renders during
   //    combat, and Malgovia starts on the regional grid with no enemies.
@@ -354,8 +354,11 @@ test.skip('sandbox combat: enter a fight and resolve an attack', async ({ page, 
 // blocks travelling on while a hostile is alive in the room, so the only
 // forward step from road_north is Attack — which trips combat initialization.
 
-const CLASS_NAMES = ['Fighter', 'Cleric', 'Rogue'] as const;
+const CLASS_NAMES = ['Fighter', 'Cleric', 'Rogue', 'Wizard'] as const;
 type PartyClass = (typeof CLASS_NAMES)[number];
+// Spellcasters in the recommended party — they may surface cast_spell; the
+// martials (Fighter/Rogue) never do.
+const SPELLCASTERS = new Set<PartyClass>(['Cleric', 'Wizard']);
 
 async function activeClass(page: Page): Promise<PartyClass | null> {
   const active = page.locator('[data-testid="party-tile"][aria-current="true"]');
@@ -407,7 +410,7 @@ test('Malgovia combat: initiative live + class-specific choices respect class', 
   page,
   request,
 }) => {
-  // 1. Fresh test user + Malgovia auto-fill (Fighter/Cleric/Rogue).
+  // 1. Fresh test user + Malgovia auto-fill (Fighter/Cleric/Rogue/Wizard).
   const email = `e2e-vale-combat-${Date.now()}@pansori.local`;
   const loginRes = await request.post(`${BACKEND_URL}/api/auth/test-login`, {
     data: { email, displayName: 'E2E Malgovia Combat User' },
@@ -439,7 +442,7 @@ test('Malgovia combat: initiative live + class-specific choices respect class', 
   await page.waitForTimeout(400);
 
   // 4. The first attack ignites combat. InitiativeStrip appears with one
-  //    entry per PC (3) plus the bandits (2) = 5 total. Verify the full
+  //    entry per PC (4) plus the bandits (2) = 6 total. Verify the full
   //    roster: each PC class shows up exactly once and every bandit
   //    enemy in the room is represented. A bug that left a PC out of
   //    the order, doubled an entry, or rolled initiative for the wrong
@@ -461,10 +464,11 @@ test('Malgovia combat: initiative live + class-specific choices respect class', 
     initialEntries.filter((t) => t === 'Bandit Ruffian'),
     `expected 2 Bandit Ruffian entries, got ${JSON.stringify(initialEntries)}`
   ).toHaveLength(2);
-  expect(initialEntries).toHaveLength(5);
+  expect(initialEntries).toHaveLength(6);
 
-  // 5. Per-PC class invariant: cast_spell appears iff active class is
-  //    Cleric. Iterate observed PC turns; tolerate combat ending early.
+  // 5. Per-PC class invariant: cast_spell appears iff the active class is a
+  //    spellcaster (Cleric / Wizard). Iterate observed PC turns; tolerate
+  //    combat ending early.
   let observed: PartyClass[] = [];
   for (let turn = 0; turn < 8; turn++) {
     // Combat may have ended (skeleton fell). If so, exit the loop.
@@ -513,16 +517,16 @@ test('Malgovia combat: initiative live + class-specific choices respect class', 
     // Skip the cast-presence assertion in that case; the inverse
     // assertion (Fighter/Rogue NEVER see cast_spell) still holds.
     const actionAlreadyUsed = types.includes('end_turn');
-    if (cls !== 'Cleric') {
+    if (!SPELLCASTERS.has(cls)) {
       expect(
         hasCast,
         `class=${cls} turn=${turn}: cast_spell present=${hasCast}, ` +
-          `but only Cleric should see cast_spell. action types=${types.join(',')}, spellBar=${spellBarCount}`
+          `but only spellcasters (Cleric/Wizard) should see cast_spell. action types=${types.join(',')}, spellBar=${spellBarCount}`
       ).toBe(false);
     } else if (!actionAlreadyUsed) {
       expect(
         hasCast,
-        `class=Cleric turn=${turn}: action is fresh but no cast_spell offered. ` +
+        `class=${cls} turn=${turn}: action is fresh but no cast_spell offered. ` +
           `action types=${types.join(',')}, spellBar=${spellBarCount}`
       ).toBe(true);
     }

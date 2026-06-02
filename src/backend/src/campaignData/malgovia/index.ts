@@ -114,11 +114,11 @@ const context: Context = {
 
   campaign: {
     world_name: 'Malgovia',
-    // Three quests + 8-room crypt with a multi-attack lich boss — tuned for 3 PCs.
-    recommendedPartySize: 3,
-    // Charnel Hall blade trap + Garrison strongbox favor Rogue's Stealth /
-    // Investigation / Cunning Action over a Wizard's blast spells here.
-    recommendedComposition: ['Fighter', 'Cleric', 'Rogue'],
+    // Tuned for the standard 5e party of 4: a martial front line, divine + arcane
+    // casters, and a Rogue for the Charnel Hall blade trap + Garrison strongbox
+    // (Stealth / Investigation / Cunning Action).
+    recommendedPartySize: 4,
+    recommendedComposition: ['Fighter', 'Cleric', 'Rogue', 'Wizard'],
     intro:
       'Malgovia stretches before you — a shadow of its former self. Years ago an arrogant mage thought he could control a powerful gateway spell but failed, leaving behind a shadowed frontier of dread-filled tombs, frozen spires, and silent groves, where suspicious folk eye every stranger who walks the pine-dark roads.',
 
