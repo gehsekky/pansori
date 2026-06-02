@@ -33,14 +33,10 @@ import type { Context } from '../../types.js';
 
 export const groveContent: Context = {
   id: 'grove_of_thorns',
-  worldNoun: 'grove',
-  mapType: 'campaign',
-  gridEnabled: true,
+  displayNoun: 'grove',
   gridWidth: 10,
   gridHeight: 10,
   startRoomId: 'pinegate_square',
-
-  worldNames: ['The Verdant Reach', 'Pinegate and the Ancient Grove', 'The Old Wood'],
 
   // ─── Classes (SRD spreads) ──────────────────────────────────────────────────
 
@@ -91,12 +87,6 @@ export const groveContent: Context = {
       featureDesc: 'You and your companions receive healing and care at temples.',
     },
   }),
-
-  introTexts: [
-    `Pinegate is the last village before the Verdant Reach. Two weeks ago, Mother Mareth — the Circle's druid — went silent. Trappers come back wounded or not at all. The villagers are afraid to enter the grove. You arrive at the bridge over the Thornwater with steel and spellcraft.`,
-    `The road bends through pine and bramble until Pinegate's lantern-lights show. An elderly woman waits at the village well: "Strangers with sword and spell — the Circle is dying. Will you walk into the grove with me?"`,
-    `Bells ring slow over Pinegate as you arrive. Smoke rises from the Verdant Hall — empty, you'll later learn. The grove past the river has gone too quiet.`,
-  ],
 
   // ─── Spell system ────────────────────────────────────────────────────────────
 
@@ -880,7 +870,6 @@ export const groveContent: Context = {
     noEnemy: ['No foe present.'],
     alreadyDead: ['The body is still.'],
     sneakSuccess: ['You slip past the {enemy} unnoticed.'],
-    sneakFail: ['The {enemy} spots you — {dmg} damage.'],
     deathLines: [
       'The grove takes you back to the soil.',
       'Mareth — wherever she is — would have asked them to leave you whole.',

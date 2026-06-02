@@ -108,15 +108,8 @@ const CRYPT_LORD_BASE: EnemyTemplate = {
 
 const context: Context = {
   id: 'vale_of_shadows',
-  worldNoun: 'vale',
-  mapType: 'campaign',
+  displayNoun: 'vale',
   startRoomId: 'millhaven_square',
-
-  worldNames: [
-    'Duskenvale',
-    'The Darkened Vale',
-    'Millhaven, the Frozen Pass, and the Silent Grove',
-  ],
 
   // ─── Classes ─────────────────────────────────────────────────────────────────
 
@@ -173,16 +166,6 @@ const context: Context = {
       featureDesc: 'You and your companions receive healing and care at temples.',
     },
   }),
-
-  // ─── Intro texts ──────────────────────────────────────────────────────────────
-
-  introTexts: [
-    `You arrive in Millhaven, a market town nestled at the edge of Duskenvale. Merchants hawk their wares in the square, but unease hangs in the air — the old crypt beyond the hills has been making sounds at night, and two of the Guild's supply wagons have gone missing on the Old Road.`,
-    `The sun is setting over Millhaven as you ride in. The innkeeper greets you with a worried look — there's trouble in the vale, and coin to be made for those with sword or spell.`,
-    `Rain patters on the cobblestones of Millhaven's market square. A priest from the Temple of Selûne approaches you the moment you dismount — they need capable adventurers, and word travels fast in small towns.`,
-  ],
-
-  // ─── Room pool (roguelike — not used in campaign mode, but required by type) ─
 
   // ─── Enemy templates ──────────────────────────────────────────────────────────
 
@@ -281,120 +264,6 @@ const context: Context = {
       heal: null,
       effect: null,
       aliases: ['cargo', 'crate', 'shipment', 'goods'],
-    },
-  ],
-
-  // ─── NPC templates ───────────────────────────────────────────────────────────
-
-  npcTemplates: [
-    {
-      id: 'npc_aldric',
-      name: 'Aldric the Merchant',
-      attitude: 'friendly',
-      factionId: 'faction_guild',
-      hp: 4,
-      ac: 10,
-      damage: '1d4',
-      toHit: 0,
-      xp: 0,
-      greeting:
-        "Thank the gods — capable folk! Two of our supply wagons vanished on the Old Road three days past. I'll pay well for anyone who finds what happened to them and recovers the shipping ledger.",
-      responses: [
-        {
-          label: "I'll look into the missing shipment.",
-          reply:
-            'Wonderful! The ledger would prove our goods were never delivered — the Guild needs it to claim compensation. Last seen near the old crypt road.',
-          consequences: [
-            { type: 'advance_quest', questId: 'quest_shipment', stepId: 'step_talk_aldric' },
-          ],
-        },
-        {
-          label: 'What do you know about the crypt?',
-          reply:
-            "Nothing good. Locals avoid it. Word is, something stirs within — lights at night, groaning sounds. An old wizard sealed it years ago, but seals don't last forever.",
-        },
-        {
-          label: "I'll need supplies.",
-          reply: 'Of course. Browse what I have — Guild members get a fair price.',
-        },
-      ],
-      persuasionDC: 12,
-      shop: [
-        { itemId: 'healing_potion', price: 50 },
-        { itemId: 'rope', price: 1 },
-        { itemId: 'torch', price: 1 },
-      ],
-    },
-    {
-      id: 'npc_sister_maren',
-      name: 'Sister Maren',
-      attitude: 'friendly',
-      hp: 8,
-      ac: 11,
-      damage: '1d4',
-      toHit: 2,
-      xp: 0,
-      greeting:
-        "Selûne's blessing upon you, traveler. I am Sister Maren of the Temple. The crypt to the north — something evil has taken root there. I need brave souls to descend and cleanse it.",
-      responses: [
-        {
-          label: 'Tell me about the crypt.',
-          reply:
-            'It is the Shattered Crypt — an old noble tomb from the Third Age. A lich was sealed within, long ago. We fear the seal has weakened. The Crypt Lord must be destroyed.',
-          consequences: [
-            { type: 'advance_quest', questId: 'quest_crypt', stepId: 'step_learn_crypt' },
-          ],
-        },
-        {
-          label: 'I will clear the crypt.',
-          reply:
-            'Bless you. Destroy the Crypt Lord at the lowest level. The moonstone amulet within is sacred to Selûne — please return it to the temple.',
-          consequences: [
-            { type: 'advance_quest', questId: 'quest_crypt', stepId: 'step_learn_crypt' },
-          ],
-        },
-        {
-          label: 'Can you heal my wounds?',
-          reply: 'For a small donation to the temple, yes.',
-          consequences: [{ type: 'modify_hp', amount: 8 }],
-        },
-      ],
-      persuasionDC: 10,
-    },
-    {
-      id: 'npc_dusk',
-      name: 'Dusk',
-      attitude: 'indifferent',
-      hp: 14,
-      ac: 13,
-      damage: '1d6+2',
-      toHit: 4,
-      xp: 0,
-      greeting:
-        "Eyes down, stranger. What brings you to the Lantern District? If it's trouble with the Watch, we might have common cause.",
-      responses: [
-        {
-          label: 'Tell me about the City Watch.',
-          reply:
-            "Captain Vane's rotten from the boots up. Taking coin from the road bandits to look the other way. I have proof — or I will, if you can get into his office.",
-          consequences: [
-            { type: 'advance_quest', questId: 'quest_shadow', stepId: 'step_meet_dusk' },
-          ],
-        },
-        {
-          label: 'What do you need me to do?',
-          reply:
-            "Vane keeps a letter in his strongbox at the garrison. Get it. It ties him to the bandit raids. Bring it to me and I'll make sure the right people see it.",
-          consequences: [
-            { type: 'advance_quest', questId: 'quest_shadow', stepId: 'step_meet_dusk' },
-          ],
-        },
-        {
-          label: 'Not interested.',
-          reply: "Your loss. Don't say I didn't offer.",
-        },
-      ],
-      persuasionDC: 14,
     },
   ],
 
@@ -528,10 +397,6 @@ const context: Context = {
     sneakSuccess: [
       'You slip into the shadows undetected.',
       'Moving like a ghost, you disappear from sight.',
-    ],
-    sneakFail: [
-      'Your boot catches on a loose stone — the element of surprise is lost!',
-      'A creak of leather betrays you.',
     ],
     deathLines: ['{name} falls, life fading...', '{name} collapses — not long now...'],
     enemyDeflected: [
@@ -1245,10 +1110,9 @@ const context: Context = {
       },
     },
 
-    // Author-placed NPCs. Templates above live in `npcTemplates`; these entries
-    // bind them to specific rooms in the campaign. Without this, the engine's
-    // seed.npcs[roomId] lookup would return undefined and nothing would talk
-    // to the player.
+    // Author-placed NPCs, bound to specific rooms in the campaign. Without this,
+    // the engine's seed.npcs[roomId] lookup would return undefined and nothing
+    // would talk to the player.
     npcs: {
       millhaven_market: {
         roomId: 'millhaven_market',
@@ -1372,7 +1236,7 @@ const context: Context = {
       },
     },
 
-    startingLoot: ['healing_potion'],
+    defaultStartingLoot: ['healing_potion'],
 
     // ─── 3-level grid map (regional → town → local) ───────────────────────────
     // The party starts on the regional grid as a single marker (see
@@ -1774,7 +1638,6 @@ function foldCampaign(into: Context, content: Context, sites: MapSite[], dropRoo
   const lootIds = new Set(into.lootTable.map((i) => i.id));
   into.enemyTemplates.push(...content.enemyTemplates);
   into.lootTable.push(...content.lootTable.filter((i) => !lootIds.has(i.id)));
-  (into.npcTemplates ??= []).push(...(content.npcTemplates ?? []));
   (into.rules ??= []).push(...(content.rules ?? []));
   const drop = new Set(dropRooms);
   intoCamp.rooms.push(...fromCamp.rooms.filter((r) => !drop.has(r.id)));

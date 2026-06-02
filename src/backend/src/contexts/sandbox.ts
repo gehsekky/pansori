@@ -19,21 +19,11 @@ import type { Context } from '../types.js';
 
 export const context: Context = {
   id: 'sandbox',
-  worldNoun: 'dungeon',
+  displayNoun: 'dungeon',
   // A small defined grid campaign (the engine focuses on authored campaigns).
-  mapType: 'campaign',
-  gridEnabled: true,
   gridWidth: 8,
   gridHeight: 8,
   startRoomId: 'entry_hall',
-
-  worldNames: [
-    'The Testing Grounds',
-    'Chamber of Mechanics',
-    'The Rules Dungeon',
-    'Vault of Combat',
-    'The Iron Gauntlet',
-  ],
 
   // ─── Classes ──────────────────────────────────────────────────────────────────
   classPrimaryStats: { ...SRD_CLASS_PRIMARY_STATS },
@@ -406,13 +396,6 @@ export const context: Context = {
     },
   },
 
-  // ─── Intro texts ──────────────────────────────────────────────────────────────
-  introTexts: [
-    'The dungeon stretches before you. Every rule of combat, every mechanical interaction — tested here.',
-    'Stone walls, flickering torches, and enemies designed to stress-test the rules engine. Welcome to the sandbox.',
-    'This is a development environment. The dungeon is clinical, the enemies are statistical. Good luck.',
-  ],
-
   // ─── Narratives (minimal/functional for dev context) ──────────────────────────
   narratives: {
     roomArrival: {
@@ -488,7 +471,6 @@ export const context: Context = {
     noEnemy: ['No enemy here.'],
     alreadyDead: ['The remains of your foe lie still.'],
     sneakSuccess: ['You slip past the {enemy} undetected.'],
-    sneakFail: ['The {enemy} spots you and strikes — {dmg} damage.'],
     deathLines: [
       'Slain by {enemy}. The dungeon claims another soul.',
       'The darkness of {world} takes you.',

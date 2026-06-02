@@ -151,8 +151,7 @@ gameRouter.get('/contexts', (_req, res) => {
     }));
     return {
       id: c.id,
-      displayName: c.worldNoun,
-      mapType: c.mapType,
+      displayName: c.displayNoun,
       classes: Object.keys(c.classPrimaryStats),
       // Per-class "choose N from options" skill proficiencies + the curated
       // default selection — drives the creation-screen skill picker.
@@ -422,7 +421,7 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
       const startingEq = resolveStartingEquipment(
         ctx.classStartingEquipment?.[c.character_class],
         c.starting_equipment,
-        ctx.classStartingLoot?.[c.character_class] ?? ctx.campaign?.startingLoot ?? []
+        ctx.classStartingLoot?.[c.character_class] ?? ctx.campaign?.defaultStartingLoot ?? []
       );
       const startingIds = startingEq.items;
       const startingInventory = startingIds
@@ -645,7 +644,7 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
     // same campaign. campaign_states is keyed on (user_id, campaign_id),
     // not per-session — without this, "+ NEW ADVENTURE" for Vale shows
     // every quest from the prior Vale playthrough already marked done.
-    if (ctx.mapType === 'campaign' && ctx.campaign) {
+    if (ctx.campaign) {
       await resetCampaignState(pool, authedUserId(req), ctx.id);
       // Seed the fresh persisted campaign state with the opening quest(s) marked
       // active, matching initialState.quest_progress — so the first action's
@@ -1243,7 +1242,7 @@ gameRouter.post('/session/:id/action', async (req: Request, res: Response) => {
 
     // For campaign sessions, load and merge persisted campaign state
     let campaignState = null;
-    if (ctx.mapType === 'campaign' && ctx.campaign) {
+    if (ctx.campaign) {
       campaignState = await loadCampaignState(pool, authedUserId(req), ctx.id);
       state = mergeCampaignIntoGameState(state, campaignState);
     }
@@ -1257,7 +1256,7 @@ gameRouter.post('/session/:id/action', async (req: Request, res: Response) => {
     });
 
     // For campaign sessions, evaluate quest steps and save campaign state
-    if (ctx.mapType === 'campaign' && ctx.campaign && campaignState) {
+    if (ctx.campaign && campaignState) {
       const activeChar =
         result.newState.characters.find((c) => c.id === result.newState.active_character_id) ??
         result.newState.characters[0];

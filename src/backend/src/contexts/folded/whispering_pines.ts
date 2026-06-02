@@ -30,11 +30,8 @@ import type { Context } from '../../types.js';
 
 export const whisperingPinesContent: Context = {
   id: 'whispering_pines',
-  worldNoun: 'pass',
-  mapType: 'campaign',
+  displayNoun: 'pass',
   startRoomId: 'pines_square',
-
-  worldNames: ['Whispering Pines', 'The Frozen Pass', 'Pines and the Iceshard Spire'],
 
   // ─── Classes (shared with Vale; copied to keep contexts self-contained) ──────
 
@@ -91,14 +88,6 @@ export const whisperingPinesContent: Context = {
       featureDesc: 'You and your companions receive healing and care at temples.',
     },
   }),
-
-  // ─── Intro texts ──────────────────────────────────────────────────────────────
-
-  introTexts: [
-    `Snow swirls around your boots as you ride into Whispering Pines, the last village before the high pass. Lanterns burn in the windows even at midday — the days are short here, and something has been killing trappers in the hills.`,
-    `Frost crunches under your horse's hooves as Whispering Pines comes into view. The village wardens stop you at the bridge: "If you've come to help, the trapper Old Halden is missing three days now. The cult above the pass has him, or worse."`,
-    `A bitter wind hisses through the pines as you arrive. The innkeeper meets you at the door, breath fogging: "Strangers with sword and spell — Selûne sent you in time. The Iceshard Spire glows again at night. The cult is back."`,
-  ],
 
   // Roguelike room pool unused in campaign mode but required by type
 
@@ -286,112 +275,6 @@ export const whisperingPinesContent: Context = {
     },
   ],
 
-  // ─── NPC templates ───────────────────────────────────────────────────────────
-
-  npcTemplates: [
-    {
-      id: 'npc_brann',
-      name: 'Innkeeper Brann',
-      attitude: 'friendly',
-      factionId: 'faction_wardens',
-      hp: 6,
-      ac: 10,
-      damage: '1d4',
-      toHit: 0,
-      xp: 0,
-      greeting:
-        "Thank the gods you're here. Old Halden the trapper went up the pass three days back to check his lines — never came down. The wardens won't go after him; they say the spire's haunted. I'll pay if you bring him back, or find proof.",
-      responses: [
-        {
-          label: "I'll search the pass for Halden.",
-          reply:
-            "Bless you. His daughter's been crying herself to sleep. He carries a silver locket — bring it back if you find him, dead or alive.",
-          consequences: [
-            { type: 'advance_quest', questId: 'quest_trapper', stepId: 'step_talk_brann' },
-          ],
-        },
-        {
-          label: 'What about the spire above the pass?',
-          reply:
-            'Iceshard Spire? Cultists holed up there decades ago. We thought the cold killed them. Lately the lights are back — green flames, in the topmost window. Captain Riese can tell you more.',
-        },
-        {
-          label: 'I could use some supplies.',
-          reply: 'Got mulled elixirs and bandages. Anything stronger, ask Marta at the lodge.',
-        },
-      ],
-      persuasionDC: 10,
-      shop: [
-        { itemId: 'elixir_of_warmth', price: 20 },
-        { itemId: 'fur_cloak', price: 40 },
-      ],
-    },
-    {
-      id: 'npc_riese',
-      name: 'Captain Riese',
-      attitude: 'indifferent',
-      hp: 22,
-      ac: 16,
-      damage: '1d8+3',
-      toHit: 5,
-      xp: 0,
-      greeting:
-        "You're the strangers Brann mentioned. Listen — the trapper's a sideshow. The real problem is the cult at Iceshard. They've been gathering. Bring back their idol and I'll know how bad it's gotten. Kill their leader and we end this for a generation.",
-      responses: [
-        {
-          label: "I'll end the cult at the spire.",
-          reply:
-            "Good. The Acolyte will be at the top — that's where the green light burns. Bring back the idol so we can identify the patron. And don't drink anything they offer you.",
-          consequences: [
-            { type: 'advance_quest', questId: 'quest_cult', stepId: 'step_meet_riese' },
-          ],
-        },
-        {
-          label: 'What do you know about the cult?',
-          reply:
-            'Frostspire cultists — they worship something old in the ice. Cold-bloods, all of them. Their magic is brittle but their faith is not. Take fire if you have it.',
-        },
-        {
-          label: 'Can the Wardens spare a healer?',
-          reply: "We've a field medic, yes. It'll cost you, mind. Times are hard.",
-          consequences: [{ type: 'modify_hp', amount: 6 }],
-        },
-      ],
-      persuasionDC: 13,
-    },
-    {
-      id: 'npc_marta',
-      name: 'Marta the Trapper',
-      attitude: 'friendly',
-      factionId: 'faction_wardens',
-      hp: 12,
-      ac: 13,
-      damage: '1d6+2',
-      toHit: 3,
-      xp: 0,
-      greeting:
-        "Halden was a friend. If you're going after him, take what you need — warhammers work better than blades against the mephits, in my experience. And carry torches.",
-      responses: [
-        {
-          label: 'What can I buy?',
-          reply: "Everything's marked. Warden discount if Riese's vouched for you.",
-        },
-        {
-          label: 'Tell me about the mephits.',
-          reply:
-            'Ice mephits. Little spite-things made of frost and meanness. Cold breath — wear your cloak. They flee fire like cats from water.',
-        },
-      ],
-      persuasionDC: 11,
-      shop: [
-        { itemId: 'warhammer', price: 30 },
-        { itemId: 'longbow', price: 50 },
-        { itemId: 'leather_armor', price: 45 },
-        { itemId: 'elixir_of_warmth', price: 18 },
-      ],
-    },
-  ],
-
   // ─── Narratives ───────────────────────────────────────────────────────────────
 
   narratives: {
@@ -505,10 +388,6 @@ export const whisperingPinesContent: Context = {
     noEnemy: ['No enemy here.', 'The way is clear.'],
     alreadyDead: ['That foe is already defeated.'],
     sneakSuccess: ['You slip past, silent as falling snow.', 'The wind covers your footfalls.'],
-    sneakFail: [
-      'Your boot finds a hidden patch of ice — your cover is blown.',
-      'A drift collapses behind you. They heard.',
-    ],
     deathLines: ['{name} sinks into the drift, fading...', '{name} falls — the cold takes them.'],
     enemyDeflected: [
       "{enemy}'s strike skids off your guard.",
@@ -1018,7 +897,7 @@ export const whisperingPinesContent: Context = {
       },
     },
 
-    startingLoot: ['elixir_of_warmth'],
+    defaultStartingLoot: ['elixir_of_warmth'],
 
     // ─── Locations ──────────────────────────────────────────────────────────────
 

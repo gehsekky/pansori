@@ -54,7 +54,7 @@ describe('Sandbox — 3-level map wiring', () => {
   const markerMove = (x: number, y: number) => act({ type: 'marker_move', to: { x, y } });
 
   it('is a campaign that starts on the regional grid and enters the dungeon', () => {
-    expect(ctx.mapType).toBe('campaign');
+    expect(ctx.campaign).toBeDefined();
   });
 
   it('travels region → dungeon entry → guard post via room exits', async () => {

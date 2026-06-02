@@ -20,7 +20,6 @@ import type {
   GridPos,
   LootItem,
   NpcAttitude,
-  NpcTemplate,
   PendingReaction,
   PlacedNpc,
   Quest,
@@ -1526,7 +1525,9 @@ export interface CampaignData {
   // seed.npcs[roomId]; generateSeed copies this field into the seed for
   // campaign-mode runs. Roguelike NPCs are still placed by procgen.
   npcs?: Record<string, PlacedNpc>;
-  startingLoot?: string[];
+  // Per-campaign fallback starting gear (item ids) when a class has no
+  // `classStartingLoot` / `classStartingEquipment` entry.
+  defaultStartingLoot?: string[];
   // 3-level grid map model (regional → town → local): the overworld is one or
   // more `regions` (grids of sites),
   // `towns` are settlement grids of venues, and local rooms live in `rooms`
@@ -1552,13 +1553,10 @@ export type TieredNarrative = string[] | Record<string, string[]>;
 
 export interface Context {
   id: string;
-  worldNoun: string;
+  // Single-word label for this context, shown on the character-creation screen
+  // (e.g. "vale", "dungeon"). UI flavor only.
+  displayNoun: string;
   startRoomId: string;
-  worldNames: string[];
-  // Retained for back-compat in the session payload; the roguelike model was
-  // retired, so every context is a defined grid `campaign` now.
-  mapType: 'campaign';
-  gridEnabled?: boolean; // enable grid-based combat for this context
   gridWidth?: number; // default combat grid width  (squares)
   gridHeight?: number; // default combat grid height (squares)
   campaign?: CampaignData;
@@ -1596,10 +1594,8 @@ export interface Context {
   // `spellSlotsForClassLevel` in rulesEngine — not declared per context.)
   spellcastingAbility?: Record<string, AbilityKey>; // class → casting ability
   enemyTemplates: EnemyTemplate[];
-  introTexts: string[];
   lootTable: LootItem[];
   rules?: GameRule[];
-  npcTemplates?: NpcTemplate[];
   narratives: {
     roomArrival: Record<string, string[]>;
     genericArrival: string[];
@@ -1617,7 +1613,6 @@ export interface Context {
     noEnemy: string[];
     alreadyDead: string[];
     sneakSuccess: string[];
-    sneakFail: string[];
     deathLines: string[];
     enemyDeflected: string[];
     levelUp: string[];
