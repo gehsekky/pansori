@@ -1,5 +1,6 @@
 import type { ActionContext } from '../types.js';
 import type { Spell } from '../../../types.js';
+import { abilityMod } from '../../rulesEngine.js';
 import { randomUUID } from 'crypto';
 
 /**
@@ -20,7 +21,11 @@ export function runSummonSpell(
   spell: Spell,
   slotNote: string,
   slotLevel: number,
-  summonVariant?: string
+  summonVariant?: string,
+  // Caster's spellcasting ability SCORE — only consulted for
+  // `countFromSpellMod` spells (Animate Objects). Defaults to 10 (mod +0) so
+  // direct unit callers needn't supply it for fixed-count summons.
+  castingScore = 10
 ): boolean {
   if (ctx.actor.kind !== 'pc') return false;
   const { char } = ctx.actor;
@@ -29,7 +34,10 @@ export function runSummonSpell(
   const chosen = [base, ...(base.variants ?? [])].find((o) => o.name === summonVariant) ?? base;
   const baseLevel = spell.level ?? 1;
   const perUpcast = base.countPerUpcastLevel ?? 0;
-  const count = Math.max(1, 1 + perUpcast * Math.max(0, slotLevel - baseLevel));
+  // Animate Objects: the base count is the caster's spellcasting modifier;
+  // every other summon raises one at base level.
+  const baseCount = base.countFromSpellMod ? Math.max(1, abilityMod(castingScore)) : 1;
+  const count = Math.max(1, baseCount + perUpcast * Math.max(0, slotLevel - baseLevel));
 
   const raised = Array.from({ length: count }, () => ({
     id: `summon-${randomUUID()}`,

@@ -814,6 +814,11 @@ export interface Spell {
     // (Animate Dead: 2 — RAW "two additional Undead for each slot level
     // above 3"). Omitted / 0 ⇒ always one. (RE-1 Phase 4.5.)
     countPerUpcastLevel?: number;
+    // SRD Animate Objects — the base count equals the caster's spellcasting
+    // modifier (not a fixed 1). When set, `runSummonSpell` reads the passed
+    // casting score and raises `max(1, abilityMod)` creatures, with
+    // `countPerUpcastLevel` still adding per slot level above the base.
+    countFromSpellMod?: boolean;
     // SRD Find Familiar — the summon is a non-combatant (can't take the Attack
     // action). Threaded to every raised ally + the grid entity; `runAllyTurn`
     // then takes the Help action instead of attacking.

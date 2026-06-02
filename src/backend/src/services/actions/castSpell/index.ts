@@ -220,7 +220,8 @@ export const handleCastSpell: ActionHandler<{
       spell,
       slotNote,
       slotLevel,
-      (action as { summonVariant?: string }).summonVariant
+      (action as { summonVariant?: string }).summonVariant,
+      castingScore
     )
   ) {
     return;

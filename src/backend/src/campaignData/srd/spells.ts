@@ -5014,4 +5014,134 @@ export const SRD_SPELLS: Record<string, Spell> = {
     narrative: '{name} calls down a searing pillar of celestial light.',
     spellList: ['divine'],
   },
+
+  // ─── Spell batch: a force blade, an animated crew, a steed, a maze, and a
+  // mind-blasting nuke ────────────────────────────────────────────────────
+
+  // SRD: Arcane Sword — a spectral blade of force. RE-4 recurring spell attack:
+  // the initial cast (an Action) makes a melee spell attack for 4d12 + your
+  // spellcasting modifier Force; on each later turn a Bonus Action repositions
+  // it and repeats the attack. Concentration, up to 1 minute. (No upcast — RAW
+  // doesn't scale it by slot.) Gives arcane casters the recurring-attack option
+  // divine casters already get from Spiritual Weapon.
+  arcane_sword: {
+    id: 'arcane_sword',
+    name: 'Arcane Sword',
+    level: 7,
+    castTime: 'action',
+    concentration: true,
+    durationRounds: 10, // 1 minute, Concentration
+    recurringAttack: true,
+    recurringAttackCost: 'bonus_action',
+    recurringAddSpellMod: true,
+    damage: '4d12',
+    damageType: 'force',
+    rangeKind: 'ranged',
+    rangeFt: 90,
+    desc: 'Conjure a spectral sword of force (Concentration, up to 1 minute). On the cast, and as a Bonus Action on each later turn, it makes a melee spell attack for 4d12 + your spellcasting modifier Force damage.',
+    spellList: ['arcane'],
+  },
+
+  // SRD: Animate Objects — animate a crew of objects as Construct allies.
+  // Pansori summon model: the animated objects join your NEXT battle as ally
+  // combatants (Animated Object stat block — AC 15, 10 HP, Slam 1d4 + your spell
+  // mod Force). The count equals your spellcasting modifier (`countFromSpellMod`),
+  // +2 per slot level above 5th. Cast before the fight — the crew materializes at
+  // combat start.
+  animate_objects: {
+    id: 'animate_objects',
+    name: 'Animate Objects',
+    level: 5,
+    castTime: 'action',
+    outOfCombatOnly: true,
+    desc: 'Out of combat, animate a number of objects equal to your spellcasting modifier (two more per slot level above 5th). Each becomes an Animated Object (AC 15, 10 HP, Slam 1d4+4 Force) that fights at your side and joins your next battle.',
+    spellList: ['arcane'],
+    summon: {
+      name: 'Animated Object',
+      ac: 15,
+      maxHp: 10,
+      toHit: 6,
+      damage: '1d4+4',
+      countFromSpellMod: true,
+      countPerUpcastLevel: 2,
+    },
+  },
+
+  // SRD: Find Steed — summon a loyal otherworldly steed (Paladin). Pansori
+  // mounted combat: the steed materializes at the next battle's start already
+  // bearing its rider (`isMount`) and fights as an ally (Otherworldly Steed at
+  // 2nd level — AC 12, 25 HP, Speed 60). Cast before the fight. (RAW's
+  // controlled-mount action limits are not modeled; the steed fights as an
+  // ally combatant.)
+  find_steed: {
+    id: 'find_steed',
+    name: 'Find Steed',
+    level: 2,
+    castTime: 'action',
+    outOfCombatOnly: true,
+    desc: 'Out of combat, summon a loyal otherworldly steed (AC 12, 25 HP, Speed 60) that bears you into your next battle and fights at your side as a mount.',
+    spellList: ['divine'],
+    summon: {
+      name: 'Otherworldly Steed',
+      ac: 12,
+      maxHp: 25,
+      toHit: 5,
+      damage: '1d8+4',
+      isMount: true,
+      speed: 60,
+    },
+  },
+
+  // SRD: Maze — banish a creature into a labyrinthine demiplane (Concentration,
+  // up to 10 minutes). RAW: no entry save; the target escapes with a DC 20
+  // Intelligence (Investigation) check via the Study action. Pansori models the
+  // escape as a recurring INT save (the caster's spell DC) at the end of each of
+  // the target's turns, and — for engine uniformity with our other removal spell
+  // (Banishment) — gates the initial banish on that same INT save. While mazed
+  // the target is `banished` (removed from combat); it returns when concentration
+  // ends.
+  maze: {
+    id: 'maze',
+    name: 'Maze',
+    level: 8,
+    castTime: 'action',
+    concentration: true,
+    durationRounds: 100, // 10 minutes
+    savingThrow: 'int',
+    saveEffect: 'negates',
+    condition: 'banished',
+    conditionDuration: 100,
+    conditionSaveEnds: true,
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    desc: 'Banish a creature within 60 ft into a labyrinthine demiplane (INT save negates). While mazed it is removed from the fight, repeating the INT save at the end of each of its turns to escape. Concentration, up to 10 minutes.',
+    narrative:
+      '{name} folds the air into an impossible corridor — {target} stumbles into a maze with no walls and is gone.',
+    spellList: ['arcane'],
+  },
+
+  // SRD: Befuddlement — blast a creature's mind (INT save). On a failure: 10d12
+  // Psychic damage and the target can't cast spells or take the Magic action
+  // (RAW: it re-saves only every 30 days — effectively permanent in a fight).
+  // Pansori has no cast-only lockout, so the rider is approximated with the
+  // `incapacitated` condition (a superset — it also stops the target's other
+  // actions). On a successful save the target takes half damage only (no
+  // condition).
+  befuddlement: {
+    id: 'befuddlement',
+    name: 'Befuddlement',
+    level: 8,
+    castTime: 'action',
+    savingThrow: 'int',
+    saveEffect: 'half',
+    damage: '10d12',
+    damageType: 'psychic',
+    condition: 'incapacitated',
+    conditionDuration: 100,
+    rangeKind: 'ranged',
+    rangeFt: 150,
+    desc: "Blast a creature's mind (INT save). On a failure it takes 10d12 psychic damage and is incapacitated, unable to focus enough to act; on a success, half damage only.",
+    narrative: "{name} drives a spike of raw thought into {target}'s mind.",
+    spellList: ['arcane', 'primal'],
+  },
 };
