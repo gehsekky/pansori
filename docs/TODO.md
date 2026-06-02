@@ -1,6 +1,6 @@
 # TODO
 
-> **Status snapshot — verified 2026-05-31.** The top section is the
+> **Status snapshot — verified 2026-06-02.** The top section is the
 > authoritative implementation status, re-grounded in a fresh code survey
 > (not the prior changelog). The backlog below it lists only remaining
 > work. Shipped-feature completion logs were removed — `git log` is the
@@ -16,10 +16,10 @@ PHB/DMG-exclusive content (subclasses, feats, species, spells). See
 
 ---
 
-## Implementation status (code-verified 2026-06-01)
+## Implementation status (code-verified 2026-06-02)
 
-Grounded in a code survey + the full suite: **backend 2079 tests across
-246 files + frontend 144 across 25 files, all green** (lint + typecheck +
+Grounded in a code survey + the full suite: **backend 2138 tests across
+253 files + frontend 153 across 25 files, all green** (lint + typecheck +
 prettier clean).
 
 ### Done — world map / navigation
@@ -37,15 +37,25 @@ prettier clean).
   rooms (`mapEngine.ts`, `activeGrid` + `resolveMarkerMove`). Frontend
   renders all three grids (`GridMapView`); the map overlay shows the active
   grid read-only.
-- **One authored campaign — Duskenvale — runs on the grid model** (+ the
-  sandbox dev campaign). Duskenvale began as Vale of Shadows and now folds in
-  the former Whispering Pines (the Frozen Pass + Iceshard Spire) and Grove of
+- **One authored campaign — Malgovia — runs on the grid model** (+ the
+  sandbox dev campaign). Malgovia began as Vale of Shadows and absorbed the
+  former Whispering Pines (the Frozen Pass + Iceshard Spire) and Grove of
   Thorns (Pinegate + the Silent Grove) as additional sites on its regional map.
-  The folded campaigns' data lives under `contexts/folded/` (the context loader
-  only scans top-level `contexts/` files, so they aren't separate selectable
-  campaigns); `vale_of_shadows.ts` imports them and spreads their rooms / NPCs /
-  enemies / loot / quests / factions in via `foldCampaign()`. The internal
-  context id stays `vale_of_shadows`.
+  Campaign data lives under `campaignData/malgovia/` (renamed from `contexts/`),
+  split across sibling files assembled in `index.ts`: `entities.ts` (enemy
+  templates / placements / NPCs), `map.ts` (rooms / regions / towns), `game.ts`
+  (narratives / quests / factions / rules), `items.ts` (loot table / placements).
+  The old fold solution is **gone** — the absorbed areas' data was merged
+  directly into Malgovia's files (de-folded), guarded by `integrity.spec.ts`
+  (cross-refs / dup-ids / reachability) + an order-insensitive `entities`
+  snapshot. The context loader scans both top-level `campaignData/*.ts` files
+  (e.g. `sandbox.ts`) and campaign folders' `index.ts`. Internal context id is
+  `malgovia`; recommended party is **4** (Fighter / Cleric / Rogue / Wizard).
+- **Malgovia is the sole player-facing campaign** — the FE world-type picker
+  only renders when more than one visible campaign exists, so with just Malgovia
+  it's auto-selected and the selector disappears. Sandbox is marked `hidden` (an
+  internal-testing campaign), reachable via the `?campaign=sandbox` URL escape
+  hatch.
 - **Legacy nav fully removed** — the old `Location` / `District` model, the
   `travel` / `enter_district` / room-`move` actions, the room `connections`
   graph, and the roguelike procedural generator (`generateRoguelikeSeed` /
@@ -54,8 +64,8 @@ prettier clean).
   `escapeRoomId` / `escapeTriggers` / `escapeChoiceText` Context fields and
   escape narratives) was removed too — it conflicted with the grid's ascend
   exits. The `set_escape` consequence → `escaped` session-status path stays:
-  that's the legitimate "module complete, run ends" exit (fired by Grove of
-  Thorns on main-quest completion), not the room mechanic.
+  that's the legitimate "module complete, run ends" exit (fired by Malgovia's
+  Silent Grove area on main-quest completion), not the room mechanic.
 - **NPC conversation mode** — "Talk to X" opens a dedicated dialogue window
   (`GameState.active_conversation`) that, mirroring the `pending_reaction`
   pattern, makes `generateChoices` early-return **only** the dialogue options
@@ -111,7 +121,7 @@ prettier clean).
 
 | Category                  | In pansori                                       | SRD universe                     |
 | ------------------------- | ------------------------------------------------ | -------------------------------- |
-| Spells                    | **258** (27 cantrips + 231 leveled, through L9)  | ~330                             |
+| Spells                    | **263** (27 cantrips + 236 leveled, through L9)  | ~330                             |
 | Shared SRD monster pool   | **44** (`SRD_MONSTERS`) + per-campaign templates | hundreds                         |
 | Species                   | 9                                                | 9 standalone + Drow lineage      |
 | Classes                   | 12                                               | 12                               |
@@ -129,8 +139,20 @@ backend features are waiting on, and a handful of **bounded subsystems**.
 
 ### Content breadth — data on existing patterns (RE-6)
 
-- [ ] **Spells** — ~246 / ~330 SRD. Most remaining categories are already
-      representable (data entry). **Sanctuary** (L1, `sanctuary.spec.ts`) added a
+- [ ] **Spells** — **263** / ~330 SRD. Remaining gaps are overwhelmingly
+      utility / illusion / planar (Blink, Dragon's Breath, Prismatic Spray,
+      Dispel Magic, Teleport, Wish, etc.); the combat-relevant gaps are thinning.
+      Most remaining categories are already
+      representable (data entry). Force/maze batch (`forceMazeBatch.spec.ts`):
+      **Arcane Sword** (L7, recurring force-blade attack — gives arcane casters
+      the Spiritual Weapon-style recurring attack), **Animate Objects** (L5,
+      construct-crew summon; added a `countFromSpellMod` summon flag so the count
+      derives from the caster's spellcasting modifier, threaded from the
+      dispatcher's castingScore), **Find Steed** (L2, rideable mount summon on the
+      Phantom Steed `isMount` path), **Maze** (L8, INT-save banishment with a
+      save-ends escape), and **Befuddlement** (L8, 10d12 psychic save-for-half +
+      an `incapacitated` rider approximating RAW's cast-only lockout).
+      **Sanctuary** (L1, `sanctuary.spec.ts`) added a
       ward mechanic: a self/ally buff stamps the caster's spell DC
       (`Character.sanctuary_dc`); at the top of `computeEnemyAttack` an attacker
       WIS-saves vs it or loses the attack (cleared at combat end; break-on-action
@@ -783,9 +805,12 @@ options }`** → `OptionPickerDialog` (single-select; re-sends `action[param]`).
       and suppresses enemy tokens beyond the existing `dark`-illum fog).
 - [ ] **Another campaign module (opportunistic)** — coastal pirate town,
       desert ruin, planar city, etc. Authored on the 3-level grid map
-      (region + sites / town + venues / local rooms with exit cells), either
-      as a new standalone context or folded into Duskenvale like the Pines /
-      Grove areas. Not on the critical path.
+      (region + sites / town + venues / local rooms with exit cells) as its own
+      `campaignData/<name>/` folder (the context loader auto-discovers any folder
+      with an `index.ts` exporting a context), or as additional sites merged
+      directly into Malgovia's files (the fold mechanism is retired — the Pines /
+      Grove areas were merged in directly). A new player-facing campaign drops the
+      `hidden` flag so the FE world picker resurfaces. Not on the critical path.
 
 ---
 
