@@ -80,7 +80,7 @@ describe('quest conditions only reference facts the engine supplies', () => {
 
 describe('story campaigns each open with exactly one starter quest', () => {
   const cases: { name: string; quests: Quest[]; opener: string }[] = [
-    { name: 'Vale of Shadows', quests: vale.campaign?.quests ?? [], opener: 'quest_shipment' },
+    { name: 'Malgovia', quests: vale.campaign?.quests ?? [], opener: 'quest_silent_grove' },
   ];
   for (const c of cases) {
     it(`${c.name} → ${c.opener} is the sole startActive quest`, () => {

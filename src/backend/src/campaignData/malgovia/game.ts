@@ -148,7 +148,7 @@ export const quests: Quest[] = [
     id: 'quest_shipment',
     title: 'The Missing Shipment',
     desc: "The Merchant Guild's supply wagons vanished on the Old Road. Find the Guild Ledger in the crypt and return it to Aldric.",
-    startActive: true, // the Malgovia's opening quest — active from the start
+    // Mid-tier arc — discovered by visiting Millhaven after the beginner grove.
     giverNpcId: 'npc_aldric',
     factionId: 'faction_guild',
     repGain: 20,
@@ -427,6 +427,7 @@ export const quests: Quest[] = [
     id: 'quest_silent_grove',
     title: 'The Silent Grove',
     desc: "Old Elise needs someone to walk Mareth's path. Reach the Ancient Oak and find what silenced her.",
+    startActive: true, // Malgovia's opening quest — the beginner grove arc
     giverNpcId: 'npc_elise_elder',
     factionId: 'faction_verdant',
     repGain: 15,

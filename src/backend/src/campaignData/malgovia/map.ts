@@ -893,7 +893,7 @@ export const regions: Region[] = [
     feetPerSquare: 5280, // 1 square = 1 mile (SRD Travel Pace scale)
     gridWidth: 12,
     gridHeight: 8,
-    startPos: { x: 0, y: 7 }, // the southern road, bottom-left of the vale
+    startPos: { x: 4, y: 7 }, // the southern road at Pinegate's door — the beginner grove hub
     // A linear horseshoe: the party starts bottom-left, a frozen sea floods
     // in from the west across the middle (impassable), so they must arc
     // EAST along the southern road, up the open eastern lane, then WEST

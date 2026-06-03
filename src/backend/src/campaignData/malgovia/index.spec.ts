@@ -260,7 +260,7 @@ describe('Malgovia — scripted playthrough', () => {
     // ── Stage 0: regional grid start ───────────────────────────────────────
     expect(state.map_level).toBe('regional');
     expect(state.current_region_id).toBe('vale_region');
-    expect(state.marker_pos).toEqual({ x: 0, y: 7 }); // region.startPos (bottom-left)
+    expect(state.marker_pos).toEqual({ x: 4, y: 7 }); // region.startPos — Pinegate's door (beginner grove hub)
     expect(state.current_room).toBe('');
     expect(state.characters.every((c) => c.hp > 0)).toBe(true);
 

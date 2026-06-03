@@ -95,17 +95,29 @@ const BANDIT_RUFFIAN_BASE: EnemyTemplate = { ...SRD_MONSTERS.bandit, name: 'Band
 const FROST_WOLF_BASE: EnemyTemplate = {
   ...SRD_MONSTERS.wolf,
   name: 'Frost Wolf',
+  // Endgame pack hunter (the frozen north is the late-game tier): bigger and
+  // faster than a wild wolf, with a frostbite bite.
+  cr: 2,
+  hp: 36,
+  ac: 14,
+  damage: '2d6+2',
+  toHit: 5,
+  xp: 450,
+  bonusDamage: '1d4',
+  bonusDamageType: 'cold',
   resistances: ['cold'],
 };
 
 const FROST_CULTIST_BASE: EnemyTemplate = {
   name: 'Frost Cultist',
-  cr: 0.5,
-  hp: 17,
-  ac: 12,
-  damage: '1d8+1',
-  toHit: 3,
-  xp: 100,
+  // Endgame mook — Malgovia's ice realm is the late-game tier, so the spire's
+  // rank-and-file hit harder than the beginner grove / mid crypt fodder.
+  cr: 1,
+  hp: 32,
+  ac: 13,
+  damage: '1d8+3',
+  toHit: 5,
+  xp: 200,
   str: 11,
   dex: 12,
   con: 12,
@@ -118,15 +130,16 @@ const FROST_CULTIST_BASE: EnemyTemplate = {
 
 const FROST_ACOLYTE_BASE: EnemyTemplate = {
   name: 'Frost Acolyte',
-  // Boss — an Ice Mage. Vulnerable to fire to reward Burning Hands /
-  // Fire Bolt parties; multiattack of 2; paralyzing onHitEffect leans on
-  // the SRD STR/DEX auto-fail rule from §9.2.
-  cr: 4,
-  hp: 78,
+  // ENDGAME boss — the Iceshard Spire is Malgovia's final tier, so this fight
+  // outweighs the mid-tier Crypt Lord (base 97). An Ice Mage: vulnerable to fire
+  // to reward Burning Hands / Fire Bolt parties; multiattack of 2; paralyzing
+  // onHitEffect leans on the SRD STR/DEX auto-fail rule from §9.2.
+  cr: 7,
+  hp: 130,
   ac: 15,
-  damage: '2d6+3',
-  toHit: 6,
-  xp: 1100,
+  damage: '2d6+4',
+  toHit: 7,
+  xp: 2900,
   str: 12,
   dex: 14,
   con: 16,
@@ -138,14 +151,14 @@ const FROST_ACOLYTE_BASE: EnemyTemplate = {
   immunities: ['poison'],
   vulnerabilities: ['fire'],
   condition_immunities: ['frightened', 'paralyzed'],
-  onHitEffect: { condition: 'paralyzed', ability: 'con', dc: 13 },
+  onHitEffect: { condition: 'paralyzed', ability: 'con', dc: 14 },
   damageType: 'cold',
   // Spell-caster — the Acolyte sometimes hurls fire_bolt instead of
   // melee, opening a Counterspell window for any L5+ caster in the party.
   spells: ['fire_bolt'],
   castChance: 0.4,
-  spellAttackBonus: 5,
-  spellSaveDC: 13,
+  spellAttackBonus: 7,
+  spellSaveDC: 15,
   // Two-phase fight. At 60% the Acolyte buys time with an ice-armor +
   // ramped damage. At 30% it strips its frost cloak and casts more
   // aggressively — castChance can't be raised through effects, but the
@@ -158,7 +171,7 @@ const FROST_ACOLYTE_BASE: EnemyTemplate = {
         'The Acolyte hisses a hard syllable and frost rimes their robes — blows skid off. Around them the ritual flame burns colder.',
       effects: [
         { kind: 'set_ac', value: 17 },
-        { kind: 'set_damage', dice: '2d8+3' },
+        { kind: 'set_damage', dice: '2d10+4' },
       ],
     },
     {
@@ -171,7 +184,7 @@ const FROST_ACOLYTE_BASE: EnemyTemplate = {
         { kind: 'set_multiattack', value: 3 },
         {
           kind: 'set_on_hit_effect',
-          effect: { condition: 'paralyzed', ability: 'con', dc: 15 },
+          effect: { condition: 'paralyzed', ability: 'con', dc: 16 },
         },
       ],
     },
