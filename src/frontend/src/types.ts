@@ -60,7 +60,6 @@ export interface Theme {
   hpMid: string;
   hpLow: string;
   title: string;
-  worldLabel: string;
 }
 
 export interface CharClass {

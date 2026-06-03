@@ -104,7 +104,6 @@ export const context: FrontendContext = {
     hpMid: '#ff9800',
     hpLow: '#f44336',
     title: 'SANDBOX',
-    worldLabel: 'DUNGEON',
   },
 
   itemIcons: {

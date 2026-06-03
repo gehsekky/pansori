@@ -133,7 +133,6 @@ export const context: FrontendContext = {
     hpMid: '#e6a23c',
     hpLow: '#c93838',
     title: 'MALGOVIA',
-    worldLabel: 'REGION',
   },
 
   // Item icons / descs intentionally mirror the sandbox vocabulary — the items

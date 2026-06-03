@@ -436,8 +436,7 @@ export default function App() {
                     <div>
                       <h1 className={styles.title}>{ctx.theme.title}</h1>
                       <p className={styles.sub}>
-                        {ctx.theme.worldLabel}: {worldName} · ACTIVE: {activeChar?.name} [
-                        {activeChar?.character_class}]
+                        ACTIVE: {activeChar?.name} [{activeChar?.character_class}]
                       </p>
                     </div>
                   </div>

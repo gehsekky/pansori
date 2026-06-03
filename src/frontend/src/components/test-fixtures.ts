@@ -116,7 +116,6 @@ export const mockCtx: FrontendContext = {
     hpMid: '#ff0',
     hpLow: '#f00',
     title: 'Test',
-    worldLabel: 'SHIP',
   },
   itemIcons: {},
   itemDescs: {},
