@@ -312,8 +312,9 @@ export interface GameState {
   campaign_flags?: Record<string, boolean | string | number>;
   quest_progress?: QuestProgress[];
   faction_rep?: Record<string, number>;
-  world_day?: number;
-  world_hour?: number;
+  // In-game clock: total elapsed in-world minutes since campaign start (Day 1
+  // 08:00 == 480). Formatted for display via lib/gameClock.
+  world_minute?: number;
 
   // 3-level grid map (regional → town → local). `map_level` is which grid the
   // party is on; `marker_pos` is the single party-marker cell. Mirror of the BE

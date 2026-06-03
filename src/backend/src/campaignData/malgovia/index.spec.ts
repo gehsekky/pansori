@@ -114,7 +114,7 @@ function makeInitialState(party: Character[]): GameState {
     flags: {},
     quest_progress: [],
     faction_rep: {},
-    world_day: 1,
+    world_minute: 480,
   };
 }
 
@@ -122,7 +122,7 @@ function makeCampaignState(): CampaignState {
   return {
     campaign_id: ctx.id,
     user_id: 'test-user',
-    world_day: 1,
+    world_minute: 480,
     current_location: '',
     flags: {},
     quests: [],
@@ -173,7 +173,8 @@ describe('Malgovia — scripted playthrough', () => {
       campaign_flags: state.campaign_flags ?? {},
       quest_progress: state.quest_progress ?? [],
       faction_rep: state.faction_rep ?? {},
-      world_day: state.world_day ?? 1,
+      world_minute: state.world_minute ?? 0,
+      world_day: Math.floor((state.world_minute ?? 0) / 1440) + 1,
       active_level: activeChar?.level ?? 1,
       active_class: activeChar?.character_class ?? '',
     };

@@ -58,6 +58,9 @@ export const handleShortRest: ActionHandler<{ type: 'short_rest' }> = (ctx) => {
   ctx.st = {
     ...ctx.st,
     short_rested_rooms: [...(ctx.st.short_rested_rooms ?? []), ctx.roomId],
+    // SRD: a short rest is 1 hour. Advance the in-game clock (only reached on a
+    // rest that actually happens — the guards above already returned otherwise).
+    world_minute: (ctx.st.world_minute ?? 0) + 60,
   };
 
   // Short-rest resource refreshes. Multiclass: a Fighter / Cleric
@@ -160,6 +163,13 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
   }
   if (ctx.st.long_rested ?? false) {
     ctx.narrative = 'You have already taken a long rest this session.';
+    return;
+  }
+  // SRD: a creature can benefit from only one long rest per 24 hours (1440 min).
+  const nowMinute = ctx.st.world_minute ?? 0;
+  const lastLongRest = ctx.st.last_long_rest_minute;
+  if (lastLongRest != null && nowMinute - lastLongRest < 1440) {
+    ctx.narrative = "You can't take another long rest yet — only one per 24 hours.";
     return;
   }
 
@@ -269,7 +279,16 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
       ) + defenseAcBonus(refreshed, ctx.context.lootTable);
     return refreshed;
   });
-  ctx.st = { ...ctx.st, characters: restedChars, long_rested: true };
+  // SRD: a long rest is 8 hours. Advance the clock and stamp the completion
+  // minute so the next long rest must wait 24h from here.
+  const restedMinute = nowMinute + 480;
+  ctx.st = {
+    ...ctx.st,
+    characters: restedChars,
+    long_rested: true,
+    world_minute: restedMinute,
+    last_long_rest_minute: restedMinute,
+  };
   updatePcActor(ctx, { ...restedChars[safeIdx] });
   const longRestFlavor = ctx.context.narratives.longRest
     ? pick(ctx.context.narratives.longRest).replace(/{party}/g, restLines.join('; ')) + ' '

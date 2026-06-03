@@ -5,7 +5,13 @@
 
 import type { CampaignFacts, CampaignState, Quest } from '../types.js';
 import { describe, expect, it } from 'vitest';
-import { evaluateQuestSteps, starterQuestProgress } from './campaignEngine.js';
+import {
+  evaluateQuestSteps,
+  extractCampaignDelta,
+  mergeCampaignIntoGameState,
+  starterQuestProgress,
+} from './campaignEngine.js';
+import { makeState } from '../test-fixtures.js';
 import { context as vale } from '../campaignData/malgovia/index.js';
 
 // A fully-populated CampaignFacts baseline; tests override the fields they probe.
@@ -21,6 +27,7 @@ const FACTS: CampaignFacts = {
   campaign_flags: {},
   quest_progress: [],
   faction_rep: {},
+  world_minute: 480,
   world_day: 1,
   active_level: 1,
   active_class: 'Fighter',
@@ -79,6 +86,7 @@ describe('quest conditions only reference facts the engine supplies', () => {
       campaign_flags: {},
       quest_progress: [],
       faction_rep: {},
+      world_minute: 0,
       world_day: 0,
       active_level: 0,
       active_class: '',
@@ -114,7 +122,7 @@ describe('the opening arrival quest completes on reaching Pinegate', () => {
   const cs = (): CampaignState => ({
     campaign_id: vale.id,
     user_id: 'u',
-    world_day: 1,
+    world_minute: 480,
     current_location: '',
     quests: starterQuestProgress(quests), // seeds quest_arrival as active
     flags: {},
@@ -143,5 +151,28 @@ describe('the opening arrival quest completes on reaching Pinegate', () => {
     expect(pinegate.find((c) => c.questId === 'quest_arrival')?.completedStepIds).toContain(
       'step_reach_pinegate'
     );
+  });
+});
+
+describe('world_minute round-trips through merge/extract', () => {
+  const cs = (worldMinute: number): CampaignState => ({
+    campaign_id: 'c',
+    user_id: 'u',
+    world_minute: worldMinute,
+    current_location: '',
+    flags: {},
+    quests: [],
+    faction_rep: {},
+    npc_attitudes: {},
+  });
+
+  it('merge pulls the clock from CampaignState when the GameState has none', () => {
+    const merged = mergeCampaignIntoGameState(makeState(), cs(2000));
+    expect(merged.world_minute).toBe(2000);
+  });
+
+  it('extract writes the GameState clock back into the campaign delta', () => {
+    const gs = makeState({}, { world_minute: 3333 });
+    expect(extractCampaignDelta(cs(0), gs).world_minute).toBe(3333);
   });
 });

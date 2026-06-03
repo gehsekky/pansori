@@ -303,7 +303,8 @@ export function resolveMarkerMove(
       }
     }
     elapsedHours = (weightedSquares * milesPerSquare) / NORMAL_MILES_PER_HOUR;
-    next.world_hour = (st.world_hour ?? 0) + elapsedHours;
+    // SRD: Travel Pace — Normal 3 mi/hr. Advance the in-game clock in minutes.
+    next.world_minute = (st.world_minute ?? 0) + Math.round(elapsedHours * 60);
   }
 
   // ── Resolve a transition cell at the destination (descend/ascend/room) ──────

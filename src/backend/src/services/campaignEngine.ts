@@ -9,6 +9,7 @@ import type {
   QuestStatus,
 } from '../types.js';
 import { Engine, type TopLevelCondition } from 'json-rules-engine';
+import { CAMPAIGN_START_MINUTE } from './gameClock.js';
 
 // ─── DB helpers ───────────────────────────────────────────────────────────────
 
@@ -29,7 +30,7 @@ export async function loadCampaignState(
   const blank: CampaignState = {
     campaign_id: campaignId,
     user_id: userId,
-    world_day: 1,
+    world_minute: CAMPAIGN_START_MINUTE, // SRD: campaign starts Day 1 08:00.
     current_location: '',
     flags: {},
     quests: [],
@@ -91,7 +92,7 @@ export function mergeCampaignIntoGameState(gs: GameState, cs: CampaignState): Ga
     campaign_flags: { ...cs.flags, ...gs.campaign_flags },
     quest_progress: gs.quest_progress ?? cs.quests,
     faction_rep: gs.faction_rep ?? cs.faction_rep,
-    world_day: gs.world_day ?? cs.world_day,
+    world_minute: gs.world_minute ?? cs.world_minute,
     npc_attitudes: { ...cs.npc_attitudes, ...gs.npc_attitudes },
   };
 }
@@ -104,7 +105,7 @@ export function extractCampaignDelta(prev: CampaignState, gs: GameState): Campai
     flags: { ...prev.flags, ...gs.campaign_flags },
     quests: gs.quest_progress ?? prev.quests,
     faction_rep: gs.faction_rep ?? prev.faction_rep,
-    world_day: gs.world_day ?? prev.world_day,
+    world_minute: gs.world_minute ?? prev.world_minute,
     npc_attitudes: { ...prev.npc_attitudes, ...gs.npc_attitudes },
   };
 }

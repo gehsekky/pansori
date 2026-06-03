@@ -39,9 +39,12 @@ import type { GameState } from '../types.js';
  *   `normalizeState` (gameEngine.ts) handles missing optional fields.
  *   No structural migration needed to reach v1; `migrateV0ToV1` only
  *   stamps the version.
- * - **v1** — current shape. `schemaVersion` field present.
+ * - **v1** — `schemaVersion` field present.
+ * - **v2** — the in-game clock: legacy `world_day` (int) + `world_hour`
+ *   (float) collapse into a single `world_minute` (int). See
+ *   `migrateV1ToV2`.
  */
-export const CURRENT_SCHEMA_VERSION = 1;
+export const CURRENT_SCHEMA_VERSION = 2;
 
 /**
  * Apply schema migrations to bring `state` from its declared version
@@ -66,6 +69,9 @@ export function applyStateMigrations(state: GameState): GameState {
   if (from < 1) {
     working = migrateV0ToV1(working);
   }
+  if (from < 2) {
+    working = migrateV1ToV2(working);
+  }
   return { ...working, schemaVersion: CURRENT_SCHEMA_VERSION };
 }
 
@@ -78,4 +84,22 @@ export function applyStateMigrations(state: GameState): GameState {
  */
 function migrateV0ToV1(state: GameState): GameState {
   return state;
+}
+
+/**
+ * v1 → v2: collapse the legacy `world_day` (int, always 1 — never advanced) +
+ * `world_hour` (float hours, travel-only) into a single `world_minute` (int).
+ * Every save lands on a Day 1 08:00 origin (+480) so the clock never opens at
+ * "00:00 · night"; since no clock was ever displayed under v1, shifting the
+ * origin is imperceptible. Pure + idempotent: if `world_minute` is already set,
+ * just strip any stale legacy fields.
+ */
+function migrateV1ToV2(state: GameState): GameState {
+  // Legacy fields aren't on the current GameState type; read them off a loose view.
+  const legacy = state as GameState & { world_day?: number; world_hour?: number };
+  const { world_day, world_hour, ...rest } = legacy;
+  if (typeof rest.world_minute === 'number') return rest;
+  // SRD: 1 day = 1440 min; baseline Day 1 08:00 = 480 min.
+  const world_minute = ((world_day ?? 1) - 1) * 1440 + Math.round((world_hour ?? 0) * 60) + 480;
+  return { ...rest, world_minute };
 }

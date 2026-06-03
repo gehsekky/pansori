@@ -1,5 +1,6 @@
 import type { CampaignMeta, Faction, GameState, Seed } from '../types.ts';
 import { formatClassLabel } from '../lib/characterFmt.ts';
+import { formatGameClock } from '../lib/gameClock.ts';
 import styles from '../styles.module.css';
 import { useState } from 'react';
 
@@ -248,7 +249,7 @@ function AdventureLogPanel({ history, worldName, state, seed, campaignMeta }: Pr
     if (worldName) header.push(`Campaign: ${worldName}`);
     if (state?.current_location_id) header.push(`Location: ${state.current_location_id}`);
     if (state?.current_district_id) header.push(`District: ${state.current_district_id}`);
-    if (state?.world_day != null) header.push(`World day: ${state.world_day}`);
+    if (state?.world_minute != null) header.push(formatGameClock(state.world_minute).label);
     const activeChar = state?.characters?.find((c) => c.id === state.active_character_id);
     if (activeChar) header.push(`Active: ${activeChar.name} (lead)`);
     if (state?.round != null) header.push(`Round: ${state.round}`);

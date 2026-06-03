@@ -5345,6 +5345,7 @@ describe('quest auto-acceptance via talk_response', () => {
       campaign_flags: {},
       quest_progress: [],
       faction_rep: {},
+      world_minute: 480,
       world_day: 1,
       active_level: 1,
       active_class: 'Fighter',
@@ -5352,7 +5353,7 @@ describe('quest auto-acceptance via talk_response', () => {
     const emptyCs: CampaignState = {
       campaign_id: valeCtx.id,
       user_id: 'u',
-      world_day: 1,
+      world_minute: 480,
       current_location: 'town_millhaven',
       quests: [],
       flags: {},
@@ -5382,7 +5383,7 @@ describe('quest auto-acceptance via talk_response', () => {
     const emptyCs: CampaignState = {
       campaign_id: valeCtx.id,
       user_id: 'u',
-      world_day: 1,
+      world_minute: 480,
       current_location: 'town_millhaven',
       quests: [],
       flags: {},
@@ -5418,6 +5419,7 @@ describe('quest auto-acceptance via talk_response', () => {
       campaign_flags: {},
       quest_progress: [],
       faction_rep: {},
+      world_minute: 480,
       world_day: 1,
       active_level: 1,
       active_class: 'Fighter',
@@ -5425,7 +5427,7 @@ describe('quest auto-acceptance via talk_response', () => {
     const emptyCs: CampaignState = {
       campaign_id: valeCtx.id,
       user_id: 'u',
-      world_day: 1,
+      world_minute: 480,
       current_location: 'town_millhaven',
       quests: [],
       flags: {},

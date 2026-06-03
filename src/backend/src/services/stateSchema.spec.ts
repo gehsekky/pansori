@@ -41,3 +41,37 @@ describe('applyStateMigrations', () => {
     expect(migrated.visited_rooms).toEqual(['r1', 'r2', 'r3']);
   });
 });
+
+// Legacy clock fields aren't on the current GameState type; build loose views.
+type LegacyClock = { world_day?: number; world_hour?: number; world_minute?: number };
+const legacy = (over: LegacyClock): GameState =>
+  ({ ...makeState(), schemaVersion: 1, ...over }) as unknown as GameState;
+const clock = (s: GameState): LegacyClock => s as unknown as LegacyClock;
+
+describe('v1 → v2 clock migration (world_day/world_hour → world_minute)', () => {
+  it('collapses world_day + world_hour into world_minute (+480 baseline)', () => {
+    // Day 2 (1440) + 14.5h (870) + 08:00 baseline (480) = 2790.
+    const migrated = clock(applyStateMigrations(legacy({ world_day: 2, world_hour: 14.5 })));
+    expect(migrated.world_minute).toBe(2790);
+    expect(migrated.world_day).toBeUndefined();
+    expect(migrated.world_hour).toBeUndefined();
+  });
+
+  it('a save with no clock fields lands on the Day 1 08:00 baseline (480)', () => {
+    expect(clock(applyStateMigrations(legacy({}))).world_minute).toBe(480);
+  });
+
+  it('the common world_day:1/world_hour:0 save becomes 480', () => {
+    expect(clock(applyStateMigrations(legacy({ world_day: 1, world_hour: 0 }))).world_minute).toBe(
+      480
+    );
+  });
+
+  it('is idempotent — already-migrated world_minute is preserved, stale legacy stripped', () => {
+    const once = applyStateMigrations(legacy({ world_day: 9, world_minute: 1000 }));
+    expect(clock(once).world_minute).toBe(1000); // existing value wins
+    expect(clock(once).world_day).toBeUndefined();
+    const twice = applyStateMigrations(once);
+    expect(clock(twice).world_minute).toBe(1000);
+  });
+});

@@ -192,9 +192,9 @@ describe('resolveMarkerMove — descent / room change / ascent', () => {
     expect(r.transitioned).toBe(false);
     expect(r.st.marker_pos).toEqual({ x: 4, y: 4 });
     expect(r.st.map_level).toBe('regional');
-    // 4 squares × 1 mile/square ÷ 3 mi/hr (Normal pace) ≈ 1.33 hr.
+    // 4 squares × 1 mile/square ÷ 3 mi/hr (Normal pace) ≈ 1.33 hr = 80 min.
     expect(r.elapsedHours).toBeCloseTo(4 / 3, 5);
-    expect(r.st.world_hour).toBeCloseTo(4 / 3, 5);
+    expect(r.st.world_minute).toBe(80);
   });
 
   it('rejects an off-map destination', () => {

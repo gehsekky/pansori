@@ -1514,11 +1514,14 @@ export interface GameState {
   campaign_flags?: Record<string, boolean | string | number>;
   quest_progress?: QuestProgress[];
   faction_rep?: Record<string, number>; // factionId → numeric rep
-  world_day?: number;
-  // Total elapsed travel time in hours (regional grid: marker movement spends
-  // SRD travel time — Normal pace 3 mi/hr — per square crossed). Campaigns can
-  // derive the day as floor(world_hour / 24).
-  world_hour?: number;
+  // The single in-game clock: total elapsed in-world minutes since campaign
+  // start. Day 1 08:00 == 480. Everything time-like derives from this (see
+  // services/gameClock.ts): travel adds minutes (mapEngine), rests add
+  // 60 (short) / 480 (long). Day = floor(world_minute/1440)+1.
+  world_minute?: number;
+  // The world_minute at which the last long rest completed; gates SRD's "one
+  // long rest per 24 hours" (a second is blocked until 1440 min have passed).
+  last_long_rest_minute?: number;
 
   // Choice-dimming memory. Each entry is a stable seenKey emitted by the
   // backend when the corresponding choice was clicked (talk_response,
@@ -1711,6 +1714,9 @@ export interface CampaignFacts {
   campaign_flags: Record<string, boolean | string | number>;
   quest_progress: QuestProgress[];
   faction_rep: Record<string, number>;
+  // In-game clock facts. `world_minute` is canonical; `world_day` is derived
+  // (floor(world_minute/1440)+1) and kept so quests can key on the day directly.
+  world_minute: number;
   world_day: number;
   active_level: number;
   active_class: string;

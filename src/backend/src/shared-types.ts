@@ -1085,7 +1085,9 @@ export interface Faction {
 export interface CampaignState {
   campaign_id: string;
   user_id: string;
-  world_day: number;
+  // In-game clock carried across sessions (total elapsed in-world minutes since
+  // campaign start; Day 1 08:00 == 480). Resuming a session resumes the clock.
+  world_minute: number;
   current_location: string;
   flags: Record<string, boolean | string | number>;
   quests: QuestProgress[];

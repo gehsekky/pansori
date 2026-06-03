@@ -8,6 +8,7 @@ import {
   TransferSchema,
   parseBody,
 } from './schemas.js';
+import { CAMPAIGN_START_MINUTE, formatGameClock } from '../services/gameClock.js';
 import type {
   CampaignFacts,
   Character,
@@ -597,6 +598,8 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
       last_choices: [],
       short_rested_rooms: [],
       long_rested: false,
+      // In-game clock: campaigns start at Day 1, 08:00. // SRD: Day 1 08:00.
+      world_minute: CAMPAIGN_START_MINUTE,
       traps_triggered: [],
       traps_disarmed: [],
       objects_searched: [],
@@ -663,7 +666,7 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
         await saveCampaignState(pool, {
           campaign_id: ctx.id,
           user_id: authedUserId(req),
-          world_day: 1,
+          world_minute: CAMPAIGN_START_MINUTE,
           current_location: '',
           flags: {},
           quests: starters,
@@ -1289,7 +1292,9 @@ gameRouter.post('/session/:id/action', async (req: Request, res: Response) => {
         campaign_flags: result.newState.campaign_flags ?? {},
         quest_progress: result.newState.quest_progress ?? [],
         faction_rep: result.newState.faction_rep ?? {},
-        world_day: result.newState.world_day ?? 1,
+        world_minute: result.newState.world_minute ?? 0,
+        // Derived day, kept as a fact so quests can key on it directly.
+        world_day: formatGameClock(result.newState.world_minute ?? 0).day,
         active_level: activeChar?.level ?? 1,
         active_class: activeChar?.character_class ?? '',
       };
