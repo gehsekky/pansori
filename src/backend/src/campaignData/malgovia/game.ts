@@ -145,6 +145,30 @@ export const narratives: Context['narratives'] = {
 
 export const quests: Quest[] = [
   {
+    id: 'quest_arrival',
+    title: 'The Road to Pinegate',
+    desc: "Months on the road have left the party restless, and the pine-dark hills of Malgovia finally rise ahead. Word on the road said the village of Pinegate, at the vale's southern edge, needs capable hands — and where there's trouble, there's coin. Make your way to Pinegate.",
+    startActive: true, // the opening quest — frames the party's arrival in the vale
+    // No giver: it's the prologue. Completes the moment the party reaches Pinegate
+    // town, where Old Elise has the first real job (the Silent Grove).
+    steps: [
+      {
+        id: 'step_reach_pinegate',
+        desc: 'Travel to the village of Pinegate.',
+        condition: {
+          all: [{ fact: 'current_town_id', operator: 'equal', value: 'pinegate_town' }],
+        },
+      },
+    ],
+    rewards: [
+      { type: 'give_xp', amount: 50 },
+      {
+        type: 'add_narrative',
+        text: "Pinegate's lanterns flicker a wary welcome. By the well, an old woman watches you approach — she has the look of someone with a problem worth coin.",
+      },
+    ],
+  },
+  {
     id: 'quest_shipment',
     title: 'The Missing Shipment',
     desc: "The Merchant Guild's supply wagons vanished on the Old Road. Find the Guild Ledger in the crypt and return it to Aldric.",
@@ -427,7 +451,8 @@ export const quests: Quest[] = [
     id: 'quest_silent_grove',
     title: 'The Silent Grove',
     desc: "Old Elise needs someone to walk Mareth's path. Reach the Ancient Oak and find what silenced her.",
-    startActive: true, // Malgovia's opening quest — the beginner grove arc
+    // Discovered (not startActive) — Old Elise hands it over when you reach
+    // Pinegate; it's the beginner grove arc proper.
     giverNpcId: 'npc_elise_elder',
     factionId: 'faction_verdant',
     repGain: 15,

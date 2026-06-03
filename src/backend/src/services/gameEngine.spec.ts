@@ -5342,6 +5342,7 @@ describe('quest auto-acceptance via talk_response', () => {
     const elsewhere = {
       action: 'talk_response',
       room_id: 'millhaven_temple',
+      current_town_id: 'millhaven_town',
       location_id: 'town_millhaven',
       enemies_killed: [],
       loot_taken: [],
@@ -5414,6 +5415,7 @@ describe('quest auto-acceptance via talk_response', () => {
     const facts: CampaignFacts = {
       action: 'loot',
       room_id: 'dungeon_crypt_throne',
+      current_town_id: '',
       location_id: 'dungeon_shattered_crypt',
       enemies_killed: [],
       loot_taken: ['guild_ledger'],

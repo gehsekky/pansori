@@ -120,7 +120,7 @@ const context: Context = {
     recommendedPartySize: 4,
     recommendedComposition: ['Fighter', 'Cleric', 'Rogue', 'Wizard'],
     intro:
-      "The pine-dark road brings you to Pinegate, a lantern-lit village on Malgovia's southern edge. Beyond it the Silent Grove has gone wrong — beasts turned savage, the Verdant Circle's warden vanished into the trees. Set the grove right and the wider vale opens before you: east to the market town of Millhaven and the restless crypt beneath it, and north — when you are ready — to the frozen passes and the cult festering in Iceshard Spire. Start small. The vale grows colder, and crueler, the farther you walk.",
+      "You've been on the road for months, and the party grows restless as the pine-dark hills of Malgovia finally rise ahead. Somewhere back along the way you caught word: the village of Pinegate needs help, and is willing to pay. Itching for action and coin, you turn off the road toward town — and the deeper troubles of the vale that wait beyond it: a market town and its restless crypt to the east, and, far to the north, the cult festering in Iceshard Spire. Start small. The vale grows colder, and crueler, the farther you walk.",
 
     // ── Rooms (local grids) ──────────────────────────────────────────────────
     // 3-level map model: navigation is by the party marker on the regional /

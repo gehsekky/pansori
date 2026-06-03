@@ -1260,6 +1260,7 @@ gameRouter.post('/session/:id/action', async (req: Request, res: Response) => {
       const facts: CampaignFacts = {
         action: action.type,
         room_id: result.newState.current_room,
+        current_town_id: result.newState.current_town_id ?? '',
         // Retired with the Location model — quest conditions key on room_id now.
         location_id: '',
         enemies_killed: result.newState.enemies_killed,

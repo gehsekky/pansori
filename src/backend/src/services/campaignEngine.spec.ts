@@ -3,10 +3,28 @@
 // start (so the player begins with direction) while every other quest stays
 // hidden from the log until discovered.
 
-import type { CampaignFacts, Quest } from '../types.js';
+import type { CampaignFacts, CampaignState, Quest } from '../types.js';
 import { describe, expect, it } from 'vitest';
-import { starterQuestProgress } from './campaignEngine.js';
+import { evaluateQuestSteps, starterQuestProgress } from './campaignEngine.js';
 import { context as vale } from '../campaignData/malgovia/index.js';
+
+// A fully-populated CampaignFacts baseline; tests override the fields they probe.
+const FACTS: CampaignFacts = {
+  action: 'marker_move',
+  room_id: '',
+  current_town_id: '',
+  location_id: '',
+  enemies_killed: [],
+  loot_taken: [],
+  visited_rooms: [],
+  flags: {},
+  campaign_flags: {},
+  quest_progress: [],
+  faction_rep: {},
+  world_day: 1,
+  active_level: 1,
+  active_class: 'Fighter',
+};
 
 // Recursively collect every `fact` name a json-rules-engine condition references
 // (walking all/any/not branches). Used to verify quests only key on facts the
@@ -52,6 +70,7 @@ describe('quest conditions only reference facts the engine supplies', () => {
     Object.keys({
       action: '',
       room_id: '',
+      current_town_id: '',
       location_id: '',
       enemies_killed: [],
       loot_taken: [],
@@ -80,7 +99,7 @@ describe('quest conditions only reference facts the engine supplies', () => {
 
 describe('story campaigns each open with exactly one starter quest', () => {
   const cases: { name: string; quests: Quest[]; opener: string }[] = [
-    { name: 'Malgovia', quests: vale.campaign?.quests ?? [], opener: 'quest_silent_grove' },
+    { name: 'Malgovia', quests: vale.campaign?.quests ?? [], opener: 'quest_arrival' },
   ];
   for (const c of cases) {
     it(`${c.name} → ${c.opener} is the sole startActive quest`, () => {
@@ -88,4 +107,41 @@ describe('story campaigns each open with exactly one starter quest', () => {
       expect(starters.map((q) => q.id)).toEqual([c.opener]);
     });
   }
+});
+
+describe('the opening arrival quest completes on reaching Pinegate', () => {
+  const quests = vale.campaign?.quests ?? [];
+  const cs = (): CampaignState => ({
+    campaign_id: vale.id,
+    user_id: 'u',
+    world_day: 1,
+    current_location: '',
+    quests: starterQuestProgress(quests), // seeds quest_arrival as active
+    flags: {},
+    faction_rep: {},
+    npc_attitudes: {},
+  });
+
+  it('quest_arrival is the seeded opener', () => {
+    expect(starterQuestProgress(quests).map((q) => q.questId)).toEqual(['quest_arrival']);
+  });
+
+  it('step_reach_pinegate completes only once current_town_id is pinegate_town', async () => {
+    const notYet = await evaluateQuestSteps(cs(), quests, { ...FACTS, current_town_id: '' });
+    expect(notYet.find((c) => c.questId === 'quest_arrival')).toBeUndefined();
+
+    const millhaven = await evaluateQuestSteps(cs(), quests, {
+      ...FACTS,
+      current_town_id: 'millhaven_town',
+    });
+    expect(millhaven.find((c) => c.questId === 'quest_arrival')).toBeUndefined();
+
+    const pinegate = await evaluateQuestSteps(cs(), quests, {
+      ...FACTS,
+      current_town_id: 'pinegate_town',
+    });
+    expect(pinegate.find((c) => c.questId === 'quest_arrival')?.completedStepIds).toContain(
+      'step_reach_pinegate'
+    );
+  });
 });

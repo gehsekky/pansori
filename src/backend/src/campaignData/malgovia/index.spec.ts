@@ -166,6 +166,7 @@ describe('Malgovia — scripted playthrough', () => {
     const facts: CampaignFacts = {
       action: action.type,
       room_id: state.current_room,
+      current_town_id: state.current_town_id ?? '',
       location_id: state.current_location_id ?? '',
       enemies_killed: state.enemies_killed,
       loot_taken: state.loot_taken,

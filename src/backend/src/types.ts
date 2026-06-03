@@ -1695,6 +1695,10 @@ export interface Context {
 export interface CampaignFacts {
   action: string;
   room_id: string;
+  // The town the party is currently in (GameState.current_town_id), '' when not
+  // in one. Quest steps key on it for "reach <town>" objectives (e.g. the
+  // opening arrival quest completing on entering Pinegate).
+  current_town_id: string;
   location_id: string;
   enemies_killed: string[];
   loot_taken: string[];
