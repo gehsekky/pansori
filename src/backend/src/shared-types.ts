@@ -173,7 +173,14 @@ export type TerrainType =
   | 'swamp'
   | 'snow'
   | 'water'
-  | 'mountain';
+  | 'mountain'
+  // Town-cosmetic types: flavor for settlement maps only. They carry neutral
+  // travel/encounter values (town navigation is free-pathfind with no travel
+  // cost or encounter rolls — those only apply to regional overland travel), so
+  // their tooltips read as a plain label. `town_wall` is impassable.
+  | 'cobblestone'
+  | 'garden'
+  | 'town_wall';
 
 export interface TerrainCell {
   pos: GridPos;
@@ -204,6 +211,10 @@ export const TERRAIN: Record<TerrainType, TerrainSpec> = {
   snow: { passable: true, travelMult: 1.5, encounterMult: 1, label: 'snow' },
   water: { passable: false, travelMult: 1, encounterMult: 0, label: 'water' },
   mountain: { passable: false, travelMult: 1, encounterMult: 0, label: 'mountains' },
+  // Town cosmetics — neutral mechanics; `town_wall` blocks movement.
+  cobblestone: { passable: true, travelMult: 1, encounterMult: 1, label: 'cobblestone' },
+  garden: { passable: true, travelMult: 1, encounterMult: 1, label: 'garden' },
+  town_wall: { passable: false, travelMult: 1, encounterMult: 0, label: 'town wall' },
 };
 
 /**

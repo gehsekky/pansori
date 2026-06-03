@@ -820,6 +820,28 @@ export const towns: Town[] = [
     gridWidth: 8,
     gridHeight: 8,
     startPos: { x: 4, y: 6 }, // just inside the gate
+    // Cosmetic settlement terrain (no mechanics): the town wall along the north
+    // edge, cobblestone streets linking the gate to the four districts, and a
+    // couple of tended gardens.
+    terrain: [
+      ...terr('town_wall', [0, 0], [1, 0], [2, 0], [3, 0], [4, 0], [5, 0], [6, 0], [7, 0]),
+      ...terr(
+        'cobblestone',
+        [4, 1],
+        [4, 2],
+        [4, 3],
+        [4, 4],
+        [4, 5],
+        [4, 6],
+        [2, 2],
+        [3, 2],
+        [5, 2],
+        [2, 5],
+        [3, 5],
+        [5, 5]
+      ),
+      ...terr('garden', [2, 1], [5, 1], [2, 6], [5, 6]),
+    ],
     venues: [
       {
         id: 'venue_temple',
@@ -862,6 +884,25 @@ export const towns: Town[] = [
     gridWidth: 6,
     gridHeight: 6,
     startPos: { x: 3, y: 3 },
+    // Cosmetic: a snow-blanketed square with a trodden cobblestone path through
+    // the middle and a little pine greenery to either side.
+    terrain: [
+      ...terr(
+        'snow',
+        [0, 0],
+        [2, 0],
+        [3, 0],
+        [5, 0],
+        [0, 2],
+        [5, 2],
+        [2, 4],
+        [4, 4],
+        [0, 5],
+        [5, 5]
+      ),
+      ...terr('cobblestone', [3, 2], [3, 3], [3, 4]),
+      ...terr('garden', [0, 3], [5, 3]),
+    ],
     venues: [
       {
         id: 'venue_tavern',
@@ -897,6 +938,12 @@ export const towns: Town[] = [
     gridWidth: 6,
     gridHeight: 6,
     startPos: { x: 3, y: 4 },
+    // Cosmetic: a cobblestone square around the village well, ringed by pine.
+    terrain: [
+      ...terr('water', [3, 1]), // the well
+      ...terr('cobblestone', [3, 2], [3, 3], [3, 4], [2, 3], [4, 3]),
+      ...terr('garden', [0, 0], [5, 0], [0, 5], [5, 5], [0, 3], [5, 3]),
+    ],
     venues: [
       {
         id: 'venue_square_grove',

@@ -15,4 +15,9 @@ export const TERRAIN_STYLE: Record<TerrainType, { tint?: string; glyph?: string 
   snow: { tint: 'rgba(224, 234, 246, 0.55)' }, // pale icy white
   water: { tint: 'rgba(70, 110, 185, 0.45)', glyph: '≈' },
   mountain: { tint: 'rgba(95, 88, 70, 0.88)', glyph: '▲' },
+
+  // Town cosmetics — settlement-map flavor.
+  cobblestone: { tint: 'rgba(150, 140, 120, 0.34)' }, // grey-tan paving
+  garden: { tint: 'rgba(90, 140, 80, 0.34)' }, // tended greenery
+  town_wall: { tint: 'rgba(110, 100, 86, 0.9)', glyph: '▦' }, // impassable masonry
 };

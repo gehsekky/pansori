@@ -98,13 +98,16 @@ function scaleLabel(feetPerSquare: number): string {
 }
 
 // Hover-tooltip description for a (non-POI) terrain square: the capitalized
-// label plus what the square costs to cross — travel-time and random-encounter
-// modifiers from the shared TERRAIN spec — so the player can read the map
-// before moving. Impassable terrain just notes it can't be crossed.
-function describeTerrain(type: TerrainType): string {
+// label, plus — on the overland regional map — what the square costs to cross
+// (travel-time and random-encounter modifiers from the shared TERRAIN spec) so
+// the player can read the map before moving. Town / local maps show the label
+// only, since those modifiers apply only to regional overland travel.
+// Impassable terrain always notes it can't be crossed.
+function describeTerrain(type: TerrainType, withModifiers: boolean): string {
   const t = TERRAIN[type];
   const label = t.label.charAt(0).toUpperCase() + t.label.slice(1);
   if (!t.passable) return `${label} · impassable`;
+  if (!withModifiers) return label;
   const parts = [label];
   if (t.travelMult < 1) parts.push('quick travel');
   else if (t.travelMult > 1) parts.push(`slow going (${t.travelMult}× travel time)`);
@@ -199,14 +202,17 @@ function GridMapView({ grid, markerPos, enemyPresent, onMarkerMove }: Props) {
       // risk) so the player can read the map. Blank cells on a terrain-bearing
       // grid read as "plains"; grids with no authored terrain (town / local)
       // keep no tooltip on empty cells.
+      // Travel / encounter modifiers apply only to overland (regional) travel,
+      // so town / local maps tooltip the bare terrain label.
+      const showTerrainModifiers = grid.level === 'regional';
       const cellTitle = transition
         ? transition.label
         : terrainType
-          ? describeTerrain(terrainType)
+          ? describeTerrain(terrainType, showTerrainModifiers)
           : isObstacle
             ? 'Impassable'
             : grid.terrain.length > 0
-              ? describeTerrain('plains')
+              ? describeTerrain('plains', showTerrainModifiers)
               : undefined;
 
       let token: React.ReactNode = null;
