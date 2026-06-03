@@ -515,6 +515,54 @@ export default function App() {
                 )}
 
                 <div className={styles.gameMain}>
+                  {/* Map at the top of the center column — the 3-level grid
+                      (exploration marker map) or the combat grid. The narrative
+                      sits below it, and the action / choices below that. */}
+                  {(() => {
+                    if (!gameState || !seed || escaped || allDead) return null;
+                    if (
+                      gameState.combat_active &&
+                      gameState.entities &&
+                      gameState.entities.length > 0
+                    ) {
+                      return (
+                        <GridCombatView
+                          state={gameState}
+                          seed={seed}
+                          aoePreview={hoveredChoice?.aoePreview}
+                          onMove={(to) => {
+                            const activeId = gameState.active_character_id;
+                            handleChoice({
+                              label: `Move to (${to.x},${to.y})`,
+                              action: { type: 'grid_move', entityId: activeId, to },
+                            });
+                          }}
+                        />
+                      );
+                    }
+                    if (!gameState.combat_active && gameState.map_level) {
+                      const grid = activeGrid(seed, gameState);
+                      if (grid && gameState.marker_pos) {
+                        return (
+                          <GridMapView
+                            grid={grid}
+                            markerPos={gameState.marker_pos}
+                            // A surfaced Attack choice means a hostile is here
+                            // pre-combat — show the red enemy marker.
+                            enemyPresent={choices.some((c) => c.kind === 'attack')}
+                            onMarkerMove={(to) =>
+                              handleChoice({
+                                label: `Travel to (${to.x},${to.y})`,
+                                action: { type: 'marker_move', to },
+                              })
+                            }
+                          />
+                        );
+                      }
+                    }
+                    return null;
+                  })()}
+
                   <div
                     data-testid="game-narrative-panel"
                     className={styles.card}
@@ -910,56 +958,9 @@ export default function App() {
                         />
                       );
                     }
-                    // Out-of-combat exploration on the 3-level grid map: a single
-                    // party marker the player clicks to travel (marker_move). Local
-                    // combat falls through to GridCombatView below (PC tokens).
-                    if (!gameState?.combat_active && gameState?.map_level && seed) {
-                      const grid = activeGrid(seed, gameState);
-                      if (grid && gameState.marker_pos) {
-                        return (
-                          <div className={styles.combatRow}>
-                            <GridMapView
-                              grid={grid}
-                              markerPos={gameState.marker_pos}
-                              // A surfaced Attack choice means a hostile is here
-                              // pre-combat — show the red enemy marker.
-                              enemyPresent={choices.some((c) => c.kind === 'attack')}
-                              onMarkerMove={(to) =>
-                                handleChoice({
-                                  label: `Travel to (${to.x},${to.y})`,
-                                  action: { type: 'marker_move', to },
-                                })
-                              }
-                            />
-                            <div className={styles.combatActionCol}>{actionPanel}</div>
-                          </div>
-                        );
-                      }
-                    }
-                    if (
-                      gameState?.combat_active &&
-                      gameState.entities &&
-                      gameState.entities.length > 0 &&
-                      seed
-                    ) {
-                      return (
-                        <div className={styles.combatRow}>
-                          <GridCombatView
-                            state={gameState}
-                            seed={seed}
-                            aoePreview={hoveredChoice?.aoePreview}
-                            onMove={(to) => {
-                              const activeId = gameState.active_character_id;
-                              handleChoice({
-                                label: `Move to (${to.x},${to.y})`,
-                                action: { type: 'grid_move', entityId: activeId, to },
-                              });
-                            }}
-                          />
-                          <div className={styles.combatActionCol}>{actionPanel}</div>
-                        </div>
-                      );
-                    }
+                    // The grid (exploration marker map / combat grid) now renders
+                    // at the top of the center column, above the narrative, so the
+                    // action area here is just the choices/combat bar.
                     return actionPanel;
                   })()}
                 </div>
