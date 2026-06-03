@@ -323,6 +323,11 @@ export interface GameState {
   current_region_id?: string;
   current_town_id?: string;
   marker_pos?: GridPos;
+  // Parent-grid bookmarks — where the marker sat on the level above (set on
+  // descend). The map overlay's zoom-out reads these to render the region/town
+  // the party came from. Mirror of the BE fields.
+  region_marker_pos?: GridPos;
+  town_marker_pos?: GridPos;
 
   // Choice-dimming memory — keys of choices already clicked this
   // adventure. Mirror of the backend field.

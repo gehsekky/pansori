@@ -1351,6 +1351,39 @@
   text-align: center;
 }
 
+/* Map-overlay zoom controls — step the read-only view up the level hierarchy
+   (local → town → region) and back. */
+.mapZoomWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: center;
+}
+.mapZoomControls {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  width: 100%;
+}
+.mapZoomBtn {
+  background: var(--t-card);
+  color: var(--t-primary);
+  border: 1px solid var(--t-border);
+  border-radius: 2px;
+  padding: 0.3rem 0.7rem;
+  font-family: inherit;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+.mapZoomBtn:hover:not(:disabled) {
+  border-color: var(--t-primary);
+}
+.mapZoomBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 /* ─── InitiativeStrip ───────────────────────────────────────────────────── */
 
 .initiativeStrip {

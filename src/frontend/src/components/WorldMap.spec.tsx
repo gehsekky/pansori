@@ -155,4 +155,33 @@ describe('WorldMap Component', () => {
     render(<WorldMap seed={mockSeed} state={makeState()} onClose={() => {}} />);
     expect(screen.getByText(/No map to show here/i)).toBeTruthy();
   });
+
+  it('has no zoom controls on the region (top level — nothing to zoom out to)', () => {
+    render(<WorldMap seed={mockSeed} state={regionalState()} onClose={() => {}} />);
+    expect(screen.queryByTestId('map-zoom-out')).toBeNull();
+  });
+
+  it('zooms out from a town up to the region it sits in', () => {
+    const townState = makeState(
+      {},
+      {
+        map_level: 'town',
+        current_region_id: 'reg1',
+        current_town_id: 't1',
+        marker_pos: { x: 1, y: 1 },
+        region_marker_pos: { x: 3, y: 2 }, // the town's cell on the region
+        current_room: '',
+      }
+    );
+    render(<WorldMap seed={mockSeed} state={townState} onClose={() => {}} />);
+    // The fixture seed has no town grid for t1, so the town level shows a note —
+    // but the zoom-out control is present because the region is reachable.
+    const zoomOut = screen.getByTestId('map-zoom-out') as HTMLButtonElement;
+    expect(zoomOut.disabled).toBe(false);
+    fireEvent.click(zoomOut);
+    // Now viewing the region overview.
+    expect(screen.getByText(/REGION · The Wilds/i)).toBeTruthy();
+    expect(screen.getByTitle('Town')).toBeTruthy();
+    expect((screen.getByTestId('map-zoom-out') as HTMLButtonElement).disabled).toBe(true);
+  });
 });
