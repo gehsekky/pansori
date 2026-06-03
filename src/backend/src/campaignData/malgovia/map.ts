@@ -460,6 +460,12 @@ export const rooms: Room[] = [
       },
       { pos: { x: 0, y: 9 }, ascends: true, label: 'Leave the camp' },
     ],
+    // A woodland clearing: a tree-line rings the camp (cosmetic forest); a
+    // listing wagon, boulders, and a stump give hard cover mid-clearing.
+    terrain: [
+      ...terr('mountain', [4, 4], [5, 4], [4, 5], [6, 6]),
+      ...terr('forest', [3, 0], [6, 0], [9, 3], [9, 6], [2, 2], [7, 2]),
+    ],
   },
   {
     id: 'bandit_tent',
@@ -478,6 +484,9 @@ export const rooms: Room[] = [
         label: 'Back out to the camp',
       },
     ],
+    // The captain's crate-table (war-map + strongbox) sits as hard cover mid-tent,
+    // with brush crowding the oilcloth corners.
+    terrain: [...terr('mountain', [3, 3], [4, 3]), ...terr('forest', [0, 7], [7, 0])],
   },
 
   // ── Whispering Pines (folded) ────────────────────────────────────────────
@@ -491,6 +500,22 @@ export const rooms: Room[] = [
     gridHeight: 7,
     entryPos: { x: 3, y: 6 },
     exits: [{ pos: { x: 3, y: 0 }, ascends: true, label: 'Back into the village' }],
+    // Cosmetic: a timber-board floor warmed by the hearth; snow tracked in at the door.
+    terrain: [
+      ...terr(
+        'cobblestone',
+        [3, 1],
+        [3, 2],
+        [3, 3],
+        [3, 4],
+        [3, 5],
+        [2, 2],
+        [4, 2],
+        [2, 3],
+        [4, 3]
+      ),
+      ...terr('snow', [2, 6], [4, 6]),
+    ],
   },
   {
     id: 'pines_lodge',
@@ -513,6 +538,22 @@ export const rooms: Room[] = [
         emptyText: 'The latch sticks. Brace it properly and try the lock again.',
       },
     ],
+    // Cosmetic: a plank floor hung with pelts; snow tracked from the door.
+    terrain: [
+      ...terr(
+        'cobblestone',
+        [3, 1],
+        [3, 2],
+        [3, 3],
+        [3, 4],
+        [3, 5],
+        [2, 3],
+        [4, 3],
+        [2, 4],
+        [4, 4]
+      ),
+      ...terr('snow', [2, 6], [4, 6]),
+    ],
   },
   {
     id: 'pines_warden',
@@ -522,6 +563,23 @@ export const rooms: Room[] = [
     gridHeight: 7,
     entryPos: { x: 3, y: 6 },
     exits: [{ pos: { x: 3, y: 0 }, ascends: true, label: 'Back into the village' }],
+    // Cosmetic: a stone hut floor by the brazier; snow at the threshold.
+    terrain: [
+      ...terr(
+        'cobblestone',
+        [2, 2],
+        [3, 2],
+        [4, 2],
+        [2, 3],
+        [3, 3],
+        [4, 3],
+        [2, 4],
+        [3, 4],
+        [4, 4],
+        [3, 5]
+      ),
+      ...terr('snow', [2, 6], [4, 6]),
+    ],
   },
 
   // The Frozen Pass — a regional site (a Frost Wolf prowls the trail).
