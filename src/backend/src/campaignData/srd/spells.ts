@@ -5568,4 +5568,25 @@ export const SRD_SPELLS: Record<string, Spell> = {
     narrative: '{name} speaks the keyed word and the party is snatched home to safe ground.',
     spellList: ['divine'],
   },
+
+  // ─── Spell batch: engine-backed combat spells ────────────────────────────────
+
+  // SRD: Blink (L3 Transmutation) — a self-buff; about half each round you
+  // flicker into the Border Ethereal, where Material attacks can't reach you.
+  // Modeled via `Character.blinking`: the enemy-attack resolver rolls a d20 per
+  // incoming attack (11+ ⇒ the blow finds no one), matching RAW's d20 11+ test.
+  // Non-concentration (1 min ≈ encounter); cleared at combat end.
+  blink: {
+    id: 'blink',
+    name: 'Blink',
+    level: 3,
+    castTime: 'action',
+    targetType: 'self',
+    blink: true,
+    durationRounds: 10, // 1 minute (non-concentration; cleared at combat end)
+    rangeKind: 'self',
+    desc: 'For 1 minute you flicker between the Material Plane and the Border Ethereal: each incoming attack has a 50% chance (a d20 roll of 11+) to pass through empty air as you wink out. The ethereal repositioning is narrated.',
+    narrative: '{name} starts to flicker — half-here, half-gone, hard to pin down.',
+    spellList: ['arcane'],
+  },
 };

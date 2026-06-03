@@ -1636,6 +1636,34 @@ function computeEnemyAttack(
     : null;
 
   if (result.hit) {
+    // SRD Blink — the warded PC spends about half each round in the Border
+    // Ethereal, where Material attacks can't reach. RAW rolls a d20 at the start
+    // of each of the caster's turns (11+ ⇒ ethereal for the round); pansori
+    // approximates per-attack with the same d20 11+ test (same ~50%, lower
+    // variance). On a blink-out the blow finds no one — auto-miss, no duplicate
+    // spent. Checked before Mirror Image (you're not there to need a double).
+    if (char.blinking && rollDice('1d20') >= 11) {
+      return {
+        proposedChar: char,
+        proposedSt: st,
+        hpLost: 0,
+        fragment: {
+          kind: 'enemy_attack_miss',
+          attackerEnemyId: enemy.id,
+          attackerName: enemy.name,
+          targetCharId: char.id,
+          targetName: char.name,
+          atkTotal: result.total,
+          targetAc: char.ac,
+          prose: ` ${enemy.name}'s blow passes through empty air — ${char.name} has blinked out of reality!`,
+        },
+        atkTotal: result.total,
+        atkD20: result.roll,
+        hit: false,
+        hadAdvantage: hasAdvantage,
+      };
+    }
+
     // SRD Mirror Image — when a creature HITS the warded PC, roll a d6 per
     // remaining duplicate; if any is 3+, a duplicate takes the hit instead (no
     // damage) and is destroyed. (RAW exemption for a Blinded / Blindsight /
@@ -2974,6 +3002,8 @@ export function endCombatState(st: GameState): GameState {
       condition_immunities: undefined,
       // Mirror Image duplicates (1 min ≈ encounter) don't carry to the next fight.
       mirror_images: undefined,
+      // Blink (1 min ≈ encounter) doesn't carry to the next fight.
+      blinking: undefined,
       // Sanctuary ward (1 min ≈ encounter) clears at combat end.
       sanctuary_dc: undefined,
     })),

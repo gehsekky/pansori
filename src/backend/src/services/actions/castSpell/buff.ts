@@ -246,6 +246,13 @@ export function runBuffSpell(
     char.mirror_images = spell.mirrorImages;
   }
 
+  // SRD Blink — flicker the self-target into the Border Ethereal about half each
+  // round; incoming attacks find no one (read in the enemy-attack resolver).
+  // Self-target only (RAW range Self).
+  if (spell.blink && isCasterTarget) {
+    char.blinking = true;
+  }
+
   // SRD Sanctuary — ward the target so attackers must make a Wisdom save (vs the
   // caster's spell DC) or be unable to attack it. Store the DC on the ward.
   if (spell.sanctuary && dc !== undefined) {

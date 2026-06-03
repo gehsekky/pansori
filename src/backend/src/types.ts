@@ -788,6 +788,10 @@ export interface Spell {
   // SRD Mirror Image — the number of duplicates to conjure (3). The buff path
   // sets `Character.mirror_images`; the enemy-attack resolver burns them down.
   mirrorImages?: number;
+  // SRD Blink — a self-buff that flickers the caster into the Border Ethereal
+  // about half each round. The buff path sets `Character.blinking`; the
+  // enemy-attack resolver rolls a d20 (11+ ⇒ the blow finds no one) per attack.
+  blink?: boolean;
   // SRD Sanctuary — ward the self/ally target; attackers must save vs the
   // caster's DC. The buff path stamps `Character.sanctuary_dc`.
   sanctuary?: boolean;
@@ -1051,6 +1055,11 @@ export interface Character {
   // if any is 3+, a duplicate takes the hit (no damage) and is destroyed
   // (decrementing this). Set by the buff cast path; cleared at 0 / combat end.
   mirror_images?: number;
+  // SRD Blink — while set, the character spends about half each round in the
+  // Border Ethereal. The enemy-attack resolver rolls a d20 per incoming attack;
+  // on 11+ the blow finds no one (auto-miss). Set by the buff cast path;
+  // non-concentration (1 min ≈ encounter) — cleared at combat end.
+  blinking?: boolean;
   // SRD Sanctuary — the warded creature is hard to attack: a creature that tries
   // to attack it makes a Wisdom save (vs this stored caster spell DC) or must
   // choose a new target / lose the attack. Read in `computeEnemyAttack`; cleared
