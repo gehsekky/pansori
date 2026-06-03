@@ -5589,4 +5589,30 @@ export const SRD_SPELLS: Record<string, Spell> = {
     narrative: '{name} starts to flicker — half-here, half-gone, hard to pin down.',
     spellList: ['arcane'],
   },
+
+  // SRD: Arcane Hand (L5 Evocation, "Bigby's Hand") — conjure a Large hand of
+  // force (Concentration, up to 1 minute). Modeled as the Clenched Fist mode: a
+  // recurring melee spell attack (on cast + as a Bonus Action each later turn)
+  // for 5d8 Force, +2d8 per slot above 5th — reusing the recurring-attack
+  // machinery (cf. Arcane Sword). Unlike Arcane Sword the Fist adds no ability
+  // modifier to damage. The Forceful / Grasping / Interposing modes are deferred.
+  arcane_hand: {
+    id: 'arcane_hand',
+    name: 'Arcane Hand',
+    level: 5,
+    castTime: 'action',
+    concentration: true,
+    durationRounds: 10, // 1 minute, Concentration
+    recurringAttack: true,
+    recurringAttackCost: 'bonus_action',
+    damage: '5d8',
+    damageType: 'force',
+    upcastBonus: '2d8',
+    rangeKind: 'ranged',
+    rangeFt: 120,
+    desc: 'Conjure a Large hand of shimmering force (Concentration, up to 1 minute). On the cast, and as a Bonus Action on each later turn, its Clenched Fist makes a melee spell attack for 5d8 Force damage (+2d8 per slot above 5th). The push / grapple / cover modes are deferred.',
+    narrative:
+      '{name} clenches a fist and a Large hand of force snaps into being, ready to strike.',
+    spellList: ['arcane'],
+  },
 };
