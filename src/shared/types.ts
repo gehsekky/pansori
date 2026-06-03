@@ -847,6 +847,11 @@ export interface NpcTemplate {
   toHit: number;
   xp: number;
   dex?: number;
+  // Position on the room's local grid. When set, the NPC renders as a clickable
+  // token on the exploration map; clicking it (or "Talk to …") walks the party
+  // marker to a free cell ADJACENT to the NPC and opens the conversation.
+  // Omitted ⇒ no token (talk still works as a room-scoped choice).
+  pos?: GridPos;
   // Social
   greeting: string;
   responses: NpcDialogueResponse[];

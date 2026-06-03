@@ -17,6 +17,11 @@ interface Props {
   // clicked cell. The backend free-pathfinds out of combat (no movement budget)
   // and resolves any transition (site / venue / room exit / ascend) on arrival.
   onMarkerMove?: (to: GridPos) => void;
+  // A talkable NPC standing on the grid (local room maps). Renders a clickable
+  // token at `pos`; clicking it (via `onNpcClick`) walks the party adjacent and
+  // opens the conversation — the same as the "Talk to …" choice.
+  npc?: { pos: GridPos; name: string };
+  onNpcClick?: () => void;
 }
 
 const LEVEL_LABEL: Record<ActiveGrid['level'], string> = {
@@ -123,7 +128,7 @@ function describeTerrain(type: TerrainType, withModifiers: boolean): string {
  * to travel to, and obstacles. (Local combat switches to GridCombatView, which
  * deploys the party into PC tokens.)
  */
-function GridMapView({ grid, markerPos, enemyPresent, onMarkerMove }: Props) {
+function GridMapView({ grid, markerPos, enemyPresent, onMarkerMove, npc, onNpcClick }: Props) {
   // The overland (regional) map gets double-size squares so the larger, sparse
   // grid reads more like a map; the town map uses mid-size 48 px squares; local
   // exploration stays compact (CELL_PX).
@@ -166,9 +171,12 @@ function GridMapView({ grid, markerPos, enemyPresent, onMarkerMove }: Props) {
       const isEnemyMarker = !!enemyCell && enemyCell.x === x && enemyCell.y === y && !isMarker;
       const isObstacle = obstacleSet.has(key);
       const transition = transitionAt.get(key);
+      // A talkable NPC token sits here (and the party isn't standing on it).
+      const isNpc = !!npc && npc.pos.x === x && npc.pos.y === y && !isMarker;
       // Out of combat the party moves freely (the backend pathfinds), so every
       // non-obstacle cell that isn't the marker's own square is a valid target.
-      const clickable = !isObstacle && !isMarker && !!onMarkerMove;
+      // The NPC's own cell is clickable too — clicking it talks (walks adjacent).
+      const clickable = isNpc ? !!onNpcClick : !isObstacle && !isMarker && !!onMarkerMove;
 
       // Checkerboard the plain cells so the grid squares read clearly on the
       // large, sparse region/town maps — a single flat fill was
@@ -193,6 +201,7 @@ function GridMapView({ grid, markerPos, enemyPresent, onMarkerMove }: Props) {
       const ariaParts: string[] = [`${x},${y}`];
       if (isMarker) ariaParts.push('the party');
       if (isEnemyMarker) ariaParts.push('an enemy');
+      if (isNpc) ariaParts.push(`${npc!.name}, talk`);
       if (terrainType) ariaParts.push(TERRAIN[terrainType].label);
       else if (isObstacle) ariaParts.push('impassable');
       if (transition) ariaParts.push(transition.label);
@@ -205,15 +214,17 @@ function GridMapView({ grid, markerPos, enemyPresent, onMarkerMove }: Props) {
       // Travel / encounter modifiers apply only to overland (regional) travel,
       // so town / local maps tooltip the bare terrain label.
       const showTerrainModifiers = grid.level === 'regional';
-      const cellTitle = transition
-        ? transition.label
-        : terrainType
-          ? describeTerrain(terrainType, showTerrainModifiers)
-          : isObstacle
-            ? 'Impassable'
-            : grid.terrain.length > 0
-              ? describeTerrain('plains', showTerrainModifiers)
-              : undefined;
+      const cellTitle = isNpc
+        ? `Talk to ${npc!.name}`
+        : transition
+          ? transition.label
+          : terrainType
+            ? describeTerrain(terrainType, showTerrainModifiers)
+            : isObstacle
+              ? 'Impassable'
+              : grid.terrain.length > 0
+                ? describeTerrain('plains', showTerrainModifiers)
+                : undefined;
 
       let token: React.ReactNode = null;
       if (isMarker) {
@@ -227,6 +238,18 @@ function GridMapView({ grid, markerPos, enemyPresent, onMarkerMove }: Props) {
           <span className={styles.gridToken} style={{ background: 'rgba(220, 70, 70, 0.9)' }}>
             <span className={styles.gridTokenLetter}>!</span>
           </span>
+        );
+      } else if (isNpc) {
+        // A talkable NPC: a gold token with the name's initial + a name label.
+        token = (
+          <>
+            <span className={styles.gridToken} style={{ background: 'rgba(196, 160, 70, 0.92)' }}>
+              <span className={styles.gridTokenLetter}>{npc!.name.charAt(0).toUpperCase()}</span>
+            </span>
+            <span className={styles.gridMapLabel} aria-hidden="true">
+              {npc!.name}
+            </span>
+          </>
         );
       } else if (transition) {
         // A travel destination always shows its own glyph — even if terrain is
@@ -292,13 +315,16 @@ function GridMapView({ grid, markerPos, enemyPresent, onMarkerMove }: Props) {
           role={clickable ? 'button' : 'gridcell'}
           tabIndex={clickable ? 0 : undefined}
           title={cellTitle}
-          onClick={clickable ? () => onMarkerMove?.({ x, y }) : undefined}
+          onClick={
+            clickable ? () => (isNpc ? onNpcClick?.() : onMarkerMove?.({ x, y })) : undefined
+          }
           onKeyDown={
             clickable
               ? (e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
-                    onMarkerMove?.({ x, y });
+                    if (isNpc) onNpcClick?.();
+                    else onMarkerMove?.({ x, y });
                   }
                 }
               : undefined

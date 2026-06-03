@@ -1,4 +1,5 @@
 import { abilityMod, d20TestPenalty, profBonus, rollDice, skillCheck } from '../rulesEngine.js';
+import { adjacentPositions, chebyshev } from '../gridEngine.js';
 import {
   applyConsequence,
   consumeLuckForCheck,
@@ -7,9 +8,34 @@ import {
 } from '../gameEngine.js';
 import { hasExpertise, hasJackOfAllTrades, hasReliableTalent } from '../multiclass.js';
 import type { ActionHandler } from './types.js';
+import type { ActiveGrid } from '../mapEngine.js';
+import type { GridPos } from '../../types.js';
+import { activeGrid } from '../mapEngine.js';
 import { randomUUID } from 'crypto';
 import { responsesAtPath } from '../conversation.js';
 import { updatePcActor } from './actor.js';
+
+/**
+ * The cell the party marker walks to when approaching an NPC: a free square
+ * ADJACENT to the NPC (closest to where the party already stands, for the
+ * shortest visual walk). Stays put if already adjacent; falls back to the NPC's
+ * own cell only when every neighbor is blocked.
+ */
+export function approachCell(
+  grid: ActiveGrid,
+  from: GridPos | undefined,
+  target: GridPos
+): GridPos {
+  if (from && chebyshev(from, target) <= 1) return from;
+  const blocked = new Set(grid.obstacles.map((o) => `${o.x},${o.y}`));
+  const candidates = adjacentPositions(target).filter(
+    (p) =>
+      p.x >= 0 && p.x < grid.width && p.y >= 0 && p.y < grid.height && !blocked.has(`${p.x},${p.y}`)
+  );
+  if (candidates.length === 0) return target;
+  if (from) candidates.sort((a, b) => chebyshev(a, from) - chebyshev(b, from));
+  return candidates[0];
+}
 
 /**
  * `talk`: open dialogue with the NPC in the current room. Indifferent
@@ -64,6 +90,15 @@ export const handleTalk: ActionHandler<{ type: 'talk' }> = (ctx) => {
   // + Back when nested) until the player ends it. The dedicated FE panel renders
   // `active_conversation.prompt` (the NPC's current line) + those choices.
   if (!ctx.st.combat_active) {
+    // Walk the party up to the NPC: move the marker to a free cell adjacent to
+    // the NPC's token before opening the conversation. No-op if the NPC has no
+    // position or the party is already adjacent.
+    if (npc.pos && ctx.st.marker_pos) {
+      const grid = activeGrid(ctx.context.campaign, ctx.seed.rooms, ctx.st);
+      if (grid) {
+        ctx.st = { ...ctx.st, marker_pos: approachCell(grid, ctx.st.marker_pos, npc.pos) };
+      }
+    }
     ctx.st = {
       ...ctx.st,
       active_conversation: { roomId: ctx.roomId, path: [], prompt: npc.greeting },

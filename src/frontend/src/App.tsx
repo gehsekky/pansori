@@ -543,6 +543,18 @@ export default function App() {
                     if (!gameState.combat_active && gameState.map_level) {
                       const grid = activeGrid(seed, gameState);
                       if (grid && gameState.marker_pos) {
+                        // A talkable NPC token (local room maps): show it when the
+                        // backend is surfacing a "Talk to …" choice AND the NPC has
+                        // a grid position. Clicking the token dispatches that same
+                        // talk choice (which walks the party adjacent + opens the
+                        // conversation).
+                        const talkChoice = choices.find((c) => c.action.type === 'talk');
+                        const roomNpc =
+                          grid.level === 'local' ? seed.npcs?.[gameState.current_room] : undefined;
+                        const npcToken =
+                          talkChoice && roomNpc?.pos
+                            ? { pos: roomNpc.pos, name: roomNpc.name }
+                            : undefined;
                         return (
                           <GridMapView
                             grid={grid}
@@ -550,6 +562,8 @@ export default function App() {
                             // A surfaced Attack choice means a hostile is here
                             // pre-combat — show the red enemy marker.
                             enemyPresent={choices.some((c) => c.kind === 'attack')}
+                            npc={npcToken}
+                            onNpcClick={talkChoice ? () => handleChoice(talkChoice) : undefined}
                             onMarkerMove={(to) =>
                               handleChoice({
                                 label: `Travel to (${to.x},${to.y})`,

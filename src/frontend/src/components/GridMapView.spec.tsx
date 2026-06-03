@@ -188,4 +188,53 @@ describe('GridMapView', () => {
     // A second plains cell of opposite parity carries the same fill.
     expect(cell(container, 3, 2).style.background).toContain('208, 188, 146');
   });
+
+  const localGrid: ActiveGrid = {
+    level: 'local',
+    id: 'temple',
+    name: 'Temple',
+    width: 7,
+    height: 7,
+    feetPerSquare: 5,
+    terrain: [],
+    obstacles: [],
+    startPos: { x: 3, y: 6 },
+    transitions: [],
+  };
+
+  it('renders a clickable NPC token (name label + Talk tooltip) and dispatches talk', () => {
+    const onNpcClick = vi.fn();
+    const onMarkerMove = vi.fn();
+    const { container, getByText } = render(
+      <GridMapView
+        grid={localGrid}
+        markerPos={{ x: 3, y: 6 }}
+        npc={{ pos: { x: 3, y: 2 }, name: 'Sister Maren' }}
+        onNpcClick={onNpcClick}
+        onMarkerMove={onMarkerMove}
+      />
+    );
+    const npcCell = cell(container, 3, 2);
+    expect(getByText('Sister Maren')).toBeTruthy(); // name label
+    expect(npcCell.getAttribute('title')).toBe('Talk to Sister Maren');
+    expect(npcCell.getAttribute('role')).toBe('button'); // clickable
+    fireEvent.click(npcCell);
+    expect(onNpcClick).toHaveBeenCalledTimes(1);
+    expect(onMarkerMove).not.toHaveBeenCalled(); // the NPC cell talks, doesn't move
+  });
+
+  it('hides the NPC token when the party marker stands on it', () => {
+    const { container, queryByText } = render(
+      <GridMapView
+        grid={localGrid}
+        markerPos={{ x: 3, y: 2 }} // party on the NPC's cell
+        npc={{ pos: { x: 3, y: 2 }, name: 'Sister Maren' }}
+        onNpcClick={vi.fn()}
+        onMarkerMove={vi.fn()}
+      />
+    );
+    // The party marker wins the cell; the NPC label isn't drawn.
+    expect(queryByText('Sister Maren')).toBeNull();
+    expect(cell(container, 3, 2).getAttribute('aria-current')).toBe('location');
+  });
 });

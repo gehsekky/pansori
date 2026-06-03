@@ -601,6 +601,7 @@ export const npcs: Record<string, PlacedNpc> = {
   millhaven_market: {
     roomId: 'millhaven_market',
     id: 'npc_aldric',
+    pos: { x: 3, y: 2 },
     name: 'Aldric the Merchant',
     attitude: 'friendly',
     factionId: 'faction_guild',
@@ -636,6 +637,7 @@ export const npcs: Record<string, PlacedNpc> = {
   millhaven_temple: {
     roomId: 'millhaven_temple',
     id: 'npc_sister_maren',
+    pos: { x: 3, y: 2 },
     name: 'Sister Maren',
     attitude: 'friendly',
     hp: 8,
@@ -686,6 +688,7 @@ export const npcs: Record<string, PlacedNpc> = {
   millhaven_lantern: {
     roomId: 'millhaven_lantern',
     id: 'npc_dusk',
+    pos: { x: 5, y: 2 },
     name: 'Dusk',
     attitude: 'indifferent',
     hp: 14,
@@ -722,6 +725,7 @@ export const npcs: Record<string, PlacedNpc> = {
   pines_tavern: {
     roomId: 'pines_tavern',
     id: 'npc_brann',
+    pos: { x: 2, y: 2 },
     name: 'Innkeeper Brann',
     attitude: 'friendly',
     factionId: 'faction_wardens',
@@ -757,6 +761,7 @@ export const npcs: Record<string, PlacedNpc> = {
   pines_lodge: {
     roomId: 'pines_lodge',
     id: 'npc_marta',
+    pos: { x: 4, y: 2 },
     name: 'Marta the Trapper',
     attitude: 'friendly',
     factionId: 'faction_wardens',
@@ -788,6 +793,7 @@ export const npcs: Record<string, PlacedNpc> = {
   pines_warden: {
     roomId: 'pines_warden',
     id: 'npc_riese',
+    pos: { x: 3, y: 2 },
     name: 'Captain Riese',
     attitude: 'indifferent',
     hp: 22,
@@ -819,6 +825,7 @@ export const npcs: Record<string, PlacedNpc> = {
   pinegate_square: {
     roomId: 'pinegate_square',
     id: 'npc_elise_elder',
+    pos: { x: 3, y: 2 },
     name: 'Old Elise (village elder)',
     attitude: 'friendly',
     factionId: 'faction_verdant',
@@ -854,6 +861,7 @@ export const npcs: Record<string, PlacedNpc> = {
   pinegate_lodge: {
     roomId: 'pinegate_lodge',
     id: 'npc_tamsin_herbalist',
+    pos: { x: 4, y: 2 },
     name: 'Tamsin the Herbalist',
     attitude: 'friendly',
     factionId: 'faction_verdant',
