@@ -1758,6 +1758,22 @@ export interface Region {
   // drop the party into a local encounter map drawn from `encounterTable`.
   encounterTable?: string[];
   encounterChance?: number; // 0–1 per square moved
+  // SRD Tiers of Play (loosely) — the encounter-difficulty band of each overland
+  // square, so future PROCEDURAL wilderness encounters can scale creatures to the
+  // party level expected in that area. tier 1 ≈ levels 1–4, 2 ≈ 5–7, 3 ≈ 8–10
+  // (this campaign tops out near level 10). A square resolves via `regionTierAt`:
+  // the highest `tierZones` rectangle covering it, else `baseTier`. Carries no
+  // mechanics yet — pure data the encounter generator will read later.
+  baseTier?: number; // default tier for squares outside any tierZone (default 1)
+  tierZones?: TierZone[];
+}
+
+// A rectangular band of overland squares sharing an encounter tier (inclusive
+// corners; order-independent). See `Region.tierZones` / `regionTierAt`.
+export interface TierZone {
+  tier: number;
+  from: GridPos;
+  to: GridPos;
 }
 
 // A transition cell on a TOWN grid.

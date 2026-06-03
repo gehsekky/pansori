@@ -994,6 +994,16 @@ export const regions: Region[] = [
     // (Whispering Pines: Snowshrouded Bandit, Frost Wolf; Grove: Awakened Wolf).
     encounterTable: ['Bandit Ruffian', 'Snowshrouded Bandit', 'Frost Wolf', 'Awakened Wolf'],
     encounterChance: 0.1, // per mile-square crossed
+    // Encounter tiers (SRD Tiers of Play, loosely) for future procedural
+    // scaling — danger rises as you push north off the southern grove road.
+    // The 12×8 grid: y 5–7 = the beginner grove wilds (baseTier 1, levels 1–4);
+    // y 3–4 = the mid eastern lane to the crypt / bandit camp (Tier 2, ~5–7);
+    // y 0–2 = the frozen north (the pass + Iceshard Spire) — endgame (Tier 3).
+    baseTier: 1,
+    tierZones: [
+      { tier: 2, from: { x: 0, y: 3 }, to: { x: 11, y: 4 } },
+      { tier: 3, from: { x: 0, y: 0 }, to: { x: 11, y: 2 } },
+    ],
   },
 ];
 

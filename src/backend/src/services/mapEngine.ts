@@ -99,6 +99,23 @@ export interface ActiveGrid {
 export function regionById(campaign: CampaignData | undefined, id?: string): Region | undefined {
   return campaign?.regions?.find((r) => r.id === id);
 }
+
+/**
+ * The encounter-difficulty tier of an overland square (SRD Tiers of Play,
+ * loosely): the highest tier among the region's `tierZones` rectangles covering
+ * `pos`, else the region's `baseTier` (default 1). Forward-looking data for
+ * procedural wilderness encounters — it lets the generator pick creatures scaled
+ * to the party level expected in that part of the map. No mechanics today.
+ */
+export function regionTierAt(region: Region, pos: GridPos): number {
+  let tier = region.baseTier ?? 1;
+  for (const z of region.tierZones ?? []) {
+    const inX = pos.x >= Math.min(z.from.x, z.to.x) && pos.x <= Math.max(z.from.x, z.to.x);
+    const inY = pos.y >= Math.min(z.from.y, z.to.y) && pos.y <= Math.max(z.from.y, z.to.y);
+    if (inX && inY) tier = Math.max(tier, z.tier);
+  }
+  return tier;
+}
 export function townById(campaign: CampaignData | undefined, id?: string): Town | undefined {
   return campaign?.towns?.find((t) => t.id === id);
 }
