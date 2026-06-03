@@ -1,6 +1,6 @@
 # TODO
 
-> **Status snapshot — verified 2026-06-02.** The top section is the
+> **Status snapshot — verified 2026-06-03.** The top section is the
 > authoritative implementation status, re-grounded in a fresh code survey
 > (not the prior changelog). The backlog below it lists only remaining
 > work. Shipped-feature completion logs were removed — `git log` is the
@@ -16,10 +16,10 @@ PHB/DMG-exclusive content (subclasses, feats, species, spells). See
 
 ---
 
-## Implementation status (code-verified 2026-06-02)
+## Implementation status (code-verified 2026-06-03)
 
-Grounded in a code survey + the full suite: **backend 2171 tests across
-256 files + frontend 153 across 25 files, all green** (lint + typecheck +
+Grounded in a code survey + the full suite: **backend 2250 tests across
+264 files + frontend 176 across 28 files, all green** (lint + typecheck +
 prettier clean).
 
 ### Done — world map / navigation
@@ -31,8 +31,11 @@ prettier clean).
   level is a tile grid with an SRD `feetPerSquare` scale (regional 5280 /
   town 25 / local 5). Movement is `marker_move` (free pathfinding out of
   combat); the regional grid spends SRD travel time (Normal 3 mi/hr →
-  `world_hour`) and rolls a per-square random encounter that drops the party
-  into a transient local fight and marches them back. "Transition cells" —
+  the in-game clock, see below) and rolls a per-square random encounter that
+  drops the party into a transient local fight and marches them back. Every
+  authored room/town/region grid carries cosmetic + tactical `terrain`
+  (flagstone, rubble, ice, water, forest…); impassable cells fold into combat
+  obstacles. "Transition cells" —
   region `sites`, town `venues`, room `exits` — descend / ascend / change
   rooms (`mapEngine.ts`, `activeGrid` + `resolveMarkerMove`). Frontend
   renders all three grids (`GridMapView`); the map overlay shows the active
@@ -72,8 +75,21 @@ prettier clean).
   (the NPC's responses at the current node + Back when nested + End
   conversation) until the player ends it. Responses **nest** arbitrarily
   (`NpcDialogueResponse.responses`, walked by `responsesAtPath`); the FE
-  renders it as a `ConversationPanel`. Trade / Attack stay as normal choices,
-  reachable after ending the conversation.
+  renders it as a `ConversationPanel`. Attack stays a normal choice; **buying
+  is a vendor pane nested under the conversation** — see below.
+- **In-game clock** — a single integer `GameState.world_minute` (total elapsed
+  in-world minutes since campaign start; Day 1 08:00 == 480) is the source of
+  truth; day / time-of-day band are derived at display time (`gameClock.ts`,
+  mirrored BE+FE; header shows `Day N · HH:MM · band`). Regional travel adds
+  minutes; a short rest +60, a long rest +480 (SRD), with SRD's **one long rest
+  per 24 h** enforced via `last_long_rest_minute`. Replaced the old dead
+  `world_hour`/`world_day` pair (a `stateSchema` v2 migration collapses them).
+- **Vendor pane (buy-only)** — shopping is a sub-state nested under a
+  conversation (`GameState.active_shop`), mirroring nested dialogue: a friendly
+  shop NPC offers a "🛒 Check out my wares" control → `generateChoices`
+  early-returns the NPC's wares (faction-priced `buy` choices, `kind:'vendor'`)
+  - a Back control, and the FE swaps in a `VendorPanel`. Selling is a planned
+    follow-up on the same pane.
 
 ### Done — rules-engine frameworks
 
@@ -116,6 +132,15 @@ prettier clean).
   6); **ability-score generation** validation (point buy / standard array,
   backend) + background ASIs applied; **skill→ability map** with all
   contested/social checks routed through `skillCheck`.
+- **Body-slot equipment + worn effects** — `Character.equipment` is a 13-slot
+  map (`main_hand`/`off_hand`/`armor`/`shield`/`head`/`neck`/`cloak`/`hands`/
+  `arms`/`waist`/`feet`/`ring_1`/`ring_2`) keyed to inventory `instance_id`s,
+  with accessor helpers (`services/equipment.ts`) and a save migration from the
+  old `equipped_weapon`/`armor`/`shield` trio. Any item with an `ItemSlot`
+  category is equippable (rings fill ring_1 then ring_2). Items confer passive
+  `wornEffects` while worn AND attuned (`services/wornEffects.ts`); today's one
+  kind is `save_bonus` (the Moonstone Amulet's +1 WIS save, applied at condition
+  saves) — extension point for more effect kinds / save sites.
 
 ### Content counts (the breadth that remains)
 
@@ -725,21 +750,19 @@ options }`** → `OptionPickerDialog` (single-select; re-sends `action[param]`).
       for the charmer (needs social-check-site plumbing to identify
       charmer↔target — no clean surface today).
 - [~] **Multiclass edge cases** — DONE: per-class ASI spacing is locked with a
-      test (fires on the *class's own* 4/8/12/16/19, never on total level), and
-      multiclass-entry skill/tool grants now follow the 2024 PHB (Bard → a class
-      skill + Musical Instrument; Ranger → a class skill; Rogue → a class skill +
-      Thieves' Tools), threaded through `applyLevelUpForClass` via the context's
-      `classSkillChoices`. DEFERRED (larger model changes):
-      - **Warlock pact-slot pool separation** — slots are still a single merged
-        pool, so a multiclass Warlock's pact slots aren't tracked apart from
-        Spellcasting. Concrete bug to fix with this: `actions/rest.ts`
-        short-rest overwrites `spell_slots_max` to the pact-only value and
-        resets *all* `spell_slots_used` — wiping a multiclass Warlock's
-        other-class slot maximum. Needs a separate pact pool + casting +
-        short/long-rest recovery + FE.
-      - **Second-class subclass features** — subclass auto-assign only triggers
-        for the *primary* class at its level 3; a second class that reaches its
-        own subclass level gets nothing. Needs a per-class subclass model.
+  test (fires on the _class's own_ 4/8/12/16/19, never on total level), and
+  multiclass-entry skill/tool grants now follow the 2024 PHB (Bard → a class
+  skill + Musical Instrument; Ranger → a class skill; Rogue → a class skill +
+  Thieves' Tools), threaded through `applyLevelUpForClass` via the context's
+  `classSkillChoices`. DEFERRED (larger model changes): - **Warlock pact-slot pool separation** — slots are still a single merged
+  pool, so a multiclass Warlock's pact slots aren't tracked apart from
+  Spellcasting. Concrete bug to fix with this: `actions/rest.ts`
+  short-rest overwrites `spell_slots_max` to the pact-only value and
+  resets _all_ `spell_slots_used` — wiping a multiclass Warlock's
+  other-class slot maximum. Needs a separate pact pool + casting +
+  short/long-rest recovery + FE. - **Second-class subclass features** — subclass auto-assign only triggers
+  for the _primary_ class at its level 3; a second class that reaches its
+  own subclass level gets nothing. Needs a per-class subclass model.
 
 ### Subsystem follow-ups
 
