@@ -913,7 +913,7 @@ export const regions: Region[] = [
       // The southern road runs east from the start, past Pinegate + the grove,
       // to Millhaven; the eastern road then climbs north toward the crypt and
       // the frozen pass, with a short western spur into Whispering Pines.
-      ...terr('road', [2, 7], [4, 7], [6, 7], [7, 7], [8, 7], [9, 7], [10, 7]),
+      ...terr('road', [2, 7], [3, 7], [4, 7], [5, 7], [6, 7], [7, 7], [8, 7], [9, 7], [10, 7]),
       ...terr('road', [10, 6], [10, 5], [10, 4], [10, 3], [10, 2], [10, 1]),
       ...terr('road', [8, 1], [7, 1]),
       // Snowy frozen north (top band) — the Frozen Pass + Iceshard Spire sit
@@ -939,7 +939,8 @@ export const regions: Region[] = [
         [2, 5],
         [3, 5],
         [4, 5],
-        [2, 6]
+        [2, 6],
+        [6, 6]
       ),
     ],
     sites: [
