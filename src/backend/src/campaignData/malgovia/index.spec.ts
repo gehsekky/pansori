@@ -169,6 +169,7 @@ describe('Malgovia — scripted playthrough', () => {
       location_id: state.current_location_id ?? '',
       enemies_killed: state.enemies_killed,
       loot_taken: state.loot_taken,
+      visited_rooms: state.visited_rooms,
       flags: state.flags,
       campaign_flags: state.campaign_flags ?? {},
       quest_progress: state.quest_progress ?? [],

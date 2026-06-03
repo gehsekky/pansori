@@ -1264,6 +1264,7 @@ gameRouter.post('/session/:id/action', async (req: Request, res: Response) => {
         location_id: '',
         enemies_killed: result.newState.enemies_killed,
         loot_taken: result.newState.loot_taken,
+        visited_rooms: result.newState.visited_rooms ?? [],
         flags: result.newState.flags,
         campaign_flags: result.newState.campaign_flags ?? {},
         quest_progress: result.newState.quest_progress ?? [],

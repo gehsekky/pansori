@@ -1698,6 +1698,9 @@ export interface CampaignFacts {
   location_id: string;
   enemies_killed: string[];
   loot_taken: string[];
+  // Room ids the party has entered (GameState.visited_rooms). Quest steps key on
+  // it for "reach <room>" objectives (e.g. the Silent Grove's `step_reach_oak`).
+  visited_rooms: string[];
   flags: Record<string, boolean | string | number>;
   campaign_flags: Record<string, boolean | string | number>;
   quest_progress: QuestProgress[];
