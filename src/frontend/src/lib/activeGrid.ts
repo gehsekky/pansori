@@ -124,8 +124,11 @@ export function activeGrid(seed: Seed | undefined, st: GameState): ActiveGrid | 
       width: g.width,
       height: g.height,
       feetPerSquare: g.scale,
-      terrain: [],
-      obstacles: room.obstacles ?? [],
+      // Cosmetic room terrain (the same paint GridCombatView shows in combat) is
+      // surfaced in exploration too; impassable types fold into obstacles like
+      // the town / region branches. Mirrors the backend activeGrid.
+      terrain: room.terrain ?? [],
+      obstacles: mergeObstacles(room.obstacles, room.terrain, transitions),
       startPos: g.entry,
       transitions,
     };
