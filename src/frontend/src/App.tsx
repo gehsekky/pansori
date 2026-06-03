@@ -32,6 +32,7 @@ import { activeGrid } from './lib/activeGrid.ts';
 import { applyTheme } from './lib/theme.ts';
 import artManifest from './art-manifest.json';
 import { context as malgoviaContext } from './contexts/malgovia.tsx';
+import { mapPanelVisible } from './lib/mapPanelVisible.ts';
 import { context as sandboxContext } from './contexts/sandbox.tsx';
 import styles from './styles.module.css';
 import { useGame } from './hooks/useGame.ts';
@@ -519,11 +520,11 @@ export default function App() {
                       (exploration marker map) or the combat grid. The narrative
                       sits below it, and the action / choices below that. */}
                   {(() => {
-                    if (!gameState || !seed || escaped || allDead) return null;
-                    // Post-combat "Continue" gate owns the screen — hide the map so
-                    // its clickable cells can't issue a marker_move that bypasses
-                    // the gate (combat_over_pending is only cleared by Continue).
-                    if (gameState.combat_over_pending) return null;
+                    // Hidden on the terminal screens AND during the post-combat
+                    // "Continue" gate — see mapPanelVisible (the gate must own the
+                    // screen so map clicks can't bypass it via marker_move).
+                    if (!gameState || !seed || !mapPanelVisible(gameState, { escaped, allDead }))
+                      return null;
                     if (
                       gameState.combat_active &&
                       gameState.entities &&
