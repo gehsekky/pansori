@@ -179,6 +179,15 @@ export function activeGrid(
     const room = roomById(rooms, st.current_room);
     if (!room) return null;
     const g = roomGrid(room);
+    const transitions: MapTransition[] = (room.exits ?? []).map((e) => ({
+      pos: e.pos,
+      kind: e.ascends ? ('ascend' as const) : ('room_exit' as const),
+      label: e.label ?? (e.ascends ? 'Exit' : 'Passage'),
+      toRoomId: e.toRoomId,
+      entrancePos: e.entrancePos,
+      // Ascend from a local room: to the town if we're inside one, else region.
+      ascendTo: e.ascends ? (st.current_town_id ? 'town' : 'region') : undefined,
+    }));
     return {
       level,
       id: room.id,
@@ -186,18 +195,13 @@ export function activeGrid(
       width: g.width,
       height: g.height,
       feetPerSquare: g.scale,
-      terrain: [], // local rooms use the combat-grid terrain model (deferred)
-      obstacles: room.obstacles ?? [],
+      // Cosmetic room terrain (the same paint GridCombatView shows in combat) is
+      // now surfaced in exploration too. Impassable terrain types fold into the
+      // obstacle set so they block marker travel the way town / region do.
+      terrain: room.terrain ?? [],
+      obstacles: mergeObstacles(room.obstacles, room.terrain, transitions),
       startPos: g.entry,
-      transitions: (room.exits ?? []).map((e) => ({
-        pos: e.pos,
-        kind: e.ascends ? ('ascend' as const) : ('room_exit' as const),
-        label: e.label ?? (e.ascends ? 'Exit' : 'Passage'),
-        toRoomId: e.toRoomId,
-        entrancePos: e.entrancePos,
-        // Ascend from a local room: to the town if we're inside one, else region.
-        ascendTo: e.ascends ? (st.current_town_id ? 'town' : 'region') : undefined,
-      })),
+      transitions,
     };
   }
   return null;

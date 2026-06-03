@@ -24,6 +24,26 @@ export const rooms: Room[] = [
     gridHeight: 7,
     entryPos: { x: 3, y: 6 },
     exits: [{ pos: { x: 3, y: 0 }, ascends: true, label: 'Step back into Millhaven' }],
+    // Cosmetic floor: a flagstone aisle leading to the moon-altar, flanked by
+    // shrine plantings.
+    terrain: [
+      ...terr(
+        'cobblestone',
+        [3, 1],
+        [3, 2],
+        [3, 3],
+        [3, 4],
+        [3, 5],
+        [3, 6],
+        [2, 2],
+        [4, 2],
+        [2, 3],
+        [4, 3],
+        [2, 4],
+        [4, 4]
+      ),
+      ...terr('garden', [1, 1], [5, 1]),
+    ],
   },
   {
     id: 'millhaven_market',
@@ -33,6 +53,24 @@ export const rooms: Room[] = [
     gridHeight: 7,
     entryPos: { x: 3, y: 6 },
     exits: [{ pos: { x: 3, y: 0 }, ascends: true, label: 'Step back into Millhaven' }],
+    // Cosmetic: a cobbled market square with a couple of planter beds.
+    terrain: [
+      ...terr(
+        'cobblestone',
+        [2, 2],
+        [3, 2],
+        [4, 2],
+        [2, 3],
+        [3, 3],
+        [4, 3],
+        [2, 4],
+        [3, 4],
+        [4, 4],
+        [3, 5],
+        [3, 6]
+      ),
+      ...terr('garden', [1, 5], [5, 5]),
+    ],
   },
   {
     id: 'millhaven_lantern',
@@ -42,6 +80,10 @@ export const rooms: Room[] = [
     gridHeight: 7,
     entryPos: { x: 3, y: 6 },
     exits: [{ pos: { x: 3, y: 0 }, ascends: true, label: 'Step back into Millhaven' }],
+    // Cosmetic: a narrow cobbled alley winding through the slums.
+    terrain: [
+      ...terr('cobblestone', [3, 1], [3, 2], [3, 3], [3, 4], [3, 5], [3, 6], [2, 3], [4, 3]),
+    ],
   },
   {
     id: 'millhaven_garrison',
@@ -51,6 +93,23 @@ export const rooms: Room[] = [
     gridHeight: 7,
     entryPos: { x: 3, y: 6 },
     exits: [{ pos: { x: 3, y: 0 }, ascends: true, label: 'Step back into Millhaven' }],
+    // Cosmetic: a flagstone office floor.
+    terrain: [
+      ...terr(
+        'cobblestone',
+        [2, 2],
+        [3, 2],
+        [4, 2],
+        [2, 3],
+        [3, 3],
+        [4, 3],
+        [2, 4],
+        [3, 4],
+        [4, 4],
+        [3, 5],
+        [3, 6]
+      ),
+    ],
     objects: [
       {
         id: 'captain_strongbox',
