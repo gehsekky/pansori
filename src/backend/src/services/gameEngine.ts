@@ -139,6 +139,7 @@ import { llmProvider } from './llmProvider.js';
 import { randomUUID } from 'crypto';
 import { responsesAtPath } from './conversation.js';
 import { returnFromEncounter } from './mapEngine.js';
+import { wornSaveBonus } from './wornEffects.js';
 
 // Central enemy-damage floor (Undead Fortitude + future on-"reduced to 0"
 // traits). Re-exported here so combat handlers pull it from the same module
@@ -1129,7 +1130,10 @@ function conditionSavingThrow(
   // roll it, then check if the d20 + mods + bi-roll meets the DC.
   const biDie = char.bardic_inspiration_die;
   const bardicRoll = biDie ? rollDice(`1${biDie}`) : 0;
-  const dcAdjusted = effect.dc - bardicRoll - auraBonus;
+  // Worn-gear save bonus (e.g. Moonstone Amulet's +1 to WIS saves while worn and
+  // attuned). Folded into the effective DC, same mechanism as Aura of Protection.
+  const wornBonus = wornSaveBonus(char, effect.ability, context.lootTable);
+  const dcAdjusted = effect.dc - bardicRoll - auraBonus - wornBonus;
   // 2024 PHB: heavy encumbrance imposes disadvantage on STR/DEX/CON saves
   // (and checks, and attacks). Apply here so onHit-effect saves account for it.
   const enc =

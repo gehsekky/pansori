@@ -1148,6 +1148,18 @@ export type ItemSlot =
   | 'feet'
   | 'ring';
 
+/**
+ * A passive effect an item confers while WORN in its body slot (and attuned, if
+ * the item requires attunement). Deliberately small to start — `save_bonus` is
+ * the only kind today (e.g. the Moonstone Amulet's +1 to WIS saves). Extend the
+ * union as new worn-item mechanics land (AC bonuses, ability-check bonuses, …).
+ */
+export interface WornEffect {
+  kind: 'save_bonus';
+  ability: AbilityKey;
+  bonus: number;
+}
+
 export interface LootItem {
   id: string;
   name: string;
@@ -1167,6 +1179,10 @@ export interface LootItem {
   weaponType?: 'simple' | 'martial';
   light?: boolean; // TWF: can be used in off-hand with another light weapon
   requiresAttunement?: boolean; // magic items requiring attunement
+  // Passive effects this item confers while WORN in its body slot (and attuned,
+  // if requiresAttunement). Applied by the worn-effects layer — see
+  // services/wornEffects.ts. Distinct from `effect` (the consumable-use string).
+  wornEffects?: WornEffect[];
   /**
    * Cursed item flag (PHB p.214). The curse reveals on attunement and
    * voluntary de-attunement is blocked — only Remove Curse / Greater
