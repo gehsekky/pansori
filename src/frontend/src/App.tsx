@@ -549,15 +549,20 @@ export default function App() {
                       const grid = activeGrid(seed, gameState);
                       if (grid && gameState.marker_pos) {
                         // A talkable NPC token (local room maps): show it when the
-                        // backend is surfacing a "Talk to …" choice AND the NPC has
-                        // a grid position. Clicking the token dispatches that same
-                        // talk choice (which walks the party adjacent + opens the
-                        // conversation).
+                        // NPC has a grid position AND is interactable — either the
+                        // backend is surfacing a "Talk to …" choice, OR a
+                        // conversation with them is already active (during which
+                        // the talk choice is replaced by the dialogue options, so
+                        // the token must stay visible). Clicking dispatches the
+                        // talk choice (walks the party adjacent + opens dialogue);
+                        // it's non-clickable mid-conversation (the panel drives it).
                         const talkChoice = choices.find((c) => c.action.type === 'talk');
                         const roomNpc =
                           grid.level === 'local' ? seed.npcs?.[gameState.current_room] : undefined;
+                        const inConversationHere =
+                          gameState.active_conversation?.roomId === gameState.current_room;
                         const npcToken =
-                          talkChoice && roomNpc?.pos
+                          roomNpc?.pos && (talkChoice || inConversationHere)
                             ? { pos: roomNpc.pos, name: roomNpc.name }
                             : undefined;
                         return (
