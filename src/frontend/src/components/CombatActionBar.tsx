@@ -3,11 +3,13 @@ import RaIcon from './RaIcon.tsx';
 import styles from '../styles.module.css';
 
 // Horizontal icon row for the target-bearing combat verbs the engine
-// surfaces today: Attack / Grapple / Shove / Two-Weapon Attack. Each
-// pairs with the EnemySelector — the player picks a target there, the
-// CombatActionBar picks the verb. The wiring is: App.tsx already
-// filters choices to the selected enemy, so any choice with the right
-// `kind` that reaches this component is the right one to dispatch.
+// surfaces today: Attack / Grapple / Shove / Two-Weapon Attack, plus a
+// conjured recurring spell attack (Spiritual Weapon / Vampiric Touch /
+// Flame Blade) when one is active. Each pairs with the EnemySelector —
+// the player picks a target there, the CombatActionBar picks the verb.
+// The wiring is: App.tsx already filters choices to the selected enemy,
+// so any choice with the right `kind` that reaches this component is the
+// right one to dispatch.
 //
 // Cast Spell intentionally stays in the numbered text list — it varies
 // by spell + slot level, so collapsing to one button would lose the
@@ -23,9 +25,20 @@ interface ActionDef {
 const ACTIONS: ActionDef[] = [
   { kind: 'attack', icon: 'crossed-swords', shortLabel: 'Attack' },
   { kind: 'two_weapon_attack', icon: 'dervish-swords', shortLabel: 'Off-hand' },
+  { kind: 'recurring_spell_attack', icon: 'lightning-sword', shortLabel: 'Spell Atk' },
   { kind: 'grapple', icon: 'grappling-hook', shortLabel: 'Grapple' },
   { kind: 'shove', icon: 'sideswipe', shortLabel: 'Shove' },
 ];
+
+// The recurring spell-attack label varies (Spiritual Weapon / Vampiric Touch /
+// Flame Blade); the engine labels it "<Spell>: attack the <enemy> (...)", so
+// caption it with the spell name (before the colon). Other verbs use shortLabel.
+function captionFor(def: ActionDef, choice: GameChoice | undefined): string {
+  if (def.kind === 'recurring_spell_attack' && choice?.label.includes(':')) {
+    return choice.label.split(':')[0].trim();
+  }
+  return def.shortLabel;
+}
 
 interface Props {
   choices: GameChoice[];
@@ -67,7 +80,7 @@ function CombatActionBar({ choices, onChoose, disabled }: Props) {
             onClick={() => choice && onChoose(choice)}
           >
             <RaIcon name={def.icon} />
-            <span className={styles.actionBtnLabel}>{def.shortLabel}</span>
+            <span className={styles.actionBtnLabel}>{captionFor(def, choice)}</span>
           </button>
         );
       })}

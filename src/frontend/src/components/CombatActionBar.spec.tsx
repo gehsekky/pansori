@@ -24,6 +24,11 @@ const twf = makeChoice('two_weapon_attack', 'Two-weapon attack — off-hand dagg
   type: 'two_weapon_attack',
   targetEnemyId: 'g1',
 });
+const spiritWeapon = makeChoice(
+  'recurring_spell_attack',
+  'Spiritual Weapon: attack the Goblin (bonus action)',
+  { type: 'recurring_spell_attack', targetEnemyId: 'g1' }
+);
 
 describe('CombatActionBar', () => {
   it('renders nothing when no matching combat choices are present', () => {
@@ -76,6 +81,21 @@ describe('CombatActionBar', () => {
     );
     fireEvent.click(getByTestId('combat-attack'));
     expect(onChoose).toHaveBeenCalledWith(attack);
+  });
+
+  it('renders a recurring spell-attack button, captioned with the spell name', () => {
+    const onChoose = vi.fn();
+    const { getByTestId } = render(
+      <CombatActionBar choices={[spiritWeapon]} onChoose={onChoose} />
+    );
+    const btn = getByTestId('combat-recurring_spell_attack') as HTMLButtonElement;
+    expect(btn.disabled).toBe(false);
+    // Caption derives from the label prefix (before the colon), not "Spell Atk".
+    expect(btn.textContent).toContain('Spiritual Weapon');
+    // Full label still exposed for SR users.
+    expect(btn.getAttribute('title')).toBe(spiritWeapon.label);
+    fireEvent.click(btn);
+    expect(onChoose).toHaveBeenCalledWith(spiritWeapon);
   });
 
   it('exposes the full original label via aria-label + title', () => {

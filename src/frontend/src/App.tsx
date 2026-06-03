@@ -56,10 +56,17 @@ const ICONIZED_KINDS = new Set<string>([
   'grapple',
   'shove',
   'two_weapon_attack',
+  'recurring_spell_attack',
   'class_feature',
 ]);
 const DEFAULT_ACTION_KINDS = new Set<string>(['dash', 'disengage', 'dodge', 'ready']);
-const COMBAT_ACTION_KINDS = new Set<string>(['attack', 'grapple', 'shove', 'two_weapon_attack']);
+const COMBAT_ACTION_KINDS = new Set<string>([
+  'attack',
+  'grapple',
+  'shove',
+  'two_weapon_attack',
+  'recurring_spell_attack',
+]);
 
 // SpellBar surfaces one icon per cast_spell choice the active PC has
 // available — including buffs (Bless), heals (Cure Wounds, Healing
