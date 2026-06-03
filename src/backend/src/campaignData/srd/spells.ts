@@ -5483,4 +5483,89 @@ export const SRD_SPELLS: Record<string, Spell> = {
     },
     spellList: ['arcane', 'divine', 'primal'],
   },
+
+  // ─── Spell batch: Conjuration travel ─────────────────────────────────────────
+  // Long-range / planar travel. All out-of-combat narrative utility, alongside
+  // the existing Tree Stride / Wind Walk (the combat blink-teleports Misty Step /
+  // Dimension Door stay in-combat). Destinations are narrated — pansori models a
+  // single region/site map, so cross-plane / cross-world arrival is flavour.
+
+  // SRD: Passwall (L5 Transmutation) — open a 5×8×20-ft passage through wood,
+  // plaster, or stone for 1 hour. Traversal utility; narrated.
+  passwall: {
+    id: 'passwall',
+    name: 'Passwall',
+    level: 5,
+    castTime: 'action',
+    outOfCombatOnly: true,
+    rangeKind: 'ranged',
+    rangeFt: 30,
+    desc: 'You open a passage (up to 5 ft wide, 8 ft tall, 20 ft deep) through a wooden, plaster, or stone surface within range; it lasts 1 hour. The breach is narrated.',
+    narrative:
+      '{name} scatters sesame seeds against the wall and the stone yawns open into a tunnel.',
+    spellList: ['arcane'],
+  },
+
+  // SRD: Teleport (L7 Conjuration) — instantly transport yourself + up to eight
+  // companions to a distant location you know. Narrated arrival (the
+  // mishap/off-target table is not modeled).
+  teleport: {
+    id: 'teleport',
+    name: 'Teleport',
+    level: 7,
+    castTime: 'action',
+    outOfCombatOnly: true,
+    rangeKind: 'self',
+    somatic: false, // SRD: V only
+    desc: 'You and up to eight willing companions are instantly transported to a destination you know or have seen. (The off-target / mishap table for unfamiliar destinations is narrated, not rolled.)',
+    narrative:
+      '{name} fixes the destination in mind; the world lurches and the party is simply elsewhere.',
+    spellList: ['arcane'],
+  },
+
+  // SRD: Plane Shift (L7 Conjuration) — transport willing creatures to another
+  // plane. The offensive variant (a melee spell attack to banish one creature
+  // via a CHA save) is deferred — see Banishment. Narrated travel.
+  plane_shift: {
+    id: 'plane_shift',
+    name: 'Plane Shift',
+    level: 7,
+    castTime: 'action',
+    outOfCombatOnly: true,
+    rangeKind: 'touch',
+    materialCost: 250,
+    desc: 'You and up to eight willing creatures joining hands travel to another plane of existence, arriving at or near a destination you describe. The offensive banish-one-creature variant is deferred (cf. Banishment).',
+    narrative:
+      '{name} raises the forked rod; it thrums to a far plane, and the party is drawn through.',
+    spellList: ['arcane', 'divine', 'primal'],
+  },
+
+  // SRD: Etherealness (L7 Conjuration) — step into the Border Ethereal, able to
+  // move through the Material Plane unseen for up to 8 hours. Narrated.
+  etherealness: {
+    id: 'etherealness',
+    name: 'Etherealness',
+    level: 7,
+    castTime: 'action',
+    outOfCombatOnly: true,
+    rangeKind: 'self',
+    desc: 'You step into the Border Ethereal, where you can move in any direction and pass through Material objects/creatures, perceiving the Material Plane in shades of grey. Lasts up to 8 hours; the ethereal traversal is narrated.',
+    narrative: '{name} slips half a step sideways out of the world and walks on through the grey.',
+    spellList: ['arcane', 'divine'],
+  },
+
+  // SRD: Word of Recall (L6 Conjuration) — instantly return yourself + up to five
+  // companions to a sanctuary you designated earlier. Narrated.
+  word_of_recall: {
+    id: 'word_of_recall',
+    name: 'Word of Recall',
+    level: 6,
+    castTime: 'action',
+    outOfCombatOnly: true,
+    rangeKind: 'self',
+    somatic: false, // SRD: V only
+    desc: 'You and up to five willing companions are instantly teleported to a sanctuary you consecrated in advance. The return is narrated.',
+    narrative: '{name} speaks the keyed word and the party is snatched home to safe ground.',
+    spellList: ['divine'],
+  },
 };
