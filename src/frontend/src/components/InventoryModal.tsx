@@ -1,5 +1,6 @@
-import type { Character, FrontendContext, GameState } from '../types';
+import type { Character, EquipSlot, FrontendContext, GameState } from '../types';
 import Dialog from './Dialog.tsx';
+import { EQUIP_SLOTS } from '../types';
 import { formatClassLabel } from '../lib/characterFmt';
 import styles from '../styles.module.css';
 import { useState } from 'react';
@@ -29,6 +30,26 @@ function totalWeight(char: Character): number {
     return sum + w * count;
   }, 0);
 }
+
+// Display labels for each body slot.
+const SLOT_LABELS: Record<EquipSlot, string> = {
+  main_hand: 'WEAPON',
+  off_hand: 'OFF-HAND',
+  armor: 'ARMOR',
+  shield: 'SHIELD',
+  head: 'HEAD',
+  neck: 'NECK',
+  cloak: 'CLOAK',
+  hands: 'HANDS',
+  arms: 'ARMS',
+  waist: 'WAIST',
+  feet: 'FEET',
+  ring_1: 'RING 1',
+  ring_2: 'RING 2',
+};
+// Always-visible core combat slots; other slots appear only once filled, so the
+// row stays compact for a lightly-equipped character.
+const CORE_SLOTS: EquipSlot[] = ['main_hand', 'armor', 'shield'];
 
 function encumbranceLabel(weight: number, str: number): { label: string; color: string } {
   const cap = carryingCapacity(str);
@@ -61,11 +82,13 @@ function InventoryModal({
   const cap = carryingCapacity(char.str);
   const enc = encumbranceLabel(weight, char.str);
 
-  const equippedSlots: Array<{ label: string; instId: string | null }> = [
-    { label: 'WEAPON', instId: char.equipment.main_hand ?? null },
-    { label: 'ARMOR', instId: char.equipment.armor ?? null },
-    { label: 'SHIELD', instId: char.equipment.shield ?? null },
-  ];
+  // Show the core combat slots always, plus any other slot the character has
+  // something worn in — kept in canonical EQUIP_SLOTS order.
+  const shownSlots = EQUIP_SLOTS.filter((s) => CORE_SLOTS.includes(s) || char.equipment[s]);
+  const equippedSlots: Array<{ label: string; instId: string | null }> = shownSlots.map((s) => ({
+    label: SLOT_LABELS[s],
+    instId: char.equipment[s] ?? null,
+  }));
 
   function nameOf(instId: string | null): string {
     if (!instId) return '—';
@@ -128,15 +151,12 @@ function InventoryModal({
           <p className={styles.campaignEmpty}>No items.</p>
         ) : (
           char.inventory.map((item) => {
-            const isEquipped =
-              item.instance_id === (char.equipment.main_hand ?? null) ||
-              item.instance_id === (char.equipment.armor ?? null) ||
-              item.instance_id === (char.equipment.shield ?? null);
+            const isEquipped = Object.values(char.equipment).includes(item.instance_id);
             const isAttuned = char.attuned_items?.includes(item.instance_id);
+            // Equippable if it deals damage (a weapon) or declares a body slot
+            // (armor, shield, or any worn wondrous item).
             const isEquippable = !!(
-              (item as { damage?: string }).damage ||
-              (item as { slot?: string }).slot === 'armor' ||
-              (item as { slot?: string }).slot === 'shield'
+              (item as { damage?: string }).damage || (item as { slot?: string }).slot
             );
             const icon = ctx.itemIcons[item.id];
             const desc = item.desc ?? ctx.itemDescs[item.id] ?? '';

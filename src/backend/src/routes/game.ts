@@ -70,6 +70,7 @@ import {
   equippedWeaponId,
   setSlot,
   slotsForInstance,
+  toggleWornItem,
 } from '../services/equipment.js';
 import { expertiseSlotsForClassLevel, resolveCreationExpertise } from '../services/multiclass.js';
 import type { AuthedRequest } from '../auth/middleware.js';
@@ -794,6 +795,20 @@ gameRouter.post('/session/:id/equip', async (req: Request, res: Response) => {
       if ('cost' in check && check.cost === 'free_interaction') {
         char.turn_actions = { ...turnActions, free_interaction_used: true };
       }
+    } else if (loot.slot) {
+      // Worn wondrous items (head/neck/cloak/hands/arms/waist/feet + rings).
+      // No armor-style don/doff combat gate — the attunement requirement (above)
+      // is the out-of-combat gate for the magic items that need one. Toggling:
+      // if it's already worn in one of its candidate slots, take it off; else
+      // place it in the first free candidate slot (rings fill ring_1 then ring_2).
+      const result = toggleWornItem(char.equipment, loot.slot, iid);
+      if ('full' in result) {
+        res
+          .status(409)
+          .json({ error: `No free ${loot.slot} slot — unequip something there first.` });
+        return;
+      }
+      char.equipment = result.equipment;
     } else {
       res.status(400).json({ error: 'Item is not equippable' });
       return;

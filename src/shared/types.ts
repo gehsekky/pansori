@@ -1126,13 +1126,30 @@ export const EQUIP_SLOTS: EquipSlot[] = [
   'ring_2',
 ];
 
+// The body-slot *category* an item declares (LootItem.slot). 'weapon' maps to
+// the main hand and 'ring' to whichever ring slot is free; every other value
+// maps 1:1 to the EquipSlot of the same name. Distinct from EquipSlot because
+// an item doesn't know which of the two ring slots it'll land in.
+export type ItemSlot =
+  | 'weapon'
+  | 'armor'
+  | 'shield'
+  | 'head'
+  | 'neck'
+  | 'cloak'
+  | 'hands'
+  | 'arms'
+  | 'waist'
+  | 'feet'
+  | 'ring';
+
 export interface LootItem {
   id: string;
   name: string;
   desc: string;
   weight: number;
   type: 'weapon' | 'armor' | 'consumable' | 'misc';
-  slot: 'weapon' | 'armor' | 'shield' | null;
+  slot: ItemSlot | null;
   damage: string | null;
   finesse?: boolean;
   range?: 'melee' | 'ranged';

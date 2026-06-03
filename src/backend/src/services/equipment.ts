@@ -1,4 +1,4 @@
-import type { Character, EquipSlot } from '../types.js';
+import type { Character, EquipSlot, ItemSlot } from '../types.js';
 
 // Accessors for a character's body-slot equipment map. The map holds, per
 // filled slot, the inventory instance_id of the worn/wielded item. These
@@ -50,6 +50,36 @@ export function clearInstance(eq: Equipment, instanceId: string): Equipment {
 /** Slots `instanceId` currently occupies (usually 0 or 1). */
 export function slotsForInstance(eq: Equipment, instanceId: string): EquipSlot[] {
   return (Object.keys(eq) as EquipSlot[]).filter((slot) => eq[slot] === instanceId);
+}
+
+/**
+ * All EquipSlots an item with category `itemSlot` could occupy. 'weapon' →
+ * main_hand; 'ring' → both ring slots (caller picks the first free one); every
+ * other category maps 1:1 to the EquipSlot of the same name.
+ */
+export function candidateSlots(itemSlot: ItemSlot): EquipSlot[] {
+  if (itemSlot === 'weapon') return ['main_hand'];
+  if (itemSlot === 'ring') return ['ring_1', 'ring_2'];
+  return [itemSlot];
+}
+
+/**
+ * Toggle a worn item in/out of its body slot. If `instanceId` is already worn
+ * in one of the item's candidate slots, take it off; otherwise place it in the
+ * first free candidate slot. Returns the updated map, or `{ full: true }` when
+ * every candidate slot is occupied by something else (e.g. both rings worn).
+ */
+export function toggleWornItem(
+  eq: Equipment,
+  itemSlot: ItemSlot,
+  instanceId: string
+): { equipment: Equipment } | { full: true } {
+  const cands = candidateSlots(itemSlot);
+  const wornSlot = cands.find((s) => eq[s] === instanceId);
+  if (wornSlot) return { equipment: setSlot(eq, wornSlot, null) };
+  const free = cands.find((s) => !eq[s]);
+  if (!free) return { full: true };
+  return { equipment: setSlot(eq, free, instanceId) };
 }
 
 /**
