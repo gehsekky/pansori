@@ -16,7 +16,7 @@ import GridCombatView from './components/GridCombatView.tsx';
 import GridMapView from './components/GridMapView.tsx';
 import InventoryModal from './components/InventoryModal.tsx';
 import InviteDialog from './components/InviteDialog.tsx';
-import LevelUpDialog from './components/LevelUpDialog.tsx';
+import LevelingPanel from './components/LevelingPanel.tsx';
 import LoginScreen from './components/LoginScreen.tsx';
 import MoveDPad from './components/MoveDPad.tsx';
 import NarrativeText from './components/NarrativeText.tsx';
@@ -133,12 +133,6 @@ export default function App() {
   const [mapOpen, setMapOpen] = useState(false);
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
-  // CharId of the PC whose LevelUpDialog is open. Null = dialog closed.
-  // The PC must meet the XP threshold + be out of combat; the rail won't
-  // surface the trigger button otherwise. The dialog still re-checks
-  // prereqs per-class so a stat change between trigger + selection
-  // doesn't sneak through.
-  const [levelUpCharId, setLevelUpCharId] = useState<string | null>(null);
   // Which choice is currently hovered — used by GridCombatView to render an
   // AoE preview tint over the cells a hovered spell would affect.
   const [hoveredChoice, setHoveredChoice] = useState<GameChoice | null>(null);
@@ -518,7 +512,6 @@ export default function App() {
                         action: { type: 'set_active_character', characterId: charId },
                       });
                     }}
-                    onLevelUp={(charId) => setLevelUpCharId(charId)}
                   />
                 )}
 
@@ -775,7 +768,8 @@ export default function App() {
                                   (c) =>
                                     c.kind !== 'conversation' &&
                                     c.kind !== 'continue' &&
-                                    c.kind !== 'vendor'
+                                    c.kind !== 'vendor' &&
+                                    c.kind !== 'leveling'
                                 );
                               // Combat-controls container should render whenever
                               // at least one inner bar will. EnemySelector +
@@ -975,6 +969,32 @@ export default function App() {
                         </div>
                       );
                     }
+                    // Leveling: out of combat, the leveling pane takes over. In
+                    // the cascade (active_leveling set) it drives one member's
+                    // level-up; otherwise the roster lists every member who can
+                    // level. Both suppress the normal options.
+                    if (!gameState?.combat_active && gameState?.active_leveling) {
+                      const memberName = gameState.characters.find(
+                        (c) => c.id === gameState.active_leveling?.characterId
+                      )?.name;
+                      return (
+                        <LevelingPanel
+                          mode="cascade"
+                          memberName={memberName}
+                          choices={choices.filter((c) => c.kind === 'leveling')}
+                          onChoose={handleChoice}
+                        />
+                      );
+                    }
+                    if (!gameState?.combat_active && choices.some((c) => c.kind === 'leveling')) {
+                      return (
+                        <LevelingPanel
+                          mode="roster"
+                          choices={choices.filter((c) => c.kind === 'leveling')}
+                          onChoose={handleChoice}
+                        />
+                      );
+                    }
                     // Active shop: the vendor pane replaces the conversation pane
                     // (a nested sub-state). Only the NPC's wares + Back show.
                     if (
@@ -1040,25 +1060,6 @@ export default function App() {
                   onDrop={handleDrop}
                 />
               )}
-
-              {levelUpCharId &&
-                gameState &&
-                (() => {
-                  const target = gameState.characters.find((c) => c.id === levelUpCharId);
-                  if (!target) return null;
-                  return (
-                    <LevelUpDialog
-                      char={target}
-                      onClose={() => setLevelUpCharId(null)}
-                      onChoose={(className) => {
-                        handleChoice({
-                          label: `${target.name} levels up: ${className.charAt(0).toUpperCase() + className.slice(1)}`,
-                          action: { type: 'level_up_class', className },
-                        });
-                      }}
-                    />
-                  );
-                })()}
 
               {targetPicker &&
                 targetPicker.pickTargets &&

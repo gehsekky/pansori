@@ -280,6 +280,41 @@
   font-style: italic;
 }
 
+/* Leveling pane — player-driven level-up. Mirrors the conversation/vendor
+   panes; reuses .conversationControls for the Back row and .choiceBtn for the
+   roster/cascade buttons. */
+.levelingPanel {
+  background: var(--t-card);
+  border: 1px solid var(--t-border);
+  padding: 0.85rem 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.levelingHeader {
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  color: var(--t-primary);
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+}
+
+.levelingStep {
+  font-size: 0.62rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--t-dim);
+  margin: 0 0 0.6rem;
+}
+
+.levelingChoices {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
 /* Invite dialog — wraps the standard Dialog with a copy-link row and an
    optional host-only "rotate" button. The input is readonly + click-to-
    select so a player can grab the URL with one tap. */
@@ -1005,24 +1040,6 @@
   gap: 0.4rem;
   width: 100%;
   letter-spacing: 0.04em;
-}
-
-.partyTileLevelUpBtn {
-  background: transparent;
-  border: 1px solid var(--t-primary);
-  color: var(--t-primary);
-  font-family: inherit;
-  font-size: 0.7rem;
-  letter-spacing: 0.08em;
-  padding: 0.25rem 0.55rem;
-  cursor: pointer;
-  text-transform: uppercase;
-  align-self: stretch;
-  text-align: center;
-}
-
-.partyTileLevelUpBtn:hover {
-  background: var(--t-separator);
 }
 
 .partyTileActive {

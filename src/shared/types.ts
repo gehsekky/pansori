@@ -403,6 +403,10 @@ export type StructuredAction =
   // active conversation, like a nested dialogue branch). See active_shop.
   | { type: 'enter_shop' }
   | { type: 'exit_shop' }
+  // Leveling pane: open the level-up cascade for one party member (out of
+  // combat) / step back to the roster. See active_leveling.
+  | { type: 'enter_leveling'; characterId: string }
+  | { type: 'exit_leveling' }
   | { type: 'attack_npc' }
   | { type: 'use_class_feature'; featureId: string; targetEnemyId?: string }
   | { type: 'apply_asi'; stat: AbilityKey }
@@ -686,6 +690,9 @@ export type ChoiceKind =
   // Vendor-pane choices (buy rows + the Back control). The frontend renders
   // these in the dedicated VendorPanel instead of the normal choice list.
   | 'vendor'
+  // Leveling-pane choices (the per-member roster entries, the class/ASI/mastery
+  // cascade, and Back). Rendered in the dedicated LevelingPanel.
+  | 'leveling'
   // The post-combat "Continue" gate. The frontend renders a dedicated
   // interstitial instead of listing it among the normal choices.
   | 'continue';

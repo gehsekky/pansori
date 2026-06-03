@@ -6,7 +6,12 @@ import {
   fightingStyleSlots,
 } from '../fightingStyle.js';
 import { applyFeatTake, canTakeFeat, getFeat } from '../feats.js';
-import { applyLevelUpForClass, applySubclass, preparedSpellsCap } from '../gameEngine.js';
+import {
+  applyLevelUpForClass,
+  applySubclass,
+  levelUpWorkFor,
+  preparedSpellsCap,
+} from '../gameEngine.js';
 import {
   canMulticlassInto,
   evocationSavantBudget,
@@ -55,6 +60,7 @@ export const handleApplyAsi: ActionHandler<{ type: 'apply_asi'; stat: AbilityKey
   }
   updatePcActor(ctx, next);
   ctx.narrative = narrative;
+  clearLevelingIfDone(ctx);
 };
 
 /**
@@ -555,6 +561,7 @@ export const handleChooseWeaponMastery: ActionHandler<{
   if (!action.weaponId) {
     updatePcActor(ctx, { weapon_mastery_pending: remaining });
     ctx.narrative = `${char.name} has no further weapons to master.`;
+    clearLevelingIfDone(ctx);
     return;
   }
   const profs = ctx.context.classWeaponProficiencies?.[char.character_class] ?? [];
@@ -570,6 +577,7 @@ export const handleChooseWeaponMastery: ActionHandler<{
     weapon_mastery_pending: remaining,
   });
   ctx.narrative = `${char.name} masters the ${weapon.name} — ${weapon.mastery} property unlocked.`;
+  clearLevelingIfDone(ctx);
 };
 
 /**
@@ -600,6 +608,64 @@ export const handleSetActiveCharacter: ActionHandler<{
   ctx.narrative = `${target.name} steps forward to lead.`;
   ctx.usedInitiative = false;
 };
+
+/**
+ * `enter_leveling`: open the leveling pane for one party member (out of combat).
+ * Also makes them the active character so the existing level handlers
+ * (level_up_class / apply_asi / take_feat / choose_weapon_mastery), which act on
+ * the active PC, operate on the right member with no per-action plumbing.
+ */
+export const handleEnterLeveling: ActionHandler<{
+  type: 'enter_leveling';
+  characterId: string;
+}> = (ctx, action) => {
+  if (ctx.st.combat_active) {
+    ctx.narrative = `You can't level up mid-fight.`;
+    return;
+  }
+  const target = ctx.st.characters.find((c) => c.id === action.characterId);
+  if (!target || target.dead) {
+    ctx.narrative = 'That party member can’t level up right now.';
+    return;
+  }
+  if (levelUpWorkFor(target) === null) {
+    ctx.narrative = `${target.name} has nothing to level up right now.`;
+    return;
+  }
+  ctx.st = {
+    ...ctx.st,
+    active_character_id: action.characterId,
+    active_leveling: { characterId: action.characterId },
+  };
+  ctx.narrative = `Leveling up ${target.name}.`;
+};
+
+/** `exit_leveling`: close the leveling pane, back to the roster / normal play. */
+export const handleExitLeveling: ActionHandler<{ type: 'exit_leveling' }> = (ctx) => {
+  ctx.st = { ...ctx.st, active_leveling: undefined };
+  ctx.narrative = 'Back to the party.';
+};
+
+/**
+ * After a level-up cascade step resolves, drop out of the leveling pane if the
+ * member is fully done (no advance / ASI / mastery left) — generateChoices then
+ * shows the roster of any remaining members. Call at the tail of the terminal
+ * level handlers (level_up_class / apply_asi / take_feat / choose_weapon_mastery).
+ */
+function clearLevelingIfDone(ctx: Parameters<ActionHandler>[0]): void {
+  const lvl = ctx.st.active_leveling;
+  if (!lvl) return;
+  // The leveling member is the active actor (enter_leveling made them active);
+  // `updatePcActor` writes the freshest copy to `ctx.actor.char` (the commit to
+  // `ctx.st.characters` happens later), so read it from there when it matches.
+  const m =
+    ctx.actor.kind === 'pc' && ctx.actor.char.id === lvl.characterId
+      ? ctx.actor.char
+      : ctx.st.characters.find((c) => c.id === lvl.characterId);
+  if (!m || levelUpWorkFor(m) === null) {
+    ctx.st = { ...ctx.st, active_leveling: undefined };
+  }
+}
 
 /**
  * `prepare_spells`: pick which leveled spells are prepared for the
@@ -726,6 +792,7 @@ export const handleTakeFeat: ActionHandler<{
     char.asi_pending && (feat.category === 'general' || feat.category === 'epic-boon');
   updatePcActor(ctx, consumeAsi ? { ...newChar, asi_pending: false } : newChar);
   ctx.narrative = narrative;
+  clearLevelingIfDone(ctx);
 };
 
 /**
@@ -778,6 +845,8 @@ export const handleLevelUpClass: ActionHandler<{ type: 'level_up_class'; classNa
   const narrative = applyLevelUpForClass(next, cls, ctx.context);
   updatePcActor(ctx, next);
   ctx.narrative = narrative.trim();
-  // Mirror applyPartyLevelUps' implicit "uses initiative? no" stance
-  // — out-of-combat level-up never advances turn order.
+  // Out-of-combat level-up never advances turn order. If this level left no
+  // further work (no ASI/mastery pending and not eligible again), drop out of
+  // the leveling pane back to the roster.
+  clearLevelingIfDone(ctx);
 };

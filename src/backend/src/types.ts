@@ -1484,6 +1484,14 @@ export interface GameState {
   // `enter_shop`, cleared by `exit_shop` or `end_conversation`.
   active_shop?: { roomId: string };
 
+  // Leveling pane — player-driven level-up for one party member. While set (out
+  // of combat), generateChoices offers ONLY that member's level-up cascade
+  // (class pick → ASI/feat → weapon mastery) + a Back control. Opened by
+  // `enter_leveling` (which also makes the member the active character so the
+  // existing level handlers act on them); cleared by `exit_leveling` or
+  // automatically when the member has no level-up work left.
+  active_leveling?: { characterId: string };
+
   // Structured combat event log (circular buffer, capped at COMBAT_LOG_MAX).
   // Emitted in parallel to the narrative string for UI rendering of
   // mechanical events (hits, damage, conditions) separately from prose.

@@ -104,6 +104,7 @@ import {
   isEvocationSpell,
   knowsMetamagic,
   layOnHandsRemaining,
+  levelUpClassOptions,
   metamagicOptions,
   metamagicSlots,
   piercesMagicalDarkness,
@@ -3204,28 +3205,18 @@ export function applyLevelUpForClass(char: Character, className: string, context
   return out;
 }
 
-// Apply a level-up to one character if their XP threshold is met.
-// Mutates `char` in place. Returns the level-up narrative (empty if none).
-// Auto-levels into the PRIMARY class. Multiclassing is opt-in via the
-// explicit `level_up_class` action.
-function applyLevelUpFromXp(char: Character, context: Context): string {
-  if (char.dead) return '';
-  if ((char.xp ?? 0) < (char.level ?? 1) * 100) return '';
-  return applyLevelUpForClass(char, char.character_class, context);
+// Auto-leveling is RETIRED — leveling is now player-driven via the leveling
+// pane (out of combat: enter_leveling → the level_up_class cascade; see
+// generateChoices' leveling gates + GameState.active_leveling). XP still accrues
+// (splitEncounterXp / the give_xp consequence award it); the player advances
+// each member by hand. These two functions are kept as no-ops so the ~13 kill
+// sites that call `applyPartyLevelUps` need no change — they just stop leveling.
+function applyLevelUpFromXp(_char: Character, _context: Context): string {
+  return '';
 }
 
-// Check + apply level-ups for the entire living party after a kill.
-// `killer` is mutated in place (callers expect to read `char.level` etc.);
-// other party members are read+mutated through `st.characters` references
-// that `splitEncounterXp` already replaced with fresh objects.
-export function applyPartyLevelUps(st: GameState, killer: Character, context: Context): string {
-  let out = '';
-  out += applyLevelUpFromXp(killer, context);
-  for (const c of st.characters) {
-    if (c.id === killer.id || c.dead) continue;
-    out += applyLevelUpFromXp(c, context);
-  }
-  return out;
+export function applyPartyLevelUps(_st: GameState, _killer: Character, _context: Context): string {
+  return '';
 }
 
 // Post-LLM fact-preservation check. The system prompt instructs the model
@@ -3608,6 +3599,88 @@ function shopBuyChoices(npc: PlacedNpc, state: GameState, context: Context): Gam
   return out;
 }
 
+// ── Player-driven leveling (the leveling pane) ──────────────────────────────
+// What level-up work a character has, in resolution order. Pending picks
+// (ASI / weapon mastery from a prior advance) resolve BEFORE advancing again.
+export function levelUpWorkFor(char: Character): 'advance' | 'asi' | 'mastery' | null {
+  if (char.dead) return null;
+  if (char.asi_pending) return 'asi';
+  if ((char.weapon_mastery_pending ?? 0) > 0) return 'mastery';
+  if ((char.xp ?? 0) >= (char.level ?? 1) * 100 && (char.level ?? 1) < 20) return 'advance';
+  return null;
+}
+
+// The classes a character may advance into next: any class they already have,
+// plus any they meet the 2024 multiclass ability prereq for (canMulticlassInto).
+function levelClassChoices(char: Character): GameChoice[] {
+  const nextLevel = (char.level ?? 1) + 1;
+  return levelUpClassOptions(char).map((cls) => ({
+    label: `Advance ${cls[0].toUpperCase()}${cls.slice(1)} → level ${nextLevel}`,
+    action: { type: 'level_up_class' as const, className: cls },
+  }));
+}
+
+// ASI / Epic-Boon choices for a character at an ASI milestone (asi_pending).
+function asiChoicesFor(char: Character, context: Context): GameChoice[] {
+  const statLabels: Record<string, string> = {
+    str: 'STR',
+    dex: 'DEX',
+    con: 'CON',
+    int: 'INT',
+    wis: 'WIS',
+    cha: 'CHA',
+  };
+  const choices: GameChoice[] = (Object.keys(statLabels) as AbilityKey[]).map((stat) => ({
+    label: `Ability Score Improvement: +2 ${statLabels[stat]} (currently ${char[stat]})`,
+    action: { type: 'apply_asi' as const, stat },
+  }));
+  // SRD level-19 Epic Boon: take a boon feat in place of the ASI; the +1 auto-
+  // targets the best eligible ability (the boon's power is the meaningful pick).
+  if ((char.level ?? 1) >= 19) {
+    const isCaster = Object.keys(char.spell_slots_max ?? {}).length > 0;
+    for (const feat of Object.values(context.featTable ?? {})) {
+      if (feat.category !== 'epic-boon') continue;
+      if (canTakeFeat(char, feat) !== '') continue;
+      if (feat.effect.kind === 'epic-boon' && feat.effect.boon === 'spell-recall' && !isCaster) {
+        continue;
+      }
+      const eligible =
+        feat.abilityBonus && 'choices' in feat.abilityBonus
+          ? (feat.abilityBonus.choices as AbilityKey[])
+          : (['str'] as AbilityKey[]);
+      const ability = eligible.reduce(
+        (best, a) => ((char[a] ?? 10) > (char[best] ?? 10) ? a : best),
+        eligible[0]
+      );
+      choices.push({
+        label: `Epic Boon: ${feat.name} (+1 ${statLabels[ability]})`,
+        action: { type: 'take_feat' as const, featId: feat.id, abilityChoice: ability },
+      });
+    }
+  }
+  return choices;
+}
+
+// Weapon-mastery picks for a character with pending mastery slot(s).
+function masteryChoicesFor(char: Character, context: Context): GameChoice[] {
+  const profs = context.classWeaponProficiencies?.[char.character_class] ?? [];
+  const already = new Set(char.weapon_masteries ?? []);
+  const options = masterableWeapons(profs, context.lootTable).filter((w) => !already.has(w.id));
+  if (options.length === 0) {
+    // Nothing left to master — offer the slot-clearing escape so it's not stuck.
+    return [
+      {
+        label: 'No further weapons to master — continue.',
+        action: { type: 'choose_weapon_mastery', weaponId: '' },
+      },
+    ];
+  }
+  return options.map((w) => ({
+    label: `Weapon Mastery: master ${w.name} (${w.mastery})`,
+    action: { type: 'choose_weapon_mastery' as const, weaponId: w.id },
+  }));
+}
+
 export function generateChoices(state: GameState, seed: Seed, context: Context): GameChoice[] {
   const char =
     state.characters.find((c) => c.id === state.active_character_id) ?? state.characters[0];
@@ -3832,72 +3905,48 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     }
   }
 
-  // Pending ASI: only show ability-boost / feat choices until resolved.
-  if (char.asi_pending) {
-    const statLabels: Record<string, string> = {
-      str: 'STR',
-      dex: 'DEX',
-      con: 'CON',
-      int: 'INT',
-      wis: 'WIS',
-      cha: 'CHA',
-    };
-    const asiChoices: GameChoice[] = (Object.keys(statLabels) as AbilityKey[]).map((stat) => ({
-      label: `Ability Score Improvement: +2 ${statLabels[stat]} (currently ${char[stat]})`,
-      action: { type: 'apply_asi' as const, stat },
-    }));
-    // SRD level-19 Epic Boon feature — take an Epic Boon feat in place of the
-    // ASI. Offer each boon the character qualifies for and doesn't already
-    // have; the +1 ability bump auto-targets their best eligible score (the
-    // boon's signature power is the meaningful choice). `take_feat` applies it
-    // and consumes the ASI slot.
-    if ((char.level ?? 1) >= 19) {
-      const isCaster = Object.keys(char.spell_slots_max ?? {}).length > 0;
-      for (const feat of Object.values(context.featTable ?? {})) {
-        if (feat.category !== 'epic-boon') continue;
-        if (canTakeFeat(char, feat) !== '') continue; // already taken / prereq unmet
-        // SRD: Boon of Spell Recall needs a Spellcasting feature.
-        if (feat.effect.kind === 'epic-boon' && feat.effect.boon === 'spell-recall' && !isCaster) {
-          continue;
-        }
-        const eligible =
-          feat.abilityBonus && 'choices' in feat.abilityBonus
-            ? (feat.abilityBonus.choices as AbilityKey[])
-            : (['str'] as AbilityKey[]);
-        const ability = eligible.reduce(
-          (best, a) => ((char[a] ?? 10) > (char[best] ?? 10) ? a : best),
-          eligible[0]
-        );
-        asiChoices.push({
-          label: `Epic Boon: ${feat.name} (+1 ${statLabels[ability]})`,
-          action: { type: 'take_feat' as const, featId: feat.id, abilityChoice: ability },
-        });
+  // ── Player-driven leveling ────────────────────────────────────────────────
+  // Out of combat, leveling takes over the action surface (like conversation /
+  // vendor). When `active_leveling` is set, the CASCADE gate drives ONE member's
+  // level-up step (class pick → ASI/feat → weapon mastery) + a Back control.
+  // Otherwise the ROSTER gate lists every member who can level. Both early-
+  // return, so the normal options stay hidden until the party is done.
+  if (!state.combat_active) {
+    const lvl = state.active_leveling;
+    if (lvl) {
+      const m = state.characters.find((c) => c.id === lvl.characterId);
+      const work = m ? levelUpWorkFor(m) : null;
+      if (m && work) {
+        const steps =
+          work === 'advance'
+            ? levelClassChoices(m)
+            : work === 'asi'
+              ? asiChoicesFor(m, context)
+              : masteryChoicesFor(m, context);
+        return [
+          ...steps.map((c) => ({ ...c, kind: 'leveling' as const })),
+          {
+            label: '↩ Back to party',
+            action: { type: 'exit_leveling' as const },
+            kind: 'leveling' as const,
+          },
+        ];
       }
+      // The leveling member has no work left — the terminal handler clears
+      // `active_leveling`, so this only happens transiently; fall through to the
+      // roster (which shows any remaining members).
     }
-    return asiChoices;
-  }
-
-  // 2024 Weapon Mastery slot growth — a level-up granted new mastery slot(s).
-  // Surface a pick of any masterable weapon the character isn't already
-  // mastering (resolved out of combat, before other choices).
-  if ((char.weapon_mastery_pending ?? 0) > 0) {
-    const profs = context.classWeaponProficiencies?.[char.character_class] ?? [];
-    const already = new Set(char.weapon_masteries ?? []);
-    const options = masterableWeapons(profs, context.lootTable).filter((w) => !already.has(w.id));
-    if (options.length === 0) {
-      // Nothing left to master (shouldn't normally happen) — clear the pending
-      // so the player isn't stuck.
-      return [
-        {
-          label: 'No further weapons to master — continue.',
-          action: { type: 'choose_weapon_mastery', weaponId: '' },
-        },
-      ];
+    const levelable = state.characters.filter((c) => levelUpWorkFor(c) !== null);
+    if (levelable.length > 0) {
+      return levelable.map((m) => ({
+        label:
+          levelUpWorkFor(m) === 'advance'
+            ? `✨ Level up ${m.name} → level ${(m.level ?? 1) + 1}`
+            : `✨ Finish leveling ${m.name}`,
+        action: { type: 'enter_leveling' as const, characterId: m.id },
+        kind: 'leveling' as const,
+      }));
     }
-    return options.map((w) => ({
-      label: `Weapon Mastery: master ${w.name} (${w.mastery})`,
-      action: { type: 'choose_weapon_mastery' as const, weaponId: w.id },
-    }));
   }
 
   const healItems = context.lootTable.filter((i) => i.heal);

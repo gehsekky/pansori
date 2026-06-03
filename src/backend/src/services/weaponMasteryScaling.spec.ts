@@ -32,11 +32,14 @@ function fighterL3() {
   });
 }
 
+// Weapon-mastery picks surface inside the leveling pane now, so the state is in
+// the leveling sub-state for this PC (active_leveling).
 function stateFor(char: ReturnType<typeof makeChar>): GameState {
   return {
     ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall' }),
     characters: [char],
     active_character_id: 'pc-1',
+    active_leveling: { characterId: 'pc-1' },
   };
 }
 
@@ -54,11 +57,13 @@ describe('Weapon Mastery slot growth on level-up', () => {
     char.level = 4;
     char.weapon_mastery_pending = 1;
     const choices = generateChoices(stateFor(char), seed, ctx);
-    expect(choices.length).toBeGreaterThan(0);
-    expect(choices.every((c) => c.action.type === 'choose_weapon_mastery')).toBe(true);
-    expect(choices.every((c) => /Weapon Mastery: master/i.test(c.label))).toBe(true);
+    const masteryChoices = choices.filter((c) => c.action.type === 'choose_weapon_mastery');
+    expect(masteryChoices.length).toBeGreaterThan(0);
+    expect(masteryChoices.every((c) => /Weapon Mastery: master/i.test(c.label))).toBe(true);
+    // The pane also offers a Back control.
+    expect(choices.some((c) => c.action.type === 'exit_leveling')).toBe(true);
     // Already-mastered weapons aren't offered again.
-    const offered = choices.map((c) =>
+    const offered = masteryChoices.map((c) =>
       c.action.type === 'choose_weapon_mastery' ? c.action.weaponId : ''
     );
     expect(offered).not.toContain('longsword');

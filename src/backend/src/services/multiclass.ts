@@ -208,6 +208,18 @@ const MULTICLASS_PREREQS: Record<string, AbilityRequirement> = {
  * Does NOT validate that the level-up itself is legal (level cap,
  * XP, etc.) — that's the level-up handler's responsibility.
  */
+// The SRD class names (lowercase), derived from the multiclass-prereq table —
+// every class has an entry. Used to enumerate level-up targets.
+export const CLASS_NAMES = Object.keys(MULTICLASS_PREREQS);
+
+// Classes a character may advance into next: any class they already have a
+// level in, plus any they meet the 2024 multiclass ability prereq for.
+export function levelUpClassOptions(char: Character): string[] {
+  return CLASS_NAMES.filter(
+    (cls) => getClassLevel(char, cls) > 0 || canMulticlassInto(char, cls) === ''
+  );
+}
+
 export function canMulticlassInto(char: Character, targetClass: string): string {
   const cls = targetClass.toLowerCase();
   if (cls === char.character_class.toLowerCase()) {

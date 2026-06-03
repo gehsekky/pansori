@@ -1,7 +1,8 @@
 import type { Character } from '../types';
 
-// FE-side 2024 PHB multiclass prerequisites — used by LevelUpDialog to
-// gray out classes the active PC can't enter and show the reason.
+// FE-side 2024 PHB multiclass prerequisites + `levelUpAvailable` (used by
+// PartyRail to badge a member who can level). The leveling pane itself surfaces
+// the class-pick choices from the backend, so the FE no longer gates classes.
 // Mirrors `MULTICLASS_PREREQS` + `canMulticlassInto` in
 // src/backend/src/services/multiclass.ts. The BE is still authoritative —
 // the action handler re-validates; this exists so the UI can render the

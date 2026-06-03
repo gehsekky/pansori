@@ -21,11 +21,13 @@ const seed: Seed = {
   npcs: {},
 };
 
+// ASI / Epic-Boon choices surface inside the leveling pane now (active_leveling).
 function stateFor(char: ReturnType<typeof makeChar>): GameState {
   return {
     ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall' }),
     characters: [char],
     active_character_id: 'pc-1',
+    active_leveling: { characterId: 'pc-1' },
   };
 }
 

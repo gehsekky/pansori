@@ -1244,11 +1244,14 @@ describe('turn_actions lifecycle', () => {
 // ─── Ability Score Improvements ──────────────────────────────────────────────
 
 describe('Ability Score Improvements', () => {
-  it('generateChoices returns 6 stat-boost choices when asi_pending is true', () => {
-    const state = makeState({ asi_pending: true });
+  it('the leveling pane returns 6 stat-boost choices when asi_pending is true', () => {
+    // ASI choices now surface inside the leveling pane (active_leveling), with a
+    // Back control alongside.
+    const state = makeState({ asi_pending: true }, { active_leveling: { characterId: 'char-1' } });
     const choices = generateChoices(state, seed, ctx);
-    expect(choices).toHaveLength(6);
-    expect(choices.every((c) => c.action.type === 'apply_asi')).toBe(true);
+    const asi = choices.filter((c) => c.action.type === 'apply_asi');
+    expect(asi).toHaveLength(6);
+    expect(choices.some((c) => c.action.type === 'exit_leveling')).toBe(true);
   });
 
   it('apply_asi adds +2 to the chosen stat and clears asi_pending', async () => {
@@ -4096,16 +4099,17 @@ describe('encounter XP distribution', () => {
     }
   });
 
-  // ─── Non-killer level-up (the original gap fixed here) ────────────────────
+  // ─── Kills award XP but no longer auto-level ──────────────────────────────
   //
-  // `splitEncounterXp` distributes XP across the party, but the level-up
-  // check used to fire at only 2 of 13 kill sites. Non-killers would hoard
-  // XP without ever leveling. `applyPartyLevelUps` runs after every split
-  // for both the killer and every living non-killer.
+  // Leveling is now player-driven (the leveling pane). `splitEncounterXp` still
+  // distributes XP across the party on a kill, but nothing auto-levels — members
+  // who cross a threshold become *eligible* (generateChoices surfaces a
+  // `enter_leveling` roster out of combat); the player advances each by hand.
 
-  it('non-killer at XP threshold levels up on a kill', async () => {
+  it('a kill awards XP but does NOT auto-level a member at the threshold', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.99);
-    // 4 PCs, kill grants 20 XP, 5 each. PC2/PC3 at xp=95 cross to 100 → L2.
+    // 4 PCs, kill grants 20 XP, 5 each. PC2/PC3 at xp=95 cross to 100 — eligible,
+    // but stay level 1 until the player levels them.
     const state = makeKillScenario([{}, { xp: 95 }, { xp: 95 }, {}]);
     const result = await takeAction({
       action: { type: 'attack', targetEnemyId: `${CORRIDOR_ID}#0` },
@@ -4114,15 +4118,14 @@ describe('encounter XP distribution', () => {
       seed: seedWithEnemy,
       context: ctx,
     });
-    expect(result.newState.characters[0].level).toBe(1); // killer not at threshold
-    expect(result.newState.characters[1].level).toBe(2); // non-killer leveled
-    expect(result.newState.characters[2].level).toBe(2); // non-killer leveled
-    expect(result.newState.characters[3].level).toBe(1); // not at threshold
+    expect(result.newState.characters[1].level).toBe(1); // not auto-leveled
+    expect(result.newState.characters[1].xp).toBe(100); // XP accrued
+    expect(result.newState.characters[2].level).toBe(1);
   });
 
-  it('killer level-up still fires (existing behavior preserved)', async () => {
+  it('the killer accrues XP without auto-leveling', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.99);
-    // Solo PC at xp=85 + 20 = 105 → L2.
+    // Solo PC at xp=85 + 20 = 105 — eligible, but not auto-leveled.
     const state = makeKillScenario([{ xp: 85 }]);
     const result = await takeAction({
       action: { type: 'attack', targetEnemyId: `${CORRIDOR_ID}#0` },
@@ -4131,12 +4134,14 @@ describe('encounter XP distribution', () => {
       seed: seedWithEnemy,
       context: ctx,
     });
-    expect(result.newState.characters[0].level).toBe(2);
+    expect(result.newState.characters[0].level).toBe(1);
+    expect(result.newState.characters[0].xp).toBe(105);
   });
 
-  it('non-killer crossing into an ASI level flags asi_pending', async () => {
+  it('crossing an ASI threshold does not auto-flag asi_pending', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.99);
-    // 4 PCs, 20 XP / 4 = 5 each. PC2 at level=3, xp=295 → 300 → L4 (ASI level).
+    // PC2 at level=3, xp=295 → 300: eligible for L4 (an ASI level), but the ASI
+    // is only granted when the player levels them via the pane.
     const state = makeKillScenario([{}, { level: 3, xp: 295, max_hp: 30, hp: 30 }, {}, {}]);
     const result = await takeAction({
       action: { type: 'attack', targetEnemyId: `${CORRIDOR_ID}#0` },
@@ -4145,19 +4150,14 @@ describe('encounter XP distribution', () => {
       seed: seedWithEnemy,
       context: ctx,
     });
-    expect(result.newState.characters[1].level).toBe(4);
-    expect(result.newState.characters[1].asi_pending).toBe(true);
+    expect(result.newState.characters[1].level).toBe(3);
+    expect(result.newState.characters[1].asi_pending ?? false).toBe(false);
   });
 
-  it('dead PC at the XP threshold is excluded from the level-up', async () => {
+  it('a dead PC is excluded from the XP share', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.99);
-    // PC4 is dead — gets no share, no level-up. Living PCs split 20 / 3 = 6.
-    const state = makeKillScenario([
-      {},
-      { xp: 95 }, // 95 + 6 = 101 → L2
-      {},
-      { xp: 95, dead: true, hp: 0 },
-    ]);
+    // PC4 is dead — gets no share. Living PCs split 20 / 3 = 6 each.
+    const state = makeKillScenario([{}, { xp: 95 }, {}, { xp: 95, dead: true, hp: 0 }]);
     const result = await takeAction({
       action: { type: 'attack', targetEnemyId: `${CORRIDOR_ID}#0` },
       history: [],
@@ -4165,9 +4165,9 @@ describe('encounter XP distribution', () => {
       seed: seedWithEnemy,
       context: ctx,
     });
-    expect(result.newState.characters[1].level).toBe(2);
-    expect(result.newState.characters[3].level).toBe(1);
-    expect(result.newState.characters[3].xp).toBe(95);
+    expect(result.newState.characters[1].level).toBe(1);
+    expect(result.newState.characters[1].xp).toBe(101); // 95 + 6
+    expect(result.newState.characters[3].xp).toBe(95); // dead — no share
   });
 });
 
@@ -4715,8 +4715,9 @@ describe('applyConsequence give_xp', () => {
     expect(narrativeParts).toHaveLength(0);
   });
 
-  it('triggers level-up when context is provided and threshold crossed', () => {
-    // L1 → L2 = 300 XP. With 1 living PC, 300 XP grant levels them up.
+  it('awards XP but does not auto-level (leveling is player-driven)', () => {
+    // A give_xp reward accrues XP; the PC becomes eligible but is not
+    // auto-leveled — the player advances them via the leveling pane.
     const st = makeParty([{ level: 1, xp: 0 }]);
     const narrativeParts: string[] = [];
     const next = applyConsequence(
@@ -4728,9 +4729,7 @@ describe('applyConsequence give_xp', () => {
       ctx
     );
     expect(next.characters[0].xp).toBeGreaterThanOrEqual(300);
-    expect(next.characters[0].level).toBeGreaterThanOrEqual(2);
-    // Narrative line for level-up should be emitted.
-    expect(narrativeParts.join(' ')).toMatch(/level/i);
+    expect(next.characters[0].level).toBe(1); // no auto-level
   });
 
   it('does not level up when context is omitted', () => {

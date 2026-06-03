@@ -308,6 +308,12 @@ export interface GameState {
   // (`kind:'vendor'` buy choices) + a Back control, in place of the dialogue.
   active_shop?: { roomId: string };
 
+  // Leveling pane — see backend GameState. When set (out of combat), the
+  // LevelingPanel renders the active member's level-up cascade (`kind:'leveling'`
+  // choices) + a Back control. When unset but `kind:'leveling'` enter_leveling
+  // entries are present, the panel renders the party roster instead.
+  active_leveling?: { characterId: string };
+
   // Structured combat event log — see backend CombatEvent. Mirror of state.
   combat_log?: CombatEvent[];
 

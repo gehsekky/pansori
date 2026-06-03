@@ -17,11 +17,6 @@ interface Props {
   // this NPC" pattern). Omit / no-op in combat — initiative drives
   // the active marker there.
   onSetActive?: (charId: string) => void;
-  // Out-of-combat: when a PC's XP threshold is met, the rail shows a
-  // "Level Up" button under that PC's tile. Click forwards the charId
-  // here so App.tsx can open the LevelUpDialog. No-op in combat (RAW:
-  // level-ups happen during downtime).
-  onLevelUp?: (charId: string) => void;
 }
 
 // Vertical party stack — the left rail of the 3-zone layout. Every character
@@ -40,7 +35,7 @@ interface Props {
 // `onSetActive` — RAW has no initiative outside combat (SRD 5.2.1
 // p.189), so the player picks who's leading.
 
-function PartyRail({ state, activeCharId, ctx, seed, inCombat, onSetActive, onLevelUp }: Props) {
+function PartyRail({ state, activeCharId, ctx, seed, inCombat, onSetActive }: Props) {
   const [selectedCharId, setSelectedCharId] = useState<string>('');
 
   useEffect(() => {
@@ -88,18 +83,6 @@ function PartyRail({ state, activeCharId, ctx, seed, inCombat, onSetActive, onLe
                 }
               }}
             />
-            {canLevelUp && onLevelUp && (
-              <button
-                type="button"
-                className={styles.partyTileLevelUpBtn}
-                onClick={() => onLevelUp(c.id)}
-                data-testid="party-tile-level-up"
-                data-character-id={c.id}
-                title={`Level up ${c.name}`}
-              >
-                LEVEL UP →
-              </button>
-            )}
           </div>
         );
       })}
