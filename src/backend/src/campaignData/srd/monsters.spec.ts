@@ -231,6 +231,53 @@ describe('SRD bestiary additions — effect fields', () => {
     expect(SRD_MONSTERS.stone_giant.darkvision_ft).toBe(60);
   });
 
+  it('the elemental quartet is complete (Air/Earth/Water join Fire, all CR 5, two attacks)', () => {
+    for (const k of ['air_elemental', 'earth_elemental', 'water_elemental'] as const) {
+      expect(SRD_MONSTERS[k].cr).toBe(5);
+      expect(SRD_MONSTERS[k].multiattack).toBe(2);
+      expect(SRD_MONSTERS[k].immunities).toContain('poison');
+    }
+  });
+
+  it('Air Elemental resists physical + lightning and is thunder-immune at 10-ft reach', () => {
+    const a = SRD_MONSTERS.air_elemental;
+    expect(a.resistances).toEqual(['bludgeoning', 'lightning', 'piercing', 'slashing']);
+    expect(a.immunities).toEqual(['poison', 'thunder']);
+    expect(a.damageType).toBe('thunder');
+    expect(a.attackReachFt).toBe(10);
+    expect(a.speedFt).toBe(90);
+  });
+
+  it('Earth Elemental is the bruiser: thunder-vulnerable, 147 HP, 10-ft reach', () => {
+    const e = SRD_MONSTERS.earth_elemental;
+    expect(e.vulnerabilities).toEqual(['thunder']);
+    expect(e.hp).toBe(147);
+    expect(e.attackReachFt).toBe(10);
+    expect(e.damageType).toBe('bludgeoning');
+  });
+
+  it('Water Elemental resists acid + fire', () => {
+    expect(SRD_MONSTERS.water_elemental.resistances).toEqual(['acid', 'fire']);
+  });
+
+  it('Salamander: cold-vulnerable, fire-immune, bonus fire damage + a 5-ft fire aura', () => {
+    const s = SRD_MONSTERS.salamander;
+    expect(s.cr).toBe(5);
+    expect(s.vulnerabilities).toEqual(['cold']);
+    expect(s.immunities).toEqual(['fire']);
+    expect(s.bonusDamage).toBe('2d6');
+    expect(s.bonusDamageType).toBe('fire');
+    expect(s.aura).toMatchObject({ radiusFt: 5, damage: '2d6', damageType: 'fire' });
+  });
+
+  it('Polar Bear is a CR 2 two-attack beast that resists cold', () => {
+    const p = SRD_MONSTERS.polar_bear;
+    expect(p.cr).toBe(2);
+    expect(p.multiattack).toBe(2);
+    expect(p.resistances).toEqual(['cold']);
+    expect(p.damageType).toBe('slashing');
+  });
+
   it('the shared pool grew well past the original 12', () => {
     expect(Object.keys(SRD_MONSTERS).length).toBeGreaterThanOrEqual(50);
   });

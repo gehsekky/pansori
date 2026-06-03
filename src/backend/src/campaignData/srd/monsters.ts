@@ -808,6 +808,25 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     bloodiedFrenzy: true,
     // SRD: charge rider (+2d6 + Prone after moving 20+ ft) deferred.
   },
+  polar_bear: {
+    name: 'Polar Bear',
+    cr: 2,
+    hp: 42,
+    ac: 12,
+    damage: '1d8+5',
+    toHit: 7,
+    xp: 450,
+    str: 20,
+    dex: 14,
+    con: 16,
+    int: 2,
+    wis: 13,
+    cha: 7,
+    multiattack: 2, // two Rend attacks
+    speedFt: 40, // also Swim 40
+    damageType: 'slashing',
+    resistances: ['cold'],
+  },
   mummy: {
     name: 'Mummy',
     cr: 3,
@@ -980,6 +999,123 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     // SRD: Fire Aura — 10-ft emanation, 1d10 Fire. Modeled via the PC-turn-start
     // aura hook (the RAW end-of-its-turn timing is approximated, like Stench).
     aura: { radiusFt: 10, damage: '1d10', damageType: 'fire', name: 'Fire Aura' },
+  },
+  // The rest of the elemental quartet (all CR 5), alongside the Fire Elemental
+  // above. Each carries the shared elemental condition-immunity suite; their
+  // recharge AoEs (Whirlwind / Rock Launch / Whelm) and form traits are deferred
+  // — the melee Slam is the signature, like the Fire Elemental's Burn.
+  air_elemental: {
+    name: 'Air Elemental',
+    cr: 5,
+    hp: 90,
+    ac: 15,
+    damage: '2d8+5',
+    toHit: 8,
+    xp: 1800,
+    str: 14,
+    dex: 20,
+    con: 14,
+    int: 6,
+    wis: 10,
+    cha: 6,
+    multiattack: 2, // two Thunderous Slam attacks
+    speedFt: 90, // fly (hover)
+    attackReachFt: 10,
+    damageType: 'thunder',
+    resistances: ['bludgeoning', 'lightning', 'piercing', 'slashing'],
+    immunities: ['poison', 'thunder'],
+    condition_immunities: [
+      'exhaustion',
+      'grappled',
+      'paralyzed',
+      'petrified',
+      'poisoned',
+      'prone',
+      'restrained',
+      'unconscious',
+    ],
+    // SRD: Whirlwind (Recharge 4–6) — STR save, AoE Thunder + push + Prone — deferred.
+  },
+  earth_elemental: {
+    name: 'Earth Elemental',
+    cr: 5,
+    hp: 147,
+    ac: 17,
+    damage: '2d8+5',
+    toHit: 8,
+    xp: 1800,
+    str: 20,
+    dex: 8,
+    con: 20,
+    int: 5,
+    wis: 10,
+    cha: 5,
+    multiattack: 2, // two Slam attacks
+    speedFt: 30, // also Burrow 30
+    attackReachFt: 10,
+    damageType: 'bludgeoning',
+    vulnerabilities: ['thunder'],
+    immunities: ['poison'],
+    condition_immunities: ['exhaustion', 'paralyzed', 'petrified', 'poisoned', 'unconscious'],
+    // SRD: Rock Launch (ranged Slam + Prone) and Earth Glide / Siege Monster deferred.
+  },
+  water_elemental: {
+    name: 'Water Elemental',
+    cr: 5,
+    hp: 114,
+    ac: 14,
+    damage: '2d8+4',
+    toHit: 7,
+    xp: 1800,
+    str: 18,
+    dex: 14,
+    con: 18,
+    int: 5,
+    wis: 10,
+    cha: 8,
+    multiattack: 2, // two Slam attacks
+    speedFt: 30, // Swim 90
+    damageType: 'bludgeoning',
+    resistances: ['acid', 'fire'],
+    immunities: ['poison'],
+    condition_immunities: [
+      'exhaustion',
+      'grappled',
+      'paralyzed',
+      'petrified',
+      'poisoned',
+      'prone',
+      'restrained',
+      'unconscious',
+    ],
+    // SRD: Slam's Prone rider, Whelm (Recharge 4–6 grapple/suffocate), and Freeze
+    // (Cold slows it) deferred.
+  },
+  salamander: {
+    name: 'Salamander',
+    cr: 5,
+    hp: 90,
+    ac: 15,
+    damage: '2d8+4',
+    toHit: 7,
+    xp: 1800,
+    str: 18,
+    dex: 14,
+    con: 15,
+    int: 11,
+    wis: 10,
+    cha: 12,
+    multiattack: 2, // two Flame Spear attacks
+    speedFt: 30, // also Climb 30
+    damageType: 'piercing',
+    vulnerabilities: ['cold'],
+    immunities: ['fire'],
+    // SRD: Flame Spear deals piercing + 2d6 fire; the Fire Aura is a 5-ft, 2d6
+    // fire emanation (modeled via the PC-turn-start aura hook, like the Fire
+    // Elemental). Constrict (grapple/restrain) deferred.
+    bonusDamage: '2d6',
+    bonusDamageType: 'fire',
+    aura: { radiusFt: 5, damage: '2d6', damageType: 'fire', name: 'Fire Aura' },
   },
   wyvern: {
     name: 'Wyvern',
