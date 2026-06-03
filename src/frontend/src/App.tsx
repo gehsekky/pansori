@@ -26,6 +26,7 @@ import RoomArtPanel from './components/RoomArtPanel.tsx';
 import SessionsScreen from './components/SessionScreen.tsx';
 import SpellBar from './components/SpellBar.tsx';
 import TargetPickerDialog from './components/TargetPickerDialog.tsx';
+import VendorPanel from './components/VendorPanel.tsx';
 import WaitingForPlayer from './components/WaitingForPlayer.tsx';
 import WorldMap from './components/WorldMap.tsx';
 import { activeGrid } from './lib/activeGrid.ts';
@@ -763,7 +764,12 @@ export default function App() {
                                 .filter((c) => !spellBarSet.has(c))
                                 // Dialogue choices render in the ConversationPanel, and the
                                 // post-combat Continue renders in its own gate — not the list.
-                                .filter((c) => c.kind !== 'conversation' && c.kind !== 'continue');
+                                .filter(
+                                  (c) =>
+                                    c.kind !== 'conversation' &&
+                                    c.kind !== 'continue' &&
+                                    c.kind !== 'vendor'
+                                );
                               // Combat-controls container should render whenever
                               // at least one inner bar will. EnemySelector +
                               // MoveDPad + Default/Combat action bars all live
@@ -960,6 +966,28 @@ export default function App() {
                             Continue
                           </button>
                         </div>
+                      );
+                    }
+                    // Active shop: the vendor pane replaces the conversation pane
+                    // (a nested sub-state). Only the NPC's wares + Back show.
+                    if (
+                      !gameState?.combat_active &&
+                      gameState?.active_shop &&
+                      gameState.active_shop.roomId === gameState.current_room &&
+                      seed
+                    ) {
+                      const shopRoom = gameState.active_shop.roomId;
+                      const activeChar = gameState.characters.find(
+                        (c) => c.id === gameState.active_character_id
+                      );
+                      return (
+                        <VendorPanel
+                          npcName={seed.npcs?.[shopRoom]?.name ?? 'Someone'}
+                          gold={activeChar?.gold ?? 0}
+                          choices={choices.filter((c) => c.kind === 'vendor')}
+                          ctx={ctx}
+                          onChoose={handleChoice}
+                        />
                       );
                     }
                     // Active conversation: the dedicated dialogue panel replaces the

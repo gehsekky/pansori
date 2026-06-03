@@ -191,8 +191,42 @@ export const handleEndConversation: ActionHandler<{ type: 'end_conversation' }> 
   const npc = ctx.st.active_conversation
     ? ctx.seed.npcs?.[ctx.st.active_conversation.roomId]
     : undefined;
-  ctx.st = { ...ctx.st, active_conversation: undefined };
+  // Ending the talk also closes any open vendor pane (it nests under the talk).
+  ctx.st = { ...ctx.st, active_conversation: undefined, active_shop: undefined };
   ctx.narrative = npc ? `You end the conversation with ${npc.name}.` : 'You end the conversation.';
+};
+
+/**
+ * `enter_shop`: open the NPC's wares as a vendor pane nested under the current
+ * conversation. generateChoices then surfaces ONLY the buy choices + a Back
+ * control (`exit_shop`). Requires an active conversation in this room with a
+ * friendly NPC that actually has a shop.
+ */
+export const handleEnterShop: ActionHandler<{ type: 'enter_shop' }> = (ctx) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can shop.' };
+  const conv = ctx.st.active_conversation;
+  const npc = conv ? ctx.seed.npcs?.[conv.roomId] : undefined;
+  if (!conv || !npc) {
+    ctx.narrative = 'There is no one to trade with.';
+    return;
+  }
+  if (getNpcAttitude(ctx.st, npc) !== 'friendly' || !npc.shop?.length) {
+    ctx.narrative = `${npc.name} has nothing to sell you.`;
+    return;
+  }
+  ctx.st = { ...ctx.st, active_shop: { roomId: conv.roomId } };
+  ctx.narrative = `You browse ${npc.name}'s wares.`;
+};
+
+/**
+ * `exit_shop`: close the vendor pane and drop back to the conversation (the
+ * `active_conversation` is left intact).
+ */
+export const handleExitShop: ActionHandler<{ type: 'exit_shop' }> = (ctx) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can shop.' };
+  const npc = ctx.st.active_shop ? ctx.seed.npcs?.[ctx.st.active_shop.roomId] : undefined;
+  ctx.st = { ...ctx.st, active_shop: undefined };
+  ctx.narrative = npc ? `You step back from ${npc.name}'s wares.` : 'You step back from the wares.';
 };
 
 /**

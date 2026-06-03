@@ -1422,10 +1422,31 @@ describe('NPC actions', () => {
     expect(choices.some((c) => c.action.type === 'talk')).toBe(true);
   });
 
-  it('generateChoices shows buy choice for friendly NPC with shop', () => {
+  it('buying lives in the vendor pane, reached via the conversation "wares" control', () => {
+    // In conversation, a friendly shop NPC offers an enter_shop control — and
+    // NO standalone buy choices (those were removed in favour of the pane).
+    const talking = {
+      ...makeNpcState(),
+      active_conversation: { roomId: npcRoomId, path: [], prompt: 'Greetings, traveller!' },
+    };
+    const convChoices = generateChoices(talking, seedWithNpc, ctx);
+    expect(convChoices.some((c) => c.action.type === 'enter_shop')).toBe(true);
+    expect(convChoices.some((c) => c.action.type === 'buy')).toBe(false);
+
+    // Opening the shop (active_shop) surfaces ONLY the wares + a Back control.
+    const shopping = { ...talking, active_shop: { roomId: npcRoomId } };
+    const shopChoices = generateChoices(shopping, seedWithNpc, ctx);
+    expect(shopChoices.some((c) => c.action.type === 'buy')).toBe(true);
+    expect(shopChoices.some((c) => c.action.type === 'exit_shop')).toBe(true);
+    expect(shopChoices.every((c) => c.kind === 'vendor')).toBe(true);
+  });
+
+  it('no standalone buy choice in the plain action list (out of conversation)', () => {
     const state = makeNpcState();
     const choices = generateChoices(state, seedWithNpc, ctx);
-    expect(choices.some((c) => c.action.type === 'buy')).toBe(true);
+    expect(choices.some((c) => c.action.type === 'buy')).toBe(false);
+    // ...but the Talk entry that leads to the wares is present.
+    expect(choices.some((c) => c.action.type === 'talk')).toBe(true);
   });
 
   it('generateChoices shows a regular Attack choice for a hostile NPC (unified with grid combat)', () => {
@@ -1590,6 +1611,9 @@ describe('faction shop price modifiers', () => {
       traps_disarmed: [],
       objects_searched: [],
       faction_rep: { faction_guild: repWithGuild },
+      // The vendor pane is open — buy choices surface through the active_shop
+      // early-return (faction pricing is independent of attitude/shop state).
+      active_shop: { roomId: 'millhaven_market' },
     };
   }
 

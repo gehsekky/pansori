@@ -3581,6 +3581,33 @@ export function scaleUpcastDice(upcastBonus: string, levels: number): string {
   return upcastBonus;
 }
 
+// A friendly shop NPC's wares as `buy` choices, with faction-aware pricing
+// folded in (factionShopPrice + the party's rep with the NPC's faction). Each is
+// tagged `kind:'vendor'` so the frontend renders them in the VendorPanel.
+function shopBuyChoices(npc: PlacedNpc, state: GameState, context: Context): GameChoice[] {
+  if (!npc.shop?.length) return [];
+  const faction = npc.factionId
+    ? context.campaign?.factions?.find((f) => f.id === npc.factionId)
+    : undefined;
+  const rep = npc.factionId ? (state.faction_rep?.[npc.factionId] ?? 0) : 0;
+  const out: GameChoice[] = [];
+  for (const entry of npc.shop) {
+    const item = context.lootTable.find((l) => l.id === entry.itemId);
+    if (!item) continue;
+    const price = faction ? factionShopPrice(entry.price, rep, faction) : entry.price;
+    const repNote =
+      faction && price !== entry.price
+        ? ` (${faction.name} ${price < entry.price ? 'discount' : 'markup'} from ${entry.price})`
+        : '';
+    out.push({
+      label: `Buy ${item.name} — ${price}cr${repNote}`,
+      action: { type: 'buy', itemId: entry.itemId, price },
+      kind: 'vendor',
+    });
+  }
+  return out;
+}
+
 export function generateChoices(state: GameState, seed: Seed, context: Context): GameChoice[] {
   const char =
     state.characters.find((c) => c.id === state.active_character_id) ?? state.characters[0];
@@ -3748,6 +3775,23 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   // the current node + Back when nested + End conversation) until the player
   // ends it. Mirrors the pending_reaction early-return. Out of combat; a stale
   // conversation (party left the room) falls through to the normal choices.
+  // Vendor pane (nested under the conversation): when open, surface ONLY the
+  // NPC's wares + a Back control. Mirrors the conversation early-return; a stale
+  // shop (party left / NPC gone / no longer friendly) falls through.
+  const shop = state.active_shop;
+  if (shop && !state.combat_active && shop.roomId === state.current_room) {
+    const snpc = seed.npcs?.[shop.roomId];
+    if (snpc && !npcIsKilled(state, shop.roomId) && getNpcAttitude(state, snpc) === 'friendly') {
+      const vendorChoices = shopBuyChoices(snpc, state, context);
+      vendorChoices.push({
+        label: '↩ Back',
+        action: { type: 'exit_shop' as const },
+        kind: 'vendor' as const,
+      });
+      return vendorChoices;
+    }
+  }
+
   const conv = state.active_conversation;
   if (conv && !state.combat_active && conv.roomId === state.current_room) {
     const cnpc = seed.npcs?.[conv.roomId];
@@ -3767,6 +3811,15 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         convoChoices.push({
           label: '↩ Back',
           action: { type: 'conversation_back' as const },
+          kind: 'conversation' as const,
+        });
+      }
+      // A friendly NPC with wares offers a vendor pane (nested like a dialogue
+      // branch). enter_shop opens it; generateChoices then returns the buy list.
+      if (cnpc.shop?.length && getNpcAttitude(state, cnpc) === 'friendly') {
+        convoChoices.push({
+          label: '🛒 Check out my wares',
+          action: { type: 'enter_shop' as const },
           kind: 'conversation' as const,
         });
       }
@@ -4068,31 +4121,9 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     // giver's room). The route handler surfaces "✦ Quest accepted —"
     // narrative when this fires. The `accept_quest` action handler is
     // retained for backward compatibility with stale FE caches.
-    if (npc.shop?.length && attitude === 'friendly') {
-      // Faction-aware pricing — if the NPC is tagged with a factionId and the
-      // campaign defines that faction's shopPriceModifiers, the displayed and
-      // charged price scales with the party's current rep with that faction.
-      // (campaignEngine.factionShopPrice, PHB-style faction reputation.)
-      const faction = npc.factionId
-        ? context.campaign?.factions?.find((f) => f.id === npc.factionId)
-        : undefined;
-      const rep = npc.factionId ? (state.faction_rep?.[npc.factionId] ?? 0) : 0;
-      for (const entry of npc.shop) {
-        if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
-        const item = context.lootTable.find((l) => l.id === entry.itemId);
-        if (item) {
-          const price = faction ? factionShopPrice(entry.price, rep, faction) : entry.price;
-          const repNote =
-            faction && price !== entry.price
-              ? ` (${faction.name} ${price < entry.price ? 'discount' : 'markup'} from ${entry.price})`
-              : '';
-          choices.push({
-            label: `Buy ${item.name} — ${price}cr${repNote}`,
-            action: { type: 'buy', itemId: entry.itemId, price },
-          });
-        }
-      }
-    }
+    // Buying is no longer a standalone action-list choice — it lives in the
+    // vendor pane, reached via Talk → "🛒 Check out my wares" (the conversation
+    // early-return surfaces the wares control; `enter_shop` opens the pane).
     // Initial attack triggers hostility + combat (handler flips attitude and
     // dispatches a regular Attack against the NPC-as-enemy).
     choices.push({ label: `Attack ${npc.name} (makes hostile)`, action: { type: 'attack_npc' } });

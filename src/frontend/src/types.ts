@@ -303,6 +303,11 @@ export interface GameState {
   // `kind:'conversation'` choices. `path` indexes the nested response tree.
   active_conversation?: { roomId: string; path: number[]; prompt: string };
 
+  // Vendor pane nested under the conversation — see backend GameState. When set
+  // (out of combat, in the NPC's room), the VendorPanel renders the NPC's wares
+  // (`kind:'vendor'` buy choices) + a Back control, in place of the dialogue.
+  active_shop?: { roomId: string };
+
   // Structured combat event log — see backend CombatEvent. Mirror of state.
   combat_log?: CombatEvent[];
 

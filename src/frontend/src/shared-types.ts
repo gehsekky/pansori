@@ -404,6 +404,10 @@ export type StructuredAction =
   // no longer auto-switches straight back to the out-of-combat view).
   | { type: 'continue' }
   | { type: 'buy'; itemId: string; price: number }
+  // Vendor pane: open / close the NPC's wares (a sub-state nested under the
+  // active conversation, like a nested dialogue branch). See active_shop.
+  | { type: 'enter_shop' }
+  | { type: 'exit_shop' }
   | { type: 'attack_npc' }
   | { type: 'use_class_feature'; featureId: string; targetEnemyId?: string }
   | { type: 'apply_asi'; stat: AbilityKey }
@@ -684,6 +688,9 @@ export type ChoiceKind =
   // Dialogue choices while a conversation is active (NPC responses, Back, End
   // conversation). The frontend routes these to the dedicated ConversationPanel.
   | 'conversation'
+  // Vendor-pane choices (buy rows + the Back control). The frontend renders
+  // these in the dedicated VendorPanel instead of the normal choice list.
+  | 'vendor'
   // The post-combat "Continue" gate. The frontend renders a dedicated
   // interstitial instead of listing it among the normal choices.
   | 'continue';

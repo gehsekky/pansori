@@ -1478,6 +1478,12 @@ export interface GameState {
   // `end_conversation` or on leaving the room.
   active_conversation?: { roomId: string; path: number[]; prompt: string };
 
+  // Vendor pane — a sub-state nested under `active_conversation`. While set (out
+  // of combat, in the NPC's room), generateChoices offers ONLY the NPC's wares
+  // (buy choices) + a Back control that returns to the conversation. Opened by
+  // `enter_shop`, cleared by `exit_shop` or `end_conversation`.
+  active_shop?: { roomId: string };
+
   // Structured combat event log (circular buffer, capped at COMBAT_LOG_MAX).
   // Emitted in parallel to the narrative string for UI rendering of
   // mechanical events (hits, damage, conditions) separately from prose.

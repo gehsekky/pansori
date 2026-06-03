@@ -204,6 +204,82 @@
   border-color: var(--t-primary);
 }
 
+/* Vendor pane — the shopfront nested under a conversation. Mirrors the
+   conversation panel; reuses .conversationControls for the Back row and .invBtn
+   for the Buy buttons. */
+.vendorPanel {
+  background: var(--t-card);
+  border: 1px solid var(--t-border);
+  padding: 0.85rem 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.vendorHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  color: var(--t-primary);
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+}
+
+.vendorGold {
+  color: var(--t-mid);
+  letter-spacing: 0.06em;
+}
+
+.vendorSubhead {
+  font-size: 0.62rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--t-dim);
+  margin: 0 0 0.6rem;
+}
+
+.vendorList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.vendorItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--t-separator);
+}
+
+.vendorItemMain {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.vendorItemName {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.vendorItemDesc {
+  font-size: 0.72rem;
+  line-height: 1.4;
+  color: var(--t-dim);
+}
+
+.vendorEmpty {
+  color: var(--t-dim);
+  font-style: italic;
+}
+
 /* Invite dialog — wraps the standard Dialog with a copy-link row and an
    optional host-only "rotate" button. The input is readonly + click-to-
    select so a player can grab the URL with one tap. */
