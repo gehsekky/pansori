@@ -38,6 +38,7 @@ import type {
   InventoryItem,
   LootItem,
   NpcAttitude,
+  NpcDialogueResponse,
   OnHitEffect,
   PlacedNpc,
   Seed,
@@ -3485,6 +3486,24 @@ export function npcIsKilled(state: GameState, roomId: string): boolean {
   );
 }
 
+/**
+ * Whether this NPC's dialogue tree actually OFFERS a given quest — i.e. some
+ * response (at any nesting depth) advances it via an `advance_quest`
+ * consequence. Drives the "quest available" [!] marker so a giver who also owns
+ * a follow-up quest that auto-activates from the world (e.g. the Silent Grove's
+ * `quest_break_trickster`, triggered by killing the trickster — never offered in
+ * dialogue) doesn't keep flagging [!] after the dialogue quest is accepted.
+ */
+export function npcDialogueOffersQuest(npc: PlacedNpc, questId: string): boolean {
+  const walk = (responses: NpcDialogueResponse[] | undefined): boolean =>
+    (responses ?? []).some(
+      (r) =>
+        (r.consequences ?? []).some((c) => c.type === 'advance_quest' && c.questId === questId) ||
+        walk(r.responses)
+    );
+  return walk(npc.responses);
+}
+
 // ─── Choice generation ────────────────────────────────────────────────────────
 
 // Stable key for choice-dimming. Returns a string for choices the player
@@ -4019,7 +4038,12 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     // enemyAlive = true via getLivingRoomEnemies).
     const giverQuests = (context.campaign?.quests ?? []).filter((q) => q.giverNpcId === npc.id);
     const progressById = new Map((state.quest_progress ?? []).map((p) => [p.questId, p] as const));
-    const availableQuests = giverQuests.filter((q) => !progressById.has(q.id));
+    // A quest is "available here" only if it isn't already in progress AND this
+    // NPC's dialogue actually offers it — so a giver's follow-up quest that
+    // auto-activates from the world (not dialogue) doesn't keep the [!] lit.
+    const availableQuests = giverQuests.filter(
+      (q) => !progressById.has(q.id) && npcDialogueOffersQuest(npc, q.id)
+    );
     const questNote = availableQuests.length > 0 ? ' [!]' : '';
     const dcNote = attitude === 'indifferent' ? ` (CHA check DC ${npc.persuasionDC ?? 12})` : '';
     choices.push({
