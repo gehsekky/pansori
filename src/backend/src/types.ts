@@ -1476,13 +1476,13 @@ export interface GameState {
   // node, a Back when nested, and End conversation. `path` indexes the nested
   // response tree (root = []); `prompt` is the NPC's current line. Cleared by
   // `end_conversation` or on leaving the room.
-  active_conversation?: { roomId: string; path: number[]; prompt: string };
+  active_conversation?: { npcId: string; roomId: string; path: number[]; prompt: string };
 
   // Vendor pane — a sub-state nested under `active_conversation`. While set (out
   // of combat, in the NPC's room), generateChoices offers ONLY the NPC's wares
   // (buy choices) + a Back control that returns to the conversation. Opened by
   // `enter_shop`, cleared by `exit_shop` or `end_conversation`.
-  active_shop?: { roomId: string };
+  active_shop?: { npcId: string; roomId: string };
 
   // Leveling pane — player-driven level-up for one party member. While set (out
   // of combat), generateChoices offers ONLY that member's level-up cascade

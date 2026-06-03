@@ -1366,14 +1366,14 @@ const placedNpc: PlacedNpc = { ...npcTemplate, roomId: npcRoomId };
 
 const seedWithNpc: Seed = {
   ...seedWithLoot,
-  npcs: { [npcRoomId]: placedNpc },
+  npcs: { [placedNpc.id]: placedNpc },
 };
 
 function makeNpcState(charOverrides: Partial<Character> = {}, npcAttitude = placedNpc.attitude) {
   return makeState(charOverrides, {
     current_room: npcRoomId,
     visited_rooms: ['entry_hall', npcRoomId],
-    npc_attitudes: npcAttitude !== placedNpc.attitude ? { [npcRoomId]: npcAttitude } : {},
+    npc_attitudes: npcAttitude !== placedNpc.attitude ? { [placedNpc.id]: npcAttitude } : {},
     npc_talked: [],
   });
 }
@@ -1381,42 +1381,42 @@ function makeNpcState(charOverrides: Partial<Character> = {}, npcAttitude = plac
 describe('NPC actions', () => {
   it('talk to friendly NPC shows greeting and marks room as talked', async () => {
     const result = await takeAction({
-      action: { type: 'talk' },
+      action: { type: 'talk', npcId: placedNpc.id },
       history: [],
       state: makeNpcState(),
       seed: seedWithNpc,
       context: ctx,
     });
     expect(result.narrative).toContain('Greetings, traveller!');
-    expect(result.newState.npc_talked).toContain(npcRoomId);
+    expect(result.newState.npc_talked).toContain(placedNpc.id);
   });
 
   it('talk to indifferent NPC succeeds on high CHA roll', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.99); // d20 → 20, passes DC
     const state = makeNpcState({}, 'indifferent');
     const result = await takeAction({
-      action: { type: 'talk' },
+      action: { type: 'talk', npcId: placedNpc.id },
       history: [],
       state,
       seed: seedWithNpc,
       context: ctx,
     });
     expect(result.narrative).toMatch(/success/i);
-    expect(result.newState.npc_attitudes[npcRoomId]).toBe('friendly');
+    expect(result.newState.npc_attitudes[placedNpc.id]).toBe('friendly');
   });
 
   it('talk to indifferent NPC fails on low CHA roll', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0); // d20 → 1, fails DC
     const state = makeNpcState({}, 'indifferent');
     const result = await takeAction({
-      action: { type: 'talk' },
+      action: { type: 'talk', npcId: placedNpc.id },
       history: [],
       state,
       seed: seedWithNpc,
       context: ctx,
     });
     expect(result.narrative).toMatch(/fail/i);
-    expect(result.newState.npc_attitudes[npcRoomId]).not.toBe('friendly'); // attitude not changed to friendly
+    expect(result.newState.npc_attitudes[placedNpc.id]).not.toBe('friendly'); // attitude not changed to friendly
   });
 
   it('generateChoices shows talk choice for friendly NPC', () => {
@@ -1430,14 +1430,19 @@ describe('NPC actions', () => {
     // NO standalone buy choices (those were removed in favour of the pane).
     const talking = {
       ...makeNpcState(),
-      active_conversation: { roomId: npcRoomId, path: [], prompt: 'Greetings, traveller!' },
+      active_conversation: {
+        npcId: placedNpc.id,
+        roomId: npcRoomId,
+        path: [],
+        prompt: 'Greetings, traveller!',
+      },
     };
     const convChoices = generateChoices(talking, seedWithNpc, ctx);
     expect(convChoices.some((c) => c.action.type === 'enter_shop')).toBe(true);
     expect(convChoices.some((c) => c.action.type === 'buy')).toBe(false);
 
     // Opening the shop (active_shop) surfaces ONLY the wares + a Back control.
-    const shopping = { ...talking, active_shop: { roomId: npcRoomId } };
+    const shopping = { ...talking, active_shop: { npcId: placedNpc.id, roomId: npcRoomId } };
     const shopChoices = generateChoices(shopping, seedWithNpc, ctx);
     expect(shopChoices.some((c) => c.action.type === 'buy')).toBe(true);
     expect(shopChoices.some((c) => c.action.type === 'exit_shop')).toBe(true);
@@ -1461,7 +1466,7 @@ describe('NPC actions', () => {
       (c) =>
         c.action.type === 'attack' &&
         (c.action as { type: 'attack'; targetEnemyId?: string }).targetEnemyId ===
-          `npc:${npcRoomId}`
+          `npc:${placedNpc.id}`
     );
     expect(attacksOnNpc.length).toBeGreaterThan(0);
     // attack_npc only shows for non-hostile NPCs (as the "first strike that
@@ -1470,7 +1475,7 @@ describe('NPC actions', () => {
   });
 
   it('talk_response applies consequences and shows NPC reply', async () => {
-    const state = { ...makeNpcState(), npc_talked: [npcRoomId] };
+    const state = { ...makeNpcState(), npc_talked: [placedNpc.id] };
     const result = await takeAction({
       action: { type: 'talk_response', responseIdx: 1 },
       history: [],
@@ -1488,8 +1493,13 @@ describe('NPC actions', () => {
     // active — never mixed into the normal choice list.)
     const state = {
       ...makeNpcState(),
-      npc_talked: [npcRoomId],
-      active_conversation: { roomId: npcRoomId, path: [], prompt: 'Greetings, traveller!' },
+      npc_talked: [placedNpc.id],
+      active_conversation: {
+        npcId: placedNpc.id,
+        roomId: npcRoomId,
+        path: [],
+        prompt: 'Greetings, traveller!',
+      },
     };
     const choices = generateChoices(state, seedWithNpc, ctx);
     const responseChoices = choices.filter((c) => c.action.type === 'talk_response');
@@ -1501,7 +1511,7 @@ describe('NPC actions', () => {
 
   it('talk opens a conversation (prompt = greeting); responses are not mixed into the list', async () => {
     const result = await takeAction({
-      action: { type: 'talk' },
+      action: { type: 'talk', npcId: placedNpc.id },
       history: [],
       state: makeNpcState(),
       seed: seedWithNpc,
@@ -1548,16 +1558,16 @@ describe('NPC actions', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.99); // d20 → 20, always hits
     const state = makeNpcState({ hp: 10, max_hp: 10 });
     const result = await takeAction({
-      action: { type: 'attack_npc' },
+      action: { type: 'attack_npc', npcId: placedNpc.id },
       history: [],
       state,
       seed: seedWithNpc,
       context: ctx,
     });
-    expect(result.newState.npc_attitudes[npcRoomId]).toBe('hostile');
+    expect(result.newState.npc_attitudes[placedNpc.id]).toBe('hostile');
     // Combat should be live (initiative rolled, entities created).
     expect(result.newState.combat_active).toBe(true);
-    expect(result.newState.entities?.some((e) => e.id === `npc:${npcRoomId}`)).toBe(true);
+    expect(result.newState.entities?.some((e) => e.id === `npc:${placedNpc.id}`)).toBe(true);
     // Narrative reflects the unified combat path.
     expect(result.narrative).toMatch(/damage|combat|initiative/i);
   });
@@ -1565,16 +1575,16 @@ describe('NPC actions', () => {
   it('attack_npc when NPC is killed marks enemies_killed', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.99); // critical, high damage
     const weakNpc: PlacedNpc = { ...placedNpc, hp: 1 };
-    const seedWeak: Seed = { ...seedWithNpc, npcs: { [npcRoomId]: weakNpc } };
+    const seedWeak: Seed = { ...seedWithNpc, npcs: { [placedNpc.id]: weakNpc } };
     const state = makeNpcState({ hp: 10, max_hp: 10 });
     const result = await takeAction({
-      action: { type: 'attack_npc' },
+      action: { type: 'attack_npc', npcId: placedNpc.id },
       history: [],
       state,
       seed: seedWeak,
       context: ctx,
     });
-    expect(result.newState.enemies_killed).toContain(`npc:${npcRoomId}`);
+    expect(result.newState.enemies_killed).toContain(`npc:${placedNpc.id}`);
   });
 });
 
@@ -1616,7 +1626,7 @@ describe('faction shop price modifiers', () => {
       faction_rep: { faction_guild: repWithGuild },
       // The vendor pane is open — buy choices surface through the active_shop
       // early-return (faction pricing is independent of attitude/shop state).
-      active_shop: { roomId: 'millhaven_market' },
+      active_shop: { npcId: 'npc_aldric', roomId: 'millhaven_market' },
     };
   }
 
@@ -1635,7 +1645,7 @@ describe('faction shop price modifiers', () => {
     enemies: {},
     loot: {},
     npcs: {
-      millhaven_market: {
+      npc_aldric: {
         roomId: 'millhaven_market',
         id: 'npc_aldric',
         name: 'Aldric the Merchant',
@@ -4777,7 +4787,7 @@ describe('seenKeyForAction', () => {
     // gets a distinct key (no false-positive dimming across levels).
     const nested = {
       ...st,
-      active_conversation: { roomId: 'crypt_room_a', path: [0, 1], prompt: '' },
+      active_conversation: { npcId: 'x', roomId: 'crypt_room_a', path: [0, 1], prompt: '' },
     };
     expect(seenKeyForAction({ type: 'talk_response', responseIdx: 2 }, nested)).toBe(
       'talk_response::crypt_room_a::0.1::2'

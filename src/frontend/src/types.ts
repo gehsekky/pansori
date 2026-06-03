@@ -301,12 +301,12 @@ export interface GameState {
   // Active NPC conversation — see backend GameState. When set (out of combat,
   // in the NPC's room), the dedicated ConversationPanel renders `prompt` + the
   // `kind:'conversation'` choices. `path` indexes the nested response tree.
-  active_conversation?: { roomId: string; path: number[]; prompt: string };
+  active_conversation?: { npcId: string; roomId: string; path: number[]; prompt: string };
 
   // Vendor pane nested under the conversation — see backend GameState. When set
   // (out of combat, in the NPC's room), the VendorPanel renders the NPC's wares
   // (`kind:'vendor'` buy choices) + a Back control, in place of the dialogue.
-  active_shop?: { roomId: string };
+  active_shop?: { npcId: string; roomId: string };
 
   // Leveling pane — see backend GameState. When set (out of combat), the
   // LevelingPanel renders the active member's level-up cascade (`kind:'leveling'`

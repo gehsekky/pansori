@@ -17,11 +17,12 @@ interface Props {
   // clicked cell. The backend free-pathfinds out of combat (no movement budget)
   // and resolves any transition (site / venue / room exit / ascend) on arrival.
   onMarkerMove?: (to: GridPos) => void;
-  // A talkable NPC standing on the grid (local room maps). Renders a clickable
-  // token at `pos`; clicking it (via `onNpcClick`) walks the party adjacent and
-  // opens the conversation — the same as the "Talk to …" choice.
-  npc?: { pos: GridPos; name: string };
-  onNpcClick?: () => void;
+  // The talkable NPCs standing on the grid (local room maps) — a room may hold
+  // several. Renders a clickable token per NPC at its `pos`; clicking it (via
+  // `onNpcClick(id)`) walks the party adjacent and opens that NPC's conversation,
+  // the same as the "Talk to …" choice.
+  npcs?: Array<{ id: string; pos: GridPos; name: string }>;
+  onNpcClick?: (npcId: string) => void;
 }
 
 const LEVEL_LABEL: Record<ActiveGrid['level'], string> = {
@@ -117,6 +118,7 @@ function describeTerrain(type: TerrainType, withModifiers: boolean): string {
   if (t.travelMult < 1) parts.push('quick travel');
   else if (t.travelMult > 1) parts.push(`slow going (${t.travelMult}× travel time)`);
   if (t.encounterMult === 0) parts.push('safe');
+  else if (t.encounterMult < 1) parts.push('safer');
   else if (t.encounterMult > 1) parts.push('encounters more likely');
   return parts.join(' · ');
 }
@@ -128,7 +130,7 @@ function describeTerrain(type: TerrainType, withModifiers: boolean): string {
  * to travel to, and obstacles. (Local combat switches to GridCombatView, which
  * deploys the party into PC tokens.)
  */
-function GridMapView({ grid, markerPos, enemyPresent, onMarkerMove, npc, onNpcClick }: Props) {
+function GridMapView({ grid, markerPos, enemyPresent, onMarkerMove, npcs, onNpcClick }: Props) {
   // The overland (regional) map gets double-size squares so the larger, sparse
   // grid reads more like a map; the town map uses mid-size 48 px squares; local
   // exploration stays compact (CELL_PX).
@@ -172,7 +174,8 @@ function GridMapView({ grid, markerPos, enemyPresent, onMarkerMove, npc, onNpcCl
       const isObstacle = obstacleSet.has(key);
       const transition = transitionAt.get(key);
       // A talkable NPC token sits here (and the party isn't standing on it).
-      const isNpc = !!npc && npc.pos.x === x && npc.pos.y === y && !isMarker;
+      const cellNpc = npcs?.find((n) => n.pos.x === x && n.pos.y === y);
+      const isNpc = !!cellNpc && !isMarker;
       // Out of combat the party moves freely (the backend pathfinds), so every
       // non-obstacle cell that isn't the marker's own square is a valid target.
       // The NPC's own cell is clickable too — clicking it talks (walks adjacent).
@@ -201,7 +204,7 @@ function GridMapView({ grid, markerPos, enemyPresent, onMarkerMove, npc, onNpcCl
       const ariaParts: string[] = [`${x},${y}`];
       if (isMarker) ariaParts.push('the party');
       if (isEnemyMarker) ariaParts.push('an enemy');
-      if (isNpc) ariaParts.push(`${npc!.name}, talk`);
+      if (isNpc) ariaParts.push(`${cellNpc!.name}, talk`);
       if (terrainType) ariaParts.push(TERRAIN[terrainType].label);
       else if (isObstacle) ariaParts.push('impassable');
       if (transition) ariaParts.push(transition.label);
@@ -215,7 +218,7 @@ function GridMapView({ grid, markerPos, enemyPresent, onMarkerMove, npc, onNpcCl
       // so town / local maps tooltip the bare terrain label.
       const showTerrainModifiers = grid.level === 'regional';
       const cellTitle = isNpc
-        ? `Talk to ${npc!.name}`
+        ? `Talk to ${cellNpc!.name}`
         : transition
           ? transition.label
           : terrainType
@@ -244,10 +247,12 @@ function GridMapView({ grid, markerPos, enemyPresent, onMarkerMove, npc, onNpcCl
         token = (
           <>
             <span className={styles.gridToken} style={{ background: 'rgba(196, 160, 70, 0.92)' }}>
-              <span className={styles.gridTokenLetter}>{npc!.name.charAt(0).toUpperCase()}</span>
+              <span className={styles.gridTokenLetter}>
+                {cellNpc!.name.charAt(0).toUpperCase()}
+              </span>
             </span>
             <span className={styles.gridMapLabel} aria-hidden="true">
-              {npc!.name}
+              {cellNpc!.name}
             </span>
           </>
         );
@@ -316,14 +321,16 @@ function GridMapView({ grid, markerPos, enemyPresent, onMarkerMove, npc, onNpcCl
           tabIndex={clickable ? 0 : undefined}
           title={cellTitle}
           onClick={
-            clickable ? () => (isNpc ? onNpcClick?.() : onMarkerMove?.({ x, y })) : undefined
+            clickable
+              ? () => (isNpc ? onNpcClick?.(cellNpc!.id) : onMarkerMove?.({ x, y }))
+              : undefined
           }
           onKeyDown={
             clickable
               ? (e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
-                    if (isNpc) onNpcClick?.();
+                    if (isNpc) onNpcClick?.(cellNpc!.id);
                     else onMarkerMove?.({ x, y });
                   }
                 }

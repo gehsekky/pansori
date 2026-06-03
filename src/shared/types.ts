@@ -392,7 +392,8 @@ export type StructuredAction =
   // spell slots up to the feature's budget; `plan` is the chosen allocation id
   // (omitted → the engine's default lowest-first plan).
   | { type: 'recover_slots'; recovery: 'arcane' | 'natural'; plan?: string }
-  | { type: 'talk' }
+  // `npcId` selects which NPC in the room (a room may host several).
+  | { type: 'talk'; npcId: string }
   // `responseIdx` is relative to the conversation's CURRENT node (resolved via
   // `GameState.active_conversation.path`).
   | { type: 'talk_response'; responseIdx: number }
@@ -411,7 +412,7 @@ export type StructuredAction =
   // combat) / step back to the roster. See active_leveling.
   | { type: 'enter_leveling'; characterId: string }
   | { type: 'exit_leveling' }
-  | { type: 'attack_npc' }
+  | { type: 'attack_npc'; npcId: string }
   | { type: 'use_class_feature'; featureId: string; targetEnemyId?: string }
   | { type: 'apply_asi'; stat: AbilityKey }
   | {
@@ -436,11 +437,11 @@ export type StructuredAction =
       // mind or coerce an enemy mid-combat. In combat: consumes the
       // Action (no attack that turn). Out of combat: no action cost
       // (the narrative time investment is the cost). DC = max(15, target's
-      // INT score). Exactly one of `targetNpcRoomId` / `targetEnemyId` is
+      // INT score). Exactly one of `targetNpcId` / `targetEnemyId` is
       // expected.
       type: 'influence';
       skill: 'persuasion' | 'deception' | 'intimidation';
-      targetNpcRoomId?: string;
+      targetNpcId?: string;
       targetEnemyId?: string;
     }
   | {

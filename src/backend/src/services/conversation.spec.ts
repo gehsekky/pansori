@@ -12,6 +12,7 @@ import { makeState } from '../test-fixtures.js';
 afterEach(() => vi.restoreAllMocks());
 
 const ROOM = 'parley';
+const NPC = 'sage';
 
 const npc: PlacedNpc = {
   roomId: ROOM,
@@ -50,10 +51,10 @@ const seed = {
   rooms: [{ id: ROOM, name: 'Parley Room', desc: '' }],
   enemies: {},
   loot: {},
-  npcs: { [ROOM]: npc },
+  npcs: { [NPC]: npc },
 } as unknown as Seed;
 
-const start = () => makeState({ id: 'pc-1', cha: 14 }, { current_room: ROOM, npc_talked: [ROOM] });
+const start = () => makeState({ id: 'pc-1', cha: 14 }, { current_room: ROOM, npc_talked: [NPC] });
 
 const act = (
   state: ReturnType<typeof makeState>,
@@ -65,8 +66,9 @@ const convoLabels = (state: ReturnType<typeof makeState>) =>
 
 describe('conversation mode', () => {
   it('Talk opens a conversation (prompt = greeting) and only dialogue choices show', async () => {
-    const r = await act(start(), { type: 'talk' });
+    const r = await act(start(), { type: 'talk', npcId: NPC });
     expect(r.newState.active_conversation).toEqual({
+      npcId: NPC,
       roomId: ROOM,
       path: [],
       prompt: 'Ask me anything.',
@@ -82,7 +84,7 @@ describe('conversation mode', () => {
   });
 
   it('picking a branch descends a level (children shown + Back appears)', async () => {
-    let r = await act(start(), { type: 'talk' });
+    let r = await act(start(), { type: 'talk', npcId: NPC });
     r = await act(r.newState, { type: 'talk_response', responseIdx: 0 }); // "Tell me about the crypt"
     expect(r.newState.active_conversation?.path).toEqual([0]);
     expect(r.newState.active_conversation?.prompt).toBe('It is old and cursed.');
@@ -94,7 +96,7 @@ describe('conversation mode', () => {
   });
 
   it('a leaf reply stays at the current level; consequences still fire', async () => {
-    let r = await act(start(), { type: 'talk' });
+    let r = await act(start(), { type: 'talk', npcId: NPC });
     r = await act(r.newState, { type: 'talk_response', responseIdx: 0 }); // descend
     r = await act(r.newState, { type: 'talk_response', responseIdx: 1 }); // leaf "I have heard enough"
     expect(r.newState.active_conversation?.path).toEqual([0]); // unchanged — leaf
@@ -104,7 +106,7 @@ describe('conversation mode', () => {
   });
 
   it('Back steps up a level (prompt reverts to the parent / greeting)', async () => {
-    let r = await act(start(), { type: 'talk' });
+    let r = await act(start(), { type: 'talk', npcId: NPC });
     r = await act(r.newState, { type: 'talk_response', responseIdx: 0 }); // path [0]
     r = await act(r.newState, { type: 'conversation_back' });
     expect(r.newState.active_conversation?.path).toEqual([]);
@@ -113,7 +115,7 @@ describe('conversation mode', () => {
   });
 
   it('End conversation clears the state and restores normal choices', async () => {
-    let r = await act(start(), { type: 'talk' });
+    let r = await act(start(), { type: 'talk', npcId: NPC });
     r = await act(r.newState, { type: 'end_conversation' });
     expect(r.newState.active_conversation).toBeUndefined();
     const choices = generateChoices(r.newState, seed, ctx);
@@ -126,7 +128,7 @@ describe('conversation mode', () => {
     const state = {
       ...start(),
       combat_active: true,
-      active_conversation: { roomId: ROOM, path: [], prompt: 'Ask me anything.' },
+      active_conversation: { npcId: NPC, roomId: ROOM, path: [], prompt: 'Ask me anything.' },
     } as ReturnType<typeof makeState>;
     const choices = generateChoices(state, seed, ctx);
     expect(choices.some((c) => c.kind === 'conversation')).toBe(false);

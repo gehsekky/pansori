@@ -10,10 +10,11 @@ import { context as vale } from '../../campaignData/malgovia/index.js';
 afterEach(() => vi.restoreAllMocks());
 
 const ROOM = 'millhaven_market';
+const NPC = 'npc_aldric';
 
 const aldric: PlacedNpc = {
   roomId: ROOM,
-  id: 'npc_aldric',
+  id: NPC,
   name: 'Aldric the Merchant',
   attitude: 'friendly',
   factionId: 'faction_guild',
@@ -36,7 +37,7 @@ const seed: Seed = {
   rooms: [{ id: ROOM, name: 'Market', desc: '' }],
   enemies: {},
   loot: {},
-  npcs: { [ROOM]: aldric },
+  npcs: { [NPC]: aldric },
 };
 
 // A party member standing in Aldric's room. `over` patches state-level fields.
@@ -45,7 +46,10 @@ function state(over: Partial<GameState> = {}, gold = 100): GameState {
 }
 const talking = (over: Partial<GameState> = {}, gold = 100): GameState =>
   state(
-    { active_conversation: { roomId: ROOM, path: [], prompt: aldric.greeting }, ...over },
+    {
+      active_conversation: { npcId: NPC, roomId: ROOM, path: [], prompt: aldric.greeting },
+      ...over,
+    },
     gold
   );
 
@@ -59,7 +63,7 @@ describe('vendor pane — conversation wares control', () => {
 
   it('an indifferent NPC offers no wares control (cannot trade)', () => {
     const choices = generateChoices(
-      talking({ npc_attitudes: { [ROOM]: 'indifferent' } }),
+      talking({ npc_attitudes: { [NPC]: 'indifferent' } }),
       seed,
       vale
     );
@@ -76,11 +80,15 @@ describe('vendor pane — open / browse / close', () => {
       seed,
       context: vale,
     });
-    expect(r.newState.active_shop).toEqual({ roomId: ROOM });
+    expect(r.newState.active_shop).toEqual({ npcId: NPC, roomId: ROOM });
   });
 
   it('while shopping, generateChoices returns ONLY vendor choices (wares + Back)', () => {
-    const choices = generateChoices(talking({ active_shop: { roomId: ROOM } }), seed, vale);
+    const choices = generateChoices(
+      talking({ active_shop: { npcId: NPC, roomId: ROOM } }),
+      seed,
+      vale
+    );
     expect(choices.every((c) => c.kind === 'vendor')).toBe(true);
     const buy = choices.find((c) => c.action.type === 'buy');
     expect(buy).toBeDefined();
@@ -93,7 +101,7 @@ describe('vendor pane — open / browse / close', () => {
     const r = await takeAction({
       action: { type: 'buy', itemId: 'healing_potion', price: 50 },
       history: [],
-      state: talking({ active_shop: { roomId: ROOM } }, 100),
+      state: talking({ active_shop: { npcId: NPC, roomId: ROOM } }, 100),
       seed,
       context: vale,
     });
@@ -105,7 +113,7 @@ describe('vendor pane — open / browse / close', () => {
     const r = await takeAction({
       action: { type: 'exit_shop' },
       history: [],
-      state: talking({ active_shop: { roomId: ROOM } }),
+      state: talking({ active_shop: { npcId: NPC, roomId: ROOM } }),
       seed,
       context: vale,
     });
@@ -119,7 +127,7 @@ describe('vendor pane — open / browse / close', () => {
     const r = await takeAction({
       action: { type: 'end_conversation' },
       history: [],
-      state: talking({ active_shop: { roomId: ROOM } }),
+      state: talking({ active_shop: { npcId: NPC, roomId: ROOM } }),
       seed,
       context: vale,
     });
@@ -129,7 +137,7 @@ describe('vendor pane — open / browse / close', () => {
 
   it('combat suppresses the vendor pane (falls through to combat choices)', () => {
     const choices = generateChoices(
-      talking({ active_shop: { roomId: ROOM }, combat_active: true }),
+      talking({ active_shop: { npcId: NPC, roomId: ROOM }, combat_active: true }),
       seed,
       vale
     );
@@ -140,7 +148,7 @@ describe('vendor pane — open / browse / close', () => {
     const r = await takeAction({
       action: { type: 'enter_shop' },
       history: [],
-      state: talking({ npc_attitudes: { [ROOM]: 'indifferent' } }),
+      state: talking({ npc_attitudes: { [NPC]: 'indifferent' } }),
       seed,
       context: vale,
     });

@@ -4,7 +4,9 @@ import {
   applyConsequence,
   consumeLuckForCheck,
   getNpcAttitude,
+  npcById,
   npcIsKilled,
+  npcsInRoom,
 } from '../gameEngine.js';
 import { hasExpertise, hasJackOfAllTrades, hasReliableTalent } from '../multiclass.js';
 import type { ActionHandler } from './types.js';
@@ -44,15 +46,15 @@ export function approachCell(
  * options are appended inline as stage-direction hints (matches the
  * UI button format).
  */
-export const handleTalk: ActionHandler<{ type: 'talk' }> = (ctx) => {
+export const handleTalk: ActionHandler<{ type: 'talk'; npcId: string }> = (ctx, action) => {
   if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can talk.' };
   const { char } = ctx.actor;
-  const npc = ctx.seed.npcs?.[ctx.roomId];
+  const npc = npcById(ctx.seed, action.npcId);
   if (!npc) {
     ctx.narrative = 'There is no one to talk to here.';
     return;
   }
-  if (npcIsKilled(ctx.st, ctx.roomId)) {
+  if (npcIsKilled(ctx.st, npc.id)) {
     ctx.narrative = 'They are dead.';
     return;
   }
@@ -71,7 +73,7 @@ export const handleTalk: ActionHandler<{ type: 'talk' }> = (ctx) => {
     if (success) {
       ctx.st = {
         ...ctx.st,
-        npc_attitudes: { ...ctx.st.npc_attitudes, [ctx.roomId]: 'friendly' },
+        npc_attitudes: { ...ctx.st.npc_attitudes, [npc.id]: 'friendly' },
       };
       narrative = `You approach ${npc.name} with care (CHA check ${roll} vs DC ${dc} — success). ${npc.greeting}`;
     } else {
@@ -82,8 +84,8 @@ export const handleTalk: ActionHandler<{ type: 'talk' }> = (ctx) => {
     narrative = npc.greeting;
   }
 
-  if (!ctx.st.npc_talked.includes(ctx.roomId)) {
-    ctx.st = { ...ctx.st, npc_talked: [...ctx.st.npc_talked, ctx.roomId] };
+  if (!ctx.st.npc_talked.includes(npc.id)) {
+    ctx.st = { ...ctx.st, npc_talked: [...ctx.st.npc_talked, npc.id] };
   }
   // Open conversation mode (out of combat only). generateChoices then surfaces
   // ONLY the dialogue options (responses at the current node + End conversation,
@@ -101,7 +103,7 @@ export const handleTalk: ActionHandler<{ type: 'talk' }> = (ctx) => {
     }
     ctx.st = {
       ...ctx.st,
-      active_conversation: { roomId: ctx.roomId, path: [], prompt: npc.greeting },
+      active_conversation: { npcId: npc.id, roomId: ctx.roomId, path: [], prompt: npc.greeting },
     };
   } else {
     updatePcActor(ctx, { turn_actions: { ...char.turn_actions, action_used: true } });
@@ -120,14 +122,16 @@ export const handleTalkResponse: ActionHandler<{
 }> = (ctx, action) => {
   if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can respond in dialogue.' };
   const { char } = ctx.actor;
-  const npc = ctx.seed.npcs?.[ctx.roomId];
+  // The conversation tracks which NPC we're talking to; fall back to the room's
+  // first NPC for a direct dispatch with no active conversation.
+  const conv = ctx.st.active_conversation;
+  const npc = conv ? npcById(ctx.seed, conv.npcId) : npcsInRoom(ctx.seed, ctx.roomId)[0];
   if (!npc) {
     ctx.narrative = 'There is no one here.';
     return;
   }
   // `responseIdx` is relative to the conversation's current node (the path
   // tracks the nested level); default to the root list for a direct dispatch.
-  const conv = ctx.st.active_conversation;
   const path = conv?.path ?? [];
   const node = responsesAtPath(npc, path);
   const response = node[action.responseIdx];
@@ -170,7 +174,7 @@ export const handleConversationBack: ActionHandler<{ type: 'conversation_back' }
     ctx.narrative = 'No conversation to step back from.';
     return;
   }
-  const npc = ctx.seed.npcs?.[conv.roomId];
+  const npc = npcById(ctx.seed, conv.npcId);
   const newPath = conv.path.slice(0, -1);
   let prompt = npc?.greeting ?? '';
   if (npc && newPath.length > 0) {
@@ -189,7 +193,7 @@ export const handleConversationBack: ActionHandler<{ type: 'conversation_back' }
 export const handleEndConversation: ActionHandler<{ type: 'end_conversation' }> = (ctx) => {
   if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs converse.' };
   const npc = ctx.st.active_conversation
-    ? ctx.seed.npcs?.[ctx.st.active_conversation.roomId]
+    ? npcById(ctx.seed, ctx.st.active_conversation.npcId)
     : undefined;
   // Ending the talk also closes any open vendor pane (it nests under the talk).
   ctx.st = { ...ctx.st, active_conversation: undefined, active_shop: undefined };
@@ -205,7 +209,7 @@ export const handleEndConversation: ActionHandler<{ type: 'end_conversation' }> 
 export const handleEnterShop: ActionHandler<{ type: 'enter_shop' }> = (ctx) => {
   if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can shop.' };
   const conv = ctx.st.active_conversation;
-  const npc = conv ? ctx.seed.npcs?.[conv.roomId] : undefined;
+  const npc = conv ? npcById(ctx.seed, conv.npcId) : undefined;
   if (!conv || !npc) {
     ctx.narrative = 'There is no one to trade with.';
     return;
@@ -214,7 +218,7 @@ export const handleEnterShop: ActionHandler<{ type: 'enter_shop' }> = (ctx) => {
     ctx.narrative = `${npc.name} has nothing to sell you.`;
     return;
   }
-  ctx.st = { ...ctx.st, active_shop: { roomId: conv.roomId } };
+  ctx.st = { ...ctx.st, active_shop: { npcId: conv.npcId, roomId: conv.roomId } };
   ctx.narrative = `You browse ${npc.name}'s wares.`;
 };
 
@@ -224,7 +228,7 @@ export const handleEnterShop: ActionHandler<{ type: 'enter_shop' }> = (ctx) => {
  */
 export const handleExitShop: ActionHandler<{ type: 'exit_shop' }> = (ctx) => {
   if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can shop.' };
-  const npc = ctx.st.active_shop ? ctx.seed.npcs?.[ctx.st.active_shop.roomId] : undefined;
+  const npc = ctx.st.active_shop ? npcById(ctx.seed, ctx.st.active_shop.npcId) : undefined;
   ctx.st = { ...ctx.st, active_shop: undefined };
   ctx.narrative = npc ? `You step back from ${npc.name}'s wares.` : 'You step back from the wares.';
 };
@@ -243,7 +247,10 @@ export const handleBuy: ActionHandler<{
 }> = (ctx, action) => {
   if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can buy.' };
   const { char } = ctx.actor;
-  const npc = ctx.seed.npcs?.[ctx.roomId];
+  // Buying happens inside the vendor pane, so the seller is active_shop's NPC.
+  const npc = ctx.st.active_shop
+    ? npcById(ctx.seed, ctx.st.active_shop.npcId)
+    : npcsInRoom(ctx.seed, ctx.roomId)[0];
   if (!npc) {
     ctx.narrative = 'There is no one to buy from.';
     return;
@@ -280,22 +287,25 @@ export const handleBuy: ActionHandler<{
  * enhance, etc.). Without that, we'd double-fire enemy turns and
  * narrative enhancement.
  */
-export const handleAttackNpc: ActionHandler<{ type: 'attack_npc' }> = (ctx) => {
-  const npc = ctx.seed.npcs?.[ctx.roomId];
+export const handleAttackNpc: ActionHandler<{ type: 'attack_npc'; npcId: string }> = (
+  ctx,
+  action
+) => {
+  const npc = npcById(ctx.seed, action.npcId);
   if (!npc) {
     ctx.narrative = 'There is no one to attack here.';
     return;
   }
-  if (npcIsKilled(ctx.st, ctx.roomId)) {
+  if (npcIsKilled(ctx.st, npc.id)) {
     ctx.narrative = 'Already dead.';
     return;
   }
   ctx.st = {
     ...ctx.st,
-    npc_attitudes: { ...ctx.st.npc_attitudes, [ctx.roomId]: 'hostile' },
+    npc_attitudes: { ...ctx.st.npc_attitudes, [npc.id]: 'hostile' },
   };
   ctx.commitChar();
-  return { replaceWith: { type: 'attack', targetEnemyId: `npc:${ctx.roomId}` } };
+  return { replaceWith: { type: 'attack', targetEnemyId: `npc:${npc.id}` } };
 };
 
 /**
@@ -333,15 +343,15 @@ export const handleAttackNpc: ActionHandler<{ type: 'attack_npc' }> = (ctx) => {
 export const handleInfluence: ActionHandler<{
   type: 'influence';
   skill: 'persuasion' | 'deception' | 'intimidation';
-  targetNpcRoomId?: string;
+  targetNpcId?: string;
   targetEnemyId?: string;
 }> = (ctx, action) => {
   if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can use the Influence action.' };
   const { char } = ctx.actor;
-  // Resolve target: prefer explicit npc room, then explicit enemy,
-  // then current-room npc if either is omitted.
-  const npcRoomId = action.targetNpcRoomId ?? ctx.roomId;
-  const npc = ctx.seed.npcs?.[npcRoomId];
+  // Resolve target: an explicit npc, an explicit enemy, else the room's first NPC.
+  const npc = action.targetNpcId
+    ? npcById(ctx.seed, action.targetNpcId)
+    : npcsInRoom(ctx.seed, ctx.roomId)[0];
   const enemy = action.targetEnemyId
     ? ctx.livingEnemiesInRoom.find((e) => e.id === action.targetEnemyId)
     : null;
@@ -403,7 +413,7 @@ export const handleInfluence: ActionHandler<{
       };
       ctx.narrative = `${char.name} attempts a ${skillLabel} check on ${enemy.name} (${total} vs DC ${dc}) — success! ${enemy.name} yields and retreats from the fight.`;
     } else if (npc) {
-      const currentAttitude = ctx.st.npc_attitudes?.[npcRoomId] ?? npc.attitude;
+      const currentAttitude = ctx.st.npc_attitudes?.[npc.id] ?? npc.attitude;
       const nextAttitude =
         currentAttitude === 'hostile'
           ? 'indifferent'
@@ -412,7 +422,7 @@ export const handleInfluence: ActionHandler<{
             : 'friendly';
       ctx.st = {
         ...ctx.st,
-        npc_attitudes: { ...ctx.st.npc_attitudes, [npcRoomId]: nextAttitude },
+        npc_attitudes: { ...ctx.st.npc_attitudes, [npc.id]: nextAttitude },
       };
       ctx.narrative = `${char.name} uses ${skillLabel} on ${npc.name} (${total} vs DC ${dc}) — success! ${npc.name}'s attitude shifts to ${nextAttitude}.`;
     }

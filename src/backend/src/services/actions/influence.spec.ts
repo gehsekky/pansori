@@ -12,6 +12,7 @@ import { takeAction } from '../gameEngine.js';
 afterEach(() => vi.restoreAllMocks());
 
 const npcRoomId = 'npc_room';
+const npcId = 'tavern_npc';
 const seedWithNpc: Seed = {
   context_id: ctx.id,
   world_name: 'Influence Test',
@@ -25,7 +26,7 @@ const seedWithNpc: Seed = {
   enemies: {},
   loot: {},
   npcs: {
-    [npcRoomId]: {
+    [npcId]: {
       id: 'tavern_npc',
       roomId: npcRoomId,
       name: 'Suspicious Bartender',
@@ -60,14 +61,14 @@ describe('influence — NPC target out of combat', () => {
       active_character_id: 'pc-1',
     };
     const result = await takeAction({
-      action: { type: 'influence', skill: 'persuasion', targetNpcRoomId: npcRoomId },
+      action: { type: 'influence', skill: 'persuasion', targetNpcId: npcId },
       history: [],
       state,
       seed: seedWithNpc,
       context: ctx,
     });
     expect(result.narrative).toMatch(/success/i);
-    expect(result.newState.npc_attitudes?.[npcRoomId]).toBe('friendly');
+    expect(result.newState.npc_attitudes?.[npcId]).toBe('friendly');
     // Out-of-combat: no action_used consumption.
     expect(result.newState.characters[0].turn_actions.action_used).toBe(false);
   });
@@ -82,7 +83,7 @@ describe('influence — NPC target out of combat', () => {
       active_character_id: 'pc-1',
     };
     const result = await takeAction({
-      action: { type: 'influence', skill: 'deception', targetNpcRoomId: npcRoomId },
+      action: { type: 'influence', skill: 'deception', targetNpcId: npcId },
       history: [],
       state,
       seed: seedWithNpc,
@@ -90,7 +91,7 @@ describe('influence — NPC target out of combat', () => {
     });
     expect(result.narrative).toMatch(/fail/i);
     // Attitude unchanged (no entry written for this room).
-    expect(result.newState.npc_attitudes?.[npcRoomId]).toBeUndefined();
+    expect(result.newState.npc_attitudes?.[npcId]).toBeUndefined();
   });
 });
 

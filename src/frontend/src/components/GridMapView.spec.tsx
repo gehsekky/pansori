@@ -114,12 +114,14 @@ describe('GridMapView', () => {
 
   it('tooltips a non-POI square with its terrain type + travel/encounter info', () => {
     const { container } = render(<GridMapView grid={terrainGrid} markerPos={{ x: 0, y: 0 }} />);
-    // Painted terrain: label + how it crosses (road = quick + safe).
-    expect(cell(container, 0, 1).getAttribute('title')).toBe('Road · quick travel · safe');
+    // Painted terrain: label + how it crosses (road = quick + safer, the lowest
+    // nonzero encounter rate — roads aren't fully immune).
+    expect(cell(container, 0, 1).getAttribute('title')).toBe('Road · quick travel · safer');
     // Impassable terrain just notes it can't be crossed.
     expect(cell(container, 3, 1).getAttribute('title')).toBe('Water · impassable');
-    // Blank cell on a terrain grid reads as plain (no modifiers ⇒ label only).
-    expect(cell(container, 4, 2).getAttribute('title')).toBe('Plains');
+    // Blank cell on a terrain grid defaults to plains (wilds — encounters more
+    // likely than on a road).
+    expect(cell(container, 4, 2).getAttribute('title')).toBe('Plains · encounters more likely');
   });
 
   it('renders regional impassable terrain as a mountain glyph + a "mountains" legend', () => {
@@ -202,14 +204,14 @@ describe('GridMapView', () => {
     transitions: [],
   };
 
-  it('renders a clickable NPC token (name label + Talk tooltip) and dispatches talk', () => {
+  it('renders a clickable NPC token (name label + Talk tooltip) and dispatches talk with the npc id', () => {
     const onNpcClick = vi.fn();
     const onMarkerMove = vi.fn();
     const { container, getByText } = render(
       <GridMapView
         grid={localGrid}
         markerPos={{ x: 3, y: 6 }}
-        npc={{ pos: { x: 3, y: 2 }, name: 'Sister Maren' }}
+        npcs={[{ id: 'npc_maren', pos: { x: 3, y: 2 }, name: 'Sister Maren' }]}
         onNpcClick={onNpcClick}
         onMarkerMove={onMarkerMove}
       />
@@ -219,8 +221,28 @@ describe('GridMapView', () => {
     expect(npcCell.getAttribute('title')).toBe('Talk to Sister Maren');
     expect(npcCell.getAttribute('role')).toBe('button'); // clickable
     fireEvent.click(npcCell);
-    expect(onNpcClick).toHaveBeenCalledTimes(1);
+    expect(onNpcClick).toHaveBeenCalledWith('npc_maren');
     expect(onMarkerMove).not.toHaveBeenCalled(); // the NPC cell talks, doesn't move
+  });
+
+  it('renders a token per NPC when several share a room, each dispatching its own id', () => {
+    const onNpcClick = vi.fn();
+    const { container, getByText } = render(
+      <GridMapView
+        grid={localGrid}
+        markerPos={{ x: 3, y: 6 }}
+        npcs={[
+          { id: 'npc_elise', pos: { x: 3, y: 2 }, name: 'Old Elise' },
+          { id: 'npc_bram', pos: { x: 5, y: 4 }, name: 'Bram' },
+        ]}
+        onNpcClick={onNpcClick}
+        onMarkerMove={vi.fn()}
+      />
+    );
+    expect(getByText('Old Elise')).toBeTruthy();
+    expect(getByText('Bram')).toBeTruthy();
+    fireEvent.click(cell(container, 5, 4));
+    expect(onNpcClick).toHaveBeenCalledWith('npc_bram');
   });
 
   it('hides the NPC token when the party marker stands on it', () => {
@@ -228,7 +250,7 @@ describe('GridMapView', () => {
       <GridMapView
         grid={localGrid}
         markerPos={{ x: 3, y: 2 }} // party on the NPC's cell
-        npc={{ pos: { x: 3, y: 2 }, name: 'Sister Maren' }}
+        npcs={[{ id: 'npc_maren', pos: { x: 3, y: 2 }, name: 'Sister Maren' }]}
         onNpcClick={vi.fn()}
         onMarkerMove={vi.fn()}
       />

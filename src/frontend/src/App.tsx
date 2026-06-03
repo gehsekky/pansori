@@ -556,15 +556,30 @@ export default function App() {
                         // the token must stay visible). Clicking dispatches the
                         // talk choice (walks the party adjacent + opens dialogue);
                         // it's non-clickable mid-conversation (the panel drives it).
-                        const talkChoice = choices.find((c) => c.action.type === 'talk');
-                        const roomNpc =
-                          grid.level === 'local' ? seed.npcs?.[gameState.current_room] : undefined;
-                        const inConversationHere =
-                          gameState.active_conversation?.roomId === gameState.current_room;
-                        const npcToken =
-                          roomNpc?.pos && (talkChoice || inConversationHere)
-                            ? { pos: roomNpc.pos, name: roomNpc.name }
+                        // A room may hold several NPCs — one token each. A token
+                        // is shown when a talk choice for that NPC is available,
+                        // or for the NPC we're mid-conversation with (whose talk
+                        // choice is replaced by the dialogue panel).
+                        const talkByNpc = new Map(
+                          choices
+                            .filter((c) => c.action.type === 'talk')
+                            .map((c) => [(c.action as { npcId: string }).npcId, c] as const)
+                        );
+                        const convNpcId =
+                          gameState.active_conversation?.roomId === gameState.current_room
+                            ? gameState.active_conversation.npcId
                             : undefined;
+                        const npcTokens =
+                          grid.level === 'local'
+                            ? Object.values(seed.npcs ?? {})
+                                .filter(
+                                  (n) =>
+                                    n.roomId === gameState.current_room &&
+                                    n.pos &&
+                                    (talkByNpc.has(n.id) || n.id === convNpcId)
+                                )
+                                .map((n) => ({ id: n.id, pos: n.pos!, name: n.name }))
+                            : [];
                         return (
                           <GridMapView
                             grid={grid}
@@ -572,8 +587,11 @@ export default function App() {
                             // A surfaced Attack choice means a hostile is here
                             // pre-combat — show the red enemy marker.
                             enemyPresent={choices.some((c) => c.kind === 'attack')}
-                            npc={npcToken}
-                            onNpcClick={talkChoice ? () => handleChoice(talkChoice) : undefined}
+                            npcs={npcTokens}
+                            onNpcClick={(npcId) => {
+                              const tc = talkByNpc.get(npcId);
+                              if (tc) handleChoice(tc);
+                            }}
                             onMarkerMove={(to) =>
                               handleChoice({
                                 label: `Travel to (${to.x},${to.y})`,
@@ -1003,13 +1021,12 @@ export default function App() {
                       gameState.active_shop.roomId === gameState.current_room &&
                       seed
                     ) {
-                      const shopRoom = gameState.active_shop.roomId;
                       const activeChar = gameState.characters.find(
                         (c) => c.id === gameState.active_character_id
                       );
                       return (
                         <VendorPanel
-                          npcName={seed.npcs?.[shopRoom]?.name ?? 'Someone'}
+                          npcName={seed.npcs?.[gameState.active_shop.npcId]?.name ?? 'Someone'}
                           gold={activeChar?.gold ?? 0}
                           choices={choices.filter((c) => c.kind === 'vendor')}
                           ctx={ctx}
@@ -1028,7 +1045,7 @@ export default function App() {
                       const conv = gameState.active_conversation;
                       return (
                         <ConversationPanel
-                          npcName={seed.npcs?.[conv.roomId]?.name ?? 'Someone'}
+                          npcName={seed.npcs?.[conv.npcId]?.name ?? 'Someone'}
                           prompt={conv.prompt}
                           choices={choices.filter((c) => c.kind === 'conversation')}
                           seenChoices={gameState.seen_choices ?? []}

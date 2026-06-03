@@ -16,14 +16,14 @@ describe('generateSeed — Vale of Shadows campaign', () => {
 
   it('places authored NPCs at their campaign-declared rooms', () => {
     // Vale binds Aldric (market), Sister Maren (temple), Dusk (slums).
-    expect(seed.npcs?.millhaven_market?.id).toBe('npc_aldric');
-    expect(seed.npcs?.millhaven_temple?.id).toBe('npc_sister_maren');
-    expect(seed.npcs?.millhaven_lantern?.id).toBe('npc_dusk');
+    expect(seed.npcs?.npc_aldric?.id).toBe('npc_aldric');
+    expect(seed.npcs?.npc_sister_maren?.id).toBe('npc_sister_maren');
+    expect(seed.npcs?.npc_dusk?.id).toBe('npc_dusk');
   });
 
   it('rooms with placed NPCs are not enemy rooms', () => {
-    for (const roomId of Object.keys(seed.npcs ?? {})) {
-      expect(seed.enemies?.[roomId] ?? []).toEqual([]);
+    for (const npc of Object.values(seed.npcs ?? {})) {
+      expect(seed.enemies?.[npc.roomId] ?? []).toEqual([]);
     }
   });
 });
@@ -37,8 +37,8 @@ describe('generateSeed — Vale carries the folded Whispering Pines content', ()
     const roomIds = seed.rooms.map((r) => r.id);
     expect(roomIds).toContain('spire_ritual_apex');
     expect(roomIds).toContain('pines_tavern');
-    expect(seed.npcs?.pines_tavern?.id).toBe('npc_brann');
-    expect(seed.npcs?.pines_warden?.id).toBe('npc_riese');
+    expect(seed.npcs?.npc_brann?.id).toBe('npc_brann');
+    expect(seed.npcs?.npc_riese?.id).toBe('npc_riese');
   });
 
   it('keeps the Pines boss (fire-vulnerable) + quest loot', () => {

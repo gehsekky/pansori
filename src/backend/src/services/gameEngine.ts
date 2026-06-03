@@ -2428,9 +2428,18 @@ function getRoomEnemies(seed: Seed, roomId: string): Enemy[] {
 // A hostile NPC participates in combat as a regular enemy — same grid, same
 // initiative, same machinery. We surface it as an Enemy on the fly so the
 // combat path doesn't need a separate "duel" code branch.
+// `seed.npcs` is keyed by NPC id (each PlacedNpc carries its `roomId`), so a room
+// can host multiple NPCs. These helpers centralize the two access shapes.
+export function npcById(seed: Seed, npcId: string): PlacedNpc | undefined {
+  return seed.npcs?.[npcId];
+}
+export function npcsInRoom(seed: Seed, roomId: string): PlacedNpc[] {
+  return Object.values(seed.npcs ?? {}).filter((n) => n.roomId === roomId);
+}
+
 function npcAsEnemy(npc: PlacedNpc): Enemy {
   return {
-    id: `npc:${npc.roomId}`,
+    id: `npc:${npc.id}`,
     name: npc.name,
     hp: npc.hp,
     ac: npc.ac,
@@ -2444,10 +2453,11 @@ function npcAsEnemy(npc: PlacedNpc): Enemy {
 function getLivingRoomEnemies(state: GameState, seed: Seed, roomId: string): Enemy[] {
   const killed = state.enemies_killed ?? [];
   const base = getRoomEnemies(seed, roomId).filter((e) => !killed.includes(e.id));
-  // Include a hostile-flipped NPC in this room as an enemy.
-  const npc = seed.npcs?.[roomId];
-  if (npc && state.npc_attitudes?.[roomId] === 'hostile' && !killed.includes(`npc:${roomId}`)) {
-    base.push(npcAsEnemy(npc));
+  // Include every hostile-flipped NPC in this room as an enemy.
+  for (const npc of npcsInRoom(seed, roomId)) {
+    if (state.npc_attitudes?.[npc.id] === 'hostile' && !killed.includes(`npc:${npc.id}`)) {
+      base.push(npcAsEnemy(npc));
+    }
   }
   return base;
 }
@@ -2834,10 +2844,9 @@ export function getEnemyById(seed: Seed, enemyId: string): Enemy | null {
     const found = list.find((e) => e.id === enemyId);
     if (found) return found;
   }
-  // NPC-as-enemy lookup: id is `npc:${roomId}`.
+  // NPC-as-enemy lookup: id is `npc:${npcId}`.
   if (enemyId.startsWith('npc:')) {
-    const roomId = enemyId.slice('npc:'.length);
-    const npc = seed.npcs?.[roomId];
+    const npc = npcById(seed, enemyId.slice('npc:'.length));
     if (npc) return npcAsEnemy(npc);
   }
   return null;
@@ -3477,12 +3486,14 @@ export function buildArrivalNarrative(
 // ─── NPC helpers ─────────────────────────────────────────────────────────────
 
 export function getNpcAttitude(state: GameState, npc: PlacedNpc): NpcAttitude {
-  return state.npc_attitudes?.[npc.roomId] ?? npc.attitude;
+  return state.npc_attitudes?.[npc.id] ?? npc.attitude;
 }
 
-export function npcIsKilled(state: GameState, roomId: string): boolean {
+// `npc_attitudes` / `enemies_killed` are keyed by NPC id (a room may hold several
+// NPCs). Takes the npc id.
+export function npcIsKilled(state: GameState, npcId: string): boolean {
   return !!(
-    state.npc_attitudes?.[roomId] === 'hostile' && state.enemies_killed?.includes(`npc:${roomId}`)
+    state.npc_attitudes?.[npcId] === 'hostile' && state.enemies_killed?.includes(`npc:${npcId}`)
   );
 }
 
@@ -3853,8 +3864,8 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   // shop (party left / NPC gone / no longer friendly) falls through.
   const shop = state.active_shop;
   if (shop && !state.combat_active && shop.roomId === state.current_room) {
-    const snpc = seed.npcs?.[shop.roomId];
-    if (snpc && !npcIsKilled(state, shop.roomId) && getNpcAttitude(state, snpc) === 'friendly') {
+    const snpc = npcById(seed, shop.npcId);
+    if (snpc && !npcIsKilled(state, shop.npcId) && getNpcAttitude(state, snpc) === 'friendly') {
       const vendorChoices = shopBuyChoices(snpc, state, context);
       vendorChoices.push({
         label: '↩ Back',
@@ -3867,8 +3878,8 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
 
   const conv = state.active_conversation;
   if (conv && !state.combat_active && conv.roomId === state.current_room) {
-    const cnpc = seed.npcs?.[conv.roomId];
-    if (cnpc && !npcIsKilled(state, conv.roomId)) {
+    const cnpc = npcById(seed, conv.npcId);
+    if (cnpc && !npcIsKilled(state, conv.npcId)) {
       const convoChoices: GameChoice[] = responsesAtPath(cnpc, conv.path).map((r, i) => {
         const action = { type: 'talk_response' as const, responseIdx: i };
         // This early-return bypasses the end-of-function seenKey pass, so stamp
@@ -4140,42 +4151,33 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     }
   }
 
-  // NPC choices — only for non-hostile NPCs. Hostile NPCs surface as enemies
-  // via getLivingRoomEnemies and use the regular Attack choice above.
-  const npc = seed.npcs?.[roomId];
-  if (npc && !npcIsKilled(state, roomId) && !enemyAlive) {
-    const attitude = getNpcAttitude(state, npc);
-    // attitude is guaranteed non-hostile here (hostile NPCs would have set
-    // enemyAlive = true via getLivingRoomEnemies).
-    const giverQuests = (context.campaign?.quests ?? []).filter((q) => q.giverNpcId === npc.id);
+  // NPC choices — a Talk + Attack per non-hostile, living NPC in the room (a
+  // room may host several). Hostile NPCs surface as enemies via
+  // getLivingRoomEnemies (and would set enemyAlive), so they use the regular
+  // Attack choice instead; while any enemy is alive, social options are hidden.
+  if (!enemyAlive) {
     const progressById = new Map((state.quest_progress ?? []).map((p) => [p.questId, p] as const));
-    // A quest is "available here" only if it isn't already in progress AND this
-    // NPC's dialogue actually offers it — so a giver's follow-up quest that
-    // auto-activates from the world (not dialogue) doesn't keep the [!] lit.
-    const availableQuests = giverQuests.filter(
-      (q) => !progressById.has(q.id) && npcDialogueOffersQuest(npc, q.id)
-    );
-    const questNote = availableQuests.length > 0 ? ' [!]' : '';
-    const dcNote = attitude === 'indifferent' ? ` (CHA check DC ${npc.persuasionDC ?? 12})` : '';
-    choices.push({
-      label: `Talk to ${npc.name}${dcNote}${questNote}`,
-      action: { type: 'talk' },
-    });
-    // Dialogue responses are NOT surfaced here — `talk` opens conversation mode
-    // (sets `active_conversation`), and the conversation early-return above is
-    // the only place that lists responses. This keeps dialogue separate from the
-    // rest of the action surface.
-    // The explicit "Accept quest" choice is gone — quests auto-activate
-    // when their first step matches (typically a talk_response in the
-    // giver's room). The route handler surfaces "✦ Quest accepted —"
-    // narrative when this fires. The `accept_quest` action handler is
-    // retained for backward compatibility with stale FE caches.
-    // Buying is no longer a standalone action-list choice — it lives in the
-    // vendor pane, reached via Talk → "🛒 Check out my wares" (the conversation
-    // early-return surfaces the wares control; `enter_shop` opens the pane).
-    // Initial attack triggers hostility + combat (handler flips attitude and
-    // dispatches a regular Attack against the NPC-as-enemy).
-    choices.push({ label: `Attack ${npc.name} (makes hostile)`, action: { type: 'attack_npc' } });
+    for (const npc of npcsInRoom(seed, roomId)) {
+      if (npcIsKilled(state, npc.id)) continue;
+      const attitude = getNpcAttitude(state, npc);
+      if (attitude === 'hostile') continue;
+      // A quest is "available here" only if it isn't already in progress AND this
+      // NPC's dialogue actually offers it (so a world-activated follow-up quest
+      // doesn't keep the [!] lit). `talk` opens conversation mode for this npc.
+      const availableQuests = (context.campaign?.quests ?? [])
+        .filter((q) => q.giverNpcId === npc.id)
+        .filter((q) => !progressById.has(q.id) && npcDialogueOffersQuest(npc, q.id));
+      const questNote = availableQuests.length > 0 ? ' [!]' : '';
+      const dcNote = attitude === 'indifferent' ? ` (CHA check DC ${npc.persuasionDC ?? 12})` : '';
+      choices.push({
+        label: `Talk to ${npc.name}${dcNote}${questNote}`,
+        action: { type: 'talk', npcId: npc.id },
+      });
+      choices.push({
+        label: `Attack ${npc.name} (makes hostile)`,
+        action: { type: 'attack_npc', npcId: npc.id },
+      });
+    }
   }
 
   // 3-level grid map model — travel is map-driven: the FE renders the active
@@ -6289,13 +6291,10 @@ export function applyConsequence(
     }
 
     case 'set_npc_attitude': {
-      // npcId is the npc's authored id (e.g. 'npc_aldric'); npc_attitudes
-      // is keyed by roomId since each room can host at most one NPC.
-      const targetRoomId = Object.entries(seed.npcs ?? {}).find(([, n]) => n.id === c.npcId)?.[0];
-      if (!targetRoomId) return st;
+      // npc_attitudes is keyed by the NPC's id (a room may host several NPCs).
       return {
         ...st,
-        npc_attitudes: { ...(st.npc_attitudes ?? {}), [targetRoomId]: c.attitude },
+        npc_attitudes: { ...(st.npc_attitudes ?? {}), [c.npcId]: c.attitude },
       };
     }
 

@@ -272,7 +272,7 @@ describe('Malgovia — scripted playthrough', () => {
     // Merchant District venue → Aldric → quest_shipment
     await markerMove(6, 2);
     expect(state.current_room).toBe('millhaven_market');
-    await dispatch({ type: 'talk' });
+    await dispatch({ type: 'talk', npcId: 'npc_aldric' });
     await dispatch({ type: 'talk_response', responseIdx: 0 });
     await dispatch({ type: 'accept_quest', questId: 'quest_shipment' });
     expect(state.quest_progress?.find((q) => q.questId === 'quest_shipment')?.status).toBe(
@@ -284,7 +284,7 @@ describe('Malgovia — scripted playthrough', () => {
     // Temple venue → Sister Maren → quest_crypt
     await markerMove(1, 2);
     expect(state.current_room).toBe('millhaven_temple');
-    await dispatch({ type: 'talk' });
+    await dispatch({ type: 'talk', npcId: 'npc_sister_maren' });
     await dispatch({ type: 'talk_response', responseIdx: 0 });
     await dispatch({ type: 'accept_quest', questId: 'quest_crypt' });
     expect(state.quest_progress?.find((q) => q.questId === 'quest_crypt')?.status).toBe('active');
@@ -293,7 +293,7 @@ describe('Malgovia — scripted playthrough', () => {
     // Lantern District venue → Dusk → quest_shadow
     await markerMove(1, 5);
     expect(state.current_room).toBe('millhaven_lantern');
-    await dispatch({ type: 'talk' });
+    await dispatch({ type: 'talk', npcId: 'npc_dusk' });
     await dispatch({ type: 'talk_response', responseIdx: 0 });
     await dispatch({ type: 'accept_quest', questId: 'quest_shadow' });
     expect(state.quest_progress?.find((q) => q.questId === 'quest_shadow')?.status).toBe('active');
@@ -309,7 +309,7 @@ describe('Malgovia — scripted playthrough', () => {
     // Back to the Lantern District to deliver the letter
     await markerMove(1, 5);
     expect(state.current_room).toBe('millhaven_lantern');
-    await dispatch({ type: 'talk' });
+    await dispatch({ type: 'talk', npcId: 'npc_dusk' });
     expect(
       state.quest_progress?.find((q) => q.questId === 'quest_shadow')?.completedSteps
     ).toContain('step_find_letter');
@@ -389,7 +389,7 @@ describe('Malgovia — scripted playthrough', () => {
     expect(state.map_level).toBe('town');
     await markerMove(6, 2); // Merchant District → Aldric
     expect(state.current_room).toBe('millhaven_market');
-    await dispatch({ type: 'talk' }); // fires the room_id + loot quest checks
+    await dispatch({ type: 'talk', npcId: 'npc_aldric' }); // fires the room_id + loot quest checks
 
     expect(
       state.quest_progress?.find((q) => q.questId === 'quest_shipment')?.completedSteps

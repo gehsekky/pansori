@@ -9,7 +9,7 @@ import { npcDialogueOffersQuest } from './gameEngine.js';
 import { npcs } from '../campaignData/malgovia/entities.js';
 
 describe('npcDialogueOffersQuest — drives the [!] quest marker', () => {
-  const elise = npcs['pinegate_square'];
+  const elise = npcs['npc_elise_elder'];
 
   it('Elise exists and is the grove-quest giver', () => {
     expect(elise?.id).toBe('npc_elise_elder');

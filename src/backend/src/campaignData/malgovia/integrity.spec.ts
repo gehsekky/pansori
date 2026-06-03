@@ -61,9 +61,25 @@ describe('Malgovia integrity — cross-references resolve', () => {
   });
 
   it('npc / enemy / loot placements key off real rooms', () => {
-    for (const [roomId, npc] of npcEntries) {
-      expect(roomIds.has(roomId), `npc placement on missing room ${roomId}`).toBe(true);
-      expect(npc.roomId, `npc ${npc.id} roomId disagrees with its key ${roomId}`).toBe(roomId);
+    // npcs are keyed by npc.id (a room may host several); each value carries the
+    // roomId it sits in, which must be a real room.
+    for (const [npcId, npc] of npcEntries) {
+      expect(npc.id, `npc key ${npcId} disagrees with its id ${npc.id}`).toBe(npcId);
+      expect(roomIds.has(npc.roomId), `npc ${npc.id} placed in missing room ${npc.roomId}`).toBe(
+        true
+      );
+    }
+    // NPCs sharing a room must occupy distinct cells (so each renders its own token).
+    const posByRoom = new Map<string, Set<string>>();
+    for (const [, npc] of npcEntries) {
+      if (!npc.pos) continue;
+      const seen = posByRoom.get(npc.roomId) ?? new Set<string>();
+      const key = `${npc.pos.x},${npc.pos.y}`;
+      expect(seen.has(key), `npc ${npc.id} overlaps another npc at ${key} in ${npc.roomId}`).toBe(
+        false
+      );
+      seen.add(key);
+      posByRoom.set(npc.roomId, seen);
     }
     for (const roomId of Object.keys(camp.enemies ?? {})) {
       expect(roomIds.has(roomId), `enemy placement on missing room ${roomId}`).toBe(true);

@@ -611,7 +611,7 @@ export const enemies: Record<string, Enemy[]> = {
 };
 
 export const npcs: Record<string, PlacedNpc> = {
-  millhaven_market: {
+  npc_aldric: {
     roomId: 'millhaven_market',
     id: 'npc_aldric',
     pos: { x: 3, y: 2 },
@@ -647,7 +647,7 @@ export const npcs: Record<string, PlacedNpc> = {
     persuasionDC: 12,
     shop: [{ itemId: 'healing_potion', price: 50 }],
   },
-  millhaven_temple: {
+  npc_sister_maren: {
     roomId: 'millhaven_temple',
     id: 'npc_sister_maren',
     pos: { x: 3, y: 2 },
@@ -698,7 +698,7 @@ export const npcs: Record<string, PlacedNpc> = {
     ],
     persuasionDC: 10,
   },
-  millhaven_lantern: {
+  npc_dusk: {
     roomId: 'millhaven_lantern',
     id: 'npc_dusk',
     pos: { x: 5, y: 2 },
@@ -735,7 +735,7 @@ export const npcs: Record<string, PlacedNpc> = {
   },
 
   // ── Whispering Pines (folded) ────────────────────────────────────────────
-  pines_tavern: {
+  npc_brann: {
     roomId: 'pines_tavern',
     id: 'npc_brann',
     pos: { x: 2, y: 2 },
@@ -771,7 +771,7 @@ export const npcs: Record<string, PlacedNpc> = {
       { itemId: 'fur_cloak', price: 40 },
     ],
   },
-  pines_lodge: {
+  npc_marta: {
     roomId: 'pines_lodge',
     id: 'npc_marta',
     pos: { x: 4, y: 2 },
@@ -803,7 +803,7 @@ export const npcs: Record<string, PlacedNpc> = {
       { itemId: 'elixir_of_warmth', price: 18 },
     ],
   },
-  pines_warden: {
+  npc_riese: {
     roomId: 'pines_warden',
     id: 'npc_riese',
     pos: { x: 3, y: 2 },
@@ -835,7 +835,7 @@ export const npcs: Record<string, PlacedNpc> = {
   },
 
   // ── Grove of Thorns (folded) ─────────────────────────────────────────────
-  pinegate_square: {
+  npc_elise_elder: {
     roomId: 'pinegate_square',
     id: 'npc_elise_elder',
     pos: { x: 3, y: 2 },
@@ -871,7 +871,35 @@ export const npcs: Record<string, PlacedNpc> = {
     ],
     persuasionDC: 10,
   },
-  pinegate_lodge: {
+  // A SECOND NPC sharing Pinegate square with Old Elise — demonstrates multiple
+  // NPCs in one room (each is independently talkable, with its own attitude).
+  npc_bram_woodcutter: {
+    roomId: 'pinegate_square',
+    id: 'npc_bram_woodcutter',
+    pos: { x: 5, y: 4 },
+    name: 'Bram the Woodcutter',
+    attitude: 'friendly',
+    hp: 10,
+    ac: 11,
+    damage: '1d6',
+    toHit: 2,
+    xp: 0,
+    greeting:
+      'Mind the treeline, friend — the pines have gone wrong of late. I keep my axe close and my eyes closer.',
+    responses: [
+      {
+        label: 'What have you seen in the woods?',
+        reply:
+          "Shapes that don't cast shadows. Thorns where the path was. I won't go past the old marker stone anymore.",
+      },
+      {
+        label: 'Safe travels, then.',
+        reply: 'Aye. Keep to the light.',
+      },
+    ],
+    persuasionDC: 10,
+  },
+  npc_tamsin_herbalist: {
     roomId: 'pinegate_lodge',
     id: 'npc_tamsin_herbalist',
     pos: { x: 4, y: 2 },
