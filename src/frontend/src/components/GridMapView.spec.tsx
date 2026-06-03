@@ -112,11 +112,14 @@ describe('GridMapView', () => {
     expect(getByText('site')).toBeTruthy();
   });
 
-  it('tooltips a non-POI square with its terrain type (POIs keep their name)', () => {
+  it('tooltips a non-POI square with its terrain type + travel/encounter info', () => {
     const { container } = render(<GridMapView grid={terrainGrid} markerPos={{ x: 0, y: 0 }} />);
-    expect(cell(container, 0, 1).getAttribute('title')).toBe('road'); // painted terrain
-    expect(cell(container, 3, 1).getAttribute('title')).toBe('water');
-    expect(cell(container, 4, 2).getAttribute('title')).toBe('plains'); // blank cell on a terrain grid
+    // Painted terrain: label + how it crosses (road = quick + safe).
+    expect(cell(container, 0, 1).getAttribute('title')).toBe('Road · quick travel · safe');
+    // Impassable terrain just notes it can't be crossed.
+    expect(cell(container, 3, 1).getAttribute('title')).toBe('Water · impassable');
+    // Blank cell on a terrain grid reads as plain (no modifiers ⇒ label only).
+    expect(cell(container, 4, 2).getAttribute('title')).toBe('Plains');
   });
 
   it('renders regional impassable terrain as a mountain glyph + a "mountains" legend', () => {

@@ -97,6 +97,22 @@ function scaleLabel(feetPerSquare: number): string {
   return `${feetPerSquare} ft/square`;
 }
 
+// Hover-tooltip description for a (non-POI) terrain square: the capitalized
+// label plus what the square costs to cross — travel-time and random-encounter
+// modifiers from the shared TERRAIN spec — so the player can read the map
+// before moving. Impassable terrain just notes it can't be crossed.
+function describeTerrain(type: TerrainType): string {
+  const t = TERRAIN[type];
+  const label = t.label.charAt(0).toUpperCase() + t.label.slice(1);
+  if (!t.passable) return `${label} · impassable`;
+  const parts = [label];
+  if (t.travelMult < 1) parts.push('quick travel');
+  else if (t.travelMult > 1) parts.push(`slow going (${t.travelMult}× travel time)`);
+  if (t.encounterMult === 0) parts.push('safe');
+  else if (t.encounterMult > 1) parts.push('encounters more likely');
+  return parts.join(' · ');
+}
+
 /**
  * The out-of-combat exploration view for the 3-level grid map. Renders the
  * active grid (regional / town / local) with the party as a SINGLE marker,
@@ -178,18 +194,19 @@ function GridMapView({ grid, markerPos, enemyPresent, onMarkerMove }: Props) {
       else if (isObstacle) ariaParts.push('impassable');
       if (transition) ariaParts.push(transition.label);
 
-      // Hover tooltip: a destination shows its name; any other square shows its
-      // terrain type so the player can read the map. Blank cells on a
-      // terrain-bearing grid read as "plains"; grids with no authored terrain
-      // (town / local) keep no tooltip on empty cells.
+      // Hover tooltip: a destination (POI) shows its name; any other square
+      // shows its terrain type + what it costs to cross (travel time / encounter
+      // risk) so the player can read the map. Blank cells on a terrain-bearing
+      // grid read as "plains"; grids with no authored terrain (town / local)
+      // keep no tooltip on empty cells.
       const cellTitle = transition
         ? transition.label
         : terrainType
-          ? TERRAIN[terrainType].label
+          ? describeTerrain(terrainType)
           : isObstacle
-            ? 'impassable'
+            ? 'Impassable'
             : grid.terrain.length > 0
-              ? 'plains'
+              ? describeTerrain('plains')
               : undefined;
 
       let token: React.ReactNode = null;
