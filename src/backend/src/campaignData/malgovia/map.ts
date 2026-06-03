@@ -176,6 +176,22 @@ export const rooms: Room[] = [
       },
       { pos: { x: 0, y: 9 }, ascends: true, label: 'Climb out to the Old Road' },
     ],
+    // Crumbling flagstone steps; a rubble pile from the caved-in ceiling.
+    terrain: [
+      ...terr('mountain', [4, 4], [5, 4], [5, 5]),
+      ...terr(
+        'cobblestone',
+        [1, 1],
+        [2, 1],
+        [3, 1],
+        [2, 2],
+        [6, 3],
+        [3, 6],
+        [6, 6],
+        [7, 6],
+        [6, 7]
+      ),
+    ],
   },
   {
     id: 'dungeon_antechamber',
@@ -218,6 +234,11 @@ export const rooms: Room[] = [
         emptyText: 'Ashes drift through your fingers. Steady your hand and search again.',
       },
     ],
+    // Shattered urns and bone-rubble strewn across the vaulted floor.
+    terrain: [
+      ...terr('mountain', [3, 4], [4, 4], [6, 6]),
+      ...terr('cobblestone', [2, 2], [3, 2], [6, 2], [7, 3], [5, 5], [2, 6]),
+    ],
   },
   {
     id: 'dungeon_charnel_hall',
@@ -254,6 +275,11 @@ export const rooms: Room[] = [
       disarmSuccess: 'You wedge a fragment of bone into the mechanism. The blade is jammed.',
       disarmFail: 'You misjudge the angle — the mechanism trips and the blade scythes anyway!',
     },
+    // Broken burial-niche debris flanks the long corridor flagstones.
+    terrain: [
+      ...terr('mountain', [3, 4], [6, 5]),
+      ...terr('cobblestone', [2, 2], [3, 2], [4, 2], [5, 7], [6, 7], [7, 7]),
+    ],
   },
   {
     id: 'dungeon_offering_chamber',
@@ -276,6 +302,12 @@ export const rooms: Room[] = [
         entrancePos: { x: 0, y: 0 },
         label: 'Ossuary',
       },
+    ],
+    // A central altar block; a stagnant offering-pool has flooded one corner.
+    terrain: [
+      ...terr('mountain', [4, 4], [5, 4], [4, 5], [5, 5]),
+      ...terr('water', [2, 7], [3, 7]),
+      ...terr('cobblestone', [2, 2], [7, 2], [7, 6]),
     ],
   },
   {
@@ -300,6 +332,11 @@ export const rooms: Room[] = [
         label: 'Throne of the Dead',
       },
     ],
+    // Toppled picture frames fallen in a diagonal across the gallery floor.
+    terrain: [
+      ...terr('mountain', [4, 4], [5, 5], [6, 6]),
+      ...terr('cobblestone', [2, 2], [3, 2], [6, 3], [3, 6], [7, 6]),
+    ],
   },
   {
     id: 'dungeon_ossuary',
@@ -322,6 +359,11 @@ export const rooms: Room[] = [
         entrancePos: { x: 1, y: 1 },
         label: 'Throne of the Dead',
       },
+    ],
+    // Bones stacked floor-to-ceiling in great ornamental piles.
+    terrain: [
+      ...terr('mountain', [3, 3], [3, 4], [6, 5], [6, 6]),
+      ...terr('cobblestone', [2, 2], [7, 2], [5, 5], [2, 7]),
     ],
   },
   {
@@ -368,6 +410,14 @@ export const rooms: Room[] = [
       { x: 5, y: 5 },
       { x: 6, y: 5 },
     ],
+    // Cosmetic paint over the tuned combat layout: the broken pillars (which are
+    // the existing `obstacles`) render as rubble; dais flagstones around them.
+    // Mountain cells here coincide with `obstacles`, so the impassable set is
+    // unchanged — this only adds the visual.
+    terrain: [
+      ...terr('mountain', [3, 4], [7, 4], [4, 6], [6, 6]),
+      ...terr('cobblestone', [5, 1], [5, 2], [1, 2], [8, 1], [1, 8], [8, 8]),
+    ],
   },
   {
     id: 'dungeon_crypt_exit',
@@ -384,6 +434,11 @@ export const rooms: Room[] = [
         label: 'Back down to the throne',
       },
       { pos: { x: 7, y: 7 }, ascends: true, label: 'Climb out to the surface' },
+    ],
+    // A cramped rubble-strewn shaft; a clear path winds from the throne door up.
+    terrain: [
+      ...terr('mountain', [3, 3], [4, 4]),
+      ...terr('cobblestone', [1, 1], [2, 2], [5, 5], [6, 6], [6, 7]),
     ],
   },
 
