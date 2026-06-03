@@ -591,6 +591,24 @@ export const rooms: Room[] = [
     gridHeight: 8,
     entryPos: { x: 0, y: 4 },
     exits: [{ pos: { x: 9, y: 4 }, ascends: true, label: 'Back down the pass' }],
+    // A snowbound switchback: sheer cliff walls (mountain) above and below the
+    // trail, with a couple of boulders forcing the path to wind. Row 4 stays open.
+    terrain: [
+      ...terr(
+        'mountain',
+        [3, 0],
+        [4, 0],
+        [5, 0],
+        [6, 0],
+        [3, 7],
+        [4, 7],
+        [5, 7],
+        [6, 7],
+        [5, 2],
+        [4, 5]
+      ),
+      ...terr('snow', [1, 3], [2, 3], [7, 3], [2, 4], [3, 4], [6, 4], [7, 4], [3, 5], [6, 5]),
+    ],
   },
 
   // Iceshard Spire — a regional site; rooms chain entrance → hall → cult →
@@ -612,6 +630,12 @@ export const rooms: Room[] = [
         label: 'Into the Frozen Hall',
       },
       { pos: { x: 0, y: 9 }, ascends: true, label: 'Back out to the pass' },
+    ],
+    // Rime-sheathed threshold: ice columns and a frozen puddle by the arch.
+    terrain: [
+      ...terr('mountain', [4, 4], [5, 4], [5, 5]),
+      ...terr('water', [6, 7]),
+      ...terr('snow', [1, 1], [2, 2], [7, 2], [2, 6], [7, 6], [3, 8]),
     ],
   },
   {
@@ -650,6 +674,13 @@ export const rooms: Room[] = [
       disarmSuccess: 'You snap the rune cleanly. The icicle slumps harmlessly.',
       disarmFail: 'Your hand slips on the rime — the icicle plummets early!',
     },
+    // A pillared ice hall: four frozen columns break line of sight, with a
+    // frozen pool at the centre. Wide lanes between the pillars.
+    terrain: [
+      ...terr('mountain', [3, 3], [6, 3], [3, 6], [6, 6]),
+      ...terr('water', [5, 5]),
+      ...terr('snow', [1, 1], [8, 1], [5, 2], [2, 5], [1, 8], [8, 8]),
+    ],
   },
   {
     id: 'spire_cult_chamber',
@@ -672,6 +703,13 @@ export const rooms: Room[] = [
         entrancePos: { x: 1, y: 1 },
         label: 'Up to the Ritual Apex',
       },
+    ],
+    // A circular vault: the black-ironwood altar (mountain) at the centre, ice
+    // chunks scattered, a frozen patch by the chant-ring.
+    terrain: [
+      ...terr('mountain', [4, 5], [5, 5], [3, 3], [7, 6]),
+      ...terr('water', [5, 2]),
+      ...terr('snow', [2, 2], [7, 2], [2, 7], [7, 7]),
     ],
   },
   {
@@ -711,6 +749,13 @@ export const rooms: Room[] = [
       { x: 5, y: 4 },
       { x: 6, y: 4 },
     ],
+    // Cosmetic paint over the tuned layout: the shattered ice columns + frozen
+    // statuary (the existing `obstacles`) render as ice; the impassable set is
+    // unchanged. Slick-ice centre stays `difficultTerrain`.
+    terrain: [
+      ...terr('mountain', [2, 4], [8, 4], [4, 6], [6, 6], [5, 3]),
+      ...terr('snow', [1, 2], [2, 2], [8, 2], [1, 8], [8, 8], [5, 8]),
+    ],
   },
   {
     id: 'spire_egress',
@@ -727,6 +772,12 @@ export const rooms: Room[] = [
         label: 'Back up to the apex',
       },
       { pos: { x: 7, y: 7 }, ascends: true, label: 'Descend to the pass' },
+    ],
+    // A cramped icy stair: a little rubble, with a clear run from the apex door
+    // down to the daylit descent.
+    terrain: [
+      ...terr('mountain', [3, 3], [4, 4]),
+      ...terr('snow', [1, 1], [2, 2], [5, 5], [6, 6], [6, 7]),
     ],
   },
 
