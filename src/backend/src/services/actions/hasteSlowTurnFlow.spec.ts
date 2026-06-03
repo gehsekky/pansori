@@ -78,7 +78,7 @@ describe('Slow — action OR bonus action, not both', () => {
       str: 16,
       conditions: ['slowed'],
       inventory: [{ instance_id: 'sw-1', id: 'longsword', name: 'Longsword' }],
-      equipped_weapon: 'sw-1',
+      equipment: { main_hand: 'sw-1' },
       weapon_proficiencies: ['simple', 'martial'],
     });
     const enemy: Enemy = {
@@ -152,7 +152,7 @@ describe('Slow — action OR bonus action, not both', () => {
       str: 16,
       // No 'slowed' condition.
       inventory: [{ instance_id: 'sw-1', id: 'longsword', name: 'Longsword' }],
-      equipped_weapon: 'sw-1',
+      equipment: { main_hand: 'sw-1' },
       weapon_proficiencies: ['simple', 'martial'],
     });
     const enemy: Enemy = {
@@ -193,7 +193,7 @@ describe('Haste — extra-action menu', () => {
         free_interaction_used: false,
       },
       inventory: [{ instance_id: 'sw-1', id: 'longsword', name: 'Longsword' }],
-      equipped_weapon: 'sw-1',
+      equipment: { main_hand: 'sw-1' },
       weapon_proficiencies: ['simple', 'martial'],
     });
     const enemy: Enemy = {
@@ -231,7 +231,7 @@ describe('Haste — extra-action menu', () => {
         free_interaction_used: false,
       },
       inventory: [{ instance_id: 'sw-1', id: 'longsword', name: 'Longsword' }],
-      equipped_weapon: 'sw-1',
+      equipment: { main_hand: 'sw-1' },
       weapon_proficiencies: ['simple', 'martial'],
     });
     const enemy: Enemy = {
@@ -275,7 +275,7 @@ describe('Haste — extra-action menu', () => {
         free_interaction_used: false,
       },
       inventory: [{ instance_id: 'sw-1', id: 'longsword', name: 'Longsword' }],
-      equipped_weapon: 'sw-1',
+      equipment: { main_hand: 'sw-1' },
       weapon_proficiencies: ['simple', 'martial'],
     });
     const enemy: Enemy = {
@@ -315,7 +315,7 @@ describe('Haste — extra-action menu', () => {
         haste_extra_action_used: true,
       },
       inventory: [{ instance_id: 'sw-1', id: 'longsword', name: 'Longsword' }],
-      equipped_weapon: 'sw-1',
+      equipment: { main_hand: 'sw-1' },
       weapon_proficiencies: ['simple', 'martial'],
     });
     const enemy: Enemy = {

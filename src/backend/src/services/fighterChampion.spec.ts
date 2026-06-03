@@ -106,7 +106,7 @@ function championState(level: number): GameState {
     subclass: 'champion',
     level,
     str: 16,
-    equipped_weapon: 'gx-1',
+    equipment: { main_hand: 'gx-1' },
     inventory: [{ instance_id: 'gx-1', id: 'greatsword', name: 'Greatsword' }],
     weapon_proficiencies: ['simple', 'martial'],
   });

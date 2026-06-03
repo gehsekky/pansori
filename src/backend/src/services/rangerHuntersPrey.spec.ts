@@ -114,7 +114,7 @@ function hordeState(): GameState {
     level: 3,
     hunters_prey: 'horde_breaker',
     str: 16,
-    equipped_weapon: 'sw-1',
+    equipment: { main_hand: 'sw-1' },
     inventory: [{ instance_id: 'sw-1', id: 'shortsword', name: 'Shortsword' }],
     weapon_proficiencies: ['simple', 'martial'],
   });

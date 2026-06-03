@@ -7,6 +7,7 @@ import {
 } from '../rulesEngine.js';
 import type { ActionHandler } from './types.js';
 import { applyDamage } from '../damage.js';
+import { clearInstance } from '../equipment.js';
 import { fmt } from '../narrativeFmt.js';
 import { maxAttunement } from '../multiclass.js';
 import { updatePcActor } from './actor.js';
@@ -96,9 +97,7 @@ export const handleDeAttune: ActionHandler<{ type: 'de_attune'; instanceId: stri
     attuned_items: attunedList.filter((id) => id !== action.instanceId),
   };
   if (lootItem?.requiresAttunement) {
-    if (next.equipped_weapon === action.instanceId) next = { ...next, equipped_weapon: null };
-    if (next.equipped_armor === action.instanceId) next = { ...next, equipped_armor: null };
-    if (next.equipped_shield === action.instanceId) next = { ...next, equipped_shield: null };
+    next = { ...next, equipment: clearInstance(next.equipment, action.instanceId) };
   }
   updatePcActor(ctx, next);
   ctx.narrative = `You release your attunement to the ${invItem?.name ?? 'item'}.`;

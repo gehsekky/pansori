@@ -85,7 +85,7 @@ describe('extraAttackCountForChar', () => {
       hp: 30,
       max_hp: 30,
       inventory: [{ instance_id: 'sw-1', id: 'longsword', name: 'Longsword' }],
-      equipped_weapon: 'sw-1',
+      equipment: { main_hand: 'sw-1' },
       weapon_proficiencies: ['simple', 'martial'],
     });
     expect(extraAttackCountForChar(pc)).toBe(1);

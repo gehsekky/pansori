@@ -123,7 +123,7 @@ function blindRangerCombat(level: number): GameState {
     level,
     str: 16,
     conditions: ['blinded'],
-    equipped_weapon: 'sw-1',
+    equipment: { main_hand: 'sw-1' },
     inventory: [{ instance_id: 'sw-1', id: 'longsword', name: 'Longsword' }],
     weapon_proficiencies: ['simple', 'martial'],
   });

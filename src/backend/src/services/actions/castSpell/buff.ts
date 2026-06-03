@@ -1,4 +1,5 @@
 import { concentrationRoundsFor, pickCastPrefix } from './utils.js';
+import { equippedArmorId, equippedShieldId } from '../../equipment.js';
 import type { ActionContext } from '../types.js';
 import type { Spell } from '../../../types.js';
 import { composeNow } from '../../narrative/compose.js';
@@ -152,8 +153,8 @@ export function runBuffSpell(
     const recomputeAcFor = (c: typeof buffTarget): number =>
       computeTotalAc(
         c.dex,
-        c.equipped_armor,
-        c.equipped_shield,
+        equippedArmorId(c),
+        equippedShieldId(c),
         c.inventory ?? [],
         ctx.context.lootTable,
         (spell.id === 'mage_armor' ? true : (c.mage_armor_active ?? false)) as boolean,

@@ -122,6 +122,12 @@ import { consumeImproveFate, tryImproveFate } from './improveFate.js';
 import { consumeIndomitable, indomitableBonus, tryIndomitableReroll } from './indomitable.js';
 import { consumeStrokeOfLuck, strokeOfLuckAvailable } from './strokeOfLuck.js';
 import { enemyActor, pcActor } from './actions/actor.js';
+import {
+  equipmentFromLegacy,
+  equippedArmorId,
+  equippedShieldId,
+  equippedWeaponId,
+} from './equipment.js';
 import { fmt, stripForLlm } from './narrativeFmt.js';
 import { COMBAT_LOG_MAX } from '../types.js';
 import { Engine } from 'json-rules-engine';
@@ -600,8 +606,8 @@ export function breakConcentration(
       next.ac =
         computeTotalAc(
           next.dex,
-          next.equipped_armor,
-          next.equipped_shield,
+          equippedArmorId(next),
+          equippedShieldId(next),
           next.inventory ?? [],
           context.lootTable,
           next.mage_armor_active ?? false,
@@ -635,8 +641,8 @@ export function breakConcentration(
       cleared.ac =
         computeTotalAc(
           cleared.dex,
-          cleared.equipped_armor,
-          cleared.equipped_shield,
+          equippedArmorId(cleared),
+          equippedShieldId(cleared),
           cleared.inventory ?? [],
           context.lootTable,
           cleared.mage_armor_active ?? false,
@@ -1620,8 +1626,8 @@ function computeEnemyAttack(
   // (defined in every context) unused on misses. Fixed to match by
   // instance_id, which is the same pattern used elsewhere
   // (twoWeaponAttack.ts, attack/toHit.ts, castSpell.ts).
-  const armorItem = char.equipped_armor
-    ? char.inventory?.find((i) => i.instance_id === char.equipped_armor)
+  const armorItem = equippedArmorId(char)
+    ? char.inventory?.find((i) => i.instance_id === equippedArmorId(char))
     : null;
 
   if (result.hit) {
@@ -2381,8 +2387,8 @@ export function effectiveSpeed(char: Character, lootTable: LootItem[] = []): num
 // Used by Barbarian Fast Movement. With an empty loot table the category can't
 // be resolved, so it returns false (the unarmored common case is unaffected).
 function wearingHeavyArmor(char: Character, lootTable: LootItem[]): boolean {
-  if (!char.equipped_armor) return false;
-  const armorId = (char.inventory ?? []).find((i) => i.instance_id === char.equipped_armor)?.id;
+  if (!equippedArmorId(char)) return false;
+  const armorId = (char.inventory ?? []).find((i) => i.instance_id === equippedArmorId(char))?.id;
   if (!armorId) return false;
   return lootTable.find((l) => l.id === armorId)?.armorCategory === 'heavy';
 }
@@ -3378,9 +3384,8 @@ export function normalizeState(raw: Record<string, unknown>): GameState {
     level,
     gold: Number(raw.gold ?? 5),
     inventory: (raw.inventory as InventoryItem[]) ?? [],
-    equipped_weapon: (raw.equipped_weapon as string | null) ?? null,
-    equipped_armor: (raw.equipped_armor as string | null) ?? null,
-    equipped_shield: (raw.equipped_shield as string | null) ?? null,
+    // Body-slot equipment; migrates legacy equipped_weapon/armor/shield saves.
+    equipment: equipmentFromLegacy(raw as Parameters<typeof equipmentFromLegacy>[0]),
     conditions: (raw.conditions as string[]) ?? [],
     condition_durations: (raw.condition_durations as Record<string, number>) ?? {},
     death_saves: (raw.death_saves as DeathSaves) ?? { successes: 0, failures: 0 },
@@ -5696,9 +5701,9 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     char.turn_actions.action_used &&
     !char.turn_actions.bonus_action_used
   ) {
-    const equippedWpnItem = char.equipped_weapon
+    const equippedWpnItem = equippedWeaponId(char)
       ? context.lootTable.find(
-          (l) => l.id === char.inventory.find((i) => i.instance_id === char.equipped_weapon)?.id
+          (l) => l.id === char.inventory.find((i) => i.instance_id === equippedWeaponId(char))?.id
         )
       : null;
     // SRD 5.2.1 — two-weapon fighting requires both weapons to
@@ -5710,7 +5715,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       equippedWpnItem.light;
     if (mainHandEligible) {
       const offhandItem = char.inventory
-        .filter((i) => i.instance_id !== char.equipped_weapon)
+        .filter((i) => i.instance_id !== equippedWeaponId(char))
         .map((i) => context.lootTable.find((l) => l.id === i.id))
         .find((l) => l?.slot === 'weapon' && l.range !== 'ranged' && l.light);
       if (offhandItem) {
@@ -6527,8 +6532,8 @@ function applyPcOpportunityAttacks(args: {
     // OA can only be made with a melee weapon (PHB p.190). Ranged-only weapons
     // don't qualify; thrown melee weapons (handaxe, dagger) do because they
     // have a melee profile too.
-    const weaponInstance = pc.equipped_weapon
-      ? pc.inventory?.find((i) => i.instance_id === pc.equipped_weapon)
+    const weaponInstance = equippedWeaponId(pc)
+      ? pc.inventory?.find((i) => i.instance_id === equippedWeaponId(pc))
       : null;
     const weaponItem = weaponInstance
       ? args.context.lootTable.find((l) => l.id === weaponInstance.id)
@@ -6602,8 +6607,8 @@ function applyBarbarianRetaliation(args: {
   const pcIdx = st.characters.findIndex((c) => c.id === args.barbarianId);
   if (pcIdx < 0) return { st, narrative: '' };
   const pc = st.characters[pcIdx];
-  const weaponInstance = pc.equipped_weapon
-    ? pc.inventory?.find((i) => i.instance_id === pc.equipped_weapon)
+  const weaponInstance = equippedWeaponId(pc)
+    ? pc.inventory?.find((i) => i.instance_id === equippedWeaponId(pc))
     : null;
   const weaponItem = weaponInstance
     ? args.context.lootTable.find((l) => l.id === weaponInstance.id)

@@ -140,7 +140,7 @@ function retalCombat(over: Partial<Character> = {}): GameState {
     str: 18,
     hp: 120,
     max_hp: 120,
-    equipped_weapon: 'gs-1',
+    equipment: { main_hand: 'gs-1' },
     inventory: [{ instance_id: 'gs-1', id: 'greatsword', name: 'Greatsword' }],
     weapon_proficiencies: ['simple', 'martial'],
     ...over,

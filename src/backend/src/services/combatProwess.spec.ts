@@ -61,7 +61,7 @@ function prowessState(turnActions?: Record<string, unknown>) {
     hp: 60,
     max_hp: 60,
     inventory: [{ instance_id: 'ga-1', id: 'greataxe', name: 'Greataxe' }],
-    equipped_weapon: 'ga-1',
+    equipment: { main_hand: 'ga-1' },
     weapon_proficiencies: ['simple', 'martial'],
     feats: ['boon_combat_prowess'],
     ...(turnActions ? { turn_actions: { ...FRESH_TURN, ...turnActions } } : {}),

@@ -300,7 +300,7 @@ describe('cast_spell — Bless (level 1, concentration buff)', () => {
       conditions: ['blessed'],
       condition_sources: { blessed: 'caster-id' },
       inventory: [{ instance_id: 'sw-inst', id: 'shortsword', name: 'Shortsword' }],
-      equipped_weapon: 'sw-inst',
+      equipment: { main_hand: 'sw-inst' },
     });
     const enemyId = `${CORRIDOR_ID}#0`;
     const state: GameState = {
@@ -521,7 +521,7 @@ describe('cast_spell — Bless (level 1, concentration buff)', () => {
       conditions: ['blessed'],
       condition_sources: { blessed: 'caster' },
       inventory: [{ instance_id: 'sw-inst', id: 'shortsword', name: 'Shortsword' }],
-      equipped_weapon: 'sw-inst',
+      equipment: { main_hand: 'sw-inst' },
     });
     const enemyId = `${CORRIDOR_ID}#0`;
     const state: GameState = {

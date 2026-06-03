@@ -131,7 +131,7 @@ describe('de_attune — voluntary unbind', () => {
       // Stash the ring as if equipped in the weapon slot for the test
       // (the ring's slot is null in real PHB; this is just verifying
       // the unequip logic on de_attune).
-      equipped_weapon: 'ring-1',
+      equipment: { main_hand: 'ring-1' },
     });
     const state = { ...makeState(), characters: [char], active_character_id: 'pc-1' };
     const result = await takeAction({
@@ -141,7 +141,7 @@ describe('de_attune — voluntary unbind', () => {
       seed: testSeed,
       context: testCtx,
     });
-    expect(result.newState.characters[0].equipped_weapon).toBeNull();
+    expect(result.newState.characters[0].equipment.main_hand).toBeUndefined();
   });
 
   it('rejects de-attunement during combat', async () => {

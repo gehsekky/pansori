@@ -94,7 +94,7 @@ function clericCombat(over: Partial<Character> = {}): GameState {
     spells_known: ['sacred_flame'],
     spell_slots_max: { 1: 4 },
     spell_slots_used: {},
-    equipped_weapon: 'm-1',
+    equipment: { main_hand: 'm-1' },
     inventory: [{ instance_id: 'm-1', id: 'mace', name: 'Mace' }],
     weapon_proficiencies: ['simple', 'martial'],
     ...over,

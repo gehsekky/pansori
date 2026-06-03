@@ -102,7 +102,7 @@ function buildRogue(steadyAimPending: boolean) {
     hp: 30,
     max_hp: 30,
     inventory: [{ instance_id: 'dg-1', id: 'dagger', name: 'Dagger' }],
-    equipped_weapon: 'dg-1',
+    equipment: { main_hand: 'dg-1' },
     weapon_proficiencies: ['simple', 'martial'],
     turn_actions: {
       action_used: false,

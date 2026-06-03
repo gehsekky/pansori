@@ -1090,6 +1090,42 @@ export interface CampaignState {
 
 // ─── Loot ────────────────────────────────────────────────────────────
 
+// Equipment slots a character can fill. 5e has no formal body-slot system, so
+// this is pansori's model: two hands (a two-handed weapon fills `main_hand`; a
+// shield occupies `shield`), one suit of armor, and the worn wondrous-item
+// slots. A character's `equipment` maps each filled slot to an inventory
+// `instance_id`.
+export type EquipSlot =
+  | 'main_hand'
+  | 'off_hand'
+  | 'armor'
+  | 'shield'
+  | 'head'
+  | 'neck'
+  | 'cloak'
+  | 'hands'
+  | 'arms'
+  | 'waist'
+  | 'feet'
+  | 'ring_1'
+  | 'ring_2';
+
+export const EQUIP_SLOTS: EquipSlot[] = [
+  'main_hand',
+  'off_hand',
+  'armor',
+  'shield',
+  'head',
+  'neck',
+  'cloak',
+  'hands',
+  'arms',
+  'waist',
+  'feet',
+  'ring_1',
+  'ring_2',
+];
+
 export interface LootItem {
   id: string;
   name: string;

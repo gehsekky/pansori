@@ -17,6 +17,7 @@ import {
 import { getClassLevel, hasClass } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import type { InventoryItem } from '../../../types.js';
+import { equippedWeaponId } from '../../equipment.js';
 
 /**
  * Barbarian + Berserker features (SRD-only build).
@@ -101,9 +102,9 @@ export function handleBarbarianFeature(ctx: ActionContext, fid: string): boolean
       ctx.narrative = 'No enemy to Frenzy attack.';
       return true;
     }
-    const frWeapon = char.equipped_weapon
+    const frWeapon = equippedWeaponId(char)
       ? getItemData(
-          char.inventory?.find((i) => i.instance_id === char.equipped_weapon) as InventoryItem,
+          char.inventory?.find((i) => i.instance_id === equippedWeaponId(char)) as InventoryItem,
           ctx.context
         )
       : null;

@@ -144,7 +144,7 @@ describe('Polymorph — form drops when temp_hp depletes', () => {
       str: 18,
       // Greatsword for predictable hit + damage
       inventory: [{ instance_id: 'gs-1', id: 'greatsword', name: 'Greatsword' }],
-      equipped_weapon: 'gs-1',
+      equipment: { main_hand: 'gs-1' },
       weapon_proficiencies: ['martial'],
       skill_proficiencies: [],
     });

@@ -54,7 +54,7 @@ function buildRanger(opts: { rangerPos: { x: number; y: number }; enemyCondition
       { instance_id: 'bow-1', id: 'shortbow', name: 'Shortbow' },
       { instance_id: 'arrow-1', id: 'arrows', name: 'Arrows', count: 20 },
     ],
-    equipped_weapon: 'bow-1',
+    equipment: { main_hand: 'bow-1' },
     weapon_proficiencies: ['simple', 'martial'],
   });
   return {

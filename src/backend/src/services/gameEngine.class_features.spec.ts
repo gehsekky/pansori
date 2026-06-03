@@ -76,7 +76,7 @@ describe('class features', () => {
       hp: 20,
       max_hp: 20,
       temp_hp: 0,
-      equipped_weapon: 'wl-dagger',
+      equipment: { main_hand: 'wl-dagger' },
       inventory: [{ instance_id: 'wl-dagger', id: 'dagger', name: 'Dagger' }],
     });
     const state: GameState = {
@@ -150,7 +150,7 @@ describe('class features', () => {
       level: 3,
       cha: 18,
       temp_hp: 0,
-      equipped_weapon: 'wl-dagger2',
+      equipment: { main_hand: 'wl-dagger2' },
       inventory: [{ instance_id: 'wl-dagger2', id: 'dagger', name: 'Dagger' }],
     });
     const state: GameState = {
@@ -458,7 +458,7 @@ describe('class features', () => {
       max_hp: 30,
       str: 16,
       conditions: ['raging'],
-      equipped_weapon: daggerInst,
+      equipment: { main_hand: daggerInst },
       inventory: [{ instance_id: daggerInst, id: 'dagger', name: 'Dagger' }],
       turn_actions: {
         action_used: true, // attacked already this turn
@@ -564,7 +564,7 @@ describe('class features', () => {
       character_class: 'Fighter',
       level: 3,
       str: 16,
-      equipped_weapon: dagger,
+      equipment: { main_hand: dagger },
       inventory: [{ instance_id: dagger, id: 'dagger', name: 'Dagger' }],
     });
     const goblinId = `${CORRIDOR_ID}#0`;
@@ -639,7 +639,7 @@ describe('class features', () => {
       id: charId,
       character_class: 'Fighter',
       level: 1,
-      equipped_weapon: 'wp',
+      equipment: { main_hand: 'wp' },
       inventory: [{ instance_id: 'wp', id: 'dagger', name: 'Dagger' }],
     });
     const goblinId = `${CORRIDOR_ID}#0`;
@@ -798,7 +798,7 @@ describe('class features', () => {
       id: charId,
       character_class: 'Fighter',
       level: 3,
-      equipped_weapon: 'wp',
+      equipment: { main_hand: 'wp' },
       inventory: [{ instance_id: 'wp', id: 'dagger', name: 'Dagger' }],
     });
     const goblinId = `${CORRIDOR_ID}#0`;
@@ -1683,7 +1683,7 @@ describe('class features', () => {
       id: 'p1',
       character_class: 'Rogue',
       level: 3,
-      equipped_weapon: daggerInst,
+      equipment: { main_hand: daggerInst },
       inventory: [{ instance_id: daggerInst, id: 'dagger', name: 'Dagger' }],
     });
     const ally = makeChar({ id: 'p2', character_class: 'Fighter' });

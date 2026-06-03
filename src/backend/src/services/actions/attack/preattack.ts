@@ -1,5 +1,6 @@
 import type { Enemy, InventoryItem, LootItem } from '../../../types.js';
 import { chebyshev, hasLineOfSight, inRange } from '../../gridEngine.js';
+import { equippedShieldId, equippedWeaponId } from '../../equipment.js';
 import { getItemData, pick } from '../../gameEngine.js';
 import type { ActionContext } from '../types.js';
 import { BEAST_FORMS } from '../../../campaignData/srd/index.js';
@@ -73,10 +74,10 @@ export function runPreattack(
     const charEntity = ctx.st.entities.find((e) => e.id === pc.char.id);
     const enemyEntity = ctx.st.entities.find((e) => e.id === targetId && e.isEnemy);
     if (charEntity && enemyEntity) {
-      const equippedWeaponItem = pc.char.equipped_weapon
+      const equippedWeaponItem = equippedWeaponId(pc.char)
         ? getItemData(
             pc.char.inventory?.find(
-              (i) => i.instance_id === pc.char.equipped_weapon
+              (i) => i.instance_id === equippedWeaponId(pc.char)
             ) as InventoryItem,
             ctx.context
           )
@@ -118,9 +119,11 @@ export function runPreattack(
     return { done: true };
   }
 
-  const weaponItem = pc.char.equipped_weapon
+  const weaponItem = equippedWeaponId(pc.char)
     ? getItemData(
-        pc.char.inventory?.find((i) => i.instance_id === pc.char.equipped_weapon) as InventoryItem,
+        pc.char.inventory?.find(
+          (i) => i.instance_id === equippedWeaponId(pc.char)
+        ) as InventoryItem,
         ctx.context
       )
     : null;
@@ -138,7 +141,7 @@ export function runPreattack(
   // is equipped (both hands free). (The Battleaxe now carries the RAW Topple
   // mastery; the old homebrew `flex` mastery — versatile die even with a shield
   // — has been retired.)
-  const isVersatile = !!(weaponItem?.versatileDamage && !pc.char.equipped_shield);
+  const isVersatile = !!(weaponItem?.versatileDamage && !equippedShieldId(pc.char));
   if (isVersatile) {
     weaponDamage = weaponItem!.versatileDamage!;
   }

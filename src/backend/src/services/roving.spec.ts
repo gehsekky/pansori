@@ -16,7 +16,7 @@ const armoredRanger = (armorId: string) =>
   makeChar({
     character_class: 'Ranger',
     level: 6,
-    equipped_armor: 'a-1',
+    equipment: { armor: 'a-1' },
     inventory: [{ instance_id: 'a-1', id: armorId, name: armorId }],
   });
 

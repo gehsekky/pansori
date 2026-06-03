@@ -71,7 +71,7 @@ describe('Cleave damage — enemy resistance applied', () => {
       hp: 30,
       max_hp: 30,
       inventory: [{ instance_id: 'ga-1', id: 'greataxe', name: 'Greataxe' }],
-      equipped_weapon: 'ga-1',
+      equipment: { main_hand: 'ga-1' },
       weapon_proficiencies: ['simple', 'martial'],
       weapon_masteries: ['greataxe'],
     });
@@ -169,7 +169,7 @@ describe('Two-Weapon off-hand damage — enemy resistance applied', () => {
         { instance_id: 'sw-1', id: 'shortsword', name: 'Shortsword' },
         { instance_id: 'd-1', id: 'dagger', name: 'Dagger' },
       ],
-      equipped_weapon: 'sw-1',
+      equipment: { main_hand: 'sw-1' },
       weapon_proficiencies: ['simple', 'martial'],
       turn_actions: {
         // Off-hand requires action_used = true normally; setting it

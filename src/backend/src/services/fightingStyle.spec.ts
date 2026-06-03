@@ -119,7 +119,7 @@ describe('defenseAcBonus', () => {
   const armored = (styles: string[]) =>
     makeChar({
       fighting_styles: styles,
-      equipped_armor: 'armor-1',
+      equipment: { armor: 'armor-1' },
       inventory: [{ instance_id: 'armor-1', id: 'chainmail', name: 'Chain Mail', quantity: 1 }],
     });
 
@@ -133,14 +133,14 @@ describe('defenseAcBonus', () => {
 
   it('0 when unarmored even with the style', () => {
     expect(
-      defenseAcBonus(makeChar({ fighting_styles: ['defense'], equipped_armor: null }), lootTable)
+      defenseAcBonus(makeChar({ fighting_styles: ['defense'], equipment: {} }), lootTable)
     ).toBe(0);
   });
 
   it('0 with only a shield (no body armor)', () => {
     const c = makeChar({
       fighting_styles: ['defense'],
-      equipped_armor: 'shield-1',
+      equipment: { armor: 'shield-1' },
       inventory: [{ instance_id: 'shield-1', id: 'shield', name: 'Shield', quantity: 1 }],
     });
     expect(defenseAcBonus(c, lootTable)).toBe(0);
@@ -174,7 +174,7 @@ describe('handleChooseFightingStyle — Defense bumps AC immediately', () => {
       character_class: 'Fighter',
       level: 1,
       ac: 16,
-      equipped_armor: 'armor-1',
+      equipment: { armor: 'armor-1' },
       inventory: [{ instance_id: 'armor-1', id: 'chainmail', name: 'Chain Mail', quantity: 1 }],
     });
     const ctx = {

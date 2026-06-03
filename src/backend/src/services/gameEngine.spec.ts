@@ -107,9 +107,7 @@ describe('normalizeState', () => {
       gold: 5,
       character_class: 'Rogue',
       inventory: [],
-      equipped_weapon: null,
-      equipped_armor: null,
-      equipped_shield: null,
+      equipment: {},
       current_room: 'entry_hall',
       visited_rooms: ['entry_hall'],
       enemies_killed: [],
@@ -176,9 +174,7 @@ describe('normalizeState', () => {
           level: 1,
           gold: 5,
           inventory: [],
-          equipped_weapon: null,
-          equipped_armor: null,
-          equipped_shield: null,
+          equipment: {},
           conditions: [],
           death_saves: { successes: 0, failures: 0 },
           stable: false,
@@ -257,9 +253,7 @@ describe('normalizeState', () => {
           level: 1,
           gold: 5,
           inventory: [],
-          equipped_weapon: null,
-          equipped_armor: null,
-          equipped_shield: null,
+          equipment: {},
           conditions: [],
           death_saves: { successes: 0, failures: 0 },
           stable: false,
@@ -2312,7 +2306,7 @@ describe('Hide action — DC tracking (2024)', () => {
       character_class: 'Rogue',
       level: 2,
       dex: 16,
-      equipped_weapon: 'sword-inst',
+      equipment: { main_hand: 'sword-inst' },
       inventory: [{ instance_id: 'sword-inst', id: 'shortsword', name: 'Shortsword' }],
       conditions: ['invisible'],
       hide_dc: 17,
@@ -2540,7 +2534,7 @@ describe('Heavy encumbrance disadvantage (2024 variant)', () => {
       level: 1,
       str: 10,
       dex: 14,
-      equipped_weapon: 'sword-inst',
+      equipment: { main_hand: 'sword-inst' },
       inventory: [
         { instance_id: 'sword-inst', id: 'shortsword', name: 'Shortsword' },
         ...heavyLoadInventory(),
@@ -2643,7 +2637,7 @@ describe('Heavy encumbrance disadvantage (2024 variant)', () => {
       character_class: 'Fighter',
       level: 9,
       str: 16,
-      equipped_weapon: 'sword-inst',
+      equipment: { main_hand: 'sword-inst' },
       inventory: [{ instance_id: 'sword-inst', id: 'longsword', name: 'Longsword' }],
       weapon_masteries: ['longsword'],
     });
@@ -3174,7 +3168,7 @@ describe('Species damage resistance (2024)', () => {
       character_class: 'Fighter',
       species: 'goliath',
       str: 10,
-      equipped_weapon: 'sword-inst',
+      equipment: { main_hand: 'sword-inst' },
       inventory: [
         { instance_id: 'sword-inst', id: 'shortsword', name: 'Shortsword' },
         // 11 × 10 lb = 110 lb. STR 10 baseline cap is 100 lb (heavy at >100);
@@ -3360,7 +3354,7 @@ describe('Failed precondition actions do not consume the turn', () => {
     const cleric = makeChar({
       id: 'pc-1',
       character_class: 'Cleric',
-      equipped_weapon: 'mace-inst',
+      equipment: { main_hand: 'mace-inst' },
       inventory: [{ instance_id: 'mace-inst', id: 'mace', name: 'Mace' }],
       ...charOverrides,
     });
@@ -3481,7 +3475,7 @@ describe('Failed precondition actions do not consume the turn', () => {
         wis: 16,
         spells_known: ['sacred_flame', 'guiding_bolt'],
         armor_proficiencies: ['light', 'medium', 'shield'], // no 'heavy'
-        equipped_armor: 'chain-mail-inst',
+        equipment: { armor: 'chain-mail-inst' },
         inventory: [
           { instance_id: 'mace-inst', id: 'mace', name: 'Mace' },
           { instance_id: 'chain-mail-inst', id: 'chain_mail', name: 'Chain Mail' },

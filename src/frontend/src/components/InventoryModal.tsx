@@ -62,9 +62,9 @@ function InventoryModal({
   const enc = encumbranceLabel(weight, char.str);
 
   const equippedSlots: Array<{ label: string; instId: string | null }> = [
-    { label: 'WEAPON', instId: char.equipped_weapon },
-    { label: 'ARMOR', instId: char.equipped_armor },
-    { label: 'SHIELD', instId: char.equipped_shield },
+    { label: 'WEAPON', instId: char.equipment.main_hand ?? null },
+    { label: 'ARMOR', instId: char.equipment.armor ?? null },
+    { label: 'SHIELD', instId: char.equipment.shield ?? null },
   ];
 
   function nameOf(instId: string | null): string {
@@ -129,9 +129,9 @@ function InventoryModal({
         ) : (
           char.inventory.map((item) => {
             const isEquipped =
-              item.instance_id === char.equipped_weapon ||
-              item.instance_id === char.equipped_armor ||
-              item.instance_id === char.equipped_shield;
+              item.instance_id === (char.equipment.main_hand ?? null) ||
+              item.instance_id === (char.equipment.armor ?? null) ||
+              item.instance_id === (char.equipment.shield ?? null);
             const isAttuned = char.attuned_items?.includes(item.instance_id);
             const isEquippable = !!(
               (item as { damage?: string }).damage ||

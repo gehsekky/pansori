@@ -37,7 +37,7 @@ function hunterState(level: number): GameState {
     level,
     str: 16,
     hunters_mark_target_id: E1,
-    equipped_weapon: 'sw-1',
+    equipment: { main_hand: 'sw-1' },
     inventory: [{ instance_id: 'sw-1', id: 'shortsword', name: 'Shortsword' }],
     weapon_proficiencies: ['simple', 'martial'],
   });

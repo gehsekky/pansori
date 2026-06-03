@@ -86,7 +86,7 @@ function makeFighter(opts: { inspiration?: boolean } = {}) {
     level: 5,
     str: 14, // +2 mod
     inventory: [{ instance_id: 'gs-1', id: 'longsword', name: 'Longsword' }],
-    equipped_weapon: 'gs-1',
+    equipment: { main_hand: 'gs-1' },
     weapon_proficiencies: ['martial'],
     inspiration: opts.inspiration ?? false,
   });

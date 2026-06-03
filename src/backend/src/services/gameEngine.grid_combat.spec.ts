@@ -129,7 +129,7 @@ describe('Enemy tactical movement (must close distance to melee)', () => {
       dex: 14,
       armor_proficiencies: ['light', 'medium', 'heavy', 'shield'],
       weapon_proficiencies: ['simple', 'martial'],
-      equipped_weapon: 'longsword-inst',
+      equipment: { main_hand: 'longsword-inst' },
       inventory: [{ instance_id: 'longsword-inst', id: 'longsword', name: 'Longsword' }],
     });
     const enemyId = `${CORRIDOR_ID}#0`;
@@ -301,7 +301,7 @@ describe('Enemy tactical movement (must close distance to melee)', () => {
       str: 16,
       dex: 14,
       weapon_proficiencies: ['simple', 'martial'],
-      equipped_weapon: 'longsword-inst',
+      equipment: { main_hand: 'longsword-inst' },
       inventory: [{ instance_id: 'longsword-inst', id: 'longsword', name: 'Longsword' }],
     });
     const pc2 = makeChar({ id: 'pc-2', character_class: 'Cleric' });

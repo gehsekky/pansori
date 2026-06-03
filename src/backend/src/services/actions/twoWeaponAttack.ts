@@ -12,6 +12,7 @@ import {
   isRoomCleared,
   splitEncounterXp,
 } from '../gameEngine.js';
+import { equippedArmorId, equippedWeaponId } from '../equipment.js';
 import type { ActionHandler } from './types.js';
 import type { GameState } from '../../types.js';
 import { hasFightingStyle } from '../fightingStyle.js';
@@ -39,7 +40,7 @@ export const handleTwoWeaponAttack: ActionHandler<{
     return;
   }
   // SRD 5.2.1 — off-hand must be a Light weapon.
-  const mainWpnInstanceId = pc.char.equipped_weapon;
+  const mainWpnInstanceId = equippedWeaponId(pc.char);
   const offhandInvItem = pc.char.inventory
     .filter((i) => i.instance_id !== mainWpnInstanceId)
     .find((i) => {
@@ -74,9 +75,10 @@ export const handleTwoWeaponAttack: ActionHandler<{
   }
   const targetEntityId = enemyInRoom.id;
   const condDisadv = pc.char.conditions.some((c) => DISADV_CONDITIONS.has(c));
-  const armorLootItem = pc.char.equipped_armor
+  const armorLootItem = equippedArmorId(pc.char)
     ? ctx.context.lootTable.find(
-        (l) => l.id === pc.char.inventory.find((i) => i.instance_id === pc.char.equipped_armor)?.id
+        (l) =>
+          l.id === pc.char.inventory.find((i) => i.instance_id === equippedArmorId(pc.char))?.id
       )
     : null;
   const armorProf = hasArmorProficiency(

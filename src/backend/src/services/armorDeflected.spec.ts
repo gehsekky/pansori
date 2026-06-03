@@ -60,7 +60,7 @@ describe('Enemy miss vs armored PC — deflected narrative fires', () => {
       ac: 16,
       armor_proficiencies: ['light', 'medium', 'heavy'],
       inventory: [{ instance_id: 'a-1', id: 'chain_mail', name: 'Chain Mail' }],
-      equipped_armor: 'a-1',
+      equipment: { armor: 'a-1' },
     });
     const state = {
       ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),

@@ -138,7 +138,7 @@ function attackState() {
     hp: 30,
     max_hp: 30,
     inventory: [{ instance_id: 'ss-1', id: 'shortsword', name: 'Shortsword' }],
-    equipped_weapon: 'ss-1',
+    equipment: { main_hand: 'ss-1' },
     weapon_proficiencies: ['simple', 'martial'],
   });
   return {

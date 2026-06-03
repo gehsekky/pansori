@@ -100,7 +100,7 @@ function boonFighterState(overrides: Partial<ReturnType<typeof makeChar>> = {}) 
     hp: 60,
     max_hp: 60,
     inventory: [{ instance_id: 'ga-1', id: 'greataxe', name: 'Greataxe' }],
-    equipped_weapon: 'ga-1',
+    equipment: { main_hand: 'ga-1' },
     weapon_proficiencies: ['simple', 'martial'],
     feats: ['boon_irresistible_offense'],
     feat_choices: { boon_irresistible_offense: { abilityBonus: 'str' } },

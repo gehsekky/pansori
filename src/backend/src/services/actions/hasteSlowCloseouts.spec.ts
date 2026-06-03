@@ -85,7 +85,7 @@ describe('Haste — one weapon attack only on the extra slot', () => {
         free_interaction_used: false,
       },
       inventory: [{ instance_id: 'gs-1', id: 'greatsword', name: 'Greatsword' }],
-      equipped_weapon: 'gs-1',
+      equipment: { main_hand: 'gs-1' },
       weapon_proficiencies: ['simple', 'martial'],
     });
     const enemy: Enemy = {
@@ -123,7 +123,7 @@ describe('Haste — one weapon attack only on the extra slot', () => {
       str: 18,
       // No haste_extra_action_used flag — normal flow.
       inventory: [{ instance_id: 'gs-1', id: 'greatsword', name: 'Greatsword' }],
-      equipped_weapon: 'gs-1',
+      equipment: { main_hand: 'gs-1' },
       weapon_proficiencies: ['simple', 'martial'],
     });
     const enemy: Enemy = {

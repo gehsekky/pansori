@@ -9,6 +9,7 @@
 // passive effects are applied in the attack/AC pipelines.
 
 import type { Character, LootItem } from '../types.js';
+import { equippedArmorId } from './equipment.js';
 import { getClassLevel } from './multiclass.js';
 
 export const FIGHTING_STYLE_IDS = ['archery', 'defense', 'great_weapon', 'two_weapon'] as const;
@@ -84,12 +85,12 @@ export function hasFightingStyle(char: Character, style: FightingStyleId): boole
  * avoid threading a flag through its many call sites).
  */
 export function defenseAcBonus(
-  char: Pick<Character, 'fighting_styles' | 'equipped_armor' | 'inventory'>,
+  char: Pick<Character, 'fighting_styles' | 'equipment' | 'inventory'>,
   lootTable: LootItem[]
 ): number {
   if (!(char.fighting_styles ?? []).includes('defense')) return 0;
-  if (!char.equipped_armor) return 0;
-  const armorItemId = char.inventory?.find((i) => i.instance_id === char.equipped_armor)?.id;
+  if (!equippedArmorId(char)) return 0;
+  const armorItemId = char.inventory?.find((i) => i.instance_id === equippedArmorId(char))?.id;
   const armor = armorItemId ? lootTable.find((l) => l.id === armorItemId) : undefined;
   // Body armor sets `armorAcBase`; shields / unarmored don't.
   return armor?.armorAcBase !== undefined ? 1 : 0;

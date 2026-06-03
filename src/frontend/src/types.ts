@@ -15,6 +15,7 @@ import type {
   CombatEvent,
   ConditionName,
   CoverLevel,
+  EquipSlot,
   Faction,
   FactionThresholds,
   GameChoice,
@@ -148,9 +149,7 @@ export interface Character {
     desc?: string;
     [key: string]: unknown;
   }>;
-  equipped_weapon: string | null;
-  equipped_armor: string | null;
-  equipped_shield: string | null;
+  equipment: Partial<Record<EquipSlot, string>>;
   conditions: string[];
   condition_durations: Record<string, number>;
   death_saves: { successes: number; failures: number };

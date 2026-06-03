@@ -62,7 +62,7 @@ describe('Savage Attacker feat — once-per-turn damage reroll', () => {
       str: 16,
       feats: opts.savedFlag !== undefined ? ['savage_attacker'] : ['savage_attacker'],
       inventory: [{ instance_id: 'sw-1', id: 'longsword', name: 'Longsword' }],
-      equipped_weapon: 'sw-1',
+      equipment: { main_hand: 'sw-1' },
       weapon_proficiencies: ['simple', 'martial'],
       turn_actions: {
         action_used: false,
@@ -146,7 +146,7 @@ describe('Savage Attacker feat — once-per-turn damage reroll', () => {
       str: 16,
       feats: ['tough'],
       inventory: [{ instance_id: 'sw-1', id: 'longsword', name: 'Longsword' }],
-      equipped_weapon: 'sw-1',
+      equipment: { main_hand: 'sw-1' },
       weapon_proficiencies: ['simple', 'martial'],
     });
     const result = await takeAction({

@@ -109,7 +109,7 @@ describe('Sneak Attack — multiclass availability + per-class dice', () => {
       dex: 16,
       class_levels: { fighter: 5, rogue: 2 },
       inventory: [{ instance_id: 'd-1', id: 'dagger', name: 'Dagger' }],
-      equipped_weapon: 'd-1',
+      equipment: { main_hand: 'd-1' },
       weapon_proficiencies: ['simple', 'martial'],
     });
     const result = await takeAction({
@@ -135,7 +135,7 @@ describe('Sneak Attack — multiclass availability + per-class dice', () => {
       level: 5,
       dex: 16,
       inventory: [{ instance_id: 'd-1', id: 'dagger', name: 'Dagger' }],
-      equipped_weapon: 'd-1',
+      equipment: { main_hand: 'd-1' },
       weapon_proficiencies: ['simple'],
     });
     const result = await takeAction({
@@ -159,7 +159,7 @@ describe('Sneak Attack — multiclass availability + per-class dice', () => {
       dex: 16,
       class_levels: { rogue: 4, wizard: 3 },
       inventory: [{ instance_id: 'd-1', id: 'dagger', name: 'Dagger' }],
-      equipped_weapon: 'd-1',
+      equipment: { main_hand: 'd-1' },
       weapon_proficiencies: ['simple'],
     });
     const result = await takeAction({
@@ -182,7 +182,7 @@ describe('Sneak Attack — multiclass availability + per-class dice', () => {
       level: 5,
       str: 16,
       inventory: [{ instance_id: 'd-1', id: 'dagger', name: 'Dagger' }],
-      equipped_weapon: 'd-1',
+      equipment: { main_hand: 'd-1' },
       weapon_proficiencies: ['simple', 'martial'],
     });
     const result = await takeAction({

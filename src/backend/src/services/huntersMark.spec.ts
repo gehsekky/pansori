@@ -45,7 +45,7 @@ function rangerState(level: number, marked = false): GameState {
     spell_slots_max: { 1: 2 },
     spell_slots_used: {},
     spells_known: ['hunters_mark'],
-    equipped_weapon: 'sw-1',
+    equipment: { main_hand: 'sw-1' },
     inventory: [{ instance_id: 'sw-1', id: 'shortsword', name: 'Shortsword' }],
     weapon_proficiencies: ['simple', 'martial'],
     ...(marked ? { hunters_mark_target_id: ENEMY } : {}),

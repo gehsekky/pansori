@@ -168,7 +168,7 @@ describe('Slow — engine effects', () => {
       level: 5,
       str: 14,
       inventory: [{ instance_id: 'gs-1', id: 'longsword', name: 'Longsword' }],
-      equipped_weapon: 'gs-1',
+      equipment: { main_hand: 'gs-1' },
       weapon_proficiencies: ['martial'],
     });
     const state = buildState(pc);

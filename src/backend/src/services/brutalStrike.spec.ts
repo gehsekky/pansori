@@ -94,7 +94,7 @@ function barbState(rider: 'forceful' | 'hamstring') {
     hp: 60,
     max_hp: 60,
     inventory: [{ instance_id: 'gx-1', id: 'greataxe', name: 'Greataxe' }],
-    equipped_weapon: 'gx-1',
+    equipment: { main_hand: 'gx-1' },
     weapon_proficiencies: ['simple', 'martial'],
     turn_actions: { ...reckless, brutal_strike_pending: rider },
   });

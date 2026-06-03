@@ -6,6 +6,7 @@ import {
   spellSlotsForClassLevel,
 } from '../rulesEngine.js';
 import { canRestInRoom, pick } from '../gameEngine.js';
+import { equippedArmorId, equippedShieldId } from '../equipment.js';
 import { getClassLevel, hasClass } from '../multiclass.js';
 import type { ActionHandler } from './types.js';
 import { defenseAcBonus } from '../fightingStyle.js';
@@ -259,8 +260,8 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
     refreshed.ac =
       computeTotalAc(
         refreshed.dex,
-        refreshed.equipped_armor,
-        refreshed.equipped_shield,
+        equippedArmorId(refreshed),
+        equippedShieldId(refreshed),
         refreshed.inventory ?? [],
         ctx.context.lootTable,
         false,

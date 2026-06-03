@@ -92,16 +92,16 @@ function AdventureLogPanel({ history, worldName, state, seed, campaignMeta }: Pr
       if (c.dead) lines.push('    DEAD');
       // Equipped
       const eq: string[] = [];
-      if (c.equipped_weapon) {
-        const w = c.inventory?.find((i) => i.instance_id === c.equipped_weapon);
+      if (c.equipment.main_hand ?? null) {
+        const w = c.inventory?.find((i) => i.instance_id === (c.equipment.main_hand ?? null));
         if (w) eq.push(`weapon: ${w.name}`);
       }
-      if (c.equipped_armor) {
-        const a = c.inventory?.find((i) => i.instance_id === c.equipped_armor);
+      if (c.equipment.armor ?? null) {
+        const a = c.inventory?.find((i) => i.instance_id === (c.equipment.armor ?? null));
         if (a) eq.push(`armor: ${a.name}`);
       }
-      if (c.equipped_shield) {
-        const s = c.inventory?.find((i) => i.instance_id === c.equipped_shield);
+      if (c.equipment.shield ?? null) {
+        const s = c.inventory?.find((i) => i.instance_id === (c.equipment.shield ?? null));
         if (s) eq.push(`shield: ${s.name}`);
       }
       if (eq.length > 0) lines.push(`    Equipped: ${eq.join(', ')}`);

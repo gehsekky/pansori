@@ -53,7 +53,7 @@ const buildPaladin = (opts: {
     spells_known: ['divine_smite_spell'],
     prepared_spells: ['divine_smite_spell'],
     inventory: [{ instance_id: 'sw-1', id: 'longsword', name: 'Longsword' }],
-    equipped_weapon: 'sw-1',
+    equipment: { main_hand: 'sw-1' },
     divine_smite_dice: opts.smiteDice,
   });
   return {
@@ -191,7 +191,7 @@ describe('Improved Divine Smite (L11+ Paladin)', () => {
       level: 11,
       str: 16,
       inventory: [{ instance_id: 'sw-1', id: 'longsword', name: 'Longsword' }],
-      equipped_weapon: 'sw-1',
+      equipment: { main_hand: 'sw-1' },
     });
     const state = {
       ...buildPaladin({ level: 11, slots: {} }),

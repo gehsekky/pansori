@@ -63,6 +63,14 @@ import {
   starterQuestProgress,
 } from '../services/campaignEngine.js';
 import { broadcastParticipantChange, broadcastSessionState } from '../services/broadcast.js';
+import {
+  clearInstance,
+  equippedArmorId,
+  equippedShieldId,
+  equippedWeaponId,
+  setSlot,
+  slotsForInstance,
+} from '../services/equipment.js';
 import { expertiseSlotsForClassLevel, resolveCreationExpertise } from '../services/multiclass.js';
 import type { AuthedRequest } from '../auth/middleware.js';
 import { applyFeatTake } from '../services/feats.js';
@@ -483,9 +491,11 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
         level: 1,
         gold: startingEq.gold,
         inventory: startingInventory,
-        equipped_weapon: equippedWeapon,
-        equipped_armor: equippedArmor,
-        equipped_shield: equippedShield,
+        equipment: {
+          ...(equippedWeapon ? { main_hand: equippedWeapon } : {}),
+          ...(equippedArmor ? { armor: equippedArmor } : {}),
+          ...(equippedShield ? { shield: equippedShield } : {}),
+        },
         conditions: [],
         condition_durations: {},
         death_saves: { successes: 0, failures: 0 },
@@ -743,44 +753,44 @@ gameRouter.post('/session/:id/equip', async (req: Request, res: Response) => {
         res.status(409).json({ error: check.reason });
         return;
       }
-      const toggling = char.equipped_shield === iid;
-      char.equipped_shield = toggling ? null : iid;
+      const toggling = equippedShieldId(char) === iid;
+      char.equipment = setSlot(char.equipment, 'shield', toggling ? null : iid);
       char.ac =
         computeTotalAc(
           char.dex,
-          char.equipped_armor,
-          char.equipped_shield,
+          equippedArmorId(char),
+          equippedShieldId(char),
           char.inventory,
           ctx.lootTable,
           char.mage_armor_active ?? false,
           char.shield_of_faith_active ?? false
         ) + defenseAcBonus(char, ctx.lootTable);
     } else if (loot.slot === 'armor') {
-      const toggling = char.equipped_armor === iid;
+      const toggling = equippedArmorId(char) === iid;
       const check = canDonArmor(combatActive, loot.armorCategory ?? 'light');
       if (!check.allowed) {
         res.status(409).json({ error: check.reason });
         return;
       }
-      char.equipped_armor = toggling ? null : iid;
+      char.equipment = setSlot(char.equipment, 'armor', toggling ? null : iid);
       char.ac =
         computeTotalAc(
           char.dex,
-          char.equipped_armor,
-          char.equipped_shield,
+          equippedArmorId(char),
+          equippedShieldId(char),
           char.inventory,
           ctx.lootTable,
           char.mage_armor_active ?? false,
           char.shield_of_faith_active ?? false
         ) + defenseAcBonus(char, ctx.lootTable);
     } else if (loot.damage) {
-      const toggling = char.equipped_weapon === iid;
+      const toggling = equippedWeaponId(char) === iid;
       const check = canEquipWeapon(combatActive, turnActions);
       if (!check.allowed) {
         res.status(409).json({ error: check.reason });
         return;
       }
-      char.equipped_weapon = toggling ? null : iid;
+      char.equipment = setSlot(char.equipment, 'main_hand', toggling ? null : iid);
       if ('cost' in check && check.cost === 'free_interaction') {
         char.turn_actions = { ...turnActions, free_interaction_used: true };
       }
@@ -852,11 +862,7 @@ gameRouter.post('/session/:id/transfer', async (req: Request, res: Response) => 
     }
     // Equipped items must be unequipped before transfer (5e: donning another
     // person's armor takes an hour; we approximate with a hard block).
-    if (
-      fromChar.equipped_weapon === item_instance_id ||
-      fromChar.equipped_armor === item_instance_id ||
-      fromChar.equipped_shield === item_instance_id
-    ) {
+    if (slotsForInstance(fromChar.equipment, item_instance_id).length > 0) {
       res.status(409).json({ error: 'Unequip the item before transferring it.' });
       return;
     }
@@ -919,9 +925,7 @@ gameRouter.post('/session/:id/drop', async (req: Request, res: Response) => {
     const newChar = {
       ...char,
       inventory: char.inventory.filter((i) => i.instance_id !== item_instance_id),
-      equipped_weapon: char.equipped_weapon === item_instance_id ? null : char.equipped_weapon,
-      equipped_armor: char.equipped_armor === item_instance_id ? null : char.equipped_armor,
-      equipped_shield: char.equipped_shield === item_instance_id ? null : char.equipped_shield,
+      equipment: clearInstance(char.equipment, item_instance_id),
       attuned_items: (char.attuned_items ?? []).filter((id) => id !== item_instance_id),
     };
     const newState: GameState = {

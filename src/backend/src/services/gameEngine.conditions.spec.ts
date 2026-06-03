@@ -147,7 +147,7 @@ describe('conditions — new types', () => {
       character_class: 'Fighter',
       level: 3,
       str: 16,
-      equipped_weapon: staffInst,
+      equipment: { main_hand: staffInst },
       inventory: [{ instance_id: staffInst, id: 'quarterstaff', name: 'Quarterstaff' }],
       weapon_masteries: ['quarterstaff'],
     });
@@ -219,7 +219,7 @@ describe('conditions — new types', () => {
       character_class: 'Rogue',
       level: 3,
       dex: 16,
-      equipped_weapon: swordInst,
+      equipment: { main_hand: swordInst },
       inventory: [{ instance_id: swordInst, id: 'shortsword', name: 'Shortsword' }],
       weapon_masteries: ['shortsword'],
     });
@@ -294,7 +294,7 @@ describe('conditions — new types', () => {
       character_class: 'Fighter',
       level: 3,
       str: 16,
-      equipped_weapon: swordInst,
+      equipment: { main_hand: swordInst },
       inventory: [{ instance_id: swordInst, id: 'longsword', name: 'Longsword' }],
       weapon_masteries: [], // empty — no mastery applies
     });
@@ -371,7 +371,7 @@ describe('conditions — new types', () => {
       character_class: 'Fighter',
       level: 3,
       str: 18, // +4 STR mod = 4 graze damage
-      equipped_weapon: swordInst,
+      equipment: { main_hand: swordInst },
       inventory: [{ instance_id: swordInst, id: 'greatsword', name: 'Greatsword' }],
       weapon_masteries: ['greatsword'],
     });
@@ -445,7 +445,7 @@ describe('conditions — new types', () => {
       character_class: 'Fighter',
       level: 3,
       str: 16,
-      equipped_weapon: axeInst,
+      equipment: { main_hand: axeInst },
       inventory: [{ instance_id: axeInst, id: 'greataxe', name: 'Greataxe' }],
       weapon_masteries: ['greataxe'],
     });
@@ -536,8 +536,7 @@ describe('conditions — new types', () => {
       character_class: 'Fighter',
       level: 3,
       str: 16,
-      equipped_weapon: axeInst,
-      equipped_shield: shieldInst,
+      equipment: { main_hand: axeInst, shield: shieldInst },
       inventory: [
         { instance_id: axeInst, id: 'battleaxe', name: 'Battleaxe' },
         { instance_id: shieldInst, id: 'shield', name: 'Shield' },
@@ -616,7 +615,7 @@ describe('conditions — new types', () => {
       character_class: 'Rogue',
       level: 1,
       dex: 16,
-      equipped_weapon: shortswordInst,
+      equipment: { main_hand: shortswordInst },
       inventory: [
         { instance_id: shortswordInst, id: 'shortsword', name: 'Shortsword' },
         { instance_id: daggerInst, id: 'dagger', name: 'Dagger' },
@@ -747,7 +746,7 @@ describe('conditions — new types', () => {
       character_class: 'Fighter',
       level: 3,
       str: 16,
-      equipped_weapon: swordInst,
+      equipment: { main_hand: swordInst },
       inventory: [{ instance_id: swordInst, id: 'longsword', name: 'Longsword' }],
       bardic_inspiration_die: 'd6',
     });

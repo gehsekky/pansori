@@ -59,7 +59,7 @@ function thiefState(): GameState {
     level: 5,
     dex: 16,
     str: 16,
-    equipped_weapon: 'dg-1',
+    equipment: { main_hand: 'dg-1' },
     inventory: [{ instance_id: 'dg-1', id: 'dagger', name: 'Dagger' }],
     weapon_proficiencies: ['simple', 'martial'],
   });
@@ -208,7 +208,7 @@ function obscureState(): GameState {
     subclass: 'thief',
     level: 14,
     dex: 16,
-    equipped_weapon: 'dg-1',
+    equipment: { main_hand: 'dg-1' },
     inventory: [{ instance_id: 'dg-1', id: 'dagger', name: 'Dagger' }],
     weapon_proficiencies: ['simple', 'martial'],
     turn_actions: {

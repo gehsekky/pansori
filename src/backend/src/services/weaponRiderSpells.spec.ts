@@ -155,7 +155,7 @@ function attackState(rider: Partial<ReturnType<typeof makeChar>>) {
     hp: 80,
     max_hp: 80,
     inventory: [{ instance_id: 'sw-1', id: 'longsword', name: 'Longsword' }],
-    equipped_weapon: 'sw-1',
+    equipment: { main_hand: 'sw-1' },
     weapon_proficiencies: ['simple', 'martial'],
     ...rider,
   });

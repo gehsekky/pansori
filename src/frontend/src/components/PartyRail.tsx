@@ -137,9 +137,9 @@ function PartyTile({
 
   const equipped = (instId: string | null) =>
     instId ? (char.inventory?.find((i) => i.instance_id === instId) ?? null) : null;
-  const weapon = equipped(char.equipped_weapon);
-  const armor = equipped(char.equipped_armor);
-  const shield = equipped(char.equipped_shield);
+  const weapon = equipped(char.equipment.main_hand ?? null);
+  const armor = equipped(char.equipment.armor ?? null);
+  const shield = equipped(char.equipment.shield ?? null);
 
   const className = [
     styles.partyTile,

@@ -4,6 +4,7 @@ import { d, hasArmorProficiency, rollDice, spellSaveDC } from '../../rulesEngine
 import { getClassLevel, hasClass, resolveCastingAbility } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import { breakConcentration } from '../../gameEngine.js';
+import { equippedArmorId } from '../../equipment.js';
 import { spellRecallKeepsSlot } from '../../feats.js';
 import { updatePcActor } from '../actor.js';
 
@@ -60,9 +61,10 @@ export function runPrecast(
   const isSubtle = ctx.metamagic.includes('subtle');
 
   // PHB p.144: cannot cast spells while wearing armor you are not proficient with
-  const spellArmorItem = pc.char.equipped_armor
+  const spellArmorItem = equippedArmorId(pc.char)
     ? ctx.context.lootTable.find(
-        (l) => l.id === pc.char.inventory?.find((i) => i.instance_id === pc.char.equipped_armor)?.id
+        (l) =>
+          l.id === pc.char.inventory?.find((i) => i.instance_id === equippedArmorId(pc.char))?.id
       )
     : null;
   if (

@@ -13,6 +13,7 @@ import type {
   CombatEntity,
   CombatEvent,
   ConditionName,
+  EquipSlot,
   Faction,
   Feat,
   GameChoice,
@@ -961,9 +962,10 @@ export interface Character {
   level: number;
   gold: number;
   inventory: InventoryItem[];
-  equipped_weapon: string | null;
-  equipped_armor: string | null;
-  equipped_shield: string | null;
+  // Worn/wielded gear: each filled body slot → an inventory instance_id.
+  // (Replaces the old equipped_weapon/armor/shield trio; main_hand/armor/shield
+  // are the migrated equivalents.)
+  equipment: Partial<Record<EquipSlot, string>>;
   conditions: string[];
   condition_durations: Record<string, number>;
   death_saves: DeathSaves;

@@ -278,7 +278,7 @@ describe('Enlarge/Reduce — target-determined buff/debuff', () => {
       conditions: ['enlarged'],
       condition_durations: { enlarged: 100 },
       inventory: [{ instance_id: 'sw-1', id: 'longsword', name: 'Longsword' }],
-      equipped_weapon: 'sw-1',
+      equipment: { main_hand: 'sw-1' },
       weapon_proficiencies: ['simple', 'martial'],
     });
     const state = {

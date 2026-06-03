@@ -56,7 +56,7 @@ describe('Sneak Attack — once per turn', () => {
       dex: 16,
       class_levels: { fighter: 5, rogue: 2 },
       inventory: [{ instance_id: 'd-1', id: 'dagger', name: 'Dagger' }],
-      equipped_weapon: 'd-1',
+      equipment: { main_hand: 'd-1' },
       weapon_proficiencies: ['simple', 'martial'],
     });
     const state = {

@@ -39,7 +39,7 @@ function rogue20(over = {}) {
     hp: 40,
     max_hp: 40,
     inventory: [{ instance_id: 'dg-1', id: 'dagger', name: 'Dagger' }],
-    equipped_weapon: 'dg-1',
+    equipment: { main_hand: 'dg-1' },
     weapon_proficiencies: ['simple', 'martial'],
     ...over,
   });

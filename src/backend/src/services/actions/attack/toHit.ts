@@ -23,6 +23,7 @@ import {
   piercesMagicalDarkness,
 } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
+import { equippedArmorId } from '../../equipment.js';
 import { hasFightingStyle } from '../../fightingStyle.js';
 import { isHeavilyEncumbered } from '../../gameEngine.js';
 import { updatePcActor } from '../actor.js';
@@ -103,9 +104,10 @@ export function computeToHitContext(
 
   // Armor proficiency check (PHB p.144): non-proficient armor → disadv on
   // STR/DEX attack rolls.
-  const equippedArmorLootItem = pc.char.equipped_armor
+  const equippedArmorLootItem = equippedArmorId(pc.char)
     ? ctx.context.lootTable.find(
-        (l) => l.id === pc.char.inventory?.find((i) => i.instance_id === pc.char.equipped_armor)?.id
+        (l) =>
+          l.id === pc.char.inventory?.find((i) => i.instance_id === equippedArmorId(pc.char))?.id
       )
     : undefined;
   const armorProficient = hasArmorProficiency(

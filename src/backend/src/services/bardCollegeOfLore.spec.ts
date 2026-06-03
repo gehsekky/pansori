@@ -85,7 +85,7 @@ function loreCombat(over: Partial<Character> = {}): GameState {
   const c = lore({
     id: 'pc-1',
     str: 14,
-    equipped_weapon: 'm-1',
+    equipment: { main_hand: 'm-1' },
     inventory: [{ instance_id: 'm-1', id: 'mace', name: 'Mace' }],
     weapon_proficiencies: ['simple'],
     class_resource_uses: { bardic_inspiration: 2 },
