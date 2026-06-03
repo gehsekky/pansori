@@ -106,11 +106,14 @@ function scaleLabel(feetPerSquare: number): string {
  */
 function GridMapView({ grid, markerPos, enemyPresent, onMarkerMove }: Props) {
   // The overland (regional) map gets double-size squares so the larger, sparse
-  // grid reads more like a map; town / local exploration stay compact.
-  const cellPx = grid.level === 'regional' ? CELL_PX * 2 : CELL_PX;
-  // Scale the cell glyphs up to match the larger regional squares; town / local
-  // keep the CSS default (undefined ⇒ no inline override).
-  const glyphFont = grid.level === 'regional' ? '2.7rem' : undefined;
+  // grid reads more like a map; the town map uses mid-size 48 px squares; local
+  // exploration stays compact (CELL_PX).
+  const cellPx = grid.level === 'regional' ? CELL_PX * 2 : grid.level === 'town' ? 48 : CELL_PX;
+  // Scale the cell glyphs up to match the larger squares (proportional to the
+  // CSS default of 1.35rem at 32 px); local keeps the CSS default
+  // (undefined ⇒ no inline override).
+  const glyphFont =
+    grid.level === 'regional' ? '2.7rem' : grid.level === 'town' ? '2rem' : undefined;
   const obstacleSet = new Set(grid.obstacles.map((o) => `${o.x},${o.y}`));
   const transitionAt = new Map<string, MapTransition>();
   for (const t of grid.transitions) transitionAt.set(`${t.pos.x},${t.pos.y}`, t);
