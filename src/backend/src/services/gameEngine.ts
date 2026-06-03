@@ -989,7 +989,11 @@ export function applyMonsterAuras(
       workingSt = res.st;
       narrative += ` ${fmt.note(`[${label}] ${updated.name} takes ${fmt.dmg(dmg)}${aura.damageType ? ' ' + aura.damageType : ''} damage.`)}`;
     }
-    if (aura.condition && !updated.conditions.includes(aura.condition)) {
+    if (
+      aura.condition &&
+      !updated.conditions.includes(aura.condition) &&
+      !conditionImmunitiesFor(updated, workingSt).has(aura.condition)
+    ) {
       updated = {
         ...updated,
         conditions: [...updated.conditions, aura.condition],
@@ -1029,6 +1033,20 @@ export function auraConditionImmunity(char: Character, st: GameState): Set<strin
     if (getClassLevel(p, 'paladin') >= 10) out.add('frightened'); // Aura of Courage
     if (p.subclass === 'devotion' && getClassLevel(p, 'paladin') >= 7) out.add('charmed'); // Aura of Devotion
   }
+  return out;
+}
+
+/**
+ * The full set of conditions `char` is currently immune to: paladin-aura
+ * immunities (`auraConditionImmunity`) plus any from an active buff spell
+ * (`Character.condition_immunities` — Freedom of Movement, Mind Blank). The
+ * single source of truth for the condition-application guards (enemy on-hit
+ * auto-apply + save-based, monster auras) and the per-turn "freed from a
+ * now-immune condition" sweep. (RE-6.)
+ */
+export function conditionImmunitiesFor(char: Character, st: GameState): Set<string> {
+  const out = auraConditionImmunity(char, st);
+  for (const c of char.condition_immunities ?? []) out.add(c);
   return out;
 }
 
@@ -1076,9 +1094,10 @@ function conditionSavingThrow(
   };
 } {
   // SRD Paladin Aura of Courage / Aura of Devotion — a creature within the
-  // aura is immune to Frightened / Charmed, so the condition never lands (no
-  // save needed). Checked before any roll.
-  if (effect.condition && auraConditionImmunity(char, st).has(effect.condition)) {
+  // aura is immune to Frightened / Charmed, OR a buff grants immunity (Freedom
+  // of Movement → Restrained/Paralyzed, Mind Blank → Charmed), so the condition
+  // never lands (no save needed). Checked before any roll.
+  if (effect.condition && conditionImmunitiesFor(char, st).has(effect.condition)) {
     return {
       applied: false,
       inspirationConsumed: false,
@@ -1845,7 +1864,10 @@ function computeEnemyAttack(
     // separately from the save-based path below.
     if (enemy.onHitEffect && !(enemy.onHitEffect.ability && enemy.onHitEffect.dc)) {
       const cond = enemy.onHitEffect.condition;
-      if (!updatedChar.conditions.includes(cond)) {
+      if (conditionImmunitiesFor(updatedChar, st).has(cond)) {
+        // Freedom of Movement (→ Grappled) etc. — the no-save effect can't land.
+        narrative += ` ${fmt.note(`[${char.name} is immune to ${cond}]`)}`;
+      } else if (!updatedChar.conditions.includes(cond)) {
         // Add WITHOUT a condition_durations entry so the grapple persists until
         // cleared by game logic (escape action / grappler incapacitation), not
         // the per-turn tick. (PCs carry no grapple immunity to gate on.)
@@ -2928,6 +2950,7 @@ export function endCombatState(st: GameState): GameState {
       // doesn't linger.
       fire_shield: undefined,
       spell_resistances: undefined,
+      condition_immunities: undefined,
       // Mirror Image duplicates (1 min ≈ encounter) don't carry to the next fight.
       mirror_images: undefined,
       // Sanctuary ward (1 min ≈ encounter) clears at combat end.
@@ -9247,13 +9270,14 @@ export async function takeAction({
         }
       }
 
-      // SRD Paladin Aura of Courage / Devotion — Frightened / Charmed ends on
-      // a creature within the aura (the immunity in conditionSavingThrow blocks
-      // new applications; this clears one applied before the creature entered).
+      // SRD Paladin Aura of Courage / Devotion + buff immunities (Freedom of
+      // Movement, Mind Blank) — a now-immune condition ends on the creature (the
+      // guards block new applications; this clears one already present, e.g. a
+      // grapple/restrain when Freedom of Movement comes up).
       const aIdx = st.characters.findIndex((c) => c.id === endingEntry.id);
       const a = aIdx >= 0 ? st.characters[aIdx] : undefined;
       if (a && !a.dead) {
-        const immune = auraConditionImmunity(a, st);
+        const immune = conditionImmunitiesFor(a, st);
         const cleared = (a.conditions ?? []).filter((c) => immune.has(c));
         if (cleared.length > 0) {
           const freed = {

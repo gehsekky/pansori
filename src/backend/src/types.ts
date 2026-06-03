@@ -774,6 +774,12 @@ export interface Spell {
   // matching enemy damage in the attack-resolution chain. Cleared when the
   // caster's concentration ends.
   grantResistances?: string[];
+  // Buff that grants the target Immunity to one or more conditions for the
+  // duration (Freedom of Movement → Paralyzed/Restrained/Grappled; Mind Blank →
+  // Charmed). Applied to `Character.condition_immunities`; the engine then
+  // blocks those conditions from landing on the target AND clears any already
+  // present (via `conditionImmunitiesFor`). Cleared at combat end.
+  grantsConditionImmunities?: ConditionName[];
   // SRD Fire Shield — arm a melee-retaliation on the self-target (read by the
   // buff path → `Character.fire_shield`). A creature that hits the warded
   // character with a melee attack takes `dice` damage of `damageType`.
@@ -1140,6 +1146,12 @@ export interface Character {
   // cleared when the granting spell's concentration ends. You can only
   // concentrate on one spell, so this safely reflects a single active buff.
   spell_resistances?: string[];
+  // Conditions this PC is currently immune to from an active buff spell
+  // (Freedom of Movement → Paralyzed/Restrained/Grappled; Mind Blank → Charmed).
+  // Folded into `conditionImmunitiesFor` alongside paladin-aura immunities, so
+  // the application guards + the per-turn clear sweep honor it. Granted by the
+  // buff path; cleared at combat end (like `spell_resistances`).
+  condition_immunities?: ConditionName[];
   // SRD Warlock Mystic Arcanum (L11/13/15/17) — chosen spell per arcanum tier
   // (spell level 6/7/8/9 → spell id). Each is cast once per long rest without a
   // slot (tracked as class_resource_uses.mystic_arcanum_<level>).

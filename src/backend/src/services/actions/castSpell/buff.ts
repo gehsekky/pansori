@@ -209,6 +209,29 @@ export function runBuffSpell(
     }
   }
 
+  // SRD condition-immunity buff (Freedom of Movement → Paralyzed/Restrained/
+  // Grappled; Mind Blank → Charmed): grant the immunities for the duration. The
+  // engine's condition guards (`conditionImmunitiesFor`) then block them from
+  // landing AND clear any already present. Cleared at combat end.
+  if (spell.grantsConditionImmunities && spell.grantsConditionImmunities.length > 0) {
+    const imms = spell.grantsConditionImmunities;
+    if (isCasterTarget) {
+      char.condition_immunities = [...new Set([...(char.condition_immunities ?? []), ...imms])];
+    } else {
+      ctx.st = {
+        ...ctx.st,
+        characters: ctx.st.characters.map((c) =>
+          c.id === buffTarget.id
+            ? {
+                ...c,
+                condition_immunities: [...new Set([...(c.condition_immunities ?? []), ...imms])],
+              }
+            : c
+        ),
+      };
+    }
+  }
+
   // SRD Fire Shield — arm the retaliation: a creature that hits the warded
   // character with a melee attack takes the shield's damage (read in the
   // enemy-turn loop). Self-target only in pansori (RAW range Self).

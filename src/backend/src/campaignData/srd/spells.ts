@@ -5246,4 +5246,42 @@ export const SRD_SPELLS: Record<string, Spell> = {
     narrative: '{name} kindles a warding aura of life.',
     spellList: ['divine'],
   },
+
+  // ─── Spell batch: condition-immunity wards ───────────────────────────────────
+
+  // SRD: Freedom of Movement — touch a willing ally: for the duration, magical
+  // effects can't Paralyze, Restrain, or hold (Grapple) them, and difficult
+  // terrain doesn't slow them. Grants those condition immunities via the buff
+  // path; the engine then blocks them from landing AND frees the target of any
+  // already in effect. Non-concentration (cleared at combat end). (The
+  // difficult-terrain + auto-escape-nonmagical-restraints halves are narrated.)
+  freedom_of_movement: {
+    id: 'freedom_of_movement',
+    name: 'Freedom of Movement',
+    level: 4,
+    castTime: 'action',
+    targetType: 'self_or_ally',
+    grantsConditionImmunities: ['paralyzed', 'restrained', 'grappled'],
+    rangeKind: 'touch',
+    desc: "Touch a willing ally: for the fight they can't be Paralyzed, Restrained, or Grappled, and difficult terrain doesn't slow them.",
+    narrative: '{name} blesses {target} with unfettered freedom of movement.',
+    spellList: ['arcane', 'divine', 'primal'],
+  },
+
+  // SRD: Mind Blank — touch a willing ally: for the duration they have Immunity
+  // to the Charmed condition (and to Psychic damage + magical detection — those
+  // halves are narrated/deferred). Grants Charmed immunity via the buff path.
+  // Non-concentration (cleared at combat end).
+  mind_blank: {
+    id: 'mind_blank',
+    name: 'Mind Blank',
+    level: 8,
+    castTime: 'action',
+    targetType: 'self_or_ally',
+    grantsConditionImmunities: ['charmed'],
+    rangeKind: 'touch',
+    desc: "Touch a willing ally to seal their mind: for the fight they can't be Charmed. (RAW also grants immunity to psychic damage and to magical mind-reading / detection.)",
+    narrative: "{name} seals {target}'s mind against all intrusion.",
+    spellList: ['arcane'],
+  },
 };

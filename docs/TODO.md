@@ -18,8 +18,8 @@ PHB/DMG-exclusive content (subclasses, feats, species, spells). See
 
 ## Implementation status (code-verified 2026-06-02)
 
-Grounded in a code survey + the full suite: **backend 2165 tests across
-255 files + frontend 153 across 25 files, all green** (lint + typecheck +
+Grounded in a code survey + the full suite: **backend 2171 tests across
+256 files + frontend 153 across 25 files, all green** (lint + typecheck +
 prettier clean).
 
 ### Done — world map / navigation
@@ -121,7 +121,7 @@ prettier clean).
 
 | Category                  | In pansori                                       | SRD universe                     |
 | ------------------------- | ------------------------------------------------ | -------------------------------- |
-| Spells                    | **267** (27 cantrips + 240 leveled, through L9)  | ~330                             |
+| Spells                    | **269** (27 cantrips + 242 leveled, through L9)  | ~330                             |
 | Shared SRD monster pool   | **50** (`SRD_MONSTERS`) + per-campaign templates | hundreds                         |
 | Species                   | 9                                                | 9 standalone + Drow lineage      |
 | Classes                   | 12                                               | 12                               |
@@ -139,11 +139,20 @@ backend features are waiting on, and a handful of **bounded subsystems**.
 
 ### Content breadth — data on existing patterns (RE-6)
 
-- [ ] **Spells** — **267** / ~330 SRD. Remaining gaps are overwhelmingly
+- [ ] **Spells** — **269** / ~330 SRD. Remaining gaps are overwhelmingly
       utility / illusion / planar (Blink, Dragon's Breath, Prismatic Spray,
       Dispel Magic, Teleport, Wish, etc.); the combat-relevant gaps are thinning.
       Most remaining categories are already
-      representable (data entry). Animal/ward batch (`animalWardBatch.spec.ts`):
+      representable (data entry). Condition-immunity buffs
+      (`conditionImmunityBuffs.spec.ts`) added a new mechanic: a buff stamps
+      `Character.condition_immunities`, and a `conditionImmunitiesFor` helper
+      folds it in beside the paladin-aura immunities so every PC
+      condition-application guard (enemy on-hit auto-apply + save-based, monster
+      auras) and the per-turn clear sweep honor it (cleared at combat end).
+      **Freedom of Movement** (L4 — immune to Paralyzed/Restrained/Grappled; the
+      difficult-terrain half narrated) and **Mind Blank** (L8 — immune to
+      Charmed; the psychic-immunity + divination-hiding halves narrated) ride it.
+      Animal/ward batch (`animalWardBatch.spec.ts`):
       **Animal Friendship** (L1, WIS save → Charmed beast), **Giant Insect** (L4,
       beast-ally summon with cosmetic wasp/spider/centipede forms), **Warding
       Bond** (L2, ally buff → Resistance to all damage via `grantResistances`),
