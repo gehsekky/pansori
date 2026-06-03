@@ -139,7 +139,7 @@ prettier clean).
 
 | Category                  | In pansori                                       | SRD universe                     |
 | ------------------------- | ------------------------------------------------ | -------------------------------- |
-| Spells                    | **269** (27 cantrips + 242 leveled, through L9)  | ~330                             |
+| Spells                    | **274** (27 cantrips + 247 leveled, through L9)  | ~330                             |
 | Shared SRD monster pool   | **50** (`SRD_MONSTERS`) + per-campaign templates | hundreds                         |
 | Species                   | 9                                                | 9 standalone + Drow lineage      |
 | Classes                   | 12                                               | 12                               |
@@ -156,12 +156,13 @@ on existing patterns and a handful of **bounded subsystems**.
 
 ### Content breadth — data on existing patterns (RE-6)
 
-- [ ] **Spells** — **269** / ~330 SRD. Remaining gaps are overwhelmingly
-      utility / illusion / planar (Blink, Dragon's Breath, Prismatic Spray,
-      Dispel Magic, Teleport, Wish, etc.); the combat-relevant gaps are thinning.
-      Most remaining categories are already representable on shipped frameworks
-      (zones / recurring attacks / riders / AoE-condition / save-ends / walls /
-      displacement) — overwhelmingly data entry.
+- [ ] **Spells** — **274** / ~330 SRD. Remaining gaps are overwhelmingly
+      utility / divination / planar (Dispel Magic, True Seeing, Teleport, Wish,
+      etc.); the combat-relevant gaps are thinning. (Note: many spells one might
+      reach for — Blink, Cloud of Daggers, Witch Bolt, the non-Searing/Shining
+      smites — are PHB-only and out of scope.) Most remaining categories are
+      already representable on shipped frameworks (zones / recurring attacks /
+      riders / AoE-condition / save-ends / walls / displacement) — data entry.
 - [ ] **Monsters** — stat-block content breadth. The shared pool is at **50**
       (`SRD_MONSTERS`, CR 1/8–10) plus per-campaign templates, on the supported
       fields (multiattack, onHitEffect incl. grapple-on-hit, resist/vuln/immune,

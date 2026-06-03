@@ -4223,6 +4223,91 @@ export const SRD_SPELLS: Record<string, Spell> = {
     spellList: ['arcane', 'primal'],
   },
 
+  // ─── Illusion & enchantment batch (SRD) ─────────────────────────────────────
+  // SRD: Major Image (L3 Illusion, Bard/Sorcerer/Warlock/Wizard) — a movable
+  // image up to a 20-ft cube with sound/smell/temperature, on Concentration. The
+  // disbelieve check (Investigation vs spell DC) + illusory physicality narrated.
+  major_image: {
+    id: 'major_image',
+    name: 'Major Image',
+    level: 3,
+    castTime: 'action',
+    concentration: true,
+    durationRounds: 100,
+    rangeKind: 'ranged',
+    rangeFt: 120,
+    desc: 'Conjure a movable image of an object, creature, or phenomenon up to a 20-ft cube — complete with sound, smell, and warmth — and reshape it each turn (Concentration, up to 10 minutes). A creature that studies it may disbelieve with an Investigation check vs your spell save DC.',
+    narrative:
+      '{name} weaves light, sound, and scent into a phantom indistinguishable from the real thing.',
+    spellList: ['arcane'],
+  },
+  // SRD: Mislead (L5 Illusion, Bard/Warlock/Wizard) — you gain the Invisible
+  // condition while an illusory double appears; the invisibility ends if you
+  // attack or cast. Modeled via the shared `invisible` condition (the
+  // controllable double is narrated).
+  mislead: {
+    id: 'mislead',
+    name: 'Mislead',
+    level: 5,
+    castTime: 'action',
+    targetType: 'self',
+    rangeKind: 'self',
+    condition: 'invisible',
+    concentration: true,
+    durationRounds: 600,
+    desc: 'You gain the Invisible condition while an illusory double of you appears in your space (Concentration, up to 1 hour). You can move the double and speak through it; the invisibility ends if you attack or cast a spell.',
+    narrative: '{name} steps out of sight as a flawless double strides forward in their place.',
+    spellList: ['arcane'],
+  },
+  // SRD: Programmed Illusion (L6 Illusion, Bard/Wizard) — a preset image
+  // (≤30-ft cube) that stays imperceptible until a trigger you name, then plays
+  // its scene and resets. A utility set-piece — out of combat.
+  programmed_illusion: {
+    id: 'programmed_illusion',
+    name: 'Programmed Illusion',
+    level: 6,
+    castTime: 'action',
+    outOfCombatOnly: true,
+    materialCost: 25,
+    rangeKind: 'ranged',
+    rangeFt: 120,
+    desc: 'You set an illusion of an object, creature, or phenomenon (up to a 30-ft cube) that stays hidden until a trigger you describe occurs, then plays out its scripted scene before resetting. Lasts until dispelled.',
+    narrative: '{name} primes a phantom that waits, unseen, for its cue.',
+    spellList: ['arcane'],
+  },
+  // SRD: Geas (L5 Enchantment, Bard/Cleric/Druid/Paladin/Wizard) — a verbal
+  // command binding a creature for up to 30 days; while it holds the target is
+  // Charmed and takes psychic damage if it defies the order. A downtime / social
+  // spell — out of combat. (SRD cast time is 1 minute; pansori has no sub-action
+  // timer, so it casts as an action.)
+  geas: {
+    id: 'geas',
+    name: 'Geas',
+    level: 5,
+    castTime: 'action',
+    outOfCombatOnly: true,
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    desc: 'You lay a magical command on a creature you can see, ordering it to carry out a service or refrain from an action for up to 30 days. While the geas holds, the target is Charmed toward you, and it takes 5d10 psychic damage (once per day) if it defies the command.',
+    narrative: '{name} speaks a binding word; the order settles over {target} like a yoke.',
+    spellList: ['arcane', 'divine', 'primal'],
+  },
+  // SRD: Modify Memory (L5 Enchantment, Bard/Wizard) — reshape a creature's
+  // memory of a recent event on a failed WIS save (Advantage if you're fighting
+  // it). A social spell — out of combat; the save + altered recollection narrated.
+  modify_memory: {
+    id: 'modify_memory',
+    name: 'Modify Memory',
+    level: 5,
+    castTime: 'action',
+    outOfCombatOnly: true,
+    rangeKind: 'ranged',
+    rangeFt: 30,
+    desc: "You attempt to reshape a creature's memory of an event it experienced within the last 24 hours. It makes a Wisdom saving throw (with Advantage if you are fighting it); on a failure you can erase, alter, or implant its recollection of that event.",
+    narrative: "{name} threads a false strand through {target}'s recollection; the memory reknits.",
+    spellList: ['arcane'],
+  },
+
   // SRD: Fabricate (L4 Transmutation, Wizard) — convert raw material into a
   // finished product.
   fabricate: {
