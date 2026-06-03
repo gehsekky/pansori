@@ -260,12 +260,12 @@ describe('Malgovia — scripted playthrough', () => {
     // ── Stage 0: regional grid start ───────────────────────────────────────
     expect(state.map_level).toBe('regional');
     expect(state.current_region_id).toBe('vale_region');
-    expect(state.marker_pos).toEqual({ x: 4, y: 7 }); // region.startPos — Pinegate's door (beginner grove hub)
+    expect(state.marker_pos).toEqual({ x: 0, y: 7 }); // region.startPos — the south-west road end
     expect(state.current_room).toBe('');
     expect(state.characters.every((c) => c.hp > 0)).toBe(true);
 
     // ── Stage 1: enter Millhaven, accept the three quests ──────────────────
-    await markerMove(1, 7); // Millhaven site → town grid
+    await markerMove(10, 7); // Millhaven site (far east) → town grid
     expect(state.map_level).toBe('town');
     expect(state.current_town_id).toBe('millhaven_town');
 
@@ -323,7 +323,7 @@ describe('Malgovia — scripted playthrough', () => {
     expect(state.map_level).toBe('regional');
 
     // ── Stage 3: the Old Road skirmish (a regional local site) ─────────────
-    await markerMove(3, 7); // The Old Road site
+    await markerMove(10, 5); // The Old Road site (on the eastern road)
     expect(state.map_level).toBe('local');
     expect(state.current_room).toBe('old_road');
     await dispatch({ type: 'attack', targetEnemyId: 'old_road#0' });
@@ -334,7 +334,7 @@ describe('Malgovia — scripted playthrough', () => {
     expect(state.map_level).toBe('regional');
 
     // ── Stage 4: the Shattered Crypt ───────────────────────────────────────
-    await markerMove(10, 3); // Shattered Crypt site → entrance
+    await markerMove(9, 3); // Shattered Crypt site → entrance
     expect(state.current_room).toBe('dungeon_crypt_entrance');
 
     await markerMove(9, 0); // exit → antechamber
@@ -385,7 +385,7 @@ describe('Malgovia — scripted playthrough', () => {
     await markerMove(7, 7); // ascend → back to the regional grid (at the crypt site)
     expect(state.map_level).toBe('regional');
 
-    await markerMove(1, 7); // travel back to Millhaven
+    await markerMove(10, 7); // travel back to Millhaven
     expect(state.map_level).toBe('town');
     await markerMove(6, 2); // Merchant District → Aldric
     expect(state.current_room).toBe('millhaven_market');
