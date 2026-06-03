@@ -5615,4 +5615,31 @@ export const SRD_SPELLS: Record<string, Spell> = {
       '{name} clenches a fist and a Large hand of force snaps into being, ready to strike.',
     spellList: ['arcane'],
   },
+
+  // SRD: Prismatic Spray (L7 Evocation) — eight rays of light flash in a 60-ft
+  // cone. Each creature makes one DEX save, then a 1d8 picks its ray: 1–5 are
+  // 12d6 of fire / acid / lightning / poison / cold (save-for-half), 6 (indigo)
+  // Restrains (CON save-ends), 7 (violet) Blinds (WIS save-ends), and 8 strikes
+  // with two rays. Resolved by the dedicated `runPrismaticSpray` dispatch. The
+  // indigo→petrify escalation and the violet→plane-teleport are deferred.
+  prismatic_spray: {
+    id: 'prismatic_spray',
+    name: 'Prismatic Spray',
+    level: 7,
+    castTime: 'action',
+    prismaticRays: true,
+    savingThrow: 'dex',
+    saveEffect: 'half',
+    blastRadius: 60, // cone length
+    aoeShape: 'cone',
+    rangeKind: 'self',
+    desc: 'Eight rays of light flash from you in a 60-ft cone. Each creature makes a DEX save, then a d8 determines its ray: red/orange/yellow/green/blue deal 12d6 fire/acid/lightning/poison/cold (half on a save); indigo Restrains it (CON save-ends); violet Blinds it (WIS save-ends); an eighth result strikes with two rays. (The indigo→petrify and violet→banish escalations are deferred.)',
+    narratives: {
+      cast: [
+        '{name} throws wide a hand and eight searing rays of color fan out in a blinding cone',
+        '{name} unleashes {spell}{slotNote} — a prismatic fan of light scythes across the foes',
+      ],
+    },
+    spellList: ['arcane'],
+  },
 };

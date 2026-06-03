@@ -17,6 +17,7 @@ import { runCombatStart } from '../attack/combatStart.js';
 import { runEnlargeReduce } from './enlargeReduce.js';
 import { runHealSpell } from './heal.js';
 import { runMultiTargetSpell } from './multiTarget.js';
+import { runPrismaticSpray } from './prismaticSpray.js';
 import { runRecurringAttackSpell } from '../recurringSpellAttack.js';
 import { runReviveSpell } from './revive.js';
 import { runSaveSpell } from './save.js';
@@ -363,6 +364,15 @@ export const handleCastSpell: ActionHandler<{
     ctx.metamagic?.includes('transmuted') && spell.damageType
       ? { ...spell, damageType: transmutedDamageType(spellTarget, spell.damageType) }
       : spell;
+
+  // SRD Prismatic Spray — eight rays in a cone; each creature makes ONE DEX save,
+  // then 1d8 picks its ray (damage / Restrain / Blind / two rays). Owns full
+  // resolution, so it short-circuits the generic save / AoE damage path below.
+  if (spell.prismaticRays) {
+    runPrismaticSpray(ctx, spell, slotLevel, dc);
+    ctx.usedInitiative = true;
+    return;
+  }
 
   // SRD Metamagic Twinned Spell — a single-target spell also strikes a second
   // creature. Fully gated behind metamagic === 'twinned' so the normal cast

@@ -792,6 +792,12 @@ export interface Spell {
   // about half each round. The buff path sets `Character.blinking`; the
   // enemy-attack resolver rolls a d20 (11+ ⇒ the blow finds no one) per attack.
   blink?: boolean;
+  // SRD Prismatic Spray — eight rays in a cone. Each creature makes ONE DEX save,
+  // then a 1d8 picks its ray: 1–5 are 12d6 of fire/acid/lightning/poison/cold
+  // (save-for-half), 6 (indigo) Restrains (CON save-ends), 7 (violet) Blinds
+  // (WIS save-ends), 8 strikes with two rays (reroll 8s). Routed to a dedicated
+  // dispatch branch (`runPrismaticSpray`). `blastRadius` is the cone length.
+  prismaticRays?: boolean;
   // SRD Sanctuary — ward the self/ally target; attackers must save vs the
   // caster's DC. The buff path stamps `Character.sanctuary_dc`.
   sanctuary?: boolean;
