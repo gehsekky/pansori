@@ -520,6 +520,10 @@ export default function App() {
                       sits below it, and the action / choices below that. */}
                   {(() => {
                     if (!gameState || !seed || escaped || allDead) return null;
+                    // Post-combat "Continue" gate owns the screen — hide the map so
+                    // its clickable cells can't issue a marker_move that bypasses
+                    // the gate (combat_over_pending is only cleared by Continue).
+                    if (gameState.combat_over_pending) return null;
                     if (
                       gameState.combat_active &&
                       gameState.entities &&
