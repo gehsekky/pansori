@@ -587,6 +587,12 @@ export default function App() {
                             // A surfaced Attack choice means a hostile is here
                             // pre-combat — show the red enemy marker.
                             enemyPresent={choices.some((c) => c.kind === 'attack')}
+                            // Clicking the red dot engages — dispatch the
+                            // out-of-combat Attack choice to drop into combat.
+                            onEnemyClick={() => {
+                              const atk = choices.find((c) => c.kind === 'attack');
+                              if (atk) handleChoice(atk);
+                            }}
                             npcs={npcTokens}
                             onNpcClick={(npcId) => {
                               const tc = talkByNpc.get(npcId);

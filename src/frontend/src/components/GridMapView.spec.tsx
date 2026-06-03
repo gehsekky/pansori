@@ -99,6 +99,26 @@ describe('GridMapView', () => {
     expect(container.querySelectorAll('[aria-label*="an enemy"]').length).toBe(0);
   });
 
+  it('engages combat when the red enemy marker is clicked (not a travel move)', () => {
+    const onEnemyClick = vi.fn();
+    const onMarkerMove = vi.fn();
+    const { container } = render(
+      <GridMapView
+        grid={grid}
+        markerPos={{ x: 0, y: 0 }}
+        enemyPresent
+        onEnemyClick={onEnemyClick}
+        onMarkerMove={onMarkerMove}
+      />
+    );
+    const enemyCell = container.querySelector('[aria-label*="an enemy"]') as HTMLElement;
+    expect(enemyCell.getAttribute('role')).toBe('button'); // clickable
+    expect(enemyCell.getAttribute('title')).toBe('Attack');
+    fireEvent.click(enemyCell);
+    expect(onEnemyClick).toHaveBeenCalledTimes(1);
+    expect(onMarkerMove).not.toHaveBeenCalled(); // engages, doesn't travel onto the cell
+  });
+
   it('distinguishes a town (⌂) from a local site (◈) and shows their names', () => {
     const { container, getByText } = render(<GridMapView grid={grid} markerPos={{ x: 0, y: 0 }} />);
     // Town cell: house glyph + always-visible name.

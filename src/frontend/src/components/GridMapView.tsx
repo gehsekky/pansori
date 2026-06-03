@@ -13,6 +13,10 @@ interface Props {
   // red marker near the party (mirroring the single party marker) — otherwise
   // an "Attack" option appears with nothing on the map to explain it.
   enemyPresent?: boolean;
+  // Clicking the red enemy marker engages it — the parent dispatches the
+  // out-of-combat "Attack" choice, dropping the party into combat. Without this
+  // the dot would just be a travel target like any other empty cell.
+  onEnemyClick?: () => void;
   // Click-to-move: the parent dispatches a single `marker_move` action for the
   // clicked cell. The backend free-pathfinds out of combat (no movement budget)
   // and resolves any transition (site / venue / room exit / ascend) on arrival.
@@ -130,7 +134,15 @@ function describeTerrain(type: TerrainType, withModifiers: boolean): string {
  * to travel to, and obstacles. (Local combat switches to GridCombatView, which
  * deploys the party into PC tokens.)
  */
-function GridMapView({ grid, markerPos, enemyPresent, onMarkerMove, npcs, onNpcClick }: Props) {
+function GridMapView({
+  grid,
+  markerPos,
+  enemyPresent,
+  onEnemyClick,
+  onMarkerMove,
+  npcs,
+  onNpcClick,
+}: Props) {
   // The overland (regional) map gets double-size squares so the larger, sparse
   // grid reads more like a map; the town map uses mid-size 48 px squares; local
   // exploration stays compact (CELL_PX).
@@ -178,8 +190,13 @@ function GridMapView({ grid, markerPos, enemyPresent, onMarkerMove, npcs, onNpcC
       const isNpc = !!cellNpc && !isMarker;
       // Out of combat the party moves freely (the backend pathfinds), so every
       // non-obstacle cell that isn't the marker's own square is a valid target.
-      // The NPC's own cell is clickable too — clicking it talks (walks adjacent).
-      const clickable = isNpc ? !!onNpcClick : !isObstacle && !isMarker && !!onMarkerMove;
+      // The enemy marker engages (attack); the NPC's own cell talks (walks
+      // adjacent); everything else travels.
+      const clickable = isEnemyMarker
+        ? !!onEnemyClick
+        : isNpc
+          ? !!onNpcClick
+          : !isObstacle && !isMarker && !!onMarkerMove;
 
       // Checkerboard the plain cells so the grid squares read clearly on the
       // large, sparse region/town maps — a single flat fill was
@@ -217,17 +234,19 @@ function GridMapView({ grid, markerPos, enemyPresent, onMarkerMove, npcs, onNpcC
       // Travel / encounter modifiers apply only to overland (regional) travel,
       // so town / local maps tooltip the bare terrain label.
       const showTerrainModifiers = grid.level === 'regional';
-      const cellTitle = isNpc
-        ? `Talk to ${cellNpc!.name}`
-        : transition
-          ? transition.label
-          : terrainType
-            ? describeTerrain(terrainType, showTerrainModifiers)
-            : isObstacle
-              ? 'Impassable'
-              : grid.terrain.length > 0
-                ? describeTerrain('plains', showTerrainModifiers)
-                : undefined;
+      const cellTitle = isEnemyMarker
+        ? 'Attack'
+        : isNpc
+          ? `Talk to ${cellNpc!.name}`
+          : transition
+            ? transition.label
+            : terrainType
+              ? describeTerrain(terrainType, showTerrainModifiers)
+              : isObstacle
+                ? 'Impassable'
+                : grid.terrain.length > 0
+                  ? describeTerrain('plains', showTerrainModifiers)
+                  : undefined;
 
       let token: React.ReactNode = null;
       if (isMarker) {
@@ -322,7 +341,12 @@ function GridMapView({ grid, markerPos, enemyPresent, onMarkerMove, npcs, onNpcC
           title={cellTitle}
           onClick={
             clickable
-              ? () => (isNpc ? onNpcClick?.(cellNpc!.id) : onMarkerMove?.({ x, y }))
+              ? () =>
+                  isEnemyMarker
+                    ? onEnemyClick?.()
+                    : isNpc
+                      ? onNpcClick?.(cellNpc!.id)
+                      : onMarkerMove?.({ x, y })
               : undefined
           }
           onKeyDown={
@@ -330,7 +354,8 @@ function GridMapView({ grid, markerPos, enemyPresent, onMarkerMove, npcs, onNpcC
               ? (e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
-                    if (isNpc) onNpcClick?.(cellNpc!.id);
+                    if (isEnemyMarker) onEnemyClick?.();
+                    else if (isNpc) onNpcClick?.(cellNpc!.id);
                     else onMarkerMove?.({ x, y });
                   }
                 }
