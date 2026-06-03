@@ -125,3 +125,12 @@ describe('Malgovia integrity — every site is reachable from the start', () => 
     }
   });
 });
+
+describe('Malgovia is open-ended — no side-arc ends the whole adventure', () => {
+  it('no quest reward is set_escape (regression: the folded grove arc once did)', () => {
+    const enders = (camp.quests ?? [])
+      .filter((q) => (q.rewards ?? []).some((r) => r.type === 'set_escape'))
+      .map((q) => q.id);
+    expect(enders).toEqual([]);
+  });
+});

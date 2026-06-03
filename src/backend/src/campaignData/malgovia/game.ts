@@ -495,7 +495,10 @@ export const quests: Quest[] = [
       { type: 'give_gold', amount: 300 },
       { type: 'give_xp', amount: 1500 },
       // Faction rep bumped via `repGain: 30` above.
-      { type: 'set_escape' },
+      // NOTE: no `set_escape` here. Malgovia is open-ended — the grove is one
+      // side-arc among several (the crypt / Crypt Lord is the bigger fight), so
+      // finishing it must NOT end the whole adventure. (Leftover from when Grove
+      // of Thorns was a standalone campaign whose finale was the Trickster.)
       {
         type: 'add_narrative',
         text: 'The grove sighs — a long, green release. Pinegate will sleep easy tonight.',
