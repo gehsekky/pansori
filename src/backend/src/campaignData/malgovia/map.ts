@@ -627,6 +627,25 @@ export const rooms: Room[] = [
     gridHeight: 7,
     entryPos: { x: 3, y: 6 },
     exits: [{ pos: { x: 3, y: 0 }, ascends: true, label: 'Back into Pinegate' }],
+    // Cosmetic: a cobbled square around the central stone well, ringed by the
+    // dark pines beyond the houses.
+    terrain: [
+      ...terr('water', [3, 3]), // the stone well (impassable)
+      ...terr(
+        'cobblestone',
+        [2, 2],
+        [3, 2],
+        [4, 2],
+        [2, 3],
+        [4, 3],
+        [2, 4],
+        [3, 4],
+        [4, 4],
+        [3, 5],
+        [3, 6]
+      ),
+      ...terr('garden', [0, 0], [6, 0], [0, 6], [6, 6], [0, 3], [6, 3]),
+    ],
   },
   {
     id: 'pinegate_lodge',
@@ -636,6 +655,23 @@ export const rooms: Room[] = [
     gridHeight: 7,
     entryPos: { x: 3, y: 6 },
     exits: [{ pos: { x: 3, y: 0 }, ascends: true, label: 'Back into Pinegate' }],
+    // Cosmetic: a worn plank-and-flagstone common-hall floor.
+    terrain: [
+      ...terr(
+        'cobblestone',
+        [2, 2],
+        [3, 2],
+        [4, 2],
+        [2, 3],
+        [3, 3],
+        [4, 3],
+        [2, 4],
+        [3, 4],
+        [4, 4],
+        [3, 5],
+        [3, 6]
+      ),
+    ],
   },
 
   // The Grove — a regional site. Entry room is the bridge; the path chains
