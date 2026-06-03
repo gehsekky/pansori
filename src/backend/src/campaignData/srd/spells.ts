@@ -3632,6 +3632,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     level: 3,
     castTime: 'action',
     rangeKind: 'touch',
+    materialCost: 25, // SRD: a pinch of diamond dust worth 25+ GP, consumed
     desc: 'For 8 hours you hide a creature, place, or object from divination magic, magical scrying sensors, and spells that detect or locate.',
     narrative: '{name} veils the target from prying magic — to divination, it simply isn’t there.',
     spellList: ['arcane', 'primal'],
@@ -5368,5 +5369,118 @@ export const SRD_SPELLS: Record<string, Spell> = {
     desc: "Touch a willing ally to seal their mind: for the fight they can't be Charmed. (RAW also grants immunity to psychic damage and to magical mind-reading / detection.)",
     narrative: "{name} seals {target}'s mind against all intrusion.",
     spellList: ['arcane'],
+  },
+
+  // ─── Spell batch: Abjuration wards + high-level utility ──────────────────────
+  // Iconic SRD abjurations and a divination/conjuration pair that round out the
+  // utility roster. Most are narrated (pansori doesn't model ongoing enemy
+  // enchantments to dispel, scry-able auras, or planar trap glyphs); Heroes'
+  // Feast lands mechanically as a max-HP + immunity buff via the buff path.
+
+  // SRD: Dispel Magic (L3 Abjuration) — end one ongoing spell effect on a target
+  // (auto for slot ≥ the effect's level; an ability check vs DC 10 + level
+  // otherwise). Pansori doesn't track removable enemy enchantments, so which
+  // effect ends is narrated — like Counterspell, the entry is the surface.
+  dispel_magic: {
+    id: 'dispel_magic',
+    name: 'Dispel Magic',
+    level: 3,
+    castTime: 'action',
+    rangeKind: 'ranged',
+    rangeFt: 120,
+    desc: 'Choose one creature, object, or magical effect within range; any spell of 3rd level or lower on it ends. For a higher-level effect, make an ability check (DC 10 + that spell’s level) for each. Which lingering magic unravels is narrated.',
+    narrative: '{name} speaks a word of unmaking and the weave of a nearby spell frays apart.',
+    spellList: ['arcane', 'divine', 'primal'],
+  },
+
+  // SRD: Glyph of Warding (L3 Abjuration) — 1-hour cast inscribing a stored
+  // trap/spell glyph. Out-of-combat ritual-style prep; narrated.
+  glyph_of_warding: {
+    id: 'glyph_of_warding',
+    name: 'Glyph of Warding',
+    level: 3,
+    castTime: 'action', // RAW 1 hour — gated to out-of-combat below
+    outOfCombatOnly: true,
+    rangeKind: 'touch',
+    materialCost: 200,
+    desc: 'You inscribe a hidden glyph that triggers when a condition you set is met (a creature approaches, opens a warded object, etc.), unleashing a stored burst of damage or a stored spell. Placement and trigger are narrated.',
+    narrative:
+      '{name} traces a glyph in powdered diamond; it flares once, then fades from sight, waiting.',
+    spellList: ['arcane', 'divine'],
+  },
+
+  // SRD: Hallow (L5 Abjuration) — 24-hour cast that consecrates an area with a
+  // warding effect + tied guard. Out-of-combat consecration; narrated.
+  hallow: {
+    id: 'hallow',
+    name: 'Hallow',
+    level: 5,
+    castTime: 'action', // RAW 24 hours — gated to out-of-combat
+    outOfCombatOnly: true,
+    rangeKind: 'touch',
+    materialCost: 1000,
+    desc: 'You suffuse an area with sacred (or profane) power: specified creature types can’t enter or charm/frighten/possess those within, and you bind one extra guarding effect. The consecration is narrated.',
+    narrative: '{name} censes the ground for an age; the very air turns hallowed and still.',
+    spellList: ['divine'],
+  },
+
+  // SRD: Forbiddance (L6 Abjuration, ritual) — wards a region against planar
+  // travel and damages chosen creature types that enter. Out-of-combat ritual;
+  // narrated.
+  forbiddance: {
+    id: 'forbiddance',
+    name: 'Forbiddance',
+    level: 6,
+    castTime: 'action', // RAW 10 minutes / ritual — gated to out-of-combat
+    outOfCombatOnly: true,
+    ritualCasting: true,
+    rangeKind: 'touch',
+    materialCost: 1000,
+    desc: 'You ward an area for a day against magical entry (teleport / planar travel fails) and sear chosen creature types that try to enter. The boundary is narrated.',
+    narrative:
+      '{name} walks the perimeter scattering ruby dust; an unseen wall seals the ground against intrusion.',
+    spellList: ['divine'],
+  },
+
+  // SRD: True Seeing (L6 Divination) — touch; for 1 hour the target gains
+  // Truesight 120 ft (sees in darkness, through illusions/invisibility, into the
+  // Ethereal). Like See Invisibility, the reveal is narrated, not modeled.
+  true_seeing: {
+    id: 'true_seeing',
+    name: 'True Seeing',
+    level: 6,
+    castTime: 'action',
+    rangeKind: 'touch',
+    materialCost: 25,
+    desc: 'For 1 hour the touched creature gains Truesight out to 120 ft: it sees in normal and magical darkness, spots Invisible creatures and objects, sees through illusions, and perceives into the Ethereal Plane. The reveal is narrated, not modeled mechanically.',
+    narrative: "{name} dusts {target}'s eyes; every lie of shadow and glamour falls away.",
+    spellList: ['arcane', 'divine'],
+  },
+
+  // SRD: Heroes' Feast (L6 Conjuration) — a feast (1 hour to consume) that, for
+  // 24 hours, grants each partaker Poison resistance, immunity to Frightened +
+  // Poisoned, and +2d10 max HP (and that many HP). Out-of-combat prep; modeled
+  // as a single-target buff (RAW feeds up to twelve) via the buff path. The 2d10
+  // max-HP bump is fixed to its average (11), as Aid fixes its +5.
+  heroes_feast: {
+    id: 'heroes_feast',
+    name: "Heroes' Feast",
+    level: 6,
+    castTime: 'action', // RAW 10 minutes to cast + 1 hour to consume
+    outOfCombatOnly: true,
+    targetType: 'self_or_ally',
+    materialCost: 1000,
+    maxHpBonus: 11, // RAW 2d10, fixed to average (cf. Aid's fixed +5)
+    grantResistances: ['poison'],
+    grantsConditionImmunities: ['frightened', 'poisoned'],
+    rangeKind: 'touch',
+    desc: 'A magical feast steels those who partake: for 24 hours they gain Resistance to poison damage, Immunity to the Frightened and Poisoned conditions, and +11 (RAW 2d10) maximum and current HP. Pansori feeds one chosen ally (RAW up to twelve).',
+    narratives: {
+      cast: [
+        '{name} conjures a groaning board of fare; {target} eats deep and rises emboldened',
+        "{name}'s feast fills {target} with warmth and unshakable courage",
+      ],
+    },
+    spellList: ['arcane', 'divine', 'primal'],
   },
 };
