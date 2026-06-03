@@ -683,6 +683,46 @@ export const rooms: Room[] = [
     gridWidth: 8,
     gridHeight: 6,
     entryPos: { x: 0, y: 3 },
+    // Cosmetic: the stone bridge spans the rushing Thornwater (impassable), with
+    // the too-still pines on the far bank. Pathing keeps the bridge row + the
+    // x=0 column to the ascent open.
+    terrain: [
+      ...terr('cobblestone', [0, 3], [1, 3], [2, 3], [3, 3], [4, 3], [5, 3], [6, 3], [7, 3]),
+      ...terr(
+        'water',
+        [1, 1],
+        [2, 1],
+        [3, 1],
+        [4, 1],
+        [5, 1],
+        [6, 1],
+        [7, 1],
+        [1, 2],
+        [2, 2],
+        [3, 2],
+        [4, 2],
+        [5, 2],
+        [6, 2],
+        [7, 2],
+        [0, 4],
+        [1, 4],
+        [2, 4],
+        [3, 4],
+        [4, 4],
+        [5, 4],
+        [6, 4],
+        [7, 4],
+        [0, 5],
+        [1, 5],
+        [2, 5],
+        [3, 5],
+        [4, 5],
+        [5, 5],
+        [6, 5],
+        [7, 5]
+      ),
+      ...terr('forest', [1, 0], [2, 0], [3, 0], [4, 0], [5, 0], [6, 0], [7, 0]),
+    ],
     exits: [
       {
         pos: { x: 7, y: 3 },
@@ -700,6 +740,23 @@ export const rooms: Room[] = [
     gridWidth: 10,
     gridHeight: 10,
     entryPos: { x: 0, y: 0 },
+    // Cosmetic: a grassy clearing ringed by underbrush (forest).
+    terrain: [
+      ...terr('garden', [4, 4], [5, 4], [4, 5], [5, 5]),
+      ...terr(
+        'forest',
+        [2, 1],
+        [3, 1],
+        [6, 2],
+        [7, 2],
+        [1, 5],
+        [8, 4],
+        [2, 8],
+        [3, 8],
+        [7, 7],
+        [6, 8]
+      ),
+    ],
     exits: [
       {
         pos: { x: 0, y: 1 },
@@ -722,6 +779,28 @@ export const rooms: Room[] = [
     gridWidth: 10,
     gridHeight: 10,
     entryPos: { x: 0, y: 0 },
+    // Cosmetic: dense thorn-thicket (forest) with a few boggy hollows (swamp).
+    terrain: [
+      ...terr(
+        'forest',
+        [2, 1],
+        [3, 1],
+        [6, 2],
+        [1, 3],
+        [4, 3],
+        [8, 3],
+        [6, 4],
+        [2, 5],
+        [5, 5],
+        [4, 6],
+        [7, 6],
+        [3, 7],
+        [8, 7],
+        [1, 8],
+        [5, 8]
+      ),
+      ...terr('swamp', [2, 4], [7, 4], [5, 7]),
+    ],
     exits: [
       {
         pos: { x: 0, y: 1 },
@@ -744,6 +823,13 @@ export const rooms: Room[] = [
     gridWidth: 10,
     gridHeight: 10,
     entryPos: { x: 1, y: 1 },
+    // Cosmetic: the Oak's verdant dais at the heart (garden), ringed by old
+    // forest. (The mechanical root obstacles + thorned difficult terrain are
+    // the separate arrays below.)
+    terrain: [
+      ...terr('garden', [4, 4], [5, 4], [6, 4], [4, 5], [5, 5], [6, 5], [4, 6], [6, 6], [5, 7]),
+      ...terr('forest', [2, 2], [8, 2], [1, 7], [8, 7], [2, 8], [7, 8]),
+    ],
     exits: [
       {
         pos: { x: 0, y: 9 },
@@ -782,6 +868,11 @@ export const rooms: Room[] = [
     gridWidth: 8,
     gridHeight: 8,
     entryPos: { x: 0, y: 0 },
+    // Cosmetic: a sunlit sacred clearing (garden) edged by quiet pines (forest).
+    terrain: [
+      ...terr('garden', [3, 3], [4, 3], [5, 3], [2, 4], [3, 4], [4, 4], [4, 5]),
+      ...terr('forest', [1, 1], [6, 1], [1, 6], [2, 6], [6, 5], [6, 6]),
+    ],
     exits: [
       {
         pos: { x: 0, y: 1 },
