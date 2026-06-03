@@ -390,14 +390,22 @@ describe('typed overland terrain (unified model)', () => {
     expect(resolveMarkerMove(overlap, rooms, stAt(0, 0), { x: 1, y: 0 }).rejected).toBeUndefined();
   });
 
-  it('roads suppress encounters while forest is dangerous', () => {
-    // chance 0.5: road ×0 ⇒ never; forest ×1.5 ⇒ 0.75 effective. roll 0.6.
-    vi.spyOn(Math, 'random').mockReturnValue(0.6);
+  it('roads are the safest terrain but not immune; forest is more dangerous', () => {
+    // chance 0.5: road ×0.5 ⇒ 0.25 effective; forest ×2.5 ⇒ ≥1 effective.
+    // A high roll (0.4) clears the low road threshold — an all-road trip is safe…
+    vi.spyOn(Math, 'random').mockReturnValue(0.4);
     expect(
       resolveMarkerMove(terrainCampaign, rooms, stAt(0, 0), { x: 0, y: 2 }).encounter
-    ).toBeUndefined(); // all-road journey is safe
+    ).toBeUndefined();
+    // …but a low roll (0.1 < 0.25) can still trigger on a road — roads aren't safe.
+    vi.spyOn(Math, 'random').mockReturnValue(0.1);
+    expect(resolveMarkerMove(terrainCampaign, rooms, stAt(0, 0), { x: 0, y: 2 }).encounter).toBe(
+      'Bandit Ruffian'
+    );
+    // Forest: road squares (0.25) miss at 0.6 but the forest cell hits.
+    vi.spyOn(Math, 'random').mockReturnValue(0.6);
     expect(resolveMarkerMove(terrainCampaign, rooms, stAt(0, 0), { x: 0, y: 3 }).encounter).toBe(
       'Bandit Ruffian'
-    ); // the forest cell rolls 0.6 < 0.75
+    );
   });
 });

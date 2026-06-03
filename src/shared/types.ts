@@ -188,8 +188,11 @@ export interface TerrainCell {
 //  - `passable`: false ⇒ the square blocks travel (water, mountains).
 //  - `travelMult`: per-square travel-time multiplier (roads are quick, forest /
 //    swamp are slow "difficult terrain").
-//  - `encounterMult`: scales the region's per-square encounter chance (roads
-//    are safe at 0; wild terrain is more dangerous).
+//  - `encounterMult`: scales the region's per-square encounter chance. Roads
+//    are the SAFEST passable terrain but not immune (low, nonzero); wilder
+//    terrain is progressively more dangerous. Town-cosmetic types are 0 — and
+//    note encounters only roll on the REGIONAL grid (towns / local rooms never
+//    roll, regardless of terrain).
 export interface TerrainSpec {
   passable: boolean;
   travelMult: number;
@@ -198,17 +201,18 @@ export interface TerrainSpec {
 }
 
 export const TERRAIN: Record<TerrainType, TerrainSpec> = {
-  plains: { passable: true, travelMult: 1, encounterMult: 1, label: 'plains' },
-  road: { passable: true, travelMult: 0.5, encounterMult: 0, label: 'road' },
-  forest: { passable: true, travelMult: 2, encounterMult: 1.5, label: 'forest' },
-  hills: { passable: true, travelMult: 1.5, encounterMult: 1.25, label: 'hills' },
-  swamp: { passable: true, travelMult: 2, encounterMult: 1.5, label: 'swamp' },
-  snow: { passable: true, travelMult: 1.5, encounterMult: 1, label: 'snow' },
+  plains: { passable: true, travelMult: 1, encounterMult: 1.5, label: 'plains' },
+  road: { passable: true, travelMult: 0.5, encounterMult: 0.5, label: 'road' },
+  forest: { passable: true, travelMult: 2, encounterMult: 2.5, label: 'forest' },
+  hills: { passable: true, travelMult: 1.5, encounterMult: 2, label: 'hills' },
+  swamp: { passable: true, travelMult: 2, encounterMult: 2.5, label: 'swamp' },
+  snow: { passable: true, travelMult: 1.5, encounterMult: 1.5, label: 'snow' },
   water: { passable: false, travelMult: 1, encounterMult: 0, label: 'water' },
   mountain: { passable: false, travelMult: 1, encounterMult: 0, label: 'mountains' },
-  // Town cosmetics — neutral mechanics; `town_wall` blocks movement.
-  cobblestone: { passable: true, travelMult: 1, encounterMult: 1, label: 'cobblestone' },
-  garden: { passable: true, travelMult: 1, encounterMult: 1, label: 'garden' },
+  // Town cosmetics — neutral mechanics, no encounter weight; `town_wall` blocks
+  // movement. (Town / local-room grids don't roll encounters anyway.)
+  cobblestone: { passable: true, travelMult: 1, encounterMult: 0, label: 'cobblestone' },
+  garden: { passable: true, travelMult: 1, encounterMult: 0, label: 'garden' },
   town_wall: { passable: false, travelMult: 1, encounterMult: 0, label: 'town wall' },
 };
 
