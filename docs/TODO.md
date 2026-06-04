@@ -210,6 +210,12 @@ on existing patterns and a handful of **bounded subsystems**.
 - [ ] **Somatic spell components** — RAW requires a free hand; needs a
       hand-state model. No spell carries a `somatic` flag yet. Also unlocks
       focus-substitutes-for-material.
+- [ ] **Forced-march death at Exhaustion 6** — SRD Extended Travel fatigue
+      ships (`applyForcedMarch` in `actions/markerMove.ts`: CON save per hour
+      past 8/day or +1 Exhaustion, reset on long rest). But it only raises
+      `exhaustion_level`; the Exhaustion-6 = death rule fires in a separate
+      flow, so a marched-to-6 PC sits at max penalties instead of dying. Wire
+      the death check into the march path (and/or centralize exhaustion-gain).
 - [ ] **Out-of-combat systems** — Downtime, Bastions, Crafting (potions /
       scrolls / items), Vehicles. Lowest urgency.
 
