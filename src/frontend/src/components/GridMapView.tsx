@@ -266,13 +266,18 @@ function GridMapView({
 
       let token: React.ReactNode = null;
       if (isMarker) {
+        // The party marker — the swords-emblem glyph, drawn at the map-glyph
+        // size (the small token circle clipped it). The party cell is already
+        // highlighted via gridMapCellCurrent, so no backing circle is needed.
         token = (
-          <span className={styles.gridToken} style={{ background: 'rgba(70, 140, 220, 0.9)' }}>
-            <GameIcon
-              name="swords-emblem"
-              style={{ color: '#fff', fontSize: '0.95rem', textShadow: '0 0 2px rgba(0,0,0,0.8)' }}
-            />
-          </span>
+          <GameIcon
+            name="swords-emblem"
+            className={styles.gridMapGlyph}
+            style={{
+              fontSize: glyphFont ? `calc(${glyphFont} * 1.25)` : undefined,
+              color: 'rgba(100, 170, 250, 1)', // party blue
+            }}
+          />
         );
       } else if (isEnemyMarker) {
         token = (
