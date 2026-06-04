@@ -991,6 +991,14 @@
   align-items: start;
 }
 
+/* The right column (ContextPanel) stretches to the full height of the layout
+   row, matching the taller center / party columns instead of shrinking to its
+   own content. Scoped to the in-game grid so the shared .campaignPanel class
+   isn't affected elsewhere. */
+.gameLayout > .campaignPanel {
+  align-self: stretch;
+}
+
 @media (max-width: 1100px) {
   .gameLayout {
     grid-template-columns: 1fr;
