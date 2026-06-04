@@ -62,16 +62,17 @@ describe('CharacterModal', () => {
     expect(vitals.textContent).toContain('18'); // AC
   });
 
-  it('shows species traits, the background, and equipped gear', () => {
-    const { getByText } = render(<CharacterModal char={hero} ctx={ctx} onClose={vi.fn()} />);
+  it('shows species traits, the background, and spells (no equipment section)', () => {
+    const { getByText, queryByText } = render(
+      <CharacterModal char={hero} ctx={ctx} onClose={vi.fn()} />
+    );
     expect(getByText(/SPECIES — Elf/)).toBeTruthy();
     expect(getByText(/BACKGROUND — Acolyte/)).toBeTruthy();
     expect(getByText(/You served at a temple/)).toBeTruthy();
-    // Equipped items resolve from inventory by instance id.
-    expect(getByText('Mace')).toBeTruthy();
-    expect(getByText('Chain Mail')).toBeTruthy();
     // Prettified spell ids.
     expect(getByText(/Cure Wounds/)).toBeTruthy();
+    // Equipment lives in the inventory screen, not the sheet.
+    expect(queryByText('EQUIPMENT')).toBeNull();
   });
 
   it('closes on Escape via the Dialog shell', () => {

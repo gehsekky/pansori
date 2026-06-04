@@ -60,15 +60,6 @@ function CharacterModal({ char, ctx, onClose }: Props) {
   const species = SPECIES.find((s) => s.id === char.species);
   const background = ctx.backgrounds?.find((b) => b.id === char.background_id);
 
-  const equipped = (instId: string | null | undefined) =>
-    instId ? (char.inventory?.find((i) => i.instance_id === instId) ?? null) : null;
-  const weapon = equipped(char.equipment.main_hand);
-  const armor = equipped(char.equipment.armor);
-  const shield = equipped(char.equipment.shield);
-  const attuned = (char.attuned_items ?? [])
-    .map((id) => char.inventory?.find((i) => i.instance_id === id)?.name)
-    .filter((n): n is string => !!n);
-
   const title = `${char.name} — ${formatClassLabel(char.character_class, char.subclass)} ${char.level}`;
 
   const profLine = (label: string, items: string[] | undefined, prettify = true) =>
@@ -167,24 +158,6 @@ function CharacterModal({ char, ctx, onClose }: Props) {
           {profLine('Prepared', char.prepared_spells)}
         </Section>
       )}
-
-      {/* Equipment */}
-      <Section title="EQUIPMENT">
-        <p className={styles.charSheetLine}>
-          <span style={{ color: 'var(--t-dim)' }}>Weapon:</span> {weapon?.name ?? '—'}
-        </p>
-        <p className={styles.charSheetLine}>
-          <span style={{ color: 'var(--t-dim)' }}>Armor:</span> {armor?.name ?? '—'}
-        </p>
-        <p className={styles.charSheetLine}>
-          <span style={{ color: 'var(--t-dim)' }}>Shield:</span> {shield?.name ?? '—'}
-        </p>
-        {attuned.length > 0 && (
-          <p className={styles.charSheetLine}>
-            <span style={{ color: 'var(--t-dim)' }}>Attuned:</span> {attuned.join(', ')}
-          </p>
-        )}
-      </Section>
     </Dialog>
   );
 }
