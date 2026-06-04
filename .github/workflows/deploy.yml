@@ -211,6 +211,15 @@ jobs:
           else
             echo "IMAGE_TAG=$IMAGE_TAG" >> .env
           fi
+          # Reclaim disk BEFORE pulling. Each deploy tags images by commit SHA;
+          # `docker image prune -f` only removes *dangling* images, so the old
+          # tagged ones were never collected and piled up until the host ran out
+          # of space ("no space left on device" while extracting a layer).
+          # `system prune -af` drops every image not used by a running container
+          # (the live containers keep theirs) — but NOT volumes, so the Postgres
+          # data volume is safe. This both frees the backlog now and prevents
+          # future accumulation.
+          docker system prune -af || true
           docker compose -f docker-compose.prod.yml --env-file .env pull backend frontend
           docker compose -f docker-compose.prod.yml --env-file .env up -d --remove-orphans
           docker image prune -f
