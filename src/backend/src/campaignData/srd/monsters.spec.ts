@@ -44,6 +44,18 @@ const NEW_MONSTERS: Array<[string, number, number, number, string, number, numbe
   ['fire_giant', 9, 162, 18, '4d6+7', 11, 5000, 2],
   ['cloud_giant', 9, 200, 14, '3d8+8', 12, 5000, 2],
   ['young_red_dragon', 10, 178, 18, '2d6+6', 10, 5900, 3],
+  // Batch: martial/beast/monstrosity additions (CR 1/2 → 8).
+  ['ape', 0.5, 19, 12, '1d4+3', 5, 100, 2],
+  ['tiger', 1, 30, 13, '2d6+3', 5, 200],
+  ['spy', 1, 27, 12, '1d6+2', 4, 200],
+  ['pegasus', 2, 59, 12, '1d6+4', 6, 450],
+  ['giant_constrictor_snake', 2, 60, 12, '2d6+4', 6, 450],
+  ['knight', 3, 52, 18, '2d6+3', 5, 700, 2],
+  ['doppelganger', 3, 52, 14, '2d6+4', 6, 700, 2],
+  ['hell_hound', 3, 58, 15, '1d8+3', 5, 700, 2],
+  ['bulette', 5, 94, 17, '2d12+4', 7, 1800, 2],
+  ['mammoth', 6, 126, 13, '2d10+7', 10, 2300, 2],
+  ['assassin', 8, 97, 16, '1d6+4', 7, 3900, 3],
 ];
 
 describe('SRD bestiary additions — core stat lines', () => {
@@ -276,6 +288,60 @@ describe('SRD bestiary additions — effect fields', () => {
     expect(p.multiattack).toBe(2);
     expect(p.resistances).toEqual(['cold']);
     expect(p.damageType).toBe('slashing');
+  });
+
+  it('Tiger knocks Prone on a hit (auto, no save)', () => {
+    expect(SRD_MONSTERS.tiger.onHitEffect).toEqual({ condition: 'prone' });
+    expect(SRD_MONSTERS.tiger.darkvision_ft).toBe(60);
+  });
+
+  it('Spy carries a poison damage rider', () => {
+    expect(SRD_MONSTERS.spy.bonusDamage).toBe('2d6');
+    expect(SRD_MONSTERS.spy.bonusDamageType).toBe('poison');
+  });
+
+  it('Pegasus is a fast radiant-hooved flyer', () => {
+    expect(SRD_MONSTERS.pegasus.speedFt).toBe(90);
+    expect(SRD_MONSTERS.pegasus.bonusDamageType).toBe('radiant');
+  });
+
+  it('Giant Constrictor Snake grapples on a hit (escape DC 14) at 10-ft reach', () => {
+    expect(SRD_MONSTERS.giant_constrictor_snake.onHitEffect).toMatchObject({
+      condition: 'grappled',
+      escapeDc: 14,
+    });
+    expect(SRD_MONSTERS.giant_constrictor_snake.attackReachFt).toBe(10);
+  });
+
+  it('Knight parries (+2), is frighten-immune, and smites for bonus radiant', () => {
+    expect(SRD_MONSTERS.knight.parry).toBe(true);
+    expect(SRD_MONSTERS.knight.parryBonus).toBe(2);
+    expect(SRD_MONSTERS.knight.condition_immunities).toContain('frightened');
+    expect(SRD_MONSTERS.knight.bonusDamageType).toBe('radiant');
+  });
+
+  it('Doppelganger is charm-immune with two slam attacks', () => {
+    expect(SRD_MONSTERS.doppelganger.condition_immunities).toContain('charmed');
+    expect(SRD_MONSTERS.doppelganger.multiattack).toBe(2);
+  });
+
+  it('Hell Hound: Pack Tactics, fire-immune, fire rider + a Fire Breath cone', () => {
+    expect(SRD_MONSTERS.hell_hound.packTactics).toBe(true);
+    expect(SRD_MONSTERS.hell_hound.immunities).toEqual(['fire']);
+    expect(SRD_MONSTERS.hell_hound.bonusDamageType).toBe('fire');
+    expect(SRD_MONSTERS.hell_hound.breathWeapon).toMatchObject({
+      dice: '5d6',
+      damageType: 'fire',
+      savingThrow: 'dex',
+      saveDC: 12,
+    });
+  });
+
+  it('Assassin: 3 attacks, poison rider + Poisoned on hit, poison-resistant', () => {
+    expect(SRD_MONSTERS.assassin.multiattack).toBe(3);
+    expect(SRD_MONSTERS.assassin.bonusDamage).toBe('5d6');
+    expect(SRD_MONSTERS.assassin.onHitEffect).toEqual({ condition: 'poisoned' });
+    expect(SRD_MONSTERS.assassin.resistances).toEqual(['poison']);
   });
 
   it('the shared pool grew well past the original 12', () => {

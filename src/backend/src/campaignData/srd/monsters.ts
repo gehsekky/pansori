@@ -189,6 +189,63 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
 
   // ─── CR 1 ──────────────────────────────────────────────────────────────────
+  ape: {
+    name: 'Ape',
+    cr: 0.5,
+    hp: 19,
+    ac: 12,
+    damage: '1d4+3',
+    toHit: 5,
+    xp: 100,
+    str: 16,
+    dex: 14,
+    con: 14,
+    int: 6,
+    wis: 12,
+    cha: 7,
+    multiattack: 2,
+    damageType: 'bludgeoning',
+    darkvision_ft: 0, // beast — no darkvision
+  },
+  tiger: {
+    name: 'Tiger',
+    cr: 1,
+    hp: 30,
+    ac: 13,
+    damage: '2d6+3',
+    toHit: 5,
+    xp: 200,
+    str: 17,
+    dex: 16,
+    con: 14,
+    int: 3,
+    wis: 12,
+    cha: 8,
+    damageType: 'slashing',
+    darkvision_ft: 60,
+    // SRD: Rend knocks a Large-or-smaller target Prone on a hit (no save).
+    onHitEffect: { condition: 'prone' },
+  },
+  spy: {
+    name: 'Spy',
+    darkvision_ft: 0, // human — no darkvision
+    cr: 1,
+    hp: 27,
+    ac: 12,
+    damage: '1d6+2',
+    toHit: 4,
+    xp: 200,
+    str: 10,
+    dex: 15,
+    con: 10,
+    int: 12,
+    wis: 14,
+    cha: 16,
+    damageType: 'piercing',
+    // Poison-coated blade: +2d6 poison per hit.
+    bonusDamage: '2d6',
+    bonusDamageType: 'poison',
+  },
   ghoul: {
     name: 'Ghoul',
     cr: 1,
@@ -226,6 +283,48 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
 
   // ─── CR 2 ──────────────────────────────────────────────────────────────────
+  pegasus: {
+    name: 'Pegasus',
+    darkvision_ft: 0, // celestial — keen sight, no darkvision
+    cr: 2,
+    hp: 59,
+    ac: 12,
+    damage: '1d6+4',
+    toHit: 6,
+    xp: 450,
+    str: 18,
+    dex: 15,
+    con: 16,
+    int: 10,
+    wis: 15,
+    cha: 13,
+    speedFt: 90, // fly
+    damageType: 'bludgeoning',
+    // Radiant-touched hooves: +2d4 radiant per hit.
+    bonusDamage: '2d4',
+    bonusDamageType: 'radiant',
+  },
+  giant_constrictor_snake: {
+    name: 'Giant Constrictor Snake',
+    cr: 2,
+    hp: 60,
+    ac: 12,
+    damage: '2d6+4',
+    toHit: 6,
+    xp: 450,
+    str: 19,
+    dex: 14,
+    con: 12,
+    int: 1,
+    wis: 10,
+    cha: 3,
+    attackReachFt: 10,
+    damageType: 'piercing',
+    // SRD: Constrict — the bite coils the target, Grappling it (escape DC 14).
+    // (Blindsight is approximated by the default darkvision, so it fights in
+    // the dark without penalty.)
+    onHitEffect: { condition: 'grappled', escapeDc: 14 },
+  },
   cult_fanatic: {
     name: 'Cult Fanatic',
     darkvision_ft: 0, // human — no darkvision
@@ -685,6 +784,83 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   // Fliers, big beasts, a second grapple-on-hit, a full undead kit, and the
   // first CR 5 brute. All use already-supported fields; per-monster special
   // actions are noted as deferred where the engine can't yet express them.
+  knight: {
+    name: 'Knight',
+    darkvision_ft: 0, // human — no darkvision
+    cr: 3,
+    hp: 52,
+    ac: 18,
+    damage: '2d6+3',
+    toHit: 5,
+    xp: 700,
+    str: 16,
+    dex: 11,
+    con: 14,
+    int: 11,
+    wis: 11,
+    cha: 15,
+    multiattack: 2,
+    damageType: 'slashing',
+    // Oath-blessed blade: +1d8 radiant per hit.
+    bonusDamage: '1d8',
+    bonusDamageType: 'radiant',
+    condition_immunities: ['frightened'],
+    // SRD: Parry — reaction, +2 AC vs one melee attack that hits while armed.
+    parry: true,
+    parryBonus: 2,
+  },
+  doppelganger: {
+    name: 'Doppelganger',
+    cr: 3,
+    hp: 52,
+    ac: 14,
+    damage: '2d6+4',
+    toHit: 6,
+    xp: 700,
+    str: 11,
+    dex: 18,
+    con: 14,
+    int: 11,
+    wis: 12,
+    cha: 14,
+    multiattack: 2,
+    damageType: 'bludgeoning',
+    condition_immunities: ['charmed'],
+    darkvision_ft: 60,
+    // Shape-Shift / Read Thoughts / Unsettling Visage are non-combat flavor
+    // (deferred); the two Slam attacks carry the fight.
+  },
+  hell_hound: {
+    name: 'Hell Hound',
+    cr: 3,
+    hp: 58,
+    ac: 15,
+    damage: '1d8+3',
+    toHit: 5,
+    xp: 700,
+    str: 17,
+    dex: 12,
+    con: 14,
+    int: 6,
+    wis: 13,
+    cha: 6,
+    multiattack: 2,
+    speedFt: 50,
+    damageType: 'piercing',
+    bonusDamage: '1d6',
+    bonusDamageType: 'fire',
+    immunities: ['fire'],
+    packTactics: true,
+    darkvision_ft: 60,
+    breathWeapon: {
+      name: 'Fire Breath',
+      dice: '5d6',
+      damageType: 'fire',
+      savingThrow: 'dex',
+      saveDC: 12,
+      rechargeMin: 5, // Recharge 5–6
+    },
+  },
   hippogriff: {
     name: 'Hippogriff',
     darkvision_ft: 0, // relies on sight — no darkvision
@@ -1117,6 +1293,25 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     bonusDamageType: 'fire',
     aura: { radiusFt: 5, damage: '2d6', damageType: 'fire', name: 'Fire Aura' },
   },
+  bulette: {
+    name: 'Bulette',
+    cr: 5,
+    hp: 94,
+    ac: 17,
+    damage: '2d12+4',
+    toHit: 7,
+    xp: 1800,
+    str: 19,
+    dex: 11,
+    con: 21,
+    int: 2,
+    wis: 10,
+    cha: 5,
+    multiattack: 2,
+    speedFt: 40,
+    damageType: 'piercing',
+    darkvision_ft: 60,
+  },
   wyvern: {
     name: 'Wyvern',
     darkvision_ft: 120,
@@ -1151,6 +1346,26 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   // melee attack is the signature, like the Wyvern's Sting.
 
   // SRD: Stone Giant (CR 7) — two Stone Club attacks at 15-ft reach.
+  mammoth: {
+    name: 'Mammoth',
+    cr: 6,
+    hp: 126,
+    ac: 13,
+    damage: '2d10+7',
+    toHit: 10,
+    xp: 2300,
+    str: 24,
+    dex: 9,
+    con: 21,
+    int: 3,
+    wis: 11,
+    cha: 6,
+    multiattack: 2,
+    speedFt: 50,
+    attackReachFt: 10,
+    damageType: 'piercing',
+    darkvision_ft: 0, // beast — no darkvision
+  },
   stone_giant: {
     name: 'Stone Giant',
     cr: 7,
@@ -1206,6 +1421,29 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   // SRD: Frost Giant (CR 8) — two Frost Axe attacks (slashing + 2d8 cold rider);
   // Cold-immune. (Great Bow + War Cry bonus action deferred.)
+  assassin: {
+    name: 'Assassin',
+    darkvision_ft: 0, // human — no darkvision
+    cr: 8,
+    hp: 97,
+    ac: 16,
+    damage: '1d6+4',
+    toHit: 7,
+    xp: 3900,
+    str: 11,
+    dex: 18,
+    con: 14,
+    int: 16,
+    wis: 11,
+    cha: 10,
+    multiattack: 3,
+    damageType: 'piercing',
+    // Poisoned blade: +5d6 poison and the Poisoned condition on each hit.
+    bonusDamage: '5d6',
+    bonusDamageType: 'poison',
+    onHitEffect: { condition: 'poisoned' },
+    resistances: ['poison'],
+  },
   frost_giant: {
     name: 'Frost Giant',
     cr: 8,
