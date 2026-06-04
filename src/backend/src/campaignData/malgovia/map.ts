@@ -1121,6 +1121,7 @@ export const regions: Region[] = [
         pos: { x: 10, y: 5 }, // on the eastern road, climbing north out of Millhaven
         kind: 'local',
         entryRoomId: 'old_road',
+        icon: 'direction-signs',
       },
       {
         id: 'site_bandit_camp',
