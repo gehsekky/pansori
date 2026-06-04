@@ -64,20 +64,38 @@ function transitionGlyph(t: MapTransition): string {
 // ride in the tooltip) so local rooms don't get crowded.
 const LABELLED_KINDS = new Set<MapTransition['kind']>(['site', 'venue']);
 
-// On the overland (regional) map, these terrain types render a game-icons.net
-// glyph (over the type's tint) instead of the plain unicode glyph / bare tint.
-// A trial we're extending terrain by terrain; town/local maps are unaffected.
-const REGIONAL_TERRAIN_ICON: Partial<Record<TerrainType, { name: string; color: string }>> = {
+// game-icons glyphs for typed terrain (drawn over the type's tint instead of a
+// plain unicode glyph / bare tint). Applies on EVERY map level — overland, town,
+// and local. Floor/ground types (plains, cobblestone) keep just their tint; only
+// terrain "features" carry an icon.
+const TERRAIN_ICON: Partial<Record<TerrainType, { name: string; color: string }>> = {
   forest: { name: 'forest', color: 'rgba(34, 92, 34, 0.92)' },
-  water: { name: 'wave-crest', color: 'rgba(150, 205, 245, 0.95)' }, // light blue, lighter than the tint
-  mountain: { name: 'peaks', color: 'rgba(214, 210, 202, 0.95)' }, // light stone, over the dark tint
+  water: { name: 'wave-crest', color: 'rgba(150, 205, 245, 0.95)' }, // light blue over the tint
+  mountain: { name: 'peaks', color: 'rgba(214, 210, 202, 0.95)' }, // light stone over the dark tint
   hills: { name: 'hills', color: 'rgba(140, 165, 100, 0.92)' }, // grassy green over the tan tint
   road: { name: 'path-tile', color: 'rgba(214, 188, 140, 0.95)' }, // sandy path over the tan tint
+  swamp: { name: 'high-grass', color: 'rgba(150, 170, 110, 0.9)' }, // reedy marsh
+  snow: { name: 'snowflake-1', color: 'rgba(220, 235, 250, 0.95)' }, // icy north
+  garden: { name: 'flowers', color: 'rgba(150, 200, 120, 0.95)' }, // tended town greenery
+  town_wall: { name: 'brick-wall', color: 'rgba(150, 138, 120, 0.95)' }, // impassable masonry
+};
+
+// game-icons glyphs for non-site transitions (town venues + local room exits /
+// ascents). Sites are handled separately (towns → village, dungeons → their
+// authored icon, below).
+const TRANSITION_ICON: Partial<Record<MapTransition['kind'], { name: string; color: string }>> = {
+  venue: { name: 'house', color: 'rgba(222, 190, 120, 0.97)' }, // a building you can enter
+  room_exit: { name: 'wooden-door', color: 'rgba(206, 198, 182, 0.95)' }, // passage to another room
+  ascend: { name: 'return-arrow', color: 'rgba(206, 198, 182, 0.95)' }, // back up a level
 };
 
 // Local sites (dungeons) on the overland map: the game-icons glyph defaults to
 // this and is overridden per site via MapSite.icon (carried on the transition).
 const DEFAULT_SITE_ICON = 'dungeon-gate';
+// Town settlement glyph (regional site carrying toTownId).
+const TOWN_ICON = { name: 'village', color: 'rgba(222, 190, 120, 0.97)' };
+// Stone tone shared by dungeon-site + room-exit glyphs.
+const SITE_STONE = 'rgba(206, 198, 182, 0.95)';
 
 // Out of combat an enemy carries no grid position (positions are assigned only
 // when combat deploys tokens). Pick a single cell near the party for the red
@@ -174,6 +192,9 @@ function GridMapView({
   // (undefined ⇒ no inline override).
   const glyphFont =
     grid.level === 'regional' ? '2.7rem' : grid.level === 'town' ? '2rem' : undefined;
+  // game-icons read a touch small vs a plain glyph, so size them ~25% over the
+  // cell glyph font (shared by terrain / site / transition / marker icons).
+  const iconFontSize = glyphFont ? `calc(${glyphFont} * 1.25)` : undefined;
   const obstacleSet = new Set(grid.obstacles.map((o) => `${o.x},${o.y}`));
   const transitionAt = new Map<string, MapTransition>();
   for (const t of grid.transitions) transitionAt.set(`${t.pos.x},${t.pos.y}`, t);
@@ -294,17 +315,17 @@ function GridMapView({
           <GameIcon
             name="swords-emblem"
             className={styles.gridMapGlyph}
-            style={{
-              fontSize: glyphFont ? `calc(${glyphFont} * 1.25)` : undefined,
-              color: 'rgba(100, 170, 250, 1)', // party blue
-            }}
+            style={{ fontSize: iconFontSize, color: 'rgba(100, 170, 250, 1)' }} // party blue
           />
         );
       } else if (isEnemyMarker) {
+        // The "hostile here" marker (out of combat) — a red threat glyph.
         token = (
-          <span className={styles.gridToken} style={{ background: 'rgba(220, 70, 70, 0.9)' }}>
-            <span className={styles.gridTokenLetter}>!</span>
-          </span>
+          <GameIcon
+            name="daemon-skull"
+            className={styles.gridMapGlyph}
+            style={{ fontSize: iconFontSize, color: 'rgba(230, 80, 80, 1)' }}
+          />
         );
       } else if (isNpc) {
         // A talkable NPC: a gold token with the name's initial + a name label.
@@ -322,30 +343,23 @@ function GridMapView({
         );
       } else if (transition) {
         // A travel destination always shows its own glyph — even if terrain is
-        // painted on the same cell — so a site never hides behind a tint glyph.
-        // Towns (a site carrying `toTownId`) use the village glyph; local sites
-        // (dungeons) use their authored icon (default DEFAULT_SITE_ICON); every
-        // other transition (venue / room exit / ascend) keeps its unicode glyph.
+        // painted on the same cell — so it never hides behind a tint glyph.
+        // Towns → village; local dungeon sites → their authored icon (default);
+        // town venues / local room exits / ascents → their TRANSITION_ICON glyph.
         const isTown = transition.kind === 'site' && !!transition.toTownId;
         const isLocalSite = transition.kind === 'site' && !transition.toTownId;
-        const siteIcon = isTown
-          ? 'village'
+        const transIcon = isTown
+          ? TOWN_ICON
           : isLocalSite
-            ? (transition.icon ?? DEFAULT_SITE_ICON)
-            : null;
-        const siteColor = isTown
-          ? 'rgba(222, 190, 120, 0.97)' // warm settlement gold
-          : 'rgba(206, 198, 182, 0.95)'; // weathered stone
+            ? { name: transition.icon ?? DEFAULT_SITE_ICON, color: SITE_STONE }
+            : (TRANSITION_ICON[transition.kind] ?? null);
         token = (
           <>
-            {siteIcon ? (
+            {transIcon ? (
               <GameIcon
-                name={siteIcon}
+                name={transIcon.name}
                 className={styles.gridMapGlyph}
-                style={{
-                  fontSize: glyphFont ? `calc(${glyphFont} * 1.25)` : undefined,
-                  color: siteColor,
-                }}
+                style={{ fontSize: iconFontSize, color: transIcon.color }}
               />
             ) : (
               <span
@@ -363,20 +377,15 @@ function GridMapView({
             )}
           </>
         );
-      } else if (isRegional && terrainType && REGIONAL_TERRAIN_ICON[terrainType]) {
-        // game-icons.net glyph for selected overland terrain (forest, water, …),
-        // drawn over the type's tint instead of the plain unicode glyph.
-        const ic = REGIONAL_TERRAIN_ICON[terrainType]!;
+      } else if (terrainType && TERRAIN_ICON[terrainType]) {
+        // game-icons glyph for a typed terrain feature (drawn over the tint),
+        // on every map level.
+        const ic = TERRAIN_ICON[terrainType]!;
         token = (
           <GameIcon
             name={ic.name}
             className={styles.gridMapGlyph}
-            // A detailed icon reads smaller than a plain glyph at the same size,
-            // so bump it ~25% over the cell glyph font to fill the tile.
-            style={{
-              fontSize: glyphFont ? `calc(${glyphFont} * 1.25)` : undefined,
-              color: ic.color,
-            }}
+            style={{ fontSize: iconFontSize, color: ic.color }}
           />
         );
       } else if (tStyle?.glyph) {

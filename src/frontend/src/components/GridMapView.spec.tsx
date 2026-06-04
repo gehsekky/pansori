@@ -345,4 +345,52 @@ describe('GridMapView', () => {
     expect(queryByText('Sister Maren')).toBeNull();
     expect(cell(container, 3, 2).getAttribute('aria-current')).toBe('location');
   });
+
+  it('renders terrain glyphs on non-regional (town / local) grids too', () => {
+    // The terrain-icon branch is no longer regional-only: a town/local grid with
+    // typed terrain shows the same game-icons glyphs.
+    const townGrid: ActiveGrid = {
+      level: 'town',
+      id: 'pinegate',
+      name: 'Pinegate',
+      width: 6,
+      height: 6,
+      feetPerSquare: 5,
+      terrain: [
+        { pos: { x: 1, y: 1 }, type: 'water' },
+        { pos: { x: 2, y: 1 }, type: 'town_wall' },
+        { pos: { x: 3, y: 1 }, type: 'garden' },
+      ],
+      obstacles: [],
+      startPos: { x: 0, y: 5 },
+      transitions: [],
+    };
+    const { container } = render(<GridMapView grid={townGrid} markerPos={{ x: 0, y: 5 }} />);
+    expect(cell(container, 1, 1).querySelector('.game-icon-wave-crest')).toBeTruthy();
+    expect(cell(container, 2, 1).querySelector('.game-icon-brick-wall')).toBeTruthy();
+    expect(cell(container, 3, 1).querySelector('.game-icon-flowers')).toBeTruthy();
+  });
+
+  it('renders game-icons glyphs for town venues, room exits, and ascents', () => {
+    const venueGrid: ActiveGrid = {
+      ...localGrid,
+      transitions: [
+        { pos: { x: 1, y: 1 }, kind: 'venue', label: 'The Mug' },
+        { pos: { x: 2, y: 1 }, kind: 'room_exit', label: 'East Passage' },
+        { pos: { x: 3, y: 1 }, kind: 'ascend', label: 'Leave' },
+      ],
+    };
+    const { container } = render(<GridMapView grid={venueGrid} markerPos={{ x: 3, y: 6 }} />);
+    expect(cell(container, 1, 1).querySelector('.game-icon-house')).toBeTruthy();
+    expect(cell(container, 2, 1).querySelector('.game-icon-wooden-door')).toBeTruthy();
+    expect(cell(container, 3, 1).querySelector('.game-icon-return-arrow')).toBeTruthy();
+  });
+
+  it('renders the enemy marker as a red game-icons glyph (not a letter token)', () => {
+    const { container } = render(
+      <GridMapView grid={grid} markerPos={{ x: 0, y: 0 }} enemyPresent />
+    );
+    const enemyCell = container.querySelector('[aria-label*="an enemy"]') as HTMLElement;
+    expect(enemyCell.querySelector('.game-icon-daemon-skull')).toBeTruthy();
+  });
 });
