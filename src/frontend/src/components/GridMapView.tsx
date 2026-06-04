@@ -1,4 +1,5 @@
 import type { ActiveGrid, GridPos, MapTransition, TerrainType } from '../types';
+import GameIcon from './GameIcon';
 import { TERRAIN } from '../types';
 import { TERRAIN_STYLE } from '../lib/terrainStyle';
 import styles from '../styles.module.css';
@@ -304,6 +305,17 @@ function GridMapView({
           >
             {tStyle.glyph}
           </span>
+        );
+      } else if (isRegional && terrainType === 'forest') {
+        // Test: a game-icons.net tree glyph for forest tiles on the overland
+        // map (over the green tint). If it reads well we'll extend it to other
+        // terrain types / map levels.
+        token = (
+          <GameIcon
+            name="forest"
+            className={styles.gridMapGlyph}
+            style={{ fontSize: glyphFont, color: 'rgba(34, 92, 34, 0.92)' }}
+          />
         );
       } else if (isObstacle && isRegional) {
         // Legacy (untyped) regional obstacle reads as a mountain peak.

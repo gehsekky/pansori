@@ -150,6 +150,12 @@ describe('GridMapView', () => {
     expect(getByText('mountains')).toBeTruthy();
   });
 
+  it('renders the game-icons forest glyph on a regional forest tile', () => {
+    // terrainGrid has a forest at (1,2) on a regional grid.
+    const { container } = render(<GridMapView grid={terrainGrid} markerPos={{ x: 0, y: 0 }} />);
+    expect(cell(container, 1, 2).querySelector('.game-icon-forest')).toBeTruthy();
+  });
+
   it('highlights the party current cell with the current-cell class', () => {
     const { container } = render(<GridMapView grid={grid} markerPos={{ x: 1, y: 1 }} />);
     const here = cell(container, 1, 1);
