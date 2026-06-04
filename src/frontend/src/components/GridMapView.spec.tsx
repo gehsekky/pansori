@@ -182,7 +182,7 @@ describe('GridMapView', () => {
       <GridMapView grid={terrainGrid} markerPos={{ x: 0, y: 0 }} onMarkerMove={onMarkerMove} />
     );
     // Impassable terrain carries a glyph and is not clickable.
-    expect(cell(container, 2, 0).textContent).toContain('▲'); // mountain
+    expect(cell(container, 2, 0).querySelector('.game-icon-peaks')).toBeTruthy(); // mountain
     // Water uses the game-icons waves glyph (still impassable / non-clickable).
     expect(cell(container, 3, 1).querySelector('.game-icon-waves')).toBeTruthy();
     expect(cell(container, 2, 0).getAttribute('role')).toBe('gridcell');

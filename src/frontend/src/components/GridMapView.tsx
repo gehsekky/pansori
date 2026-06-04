@@ -65,6 +65,7 @@ const LABELLED_KINDS = new Set<MapTransition['kind']>(['site', 'venue']);
 const REGIONAL_TERRAIN_ICON: Partial<Record<TerrainType, { name: string; color: string }>> = {
   forest: { name: 'forest', color: 'rgba(34, 92, 34, 0.92)' },
   water: { name: 'waves', color: 'rgba(150, 205, 245, 0.95)' }, // light blue, lighter than the tint
+  mountain: { name: 'peaks', color: 'rgba(214, 210, 202, 0.95)' }, // light stone, over the dark tint
 };
 
 // Local sites (dungeons) on the overland map: the game-icons glyph defaults to
