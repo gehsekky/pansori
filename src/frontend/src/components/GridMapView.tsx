@@ -314,7 +314,12 @@ function GridMapView({
           <GameIcon
             name="forest"
             className={styles.gridMapGlyph}
-            style={{ fontSize: glyphFont, color: 'rgba(34, 92, 34, 0.92)' }}
+            // A detailed icon reads smaller than a plain glyph at the same size,
+            // so bump it ~25% over the cell glyph font to fill the tile.
+            style={{
+              fontSize: glyphFont ? `calc(${glyphFont} * 1.25)` : undefined,
+              color: 'rgba(34, 92, 34, 0.92)',
+            }}
           />
         );
       } else if (isObstacle && isRegional) {
