@@ -3665,9 +3665,9 @@ export function npcIsKilled(state: GameState, npcId: string): boolean {
  * Whether this NPC's dialogue tree actually OFFERS a given quest — i.e. some
  * response (at any nesting depth) advances it via an `advance_quest`
  * consequence. Drives the "quest available" [!] marker so a giver who also owns
- * a follow-up quest that auto-activates from the world (e.g. the Silent Grove's
- * `quest_break_trickster`, triggered by killing the trickster — never offered in
- * dialogue) doesn't keep flagging [!] after the dialogue quest is accepted.
+ * a quest that only advances from the world (a step keyed on a kill / loot /
+ * room-visit, never offered in dialogue) doesn't keep flagging [!] after the
+ * dialogue quest is accepted.
  */
 export function npcDialogueOffersQuest(npc: PlacedNpc, questId: string): boolean {
   const walk = (responses: NpcDialogueResponse[] | undefined): boolean =>
@@ -3776,6 +3776,44 @@ function shopBuyChoices(npc: PlacedNpc, state: GameState, context: Context): Gam
   return out;
 }
 
+// ── XP thresholds (SRD 5.2.1 Character Advancement) ─────────────────────────
+// Total XP required to BE at each level. A character at level L advances when
+// their total XP reaches the entry for L+1. Index 0 is unused; index 1 = 0.
+// (Replaces the old compressed `level × 100` curve, which let a single quest
+// reward vault a character several levels at once.)
+export const XP_FOR_LEVEL: readonly number[] = [
+  0, // (unused index 0)
+  0, // L1
+  300, // L2
+  900, // L3
+  2_700, // L4
+  6_500, // L5
+  14_000, // L6
+  23_000, // L7
+  34_000, // L8
+  48_000, // L9
+  64_000, // L10
+  85_000, // L11
+  100_000, // L12
+  120_000, // L13
+  140_000, // L14
+  165_000, // L15
+  195_000, // L16
+  225_000, // L17
+  265_000, // L18
+  305_000, // L19
+  355_000, // L20
+];
+
+/**
+ * Total XP required to reach `level` per the SRD 5.2.1 Character Advancement
+ * table. Levels at or below 1 need 0; levels past 20 clamp to the L20 entry.
+ */
+export function xpForLevel(level: number): number {
+  if (level <= 1) return 0;
+  return XP_FOR_LEVEL[Math.min(20, level)] ?? XP_FOR_LEVEL[20];
+}
+
 // ── Player-driven leveling (the leveling pane) ──────────────────────────────
 // What level-up work a character has, in resolution order. Pending picks
 // (ASI / weapon mastery from a prior advance) resolve BEFORE advancing again.
@@ -3783,7 +3821,8 @@ export function levelUpWorkFor(char: Character): 'advance' | 'asi' | 'mastery' |
   if (char.dead) return null;
   if (char.asi_pending) return 'asi';
   if ((char.weapon_mastery_pending ?? 0) > 0) return 'mastery';
-  if ((char.xp ?? 0) >= (char.level ?? 1) * 100 && (char.level ?? 1) < 20) return 'advance';
+  const level = char.level ?? 1;
+  if (level < 20 && (char.xp ?? 0) >= xpForLevel(level + 1)) return 'advance';
   return null;
 }
 

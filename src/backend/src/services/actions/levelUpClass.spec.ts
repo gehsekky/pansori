@@ -25,7 +25,7 @@ const minimalSeed: Seed = {
 
 describe('level_up_class — XP gating', () => {
   it('rejects when XP is below the next-level threshold', async () => {
-    const pc = makeChar({ id: 'pc-1', character_class: 'Fighter', level: 3, xp: 200 });
+    const pc = makeChar({ id: 'pc-1', character_class: 'Fighter', level: 3, xp: 2600 });
     const state = {
       ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall' }),
       characters: [pc],
@@ -38,7 +38,7 @@ describe('level_up_class — XP gating', () => {
       seed: minimalSeed,
       context: ctx,
     });
-    // Level 3 → needs 300 XP, have 200, need 100 more.
+    // Level 3 → L4 needs 2700 XP (SRD table), have 2600, need 100 more.
     expect(result.narrative).toMatch(/needs 100 more XP/);
     expect(result.newState.characters[0].level).toBe(3);
   });
@@ -61,7 +61,7 @@ describe('level_up_class — XP gating', () => {
   });
 
   it('rejects mid-combat', async () => {
-    const pc = makeChar({ id: 'pc-1', character_class: 'Fighter', level: 3, xp: 400 });
+    const pc = makeChar({ id: 'pc-1', character_class: 'Fighter', level: 3, xp: 2700 });
     const state = {
       ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: true }),
       characters: [pc],
@@ -85,7 +85,7 @@ describe('level_up_class — multiclass prereqs', () => {
       id: 'pc-1',
       character_class: 'Fighter',
       level: 3,
-      xp: 400,
+      xp: 2700,
       str: 10,
       dex: 10,
     });
@@ -110,7 +110,7 @@ describe('level_up_class — multiclass prereqs', () => {
       id: 'pc-1',
       character_class: 'Fighter',
       level: 3,
-      xp: 400,
+      xp: 2700,
       int: 10,
     });
     const state = {
@@ -134,7 +134,7 @@ describe('level_up_class — multiclass prereqs', () => {
       id: 'pc-1',
       character_class: 'Fighter',
       level: 3,
-      xp: 400,
+      xp: 2700,
       int: 13,
     });
     const state = {
@@ -161,7 +161,7 @@ describe('level_up_class — ASI gating', () => {
       id: 'pc-1',
       character_class: 'Fighter',
       level: 3,
-      xp: 400,
+      xp: 2700,
       class_levels: { fighter: 3 },
     });
     const state = {
@@ -186,7 +186,7 @@ describe('level_up_class — ASI gating', () => {
       id: 'pc-1',
       character_class: 'Fighter',
       level: 3,
-      xp: 400,
+      xp: 2700,
       int: 13,
       class_levels: { fighter: 3 },
     });
@@ -214,7 +214,7 @@ describe('level_up_class — multiclass proficiency grants', () => {
       id: 'pc-1',
       character_class: 'Fighter',
       level: 3,
-      xp: 400,
+      xp: 2700,
       int: 13,
       armor_proficiencies: ['light', 'medium', 'heavy', 'shield'],
       weapon_proficiencies: ['simple', 'martial'],
@@ -245,7 +245,7 @@ describe('level_up_class — multiclass proficiency grants', () => {
       id: 'pc-1',
       character_class: 'Wizard',
       level: 3,
-      xp: 400,
+      xp: 2700,
       wis: 13,
       armor_proficiencies: [], // Wizards start with no armor
       weapon_proficiencies: ['simple'],
@@ -272,7 +272,7 @@ describe('level_up_class — multiclass proficiency grants', () => {
       id: 'pc-1',
       character_class: 'Fighter',
       level: 4,
-      xp: 500,
+      xp: 6500,
       str: 13,
       class_levels: { fighter: 3, cleric: 1 },
       armor_proficiencies: ['light', 'medium', 'heavy', 'shield'],
@@ -301,7 +301,7 @@ describe('level_up_class — spell-slot recompute on multiclass', () => {
       id: 'pc-1',
       character_class: 'Wizard',
       level: 3,
-      xp: 400,
+      xp: 2700,
       str: 13,
       class_levels: { wizard: 3 },
       spell_slots_max: { 1: 4, 2: 2 },
@@ -329,7 +329,7 @@ describe('level_up_class — spell-slot recompute on multiclass', () => {
       id: 'pc-1',
       character_class: 'Paladin',
       level: 4,
-      xp: 500,
+      xp: 6500,
       int: 13,
       class_levels: { paladin: 4 },
       spell_slots_max: { 1: 3 }, // half-caster L4 → caster level 2 row

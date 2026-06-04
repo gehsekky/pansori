@@ -450,12 +450,14 @@ export const quests: Quest[] = [
   {
     id: 'quest_silent_grove',
     title: 'The Silent Grove',
-    desc: "Old Elise needs someone to walk Mareth's path. Reach the Ancient Oak and find what silenced her.",
+    desc: "Old Elise needs someone to walk Mareth's path: reach the Ancient Oak, defeat the Fey Trickster that silenced her, and recover the Oak's heart.",
     // Discovered (not startActive) — Old Elise hands it over when you reach
-    // Pinegate; it's the beginner grove arc proper.
+    // Pinegate; it's the beginner grove arc proper. The full arc (defeat the
+    // Trickster + recover the heart) is one quest — the former separate
+    // "Break the Trickster's Hold" was redundant (same kill trigger).
     giverNpcId: 'npc_elise_elder',
     factionId: 'faction_verdant',
-    repGain: 15,
+    repGain: 45,
     steps: [
       {
         id: 'step_talk_elise',
@@ -495,49 +497,26 @@ export const quests: Quest[] = [
           all: [{ fact: 'enemies_killed', operator: 'contains', value: 'ancient_oak#0' }],
         },
       },
-    ],
-    rewards: [
-      { type: 'give_gold', amount: 100 },
-      { type: 'give_xp', amount: 350 },
-      // Faction rep bumped via `repGain: 15` above.
       {
-        type: 'add_narrative',
-        text: "Old Elise presses your hand in both of hers. 'The Verdant Circle remembers you.'",
-      },
-    ],
-  },
-  {
-    id: 'quest_break_trickster',
-    title: "Break the Trickster's Hold",
-    desc: "The Fey Trickster has bound the Ancient Oak. Defeat it and recover the Oak's heart.",
-    giverNpcId: 'npc_elise_elder',
-    factionId: 'faction_verdant',
-    repGain: 30,
-    steps: [
-      {
-        id: 'step_kill_trickster',
-        desc: 'Defeat the Fey Trickster at the Ancient Oak.',
-        condition: {
-          all: [{ fact: 'enemies_killed', operator: 'contains', value: 'ancient_oak#0' }],
-        },
-      },
-      {
+        // With the Trickster slain, recover the Oak's heart to fully mend the
+        // grove. (Folded in from the former "Break the Trickster's Hold" quest,
+        // which keyed its first step on the same kill — a redundant duplicate.)
         id: 'step_take_heart',
-        desc: 'Recover the Heart of the Ancient Oak from the Grove Sanctum.',
+        desc: 'Recover the Heart of the Ancient Oak from the grove sanctum.',
         condition: { all: [{ fact: 'loot_taken', operator: 'contains', value: 'oak_heart' }] },
       },
     ],
+    // Rewards merged from the former two-quest grove arc. The combined XP award
+    // counts toward the SRD advancement table (leveling is XP-gated). Malgovia
+    // stays open-ended: no `set_escape`, so finishing the grove doesn't end the
+    // adventure (the crypt is the bigger fight).
     rewards: [
-      { type: 'give_gold', amount: 300 },
-      { type: 'give_xp', amount: 1500 },
-      // Faction rep bumped via `repGain: 30` above.
-      // NOTE: no `set_escape` here. Malgovia is open-ended — the grove is one
-      // side-arc among several (the crypt / Crypt Lord is the bigger fight), so
-      // finishing it must NOT end the whole adventure. (Leftover from when Grove
-      // of Thorns was a standalone campaign whose finale was the Trickster.)
+      { type: 'give_gold', amount: 400 },
+      { type: 'give_xp', amount: 1850 },
+      // Faction rep bumped via `repGain: 45` above.
       {
         type: 'add_narrative',
-        text: 'The grove sighs — a long, green release. Pinegate will sleep easy tonight.',
+        text: "Old Elise presses your hand in both of hers. 'The Verdant Circle remembers you.' The grove sighs — a long, green release; Pinegate will sleep easy tonight.",
       },
     ],
   },

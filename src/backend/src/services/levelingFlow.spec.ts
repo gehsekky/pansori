@@ -35,7 +35,7 @@ function party(chars: ReturnType<typeof makeChar>[], over: Partial<GameState> = 
 
 describe('leveling roster gate', () => {
   it('surfaces one enter_leveling per eligible member, suppressing normal options', () => {
-    const eligible = makeChar({ id: 'a', name: 'Aria', xp: 100, level: 1 });
+    const eligible = makeChar({ id: 'a', name: 'Aria', xp: 300, level: 1 });
     const notYet = makeChar({ id: 'b', name: 'Bran', xp: 0, level: 1 });
     const choices = generateChoices(party([eligible, notYet]), seed, ctx);
     expect(choices.length).toBe(1);
@@ -54,7 +54,7 @@ describe('leveling roster gate', () => {
   });
 
   it('combat suppresses the leveling roster entirely', () => {
-    const eligible = makeChar({ id: 'a', xp: 100, level: 1 });
+    const eligible = makeChar({ id: 'a', xp: 300, level: 1 });
     const choices = generateChoices(party([eligible], { combat_active: true }), seed, ctx);
     expect(choices.some((c) => c.action.type === 'enter_leveling')).toBe(false);
   });
@@ -69,7 +69,7 @@ describe('enter_leveling → cascade → auto-drop', () => {
       name: 'Wrenna',
       character_class: 'Wizard',
       level: 3,
-      xp: 300,
+      xp: 2700,
       str: 15,
       dex: 15,
       con: 15,

@@ -69,13 +69,15 @@ describe('formatPrereq', () => {
 });
 
 describe('levelUpAvailable', () => {
-  it('returns true when xp ≥ level × 100 and out of combat', () => {
-    const char = makeChar({ level: 1, xp: 100 });
+  it('returns true when xp ≥ the SRD next-level threshold and out of combat', () => {
+    // L1 → L2 needs 300 XP (SRD 5.2.1 Character Advancement table).
+    const char = makeChar({ level: 1, xp: 300 });
     expect(levelUpAvailable(char, false)).toBe(true);
   });
 
-  it('returns false when xp threshold not met', () => {
-    const char = makeChar({ level: 2, xp: 199 });
+  it('returns false when the xp threshold is not met', () => {
+    // L2 → L3 needs 900 XP; 899 is just short.
+    const char = makeChar({ level: 2, xp: 899 });
     expect(levelUpAvailable(char, false)).toBe(false);
   });
 

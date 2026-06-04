@@ -11,6 +11,7 @@ import {
   applySubclass,
   levelUpWorkFor,
   preparedSpellsCap,
+  xpForLevel,
 } from '../gameEngine.js';
 import {
   canMulticlassInto,
@@ -822,10 +823,11 @@ export const handleLevelUpClass: ActionHandler<{ type: 'level_up_class'; classNa
   if ((char.level ?? 1) >= 20) {
     return { rejected: `${char.name} is already at the level cap (20).` };
   }
-  // XP threshold: level N → N+1 needs N × 100 XP (same gate as
-  // applyLevelUpFromXp).
-  if ((char.xp ?? 0) < (char.level ?? 1) * 100) {
-    const need = (char.level ?? 1) * 100 - (char.xp ?? 0);
+  // XP threshold: SRD 5.2.1 Character Advancement table (same gate as
+  // levelUpWorkFor).
+  const nextLevelXp = xpForLevel((char.level ?? 1) + 1);
+  if ((char.xp ?? 0) < nextLevelXp) {
+    const need = nextLevelXp - (char.xp ?? 0);
     return { rejected: `${char.name} needs ${need} more XP to level up.` };
   }
   const cls = action.className.toLowerCase();

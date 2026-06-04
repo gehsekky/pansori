@@ -79,9 +79,23 @@ export function canMulticlassInto(char: Character, targetClass: string): string 
   return `Requires ${formatPrereq(req)}.`;
 }
 
+// Total XP required to BE at each level (SRD 5.2.1 Character Advancement).
+// Mirrors XP_FOR_LEVEL in the backend gameEngine — kept in sync by hand since
+// the FE can't import backend modules. A character at level L advances when
+// total XP reaches the entry for L+1.
+const XP_FOR_LEVEL: readonly number[] = [
+  0, 0, 300, 900, 2_700, 6_500, 14_000, 23_000, 34_000, 48_000, 64_000, 85_000, 100_000, 120_000,
+  140_000, 165_000, 195_000, 225_000, 265_000, 305_000, 355_000,
+];
+
+function xpForLevel(level: number): number {
+  if (level <= 1) return 0;
+  return XP_FOR_LEVEL[Math.min(20, level)] ?? XP_FOR_LEVEL[20];
+}
+
 export function levelUpAvailable(char: Character, inCombat: boolean): boolean {
   if (char.dead) return false;
   if (inCombat) return false;
   if ((char.level ?? 1) >= 20) return false;
-  return (char.xp ?? 0) >= (char.level ?? 1) * 100;
+  return (char.xp ?? 0) >= xpForLevel((char.level ?? 1) + 1);
 }

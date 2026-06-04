@@ -152,13 +152,23 @@ describe('Malgovia is open-ended — no side-arc ends the whole adventure', () =
 });
 
 describe('The Silent Grove — right-sized starter climax', () => {
-  it('completes on DEFEATING the Fey Trickster, not merely reaching the Oak', () => {
+  it('requires DEFEATING the Fey Trickster (after reaching the Oak), then taking the heart', () => {
     const grove = (camp.quests ?? []).find((q) => q.id === 'quest_silent_grove')!;
-    const last = grove.steps[grove.steps.length - 1];
-    expect(last.id).toBe('step_defeat_trickster');
-    const conds = JSON.stringify(last.condition);
+    // The defeat step is a required gate keyed on killing the Trickster.
+    const defeat = grove.steps.find((s) => s.id === 'step_defeat_trickster')!;
+    expect(defeat).toBeTruthy();
+    const conds = JSON.stringify(defeat.condition);
     expect(conds).toContain('enemies_killed');
     expect(conds).toContain('ancient_oak#0');
+    // …and it comes AFTER merely reaching the Oak (reaching alone never completes it).
+    const reachIdx = grove.steps.findIndex((s) => s.id === 'step_reach_oak');
+    const defeatIdx = grove.steps.findIndex((s) => s.id === 'step_defeat_trickster');
+    expect(defeatIdx).toBeGreaterThan(reachIdx);
+    // The folded-in final step (from the former "Break the Trickster's Hold")
+    // recovers the Oak's heart — so the consolidated quest has a single climax.
+    const last = grove.steps[grove.steps.length - 1];
+    expect(last.id).toBe('step_take_heart');
+    expect(JSON.stringify(last.condition)).toContain('oak_heart');
   });
 
   it('the Fey Trickster is a level-1-appropriate boss (no CR-4 base, no dead Hex config)', () => {

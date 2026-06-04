@@ -38,8 +38,9 @@ export function runHealSpell(
   // dice, take each die's top face instead of rolling (SRD: Supreme Healing).
   const supremeHealing = isLifeCleric && clericLvl >= 17 && slotLevel >= 1;
   const baseHealed = (supremeHealing ? maxDice(healDice) : rollDice(healDice)) + healMod;
-  // Life Cleric: Disciple of Life — healing spells restore extra 2 + spell level HP
-  const discipleBonus = isLifeCleric ? 2 + (spell.level ?? 1) : 0;
+  // Life Cleric: Disciple of Life — a slot-cast heal restores extra (2 + the
+  // SLOT level) HP (SRD: "2 plus the spell slot's level"), so upcasting scales it.
+  const discipleBonus = isLifeCleric ? 2 + slotLevel : 0;
   // Life Cleric: Blessed Healer (L6) — immediately after a spell cast with a
   // slot restores HP to one or more creatures OTHER than the caster, the
   // cleric regains 2 + the slot's level HP (SRD: Blessed Healer). Closure so
