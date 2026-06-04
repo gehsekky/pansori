@@ -61,8 +61,8 @@ grep -n "^Alert$\|^Magic Initiate$\|^Savage Attacker$\|^Skilled$" docs/srd-5.2.1
 
 All SRD 5.2.1 spells are now in the catalog. The combat-relevant ones
 are fully mechanical; spells whose RAW effect needs systems pansori
-doesn't have (possession, planar gating, extra turns, shapeshifting
-into arbitrary creatures, reality alteration) are registered as
+doesn't have (possession, planar gating, shapeshifting into arbitrary
+creatures, reality alteration) are registered as
 **narrative spells** — their effect is described and adjudicated at the
 table, the same pattern as Augury / Commune / Divination. Mechanizing
 those waits on the underlying systems.
@@ -71,7 +71,10 @@ As those systems get built, the narrative spells graduate to
 mechanical: e.g. the **anti-magic suppression** system
 (`isSpellSuppressed` + a `suppressesMagic` SpellZone) now drives
 Antimagic Field and Globe of Invulnerability for real — a spell
-crossing the zone fizzles per its level/geometry rules.
+crossing the zone fizzles per its level/geometry rules. Likewise the
+**extra-turns** system (`Character.time_stop_turns` + the turn-advance
+hook) now drives Time Stop — the caster takes 1d4+1 turns in a row
+while others stay frozen, ending the instant a turn strikes an enemy.
 
 The SRD's General Feats section is intentionally small — most
 iconic combat-optimization feats (Lucky / Sharpshooter / Sentinel

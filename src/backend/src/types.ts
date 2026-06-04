@@ -904,6 +904,9 @@ export interface Spell {
   // omitted = all). `fromOutsideOnly` (Globe) blocks only inbound spells from
   // outside; otherwise (Antimagic Field) it blocks magic in or out.
   magicSuppression?: { maxLevel?: number; fromOutsideOnly: boolean };
+  // SRD Time Stop — the caster takes this many extra turns in a row (dice expr,
+  // '1d4+1'). The utility cast path rolls it onto `Character.time_stop_turns`.
+  grantsExtraTurns?: string;
   // Long casting time (1 min+) — rejected in combat (before slot spend).
   outOfCombatOnly?: boolean;
 }
@@ -1152,6 +1155,11 @@ export interface Character {
     rounds_left: number; // duration; decremented on round wrap, cleared at 0
     concentration?: boolean; // cleared by breakConcentration when set
   } | null;
+  // SRD Time Stop — banked extra turns the caster takes in a row while everyone
+  // else is frozen. Set by the spell (1d4+1); the turn-advance hook refreshes the
+  // caster's turn instead of passing to others while this is > 0, decrementing
+  // each. Cleared to 0 the moment one of those turns affects an enemy.
+  time_stop_turns?: number;
   // SRD Dragon's Breath — a granted breath weapon the holder can exhale (its
   // action) as a 15-ft cone (DEX save, half) each turn for the spell's duration.
   // `dice` is the upcast-baked damage, `saveDc` the caster's spell save DC at

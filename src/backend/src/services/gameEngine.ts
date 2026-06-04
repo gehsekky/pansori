@@ -2814,6 +2814,18 @@ export function isSpellSuppressed(
   return { blocked: false };
 }
 
+// SRD Time Stop — a coarse signature of the enemies' state (total HP + condition
+// count + kill count). The turn-advance hook compares it across a Time-Stopped
+// turn: any change means the caster's action affected an enemy, which ends the
+// time stop. (Buffing an ally isn't detected — a documented simplification; the
+// rule that matters, "no free attacks under Time Stop", is enforced.)
+function enemySignature(st: GameState): string {
+  const es = (st.entities ?? []).filter((e) => e.isEnemy);
+  const hp = es.reduce((a, e) => a + Math.max(0, e.hp), 0);
+  const conds = es.reduce((a, e) => a + (e.conditions?.length ?? 0), 0);
+  return `${hp}:${conds}:${st.enemies_killed?.length ?? 0}`;
+}
+
 // RE-4 — round-wrap tick for every persistent zone in the current room.
 export function fireSpellZones(
   st: GameState,
@@ -9559,6 +9571,12 @@ export async function takeAction({
   const slowSnapshotActionUsed = char.turn_actions.action_used;
   const slowSnapshotBonusUsed = char.turn_actions.bonus_action_used;
 
+  // SRD Time Stop — snapshot the enemies' state before the action so the
+  // turn-advance hook can tell whether a Time-Stopped turn affected an enemy
+  // (which ends the time stop). Captured for every combat action so the casting
+  // turn itself (a self spell, no enemy change) doesn't read as "affected".
+  const preActionEnemySig = st.combat_active ? enemySignature(st) : '';
+
   const dispatchResult = await dispatchAction(ctx, action);
   if (dispatchResult.handled && dispatchResult.replaceWith) {
     // Transformer: the handler staged pre-mutations into ctx (e.g. flipped
@@ -9627,6 +9645,19 @@ export async function takeAction({
     }
   }
 
+  // ── SRD Time Stop — ends the instant a turn affects an enemy ───────────────
+  // Checked every action (not just at turn end) so it ends mid-turn, as RAW.
+  // The enemy signature changing means this action dealt damage / a condition /
+  // a kill, which drops the bank to 0 (the grant hook below then won't fire).
+  if (
+    (char.time_stop_turns ?? 0) > 0 &&
+    st.combat_active &&
+    enemySignature(st) !== preActionEnemySig
+  ) {
+    char = { ...char, time_stop_turns: 0 };
+    narrative += ` ⏳ The frozen moment shatters — striking an enemy ends the time stop.`;
+  }
+
   // ── Write char back into state ─────────────────────────────────────────────
   commitChar();
 
@@ -9653,6 +9684,21 @@ export async function takeAction({
     if (!hasBonusChoices && !hasMovementLeft && !hasUnspentHasteExtra) {
       usedInitiative = true;
     }
+  }
+
+  // ── SRD Time Stop — grant the next frozen-time turn ────────────────────────
+  // When the just-ended turn belongs to a PC with banked Time-Stop turns (and
+  // the time stop wasn't ended this turn by striking an enemy — that zeroed the
+  // bank before commitChar above), refresh their turn and suppress the advance
+  // so the same creature acts again while everyone else stays frozen.
+  if (usedInitiative && st.combat_active && (st.characters[safeIdx]?.time_stop_turns ?? 0) > 0) {
+    const tsChar = st.characters[safeIdx];
+    const left = (tsChar.time_stop_turns ?? 0) - 1;
+    st = commitCharacter(st, { ...tsChar, time_stop_turns: left, turn_actions: { ...FRESH_TURN } });
+    char = st.characters[safeIdx];
+    st = { ...st, movement_used: { ...(st.movement_used ?? {}), [char.id]: 0 } };
+    narrative += ` ⏳ Time stands still — ${char.name} takes another turn${left > 0 ? ` (${left} left)` : ''}.`;
+    usedInitiative = false; // same creature acts again — don't pass the turn
   }
 
   // ── Advance initiative / active character ──────────────────────────────────

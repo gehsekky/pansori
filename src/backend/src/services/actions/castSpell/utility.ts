@@ -4,6 +4,7 @@ import { composeNow } from '../../narrative/compose.js';
 import { concentrationRoundsFor } from './utils.js';
 import { lightReaches } from '../../gridEngine.js';
 import { randomUUID } from 'crypto';
+import { rollDice } from '../../rulesEngine.js';
 import { zoneCells } from '../../gameEngine.js';
 
 /**
@@ -193,6 +194,15 @@ export function runUtilitySpell(
         ? ` A shimmering globe forms — lesser magic from outside cannot reach within.`
         : ` An aura of dead magic spreads out — spells simply fail near ${char.name}.`;
     }
+  }
+
+  // SRD Time Stop — bank 1d4+1 extra turns. The turn-advance hook in takeAction
+  // refreshes the caster's turn instead of passing to others while the bank is
+  // > 0, and ends it the instant one of those turns affects an enemy.
+  if (spell.grantsExtraTurns) {
+    const turns = Math.max(1, rollDice(spell.grantsExtraTurns));
+    char.time_stop_turns = turns;
+    ctx.narrative += ` Time freezes — ${char.name} will act ${turns} more time${turns === 1 ? '' : 's'} before the world moves again.`;
   }
 
   // Bless (PHB p.219) — caster picks up to 3 creatures (RAW). Pansori
