@@ -400,8 +400,35 @@ async function choiceActionTypes(page: Page): Promise<string[]> {
 async function clickTravelTo(page: Page, siteName: string): Promise<void> {
   // Travel is map-driven: GridMapView renders each transition cell as a
   // clickable, labelled square whose aria-label carries the destination name
-  // (e.g. "5,1, The Old Road"). Click that cell to dispatch the marker_move —
-  // the old "Travel to / Enter" text choices were removed as redundant.
+  // (e.g. "5,1, The Old Road"). Click that cell to dispatch the marker_move.
+  //
+  // Fog of war: a distant site (The Old Road sits far east of the start) begins
+  // undiscovered — hidden + non-travelable — until the party explores to it. So
+  // walk EAST along the southern road (row y=7): each step clicks the easternmost
+  // revealed road cell, pushing the fog frontier until the site is revealed, then
+  // clicks it. Random encounters are disabled under the e2e test-login backend,
+  // so the scripted journey arrives deterministically.
+  for (let step = 0; step < 12; step++) {
+    const site = page.locator(`[aria-label*="${siteName}"]`).first();
+    if (await site.isVisible().catch(() => false)) {
+      await site.click();
+      await page.waitForTimeout(300);
+      return;
+    }
+    // Among the revealed, travelable map cells on the southern road (y=7), pick
+    // the easternmost and step onto it to advance toward the site.
+    const labels = (await page
+      .locator('[role="button"][aria-label]')
+      .evaluateAll((els) => els.map((e) => e.getAttribute('aria-label') ?? ''))) as string[];
+    let bestX = -1;
+    for (const label of labels) {
+      const m = label.match(/^(\d+),7(?:,|$)/);
+      if (m && Number(m[1]) > bestX) bestX = Number(m[1]);
+    }
+    if (bestX < 0) break;
+    await page.locator(`[aria-label^="${bestX},7"]`).first().click();
+    await page.waitForTimeout(250);
+  }
   const cellEl = page.locator(`[aria-label*="${siteName}"]`).first();
   await expect(cellEl).toBeVisible({ timeout: 5_000 });
   await cellEl.click();
