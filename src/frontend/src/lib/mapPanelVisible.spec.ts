@@ -2,7 +2,8 @@
 // be HIDDEN during the post-combat "Continue" gate (combat_over_pending) so its
 // clickable cells can't issue a marker_move that bypasses the gate — which left
 // combat_over_pending stuck and resurfaced "THE FIGHT IS OVER" in a peaceful
-// town. Also hidden on the terminal (escaped / all-dead) screens.
+// town. Also hidden on the "escaped" terminal screen. On a party wipe the map
+// STAYS visible (the final battlefield shows beside the death notice).
 
 import { describe, expect, it } from 'vitest';
 import type { GameState } from '../types';
@@ -25,8 +26,8 @@ describe('mapPanelVisible', () => {
     expect(mapPanelVisible(gs(false), { escaped: true, allDead: false })).toBe(false);
   });
 
-  it('hides the map when the whole party is dead', () => {
-    expect(mapPanelVisible(gs(false), { escaped: false, allDead: true })).toBe(false);
+  it('KEEPS the map visible when the whole party is dead (final battlefield)', () => {
+    expect(mapPanelVisible(gs(false), { escaped: false, allDead: true })).toBe(true);
   });
 
   it('hides the map when there is no game state', () => {

@@ -796,7 +796,7 @@ export default function App() {
                               marginBottom: '1.25rem',
                             }}
                           >
-                            The {worldName} has claimed another victim.
+                            The darkness has claimed another victim.
                           </p>
                           <button
                             className={styles.submit}
