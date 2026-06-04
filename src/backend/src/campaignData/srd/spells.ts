@@ -5989,4 +5989,47 @@ export const SRD_SPELLS: Record<string, Spell> = {
       '{name} steps free of the body; silver cords trail behind as the party walks the Astral.',
     spellList: ['divine', 'arcane'],
   },
+
+  // ─── Summons (join the next battle, per the summon system) ────────────────────
+  // SRD: Summon Dragon — a Draconic Spirit fights at the party's side. Modeled at
+  // its base (level-5) stat block: AC 19, 50 HP, Rend +7 for 1d6+9 Force. The
+  // per-slot scaling of the spirit's AC/HP/Rend/Multiattack + its Breath Weapon
+  // are deferred (the summon block is a fixed stat line).
+  summon_dragon: {
+    id: 'summon_dragon',
+    name: 'Summon Dragon',
+    level: 5,
+    castTime: 'action',
+    concentration: true,
+    outOfCombatOnly: true,
+    desc: 'Conjure a Draconic Spirit (AC 19, 50 HP, Rend +7 for 1d6+9 Force) that fights at your side and joins the next battle. Concentration, up to 1 hour.',
+    spellList: ['arcane'],
+    summon: {
+      name: 'Draconic Spirit',
+      ac: 19,
+      maxHp: 50,
+      toHit: 7,
+      damage: '1d6+9',
+    },
+  },
+  // SRD: Faithful Hound (Mordenkainen's) — a phantom watchdog that bites an
+  // adjacent intruder for 4d8 Force each round. RAW it is invisible + invulnerable
+  // and uses a DEX save; modeled as a durable summoned ally with an attack-roll
+  // bite (the summon shape), joining the next battle.
+  faithful_hound: {
+    id: 'faithful_hound',
+    name: 'Faithful Hound',
+    level: 4,
+    castTime: 'action',
+    outOfCombatOnly: true,
+    desc: 'Conjure a phantom watchdog (AC 15, 20 HP, bite +6 for 4d8 Force) that guards the party and joins the next battle, biting an adjacent foe each round.',
+    spellList: ['arcane'],
+    summon: {
+      name: 'Phantom Watchdog',
+      ac: 15,
+      maxHp: 20,
+      toHit: 6,
+      damage: '4d8',
+    },
+  },
 };
