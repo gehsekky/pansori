@@ -5567,6 +5567,25 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         if (injured.length === 0) continue;
       }
 
+      // SRD Spare the Dying — one choice per DOWNED ally (0 HP, dying, not yet
+      // stable). Offered only when someone is dying; routed through the ally-buff
+      // path with the chosen target. Skips the generic emission below.
+      if (spell.stabilizes) {
+        const dying = state.characters.filter((c) => !c.dead && c.hp <= 0 && !c.stable);
+        if (dying.length === 0) continue;
+        const stNote = isBonusAction ? ', bonus action' : '';
+        for (const ally of dying) {
+          if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+          choices.push({
+            label: `Cast ${spell.name} (cantrip${stNote}) → stabilize ${ally.name}`,
+            action: { type: 'cast_spell', spellId, slotLevel: 0, targetCharId: ally.id },
+            requiresBonusAction: isBonusAction || undefined,
+            kind: 'cast_spell',
+          });
+        }
+        continue;
+      }
+
       // Summon spells (Animate Dead): emit one cast choice per available
       // slot level × creature variant (Skeleton / Zombie). RAW multi-raise
       // scales the count by slot level above base (countPerUpcastLevel).

@@ -907,6 +907,10 @@ export interface Spell {
   // SRD Time Stop — the caster takes this many extra turns in a row (dice expr,
   // '1d4+1'). The utility cast path rolls it onto `Character.time_stop_turns`.
   grantsExtraTurns?: string;
+  // SRD Spare the Dying — stabilize a dying ally (sets `Character.stable`, so the
+  // death-save flow stops rolling). Routed through the ally-buff path; the cast
+  // surface offers one choice per downed party member.
+  stabilizes?: boolean;
   // SRD shapeshift spells (Shapechange = self, Animal Shapes = the party). The
   // cast path puts the target(s) into a chosen BeastForm via the `wild_shaped`
   // machinery, concentration-bound. Beasts cap at CR 1 in pansori, so the

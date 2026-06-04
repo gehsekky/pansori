@@ -464,6 +464,22 @@ export function runBuffSpell(
     }
   }
 
+  // SRD Spare the Dying — stabilize the dying target: it stops rolling death
+  // saves (the death-save flow reads `stable`). Targets a downed ally (hp 0,
+  // not yet dead), surfaced per-ally by the cast menu.
+  if (spell.stabilizes) {
+    if (isCasterTarget) {
+      char.stable = true;
+    } else {
+      ctx.st = {
+        ...ctx.st,
+        characters: ctx.st.characters.map((c) =>
+          c.id === buffTarget.id ? { ...c, stable: true } : c
+        ),
+      };
+    }
+  }
+
   const buffProse =
     pickCastPrefix(spell, {
       name: char.name,
