@@ -374,10 +374,11 @@ describe('rollDeathSave', () => {
     expect(result.saves.failures).toBe(2);
   });
 
-  it('natural 1 with 2 existing failures → dead', () => {
+  it('natural 1 with 2 existing failures → dead, capped at 3 (not 4)', () => {
     mockRandom(0); // d20 → 1
     const result = rollDeathSave({ successes: 0, failures: 2 });
     expect(result.result).toBe('dead');
+    expect(result.saves.failures).toBe(3); // +2 from a Nat 1, but the tally caps at 3
   });
 
   it('roll 10 → success', () => {

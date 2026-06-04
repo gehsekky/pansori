@@ -485,6 +485,16 @@ export const quests: Quest[] = [
           all: [{ fact: 'visited_rooms', operator: 'contains', value: 'ancient_oak' }],
         },
       },
+      {
+        // The quest pays out only once the Trickster is beaten — Old Elise's
+        // charge was "defeat the Fey Trickster at the heart and the grove will
+        // mend," so reaching the Oak alone no longer completes it.
+        id: 'step_defeat_trickster',
+        desc: 'Defeat the Fey Trickster at the heart of the grove.',
+        condition: {
+          all: [{ fact: 'enemies_killed', operator: 'contains', value: 'ancient_oak#0' }],
+        },
+      },
     ],
     rewards: [
       { type: 'give_gold', amount: 100 },

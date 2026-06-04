@@ -200,29 +200,29 @@ const AWAKENED_WOLF_BASE: EnemyTemplate = {
   int: 10,
 };
 
+// Right-sized as the climax of the Silent Grove — a starter quest for a level-1
+// party. NOTE: room enemies are HP-scaled ×(0.5 + partySize·0.5) at seed time,
+// so a 4-PC party faces ~2.5× these numbers (hp 18 → ~45). A single attack +
+// the charm rider keeps it threatening but winnable for four level-1 heroes.
 const FEY_TRICKSTER_BASE: EnemyTemplate = {
   name: 'Fey Trickster',
-  cr: 4,
-  hp: 60,
-  ac: 14,
-  damage: '1d6+3',
-  toHit: 5,
-  xp: 1100,
+  cr: 2,
+  hp: 18,
+  ac: 13,
+  damage: '1d6+2',
+  toHit: 4,
+  xp: 450,
   str: 10,
-  dex: 17,
-  con: 14,
+  dex: 16,
+  con: 12,
   int: 14,
   wis: 13,
   cha: 16,
-  multiattack: 2,
-  // Charms instead of paralyzes — boss flavor: it's not killing
-  // you, it's seducing you into the grove. Charmed PCs lose their
-  // turn (engine handles via the existing charmed condition).
-  onHitEffect: { condition: 'charmed', ability: 'wis', dc: 13 },
-  // Hexes a target ~30% of turns (its fey-curse motif).
-  spells: ['hex'],
-  castChance: 0.3,
-  spellSaveDC: 13,
+  // Charms instead of paralyzes — boss flavor: it's not killing you, it's
+  // seducing you into the grove. Its one melee touch carries the charm rider.
+  // (Hex is dropped: enemy spellcasting only resolves damage spells, so the
+  // Trickster's debuff spell never fired — the charm IS its signature now.)
+  onHitEffect: { condition: 'charmed', ability: 'wis', dc: 12 },
   damageType: 'piercing',
 };
 
@@ -602,8 +602,12 @@ export const enemies: Record<string, Enemy[]> = {
       id: 'ancient_oak#0',
       cr: undefined,
     }),
-    place(SRD_MONSTERS.brown_bear, {
+    // A single savage grove-beast minion — right-sized for a level-1 party
+    // (the old Brown Bear, 34 hp → ~85 scaled with two 2d6+4 attacks, made the
+    // starter encounter an auto-wipe). A wolf reads as a "beast gone savage".
+    place(SRD_MONSTERS.wolf, {
       id: 'ancient_oak#1',
+      name: 'Thornbound Wolf',
       cr: undefined,
       damageType: undefined,
     }),

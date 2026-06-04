@@ -1112,16 +1112,17 @@ export function rollDeathSave(
   if (roll === 20)
     return { roll, result: 'regain_hp' as const, saves: { successes: 0, failures: 0 } };
   if (roll === 1) {
-    const saves = { ...current, failures: current.failures + 2 };
+    // A Nat 1 is two failures — but the tally is capped at 3 (death), never 4+.
+    const saves = { ...current, failures: Math.min(3, current.failures + 2) };
     const result = saves.failures >= 3 ? ('dead' as const) : ('double_failure' as const);
     return { roll, result, saves };
   }
   if (roll - reviveD20Pen >= 10) {
-    const saves = { ...current, successes: current.successes + 1 };
+    const saves = { ...current, successes: Math.min(3, current.successes + 1) };
     const result = saves.successes >= 3 ? ('stable' as const) : ('success' as const);
     return { roll, result, saves };
   }
-  const saves = { ...current, failures: current.failures + 1 };
+  const saves = { ...current, failures: Math.min(3, current.failures + 1) };
   const result = saves.failures >= 3 ? ('dead' as const) : ('failure' as const);
   return { roll, result, saves };
 }

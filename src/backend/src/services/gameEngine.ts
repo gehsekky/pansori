@@ -2223,6 +2223,8 @@ export function processDeathSave(
     if (failures >= 3) {
       attacked.dead = true;
       attacked.died_at_round = currentRound;
+      // Dead, not merely unconscious — drop the downed condition.
+      attacked.conditions = (attacked.conditions ?? []).filter((c) => c !== 'unconscious');
       narrative +=
         ' ' +
         pick(context.narratives.deathLines)
@@ -2297,6 +2299,8 @@ export function processDeathSave(
     case 'dead':
       newChar.dead = true;
       newChar.died_at_round = currentRound;
+      // Dead, not merely unconscious — drop the downed condition.
+      newChar.conditions = (newChar.conditions ?? []).filter((c) => c !== 'unconscious');
       narrative = pick(context.narratives.deathLines)
         .replace(/{name}/g, char.name)
         .replace('{enemy}', enemy?.name ?? 'your wounds')

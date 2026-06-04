@@ -150,3 +150,29 @@ describe('Malgovia is open-ended — no side-arc ends the whole adventure', () =
     expect(enders).toEqual([]);
   });
 });
+
+describe('The Silent Grove — right-sized starter climax', () => {
+  it('completes on DEFEATING the Fey Trickster, not merely reaching the Oak', () => {
+    const grove = (camp.quests ?? []).find((q) => q.id === 'quest_silent_grove')!;
+    const last = grove.steps[grove.steps.length - 1];
+    expect(last.id).toBe('step_defeat_trickster');
+    const conds = JSON.stringify(last.condition);
+    expect(conds).toContain('enemies_killed');
+    expect(conds).toContain('ancient_oak#0');
+  });
+
+  it('the Fey Trickster is a level-1-appropriate boss (no CR-4 base, no dead Hex config)', () => {
+    const fey = (camp.enemies?.ancient_oak ?? []).find((e) => e.id === 'ancient_oak#0')!;
+    expect(fey.name).toBe('Fey Trickster');
+    expect(fey.hp).toBeLessThanOrEqual(20); // base; ×2.5 for a 4-PC party
+    expect(fey.multiattack ?? 1).toBe(1); // single attack at low level
+    expect(fey.spells ?? []).toEqual([]); // Hex never resolved (enemy cast = damage only)
+    expect(fey.onHitEffect?.condition).toBe('charmed'); // its working signature
+  });
+
+  it('the grove minion is a weak beast, not an 85-HP Brown Bear', () => {
+    const minion = (camp.enemies?.ancient_oak ?? []).find((e) => e.id === 'ancient_oak#1')!;
+    expect(minion.name).not.toBe('Brown Bear');
+    expect(minion.hp).toBeLessThanOrEqual(15); // base; ×2.5 scaled is still modest
+  });
+});
