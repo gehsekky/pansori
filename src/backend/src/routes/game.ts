@@ -1266,6 +1266,13 @@ gameRouter.post('/session/:id/action', async (req: Request, res: Response) => {
       state = mergeCampaignIntoGameState(state, campaignState);
     }
 
+    // Snapshot the seed BEFORE takeAction — most actions leave it untouched, but
+    // some mutate it in place (marker_move materializes a rolled encounter enemy
+    // into seed.enemies). takeAction mutates `row.seed` by reference, so we
+    // capture its JSON now to detect a real change afterwards and skip rewriting
+    // the (potentially large, multi-region) seed blob on the common no-change path.
+    const seedBefore = JSON.stringify(row.seed);
+
     const result = await takeAction({
       action,
       history: history ?? [],
@@ -1404,14 +1411,22 @@ gameRouter.post('/session/:id/action', async (req: Request, res: Response) => {
 
     const newStatus = result.dead ? 'dead' : result.escaped ? 'escaped' : row.status;
     const nextTurnSeq = row.turn_seq + 1;
-    // Persist the seed too: most actions leave it untouched, but some mutate it
-    // in place (marker_move materializes a rolled encounter enemy into
-    // seed.enemies). Without saving it, that enemy is lost next request and the
-    // party is stuck in the empty encounter room.
-    await pool.query(
-      'UPDATE game_sessions SET state = $1, seed = $2, status = $3, turn_seq = $4, updated_at = NOW() WHERE id = $5',
-      [JSON.stringify(result.newState), JSON.stringify(result.seed), newStatus, nextTurnSeq, row.id]
-    );
+    // Persist the seed only when it actually changed (see seedBefore above) —
+    // the seed holds the campaign content + maps and is large; rewriting it
+    // every turn is wasteful since it mutates rarely. The state always changes,
+    // so it's always written.
+    const seedAfter = JSON.stringify(result.seed);
+    if (seedAfter !== seedBefore) {
+      await pool.query(
+        'UPDATE game_sessions SET state = $1, seed = $2, status = $3, turn_seq = $4, updated_at = NOW() WHERE id = $5',
+        [JSON.stringify(result.newState), seedAfter, newStatus, nextTurnSeq, row.id]
+      );
+    } else {
+      await pool.query(
+        'UPDATE game_sessions SET state = $1, status = $2, turn_seq = $3, updated_at = NOW() WHERE id = $4',
+        [JSON.stringify(result.newState), newStatus, nextTurnSeq, row.id]
+      );
+    }
 
     // Broadcast the new state + turn_seq to every socket joined to this
     // session's room. The acting participant gets it back via the REST

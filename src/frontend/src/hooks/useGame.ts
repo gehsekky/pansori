@@ -12,6 +12,18 @@ import { useEffect, useRef, useState } from 'react';
 
 type HistoryEntry = { role: 'user' | 'assistant'; content: string };
 
+// Rebuild the in-memory adventure-log transcript from the persisted `run_log`
+// so the Adventure Log survives reloads / resumes (the transcript itself isn't
+// persisted — it's a client-side mirror). Each run_log entry becomes a user
+// (action) + assistant (narrative) pair, matching the interleaved shape
+// AdventureLogPanel expects ([user_0, assistant_0, user_1, ...]).
+export function historyFromRunLog(state: GameState): HistoryEntry[] {
+  return (state.run_log ?? []).flatMap((e) => [
+    { role: 'user' as const, content: e.action },
+    { role: 'assistant' as const, content: e.narrative },
+  ]);
+}
+
 export interface UseGameReturn {
   session: Session | null;
   gameState: GameState | null;
@@ -108,7 +120,7 @@ export function useGame(): UseGameReturn {
       setGameState(result.state);
       setSeed(result.seed);
       setCampaignMeta(result.campaignMeta ?? null);
-      setHistory([]);
+      setHistory(historyFromRunLog(result.state));
       setEscaped(false);
       setRoomLog(result.state.room_log || []);
       setChoices(result.state.last_choices || []);
@@ -127,6 +139,7 @@ export function useGame(): UseGameReturn {
       setGameState(s.state);
       setSeed(s.seed);
       setCampaignMeta(s.campaignMeta ?? null);
+      setHistory(historyFromRunLog(s.state));
       setRoomLog(s.state.room_log || []);
       setEscaped(s.status === 'escaped');
       setChoices(s.state.last_choices || []);
