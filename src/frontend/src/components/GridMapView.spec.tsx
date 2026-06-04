@@ -119,10 +119,10 @@ describe('GridMapView', () => {
     expect(onMarkerMove).not.toHaveBeenCalled(); // engages, doesn't travel onto the cell
   });
 
-  it('distinguishes a town (⌂) from a local site (◈) and shows their names', () => {
+  it('distinguishes a town (village icon) from a local site (◈) and shows their names', () => {
     const { container, getByText } = render(<GridMapView grid={grid} markerPos={{ x: 0, y: 0 }} />);
-    // Town cell: house glyph + always-visible name.
-    expect(cell(container, 3, 0).textContent).toContain('⌂');
+    // Town cell: game-icons village glyph + always-visible name.
+    expect(cell(container, 3, 0).querySelector('.game-icon-village')).toBeTruthy();
     expect(getByText('Millhaven')).toBeTruthy();
     // Local site cell: diamond glyph + name.
     expect(cell(container, 0, 2).textContent).toContain('◈');
@@ -185,8 +185,8 @@ describe('GridMapView', () => {
 
   it('shows the site glyph (not the terrain glyph) and stays clickable when terrain overlaps a site', () => {
     // Regression: Pinegate is a town site painted with water terrain on the
-    // same cell. It must read as ⌂ (town), not ≈ (water), and stay travel-able
-    // (the builder keeps the site cell out of obstacles).
+    // same cell. It must read as a town (village icon), not the water waves,
+    // and stay travel-able (the builder keeps the site cell out of obstacles).
     const overlap: ActiveGrid = {
       level: 'regional',
       id: 'reg3',
@@ -204,8 +204,8 @@ describe('GridMapView', () => {
       <GridMapView grid={overlap} markerPos={{ x: 0, y: 0 }} onMarkerMove={onMarkerMove} />
     );
     const c = cell(container, 1, 0);
-    expect(c.textContent).toContain('⌂'); // town glyph wins
-    expect(c.textContent).not.toContain('≈'); // not the water glyph
+    expect(c.querySelector('.game-icon-village')).toBeTruthy(); // town icon wins
+    expect(c.querySelector('.game-icon-waves')).toBeNull(); // not the water waves
     expect(c.getAttribute('role')).toBe('button'); // reachable
   });
 

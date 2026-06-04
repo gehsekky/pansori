@@ -287,15 +287,29 @@ function GridMapView({
       } else if (transition) {
         // A travel destination always shows its own glyph — even if terrain is
         // painted on the same cell — so a site never hides behind a tint glyph.
+        // Towns (a site carrying `toTownId`) use the game-icons village glyph;
+        // every other transition keeps its plain unicode glyph for now.
+        const isTown = transition.kind === 'site' && !!transition.toTownId;
         token = (
           <>
-            <span
-              className={styles.gridMapGlyph}
-              aria-hidden="true"
-              style={{ fontSize: glyphFont }}
-            >
-              {transitionGlyph(transition)}
-            </span>
+            {isTown ? (
+              <GameIcon
+                name="village"
+                className={styles.gridMapGlyph}
+                style={{
+                  fontSize: glyphFont ? `calc(${glyphFont} * 1.25)` : undefined,
+                  color: 'rgba(222, 190, 120, 0.97)', // warm settlement gold
+                }}
+              />
+            ) : (
+              <span
+                className={styles.gridMapGlyph}
+                aria-hidden="true"
+                style={{ fontSize: glyphFont }}
+              >
+                {transitionGlyph(transition)}
+              </span>
+            )}
             {LABELLED_KINDS.has(transition.kind) && (
               <span className={styles.gridMapLabel} aria-hidden="true">
                 {transition.label}
