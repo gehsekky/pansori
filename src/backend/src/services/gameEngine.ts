@@ -6172,6 +6172,10 @@ export async function runRules(
     ...state.flags,
     action: action.type,
     room_id: state.current_room,
+    // The NPC the party is mid-conversation with ('' otherwise) — lets a
+    // "talk to <NPC>" rule scope to the specific NPC, not just the room (a room
+    // may host several NPCs, e.g. Pinegate Square holds Old Elise AND Bram).
+    npc_id: state.active_conversation?.npcId ?? '',
     prev_room_id: prevRoomId,
     visited_rooms: state.visited_rooms,
     enemies_killed: state.enemies_killed,

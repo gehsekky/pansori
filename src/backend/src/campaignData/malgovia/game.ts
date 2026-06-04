@@ -658,6 +658,9 @@ export const rules: GameRule[] = [
           ],
         },
         { fact: 'room_id', operator: 'equal', value: 'pinegate_square' },
+        // Scope to Old Elise specifically — Pinegate Square also hosts Bram the
+        // Woodcutter, and talking to him must NOT hand over the Silent Grove.
+        { fact: 'npc_id', operator: 'equal', value: 'npc_elise_elder' },
       ],
     },
     // No consequence needed — `once` makes the engine set the

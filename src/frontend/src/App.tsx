@@ -583,6 +583,17 @@ export default function App() {
                           gameState.active_conversation?.roomId === gameState.current_room
                             ? gameState.active_conversation.npcId
                             : undefined;
+                        // While a conversation is open the backend suppresses
+                        // every NPC's "Talk to …" choice, so the room's OTHER
+                        // NPCs would vanish from the map. Keep them visible: a
+                        // conversation can't co-occur with a hostile/combat NPC
+                        // (social options need no live enemy), so any positioned,
+                        // non-hostile, un-killed NPC in the room is still standing
+                        // there. Hostile / killed NPCs surface as enemy markers.
+                        const inConversationHere = !!convNpcId;
+                        const npcGone = (id: string) =>
+                          gameState.npc_attitudes?.[id] === 'hostile' ||
+                          (gameState.enemies_killed ?? []).includes(`npc:${id}`);
                         const npcTokens =
                           grid.level === 'local'
                             ? Object.values(seed.npcs ?? {})
@@ -590,7 +601,10 @@ export default function App() {
                                   (n) =>
                                     n.roomId === gameState.current_room &&
                                     n.pos &&
-                                    (talkByNpc.has(n.id) || n.id === convNpcId)
+                                    !npcGone(n.id) &&
+                                    (talkByNpc.has(n.id) ||
+                                      n.id === convNpcId ||
+                                      inConversationHere)
                                 )
                                 .map((n) => ({ id: n.id, pos: n.pos!, name: n.name }))
                             : [];
