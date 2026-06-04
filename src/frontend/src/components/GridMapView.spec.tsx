@@ -205,7 +205,7 @@ describe('GridMapView', () => {
     // Impassable terrain carries a glyph and is not clickable.
     expect(cell(container, 2, 0).querySelector('.game-icon-peaks')).toBeTruthy(); // mountain
     // Water uses the game-icons waves glyph (still impassable / non-clickable).
-    expect(cell(container, 3, 1).querySelector('.game-icon-waves')).toBeTruthy();
+    expect(cell(container, 3, 1).querySelector('.game-icon-water-drop')).toBeTruthy();
     expect(cell(container, 2, 0).getAttribute('role')).toBe('gridcell');
     expect(cell(container, 3, 1).getAttribute('role')).toBe('gridcell');
     // Passable terrain (road) stays travel-able.
@@ -239,7 +239,7 @@ describe('GridMapView', () => {
     );
     const c = cell(container, 1, 0);
     expect(c.querySelector('.game-icon-village')).toBeTruthy(); // town icon wins
-    expect(c.querySelector('.game-icon-waves')).toBeNull(); // not the water waves
+    expect(c.querySelector('.game-icon-water-drop')).toBeNull(); // not the water tile
     expect(c.getAttribute('role')).toBe('button'); // reachable
   });
 
