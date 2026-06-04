@@ -13,6 +13,7 @@ import {
   makeState,
   baseSandboxSeed as seed,
   seedWithEnemy,
+  withAdjacentEntities,
 } from '../test-fixtures.js';
 import type { GameState, Seed } from '../types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -1784,9 +1785,12 @@ describe('class features', () => {
       .mockReturnValueOnce(0.999) // second attack d20 → 20 (hit)
       .mockReturnValue(0.999); // damage dice
 
-    const state = makeState(
-      { character_class: 'Fighter', level: 5 },
-      { current_room: CORRIDOR_ID, visited_rooms: ['entry_hall', CORRIDOR_ID] }
+    const state = withAdjacentEntities(
+      makeState(
+        { character_class: 'Fighter', level: 5 },
+        { current_room: CORRIDOR_ID, visited_rooms: ['entry_hall', CORRIDOR_ID] }
+      ),
+      `${CORRIDOR_ID}#0`
     );
     const result = await takeAction({
       action: { type: 'attack' },
@@ -1806,9 +1810,12 @@ describe('class features', () => {
       .mockReturnValueOnce(0) // first attack d20 → 1 (fumble)
       .mockReturnValue(0);
 
-    const state = makeState(
-      { character_class: 'Fighter', level: 4 },
-      { current_room: CORRIDOR_ID, visited_rooms: ['entry_hall', CORRIDOR_ID] }
+    const state = withAdjacentEntities(
+      makeState(
+        { character_class: 'Fighter', level: 4 },
+        { current_room: CORRIDOR_ID, visited_rooms: ['entry_hall', CORRIDOR_ID] }
+      ),
+      `${CORRIDOR_ID}#0`
     );
     const result = await takeAction({
       action: { type: 'attack' },
@@ -1826,9 +1833,12 @@ describe('class features', () => {
   // and lets us count the labels exactly.
   it('Fighter at level 11 makes 3 attacks (Attack 3 label, no Attack 4)', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0); // every d20 → 1: all miss, enemy survives
-    const state = makeState(
-      { character_class: 'Fighter', level: 11 },
-      { current_room: CORRIDOR_ID, visited_rooms: ['entry_hall', CORRIDOR_ID] }
+    const state = withAdjacentEntities(
+      makeState(
+        { character_class: 'Fighter', level: 11 },
+        { current_room: CORRIDOR_ID, visited_rooms: ['entry_hall', CORRIDOR_ID] }
+      ),
+      `${CORRIDOR_ID}#0`
     );
     const result = await takeAction({
       action: { type: 'attack' },
@@ -1844,9 +1854,12 @@ describe('class features', () => {
 
   it('Fighter at level 20 makes 4 attacks (Attack 4 label, no Attack 5)', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0); // every d20 → 1: all miss, enemy survives
-    const state = makeState(
-      { character_class: 'Fighter', level: 20 },
-      { current_room: CORRIDOR_ID, visited_rooms: ['entry_hall', CORRIDOR_ID] }
+    const state = withAdjacentEntities(
+      makeState(
+        { character_class: 'Fighter', level: 20 },
+        { current_room: CORRIDOR_ID, visited_rooms: ['entry_hall', CORRIDOR_ID] }
+      ),
+      `${CORRIDOR_ID}#0`
     );
     const result = await takeAction({
       action: { type: 'attack' },
@@ -1936,9 +1949,13 @@ describe('class features', () => {
       },
     };
     vi.spyOn(Math, 'random').mockReturnValue(0.999); // always hit/crit
-    const state = makeState(
-      { character_class: 'Warrior', conditions: ['raging'] },
-      { current_room: CORRIDOR_ID, visited_rooms: ['entry_hall', CORRIDOR_ID] }
+    const state = withAdjacentEntities(
+      makeState(
+        { character_class: 'Warrior', conditions: ['raging'] },
+        { current_room: CORRIDOR_ID, visited_rooms: ['entry_hall', CORRIDOR_ID] }
+      ),
+      `${CORRIDOR_ID}#0`,
+      { enemyHp: 1 } // fragile goblin — the opening blow kills it, ending combat
     );
     const result = await takeAction({
       action: { type: 'attack' },

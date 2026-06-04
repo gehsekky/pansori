@@ -56,8 +56,18 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
   // ── Combat-start: only fires on the first attack of an encounter.
   //    Rolls initiative for everyone, seeds grid entities (PCs +
   //    Beastmaster companions + enemies), runs the surprise check, and
-  //    emits the opening-blow narrative.
-  runCombatStart(ctx, target);
+  //    emits the opening-blow narrative. Passing the weapon lets it
+  //    reach-gate the opening swing against the freshly-seeded grid —
+  //    on a fresh encounter the entities don't exist when runPreattack's
+  //    range check runs, so the opening blow would otherwise ignore distance.
+  const { openingBlowInReach } = runCombatStart(ctx, target, {
+    openingBlow: { weapon: weaponItem },
+  });
+  // Out of reach: combat has begun (initiative rolled, tokens placed) but the
+  // opening blow is withheld. Don't consume the action — the PC keeps their
+  // turn to move into reach and attack normally (where the standard range gate
+  // now applies, since entities exist).
+  if (!openingBlowInReach) return;
 
   // ── To-hit context: compute armor/weapon proficiency, all the
   //    advantage/disadvantage sources, cover/flanking, crit threshold,

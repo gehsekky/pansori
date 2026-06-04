@@ -17,7 +17,7 @@
 // `mockRandom` was duplicated identically in `rulesEngine.spec.ts` and
 // `damage.spec.ts`; lifted here so spec files share one definition.
 
-import type { Character, Context, Enemy, GameState, Seed } from './types.js';
+import type { Character, CombatEntity, Context, Enemy, GameState, Seed } from './types.js';
 import { context as sandboxCtx } from './campaignData/sandbox.js';
 import { vi } from 'vitest';
 
@@ -87,6 +87,45 @@ export function makeChar(overrides: Partial<Character> = {}): Character {
     concentrating_on: null,
     ...overrides,
   };
+}
+
+/**
+ * Seed grid `entities` with `state.characters[0]` placed adjacent to the named
+ * enemy (PC at (4,5), enemy at (5,5)). Use for tests that trigger combat-start
+ * via an Attack: the opening blow is now reach-gated against the freshly-seeded
+ * grid, and the default fresh-seed placement is 25 ft apart (out of melee
+ * reach). Pre-seeding adjacency keeps the PC in reach so the opening swing
+ * lands. `enemyHp` defaults high so the enemy survives a multi-attack loop;
+ * pass `enemyHp: 1` for kill/combat-end tests.
+ */
+export function withAdjacentEntities(
+  state: GameState,
+  enemyId: string,
+  opts: { enemyHp?: number; enemyMaxHp?: number } = {}
+): GameState {
+  const pc = state.characters[0];
+  const enemyHp = opts.enemyHp ?? 50;
+  const entities: CombatEntity[] = [
+    {
+      id: pc.id,
+      isEnemy: false,
+      pos: { x: 4, y: 5 },
+      hp: pc.hp,
+      maxHp: pc.max_hp,
+      conditions: pc.conditions ?? [],
+      condition_durations: pc.condition_durations ?? {},
+    },
+    {
+      id: enemyId,
+      isEnemy: true,
+      pos: { x: 5, y: 5 },
+      hp: enemyHp,
+      maxHp: opts.enemyMaxHp ?? enemyHp,
+      conditions: [],
+      condition_durations: {},
+    },
+  ];
+  return { ...state, entities };
 }
 
 /**

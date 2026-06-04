@@ -30,6 +30,7 @@ import {
   makeState,
   seedWithEnemy,
   spellSeed,
+  withAdjacentEntities,
 } from '../test-fixtures.js';
 import { context as ctx } from '../campaignData/sandbox.js';
 import { generateSeed } from './procgen.js';
@@ -1576,7 +1577,15 @@ describe('NPC actions', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.99); // critical, high damage
     const weakNpc: PlacedNpc = { ...placedNpc, hp: 1 };
     const seedWeak: Seed = { ...seedWithNpc, npcs: { [placedNpc.id]: weakNpc } };
-    const state = makeNpcState({ hp: 10, max_hp: 10 });
+    // Place the PC adjacent to the (about-to-be-hostile) NPC so the opening
+    // blow is in reach — combat-start now reach-gates the first swing.
+    const state = withAdjacentEntities(
+      makeNpcState({ hp: 10, max_hp: 10 }),
+      `npc:${placedNpc.id}`,
+      {
+        enemyHp: 1,
+      }
+    );
     const result = await takeAction({
       action: { type: 'attack_npc', npcId: placedNpc.id },
       history: [],
@@ -3600,9 +3609,12 @@ describe('preservesCriticalFacts (LLM safety guard)', () => {
 describe('narrative tokenization', () => {
   it('player melee hit emits {{dmg|N}} for damage and {{note|...}} for the to-hit breakdown', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.99); // forces hit + max damage
-    const state = makeState(
-      { hp: 20, max_hp: 20 },
-      { current_room: CORRIDOR_ID, visited_rooms: ['entry_hall', CORRIDOR_ID] }
+    const state = withAdjacentEntities(
+      makeState(
+        { hp: 20, max_hp: 20 },
+        { current_room: CORRIDOR_ID, visited_rooms: ['entry_hall', CORRIDOR_ID] }
+      ),
+      `${CORRIDOR_ID}#0`
     );
     const result = await takeAction({
       action: { type: 'attack' },

@@ -1,4 +1,4 @@
-import type { CombatEntity, Enemy } from '../../../types.js';
+import type { CombatEntity, Enemy, LootItem } from '../../../types.js';
 import { FRESH_TURN, abilityMod, profBonus, rollDice } from '../../rulesEngine.js';
 import { buildInitiativeOrder, pick, seedSummonedAllies } from '../../gameEngine.js';
 import {
@@ -10,7 +10,17 @@ import {
 } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import { improveFateRefresh } from '../../improveFate.js';
+import { inRange } from '../../gridEngine.js';
 import { updatePcActor } from '../actor.js';
+
+/**
+ * Optional combat-start tuning. `openingBlow.weapon` is supplied by the Attack
+ * handler so the opening swing's reach can be checked against the just-seeded
+ * grid (`null` = unarmed / melee reach). Spell + marker-move callers omit it.
+ */
+export interface CombatStartOpts {
+  openingBlow?: { weapon: Pick<LootItem, 'range' | 'thrown' | 'reach'> | null };
+}
 
 /**
  * Combat-start phase. Only runs on the FIRST attack of an encounter
@@ -32,12 +42,18 @@ import { updatePcActor } from '../actor.js';
  *    + surprise note + acts-first / opening-blow line for the
  *    triggering PC.
  *
- * Returns nothing — mutates ctx (combat_active, characters'
- * initiative_roll, entities, initiative_idx, narrative).
+ * Mutates ctx (combat_active, characters' initiative_roll, entities,
+ * initiative_idx, narrative). Returns `{ openingBlowInReach }` — false only
+ * when an Attack-handler opening blow can't reach its target (the caller then
+ * skips attack resolution; combat has still begun and the PC keeps their turn).
  */
-export function runCombatStart(ctx: ActionContext, target: Enemy): void {
-  if (ctx.st.combat_active) return;
-  if (ctx.actor.kind !== 'pc') return;
+export function runCombatStart(
+  ctx: ActionContext,
+  target: Enemy,
+  opts?: CombatStartOpts
+): { openingBlowInReach: boolean } {
+  if (ctx.st.combat_active) return { openingBlowInReach: true };
+  if (ctx.actor.kind !== 'pc') return { openingBlowInReach: true };
   const pc = ctx.actor;
 
   const enemiesForInit = ctx.livingEnemiesInRoom;
@@ -149,7 +165,27 @@ export function runCombatStart(ctx: ActionContext, target: Enemy): void {
   // After this opening swing, play returns to the initiative order at the
   // slot just past them (handled by the post-attack initiative advance).
   const isHighestInit = myInitIdx === 0;
-  ctx.narrative += isHighestInit
-    ? `${pc.char.name} acts first (initiative ${myRoll})! `
-    : `${pc.char.name} strikes with the opening blow (initiative ${myRoll})! `;
+
+  // Opening-blow reach gate. The grid entities are seeded HERE — after
+  // runPreattack's range check already ran with no entities to measure — so
+  // without this the opening swing would land regardless of distance. When the
+  // Attack handler supplies its weapon and the triggering PC can't reach the
+  // target, combat still begins but the blow is withheld (caller skips
+  // resolution); the PC keeps their turn to close the gap and strike.
+  let openingBlowInReach = true;
+  if (opts?.openingBlow) {
+    const charEnt = ctx.st.entities?.find((e) => e.id === pc.char.id && !e.isEnemy);
+    const targetEnt = ctx.st.entities?.find((e) => e.id === target.id && e.isEnemy);
+    if (charEnt && targetEnt && !inRange(charEnt.pos, targetEnt.pos, opts.openingBlow.weapon)) {
+      openingBlowInReach = false;
+    }
+  }
+
+  ctx.narrative += !openingBlowInReach
+    ? `${pc.char.name} rolls initiative (${myRoll}) but must close the distance before striking. `
+    : isHighestInit
+      ? `${pc.char.name} acts first (initiative ${myRoll})! `
+      : `${pc.char.name} strikes with the opening blow (initiative ${myRoll})! `;
+
+  return { openingBlowInReach };
 }
