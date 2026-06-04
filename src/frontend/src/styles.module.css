@@ -997,6 +997,22 @@
    isn't affected elsewhere. */
 .gameLayout > .campaignPanel {
   align-self: stretch;
+  /* Lay the panel out as a column so the tab body can fill the stretched row
+     height: the tabs stay a fixed header, the body flexes to fill + scrolls. */
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.gameLayout > .campaignPanel > .campaignTabs {
+  flex-shrink: 0;
+}
+/* The tab body (Adventure Log etc.) fills the panel's height instead of its
+   default 280px cap, scrolling when the log outgrows the space. Scoped to the
+   in-game grid so the shared .campaignBody (CampaignPanel) keeps its cap. */
+.gameLayout > .campaignPanel > .campaignBody {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
 }
 
 @media (max-width: 1100px) {
