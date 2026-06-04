@@ -1137,7 +1137,7 @@ export const regions: Region[] = [
         pos: { x: 9, y: 3 }, // mid-tier, off the eastern road
         kind: 'local',
         entryRoomId: 'dungeon_crypt_entrance',
-        icon: 'tombstone',
+        icon: 'ancient-sword',
       },
       // ── Whispering Pines (folded) — three new sites in the frozen north ──
       {
