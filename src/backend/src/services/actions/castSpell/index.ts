@@ -14,6 +14,7 @@ import { runAttackRollSpell } from './attackRoll.js';
 import { runAutoHitSpell } from './autoHit.js';
 import { runBuffSpell } from './buff.js';
 import { runCombatStart } from '../attack/combatStart.js';
+import { runDivineWord } from './divineWord.js';
 import { runEnlargeReduce } from './enlargeReduce.js';
 import { runHealSpell } from './heal.js';
 import { runMultiTargetSpell } from './multiTarget.js';
@@ -370,6 +371,15 @@ export const handleCastSpell: ActionHandler<{
   // resolution, so it short-circuits the generic save / AoE damage path below.
   if (spell.prismaticRays) {
     runPrismaticSpray(ctx, spell, slotLevel, dc);
+    ctx.usedInitiative = true;
+    return;
+  }
+
+  // SRD Divine Word — each enemy in range makes a CHA save; on a failure a
+  // target with ≤50 HP is slain or stunned/blinded/deafened by its current-HP
+  // bracket. Owns full resolution, short-circuiting the generic save path.
+  if (spell.divineWord) {
+    runDivineWord(ctx, spell, dc);
     ctx.usedInitiative = true;
     return;
   }

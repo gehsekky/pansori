@@ -5642,4 +5642,30 @@ export const SRD_SPELLS: Record<string, Spell> = {
     },
     spellList: ['arcane'],
   },
+
+  // SRD: Divine Word (L7 Evocation, Cleric) — a Bonus Action word of power.
+  // Each enemy in range makes a CHA save; on a failure a target with ≤50 HP
+  // suffers an effect by its current HP (≤20 dies; 21–30 Blinded+Deafened+
+  // Stunned; 31–40 Blinded+Deafened; 41–50 Deafened). Resolved by the dedicated
+  // `runDivineWord` dispatch. V only (somatic: false). The outsider plane-banish
+  // is deferred (no creature-type / planar model).
+  divine_word: {
+    id: 'divine_word',
+    name: 'Divine Word',
+    level: 7,
+    castTime: 'bonus_action',
+    divineWord: true,
+    savingThrow: 'cha',
+    rangeKind: 'ranged',
+    rangeFt: 30,
+    somatic: false, // SRD: V only
+    desc: 'You utter a word from the Upper Planes. Each enemy within 30 ft makes a CHA save; on a failure, a target with 50 HP or fewer is felled or wracked by its wounds — ≤20 HP dies; 21–30 is Blinded, Deafened, and Stunned (1 hr); 31–40 is Blinded and Deafened (10 min); 41–50 is Deafened (1 min). (The Celestial/Elemental/Fey/Fiend plane-banish is deferred.)',
+    narratives: {
+      cast: [
+        '{name} speaks a Word from the Upper Planes — searing syllables that crash over the unworthy',
+        '{name} utters {spell}{slotNote}; a thunderclap of holy power rolls across the foes',
+      ],
+    },
+    spellList: ['divine'],
+  },
 };

@@ -798,6 +798,12 @@ export interface Spell {
   // (WIS save-ends), 8 strikes with two rays (reroll 8s). Routed to a dedicated
   // dispatch branch (`runPrismaticSpray`). `blastRadius` is the cone length.
   prismaticRays?: boolean;
+  // SRD Divine Word — each enemy within `rangeFt` makes a CHA save; on a failure
+  // a target with ≤50 HP suffers an effect by its CURRENT HP (≤20 dies; 21–30
+  // Blinded+Deafened+Stunned; 31–40 Blinded+Deafened; 41–50 Deafened). Routed to
+  // the dedicated `runDivineWord` dispatch. (The outsider plane-banish is
+  // deferred — pansori doesn't model creature type / planes.)
+  divineWord?: boolean;
   // SRD Sanctuary — ward the self/ally target; attackers must save vs the
   // caster's DC. The buff path stamps `Character.sanctuary_dc`.
   sanctuary?: boolean;
