@@ -185,6 +185,7 @@ export const handleCastSpell: ActionHandler<{
         targetCharId?: string;
         restorationEffect?: string;
         resistType?: string;
+        breathType?: string;
       },
       spell,
       slotLevel,

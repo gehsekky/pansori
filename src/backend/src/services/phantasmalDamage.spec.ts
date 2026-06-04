@@ -43,7 +43,15 @@ function afflictedState(opts: { hp: number; dc: number; acted: boolean }) {
     ],
     initiative_idx: 0,
     entities: [
-      { id: 'pc-1', isEnemy: false, pos: { x: 1, y: 1 }, hp: 60, maxHp: 60, conditions: [] },
+      {
+        id: 'pc-1',
+        isEnemy: false,
+        pos: { x: 1, y: 1 },
+        hp: 60,
+        maxHp: 60,
+        conditions: [],
+        condition_durations: {},
+      },
       {
         id: enemyId,
         isEnemy: true,
@@ -51,6 +59,7 @@ function afflictedState(opts: { hp: number; dc: number; acted: boolean }) {
         hp: opts.hp,
         maxHp: opts.hp,
         conditions: ['phantasm'],
+        condition_durations: {},
         save_ends: {
           phantasm: {
             ability: 'int' as const,
@@ -113,9 +122,33 @@ describe('Phantasmal Force — cast stamps the recurring tick', () => {
       ],
       initiative_idx: 0,
       entities: [
-        { id: 'pc-1', isEnemy: false, pos: { x: 1, y: 1 }, hp: 40, maxHp: 40, conditions: [] },
-        { id: 'pc-2', isEnemy: false, pos: { x: 1, y: 3 }, hp: 40, maxHp: 40, conditions: [] },
-        { id: enemyId, isEnemy: true, pos: { x: 2, y: 2 }, hp: 80, maxHp: 80, conditions: [] },
+        {
+          id: 'pc-1',
+          isEnemy: false,
+          pos: { x: 1, y: 1 },
+          hp: 40,
+          maxHp: 40,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: 'pc-2',
+          isEnemy: false,
+          pos: { x: 1, y: 3 },
+          hp: 40,
+          maxHp: 40,
+          conditions: [],
+          condition_durations: {},
+        },
+        {
+          id: enemyId,
+          isEnemy: true,
+          pos: { x: 2, y: 2 },
+          hp: 80,
+          maxHp: 80,
+          conditions: [],
+          condition_durations: {},
+        },
       ],
     };
     const r = await takeAction({

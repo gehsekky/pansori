@@ -76,6 +76,7 @@ import { handleRecoverSlots } from './recoverSlots.js';
 import { handleRecurringSpellAttack } from './recurringSpellAttack.js';
 import { handleSneak } from './sneak.js';
 import { handleTwoWeaponAttack } from './twoWeaponAttack.js';
+import { handleUseBreath } from './useBreath.js';
 import { handleUseClassFeature } from './classFeature/index.js';
 
 /**
@@ -97,6 +98,7 @@ const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   help: handleHelp as ActionHandler,
   ready: handleReady as ActionHandler,
   recurring_spell_attack: handleRecurringSpellAttack as ActionHandler,
+  use_breath: handleUseBreath as ActionHandler,
   apply_asi: handleApplyAsi as ActionHandler,
   level_up_class: handleLevelUpClass as ActionHandler,
   enter_leveling: handleEnterLeveling as ActionHandler,

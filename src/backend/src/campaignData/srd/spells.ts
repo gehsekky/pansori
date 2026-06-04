@@ -3211,6 +3211,26 @@ export const SRD_SPELLS: Record<string, Spell> = {
     rangeFt: 120,
     spellList: ['arcane'],
   },
+  // SRD: Dragon's Breath — L2 Transmutation (Sorcerer, Wizard). A bonus-action
+  // touch buff: a willing creature (self or ally) gains a breath weapon it can
+  // exhale as an action — a 15-ft cone, DEX save for half, 3d6 (+1d6/slot above
+  // 2nd) of a damage type chosen at cast. Concentration, up to 1 minute. The
+  // buff path stamps `granted_breath`; the `use_breath` action fires the cone.
+  dragons_breath: {
+    id: 'dragons_breath',
+    name: "Dragon's Breath",
+    level: 2,
+    castTime: 'bonus_action',
+    targetType: 'self_or_ally',
+    rangeKind: 'touch',
+    concentration: true,
+    durationRounds: 10,
+    grantsBreath: true,
+    damage: '3d6',
+    upcastBonus: '1d6',
+    desc: 'Touch a willing creature (self or ally); choose Acid, Cold, Fire, Lightning, or Poison. Until the spell ends it can use its action to exhale a 15-ft cone — each creature there makes a DEX save, taking 3d6 of the chosen type (half on a save). +1d6 per slot level above 2nd. Concentration, up to 1 minute.',
+    spellList: ['arcane'],
+  },
   // SRD: Phantasmal Force — L2 Illusion (Bard, Sorcerer, Wizard). An illusion in
   // one creature's mind (INT save negates). While it perceives the phantasm
   // (the benign `phantasm` carrier condition), a dangerous illusion deals 2d8

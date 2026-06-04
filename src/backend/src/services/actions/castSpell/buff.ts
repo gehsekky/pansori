@@ -1,9 +1,9 @@
+import { computeTotalAc, spellSaveDC, upcastDamage } from '../../rulesEngine.js';
 import { concentrationRoundsFor, pickCastPrefix } from './utils.js';
 import { equippedArmorId, equippedShieldId } from '../../equipment.js';
 import type { ActionContext } from '../types.js';
 import type { Spell } from '../../../types.js';
 import { composeNow } from '../../narrative/compose.js';
-import { computeTotalAc } from '../../rulesEngine.js';
 import { defenseAcBonus } from '../../fightingStyle.js';
 
 /**
@@ -26,6 +26,7 @@ export function runBuffSpell(
     targetCharId?: string;
     restorationEffect?: string;
     resistType?: string;
+    breathType?: string;
   },
   spell: Spell,
   slotLevel: number,
@@ -438,6 +439,26 @@ export function runBuffSpell(
         ...ctx.st,
         characters: ctx.st.characters.map((c) =>
           c.id === buffTarget.id ? { ...c, fly_speed_ft: flyFt } : c
+        ),
+      };
+    }
+  }
+
+  // SRD Dragon's Breath — grant the target a breath weapon for the duration.
+  // The chosen element comes from the cast option picker (default fire); the
+  // damage is the spell's dice scaled for the slot; the save DC is the caster's.
+  if (spell.grantsBreath) {
+    const breathType = action.breathType ?? 'fire';
+    const dice = upcastDamage(spell, slotLevel) || spell.damage || '3d6';
+    const saveDc = dc ?? spellSaveDC(char.level, char.int);
+    const granted = { damageType: breathType, dice, saveDc, sourceCasterId: char.id };
+    if (isCasterTarget) {
+      char.granted_breath = granted;
+    } else {
+      ctx.st = {
+        ...ctx.st,
+        characters: ctx.st.characters.map((c) =>
+          c.id === buffTarget.id ? { ...c, granted_breath: granted } : c
         ),
       };
     }

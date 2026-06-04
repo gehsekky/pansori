@@ -494,6 +494,9 @@ export function breakConcentration(
   const wasHaste = char.concentrating_on.spellId === 'haste';
   // SRD Ranger Hunter's Mark — dropping concentration clears the marked target.
   const wasHuntersMark = char.concentrating_on.spellId === 'hunters_mark';
+  // SRD Dragon's Breath — dropping concentration revokes the granted breath
+  // weapon from whichever creature (self or ally) the caster touched.
+  const wasDragonsBreath = char.concentrating_on.spellId === 'dragons_breath';
   // SRD Blur — dropping concentration clears the `blurred` self-buff.
   const wasBlur = char.concentrating_on.spellId === 'blur';
   // SRD Divine Favor / smites — concentration drop ends the per-attack weapon
@@ -580,6 +583,18 @@ export function breakConcentration(
     };
     if (newChar.fly_speed_ft) {
       newChar = { ...newChar, fly_speed_ft: undefined };
+    }
+  }
+  if (wasDragonsBreath) {
+    // Revoke the granted breath from any creature this caster armed.
+    newSt = {
+      ...newSt,
+      characters: newSt.characters.map((c) =>
+        c.granted_breath?.sourceCasterId === char.id ? { ...c, granted_breath: undefined } : c
+      ),
+    };
+    if (newChar.granted_breath?.sourceCasterId === char.id) {
+      newChar = { ...newChar, granted_breath: undefined };
     }
   }
   // SRD Blur — clear the `blurred` self-buff from the caster (+ entity mirror).
@@ -3036,6 +3051,9 @@ export function endCombatState(st: GameState): GameState {
       blinking: undefined,
       // Sanctuary ward (1 min ≈ encounter) clears at combat end.
       sanctuary_dc: undefined,
+      // Dragon's Breath (1 min ≈ encounter) — the granted breath doesn't carry
+      // to the next fight.
+      granted_breath: undefined,
     })),
   };
 }
@@ -5573,7 +5591,19 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
                     { id: 'thunder', label: 'Thunder' },
                   ],
                 }
-              : undefined;
+              : spellId === 'dragons_breath'
+                ? {
+                    param: 'breathType',
+                    title: "Dragon's Breath — choose the breath's damage type",
+                    options: [
+                      { id: 'acid', label: 'Acid' },
+                      { id: 'cold', label: 'Cold' },
+                      { id: 'fire', label: 'Fire' },
+                      { id: 'lightning', label: 'Lightning' },
+                      { id: 'poison', label: 'Poison' },
+                    ],
+                  }
+                : undefined;
 
       if (spell.level === 0) {
         // Cantrip: no slot needed
@@ -6071,6 +6101,25 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
           kind: 'recurring_spell_attack',
         });
       }
+    }
+  }
+
+  // ── SRD Dragon's Breath — exhale a 15-ft cone toward an enemy (the holder's
+  // action), once per turn for the spell's duration. One choice per living
+  // enemy to aim the cone.
+  if (
+    state.combat_active &&
+    char.granted_breath &&
+    !char.turn_actions.action_used &&
+    livingEnemies.length > 0
+  ) {
+    for (const en of livingEnemies) {
+      if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+      choices.push({
+        label: `Exhale ${char.granted_breath.damageType} breath (15-ft cone) → the ${en.name}`,
+        action: { type: 'use_breath', targetEnemyId: en.id },
+        kind: 'use_breath',
+      });
     }
   }
 

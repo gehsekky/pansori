@@ -892,6 +892,12 @@ export interface Spell {
     isMount?: boolean;
     speed?: number;
   };
+  // SRD Dragon's Breath — a self/ally buff that grants the target a breath
+  // weapon: until the spell ends (concentration) the target can take an action
+  // to exhale a 15-ft cone (DEX save-for-half) dealing the spell's `damage`
+  // (+`upcastBonus`/level) of a type chosen at cast. The buff path stamps
+  // `Character.granted_breath`; the `use_breath` action re-issues the cone.
+  grantsBreath?: boolean;
   // Long casting time (1 min+) — rejected in combat (before slot spend).
   outOfCombatOnly?: boolean;
 }
@@ -1140,6 +1146,17 @@ export interface Character {
     rounds_left: number; // duration; decremented on round wrap, cleared at 0
     concentration?: boolean; // cleared by breakConcentration when set
   } | null;
+  // SRD Dragon's Breath — a granted breath weapon the holder can exhale (its
+  // action) as a 15-ft cone (DEX save, half) each turn for the spell's duration.
+  // `dice` is the upcast-baked damage, `saveDc` the caster's spell save DC at
+  // cast, `damageType` the chosen element. Cleared when the CASTER (`sourceCasterId`)
+  // drops concentration. Re-issued via the `use_breath` action.
+  granted_breath?: {
+    damageType: string;
+    dice: string;
+    saveDc: number;
+    sourceCasterId: string;
+  };
   // SRD Ranger Hunter's Mark — the id of the currently-marked enemy entity.
   // Set when the spell is cast, cleared on breakConcentration. The caster's
   // attack rolls vs this target deal +1d6 Force (d10 at Ranger L20, Foe Slayer).

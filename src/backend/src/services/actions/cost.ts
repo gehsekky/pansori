@@ -125,6 +125,8 @@ export const ACTION_COSTS: Record<StructuredAction['type'], ActionCost> = {
   // RE-4 — recurring_spell_attack self-manages its cost (bonus action for
   // Spiritual Weapon, action for Vampiric Touch).
   recurring_spell_attack: 'managed',
+  // SRD Dragon's Breath — the handler consumes the holder's action itself.
+  use_breath: 'managed',
   jump: 'managed',
   resolve_reaction: 'managed',
   attack: 'managed',

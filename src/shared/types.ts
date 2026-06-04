@@ -517,6 +517,9 @@ export type StructuredAction =
       // picker): 'acid' | 'cold' | 'fire' | 'lightning' | 'thunder'. Omitted =
       // the spell's default (fire).
       resistType?: string;
+      // Dragon's Breath — the chosen breath damage type (option picker): 'acid'
+      // | 'cold' | 'fire' | 'lightning' | 'poison'. Omitted = fire.
+      breathType?: string;
       // Cleric L10 Divine Intervention — cast this Cleric spell (level ≤5,
       // non-Reaction) without a slot or Material components, 1/Long Rest.
       // Set by the Divine Intervention choice surface; precast validates
@@ -571,6 +574,9 @@ export type StructuredAction =
   // RE-4 — re-issue a recurring spell attack (Spiritual Weapon / Vampiric Touch)
   // at a target on a later turn, for the spell's recurring cost.
   | { type: 'recurring_spell_attack'; targetEnemyId?: string }
+  // SRD Dragon's Breath — the granted-breath holder exhales a 15-ft cone toward
+  // the aimed enemy (its action). Surfaced while `Character.granted_breath` is set.
+  | { type: 'use_breath'; targetEnemyId?: string }
   | { type: 'jump'; to: GridPos } // SRD Long Jump — leap up to STR ft over terrain/obstacles
   // 3-level grid map model — move the single party marker on the current grid
   // (regional / town / local-exploration). Free pathfind out of combat; the
@@ -694,6 +700,7 @@ export type ChoiceKind =
   | 'grid_move'
   | 'move_zone'
   | 'recurring_spell_attack'
+  | 'use_breath'
   | 'dash'
   | 'disengage'
   | 'dodge'
