@@ -62,6 +62,7 @@ export function activeGrid(seed: Seed | undefined, st: GameState): ActiveGrid | 
       label: s.name,
       toTownId: s.kind === 'town' ? s.townId : undefined,
       toRoomId: s.kind === 'local' ? s.entryRoomId : undefined,
+      icon: s.icon,
     }));
     return {
       level,

@@ -372,6 +372,9 @@ export interface MapSite {
   townId?: string;
   entryRoomId?: string;
   desc?: string;
+  // Overland glyph for a `local` site (dungeon): a game-icons.net icon name.
+  // Omitted ⇒ a default dungeon icon. Towns use the village glyph regardless.
+  icon?: string;
 }
 
 export interface Region {
@@ -423,6 +426,9 @@ export interface MapTransition {
   toRoomId?: string;
   entrancePos?: GridPos;
   ascendTo?: 'town' | 'region';
+  // Overland glyph for a local `site` (dungeon): a game-icons.net icon name,
+  // carried through from the MapSite. Omitted ⇒ a default dungeon icon.
+  icon?: string;
 }
 
 export interface ActiveGrid {

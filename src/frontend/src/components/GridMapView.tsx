@@ -67,6 +67,10 @@ const REGIONAL_TERRAIN_ICON: Partial<Record<TerrainType, { name: string; color: 
   water: { name: 'waves', color: 'rgba(150, 205, 245, 0.95)' }, // light blue, lighter than the tint
 };
 
+// Local sites (dungeons) on the overland map: the game-icons glyph defaults to
+// this and is overridden per site via MapSite.icon (carried on the transition).
+const DEFAULT_SITE_ICON = 'dungeon-gate';
+
 // Out of combat an enemy carries no grid position (positions are assigned only
 // when combat deploys tokens). Pick a single cell near the party for the red
 // "enemy here" marker: the first valid cell from a ring around the party
@@ -287,18 +291,28 @@ function GridMapView({
       } else if (transition) {
         // A travel destination always shows its own glyph — even if terrain is
         // painted on the same cell — so a site never hides behind a tint glyph.
-        // Towns (a site carrying `toTownId`) use the game-icons village glyph;
-        // every other transition keeps its plain unicode glyph for now.
+        // Towns (a site carrying `toTownId`) use the village glyph; local sites
+        // (dungeons) use their authored icon (default DEFAULT_SITE_ICON); every
+        // other transition (venue / room exit / ascend) keeps its unicode glyph.
         const isTown = transition.kind === 'site' && !!transition.toTownId;
+        const isLocalSite = transition.kind === 'site' && !transition.toTownId;
+        const siteIcon = isTown
+          ? 'village'
+          : isLocalSite
+            ? (transition.icon ?? DEFAULT_SITE_ICON)
+            : null;
+        const siteColor = isTown
+          ? 'rgba(222, 190, 120, 0.97)' // warm settlement gold
+          : 'rgba(206, 198, 182, 0.95)'; // weathered stone
         token = (
           <>
-            {isTown ? (
+            {siteIcon ? (
               <GameIcon
-                name="village"
+                name={siteIcon}
                 className={styles.gridMapGlyph}
                 style={{
                   fontSize: glyphFont ? `calc(${glyphFont} * 1.25)` : undefined,
-                  color: 'rgba(222, 190, 120, 0.97)', // warm settlement gold
+                  color: siteColor,
                 }}
               />
             ) : (

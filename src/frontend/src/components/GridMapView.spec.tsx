@@ -119,17 +119,30 @@ describe('GridMapView', () => {
     expect(onMarkerMove).not.toHaveBeenCalled(); // engages, doesn't travel onto the cell
   });
 
-  it('distinguishes a town (village icon) from a local site (◈) and shows their names', () => {
+  it('distinguishes a town (village icon) from a local site (default dungeon icon) and shows their names', () => {
     const { container, getByText } = render(<GridMapView grid={grid} markerPos={{ x: 0, y: 0 }} />);
     // Town cell: game-icons village glyph + always-visible name.
     expect(cell(container, 3, 0).querySelector('.game-icon-village')).toBeTruthy();
     expect(getByText('Millhaven')).toBeTruthy();
-    // Local site cell: diamond glyph + name.
-    expect(cell(container, 0, 2).textContent).toContain('◈');
+    // Local site cell (no authored icon): the default dungeon glyph + name.
+    expect(cell(container, 0, 2).querySelector('.game-icon-dungeon-gate')).toBeTruthy();
     expect(getByText('Old Crypt')).toBeTruthy();
     // Legend gains town + site entries.
     expect(getByText('town')).toBeTruthy();
     expect(getByText('site')).toBeTruthy();
+  });
+
+  it('renders a per-dungeon icon override on a local site', () => {
+    const withIcon: ActiveGrid = {
+      ...grid,
+      transitions: [
+        { pos: { x: 0, y: 2 }, kind: 'site', label: 'Shattered Crypt', icon: 'tombstone' },
+      ],
+    };
+    const { container } = render(<GridMapView grid={withIcon} markerPos={{ x: 0, y: 0 }} />);
+    const c = cell(container, 0, 2);
+    expect(c.querySelector('.game-icon-tombstone')).toBeTruthy(); // override wins
+    expect(c.querySelector('.game-icon-dungeon-gate')).toBeNull(); // not the default
   });
 
   it('tooltips a non-POI square with its terrain type + travel/encounter info', () => {

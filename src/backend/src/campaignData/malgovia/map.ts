@@ -1128,6 +1128,7 @@ export const regions: Region[] = [
         pos: { x: 11, y: 3 }, // off the eastern road, by the crypt
         kind: 'local',
         entryRoomId: 'bandit_camp',
+        icon: 'camping-tent',
       },
       {
         id: 'site_crypt',
@@ -1135,6 +1136,7 @@ export const regions: Region[] = [
         pos: { x: 9, y: 3 }, // mid-tier, off the eastern road
         kind: 'local',
         entryRoomId: 'dungeon_crypt_entrance',
+        icon: 'tombstone',
       },
       // ── Whispering Pines (folded) — three new sites in the frozen north ──
       {
@@ -1150,6 +1152,7 @@ export const regions: Region[] = [
         pos: { x: 5, y: 1 }, // snowy north, on the way west to the Spire
         kind: 'local',
         entryRoomId: 'pass_climb',
+        icon: 'mountains',
       },
       {
         id: 'site_spire',
@@ -1157,6 +1160,7 @@ export const regions: Region[] = [
         pos: { x: 1, y: 0 }, // climax, the frozen NW corner
         kind: 'local',
         entryRoomId: 'spire_entrance',
+        icon: 'ice-iris',
       },
       // ── Grove of Thorns (folded) — Pinegate + the Silent Grove ──
       {
@@ -1172,6 +1176,7 @@ export const regions: Region[] = [
         pos: { x: 3, y: 6 }, // the beginner dungeon, in a forest clearing by Pinegate
         kind: 'local',
         entryRoomId: 'thornwater_bridge',
+        icon: 'forest',
       },
     ],
     // Bandit Ruffian (Malgovia) + the folded modules' overland encounters

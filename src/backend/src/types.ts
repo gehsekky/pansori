@@ -1788,6 +1788,10 @@ export interface MapSite {
   townId?: string; // kind 'town' → the Town grid to open
   entryRoomId?: string; // kind 'local' → the local room to drop into
   desc?: string;
+  // Overland map glyph for a `local` site (dungeon): a game-icons.net icon name
+  // (e.g. 'tombstone', 'ice-iris'). Omitted ⇒ a default dungeon icon. Towns use
+  // the village glyph regardless.
+  icon?: string;
 }
 
 export interface Region {
