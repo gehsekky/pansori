@@ -6032,4 +6032,64 @@ export const SRD_SPELLS: Record<string, Spell> = {
       damage: '4d8',
     },
   },
+
+  // ─── Removal effects (a creature is taken out of the fight) ───────────────────
+  // These reuse the `banished` condition — a banished creature is skipped by the
+  // enemy turn loop and can't be targeted, then returns when the effect ends.
+  // SRD: Otiluke's Resilient Sphere — a Large-or-smaller creature is sealed in an
+  // impervious sphere (DEX save negates); it can't act on anything outside and
+  // nothing outside can reach it. 1 minute, not concentration. (The sphere's
+  // destructible shell is abstracted to the duration.)
+  resilient_sphere: {
+    id: 'resilient_sphere',
+    name: 'Resilient Sphere',
+    level: 4,
+    castTime: 'action',
+    savingThrow: 'dex',
+    saveEffect: 'negates',
+    condition: 'banished',
+    conditionDuration: 10,
+    rangeKind: 'ranged',
+    rangeFt: 30,
+    desc: 'A shimmering sphere seals a creature within 30 ft (DEX save negates) — it is removed from the fight, unable to affect anyone outside and untouchable from without, for up to 1 minute.',
+    narrative: '{name} encases {target} in a glassy sphere of force — sealed away from the battle.',
+    spellList: ['arcane'],
+  },
+  // SRD: Forcecage — a prison of force traps a creature with no save to avoid the
+  // cage (only a CHA save to teleport out). Pansori folds that into a CHA
+  // save-negates, ~10-minute, non-concentration banish. (Simplification: RAW the
+  // cage lands automatically; here a strong CHA save can resist it.)
+  forcecage: {
+    id: 'forcecage',
+    name: 'Forcecage',
+    level: 7,
+    castTime: 'action',
+    savingThrow: 'cha',
+    saveEffect: 'negates',
+    condition: 'banished',
+    conditionDuration: 100,
+    rangeKind: 'ranged',
+    rangeFt: 100,
+    desc: 'A cage of force snaps shut around a creature within 100 ft (CHA save to resist) — it is trapped, out of the fight, for the encounter.',
+    narrative: '{name} slams a lattice of force shut around {target} — caged, with no way through.',
+    spellList: ['arcane'],
+  },
+  // SRD: Imprisonment — bind a creature within 30 ft (WIS save negates) in an
+  // inescapable prison. RAW it lasts until dispelled / the named condition is met;
+  // pansori models it as an effectively permanent banish for the fight.
+  imprisonment: {
+    id: 'imprisonment',
+    name: 'Imprisonment',
+    level: 9,
+    castTime: 'action',
+    savingThrow: 'wis',
+    saveEffect: 'negates',
+    condition: 'banished',
+    conditionDuration: 6000,
+    rangeKind: 'ranged',
+    rangeFt: 30,
+    desc: 'Bind a creature within 30 ft (WIS save negates) in an inescapable prison — removed from the fight for its duration.',
+    narrative: '{name} speaks the binding; {target} is dragged out of the world and sealed away.',
+    spellList: ['arcane'],
+  },
 };
