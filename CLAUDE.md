@@ -57,7 +57,15 @@ grep -n "^Alert$\|^Magic Initiate$\|^Savage Attacker$\|^Skilled$" docs/srd-5.2.1
 | Origin feats | 4 (+ Magic Initiate's 3 list variants) | 6 |
 | General feats | 2 (ASI + Grappler) | 0 (neither fits the choose-a-feat surface today) |
 | Species | 9 standalone + Drow as Elf-lineage | 9 |
-| Spells | ~332 | 111 |
+| Spells | ~332 | all (full SRD coverage; the un-modelable utility/meta spells are narrative-only — see note below) |
+
+All SRD 5.2.1 spells are now in the catalog. The combat-relevant ones
+are fully mechanical; spells whose RAW effect needs systems pansori
+doesn't have (magic suppression, possession, planar gating, extra
+turns, shapeshifting into arbitrary creatures, reality alteration) are
+registered as **narrative spells** — their effect is described and
+adjudicated at the table, the same pattern as Augury / Commune /
+Divination. Mechanizing those waits on the underlying systems.
 
 The SRD's General Feats section is intentionally small — most
 iconic combat-optimization feats (Lucky / Sharpshooter / Sentinel
