@@ -1161,7 +1161,7 @@ export const regions: Region[] = [
         pos: { x: 1, y: 0 }, // climax, the frozen NW corner
         kind: 'local',
         entryRoomId: 'spire_entrance',
-        icon: 'ice-iris',
+        icon: 'evil-tower',
       },
       // ── Grove of Thorns (folded) — Pinegate + the Silent Grove ──
       {
