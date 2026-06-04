@@ -196,7 +196,7 @@ export function runSaveSpell(
       // attack resolver clears polymorph_state + the polymorphed
       // condition). Pansori MVP auto-picks Wolf regardless of target
       // CR; RAW lets the caster pick any beast ≤ target level.
-      const isPolymorph = spell.id === 'polymorph';
+      const isPolymorph = spell.id === 'polymorph' || spell.id === 'true_polymorph';
       // Stamp a finite duration only for non-concentration condition spells
       // (Charm Person/Monster, Blindness). Concentration spells (Hold Person,
       // Fear, Dominate, …) leave the duration unset — concentration is their

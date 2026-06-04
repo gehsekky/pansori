@@ -482,7 +482,9 @@ export function breakConcentration(
   // restore those + clear the polymorphed condition. Pansori MVP assumes
   // one Polymorph active at a time and reverts every polymorphed entity.
   // RAW would track per-caster.
-  const wasPolymorph = char.concentrating_on.spellId === 'polymorph';
+  const wasPolymorph =
+    char.concentrating_on.spellId === 'polymorph' ||
+    char.concentrating_on.spellId === 'true_polymorph';
   // 2024 PHB Haste — concentration drop strips the hasted condition
   // and triggers the RAW lethargy: "the target is Incapacitated and
   // has a Speed of 0 until the end of its next turn." Pansori models
@@ -5558,7 +5560,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       // Restoration's effect. Tagged on the cast choice so the FE opens an
       // option dialog; the cast path honors the chosen id (else its default).
       const pickOption: GameChoice['pickOption'] =
-        spellId === 'polymorph'
+        spellId === 'polymorph' || spellId === 'true_polymorph'
           ? {
               param: 'beastForm',
               title: 'Polymorph — choose a beast form',
