@@ -122,4 +122,36 @@ describe('runSummonSpell', () => {
     runSummonSpell(ctx, animateDead, '', 5, 'Skeleton');
     expect(ctx.narrative).toContain('5 Skeletons rise');
   });
+
+  // SRD Create Undead — raises a fixed `baseCount` (3 Ghouls), +1 per slot
+  // level above 6th.
+  const createUndead = {
+    id: 'create_undead',
+    name: 'Create Undead',
+    level: 6,
+    summon: {
+      name: 'Ghoul',
+      ac: 13,
+      maxHp: 22,
+      toHit: 4,
+      damage: '2d6+2',
+      baseCount: 3,
+      countPerUpcastLevel: 1,
+    },
+  } as unknown as Spell;
+
+  it('raises baseCount creatures at base level (Create Undead → 3 Ghouls)', () => {
+    const ctx = ctxWith();
+    runSummonSpell(ctx, createUndead, '', 6);
+    expect(ctx.st.summoned_allies).toHaveLength(3);
+    expect(ctx.st.summoned_allies?.every((a) => a.name === 'Ghoul')).toBe(true);
+    expect(ctx.st.summoned_allies?.[0]).toMatchObject({ ac: 13, maxHp: 22, toHit: 4 });
+    expect(ctx.narrative).toContain('3 Ghouls rise');
+  });
+
+  it('adds baseCount + per-upcast above base (Create Undead L8 → 5 Ghouls)', () => {
+    const ctx = ctxWith();
+    runSummonSpell(ctx, createUndead, '', 8);
+    expect(ctx.st.summoned_allies).toHaveLength(5);
+  });
 });

@@ -5474,10 +5474,11 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         );
         const variants = [spell.summon, ...(spell.summon.variants ?? [])];
         const perUpcast = spell.summon.countPerUpcastLevel ?? 0;
+        const summonBase = spell.summon.baseCount ?? 1;
         for (let sl = sBase; sl <= sMax; sl++) {
           const avail = (slots[sl] ?? 0) - (slotsUsed[sl] ?? 0);
           if (avail <= 0) continue;
-          const count = Math.max(1, 1 + perUpcast * (sl - sBase));
+          const count = Math.max(1, summonBase + perUpcast * (sl - sBase));
           const slotLabel = sl === sBase ? `Lvl ${sl}` : `${ordinal(sl)} slot`;
           for (const v of variants) {
             if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;

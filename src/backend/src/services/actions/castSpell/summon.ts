@@ -35,8 +35,10 @@ export function runSummonSpell(
   const baseLevel = spell.level ?? 1;
   const perUpcast = base.countPerUpcastLevel ?? 0;
   // Animate Objects: the base count is the caster's spellcasting modifier;
-  // every other summon raises one at base level.
-  const baseCount = base.countFromSpellMod ? Math.max(1, abilityMod(castingScore)) : 1;
+  // Create Undead raises a fixed `baseCount` (3); every other summon raises one.
+  const baseCount = base.countFromSpellMod
+    ? Math.max(1, abilityMod(castingScore))
+    : (base.baseCount ?? 1);
   const count = Math.max(1, baseCount + perUpcast * Math.max(0, slotLevel - baseLevel));
 
   const raised = Array.from({ length: count }, () => ({

@@ -863,6 +863,9 @@ export interface Spell {
     // Animate Dead: Skeleton [the base block above] or Zombie). The cast
     // surface offers the base plus each variant. (RE-1 Phase 4.5.)
     variants?: Array<{ name: string; ac: number; maxHp: number; toHit: number; damage: string }>;
+    // Creatures raised at the spell's base level (Create Undead: 3 Ghouls).
+    // Omitted ⇒ 1. Overridden by `countFromSpellMod` (Animate Objects) when set.
+    baseCount?: number;
     // Extra creatures raised per slot level above the spell's base level
     // (Animate Dead: 2 — RAW "two additional Undead for each slot level
     // above 3"). Omitted / 0 ⇒ always one. (RE-1 Phase 4.5.)

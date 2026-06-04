@@ -2198,6 +2198,33 @@ export const SRD_SPELLS: Record<string, Spell> = {
       countPerUpcastLevel: 2,
     },
   },
+  // SRD: Create Undead — L6 Necromancy (Cleric, Warlock, Wizard). 1-minute
+  // ritual ("only at night"), so out-of-combat only. Raises three Ghouls (the
+  // SRD Ghoul stat block) that fight at the party's side and join the next
+  // battle; command them as a Bonus Action. A higher slot raises one more Ghoul
+  // per level above 6th (7th→4, 8th→5, 9th→6 — the RAW Ghoul line). The 8th/9th-
+  // level options to instead raise Ghasts/Wights/Mummies are deferred: they need
+  // per-variant slot-level gating with their own counts, which the flat summon
+  // model doesn't carry yet. Onyx component is flavor (no gold cost), matching
+  // Animate Dead.
+  create_undead: {
+    id: 'create_undead',
+    name: 'Create Undead',
+    level: 6,
+    castTime: 'action',
+    desc: 'Out of combat (a night ritual over fresh corpses and black onyx), raise three Ghouls (AC 13, 22 HP, +4, 2d6+2) to fight at your side and join the next battle; command them as a Bonus Action. A higher-level slot raises one more Ghoul per level above 6th.',
+    spellList: ['divine', 'arcane'],
+    outOfCombatOnly: true,
+    summon: {
+      name: 'Ghoul',
+      ac: 13,
+      maxHp: 22,
+      toHit: 4,
+      damage: '2d6+2',
+      baseCount: 3,
+      countPerUpcastLevel: 1,
+    },
+  },
   revivify: {
     id: 'revivify',
     name: 'Revivify',
