@@ -1358,6 +1358,14 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     multiattack: 3,
     attackReachFt: 120, // Arcane Burst — ranged
     damageType: 'force',
+    // SRD Spellcasting: 2/Day Fireball, 1/Day Cone of Cold. Modeled via the
+    // enemy AoE-cast path — each turn the mage may open with an area spell
+    // (resolveEnemyAoeSpell) instead of Arcane Burst. (Per-day counts aren't
+    // tracked; `castChance` is the per-turn abstraction. Fireball resolves at
+    // its base 8d6 — the stat block's level-4 bump isn't modeled.)
+    spells: ['fireball', 'cone_of_cold'],
+    castChance: 0.3,
+    spellSaveDC: 14,
   },
   wyvern: {
     name: 'Wyvern',
@@ -1625,5 +1633,10 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     damageType: 'force',
     immunities: ['psychic'],
     condition_immunities: ['charmed'],
+    // SRD Spellcasting (offensive subset): Fireball + Cone of Cold via the enemy
+    // AoE-cast path, at the archmage's spell save DC 17.
+    spells: ['fireball', 'cone_of_cold'],
+    castChance: 0.35,
+    spellSaveDC: 17,
   },
 };

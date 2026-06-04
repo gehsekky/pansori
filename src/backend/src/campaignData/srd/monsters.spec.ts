@@ -363,6 +363,15 @@ describe('SRD bestiary additions — effect fields', () => {
     expect(SRD_MONSTERS.archmage.condition_immunities).toContain('charmed');
   });
 
+  it('Mage and Archmage carry AoE spells (Fireball / Cone of Cold) for enemy casting', () => {
+    for (const k of ['mage', 'archmage'] as const) {
+      expect(SRD_MONSTERS[k].spells).toEqual(['fireball', 'cone_of_cold']);
+      expect(SRD_MONSTERS[k].castChance).toBeGreaterThan(0);
+      expect(SRD_MONSTERS[k].spellSaveDC).toBeGreaterThan(0);
+    }
+    expect(SRD_MONSTERS.archmage.spellSaveDC).toBe(17);
+  });
+
   it('the shared pool grew well past the original 12', () => {
     expect(Object.keys(SRD_MONSTERS).length).toBeGreaterThanOrEqual(50);
   });

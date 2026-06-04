@@ -63,6 +63,10 @@ import {
   canSeeTarget,
   coverBonus,
   distanceFeet,
+  entitiesInBlast,
+  entitiesInCone,
+  entitiesInCube,
+  entitiesInLine,
   findPath,
   hasLineOfSight,
   isInSunlight,
@@ -7425,6 +7429,81 @@ export function attemptEnemyApproach(args: {
  * outcome surface for direct tests.
  */
 /**
+ * AoE enemy damage spell (Fireball, Cone of Cold, Lightning Bolt, …) — the
+ * mirror of the PC `runAoeSpell` from the other side. The epicenter is the
+ * chosen target PC's cell (sphere) or the directional shape (cone/line/cube)
+ * extends from the caster toward it. Damage is rolled ONCE (SRD 5.2.1: one roll
+ * for the whole spell) and applied to every party-side creature in the area;
+ * each rolls its own save — a failure takes full damage, a success takes half
+ * on `saveEffect: 'half'` (none on `'negates'`). Evasion zeroes a successful DEX
+ * save-for-half. A dual-type spell's second component (Flame Strike's radiant)
+ * is rolled once and applied the same way. Friendly fire is skipped — the caster
+ * spares its own allies. Unlike the single-target path, an AoE cast does NOT
+ * open the interactive Indomitable reroll window (saves resolve immediately);
+ * Counterspell still gates the whole spell upstream in `attemptEnemySpellCast`.
+ */
+function resolveEnemyAoeSpell(args: {
+  enemy: Enemy;
+  spell: Spell;
+  target: Character;
+  st: GameState;
+  narrative: string;
+  context?: Context;
+  casterPos?: GridPos;
+  epicenter: GridPos;
+  entities: CombatEntity[];
+}): { st: GameState; target: Character; narrative: string } {
+  const { enemy, spell, casterPos, epicenter, entities } = args;
+  let st = args.st;
+  const shape = spell.aoeShape ?? 'sphere';
+  const radius = spell.blastRadius ?? 0;
+  const dc = enemy.spellSaveDC ?? 8 + Math.floor((enemy.toHit + 5) / 2);
+  const save = spell.savingThrow ?? 'dex';
+
+  const inArea =
+    shape === 'cone' && casterPos
+      ? entitiesInCone(casterPos, epicenter, radius, entities)
+      : shape === 'line' && casterPos
+        ? entitiesInLine(casterPos, epicenter, radius, entities)
+        : shape === 'cube' && casterPos
+          ? entitiesInCube(casterPos, epicenter, radius, entities)
+          : entitiesInBlast(epicenter, radius, entities);
+  // Party-side creatures only (no friendly fire), resolved against live PCs.
+  const victimIds = new Set(inArea.filter((e) => !e.isEnemy).map((e) => e.id));
+
+  // SRD — one damage roll for the whole spell, shared by every target.
+  const dmgRoll = rollDice(spell.damage ?? '0');
+  const dmgRoll2 = spell.damage2 ? rollDice(spell.damage2) : 0;
+  const half = (n: number): number => Math.floor(n / 2);
+
+  let narrative = args.narrative + ` ${enemy.name} unleashes ${spell.name}!`;
+  const struck = st.characters.filter((c) => !c.dead && victimIds.has(c.id));
+  for (const c of struck) {
+    const saveScore = (c[save] ?? 10) as number;
+    const saveProf =
+      args.context && hasSaveProficiency(c, save, args.context) ? profBonus(c.level) : 0;
+    const dangerSenseAdv = save === 'dex' && hasDangerSense(c);
+    const d20 = dangerSenseAdv ? Math.max(rollDice('1d20'), rollDice('1d20')) : rollDice('1d20');
+    const total = d20 + abilityMod(saveScore) + saveProf + auraOfProtectionBonus(c, st);
+    const saved = total >= dc;
+    const evasion = save === 'dex' && spell.saveEffect === 'half' && hasEvasion(c);
+    const effOf = (rolled: number): number => {
+      if (evasion) return saved ? 0 : half(rolled);
+      if (saved) return spell.saveEffect === 'half' ? half(rolled) : 0;
+      return rolled;
+    };
+    const dmg = effOf(dmgRoll) + effOf(dmgRoll2);
+    const evasionNote = evasion ? ' ✦ Evasion' : '';
+    const newHp = Math.max(0, c.hp - dmg);
+    st = commitCharacter(st, { ...c, hp: newHp });
+    narrative += ` ${c.name} ${fmt.save(save.toUpperCase(), total)} vs ${fmt.dc(dc)} — ${saved ? 'saves' : 'fails'}, ${fmt.dmg(dmg)} ${spell.damageType ?? 'damage'}.${evasionNote}`;
+  }
+  if (struck.length === 0) narrative += ' No one is caught in the blast.';
+  const primary = st.characters.find((c) => c.id === args.target.id) ?? args.target;
+  return { st, target: primary, narrative };
+}
+
+/**
  * Resolve an enemy's damage spell against a PC: roll damage, apply the
  * saving throw (half / negates / full), reduce HP, and commit. Extracted
  * from `attemptEnemySpellCast` so the resolution runs through the dispatched
@@ -7432,6 +7511,7 @@ export function attemptEnemyApproach(args: {
  * stay in the orchestrator. The enemy spell model is the stripped-down
  * `{ damage, savingThrow, saveEffect, damageType }` — distinct from the PC
  * `castSpell` pipeline by design (same split as the EE-2 attack resolvers).
+ * AoE spells (with `blastRadius`) branch to `resolveEnemyAoeSpell`.
  */
 export function resolveEnemySpell(args: {
   enemy: Enemy;
@@ -7456,6 +7536,29 @@ export function resolveEnemySpell(args: {
 } {
   const { enemy, spell, target } = args;
   let narrative = args.narrative;
+  // AoE damage spell (Fireball, Cone of Cold, …): when the grid is populated and
+  // both the caster and the chosen epicenter PC have positions, every party-side
+  // creature in the area rolls its own save. Falls through to the single-target
+  // path when positions are missing (unit tests that pin the dice math).
+  if (spell.blastRadius && args.st.entities) {
+    const ents = args.st.entities;
+    const casterPos = ents.find((e) => e.id === enemy.id && e.isEnemy)?.pos;
+    const epicenter = ents.find((e) => e.id === target.id && !e.isEnemy)?.pos;
+    if (epicenter) {
+      const r = resolveEnemyAoeSpell({
+        enemy,
+        spell,
+        target,
+        st: args.st,
+        narrative,
+        context: args.context,
+        casterPos,
+        epicenter,
+        entities: ents,
+      });
+      return { st: r.st, target: r.target, narrative: r.narrative };
+    }
+  }
   const dmgRoll = rollDice(spell.damage ?? '0');
   let newTarget: Character;
   let pendingSaveReroll: PendingSaveRerollInfo | undefined;
