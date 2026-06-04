@@ -1749,6 +1749,20 @@ function CharScreen({
                           </button>
                         )}
                       </div>
+                      <p
+                        style={{
+                          fontSize: '0.7rem',
+                          color: 'var(--t-dim)',
+                          marginTop: 4,
+                          letterSpacing: '0.05em',
+                        }}
+                        data-testid={`ability-sum-${idx}`}
+                      >
+                        SUM:{' '}
+                        <span style={{ color: 'var(--t-mid)', fontWeight: 'bold' }}>
+                          {STAT_KEYS.reduce((sum, k) => sum + draft.stats[k], 0)}
+                        </span>
+                      </p>
                       {(draft.statMethod === 'pointbuy' || draft.statMethod === 'manual') && (
                         <p
                           style={{

@@ -63,6 +63,12 @@ describe('CharScreen — single block + portrait nav', () => {
     expect(getByText('PARTY LEADER')).toBeTruthy();
   });
 
+  it('shows the sum of the current ability scores (standard array → 72)', () => {
+    const { getByText, getByTestId } = renderScreen();
+    fireEvent.click(getByText('ARRAY')); // 15/14/13/12/10/8 reordered → sum 72
+    expect(getByTestId('ability-sum-0').textContent).toContain('72');
+  });
+
   it('the + block dims and disables once the party is full', () => {
     const { container, getByTestId } = renderScreen();
     fireEvent.click(getByTestId('add-member-btn')); // 2
