@@ -6092,4 +6092,77 @@ export const SRD_SPELLS: Record<string, Spell> = {
     narrative: '{name} speaks the binding; {target} is dragged out of the world and sealed away.',
     spellList: ['arcane'],
   },
+
+  // ─── High-level area damage (reuse the AoE / zone / wall paths) ───────────────
+  // SRD: Reverse Gravity — everything in a 50-ft area falls upward and slams the
+  // ceiling. A DEX save lets a creature grab a fixed object and avoid the fall
+  // (negates); a failure takes falling damage (~10d6 bludgeoning for the ~100-ft
+  // cylinder). Resolved as a one-shot DEX-save-negates sphere.
+  reverse_gravity: {
+    id: 'reverse_gravity',
+    name: 'Reverse Gravity',
+    level: 7,
+    castTime: 'action',
+    concentration: true,
+    damage: '10d6',
+    damageType: 'bludgeoning',
+    savingThrow: 'dex',
+    saveEffect: 'negates',
+    blastRadius: 50,
+    aoeShape: 'sphere',
+    rangeKind: 'ranged',
+    rangeFt: 100,
+    desc: 'Reverse gravity in a 50-ft area within 100 ft: creatures fall upward and strike the ceiling for ~10d6 bludgeoning, unless a DEX save lets them grab a fixed object (negates). Concentration, up to 1 minute.',
+    narrative:
+      '{name} inverts gravity — the floor lets go and everything not anchored hurtles upward.',
+    spellList: ['arcane', 'primal'],
+  },
+  // SRD: Storm of Vengeance — a vast storm that lashes everything beneath it round
+  // after round. RAW it escalates through distinct effects each round; pansori
+  // models it as a persistent damage zone (recurring lightning, DEX save-for-half)
+  // — the escalating per-round effect table is simplified to a steady tick.
+  storm_of_vengeance: {
+    id: 'storm_of_vengeance',
+    name: 'Storm of Vengeance',
+    level: 9,
+    castTime: 'action',
+    persistentZone: true,
+    concentration: true,
+    durationRounds: 10,
+    damage: '4d6',
+    damageType: 'lightning',
+    savingThrow: 'dex',
+    saveEffect: 'half',
+    blastRadius: 40,
+    aoeShape: 'sphere',
+    rangeKind: 'ranged',
+    rangeFt: 120,
+    desc: 'A towering storm churns over the battlefield: each round, creatures beneath it make a DEX save, taking 4d6 lightning on a failure or half on a success. Concentration, up to 1 minute.',
+    narrative: '{name} calls down a black, churning storm that answers with thunder and lightning.',
+    spellList: ['primal'],
+  },
+  // SRD: Prismatic Wall — a shimmering multi-layered wall. RAW a creature passing
+  // it faces a save against each colored layer; pansori models it as an opaque,
+  // impassable wall whose formation deals a heavy DEX-save-for-half hit.
+  // Concentration-bound (the wall system's lifecycle) — a simplification of the
+  // RAW 10-minute, non-concentration duration.
+  prismatic_wall: {
+    id: 'prismatic_wall',
+    name: 'Prismatic Wall',
+    level: 9,
+    castTime: 'action',
+    concentration: true,
+    damage: '10d6',
+    damageType: 'radiant',
+    savingThrow: 'dex',
+    saveEffect: 'half',
+    blastRadius: 90,
+    aoeShape: 'line',
+    wall: { blocksMovement: true, blocksLineOfSight: true },
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    desc: 'Raise a 90-ft wall of shifting prismatic light: it blocks sight and passage, and creatures caught as it forms take 10d6 (DEX save halves). Concentration.',
+    narrative: '{name} throws up a wall of seven shifting colors, searing and impassable.',
+    spellList: ['arcane'],
+  },
 };
