@@ -268,7 +268,10 @@ function GridMapView({
       if (isMarker) {
         token = (
           <span className={styles.gridToken} style={{ background: 'rgba(70, 140, 220, 0.9)' }}>
-            <span className={styles.gridTokenLetter}>@</span>
+            <GameIcon
+              name="swords-emblem"
+              style={{ color: '#fff', fontSize: '0.95rem', textShadow: '0 0 2px rgba(0,0,0,0.8)' }}
+            />
           </span>
         );
       } else if (isEnemyMarker) {

@@ -55,8 +55,9 @@ describe('GridMapView', () => {
     // Header shows level + name + mile scale.
     expect(getByText(/REGION · The Vale/)).toBeTruthy();
     expect(getByText(/1 mi\/square/)).toBeTruthy();
-    // Party marker on its cell.
+    // Party marker on its cell — the swords-emblem glyph.
     expect(cell(container, 0, 0).getAttribute('aria-current')).toBe('location');
+    expect(cell(container, 0, 0).querySelector('.game-icon-swords-emblem')).toBeTruthy();
     // Transition cell carries its label.
     expect(cell(container, 3, 0).getAttribute('title')).toBe('Millhaven');
   });

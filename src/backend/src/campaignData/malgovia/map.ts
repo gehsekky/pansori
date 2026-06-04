@@ -1152,7 +1152,7 @@ export const regions: Region[] = [
         pos: { x: 5, y: 1 }, // snowy north, on the way west to the Spire
         kind: 'local',
         entryRoomId: 'pass_climb',
-        icon: 'mountains',
+        icon: 'mountain-road',
       },
       {
         id: 'site_spire',
