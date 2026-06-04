@@ -1463,11 +1463,14 @@
   color: var(--t-primary);
 }
 
-/* The trailing party controls (add / auto-fill / begin) shouldn't stretch
-   the full width of the wide container. */
+/* Party controls (auto-fill / begin) now ride in a right-hand column beside the
+   active setup block, inside .charPartyLayout. */
 .charPartyControls {
-  max-width: 520px;
-  margin-top: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 220px;
+  max-width: 240px;
+  margin-top: 0;
 }
 
 .classDesc {
@@ -2363,6 +2366,12 @@
   }
   .charActiveCard {
     max-width: 100%;
+  }
+  /* Controls drop below the block (full width) once the layout stacks. */
+  .charPartyControls {
+    flex: 0 0 auto;
+    max-width: 100%;
+    margin-top: 1.25rem;
   }
 
   /* Sessions list header: [title | actions] → stack */

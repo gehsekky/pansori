@@ -1748,65 +1748,65 @@ function CharScreen({
                 </div>
               );
             })()}
-          </div>
 
-          <div className={styles.charPartyControls}>
-            {selectedCtxForInit?.recommendedPartySize !== undefined && (
-              <button
-                className={styles.submit}
-                style={{
-                  marginTop: 0,
-                  marginBottom: '1rem',
-                  background: 'transparent',
-                  border: '1px dashed var(--t-primary)',
-                  color: 'var(--t-primary)',
-                }}
-                onClick={autoFillParty}
-                data-testid="auto-fill-party-btn"
-                title={(
-                  selectedCtxForInit.recommendedComposition ??
-                  DEFAULT_COMPOSITION_BY_SIZE[selectedCtxForInit.recommendedPartySize] ??
-                  []
-                ).join(' / ')}
-              >
-                <span aria-hidden="true">★ </span>AUTO-FILL RECOMMENDED PARTY (
-                {(
-                  selectedCtxForInit.recommendedComposition ??
-                  DEFAULT_COMPOSITION_BY_SIZE[selectedCtxForInit.recommendedPartySize] ??
-                  []
-                ).join(' / ')}
-                )
-              </button>
-            )}
-
-            {selectedCtxForInit?.recommendedPartySize !== undefined &&
-              party.length !== selectedCtxForInit.recommendedPartySize && (
-                <p
+            <div className={styles.charPartyControls}>
+              {selectedCtxForInit?.recommendedPartySize !== undefined && (
+                <button
+                  className={styles.submit}
                   style={{
-                    fontSize: '0.75rem',
-                    color: 'var(--t-mid)',
+                    marginTop: 0,
                     marginBottom: '1rem',
-                    letterSpacing: '0.05em',
+                    background: 'transparent',
+                    border: '1px dashed var(--t-primary)',
+                    color: 'var(--t-primary)',
                   }}
+                  onClick={autoFillParty}
+                  data-testid="auto-fill-party-btn"
+                  title={(
+                    selectedCtxForInit.recommendedComposition ??
+                    DEFAULT_COMPOSITION_BY_SIZE[selectedCtxForInit.recommendedPartySize] ??
+                    []
+                  ).join(' / ')}
                 >
-                  ⚠ {selectedCtxForInit.displayName} is tuned for a party of{' '}
-                  {selectedCtxForInit.recommendedPartySize}. You can play with {party.length}, but
-                  encounters may feel{' '}
-                  {party.length < selectedCtxForInit.recommendedPartySize ? 'harder' : 'easier'}{' '}
-                  than intended.
-                </p>
+                  <span aria-hidden="true">★ </span>AUTO-FILL RECOMMENDED PARTY (
+                  {(
+                    selectedCtxForInit.recommendedComposition ??
+                    DEFAULT_COMPOSITION_BY_SIZE[selectedCtxForInit.recommendedPartySize] ??
+                    []
+                  ).join(' / ')}
+                  )
+                </button>
               )}
 
-            {error && <p className={styles.err}>{error}</p>}
+              {selectedCtxForInit?.recommendedPartySize !== undefined &&
+                party.length !== selectedCtxForInit.recommendedPartySize && (
+                  <p
+                    style={{
+                      fontSize: '0.75rem',
+                      color: 'var(--t-mid)',
+                      marginBottom: '1rem',
+                      letterSpacing: '0.05em',
+                    }}
+                  >
+                    ⚠ {selectedCtxForInit.displayName} is tuned for a party of{' '}
+                    {selectedCtxForInit.recommendedPartySize}. You can play with {party.length}, but
+                    encounters may feel{' '}
+                    {party.length < selectedCtxForInit.recommendedPartySize ? 'harder' : 'easier'}{' '}
+                    than intended.
+                  </p>
+                )}
 
-            <button
-              data-testid="begin-adventure-btn"
-              className={styles.submit}
-              onClick={handle}
-              disabled={loading}
-            >
-              {loading ? 'LAUNCHING ADVENTURE...' : 'BEGIN ADVENTURE'}
-            </button>
+              {error && <p className={styles.err}>{error}</p>}
+
+              <button
+                data-testid="begin-adventure-btn"
+                className={styles.submit}
+                onClick={handle}
+                disabled={loading}
+              >
+                {loading ? 'LAUNCHING ADVENTURE...' : 'BEGIN ADVENTURE'}
+              </button>
+            </div>
           </div>
         </div>
 
