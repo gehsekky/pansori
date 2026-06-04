@@ -995,6 +995,11 @@
   .gameLayout {
     grid-template-columns: 1fr;
   }
+  /* Not enough room for the block's two field columns once the nav + controls
+     share the row — collapse the setup block to a single column. */
+  .charCardCols {
+    grid-template-columns: 1fr;
+  }
 }
 
 .gameMain {
@@ -1254,7 +1259,7 @@
   flex-direction: column;
   gap: 2rem;
   width: 100%;
-  max-width: 1080px;
+  max-width: 1240px;
   margin: 3rem auto;
 }
 
@@ -1381,10 +1386,23 @@
   color: var(--t-dim);
 }
 
-/* The active block: now the only one on screen, so it can use the width. */
+/* The active block: now the only one on screen, so it can be wider — and lay
+   its fields out in two columns to stay short. */
 .charActiveCard {
   flex: 1 1 auto;
-  max-width: 640px;
+  max-width: 880px;
+}
+
+/* Two-column field layout inside the active setup block. The leader label +
+   remove ✕ stay full-width above this grid. */
+.charCardCols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.25rem 1.5rem;
+  align-items: start;
+}
+.charCardCol {
+  min-width: 0;
 }
 
 /* ─── CharacterModal (in-game sheet) ─────────────────────────────────────── */
