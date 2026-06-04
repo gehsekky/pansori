@@ -227,7 +227,19 @@ export function runSaveSpell(
               ? {
                   save_ends: {
                     ...e.save_ends,
-                    [condToApply]: { ability: spell.savingThrow!, dc },
+                    [condToApply]: {
+                      ability: spell.savingThrow!,
+                      dc,
+                      // Recurring save-ends damage (Phantasmal Killer / Force):
+                      // the enemy turn loop deals this on each failed re-save.
+                      ...(spell.recurringSaveDamage
+                        ? {
+                            recurDice: spell.recurringSaveDamage.dice,
+                            recurType: spell.recurringSaveDamage.damageType,
+                            casterId: char.id,
+                          }
+                        : {}),
+                    },
                   },
                   save_ends_acted: (e.save_ends_acted ?? []).filter((c) => c !== condToApply),
                 }

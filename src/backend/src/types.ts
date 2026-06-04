@@ -622,6 +622,13 @@ export interface Spell {
   // `conditionDuration` (a save-ends condition has no fixed timer) and of
   // concentration (which, when present, also clears the condition on break).
   conditionSaveEnds?: boolean;
+  // SRD recurring "save-ends" damage (Phantasmal Killer 4d10, Phantasmal Force
+  // 2d8): while the `conditionSaveEnds` condition persists, the target takes
+  // this damage again on each FAILED end-of-turn save (the enemy turn loop ticks
+  // it). Stamped into `CombatEntity.save_ends[condition]` as recurDice/recurType
+  // at cast. Independent of the spell's initial `damage` — Phantasmal Force deals
+  // no damage on the initial save, only the recurring tick.
+  recurringSaveDamage?: { dice: string; damageType: string };
   // SRD per-attack weapon riders (Divine Favor, Searing/Shining/Ensnaring
   // Strike). A self-cast buff that augments the caster's weapon hits:
   //   - `persistent: true` (Divine Favor) → every weapon hit for the duration

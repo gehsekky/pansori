@@ -8452,6 +8452,11 @@ export async function runEnemyTurns(args: {
         const acted = new Set(seEnt.save_ends_acted ?? []);
         const nextActed = new Set(acted);
         const cleared: string[] = [];
+        // SRD Phantasmal Killer / Force — a failed end-of-turn save takes the
+        // illusion's psychic damage again. Accrued across save-ends conditions.
+        let recurDamage = 0;
+        let recurType = '';
+        let recurCasterId: string | undefined;
         for (const [cond, info] of Object.entries(seEnt.save_ends)) {
           if (!acted.has(cond)) {
             nextActed.add(cond); // first afflicted turn — no save yet
@@ -8467,9 +8472,20 @@ export async function runEnemyTurns(args: {
             0,
             seEnt.conditions
           );
-          if (!failed) cleared.push(cond);
+          if (!failed) {
+            cleared.push(cond);
+          } else if (info.recurDice) {
+            recurDamage += applyDamageMultiplier(
+              rollDice(info.recurDice),
+              info.recurType,
+              rm
+            ).damage;
+            recurType = info.recurType ?? recurType;
+            recurCasterId = info.casterId ?? recurCasterId;
+          }
         }
-        if (cleared.length > 0 || nextActed.size !== acted.size) {
+        const recurNewHp = Math.max(0, seEnt.hp - recurDamage);
+        if (cleared.length > 0 || nextActed.size !== acted.size || recurDamage > 0) {
           st = {
             ...st,
             entities: (st.entities ?? []).map((e) => {
@@ -8478,6 +8494,7 @@ export async function runEnemyTurns(args: {
               for (const c of cleared) delete nextSaveEnds[c];
               return {
                 ...e,
+                hp: recurDamage > 0 ? recurNewHp : e.hp,
                 conditions: e.conditions.filter((c) => !cleared.includes(c)),
                 save_ends: nextSaveEnds,
                 save_ends_acted: [...nextActed].filter((c) => !cleared.includes(c)),
@@ -8486,6 +8503,30 @@ export async function runEnemyTurns(args: {
           };
           if (cleared.length > 0) {
             narrative += `\n\n[${rm.name} shakes off ${cleared.join(', ')}.]`;
+          }
+          if (recurDamage > 0) {
+            narrative += `\n\n[${rm.name} takes ${recurDamage} ${recurType} from the illusion${recurNewHp <= 0 ? ' and succumbs' : ''}.]`;
+          }
+          // The recurring tick dropped the creature — resolve the kill (XP to
+          // the caster, room-clear) and skip its turn.
+          if (recurDamage > 0 && recurNewHp <= 0 && !st.enemies_killed.includes(eEntry.id)) {
+            st = { ...st, enemies_killed: [...st.enemies_killed, eEntry.id] };
+            if (recurCasterId) {
+              const split = splitEncounterXp(st, recurCasterId, rm.xp ?? 10);
+              st = split.st;
+              const killer = st.characters.find((c) => c.id === recurCasterId);
+              if (killer) {
+                killer.xp = (killer.xp || 0) + split.share;
+                narrative += applyPartyLevelUps(st, killer, args.context);
+              }
+            }
+            if (isRoomCleared(st, args.seed, st.current_room)) st = endCombatState(st);
+            resumeMi = 0;
+            const prevAdvIdxDot = advIdx;
+            advIdx = (advIdx + 1) % orderLen;
+            if (advIdx === 0 && prevAdvIdxDot !== 0) roundWrapped = true;
+            if (advIdx === args.initialCurrentIdx) break;
+            continue;
           }
         }
       }

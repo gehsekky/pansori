@@ -151,7 +151,13 @@ export type ConditionName =
   // SRD: Ray of Enfeeblement — an enervated creature attacks at Disadvantage
   // (`imposesDisadvantageOnSelfAttacks`); save-ends each turn, concentration-
   // linked. (RAW's −1d8 weapon damage rider is narrated, not modeled.)
-  | 'enfeebled';
+  | 'enfeebled'
+  // SRD: Phantasmal Force — a benign carrier condition (no attack/defense
+  // effect of its own) marking a creature that perceives a damaging illusion.
+  // It drives the recurring save-ends damage tick (the creature takes the
+  // spell's psychic damage each failed end-of-turn INT save) and is cleared the
+  // moment that save succeeds. Concentration-linked.
+  | 'phantasm';
 
 export type NpcAttitude = 'friendly' | 'indifferent' | 'hostile';
 
@@ -379,7 +385,14 @@ export interface CombatEntity {
   // a success removes the condition and its entry here. Stamped on cast by the
   // save / AoE-condition paths (for `spell.conditionSaveEnds` spells) or by a
   // bespoke handler (Power Word Stun). The DC is the caster's spell save DC.
-  save_ends?: Record<string, { ability: AbilityKey; dc: number }>;
+  // The optional `recurDice` / `recurType` / `casterId` carry a recurring damage
+  // tick (Phantasmal Killer 4d10, Phantasmal Force 2d8): on each FAILED end-of-
+  // turn save the creature takes `recurDice` damage of `recurType`, credited to
+  // `casterId` on a kill. Absent ⇒ a pure save-ends condition (Slow, Stun).
+  save_ends?: Record<
+    string,
+    { ability: AbilityKey; dc: number; recurDice?: string; recurType?: string; casterId?: string }
+  >;
   // Conditions in `save_ends` for which this creature has completed ≥1 afflicted
   // turn — gates the recurring save so the effect always lasts at least its
   // first turn (RAW), mirroring `confused_acted` but per-condition.

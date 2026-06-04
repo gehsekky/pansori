@@ -3202,11 +3202,38 @@ export const SRD_SPELLS: Record<string, Spell> = {
     saveEffect: 'half',
     condition: 'frightened',
     conditionDuration: 10,
+    conditionSaveEnds: true,
+    recurringSaveDamage: { dice: '4d10', damageType: 'psychic' },
     concentration: true,
     durationRounds: 10,
-    desc: "An illusion of the target's deepest fear. It makes a WIS save, taking 4d10 psychic on a failure (and Disadvantage on ability checks and attack rolls for the duration, modeled as Frightened) or half on a success. (RAW the damage recurs on failed end-of-turn saves; pansori resolves it once on cast.)",
+    desc: "An illusion of the target's deepest fear. It makes a WIS save, taking 4d10 psychic on a failure (and Disadvantage on ability checks and attack rolls for the duration, modeled as Frightened) or half on a success (ending the spell). At the end of each of its turns it repeats the WIS save, taking 4d10 psychic again on a failure or ending the spell on a success. Concentration, up to 1 minute.",
     rangeKind: 'ranged',
     rangeFt: 120,
+    spellList: ['arcane'],
+  },
+  // SRD: Phantasmal Force — L2 Illusion (Bard, Sorcerer, Wizard). An illusion in
+  // one creature's mind (INT save negates). While it perceives the phantasm
+  // (the benign `phantasm` carrier condition), a dangerous illusion deals 2d8
+  // psychic on each of the caster's turns — modeled as the recurring save-ends
+  // tick on the target's failed end-of-turn INT save (its Study/Investigation
+  // check to disbelieve). Concentration, up to 1 minute. (The non-damaging
+  // illusion uses — sensory deception, fake terrain — are narrative, not
+  // mechanized.)
+  phantasmal_force: {
+    id: 'phantasmal_force',
+    name: 'Phantasmal Force',
+    level: 2,
+    castTime: 'action',
+    savingThrow: 'int',
+    saveEffect: 'negates',
+    condition: 'phantasm',
+    conditionSaveEnds: true,
+    recurringSaveDamage: { dice: '2d8', damageType: 'psychic' },
+    concentration: true,
+    durationRounds: 10,
+    desc: "Craft an illusion in one creature's mind within 60 ft (INT save negates). While it believes the phantasm, a dangerous illusion deals 2d8 psychic each round; it repeats the INT save at the end of each of its turns, ending the spell on a success. Concentration, up to 1 minute.",
+    rangeKind: 'ranged',
+    rangeFt: 60,
     spellList: ['arcane'],
   },
   // SRD: Chain Lightning (L6) — a lightning bolt strikes one target (DEX save
