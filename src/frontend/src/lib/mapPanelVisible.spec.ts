@@ -1,9 +1,9 @@
-// Regression guard for the map-to-top layout: the top-of-column map panel must
-// be HIDDEN during the post-combat "Continue" gate (combat_over_pending) so its
-// clickable cells can't issue a marker_move that bypasses the gate — which left
-// combat_over_pending stuck and resurfaced "THE FIGHT IS OVER" in a peaceful
-// town. Also hidden on the "escaped" terminal screen. On a party wipe the map
-// STAYS visible (the final battlefield shows beside the death notice).
+// The top-of-column map panel is hidden only on the "escaped" terminal screen.
+// It STAYS visible during the post-combat "Continue" gate (combat_over_pending)
+// and on a party wipe — the caller renders it READ-ONLY in the gate (no click
+// handlers) so its cells can't issue a marker_move that bypasses the gate (which
+// once left combat_over_pending stuck and resurfaced "THE FIGHT IS OVER" in a
+// peaceful town).
 
 import { describe, expect, it } from 'vitest';
 import type { GameState } from '../types';
@@ -18,8 +18,8 @@ describe('mapPanelVisible', () => {
     expect(mapPanelVisible(gs(false), { escaped: false, allDead: false })).toBe(true);
   });
 
-  it('HIDES the map during the post-combat Continue gate (the regression)', () => {
-    expect(mapPanelVisible(gs(true), { escaped: false, allDead: false })).toBe(false);
+  it('KEEPS the map visible during the post-combat Continue gate (rendered read-only)', () => {
+    expect(mapPanelVisible(gs(true), { escaped: false, allDead: false })).toBe(true);
   });
 
   it('hides the map on the "escaped" terminal screen', () => {

@@ -3694,12 +3694,14 @@ export function seenKeyForAction(action: StructuredAction, state: GameState): st
   const room = state.current_room;
   switch (action.type) {
     case 'talk_response': {
-      // Include the conversation path so the SAME response index at different
-      // nesting levels gets a distinct key (otherwise picking root option 0
-      // would dim a nested option 0). Path is the node the player is at when
-      // the choice is shown / clicked.
+      // Include the active NPC id so two NPCs sharing a room (e.g. Old Elise +
+      // Bram in pinegate_square) don't share response keys — otherwise dimming
+      // Elise's response #0 would also dim Bram's #0. Include the conversation
+      // path so the SAME response index at different nesting levels gets a
+      // distinct key (picking root option 0 must not dim a nested option 0).
+      const npcId = state.active_conversation?.npcId ?? '';
       const path = (state.active_conversation?.path ?? []).join('.');
-      return `talk_response::${room}::${path}::${action.responseIdx}`;
+      return `talk_response::${room}::${npcId}::${path}::${action.responseIdx}`;
     }
     case 'interact_object':
       return `interact_object::${room}::${action.objectId}`;

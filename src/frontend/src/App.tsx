@@ -534,9 +534,10 @@ export default function App() {
                       (exploration marker map) or the combat grid. The narrative
                       sits below it, and the action / choices below that. */}
                   {(() => {
-                    // Hidden on the terminal screens AND during the post-combat
-                    // "Continue" gate — see mapPanelVisible (the gate must own the
-                    // screen so map clicks can't bypass it via marker_move).
+                    // Hidden only on the "escaped" terminal screen. It stays
+                    // visible on a wipe and during the post-combat "Continue"
+                    // gate (rendered READ-ONLY in the gate — see below). See
+                    // mapPanelVisible.
                     if (!gameState || !seed || !mapPanelVisible(gameState, { escaped, allDead }))
                       return null;
                     if (
@@ -614,6 +615,11 @@ export default function App() {
                           grid.level === 'regional' && gameState.current_region_id
                             ? new Set(gameState.revealed_cells?.[gameState.current_region_id] ?? [])
                             : undefined;
+                        // During the post-combat "Continue" gate the map is
+                        // shown but READ-ONLY: withholding the click handlers
+                        // makes every cell non-clickable, so a stray marker_move
+                        // can't bypass the gate (only Continue clears it).
+                        const mapInteractive = !gameState.combat_over_pending;
                         return (
                           <GridMapView
                             grid={grid}
@@ -624,20 +630,31 @@ export default function App() {
                             enemyPresent={choices.some((c) => c.kind === 'attack')}
                             // Clicking the red dot engages — dispatch the
                             // out-of-combat Attack choice to drop into combat.
-                            onEnemyClick={() => {
-                              const atk = choices.find((c) => c.kind === 'attack');
-                              if (atk) handleChoice(atk);
-                            }}
+                            onEnemyClick={
+                              mapInteractive
+                                ? () => {
+                                    const atk = choices.find((c) => c.kind === 'attack');
+                                    if (atk) handleChoice(atk);
+                                  }
+                                : undefined
+                            }
                             npcs={npcTokens}
-                            onNpcClick={(npcId) => {
-                              const tc = talkByNpc.get(npcId);
-                              if (tc) handleChoice(tc);
-                            }}
-                            onMarkerMove={(to) =>
-                              handleChoice({
-                                label: `Travel to (${to.x},${to.y})`,
-                                action: { type: 'marker_move', to },
-                              })
+                            onNpcClick={
+                              mapInteractive
+                                ? (npcId) => {
+                                    const tc = talkByNpc.get(npcId);
+                                    if (tc) handleChoice(tc);
+                                  }
+                                : undefined
+                            }
+                            onMarkerMove={
+                              mapInteractive
+                                ? (to) =>
+                                    handleChoice({
+                                      label: `Travel to (${to.x},${to.y})`,
+                                      action: { type: 'marker_move', to },
+                                    })
+                                : undefined
                             }
                           />
                         );

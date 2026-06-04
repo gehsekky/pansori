@@ -4778,20 +4778,30 @@ describe('seenKeyForAction', () => {
     ).toBeUndefined();
   });
 
-  it('talk_response folds the room id, conversation path, and response index', () => {
-    // No active conversation → empty path segment.
+  it('talk_response folds the room id, active NPC id, conversation path, and response index', () => {
+    // No active conversation → empty npc + path segments.
     expect(seenKeyForAction({ type: 'talk_response', responseIdx: 2 }, st)).toBe(
-      'talk_response::crypt_room_a::::2'
+      'talk_response::crypt_room_a::::::2'
     );
-    // A nested node's path is included, so the same index at different depths
-    // gets a distinct key (no false-positive dimming across levels).
+    // A nested node's path + the active NPC id are included, so the same index at
+    // different depths / NPCs gets a distinct key.
     const nested = {
       ...st,
       active_conversation: { npcId: 'x', roomId: 'crypt_room_a', path: [0, 1], prompt: '' },
     };
     expect(seenKeyForAction({ type: 'talk_response', responseIdx: 2 }, nested)).toBe(
-      'talk_response::crypt_room_a::0.1::2'
+      'talk_response::crypt_room_a::x::0.1::2'
     );
+  });
+
+  it('two NPCs sharing a room get distinct talk_response keys (Elise/Bram regression)', () => {
+    const withNpc = (npcId: string) => ({
+      ...st,
+      active_conversation: { npcId, roomId: 'crypt_room_a', path: [], prompt: '' },
+    });
+    const elise = seenKeyForAction({ type: 'talk_response', responseIdx: 0 }, withNpc('npc_elise'));
+    const bram = seenKeyForAction({ type: 'talk_response', responseIdx: 0 }, withNpc('npc_bram'));
+    expect(elise).not.toBe(bram); // dimming Elise's response no longer dims Bram's
   });
 
   it('interact_object folds room id + object id', () => {
