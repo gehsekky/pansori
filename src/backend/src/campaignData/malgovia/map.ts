@@ -1080,6 +1080,7 @@ export const regions: Region[] = [
       ...terr(
         'road',
         [0, 7],
+        [1, 7],
         [2, 7],
         [3, 7],
         [4, 7],
