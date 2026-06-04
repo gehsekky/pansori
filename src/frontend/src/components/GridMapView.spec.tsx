@@ -169,6 +169,16 @@ describe('GridMapView', () => {
     expect(cell(container, 1, 2).querySelector('.game-icon-forest')).toBeTruthy();
   });
 
+  it('renders the game-icons path-tile glyph on a regional road tile (still clickable)', () => {
+    // terrainGrid has a road at (0,1).
+    const onMarkerMove = vi.fn();
+    const { container } = render(
+      <GridMapView grid={terrainGrid} markerPos={{ x: 0, y: 0 }} onMarkerMove={onMarkerMove} />
+    );
+    expect(cell(container, 0, 1).querySelector('.game-icon-path-tile')).toBeTruthy();
+    expect(cell(container, 0, 1).getAttribute('role')).toBe('button'); // passable
+  });
+
   it('renders the game-icons hills glyph on a regional hills tile', () => {
     const hillsGrid: ActiveGrid = {
       ...grid,
