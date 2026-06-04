@@ -56,6 +56,11 @@ const NEW_MONSTERS: Array<[string, number, number, number, string, number, numbe
   ['bulette', 5, 94, 17, '2d12+4', 7, 1800, 2],
   ['mammoth', 6, 126, 13, '2d10+7', 10, 2300, 2],
   ['assassin', 8, 97, 16, '1d6+4', 7, 3900, 3],
+  // SRD 5.2.1 caster monsters — their concrete attack action (Arcane Burst /
+  // Radiant Flame), modeled as native multiattack.
+  ['priest', 2, 38, 13, '2d10', 5, 450, 2],
+  ['mage', 6, 81, 15, '3d8+3', 6, 2300, 3],
+  ['archmage', 12, 170, 17, '4d10+5', 9, 8000, 4],
 ];
 
 describe('SRD bestiary additions — core stat lines', () => {
@@ -342,6 +347,20 @@ describe('SRD bestiary additions — effect fields', () => {
     expect(SRD_MONSTERS.assassin.bonusDamage).toBe('5d6');
     expect(SRD_MONSTERS.assassin.onHitEffect).toEqual({ condition: 'poisoned' });
     expect(SRD_MONSTERS.assassin.resistances).toEqual(['poison']);
+  });
+
+  it('caster monsters fight at range with their concrete attack', () => {
+    // Priest — ranged Radiant Flame.
+    expect(SRD_MONSTERS.priest.damageType).toBe('radiant');
+    expect(SRD_MONSTERS.priest.attackReachFt).toBe(60);
+    // Mage — ranged Force Arcane Burst, three per turn.
+    expect(SRD_MONSTERS.mage.damageType).toBe('force');
+    expect(SRD_MONSTERS.mage.multiattack).toBe(3);
+    expect(SRD_MONSTERS.mage.attackReachFt).toBe(120);
+    // Archmage — four bursts, psychic/charm immune.
+    expect(SRD_MONSTERS.archmage.multiattack).toBe(4);
+    expect(SRD_MONSTERS.archmage.immunities).toEqual(['psychic']);
+    expect(SRD_MONSTERS.archmage.condition_immunities).toContain('charmed');
   });
 
   it('the shared pool grew well past the original 12', () => {

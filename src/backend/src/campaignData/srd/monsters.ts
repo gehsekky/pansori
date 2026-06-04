@@ -325,6 +325,30 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     // the dark without penalty.)
     onHitEffect: { condition: 'grappled', escapeDc: 14 },
   },
+  // SRD 5.2.1 redesigned monster casters around a concrete attack action plus a
+  // short per-day spell list. We model the damage-dealing attack faithfully with
+  // native fields; the per-day spells (here Spirit Guardians — an AoE aura) are
+  // deferred until enemy AoE spellcasting lands. The Priest fights with Radiant
+  // Flame (a ranged radiant bolt), so it reads as a caster, not a basher.
+  priest: {
+    name: 'Priest',
+    darkvision_ft: 0, // human — no darkvision
+    cr: 2,
+    hp: 38,
+    ac: 13,
+    damage: '2d10',
+    toHit: 5,
+    xp: 450,
+    str: 16,
+    dex: 10,
+    con: 12,
+    int: 13,
+    wis: 16,
+    cha: 13,
+    multiattack: 2,
+    attackReachFt: 60, // Radiant Flame — ranged
+    damageType: 'radiant',
+  },
   cult_fanatic: {
     name: 'Cult Fanatic',
     darkvision_ft: 0, // human — no darkvision
@@ -1312,6 +1336,29 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     damageType: 'piercing',
     darkvision_ft: 60,
   },
+  // Arcane Burst is the Mage's whole offense in SRD 5.2.1 — a ranged Force
+  // attack, thrice per turn. Its 2/Day Fireball + 1/Day Cone of Cold are AoE
+  // (deferred until enemy AoE spellcasting lands). A long reach models the
+  // 120-ft range so it pelts the party without closing.
+  mage: {
+    name: 'Mage',
+    darkvision_ft: 0, // human — no darkvision
+    cr: 6,
+    hp: 81,
+    ac: 15,
+    damage: '3d8+3',
+    toHit: 6,
+    xp: 2300,
+    str: 9,
+    dex: 14,
+    con: 11,
+    int: 17,
+    wis: 12,
+    cha: 11,
+    multiattack: 3,
+    attackReachFt: 120, // Arcane Burst — ranged
+    damageType: 'force',
+  },
   wyvern: {
     name: 'Wyvern',
     darkvision_ft: 120,
@@ -1553,5 +1600,30 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
       saveDC: 17,
       rechargeMin: 5, // Recharge 5–6
     },
+  },
+  // The Archmage scales the Mage's pattern up: four Arcane Bursts (4d10+5 Force)
+  // at 150 ft, with Psychic immunity and Charmed immunity (its Mind Blank). Its
+  // Fireball / Cone of Cold / Wall of Force arsenal is AoE/utility — deferred.
+  // Magic Resistance (advantage on saves vs spells) isn't modeled yet.
+  archmage: {
+    name: 'Archmage',
+    darkvision_ft: 0, // human — no darkvision
+    cr: 12,
+    hp: 170,
+    ac: 17,
+    damage: '4d10+5',
+    toHit: 9,
+    xp: 8000,
+    str: 10,
+    dex: 14,
+    con: 12,
+    int: 20,
+    wis: 15,
+    cha: 16,
+    multiattack: 4,
+    attackReachFt: 150, // Arcane Burst — ranged
+    damageType: 'force',
+    immunities: ['psychic'],
+    condition_immunities: ['charmed'],
   },
 };
