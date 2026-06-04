@@ -2776,6 +2776,44 @@ export function applyZoneTick(
   return { st: workingSt, narrative, dealt };
 }
 
+// SRD anti-magic suppression (Antimagic Field, Globe of Invulnerability) — would
+// a `suppressesMagic` zone in the current room stop this cast? `targetPos` is the
+// spell's target/epicenter cell; omit it for a self/utility cast (the caster's
+// own cell is used, so a caster standing inside an Antimagic Field can't cast at
+// all). `spellLevel` should be the slot level (upcasts count toward Globe's cap).
+//   - Globe (`suppressFromOutsideOnly`): blocks a spell ≤ maxLevel cast from
+//     OUTSIDE the globe at a target INSIDE it.
+//   - Antimagic Field: blocks any spell ≤ maxLevel with the caster OR the target
+//     inside the field.
+export function isSpellSuppressed(
+  st: GameState,
+  casterId: string,
+  targetPos: GridPos | undefined,
+  spellLevel: number
+): { blocked: boolean; zoneName?: string } {
+  const zones = (st.spell_zones ?? []).filter(
+    (z) => z.suppressesMagic && z.roomId === st.current_room
+  );
+  if (zones.length === 0 || !st.entities) return { blocked: false };
+  const casterPos = st.entities.find((e) => e.id === casterId)?.pos;
+  if (!casterPos) return { blocked: false };
+  const tgt = targetPos ?? casterPos; // self / utility cast → the caster's cell
+  for (const z of zones) {
+    if (z.suppressMaxLevel !== undefined && spellLevel > z.suppressMaxLevel) continue;
+    const owner = st.entities.find((e) => e.id === z.casterId);
+    const center = z.followsCaster ? owner?.pos : z.center;
+    if (!center) continue;
+    const r = z.radiusFt ?? 10;
+    const casterInside = distanceFeet(center, casterPos) <= r;
+    const targetInside = distanceFeet(center, tgt) <= r;
+    const blocked = z.suppressFromOutsideOnly
+      ? !casterInside && targetInside
+      : casterInside || targetInside;
+    if (blocked) return { blocked: true, zoneName: z.name };
+  }
+  return { blocked: false };
+}
+
 // RE-4 — round-wrap tick for every persistent zone in the current room.
 export function fireSpellZones(
   st: GameState,
@@ -7747,6 +7785,13 @@ async function attemptEnemySpellCast(args: {
   const spellId = pick(enemy.spells);
   const spell = context.spellTable?.[spellId];
   if (!spell?.damage) return { kind: 'no-cast' };
+
+  // SRD anti-magic suppression — an enemy spell crossing an Antimagic Field /
+  // Globe of Invulnerability fizzles before it's cast.
+  const supTargetPos = st.entities?.find((e) => e.id === target.id && !e.isEnemy)?.pos;
+  if (isSpellSuppressed(st, enemyId, supTargetPos, spell.level).blocked) {
+    return { kind: 'no-cast' };
+  }
 
   // Counterspell eligibility — check all party PCs.
   const reactor = st.characters.find((c) =>

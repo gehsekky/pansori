@@ -158,6 +158,43 @@ export function runUtilitySpell(
     }
   }
 
+  // SRD anti-magic suppression (Antimagic Field, Globe of Invulnerability) — a
+  // caster-following, non-damage SpellZone (10-ft radius). `isSpellSuppressed`
+  // reads it to fizzle spells that cross it. Bound to the caster's concentration;
+  // `breakConcentration` / combat-end tear the zone down with every spell zone.
+  if (spell.magicSuppression && ctx.st.entities) {
+    const casterEnt = ctx.st.entities.find((e) => e.id === char.id);
+    if (casterEnt) {
+      const gridW = ctx.context.gridWidth ?? 8;
+      const gridH = ctx.context.gridHeight ?? 8;
+      const radiusFt = 10;
+      const zone: SpellZone = {
+        id: randomUUID(),
+        casterId: char.id,
+        spellId: spell.id,
+        name: spell.name,
+        roomId: ctx.st.current_room,
+        cells: zoneCells(casterEnt.pos, radiusFt, gridW, gridH),
+        damage: '0',
+        damageType: 'none',
+        suppressesMagic: true,
+        suppressMaxLevel: spell.magicSuppression.maxLevel,
+        suppressFromOutsideOnly: spell.magicSuppression.fromOutsideOnly,
+        followsCaster: true,
+        radiusFt,
+        center: casterEnt.pos,
+      };
+      ctx.st = { ...ctx.st, spell_zones: [...(ctx.st.spell_zones ?? []), zone] };
+      char.concentrating_on = {
+        spellId: spell.id,
+        rounds_left: concentrationRoundsFor(spell) * (ctx.metamagic?.includes('extended') ? 2 : 1),
+      };
+      ctx.narrative += spell.magicSuppression.fromOutsideOnly
+        ? ` A shimmering globe forms — lesser magic from outside cannot reach within.`
+        : ` An aura of dead magic spreads out — spells simply fail near ${char.name}.`;
+    }
+  }
+
   // Bless (PHB p.219) — caster picks up to 3 creatures (RAW). Pansori
   // simplifies: caster + first 2 living non-caster party members are
   // blessed. Each gets +1d4 to attack rolls (saves are a follow-up).

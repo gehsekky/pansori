@@ -1,9 +1,9 @@
 import type { AbilityKey, Spell } from '../../../types.js';
 import { SQUARE_SIZE, distanceFeet, hasLineOfSight } from '../../gridEngine.js';
+import { breakConcentration, isSpellSuppressed } from '../../gameEngine.js';
 import { d, hasArmorProficiency, rollDice, spellSaveDC } from '../../rulesEngine.js';
 import { getClassLevel, hasClass, resolveCastingAbility } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
-import { breakConcentration } from '../../gameEngine.js';
 import { equippedArmorId } from '../../equipment.js';
 import { spellRecallKeepsSlot } from '../../feats.js';
 import { updatePcActor } from '../actor.js';
@@ -202,6 +202,23 @@ export function runPrecast(
   if (spell.outOfCombatOnly && ctx.st.combat_active) {
     ctx.narrative = `${spell.name} has a long casting time — cast it out of combat.`;
     return { done: true };
+  }
+
+  // SRD anti-magic suppression — Antimagic Field / Globe of Invulnerability. A
+  // spell that crosses such a zone fizzles before the slot is spent. Checked at
+  // the slot level (upcasts count toward Globe's cap). The suppression spells
+  // themselves still raise their zone normally (their own zone doesn't exist yet
+  // at cast time, so this never self-blocks).
+  if (ctx.st.combat_active) {
+    const targetId = (action as { targetEnemyId?: string }).targetEnemyId;
+    const targetPos = targetId
+      ? ctx.st.entities?.find((e) => e.id === targetId && e.isEnemy)?.pos
+      : undefined;
+    const sup = isSpellSuppressed(ctx.st, pc.char.id, targetPos, slotLevel);
+    if (sup.blocked) {
+      ctx.narrative = `${spell.name} fizzles — ${sup.zoneName} suppresses the magic.`;
+      return { done: true };
+    }
   }
 
   // Spell preparation check (Cleric, Paladin, Druid). Multi-class

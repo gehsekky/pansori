@@ -898,6 +898,12 @@ export interface Spell {
   // (+`upcastBonus`/level) of a type chosen at cast. The buff path stamps
   // `Character.granted_breath`; the `use_breath` action re-issues the cone.
   grantsBreath?: boolean;
+  // SRD anti-magic suppression (Antimagic Field, Globe of Invulnerability). The
+  // utility cast path raises a caster-following `suppressesMagic` SpellZone
+  // (10-ft radius). `maxLevel` caps which spell levels it stops (Globe: 5;
+  // omitted = all). `fromOutsideOnly` (Globe) blocks only inbound spells from
+  // outside; otherwise (Antimagic Field) it blocks magic in or out.
+  magicSuppression?: { maxLevel?: number; fromOutsideOnly: boolean };
   // Long casting time (1 min+) — rejected in combat (before slot spend).
   outOfCombatOnly?: boolean;
 }
@@ -1451,6 +1457,15 @@ export interface SpellZone {
   // illuminate them, so only Blindsight / Devil's Sight pierces. `applyZoneTick`
   // skips these (no damage); `magicalDarknessCells` / `canSeeTarget` read them.
   blocksSight?: boolean;
+  // SRD anti-magic suppression (Antimagic Field, Globe of Invulnerability). A
+  // suppression zone deals no damage; instead `isSpellSuppressed` fizzles spells
+  // that cross it. `suppressMaxLevel` is the highest spell level it stops
+  // (Globe: 5; omitted = all, for Antimagic Field). `suppressFromOutsideOnly`
+  // (Globe) blocks only spells cast from OUTSIDE at a target inside; otherwise
+  // (Antimagic Field) any spell with the caster OR target inside is stopped.
+  suppressesMagic?: boolean;
+  suppressMaxLevel?: number;
+  suppressFromOutsideOnly?: boolean;
 }
 
 export interface GameState {
