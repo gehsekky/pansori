@@ -1535,6 +1535,11 @@ export interface GameState {
   current_region_id?: string;
   current_town_id?: string;
   marker_pos?: GridPos;
+  // Fog of war — permanently-revealed cells per grid, keyed by grid id (the
+  // region id for the overland map; towns/local rooms may use it later). Each
+  // value is a set of "x,y" cell keys discovered within the party's sight radius.
+  // The party can only travel to revealed cells. Currently regional-only.
+  revealed_cells?: Record<string, string[]>;
   // Return-cell bookmarks for ascending: the party's last cell on the regional
   // grid (restored when leaving a town/site back to the region) and on the town
   // grid (restored when leaving a venue interior back to the town). Set on

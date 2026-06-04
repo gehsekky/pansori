@@ -337,6 +337,9 @@ export interface GameState {
   current_region_id?: string;
   current_town_id?: string;
   marker_pos?: GridPos;
+  // Fog of war — permanently-revealed "x,y" cells per grid id (region id for the
+  // overland map). The party can only travel to revealed cells. Regional-only.
+  revealed_cells?: Record<string, string[]>;
   // Parent-grid bookmarks — where the marker sat on the level above (set on
   // descend). The map overlay's zoom-out reads these to render the region/town
   // the party came from. Mirror of the BE fields.

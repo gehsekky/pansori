@@ -1,5 +1,10 @@
 import type { Context, GameState, GridPos } from '../../types.js';
-import { ENCOUNTER_ROOM_ID, resolveMarkerMove, stageEncounter } from '../mapEngine.js';
+import {
+  ENCOUNTER_ROOM_ID,
+  resolveMarkerMove,
+  revealRegional,
+  stageEncounter,
+} from '../mapEngine.js';
 import { buildArrivalNarrative, hasSaveProficiency } from '../gameEngine.js';
 import { materializeEnemy, scaleEnemyHp } from '../enemyFactory.js';
 import type { ActionHandler } from './types.js';
@@ -75,6 +80,9 @@ export const handleMarkerMove: ActionHandler<{ type: 'marker_move'; to: GridPos 
     return;
   }
   ctx.st = res.st;
+  // Fog of war — reveal the overland cells now within the party's sight radius
+  // (no-op when the move descended into a town / local room).
+  ctx.st = revealRegional(ctx.context.campaign, ctx.st);
 
   // Walking away from an NPC ends any conversation with them (the marker left
   // their room) — so a stale conversation can't linger into the next room.

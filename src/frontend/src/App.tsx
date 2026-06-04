@@ -608,10 +608,17 @@ export default function App() {
                                 )
                                 .map((n) => ({ id: n.id, pos: n.pos!, name: n.name }))
                             : [];
+                        // Fog of war (regional map only): the party can only
+                        // see / travel to cells discovered within sight range.
+                        const revealed =
+                          grid.level === 'regional' && gameState.current_region_id
+                            ? new Set(gameState.revealed_cells?.[gameState.current_region_id] ?? [])
+                            : undefined;
                         return (
                           <GridMapView
                             grid={grid}
                             markerPos={gameState.marker_pos}
+                            revealed={revealed}
                             // A surfaced Attack choice means a hostile is here
                             // pre-combat — show the red enemy marker.
                             enemyPresent={choices.some((c) => c.kind === 'attack')}

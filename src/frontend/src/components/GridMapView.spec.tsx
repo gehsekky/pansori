@@ -164,6 +164,31 @@ describe('GridMapView', () => {
     expect(getByText('mountains')).toBeTruthy();
   });
 
+  it('fog of war: hides undiscovered cells and blocks travel to them', () => {
+    const onMarkerMove = vi.fn();
+    // Only (0,0) and (1,0) are discovered; the town site at (3,0) is fogged.
+    const { container } = render(
+      <GridMapView
+        grid={grid}
+        markerPos={{ x: 0, y: 0 }}
+        onMarkerMove={onMarkerMove}
+        revealed={new Set(['0,0', '1,0'])}
+      />
+    );
+    // A revealed plain cell is a normal travel target.
+    expect(cell(container, 1, 0).getAttribute('role')).toBe('button');
+    // The fogged town site reads as unexplored — hidden glyph, not travelable.
+    const fog = cell(container, 3, 0);
+    expect(fog.getAttribute('title')).toBe('Unexplored');
+    expect(fog.getAttribute('aria-label')).toContain('unexplored');
+    expect(fog.getAttribute('role')).toBe('gridcell'); // not a button
+    expect(fog.querySelector('.game-icon-village')).toBeNull(); // site glyph hidden
+    fireEvent.click(fog);
+    expect(onMarkerMove).not.toHaveBeenCalled();
+    // The party marker is never fogged.
+    expect(cell(container, 0, 0).querySelector('.game-icon-swords-emblem')).toBeTruthy();
+  });
+
   it('renders the game-icons forest glyph on a regional forest tile', () => {
     // terrainGrid has a forest at (1,2) on a regional grid.
     const { container } = render(<GridMapView grid={terrainGrid} markerPos={{ x: 0, y: 0 }} />);

@@ -54,10 +54,40 @@ export const ENCOUNTER_ROOM_ID = '__encounter__';
  * Place the party on the regional grid at campaign start. No-op unless the
  * campaign uses the new map model (`regions`) and map state isn't already set.
  */
+// Fog of war: the party's overland sight radius. 1 regional square = 1 mile
+// (feetPerSquare 5280), so a 3-square radius ≈ the ~3-mile real-world horizon.
+export const SIGHT_RADIUS = 3;
+
+// Permanently reveal every regional cell within SIGHT_RADIUS (circular,
+// Euclidean) of the party's marker, accumulating into
+// `GameState.revealed_cells` keyed by the current region. No-op off the
+// regional grid. Idempotent — re-revealing a seen cell is harmless.
+export function revealRegional(campaign: CampaignData | undefined, st: GameState): GameState {
+  if (st.map_level !== 'regional' || !st.current_region_id || !st.marker_pos) return st;
+  const region = regionById(campaign, st.current_region_id);
+  if (!region) return st;
+  const { x: cx, y: cy } = st.marker_pos;
+  const r = SIGHT_RADIUS;
+  const seen = new Set(st.revealed_cells?.[st.current_region_id] ?? []);
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      if (dx * dx + dy * dy > r * r) continue; // circular sight
+      const x = cx + dx;
+      const y = cy + dy;
+      if (x < 0 || y < 0 || x >= region.gridWidth || y >= region.gridHeight) continue;
+      seen.add(`${x},${y}`);
+    }
+  }
+  return {
+    ...st,
+    revealed_cells: { ...(st.revealed_cells ?? {}), [st.current_region_id]: [...seen] },
+  };
+}
+
 export function initMapState(campaign: CampaignData | undefined, st: GameState): GameState {
   const region = campaign?.regions?.[0];
   if (!region || st.map_level) return st;
-  return {
+  return revealRegional(campaign, {
     ...st,
     map_level: 'regional',
     current_region_id: region.id,
@@ -65,7 +95,7 @@ export function initMapState(campaign: CampaignData | undefined, st: GameState):
     // The party is on the overland grid, not in any room — clear current_room
     // so no stray room-level choices surface while travelling.
     current_room: '',
-  };
+  });
 }
 
 // A transition cell on the active grid — where stepping onto it does something.

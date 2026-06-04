@@ -28,6 +28,11 @@ interface Props {
   // the same as the "Talk to …" choice.
   npcs?: Array<{ id: string; pos: GridPos; name: string }>;
   onNpcClick?: (npcId: string) => void;
+  // Fog of war — the set of revealed "x,y" cell keys. When provided, any cell
+  // not in the set is hidden (obscured + non-travelable). Omit to disable fog
+  // (towns / local maps render fully). The party + enemy markers are never
+  // fogged.
+  revealed?: ReadonlySet<string>;
 }
 
 const LEVEL_LABEL: Record<ActiveGrid['level'], string> = {
@@ -158,6 +163,7 @@ function GridMapView({
   onMarkerMove,
   npcs,
   onNpcClick,
+  revealed,
 }: Props) {
   // The overland (regional) map gets double-size squares so the larger, sparse
   // grid reads more like a map; the town map uses mid-size 48 px squares; local
@@ -204,15 +210,20 @@ function GridMapView({
       // A talkable NPC token sits here (and the party isn't standing on it).
       const cellNpc = npcs?.find((n) => n.pos.x === x && n.pos.y === y);
       const isNpc = !!cellNpc && !isMarker;
+      // Fog of war — an undiscovered cell is hidden and can't be travelled to.
+      // The party + the (always-nearby) enemy marker are never fogged.
+      const fogged = !!revealed && !revealed.has(key) && !isMarker && !isEnemyMarker;
       // Out of combat the party moves freely (the backend pathfinds), so every
       // non-obstacle cell that isn't the marker's own square is a valid target.
       // The enemy marker engages (attack); the NPC's own cell talks (walks
-      // adjacent); everything else travels.
-      const clickable = isEnemyMarker
-        ? !!onEnemyClick
-        : isNpc
-          ? !!onNpcClick
-          : !isObstacle && !isMarker && !!onMarkerMove;
+      // adjacent); everything else travels. Fogged cells are never clickable.
+      const clickable = fogged
+        ? false
+        : isEnemyMarker
+          ? !!onEnemyClick
+          : isNpc
+            ? !!onNpcClick
+            : !isObstacle && !isMarker && !!onMarkerMove;
 
       // Checkerboard the plain cells so the grid squares read clearly on the
       // large, sparse region/town maps — a single flat fill was
@@ -233,14 +244,20 @@ function GridMapView({
       if (transition) cellBg = 'rgba(150, 120, 60, 0.35)';
       else if (isObstacle && !tStyle?.tint)
         cellBg = isRegional ? 'rgba(95, 88, 70, 0.85)' : 'rgba(90, 85, 70, 0.7)';
+      // Fog covers the cell's terrain/sites entirely with an unexplored fill.
+      if (fogged) cellBg = 'rgba(6, 8, 14, 0.94)';
 
       const ariaParts: string[] = [`${x},${y}`];
-      if (isMarker) ariaParts.push('the party');
-      if (isEnemyMarker) ariaParts.push('an enemy');
-      if (isNpc) ariaParts.push(`${cellNpc!.name}, talk`);
-      if (terrainType) ariaParts.push(TERRAIN[terrainType].label);
-      else if (isObstacle) ariaParts.push('impassable');
-      if (transition) ariaParts.push(transition.label);
+      if (fogged) {
+        ariaParts.push('unexplored');
+      } else {
+        if (isMarker) ariaParts.push('the party');
+        if (isEnemyMarker) ariaParts.push('an enemy');
+        if (isNpc) ariaParts.push(`${cellNpc!.name}, talk`);
+        if (terrainType) ariaParts.push(TERRAIN[terrainType].label);
+        else if (isObstacle) ariaParts.push('impassable');
+        if (transition) ariaParts.push(transition.label);
+      }
 
       // Hover tooltip: a destination (POI) shows its name; any other square
       // shows its terrain type + what it costs to cross (travel time / encounter
@@ -250,22 +267,26 @@ function GridMapView({
       // Travel / encounter modifiers apply only to overland (regional) travel,
       // so town / local maps tooltip the bare terrain label.
       const showTerrainModifiers = grid.level === 'regional';
-      const cellTitle = isEnemyMarker
-        ? 'Attack'
-        : isNpc
-          ? `Talk to ${cellNpc!.name}`
-          : transition
-            ? transition.label
-            : terrainType
-              ? describeTerrain(terrainType, showTerrainModifiers)
-              : isObstacle
-                ? 'Impassable'
-                : grid.terrain.length > 0
-                  ? describeTerrain('plains', showTerrainModifiers)
-                  : undefined;
+      const cellTitle = fogged
+        ? 'Unexplored'
+        : isEnemyMarker
+          ? 'Attack'
+          : isNpc
+            ? `Talk to ${cellNpc!.name}`
+            : transition
+              ? transition.label
+              : terrainType
+                ? describeTerrain(terrainType, showTerrainModifiers)
+                : isObstacle
+                  ? 'Impassable'
+                  : grid.terrain.length > 0
+                    ? describeTerrain('plains', showTerrainModifiers)
+                    : undefined;
 
       let token: React.ReactNode = null;
-      if (isMarker) {
+      if (fogged) {
+        // Hidden cell — render no terrain/site/marker glyph.
+      } else if (isMarker) {
         // The party marker — the swords-emblem glyph, drawn at the map-glyph
         // size (the small token circle clipped it). The party cell is already
         // highlighted via gridMapCellCurrent, so no backing circle is needed.
