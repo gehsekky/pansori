@@ -40,3 +40,10 @@ General Public License v3.0 — see [LICENSE](LICENSE).
   Daniela Howe and Ivan Montiel — fantasy-domain glyphs (weapons,
   spells, damage types, conditions). Font licensed under
   [SIL OFL 1.1](https://scripts.sil.org/OFL); CSS under MIT.
+- [Game-icons.net](https://game-icons.net/) — a broad set of
+  fantasy/RPG glyphs (weapons, armor, potions, creatures), bundled as
+  a web font via [gameicons-font](https://github.com/seiyria/gameicons-font)
+  (vendored under `src/frontend/src/vendor/game-icons/`). The icons are
+  licensed [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) by
+  their many contributors (Lorc, Delapouite, and others — see the
+  game-icons.net authors page); attribution is given here per that license.

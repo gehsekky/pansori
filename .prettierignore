@@ -2,3 +2,5 @@
 **/dist
 **/build
 **/.env
+# Vendored third-party assets (game-icons.net font + CSS) — kept verbatim.
+**/vendor/
