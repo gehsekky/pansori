@@ -169,6 +169,16 @@ describe('GridMapView', () => {
     expect(cell(container, 1, 2).querySelector('.game-icon-forest')).toBeTruthy();
   });
 
+  it('renders the game-icons hills glyph on a regional hills tile', () => {
+    const hillsGrid: ActiveGrid = {
+      ...grid,
+      terrain: [{ pos: { x: 1, y: 1 }, type: 'hills' }],
+      transitions: [],
+    };
+    const { container } = render(<GridMapView grid={hillsGrid} markerPos={{ x: 0, y: 0 }} />);
+    expect(cell(container, 1, 1).querySelector('.game-icon-hills')).toBeTruthy();
+  });
+
   it('highlights the party current cell with the current-cell class', () => {
     const { container } = render(<GridMapView grid={grid} markerPos={{ x: 1, y: 1 }} />);
     const here = cell(container, 1, 1);

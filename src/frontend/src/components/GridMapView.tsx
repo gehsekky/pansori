@@ -66,6 +66,7 @@ const REGIONAL_TERRAIN_ICON: Partial<Record<TerrainType, { name: string; color: 
   forest: { name: 'forest', color: 'rgba(34, 92, 34, 0.92)' },
   water: { name: 'waves', color: 'rgba(150, 205, 245, 0.95)' }, // light blue, lighter than the tint
   mountain: { name: 'peaks', color: 'rgba(214, 210, 202, 0.95)' }, // light stone, over the dark tint
+  hills: { name: 'hills', color: 'rgba(140, 165, 100, 0.92)' }, // grassy green over the tan tint
 };
 
 // Local sites (dungeons) on the overland map: the game-icons glyph defaults to
