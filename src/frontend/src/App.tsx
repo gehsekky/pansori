@@ -606,7 +606,7 @@ export default function App() {
                                       n.id === convNpcId ||
                                       inConversationHere)
                                 )
-                                .map((n) => ({ id: n.id, pos: n.pos!, name: n.name }))
+                                .map((n) => ({ id: n.id, pos: n.pos!, name: n.name, icon: n.icon }))
                             : [];
                         // Fog of war (regional map only): the party can only
                         // see / travel to cells discovered within sight range.

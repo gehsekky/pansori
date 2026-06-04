@@ -1781,6 +1781,14 @@
   text-shadow: 0 0 2px rgba(0, 0, 0, 0.8);
 }
 
+/* A game-icons glyph filling an enemy combat token (in place of a letter). */
+.gridTokenIcon {
+  color: #fff;
+  font-size: 1.05rem;
+  line-height: 1;
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.85);
+}
+
 .gridHpBar {
   position: absolute;
   bottom: -3px;

@@ -393,4 +393,21 @@ describe('GridMapView', () => {
     const enemyCell = container.querySelector('[aria-label*="an enemy"]') as HTMLElement;
     expect(enemyCell.querySelector('.game-icon-daemon-skull')).toBeTruthy();
   });
+
+  it('renders an NPC token with the default glyph, or a per-NPC icon override', () => {
+    const { container } = render(
+      <GridMapView
+        grid={localGrid}
+        markerPos={{ x: 3, y: 6 }}
+        npcs={[
+          { id: 'npc_a', pos: { x: 1, y: 1 }, name: 'Townsfolk' }, // no icon → default
+          { id: 'npc_bram', pos: { x: 2, y: 1 }, name: 'Bram', icon: 'wood-axe' }, // override
+        ]}
+        onNpcClick={vi.fn()}
+        onMarkerMove={vi.fn()}
+      />
+    );
+    expect(cell(container, 1, 1).querySelector('.game-icon-conversation')).toBeTruthy();
+    expect(cell(container, 2, 1).querySelector('.game-icon-wood-axe')).toBeTruthy();
+  });
 });

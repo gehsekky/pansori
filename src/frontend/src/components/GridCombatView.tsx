@@ -1,4 +1,5 @@
 import type { CombatEntity, GameState, GridPos, Seed, TerrainType } from '../types';
+import GameIcon from './GameIcon';
 import { TERRAIN } from '../types';
 import { TERRAIN_STYLE } from '../lib/terrainStyle';
 import styles from '../styles.module.css';
@@ -78,6 +79,60 @@ function cellsOnLine(a: GridPos, b: GridPos): GridPos[] {
 function tokenLabel(name: string): string {
   const first = name.trim()[0] ?? '?';
   return first.toUpperCase();
+}
+
+// game-icons glyph per enemy family, matched by keyword against the creature's
+// name (first match wins → list specific families before generic ones). All
+// multiples of a kind share an icon; the hover tooltip carries the numbered name
+// ("Bandit #2") to tell them apart. Anything unmatched falls back to a generic
+// threat skull (same glyph the overland "hostile here" marker uses).
+const ENEMY_ICON_RULES: Array<[RegExp, string]> = [
+  // Beasts & monstrosities
+  [/owlbear/, 'owl'],
+  [/dragon/, 'dragon-head'],
+  [/wyvern/, 'wyvern'],
+  [/kobold/, 'spiked-dragon-head'],
+  [/wolf|worg/, 'wolf-head'],
+  [/bear/, 'bear-head'],
+  [/spider/, 'spider-alt'],
+  [/\brat\b/, 'rat'],
+  [/boar/, 'boar'],
+  [/ape|gorilla/, 'gorilla'],
+  [/lion|tiger|saber|manticore/, 'lion'],
+  [/griffon|griffin|hippogriff/, 'griffin-symbol'],
+  [/eagle/, 'eagle-emblem'],
+  [/owl/, 'owl'],
+  // Undead
+  [/skeleton/, 'skeleton'],
+  [/zombie|ghoul|ghast/, 'shambling-zombie'],
+  [/mummy/, 'mummy-head'],
+  [/lich|crypt lord|phylactery|sealed tomb/, 'crowned-skull'],
+  [/wight|wraith|specter|spectre|shadow|ghost|dusk/, 'spectre'],
+  // Humanoids
+  [/goblin|bugbear/, 'goblin-head'],
+  [/orc/, 'orc-head'],
+  [/gnoll/, 'evil-minion'],
+  [/imp|mephit|fey|trickster/, 'imp'],
+  [/giant|ogre|ettin/, 'ogre'],
+  // Elementals
+  [/fire elemental|salamander|fire aura|fire breath|stench/, 'flame'],
+  [/water elemental/, 'wave-crest'],
+  [/earth elemental|boulder|stone/, 'stone-pile'],
+  [/air elemental/, 'tornado'],
+  [/animated armor|armor/, 'armor-vest'],
+  // Human factions
+  [/cultist|fanatic|acolyte|cult/, 'cultist'],
+  [/bandit|ruffian|bowman|robber|scout|thief|snowshroud/, 'robber'],
+  [/berserker|barbarian/, 'barbarian'],
+  [/gladiator|captain|guard|warrior|soldier|knight/, 'spartan-helmet'],
+  // Generic icy leftovers (after the specific frost-beasts/humans above)
+  [/ice|frost|snow/, 'snowflake-1'],
+];
+const DEFAULT_ENEMY_ICON = 'daemon-skull';
+function enemyIcon(name: string): string {
+  const n = name.toLowerCase();
+  for (const [re, icon] of ENEMY_ICON_RULES) if (re.test(n)) return icon;
+  return DEFAULT_ENEMY_ICON;
 }
 
 function hpColor(hp: number, maxHp: number): string {
@@ -453,7 +508,17 @@ function GridCombatView({
                 : '1px solid rgba(255, 255, 255, 0.25)',
             }}
           >
-            <span className={styles.gridTokenLetter}>{tokenLetter}</span>
+            {ent.isEnemy ? (
+              // Enemies read as a family glyph; the numbered name rides in the
+              // tooltip / aria-label to tell duplicates apart.
+              <GameIcon
+                name={enemyIcon(displayName(ent))}
+                className={styles.gridTokenIcon}
+                aria-hidden="true"
+              />
+            ) : (
+              <span className={styles.gridTokenLetter}>{tokenLetter}</span>
+            )}
             <div
               className={styles.gridHpBar}
               style={{

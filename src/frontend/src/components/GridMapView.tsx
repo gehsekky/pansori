@@ -26,7 +26,7 @@ interface Props {
   // several. Renders a clickable token per NPC at its `pos`; clicking it (via
   // `onNpcClick(id)`) walks the party adjacent and opens that NPC's conversation,
   // the same as the "Talk to …" choice.
-  npcs?: Array<{ id: string; pos: GridPos; name: string }>;
+  npcs?: Array<{ id: string; pos: GridPos; name: string; icon?: string }>;
   onNpcClick?: (npcId: string) => void;
   // Fog of war — the set of revealed "x,y" cell keys. When provided, any cell
   // not in the set is hidden (obscured + non-travelable). Omit to disable fog
@@ -96,6 +96,11 @@ const DEFAULT_SITE_ICON = 'dungeon-gate';
 const TOWN_ICON = { name: 'village', color: 'rgba(222, 190, 120, 0.97)' };
 // Stone tone shared by dungeon-site + room-exit glyphs.
 const SITE_STONE = 'rgba(206, 198, 182, 0.95)';
+
+// Talkable-NPC token: a warm gold glyph. Each NPC may override the glyph via
+// PlacedNpc.icon (e.g. 'wood-axe'); this is the fallback when none is set.
+const DEFAULT_NPC_ICON = 'conversation';
+const NPC_GOLD = 'rgba(230, 200, 120, 1)';
 
 // Out of combat an enemy carries no grid position (positions are assigned only
 // when combat deploys tokens). Pick a single cell near the party for the red
@@ -328,14 +333,15 @@ function GridMapView({
           />
         );
       } else if (isNpc) {
-        // A talkable NPC: a gold token with the name's initial + a name label.
+        // A talkable NPC: a gold game-icons glyph (per-NPC override, else the
+        // default NPC glyph) + a name label.
         token = (
           <>
-            <span className={styles.gridToken} style={{ background: 'rgba(196, 160, 70, 0.92)' }}>
-              <span className={styles.gridTokenLetter}>
-                {cellNpc!.name.charAt(0).toUpperCase()}
-              </span>
-            </span>
+            <GameIcon
+              name={cellNpc!.icon ?? DEFAULT_NPC_ICON}
+              className={styles.gridMapGlyph}
+              style={{ fontSize: iconFontSize, color: NPC_GOLD }}
+            />
             <span className={styles.gridMapLabel} aria-hidden="true">
               {cellNpc!.name}
             </span>

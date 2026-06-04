@@ -129,3 +129,29 @@ describe('GridCombatView — cosmetic terrain paint', () => {
     expect(getByText('swamp')).toBeTruthy(); // legend entry
   });
 });
+
+describe('GridCombatView — enemy token glyphs', () => {
+  it('renders the enemy as its family game-icon (Goblin → goblin-head)', () => {
+    const { state, seed } = build({
+      lighting: 'bright',
+      pcPos: { x: 0, y: 5 },
+      enemyPos: { x: 6, y: 5 },
+    });
+    const { container } = render(<GridCombatView state={state} seed={seed} />);
+    expect(cell(container, 6, 5).querySelector('.game-icon-goblin-head')).toBeTruthy();
+  });
+
+  it('falls back to a generic threat glyph for an unmapped creature name', () => {
+    const { state, seed } = build({
+      lighting: 'bright',
+      pcPos: { x: 0, y: 5 },
+      enemyPos: { x: 6, y: 5 },
+    });
+    // Rename the fixture enemy to something no rule matches.
+    for (const list of Object.values(seed.enemies ?? {})) {
+      for (const e of list) e.name = 'Gelatinous Cube';
+    }
+    const { container } = render(<GridCombatView state={state} seed={seed} />);
+    expect(cell(container, 6, 5).querySelector('.game-icon-daemon-skull')).toBeTruthy();
+  });
+});

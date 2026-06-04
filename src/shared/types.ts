@@ -877,6 +877,10 @@ export interface NpcTemplate {
   // marker to a free cell ADJACENT to the NPC and opens the conversation.
   // Omitted ⇒ no token (talk still works as a room-scoped choice).
   pos?: GridPos;
+  // game-icons.net glyph name for this NPC's map token (e.g. 'wood-axe'). When
+  // omitted the token uses a generic NPC glyph — a per-NPC override over that
+  // default, mirroring how dungeon sites override DEFAULT_SITE_ICON.
+  icon?: string;
   // Social
   greeting: string;
   responses: NpcDialogueResponse[];
