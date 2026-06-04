@@ -59,6 +59,14 @@ function transitionGlyph(t: MapTransition): string {
 // ride in the tooltip) so local rooms don't get crowded.
 const LABELLED_KINDS = new Set<MapTransition['kind']>(['site', 'venue']);
 
+// On the overland (regional) map, these terrain types render a game-icons.net
+// glyph (over the type's tint) instead of the plain unicode glyph / bare tint.
+// A trial we're extending terrain by terrain; town/local maps are unaffected.
+const REGIONAL_TERRAIN_ICON: Partial<Record<TerrainType, { name: string; color: string }>> = {
+  forest: { name: 'forest', color: 'rgba(34, 92, 34, 0.92)' },
+  water: { name: 'waves', color: 'rgba(225, 240, 252, 0.95)' },
+};
+
 // Out of combat an enemy carries no grid position (positions are assigned only
 // when combat deploys tokens). Pick a single cell near the party for the red
 // "enemy here" marker: the first valid cell from a ring around the party
@@ -295,8 +303,24 @@ function GridMapView({
             )}
           </>
         );
+      } else if (isRegional && terrainType && REGIONAL_TERRAIN_ICON[terrainType]) {
+        // game-icons.net glyph for selected overland terrain (forest, water, …),
+        // drawn over the type's tint instead of the plain unicode glyph.
+        const ic = REGIONAL_TERRAIN_ICON[terrainType]!;
+        token = (
+          <GameIcon
+            name={ic.name}
+            className={styles.gridMapGlyph}
+            // A detailed icon reads smaller than a plain glyph at the same size,
+            // so bump it ~25% over the cell glyph font to fill the tile.
+            style={{
+              fontSize: glyphFont ? `calc(${glyphFont} * 1.25)` : undefined,
+              color: ic.color,
+            }}
+          />
+        );
       } else if (tStyle?.glyph) {
-        // Impassable typed terrain (mountains ▲, water ≈).
+        // Impassable typed terrain not yet iconified (mountains ▲).
         token = (
           <span
             className={styles.gridMapObstacleGlyph}
@@ -305,22 +329,6 @@ function GridMapView({
           >
             {tStyle.glyph}
           </span>
-        );
-      } else if (isRegional && terrainType === 'forest') {
-        // Test: a game-icons.net tree glyph for forest tiles on the overland
-        // map (over the green tint). If it reads well we'll extend it to other
-        // terrain types / map levels.
-        token = (
-          <GameIcon
-            name="forest"
-            className={styles.gridMapGlyph}
-            // A detailed icon reads smaller than a plain glyph at the same size,
-            // so bump it ~25% over the cell glyph font to fill the tile.
-            style={{
-              fontSize: glyphFont ? `calc(${glyphFont} * 1.25)` : undefined,
-              color: 'rgba(34, 92, 34, 0.92)',
-            }}
-          />
         );
       } else if (isObstacle && isRegional) {
         // Legacy (untyped) regional obstacle reads as a mountain peak.

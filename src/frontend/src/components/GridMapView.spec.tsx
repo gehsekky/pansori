@@ -170,7 +170,8 @@ describe('GridMapView', () => {
     );
     // Impassable terrain carries a glyph and is not clickable.
     expect(cell(container, 2, 0).textContent).toContain('▲'); // mountain
-    expect(cell(container, 3, 1).textContent).toContain('≈'); // water
+    // Water uses the game-icons waves glyph (still impassable / non-clickable).
+    expect(cell(container, 3, 1).querySelector('.game-icon-waves')).toBeTruthy();
     expect(cell(container, 2, 0).getAttribute('role')).toBe('gridcell');
     expect(cell(container, 3, 1).getAttribute('role')).toBe('gridcell');
     // Passable terrain (road) stays travel-able.
