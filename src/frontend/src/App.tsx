@@ -4,6 +4,7 @@ import type { FrontendContext, GameChoice, Seed, SessionSummary } from './types.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import AdventureLogPanel from './components/AdventureLogPanel.tsx';
 import CharScreen from './components/CharScreen.tsx';
+import CharacterModal from './components/CharacterModal.tsx';
 import ClassAbilityBar from './components/ClassAbilityBar.tsx';
 import CombatActionBar from './components/CombatActionBar.tsx';
 import CombatLogPanel from './components/CombatLogPanel.tsx';
@@ -132,6 +133,8 @@ export default function App() {
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [mapOpen, setMapOpen] = useState(false);
   const [inventoryOpen, setInventoryOpen] = useState(false);
+  // Which party member's character sheet modal is open (null = closed).
+  const [sheetCharId, setSheetCharId] = useState<string | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
   // Which choice is currently hovered — used by GridCombatView to render an
   // AoE preview tint over the cells a hovered spell would affect.
@@ -295,7 +298,7 @@ export default function App() {
       // Number keys pick choices when no modal blocks input. Choices that
       // get their own dedicated UI (grid move D-pad, default-action icon
       // row) drop out of the numbered list so the indices stay stable.
-      if (inventoryOpen || mapOpen) return;
+      if (inventoryOpen || mapOpen || sheetCharId) return;
       const idx = parseInt(e.key, 10);
       const numbered = choices.filter((c) => !ICONIZED_KINDS.has(c.kind ?? ''));
       if (!isNaN(idx) && idx >= 1 && idx <= numbered.length) chooseWithPicker(numbered[idx - 1]);
@@ -306,7 +309,17 @@ export default function App() {
     // it in the dep list, a stale closure would dispatch with frozen
     // history after the player takes several non-keyboard actions.
     // Re-registering the listener on each render is cheap (one DOM op).
-  }, [view, loading, escaped, gameState, choices, inventoryOpen, mapOpen, chooseWithPicker]);
+  }, [
+    view,
+    loading,
+    escaped,
+    gameState,
+    choices,
+    inventoryOpen,
+    mapOpen,
+    sheetCharId,
+    chooseWithPicker,
+  ]);
 
   async function wrappedResumeSession(id: string) {
     await handleResumeSession(id);
@@ -512,6 +525,7 @@ export default function App() {
                         action: { type: 'set_active_character', characterId: charId },
                       });
                     }}
+                    onOpenSheet={setSheetCharId}
                   />
                 )}
 
@@ -1083,6 +1097,19 @@ export default function App() {
                   onDrop={handleDrop}
                 />
               )}
+
+              {sheetCharId &&
+                gameState &&
+                (() => {
+                  const sheetChar = gameState.characters.find((c) => c.id === sheetCharId);
+                  return sheetChar ? (
+                    <CharacterModal
+                      char={sheetChar}
+                      ctx={ctx}
+                      onClose={() => setSheetCharId(null)}
+                    />
+                  ) : null;
+                })()}
 
               {targetPicker &&
                 targetPicker.pickTargets &&

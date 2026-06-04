@@ -1021,6 +1021,7 @@
 }
 
 .partyTileWrap {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
@@ -1291,6 +1292,175 @@
 .charHeroCard {
   flex: 1 1 320px;
   max-width: 360px;
+}
+
+/* ─── Single-block party setup: portrait nav + active block ──────────────── */
+
+/* Row: the vertical portrait nav on the left, the active setup block right. */
+.charPartyLayout {
+  display: flex;
+  flex-direction: row;
+  gap: 1.25rem;
+  align-items: flex-start;
+}
+
+/* The vertical portrait nav column. */
+.charPartyNav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  flex: 0 0 auto;
+}
+
+/* A portrait square that selects which member you're editing. */
+.charNavPortrait {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border: 2px solid var(--t-border);
+  border-radius: 8px;
+  background: var(--t-bg);
+  cursor: pointer;
+  overflow: hidden;
+  transition:
+    border-color 0.12s ease,
+    transform 0.12s ease;
+}
+.charNavPortrait:hover {
+  border-color: var(--t-mid);
+}
+.charNavPortraitActive {
+  border-color: var(--t-primary);
+  box-shadow: 0 0 0 2px var(--t-primary);
+}
+.charNavPortraitImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+/* The name initial sits in the corner so empty/identical placeholders still
+   read as distinct members. */
+.charNavPortraitInitial {
+  position: absolute;
+  bottom: 1px;
+  right: 3px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--t-text);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  letter-spacing: 0;
+}
+
+/* The "+" add block under the portraits. */
+.charNavAdd {
+  width: 56px;
+  height: 56px;
+  border: 2px dashed var(--t-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--t-dim);
+  font-size: 1.6rem;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    border-color 0.12s ease,
+    color 0.12s ease;
+}
+.charNavAdd:hover {
+  border-color: var(--t-primary);
+  color: var(--t-primary);
+}
+.charNavAddDisabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.charNavAddDisabled:hover {
+  border-color: var(--t-border);
+  color: var(--t-dim);
+}
+
+/* The active block: now the only one on screen, so it can use the width. */
+.charActiveCard {
+  flex: 1 1 auto;
+  max-width: 640px;
+}
+
+/* ─── CharacterModal (in-game sheet) ─────────────────────────────────────── */
+
+.charSheetAbilities {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0.5rem;
+}
+.charSheetAbility {
+  text-align: center;
+  border: 1px solid var(--t-border);
+  border-radius: 6px;
+  padding: 0.5rem 0.25rem;
+  background: var(--t-bg);
+}
+.charSheetAbilityLabel {
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  color: var(--t-dim);
+}
+.charSheetAbilityScore {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--t-text);
+  line-height: 1.2;
+}
+.charSheetAbilityMod {
+  font-size: 0.8rem;
+  color: var(--t-primary);
+}
+.charSheetVitals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+  font-size: 0.85rem;
+  color: var(--t-text);
+}
+.charSheetLine {
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: var(--t-text);
+  margin: 0.15rem 0;
+}
+.charSheetList {
+  margin: 0.2rem 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: var(--t-text);
+}
+
+/* ─── PartyRail per-tile "view sheet" (ⓘ) button ─────────────────────────── */
+/* Lives in the tile wrap (a sibling of the tile <button>, never nested) so it
+   doesn't make a button-in-button. Sits in the tile's top-right corner. */
+.partyTileInfo {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 2;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--t-dim);
+  font-size: 0.9rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.partyTileInfo:hover {
+  color: var(--t-primary);
 }
 
 /* The trailing party controls (add / auto-fill / begin) shouldn't stretch
@@ -2177,6 +2347,22 @@
   .charPartyCol {
     flex: 1 1 auto;
     width: 100%;
+  }
+
+  /* Narrow screens: the portrait nav becomes a horizontal scroll strip above
+     the active setup block, which now takes the full width. */
+  .charPartyLayout {
+    flex-direction: column;
+  }
+  .charPartyNav {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    width: 100%;
+    padding-bottom: 0.25rem;
+  }
+  .charActiveCard {
+    max-width: 100%;
   }
 
   /* Sessions list header: [title | actions] → stack */

@@ -17,6 +17,8 @@ interface Props {
   // this NPC" pattern). Omit / no-op in combat — initiative drives
   // the active marker there.
   onSetActive?: (charId: string) => void;
+  // Open the full character sheet for a party member (the ⓘ on each tile).
+  onOpenSheet?: (charId: string) => void;
 }
 
 // Vertical party stack — the left rail of the 3-zone layout. Every character
@@ -35,7 +37,7 @@ interface Props {
 // `onSetActive` — RAW has no initiative outside combat (SRD 5.2.1
 // p.189), so the player picks who's leading.
 
-function PartyRail({ state, activeCharId, ctx, seed, inCombat, onSetActive }: Props) {
+function PartyRail({ state, activeCharId, ctx, seed, inCombat, onSetActive, onOpenSheet }: Props) {
   const [selectedCharId, setSelectedCharId] = useState<string>('');
 
   useEffect(() => {
@@ -64,6 +66,22 @@ function PartyRail({ state, activeCharId, ctx, seed, inCombat, onSetActive }: Pr
         const canLevelUp = levelUpAvailable(c, inCombat);
         return (
           <div key={c.id} className={styles.partyTileWrap}>
+            {onOpenSheet && (
+              <button
+                type="button"
+                className={styles.partyTileInfo}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenSheet(c.id);
+                }}
+                title={`${c.name} — character sheet`}
+                aria-label={`View ${c.name}'s character sheet`}
+                data-testid="open-sheet-btn"
+                data-character-id={c.id}
+              >
+                <span aria-hidden="true">ⓘ</span>
+              </button>
+            )}
             <PartyTile
               char={c}
               ctx={ctx}

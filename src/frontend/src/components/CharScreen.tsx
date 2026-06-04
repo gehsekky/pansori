@@ -16,6 +16,20 @@ import SpellPickerDialog from './SpellPickerDialog';
 import { applyTheme } from '../lib/theme';
 import styles from '../styles.module.css';
 
+// Max party size. One knob to bump later (the engine is being readied for 6);
+// a real bump should also re-check any backend party-size validation.
+const MAX_PARTY = 4;
+
+// Placeholder portrait colors (art TBD) — one per nav slot, enough for a party
+// of six. A simple bust silhouette tinted by slot.
+const PORTRAIT_COLORS = ['#4a9eff', '#ff6b6b', '#ffd93d', '#6bcb77', '#c77dff', '#ff9f1c'];
+function placeholderPortrait(idx: number): string {
+  const fill = PORTRAIT_COLORS[idx % PORTRAIT_COLORS.length];
+  return `data:image/svg+xml,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><rect width="40" height="40" fill="#1a1a2e"/><circle cx="20" cy="14" r="7" fill="${fill}"/><ellipse cx="20" cy="34" rx="10" ry="7" fill="${fill}"/></svg>`
+  )}`;
+}
+
 const MAGIC_INITIATE_FEAT_IDS: ReadonlySet<string> = new Set([
   'magic_initiate_arcane',
   'magic_initiate_divine',
@@ -370,6 +384,15 @@ function CharScreen({
   // box again cancels. Allows assigning rolled or array values to the right
   // abilities (PHB p.13: "Standard Method" assignment).
   const [swapFrom, setSwapFrom] = useState<{ partyIdx: number; key: keyof StatBlock } | null>(null);
+  // Which party member's setup block is on screen. Only one is shown at a time;
+  // the portrait nav (left) switches it. Kept in range by add/remove/auto-fill.
+  const [activeIdx, setActiveIdx] = useState(0);
+  // Switch the visible setup block, cancelling any half-finished stat swap
+  // (a pending swap belongs to the member you were just editing).
+  function selectMember(idx: number) {
+    setActiveIdx(idx);
+    setSwapFrom(null);
+  }
   // BE context summaries (originFeat per background, feat shapes, spell
   // catalog) drive the Magic Initiate spell picker. Lazy-loaded on mount;
   // empty until the request resolves. The picker trigger button stays
@@ -475,6 +498,10 @@ function CharScreen({
     // against the current campaign's classes / backgrounds). Otherwise
     // fall back to a fresh single-member party for this context.
     const saved = loadPartyDraft(contextId);
+    // Switching campaigns rebuilds the party — snap the selection back to the
+    // leader so we never point past the new (possibly shorter) list.
+    setActiveIdx(0);
+    setSwapFrom(null);
     if (saved) {
       setParty(saved.map((d) => sanitizeDraft(d, c)));
     } else {
@@ -508,7 +535,7 @@ function CharScreen({
   }
 
   function addMember() {
-    if (party.length >= 4) return;
+    if (party.length >= MAX_PARTY) return;
     setParty((prev) => [
       ...prev,
       {
@@ -522,10 +549,15 @@ function CharScreen({
         statMethod: 'roll',
       },
     ]);
+    // Jump to the freshly-added member (its index = the old length).
+    selectMember(party.length);
   }
 
   function removeMember(idx: number) {
     setParty((prev) => prev.filter((_, i) => i !== idx));
+    // Keep the selection valid after the list shrinks by one.
+    setActiveIdx((cur) => Math.min(cur, party.length - 2));
+    setSwapFrom(null);
   }
 
   // Build the campaign's recommended party. Uses the campaign's authored
@@ -541,7 +573,8 @@ function CharScreen({
     const fallbackClass = selectedCtxForInit.classes[0]?.id ?? '';
     const composition = (desired.length ? desired : [fallbackClass])
       .map((cls) => (validClasses.has(cls) ? cls : fallbackClass))
-      .slice(0, 4);
+      .slice(0, MAX_PARTY);
+    selectMember(0);
     setParty(
       composition.map((cls) => ({
         name: cls,
@@ -659,11 +692,63 @@ function CharScreen({
             HERO REGISTRY
           </h1>
           <p className={styles.sub} style={{ marginBottom: '2rem' }}>
-            REGISTER YOUR PARTY — UP TO 4 HEROES
+            REGISTER YOUR PARTY — UP TO {MAX_PARTY} HEROES
           </p>
 
-          <div className={styles.charPartyRow}>
-            {party.map((draft, idx) => {
+          <div className={styles.charPartyLayout}>
+            {/* Portrait nav — switch which member's setup block is shown, and
+                add a new member. One block is on screen at a time. */}
+            <div className={styles.charPartyNav} role="tablist" aria-label="Party members">
+              {party.map((d, i) => {
+                const navPortrait =
+                  d.portrait ??
+                  (i === 0 && user?.avatar_url ? user.avatar_url : placeholderPortrait(i));
+                const active = i === activeIdx;
+                const label = d.name || (i === 0 ? 'Party Leader' : `Hero ${i + 1}`);
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    aria-current={active ? 'true' : undefined}
+                    className={`${styles.charNavPortrait} ${active ? styles.charNavPortraitActive : ''}`}
+                    onClick={() => selectMember(i)}
+                    title={label}
+                    aria-label={`Edit ${label}`}
+                    data-testid={`nav-portrait-${i}`}
+                  >
+                    <img src={navPortrait} alt="" className={styles.charNavPortraitImg} />
+                    <span className={styles.charNavPortraitInitial} aria-hidden="true">
+                      {(d.name || (i === 0 ? 'P' : String(i + 1))).charAt(0).toUpperCase()}
+                    </span>
+                  </button>
+                );
+              })}
+              <button
+                type="button"
+                className={`${styles.charNavAdd} ${
+                  party.length >= MAX_PARTY ? styles.charNavAddDisabled : ''
+                }`}
+                onClick={addMember}
+                disabled={party.length >= MAX_PARTY}
+                aria-disabled={party.length >= MAX_PARTY}
+                title={
+                  party.length >= MAX_PARTY
+                    ? `Party is full (max ${MAX_PARTY})`
+                    : 'Add a party member'
+                }
+                aria-label="Add a party member"
+                data-testid="add-member-btn"
+              >
+                <span aria-hidden="true">+</span>
+              </button>
+            </div>
+
+            {/* The single active member's setup block. */}
+            {(() => {
+              const idx = activeIdx;
+              const draft = party[idx];
               const primaryStat = selectedCtx?.classPrimaryStats[draft.cls]?.toLowerCase() as
                 | keyof StatBlock
                 | undefined;
@@ -680,7 +765,7 @@ function CharScreen({
               return (
                 <div
                   key={idx}
-                  className={`${styles.card} ${styles.charHeroCard}`}
+                  className={`${styles.card} ${styles.charHeroCard} ${styles.charActiveCard}`}
                   style={{ position: 'relative' }}
                 >
                   {party.length > 1 && (
@@ -1662,26 +1747,10 @@ function CharScreen({
                     )}
                 </div>
               );
-            })}
+            })()}
           </div>
 
           <div className={styles.charPartyControls}>
-            {party.length < 4 && (
-              <button
-                className={styles.submit}
-                style={{
-                  marginTop: 0,
-                  marginBottom: '0.5rem',
-                  background: 'transparent',
-                  border: '1px dashed var(--t-border)',
-                  color: 'var(--t-dim)',
-                }}
-                onClick={addMember}
-              >
-                + ADD PARTY MEMBER
-              </button>
-            )}
-
             {selectedCtxForInit?.recommendedPartySize !== undefined && (
               <button
                 className={styles.submit}
