@@ -1,9 +1,48 @@
+import type { Context, GameState, GridPos } from '../../types.js';
 import { ENCOUNTER_ROOM_ID, resolveMarkerMove, stageEncounter } from '../mapEngine.js';
+import { buildArrivalNarrative, hasSaveProficiency } from '../gameEngine.js';
 import { materializeEnemy, scaleEnemyHp } from '../enemyFactory.js';
 import type { ActionHandler } from './types.js';
-import type { GridPos } from '../../types.js';
-import { buildArrivalNarrative } from '../gameEngine.js';
+import { rollConditionSave } from '../rulesEngine.js';
 import { runCombatStart } from './attack/combatStart.js';
+
+const MARCH_BUDGET_MIN = 8 * 60; // SRD: 8 hours of travel/day before fatigue risk
+
+/**
+ * SRD 5.2.1 Extended Travel ("forced march"): each full hour of overland travel
+ * beyond 8 hours in a day forces every character to make a Constitution save
+ * (DC 10 + 1 per hour past 8) or gain a level of Exhaustion. Accrues the move's
+ * `elapsedMin` into `travel_minutes_today` (reset by a long rest) and rolls a
+ * save for each newly-completed past-8 hour this move added.
+ */
+export function applyForcedMarch(
+  st: GameState,
+  elapsedMin: number,
+  context: Context
+): { st: GameState; note: string } {
+  if (elapsedMin <= 0) return { st, note: '' };
+  const before = st.travel_minutes_today ?? 0;
+  const after = before + elapsedMin;
+  const pastBefore = Math.max(0, Math.floor((before - MARCH_BUDGET_MIN) / 60));
+  const pastAfter = Math.max(0, Math.floor((after - MARCH_BUDGET_MIN) / 60));
+  let characters = st.characters;
+  const notes: string[] = [];
+  for (let h = pastBefore + 1; h <= pastAfter; h++) {
+    const dc = 10 + h; // 1st hour past 8 → DC 11, 2nd → DC 12, …
+    characters = characters.map((c) => {
+      if (c.dead) return c;
+      const prof = hasSaveProficiency(c, 'con', context);
+      const failed = rollConditionSave('con', c.con, dc, prof, c.level, 0, c.conditions ?? []);
+      if (!failed) return c;
+      const lvl = (c.exhaustion_level ?? 0) + 1;
+      notes.push(`${c.name} (DC ${dc} CON) → Exhaustion ${lvl}`);
+      return { ...c, exhaustion_level: lvl };
+    });
+  }
+  const next: GameState = { ...st, travel_minutes_today: after, characters };
+  const note = notes.length ? ` The forced march takes its toll — ${notes.join('; ')}.` : '';
+  return { st: next, note };
+}
 
 /**
  * `marker_move`: move the single party marker on the current grid (regional /
@@ -62,6 +101,10 @@ export const handleMarkerMove: ActionHandler<{ type: 'marker_move'; to: GridPos 
   if (res.elapsedHours >= 1) {
     ctx.narrative += ` (${Math.round(res.elapsedHours)} hr of travel.)`;
   }
+  // SRD Extended Travel — overland hours beyond 8/day risk Exhaustion.
+  const march = applyForcedMarch(ctx.st, Math.round(res.elapsedHours * 60), ctx.context);
+  ctx.st = march.st;
+  ctx.narrative += march.note;
   // A random encounter interrupted the march — drop the party off the map into
   // a transient local combat against the rolled creature. Materialize it from
   // the campaign bestiary (scaled to party size, like authored room enemies);

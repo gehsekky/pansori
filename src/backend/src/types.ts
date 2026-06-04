@@ -1562,6 +1562,11 @@ export interface GameState {
   // The world_minute at which the last long rest completed; gates SRD's "one
   // long rest per 24 hours" (a second is blocked until 1440 min have passed).
   last_long_rest_minute?: number;
+  // SRD 5.2.1 Extended Travel ("forced march") — minutes of overland travel
+  // accrued since the last long rest. Beyond 8 hours (480), each further full
+  // hour forces a CON save (DC 10 + hours past 8) or a level of Exhaustion
+  // (see applyForcedMarch). Reset to 0 by a long rest.
+  travel_minutes_today?: number;
 
   // Choice-dimming memory. Each entry is a stable seenKey emitted by the
   // backend when the corresponding choice was clicked (talk_response,

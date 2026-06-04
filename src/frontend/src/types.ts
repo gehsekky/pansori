@@ -326,6 +326,9 @@ export interface GameState {
   // In-game clock: total elapsed in-world minutes since campaign start (Day 1
   // 08:00 == 480). Formatted for display via lib/gameClock.
   world_minute?: number;
+  // Minutes of overland travel since the last long rest — drives SRD forced-
+  // march fatigue (engine-side). Reset to 0 by a long rest.
+  travel_minutes_today?: number;
 
   // 3-level grid map (regional → town → local). `map_level` is which grid the
   // party is on; `marker_pos` is the single party-marker cell. Mirror of the BE

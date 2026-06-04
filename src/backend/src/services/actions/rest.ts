@@ -288,6 +288,8 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
     long_rested: true,
     world_minute: restedMinute,
     last_long_rest_minute: restedMinute,
+    // A full rest refreshes the SRD forced-march budget (8h/day before fatigue).
+    travel_minutes_today: 0,
   };
   updatePcActor(ctx, { ...restedChars[safeIdx] });
   const longRestFlavor = ctx.context.narratives.longRest
