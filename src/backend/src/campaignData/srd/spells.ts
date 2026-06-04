@@ -5668,4 +5668,31 @@ export const SRD_SPELLS: Record<string, Spell> = {
     },
     spellList: ['divine'],
   },
+
+  // SRD: Holy Aura (L8 Abjuration, Cleric) — a self-cast concentration aura
+  // (30-ft emanation). Pansori abstracts the emanation to the whole party: each
+  // ally gains `holy_warded` for the duration via the buff path — attackers roll
+  // Disadvantage against them and they have Advantage on ALL saves. Cleared when
+  // the caster's concentration ends. The fiend/undead-hit-blinds-attacker rider
+  // is deferred (no creature-type model).
+  holy_aura: {
+    id: 'holy_aura',
+    name: 'Holy Aura',
+    level: 8,
+    castTime: 'action',
+    targetType: 'self',
+    holyAura: true,
+    concentration: true,
+    durationRounds: 10, // 1 minute, Concentration
+    materialCost: 1000,
+    rangeKind: 'self',
+    desc: 'A 30-ft aura of holy light surrounds you for the duration. While it lasts, your allies have Advantage on all saving throws and attackers have Disadvantage on attack rolls against them. (RAW also blinds a Fiend or Undead that hits a warded ally with a melee attack — deferred.)',
+    narratives: {
+      cast: [
+        '{name} blazes with sacred light — a protective aura settles over the whole party',
+        '{name} invokes {spell}{slotNote}; holy radiance wreathes the party against harm',
+      ],
+    },
+    spellList: ['divine'],
+  },
 };

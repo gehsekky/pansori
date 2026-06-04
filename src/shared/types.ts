@@ -129,6 +129,12 @@ export type ConditionName =
   // `ENEMY_DISADV_CONDITIONS` (imposesDisadvantageOnAttackers) in the enemy
   // attack path, like `invisible`. Cleared by breakConcentration.
   | 'blurred'
+  // SRD: Holy Aura — a warded ally: attackers have Disadvantage against it
+  // (`imposesDisadvantageOnAttackers`) and it has Advantage on ALL saving throws
+  // (a literal `holy_warded` check in rollConditionSave, like `hopeful`).
+  // Party-wide, applied by the buff path; cleared by breakConcentration + at
+  // combat end.
+  | 'holy_warded'
   // SRD: Bestow Curse — a generic hindering curse; the cursed creature attacks
   // at Disadvantage (`imposesDisadvantageOnSelfAttacks`). Concentration-linked,
   // cleared by breakConcentration. (RAW's choice of curse effects is abstracted

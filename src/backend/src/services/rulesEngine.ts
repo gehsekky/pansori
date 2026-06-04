@@ -668,7 +668,10 @@ export function rollConditionSave(
   // saves (and death saves; that path lives in the death-save
   // handler, not here).
   const hopefulAdv = ability === 'wis' && targetConditions.includes('hopeful');
-  const advSource = advantage || hasteAdv || hopefulAdv;
+  // SRD Holy Aura — a warded creature has Advantage on ALL saving throws
+  // (literal check, like `hopeful` / `hasted` above).
+  const holyAuraAdv = targetConditions.includes('holy_warded');
+  const advSource = advantage || hasteAdv || hopefulAdv || holyAuraAdv;
   const netAdv = advSource && !disadv;
   const netDisadv = disadv && !advSource;
   // Note: Halfling Lucky for saves would land here. We don't currently

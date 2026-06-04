@@ -132,6 +132,12 @@ const defs: ConditionDef[] = [
   // caster's concentration drop), so 'permanent' here keeps tickConditions from
   // auto-expiring it.
   { id: 'blurred', duration: 'permanent', imposesDisadvantageOnAttackers: true },
+  // SRD Holy Aura — a warded ally: attackers have Disadvantage against it. (Its
+  // Advantage on ALL saves is a literal `holy_warded` check in rollConditionSave,
+  // like `hopeful` / `hasted`.) Party-wide, concentration-linked (cleared on the
+  // caster's concentration drop), so 'permanent' keeps tickConditions from
+  // auto-expiring it. (The fiend/undead-hit-blinds-attacker rider is deferred.)
+  { id: 'holy_warded', duration: 'permanent', imposesDisadvantageOnAttackers: true },
   // Unconscious + petrified: no auto-expire; cleared by death-save recovery
   // / Restoration. Saves auto-fail while present. The pre-registry code
   // omitted them from CONDITION_DURATION (treated as permanent) and from

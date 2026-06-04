@@ -458,6 +458,8 @@ export function breakConcentration(
   if (!char.concentrating_on) return { char, st };
   const condition = char.concentrating_on.condition;
   const wasBless = char.concentrating_on.spellId === 'bless';
+  // SRD Holy Aura — concentration drop ends the party-wide `holy_warded` ward.
+  const wasHolyAura = char.concentrating_on.spellId === 'holy_aura';
   // 2024 PHB Shield of Faith — concentration drop clears the +2 AC.
   // Pansori MVP assumes ONE Shield of Faith active in the party at
   // a time (the typical case — one Cleric concentrating). When the
@@ -542,6 +544,28 @@ export function breakConcentration(
         condition_sources: rest2,
       };
     }
+  }
+  // SRD Holy Aura — the ward sits on the whole party. When the caster's
+  // concentration drops, strip `holy_warded` from every PC + their entity
+  // mirror (and the caster's local ref so a write-back can't resurrect it).
+  if (wasHolyAura) {
+    newSt = {
+      ...newSt,
+      characters: newSt.characters.map((c) =>
+        (c.conditions ?? []).includes('holy_warded')
+          ? { ...c, conditions: (c.conditions ?? []).filter((x) => x !== 'holy_warded') }
+          : c
+      ),
+      entities: (newSt.entities ?? []).map((e) =>
+        !e.isEnemy && e.conditions.includes('holy_warded')
+          ? { ...e, conditions: e.conditions.filter((x) => x !== 'holy_warded') }
+          : e
+      ),
+    };
+    newChar = {
+      ...newChar,
+      conditions: (newChar.conditions ?? []).filter((x) => x !== 'holy_warded'),
+    };
   }
   if (wasFlight) {
     newSt = {
@@ -2974,7 +2998,9 @@ export function endCombatState(st: GameState): GameState {
           cond !== 'raging' &&
           cond !== 'superior_defense' &&
           cond !== 'innate_sorcery' &&
-          cond !== 'holy_nimbus'
+          cond !== 'holy_nimbus' &&
+          // Holy Aura's party ward (1 min ≈ encounter) doesn't carry over.
+          cond !== 'holy_warded'
       ),
       condition_durations: Object.fromEntries(
         Object.entries(c.condition_durations ?? {}).filter(

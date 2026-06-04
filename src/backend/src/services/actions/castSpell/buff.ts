@@ -131,6 +131,33 @@ export function runBuffSpell(
     }
   }
 
+  // SRD Holy Aura — a 30-ft emanation centered on the caster. Pansori abstracts
+  // the emanation to the whole party (everyone in the fight is "in the aura"):
+  // each living party member gains `holy_warded` for the duration — attackers
+  // have Disadvantage against them and they have Advantage on ALL saves. Bound to
+  // the caster's concentration (cleared in breakConcentration). The fiend/undead-
+  // hit-blinds-attacker rider is deferred (no creature-type model).
+  if (spell.holyAura && isCasterTarget) {
+    const WARD = 'holy_warded';
+    ctx.st = {
+      ...ctx.st,
+      characters: ctx.st.characters.map((c) =>
+        c.dead || (c.conditions ?? []).includes(WARD)
+          ? c
+          : { ...c, conditions: [...(c.conditions ?? []), WARD] }
+      ),
+      entities: (ctx.st.entities ?? []).map((e) =>
+        !e.isEnemy && !e.conditions.includes(WARD)
+          ? { ...e, conditions: [...e.conditions, WARD] }
+          : e
+      ),
+    };
+    // Keep the in-hand caster ref in sync (it's committed after the cast).
+    if (!(char.conditions ?? []).includes(WARD)) {
+      char.conditions = [...(char.conditions ?? []), WARD];
+    }
+  }
+
   if (spell.concentration) {
     // SRD Metamagic Extended Spell — double the concentration duration.
     const extendMult = ctx.metamagic?.includes('extended') ? 2 : 1;

@@ -804,6 +804,11 @@ export interface Spell {
   // the dedicated `runDivineWord` dispatch. (The outsider plane-banish is
   // deferred — pansori doesn't model creature type / planes.)
   divineWord?: boolean;
+  // SRD Holy Aura — a self-cast concentration aura. The buff path applies the
+  // party-wide `holy_warded` condition (attackers roll Disadvantage vs warded
+  // allies; warded allies have Advantage on ALL saves). Cleared when the caster's
+  // concentration ends. (The fiend/undead-hit-blinds-attacker rider is deferred.)
+  holyAura?: boolean;
   // SRD Sanctuary — ward the self/ally target; attackers must save vs the
   // caster's DC. The buff path stamps `Character.sanctuary_dc`.
   sanctuary?: boolean;

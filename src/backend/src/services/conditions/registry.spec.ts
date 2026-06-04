@@ -146,10 +146,13 @@ describe('condition registry — derived Sets (compat shim)', () => {
     );
   });
 
-  it('PLAYER_ADV_CONDITIONS = {invisible}; ENEMY_DISADV_CONDITIONS = {invisible, blurred}', () => {
-    // Blur added `blurred` (attackers have Disadvantage) alongside Invisible.
+  it('PLAYER_ADV_CONDITIONS = {invisible}; ENEMY_DISADV_CONDITIONS = {invisible, blurred, holy_warded}', () => {
+    // Blur added `blurred` and Holy Aura added `holy_warded` (attackers have
+    // Disadvantage) alongside Invisible.
     expect([...PLAYER_ADV_CONDITIONS]).toEqual(['invisible']);
-    expect([...ENEMY_DISADV_CONDITIONS].sort()).toEqual(['blurred', 'invisible'].sort());
+    expect([...ENEMY_DISADV_CONDITIONS].sort()).toEqual(
+      ['blurred', 'holy_warded', 'invisible'].sort()
+    );
   });
 });
 
