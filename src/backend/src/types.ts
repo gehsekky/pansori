@@ -907,6 +907,11 @@ export interface Spell {
   // SRD Time Stop — the caster takes this many extra turns in a row (dice expr,
   // '1d4+1'). The utility cast path rolls it onto `Character.time_stop_turns`.
   grantsExtraTurns?: string;
+  // SRD shapeshift spells (Shapechange = self, Animal Shapes = the party). The
+  // cast path puts the target(s) into a chosen BeastForm via the `wild_shaped`
+  // machinery, concentration-bound. Beasts cap at CR 1 in pansori, so the
+  // "any creature" breadth is narrowed to the beast-form catalog.
+  shapeshift?: { scope: 'self' | 'allies' };
   // Long casting time (1 min+) — rejected in combat (before slot spend).
   outOfCombatOnly?: boolean;
 }
@@ -1124,6 +1129,11 @@ export interface Character {
   // 2024 PHB Wild Shape — id of the active BeastForm while wild_shaped.
   // Cleared on dismiss_wild_shape.
   wild_shape_form?: string;
+  // SRD shapeshift SPELLS (Shapechange, Animal Shapes) reuse the `wild_shaped`
+  // machinery but, unlike a druid's class feature, are concentration-bound. This
+  // marks which spell shaped the creature so `breakConcentration` / combat-end
+  // revert exactly those (and leave a druid's independent Wild Shape alone).
+  shapeshift_spell?: string;
   attuned_items: string[]; // instance_ids of attuned magic items (max 3)
   // `rounds_left` ticks down on each round wrap; concentration ends
   // automatically when it reaches 0. 10 rounds = 1 minute (the most

@@ -61,8 +61,8 @@ grep -n "^Alert$\|^Magic Initiate$\|^Savage Attacker$\|^Skilled$" docs/srd-5.2.1
 
 All SRD 5.2.1 spells are now in the catalog. The combat-relevant ones
 are fully mechanical; spells whose RAW effect needs systems pansori
-doesn't have (possession, planar gating, shapeshifting into arbitrary
-creatures, reality alteration) are registered as
+doesn't have (possession, planar gating, reality alteration) are
+registered as
 **narrative spells** — their effect is described and adjudicated at the
 table, the same pattern as Augury / Commune / Divination. Mechanizing
 those waits on the underlying systems.
@@ -75,6 +75,10 @@ crossing the zone fizzles per its level/geometry rules. Likewise the
 **extra-turns** system (`Character.time_stop_turns` + the turn-advance
 hook) now drives Time Stop — the caster takes 1d4+1 turns in a row
 while others stay frozen, ending the instant a turn strikes an enemy.
+And the **shapeshift** system (reusing the `wild_shaped` BeastForm
+machinery, concentration-bound via `Character.shapeshift_spell`) drives
+Shapechange (self) and Animal Shapes (the party) — narrowed to the
+beast-form catalog (CR ≤ 1).
 
 The SRD's General Feats section is intentionally small — most
 iconic combat-optimization feats (Lucky / Sharpshooter / Sentinel

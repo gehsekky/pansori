@@ -499,6 +499,13 @@ export function breakConcentration(
   // SRD Dragon's Breath — dropping concentration revokes the granted breath
   // weapon from whichever creature (self or ally) the caster touched.
   const wasDragonsBreath = char.concentrating_on.spellId === 'dragons_breath';
+  // SRD shapeshift spells (Shapechange, Animal Shapes) — dropping concentration
+  // reverts every creature shaped by this spell back to its true form.
+  const shapeshiftSpellId =
+    char.concentrating_on.spellId === 'shapechange' ||
+    char.concentrating_on.spellId === 'animal_shapes'
+      ? char.concentrating_on.spellId
+      : undefined;
   // SRD Blur — dropping concentration clears the `blurred` self-buff.
   const wasBlur = char.concentrating_on.spellId === 'blur';
   // SRD Divine Favor / smites — concentration drop ends the per-attack weapon
@@ -598,6 +605,20 @@ export function breakConcentration(
     if (newChar.granted_breath?.sourceCasterId === char.id) {
       newChar = { ...newChar, granted_breath: undefined };
     }
+  }
+  if (shapeshiftSpellId) {
+    const revert = (c: Character): Character =>
+      c.shapeshift_spell === shapeshiftSpellId
+        ? {
+            ...c,
+            conditions: (c.conditions ?? []).filter((x) => x !== 'wild_shaped'),
+            wild_shape_form: undefined,
+            shapeshift_spell: undefined,
+            temp_hp: undefined,
+          }
+        : c;
+    newSt = { ...newSt, characters: newSt.characters.map(revert) };
+    newChar = revert(newChar);
   }
   // SRD Blur — clear the `blurred` self-buff from the caster (+ entity mirror).
   if (wasBlur) {
@@ -3071,7 +3092,10 @@ export function endCombatState(st: GameState): GameState {
           cond !== 'innate_sorcery' &&
           cond !== 'holy_nimbus' &&
           // Holy Aura's party ward (1 min ≈ encounter) doesn't carry over.
-          cond !== 'holy_warded'
+          cond !== 'holy_warded' &&
+          // Spell-driven shapeshift (Shapechange / Animal Shapes) ends with the
+          // encounter; a druid's own Wild Shape (no `shapeshift_spell`) persists.
+          !(cond === 'wild_shaped' && c.shapeshift_spell)
       ),
       condition_durations: Object.fromEntries(
         Object.entries(c.condition_durations ?? {}).filter(
@@ -3106,6 +3130,12 @@ export function endCombatState(st: GameState): GameState {
       // Dragon's Breath (1 min ≈ encounter) — the granted breath doesn't carry
       // to the next fight.
       granted_breath: undefined,
+      // Spell-driven shapeshift (Shapechange / Animal Shapes) ends with the
+      // encounter — clear the form (the `wild_shaped` condition itself is dropped
+      // by the conditions filter above). A druid's own Wild Shape is left alone.
+      ...(c.shapeshift_spell
+        ? { wild_shape_form: undefined, shapeshift_spell: undefined, temp_hp: undefined }
+        : {}),
     })),
   };
 }
@@ -5610,10 +5640,13 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       // Restoration's effect. Tagged on the cast choice so the FE opens an
       // option dialog; the cast path honors the chosen id (else its default).
       const pickOption: GameChoice['pickOption'] =
-        spellId === 'polymorph' || spellId === 'true_polymorph'
+        spellId === 'polymorph' ||
+        spellId === 'true_polymorph' ||
+        spellId === 'shapechange' ||
+        spellId === 'animal_shapes'
           ? {
               param: 'beastForm',
-              title: 'Polymorph — choose a beast form',
+              title: 'Choose a beast form',
               options: Object.values(BEAST_FORMS).map((f) => ({
                 id: f.id,
                 label: f.name,
