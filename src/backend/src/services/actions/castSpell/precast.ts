@@ -45,6 +45,7 @@ export function runPrecast(
     divineIntervention?: boolean;
     overchannel?: boolean;
     mysticArcanum?: boolean;
+    wishDuplicate?: boolean;
   },
   spell: Spell
 ): PrecastResult {
@@ -52,6 +53,10 @@ export function runPrecast(
   const pc = ctx.actor;
   const { spellId, slotLevel } = action;
   const isRitualCast = action.ritual ?? false;
+  // SRD Wish (basic use) — a duplicated spell "simply takes effect": no slot,
+  // no prep, no material component, no level prerequisite. Treated like the
+  // other slot-free casts (Divine Intervention etc.) in the gates below.
+  const usedWish = action.wishDuplicate === true;
 
   // Sorcerer Metamagic — capture the modifier set by the prior activation and
   // clear it from state so it applies to exactly this one cast. Done first so
@@ -228,7 +233,8 @@ export function runPrecast(
     prepClasses.some((c) => hasClass(pc.char, c)) &&
     spell.level > 0 &&
     !isRitualCast &&
-    !usedDivineIntervention
+    !usedDivineIntervention &&
+    !usedWish
   ) {
     const prepared = pc.char.prepared_spells ?? [];
     if (prepared.length > 0 && !prepared.includes(spellId)) {
@@ -276,7 +282,7 @@ export function runPrecast(
   // the cast if the caster can't afford it; deduct from gold otherwise.
   // Checked BEFORE slot deduction so a missing diamond doesn't waste a
   // slot — RAW treats slot + material as a single cast-initiation event.
-  if (spell.materialCost && spell.materialCost > 0 && !usedDivineIntervention) {
+  if (spell.materialCost && spell.materialCost > 0 && !usedDivineIntervention && !usedWish) {
     if ((pc.char.gold ?? 0) < spell.materialCost) {
       ctx.narrative = `${spell.name} requires a ${spell.materialCost} gp material component you don't have.`;
       return { done: true };
@@ -292,7 +298,8 @@ export function runPrecast(
     !usedDivineIntervention &&
     !usedSpellMastery &&
     !usedSignature &&
-    !usedMysticArcanum
+    !usedMysticArcanum &&
+    !usedWish
   ) {
     if (slotLevel < spell.level) {
       ctx.narrative = `${spell.name} requires at least a level-${spell.level} slot.`;
@@ -325,7 +332,7 @@ export function runPrecast(
   // even if a downstream gate (e.g. Revivify's death-window check)
   // later fails — RAW: the diamond is gone the moment you start
   // casting, not when the spell resolves.
-  if (spell.materialCost && spell.materialCost > 0 && !usedDivineIntervention) {
+  if (spell.materialCost && spell.materialCost > 0 && !usedDivineIntervention && !usedWish) {
     pc.char.gold = (pc.char.gold ?? 0) - spell.materialCost;
     ctx.narrative = `${pc.char.name} expends a ${spell.materialCost} gp component. `;
   }
@@ -441,7 +448,8 @@ export function runPrecast(
       usedMagicInitiateFree ||
       usedSpellMastery ||
       usedSignature ||
-      usedMysticArcanum,
+      usedMysticArcanum ||
+      usedWish,
   };
 }
 

@@ -525,6 +525,12 @@ export type StructuredAction =
       // Dragon's Breath — the chosen breath damage type (option picker): 'acid'
       // | 'cold' | 'fire' | 'lightning' | 'poison'. Omitted = fire.
       breathType?: string;
+      // SRD Wish (basic use) — the spell id (level 1-8) to duplicate. Set by the
+      // Wish option picker; the handler re-dispatches it as a free duplicate.
+      wishSpellId?: string;
+      // Marks a cast that IS a free Wish duplicate (no slot / prep / material /
+      // level prerequisites) — set by the Wish handler on the re-dispatched cast.
+      wishDuplicate?: boolean;
       // Cleric L10 Divine Intervention — cast this Cleric spell (level ≤5,
       // non-Reaction) without a slot or Material components, 1/Long Rest.
       // Set by the Divine Intervention choice surface; precast validates

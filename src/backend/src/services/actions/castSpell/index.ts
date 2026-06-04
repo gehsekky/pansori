@@ -120,11 +120,39 @@ export const handleCastSpell: ActionHandler<{
       divineIntervention?: boolean;
       overchannel?: boolean;
       mysticArcanum?: boolean;
+      wishDuplicate?: boolean;
     },
     spell
   );
   if (precast.done) return;
   const { castingScore, slotNote, dc, isRitualCast, freeCast } = precast;
+
+  // ── SRD Wish (basic use) ────────────────────────────────────────────────
+  // Wish's own 9th-level slot was just spent in precast. If the caster chose a
+  // spell to duplicate (level 1-8), re-dispatch it as a FREE duplicate
+  // (`wishDuplicate` → precast skips slot / prep / material / level gates). The
+  // turn's action was already consumed by Wish, so the duplicate rides on it.
+  if (spell.id === 'wish') {
+    const dupId = (action as { wishSpellId?: string }).wishSpellId;
+    const dup = dupId ? ctx.context.spellTable?.[dupId] : undefined;
+    if (dup && dup.level >= 1 && dup.level <= 8) {
+      ctx.narrative = `🌟 ${pc.char.name} speaks a wish — reality reshapes to duplicate ${dup.name}.`;
+      ctx.commitChar(); // persist the 9th-slot spend before re-entering takeAction
+      return {
+        replaceWith: {
+          type: 'cast_spell',
+          spellId: dup.id,
+          slotLevel: dup.level,
+          wishDuplicate: true,
+          targetEnemyId: (action as { targetEnemyId?: string }).targetEnemyId,
+          targetCharId: (action as { targetCharId?: string }).targetCharId,
+          beastForm: (action as { beastForm?: string }).beastForm,
+        },
+      };
+    }
+    // No valid duplicate chosen → fall through to Wish's narrative (the
+    // open-ended "alter reality" use is adjudicated at the table).
+  }
 
   // ── Divine Smite (2024 PHB) ────────────────────────────────────────────
   // Bonus-action pre-buff: queues 2d8 radiant on the caster's next

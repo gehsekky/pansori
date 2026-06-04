@@ -78,7 +78,10 @@ while others stay frozen, ending the instant a turn strikes an enemy.
 And the **shapeshift** system (reusing the `wild_shaped` BeastForm
 machinery, concentration-bound via `Character.shapeshift_spell`) drives
 Shapechange (self) and Animal Shapes (the party) — narrowed to the
-beast-form catalog (CR ≤ 1).
+beast-form catalog (CR ≤ 1). And **Wish** (basic use) duplicates any
+spell of level 1-8 for free (no slot / prep / material / prerequisite),
+via a `wishDuplicate` free-cast flag + a `replaceWith` re-dispatch; its
+open-ended "alter reality" use stays narrative.
 
 The SRD's General Feats section is intentionally small — most
 iconic combat-optimization feats (Lucky / Sharpshooter / Sentinel

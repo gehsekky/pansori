@@ -5688,7 +5688,17 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
                       { id: 'poison', label: 'Poison' },
                     ],
                   }
-                : undefined;
+                : spellId === 'wish'
+                  ? {
+                      // SRD Wish (basic use) — duplicate any spell of level 1-8.
+                      param: 'wishSpellId',
+                      title: 'Wish — duplicate a spell (level 8 or lower)',
+                      options: Object.values(context.spellTable ?? {})
+                        .filter((s) => s.level >= 1 && s.level <= 8)
+                        .sort((a, b) => a.level - b.level || a.name.localeCompare(b.name))
+                        .map((s) => ({ id: s.id, label: s.name, sub: `Lvl ${s.level}` })),
+                    }
+                  : undefined;
 
       if (spell.level === 0) {
         // Cantrip: no slot needed
