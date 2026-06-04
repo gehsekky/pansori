@@ -64,7 +64,7 @@ const LABELLED_KINDS = new Set<MapTransition['kind']>(['site', 'venue']);
 // A trial we're extending terrain by terrain; town/local maps are unaffected.
 const REGIONAL_TERRAIN_ICON: Partial<Record<TerrainType, { name: string; color: string }>> = {
   forest: { name: 'forest', color: 'rgba(34, 92, 34, 0.92)' },
-  water: { name: 'waves', color: 'rgba(225, 240, 252, 0.95)' },
+  water: { name: 'waves', color: 'rgba(150, 205, 245, 0.95)' }, // light blue, lighter than the tint
 };
 
 // Out of combat an enemy carries no grid position (positions are assigned only
