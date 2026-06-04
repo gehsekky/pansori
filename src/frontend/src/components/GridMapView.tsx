@@ -64,7 +64,7 @@ const LABELLED_KINDS = new Set<MapTransition['kind']>(['site', 'venue']);
 // A trial we're extending terrain by terrain; town/local maps are unaffected.
 const REGIONAL_TERRAIN_ICON: Partial<Record<TerrainType, { name: string; color: string }>> = {
   forest: { name: 'forest', color: 'rgba(34, 92, 34, 0.92)' },
-  water: { name: 'water-drop', color: 'rgba(150, 205, 245, 0.95)' }, // light blue, lighter than the tint
+  water: { name: 'wave-crest', color: 'rgba(150, 205, 245, 0.95)' }, // light blue, lighter than the tint
   mountain: { name: 'peaks', color: 'rgba(214, 210, 202, 0.95)' }, // light stone, over the dark tint
   hills: { name: 'hills', color: 'rgba(140, 165, 100, 0.92)' }, // grassy green over the tan tint
   road: { name: 'path-tile', color: 'rgba(214, 188, 140, 0.95)' }, // sandy path over the tan tint
