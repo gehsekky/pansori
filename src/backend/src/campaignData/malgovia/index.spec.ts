@@ -251,6 +251,11 @@ describe('Malgovia — scripted playthrough', () => {
     if (state.combat_active) {
       throw new Error(`Combat soft-locked after 300 actions in room ${state.current_room}`);
     }
+    // Dismiss the post-combat "Continue" gate like a player would — it clears
+    // the battlefield kept on screen for the gate so the next combat starts clean.
+    if (state.combat_over_pending) {
+      await dispatch({ type: 'continue' });
+    }
   }
 
   // Move the party marker to a cell (the 3-level map navigation primitive).

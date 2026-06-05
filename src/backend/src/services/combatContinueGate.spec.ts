@@ -64,8 +64,20 @@ describe('endCombatState — post-combat gate', () => {
     expect(after.map_level).toBe('town'); // …but the underlying level collapsed
   });
 
-  it('clears the battlefield entities for an authored-room fight (no encounter_return)', () => {
+  it('also keeps the battlefield for an authored-room fight (so the gate shows the field, not the exploration map)', () => {
     const after = endCombatState(inCombat({ entities: ents } as Partial<GameState>));
+    expect(after.combat_over_pending).toBe(true);
+    expect(after.entities).toHaveLength(2); // battlefield kept through the gate
+  });
+
+  it('drops the battlefield when the whole party is dead (game over, not a gate)', () => {
+    const after = endCombatState(
+      inCombat({
+        entities: ents,
+        characters: [makeChar({ id: 'pc-1', hp: 0, max_hp: 20, dead: true })],
+      } as Partial<GameState>)
+    );
+    expect(after.combat_over_pending).toBeFalsy();
     expect(after.entities).toBeUndefined();
   });
 });
