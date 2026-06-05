@@ -1,11 +1,11 @@
 import type { Spell, SpellZone } from '../../../types.js';
+import { effectiveSpeed, zoneCells } from '../../gameEngine.js';
 import type { ActionContext } from '../types.js';
 import { composeNow } from '../../narrative/compose.js';
 import { concentrationRoundsFor } from './utils.js';
 import { lightReaches } from '../../gridEngine.js';
 import { randomUUID } from 'crypto';
 import { rollDice } from '../../rulesEngine.js';
-import { zoneCells } from '../../gameEngine.js';
 
 /**
  * Utility-spell branch — spells with no damage, no save, no attack
@@ -50,6 +50,28 @@ export function runUtilitySpell(
     ? spell.narrative.replace('{name}', char.name)
     : `${char.name} casts ${spell.name}${slotNote}.`;
   composeNow(ctx, { kind: 'spell_utility', prose: utilityProse });
+
+  // SRD Expeditious Retreat — a bonus-action cast that grants the Dash action
+  // this turn: extra movement equal to the caster's Speed. The grid budget is
+  // `speed − movement_used`, so subtracting Speed (allowed to go negative — a
+  // surplus) grants the full extra Speed regardless of whether the caster has
+  // already moved. Concentration is set so the RAW "Dash as a Bonus Action on
+  // later turns" can graduate later; pansori grants the immediate Dash now.
+  if (spell.id === 'expeditious_retreat' && ctx.st.combat_active && ctx.st.entities) {
+    const dashSpeed = effectiveSpeed(char, ctx.context.lootTable);
+    ctx.st = {
+      ...ctx.st,
+      movement_used: {
+        ...(ctx.st.movement_used ?? {}),
+        [char.id]: (ctx.st.movement_used?.[char.id] ?? 0) - dashSpeed,
+      },
+    };
+    char.concentrating_on = {
+      spellId: 'expeditious_retreat',
+      rounds_left: concentrationRoundsFor(spell) * (ctx.metamagic?.includes('extended') ? 2 : 1),
+    };
+    ctx.narrative += ` ${char.name} surges ahead — an extra ${dashSpeed} ft of movement this turn.`;
+  }
 
   // SRD Vision & Light — Light (20 ft bright) / Daylight (60 ft bright) make the
   // caster a light source: their grid entity sheds bright light to that radius
