@@ -491,6 +491,52 @@ export function runBuffSpell(
     char.sees_invisible = true;
   }
 
+  // SRD Dispel Magic — end the spell effects gripping the target: strip the
+  // dispellable (spell-origin) control conditions. Mirrors the restoration
+  // strip; clears the charm/fear source links too.
+  if (spell.id === 'dispel_magic') {
+    const DISPELLABLE = [
+      'charmed',
+      'frightened',
+      'paralyzed',
+      'restrained',
+      'blinded',
+      'deafened',
+      'stunned',
+      'slowed',
+      'incapacitated',
+    ];
+    const dispelFrom = (c: typeof buffTarget): typeof buffTarget => {
+      const ended = (c.conditions ?? []).filter((x) => DISPELLABLE.includes(x));
+      if (ended.length === 0) return c;
+      const { charmer_id: _drop, ...rest } = c;
+      void _drop;
+      const durs = { ...(c.condition_durations ?? {}) };
+      for (const e of ended) delete durs[e];
+      const srcs = { ...(c.condition_sources ?? {}) };
+      for (const e of ended) delete srcs[e];
+      return {
+        ...rest,
+        conditions: (c.conditions ?? []).filter((x) => !DISPELLABLE.includes(x)),
+        condition_durations: durs,
+        condition_sources: srcs,
+      };
+    };
+    if (isCasterTarget) {
+      Object.assign(char, dispelFrom(char));
+    } else {
+      ctx.st = {
+        ...ctx.st,
+        characters: ctx.st.characters.map((c) => (c.id === buffTarget.id ? dispelFrom(c) : c)),
+        entities: (ctx.st.entities ?? []).map((e) =>
+          e.id === buffTarget.id && !e.isEnemy
+            ? { ...e, conditions: e.conditions.filter((x) => !DISPELLABLE.includes(x)) }
+            : e
+        ),
+      };
+    }
+  }
+
   // SRD Longstrider — +10 ft Speed (read by effectiveSpeed). Touch, 1 hour, not
   // concentration; persists like Mage Armor. (Upcast extra targets deferred.)
   if (spell.id === 'longstrider') {

@@ -5491,7 +5491,14 @@ export const SRD_SPELLS: Record<string, Spell> = {
     castTime: 'action',
     rangeKind: 'ranged',
     rangeFt: 120,
-    desc: 'Choose one creature, object, or magical effect within range; any spell of 3rd level or lower on it ends. For a higher-level effect, make an ability check (DC 10 + that spell’s level) for each. Which lingering magic unravels is narrated.',
+    // pansori models the most common, mechanical use: end the spell effects
+    // afflicting a chosen creature — strip the dispellable (spell-origin) control
+    // conditions (Charmed/Frightened/Paralyzed/Restrained/Blinded/Deafened/
+    // Stunned/Slowed/Incapacitated). Targets an ally (the held/charmed party
+    // member) via the buff path. Dispelling enemy buffs / hostile zones, and the
+    // level-4+ ability check, stay narrative for now.
+    targetType: 'self_or_ally',
+    desc: 'Free a creature you can see of the spell effects gripping it — ends Charmed, Frightened, Paralyzed, Restrained, Blinded, Deafened, Stunned, Slowed, or Incapacitated on it.',
     narrative: '{name} speaks a word of unmaking and the weave of a nearby spell frays apart.',
     spellList: ['arcane', 'divine', 'primal'],
   },
