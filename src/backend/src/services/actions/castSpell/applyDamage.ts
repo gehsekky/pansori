@@ -11,6 +11,7 @@ import {
 } from '../../gameEngine.js';
 import type { ActionContext } from '../types.js';
 import { applyDamageMultiplier } from '../../rulesEngine.js';
+import { fillEnemyTokens } from '../../narrative/enemyName.js';
 import { fmt } from '../../narrativeFmt.js';
 import { grantEnemyDrops } from '../enemyDrops.js';
 
@@ -81,9 +82,10 @@ export function applySingleTargetDamage(
     }
     ctx.narrative +=
       ' ' +
-      pick(ctx.context.narratives.killShot)
-        .replace('{enemy}', spellTarget.name)
-        .replace('{xp}', String(xpShare));
+      fillEnemyTokens(pick(ctx.context.narratives.killShot), spellTarget).replace(
+        '{xp}',
+        String(xpShare)
+      );
     grantEnemyDrops(ctx, spellTarget);
     ctx.narrative += applyPartyLevelUps(ctx.st, char, ctx.context);
   } else {

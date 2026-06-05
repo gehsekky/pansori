@@ -33,6 +33,7 @@ import type {
 import type { Character, CombatEvent } from '../../types.js';
 import { buildCombatHitNarrative, hpTier, pick, pickTiered, pushEvent } from '../gameEngine.js';
 import type { ActionContext } from '../actions/types.js';
+import { fillEnemyTokens } from './enemyName.js';
 import { fmt } from '../narrativeFmt.js';
 
 function lookupAttacker(attackerId: string, ctx: ActionContext): Character {
@@ -99,9 +100,9 @@ export function renderAttackMiss(f: AttackMissFragment, ctx: ActionContext): Com
   if (f.reason === 'fumble') {
     prose = `Natural 1 — a fumble! ${f.weaponLabel} goes completely wide.${f.atkNote}`;
   } else {
-    prose = pickTiered(ctx.context.narratives.combatMiss, hpTier(attacker)).replace(
-      /\{enemy\}/g,
-      f.target.name
+    prose = fillEnemyTokens(
+      pickTiered(ctx.context.narratives.combatMiss, hpTier(attacker)),
+      f.target
     );
     prose += f.atkNote + ' ';
   }

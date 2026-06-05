@@ -10,6 +10,7 @@ import {
 } from '../../gameEngine.js';
 import type { ActionContext } from '../types.js';
 import { entitiesInBlast } from '../../gridEngine.js';
+import { fillEnemyTokens } from '../../narrative/enemyName.js';
 import { fmt } from '../../narrativeFmt.js';
 import { grantEnemyDrops } from '../enemyDrops.js';
 import { rollConditionSave } from '../../rulesEngine.js';
@@ -77,9 +78,10 @@ function killEnemy(ctx: ActionContext, enemy: Enemy, targetId: string): void {
   }
   ctx.narrative +=
     ' ' +
-    pick(ctx.context.narratives.killShot)
-      .replace('{enemy}', enemy.name)
-      .replace('{xp}', String(split.share));
+    fillEnemyTokens(pick(ctx.context.narratives.killShot), enemy).replace(
+      '{xp}',
+      String(split.share)
+    );
   grantEnemyDrops(ctx, enemy);
   ctx.narrative += applyPartyLevelUps(ctx.st, char, ctx.context);
 }

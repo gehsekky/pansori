@@ -705,6 +705,7 @@ export const npcs: Record<string, PlacedNpc> = {
     id: 'npc_dusk',
     pos: { x: 5, y: 2 },
     name: 'Dusk',
+    proper_noun: true, // single-word personal name — no article in combat prose
     attitude: 'indifferent',
     hp: 14,
     ac: 13,

@@ -9,6 +9,7 @@ import {
   uncannyMetabolismRefresh,
 } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
+import { fillEnemyTokens } from '../../narrative/enemyName.js';
 import { improveFateRefresh } from '../../improveFate.js';
 import { inRange } from '../../gridEngine.js';
 import { updatePcActor } from '../actor.js';
@@ -147,11 +148,11 @@ export function runCombatStart(
     .join(' → ');
   const surpriseLabel =
     enemiesForInit.length === 1
-      ? `The ${enemiesForInit[0].name} is SURPRISED!`
+      ? fillEnemyTokens('{The_enemy} is SURPRISED!', enemiesForInit[0])
       : `${enemiesForInit.map((e) => e.name).join(', ')} are SURPRISED!`;
   const surpriseNote = ctx.st.surprised?.length ? ` ${surpriseLabel}` : '';
   const combatPrefix = ctx.context.narratives.combatStart
-    ? pick(ctx.context.narratives.combatStart).replace(/{enemy}/g, target.name) + ' '
+    ? fillEnemyTokens(pick(ctx.context.narratives.combatStart), target) + ' '
     : 'Combat begins! ';
   ctx.narrative = `${combatPrefix}Initiative: ${orderText}.${surpriseNote} `;
 

@@ -906,6 +906,11 @@ export interface NpcTemplate {
   id: string;
   name: string;
   attitude: NpcAttitude;
+  // Treat `name` as a proper noun in combat prose (no definite article) when
+  // this NPC turns hostile and is fought. Omitted ⇒ inferred from the name's
+  // shape; set for single-word proper names a heuristic can't catch (e.g.
+  // "Dusk"). Mirrors Enemy.proper_noun, carried through npcAsEnemy.
+  proper_noun?: boolean;
   // Stat block — used when attitude becomes hostile or player attacks
   hp: number;
   ac: number;

@@ -353,6 +353,11 @@ export interface EnemyTemplate {
 export interface Enemy {
   id: string; // stable per-instance id (distinct from roomId; multiple enemies share a room)
   name: string;
+  // Treat `name` as a proper noun in prose (no definite article): "Captain
+  // Riese reels", not "the Captain Riese reels". Omitted ⇒ inferred from the
+  // name's shape (see narrative/enemyName.ts). Set explicitly for single-word
+  // proper names a heuristic can't catch (e.g. "Dusk").
+  proper_noun?: boolean;
   hp: number;
   ac: number;
   damage: string;

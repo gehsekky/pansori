@@ -41,6 +41,7 @@ import {
 import type { ActionContext } from '../types.js';
 import type { ToHitContext } from './toHit.js';
 import { composeNow } from '../../narrative/compose.js';
+import { fillEnemyTokens } from '../../narrative/enemyName.js';
 import { fmt } from '../../narrativeFmt.js';
 import { grantEnemyDrops } from '../enemyDrops.js';
 import { hasFightingStyle } from '../../fightingStyle.js';
@@ -1190,9 +1191,10 @@ export function resolveOneAttack(
     }
     const killProse =
       ' ' +
-      pick(ctx.context.narratives.killShot)
-        .replace('{enemy}', target.name)
-        .replace('{xp}', String(xpShare));
+      fillEnemyTokens(pick(ctx.context.narratives.killShot), target).replace(
+        '{xp}',
+        String(xpShare)
+      );
     composeNow(ctx, {
       kind: 'attack_kill',
       attackerId: pc.char.id,

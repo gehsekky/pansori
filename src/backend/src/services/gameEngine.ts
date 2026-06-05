@@ -143,6 +143,7 @@ import { applyStateMigrations } from './stateSchema.js';
 import { availableLootIn } from './placedLoot.js';
 import { canTakeFeat } from './feats.js';
 import { factionShopPrice } from './campaignEngine.js';
+import { fillEnemyTokens } from './narrative/enemyName.js';
 import { llmProvider } from './llmProvider.js';
 import { randomUUID } from 'crypto';
 import { responsesAtPath } from './conversation.js';
@@ -950,7 +951,7 @@ export function buildCombatHitNarrative(
   context: Context
 ): string {
   const tier = hpTier(char);
-  const opening = pickTiered(context.narratives.combatHit, tier).replace(/{enemy}/g, enemy.name);
+  const opening = fillEnemyTokens(pickTiered(context.narratives.combatHit, tier), enemy);
   const verbPool = context.narratives.weaponVerbs?.[weaponItem?.id ?? ''] ??
     context.narratives.weaponVerbs?.['unarmed'] ?? ['connects with'];
   const verb = pick(verbPool);
@@ -2003,8 +2004,7 @@ function computeEnemyAttack(
       }
     }
 
-    let narrative = pick(context.narratives.enemyAttacks)
-      .replace('{enemy}', enemy.name)
+    let narrative = fillEnemyTokens(pick(context.narratives.enemyAttacks), enemy)
       .replace('{target}', char.name)
       .replace('{dmg}', fmt.dmg(hpLost));
     narrative += ` ${char.name} takes ${fmt.dmg(hpLost)} damage.`;
@@ -2197,8 +2197,7 @@ function computeEnemyAttack(
   }
   if (armorItem) {
     const deflectedProse =
-      pick(context.narratives.enemyDeflected)
-        .replace('{enemy}', enemy.name)
+      fillEnemyTokens(pick(context.narratives.enemyDeflected), enemy)
         .replace('{target}', char.name)
         .replace('{armor}', armorItem.name) + darknessNote;
     return {
@@ -2688,6 +2687,7 @@ function npcAsEnemy(npc: PlacedNpc): Enemy {
   return {
     id: `npc:${npc.id}`,
     name: npc.name,
+    proper_noun: npc.proper_noun,
     hp: npc.hp,
     ac: npc.ac,
     damage: npc.damage,

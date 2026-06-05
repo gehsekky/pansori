@@ -92,6 +92,11 @@ function statementWindowFrom(src: string, start: number): string {
   return src.slice(start);
 }
 
+// Enemy-name tokens are substituted by the fillEnemyTokens() helper (article-
+// aware proper-noun handling) rather than an inline .replace(...). Treat a
+// fillEnemyTokens(...) call as handling all of them for this pool.
+const ENEMY_NAME_TOKENS = ['enemy', 'the_enemy', 'The_enemy'];
+
 // Extract the set of {token} substrings that appear inside any `.replace(...)`
 // call args within the window.
 function tokensHandledInWindow(window: string): Set<string> {
@@ -101,11 +106,14 @@ function tokensHandledInWindow(window: string): Set<string> {
   for (const m of window.matchAll(/\.replace\s*\(([^)]+)\)/g)) {
     for (const tm of m[1].matchAll(/\{(\w+)\}/g)) handled.add(tm[1]);
   }
+  if (/\bfillEnemyTokens\s*\(/.test(window)) {
+    for (const t of ENEMY_NAME_TOKENS) handled.add(t);
+  }
   return handled;
 }
 
 function hasReplaceInWindow(window: string): boolean {
-  return /\.replace\s*\(/.test(window);
+  return /\.replace\s*\(/.test(window) || /\bfillEnemyTokens\s*\(/.test(window);
 }
 
 function lineOf(src: string, idx: number): number {
@@ -125,7 +133,11 @@ describe('narrative placeholder lint', () => {
         const refRe = new RegExp(`narratives\\.${poolName}\\b`, 'g');
         let m: RegExpExecArray | null;
         while ((m = refRe.exec(ENGINE_SRC)) !== null) {
-          const window = statementWindowFrom(ENGINE_SRC, m.index);
+          // Start the window at the line start so a wrapping call to the left of
+          // the pool reference (e.g. `fillEnemyTokens(pick(narratives.X))`) is
+          // inside the window, not just the trailing `.replace(...)` chain.
+          const lineStart = ENGINE_SRC.lastIndexOf('\n', m.index) + 1;
+          const window = statementWindowFrom(ENGINE_SRC, lineStart);
           // No .replace in the same statement → the pool was bound to a
           // variable for later use; skip strict, rely on the loose check.
           if (!hasReplaceInWindow(window)) continue;
@@ -154,9 +166,12 @@ describe('narrative placeholder lint', () => {
       const required = tokensByPool(ctx.narratives);
       const allTokens = new Set<string>();
       for (const set of required.values()) for (const t of set) allTokens.add(t);
-      const unhandled = [...allTokens].filter(
-        (t) => !new RegExp(`\\.replace\\([^)]*\\{${t}\\}`).test(ENGINE_SRC)
-      );
+      const helperHandlesEnemyTokens = /\bfillEnemyTokens\s*\(/.test(ENGINE_SRC);
+      const unhandled = [...allTokens].filter((t) => {
+        if (new RegExp(`\\.replace\\([^)]*\\{${t}\\}`).test(ENGINE_SRC)) return false;
+        if (ENEMY_NAME_TOKENS.includes(t) && helperHandlesEnemyTokens) return false;
+        return true;
+      });
       expect(
         unhandled,
         `Unhandled placeholders in ${ctxName} narratives — engine needs a .replace(...) for each: ${unhandled.join(', ')}`

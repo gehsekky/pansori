@@ -31,6 +31,7 @@ import {
 import type { ActionContext } from '../types.js';
 import { composeNow } from '../../narrative/compose.js';
 import { coverBonus } from '../../gridEngine.js';
+import { fillEnemyTokens } from '../../narrative/enemyName.js';
 import { fmt } from '../../narrativeFmt.js';
 
 /**
@@ -350,9 +351,10 @@ export function runSaveSpell(
       }
       ctx.narrative +=
         ' ' +
-        pick(ctx.context.narratives.killShot)
-          .replace('{enemy}', spellTarget.name)
-          .replace('{xp}', String(xpShare));
+        fillEnemyTokens(pick(ctx.context.narratives.killShot), spellTarget).replace(
+          '{xp}',
+          String(xpShare)
+        );
       ctx.narrative += applyPartyLevelUps(ctx.st, char, ctx.context);
     }
     ctx.narrative += fortNote;
