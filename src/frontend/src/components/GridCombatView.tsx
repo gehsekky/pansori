@@ -637,6 +637,11 @@ function GridCombatView({
       } else if (illum === 'dim') {
         ariaParts.push('dim light');
       }
+      // Cosmetic terrain paint — surface it for context (SR + hover), like the
+      // exploration maps. It carries no combat mechanics beyond the difficult-
+      // terrain flag noted separately below.
+      const terrainLabel = terrainType ? TERRAIN[terrainType].label : '';
+      if (terrainLabel) ariaParts.push(terrainLabel.toLowerCase());
       if (difficult && !obstacle) {
         ariaParts.push('difficult terrain, double movement cost');
       }
@@ -646,6 +651,17 @@ function GridCombatView({
         );
       }
       const ariaLabel = ariaParts.join(', ');
+      // Hover tooltip: terrain label · difficult-terrain note · the Move-here
+      // action hint (for a reachable cell). Empty when there's nothing to say.
+      const titleParts: string[] = [];
+      if (terrainLabel) titleParts.push(terrainLabel);
+      if (difficult && !obstacle) titleParts.push('Difficult terrain — 2× movement');
+      if (clickable) {
+        titleParts.push(
+          `Move here (${chebyshev(activeEntity!.pos, { x, y }) * SQUARE_SIZE_FT} ft${difficult ? ', 2× cost' : ''})`
+        );
+      }
+      const cellTitle = titleParts.length > 0 ? titleParts.join(' · ') : undefined;
 
       cells.push(
         <div
@@ -686,13 +702,7 @@ function GridCombatView({
                 }
               : undefined
           }
-          title={
-            clickable
-              ? `Move here (${chebyshev(activeEntity!.pos, { x, y }) * SQUARE_SIZE_FT} ft${difficult ? ', includes difficult terrain — 2× cost' : ''})`
-              : difficult
-                ? 'Difficult terrain — 2× movement cost'
-                : undefined
-          }
+          title={cellTitle}
         >
           {token}
         </div>

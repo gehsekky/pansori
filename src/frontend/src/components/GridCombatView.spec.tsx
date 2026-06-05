@@ -128,6 +128,19 @@ describe('GridCombatView — cosmetic terrain paint', () => {
     expect(cell(container, 9, 9).style.background).toContain('96, 112, 72'); // swamp tint
     expect(getByText('swamp')).toBeTruthy(); // legend entry
   });
+
+  it('surfaces the terrain label in the cell hover tooltip (title)', () => {
+    const { state, seed } = build({
+      lighting: 'bright',
+      terrain: [{ pos: { x: 9, y: 9 }, type: 'swamp' }],
+      pcPos: { x: 0, y: 0 },
+      enemyPos: { x: 1, y: 0 },
+    });
+    const { container } = render(<GridCombatView state={state} seed={seed} />);
+    expect(cell(container, 9, 9).getAttribute('title')).toMatch(/swamp/i);
+    // A plain, unreachable, untainted cell has no tooltip.
+    expect(cell(container, 5, 5).getAttribute('title')).toBeNull();
+  });
 });
 
 describe('GridCombatView — battlefield floor texture', () => {
