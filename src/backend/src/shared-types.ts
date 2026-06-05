@@ -531,6 +531,10 @@ export type StructuredAction =
       // Dragon's Breath — the chosen breath damage type (option picker): 'acid'
       // | 'cold' | 'fire' | 'lightning' | 'poison'. Omitted = fire.
       breathType?: string;
+      // Blindness/Deafness — the chosen condition (option picker): 'blinded' |
+      // 'deafened'. Honored only if in the spell's `conditionChoices`; else the
+      // spell's default `condition` (Blinded).
+      conditionChoice?: ConditionName;
       // SRD Wish (basic use) — the spell id (level 1-8) to duplicate. Set by the
       // Wish option picker; the handler re-dispatches it as a free duplicate.
       wishSpellId?: string;

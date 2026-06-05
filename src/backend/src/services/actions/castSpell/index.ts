@@ -1,5 +1,5 @@
 import type { ActionContext, ActionHandler } from '../types.js';
-import type { Enemy, Spell } from '../../../types.js';
+import type { ConditionName, Enemy, Spell } from '../../../types.js';
 import { isSpellOutOfRange, runPrecast } from './precast.js';
 import { rollDice, transmutedDamageType } from '../../rulesEngine.js';
 import { runPowerWordKill, runPowerWordStun } from './powerWords.js';
@@ -558,7 +558,8 @@ export const handleCastSpell: ActionHandler<{
       slotLevel,
       slotNote,
       dc,
-      polymorphForm
+      polymorphForm,
+      (action as { conditionChoice?: ConditionName }).conditionChoice
     );
     if (r.done) return;
     spellDmg = r.spellDmg;

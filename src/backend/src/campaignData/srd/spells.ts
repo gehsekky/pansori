@@ -794,10 +794,11 @@ export const SRD_SPELLS: Record<string, Spell> = {
     saveEffect: 'negates',
     concentration: true,
     condition: 'prone',
+    conditionAlso: 'incapacitated', // RAW: laughing on the ground, both for the duration
     conditionDuration: 10,
     rangeKind: 'ranged',
     rangeFt: 30,
-    desc: 'WIS save or Prone (and Incapacitated, RAW) for 1 minute (concentration). Target re-saves on damage.',
+    desc: 'WIS save or fall Prone and Incapacitated with laughter for 1 minute (concentration). Both end when concentration drops.',
     spellList: ['arcane'],
   },
   // SRD: Longstrider — touch, +10 speed for 1 hour. Multi-target
@@ -1714,11 +1715,13 @@ export const SRD_SPELLS: Record<string, Spell> = {
     castTime: 'action',
     savingThrow: 'con',
     saveEffect: 'negates',
-    condition: 'blinded',
+    condition: 'blinded', // default; the caster may pick Deafened instead
+    conditionChoices: ['blinded', 'deafened'],
+    conditionSaveEnds: true, // re-saves (CON) at the end of each of its turns
     conditionDuration: 10,
     rangeKind: 'ranged',
     rangeFt: 120,
-    desc: 'CON save or Blinded for 1 minute. (Deafened option deferred — pansori MVP defaults to Blinded.)',
+    desc: 'CON save or be Blinded OR Deafened (caster’s choice) for 1 minute; the target re-saves (CON) at the end of each of its turns.',
     spellList: ['arcane', 'divine'],
   },
   // SRD: Detect Thoughts — divination, concentration up to 1 minute.

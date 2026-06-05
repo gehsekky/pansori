@@ -463,6 +463,11 @@ export function breakConcentration(
 ): { char: Character; st: GameState } {
   if (!char.concentrating_on) return { char, st };
   const condition = char.concentrating_on.condition;
+  // A spell may link two conditions (Hideous Laughter: prone + incapacitated) —
+  // strip both from affected creatures when concentration drops.
+  const linkedConditions = [condition, char.concentrating_on.condition2].filter(
+    (c): c is string => !!c
+  );
   const wasBless = char.concentrating_on.spellId === 'bless';
   // SRD Holy Aura — concentration drop ends the party-wide `holy_warded` ward.
   const wasHolyAura = char.concentrating_on.spellId === 'holy_aura';
@@ -532,13 +537,15 @@ export function breakConcentration(
     // when the caster's concentration drops.
     ...(char.recurring_attack?.concentration ? { recurring_attack: null } : {}),
   };
-  // Strip the linked enemy condition (Hold Person etc.)
+  // Strip the linked enemy condition(s) (Hold Person; Hideous Laughter's pair).
   let newSt: GameState =
-    condition && st.entities
+    linkedConditions.length > 0 && st.entities
       ? {
           ...st,
           entities: st.entities.map((e) =>
-            e.isEnemy ? { ...e, conditions: e.conditions.filter((c) => c !== condition) } : e
+            e.isEnemy
+              ? { ...e, conditions: e.conditions.filter((c) => !linkedConditions.includes(c)) }
+              : e
           ),
         }
       : st;
@@ -5813,17 +5820,26 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
                       { id: 'poison', label: 'Poison' },
                     ],
                   }
-                : spellId === 'wish'
+                : spellId === 'blindness_deafness'
                   ? {
-                      // SRD Wish (basic use) — duplicate any spell of level 1-8.
-                      param: 'wishSpellId',
-                      title: 'Wish — duplicate a spell (level 8 or lower)',
-                      options: Object.values(context.spellTable ?? {})
-                        .filter((s) => s.level >= 1 && s.level <= 8)
-                        .sort((a, b) => a.level - b.level || a.name.localeCompare(b.name))
-                        .map((s) => ({ id: s.id, label: s.name, sub: `Lvl ${s.level}` })),
+                      param: 'conditionChoice',
+                      title: 'Blindness/Deafness — choose the affliction',
+                      options: [
+                        { id: 'blinded', label: 'Blinded' },
+                        { id: 'deafened', label: 'Deafened' },
+                      ],
                     }
-                  : undefined;
+                  : spellId === 'wish'
+                    ? {
+                        // SRD Wish (basic use) — duplicate any spell of level 1-8.
+                        param: 'wishSpellId',
+                        title: 'Wish — duplicate a spell (level 8 or lower)',
+                        options: Object.values(context.spellTable ?? {})
+                          .filter((s) => s.level >= 1 && s.level <= 8)
+                          .sort((a, b) => a.level - b.level || a.name.localeCompare(b.name))
+                          .map((s) => ({ id: s.id, label: s.name, sub: `Lvl ${s.level}` })),
+                      }
+                    : undefined;
 
       if (spell.level === 0) {
         // Cantrip: no slot needed

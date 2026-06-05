@@ -628,6 +628,14 @@ export interface Spell {
   attackRoll?: boolean; // true = uses spell attack roll vs enemy AC
   heal?: string; // dice expr for healing
   condition?: ConditionName;
+  // A SECOND condition co-applied with `condition` on the same failed save, no
+  // separate roll (SRD Tasha's Hideous Laughter: Prone + Incapacitated). Shares
+  // the spell's duration / concentration; breakConcentration clears both.
+  conditionAlso?: ConditionName;
+  // Player-chosen condition for a spell that offers a choice (SRD
+  // Blindness/Deafness: Blinded OR Deafened). When the cast supplies a
+  // `conditionChoice` from this list, it overrides `condition`.
+  conditionChoices?: ConditionName[];
   conditionDuration?: number; // rounds; undefined = permanent until cleared
   // SRD "save ends" conditions (Slow's slowed, Power Word Stun's stunned): the
   // afflicted creature repeats the save (`savingThrow`) at the end of each of
@@ -1162,6 +1170,9 @@ export interface Character {
   concentrating_on?: {
     spellId: string;
     condition?: string;
+    // A second concentration-linked condition (Hideous Laughter's incapacitated
+    // alongside prone); breakConcentration strips both from affected creatures.
+    condition2?: string;
     rounds_left?: number;
     // The spell save DC, stamped for effects whose ongoing resolution
     // re-rolls a save away from the cast site (Confusion: each confused

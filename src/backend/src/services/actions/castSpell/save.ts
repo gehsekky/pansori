@@ -1,4 +1,4 @@
-import type { Enemy, Spell } from '../../../types.js';
+import type { ConditionName, Enemy, Spell } from '../../../types.js';
 import {
   TURN_LOOP_MANAGED_CONDITIONS,
   applyPartyLevelUps,
@@ -59,7 +59,10 @@ export function runSaveSpell(
   slotNote: string,
   dc: number,
   // Polymorph — the player-chosen beast form (name + HP pool). Omitted ⇒ Wolf.
-  polymorphForm?: { name: string; hp: number }
+  polymorphForm?: { name: string; hp: number },
+  // SRD Blindness/Deafness — the player-chosen condition (Blinded | Deafened).
+  // Honored only when it's one of the spell's `conditionChoices`; else `condition`.
+  conditionChoice?: ConditionName
 ): { done: boolean; spellDmg: number; spellHit: boolean } {
   if (ctx.actor.kind !== 'pc') return { done: true, spellDmg: 0, spellHit: false };
   const { char } = ctx.actor;
@@ -189,10 +192,17 @@ export function runSaveSpell(
   // (done:false) so runAoeSpell applies damage + the condition to every target
   // in the blast. Only non-blast condition saves (Hold Person, …) handle inline.
   if (spell.condition && saveFailed && !spell.blastRadius) {
-    if (spellTarget.condition_immunities?.includes(spell.condition)) {
-      ctx.narrative += ` ${fmt.note(`[${spellTarget.name} is immune to ${spell.condition}]`)}`;
+    // The player may pick from `conditionChoices` (Blindness/Deafness); else the
+    // default `condition`. `condAlso` is a co-applied second condition (Hideous
+    // Laughter: Prone + Incapacitated) landing on the same failed save.
+    const condToApply =
+      conditionChoice && spell.conditionChoices?.includes(conditionChoice)
+        ? conditionChoice
+        : spell.condition;
+    const condAlso = spell.conditionAlso;
+    if (spellTarget.condition_immunities?.includes(condToApply)) {
+      ctx.narrative += ` ${fmt.note(`[${spellTarget.name} is immune to ${condToApply}]`)}`;
     } else {
-      const condToApply = spell.condition;
       // 2024 PHB Polymorph — give the target Temporary Hit Points
       // equal to the chosen beast form's HP (Wolf: 11). The form's
       // pool lives on `entity.temp_hp`; damage absorbs into it first,
@@ -223,9 +233,19 @@ export function runSaveSpell(
           if (e.id !== spellTargetId || !e.isEnemy) return e;
           const next = {
             ...e,
-            conditions: [...e.conditions.filter((c) => c !== condToApply), condToApply],
+            conditions: [
+              ...e.conditions.filter((c) => c !== condToApply && c !== condAlso),
+              condToApply,
+              ...(condAlso ? [condAlso] : []),
+            ],
             ...(stampDuration !== undefined
-              ? { condition_durations: { ...e.condition_durations, [condToApply]: stampDuration } }
+              ? {
+                  condition_durations: {
+                    ...e.condition_durations,
+                    [condToApply]: stampDuration,
+                    ...(condAlso ? { [condAlso]: stampDuration } : {}),
+                  },
+                }
               : {}),
             ...(stampSaveEnds
               ? {
@@ -273,12 +293,13 @@ export function runSaveSpell(
         targetName: spellTarget.name,
         condition: condToApply,
         source: spell.name,
-        prose: ` The ${spellTarget.name} is ${condToApply}!`,
+        prose: ` The ${spellTarget.name} is ${condToApply}${condAlso ? ` and ${condAlso}` : ''}!`,
       });
       if (spell.concentration) {
         char.concentrating_on = {
           spellId: spell.id,
           condition: condToApply,
+          condition2: condAlso,
           rounds_left: concentrationRoundsFor(spell),
           // Stamp the DC so effects that re-roll a save away from the cast
           // site read the caster's real spell save DC (Dominate's on-damage
