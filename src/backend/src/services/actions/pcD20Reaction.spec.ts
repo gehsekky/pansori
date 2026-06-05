@@ -239,6 +239,42 @@ describe('PC d20 reaction window — Heroic Inspiration', () => {
     expect(afterPc?.inspiration).toBe(false); // spent regardless
   });
 
+  it('keeps the speaker label adjacent to the reroll line (no stranded "[Name]")', async () => {
+    // In a multi-PC party the engine prepends "[Fighter] ". The reroll
+    // narrative starts with a "\n\n" paragraph separator; without the
+    // leading-blank-line strip that produced "[Fighter]\n\n[Heroic ...]" —
+    // a bare label above a blank line. d20 = 2 (miss → pause), reroll 20.
+    let firstRoll = true;
+    vi.spyOn(Math, 'random').mockImplementation(() => {
+      if (firstRoll) {
+        firstRoll = false;
+        return 0.05; // first attack d20 = 2 → miss
+      }
+      return 0.99; // reroll d20 = 20
+    });
+    const pc = { ...makeFighter({ inspiration: true }), name: 'Fighter' };
+    // Second living PC so livingPartyCount > 1 → speaker prefix engages.
+    const ally = makeChar({ id: 'pc-2', character_class: 'Cleric', level: 5 });
+    const twoPc: GameState = { ...buildState(pc), characters: [pc, ally] };
+    const result1 = await takeAction({
+      action: { type: 'attack', targetEnemyId: enemyId },
+      history: [],
+      state: twoPc,
+      seed,
+      context: ctx,
+    });
+    const result2 = await takeAction({
+      action: { type: 'resolve_reaction', accept: true },
+      history: [],
+      state: result1.newState,
+      seed,
+      context: ctx,
+    });
+    // The label sits next to the reroll bracket, not above a blank line.
+    expect(result2.narrative).toMatch(/\[Fighter] \[Heroic Inspiration: reroll/);
+    expect(result2.narrative).not.toMatch(/\[Fighter]\s*\n/);
+  });
+
   it('decline commits the missed attack + Inspiration retained', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.05);
     const pc = makeFighter({ inspiration: true });

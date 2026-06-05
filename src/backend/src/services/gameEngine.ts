@@ -955,11 +955,15 @@ export function buildCombatHitNarrative(
     context.narratives.weaponVerbs?.['unarmed'] ?? ['connects with'];
   const verb = pick(verbPool);
   const stylePool = context.narratives.classStyle?.[char.character_class];
-  const style = stylePool ? `, ${pick(stylePool)},` : '';
+  // No trailing comma — the sentence-ending "!" supplies the terminal
+  // punctuation; a comma here produced a stray ",!" seam before the damage.
+  const style = stylePool ? `, ${pick(stylePool)}` : '';
   const reactionPool = context.narratives.enemyReactions?.[enemy.name];
   const reaction = reactionPool ? ` — ${pick(reactionPool)}` : '';
   const critNote = critical ? 'Critical hit! ' : '';
-  const weaponLabel = weaponItem ? `your ${weaponItem.name}` : 'your fists';
+  // `opening` always ends a sentence, so the weapon clause starts a new one —
+  // capitalize "Your" rather than emitting "...staggers. your Dagger ...".
+  const weaponLabel = weaponItem ? `Your ${weaponItem.name}` : 'Your fists';
   return `${opening} ${critNote}${weaponLabel} ${verb}${style}${reaction}! ${fmt.dmg(damage)} damage.`;
 }
 
@@ -10398,7 +10402,12 @@ export async function takeAction({
   // after it.
   const speakerPrefix =
     livingPartyCount > 1 && !alreadyNamedAtStart && body.trim().length > 0 ? `[${char.name}] ` : '';
-  const rawNarrative = speakerPrefix + body;
+  // Strip leading blank lines before prefixing. Some reaction/inspiration
+  // narratives prepend a "\n\n" paragraph separator assuming prior content
+  // (e.g. reaction.ts's Heroic Inspiration reroll); when the reaction is the
+  // whole turn that separator is spurious and would strand a bare "[Name]"
+  // above a blank line instead of sitting next to the first sentence.
+  const rawNarrative = speakerPrefix + body.replace(/^\s+/, '');
 
   const activeRoom = seed.rooms.find((r) => r.id === st.current_room);
   // The LLM rewrites prose freely. We strip:

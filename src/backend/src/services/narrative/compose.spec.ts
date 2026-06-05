@@ -1,4 +1,4 @@
-import type { Character, GameState } from '../../types.js';
+import type { Character, Context, GameState, LootItem } from '../../types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   composeNow,
@@ -21,6 +21,7 @@ import {
 } from './compose.js';
 import { makeChar, makeEnemy, makeMinimalContext } from '../../test-fixtures.js';
 import type { ActionContext } from '../actions/types.js';
+import { buildCombatHitNarrative } from '../gameEngine.js';
 import { pcActor } from '../actions/actor.js';
 
 afterEach(() => vi.restoreAllMocks());
@@ -850,5 +851,43 @@ describe('composeNow', () => {
     expect(ctx.narrative).toBe('Bjorn swings.  The orc falls.');
     expect(ctx.st.combat_log).toHaveLength(1);
     expect(ctx.st.combat_log?.[0].kind).toBe('kill');
+  });
+});
+
+describe('buildCombatHitNarrative — prose seams', () => {
+  // A context whose pools mirror the live malgovia phrasing that surfaced the
+  // bugs: a sentence-ending combatHit lead-in, a weapon, and a class style.
+  const styledContext = (): Context =>
+    ({
+      narratives: {
+        combatHit: { healthy: ['Your attack connects cleanly — {enemy} staggers.'] },
+        weaponVerbs: { dagger: ['punches'] },
+        classStyle: { Rogue: ['finding the weak point'] },
+        enemyReactions: {},
+      },
+    }) as unknown as Context;
+
+  const dagger = { id: 'dagger', name: 'Dagger' } as LootItem;
+
+  it('does not emit a ",!" seam before the damage', () => {
+    const char = fixtureChar({ character_class: 'Rogue' });
+    const prose = buildCombatHitNarrative(makeEnemy(), dagger, 10, false, char, styledContext());
+    expect(prose).not.toMatch(/,!/);
+    // The style clause flows straight into the "!" that closes the sentence.
+    expect(prose).toMatch(/finding the weak point! /);
+  });
+
+  it('capitalizes the weapon clause that starts a new sentence', () => {
+    const char = fixtureChar({ character_class: 'Rogue' });
+    const prose = buildCombatHitNarrative(makeEnemy(), dagger, 10, false, char, styledContext());
+    expect(prose).toContain('staggers. Your Dagger punches');
+    expect(prose).not.toContain('staggers. your Dagger');
+  });
+
+  it('capitalizes the unarmed fallback too', () => {
+    const char = fixtureChar({ character_class: 'Rogue' });
+    const prose = buildCombatHitNarrative(makeEnemy(), null, 6, false, char, styledContext());
+    expect(prose).toContain('Your fists');
+    expect(prose).not.toContain('your fists');
   });
 });
