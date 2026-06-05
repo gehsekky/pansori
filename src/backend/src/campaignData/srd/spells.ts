@@ -677,9 +677,10 @@ export const SRD_SPELLS: Record<string, Spell> = {
     castTime: 'action',
     concentration: true,
     durationRounds: 100, // 10 minutes
+    targetType: 'self_or_ally',
     narrative:
       '{name} traces a sigil against an ally — a faint shimmer wards them from otherworldly malice.',
-    desc: 'Touch buff: protection against Aberrations / Celestials / Elementals / Fey / Fiends / Undead for 10 minutes (concentration).',
+    desc: 'Touch a willing creature: it has Advantage on saves against being Charmed or Frightened for 10 minutes (concentration). (Per RAW the full ward keys on Aberration/Celestial/Elemental/Fey/Fiend/Undead — narrative here.)',
     rangeKind: 'touch',
     spellList: ['arcane', 'divine'],
   },

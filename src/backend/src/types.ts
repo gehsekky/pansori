@@ -1344,6 +1344,11 @@ export interface Character {
   // sweep redirects it). The ward's resistance-to-all is the grantResistances
   // buff; this is the "you take the damage too" half. Ends if the warder drops.
   warded_by?: string;
+  // SRD Protection from Evil and Good (L1) — pansori grants the most testable
+  // slice: Advantage on saves vs Charmed / Frightened (the rest — attacker
+  // Disadvantage from those creature types, no possession — needs type tags).
+  // Read in conditionSavingThrow; cleared on breakConcentration.
+  protected_from_evil?: boolean;
   // SRD Death Ward (L4 Abjuration) — one-shot rescue. While set,
   // the next time the target's HP would drop to 0, it drops to 1
   // instead and the flag clears (the spell "ends" per RAW). 8-hour

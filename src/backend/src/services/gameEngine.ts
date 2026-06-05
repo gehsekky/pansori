@@ -489,6 +489,8 @@ export function breakConcentration(
   const wasSpiderClimb = char.concentrating_on.spellId === 'spider_climb';
   // SRD Pass without Trace — dropping concentration ends the party Stealth aura.
   const wasPassWithoutTrace = char.concentrating_on.spellId === 'pass_without_trace';
+  // SRD Protection from Evil and Good — dropping concentration ends the ward.
+  const wasProtectionEvil = char.concentrating_on.spellId === 'protection_from_evil_and_good';
   // 2024 PHB Polymorph — concentration drop reverts every polymorphed
   // entity. The polymorph_state stash carries originalHp / originalMaxHp;
   // restore those + clear the polymorphed condition. Pansori MVP assumes
@@ -634,6 +636,17 @@ export function breakConcentration(
     };
     if (newChar.pass_without_trace_active) {
       newChar = { ...newChar, pass_without_trace_active: undefined };
+    }
+  }
+  if (wasProtectionEvil) {
+    newSt = {
+      ...newSt,
+      characters: newSt.characters.map((c) =>
+        c.protected_from_evil ? { ...c, protected_from_evil: undefined } : c
+      ),
+    };
+    if (newChar.protected_from_evil) {
+      newChar = { ...newChar, protected_from_evil: undefined };
     }
   }
   if (wasDragonsBreath) {
@@ -1260,7 +1273,10 @@ function conditionSavingThrow(
   const speciesAdv =
     (effect.condition === 'charmed' && (speciesId === 'elf' || speciesId === 'drow')) ||
     (effect.condition === 'frightened' && speciesId === 'halfling') ||
-    (effect.condition === 'poisoned' && speciesId === 'dwarf');
+    (effect.condition === 'poisoned' && speciesId === 'dwarf') ||
+    // SRD Protection from Evil and Good — Advantage on saves vs Charmed/Frightened.
+    (!!char.protected_from_evil &&
+      (effect.condition === 'charmed' || effect.condition === 'frightened'));
   // SRD Barbarian Danger Sense (L2): Advantage on DEX saves.
   const dangerSenseAdv = effect.ability === 'dex' && hasDangerSense(char);
   let applied = rollConditionSave(

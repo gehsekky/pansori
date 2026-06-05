@@ -537,6 +537,22 @@ export function runBuffSpell(
     }
   }
 
+  // SRD Protection from Evil and Good — ward the target: pansori grants Advantage
+  // on saves vs Charmed / Frightened (read in conditionSavingThrow). Concentration;
+  // cleared on breakConcentration.
+  if (spell.id === 'protection_from_evil_and_good') {
+    if (isCasterTarget) {
+      char.protected_from_evil = true;
+    } else {
+      ctx.st = {
+        ...ctx.st,
+        characters: ctx.st.characters.map((c) =>
+          c.id === buffTarget.id ? { ...c, protected_from_evil: true } : c
+        ),
+      };
+    }
+  }
+
   // SRD Warding Bond — bond the target to the caster: while warded, the target
   // takes Resistance to all damage (the grantResistances block above) AND the
   // caster takes the same damage the target takes (the post-action sweep reads
