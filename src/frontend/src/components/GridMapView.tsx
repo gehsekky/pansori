@@ -96,6 +96,21 @@ const TERRAIN_ICON: Partial<Record<TerrainType, { name: string; color: string }>
   town_wall: { name: 'brick-wall', color: 'rgba(150, 138, 120, 0.95)' }, // impassable masonry
 };
 
+// Hand-painted terrain tiles (David Baumgart). Each PNG is 256×384 and renders
+// bottom-anchored at 150% cell height so the top third overhangs the row above
+// (2.5D layered overland look). Terrains with no tile fall back to the tint +
+// game-icons glyph below — chiefly the town/interior types (road, cobblestone,
+// garden, town_wall) this terrain set doesn't cover.
+const TERRAIN_TILE: Partial<Record<TerrainType, string>> = {
+  plains: '/art/tiles/plains.png',
+  forest: '/art/tiles/forest.png',
+  hills: '/art/tiles/hills.png',
+  swamp: '/art/tiles/swamp.png',
+  snow: '/art/tiles/snow.png',
+  water: '/art/tiles/water.png',
+  mountain: '/art/tiles/mountain.png',
+};
+
 // game-icons glyphs for non-site transitions (town venues + local room exits /
 // ascents). Sites are handled separately (towns → village, dungeons → their
 // authored icon, below).
@@ -303,6 +318,18 @@ function GridMapView({
       // An unpainted cell on a terrain-bearing grid is plains (light tan). The
       // tints + the 1px gridlines separate squares, so no checkerboard needed.
       const plainsDefault = !terrainType && !isObstacle && grid.terrain.length > 0;
+      // Hand-painted terrain tile for this cell, if the terrain type has one.
+      // Explicitly-painted terrain gets its tile on every map level; an
+      // unpainted "plains" cell only tiles on the regional map (so interior
+      // rooms don't sprout grass where they're just bare floor). Fogged cells
+      // never show a tile.
+      const tileSrc = fogged
+        ? undefined
+        : terrainType
+          ? TERRAIN_TILE[terrainType]
+          : isRegional && plainsDefault
+            ? TERRAIN_TILE.plains
+            : undefined;
       const fillTint = tStyle?.tint ?? (plainsDefault ? TERRAIN_STYLE.plains.tint : undefined);
       let cellBg = fillTint
         ? `linear-gradient(${fillTint}, ${fillTint}), var(--t-bg)`
@@ -458,9 +485,9 @@ function GridMapView({
             )}
           </>
         );
-      } else if (terrainType && TERRAIN_ICON[terrainType]) {
+      } else if (!tileSrc && terrainType && TERRAIN_ICON[terrainType]) {
         // game-icons glyph for a typed terrain feature (drawn over the tint),
-        // on every map level.
+        // on every map level. Suppressed when a painted tile covers the cell.
         const ic = TERRAIN_ICON[terrainType]!;
         token = (
           <GameIcon
@@ -469,7 +496,7 @@ function GridMapView({
             style={{ fontSize: iconFontSize, color: ic.color }}
           />
         );
-      } else if (tStyle?.glyph) {
+      } else if (!tileSrc && tStyle?.glyph) {
         // Impassable typed terrain not yet iconified (mountains ▲).
         token = (
           <span
@@ -493,6 +520,10 @@ function GridMapView({
         );
       }
 
+      // Cells carrying a token (party / enemy / NPC / loot / object / transition)
+      // are lifted above neighbouring tile overhangs so the tile rising from the
+      // row below can't occlude them.
+      const elevated = isMarker || isEnemyMarker || isNpc || isLoot || isObject || !!transition;
       cells.push(
         <div
           key={key}
@@ -508,6 +539,7 @@ function GridMapView({
             cursor: clickable ? 'pointer' : 'default',
             width: cellPx,
             height: cellPx,
+            ...(elevated ? { zIndex: 2 } : {}),
           }}
           aria-label={ariaParts.join(', ')}
           aria-current={isMarker ? 'location' : undefined}
@@ -543,6 +575,15 @@ function GridMapView({
               : undefined
           }
         >
+          {tileSrc && (
+            <img
+              src={tileSrc}
+              alt=""
+              aria-hidden="true"
+              draggable={false}
+              className={styles.gridMapTile}
+            />
+          )}
           {token}
         </div>
       );

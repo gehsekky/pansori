@@ -189,10 +189,12 @@ describe('GridMapView', () => {
     expect(cell(container, 0, 0).querySelector('.game-icon-swords-emblem')).toBeTruthy();
   });
 
-  it('renders the game-icons forest glyph on a regional forest tile', () => {
+  it('renders the painted terrain tile (not a glyph) on a regional forest cell', () => {
     // terrainGrid has a forest at (1,2) on a regional grid.
     const { container } = render(<GridMapView grid={terrainGrid} markerPos={{ x: 0, y: 0 }} />);
-    expect(cell(container, 1, 2).querySelector('.game-icon-forest')).toBeTruthy();
+    const c = cell(container, 1, 2);
+    expect(c.querySelector('img')?.getAttribute('src')).toContain('/art/tiles/forest.png');
+    expect(c.querySelector('.game-icon-forest')).toBeNull(); // tile replaces the glyph
   });
 
   it('renders the game-icons path-tile glyph on a regional road tile (still clickable)', () => {
@@ -212,7 +214,9 @@ describe('GridMapView', () => {
       transitions: [],
     };
     const { container } = render(<GridMapView grid={hillsGrid} markerPos={{ x: 0, y: 0 }} />);
-    expect(cell(container, 1, 1).querySelector('.game-icon-hills')).toBeTruthy();
+    expect(cell(container, 1, 1).querySelector('img')?.getAttribute('src')).toContain(
+      '/art/tiles/hills.png'
+    );
   });
 
   it('highlights the party current cell with the current-cell class', () => {
@@ -227,10 +231,13 @@ describe('GridMapView', () => {
     const { container, getByText } = render(
       <GridMapView grid={terrainGrid} markerPos={{ x: 0, y: 0 }} onMarkerMove={onMarkerMove} />
     );
-    // Impassable terrain carries a glyph and is not clickable.
-    expect(cell(container, 2, 0).querySelector('.game-icon-peaks')).toBeTruthy(); // mountain
-    // Water uses the game-icons waves glyph (still impassable / non-clickable).
-    expect(cell(container, 3, 1).querySelector('.game-icon-wave-crest')).toBeTruthy();
+    // Impassable terrain now carries its painted tile, and is not clickable.
+    expect(cell(container, 2, 0).querySelector('img')?.getAttribute('src')).toContain(
+      '/art/tiles/mountain.png'
+    );
+    expect(cell(container, 3, 1).querySelector('img')?.getAttribute('src')).toContain(
+      '/art/tiles/water.png'
+    );
     expect(cell(container, 2, 0).getAttribute('role')).toBe('gridcell');
     expect(cell(container, 3, 1).getAttribute('role')).toBe('gridcell');
     // Passable terrain (road) stays travel-able.
@@ -346,9 +353,9 @@ describe('GridMapView', () => {
     expect(cell(container, 3, 2).getAttribute('aria-current')).toBe('location');
   });
 
-  it('renders terrain glyphs on non-regional (town / local) grids too', () => {
-    // The terrain-icon branch is no longer regional-only: a town/local grid with
-    // typed terrain shows the same game-icons glyphs.
+  it('on town/local grids: painted tiles where available, glyphs for the rest', () => {
+    // Terrain with a tile (water) shows the tile on every level; interior types
+    // this set doesn't cover (town_wall, garden) keep their game-icons glyphs.
     const townGrid: ActiveGrid = {
       level: 'town',
       id: 'pinegate',
@@ -366,9 +373,56 @@ describe('GridMapView', () => {
       transitions: [],
     };
     const { container } = render(<GridMapView grid={townGrid} markerPos={{ x: 0, y: 5 }} />);
-    expect(cell(container, 1, 1).querySelector('.game-icon-wave-crest')).toBeTruthy();
+    expect(cell(container, 1, 1).querySelector('img')?.getAttribute('src')).toContain(
+      '/art/tiles/water.png'
+    );
     expect(cell(container, 2, 1).querySelector('.game-icon-brick-wall')).toBeTruthy();
     expect(cell(container, 3, 1).querySelector('.game-icon-flowers')).toBeTruthy();
+  });
+
+  it('tiles unpainted plains on the regional map but leaves interior grids bare', () => {
+    // Regional: an unpainted cell on a terrain-bearing grid is plains → plains tile.
+    const { container } = render(<GridMapView grid={terrainGrid} markerPos={{ x: 0, y: 0 }} />);
+    expect(cell(container, 4, 2).querySelector('img')?.getAttribute('src')).toContain(
+      '/art/tiles/plains.png'
+    );
+    // Local interior: cobblestone has no tile, and unpainted cells don't sprout
+    // grass — so no tile images at all.
+    const room: ActiveGrid = {
+      level: 'local',
+      id: 'room',
+      name: 'Room',
+      width: 4,
+      height: 4,
+      feetPerSquare: 5,
+      terrain: [{ pos: { x: 0, y: 0 }, type: 'cobblestone' }],
+      obstacles: [],
+      startPos: { x: 0, y: 3 },
+      transitions: [],
+    };
+    const { container: c2 } = render(<GridMapView grid={room} markerPos={{ x: 0, y: 3 }} />);
+    expect(c2.querySelector('img')).toBeNull();
+  });
+
+  it('does not render a tile on a fogged cell', () => {
+    const { container } = render(
+      <GridMapView grid={terrainGrid} markerPos={{ x: 0, y: 0 }} revealed={new Set(['0,0'])} />
+    );
+    expect(cell(container, 1, 2).querySelector('img')).toBeNull(); // fogged forest cell
+  });
+
+  it('elevates token cells so tile overhangs from below cannot occlude them', () => {
+    const { container } = render(
+      <GridMapView
+        grid={localGrid}
+        markerPos={{ x: 3, y: 6 }}
+        npcs={[{ id: 'n', pos: { x: 1, y: 1 }, name: 'X' }]}
+        onNpcClick={vi.fn()}
+        onMarkerMove={vi.fn()}
+      />
+    );
+    expect(cell(container, 3, 6).style.zIndex).toBe('2'); // party marker cell
+    expect(cell(container, 1, 1).style.zIndex).toBe('2'); // NPC token cell
   });
 
   it('renders game-icons glyphs for town venues, room exits, and ascents', () => {

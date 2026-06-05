@@ -15,6 +15,7 @@ describe('AboutModal', () => {
     expect(getByText(/CC BY 3\.0/)).toBeTruthy();
     expect(getByText(/RPG Awesome/)).toBeTruthy();
     expect(getByText(/Phosphor Icons/)).toBeTruthy();
+    expect(getByText(/David Baumgart/)).toBeTruthy(); // terrain tile art
     // Attribution links open safely in a new tab.
     const srd = getByText(/System Reference Document 5\.2\.1/).closest('a')!;
     expect(srd.getAttribute('target')).toBe('_blank');

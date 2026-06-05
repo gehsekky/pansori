@@ -1785,6 +1785,22 @@
   background: var(--t-separator);
   padding: 1px;
   width: fit-content;
+  /* Clip the top row's upward tile overhang to the board rectangle so it can't
+     bleed over the header. Inner-row overhang stays within the board. */
+  overflow: hidden;
+}
+
+/* Hand-painted terrain tile: bottom-anchored, 150% cell height so the top third
+   overhangs the row above. Non-interactive (clicks pass through to the cell). */
+.gridMapTile {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 150%;
+  object-fit: fill;
+  pointer-events: none;
+  user-select: none;
 }
 
 /* Last-attacker arrows — sit on top of the board, never intercept clicks. */

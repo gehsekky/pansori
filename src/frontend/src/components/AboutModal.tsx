@@ -73,6 +73,14 @@ function AboutModal({ onClose }: { onClose: () => void }) {
           </ul>
         </section>
 
+        <section>
+          <h3 className={styles.aboutHeading}>Map &amp; terrain art</h3>
+          <p>
+            Overland terrain tiles by <Ext href="https://dgbaumgart.com">David Baumgart</Ext> —
+            hand-painted square terrain tiles, used as in-game map art per the author&apos;s terms.
+          </p>
+        </section>
+
         <p className={styles.aboutFoot}>Full legal notices live in the project&apos;s LEGAL.md.</p>
       </div>
     </Dialog>

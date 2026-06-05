@@ -47,3 +47,14 @@ General Public License v3.0 — see [LICENSE](LICENSE).
   licensed [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) by
   their many contributors (Lorc, Delapouite, and others — see the
   game-icons.net authors page); attribution is given here per that license.
+
+## Map & terrain art
+
+- Overland terrain tiles by [David Baumgart](https://dgbaumgart.com) —
+  hand-painted square terrain tiles from his "Hex and Tile Terrain
+  Sample Set" (free samples drawn from his paid square-tile packs),
+  vendored under `src/frontend/public/art/tiles/` (see that folder's
+  `CREDITS.txt` for the per-file provenance). Used as in-game map art per
+  the author's terms — usable in a free or commercial game, may be
+  modified/remixed, and not repackaged for standalone distribution or
+  sale. Credit: "David Baumgart".
