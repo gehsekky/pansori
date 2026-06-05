@@ -1784,6 +1784,10 @@
 .gridBoardWrap {
   position: relative;
   width: fit-content;
+  /* Keep a large board (e.g. bigger regional squares) inside its panel —
+     scroll rather than overflow the layout. */
+  max-width: 100%;
+  overflow: auto;
 }
 
 .gridBoard {

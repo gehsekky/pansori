@@ -5,6 +5,10 @@ import { TERRAIN_STYLE } from '../lib/terrainStyle';
 import styles from '../styles.module.css';
 
 const CELL_PX = 32;
+// Overland (regional) square size. Larger than town/local so the sparse map
+// reads more like a map and the painted terrain tiles have room to breathe.
+// Tweak to taste — glyph sizes scale off it automatically.
+const REGIONAL_CELL_PX = 96;
 
 interface Props {
   grid: ActiveGrid;
@@ -237,12 +241,12 @@ function GridMapView({
   // The overland (regional) map gets double-size squares so the larger, sparse
   // grid reads more like a map; the town map uses mid-size 48 px squares; local
   // exploration stays compact (CELL_PX).
-  const cellPx = grid.level === 'regional' ? CELL_PX * 2 : grid.level === 'town' ? 48 : CELL_PX;
-  // Scale the cell glyphs up to match the larger squares (proportional to the
-  // CSS default of 1.35rem at 32 px); local keeps the CSS default
-  // (undefined ⇒ no inline override).
-  const glyphFont =
-    grid.level === 'regional' ? '2.7rem' : grid.level === 'town' ? '2rem' : undefined;
+  const cellPx =
+    grid.level === 'regional' ? REGIONAL_CELL_PX : grid.level === 'town' ? 48 : CELL_PX;
+  // Scale the cell glyphs proportionally to the square (the CSS default is
+  // 1.35rem at CELL_PX); local keeps the default (undefined ⇒ no inline
+  // override), so a change to REGIONAL_CELL_PX re-sizes its glyphs automatically.
+  const glyphFont = cellPx === CELL_PX ? undefined : `${((1.35 * cellPx) / CELL_PX).toFixed(2)}rem`;
   // game-icons read a touch small vs a plain glyph, so size them ~25% over the
   // cell glyph font (shared by terrain / site / transition / marker icons).
   const iconFontSize = glyphFont ? `calc(${glyphFont} * 1.25)` : undefined;
