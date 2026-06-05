@@ -16,6 +16,8 @@ describe('AboutModal', () => {
     expect(getByText(/RPG Awesome/)).toBeTruthy();
     expect(getByText(/Phosphor Icons/)).toBeTruthy();
     expect(getByText(/David Baumgart/)).toBeTruthy(); // terrain tile art
+    expect(getByText(/Tiny Swords/)).toBeTruthy(); // party sprite
+    expect(getByText(/Pixel Frog/)).toBeTruthy();
     // Attribution links open safely in a new tab.
     const srd = getByText(/System Reference Document 5\.2\.1/).closest('a')!;
     expect(srd.getAttribute('target')).toBe('_blank');

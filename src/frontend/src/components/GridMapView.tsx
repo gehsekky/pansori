@@ -404,16 +404,36 @@ function GridMapView({
       if (fogged) {
         // Hidden cell — render no terrain/site/marker glyph.
       } else if (isMarker) {
-        // The party marker — the swords-emblem glyph, drawn at the map-glyph
-        // size (the small token circle clipped it). The party cell is already
-        // highlighted via gridMapCellCurrent, so no backing circle is needed.
-        token = (
-          <GameIcon
-            name="swords-emblem"
-            className={styles.gridMapGlyph}
-            style={{ fontSize: iconFontSize, color: 'rgba(100, 170, 250, 1)' }} // party blue
-          />
-        );
+        // The party marker. On the overworld + town maps it's the animated
+        // Tiny Swords warrior sprite (sized ~1.5× the cell via the --mk var);
+        // local rooms keep the compact swords-emblem glyph. The party cell is
+        // already highlighted via gridMapCellCurrent, so no backing circle.
+        if (grid.level === 'regional' || grid.level === 'town') {
+          // The warrior sits in a ~64px footprint inside its 192px frame, so
+          // render the frame at 2× the cell to read roughly cell-sized.
+          const markerPx = Math.round(cellPx * 2);
+          token = (
+            <div
+              className={styles.gridMapMarkerSprite}
+              style={
+                {
+                  width: markerPx,
+                  height: markerPx,
+                  '--mk': `${markerPx}px`,
+                } as React.CSSProperties
+              }
+              aria-hidden="true"
+            />
+          );
+        } else {
+          token = (
+            <GameIcon
+              name="swords-emblem"
+              className={styles.gridMapGlyph}
+              style={{ fontSize: iconFontSize, color: 'rgba(100, 170, 250, 1)' }} // party blue
+            />
+          );
+        }
       } else if (isEnemyMarker) {
         // The "hostile here" marker (out of combat) — a red threat glyph.
         token = (

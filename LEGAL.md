@@ -58,3 +58,8 @@ General Public License v3.0 — see [LICENSE](LICENSE).
   the author's terms — usable in a free or commercial game, may be
   modified/remixed, and not repackaged for standalone distribution or
   sale. Credit: "David Baumgart".
+- Party map sprite from ["Tiny Swords"](https://pixelfrog-assets.itch.io/tiny-swords)
+  by Pixel Frog, vendored under `src/frontend/public/art/sprites/`. Usable
+  in free or commercial projects and may be modified; the assets may not
+  be redistributed, resold, or repackaged on their own. Crediting is not
+  required by the license but is given here.

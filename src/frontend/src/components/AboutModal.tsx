@@ -79,6 +79,11 @@ function AboutModal({ onClose }: { onClose: () => void }) {
             Overland terrain tiles by <Ext href="https://dgbaumgart.com">David Baumgart</Ext> —
             hand-painted square terrain tiles, used as in-game map art per the author&apos;s terms.
           </p>
+          <p>
+            Party map sprite from{' '}
+            <Ext href="https://pixelfrog-assets.itch.io/tiny-swords">Tiny Swords</Ext> by Pixel
+            Frog.
+          </p>
         </section>
 
         <p className={styles.aboutFoot}>Full legal notices live in the project&apos;s LEGAL.md.</p>

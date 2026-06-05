@@ -1801,6 +1801,27 @@
   overflow: hidden;
 }
 
+/* Party marker sprite — one frame of the 6x8 Tiny Swords warrior sheet (192px
+   frames). `--mk` (set inline from the cell size) is the displayed frame size;
+   row 0 (top) is the front-facing idle, stepped through its 6 frames. Sits in
+   the token layer (z-index 2) so it draws above the terrain tile. */
+.gridMapMarkerSprite {
+  background-image: url('/art/sprites/warrior_blue.png');
+  background-repeat: no-repeat;
+  background-size: calc(var(--mk) * 6) calc(var(--mk) * 8);
+  background-position: 0 0;
+  image-rendering: pixelated;
+  position: relative;
+  z-index: 2;
+  /* 6 idle frames at the pack's 100ms/frame (10 fps). */
+  animation: gridMarkerIdle 0.6s steps(6) infinite;
+}
+@keyframes gridMarkerIdle {
+  to {
+    background-position-x: calc(var(--mk) * -6);
+  }
+}
+
 /* Hand-painted terrain tile: bottom-anchored, 150% cell height so the top third
    overhangs the row above. Non-interactive (clicks pass through to the cell). */
 .gridMapTile {

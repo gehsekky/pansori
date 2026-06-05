@@ -55,9 +55,9 @@ describe('GridMapView', () => {
     // Header shows level + name + mile scale.
     expect(getByText(/REGION · The Vale/)).toBeTruthy();
     expect(getByText(/1 mi\/square/)).toBeTruthy();
-    // Party marker on its cell — the swords-emblem glyph.
+    // Party marker on its cell — the animated warrior sprite on the overworld.
     expect(cell(container, 0, 0).getAttribute('aria-current')).toBe('location');
-    expect(cell(container, 0, 0).querySelector('.game-icon-swords-emblem')).toBeTruthy();
+    expect(cell(container, 0, 0).querySelector('[class*="gridMapMarkerSprite"]')).toBeTruthy();
     // Transition cell carries its label.
     expect(cell(container, 3, 0).getAttribute('title')).toBe('Millhaven');
   });
@@ -205,7 +205,7 @@ describe('GridMapView', () => {
     fireEvent.click(fog);
     expect(onMarkerMove).not.toHaveBeenCalled();
     // The party marker is never fogged.
-    expect(cell(container, 0, 0).querySelector('.game-icon-swords-emblem')).toBeTruthy();
+    expect(cell(container, 0, 0).querySelector('[class*="gridMapMarkerSprite"]')).toBeTruthy();
   });
 
   it('renders the painted terrain tile (not a glyph) on a regional forest cell', () => {
@@ -566,5 +566,15 @@ describe('GridMapView', () => {
     expect(onLootClick).not.toHaveBeenCalled();
     expect(onObjectClick).not.toHaveBeenCalled();
     expect(onEnemyClick).not.toHaveBeenCalled();
+  });
+
+  it('uses the warrior sprite marker on the overworld/town but the glyph in local rooms', () => {
+    const { container: reg } = render(<GridMapView grid={grid} markerPos={{ x: 0, y: 0 }} />);
+    expect(reg.querySelector('[class*="gridMapMarkerSprite"]')).toBeTruthy();
+    expect(reg.querySelector('.game-icon-swords-emblem')).toBeNull();
+
+    const { container: loc } = render(<GridMapView grid={localGrid} markerPos={{ x: 3, y: 6 }} />);
+    expect(loc.querySelector('.game-icon-swords-emblem')).toBeTruthy();
+    expect(loc.querySelector('[class*="gridMapMarkerSprite"]')).toBeNull();
   });
 });
