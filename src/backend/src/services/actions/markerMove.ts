@@ -83,14 +83,33 @@ export const handleMarkerMove: ActionHandler<{ type: 'marker_move'; to: GridPos 
     return;
   }
   const fromRoom = ctx.st.current_room;
-  const res = resolveMarkerMove(ctx.context.campaign, ctx.seed.rooms, ctx.st, action.to);
+  // SRD Extended Travel — overland hours beyond 8/day risk Exhaustion. Fed to
+  // resolveMarkerMove as a per-square hook so a collapse halts the party AT the
+  // square it happens on (not at the destination); `died` stops the march.
+  const applyFatigue = (s: GameState, minutes: number) => {
+    const deadBefore = s.characters.filter((c) => c.dead).length;
+    const m = applyForcedMarch(s, minutes, ctx.context);
+    return {
+      st: m.st,
+      note: m.note,
+      died: m.st.characters.filter((c) => c.dead).length > deadBefore,
+    };
+  };
+  const res = resolveMarkerMove(
+    ctx.context.campaign,
+    ctx.seed.rooms,
+    ctx.st,
+    action.to,
+    applyFatigue
+  );
   if (res.rejected) {
     ctx.narrative = res.rejected;
     return;
   }
   ctx.st = res.st;
-  // Fog of war is revealed along the whole route inside resolveMarkerMove (every
-  // cell the party crossed, not just the destination), so nothing to do here.
+  // Fog + travel time + forced-march fatigue are all resolved square-by-square
+  // inside resolveMarkerMove (it stops the marker at the first encounter / fatigue
+  // collapse), so there's nothing more to apply here.
 
   // Walking away from an NPC ends any conversation with them (the marker left
   // their room) — so a stale conversation can't linger into the next room.
@@ -117,10 +136,7 @@ export const handleMarkerMove: ActionHandler<{ type: 'marker_move'; to: GridPos 
   if (res.elapsedHours >= 1) {
     ctx.narrative += ` (${Math.round(res.elapsedHours)} hr of travel.)`;
   }
-  // SRD Extended Travel — overland hours beyond 8/day risk Exhaustion.
-  const march = applyForcedMarch(ctx.st, Math.round(res.elapsedHours * 60), ctx.context);
-  ctx.st = march.st;
-  ctx.narrative += march.note;
+  if (res.fatigueNote) ctx.narrative += res.fatigueNote;
   // A random encounter interrupted the march — drop the party off the map into
   // a transient local combat against the rolled creature. Materialize it from
   // the campaign bestiary (scaled to party size, like authored room enemies);

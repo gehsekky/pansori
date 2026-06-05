@@ -274,17 +274,30 @@ function transitionAt(grid: ActiveGrid, pos: GridPos): MapTransition | undefined
 export interface MarkerMoveResult {
   st: GameState;
   narrative: string;
-  /** Squares the marker crossed (for travel-time / encounter rolls). */
+  /** Squares the marker actually crossed (it stops early at an event cell). */
   squaresMoved: number;
   /** A transition was resolved at the destination (descend/ascend/room change). */
   transitioned: boolean;
-  /** Travel time the move cost in hours (regional grid only). */
+  /** Travel time the (possibly-interrupted) leg cost in hours (regional only). */
   elapsedHours: number;
-  /** A random encounter triggered en route — the rolled enemy template name.
-   *  The caller drops the party into a local encounter (combat). */
+  /** A random encounter triggered en route — the rolled enemy template name. The
+   *  marker is left ON the encounter cell; the caller drops into combat there. */
   encounter?: string;
+  /** Accumulated forced-march notes for the cells crossed this leg. */
+  fatigueNote?: string;
   rejected?: string;
 }
+
+/**
+ * Per-cell forced-march hook supplied by the caller (it owns the action context
+ * the fatigue rules need). Applied as the marker crosses each regional cell so a
+ * collapse halts the party AT that cell. Returns the updated state, a note, and
+ * whether the increment killed anyone (which stops the march).
+ */
+export type TravelFatigueFn = (
+  st: GameState,
+  minutes: number
+) => { st: GameState; note: string; died: boolean };
 
 /**
  * Move the party marker to `to` on the current grid (free pathfinding — no combat
@@ -295,7 +308,8 @@ export function resolveMarkerMove(
   campaign: CampaignData | undefined,
   rooms: Room[],
   st: GameState,
-  to: GridPos
+  to: GridPos,
+  applyFatigue?: TravelFatigueFn
 ): MarkerMoveResult {
   const reject = (rejected: string): MarkerMoveResult => ({
     st,
@@ -315,21 +329,21 @@ export function resolveMarkerMove(
   if (!path || path.length === 0) return reject('No path there.');
 
   let next: GameState = { ...st, marker_pos: to };
-  const squaresMoved = path.length;
-  let narrative = '';
-
-  // ── Fog of war: reveal the sight radius along the WHOLE route ────────────────
-  // The party walks every cell on the path, so reveal around each (not just the
-  // destination). Done here — before any transition below can flip map_level to
-  // 'town' — so descending into a site still banks the overland cells crossed to
-  // reach it. `[from, ...path]` is the contiguous route (findPath omits `from`).
-  if (grid.level === 'regional' && st.current_region_id) {
-    next = revealRegionalCells(campaign, next, st.current_region_id, [from, ...path]);
-  }
-
-  // ── Regional travel: spend SRD travel time + roll a per-square encounter ────
+  let squaresMoved = path.length;
   let elapsedHours = 0;
   let encounter: string | undefined;
+  let fatigueNote: string | undefined;
+  let narrative = '';
+  // Whether the marker actually settled on `to` (vs. stopping early at an event).
+  let reachedDest = true;
+
+  // ── Regional travel: walk the route SQUARE BY SQUARE, stopping at the first
+  //    interrupt so the party halts where it happens. Per cell: spend that
+  //    square's SRD travel time (applying forced-march fatigue as it accrues),
+  //    then roll that square's random encounter. A fatigue death or an encounter
+  //    leaves the marker ON that cell and abandons the rest of the path — the
+  //    player re-issues the move to press on. Fog is revealed only for the cells
+  //    actually crossed. ──────────────────────────────────────────────────────
   if (grid.level === 'regional') {
     const region = regionById(campaign, st.current_region_id);
     const milesPerSquare = grid.feetPerSquare / FEET_PER_MILE;
@@ -337,30 +351,61 @@ export function resolveMarkerMove(
     const table = region?.encounterTable ?? [];
     // E2E determinism: the test-login backend (E2E_TEST_LOGIN_ENABLED, never
     // production) suppresses random wilderness encounters so a scripted journey
-    // reliably arrives at its destination site instead of being pre-empted by
-    // an ambush. Unit tests (vitest, no such env) still roll encounters.
+    // reliably arrives at its destination instead of being pre-empted by an
+    // ambush. Unit tests (vitest, no such env) still roll encounters.
     const encountersDisabled =
       process.env.NODE_ENV !== 'production' && process.env.E2E_TEST_LOGIN_ENABLED === 'true';
     const rollEncounters = !encountersDisabled && chance > 0 && table.length > 0;
-    // Walk the crossed cells: terrain sets per-square travel time (roads quick,
-    // forest/swamp slow) and scales the encounter chance (roads are safe, wild
-    // terrain dangerous). With no authored terrain every cell is plains (mult
-    // 1), reproducing the old flat behaviour.
-    let weightedSquares = 0;
+    const fatigueNotes: string[] = [];
+    const crossed: GridPos[] = [from];
+    let stopCell: GridPos = to;
+    let elapsedMin = 0;
     for (const cell of path) {
       const spec = TERRAIN[terrainTypeAt(region?.terrain, cell)];
-      weightedSquares += spec.travelMult;
-      if (rollEncounters && !encounter && Math.random() < chance * spec.encounterMult) {
+      // SRD: Travel Pace — Normal 3 mi/hr. Minutes to cross this (weighted) square.
+      const cellMin = Math.round((spec.travelMult * milesPerSquare * 60) / NORMAL_MILES_PER_HOUR);
+      // Fatigue accrues as we cross the square; a collapse stops the party here.
+      if (applyFatigue && cellMin > 0) {
+        const r = applyFatigue(next, cellMin);
+        next = r.st;
+        if (r.note) fatigueNotes.push(r.note);
+        elapsedMin += cellMin;
+        crossed.push(cell);
+        if (r.died) {
+          stopCell = cell;
+          reachedDest = false;
+          break;
+        }
+      } else {
+        elapsedMin += cellMin;
+        crossed.push(cell);
+      }
+      // This square's random encounter — fires the party into combat right here.
+      if (rollEncounters && Math.random() < chance * spec.encounterMult) {
         encounter = table[Math.floor(Math.random() * table.length)];
+        stopCell = cell;
+        reachedDest = false;
+        break;
       }
     }
-    elapsedHours = (weightedSquares * milesPerSquare) / NORMAL_MILES_PER_HOUR;
-    // SRD: Travel Pace — Normal 3 mi/hr. Advance the in-game clock in minutes.
-    next.world_minute = (st.world_minute ?? 0) + Math.round(elapsedHours * 60);
+    elapsedHours = elapsedMin / 60;
+    squaresMoved = crossed.length - 1;
+    fatigueNote = fatigueNotes.join('');
+    next = {
+      ...next,
+      marker_pos: stopCell,
+      world_minute: (st.world_minute ?? 0) + elapsedMin,
+    };
+    // Fog of war — reveal only the cells actually crossed (the marker may have
+    // stopped short). Done before any transition flips map_level to 'town'.
+    if (st.current_region_id) {
+      next = revealRegionalCells(campaign, next, st.current_region_id, crossed);
+    }
   }
 
-  // ── Resolve a transition cell at the destination (descend/ascend/room) ──────
-  const transition = encounter ? undefined : transitionAt(grid, to);
+  // ── Resolve a transition cell only when the marker actually settled on `to` ──
+  // (a mid-route encounter / collapse leaves it short, so no descend happens).
+  const transition = reachedDest ? transitionAt(grid, next.marker_pos ?? to) : undefined;
   let transitioned = false;
   if (transition) {
     const res = resolveTransition(campaign, rooms, next, transition);
@@ -368,7 +413,7 @@ export function resolveMarkerMove(
     narrative = res.narrative;
     transitioned = true;
   }
-  return { st: next, narrative, squaresMoved, transitioned, elapsedHours, encounter };
+  return { st: next, narrative, squaresMoved, transitioned, elapsedHours, encounter, fatigueNote };
 }
 
 /** Apply a transition the marker stepped onto: descend / ascend / change room. */

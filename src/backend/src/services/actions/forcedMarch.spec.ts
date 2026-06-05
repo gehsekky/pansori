@@ -8,6 +8,7 @@ import { applyForcedMarch } from './markerMove.js';
 import { handleMarkerMove } from './markerMove.js';
 import { makeChar } from '../../test-fixtures.js';
 import { pcActor } from './actor.js';
+import { resolveMarkerMove } from '../mapEngine.js';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -123,5 +124,38 @@ describe('handleMarkerMove — forced-march wiring', () => {
     expect(ctxM.st.travel_minutes_today).toBe(550); // 470 + 80
     expect(ctxM.st.characters[0].exhaustion_level).toBe(1);
     expect(ctxM.narrative).toContain('forced march');
+  });
+
+  it('halts the march on the square where a member collapses (short of the destination)', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0); // every CON save fails
+    const ctxM = ctxFor(470);
+    ctxM.st.characters[0].exhaustion_level = 5; // one failed save from death
+    handleMarkerMove(ctxM, { type: 'marker_move', to: { x: 8, y: 0 } });
+    expect(ctxM.st.characters[0].dead).toBe(true);
+    expect(ctxM.st.characters[0].exhaustion_level).toBe(6);
+    // Stopped where they fell — short of the destination (x=8).
+    expect(ctxM.st.marker_pos!.x).toBeGreaterThan(0);
+    expect(ctxM.st.marker_pos!.x).toBeLessThan(8);
+    expect(ctxM.narrative).toContain('dies of exhaustion');
+  });
+
+  it('an encounter leaves the marker ON the encounter square, not the destination', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0); // < chance → ambush on the first square
+    const campEnc: CampaignData = {
+      ...campaign,
+      regions: [{ ...campaign.regions![0], encounterChance: 1, encounterTable: ['Goblin'] }],
+    };
+    const st = {
+      map_level: 'regional',
+      current_region_id: 'reg1',
+      marker_pos: { x: 0, y: 0 },
+      characters: [makeChar({ id: 'a', con: 10 })],
+      travel_minutes_today: 0,
+    } as unknown as GameState;
+    const r = resolveMarkerMove(campEnc, [], st, { x: 6, y: 0 });
+    expect(r.encounter).toBe('Goblin');
+    expect(r.st.marker_pos).toEqual({ x: 1, y: 0 }); // stopped on the first crossed square
+    expect(r.squaresMoved).toBe(1);
+    expect(r.transitioned).toBe(false);
   });
 });
