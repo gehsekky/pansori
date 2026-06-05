@@ -568,13 +568,11 @@ describe('GridMapView', () => {
     expect(onEnemyClick).not.toHaveBeenCalled();
   });
 
-  it('uses the warrior sprite marker on the overworld/town but the glyph in local rooms', () => {
-    const { container: reg } = render(<GridMapView grid={grid} markerPos={{ x: 0, y: 0 }} />);
-    expect(reg.querySelector('[class*="gridMapMarkerSprite"]')).toBeTruthy();
-    expect(reg.querySelector('.game-icon-swords-emblem')).toBeNull();
-
-    const { container: loc } = render(<GridMapView grid={localGrid} markerPos={{ x: 3, y: 6 }} />);
-    expect(loc.querySelector('.game-icon-swords-emblem')).toBeTruthy();
-    expect(loc.querySelector('[class*="gridMapMarkerSprite"]')).toBeNull();
+  it('uses the warrior sprite marker on every exploration map level (regional/town/local)', () => {
+    for (const g of [grid, localGrid]) {
+      const { container } = render(<GridMapView grid={g} markerPos={{ x: 0, y: 0 }} />);
+      expect(container.querySelector('[class*="gridMapMarkerSprite"]')).toBeTruthy();
+      expect(container.querySelector('.game-icon-swords-emblem')).toBeNull();
+    }
   });
 });

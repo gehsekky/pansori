@@ -409,40 +409,30 @@ function GridMapView({
       if (fogged) {
         // Hidden cell — render no terrain/site/marker glyph.
       } else if (isMarker) {
-        // The party marker. On the overworld + town maps it's the animated
-        // Tiny Swords warrior sprite (sized ~1.5× the cell via the --mk var);
-        // local rooms keep the compact swords-emblem glyph. The party cell is
-        // already highlighted via gridMapCellCurrent, so no backing circle.
-        if (grid.level === 'regional' || grid.level === 'town') {
-          // Feet-anchored idle strip rendered larger than the cell (~1.6×) so the
-          // warrior stands on the tile and overhangs upward (CSS bottom-anchors
-          // him + flex-shrink:0 lets him spill past the square sideways). Shift
-          // right ~13% of the cell so the left-cropped strip reads centred.
-          const markerPx = Math.round(cellPx * 1.6);
-          const shiftX = Math.round(cellPx * 0.13);
-          token = (
-            <div
-              className={styles.gridMapMarkerSprite}
-              style={
-                {
-                  width: markerPx,
-                  height: markerPx,
-                  '--mk': `${markerPx}px`,
-                  transform: `translateX(${shiftX}px)`,
-                } as React.CSSProperties
-              }
-              aria-hidden="true"
-            />
-          );
-        } else {
-          token = (
-            <GameIcon
-              name="swords-emblem"
-              className={styles.gridMapGlyph}
-              style={{ fontSize: iconFontSize, color: 'rgba(100, 170, 250, 1)' }} // party blue
-            />
-          );
-        }
+        // The party marker — the animated Tiny Swords warrior on every
+        // exploration map level (regional / town / local). Combat uses
+        // GridCombatView, not this view, so it's always the out-of-combat party.
+        // Feet-anchored idle strip rendered larger than the cell (~1.6×) so the
+        // warrior stands on the tile and overhangs upward (CSS bottom-anchors him
+        // + flex-shrink:0 lets him spill past the square sideways); shift right
+        // ~13% of the cell so the left-cropped strip reads centred. The party
+        // cell is already highlighted via gridMapCellCurrent.
+        const markerPx = Math.round(cellPx * 1.6);
+        const shiftX = Math.round(cellPx * 0.13);
+        token = (
+          <div
+            className={styles.gridMapMarkerSprite}
+            style={
+              {
+                width: markerPx,
+                height: markerPx,
+                '--mk': `${markerPx}px`,
+                transform: `translateX(${shiftX}px)`,
+              } as React.CSSProperties
+            }
+            aria-hidden="true"
+          />
+        );
       } else if (isEnemyMarker) {
         // The "hostile here" marker (out of combat) — a red threat glyph.
         token = (
