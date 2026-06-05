@@ -5,7 +5,14 @@ import { TERRAIN_STYLE } from '../lib/terrainStyle';
 import styles from '../styles.module.css';
 
 const SQUARE_SIZE_FT = 5;
-const CELL_PX = 32;
+const CELL_PX = 48;
+// Token / glyph sizes scale with the cell (baseline tuned at 32 px) so a bigger
+// battlefield square doesn't leave the token floating in empty space.
+const CELL_SCALE = CELL_PX / 32;
+const TOKEN_PX = Math.round(24 * CELL_SCALE);
+const TOKEN_ICON_REM = `${(1.05 * CELL_SCALE).toFixed(2)}rem`;
+const TOKEN_LETTER_REM = `${(0.7 * CELL_SCALE).toFixed(2)}rem`;
+const CORPSE_REM = `${(0.9 * CELL_SCALE).toFixed(2)}rem`;
 // Seamless ground texture under the battlefield — the same arexxuru floor tiles
 // the exploration map uses for local rooms, painted as the cell's bottom layer
 // (combat tints / lighting / highlights composite over it). One of 3 variants
@@ -537,6 +544,8 @@ function GridCombatView({
             className={styles.gridToken}
             title={tokenTitle}
             style={{
+              width: TOKEN_PX,
+              height: TOKEN_PX,
               background: tokenBg,
               boxShadow: isActive ? '0 0 6px 2px var(--t-primary)' : 'none',
               border: isActive
@@ -550,10 +559,13 @@ function GridCombatView({
               <GameIcon
                 name={enemyIcon(displayName(ent))}
                 className={styles.gridTokenIcon}
+                style={{ fontSize: TOKEN_ICON_REM }}
                 aria-hidden="true"
               />
             ) : (
-              <span className={styles.gridTokenLetter}>{tokenLetter}</span>
+              <span className={styles.gridTokenLetter} style={{ fontSize: TOKEN_LETTER_REM }}>
+                {tokenLetter}
+              </span>
             )}
             <div
               className={styles.gridHpBar}
@@ -575,6 +587,8 @@ function GridCombatView({
             className={styles.gridToken}
             title={`${displayName(corpse)} — dead`}
             style={{
+              width: TOKEN_PX,
+              height: TOKEN_PX,
               background: 'rgba(80, 80, 80, 0.35)',
               border: '1px dashed rgba(255, 255, 255, 0.2)',
               opacity: 0.7,
@@ -582,7 +596,7 @@ function GridCombatView({
           >
             <span
               className={styles.gridTokenLetter}
-              style={{ fontSize: '0.9rem' }}
+              style={{ fontSize: CORPSE_REM }}
               aria-hidden="true"
             >
               💀
@@ -593,6 +607,7 @@ function GridCombatView({
           // as a distinct stone-grey block so it reads as scenery, not a token.
           <div
             className={styles.gridObstacle}
+            style={{ width: TOKEN_PX, height: TOKEN_PX }}
             title="Obstacle — blocks movement, grants cover"
             aria-hidden="true"
           />
@@ -637,6 +652,8 @@ function GridCombatView({
           key={`${x},${y}`}
           className={styles.gridCell}
           style={{
+            width: CELL_PX,
+            height: CELL_PX,
             background: cellBg,
             cursor: clickable ? 'pointer' : 'default',
           }}
