@@ -43,7 +43,7 @@ export const handleSneak: ActionHandler<{ type: 'sneak' }> = (ctx) => {
     return { rejected: 'Nothing to sneak past. You move freely.' };
   }
   const enemy = ctx.enemy;
-  // 2024 PHB lighting (PHB p.190). Dim light gives observers
+  // SRD lighting (SRD). Dim light gives observers
   // Disadvantage on sight Perception (-5 to passive); dark light
   // heavily obscures (effective passive 0 — sneak auto-succeeds).
   // Pansori enemies don't track darkvision today, so the observer's

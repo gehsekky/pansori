@@ -4,7 +4,7 @@ import { updatePcActor } from './actor.js';
 
 /**
  * `spend_inspiration`: queue Heroic Inspiration to grant advantage on
- * the next d20 test (2024 PHB — applies to any check, not just
+ * the next d20 test (SRD — applies to any check, not just
  * attacks). Costs nothing if no inspiration is held; idempotent if
  * already queued.
  */
@@ -26,7 +26,7 @@ export const handleSpendInspiration: ActionHandler<{ type: 'spend_inspiration' }
 };
 
 /**
- * `stand_up`: spend half-speed of movement to drop prone. PHB p.190 —
+ * `stand_up`: spend half-speed of movement to drop prone. SRD —
  * "Standing up takes more effort; doing so costs an amount of movement
  * equal to half your speed." Guarded by remaining movement budget so a
  * mid-turn stand-up after a partial move can't exceed the cap.
@@ -57,7 +57,7 @@ export const handleStandUp: ActionHandler<{ type: 'stand_up' }> = (ctx) => {
 };
 
 /**
- * `dodge`: PHB p.192 — until your next turn, attack rolls against you
+ * `dodge`: SRD — until your next turn, attack rolls against you
  * have disadvantage (if you can see the attacker) and you have
  * advantage on Dex saves. Engine tracks via `turn_actions.dodging` and
  * applies the modifier in attack resolution.
@@ -86,7 +86,7 @@ export const handleDodge: ActionHandler<{ type: 'dodge' }> = (ctx) => {
 };
 
 /**
- * `disengage`: PHB p.192 — your movement this turn doesn't provoke
+ * `disengage`: SRD — your movement this turn doesn't provoke
  * opportunity attacks. Engine tracks via `turn_actions.disengaged` and
  * skips OA triggers when set.
  */
@@ -102,7 +102,7 @@ export const handleDisengage: ActionHandler<{ type: 'disengage' }> = (ctx) => {
 };
 
 /**
- * `dash`: PHB p.192 — gain extra movement equal to your speed for the
+ * `dash`: SRD — gain extra movement equal to your speed for the
  * turn. Implemented by reducing `movement_used` by speed so the
  * remaining-budget math implicitly gives a full extra speed worth.
  */
@@ -122,7 +122,7 @@ export const handleDash: ActionHandler<{ type: 'dash' }> = (ctx) => {
 };
 
 /**
- * `help`: PHB p.192 — give an ally advantage on their next attack
+ * `help`: SRD — give an ally advantage on their next attack
  * roll. Engine tracks via `state.help_target_id`; the bonus is
  * consumed on the helped ally's next attack resolution.
  */
@@ -138,7 +138,7 @@ export const handleHelp: ActionHandler<{ type: 'help'; targetId: string }> = (ct
 };
 
 /**
- * `ready`: PHB p.193 — prepare an action to fire when a trigger
+ * `ready`: SRD — prepare an action to fire when a trigger
  * condition occurs. Stored on `turn_actions.readied_action`; consumed
  * by the matching `use_reaction` handler when the player declares the
  * trigger has fired.

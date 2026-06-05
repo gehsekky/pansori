@@ -19,7 +19,7 @@ import { updatePcActor } from './actor.js';
  * `interact_object`: search a room object (chest, body, altar, etc.).
  * Out of combat, this is a free interaction. In combat: blocked
  * unless the character is a Thief (Rogue L3+ subclass), in which
- * case Fast Hands (PHB p.97) lets them use a bonus action.
+ * case Fast Hands (SRD) lets them use a bonus action.
  *
  * Flavor objects (no DC, no lootIds) are one-shot — text only.
  * Searchable objects roll INT (Investigation) DC; on success, add

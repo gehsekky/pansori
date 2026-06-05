@@ -6,7 +6,7 @@ import { composeNow } from '../../narrative/compose.js';
 import { fmt } from '../../narrativeFmt.js';
 
 /**
- * Cleric features. All 2024 PHB Channel Divinity variants except
+ * Cleric features. All SRD Channel Divinity variants except
  * Turn Undead (which Wizard's Counterspell parallel is the cast
  * handler's job).
  *

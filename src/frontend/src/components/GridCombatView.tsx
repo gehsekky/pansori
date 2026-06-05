@@ -306,7 +306,7 @@ function GridCombatView({
         const dvSq = (charDef?.darkvision_ft ?? 0) / SQUARE_SIZE_FT;
         if (dist <= TORCH_BRIGHT_SQ) here = 'bright';
         else if (dist <= TORCH_DIM_SQ) here = 'dim';
-        // Darkvision bumps Darkness → Dim within the radius (PHB/SRD).
+        // Darkvision bumps Darkness → Dim within the radius (SRD).
         else if (dvSq > 0 && dist <= dvSq) here = 'dim';
       }
       best = brighter(best, here);

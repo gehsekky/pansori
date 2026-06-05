@@ -1,6 +1,6 @@
-// 2024 PHB Species (formerly "races").
+// SRD Species (formerly "races").
 //
-// 2024 PHB shifted ability score increases out of species and onto
+// SRD shifted ability score increases out of species and onto
 // backgrounds, so species here only define mechanical traits — speed,
 // size, darkvision, damage resistances, innate cantrips, etc. Players
 // pick a species at character creation; the engine reads this catalog
@@ -130,7 +130,7 @@ export const SRD_SPECIES: Record<string, Species> = {
   goliath: {
     id: 'goliath',
     name: 'Goliath',
-    desc: 'Mountain-bred giants with otherworldly stamina (new in 2024 PHB).',
+    desc: 'Mountain-bred giants with otherworldly stamina (new in SRD).',
     size: 'medium',
     speedFt: 35, // 2024: 35 ft base
     traits: [
@@ -142,7 +142,7 @@ export const SRD_SPECIES: Record<string, Species> = {
   orc: {
     id: 'orc',
     name: 'Orc',
-    desc: 'Bold, durable warriors with primal fury (2024 PHB; no longer Half-Orc).',
+    desc: 'Bold, durable warriors with primal fury (SRD; no longer Half-Orc).',
     size: 'medium',
     speedFt: 30,
     darkvisionFt: 120,

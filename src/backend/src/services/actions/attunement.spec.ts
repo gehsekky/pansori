@@ -129,7 +129,7 @@ describe('de_attune — voluntary unbind', () => {
       ],
       attuned_items: ['ring-1'],
       // Stash the ring as if equipped in the weapon slot for the test
-      // (the ring's slot is null in real PHB; this is just verifying
+      // (the ring's slot is null in real SRD; this is just verifying
       // the unequip logic on de_attune).
       equipment: { main_hand: 'ring-1' },
     });

@@ -15,7 +15,7 @@ interface Props {
   onDrop: (itemInstanceId: string, charId: string) => void;
 }
 
-// 5e carrying capacity: STR × 15 lbs (PHB).
+// 5e carrying capacity: STR × 15 lbs (SRD).
 // Variant encumbrance (informational only — not enforced):
 //   STR × 5  = encumbered    (−10 ft speed)
 //   STR × 10 = heavily encumbered (−20 ft speed, disadv on STR/DEX/CON checks/attacks/saves)

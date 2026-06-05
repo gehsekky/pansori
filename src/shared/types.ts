@@ -53,11 +53,11 @@ export type ConditionName =
   | 'unconscious'
   | 'deafened'
   | 'petrified'
-  // 2024 PHB Faerie Fire — outlined creature. Attacks against it
+  // SRD Faerie Fire — outlined creature. Attacks against it
   // have advantage. Engine-internal marker, not in the SRD 14
   // standard conditions list.
   | 'faerie_fired'
-  // 2024 PHB Banishment — target is sent to a harmless demiplane.
+  // SRD Banishment — target is sent to a harmless demiplane.
   // While banished, the creature is removed from combat: skipped
   // by the enemy turn loop, filtered out of player attack-target
   // selection, can't be hit or healed. Cleared when the caster's
@@ -65,7 +65,7 @@ export type ConditionName =
   // creature returns to its space. Linked to caster via
   // `concentrating_on.condition = 'banished'`.
   | 'banished'
-  // 2024 PHB Polymorph — target is transformed into a small beast.
+  // SRD Polymorph — target is transformed into a small beast.
   // The creature stays on the grid + can be attacked; their HP is
   // replaced with the beast form's pool (originals stashed on
   // `entity.polymorph_state`). Enemy turn loop skips polymorphed
@@ -73,14 +73,14 @@ export type ConditionName =
   // form's actions — pansori MVP skips for simplicity). Cleared
   // by concentration drop, which also restores the original HP.
   | 'polymorphed'
-  // 2024 PHB Haste — Speed doubled, +2 AC, advantage on Dex saves,
+  // SRD Haste — Speed doubled, +2 AC, advantage on Dex saves,
   // and an extra limited action each turn (extra action deferred in
   // pansori MVP). effectiveSpeed reads this flag; computeTotalAc
   // adds +2; rollConditionSave gives advantage on Dex. When the
   // caster's concentration drops, the lethargy hook applies
   // `incapacitated` for one round per RAW.
   | 'hasted'
-  // 2024 PHB Slow — Speed halved, -2 AC, -2 Dex saves, no reactions,
+  // SRD Slow — Speed halved, -2 AC, -2 Dex saves, no reactions,
   // and capped action economy each turn (action-economy gate
   // deferred in pansori MVP behind the same turn-flow refactor that
   // Haste's extra action needs). effectiveSpeed halves speed when
@@ -348,9 +348,9 @@ export interface CombatEntity {
   // seed's runtime Enemy fields reflect the current phase. A 0 (or undefined)
   // means the boss is still in its base statline.
   phase_index?: number;
-  // 2024 PHB Polymorph state — when set, the entity is transformed
+  // SRD Polymorph state — when set, the entity is transformed
   // into a beast form. The form's HP pool lives on `temp_hp` (per
-  // 2024 PHB Polymorph rewrite: form HP is Temporary Hit Points, not
+  // SRD Polymorph rewrite: form HP is Temporary Hit Points, not
   // a separate buffer). Damage absorbs into temp_hp first; when
   // temp_hp depletes to 0 the form drops automatically (entity stays
   // at its real `hp`, condition cleared, polymorph_state cleared).
@@ -359,7 +359,7 @@ export interface CombatEntity {
   polymorph_state?: {
     formName: string;
   };
-  // 2024 PHB temporary hit points (enemies only — PC temp HP lives
+  // SRD temporary hit points (enemies only — PC temp HP lives
   // on `Character.temp_hp`). Damage absorbs into this before `hp`;
   // when depleted, the polymorph form drops (if `polymorph_state`
   // is set) and excess damage carries over to `hp` (per RAW).
@@ -457,7 +457,7 @@ export type StructuredAction =
     }
   | { type: 'de_attune'; instanceId: string }
   | {
-      // 2024 PHB Influence action — distinct from `talk` (free narrative
+      // SRD Influence action — distinct from `talk` (free narrative
       // dialogue). Triggers a CHA-based skill check to change an NPC's
       // mind or coerce an enemy mid-combat. In combat: consumes the
       // Action (no attack that turn). Out of combat: no action cost
@@ -470,7 +470,7 @@ export type StructuredAction =
       targetEnemyId?: string;
     }
   | {
-      // 2024 PHB Study action — INT-based mental deduction. Distinct
+      // SRD Study action — INT-based mental deduction. Distinct
       // from the legacy `examine` action (which never had formal
       // combat-action status). Lets a player roll INT + skill prof
       // to identify a creature's vulnerabilities / immunities,
@@ -492,7 +492,7 @@ export type StructuredAction =
       slotLevel: number;
       ritual?: boolean;
       targetEnemyId?: string;
-      // 2024 PHB multi-target spells (Magic Missile darts, Eldritch Blast
+      // SRD multi-target spells (Magic Missile darts, Eldritch Blast
       // beams). One entry per dart/beam; duplicates = multiple darts on the
       // same target. When omitted, falls back to focus-fire on `targetEnemyId`.
       targetEnemyIds?: string[];
@@ -566,9 +566,9 @@ export type StructuredAction =
   | { type: 'try_escape_grapple' }
   | { type: 'stand_up' }
   | { type: 'spend_inspiration' }
-  // Manual level-up into a specific class (2024 PHB multiclassing).
+  // Manual level-up into a specific class (SRD multiclassing).
   // Bumps `char.level` + `class_levels[className]` together. Validates
-  // XP threshold; for non-primary classes also validates the 2024 PHB
+  // XP threshold; for non-primary classes also validates the SRD
   // multiclass prerequisites (ability-score minimums). Surfaces as a
   // choice when XP crosses the next-level threshold. Out-of-combat
   // only (RAW: level-ups happen during downtime / long rest).
@@ -984,11 +984,11 @@ export interface Background {
   toolProficiency?: string | null;
   feature: string;
   featureDesc: string;
-  // 2024 PHB additions. Optional so legacy context backgrounds
+  // SRD additions. Optional so legacy context backgrounds
   // continue to work; new backgrounds should set them.
   /**
    * Origin feat granted automatically at character creation. References
-   * a feat id in `Context.featTable`. The 2024 PHB lists one origin
+   * a feat id in `Context.featTable`. The SRD lists one origin
    * feat per background (e.g. Acolyte → Magic Initiate, Farmer → Tough).
    */
   originFeat?: string;
@@ -1011,7 +1011,7 @@ export interface Background {
   language?: string;
 }
 
-// ─── Feats (2024 PHB Chapter 5) ──────────────────────────────────────
+// ─── Feats (SRD Chapter 5) ──────────────────────────────────────
 //
 // A feat is a chunk of mechanical effect a player chooses at
 // character creation (origin feats), at ASI levels (general feats),
@@ -1251,7 +1251,7 @@ export interface LootItem {
   // services/wornEffects.ts. Distinct from `effect` (the consumable-use string).
   wornEffects?: WornEffect[];
   /**
-   * Cursed item flag (PHB p.214). The curse reveals on attunement and
+   * Cursed item flag (SRD). The curse reveals on attunement and
    * voluntary de-attunement is blocked — only Remove Curse / Greater
    * Restoration / equivalent magic can break the bond. Pansori doesn't
    * yet implement those spells, so cursed items are effectively
@@ -1277,7 +1277,7 @@ export interface LootItem {
   // SRD 5.2.1 p.90 "Heavy": disadv on attacks if STR < 13 (melee) / DEX < 13
   // (ranged). Greataxe, greatsword, maul, heavy crossbow, longbow, etc.
   heavy?: boolean;
-  // 2024 PHB Weapon Mastery property. Each weapon has at most one mastery.
+  // SRD Weapon Mastery property. Each weapon has at most one mastery.
   // Only applies when the wielder's class grants Weapon Mastery AND they
   // have mastered this specific weapon (Character.weaponMasteries).
   mastery?: WeaponMastery;
@@ -1312,7 +1312,7 @@ interface PendingReactionBase {
   eligibleCharIds: string[];
 }
 
-// Shield (PHB p.275). Triggers BEFORE damage applies — accepting negates the
+// Shield (SRD). Triggers BEFORE damage applies — accepting negates the
 // hit retroactively. The BE stashes a pre-computed proposed snapshot
 // (fragment + char + state) so a decline commits them as-rolled and an
 // accept discards them — including the concentration-save outcome that
@@ -1334,7 +1334,7 @@ export interface PendingShieldReaction extends PendingReactionBase {
   pendingProposedSt: unknown;
 }
 
-// Hellish Rebuke (PHB p.252). Triggers AFTER damage applies — accepting deals
+// Hellish Rebuke (SRD). Triggers AFTER damage applies — accepting deals
 // 2d10 fire damage back to the attacker (DEX save for half). No state to
 // stash: the damage that triggered Rebuke is already on the books, and a
 // decline just lets the enemy turn continue.
@@ -1342,7 +1342,7 @@ export interface PendingHellishRebukeReaction extends PendingReactionBase {
   kind: 'hellish_rebuke';
 }
 
-// Uncanny Dodge (PHB Rogue L5). Triggers BEFORE damage commits when
+// Uncanny Dodge (SRD Rogue L5). Triggers BEFORE damage commits when
 // the Rogue can see the attacker — accepting halves the damage from
 // that one attack. Pre-built proposed snapshot is stashed the same
 // way as Shield: accept ⇒ halve damage in the snapshot, commit;
@@ -1399,7 +1399,7 @@ export interface PendingSaveRerollReaction extends PendingReactionBase {
   rerollSucceeds: boolean;
 }
 
-// Counterspell (PHB p.228). Triggers BEFORE the enemy spell resolves —
+// Counterspell (SRD). Triggers BEFORE the enemy spell resolves —
 // accepting consumes a slot on the PC and negates the enemy spell.
 export interface PendingCounterspellReaction extends PendingReactionBase {
   kind: 'counterspell';
@@ -1412,7 +1412,7 @@ export interface PendingCounterspellReaction extends PendingReactionBase {
   intendedTargetPcId: string;
 }
 
-// 2024 PHB PC-turn d20 reaction window. Fires when a PC rolls a d20
+// SRD PC-turn d20 reaction window. Fires when a PC rolls a d20
 // for an attack roll (initial scope; saves + ability checks land next)
 // and the engine should pause to offer post-roll reactions before
 // committing the outcome. Distinct base from PendingReactionBase

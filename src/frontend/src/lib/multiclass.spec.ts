@@ -38,7 +38,7 @@ describe('canMulticlassInto (FE)', () => {
     expect(canMulticlassInto(char, 'Necromancer')).toMatch(/not a known class/);
   });
 
-  it('covers all 12 PHB classes', () => {
+  it('covers all 12 SRD classes', () => {
     expect(Object.keys(MULTICLASS_PREREQS).sort()).toEqual(
       [
         'barbarian',

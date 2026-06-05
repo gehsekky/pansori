@@ -1,4 +1,4 @@
-// Initiative tiebreaker tests — 2024 PHB ties are DM-arbitrated;
+// Initiative tiebreaker tests — SRD ties are DM-arbitrated;
 // pansori uses (1) higher DEX wins, (2) PCs before enemies. Tests
 // pin the order so future sort changes don't silently reshuffle
 // turn order.

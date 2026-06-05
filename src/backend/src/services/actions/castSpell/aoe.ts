@@ -41,7 +41,7 @@ import { grantEnemyDrops } from '../enemyDrops.js';
  * directional shapes). Each entity rolls its own save; failures take
  * full damage (multiplied for resistance/vulnerability), successes
  * take half on `saveEffect === 'half'`. Allies in the blast also save
- * — Evoker's Sculpt Spells auto-succeeds them per PHB p.117.
+ * — Evoker's Sculpt Spells auto-succeeds them per SRD.
  *
  * Returns `true` when the AOE branch fired (the orchestrator returns
  * immediately). Returns `false` when the spell isn't an AOE spell or

@@ -1722,7 +1722,7 @@ describe('faction shop price modifiers', () => {
 // ─── prepare_spells — cap calculation + clamping ─────────────────────────────
 
 describe('prepare_spells', () => {
-  it('cantrips are filtered out of prepared_spells (always-known, PHB p.234)', async () => {
+  it('cantrips are filtered out of prepared_spells (always-known, SRD)', async () => {
     // Cleric L1 WIS 14 → cap 3. spellIds includes Sacred Flame (cantrip)
     // which must be stripped before counting + storing.
     const state = makeClericState({ wis: 14, level: 1 });
@@ -1870,7 +1870,7 @@ describe('set_active_character (out-of-combat lead handoff)', () => {
 // ─── enter_district sync ─────────────────────────────────────────────────────
 //
 
-// ─── 2024 PHB class feature audit ────────────────────────────────────────────
+// ─── SRD class feature audit ────────────────────────────────────────────
 
 describe('Fighter Second Wind (2024 multi-use)', () => {
   function makeFighter(level: number, used = 0): GameState {
@@ -3517,7 +3517,7 @@ describe('Failed precondition actions do not consume the turn', () => {
   });
 
   it('Cleric in heavy armor (no proficiency) cannot cast — turn, slot, and concentration preserved', async () => {
-    // PHB p.144: casting while wearing armor you lack proficiency with fails.
+    // SRD: casting while wearing armor you lack proficiency with fails.
     // The guard must fire BEFORE consuming the action, the spell slot, or
     // breaking existing concentration.
     const state = makeRangeState(
@@ -3975,7 +3975,7 @@ describe('default-action choice tagging', () => {
   });
 });
 
-// ─── Encounter XP distribution (2024 PHB / SRD 5.2.1) ────────────────────────
+// ─── Encounter XP distribution (SRD / SRD 5.2.1) ────────────────────────
 //
 // XP from a defeated creature is divided equally among all party members
 // who participated. Pansori's participation model is "alive when the kill
@@ -5259,7 +5259,7 @@ describe('hostile in current room blocks loot / move', () => {
 });
 
 // ─── Turn Undead is a Magic Action (not bonus action) ───────────────────────
-// 2024 PHB p.74. Earlier the engine had Turn Undead gated on bonus_action_used
+// SRD. Earlier the engine had Turn Undead gated on bonus_action_used
 // + the choice flagged requiresBonusAction:true, which blocked the Cleric
 // from using it after a Healing Potion (also bonus action) in a real
 // playthrough. This regression catches the action-economy.

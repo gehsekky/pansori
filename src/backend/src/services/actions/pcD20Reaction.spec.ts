@@ -1,4 +1,4 @@
-// 2024 PHB PC-turn d20 reaction window. SRD Heroic Inspiration:
+// SRD PC-turn d20 reaction window. SRD Heroic Inspiration:
 // "expend it to reroll any die immediately after rolling it, and you
 // must use the new roll." Pansori MVP wires Inspiration for attack
 // rolls only (saves + checks deferred), and only when the original

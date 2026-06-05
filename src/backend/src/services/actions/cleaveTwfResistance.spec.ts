@@ -5,7 +5,7 @@
 // directly to entity HP. The main-hand attack and most spell
 // damage paths route through `applyDamageMultiplier` for enemy
 // resistance / vulnerability / immunity — but Cleave (the
-// secondary hit from 2024 PHB Cleave mastery) and Two-Weapon
+// secondary hit from SRD Cleave mastery) and Two-Weapon
 // off-hand did not. A slashing-resistant enemy took full damage
 // from a Cleave hit, even though they'd take half from the main
 // hand. Same gap for off-hand shortsword vs piercing-resistant.

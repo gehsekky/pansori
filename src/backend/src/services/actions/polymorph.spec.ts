@@ -1,5 +1,5 @@
-// 2024 PHB Polymorph (L4 transmutation). WIS save or target is
-// transformed into a small beast. Per the 2024 PHB rewrite the form's
+// SRD Polymorph (L4 transmutation). WIS save or target is
+// transformed into a small beast. Per the SRD rewrite the form's
 // HP is **Temporary Hit Points**, not a separate buffer:
 //   - Damage absorbs into entity.temp_hp first; excess carries to hp.
 //   - When temp_hp depletes the form drops automatically (condition +
@@ -98,7 +98,7 @@ describe('Polymorph — cast effect (2024 temp HP rule)', () => {
     });
     const enemyEnt = result.newState.entities?.find((e) => e.id === enemyId && e.isEnemy);
     expect(enemyEnt?.conditions).toContain('polymorphed');
-    // Real HP is NOT swapped (2024 PHB rewrite — form HP is temp HP).
+    // Real HP is NOT swapped (SRD rewrite — form HP is temp HP).
     expect(enemyEnt?.hp).toBe(60);
     expect(enemyEnt?.maxHp).toBe(60);
     // Wolf form pool lives on temp_hp.

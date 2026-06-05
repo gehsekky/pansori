@@ -14,7 +14,7 @@ describe('getBackground', () => {
 });
 
 describe('backgroundGrants', () => {
-  it('reports the full grant shape for a 2024-PHB background', () => {
+  it('reports the full grant shape for a SRD background', () => {
     const bg = getBackground('soldier', ctx)!;
     const grants = backgroundGrants(bg);
     expect(grants.skillProficiencies).toEqual(['athletics', 'intimidation']);

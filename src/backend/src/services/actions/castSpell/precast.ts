@@ -65,7 +65,7 @@ export function runPrecast(
   if (ctx.st.metamagic_active) ctx.st = { ...ctx.st, metamagic_active: undefined };
   const isSubtle = ctx.metamagic.includes('subtle');
 
-  // PHB p.144: cannot cast spells while wearing armor you are not proficient with
+  // SRD: cannot cast spells while wearing armor you are not proficient with
   const spellArmorItem = equippedArmorId(pc.char)
     ? ctx.context.lootTable.find(
         (l) =>
@@ -263,14 +263,14 @@ export function runPrecast(
     }
   }
 
-  // Break existing concentration if this spell also requires concentration (PHB p.203)
+  // Break existing concentration if this spell also requires concentration (SRD)
   if (spell.concentration && pc.char.concentrating_on) {
     const { char: nc, st: ns } = breakConcentration(pc.char, ctx.st, ctx.context);
     updatePcActor(ctx, nc);
     ctx.st = ns;
   }
 
-  // Magic Initiate free L1 cast (2024 PHB origin feat) — the player
+  // Magic Initiate free L1 cast (SRD origin feat) — the player
   // picked one L1 spell when taking Magic Initiate (Arcane/Divine/
   // Primal). That specific spell can be cast 1× per long rest without
   // expending a slot; subsequent casts that day need a slot like any
@@ -293,7 +293,7 @@ export function runPrecast(
     }
   }
 
-  // 2024 PHB / SRD 5.2.1 — costly material components (Identify's 100 gp
+  // SRD / SRD 5.2.1 — costly material components (Identify's 100 gp
   // pearl, Revivify's 300 gp diamond, etc.) are consumed on cast. Block
   // the cast if the caster can't afford it; deduct from gold otherwise.
   // Checked BEFORE slot deduction so a missing diamond doesn't waste a
@@ -423,7 +423,7 @@ export function runPrecast(
     }
   }
 
-  // Multiclass spell-casting ability resolution (2024 PHB). For a
+  // Multiclass spell-casting ability resolution (SRD). For a
   // multiclass PC, pick the best casting ability across the classes
   // whose spell list matches the spell's `spellList` tag. Single-
   // class PCs fall through to the primary-class lookup.

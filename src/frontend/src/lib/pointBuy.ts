@@ -13,7 +13,7 @@ export type AbilityScores = {
 
 const KEYS: (keyof AbilityScores)[] = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
 
-// PHB p.13 — the deterministic alternative to rolling. Also a maxed-out
+// SRD — the deterministic alternative to rolling. Also a maxed-out
 // 27-point spread, so it doubles as the starting point for Point Buy.
 export const STANDARD_ARRAY: AbilityScores = {
   str: 15,
@@ -24,7 +24,7 @@ export const STANDARD_ARRAY: AbilityScores = {
   cha: 8,
 };
 
-// PHB p.13 point buy — 27 points, scores 8–15, with 14/15 costing extra.
+// SRD point buy — 27 points, scores 8–15, with 14/15 costing extra.
 export const POINT_BUY_BUDGET = 27;
 export const POINT_BUY_MIN = 8;
 export const POINT_BUY_MAX = 15;

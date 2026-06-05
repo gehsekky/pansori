@@ -13,7 +13,7 @@ import { getEnemyById } from '../gameEngine.js';
 import { updatePcActor } from './actor.js';
 
 /**
- * `grapple`: 2024 PHB Unarmed Strike: Grapple. Contested STR
+ * `grapple`: SRD Unarmed Strike: Grapple. Contested STR
  * (Athletics) vs target's better-of-STR-or-DEX. 5 ft reach
  * prerequisite is checked before the action is spent — out-of-reach
  * attempts surface as a free notice. Sets `grappled` condition on
@@ -187,9 +187,9 @@ export const handleTryEscapeGrapple: ActionHandler<{ type: 'try_escape_grapple' 
 };
 
 /**
- * `shove`: 2024 PHB Unarmed Strike: Shove. Contested STR (Athletics)
+ * `shove`: SRD Unarmed Strike: Shove. Contested STR (Athletics)
  * vs target's better-of-STR-or-DEX. 5 ft reach prerequisite enforced
- * up front. On success: knocks the target prone (PHB p.193 prone
+ * up front. On success: knocks the target prone (SRD prone
  * condition — melee attackers gain advantage, ranged attackers get
  * disadvantage).
  */

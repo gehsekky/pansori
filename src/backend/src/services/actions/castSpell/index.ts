@@ -154,7 +154,7 @@ export const handleCastSpell: ActionHandler<{
     // open-ended "alter reality" use is adjudicated at the table).
   }
 
-  // ── Divine Smite (2024 PHB) ────────────────────────────────────────────
+  // ── Divine Smite (SRD) ────────────────────────────────────────────
   // Bonus-action pre-buff: queues 2d8 radiant on the caster's next
   // successful weapon attack, upcast +1d8 per slot level above 1st.
   // The buff doesn't deal damage on cast — it stashes
@@ -403,7 +403,7 @@ export const handleCastSpell: ActionHandler<{
     return;
   }
 
-  // 2024 PHB Magic Missile / Eldritch Blast multi-target.
+  // SRD Magic Missile / Eldritch Blast multi-target.
   if (
     runMultiTargetSpell(
       ctx,

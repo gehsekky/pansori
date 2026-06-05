@@ -194,7 +194,7 @@ export function pushEvent(st: GameState, event: CombatEvent): GameState {
   return { ...st, combat_log: next.slice(-COMBAT_LOG_MAX) };
 }
 
-// 2024 PHB Heroic Inspiration — read the pending flag and (if set) clear it
+// SRD Heroic Inspiration — read the pending flag and (if set) clear it
 // on `char`. Returns whether inspiration was active so the caller can pass
 // it as advantage to a d20 roll. Saves already integrate this through
 // applyConditionSave; this helper exists for ability/skill checks.
@@ -216,7 +216,7 @@ export function consumeLuckForCheck(char: Character): boolean {
   return true;
 }
 
-// 2024 PHB Bardic Inspiration on any d20. Saves already consume the die
+// SRD Bardic Inspiration on any d20. Saves already consume the die
 // through `conditionSavingThrow`; this mirror lets skill/ability checks
 // auto-spend the stashed die. Returns the rolled die value (0 if no die),
 // and clears the die on `char` when consumed. The caller subtracts the
@@ -472,14 +472,14 @@ export function breakConcentration(
   const wasBless = char.concentrating_on.spellId === 'bless';
   // SRD Holy Aura — concentration drop ends the party-wide `holy_warded` ward.
   const wasHolyAura = char.concentrating_on.spellId === 'holy_aura';
-  // 2024 PHB Shield of Faith — concentration drop clears the +2 AC.
+  // SRD Shield of Faith — concentration drop clears the +2 AC.
   // Pansori MVP assumes ONE Shield of Faith active in the party at
   // a time (the typical case — one Cleric concentrating). When the
   // caster's concentration drops, sweep every PC with the flag and
   // clear + recompute AC. Multi-caster SoF on different targets
   // isn't tracked; defensible since the failure mode is rare.
   const wasShieldOfFaith = char.concentrating_on.spellId === 'shield_of_faith';
-  // 2024 PHB Fly / Levitate — concentration drop clears the fly_speed_ft
+  // SRD Fly / Levitate — concentration drop clears the fly_speed_ft
   // grant the caster placed on the target. Pansori models one Fly /
   // Levitate active per caster (the typical case); sweeping all PCs is
   // defensive against drift.
@@ -491,7 +491,7 @@ export function breakConcentration(
   const wasPassWithoutTrace = char.concentrating_on.spellId === 'pass_without_trace';
   // SRD Protection from Evil and Good — dropping concentration ends the ward.
   const wasProtectionEvil = char.concentrating_on.spellId === 'protection_from_evil_and_good';
-  // 2024 PHB Polymorph — concentration drop reverts every polymorphed
+  // SRD Polymorph — concentration drop reverts every polymorphed
   // entity. The polymorph_state stash carries originalHp / originalMaxHp;
   // restore those + clear the polymorphed condition. Pansori MVP assumes
   // one Polymorph active at a time and reverts every polymorphed entity.
@@ -499,7 +499,7 @@ export function breakConcentration(
   const wasPolymorph =
     char.concentrating_on.spellId === 'polymorph' ||
     char.concentrating_on.spellId === 'true_polymorph';
-  // 2024 PHB Haste — concentration drop strips the hasted condition
+  // SRD Haste — concentration drop strips the hasted condition
   // and triggers the RAW lethargy: "the target is Incapacitated and
   // has a Speed of 0 until the end of its next turn." Pansori models
   // the speed-0 via the existing `incapacitated` condition (which
@@ -554,7 +554,7 @@ export function breakConcentration(
           ),
         }
       : st;
-  // Bless (PHB p.219) — the buff is on ALLIES, not enemies. When the
+  // Bless (SRD) — the buff is on ALLIES, not enemies. When the
   // caster's concentration drops, clear `blessed` from every PC whose
   // condition_sources.blessed pointed at this caster. The caster's
   // local ref is mutated too so callers writing it back to state don't
@@ -688,7 +688,7 @@ export function breakConcentration(
     };
   }
   if (wasPolymorph && newSt.entities) {
-    // 2024 PHB Polymorph rewrite — form HP lives on `temp_hp`, not a
+    // SRD Polymorph rewrite — form HP lives on `temp_hp`, not a
     // separate pool. Concentration drop clears temp_hp + the
     // polymorph_state stash + the polymorphed condition. The
     // entity's `hp` was never modified by the polymorph cast, so
@@ -1242,15 +1242,15 @@ function conditionSavingThrow(
     };
   }
   const proficient = hasSaveProficiency(char, effect.ability, context);
-  // 2024 PHB — Heroic Inspiration can be spent on any d20 test. If the
+  // SRD — Heroic Inspiration can be spent on any d20 test. If the
   // player armed it via spend_inspiration, the save gets advantage and
   // the flag is consumed (the caller updates char accordingly).
   const inspirationActive = !!char.turn_actions?.inspiration_pending;
-  // Lucky feat (2024 PHB) — same shape: per-roll flag set via
+  // Lucky feat (SRD) — same shape: per-roll flag set via
   // `use_luck`, consumed here. The luck-point pool was already
   // decremented at spend time.
   const luckActive = !!char.turn_actions?.luck_pending;
-  // 2024 PHB Bardic Inspiration — if the saver carries a BI die, it can
+  // SRD Bardic Inspiration — if the saver carries a BI die, it can
   // be spent on this save (and is consumed regardless of outcome). We
   // roll it, then check if the d20 + mods + bi-roll meets the DC.
   const biDie = char.bardic_inspiration_die;
@@ -1259,12 +1259,12 @@ function conditionSavingThrow(
   // attuned). Folded into the effective DC, same mechanism as Aura of Protection.
   const wornBonus = wornSaveBonus(char, effect.ability, context.lootTable);
   const dcAdjusted = effect.dc - bardicRoll - auraBonus - wornBonus;
-  // 2024 PHB: heavy encumbrance imposes disadvantage on STR/DEX/CON saves
+  // SRD: heavy encumbrance imposes disadvantage on STR/DEX/CON saves
   // (and checks, and attacks). Apply here so onHit-effect saves account for it.
   const enc =
     (effect.ability === 'str' || effect.ability === 'dex' || effect.ability === 'con') &&
     isHeavilyEncumbered(char);
-  // 2024 PHB species save advantages that key off the *condition being
+  // SRD species save advantages that key off the *condition being
   // applied* (not the save ability itself):
   //   Elf / Drow — Fey Ancestry, advantage on saves vs Charmed
   //   Halfling   — Brave, advantage on saves vs Frightened
@@ -1562,7 +1562,7 @@ function computeEnemyAttack(
   char: Character,
   st: GameState,
   context: Context,
-  // 2024 PHB Lucky feat (Disadvantage benefit) — when set, the target
+  // SRD Lucky feat (Disadvantage benefit) — when set, the target
   // spent a luck point to impose Disadvantage on this attack roll.
   // Combines with any existing adv/disadv per RAW (single advantage
   // + single disadvantage cancel to a normal roll).
@@ -1822,18 +1822,18 @@ function computeEnemyAttack(
         };
       }
     }
-    // Rage resistance: halve physical damage while raging (PHB p.48)
+    // Rage resistance: halve physical damage while raging (SRD)
     const isRaging = char.conditions.includes('raging');
-    // Petrified: resistance to all damage (PHB p.291)
+    // Petrified: resistance to all damage (SRD)
     const isPetrified = char.conditions.includes('petrified');
-    // 2024 PHB Beast Form (Bear / Brown Bear) — physical damage resistance
+    // SRD Beast Form (Bear / Brown Bear) — physical damage resistance
     // while shifted into a physicalResistance form.
     const beastForm =
       char.conditions.includes('wild_shaped') && char.wild_shape_form
         ? BEAST_FORMS[char.wild_shape_form]
         : undefined;
     const beastResist = !!beastForm?.physicalResistance;
-    // 2024 PHB species resistance — Dwarves (poison), Dragonborn (ancestry
+    // SRD species resistance — Dwarves (poison), Dragonborn (ancestry
     // type, default fire), Tieflings (fire).
     const speciesData = char.species ? SRD_SPECIES[char.species] : undefined;
     const speciesResist =
@@ -2399,7 +2399,7 @@ export function inflictCondition(char: Character, condition: string, sourceId?: 
     ...char,
     conditions: [...char.conditions, condition],
     condition_durations: durationEntry,
-    // 2024 PHB Frightened (and a few others) track the source entity. Other
+    // SRD Frightened (and a few others) track the source entity. Other
     // conditions ignore sourceId — it's free metadata when provided.
     ...(sourceId
       ? { condition_sources: { ...(char.condition_sources ?? {}), [condition]: sourceId } }
@@ -2597,7 +2597,7 @@ export function effectiveSpeed(char: Character, lootTable: LootItem[] = []): num
   // SRD Longstrider — +10 ft Speed for the duration (a flat increase before the
   // Haste/Slow multipliers, like the other movement features below).
   if (char.longstrider_active) base += 10;
-  // 2024 PHB Goliath Large Form — +10 ft speed while the condition is active.
+  // SRD Goliath Large Form — +10 ft speed while the condition is active.
   if (char.conditions?.includes('large_form')) base += 10;
   // SRD Barbarian Fast Movement (L5): +10 ft while not wearing Heavy armor.
   // Applied to the base before the Haste/Slow multipliers — it's a permanent
@@ -2608,20 +2608,20 @@ export function effectiveSpeed(char: Character, lootTable: LootItem[] = []): num
   // (Roving's "Climb/Swim Speed = Speed" half is deferred — no vertical/liquid
   // traversal model.)
   if (getClassLevel(char, 'ranger') >= 6 && !wearingHeavyArmor(char, lootTable)) base += 10;
-  // 2024 PHB Haste — "the target's Speed is doubled." Multiplies the
+  // SRD Haste — "the target's Speed is doubled." Multiplies the
   // post-Goliath / post-Mobile base; encumbrance still reduces after.
   // Applies to both walking and any future modes that derive from this
   // value (gridMove uses effectiveSpeed as the walking budget).
   if (char.conditions?.includes('hasted')) base *= 2;
-  // 2024 PHB Slow — "the target's Speed is halved." Floor-divide so
+  // SRD Slow — "the target's Speed is halved." Floor-divide so
   // odd speeds (a rare 25 ft speed) don't fractional. If both hasted
   // and slowed are somehow stacked (RAW: cancel adv/disadv style), they
   // multiplicatively offset — pansori MVP applies both in sequence.
   if (char.conditions?.includes('slowed')) base = Math.floor(base / 2);
-  // 2024 PHB Exhaustion — Speed is reduced by 5 ft per Exhaustion level.
+  // SRD Exhaustion — Speed is reduced by 5 ft per Exhaustion level.
   base = Math.max(0, base - 5 * (char.exhaustion_level ?? 0));
   const weight = charCarriedWeight(char);
-  // 2024 PHB Goliath Powerful Build: count as one size larger for carrying
+  // SRD Goliath Powerful Build: count as one size larger for carrying
   // capacity. Mechanically: double the effective STR-based thresholds.
   const carryMult = char.species === 'goliath' ? 2 : 1;
   const str = char.str * carryMult;
@@ -2649,7 +2649,7 @@ function charCarriedWeight(char: Pick<Character, 'inventory'>): number {
   }, 0);
 }
 
-// 2024 PHB Variant Encumbrance — Heavily Encumbered (>10×STR) gives
+// SRD Variant Encumbrance — Heavily Encumbered (>10×STR) gives
 // disadvantage on STR/DEX/CON ability checks, saving throws, AND attack
 // rolls. Encumbered (>5×STR) only reduces speed; we ignore it for
 // disadvantage purposes. Used in attack and skill/save resolution paths.
@@ -3206,7 +3206,7 @@ export function buildInitiativeOrder(chars: Character[], enemies: Enemy[]): Init
     ...chars
       .filter((c) => !c.dead)
       .map((c) => {
-        // 2024 PHB Alert feat — adds proficiency bonus to Initiative.
+        // SRD Alert feat — adds proficiency bonus to Initiative.
         const alertBonus = (c.feats ?? []).includes('alert') ? profBonus(c.level) : 0;
         // SRD Barbarian Feral Instinct (L7) — Advantage on Initiative rolls.
         const feralAdv = getClassLevel(c, 'barbarian') >= 7;
@@ -3225,7 +3225,7 @@ export function buildInitiativeOrder(chars: Character[], enemies: Enemy[]): Init
   ];
   // Sort descending by roll. Tiebreakers (in order):
   //   1. Higher DEX score acts first.
-  //   2. PCs before enemies (RAW 2024 PHB delegates to the DM; the
+  //   2. PCs before enemies (RAW SRD delegates to the DM; the
   //      friendly-side-wins convention matches every published
   //      adventure module's automated behavior).
   // Stable-sort isn't depended on — both tiebreakers are explicit
@@ -3332,7 +3332,7 @@ export function endCombatState(st: GameState): GameState {
   };
 }
 
-// Encounter XP distribution — 2024 PHB / SRD 5.2.1 (Gaining XP, p.260):
+// Encounter XP distribution — SRD / SRD 5.2.1 (Gaining XP, p.260):
 // the XP from a defeated creature is divided equally among all party
 // members who participated. Pansori's participation model is "alive when
 // the kill resolved" — a downed/unconscious PC (hp = 0, dead = false)
@@ -3450,7 +3450,7 @@ export function applyLevelUpForClass(char: Character, className: string, context
   const newClassLevel = char.class_levels[cls];
 
   const dwarfLvlBonus = char.species === 'dwarf' ? 1 : 0;
-  // 2024 PHB Draconic Sorcerer Draconic Resilience — +1 HP per
+  // SRD Draconic Sorcerer Draconic Resilience — +1 HP per
   // Sorcerer level (retroactive on subclass-select; +1 per level
   // taken thereafter). Stacks on top of the d6 roll.
   const draconicBonus = cls === 'sorcerer' && char.subclass === 'draconic' ? 1 : 0;
@@ -3543,7 +3543,7 @@ export function applyLevelUpForClass(char: Character, className: string, context
     if (char.spells_known.length > before) out += ` 🐉 Draconic Spells expanded.`;
   }
 
-  // First multiclass level: narrow proficiency grants per 2024 PHB (armor /
+  // First multiclass level: narrow proficiency grants per SRD (armor /
   // weapons, plus a class-list skill + tools for Bard / Ranger / Rogue). The
   // entry skill auto-picks from the context's class skill-choice options.
   if (isFirstLevelInClass && cls !== char.character_class.toLowerCase()) {
@@ -3605,7 +3605,7 @@ export function preservesCriticalFacts(input: string, output: string): boolean {
   return true;
 }
 
-// Fiend Warlock — Dark One's Blessing (PHB p.108): when you reduce a hostile
+// Fiend Warlock — Dark One's Blessing (SRD): when you reduce a hostile
 // creature to 0 HP, gain temp HP = CHA mod + warlock level (min 1).
 export function grantDarkOnesBlessing(char: Character): string {
   if (!hasClass(char, 'warlock') || char.subclass !== 'fiend') return '';
@@ -4117,7 +4117,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   // player decides. Suppresses everything else (attacks, movement, etc.).
   const pending = state.pending_reaction;
   if (pending && pending.eligibleCharIds.includes(char.id)) {
-    // 2024 PHB PC-turn d20 reaction window — distinct shape from
+    // SRD PC-turn d20 reaction window — distinct shape from
     // the enemy-attack-base reactions (no attackerEnemyId; rollerCharId
     // instead). Branch early so the enemy-attack label lookup below
     // doesn't crash on the missing field.
@@ -4375,7 +4375,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   if (char.hp <= 0 && char.stable)
     return [{ label: 'Use healing item', action: { type: 'use', itemId: healItem?.id ?? '' } }];
 
-  // Surprised on round 1: entity cannot act (PHB p.189)
+  // Surprised on round 1: entity cannot act (SRD)
   if (state.combat_active && (state.surprised ?? []).includes(char.id)) {
     return [{ label: 'SURPRISED — cannot act this round (pass)', action: { type: 'pass' } }];
   }
@@ -4399,7 +4399,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     const ent = state.entities?.find((ent) => ent.id === e.id && ent.isEnemy);
     if (!ent) return true;
     if (ent.hp <= 0) return false;
-    // 2024 PHB Banishment — banished enemies are in a harmless demiplane
+    // SRD Banishment — banished enemies are in a harmless demiplane
     // and aren't targetable. Filter them out of attack-target selection
     // here so cast / attack choices don't surface them.
     if (ent.conditions.includes('banished')) return false;
@@ -4428,7 +4428,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     });
   }
 
-  // Attack is the Action (PHB p.192). Don't offer it once the action is spent —
+  // Attack is the Action (SRD). Don't offer it once the action is spent —
   // an unintended click on a stale Attack choice would otherwise pass through
   // the post-action auto-advance and end the turn (e.g. an out-of-range
   // attempt that should be a no-op).
@@ -4613,7 +4613,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       action: { type: 'dash' },
       kind: 'dash',
     });
-    // Help — RAW (PHB p.192): to grant advantage on an ally's attack, an enemy
+    // Help — RAW (SRD): to grant advantage on an ally's attack, an enemy
     // must be within 5 ft of the helper. Without grid entities this gate can't
     // be enforced, so we conservatively only show the choice when the helper
     // has an adjacent enemy.
@@ -4997,7 +4997,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     const prepClasses = ['cleric', 'paladin', 'druid', 'wizard'];
     if (prepClasses.some((c) => hasClass(char, c)) && (char.spells_known ?? []).length > 0) {
       const cap = preparedSpellsCap(char, context);
-      // Cantrips are always known, not prepared (PHB p.234) — exclude
+      // Cantrips are always known, not prepared (SRD) — exclude
       // them from the auto-prep list and from the cap math so the
       // player doesn't burn a prep slot on Sacred Flame.
       const known = (char.spells_known ?? []).filter(
@@ -5098,7 +5098,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       });
     }
 
-    // Path of the Berserker — Frenzy (PHB p.49): while raging, make a
+    // Path of the Berserker — Frenzy (SRD): while raging, make a
     // single melee weapon attack as a bonus action each turn. RAW also
     // imposes exhaustion when the rage ends; deferred to keep MVP scope.
     if (
@@ -5115,7 +5115,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       });
     }
 
-    // Fighter L9 — Tactical Master (2024 PHB). Pre-arm a mastery swap so the
+    // Fighter L9 — Tactical Master (SRD). Pre-arm a mastery swap so the
     // next attack uses Push/Sap/Slow regardless of the weapon's actual
     // mastery. Available once per attack; cleared when the attack resolves.
     if (
@@ -5134,7 +5134,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       }
     }
 
-    // 2024 PHB Dragonborn — Breath Weapon. Action; 15-ft cone; DEX save
+    // SRD Dragonborn — Breath Weapon. Action; 15-ft cone; DEX save
     // for half. Damage scales with level (1d10/2d10/3d10/4d10 at L1/5/11/17).
     // 1/short rest, tracked via class_resource_uses.breath_weapon_used.
     if (
@@ -5151,7 +5151,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       });
     }
 
-    // 2024 PHB Goliath — Large Form. Bonus action; become Large for ~10
+    // SRD Goliath — Large Form. Bonus action; become Large for ~10
     // rounds (1 min RAW), +10 ft speed and advantage on STR ability checks
     // while active. 1/short rest. Tracked via `large_form` condition.
     if (
@@ -5169,7 +5169,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       });
     }
 
-    // 2024 PHB Orc — Adrenaline Rush. Bonus action: take the Dash action
+    // SRD Orc — Adrenaline Rush. Bonus action: take the Dash action
     // (refund full speed worth of movement) and gain temp HP equal to your
     // proficiency bonus. 1/short rest.
     if (
@@ -5187,7 +5187,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       });
     }
 
-    // Fighter: Second Wind (bonus action). 2024 PHB has multi-use scaling:
+    // Fighter: Second Wind (bonus action). SRD has multi-use scaling:
     // 2 uses at L1, 3 at L4, 4 at L10. All recover on a short or long rest.
     if (hasClass(char, 'fighter')) {
       const fighterLvl = getClassLevel(char, 'fighter');
@@ -5230,7 +5230,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       }
     }
 
-    // 2024 PHB Rogue L3+: Steady Aim — bonus action for advantage on the next
+    // SRD Rogue L3+: Steady Aim — bonus action for advantage on the next
     // attack, only if you haven't moved this turn (and your Speed drops to 0).
     if (
       hasClass(char, 'rogue') &&
@@ -5245,7 +5245,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       });
     }
 
-    // 2024 PHB Rogue L5+: Cunning Strike. Pre-commit an effect that fires
+    // SRD Rogue L5+: Cunning Strike. Pre-commit an effect that fires
     // on the next Sneak Attack hit. Each effect costs 1 SA die (subtracted
     // from the SA damage roll). Setting a Cunning Strike is free — no
     // action cost.
@@ -5367,7 +5367,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     });
   }
 
-  // Barbarian: Reckless Attack (PHB p.49) — RAW costs nothing; it's a free
+  // Barbarian: Reckless Attack (SRD) — RAW costs nothing; it's a free
   // declaration made before the first attack on your turn. Advantage on STR
   // melee, but enemies have advantage attacking you until your next turn.
   // Must be available regardless of bonus-action state.
@@ -5409,7 +5409,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   }
 
   // ── Monk choices ────────────────────────────────────────────────────────────
-  // 2024 PHB renames Ki Points to Discipline Points; the internal storage
+  // SRD renames Ki Points to Discipline Points; the internal storage
   // key stays `ki_points` so existing tests + state continue to work, but
   // UI labels say "DP" so the player sees 2024 terminology.
   if (hasClass(char, 'monk')) {
@@ -5547,13 +5547,13 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   // ── Druid: Wild Shape ───────────────────────────────────────────────────────
   if (hasClass(char, 'druid')) {
     const wsUses = char.class_resource_uses?.wild_shape ?? 2;
-    // Circle of the Moon (PHB p.69) — Combat Wild Shape: use as a bonus
+    // Circle of the Moon (SRD) — Combat Wild Shape: use as a bonus
     const wsAvailable =
       !char.conditions.includes('wild_shaped') &&
       wsUses > 0 &&
       (!state.combat_active || !char.turn_actions.action_used);
     if (wsAvailable) {
-      // 2024 PHB Beast Forms — surface one choice per accessible form. The
+      // SRD Beast Forms — surface one choice per accessible form. The
       // form's stat block replaces the druid's attack while shifted (see
       // BEAST_FORMS in contexts/srd/beast_forms.ts).
       // Wild Shape CR access scales with Druid level only.
@@ -5670,7 +5670,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   }
 
   // ── Warlock: Invocations ─────────────────────────────────────────────────────
-  // RAW (PHB p.107): invocations are learned at level-up, not chosen mid-fight.
+  // RAW (SRD): invocations are learned at level-up, not chosen mid-fight.
   // Gate to out-of-combat so this surfaces as a downtime/level-up decision.
   if (!state.combat_active && hasClass(char, 'warlock') && getClassLevel(char, 'warlock') >= 2) {
     if (!(char.feats ?? []).includes('agonizing_blast'))
@@ -5702,7 +5702,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         });
     }
 
-    // 2024 PHB Cleric universal Channel Divinity options — available to
+    // SRD Cleric universal Channel Divinity options — available to
     // every Cleric regardless of subclass.
     if (hasClass(char, 'cleric') && cdLeft > 0 && state.combat_active && enemyAlive) {
       choices.push({
@@ -5716,7 +5716,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         kind: 'class_feature',
       });
     }
-    // 2024 PHB Cleric L5: Sear Undead replaces Destroy Undead. AoE radiant
+    // SRD Cleric L5: Sear Undead replaces Destroy Undead. AoE radiant
     // damage to all undead in 30 ft, WIS save halves.
     if (
       hasClass(char, 'cleric') &&
@@ -6016,7 +6016,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         }
       } else {
         // Leveled spell: emit one choice per available slot level (base + upcasts).
-        // 2024 PHB Ritual casting (10 min, no slot, out of combat) — when
+        // SRD Ritual casting (10 min, no slot, out of combat) — when
         // the spell is tagged ritualCasting AND the PC has a ritual-cast-
         // eligible class (Wizard / Cleric / Druid / Bard) AND combat is
         // not active, emit an additional "Cast as ritual" choice. The
@@ -6096,7 +6096,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
               pickOption,
             });
           }
-          // 2024 PHB Magic Missile multi-target: when there are 2+ living
+          // SRD Magic Missile multi-target: when there are 2+ living
           // enemies, emit a focus-fire choice per enemy + one "spread evenly"
           // choice that distributes darts across all targets.
           if (spellId === 'magic_missile' && livingEnemies.length >= 2) {
@@ -6139,7 +6139,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         }
         if (!emittedAny) continue;
       }
-      // 2024 PHB Eldritch Blast multi-beam (L5+ — 2 beams; L11+ 3; L17+ 4).
+      // SRD Eldritch Blast multi-beam (L5+ — 2 beams; L11+ 3; L17+ 4).
       // Emit per-target focus-fire + a spread variant when multiple enemies
       // are alive. Cantrip path handled separately above (only adds extras
       // when level + multi-enemy conditions are met).
@@ -6335,7 +6335,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     });
   }
 
-  // Spend Heroic Inspiration on the next d20 (2024 PHB) — one-shot
+  // Spend Heroic Inspiration on the next d20 (SRD) — one-shot
   // advantage on any d20 test (attack, save, or ability check).
   // Available in or out of combat once the char has it stored and hasn't
   // already queued it this turn.
@@ -6848,7 +6848,7 @@ export function applyConsequence(
 
 // ─── Enemy turn auto-resolve (with reaction-window support) ───────────────────
 
-// PHB p.190: reactions interrupt the attacker's resolve. When an enemy's
+// SRD: reactions interrupt the attacker's resolve. When an enemy's
 // attack lands within Shield's window ([AC, AC+4]) on a defender who has
 // Shield prepared + a 1st-level slot + an unused reaction, this helper sets
 // `st.pending_reaction` and returns `paused: true` so the engine can yield
@@ -6891,7 +6891,7 @@ function isShieldEligible(
 }
 
 /**
- * Uncanny Dodge (PHB Rogue L5). Triggers BEFORE damage commits when
+ * Uncanny Dodge (SRD Rogue L5). Triggers BEFORE damage commits when
  * the Rogue can see the attacker — halves damage from that one
  * attack at the cost of their reaction.
  *
@@ -6928,7 +6928,7 @@ function isDeflectAttacksEligible(target: Character, damageType: string | undefi
   return ['bludgeoning', 'piercing', 'slashing'].includes(damageType ?? 'bludgeoning');
 }
 
-// Hellish Rebuke (PHB p.252) — triggers AFTER damage applies. Requires the
+// Hellish Rebuke (SRD) — triggers AFTER damage applies. Requires the
 // PC to be conscious (target.hp > 0 after the hit), within 60 ft of the
 // attacker (we have grid positions), and Warlock-only since that's the spell
 // list it appears on. Multi-class isn't modeled, so the class check is exact.
@@ -6938,7 +6938,7 @@ function isHellishRebukeEligible(
   attackerPos: { x: number; y: number } | undefined,
   context: Context
 ): boolean {
-  // 2024 PHB: Warlocks cast it from their spell list; Tieflings L3+ get it
+  // SRD: Warlocks cast it from their spell list; Tieflings L3+ get it
   // as a racial Innate spell (1/long rest, no slot cost).
   const isWarlock =
     hasClass(target, 'warlock') && knowsSpellWithSlot(target, 'hellish_rebuke', context);
@@ -6980,7 +6980,7 @@ export function applyEnemySpellDamage(
   };
 }
 
-// Counterspell (PHB p.234) — triggers when a creature within 60 ft is
+// Counterspell (SRD) — triggers when a creature within 60 ft is
 // casting a spell. Requires Counterspell prepared/known + a 3rd-level slot
 // (since the spell itself is 3rd level — slots ≥ spell level only).
 function isCounterspellEligible(
@@ -7113,7 +7113,7 @@ function applyPcOpportunityAttacks(args: {
       )
     )
       continue;
-    // OA can only be made with a melee weapon (PHB p.190). Ranged-only weapons
+    // OA can only be made with a melee weapon (SRD). Ranged-only weapons
     // don't qualify; thrown melee weapons (handaxe, dagger) do because they
     // have a melee profile too.
     const weaponInstance = equippedWeaponId(pc)
@@ -7521,7 +7521,7 @@ export function resolveEnemySubAttack(args: {
     return { outcome: 'killed-massive', st, target, narrative };
   }
 
-  // Hellish Rebuke (PHB p.252) — triggers AFTER damage applies. The
+  // Hellish Rebuke (SRD) — triggers AFTER damage applies. The
   // damage is already on the books in `target`; if the player
   // accepts, the resolve path deals damage back to the attacker.
   // Commit the new target HP to state BEFORE pausing so the resumed
@@ -8801,7 +8801,7 @@ export function canAttemptHide(
 }
 
 /**
- * Hide DC check for an enemy attacking an invisible PC. The 2024 PHB
+ * Hide DC check for an enemy attacking an invisible PC. The SRD
  * Hide rules use a stable hide DC (rolled at Hide-action time and
  * stashed on the character); enemies check against it via passive
  * Perception first, then active Search if passive falls short.
@@ -8949,7 +8949,7 @@ export async function runEnemyTurns(args: {
       continue;
     }
     if (rm && !st.enemies_killed.includes(eEntry.id)) {
-      // Surprised creatures skip their first turn entirely (2014 PHB
+      // Surprised creatures skip their first turn entirely (SRD
       // p.189 — Pansori's chosen surprise model; PC-side handling mirrors
       // this at the `Surprised — cannot act this round` choice). The
       // `surprised` array is cleared on round-wrap so the skip only
@@ -8963,7 +8963,7 @@ export async function runEnemyTurns(args: {
         if (advIdx === args.initialCurrentIdx) break;
         continue;
       }
-      // 2024 PHB Banishment — banished creatures are in a harmless
+      // SRD Banishment — banished creatures are in a harmless
       // demiplane and skip their turn entirely. The condition is
       // cleared by the caster's concentration drop in
       // breakConcentration, so the creature returns the moment the
@@ -8978,7 +8978,7 @@ export async function runEnemyTurns(args: {
         if (advIdx === args.initialCurrentIdx) break;
         continue;
       }
-      // 2024 PHB Polymorph — polymorphed creatures retain their
+      // SRD Polymorph — polymorphed creatures retain their
       // personality but use the new form's actions (RAW). Pansori
       // MVP skips their turn entirely — the beast form's attack
       // profile would need to substitute for the seed template's
@@ -9470,7 +9470,7 @@ export async function runEnemyTurns(args: {
       const { actorEnt: eEnt, targetCharIdx } = selectTarget(eEntry.id, st);
       if (targetCharIdx >= 0) {
         let target = st.characters[targetCharIdx];
-        // 2024 PHB Hide DC tracking — delegated to `resolveEnemyHideCheck`.
+        // SRD Hide DC tracking — delegated to `resolveEnemyHideCheck`.
         // See that function's JSDoc for the outcome matrix.
         const hideResult = resolveEnemyHideCheck(rm, target, targetCharIdx, st);
         st = hideResult.st;
@@ -9980,7 +9980,7 @@ export async function takeAction({
     return { narrative, choices: st.last_choices, newState: st, seed, escaped: false, dead: false };
   }
 
-  // Exhaustion level 6 = death (PHB p.291)
+  // Exhaustion level 6 = death (SRD)
   if ((char.exhaustion_level ?? 0) >= 6 && !char.dead) {
     char.dead = true;
     char.died_at_round = st.round ?? 0;
@@ -10137,7 +10137,7 @@ export async function takeAction({
   // ── Auto-advance initiative when action is used and no bonus choices remain ─
   // When class features add bonus-action choices (requiresBonusAction: true),
   // this block will stay false and the player gets another pick before advancing.
-  // PHB p.190: movement is its own resource on your turn, separate from the
+  // SRD: movement is its own resource on your turn, separate from the
   // Action. Don't auto-advance while the character still has movement left —
   // otherwise a click that was a no-op (e.g. a too-far grid_move that errored
   // with "not enough movement") would end the turn. The player can always
@@ -10257,7 +10257,7 @@ export async function takeAction({
     if (roundWrapped) {
       // New round: bump the round counter (so combat-event payloads tag the
       // right round), reset turn_actions, movement budgets, and clear
-      // surprise (PHB p.189).
+      // surprise (SRD).
       st = {
         ...st,
         round: (st.round ?? 1) + 1,
@@ -10435,7 +10435,7 @@ export async function takeAction({
 
   // SRD 5.2.1 p.184 — Invisible: attacking reveals location. The condition
   // ends after the attack; the character must re-Hide to regain it.
-  // EXCEPTION: 2024 PHB Greater Invisibility (and Invisibility cast as a
+  // EXCEPTION: SRD Greater Invisibility (and Invisibility cast as a
   // BUFF, not from Hide) explicitly allows attacking while invisible —
   // the condition source is magical and persists. Self-cast invisibility
   // spells are exempted from this break-on-attack rule.

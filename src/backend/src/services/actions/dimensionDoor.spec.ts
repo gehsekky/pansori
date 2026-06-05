@@ -1,4 +1,4 @@
-// 2024 PHB Dimension Door (L4 conjuration). Real grid teleport.
+// SRD Dimension Door (L4 conjuration). Real grid teleport.
 // Pansori MVP auto-picks the cell with maximum min-distance to any
 // living enemy ("safest" cell). Movement budget isn't consumed (RAW:
 // teleport doesn't use movement). Willing-creature passenger deferred.

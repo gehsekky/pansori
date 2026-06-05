@@ -11,7 +11,7 @@ import { updatePcActor } from './actor.js';
  * - entities exist (grid combat is active)
  * - the move targets this character (no manipulating allies)
  * - speed isn't 0 (grappled / restrained reject the move)
- * - 2024 PHB Frightened: can't move closer to fear source
+ * - SRD Frightened: can't move closer to fear source
  * - the path exists (BFS over grid, blocked by living entities +
  *   room obstacles; dead bodies are walked over to match the FE)
  * - movement budget covers the path (difficult-terrain squares cost
@@ -49,7 +49,7 @@ export const handleGridMove: ActionHandler<{
     return;
   }
 
-  // 2024 PHB Frightened — can't willingly move closer to the source of fear.
+  // SRD Frightened — can't willingly move closer to the source of fear.
   if (char.conditions.includes('frightened') && char.condition_sources?.frightened) {
     const fearSourceId = char.condition_sources.frightened;
     const fearSourceEnt = ctx.st.entities.find((e) => e.id === fearSourceId);
@@ -83,7 +83,7 @@ export const handleGridMove: ActionHandler<{
   const currentRoomForMove = ctx.seed.rooms.find((r) => r.id === ctx.roomId);
   const roomObstacles = currentRoomForMove?.obstacles ?? [];
   const walkSpeedFt = effectiveSpeed(char, ctx.context.lootTable);
-  // 2024 PHB flying movement — when the PC has a fly speed ≥ their
+  // SRD flying movement — when the PC has a fly speed ≥ their
   // walking speed, the path may pass over obstacle cells (boulders,
   // columns, debris) and difficult-terrain cells without the 2× cost.
   // RAW lets flying creatures move over difficult terrain without
@@ -119,7 +119,7 @@ export const handleGridMove: ActionHandler<{
     return;
   }
 
-  // 2024 PHB cost rules. Per RAW, multiple "extra-foot" sources DON'T
+  // SRD cost rules. Per RAW, multiple "extra-foot" sources DON'T
   // stack — a cell that's both difficult terrain AND climbable still
   // costs 2× total, not 3×. Flying bypasses ALL of these (RAW: flying
   // creatures ignore difficult terrain; a climbable wall or swimmable

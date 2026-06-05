@@ -46,7 +46,7 @@ function metamagicCost(char: Character, base: number): { cost: number; free: boo
  * lets the Warlock see in magical darkness (rendering hook).
  *
  * Archfey Patron — Fey Presence: AoE WIS save in 10 ft → frightened.
- * 1/short rest. The 2024 PHB shape (no charm option) since fright is
+ * 1/short rest. The SRD shape (no charm option) since fright is
  * already encoded in the engine; charm would need a new movement
  * gate path.
  *

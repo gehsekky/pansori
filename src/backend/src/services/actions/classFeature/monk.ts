@@ -16,12 +16,12 @@ import { composeNow } from '../../narrative/compose.js';
  * Monk + Open Hand + Shadow features.
  *
  *  - `flurry_of_blows`: bonus action after the Attack action. 1 ki for
- *    2 unarmed strikes at the 2024 PHB Martial Arts die. Open Hand
+ *    2 unarmed strikes at the SRD Martial Arts die. Open Hand
  *    subclass forces a DEX save on each hit or knock prone.
- *  - `patient_defense_{free|dp}`: 2024 PHB Dodge-as-bonus-action.
+ *  - `patient_defense_{free|dp}`: SRD Dodge-as-bonus-action.
  *    Free 1/turn or 1 DP for the extra DEX-save advantage.
  *  - `step_of_wind_{free_dash|free_disengage|dash|disengage}`:
- *    2024 PHB. Free variants pick ONE effect; 1-DP variants give
+ *    SRD. Free variants pick ONE effect; 1-DP variants give
  *    Dash AND Disengage. Free uses share the `monk_free_used` slot.
  *  - `stunning_strike`: 1 ki, once per turn (was per-hit in 2014).
  *    CON save vs Monk DC or stunned until end of caster's next turn.
@@ -250,7 +250,7 @@ export function handleMonkFeature(ctx: ActionContext, fid: string): boolean {
       ...(char.class_resource_uses ?? {}),
       ki_points: kiPool2 - 1,
     };
-    // 2024 PHB: spending 1 DP gives BOTH Dash and Disengage. The legacy
+    // SRD: spending 1 DP gives BOTH Dash and Disengage. The legacy
     // `step_of_wind_disengage` id is kept for back-compat but now also
     // dashes. `step_of_wind_dash` does the same.
     char.turn_actions = {

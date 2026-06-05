@@ -232,7 +232,7 @@ describe('spellSlotsForChar — warlock', () => {
   });
 });
 
-describe('canMulticlassInto — 2024 PHB prereqs', () => {
+describe('canMulticlassInto — SRD prereqs', () => {
   it('returns empty for the first class (no prereq check)', () => {
     const char = makeChar({ character_class: 'Fighter', str: 8, dex: 8 });
     // Even with terrible stats, continuing in the first class is fine.

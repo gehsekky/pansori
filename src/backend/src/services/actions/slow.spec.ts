@@ -1,4 +1,4 @@
-// 2024 PHB Slow (L3 transmutation). WIS save or target is slowed:
+// SRD Slow (L3 transmutation). WIS save or target is slowed:
 // Speed halved, -2 AC, -2 Dex saves, no reactions, action-or-bonus
 // (not both), one attack max, 25% somatic-spell fail. Pansori MVP
 // wires the speed / AC / Dex save effects via the `slowed` condition

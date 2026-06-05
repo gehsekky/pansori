@@ -83,7 +83,7 @@ export type CharacterInput = {
   portrait_url?: string;
   // No subclass at creation: the 2024 SRD picks subclasses at level 3, and
   // pansori's strict-SRD build has exactly one per class — auto-applied at L3.
-  // 2024 PHB Species (formerly "race"). Optional — engine defaults to
+  // SRD Species (formerly "race"). Optional — engine defaults to
   // Human when omitted.
   species?: string;
   // 2024 background ability-score increase. Omitted = +1 to all three of the

@@ -1,4 +1,4 @@
-// 2024 PHB terrain modes — climb / swim cells on Room. A PC without
+// SRD terrain modes — climb / swim cells on Room. A PC without
 // the matching movement mode (climb_speed_ft / swim_speed_ft) pays
 // 2× cost per cell, mirroring the existing difficult-terrain rule.
 // RAW says these costs DON'T stack — a cell counted as both

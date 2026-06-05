@@ -203,7 +203,7 @@ export function runSaveSpell(
     if (spellTarget.condition_immunities?.includes(condToApply)) {
       ctx.narrative += ` ${fmt.note(`[${spellTarget.name} is immune to ${condToApply}]`)}`;
     } else {
-      // 2024 PHB Polymorph — give the target Temporary Hit Points
+      // SRD Polymorph — give the target Temporary Hit Points
       // equal to the chosen beast form's HP (Wolf: 11). The form's
       // pool lives on `entity.temp_hp`; damage absorbs into it first,
       // and when temp_hp depletes the form drops automatically (the

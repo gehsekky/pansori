@@ -1,4 +1,4 @@
-// Multiclass spell-casting ability resolution (2024 PHB).
+// Multiclass spell-casting ability resolution (SRD).
 //
 // **Pre-existing gap:** castSpell read `spellcastingAbility[character_class]`
 // — primary class only. A Wizard/Cleric multiclass casting Cure

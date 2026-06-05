@@ -61,7 +61,7 @@ export interface AttackContext {
   isVersatile: boolean;
   weaponLabel: string;
   toHit: ToHitContext;
-  /** 2024 PHB Heroic Inspiration / Lucky-RAW reroll plumbing — when set,
+  /** SRD Heroic Inspiration / Lucky-RAW reroll plumbing — when set,
    *  resolveOneAttack passes this d20 to resolvePlayerAttack via
    *  `forceRoll1`. Caller is responsible for clearing the resource that
    *  granted the reroll BEFORE re-invoking, to prevent infinite-pause
@@ -119,7 +119,7 @@ export function resolveOneAttack(
     !disadvantage;
   const effectiveAdvantage = brutalStrikeApplies ? false : advantage;
 
-  // 2024 PHB Slow — slowed creature takes -2 AC. Read the live target
+  // SRD Slow — slowed creature takes -2 AC. Read the live target
   // entity (target.ac comes from the seed template; the slowed flag
   // lives on the grid entity). Stacks with cover (RAW: penalties +
   // bonuses are additive).
@@ -164,7 +164,7 @@ export function resolveOneAttack(
     attackBonus: totalAttackBonus,
     targetAc: effectiveEnemyAc,
   };
-  // Bardic Inspiration consumption on attack roll (2024 PHB p.52). If
+  // Bardic Inspiration consumption on attack roll (SRD). If
   // a stashed BI die exists, roll it and add to total. If that turns a
   // miss into a hit, atk.hit flips AND we need to roll damage
   // (resolvePlayerAttack returned 0 damage on the original miss).
@@ -180,7 +180,7 @@ export function resolveOneAttack(
     biNote = ` ✦ Bardic Inspiration: +${biRoll} (${pc.char.bardic_inspiration_die})`;
     updatePcActor(ctx, { bardic_inspiration_die: undefined });
   }
-  // Bless (PHB p.219): +1d4 to attack rolls. Same miss-to-hit
+  // Bless (SRD): +1d4 to attack rolls. Same miss-to-hit
   // damage-roll concern as BI above.
   let blessNote = '';
   if ((pc.char.conditions ?? []).includes('blessed') && !atk.fumble) {
@@ -326,7 +326,7 @@ export function resolveOneAttack(
       : atk.damage
     : Math.max(1, unarmedDamage(pc.char.str));
 
-  // 2024 PHB Savage Attacker origin feat — once per turn, on a
+  // SRD Savage Attacker origin feat — once per turn, on a
   // weapon-damage hit, reroll the damage and use the higher total.
   // Gates on `turn_actions.savage_attacker_used` to enforce the
   // once-per-turn limit across Extra Attack / two-weapon sequences.
@@ -378,7 +378,7 @@ export function resolveOneAttack(
     );
 
   if (atk.fumble) {
-    // 2024 PHB — a Nat 1 on a d20 grants Heroic Inspiration. Failure
+    // SRD — a Nat 1 on a d20 grants Heroic Inspiration. Failure
     // becomes the seed of next turn's success.
     const bonuses: { label: string }[] = [];
     if (!pc.char.inspiration) {
@@ -405,7 +405,7 @@ export function resolveOneAttack(
   }
   if (!atk.hit) {
     const bonuses: { label: string }[] = [];
-    // 2024 PHB Fighter L13 — Studied Attacks. On miss, mark the target
+    // SRD Fighter L13 — Studied Attacks. On miss, mark the target
     // so this Fighter's next attack against them has advantage.
     if (hasClass(pc.char, 'fighter') && getClassLevel(pc.char, 'fighter') >= 13) {
       const tag = `studied_by_${pc.char.id}`;
@@ -424,7 +424,7 @@ export function resolveOneAttack(
         label: `Studied Attacks: advantage on next attack vs ${target.name}`,
       });
     }
-    // 2024 PHB Graze weapon mastery (greatsword, glaive) — even on a
+    // SRD Graze weapon mastery (greatsword, glaive) — even on a
     // miss, deal STR mod damage (DEX for Finesse weapons). Floor at 0.
     if (
       weaponItem?.mastery === 'graze' &&
@@ -490,7 +490,7 @@ export function resolveOneAttack(
     if (isFinesseOrRanged && triggers) {
       const saExpr = sneakAttackDice(getClassLevel(pc.char, 'rogue'));
       sneakDmg = isCrit ? rollCritical(saExpr) : rollDice(saExpr);
-      // 2024 PHB Cunning Strike: if the player pre-committed an effect,
+      // SRD Cunning Strike: if the player pre-committed an effect,
       // subtract one die from the SA roll (average 3.5 on 1d6).
       if (pc.char.turn_actions.cunning_strike_pending) {
         sneakDmg = Math.max(0, sneakDmg - rollDice('1d6'));
@@ -527,12 +527,12 @@ export function resolveOneAttack(
         : rollDice('1d6')
       : 0;
 
-  // ── Divine Smite (2024 PHB) ─────────────────────────────────────
+  // ── Divine Smite (SRD) ─────────────────────────────────────
   // Pre-buff from the bonus-action `divine_smite_spell` cast.
   // Consumes `divine_smite_dice` on the next weapon hit and rolls
   // that many d8 radiant. Crit doubles the dice per RAW
   // ("you can roll the spell's damage dice twice and add them
-  // together" — 2024 PHB Divine Smite).
+  // together" — SRD Divine Smite).
   let smiteDmg = 0;
   let smiteDice = 0;
   if ((pc.char.divine_smite_dice ?? 0) > 0 && (weaponItem || hasClass(pc.char, 'monk'))) {
@@ -633,7 +633,7 @@ export function resolveOneAttack(
   const totalDmg = finalDmg + radiantRider + spellWeaponRider;
   const enemyEnt = ctx.st.entities?.find((e) => e.id === targetId && e.isEnemy);
   const curEnemyHp = enemyEnt?.hp ?? 0;
-  // 2024 PHB enemy temp HP — currently only set by Polymorph. Absorb
+  // SRD enemy temp HP — currently only set by Polymorph. Absorb
   // damage into temp_hp first, then into hp. When temp_hp depletes,
   // the polymorph form drops automatically (cleared below at the
   // state-update site).
@@ -871,7 +871,7 @@ export function resolveOneAttack(
     }
   }
 
-  // ── 2024 PHB Cunning Strike effect application ───────────────────────
+  // ── SRD Cunning Strike effect application ───────────────────────
   if (pc.char.turn_actions.cunning_strike_pending && sneakDmg > 0 && newEnemyHp > 0) {
     const csEffect = pc.char.turn_actions.cunning_strike_pending;
     const csDc = 8 + profBonus(pc.char.level) + abilityMod(pc.char.dex);
@@ -1022,13 +1022,13 @@ export function resolveOneAttack(
     }
   }
 
-  // ── 2024 PHB Weapon Mastery on hit ────────────────────────────────────
+  // ── SRD Weapon Mastery on hit ────────────────────────────────────
   if (
     weaponItem?.mastery &&
     newEnemyHp > 0 &&
     (pc.char.weapon_masteries ?? []).includes(weaponItem.id)
   ) {
-    // 2024 PHB Fighter L9 Tactical Master — pre-armed swap wins over the
+    // SRD Fighter L9 Tactical Master — pre-armed swap wins over the
     // weapon's printed mastery for this one attack.
     let mastery = weaponItem.mastery;
     if (pc.char.turn_actions.tactical_master_mastery) {
@@ -1105,7 +1105,7 @@ export function resolveOneAttack(
       };
       ctx.narrative += ` ${fmt.note(`[Sap: ${target.name} has disadvantage on its next attack]`)}`;
     } else if (mastery === 'slow') {
-      // 2024 PHB Slow weapon mastery — narrative-only "speed -10 ft"
+      // SRD Slow weapon mastery — narrative-only "speed -10 ft"
       // marker. Distinct from the Slow SPELL's `slowed` condition
       // (speed halved, -2 AC, -2 Dex saves). Renamed from `slowed`
       // to `slow_struck` to avoid name collision with the spell;
@@ -1123,7 +1123,7 @@ export function resolveOneAttack(
       };
       ctx.narrative += ` ${fmt.note(`[Slow: ${target.name}'s speed -10 ft]`)}`;
     } else if (mastery === 'cleave') {
-      // 2024 PHB Cleave (greataxe, halberd) — second enemy within 5 ft
+      // SRD Cleave (greataxe, halberd) — second enemy within 5 ft
       // takes the weapon's damage die (no ability mod).
       const targetEnt = ctx.st.entities?.find((e) => e.id === targetId && e.isEnemy);
       if (targetEnt && weaponItem.damage) {
@@ -1216,7 +1216,7 @@ export function resolveOneAttack(
         hp: newEnemyHp,
         temp_hp: newEnemyTempHp > 0 ? newEnemyTempHp : undefined,
       };
-      // 2024 PHB Polymorph form-drop: when the polymorph buffer
+      // SRD Polymorph form-drop: when the polymorph buffer
       // (temp_hp) depletes to 0, the form ends. Clear polymorph_state
       // + the polymorphed condition; the entity's real `hp` is
       // unchanged (it was never modified by the polymorph cast).

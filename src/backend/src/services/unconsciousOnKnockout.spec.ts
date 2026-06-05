@@ -1,6 +1,6 @@
 // Regression test for the Unconscious-on-knockout RAW behavior.
 //
-// **Pre-existing gap:** RAW 2024 PHB — a creature reduced to 0 HP
+// **Pre-existing gap:** RAW SRD — a creature reduced to 0 HP
 // without being killed outright becomes Unconscious. Pansori only
 // applied this via the Sleep spell; downed PCs sat at 0 HP without
 // the condition. Consequences pre-fix:

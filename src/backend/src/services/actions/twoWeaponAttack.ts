@@ -19,8 +19,8 @@ import { hasFightingStyle } from '../fightingStyle.js';
 import { updatePcActor } from './actor.js';
 
 /**
- * `two_weapon_attack`: PHB p.195 off-hand strike. No ability mod to
- * damage. Normally costs a bonus action; 2024 PHB Nick mastery
+ * `two_weapon_attack`: SRD off-hand strike. No ability mod to
+ * damage. Normally costs a bonus action; SRD Nick mastery
  * (dagger, light hammer, sickle, scimitar) trained users get it free
  * as part of the Attack action — frees the bonus action for Cunning
  * Action / Rage / etc.

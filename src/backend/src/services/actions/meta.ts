@@ -35,7 +35,7 @@ import { updatePcActor } from './actor.js';
  * `apply_asi`: spend a pending Ability Score Improvement (granted by
  * `applyLevelUpFromXp` at the appropriate levels). +2 to the chosen
  * stat. CON increases retroactively raise max HP across every level
- * (PHB convention).
+ * (SRD convention).
  */
 export const handleApplyAsi: ActionHandler<{ type: 'apply_asi'; stat: AbilityKey }> = (
   ctx,
@@ -670,7 +670,7 @@ function clearLevelingIfDone(ctx: Parameters<ActionHandler>[0]): void {
 
 /**
  * `prepare_spells`: pick which leveled spells are prepared for the
- * day. Cantrips are always known (PHB p.234) so they're stripped from
+ * day. Cantrips are always known (SRD) so they're stripped from
  * input. Cap = level + spellcasting modifier (preparedSpellsCap).
  * Out-of-combat only.
  */
@@ -798,12 +798,12 @@ export const handleTakeFeat: ActionHandler<{
 
 /**
  * `level_up_class`: manually advance one level, choosing the class
- * to add the level to (2024 PHB multiclassing). Validates:
+ * to add the level to (SRD multiclassing). Validates:
  *
  *   - XP threshold met for `char.level + 1`.
  *   - Out of combat (RAW: level-ups happen during downtime).
  *   - Total level not yet at the cap (20).
- *   - 2024 PHB multiclass prerequisites for any class other than
+ *   - SRD multiclass prerequisites for any class other than
  *     `char.character_class` (the primary, taken at creation).
  *
  * On success delegates to `applyLevelUpForClass` which does the

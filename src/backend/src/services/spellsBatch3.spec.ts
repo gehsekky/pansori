@@ -1,5 +1,5 @@
 // Cone of Cold, Stinking Cloud, Wall of Fire — three more AoE
-// spells (2024 PHB).
+// spells (SRD).
 
 import { describe, expect, it } from 'vitest';
 import { SRD_SPELLS } from '../campaignData/srd/index.js';

@@ -67,7 +67,7 @@ export function runHealSpell(
   // to its own max via the per-target `Math.min(max_hp, …)` caps below.
   const healed = spell.healFull ? Number.MAX_SAFE_INTEGER : baseHealed + discipleBonus;
 
-  // 2024 PHB Mass Healing Word (L3) / Mass Cure Wounds (L5) — apply the
+  // SRD Mass Healing Word (L3) / Mass Cure Wounds (L5) — apply the
   // rolled heal to EVERY living party member instead of just the most-
   // injured ally. RAW caps at 6 targets within range; pansori MVP heals
   // the whole party (parties are 1-4 PCs so the cap doesn't bite).

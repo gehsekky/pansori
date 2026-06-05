@@ -1,4 +1,4 @@
-// Multiclassing helpers (2024 PHB Ch. 1).
+// Multiclassing helpers (SRD Ch. 1).
 //
 // This module is the **read-side type seam** for multiclass support.
 // It exposes `class_levels` lookups in a way that handles legacy
@@ -29,11 +29,11 @@ import {
 } from './rulesEngine.js';
 import type { Character } from '../types.js';
 
-// ─── Multiclass proficiency grants (2024 PHB Ch. 1) ────────────────────────
+// ─── Multiclass proficiency grants (SRD Ch. 1) ────────────────────────
 
 /**
  * Armor + weapon proficiencies granted on multiclass entry (the FIRST
- * level taken in a non-primary class). RAW 2024 PHB grants a narrow
+ * level taken in a non-primary class). RAW SRD grants a narrow
  * subset — not the full class loadout. Skill / tool / instrument
  * choices are listed for some classes (Bard, Ranger, Rogue) and need
  * a player chooser; deferred to the level-up UX PR.
@@ -45,7 +45,7 @@ import type { Character } from '../types.js';
 type ProfGrant = {
   armor?: string[]; // 'light' | 'medium' | 'shield'
   weapon?: string[]; // 'simple' | 'martial' | 'martial-light'
-  // 2024 PHB multiclass entry also grants one skill (from the class's skill
+  // SRD multiclass entry also grants one skill (from the class's skill
   // list) for Bard / Ranger / Rogue. We auto-pick the first option the
   // character doesn't already have (no mid-game picker), like the creation
   // defaults.
@@ -77,7 +77,7 @@ const MULTICLASS_PROF_GRANTS: Record<string, ProfGrant> = {
 };
 
 /**
- * Apply the 2024 PHB multiclass proficiency grants to `char` for
+ * Apply the SRD multiclass proficiency grants to `char` for
  * a first level in `className`. Mutates `char` in place (adds
  * proficiencies that aren't already present). Returns a human-
  * readable note for the level-up narrative, or empty if nothing
@@ -138,11 +138,11 @@ export function applyMulticlassProfGrants(
   return ` Multiclass proficiency: ${added.join(', ')}.`;
 }
 
-// ─── Multiclass prerequisites (2024 PHB Ch. 1) ─────────────────────────────
+// ─── Multiclass prerequisites (SRD Ch. 1) ─────────────────────────────
 
 /**
  * Minimum ability scores required to take a level in each class as
- * a multiclass option. Values are pulled directly from 2024 PHB Ch. 1
+ * a multiclass option. Values are pulled directly from SRD Ch. 1
  * "Multiclassing — Prerequisites" — every entry is an AND across the
  * listed pairs (`Paladin` needs STR 13 AND CHA 13; `Fighter` is the
  * one OR — STR 13 OR DEX 13 — modeled below as the `or` variant).
@@ -196,7 +196,7 @@ const MULTICLASS_PREREQS: Record<string, AbilityRequirement> = {
 };
 
 /**
- * Checks whether `char` meets the 2024 PHB multiclass prerequisites
+ * Checks whether `char` meets the SRD multiclass prerequisites
  * for `targetClass` (case-insensitive). Returns an empty string on
  * success or a human-readable reason on failure (mirrors the
  * `canTakeFeat` shape — callers short-circuit on truthy returns).
@@ -247,7 +247,7 @@ export function canMulticlassInto(char: Character, targetClass: string): string 
   return `Multiclassing into ${targetClass} requires ${reqList}.`;
 }
 
-// ─── Caster contributions (2024 PHB Ch. 1 multiclass spell-slot rule) ──────
+// ─── Caster contributions (SRD Ch. 1 multiclass spell-slot rule) ──────
 
 const FULL_CASTERS = new Set(['bard', 'cleric', 'druid', 'sorcerer', 'wizard']);
 const HALF_CASTERS = new Set(['paladin', 'ranger']);
@@ -320,7 +320,7 @@ export function hasClass(char: Character, className: string): boolean {
 }
 
 /**
- * 2024 PHB ritual-cast eligibility — Wizard / Cleric / Druid / Bard
+ * SRD ritual-cast eligibility — Wizard / Cleric / Druid / Bard
  * can cast spells tagged `ritualCasting` as 10-minute rituals without
  * expending a slot. Warlock + Sorcerer have NO base ritual access
  * (Warlock RAW gets it only via Pact of the Tome + Book of Ancient
@@ -365,8 +365,8 @@ export function getAllClasses(char: Character): string[] {
  * the lowercase coercion. Used for tie-breaking rules that depend
  * specifically on the first class:
  *
- *   - 2024 PHB: saving-throw proficiencies come from the FIRST class only.
- *   - 2024 PHB: when a class feature exists on multiple classes the
+ *   - SRD: saving-throw proficiencies come from the FIRST class only.
+ *   - SRD: when a class feature exists on multiple classes the
  *     PC has, the first-class version usually wins.
  */
 export function getPrimaryClass(char: Character): string {
@@ -374,7 +374,7 @@ export function getPrimaryClass(char: Character): string {
 }
 
 /**
- * 2024 PHB Multiclassing — Extra Attack: "If you gain the Extra
+ * SRD Multiclassing — Extra Attack: "If you gain the Extra
  * Attack feature from more than one class, the features don't add
  * together." Take the maximum extraAttackCount across all classes
  * the PC has levels in. A Fighter 4 / Ranger 4 (total 8) gets 0
@@ -1015,7 +1015,7 @@ const CLASS_SPELL_LISTS: Record<string, Array<'arcane' | 'divine' | 'primal'>> =
 };
 
 /**
- * Multiclass spell-casting ability resolver (2024 PHB).
+ * Multiclass spell-casting ability resolver (SRD).
  *
  * RAW: when a multiclass spellcaster casts a spell, they use the
  * casting ability of the class whose spell list grants access to
@@ -1068,7 +1068,7 @@ export function resolveCastingAbility(
 
 /**
  * Returns the spell-slot map (slot level → count) `char` has access to,
- * accounting for multiclass caster-level contributions (2024 PHB Ch. 1).
+ * accounting for multiclass caster-level contributions (SRD Ch. 1).
  *
  *   - Pure single-class: same answer as `spellSlotsForClassLevel`
  *     for that class (table-equivalent).

@@ -309,7 +309,7 @@ export const handleAttackNpc: ActionHandler<{ type: 'attack_npc'; npcId: string 
 };
 
 /**
- * 2024 PHB **Influence action**. Distinct from `talk` (free narrative
+ * SRD **Influence action**. Distinct from `talk` (free narrative
  * dialogue):
  *
  *   - **Talk** = open-ended chat, costless, no skill check. Player
@@ -434,7 +434,7 @@ export const handleInfluence: ActionHandler<{
 };
 
 /**
- * 2024 PHB **Study action**. INT-based mental-deduction action,
+ * SRD **Study action**. INT-based mental-deduction action,
  * distinct from `examine` (which is informal in pansori — short
  * sensory description with no roll). 5.5e splits the old "look at
  * something" into:

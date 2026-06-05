@@ -1,6 +1,6 @@
 // Influence action tests — covers both target shapes (NPC out of
 // combat; enemy in combat) and both success/failure outcomes.
-// Mirrors the framing from the 2024 PHB: distinct from `talk`,
+// Mirrors the framing from the SRD: distinct from `talk`,
 // triggers a CHA + skill check, in-combat consumes the Action.
 
 import type { Context, Seed } from '../../types.js';

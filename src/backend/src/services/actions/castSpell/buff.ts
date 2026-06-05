@@ -303,7 +303,7 @@ export function runBuffSpell(
     }
   }
 
-  // 2024 PHB Fly + Levitate: set fly_speed_ft on the target. The
+  // SRD Fly + Levitate: set fly_speed_ft on the target. The
   // movement-mode pipeline (gridMove obstacle bypass + difficult-
   // terrain ignore) keys off this field. Concentration drop in
   // breakConcentration clears the flag (see gameEngine.ts).

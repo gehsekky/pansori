@@ -153,7 +153,7 @@ interface CharDraft {
   speciesId: string;
   backgroundId: string;
   stats: StatBlock;
-  // PHB p.12-13 — 'roll' = 4d6-drop-lowest six times, 'array' = the
+  // SRD-13 — 'roll' = 4d6-drop-lowest six times, 'array' = the
   // 15/14/13/12/10/8 standard array assigned to abilities. Either way the
   // player can swap values between ability slots.
   statMethod: StatMethod;
@@ -382,7 +382,7 @@ function CharScreen({
   // Two-click swap state — when the player clicks a stat box, we remember
   // it; clicking another stat box swaps the two values; clicking the same
   // box again cancels. Allows assigning rolled or array values to the right
-  // abilities (PHB p.13: "Standard Method" assignment).
+  // abilities (SRD: "Standard Method" assignment).
   const [swapFrom, setSwapFrom] = useState<{ partyIdx: number; key: keyof StatBlock } | null>(null);
   // Which party member's setup block is on screen. Only one is shown at a time;
   // the portrait nav (left) switches it. Kept in range by add/remove/auto-fill.
@@ -1533,8 +1533,8 @@ function CharScreen({
                       <label className={styles.formLbl} style={{ marginTop: 12 }}>
                         ABILITY SCORES
                       </label>
-                      {/* Generation method: 4d6-drop-lowest (PHB p.12), the standard
-                    array 15/14/13/12/10/8 (PHB p.13), 27-point buy, or free
+                      {/* Generation method: 4d6-drop-lowest (SRD), the standard
+                    array 15/14/13/12/10/8 (SRD), 27-point buy, or free
                     manual entry. */}
                       <div style={{ display: 'flex', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
                         {(['roll', 'array', 'pointbuy', 'manual'] as const).map((m) => {

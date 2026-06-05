@@ -1,4 +1,4 @@
-// Study action tests — 2024 PHB. Creature-analysis branch: INT +
+// Study action tests — SRD. Creature-analysis branch: INT +
 // skill check reveals resistances / vulnerabilities / immunities /
 // condition_immunities on success.
 

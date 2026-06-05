@@ -1,6 +1,6 @@
 import type { Character } from '../types';
 
-// FE-side 2024 PHB multiclass prerequisites + `levelUpAvailable` (used by
+// FE-side SRD multiclass prerequisites + `levelUpAvailable` (used by
 // PartyRail to badge a member who can level). The leveling pane itself surfaces
 // the class-pick choices from the backend, so the FE no longer gates classes.
 // Mirrors `MULTICLASS_PREREQS` + `canMulticlassInto` in

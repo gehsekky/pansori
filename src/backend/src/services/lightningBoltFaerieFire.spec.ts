@@ -1,4 +1,4 @@
-// New 2024 PHB spells — Lightning Bolt + Faerie Fire.
+// New SRD spells — Lightning Bolt + Faerie Fire.
 // Both are data + small toHit hook (Faerie Fire only).
 
 import { describe, expect, it } from 'vitest';

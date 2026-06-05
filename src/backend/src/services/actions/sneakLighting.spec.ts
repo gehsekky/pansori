@@ -1,4 +1,4 @@
-// 2024 PHB lighting integration with the sneak action — the observer
+// SRD lighting integration with the sneak action — the observer
 // enemy's effective light adjusts the Stealth DC the group check
 // rolls against. Dark light effectively guarantees the sneak succeeds
 // (DC 0); dim light makes it 5 points easier.

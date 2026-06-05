@@ -1,4 +1,4 @@
-// Multiclass edge cases: the 2024 PHB skill/tool grants on multiclass ENTRY
+// Multiclass edge cases: the SRD skill/tool grants on multiclass ENTRY
 // (Bard / Ranger / Rogue), and ASI spacing on PER-CLASS milestones (not total
 // level). Armor/weapon entry grants are covered elsewhere; this guards the
 // newly-added skill + tool grants and locks the per-class ASI gating.

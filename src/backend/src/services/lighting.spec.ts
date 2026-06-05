@@ -1,4 +1,4 @@
-// 2024 PHB lighting & vision (PHB p.190). Pansori models room-grained
+// SRD lighting & vision (SRD). Pansori models room-grained
 // lighting (Room.lighting) — each room is bright / dim / dark uniformly.
 // The Stealth-vs-Perception contest reads the observer's effective
 // light to adjust the passive Perception DC:

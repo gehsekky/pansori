@@ -84,7 +84,7 @@ export interface Room {
   trap?: Trap; // static trap defined in context; can be overridden per-room
   objects?: RoomObject[];
   difficultTerrain?: GridPos[]; // squares costing 2× movement to enter
-  // 2024 PHB terrain modes — squares that require a matching movement
+  // SRD terrain modes — squares that require a matching movement
   // mode to traverse at full speed:
   //   `climbTerrain` (walls / cliffs / ladders): costs 2× movement to
   //     enter without a climb speed; full cost with `climb_speed_ft > 0`.
@@ -474,7 +474,7 @@ export interface TurnActions {
   haste_extra_action_used?: boolean;
   dodging?: boolean; // Dodge action: enemy attacks have disadvantage until next turn
   disengaged?: boolean; // Disengage action: no opportunity attacks this turn
-  // Barbarian Reckless Attack (PHB p.49): advantage on STR melee attacks this turn,
+  // Barbarian Reckless Attack (SRD): advantage on STR melee attacks this turn,
   // but enemies have advantage on attacks vs the Barbarian until their next turn.
   reckless?: boolean;
   // SRD 5.2.1 p.67 Quickened Spell metamagic: you can't use Quickened if a
@@ -485,7 +485,7 @@ export interface TurnActions {
   // Heroic Inspiration pending — when set, the next attack roll gets
   // advantage and both this flag + char.inspiration are cleared (one-shot).
   inspiration_pending?: boolean;
-  // Lucky feat (2024 PHB) — when set, the next PC attack roll gets
+  // Lucky feat (SRD) — when set, the next PC attack roll gets
   // advantage. Decoupled from inspiration_pending so a PC can stack
   // sources or use Lucky without burning their Heroic Inspiration.
   // Set by `use_luck`, cleared on consumption (one-shot).
@@ -500,7 +500,7 @@ export interface TurnActions {
   // hit, deals +1d10 and applies the chosen effect. Consumed on the next
   // qualifying attack; cleared at end of turn via FRESH_TURN otherwise.
   brutal_strike_pending?: 'forceful' | 'hamstring';
-  // Savage Attacker feat (2024 PHB origin) — once per turn, on a
+  // Savage Attacker feat (SRD origin) — once per turn, on a
   // weapon-damage hit, reroll damage and take the higher. This flag
   // marks the reroll as already spent this turn so multi-hit turns
   // (Extra Attack, two-weapon) only benefit once.
@@ -515,7 +515,7 @@ export interface TurnActions {
   // Fighting could trigger SA on every hit. RAW: only on the
   // first qualifying hit. Cleared by FRESH_TURN at turn start.
   sneak_attack_used?: boolean;
-  // 2024 PHB Rogue Cunning Strike (L5+) — when set, the next Sneak Attack
+  // SRD Rogue Cunning Strike (L5+) — when set, the next Sneak Attack
   // spends 1 die for the chosen effect (trip, poison, withdraw, disarm)
   // and one SA die is removed from the damage roll. Cleared after applied.
   cunning_strike_pending?:
@@ -532,12 +532,12 @@ export interface TurnActions {
     trigger: string;
     action: StructuredAction;
   };
-  // 2024 PHB Monk — Patient Defense and Step of the Wind can each be used
+  // SRD Monk — Patient Defense and Step of the Wind can each be used
   // once per turn without spending Discipline Points; spending 1 DP grants
   // both effects. This flag marks the free monk bonus action as consumed
   // this turn.
   monk_free_used?: boolean;
-  // 2024 PHB Monk L5 — Stunning Strike is once per turn (was per-hit in
+  // SRD Monk L5 — Stunning Strike is once per turn (was per-hit in
   // 2014). Set when the monk has already taken their stun shot this turn.
   monk_stunning_strike_used?: boolean;
   // SRD Open Hand Monk L11 — Fleet Step grants a free Step of the Wind after
@@ -546,11 +546,11 @@ export interface TurnActions {
   // SRD Fiend Warlock L14 — Hurl Through Hell is usable once per turn on a hit;
   // this marks it spent for the current turn.
   hurl_through_hell_used?: boolean;
-  // 2024 PHB Fighter L9 — Tactical Master. When attacking with any weapon
+  // SRD Fighter L9 — Tactical Master. When attacking with any weapon
   // whose mastery you've trained, the Fighter may swap in Push, Sap, or
   // Slow for that attack. Cleared when the attack resolves.
   tactical_master_mastery?: 'push' | 'sap' | 'slow';
-  // 2024 PHB Fighter L17 — Action Surge can be used twice per rest, but
+  // SRD Fighter L17 — Action Surge can be used twice per rest, but
   // still only ONCE per turn. This flag marks the per-turn use; the
   // per-rest cap is tracked on class_resource_uses.action_surge.
   action_surge_used?: boolean;
@@ -785,7 +785,7 @@ export interface Spell {
   // exceptions. The precast somatic-fail gate reads this only when
   // the caster has the 'slowed' condition.
   somatic?: boolean;
-  // 2024 PHB spell-list tags. A spell can belong to multiple lists
+  // SRD spell-list tags. A spell can belong to multiple lists
   // (e.g. Healing Word is on the Cleric, Druid, and Bard lists →
   // ['divine', 'primal', 'arcane']). Used by Magic Initiate to
   // validate that the player's spell pick comes from the matching
@@ -853,13 +853,13 @@ export interface Spell {
   tempHpGrant?: number; // Heroism gives mod-equal temp HP each turn; MVP grants once on cast.
   maxHpBonus?: number; // Aid bumps target's max HP (and current HP).
   upcastMaxHpBonus?: number; // extra max HP per slot above base (Aid: +5 per slot).
-  // 2024 PHB — some spells require a costly material component that's
+  // SRD — some spells require a costly material component that's
   // consumed on cast (Identify's 100 gp pearl, Revivify's 300 gp diamond,
   // Resurrection's 1000 gp diamond, etc.). Engine deducts from char.gold
   // on cast and blocks the cast if the caster can't afford it. Free
   // material components (just listed in the description) don't set this.
   materialCost?: number;
-  // 2024 PHB — some healing spells also strip conditions from the
+  // SRD — some healing spells also strip conditions from the
   // target on cast (Heal: Blinded / Deafened / Poisoned; Greater
   // Restoration: Charmed / Petrified / Stunned + Exhaustion; etc.).
   // The heal branch in castSpell reads this and removes each entry
@@ -951,7 +951,7 @@ export interface Spell {
   outOfCombatOnly?: boolean;
 }
 
-// ─── Beast Forms (2024 PHB Wild Shape) ───────────────────────────────────────
+// ─── Beast Forms (SRD Wild Shape) ───────────────────────────────────────
 // Each form is a curated beast stat block the druid can transform into.
 // Replaces equipped-weapon attacks while in form. Form-specific traits
 // (Bear's physical resistance, Wolf's pack tactics, Hawk's flying) apply
@@ -974,7 +974,7 @@ export interface BeastForm {
   physicalResistance?: boolean; // resistance to non-magical bludgeoning/piercing/slashing
   speedFt?: number; // movement speed override (default 30)
   descriptor: string; // short flavor for narratives
-  // 2024 PHB Polymorph — the beast's Hit Points. The polymorphed creature's HP
+  // SRD Polymorph — the beast's Hit Points. The polymorphed creature's HP
   // is replaced by this (modeled as `temp_hp`); when it depletes, the form
   // drops. Wild Shape ignores this (it derives temp HP from druid level).
   hp?: number;
@@ -1014,14 +1014,14 @@ export interface Character {
    * Primary / first class — taken at character creation. Single-class
    * characters carry only this. Multiclass characters use it for
    * tie-breaking (e.g. saving-throw profs come from the FIRST class
-   * only per 2024 PHB) and as the display label.
+   * only per SRD) and as the display label.
    *
    * For per-class level lookups, prefer `class_levels` via the
    * `getClassLevels` / `getClassLevel` helpers in `services/multiclass.ts`.
    */
   character_class: string;
   /**
-   * Per-class level breakdown (multiclassing — 2024 PHB Ch. 1). Keys
+   * Per-class level breakdown (multiclassing — SRD Ch. 1). Keys
    * are class names lowercased (`'fighter'`, `'wizard'`); values are
    * the level taken in that class. Sum across all keys should equal
    * `level`. Absent on legacy single-class PCs — `getClassLevels`
@@ -1084,7 +1084,7 @@ export interface Character {
   class_resource_uses: Record<string, number>;
   // True when the character has levelled up to an ASI level and hasn't chosen their improvement yet
   asi_pending: boolean;
-  // 0 = none; 1–6 = exhaustion level per 5e PHB (cumulative penalties)
+  // 0 = none; 1–6 = exhaustion level per SRD (cumulative penalties)
   exhaustion_level: number;
   // Background
   background_id: string | null;
@@ -1097,7 +1097,7 @@ export interface Character {
   // 5e proficiencies (populated at session creation from context tables)
   armor_proficiencies: string[]; // e.g. ['light', 'medium', 'shield']
   weapon_proficiencies: string[]; // e.g. ['simple', 'martial']
-  // 2024 PHB Weapon Mastery — weapon ids the PC has mastered. Class-based
+  // SRD Weapon Mastery — weapon ids the PC has mastered. Class-based
   // grant: Fighter/Paladin/Ranger get 2-3 at L1, Barbarian/Rogue get 2,
   // Wizard/Druid/Bard get 0 by default. Wielding a weapon NOT in this list
   // doesn't grant its mastery property even if the weapon has one.
@@ -1107,14 +1107,14 @@ export interface Character {
   // weapons the player must still pick; generateChoices surfaces the picks and
   // `choose_weapon_mastery` decrements it.
   weapon_mastery_pending?: number;
-  // Bardic Inspiration die granted by a Bard (PHB p.53 / 2024 p.52). The
+  // Bardic Inspiration die granted by a Bard (SRD / 2024 p.52). The
   // die is stored as a dice expression ('d6', 'd8', ...) and consumed on
-  // the next d20 test (attack/save/check). 2024 PHB expands what the die
+  // the next d20 test (attack/save/check). SRD expands what the die
   // can apply to — Pansori applies it to attack-roll consumption today;
   // save consumption follows the Heroic Inspiration pattern.
   bardic_inspiration_die?: string;
   /**
-   * 2024 PHB Divine Smite spell — bonus-action pre-buff. When the
+   * SRD Divine Smite spell — bonus-action pre-buff. When the
    * Paladin casts the spell, this records the number of d8 radiant
    * dice queued for the next weapon-attack hit. Cleared when the
    * next weapon hit consumes the buff (or at the end of the next
@@ -1161,7 +1161,7 @@ export interface Character {
     appliesCondition?: ConditionName;
     conditionSave?: AbilityKey;
   };
-  // 2024 PHB Wild Shape — id of the active BeastForm while wild_shaped.
+  // SRD Wild Shape — id of the active BeastForm while wild_shaped.
   // Cleared on dismiss_wild_shape.
   wild_shape_form?: string;
   // SRD shapeshift SPELLS (Shapechange, Animal Shapes) reuse the `wild_shaped`
@@ -1318,11 +1318,11 @@ export interface Character {
   expertise_skills?: string[]; // skills with double proficiency bonus (Rogue/Bard)
   prepared_spells?: string[]; // spell ids currently prepared (Cleric/Paladin/Druid)
   charmer_id?: string; // entity id of the charmer when charmed
-  // 2024 PHB Mage Armor spell — when active, base AC becomes
+  // SRD Mage Armor spell — when active, base AC becomes
   // 13 + DEX mod (only effective when not wearing body armor).
   // computeTotalAc reads this. Expires on long rest.
   mage_armor_active?: boolean;
-  // 2024 PHB Shield of Faith spell — +2 AC for concentration
+  // SRD Shield of Faith spell — +2 AC for concentration
   // duration (up to 10 min). computeTotalAc reads this. Expires
   // when the caster's concentration drops.
   shield_of_faith_active?: boolean;
@@ -1355,7 +1355,7 @@ export interface Character {
   // duration; pansori clears it defensively on long rest like the
   // other buff flags. The flag is consumed inside `applyDamage`.
   death_ward_active?: boolean;
-  // 2024 PHB movement modes (separate from `speed`, which is the
+  // SRD movement modes (separate from `speed`, which is the
   // walking speed). When non-zero, the character has the matching
   // mode; the engine reads these where the mode changes gameplay.
   // Today the only fully-wired mode is `fly_speed_ft`: gridMove
@@ -1382,7 +1382,7 @@ export interface Character {
   // SRD 5.2.1 p.17–18: Temporary Hit Points. Absorb damage before HP. Don't
   // stack with themselves (replace if higher); expire on a Long Rest.
   temp_hp?: number;
-  // 2024 PHB Heroic Inspiration: granted automatically on a Nat 1 d20.
+  // SRD Heroic Inspiration: granted automatically on a Nat 1 d20.
   // Player can spend it on a later d20 to gain advantage (one-shot).
   inspiration?: boolean;
   // SRD 5.2.1 p.11 — Hide action stores the Stealth check total as the DC
@@ -1391,11 +1391,11 @@ export interface Character {
   // (or active Search) to reveal you before they can target effectively.
   // Cleared when invisible is cleared.
   hide_dc?: number;
-  // 2024 PHB — some conditions track the entity that caused them. Primary
+  // SRD — some conditions track the entity that caused them. Primary
   // use: Frightened can't willingly move closer to its source. Keyed by
   // condition name; cleared whenever the condition is removed.
   condition_sources?: Record<string, string>;
-  // 2024 PHB Species (formerly "race"). Determines size, speed, darkvision,
+  // SRD Species (formerly "race"). Determines size, speed, darkvision,
   // resistances, and innate cantrips. See contexts/srd/species.ts. Optional
   // because pre-species saves still need to load — defaults applied as
   // "Human" when missing.
@@ -1412,7 +1412,7 @@ export interface Character {
 // ─── Reactive spell window ───────────────────────────────────────────────────
 
 // A `pending_reaction` snapshot pauses the enemy-turn loop mid-resolution
-// and gives an eligible PC the chance to spend their reaction (PHB p.190).
+// and gives an eligible PC the chance to spend their reaction (SRD).
 // The engine stores enough state to resume after the player decides:
 //   - resumeFromInitiativeIdx / resumeFromMultiattackIdx: where in the
 //     auto-resolve loop to pick up.
@@ -1424,18 +1424,18 @@ export interface Character {
 // Fields shared by every reaction-window variant: who triggered it, who can
 // react, where to resume the enemy turn loop.
 
-// Shield (PHB p.275). Triggers BEFORE damage applies — accepting negates the
+// Shield (SRD). Triggers BEFORE damage applies — accepting negates the
 // hit retroactively. pendingDamage/pendingNarrative are stashed so a decline
 // can apply them as if Shield was never offered.
 // `PendingShieldReaction` is re-exported from ./shared-types (see src/shared/types.ts).
 
-// Hellish Rebuke (PHB p.252). Triggers AFTER damage applies — accepting deals
+// Hellish Rebuke (SRD). Triggers AFTER damage applies — accepting deals
 // 2d10 fire damage back to the attacker (DEX save for half). No state to
 // stash: the damage that triggered Rebuke is already on the books, and a
 // decline just lets the loop continue.
 // `PendingHellishRebukeReaction` is re-exported from ./shared-types (see src/shared/types.ts).
 
-// Counterspell (PHB p.234). Triggers BEFORE an enemy spell resolves — the
+// Counterspell (SRD). Triggers BEFORE an enemy spell resolves — the
 // engine snapshots the enemy's intent (spell id + level + intended target)
 // so a Counterspell accept can nullify it, and a decline lets the spell
 // fire as normal during the resume.
@@ -1623,7 +1623,7 @@ export interface GameState {
   cutting_words_penalty?: number; // Lore Bard Cutting Words penalty to apply
   round?: number; // current combat round (1-indexed)
 
-  // Reactive spell window (PHB p.190 — reactions). When set, the engine is
+  // Reactive spell window (SRD — reactions). When set, the engine is
   // paused mid-enemy-turn waiting for an eligible PC to decide whether to
   // spend their reaction. While set, generateChoices offers only the
   // reaction choices; the player resolves with `resolve_reaction`.

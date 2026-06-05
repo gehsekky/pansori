@@ -1,4 +1,4 @@
-// 2024 PHB Mass Healing Word (L3 bonus action) and Mass Cure Wounds
+// SRD Mass Healing Word (L3 bonus action) and Mass Cure Wounds
 // (L5 action). Both route through the heal branch's mass-heal path,
 // distributing the rolled heal across all living party members.
 // Pansori MVP heals the whole party (RAW caps at 6 within 30 ft —

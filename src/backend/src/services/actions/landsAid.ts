@@ -1,4 +1,4 @@
-// 2024 PHB Land Druid L3 — Land's Aid.
+// SRD Land Druid L3 — Land's Aid.
 //
 // Channel Nature (2 uses per long rest at L3, more at higher
 // levels per RAW). Pansori MVP: track via

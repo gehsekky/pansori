@@ -1,4 +1,4 @@
-// 2024 PHB Heal (L6). Big single-target heal — 70 HP fixed (+10
+// SRD Heal (L6). Big single-target heal — 70 HP fixed (+10
 // per slot above 6th). Also cures Blinded / Deafened / Poisoned
 // per SRD: "This spell also ends the Blinded, Deafened, and
 // Poisoned conditions on the target." Wired via the new

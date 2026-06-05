@@ -27,7 +27,7 @@ afterEach(() => vi.restoreAllMocks());
 // `ctxWithRage` and `dungeonSeedWithEnemy` live in test-fixtures.ts.
 
 describe('class features', () => {
-  // ── Sorcerer subclasses (PHB Chapter 3) ─────────────────────────────────────
+  // ── Sorcerer subclasses (SRD Chapter 3) ─────────────────────────────────────
 
   it('Sorcerer Draconic Bloodline grants +1 HP per level via select_subclass', async () => {
     const state = makeState({
@@ -61,7 +61,7 @@ describe('class features', () => {
     expect(result.newState.characters[0].max_hp).toBe(30); // unchanged
   });
 
-  // ── Warlock subclasses (PHB Chapter 3) ──────────────────────────────────────
+  // ── Warlock subclasses (SRD Chapter 3) ──────────────────────────────────────
 
   it("Fiend Warlock — Dark One's Blessing: temp HP on kill = level + CHA mod", async () => {
     // CHA 18 (+4) at L3 → grant 7 temp HP on kill. Force a hit + lethal damage.
@@ -211,9 +211,9 @@ describe('class features', () => {
     expect(result.newState.characters[0].temp_hp ?? 0).toBe(0);
   });
 
-  // ── Druid subclasses (PHB p.65-69) ──────────────────────────────────────────
+  // ── Druid subclasses (SRD-69) ──────────────────────────────────────────
 
-  it('Base Druid Wild Shape — temp HP = 2 × druid level (2024 PHB)', async () => {
+  it('Base Druid Wild Shape — temp HP = 2 × druid level (SRD)', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
     const druidId = 'd-base';
     const druid = makeChar({
@@ -356,7 +356,7 @@ describe('class features', () => {
     expect(result.narrative).toMatch(/isn't available/i);
   });
 
-  // ── Monk subclasses (PHB p.79-80) ───────────────────────────────────────────
+  // ── Monk subclasses (SRD-80) ───────────────────────────────────────────
 
   it('Way of the Open Hand — Flurry hits force DEX save or prone', async () => {
     // All rolls high → strikes auto-hit (AC 12), DEX saves auto-pass.
@@ -444,7 +444,7 @@ describe('class features', () => {
     expect(result.narrative).toMatch(/Open Hand:/);
   });
 
-  // ── Barbarian subclasses (PHB p.49-51) ──────────────────────────────────────
+  // ── Barbarian subclasses (SRD-51) ──────────────────────────────────────
 
   it('Path of the Berserker — Frenzy makes a bonus-action melee attack while raging', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.999); // d20 → 20, dmg max
@@ -874,7 +874,7 @@ describe('class features', () => {
     expect(log[0].round).toBeGreaterThan(0);
   });
 
-  // ── Shield (reactive spell, PHB p.275) ──────────────────────────────────────
+  // ── Shield (reactive spell, SRD) ──────────────────────────────────────
 
   it('Shield reaction window opens when enemy hits within [AC, AC+4]', async () => {
     // Enemy attack roll: d20=15, toHit +3 → total 18. PC AC 16 → total in window (16-20).
@@ -1222,7 +1222,7 @@ describe('class features', () => {
     expect(result.newState.pending_reaction).toBeUndefined();
   });
 
-  // ── Hellish Rebuke (reactive spell, PHB p.252) ──────────────────────────────
+  // ── Hellish Rebuke (reactive spell, SRD) ──────────────────────────────
 
   it('Accepting Hellish Rebuke consumes slot + reaction and damages attacker', async () => {
     // Force d20 → max (20) for all rolls so the enemy fails the DEX save and
@@ -1400,7 +1400,7 @@ describe('class features', () => {
     expect(result.newState.pending_reaction).toBeUndefined();
   });
 
-  // ── Counterspell (reactive spell, PHB p.234) ────────────────────────────────
+  // ── Counterspell (reactive spell, SRD) ────────────────────────────────
 
   it('Accepting Counterspell consumes a 3rd-level slot, auto-counters lvl-1 enemy spell', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
@@ -1984,7 +1984,7 @@ describe('class features', () => {
       seed: dungeonSeedWithEnemy,
       context: ctxWithRage,
     });
-    // rageUsesMax(6) = 4 (2024 PHB)
+    // rageUsesMax(6) = 4 (SRD)
     expect(result.newState.characters[0].class_resource_uses.rage_uses).toBe(4);
   });
 

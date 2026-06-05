@@ -1,4 +1,4 @@
-// 2024 PHB Haste (L3 transmutation). Buff a willing creature:
+// SRD Haste (L3 transmutation). Buff a willing creature:
 // Speed doubled, +2 AC, Advantage on Dex saves, +1 limited extra
 // action (deferred in pansori MVP). Concentration drop applies the
 // RAW lethargy: target is Incapacitated until the end of its next

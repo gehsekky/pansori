@@ -539,7 +539,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
     aliases: ['healing potion', 'potion', 'health potion'],
   },
   healers_kit: {
-    // Healer's Kit (2024 PHB) — 10 uses. The Healer feat lets a PC use a
+    // Healer's Kit (SRD) — 10 uses. The Healer feat lets a PC use a
     // charge to heal a creature with the Use-an-Object action. Charges tracked
     // via inventory `count`; the `use_healer_kit` handler decrements.
     id: 'healers_kit',

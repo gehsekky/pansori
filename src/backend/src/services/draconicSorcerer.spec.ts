@@ -1,4 +1,4 @@
-// Draconic Sorcerer Draconic Resilience (2024 PHB). +1 HP per
+// Draconic Sorcerer Draconic Resilience (SRD). +1 HP per
 // sorcerer level — applied retroactively at subclass-select (the
 // existing handleSelectSubclass handles this) AND on every
 // subsequent Sorcerer level-up (this PR's wiring).

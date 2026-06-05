@@ -356,7 +356,7 @@ describe('skillCheck', () => {
 
 // ─── rollDeathSave ───────────────────────────────────────────────────────────
 //
-// PHB rules: nat 20 → regain 1 HP; nat 1 → 2 failures; 10–19 → success;
+// SRD rules: nat 20 → regain 1 HP; nat 1 → 2 failures; 10–19 → success;
 // 2–9 → failure; 3 successes → stable; 3 failures → dead.
 
 describe('rollDeathSave', () => {
@@ -554,7 +554,7 @@ describe('rageDamageBonus(level)', () => {
 });
 
 describe('rageUsesMax(level)', () => {
-  // 2024 PHB rage progression — rebalanced from 2014 (more uses earlier).
+  // SRD rage progression — rebalanced from 2014 (more uses earlier).
   it.each([
     [1, 2],
     [2, 2],

@@ -1,7 +1,7 @@
 // Background machinery — lookup + character-creation grant logic.
 // Existing skill / tool proficiency application lives inline in
 // routes/game.ts (the character creation endpoint). This module
-// covers the 2024 PHB additions: origin feat auto-grant, ability
+// covers the SRD additions: origin feat auto-grant, ability
 // score increase metadata, language grant, supplemental starting
 // equipment.
 //

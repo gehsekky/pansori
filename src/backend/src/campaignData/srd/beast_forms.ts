@@ -1,6 +1,6 @@
 import type { BeastForm } from '../../types.js';
 
-// 2024 PHB Wild Shape "Beast Forms" — a curated list of beast stat blocks
+// SRD Wild Shape "Beast Forms" — a curated list of beast stat blocks
 // the druid can transform into. Each form replaces the druid's attack
 // profile while shifted and applies its trait set.
 //
@@ -10,7 +10,7 @@ import type { BeastForm } from '../../types.js';
 //   - Circle of the Moon druids can pick any form with cr ≤ floor(level/3),
 //     min 1. (i.e. L3-L5 = 1, L6-L8 = 2, L9-L11 = 3, etc.)
 //
-// These match the 2024 PHB Wild Shape progression. Pansori models temp
+// These match the SRD Wild Shape progression. Pansori models temp
 // HP separately (2 × level for base, 3 × level for Moon — see Wild Shape
 // handler in gameEngine.ts).
 

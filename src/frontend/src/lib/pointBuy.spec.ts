@@ -1,4 +1,4 @@
-// Ability-score point-buy math (2024 PHB): 27 points, scores 8–15, with 14/15
+// Ability-score point-buy math (SRD): 27 points, scores 8–15, with 14/15
 // costing extra. The standard array is itself a maxed-out 27-point spread, so
 // it's the natural starting point when the player switches to Point Buy.
 
@@ -6,7 +6,7 @@ import { POINT_BUY_BUDGET, POINT_BUY_COST, STANDARD_ARRAY, pointBuySpent } from 
 import { describe, expect, it } from 'vitest';
 
 describe('point-buy cost table', () => {
-  it('matches the PHB schedule (8→0 … 13→5, 14→7, 15→9)', () => {
+  it('matches the SRD schedule (8→0 … 13→5, 14→7, 15→9)', () => {
     expect(POINT_BUY_COST).toMatchObject({ 8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9 });
   });
 

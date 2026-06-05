@@ -115,7 +115,7 @@ export function runCombatStart(
     };
   }
 
-  // ── Surprise check (PHB p.189) ────────────────────────────────────
+  // ── Surprise check (SRD) ────────────────────────────────────
   // If the party averages a higher Stealth than the highest passive
   // Perception among the enemies, all enemies are surprised for round 1.
   const partyAvgStealth = Math.round(

@@ -1,4 +1,4 @@
-// Tests for the Alert + Savage Attacker origin feats (2024 PHB).
+// Tests for the Alert + Savage Attacker origin feats (SRD).
 // Alert: +prof bonus to Initiative rolls. Savage Attacker: once
 // per turn, weapon-damage hits reroll the damage and take the
 // higher result.

@@ -95,7 +95,7 @@ export const handleResolveReaction: ActionHandler<{
     ctx.narrative = 'No reaction pending.';
     return;
   }
-  // 2024 PHB PC-turn d20 reactions (Heroic Inspiration etc.) carry
+  // SRD PC-turn d20 reactions (Heroic Inspiration etc.) carry
   // `rollerCharId`; save-reroll (Indomitable / Countercharm) carries
   // `reactorCharId` (the bard may differ from the condition-holder). The rest
   // use the enemy-attack-base `targetCharId`.
@@ -110,7 +110,7 @@ export const handleResolveReaction: ActionHandler<{
     return;
   }
 
-  // 2024 PHB PC-turn d20 reaction window. Heroic Inspiration is the
+  // SRD PC-turn d20 reaction window. Heroic Inspiration is the
   // first source; Lucky-RAW (PHB-only feat) and Clockwork Soul Restore
   // Balance will plug into the same shape. Branches early (returns) so
   // the enemy-turn resume below doesn't fire — the PC is still on their
@@ -250,7 +250,7 @@ export const handleResolveReaction: ActionHandler<{
     if (action.accept) {
       const slotsMax = pc.char.spell_slots_max ?? {};
       const slotsUsed = pc.char.spell_slots_used ?? {};
-      // 2024 PHB Tiefling Infernal Legacy — 1/long-rest free racial slot
+      // SRD Tiefling Infernal Legacy — 1/long-rest free racial slot
       // at L3+. Prefer it over a real spell slot.
       const isTieflingInnate =
         pc.char.species === 'tiefling' &&
@@ -333,7 +333,7 @@ export const handleResolveReaction: ActionHandler<{
       ctx.st = { ...ctx.st, pending_reaction: undefined };
     }
   } else if (rx.kind === 'counterspell') {
-    // PHB p.234. Accept = burn a ≥ L3 slot to interrupt. Slot ≥ enemy
+    // SRD. Accept = burn a ≥ L3 slot to interrupt. Slot ≥ enemy
     // spell level auto-counters; otherwise an ability check vs
     // DC 10 + spell level. Decline = enemy spell resolves.
     if (action.accept) {
@@ -401,7 +401,7 @@ export const handleResolveReaction: ActionHandler<{
       ctx.st = { ...ctx.st, pending_reaction: undefined };
     }
   } else if (rx.kind === 'uncanny_dodge') {
-    // PHB Rogue L5. Accept = halve the proposed damage + commit;
+    // SRD Rogue L5. Accept = halve the proposed damage + commit;
     // decline = commit the full proposed snapshot.
     const pendingFragment = rx.pendingFragment as EnemyAttackHitFragment;
     const pendingProposedChar = rx.pendingProposedChar as Character;

@@ -272,7 +272,7 @@ export function runUtilitySpell(
     ctx.narrative += ` Time freezes — ${char.name} will act ${turns} more time${turns === 1 ? '' : 's'} before the world moves again.`;
   }
 
-  // Bless (PHB p.219) — caster picks up to 3 creatures (RAW). Pansori
+  // Bless (SRD) — caster picks up to 3 creatures (RAW). Pansori
   // simplifies: caster + first 2 living non-caster party members are
   // blessed. Each gets +1d4 to attack rolls (saves are a follow-up).
   // Concentration links the buff to the caster — `blessed` clears
@@ -385,7 +385,7 @@ export function runUtilitySpell(
     ctx.narrative += ` Hopeful: ${hopefulNames}.`;
   }
 
-  // 2024 PHB Dimension Door (L4) / Misty Step (L2) — real grid teleport.
+  // SRD Dimension Door (L4) / Misty Step (L2) — real grid teleport.
   // Pansori MVP auto-picks the cell with maximum min-distance to any living
   // enemy (the "safest" cell). The caster's grid entity moves there; movement
   // budget for the turn isn't consumed (RAW: teleport doesn't use movement).

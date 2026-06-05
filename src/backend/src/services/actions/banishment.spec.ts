@@ -1,4 +1,4 @@
-// 2024 PHB Banishment (L4 abjuration). CHA save or the target is
+// SRD Banishment (L4 abjuration). CHA save or the target is
 // banished — sent to a harmless demiplane for the duration. Pansori
 // models this as the `banished` condition + concentration link:
 //   - Enemy turn loop skips banished entities.

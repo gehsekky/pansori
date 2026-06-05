@@ -167,25 +167,25 @@ const defs: ConditionDef[] = [
   // narrative + future enforcement (the per-turn restriction isn't gated yet).
   { id: 'dazed', duration: 1 },
   { id: 'grappled', duration: 1, blocksMovement: true },
-  // 2024 PHB Banishment — target removed from combat to a harmless
+  // SRD Banishment — target removed from combat to a harmless
   // demiplane. Duration is concentration-linked (cleared by the
   // caster's concentration drop via the linked-condition path in
   // breakConcentration). Marked 'permanent' here so tickConditions
   // doesn't auto-expire it round-by-round; the caster's concentration
   // is the actual timer.
   { id: 'banished', duration: 'permanent' },
-  // 2024 PHB Polymorph — target transformed into a beast. Duration
+  // SRD Polymorph — target transformed into a beast. Duration
   // is concentration-linked; the caster's drop reverts the entity
   // via the polymorph_state stash. Same 'permanent' shape as
   // banished so tickConditions doesn't auto-expire it.
   { id: 'polymorphed', duration: 'permanent' },
-  // 2024 PHB Haste — Speed doubled, +2 AC, advantage on Dex saves.
+  // SRD Haste — Speed doubled, +2 AC, advantage on Dex saves.
   // Concentration-linked; cleared on caster's concentration drop +
   // applies the `incapacitated` lethargy condition for one round.
   // Permanent duration here means tickConditions doesn't auto-expire;
   // the caster's concentration is the real timer.
   { id: 'hasted', duration: 'permanent' },
-  // 2024 PHB Slow — Speed halved, -2 AC, -2 Dex saves. Concentration-
+  // SRD Slow — Speed halved, -2 AC, -2 Dex saves. Concentration-
   // linked, cleared on caster's concentration drop. Per RAW the
   // target also repeats the save at the end of each of its turns to
   // throw off the effect — pansori MVP doesn't auto-fire this

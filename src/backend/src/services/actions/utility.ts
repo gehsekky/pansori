@@ -4,7 +4,7 @@ import { posEqual } from '../gridEngine.js';
 import { updatePcActor } from './actor.js';
 
 /**
- * `pass`: skip the rest of the turn. RAW (PHB p.189) — a character can
+ * `pass`: skip the rest of the turn. RAW (SRD) — a character can
  * always choose to take no action. Special-cases stunned/paralyzed in
  * the narrative so the prose explains *why* the turn was forfeited
  * rather than just announcing it. Marks both the action and bonus

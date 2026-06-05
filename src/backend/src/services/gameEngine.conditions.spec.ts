@@ -126,7 +126,7 @@ describe('conditions — new types', () => {
     expect(r3.newState.characters[0].turn_actions.inspiration_pending).toBeFalsy();
   });
 
-  // ── 2024 PHB Weapon Mastery ─────────────────────────────────────────────────
+  // ── SRD Weapon Mastery ─────────────────────────────────────────────────
 
   it('Topple mastery: longsword hit forces CON save or prone', async () => {
     // Force d20=20 to land the attack; enemy d20=1 for the CON save → fail.
@@ -685,7 +685,7 @@ describe('conditions — new types', () => {
     expect(result.newState.characters[0].turn_actions.bonus_action_used).toBe(false);
   });
 
-  // ── Bardic Inspiration (2024 PHB) ──────────────────────────────────────────
+  // ── Bardic Inspiration (SRD) ──────────────────────────────────────────
 
   it('Bard grants Bardic Inspiration — die is stashed on the target ally', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
@@ -786,7 +786,7 @@ describe('conditions — new types', () => {
     expect(newFighter.bardic_inspiration_die).toBeUndefined();
   });
 
-  // ── Heroic Inspiration: 2024 PHB spend on saves ─────────────────────────────
+  // ── Heroic Inspiration: SRD spend on saves ─────────────────────────────
 
   it('spend_inspiration grants advantage on a save vs enemy onHitEffect', async () => {
     // Build a seed where the enemy's attack ALWAYS hits + has an onHitEffect

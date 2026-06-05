@@ -44,7 +44,7 @@ export type PreattackResult =
  *
  * Weapon resolution:
  *  - getItemData lookup on equipped_weapon
- *  - 2024 PHB Beast Form override (Druid Wild Shape uses the form's
+ *  - SRD Beast Form override (Druid Wild Shape uses the form's
  *    natural attack damage)
  *  - Versatile: uses two-handed die when no shield equipped, OR
  *    when wielder has Flex mastery on the weapon (even with shield)
@@ -128,7 +128,7 @@ export function runPreattack(
       )
     : null;
   let weaponDamage = weaponItem?.damage ?? null;
-  // 2024 PHB Beast Forms — while shifted, the form's natural attack
+  // SRD Beast Forms — while shifted, the form's natural attack
   // damage replaces the equipped weapon's. The druid's own to-hit
   // (STR/DEX + prof) still applies — the form's RAW attack bonus is
   // similar in magnitude so the engine's calculated to-hit is a
@@ -147,7 +147,7 @@ export function runPreattack(
   }
   const weaponLabel = weaponItem ? `Your ${weaponItem.name}` : 'Your fists';
 
-  // ── Ammunition check (PHB p.146) ──────────────────────────────────────
+  // ── Ammunition check (SRD) ──────────────────────────────────────
   if (weaponItem?.range === 'ranged' && !weaponItem.thrown) {
     // NOTE: order matters. 'hand_crossbow' includes both 'bow' and
     // 'crossbow' as substrings, so 'crossbow' must be checked first

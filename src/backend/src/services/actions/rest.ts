@@ -14,12 +14,12 @@ import { resetFeatLongRestResources } from '../feats.js';
 import { updatePcActor } from './actor.js';
 
 /**
- * `short_rest`: PHB p.196 — spend Hit Dice to recover HP, refresh
+ * `short_rest`: SRD — spend Hit Dice to recover HP, refresh
  * short-rest class features. One per room (tracked via
  * `short_rested_rooms`) to keep encounter pacing meaningful — players
  * can't infinite-rest mid-dungeon.
  *
- * Each class branch below maps to a 2024 PHB short-rest recharge:
+ * Each class branch below maps to a SRD short-rest recharge:
  * Fighter (Second Wind, Action Surge), Bard L5+ (Bardic Inspiration),
  * Monk (Ki), Druid (Wild Shape; Land subclass also gets Natural
  * Recovery), Cleric/Paladin (Channel Divinity), Battle Master
@@ -140,7 +140,7 @@ export const handleShortRest: ActionHandler<{ type: 'short_rest' }> = (ctx) => {
 };
 
 /**
- * `long_rest`: PHB p.197 — full HP, half-of-level hit dice back, all
+ * `long_rest`: SRD — full HP, half-of-level hit dice back, all
  * spell slots restored, exhaustion -1, all conditions cleared (except
  * exhaustion which only drops by 1). One per session (tracked via
  * `state.long_rested`).
@@ -222,7 +222,7 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
     const humanGrant = c.species === 'human';
     if (c.species === 'orc') delete restoredUses.relentless_endurance_used;
     if (c.species === 'tiefling') delete restoredUses.tiefling_rebuke_used;
-    // 2024 PHB Land Druid Land's Aid uses — refills on long rest.
+    // SRD Land Druid Land's Aid uses — refills on long rest.
     // (RAW: Channel Nature is short-rest, but pansori MVP is
     // long-rest only.)
     if (c.subclass === 'land' && hasClass(c, 'druid')) {
@@ -246,7 +246,7 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
       exhaustion_level: newExhaustion,
       spell_slots_used: {},
       inspiration: humanGrant ? true : c.inspiration,
-      // 2024 PHB Mage Armor — 8-hour duration, ends on long rest.
+      // SRD Mage Armor — 8-hour duration, ends on long rest.
       // Shield of Faith is concentration so it'd normally end well
       // before a rest, but clear defensively.
       mage_armor_active: undefined,
@@ -259,7 +259,7 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
       // /serialization-conscious paths don't carry a useless 0 around.
       revive_d20_penalty:
         (c.revive_d20_penalty ?? 0) > 1 ? (c.revive_d20_penalty ?? 0) - 1 : undefined,
-      // 2024 PHB movement modes — fly is the only one with purely
+      // SRD movement modes — fly is the only one with purely
       // short-duration sources today (the Fly spell). Climb / swim
       // grants come from species traits / subclass features that
       // persist across rests, so they're NOT cleared here.

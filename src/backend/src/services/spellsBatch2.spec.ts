@@ -1,4 +1,4 @@
-// Web, Hold Monster, Suggestion (2024 PHB) — three more spells.
+// Web, Hold Monster, Suggestion (SRD) — three more spells.
 // All use the existing condition-application pattern in
 // castSpell; this spec pins the spell data shape.
 

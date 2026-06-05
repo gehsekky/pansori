@@ -13,9 +13,9 @@ import { maxAttunement } from '../multiclass.js';
 import { updatePcActor } from './actor.js';
 
 /**
- * `attune`: PHB p.138 — bind to a magic item that requires
+ * `attune`: SRD — bind to a magic item that requires
  * attunement. Out-of-combat only. Cap of 3 attuned items per
- * character (PHB rule). De-attunement is implicit on item transfer
+ * character (SRD rule). De-attunement is implicit on item transfer
  * elsewhere.
  */
 export const handleAttune: ActionHandler<{ type: 'attune'; instanceId: string }> = (
@@ -52,7 +52,7 @@ export const handleAttune: ActionHandler<{ type: 'attune'; instanceId: string }>
   }
   updatePcActor(ctx, { attuned_items: [...attunedList, instanceId] });
   let narrative = `You spend a moment focusing on the ${invItem.name}, attuning yourself to its magic. (${attunedList.length + 1}/${attuneCap} attuned items)`;
-  // Cursed items reveal on attunement (PHB p.214). The curse text is
+  // Cursed items reveal on attunement (SRD). The curse text is
   // appended so the player learns about the curse and knows they're
   // bound until remove-curse or equivalent.
   if (lootItem.cursed) {
@@ -62,7 +62,7 @@ export const handleAttune: ActionHandler<{ type: 'attune'; instanceId: string }>
 };
 
 /**
- * `de_attune`: voluntarily end attunement with a magic item (PHB
+ * `de_attune`: voluntarily end attunement with a magic item (SRD
  * p.215 — "If you cease attunement, you spend another short rest..."
  * — Pansori treats this as out-of-combat, no resource cost). Cursed
  * items resist voluntary de-attunement; a Remove Curse / Greater

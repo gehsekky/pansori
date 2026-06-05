@@ -122,7 +122,7 @@ export const SPECIES: FrontendSpecies[] = [
   {
     id: 'goliath',
     name: 'Goliath',
-    desc: 'Mountain-bred giants with otherworldly stamina (new in 2024 PHB).',
+    desc: 'Mountain-bred giants with otherworldly stamina (new in SRD).',
     size: 'medium',
     speedFt: 35,
     traits: [
@@ -134,7 +134,7 @@ export const SPECIES: FrontendSpecies[] = [
   {
     id: 'orc',
     name: 'Orc',
-    desc: 'Bold, durable warriors with primal fury (2024 PHB).',
+    desc: 'Bold, durable warriors with primal fury (SRD).',
     size: 'medium',
     speedFt: 30,
     darkvisionFt: 120,

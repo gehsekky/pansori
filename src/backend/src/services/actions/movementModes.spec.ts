@@ -1,4 +1,4 @@
-// 2024 PHB / SRD 5.2.1 movement modes — per-mode speed fields
+// SRD / SRD 5.2.1 movement modes — per-mode speed fields
 // (fly / swim / climb) on Character + the engine effects:
 //   - gridMove lets a flying PC bypass obstacles + ignore difficult-
 //     terrain cost.

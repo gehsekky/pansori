@@ -108,7 +108,7 @@ export interface ActionContext {
   enemyApproach?: { kind: 'proceed-to-attack' | 'skip-turn'; movementHeaderPrinted: boolean };
 
   /**
-   * 2024 PHB PC-turn d20 reaction window — side-channel for the
+   * SRD PC-turn d20 reaction window — side-channel for the
    * attack-handler orchestrator to detect hit/miss + capture the
    * inputs needed to re-resolve on Heroic Inspiration reroll. Set by
    * resolveOneAttack after each attack; consumed by attack/index.ts

@@ -87,9 +87,9 @@ import { randomUUID } from 'crypto';
 const CONTEXTS: Record<string, Context> = await loadContexts();
 const DEFAULT_CONTEXT = Object.values(CONTEXTS)[0] ?? ({ id: 'none' } as Context);
 
-// 2024 PHB — initial weapon masteries by class. Each listed class starts
+// SRD — initial weapon masteries by class. Each listed class starts
 // with these weapons mastered; non-listed classes don't get the feature.
-// Picks follow common 2024 PHB starting-class examples; the count is
+// Picks follow common SRD starting-class examples; the count is
 // clamped to SRD_WEAPON_MASTERY_SLOTS (Fighter 3 / Barb-Pal-Rang 2 / Rog 1)
 // so we never give a class more masteries than RAW allows.
 // After requireAuth, req.user is guaranteed non-null. Pull the id
@@ -385,7 +385,7 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
           }
         : { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 };
       const bg = ctx.backgrounds?.find((b) => b.id === c.background_id) ?? null;
-      // 2024 PHB — ability-score increases come from the background. The player
+      // SRD — ability-score increases come from the background. The player
       // picks either +2/+1 across two of the three listed abilities (`ability_bonus`)
       // or +1 to all three (omitted); the helper re-validates the split.
       base = applyAbilityScoreIncreases(base, bg?.abilityScoreIncreases ?? [], c.ability_bonus);
@@ -397,7 +397,7 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
         c.class_skills,
         ctx.classSkills?.[c.character_class] ?? []
       );
-      // 2024 PHB species traits — speed, darkvision, resistances, innate
+      // SRD species traits — speed, darkvision, resistances, innate
       // cantrips. Defaults to Human when missing/unknown.
       const speciesId = c.species && SRD_SPECIES[c.species] ? c.species : 'human';
       const speciesData = SRD_SPECIES[speciesId];
@@ -418,7 +418,7 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
 
       const hitDie = ctx.classHitDie[c.character_class] ?? 8;
       const conMod = Math.floor(((base.con ?? 10) - 10) / 2);
-      // 2024 PHB: max hit die + CON mod at level 1. Dwarven Toughness adds +1
+      // SRD: max hit die + CON mod at level 1. Dwarven Toughness adds +1
       // max HP per level. Subclass HP riders (e.g. Sorcerer Draconic
       // Resilience) are granted retroactively by `applySubclass` when the
       // single SRD subclass auto-applies at level 3 — not at creation.
@@ -522,7 +522,7 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
         spells_known: ctx.classSpells?.[c.character_class] ?? [],
         armor_proficiencies: armorProfs,
         weapon_proficiencies: weaponProfs,
-        // 2024 PHB Weapon Mastery — the player-chosen (or default) mastered
+        // SRD Weapon Mastery — the player-chosen (or default) mastered
         // weapons. Classes without the feature get an empty list.
         weapon_masteries: weaponMasteries,
         // 2024 Fighting Style — the Fighter's level-1 pick (chosen or default).
@@ -541,7 +541,7 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
         // longer takes a subclass. The single SRD subclass auto-applies at L3
         // via `applyLevelUpForClass` → `applySubclass`. Heroes start L1 with none.
         subclass: undefined,
-        // 2024 PHB species — seed mechanical traits from the catalog.
+        // SRD species — seed mechanical traits from the catalog.
         species: speciesId,
         speed: speciesData.speedFt,
         darkvision_ft: speciesData.darkvisionFt,
@@ -561,7 +561,7 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
             }
           : {}),
       };
-      // Apply origin feat from background. 2024 PHB grants one origin
+      // Apply origin feat from background. SRD grants one origin
       // feat per background (Acolyte → Magic Initiate, Farmer → Tough,
       // etc.). The feat is auto-applied at creation; no asi_pending
       // is consumed because origin feats don't compete with ASI slots.
@@ -832,7 +832,7 @@ gameRouter.post('/session/:id/equip', async (req: Request, res: Response) => {
   }
 });
 
-// Transfer an item from one party member to another. PHB p.190 lets you
+// Transfer an item from one party member to another. SRD lets you
 // interact with one object per turn free (move + give); we don't gate on
 // action economy here — the inventory UI treats transfers as fluid.
 gameRouter.post('/session/:id/transfer', async (req: Request, res: Response) => {

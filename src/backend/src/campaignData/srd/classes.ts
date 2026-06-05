@@ -8,9 +8,9 @@ import type { AbilityKey } from '../../types.js';
 // diverges from RAW (e.g. a low-magic setting that strips spellcasting
 // from a class), it can override individual entries.
 //
-// Class identifiers use PHB titlecase: 'Fighter', 'Rogue', 'Wizard', etc.
+// Class identifiers use SRD titlecase: 'Fighter', 'Rogue', 'Wizard', etc.
 
-// ─── Hit Dice (PHB 2024 — same as 2014) ──────────────────────────────────────
+// ─── Hit Dice (SRD — same as 2014) ──────────────────────────────────────
 export const SRD_CLASS_HIT_DIE: Record<string, number> = {
   Fighter: 10,
   Rogue: 8,
@@ -26,7 +26,7 @@ export const SRD_CLASS_HIT_DIE: Record<string, number> = {
   Barbarian: 12,
 };
 
-// ─── Armor Proficiencies (PHB 2024 p.50+) ────────────────────────────────────
+// ─── Armor Proficiencies (SRD) ────────────────────────────────────
 export const SRD_CLASS_ARMOR_PROFICIENCIES: Record<string, string[]> = {
   Fighter: ['light', 'medium', 'heavy', 'shield'],
   Rogue: ['light'],
@@ -42,7 +42,7 @@ export const SRD_CLASS_ARMOR_PROFICIENCIES: Record<string, string[]> = {
   Barbarian: ['light', 'medium', 'shield'],
 };
 
-// ─── Weapon Proficiencies (PHB 2024 p.50+) ───────────────────────────────────
+// ─── Weapon Proficiencies (SRD) ───────────────────────────────────
 export const SRD_CLASS_WEAPON_PROFICIENCIES: Record<string, string[]> = {
   Fighter: ['simple', 'martial'],
   Rogue: ['simple', 'martial'],
@@ -58,7 +58,7 @@ export const SRD_CLASS_WEAPON_PROFICIENCIES: Record<string, string[]> = {
   Barbarian: ['simple', 'martial'],
 };
 
-// ─── Saving Throws (PHB 2024 — same as 2014) ─────────────────────────────────
+// ─── Saving Throws (SRD — same as 2014) ─────────────────────────────────
 export const SRD_CLASS_SAVING_THROWS: Record<string, AbilityKey[]> = {
   Fighter: ['str', 'con'],
   Rogue: ['dex', 'int'],
@@ -108,13 +108,13 @@ export const SRD_SPELLCASTING_ABILITY: Record<string, AbilityKey> = {
   Ranger: 'wis',
 };
 
-// ─── Weapon Mastery slots (2024 PHB) ─────────────────────────────────────────
+// ─── Weapon Mastery slots (SRD) ─────────────────────────────────────────
 // Number of weapons a class can "train" with at L1, gaining access to that
 // weapon's Mastery property (e.g. Topple on a maul). Classes not listed here
 // don't get the Weapon Mastery feature. Slot counts scale at higher levels
 // in 2024 RAW (Fighter +1 at L4/L10/L16, etc.); we apply the L1 baseline and
-// extend later when leveling lands. PHB p.45 (Barb), 51 (Fight), 81 (Pal),
-// 89 (Rang), 97 (Rog).
+// extend later when leveling lands. SRD class sections: Barbarian / Fighter /
+// Paladin / Ranger / Rogue.
 export const SRD_WEAPON_MASTERY_SLOTS: Record<string, number> = {
   Barbarian: 2,
   Fighter: 3,

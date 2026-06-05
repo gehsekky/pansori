@@ -9,14 +9,14 @@ import { rollDice } from './rulesEngine.js';
  *   1. Temp HP absorption (SRD 5.2.1 p.17–18). Temp HP soaks damage
  *      before regular HP and is decremented; it doesn't stack with
  *      itself.
- *   2. Exhaustion-4 max-HP halving (PHB p.291). HP can't exceed
+ *   2. Exhaustion-4 max-HP halving (SRD). HP can't exceed
  *      floor(max_hp / 2) while exhaustion ≥ 4; damage that would land
  *      below that is reported as actual loss.
  *   3. Concentration check (SRD 5.2.1 p.203). Any damage taken while
  *      concentrating triggers a CON save against DC max(10, dmg/2).
  *      Failure ends the spell and clears any linked conditions on
  *      allies / enemies.
- *   4. HP floor at 0 — knock-out detection. The 2024 PHB death-saving
+ *   4. HP floor at 0 — knock-out detection. The SRD death-saving
  *      path stays in the caller (different sources narrate the
  *      transition differently — trap "you collapse" vs. spell
  *      "incinerates you"); this helper just reports `knockedOut: true`.
@@ -158,7 +158,7 @@ export function applyDamage(
     concentrationSaveReroll = conc.deferredReroll;
   }
 
-  // 2024 PHB — a creature reduced to 0 HP without being killed
+  // SRD — a creature reduced to 0 HP without being killed
   // outright becomes Unconscious. Inflict the condition here so
   // every damage path (enemy attacks, traps, falling, mystery
   // consumables, OA) consistently transitions to the right
@@ -198,7 +198,7 @@ export function applyDamage(
 }
 
 /**
- * 2024 PHB falling damage. 1d6 bludgeoning per 10 feet fallen,
+ * SRD falling damage. 1d6 bludgeoning per 10 feet fallen,
  * capped at 20d6 (terminal velocity at 200 ft). The creature lands
  * prone if it takes damage from the fall (and survives) — falls of
  * 0 ft or less are no-ops.

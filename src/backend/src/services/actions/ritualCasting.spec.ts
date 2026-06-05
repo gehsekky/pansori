@@ -1,4 +1,4 @@
-// 2024 PHB Ritual Casting (Chapter 3). Spells tagged with
+// SRD Ritual Casting (Chapter 3). Spells tagged with
 // `ritualCasting: true` can be cast as a 10-minute ritual without
 // expending a slot, out of combat. Pansori models the 10-minute
 // time cost as "out of combat" (no finer-grained time axis).

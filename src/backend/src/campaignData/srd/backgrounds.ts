@@ -53,7 +53,7 @@ export const SRD_BACKGROUNDS: Record<string, Background> = {
     feature: 'Researcher',
     featureDesc: 'If you do not know information, you know where to find it.',
     abilityScoreIncreases: ['con', 'int', 'wis'],
-    // 2024 PHB: Sage gets Magic Initiate (Wizard / Arcane list). Cantrips +
+    // SRD: Sage gets Magic Initiate (Wizard / Arcane list). Cantrips +
     // the L1 choice come from the FE spell picker; the BE re-validates them.
     originFeat: 'magic_initiate_arcane',
     language: 'Common',
@@ -67,7 +67,7 @@ export const SRD_BACKGROUNDS: Record<string, Background> = {
     feature: 'Shelter of the Faithful',
     featureDesc: 'You and your companions can receive healing and care at temples.',
     abilityScoreIncreases: ['int', 'wis', 'cha'],
-    // 2024 PHB: Acolyte gets Magic Initiate (Cleric / Divine list).
+    // SRD: Acolyte gets Magic Initiate (Cleric / Divine list).
     originFeat: 'magic_initiate_divine',
     language: 'Celestial',
   },

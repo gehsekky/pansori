@@ -92,7 +92,7 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
     deferStrokeOfLuck: true,
   };
 
-  // 2024 PHB Heroic Inspiration post-roll reaction window — snapshot
+  // SRD Heroic Inspiration post-roll reaction window — snapshot
   // the pre-attack state so the reaction resolver can rewind on accept
   // (the resolver re-runs this attack with a forced d20).
   const preAttackChar = pc.char;
@@ -101,7 +101,7 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
   // ── First attack ─────────────────────────────────────────────────────
   const killed = resolveOneAttack(ctx, atkCtx, '');
 
-  // 2024 PHB Heroic Inspiration post-roll pause. SRD: "expend it to
+  // SRD Heroic Inspiration post-roll pause. SRD: "expend it to
   // reroll any die immediately after rolling it, and you must use the
   // new roll." Pansori MVP surfaces the prompt only on a missed
   // attack — RAW would also let you reroll a hit for crit chasing,

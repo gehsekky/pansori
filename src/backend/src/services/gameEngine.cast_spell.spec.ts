@@ -243,7 +243,7 @@ describe('cast_spell — Misty Step (level 2, bonus action, utility)', () => {
   });
 });
 
-// ─── Bless (PHB p.219) — concentration buff, +1d4 to attack rolls ────────────
+// ─── Bless (SRD) — concentration buff, +1d4 to attack rolls ────────────
 //
 // The Vale Crypt Lord log showed Bless casting a flavorful narrative but
 // the +1d4 never appeared in subsequent Rogue attack notes. Bless now

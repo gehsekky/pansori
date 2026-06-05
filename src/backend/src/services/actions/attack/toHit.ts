@@ -102,7 +102,7 @@ export function computeToHitContext(
   const pc = ctx.actor;
   const { target, targetId, weaponItem } = pre;
 
-  // Armor proficiency check (PHB p.144): non-proficient armor → disadv on
+  // Armor proficiency check (SRD): non-proficient armor → disadv on
   // STR/DEX attack rolls.
   const equippedArmorLootItem = equippedArmorId(pc.char)
     ? ctx.context.lootTable.find(
@@ -119,7 +119,7 @@ export function computeToHitContext(
     weaponItem?.weaponType
   );
 
-  // 2024 PHB ranged-in-melee disadvantage: only applies when a
+  // SRD ranged-in-melee disadvantage: only applies when a
   // non-incapacitated enemy is within 5 ft of the attacker. Previously
   // pansori applied the penalty to every ranged attack — making bows
   // strictly worse than melee in any combat. The grid + condition
@@ -157,7 +157,7 @@ export function computeToHitContext(
   const enemyProne = enemyEntity2?.conditions.includes('prone') ?? false;
   const enemyParalyzed = enemyEntity2?.conditions.includes('paralyzed') ?? false;
   const enemyUnconscious = enemyEntity2?.conditions.includes('unconscious') ?? false;
-  // 2024 PHB Faerie Fire — attacks against an outlined creature
+  // SRD Faerie Fire — attacks against an outlined creature
   // have advantage.
   const enemyFaerieFired = enemyEntity2?.conditions.includes('faerie_fired') ?? false;
   // SRD Blinded — attack rolls against a Blinded creature have Advantage
@@ -170,7 +170,7 @@ export function computeToHitContext(
   const proneAdv = enemyProne && weaponItem?.range !== 'ranged';
   const proneDisadv = enemyProne && weaponItem?.range === 'ranged';
 
-  // Thrown weapon beyond normal range: disadvantage (PHB p.147)
+  // Thrown weapon beyond normal range: disadvantage (SRD)
   let thrownLongRangeDisadv = false;
   if (weaponItem?.thrown && ctx.st.entities) {
     const charEnt = ctx.st.entities.find((e) => e.id === pc.char.id);
@@ -231,7 +231,7 @@ export function computeToHitContext(
     }
   }
 
-  // 2024 PHB Vex weapon mastery — previous hit with a Vex weapon by this
+  // SRD Vex weapon mastery — previous hit with a Vex weapon by this
   // char on this target grants advantage on the next attack. Consume the
   // tag immediately (RAW: lasts until end of your next turn, but for our
   // single-attack action model, one-shot is closer to what players expect).
@@ -250,7 +250,7 @@ export function computeToHitContext(
     };
   }
 
-  // 2024 PHB Fighter L13 Studied Attacks — same shape as Vex but seeded by
+  // SRD Fighter L13 Studied Attacks — same shape as Vex but seeded by
   // a *miss* on a prior turn (mark applied in the miss branch below).
   const studyTag = `studied_by_${pc.char.id}`;
   const studyAdv = !!ctx.st.entities?.find(

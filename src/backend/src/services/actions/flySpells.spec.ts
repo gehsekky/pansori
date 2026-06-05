@@ -1,4 +1,4 @@
-// 2024 PHB Fly (L3) and Levitate (L2). Both set fly_speed_ft on the
+// SRD Fly (L3) and Levitate (L2). Both set fly_speed_ft on the
 // target via the buff path; concentration drop clears it. Pansori
 // approximates "vertical-only" Levitate as a 20 ft flying speed
 // (the implied movement budget) and full Fly as 60 ft.

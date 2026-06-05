@@ -11,7 +11,7 @@ import type { Spell } from '../../types.js';
 //   - add campaign-specific spells (`spellTable: { ...SRD_SPELLS, my_spell }`)
 //   - override an SRD spell (same id wins in the campaign's local entry)
 //
-// Spell IDs match the SRD 5.2.1 / 2014 PHB names where possible. Damage and
+// Spell IDs match the SRD 5.2.1 / SRD names where possible. Damage and
 // upcast formulas follow RAW unless a flavour note documents the change.
 
 export const SRD_SPELLS: Record<string, Spell> = {
@@ -305,7 +305,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     name: 'Vicious Mockery',
     level: 0,
     castTime: 'action',
-    // 2024 PHB Bard cantrip — psychic damage + WIS save or disadvantage on
+    // SRD Bard cantrip — psychic damage + WIS save or disadvantage on
     // its next attack. Damage scales like a standard cantrip.
     damage: '1d6',
     upcastBonus: '1d6',
@@ -315,7 +315,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     rangeKind: 'ranged',
     rangeFt: 60,
     desc: 'Hurl insults at a creature. WIS save or take 1d6 psychic damage (scales with level).',
-    // Bard is on the arcane list in 2024 PHB.
+    // Bard is on the arcane list in SRD.
     spellList: ['arcane'],
   },
   // SRD: Poison Spray — ranged spell attack, single target, 1d12 poison.
@@ -824,7 +824,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     name: 'Cure Wounds',
     level: 1,
     castTime: 'action',
-    // 2024 PHB: 2d8 + spellcasting modifier (was 1d8 + mod in 2014). Engine
+    // SRD: 2d8 + spellcasting modifier (was 1d8 + mod in 2014). Engine
     // adds the casting-stat mod on top of this roll.
     heal: '2d8',
     upcastBonus: '2d8',
@@ -837,7 +837,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
         '{name} breathes a quiet prayer and touches {target} — {spell}{slotNote}',
       ],
     },
-    // Bard / Cleric / Druid / Paladin / Ranger list (2024 PHB).
+    // Bard / Cleric / Druid / Paladin / Ranger list (SRD).
     spellList: ['arcane', 'divine', 'primal'],
   },
   healing_word: {
@@ -845,13 +845,13 @@ export const SRD_SPELLS: Record<string, Spell> = {
     name: 'Healing Word',
     level: 1,
     castTime: 'bonus_action',
-    // 2024 PHB: 2d4 + spellcasting modifier (was 1d4 + mod in 2014).
+    // SRD: 2d4 + spellcasting modifier (was 1d4 + mod in 2014).
     heal: '2d4',
     upcastBonus: '2d4',
     rangeKind: 'ranged',
     rangeFt: 60,
     desc: 'A creature of your choice regains HP. Bonus action.',
-    // Bard / Cleric / Druid (2024 PHB).
+    // Bard / Cleric / Druid (SRD).
     spellList: ['arcane', 'divine', 'primal'],
   },
   // SRD: Lesser Restoration — L2 Abjuration, bonus action, touch.
@@ -999,7 +999,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
   shield: {
     id: 'shield',
     name: 'Shield',
-    // PHB p.275 — abjuration, 1st-level. "When you are hit by an attack or
+    // SRD — abjuration, 1st-level. "When you are hit by an attack or
     // targeted by the magic missile spell, you can cast this spell as a
     // reaction to gain +5 AC until the start of your next turn."
     desc: 'A reaction that grants +5 AC until the start of your next turn against the triggering attack and any others.',
@@ -1011,7 +1011,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
   hellish_rebuke: {
     id: 'hellish_rebuke',
     name: 'Hellish Rebuke',
-    // PHB p.252 — evocation, 1st-level. "1 reaction, which you take in
+    // SRD — evocation, 1st-level. "1 reaction, which you take in
     // response to being damaged by a creature within 60 feet of you that
     // you can see. The creature takes 2d10 fire damage on a failed Dex
     // save, or half as much on a successful one." Warlock spell.
@@ -1037,7 +1037,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     desc: 'Concentration. Allies gain +1d4 to attack rolls and saving throws.',
     rangeKind: 'ranged',
     rangeFt: 30,
-    // Cleric / Paladin (2024 PHB).
+    // Cleric / Paladin (SRD).
     spellList: ['divine'],
   },
   // SRD: Bane — the inverse of Bless. Three target enemies CHA save
@@ -1249,7 +1249,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     pushFt: 10,
     desc: 'A 15-ft cube of thunderous force erupts from you. Each creature makes a CON save — 2d8 thunder (half on a success); on a failure it is also pushed 10 ft away.',
     rangeKind: 'self',
-    // Bard / Druid / Sorcerer / Wizard (2024 PHB).
+    // Bard / Druid / Sorcerer / Wizard (SRD).
     spellList: ['arcane', 'primal'],
   },
   gust_of_wind: {
@@ -1269,7 +1269,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     pushFt: 15,
     desc: 'A 60-ft line of strong wind blasts from you. Each creature in the line makes a STR save or is pushed 15 ft away (Concentration, up to 1 min).',
     rangeKind: 'self',
-    // Druid / Ranger / Sorcerer / Wizard (2024 PHB).
+    // Druid / Ranger / Sorcerer / Wizard (SRD).
     spellList: ['primal', 'arcane'],
   },
   burning_hands: {
@@ -1305,7 +1305,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     rangeKind: 'ranged',
     rangeFt: 90,
     desc: 'Grasping weeds restrain creatures in a 20-ft area.',
-    // Druid / Ranger (2024 PHB).
+    // Druid / Ranger (SRD).
     spellList: ['primal'],
   },
   mage_armor: {
@@ -1441,7 +1441,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
         '{name} weaves {spell}{slotNote}; pale blue flames trace the silhouettes of every creature in the area',
       ],
     },
-    // Bard / Druid (2024 PHB).
+    // Bard / Druid (SRD).
     spellList: ['arcane', 'primal'],
   },
   charm_person: {
@@ -1456,7 +1456,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     rangeKind: 'ranged',
     rangeFt: 30,
     desc: 'A humanoid you can see is charmed for 1 hour on failed WIS save.',
-    // Bard / Druid / Sorcerer / Warlock / Wizard (2024 PHB).
+    // Bard / Druid / Sorcerer / Warlock / Wizard (SRD).
     spellList: ['arcane', 'primal'],
   },
   sleep: {
@@ -1476,7 +1476,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     rangeKind: 'ranged',
     rangeFt: 90,
     desc: 'Sends creatures into a magical slumber (5d8 HP pool).',
-    // Bard / Sorcerer / Wizard (2024 PHB).
+    // Bard / Sorcerer / Wizard (SRD).
     spellList: ['arcane'],
   },
   hex: {
@@ -1497,7 +1497,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     id: 'divine_smite_spell',
     name: 'Divine Smite',
     level: 1,
-    // 2024 PHB — bonus-action cast. The spell doesn't deal damage on
+    // SRD — bonus-action cast. The spell doesn't deal damage on
     // its own; it pre-buffs the caster so the next successful weapon
     // attack within 1 minute / before the end of the next turn adds
     // +2d8 radiant (upcast +1d8 per level above 1).
@@ -1938,7 +1938,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     desc: 'Target must make a WIS save or be paralyzed for up to 3 rounds (Concentration).',
     rangeKind: 'ranged',
     rangeFt: 60,
-    // Bard / Cleric / Druid / Sorcerer / Warlock / Wizard (2024 PHB).
+    // Bard / Cleric / Druid / Sorcerer / Warlock / Wizard (SRD).
     spellList: ['arcane', 'divine', 'primal'],
   },
   // SRD: Dominate Beast / Person / Monster — one creature makes a WIS save (with
@@ -2020,7 +2020,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
         '{name} weaves {spell}{slotNote} into a sticky lattice that fills the chamber',
       ],
     },
-    // Sorcerer / Wizard (2024 PHB).
+    // Sorcerer / Wizard (SRD).
     spellList: ['arcane'],
   },
   suggestion: {
@@ -2042,7 +2042,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
         '{name} murmurs {spell}{slotNote} — honeyed words wind around {target}',
       ],
     },
-    // Bard / Sorcerer / Warlock / Wizard (2024 PHB).
+    // Bard / Sorcerer / Warlock / Wizard (SRD).
     spellList: ['arcane'],
   },
   misty_step: {
@@ -2053,7 +2053,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     narrative: 'You vanish in a puff of silver mist and reappear nearby.',
     desc: 'Surrounded by silver mist, you teleport up to 30 feet.',
     rangeKind: 'self',
-    // Sorcerer / Warlock / Wizard (2024 PHB). Druid also has it.
+    // Sorcerer / Warlock / Wizard (SRD). Druid also has it.
     spellList: ['arcane', 'primal'],
   },
   // SRD: Spiritual Weapon (L2) — a floating force weapon (1 minute, NO
@@ -2472,7 +2472,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
   counterspell: {
     id: 'counterspell',
     name: 'Counterspell',
-    // PHB p.234 — abjuration, 3rd-level. "1 reaction, which you take when
+    // SRD — abjuration, 3rd-level. "1 reaction, which you take when
     // you see a creature within 60 feet of you casting a spell. The
     // creature's spell fails and has no effect if it is of 3rd level or
     // lower. If it is 4th level or higher, make an ability check using
@@ -2483,7 +2483,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     castTime: 'reaction',
     rangeKind: 'ranged',
     rangeFt: 60,
-    // Sorcerer / Warlock / Wizard (2024 PHB).
+    // Sorcerer / Warlock / Wizard (SRD).
     spellList: ['arcane'],
   },
   fireball: {
@@ -2538,7 +2538,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     name: 'Spirit Guardians',
     level: 3,
     castTime: 'action',
-    // 2024 PHB Cleric L3 — a 15-ft radius aura around the caster. Hostile
+    // SRD Cleric L3 — a 15-ft radius aura around the caster. Hostile
     // creatures in the area take 3d8 radiant (WIS save halves). Now a RE-4
     // caster-following persistent zone: the aura is centered on the caster and
     // recomputed from their cell each round (so it moves with them), ticking on
@@ -2759,7 +2759,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
         "{name} casts {spell}{slotNote}; {target}'s limbs lock as if frozen mid-motion",
       ],
     },
-    // Bard / Sorcerer / Warlock / Wizard (2024 PHB).
+    // Bard / Sorcerer / Warlock / Wizard (SRD).
     spellList: ['arcane'],
   },
   inflict_wounds: {
@@ -2767,7 +2767,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     name: 'Inflict Wounds',
     level: 1,
     castTime: 'action',
-    // 2024 PHB Cleric/Warlock L1 — touch spell, attack roll, big up-front
+    // SRD Cleric/Warlock L1 — touch spell, attack roll, big up-front
     // necrotic damage.
     damage: '2d10',
     upcastBonus: '2d10',
@@ -2779,7 +2779,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     spellList: ['arcane', 'divine'],
   },
 
-  // ── Ritual spells (2024 PHB Chapter 3, Ritual tag) ───────────────────
+  // ── Ritual spells (SRD Chapter 3, Ritual tag) ───────────────────
   // RAW: a ritual spell can be cast normally (action + slot) OR as a
   // ritual (10 min, no slot, out of combat). Pansori models the
   // 10-minute time cost as "out of combat" — the engine doesn't have
@@ -2826,7 +2826,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     spellList: ['arcane'],
   },
 
-  // ── Flight & movement-mode spells (PHB 2024 Chapter 3) ────────────────
+  // ── Flight & movement-mode spells (SRD Chapter 3) ────────────────
   // These two spells set fly_speed_ft on the target via the buff path
   // (see castSpell/buff.ts spell-id check). Concentration drop clears
   // the flag in breakConcentration (gameEngine.ts).
@@ -2858,7 +2858,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     spellList: ['arcane'],
   },
 
-  // ── Multi-target heals (PHB 2024 Chapter 3) ──────────────────────────
+  // ── Multi-target heals (SRD Chapter 3) ──────────────────────────
   // Route through the new `multiTargetHeal` branch in castSpell —
   // distributes the rolled heal across all living party members
   // (pansori MVP: party-wide, not RAW's "up to 6 within 30 ft").
@@ -2928,7 +2928,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     spellList: ['divine', 'primal'],
   },
 
-  // 2024 PHB Banishment (L4 abjuration). Send a creature to a
+  // SRD Banishment (L4 abjuration). Send a creature to a
   // harmless demiplane on a failed CHA save. The banished target is
   // removed from combat — enemy-turn loop skips them, player attack
   // selection filters them out. Concentration drop returns them
@@ -2954,7 +2954,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     spellList: ['arcane', 'divine'],
   },
 
-  // 2024 PHB Polymorph (L4 transmutation). Target makes a WIS save or
+  // SRD Polymorph (L4 transmutation). Target makes a WIS save or
   // is transformed into a small beast for the duration. Pansori MVP
   // auto-picks 'Wolf' (CR 1/4, 11 HP, 2d4+2 bite) as the form for
   // every successful polymorph. RAW lets the caster pick a beast with
@@ -2982,7 +2982,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     spellList: ['arcane', 'primal'],
   },
 
-  // 2024 PHB Slow (L3 transmutation). Up to 6 creatures in a 40-ft
+  // SRD Slow (L3 transmutation). Up to 6 creatures in a 40-ft
   // cube make a WIS save or are slowed for the duration. Pansori MVP
   // hits a single target via the existing save+condition path (RAW
   // multi-target deferred).
@@ -3011,7 +3011,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     saveEffect: 'negates',
     condition: 'slowed',
     conditionDuration: 100,
-    // 2024 PHB — the target repeats the WIS save at the end of each of its turns,
+    // SRD — the target repeats the WIS save at the end of each of its turns,
     // ending the spell on itself on a success.
     conditionSaveEnds: true,
     desc: 'Up to six creatures in a 40 ft cube make a WIS save or are slowed for 1 minute (Speed halved, -2 AC, -2 Dex saves). Each repeats the save at the end of its turn, ending it on a success.',
@@ -3021,7 +3021,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     spellList: ['arcane'],
   },
 
-  // 2024 PHB Haste (L3 transmutation). Buff a willing creature
+  // SRD Haste (L3 transmutation). Buff a willing creature
   // for concentration up to 1 minute: Speed doubled, +2 AC,
   // advantage on Dex saves, and one extra action per turn (limited
   // to Attack-one / Dash / Disengage / Hide / Utilize). When the
@@ -3055,7 +3055,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     spellList: ['arcane'],
   },
 
-  // 2024 PHB Dimension Door (L4 conjuration). Teleport up to 500 ft
+  // SRD Dimension Door (L4 conjuration). Teleport up to 500 ft
   // to an unoccupied space. Pansori treats the grid as effectively
   // "within range" since rooms are smaller than 500 ft. New castSpell
   // branch auto-picks the cell with maximum min-distance to any
@@ -4180,7 +4180,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     rangeKind: 'ranged',
     rangeFt: 30,
     desc: 'One creature you can see makes a WIS save (with Advantage if it is fighting you). On a failure it is Charmed and Friendly to you for 1 hour. The +1-target upcast and damage-ends-the-charm rider are deferred.',
-    // Bard / Druid / Sorcerer / Warlock / Wizard (2024 PHB).
+    // Bard / Druid / Sorcerer / Warlock / Wizard (SRD).
     spellList: ['arcane', 'primal'],
   },
 

@@ -178,7 +178,7 @@ export function canReact(char: {
   return true;
 }
 
-// PHB proficiency bonus table
+// SRD proficiency bonus table
 export function profBonus(level: number | undefined): number {
   return Math.ceil((level ?? 1) / 4) + 1;
 }
@@ -246,8 +246,8 @@ interface AttackResult {
 }
 
 // Player attacks an enemy. Finesse weapons use whichever of STR/DEX is higher.
-// Advantage and disadvantage both present → they cancel out (5e PHB p.173).
-// weaponProficient=false omits proficiency bonus (PHB p.147: no profBonus without proficiency).
+// Advantage and disadvantage both present → they cancel out (SRD p.173).
+// weaponProficient=false omits proficiency bonus (SRD: no profBonus without proficiency).
 // ranged=true forces DEX for attack and damage (overrides finesse logic).
 export function resolvePlayerAttack(
   player: PlayerStats,
@@ -261,7 +261,7 @@ export function resolvePlayerAttack(
   critThreshold = 20,
   attackBonus = 0,
   halflingLucky = false,
-  // 2024 PHB Heroic Inspiration / Lucky-RAW reroll — when set, the
+  // SRD Heroic Inspiration / Lucky-RAW reroll — when set, the
   // function skips the internal d20 generation and uses this value
   // as the (single) roll instead. RAW for Heroic Inspiration says
   // "you must use the new roll" — no advantage/disadvantage logic,
@@ -288,7 +288,7 @@ export function resolvePlayerAttack(
     const netAdv = advantage && !disadvantage;
     const netDisadv = disadvantage && !advantage;
     roll = netDisadv ? Math.min(roll1, d(20)) : netAdv ? Math.max(roll1, d(20)) : roll1;
-    // 2024 PHB Halfling Lucky — re-roll a Nat 1 on a d20 once; take the new
+    // SRD Halfling Lucky — re-roll a Nat 1 on a d20 once; take the new
     // result. Applies to the final kept roll (after advantage/disadvantage).
     if (halflingLucky && roll === 1) roll = d(20);
   }
@@ -346,7 +346,7 @@ export function resolvePlayerAttack(
   };
 }
 
-// Two-weapon fighting: off-hand attack gets no ability modifier to damage (PHB p.195)
+// Two-weapon fighting: off-hand attack gets no ability modifier to damage (SRD)
 export function resolveOffHandAttack(
   player: PlayerStats,
   weaponDamage: string | null,
@@ -367,7 +367,7 @@ export function resolveOffHandAttack(
   const netDisadv = disadvantage && !advantage;
   const roll = netDisadv ? Math.min(roll1, d(20)) : netAdv ? Math.max(roll1, d(20)) : roll1;
   const total = roll + atkMod + prof;
-  // Off-hand damage: NO ability modifier added (PHB p.195)
+  // Off-hand damage: NO ability modifier added (SRD)
   if (roll === 1)
     return {
       hit: false,
@@ -429,7 +429,7 @@ interface EnemyStats {
 }
 
 // Enemy attacks the player. Advantage rolls 2d20 keep higher; disadvantage keeps lower.
-// Advantage + disadvantage cancel per 5e PHB p.173.
+// Advantage + disadvantage cancel per SRD p.173.
 export function resolveEnemyAttack(
   enemy: EnemyStats,
   playerAC: number,
@@ -463,7 +463,7 @@ export function canEquipWeapon(combatActive: boolean, turnActions?: TurnActions)
   } as const;
 }
 
-// Shields cost 1 action to don/doff (PHB). We block in combat for simplicity.
+// Shields cost 1 action to don/doff (SRD). We block in combat for simplicity.
 export function canDonShield(combatActive: boolean) {
   if (!combatActive) return { allowed: true } as const;
   return {
@@ -472,7 +472,7 @@ export function canDonShield(combatActive: boolean) {
   } as const;
 }
 
-// Don/doff times per 5e PHB: light 1 min, medium 5 min, heavy 10 min.
+// Don/doff times per SRD: light 1 min, medium 5 min, heavy 10 min.
 // None of these can be done in combat.
 const DON_TIME: Record<string, string> = {
   light: '1 minute',
@@ -489,7 +489,7 @@ export function canDonArmor(combatActive: boolean, armorCategory: string) {
   } as const;
 }
 
-// 5e PHB p.144: non-proficient armor → disadvantage on STR/DEX checks and attack rolls, cannot cast spells
+// SRD p.144: non-proficient armor → disadvantage on STR/DEX checks and attack rolls, cannot cast spells
 export function hasArmorProficiency(
   armorProficiencies: string[],
   armorCategory: string | undefined
@@ -498,7 +498,7 @@ export function hasArmorProficiency(
   return armorProficiencies.includes(armorCategory);
 }
 
-// 5e PHB p.147: non-proficient weapon → no proficiency bonus added to attack rolls
+// SRD p.147: non-proficient weapon → no proficiency bonus added to attack rolls
 export function hasWeaponProficiency(
   weaponProficiencies: string[],
   weaponType: string | undefined
@@ -650,7 +650,7 @@ export function rollConditionSave(
   }
   const prof = proficient ? profBonus(level) : 0;
   const cover = ability === 'dex' ? coverDexBonus : 0;
-  // 2024 PHB Slow — slowed creature has a -2 penalty to Dex saves.
+  // SRD Slow — slowed creature has a -2 penalty to Dex saves.
   // Stacks linearly with proficiency / cover. Pansori MVP applies
   // only on Dex saves (RAW: "−2 penalty to ... Dexterity saving
   // throws"); other saves unaffected.
@@ -660,12 +660,12 @@ export function rollConditionSave(
   // throw"). Rolled fresh on each save, mirror of the toHit baneRoll.
   const baneRoll = targetConditions.includes('baned') ? d(4) : 0;
   // Save disadvantage from conditions (e.g. restrained → DEX saves). Advantage
-  // and disadvantage cancel — see 2024 PHB advantage/disadvantage rules.
+  // and disadvantage cancel — see SRD advantage/disadvantage rules.
   // `extraDisadvantage` covers any caller-supplied source (e.g. heavy
-  // encumbrance giving disadv on STR/DEX/CON saves per 2024 PHB).
+  // encumbrance giving disadv on STR/DEX/CON saves per SRD).
   const disadv = disadvantageOnSave(targetConditions, ability) || extraDisadvantage;
-  // 2024 PHB Haste — "the target has Advantage on Dexterity saving
-  // throws." Caller advantage wins by 2024 PHB stacking rules, so OR
+  // SRD Haste — "the target has Advantage on Dexterity saving
+  // throws." Caller advantage wins by SRD stacking rules, so OR
   // these together rather than threading a separate parameter.
   const hasteAdv = ability === 'dex' && targetConditions.includes('hasted');
   // SRD Beacon of Hope — hopeful creatures have advantage on WIS
@@ -713,13 +713,13 @@ export function resolveMysteryConsumable(): { result: 'heal' | 'hurt' | 'none'; 
 
 // ─── Passive checks ───────────────────────────────────────────────────────────
 
-// Passive Perception DC an enemy presents: 10 + WIS modifier (PHB p.175)
+// Passive Perception DC an enemy presents: 10 + WIS modifier (SRD)
 export function passivePerceptionDC(enemyWisdom: number): number {
   return 10 + abilityMod(enemyWisdom);
 }
 
 /**
- * 2024 PHB lighting & vision (PHB p.190).
+ * SRD lighting & vision (SRD).
  *
  * Each cell / room has one of three light levels:
  *   - bright: normal vision; no effect.
@@ -846,7 +846,7 @@ export function skillCheck(
   const netAdv = advantage && !disadvantage;
   const netDisadv = disadvantage && !advantage;
   let roll = netDisadv ? Math.min(roll1, d(20)) : netAdv ? Math.max(roll1, d(20)) : roll1;
-  // 2024 PHB Halfling Lucky — re-roll a Nat 1, take the new result.
+  // SRD Halfling Lucky — re-roll a Nat 1, take the new result.
   if (halflingLucky && roll === 1) roll = d(20);
   // Reliable Talent floors the (post-reroll) die at 10 on a proficient check.
   if (reliableTalent && proficient && roll < 10) roll = 10;
@@ -876,7 +876,7 @@ export function skillCheck(
 
 // ─── Class features ───────────────────────────────────────────────────────────
 
-// Sneak Attack dice expression (Rogue PHB p.96): ⌈level/2⌉ d6
+// Sneak Attack dice expression (Rogue SRD): ⌈level/2⌉ d6
 export function sneakAttackDice(level: number): string {
   return `${Math.ceil(level / 2)}d6`;
 }
@@ -897,7 +897,7 @@ export function extraAttackCount(cls: string, level: number): number {
   return 0;
 }
 
-// Barbarian Rage damage bonus (2024 PHB) — applies to STR-based melee attacks.
+// Barbarian Rage damage bonus (SRD) — applies to STR-based melee attacks.
 // Same progression as 2014: +2 / +3 / +4 at L1/L9/L16.
 export function rageDamageBonus(level: number): number {
   if (level >= 16) return 4;
@@ -905,8 +905,8 @@ export function rageDamageBonus(level: number): number {
   return 2;
 }
 
-// Rage uses per long rest (2024 PHB).
-// 2024 PHB progression rebalanced upward at lower levels compared to 2014.
+// Rage uses per long rest (SRD).
+// SRD progression rebalanced upward at lower levels compared to 2014.
 // 2024: L1-2=2, L3-5=3, L6-11=4, L12-16=5, L17+=6.
 export function rageUsesMax(level: number): number {
   if (level >= 17) return 6;
@@ -977,17 +977,17 @@ export function upcastDamage2(spell: Spell, slotLevel: number): string {
   return addDice(base, multiplyDice(spell.upcastBonus2, extraLevels));
 }
 
-// Returns cantrip damage dice scaled by character level (PHB cantrip progression).
+// Returns cantrip damage dice scaled by character level (SRD cantrip progression).
 export function cantripDamageDice(spell: Spell, charLevel: number): string {
   const bonus = charLevel >= 17 ? 3 : charLevel >= 11 ? 2 : charLevel >= 5 ? 1 : 0;
   if (bonus === 0 || !spell.upcastBonus) return spell.damage ?? '0';
   return addDice(spell.damage ?? '0', multiplyDice(spell.upcastBonus, bonus));
 }
 
-// ─── Spell slot tables (PHB) ─────────────────────────────────────────────────
+// ─── Spell slot tables (SRD) ─────────────────────────────────────────────────
 
 // Returns max slots per spell level for a given class and character level.
-// PHB multiclass spell-slot table, indexed by effective caster level
+// SRD multiclass spell-slot table, indexed by effective caster level
 // (1–20). Single-class full-casters use their level directly; half-
 // casters use ⌊level/2⌋; third-casters use ⌊level/3⌋. Multiclass
 // characters sum the contributions and look up here. Defined as a
@@ -1063,7 +1063,7 @@ export function spellSlotsForClassLevel(cls: string, level: number): Record<numb
     return pactSlots[level] ?? {};
   }
 
-  // PHB multiclassing spell slot table (full casters; half casters use ⌊level/2⌋)
+  // SRD multiclassing spell slot table (full casters; half casters use ⌊level/2⌋)
   if (!fullCasters.includes(cls) && !halfCasters.includes(cls)) return {};
   const effectiveLevel = halfCasters.includes(cls) ? Math.floor(level / 2) : level;
   return spellSlotsForCasterLevel(effectiveLevel);
@@ -1071,12 +1071,12 @@ export function spellSlotsForClassLevel(cls: string, level: number): Record<numb
 
 // ─── Spell helpers ────────────────────────────────────────────────────────────
 
-// Spell attack bonus = proficiency + spellcasting ability modifier (PHB p.205)
+// Spell attack bonus = proficiency + spellcasting ability modifier (SRD)
 export function spellAttackBonus(level: number, castingAbilityScore: number): number {
   return profBonus(level) + abilityMod(castingAbilityScore);
 }
 
-// Spell save DC = 8 + proficiency + spellcasting ability modifier (PHB p.205)
+// Spell save DC = 8 + proficiency + spellcasting ability modifier (SRD)
 export function spellSaveDC(level: number, castingAbilityScore: number): number {
   return 8 + profBonus(level) + abilityMod(castingAbilityScore);
 }
@@ -1100,7 +1100,7 @@ export function resolveSpellAttack(
 
 // ─── Death saves ──────────────────────────────────────────────────────────────
 
-// Per 5e PHB: d20, 10+ = success, 1-9 = failure, nat 20 = regain 1 HP, nat 1 = 2 failures.
+// Per SRD: d20, 10+ = success, 1-9 = failure, nat 20 = regain 1 HP, nat 1 = 2 failures.
 // 3 successes = stable, 3 failures = dead.
 // SRD Beacon of Hope grants advantage on death saves — caller passes
 // `advantage = true` when the dying PC has the `hopeful` condition.

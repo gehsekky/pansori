@@ -3,7 +3,7 @@
 // **Pre-fix bug:** pansori applied "ranged in melee" disadvantage
 // to every ranged-weapon attack, regardless of whether an enemy was
 // actually adjacent. This made bows strictly worse than melee
-// weapons in any combat. RAW (2024 PHB): disadvantage applies only
+// weapons in any combat. RAW (SRD): disadvantage applies only
 // when a non-incapacitated enemy is within 5 ft of the attacker.
 //
 // The fix in toHit.ts checks grid distance to any living

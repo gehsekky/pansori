@@ -12,7 +12,7 @@ import { entitiesInCone } from '../../gridEngine.js';
 import { updatePcActor } from '../actor.js';
 
 /**
- * 2024 PHB species (formerly "racial") features. Three classes
+ * SRD species (formerly "racial") features. Three classes
  * bundled — each has exactly one "racial trait as featureId" entry.
  *
  *  - `adrenaline_rush` (Orc): bonus action Dash + temp HP equal to
