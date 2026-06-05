@@ -103,6 +103,7 @@ const TERRAIN_ICON: Partial<Record<TerrainType, { name: string; color: string }>
 // garden, town_wall) this terrain set doesn't cover.
 const TERRAIN_TILE: Partial<Record<TerrainType, string>> = {
   plains: '/art/tiles/plains.png',
+  road: '/art/tiles/road.png',
   forest: '/art/tiles/forest.png',
   hills: '/art/tiles/hills.png',
   swamp: '/art/tiles/swamp.png',

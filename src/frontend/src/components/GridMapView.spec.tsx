@@ -200,13 +200,15 @@ describe('GridMapView', () => {
     expect(c.querySelector('.game-icon-forest')).toBeNull(); // tile replaces the glyph
   });
 
-  it('renders the game-icons path-tile glyph on a regional road tile (still clickable)', () => {
+  it('renders the road terrain tile on a regional road cell (still clickable)', () => {
     // terrainGrid has a road at (0,1).
     const onMarkerMove = vi.fn();
     const { container } = render(
       <GridMapView grid={terrainGrid} markerPos={{ x: 0, y: 0 }} onMarkerMove={onMarkerMove} />
     );
-    expect(cell(container, 0, 1).querySelector('.game-icon-path-tile')).toBeTruthy();
+    expect(cell(container, 0, 1).querySelector('img')?.getAttribute('src')).toContain(
+      '/art/tiles/road.png'
+    );
     expect(cell(container, 0, 1).getAttribute('role')).toBe('button'); // passable
   });
 
