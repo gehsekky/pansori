@@ -85,8 +85,11 @@ function AboutModal({ onClose }: { onClose: () => void }) {
             Frog.
           </p>
           <p>
-            Local-room floor textures from a free pixel-tiles pack (AI-assisted), used as in-game
-            map art under its non-commercial terms.
+            Local-room floor textures from the{' '}
+            <Ext href="https://arexxuru.itch.io/pixel-floor-texture-pack-ground-tile">
+              Pixel Floor Texture Pack
+            </Ext>{' '}
+            by arexxuru (AI-assisted), used as in-game map art under its non-commercial terms.
           </p>
         </section>
 
