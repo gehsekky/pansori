@@ -97,7 +97,7 @@ export const handleGrapple: ActionHandler<{
 };
 
 /**
- * `try_escape_grapple`: SRD 5.2.1 p.16 — grappled creature spends its
+ * `try_escape_grapple`: SRD 5.2.1 — grappled creature spends its
  * action on a contested STR(Athletics) or DEX(Acrobatics) check vs
  * grappler's STR(Athletics). Engine picks the better of the two for
  * the player. Lenient fallback when there's no tracked grappler:

@@ -353,7 +353,7 @@ export function runPrecast(
     ctx.narrative = `${pc.char.name} expends a ${spell.materialCost} gp component. `;
   }
 
-  // SRD 5.2.1 p.67 (Quickened Spell): after consuming Quickened, can't
+  // SRD 5.2.1 (Quickened Spell): after consuming Quickened, can't
   // cast a level 1+ spell on the same turn EXCEPT the quickened cast
   // itself (which is the spell that got "modified"). We detect the
   // quickened cast via ctx.st.metamagic_active === 'quickened' being still

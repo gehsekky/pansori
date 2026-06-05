@@ -130,7 +130,7 @@ export function posEqual(a: GridPos, b: GridPos): boolean {
 
 // True if attacker can reach target given the equipped weapon.
 // Thrown melee weapons (weapon.thrown) extend reach to their long range.
-// Reach weapons (SRD 5.2.1 p.90: glaive, halberd, etc.) get +5 ft melee.
+// Reach weapons (SRD 5.2.1: glaive, halberd, etc.) get +5 ft melee.
 export function inRange(
   attacker: GridPos,
   target: GridPos,
@@ -255,7 +255,7 @@ export function entitiesInBlast(
 }
 
 // Entities in a cone of given length (feet), originating from caster pointing
-// toward target. The cone widens at 45° per side from caster. SRD 5.2.1 p.193:
+// toward target. The cone widens at 45° per side from caster. SRD 5.2.1:
 // "A cone's width at a given point equals the distance from the point of origin".
 export function entitiesInCone(
   caster: GridPos,
@@ -376,7 +376,7 @@ export function pathCostFeet(path: GridPos[]): number {
 // Which entities in `before` were adjacent to `mover` but are no longer
 // adjacent after the move? These entities may take opportunity attacks.
 //
-// `attackerReachFt` (SRD 5.2.1 p.90) lets the caller report each potential
+// `attackerReachFt` (SRD 5.2.1) lets the caller report each potential
 // attacker's weapon reach — Reach weapons (glaive, halberd, pike, whip)
 // extend melee threat from 5 ft to 10 ft. Default is 5 ft for any attacker
 // without a reach lookup (most enemies don't expose weapon data, so they

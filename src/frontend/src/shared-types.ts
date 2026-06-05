@@ -1273,13 +1273,13 @@ export interface LootItem {
   versatileDamage?: string; // two-handed damage for versatile weapons (e.g. '1d8' for quarterstaff)
   damageType?: string; // piercing / slashing / bludgeoning / fire / etc.
   thrown?: { normalRange: number; longRange: number }; // melee weapon usable as ranged
-  // SRD 5.2.1 p.90 "Loading": one shot per Action/Bonus/Reaction regardless of
+  // SRD 5.2.1 "Loading": one shot per Action/Bonus/Reaction regardless of
   // Extra Attack. Hand/heavy crossbows, muskets, pistols, blowguns all have it.
   loading?: boolean;
-  // SRD 5.2.1 p.90 "Reach": adds 5 ft to melee reach (also for opportunity
+  // SRD 5.2.1 "Reach": adds 5 ft to melee reach (also for opportunity
   // attacks made with this weapon). Glaive, halberd, lance, pike, whip.
   reach?: boolean;
-  // SRD 5.2.1 p.90 "Heavy": disadv on attacks if STR < 13 (melee) / DEX < 13
+  // SRD 5.2.1 "Heavy": disadv on attacks if STR < 13 (melee) / DEX < 13
   // (ranged). Greataxe, greatsword, maul, heavy crossbow, longbow, etc.
   heavy?: boolean;
   // SRD Weapon Mastery property. Each weapon has at most one mastery.

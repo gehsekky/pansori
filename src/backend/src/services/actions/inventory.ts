@@ -63,7 +63,7 @@ export const handleAttune: ActionHandler<{ type: 'attune'; instanceId: string }>
 
 /**
  * `de_attune`: voluntarily end attunement with a magic item (SRD
- * p.215 — "If you cease attunement, you spend another short rest..."
+ * — "If you cease attunement, you spend another short rest..."
  * — Pansori treats this as out-of-combat, no resource cost). Cursed
  * items resist voluntary de-attunement; a Remove Curse / Greater
  * Restoration would be required (not yet implemented as a spell —
@@ -112,7 +112,7 @@ export const handleDeAttune: ActionHandler<{ type: 'de_attune'; instanceId: stri
  * - mystery: random heal / hurt / nothing
  *
  * In combat: potion-like consumables cost a bonus action (SRD 5.2.1
- * p.204); everything else costs a full action.
+ *); everything else costs a full action.
  */
 export const handleUse: ActionHandler<{
   type: 'use';

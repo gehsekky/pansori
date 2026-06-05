@@ -2910,14 +2910,14 @@ describe('Heavy encumbrance disadvantage (2024 variant)', () => {
   });
 });
 
-// ─── Group ability checks (SRD p.6) ──────────────────────────────────────────
+// ─── Group ability checks (SRD) ──────────────────────────────────────────
 //
 // When a number of individuals attempt a check together, if at least half
 // the group succeeds, the whole group succeeds. The sneak action is the
 // natural fit since `current_room` is single-valued — the party moves
 // together. Solo parties collapse to the existing single-PC behavior.
 
-describe('group ability check — sneak (SRD p.6)', () => {
+describe('group ability check — sneak (SRD)', () => {
   function makeSneakScenario(party: Array<Partial<Character>>): GameState {
     const characters = party.map((o, i) =>
       makeChar({ id: `pc-${i + 1}`, name: `PC${i + 1}`, ...o })
@@ -4469,7 +4469,7 @@ describe('speaker prefix (multi-PC narratives)', () => {
       max_hp: 13,
       death_saves: { successes: 1, failures: 2 },
       // Pre-existing conditions persist through Nat 20 recovery; only
-      // unconscious clears (RAW: SRD 5.2.1 p.197). Pansori previously
+      // unconscious clears (RAW: SRD 5.2.1). Pansori previously
       // cleared the whole array, which erased frightened from a downed-
       // then-revived PC and dropped the disadvantage on their next attack.
       conditions: ['unconscious', 'frightened'],

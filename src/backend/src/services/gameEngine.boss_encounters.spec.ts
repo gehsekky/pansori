@@ -198,7 +198,7 @@ describe('boss phase transitions', () => {
   });
 });
 
-// ─── Boss legendary + lair actions (SRD p.221) ───────────────────────────────
+// ─── Boss legendary + lair actions (SRD) ───────────────────────────────
 //
 // Legendary actions fire AFTER another creature's turn ends, spending
 // points from a per-round pool that refreshes on the legendary creature's

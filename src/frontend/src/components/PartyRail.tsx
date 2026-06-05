@@ -35,7 +35,7 @@ interface Props {
 //
 // Out of combat, clicking a tile ALSO promotes that PC to active via
 // `onSetActive` — RAW has no initiative outside combat (SRD 5.2.1
-// p.189), so the player picks who's leading.
+//), so the player picks who's leading.
 
 function PartyRail({ state, activeCharId, ctx, seed, inCombat, onSetActive, onOpenSheet }: Props) {
   const [selectedCharId, setSelectedCharId] = useState<string>('');

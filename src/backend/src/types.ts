@@ -105,7 +105,7 @@ export interface Room {
   // the mechanical arrays above (difficultTerrain / climbTerrain / swimTerrain /
   // coverPositions / obstacles). Nothing in the engine reads `terrain`.
   terrain?: TerrainCell[];
-  // Ambient lighting per SRD 5.2.1 p.11 "Vision and Light". Default 'bright'
+  // Ambient lighting per SRD 5.2.1 "Vision and Light". Default 'bright'
   // (the room is well-lit; tactical fog-of-war is disabled). 'dim' makes the
   // whole room Lightly Obscured (Disadvantage on sight-based Perception).
   // 'dark' makes squares outside a PC's lit radius Heavily Obscured
@@ -171,7 +171,7 @@ export type BossPhaseEffect =
   | { kind: 'add_resistance'; damageType: string }
   | { kind: 'heal'; amount: number };
 
-// Legendary actions (SRD p.221). Fire AFTER another creature's turn ends —
+// Legendary actions (SRD). Fire AFTER another creature's turn ends —
 // the legendary creature spends points from `legendary_action_points` to
 // take a quick action. Pool refreshes at the start of the legendary
 // creature's own turn. The engine fires at most one legendary action per
@@ -184,7 +184,7 @@ export interface LegendaryAction {
   narrative?: string;
 }
 
-// Lair actions (SRD p.221). Fire on initiative count 20 (round-start in
+// Lair actions (SRD). Fire on initiative count 20 (round-start in
 // Pansori's simpler model) when a creature with `lair_actions` is in the
 // current room. The engine fires one lair action per round, chosen at
 // random from the list.
@@ -316,7 +316,7 @@ export interface EnemyTemplate {
   castChance?: number;
   spellSaveDC?: number;
   spellAttackBonus?: number;
-  // Tactical movement (SRD 5.2.1 p.190). Engine-level defaults: 5 ft melee
+  // Tactical movement (SRD 5.2.1). Engine-level defaults: 5 ft melee
   // reach, 30 ft walking speed. Override for reach weapons (10 ft) or
   // larger/faster monsters.
   attackReachFt?: number;
@@ -336,7 +336,7 @@ export interface EnemyTemplate {
   // HP-threshold phase transitions for boss encounters. Order does not
   // matter — engine sorts by descending hpPct internally.
   phases?: BossPhase[];
-  // Boss-only systems (SRD p.221). Bosses with `legendary_actions` get
+  // Boss-only systems (SRD). Bosses with `legendary_actions` get
   // `legendary_pool` points per round to spend on post-PC-turn actions;
   // bosses with `lair_actions` fire one environment effect on round wrap.
   legendary_actions?: LegendaryAction[];
@@ -409,7 +409,7 @@ export interface Enemy {
   castChance?: number; // 0..1 probability per turn; 0 or undefined = never cast
   spellSaveDC?: number; // DC for save-based spells; defaults to 8 + prof(CR-derived) + caster mod
   spellAttackBonus?: number; // +mod for spell-attack-roll spells; defaults to toHit
-  // Tactical movement (SRD 5.2.1 p.190). Mirrors EnemyTemplate fields and is
+  // Tactical movement (SRD 5.2.1). Mirrors EnemyTemplate fields and is
   // carried through procgen. attackReachFt defaults to 5 ft (the default
   // melee reach); speedFt defaults to 30 ft (the default humanoid walk).
   attackReachFt?: number;
@@ -421,7 +421,7 @@ export interface Enemy {
   // Max hp captured at seed time so phase thresholds can be re-evaluated
   // against the *original* HP after damage reduces hp below maxHp.
   maxHp?: number;
-  // Boss-only systems (SRD p.221). Mirrors EnemyTemplate fields and is
+  // Boss-only systems (SRD). Mirrors EnemyTemplate fields and is
   // carried through procgen. `legendary_action_points` is the current
   // pool; refreshes on this enemy's own turn start.
   legendary_actions?: LegendaryAction[];
@@ -477,7 +477,7 @@ export interface TurnActions {
   // Barbarian Reckless Attack (SRD): advantage on STR melee attacks this turn,
   // but enemies have advantage on attacks vs the Barbarian until their next turn.
   reckless?: boolean;
-  // SRD 5.2.1 p.67 Quickened Spell metamagic: you can't use Quickened if a
+  // SRD 5.2.1 Quickened Spell metamagic: you can't use Quickened if a
   // level 1+ spell was already cast this turn, AND you can't cast a level 1+
   // spell on the same turn that you used Quickened.
   leveled_spell_cast?: boolean; // set after any non-cantrip spell resolves
@@ -699,7 +699,7 @@ export interface Spell {
   damageType2?: string;
   upcastBonus2?: string;
   blastRadius?: number; // AOE radius in feet; undefined = single target
-  // SRD 5.2.1 p.193 — Areas of Effect. Default is 'sphere' (radius from a point).
+  // SRD 5.2.1 — Areas of Effect. Default is 'sphere' (radius from a point).
   //   sphere: blastRadius = radius
   //   cone:   blastRadius = length of the cone, originating from caster
   //   cube:   blastRadius = side length of cube emanating from caster
@@ -1107,7 +1107,7 @@ export interface Character {
   // weapons the player must still pick; generateChoices surfaces the picks and
   // `choose_weapon_mastery` decrements it.
   weapon_mastery_pending?: number;
-  // Bardic Inspiration die granted by a Bard (SRD / 2024 p.52). The
+  // Bardic Inspiration die granted by a Bard (SRD / 2024). The
   // die is stored as a dice expression ('d6', 'd8', ...) and consumed on
   // the next d20 test (attack/save/check). SRD expands what the die
   // can apply to — Pansori applies it to attack-roll consumption today;
@@ -1370,7 +1370,7 @@ export interface Character {
   fly_speed_ft?: number;
   swim_speed_ft?: number;
   climb_speed_ft?: number;
-  // SRD 5.2.1 p.11: Darkvision treats Darkness as Dim Light within this radius
+  // SRD 5.2.1: Darkvision treats Darkness as Dim Light within this radius
   // (typically 60 ft for elves/dwarves/halflings/etc.). Default 0 = no
   // darkvision (typical human).
   darkvision_ft?: number;
@@ -1379,13 +1379,13 @@ export interface Character {
   // objects, and is immune to visual illusions; pansori records the range for
   // narration today (the see-Invisible substrate isn't modeled yet).
   truesight_ft?: number;
-  // SRD 5.2.1 p.17–18: Temporary Hit Points. Absorb damage before HP. Don't
+  // SRD 5.2.1: Temporary Hit Points. Absorb damage before HP. Don't
   // stack with themselves (replace if higher); expire on a Long Rest.
   temp_hp?: number;
   // SRD Heroic Inspiration: granted automatically on a Nat 1 d20.
   // Player can spend it on a later d20 to gain advantage (one-shot).
   inspiration?: boolean;
-  // SRD 5.2.1 p.11 — Hide action stores the Stealth check total as the DC
+  // SRD 5.2.1 — Hide action stores the Stealth check total as the DC
   // for anyone trying to find you. While the `invisible` condition is set
   // and hide_dc > 0, enemies must beat hide_dc with a passive Perception
   // (or active Search) to reveal you before they can target effectively.

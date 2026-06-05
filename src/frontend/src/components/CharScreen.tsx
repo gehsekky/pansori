@@ -139,7 +139,7 @@ type StatMethod = 'roll' | 'array' | 'pointbuy' | 'manual';
 
 // Fallback compositions when a campaign doesn't override. Mirrors the 5e
 // "iconic four" — Fighter (tank), Cleric (heal), Wizard (magic), Rogue (utility).
-// Roles taken from DMG p.83: Defender / Healer / Controller / Striker.
+// Roles taken from DMG: Defender / Healer / Controller / Striker.
 const DEFAULT_COMPOSITION_BY_SIZE: Record<number, string[]> = {
   1: ['Paladin'],
   2: ['Fighter', 'Cleric'],

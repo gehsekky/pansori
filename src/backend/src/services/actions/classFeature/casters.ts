@@ -228,7 +228,7 @@ export function handleCasterFeature(ctx: ActionContext, fid: string): boolean {
       ctx.narrative = 'Bonus action already used this turn.';
       return true;
     }
-    // SRD 5.2.1 p.67: can't activate Quickened if you've already cast
+    // SRD 5.2.1: can't activate Quickened if you've already cast
     // a level 1+ spell this turn.
     if (char.turn_actions.leveled_spell_cast) {
       ctx.narrative =

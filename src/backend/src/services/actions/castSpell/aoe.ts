@@ -194,7 +194,7 @@ export function runAoeSpell(
 
     if (target.isEnemy && targetEnemy) {
       const tScore = (targetEnemy as unknown as Record<string, number>)[spell.savingThrow] ?? 10;
-      // Cover bonus on DEX saves (SRD 5.2.1 p.15): obstacles between
+      // Cover bonus on DEX saves (SRD 5.2.1): obstacles between
       // the blast epicenter and this target give +2 (half) / +5
       // (three-quarters) to the DEX save.
       let tCover = 0;

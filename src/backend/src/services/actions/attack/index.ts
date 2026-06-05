@@ -158,7 +158,7 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
 
   if (!killed) {
     // ── Extra Attack (Fighter L5+, Ranger/Paladin/Barbarian/Monk L5) ───
-    // SRD 5.2.1 p.90 "Loading": a Loading weapon fires only once per
+    // SRD 5.2.1 "Loading": a Loading weapon fires only once per
     // Action/Bonus/Reaction regardless of Extra Attack.
     // SRD Haste — "That action can be used only to take the Attack
     // (one weapon attack only)." When the haste_extra_action wrapper

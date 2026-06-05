@@ -926,7 +926,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     level: 1,
     castTime: 'action',
     damageType: 'force',
-    // SRD 5.2.1 p.282 — three darts at 1d4+1 each = 3d4+3 total.
+    // SRD 5.2.1 — three darts at 1d4+1 each = 3d4+3 total.
     damage: '3d4+3',
     upcastBonus: '1d4+1',
     desc: 'Three magical darts each deal 1d4+1 force damage, automatically hitting. +1 dart per slot above 1st.',

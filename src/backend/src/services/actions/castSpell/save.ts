@@ -68,7 +68,7 @@ export function runSaveSpell(
   const { char } = ctx.actor;
   const saveAbility = spell.savingThrow!;
   const enemyScore = (spellTarget as unknown as Record<string, number>)[saveAbility] ?? 10;
-  // Cover bonus to DEX saves (SRD 5.2.1 p.15): the spell originates from
+  // Cover bonus to DEX saves (SRD 5.2.1): the spell originates from
   // the caster, so half/three-quarters cover between caster→target
   // applies to the target's DEX save against the spell. Other abilities
   // are unaffected.

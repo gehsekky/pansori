@@ -6,13 +6,13 @@ import { rollDice } from './rulesEngine.js';
  * Single-entry helper for applying damage to a PC. Centralizes the
  * cross-cutting effects that every damage source needs to honor:
  *
- *   1. Temp HP absorption (SRD 5.2.1 p.17–18). Temp HP soaks damage
+ *   1. Temp HP absorption (SRD 5.2.1). Temp HP soaks damage
  *      before regular HP and is decremented; it doesn't stack with
  *      itself.
  *   2. Exhaustion-4 max-HP halving (SRD). HP can't exceed
  *      floor(max_hp / 2) while exhaustion ≥ 4; damage that would land
  *      below that is reported as actual loss.
- *   3. Concentration check (SRD 5.2.1 p.203). Any damage taken while
+ *   3. Concentration check (SRD 5.2.1). Any damage taken while
  *      concentrating triggers a CON save against DC max(10, dmg/2).
  *      Failure ends the spell and clears any linked conditions on
  *      allies / enemies.

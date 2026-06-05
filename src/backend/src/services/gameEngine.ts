@@ -859,7 +859,7 @@ export function checkConcentration(
   if (char.concentrating_on.spellId === 'hunters_mark' && getClassLevel(char, 'ranger') >= 13) {
     return { char, st, note: ` [Relentless Hunter: Hunter's Mark holds]` };
   }
-  // SRD 5.2.1 p.203 — Concentration DC is 10 or half damage taken, whichever
+  // SRD 5.2.1 — Concentration DC is 10 or half damage taken, whichever
   // is higher; capped at 30. The cap basically only matters at >60 dmg.
   const dc = Math.min(30, Math.max(10, Math.floor(dmgTaken / 2)));
   // SRD revive penalty applies to the concentration CON save like
@@ -1529,7 +1529,7 @@ export interface PendingSaveRerollInfo {
   concentrationSpellId?: string;
 }
 
-// SRD 5.2.1 p.17 — Massive Damage: when damage reduces a character to 0 HP
+// SRD 5.2.1 — Massive Damage: when damage reduces a character to 0 HP
 // and the leftover damage equals or exceeds their HP maximum, the character
 // dies outright (no death saves).
 function isMassiveDamageDeath(prevHp: number, damage: number, maxHp: number): boolean {
@@ -2268,7 +2268,7 @@ export function processDeathSave(
   enemyAttackContext: boolean = false,
   currentRound: number = 1
 ): { narrative: string; newChar: Character; died: boolean; endedCombat: boolean } {
-  // SRD 5.2.1 p.197 — an enemy that hits an Unconscious creature within 5 ft
+  // SRD 5.2.1 — an enemy that hits an Unconscious creature within 5 ft
   // auto-crits, and that hit counts as 2 death save failures. This is NOT a
   // death save the downed PC rolls — they only roll at the start of their own
   // turn — so short-circuit BEFORE rollDeathSave: apply the 2 failures and
@@ -2313,7 +2313,7 @@ export function processDeathSave(
 
   switch (save.result) {
     case 'regain_hp':
-      // SRD 5.2.1 p.197 — rolling a 20 on a death save regains 1 HP and ends
+      // SRD 5.2.1 — rolling a 20 on a death save regains 1 HP and ends
       // the unconscious condition. It does NOT end the combat encounter;
       // remaining enemies keep fighting. Other conditions (frightened /
       // prone / grappled / etc.) persist — clearing every condition was a
@@ -2587,7 +2587,7 @@ export function tickEnemyConditions(st: GameState): { st: GameState; narrative: 
   return { st: { ...st, entities }, narrative };
 }
 
-// SRD 5.2.1 p.178 (Variant Encumbrance) — speed reductions tied to carried weight.
+// SRD 5.2.1 (Variant Encumbrance) — speed reductions tied to carried weight.
 // ≤ 5×STR: normal speed
 // > 5×STR, ≤ 10×STR: -10 ft (encumbered)
 // > 10×STR, ≤ 15×STR: -20 ft (heavily encumbered)
@@ -2848,7 +2848,7 @@ export function maybeFireBreathWeapon(args: {
   return { fired: true, st, narrative };
 }
 
-// SRD p.221 — lair actions. Fire one randomly-picked action per round on
+// SRD — lair actions. Fire one randomly-picked action per round on
 // the round-wrap path. Only fires if a living enemy with `lair_actions`
 // is in the current room. Returns updated state, narrative addendum,
 // and a `fired` flag so callers can skip the narrative-prefix work when
@@ -3070,7 +3070,7 @@ export function fireSpellZones(
   return { st: workingSt, narrative: narrative + expiredNote };
 }
 
-// SRD p.221 — legendary actions. Fire AT MOST ONE after another creature's
+// SRD — legendary actions. Fire AT MOST ONE after another creature's
 // turn ends. Spends `legendary_action_points` (refreshed on the legendary
 // creature's own turn). Picks the lowest-cost available action and resolves
 // its effect immediately against the nearest living PC.
@@ -3332,7 +3332,7 @@ export function endCombatState(st: GameState): GameState {
   };
 }
 
-// Encounter XP distribution — SRD / SRD 5.2.1 (Gaining XP, p.260):
+// Encounter XP distribution — SRD / SRD 5.2.1 (Gaining XP,):
 // the XP from a defeated creature is divided equally among all party
 // members who participated. Pansori's participation model is "alive when
 // the kill resolved" — a downed/unconscious PC (hp = 0, dead = false)
@@ -4477,7 +4477,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       });
     }
   }
-  // SRD 5.2.1 p.204: drinking/administering a potion is a Bonus Action. In
+  // SRD 5.2.1: drinking/administering a potion is a Bonus Action. In
   // combat, suppress the choice if the bonus action is already spent.
   const potionBonusAvailable = !state.combat_active || !char.turn_actions.bonus_action_used;
   if (healItem && potionBonusAvailable && (!MAX_CHOICES || choices.length < MAX_CHOICES)) {
@@ -6323,7 +6323,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     }
   }
 
-  // Try to escape grapple — SRD 5.2.1 p.16, contested Athletics or Acrobatics
+  // Try to escape grapple — SRD 5.2.1, contested Athletics or Acrobatics
   if (
     state.combat_active &&
     !char.turn_actions.action_used &&
@@ -6346,7 +6346,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     });
   }
 
-  // Stand up from prone — SRD 5.2.1 p.187: costs half the creature's speed.
+  // Stand up from prone — SRD 5.2.1: costs half the creature's speed.
   if (state.combat_active && char.conditions.includes('prone')) {
     const speedFt = effectiveSpeed(char, context.lootTable);
     const standCost = Math.floor(speedFt / 2);
@@ -7081,7 +7081,7 @@ function planEnemyApproach(args: {
 }
 
 // Resolves opportunity attacks PCs make against an enemy who walked out of
-// their melee threat zone (SRD 5.2.1 p.191). Mirrors the PC-side OA loop in
+// their melee threat zone (SRD 5.2.1). Mirrors the PC-side OA loop in
 // the grid_move handler: auto-fires for any PC with a reaction available and
 // a melee weapon (or unarmed) in hand, consumes the PC's reaction, applies
 // damage to the enemy entity, and marks the enemy killed if it hits 0 HP.
@@ -7721,7 +7721,7 @@ async function runEnemyMultiattackLoop(args: {
 
 /**
  * Tactical approach movement for an enemy that wants to melee a PC.
- * SRD 5.2.1 p.190 — the enemy must be within `attackReachFt` of the
+ * SRD 5.2.1 — the enemy must be within `attackReachFt` of the
  * target before its swing connects; otherwise it walks up to
  * `speedFt` toward an in-reach square. PCs whose threat zone is
  * broken by the move get opportunity attacks (which may kill the
@@ -8950,7 +8950,7 @@ export async function runEnemyTurns(args: {
     }
     if (rm && !st.enemies_killed.includes(eEntry.id)) {
       // Surprised creatures skip their first turn entirely (SRD
-      // p.189 — Pansori's chosen surprise model; PC-side handling mirrors
+      // — Pansori's chosen surprise model; PC-side handling mirrors
       // this at the `Surprised — cannot act this round` choice). The
       // `surprised` array is cleared on round-wrap so the skip only
       // applies in round 1.
@@ -9464,7 +9464,7 @@ export async function runEnemyTurns(args: {
           continue;
         }
       }
-      // SRD p.221 — legendary action pool refreshes at the start of the
+      // SRD — legendary action pool refreshes at the start of the
       // legendary creature's own turn.
       if (rm.legendary_actions?.length) refreshLegendaryPool(args.seed, rm.id);
       const { actorEnt: eEnt, targetCharIdx } = selectTarget(eEntry.id, st);
@@ -10226,7 +10226,7 @@ export async function takeAction({
     const startAdvIdx = (currentIdx + 1) % orderLen;
     const initialRoundWrapped = startAdvIdx === 0;
 
-    // SRD p.221 — legendary action: fires AFTER another creature's turn ends.
+    // SRD — legendary action: fires AFTER another creature's turn ends.
     // Resolved before runEnemyTurns so the spend is recorded against the
     // current pool; the legendary creature's own turn (later in the loop)
     // will refresh the pool for the next round.
@@ -10280,7 +10280,7 @@ export async function takeAction({
       const enemyCondRes = tickEnemyConditions(st);
       st = enemyCondRes.st;
       narrative += enemyCondRes.narrative;
-      // SRD p.221 — lair action fires on round start (init count 20).
+      // SRD — lair action fires on round start (init count 20).
       const lairRes = fireLairAction(st, seed, context);
       st = lairRes.st;
       narrative += lairRes.narrative;
@@ -10354,7 +10354,7 @@ export async function takeAction({
     }
   }
   // Out-of-combat: active_character_id stays on whoever the player
-  // chose. RAW has no initiative outside combat (SRD 5.2.1 p.189) — the
+  // chose. RAW has no initiative outside combat (SRD 5.2.1) — the
   // party operates as a unit — so the prior auto-rotate every action
   // was non-RAW and made NPC dialogue feel jarring (different PC
   // credited per response). Players hand the spotlight off explicitly
@@ -10433,7 +10433,7 @@ export async function takeAction({
     enhanced === llmInput || (enhanced.length > 0 && preservesCriticalFacts(llmInput, enhanced));
   const finalNarrative = enhanced === llmInput || !enhancementFaithful ? rawNarrative : enhanced;
 
-  // SRD 5.2.1 p.184 — Invisible: attacking reveals location. The condition
+  // SRD 5.2.1 — Invisible: attacking reveals location. The condition
   // ends after the attack; the character must re-Hide to regain it.
   // EXCEPTION: SRD Greater Invisibility (and Invisibility cast as a
   // BUFF, not from Hide) explicitly allows attacking while invisible —
@@ -10517,7 +10517,7 @@ export async function takeAction({
     if (anyRevived) st = updated;
   }
 
-  // SRD 5.2.1 p.203 — Concentration ends when the caster is incapacitated or
+  // SRD 5.2.1 — Concentration ends when the caster is incapacitated or
   // dies. We don't catch every state transition mid-handler, so sweep here.
   {
     const incapCond = new Set([
@@ -10545,7 +10545,7 @@ export async function takeAction({
     if (anyBroken) st = updated;
   }
 
-  // SRD 5.2.1 p.16 — Grappled ends if the grappler is incapacitated. Sweep here
+  // SRD 5.2.1 — Grappled ends if the grappler is incapacitated. Sweep here
   // so deaths/conditions applied this turn drop their grapples for the next turn.
   if (st.entities && st.entities.some((e) => e.grappled_by)) {
     const killed = new Set(st.enemies_killed ?? []);

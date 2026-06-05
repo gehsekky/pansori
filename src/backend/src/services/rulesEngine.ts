@@ -207,7 +207,7 @@ export function applyDamageMultiplier(
   if (!damageType) return { damage: raw, note: '' };
   if (enemy.immunities?.includes(damageType))
     return { damage: 0, note: ` [immune to ${damageType}]` };
-  // SRD 5.2.1 p.17 — order is: adjustments → resistance → vulnerability.
+  // SRD 5.2.1 — order is: adjustments → resistance → vulnerability.
   // If a creature has both (rare), resistance halves first then vulnerability
   // doubles → net unchanged.
   const hasResist = (enemy.resistances?.includes(damageType) ?? false) && !opts?.ignoreResistance;
@@ -246,7 +246,7 @@ interface AttackResult {
 }
 
 // Player attacks an enemy. Finesse weapons use whichever of STR/DEX is higher.
-// Advantage and disadvantage both present → they cancel out (SRD p.173).
+// Advantage and disadvantage both present → they cancel out (SRD).
 // weaponProficient=false omits proficiency bonus (SRD: no profBonus without proficiency).
 // ranged=true forces DEX for attack and damage (overrides finesse logic).
 export function resolvePlayerAttack(
@@ -429,7 +429,7 @@ interface EnemyStats {
 }
 
 // Enemy attacks the player. Advantage rolls 2d20 keep higher; disadvantage keeps lower.
-// Advantage + disadvantage cancel per SRD p.173.
+// Advantage + disadvantage cancel per SRD.
 export function resolveEnemyAttack(
   enemy: EnemyStats,
   playerAC: number,
@@ -489,7 +489,7 @@ export function canDonArmor(combatActive: boolean, armorCategory: string) {
   } as const;
 }
 
-// SRD p.144: non-proficient armor → disadvantage on STR/DEX checks and attack rolls, cannot cast spells
+// SRD: non-proficient armor → disadvantage on STR/DEX checks and attack rolls, cannot cast spells
 export function hasArmorProficiency(
   armorProficiencies: string[],
   armorCategory: string | undefined
@@ -498,7 +498,7 @@ export function hasArmorProficiency(
   return armorProficiencies.includes(armorCategory);
 }
 
-// SRD p.147: non-proficient weapon → no proficiency bonus added to attack rolls
+// SRD: non-proficient weapon → no proficiency bonus added to attack rolls
 export function hasWeaponProficiency(
   weaponProficiencies: string[],
   weaponType: string | undefined
@@ -616,7 +616,7 @@ export function abilityForSkill(skill: string): AbilityKey {
 
 // On-hit saving throw: returns true if the save FAILS (condition is applied).
 // Pass proficient=true when the character has saving throw proficiency in this ability.
-// coverDexBonus (SRD 5.2.1 p.15): half cover +2 to DEX saves, three-quarters
+// coverDexBonus (SRD 5.2.1): half cover +2 to DEX saves, three-quarters
 // cover +5 — applied only for DEX saves. AC use of the same bonus happens
 // separately in resolvePlayerAttack / resolveEnemyAttack.
 // targetConditions: pass the target's current conditions to force auto-fail on
@@ -644,7 +644,7 @@ export function rollConditionSave(
   forceD20?: number
 ): boolean {
   // Auto-fail saves: registry-driven. Paralyzed/stunned/unconscious/petrified
-  // auto-fail STR + DEX saves (SRD 5.2.1 p.186/p.189).
+  // auto-fail STR + DEX saves (SRD 5.2.1).
   if (autoFailsSave(targetConditions, ability)) {
     return true;
   }

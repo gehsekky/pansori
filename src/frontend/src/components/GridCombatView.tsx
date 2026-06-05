@@ -225,7 +225,7 @@ function GridCombatView({
     return out;
   })();
 
-  // ── Lighting / fog-of-war (SRD 5.2.1 p.11 Vision and Light) ──────────────
+  // ── Lighting / fog-of-war (SRD 5.2.1 Vision and Light) ──────────────
   // Determine the current room's ambient lighting from the seed. Default
   // 'bright' (no fog of war) when unspecified.
   const currentRoom = seed.rooms.find((r) => r.id === state.current_room);

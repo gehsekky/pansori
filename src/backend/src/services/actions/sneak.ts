@@ -26,7 +26,7 @@ import { isInSunlight } from '../gridEngine.js';
 import { updatePcActor } from './actor.js';
 
 /**
- * `sneak`: SRD p.6 group ability check. Every living party member
+ * `sneak`: SRD group ability check. Every living party member
  * rolls Stealth (DEX) vs the enemy's passive Perception DC; the
  * group passes if at least half succeed. Only the active PC auto-
  * spends Heroic Inspiration / Bardic Inspiration — passive party

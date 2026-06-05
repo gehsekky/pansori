@@ -21,7 +21,7 @@ function ent(id: string, pos: GridPos): CombatEntity {
   };
 }
 
-describe('AoE geometry — SRD 5.2.1 p.193', () => {
+describe('AoE geometry — SRD 5.2.1', () => {
   // Caster at (0,0); aim east. 5 ft per square.
 
   it('sphere catches all entities within radius', () => {
@@ -72,7 +72,7 @@ describe('AoE geometry — SRD 5.2.1 p.193', () => {
   });
 });
 
-describe('opportunityAttackTriggers — SRD 5.2.1 p.90 reach weapons', () => {
+describe('opportunityAttackTriggers — SRD 5.2.1 reach weapons', () => {
   // PC mover at (0,0) → moves to (3,0). Two enemies: one at (1,0) with no
   // reach (5 ft), one at (2,0) with reach (10 ft). The mover starts adjacent
   // to both, ends 3 squares (15 ft) away — out of both threat ranges.
