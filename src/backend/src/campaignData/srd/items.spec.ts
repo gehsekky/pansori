@@ -18,12 +18,42 @@ describe('SRD_ITEMS catalog integrity', () => {
     }
   });
 
-  it('has the expected catalog size (21 weapons + 7 armor + 4 gear)', () => {
-    expect(ALL_SRD_ITEM_IDS).toHaveLength(32);
+  it('has the expected catalog size (38 weapons + 13 armor + 4 gear)', () => {
+    // Full SRD 5.2.1 weapon + armor tables (incl. firearms: Musket, Pistol).
+    expect(ALL_SRD_ITEM_IDS).toHaveLength(55);
     const weapons = Object.values(SRD_ITEMS).filter((i) => i.type === 'weapon');
     const armor = Object.values(SRD_ITEMS).filter((i) => i.type === 'armor');
-    expect(weapons).toHaveLength(21);
-    expect(armor).toHaveLength(7);
+    expect(weapons).toHaveLength(38);
+    expect(armor).toHaveLength(13);
+  });
+
+  it('covers the full SRD 5.2.1 weapon + armor tables', () => {
+    // prettier-ignore
+    const expectedWeapons = [
+      // Simple melee
+      'club', 'dagger', 'greatclub', 'handaxe', 'javelin', 'light_hammer', 'mace',
+      'quarterstaff', 'sickle', 'spear',
+      // Simple ranged
+      'dart', 'light_crossbow', 'shortbow', 'sling',
+      // Martial melee
+      'battleaxe', 'flail', 'glaive', 'greataxe', 'greatsword', 'halberd', 'lance',
+      'longsword', 'maul', 'morningstar', 'pike', 'rapier', 'scimitar', 'shortsword',
+      'trident', 'warhammer', 'war_pick', 'whip',
+      // Martial ranged (incl. firearms)
+      'blowgun', 'hand_crossbow', 'heavy_crossbow', 'longbow', 'musket', 'pistol',
+    ];
+    // prettier-ignore
+    const expectedArmor = [
+      'padded_armor', 'leather_armor', 'studded_leather', // light
+      'hide_armor', 'chain_shirt', 'scale_mail', 'breastplate', 'half_plate', // medium
+      'ring_mail', 'chain_mail', 'splint_armor', 'plate_armor', // heavy
+      'shield',
+    ];
+    for (const id of [...expectedWeapons, ...expectedArmor]) {
+      expect(SRD_ITEMS[id], `missing SRD item ${id}`).toBeTruthy();
+    }
+    expect(expectedWeapons).toHaveLength(38);
+    expect(expectedArmor).toHaveLength(13);
   });
 
   it('weapons declare damage + weaponType; armor declares a category', () => {
