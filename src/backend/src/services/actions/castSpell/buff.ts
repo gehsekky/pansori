@@ -537,6 +537,20 @@ export function runBuffSpell(
     }
   }
 
+  // SRD Pass without Trace — a 30-ft aura granting the party +10 Stealth.
+  // pansori abstracts the emanation to the whole party (flag every living PC),
+  // bound to the caster's concentration (cleared in breakConcentration). The
+  // Hide check reads pass_without_trace_active.
+  if (spell.id === 'pass_without_trace' && isCasterTarget) {
+    ctx.st = {
+      ...ctx.st,
+      characters: ctx.st.characters.map((c) =>
+        c.dead ? c : { ...c, pass_without_trace_active: true }
+      ),
+    };
+    char.pass_without_trace_active = true;
+  }
+
   // SRD Longstrider — +10 ft Speed (read by effectiveSpeed). Touch, 1 hour, not
   // concentration; persists like Mage Armor. (Upcast extra targets deferred.)
   if (spell.id === 'longstrider') {

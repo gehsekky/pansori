@@ -487,6 +487,8 @@ export function breakConcentration(
     char.concentrating_on.spellId === 'fly' || char.concentrating_on.spellId === 'levitate';
   // SRD Spider Climb — dropping concentration revokes the granted Climb Speed.
   const wasSpiderClimb = char.concentrating_on.spellId === 'spider_climb';
+  // SRD Pass without Trace — dropping concentration ends the party Stealth aura.
+  const wasPassWithoutTrace = char.concentrating_on.spellId === 'pass_without_trace';
   // 2024 PHB Polymorph — concentration drop reverts every polymorphed
   // entity. The polymorph_state stash carries originalHp / originalMaxHp;
   // restore those + clear the polymorphed condition. Pansori MVP assumes
@@ -621,6 +623,17 @@ export function breakConcentration(
     };
     if (newChar.climb_speed_ft) {
       newChar = { ...newChar, climb_speed_ft: undefined };
+    }
+  }
+  if (wasPassWithoutTrace) {
+    newSt = {
+      ...newSt,
+      characters: newSt.characters.map((c) =>
+        c.pass_without_trace_active ? { ...c, pass_without_trace_active: undefined } : c
+      ),
+    };
+    if (newChar.pass_without_trace_active) {
+      newChar = { ...newChar, pass_without_trace_active: undefined };
     }
   }
   if (wasDragonsBreath) {

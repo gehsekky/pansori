@@ -46,6 +46,9 @@ export function resolveHideAttempt(ctx: ActionContext): HideResult {
   if (!eligibility.allowed) return { ok: false, reason: eligibility.reason };
 
   const HIDE_DC = 15;
+  // SRD Pass without Trace — +10 to the Stealth check (folded into the check's
+  // effective DC, the same way the bardic roll is below; the displayed DC stays 15).
+  const passWithoutTraceBonus = pc.char.pass_without_trace_active ? 10 : 0;
   const hideProf = pc.char.skill_proficiencies?.includes('Stealth') ?? false;
   const inspAdv = consumeInspirationForCheck(pc.char);
   const luckAdv = consumeLuckForCheck(pc.char);
@@ -53,7 +56,7 @@ export function resolveHideAttempt(ctx: ActionContext): HideResult {
   const peerlessRoll = peerlessSkillDie(pc.char);
   const check = skillCheck(
     pc.char.dex,
-    HIDE_DC - bardicRoll,
+    HIDE_DC - bardicRoll - passWithoutTraceBonus,
     hideProf,
     pc.char.level,
     isHeavilyEncumbered(pc.char),

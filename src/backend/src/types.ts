@@ -1336,6 +1336,9 @@ export interface Character {
   // SRD Longstrider (L1) — +10 ft Speed for 1 hour (NOT concentration).
   // `effectiveSpeed` reads this; persistent like Mage Armor (expires on rest).
   longstrider_active?: boolean;
+  // SRD Pass without Trace (L2) — +10 to Stealth checks for the party while the
+  // caster concentrates. Read by the Hide check; cleared on breakConcentration.
+  pass_without_trace_active?: boolean;
   // SRD Death Ward (L4 Abjuration) — one-shot rescue. While set,
   // the next time the target's HP would drop to 0, it drops to 1
   // instead and the flag clears (the spell "ends" per RAW). 8-hour

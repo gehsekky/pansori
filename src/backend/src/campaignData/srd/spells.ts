@@ -1354,14 +1354,15 @@ export const SRD_SPELLS: Record<string, Spell> = {
     castTime: 'action',
     concentration: true,
     targetType: 'self_or_ally',
-    // RAW: temp HP equal to spellcasting modifier at the start of each
-    // of the target's turns + immunity to Frightened. Pansori MVP grants
-    // a flat 3 temp HP on cast (mod-ish for L1-4) and leaves the
-    // refresh-per-turn + frightened-immunity for a follow-up.
+    // RAW: temp HP equal to the spellcasting modifier at the start of each of
+    // the target's turns + immunity to Frightened. Pansori grants a flat 3 temp
+    // HP on cast (mod-ish for L1-4) and the Frightened immunity (via the buff
+    // path's grantsConditionImmunities); the per-turn refresh stays a follow-up.
     tempHpGrant: 3,
+    grantsConditionImmunities: ['frightened'],
     durationRounds: 10, // 1 minute concentration
     rangeKind: 'touch',
-    desc: 'A willing creature gains 3 temporary HP and emboldened resolve (Concentration, up to 1 minute).',
+    desc: 'A willing creature gains 3 temporary HP and immunity to the Frightened condition (Concentration, up to 1 minute).',
     narratives: {
       cast: [
         '{name} grasps {target} by the shoulder — {spell}{slotNote} surges through them like liquid courage',
@@ -1697,9 +1698,10 @@ export const SRD_SPELLS: Record<string, Spell> = {
     castTime: 'action',
     concentration: true,
     durationRounds: 600, // 1 hour
+    targetType: 'self', // cast on self; the aura flags the whole party
     narrative:
       '{name} burns a sprig of mistletoe — a hush settles over the party. Footsteps vanish into the loam.',
-    desc: '30-ft party-stealth aura: +10 Stealth, leave no tracks (concentration, 1 hour).',
+    desc: '30-ft party-stealth aura: +10 to Stealth checks (concentration, 1 hour).',
     rangeKind: 'self',
     spellList: ['primal'],
   },
