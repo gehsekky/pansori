@@ -2377,6 +2377,55 @@ export function inflictCondition(char: Character, condition: string, sourceId?: 
   };
 }
 
+// SRD charm riders — a Charmed creature's charm ends when it takes damage
+// (Charm Person / Charm Monster / Hypnotic Pattern, …). Called once at the end
+// of an action with a per-id HP snapshot taken before it resolved; clears
+// `charmed` + the charmer link from any creature whose HP dropped. A single
+// choke point that covers every damage path (attacks, AoE, zones, …).
+export function breakCharmOnDamage(st: GameState, prevHp: Map<string, number>): GameState {
+  let next = st;
+  // Enemies charmed by a PC — the condition lives on the grid entity.
+  if (next.entities?.some((e) => e.isEnemy && e.conditions.includes('charmed'))) {
+    next = {
+      ...next,
+      entities: next.entities.map((e) =>
+        e.isEnemy && e.conditions.includes('charmed') && e.hp < (prevHp.get(e.id) ?? e.hp)
+          ? { ...e, conditions: e.conditions.filter((c) => c !== 'charmed'), charmer_id: undefined }
+          : e
+      ),
+    };
+  }
+  // PCs charmed by an enemy — condition on the Character (+ entity mirror).
+  const broken = new Set<string>();
+  if (next.characters.some((c) => c.conditions.includes('charmed'))) {
+    next = {
+      ...next,
+      characters: next.characters.map((c) => {
+        if (c.conditions.includes('charmed') && c.hp < (prevHp.get(c.id) ?? c.hp)) {
+          broken.add(c.id);
+          return {
+            ...c,
+            conditions: c.conditions.filter((x) => x !== 'charmed'),
+            charmer_id: undefined,
+          };
+        }
+        return c;
+      }),
+    };
+    if (broken.size > 0 && next.entities) {
+      next = {
+        ...next,
+        entities: next.entities.map((e) =>
+          !e.isEnemy && broken.has(e.id)
+            ? { ...e, conditions: e.conditions.filter((x) => x !== 'charmed') }
+            : e
+        ),
+      };
+    }
+  }
+  return next;
+}
+
 export function tickConditions(char: Character): Character {
   const durations = char.condition_durations ?? {};
   if (!char.conditions.length) return char;
@@ -9523,6 +9572,12 @@ export async function takeAction({
 }) {
   void history;
 
+  // Pre-action HP snapshot (per entity/character id) for the charm-break sweep:
+  // any Charmed creature that loses HP this action has its charm end (SRD).
+  const prevHpForCharm = new Map<string, number>();
+  for (const e of state.entities ?? []) prevHpForCharm.set(e.id, e.hp);
+  for (const c of state.characters) prevHpForCharm.set(c.id, c.hp);
+
   const prevRoomId = state.current_room;
   // Allow mutation in travel case (rebinding local variable only)
   let seed = seedArg;
@@ -10372,6 +10427,9 @@ export async function takeAction({
   if (usedKey && !(st.seen_choices ?? []).includes(usedKey)) {
     st.seen_choices = [...(st.seen_choices ?? []), usedKey];
   }
+
+  // SRD — break Charm on any creature that took damage this action.
+  st = breakCharmOnDamage(st, prevHpForCharm);
 
   st.last_choices = generateChoices(st, seed, context);
 
