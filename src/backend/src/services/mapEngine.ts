@@ -58,30 +58,43 @@ export const ENCOUNTER_ROOM_ID = '__encounter__';
 // (feetPerSquare 5280), so a 3-square radius ≈ the ~3-mile real-world horizon.
 export const SIGHT_RADIUS = 3;
 
-// Permanently reveal every regional cell within SIGHT_RADIUS (circular,
-// Euclidean) of the party's marker, accumulating into
-// `GameState.revealed_cells` keyed by the current region. No-op off the
-// regional grid. Idempotent — re-revealing a seen cell is harmless.
-export function revealRegional(campaign: CampaignData | undefined, st: GameState): GameState {
-  if (st.map_level !== 'regional' || !st.current_region_id || !st.marker_pos) return st;
-  const region = regionById(campaign, st.current_region_id);
+// Permanently reveal every cell within SIGHT_RADIUS (circular, Euclidean) of
+// EACH given cell in `regionId`, accumulating into `GameState.revealed_cells`.
+// Takes the region id explicitly (rather than reading `st.map_level`) so it can
+// bank the overland route even after a move descended into a town. Idempotent.
+export function revealRegionalCells(
+  campaign: CampaignData | undefined,
+  st: GameState,
+  regionId: string,
+  cells: GridPos[]
+): GameState {
+  const region = regionById(campaign, regionId);
   if (!region) return st;
-  const { x: cx, y: cy } = st.marker_pos;
   const r = SIGHT_RADIUS;
-  const seen = new Set(st.revealed_cells?.[st.current_region_id] ?? []);
-  for (let dy = -r; dy <= r; dy++) {
-    for (let dx = -r; dx <= r; dx++) {
-      if (dx * dx + dy * dy > r * r) continue; // circular sight
-      const x = cx + dx;
-      const y = cy + dy;
-      if (x < 0 || y < 0 || x >= region.gridWidth || y >= region.gridHeight) continue;
-      seen.add(`${x},${y}`);
+  const seen = new Set(st.revealed_cells?.[regionId] ?? []);
+  for (const { x: cx, y: cy } of cells) {
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (dx * dx + dy * dy > r * r) continue; // circular sight
+        const x = cx + dx;
+        const y = cy + dy;
+        if (x < 0 || y < 0 || x >= region.gridWidth || y >= region.gridHeight) continue;
+        seen.add(`${x},${y}`);
+      }
     }
   }
   return {
     ...st,
-    revealed_cells: { ...(st.revealed_cells ?? {}), [st.current_region_id]: [...seen] },
+    revealed_cells: { ...(st.revealed_cells ?? {}), [regionId]: [...seen] },
   };
+}
+
+// Reveal the sight radius around the party's current marker. No-op off the
+// regional grid. (Single-cell convenience over `revealRegionalCells` — used for
+// the initial reveal and any non-travel reposition.)
+export function revealRegional(campaign: CampaignData | undefined, st: GameState): GameState {
+  if (st.map_level !== 'regional' || !st.current_region_id || !st.marker_pos) return st;
+  return revealRegionalCells(campaign, st, st.current_region_id, [st.marker_pos]);
 }
 
 export function initMapState(campaign: CampaignData | undefined, st: GameState): GameState {
@@ -304,6 +317,15 @@ export function resolveMarkerMove(
   let next: GameState = { ...st, marker_pos: to };
   const squaresMoved = path.length;
   let narrative = '';
+
+  // ── Fog of war: reveal the sight radius along the WHOLE route ────────────────
+  // The party walks every cell on the path, so reveal around each (not just the
+  // destination). Done here — before any transition below can flip map_level to
+  // 'town' — so descending into a site still banks the overland cells crossed to
+  // reach it. `[from, ...path]` is the contiguous route (findPath omits `from`).
+  if (grid.level === 'regional' && st.current_region_id) {
+    next = revealRegionalCells(campaign, next, st.current_region_id, [from, ...path]);
+  }
 
   // ── Regional travel: spend SRD travel time + roll a per-square encounter ────
   let elapsedHours = 0;
