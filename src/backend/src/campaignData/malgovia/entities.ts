@@ -849,7 +849,7 @@ export const npcs: Record<string, PlacedNpc> = {
     id: 'npc_elise_elder',
     pos: { x: 3, y: 2 },
     name: 'Old Elise (village elder)',
-    icon: 'public-speaker',
+    icon: 'sprite:pawn_yellow_idle', // animated Tiny Swords pawn (yellow, idle)
     attitude: 'friendly',
     factionId: 'faction_verdant',
     hp: 6,
