@@ -4287,6 +4287,30 @@ describe('speaker prefix (multi-PC narratives)', () => {
     expect(result.narrative.startsWith('[PC1]')).toBe(false);
   });
 
+  it('does NOT prefix an empty turn — no bare "[Name]" on a post-combat Continue', async () => {
+    // Regression: a "Continue" that only clears the post-combat gate produces an
+    // empty narrative; the speaker prefix used to attach anyway, leaving a bare
+    // "[PC1]" line in the log.
+    const base = makeAttackScenario([{}, {}]);
+    const postCombat: GameState = {
+      ...base,
+      combat_active: false,
+      combat_over_pending: true,
+      entities: undefined,
+      initiative_order: [],
+    };
+    const result = await takeAction({
+      action: { type: 'continue' },
+      history: [],
+      state: postCombat,
+      seed: seedWithEnemy,
+      context: ctx,
+    });
+    expect(result.narrative.startsWith('[PC1]')).toBe(false);
+    expect(result.narrative.trim()).toBe('');
+    expect(result.newState.combat_over_pending).toBe(false);
+  });
+
   it('single-target offensive spell emits one cast choice per living enemy', () => {
     // Guiding Bolt is a single-target spell attack ("a creature of your
     // choice"). With 2+ enemies in the room, the choice generator must

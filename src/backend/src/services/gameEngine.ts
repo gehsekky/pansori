@@ -10022,13 +10022,17 @@ export async function takeAction({
   // character is the one being damaged, so the prose already names them).
   // Solo-character parties are unambiguous and skip the prefix entirely.
   const livingPartyCount = st.characters.filter((c) => !c.dead).length;
+  const body = extraNarrative ? `${narrative}\n\n${extraNarrative}` : narrative;
   const alreadyNamedAtStart =
     narrative.startsWith(`${char.name} `) ||
     narrative.startsWith(`${char.name}:`) ||
     narrative.startsWith(`[${char.name}]`);
-  const speakerPrefix = livingPartyCount > 1 && !alreadyNamedAtStart ? `[${char.name}] ` : '';
-  const rawNarrative =
-    speakerPrefix + (extraNarrative ? `${narrative}\n\n${extraNarrative}` : narrative);
+  // Skip the prefix on an empty turn (e.g. a "Continue" that only clears a
+  // post-combat gate) — otherwise the log shows a bare "[Name]" with nothing
+  // after it.
+  const speakerPrefix =
+    livingPartyCount > 1 && !alreadyNamedAtStart && body.trim().length > 0 ? `[${char.name}] ` : '';
+  const rawNarrative = speakerPrefix + body;
 
   const activeRoom = seed.rooms.find((r) => r.id === st.current_room);
   // The LLM rewrites prose freely. We strip:
