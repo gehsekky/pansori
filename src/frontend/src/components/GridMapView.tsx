@@ -280,6 +280,12 @@ function GridMapView({
       const isObstacle = obstacleSet.has(key);
       const transition = transitionAt.get(key);
       const isTownSite = transition?.kind === 'site' && !!transition.toTownId;
+      // A site can opt into a painted tile via an `icon: 'tile:<name>'` value
+      // (e.g. 'tile:forest' → /art/tiles/forest.png) instead of a game-icons glyph.
+      const siteTileName =
+        transition?.kind === 'site' && transition.icon?.startsWith('tile:')
+          ? transition.icon.slice('tile:'.length)
+          : undefined;
       // A talkable NPC token sits here (and the party isn't standing on it).
       const cellNpc = npcs?.find((n) => n.pos.x === x && n.pos.y === y);
       const isNpc = !!cellNpc && !isMarker;
@@ -331,11 +337,13 @@ function GridMapView({
         ? undefined
         : isTownSite
           ? TOWN_SITE_TILE
-          : terrainType
-            ? TERRAIN_TILE[terrainType]
-            : isRegional && plainsDefault
-              ? TERRAIN_TILE.plains
-              : undefined;
+          : siteTileName
+            ? `/art/tiles/${siteTileName}.png`
+            : terrainType
+              ? TERRAIN_TILE[terrainType]
+              : isRegional && plainsDefault
+                ? TERRAIN_TILE.plains
+                : undefined;
       const fillTint = tStyle?.tint ?? (plainsDefault ? TERRAIN_STYLE.plains.tint : undefined);
       let cellBg = fillTint
         ? `linear-gradient(${fillTint}, ${fillTint}), var(--t-bg)`
@@ -468,7 +476,7 @@ function GridMapView({
           : (TRANSITION_ICON[transition.kind] ?? null);
         token = (
           <>
-            {isTownSite ? null : transIcon ? (
+            {isTownSite || siteTileName ? null : transIcon ? (
               <GameIcon
                 name={transIcon.name}
                 className={styles.gridMapGlyph}

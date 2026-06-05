@@ -1195,7 +1195,9 @@ export const regions: Region[] = [
         pos: { x: 5, y: 6 }, // the beginner dungeon, in a forest clearing by Pinegate
         kind: 'local',
         entryRoomId: 'thornwater_bridge',
-        icon: 'forest',
+        // `tile:<name>` renders the painted /art/tiles/<name>.png tile instead of
+        // a game-icons glyph (here the broadleaf-forest tile for the grove).
+        icon: 'tile:forest',
       },
     ],
     // Bandit Ruffian (Malgovia) + the folded modules' overland encounters

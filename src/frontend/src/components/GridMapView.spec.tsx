@@ -136,6 +136,22 @@ describe('GridMapView', () => {
     expect(getByText('site')).toBeTruthy();
   });
 
+  it('renders a site as a painted tile when its icon is "tile:<name>"', () => {
+    const groveGrid: ActiveGrid = {
+      ...grid,
+      transitions: [
+        { pos: { x: 0, y: 2 }, kind: 'site', label: 'The Silent Grove', icon: 'tile:forest' },
+      ],
+    };
+    const { container, getByText } = render(
+      <GridMapView grid={groveGrid} markerPos={{ x: 0, y: 0 }} />
+    );
+    const c = cell(container, 0, 2);
+    expect(c.querySelector('img')?.getAttribute('src')).toContain('/art/tiles/forest.png');
+    expect(c.querySelector('.game-icon-dungeon-gate')).toBeNull(); // tile replaces the glyph
+    expect(getByText('The Silent Grove')).toBeTruthy(); // label kept
+  });
+
   it('renders a per-dungeon icon override on a local site', () => {
     const withIcon: ActiveGrid = {
       ...grid,
