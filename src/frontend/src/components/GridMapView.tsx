@@ -410,8 +410,10 @@ function GridMapView({
         // already highlighted via gridMapCellCurrent, so no backing circle.
         if (grid.level === 'regional' || grid.level === 'town') {
           // Pre-trimmed idle strip → the warrior is centred in each frame, so
-          // just size it (~1.25× the cell) and centre the element on the cell.
+          // just size it (~1.25× the cell) and centre the element on the cell,
+          // with a small left nudge (the shield reads heavier on the right).
           const markerPx = Math.round(cellPx * 1.25);
+          const nudgeX = Math.round(cellPx * 0.06);
           token = (
             <div
               className={styles.gridMapMarkerSprite}
@@ -420,6 +422,7 @@ function GridMapView({
                   width: markerPx,
                   height: markerPx,
                   '--mk': `${markerPx}px`,
+                  transform: `translateX(-${nudgeX}px)`,
                 } as React.CSSProperties
               }
               aria-hidden="true"
