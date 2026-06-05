@@ -1593,6 +1593,13 @@
   line-height: 1.55;
   max-height: 70vh;
   overflow-y: auto;
+  /* The modal box (--t-card) is dark; set a legible foreground so paragraph
+     text doesn't fall back to the browser-default black. Headings + links keep
+     the brighter --t-primary below. */
+  color: var(--t-mid);
+}
+.aboutBody strong {
+  color: var(--t-primary);
 }
 .aboutBody section {
   margin-bottom: 1rem;

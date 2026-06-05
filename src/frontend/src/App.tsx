@@ -506,6 +506,9 @@ export default function App() {
                           RESIGN
                         </button>
                       )}
+                      <button className={styles.signOutBtn} onClick={() => setAboutOpen(true)}>
+                        ABOUT
+                      </button>
                       <button className={styles.signOutBtn} onClick={handleLogout}>
                         SIGN OUT
                       </button>
