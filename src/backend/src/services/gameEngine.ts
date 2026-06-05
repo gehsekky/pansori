@@ -7731,6 +7731,34 @@ export function attemptEnemyApproach(args: {
  * open the interactive Indomitable reroll window (saves resolve immediately);
  * Counterspell still gates the whole spell upstream in `attemptEnemySpellCast`.
  */
+// Apply an enemy AoE spell's rider condition to a PC who failed its save
+// (an enemy casting a Sunburst/Weird-style spell → Blinded / Frightened). The
+// mirror of the PC-side AoE rider: respects condition immunity, stamps the
+// spell's duration (else the condition table default), records the fear/charm
+// source. Returns the updated state + a note fragment.
+function applyEnemySpellConditionToPc(
+  st: GameState,
+  spell: Spell,
+  pcId: string,
+  enemyId: string
+): { st: GameState; note: string } {
+  const cond = spell.condition;
+  if (!cond) return { st, note: '' };
+  const pc = st.characters.find((c) => c.id === pcId);
+  if (!pc || pc.dead || pc.conditions.includes(cond)) return { st, note: '' };
+  if (conditionImmunitiesFor(pc, st).has(cond))
+    return { st, note: ` ${pc.name} is immune to ${cond}.` };
+  const sourceId = cond === 'frightened' || cond === 'charmed' ? enemyId : undefined;
+  let updated = inflictCondition(pc, cond, sourceId);
+  if (spell.conditionDuration) {
+    updated = {
+      ...updated,
+      condition_durations: { ...updated.condition_durations, [cond]: spell.conditionDuration },
+    };
+  }
+  return { st: commitCharacter(st, updated), note: ` ${pc.name} is ${cond}!` };
+}
+
 function resolveEnemyAoeSpell(args: {
   enemy: Enemy;
   spell: Spell;
@@ -7786,6 +7814,13 @@ function resolveEnemyAoeSpell(args: {
     const newHp = Math.max(0, c.hp - dmg);
     st = commitCharacter(st, { ...c, hp: newHp });
     narrative += ` ${c.name} ${fmt.save(save.toUpperCase(), total)} vs ${fmt.dc(dc)} — ${saved ? 'saves' : 'fails'}, ${fmt.dmg(dmg)} ${spell.damageType ?? 'damage'}.${evasionNote}`;
+    // SRD AoE rider condition (Sunburst → Blinded, Weird → Frightened): a PC who
+    // failed and is still standing gains the spell's condition.
+    if (!saved && spell.condition && newHp > 0) {
+      const cr = applyEnemySpellConditionToPc(st, spell, c.id, enemy.id);
+      st = cr.st;
+      narrative += cr.note;
+    }
   }
   if (struck.length === 0) narrative += ' No one is caught in the blast.';
   const primary = st.characters.find((c) => c.id === args.target.id) ?? args.target;
