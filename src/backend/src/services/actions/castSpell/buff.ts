@@ -491,6 +491,21 @@ export function runBuffSpell(
     char.sees_invisible = true;
   }
 
+  // SRD Longstrider — +10 ft Speed (read by effectiveSpeed). Touch, 1 hour, not
+  // concentration; persists like Mage Armor. (Upcast extra targets deferred.)
+  if (spell.id === 'longstrider') {
+    if (isCasterTarget) {
+      char.longstrider_active = true;
+    } else {
+      ctx.st = {
+        ...ctx.st,
+        characters: ctx.st.characters.map((c) =>
+          c.id === buffTarget.id ? { ...c, longstrider_active: true } : c
+        ),
+      };
+    }
+  }
+
   // SRD Dragon's Breath — grant the target a breath weapon for the duration.
   // The chosen element comes from the cast option picker (default fire); the
   // damage is the spell's dice scaled for the slot; the save DC is the caster's.

@@ -1314,6 +1314,9 @@ export interface Character {
   // SRD See Invisibility (L2) — while set, this creature can see Invisible
   // creatures (its attacks/sight ignore the target's `invisible` condition).
   sees_invisible?: boolean;
+  // SRD Longstrider (L1) — +10 ft Speed for 1 hour (NOT concentration).
+  // `effectiveSpeed` reads this; persistent like Mage Armor (expires on rest).
+  longstrider_active?: boolean;
   // SRD Death Ward (L4 Abjuration) — one-shot rescue. While set,
   // the next time the target's HP would drop to 0, it drops to 1
   // instead and the flag clears (the spell "ends" per RAW). 8-hour

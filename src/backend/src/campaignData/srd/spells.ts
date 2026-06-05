@@ -811,8 +811,9 @@ export const SRD_SPELLS: Record<string, Spell> = {
     level: 1,
     castTime: 'action',
     durationRounds: 600, // 1 hour
+    targetType: 'self_or_ally',
     narrative: '{name} touches an ally — their stride lengthens, the ground feels closer.',
-    desc: 'Touch buff: +10 speed for 1 hour. Targets one creature; upcast +1 creature per slot above 1.',
+    desc: 'Touch buff: +10 ft Speed for 1 hour. (Upcast adds targets — deferred; pansori targets one.)',
     rangeKind: 'touch',
     spellList: ['arcane', 'primal'],
   },

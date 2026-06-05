@@ -2476,6 +2476,9 @@ export function tickEnemyConditions(st: GameState): { st: GameState; narrative: 
 // > 15×STR: speed 0 (overloaded)
 export function effectiveSpeed(char: Character, lootTable: LootItem[] = []): number {
   let base = char.speed ?? DEFAULT_SPEED_FEET;
+  // SRD Longstrider — +10 ft Speed for the duration (a flat increase before the
+  // Haste/Slow multipliers, like the other movement features below).
+  if (char.longstrider_active) base += 10;
   // 2024 PHB Goliath Large Form — +10 ft speed while the condition is active.
   if (char.conditions?.includes('large_form')) base += 10;
   // SRD Barbarian Fast Movement (L5): +10 ft while not wearing Heavy armor.
