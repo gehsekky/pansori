@@ -3835,11 +3835,21 @@ export function levelUpWorkFor(char: Character): 'advance' | 'asi' | 'mastery' |
 // The classes a character may advance into next: any class they already have,
 // plus any they meet the 2024 multiclass ability prereq for (canMulticlassInto).
 function levelClassChoices(char: Character): GameChoice[] {
-  const nextLevel = (char.level ?? 1) + 1;
-  return levelUpClassOptions(char).map((cls) => ({
-    label: `Advance ${cls[0].toUpperCase()}${cls.slice(1)} → level ${nextLevel}`,
-    action: { type: 'level_up_class' as const, className: cls },
-  }));
+  // The choice gains a level in the CHOSEN class — not the character's total
+  // level. Continuing an existing class advances that class's level; picking a
+  // class you have no levels in is a multiclass that grants its LEVEL 1 (your
+  // total level still goes up by one). Label per-class so a Wizard 1 → 2 sees
+  // "Advance Wizard → level 2" vs "Multiclass: Barbarian (level 1)", not a
+  // misleading "Advance Barbarian → level 2".
+  return levelUpClassOptions(char).map((cls) => {
+    const name = `${cls[0].toUpperCase()}${cls.slice(1)}`;
+    const classNext = getClassLevel(char, cls) + 1;
+    const label =
+      classNext === 1
+        ? `Multiclass: ${name} (new class — level 1)`
+        : `Advance ${name} → level ${classNext}`;
+    return { label, action: { type: 'level_up_class' as const, className: cls } };
+  });
 }
 
 // ASI / Epic-Boon choices for a character at an ASI milestone (asi_pending).

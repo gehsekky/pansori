@@ -104,6 +104,18 @@ describe('enter_leveling → cascade → auto-drop', () => {
     expect(classNames).toContain('wizard'); // continue primary
     expect(classNames.length).toBeGreaterThan(1); // INT 15 → multiclass options
     expect(choices.some((c) => c.action.type === 'exit_leveling')).toBe(true);
+
+    // Labels reflect the CLASS level gained, not the total character level: the
+    // Wizard (level 3) continues to wizard 4, while a multiclass option grants
+    // the new class's LEVEL 1 (not a misleading "→ level 4").
+    const labelByClass = new Map(
+      classPicks.map(
+        (c) => [c.action.type === 'level_up_class' ? c.action.className : '', c.label] as const
+      )
+    );
+    expect(labelByClass.get('wizard')).toBe('Advance Wizard → level 4');
+    const mcClass = classNames.find((n) => n !== 'wizard')!;
+    expect(labelByClass.get(mcClass)).toContain('(new class — level 1)');
   });
 
   it('advancing into an ASI level shows ASI choices next, then auto-drops when done', async () => {
