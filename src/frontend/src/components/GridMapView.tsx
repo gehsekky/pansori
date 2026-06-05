@@ -409,9 +409,15 @@ function GridMapView({
         // local rooms keep the compact swords-emblem glyph. The party cell is
         // already highlighted via gridMapCellCurrent, so no backing circle.
         if (grid.level === 'regional' || grid.level === 'town') {
-          // The warrior sits in a ~64px footprint inside its 192px frame, so
-          // render the frame at 2× the cell to read roughly cell-sized.
+          // The warrior occupies a ~79×90 box centered at (102,90) inside its
+          // 192px frame (measured) — i.e. offset from the frame's own centre. We
+          // render the frame at 2× the cell and translate by that offset so the
+          // CHARACTER (not the padded frame) sits dead-centre on the cell.
+          const FRAME = 192;
           const markerPx = Math.round(cellPx * 2);
+          const scale = markerPx / FRAME;
+          const dx = (FRAME / 2 - 102) * scale; // char bbox centre x = 102
+          const dy = (FRAME / 2 - 90) * scale; //  char bbox centre y = 90
           token = (
             <div
               className={styles.gridMapMarkerSprite}
@@ -420,6 +426,7 @@ function GridMapView({
                   width: markerPx,
                   height: markerPx,
                   '--mk': `${markerPx}px`,
+                  transform: `translate(${dx.toFixed(1)}px, ${dy.toFixed(1)}px)`,
                 } as React.CSSProperties
               }
               aria-hidden="true"
@@ -637,7 +644,7 @@ function GridMapView({
           {grid.width}×{grid.height} · {scaleLabel(grid.feetPerSquare)}
         </span>
       </div>
-      <div className={styles.gridBoardWrap}>
+      <div className={styles.gridBoardWrap} style={{ padding: Math.round(cellPx * 0.55) }}>
         <div
           className={styles.gridBoard}
           style={{

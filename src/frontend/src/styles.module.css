@@ -1784,8 +1784,10 @@
 .gridBoardWrap {
   position: relative;
   width: fit-content;
-  /* Keep a large board (e.g. bigger regional squares) inside its panel —
-     scroll rather than overflow the layout. */
+  /* Inset padding (set inline from the cell size) gives the cells' bleed room —
+     the top-row tile overhang, destination name labels below bottom-row cells,
+     and the party sprite around edge cells — so `overflow` contains them to the
+     panel (scrolling a large board) instead of clipping them off. */
   max-width: 100%;
   overflow: auto;
 }
@@ -1796,9 +1798,6 @@
   background: var(--t-separator);
   padding: 1px;
   width: fit-content;
-  /* Clip the top row's upward tile overhang to the board rectangle so it can't
-     bleed over the header. Inner-row overhang stays within the board. */
-  overflow: hidden;
 }
 
 /* Party marker sprite — one frame of the 6x8 Tiny Swords warrior sheet (192px
