@@ -50,7 +50,8 @@ function AboutModal({ onClose }: { onClose: () => void }) {
           <h3 className={styles.aboutHeading}>Code</h3>
           <p>
             The Pansori engine and all original code, narrative, and non-SRD content are licensed
-            under the <Ext href="https://www.gnu.org/licenses/gpl-3.0.html">GNU GPL v3.0</Ext>.
+            under the <Ext href="https://www.gnu.org/licenses/gpl-3.0.html">GNU GPL v3.0</Ext>. The
+            source lives on <Ext href="https://github.com/gehsekky/pansori">GitHub</Ext>.
           </p>
         </section>
 

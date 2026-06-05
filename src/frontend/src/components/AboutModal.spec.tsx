@@ -11,6 +11,11 @@ describe('AboutModal', () => {
     expect(getByText(/System Reference Document 5\.2\.1/)).toBeTruthy();
     expect(getByText(/CC BY 4\.0/)).toBeTruthy();
     expect(getByText(/GNU GPL v3\.0/)).toBeTruthy();
+    expect(
+      getByText(/GitHub/)
+        .closest('a')!
+        .getAttribute('href')
+    ).toBe('https://github.com/gehsekky/pansori');
     expect(getByText(/Game-icons\.net/)).toBeTruthy();
     expect(getByText(/CC BY 3\.0/)).toBeTruthy();
     expect(getByText(/RPG Awesome/)).toBeTruthy();
