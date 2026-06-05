@@ -27,6 +27,7 @@ import type {
   ChoiceDirection,
   CombatEntity,
   CombatEvent,
+  ConditionName,
   Context,
   DeathSaves,
   Enemy,
@@ -2659,7 +2660,16 @@ function getLivingRoomEnemies(state: GameState, seed: Seed, roomId: string): Ene
 export function applyAoeSaveToParty(
   st: GameState,
   context: Context,
-  opts: { dice: string; damageType: string; savingThrow: AbilityKey; saveDC: number }
+  opts: {
+    dice: string;
+    damageType: string;
+    savingThrow: AbilityKey;
+    saveDC: number;
+    // Optional rider condition for a failed save (breath / lair that also
+    // Blinds / Frightens / Poisons). Stamped for `conditionDuration` rounds.
+    condition?: ConditionName;
+    conditionDuration?: number;
+  }
 ): { st: GameState; narrative: string } {
   const fullDmg = rollDice(opts.dice);
   const scoreKey = opts.savingThrow;
@@ -2688,13 +2698,35 @@ export function applyAoeSaveToParty(
     );
     const dealt = saveFailed ? fullDmg : Math.floor(fullDmg / 2);
     const dmgResult = applyDamage(origC, workingSt, dealt);
+    let damagedChar = dmgResult.char;
     workingSt = {
       ...dmgResult.st,
-      characters: dmgResult.st.characters.map((c) =>
-        c.id === dmgResult.char.id ? dmgResult.char : c
-      ),
+      characters: dmgResult.st.characters.map((c) => (c.id === damagedChar.id ? damagedChar : c)),
     };
-    narrative += ` ${origC.name}: ${scoreKey.toUpperCase()} save vs DC ${opts.saveDC} — ${saveFailed ? 'fails' : 'succeeds (half)'} (${dealt} ${opts.damageType}).${dmgResult.concentrationNote}`;
+    // Rider condition on a failed save (breath / lair) — applied to the survivor,
+    // respecting immunity + the existing fear/charm source tracking.
+    let condNote = '';
+    if (
+      saveFailed &&
+      opts.condition &&
+      !damagedChar.dead &&
+      !damagedChar.conditions.includes(opts.condition) &&
+      !conditionImmunitiesFor(damagedChar, workingSt).has(opts.condition)
+    ) {
+      damagedChar = inflictCondition(damagedChar, opts.condition);
+      if (opts.conditionDuration) {
+        damagedChar = {
+          ...damagedChar,
+          condition_durations: {
+            ...damagedChar.condition_durations,
+            [opts.condition]: opts.conditionDuration,
+          },
+        };
+      }
+      workingSt = commitCharacter(workingSt, damagedChar);
+      condNote = ` ${damagedChar.name} is ${opts.condition}!`;
+    }
+    narrative += ` ${origC.name}: ${scoreKey.toUpperCase()} save vs DC ${opts.saveDC} — ${saveFailed ? 'fails' : 'succeeds (half)'} (${dealt} ${opts.damageType}).${dmgResult.concentrationNote}${condNote}`;
   }
   return { st: workingSt, narrative };
 }
@@ -2739,6 +2771,8 @@ export function maybeFireBreathWeapon(args: {
     damageType: breath.damageType,
     savingThrow: breath.savingThrow,
     saveDC: breath.saveDC,
+    condition: breath.condition,
+    conditionDuration: breath.conditionDuration,
   });
   if (!turnHeaderShown) narrative += `\n\n[${args.enemy.name}'s turn]`;
   narrative += ` 🔥 ${args.enemy.name} unleashes ${breath.name}!` + res.narrative;
@@ -2775,6 +2809,8 @@ function fireLairAction(
       damageType: action.damageType,
       savingThrow: action.savingThrow as AbilityKey,
       saveDC: action.saveDC,
+      condition: action.condition,
+      conditionDuration: action.conditionDuration,
     });
     return {
       st: res.st,

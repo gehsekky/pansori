@@ -196,6 +196,10 @@ export type LairAction = {
   damageType: string;
   savingThrow: 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha';
   saveDC: number;
+  // Optional rider condition applied to a PC who fails the save (e.g. a lair
+  // that Frightens). Stamped with `conditionDuration` rounds (default 1).
+  condition?: ConditionName;
+  conditionDuration?: number;
   narrative: string; // pre-effect description (e.g. "The walls shake...")
 };
 
@@ -236,6 +240,10 @@ export interface BreathWeapon {
   savingThrow: AbilityKey;
   saveDC: number;
   rechargeMin?: number; // recharge on a d6 ≥ this (default 5)
+  // Optional rider condition applied to a PC who fails the save (a breath that
+  // also Blinds / Poisons). Stamped with `conditionDuration` rounds (default 1).
+  condition?: ConditionName;
+  conditionDuration?: number;
 }
 
 export interface EnemyTemplate {
