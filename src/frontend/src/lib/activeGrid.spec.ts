@@ -88,6 +88,17 @@ describe('activeGrid (FE port)', () => {
     expect(g.startPos).toEqual({ x: 0, y: 0 });
     expect(g.transitions.find((t) => t.kind === 'room_exit')?.toRoomId).toBe('hall');
     expect(g.transitions.find((t) => t.kind === 'ascend')?.ascendTo).toBe('region');
+    // Floor texture defaults to cobblestone when the room doesn't author one.
+    expect(g.floor).toBe('cobblestone');
+  });
+
+  it('carries an authored room floor through to the grid', () => {
+    const dirtSeed = {
+      ...seed,
+      rooms: [{ ...seed.rooms[0], floor: 'dirt' }],
+    } as unknown as Seed;
+    const g = activeGrid(dirtSeed, { map_level: 'local', current_room: 'crypt' } as GameState)!;
+    expect(g.floor).toBe('dirt');
   });
 
   it('an in-town local room ascends to the town, not the region', () => {

@@ -132,6 +132,7 @@ export function activeGrid(seed: Seed | undefined, st: GameState): ActiveGrid | 
       obstacles: mergeObstacles(room.obstacles, room.terrain, transitions),
       startPos: g.entry,
       transitions,
+      floor: room.floor ?? 'cobblestone',
     };
   }
 

@@ -483,6 +483,8 @@ export interface Seed {
     feetPerSquare?: number;
     entryPos?: GridPos;
     exits?: RoomExit[];
+    // Cosmetic local-room floor texture (mirror of BE Room.floor).
+    floor?: FloorType;
   }>;
   enemies?: Record<string, Array<{ id: string; name: string; hp: number; ac: number }>>;
   loot?: Record<string, unknown>;
