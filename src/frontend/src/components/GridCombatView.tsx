@@ -178,7 +178,11 @@ function GridCombatView({
   onMove,
   aoePreview,
 }: Props) {
-  if (!state.combat_active || !state.entities?.length) return null;
+  // Render during live combat AND through the post-combat "Continue" gate (the
+  // battlefield stays visible until the player dismisses it — entities are kept
+  // for the gate, then cleared by `continue`). Read-only during the gate: the
+  // caller withholds onMove when combat isn't active.
+  if ((!state.combat_active && !state.combat_over_pending) || !state.entities?.length) return null;
 
   const entities = state.entities;
   const activeId = state.active_character_id;
@@ -659,7 +663,8 @@ function GridCombatView({
       <div className={styles.gridHeader}>
         <span className={styles.gridHeaderLabel}>BATTLEFIELD</span>
         <span className={styles.gridHeaderInfo}>
-          {gridWidth}×{gridHeight} squares · move: {remainingFt}/{speedFt}ft
+          {gridWidth}×{gridHeight} squares
+          {state.combat_active ? ` · move: ${remainingFt}/${speedFt}ft` : ' · cleared'}
           {lightingNote}
         </span>
       </div>

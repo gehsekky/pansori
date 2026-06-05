@@ -154,4 +154,27 @@ describe('GridCombatView — enemy token glyphs', () => {
     const { container } = render(<GridCombatView state={state} seed={seed} />);
     expect(cell(container, 6, 5).querySelector('.game-icon-daemon-skull')).toBeTruthy();
   });
+
+  it('keeps the battlefield on screen during the post-combat gate, marked cleared', () => {
+    const { state, seed } = build({
+      lighting: 'bright',
+      pcPos: { x: 0, y: 5 },
+      enemyPos: { x: 6, y: 5 },
+    });
+    const gate = { ...state, combat_active: false, combat_over_pending: true } as GameState;
+    const { getByText } = render(<GridCombatView state={gate} seed={seed} />);
+    expect(getByText('BATTLEFIELD')).toBeTruthy(); // still rendered
+    expect(getByText(/cleared/)).toBeTruthy(); // header reads "cleared", not a move counter
+  });
+
+  it('renders nothing once combat is over and the gate is dismissed', () => {
+    const { state, seed } = build({
+      lighting: 'bright',
+      pcPos: { x: 0, y: 5 },
+      enemyPos: { x: 6, y: 5 },
+    });
+    const done = { ...state, combat_active: false, combat_over_pending: false } as GameState;
+    const { container } = render(<GridCombatView state={done} seed={seed} />);
+    expect(container.firstChild).toBeNull();
+  });
 });

@@ -44,7 +44,9 @@ export const handleEndTurn: ActionHandler<{ type: 'end_turn' }> = (ctx) => {
  * out-of-combat acknowledgement — no turn economy, no narrative noise.
  */
 export const handleContinue: ActionHandler<{ type: 'continue' }> = (ctx) => {
-  ctx.st = { ...ctx.st, combat_over_pending: false };
+  // Drop the post-combat battlefield kept on screen for the gate (wilderness
+  // encounters — see endCombatState) as we return to exploration.
+  ctx.st = { ...ctx.st, combat_over_pending: false, entities: undefined };
   ctx.narrative = '';
   // A wilderness ambush interrupts travel BEFORE the destination transition
   // resolves (resolveMarkerMove skips the transition when an encounter fires),

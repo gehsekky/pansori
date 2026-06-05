@@ -44,6 +44,30 @@ describe('endCombatState — post-combat gate', () => {
     const after = endCombatState(dead);
     expect(after.combat_over_pending).toBeFalsy();
   });
+
+  const ents = [
+    { id: 'pc-1', isEnemy: false, pos: { x: 1, y: 1 }, hp: 20 },
+    { id: 'goblin', isEnemy: true, pos: { x: 3, y: 3 }, hp: 0 },
+  ] as GameState['entities'];
+
+  it('keeps the battlefield entities through the gate for a wilderness encounter', () => {
+    // encounter_return marks a wilderness fight — its battlefield is the combat
+    // grid, so it must survive the gate (the map already collapsed back to town).
+    const after = endCombatState(
+      inCombat({
+        entities: ents,
+        encounter_return: { level: 'town', town_id: 'town1', pos: { x: 2, y: 3 } },
+      } as Partial<GameState>)
+    );
+    expect(after.combat_over_pending).toBe(true);
+    expect(after.entities).toHaveLength(2); // battlefield kept for the gate
+    expect(after.map_level).toBe('town'); // …but the underlying level collapsed
+  });
+
+  it('clears the battlefield entities for an authored-room fight (no encounter_return)', () => {
+    const after = endCombatState(inCombat({ entities: ents } as Partial<GameState>));
+    expect(after.entities).toBeUndefined();
+  });
 });
 
 describe('generateChoices — Continue gate', () => {
@@ -71,5 +95,23 @@ describe('continue action', () => {
     // Back to normal exploration choices — no longer the single Continue gate.
     expect(r.choices.some((c) => c.action.type === 'continue')).toBe(false);
     expect(r.choices.length).toBeGreaterThan(0);
+  });
+
+  it('drops the kept battlefield entities when dismissing the gate', async () => {
+    const st = endCombatState(
+      inCombat({
+        entities: [{ id: 'pc-1', isEnemy: false, pos: { x: 1, y: 1 }, hp: 20 }],
+        encounter_return: { level: 'regional', pos: { x: 0, y: 0 } },
+      } as Partial<GameState>)
+    );
+    expect(st.entities).toBeDefined(); // shown during the gate
+    const r = await takeAction({
+      action: { type: 'continue' },
+      history: [],
+      state: st,
+      seed,
+      context: ctx,
+    });
+    expect(r.newState.entities).toBeUndefined(); // …cleared on Continue
   });
 });

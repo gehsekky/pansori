@@ -3074,13 +3074,21 @@ export function endCombatState(st: GameState): GameState {
   // party survived (an all-dead party goes to the game-over screen, not a
   // Continue prompt).
   const partySurvived = st.characters.some((c) => !c.dead);
+  // Keep the combat battlefield on screen through the post-combat gate for a
+  // WILDERNESS encounter (`encounter_return` was set): its battlefield is the
+  // combat grid, which has no exploration-map equivalent — `returnFromEncounter`
+  // already restored the overworld/town level above, so without this the gate
+  // would snap to that map instead of the fight just fought. Authored-room
+  // combat keeps clearing entities; its room renders via the exploration map
+  // during the gate. `continue` clears these entities when it dismisses the gate.
+  const keepBattlefield = partySurvived && !!st.encounter_return;
   return {
     ...collapsed,
     combat_active: false,
     combat_over_pending: partySurvived,
     initiative_order: [],
     initiative_idx: 0,
-    entities: undefined,
+    entities: keepBattlefield ? st.entities : undefined,
     movement_used: undefined,
     // Persistent damage zones are combat constructs; clear any that outlived the
     // fight so a non-concentration zone (Guardian of Faith) can't leak into the

@@ -548,22 +548,29 @@ export default function App() {
                     if (!gameState || !seed || !mapPanelVisible(gameState, { escaped, allDead }))
                       return null;
                     if (
-                      gameState.combat_active &&
+                      (gameState.combat_active || gameState.combat_over_pending) &&
                       gameState.entities &&
                       gameState.entities.length > 0
                     ) {
+                      // The battlefield stays up through the post-combat gate
+                      // (so a wilderness fight doesn't snap back to the overworld
+                      // map). Read-only there: withhold onMove when combat's over.
                       return (
                         <GridCombatView
                           state={gameState}
                           seed={seed}
                           aoePreview={hoveredChoice?.aoePreview}
-                          onMove={(to) => {
-                            const activeId = gameState.active_character_id;
-                            handleChoice({
-                              label: `Move to (${to.x},${to.y})`,
-                              action: { type: 'grid_move', entityId: activeId, to },
-                            });
-                          }}
+                          onMove={
+                            gameState.combat_active
+                              ? (to) => {
+                                  const activeId = gameState.active_character_id;
+                                  handleChoice({
+                                    label: `Move to (${to.x},${to.y})`,
+                                    action: { type: 'grid_move', entityId: activeId, to },
+                                  });
+                                }
+                              : undefined
+                          }
                         />
                       );
                     }
