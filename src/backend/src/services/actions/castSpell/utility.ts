@@ -319,13 +319,14 @@ export function runUtilitySpell(
     ctx.narrative += ` Hopeful: ${hopefulNames}.`;
   }
 
-  // 2024 PHB Dimension Door (L4) — real grid teleport. Pansori MVP
-  // auto-picks the cell with maximum min-distance to any living enemy
-  // (the "safest" cell). The caster's grid entity moves there; movement
-  // budget for the turn isn't consumed (RAW: teleport doesn't use
-  // movement). Willing-creature passenger deferred. No-op when the
-  // grid isn't populated — narrative-only fallback.
-  if (spell.id === 'dimension_door' && ctx.st.entities) {
+  // 2024 PHB Dimension Door (L4) / Misty Step (L2) — real grid teleport.
+  // Pansori MVP auto-picks the cell with maximum min-distance to any living
+  // enemy (the "safest" cell). The caster's grid entity moves there; movement
+  // budget for the turn isn't consumed (RAW: teleport doesn't use movement).
+  // Misty Step is a bonus-action 30-ft (6-square) hop — the candidate cells are
+  // capped to that radius; Dimension Door has no range cap. Willing-creature
+  // passenger deferred. No-op when the grid isn't populated.
+  if ((spell.id === 'dimension_door' || spell.id === 'misty_step') && ctx.st.entities) {
     const gridW = ctx.context.gridWidth ?? 10;
     const gridH = ctx.context.gridHeight ?? 10;
     const currentRoomForDD = ctx.seed.rooms.find((r) => r.id === ctx.roomId);
@@ -339,14 +340,23 @@ export function runUtilitySpell(
     const livingEnemyPositions = ctx.livingEnemiesInRoom
       .map((e) => ctx.st.entities?.find((ent) => ent.id === e.id && ent.isEnemy)?.pos)
       .filter((p): p is { x: number; y: number } => !!p);
+    const casterEnt = ctx.st.entities.find((e) => e.id === char.id);
+    // Misty Step: 30 ft = 6 squares (5 ft/square). Dimension Door: anywhere.
+    const rangeSquares = spell.id === 'misty_step' ? 6 : Infinity;
     let bestCell: { x: number; y: number } | null = null;
     let bestDist = -1;
     for (let x = 0; x < gridW; x++) {
       for (let y = 0; y < gridH; y++) {
         if (occupied.has(`${x},${y}`)) continue;
         // Skip the caster's own current cell — no-op teleport.
-        const casterEnt = ctx.st.entities.find((e) => e.id === char.id);
         if (casterEnt && casterEnt.pos.x === x && casterEnt.pos.y === y) continue;
+        // Respect the spell's teleport range from the caster's current cell.
+        if (
+          casterEnt &&
+          Math.max(Math.abs(casterEnt.pos.x - x), Math.abs(casterEnt.pos.y - y)) > rangeSquares
+        ) {
+          continue;
+        }
         const minDistFromEnemy =
           livingEnemyPositions.length === 0
             ? 0
