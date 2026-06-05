@@ -11,13 +11,13 @@ describe('LoginScreen', () => {
 
   it('renders the PANSORI title', () => {
     vi.spyOn(api, 'listProviders').mockResolvedValue([]);
-    render(<LoginScreen />);
+    render(<LoginScreen onAbout={vi.fn()} />);
     expect(screen.getByText(/PANSORI/i)).toBeTruthy();
   });
 
   it('renders the sign-in call-to-action text', () => {
     vi.spyOn(api, 'listProviders').mockResolvedValue([]);
-    render(<LoginScreen />);
+    render(<LoginScreen onAbout={vi.fn()} />);
     expect(screen.getByText(/SIGN IN TO CONTINUE/i)).toBeTruthy();
   });
 
@@ -26,7 +26,7 @@ describe('LoginScreen', () => {
       { id: 'google', label: 'Sign in with Google' },
       { id: 'discord', label: 'Sign in with Discord' },
     ]);
-    render(<LoginScreen />);
+    render(<LoginScreen onAbout={vi.fn()} />);
     await waitFor(() => {
       expect(screen.getByTestId('auth-provider-google')).toBeTruthy();
       expect(screen.getByTestId('auth-provider-discord')).toBeTruthy();
@@ -37,7 +37,7 @@ describe('LoginScreen', () => {
     vi.spyOn(api, 'listProviders').mockResolvedValue([
       { id: 'google', label: 'Sign in with Google' },
     ]);
-    render(<LoginScreen />);
+    render(<LoginScreen onAbout={vi.fn()} />);
     await waitFor(() => {
       const link = screen.getByTestId('auth-provider-google') as HTMLAnchorElement;
       expect(link.href).toContain('/api/auth/google');
@@ -46,7 +46,7 @@ describe('LoginScreen', () => {
 
   it('shows an empty-state message when no providers are configured', async () => {
     vi.spyOn(api, 'listProviders').mockResolvedValue([]);
-    render(<LoginScreen />);
+    render(<LoginScreen onAbout={vi.fn()} />);
     await waitFor(() => {
       expect(screen.getByText(/NO AUTH PROVIDERS CONFIGURED/i)).toBeTruthy();
     });

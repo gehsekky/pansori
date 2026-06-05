@@ -2,7 +2,7 @@ import { AuthProvider, api } from '../lib/api';
 import { useEffect, useState } from 'react';
 import styles from '../styles.module.css';
 
-function LoginScreen() {
+function LoginScreen({ onAbout }: { onAbout: () => void }) {
   // Providers are advertised by the backend at /api/auth/providers — the
   // server only lists the ones it's configured for (env vars present). The
   // UI follows that source of truth instead of guessing.
@@ -44,6 +44,14 @@ function LoginScreen() {
             ))}
           </div>
         )}
+        <button
+          type="button"
+          className={styles.ghostBtn}
+          style={{ marginTop: '1.5rem' }}
+          onClick={onAbout}
+        >
+          ABOUT
+        </button>
       </main>
     </div>
   );

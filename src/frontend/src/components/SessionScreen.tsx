@@ -11,6 +11,7 @@ function SessionsScreen({
   onLogout,
   onDelete,
   onClearCompleted,
+  onAbout,
   contexts,
 }: {
   sessions: SessionSummary[];
@@ -21,6 +22,7 @@ function SessionsScreen({
   onLogout: () => void;
   onDelete: (id: string) => void;
   onClearCompleted: () => void;
+  onAbout: () => void;
   contexts: Record<string, FrontendContext>;
 }) {
   const statusColor = (s: string) =>
@@ -55,6 +57,9 @@ function SessionsScreen({
               onClick={onNewGame}
             >
               + NEW ADVENTURE
+            </button>
+            <button className={styles.ghostBtn} onClick={onAbout}>
+              ABOUT
             </button>
             <button className={styles.ghostBtn} onClick={onLogout}>
               SIGN OUT

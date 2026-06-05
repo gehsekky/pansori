@@ -40,6 +40,7 @@ const defaultProps = {
   onLogout: vi.fn(),
   onDelete: vi.fn(),
   onClearCompleted: vi.fn(),
+  onAbout: vi.fn(),
   contexts,
 };
 

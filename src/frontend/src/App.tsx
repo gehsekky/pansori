@@ -2,6 +2,7 @@ import { type AuthUser, type CharacterInput, api } from './lib/api.ts';
 import { FactionsView, QuestsView } from './components/CampaignPanel.tsx';
 import type { FrontendContext, GameChoice, Seed, SessionSummary } from './types.ts';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import AboutModal from './components/AboutModal.tsx';
 import AdventureLogPanel from './components/AdventureLogPanel.tsx';
 import CharScreen from './components/CharScreen.tsx';
 import CharacterModal from './components/CharacterModal.tsx';
@@ -134,6 +135,7 @@ export default function App() {
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [mapOpen, setMapOpen] = useState(false);
   const [inventoryOpen, setInventoryOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
   // Which party member's character sheet modal is open (null = closed).
   const [sheetCharId, setSheetCharId] = useState<string | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -346,7 +348,7 @@ export default function App() {
         </div>
       )}
 
-      {view === 'login' && <LoginScreen />}
+      {view === 'login' && <LoginScreen onAbout={() => setAboutOpen(true)} />}
 
       {view === 'sessions' && (
         <SessionsScreen
@@ -358,6 +360,7 @@ export default function App() {
           onLogout={handleLogout}
           onDelete={handleDeleteSession}
           onClearCompleted={handleClearCompleted}
+          onAbout={() => setAboutOpen(true)}
           contexts={CONTEXTS}
         />
       )}
@@ -1307,6 +1310,8 @@ export default function App() {
             </div>
           );
         })()}
+
+      {aboutOpen && <AboutModal onClose={() => setAboutOpen(false)} />}
     </>
   );
 }
