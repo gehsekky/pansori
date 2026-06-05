@@ -131,6 +131,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
     aliases: ['dart', 'darts'],
     weaponType: 'simple',
     damageType: 'piercing',
+    mastery: 'vex',
   },
 
   club: {

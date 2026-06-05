@@ -56,6 +56,10 @@ describe('SRD_ITEMS catalog integrity', () => {
     expect(expectedArmor).toHaveLength(13);
   });
 
+  it('Dart carries its SRD Vex mastery', () => {
+    expect(SRD_ITEMS.dart.mastery).toBe('vex');
+  });
+
   it('weapons declare damage + weaponType; armor declares a category', () => {
     for (const item of Object.values(SRD_ITEMS)) {
       if (item.type === 'weapon') {
