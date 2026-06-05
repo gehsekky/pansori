@@ -1339,6 +1339,11 @@ export interface Character {
   // SRD Pass without Trace (L2) — +10 to Stealth checks for the party while the
   // caster concentrates. Read by the Hide check; cleared on breakConcentration.
   pass_without_trace_active?: boolean;
+  // SRD Warding Bond (L2) — the id of the warder. While set, whenever this
+  // creature takes damage the warder takes the same amount (the post-action
+  // sweep redirects it). The ward's resistance-to-all is the grantResistances
+  // buff; this is the "you take the damage too" half. Ends if the warder drops.
+  warded_by?: string;
   // SRD Death Ward (L4 Abjuration) — one-shot rescue. While set,
   // the next time the target's HP would drop to 0, it drops to 1
   // instead and the flag clears (the spell "ends" per RAW). 8-hour

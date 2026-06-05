@@ -5413,7 +5413,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
       'thunder',
     ],
     rangeKind: 'touch',
-    desc: 'Touch a willing ally to forge a warding bond: they gain Resistance to all damage for the fight.',
+    desc: 'Touch a willing ally to forge a warding bond: they gain Resistance to all damage, and whenever they take damage you take the same amount. (The +1 AC / +1 saves stay narrative.)',
     narrative: '{name} forges a warding bond — {target} is sheathed against all harm.',
     spellList: ['divine'],
   },

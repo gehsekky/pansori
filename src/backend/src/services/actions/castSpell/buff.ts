@@ -537,6 +537,19 @@ export function runBuffSpell(
     }
   }
 
+  // SRD Warding Bond — bond the target to the caster: while warded, the target
+  // takes Resistance to all damage (the grantResistances block above) AND the
+  // caster takes the same damage the target takes (the post-action sweep reads
+  // `warded_by`). Self-cast is a no-op for the redirect (you'd ward yourself).
+  if (spell.id === 'warding_bond' && !isCasterTarget) {
+    ctx.st = {
+      ...ctx.st,
+      characters: ctx.st.characters.map((c) =>
+        c.id === buffTarget.id ? { ...c, warded_by: char.id } : c
+      ),
+    };
+  }
+
   // SRD Pass without Trace — a 30-ft aura granting the party +10 Stealth.
   // pansori abstracts the emanation to the whole party (flag every living PC),
   // bound to the caster's concentration (cleared in breakConcentration). The

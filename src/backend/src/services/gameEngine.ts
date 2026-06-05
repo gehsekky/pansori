@@ -2440,6 +2440,38 @@ export function breakCharmOnDamage(st: GameState, prevHp: Map<string, number>): 
   return next;
 }
 
+// SRD Warding Bond — whenever a warded creature takes damage, its warder takes
+// the same amount. Called once at the end of an action with the pre-action HP
+// snapshot: for each `warded_by` creature whose HP dropped, deal that amount to
+// the warder (full death/downing flow via applyDamage). The bond ends if the
+// warder is gone or drops to 0.
+export function redirectWardingBondDamage(st: GameState, prevHp: Map<string, number>): GameState {
+  let next = st;
+  for (const ward of st.characters) {
+    if (!ward.warded_by || ward.dead) continue;
+    const live = next.characters.find((c) => c.id === ward.id);
+    if (!live) continue;
+    const drop = (prevHp.get(ward.id) ?? live.hp) - live.hp;
+    if (drop <= 0) continue;
+    const warder = next.characters.find((c) => c.id === ward.warded_by);
+    const endBond = (s: GameState): GameState => ({
+      ...s,
+      characters: s.characters.map((c) => (c.id === ward.id ? { ...c, warded_by: undefined } : c)),
+    });
+    if (!warder || warder.dead) {
+      next = endBond(next); // warder gone → the ward ends
+      continue;
+    }
+    const res = applyDamage(warder, next, drop);
+    next = {
+      ...res.st,
+      characters: res.st.characters.map((c) => (c.id === res.char.id ? res.char : c)),
+    };
+    if (res.char.hp <= 0) next = endBond(next); // warder downed → the bond ends
+  }
+  return next;
+}
+
 export function tickConditions(char: Character): Character {
   const durations = char.condition_durations ?? {};
   if (!char.conditions.length) return char;
@@ -10579,6 +10611,8 @@ export async function takeAction({
 
   // SRD — break Charm on any creature that took damage this action.
   st = breakCharmOnDamage(st, prevHpForCharm);
+  // SRD Warding Bond — redirect a warded ally's damage to its warder.
+  st = redirectWardingBondDamage(st, prevHpForCharm);
 
   st.last_choices = generateChoices(st, seed, context);
 
