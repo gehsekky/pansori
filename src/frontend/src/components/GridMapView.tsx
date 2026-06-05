@@ -111,6 +111,10 @@ const TERRAIN_TILE: Partial<Record<TerrainType, string>> = {
   mountain: '/art/tiles/mountain.png',
 };
 
+// A town site on the regional map renders as this hand-painted village tile
+// (David Baumgart's dirtVillage) instead of the generic village glyph.
+const TOWN_SITE_TILE = '/art/tiles/town.png';
+
 // game-icons glyphs for non-site transitions (town venues + local room exits /
 // ascents). Sites are handled separately (towns → village, dungeons → their
 // authored icon, below).
@@ -123,8 +127,6 @@ const TRANSITION_ICON: Partial<Record<MapTransition['kind'], { name: string; col
 // Local sites (dungeons) on the overland map: the game-icons glyph defaults to
 // this and is overridden per site via MapSite.icon (carried on the transition).
 const DEFAULT_SITE_ICON = 'dungeon-gate';
-// Town settlement glyph (regional site carrying toTownId).
-const TOWN_ICON = { name: 'village', color: 'rgba(222, 190, 120, 0.97)' };
 // Stone tone shared by dungeon-site + room-exit glyphs.
 const SITE_STONE = 'rgba(206, 198, 182, 0.95)';
 
@@ -276,6 +278,7 @@ function GridMapView({
       const isEnemyMarker = !!enemyCell && enemyCell.x === x && enemyCell.y === y && !isMarker;
       const isObstacle = obstacleSet.has(key);
       const transition = transitionAt.get(key);
+      const isTownSite = transition?.kind === 'site' && !!transition.toTownId;
       // A talkable NPC token sits here (and the party isn't standing on it).
       const cellNpc = npcs?.find((n) => n.pos.x === x && n.pos.y === y);
       const isNpc = !!cellNpc && !isMarker;
@@ -325,11 +328,13 @@ function GridMapView({
       // never show a tile.
       const tileSrc = fogged
         ? undefined
-        : terrainType
-          ? TERRAIN_TILE[terrainType]
-          : isRegional && plainsDefault
-            ? TERRAIN_TILE.plains
-            : undefined;
+        : isTownSite
+          ? TOWN_SITE_TILE
+          : terrainType
+            ? TERRAIN_TILE[terrainType]
+            : isRegional && plainsDefault
+              ? TERRAIN_TILE.plains
+              : undefined;
       const fillTint = tStyle?.tint ?? (plainsDefault ? TERRAIN_STYLE.plains.tint : undefined);
       let cellBg = fillTint
         ? `linear-gradient(${fillTint}, ${fillTint}), var(--t-bg)`
@@ -452,18 +457,17 @@ function GridMapView({
       } else if (transition) {
         // A travel destination always shows its own glyph — even if terrain is
         // painted on the same cell — so it never hides behind a tint glyph.
-        // Towns → village; local dungeon sites → their authored icon (default);
-        // town venues / local room exits / ascents → their TRANSITION_ICON glyph.
-        const isTown = transition.kind === 'site' && !!transition.toTownId;
+        // Towns → painted village tile (set as tileSrc above; the glyph is
+        // suppressed so the tile carries the visual). Local dungeon sites →
+        // their authored icon (default); town venues / local room exits /
+        // ascents → their TRANSITION_ICON glyph.
         const isLocalSite = transition.kind === 'site' && !transition.toTownId;
-        const transIcon = isTown
-          ? TOWN_ICON
-          : isLocalSite
-            ? { name: transition.icon ?? DEFAULT_SITE_ICON, color: SITE_STONE }
-            : (TRANSITION_ICON[transition.kind] ?? null);
+        const transIcon = isLocalSite
+          ? { name: transition.icon ?? DEFAULT_SITE_ICON, color: SITE_STONE }
+          : (TRANSITION_ICON[transition.kind] ?? null);
         token = (
           <>
-            {transIcon ? (
+            {isTownSite ? null : transIcon ? (
               <GameIcon
                 name={transIcon.name}
                 className={styles.gridMapGlyph}

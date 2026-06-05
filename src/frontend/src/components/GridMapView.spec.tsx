@@ -120,10 +120,13 @@ describe('GridMapView', () => {
     expect(onMarkerMove).not.toHaveBeenCalled(); // engages, doesn't travel onto the cell
   });
 
-  it('distinguishes a town (village icon) from a local site (default dungeon icon) and shows their names', () => {
+  it('distinguishes a town (painted village tile) from a local site (default dungeon icon) and shows their names', () => {
     const { container, getByText } = render(<GridMapView grid={grid} markerPos={{ x: 0, y: 0 }} />);
-    // Town cell: game-icons village glyph + always-visible name.
-    expect(cell(container, 3, 0).querySelector('.game-icon-village')).toBeTruthy();
+    // Town cell: the painted village tile (not the old glyph) + always-visible name.
+    expect(cell(container, 3, 0).querySelector('img')?.getAttribute('src')).toContain(
+      '/art/tiles/town.png'
+    );
+    expect(cell(container, 3, 0).querySelector('.game-icon-village')).toBeNull();
     expect(getByText('Millhaven')).toBeTruthy();
     // Local site cell (no authored icon): the default dungeon glyph + name.
     expect(cell(container, 0, 2).querySelector('.game-icon-dungeon-gate')).toBeTruthy();
@@ -249,10 +252,10 @@ describe('GridMapView', () => {
     expect(getByText('mountains')).toBeTruthy();
   });
 
-  it('shows the site glyph (not the terrain glyph) and stays clickable when terrain overlaps a site', () => {
+  it('shows the town tile (not the terrain) and stays clickable when terrain overlaps a site', () => {
     // Regression: Pinegate is a town site painted with water terrain on the
-    // same cell. It must read as a town (village icon), not the water waves,
-    // and stay travel-able (the builder keeps the site cell out of obstacles).
+    // same cell. It must read as a town (the village tile wins over the water
+    // tile) and stay travel-able (the builder keeps the site cell out of obstacles).
     const overlap: ActiveGrid = {
       level: 'regional',
       id: 'reg3',
@@ -270,8 +273,8 @@ describe('GridMapView', () => {
       <GridMapView grid={overlap} markerPos={{ x: 0, y: 0 }} onMarkerMove={onMarkerMove} />
     );
     const c = cell(container, 1, 0);
-    expect(c.querySelector('.game-icon-village')).toBeTruthy(); // town icon wins
-    expect(c.querySelector('.game-icon-wave-crest')).toBeNull(); // not the water tile
+    expect(c.querySelector('img')?.getAttribute('src')).toContain('/art/tiles/town.png'); // town wins
+    expect(c.querySelector('.game-icon-wave-crest')).toBeNull(); // not the water glyph
     expect(c.getAttribute('role')).toBe('button'); // reachable
   });
 
