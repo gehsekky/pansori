@@ -420,6 +420,8 @@ export interface Town {
   obstacles?: GridPos[];
   startPos: GridPos;
   venues: MapVenue[];
+  // Cosmetic ground texture for the town's bare cells (mirror of BE Town.floor).
+  floor?: FloorType;
 }
 
 // The normalized grid the party marker is on (mirror of mapEngine.ActiveGrid),

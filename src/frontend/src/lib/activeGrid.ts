@@ -99,6 +99,7 @@ export function activeGrid(seed: Seed | undefined, st: GameState): ActiveGrid | 
       obstacles: mergeObstacles(town.obstacles, town.terrain, transitions),
       startPos: town.startPos,
       transitions,
+      floor: town.floor ?? 'dirt',
     };
   }
 

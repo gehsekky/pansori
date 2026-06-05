@@ -98,7 +98,7 @@ const TERRAIN_ICON: Partial<Record<TerrainType, { name: string; color: string }>
   road: { name: 'path-tile', color: 'rgba(214, 188, 140, 0.95)' }, // sandy path over the tan tint
   swamp: { name: 'high-grass', color: 'rgba(150, 170, 110, 0.9)' }, // reedy marsh
   snow: { name: 'snowflake-1', color: 'rgba(220, 235, 250, 0.95)' }, // icy north
-  garden: { name: 'flowers', color: 'rgba(150, 200, 120, 0.95)' }, // tended town greenery
+  // garden has no glyph — it renders as a grass floor texture (see TERRAIN_FLOOR).
   town_wall: { name: 'brick-wall', color: 'rgba(150, 138, 120, 0.95)' }, // impassable masonry
 };
 
@@ -369,17 +369,19 @@ function GridMapView({
               : isRegional && plainsDefault
                 ? TERRAIN_TILE.plains
                 : undefined;
-      // Seamless ground texture for a local-room floor cell. A painted "ground"
-      // terrain (cobblestone / garden) picks the matching texture; every other
-      // walkable cell uses the room's default floor. Feature terrain (water /
-      // forest / …, which gets a Baumgart tile above) and obstacle walls keep
-      // their look. Exits get floor too (the door sits on it). One of 3 variants
-      // per cell for organic variation.
-      const cellFloor = grid.floor
-        ? ((terrainType ? TERRAIN_FLOOR[terrainType] : undefined) ?? grid.floor)
-        : undefined;
+      // Seamless ground texture for a floored cell (local rooms + town maps). A
+      // painted "ground" terrain (cobblestone / garden) picks the matching
+      // texture; every other walkable cell uses the grid's default floor. Feature
+      // terrain (water / forest / …, which gets a Baumgart tile above) and
+      // obstacle walls keep their look. Exits/venues get floor too (the marker
+      // sits on it). One of 3 variants per cell for organic variation.
+      const floored = grid.level === 'local' || grid.level === 'town';
+      const cellFloor =
+        floored && grid.floor
+          ? ((terrainType ? TERRAIN_FLOOR[terrainType] : undefined) ?? grid.floor)
+          : undefined;
       const floorSrc =
-        grid.level === 'local' && cellFloor && !fogged && !isObstacle && !tileSrc
+        cellFloor && !fogged && !isObstacle && !tileSrc
           ? `/art/floors/${cellFloor}_${floorVariant(x, y)}.png`
           : undefined;
       const fillTint = tStyle?.tint ?? (plainsDefault ? TERRAIN_STYLE.plains.tint : undefined);

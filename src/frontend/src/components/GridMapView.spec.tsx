@@ -374,9 +374,7 @@ describe('GridMapView', () => {
     expect(cell(container, 3, 2).getAttribute('aria-current')).toBe('location');
   });
 
-  it('on town/local grids: painted tiles where available, glyphs for the rest', () => {
-    // Terrain with a tile (water) shows the tile on every level; interior types
-    // this set doesn't cover (town_wall, garden) keep their game-icons glyphs.
+  it('on a town grid: Baumgart tiles for features, floor textures for ground terrain + bare cells, glyphs for walls', () => {
     const townGrid: ActiveGrid = {
       level: 'town',
       id: 'pinegate',
@@ -384,21 +382,33 @@ describe('GridMapView', () => {
       width: 6,
       height: 6,
       feetPerSquare: 5,
+      floor: 'dirt', // town default ground
       terrain: [
-        { pos: { x: 1, y: 1 }, type: 'water' },
-        { pos: { x: 2, y: 1 }, type: 'town_wall' },
-        { pos: { x: 3, y: 1 }, type: 'garden' },
+        { pos: { x: 1, y: 1 }, type: 'water' }, // feature → painted tile
+        { pos: { x: 2, y: 1 }, type: 'town_wall' }, // impassable → wall glyph, no floor
+        { pos: { x: 3, y: 1 }, type: 'garden' }, // ground → grass floor (no flower glyph)
       ],
-      obstacles: [],
+      obstacles: [{ x: 2, y: 1 }], // the wall is impassable, as the real builder folds it
       startPos: { x: 0, y: 5 },
       transitions: [],
     };
     const { container } = render(<GridMapView grid={townGrid} markerPos={{ x: 0, y: 5 }} />);
+    const fSrc = (x: number, y: number) =>
+      (
+        cell(container, x, y).querySelector('[class*="gridMapFloor"]') as HTMLImageElement | null
+      )?.getAttribute('src');
+    // Water keeps its Baumgart tile (no floor).
     expect(cell(container, 1, 1).querySelector('img')?.getAttribute('src')).toContain(
       '/art/tiles/water.png'
     );
+    // The wall keeps its glyph and gets no floor.
     expect(cell(container, 2, 1).querySelector('.game-icon-brick-wall')).toBeTruthy();
-    expect(cell(container, 3, 1).querySelector('.game-icon-flowers')).toBeTruthy();
+    expect(cell(container, 2, 1).querySelector('[class*="gridMapFloor"]')).toBeNull();
+    // Garden → grass floor, and the flower glyph is gone.
+    expect(fSrc(3, 1)).toMatch(/\/art\/floors\/grass_[123]\.png$/);
+    expect(cell(container, 3, 1).querySelector('.game-icon-flowers')).toBeNull();
+    // A bare town cell gets the default dirt floor.
+    expect(fSrc(0, 0)).toMatch(/\/art\/floors\/dirt_[123]\.png$/);
   });
 
   it('tiles unpainted plains on the regional map but leaves interior grids bare', () => {

@@ -1944,4 +1944,8 @@ export interface Town {
   obstacles?: GridPos[];
   startPos: GridPos;
   venues: MapVenue[];
+  // Cosmetic ground texture for the town's bare cells (see Room.floor). Painted
+  // cobblestone/garden cells override per-cell; defaults to 'dirt' (packed earth
+  // between the cobbled streets) when unset.
+  floor?: FloorType;
 }

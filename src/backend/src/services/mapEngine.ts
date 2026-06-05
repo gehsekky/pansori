@@ -238,6 +238,7 @@ export function activeGrid(
       obstacles: mergeObstacles(town.obstacles, town.terrain, transitions),
       startPos: town.startPos,
       transitions,
+      floor: town.floor ?? 'dirt',
     };
   }
   if (level === 'local') {
