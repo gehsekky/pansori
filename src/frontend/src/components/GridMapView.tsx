@@ -4,11 +4,13 @@ import { TERRAIN } from '../types';
 import { TERRAIN_STYLE } from '../lib/terrainStyle';
 import styles from '../styles.module.css';
 
+// Glyph-scaling reference: the .gridMapGlyph CSS default (1.35rem) is sized for
+// a 32px square; glyph sizes below scale off this base. Per-level square sizes
+// are their own constants — tweak to taste, glyphs follow automatically.
 const CELL_PX = 32;
-// Overland (regional) square size. Larger than town/local so the sparse map
-// reads more like a map and the painted terrain tiles have room to breathe.
-// Tweak to taste — glyph sizes scale off it automatically.
 const REGIONAL_CELL_PX = 96;
+const TOWN_CELL_PX = 64;
+const LOCAL_CELL_PX = 48;
 
 interface Props {
   grid: ActiveGrid;
@@ -238,15 +240,18 @@ function GridMapView({
   revealed,
   readOnly,
 }: Props) {
-  // The overland (regional) map gets double-size squares so the larger, sparse
-  // grid reads more like a map; the town map uses mid-size 48 px squares; local
-  // exploration stays compact (CELL_PX).
+  // Square size per map level: the sparse overland map gets the biggest squares
+  // so it reads like a map and the terrain tiles have room; town is mid-size;
+  // local exploration is the most compact.
   const cellPx =
-    grid.level === 'regional' ? REGIONAL_CELL_PX : grid.level === 'town' ? 48 : CELL_PX;
-  // Scale the cell glyphs proportionally to the square (the CSS default is
-  // 1.35rem at CELL_PX); local keeps the default (undefined ⇒ no inline
-  // override), so a change to REGIONAL_CELL_PX re-sizes its glyphs automatically.
-  const glyphFont = cellPx === CELL_PX ? undefined : `${((1.35 * cellPx) / CELL_PX).toFixed(2)}rem`;
+    grid.level === 'regional'
+      ? REGIONAL_CELL_PX
+      : grid.level === 'town'
+        ? TOWN_CELL_PX
+        : LOCAL_CELL_PX;
+  // Scale the cell glyphs proportionally to the square (the CSS default 1.35rem
+  // is sized for CELL_PX), so changing any square size re-sizes its glyphs.
+  const glyphFont = `${((1.35 * cellPx) / CELL_PX).toFixed(2)}rem`;
   // game-icons read a touch small vs a plain glyph, so size them ~25% over the
   // cell glyph font (shared by terrain / site / transition / marker icons).
   const iconFontSize = glyphFont ? `calc(${glyphFont} * 1.25)` : undefined;
