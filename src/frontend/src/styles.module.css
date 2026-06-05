@@ -1818,6 +1818,9 @@
      overhang upward beyond the square — the same 2.5D bleed the terrain tiles
      use. The cell's z-index keeps him above the tile in the row behind. */
   align-self: flex-end;
+  /* Don't let the flex cell squeeze the (wider-than-cell) sprite — that would
+     clip the background's right edge (the sword) at the tile boundary. */
+  flex-shrink: 0;
   /* 8 idle frames at the pack's 100ms/frame (10 fps). */
   animation: gridMarkerIdle 0.8s steps(8) infinite;
 }
