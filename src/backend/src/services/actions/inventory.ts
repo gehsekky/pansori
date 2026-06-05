@@ -177,6 +177,26 @@ export const handleUse: ActionHandler<{
       nextChar = { ...nextChar, inventory: nextChar.inventory.filter((_, i) => i !== firstIdx) };
       const { roll1, roll2, best } = resolveSaveWithAdvantage(nextChar.con);
       narrative = `You use the ${held.name}. CON save with advantage: rolled ${roll1} and ${roll2} — keeping the ${best}. You feel steadier.`;
+    } else if (itemData.effect === 'stabilize') {
+      // Healer's Kit (SRD) — stabilize a dying creature: it stops rolling death
+      // saves (the death-save flow reads `stable`). Reusable, so the kit is not
+      // consumed. Targets a downed ally (hp 0, alive, not already stable) or the
+      // user if they're the one dying. Mirrors Spare the Dying's stabilize.
+      const targetId = action.targetCharId;
+      const targetIdx = targetId ? nextSt.characters.findIndex((c) => c.id === targetId) : safeIdx;
+      const isSelfT = targetIdx < 0 || targetIdx === safeIdx;
+      const tgt = isSelfT ? nextChar : nextSt.characters[targetIdx];
+      if (tgt.hp > 0 || tgt.dead) {
+        narrative = `${tgt.name} doesn't need stabilizing.`;
+      } else if (tgt.stable) {
+        narrative = `${tgt.name} is already stable.`;
+      } else if (isSelfT) {
+        nextChar = { ...nextChar, stable: true };
+        narrative = `You bind your own wounds with the ${held.name} — stabilized, you stop rolling death saves.`;
+      } else {
+        nextSt = commitCharacter(nextSt, { ...tgt, stable: true });
+        narrative = `${nextChar.name} works the ${held.name} over ${tgt.name} — bandaged and stabilized, ${tgt.name} stops rolling death saves.`;
+      }
     } else if (itemData.effect === 'mystery') {
       nextChar = { ...nextChar, inventory: nextChar.inventory.filter((_, i) => i !== firstIdx) };
       const { result, value } = resolveMysteryConsumable();

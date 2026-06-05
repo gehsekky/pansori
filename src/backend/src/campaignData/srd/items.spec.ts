@@ -18,14 +18,18 @@ describe('SRD_ITEMS catalog integrity', () => {
     }
   });
 
-  it('has the expected catalog size (38 weapons + 13 armor + 6 gear)', () => {
+  it('has the expected catalog size (38 weapons + 13 armor + 28 gear)', () => {
     // Full SRD 5.2.1 weapon + armor tables (incl. firearms: Musket, Pistol),
-    // plus consumable/misc gear (potions, kits, foci, torch + lantern).
-    expect(ALL_SRD_ITEM_IDS).toHaveLength(57);
+    // plus consumable/misc gear, tools, foci, and light sources.
+    expect(ALL_SRD_ITEM_IDS).toHaveLength(79);
     const weapons = Object.values(SRD_ITEMS).filter((i) => i.type === 'weapon');
     const armor = Object.values(SRD_ITEMS).filter((i) => i.type === 'armor');
+    const gear = Object.values(SRD_ITEMS).filter(
+      (i) => i.type === 'misc' || i.type === 'consumable'
+    );
     expect(weapons).toHaveLength(38);
     expect(armor).toHaveLength(13);
+    expect(gear).toHaveLength(28);
   });
 
   it('covers the full SRD 5.2.1 weapon + armor tables', () => {
