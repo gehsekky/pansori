@@ -382,8 +382,9 @@ describe('GridMapView', () => {
     };
     const { container } = render(<GridMapView grid={venueGrid} markerPos={{ x: 3, y: 6 }} />);
     expect(cell(container, 1, 1).querySelector('.game-icon-house')).toBeTruthy();
-    expect(cell(container, 2, 1).querySelector('.game-icon-wooden-door')).toBeTruthy();
-    expect(cell(container, 3, 1).querySelector('.game-icon-return-arrow')).toBeTruthy();
+    // Room exits and ascents both use the exit-door glyph.
+    expect(cell(container, 2, 1).querySelector('.game-icon-exit-door')).toBeTruthy();
+    expect(cell(container, 3, 1).querySelector('.game-icon-exit-door')).toBeTruthy();
   });
 
   it('renders the enemy marker as a red game-icons glyph (not a letter token)', () => {
@@ -454,5 +455,41 @@ describe('GridMapView', () => {
     expect(objCell.getAttribute('title')).toBe("Approach the Captain's Strongbox");
     fireEvent.click(objCell);
     expect(onObjectClick).toHaveBeenCalledWith('strongbox');
+  });
+
+  it('readOnly suppresses every cell click even when handlers are wired (alternate flow owns the surface)', () => {
+    const onMarkerMove = vi.fn();
+    const onNpcClick = vi.fn();
+    const onLootClick = vi.fn();
+    const onObjectClick = vi.fn();
+    const onEnemyClick = vi.fn();
+    const { container } = render(
+      <GridMapView
+        grid={localGrid}
+        markerPos={{ x: 3, y: 6 }}
+        readOnly
+        enemyPresent
+        npcs={[{ id: 'npc_x', pos: { x: 1, y: 1 }, name: 'Elder' }]}
+        loot={[{ key: 'r#0', pos: { x: 2, y: 2 }, name: 'Potion' }]}
+        objects={[{ id: 'chest', pos: { x: 4, y: 1 }, name: 'Chest' }]}
+        onMarkerMove={onMarkerMove}
+        onNpcClick={onNpcClick}
+        onLootClick={onLootClick}
+        onObjectClick={onObjectClick}
+        onEnemyClick={onEnemyClick}
+      />
+    );
+    // No cell is a button; the tokens still render (the map is visible).
+    expect(container.querySelectorAll('[role="button"]').length).toBe(0);
+    // Clicking the token cells fires nothing.
+    fireEvent.click(cell(container, 1, 1)); // npc
+    fireEvent.click(cell(container, 2, 2)); // loot
+    fireEvent.click(cell(container, 4, 1)); // object
+    fireEvent.click(cell(container, 0, 0)); // empty travel cell
+    expect(onMarkerMove).not.toHaveBeenCalled();
+    expect(onNpcClick).not.toHaveBeenCalled();
+    expect(onLootClick).not.toHaveBeenCalled();
+    expect(onObjectClick).not.toHaveBeenCalled();
+    expect(onEnemyClick).not.toHaveBeenCalled();
   });
 });

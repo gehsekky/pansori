@@ -44,6 +44,11 @@ interface Props {
   // (towns / local maps render fully). The party + enemy markers are never
   // fogged.
   revealed?: ReadonlySet<string>;
+  // Read-only mode: render the map but make EVERY cell non-clickable. Used when
+  // an alternate flow owns the action surface (post-combat Continue gate, an
+  // open conversation, the leveling roster, a vendor) so a stray map click can't
+  // dispatch a move / talk / pickup and break out of that flow.
+  readOnly?: boolean;
 }
 
 const LEVEL_LABEL: Record<ActiveGrid['level'], string> = {
@@ -96,8 +101,8 @@ const TERRAIN_ICON: Partial<Record<TerrainType, { name: string; color: string }>
 // authored icon, below).
 const TRANSITION_ICON: Partial<Record<MapTransition['kind'], { name: string; color: string }>> = {
   venue: { name: 'house', color: 'rgba(222, 190, 120, 0.97)' }, // a building you can enter
-  room_exit: { name: 'wooden-door', color: 'rgba(206, 198, 182, 0.95)' }, // passage to another room
-  ascend: { name: 'return-arrow', color: 'rgba(206, 198, 182, 0.95)' }, // back up a level
+  room_exit: { name: 'exit-door', color: 'rgba(206, 198, 182, 0.95)' }, // passage out to another room
+  ascend: { name: 'exit-door', color: 'rgba(206, 198, 182, 0.95)' }, // leave back up a level
 };
 
 // Local sites (dungeons) on the overland map: the game-icons glyph defaults to
@@ -209,6 +214,7 @@ function GridMapView({
   objects,
   onObjectClick,
   revealed,
+  readOnly,
 }: Props) {
   // The overland (regional) map gets double-size squares so the larger, sparse
   // grid reads more like a map; the town map uses mid-size 48 px squares; local
@@ -271,17 +277,19 @@ function GridMapView({
       // non-obstacle cell that isn't the marker's own square is a valid target.
       // The enemy marker engages (attack); the NPC's own cell talks (walks
       // adjacent); everything else travels. Fogged cells are never clickable.
-      const clickable = fogged
+      const clickable = readOnly
         ? false
-        : isEnemyMarker
-          ? !!onEnemyClick
-          : isNpc
-            ? !!onNpcClick
-            : isLoot
-              ? !!onLootClick
-              : isObject
-                ? !!onObjectClick
-                : !isObstacle && !isMarker && !!onMarkerMove;
+        : fogged
+          ? false
+          : isEnemyMarker
+            ? !!onEnemyClick
+            : isNpc
+              ? !!onNpcClick
+              : isLoot
+                ? !!onLootClick
+                : isObject
+                  ? !!onObjectClick
+                  : !isObstacle && !isMarker && !!onMarkerMove;
 
       // Checkerboard the plain cells so the grid squares read clearly on the
       // large, sparse region/town maps — a single flat fill was

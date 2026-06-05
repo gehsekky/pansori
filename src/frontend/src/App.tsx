@@ -649,84 +649,78 @@ export default function App() {
                           grid.level === 'regional' && gameState.current_region_id
                             ? new Set(gameState.revealed_cells?.[gameState.current_region_id] ?? [])
                             : undefined;
-                        // During the post-combat "Continue" gate the map is
-                        // shown but READ-ONLY: withholding the click handlers
-                        // makes every cell non-clickable, so a stray marker_move
-                        // can't bypass the gate (only Continue clears it).
-                        const mapInteractive = !gameState.combat_over_pending;
+                        // Read-only map: while an alternate flow owns the bottom
+                        // action surface — the post-combat "Continue" gate, an
+                        // open conversation, the leveling roster/cascade, or a
+                        // vendor — the map stays visible but non-interactive. A
+                        // stray click would otherwise dispatch marker_move / talk
+                        // / pickup and break out of that flow.
+                        const convHere =
+                          !!gameState.active_conversation &&
+                          gameState.active_conversation.roomId === gameState.current_room;
+                        const shopHere =
+                          !!gameState.active_shop &&
+                          gameState.active_shop.roomId === gameState.current_room;
+                        const mapReadOnly =
+                          gameState.combat_over_pending ||
+                          convHere ||
+                          shopHere ||
+                          !!gameState.active_leveling;
                         return (
                           <GridMapView
                             grid={grid}
                             markerPos={gameState.marker_pos}
                             revealed={revealed}
+                            readOnly={mapReadOnly}
                             // A surfaced Attack choice means a hostile is here
                             // pre-combat — show the red enemy marker.
                             enemyPresent={choices.some((c) => c.kind === 'attack')}
                             // Clicking the red dot engages — dispatch the
                             // out-of-combat Attack choice to drop into combat.
-                            onEnemyClick={
-                              mapInteractive
-                                ? () => {
-                                    const atk = choices.find((c) => c.kind === 'attack');
-                                    if (atk) handleChoice(atk);
-                                  }
-                                : undefined
-                            }
+                            onEnemyClick={() => {
+                              const atk = choices.find((c) => c.kind === 'attack');
+                              if (atk) handleChoice(atk);
+                            }}
                             npcs={npcTokens}
-                            onNpcClick={
-                              mapInteractive
-                                ? (npcId) => {
-                                    const tc = talkByNpc.get(npcId);
-                                    if (tc) handleChoice(tc);
-                                  }
-                                : undefined
-                            }
+                            onNpcClick={(npcId) => {
+                              const tc = talkByNpc.get(npcId);
+                              if (tc) handleChoice(tc);
+                            }}
                             loot={lootTokens}
-                            onLootClick={
-                              mapInteractive
-                                ? (key) => {
-                                    // Adjacent already? Pick it up. Otherwise walk
-                                    // up to it; the Pick-up choice surfaces next.
-                                    const pick = pickupByKey.get(key);
-                                    if (pick) {
-                                      handleChoice(pick);
-                                      return;
-                                    }
-                                    const tok = lootTokens.find((l) => l.key === key);
-                                    if (tok)
-                                      handleChoice({
-                                        label: `Approach the ${tok.name}`,
-                                        action: { type: 'approach', pos: tok.pos },
-                                      });
-                                  }
-                                : undefined
-                            }
+                            onLootClick={(key) => {
+                              // Adjacent already? Pick it up. Otherwise walk up to
+                              // it; the Pick-up choice surfaces next.
+                              const pick = pickupByKey.get(key);
+                              if (pick) {
+                                handleChoice(pick);
+                                return;
+                              }
+                              const tok = lootTokens.find((l) => l.key === key);
+                              if (tok)
+                                handleChoice({
+                                  label: `Approach the ${tok.name}`,
+                                  action: { type: 'approach', pos: tok.pos },
+                                });
+                            }}
                             objects={objectTokens}
-                            onObjectClick={
-                              mapInteractive
-                                ? (id) => {
-                                    const it = interactById.get(id);
-                                    if (it) {
-                                      handleChoice(it);
-                                      return;
-                                    }
-                                    const tok = objectTokens.find((o) => o.id === id);
-                                    if (tok)
-                                      handleChoice({
-                                        label: `Approach the ${tok.name}`,
-                                        action: { type: 'approach', pos: tok.pos },
-                                      });
-                                  }
-                                : undefined
-                            }
-                            onMarkerMove={
-                              mapInteractive
-                                ? (to) =>
-                                    handleChoice({
-                                      label: `Travel to (${to.x},${to.y})`,
-                                      action: { type: 'marker_move', to },
-                                    })
-                                : undefined
+                            onObjectClick={(id) => {
+                              const it = interactById.get(id);
+                              if (it) {
+                                handleChoice(it);
+                                return;
+                              }
+                              const tok = objectTokens.find((o) => o.id === id);
+                              if (tok)
+                                handleChoice({
+                                  label: `Approach the ${tok.name}`,
+                                  action: { type: 'approach', pos: tok.pos },
+                                });
+                            }}
+                            onMarkerMove={(to) =>
+                              handleChoice({
+                                label: `Travel to (${to.x},${to.y})`,
+                                action: { type: 'marker_move', to },
+                              })
                             }
                           />
                         );
