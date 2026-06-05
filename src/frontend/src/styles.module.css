@@ -1805,9 +1805,11 @@
    row 0 (top) is the front-facing idle, stepped through its 6 frames. Sits in
    the token layer (z-index 2) so it draws above the terrain tile. */
 .gridMapMarkerSprite {
-  background-image: url('/art/sprites/warrior_blue.png');
+  /* Trimmed idle strip (warrior_blue_idle.png): 6 frames in one row, the
+     warrior centred in each, so the marker needs no positioning nudge. */
+  background-image: url('/art/sprites/warrior_blue_idle.png');
   background-repeat: no-repeat;
-  background-size: calc(var(--mk) * 6) calc(var(--mk) * 8);
+  background-size: calc(var(--mk) * 6) var(--mk);
   background-position: 0 0;
   image-rendering: pixelated;
   position: relative;
