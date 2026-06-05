@@ -326,7 +326,10 @@ function GridMapView({
       // Out of combat the party moves freely (the backend pathfinds), so every
       // non-obstacle cell that isn't the marker's own square is a valid target.
       // The enemy marker engages (attack); the NPC's own cell talks (walks
-      // adjacent); everything else travels. Fogged cells are never clickable.
+      // adjacent); everything else travels. The marker's OWN square is clickable
+      // only when it's a transition (a site / venue / exit) — so the party can
+      // re-enter the place it's standing on (e.g. just after ascending onto it)
+      // without stepping off and clicking back. Fogged cells are never clickable.
       const clickable = readOnly
         ? false
         : fogged
@@ -339,7 +342,7 @@ function GridMapView({
                 ? !!onLootClick
                 : isObject
                   ? !!onObjectClick
-                  : !isObstacle && !isMarker && !!onMarkerMove;
+                  : !isObstacle && (!isMarker || !!transition) && !!onMarkerMove;
 
       // Checkerboard the plain cells so the grid squares read clearly on the
       // large, sparse region/town maps — a single flat fill was

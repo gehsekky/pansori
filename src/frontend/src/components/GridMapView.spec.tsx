@@ -76,13 +76,26 @@ describe('GridMapView', () => {
     fireEvent.click(cell(container, 3, 0));
     expect(onMarkerMove).toHaveBeenCalledWith({ x: 3, y: 0 });
 
-    // The obstacle and the marker's own cell are not buttons.
+    // The obstacle and the marker's own (plain) cell are not buttons.
     expect(cell(container, 2, 2).getAttribute('role')).toBe('gridcell');
     expect(cell(container, 0, 0).getAttribute('role')).toBe('gridcell');
     onMarkerMove.mockClear();
     fireEvent.click(cell(container, 2, 2));
     fireEvent.click(cell(container, 0, 0));
     expect(onMarkerMove).not.toHaveBeenCalled();
+  });
+
+  it('makes the marker cell clickable when it sits on a transition, to re-enter it', () => {
+    const onMarkerMove = vi.fn();
+    // Park the party ON the Millhaven site cell (3,0).
+    const { container } = render(
+      <GridMapView grid={grid} markerPos={{ x: 3, y: 0 }} onMarkerMove={onMarkerMove} />
+    );
+    const siteCell = cell(container, 3, 0);
+    expect(siteCell.getAttribute('aria-current')).toBe('location'); // still the party's square
+    expect(siteCell.getAttribute('role')).toBe('button'); // …but now clickable
+    fireEvent.click(siteCell);
+    expect(onMarkerMove).toHaveBeenCalledWith({ x: 3, y: 0 }); // re-enter this cell
   });
 
   it('shows a single red enemy marker near the party when an enemy is present', () => {

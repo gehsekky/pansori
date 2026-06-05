@@ -200,6 +200,23 @@ describe('resolveMarkerMove — descent / room change / ascent', () => {
   it('rejects an off-map destination', () => {
     expect(move(start(), 99, 99).rejected).toBeTruthy();
   });
+
+  it('re-enters a transition the marker is already standing on (no travel)', () => {
+    // Park the marker ON the town site, then "move" onto it again → re-enter.
+    const onSite = { ...start(), marker_pos: { x: 2, y: 0 } } as GameState;
+    const r = move(onSite, 2, 0);
+    expect(r.rejected).toBeUndefined();
+    expect(r.transitioned).toBe(true);
+    expect(r.st.map_level).toBe('town');
+    expect(r.st.current_town_id).toBe('town1');
+    expect(r.squaresMoved).toBe(0); // stood still
+    expect(r.elapsedHours).toBe(0); // no travel time
+  });
+
+  it('still rejects a same-cell move on a plain (non-transition) cell', () => {
+    const here = { ...start(), marker_pos: { x: 4, y: 4 } } as GameState;
+    expect(move(here, 4, 4).rejected).toBe('Already there.');
+  });
 });
 
 describe('initMapState', () => {

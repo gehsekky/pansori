@@ -329,11 +329,18 @@ export function resolveMarkerMove(
   const grid = activeGrid(campaign, rooms, st);
   if (!grid) return reject('No map here.');
   const from = st.marker_pos ?? grid.startPos;
-  if (posEqual(from, to)) return reject('Already there.');
+  // Re-issuing the move onto the cell the marker already occupies: a no-op,
+  // UNLESS that cell is a transition (site / venue / exit). After ascending you
+  // land ON the place you came from, so clicking it should re-enter it rather
+  // than reject — no travel, no pathfind, straight to the transition below.
+  const stayingPut = posEqual(from, to);
+  if (stayingPut && !transitionAt(grid, to)) return reject('Already there.');
   if (to.x < 0 || to.x >= grid.width || to.y < 0 || to.y >= grid.height)
     return reject('Off the map.');
-  const path = findPath(from, to, grid.obstacles, grid.width, grid.height);
-  if (!path || path.length === 0) return reject('No path there.');
+  const path = stayingPut
+    ? []
+    : (findPath(from, to, grid.obstacles, grid.width, grid.height) ?? []);
+  if (!stayingPut && path.length === 0) return reject('No path there.');
 
   let next: GameState = { ...st, marker_pos: to };
   let squaresMoved = path.length;
