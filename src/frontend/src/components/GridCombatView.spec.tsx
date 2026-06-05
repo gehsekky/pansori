@@ -138,8 +138,9 @@ describe('GridCombatView — cosmetic terrain paint', () => {
     });
     const { container } = render(<GridCombatView state={state} seed={seed} />);
     expect(cell(container, 9, 9).getAttribute('title')).toMatch(/swamp/i);
-    // A plain, unreachable, untainted cell has no tooltip.
-    expect(cell(container, 5, 5).getAttribute('title')).toBeNull();
+    // Every walkable cell describes its ground — an unpainted cell falls back to
+    // the room's floor (cobblestone by default), not an empty tooltip.
+    expect(cell(container, 5, 5).getAttribute('title')).toMatch(/cobblestone/i);
   });
 });
 
