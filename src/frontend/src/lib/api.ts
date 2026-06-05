@@ -101,6 +101,11 @@ export type CharacterInput = {
   // 2024 Fighting Style for the class's level-1 slot (Fighter). Omitted/invalid
   // = the default. Re-validated server-side.
   fighting_style?: string;
+  // SRD Cleric Divine Order (level 1): 'protector' or 'thaumaturge'. With
+  // 'thaumaturge', `divine_order_cantrip` is the chosen Cleric cantrip. Omitted
+  // = no order yet (the in-game prompt remains as a fallback).
+  divine_order?: 'protector' | 'thaumaturge';
+  divine_order_cantrip?: string;
   // SRD Expertise picks chosen at creation (Rogue's two level-1 slots). Each
   // must be one of the character's proficient skills. Omitted/invalid = the
   // first proficiencies. Re-validated server-side.
@@ -149,6 +154,10 @@ export interface BackendContextSummary {
     string,
     { count: number; options: Array<{ id: string; label: string }>; default: string }
   >;
+  // SRD Cleric Divine Order — the Cleric cantrips a Thaumaturge can learn at
+  // creation, for the creation-screen dropdown. Populated only when a Cleric is
+  // castable in the context.
+  divineOrderCantrips?: Array<{ id: string; name: string }>;
   // Per-class Expertise slot count at level 1 (Rogue: 2), for the creation
   // picker. The eligible skills are the character's own proficiencies, so the
   // screen assembles the options from the live draft rather than the server.

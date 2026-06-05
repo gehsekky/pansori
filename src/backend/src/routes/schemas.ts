@@ -71,6 +71,13 @@ const CharacterInputSchema = z
     // invalid/omitted falls back to the default. Later picks (Fighter L7,
     // Paladin/Ranger L2) are made in-game.
     fighting_style: z.string().min(1).max(40).optional(),
+    // SRD Cleric Divine Order (level 1) chosen at creation — 'protector' (Martial
+    // weapons + Heavy armor) or 'thaumaturge' (an extra cantrip + WIS to Arcana/
+    // Religion). `divine_order_cantrip` is the Thaumaturge cantrip pick (a Cleric
+    // cantrip); re-validated server-side. Omitted = no order yet (the in-game
+    // prompt remains as a fallback).
+    divine_order: z.enum(['protector', 'thaumaturge']).optional(),
+    divine_order_cantrip: z.string().min(1).max(40).optional(),
     // SRD Expertise picks chosen at creation (Rogue's two level-1 slots). Each
     // must be one of the character's proficient skills; re-validated server-
     // side, with an invalid/omitted list falling back to the first proficiencies.

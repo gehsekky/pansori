@@ -75,6 +75,7 @@ import {
 } from '../services/equipment.js';
 import { expertiseSlotsForClassLevel, resolveCreationExpertise } from '../services/multiclass.js';
 import type { AuthedRequest } from '../auth/middleware.js';
+import { applyCreationDivineOrder } from '../services/actions/meta.js';
 import { applyFeatTake } from '../services/feats.js';
 import { generateSeed } from '../services/procgen.js';
 import { initMapState } from '../services/mapEngine.js';
@@ -231,6 +232,16 @@ gameRouter.get('/contexts', (_req, res) => {
           })
           .filter((e): e is NonNullable<typeof e> => e !== null)
       ),
+      // SRD Cleric Divine Order — the Cleric (divine-list) cantrips a Thaumaturge
+      // can learn at creation, for the creation-screen dropdown.
+      divineOrderCantrips: Object.values(c.spellTable ?? {})
+        .filter(
+          (s) =>
+            s.level === 0 &&
+            ((s as { spellList?: ReadonlyArray<string> }).spellList?.includes('divine') ?? false)
+        )
+        .map((s) => ({ id: s.id, name: s.name }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
       // SRD Expertise slots a class grants at level 1 (Rogue: 2), for the
       // creation picker. Only the count travels — the eligible skills are the
       // character's proficiencies (class + background + species), which the
@@ -561,6 +572,12 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
             }
           : {}),
       };
+      // SRD Cleric Divine Order (level 1) — apply the creation-screen pick.
+      // Protector trains Martial weapons + Heavy armor; Thaumaturge learns the
+      // chosen Cleric cantrip (the +WIS to Arcana/Religion is read off
+      // `divine_order`). Omitted leaves it unset — the in-game prompt then
+      // surfaces it as a fallback.
+      applyCreationDivineOrder(builtChar, c.divine_order, c.divine_order_cantrip, ctx.spellTable);
       // Apply origin feat from background. SRD grants one origin
       // feat per background (Acolyte → Magic Initiate, Farmer → Tough,
       // etc.). The feat is auto-applied at creation; no asi_pending

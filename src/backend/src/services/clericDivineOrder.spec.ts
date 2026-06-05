@@ -3,9 +3,9 @@
 // Intelligence (Arcana/Religion) checks).
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { applyCreationDivineOrder, handleChooseDivineOrder } from './actions/meta.js';
 import type { Character } from '../types.js';
 import { context as ctx } from '../campaignData/sandbox.js';
-import { handleChooseDivineOrder } from './actions/meta.js';
 import { makeChar } from '../test-fixtures.js';
 import { pcActor } from './actions/actor.js';
 
@@ -86,5 +86,45 @@ describe('Divine Order — gating', () => {
     const c = featCtx(makeChar({ character_class: 'Fighter', level: 5 }));
     handleChooseDivineOrder(c, { type: 'choose_divine_order', option: 'protector' });
     expect(pcChar(c).divine_order).toBeUndefined();
+  });
+});
+
+// The same mechanics, but chosen on the new-game screen instead of in play.
+// `applyCreationDivineOrder` mutates the freshly built character; the route
+// (`routes/game.ts`) calls it after `builtChar` is assembled.
+describe('Divine Order — applied at character creation', () => {
+  it('Protector trains Martial weapons + Heavy armor', () => {
+    const char = cleric({ weapon_proficiencies: ['simple'], armor_proficiencies: ['light'] });
+    applyCreationDivineOrder(char, 'protector', undefined, ctx.spellTable);
+    expect(char.divine_order).toBe('protector');
+    expect(char.weapon_proficiencies).toContain('martial');
+    expect(char.armor_proficiencies).toContain('heavy');
+  });
+
+  it('Thaumaturge learns the chosen Cleric cantrip', () => {
+    const char = cleric({ spells_known: ['sacred_flame'] });
+    applyCreationDivineOrder(char, 'thaumaturge', 'guidance', ctx.spellTable);
+    expect(char.divine_order).toBe('thaumaturge');
+    expect(char.spells_known).toContain('guidance');
+  });
+
+  it('Thaumaturge ignores a non-Cleric cantrip but still sets the order', () => {
+    const char = cleric({ spells_known: [] });
+    applyCreationDivineOrder(char, 'thaumaturge', 'fire_bolt', ctx.spellTable);
+    expect(char.divine_order).toBe('thaumaturge');
+    expect(char.spells_known).not.toContain('fire_bolt');
+  });
+
+  it('is a no-op for a non-Cleric', () => {
+    const char = makeChar({ character_class: 'Fighter', level: 1 });
+    applyCreationDivineOrder(char, 'protector', undefined, ctx.spellTable);
+    expect(char.divine_order).toBeUndefined();
+    expect(char.weapon_proficiencies).not.toContain('martial');
+  });
+
+  it('is a no-op when no order is chosen (leaves the in-game fallback)', () => {
+    const char = cleric();
+    applyCreationDivineOrder(char, undefined, undefined, ctx.spellTable);
+    expect(char.divine_order).toBeUndefined();
   });
 });

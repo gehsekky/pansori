@@ -185,6 +185,11 @@ interface CharDraft {
   // 2024 Fighting Style (Fighter's level-1 slot). Undefined = the default
   // (shown pre-selected). Cleared on class change.
   fightingStyle?: string;
+  // SRD Cleric Divine Order (level-1 pick): 'protector' | 'thaumaturge'. No
+  // default — the player chooses (or leaves it for the in-game fallback).
+  // `divineOrderCantrip` is the Thaumaturge cantrip. Cleared on class change.
+  divineOrder?: 'protector' | 'thaumaturge';
+  divineOrderCantrip?: string;
   // SRD Expertise (Rogue's two level-1 slots). Undefined = the default (the
   // first proficiencies, shown pre-selected). Cleared on class change; stale
   // picks are filtered against the live proficiency pool.
@@ -675,6 +680,8 @@ function CharScreen({
           starting_equipment: d.startingEquipment,
           weapon_masteries: d.weaponMasteries,
           fighting_style: d.fightingStyle,
+          divine_order: d.divineOrder,
+          divine_order_cantrip: d.divineOrder === 'thaumaturge' ? d.divineOrderCantrip : undefined,
           rogue_expertise: d.rogueExpertise,
         })),
         contextId
@@ -830,6 +837,8 @@ function CharScreen({
                             startingEquipment: undefined,
                             weaponMasteries: undefined,
                             fightingStyle: undefined,
+                            divineOrder: undefined,
+                            divineOrderCantrip: undefined,
                             rogueExpertise: undefined,
                           })
                         }
@@ -1163,6 +1172,93 @@ function CharScreen({
                           </div>
                         );
                       })()}
+
+                      {/* SRD Cleric Divine Order — the level-1 pick (Protector /
+                      Thaumaturge). Player-driven: no default; Thaumaturge reveals
+                      a cantrip dropdown. Left unset, the in-game prompt is a
+                      fallback. */}
+                      {draft.cls === 'Cleric' &&
+                        (() => {
+                          const cantrips = beContexts[contextId]?.divineOrderCantrips ?? [];
+                          const orders = [
+                            {
+                              id: 'protector' as const,
+                              label: 'Protector — Martial weapons + Heavy armor',
+                            },
+                            {
+                              id: 'thaumaturge' as const,
+                              label: 'Thaumaturge — an extra cantrip; +WIS to Arcana/Religion',
+                            },
+                          ];
+                          return (
+                            <div style={{ marginTop: 12 }}>
+                              <label className={styles.formLbl}>DIVINE ORDER</label>
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: 4,
+                                  marginTop: 4,
+                                }}
+                                data-testid={`divine-order-${idx}`}
+                              >
+                                {orders.map((o) => {
+                                  const on = o.id === draft.divineOrder;
+                                  return (
+                                    <button
+                                      key={o.id}
+                                      type="button"
+                                      aria-pressed={on}
+                                      onClick={() =>
+                                        updateDraft(idx, {
+                                          divineOrder: o.id,
+                                          divineOrderCantrip:
+                                            o.id === 'thaumaturge'
+                                              ? (draft.divineOrderCantrip ?? cantrips[0]?.id)
+                                              : undefined,
+                                        })
+                                      }
+                                      style={{
+                                        textAlign: 'left',
+                                        fontFamily: 'inherit',
+                                        fontSize: '0.72rem',
+                                        lineHeight: 1.4,
+                                        padding: '0.35rem 0.55rem',
+                                        background: on ? 'var(--t-separator)' : 'transparent',
+                                        border: `1px solid ${on ? 'var(--t-primary)' : 'var(--t-border)'}`,
+                                        color: on ? 'var(--t-primary)' : 'var(--t-dim)',
+                                        cursor: 'pointer',
+                                      }}
+                                    >
+                                      {on ? '✓ ' : ''}
+                                      {o.label}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                              {draft.divineOrder === 'thaumaturge' && cantrips.length > 0 && (
+                                <div style={{ marginTop: 6 }}>
+                                  <label className={styles.formLbl}>THAUMATURGE CANTRIP</label>
+                                  <select
+                                    className={styles.formInp}
+                                    style={{ cursor: 'pointer', marginTop: 4 }}
+                                    value={draft.divineOrderCantrip ?? cantrips[0]?.id}
+                                    onChange={(e) =>
+                                      updateDraft(idx, { divineOrderCantrip: e.target.value })
+                                    }
+                                    data-testid={`divine-order-cantrip-${idx}`}
+                                  >
+                                    {cantrips.map((cn) => (
+                                      <option key={cn.id} value={cn.id}>
+                                        {cn.name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                     </div>
                     <div className={styles.charCardCol}>
                       <label

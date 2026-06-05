@@ -1,3 +1,4 @@
+import type { AbilityKey, Character, Spell } from '../../types.js';
 import {
   FIGHTING_STYLE_IDS,
   FIGHTING_STYLE_LABELS,
@@ -26,7 +27,6 @@ import {
   metamagicOptions,
   metamagicSlots,
 } from '../multiclass.js';
-import type { AbilityKey } from '../../types.js';
 import type { ActionHandler } from './types.js';
 import { masterableWeapons } from '../../campaignData/srd/index.js';
 import { updatePcActor } from './actor.js';
@@ -293,6 +293,42 @@ export const handleChooseDivineOrder: ActionHandler<{
   }
   return { rejected: `Unknown Divine Order option: ${action.option}.` };
 };
+
+/**
+ * SRD Cleric Divine Order applied at *character creation* (the player picks it on
+ * the new-game screen), mirroring the in-game {@link handleChooseDivineOrder}.
+ * Mutates the built character: Protector trains Martial weapons + Heavy armor;
+ * Thaumaturge learns the chosen Cleric cantrip (the +WIS to Arcana/Religion is
+ * read off `divine_order` at check time). A no-op for a non-Cleric, an unset
+ * order, or a Thaumaturge cantrip that isn't a valid Cleric cantrip.
+ */
+export function applyCreationDivineOrder(
+  char: Character,
+  order: 'protector' | 'thaumaturge' | undefined,
+  cantrip: string | undefined,
+  spellTable: Record<string, Spell> | undefined
+): void {
+  if (!order || !hasClass(char, 'cleric')) return;
+  char.divine_order = order;
+  if (order === 'protector') {
+    if (!char.weapon_proficiencies.includes('martial')) {
+      char.weapon_proficiencies = [...char.weapon_proficiencies, 'martial'];
+    }
+    if (!char.armor_proficiencies.includes('heavy')) {
+      char.armor_proficiencies = [...char.armor_proficiencies, 'heavy'];
+    }
+    return;
+  }
+  // thaumaturge — learn the chosen Cleric cantrip (if valid + not already known)
+  if (!cantrip) return;
+  const sp = spellTable?.[cantrip];
+  const isClericCantrip =
+    sp?.level === 0 &&
+    ((sp as { spellList?: ReadonlyArray<string> }).spellList?.includes('divine') ?? false);
+  if (isClericCantrip && !(char.spells_known ?? []).includes(cantrip)) {
+    char.spells_known = [...(char.spells_known ?? []), cantrip];
+  }
+}
 
 /**
  * `choose_spell_mastery`: SRD Wizard (L18) — designate a level-1 (tier 1) or
