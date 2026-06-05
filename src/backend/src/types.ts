@@ -114,7 +114,17 @@ export interface Room {
   // visibility behaves like 'bright', but creatures with Sunlight
   // Sensitivity attack at Disadvantage there (an outdoor / daylit room).
   lighting?: 'bright' | 'dim' | 'dark' | 'sunlight';
+  // PURELY COSMETIC ground texture for the local-room exploration floor — a
+  // seamless top-down tile (grass / dirt / cobblestone / sand) painted under
+  // every walkable cell so a room reads as a place. No mechanics; defaults to
+  // 'cobblestone' (worked-stone interiors) when unset. Only the local map level
+  // renders it.
+  floor?: FloorType;
 }
+
+// Local-room floor textures (see Room.floor). Each has a few seamless variants
+// under public/art/floors/<type>_<n>.png.
+export type FloorType = 'grass' | 'dirt' | 'cobblestone' | 'sand';
 
 // `ConditionName` is re-exported from ./shared-types (see src/shared/types.ts).
 

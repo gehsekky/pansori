@@ -16,7 +16,7 @@ const manifest: Record<string, Record<string, string>> = {};
 // Shared art folders under public/art that aren't per-context room art (map
 // terrain tiles, the party sprite, etc.) — they're referenced by fixed paths in
 // the components, not via the room-art manifest, so keep them out of it.
-const NON_CONTEXT_DIRS = new Set(['tiles', 'sprites']);
+const NON_CONTEXT_DIRS = new Set(['tiles', 'sprites', 'floors']);
 
 if (existsSync(artDir)) {
   for (const contextId of readdirSync(artDir, { withFileTypes: true })

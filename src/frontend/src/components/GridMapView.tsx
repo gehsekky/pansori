@@ -137,6 +137,12 @@ const DEFAULT_SITE_ICON = 'dungeon-gate';
 // Stone tone shared by dungeon-site + room-exit glyphs.
 const SITE_STONE = 'rgba(206, 198, 182, 0.95)';
 
+// Local-room floor texture: each floor type has 3 seamless variants. Pick one
+// deterministically per cell so the room floor varies without a random reshuffle
+// on every render (which would flicker).
+const FLOOR_VARIANTS = 3;
+const floorVariant = (x: number, y: number) => ((x * 7 + y * 13) % FLOOR_VARIANTS) + 1;
+
 // Talkable-NPC token: a warm gold glyph. Each NPC may override the glyph via
 // PlacedNpc.icon (e.g. 'wood-axe'); this is the fallback when none is set.
 const DEFAULT_NPC_ICON = 'conversation';
@@ -353,6 +359,14 @@ function GridMapView({
               : isRegional && plainsDefault
                 ? TERRAIN_TILE.plains
                 : undefined;
+      // Seamless ground texture for a bare local-room floor cell. Painted terrain
+      // (which gets a Baumgart tile above) and obstacle walls keep their look; the
+      // floor fills every other walkable cell (exits included, so the door sits on
+      // floor). One of 3 variants per cell for organic variation.
+      const floorSrc =
+        grid.level === 'local' && grid.floor && !fogged && !isObstacle && !tileSrc
+          ? `/art/floors/${grid.floor}_${floorVariant(x, y)}.png`
+          : undefined;
       const fillTint = tStyle?.tint ?? (plainsDefault ? TERRAIN_STYLE.plains.tint : undefined);
       let cellBg = fillTint
         ? `linear-gradient(${fillTint}, ${fillTint}), var(--t-bg)`
@@ -634,6 +648,15 @@ function GridMapView({
               : undefined
           }
         >
+          {floorSrc && (
+            <img
+              src={floorSrc}
+              alt=""
+              aria-hidden="true"
+              draggable={false}
+              className={styles.gridMapFloor}
+            />
+          )}
           {tileSrc && (
             <img
               src={tileSrc}

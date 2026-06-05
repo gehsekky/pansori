@@ -1860,6 +1860,20 @@
   user-select: none;
 }
 
+/* Seamless top-down floor texture for a local-room cell — fills the square flat
+   (no overhang, unlike .gridMapTile), painted behind the cell's token. Sits in
+   the cell's background layer so the hover ring + tokens stay on top. */
+.gridMapFloor {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+  pointer-events: none;
+  user-select: none;
+}
+
 /* Last-attacker arrows — sit on top of the board, never intercept clicks. */
 .gridArrows {
   position: absolute;

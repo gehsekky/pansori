@@ -507,6 +507,22 @@ describe('GridMapView', () => {
     expect(c.textContent).toContain('Bram'); // name label still shown
   });
 
+  it('paints a floor texture on walkable local-room cells (not walls), and never on region maps', () => {
+    const grassRoom: ActiveGrid = { ...localGrid, floor: 'grass', obstacles: [{ x: 0, y: 0 }] };
+    const { container } = render(<GridMapView grid={grassRoom} markerPos={{ x: 3, y: 6 }} />);
+    // A plain walkable cell gets a grass floor image (one of the 3 variants).
+    const floor = cell(container, 2, 2).querySelector(
+      '[class*="gridMapFloor"]'
+    ) as HTMLImageElement;
+    expect(floor).toBeTruthy();
+    expect(floor.getAttribute('src')).toMatch(/\/art\/floors\/grass_[123]\.png$/);
+    // An obstacle (wall) cell keeps its tint — no floor texture.
+    expect(cell(container, 0, 0).querySelector('[class*="gridMapFloor"]')).toBeNull();
+    // Region/town maps never paint floors (floor is undefined there).
+    const { container: reg } = render(<GridMapView grid={grid} markerPos={{ x: 0, y: 0 }} />);
+    expect(reg.querySelector('[class*="gridMapFloor"]')).toBeNull();
+  });
+
   it('renders clickable loot tokens (default glyph + label + Approach tooltip) and dispatches onLootClick with the key', () => {
     const onLootClick = vi.fn();
     const onMarkerMove = vi.fn();

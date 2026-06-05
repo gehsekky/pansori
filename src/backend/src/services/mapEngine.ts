@@ -7,6 +7,7 @@
 
 import {
   type CampaignData,
+  type FloorType,
   type GameState,
   type GridPos,
   type MapLevel,
@@ -137,6 +138,10 @@ export interface ActiveGrid {
   obstacles: GridPos[];
   transitions: MapTransition[];
   startPos: GridPos;
+  // Cosmetic floor texture for a local room (undefined for region/town grids,
+  // which render terrain tiles instead). Defaults to 'cobblestone' when the
+  // room doesn't author one. See Room.floor.
+  floor?: FloorType;
 }
 
 export function regionById(campaign: CampaignData | undefined, id?: string): Region | undefined {
@@ -262,6 +267,7 @@ export function activeGrid(
       obstacles: mergeObstacles(room.obstacles, room.terrain, transitions),
       startPos: g.entry,
       transitions,
+      floor: room.floor ?? 'cobblestone',
     };
   }
   return null;

@@ -84,6 +84,10 @@ function AboutModal({ onClose }: { onClose: () => void }) {
             <Ext href="https://pixelfrog-assets.itch.io/tiny-swords">Tiny Swords</Ext> by Pixel
             Frog.
           </p>
+          <p>
+            Local-room floor textures from a free pixel-tiles pack (AI-assisted), used as in-game
+            map art under its non-commercial terms.
+          </p>
         </section>
 
         <p className={styles.aboutFoot}>Full legal notices live in the project&apos;s LEGAL.md.</p>

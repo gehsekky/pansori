@@ -450,7 +450,14 @@ export interface ActiveGrid {
   obstacles: GridPos[];
   transitions: MapTransition[];
   startPos: GridPos;
+  // Cosmetic floor texture for a local room (undefined on region/town grids).
+  // Mirror of mapEngine.ActiveGrid.floor.
+  floor?: FloorType;
 }
+
+// Local-room floor textures (mirror of BE Room.floor); seamless tiles under
+// public/art/floors/<type>_<n>.png.
+export type FloorType = 'grass' | 'dirt' | 'cobblestone' | 'sand';
 
 export interface Seed {
   context_id: string;

@@ -792,6 +792,7 @@ export const rooms: Room[] = [
     desc: 'A small village square with a stone well at its center. Pine trees rise dark beyond the houses. Lanterns burn even at midday.',
     gridWidth: 7,
     gridHeight: 7,
+    floor: 'dirt', // open village ground
     entryPos: { x: 3, y: 6 },
     exits: [{ pos: { x: 3, y: 0 }, ascends: true, label: 'Back into Pinegate' }],
     // Cosmetic: a cobbled square around the central stone well, ringed by the
@@ -906,6 +907,7 @@ export const rooms: Room[] = [
     desc: "The path widens into a clearing of standing stones. Wolf-eyes glow from the underbrush. The Circle's old gateway arch is here — and broken.",
     gridWidth: 10,
     gridHeight: 10,
+    floor: 'grass', // forest clearing
     entryPos: { x: 0, y: 0 },
     // Cosmetic: a grassy clearing ringed by underbrush (forest).
     terrain: [
@@ -1034,6 +1036,7 @@ export const rooms: Room[] = [
     desc: "A sunlit clearing past the Oak. Mareth's charm warms in your hand. The path back to Pinegate is open.",
     gridWidth: 8,
     gridHeight: 8,
+    floor: 'grass', // sacred sunlit clearing
     entryPos: { x: 0, y: 0 },
     // Cosmetic: a sunlit sacred clearing (garden) edged by quiet pines (forest).
     terrain: [
