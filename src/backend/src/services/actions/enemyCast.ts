@@ -17,7 +17,9 @@ export const handleEnemyCast: ActionHandler<{
   if (ctx.actor.kind !== 'enemy') return { rejected: 'enemy_cast requires an enemy actor.' };
   const { enemy } = ctx.actor;
   const spell = ctx.context.spellTable?.[action.spellId];
-  if (!spell?.damage) return { rejected: 'enemy_cast: spell has no damage.' };
+  // Damage spells + single-target condition spells (Hold Person, Cause Fear).
+  if (!spell?.damage && !spell?.condition)
+    return { rejected: 'enemy_cast: spell has no damage or condition.' };
   const target = ctx.st.characters.find((c) => c.id === action.targetCharId);
   if (!target) return { rejected: 'enemy_cast: target not found.' };
 

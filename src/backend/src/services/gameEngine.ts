@@ -7922,6 +7922,98 @@ function resolveEnemyAoeSpell(args: {
  * `castSpell` pipeline by design (same split as the EE-2 attack resolvers).
  * AoE spells (with `blastRadius`) branch to `resolveEnemyAoeSpell`.
  */
+// Resolve an enemy's single-target CONDITION spell (Hold Person → Paralyzed,
+// Cause Fear → Frightened) against a PC. Uses the canonical conditionSavingThrow
+// — proficiency, Aura of Protection, and the auto-resolving rerolls (Indomitable,
+// Stroke of Luck, Lucky, Dark One's Luck, Improve Fate, Bardic, Countercharm) —
+// so the condition lands only on a CONFIRMED failed save. The rerolls
+// auto-resolve here (no interactive window, unlike the PC-side onHitEffect path).
+function resolveEnemyConditionCast(args: {
+  enemy: Enemy;
+  spell: Spell;
+  target: Character;
+  st: GameState;
+  narrative: string;
+  context?: Context;
+}): { st: GameState; target: Character; narrative: string } {
+  const { enemy, spell, target } = args;
+  const cond = spell.condition!;
+  let st = args.st;
+  let narrative = `${args.narrative} ${enemy.name} casts ${spell.name} at ${target.name}!`;
+  if (conditionImmunitiesFor(target, st).has(cond)) {
+    return {
+      st,
+      target,
+      narrative: `${narrative} ${fmt.note(`[${target.name} is immune to ${cond}]`)}`,
+    };
+  }
+  const ability = spell.savingThrow;
+  const dc = enemy.spellSaveDC ?? 8 + Math.floor((enemy.toHit + 5) / 2);
+  let updated = target;
+  let applied: boolean;
+  if (ability && args.context) {
+    const res = conditionSavingThrow(
+      { condition: cond, ability, dc } as OnHitEffect & { ability: AbilityKey; dc: number },
+      updated,
+      st,
+      args.context,
+      auraOfProtectionBonus(updated, st),
+      false // auto-resolve the PC's rerolls inline (no interactive window)
+    );
+    applied = res.applied;
+    if (res.indomitableConsumed) {
+      updated = consumeIndomitable(updated);
+      narrative += ' ✦ Indomitable — rerolled the save!';
+    }
+    if (res.strokeOfLuckConsumed) updated = consumeStrokeOfLuck(updated);
+    if (res.darkOnesLuckConsumed) updated = consumeDarkOnesLuck(updated);
+    if (res.improveFateConsumed) updated = consumeImproveFate(updated);
+    if (res.inspirationConsumed) {
+      updated = {
+        ...updated,
+        inspiration: false,
+        turn_actions: { ...updated.turn_actions, inspiration_pending: false },
+      };
+    }
+    if (res.luckConsumed) {
+      updated = { ...updated, turn_actions: { ...updated.turn_actions, luck_pending: false } };
+    }
+    if (res.bardicInspirationConsumed) updated = { ...updated, bardic_inspiration_die: undefined };
+    if (res.countercharmBardId) {
+      const bardId = res.countercharmBardId;
+      if (bardId === updated.id) {
+        updated = { ...updated, turn_actions: { ...updated.turn_actions, reaction_used: true } };
+      } else {
+        st = {
+          ...st,
+          characters: st.characters.map((c) =>
+            c.id === bardId ? { ...c, turn_actions: { ...c.turn_actions, reaction_used: true } } : c
+          ),
+        };
+      }
+    }
+  } else {
+    // No save ability / no context (unit harness) — plain save vs DC.
+    const score = ability ? ((target[ability] ?? 10) as number) : 10;
+    applied = ability ? rollDice('1d20') + abilityMod(score) < dc : true;
+  }
+  if (applied) {
+    const src = cond === 'frightened' || cond === 'charmed' ? enemy.id : undefined;
+    updated = inflictCondition(updated, cond, src);
+    if (cond === 'charmed') updated = { ...updated, charmer_id: enemy.id };
+    if (spell.conditionDuration) {
+      updated = {
+        ...updated,
+        condition_durations: { ...updated.condition_durations, [cond]: spell.conditionDuration },
+      };
+    }
+    narrative += ` ${target.name} is ${cond}!`;
+  } else {
+    narrative += ` ${target.name} resists.`;
+  }
+  return { st: commitCharacter(st, updated), target: updated, narrative };
+}
+
 export function resolveEnemySpell(args: {
   enemy: Enemy;
   spell: Spell;
@@ -7945,6 +8037,12 @@ export function resolveEnemySpell(args: {
 } {
   const { enemy, spell, target } = args;
   let narrative = args.narrative;
+  // Pure single-target condition spell (Hold Person, Cause Fear): no damage, not
+  // an area — resolve the save + apply the condition (with the PC's rerolls).
+  if (spell.condition && !spell.damage && !spell.blastRadius) {
+    const r = resolveEnemyConditionCast({ ...args, narrative });
+    return { st: r.st, target: r.target, narrative: r.narrative };
+  }
   // AoE damage spell (Fireball, Cone of Cold, …): when the grid is populated and
   // both the caster and the chosen epicenter PC have positions, every party-side
   // creature in the area rolls its own save. Falls through to the single-target
@@ -8104,7 +8202,9 @@ async function attemptEnemySpellCast(args: {
   }
   const spellId = pick(enemy.spells);
   const spell = context.spellTable?.[spellId];
-  if (!spell?.damage) return { kind: 'no-cast' };
+  // The enemy resolver handles damage spells and single-target condition spells
+  // (Hold Person, Cause Fear). Anything else (pure narrative) isn't castable.
+  if (!spell?.damage && !spell?.condition) return { kind: 'no-cast' };
 
   // SRD anti-magic suppression — an enemy spell crossing an Antimagic Field /
   // Globe of Invulnerability fizzles before it's cast.
