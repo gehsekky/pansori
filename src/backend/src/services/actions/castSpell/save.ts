@@ -184,7 +184,11 @@ export function runSaveSpell(
     });
   }
 
-  if (spell.condition && saveFailed) {
+  // An AoE save spell that ALSO carries a rider condition (Sunburst → Blinded,
+  // Weird → Frightened) must not be resolved single-target here — fall through
+  // (done:false) so runAoeSpell applies damage + the condition to every target
+  // in the blast. Only non-blast condition saves (Hold Person, …) handle inline.
+  if (spell.condition && saveFailed && !spell.blastRadius) {
     if (spellTarget.condition_immunities?.includes(spell.condition)) {
       ctx.narrative += ` ${fmt.note(`[${spellTarget.name} is immune to ${spell.condition}]`)}`;
     } else {

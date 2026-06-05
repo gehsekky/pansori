@@ -3373,7 +3373,11 @@ export const SRD_SPELLS: Record<string, Spell> = {
     saveEffect: 'half',
     blastRadius: 60,
     aoeShape: 'sphere',
-    desc: 'Brilliant sunlight flashes in a 60-ft-radius sphere (and dispels magical Darkness there); each creature makes a CON save, taking 12d6 radiant on a failure or half on a success. (RAW a failed save also Blinds for 1 minute; that rider is deferred so the full-area damage resolves.)',
+    // SRD: a failed save also Blinds for 1 minute; the creature re-saves (CON)
+    // at the end of each of its turns, ending the effect on a success.
+    condition: 'blinded',
+    conditionSaveEnds: true,
+    desc: 'Brilliant sunlight flashes in a 60-ft-radius sphere (and dispels magical Darkness there); each creature makes a CON save, taking 12d6 radiant + Blinded on a failure (CON save ends at end of turn), or half damage on a success.',
     rangeKind: 'ranged',
     rangeFt: 150,
     spellList: ['divine', 'primal', 'arcane'],
@@ -3416,7 +3420,13 @@ export const SRD_SPELLS: Record<string, Spell> = {
     durationRounds: 10,
     blastRadius: 30,
     aoeShape: 'sphere',
-    desc: 'Illusory terrors assail each chosen creature in a 30-ft-radius sphere: WIS save for half of 10d10 psychic (Concentration, up to 1 minute). (RAW a failed save also Frightens, with recurring psychic damage; that rider is deferred so the full-area damage resolves.)',
+    // SRD: a failed save also Frightens for the duration; the target re-saves
+    // (WIS) at the end of each turn, taking 5d10 psychic on a failure or ending
+    // the effect on a success.
+    condition: 'frightened',
+    conditionSaveEnds: true,
+    recurringSaveDamage: { dice: '5d10', damageType: 'psychic' },
+    desc: 'Illusory terrors assail each chosen creature in a 30-ft-radius sphere: WIS save for half of 10d10 psychic, or full + Frightened on a failure (WIS save ends at end of turn, 5d10 psychic on a failed re-save). Concentration, up to 1 minute.',
     rangeKind: 'ranged',
     rangeFt: 120,
     spellList: ['arcane'],

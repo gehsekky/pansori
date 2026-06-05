@@ -45,7 +45,7 @@ function casterState(enhancement?: number): GameState {
     spell_slots_max: { 2: 2, 4: 1 },
     spell_slots_used: {},
     spells_known: ['magic_weapon'],
-    spells_prepared: ['magic_weapon'],
+    prepared_spells: ['magic_weapon'],
     equipment: { main_hand: 'sw-1' },
     inventory: [{ instance_id: 'sw-1', id: 'shortsword', name: 'Shortsword' }],
     weapon_proficiencies: ['simple', 'martial'],

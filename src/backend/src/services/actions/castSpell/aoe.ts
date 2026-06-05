@@ -1,14 +1,6 @@
 import type { Character, Spell } from '../../../types.js';
 import {
-  abilityMod,
-  applyDamageMultiplier,
-  maxDice,
-  rollConditionSave,
-  rollDice,
-  upcastDamage,
-  upcastDamage2,
-} from '../../rulesEngine.js';
-import {
+  TURN_LOOP_MANAGED_CONDITIONS,
   applyPartyLevelUps,
   dominatedDamageReSave,
   endCombatState,
@@ -20,6 +12,15 @@ import {
   splitEncounterXp,
 } from '../../gameEngine.js';
 import {
+  abilityMod,
+  applyDamageMultiplier,
+  maxDice,
+  rollConditionSave,
+  rollDice,
+  upcastDamage,
+  upcastDamage2,
+} from '../../rulesEngine.js';
+import {
   coverBonus,
   entitiesInBlast,
   entitiesInCone,
@@ -29,6 +30,7 @@ import {
 } from '../../gridEngine.js';
 import { empoweredEvocationBonus, getClassLevel } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
+import { concentrationRoundsFor } from './utils.js';
 import { fmt } from '../../narrativeFmt.js';
 import { grantEnemyDrops } from '../enemyDrops.js';
 
@@ -64,6 +66,80 @@ function secondaryAoeDamage(
   const eff = failed ? base : spell.saveEffect === 'half' ? Math.floor(base / 2) : 0;
   if (eff <= 0) return 0;
   return resistTarget ? applyDamageMultiplier(eff, spell.damageType2, resistTarget).damage : eff;
+}
+
+// Apply an AoE spell's rider condition to an enemy that failed its save and is
+// still standing (Sunburst → Blinded, Weird → Frightened). Mirrors the single-
+// target save.ts condition block: respects condition immunity, wires save-ends
+// (+ any recurring save damage), stamps a finite duration for non-concentration
+// non-save-ends spells, records the charm/fear source, and links the caster's
+// concentration once (one condition cleared from all enemies on break).
+function applyAoeCondition(
+  ctx: ActionContext,
+  spell: Spell,
+  char: Character,
+  targetId: string,
+  targetName: string,
+  targetEnemy: { condition_immunities?: string[] },
+  dc: number
+): void {
+  const cond = spell.condition;
+  if (!cond) return;
+  if (targetEnemy.condition_immunities?.includes(cond)) {
+    ctx.narrative += ` ${fmt.note(`[${targetName} is immune to ${cond}]`)}`;
+    return;
+  }
+  const stampSaveEnds = spell.conditionSaveEnds && spell.savingThrow;
+  const stampDuration =
+    !spell.concentration &&
+    !stampSaveEnds &&
+    spell.conditionDuration &&
+    !TURN_LOOP_MANAGED_CONDITIONS.has(cond)
+      ? spell.conditionDuration
+      : undefined;
+  ctx.st = {
+    ...ctx.st,
+    entities: (ctx.st.entities ?? []).map((e) => {
+      if (e.id !== targetId || !e.isEnemy) return e;
+      return {
+        ...e,
+        conditions: [...e.conditions.filter((c) => c !== cond), cond],
+        ...(stampDuration !== undefined
+          ? { condition_durations: { ...e.condition_durations, [cond]: stampDuration } }
+          : {}),
+        ...(stampSaveEnds
+          ? {
+              save_ends: {
+                ...e.save_ends,
+                [cond]: {
+                  ability: spell.savingThrow!,
+                  dc,
+                  ...(spell.recurringSaveDamage
+                    ? {
+                        recurDice: spell.recurringSaveDamage.dice,
+                        recurType: spell.recurringSaveDamage.damageType,
+                        casterId: char.id,
+                      }
+                    : {}),
+                },
+              },
+              save_ends_acted: (e.save_ends_acted ?? []).filter((c) => c !== cond),
+            }
+          : {}),
+        ...(cond === 'charmed' ? { charmer_id: char.id } : {}),
+        ...(cond === 'frightened' ? { frightened_by: char.id } : {}),
+      };
+    }),
+  };
+  ctx.narrative += ` ${targetName} is ${cond}!`;
+  if (spell.concentration && char.concentrating_on?.spellId !== spell.id) {
+    char.concentrating_on = {
+      spellId: spell.id,
+      condition: cond,
+      rounds_left: concentrationRoundsFor(spell),
+      save_dc: dc,
+    };
+  }
 }
 
 export function runAoeSpell(
@@ -208,6 +284,15 @@ export function runAoeSpell(
         );
         ctx.st = pr.st;
         if (pr.pushedFt > 0) ctx.narrative += ` ${targetEnemy.name} is pushed ${pr.pushedFt} ft.`;
+      }
+      // SRD AoE rider condition (Sunburst → Blinded, Weird → Frightened): a
+      // creature that failed its save and is still standing gains the condition.
+      if (
+        spell.condition &&
+        tFailed &&
+        (ctx.st.entities?.find((e) => e.id === target.id && e.isEnemy)?.hp ?? 0) > 0
+      ) {
+        applyAoeCondition(ctx, spell, char, target.id, targetEnemy.name, targetEnemy, dc);
       }
     } else if (targetChar && !target.isEnemy) {
       // Allies in blast auto-succeed (and take no damage) via Evoker Sculpt
