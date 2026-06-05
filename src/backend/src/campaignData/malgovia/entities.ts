@@ -644,10 +644,6 @@ export const npcs: Record<string, PlacedNpc> = {
         reply:
           'Nothing good. Locals avoid it. Word is, something stirs within — lights at night, groaning sounds.',
       },
-      {
-        label: "I'll need supplies.",
-        reply: 'Of course. Browse what I have — Guild members get a fair price.',
-      },
     ],
     persuasionDC: 12,
     shop: [{ itemId: 'healing_potion', price: 50 }],
@@ -767,10 +763,6 @@ export const npcs: Record<string, PlacedNpc> = {
         reply:
           'Iceshard Spire. Cultists. Green fire in the topmost window. Captain Riese knows more.',
       },
-      {
-        label: 'Supplies?',
-        reply: 'Mulled elixirs, fur cloaks. Anything heavier, ask Marta at the lodge.',
-      },
     ],
     persuasionDC: 10,
     shop: [
@@ -794,10 +786,6 @@ export const npcs: Record<string, PlacedNpc> = {
     greeting:
       'Halden was a friend. Take what you need — warhammers work better than blades on the mephits. Carry torches.',
     responses: [
-      {
-        label: 'Show me your goods.',
-        reply: "Everything's marked. Warden discount if Riese's vouched for you.",
-      },
       {
         label: 'Tell me about the mephits.',
         reply: 'Cold breath. Wear your cloak. They flee fire like cats from water.',
@@ -926,10 +914,6 @@ export const npcs: Record<string, PlacedNpc> = {
     greeting:
       'Welcome. The grove has not yielded medicine in weeks — what I have left, I sell. Circle-members get a fair price.',
     responses: [
-      {
-        label: 'Show me your wares.',
-        reply: 'Take what you need — coin or rep.',
-      },
       {
         label: 'What can you tell me about the grove?',
         reply:
