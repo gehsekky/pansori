@@ -22,7 +22,20 @@ export function activeWornEffects(char: Character, lootTable: LootItem[]): WornE
 
 /** Total flat bonus to saving throws of `ability` from worn gear (e.g. +1 WIS). */
 export function wornSaveBonus(char: Character, ability: AbilityKey, lootTable: LootItem[]): number {
-  return activeWornEffects(char, lootTable)
-    .filter((e) => e.kind === 'save_bonus' && e.ability === ability)
-    .reduce((sum, e) => sum + e.bonus, 0);
+  return activeWornEffects(char, lootTable).reduce(
+    (sum, e) => (e.kind === 'save_bonus' && e.ability === ability ? sum + e.bonus : sum),
+    0
+  );
+}
+
+/**
+ * Largest bright-light radius (ft) shed by the character's worn light sources
+ * (e.g. a held Torch). 0 = no worn light. Synced onto the combat entity's
+ * `light_radius_ft` at combat start so the bearer illuminates the dark.
+ */
+export function wornLightRadius(char: Character, lootTable: LootItem[]): number {
+  return activeWornEffects(char, lootTable).reduce(
+    (max, e) => (e.kind === 'light' ? Math.max(max, e.radiusFt) : max),
+    0
+  );
 }

@@ -13,6 +13,7 @@ import type { Character, CombatEntity, Enemy, GameState, Seed } from '../types.j
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { canSeeTarget, isIlluminated, isInSunlight, magicalDarknessCells } from './gridEngine.js';
 import { makeChar, makeState } from '../test-fixtures.js';
+import { SRD_ITEMS } from '../campaignData/srd/items.js';
 import { SRD_MONSTERS } from '../campaignData/srd/monsters.js';
 import { context as ctx } from '../campaignData/sandbox.js';
 import { takeAction } from './gameEngine.js';
@@ -300,6 +301,71 @@ describe('isIlluminated', () => {
     expect(isIlluminated({ x: 8, y: 5 }, ents, [{ x: 7, y: 5 }])).toBe(false); // wall between
     // A wall NOT between source and cell doesn't block.
     expect(isIlluminated({ x: 8, y: 5 }, ents, [{ x: 1, y: 1 }])).toBe(true);
+  });
+});
+
+describe('worn Torch — light source at combat start', () => {
+  // The torch's `light` worn effect is synced onto the bearer's combat entity
+  // when combat starts (combatStart seeds entities). The existing "light negates
+  // the darkness penalty" tests then cover the downstream effect of a non-zero
+  // light_radius_ft, so here we just assert the wiring stamps the entity.
+  function freshDarkState(pc: ReturnType<typeof makeChar>): GameState {
+    return {
+      ...makeState({ id: pc.id }, { current_room: 'entry_hall', combat_active: false }),
+      characters: [pc],
+      active_character_id: pc.id,
+      initiative_order: [],
+      initiative_idx: 0,
+      entities: undefined,
+    } as unknown as GameState;
+  }
+  const torchCtx = { ...ctx, lootTable: [...ctx.lootTable, SRD_ITEMS.torch] };
+
+  it('a torch-bearer is seeded with a 20-ft light radius when combat begins', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const pc = makeChar({
+      id: 'pc-1',
+      character_class: 'Fighter',
+      level: 1,
+      inventory: [
+        { instance_id: 'ss-1', id: 'shortsword', name: 'Shortsword' },
+        { instance_id: 't-1', id: 'torch', name: 'Torch' },
+      ],
+      equipment: { main_hand: 'ss-1', off_hand: 't-1' },
+      weapon_proficiencies: ['simple', 'martial'],
+    });
+    const r = await takeAction({
+      action: { type: 'attack', targetEnemyId: ENEMY_ID },
+      history: [],
+      state: freshDarkState(pc),
+      seed: seedWith('dark', {}),
+      context: torchCtx,
+    });
+    const pcEnt = r.newState.entities?.find((e) => e.id === 'pc-1');
+    expect(pcEnt?.light_radius_ft).toBe(20);
+    // Mundane light carries no spell level (so the Darkness spell can't snuff it).
+    expect(pcEnt?.light_spell_level).toBeUndefined();
+  });
+
+  it('a PC with no torch is seeded with no light', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const pc = makeChar({
+      id: 'pc-1',
+      character_class: 'Fighter',
+      level: 1,
+      inventory: [{ instance_id: 'ss-1', id: 'shortsword', name: 'Shortsword' }],
+      equipment: { main_hand: 'ss-1' },
+      weapon_proficiencies: ['simple', 'martial'],
+    });
+    const r = await takeAction({
+      action: { type: 'attack', targetEnemyId: ENEMY_ID },
+      history: [],
+      state: freshDarkState(pc),
+      seed: seedWith('dark', {}),
+      context: torchCtx,
+    });
+    const pcEnt = r.newState.entities?.find((e) => e.id === 'pc-1');
+    expect(pcEnt?.light_radius_ft).toBeUndefined();
   });
 });
 

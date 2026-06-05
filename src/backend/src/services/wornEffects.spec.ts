@@ -1,6 +1,7 @@
-import { activeWornEffects, wornSaveBonus } from './wornEffects.js';
+import { activeWornEffects, wornLightRadius, wornSaveBonus } from './wornEffects.js';
 import { describe, expect, it } from 'vitest';
 import type { LootItem } from '../types.js';
+import { SRD_ITEMS } from '../campaignData/srd/items.js';
 import { makeChar } from '../test-fixtures.js';
 
 // A worn item that grants +1 WIS saves and requires attunement (the Moonstone
@@ -66,5 +67,37 @@ describe('worn effects — Moonstone Amulet (+1 WIS save)', () => {
     });
     // amulet (+1, worn+attuned) + ring (+1, worn, no attunement needed) = +2
     expect(wornSaveBonus(char, 'wis', [amulet, ring])).toBe(2);
+  });
+});
+
+describe('worn light sources (Torch / Hooded Lantern)', () => {
+  const torchLoot = [SRD_ITEMS.torch, SRD_ITEMS.hooded_lantern];
+
+  it('an equipped Torch sheds a 20-ft bright radius', () => {
+    const char = makeChar({
+      inventory: [{ instance_id: 't-1', id: 'torch', name: 'Torch' }],
+      equipment: { off_hand: 't-1' },
+    });
+    expect(wornLightRadius(char, torchLoot)).toBe(20);
+  });
+
+  it('an equipped Hooded Lantern sheds a 30-ft bright radius', () => {
+    const char = makeChar({
+      inventory: [{ instance_id: 'l-1', id: 'hooded_lantern', name: 'Hooded Lantern' }],
+      equipment: { off_hand: 'l-1' },
+    });
+    expect(wornLightRadius(char, torchLoot)).toBe(30);
+  });
+
+  it('a torch carried but NOT equipped sheds no light', () => {
+    const char = makeChar({
+      inventory: [{ instance_id: 't-1', id: 'torch', name: 'Torch' }],
+      equipment: {},
+    });
+    expect(wornLightRadius(char, torchLoot)).toBe(0);
+  });
+
+  it('no light source ⇒ 0', () => {
+    expect(wornLightRadius(makeChar({ equipment: {} }), torchLoot)).toBe(0);
   });
 });

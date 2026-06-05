@@ -13,6 +13,7 @@ import { fillEnemyTokens } from '../../narrative/enemyName.js';
 import { improveFateRefresh } from '../../improveFate.js';
 import { inRange } from '../../gridEngine.js';
 import { updatePcActor } from '../actor.js';
+import { wornLightRadius } from '../../wornEffects.js';
 
 /**
  * Optional combat-start tuning. `openingBlow.weapon` is supplied by the Attack
@@ -91,15 +92,23 @@ export function runCombatStart(
   if (!ctx.st.entities) {
     const gw = ctx.context.gridWidth ?? 8;
     const gh = ctx.context.gridHeight ?? 8;
-    const pcEntities: CombatEntity[] = ctx.st.characters.map((c, ci) => ({
-      id: c.id,
-      isEnemy: false,
-      pos: { x: 1 + ci, y: 1 },
-      hp: c.hp,
-      maxHp: c.max_hp,
-      conditions: c.conditions,
-      condition_durations: c.condition_durations,
-    }));
+    const pcEntities: CombatEntity[] = ctx.st.characters.map((c, ci) => {
+      // SRD Vision & Light — a worn light source (e.g. a Torch) makes its bearer
+      // emit light, negating the darkness penalty around them. Mundane, so no
+      // `light_spell_level` (the Darkness spell can't snuff it). Mirrors how the
+      // Light cantrip stamps `light_radius_ft` onto the caster's entity.
+      const lightFt = wornLightRadius(c, ctx.context.lootTable);
+      return {
+        id: c.id,
+        isEnemy: false,
+        pos: { x: 1 + ci, y: 1 },
+        hp: c.hp,
+        maxHp: c.max_hp,
+        conditions: c.conditions,
+        condition_durations: c.condition_durations,
+        ...(lightFt > 0 ? { light_radius_ft: lightFt } : {}),
+      };
+    });
     const enemyEntities: CombatEntity[] = enemiesForInit.map((en, ei) => ({
       id: en.id,
       isEnemy: true,

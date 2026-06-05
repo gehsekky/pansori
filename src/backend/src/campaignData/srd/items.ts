@@ -974,6 +974,41 @@ export const SRD_ITEMS: Record<string, LootItem> = {
     effect: 'spellcasting_focus',
     aliases: ['holy symbol', 'symbol', 'holy focus'],
   },
+  torch: {
+    // SRD light source — held in the off hand. While equipped it sheds bright
+    // light in a 20-ft radius (dim to 40 ft); wired into combat lighting via a
+    // `light` worn effect synced onto the bearer's entity at combat start, so a
+    // torch-bearer negates the darkness penalty around them. Mundane, so the
+    // Darkness spell can't snuff it (it just can't pierce magical darkness).
+    id: 'torch',
+    name: 'Torch',
+    desc: 'Sheds bright light in a 20-foot radius and dim light for an additional 20 feet. Burns for 1 hour.',
+    weight: 1,
+    type: 'misc',
+    slot: 'off_hand',
+    damage: null,
+    ac_bonus: null,
+    heal: null,
+    effect: null,
+    aliases: ['torch'],
+    wornEffects: [{ kind: 'light', radiusFt: 20 }],
+  },
+  hooded_lantern: {
+    // SRD light source — a brighter, steadier alternative to the Torch. Bright
+    // light 30 ft, dim to 60 ft. Same `light` worn-effect wiring.
+    id: 'hooded_lantern',
+    name: 'Hooded Lantern',
+    desc: 'Sheds bright light in a 30-foot radius and dim light for an additional 30 feet. Burns 6 hours on a flask of oil.',
+    weight: 2,
+    type: 'misc',
+    slot: 'off_hand',
+    damage: null,
+    ac_bonus: null,
+    heal: null,
+    effect: null,
+    aliases: ['hooded lantern', 'lantern'],
+    wornEffects: [{ kind: 'light', radiusFt: 30 }],
+  },
   component_pouch: {
     id: 'component_pouch',
     name: 'Component Pouch',

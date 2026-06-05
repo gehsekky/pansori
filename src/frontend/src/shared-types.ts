@@ -1214,6 +1214,7 @@ export const EQUIP_SLOTS: EquipSlot[] = [
 // an item doesn't know which of the two ring slots it'll land in.
 export type ItemSlot =
   | 'weapon'
+  | 'off_hand'
   | 'armor'
   | 'shield'
   | 'head'
@@ -1227,15 +1228,17 @@ export type ItemSlot =
 
 /**
  * A passive effect an item confers while WORN in its body slot (and attuned, if
- * the item requires attunement). Deliberately small to start — `save_bonus` is
- * the only kind today (e.g. the Moonstone Amulet's +1 to WIS saves). Extend the
- * union as new worn-item mechanics land (AC bonuses, ability-check bonuses, …).
+ * the item requires attunement). A small discriminated union:
+ *   - `save_bonus`: flat bonus to saves of an ability (e.g. Moonstone Amulet +1 WIS).
+ *   - `light`: the item sheds light — its bearer emits a `radiusFt` bright-light
+ *     radius (dim to 2×) in combat, negating the darkness penalty around them.
+ *     Mundane (no spell level), so magical Darkness can't dispel it. Synced onto
+ *     the bearer's combat entity at combat-start seeding, like the Light cantrip.
+ * Extend the union as new worn-item mechanics land.
  */
-export interface WornEffect {
-  kind: 'save_bonus';
-  ability: AbilityKey;
-  bonus: number;
-}
+export type WornEffect =
+  | { kind: 'save_bonus'; ability: AbilityKey; bonus: number }
+  | { kind: 'light'; radiusFt: number };
 
 export interface LootItem {
   id: string;
