@@ -363,6 +363,27 @@ export const handleCastSpell: ActionHandler<{
     return;
   }
 
+  // SRD Hex (Warlock L1) — curse the target enemy: set the tracked id +
+  // concentration, no immediate damage. The +1d6 Necrotic rider on the caster's
+  // hits vs that target lives in resolveOneAttack (mirrors Hunter's Mark).
+  if (spell.id === 'hex') {
+    updatePcActor(ctx, {
+      hex_target_id: spellTargetId,
+      concentrating_on: { spellId: 'hex', rounds_left: spell.durationRounds ?? 600 },
+    });
+    ctx.narrative =
+      (ctx.narrative ?? '') +
+      pickCastPrefix(spell, {
+        name: pc.char.name,
+        spell: spell.name,
+        slotNote,
+        target: spellTarget.name,
+      }) +
+      '.';
+    ctx.usedInitiative = true;
+    return;
+  }
+
   // SRD Power Word Kill (L9) — instant death if the target has ≤100 HP,
   // else 12d12 psychic; a L20 Bard's Words of Creation adds a second
   // target within 10 ft. Owns its own kill resolution, so it short-

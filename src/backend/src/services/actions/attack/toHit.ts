@@ -398,7 +398,10 @@ export function computeToHitContext(
   // −N penalty on D20 Tests (attacks, saves, checks) until it
   // decays off via long rest. Subtracted from the attack bonus.
   const revivePenalty = d20TestPenalty(pc.char);
-  const totalAttackBonus = sacredWeaponBonus - revivePenalty + archeryBonus;
+  // SRD Magic Weapon — flat +N to the attack roll (weapon attacks only; the
+  // matching +N to damage is applied in resolveOneAttack).
+  const magicWeaponBonus = weaponItem ? (pc.char.weapon_enhancement ?? 0) : 0;
+  const totalAttackBonus = sacredWeaponBonus - revivePenalty + archeryBonus + magicWeaponBonus;
 
   // Silence linter: target is part of the signature but referenced via the
   // returned ToHitContext (resolveOneAttack reads target via the closure).

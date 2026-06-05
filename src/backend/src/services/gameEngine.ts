@@ -498,6 +498,10 @@ export function breakConcentration(
   const wasHaste = char.concentrating_on.spellId === 'haste';
   // SRD Ranger Hunter's Mark — dropping concentration clears the marked target.
   const wasHuntersMark = char.concentrating_on.spellId === 'hunters_mark';
+  // SRD Hex — dropping concentration lifts the curse (clears the hexed target).
+  const wasHex = char.concentrating_on.spellId === 'hex';
+  // SRD Magic Weapon — dropping concentration ends the +N weapon enhancement.
+  const wasMagicWeapon = char.concentrating_on.spellId === 'magic_weapon';
   // SRD Dragon's Breath — dropping concentration revokes the granted breath
   // weapon from whichever creature (self or ally) the caster touched.
   const wasDragonsBreath = char.concentrating_on.spellId === 'dragons_breath';
@@ -518,6 +522,8 @@ export function breakConcentration(
     ...char,
     concentrating_on: null,
     ...(wasHuntersMark ? { hunters_mark_target_id: undefined } : {}),
+    ...(wasHex ? { hex_target_id: undefined } : {}),
+    ...(wasMagicWeapon ? { weapon_enhancement: undefined } : {}),
     ...(wasWeaponRider ? { weapon_rider: undefined } : {}),
     ...(wasPendingSmite ? { pending_smite: undefined } : {}),
     // RE-4 — a concentration-based recurring spell attack (Vampiric Touch) ends

@@ -31,8 +31,8 @@ export function runUtilitySpell(
   const { char } = ctx.actor;
   // A few spells have no damage/save/attack/condition but are NOT utility —
   // they need a living enemy target and resolve in the offensive pipeline
-  // (castSpell/index.ts interception): Hunter's Mark (marks a target) and Power
-  // Word Stun (HP-threshold Stun). Let them fall through.
+  // (castSpell/index.ts interception): Hunter's Mark + Hex (mark/curse a target)
+  // and Power Word Stun (HP-threshold Stun). Let them fall through.
   if (
     spell.damage ||
     spell.savingThrow ||
@@ -40,6 +40,7 @@ export function runUtilitySpell(
     spell.condition ||
     spell.wall || // barrier-only walls (Force / Stone) resolve in the wall path
     spell.id === 'hunters_mark' ||
+    spell.id === 'hex' ||
     spell.id === 'power_word_stun'
   ) {
     return false;

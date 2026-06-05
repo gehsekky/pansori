@@ -1204,6 +1204,14 @@ export interface Character {
   // Set when the spell is cast, cleared on breakConcentration. The caster's
   // attack rolls vs this target deal +1d6 Force (d10 at Ranger L20, Foe Slayer).
   hunters_mark_target_id?: string;
+  // SRD Hex (Warlock L1) — the id of the hexed enemy entity. Like Hunter's Mark:
+  // the caster's hits vs this target deal +1d6 necrotic. Set on cast, cleared on
+  // breakConcentration. (The curse-an-ability-for-disadvantage rider is narrative.)
+  hex_target_id?: string;
+  // SRD Magic Weapon (L2) — a flat +N enhancement on the wielder's weapon
+  // attacks (+1, or +2 at slot 4, +3 at slot 6). Adds to both the attack roll
+  // (toHit) and weapon damage. Concentration-bound; cleared on breakConcentration.
+  weapon_enhancement?: number;
   // SRD Ranger Hunter "feature option" picks (swappable on a rest):
   //   Hunter's Prey (L3): 'colossus_slayer' | 'horde_breaker' (defaults to
   //     colossus_slayer when unset, preserving the pre-picker behavior).

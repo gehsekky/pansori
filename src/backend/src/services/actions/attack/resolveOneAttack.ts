@@ -361,13 +361,20 @@ export function resolveOneAttack(
       enlargeReduceNote = ` -${penalty} (Reduced)`;
     }
   }
+  // SRD Magic Weapon — flat +N to weapon damage on a hit (the matching +N to the
+  // attack roll is folded into totalAttackBonus in toHit.ts). Weapon attacks only.
+  let magicWeaponNote = '';
+  if (atk.hit && weaponItem && (pc.char.weapon_enhancement ?? 0) > 0) {
+    baseHit += pc.char.weapon_enhancement!;
+    magicWeaponNote = ` +${pc.char.weapon_enhancement} (Magic Weapon)`;
+  }
   const versatileNote = isVersatile ? ' (versatile)' : '';
   const coverNote = coverAcBonus > 0 ? ` +${coverAcBonus} cover` : '';
   const bonusNote = totalAttackBonus > 0 ? ` +${totalAttackBonus} bonus` : '';
   const atkNote =
     ' ' +
     fmt.note(
-      `(${label}d20 ${atk.roll}+${atk.atkMod} ${atk.atkStat}+${atk.prof} prof${bonusNote} = ${atk.total} vs AC ${effectiveEnemyAc}${coverNote}${disadvNote}${versatileNote})${noProfNote}${biNote}${blessNote}${baneNote}${strokeNote}${peerlessNote}${peerlessAimNote}${brutalNote}${parryNote}${enlargeReduceNote}`
+      `(${label}d20 ${atk.roll}+${atk.atkMod} ${atk.atkStat}+${atk.prof} prof${bonusNote} = ${atk.total} vs AC ${effectiveEnemyAc}${coverNote}${disadvNote}${versatileNote})${noProfNote}${biNote}${blessNote}${baneNote}${strokeNote}${peerlessNote}${peerlessAimNote}${brutalNote}${parryNote}${enlargeReduceNote}${magicWeaponNote}`
     );
 
   if (atk.fumble) {
@@ -511,6 +518,15 @@ export function resolveOneAttack(
         : rollDice(huntersMarkDie)
       : 0;
 
+  // SRD Hex (Warlock) — +1d6 Necrotic on a hit against the hexed target (doubled
+  // on a crit). Mirrors Hunter's Mark; folded into rawDmg below.
+  const hexDmg =
+    atk.hit && pc.char.hex_target_id === targetId
+      ? isCrit
+        ? rollCritical('1d6')
+        : rollDice('1d6')
+      : 0;
+
   // ── Divine Smite (2024 PHB) ─────────────────────────────────────
   // Pre-buff from the bonus-action `divine_smite_spell` cast.
   // Consumes `divine_smite_dice` on the next weapon hit and rolls
@@ -585,7 +601,13 @@ export function resolveOneAttack(
   }
 
   const rawDmg =
-    baseHit + sneakDmg + rageBonus + brutalStrikeDmg + huntersMarkDmg + overwhelmingStrikeDmg;
+    baseHit +
+    sneakDmg +
+    rageBonus +
+    brutalStrikeDmg +
+    huntersMarkDmg +
+    hexDmg +
+    overwhelmingStrikeDmg;
   // SRD Monk Empowered Strikes (L6) — unarmed strikes can deal Force damage.
   // pansori auto-picks Force (it bypasses most resistances); only when unarmed
   // (no weaponItem). Otherwise the weapon's own type stands.
@@ -641,6 +663,9 @@ export function resolveOneAttack(
   }
   if (huntersMarkDmg > 0) {
     hitBonuses.push({ label: `Hunter's Mark ${huntersMarkDie}: +${huntersMarkDmg} force` });
+  }
+  if (hexDmg > 0) {
+    hitBonuses.push({ label: `Hex 1d6: +${hexDmg} necrotic` });
   }
   if (weaponRiderDmg > 0 && weaponRider) {
     hitBonuses.push({

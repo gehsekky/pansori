@@ -1483,6 +1483,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     narrative: 'A dark curse settles on your target.',
     desc: 'Curse a creature — bonus 1d6 necrotic on every hit. Concentration.',
     concentration: true,
+    durationRounds: 600, // 1 hour
     rangeKind: 'ranged',
     rangeFt: 90,
     // Warlock-only.
@@ -1625,10 +1626,10 @@ export const SRD_SPELLS: Record<string, Spell> = {
     rangeKind: 'touch',
     spellList: ['primal'],
   },
-  // SRD: Magic Weapon — touch a nonmagical weapon; it becomes a
-  // +1 weapon (attack + damage) for 1 hour (concentration). Pansori
-  // MVP is narrative — persistent weapon-buff stacks need a
-  // per-weapon-buff field that's deferred.
+  // SRD: Magic Weapon — touch a weapon; it becomes a +1 weapon (attack + damage)
+  // for 1 hour (concentration), +2 at slot 4, +3 at slot 6. Mechanized via
+  // `Character.weapon_enhancement` (set in the buff path; added to the attack roll
+  // in toHit.ts + to damage in resolveOneAttack; cleared on breakConcentration).
   magic_weapon: {
     id: 'magic_weapon',
     name: 'Magic Weapon',
@@ -1636,6 +1637,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     castTime: 'bonus_action',
     concentration: true,
     durationRounds: 600, // 1 hour
+    targetType: 'self_or_ally', // the wielder you touch (self by default)
     narrative:
       "{name}'s palm traces along the weapon — runes flare and the steel rings with new edge.",
     desc: 'Touch a weapon: +1 to attack + damage for 1 hour (concentration). Upcast: +2 at L4, +3 at L6.',

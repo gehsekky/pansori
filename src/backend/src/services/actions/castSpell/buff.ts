@@ -430,6 +430,23 @@ export function runBuffSpell(
     }
   }
 
+  // SRD Magic Weapon — flat weapon enhancement: +1, or +2 at slot 4, +3 at slot
+  // 6. Adds to the wielder's weapon attack rolls (toHit.ts) + damage
+  // (resolveOneAttack). Concentration-bound; cleared in breakConcentration.
+  if (spell.id === 'magic_weapon') {
+    const bonus = slotLevel >= 6 ? 3 : slotLevel >= 4 ? 2 : 1;
+    if (isCasterTarget) {
+      char.weapon_enhancement = bonus;
+    } else {
+      ctx.st = {
+        ...ctx.st,
+        characters: ctx.st.characters.map((c) =>
+          c.id === buffTarget.id ? { ...c, weapon_enhancement: bonus } : c
+        ),
+      };
+    }
+  }
+
   if (spell.id === 'fly' || spell.id === 'levitate') {
     const flyFt = spell.id === 'fly' ? 60 : 20;
     if (isCasterTarget) {
