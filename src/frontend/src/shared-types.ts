@@ -403,7 +403,13 @@ export interface CombatEntity {
 
 export type StructuredAction =
   | { type: 'attack'; targetEnemyId?: string }
-  | { type: 'loot' }
+  // `lootKey` selects which placed item to take (a room may hold several);
+  // omitted → the first available item in the room.
+  | { type: 'loot'; lootKey?: string }
+  // Walk the party marker to a cell adjacent to `pos` (out of combat). Dispatched
+  // by clicking a loot / object token on the local-room map; the contextual
+  // Pick-up / Interact choice then surfaces via its adjacency gate.
+  | { type: 'approach'; pos: GridPos }
   | { type: 'use'; itemId: string; targetCharId?: string }
   | { type: 'sneak' }
   | { type: 'examine' }
@@ -885,6 +891,11 @@ export interface RoomObject {
   lootIds?: string[];
   foundText?: string;
   emptyText?: string;
+  // Grid cell for the object on the local-room map. When set, the object
+  // renders as a clickable map token; clicking walks the party adjacent
+  // (the `approach` action) and the "Interact" choice is gated on adjacency.
+  // Unset → object stays text-only (legacy behaviour).
+  pos?: GridPos;
 }
 
 export interface NpcShopEntry {
@@ -1271,6 +1282,19 @@ export interface LootItem {
   // Only applies when the wielder's class grants Weapon Mastery AND they
   // have mastered this specific weapon (Character.weaponMasteries).
   mastery?: WeaponMastery;
+}
+
+/**
+ * A loot item placed in a room. Rooms hold a list of these (`Seed.loot` is
+ * `Record<roomId, PlacedLoot[]>`). `pos` is the grid cell on the local-room map
+ * — when set the item renders as a clickable token and its "Pick up" choice is
+ * gated on the party being adjacent. `key` is a stable per-placement identity
+ * (distinct from the item `id`, which can repeat) used for the `loot_taken`
+ * gate; when unauthored the engine derives `${roomId}#${index}`.
+ */
+export interface PlacedLoot extends LootItem {
+  pos?: GridPos;
+  key?: string;
 }
 
 // ─── Reactive-spell pause shapes ─────────────────────────────────────

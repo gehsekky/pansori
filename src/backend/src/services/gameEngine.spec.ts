@@ -61,19 +61,21 @@ const seed: Seed = {
 const seedWithLoot: Seed = {
   ...seed,
   loot: {
-    [CORRIDOR_ID]: {
-      id: 'medkit',
-      name: 'Med-Kit',
-      desc: 'Heals wounds.',
-      weight: 1,
-      type: 'consumable',
-      slot: null,
-      damage: null,
-      ac_bonus: null,
-      heal: '1d6+1',
-      effect: null,
-      aliases: ['medkit', 'med-kit', 'med kit'],
-    },
+    [CORRIDOR_ID]: [
+      {
+        id: 'medkit',
+        name: 'Med-Kit',
+        desc: 'Heals wounds.',
+        weight: 1,
+        type: 'consumable',
+        slot: null,
+        damage: null,
+        ac_bonus: null,
+        heal: '1d6+1',
+        effect: null,
+        aliases: ['medkit', 'med-kit', 'med kit'],
+      },
+    ],
   },
 };
 
@@ -421,7 +423,9 @@ describe('takeAction', () => {
     expect(char.inventory).toHaveLength(1);
     expect(char.inventory[0].id).toBe('medkit');
     expect(char.inventory[0].instance_id).toBeTruthy();
-    expect(result.newState.loot_taken).toContain(CORRIDOR_ID);
+    // loot_taken records the quest-facing item id AND the per-placement gate key.
+    expect(result.newState.loot_taken).toContain('medkit');
+    expect(result.newState.loot_taken).toContain(`${CORRIDOR_ID}#0`);
   });
 
   it('first attack populates initiative_order with all party members and the enemy', async () => {
@@ -794,19 +798,21 @@ function makeCtxWithRules(rules: GameRule[]): Context {
 const rulesSeed: Seed = {
   ...seed,
   loot: {
-    medkit: {
-      id: 'medkit',
-      name: 'Med-Kit',
-      desc: 'Heals wounds.',
-      weight: 1,
-      type: 'consumable',
-      slot: null,
-      damage: null,
-      ac_bonus: null,
-      heal: '1d6+1',
-      effect: null,
-      aliases: ['medkit'],
-    },
+    medkit: [
+      {
+        id: 'medkit',
+        name: 'Med-Kit',
+        desc: 'Heals wounds.',
+        weight: 1,
+        type: 'consumable',
+        slot: null,
+        damage: null,
+        ac_bonus: null,
+        heal: '1d6+1',
+        effect: null,
+        aliases: ['medkit'],
+      },
+    ],
   },
 };
 
@@ -5160,19 +5166,21 @@ describe('hostile in current room blocks loot / move', () => {
     const seed = {
       ...valeSeedWithGhoulIn('dungeon_offering_chamber'),
       loot: {
-        dungeon_offering_chamber: {
-          id: 'guild_ledger',
-          name: 'Guild Ledger',
-          weight: 1,
-          desc: '',
-          type: 'misc' as const,
-          slot: null,
-          damage: null,
-          ac_bonus: null,
-          heal: null,
-          effect: null,
-          aliases: [],
-        },
+        dungeon_offering_chamber: [
+          {
+            id: 'guild_ledger',
+            name: 'Guild Ledger',
+            weight: 1,
+            desc: '',
+            type: 'misc' as const,
+            slot: null,
+            damage: null,
+            ac_bonus: null,
+            heal: null,
+            effect: null,
+            aliases: [],
+          },
+        ],
       },
     };
     const st = makeState(
@@ -5219,19 +5227,21 @@ describe('hostile in current room blocks loot / move', () => {
     const seed = {
       ...valeSeedWithGhoulIn('dungeon_offering_chamber'),
       loot: {
-        dungeon_offering_chamber: {
-          id: 'guild_ledger',
-          name: 'Guild Ledger',
-          weight: 1,
-          desc: '',
-          type: 'misc' as const,
-          slot: null,
-          damage: null,
-          ac_bonus: null,
-          heal: null,
-          effect: null,
-          aliases: [],
-        },
+        dungeon_offering_chamber: [
+          {
+            id: 'guild_ledger',
+            name: 'Guild Ledger',
+            weight: 1,
+            desc: '',
+            type: 'misc' as const,
+            slot: null,
+            damage: null,
+            ac_bonus: null,
+            heal: null,
+            effect: null,
+            aliases: [],
+          },
+        ],
       },
     };
     const st = makeState(

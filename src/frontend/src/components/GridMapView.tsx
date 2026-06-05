@@ -28,6 +28,17 @@ interface Props {
   // the same as the "Talk to …" choice.
   npcs?: Array<{ id: string; pos: GridPos; name: string; icon?: string }>;
   onNpcClick?: (npcId: string) => void;
+  // Ground loot standing on the grid (local room maps). Renders a clickable
+  // token per item at its `pos`; clicking it (via `onLootClick(key)`) walks the
+  // party adjacent (the `approach` action), after which the "Pick up …" choice
+  // surfaces. Items already taken aren't passed in (so they vanish on pickup).
+  loot?: Array<{ key: string; pos: GridPos; name: string; icon?: string }>;
+  onLootClick?: (lootKey: string) => void;
+  // Interactable objects (chests / strongboxes) with a position. Same approach
+  // flow as loot — clicking walks the party adjacent, then "Interact with …"
+  // surfaces. Searched objects aren't passed in.
+  objects?: Array<{ id: string; pos: GridPos; name: string; icon?: string }>;
+  onObjectClick?: (objectId: string) => void;
   // Fog of war — the set of revealed "x,y" cell keys. When provided, any cell
   // not in the set is hidden (obscured + non-travelable). Omit to disable fog
   // (towns / local maps render fully). The party + enemy markers are never
@@ -101,6 +112,13 @@ const SITE_STONE = 'rgba(206, 198, 182, 0.95)';
 // PlacedNpc.icon (e.g. 'wood-axe'); this is the fallback when none is set.
 const DEFAULT_NPC_ICON = 'conversation';
 const NPC_GOLD = 'rgba(230, 200, 120, 1)';
+
+// Ground-loot token: a green item glyph. Interactable objects (chests) use a
+// distinct chest glyph in a warmer tone so they read apart from loose loot.
+const DEFAULT_LOOT_ICON = 'swap-bag';
+const LOOT_GREEN = 'rgba(120, 210, 140, 1)';
+const DEFAULT_OBJECT_ICON = 'locked-chest';
+const OBJECT_BROWN = 'rgba(205, 170, 110, 1)';
 
 // Out of combat an enemy carries no grid position (positions are assigned only
 // when combat deploys tokens). Pick a single cell near the party for the red
@@ -186,6 +204,10 @@ function GridMapView({
   onMarkerMove,
   npcs,
   onNpcClick,
+  loot,
+  onLootClick,
+  objects,
+  onObjectClick,
   revealed,
 }: Props) {
   // The overland (regional) map gets double-size squares so the larger, sparse
@@ -236,6 +258,12 @@ function GridMapView({
       // A talkable NPC token sits here (and the party isn't standing on it).
       const cellNpc = npcs?.find((n) => n.pos.x === x && n.pos.y === y);
       const isNpc = !!cellNpc && !isMarker;
+      // Ground loot / interactable object tokens (mutually exclusive with the
+      // higher-priority marker / enemy / NPC tokens on the same cell).
+      const cellLoot = loot?.find((l) => l.pos.x === x && l.pos.y === y);
+      const isLoot = !!cellLoot && !isMarker && !isEnemyMarker && !isNpc;
+      const cellObject = objects?.find((o) => o.pos.x === x && o.pos.y === y);
+      const isObject = !!cellObject && !isMarker && !isEnemyMarker && !isNpc && !isLoot;
       // Fog of war — an undiscovered cell is hidden and can't be travelled to.
       // The party + the (always-nearby) enemy marker are never fogged.
       const fogged = !!revealed && !revealed.has(key) && !isMarker && !isEnemyMarker;
@@ -249,7 +277,11 @@ function GridMapView({
           ? !!onEnemyClick
           : isNpc
             ? !!onNpcClick
-            : !isObstacle && !isMarker && !!onMarkerMove;
+            : isLoot
+              ? !!onLootClick
+              : isObject
+                ? !!onObjectClick
+                : !isObstacle && !isMarker && !!onMarkerMove;
 
       // Checkerboard the plain cells so the grid squares read clearly on the
       // large, sparse region/town maps — a single flat fill was
@@ -280,6 +312,8 @@ function GridMapView({
         if (isMarker) ariaParts.push('the party');
         if (isEnemyMarker) ariaParts.push('an enemy');
         if (isNpc) ariaParts.push(`${cellNpc!.name}, talk`);
+        if (isLoot) ariaParts.push(`${cellLoot!.name}, pick up`);
+        if (isObject) ariaParts.push(`${cellObject!.name}, search`);
         if (terrainType) ariaParts.push(TERRAIN[terrainType].label);
         else if (isObstacle) ariaParts.push('impassable');
         if (transition) ariaParts.push(transition.label);
@@ -299,15 +333,19 @@ function GridMapView({
           ? 'Attack'
           : isNpc
             ? `Talk to ${cellNpc!.name}`
-            : transition
-              ? transition.label
-              : terrainType
-                ? describeTerrain(terrainType, showTerrainModifiers)
-                : isObstacle
-                  ? 'Impassable'
-                  : grid.terrain.length > 0
-                    ? describeTerrain('plains', showTerrainModifiers)
-                    : undefined;
+            : isLoot
+              ? `Approach the ${cellLoot!.name}`
+              : isObject
+                ? `Approach the ${cellObject!.name}`
+                : transition
+                  ? transition.label
+                  : terrainType
+                    ? describeTerrain(terrainType, showTerrainModifiers)
+                    : isObstacle
+                      ? 'Impassable'
+                      : grid.terrain.length > 0
+                        ? describeTerrain('plains', showTerrainModifiers)
+                        : undefined;
 
       let token: React.ReactNode = null;
       if (fogged) {
@@ -344,6 +382,35 @@ function GridMapView({
             />
             <span className={styles.gridMapLabel} aria-hidden="true">
               {cellNpc!.name}
+            </span>
+          </>
+        );
+      } else if (isLoot) {
+        // Ground loot — a green item glyph + name label. Clicking walks the
+        // party adjacent; the "Pick up …" choice then surfaces.
+        token = (
+          <>
+            <GameIcon
+              name={cellLoot!.icon ?? DEFAULT_LOOT_ICON}
+              className={styles.gridMapGlyph}
+              style={{ fontSize: iconFontSize, color: LOOT_GREEN }}
+            />
+            <span className={styles.gridMapLabel} aria-hidden="true">
+              {cellLoot!.name}
+            </span>
+          </>
+        );
+      } else if (isObject) {
+        // An interactable object (chest / strongbox) — a chest glyph + label.
+        token = (
+          <>
+            <GameIcon
+              name={cellObject!.icon ?? DEFAULT_OBJECT_ICON}
+              className={styles.gridMapGlyph}
+              style={{ fontSize: iconFontSize, color: OBJECT_BROWN }}
+            />
+            <span className={styles.gridMapLabel} aria-hidden="true">
+              {cellObject!.name}
             </span>
           </>
         );
@@ -446,7 +513,11 @@ function GridMapView({
                     ? onEnemyClick?.()
                     : isNpc
                       ? onNpcClick?.(cellNpc!.id)
-                      : onMarkerMove?.({ x, y })
+                      : isLoot
+                        ? onLootClick?.(cellLoot!.key)
+                        : isObject
+                          ? onObjectClick?.(cellObject!.id)
+                          : onMarkerMove?.({ x, y })
               : undefined
           }
           onKeyDown={
@@ -456,6 +527,8 @@ function GridMapView({
                     e.preventDefault();
                     if (isEnemyMarker) onEnemyClick?.();
                     else if (isNpc) onNpcClick?.(cellNpc!.id);
+                    else if (isLoot) onLootClick?.(cellLoot!.key);
+                    else if (isObject) onObjectClick?.(cellObject!.id);
                     else onMarkerMove?.({ x, y });
                   }
                 }

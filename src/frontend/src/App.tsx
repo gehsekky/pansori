@@ -33,6 +33,7 @@ import WorldMap from './components/WorldMap.tsx';
 import { activeGrid } from './lib/activeGrid.ts';
 import { applyTheme } from './lib/theme.ts';
 import artManifest from './art-manifest.json';
+import { availableLootIn } from './lib/placedLoot.ts';
 import { context as malgoviaContext } from './contexts/malgovia.tsx';
 import { mapPanelVisible } from './lib/mapPanelVisible.ts';
 import { context as sandboxContext } from './contexts/sandbox.tsx';
@@ -609,6 +610,39 @@ export default function App() {
                                 )
                                 .map((n) => ({ id: n.id, pos: n.pos!, name: n.name, icon: n.icon }))
                             : [];
+                        // Ground loot tokens (local rooms): not-yet-taken items
+                        // with a position. Clicking one walks the party adjacent
+                        // (the `approach` action); once adjacent the "Pick up …"
+                        // choice appears (so a smart click picks it up directly).
+                        const lootTokens =
+                          grid.level === 'local'
+                            ? availableLootIn(gameState, seed, gameState.current_room)
+                                .filter((l) => l.pos)
+                                .map((l) => ({ key: l.key!, pos: l.pos!, name: l.name }))
+                            : [];
+                        const pickupByKey = new Map(
+                          choices
+                            .filter((c) => c.action.type === 'loot')
+                            .map((c) => [(c.action as { lootKey?: string }).lootKey, c] as const)
+                        );
+                        // Interactable-object tokens (local rooms): positioned,
+                        // not-yet-searched objects. Same approach-then-act flow.
+                        const roomDef = seed.rooms.find((r) => r.id === gameState.current_room);
+                        const searchedHere = new Set(gameState.objects_searched ?? []);
+                        const objectTokens =
+                          grid.level === 'local'
+                            ? (roomDef?.objects ?? [])
+                                .filter(
+                                  (o) =>
+                                    o.pos && !searchedHere.has(`${gameState.current_room}:${o.id}`)
+                                )
+                                .map((o) => ({ id: o.id, pos: o.pos!, name: o.name }))
+                            : [];
+                        const interactById = new Map(
+                          choices
+                            .filter((c) => c.action.type === 'interact_object')
+                            .map((c) => [(c.action as { objectId: string }).objectId, c] as const)
+                        );
                         // Fog of war (regional map only): the party can only
                         // see / travel to cells discovered within sight range.
                         const revealed =
@@ -644,6 +678,44 @@ export default function App() {
                                 ? (npcId) => {
                                     const tc = talkByNpc.get(npcId);
                                     if (tc) handleChoice(tc);
+                                  }
+                                : undefined
+                            }
+                            loot={lootTokens}
+                            onLootClick={
+                              mapInteractive
+                                ? (key) => {
+                                    // Adjacent already? Pick it up. Otherwise walk
+                                    // up to it; the Pick-up choice surfaces next.
+                                    const pick = pickupByKey.get(key);
+                                    if (pick) {
+                                      handleChoice(pick);
+                                      return;
+                                    }
+                                    const tok = lootTokens.find((l) => l.key === key);
+                                    if (tok)
+                                      handleChoice({
+                                        label: `Approach the ${tok.name}`,
+                                        action: { type: 'approach', pos: tok.pos },
+                                      });
+                                  }
+                                : undefined
+                            }
+                            objects={objectTokens}
+                            onObjectClick={
+                              mapInteractive
+                                ? (id) => {
+                                    const it = interactById.get(id);
+                                    if (it) {
+                                      handleChoice(it);
+                                      return;
+                                    }
+                                    const tok = objectTokens.find((o) => o.id === id);
+                                    if (tok)
+                                      handleChoice({
+                                        label: `Approach the ${tok.name}`,
+                                        action: { type: 'approach', pos: tok.pos },
+                                      });
                                   }
                                 : undefined
                             }

@@ -53,6 +53,7 @@ import { handleGrapple, handleShove, handleTryEscapeGrapple } from './combatTact
 import { handleLongRest, handleShortRest } from './rest.js';
 import { handleResolveReaction, handleUseReaction } from './reaction.js';
 import type { StructuredAction } from '../../types.js';
+import { handleApproach } from './approach.js';
 import { handleAttack } from './attack/index.js';
 import { handleCastSpell } from './castSpell/index.js';
 import { handleCommandSummon } from './commandSummon.js';
@@ -136,6 +137,7 @@ const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   enter_shop: handleEnterShop as ActionHandler,
   exit_shop: handleExitShop as ActionHandler,
   marker_move: handleMarkerMove as ActionHandler,
+  approach: handleApproach as ActionHandler,
   accept_quest: handleAcceptQuest as ActionHandler,
   complete_quest: handleCompleteQuest as ActionHandler,
   grapple: handleGrapple as ActionHandler,

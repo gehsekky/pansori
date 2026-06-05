@@ -22,6 +22,7 @@ import type {
   LootItem,
   NpcAttitude,
   PendingReaction,
+  PlacedLoot,
   PlacedNpc,
   Quest,
   QuestProgress,
@@ -422,7 +423,11 @@ export interface Seed {
   intro: string;
   rooms: Room[];
   enemies: Record<string, Enemy[]>;
-  loot: Record<string, LootItem>;
+  // Loot placed in each room, keyed by room id. Each room holds a list of
+  // positioned items (PlacedLoot). Legacy seed snapshots may carry a single
+  // LootItem here instead of an array — read via `placedLootIn()`, which
+  // normalizes both shapes.
+  loot: Record<string, PlacedLoot[]>;
   npcs: Record<string, PlacedNpc>;
   seed_id: string;
   // 3-level grid map definitions (copied from the campaign at seed time so the
@@ -1681,7 +1686,7 @@ export interface CampaignData {
   intro: string;
   rooms: Room[];
   enemies?: Record<string, Enemy[]>;
-  loot?: Record<string, LootItem>;
+  loot?: Record<string, PlacedLoot[]>;
   // Author-placed NPCs keyed by roomId. The engine's NPC lookup is
   // seed.npcs[roomId]; generateSeed copies this field into the seed for
   // campaign-mode runs. Roguelike NPCs are still placed by procgen.

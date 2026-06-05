@@ -122,6 +122,7 @@ export const rooms: Room[] = [
         foundText:
           "The lock clicks. Inside, the incriminating letter — proof Captain Vane was on the bandits' payroll.",
         emptyText: 'The lock resists you. Reset your tools and try again.',
+        pos: { x: 3, y: 2 },
       },
     ],
   },
@@ -232,6 +233,7 @@ export const rooms: Room[] = [
         lootIds: ['healing_potion'],
         foundText: 'Beneath the ashes — a small vial wrapped in cloth. A healing potion!',
         emptyText: 'Ashes drift through your fingers. Steady your hand and search again.',
+        pos: { x: 2, y: 7 },
       },
     ],
     // Shattered urns and bone-rubble strewn across the vaulted floor.
@@ -536,6 +538,7 @@ export const rooms: Room[] = [
         lootIds: ['elixir_of_warmth'],
         foundText: 'Inside: a wax-stoppered vial. An elixir of warmth.',
         emptyText: 'The latch sticks. Brace it properly and try the lock again.',
+        pos: { x: 3, y: 2 },
       },
     ],
     // Cosmetic: a plank floor hung with pelts; snow tracked from the door.

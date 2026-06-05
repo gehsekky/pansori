@@ -410,4 +410,49 @@ describe('GridMapView', () => {
     expect(cell(container, 1, 1).querySelector('.game-icon-conversation')).toBeTruthy();
     expect(cell(container, 2, 1).querySelector('.game-icon-wood-axe')).toBeTruthy();
   });
+
+  it('renders clickable loot tokens (default glyph + label + Approach tooltip) and dispatches onLootClick with the key', () => {
+    const onLootClick = vi.fn();
+    const onMarkerMove = vi.fn();
+    const { container, getByText } = render(
+      <GridMapView
+        grid={localGrid}
+        markerPos={{ x: 3, y: 6 }}
+        loot={[
+          { key: 'room#0', pos: { x: 2, y: 2 }, name: 'Healing Potion' },
+          { key: 'room#1', pos: { x: 5, y: 4 }, name: 'Silver Dagger' },
+        ]}
+        onLootClick={onLootClick}
+        onMarkerMove={onMarkerMove}
+      />
+    );
+    expect(getByText('Healing Potion')).toBeTruthy();
+    expect(getByText('Silver Dagger')).toBeTruthy();
+    const lootCell = cell(container, 2, 2);
+    expect(lootCell.querySelector('.game-icon-swap-bag')).toBeTruthy(); // green loot glyph
+    expect(lootCell.getAttribute('title')).toBe('Approach the Healing Potion');
+    expect(lootCell.getAttribute('role')).toBe('button');
+    fireEvent.click(cell(container, 5, 4));
+    expect(onLootClick).toHaveBeenCalledWith('room#1');
+    expect(onMarkerMove).not.toHaveBeenCalled(); // the loot cell approaches, doesn't travel
+  });
+
+  it('renders a clickable container token (chest glyph) and dispatches onObjectClick with the id', () => {
+    const onObjectClick = vi.fn();
+    const { container, getByText } = render(
+      <GridMapView
+        grid={localGrid}
+        markerPos={{ x: 3, y: 6 }}
+        objects={[{ id: 'strongbox', pos: { x: 4, y: 1 }, name: "Captain's Strongbox" }]}
+        onObjectClick={onObjectClick}
+        onMarkerMove={vi.fn()}
+      />
+    );
+    expect(getByText("Captain's Strongbox")).toBeTruthy();
+    const objCell = cell(container, 4, 1);
+    expect(objCell.querySelector('.game-icon-locked-chest')).toBeTruthy();
+    expect(objCell.getAttribute('title')).toBe("Approach the Captain's Strongbox");
+    fireEvent.click(objCell);
+    expect(onObjectClick).toHaveBeenCalledWith('strongbox');
+  });
 });

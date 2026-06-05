@@ -3,7 +3,7 @@ import type {
   Enemy,
   GameState,
   GridPos,
-  LootItem,
+  PlacedLoot,
   Seed,
   StructuredAction,
 } from '../../types.js';
@@ -33,8 +33,9 @@ export interface ActionContext {
   readonly livingEnemiesInRoom: Enemy[];
   readonly enemy: Enemy | undefined;
   readonly enemyAlive: boolean;
-  readonly loot: LootItem | undefined;
-  readonly lootAvail: boolean | undefined;
+  // Not-yet-taken placed loot in the current room (normalized via
+  // `availableLootIn`); empty out of combat or when the room has none.
+  readonly placedLoot: PlacedLoot[];
 
   // Working state — handlers mutate via wholesale replacement
   /** Reassigned only by the `travel` handler. */

@@ -45,7 +45,7 @@ describe('generateSeed — Vale carries the folded Whispering Pines content', ()
     const boss = seed.enemies?.spire_ritual_apex?.[0];
     expect(boss?.name).toBe('Frost Acolyte');
     expect(boss?.vulnerabilities).toContain('fire');
-    expect(seed.loot?.spire_ritual_apex?.id).toBe('cult_idol');
+    expect(seed.loot?.spire_ritual_apex?.[0]?.id).toBe('cult_idol');
   });
 
   it('drops new sites + the Pines town onto the Vale regional map', () => {

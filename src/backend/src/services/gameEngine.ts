@@ -61,6 +61,7 @@ import {
   DEFAULT_SPEED_FEET,
   SQUARE_SIZE,
   canSeeTarget,
+  chebyshev,
   coverBonus,
   distanceFeet,
   entitiesInBlast,
@@ -138,6 +139,7 @@ import { COMBAT_LOG_MAX } from '../types.js';
 import { Engine } from 'json-rules-engine';
 import { applyDamage } from './damage.js';
 import { applyStateMigrations } from './stateSchema.js';
+import { availableLootIn } from './placedLoot.js';
 import { canTakeFeat } from './feats.js';
 import { factionShopPrice } from './campaignEngine.js';
 import { llmProvider } from './llmProvider.js';
@@ -3630,9 +3632,13 @@ export function buildArrivalNarrative(
   // error message rather than re-entry flavor — see Vale playthrough
   // log, 2026-05-21. Cleared rooms now just rely on exits + loot for
   // their narrative cues.)
-  const newLoot = seed.loot?.[targetId];
-  if (newLoot && !state.loot_taken.includes(targetId)) {
-    text += ` You spot a ${newLoot.name} on the ground.`;
+  const spotted = availableLootIn(state, seed, targetId);
+  if (spotted.length === 1) {
+    text += ` You spot a ${spotted[0].name} on the ground.`;
+  } else if (spotted.length > 1) {
+    const names = spotted.map((l) => l.name);
+    const list = `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+    text += ` You spot ${list} here.`;
   }
 
   // Passive trap detection (5e DMG ch.5)
@@ -3710,7 +3716,7 @@ export function seenKeyForAction(action: StructuredAction, state: GameState): st
     case 'examine':
       return `examine::${room}`;
     case 'loot':
-      return `loot::${room}`;
+      return `loot::${room}${action.lootKey ? `::${action.lootKey}` : ''}`;
     default:
       return undefined;
   }
@@ -4204,8 +4210,6 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     return true;
   });
   const enemyAlive = livingEnemies.length > 0;
-  const loot = seed.loot?.[roomId];
-  const lootAvail = loot && !state.loot_taken?.includes(roomId);
 
   // Trap: offer disarm if trap is detected (party passive Perception
   // beat the DC) but not yet spent. Disarm is an Action (cost.ts) — in
@@ -4263,9 +4267,19 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   // Loot is suppressed while a hostile is in the room — RAW: you don't get
   // to casually pocket items with a Crypt Ghoul watching. Engage or escape
   // first. Mirrors the same author intent already enforced on Move-between-
-  // rooms at the bottom of generateChoices.
-  if (lootAvail && !enemyAlive) {
-    choices.push({ label: `Pick up the ${loot.name}`, action: { type: 'loot' } });
+  // rooms at the bottom of generateChoices. Each not-yet-taken item offers its
+  // own "Pick up" choice; a positioned item is gated on the party marker being
+  // adjacent (clicking its map token approaches first), while an item with no
+  // `pos` (legacy) stays ungated.
+  if (!enemyAlive) {
+    for (const item of availableLootIn(state, seed, roomId)) {
+      const adjacent = !item.pos || !state.marker_pos || chebyshev(state.marker_pos, item.pos) <= 1;
+      if (!adjacent) continue;
+      choices.push({
+        label: `Pick up the ${item.name}`,
+        action: { type: 'loot', lootKey: item.key },
+      });
+    }
   }
   // SRD 5.2.1 p.204: drinking/administering a potion is a Bonus Action. In
   // combat, suppress the choice if the bonus action is already spent.
@@ -4344,7 +4358,11 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
       const searchKey = `${roomId}:${obj.id}`;
       const alreadySearched = (state.objects_searched ?? []).includes(searchKey);
-      if (!alreadySearched) {
+      // A positioned object renders as a map token; gate its Interact choice on
+      // the party being adjacent (clicking the token approaches first). Objects
+      // with no `pos` (legacy) stay ungated.
+      const adjacent = !obj.pos || !state.marker_pos || chebyshev(state.marker_pos, obj.pos) <= 1;
+      if (!alreadySearched && adjacent) {
         choices.push({
           label: useBonus
             ? `Fast Hands: Interact with ${obj.name} — bonus action`
@@ -6457,7 +6475,12 @@ export function applyConsequence(
 
     case 'give_item': {
       const targetId = c.characterId ?? activeCharId;
-      const lootEntry = seed.loot?.[c.itemId] ?? null;
+      // `seed.loot` is keyed by room id and holds positioned-loot lists, so look
+      // the item up by id across every room's placement list.
+      const lootEntry =
+        Object.values(seed.loot ?? {})
+          .flat()
+          .find((l) => l?.id === c.itemId) ?? null;
       if (!lootEntry) return st;
       const newItem = { ...lootEntry, instance_id: randomUUID() };
       const characters = st.characters.map((ch) =>
@@ -7075,8 +7098,7 @@ function buildEnemyActionCtx(args: {
     livingEnemiesInRoom: [],
     enemy: undefined,
     enemyAlive: false,
-    loot: undefined,
-    lootAvail: false,
+    placedLoot: [],
     seed,
     st,
     actor: enemyActor(enemy, ent),
@@ -9488,8 +9510,7 @@ export async function takeAction({
   });
   const enemy: Enemy | undefined = livingEnemiesInRoom[0];
   const enemyAlive = livingEnemiesInRoom.length > 0;
-  const loot = seed.loot?.[roomId];
-  const lootAvail = loot && !st.loot_taken.includes(roomId);
+  const placedLoot = availableLootIn(st, seed, roomId);
 
   let narrative = '';
   let escaped = false;
@@ -9658,8 +9679,7 @@ export async function takeAction({
     livingEnemiesInRoom,
     enemy,
     enemyAlive,
-    loot,
-    lootAvail,
+    placedLoot,
     seed,
     st,
     actor: pcActor(char, safeIdx),

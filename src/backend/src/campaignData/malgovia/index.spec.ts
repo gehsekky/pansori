@@ -359,7 +359,7 @@ describe('Malgovia — scripted playthrough', () => {
     await clearCombat();
     expect(state.enemies_killed).toContain('dungeon_offering_chamber#0');
     await dispatch({ type: 'loot' });
-    expect(state.loot_taken).toContain('dungeon_offering_chamber');
+    expect(state.loot_taken).toContain('guild_ledger');
     const allInv = state.characters.flatMap((c) => c.inventory);
     expect(allInv.some((i) => i.id === 'guild_ledger')).toBe(true);
 
@@ -375,7 +375,7 @@ describe('Malgovia — scripted playthrough', () => {
     await clearCombat();
     expect(state.enemies_killed).toContain('dungeon_crypt_throne#0'); // Crypt Lord
     await dispatch({ type: 'loot' });
-    expect(state.loot_taken).toContain('dungeon_crypt_throne');
+    expect(state.loot_taken).toContain('moonstone_amulet');
     const allInv2 = state.characters.flatMap((c) => c.inventory);
     expect(allInv2.some((i) => i.id === 'moonstone_amulet')).toBe(true);
 
