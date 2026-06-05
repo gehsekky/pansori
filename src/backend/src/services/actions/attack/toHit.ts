@@ -163,6 +163,10 @@ export function computeToHitContext(
   // SRD Blinded — attack rolls against a Blinded creature have Advantage
   // (Blindness/Deafness, Color Spray, Rogue Cunning Strike: Obscure).
   const enemyBlinded = enemyEntity2?.conditions.includes('blinded') ?? false;
+  // SRD Invisible — an attacker can't see the creature, so attacks against it
+  // have Disadvantage. See Invisibility (Character.sees_invisible) negates it.
+  const enemyInvisible =
+    (enemyEntity2?.conditions.includes('invisible') ?? false) && !(pc.char.sees_invisible ?? false);
   const proneAdv = enemyProne && weaponItem?.range !== 'ranged';
   const proneDisadv = enemyProne && weaponItem?.range === 'ranged';
 
@@ -309,7 +313,8 @@ export function computeToHitContext(
     !armorProficient ||
     proneDisadv ||
     thrownLongRangeDisadv ||
-    darknessDisadv;
+    darknessDisadv ||
+    enemyInvisible;
 
   const inspirationAdv = !!pc.char.turn_actions.inspiration_pending;
   if (inspirationAdv) {
@@ -367,6 +372,7 @@ export function computeToHitContext(
     proneDisadv ? 'prone (ranged)' : '',
     thrownLongRangeDisadv ? 'thrown beyond normal range' : '',
     darknessDisadv ? "Blinded by darkness — you can't see your target" : '',
+    enemyInvisible ? 'target is invisible' : '',
   ]
     .filter(Boolean)
     .join(', ');

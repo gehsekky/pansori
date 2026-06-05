@@ -479,6 +479,8 @@ export function breakConcentration(
   // defensive against drift.
   const wasFlight =
     char.concentrating_on.spellId === 'fly' || char.concentrating_on.spellId === 'levitate';
+  // SRD Spider Climb — dropping concentration revokes the granted Climb Speed.
+  const wasSpiderClimb = char.concentrating_on.spellId === 'spider_climb';
   // 2024 PHB Polymorph — concentration drop reverts every polymorphed
   // entity. The polymorph_state stash carries originalHp / originalMaxHp;
   // restore those + clear the polymorphed condition. Pansori MVP assumes
@@ -602,6 +604,17 @@ export function breakConcentration(
       newChar = { ...newChar, fly_speed_ft: undefined };
     }
   }
+  if (wasSpiderClimb) {
+    newSt = {
+      ...newSt,
+      characters: newSt.characters.map((c) =>
+        c.climb_speed_ft ? { ...c, climb_speed_ft: undefined } : c
+      ),
+    };
+    if (newChar.climb_speed_ft) {
+      newChar = { ...newChar, climb_speed_ft: undefined };
+    }
+  }
   if (wasDragonsBreath) {
     // Revoke the granted breath from any creature this caster armed.
     newSt = {
@@ -688,7 +701,8 @@ export function breakConcentration(
           context.lootTable,
           next.mage_armor_active ?? false,
           next.shield_of_faith_active ?? false,
-          false
+          false,
+          next.barkskin_active ?? false
         ) + defenseAcBonus(next, context.lootTable);
       return next;
     };
@@ -722,7 +736,9 @@ export function breakConcentration(
           cleared.inventory ?? [],
           context.lootTable,
           cleared.mage_armor_active ?? false,
-          false
+          false,
+          false,
+          cleared.barkskin_active ?? false
         ) + defenseAcBonus(cleared, context.lootTable);
       return cleared;
     };

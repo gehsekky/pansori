@@ -1307,6 +1307,13 @@ export interface Character {
   // duration (up to 10 min). computeTotalAc reads this. Expires
   // when the caster's concentration drops.
   shield_of_faith_active?: boolean;
+  // SRD Barkskin (L2) — the target's AC can't be less than 17. A persistent
+  // floor (1 hour, NOT concentration); computeTotalAc reads this and floors the
+  // result. Modeled like mage_armor (set-and-forget; expires on long rest).
+  barkskin_active?: boolean;
+  // SRD See Invisibility (L2) — while set, this creature can see Invisible
+  // creatures (its attacks/sight ignore the target's `invisible` condition).
+  sees_invisible?: boolean;
   // SRD Death Ward (L4 Abjuration) — one-shot rescue. While set,
   // the next time the target's HP would drop to 0, it drops to 1
   // instead and the flag clears (the spell "ends" per RAW). 8-hour

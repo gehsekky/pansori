@@ -1617,12 +1617,15 @@ export const SRD_SPELLS: Record<string, Spell> = {
     id: 'barkskin',
     name: 'Barkskin',
     level: 2,
-    castTime: 'action',
-    concentration: true,
+    // SRD 5.2.1: Bonus Action, Touch, 1 hour, NOT concentration. AC can't be
+    // less than 17. Modeled via Character.barkskin_active (an AC floor in
+    // computeTotalAc), persistent like Mage Armor.
+    castTime: 'bonus_action',
     durationRounds: 600, // 1 hour
+    targetType: 'self_or_ally',
     narrative:
       '{name} presses a sprig of holly to an ally — rough bark-like skin hardens over their hide.',
-    desc: 'Touch buff: minimum AC 17 for 1 hour (concentration).',
+    desc: "Touch a willing creature: its AC can't be less than 17 for 1 hour.",
     rangeKind: 'touch',
     spellList: ['primal'],
   },
@@ -3884,6 +3887,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     castTime: 'action',
     concentration: true,
     durationRounds: 600,
+    targetType: 'self_or_ally',
     rangeKind: 'touch',
     desc: 'A willing creature you touch can move up, down, and across vertical surfaces and ceilings while leaving its hands free, gaining a Climb Speed equal to its Speed (Concentration, up to 1 hour).',
     narrative: "{name}'s touch lets the climber cling to sheer stone like a spider.",
@@ -3996,7 +4000,8 @@ export const SRD_SPELLS: Record<string, Spell> = {
     level: 2,
     castTime: 'action',
     rangeKind: 'self',
-    desc: 'For 1 hour you can see Invisible creatures and objects (and into the Ethereal Plane) as if they were visible. The reveal is narrated, not modeled mechanically.',
+    targetType: 'self',
+    desc: 'For 1 hour you can see Invisible creatures as if they were visible — your attacks and sight ignore the Invisible condition. (The into-the-Ethereal reveal stays narrative.)',
     narrative: '{name} blinks, and the unseen swims into focus.',
     spellList: ['arcane'],
   },

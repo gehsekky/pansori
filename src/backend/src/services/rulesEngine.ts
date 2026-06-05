@@ -528,7 +528,10 @@ export function computeTotalAc(
   // false for legacy compat.
   mageArmorActive: boolean = false,
   shieldOfFaithActive: boolean = false,
-  hastedActive: boolean = false
+  hastedActive: boolean = false,
+  // SRD Barkskin — the target's AC can't be less than 17, regardless of armor.
+  // Applied as a floor on the final value. Defaults false for legacy compat.
+  barkskinActive: boolean = false
 ): number {
   const dexMod = abilityMod(dex);
   const armorId = equippedArmorInstanceId
@@ -551,6 +554,7 @@ export function computeTotalAc(
   if (shield?.ac_bonus) ac += shield.ac_bonus;
   if (shieldOfFaithActive) ac += 2;
   if (hastedActive) ac += 2;
+  if (barkskinActive) ac = Math.max(ac, 17);
   return ac;
 }
 

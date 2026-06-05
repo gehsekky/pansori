@@ -176,7 +176,10 @@ export function runBuffSpell(
   // Haste also gets +2 AC via the hasted condition — recompute when
   // the buff path adds the condition.
   const grantsAcBump =
-    spell.id === 'mage_armor' || spell.id === 'shield_of_faith' || spell.id === 'haste';
+    spell.id === 'mage_armor' ||
+    spell.id === 'shield_of_faith' ||
+    spell.id === 'haste' ||
+    spell.id === 'barkskin';
   if (grantsAcBump) {
     const recomputeAcFor = (c: typeof buffTarget): number =>
       computeTotalAc(
@@ -191,11 +194,14 @@ export function runBuffSpell(
         // path runs, the target's conditions include 'hasted', so
         // pass true when this is the Haste cast OR when the target
         // already had the condition from a prior cast.
-        spell.id === 'haste' || (c.conditions ?? []).includes('hasted')
+        spell.id === 'haste' || (c.conditions ?? []).includes('hasted'),
+        // SRD Barkskin — floor the AC at 17 (this cast OR an existing barkskin).
+        spell.id === 'barkskin' ? true : (c.barkskin_active ?? false)
       ) + defenseAcBonus(c, ctx.context.lootTable);
     if (isCasterTarget) {
       if (spell.id === 'mage_armor') char.mage_armor_active = true;
       if (spell.id === 'shield_of_faith') char.shield_of_faith_active = true;
+      if (spell.id === 'barkskin') char.barkskin_active = true;
       char.ac = recomputeAcFor(char);
     } else {
       ctx.st = {
@@ -207,6 +213,7 @@ export function runBuffSpell(
             mage_armor_active: spell.id === 'mage_armor' ? true : c.mage_armor_active,
             shield_of_faith_active:
               spell.id === 'shield_of_faith' ? true : c.shield_of_faith_active,
+            barkskin_active: spell.id === 'barkskin' ? true : c.barkskin_active,
           };
           return { ...flagged, ac: recomputeAcFor(flagged) };
         }),
@@ -459,6 +466,29 @@ export function runBuffSpell(
         ),
       };
     }
+  }
+
+  // SRD Spider Climb — grant a Climb Speed equal to the target's Speed (the
+  // gridMove climb-terrain pipeline reads climb_speed_ft). Concentration; the
+  // grant clears in breakConcentration.
+  if (spell.id === 'spider_climb') {
+    if (isCasterTarget) {
+      char.climb_speed_ft = char.speed;
+    } else {
+      ctx.st = {
+        ...ctx.st,
+        characters: ctx.st.characters.map((c) =>
+          c.id === buffTarget.id ? { ...c, climb_speed_ft: c.speed } : c
+        ),
+      };
+    }
+  }
+
+  // SRD See Invisibility — the caster can see Invisible creatures (attacks +
+  // sight ignore the target's Invisible condition). Self-only, 1 hour, not
+  // concentration; persists like Mage Armor.
+  if (spell.id === 'see_invisibility' && isCasterTarget) {
+    char.sees_invisible = true;
   }
 
   // SRD Dragon's Breath — grant the target a breath weapon for the duration.
