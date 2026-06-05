@@ -1932,6 +1932,12 @@
   font-size: 1.35rem;
   line-height: 1;
   text-shadow: 0 0 2px rgba(0, 0, 0, 0.7);
+  /* Lift the marker / token glyph into the positioned layer so it paints ABOVE
+     the cell's terrain tile (.gridMapTile is position:absolute, so without this
+     the tile would cover the in-flow glyph). Cell-level z-index handles
+     overhangs from neighbouring tiles. */
+  position: relative;
+  z-index: 2;
 }
 
 /* Always-visible name caption under a destination cell (town / site / venue).
