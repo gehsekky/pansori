@@ -1809,7 +1809,7 @@
      warrior centred in each, so the marker needs no positioning nudge. */
   background-image: url('/art/sprites/warrior_blue_idle.png');
   background-repeat: no-repeat;
-  background-size: calc(var(--mk) * 6) var(--mk);
+  background-size: calc(var(--mk) * 8) var(--mk);
   background-position: 0 0;
   image-rendering: pixelated;
   position: relative;
@@ -1818,12 +1818,12 @@
      overhang upward beyond the square — the same 2.5D bleed the terrain tiles
      use. The cell's z-index keeps him above the tile in the row behind. */
   align-self: flex-end;
-  /* 6 idle frames at the pack's 100ms/frame (10 fps). */
-  animation: gridMarkerIdle 0.6s steps(6) infinite;
+  /* 8 idle frames at the pack's 100ms/frame (10 fps). */
+  animation: gridMarkerIdle 0.8s steps(8) infinite;
 }
 @keyframes gridMarkerIdle {
   to {
-    background-position-x: calc(var(--mk) * -6);
+    background-position-x: calc(var(--mk) * -8);
   }
 }
 

@@ -411,9 +411,9 @@ function GridMapView({
         if (grid.level === 'regional' || grid.level === 'town') {
           // Feet-anchored idle strip rendered larger than the cell (~1.6×) so the
           // warrior stands on the tile and overhangs upward (CSS bottom-anchors
-          // him). Small left nudge — the shield reads heavier on the right.
+          // him). The strip is already cropped left-of-centre with sword margin,
+          // so no positioning nudge is needed.
           const markerPx = Math.round(cellPx * 1.6);
-          const nudgeX = Math.round(cellPx * 0.06);
           token = (
             <div
               className={styles.gridMapMarkerSprite}
@@ -422,7 +422,6 @@ function GridMapView({
                   width: markerPx,
                   height: markerPx,
                   '--mk': `${markerPx}px`,
-                  transform: `translateX(-${nudgeX}px)`,
                 } as React.CSSProperties
               }
               aria-hidden="true"
