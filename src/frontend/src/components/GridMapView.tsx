@@ -1,4 +1,4 @@
-import type { ActiveGrid, GridPos, MapTransition, TerrainType } from '../types';
+import type { ActiveGrid, FloorType, GridPos, MapTransition, TerrainType } from '../types';
 import GameIcon from './GameIcon';
 import { TERRAIN } from '../types';
 import { TERRAIN_STYLE } from '../lib/terrainStyle';
@@ -142,6 +142,16 @@ const SITE_STONE = 'rgba(206, 198, 182, 0.95)';
 // on every render (which would flicker).
 const FLOOR_VARIANTS = 3;
 const floorVariant = (x: number, y: number) => ((x * 7 + y * 13) % FLOOR_VARIANTS) + 1;
+
+// Per-cell terrain → floor texture, for the flat "ground" terrain types that
+// have no 2.5D Baumgart tile of their own (cobblestone plazas, garden patches).
+// A painted cell of these types renders the matching floor texture instead of
+// the room's default floor; feature terrains (water / forest / …) keep their
+// Baumgart tile, and unpainted cells use the room default. Local maps only.
+const TERRAIN_FLOOR: Partial<Record<TerrainType, FloorType>> = {
+  cobblestone: 'cobblestone',
+  garden: 'grass',
+};
 
 // Talkable-NPC token: a warm gold glyph. Each NPC may override the glyph via
 // PlacedNpc.icon (e.g. 'wood-axe'); this is the fallback when none is set.
@@ -359,13 +369,18 @@ function GridMapView({
               : isRegional && plainsDefault
                 ? TERRAIN_TILE.plains
                 : undefined;
-      // Seamless ground texture for a bare local-room floor cell. Painted terrain
-      // (which gets a Baumgart tile above) and obstacle walls keep their look; the
-      // floor fills every other walkable cell (exits included, so the door sits on
-      // floor). One of 3 variants per cell for organic variation.
+      // Seamless ground texture for a local-room floor cell. A painted "ground"
+      // terrain (cobblestone / garden) picks the matching texture; every other
+      // walkable cell uses the room's default floor. Feature terrain (water /
+      // forest / …, which gets a Baumgart tile above) and obstacle walls keep
+      // their look. Exits get floor too (the door sits on it). One of 3 variants
+      // per cell for organic variation.
+      const cellFloor = grid.floor
+        ? ((terrainType ? TERRAIN_FLOOR[terrainType] : undefined) ?? grid.floor)
+        : undefined;
       const floorSrc =
-        grid.level === 'local' && grid.floor && !fogged && !isObstacle && !tileSrc
-          ? `/art/floors/${grid.floor}_${floorVariant(x, y)}.png`
+        grid.level === 'local' && cellFloor && !fogged && !isObstacle && !tileSrc
+          ? `/art/floors/${cellFloor}_${floorVariant(x, y)}.png`
           : undefined;
       const fillTint = tStyle?.tint ?? (plainsDefault ? TERRAIN_STYLE.plains.tint : undefined);
       let cellBg = fillTint

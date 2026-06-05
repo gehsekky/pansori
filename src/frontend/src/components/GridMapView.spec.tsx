@@ -523,6 +523,29 @@ describe('GridMapView', () => {
     expect(reg.querySelector('[class*="gridMapFloor"]')).toBeNull();
   });
 
+  it('lets a ground terrain type (cobblestone / garden) pick its own floor texture over the room default', () => {
+    const square: ActiveGrid = {
+      ...localGrid,
+      floor: 'dirt', // room default
+      terrain: [
+        { pos: { x: 1, y: 1 }, type: 'cobblestone' },
+        { pos: { x: 2, y: 1 }, type: 'garden' },
+        { pos: { x: 3, y: 3 }, type: 'water' }, // feature terrain → Baumgart tile, not a floor
+      ],
+    };
+    const { container } = render(<GridMapView grid={square} markerPos={{ x: 0, y: 0 }} />);
+    const src = (x: number, y: number) =>
+      (
+        cell(container, x, y).querySelector('[class*="gridMapFloor"]') as HTMLImageElement | null
+      )?.getAttribute('src');
+    expect(src(1, 1)).toMatch(/\/art\/floors\/cobblestone_[123]\.png$/); // cobblestone terrain
+    expect(src(2, 1)).toMatch(/\/art\/floors\/grass_[123]\.png$/); // garden → grass
+    expect(src(5, 5)).toMatch(/\/art\/floors\/dirt_[123]\.png$/); // bare → room default
+    // The well (water) keeps its Baumgart tile, no flat floor.
+    expect(cell(container, 3, 3).querySelector('[class*="gridMapFloor"]')).toBeNull();
+    expect(cell(container, 3, 3).querySelector('[class*="gridMapTile"]')).toBeTruthy();
+  });
+
   it('renders clickable loot tokens (default glyph + label + Approach tooltip) and dispatches onLootClick with the key', () => {
     const onLootClick = vi.fn();
     const onMarkerMove = vi.fn();
