@@ -160,6 +160,50 @@ export function runUtilitySpell(
     }
   }
 
+  // SRD Fog Cloud (L1) / Silence (L2) — non-damage control zones centered on a
+  // point in range (the targeted enemy if any, else the caster), bound to the
+  // caster's concentration (`breakConcentration` / combat-end clear it).
+  //   Fog Cloud  → a `blocksSight` zone (Heavily Obscured): Darkvision can't
+  //     pierce it — the same combat-blinding machinery as Darkness, minus the
+  //     light-dispel interaction. (RAW heavy obscurement; Devil's Sight piercing
+  //     it is a rare MVP inaccuracy shared with Darkness.)
+  //   Silence    → a `blocksVerbal` zone: a creature inside can't cast a spell
+  //     with a Verbal component (enforced in precast).
+  if ((spell.id === 'fog_cloud' || spell.id === 'silence') && ctx.st.entities) {
+    const casterEnt = ctx.st.entities.find((e) => e.id === char.id);
+    const targetEnt = ctx.enemy
+      ? ctx.st.entities.find((e) => e.id === ctx.enemy!.id && e.isEnemy && e.hp > 0)
+      : undefined;
+    const center = (targetEnt ?? casterEnt)?.pos;
+    if (center) {
+      const gridW = ctx.context.gridWidth ?? 8;
+      const gridH = ctx.context.gridHeight ?? 8;
+      const radiusFt = spell.blastRadius ?? 20;
+      const zone: SpellZone = {
+        id: randomUUID(),
+        casterId: char.id,
+        spellId: spell.id,
+        name: spell.name,
+        roomId: ctx.st.current_room,
+        cells: zoneCells(center, radiusFt, gridW, gridH),
+        damage: '0',
+        damageType: 'none',
+        ...(spell.id === 'fog_cloud' ? { blocksSight: true } : { blocksVerbal: true }),
+        radiusFt,
+        center,
+      };
+      ctx.st = { ...ctx.st, spell_zones: [...(ctx.st.spell_zones ?? []), zone] };
+      char.concentrating_on = {
+        spellId: spell.id,
+        rounds_left: concentrationRoundsFor(spell) * (ctx.metamagic?.includes('extended') ? 2 : 1),
+      };
+      ctx.narrative +=
+        spell.id === 'fog_cloud'
+          ? ` Fog swallows the area — sight can't reach through it.`
+          : ` Utter quiet smothers the area — no verbal spell can be cast within.`;
+    }
+  }
+
   // SRD anti-magic suppression (Antimagic Field, Globe of Invulnerability) — a
   // caster-following, non-damage SpellZone (10-ft radius). `isSpellSuppressed`
   // reads it to fizzle spells that cross it. Bound to the caster's concentration;

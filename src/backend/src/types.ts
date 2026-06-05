@@ -1521,6 +1521,9 @@ export interface SpellZone {
   suppressesMagic?: boolean;
   suppressMaxLevel?: number;
   suppressFromOutsideOnly?: boolean;
+  // SRD Silence — a zone of utter quiet (no damage). A creature standing in its
+  // cells can't cast a spell with a Verbal component (checked in precast).
+  blocksVerbal?: boolean;
 }
 
 export interface GameState {

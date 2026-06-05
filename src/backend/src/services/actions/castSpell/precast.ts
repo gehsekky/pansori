@@ -91,6 +91,22 @@ export function runPrecast(
     return { done: true };
   }
 
+  // SRD Silence: a caster standing inside a Silence zone can't cast a spell with
+  // a Verbal component (Subtle Spell bypasses it). Reads the caster's grid cell
+  // against any `blocksVerbal` SpellZone in the room.
+  if (!isSubtle && (spell as { verbal?: boolean }).verbal) {
+    const casterPos = ctx.st.entities?.find((e) => e.id === pc.char.id)?.pos;
+    const silenced =
+      !!casterPos &&
+      (ctx.st.spell_zones ?? []).some(
+        (z) => z.blocksVerbal && z.cells.some((c) => c.x === casterPos.x && c.y === casterPos.y)
+      );
+    if (silenced) {
+      ctx.narrative = `You cannot cast ${spell.name} — its verbal component is smothered by magical Silence.`;
+      return { done: true };
+    }
+  }
+
   // Ritual casting: no slot cost, only out of combat
   if (isRitualCast) {
     if (!(spell as { ritualCasting?: boolean }).ritualCasting) {
