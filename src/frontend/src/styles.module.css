@@ -1830,6 +1830,23 @@
   }
 }
 
+/* An NPC rendered as an animated sprite strip instead of a glyph (icon
+   `sprite:<stem>`). Same feet-anchored, cell-overhanging treatment as the party
+   marker, but the strip URL comes from --sprite-url so any 8-frame idle sheet
+   under /art/sprites can be slotted in per NPC. */
+.gridMapNpcSprite {
+  background-image: var(--sprite-url);
+  background-repeat: no-repeat;
+  background-size: calc(var(--mk) * 8) var(--mk);
+  background-position: 0 0;
+  image-rendering: pixelated;
+  position: relative;
+  z-index: 2;
+  align-self: flex-end;
+  flex-shrink: 0;
+  animation: gridMarkerIdle 0.8s steps(8) infinite;
+}
+
 /* Hand-painted terrain tile: bottom-anchored, 150% cell height so the top third
    overhangs the row above. Non-interactive (clicks pass through to the cell). */
 .gridMapTile {

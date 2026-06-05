@@ -487,6 +487,26 @@ describe('GridMapView', () => {
     expect(cell(container, 2, 1).querySelector('.game-icon-wood-axe')).toBeTruthy();
   });
 
+  it('renders an NPC with a sprite: icon as an animated sprite strip (not a glyph) + label', () => {
+    const { container } = render(
+      <GridMapView
+        grid={localGrid}
+        markerPos={{ x: 3, y: 6 }}
+        npcs={[
+          { id: 'npc_bram', pos: { x: 2, y: 1 }, name: 'Bram', icon: 'sprite:pawn_blue_axe_idle' },
+        ]}
+        onNpcClick={vi.fn()}
+        onMarkerMove={vi.fn()}
+      />
+    );
+    const c = cell(container, 2, 1);
+    const sprite = c.querySelector('[class*="gridMapNpcSprite"]') as HTMLElement | null;
+    expect(sprite).toBeTruthy();
+    expect(sprite!.style.getPropertyValue('--sprite-url')).toContain('pawn_blue_axe_idle.png');
+    expect(c.querySelector('[class*="game-icon"]')).toBeNull(); // no glyph
+    expect(c.textContent).toContain('Bram'); // name label still shown
+  });
+
   it('renders clickable loot tokens (default glyph + label + Approach tooltip) and dispatches onLootClick with the key', () => {
     const onLootClick = vi.fn();
     const onMarkerMove = vi.fn();

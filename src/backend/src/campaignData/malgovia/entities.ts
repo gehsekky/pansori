@@ -888,7 +888,7 @@ export const npcs: Record<string, PlacedNpc> = {
     id: 'npc_bram_woodcutter',
     pos: { x: 5, y: 4 },
     name: 'Bram the Woodcutter',
-    icon: 'wood-axe',
+    icon: 'sprite:pawn_blue_axe_idle', // animated Tiny Swords pawn (axe idle)
     attitude: 'friendly',
     hp: 10,
     ac: 11,

@@ -443,9 +443,32 @@ function GridMapView({
           />
         );
       } else if (isNpc) {
-        // A talkable NPC: a gold game-icons glyph (per-NPC override, else the
-        // default NPC glyph) + a name label.
-        token = (
+        // A talkable NPC. An `icon` of `sprite:<stem>` renders an animated Tiny
+        // Swords sprite strip (feet-anchored, overhanging the cell like the party
+        // marker) from /art/sprites/<stem>.png; otherwise a gold game-icons glyph
+        // (per-NPC override, else the default NPC glyph). Either way, a name label.
+        const npcSprite = cellNpc!.icon?.startsWith('sprite:')
+          ? cellNpc!.icon.slice('sprite:'.length)
+          : null;
+        token = npcSprite ? (
+          <>
+            <div
+              className={styles.gridMapNpcSprite}
+              style={
+                {
+                  width: Math.round(cellPx * 1.4),
+                  height: Math.round(cellPx * 1.4),
+                  '--mk': `${Math.round(cellPx * 1.4)}px`,
+                  '--sprite-url': `url('/art/sprites/${npcSprite}.png')`,
+                } as React.CSSProperties
+              }
+              aria-hidden="true"
+            />
+            <span className={styles.gridMapLabel} aria-hidden="true">
+              {cellNpc!.name}
+            </span>
+          </>
+        ) : (
           <>
             <GameIcon
               name={cellNpc!.icon ?? DEFAULT_NPC_ICON}
