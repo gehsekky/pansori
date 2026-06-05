@@ -34,7 +34,21 @@ export function applyForcedMarch(
       const prof = hasSaveProficiency(c, 'con', context);
       const failed = rollConditionSave('con', c.con, dc, prof, c.level, 0, c.conditions ?? []);
       if (!failed) return c;
-      const lvl = (c.exhaustion_level ?? 0) + 1;
+      // SRD 5.2.1 Exhaustion: cumulative, and "You die if your Exhaustion level
+      // is 6." Cap at 6 and kill on reaching it — for EVERY marcher, here and
+      // now, not only the active character (the general death sweep in takeAction
+      // only checks the active PC, which would otherwise delay the death).
+      const lvl = Math.min(6, (c.exhaustion_level ?? 0) + 1);
+      if (lvl >= 6) {
+        notes.push(`${c.name} (DC ${dc} CON) collapses and dies of exhaustion`);
+        return {
+          ...c,
+          exhaustion_level: 6,
+          dead: true,
+          died_at_round: st.round ?? 0,
+          conditions: (c.conditions ?? []).filter((x) => x !== 'unconscious'),
+        };
+      }
       notes.push(`${c.name} (DC ${dc} CON) → Exhaustion ${lvl}`);
       return { ...c, exhaustion_level: lvl };
     });

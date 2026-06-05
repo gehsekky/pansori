@@ -55,6 +55,23 @@ describe('applyForcedMarch — helper', () => {
     const r = applyForcedMarch(st, 70, ctx);
     expect(r.st.characters[0].exhaustion_level ?? 0).toBe(0);
   });
+
+  it('caps Exhaustion at 6 and kills on reaching it (SRD: level 6 = death)', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0); // every save fails
+    const st = stWith(
+      470,
+      makeChar({ id: 'a', con: 10 }), // 0 → would hit ~10 levels without a cap
+      makeChar({ id: 'b', con: 10, exhaustion_level: 5 }) // 5 → dies on the first fail
+    );
+    const r = applyForcedMarch(st, 600, ctx); // +600m → ~10 hrs past 8
+    // 'a' is capped at 6 and dead — never climbs to 7+.
+    expect(r.st.characters[0].exhaustion_level).toBe(6);
+    expect(r.st.characters[0].dead).toBe(true);
+    // 'b' starts at 5 and dies the moment it reaches 6.
+    expect(r.st.characters[1].exhaustion_level).toBe(6);
+    expect(r.st.characters[1].dead).toBe(true);
+    expect(r.note).toContain('dies of exhaustion');
+  });
 });
 
 // ── Integration: the marker_move handler accrues travel + applies fatigue ──
