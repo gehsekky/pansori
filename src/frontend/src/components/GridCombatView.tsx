@@ -1,4 +1,4 @@
-import type { CombatEntity, GameState, GridPos, Seed, TerrainType } from '../types';
+import type { CombatEntity, FloorType, GameState, GridPos, Seed, TerrainType } from '../types';
 import GameIcon from './GameIcon';
 import { TERRAIN } from '../types';
 import { TERRAIN_STYLE } from '../lib/terrainStyle';
@@ -6,6 +6,18 @@ import styles from '../styles.module.css';
 
 const SQUARE_SIZE_FT = 5;
 const CELL_PX = 32;
+// Seamless ground texture under the battlefield — the same arexxuru floor tiles
+// the exploration map uses for local rooms, painted as the cell's bottom layer
+// (combat tints / lighting / highlights composite over it). One of 3 variants
+// per cell, deterministic so it doesn't reshuffle on every render. A painted
+// "ground" terrain (cobblestone / garden) picks its own texture (TERRAIN_FLOOR);
+// every other cell uses the room's floor. Mirrors GridMapView's local floors.
+const FLOOR_VARIANTS = 3;
+const floorVariant = (x: number, y: number) => ((x * 7 + y * 13) % FLOOR_VARIANTS) + 1;
+const TERRAIN_FLOOR: Partial<Record<TerrainType, FloorType>> = {
+  cobblestone: 'cobblestone',
+  garden: 'grass',
+};
 // SRD 5.2.1 — equipment chapter: torch sheds Bright Light 20 ft, Dim Light 20
 // ft beyond. We assume the party carries lit torches; future work: gate this
 // on actual inventory + a 'lit' state.
@@ -229,6 +241,10 @@ function GridCombatView({
   // Determine the current room's ambient lighting from the seed. Default
   // 'bright' (no fog of war) when unspecified.
   const currentRoom = seed.rooms.find((r) => r.id === state.current_room);
+  // The battlefield's ground texture: the room's authored floor, else cobblestone
+  // for an interior (matching the exploration map default) or dirt for a transient
+  // wilderness-encounter room (no authored room).
+  const roomFloor: FloorType = currentRoom?.floor ?? (currentRoom ? 'cobblestone' : 'dirt');
   // 'sunlight' is Bright Light for vision (it only differs from 'bright' for
   // Sunlight Sensitivity, a backend-only combat rule), so collapse it here.
   const rawLighting = currentRoom?.lighting ?? 'bright';
@@ -450,26 +466,42 @@ function GridCombatView({
       const hideEntity = ent?.isEnemy && !visible && !isActive;
       const hideCorpse = corpse?.isEnemy && !visible;
 
-      // Cosmetic terrain tint is the base layer; the dynamic combat overlays
-      // (lighting, fog, reachable, AoE) replace it so live state reads on top.
+      // The floor texture is the bottom layer; the cosmetic terrain tint + the
+      // dynamic combat overlays (lighting, fog, reachable, AoE) composite over it.
+      // A painted "ground" terrain picks its own texture; everything else uses the
+      // room floor. Obstacle (wall) cells keep their own look — no floor there.
       const terrainType = terrainAt.get(`${x},${y}`);
-      let bg = (terrainType && TERRAIN_STYLE[terrainType].tint) || 'transparent';
-      if (illum === 'dim') bg = 'rgba(0, 0, 0, 0.30)';
-      else if (illum === 'dark') bg = 'rgba(0, 0, 0, 0.70)';
+      const cellFloor = (terrainType ? TERRAIN_FLOOR[terrainType] : undefined) ?? roomFloor;
+      const floorLayer = isObstacle(x, y)
+        ? '' // walls keep their own look — no floor under the obstacle marker
+        : `url('/art/floors/${cellFloor}_${floorVariant(x, y)}.png') center / cover no-repeat`;
+      // The single tint colour for this cell's live state (later states win).
+      let tint = (terrainType && TERRAIN_STYLE[terrainType].tint) || '';
+      if (illum === 'dim') tint = 'rgba(0, 0, 0, 0.30)';
+      else if (illum === 'dark') tint = 'rgba(0, 0, 0, 0.70)';
       // Out-of-sight ("ghost") cells: a cool blue-grey haze over the dark fog so
       // the player reads them as "unknown / around a corner" rather than unlit.
-      if (losBlocked) bg = 'rgba(70, 90, 120, 0.55)';
-      if (reachable) bg = 'rgba(120, 200, 255, 0.10)';
+      if (losBlocked) tint = 'rgba(70, 90, 120, 0.55)';
+      if (reachable) tint = 'rgba(120, 200, 255, 0.10)';
       // AoE preview tint wins over reachable highlight.
-      if (aoeCells.has(`${x},${y}`)) bg = 'rgba(255, 140, 50, 0.30)';
+      if (aoeCells.has(`${x},${y}`)) tint = 'rgba(255, 140, 50, 0.30)';
       // Difficult terrain: stipple pattern layered above the cell bg so
       // the player can see the texture in any state (idle, reachable, AoE).
       const DIFFICULT_STIPPLE =
         'radial-gradient(circle, rgba(170, 140, 90, 0.55) 1.2px, transparent 1.6px) 0 0 / 4px 4px';
-      const cellBg = difficult ? `${DIFFICULT_STIPPLE}, ${bg}` : bg;
-      const cellHoverBg = difficult
-        ? `${DIFFICULT_STIPPLE}, rgba(120, 200, 255, 0.35)`
-        : 'rgba(120, 200, 255, 0.35)';
+      // Assemble the cell background top→bottom: stipple, tint (as a gradient so
+      // it can sit above the floor image), floor texture. A solid colour can only
+      // be a final layer, so tints are expressed as a flat linear-gradient.
+      const layered = (tintColor: string): string =>
+        [
+          difficult ? DIFFICULT_STIPPLE : '',
+          tintColor ? `linear-gradient(${tintColor}, ${tintColor})` : '',
+          floorLayer,
+        ]
+          .filter(Boolean)
+          .join(', ') || 'transparent';
+      const cellBg = layered(tint);
+      const cellHoverBg = layered('rgba(120, 200, 255, 0.35)');
 
       const tokenBg = ent?.isEnemy
         ? 'rgba(220, 70, 70, 0.85)'

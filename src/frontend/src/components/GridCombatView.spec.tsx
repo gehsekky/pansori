@@ -130,6 +130,33 @@ describe('GridCombatView — cosmetic terrain paint', () => {
   });
 });
 
+describe('GridCombatView — battlefield floor texture', () => {
+  it('paints the room floor under walkable cells (and a tint composites over it)', () => {
+    const { state, seed } = build({
+      lighting: 'bright',
+      obstacles: [{ x: 8, y: 8 }],
+      pcPos: { x: 0, y: 0 },
+      enemyPos: { x: 1, y: 0 },
+    });
+    // Default floor for an authored interior room is cobblestone.
+    const { container } = render(<GridCombatView state={state} seed={seed} />);
+    expect(cell(container, 9, 9).style.background).toMatch(/\/art\/floors\/cobblestone_[123]\.png/);
+    // A wall (obstacle) cell keeps its own look — no floor underneath.
+    expect(cell(container, 8, 8).style.background).not.toContain('/art/floors/');
+  });
+
+  it("honors the room's authored floor", () => {
+    const { state, seed } = build({
+      lighting: 'bright',
+      pcPos: { x: 0, y: 0 },
+      enemyPos: { x: 1, y: 0 },
+    });
+    (seed.rooms[0] as { floor?: string }).floor = 'grass';
+    const { container } = render(<GridCombatView state={state} seed={seed} />);
+    expect(cell(container, 9, 9).style.background).toMatch(/\/art\/floors\/grass_[123]\.png/);
+  });
+});
+
 describe('GridCombatView — enemy token glyphs', () => {
   it('renders the enemy as its family game-icon (Goblin → goblin-head)', () => {
     const { state, seed } = build({
