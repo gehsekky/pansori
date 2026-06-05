@@ -254,6 +254,10 @@ export interface EnemyTemplate {
   damage: string;
   toHit: number;
   xp: number;
+  // SRD creature type, when it matters mechanically (e.g. Holy Water damages
+  // only Fiends/Undead; future Turn Undead, etc.). Omitted ⇒ unspecified.
+  // Carried through place() + procgen onto the Enemy.
+  creatureType?: 'undead' | 'fiend' | 'beast' | 'humanoid' | 'construct' | 'dragon';
   str?: number;
   dex?: number;
   con?: number;
@@ -358,6 +362,9 @@ export interface Enemy {
   // name's shape (see narrative/enemyName.ts). Set explicitly for single-word
   // proper names a heuristic can't catch (e.g. "Dusk").
   proper_noun?: boolean;
+  // SRD creature type (see EnemyTemplate.creatureType) — drives Fiend/Undead
+  // interactions like Holy Water. Carried from the template via place()/procgen.
+  creatureType?: 'undead' | 'fiend' | 'beast' | 'humanoid' | 'construct' | 'dragon';
   hp: number;
   ac: number;
   damage: string;

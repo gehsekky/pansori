@@ -76,6 +76,7 @@ import { handleMoveZone } from './moveZone.js';
 import { handleRecoverSlots } from './recoverSlots.js';
 import { handleRecurringSpellAttack } from './recurringSpellAttack.js';
 import { handleSneak } from './sneak.js';
+import { handleThrowItem } from './throwItem.js';
 import { handleTwoWeaponAttack } from './twoWeaponAttack.js';
 import { handleUseBreath } from './useBreath.js';
 import { handleUseClassFeature } from './classFeature/index.js';
@@ -148,6 +149,7 @@ const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   sneak: handleSneak as ActionHandler,
   disarm_trap: handleDisarmTrap as ActionHandler,
   use: handleUse as ActionHandler,
+  throw_item: handleThrowItem as ActionHandler,
   interact_object: handleInteractObject as ActionHandler,
   examine: handleExamine as ActionHandler,
   attack_npc: handleAttackNpc as ActionHandler,

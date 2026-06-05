@@ -4464,6 +4464,24 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       }
     }
   }
+  // Thrown splash weapons (Acid / Alchemist's Fire / Holy Water) — one choice
+  // per held splash item × living enemy, gated like Attack (the Action).
+  if (enemyAlive && (!state.combat_active || !char.turn_actions.action_used)) {
+    const splashItems = (char.inventory ?? []).filter((i) => getItemData(i, context).splash);
+    const seenSplash = new Set<string>();
+    for (const item of splashItems) {
+      if (seenSplash.has(item.id)) continue; // one entry per item type
+      seenSplash.add(item.id);
+      for (const en of livingEnemies) {
+        if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+        choices.push({
+          label: `Throw ${item.name} at ${en.name}`,
+          action: { type: 'throw_item', itemId: item.id, targetEnemyId: en.id },
+          kind: 'attack',
+        });
+      }
+    }
+  }
   // Loot is suppressed while a hostile is in the room — RAW: you don't get
   // to casually pocket items with a Crypt Ghoul watching. Engage or escape
   // first. Mirrors the same author intent already enforced on Move-between-
@@ -9037,6 +9055,7 @@ export async function runEnemyTurns(args: {
         // illusion's psychic damage again. Accrued across save-ends conditions.
         let recurDamage = 0;
         let recurType = '';
+        let recurLabel = 'the illusion';
         let recurCasterId: string | undefined;
         for (const [cond, info] of Object.entries(seEnt.save_ends)) {
           if (!acted.has(cond)) {
@@ -9062,6 +9081,7 @@ export async function runEnemyTurns(args: {
               rm
             ).damage;
             recurType = info.recurType ?? recurType;
+            recurLabel = info.label ?? recurLabel;
             recurCasterId = info.casterId ?? recurCasterId;
           }
         }
@@ -9086,7 +9106,7 @@ export async function runEnemyTurns(args: {
             narrative += `\n\n[${rm.name} shakes off ${cleared.join(', ')}.]`;
           }
           if (recurDamage > 0) {
-            narrative += `\n\n[${rm.name} takes ${recurDamage} ${recurType} from the illusion${recurNewHp <= 0 ? ' and succumbs' : ''}.]`;
+            narrative += `\n\n[${rm.name} takes ${recurDamage} ${recurType} from ${recurLabel}${recurNewHp <= 0 ? ' and succumbs' : ''}.]`;
           }
           // The recurring tick dropped the creature — resolve the kill (XP to
           // the caster, room-clear) and skip its turn.

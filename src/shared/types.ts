@@ -386,7 +386,17 @@ export interface CombatEntity {
   // `casterId` on a kill. Absent ⇒ a pure save-ends condition (Slow, Stun).
   save_ends?: Record<
     string,
-    { ability: AbilityKey; dc: number; recurDice?: string; recurType?: string; casterId?: string }
+    {
+      ability: AbilityKey;
+      dc: number;
+      recurDice?: string;
+      recurType?: string;
+      casterId?: string;
+      // Source phrase for the recurring-damage line ("takes 3 fire from {label}").
+      // Defaults to "the illusion" (Phantasmal Killer / Force); Alchemist's Fire
+      // sets "the flames".
+      label?: string;
+    }
   >;
   // Conditions in `save_ends` for which this creature has completed ≥1 afflicted
   // turn — gates the recurring save so the effect always lasts at least its
@@ -406,6 +416,7 @@ export type StructuredAction =
   // Pick-up / Interact choice then surfaces via its adjacency gate.
   | { type: 'approach'; pos: GridPos }
   | { type: 'use'; itemId: string; targetCharId?: string }
+  | { type: 'throw_item'; itemId: string; targetEnemyId: string }
   | { type: 'sneak' }
   | { type: 'examine' }
   | { type: 'death_save' }
@@ -1289,6 +1300,17 @@ export interface LootItem {
   // Only applies when the wielder's class grants Weapon Mastery AND they
   // have mastered this specific weapon (Character.weaponMasteries).
   mastery?: WeaponMastery;
+  // SRD thrown splash weapon (Acid vial, Alchemist's Fire, Holy Water). The
+  // `throw_item` action makes a DEX ranged attack vs the target's AC; on a hit
+  // it deals `damage` of `damageType`. `vsCreatureTypes` (Holy Water) restricts
+  // the damage to matching `Enemy.creatureType`; `burn` (Alchemist's Fire) sets
+  // the target alight for that recurring fire die (save-ends DC 10 DEX).
+  splash?: {
+    damage: string;
+    damageType: string;
+    vsCreatureTypes?: string[];
+    burn?: string;
+  };
 }
 
 /**

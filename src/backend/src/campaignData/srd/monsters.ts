@@ -64,6 +64,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   skeleton: {
     name: 'Skeleton',
+    creatureType: 'undead',
     cr: 0.25,
     hp: 13,
     ac: 13,
@@ -133,6 +134,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   shadow: {
     name: 'Shadow',
+    creatureType: 'undead',
     cr: 0.5,
     hp: 16,
     ac: 12,
@@ -248,6 +250,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   ghoul: {
     name: 'Ghoul',
+    creatureType: 'undead',
     cr: 1,
     hp: 22,
     ac: 13,
@@ -461,6 +464,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   // ─── More CR 1/4 ─────────────────────────────────────────────────────────────
   zombie: {
     name: 'Zombie',
+    creatureType: 'undead',
     cr: 0.25,
     hp: 15,
     ac: 8,
@@ -576,6 +580,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   specter: {
     name: 'Specter',
+    creatureType: 'undead',
     cr: 1,
     hp: 22,
     ac: 12,
@@ -687,6 +692,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   ghast: {
     name: 'Ghast',
+    creatureType: 'undead',
     cr: 2,
     hp: 36,
     ac: 13,
@@ -779,6 +785,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   wight: {
     name: 'Wight',
+    creatureType: 'undead',
     cr: 3,
     hp: 82,
     ac: 14,
@@ -1029,6 +1036,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   mummy: {
     name: 'Mummy',
+    creatureType: 'undead',
     cr: 3,
     hp: 58,
     ac: 11,
@@ -1133,6 +1141,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   wraith: {
     name: 'Wraith',
+    creatureType: 'undead',
     cr: 5,
     hp: 67,
     ac: 13,

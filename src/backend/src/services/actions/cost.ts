@@ -49,6 +49,7 @@ export const ACTION_COSTS: Record<StructuredAction['type'], ActionCost> = {
   ready: 'action',
   sneak: 'action',
   disarm_trap: 'action',
+  throw_item: 'action',
   grapple: 'action',
   shove: 'action',
   try_escape_grapple: 'action',

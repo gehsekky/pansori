@@ -1086,6 +1086,54 @@ export const SRD_ITEMS: Record<string, LootItem> = {
       'You ready the flask of oil — pour it to refuel a lantern, or spread it to be lit.',
     aliases: ['oil', 'oil flask', 'flask of oil', 'lamp oil'],
   },
+  acid_vial: {
+    // SRD thrown splash weapon — throw at a foe (DEX ranged attack); on a hit,
+    // 2d6 acid. See the `throw_item` action.
+    id: 'acid_vial',
+    name: 'Acid (vial)',
+    desc: 'A vial of corrosive acid. Throw it at a creature (ranged attack) for 2d6 acid damage on a hit.',
+    weight: 1,
+    type: 'consumable',
+    slot: null,
+    damage: null,
+    ac_bonus: null,
+    heal: null,
+    effect: null,
+    aliases: ['acid', 'acid vial', 'vial of acid'],
+    splash: { damage: '2d6', damageType: 'acid' },
+  },
+  alchemists_fire: {
+    // SRD thrown splash weapon — 1d4 fire on a hit, then the target burns (1d4
+    // fire at the start of each of its turns; DC 10 DEX to douse).
+    id: 'alchemists_fire',
+    name: "Alchemist's Fire (flask)",
+    desc: 'A sticky, volatile fluid. Throw it (ranged attack) for 1d4 fire on a hit; the target then burns for 1d4 fire each turn until it douses the flames (DC 10 DEX).',
+    weight: 1,
+    type: 'consumable',
+    slot: null,
+    damage: null,
+    ac_bonus: null,
+    heal: null,
+    effect: null,
+    aliases: ["alchemist's fire", 'alchemists fire', 'alchemist fire'],
+    splash: { damage: '1d4', damageType: 'fire', burn: '1d4' },
+  },
+  holy_water: {
+    // SRD thrown splash weapon — 2d6 radiant, but ONLY to Fiends and Undead
+    // (gated on Enemy.creatureType). Splashes harmlessly off anything else.
+    id: 'holy_water',
+    name: 'Holy Water (flask)',
+    desc: 'Blessed water. Throw it (ranged attack) at a Fiend or Undead for 2d6 radiant damage on a hit; harmless to other creatures.',
+    weight: 1,
+    type: 'consumable',
+    slot: null,
+    damage: null,
+    ac_bonus: null,
+    heal: null,
+    effect: null,
+    aliases: ['holy water', 'flask of holy water'],
+    splash: { damage: '2d6', damageType: 'radiant', vsCreatureTypes: ['undead', 'fiend'] },
+  },
 
   // ─── Tools ───────────────────────────────────────────────────────────────────
   // Physical tools. The mechanical edge is tool *proficiency* (a Character
