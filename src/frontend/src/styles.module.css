@@ -1814,6 +1814,10 @@
   image-rendering: pixelated;
   position: relative;
   z-index: 2;
+  /* Stand the warrior on the tile (feet at the cell's bottom) and let him
+     overhang upward beyond the square — the same 2.5D bleed the terrain tiles
+     use. The cell's z-index keeps him above the tile in the row behind. */
+  align-self: flex-end;
   /* 6 idle frames at the pack's 100ms/frame (10 fps). */
   animation: gridMarkerIdle 0.6s steps(6) infinite;
 }

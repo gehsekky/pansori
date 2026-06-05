@@ -409,10 +409,10 @@ function GridMapView({
         // local rooms keep the compact swords-emblem glyph. The party cell is
         // already highlighted via gridMapCellCurrent, so no backing circle.
         if (grid.level === 'regional' || grid.level === 'town') {
-          // Pre-trimmed idle strip → the warrior is centred in each frame, so
-          // just size it (~1.25× the cell) and centre the element on the cell,
-          // with a small left nudge (the shield reads heavier on the right).
-          const markerPx = Math.round(cellPx * 1.25);
+          // Feet-anchored idle strip rendered larger than the cell (~1.6×) so the
+          // warrior stands on the tile and overhangs upward (CSS bottom-anchors
+          // him). Small left nudge — the shield reads heavier on the right.
+          const markerPx = Math.round(cellPx * 1.6);
           const nudgeX = Math.round(cellPx * 0.06);
           token = (
             <div
@@ -640,7 +640,7 @@ function GridMapView({
           {grid.width}×{grid.height} · {scaleLabel(grid.feetPerSquare)}
         </span>
       </div>
-      <div className={styles.gridBoardWrap} style={{ padding: Math.round(cellPx * 0.55) }}>
+      <div className={styles.gridBoardWrap} style={{ padding: Math.round(cellPx * 0.65) }}>
         <div
           className={styles.gridBoard}
           style={{
