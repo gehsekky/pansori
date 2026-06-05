@@ -32,6 +32,20 @@ describe('AdventureLogPanel', () => {
     expect(screen.getByText(/No actions taken yet/i)).toBeDefined();
   });
 
+  it('renders narrative tokens as display text, not raw {{…}} markup', () => {
+    const history = [
+      { content: '> attack' },
+      { content: 'You hit for {{dmg|7}} damage. {{note|(d20 18 vs AC 13)}}' },
+    ];
+    const { container } = render(<AdventureLogPanel history={history} />);
+    // The raw token markup must not leak into the rendered DOM.
+    expect(container.textContent).not.toMatch(/\{\{dmg/);
+    expect(container.textContent).not.toMatch(/\{\{note/);
+    // The token's display value surfaces instead (as a styled pill).
+    expect(screen.getByText('7')).toBeDefined();
+    expect(screen.getByText('(d20 18 vs AC 13)')).toBeDefined();
+  });
+
   it('copies the FULL chronological log with state snapshot to clipboard', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.assign(navigator, { clipboard: { writeText } });
@@ -91,6 +105,25 @@ describe('AdventureLogPanel', () => {
     expect(t2).toBeGreaterThan(t1);
     expect(text).toMatch(/--- Turn 1 ---/);
     expect(text).toMatch(/--- Turn 2 ---/);
+  });
+
+  it('strips narrative token markup from the copied log', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+    render(
+      <AdventureLogPanel
+        history={[
+          { content: '> attack' },
+          { content: 'You hit for {{dmg|7}} damage. {{note|(roll)}}' },
+        ]}
+      />
+    );
+    fireEvent.click(screen.getByTestId('adventure-log-copy-btn'));
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    const text = writeText.mock.calls[0][0] as string;
+    expect(text).not.toMatch(/\{\{dmg/);
+    expect(text).not.toMatch(/\{\{note/);
+    expect(text).toMatch(/ENGINE: You hit for 7 damage\. \(roll\)/);
   });
 
   it('surfaces death-save state when present in the snapshot', async () => {

@@ -1,6 +1,8 @@
 import type { CampaignMeta, Faction, GameState, Seed } from '../types.ts';
+import NarrativeText from './NarrativeText.tsx';
 import { formatClassLabel } from '../lib/characterFmt.ts';
 import { formatGameClock } from '../lib/gameClock.ts';
+import { stripNarrativeTokens } from '../lib/narrativeFmt.ts';
 import styles from '../styles.module.css';
 import { useState } from 'react';
 
@@ -286,8 +288,8 @@ function AdventureLogPanel({ history, worldName, state, seed, campaignMeta }: Pr
       const user = history[userIdx];
       const asst = history[asstIdx];
       turnLines.push(`--- Turn ${i + 1} ---`);
-      if (user) turnLines.push(`USER: ${user.content}`);
-      if (asst) turnLines.push(`ENGINE: ${asst.content}`);
+      if (user) turnLines.push(`USER: ${stripNarrativeTokens(user.content)}`);
+      if (asst) turnLines.push(`ENGINE: ${stripNarrativeTokens(asst.content)}`);
     }
     // Join sections with blank-line separators
     return [...sections.map((s) => s.join('\n')), '', turnLines.join('\n\n')].join('\n');
@@ -327,7 +329,7 @@ function AdventureLogPanel({ history, worldName, state, seed, campaignMeta }: Pr
       {entries.map((m, i) => (
         <p key={i} className={styles.logEntry}>
           <span aria-hidden="true">› </span>
-          {m.content}
+          <NarrativeText text={m.content} />
         </p>
       ))}
     </>
