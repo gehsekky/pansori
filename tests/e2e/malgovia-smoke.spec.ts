@@ -238,13 +238,17 @@ test('session resume: state survives a page reload', async ({ page, request }) =
   const initialText = (await narrative.textContent()) ?? '';
   expect(initialText.length).toBeGreaterThan(0);
 
-  // After session creation, the URL changes to /<sessionId>. We rely on this
-  // for the reload-resume path; capture it here.
-  await page.waitForFunction(() => /^\/[0-9a-f-]{36}$/i.test(window.location.pathname), null, {
-    timeout: 5_000,
-  });
+  // After session creation, the URL changes to /game/<sessionId>. We rely on
+  // this for the reload-resume path; capture it here.
+  await page.waitForFunction(
+    () => /^\/game\/[0-9a-f-]{36}$/i.test(window.location.pathname),
+    null,
+    {
+      timeout: 5_000,
+    }
+  );
   const sessionUrl = page.url();
-  const sessionId = new URL(sessionUrl).pathname.slice(1);
+  const sessionId = new URL(sessionUrl).pathname.replace(/^\/game\//, '');
   expect(sessionId).toMatch(/^[0-9a-f-]{36}$/i);
 
   // Take an action so the state differs from initial — pick any choice,

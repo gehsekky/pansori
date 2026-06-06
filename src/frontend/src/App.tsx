@@ -230,7 +230,7 @@ export default function App() {
         if (joinToken) {
           try {
             const { session_id } = await api.joinSession(joinToken);
-            window.history.replaceState(null, '', `/${session_id}`);
+            window.history.replaceState(null, '', `/game/${session_id}`);
             await handleResumeSession(session_id);
             setView('game');
             return;
@@ -242,7 +242,10 @@ export default function App() {
             return loadSessions();
           }
         }
-        const uuidInPath = window.location.pathname.match(/^\/([0-9a-f-]{36})$/i)?.[1];
+        // Game deep link: /game/<session id>. The bare legacy form
+        // /<session id> (pre-/game/ routing) still resumes — old bookmarks
+        // keep working — and gets normalized to the new URL on success.
+        const uuidInPath = window.location.pathname.match(/^\/(?:game\/)?([0-9a-f-]{36})$/i)?.[1];
         if (uuidInPath) {
           return handleResumeSession(uuidInPath)
             .then(() => setView('game'))

@@ -125,7 +125,7 @@ export function useGame(): UseGameReturn {
       setRoomLog(result.state.room_log || []);
       setChoices(result.state.last_choices || []);
       setTurnSeq(result.session.turn_seq ?? 0);
-      window.history.pushState(null, '', `/${result.session.id}`);
+      window.history.pushState(null, '', `/game/${result.session.id}`);
     } finally {
       setLoading(false);
     }
@@ -144,7 +144,7 @@ export function useGame(): UseGameReturn {
       setEscaped(s.status === 'escaped');
       setChoices(s.state.last_choices || []);
       setTurnSeq(s.turn_seq ?? 0);
-      window.history.pushState(null, '', `/${id}`);
+      window.history.pushState(null, '', `/game/${id}`);
     } catch (e) {
       console.error(e);
     } finally {
