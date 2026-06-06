@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render } from '@testing-library/react';
+import { fireEvent, render, waitFor } from '@testing-library/react';
 import CharScreen from './CharScreen';
 import type { FrontendContext } from '../types';
 import { api } from '../lib/api';
@@ -80,5 +80,47 @@ describe('CharScreen — single block + portrait nav', () => {
     // A further click is a no-op.
     fireEvent.click(addBtn);
     expect(navCount(container)).toBe(4);
+  });
+});
+
+// Cleric Divine Order (L1) is chosen at creation and required before start.
+// (beContexts is empty here — listContexts is mocked [] — so the other
+// beCtx-gated start validations are skipped, isolating the Divine Order gate.)
+const clericCtx: FrontendContext = {
+  ...ctx,
+  classes: [
+    { id: 'Fighter', desc: 'A warrior.' },
+    { id: 'Cleric', desc: 'A holy warrior.' },
+  ],
+  classPrimaryStats: { Fighter: 'STR', Cleric: 'WIS' },
+  classSkills: { Fighter: [], Cleric: [] },
+};
+
+function renderCleric(onStart = vi.fn()) {
+  const utils = render(
+    <CharScreen onStart={onStart} loading={false} availableContexts={[clericCtx]} user={null} />
+  );
+  // Name the leader and switch them to Cleric.
+  const nameInput = utils.container.querySelector('input[id$="-name"]') as HTMLInputElement;
+  fireEvent.change(nameInput, { target: { value: 'Brother Cael' } });
+  fireEvent.change(utils.container.querySelector('#char-0-class')!, {
+    target: { value: 'Cleric' },
+  });
+  return { onStart, ...utils };
+}
+
+describe('CharScreen — Cleric Divine Order required at creation', () => {
+  it('blocks BEGIN ADVENTURE until the Cleric chooses a Divine Order', async () => {
+    const { getByTestId, findByText } = renderCleric();
+    fireEvent.click(getByTestId('begin-adventure-btn'));
+    expect(await findByText(/must choose a Divine Order/i)).toBeTruthy();
+  });
+
+  it('allows starting once a Divine Order is chosen', async () => {
+    const onStart = vi.fn().mockResolvedValue(undefined);
+    const { getByTestId, getByText } = renderCleric(onStart);
+    fireEvent.click(getByText(/Protector — Martial weapons/));
+    fireEvent.click(getByTestId('begin-adventure-btn'));
+    await waitFor(() => expect(onStart).toHaveBeenCalledTimes(1));
   });
 });

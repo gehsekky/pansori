@@ -663,6 +663,15 @@ function CharScreen({
         `${d.name || `Hero ${badExpertise + 1}`} must choose exactly ${choice.count} Expertise skill${choice.count === 1 ? '' : 's'}`
       );
     }
+    // Cleric Divine Order (L1) is chosen at creation — require it before start
+    // (picking Thaumaturge auto-selects its cantrip, so the order alone is enough).
+    const missingDivineOrder = party.findIndex((d) => d.cls === 'Cleric' && !d.divineOrder);
+    if (missingDivineOrder >= 0) {
+      const d = party[missingDivineOrder];
+      return setError(
+        `${d.name || `Hero ${missingDivineOrder + 1}`} must choose a Divine Order (Protector or Thaumaturge)`
+      );
+    }
     setError('');
     localStorage.setItem('operative_name', leader.name.trim());
     try {
