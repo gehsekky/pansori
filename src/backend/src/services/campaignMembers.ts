@@ -7,9 +7,14 @@ import type { AppUser } from '../auth/passport.js';
 import type { CampaignRole } from '../auth/middleware.js';
 import type { Pool } from 'pg';
 
+export type CampaignVisibility = 'global' | 'private';
+
 export interface CampaignListing {
   id: string;
   name: string;
+  // 'global' campaigns are visible to every user; 'private' ones only to
+  // members. Only site admins flip this (setCampaignVisibility).
+  visibility: CampaignVisibility;
   // The caller's role on this campaign. Site admins resolve to 'owner'
   // everywhere (they bypass membership checks in the middleware too).
   my_role: CampaignRole | null;
@@ -32,23 +37,61 @@ export type MemberRemovalResult =
   | { ok: true }
   | { ok: false; reason: 'not_a_member' | 'last_owner' };
 
-// Every registered campaign + the caller's role on it. The registry list is
-// not secret (campaign ids already surface in the world picker); roles are
-// what gate the admin section's edit surfaces.
+// Campaigns the caller can see + their role on each: global campaigns for
+// everyone, private ones only for members (site admins see all). This is
+// both the admin-section list and the visibility source for play surfaces.
 export async function listCampaignsForUser(pool: Pool, user: AppUser): Promise<CampaignListing[]> {
-  const { rows } = await pool.query<{ id: string; name: string; my_role: CampaignRole | null }>(
-    `SELECT c.id, c.name, m.role AS my_role
+  const { rows } = await pool.query<{
+    id: string;
+    name: string;
+    visibility: CampaignVisibility;
+    my_role: CampaignRole | null;
+  }>(
+    `SELECT c.id, c.name, c.visibility, m.role AS my_role
        FROM campaigns c
        LEFT JOIN campaign_members m
          ON m.campaign_id = c.id AND m.user_id = $1
+      WHERE c.visibility = 'global' OR m.role IS NOT NULL OR $2
       ORDER BY c.name`,
-    [user.id]
+    [user.id, user.is_admin]
   );
   return rows.map((r) => ({
     id: r.id,
     name: r.name,
+    visibility: r.visibility,
     my_role: r.my_role ?? (user.is_admin ? 'owner' : null),
   }));
+}
+
+// The campaign ids this user may see/play: global ones + any membership.
+// Gates the new-game context list and session creation.
+export async function listVisibleCampaignIds(pool: Pool, user: AppUser): Promise<Set<string>> {
+  if (user.is_admin) {
+    const { rows } = await pool.query<{ id: string }>('SELECT id FROM campaigns');
+    return new Set(rows.map((r) => r.id));
+  }
+  const { rows } = await pool.query<{ id: string }>(
+    `SELECT c.id
+       FROM campaigns c
+       LEFT JOIN campaign_members m
+         ON m.campaign_id = c.id AND m.user_id = $1
+      WHERE c.visibility = 'global' OR m.role IS NOT NULL`,
+    [user.id]
+  );
+  return new Set(rows.map((r) => r.id));
+}
+
+// Admin-only: promote a campaign to global / demote back to private.
+export async function setCampaignVisibility(
+  pool: Pool,
+  campaignId: string,
+  visibility: CampaignVisibility
+): Promise<boolean> {
+  const { rowCount } = await pool.query(
+    'UPDATE campaigns SET visibility = $2, updated_at = NOW() WHERE id = $1',
+    [campaignId, visibility]
+  );
+  return (rowCount ?? 0) > 0;
 }
 
 export async function listMembers(pool: Pool, campaignId: string): Promise<CampaignMemberRow[]> {
@@ -57,7 +100,8 @@ export async function listMembers(pool: Pool, campaignId: string): Promise<Campa
        FROM campaign_members m
        JOIN users u ON u.id = m.user_id
       WHERE m.campaign_id = $1
-      ORDER BY m.role DESC, u.display_name`, // role DESC: 'owner' > 'editor' lexically, owners first
+      ORDER BY CASE m.role WHEN 'owner' THEN 0 WHEN 'editor' THEN 1 ELSE 2 END,
+               u.display_name`, // owners, then editors, then players
     [campaignId]
   );
   return rows;
@@ -108,7 +152,7 @@ export async function addMemberByEmail(
   const userId = userRows[0]?.id;
   if (!userId) return { ok: false, reason: 'user_not_found' };
 
-  if (role === 'editor' && (await isLastOwner(pool, campaignId, userId))) {
+  if (role !== 'owner' && (await isLastOwner(pool, campaignId, userId))) {
     return { ok: false, reason: 'last_owner' };
   }
 
@@ -132,7 +176,7 @@ export async function setMemberRole(
 ): Promise<MemberMutationResult> {
   const existing = await fetchMember(pool, campaignId, userId);
   if (!existing) return { ok: false, reason: 'not_a_member' };
-  if (role === 'editor' && (await isLastOwner(pool, campaignId, userId))) {
+  if (role !== 'owner' && (await isLastOwner(pool, campaignId, userId))) {
     return { ok: false, reason: 'last_owner' };
   }
   await pool.query(

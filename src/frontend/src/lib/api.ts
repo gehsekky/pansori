@@ -34,15 +34,20 @@ export interface AuthProvider {
   label: string; // human-readable button text
 }
 
-// ─── Campaign admin (owners/editors) ─────────────────────────────────────────
-// Mirrors routes/campaigns.ts on the backend. Roles are a two-tier
-// hierarchy (owner ⊃ editor); site admins resolve to 'owner' everywhere.
+// ─── Campaign admin (owners/editors/players) ─────────────────────────────────
+// Mirrors routes/campaigns.ts on the backend. Roles are a three-tier
+// hierarchy (owner ⊃ editor ⊃ player — players can see/play a private
+// campaign but not edit); site admins resolve to 'owner' everywhere.
 
-export type CampaignRole = 'owner' | 'editor';
+export type CampaignRole = 'owner' | 'editor' | 'player';
+export type CampaignVisibility = 'global' | 'private';
 
 export interface CampaignListing {
   id: string;
   name: string;
+  // 'global' = visible to every user; 'private' = members only. Only site
+  // admins can change this.
+  visibility: CampaignVisibility;
   my_role: CampaignRole | null;
 }
 
@@ -257,6 +262,13 @@ export const api = {
   removeCampaignMember: (campaignId: string, userId: string) =>
     req<{ ok: boolean }>(`/campaigns/${campaignId}/members/${userId}`, {
       method: 'DELETE',
+    }),
+
+  // Site-admin only — promote to global / demote to private.
+  setCampaignVisibility: (campaignId: string, visibility: CampaignVisibility) =>
+    req<{ ok: boolean; visibility: CampaignVisibility }>(`/campaigns/${campaignId}/visibility`, {
+      method: 'PUT',
+      body: JSON.stringify({ visibility }),
     }),
 
   listContexts: () => req<BackendContextSummary[]>('/game/contexts'),

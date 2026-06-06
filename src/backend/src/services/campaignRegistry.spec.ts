@@ -12,7 +12,7 @@ function makeMockPool() {
   const queries: string[] = [];
   const pool = {
     query: vi.fn(async (sql: string, params?: unknown[]) => {
-      queries.push(sql.split('\n')[0].trim());
+      queries.push(sql);
       if (sql.includes('INSERT INTO campaigns') && Array.isArray(params)) {
         upserts.push({ id: String(params[0]), name: String(params[1]) });
       }
@@ -51,6 +51,10 @@ describe('syncCampaignRegistry', () => {
     ]);
     // Upsert, not plain insert — re-running on an existing registry updates.
     expect(mock.queries.every((q) => !q.startsWith('DELETE'))).toBe(true);
+    // Code-authored campaigns register as global; the conflict-update must
+    // NOT touch visibility (admin demotions survive restarts).
+    expect(mock.queries[0]).toContain('visibility');
+    expect(mock.queries[0]).not.toContain('SET visibility');
   });
 
   it('handles an empty context map without touching the table', async () => {

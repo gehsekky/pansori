@@ -13,13 +13,15 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
 
 // ─── Campaign roles ──────────────────────────────────────────────────────────
 //
-// Two-tier hierarchy on campaign_members: owner ⊃ editor. Owners manage
-// members (and everything editors can); editors edit campaign content.
+// Three-tier hierarchy on campaign_members: owner ⊃ editor ⊃ player.
+// Owners manage members (and everything below); editors edit campaign
+// content; players can see and play a private campaign (membership is what
+// makes it show up in their new-game picker) but can't edit anything.
 // Site admins (users.is_admin) bypass membership checks entirely.
 
-export type CampaignRole = 'owner' | 'editor';
+export type CampaignRole = 'owner' | 'editor' | 'player';
 
-const ROLE_RANK: Record<CampaignRole, number> = { editor: 1, owner: 2 };
+const ROLE_RANK: Record<CampaignRole, number> = { player: 1, editor: 2, owner: 3 };
 
 // Gate on the site-admin flag. Mount after requireAuth.
 export function requireAdmin(req: Request, res: Response, next: NextFunction) {

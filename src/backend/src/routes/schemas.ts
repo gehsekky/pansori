@@ -173,7 +173,13 @@ export const ActionSchema = z
 
 // ─── Campaigns (admin / membership) ─────────────────────────────────────────
 
-const CampaignRoleSchema = z.enum(['owner', 'editor']);
+const CampaignRoleSchema = z.enum(['owner', 'editor', 'player']);
+
+export const SetCampaignVisibilitySchema = z
+  .object({
+    visibility: z.enum(['global', 'private']),
+  })
+  .strict();
 
 export const AddCampaignMemberSchema = z
   .object({

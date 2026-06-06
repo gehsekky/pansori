@@ -24,9 +24,12 @@ export async function syncCampaignRegistry(
   const ids = Object.keys(contexts);
   for (const id of ids) {
     const name = campaignDisplayName(contexts[id]);
+    // Code-authored campaigns are the built-ins — globally visible on first
+    // registration. Visibility is deliberately NOT in the conflict update:
+    // an admin demoting a campaign to private must survive restarts.
     await pool.query(
-      `INSERT INTO campaigns (id, name)
-       VALUES ($1, $2)
+      `INSERT INTO campaigns (id, name, visibility)
+       VALUES ($1, $2, 'global')
        ON CONFLICT (id) DO UPDATE
          SET name = EXCLUDED.name, updated_at = NOW()`,
       [id, name]

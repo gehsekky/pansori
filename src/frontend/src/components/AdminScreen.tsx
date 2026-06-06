@@ -3,6 +3,7 @@ import {
   type CampaignListing,
   type CampaignMember,
   type CampaignRole,
+  type CampaignVisibility,
   api,
 } from '../lib/api.ts';
 import { useCallback, useEffect, useState } from 'react';
@@ -38,19 +39,23 @@ function AdminScreen({ user, onBack }: { user: AuthUser; onBack: () => void }) {
   const [busy, setBusy] = useState(false);
 
   const [addEmail, setAddEmail] = useState('');
-  const [addRole, setAddRole] = useState<CampaignRole>('editor');
+  // Default to 'player' — inviting friends to play is the common case.
+  const [addRole, setAddRole] = useState<CampaignRole>('player');
 
   const selected = campaigns.find((c) => c.id === selectedId) ?? null;
   // my_role is already 'owner' for site admins (backend resolves it).
   const canManage = selected?.my_role === 'owner';
+  // Players can see/play a campaign but have nothing to do on this screen —
+  // the member list itself is editor+.
+  const adminRole = (r: CampaignRole | null) => r === 'owner' || r === 'editor';
 
   useEffect(() => {
     api
       .listCampaigns()
       .then((list) => {
         setCampaigns(list);
-        // Auto-select the first campaign the user has a role on.
-        const first = list.find((c) => c.my_role);
+        // Auto-select the first campaign the user can administer.
+        const first = list.find((c) => c.my_role === 'owner' || c.my_role === 'editor');
         if (first) setSelectedId(first.id);
       })
       .catch(() => setCampaignsErr('Could not load campaigns.'));
@@ -115,6 +120,23 @@ function AdminScreen({ user, onBack }: { user: AuthUser; onBack: () => void }) {
     }
   }
 
+  // Site-admin only: promote to global / demote to private. The backend
+  // enforces it too (requireAdmin) — the button simply isn't rendered for
+  // non-admins.
+  async function handleVisibility(visibility: CampaignVisibility) {
+    if (!selectedId || busy) return;
+    setBusy(true);
+    setMutationErr(null);
+    try {
+      await api.setCampaignVisibility(selectedId, visibility);
+      setCampaigns((prev) => prev.map((c) => (c.id === selectedId ? { ...c, visibility } : c)));
+    } catch (err) {
+      setMutationErr(errorText(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className={styles.pageFlex}>
       <div className={styles.sessionsInner}>
@@ -144,7 +166,7 @@ function AdminScreen({ user, onBack }: { user: AuthUser; onBack: () => void }) {
         {/* ── Campaign list ─────────────────────────────────────────────── */}
         <div className={styles.sessionList}>
           {campaigns.map((c) => {
-            const manageable = c.my_role !== null;
+            const manageable = adminRole(c.my_role);
             const isSelected = c.id === selectedId;
             return (
               <button
@@ -187,16 +209,27 @@ function AdminScreen({ user, onBack }: { user: AuthUser; onBack: () => void }) {
                     {c.id}
                   </p>
                 </div>
-                <p
-                  style={{
-                    fontSize: '0.75rem',
-                    letterSpacing: '0.1em',
-                    color: c.my_role ? 'var(--t-mid)' : 'var(--t-dim)',
-                    flexShrink: 0,
-                  }}
-                >
-                  {c.my_role ? c.my_role.toUpperCase() : 'NO ACCESS'}
-                </p>
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                  <p
+                    style={{
+                      fontSize: '0.75rem',
+                      letterSpacing: '0.1em',
+                      color: c.my_role ? 'var(--t-mid)' : 'var(--t-dim)',
+                    }}
+                  >
+                    {c.my_role ? c.my_role.toUpperCase() : 'NO ACCESS'}
+                  </p>
+                  <p
+                    style={{
+                      fontSize: '0.7rem',
+                      letterSpacing: '0.1em',
+                      color: c.visibility === 'global' ? 'var(--t-hp-high)' : 'var(--t-dim)',
+                      marginTop: 2,
+                    }}
+                  >
+                    {c.visibility.toUpperCase()}
+                  </p>
+                </div>
               </button>
             );
           })}
@@ -205,16 +238,30 @@ function AdminScreen({ user, onBack }: { user: AuthUser; onBack: () => void }) {
         {/* ── Members panel ─────────────────────────────────────────────── */}
         {selected && (
           <div className={styles.card} style={{ marginTop: '1rem' }}>
-            <p
+            <div
               style={{
-                fontSize: '0.8rem',
-                letterSpacing: '0.12em',
-                color: 'var(--t-mid)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
                 marginBottom: '0.75rem',
               }}
             >
-              MEMBERS — {selected.name.toUpperCase()}
-            </p>
+              <p style={{ fontSize: '0.8rem', letterSpacing: '0.12em', color: 'var(--t-mid)' }}>
+                MEMBERS — {selected.name.toUpperCase()}
+              </p>
+              {user.is_admin && (
+                <button
+                  className={styles.ghostBtn}
+                  style={{ padding: '0.3rem 0.6rem', fontSize: '0.7rem' }}
+                  disabled={busy}
+                  onClick={() =>
+                    handleVisibility(selected.visibility === 'global' ? 'private' : 'global')
+                  }
+                >
+                  {selected.visibility === 'global' ? 'MAKE PRIVATE' : 'MAKE GLOBAL'}
+                </button>
+              )}
+            </div>
 
             {membersErr && (
               <p role="alert" style={{ color: 'var(--t-hp-low)', fontSize: '0.8rem' }}>
@@ -260,6 +307,7 @@ function AdminScreen({ user, onBack }: { user: AuthUser; onBack: () => void }) {
                     >
                       <option value="owner">OWNER</option>
                       <option value="editor">EDITOR</option>
+                      <option value="player">PLAYER</option>
                     </select>
                     <button
                       className={styles.ghostBtn}
@@ -309,6 +357,7 @@ function AdminScreen({ user, onBack }: { user: AuthUser; onBack: () => void }) {
                   aria-label="Role for new member"
                   onChange={(e) => setAddRole(e.target.value as CampaignRole)}
                 >
+                  <option value="player">PLAYER</option>
                   <option value="editor">EDITOR</option>
                   <option value="owner">OWNER</option>
                 </select>

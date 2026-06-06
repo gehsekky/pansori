@@ -11,6 +11,7 @@ vi.mock('../lib/api.ts', () => ({
     addCampaignMember: vi.fn(),
     setCampaignMemberRole: vi.fn(),
     removeCampaignMember: vi.fn(),
+    setCampaignVisibility: vi.fn(),
   },
 }));
 
@@ -45,10 +46,13 @@ const MEMBERS = [
   },
 ];
 
-function mockCampaigns(myRole: 'owner' | 'editor' | null) {
+function mockCampaigns(
+  myRole: 'owner' | 'editor' | 'player' | null,
+  visibility: 'global' | 'private' = 'global'
+) {
   mocked.listCampaigns.mockResolvedValue([
-    { id: 'malgovia', name: 'Malgovia', my_role: myRole },
-    { id: 'sandbox', name: 'Dev Sandbox', my_role: null },
+    { id: 'malgovia', name: 'Malgovia', visibility, my_role: myRole },
+    { id: 'sandbox', name: 'Dev Sandbox', visibility: 'global', my_role: null },
   ]);
   mocked.listCampaignMembers.mockResolvedValue(MEMBERS);
 }
@@ -84,8 +88,9 @@ describe('AdminScreen', () => {
     const email = await screen.findByLabelText('ADD MEMBER BY EMAIL');
     fireEvent.change(email, { target: { value: 'carol@test' } });
     fireEvent.click(screen.getByText('ADD'));
+    // 'player' is the add-form default — inviting friends to play.
     await waitFor(() =>
-      expect(mocked.addCampaignMember).toHaveBeenCalledWith('malgovia', 'carol@test', 'editor')
+      expect(mocked.addCampaignMember).toHaveBeenCalledWith('malgovia', 'carol@test', 'player')
     );
     // Initial load + reload after the add.
     await waitFor(() => expect(mocked.listCampaignMembers).toHaveBeenCalledTimes(2));
@@ -129,5 +134,36 @@ describe('AdminScreen', () => {
     mocked.listCampaigns.mockRejectedValue(new Error('boom'));
     render(<AdminScreen user={OWNER_USER} onBack={vi.fn()} />);
     expect(await screen.findByText('Could not load campaigns.')).toBeTruthy();
+  });
+
+  it('treats player membership as no-admin: card disabled, PLAYER badge', async () => {
+    mockCampaigns('player');
+    render(<AdminScreen user={OWNER_USER} onBack={vi.fn()} />);
+    const card = (await screen.findByText('Malgovia')).closest('button')!;
+    expect(card.disabled).toBe(true);
+    expect(within(card).getByText('PLAYER')).toBeTruthy();
+    // Nothing auto-selected → no members panel.
+    expect(screen.queryByText(/^MEMBERS — /)).toBeNull();
+  });
+
+  it('shows the visibility badge and an admin-only promote/demote toggle', async () => {
+    mockCampaigns('owner', 'private');
+    mocked.setCampaignVisibility.mockResolvedValue({ ok: true, visibility: 'global' });
+    const { unmount } = render(<AdminScreen user={OWNER_USER} onBack={vi.fn()} />);
+    // Non-admin owner: badge yes, toggle no.
+    const card = (await screen.findByText('Malgovia')).closest('button')!;
+    expect(within(card).getByText('PRIVATE')).toBeTruthy();
+    await screen.findByText('MEMBERS — MALGOVIA');
+    expect(screen.queryByText('MAKE GLOBAL')).toBeNull();
+    unmount();
+
+    mockCampaigns('owner', 'private');
+    render(<AdminScreen user={{ ...OWNER_USER, is_admin: true }} onBack={vi.fn()} />);
+    fireEvent.click(await screen.findByText('MAKE GLOBAL'));
+    await waitFor(() =>
+      expect(mocked.setCampaignVisibility).toHaveBeenCalledWith('malgovia', 'global')
+    );
+    // Local state flips without a refetch — button now offers the demote.
+    expect(await screen.findByText('MAKE PRIVATE')).toBeTruthy();
   });
 });

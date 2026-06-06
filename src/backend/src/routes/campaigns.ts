@@ -6,18 +6,24 @@
 // rules live in services/campaignMembers.ts — handlers here only parse,
 // delegate, and map result reasons to HTTP statuses.
 
-import { AddCampaignMemberSchema, SetCampaignMemberRoleSchema, parseBody } from './schemas.js';
+import {
+  AddCampaignMemberSchema,
+  SetCampaignMemberRoleSchema,
+  SetCampaignVisibilitySchema,
+  parseBody,
+} from './schemas.js';
 import { Request, Response, Router } from 'express';
 import {
   addMemberByEmail,
   listCampaignsForUser,
   listMembers,
   removeMember,
+  setCampaignVisibility,
   setMemberRole,
 } from '../services/campaignMembers.js';
+import { requireAdmin, requireCampaignRole } from '../auth/middleware.js';
 import type { AuthedRequest } from '../auth/middleware.js';
 import { pool } from '../db/pool.js';
-import { requireCampaignRole } from '../auth/middleware.js';
 
 export const campaignsRouter = Router();
 
@@ -109,6 +115,32 @@ campaignsRouter.put(
     } catch (err) {
       console.error('[campaigns] role change failed:', err);
       res.status(500).json({ error: 'Failed to change role' });
+    }
+  }
+);
+
+// Promote a campaign to global / demote to private. Site-admin only — this
+// is the one campaign capability owners do NOT get.
+campaignsRouter.put(
+  '/:campaignId/visibility',
+  requireAdmin,
+  async (req: Request, res: Response) => {
+    const parsed = parseBody(req, res, SetCampaignVisibilitySchema);
+    if (!parsed) return;
+    try {
+      const updated = await setCampaignVisibility(
+        pool,
+        param(req, 'campaignId'),
+        parsed.visibility
+      );
+      if (!updated) {
+        res.status(404).json({ error: 'campaign_not_found' });
+        return;
+      }
+      res.json({ ok: true, visibility: parsed.visibility });
+    } catch (err) {
+      console.error('[campaigns] visibility change failed:', err);
+      res.status(500).json({ error: 'Failed to change visibility' });
     }
   }
 );

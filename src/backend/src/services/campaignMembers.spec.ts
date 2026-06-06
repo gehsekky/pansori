@@ -5,10 +5,13 @@
 // fallback in the campaign listing.
 
 import {
+  type CampaignVisibility,
   addMemberByEmail,
   listCampaignsForUser,
   listMembers,
+  listVisibleCampaignIds,
   removeMember,
+  setCampaignVisibility,
   setMemberRole,
 } from './campaignMembers.js';
 import { describe, expect, it, vi } from 'vitest';
@@ -32,11 +35,14 @@ interface FakeMember {
 
 function makeDb(opts: {
   users?: FakeUser[];
-  campaigns?: { id: string; name: string }[];
+  campaigns?: { id: string; name: string; visibility?: CampaignVisibility }[];
   members?: Omit<FakeMember, 'added_at'>[];
 }) {
   const users = opts.users ?? [];
-  const campaigns = opts.campaigns ?? [];
+  const campaigns = (opts.campaigns ?? []).map((c) => ({
+    ...c,
+    visibility: c.visibility ?? ('global' as CampaignVisibility),
+  }));
   const members: FakeMember[] = (opts.members ?? []).map((m) => ({
     ...m,
     added_at: new Date(0),
@@ -70,7 +76,7 @@ function makeDb(opts: {
         const m = members.find((m) => m.campaign_id === params[0] && m.user_id === params[1]);
         return { rows: m ? [joined(m)] : [], rowCount: m ? 1 : 0 };
       }
-      if (sql.includes('JOIN users u') && sql.includes('ORDER BY m.role DESC')) {
+      if (sql.includes('JOIN users u') && sql.includes('ORDER BY CASE m.role')) {
         const rows = members.filter((m) => m.campaign_id === params[0]).map(joined);
         return { rows, rowCount: rows.length };
       }
@@ -95,12 +101,37 @@ function makeDb(opts: {
         if (idx >= 0) members.splice(idx, 1);
         return { rows: [], rowCount: idx >= 0 ? 1 : 0 };
       }
-      if (sql.includes('FROM campaigns c')) {
-        const rows = campaigns.map((c) => {
-          const m = members.find((m) => m.campaign_id === c.id && m.user_id === params[0]);
-          return { id: c.id, name: c.name, my_role: m?.role ?? null };
-        });
+      if (sql.includes('AS my_role')) {
+        // listCampaignsForUser: global OR member OR admin ($2).
+        const [userId, isAdmin] = params as [string, boolean];
+        const rows = campaigns
+          .map((c) => {
+            const m = members.find((m) => m.campaign_id === c.id && m.user_id === userId);
+            return { id: c.id, name: c.name, visibility: c.visibility, my_role: m?.role ?? null };
+          })
+          .filter((r) => r.visibility === 'global' || r.my_role !== null || isAdmin);
         return { rows, rowCount: rows.length };
+      }
+      if (sql.includes('SELECT id FROM campaigns')) {
+        // listVisibleCampaignIds, admin path: everything.
+        const rows = campaigns.map((c) => ({ id: c.id }));
+        return { rows, rowCount: rows.length };
+      }
+      if (sql.includes('SELECT c.id')) {
+        // listVisibleCampaignIds, non-admin path: global OR member.
+        const rows = campaigns
+          .filter(
+            (c) =>
+              c.visibility === 'global' ||
+              members.some((m) => m.campaign_id === c.id && m.user_id === params[0])
+          )
+          .map((c) => ({ id: c.id }));
+        return { rows, rowCount: rows.length };
+      }
+      if (sql.includes('UPDATE campaigns SET visibility')) {
+        const c = campaigns.find((c) => c.id === params[0]);
+        if (c) c.visibility = params[1] as CampaignVisibility;
+        return { rows: [], rowCount: c ? 1 : 0 };
       }
       throw new Error(`fake db: unhandled query: ${sql.split('\n')[0]}`);
     }),
@@ -123,23 +154,73 @@ describe('listCampaignsForUser', () => {
       campaigns: [
         { id: 'malgovia', name: 'Malgovia' },
         { id: 'sandbox', name: 'sandbox' },
+        { id: 'secret', name: 'Secret Realm', visibility: 'private' },
       ],
       members: [{ campaign_id: 'malgovia', user_id: 'a', role: 'editor' }],
     });
 
-  it('returns membership roles, null where none', async () => {
+  it('returns membership roles, null where none — private non-member campaigns hidden', async () => {
     const db = setup();
     const list = await listCampaignsForUser(db.pool, appUser('a'));
     expect(list).toEqual([
-      { id: 'malgovia', name: 'Malgovia', my_role: 'editor' },
-      { id: 'sandbox', name: 'sandbox', my_role: null },
+      { id: 'malgovia', name: 'Malgovia', visibility: 'global', my_role: 'editor' },
+      { id: 'sandbox', name: 'sandbox', visibility: 'global', my_role: null },
     ]);
   });
 
-  it('resolves admins to owner on campaigns they have no row for', async () => {
+  it('shows a private campaign to its members', async () => {
+    const db = setup();
+    db.members.push({ campaign_id: 'secret', user_id: 'a', role: 'player', added_at: new Date(0) });
+    const list = await listCampaignsForUser(db.pool, appUser('a'));
+    expect(list.find((c) => c.id === 'secret')?.my_role).toBe('player');
+  });
+
+  it('resolves admins to owner on campaigns they have no row for (private included)', async () => {
     const db = setup();
     const list = await listCampaignsForUser(db.pool, appUser('z', true));
+    expect(list).toHaveLength(3);
     expect(list.every((c) => c.my_role === 'owner')).toBe(true);
+  });
+});
+
+describe('listVisibleCampaignIds', () => {
+  const setup = () =>
+    makeDb({
+      users: [ALICE],
+      campaigns: [
+        { id: 'malgovia', name: 'Malgovia' },
+        { id: 'secret', name: 'Secret Realm', visibility: 'private' },
+      ],
+      members: [{ campaign_id: 'secret', user_id: 'a', role: 'player' }],
+    });
+
+  it('non-members see only global campaigns', async () => {
+    const db = setup();
+    expect(await listVisibleCampaignIds(db.pool, appUser('z'))).toEqual(new Set(['malgovia']));
+  });
+
+  it('members (any role, incl. player) see their private campaigns', async () => {
+    const db = setup();
+    expect(await listVisibleCampaignIds(db.pool, appUser('a'))).toEqual(
+      new Set(['malgovia', 'secret'])
+    );
+  });
+
+  it('admins see everything', async () => {
+    const db = setup();
+    expect(await listVisibleCampaignIds(db.pool, appUser('z', true))).toEqual(
+      new Set(['malgovia', 'secret'])
+    );
+  });
+});
+
+describe('setCampaignVisibility', () => {
+  it('updates visibility and reports a missing campaign', async () => {
+    const db = makeDb({ campaigns: [{ id: 'malgovia', name: 'Malgovia' }] });
+    expect(await setCampaignVisibility(db.pool, 'malgovia', 'private')).toBe(true);
+    const ids = await listVisibleCampaignIds(db.pool, appUser('z'));
+    expect(ids.has('malgovia')).toBe(false);
+    expect(await setCampaignVisibility(db.pool, 'nope', 'global')).toBe(false);
   });
 });
 
@@ -190,13 +271,19 @@ describe('setMemberRole', () => {
     expect(result).toEqual({ ok: false, reason: 'not_a_member' });
   });
 
-  it('refuses to demote the sole owner', async () => {
+  it('refuses to demote the sole owner (to editor or player)', async () => {
     const db = makeDb({
       users: [ALICE],
       members: [{ campaign_id: 'malgovia', user_id: 'a', role: 'owner' }],
     });
-    const result = await setMemberRole(db.pool, 'malgovia', 'a', 'editor');
-    expect(result).toEqual({ ok: false, reason: 'last_owner' });
+    expect(await setMemberRole(db.pool, 'malgovia', 'a', 'editor')).toEqual({
+      ok: false,
+      reason: 'last_owner',
+    });
+    expect(await setMemberRole(db.pool, 'malgovia', 'a', 'player')).toEqual({
+      ok: false,
+      reason: 'last_owner',
+    });
   });
 
   it('demotes an owner when another owner remains', async () => {

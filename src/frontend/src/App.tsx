@@ -277,7 +277,11 @@ export default function App() {
     }
     api
       .listCampaigns()
-      .then((list) => setCanAdmin(list.some((c) => c.my_role !== null)))
+      // 'player' members can see/play a campaign but have nothing to do on
+      // the admin screen — only owner/editor roles surface the entry.
+      .then((list) =>
+        setCanAdmin(list.some((c) => c.my_role === 'owner' || c.my_role === 'editor'))
+      )
       .catch(() => setCanAdmin(false));
   }, [user]);
 

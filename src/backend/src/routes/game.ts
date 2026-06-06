@@ -88,6 +88,7 @@ import { applyCreationDivineOrder } from '../services/actions/meta.js';
 import { applyFeatTake } from '../services/feats.js';
 import { generateSeed } from '../services/procgen.js';
 import { initMapState } from '../services/mapEngine.js';
+import { listVisibleCampaignIds } from '../services/campaignMembers.js';
 import { loadContexts } from '../services/contextLoader.js';
 import { pool } from '../db/pool.js';
 import { randomUUID } from 'crypto';
@@ -155,164 +156,181 @@ async function fetchSessionForParticipant(
 
 export const gameRouter = Router();
 
-// List all available game contexts (id + display metadata only — no rules/loot).
-// Backgrounds carry their `originFeat` id so the FE can spot Magic Initiate
-// at character creation and route to the spell picker. Spell metadata is
-// included as a slim list per `spellList` tag (arcane / divine / primal)
-// for the same picker. Sized one-time, fetched once at app start.
-gameRouter.get('/contexts', (_req, res) => {
-  const list = Object.values(CONTEXTS).map((c) => {
-    const spells = Object.values(c.spellTable ?? {}).map((s) => ({
-      id: s.id,
-      name: s.name,
-      level: s.level,
-      desc: s.desc,
-      spellList: s.spellList ?? [],
-    }));
-    return {
-      id: c.id,
-      displayName: c.displayNoun,
-      classes: Object.keys(c.classPrimaryStats),
-      // Per-class "choose N from options" skill proficiencies + the curated
-      // default selection — drives the creation-screen skill picker.
-      classSkillChoices: Object.fromEntries(
-        Object.entries(c.classSkillChoices ?? {}).map(([cls, choice]) => [
-          cls,
-          {
-            count: choice.count,
-            options: choice.options,
-            default: defaultClassSkills(cls, c.classSkills?.[cls] ?? []),
-          },
-        ])
-      ),
-      // Starting-equipment packages with item display names resolved, for the
-      // creation-screen picker.
-      classStartingEquipment: Object.fromEntries(
-        Object.entries(c.classStartingEquipment ?? {}).map(([cls, pkgs]) => [
-          cls,
-          pkgs.map((p) => ({
-            id: p.id,
-            label: p.label,
-            gold: p.gold,
-            items: p.items.map((id) => c.lootTable.find((l) => l.id === id)?.name ?? id),
-          })),
-        ])
-      ),
-      // Weapon Mastery options per class with the feature (the weapons it may
-      // master + slot count + default picks), for the creation-screen picker.
-      weaponMasteryChoices: Object.fromEntries(
-        Object.keys(c.classPrimaryStats)
-          .map((cls) => {
-            const count = SRD_WEAPON_MASTERY_SLOTS[cls] ?? 0;
-            if (count <= 0) return null;
-            const options = masterableWeapons(c.classWeaponProficiencies?.[cls] ?? [], c.lootTable);
-            return [
-              cls,
-              {
-                count,
-                options,
-                default: defaultWeaponMasteries(
-                  SRD_DEFAULT_WEAPON_MASTERIES[cls] ?? [],
-                  options.map((o) => o.id),
-                  count
-                ),
-              },
-            ] as const;
-          })
-          .filter((e): e is NonNullable<typeof e> => e !== null)
-      ),
-      // Fighting Style options for classes that grant one at level 1 (Fighter),
-      // for the creation-screen picker. Later picks are made in-game.
-      fightingStyleChoices: Object.fromEntries(
-        Object.keys(c.classPrimaryStats)
-          .map((cls) => {
-            const count = fightingStyleSlotsForClassLevel(cls, 1);
-            if (count <= 0) return null;
-            return [
-              cls,
-              {
-                count,
-                options: OFFERED_FIGHTING_STYLE_IDS.map((id) => ({
-                  id,
-                  label: FIGHTING_STYLE_LABELS[id] ?? id,
-                })),
-                default: DEFAULT_FIGHTING_STYLE,
-              },
-            ] as const;
-          })
-          .filter((e): e is NonNullable<typeof e> => e !== null)
-      ),
-      // SRD Cleric Divine Order — the Cleric (divine-list) cantrips a Thaumaturge
-      // can learn at creation, for the creation-screen dropdown.
-      divineOrderCantrips: Object.values(c.spellTable ?? {})
-        .filter(
-          (s) =>
-            s.level === 0 &&
-            ((s as { spellList?: ReadonlyArray<string> }).spellList?.includes('divine') ?? false)
-        )
-        .map((s) => ({ id: s.id, name: s.name }))
-        .sort((a, b) => a.name.localeCompare(b.name)),
-      // Caster spell picks at creation — per full-caster class, the spell-list
-      // tag + how many cantrips / level-1 spells to choose + the default
-      // pre-selection. The FE filters the `spells` array above by the tag.
-      casterSpellChoices: Object.fromEntries(
-        Object.keys(c.classPrimaryStats)
-          .map((cls) => {
-            const tag = classSpellListTag(cls);
-            if (!tag || !(cls in SRD_CASTER_SPELL_COUNTS)) return null;
-            const available = casterSpellOptions(cls, c.spellTable ?? {});
-            const counts = casterSpellCounts(cls, available);
-            if (!counts || counts.cantrips + counts.l1 === 0) return null;
-            const def = defaultCasterSpells(cls, available, c.classSpells?.[cls] ?? []);
-            return [
-              cls,
-              {
-                spellList: tag,
-                cantripCount: counts.cantrips,
-                l1Count: counts.l1,
-                defaultCantrips: def.cantrips,
-                defaultL1: def.l1,
-              },
-            ] as const;
-          })
-          .filter((e): e is NonNullable<typeof e> => e !== null)
-      ),
-      // SRD Expertise slots a class grants at level 1 (Rogue: 2), for the
-      // creation picker. Only the count travels — the eligible skills are the
-      // character's proficiencies (class + background + species), which the
-      // creation screen assembles from the live draft.
-      expertiseChoices: Object.fromEntries(
-        Object.keys(c.classPrimaryStats)
-          .map((cls) => {
-            const count = expertiseSlotsForClassLevel(cls, 1);
-            return count > 0 ? ([cls, { count }] as const) : null;
-          })
-          .filter((e): e is NonNullable<typeof e> => e !== null)
-      ),
-      backgrounds: (c.backgrounds ?? []).map((b) => ({
-        id: b.id,
-        name: b.name,
-        desc: b.desc,
-        skillProficiencies: b.skillProficiencies,
-        toolProficiency: b.toolProficiency ?? null,
-        feature: b.feature,
-        featureDesc: b.featureDesc,
-        originFeat: b.originFeat ?? null,
-        // The three abilities this background can boost — the creation UI uses
-        // them to offer the +2/+1 split.
-        abilityScoreIncreases: b.abilityScoreIncreases ?? [],
-      })),
-      featTable: c.featTable
-        ? Object.fromEntries(
-            Object.entries(c.featTable).map(([id, f]) => [
-              id,
-              { id: f.id, name: f.name, desc: f.desc, effect: f.effect },
-            ])
+// List the game contexts available TO THIS USER (id + display metadata only
+// — no rules/loot): global campaigns plus any the user is a member of
+// (owner/editor/player). Private campaigns stay invisible to non-members —
+// this list is what gates the new-game picker. Backgrounds carry their
+// `originFeat` id so the FE can spot Magic Initiate at character creation
+// and route to the spell picker. Spell metadata is included as a slim list
+// per `spellList` tag (arcane / divine / primal) for the same picker.
+gameRouter.get('/contexts', async (req, res) => {
+  let visible: Set<string>;
+  try {
+    visible = await listVisibleCampaignIds(pool, (req as AuthedRequest).user);
+  } catch (err) {
+    // Registry unavailable (e.g. mid-migration) — fail open to the code-
+    // defined contexts rather than blanking the new-game page; the code
+    // contexts are exactly the global built-ins today.
+    console.error('[contexts] visibility lookup failed — falling back to all:', err);
+    visible = new Set(Object.keys(CONTEXTS));
+  }
+  const list = Object.values(CONTEXTS)
+    .filter((c) => visible.has(c.id))
+    .map((c) => {
+      const spells = Object.values(c.spellTable ?? {}).map((s) => ({
+        id: s.id,
+        name: s.name,
+        level: s.level,
+        desc: s.desc,
+        spellList: s.spellList ?? [],
+      }));
+      return {
+        id: c.id,
+        displayName: c.displayNoun,
+        classes: Object.keys(c.classPrimaryStats),
+        // Per-class "choose N from options" skill proficiencies + the curated
+        // default selection — drives the creation-screen skill picker.
+        classSkillChoices: Object.fromEntries(
+          Object.entries(c.classSkillChoices ?? {}).map(([cls, choice]) => [
+            cls,
+            {
+              count: choice.count,
+              options: choice.options,
+              default: defaultClassSkills(cls, c.classSkills?.[cls] ?? []),
+            },
+          ])
+        ),
+        // Starting-equipment packages with item display names resolved, for the
+        // creation-screen picker.
+        classStartingEquipment: Object.fromEntries(
+          Object.entries(c.classStartingEquipment ?? {}).map(([cls, pkgs]) => [
+            cls,
+            pkgs.map((p) => ({
+              id: p.id,
+              label: p.label,
+              gold: p.gold,
+              items: p.items.map((id) => c.lootTable.find((l) => l.id === id)?.name ?? id),
+            })),
+          ])
+        ),
+        // Weapon Mastery options per class with the feature (the weapons it may
+        // master + slot count + default picks), for the creation-screen picker.
+        weaponMasteryChoices: Object.fromEntries(
+          Object.keys(c.classPrimaryStats)
+            .map((cls) => {
+              const count = SRD_WEAPON_MASTERY_SLOTS[cls] ?? 0;
+              if (count <= 0) return null;
+              const options = masterableWeapons(
+                c.classWeaponProficiencies?.[cls] ?? [],
+                c.lootTable
+              );
+              return [
+                cls,
+                {
+                  count,
+                  options,
+                  default: defaultWeaponMasteries(
+                    SRD_DEFAULT_WEAPON_MASTERIES[cls] ?? [],
+                    options.map((o) => o.id),
+                    count
+                  ),
+                },
+              ] as const;
+            })
+            .filter((e): e is NonNullable<typeof e> => e !== null)
+        ),
+        // Fighting Style options for classes that grant one at level 1 (Fighter),
+        // for the creation-screen picker. Later picks are made in-game.
+        fightingStyleChoices: Object.fromEntries(
+          Object.keys(c.classPrimaryStats)
+            .map((cls) => {
+              const count = fightingStyleSlotsForClassLevel(cls, 1);
+              if (count <= 0) return null;
+              return [
+                cls,
+                {
+                  count,
+                  options: OFFERED_FIGHTING_STYLE_IDS.map((id) => ({
+                    id,
+                    label: FIGHTING_STYLE_LABELS[id] ?? id,
+                  })),
+                  default: DEFAULT_FIGHTING_STYLE,
+                },
+              ] as const;
+            })
+            .filter((e): e is NonNullable<typeof e> => e !== null)
+        ),
+        // SRD Cleric Divine Order — the Cleric (divine-list) cantrips a Thaumaturge
+        // can learn at creation, for the creation-screen dropdown.
+        divineOrderCantrips: Object.values(c.spellTable ?? {})
+          .filter(
+            (s) =>
+              s.level === 0 &&
+              ((s as { spellList?: ReadonlyArray<string> }).spellList?.includes('divine') ?? false)
           )
-        : {},
-      spells,
-    };
-  });
+          .map((s) => ({ id: s.id, name: s.name }))
+          .sort((a, b) => a.name.localeCompare(b.name)),
+        // Caster spell picks at creation — per full-caster class, the spell-list
+        // tag + how many cantrips / level-1 spells to choose + the default
+        // pre-selection. The FE filters the `spells` array above by the tag.
+        casterSpellChoices: Object.fromEntries(
+          Object.keys(c.classPrimaryStats)
+            .map((cls) => {
+              const tag = classSpellListTag(cls);
+              if (!tag || !(cls in SRD_CASTER_SPELL_COUNTS)) return null;
+              const available = casterSpellOptions(cls, c.spellTable ?? {});
+              const counts = casterSpellCounts(cls, available);
+              if (!counts || counts.cantrips + counts.l1 === 0) return null;
+              const def = defaultCasterSpells(cls, available, c.classSpells?.[cls] ?? []);
+              return [
+                cls,
+                {
+                  spellList: tag,
+                  cantripCount: counts.cantrips,
+                  l1Count: counts.l1,
+                  defaultCantrips: def.cantrips,
+                  defaultL1: def.l1,
+                },
+              ] as const;
+            })
+            .filter((e): e is NonNullable<typeof e> => e !== null)
+        ),
+        // SRD Expertise slots a class grants at level 1 (Rogue: 2), for the
+        // creation picker. Only the count travels — the eligible skills are the
+        // character's proficiencies (class + background + species), which the
+        // creation screen assembles from the live draft.
+        expertiseChoices: Object.fromEntries(
+          Object.keys(c.classPrimaryStats)
+            .map((cls) => {
+              const count = expertiseSlotsForClassLevel(cls, 1);
+              return count > 0 ? ([cls, { count }] as const) : null;
+            })
+            .filter((e): e is NonNullable<typeof e> => e !== null)
+        ),
+        backgrounds: (c.backgrounds ?? []).map((b) => ({
+          id: b.id,
+          name: b.name,
+          desc: b.desc,
+          skillProficiencies: b.skillProficiencies,
+          toolProficiency: b.toolProficiency ?? null,
+          feature: b.feature,
+          featureDesc: b.featureDesc,
+          originFeat: b.originFeat ?? null,
+          // The three abilities this background can boost — the creation UI uses
+          // them to offer the +2/+1 split.
+          abilityScoreIncreases: b.abilityScoreIncreases ?? [],
+        })),
+        featTable: c.featTable
+          ? Object.fromEntries(
+              Object.entries(c.featTable).map(([id, f]) => [
+                id,
+                { id: f.id, name: f.name, desc: f.desc, effect: f.effect },
+              ])
+            )
+          : {},
+        spells,
+      };
+    });
   res.json(list);
 });
 
@@ -413,6 +431,19 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
   }
 
   const ctx = CONTEXTS[context_id ?? ''] ?? DEFAULT_CONTEXT;
+  // Visibility gate: a private campaign is playable only by its members
+  // (the /contexts list already hides it, but enforce server-side too).
+  try {
+    const visible = await listVisibleCampaignIds(pool, (req as AuthedRequest).user);
+    if (!visible.has(ctx.id)) {
+      res.status(403).json({ error: 'campaign_not_visible' });
+      return;
+    }
+  } catch (err) {
+    // Same fail-open rationale as /contexts: code contexts are the global
+    // built-ins, so a registry hiccup must not block starting those.
+    console.error('[session/new] visibility lookup failed — allowing code context:', err);
+  }
   const seed = generateSeed(ctx, characters.length);
   const client = await pool.connect();
   try {

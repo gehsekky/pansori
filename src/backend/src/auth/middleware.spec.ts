@@ -103,6 +103,25 @@ describe('requireCampaignRole', () => {
     expect((req as CampaignAuthedRequest).campaign_role).toBe('editor');
   });
 
+  it('lets a player through a player gate but not an editor gate', async () => {
+    const next = vi.fn();
+    const res = makeRes();
+    const req = makeReq({ campaignId: 'malgovia' });
+    memberRole('player');
+    await requireCampaignRole('player')(req, res as never, next);
+    expect(next).toHaveBeenCalled();
+    expect((req as CampaignAuthedRequest).campaign_role).toBe('player');
+
+    const blocked = makeRes();
+    memberRole('player');
+    await requireCampaignRole('editor')(
+      makeReq({ campaignId: 'malgovia' }),
+      blocked as never,
+      vi.fn()
+    );
+    expect(blocked.statusCode).toBe(403);
+  });
+
   it('blocks an editor from an owner gate with 403', async () => {
     const next = vi.fn();
     const res = makeRes();

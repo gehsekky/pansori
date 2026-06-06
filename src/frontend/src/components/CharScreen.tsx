@@ -351,7 +351,11 @@ function CharScreen({
 }) {
   // Player-facing campaigns (sandbox + other test campaigns are `hidden`). The
   // picker only renders when there's a real choice (>1 visible); with a single
-  // campaign we drop the selector and use it directly.
+  // campaign we drop the selector and use it directly. Once the BE context
+  // list loads it also constrains the picker: the server only returns
+  // campaigns visible to this user (global + their memberships), so a
+  // private campaign never shows for non-members. Until/unless it loads,
+  // fall back to the full code-context list (those are the global built-ins).
   const visibleContexts = availableContexts.filter((c) => !c.hidden);
   const [contextId, setContextId] = useState(() => {
     // `?campaign=<id>` is the internal-testing escape hatch — it can select a
@@ -428,6 +432,15 @@ function CharScreen({
       cancelled = true;
     };
   }, []);
+
+  // The world picker's list: code contexts minus hidden ones, intersected
+  // with what the server says this user may see (global campaigns + their
+  // memberships). Before the BE list resolves, show the code list as-is —
+  // today's code contexts are all global, so there's nothing to over-show.
+  const beLoaded = Object.keys(beContexts).length > 0;
+  const pickerContexts = beLoaded
+    ? visibleContexts.filter((c) => c.id in beContexts)
+    : visibleContexts;
 
   function swapStats(partyIdx: number, a: keyof StatBlock, b: keyof StatBlock) {
     if (a === b) return;
@@ -1999,7 +2012,7 @@ function CharScreen({
           </div>
         </div>
 
-        {visibleContexts.length > 1 && (
+        {pickerContexts.length > 1 && (
           <div className={styles.charWorldCol}>
             <h2 className={styles.title} style={{ fontSize: '1.1rem', marginBottom: 4 }}>
               WORLD TYPE
@@ -2009,7 +2022,7 @@ function CharScreen({
             </p>
 
             <div className={styles.charWorldRow}>
-              {visibleContexts.map((c) => {
+              {pickerContexts.map((c) => {
                 const selected = c.id === contextId;
                 return (
                   <button

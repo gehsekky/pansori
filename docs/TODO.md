@@ -250,6 +250,39 @@ on existing patterns and a handful of **bounded subsystems**.
 
 ---
 
+## Campaign platform (active major feature)
+
+> **End goal:** users author their own campaigns online and invite friends
+> to play them. A campaign is **private by default** — invisible to
+> non-members everywhere, including the new-game picker; members must be
+> added to it (role `player`+) to see/play it. Some campaigns are **global**
+> (visible to all users — the code-authored built-ins); **only site admins
+> can promote** a campaign to global. Campaign content moves from code into
+> the DB so owners/editors edit it in the website's admin section.
+>
+> **Shipped groundwork (2026-06):** `users.is_admin`; `campaigns` registry
+> (startup-synced from code contexts, code built-ins = global) with
+> `visibility`; `campaign_members` with `owner ⊃ editor ⊃ player` +
+> last-owner guard; role middleware (`requireAdmin`,
+> `requireCampaignRole`); `/api/campaigns` membership + visibility API;
+> admin FE shell (campaign list, member management, admin-only
+> promote/demote); `/game/contexts` + `session/new` visibility gating; FE
+> picker intersects with the server-visible set.
+
+- [ ] **Campaign creation** — `POST /api/campaigns` (creator becomes owner,
+      visibility private) + a "new campaign" surface in the admin shell.
+      Blocked on the first DB-content tables existing (a campaign with no
+      content can't be played).
+- [ ] **First DB-backed content table** — pick the pilot (likely
+      `narratives`: pure strings, no cross-refs), editor-gated CRUD, engine
+      reads DB-first with code fallback. The pattern the rest of the content
+      migration follows.
+- [ ] **Content editing UI** — replaces the CONTENT placeholder card in
+      AdminScreen, one section per migrated table.
+- [ ] **Remaining content tables** — entities / map / items / quests /
+      factions on the pilot's pattern, until `campaignData/<name>/` folders
+      are only one source among many.
+
 ## Content & playtest
 
 - [ ] **Wire boss legendary + lair actions to an actual boss** — scaffolding +
