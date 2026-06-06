@@ -345,6 +345,100 @@ export function resolveClassSkills(
   return defaultClassSkills(className, fallback);
 }
 
+// ─── Caster spell choices (level 1) ──────────────────────────────────────────
+// SRD spell picks a full caster makes at creation: cantrips + level-1 spells.
+// Half-casters (Paladin / Ranger) get no spell slots until level 2, so they're
+// not listed (no creation pick). The eligible spells come from the campaign's
+// spell table filtered by the class's spell list (see casterSpellOptions).
+export const SRD_CASTER_SPELL_COUNTS: Record<string, { cantrips: number; l1: number }> = {
+  Wizard: { cantrips: 3, l1: 6 }, // 3 cantrips + a starting spellbook of 6
+  Sorcerer: { cantrips: 4, l1: 2 },
+  Bard: { cantrips: 2, l1: 4 },
+  Cleric: { cantrips: 3, l1: 4 }, // prepared pool
+  Druid: { cantrips: 2, l1: 4 }, // prepared pool
+  Warlock: { cantrips: 2, l1: 2 },
+};
+
+/** Counts clamped to what the campaign's spell list can actually offer. */
+export function casterSpellCounts(
+  className: string,
+  available: { cantrips: string[]; l1: string[] }
+): { cantrips: number; l1: number } | null {
+  const c = SRD_CASTER_SPELL_COUNTS[className];
+  if (!c) return null;
+  return {
+    cantrips: Math.min(c.cantrips, available.cantrips.length),
+    l1: Math.min(c.l1, available.l1.length),
+  };
+}
+
+function padPicks(curated: readonly string[], options: readonly string[], count: number): string[] {
+  const opt = new Set(options);
+  const out: string[] = [];
+  const add = (s: string) => {
+    if (out.length < count && opt.has(s) && !out.includes(s)) out.push(s);
+  };
+  curated.forEach(add); // the campaign's curated picks first
+  options.forEach(add); // then top up from the offered options
+  return out;
+}
+
+/**
+ * Default creation picks for a caster: the campaign's curated known list
+ * (`classSpells`, filtered to legal cantrip/L1 options) first, topped up from
+ * the options to the (clamped) count. The creation-screen pre-selection AND the
+ * server-side fallback.
+ */
+export function defaultCasterSpells(
+  className: string,
+  available: { cantrips: string[]; l1: string[] },
+  curatedKnown: readonly string[]
+): { cantrips: string[]; l1: string[] } {
+  const counts = casterSpellCounts(className, available);
+  if (!counts) return { cantrips: [], l1: [] };
+  const known = new Set(curatedKnown);
+  return {
+    cantrips: padPicks(
+      available.cantrips.filter((id) => known.has(id)),
+      available.cantrips,
+      counts.cantrips
+    ),
+    l1: padPicks(
+      available.l1.filter((id) => known.has(id)),
+      available.l1,
+      counts.l1
+    ),
+  };
+}
+
+/**
+ * Resolve a caster's creation spell picks. A valid `chosen` selection (right
+ * clamped count, distinct, all offered) is used; otherwise we fall back to the
+ * default. Returns `{ cantrips, l1 }`; the caller flattens them onto
+ * `spells_known`. Empty for non-caster (or half-caster) classes.
+ */
+export function resolveCasterSpells(
+  className: string,
+  chosen: { cantrips?: string[]; l1?: string[] } | undefined,
+  available: { cantrips: string[]; l1: string[] },
+  curatedKnown: readonly string[]
+): { cantrips: string[]; l1: string[] } {
+  const counts = casterSpellCounts(className, available);
+  if (!counts) return { cantrips: [], l1: [] };
+  const valid = (picks: string[] | undefined, opts: string[], count: number): string[] | null => {
+    if (!picks) return null;
+    const distinct = new Set(picks);
+    const ok =
+      picks.length === count && distinct.size === count && picks.every((p) => opts.includes(p));
+    return ok ? [...distinct] : null;
+  };
+  const def = defaultCasterSpells(className, available, curatedKnown);
+  return {
+    cantrips: valid(chosen?.cantrips, available.cantrips, counts.cantrips) ?? def.cantrips,
+    l1: valid(chosen?.l1, available.l1, counts.l1) ?? def.l1,
+  };
+}
+
 // ─── Starting equipment (2024 SRD "Choose A, B, or C") ───────────────────────
 // Each class offers a few starting-equipment packages: a gear loadout (+ a
 // little gold) or a gold-only option to buy your own. pansori's combat-focused

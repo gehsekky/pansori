@@ -19,6 +19,7 @@
 //     creation). Saving-throw profs are derived from this class
 //     only — that rule stays once the prereq + spell-slot PRs land.
 
+import type { Character, Spell } from '../types.js';
 import {
   abilityMod,
   extraAttackCount,
@@ -27,7 +28,6 @@ import {
   spellSlotsForCasterLevel,
   spellSlotsForClassLevel,
 } from './rulesEngine.js';
-import type { Character } from '../types.js';
 
 // ─── Multiclass proficiency grants (SRD Ch. 1) ────────────────────────
 
@@ -1013,6 +1013,37 @@ const CLASS_SPELL_LISTS: Record<string, Array<'arcane' | 'divine' | 'primal'>> =
   druid: ['primal'],
   ranger: ['primal'],
 };
+
+/** The spell-list tag a class draws from (arcane / divine / primal), or undefined. */
+export function classSpellListTag(cls: string): 'arcane' | 'divine' | 'primal' | undefined {
+  return CLASS_SPELL_LISTS[cls.toLowerCase()]?.[0];
+}
+
+/**
+ * The cantrip + level-1 spell ids a class may pick at creation from a campaign's
+ * spell table — every catalog spell of the right level whose `spellList`
+ * overlaps the class's list. Sorted by name. Empty for non-casters.
+ */
+export function casterSpellOptions(
+  cls: string,
+  spellTable: Record<string, Spell>
+): { cantrips: string[]; l1: string[] } {
+  const lists = CLASS_SPELL_LISTS[cls.toLowerCase()] ?? [];
+  if (lists.length === 0) return { cantrips: [], l1: [] };
+  const onList = (s: Spell) => (s.spellList ?? []).some((l) => lists.includes(l));
+  const byName = (a: Spell, b: Spell) => a.name.localeCompare(b.name);
+  const all = Object.values(spellTable);
+  return {
+    cantrips: all
+      .filter((s) => s.level === 0 && onList(s))
+      .sort(byName)
+      .map((s) => s.id),
+    l1: all
+      .filter((s) => s.level === 1 && onList(s))
+      .sort(byName)
+      .map((s) => s.id),
+  };
+}
 
 /**
  * Multiclass spell-casting ability resolver (SRD).

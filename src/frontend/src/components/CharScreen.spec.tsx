@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, waitFor } from '@testing-library/react';
+import type { BackendContextSummary } from '../lib/api';
 import CharScreen from './CharScreen';
 import type { FrontendContext } from '../types';
 import { api } from '../lib/api';
@@ -122,5 +123,76 @@ describe('CharScreen — Cleric Divine Order required at creation', () => {
     fireEvent.click(getByText(/Protector — Martial weapons/));
     fireEvent.click(getByTestId('begin-adventure-btn'));
     await waitFor(() => expect(onStart).toHaveBeenCalledTimes(1));
+  });
+});
+
+// Caster spell picker — a full caster chooses cantrips + level-1 spells at
+// creation. Driven by the BackendContextSummary's casterSpellChoices (fetched
+// via listContexts), so this test mocks that response.
+const wizardCtx: FrontendContext = {
+  ...ctx,
+  classes: [
+    { id: 'Fighter', desc: 'A warrior.' },
+    { id: 'Wizard', desc: 'An arcane caster.' },
+  ],
+  classPrimaryStats: { Fighter: 'STR', Wizard: 'INT' },
+  classSkills: { Fighter: [], Wizard: [] },
+};
+
+const wizardSummary = {
+  id: wizardCtx.id,
+  displayName: 'Test',
+  classes: ['Fighter', 'Wizard'],
+  classSkillChoices: {},
+  classStartingEquipment: {},
+  weaponMasteryChoices: {},
+  fightingStyleChoices: {},
+  expertiseChoices: {},
+  backgrounds: [],
+  featTable: {},
+  casterSpellChoices: {
+    Wizard: {
+      spellList: 'arcane',
+      cantripCount: 2,
+      l1Count: 1,
+      defaultCantrips: ['fire_bolt', 'mage_hand'],
+      defaultL1: ['magic_missile'],
+    },
+  },
+  spells: [
+    { id: 'fire_bolt', name: 'Fire Bolt', level: 0, desc: '1d10', spellList: ['arcane'] },
+    { id: 'mage_hand', name: 'Mage Hand', level: 0, desc: 'hand', spellList: ['arcane'] },
+    { id: 'magic_missile', name: 'Magic Missile', level: 1, desc: 'darts', spellList: ['arcane'] },
+    { id: 'sacred_flame', name: 'Sacred Flame', level: 0, desc: 'radiant', spellList: ['divine'] },
+  ],
+} as unknown as BackendContextSummary;
+
+describe('CharScreen — caster spell picker', () => {
+  it('surfaces the picker for a Wizard and opens it with the arcane list', async () => {
+    vi.spyOn(api, 'listContexts').mockResolvedValue([wizardSummary]);
+    const { container, findByTestId, getByTestId, queryByTestId } = render(
+      <CharScreen onStart={vi.fn()} loading={false} availableContexts={[wizardCtx]} user={null} />
+    );
+    fireEvent.change(container.querySelector('input[id$="-name"]')!, { target: { value: 'Mage' } });
+    fireEvent.change(container.querySelector('#char-0-class')!, { target: { value: 'Wizard' } });
+
+    // The trigger appears once the async beContexts fetch resolves.
+    fireEvent.click(await findByTestId('caster-spells-trigger-0'));
+    expect(await findByTestId('spell-picker-dialog')).toBeTruthy();
+    // Arcane cantrips + L1 shown; the divine cantrip is filtered out.
+    expect(getByTestId('spell-picker-cantrip-fire_bolt')).toBeTruthy();
+    expect(getByTestId('spell-picker-l1-magic_missile')).toBeTruthy();
+    expect(queryByTestId('spell-picker-cantrip-sacred_flame')).toBeNull();
+  });
+
+  it('does not surface the picker for a non-caster (Fighter)', async () => {
+    vi.spyOn(api, 'listContexts').mockResolvedValue([wizardSummary]);
+    const { container, queryByTestId } = render(
+      <CharScreen onStart={vi.fn()} loading={false} availableContexts={[wizardCtx]} user={null} />
+    );
+    fireEvent.change(container.querySelector('input[id$="-name"]')!, { target: { value: 'Bonk' } });
+    // Default class is Fighter; wait for the fetch to settle, then assert absence.
+    await waitFor(() => expect(api.listContexts).toHaveBeenCalled());
+    expect(queryByTestId('caster-spells-trigger-0')).toBeNull();
   });
 });

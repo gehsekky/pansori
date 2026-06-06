@@ -110,6 +110,9 @@ export type CharacterInput = {
   // must be one of the character's proficient skills. Omitted/invalid = the
   // first proficiencies. Re-validated server-side.
   rogue_expertise?: string[];
+  // SRD caster spell picks at creation — chosen cantrips + level-1 spells.
+  // Omitted/invalid = the curated default. Re-validated server-side.
+  caster_spells?: { cantrips?: string[]; l1?: string[] };
   // Origin-feat choices that need player input at character creation.
   // Today only Magic Initiate variants populate this — the player picks
   // 2 cantrips + 1 L1 spell. BE validates the shape AND that each picked
@@ -158,6 +161,19 @@ export interface BackendContextSummary {
   // creation, for the creation-screen dropdown. Populated only when a Cleric is
   // castable in the context.
   divineOrderCantrips?: Array<{ id: string; name: string }>;
+  // Caster spell picks at creation — per full-caster class, the spell-list tag,
+  // how many cantrips / level-1 spells to choose, and the default pre-selection.
+  // The picker filters the `spells` array below by `spellList`.
+  casterSpellChoices?: Record<
+    string,
+    {
+      spellList: 'arcane' | 'divine' | 'primal';
+      cantripCount: number;
+      l1Count: number;
+      defaultCantrips: string[];
+      defaultL1: string[];
+    }
+  >;
   // Per-class Expertise slot count at level 1 (Rogue: 2), for the creation
   // picker. The eligible skills are the character's own proficiencies, so the
   // screen assembles the options from the live draft rather than the server.

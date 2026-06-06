@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { type Dispatch, type SetStateAction, useMemo, useState } from 'react';
 import Dialog from './Dialog.tsx';
 import styles from '../styles.module.css';
 
@@ -11,32 +11,27 @@ interface SpellOption {
 }
 
 interface Props {
-  // Display name of the feat being chosen for (e.g. "Magic Initiate (Arcane)").
+  // Title noun for the dialog (e.g. "Magic Initiate (Arcane)" or "Wizard").
   featName: string;
-  // The spell list this feat draws from. The picker filters `spells` so only
-  // tagged entries are visible.
+  // The spell list this picker draws from. Filters `spells` to tagged entries.
   spellList: 'arcane' | 'divine' | 'primal';
   cantripCount: number;
   l1Count: number;
   spells: SpellOption[];
-  // Prior picks — used to repopulate when the dialog is reopened after
-  // initial selection. Empty arrays / null on first open.
+  // Prior picks — repopulated when the dialog is reopened. Empty on first open.
   initialCantrips: string[];
-  initialL1: string | null;
+  initialL1: string[];
+  // Optional extra line under the intro (Magic Initiate's free-cast caveat).
+  note?: string;
   onClose: () => void;
-  onSave: (cantripChoices: string[], l1Choice: string | null) => void;
+  onSave: (cantripChoices: string[], l1Choices: string[]) => void;
 }
 
-// Magic Initiate spell picker. Surfaced at character creation when the
-// chosen background's origin feat is one of the three Magic Initiate
-// variants (arcane / divine / primal). Player picks N cantrips + 1 L1
-// spell from the matching spell list. Backend re-validates the shape +
-// content (existence, level, spellList tag) on session creation so the
-// dialog is defense-in-depth, not a security boundary.
-//
-// Save is gated on the exact counts (cantrips === cantripCount,
-// l1Count === 1 → l1Choice set). The button label calls this out so
-// players know what's missing.
+// Shared spell picker — chooses N cantrips + M level-1 spells from a single
+// spell list. Used by both Magic Initiate (origin feat, M = 1) and the caster
+// creation spell picker (M > 1). Both cantrips and L1 are capped multi-selects.
+// The backend re-validates picks (existence, level, spellList tag, counts) on
+// session creation, so this dialog is defense-in-depth, not a security boundary.
 function SpellPickerDialog({
   featName,
   spellList,
@@ -45,11 +40,12 @@ function SpellPickerDialog({
   spells,
   initialCantrips,
   initialL1,
+  note,
   onClose,
   onSave,
 }: Props) {
   const [cantrips, setCantrips] = useState<string[]>(initialCantrips);
-  const [l1, setL1] = useState<string | null>(initialL1);
+  const [l1, setL1] = useState<string[]>(initialL1);
 
   const cantripOptions = useMemo(
     () => spells.filter((s) => s.level === 0 && s.spellList.includes(spellList)),
@@ -60,17 +56,25 @@ function SpellPickerDialog({
     [spells, spellList]
   );
 
-  function toggleCantrip(id: string) {
-    setCantrips((prev) => {
+  const cappedToggle = (setter: Dispatch<SetStateAction<string[]>>, cap: number, id: string) =>
+    setter((prev) => {
       if (prev.includes(id)) return prev.filter((p) => p !== id);
-      if (prev.length >= cantripCount) return prev;
+      if (prev.length >= cap) return prev;
       return [...prev, id];
     });
-  }
 
   const cantripsComplete = cantrips.length === cantripCount;
-  const l1Complete = l1Count === 0 || !!l1;
+  const l1Complete = l1.length === l1Count;
   const canSave = cantripsComplete && l1Complete;
+
+  const remaining = [
+    cantripCount - cantrips.length > 0
+      ? `${cantripCount - cantrips.length} more cantrip${cantripCount - cantrips.length === 1 ? '' : 's'}`
+      : null,
+    l1Count - l1.length > 0
+      ? `${l1Count - l1.length} more L1 spell${l1Count - l1.length === 1 ? '' : 's'}`
+      : null,
+  ].filter(Boolean);
 
   return (
     <Dialog
@@ -89,9 +93,9 @@ function SpellPickerDialog({
           }}
         >
           Pick {cantripCount} cantrip{cantripCount === 1 ? '' : 's'}
-          {l1Count > 0 ? ` and ${l1Count} level-1 spell` : ''} from the{' '}
-          <span style={{ color: 'var(--t-primary)' }}>{spellList}</span> spell list. The level-1
-          spell can be cast once per long rest without expending a slot.
+          {l1Count > 0 ? ` and ${l1Count} level-1 spell${l1Count === 1 ? '' : 's'}` : ''} from the{' '}
+          <span style={{ color: 'var(--t-primary)' }}>{spellList}</span> spell list.
+          {note ? ` ${note}` : ''}
         </p>
 
         <h3
@@ -127,7 +131,7 @@ function SpellPickerDialog({
                       type="checkbox"
                       checked={picked}
                       disabled={limitHit}
-                      onChange={() => toggleCantrip(s.id)}
+                      onChange={() => cappedToggle(setCantrips, cantripCount, s.id)}
                       data-testid={`spell-picker-cantrip-input-${s.id}`}
                     />
                     <span style={{ flex: 1 }}>
@@ -152,7 +156,7 @@ function SpellPickerDialog({
                 textTransform: 'uppercase',
               }}
             >
-              Level-1 spell ({l1 ? '1' : '0'}/{l1Count})
+              Level-1 spell{l1Count === 1 ? '' : 's'} ({l1.length}/{l1Count})
             </h3>
             <div className={styles.invBody}>
               {l1Options.length === 0 ? (
@@ -160,30 +164,35 @@ function SpellPickerDialog({
                   No level-1 spells available on the {spellList} list.
                 </p>
               ) : (
-                l1Options.map((s) => (
-                  <div
-                    key={s.id}
-                    className={styles.invItem}
-                    data-testid={`spell-picker-l1-${s.id}`}
-                  >
-                    <label
-                      style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}
-                      className={styles.invItemHeader}
+                l1Options.map((s) => {
+                  const picked = l1.includes(s.id);
+                  const limitHit = !picked && l1.length >= l1Count;
+                  return (
+                    <div
+                      key={s.id}
+                      className={styles.invItem}
+                      data-testid={`spell-picker-l1-${s.id}`}
+                      style={limitHit ? { opacity: 0.55 } : undefined}
                     >
-                      <input
-                        type="radio"
-                        name="spell-picker-l1"
-                        checked={l1 === s.id}
-                        onChange={() => setL1(s.id)}
-                        data-testid={`spell-picker-l1-input-${s.id}`}
-                      />
-                      <span style={{ flex: 1 }}>
-                        <span className={styles.invItemName}>{s.name}</span>
-                        <div className={styles.invItemDesc}>{s.desc}</div>
-                      </span>
-                    </label>
-                  </div>
-                ))
+                      <label
+                        style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}
+                        className={styles.invItemHeader}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={picked}
+                          disabled={limitHit}
+                          onChange={() => cappedToggle(setL1, l1Count, s.id)}
+                          data-testid={`spell-picker-l1-input-${s.id}`}
+                        />
+                        <span style={{ flex: 1 }}>
+                          <span className={styles.invItemName}>{s.name}</span>
+                          <div className={styles.invItemDesc}>{s.desc}</div>
+                        </span>
+                      </label>
+                    </div>
+                  );
+                })
               )}
             </div>
           </>
@@ -191,12 +200,7 @@ function SpellPickerDialog({
       </div>
 
       <div
-        style={{
-          display: 'flex',
-          gap: '0.5rem',
-          justifyContent: 'flex-end',
-          marginTop: '1rem',
-        }}
+        style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1rem' }}
       >
         <button className={styles.invBtn} onClick={onClose} data-testid="spell-picker-cancel">
           Cancel
@@ -210,9 +214,7 @@ function SpellPickerDialog({
           }}
           data-testid="spell-picker-save"
         >
-          {canSave
-            ? 'Save spell choices'
-            : `Pick ${cantripCount - cantrips.length} more cantrip${cantripCount - cantrips.length === 1 ? '' : 's'}${l1Count > 0 && !l1 ? ' + 1 L1 spell' : ''}`}
+          {canSave ? 'Save spell choices' : `Pick ${remaining.join(' + ')}`}
         </button>
       </div>
     </Dialog>

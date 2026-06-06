@@ -77,7 +77,7 @@ describe('SpellPickerDialog', () => {
         l1Count={1}
         spells={SPELLS}
         initialCantrips={[]}
-        initialL1={null}
+        initialL1={[]}
         onClose={() => {}}
         onSave={() => {}}
       />
@@ -101,7 +101,7 @@ describe('SpellPickerDialog', () => {
         l1Count={1}
         spells={SPELLS}
         initialCantrips={[]}
-        initialL1={null}
+        initialL1={[]}
         onClose={() => {}}
         onSave={() => {}}
       />
@@ -121,7 +121,7 @@ describe('SpellPickerDialog', () => {
         l1Count={1}
         spells={SPELLS}
         initialCantrips={[]}
-        initialL1={null}
+        initialL1={[]}
         onClose={() => {}}
         onSave={() => {}}
       />
@@ -146,7 +146,7 @@ describe('SpellPickerDialog', () => {
         l1Count={0}
         spells={SPELLS}
         initialCantrips={[]}
-        initialL1={null}
+        initialL1={[]}
         onClose={() => {}}
         onSave={() => {}}
       />
@@ -166,7 +166,7 @@ describe('SpellPickerDialog', () => {
         l1Count={0}
         spells={SPELLS}
         initialCantrips={[]}
-        initialL1={null}
+        initialL1={[]}
         onClose={() => {}}
         onSave={() => {}}
       />
@@ -190,7 +190,7 @@ describe('SpellPickerDialog', () => {
         l1Count={1}
         spells={SPELLS}
         initialCantrips={[]}
-        initialL1={null}
+        initialL1={[]}
         onClose={onClose}
         onSave={onSave}
       />
@@ -202,7 +202,7 @@ describe('SpellPickerDialog', () => {
     expect(onSave).toHaveBeenCalledTimes(1);
     const [cantrips, l1] = onSave.mock.calls[0];
     expect(cantrips.sort()).toEqual(['fire_bolt', 'mage_hand']);
-    expect(l1).toBe('magic_missile');
+    expect(l1).toEqual(['magic_missile']);
     expect(onClose).toHaveBeenCalled();
   });
 
@@ -215,7 +215,7 @@ describe('SpellPickerDialog', () => {
         l1Count={1}
         spells={SPELLS}
         initialCantrips={['fire_bolt', 'mage_hand']}
-        initialL1="magic_missile"
+        initialL1={['magic_missile']}
         onClose={() => {}}
         onSave={() => {}}
       />
@@ -244,7 +244,7 @@ describe('SpellPickerDialog', () => {
         l1Count={1}
         spells={SPELLS}
         initialCantrips={[]}
-        initialL1={null}
+        initialL1={[]}
         onClose={onClose}
         onSave={onSave}
       />
@@ -253,6 +253,33 @@ describe('SpellPickerDialog', () => {
     fireEvent.click(getByTestId('spell-picker-cancel'));
     expect(onSave).not.toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('supports multi-select L1 (caster mode) with a cap and save gating', () => {
+    const onSave = vi.fn();
+    const { getByTestId } = render(
+      <SpellPickerDialog
+        featName="Wizard"
+        spellList="arcane"
+        cantripCount={1}
+        l1Count={2}
+        spells={SPELLS}
+        initialCantrips={[]}
+        initialL1={[]}
+        onClose={() => {}}
+        onSave={onSave}
+      />
+    );
+    const save = getByTestId('spell-picker-save') as HTMLButtonElement;
+    fireEvent.click(getByTestId('spell-picker-cantrip-input-fire_bolt'));
+    fireEvent.click(getByTestId('spell-picker-l1-input-magic_missile'));
+    expect(save.disabled).toBe(true); // only 1 of 2 L1 picked
+    fireEvent.click(getByTestId('spell-picker-l1-input-shield'));
+    expect(save.disabled).toBe(false);
+    fireEvent.click(save);
+    const [cantrips, l1] = onSave.mock.calls[0];
+    expect(cantrips).toEqual(['fire_bolt']);
+    expect([...l1].sort()).toEqual(['magic_missile', 'shield']);
   });
 
   it('omits the L1 section when l1Count is 0', () => {
@@ -264,7 +291,7 @@ describe('SpellPickerDialog', () => {
         l1Count={0}
         spells={SPELLS}
         initialCantrips={[]}
-        initialL1={null}
+        initialL1={[]}
         onClose={() => {}}
         onSave={() => {}}
       />

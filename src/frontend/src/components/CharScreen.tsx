@@ -194,6 +194,9 @@ interface CharDraft {
   // first proficiencies, shown pre-selected). Cleared on class change; stale
   // picks are filtered against the live proficiency pool.
   rogueExpertise?: string[];
+  // SRD caster spell picks (cantrips + level-1 spells). Undefined = the default
+  // pre-selection from the BE summary. Cleared on class change.
+  casterSpells?: { cantrips: string[]; l1: string[] };
 }
 
 // 'sleight_of_hand' → 'Sleight of Hand'. Skill ids are snake_case.
@@ -403,8 +406,10 @@ function CharScreen({
   // empty until the request resolves. The picker trigger button stays
   // hidden until the data is ready so players can't open an empty dialog.
   const [beContexts, setBeContexts] = useState<Record<string, BackendContextSummary>>({});
-  // Which party-member index has the spell picker open. null = closed.
+  // Which party-member index has the Magic Initiate spell picker open. null = closed.
   const [spellPickerIdx, setSpellPickerIdx] = useState<number | null>(null);
+  // Which party-member index has the caster spell picker open. null = closed.
+  const [casterPickerIdx, setCasterPickerIdx] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -692,6 +697,7 @@ function CharScreen({
           divine_order: d.divineOrder,
           divine_order_cantrip: d.divineOrder === 'thaumaturge' ? d.divineOrderCantrip : undefined,
           rogue_expertise: d.rogueExpertise,
+          caster_spells: d.casterSpells,
         })),
         contextId
       );
@@ -849,6 +855,7 @@ function CharScreen({
                             divineOrder: undefined,
                             divineOrderCantrip: undefined,
                             rogueExpertise: undefined,
+                            casterSpells: undefined,
                           })
                         }
                       >
@@ -1435,6 +1442,34 @@ function CharScreen({
                                 {complete
                                   ? `✓ ${inputs.featName} — ${cantripsPicked} cantrips + ${l1Picked ? '1' : '0'} L1 chosen (click to change)`
                                   : `⚠ ${inputs.featName} — pick ${inputs.cantripCount} cantrips${inputs.l1Count > 0 ? ' + 1 L1 spell' : ''}`}
+                              </button>
+                            );
+                          })()}
+                          {/* Caster spell picker — full casters choose their starting
+                        cantrips + level-1 spells. Defaults are pre-filled (valid), so
+                        this is opt-in customization, not a required gate. */}
+                          {(() => {
+                            const choice = beContexts[contextId]?.casterSpellChoices?.[draft.cls];
+                            if (!choice) return null;
+                            const picked = draft.casterSpells ?? {
+                              cantrips: choice.defaultCantrips,
+                              l1: choice.defaultL1,
+                            };
+                            return (
+                              <button
+                                type="button"
+                                className={styles.formInp}
+                                style={{
+                                  cursor: 'pointer',
+                                  marginTop: 8,
+                                  color: 'var(--t-primary)',
+                                  borderColor: 'var(--t-primary)',
+                                  textAlign: 'left',
+                                }}
+                                onClick={() => setCasterPickerIdx(idx)}
+                                data-testid={`caster-spells-trigger-${idx}`}
+                              >
+                                {`✦ Spells — ${picked.cantrips.length} cantrips + ${picked.l1.length} level-1 (click to choose)`}
                               </button>
                             );
                           })()}
@@ -2076,15 +2111,37 @@ function CharScreen({
               l1Count={inputs.l1Count}
               spells={beCtx?.spells ?? []}
               initialCantrips={draft.featChoices?.cantripChoices ?? []}
-              initialL1={draft.featChoices?.l1Choice ?? null}
+              initialL1={draft.featChoices?.l1Choice ? [draft.featChoices.l1Choice] : []}
+              note="The level-1 spell can be cast once per long rest without expending a slot."
               onClose={() => setSpellPickerIdx(null)}
-              onSave={(cantripChoices, l1Choice) => {
+              onSave={(cantripChoices, l1Choices) => {
                 updateDraft(spellPickerIdx, {
-                  featChoices: {
-                    cantripChoices,
-                    l1Choice: l1Choice ?? undefined,
-                  },
+                  featChoices: { cantripChoices, l1Choice: l1Choices[0] ?? undefined },
                 });
+              }}
+            />
+          );
+        })()}
+
+      {/* Caster spell picker — chosen cantrips + level-1 spells for a full caster. */}
+      {casterPickerIdx !== null &&
+        (() => {
+          const draft = party[casterPickerIdx];
+          const beCtx = beContexts[contextId];
+          const choice = beCtx?.casterSpellChoices?.[draft.cls];
+          if (!choice) return null;
+          return (
+            <SpellPickerDialog
+              featName={draft.cls}
+              spellList={choice.spellList}
+              cantripCount={choice.cantripCount}
+              l1Count={choice.l1Count}
+              spells={beCtx?.spells ?? []}
+              initialCantrips={draft.casterSpells?.cantrips ?? choice.defaultCantrips}
+              initialL1={draft.casterSpells?.l1 ?? choice.defaultL1}
+              onClose={() => setCasterPickerIdx(null)}
+              onSave={(cantrips, l1) => {
+                updateDraft(casterPickerIdx, { casterSpells: { cantrips, l1 } });
               }}
             />
           );

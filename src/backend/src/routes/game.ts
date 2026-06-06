@@ -35,12 +35,16 @@ import {
 } from '../services/rulesEngine.js';
 import { Request, Response, Router } from 'express';
 import {
+  SRD_CASTER_SPELL_COUNTS,
   SRD_DEFAULT_WEAPON_MASTERIES,
   SRD_SPECIES,
   SRD_WEAPON_MASTERY_SLOTS,
+  casterSpellCounts,
+  defaultCasterSpells,
   defaultClassSkills,
   defaultWeaponMasteries,
   masterableWeapons,
+  resolveCasterSpells,
   resolveClassSkills,
   resolveStartingEquipment,
   resolveWeaponMasteries,
@@ -65,6 +69,12 @@ import {
 } from '../services/campaignEngine.js';
 import { broadcastParticipantChange, broadcastSessionState } from '../services/broadcast.js';
 import {
+  casterSpellOptions,
+  classSpellListTag,
+  expertiseSlotsForClassLevel,
+  resolveCreationExpertise,
+} from '../services/multiclass.js';
+import {
   clearInstance,
   equippedArmorId,
   equippedShieldId,
@@ -73,7 +83,6 @@ import {
   slotsForInstance,
   toggleWornItem,
 } from '../services/equipment.js';
-import { expertiseSlotsForClassLevel, resolveCreationExpertise } from '../services/multiclass.js';
 import type { AuthedRequest } from '../auth/middleware.js';
 import { applyCreationDivineOrder } from '../services/actions/meta.js';
 import { applyFeatTake } from '../services/feats.js';
@@ -242,6 +251,31 @@ gameRouter.get('/contexts', (_req, res) => {
         )
         .map((s) => ({ id: s.id, name: s.name }))
         .sort((a, b) => a.name.localeCompare(b.name)),
+      // Caster spell picks at creation — per full-caster class, the spell-list
+      // tag + how many cantrips / level-1 spells to choose + the default
+      // pre-selection. The FE filters the `spells` array above by the tag.
+      casterSpellChoices: Object.fromEntries(
+        Object.keys(c.classPrimaryStats)
+          .map((cls) => {
+            const tag = classSpellListTag(cls);
+            if (!tag || !(cls in SRD_CASTER_SPELL_COUNTS)) return null;
+            const available = casterSpellOptions(cls, c.spellTable ?? {});
+            const counts = casterSpellCounts(cls, available);
+            if (!counts || counts.cantrips + counts.l1 === 0) return null;
+            const def = defaultCasterSpells(cls, available, c.classSpells?.[cls] ?? []);
+            return [
+              cls,
+              {
+                spellList: tag,
+                cantripCount: counts.cantrips,
+                l1Count: counts.l1,
+                defaultCantrips: def.cantrips,
+                defaultL1: def.l1,
+              },
+            ] as const;
+          })
+          .filter((e): e is NonNullable<typeof e> => e !== null)
+      ),
       // SRD Expertise slots a class grants at level 1 (Rogue: 2), for the
       // creation picker. Only the count travels — the eligible skills are the
       // character's proficiencies (class + background + species), which the
@@ -490,6 +524,22 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
         SRD_DEFAULT_WEAPON_MASTERIES[c.character_class] ?? []
       );
 
+      // Caster spell picks (level 1) — the player-chosen (or default) cantrips +
+      // level-1 spells become `spells_known`. Non-caster / half-caster classes
+      // keep the curated `classSpells` default. (Re-validated server-side.)
+      const curatedKnown = ctx.classSpells?.[c.character_class] ?? [];
+      const casterStartingSpells = (() => {
+        if (!(c.character_class in SRD_CASTER_SPELL_COUNTS)) return curatedKnown;
+        const available = casterSpellOptions(c.character_class, ctx.spellTable ?? {});
+        const picks = resolveCasterSpells(
+          c.character_class,
+          c.caster_spells,
+          available,
+          curatedKnown
+        );
+        return [...picks.cantrips, ...picks.l1];
+      })();
+
       const builtChar: Character = {
         id: randomUUID(),
         name: c.name,
@@ -535,7 +585,7 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
         // creation, replacing the old per-context classSpellSlots table.
         spell_slots_max: spellSlotsForClassLevel(c.character_class.toLowerCase(), 1),
         spell_slots_used: {},
-        spells_known: ctx.classSpells?.[c.character_class] ?? [],
+        spells_known: casterStartingSpells,
         armor_proficiencies: armorProfs,
         weapon_proficiencies: weaponProfs,
         // SRD Weapon Mastery — the player-chosen (or default) mastered
@@ -569,12 +619,7 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
         // Species innate cantrips merged into spells_known so the engine
         // surfaces them without slot cost.
         ...(speciesData.innateCantrips && speciesData.innateCantrips.length > 0
-          ? {
-              spells_known: [
-                ...(ctx.classSpells?.[c.character_class] ?? []),
-                ...speciesData.innateCantrips,
-              ],
-            }
+          ? { spells_known: [...casterStartingSpells, ...speciesData.innateCantrips] }
           : {}),
       };
       // SRD Cleric Divine Order (level 1) — apply the creation-screen pick.

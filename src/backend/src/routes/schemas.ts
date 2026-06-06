@@ -82,6 +82,16 @@ const CharacterInputSchema = z
     // must be one of the character's proficient skills; re-validated server-
     // side, with an invalid/omitted list falling back to the first proficiencies.
     rogue_expertise: z.array(z.string().min(1).max(40)).max(8).optional(),
+    // SRD caster spell picks at creation — chosen cantrips + level-1 spells from
+    // the class's spell list. Re-validated server-side against the class's
+    // options + counts; an invalid/omitted pick falls back to the curated default.
+    caster_spells: z
+      .object({
+        cantrips: z.array(z.string().min(1).max(60)).max(12).optional(),
+        l1: z.array(z.string().min(1).max(60)).max(12).optional(),
+      })
+      .strict()
+      .optional(),
     feat_choices: FeatChoicesSchema.optional(),
     // 2024 background ability-score increase. Omitted = +1 to all three of the
     // background's listed abilities; supplied = +2 to `plus2` and +1 to `plus1`

@@ -24,6 +24,10 @@ export {
   defaultClassSkills,
   defaultWeaponMasteries,
   weaponMasterySlotsForLevel,
+  SRD_CASTER_SPELL_COUNTS,
+  casterSpellCounts,
+  defaultCasterSpells,
+  resolveCasterSpells,
 } from './classes.js';
 export type { EquipmentPackage } from './classes.js';
 export { BEAST_FORMS, maxBeastCRForLevel, availableBeastForms } from './beast_forms.js';
