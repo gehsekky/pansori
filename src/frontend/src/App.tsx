@@ -137,6 +137,9 @@ export default function App() {
   // Whether to surface the ADMIN entry on the sessions screen: site admins
   // always; otherwise anyone holding an owner/editor role on any campaign.
   const [canAdmin, setCanAdmin] = useState(false);
+  // Deep-linked creator selection (/creator/<campaign id>) — consumed by
+  // AdminScreen as its initial selection when the creator view opens.
+  const [creatorCampaignId, setCreatorCampaignId] = useState<string | null>(null);
   const [mapOpen, setMapOpen] = useState(false);
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
@@ -241,6 +244,14 @@ export default function App() {
             window.history.replaceState(null, '', '/');
             return loadSessions();
           }
+        }
+        // Creator deep link: /creator or /creator/<campaign id> — reopens
+        // the creator view (with that campaign selected) across refreshes.
+        const creatorMatch = window.location.pathname.match(/^\/creator(?:\/([a-z0-9_-]+))?\/?$/i);
+        if (creatorMatch) {
+          setCreatorCampaignId(creatorMatch[1] ?? null);
+          setView('creator');
+          return;
         }
         // Game deep link: /game/<session id>. The bare legacy form
         // /<session id> (pre-/game/ routing) still resumes — old bookmarks
@@ -391,7 +402,11 @@ export default function App() {
           onClearCompleted={handleClearCompleted}
           onAbout={() => setAboutOpen(true)}
           onAdmin={canAdmin ? () => setView('admin') : undefined}
-          onCreator={() => setView('creator')}
+          onCreator={() => {
+            setCreatorCampaignId(null);
+            window.history.pushState(null, '', '/creator');
+            setView('creator');
+          }}
           contexts={CONTEXTS}
         />
       )}
@@ -410,7 +425,14 @@ export default function App() {
         <AdminScreen
           user={user}
           mode="creator"
+          initialCampaignId={creatorCampaignId}
+          onSelectCampaign={(id) =>
+            // replaceState (not push): selection changes shouldn't pile up
+            // history entries — the creator view itself is the destination.
+            window.history.replaceState(null, '', id ? `/creator/${id}` : '/creator')
+          }
           onBack={() => {
+            window.history.replaceState(null, '', '/');
             loadSessions();
           }}
         />

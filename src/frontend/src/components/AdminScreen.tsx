@@ -38,10 +38,19 @@ function AdminScreen({
   user,
   onBack,
   mode = 'admin',
+  initialCampaignId,
+  onSelectCampaign,
 }: {
   user: AuthUser;
   onBack: () => void;
   mode?: 'admin' | 'creator';
+  // Deep-link support (/creator/<campaign id>): pre-select this campaign
+  // once the list loads, falling back to the usual auto-select when the
+  // id is unknown or not workable by this user.
+  initialCampaignId?: string | null;
+  // Selection→URL sync: fired with the selected campaign id (null when
+  // nothing is selected) so the parent can keep the address bar current.
+  onSelectCampaign?: (id: string | null) => void;
 }) {
   const [campaigns, setCampaigns] = useState<CampaignListing[]>([]);
   const [campaignsErr, setCampaignsErr] = useState<string | null>(null);
@@ -76,12 +85,32 @@ function AdminScreen({
       .listCampaigns()
       .then((list) => {
         setCampaigns(list);
-        // Auto-select the first campaign the user can administer.
-        const first = list.find((c) => c.my_role === 'owner' || c.my_role === 'editor');
+        // Deep-linked campaign first (if this user can work on it), then
+        // the first campaign the user can administer.
+        const workable = (c: CampaignListing) => c.my_role === 'owner' || c.my_role === 'editor';
+        const initial = initialCampaignId
+          ? list.find((c) => c.id === initialCampaignId && workable(c))
+          : undefined;
+        const first = initial ?? list.find(workable);
         if (first) setSelectedId(first.id);
       })
       .catch(() => setCampaignsErr('Could not load campaigns.'));
+    // Mount-only by design: initialCampaignId only matters for the first
+    // load — afterwards the user's clicks own the selection.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Keep the parent (and so the URL) in sync with the selection — but only
+  // once the campaign list has loaded. Before that, selectedId is still the
+  // initial null and syncing would clobber a /creator/<id> deep link that
+  // is about to resolve into a selection.
+  useEffect(() => {
+    if (campaigns.length === 0) return;
+    onSelectCampaign?.(selectedId);
+    // onSelectCampaign identity is unstable in the parent (inline arrow);
+    // syncing on selection/load change only is the intent.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId, campaigns.length]);
 
   const loadMembers = useCallback((campaignId: string) => {
     setMembers([]);

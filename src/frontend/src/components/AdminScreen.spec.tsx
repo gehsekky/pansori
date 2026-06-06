@@ -169,6 +169,38 @@ describe('AdminScreen', () => {
     expect(screen.queryByText('Secret Realm')).toBeNull();
   });
 
+  it('deep-links select the initial campaign and report selection changes', async () => {
+    mocked.listCampaigns.mockResolvedValue([
+      { id: 'malgovia', name: 'Malgovia', visibility: 'global', my_role: 'owner' },
+      { id: 'sandbox', name: 'Dev Sandbox', visibility: 'global', my_role: 'owner' },
+    ]);
+    mocked.listCampaignMembers.mockResolvedValue(MEMBERS);
+    const onSelectCampaign = vi.fn();
+    render(
+      <AdminScreen
+        user={OWNER_USER}
+        onBack={vi.fn()}
+        mode="creator"
+        initialCampaignId="sandbox"
+        onSelectCampaign={onSelectCampaign}
+      />
+    );
+    // The deep-linked campaign wins over the first-workable default…
+    expect(await screen.findByText('MEMBERS — DEV SANDBOX')).toBeTruthy();
+    await waitFor(() => expect(onSelectCampaign).toHaveBeenLastCalledWith('sandbox'));
+    // …and clicking another campaign reports the new selection.
+    fireEvent.click(screen.getByText('Malgovia'));
+    await waitFor(() => expect(onSelectCampaign).toHaveBeenLastCalledWith('malgovia'));
+  });
+
+  it('falls back to the first workable campaign when the deep link is unknown', async () => {
+    mockCampaigns('owner');
+    render(
+      <AdminScreen user={OWNER_USER} onBack={vi.fn()} mode="creator" initialCampaignId="nope" />
+    );
+    expect(await screen.findByText('MEMBERS — MALGOVIA')).toBeTruthy();
+  });
+
   it('creator mode shows an empty state when the user works on nothing', async () => {
     mocked.listCampaigns.mockResolvedValue([
       { id: 'malgovia', name: 'Malgovia', visibility: 'global', my_role: null },
