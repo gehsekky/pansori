@@ -393,7 +393,7 @@ export const SRD_CLASS_STARTING_EQUIPMENT: Record<string, EquipmentPackage[]> = 
     {
       id: 'B',
       label: 'Skirmisher',
-      items: ['studded_leather', 'shortsword', 'shortsword', 'longbow'],
+      items: ['studded_leather', 'shortsword', 'shortsword', 'longbow', 'arrows'],
       gold: 11,
     },
     { id: 'C', label: 'Gold only', items: [], gold: 155 },
@@ -415,7 +415,7 @@ export const SRD_CLASS_STARTING_EQUIPMENT: Record<string, EquipmentPackage[]> = 
     {
       id: 'A',
       label: 'Studded leather & bow',
-      items: ['studded_leather', 'shortsword', 'shortsword', 'longbow'],
+      items: ['studded_leather', 'shortsword', 'shortsword', 'longbow', 'arrows'],
       gold: 7,
     },
     { id: 'B', label: 'Gold only', items: [], gold: 150 },
@@ -424,7 +424,7 @@ export const SRD_CLASS_STARTING_EQUIPMENT: Record<string, EquipmentPackage[]> = 
     {
       id: 'A',
       label: 'Leather, blades & bow',
-      items: ['leather_armor', 'dagger', 'dagger', 'shortsword', 'shortbow'],
+      items: ['leather_armor', 'dagger', 'dagger', 'shortsword', 'shortbow', 'arrows'],
       gold: 8,
     },
     { id: 'B', label: 'Gold only', items: [], gold: 100 },

@@ -461,10 +461,14 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
       const firstShield = startingInventory.find(
         (i) => ctx.lootTable.find((l) => l.id === i.id)?.slot === 'shield'
       );
+      const firstAmmo = startingInventory.find(
+        (i) => ctx.lootTable.find((l) => l.id === i.id)?.slot === 'quiver'
+      );
 
       const equippedWeapon = firstWeapon?.instance_id ?? null;
       const equippedArmor = firstArmor?.instance_id ?? null;
       const equippedShield = firstShield?.instance_id ?? null;
+      const equippedQuiver = firstAmmo?.instance_id ?? null;
 
       const initialAc = computeTotalAc(
         base.dex ?? 10,
@@ -508,6 +512,7 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
           ...(equippedWeapon ? { main_hand: equippedWeapon } : {}),
           ...(equippedArmor ? { armor: equippedArmor } : {}),
           ...(equippedShield ? { shield: equippedShield } : {}),
+          ...(equippedQuiver ? { quiver: equippedQuiver } : {}),
         },
         conditions: [],
         condition_durations: {},

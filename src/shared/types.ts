@@ -1196,7 +1196,8 @@ export type EquipSlot =
   | 'waist'
   | 'feet'
   | 'ring_1'
-  | 'ring_2';
+  | 'ring_2'
+  | 'quiver';
 
 export const EQUIP_SLOTS: EquipSlot[] = [
   'main_hand',
@@ -1212,6 +1213,7 @@ export const EQUIP_SLOTS: EquipSlot[] = [
   'feet',
   'ring_1',
   'ring_2',
+  'quiver',
 ];
 
 // The body-slot *category* an item declares (LootItem.slot). 'weapon' maps to
@@ -1230,7 +1232,8 @@ export type ItemSlot =
   | 'arms'
   | 'waist'
   | 'feet'
-  | 'ring';
+  | 'ring'
+  | 'quiver';
 
 /**
  * A passive effect an item confers while WORN in its body slot (and attuned, if
@@ -1311,6 +1314,9 @@ export interface LootItem {
     vsCreatureTypes?: string[];
     burn?: string;
   };
+  // Default stack size for a stackable item (ammunition — e.g. a bundle of 20
+  // Arrows). Carried onto the inventory item; ranged attacks decrement it.
+  count?: number;
 }
 
 /**

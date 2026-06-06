@@ -149,27 +149,43 @@ export function runPreattack(
 
   // ── Ammunition check (SRD) ──────────────────────────────────────
   if (weaponItem?.range === 'ranged' && !weaponItem.thrown) {
-    // NOTE: order matters. 'hand_crossbow' includes both 'bow' and
-    // 'crossbow' as substrings, so 'crossbow' must be checked first
-    // or all crossbows would incorrectly look for arrows.
+    // NOTE: order matters. 'hand_crossbow' includes both 'bow' and 'crossbow',
+    // so 'crossbow' (and 'blowgun', which must beat 'bow') are checked first.
+    // Firearms (musket/pistol) use their own bullets, distinct from a sling's.
     const ammoTypes: Record<string, string[]> = {
       crossbow: ['bolt', 'bolts'],
+      blowgun: ['needle', 'needles'],
       bow: ['arrow', 'arrows'],
-      sling: ['bullet', 'bullets', 'sling_bullet'],
+      sling: ['sling_bullet', 'sling_bullets'],
+      musket: ['firearm_bullet', 'firearm_bullets'],
+      pistol: ['firearm_bullet', 'firearm_bullets'],
     };
     const wepKey = Object.keys(ammoTypes).find((k) => weaponItem.id.includes(k)) ?? 'arrow';
     const ammoIds = ammoTypes[wepKey] ?? ['arrow', 'arrows'];
-    const ammoIdx = pc.char.inventory.findIndex((i) => ammoIds.some((a) => i.id.includes(a)));
+    const matches = (i: InventoryItem) => ammoIds.some((a) => i.id.includes(a));
+    // Prefer the ammo equipped in the quiver slot; fall back to any matching
+    // bundle loose in the pack (so unequipped ammo still fires).
+    const quiverInst = pc.char.equipment?.quiver;
+    let ammoIdx = quiverInst
+      ? pc.char.inventory.findIndex((i) => i.instance_id === quiverInst && matches(i))
+      : -1;
+    if (ammoIdx === -1) ammoIdx = pc.char.inventory.findIndex(matches);
     if (ammoIdx === -1) {
       ctx.narrative = `You have no ammunition for your ${weaponItem.name}.`;
       return { done: true };
     }
     const ammoItem = pc.char.inventory[ammoIdx];
-    const ammoCount = (ammoItem.count as number | undefined) ?? 1;
+    const ammoCount = ammoItem.count ?? 1;
     if (ammoCount <= 1) {
-      updatePcActor(ctx, {
-        inventory: pc.char.inventory.filter((_, i) => i !== ammoIdx),
-      });
+      // Stack spent — drop the bundle, and clear the quiver slot if this was
+      // the equipped one (so it doesn't dangle on a missing instance_id).
+      const nextInventory = pc.char.inventory.filter((_, i) => i !== ammoIdx);
+      if (pc.char.equipment?.quiver === ammoItem.instance_id) {
+        const { quiver: _drop, ...restEquip } = pc.char.equipment ?? {};
+        updatePcActor(ctx, { inventory: nextInventory, equipment: restEquip });
+      } else {
+        updatePcActor(ctx, { inventory: nextInventory });
+      }
     } else {
       updatePcActor(ctx, {
         inventory: pc.char.inventory.map((item, i) =>

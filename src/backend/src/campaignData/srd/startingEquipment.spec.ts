@@ -28,6 +28,16 @@ describe('SRD_CLASS_STARTING_EQUIPMENT', () => {
     expect(SRD_CLASS_STARTING_EQUIPMENT.Fighter.map((p) => p.id)).toEqual(['A', 'B', 'C']);
     expect(SRD_CLASS_STARTING_EQUIPMENT.Wizard).toHaveLength(2);
   });
+
+  it('every starting package with a bow also bundles arrows (so ranged starters can shoot)', () => {
+    for (const [cls, pkgs] of Object.entries(SRD_CLASS_STARTING_EQUIPMENT)) {
+      for (const pkg of pkgs) {
+        if (pkg.items.some((id) => id === 'longbow' || id === 'shortbow')) {
+          expect(pkg.items, `${cls} ${pkg.id}`).toContain('arrows');
+        }
+      }
+    }
+  });
 });
 
 describe('resolveStartingEquipment', () => {

@@ -1014,6 +1014,9 @@ export interface InventoryItem {
   instance_id: string;
   id: string;
   name: string;
+  // Stack size for stackable items (ammunition). Undefined ⇒ a single item.
+  // Ranged attacks decrement this; at 0 the item (and any quiver equip) is removed.
+  count?: number;
   [key: string]: unknown;
 }
 

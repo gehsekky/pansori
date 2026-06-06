@@ -46,6 +46,7 @@ const SLOT_LABELS: Record<EquipSlot, string> = {
   feet: 'FEET',
   ring_1: 'RING 1',
   ring_2: 'RING 2',
+  quiver: 'QUIVER',
 };
 // Always-visible core combat slots; other slots appear only once filled, so the
 // row stays compact for a lightly-equipped character.

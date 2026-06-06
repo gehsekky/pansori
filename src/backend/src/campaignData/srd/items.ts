@@ -1377,6 +1377,83 @@ export const SRD_ITEMS: Record<string, LootItem> = {
     effect: null,
     aliases: ['mess kit'],
   },
+
+  // ─── Ammunition ──────────────────────────────────────────────────────────────
+  // Stackable bundles (default 20) equipped into the `quiver` slot. A ranged
+  // attack with a matching weapon spends one (preattack.ts); when the stack hits
+  // 0 it's removed and the quiver slot cleared. Each id contains the substring
+  // the weapon→ammo map keys on (arrow / bolt / sling_bullet / needle /
+  // firearm_bullet) so the right ammo is matched to the right weapon.
+  arrows: {
+    id: 'arrows',
+    name: 'Arrows',
+    desc: 'A bundle of arrows for a shortbow or longbow.',
+    weight: 1,
+    type: 'misc',
+    slot: 'quiver',
+    damage: null,
+    ac_bonus: null,
+    heal: null,
+    effect: null,
+    aliases: ['arrows', 'arrow', 'quiver of arrows'],
+    count: 20,
+  },
+  crossbow_bolts: {
+    id: 'crossbow_bolts',
+    name: 'Crossbow Bolts',
+    desc: 'A case of bolts for a hand, light, or heavy crossbow.',
+    weight: 1,
+    type: 'misc',
+    slot: 'quiver',
+    damage: null,
+    ac_bonus: null,
+    heal: null,
+    effect: null,
+    aliases: ['crossbow bolts', 'bolts', 'bolt', 'case of bolts'],
+    count: 20,
+  },
+  sling_bullets: {
+    id: 'sling_bullets',
+    name: 'Sling Bullets',
+    desc: 'A pouch of lead bullets for a sling.',
+    weight: 1,
+    type: 'misc',
+    slot: 'quiver',
+    damage: null,
+    ac_bonus: null,
+    heal: null,
+    effect: null,
+    aliases: ['sling bullets', 'sling bullet'],
+    count: 20,
+  },
+  blowgun_needles: {
+    id: 'blowgun_needles',
+    name: 'Blowgun Needles',
+    desc: 'A tin of needles for a blowgun.',
+    weight: 1,
+    type: 'misc',
+    slot: 'quiver',
+    damage: null,
+    ac_bonus: null,
+    heal: null,
+    effect: null,
+    aliases: ['blowgun needles', 'needles', 'needle'],
+    count: 50,
+  },
+  firearm_bullets: {
+    id: 'firearm_bullets',
+    name: 'Firearm Bullets',
+    desc: 'A pouch of bullets for a musket or pistol.',
+    weight: 2,
+    type: 'misc',
+    slot: 'quiver',
+    damage: null,
+    ac_bonus: null,
+    heal: null,
+    effect: null,
+    aliases: ['firearm bullets', 'firearm bullet', 'gun bullets'],
+    count: 20,
+  },
 };
 
 /** Every SRD item id, for contexts that want the full catalog. */
