@@ -120,6 +120,40 @@ describe('CampaignContentEditor', () => {
     expect(await screen.findByText(/Invalid shape — genericArrival: Required/)).toBeTruthy();
   });
 
+  it('regions section offers PAINT buttons for saved regions', async () => {
+    mocked.listCampaignSections.mockResolvedValue([{ section: 'regions', source: 'db' }]);
+    mocked.getCampaignSection.mockResolvedValue({
+      section: 'regions',
+      source: 'db',
+      value: [{ id: 'vale', name: 'The Vale', isStartingRegion: true }],
+    });
+    const onEditRegion = vi.fn();
+    render(<CampaignContentEditor campaignId="malgovia" onEditRegion={onEditRegion} />);
+    fireEvent.click(await screen.findByText('REGIONS'));
+    fireEvent.click(await screen.findByRole('button', { name: /The Vale/ }));
+    expect(onEditRegion).toHaveBeenCalledWith('vale');
+  });
+
+  it('regions section with nothing saved offers the starter region flow', async () => {
+    mocked.listCampaignSections.mockResolvedValue([{ section: 'regions', source: 'none' }]);
+    mocked.getCampaignSection.mockResolvedValue({
+      section: 'regions',
+      source: 'none',
+      value: null,
+    });
+    mocked.putCampaignSection.mockResolvedValue({ ok: true, section: 'regions', source: 'db' });
+    render(<CampaignContentEditor campaignId="malgovia" onEditRegion={vi.fn()} />);
+    fireEvent.click(await screen.findByText('REGIONS'));
+    expect(await screen.findByText(/NO SAVED REGIONS YET/)).toBeTruthy();
+    fireEvent.click(screen.getByText('INSERT STARTER REGION'));
+    const textarea = screen.getByLabelText(/REGIONS/) as HTMLTextAreaElement;
+    expect(textarea.value).toContain('"region-1"');
+    expect(textarea.value).toContain('"isStartingRegion": true');
+    // Saving flips the section to db and surfaces the PAINT button.
+    fireEvent.click(screen.getByText('SAVE TO DATABASE'));
+    expect(await screen.findByRole('button', { name: /New Region/ })).toBeTruthy();
+  });
+
   it('reverts a DB section to code after confirm and reloads it', async () => {
     mocked.getCampaignSection
       .mockResolvedValueOnce({ section: 'narratives', source: 'db', value: { a: 1 } })

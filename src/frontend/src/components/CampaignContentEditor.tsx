@@ -47,6 +47,10 @@ function CampaignContentEditor({
   const [active, setActive] = useState<string | null>(null);
   const [activeSource, setActiveSource] = useState<CampaignSectionSource>('none');
   const [text, setText] = useState('');
+  // The section's last SAVED value — what the server (and so the region
+  // painter) actually has. The PAINT MAP buttons derive from this, not from
+  // the live textarea: painting an unsaved region would dead-end.
+  const [savedValue, setSavedValue] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -67,11 +71,13 @@ function CampaignContentEditor({
       setError(null);
       setSaved(false);
       setText('');
+      setSavedValue(null);
       api
         .getCampaignSection(campaignId, section)
         .then((s) => {
           setActiveSource(s.source);
           setText(s.value === null ? '' : JSON.stringify(s.value, null, 2));
+          setSavedValue(s.value);
         })
         .catch(() => setError('Could not load this section.'));
     },
@@ -94,12 +100,35 @@ function CampaignContentEditor({
       await api.putCampaignSection(campaignId, active, value);
       setActiveSource('db');
       setSections((prev) => prev.map((s) => (s.section === active ? { ...s, source: 'db' } : s)));
+      setSavedValue(value);
       setSaved(true);
     } catch (err) {
       setError(describeError(err));
     } finally {
       setBusy(false);
     }
+  }
+
+  // A minimal valid region to get a new campaign onto the map painter in
+  // one click: insert → SAVE → its PAINT button appears.
+  function starterRegionJson(): string {
+    const grid = Array.from({ length: 8 }, () =>
+      Array.from({ length: 10 }, () => ({ t: 'plains' }))
+    );
+    return JSON.stringify(
+      [
+        {
+          id: 'region-1',
+          name: 'New Region',
+          isStartingRegion: true,
+          feetPerSquare: 5280,
+          grid,
+          startPos: { x: 1, y: 1 },
+        },
+      ],
+      null,
+      2
+    );
   }
 
   async function handleRevert() {
@@ -171,20 +200,16 @@ function CampaignContentEditor({
 
       {active && (
         <>
-          {/* Region painter shortcuts — one per region currently in the
-              editor text (so unsaved JSON edits are reflected too). */}
+          {/* Region painter shortcuts — one per SAVED region (the painter
+              loads from the server, so unsaved regions can't be painted
+              yet). With nothing saved, offer a one-click starter region. */}
           {active === 'regions' &&
             onEditRegion &&
             (() => {
-              let parsed: Array<{ id?: string; name?: string }> = [];
-              try {
-                const v = JSON.parse(text);
-                if (Array.isArray(v)) parsed = v;
-              } catch {
-                /* not valid JSON right now — no shortcuts */
-              }
-              const regions = parsed.filter((r) => typeof r.id === 'string');
-              if (regions.length === 0) return null;
+              const savedRegions = (Array.isArray(savedValue) ? savedValue : []).filter(
+                (r): r is { id: string; name?: string } =>
+                  typeof (r as { id?: unknown }).id === 'string'
+              );
               return (
                 <div
                   style={{
@@ -195,17 +220,43 @@ function CampaignContentEditor({
                     alignItems: 'center',
                   }}
                 >
-                  <span style={{ fontSize: '0.7rem', color: 'var(--t-dim)' }}>PAINT MAP:</span>
-                  {regions.map((r) => (
-                    <button
-                      key={r.id}
-                      className={styles.ghostBtn}
-                      style={{ padding: '0.25rem 0.6rem', fontSize: '0.7rem' }}
-                      onClick={() => onEditRegion(r.id!)}
-                    >
-                      🗺 {r.name ?? r.id}
-                    </button>
-                  ))}
+                  {savedRegions.length > 0 ? (
+                    <>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--t-dim)' }}>PAINT MAP:</span>
+                      {savedRegions.map((r) => (
+                        <button
+                          key={r.id}
+                          className={styles.ghostBtn}
+                          style={{ padding: '0.25rem 0.6rem', fontSize: '0.7rem' }}
+                          onClick={() => onEditRegion(r.id)}
+                        >
+                          🗺 {r.name ?? r.id}
+                        </button>
+                      ))}
+                      <span style={{ fontSize: '0.7rem', color: 'var(--t-dim)' }}>
+                        (NEW REGIONS NEED A SAVE FIRST)
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--t-dim)' }}>
+                        NO SAVED REGIONS YET —
+                      </span>
+                      <button
+                        className={styles.ghostBtn}
+                        style={{ padding: '0.25rem 0.6rem', fontSize: '0.7rem' }}
+                        onClick={() => {
+                          setText(starterRegionJson());
+                          setSaved(false);
+                        }}
+                      >
+                        INSERT STARTER REGION
+                      </button>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--t-dim)' }}>
+                        THEN SAVE TO UNLOCK THE MAP PAINTER
+                      </span>
+                    </>
+                  )}
                 </div>
               );
             })()}
