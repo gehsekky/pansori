@@ -612,6 +612,10 @@ function CharScreen({
         portrait: null,
         rollCount: 1,
         statMethod: 'roll',
+        // Divine Order is required at BEGIN — auto-fill defaults a Cleric
+        // to Protector (same spirit as defaulting skills/equipment/
+        // masteries; the player can still switch to Thaumaturge).
+        ...(cls === 'Cleric' ? { divineOrder: 'protector' as const } : {}),
       }))
     );
   }

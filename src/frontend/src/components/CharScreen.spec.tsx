@@ -124,6 +124,29 @@ describe('CharScreen — Cleric Divine Order required at creation', () => {
     fireEvent.click(getByTestId('begin-adventure-btn'));
     await waitFor(() => expect(onStart).toHaveBeenCalledTimes(1));
   });
+
+  it('auto-fill produces a start-able party: the Cleric defaults to Protector', async () => {
+    // Regression (CI smoke breakage): auto-fill seeded a Cleric without a
+    // Divine Order, so BEGIN ADVENTURE was blocked by the required-order
+    // gate. Auto-fill must default every required choice.
+    const autoCtx: FrontendContext = {
+      ...clericCtx,
+      recommendedPartySize: 2,
+      recommendedComposition: ['Fighter', 'Cleric'],
+    };
+    const onStart = vi.fn().mockResolvedValue(undefined);
+    const { getByTestId } = render(
+      <CharScreen onStart={onStart} loading={false} availableContexts={[autoCtx]} user={null} />
+    );
+    fireEvent.click(getByTestId('auto-fill-party-btn'));
+    fireEvent.click(getByTestId('begin-adventure-btn'));
+    await waitFor(() => expect(onStart).toHaveBeenCalledTimes(1));
+    const characters = onStart.mock.calls[0][0] as Array<{
+      character_class: string;
+      divine_order?: string;
+    }>;
+    expect(characters.find((c) => c.character_class === 'Cleric')?.divine_order).toBe('protector');
+  });
 });
 
 // Caster spell picker — a full caster chooses cantrips + level-1 spells at
