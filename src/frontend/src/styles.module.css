@@ -1235,7 +1235,9 @@
 
 .sessionsInner {
   width: 100%;
-  max-width: 620px;
+  /* Sized for 1920×1080 desktop: a comfortable centered content column.
+     Narrower viewports just use the full width (pageFlex padding applies). */
+  max-width: 1200px;
   margin: 4rem auto;
 }
 
@@ -1253,8 +1255,10 @@
 }
 
 .sessionList {
-  display: flex;
-  flex-direction: column;
+  /* Fill the widened container: two columns of cards at desktop widths,
+     collapsing to one when a 480px card no longer fits. */
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(480px, 100%), 1fr));
   gap: 0.75rem;
 }
 
