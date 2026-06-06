@@ -74,6 +74,17 @@ export interface CampaignSectionValue extends CampaignSectionInfo {
   value: unknown;
 }
 
+// Catalog item — a full LootItem definition. The FE only inspects the
+// display fields; the rest rides along so a badge selection can be
+// PUT straight back as the lootTable section value.
+export interface CatalogItem {
+  id: string;
+  name: string;
+  type: 'weapon' | 'armor' | 'consumable' | 'misc';
+  desc: string;
+  [key: string]: unknown;
+}
+
 export interface ActionResult {
   narrative: string;
   choices: GameChoice[];
@@ -284,6 +295,9 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ visibility }),
     }),
+
+  // The global item catalog (SRD equipment) — drives the loot-table badge picker.
+  listItemCatalog: () => req<CatalogItem[]>('/campaigns/catalog/items'),
 
   // Content sections (editor+). PUT writes the DB version (live immediately);
   // DELETE reverts the section to the code-defined version.

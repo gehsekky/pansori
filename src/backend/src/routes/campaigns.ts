@@ -35,9 +35,22 @@ import {
 } from '../services/campaignMembers.js';
 import { requireAdmin, requireCampaignRole } from '../auth/middleware.js';
 import type { AuthedRequest } from '../auth/middleware.js';
+import { getItemCatalog } from '../services/itemCatalog.js';
 import { pool } from '../db/pool.js';
 
 export const campaignsRouter = Router();
+
+// The global item catalog (SRD equipment, full definitions) — feeds the
+// creator UI's loot-table badge picker. Catalog contents aren't secret
+// (it's the SRD), so plain requireAuth (mounted in index.ts) suffices.
+campaignsRouter.get('/catalog/items', async (_req: Request, res: Response) => {
+  try {
+    res.json(await getItemCatalog(pool));
+  } catch (err) {
+    console.error('[campaigns] item catalog read failed:', err);
+    res.status(500).json({ error: 'Failed to read item catalog' });
+  }
+});
 
 // Express types params as string | string[]; these routes never declare
 // repeatable params, so collapse to the string (requireCampaignRole already

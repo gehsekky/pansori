@@ -56,6 +56,16 @@ export async function syncItemCatalog(pool: Pool): Promise<void> {
   console.log(`[itemCatalog] Synced ${entries.length} catalog item(s)`);
 }
 
+// The full catalog, ordered for display (type groups, alphabetical within).
+// Serves the creator UI's badge picker — full definitions so a selection
+// can round-trip straight back through the lootTable section PUT.
+export async function getItemCatalog(pool: Pool): Promise<LootItem[]> {
+  const { rows } = await pool.query<{ definition: LootItem }>(
+    'SELECT definition FROM items ORDER BY type, name'
+  );
+  return rows.map((r) => r.definition);
+}
+
 // A campaign's DB loot table, resolved to full definitions in authored
 // order: override if present, else the catalog definition. Mappings whose
 // id has neither (catalog row removed from code) are skipped with a warn.
