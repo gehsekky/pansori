@@ -61,6 +61,26 @@ const NEW_MONSTERS: Array<[string, number, number, number, string, number, numbe
   ['priest', 2, 38, 13, '2d10', 5, 450, 2],
   ['mage', 6, 81, 15, '3d8+3', 6, 2300, 3],
   ['archmage', 12, 170, 17, '4d10+5', 9, 8000, 4],
+  // Batch 2026-06: beasts / humanoids / monstrosities / wyrmlings.
+  ['hyena', 0, 5, 11, '1d6', 2, 10],
+  ['giant_crab', 0.125, 13, 15, '1d6+1', 3, 25],
+  ['noble', 0.125, 9, 15, '1d8+1', 3, 25],
+  ['constrictor_snake', 0.25, 13, 13, '1d8+2', 4, 50],
+  ['giant_wolf_spider', 0.25, 11, 13, '1d4+3', 5, 50],
+  ['cockatrice', 0.5, 22, 11, '1d4+1', 3, 100],
+  ['crocodile', 0.5, 13, 12, '1d8+2', 4, 100],
+  ['tough', 0.5, 32, 12, '1d6+2', 4, 100],
+  ['satyr', 0.5, 31, 13, '1d4+3', 5, 100],
+  ['giant_hyena', 1, 45, 12, '2d6+3', 5, 200],
+  ['merrow', 2, 45, 13, '2d6+4', 6, 450, 2],
+  ['mimic', 2, 58, 12, '1d8+3', 5, 450],
+  ['awakened_tree', 2, 59, 13, '3d6+4', 6, 450],
+  ['white_dragon_wyrmling', 2, 32, 16, '1d8+2', 4, 450, 2],
+  ['black_dragon_wyrmling', 2, 33, 17, '1d6+2', 4, 450, 2],
+  ['ankheg', 2, 45, 14, '2d6+3', 5, 450],
+  ['minotaur', 3, 85, 14, '1d12+4', 6, 700],
+  ['giant_scorpion', 3, 52, 15, '1d8+3', 5, 700, 3],
+  ['warrior_veteran', 3, 65, 17, '2d6+3', 5, 700, 2],
 ];
 
 describe('SRD bestiary additions — core stat lines', () => {
@@ -374,5 +394,71 @@ describe('SRD bestiary additions — effect fields', () => {
 
   it('the shared pool grew well past the original 12', () => {
     expect(Object.keys(SRD_MONSTERS).length).toBeGreaterThanOrEqual(50);
+  });
+
+  // ── Batch 2026-06 effect fields ────────────────────────────────────────────
+
+  it('grapplers carry their RAW escape DCs', () => {
+    expect(SRD_MONSTERS.giant_crab.onHitEffect).toEqual({ condition: 'grappled', escapeDc: 11 });
+    expect(SRD_MONSTERS.crocodile.onHitEffect).toEqual({ condition: 'grappled', escapeDc: 12 });
+    expect(SRD_MONSTERS.constrictor_snake.onHitEffect).toEqual({
+      condition: 'grappled',
+      escapeDc: 12,
+    });
+    expect(SRD_MONSTERS.mimic.onHitEffect).toEqual({ condition: 'grappled', escapeDc: 13 });
+    expect(SRD_MONSTERS.ankheg.onHitEffect).toEqual({ condition: 'grappled', escapeDc: 13 });
+  });
+
+  it('pack hunters and the rampager carry their traits', () => {
+    expect(SRD_MONSTERS.hyena.packTactics).toBe(true);
+    expect(SRD_MONSTERS.tough.packTactics).toBe(true);
+    expect(SRD_MONSTERS.giant_hyena.rampage).toBe(true);
+  });
+
+  it('Noble and Warrior Veteran carry the Parry reaction', () => {
+    expect(SRD_MONSTERS.noble.parry).toBe(true);
+    expect(SRD_MONSTERS.warrior_veteran.parry).toBe(true);
+  });
+
+  it('Cockatrice models the first petrification stage (CON 11 → Restrained)', () => {
+    expect(SRD_MONSTERS.cockatrice.onHitEffect).toEqual({
+      condition: 'restrained',
+      ability: 'con',
+      dc: 11,
+    });
+    expect(SRD_MONSTERS.cockatrice.condition_immunities).toContain('petrified');
+  });
+
+  it('wyrmlings breathe per RAW (cold CON 12 / acid DEX 11) with elemental riders', () => {
+    expect(SRD_MONSTERS.white_dragon_wyrmling.breathWeapon).toMatchObject({
+      dice: '5d8',
+      damageType: 'cold',
+      savingThrow: 'con',
+      saveDC: 12,
+    });
+    expect(SRD_MONSTERS.black_dragon_wyrmling.breathWeapon).toMatchObject({
+      dice: '5d8',
+      damageType: 'acid',
+      savingThrow: 'dex',
+      saveDC: 11,
+    });
+    expect(SRD_MONSTERS.white_dragon_wyrmling.bonusDamageType).toBe('cold');
+    expect(SRD_MONSTERS.black_dragon_wyrmling.creatureType).toBe('dragon');
+  });
+
+  it('Ankheg sprays acid on a Recharge 6', () => {
+    expect(SRD_MONSTERS.ankheg.breathWeapon).toMatchObject({
+      dice: '4d6',
+      damageType: 'acid',
+      savingThrow: 'dex',
+      saveDC: 12,
+      rechargeMin: 6,
+    });
+  });
+
+  it('reach attackers carry 10 ft (Awakened Tree slam, Minotaur glaive)', () => {
+    expect(SRD_MONSTERS.awakened_tree.attackReachFt).toBe(10);
+    expect(SRD_MONSTERS.minotaur.attackReachFt).toBe(10);
+    expect(SRD_MONSTERS.minotaur.bonusDamageType).toBe('necrotic');
   });
 });
