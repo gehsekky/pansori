@@ -125,3 +125,9 @@ Never cite PHB pages — pansori doesn't carry PHB content.
   Divine Order incident, 2026-06-06). Check exit codes explicitly;
   don't pipe test output through grep/tail in a way that can mask
   a failure.
+- **Migration changes add `npm run check-migrations`** to that
+  gate: it double-applies every migration file to a scratch DB,
+  catching fresh-environment breakage (CI initdb + runner re-run)
+  that an incrementally evolved dev database hides — e.g. a later
+  migration dropping a column an earlier file references (the
+  015/020 incident, 2026-06-06).

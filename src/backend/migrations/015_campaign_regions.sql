@@ -32,30 +32,12 @@ CREATE TABLE IF NOT EXISTS campaign_regions (
 CREATE INDEX IF NOT EXISTS idx_campaign_regions_campaign
   ON campaign_regions(campaign_id);
 
--- Backfill from the interim JSONB section. COALESCE defaults cover blobs
--- saved under the earliest regions schema (id/name/isStartingRegion only,
--- before scale/canvas/startPos became required).
-INSERT INTO campaign_regions
-  (campaign_id, id, sort_order, name, is_starting_region, description,
-   feet_per_square, grid_width, grid_height, start_x, start_y,
-   encounter_chance, base_tier)
-SELECT c.id,
-       r.value->>'id',
-       r.ordinality - 1,
-       r.value->>'name',
-       COALESCE((r.value->>'isStartingRegion')::boolean, FALSE),
-       r.value->>'desc',
-       COALESCE((r.value->>'feetPerSquare')::double precision, 5280),
-       COALESCE((r.value->>'gridWidth')::int, 10),
-       COALESCE((r.value->>'gridHeight')::int, 10),
-       COALESCE((r.value->'startPos'->>'x')::int, 0),
-       COALESCE((r.value->'startPos'->>'y')::int, 0),
-       (r.value->>'encounterChance')::double precision,
-       (r.value->>'baseTier')::int
-FROM campaigns c,
-     LATERAL jsonb_array_elements(c.data->'regions') WITH ORDINALITY AS r(value, ordinality)
-WHERE jsonb_typeof(c.data->'regions') = 'array'
-ON CONFLICT (campaign_id, id) DO NOTHING;
+-- (A backfill from the interim `data.regions` JSONB blobs lived here
+-- briefly; it referenced grid_width/grid_height, which migration 020
+-- later drops — making this file fail the idempotent RE-RUN that fresh
+-- environments do (initdb applies the directory, then migrationRunner
+-- applies it again). No durable DB ever held those interim blobs, so the
+-- backfill is gone rather than column-guarded.)
 
 -- The JSONB key is no longer the storage — remove it so the overlay never
 -- serves a stale copy.
