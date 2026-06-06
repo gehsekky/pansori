@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
+import { TERRAIN } from '../shared-types.js';
 import { z } from 'zod';
 
 // Zod schemas for request bodies on the auth + game routes. Each handler
@@ -243,6 +244,22 @@ const SLUG = z
   .max(40)
   .regex(/^[a-z0-9_-]+$/, 'lowercase letters, digits, - and _ only');
 
+// One square of a region's dense terrain grid. `t` is the terrain type —
+// behavior (passability / travel cost / encounter multiplier) derives from
+// the shared TERRAIN registry; `tier` / `enc` are rare per-cell overrides
+// of the region-level defaults.
+const TerrainCellSchema = z
+  .object({
+    t: z.enum(Object.keys(TERRAIN) as [string, ...string[]]),
+    tier: z.number().int().min(1).max(4).optional(),
+    enc: z.number().min(0).max(1).optional(),
+  })
+  .strict();
+
+// Rows of cells: [y][x], rectangular, 1–200 a side. Dimensions are DERIVED
+// from the array shape — startPos / site positions bounds-check against it.
+const RegionGridSchema = z.array(z.array(TerrainCellSchema).min(1).max(200)).min(1).max(200);
+
 // A region's transition cells (MapSite): stepping onto one opens a town
 // grid (kind 'town' → townId) or drops into a local room (kind 'local' →
 // entryRoomId). The kind↔target pairing and grid bounds are enforced in
@@ -271,8 +288,8 @@ const RegionsSchema = z
         desc: z.string().min(1).max(2000).optional(),
         // SRD overland scale: 5280 = 1 mile per square (Travel Pace).
         feetPerSquare: z.number().positive(),
-        gridWidth: z.number().int().min(1).max(200),
-        gridHeight: z.number().int().min(1).max(200),
+        // The dense terrain grid — dimensions derive from its shape.
+        grid: RegionGridSchema,
         // Where the party marker begins on this region's grid.
         startPos: GridPosSchema,
         // Random-encounter roll per square crossed (0–1).
@@ -284,10 +301,22 @@ const RegionsSchema = z
       })
       .strict()
       .superRefine((r, ctx) => {
-        if (r.startPos.x >= r.gridWidth || r.startPos.y >= r.gridHeight) {
+        // Rectangularity: every row as wide as the first.
+        const gridHeight = r.grid.length;
+        const gridWidth = r.grid[0]?.length ?? 0;
+        r.grid.forEach((row, y) => {
+          if (row.length !== gridWidth) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: `grid row ${y} has ${row.length} cells; expected ${gridWidth} (grid must be rectangular)`,
+              path: ['grid', y],
+            });
+          }
+        });
+        if (r.startPos.x >= gridWidth || r.startPos.y >= gridHeight) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
-            message: `startPos (${r.startPos.x},${r.startPos.y}) is outside the ${r.gridWidth}x${r.gridHeight} grid`,
+            message: `startPos (${r.startPos.x},${r.startPos.y}) is outside the ${gridWidth}x${gridHeight} grid`,
             path: ['startPos'],
           });
         }
@@ -301,10 +330,10 @@ const RegionsSchema = z
             });
           }
           siteIds.add(s.id);
-          if (s.pos.x >= r.gridWidth || s.pos.y >= r.gridHeight) {
+          if (s.pos.x >= gridWidth || s.pos.y >= gridHeight) {
             ctx.addIssue({
               code: z.ZodIssueCode.custom,
-              message: `site "${s.id}" pos (${s.pos.x},${s.pos.y}) is outside the ${r.gridWidth}x${r.gridHeight} grid`,
+              message: `site "${s.id}" pos (${s.pos.x},${s.pos.y}) is outside the ${gridWidth}x${gridHeight} grid`,
               path: ['sites', i, 'pos'],
             });
           }

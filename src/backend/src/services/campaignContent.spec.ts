@@ -6,6 +6,7 @@
 
 import {
   type CampaignRegion,
+  type CampaignRegionCell,
   EDITABLE_SECTIONS,
   applyCampaignOverlays,
   deleteCampaignSection,
@@ -106,12 +107,11 @@ function makeContentDb(initial: {
         is_starting_region: p[3],
         description: p[4],
         feet_per_square: p[5],
-        grid_width: p[6],
-        grid_height: p[7],
-        start_x: p[8],
-        start_y: p[9],
-        encounter_chance: p[10],
-        base_tier: p[11],
+        grid: JSON.parse(p[6] as string), // pg parses jsonb on read
+        start_x: p[7],
+        start_y: p[8],
+        encounter_chance: p[9],
+        base_tier: p[10],
       }));
       return { rows, rowCount: rows.length };
     }
@@ -147,14 +147,17 @@ function makeContentDb(initial: {
   return { pool, campaigns, regions };
 }
 
+// Uniform dense grid builder: h rows of w cells of one terrain type.
+const G = (w: number, h: number, t = 'plains'): CampaignRegionCell[][] =>
+  Array.from({ length: h }, () => Array.from({ length: w }, () => ({ t })));
+
 const REGION_A: CampaignRegion = {
   id: 'malgovia',
   name: 'Malgovia',
   isStartingRegion: true,
   desc: 'A mist-shrouded vale.',
   feetPerSquare: 5280,
-  gridWidth: 12,
-  gridHeight: 10,
+  grid: G(12, 10),
   startPos: { x: 3, y: 4 },
   encounterChance: 0.15,
   baseTier: 1,
@@ -165,8 +168,7 @@ const REGION_B: CampaignRegion = {
   name: 'The Frost Reach',
   isStartingRegion: false,
   feetPerSquare: 5280,
-  gridWidth: 8,
-  gridHeight: 8,
+  grid: G(8, 8, 'snow'),
   startPos: { x: 0, y: 0 },
 };
 
@@ -278,13 +280,13 @@ describe('editable sections registry', () => {
   });
 
   // A minimal valid region — tests tweak single fields off this base.
+  // (12x10 dense plains grid; dimensions derive from the array shape.)
   const region = (over: Record<string, unknown> = {}) => ({
     id: 'malgovia',
     name: 'Malgovia',
     isStartingRegion: true,
     feetPerSquare: 5280,
-    gridWidth: 12,
-    gridHeight: 10,
+    grid: G(12, 10),
     startPos: { x: 3, y: 4 },
     ...over,
   });
@@ -297,20 +299,53 @@ describe('editable sections registry', () => {
     expect(result.success, JSON.stringify(result.error?.issues)).toBe(true);
   });
 
-  it('regions schema requires scale, canvas, and startPos', () => {
+  it('regions schema requires scale, grid, and startPos', () => {
     const regions = CAMPAIGN_SECTION_SCHEMAS.regions;
-    for (const missing of ['feetPerSquare', 'gridWidth', 'gridHeight', 'startPos']) {
+    for (const missing of ['feetPerSquare', 'grid', 'startPos']) {
       const r = region();
       delete (r as Record<string, unknown>)[missing];
       expect(regions.safeParse([r]).success, `missing ${missing} should fail`).toBe(false);
     }
   });
 
-  it('regions schema bounds-checks startPos against the grid', () => {
+  it('regions schema bounds-checks startPos against the derived grid dims', () => {
     const regions = CAMPAIGN_SECTION_SCHEMAS.regions;
-    expect(regions.safeParse([region({ startPos: { x: 12, y: 0 } })]).success).toBe(false); // x == gridWidth
-    expect(regions.safeParse([region({ startPos: { x: 0, y: 10 } })]).success).toBe(false); // y == gridHeight
+    expect(regions.safeParse([region({ startPos: { x: 12, y: 0 } })]).success).toBe(false); // x == width
+    expect(regions.safeParse([region({ startPos: { x: 0, y: 10 } })]).success).toBe(false); // y == height
     expect(regions.safeParse([region({ startPos: { x: 11, y: 9 } })]).success).toBe(true); // corner ok
+  });
+
+  it('regions schema validates grid cells: rectangular, known types, override ranges', () => {
+    const regions = CAMPAIGN_SECTION_SCHEMAS.regions;
+    // Ragged rows rejected.
+    const ragged = G(4, 3);
+    ragged[1] = ragged[1].slice(0, 2);
+    expect(regions.safeParse([region({ grid: ragged, startPos: { x: 0, y: 0 } })]).success).toBe(
+      false
+    );
+    // Unknown terrain type / unknown cell field / out-of-range overrides.
+    expect(
+      regions.safeParse([region({ grid: [[{ t: 'lava' }]], startPos: { x: 0, y: 0 } })]).success
+    ).toBe(false);
+    expect(
+      regions.safeParse([
+        region({ grid: [[{ t: 'road', slippery: true }]], startPos: { x: 0, y: 0 } }),
+      ]).success
+    ).toBe(false);
+    expect(
+      regions.safeParse([region({ grid: [[{ t: 'road', tier: 9 }]], startPos: { x: 0, y: 0 } })])
+        .success
+    ).toBe(false);
+    expect(
+      regions.safeParse([region({ grid: [[{ t: 'road', enc: 1.5 }]], startPos: { x: 0, y: 0 } })])
+        .success
+    ).toBe(false);
+    // Valid per-cell overrides pass.
+    expect(
+      regions.safeParse([
+        region({ grid: [[{ t: 'forest', tier: 2, enc: 0.4 }]], startPos: { x: 0, y: 0 } }),
+      ]).success
+    ).toBe(true);
   });
 
   it('regions schema validates sites: kind↔target, bounds, unique ids', () => {

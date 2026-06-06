@@ -99,14 +99,24 @@ export interface CampaignRegionSite {
   icon?: string;
 }
 
+// One square of the dense terrain grid: `t` is the terrain type (behavior
+// derives from the shared TERRAIN registry); `tier` / `enc` are rare
+// per-cell overrides of the region-level defaults.
+export interface CampaignRegionCell {
+  t: string;
+  tier?: number;
+  enc?: number;
+}
+
 export interface CampaignRegion {
   id: string;
   name: string;
   isStartingRegion: boolean;
   desc?: string;
   feetPerSquare: number;
-  gridWidth: number;
-  gridHeight: number;
+  // Dense [y][x] terrain grid — dimensions derive from its shape
+  // (validated rectangular at the API). Stored as a JSONB column.
+  grid: CampaignRegionCell[][];
   startPos: { x: number; y: number };
   encounterChance?: number;
   baseTier?: number;
@@ -121,8 +131,7 @@ interface RegionRow {
   is_starting_region: boolean;
   description: string | null;
   feet_per_square: number;
-  grid_width: number;
-  grid_height: number;
+  grid: CampaignRegionCell[][];
   start_x: number;
   start_y: number;
   encounter_chance: number | null;
@@ -136,8 +145,7 @@ function rowToRegion(r: RegionRow): CampaignRegion {
     isStartingRegion: r.is_starting_region,
     ...(r.description !== null ? { desc: r.description } : {}),
     feetPerSquare: r.feet_per_square,
-    gridWidth: r.grid_width,
-    gridHeight: r.grid_height,
+    grid: r.grid,
     startPos: { x: r.start_x, y: r.start_y },
     ...(r.encounter_chance !== null ? { encounterChance: r.encounter_chance } : {}),
     ...(r.base_tier !== null ? { baseTier: r.base_tier } : {}),
@@ -145,7 +153,7 @@ function rowToRegion(r: RegionRow): CampaignRegion {
 }
 
 const REGION_COLUMNS = `id, name, is_starting_region, description, feet_per_square,
-       grid_width, grid_height, start_x, start_y, encounter_chance, base_tier`;
+       grid, start_x, start_y, encounter_chance, base_tier`;
 
 interface SiteRow {
   region_id: string;
@@ -227,9 +235,8 @@ export async function putCampaignRegions(
       await client.query(
         `INSERT INTO campaign_regions
            (campaign_id, id, sort_order, name, is_starting_region, description,
-            feet_per_square, grid_width, grid_height, start_x, start_y,
-            encounter_chance, base_tier)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+            feet_per_square, grid, start_x, start_y, encounter_chance, base_tier)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, $12)`,
         [
           campaignId,
           r.id,
@@ -238,8 +245,7 @@ export async function putCampaignRegions(
           r.isStartingRegion,
           r.desc ?? null,
           r.feetPerSquare,
-          r.gridWidth,
-          r.gridHeight,
+          JSON.stringify(r.grid),
           r.startPos.x,
           r.startPos.y,
           r.encounterChance ?? null,
