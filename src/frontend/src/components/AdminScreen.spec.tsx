@@ -154,6 +154,30 @@ describe('AdminScreen', () => {
     expect(screen.queryByText(/^MEMBERS — /)).toBeNull();
   });
 
+  it('creator mode shows only owner/editor campaigns with its own title', async () => {
+    mocked.listCampaigns.mockResolvedValue([
+      { id: 'malgovia', name: 'Malgovia', visibility: 'global', my_role: 'owner' },
+      { id: 'sandbox', name: 'Dev Sandbox', visibility: 'global', my_role: null },
+      { id: 'secret', name: 'Secret Realm', visibility: 'private', my_role: 'player' },
+    ]);
+    mocked.listCampaignMembers.mockResolvedValue(MEMBERS);
+    render(<AdminScreen user={OWNER_USER} onBack={vi.fn()} mode="creator" />);
+    expect(await screen.findByText('CAMPAIGN CREATOR')).toBeTruthy();
+    expect(await screen.findByText('Malgovia')).toBeTruthy();
+    // No-access and player-only campaigns don't belong on the creator surface.
+    expect(screen.queryByText('Dev Sandbox')).toBeNull();
+    expect(screen.queryByText('Secret Realm')).toBeNull();
+  });
+
+  it('creator mode shows an empty state when the user works on nothing', async () => {
+    mocked.listCampaigns.mockResolvedValue([
+      { id: 'malgovia', name: 'Malgovia', visibility: 'global', my_role: null },
+    ]);
+    render(<AdminScreen user={OWNER_USER} onBack={vi.fn()} mode="creator" />);
+    expect(await screen.findByText('NO CAMPAIGNS YET')).toBeTruthy();
+    expect(screen.queryByText('Malgovia')).toBeNull();
+  });
+
   it('shows the visibility badge and an admin-only promote/demote toggle', async () => {
     mockCampaigns('owner', 'private');
     mocked.setCampaignVisibility.mockResolvedValue({ ok: true, visibility: 'global' });

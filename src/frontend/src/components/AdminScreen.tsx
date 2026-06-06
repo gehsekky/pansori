@@ -27,7 +27,22 @@ function errorText(err: unknown): string {
 // Owners (and site admins, who resolve to owner everywhere) manage members;
 // editors get a read-only view. Campaign *content* editing will mount here
 // as content tables move into the DB — see the placeholder card.
-function AdminScreen({ user, onBack }: { user: AuthUser; onBack: () => void }) {
+//
+// Two modes share this screen:
+//   'admin'   — the site-admin surface: every campaign the server lists
+//               (global + memberships; admins see all), gated by canAdmin.
+//   'creator' — the everyone-facing surface: only campaigns the user can
+//               actually work on (owner/editor), with a creation-coming
+//               empty state. Same member/content panes once selected.
+function AdminScreen({
+  user,
+  onBack,
+  mode = 'admin',
+}: {
+  user: AuthUser;
+  onBack: () => void;
+  mode?: 'admin' | 'creator';
+}) {
   const [campaigns, setCampaigns] = useState<CampaignListing[]>([]);
   const [campaignsErr, setCampaignsErr] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -43,12 +58,18 @@ function AdminScreen({ user, onBack }: { user: AuthUser; onBack: () => void }) {
   // Default to 'player' — inviting friends to play is the common case.
   const [addRole, setAddRole] = useState<CampaignRole>('player');
 
-  const selected = campaigns.find((c) => c.id === selectedId) ?? null;
-  // my_role is already 'owner' for site admins (backend resolves it).
-  const canManage = selected?.my_role === 'owner';
   // Players can see/play a campaign but have nothing to do on this screen —
   // the member list itself is editor+.
   const adminRole = (r: CampaignRole | null) => r === 'owner' || r === 'editor';
+
+  // Creator mode shows only the campaigns the user can work on; admin mode
+  // shows everything the server listed (incl. global NO ACCESS rows).
+  const visibleCampaigns =
+    mode === 'creator' ? campaigns.filter((c) => adminRole(c.my_role)) : campaigns;
+
+  const selected = visibleCampaigns.find((c) => c.id === selectedId) ?? null;
+  // my_role is already 'owner' for site admins (backend resolves it).
+  const canManage = selected?.my_role === 'owner';
 
   useEffect(() => {
     api
@@ -144,7 +165,7 @@ function AdminScreen({ user, onBack }: { user: AuthUser; onBack: () => void }) {
         <div className={styles.sessionsHeader}>
           <div>
             <h1 className={styles.title} style={{ fontSize: '1.1rem', marginBottom: 4 }}>
-              PANSORI ADMIN
+              {mode === 'admin' ? 'PANSORI ADMIN' : 'CAMPAIGN CREATOR'}
             </h1>
             <p className={styles.sub}>
               {user.display_name.toUpperCase()}
@@ -165,8 +186,22 @@ function AdminScreen({ user, onBack }: { user: AuthUser; onBack: () => void }) {
         )}
 
         {/* ── Campaign list ─────────────────────────────────────────────── */}
+        {mode === 'creator' && !campaignsErr && visibleCampaigns.length === 0 && (
+          <div
+            className={styles.card}
+            style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--t-dim)' }}
+          >
+            <p style={{ fontSize: '0.8rem', letterSpacing: '0.12em', marginBottom: 8 }}>
+              NO CAMPAIGNS YET
+            </p>
+            <p style={{ fontSize: '0.75rem' }}>
+              You don&apos;t own or edit any campaigns. Creating your own campaign is coming soon —
+              for now, a campaign owner can add you as an editor.
+            </p>
+          </div>
+        )}
         <div className={styles.sessionList}>
-          {campaigns.map((c) => {
+          {visibleCampaigns.map((c) => {
             const manageable = adminRole(c.my_role);
             const isSelected = c.id === selectedId;
             return (

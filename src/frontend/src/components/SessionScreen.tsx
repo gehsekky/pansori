@@ -13,6 +13,7 @@ function SessionsScreen({
   onClearCompleted,
   onAbout,
   onAdmin,
+  onCreator,
   contexts,
 }: {
   sessions: SessionSummary[];
@@ -27,6 +28,8 @@ function SessionsScreen({
   // Present only when the user can administer at least one campaign
   // (site admin, or holds an owner/editor role) — absent hides the button.
   onAdmin?: () => void;
+  // The creator surface (own/edited campaigns) — available to everyone.
+  onCreator: () => void;
   contexts: Record<string, FrontendContext>;
 }) {
   const statusColor = (s: string) =>
@@ -61,6 +64,9 @@ function SessionsScreen({
               onClick={onNewGame}
             >
               + NEW ADVENTURE
+            </button>
+            <button className={styles.ghostBtn} onClick={onCreator}>
+              CREATOR
             </button>
             {onAdmin && (
               <button className={styles.ghostBtn} onClick={onAdmin}>

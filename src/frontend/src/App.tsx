@@ -127,7 +127,7 @@ function getCtx(seed: Seed | null): FrontendContext {
 
 applyTheme(sandboxContext.theme);
 
-type View = 'login' | 'loading' | 'sessions' | 'char' | 'game' | 'admin';
+type View = 'login' | 'loading' | 'sessions' | 'char' | 'game' | 'admin' | 'creator';
 
 // ─── App shell ───────────────────────────────────────────────────────────────
 export default function App() {
@@ -388,6 +388,7 @@ export default function App() {
           onClearCompleted={handleClearCompleted}
           onAbout={() => setAboutOpen(true)}
           onAdmin={canAdmin ? () => setView('admin') : undefined}
+          onCreator={() => setView('creator')}
           contexts={CONTEXTS}
         />
       )}
@@ -395,6 +396,17 @@ export default function App() {
       {view === 'admin' && user && (
         <AdminScreen
           user={user}
+          mode="admin"
+          onBack={() => {
+            loadSessions();
+          }}
+        />
+      )}
+
+      {view === 'creator' && user && (
+        <AdminScreen
+          user={user}
+          mode="creator"
           onBack={() => {
             loadSessions();
           }}

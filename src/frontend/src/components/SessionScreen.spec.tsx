@@ -47,6 +47,7 @@ const defaultProps = {
   onDelete: vi.fn(),
   onClearCompleted: vi.fn(),
   onAbout: vi.fn(),
+  onCreator: vi.fn(),
   contexts,
 };
 
@@ -115,5 +116,12 @@ describe('SessionsScreen', () => {
     render(<SessionsScreen {...defaultProps} onAdmin={onAdmin} />);
     fireEvent.click(screen.getByRole('button', { name: /admin/i }));
     expect(onAdmin).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the CREATOR button for everyone', () => {
+    const onCreator = vi.fn();
+    render(<SessionsScreen {...defaultProps} onCreator={onCreator} />);
+    fireEvent.click(screen.getByRole('button', { name: /creator/i }));
+    expect(onCreator).toHaveBeenCalledTimes(1);
   });
 });
