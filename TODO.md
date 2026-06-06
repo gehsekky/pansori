@@ -44,12 +44,55 @@ BE 2520 + FE 221 tests).
 
 ### Follow-up (related, but NOT PHB — out of this task's scope)
 
-- [ ] Some comments still cite **`SRD p.NNN`** (page numbers) — e.g.
-      `rulesEngine.ts` advantage/disadvantage + armor/weapon proficiency notes.
-      The convention says use SRD **section names**, not page numbers. These
-      pre-date this task and aren't PHB; relabel in a separate pass if desired.
+- [x] **`SRD p.NNN` page citations dropped** — relabeled to SRD section names
+      across the citations (rulesEngine, etc.); no `SRD p.` / `PHB p.` page
+      references remain in source.
 - [ ] Box-drawing comment headers that shrank (e.g. `// ─── X (SRD) ───`) have
       slightly shorter trailing rules now — purely cosmetic.
+
+---
+
+# SRD equipment + creation/combat (this session)
+
+## ✅ Done
+
+**Equipment catalog (`campaignData/srd/items.ts`) — now the full SRD 5.2.1 tables:**
+- [x] All 38 weapons (simple + martial, incl. firearms) with RAW damage /
+      properties / mastery; fixed Dart's missing Vex mastery.
+- [x] All 13 armor entries (padded → plate + shield) with base AC / DEX cap.
+- [x] Tools + adventuring gear (backpack, rope, tinderbox, …); Healer's Kit
+      wired to a `stabilize` use; Antitoxin (`con_advantage`).
+- [x] Light sources — Torch / Hooded Lantern / Bullseye Lantern as a `light`
+      worn effect + a **quiver** equip slot; combat seeding emits `light_radius_ft`.
+- [x] Thrown splash weapons (`throw_item`): Acid, Alchemist's Fire (save-ends
+      burn), Holy Water (gated on a new `Enemy.creatureType`).
+- [x] Ammunition (arrows/bolts/bullets/needles) + the quiver slot; ranged
+      attacks spend a matching round; ranged starters bundle arrows.
+
+**Rules / creation / combat:**
+- [x] Rogue weapon proficiency = Simple + Finesse/Light martial
+      (`martial_finesse_light`) — fixes the mastery picker + attack proficiency.
+- [x] Cleric **Divine Order** moved to character creation (required to start).
+- [x] **Caster spell picker** at creation (cantrips + L1 from the class list);
+      Magic Initiate vs caster pickers lock duplicate *cantrips* but allow the
+      beneficial L1 overlap; locked spells shown (not hidden).
+- [x] Magic Initiate free L1 cast surfaced as a distinct, slot-independent
+      combat choice (`✦ … free, Magic Initiate`); cantrips tagged by source.
+
+## ⏳ Deferred / open
+
+- [ ] **Mounts, vehicles, trade goods** — the rest of the SRD equipment chapter;
+      not modeled (no systems for them yet).
+- [ ] **Caltrops / ball bearings** — area-denial consumables; need a
+      movement-triggered ground-effect mechanic (the thrown splash weapons exist;
+      these don't).
+- [ ] **Spellcasting foci** (holy symbol / component pouch / arcane focus) are
+      still flavor — `effect: 'spellcasting_focus'` isn't read anywhere; casting
+      has no focus/component gate.
+- [ ] **Per-campaign spell curation** — `spellTable` loads the whole SRD catalog
+      everywhere; no `srdSpells(…)` selector (cf. `srdItems`) for low-magic settings.
+- [ ] Continue the **auto-pick → player-driven** migration (Divine Order + caster
+      spells done) for any remaining auto-assigned creation choices.
 
 ### Verify after each batch
 - BE: `npx tsc --noEmit`, `npx eslint .`, `npx vitest run`
