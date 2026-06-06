@@ -106,4 +106,14 @@ describe('SessionsScreen', () => {
     render(<SessionsScreen {...defaultProps} sessions={[escapedSession]} />);
     expect(screen.getByText(/ESCAPED/i)).toBeTruthy();
   });
+
+  it('shows the ADMIN button only when onAdmin is provided', () => {
+    const { unmount } = render(<SessionsScreen {...defaultProps} />);
+    expect(screen.queryByRole('button', { name: /admin/i })).toBeNull();
+    unmount();
+    const onAdmin = vi.fn();
+    render(<SessionsScreen {...defaultProps} onAdmin={onAdmin} />);
+    fireEvent.click(screen.getByRole('button', { name: /admin/i }));
+    expect(onAdmin).toHaveBeenCalledTimes(1);
+  });
 });

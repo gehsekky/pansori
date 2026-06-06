@@ -34,6 +34,27 @@ export interface AuthProvider {
   label: string; // human-readable button text
 }
 
+// ─── Campaign admin (owners/editors) ─────────────────────────────────────────
+// Mirrors routes/campaigns.ts on the backend. Roles are a two-tier
+// hierarchy (owner ⊃ editor); site admins resolve to 'owner' everywhere.
+
+export type CampaignRole = 'owner' | 'editor';
+
+export interface CampaignListing {
+  id: string;
+  name: string;
+  my_role: CampaignRole | null;
+}
+
+export interface CampaignMember {
+  user_id: string;
+  role: CampaignRole;
+  added_at: string;
+  display_name: string;
+  email: string;
+  avatar_url: string | null;
+}
+
 export interface ActionResult {
   narrative: string;
   choices: GameChoice[];
@@ -213,6 +234,30 @@ export interface BackendContextSummary {
 
 export const api = {
   getMe: () => req<AuthUser>('/auth/me'),
+
+  // ─── Campaign admin ────────────────────────────────────────────────────────
+
+  listCampaigns: () => req<CampaignListing[]>('/campaigns'),
+
+  listCampaignMembers: (campaignId: string) =>
+    req<CampaignMember[]>(`/campaigns/${campaignId}/members`),
+
+  addCampaignMember: (campaignId: string, email: string, role: CampaignRole) =>
+    req<CampaignMember>(`/campaigns/${campaignId}/members`, {
+      method: 'POST',
+      body: JSON.stringify({ email, role }),
+    }),
+
+  setCampaignMemberRole: (campaignId: string, userId: string, role: CampaignRole) =>
+    req<CampaignMember>(`/campaigns/${campaignId}/members/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ role }),
+    }),
+
+  removeCampaignMember: (campaignId: string, userId: string) =>
+    req<{ ok: boolean }>(`/campaigns/${campaignId}/members/${userId}`, {
+      method: 'DELETE',
+    }),
 
   listContexts: () => req<BackendContextSummary[]>('/game/contexts'),
 

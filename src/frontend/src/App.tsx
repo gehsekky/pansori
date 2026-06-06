@@ -3,6 +3,7 @@ import { FactionsView, QuestsView } from './components/CampaignPanel.tsx';
 import type { FrontendContext, GameChoice, Seed, SessionSummary } from './types.ts';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import AboutModal from './components/AboutModal.tsx';
+import AdminScreen from './components/AdminScreen.tsx';
 import AdventureLogPanel from './components/AdventureLogPanel.tsx';
 import CharScreen from './components/CharScreen.tsx';
 import CharacterModal from './components/CharacterModal.tsx';
@@ -126,13 +127,16 @@ function getCtx(seed: Seed | null): FrontendContext {
 
 applyTheme(sandboxContext.theme);
 
-type View = 'login' | 'loading' | 'sessions' | 'char' | 'game';
+type View = 'login' | 'loading' | 'sessions' | 'char' | 'game' | 'admin';
 
 // ─── App shell ───────────────────────────────────────────────────────────────
 export default function App() {
   const [view, setView] = useState<View>('loading');
   const [user, setUser] = useState<AuthUser | null>(null);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
+  // Whether to surface the ADMIN entry on the sessions screen: site admins
+  // always; otherwise anyone holding an owner/editor role on any campaign.
+  const [canAdmin, setCanAdmin] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
@@ -259,6 +263,24 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Resolve admin-entry visibility whenever the signed-in user changes.
+  // Site admins skip the round-trip; everyone else gets one light
+  // campaigns query to see if they hold any owner/editor role.
+  useEffect(() => {
+    if (!user) {
+      setCanAdmin(false);
+      return;
+    }
+    if (user.is_admin) {
+      setCanAdmin(true);
+      return;
+    }
+    api
+      .listCampaigns()
+      .then((list) => setCanAdmin(list.some((c) => c.my_role !== null)))
+      .catch(() => setCanAdmin(false));
+  }, [user]);
+
   async function loadSessions() {
     const list = await api.listSessions();
     setSessions(list);
@@ -361,7 +383,17 @@ export default function App() {
           onDelete={handleDeleteSession}
           onClearCompleted={handleClearCompleted}
           onAbout={() => setAboutOpen(true)}
+          onAdmin={canAdmin ? () => setView('admin') : undefined}
           contexts={CONTEXTS}
+        />
+      )}
+
+      {view === 'admin' && user && (
+        <AdminScreen
+          user={user}
+          onBack={() => {
+            loadSessions();
+          }}
         />
       )}
 

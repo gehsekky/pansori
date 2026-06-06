@@ -12,6 +12,7 @@ function SessionsScreen({
   onDelete,
   onClearCompleted,
   onAbout,
+  onAdmin,
   contexts,
 }: {
   sessions: SessionSummary[];
@@ -23,6 +24,9 @@ function SessionsScreen({
   onDelete: (id: string) => void;
   onClearCompleted: () => void;
   onAbout: () => void;
+  // Present only when the user can administer at least one campaign
+  // (site admin, or holds an owner/editor role) — absent hides the button.
+  onAdmin?: () => void;
   contexts: Record<string, FrontendContext>;
 }) {
   const statusColor = (s: string) =>
@@ -58,6 +62,11 @@ function SessionsScreen({
             >
               + NEW ADVENTURE
             </button>
+            {onAdmin && (
+              <button className={styles.ghostBtn} onClick={onAdmin}>
+                ADMIN
+              </button>
+            )}
             <button className={styles.ghostBtn} onClick={onAbout}>
               ABOUT
             </button>
