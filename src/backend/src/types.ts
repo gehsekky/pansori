@@ -1328,6 +1328,9 @@ export interface Character {
       // Magic Initiate — the chosen L1 spell id (so the cast handler
       // can identify the free-cast spell from `feat_choices`).
       magicInitiateL1?: string;
+      // Magic Initiate — the chosen cantrip ids, so the combat spell list can
+      // tag them as feat-granted (they're otherwise identical to class cantrips).
+      magicInitiateCantrips?: string[];
     }
   >;
   expertise_skills?: string[]; // skills with double proficiency bonus (Rogue/Bard)

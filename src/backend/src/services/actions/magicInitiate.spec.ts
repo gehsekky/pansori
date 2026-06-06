@@ -38,6 +38,20 @@ describe('Magic Initiate — take_feat side effects', () => {
     expect(newChar.feat_choices?.magic_initiate_arcane?.magicInitiateL1).toBe('magic_missile');
   });
 
+  it('records the chosen cantrips on feat_choices (for source tagging)', () => {
+    const char = makeChar({ id: 'pc-1', spells_known: [] });
+    const feat = getFeat('magic_initiate_arcane', ctx);
+    if (!feat) throw new Error('feat not in context');
+    const { newChar } = applyFeatTake(char, feat, {
+      cantripChoices: ['fire_bolt', 'mage_hand'],
+      l1Choice: 'magic_missile',
+    });
+    expect(newChar.feat_choices?.magic_initiate_arcane?.magicInitiateCantrips).toEqual([
+      'fire_bolt',
+      'mage_hand',
+    ]);
+  });
+
   it('initializes the free-cast token at 0 (available)', () => {
     const char = makeChar({ id: 'pc-1' });
     const feat = getFeat('magic_initiate_arcane', ctx);
@@ -360,5 +374,20 @@ describe('Magic Initiate — free L1 cast surfaces as a labeled combat choice', 
   it('once the freebie is spent, the spell drops out (no slot to fall back on)', () => {
     const labels = castLabels(fighterMI({ class_resource_uses: { magic_initiate_l1_used: 1 } }));
     expect(labels.some((l) => /Cure Wounds/.test(l))).toBe(false);
+  });
+
+  it('tags a Magic Initiate CANTRIP in the combat spell list', () => {
+    const labels = castLabels(
+      fighterMI({
+        spells_known: ['cure_wounds', 'guidance'],
+        feat_choices: {
+          magic_initiate_divine: {
+            magicInitiateL1: 'cure_wounds',
+            magicInitiateCantrips: ['guidance'],
+          },
+        },
+      })
+    );
+    expect(labels.some((l) => /Guidance \(cantrip, Magic Initiate\)/.test(l))).toBe(true);
   });
 });

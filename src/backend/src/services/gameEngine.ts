@@ -6012,6 +6012,13 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       if (spell.level === 0) {
         // Cantrip: no slot needed
         const slotNote = isBonusAction ? ', bonus action' : '';
+        // Tag a cantrip granted by Magic Initiate so its source is clear in the
+        // list (it's otherwise identical to a class cantrip — at-will, no slot).
+        const cantripTag = Object.values(char.feat_choices ?? {}).some(
+          (c) => c?.magicInitiateCantrips?.includes(spellId) ?? false
+        )
+          ? ', Magic Initiate'
+          : '';
         if (emitPerEnemy) {
           // One choice per living enemy. `enemyDisambig` is consumed in
           // declaration order across calls so #1/#2 stay stable.
@@ -6019,7 +6026,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
             if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
             const suffix = enemyDisambig(en);
             choices.push({
-              label: `Cast ${spell.name} (cantrip${slotNote}) → ${en.name}${suffix}`,
+              label: `Cast ${spell.name} (cantrip${slotNote}${cantripTag}) → ${en.name}${suffix}`,
               action: { type: 'cast_spell', spellId, slotLevel: 0, targetEnemyId: en.id },
               requiresBonusAction: isBonusAction || undefined,
               aoePreview: aoePreview ? { ...aoePreview, targetEnemyId: en.id } : undefined,
@@ -6029,7 +6036,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         } else {
           const targetId = isOffensive ? livingEnemies[0]?.id : undefined;
           choices.push({
-            label: `Cast ${spell.name} (cantrip${slotNote})`,
+            label: `Cast ${spell.name} (cantrip${slotNote}${cantripTag})`,
             action: { type: 'cast_spell', spellId, slotLevel: 0, targetEnemyId: targetId },
             requiresBonusAction: isBonusAction || undefined,
             aoePreview: aoePreview ? { ...aoePreview, targetEnemyId: targetId } : undefined,

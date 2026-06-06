@@ -138,14 +138,15 @@ export function applyFeatTake(
           magic_initiate_l1_used: 0,
         },
       };
-      if (l1) {
+      if (cantrips.length > 0 || l1) {
         next = {
           ...next,
           feat_choices: {
             ...(next.feat_choices ?? {}),
             [feat.id]: {
               ...(next.feat_choices?.[feat.id] ?? {}),
-              magicInitiateL1: l1,
+              ...(cantrips.length > 0 ? { magicInitiateCantrips: [...cantrips] } : {}),
+              ...(l1 ? { magicInitiateL1: l1 } : {}),
             },
           },
         };
