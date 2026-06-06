@@ -2103,6 +2103,12 @@ function CharScreen({
           const inputs = getMagicInitiatePickerInputs(beContexts[contextId], draft.backgroundId);
           if (!inputs) return null;
           const beCtx = beContexts[contextId];
+          // Exclude this caster's chosen CANTRIPS (overlap there is pointless —
+          // cantrips are at-will from either source). The level-1 spell is NOT
+          // excluded: picking the same L1 here and in the caster picker is a real
+          // strategy — Magic Initiate grants a free once-per-long-rest cast of it.
+          const cc = beCtx?.casterSpellChoices?.[draft.cls];
+          const casterCantrips = draft.casterSpells?.cantrips ?? cc?.defaultCantrips ?? [];
           return (
             <SpellPickerDialog
               featName={inputs.featName}
@@ -2113,6 +2119,7 @@ function CharScreen({
               initialCantrips={draft.featChoices?.cantripChoices ?? []}
               initialL1={draft.featChoices?.l1Choice ? [draft.featChoices.l1Choice] : []}
               note="The level-1 spell can be cast once per long rest without expending a slot."
+              excludeIds={casterCantrips}
               onClose={() => setSpellPickerIdx(null)}
               onSave={(cantripChoices, l1Choices) => {
                 updateDraft(spellPickerIdx, {
@@ -2130,6 +2137,10 @@ function CharScreen({
           const beCtx = beContexts[contextId];
           const choice = beCtx?.casterSpellChoices?.[draft.cls];
           if (!choice) return null;
+          // Exclude the Magic Initiate CANTRIPS (duplicate cantrips are pointless).
+          // The Magic Initiate level-1 spell is intentionally NOT excluded — taking
+          // the same L1 spell here grants its free once-per-long-rest cast on top.
+          const miCantrips = draft.featChoices?.cantripChoices ?? [];
           return (
             <SpellPickerDialog
               featName={draft.cls}
@@ -2139,6 +2150,7 @@ function CharScreen({
               spells={beCtx?.spells ?? []}
               initialCantrips={draft.casterSpells?.cantrips ?? choice.defaultCantrips}
               initialL1={draft.casterSpells?.l1 ?? choice.defaultL1}
+              excludeIds={miCantrips}
               onClose={() => setCasterPickerIdx(null)}
               onSave={(cantrips, l1) => {
                 updateDraft(casterPickerIdx, { casterSpells: { cantrips, l1 } });

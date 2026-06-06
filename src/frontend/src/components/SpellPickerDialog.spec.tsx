@@ -282,6 +282,29 @@ describe('SpellPickerDialog', () => {
     expect([...l1].sort()).toEqual(['magic_missile', 'shield']);
   });
 
+  it('hides spells listed in excludeIds (chosen in another picker)', () => {
+    const { queryByTestId } = render(
+      <SpellPickerDialog
+        featName="Wizard"
+        spellList="arcane"
+        cantripCount={1}
+        l1Count={1}
+        spells={SPELLS}
+        initialCantrips={[]}
+        initialL1={[]}
+        excludeIds={['mage_hand', 'magic_missile']}
+        onClose={() => {}}
+        onSave={() => {}}
+      />
+    );
+    // Excluded entries don't render…
+    expect(queryByTestId('spell-picker-cantrip-mage_hand')).toBeNull();
+    expect(queryByTestId('spell-picker-l1-magic_missile')).toBeNull();
+    // …but the rest of the list still does.
+    expect(queryByTestId('spell-picker-cantrip-fire_bolt')).toBeTruthy();
+    expect(queryByTestId('spell-picker-l1-shield')).toBeTruthy();
+  });
+
   it('omits the L1 section when l1Count is 0', () => {
     const { queryByTestId } = render(
       <SpellPickerDialog

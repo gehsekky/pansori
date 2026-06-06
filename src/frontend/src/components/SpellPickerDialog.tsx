@@ -23,6 +23,10 @@ interface Props {
   initialL1: string[];
   // Optional extra line under the intro (Magic Initiate's free-cast caveat).
   note?: string;
+  // Spell ids already chosen in ANOTHER picker (e.g. Magic Initiate vs the
+  // caster picker on the same character) — hidden here so you can't pick the
+  // same spell twice.
+  excludeIds?: string[];
   onClose: () => void;
   onSave: (cantripChoices: string[], l1Choices: string[]) => void;
 }
@@ -41,19 +45,23 @@ function SpellPickerDialog({
   initialCantrips,
   initialL1,
   note,
+  excludeIds,
   onClose,
   onSave,
 }: Props) {
+  const exclude = useMemo(() => new Set(excludeIds ?? []), [excludeIds]);
   const [cantrips, setCantrips] = useState<string[]>(initialCantrips);
   const [l1, setL1] = useState<string[]>(initialL1);
 
   const cantripOptions = useMemo(
-    () => spells.filter((s) => s.level === 0 && s.spellList.includes(spellList)),
-    [spells, spellList]
+    () =>
+      spells.filter((s) => s.level === 0 && s.spellList.includes(spellList) && !exclude.has(s.id)),
+    [spells, spellList, exclude]
   );
   const l1Options = useMemo(
-    () => spells.filter((s) => s.level === 1 && s.spellList.includes(spellList)),
-    [spells, spellList]
+    () =>
+      spells.filter((s) => s.level === 1 && s.spellList.includes(spellList) && !exclude.has(s.id)),
+    [spells, spellList, exclude]
   );
 
   const cappedToggle = (setter: Dispatch<SetStateAction<string[]>>, cap: number, id: string) =>
