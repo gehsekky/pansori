@@ -8,14 +8,17 @@
 import {
   type CampaignRegion,
   type CampaignRegionCell,
+  type CampaignRoom,
   type CampaignTown,
   EDITABLE_SECTIONS,
   applyCampaignOverlays,
   dbRegionsToEngine,
+  dbRoomsToEngine,
   dbTownsToEngine,
   deleteCampaignSection,
   getCampaignData,
   getCampaignRegions,
+  getCampaignRooms,
   getCampaignTowns,
   getDbSection,
   isEditableSection,
@@ -57,6 +60,10 @@ function makeContentDb(initial: {
   // campaignId → venue insert params after campaign_id: [town_id, id,
   // sort_order, name, pos_x, pos_y, kind, entry_room_id, description]
   const venues = new Map<string, unknown[][]>();
+  // campaignId → room insert params after campaign_id: [id, sort_order,
+  // name, description, feet_per_square, gridJson, entry_x, entry_y,
+  // exitsJson, lighting, floor, can_rest]
+  const rooms = new Map<string, unknown[][]>();
 
   const query = vi.fn(async (sql: string, params: unknown[] = []) => {
     if (/^(BEGIN|COMMIT|ROLLBACK)/.test(sql)) return { rows: [], rowCount: 0 };
@@ -132,6 +139,37 @@ function makeContentDb(initial: {
       list.push(rest);
       venues.set(campaignId as string, list);
       return { rows: [], rowCount: 1 };
+    }
+    if (sql.includes('DELETE FROM campaign_rooms')) {
+      rooms.delete(params[0] as string);
+      return { rows: [], rowCount: 0 };
+    }
+    if (sql.includes('INSERT INTO campaign_rooms')) {
+      const [campaignId, ...rest] = params;
+      const list = rooms.get(campaignId as string) ?? [];
+      list.push(rest);
+      rooms.set(campaignId as string, list);
+      return { rows: [], rowCount: 1 };
+    }
+    if (sql.includes('FROM campaign_rooms') && sql.includes('SELECT')) {
+      const list = [...(rooms.get(params[0] as string) ?? [])].sort(
+        (a, b) => (a[1] as number) - (b[1] as number)
+      );
+      const rows = list.map((p) => ({
+        id: p[0],
+        sort_order: p[1],
+        name: p[2],
+        description: p[3],
+        feet_per_square: p[4],
+        grid: JSON.parse(p[5] as string),
+        entry_x: p[6],
+        entry_y: p[7],
+        exits: JSON.parse(p[8] as string),
+        lighting: p[9],
+        floor: p[10],
+        can_rest: p[11],
+      }));
+      return { rows, rowCount: rows.length };
     }
     if (sql.includes('DELETE FROM campaign_towns')) {
       towns.delete(params[0] as string);
@@ -268,6 +306,39 @@ const TOWN_B: CampaignTown = {
   startPos: { x: 0, y: 0 },
 };
 
+// Room grids: cells are {t?, m?} — bare {} = floor, no paint, no mechanics.
+const RG = (w: number, h: number): Array<Array<Record<string, unknown>>> =>
+  Array.from({ length: h }, () => Array.from({ length: w }, () => ({})));
+
+const ROOM_A: CampaignRoom = {
+  id: 'taproom',
+  name: 'The Taproom',
+  desc: 'Lamplight, low beams, and the smell of cider.',
+  grid: (() => {
+    const g = RG(8, 6);
+    g[0][3] = { m: 'obstacle' }; // the bar
+    g[2][2] = { t: 'water', m: 'swim' }; // a leaky cellar pool
+    g[4][5] = { m: 'cover' };
+    return g as CampaignRoom['grid'];
+  })(),
+  entryPos: { x: 0, y: 2 },
+  exits: [
+    { pos: { x: 7, y: 2 }, toRoomId: 'cellar', entrancePos: { x: 0, y: 0 }, label: 'Stairs down' },
+    { pos: { x: 0, y: 5 }, ascends: true, label: 'Door' },
+  ],
+  lighting: 'dim',
+  floor: 'cobblestone',
+  canRest: true,
+};
+
+const ROOM_B: CampaignRoom = {
+  id: 'cellar',
+  name: 'The Cellar',
+  desc: 'Cold stone and old barrels.',
+  grid: RG(4, 4) as CampaignRoom['grid'],
+  entryPos: { x: 0, y: 0 },
+};
+
 describe('mergeContextWithOverlay', () => {
   const code = codeCtx({
     id: 'malgovia',
@@ -396,6 +467,35 @@ describe('editable sections registry', () => {
       region({ id: 'frost-reach', name: 'The Frost Reach', isStartingRegion: false }),
     ]);
     expect(result.success, JSON.stringify(result.error?.issues)).toBe(true);
+  });
+
+  it('rooms schema accepts the fixtures; exits cross-validate against the payload', () => {
+    const rooms = CAMPAIGN_SECTION_SCHEMAS.rooms;
+    const ok = rooms.safeParse([ROOM_A, ROOM_B]);
+    expect(ok.success, JSON.stringify(ok.error?.issues)).toBe(true);
+    // An exit pointing at a room NOT in the payload is rejected.
+    expect(rooms.safeParse([ROOM_A]).success).toBe(false); // 'cellar' missing
+    // entrancePos must fit the TARGET room's grid (cellar is 4x4).
+    const badEntrance = {
+      ...ROOM_A,
+      exits: [{ pos: { x: 7, y: 2 }, toRoomId: 'cellar', entrancePos: { x: 4, y: 0 } }],
+    };
+    expect(rooms.safeParse([badEntrance, ROOM_B]).success).toBe(false);
+    // Exactly one of toRoomId | ascends.
+    expect(
+      rooms.safeParse([
+        { ...ROOM_B, exits: [{ pos: { x: 0, y: 1 }, toRoomId: 'cellar', ascends: true }] },
+      ]).success
+    ).toBe(false);
+    expect(rooms.safeParse([{ ...ROOM_B, exits: [{ pos: { x: 0, y: 1 } }] }]).success).toBe(false);
+    // Cell shape: unknown mech flag / unknown terrain / extra key / bad bounds.
+    expect(rooms.safeParse([{ ...ROOM_B, grid: [[{ m: 'lava' }]] }]).success).toBe(false);
+    expect(rooms.safeParse([{ ...ROOM_B, grid: [[{ t: 'lava' }]] }]).success).toBe(false);
+    expect(rooms.safeParse([{ ...ROOM_B, grid: [[{ sticky: true }]] }]).success).toBe(false);
+    expect(rooms.safeParse([{ ...ROOM_B, entryPos: { x: 4, y: 0 } }]).success).toBe(false);
+    // Duplicate ids and empty lists rejected.
+    expect(rooms.safeParse([ROOM_B, { ...ROOM_B, name: 'Other' }]).success).toBe(false);
+    expect(rooms.safeParse([]).success).toBe(false);
   });
 
   it('terrainArt schema: per-type tile ids from the shared catalog, {} allowed', () => {
@@ -667,6 +767,70 @@ describe('towns table store', () => {
   });
 });
 
+describe('rooms table store', () => {
+  it('round-trips rooms with exits/lighting/floor, preserving order + optionals', async () => {
+    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    expect(await putCampaignSection(db.pool, 'malgovia', 'rooms', [ROOM_A, ROOM_B])).toBe(true);
+    const back = await getCampaignRooms(db.pool, 'malgovia');
+    expect(back).toEqual([ROOM_A, ROOM_B]);
+    // The lean room carries no optional keys (absent, not null/false).
+    expect('exits' in back[1]).toBe(false);
+    expect('lighting' in back[1]).toBe(false);
+    expect('floor' in back[1]).toBe(false);
+    expect('canRest' in back[1]).toBe(false);
+    expect('feetPerSquare' in back[1]).toBe(false); // default 5 stays implicit
+  });
+
+  it('put is replace-all; delete reverts to empty; missing campaign rejected', async () => {
+    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    await putCampaignSection(db.pool, 'malgovia', 'rooms', [ROOM_A, ROOM_B]);
+    await putCampaignSection(db.pool, 'malgovia', 'rooms', [ROOM_B]);
+    expect((await getCampaignRooms(db.pool, 'malgovia')).map((r) => r.id)).toEqual(['cellar']);
+    expect(await deleteCampaignSection(db.pool, 'malgovia', 'rooms')).toBe(true);
+    expect(await getCampaignRooms(db.pool, 'malgovia')).toEqual([]);
+    expect(await putCampaignSection(db.pool, 'nope', 'rooms', [ROOM_B])).toBe(false);
+    expect(await deleteCampaignSection(db.pool, 'nope', 'rooms')).toBe(false);
+  });
+
+  it('getDbSection reports presence from the rooms table', async () => {
+    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    expect((await getDbSection(db.pool, 'malgovia', 'rooms')).present).toBe(false);
+    await putCampaignSection(db.pool, 'malgovia', 'rooms', [ROOM_A, ROOM_B]);
+    const after = await getDbSection(db.pool, 'malgovia', 'rooms');
+    expect(after.present).toBe(true);
+    expect(after.value).toEqual([ROOM_A, ROOM_B]);
+  });
+});
+
+describe('dbRoomsToEngine', () => {
+  it('derives dims; cosmetic paint → terrain; mech flags → the engine arrays', () => {
+    const [room] = dbRoomsToEngine([ROOM_A]);
+    expect(room.gridWidth).toBe(8);
+    expect(room.gridHeight).toBe(6);
+    expect(room.terrain).toEqual([{ pos: { x: 2, y: 2 }, type: 'water' }]);
+    expect(room.obstacles).toEqual([{ x: 3, y: 0 }]);
+    expect(room.swimTerrain).toEqual([{ x: 2, y: 2 }]); // t + m can share a cell
+    expect(room.coverPositions).toEqual([{ x: 5, y: 4 }]);
+    expect(room.difficultTerrain).toBeUndefined();
+    expect(room.climbTerrain).toBeUndefined();
+    // Scalars + exits pass through.
+    expect(room.entryPos).toEqual({ x: 0, y: 2 });
+    expect(room.exits).toEqual(ROOM_A.exits);
+    expect(room.lighting).toBe('dim');
+    expect(room.floor).toBe('cobblestone');
+    expect(room.canRest).toBe(true);
+  });
+
+  it('a bare room is just a grid: no terrain/mech keys at all', () => {
+    const [room] = dbRoomsToEngine([ROOM_B]);
+    expect(room.gridWidth).toBe(4);
+    expect('terrain' in room).toBe(false);
+    expect('obstacles' in room).toBe(false);
+    expect('exits' in room).toBe(false);
+    expect('canRest' in room).toBe(false);
+  });
+});
+
 describe('section CRUD + live refresh', () => {
   it('put → refresh serves the DB version; delete → refresh restores code', async () => {
     const db = makeContentDb({ campaigns: { malgovia: {} } });
@@ -788,6 +952,33 @@ describe('section CRUD + live refresh', () => {
     expect(contexts.ghost.campaign?.intro).toBe('Boo. The tale begins.');
     // Template machinery still present under the overridden opening.
     expect(contexts.ghost.campaign?.rooms.length).toBeGreaterThan(0);
+  });
+
+  it('DB rooms replace the campaign rooms wholesale on refresh', async () => {
+    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    const code = codeCtx({
+      id: 'malgovia',
+      campaign: {
+        world_name: 'Malgovia',
+        intro: 'x',
+        rooms: [{ id: 'code-room', name: 'Code Room', desc: 'd' }],
+        regions: [{ id: 'code-region' } as never],
+      } as never,
+    });
+    const contexts: Record<string, Context> = { malgovia: code };
+    await putCampaignSection(db.pool, 'malgovia', 'rooms', [ROOM_A, ROOM_B]);
+    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
+    const campaign = contexts.malgovia.campaign!;
+    // DB rooms in engine form; the code rooms are gone (wholesale replace);
+    // untouched sections (regions) stay code-supplied.
+    expect(campaign.rooms.map((r) => r.id)).toEqual(['taproom', 'cellar']);
+    expect(campaign.rooms[0].gridWidth).toBe(8);
+    expect(campaign.regions?.map((r) => r.id)).toEqual(['code-region']);
+
+    // Delete → refresh restores the code rooms.
+    await deleteCampaignSection(db.pool, 'malgovia', 'rooms');
+    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
+    expect(contexts.malgovia.campaign?.rooms.map((r) => r.id)).toEqual(['code-room']);
   });
 
   it('DB towns without DB regions still fold in, keeping the code regions', async () => {

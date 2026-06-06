@@ -763,6 +763,121 @@ const TownsSchema = z
     }
   });
 
+// Rooms — the third (local) map level. Each cell carries an optional
+// cosmetic terrain paint `t` and at most one mechanical flag `m`; exits are
+// the per-cell room connections (toRoomId XOR ascends), cross-validated
+// against the payload's own room ids and the TARGET room's grid bounds.
+const RoomCellSchema = z
+  .object({
+    t: z.enum(Object.keys(TERRAIN) as [string, ...string[]]).optional(),
+    m: z.enum(['obstacle', 'difficult', 'climb', 'swim', 'cover']).optional(),
+  })
+  .strict();
+const RoomGridSchema = z.array(z.array(RoomCellSchema).min(1).max(200)).min(1).max(200);
+
+const RoomExitSchema = z
+  .object({
+    pos: GridPosSchema,
+    toRoomId: SLUG.optional(),
+    entrancePos: GridPosSchema.optional(),
+    label: z.string().min(1).max(80).optional(),
+    ascends: z.boolean().optional(),
+  })
+  .strict();
+
+const RoomsSchema = z
+  .array(
+    z
+      .object({
+        id: SLUG,
+        name: z.string().min(1).max(80),
+        desc: z.string().min(1).max(4000),
+        // SRD tactical scale: 5 ft per square (the default when omitted).
+        feetPerSquare: z.number().positive().optional(),
+        grid: RoomGridSchema,
+        entryPos: GridPosSchema,
+        exits: z.array(RoomExitSchema).max(20).optional(),
+        lighting: z.enum(['bright', 'dim', 'dark', 'sunlight']).optional(),
+        floor: z.enum(['grass', 'dirt', 'cobblestone', 'sand']).optional(),
+        canRest: z.boolean().optional(),
+      })
+      .strict()
+      .superRefine((r, ctx) => {
+        const gridHeight = r.grid.length;
+        const gridWidth = r.grid[0]?.length ?? 0;
+        r.grid.forEach((row, y) => {
+          if (row.length !== gridWidth) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: `grid row ${y} has ${row.length} cells; expected ${gridWidth} (grid must be rectangular)`,
+              path: ['grid', y],
+            });
+          }
+        });
+        if (r.entryPos.x >= gridWidth || r.entryPos.y >= gridHeight) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `entryPos (${r.entryPos.x},${r.entryPos.y}) is outside the ${gridWidth}x${gridHeight} grid`,
+            path: ['entryPos'],
+          });
+        }
+        (r.exits ?? []).forEach((e, i) => {
+          if (e.pos.x >= gridWidth || e.pos.y >= gridHeight) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: `exit ${i} pos (${e.pos.x},${e.pos.y}) is outside the ${gridWidth}x${gridHeight} grid`,
+              path: ['exits', i, 'pos'],
+            });
+          }
+          if (!e.toRoomId === !e.ascends) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: `exit ${i} needs exactly one of toRoomId or ascends`,
+              path: ['exits', i],
+            });
+          }
+        });
+      })
+  )
+  .min(1)
+  .max(200)
+  .superRefine((rooms, ctx) => {
+    const ids = new Set<string>();
+    for (const r of rooms) {
+      if (ids.has(r.id)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: `duplicate room id "${r.id}"` });
+      }
+      ids.add(r.id);
+    }
+    // Exits must lead somewhere real: toRoomId resolves within this payload,
+    // and an explicit entrancePos must fit the TARGET room's grid.
+    rooms.forEach((r, ri) =>
+      (r.exits ?? []).forEach((e, ei) => {
+        if (!e.toRoomId) return;
+        const target = rooms.find((t) => t.id === e.toRoomId);
+        if (!target) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `room "${r.id}" exit ${ei} points at unknown room "${e.toRoomId}"`,
+            path: [ri, 'exits', ei, 'toRoomId'],
+          });
+          return;
+        }
+        if (e.entrancePos) {
+          const th = target.grid.length;
+          const tw = target.grid[0]?.length ?? 0;
+          if (e.entrancePos.x >= tw || e.entrancePos.y >= th) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: `room "${r.id}" exit ${ei} entrancePos is outside "${target.id}"'s ${tw}x${th} grid`,
+              path: [ri, 'exits', ei, 'entrancePos'],
+            });
+          }
+        }
+      })
+    );
+  });
+
 // Campaign terrain skin: terrain type → tile id from the shared catalog.
 // Every key optional ({} = all defaults); unknown types / tile ids rejected.
 const TILE_ID = z.enum(Object.keys(TERRAIN_TILES) as [string, ...string[]]);
@@ -775,6 +890,7 @@ export const CAMPAIGN_SECTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
   // code/template campaign.intro).
   gameStart: z.string().min(1).max(4000),
   narratives: NarrativesSchema,
+  rooms: RoomsSchema,
   terrainArt: TerrainArtSchema,
   regions: RegionsSchema,
   towns: TownsSchema,

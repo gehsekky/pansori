@@ -28,8 +28,11 @@ import type {
   Context,
   EnemyTemplate,
   FloorType,
+  GridPos,
   LootItem,
   Region,
+  Room,
+  RoomExit,
   TerrainCell,
   TerrainType,
   TierZone,
@@ -64,10 +67,14 @@ export function baseContextFor(campaignId: string): Context {
 // stay in lockstep — there's a spec asserting that). Order is the display
 // order in the admin UI.
 //
-// 'regions' / 'towns' are DB-era sections with no code-context counterpart
-// — stored relationally in campaign_regions / campaign_towns. They're LIVE:
-// loadOverlay converts them (dbRegionsToEngine / dbTownsToEngine) and folds
-// them into campaign.regions / campaign.towns, replacing the code maps.
+// 'regions' / 'towns' / 'rooms' are DB-era sections with no code-context
+// counterpart — stored relationally in campaign_regions / campaign_towns /
+// campaign_rooms. They're LIVE: loadOverlay converts them (dbRegionsToEngine
+// / dbTownsToEngine / dbRoomsToEngine) and folds them into the campaign
+// block, replacing the code maps wholesale. NOTE the wholesale semantics
+// for rooms in particular: a campaign with ANY DB rooms serves ONLY those
+// rooms — code/template rooms (and anything keyed to their ids, e.g.
+// placed enemies/loot) stop resolving until those sections migrate too.
 //
 // 'gameStart' is the game-start narration hook: a campaigns.data key that
 // loadOverlay folds into campaign.intro (the first narrative entry of a
@@ -87,6 +94,7 @@ export const EDITABLE_SECTIONS = [
   'narratives',
   'regions',
   'towns',
+  'rooms',
   'terrainArt',
   'customItems',
   'customMonsters',
@@ -528,6 +536,178 @@ export function dbTownsToEngine(towns: CampaignTown[]): Town[] {
   });
 }
 
+// ─── Rooms (relational storage — campaign_rooms) ─────────────────────────────
+
+// One square of a room's dense cell grid. BOTH layers optional: `t` is the
+// cosmetic terrain paint (absent = bare floor texture), `m` is the cell's
+// mechanical flag — at most one per cell, covering the engine's sparse
+// arrays (obstacles / difficultTerrain / climbTerrain / swimTerrain /
+// coverPositions). Authored layer overlap (a cell that's both difficult
+// AND cover) stays a code-room capability.
+export type RoomCellMech = 'obstacle' | 'difficult' | 'climb' | 'swim' | 'cover';
+export interface CampaignRoomCell {
+  t?: string;
+  m?: RoomCellMech;
+}
+
+export interface CampaignRoomExit {
+  pos: GridPos;
+  toRoomId?: string;
+  entrancePos?: GridPos;
+  label?: string;
+  ascends?: boolean;
+}
+
+export interface CampaignRoom {
+  id: string;
+  name: string;
+  desc: string;
+  feetPerSquare?: number; // default 5 (SRD tactical scale)
+  grid: CampaignRoomCell[][];
+  entryPos: GridPos;
+  exits?: CampaignRoomExit[];
+  lighting?: 'bright' | 'dim' | 'dark' | 'sunlight';
+  floor?: FloorType;
+  canRest?: boolean;
+}
+
+interface RoomRow {
+  id: string;
+  name: string;
+  description: string;
+  feet_per_square: number;
+  grid: CampaignRoomCell[][];
+  entry_x: number;
+  entry_y: number;
+  exits: CampaignRoomExit[];
+  lighting: CampaignRoom['lighting'] | null;
+  floor: FloorType | null;
+  can_rest: boolean;
+}
+
+export async function getCampaignRooms(pool: Pool, campaignId: string): Promise<CampaignRoom[]> {
+  const { rows } = await pool.query<RoomRow>(
+    `SELECT id, name, description, feet_per_square, grid, entry_x, entry_y, exits,
+            lighting, floor, can_rest
+       FROM campaign_rooms
+      WHERE campaign_id = $1
+      ORDER BY sort_order, id`,
+    [campaignId]
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    desc: r.description,
+    ...(r.feet_per_square !== 5 ? { feetPerSquare: r.feet_per_square } : {}),
+    grid: r.grid,
+    entryPos: { x: r.entry_x, y: r.entry_y },
+    ...(r.exits.length > 0 ? { exits: r.exits } : {}),
+    ...(r.lighting !== null ? { lighting: r.lighting } : {}),
+    ...(r.floor !== null ? { floor: r.floor } : {}),
+    ...(r.can_rest ? { canRest: true } : {}),
+  }));
+}
+
+// Replace-all write, matching the editor's whole-section semantics.
+export async function putCampaignRooms(
+  pool: Pool,
+  campaignId: string,
+  rooms: CampaignRoom[]
+): Promise<boolean> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rowCount } = await client.query('SELECT 1 FROM campaigns WHERE id = $1', [campaignId]);
+    if (!rowCount) {
+      await client.query('ROLLBACK');
+      return false;
+    }
+    await client.query('DELETE FROM campaign_rooms WHERE campaign_id = $1', [campaignId]);
+    for (let i = 0; i < rooms.length; i++) {
+      const r = rooms[i];
+      await client.query(
+        `INSERT INTO campaign_rooms
+           (campaign_id, id, sort_order, name, description, feet_per_square,
+            grid, entry_x, entry_y, exits, lighting, floor, can_rest)
+         VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10::jsonb, $11, $12, $13)`,
+        [
+          campaignId,
+          r.id,
+          i,
+          r.name,
+          r.desc,
+          r.feetPerSquare ?? 5,
+          JSON.stringify(r.grid),
+          r.entryPos.x,
+          r.entryPos.y,
+          JSON.stringify(r.exits ?? []),
+          r.lighting ?? null,
+          r.floor ?? null,
+          r.canRest ?? false,
+        ]
+      );
+    }
+    await client.query('COMMIT');
+    return true;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+export async function deleteCampaignRooms(pool: Pool, campaignId: string): Promise<boolean> {
+  const { rowCount } = await pool.query('SELECT 1 FROM campaigns WHERE id = $1', [campaignId]);
+  if (!rowCount) return false;
+  await pool.query('DELETE FROM campaign_rooms WHERE campaign_id = $1', [campaignId]);
+  return true;
+}
+
+// Convert DB rooms into the engine model: dims derive from the dense grid,
+// cosmetic `t` paint becomes the sparse terrain array, and each cell's
+// mechanical flag lands in the matching engine array. Exits pass through
+// (the shapes match).
+export function dbRoomsToEngine(rooms: CampaignRoom[]): Room[] {
+  return rooms.map((r) => {
+    const terrain: TerrainCell[] = [];
+    const mech: Record<RoomCellMech, GridPos[]> = {
+      obstacle: [],
+      difficult: [],
+      climb: [],
+      swim: [],
+      cover: [],
+    };
+    r.grid.forEach((row, y) =>
+      row.forEach((cell, x) => {
+        if (cell.t) terrain.push({ pos: { x, y }, type: cell.t as TerrainType });
+        if (cell.m) mech[cell.m].push({ x, y });
+      })
+    );
+    return {
+      id: r.id,
+      name: r.name,
+      desc: r.desc,
+      gridWidth: r.grid[0]?.length ?? 0,
+      gridHeight: r.grid.length,
+      ...(r.feetPerSquare !== undefined ? { feetPerSquare: r.feetPerSquare } : {}),
+      entryPos: r.entryPos,
+      ...(r.exits && r.exits.length > 0
+        ? { exits: r.exits.map((e) => ({ ...e }) as RoomExit) }
+        : {}),
+      ...(terrain.length > 0 ? { terrain } : {}),
+      ...(mech.obstacle.length > 0 ? { obstacles: mech.obstacle } : {}),
+      ...(mech.difficult.length > 0 ? { difficultTerrain: mech.difficult } : {}),
+      ...(mech.climb.length > 0 ? { climbTerrain: mech.climb } : {}),
+      ...(mech.swim.length > 0 ? { swimTerrain: mech.swim } : {}),
+      ...(mech.cover.length > 0 ? { coverPositions: mech.cover } : {}),
+      ...(r.lighting !== undefined ? { lighting: r.lighting } : {}),
+      ...(r.floor !== undefined ? { floor: r.floor } : {}),
+      ...(r.canRest ? { canRest: true } : {}),
+    };
+  });
+}
+
 // Convert DB regions (dense {t, tier?, enc?} grid + child sites) into the
 // engine's map model (sparse terrain + tierZones rectangles):
 //
@@ -605,6 +785,10 @@ export async function getDbSection(
     const towns = await getCampaignTowns(pool, campaignId);
     return { present: towns.length > 0, value: towns.length > 0 ? towns : undefined };
   }
+  if (section === 'rooms') {
+    const rooms = await getCampaignRooms(pool, campaignId);
+    return { present: rooms.length > 0, value: rooms.length > 0 ? rooms : undefined };
+  }
   if (section === 'customItems') {
     const items = await getCampaignCustomItems(pool, campaignId);
     return { present: items.length > 0, value: items.length > 0 ? items : undefined };
@@ -634,6 +818,9 @@ export async function putCampaignSection(
   if (section === 'towns') {
     return putCampaignTowns(pool, campaignId, value as CampaignTown[]);
   }
+  if (section === 'rooms') {
+    return putCampaignRooms(pool, campaignId, value as CampaignRoom[]);
+  }
   if (section === 'customItems') {
     return putCampaignCustomItems(pool, campaignId, value as LootItem[]);
   }
@@ -661,6 +848,9 @@ export async function deleteCampaignSection(
   }
   if (section === 'towns') {
     return deleteCampaignTowns(pool, campaignId);
+  }
+  if (section === 'rooms') {
+    return deleteCampaignRooms(pool, campaignId);
   }
   if (section === 'customItems') {
     return deleteCampaignCustomItems(pool, campaignId);
@@ -719,18 +909,20 @@ async function loadOverlay(
   const gameStart = typeof overlay.gameStart === 'string' ? overlay.gameStart : undefined;
   delete overlay.gameStart;
 
-  // DB regions + towns DRIVE the map: converted to the engine model and
-  // folded into the campaign block (each replacing its code/template
-  // counterpart while the rest of the block — rooms, placed enemies/loot,
-  // quests — stays code-supplied until those sections migrate).
+  // DB regions + towns + rooms DRIVE the map: converted to the engine model
+  // and folded into the campaign block (each replacing its code/template
+  // counterpart while the rest of the block — placed enemies/loot, quests —
+  // stays code-supplied until those sections migrate).
   const dbRegions = await getCampaignRegions(pool, campaignId);
   const dbTowns = await getCampaignTowns(pool, campaignId);
-  if (dbRegions.length > 0 || dbTowns.length > 0 || gameStart !== undefined) {
+  const dbRooms = await getCampaignRooms(pool, campaignId);
+  if (dbRegions.length > 0 || dbTowns.length > 0 || dbRooms.length > 0 || gameStart !== undefined) {
     overlay.campaign = {
       ...(code.campaign ?? { world_name: code.id, intro: '', rooms: [] }),
       ...(gameStart !== undefined ? { intro: gameStart } : {}),
       ...(dbRegions.length > 0 ? { regions: dbRegionsToEngine(dbRegions) } : {}),
       ...(dbTowns.length > 0 ? { towns: dbTownsToEngine(dbTowns) } : {}),
+      ...(dbRooms.length > 0 ? { rooms: dbRoomsToEngine(dbRooms) } : {}),
     };
   }
 
