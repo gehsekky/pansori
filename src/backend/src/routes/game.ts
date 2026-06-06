@@ -97,7 +97,12 @@ import { randomUUID } from 'crypto';
 // Adding a new campaign only requires dropping a .ts file there. Exported
 // so index.ts can sync the campaigns DB registry from the same load.
 export const CONTEXTS: Record<string, Context> = await loadContexts();
-const DEFAULT_CONTEXT = Object.values(CONTEXTS)[0] ?? ({ id: 'none' } as Context);
+// Resolved lazily (not a const) because startup applies DB content overlays
+// onto CONTEXTS after migrations (services/campaignContent.ts) — a captured
+// first-entry reference would keep serving the pre-overlay object.
+function defaultContext(): Context {
+  return Object.values(CONTEXTS)[0] ?? ({ id: 'none' } as Context);
+}
 
 // SRD — initial weapon masteries by class. Each listed class starts
 // with these weapons mastered; non-listed classes don't get the feature.
@@ -430,7 +435,7 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
     }
   }
 
-  const ctx = CONTEXTS[context_id ?? ''] ?? DEFAULT_CONTEXT;
+  const ctx = CONTEXTS[context_id ?? ''] ?? defaultContext();
   // Visibility gate: a private campaign is playable only by its members
   // (the /contexts list already hides it, but enforce server-side too).
   try {
@@ -808,7 +813,7 @@ gameRouter.post('/session/:id/equip', async (req: Request, res: Response) => {
       return;
     }
 
-    const ctx = CONTEXTS[row.seed.context_id ?? ''] ?? DEFAULT_CONTEXT;
+    const ctx = CONTEXTS[row.seed.context_id ?? ''] ?? defaultContext();
     const state = backfillOwnership(normalizeState(row.state), row.user_id);
 
     // Resolve target character
@@ -1328,7 +1333,7 @@ gameRouter.post('/session/:id/action', async (req: Request, res: Response) => {
       return;
     }
 
-    const ctx = CONTEXTS[row.seed.context_id ?? ''] ?? DEFAULT_CONTEXT;
+    const ctx = CONTEXTS[row.seed.context_id ?? ''] ?? defaultContext();
     let state = backfillOwnership(normalizeState(row.state), row.user_id);
 
     // Turn enforcement. Two cases:

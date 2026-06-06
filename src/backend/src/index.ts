@@ -2,6 +2,7 @@ import 'dotenv/config';
 import './auth/passport.js';
 import { CONTEXTS, gameRouter } from './routes/game.js';
 import { Server } from 'socket.io';
+import { applyCampaignOverlays } from './services/campaignContent.js';
 import { authRouter } from './routes/auth.js';
 import { campaignsRouter } from './routes/campaigns.js';
 import connectPgSimple from 'connect-pg-simple';
@@ -162,11 +163,13 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3001;
 
-// Run pending DB migrations, then sync the campaigns registry, before
-// serving traffic. A failure in either aborts startup so we don't accept
-// requests against a half-migrated schema or an unregistered campaign set.
+// Run pending DB migrations, sync the campaigns registry, then overlay
+// DB-authored campaign data onto the code contexts — all before serving
+// traffic. A failure in any aborts startup so we don't accept requests
+// against a half-migrated schema or a half-resolved campaign set.
 runMigrations(pool)
   .then(() => syncCampaignRegistry(pool, CONTEXTS))
+  .then(() => applyCampaignOverlays(pool, CONTEXTS))
   .then(() => {
     httpServer.listen(PORT, () => console.log(`Backend running on :${PORT}`));
   })
