@@ -1255,10 +1255,9 @@
 }
 
 .sessionList {
-  /* Fill the widened container: two columns of cards at desktop widths,
-     collapsing to one when a 480px card no longer fits. */
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(480px, 100%), 1fr));
+  /* One card per row, each spanning the full container width. */
+  display: flex;
+  flex-direction: column;
   gap: 0.75rem;
 }
 
