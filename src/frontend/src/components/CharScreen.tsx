@@ -435,12 +435,30 @@ function CharScreen({
 
   // The world picker's list: code contexts minus hidden ones, intersected
   // with what the server says this user may see (global campaigns + their
-  // memberships). Before the BE list resolves, show the code list as-is —
-  // today's code contexts are all global, so there's nothing to over-show.
+  // memberships) — PLUS the server-listed campaigns that have no code
+  // context at all (creator-built, DB-only). Those get a synthesized card:
+  // a code context donates the SRD class/background/theme machinery while
+  // the id/name come from the server. Before the BE list resolves, show
+  // the code list as-is — the code contexts are the global built-ins.
   const beLoaded = Object.keys(beContexts).length > 0;
+  const donorCtx = availableContexts[0];
+  const beOnlyContexts: FrontendContext[] = !beLoaded
+    ? []
+    : Object.values(beContexts)
+        .filter((b) => !availableContexts.some((c) => c.id === b.id))
+        .map((b) => ({
+          ...donorCtx,
+          id: b.id,
+          displayName: b.displayName,
+          tagline: 'A creator-built campaign.',
+          previewArt: '',
+          hidden: false,
+        }));
   const pickerContexts = beLoaded
-    ? visibleContexts.filter((c) => c.id in beContexts)
+    ? [...visibleContexts.filter((c) => c.id in beContexts), ...beOnlyContexts]
     : visibleContexts;
+  // Selection lookups resolve from code + synthesized contexts alike.
+  const allContexts = [...availableContexts, ...beOnlyContexts];
 
   function swapStats(partyIdx: number, a: keyof StatBlock, b: keyof StatBlock) {
     if (a === b) return;
@@ -467,7 +485,7 @@ function CharScreen({
 
   function setStatMethod(partyIdx: number, method: StatMethod) {
     setSwapFrom(null);
-    const ctxForMethod = availableContexts.find((c) => c.id === contextId) ?? availableContexts[0];
+    const ctxForMethod = allContexts.find((c) => c.id === contextId) ?? allContexts[0];
     setParty((prev) =>
       prev.map((d, i) => {
         if (i !== partyIdx) return d;
@@ -513,7 +531,7 @@ function CharScreen({
   }
 
   useEffect(() => {
-    const c = availableContexts.find((c) => c.id === contextId);
+    const c = allContexts.find((c) => c.id === contextId);
     if (!c) return;
     applyTheme(c.theme);
     localStorage.setItem('last_context_id', contextId);
@@ -550,7 +568,7 @@ function CharScreen({
     savePartyDraft(contextId, party);
   }, [contextId, party]);
 
-  const selectedCtx = availableContexts.find((c) => c.id === contextId);
+  const selectedCtx = allContexts.find((c) => c.id === contextId);
   const classes = selectedCtx?.classes ?? [];
 
   function updateDraft(idx: number, patch: Partial<CharDraft>) {

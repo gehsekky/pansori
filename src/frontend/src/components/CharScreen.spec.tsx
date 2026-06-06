@@ -190,6 +190,30 @@ const wizardSummary = {
   ],
 } as unknown as BackendContextSummary;
 
+describe('CharScreen — campaign selector includes DB-only campaigns', () => {
+  it('synthesizes a picker card for a server-listed campaign with no code context', async () => {
+    const mistwoodSummary = {
+      ...wizardSummary,
+      id: 'mistwood',
+      displayName: 'Mistwood',
+    } as BackendContextSummary;
+    const sandboxSummary = { ...wizardSummary, id: ctx.id } as BackendContextSummary;
+    vi.spyOn(api, 'listContexts').mockResolvedValue([sandboxSummary, mistwoodSummary]);
+    const { findByTestId, container, getByText } = render(
+      <CharScreen onStart={vi.fn()} loading={false} availableContexts={[ctx]} user={null} />
+    );
+    // The DB-only campaign gets a card once the BE list loads…
+    const card = await findByTestId('world-picker-mistwood');
+    expect(card.textContent).toContain('Mistwood');
+    expect(card.textContent).toContain('creator-built');
+    // …and selecting it keeps the donor's class machinery working.
+    fireEvent.click(card);
+    expect(getByText('PARTY LEADER')).toBeTruthy();
+    const classSelect = container.querySelector('#char-0-class') as HTMLSelectElement;
+    expect(classSelect.options.length).toBeGreaterThan(0);
+  });
+});
+
 describe('CharScreen — caster spell picker', () => {
   it('surfaces the picker for a Wizard and opens it with the arcane list', async () => {
     vi.spyOn(api, 'listContexts').mockResolvedValue([wizardSummary]);
