@@ -287,6 +287,8 @@ const RegionSiteSchema = z
     townId: SLUG.optional(),
     entryRoomId: SLUG.optional(),
     desc: z.string().min(1).max(2000).optional(),
+    // Narration hook — appended to "You enter X." on every landing.
+    onEnter: z.string().min(1).max(2000).optional(),
     // game-icons.net icon name for 'local' sites; towns use the village glyph.
     icon: z.string().min(1).max(60).optional(),
   })
@@ -300,6 +302,8 @@ const RegionsSchema = z
         name: z.string().min(1).max(80),
         isStartingRegion: z.boolean(),
         desc: z.string().min(1).max(2000).optional(),
+        // Narration hook — fires on first entry; desc is the fallback.
+        onEnter: z.string().min(1).max(2000).optional(),
         // SRD overland scale: 5280 = 1 mile per square (Travel Pace).
         feetPerSquare: z.number().positive(),
         // The dense terrain grid — dimensions derive from its shape.
@@ -759,6 +763,9 @@ const TownsSchema = z
 
 export const CAMPAIGN_SECTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
   displayNoun: z.string().min(1).max(40),
+  // Narration hook: the first narrative entry of a new game (overlays the
+  // code/template campaign.intro).
+  gameStart: z.string().min(1).max(4000),
   narratives: NarrativesSchema,
   regions: RegionsSchema,
   towns: TownsSchema,

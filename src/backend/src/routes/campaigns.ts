@@ -250,10 +250,14 @@ function sectionSource(
 
 // Effective fallback value for a section the DB doesn't carry: the literal
 // code field, or — for the customs sections — the code campaign's own
-// non-catalog entries.
+// non-catalog entries. gameStart maps to the code campaign.intro (that's
+// the field it overlays).
 async function sectionCodeFallback(campaignId: string, section: string): Promise<unknown | null> {
   if (section === 'customItems' || section === 'customMonsters') {
     return getCustomsCodeFallback(pool, CODE_CONTEXTS[campaignId], section);
+  }
+  if (section === 'gameStart') {
+    return CODE_CONTEXTS[campaignId]?.campaign?.intro ?? null;
   }
   const code = CODE_CONTEXTS[campaignId] as unknown as Record<string, unknown> | undefined;
   return code?.[section] ?? null;

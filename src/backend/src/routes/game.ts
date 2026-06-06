@@ -83,12 +83,12 @@ import {
   slotsForInstance,
   toggleWornItem,
 } from '../services/equipment.js';
+import { initMapState, regionEnterNarration } from '../services/mapEngine.js';
 import type { AuthedRequest } from '../auth/middleware.js';
 import { CONTEXTS } from '../services/contextStore.js';
 import { applyCreationDivineOrder } from '../services/actions/meta.js';
 import { applyFeatTake } from '../services/feats.js';
 import { generateSeed } from '../services/procgen.js';
-import { initMapState } from '../services/mapEngine.js';
 import { listVisibleCampaignIds } from '../services/campaignMembers.js';
 import { pool } from '../db/pool.js';
 import { randomUUID } from 'crypto';
@@ -722,7 +722,10 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
       .filter((q) => q.startActive)
       .map((q) => `\n\n✦ Quest: ${q.title} — ${q.desc}`)
       .join('');
-    const startNarrative = seed.intro + starterQuestLine;
+    // regionEnter narration hook — game start counts as first entry to the
+    // starting region (initMapState recorded it in visited_regions).
+    const regionArrival = regionEnterNarration(ctx.campaign, initialState.current_region_id);
+    const startNarrative = seed.intro + regionArrival + starterQuestLine;
     initialState.run_log = [
       { character_id: leader.id, action: 'start', narrative: startNarrative },
     ];

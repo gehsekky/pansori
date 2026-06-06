@@ -8,6 +8,7 @@ import {
   ENCOUNTER_ROOM_ID,
   activeGrid,
   initMapState,
+  regionEnterNarration,
   resolveMarkerMove,
   returnFromEncounter,
   stageEncounter,
@@ -225,6 +226,9 @@ describe('initMapState', () => {
     expect(st.map_level).toBe('regional');
     expect(st.current_region_id).toBe('reg1');
     expect(st.marker_pos).toEqual({ x: 0, y: 0 });
+    // Game start counts as entering the starting region — recorded so the
+    // regionEnter hook stays first-entry-only once region travel exists.
+    expect(st.visited_regions).toEqual(['reg1']);
   });
 
   it('is a no-op without regions or when map state is already set', () => {
@@ -233,6 +237,67 @@ describe('initMapState', () => {
     );
     const already = initMapState(campaign, { ...start(), map_level: 'town' } as GameState);
     expect(already.map_level).toBe('town'); // untouched
+  });
+});
+
+describe('narration hooks', () => {
+  it('regionEnterNarration: onEnter wins, desc is the fallback, neither → empty', () => {
+    const withHooks: CampaignData = {
+      ...campaign,
+      regions: [{ ...campaign.regions![0], desc: 'A vale of mists.', onEnter: 'The mists part.' }],
+    };
+    expect(regionEnterNarration(withHooks, 'reg1')).toBe('\n\nThe mists part.');
+    const descOnly: CampaignData = {
+      ...campaign,
+      regions: [{ ...campaign.regions![0], desc: 'A vale of mists.' }],
+    };
+    expect(regionEnterNarration(descOnly, 'reg1')).toBe('\n\nA vale of mists.');
+    expect(regionEnterNarration(campaign, 'reg1')).toBe(''); // fixture has neither
+    expect(regionEnterNarration(campaign, 'nope')).toBe('');
+    expect(regionEnterNarration(undefined, 'reg1')).toBe('');
+  });
+
+  it('a site onEnter hook follows the announcement on town descend', () => {
+    const hooked: CampaignData = {
+      ...campaign,
+      regions: [
+        {
+          ...campaign.regions![0],
+          sites: campaign.regions![0].sites.map((s) =>
+            s.id === 's_town' ? { ...s, onEnter: 'Smoke curls from the mill chimneys.' } : s
+          ),
+        },
+      ],
+    };
+    const r = resolveMarkerMove(hooked, rooms, start(), { x: 2, y: 0 });
+    expect(r.transitioned).toBe(true);
+    expect(r.narrative).toContain('You enter Millhaven. Smoke curls from the mill chimneys.');
+  });
+
+  it('a site onEnter hook follows the announcement on local descend, every landing', () => {
+    const hooked: CampaignData = {
+      ...campaign,
+      regions: [
+        {
+          ...campaign.regions![0],
+          sites: campaign.regions![0].sites.map((s) =>
+            s.id === 's_crypt' ? { ...s, onEnter: 'Cold air breathes up from the dark.' } : s
+          ),
+        },
+      ],
+    };
+    let r = resolveMarkerMove(hooked, rooms, start(), { x: 5, y: 0 });
+    expect(r.narrative).toContain('You enter Crypt Entrance. Cold air breathes up from the dark.');
+    // Leave and land again — the hook fires every time.
+    r = resolveMarkerMove(hooked, rooms, r.st, { x: 0, y: 1 }); // ascend
+    r = resolveMarkerMove(hooked, rooms, r.st, { x: 5, y: 0 }); // re-enter
+    expect(r.narrative).toContain('Cold air breathes up from the dark.');
+  });
+
+  it('unhooked transitions keep the bare announcement', () => {
+    const r = resolveMarkerMove(campaign, rooms, start(), { x: 2, y: 0 });
+    expect(r.narrative).toContain('You enter Millhaven.');
+    expect(r.narrative.trim().endsWith('Millhaven.')).toBe(true);
   });
 });
 

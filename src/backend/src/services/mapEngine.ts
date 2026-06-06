@@ -106,10 +106,30 @@ export function initMapState(campaign: CampaignData | undefined, st: GameState):
     map_level: 'regional',
     current_region_id: region.id,
     marker_pos: region.startPos,
+    // Game start counts as entering the starting region — the regionEnter
+    // narration hook fires once per region, so record the visit.
+    visited_regions: [region.id],
     // The party is on the overland grid, not in any room — clear current_room
     // so no stray room-level choices surface while travelling.
     current_room: '',
   });
+}
+
+// The regionEnter narration hook: authored flavor for FIRST entry to a
+// region (game start counts — the campaign opens in regions[0]). Explicit
+// `onEnter` wins; `desc` is the fallback so already-authored regions narrate
+// for free. Returns '' when the region carries neither.
+//
+// Callers fire this only on first entry (st.visited_regions tracks that);
+// region-to-region travel — when it lands — appends the region id there and
+// calls this for newly-entered regions.
+export function regionEnterNarration(
+  campaign: CampaignData | undefined,
+  regionId: string | undefined
+): string {
+  const region = regionById(campaign, regionId);
+  const text = region?.onEnter ?? region?.desc;
+  return text ? `\n\n${text}` : '';
 }
 
 // A transition cell on the active grid — where stepping onto it does something.
@@ -122,6 +142,9 @@ export interface MapTransition {
   toRoomId?: string; // site/venue → local room, or room_exit → next room
   entrancePos?: GridPos; // arrival cell in the destination room
   ascendTo?: 'town' | 'region'; // ascend / gate
+  // Narration hook (site enter) — authored flavor appended to the
+  // "You enter X." line when the transition resolves.
+  onEnter?: string;
 }
 
 // The grid the party marker is currently on, normalized for movement + render.
@@ -203,6 +226,7 @@ export function activeGrid(
       label: s.name,
       toTownId: s.kind === 'town' ? s.townId : undefined,
       toRoomId: s.kind === 'local' ? s.entryRoomId : undefined,
+      onEnter: s.onEnter,
     }));
     return {
       level,
@@ -437,6 +461,9 @@ export function resolveTransition(
   st: GameState,
   t: MapTransition
 ): { st: GameState; narrative: string } {
+  // The site-enter narration hook: authored flavor follows the
+  // announcement line every time the party lands on the site's square.
+  const hook = t.onEnter ? ` ${t.onEnter}` : '';
   // ── Descend into a town ──────────────────────────────────────────────
   if (t.kind === 'site' && t.toTownId) {
     const town = townById(campaign, t.toTownId);
@@ -450,7 +477,7 @@ export function resolveTransition(
         region_marker_pos: st.marker_pos, // bookmark the region cell for ascent
         current_room: '', // on the town grid, not in any room
       },
-      narrative: ` You enter ${town.name}.`,
+      narrative: ` You enter ${town.name}.${hook}`,
     };
   }
   // ── Descend into a local room (from a region site or a town interior) ─
@@ -473,7 +500,7 @@ export function resolveTransition(
         // Bookmark the cell to return to on ascent (town venue cell or region site cell).
         ...(fromTown ? { town_marker_pos: st.marker_pos } : { region_marker_pos: st.marker_pos }),
       },
-      narrative: ` You enter ${room.name}.`,
+      narrative: ` You enter ${room.name}.${hook}`,
     };
   }
   // ── Move to another local room via an exit cell ──────────────────────

@@ -34,6 +34,7 @@ interface EditorRegion {
   desc?: string;
   feetPerSquare?: number;
   isStartingRegion?: boolean; // regions only
+  onEnter?: string; // regions only — first-entry narration (desc fallback)
   encounterChance?: number; // regions only
   baseTier?: number; // regions only
   floor?: string; // towns only
@@ -48,6 +49,7 @@ interface Details {
   name: string;
   desc: string;
   feetPerSquare: string;
+  onEnter: string; // regions only
   encounterChance: string; // regions only
   baseTier: string; // regions only
   floor: string; // towns only
@@ -58,6 +60,7 @@ function detailsFrom(r: EditorRegion): Details {
     name: r.name ?? '',
     desc: r.desc ?? '',
     feetPerSquare: r.feetPerSquare !== undefined ? String(r.feetPerSquare) : '',
+    onEnter: r.onEnter ?? '',
     encounterChance: r.encounterChance !== undefined ? String(r.encounterChance) : '',
     baseTier: r.baseTier !== undefined ? String(r.baseTier) : '',
     floor: r.floor ?? '',
@@ -222,6 +225,8 @@ function RegionEditorScreen({
     }
     next.feetPerSquare = fps;
     if (kind === 'region') {
+      if (details.onEnter.trim()) next.onEnter = details.onEnter.trim();
+      else delete next.onEnter;
       if (details.encounterChance.trim() === '') delete next.encounterChance;
       else {
         const enc = Number(details.encounterChance);
@@ -652,6 +657,22 @@ function RegionEditorScreen({
                   onChange={(e) => updateDetail('desc', e.target.value)}
                 />
               </div>
+              {kind === 'region' && (
+                <div style={{ marginTop: '0.75rem' }}>
+                  <label className={styles.formLbl} htmlFor="map-detail-on-enter">
+                    ON ENTER NARRATION (FIRST ENTRY — FALLS BACK TO DESCRIPTION)
+                  </label>
+                  <textarea
+                    id="map-detail-on-enter"
+                    className={styles.formInp}
+                    rows={2}
+                    style={{ resize: 'vertical' }}
+                    placeholder="Narrated the first time the party enters this region — game start counts."
+                    value={details.onEnter}
+                    onChange={(e) => updateDetail('onEnter', e.target.value)}
+                  />
+                </div>
+              )}
               {kind === 'region' && (
                 <div
                   style={{

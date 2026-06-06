@@ -44,12 +44,12 @@ function makeContentDb(initial: {
 }) {
   const campaigns = new Map(Object.entries(initial.campaigns ?? {}));
   // Stored as the insert params after campaign_id: [id, sort_order, name,
-  // is_starting_region, description, feet_per_square, grid_width,
-  // grid_height, start_x, start_y, encounter_chance, base_tier]
+  // is_starting_region, description, on_enter, feet_per_square, grid,
+  // start_x, start_y, encounter_chance, base_tier]
   const regions = new Map<string, unknown[][]>(Object.entries(initial.regions ?? {}));
   // campaignId → site insert params after campaign_id: [region_id, id,
   // sort_order, name, pos_x, pos_y, kind, town_id, entry_room_id,
-  // description, icon]
+  // description, on_enter, icon]
   const sites = new Map<string, unknown[][]>();
   // campaignId → town insert params after campaign_id: [id, sort_order,
   // name, description, feet_per_square, gridJson, start_x, start_y, floor]
@@ -97,7 +97,8 @@ function makeContentDb(initial: {
         town_id: p[7],
         entry_room_id: p[8],
         description: p[9],
-        icon: p[10],
+        on_enter: p[10],
+        icon: p[11],
       }));
       return { rows, rowCount: rows.length };
     }
@@ -171,12 +172,13 @@ function makeContentDb(initial: {
         name: p[2],
         is_starting_region: p[3],
         description: p[4],
-        feet_per_square: p[5],
-        grid: JSON.parse(p[6] as string), // pg parses jsonb on read
-        start_x: p[7],
-        start_y: p[8],
-        encounter_chance: p[9],
-        base_tier: p[10],
+        on_enter: p[5],
+        feet_per_square: p[6],
+        grid: JSON.parse(p[7] as string), // pg parses jsonb on read
+        start_x: p[8],
+        start_y: p[9],
+        encounter_chance: p[10],
+        base_tier: p[11],
       }));
       return { rows, rowCount: rows.length };
     }
@@ -387,10 +389,24 @@ describe('editable sections registry', () => {
 
   it('regions schema accepts a valid list with exactly one starting region', () => {
     const result = CAMPAIGN_SECTION_SCHEMAS.regions.safeParse([
-      region({ desc: 'A mist-shrouded vale.', encounterChance: 0.15, baseTier: 1 }),
+      region({
+        desc: 'A mist-shrouded vale.',
+        onEnter: 'The mists part as you crest the ridge.',
+        encounterChance: 0.15,
+        baseTier: 1,
+      }),
       region({ id: 'frost-reach', name: 'The Frost Reach', isStartingRegion: false }),
     ]);
     expect(result.success, JSON.stringify(result.error?.issues)).toBe(true);
+  });
+
+  it('gameStart schema is a plain narration string', () => {
+    const gameStart = CAMPAIGN_SECTION_SCHEMAS.gameStart;
+    expect(gameStart.safeParse('The road south is long and the coin pouch light.').success).toBe(
+      true
+    );
+    expect(gameStart.safeParse('').success).toBe(false);
+    expect(gameStart.safeParse({ text: 'nope' }).success).toBe(false);
   });
 
   it('regions schema requires scale, grid, and startPos', () => {
@@ -703,6 +719,42 @@ describe('section CRUD + live refresh', () => {
     expect(campaign.towns?.[0].venues.map((v) => v.id)).toEqual(['gate', 'tavern']);
   });
 
+  it('gameStart folds into campaign.intro, never the top level; delete restores code', async () => {
+    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    const code = codeCtx({
+      id: 'malgovia',
+      campaign: {
+        world_name: 'Malgovia',
+        intro: 'The code opening.',
+        rooms: [{ id: 'square', name: 'Square', desc: 'd' }],
+      } as never,
+    });
+    const contexts: Record<string, Context> = { malgovia: code };
+
+    expect(
+      await putCampaignSection(db.pool, 'malgovia', 'gameStart', 'A new dawn over the vale.')
+    ).toBe(true);
+    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
+    expect(contexts.malgovia.campaign?.intro).toBe('A new dawn over the vale.');
+    // The hook lands inside the campaign block — no stray top-level field —
+    // and the rest of the block survives.
+    expect('gameStart' in contexts.malgovia).toBe(false);
+    expect(contexts.malgovia.campaign?.rooms.map((r) => r.id)).toEqual(['square']);
+
+    expect(await deleteCampaignSection(db.pool, 'malgovia', 'gameStart')).toBe(true);
+    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
+    expect(contexts.malgovia.campaign?.intro).toBe('The code opening.');
+  });
+
+  it('gameStart overlays the base template intro for DB-born campaigns', async () => {
+    const db = makeContentDb({ campaigns: { ghost: { gameStart: 'Boo. The tale begins.' } } });
+    const contexts: Record<string, Context> = {};
+    await refreshCampaignOverlay(db.pool, contexts, {}, 'ghost');
+    expect(contexts.ghost.campaign?.intro).toBe('Boo. The tale begins.');
+    // Template machinery still present under the overridden opening.
+    expect(contexts.ghost.campaign?.rooms.length).toBeGreaterThan(0);
+  });
+
   it('DB towns without DB regions still fold in, keeping the code regions', async () => {
     const db = makeContentDb({ campaigns: { malgovia: {} } });
     const code = codeCtx({
@@ -726,6 +778,7 @@ describe('section CRUD + live refresh', () => {
     const db = makeContentDb({ campaigns: { malgovia: {} } });
     const withSites: CampaignRegion = {
       ...REGION_A,
+      onEnter: 'The mists part as you crest the ridge.',
       sites: [
         { id: 'oakvale', name: 'Oakvale', pos: { x: 1, y: 1 }, kind: 'town', townId: 'oakvale' },
         {
@@ -736,6 +789,7 @@ describe('section CRUD + live refresh', () => {
           entryRoomId: 'crypt-entrance',
           icon: 'tombstone',
           desc: 'A sunken door in the hillside.',
+          onEnter: 'Cold air breathes up from the dark.',
         },
       ],
     };
@@ -810,6 +864,7 @@ describe('dbRegionsToEngine', () => {
   it('passes sites and scalars through untouched', () => {
     const withSites: CampaignRegion = {
       ...REGION_A,
+      onEnter: 'The mists part.',
       sites: [
         {
           id: 'old-crypt',
@@ -818,6 +873,7 @@ describe('dbRegionsToEngine', () => {
           kind: 'local',
           entryRoomId: 'crypt-entrance',
           icon: 'tombstone',
+          onEnter: 'Cold air breathes up from the dark.',
         },
       ],
     };
@@ -827,6 +883,7 @@ describe('dbRegionsToEngine', () => {
     expect(region.encounterChance).toBe(0.15);
     expect(region.baseTier).toBe(1);
     expect(region.desc).toBe('A mist-shrouded vale.');
+    expect(region.onEnter).toBe('The mists part.');
   });
 });
 

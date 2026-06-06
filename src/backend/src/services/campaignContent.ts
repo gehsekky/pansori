@@ -69,6 +69,10 @@ export function baseContextFor(campaignId: string): Context {
 // loadOverlay converts them (dbRegionsToEngine / dbTownsToEngine) and folds
 // them into campaign.regions / campaign.towns, replacing the code maps.
 //
+// 'gameStart' is the game-start narration hook: a campaigns.data key that
+// loadOverlay folds into campaign.intro (the first narrative entry of a
+// new game), replacing the code/template opening.
+//
 // 'customItems' / 'customMonsters' are a campaign's OWN content on top of
 // the ambient SRD catalogs (services/itemCatalog.ts / monsterCatalog.ts):
 // every campaign automatically gets the full catalogs; customs add to them
@@ -76,6 +80,7 @@ export function baseContextFor(campaignId: string): Context {
 // composed lootTable / enemyTemplates are LIVE engine fields.
 export const EDITABLE_SECTIONS = [
   'displayNoun',
+  'gameStart',
   'narratives',
   'regions',
   'towns',
@@ -115,6 +120,8 @@ export interface CampaignRegionSite {
   townId?: string;
   entryRoomId?: string;
   desc?: string;
+  // Narration hook — fires every time the party lands on this site.
+  onEnter?: string;
   icon?: string;
 }
 
@@ -132,6 +139,8 @@ export interface CampaignRegion {
   name: string;
   isStartingRegion: boolean;
   desc?: string;
+  // Narration hook — fires on first entry (desc is the fallback).
+  onEnter?: string;
   feetPerSquare: number;
   // Dense [y][x] terrain grid — dimensions derive from its shape
   // (validated rectangular at the API). Stored as a JSONB column.
@@ -149,6 +158,7 @@ interface RegionRow {
   name: string;
   is_starting_region: boolean;
   description: string | null;
+  on_enter: string | null;
   feet_per_square: number;
   grid: CampaignRegionCell[][];
   start_x: number;
@@ -163,6 +173,7 @@ function rowToRegion(r: RegionRow): CampaignRegion {
     name: r.name,
     isStartingRegion: r.is_starting_region,
     ...(r.description !== null ? { desc: r.description } : {}),
+    ...(r.on_enter !== null ? { onEnter: r.on_enter } : {}),
     feetPerSquare: r.feet_per_square,
     grid: r.grid,
     startPos: { x: r.start_x, y: r.start_y },
@@ -171,7 +182,7 @@ function rowToRegion(r: RegionRow): CampaignRegion {
   };
 }
 
-const REGION_COLUMNS = `id, name, is_starting_region, description, feet_per_square,
+const REGION_COLUMNS = `id, name, is_starting_region, description, on_enter, feet_per_square,
        grid, start_x, start_y, encounter_chance, base_tier`;
 
 interface SiteRow {
@@ -184,6 +195,7 @@ interface SiteRow {
   town_id: string | null;
   entry_room_id: string | null;
   description: string | null;
+  on_enter: string | null;
   icon: string | null;
 }
 
@@ -196,6 +208,7 @@ function rowToSite(r: SiteRow): CampaignRegionSite {
     ...(r.town_id !== null ? { townId: r.town_id } : {}),
     ...(r.entry_room_id !== null ? { entryRoomId: r.entry_room_id } : {}),
     ...(r.description !== null ? { desc: r.description } : {}),
+    ...(r.on_enter !== null ? { onEnter: r.on_enter } : {}),
     ...(r.icon !== null ? { icon: r.icon } : {}),
   };
 }
@@ -213,7 +226,8 @@ export async function getCampaignRegions(
   );
   if (rows.length === 0) return [];
   const { rows: siteRows } = await pool.query<SiteRow>(
-    `SELECT region_id, id, name, pos_x, pos_y, kind, town_id, entry_room_id, description, icon
+    `SELECT region_id, id, name, pos_x, pos_y, kind, town_id, entry_room_id, description,
+            on_enter, icon
        FROM campaign_region_sites
       WHERE campaign_id = $1
       ORDER BY region_id, sort_order, id`,
@@ -254,8 +268,8 @@ export async function putCampaignRegions(
       await client.query(
         `INSERT INTO campaign_regions
            (campaign_id, id, sort_order, name, is_starting_region, description,
-            feet_per_square, grid, start_x, start_y, encounter_chance, base_tier)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, $12)`,
+            on_enter, feet_per_square, grid, start_x, start_y, encounter_chance, base_tier)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12, $13)`,
         [
           campaignId,
           r.id,
@@ -263,6 +277,7 @@ export async function putCampaignRegions(
           r.name,
           r.isStartingRegion,
           r.desc ?? null,
+          r.onEnter ?? null,
           r.feetPerSquare,
           JSON.stringify(r.grid),
           r.startPos.x,
@@ -277,8 +292,8 @@ export async function putCampaignRegions(
         await client.query(
           `INSERT INTO campaign_region_sites
              (campaign_id, region_id, id, sort_order, name, pos_x, pos_y, kind,
-              town_id, entry_room_id, description, icon)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+              town_id, entry_room_id, description, on_enter, icon)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
           [
             campaignId,
             r.id,
@@ -291,6 +306,7 @@ export async function putCampaignRegions(
             s.townId ?? null,
             s.entryRoomId ?? null,
             s.desc ?? null,
+            s.onEnter ?? null,
             s.icon ?? null,
           ]
         );
@@ -540,6 +556,7 @@ export function dbRegionsToEngine(regions: CampaignRegion[]): Region[] {
       id: r.id,
       name: r.name,
       ...(r.desc !== undefined ? { desc: r.desc } : {}),
+      ...(r.onEnter !== undefined ? { onEnter: r.onEnter } : {}),
       feetPerSquare: r.feetPerSquare,
       gridWidth: r.grid[0]?.length ?? 0,
       gridHeight: r.grid.length,
@@ -692,15 +709,22 @@ async function loadOverlay(
   const overlay: Record<string, unknown> =
     typeof data === 'object' && data !== null && !Array.isArray(data) ? { ...data } : {};
 
+  // The gameStart narration hook lives in campaigns.data but lands inside
+  // the campaign block (it overlays campaign.intro — the game's first
+  // narrative entry), not as a top-level Context field.
+  const gameStart = typeof overlay.gameStart === 'string' ? overlay.gameStart : undefined;
+  delete overlay.gameStart;
+
   // DB regions + towns DRIVE the map: converted to the engine model and
   // folded into the campaign block (each replacing its code/template
   // counterpart while the rest of the block — rooms, placed enemies/loot,
   // quests — stays code-supplied until those sections migrate).
   const dbRegions = await getCampaignRegions(pool, campaignId);
   const dbTowns = await getCampaignTowns(pool, campaignId);
-  if (dbRegions.length > 0 || dbTowns.length > 0) {
+  if (dbRegions.length > 0 || dbTowns.length > 0 || gameStart !== undefined) {
     overlay.campaign = {
       ...(code.campaign ?? { world_name: code.id, intro: '', rooms: [] }),
+      ...(gameStart !== undefined ? { intro: gameStart } : {}),
       ...(dbRegions.length > 0 ? { regions: dbRegionsToEngine(dbRegions) } : {}),
       ...(dbTowns.length > 0 ? { towns: dbTownsToEngine(dbTowns) } : {}),
     };

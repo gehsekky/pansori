@@ -169,21 +169,38 @@ describe('RegionEditorScreen', () => {
     expect(list[0].sites).toEqual(REGION.sites);
   });
 
+  it('ON ENTER narration round-trips through the details form (regions only)', async () => {
+    renderEditor();
+    await screen.findByTestId('cell-0-0');
+    fireEvent.change(screen.getByLabelText(/ON ENTER NARRATION/), {
+      target: { value: 'The mists part as you crest the ridge.' },
+    });
+    fireEvent.click(screen.getByText('SAVE'));
+    await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
+    const saved = mocked.putCampaignSection.mock.calls[0][2] as Array<{ onEnter?: string }>;
+    expect(saved[0].onEnter).toBe('The mists part as you crest the ridge.');
+  });
+
   it('clearing an optional detail removes the key instead of writing empty', async () => {
     mocked.getCampaignSection.mockResolvedValue({
       section: 'regions',
       source: 'db',
-      value: [{ ...REGION, desc: 'old', encounterChance: 0.5, baseTier: 3 }, OTHER],
+      value: [
+        { ...REGION, desc: 'old', onEnter: 'old hook', encounterChance: 0.5, baseTier: 3 },
+        OTHER,
+      ],
     });
     renderEditor();
     await screen.findByTestId('cell-0-0');
     fireEvent.change(screen.getByLabelText('DESCRIPTION'), { target: { value: '' } });
+    fireEvent.change(screen.getByLabelText(/ON ENTER NARRATION/), { target: { value: '' } });
     fireEvent.change(screen.getByLabelText('ENCOUNTER CHANCE (0–1)'), { target: { value: '' } });
     fireEvent.change(screen.getByLabelText('BASE TIER'), { target: { value: '' } });
     fireEvent.click(screen.getByText('SAVE'));
     await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
     const saved = mocked.putCampaignSection.mock.calls[0][2] as Array<Record<string, unknown>>;
     expect('desc' in saved[0]).toBe(false);
+    expect('onEnter' in saved[0]).toBe(false);
     expect('encounterChance' in saved[0]).toBe(false);
     expect('baseTier' in saved[0]).toBe(false);
   });
@@ -242,6 +259,7 @@ describe('RegionEditorScreen', () => {
     expect((screen.getByLabelText('FLOOR') as HTMLSelectElement).value).toBe('dirt');
     expect(screen.queryByLabelText('ENCOUNTER CHANCE (0–1)')).toBeNull();
     expect(screen.queryByLabelText('BASE TIER')).toBeNull();
+    expect(screen.queryByLabelText(/ON ENTER NARRATION/)).toBeNull();
     expect(screen.queryByTestId('make-starter-btn')).toBeNull();
     fireEvent.change(screen.getByLabelText('FLOOR'), { target: { value: 'cobblestone' } });
     fireEvent.click(screen.getByText('SAVE'));

@@ -337,6 +337,9 @@ export interface GameState {
   current_region_id?: string;
   current_town_id?: string;
   marker_pos?: GridPos;
+  // Regions the party has entered (regionEnter narration fires on first
+  // entry only). Mirror of the BE field.
+  visited_regions?: string[];
   // Fog of war — permanently-revealed "x,y" cells per grid id (region id for the
   // overland map). The party can only travel to revealed cells. Regional-only.
   revealed_cells?: Record<string, string[]>;
@@ -378,6 +381,9 @@ export interface MapSite {
   townId?: string;
   entryRoomId?: string;
   desc?: string;
+  // Narration hook — fired by the backend on every landing; mirrored here
+  // for seed parity only.
+  onEnter?: string;
   // Overland glyph for a `local` site (dungeon): a game-icons.net icon name.
   // Omitted ⇒ a default dungeon icon. Towns use the village glyph regardless.
   icon?: string;
@@ -387,6 +393,8 @@ export interface Region {
   id: string;
   name: string;
   desc?: string;
+  // Narration hook (first entry) — backend-fired; seed parity only.
+  onEnter?: string;
   feetPerSquare: number;
   gridWidth: number;
   gridHeight: number;

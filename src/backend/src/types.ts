@@ -1685,6 +1685,10 @@ export interface GameState {
   current_region_id?: string;
   current_town_id?: string;
   marker_pos?: GridPos;
+  // Region ids the party has entered — the regionEnter narration hook fires
+  // only on first entry. Seeded with the starting region at init; future
+  // region-to-region travel appends here before firing the hook.
+  visited_regions?: string[];
   // Fog of war — permanently-revealed cells per grid, keyed by grid id (the
   // region id for the overland map; towns/local rooms may use it later). Each
   // value is a set of "x,y" cell keys discovered within the party's sight radius.
@@ -1948,6 +1952,9 @@ export interface MapSite {
   townId?: string; // kind 'town' → the Town grid to open
   entryRoomId?: string; // kind 'local' → the local room to drop into
   desc?: string;
+  // Narration hook — authored flavor appended to the "You enter X." line
+  // every time the party lands on this site's square.
+  onEnter?: string;
   // Overland map glyph for a `local` site (dungeon): a game-icons.net icon name
   // (e.g. 'tombstone', 'ice-iris'). Omitted ⇒ a default dungeon icon. Towns use
   // the village glyph regardless.
@@ -1958,6 +1965,9 @@ export interface Region {
   id: string;
   name: string;
   desc?: string;
+  // Narration hook — fires on FIRST entry to the region (game start counts
+  // as entering the starting region). Falls back to `desc` when absent.
+  onEnter?: string;
   feetPerSquare: number; // 5280 (1 mile per square — SRD Travel Pace scale)
   gridWidth: number;
   gridHeight: number;
