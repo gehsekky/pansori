@@ -53,15 +53,17 @@ function SpellPickerDialog({
   const [cantrips, setCantrips] = useState<string[]>(initialCantrips);
   const [l1, setL1] = useState<string[]>(initialL1);
 
+  // Show the WHOLE list (filtered only by level + spell-list tag). Spells already
+  // chosen in another picker on this character are shown but locked (disabled +
+  // noted) rather than hidden — so the list is complete and a prior pick is never
+  // counted-but-invisible.
   const cantripOptions = useMemo(
-    () =>
-      spells.filter((s) => s.level === 0 && s.spellList.includes(spellList) && !exclude.has(s.id)),
-    [spells, spellList, exclude]
+    () => spells.filter((s) => s.level === 0 && s.spellList.includes(spellList)),
+    [spells, spellList]
   );
   const l1Options = useMemo(
-    () =>
-      spells.filter((s) => s.level === 1 && s.spellList.includes(spellList) && !exclude.has(s.id)),
-    [spells, spellList, exclude]
+    () => spells.filter((s) => s.level === 1 && s.spellList.includes(spellList)),
+    [spells, spellList]
   );
 
   const cappedToggle = (setter: Dispatch<SetStateAction<string[]>>, cap: number, id: string) =>
@@ -123,13 +125,14 @@ function SpellPickerDialog({
           ) : (
             cantripOptions.map((s) => {
               const picked = cantrips.includes(s.id);
-              const limitHit = !picked && cantrips.length >= cantripCount;
+              const lockedElsewhere = !picked && exclude.has(s.id);
+              const limitHit = !picked && !lockedElsewhere && cantrips.length >= cantripCount;
               return (
                 <div
                   key={s.id}
                   className={styles.invItem}
                   data-testid={`spell-picker-cantrip-${s.id}`}
-                  style={limitHit ? { opacity: 0.55 } : undefined}
+                  style={limitHit || lockedElsewhere ? { opacity: 0.55 } : undefined}
                 >
                   <label
                     style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}
@@ -138,12 +141,20 @@ function SpellPickerDialog({
                     <input
                       type="checkbox"
                       checked={picked}
-                      disabled={limitHit}
+                      disabled={limitHit || lockedElsewhere}
                       onChange={() => cappedToggle(setCantrips, cantripCount, s.id)}
                       data-testid={`spell-picker-cantrip-input-${s.id}`}
                     />
                     <span style={{ flex: 1 }}>
-                      <span className={styles.invItemName}>{s.name}</span>
+                      <span className={styles.invItemName}>
+                        {s.name}
+                        {lockedElsewhere && (
+                          <span style={{ color: 'var(--t-dim)', fontSize: '0.72rem' }}>
+                            {' '}
+                            — already in your spell list
+                          </span>
+                        )}
+                      </span>
                       <div className={styles.invItemDesc}>{s.desc}</div>
                     </span>
                   </label>
@@ -174,13 +185,14 @@ function SpellPickerDialog({
               ) : (
                 l1Options.map((s) => {
                   const picked = l1.includes(s.id);
-                  const limitHit = !picked && l1.length >= l1Count;
+                  const lockedElsewhere = !picked && exclude.has(s.id);
+                  const limitHit = !picked && !lockedElsewhere && l1.length >= l1Count;
                   return (
                     <div
                       key={s.id}
                       className={styles.invItem}
                       data-testid={`spell-picker-l1-${s.id}`}
-                      style={limitHit ? { opacity: 0.55 } : undefined}
+                      style={limitHit || lockedElsewhere ? { opacity: 0.55 } : undefined}
                     >
                       <label
                         style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}
@@ -189,12 +201,20 @@ function SpellPickerDialog({
                         <input
                           type="checkbox"
                           checked={picked}
-                          disabled={limitHit}
+                          disabled={limitHit || lockedElsewhere}
                           onChange={() => cappedToggle(setL1, l1Count, s.id)}
                           data-testid={`spell-picker-l1-input-${s.id}`}
                         />
                         <span style={{ flex: 1 }}>
-                          <span className={styles.invItemName}>{s.name}</span>
+                          <span className={styles.invItemName}>
+                            {s.name}
+                            {lockedElsewhere && (
+                              <span style={{ color: 'var(--t-dim)', fontSize: '0.72rem' }}>
+                                {' '}
+                                — already in your spell list
+                              </span>
+                            )}
+                          </span>
                           <div className={styles.invItemDesc}>{s.desc}</div>
                         </span>
                       </label>

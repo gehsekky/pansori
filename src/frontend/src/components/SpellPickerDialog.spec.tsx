@@ -282,8 +282,8 @@ describe('SpellPickerDialog', () => {
     expect([...l1].sort()).toEqual(['magic_missile', 'shield']);
   });
 
-  it('hides spells listed in excludeIds (chosen in another picker)', () => {
-    const { queryByTestId } = render(
+  it('shows excludeIds spells but locks them (chosen in another picker)', () => {
+    const { getByTestId } = render(
       <SpellPickerDialog
         featName="Wizard"
         spellList="arcane"
@@ -297,12 +297,38 @@ describe('SpellPickerDialog', () => {
         onSave={() => {}}
       />
     );
-    // Excluded entries don't render…
-    expect(queryByTestId('spell-picker-cantrip-mage_hand')).toBeNull();
-    expect(queryByTestId('spell-picker-l1-magic_missile')).toBeNull();
-    // …but the rest of the list still does.
-    expect(queryByTestId('spell-picker-cantrip-fire_bolt')).toBeTruthy();
-    expect(queryByTestId('spell-picker-l1-shield')).toBeTruthy();
+    // Excluded entries are still shown (so a prior pick is never hidden) but
+    // locked — you can't double-pick a spell already in your other list.
+    expect((getByTestId('spell-picker-cantrip-input-mage_hand') as HTMLInputElement).disabled).toBe(
+      true
+    );
+    expect((getByTestId('spell-picker-l1-input-magic_missile') as HTMLInputElement).disabled).toBe(
+      true
+    );
+    // Non-excluded options remain selectable.
+    expect((getByTestId('spell-picker-cantrip-input-fire_bolt') as HTMLInputElement).disabled).toBe(
+      false
+    );
+  });
+
+  it('still shows a currently-selected spell even if it is in excludeIds (never hidden)', () => {
+    const { getByTestId } = render(
+      <SpellPickerDialog
+        featName="Wizard"
+        spellList="arcane"
+        cantripCount={1}
+        l1Count={0}
+        spells={SPELLS}
+        initialCantrips={['mage_hand']}
+        initialL1={[]}
+        excludeIds={['mage_hand']}
+        onClose={() => {}}
+        onSave={() => {}}
+      />
+    );
+    const input = getByTestId('spell-picker-cantrip-input-mage_hand') as HTMLInputElement;
+    expect(input.checked).toBe(true); // visible + checked, not hidden
+    expect(input.disabled).toBe(false); // selected → toggleable so you can drop it
   });
 
   it('omits the L1 section when l1Count is 0', () => {
