@@ -14,6 +14,13 @@ export const narratives: Context['narratives'] = {
     dungeon_crypt_exit: [
       'A shaft of pale light falls from above — the entrance to the crypt, and freedom beyond.',
     ],
+    // The Burnt Stump lodge (Pinegate) — a warm, fire-lit common-hall, not the
+    // dark/skittery places the generic lines suit.
+    pinegate_lodge: [
+      'The lodge is warm with woodsmoke; a fire crackles in the hearth, and Mareth’s carved charm hangs on the far wall.',
+      'Conversation lulls as you duck into the common-hall. The fire pops, and the timber walls smell of pine and old ale.',
+      'Lamplight and hearth-glow fill the Burnt Stump; benches scrape as folk make room at the long tables.',
+    ],
   },
   genericArrival: [
     'The shadows shift as you enter.',
