@@ -4,15 +4,30 @@ import { srdItems } from '../srd/index.js';
 export const lootTable: LootItem[] = [
   // Shared SRD equipment available in this campaign.
   ...srdItems(
+    // Simple weapons (full SRD spread — every class is proficient with these).
+    'club',
     'dagger',
     'dart',
+    'greatclub',
     'handaxe',
-    'greataxe',
-    'longsword',
-    'shortsword',
-    'rapier',
+    'javelin',
+    'light_hammer',
     'mace',
     'quarterstaff',
+    'sickle',
+    'spear',
+    'light_crossbow',
+    'shortbow',
+    'sling',
+    // Martial weapons with Finesse/Light (Rogue-masterable) + the heavier
+    // martials already stocked for Fighter/Barbarian/etc.
+    'rapier',
+    'scimitar',
+    'shortsword',
+    'whip',
+    'hand_crossbow',
+    'greataxe',
+    'longsword',
     'longbow',
     'leather_armor',
     'studded_leather',
