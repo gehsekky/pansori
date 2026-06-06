@@ -19,15 +19,29 @@ export const lootTable: LootItem[] = [
     'light_crossbow',
     'shortbow',
     'sling',
-    // Martial weapons with Finesse/Light (Rogue-masterable) + the heavier
-    // martials already stocked for Fighter/Barbarian/etc.
+    // Martial weapons — the full SRD martial set (melee + ranged). The
+    // Finesse/Light ones (rapier/scimitar/shortsword/whip/hand crossbow) are
+    // Rogue-masterable; the rest serve Fighter/Barbarian/Paladin/Ranger.
+    // (warhammer is added separately below.)
+    'battleaxe',
+    'flail',
+    'glaive',
+    'greataxe',
+    'greatsword',
+    'halberd',
+    'lance',
+    'longsword',
+    'maul',
+    'morningstar',
+    'pike',
     'rapier',
     'scimitar',
     'shortsword',
+    'trident',
+    'war_pick',
     'whip',
     'hand_crossbow',
-    'greataxe',
-    'longsword',
+    'heavy_crossbow',
     'longbow',
     'leather_armor',
     'studded_leather',
