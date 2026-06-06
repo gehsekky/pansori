@@ -237,15 +237,35 @@ const GridPosSchema = z
   })
   .strict();
 
+const SLUG = z
+  .string()
+  .min(1)
+  .max(40)
+  .regex(/^[a-z0-9_-]+$/, 'lowercase letters, digits, - and _ only');
+
+// A region's transition cells (MapSite): stepping onto one opens a town
+// grid (kind 'town' → townId) or drops into a local room (kind 'local' →
+// entryRoomId). The kind↔target pairing and grid bounds are enforced in
+// the region-level superRefine below (they need the region's grid size).
+const RegionSiteSchema = z
+  .object({
+    id: SLUG,
+    name: z.string().min(1).max(80),
+    pos: GridPosSchema,
+    kind: z.enum(['town', 'local']),
+    townId: SLUG.optional(),
+    entryRoomId: SLUG.optional(),
+    desc: z.string().min(1).max(2000).optional(),
+    // game-icons.net icon name for 'local' sites; towns use the village glyph.
+    icon: z.string().min(1).max(60).optional(),
+  })
+  .strict();
+
 const RegionsSchema = z
   .array(
     z
       .object({
-        id: z
-          .string()
-          .min(1)
-          .max(40)
-          .regex(/^[a-z0-9_-]+$/, 'lowercase letters, digits, - and _ only'),
+        id: SLUG,
         name: z.string().min(1).max(80),
         isStartingRegion: z.boolean(),
         desc: z.string().min(1).max(2000).optional(),
@@ -259,6 +279,8 @@ const RegionsSchema = z
         encounterChance: z.number().min(0).max(1).optional(),
         // SRD tiers of play (1 ≈ L1–4, 2 ≈ L5–7, 3 ≈ L8–10).
         baseTier: z.number().int().min(1).max(4).optional(),
+        // Transition cells. Omitted = a region with no sites (yet).
+        sites: z.array(RegionSiteSchema).max(100).optional(),
       })
       .strict()
       .superRefine((r, ctx) => {
@@ -269,6 +291,38 @@ const RegionsSchema = z
             path: ['startPos'],
           });
         }
+        const siteIds = new Set<string>();
+        (r.sites ?? []).forEach((s, i) => {
+          if (siteIds.has(s.id)) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: `duplicate site id "${s.id}"`,
+              path: ['sites', i, 'id'],
+            });
+          }
+          siteIds.add(s.id);
+          if (s.pos.x >= r.gridWidth || s.pos.y >= r.gridHeight) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: `site "${s.id}" pos (${s.pos.x},${s.pos.y}) is outside the ${r.gridWidth}x${r.gridHeight} grid`,
+              path: ['sites', i, 'pos'],
+            });
+          }
+          if (s.kind === 'town' && !s.townId) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: `site "${s.id}" is a town site and needs townId`,
+              path: ['sites', i, 'townId'],
+            });
+          }
+          if (s.kind === 'local' && !s.entryRoomId) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: `site "${s.id}" is a local site and needs entryRoomId`,
+              path: ['sites', i, 'entryRoomId'],
+            });
+          }
+        });
       })
   )
   .min(1)

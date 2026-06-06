@@ -40,6 +40,10 @@ function makeContentDb(initial: {
   // is_starting_region, description, feet_per_square, grid_width,
   // grid_height, start_x, start_y, encounter_chance, base_tier]
   const regions = new Map<string, unknown[][]>(Object.entries(initial.regions ?? {}));
+  // campaignId → site insert params after campaign_id: [region_id, id,
+  // sort_order, name, pos_x, pos_y, kind, town_id, entry_room_id,
+  // description, icon]
+  const sites = new Map<string, unknown[][]>();
 
   const query = vi.fn(async (sql: string, params: unknown[] = []) => {
     if (/^(BEGIN|COMMIT|ROLLBACK)/.test(sql)) return { rows: [], rowCount: 0 };
@@ -64,6 +68,32 @@ function makeContentDb(initial: {
       const data = campaigns.get(params[0] as string) as Record<string, unknown> | undefined;
       if (data) delete data[params[1] as string];
       return { rows: [], rowCount: data ? 1 : 0 };
+    }
+    if (sql.includes('FROM campaign_region_sites') && sql.includes('SELECT')) {
+      const list = [...(sites.get(params[0] as string) ?? [])].sort((a, b) =>
+        a[0] === b[0] ? (a[2] as number) - (b[2] as number) : String(a[0]) < String(b[0]) ? -1 : 1
+      );
+      const rows = list.map((p) => ({
+        region_id: p[0],
+        id: p[1],
+        sort_order: p[2],
+        name: p[3],
+        pos_x: p[4],
+        pos_y: p[5],
+        kind: p[6],
+        town_id: p[7],
+        entry_room_id: p[8],
+        description: p[9],
+        icon: p[10],
+      }));
+      return { rows, rowCount: rows.length };
+    }
+    if (sql.includes('INSERT INTO campaign_region_sites')) {
+      const [campaignId, ...rest] = params;
+      const list = sites.get(campaignId as string) ?? [];
+      list.push(rest);
+      sites.set(campaignId as string, list);
+      return { rows: [], rowCount: 1 };
     }
     if (sql.includes('FROM campaign_regions') && sql.includes('SELECT')) {
       const list = [...(regions.get(params[0] as string) ?? [])].sort(
@@ -97,6 +127,7 @@ function makeContentDb(initial: {
     }
     if (sql.includes('DELETE FROM campaign_regions')) {
       regions.delete(params[0] as string);
+      sites.delete(params[0] as string); // FK cascade
       return { rows: [], rowCount: 0 };
     }
     if (sql.includes('INSERT INTO campaign_regions')) {
@@ -282,6 +313,43 @@ describe('editable sections registry', () => {
     expect(regions.safeParse([region({ startPos: { x: 11, y: 9 } })]).success).toBe(true); // corner ok
   });
 
+  it('regions schema validates sites: kind↔target, bounds, unique ids', () => {
+    const regions = CAMPAIGN_SECTION_SCHEMAS.regions;
+    const town = {
+      id: 'oakvale',
+      name: 'Oakvale',
+      pos: { x: 1, y: 1 },
+      kind: 'town',
+      townId: 'oakvale',
+    };
+    const dungeon = {
+      id: 'old-crypt',
+      name: 'The Old Crypt',
+      pos: { x: 5, y: 5 },
+      kind: 'local',
+      entryRoomId: 'crypt-entrance',
+      icon: 'tombstone',
+    };
+    expect(
+      regions.safeParse([region({ sites: [town, dungeon] })]).success,
+      'valid sites should pass'
+    ).toBe(true);
+    // Town site without townId / local site without entryRoomId.
+    expect(regions.safeParse([region({ sites: [{ ...town, townId: undefined }] })]).success).toBe(
+      false
+    );
+    expect(
+      regions.safeParse([region({ sites: [{ ...dungeon, entryRoomId: undefined }] })]).success
+    ).toBe(false);
+    // Out-of-grid pos (grid is 12x10) and duplicate ids.
+    expect(
+      regions.safeParse([region({ sites: [{ ...town, pos: { x: 12, y: 0 } }] })]).success
+    ).toBe(false);
+    expect(regions.safeParse([region({ sites: [town, town] })]).success).toBe(false);
+    // Unknown extra field.
+    expect(regions.safeParse([region({ sites: [{ ...town, mayor: 'Bob' }] })]).success).toBe(false);
+  });
+
   it('regions schema rejects duplicate ids, bad slugs, and wrong start counts', () => {
     const regions = CAMPAIGN_SECTION_SCHEMAS.regions;
     expect(
@@ -364,6 +432,37 @@ describe('section CRUD + live refresh', () => {
     expect((contexts.malgovia as unknown as { regions: CampaignRegion[] }).regions).toEqual([
       REGION_A,
     ]);
+  });
+
+  it('regions round-trip their sites (child rows) in order; replace-all cascades them', async () => {
+    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    const withSites: CampaignRegion = {
+      ...REGION_A,
+      sites: [
+        { id: 'oakvale', name: 'Oakvale', pos: { x: 1, y: 1 }, kind: 'town', townId: 'oakvale' },
+        {
+          id: 'old-crypt',
+          name: 'The Old Crypt',
+          pos: { x: 5, y: 5 },
+          kind: 'local',
+          entryRoomId: 'crypt-entrance',
+          icon: 'tombstone',
+          desc: 'A sunken door in the hillside.',
+        },
+      ],
+    };
+    expect(await putCampaignSection(db.pool, 'malgovia', 'regions', [withSites, REGION_B])).toBe(
+      true
+    );
+    const back = await getCampaignRegions(db.pool, 'malgovia');
+    expect(back).toEqual([withSites, REGION_B]);
+    // Optional fields absent (not null) and siteless regions carry no key.
+    expect('townId' in back[0].sites![1]).toBe(false);
+    expect('sites' in back[1]).toBe(false);
+
+    // Replace-all with a siteless list drops the child rows too.
+    await putCampaignSection(db.pool, 'malgovia', 'regions', [REGION_A]);
+    expect(await getCampaignRegions(db.pool, 'malgovia')).toEqual([REGION_A]);
   });
 
   it('reports a missing campaign and reads back stored data', async () => {

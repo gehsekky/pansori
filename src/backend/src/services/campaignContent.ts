@@ -88,6 +88,17 @@ export function mergeContextWithOverlay(code: Context, overlay: Record<string, u
 
 // The JSON shape the content API serves — matches the regions section
 // schema in routes/schemas.ts and what the editor round-trips.
+export interface CampaignRegionSite {
+  id: string;
+  name: string;
+  pos: { x: number; y: number };
+  kind: 'town' | 'local';
+  townId?: string;
+  entryRoomId?: string;
+  desc?: string;
+  icon?: string;
+}
+
 export interface CampaignRegion {
   id: string;
   name: string;
@@ -99,6 +110,9 @@ export interface CampaignRegion {
   startPos: { x: number; y: number };
   encounterChance?: number;
   baseTier?: number;
+  // Transition cells — stored in campaign_region_sites, authored inside
+  // the region's JSON. Present only when the region has sites.
+  sites?: CampaignRegionSite[];
 }
 
 interface RegionRow {
@@ -133,6 +147,32 @@ function rowToRegion(r: RegionRow): CampaignRegion {
 const REGION_COLUMNS = `id, name, is_starting_region, description, feet_per_square,
        grid_width, grid_height, start_x, start_y, encounter_chance, base_tier`;
 
+interface SiteRow {
+  region_id: string;
+  id: string;
+  name: string;
+  pos_x: number;
+  pos_y: number;
+  kind: 'town' | 'local';
+  town_id: string | null;
+  entry_room_id: string | null;
+  description: string | null;
+  icon: string | null;
+}
+
+function rowToSite(r: SiteRow): CampaignRegionSite {
+  return {
+    id: r.id,
+    name: r.name,
+    pos: { x: r.pos_x, y: r.pos_y },
+    kind: r.kind,
+    ...(r.town_id !== null ? { townId: r.town_id } : {}),
+    ...(r.entry_room_id !== null ? { entryRoomId: r.entry_room_id } : {}),
+    ...(r.description !== null ? { desc: r.description } : {}),
+    ...(r.icon !== null ? { icon: r.icon } : {}),
+  };
+}
+
 export async function getCampaignRegions(
   pool: Pool,
   campaignId: string
@@ -144,7 +184,25 @@ export async function getCampaignRegions(
       ORDER BY sort_order, id`,
     [campaignId]
   );
-  return rows.map(rowToRegion);
+  if (rows.length === 0) return [];
+  const { rows: siteRows } = await pool.query<SiteRow>(
+    `SELECT region_id, id, name, pos_x, pos_y, kind, town_id, entry_room_id, description, icon
+       FROM campaign_region_sites
+      WHERE campaign_id = $1
+      ORDER BY region_id, sort_order, id`,
+    [campaignId]
+  );
+  const sitesByRegion = new Map<string, CampaignRegionSite[]>();
+  for (const row of siteRows) {
+    const list = sitesByRegion.get(row.region_id) ?? [];
+    list.push(rowToSite(row));
+    sitesByRegion.set(row.region_id, list);
+  }
+  return rows.map((r) => {
+    const region = rowToRegion(r);
+    const sites = sitesByRegion.get(r.id);
+    return sites && sites.length > 0 ? { ...region, sites } : region;
+  });
 }
 
 // Replace-all write, matching the editor's whole-section semantics: the
@@ -162,6 +220,7 @@ export async function putCampaignRegions(
       await client.query('ROLLBACK');
       return false;
     }
+    // Replace-all: deleting the regions cascades their sites away too.
     await client.query('DELETE FROM campaign_regions WHERE campaign_id = $1', [campaignId]);
     for (let i = 0; i < regions.length; i++) {
       const r = regions[i];
@@ -187,6 +246,30 @@ export async function putCampaignRegions(
           r.baseTier ?? null,
         ]
       );
+      const sites = r.sites ?? [];
+      for (let j = 0; j < sites.length; j++) {
+        const s = sites[j];
+        await client.query(
+          `INSERT INTO campaign_region_sites
+             (campaign_id, region_id, id, sort_order, name, pos_x, pos_y, kind,
+              town_id, entry_room_id, description, icon)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+          [
+            campaignId,
+            r.id,
+            s.id,
+            j,
+            s.name,
+            s.pos.x,
+            s.pos.y,
+            s.kind,
+            s.townId ?? null,
+            s.entryRoomId ?? null,
+            s.desc ?? null,
+            s.icon ?? null,
+          ]
+        );
+      }
     }
     await client.query('COMMIT');
     return true;
