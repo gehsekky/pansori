@@ -6062,10 +6062,22 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
             .map(Number)
             .filter((l) => l >= baseLevel)
         );
+        // SRD Magic Initiate free L1 cast — this specific spell can be cast once
+        // per long rest with NO slot (precast.ts applies the freebie). Offer +
+        // label the base-level cast even with no slot available, so a non-caster
+        // (or a slot-depleted caster) can still use the feat's free cast.
+        const miFreeAvailable =
+          baseLevel > 0 &&
+          Object.values(char.feat_choices ?? {}).some((c) => c?.magicInitiateL1 === spellId) &&
+          (char.class_resource_uses?.magic_initiate_l1_used ?? 0) === 0;
+        const upperSlotLevel = miFreeAvailable
+          ? Math.max(baseLevel, Number.isFinite(maxSlotLevel) ? maxSlotLevel : baseLevel)
+          : maxSlotLevel;
         let emittedAny = false;
-        for (let sl = baseLevel; sl <= maxSlotLevel; sl++) {
+        for (let sl = baseLevel; sl <= upperSlotLevel; sl++) {
           const avail = (slots[sl] ?? 0) - (slotsUsed[sl] ?? 0);
-          if (avail <= 0) continue;
+          const isFreeBase = sl === baseLevel && miFreeAvailable;
+          if (avail <= 0 && !isFreeBase) continue;
           emittedAny = true;
           const isUpcast = sl > baseLevel;
           const upcastPart =
@@ -6073,6 +6085,12 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
               ? ` — upcast +${scaleUpcastDice(spell.upcastBonus, sl - baseLevel)}`
               : '';
           const slotNote = isBonusAction ? ', bonus action' : '';
+          // The parenthetical descriptor: the freebie reads "free, Magic Initiate"
+          // (with a ✦ prefix); any other cast reads its slot level.
+          const castPrefix = isFreeBase ? '✦ ' : '';
+          const levelDesc = isFreeBase
+            ? 'free, Magic Initiate'
+            : `${sl === baseLevel ? `Lvl ${sl}` : `${ordinal(sl)} slot`}${slotNote}${upcastPart}`;
           if (emitPerEnemy) {
             // Per-enemy basic choices at this slot level. `enemyDisambig`
             // is reset per slot below to keep #1/#2 numbering stable
@@ -6088,7 +6106,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
               if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
               const suffix = slotDisambig(en);
               choices.push({
-                label: `Cast ${spell.name} (${sl === baseLevel ? `Lvl ${sl}` : `${ordinal(sl)} slot`}${slotNote}${upcastPart}) → ${en.name}${suffix}`,
+                label: `${castPrefix}Cast ${spell.name} (${levelDesc}) → ${en.name}${suffix}`,
                 action: { type: 'cast_spell', spellId, slotLevel: sl, targetEnemyId: en.id },
                 requiresBonusAction: isBonusAction || undefined,
                 aoePreview: aoePreview ? { ...aoePreview, targetEnemyId: en.id } : undefined,
@@ -6109,7 +6127,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
                   ? { side: 'enemy' as const, max: 3 + (sl - baseLevel) }
                   : undefined;
             choices.push({
-              label: `Cast ${spell.name} (${sl === baseLevel ? `Lvl ${sl}` : `${ordinal(sl)} slot`}${slotNote}${upcastPart} — ${avail} slot${avail === 1 ? '' : 's'} left)`,
+              label: `${castPrefix}Cast ${spell.name} (${levelDesc}${isFreeBase ? '' : ` — ${avail} slot${avail === 1 ? '' : 's'} left`})`,
               action: { type: 'cast_spell', spellId, slotLevel: sl, targetEnemyId: targetId },
               requiresBonusAction: isBonusAction || undefined,
               aoePreview: aoePreview ? { ...aoePreview, targetEnemyId: targetId } : undefined,

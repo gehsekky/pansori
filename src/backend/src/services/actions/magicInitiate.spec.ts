@@ -4,12 +4,12 @@
 // + the cast-time freebie (first cast doesn't spend a slot;
 // subsequent casts that day do).
 
+import type { GameState, Seed } from '../../types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { applyFeatTake, getFeat, resetFeatLongRestResources } from '../feats.js';
-import { makeChar, makeState } from '../../test-fixtures.js';
-import type { Seed } from '../../types.js';
+import { baseSandboxSeed, makeChar, makeState } from '../../test-fixtures.js';
+import { generateChoices, takeAction } from '../gameEngine.js';
 import { context as ctx } from '../../campaignData/sandbox.js';
-import { takeAction } from '../gameEngine.js';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -324,5 +324,41 @@ describe('Magic Initiate — long-rest reset', () => {
     const reset = resetFeatLongRestResources(char, ctx, char.class_resource_uses ?? {});
     // Field unchanged — only feats with the matching effect trigger a reset.
     expect(reset.magic_initiate_l1_used).toBe(1);
+  });
+});
+
+describe('Magic Initiate — free L1 cast surfaces as a labeled combat choice', () => {
+  // A Fighter (no spell slots) with Magic Initiate Divine → Cure Wounds.
+  const fighterMI = (over: Partial<ReturnType<typeof makeChar>> = {}): GameState =>
+    makeState(
+      {
+        id: 'pc-1',
+        character_class: 'Fighter',
+        level: 1,
+        hp: 5,
+        max_hp: 10, // injured, so the heal-spell choice is offered
+        spells_known: ['cure_wounds'],
+        spell_slots_max: {},
+        spell_slots_used: {},
+        feat_choices: { magic_initiate_divine: { magicInitiateL1: 'cure_wounds' } },
+        class_resource_uses: { magic_initiate_l1_used: 0 },
+        ...over,
+      },
+      { combat_active: true }
+    );
+
+  const castLabels = (st: GameState) =>
+    generateChoices(st, baseSandboxSeed, ctx)
+      .filter((c) => c.action.type === 'cast_spell')
+      .map((c) => c.label);
+
+  it('a slot-less caster sees the "free, Magic Initiate" cast even with no slots', () => {
+    const labels = castLabels(fighterMI());
+    expect(labels.some((l) => /Cure Wounds/.test(l) && /free, Magic Initiate/.test(l))).toBe(true);
+  });
+
+  it('once the freebie is spent, the spell drops out (no slot to fall back on)', () => {
+    const labels = castLabels(fighterMI({ class_resource_uses: { magic_initiate_l1_used: 1 } }));
+    expect(labels.some((l) => /Cure Wounds/.test(l))).toBe(false);
   });
 });
