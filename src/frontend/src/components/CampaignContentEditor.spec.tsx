@@ -104,6 +104,41 @@ describe('CampaignContentEditor', () => {
     expect(mocked.putCampaignSection).not.toHaveBeenCalled();
   });
 
+  it('terrainArt offers theme presets that pre-fill the override map', async () => {
+    mocked.listCampaignSections.mockResolvedValue([{ section: 'terrainArt', source: 'none' }]);
+    mocked.getCampaignSection.mockResolvedValue({
+      section: 'terrainArt',
+      source: 'none',
+      value: null,
+    });
+    mocked.putCampaignSection.mockResolvedValue({ ok: true, section: 'terrainArt', source: 'db' });
+    render(<CampaignContentEditor campaignId="the-sky-has-fallen" />);
+    fireEvent.click(await screen.findByText('TERRAINART'));
+    await screen.findByText('THEME PRESET:');
+    // The valid-tile-id hint is shown for hand-tweaking.
+    expect(screen.getByText(/TILES: plains · road/)).toBeTruthy();
+    fireEvent.click(screen.getByTestId('terrain-theme-ashlands'));
+    const textarea = screen.getByLabelText(/TERRAINART/) as HTMLTextAreaElement;
+    const parsed = JSON.parse(textarea.value);
+    expect(parsed.plains).toBe('plains-ash');
+    expect(parsed.forest).toBe('forest-dead');
+    // CLASSIC resets to the empty map (all defaults).
+    fireEvent.click(screen.getByTestId('terrain-theme-classic'));
+    expect(JSON.parse((screen.getByLabelText(/TERRAINART/) as HTMLTextAreaElement).value)).toEqual(
+      {}
+    );
+    // Saving sends the parsed override map.
+    fireEvent.click(screen.getByTestId('terrain-theme-frostbound'));
+    fireEvent.click(screen.getByText('SAVE TO DATABASE'));
+    await waitFor(() =>
+      expect(mocked.putCampaignSection).toHaveBeenCalledWith(
+        'the-sky-has-fallen',
+        'terrainArt',
+        expect.objectContaining({ water: 'water-ice' })
+      )
+    );
+  });
+
   it('surfaces server-side shape validation issues', async () => {
     mocked.getCampaignSection.mockResolvedValue({
       section: 'narratives',

@@ -33,5 +33,6 @@ export function generateSeed(context: Context, partySize = 1): Seed {
     seed_id: randomUUID(),
     regions: c.regions,
     towns: c.towns,
+    terrain_art: context.terrainArt,
   };
 }

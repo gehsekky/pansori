@@ -102,7 +102,7 @@ export default function WorldMap({ seed, state, onClose }: Props) {
           )}
           {grid && markerPos ? (
             // Read-only (no onMarkerMove) — this is an overview, not a control.
-            <GridMapView grid={grid} markerPos={markerPos} />
+            <GridMapView grid={grid} markerPos={markerPos} terrainArt={seed.terrain_art} />
           ) : (
             <p className={styles.mapEmptyNote}>
               No map to show for this level — zoom out to find your bearings.

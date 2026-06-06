@@ -229,6 +229,30 @@ describe('GridMapView', () => {
     expect(c.querySelector('.game-icon-forest')).toBeNull(); // tile replaces the glyph
   });
 
+  it('terrainArt overrides skin a type: base PNG swaps + recolor filter applies', () => {
+    // Ashlands forest: 'forest-dead' draws the forest base PNG with a filter;
+    // an override can also point at ANOTHER type's base (plains → snow tile).
+    const { container } = render(
+      <GridMapView
+        grid={terrainGrid}
+        markerPos={{ x: 0, y: 0 }}
+        terrainArt={{ forest: 'forest-dead', plains: 'snow' }}
+      />
+    );
+    const forest = cell(container, 1, 2).querySelector('img')!;
+    expect(forest.getAttribute('src')).toContain('/art/tiles/forest.png');
+    expect(forest.style.filter).toContain('sepia');
+    // Unpainted regional cells default to plains — skinned to the snow tile,
+    // with no filter (it's a base tile).
+    const plains = cell(container, 4, 2).querySelector('img')!;
+    expect(plains.getAttribute('src')).toContain('/art/tiles/snow.png');
+    expect(plains.style.filter).toBe('');
+    // Types without an override keep their default art.
+    expect(cell(container, 0, 1).querySelector('img')?.getAttribute('src')).toContain(
+      '/art/tiles/road.png'
+    );
+  });
+
   it('renders the road terrain tile on a regional road cell (still clickable)', () => {
     // terrainGrid has a road at (0,1).
     const onMarkerMove = vi.fn();

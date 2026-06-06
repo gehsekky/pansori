@@ -28,6 +28,7 @@ import type {
   QuestProgress,
   RoomObject,
   StructuredAction,
+  TerrainArtMap,
   TerrainCell,
 } from './shared-types.js';
 
@@ -465,6 +466,9 @@ export interface Seed {
   // active grid client-side). Absent for roguelike / non-map campaigns.
   regions?: Region[];
   towns?: Town[];
+  // Campaign terrain-art overrides (Context.terrainArt), snapshotted at seed
+  // time like the maps above — the FE skins its tiles from this.
+  terrain_art?: TerrainArtMap;
 }
 
 // ─── Game state ───────────────────────────────────────────────────────────────
@@ -1805,8 +1809,14 @@ export type TieredNarrative = string[] | Record<string, string[]>;
 export interface Context {
   id: string;
   // Single-word label for this context, shown on the character-creation screen
-  // (e.g. "vale", "dungeon"). UI flavor only.
+  // (e.g. "vale", "dungeon"). UI flavor only. (Legacy: no longer an editable
+  // section — the picker shows campaigns.name; this remains the registry-down
+  // fallback only.)
   displayNoun: string;
+  // Campaign-scoped terrain art: terrain type → tile id from the shared
+  // TERRAIN_TILES catalog. Unmapped types render their default tile. Editable
+  // section ('terrainArt'); copied into the seed so the FE map can skin itself.
+  terrainArt?: TerrainArtMap;
   gridWidth?: number; // default combat grid width  (squares)
   gridHeight?: number; // default combat grid height (squares)
   campaign?: CampaignData;

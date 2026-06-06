@@ -228,6 +228,103 @@ export const TERRAIN: Record<TerrainType, TerrainSpec> = {
   town_wall: { passable: false, travelMult: 1, encounterMult: 0, label: 'town wall' },
 };
 
+// ─── Terrain ART (campaign-scoped skin over the global tile set) ──────
+//
+// The base art is one hand-painted tileset (David Baumgart, 8 overland
+// PNGs under /art/tiles). The tile CATALOG below adds recolored variants:
+// each entry names a base PNG plus an optional CSS filter the renderer
+// applies — so alternate looks (ashlands, frostbound) cost no new assets.
+//
+// A campaign's `terrainArt` section maps terrain TYPE → tile id from this
+// catalog; unmapped types render their default tile. Shared so the FE
+// renders it and the BE validates it from one definition. PURELY VISUAL —
+// mechanics stay on the terrain type (see `TERRAIN`), whatever it looks like.
+export interface TerrainTileSpec {
+  // The PNG this tile draws: /art/tiles/<base>.png (the 8 shipped tiles).
+  base: 'plains' | 'road' | 'forest' | 'hills' | 'swamp' | 'snow' | 'water' | 'mountain';
+  label: string;
+  // CSS filter recoloring the base PNG; omitted = the art as painted.
+  filter?: string;
+}
+
+export const TERRAIN_TILES = {
+  // The base set — each overland type's own tile, unfiltered.
+  plains: { base: 'plains', label: 'plains' },
+  road: { base: 'road', label: 'road' },
+  forest: { base: 'forest', label: 'forest' },
+  hills: { base: 'hills', label: 'hills' },
+  swamp: { base: 'swamp', label: 'swamp' },
+  snow: { base: 'snow', label: 'snow' },
+  water: { base: 'water', label: 'water' },
+  mountain: { base: 'mountain', label: 'mountains' },
+  // Ashlands — scorched, grey, post-cataclysm.
+  'plains-ash': { base: 'plains', label: 'ash flats', filter: 'grayscale(0.75) brightness(0.7)' },
+  'road-cracked': {
+    base: 'road',
+    label: 'cracked road',
+    filter: 'grayscale(0.55) brightness(0.8)',
+  },
+  'forest-dead': {
+    base: 'forest',
+    label: 'dead forest',
+    filter: 'sepia(0.55) saturate(0.45) brightness(0.72)',
+  },
+  'hills-barren': {
+    base: 'hills',
+    label: 'barren hills',
+    filter: 'saturate(0.35) brightness(0.78)',
+  },
+  'swamp-blight': {
+    base: 'swamp',
+    label: 'blighted mire',
+    filter: 'hue-rotate(28deg) saturate(0.7) brightness(0.7)',
+  },
+  'water-murk': {
+    base: 'water',
+    label: 'murkwater',
+    filter: 'hue-rotate(45deg) saturate(0.5) brightness(0.55)',
+  },
+  'mountain-char': {
+    base: 'mountain',
+    label: 'charred peaks',
+    filter: 'grayscale(0.6) brightness(0.6)',
+  },
+  'snow-ashfall': { base: 'snow', label: 'ashfall', filter: 'grayscale(0.9) brightness(0.75)' },
+  // Frostbound — washed-out, icy.
+  'plains-tundra': {
+    base: 'plains',
+    label: 'tundra',
+    filter: 'saturate(0.5) brightness(1.15) hue-rotate(-12deg)',
+  },
+  'road-snowbound': {
+    base: 'road',
+    label: 'snowbound road',
+    filter: 'saturate(0.55) brightness(1.18)',
+  },
+  'forest-frost': {
+    base: 'forest',
+    label: 'frosted forest',
+    filter: 'saturate(0.45) brightness(1.2) hue-rotate(-18deg)',
+  },
+  'hills-frost': {
+    base: 'hills',
+    label: 'frosted hills',
+    filter: 'saturate(0.4) brightness(1.25)',
+  },
+  'swamp-frozen': {
+    base: 'swamp',
+    label: 'frozen fen',
+    filter: 'saturate(0.45) brightness(1.15) hue-rotate(-25deg)',
+  },
+  'water-ice': { base: 'water', label: 'pack ice', filter: 'saturate(0.45) brightness(1.4)' },
+} as const satisfies Record<string, TerrainTileSpec>;
+
+export type TerrainTileId = keyof typeof TERRAIN_TILES;
+
+// A campaign's terrain-art overrides: type → tile id. Empty / absent =
+// every type renders its default tile.
+export type TerrainArtMap = Partial<Record<TerrainType, TerrainTileId>>;
+
 /**
  * Which combat side an entity fights for: PCs and their allies
  * (companions, summons) oppose enemies. Derived from `isEnemy` /

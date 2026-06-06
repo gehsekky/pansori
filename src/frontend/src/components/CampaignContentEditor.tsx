@@ -1,4 +1,5 @@
 import { type CampaignSectionInfo, type CampaignSectionSource, api } from '../lib/api.ts';
+import { TERRAIN_TILES, type TerrainArtMap } from '../types.ts';
 import { useCallback, useEffect, useState } from 'react';
 import styles from '../styles.module.css';
 
@@ -40,6 +41,33 @@ const SOURCE_LABEL: Record<CampaignSectionSource, string> = {
 // escaping happens on the wire automatically; on load the string value
 // displays verbatim.
 const PLAIN_TEXT_SECTIONS = new Set(['gameStart']);
+
+// Curated terrain-art themes: each pre-fills the terrainArt JSON with a
+// per-type override map (the author can hand-tweak entries after). CLASSIC
+// is the empty map — every type renders its default tile. All tile ids
+// come from the shared TERRAIN_TILES catalog (recolors of the same
+// hand-painted set, so themes cost no new assets).
+const TERRAIN_THEMES: Record<string, TerrainArtMap> = {
+  CLASSIC: {},
+  ASHLANDS: {
+    plains: 'plains-ash',
+    road: 'road-cracked',
+    forest: 'forest-dead',
+    hills: 'hills-barren',
+    swamp: 'swamp-blight',
+    water: 'water-murk',
+    mountain: 'mountain-char',
+    snow: 'snow-ashfall',
+  },
+  FROSTBOUND: {
+    plains: 'plains-tundra',
+    road: 'road-snowbound',
+    forest: 'forest-frost',
+    hills: 'hills-frost',
+    swamp: 'swamp-frozen',
+    water: 'water-ice',
+  },
+};
 
 function CampaignContentEditor({
   campaignId,
@@ -276,6 +304,36 @@ function CampaignContentEditor({
                 </div>
               );
             })()}
+          {/* Terrain-art theme presets — pre-fill the per-type override map;
+              hand-tweak entries in the JSON after. The tile list below the
+              buttons is the catalog of valid ids. */}
+          {active === 'terrainArt' && (
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.7rem', color: 'var(--t-dim)' }}>THEME PRESET:</span>
+                {Object.keys(TERRAIN_THEMES).map((theme) => (
+                  <button
+                    key={theme}
+                    className={styles.ghostBtn}
+                    style={{ padding: '0.25rem 0.6rem', fontSize: '0.7rem' }}
+                    data-testid={`terrain-theme-${theme.toLowerCase()}`}
+                    onClick={() => {
+                      setText(JSON.stringify(TERRAIN_THEMES[theme], null, 2));
+                      setSaved(false);
+                    }}
+                  >
+                    {theme}
+                  </button>
+                ))}
+                <span style={{ fontSize: '0.7rem', color: 'var(--t-dim)' }}>
+                  THEN SAVE — OR HAND-TWEAK ENTRIES FIRST
+                </span>
+              </div>
+              <p style={{ fontSize: '0.68rem', color: 'var(--t-dim)', marginTop: 6 }}>
+                TILES: {Object.keys(TERRAIN_TILES).join(' · ')}
+              </p>
+            </div>
+          )}
           <label className={styles.formLbl} htmlFor="content-section-editor">
             {active.toUpperCase()} — SERVING FROM {SOURCE_LABEL[activeSource]}
             {PLAIN_TEXT_SECTIONS.has(active) && ' · PLAIN TEXT'}

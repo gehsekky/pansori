@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
-import { TERRAIN } from '../shared-types.js';
+import { TERRAIN, TERRAIN_TILES } from '../shared-types.js';
 import { z } from 'zod';
 
 // Zod schemas for request bodies on the auth + game routes. Each handler
@@ -763,11 +763,19 @@ const TownsSchema = z
     }
   });
 
+// Campaign terrain skin: terrain type → tile id from the shared catalog.
+// Every key optional ({} = all defaults); unknown types / tile ids rejected.
+const TILE_ID = z.enum(Object.keys(TERRAIN_TILES) as [string, ...string[]]);
+const TerrainArtSchema = z
+  .object(Object.fromEntries(Object.keys(TERRAIN).map((t) => [t, TILE_ID.optional()])))
+  .strict();
+
 export const CAMPAIGN_SECTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
   // Narration hook: the first narrative entry of a new game (overlays the
   // code/template campaign.intro).
   gameStart: z.string().min(1).max(4000),
   narratives: NarrativesSchema,
+  terrainArt: TerrainArtSchema,
   regions: RegionsSchema,
   towns: TownsSchema,
   // Customs ON TOP of the ambient SRD catalogs — same per-entry shapes as

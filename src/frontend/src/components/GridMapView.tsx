@@ -1,6 +1,14 @@
-import type { ActiveGrid, FloorType, GridPos, MapTransition, TerrainType } from '../types';
+import type {
+  ActiveGrid,
+  FloorType,
+  GridPos,
+  MapTransition,
+  TerrainArtMap,
+  TerrainTileSpec,
+  TerrainType,
+} from '../types';
+import { TERRAIN, TERRAIN_TILES } from '../types';
 import GameIcon from './GameIcon';
-import { TERRAIN } from '../types';
 import { TERRAIN_STYLE } from '../lib/terrainStyle';
 import styles from '../styles.module.css';
 
@@ -55,6 +63,9 @@ interface Props {
   // open conversation, the leveling roster, a vendor) so a stray map click can't
   // dispatch a move / talk / pickup and break out of that flow.
   readOnly?: boolean;
+  // Campaign terrain skin (seed.terrain_art): terrain type → TERRAIN_TILES id.
+  // Unmapped types render their default tile; omitted = all defaults.
+  terrainArt?: TerrainArtMap;
 }
 
 const LEVEL_LABEL: Record<ActiveGrid['level'], string> = {
@@ -255,7 +266,19 @@ function GridMapView({
   onObjectClick,
   revealed,
   readOnly,
+  terrainArt,
 }: Props) {
+  // Resolve a terrain type's tile through the campaign skin: an override id
+  // picks its catalog entry (base PNG + recolor filter); otherwise the type's
+  // default tile (no filter). Types with no tile at all return src undefined
+  // and fall through to the tint + glyph path.
+  const tileFor = (t: TerrainType): { src?: string; filter?: string } => {
+    const override = terrainArt?.[t];
+    // Widen past the catalog's per-entry literal types (filter is optional).
+    const spec: TerrainTileSpec | undefined = override ? TERRAIN_TILES[override] : undefined;
+    if (spec) return { src: `/art/tiles/${spec.base}.png`, filter: spec.filter };
+    return { src: TERRAIN_TILE[t] };
+  };
   // Square size per map level: the sparse overland map gets the biggest squares
   // so it reads like a map and the terrain tiles have room; town is mid-size;
   // local exploration is the most compact.
@@ -361,17 +384,18 @@ function GridMapView({
       // unpainted "plains" cell only tiles on the regional map (so interior
       // rooms don't sprout grass where they're just bare floor). Fogged cells
       // never show a tile.
-      const tileSrc = fogged
-        ? undefined
+      const cellTile = fogged
+        ? {}
         : isTownSite
-          ? TOWN_SITE_TILE
+          ? { src: TOWN_SITE_TILE }
           : siteTileName
-            ? `/art/tiles/${siteTileName}.png`
+            ? { src: `/art/tiles/${siteTileName}.png` }
             : terrainType
-              ? TERRAIN_TILE[terrainType]
+              ? tileFor(terrainType)
               : isRegional && plainsDefault
-                ? TERRAIN_TILE.plains
-                : undefined;
+                ? tileFor('plains')
+                : {};
+      const tileSrc = cellTile.src;
       // Seamless ground texture for a floored cell (local rooms + town maps). A
       // painted "ground" terrain (cobblestone / garden) picks the matching
       // texture; every other walkable cell uses the grid's default floor. Feature
@@ -684,6 +708,7 @@ function GridMapView({
               aria-hidden="true"
               draggable={false}
               className={styles.gridMapTile}
+              style={cellTile.filter ? { filter: cellTile.filter } : undefined}
             />
           )}
           {token}

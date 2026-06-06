@@ -30,6 +30,7 @@ import type {
   QuestStep,
   RoomObject,
   StructuredAction,
+  TerrainArtMap,
   TerrainCell,
   WeaponMastery,
 } from './shared-types.js';
@@ -502,6 +503,9 @@ export interface Seed {
   // 3-level grid map definitions (copied from the campaign at seed time).
   regions?: Region[];
   towns?: Town[];
+  // Campaign terrain-art overrides (type → TERRAIN_TILES id), snapshotted at
+  // seed time — GridMapView skins its tiles from this.
+  terrain_art?: TerrainArtMap;
 }
 
 export interface Session {

@@ -800,6 +800,7 @@ export default function App() {
                             markerPos={gameState.marker_pos}
                             revealed={revealed}
                             readOnly={mapReadOnly}
+                            terrainArt={seed?.terrain_art}
                             // A surfaced Attack choice means a hostile is here
                             // pre-combat — show the red enemy marker.
                             enemyPresent={choices.some((c) => c.kind === 'attack')}

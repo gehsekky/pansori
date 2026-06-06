@@ -26,6 +26,16 @@ describe('generateSeed — Vale of Shadows campaign', () => {
       expect(seed.enemies?.[npc.roomId] ?? []).toEqual([]);
     }
   });
+
+  it('snapshots the campaign terrain-art overrides into the seed', () => {
+    // Vale defines none — absent, not an empty object.
+    expect(seed.terrain_art).toBeUndefined();
+    const skinned = generateSeed(
+      { ...valeCtx, terrainArt: { plains: 'plains-ash', water: 'water-murk' } },
+      1
+    );
+    expect(skinned.terrain_art).toEqual({ plains: 'plains-ash', water: 'water-murk' });
+  });
 });
 
 describe('generateSeed — Vale carries the folded Whispering Pines content', () => {

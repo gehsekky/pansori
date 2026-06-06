@@ -398,6 +398,20 @@ describe('editable sections registry', () => {
     expect(result.success, JSON.stringify(result.error?.issues)).toBe(true);
   });
 
+  it('terrainArt schema: per-type tile ids from the shared catalog, {} allowed', () => {
+    const art = CAMPAIGN_SECTION_SCHEMAS.terrainArt;
+    expect(art.safeParse({}).success).toBe(true);
+    expect(
+      art.safeParse({ plains: 'plains-ash', forest: 'forest-dead', water: 'water-murk' }).success
+    ).toBe(true);
+    // A type may point at another type's base tile (plains → snow).
+    expect(art.safeParse({ plains: 'snow' }).success).toBe(true);
+    // Unknown tile id / unknown terrain type / wrong value shape.
+    expect(art.safeParse({ plains: 'lava-flow' }).success).toBe(false);
+    expect(art.safeParse({ tundra: 'plains-ash' }).success).toBe(false);
+    expect(art.safeParse({ plains: { base: 'snow' } }).success).toBe(false);
+  });
+
   it('gameStart schema is a plain narration string', () => {
     const gameStart = CAMPAIGN_SECTION_SCHEMAS.gameStart;
     expect(gameStart.safeParse('The road south is long and the coin pouch light.').success).toBe(
@@ -749,6 +763,22 @@ describe('section CRUD + live refresh', () => {
     expect(await deleteCampaignSection(db.pool, 'malgovia', 'gameStart')).toBe(true);
     await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
     expect(contexts.malgovia.campaign?.intro).toBe('The code opening.');
+  });
+
+  it('terrainArt overlays the context top-level and reverts to none on delete', async () => {
+    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    const code = codeCtx({ id: 'malgovia' });
+    const contexts: Record<string, Context> = { malgovia: code };
+    const art = { plains: 'plains-ash', forest: 'forest-dead' };
+
+    expect(await putCampaignSection(db.pool, 'malgovia', 'terrainArt', art)).toBe(true);
+    expect((await getDbSection(db.pool, 'malgovia', 'terrainArt')).value).toEqual(art);
+    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
+    expect(contexts.malgovia.terrainArt).toEqual(art);
+
+    expect(await deleteCampaignSection(db.pool, 'malgovia', 'terrainArt')).toBe(true);
+    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
+    expect(contexts.malgovia.terrainArt).toBeUndefined();
   });
 
   it('gameStart overlays the base template intro for DB-born campaigns', async () => {
