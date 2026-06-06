@@ -24,7 +24,15 @@
 // (routes/campaigns.ts) re-apply the overlay for the edited campaign via
 // refreshCampaignOverlay, so changes go live without a restart.
 
-import type { Context, EnemyTemplate, LootItem } from '../types.js';
+import type {
+  Context,
+  EnemyTemplate,
+  LootItem,
+  Region,
+  TerrainCell,
+  TerrainType,
+  TierZone,
+} from '../types.js';
 import {
   composeEnemyTemplates,
   deleteCampaignCustomMonsters,
@@ -304,6 +312,51 @@ export async function deleteCampaignRegions(pool: Pool, campaignId: string): Pro
   return true;
 }
 
+// Convert DB regions (dense {t, tier?, enc?} grid + child sites) into the
+// engine's map model (sparse terrain + tierZones rectangles):
+//
+//   - grid cells of any non-default type become sparse TerrainCells
+//     (unlisted cells default to 'plains' in the engine — same default)
+//   - per-cell `tier` overrides become 1x1 TierZone rectangles, which
+//     `regionTierAt` already resolves (highest covering zone, else
+//     baseTier) — painted tier bands of any shape Just Work
+//   - the starting region sorts FIRST: initMapState opens the campaign at
+//     campaign.regions[0]
+//   - per-cell `enc` has no engine slot yet — encounters only roll where a
+//     region has an encounterTable, which DB regions don't carry until the
+//     entities cross-validation lands. Ignored (documented) for now.
+export function dbRegionsToEngine(regions: CampaignRegion[]): Region[] {
+  const ordered = [...regions].sort(
+    (a, b) => Number(b.isStartingRegion) - Number(a.isStartingRegion)
+  );
+  return ordered.map((r) => {
+    const terrain: TerrainCell[] = [];
+    const tierZones: TierZone[] = [];
+    r.grid.forEach((row, y) =>
+      row.forEach((cell, x) => {
+        if (cell.t !== 'plains') terrain.push({ pos: { x, y }, type: cell.t as TerrainType });
+        if (cell.tier !== undefined) {
+          tierZones.push({ tier: cell.tier, from: { x, y }, to: { x, y } });
+        }
+      })
+    );
+    return {
+      id: r.id,
+      name: r.name,
+      ...(r.desc !== undefined ? { desc: r.desc } : {}),
+      feetPerSquare: r.feetPerSquare,
+      gridWidth: r.grid[0]?.length ?? 0,
+      gridHeight: r.grid.length,
+      ...(terrain.length > 0 ? { terrain } : {}),
+      startPos: r.startPos,
+      sites: (r.sites ?? []).map((s) => ({ ...s })),
+      ...(r.encounterChance !== undefined ? { encounterChance: r.encounterChance } : {}),
+      ...(r.baseTier !== undefined ? { baseTier: r.baseTier } : {}),
+      ...(tierZones.length > 0 ? { tierZones } : {}),
+    };
+  });
+}
+
 // ─── Section CRUD (the content-editing API's storage layer) ─────────────────
 
 // The DB-authored data object for one campaign; null if the campaign row
@@ -432,8 +485,18 @@ async function loadOverlay(
   const data = (await getCampaignData(pool, campaignId)) ?? {};
   const overlay: Record<string, unknown> =
     typeof data === 'object' && data !== null && !Array.isArray(data) ? { ...data } : {};
-  const regions = await getCampaignRegions(pool, campaignId);
-  if (regions.length > 0) overlay.regions = regions;
+
+  // DB regions DRIVE the map: converted to the engine model and folded
+  // into the campaign block (replacing the code/template regions while
+  // the rest of the block — rooms, towns, placed enemies/loot, quests —
+  // stays code-supplied until those sections migrate).
+  const dbRegions = await getCampaignRegions(pool, campaignId);
+  if (dbRegions.length > 0) {
+    overlay.campaign = {
+      ...(code.campaign ?? { world_name: code.id, intro: '', rooms: [] }),
+      regions: dbRegionsToEngine(dbRegions),
+    };
+  }
 
   const lootTable = composeLootTable(
     await getCampaignCustomItems(pool, campaignId),

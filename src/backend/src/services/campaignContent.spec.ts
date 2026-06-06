@@ -9,6 +9,7 @@ import {
   type CampaignRegionCell,
   EDITABLE_SECTIONS,
   applyCampaignOverlays,
+  dbRegionsToEngine,
   deleteCampaignSection,
   getCampaignData,
   getCampaignRegions,
@@ -24,6 +25,7 @@ import { CAMPAIGN_SECTION_SCHEMAS } from '../routes/schemas.js';
 import type { Context } from '../types.js';
 import type { Pool } from 'pg';
 import { context as malgovia } from '../campaignData/malgovia/index.js';
+import { regionTierAt } from './mapEngine.js';
 
 function codeCtx(partial: Partial<Context> & { id: string }): Context {
   return partial as Context;
@@ -458,15 +460,28 @@ describe('section CRUD + live refresh', () => {
     expect(contexts.malgovia.displayNoun).toBe('vale');
   });
 
-  it('refresh folds table regions into the live context', async () => {
+  it('refresh folds CONVERTED table regions into the campaign block, keeping its rooms', async () => {
     const db = makeContentDb({ campaigns: { malgovia: {} } });
-    const code = codeCtx({ id: 'malgovia', displayNoun: 'vale' });
+    const code = codeCtx({
+      id: 'malgovia',
+      displayNoun: 'vale',
+      campaign: {
+        world_name: 'Malgovia',
+        intro: 'x',
+        rooms: [{ id: 'square', name: 'Square', desc: 'd' }],
+        regions: [{ id: 'old-code-region' } as never],
+      } as never,
+    });
     const contexts: Record<string, Context> = { malgovia: code };
     await putCampaignSection(db.pool, 'malgovia', 'regions', [REGION_A]);
     await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
-    expect((contexts.malgovia as unknown as { regions: CampaignRegion[] }).regions).toEqual([
-      REGION_A,
-    ]);
+    const campaign = contexts.malgovia.campaign!;
+    // Code rooms preserved; DB regions replace the code regions, in engine form.
+    expect(campaign.rooms.map((r) => r.id)).toEqual(['square']);
+    expect(campaign.regions?.map((r) => r.id)).toEqual(['malgovia']);
+    expect(campaign.regions?.[0].gridWidth).toBe(12);
+    expect(campaign.regions?.[0].gridHeight).toBe(10);
+    expect(campaign.regions?.[0].startPos).toEqual({ x: 3, y: 4 });
   });
 
   it('regions round-trip their sites (child rows) in order; replace-all cascades them', async () => {
@@ -524,6 +539,59 @@ describe('section CRUD + live refresh', () => {
   });
 });
 
+describe('dbRegionsToEngine', () => {
+  it('converts the dense grid to sparse terrain (plains is the engine default)', () => {
+    const grid = G(3, 2);
+    grid[0][1] = { t: 'forest' };
+    grid[1][2] = { t: 'water' };
+    const [region] = dbRegionsToEngine([{ ...REGION_A, grid }]);
+    expect(region.gridWidth).toBe(3);
+    expect(region.gridHeight).toBe(2);
+    expect(region.terrain).toEqual([
+      { pos: { x: 1, y: 0 }, type: 'forest' },
+      { pos: { x: 2, y: 1 }, type: 'water' },
+    ]);
+    // An all-plains grid carries no terrain key at all.
+    expect(dbRegionsToEngine([REGION_A])[0].terrain).toBeUndefined();
+  });
+
+  it('per-cell tiers become 1x1 tierZones that regionTierAt resolves', () => {
+    const grid = G(3, 2);
+    grid[1][1] = { t: 'hills', tier: 3 };
+    const [region] = dbRegionsToEngine([{ ...REGION_A, grid, baseTier: 1 }]);
+    expect(region.tierZones).toEqual([{ tier: 3, from: { x: 1, y: 1 }, to: { x: 1, y: 1 } }]);
+    expect(regionTierAt(region, { x: 1, y: 1 })).toBe(3);
+    expect(regionTierAt(region, { x: 0, y: 0 })).toBe(1); // baseTier elsewhere
+  });
+
+  it('puts the starting region first (initMapState opens at regions[0])', () => {
+    const converted = dbRegionsToEngine([REGION_B, REGION_A]); // A is the starter
+    expect(converted.map((r) => r.id)).toEqual(['malgovia', 'frost-reach']);
+  });
+
+  it('passes sites and scalars through untouched', () => {
+    const withSites: CampaignRegion = {
+      ...REGION_A,
+      sites: [
+        {
+          id: 'old-crypt',
+          name: 'The Old Crypt',
+          pos: { x: 5, y: 5 },
+          kind: 'local',
+          entryRoomId: 'crypt-entrance',
+          icon: 'tombstone',
+        },
+      ],
+    };
+    const [region] = dbRegionsToEngine([withSites]);
+    expect(region.sites).toEqual(withSites.sites);
+    expect(region.feetPerSquare).toBe(5280);
+    expect(region.encounterChance).toBe(0.15);
+    expect(region.baseTier).toBe(1);
+    expect(region.desc).toBe('A mist-shrouded vale.');
+  });
+});
+
 describe('applyCampaignOverlays', () => {
   it('replaces code contexts in place and bases DB-born rows on the template', async () => {
     const contexts: Record<string, Context> = {
@@ -540,9 +608,8 @@ describe('applyCampaignOverlays', () => {
     await putCampaignSection(db.pool, 'malgovia', 'regions', [REGION_A]);
     await applyCampaignOverlays(db.pool, contexts);
     expect(contexts.malgovia.displayNoun).toBe('db-vale');
-    expect((contexts.malgovia as unknown as { regions: CampaignRegion[] }).regions).toEqual([
-      REGION_A,
-    ]);
+    // DB regions land in the campaign block, converted to engine form.
+    expect(contexts.malgovia.campaign?.regions?.map((r) => r.id)).toEqual(['malgovia']);
     expect(contexts.sandbox.displayNoun).toBe('sandbox');
     // The DB-born campaign joined the live map, based on the template.
     expect(Object.keys(contexts).sort()).toEqual(['ghost', 'malgovia', 'sandbox']);
