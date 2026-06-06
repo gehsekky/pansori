@@ -44,6 +44,8 @@ export const lootTable: LootItem[] = [
     'hand_crossbow',
     'heavy_crossbow',
     'longbow',
+    'musket',
+    'pistol',
     'leather_armor',
     'studded_leather',
     'scale_mail',
