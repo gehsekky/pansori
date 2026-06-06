@@ -70,6 +70,16 @@ function AdminScreen({
   // Default to 'player' — inviting friends to play is the common case.
   const [addRole, setAddRole] = useState<CampaignRole>('player');
 
+  // New-campaign form (creator mode): name → derived slug id.
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [createErr, setCreateErr] = useState<string | null>(null);
+  const newId = newName
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40);
+
   // Players can see/play a campaign but have nothing to do on this screen —
   // the member list itself is editor+.
   const adminRole = (r: CampaignRole | null) => r === 'owner' || r === 'editor';
@@ -174,6 +184,29 @@ function AdminScreen({
     }
   }
 
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault();
+    if (busy || newId.length < 3) return;
+    setBusy(true);
+    setCreateErr(null);
+    try {
+      const created = await api.createCampaign(newId, newName.trim());
+      setCampaigns((prev) => [...prev, created]);
+      setSelectedId(created.id);
+      setCreating(false);
+      setNewName('');
+    } catch (err) {
+      const reason = (err as { error?: string })?.error;
+      setCreateErr(
+        reason === 'campaign_exists'
+          ? `The id "${newId}" is taken — pick a different name.`
+          : 'Could not create the campaign — try again.'
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
   // Site-admin only: promote to global / demote to private. The backend
   // enforces it too (requireAdmin) — the button simply isn't rendered for
   // non-admins.
@@ -205,6 +238,19 @@ function AdminScreen({
             </p>
           </div>
           <div className={styles.sessionsActions}>
+            {mode === 'creator' && (
+              <button
+                data-testid="new-campaign-btn"
+                className={styles.submit}
+                style={{ marginTop: 0, width: 'auto', padding: '0.5rem 1.25rem' }}
+                onClick={() => {
+                  setCreating((v) => !v);
+                  setCreateErr(null);
+                }}
+              >
+                + NEW CAMPAIGN
+              </button>
+            )}
             <button className={styles.ghostBtn} onClick={onBack}>
               BACK
             </button>
@@ -217,6 +263,47 @@ function AdminScreen({
           </div>
         )}
 
+        {/* ── New-campaign form ─────────────────────────────────────────── */}
+        {creating && mode === 'creator' && (
+          <form className={styles.card} style={{ marginBottom: '1rem' }} onSubmit={handleCreate}>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end' }}>
+              <div style={{ flex: 1 }}>
+                <label className={styles.formLbl} htmlFor="new-campaign-name">
+                  CAMPAIGN NAME
+                </label>
+                <input
+                  id="new-campaign-name"
+                  className={styles.formInp}
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  placeholder="e.g. The Mistwood"
+                  autoFocus
+                />
+              </div>
+              <button
+                type="submit"
+                className={styles.sendBtn}
+                disabled={busy || newId.length < 3}
+                data-testid="create-campaign-btn"
+              >
+                CREATE
+              </button>
+            </div>
+            <p style={{ fontSize: '0.7rem', color: 'var(--t-dim)', marginTop: 6 }}>
+              ID: {newId || '—'} · PRIVATE — ONLY MEMBERS SEE IT · STARTS ON THE BASE TEMPLATE
+              (PLAYABLE IMMEDIATELY)
+            </p>
+            {createErr && (
+              <p
+                role="alert"
+                style={{ color: 'var(--t-hp-low)', fontSize: '0.8rem', marginTop: 6 }}
+              >
+                {createErr}
+              </p>
+            )}
+          </form>
+        )}
+
         {/* ── Campaign list ─────────────────────────────────────────────── */}
         {mode === 'creator' && !campaignsErr && visibleCampaigns.length === 0 && (
           <div
@@ -227,8 +314,8 @@ function AdminScreen({
               NO CAMPAIGNS YET
             </p>
             <p style={{ fontSize: '0.75rem' }}>
-              You don&apos;t own or edit any campaigns. Creating your own campaign is coming soon —
-              for now, a campaign owner can add you as an editor.
+              You don&apos;t own or edit any campaigns. Hit + NEW CAMPAIGN to start one — it&apos;s
+              private until you invite players, and playable immediately on the base template.
             </p>
           </div>
         )}

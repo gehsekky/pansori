@@ -7,6 +7,7 @@
 import {
   type CampaignVisibility,
   addMemberByEmail,
+  createCampaign,
   listCampaignsForUser,
   listMembers,
   listVisibleCampaignIds,
@@ -79,6 +80,12 @@ function makeDb(opts: {
       if (sql.includes('JOIN users u') && sql.includes('ORDER BY CASE m.role')) {
         const rows = members.filter((m) => m.campaign_id === params[0]).map(joined);
         return { rows, rowCount: rows.length };
+      }
+      if (sql.includes('INSERT INTO campaigns')) {
+        const [id, name] = params as [string, string];
+        if (campaigns.some((c) => c.id === id)) return { rows: [], rowCount: 0 }; // ON CONFLICT DO NOTHING
+        campaigns.push({ id, name, visibility: 'private' });
+        return { rows: [], rowCount: 1 };
       }
       if (sql.includes('INSERT INTO campaign_members')) {
         const [campaign_id, user_id, role] = params as [string, string, CampaignRole];
@@ -344,6 +351,36 @@ describe('removeMember', () => {
     });
     expect(await removeMember(db.pool, 'malgovia', 'a')).toEqual({ ok: true });
     expect(db.members).toHaveLength(1);
+  });
+});
+
+describe('createCampaign', () => {
+  it('creates a private campaign with the creator as owner', async () => {
+    const db = makeDb({ users: [ALICE], campaigns: [{ id: 'malgovia', name: 'Malgovia' }] });
+    const result = await createCampaign(db.pool, appUser('a'), 'mistwood', 'The Mistwood');
+    expect(result).toEqual({
+      id: 'mistwood',
+      name: 'The Mistwood',
+      visibility: 'private',
+      my_role: 'owner',
+    });
+    expect(db.members.find((m) => m.campaign_id === 'mistwood')).toMatchObject({
+      user_id: 'a',
+      role: 'owner',
+    });
+    // It lists for the creator, invisible to strangers.
+    expect((await listCampaignsForUser(db.pool, appUser('a'))).map((c) => c.id)).toContain(
+      'mistwood'
+    );
+    expect((await listCampaignsForUser(db.pool, appUser('z'))).map((c) => c.id)).not.toContain(
+      'mistwood'
+    );
+  });
+
+  it('rejects a taken id (including the code built-ins)', async () => {
+    const db = makeDb({ users: [ALICE], campaigns: [{ id: 'malgovia', name: 'Malgovia' }] });
+    expect(await createCampaign(db.pool, appUser('a'), 'malgovia', 'Imposter')).toBe('exists');
+    expect(db.members).toHaveLength(0);
   });
 });
 

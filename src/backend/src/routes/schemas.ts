@@ -182,6 +182,20 @@ export const SetCampaignVisibilitySchema = z
   })
   .strict();
 
+// Campaign creation: slug id + display name. 'catalog' is reserved (it
+// prefixes the catalog read routes under /api/campaigns).
+export const CreateCampaignSchema = z
+  .object({
+    id: z
+      .string()
+      .min(3)
+      .max(40)
+      .regex(/^[a-z0-9_-]+$/, 'lowercase letters, digits, - and _ only')
+      .refine((v) => v !== 'catalog', { message: 'reserved id' }),
+    name: z.string().min(1).max(80),
+  })
+  .strict();
+
 // ─── Campaign content sections ───────────────────────────────────────────────
 // Per-section value schemas for the content-editing API. A section becomes
 // editable by adding it here AND to EDITABLE_SECTIONS (campaignContent.ts) —

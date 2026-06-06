@@ -40,6 +40,14 @@ import {
   putCampaignCustomItems,
 } from './itemCatalog.js';
 import type { Pool } from 'pg';
+import { baseCampaignContext } from '../campaignData/srd/baseCampaign.js';
+
+// The code supplement for a DB-born campaign (no campaignData/ folder):
+// the base template, re-keyed to the campaign's id. Everything the
+// creator hasn't (or can't yet) put in the DB comes from here.
+export function baseContextFor(campaignId: string): Context {
+  return { ...baseCampaignContext, id: campaignId };
+}
 
 // The Context sections editable through the content API. Grows as zod
 // schemas land per section (routes/schemas.ts CAMPAIGN_SECTION_SCHEMAS must
@@ -446,25 +454,23 @@ async function loadOverlay(
 
 // Overlay every registered campaign's DB content onto the loaded code
 // contexts, in place (the CONTEXTS map is shared by reference across the
-// route handlers). Campaigns with no DB content are untouched; DB rows
-// without a code context are skipped — a DB-only campaign isn't playable
-// until campaign creation lands with required-field validation.
+// route handlers). DB-born campaigns (no code context) resolve over the
+// base template — that's what makes a freshly created campaign playable.
 export async function applyCampaignOverlays(
   pool: Pool,
   contexts: Record<string, Context>
 ): Promise<void> {
   const { rows } = await pool.query<{ id: string }>('SELECT id FROM campaigns');
   for (const row of rows) {
-    const code = contexts[row.id];
-    if (!code) {
-      console.warn(`[campaignContent] DB campaign "${row.id}" has no code context — skipping`);
-      continue;
-    }
+    const hasCode = !!contexts[row.id];
+    const code = contexts[row.id] ?? baseContextFor(row.id);
     const overlay = await loadOverlay(pool, row.id, code);
-    if (Object.keys(overlay).length === 0) continue;
+    if (Object.keys(overlay).length === 0 && hasCode) continue;
     contexts[row.id] = mergeContextWithOverlay(code, overlay);
     console.log(
-      `[campaignContent] Applied DB overlay for ${row.id}: ${Object.keys(overlay).join(', ')}`
+      `[campaignContent] Resolved ${row.id} over ${hasCode ? 'code' : 'the base template'}: ${
+        Object.keys(overlay).join(', ') || '(no DB sections)'
+      }`
     );
   }
 }
@@ -479,8 +485,8 @@ export async function refreshCampaignOverlay(
   codeContexts: Record<string, Context>,
   campaignId: string
 ): Promise<void> {
-  const code = codeContexts[campaignId];
-  if (!code) return; // DB-only campaign — nothing to serve until creation lands
+  // DB-born campaigns re-resolve over the base template.
+  const code = codeContexts[campaignId] ?? baseContextFor(campaignId);
   const overlay = await loadOverlay(pool, campaignId, code);
   contexts[campaignId] = mergeContextWithOverlay(code, overlay);
 }

@@ -81,6 +81,31 @@ export async function listVisibleCampaignIds(pool: Pool, user: AppUser): Promise
   return new Set(rows.map((r) => r.id));
 }
 
+// Create a DB-born campaign: private by default, creator becomes its
+// owner. 'exists' when the id is taken (incl. the code built-ins, which
+// the registry sync owns).
+export async function createCampaign(
+  pool: Pool,
+  user: AppUser,
+  id: string,
+  name: string
+): Promise<'exists' | CampaignListing> {
+  const { rowCount } = await pool.query(
+    `INSERT INTO campaigns (id, name, visibility)
+     VALUES ($1, $2, 'private')
+     ON CONFLICT (id) DO NOTHING`,
+    [id, name]
+  );
+  if (!rowCount) return 'exists';
+  await pool.query(
+    `INSERT INTO campaign_members (campaign_id, user_id, role)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (campaign_id, user_id) DO UPDATE SET role = EXCLUDED.role`,
+    [id, user.id, 'owner']
+  );
+  return { id, name, visibility: 'private', my_role: 'owner' };
+}
+
 // Admin-only: promote a campaign to global / demote back to private.
 export async function setCampaignVisibility(
   pool: Pool,

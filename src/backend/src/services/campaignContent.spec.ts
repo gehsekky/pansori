@@ -508,16 +508,24 @@ describe('section CRUD + live refresh', () => {
     expect(await deleteCampaignSection(db.pool, 'nope', 'displayNoun')).toBe(false);
   });
 
-  it('refresh is a no-op for DB-only campaigns (no code context)', async () => {
+  it('DB-born campaigns (no code context) resolve over the base template', async () => {
     const db = makeContentDb({ campaigns: { ghost: { displayNoun: 'boo' } } });
     const contexts: Record<string, Context> = {};
     await refreshCampaignOverlay(db.pool, contexts, {}, 'ghost');
-    expect(Object.keys(contexts)).toEqual([]);
+    const ghost = contexts.ghost;
+    expect(ghost).toBeDefined();
+    // Identity comes from the campaign, machinery from the base template,
+    // DB sections overlay it.
+    expect(ghost.id).toBe('ghost');
+    expect(ghost.displayNoun).toBe('boo');
+    expect(Object.keys(ghost.classHitDie).length).toBeGreaterThan(0);
+    expect(ghost.campaign?.rooms.length).toBeGreaterThan(0);
+    expect(ghost.narratives.genericArrival.length).toBeGreaterThan(0);
   });
 });
 
 describe('applyCampaignOverlays', () => {
-  it('replaces matching contexts in place (JSONB + table regions) and skips unknown rows', async () => {
+  it('replaces code contexts in place and bases DB-born rows on the template', async () => {
     const contexts: Record<string, Context> = {
       malgovia: codeCtx({ id: 'malgovia', displayNoun: 'vale' }),
       sandbox: codeCtx({ id: 'sandbox', displayNoun: 'sandbox' }),
@@ -526,7 +534,7 @@ describe('applyCampaignOverlays', () => {
       campaigns: {
         malgovia: { displayNoun: 'db-vale' },
         sandbox: {},
-        ghost: { displayNoun: 'nope' }, // no code context
+        ghost: { displayNoun: 'boo' }, // DB-born — no code context
       },
     });
     await putCampaignSection(db.pool, 'malgovia', 'regions', [REGION_A]);
@@ -536,6 +544,10 @@ describe('applyCampaignOverlays', () => {
       REGION_A,
     ]);
     expect(contexts.sandbox.displayNoun).toBe('sandbox');
-    expect(Object.keys(contexts).sort()).toEqual(['malgovia', 'sandbox']);
+    // The DB-born campaign joined the live map, based on the template.
+    expect(Object.keys(contexts).sort()).toEqual(['ghost', 'malgovia', 'sandbox']);
+    expect(contexts.ghost.id).toBe('ghost');
+    expect(contexts.ghost.displayNoun).toBe('boo');
+    expect(contexts.ghost.campaign?.rooms.length).toBeGreaterThan(0);
   });
 });

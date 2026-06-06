@@ -278,6 +278,13 @@ export const api = {
       method: 'DELETE',
     }),
 
+  // Create a DB-born campaign — creator becomes owner; private by default.
+  createCampaign: (id: string, name: string) =>
+    req<CampaignListing>('/campaigns', {
+      method: 'POST',
+      body: JSON.stringify({ id, name }),
+    }),
+
   // Site-admin only — promote to global / demote to private.
   setCampaignVisibility: (campaignId: string, visibility: CampaignVisibility) =>
     req<{ ok: boolean; visibility: CampaignVisibility }>(`/campaigns/${campaignId}/visibility`, {

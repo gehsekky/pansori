@@ -12,6 +12,7 @@ vi.mock('../lib/api.ts', () => ({
     setCampaignMemberRole: vi.fn(),
     removeCampaignMember: vi.fn(),
     setCampaignVisibility: vi.fn(),
+    createCampaign: vi.fn(),
     // Used by the nested CampaignContentEditor.
     listCampaignSections: vi.fn(),
     getCampaignSection: vi.fn(),
@@ -167,6 +168,41 @@ describe('AdminScreen', () => {
     // No-access and player-only campaigns don't belong on the creator surface.
     expect(screen.queryByText('Dev Sandbox')).toBeNull();
     expect(screen.queryByText('Secret Realm')).toBeNull();
+  });
+
+  it('creator mode creates a campaign: name → derived slug id, selected on success', async () => {
+    mocked.listCampaigns.mockResolvedValue([
+      { id: 'malgovia', name: 'Malgovia', visibility: 'global', my_role: 'owner' },
+    ]);
+    mocked.listCampaignMembers.mockResolvedValue(MEMBERS);
+    mocked.createCampaign.mockResolvedValue({
+      id: 'the-mistwood',
+      name: 'The Mistwood!',
+      visibility: 'private',
+      my_role: 'owner',
+    });
+    render(<AdminScreen user={OWNER_USER} onBack={vi.fn()} mode="creator" />);
+    fireEvent.click(await screen.findByTestId('new-campaign-btn'));
+    fireEvent.change(screen.getByLabelText('CAMPAIGN NAME'), {
+      target: { value: 'The Mistwood!' },
+    });
+    expect(screen.getByText(/ID: the-mistwood/)).toBeTruthy();
+    fireEvent.click(screen.getByTestId('create-campaign-btn'));
+    await waitFor(() =>
+      expect(mocked.createCampaign).toHaveBeenCalledWith('the-mistwood', 'The Mistwood!')
+    );
+    // The new campaign joins the list and becomes the selection.
+    expect(await screen.findByText('MEMBERS — THE MISTWOOD!')).toBeTruthy();
+  });
+
+  it('surfaces a taken-id conflict on create', async () => {
+    mocked.listCampaigns.mockResolvedValue([]);
+    mocked.createCampaign.mockRejectedValue({ error: 'campaign_exists' });
+    render(<AdminScreen user={OWNER_USER} onBack={vi.fn()} mode="creator" />);
+    fireEvent.click(await screen.findByTestId('new-campaign-btn'));
+    fireEvent.change(screen.getByLabelText('CAMPAIGN NAME'), { target: { value: 'Malgovia' } });
+    fireEvent.click(screen.getByTestId('create-campaign-btn'));
+    expect(await screen.findByText(/"malgovia" is taken/)).toBeTruthy();
   });
 
   it('deep-links select the initial campaign and report selection changes', async () => {

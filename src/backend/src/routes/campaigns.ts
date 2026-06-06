@@ -9,6 +9,7 @@
 import {
   AddCampaignMemberSchema,
   CAMPAIGN_SECTION_SCHEMAS,
+  CreateCampaignSchema,
   PutCampaignSectionSchema,
   SetCampaignMemberRoleSchema,
   SetCampaignVisibilitySchema,
@@ -28,6 +29,7 @@ import {
 import { Request, Response, Router } from 'express';
 import {
   addMemberByEmail,
+  createCampaign,
   listCampaignsForUser,
   listMembers,
   removeMember,
@@ -80,6 +82,27 @@ const MUTATION_STATUS: Record<'user_not_found' | 'not_a_member' | 'last_owner', 
   // permissions failure — transfer ownership first.
   last_owner: 409,
 };
+
+// Create a DB-born campaign: any authenticated user; creator becomes the
+// owner; private by default. The new campaign resolves over the base
+// template immediately, so it's playable before any content is authored.
+campaignsRouter.post('/', async (req: Request, res: Response) => {
+  const parsed = parseBody(req, res, CreateCampaignSchema);
+  if (!parsed) return;
+  try {
+    const result = await createCampaign(pool, (req as AuthedRequest).user, parsed.id, parsed.name);
+    if (result === 'exists') {
+      res.status(409).json({ error: 'campaign_exists' });
+      return;
+    }
+    // Make it live (base template + no DB sections yet) without a restart.
+    await refreshCampaignOverlay(pool, CONTEXTS, CODE_CONTEXTS, parsed.id);
+    res.status(201).json(result);
+  } catch (err) {
+    console.error('[campaigns] create failed:', err);
+    res.status(500).json({ error: 'Failed to create campaign' });
+  }
+});
 
 // All registered campaigns + the caller's role on each (admins read as
 // owner everywhere). Drives the admin section's campaign list.
