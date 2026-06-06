@@ -25,6 +25,7 @@ import MoveDPad from './components/MoveDPad.tsx';
 import NarrativeText from './components/NarrativeText.tsx';
 import OptionPickerDialog from './components/OptionPickerDialog.tsx';
 import PartyRail from './components/PartyRail.tsx';
+import RegionEditorScreen from './components/RegionEditorScreen.tsx';
 import RoomArtPanel from './components/RoomArtPanel.tsx';
 import SessionsScreen from './components/SessionScreen.tsx';
 import SpellBar from './components/SpellBar.tsx';
@@ -127,7 +128,15 @@ function getCtx(seed: Seed | null): FrontendContext {
 
 applyTheme(sandboxContext.theme);
 
-type View = 'login' | 'loading' | 'sessions' | 'char' | 'game' | 'admin' | 'creator';
+type View =
+  | 'login'
+  | 'loading'
+  | 'sessions'
+  | 'char'
+  | 'game'
+  | 'admin'
+  | 'creator'
+  | 'region-editor';
 
 // ─── App shell ───────────────────────────────────────────────────────────────
 export default function App() {
@@ -140,6 +149,8 @@ export default function App() {
   // Deep-linked creator selection (/creator/<campaign id>) — consumed by
   // AdminScreen as its initial selection when the creator view opens.
   const [creatorCampaignId, setCreatorCampaignId] = useState<string | null>(null);
+  // Deep-linked region painter (/creator/<campaign id>/region/<region id>).
+  const [creatorRegionId, setCreatorRegionId] = useState<string | null>(null);
   const [mapOpen, setMapOpen] = useState(false);
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
@@ -244,6 +255,16 @@ export default function App() {
             window.history.replaceState(null, '', '/');
             return loadSessions();
           }
+        }
+        // Region painter deep link: /creator/<campaign id>/region/<region id>.
+        const regionMatch = window.location.pathname.match(
+          /^\/creator\/([a-z0-9_-]+)\/region\/([a-z0-9_-]+)\/?$/i
+        );
+        if (regionMatch) {
+          setCreatorCampaignId(regionMatch[1]);
+          setCreatorRegionId(regionMatch[2]);
+          setView('region-editor');
+          return;
         }
         // Creator deep link: /creator or /creator/<campaign id> — reopens
         // the creator view (with that campaign selected) across refreshes.
@@ -431,9 +452,26 @@ export default function App() {
             // history entries — the creator view itself is the destination.
             window.history.replaceState(null, '', id ? `/creator/${id}` : '/creator')
           }
+          onEditRegion={(campaignId, regionId) => {
+            setCreatorCampaignId(campaignId);
+            setCreatorRegionId(regionId);
+            window.history.pushState(null, '', `/creator/${campaignId}/region/${regionId}`);
+            setView('region-editor');
+          }}
           onBack={() => {
             window.history.replaceState(null, '', '/');
             loadSessions();
+          }}
+        />
+      )}
+
+      {view === 'region-editor' && user && creatorCampaignId && creatorRegionId && (
+        <RegionEditorScreen
+          campaignId={creatorCampaignId}
+          regionId={creatorRegionId}
+          onBack={() => {
+            window.history.pushState(null, '', `/creator/${creatorCampaignId}`);
+            setView('creator');
           }}
         />
       )}

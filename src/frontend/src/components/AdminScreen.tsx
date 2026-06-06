@@ -40,6 +40,7 @@ function AdminScreen({
   mode = 'admin',
   initialCampaignId,
   onSelectCampaign,
+  onEditRegion,
 }: {
   user: AuthUser;
   onBack: () => void;
@@ -51,6 +52,8 @@ function AdminScreen({
   // Selection→URL sync: fired with the selected campaign id (null when
   // nothing is selected) so the parent can keep the address bar current.
   onSelectCampaign?: (id: string | null) => void;
+  // Open the visual region painter for a region of the given campaign.
+  onEditRegion?: (campaignId: string, regionId: string) => void;
 }) {
   const [campaigns, setCampaigns] = useState<CampaignListing[]>([]);
   const [campaignsErr, setCampaignsErr] = useState<string | null>(null);
@@ -448,7 +451,14 @@ function AdminScreen({
         )}
 
         {/* ── Content editing (DB-first sections, code supplement) ──────── */}
-        {selected && <CampaignContentEditor campaignId={selected.id} />}
+        {selected && (
+          <CampaignContentEditor
+            campaignId={selected.id}
+            onEditRegion={
+              onEditRegion ? (regionId) => onEditRegion(selected.id, regionId) : undefined
+            }
+          />
+        )}
       </div>
     </div>
   );

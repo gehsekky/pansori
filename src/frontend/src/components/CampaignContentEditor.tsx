@@ -33,7 +33,15 @@ const SOURCE_LABEL: Record<CampaignSectionSource, string> = {
   none: 'EMPTY',
 };
 
-function CampaignContentEditor({ campaignId }: { campaignId: string }) {
+function CampaignContentEditor({
+  campaignId,
+  onEditRegion,
+}: {
+  campaignId: string;
+  // Open the visual painter for one of this campaign's regions — offered
+  // under the REGIONS section when provided.
+  onEditRegion?: (regionId: string) => void;
+}) {
   const [sections, setSections] = useState<CampaignSectionInfo[]>([]);
   const [sectionsErr, setSectionsErr] = useState<string | null>(null);
   const [active, setActive] = useState<string | null>(null);
@@ -163,6 +171,44 @@ function CampaignContentEditor({ campaignId }: { campaignId: string }) {
 
       {active && (
         <>
+          {/* Region painter shortcuts — one per region currently in the
+              editor text (so unsaved JSON edits are reflected too). */}
+          {active === 'regions' &&
+            onEditRegion &&
+            (() => {
+              let parsed: Array<{ id?: string; name?: string }> = [];
+              try {
+                const v = JSON.parse(text);
+                if (Array.isArray(v)) parsed = v;
+              } catch {
+                /* not valid JSON right now — no shortcuts */
+              }
+              const regions = parsed.filter((r) => typeof r.id === 'string');
+              if (regions.length === 0) return null;
+              return (
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: 6,
+                    flexWrap: 'wrap',
+                    marginBottom: 8,
+                    alignItems: 'center',
+                  }}
+                >
+                  <span style={{ fontSize: '0.7rem', color: 'var(--t-dim)' }}>PAINT MAP:</span>
+                  {regions.map((r) => (
+                    <button
+                      key={r.id}
+                      className={styles.ghostBtn}
+                      style={{ padding: '0.25rem 0.6rem', fontSize: '0.7rem' }}
+                      onClick={() => onEditRegion(r.id!)}
+                    >
+                      🗺 {r.name ?? r.id}
+                    </button>
+                  ))}
+                </div>
+              );
+            })()}
           <label className={styles.formLbl} htmlFor="content-section-editor">
             {active.toUpperCase()} — SERVING FROM {SOURCE_LABEL[activeSource]}
           </label>
