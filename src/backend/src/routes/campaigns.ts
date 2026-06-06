@@ -19,6 +19,7 @@ import {
   EDITABLE_SECTIONS,
   deleteCampaignSection,
   getCampaignData,
+  getDbSection,
   isEditableSection,
   putCampaignSection,
   refreshCampaignOverlay,
@@ -183,12 +184,14 @@ campaignsRouter.delete(
 // DELETE reverts the section to code.
 
 // Where does a section's effective value come from for this campaign?
+// `present` = the DB has a version (wherever it's stored — JSONB key or a
+// section's own table; getDbSection abstracts that).
 function sectionSource(
-  data: Record<string, unknown>,
+  present: boolean,
   campaignId: string,
   section: string
 ): 'db' | 'code' | 'none' {
-  if (section in data) return 'db';
+  if (present) return 'db';
   const code = CODE_CONTEXTS[campaignId] as unknown as Record<string, unknown> | undefined;
   if (code && code[section] !== undefined) return 'code';
   return 'none';
@@ -201,17 +204,18 @@ campaignsRouter.get(
   requireCampaignRole('editor'),
   async (req: Request, res: Response) => {
     try {
-      const data = await getCampaignData(pool, param(req, 'campaignId'));
-      if (data === null) {
+      const campaignId = param(req, 'campaignId');
+      // Existence check — a missing campaign has no data row at all.
+      if ((await getCampaignData(pool, campaignId)) === null) {
         res.status(404).json({ error: 'campaign_not_found' });
         return;
       }
-      res.json(
-        EDITABLE_SECTIONS.map((section) => ({
-          section,
-          source: sectionSource(data, param(req, 'campaignId'), section),
-        }))
-      );
+      const sections = [];
+      for (const section of EDITABLE_SECTIONS) {
+        const { present } = await getDbSection(pool, campaignId, section);
+        sections.push({ section, source: sectionSource(present, campaignId, section) });
+      }
+      res.json(sections);
     } catch (err) {
       console.error('[campaigns] data listing failed:', err);
       res.status(500).json({ error: 'Failed to list campaign data' });
@@ -230,15 +234,14 @@ campaignsRouter.get(
     }
     try {
       const campaignId = param(req, 'campaignId');
-      const data = await getCampaignData(pool, campaignId);
-      if (data === null) {
+      if ((await getCampaignData(pool, campaignId)) === null) {
         res.status(404).json({ error: 'campaign_not_found' });
         return;
       }
-      const source = sectionSource(data, campaignId, section);
+      const { present, value } = await getDbSection(pool, campaignId, section);
+      const source = sectionSource(present, campaignId, section);
       const code = CODE_CONTEXTS[campaignId] as unknown as Record<string, unknown> | undefined;
-      const value = source === 'db' ? data[section] : (code?.[section] ?? null);
-      res.json({ section, source, value });
+      res.json({ section, source, value: present ? value : (code?.[section] ?? null) });
     } catch (err) {
       console.error('[campaigns] section read failed:', err);
       res.status(500).json({ error: 'Failed to read section' });
@@ -305,7 +308,7 @@ campaignsRouter.delete(
         return;
       }
       await refreshCampaignOverlay(pool, CONTEXTS, CODE_CONTEXTS, campaignId);
-      res.json({ ok: true, section, source: sectionSource({}, campaignId, section) });
+      res.json({ ok: true, section, source: sectionSource(false, campaignId, section) });
     } catch (err) {
       console.error('[campaigns] section revert failed:', err);
       res.status(500).json({ error: 'Failed to revert section' });

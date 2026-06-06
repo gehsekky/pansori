@@ -1,13 +1,17 @@
 // DB-first context resolution — the merge rules that bridge DB-authored
 // campaign content and the campaignData/ code folders: DB top-level fields
 // win, code fills the rest, the merge is shallow (whole-section replace),
-// protected fields and malformed overlays are ignored.
+// protected fields and malformed overlays are ignored. Regions live in
+// their own table (campaign_regions); everything else in campaigns.data.
 
 import {
+  type CampaignRegion,
   EDITABLE_SECTIONS,
   applyCampaignOverlays,
   deleteCampaignSection,
   getCampaignData,
+  getCampaignRegions,
+  getDbSection,
   isEditableSection,
   mergeContextWithOverlay,
   putCampaignSection,
@@ -23,38 +27,106 @@ function codeCtx(partial: Partial<Context> & { id: string }): Context {
   return partial as Context;
 }
 
-function makePool(rows: Array<{ id: string; data: unknown }>) {
-  return {
-    query: vi.fn(async () => ({ rows, rowCount: rows.length })),
+// Stateful fake of the campaigns + campaign_regions tables. One dispatcher
+// serves pool.query AND client.query (putCampaignRegions runs a
+// transaction via pool.connect).
+function makeContentDb(initial: {
+  campaigns?: Record<string, unknown>;
+  regions?: Record<string, unknown[][]>; // campaignId → rows as insert-param tuples (sans campaign_id)
+}) {
+  const campaigns = new Map(Object.entries(initial.campaigns ?? {}));
+  // Stored as the insert params after campaign_id: [id, sort_order, name,
+  // is_starting_region, description, feet_per_square, grid_width,
+  // grid_height, start_x, start_y, encounter_chance, base_tier]
+  const regions = new Map<string, unknown[][]>(Object.entries(initial.regions ?? {}));
+
+  const query = vi.fn(async (sql: string, params: unknown[] = []) => {
+    if (/^(BEGIN|COMMIT|ROLLBACK)/.test(sql)) return { rows: [], rowCount: 0 };
+    if (sql.includes('SELECT 1 FROM campaigns')) {
+      const hit = campaigns.has(params[0] as string);
+      return { rows: hit ? [{ '?column?': 1 }] : [], rowCount: hit ? 1 : 0 };
+    }
+    if (sql.includes('SELECT data FROM campaigns')) {
+      const data = campaigns.get(params[0] as string);
+      return { rows: data !== undefined ? [{ data }] : [], rowCount: data !== undefined ? 1 : 0 };
+    }
+    if (sql.includes('SELECT id FROM campaigns')) {
+      const rows = [...campaigns.keys()].map((id) => ({ id }));
+      return { rows, rowCount: rows.length };
+    }
+    if (sql.includes('jsonb_set')) {
+      const data = campaigns.get(params[0] as string) as Record<string, unknown> | undefined;
+      if (data) data[params[1] as string] = JSON.parse(params[2] as string);
+      return { rows: [], rowCount: data ? 1 : 0 };
+    }
+    if (sql.includes('data - $2')) {
+      const data = campaigns.get(params[0] as string) as Record<string, unknown> | undefined;
+      if (data) delete data[params[1] as string];
+      return { rows: [], rowCount: data ? 1 : 0 };
+    }
+    if (sql.includes('FROM campaign_regions') && sql.includes('SELECT')) {
+      const list = [...(regions.get(params[0] as string) ?? [])].sort(
+        (a, b) => (a[1] as number) - (b[1] as number)
+      );
+      const rows = list.map((p) => ({
+        id: p[0],
+        sort_order: p[1],
+        name: p[2],
+        is_starting_region: p[3],
+        description: p[4],
+        feet_per_square: p[5],
+        grid_width: p[6],
+        grid_height: p[7],
+        start_x: p[8],
+        start_y: p[9],
+        encounter_chance: p[10],
+        base_tier: p[11],
+      }));
+      return { rows, rowCount: rows.length };
+    }
+    if (sql.includes('DELETE FROM campaign_regions')) {
+      regions.delete(params[0] as string);
+      return { rows: [], rowCount: 0 };
+    }
+    if (sql.includes('INSERT INTO campaign_regions')) {
+      const [campaignId, ...rest] = params;
+      const list = regions.get(campaignId as string) ?? [];
+      list.push(rest);
+      regions.set(campaignId as string, list);
+      return { rows: [], rowCount: 1 };
+    }
+    throw new Error(`fake content db: unhandled query: ${sql.split('\n')[0]}`);
+  });
+
+  const pool = {
+    query,
+    connect: vi.fn(async () => ({ query, release: vi.fn() })),
   } as unknown as Pool;
+  return { pool, campaigns, regions };
 }
 
-// Stateful fake of the campaigns table for the section-CRUD round trip:
-// SELECT data / jsonb_set write / `data - key` delete.
-function makeContentDb(initial: Record<string, Record<string, unknown>>) {
-  const table = new Map(Object.entries(initial));
-  const pool = {
-    query: vi.fn(async (sql: string, params: unknown[] = []) => {
-      const id = params[0] as string;
-      if (sql.includes('SELECT data FROM campaigns')) {
-        const data = table.get(id);
-        return { rows: data ? [{ data }] : [], rowCount: data ? 1 : 0 };
-      }
-      if (sql.includes('jsonb_set')) {
-        const data = table.get(id);
-        if (data) data[params[1] as string] = JSON.parse(params[2] as string);
-        return { rows: [], rowCount: data ? 1 : 0 };
-      }
-      if (sql.includes('data - $2')) {
-        const data = table.get(id);
-        if (data) delete data[params[1] as string];
-        return { rows: [], rowCount: data ? 1 : 0 };
-      }
-      throw new Error(`fake content db: unhandled query: ${sql.split('\n')[0]}`);
-    }),
-  } as unknown as Pool;
-  return { pool, table };
-}
+const REGION_A: CampaignRegion = {
+  id: 'malgovia',
+  name: 'Malgovia',
+  isStartingRegion: true,
+  desc: 'A mist-shrouded vale.',
+  feetPerSquare: 5280,
+  gridWidth: 12,
+  gridHeight: 10,
+  startPos: { x: 3, y: 4 },
+  encounterChance: 0.15,
+  baseTier: 1,
+};
+
+const REGION_B: CampaignRegion = {
+  id: 'frost-reach',
+  name: 'The Frost Reach',
+  isStartingRegion: false,
+  feetPerSquare: 5280,
+  gridWidth: 8,
+  gridHeight: 8,
+  startPos: { x: 0, y: 0 },
+};
 
 describe('mergeContextWithOverlay', () => {
   const code = codeCtx({
@@ -75,18 +147,12 @@ describe('mergeContextWithOverlay', () => {
   });
 
   it('replaces a section wholesale (shallow, not deep, merge)', () => {
-    const merged = mergeContextWithOverlay(code, {
-      classHitDie: { wizard: 6 },
-    });
-    // The code's fighter entry is gone — the DB section is the section.
+    const merged = mergeContextWithOverlay(code, { classHitDie: { wizard: 6 } });
     expect(merged.classHitDie).toEqual({ wizard: 6 });
   });
 
   it('never overrides protected fields and skips null values', () => {
-    const merged = mergeContextWithOverlay(code, {
-      id: 'evil-rename',
-      displayNoun: null,
-    });
+    const merged = mergeContextWithOverlay(code, { id: 'evil-rename', displayNoun: null });
     expect(merged.id).toBe('malgovia');
     expect(merged.displayNoun).toBe('vale');
   });
@@ -157,17 +223,12 @@ describe('editable sections registry', () => {
 
   it('regions schema rejects duplicate ids, bad slugs, and wrong start counts', () => {
     const regions = CAMPAIGN_SECTION_SCHEMAS.regions;
-    // Duplicate ids.
     expect(
       regions.safeParse([region(), region({ name: 'B', isStartingRegion: false })]).success
     ).toBe(false);
-    // Non-slug id.
     expect(regions.safeParse([region({ id: 'Malgovia!' })]).success).toBe(false);
-    // Zero starting regions.
     expect(regions.safeParse([region({ isStartingRegion: false })]).success).toBe(false);
-    // Two starting regions.
     expect(regions.safeParse([region(), region({ id: 'b' })]).success).toBe(false);
-    // Empty list, unknown extra fields, out-of-range tuning values.
     expect(regions.safeParse([]).success).toBe(false);
     expect(regions.safeParse([region({ biome: 'swamp' })]).success).toBe(false);
     expect(regions.safeParse([region({ encounterChance: 1.5 })]).success).toBe(false);
@@ -175,9 +236,51 @@ describe('editable sections registry', () => {
   });
 });
 
+describe('regions table store', () => {
+  it('round-trips the JSON shape through rows, preserving order + optionals', async () => {
+    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    expect(await putCampaignSection(db.pool, 'malgovia', 'regions', [REGION_A, REGION_B])).toBe(
+      true
+    );
+    const back = await getCampaignRegions(db.pool, 'malgovia');
+    expect(back).toEqual([REGION_A, REGION_B]);
+    // Optional fields absent (not null) on the lean region.
+    expect('desc' in back[1]).toBe(false);
+    expect('encounterChance' in back[1]).toBe(false);
+  });
+
+  it('put is replace-all, not append', async () => {
+    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    await putCampaignSection(db.pool, 'malgovia', 'regions', [REGION_A, REGION_B]);
+    await putCampaignSection(db.pool, 'malgovia', 'regions', [
+      { ...REGION_B, isStartingRegion: true },
+    ]);
+    const back = await getCampaignRegions(db.pool, 'malgovia');
+    expect(back.map((r) => r.id)).toEqual(['frost-reach']);
+  });
+
+  it('rejects writes to a missing campaign; delete reverts to empty', async () => {
+    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    expect(await putCampaignSection(db.pool, 'nope', 'regions', [REGION_A])).toBe(false);
+    await putCampaignSection(db.pool, 'malgovia', 'regions', [REGION_A]);
+    expect(await deleteCampaignSection(db.pool, 'malgovia', 'regions')).toBe(true);
+    expect(await getCampaignRegions(db.pool, 'malgovia')).toEqual([]);
+    expect(await deleteCampaignSection(db.pool, 'nope', 'regions')).toBe(false);
+  });
+
+  it('getDbSection reports presence from the table, not the JSONB', async () => {
+    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    expect((await getDbSection(db.pool, 'malgovia', 'regions')).present).toBe(false);
+    await putCampaignSection(db.pool, 'malgovia', 'regions', [REGION_A]);
+    const after = await getDbSection(db.pool, 'malgovia', 'regions');
+    expect(after.present).toBe(true);
+    expect(after.value).toEqual([REGION_A]);
+  });
+});
+
 describe('section CRUD + live refresh', () => {
   it('put → refresh serves the DB version; delete → refresh restores code', async () => {
-    const db = makeContentDb({ malgovia: {} });
+    const db = makeContentDb({ campaigns: { malgovia: {} } });
     const code = codeCtx({ id: 'malgovia', displayNoun: 'vale' });
     const contexts: Record<string, Context> = { malgovia: code };
     const codeContexts: Record<string, Context> = { malgovia: code };
@@ -191,8 +294,19 @@ describe('section CRUD + live refresh', () => {
     expect(contexts.malgovia.displayNoun).toBe('vale');
   });
 
+  it('refresh folds table regions into the live context', async () => {
+    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    const code = codeCtx({ id: 'malgovia', displayNoun: 'vale' });
+    const contexts: Record<string, Context> = { malgovia: code };
+    await putCampaignSection(db.pool, 'malgovia', 'regions', [REGION_A]);
+    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
+    expect((contexts.malgovia as unknown as { regions: CampaignRegion[] }).regions).toEqual([
+      REGION_A,
+    ]);
+  });
+
   it('reports a missing campaign and reads back stored data', async () => {
-    const db = makeContentDb({ malgovia: { displayNoun: 'marsh' } });
+    const db = makeContentDb({ campaigns: { malgovia: { displayNoun: 'marsh' } } });
     expect(await getCampaignData(db.pool, 'malgovia')).toEqual({ displayNoun: 'marsh' });
     expect(await getCampaignData(db.pool, 'nope')).toBeNull();
     expect(await putCampaignSection(db.pool, 'nope', 'displayNoun', 'x')).toBe(false);
@@ -200,7 +314,7 @@ describe('section CRUD + live refresh', () => {
   });
 
   it('refresh is a no-op for DB-only campaigns (no code context)', async () => {
-    const db = makeContentDb({ ghost: { displayNoun: 'boo' } });
+    const db = makeContentDb({ campaigns: { ghost: { displayNoun: 'boo' } } });
     const contexts: Record<string, Context> = {};
     await refreshCampaignOverlay(db.pool, contexts, {}, 'ghost');
     expect(Object.keys(contexts)).toEqual([]);
@@ -208,19 +322,25 @@ describe('section CRUD + live refresh', () => {
 });
 
 describe('applyCampaignOverlays', () => {
-  it('replaces matching contexts in place and skips unknown/malformed rows', async () => {
+  it('replaces matching contexts in place (JSONB + table regions) and skips unknown rows', async () => {
     const contexts: Record<string, Context> = {
       malgovia: codeCtx({ id: 'malgovia', displayNoun: 'vale' }),
       sandbox: codeCtx({ id: 'sandbox', displayNoun: 'sandbox' }),
     };
-    const pool = makePool([
-      { id: 'malgovia', data: { displayNoun: 'db-vale' } },
-      { id: 'ghost', data: { displayNoun: 'nope' } }, // no code context
-      { id: 'sandbox', data: ['not', 'an', 'object'] }, // malformed
-    ]);
-    await applyCampaignOverlays(pool, contexts);
+    const db = makeContentDb({
+      campaigns: {
+        malgovia: { displayNoun: 'db-vale' },
+        sandbox: {},
+        ghost: { displayNoun: 'nope' }, // no code context
+      },
+    });
+    await putCampaignSection(db.pool, 'malgovia', 'regions', [REGION_A]);
+    await applyCampaignOverlays(db.pool, contexts);
     expect(contexts.malgovia.displayNoun).toBe('db-vale');
+    expect((contexts.malgovia as unknown as { regions: CampaignRegion[] }).regions).toEqual([
+      REGION_A,
+    ]);
     expect(contexts.sandbox.displayNoun).toBe('sandbox');
-    expect(Object.keys(contexts)).toEqual(['malgovia', 'sandbox']);
+    expect(Object.keys(contexts).sort()).toEqual(['malgovia', 'sandbox']);
   });
 });
