@@ -220,9 +220,45 @@ const NarrativesSchema = z
   })
   .strict();
 
+// Regions — the DB-era simplified region list. `id` is the stable key
+// other content will reference (towns, sites), so it's slug-shaped;
+// `name` is the display string. Exactly one region is the campaign start.
+const RegionsSchema = z
+  .array(
+    z
+      .object({
+        id: z
+          .string()
+          .min(1)
+          .max(40)
+          .regex(/^[a-z0-9_-]+$/, 'lowercase letters, digits, - and _ only'),
+        name: z.string().min(1).max(80),
+        isStartingRegion: z.boolean(),
+      })
+      .strict()
+  )
+  .min(1)
+  .superRefine((regions, ctx) => {
+    const ids = new Set<string>();
+    for (const r of regions) {
+      if (ids.has(r.id)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: `duplicate region id "${r.id}"` });
+      }
+      ids.add(r.id);
+    }
+    const starts = regions.filter((r) => r.isStartingRegion).length;
+    if (starts !== 1) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `exactly one region must have isStartingRegion true (found ${starts})`,
+      });
+    }
+  });
+
 export const CAMPAIGN_SECTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
   displayNoun: z.string().min(1).max(40),
   narratives: NarrativesSchema,
+  regions: RegionsSchema,
 };
 
 // PUT body for a section write: { value: <section payload> }.

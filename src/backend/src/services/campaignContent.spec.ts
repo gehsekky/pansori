@@ -118,6 +118,45 @@ describe('editable sections registry', () => {
     expect(CAMPAIGN_SECTION_SCHEMAS.displayNoun.safeParse('').success).toBe(false);
     expect(CAMPAIGN_SECTION_SCHEMAS.displayNoun.safeParse('marsh').success).toBe(true);
   });
+
+  it('regions schema accepts a valid list with exactly one starting region', () => {
+    const result = CAMPAIGN_SECTION_SCHEMAS.regions.safeParse([
+      { id: 'malgovia', name: 'Malgovia', isStartingRegion: true },
+      { id: 'frost-reach', name: 'The Frost Reach', isStartingRegion: false },
+    ]);
+    expect(result.success, JSON.stringify(result.error?.issues)).toBe(true);
+  });
+
+  it('regions schema rejects duplicate ids, bad slugs, and wrong start counts', () => {
+    const regions = CAMPAIGN_SECTION_SCHEMAS.regions;
+    // Duplicate ids.
+    expect(
+      regions.safeParse([
+        { id: 'malgovia', name: 'A', isStartingRegion: true },
+        { id: 'malgovia', name: 'B', isStartingRegion: false },
+      ]).success
+    ).toBe(false);
+    // Non-slug id.
+    expect(
+      regions.safeParse([{ id: 'Malgovia!', name: 'A', isStartingRegion: true }]).success
+    ).toBe(false);
+    // Zero starting regions.
+    expect(regions.safeParse([{ id: 'a', name: 'A', isStartingRegion: false }]).success).toBe(
+      false
+    );
+    // Two starting regions.
+    expect(
+      regions.safeParse([
+        { id: 'a', name: 'A', isStartingRegion: true },
+        { id: 'b', name: 'B', isStartingRegion: true },
+      ]).success
+    ).toBe(false);
+    // Empty list and unknown extra fields.
+    expect(regions.safeParse([]).success).toBe(false);
+    expect(
+      regions.safeParse([{ id: 'a', name: 'A', isStartingRegion: true, biome: 'swamp' }]).success
+    ).toBe(false);
+  });
 });
 
 describe('section CRUD + live refresh', () => {

@@ -27,7 +27,13 @@ import type { Pool } from 'pg';
 // schemas land per section (routes/schemas.ts CAMPAIGN_SECTION_SCHEMAS must
 // stay in lockstep — there's a spec asserting that). Order is the display
 // order in the admin UI.
-export const EDITABLE_SECTIONS = ['displayNoun', 'narratives'] as const;
+//
+// 'regions' is the first DB-era section with no code-context counterpart:
+// a deliberately simplified region list ({id, name, isStartingRegion})
+// that campaigns define in the DB from day one. The engine doesn't read it
+// yet — it still runs on campaign.regions (the 3-level grid model); the
+// resolver will map this list in as the map content migrates to the DB.
+export const EDITABLE_SECTIONS = ['displayNoun', 'narratives', 'regions'] as const;
 export type EditableSection = (typeof EDITABLE_SECTIONS)[number];
 
 export function isEditableSection(s: string): s is EditableSection {
