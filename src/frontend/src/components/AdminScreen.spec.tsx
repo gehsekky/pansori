@@ -17,8 +17,6 @@ vi.mock('../lib/api.ts', () => ({
     getCampaignSection: vi.fn(),
     putCampaignSection: vi.fn(),
     deleteCampaignSection: vi.fn(),
-    listItemCatalog: vi.fn(),
-    listMonsterCatalog: vi.fn(),
   },
 }));
 

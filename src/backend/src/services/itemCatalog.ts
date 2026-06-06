@@ -1,40 +1,25 @@
-// Item catalog + per-campaign loot tables (the items/campaign_items pair).
+// Item catalog + per-campaign custom items.
 //
-// `items` is the global catalog, code-canonical: syncItemCatalog upserts
-// every SRD_ITEMS entry at startup, so catalog rows always match the code
-// registry (edit SRD items in code, not the DB). `campaign_items` is a
-// campaign's loot table — which catalog items it offers, in order, with
-// two kinds of `override`:
-//   override = NULL       → serve the catalog definition (follows code updates)
-//   override = LootItem   → serve this definition instead — either a tweak
-//                           of a catalog item or a fully custom campaign
-//                           item (id with no catalog row)
+// The catalog is AMBIENT: every campaign automatically gets the full SRD
+// item list — the engine only ever looks items up by id (loot resolution,
+// drops, quest rewards), never samples the pool, so unreferenced entries
+// never surface in play. `items` is code-canonical: syncItemCatalog
+// upserts every SRD_ITEMS entry at startup (edit SRD items in code, not
+// the DB).
 //
-// putCampaignLootTable decides which form to store by comparing the posted
-// definition against the catalog (key-order-insensitive): identical →
-// mapping only, so the campaign keeps tracking the canonical item.
+// `campaign_custom_items` is a campaign's own content: brand-new items
+// AND tweaks — a custom sharing a catalog id shadows the catalog entry.
+// The effective loot table composes as
+//
+//   DB customs → code campaign entries → full catalog   (dedup by id,
+//                                                         earlier wins)
+//
+// so code campaigns' inline customs (Moonstone Amulet, …) keep working,
+// and `lootTable.find(byId)` resolves the campaign's version first.
 
 import type { LootItem } from '../types.js';
 import type { Pool } from 'pg';
 import { SRD_ITEMS } from '../campaignData/srd/index.js';
-
-// Key-order-insensitive structural equality — editor JSON and code literals
-// serialize keys in different orders.
-function stableStringify(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
-  if (typeof value === 'object' && value !== null) {
-    const entries = Object.entries(value as Record<string, unknown>)
-      .filter(([, v]) => v !== undefined)
-      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-      .map(([k, v]) => `${JSON.stringify(k)}:${stableStringify(v)}`);
-    return `{${entries.join(',')}}`;
-  }
-  return JSON.stringify(value);
-}
-
-export function sameDefinition(a: unknown, b: unknown): boolean {
-  return stableStringify(a) === stableStringify(b);
-}
 
 // Upsert the code catalog into the items table. Runs at startup after
 // migrations (index.ts). Code wins for catalog rows — a drifted DB copy is
@@ -57,8 +42,6 @@ export async function syncItemCatalog(pool: Pool): Promise<void> {
 }
 
 // The full catalog, ordered for display (type groups, alphabetical within).
-// Serves the creator UI's badge picker — full definitions so a selection
-// can round-trip straight back through the lootTable section PUT.
 export async function getItemCatalog(pool: Pool): Promise<LootItem[]> {
   const { rows } = await pool.query<{ definition: LootItem }>(
     'SELECT definition FROM items ORDER BY type, name'
@@ -66,40 +49,20 @@ export async function getItemCatalog(pool: Pool): Promise<LootItem[]> {
   return rows.map((r) => r.definition);
 }
 
-// A campaign's DB loot table, resolved to full definitions in authored
-// order: override if present, else the catalog definition. Mappings whose
-// id has neither (catalog row removed from code) are skipped with a warn.
-export async function getCampaignLootTable(pool: Pool, campaignId: string): Promise<LootItem[]> {
-  const { rows } = await pool.query<{
-    item_id: string;
-    override: LootItem | null;
-    definition: LootItem | null;
-  }>(
-    `SELECT ci.item_id, ci.override, i.definition
-       FROM campaign_items ci
-       LEFT JOIN items i ON i.id = ci.item_id
-      WHERE ci.campaign_id = $1
-      ORDER BY ci.sort_order, ci.item_id`,
+// A campaign's custom items in authored order.
+export async function getCampaignCustomItems(pool: Pool, campaignId: string): Promise<LootItem[]> {
+  const { rows } = await pool.query<{ definition: LootItem }>(
+    `SELECT definition
+       FROM campaign_custom_items
+      WHERE campaign_id = $1
+      ORDER BY sort_order, item_id`,
     [campaignId]
   );
-  const out: LootItem[] = [];
-  for (const row of rows) {
-    const def = row.override ?? row.definition;
-    if (!def) {
-      console.warn(
-        `[itemCatalog] ${campaignId}: mapping for "${row.item_id}" has no catalog row and no override — skipping`
-      );
-      continue;
-    }
-    out.push(def);
-  }
-  return out;
+  return rows.map((r) => r.definition);
 }
 
-// Replace-all write, matching the editor's whole-section semantics. Posted
-// items matching the catalog byte-for-byte (key-order aside) store as bare
-// mappings; everything else stores its definition as the override.
-export async function putCampaignLootTable(
+// Replace-all write, matching the editor's whole-section semantics.
+export async function putCampaignCustomItems(
   pool: Pool,
   campaignId: string,
   items: LootItem[]
@@ -112,22 +75,12 @@ export async function putCampaignLootTable(
       await client.query('ROLLBACK');
       return false;
     }
-    const ids = items.map((i) => i.id);
-    const { rows: catalogRows } = await client.query<{ id: string; definition: LootItem }>(
-      'SELECT id, definition FROM items WHERE id = ANY($1)',
-      [ids]
-    );
-    const catalog = new Map(catalogRows.map((r) => [r.id, r.definition]));
-
-    await client.query('DELETE FROM campaign_items WHERE campaign_id = $1', [campaignId]);
+    await client.query('DELETE FROM campaign_custom_items WHERE campaign_id = $1', [campaignId]);
     for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      const catalogDef = catalog.get(item.id);
-      const override = catalogDef && sameDefinition(catalogDef, item) ? null : item;
       await client.query(
-        `INSERT INTO campaign_items (campaign_id, item_id, sort_order, override)
+        `INSERT INTO campaign_custom_items (campaign_id, item_id, sort_order, definition)
          VALUES ($1, $2, $3, $4::jsonb)`,
-        [campaignId, item.id, i, override === null ? null : JSON.stringify(override)]
+        [campaignId, items[i].id, i, JSON.stringify(items[i])]
       );
     }
     await client.query('COMMIT');
@@ -140,9 +93,28 @@ export async function putCampaignLootTable(
   }
 }
 
-export async function deleteCampaignLootTable(pool: Pool, campaignId: string): Promise<boolean> {
+export async function deleteCampaignCustomItems(pool: Pool, campaignId: string): Promise<boolean> {
   const { rowCount } = await pool.query('SELECT 1 FROM campaigns WHERE id = $1', [campaignId]);
   if (!rowCount) return false;
-  await pool.query('DELETE FROM campaign_items WHERE campaign_id = $1', [campaignId]);
+  await pool.query('DELETE FROM campaign_custom_items WHERE campaign_id = $1', [campaignId]);
   return true;
+}
+
+// Effective loot table: DB customs → code campaign entries → full catalog,
+// deduped by id (earlier wins, preserving each source's internal order).
+export function composeLootTable(
+  customs: LootItem[],
+  codeLootTable: LootItem[],
+  catalog: LootItem[]
+): LootItem[] {
+  const seen = new Set<string>();
+  const out: LootItem[] = [];
+  for (const list of [customs, codeLootTable, catalog]) {
+    for (const item of list) {
+      if (seen.has(item.id)) continue;
+      seen.add(item.id);
+      out.push(item);
+    }
+  }
+  return out;
 }

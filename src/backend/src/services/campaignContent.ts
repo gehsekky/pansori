@@ -26,14 +26,18 @@
 
 import type { Context, EnemyTemplate, LootItem } from '../types.js';
 import {
-  deleteCampaignEnemyTemplates,
-  getCampaignEnemyTemplates,
-  putCampaignEnemyTemplates,
+  composeEnemyTemplates,
+  deleteCampaignCustomMonsters,
+  getCampaignCustomMonsters,
+  getMonsterCatalog,
+  putCampaignCustomMonsters,
 } from './monsterCatalog.js';
 import {
-  deleteCampaignLootTable,
-  getCampaignLootTable,
-  putCampaignLootTable,
+  composeLootTable,
+  deleteCampaignCustomItems,
+  getCampaignCustomItems,
+  getItemCatalog,
+  putCampaignCustomItems,
 } from './itemCatalog.js';
 import type { Pool } from 'pg';
 
@@ -47,16 +51,17 @@ import type { Pool } from 'pg';
 // yet — it still runs on campaign.regions (the 3-level grid model); the
 // resolver will map this list in as the map content migrates to the DB.
 //
-// 'lootTable' and 'enemyTemplates' are table-backed too (catalog + mapping
-// pairs — services/itemCatalog.ts / monsterCatalog.ts) and — unlike
-// regions — are LIVE engine fields: a campaign with mappings serves its DB
-// loot table / bestiary to gameplay.
+// 'customItems' / 'customMonsters' are a campaign's OWN content on top of
+// the ambient SRD catalogs (services/itemCatalog.ts / monsterCatalog.ts):
+// every campaign automatically gets the full catalogs; customs add to them
+// and shadow same-id (items) / same-name (monsters) catalog entries. The
+// composed lootTable / enemyTemplates are LIVE engine fields.
 export const EDITABLE_SECTIONS = [
   'displayNoun',
   'narratives',
   'regions',
-  'lootTable',
-  'enemyTemplates',
+  'customItems',
+  'customMonsters',
 ] as const;
 export type EditableSection = (typeof EDITABLE_SECTIONS)[number];
 
@@ -229,12 +234,12 @@ export async function getDbSection(
     const regions = await getCampaignRegions(pool, campaignId);
     return { present: regions.length > 0, value: regions.length > 0 ? regions : undefined };
   }
-  if (section === 'lootTable') {
-    const items = await getCampaignLootTable(pool, campaignId);
+  if (section === 'customItems') {
+    const items = await getCampaignCustomItems(pool, campaignId);
     return { present: items.length > 0, value: items.length > 0 ? items : undefined };
   }
-  if (section === 'enemyTemplates') {
-    const templates = await getCampaignEnemyTemplates(pool, campaignId);
+  if (section === 'customMonsters') {
+    const templates = await getCampaignCustomMonsters(pool, campaignId);
     return { present: templates.length > 0, value: templates.length > 0 ? templates : undefined };
   }
   const data = await getCampaignData(pool, campaignId);
@@ -255,11 +260,11 @@ export async function putCampaignSection(
   if (section === 'regions') {
     return putCampaignRegions(pool, campaignId, value as CampaignRegion[]);
   }
-  if (section === 'lootTable') {
-    return putCampaignLootTable(pool, campaignId, value as LootItem[]);
+  if (section === 'customItems') {
+    return putCampaignCustomItems(pool, campaignId, value as LootItem[]);
   }
-  if (section === 'enemyTemplates') {
-    return putCampaignEnemyTemplates(pool, campaignId, value as EnemyTemplate[]);
+  if (section === 'customMonsters') {
+    return putCampaignCustomMonsters(pool, campaignId, value as EnemyTemplate[]);
   }
   const { rowCount } = await pool.query(
     `UPDATE campaigns
@@ -280,11 +285,11 @@ export async function deleteCampaignSection(
   if (section === 'regions') {
     return deleteCampaignRegions(pool, campaignId);
   }
-  if (section === 'lootTable') {
-    return deleteCampaignLootTable(pool, campaignId);
+  if (section === 'customItems') {
+    return deleteCampaignCustomItems(pool, campaignId);
   }
-  if (section === 'enemyTemplates') {
-    return deleteCampaignEnemyTemplates(pool, campaignId);
+  if (section === 'customMonsters') {
+    return deleteCampaignCustomMonsters(pool, campaignId);
   }
   const { rowCount } = await pool.query(
     `UPDATE campaigns SET data = data - $2, updated_at = NOW() WHERE id = $1`,
@@ -293,20 +298,60 @@ export async function deleteCampaignSection(
   return (rowCount ?? 0) > 0;
 }
 
+// ─── Code-customs fallback (editing convenience) ─────────────────────────────
+
+// What the customs sections resolve to when the DB has no rows: the code
+// campaign's own entries — the ones that aren't catalog entries (identity:
+// item id / monster name). Gives editors the code customs as a starting
+// point instead of an empty pane. Null when the code has none.
+export async function getCustomsCodeFallback(
+  pool: Pool,
+  code: Context | undefined,
+  section: 'customItems' | 'customMonsters'
+): Promise<unknown[] | null> {
+  if (!code) return null;
+  if (section === 'customItems') {
+    const catalogIds = new Set((await getItemCatalog(pool)).map((i) => i.id));
+    const customs = (code.lootTable ?? []).filter((i) => !catalogIds.has(i.id));
+    return customs.length > 0 ? customs : null;
+  }
+  const catalogNames = new Set((await getMonsterCatalog(pool)).map((m) => m.definition.name));
+  const customs = (code.enemyTemplates ?? []).filter((t) => !catalogNames.has(t.name));
+  return customs.length > 0 ? customs : null;
+}
+
 // ─── Overlay resolution (DB record first, code supplements) ──────────────────
 
-// One campaign's full DB overlay: the JSONB sections plus the table-backed
-// ones, as a single top-level-field map ready to merge.
-async function loadOverlay(pool: Pool, campaignId: string): Promise<Record<string, unknown>> {
+// One campaign's full DB overlay: the JSONB sections, the table-backed
+// ones, and the composed catalog-backed lists, as a single top-level-field
+// map ready to merge. lootTable / enemyTemplates are ALWAYS composed —
+// DB customs → code campaign entries → full catalog — so every campaign
+// carries the whole SRD plus its own content.
+async function loadOverlay(
+  pool: Pool,
+  campaignId: string,
+  code: Context
+): Promise<Record<string, unknown>> {
   const data = (await getCampaignData(pool, campaignId)) ?? {};
   const overlay: Record<string, unknown> =
     typeof data === 'object' && data !== null && !Array.isArray(data) ? { ...data } : {};
   const regions = await getCampaignRegions(pool, campaignId);
   if (regions.length > 0) overlay.regions = regions;
-  const lootTable = await getCampaignLootTable(pool, campaignId);
+
+  const lootTable = composeLootTable(
+    await getCampaignCustomItems(pool, campaignId),
+    code.lootTable ?? [],
+    await getItemCatalog(pool)
+  );
   if (lootTable.length > 0) overlay.lootTable = lootTable;
-  const enemyTemplates = await getCampaignEnemyTemplates(pool, campaignId);
+
+  const enemyTemplates = composeEnemyTemplates(
+    await getCampaignCustomMonsters(pool, campaignId),
+    code.enemyTemplates ?? [],
+    (await getMonsterCatalog(pool)).map((m) => m.definition)
+  );
   if (enemyTemplates.length > 0) overlay.enemyTemplates = enemyTemplates;
+
   return overlay;
 }
 
@@ -326,7 +371,7 @@ export async function applyCampaignOverlays(
       console.warn(`[campaignContent] DB campaign "${row.id}" has no code context — skipping`);
       continue;
     }
-    const overlay = await loadOverlay(pool, row.id);
+    const overlay = await loadOverlay(pool, row.id, code);
     if (Object.keys(overlay).length === 0) continue;
     contexts[row.id] = mergeContextWithOverlay(code, overlay);
     console.log(
@@ -347,6 +392,6 @@ export async function refreshCampaignOverlay(
 ): Promise<void> {
   const code = codeContexts[campaignId];
   if (!code) return; // DB-only campaign — nothing to serve until creation lands
-  const overlay = await loadOverlay(pool, campaignId);
+  const overlay = await loadOverlay(pool, campaignId, code);
   contexts[campaignId] = mergeContextWithOverlay(code, overlay);
 }

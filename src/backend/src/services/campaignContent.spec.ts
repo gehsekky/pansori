@@ -85,9 +85,14 @@ function makeContentDb(initial: {
       }));
       return { rows, rowCount: rows.length };
     }
-    if (sql.includes('FROM campaign_items') || sql.includes('FROM campaign_monsters')) {
-      // Loot tables / bestiaries aren't exercised through this fake —
-      // overlay tests just need the queries to resolve empty.
+    if (
+      sql.includes('FROM campaign_custom_items') ||
+      sql.includes('FROM campaign_custom_monsters') ||
+      sql.includes('FROM items') ||
+      sql.includes('FROM monsters')
+    ) {
+      // Catalogs / customs aren't exercised through this fake — overlay
+      // composition just needs the queries to resolve empty.
       return { rows: [], rowCount: 0 };
     }
     if (sql.includes('DELETE FROM campaign_regions')) {
@@ -173,8 +178,10 @@ describe('editable sections registry', () => {
   it('stays in lockstep with the per-section schemas', () => {
     expect([...EDITABLE_SECTIONS].sort()).toEqual(Object.keys(CAMPAIGN_SECTION_SCHEMAS).sort());
     expect(isEditableSection('narratives')).toBe(true);
-    expect(isEditableSection('enemyTemplates')).toBe(true);
-    expect(isEditableSection('spellTable')).toBe(false);
+    expect(isEditableSection('customMonsters')).toBe(true);
+    // The composed engine fields are not directly editable — customs are.
+    expect(isEditableSection('lootTable')).toBe(false);
+    expect(isEditableSection('enemyTemplates')).toBe(false);
   });
 
   it('narratives schema accepts the real malgovia narratives', () => {
@@ -186,21 +193,21 @@ describe('editable sections registry', () => {
 
   it('lootTable schema accepts every SRD catalog item and the real malgovia loot table', () => {
     // The whole catalog must round-trip — this is what the editor serves.
-    const catalog = CAMPAIGN_SECTION_SCHEMAS.lootTable.safeParse(Object.values(SRD_ITEMS));
+    const catalog = CAMPAIGN_SECTION_SCHEMAS.customItems.safeParse(Object.values(SRD_ITEMS));
     expect(catalog.success, JSON.stringify(catalog.error?.issues?.slice(0, 3))).toBe(true);
-    const loot = CAMPAIGN_SECTION_SCHEMAS.lootTable.safeParse(malgovia.lootTable);
+    const loot = CAMPAIGN_SECTION_SCHEMAS.customItems.safeParse(malgovia.lootTable);
     expect(loot.success, JSON.stringify(loot.error?.issues?.slice(0, 3))).toBe(true);
   });
 
   it('enemyTemplates schema accepts the whole SRD bestiary and the real malgovia templates', () => {
-    const bestiary = CAMPAIGN_SECTION_SCHEMAS.enemyTemplates.safeParse(Object.values(SRD_MONSTERS));
+    const bestiary = CAMPAIGN_SECTION_SCHEMAS.customMonsters.safeParse(Object.values(SRD_MONSTERS));
     expect(bestiary.success, JSON.stringify(bestiary.error?.issues?.slice(0, 3))).toBe(true);
-    const campaign = CAMPAIGN_SECTION_SCHEMAS.enemyTemplates.safeParse(malgovia.enemyTemplates);
+    const campaign = CAMPAIGN_SECTION_SCHEMAS.customMonsters.safeParse(malgovia.enemyTemplates);
     expect(campaign.success, JSON.stringify(campaign.error?.issues?.slice(0, 3))).toBe(true);
   });
 
   it('enemyTemplates schema rejects duplicates, unknown fields, and bad nested shapes', () => {
-    const schema = CAMPAIGN_SECTION_SCHEMAS.enemyTemplates;
+    const schema = CAMPAIGN_SECTION_SCHEMAS.customMonsters;
     const bandit = SRD_MONSTERS.bandit;
     expect(schema.safeParse([bandit, bandit]).success).toBe(false); // dup name
     expect(schema.safeParse([{ ...bandit, sneer: true }]).success).toBe(false); // unknown field
@@ -219,7 +226,7 @@ describe('editable sections registry', () => {
   });
 
   it('lootTable schema rejects duplicates, unknown fields, and off-enum values', () => {
-    const loot = CAMPAIGN_SECTION_SCHEMAS.lootTable;
+    const loot = CAMPAIGN_SECTION_SCHEMAS.customItems;
     const dagger = SRD_ITEMS.dagger;
     expect(loot.safeParse([dagger, dagger]).success).toBe(false);
     expect(loot.safeParse([{ ...dagger, zappiness: 9 }]).success).toBe(false);

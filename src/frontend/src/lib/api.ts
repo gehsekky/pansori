@@ -74,32 +74,6 @@ export interface CampaignSectionValue extends CampaignSectionInfo {
   value: unknown;
 }
 
-// Catalog item — a full LootItem definition. The FE only inspects the
-// display fields; the rest rides along so a badge selection can be
-// PUT straight back as the lootTable section value.
-export interface CatalogItem {
-  id: string;
-  name: string;
-  type: 'weapon' | 'armor' | 'consumable' | 'misc';
-  desc: string;
-  [key: string]: unknown;
-}
-
-// Catalog monster — EnemyTemplate carries no id field, so the catalog
-// pairs the registry key with the full definition.
-export interface CatalogMonster {
-  id: string;
-  definition: {
-    name: string;
-    cr: number;
-    hp: number;
-    ac: number;
-    toHit: number;
-    damage: string;
-    [key: string]: unknown;
-  };
-}
-
 export interface ActionResult {
   narrative: string;
   choices: GameChoice[];
@@ -310,12 +284,6 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ visibility }),
     }),
-
-  // The global item catalog (SRD equipment) — drives the loot-table badge picker.
-  listItemCatalog: () => req<CatalogItem[]>('/campaigns/catalog/items'),
-
-  // The global monster catalog (SRD bestiary) — drives the enemy-templates picker.
-  listMonsterCatalog: () => req<CatalogMonster[]>('/campaigns/catalog/monsters'),
 
   // Content sections (editor+). PUT writes the DB version (live immediately);
   // DELETE reverts the section to the code-defined version.

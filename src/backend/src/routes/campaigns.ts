@@ -19,6 +19,7 @@ import {
   EDITABLE_SECTIONS,
   deleteCampaignSection,
   getCampaignData,
+  getCustomsCodeFallback,
   getDbSection,
   isEditableSection,
   putCampaignSection,
@@ -210,7 +211,9 @@ campaignsRouter.delete(
 
 // Where does a section's effective value come from for this campaign?
 // `present` = the DB has a version (wherever it's stored — JSONB key or a
-// section's own table; getDbSection abstracts that).
+// section's own table; getDbSection abstracts that). The customs sections
+// have no literal code field — their code fallback is the code campaign's
+// non-catalog entries (getCustomsCodeFallback), resolved by the callers.
 function sectionSource(
   present: boolean,
   campaignId: string,
@@ -220,6 +223,17 @@ function sectionSource(
   const code = CODE_CONTEXTS[campaignId] as unknown as Record<string, unknown> | undefined;
   if (code && code[section] !== undefined) return 'code';
   return 'none';
+}
+
+// Effective fallback value for a section the DB doesn't carry: the literal
+// code field, or — for the customs sections — the code campaign's own
+// non-catalog entries.
+async function sectionCodeFallback(campaignId: string, section: string): Promise<unknown | null> {
+  if (section === 'customItems' || section === 'customMonsters') {
+    return getCustomsCodeFallback(pool, CODE_CONTEXTS[campaignId], section);
+  }
+  const code = CODE_CONTEXTS[campaignId] as unknown as Record<string, unknown> | undefined;
+  return code?.[section] ?? null;
 }
 
 // The editable sections + each one's current source — drives the admin
@@ -238,7 +252,11 @@ campaignsRouter.get(
       const sections = [];
       for (const section of EDITABLE_SECTIONS) {
         const { present } = await getDbSection(pool, campaignId, section);
-        sections.push({ section, source: sectionSource(present, campaignId, section) });
+        let source = sectionSource(present, campaignId, section);
+        if (source === 'none' && (await sectionCodeFallback(campaignId, section)) !== null) {
+          source = 'code';
+        }
+        sections.push({ section, source });
       }
       res.json(sections);
     } catch (err) {
@@ -264,9 +282,9 @@ campaignsRouter.get(
         return;
       }
       const { present, value } = await getDbSection(pool, campaignId, section);
-      const source = sectionSource(present, campaignId, section);
-      const code = CODE_CONTEXTS[campaignId] as unknown as Record<string, unknown> | undefined;
-      res.json({ section, source, value: present ? value : (code?.[section] ?? null) });
+      const fallback = present ? null : await sectionCodeFallback(campaignId, section);
+      const source = present ? 'db' : fallback !== null ? 'code' : 'none';
+      res.json({ section, source, value: present ? value : fallback });
     } catch (err) {
       console.error('[campaigns] section read failed:', err);
       res.status(500).json({ error: 'Failed to read section' });
@@ -333,7 +351,8 @@ campaignsRouter.delete(
         return;
       }
       await refreshCampaignOverlay(pool, CONTEXTS, CODE_CONTEXTS, campaignId);
-      res.json({ ok: true, section, source: sectionSource(false, campaignId, section) });
+      const fallback = await sectionCodeFallback(campaignId, section);
+      res.json({ ok: true, section, source: fallback !== null ? 'code' : 'none' });
     } catch (err) {
       console.error('[campaigns] section revert failed:', err);
       res.status(500).json({ error: 'Failed to revert section' });

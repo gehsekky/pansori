@@ -576,8 +576,10 @@ export const CAMPAIGN_SECTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
   displayNoun: z.string().min(1).max(40),
   narratives: NarrativesSchema,
   regions: RegionsSchema,
-  lootTable: LootTableSchema,
-  enemyTemplates: EnemyTemplatesSchema,
+  // Customs ON TOP of the ambient SRD catalogs — same per-entry shapes as
+  // the catalogs themselves (these compose into live engine fields).
+  customItems: LootTableSchema,
+  customMonsters: EnemyTemplatesSchema,
 };
 
 // PUT body for a section write: { value: <section payload> }.

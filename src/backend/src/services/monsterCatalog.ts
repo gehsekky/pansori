@@ -1,26 +1,28 @@
-// Monster catalog + per-campaign enemy templates (monsters /
-// campaign_monsters), mirroring itemCatalog.ts with one twist:
-// EnemyTemplate has no id field, so mapping resolution is by DEEP
-// EQUALITY. A posted template identical to a catalog definition stores as
-// a bare mapping (and keeps tracking the code-canonical entry); anything
-// else — campaign rethemes ({...SRD_MONSTERS.skeleton, name: 'Skeleton
-// Warrior'}) and bosses — stores its full definition as an override under
-// a slug derived from its name.
+// Monster catalog + per-campaign custom monsters, mirroring itemCatalog.ts.
+//
+// The catalog is AMBIENT: every campaign automatically gets the full SRD
+// bestiary — the engine only ever looks templates up by name (region
+// encounter tables, placements), never samples the pool. `monsters` is
+// code-canonical, startup-synced from SRD_MONSTERS.
+//
+// `campaign_custom_monsters` is a campaign's own content: bosses and
+// rethemes ({...SRD_MONSTERS.skeleton, name: 'Skeleton Warrior'}). Identity
+// is the template NAME (EnemyTemplate has no id field) — a custom sharing a
+// catalog monster's name shadows it. The effective bestiary composes as
+// DB customs → code campaign entries → full catalog (dedup by name,
+// earlier wins). Custom rows are keyed by a name-derived slug.
 
 import type { EnemyTemplate } from '../types.js';
 import type { Pool } from 'pg';
 import { SRD_MONSTERS } from '../campaignData/srd/index.js';
-import { sameDefinition } from './itemCatalog.js';
 
 export interface MonsterCatalogEntry {
   id: string;
   definition: EnemyTemplate;
 }
 
-// Slug for a custom template's mapping key, derived from its display name
-// ('Skeleton Warrior' → 'skeleton-warrior'). Uniqueness within one PUT is
-// enforced with numeric suffixes; collisions across writes are fine — the
-// write is replace-all.
+// Mapping key for a custom template ('Skeleton Warrior' → 'skeleton-warrior').
+// Uniqueness within one PUT is enforced with numeric suffixes.
 function slugify(name: string): string {
   const slug = name
     .toLowerCase()
@@ -47,7 +49,7 @@ export async function syncMonsterCatalog(pool: Pool): Promise<void> {
 }
 
 // The full bestiary with catalog ids, ordered for display (CR ascending,
-// name within) — feeds the creator UI's badge picker.
+// name within).
 export async function getMonsterCatalog(pool: Pool): Promise<MonsterCatalogEntry[]> {
   const { rows } = await pool.query<MonsterCatalogEntry>(
     'SELECT id, definition FROM monsters ORDER BY cr, name'
@@ -55,40 +57,24 @@ export async function getMonsterCatalog(pool: Pool): Promise<MonsterCatalogEntry
   return rows;
 }
 
-export async function getCampaignEnemyTemplates(
+// A campaign's custom monsters in authored order.
+export async function getCampaignCustomMonsters(
   pool: Pool,
   campaignId: string
 ): Promise<EnemyTemplate[]> {
-  const { rows } = await pool.query<{
-    monster_id: string;
-    override: EnemyTemplate | null;
-    definition: EnemyTemplate | null;
-  }>(
-    `SELECT cm.monster_id, cm.override, m.definition
-       FROM campaign_monsters cm
-       LEFT JOIN monsters m ON m.id = cm.monster_id
-      WHERE cm.campaign_id = $1
-      ORDER BY cm.sort_order, cm.monster_id`,
+  const { rows } = await pool.query<{ definition: EnemyTemplate }>(
+    `SELECT definition
+       FROM campaign_custom_monsters
+      WHERE campaign_id = $1
+      ORDER BY sort_order, monster_id`,
     [campaignId]
   );
-  const out: EnemyTemplate[] = [];
-  for (const row of rows) {
-    const def = row.override ?? row.definition;
-    if (!def) {
-      console.warn(
-        `[monsterCatalog] ${campaignId}: mapping for "${row.monster_id}" has no catalog row and no override — skipping`
-      );
-      continue;
-    }
-    out.push(def);
-  }
-  return out;
+  return rows.map((r) => r.definition);
 }
 
-// Replace-all write. Each posted template is matched against the catalog
-// by deep equality: identical → bare mapping under the catalog id; else →
-// override under a name-derived slug (suffixed to stay unique in the list).
-export async function putCampaignEnemyTemplates(
+// Replace-all write. Rows are keyed by a slug of the template name,
+// suffixed for duplicates within the posted list.
+export async function putCampaignCustomMonsters(
   pool: Pool,
   campaignId: string,
   templates: EnemyTemplate[]
@@ -101,10 +87,6 @@ export async function putCampaignEnemyTemplates(
       await client.query('ROLLBACK');
       return false;
     }
-    const { rows: catalogRows } = await client.query<MonsterCatalogEntry>(
-      'SELECT id, definition FROM monsters'
-    );
-
     const usedIds = new Set<string>();
     const uniqueId = (base: string): string => {
       let id = base;
@@ -113,19 +95,12 @@ export async function putCampaignEnemyTemplates(
       usedIds.add(id);
       return id;
     };
-
-    await client.query('DELETE FROM campaign_monsters WHERE campaign_id = $1', [campaignId]);
+    await client.query('DELETE FROM campaign_custom_monsters WHERE campaign_id = $1', [campaignId]);
     for (let i = 0; i < templates.length; i++) {
-      const template = templates[i];
-      const catalogMatch = catalogRows.find((c) => sameDefinition(c.definition, template));
-      const monsterId = uniqueId(catalogMatch ? catalogMatch.id : slugify(template.name));
-      // A bare mapping is only valid when the row's id still points at the
-      // catalog row — a suffixed duplicate must carry its own definition.
-      const override = catalogMatch && monsterId === catalogMatch.id ? null : template;
       await client.query(
-        `INSERT INTO campaign_monsters (campaign_id, monster_id, sort_order, override)
+        `INSERT INTO campaign_custom_monsters (campaign_id, monster_id, sort_order, definition)
          VALUES ($1, $2, $3, $4::jsonb)`,
-        [campaignId, monsterId, i, override === null ? null : JSON.stringify(override)]
+        [campaignId, uniqueId(slugify(templates[i].name)), i, JSON.stringify(templates[i])]
       );
     }
     await client.query('COMMIT');
@@ -138,12 +113,31 @@ export async function putCampaignEnemyTemplates(
   }
 }
 
-export async function deleteCampaignEnemyTemplates(
+export async function deleteCampaignCustomMonsters(
   pool: Pool,
   campaignId: string
 ): Promise<boolean> {
   const { rowCount } = await pool.query('SELECT 1 FROM campaigns WHERE id = $1', [campaignId]);
   if (!rowCount) return false;
-  await pool.query('DELETE FROM campaign_monsters WHERE campaign_id = $1', [campaignId]);
+  await pool.query('DELETE FROM campaign_custom_monsters WHERE campaign_id = $1', [campaignId]);
   return true;
+}
+
+// Effective bestiary: DB customs → code campaign entries → full catalog,
+// deduped by NAME (earlier wins, preserving each source's internal order).
+export function composeEnemyTemplates(
+  customs: EnemyTemplate[],
+  codeTemplates: EnemyTemplate[],
+  catalog: EnemyTemplate[]
+): EnemyTemplate[] {
+  const seen = new Set<string>();
+  const out: EnemyTemplate[] = [];
+  for (const list of [customs, codeTemplates, catalog]) {
+    for (const template of list) {
+      if (seen.has(template.name)) continue;
+      seen.add(template.name);
+      out.push(template);
+    }
+  }
+  return out;
 }
