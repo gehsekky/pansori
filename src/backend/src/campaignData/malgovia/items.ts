@@ -40,6 +40,7 @@ export const lootTable: LootItem[] = [
     'trident',
     'war_pick',
     'whip',
+    'blowgun',
     'hand_crossbow',
     'heavy_crossbow',
     'longbow',
