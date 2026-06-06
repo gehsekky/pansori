@@ -827,6 +827,9 @@ describe('section CRUD + live refresh', () => {
     expect(ghost.displayNoun).toBe('boo');
     expect(Object.keys(ghost.classHitDie).length).toBeGreaterThan(0);
     expect(ghost.campaign?.rooms.length).toBeGreaterThan(0);
+    // The template opening is never empty — the gameStart section's code
+    // fallback serves it, so the editor never starts from null.
+    expect(ghost.campaign?.intro.length).toBeGreaterThan(0);
     expect(ghost.narratives.genericArrival.length).toBeGreaterThan(0);
   });
 });

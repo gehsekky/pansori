@@ -18,6 +18,7 @@ import {
 import { CODE_CONTEXTS, CONTEXTS } from '../services/contextStore.js';
 import {
   EDITABLE_SECTIONS,
+  baseContextFor,
   deleteCampaignSection,
   getCampaignData,
   getCustomsCodeFallback,
@@ -257,7 +258,11 @@ async function sectionCodeFallback(campaignId: string, section: string): Promise
     return getCustomsCodeFallback(pool, CODE_CONTEXTS[campaignId], section);
   }
   if (section === 'gameStart') {
-    return CODE_CONTEXTS[campaignId]?.campaign?.intro ?? null;
+    // Never null: a DB-born campaign (no code context) resolves over the
+    // base template, so its effective opening is the template intro — serve
+    // that as the editing starting point, exactly what the engine plays.
+    const code = CODE_CONTEXTS[campaignId] ?? baseContextFor(campaignId);
+    return code.campaign?.intro ?? null;
   }
   const code = CODE_CONTEXTS[campaignId] as unknown as Record<string, unknown> | undefined;
   return code?.[section] ?? null;
