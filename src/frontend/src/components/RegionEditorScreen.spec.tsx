@@ -355,6 +355,136 @@ describe('RegionEditorScreen', () => {
     ]);
   });
 
+  describe('room mode', () => {
+    const TAPROOM = {
+      id: 'taproom',
+      name: 'The Taproom',
+      desc: 'Lamplight and cider.',
+      grid: [
+        [{}, {}, {}],
+        [{}, { t: 'water', m: 'swim' }, {}],
+        [{}, {}, {}],
+      ],
+      entryPos: { x: 0, y: 0 },
+      exits: [{ pos: { x: 2, y: 2 }, ascends: true, label: 'Door' }],
+      lighting: 'dim',
+      floor: 'cobblestone',
+      canRest: true,
+    };
+    const CELLAR = {
+      id: 'cellar',
+      name: 'The Cellar',
+      desc: 'Cold stone.',
+      grid: [
+        [{}, {}],
+        [{}, {}],
+      ],
+      entryPos: { x: 0, y: 0 },
+    };
+
+    function renderRoom(roomId = 'taproom') {
+      mocked.getCampaignSection.mockResolvedValue({
+        section: 'rooms',
+        source: 'db',
+        value: [TAPROOM, CELLAR],
+      });
+      mocked.putCampaignSection.mockResolvedValue({ ok: true, section: 'rooms', source: 'db' });
+      return render(
+        <RegionEditorScreen campaignId="sandbox" regionId={roomId} kind="room" onBack={vi.fn()} />
+      );
+    }
+
+    it('loads the room: bare floors, mech letters, entry marker, exit marker', async () => {
+      renderRoom();
+      expect(await screen.findByText(/ROOM MAP — THE TAPROOM/)).toBeTruthy();
+      expect(screen.getByText(/3×3 · 1 SQUARE = 5 FT/)).toBeTruthy(); // default scale
+      expect(screen.getByTestId('cell-0-0').getAttribute('aria-label')).toContain('floor');
+      expect(screen.getByTestId('cell-0-0').getAttribute('aria-label')).toContain('(start)');
+      expect(screen.getByTestId('cell-1-1').getAttribute('aria-label')).toContain('water [swim]');
+      expect(screen.getByTestId('cell-2-2').getAttribute('aria-label')).toContain('site: Door');
+    });
+
+    it('MECHANICS brush paints one flag per cell and clears it', async () => {
+      renderRoom();
+      await screen.findByTestId('cell-0-0');
+      fireEvent.click(screen.getByRole('button', { name: 'MECHANICS' }));
+      fireEvent.click(screen.getByRole('button', { name: /OBSTACLE/ }));
+      fireEvent.mouseDown(screen.getByTestId('cell-2-0'));
+      expect(screen.getByTestId('cell-2-0').getAttribute('aria-label')).toContain('[obstacle]');
+      // Repainting with another flag replaces it; CLEAR removes it.
+      fireEvent.click(screen.getByRole('button', { name: /COVER/ }));
+      fireEvent.mouseDown(screen.getByTestId('cell-2-0'));
+      expect(screen.getByTestId('cell-2-0').getAttribute('aria-label')).toContain('[cover]');
+      fireEvent.click(screen.getByRole('button', { name: 'CLEAR' }));
+      fireEvent.mouseDown(screen.getByTestId('cell-2-0'));
+      expect(screen.getByTestId('cell-2-0').getAttribute('aria-label')).not.toContain('[');
+    });
+
+    it('the NONE (FLOOR) brush erases cosmetic paint', async () => {
+      renderRoom();
+      await screen.findByTestId('cell-0-0');
+      fireEvent.click(screen.getByRole('button', { name: 'NONE (FLOOR)' }));
+      fireEvent.mouseDown(screen.getByTestId('cell-1-1')); // painted water
+      const label = screen.getByTestId('cell-1-1').getAttribute('aria-label')!;
+      expect(label).toContain('floor');
+      expect(label).toContain('[swim]'); // the mech flag survives the paint erase
+    });
+
+    it('EXITS tool: a room exit needs a target; saved exits map back to the exit shape', async () => {
+      renderRoom();
+      await screen.findByTestId('cell-0-0');
+      fireEvent.click(screen.getByRole('button', { name: 'EXITS' }));
+      fireEvent.mouseDown(screen.getByTestId('cell-0-2')); // place → defaults to ascend
+      fireEvent.change(screen.getByLabelText('KIND'), { target: { value: 'room' } });
+      fireEvent.change(screen.getByLabelText('LABEL'), { target: { value: 'Stairs down' } });
+      // No TO ROOM picked yet — save is blocked client-side.
+      fireEvent.click(screen.getByText('SAVE'));
+      expect(await screen.findByText(/needs a TO ROOM target/)).toBeTruthy();
+      expect(mocked.putCampaignSection).not.toHaveBeenCalled();
+      // The picker offers the OTHER rooms only (not the edited room itself).
+      const toRoom = screen.getByLabelText('TO ROOM') as HTMLSelectElement;
+      expect([...toRoom.options].map((o) => o.value)).toEqual(['', 'cellar']);
+      fireEvent.change(toRoom, { target: { value: 'cellar' } });
+      fireEvent.click(screen.getByText('SAVE'));
+      await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
+      const list = mocked.putCampaignSection.mock.calls[0][2] as Array<{
+        exits?: Array<Record<string, unknown>>;
+      }>;
+      expect(list[0].exits).toEqual([
+        { pos: { x: 2, y: 2 }, ascends: true, label: 'Door' },
+        { pos: { x: 0, y: 2 }, toRoomId: 'cellar', label: 'Stairs down' },
+      ]);
+    });
+
+    it('details: entry pos tool, lighting/floor/can-rest, desc required', async () => {
+      renderRoom();
+      await screen.findByTestId('cell-0-0');
+      // Relocate the entry marker.
+      fireEvent.click(screen.getByRole('button', { name: 'ENTRY POS' }));
+      fireEvent.mouseDown(screen.getByTestId('cell-1-0'));
+      // Room details: lighting select pre-filled, can-rest checked.
+      expect((screen.getByLabelText('LIGHTING') as HTMLSelectElement).value).toBe('dim');
+      expect((screen.getByLabelText('CAN REST HERE') as HTMLInputElement).checked).toBe(true);
+      fireEvent.change(screen.getByLabelText('LIGHTING'), { target: { value: 'dark' } });
+      fireEvent.click(screen.getByLabelText('CAN REST HERE'));
+      // Blank description blocks the save.
+      fireEvent.change(screen.getByLabelText('DESCRIPTION'), { target: { value: '' } });
+      fireEvent.click(screen.getByText('SAVE'));
+      expect(await screen.findByText(/DESCRIPTION is required/)).toBeTruthy();
+      fireEvent.change(screen.getByLabelText('DESCRIPTION'), { target: { value: 'New desc.' } });
+      fireEvent.click(screen.getByText('SAVE'));
+      await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
+      const saved = mocked.putCampaignSection.mock.calls[0][2] as Array<Record<string, unknown>>;
+      expect(saved[0].entryPos).toEqual({ x: 1, y: 0 });
+      expect(saved[0].lighting).toBe('dark');
+      expect('canRest' in saved[0]).toBe(false); // unchecked → key dropped
+      expect(saved[0].desc).toBe('New desc.');
+      // Region-only fields never sneak into a room payload.
+      expect('startPos' in saved[0]).toBe(false);
+      expect('isStartingRegion' in saved[0]).toBe(false);
+    });
+  });
+
   it('town mode swaps the region-only details for the floor picker', async () => {
     mocked.getCampaignSection.mockResolvedValue({
       section: 'towns',

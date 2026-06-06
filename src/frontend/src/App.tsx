@@ -151,7 +151,7 @@ export default function App() {
   const [creatorCampaignId, setCreatorCampaignId] = useState<string | null>(null);
   // Deep-linked map painter (/creator/<campaign id>/(region|town)/<map id>).
   const [creatorRegionId, setCreatorRegionId] = useState<string | null>(null);
-  const [creatorMapKind, setCreatorMapKind] = useState<'region' | 'town'>('region');
+  const [creatorMapKind, setCreatorMapKind] = useState<'region' | 'town' | 'room'>('region');
   const [mapOpen, setMapOpen] = useState(false);
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
@@ -257,9 +257,9 @@ export default function App() {
             return loadSessions();
           }
         }
-        // Map painter deep link: /creator/<campaign id>/(region|town)/<map id>.
+        // Map painter deep link: /creator/<campaign id>/(region|town|room)/<map id>.
         const regionMatch = window.location.pathname.match(
-          /^\/creator\/([a-z0-9_-]+)\/(region|town)\/([a-z0-9_-]+)\/?$/i
+          /^\/creator\/([a-z0-9_-]+)\/(region|town|room)\/([a-z0-9_-]+)\/?$/i
         );
         if (regionMatch) {
           setCreatorCampaignId(regionMatch[1]);

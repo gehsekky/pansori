@@ -136,6 +136,56 @@ describe('MapsPanel — regions', () => {
   });
 });
 
+describe('MapsPanel — rooms', () => {
+  beforeEach(() => {
+    mocked.getCampaignSection.mockResolvedValue({
+      section: 'rooms',
+      source: 'db',
+      value: [
+        {
+          id: 'taproom',
+          name: 'The Taproom',
+          desc: 'Lamplight and cider.',
+          grid: [
+            [{}, {}],
+            [{}, {}],
+          ],
+          entryPos: { x: 0, y: 0 },
+          exits: [{ pos: { x: 1, y: 1 }, ascends: true, label: 'Door' }],
+        },
+      ],
+    });
+    mocked.putCampaignSection.mockResolvedValue({ ok: true, section: 'rooms', source: 'db' });
+  });
+
+  it('renders room cards with exit counts', async () => {
+    render(<MapsPanel campaignId="malgovia" kind="room" />);
+    expect(await screen.findByText('ROOMS')).toBeTruthy();
+    expect(screen.getByText('The Taproom')).toBeTruthy();
+    expect(screen.getByText(/2×2 · 1 EXIT/)).toBeTruthy();
+  });
+
+  it('creates a room: bare-floor starter with a way out, painter opened', async () => {
+    const onOpenMap = vi.fn();
+    render(<MapsPanel campaignId="malgovia" kind="room" onOpenMap={onOpenMap} />);
+    fireEvent.click(await screen.findByTestId('new-room-btn'));
+    fireEvent.change(screen.getByLabelText('ROOM NAME'), { target: { value: 'The Cellar' } });
+    expect(screen.getByText(/SHIPS WITH A WAY OUT/)).toBeTruthy();
+    fireEvent.click(screen.getByTestId('create-room-btn'));
+    await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
+    const [, section, value] = mocked.putCampaignSection.mock.calls[0];
+    expect(section).toBe('rooms');
+    const list = value as Array<Record<string, unknown>>;
+    expect(list.map((r) => r.id)).toEqual(['taproom', 'the-cellar']);
+    const created = list[1];
+    expect(created.desc).toBeTruthy(); // rooms require a description
+    expect((created.grid as unknown[][]).length).toBe(6);
+    expect((created.grid as unknown[][])[0]).toEqual([{}, {}, {}, {}, {}, {}, {}, {}]);
+    expect(created.exits).toEqual([{ pos: { x: 0, y: 1 }, ascends: true, label: 'Way out' }]);
+    expect(onOpenMap).toHaveBeenCalledWith('the-cellar');
+  });
+});
+
 describe('MapsPanel — towns', () => {
   it('renders town cards with venue counts and no starting badge', async () => {
     render(<MapsPanel campaignId="malgovia" kind="town" />);

@@ -6,32 +6,46 @@ import styles from '../styles.module.css';
 // Visual map grid painter:
 //   /creator/<campaign id>/region/<region id>   (kind 'region')
 //   /creator/<campaign id>/town/<town id>       (kind 'town')
+//   /creator/<campaign id>/room/<room id>       (kind 'room')
 //
-// Edits ONE map: its dense terrain grid plus the non-map details (name,
+// Edits ONE map: its dense cell grid plus the non-map details (name,
 // description, scale; region encounter chance / base tier / starting
-// flag; town floor). Pick a terrain from the palette and click/drag to
-// paint; the TIER tool (regions only — towns carry no tiers) paints
-// per-cell tier overrides (rendered as a corner number); the START tool
-// relocates the party marker; the SITES/VENUES tool places and edits the
-// map's transition markers (◆) — click a cell to place, click a marker to
-// select, with a form for name/kind/target and MOVE/DELETE. SAVE writes
-// the whole section back through the normal content PUT — same
-// validation, same live refresh.
+// flag; town/room floor; room lighting + can-rest). Pick a terrain from
+// the palette and click/drag to paint (rooms also have a MECHANICS brush
+// — one obstacle/difficult/climb/swim/cover flag per cell); the TIER tool
+// (regions only) paints per-cell tier overrides; the START/ENTRY tool
+// relocates the party marker; the SITES/VENUES/EXITS tool places and
+// edits the map's transition markers (◆) — click a cell to place, click a
+// marker to select, with a form for name/kind/target and MOVE/DELETE.
+// SAVE writes the whole section back through the normal content PUT —
+// same validation, same live refresh.
 //
 // The grid model is the painter's data model on purpose (design call
-// 2026-06-06): cells are { t, tier?, enc? }; terrain BEHAVIOR derives
-// from the shared TERRAIN registry. `enc` overrides stay JSON-only here.
+// 2026-06-06): region/town cells are { t, tier?, enc? }; room cells are
+// { t?, m? } (t absent = bare floor). `enc` overrides stay JSON-only here.
 
 interface Cell {
-  t: string;
+  t?: string;
   tier?: number;
   enc?: number;
+  m?: string; // rooms only — one mechanical flag per cell
 }
 
-// A site (region) or venue (town) — the map's transition cells, edited
-// visually with the SITES/VENUES tool. One shape covers both: sites are
-// kind 'town'|'local' (+ townId/entryRoomId/icon/onEnter), venues are
-// kind 'interior'|'gate' (+ entryRoomId).
+const MECH_FLAGS = ['obstacle', 'difficult', 'climb', 'swim', 'cover'] as const;
+// Corner letter per mechanical flag, so painted mechanics read at a glance.
+const MECH_LETTER: Record<string, string> = {
+  obstacle: 'O',
+  difficult: 'D',
+  climb: 'C',
+  swim: 'S',
+  cover: 'V',
+};
+
+// A site (region), venue (town), or exit (room) — the map's transition
+// cells, edited visually with the SITES/VENUES/EXITS tool. One shape
+// covers all three: sites are kind 'town'|'local', venues
+// 'interior'|'gate', exits 'room'|'ascend' (exits have no stored id —
+// the editor synthesizes one and maps back to the exit shape on save).
 interface EditorSite {
   id: string;
   name: string;
@@ -39,28 +53,54 @@ interface EditorSite {
   kind: string;
   townId?: string;
   entryRoomId?: string;
+  toRoomId?: string; // rooms only — exit target
+  entrancePos?: { x: number; y: number }; // rooms only — preserved, not edited
   desc?: string;
   onEnter?: string;
   icon?: string;
   [key: string]: unknown;
 }
 
+interface EditorExit {
+  pos: { x: number; y: number };
+  toRoomId?: string;
+  entrancePos?: { x: number; y: number };
+  label?: string;
+  ascends?: boolean;
+}
+
 interface EditorRegion {
   id: string;
   name: string;
   grid: Cell[][];
-  startPos: { x: number; y: number };
+  startPos?: { x: number; y: number }; // regions/towns
+  entryPos?: { x: number; y: number }; // rooms
   desc?: string;
   feetPerSquare?: number;
   isStartingRegion?: boolean; // regions only
   onEnter?: string; // regions only — first-entry narration (desc fallback)
   encounterChance?: number; // regions only
   baseTier?: number; // regions only
-  floor?: string; // towns only
+  floor?: string; // towns + rooms
+  lighting?: string; // rooms only
+  canRest?: boolean; // rooms only
   sites?: EditorSite[];
   venues?: EditorSite[];
+  exits?: EditorExit[]; // rooms only
   [key: string]: unknown;
 }
+
+// Room exits ↔ the marker-editing shape: exits carry no id, so the editor
+// synthesizes exit-N keys on load and strips them again on save.
+const exitsToSites = (exits?: EditorExit[]): EditorSite[] =>
+  (exits ?? []).map((e, i) => ({
+    id: `exit-${i + 1}`,
+    name: e.label ?? '',
+    pos: { ...e.pos },
+    kind: e.ascends ? 'ascend' : 'room',
+    ...(e.toRoomId ? { toRoomId: e.toRoomId } : {}),
+    ...(e.entrancePos ? { entrancePos: { ...e.entrancePos } } : {}),
+  }));
 
 // The non-map fields editable on this page, held as strings ('' = unset)
 // and parsed/pruned at save time.
@@ -71,7 +111,8 @@ interface Details {
   onEnter: string; // regions only
   encounterChance: string; // regions only
   baseTier: string; // regions only
-  floor: string; // towns only
+  floor: string; // towns + rooms
+  lighting: string; // rooms only
 }
 
 function detailsFrom(r: EditorRegion): Details {
@@ -83,6 +124,7 @@ function detailsFrom(r: EditorRegion): Details {
     encounterChance: r.encounterChance !== undefined ? String(r.encounterChance) : '',
     baseTier: r.baseTier !== undefined ? String(r.baseTier) : '',
     floor: r.floor ?? '',
+    lighting: r.lighting ?? '',
   };
 }
 
@@ -102,7 +144,7 @@ const TERRAIN_COLORS: Record<TerrainType, string> = {
 
 const TERRAIN_TYPES = Object.keys(TERRAIN) as TerrainType[];
 
-type Tool = 'terrain' | 'tier' | 'start' | 'site';
+type Tool = 'terrain' | 'tier' | 'start' | 'site' | 'mech';
 
 const CELL_PX = 30;
 
@@ -127,11 +169,12 @@ function RegionEditorScreen({
   campaignId: string;
   regionId: string;
   // Which map level is being painted — picks the section ('regions' /
-  // 'towns'), the marker source (sites / venues), and tool availability.
-  kind?: 'region' | 'town';
+  // 'towns' / 'rooms'), the marker source (sites / venues / exits), and
+  // tool availability.
+  kind?: 'region' | 'town' | 'room';
   onBack: () => void;
 }) {
-  const section = kind === 'region' ? 'regions' : 'towns';
+  const section = kind === 'region' ? 'regions' : kind === 'town' ? 'towns' : 'rooms';
   // The full regions list (the save unit) + the edited region's pieces.
   const [regions, setRegions] = useState<EditorRegion[] | null>(null);
   const [grid, setGrid] = useState<Cell[][]>([]);
@@ -151,8 +194,13 @@ function RegionEditorScreen({
   const [loadErr, setLoadErr] = useState<string | null>(null);
 
   const [tool, setTool] = useState<Tool>('terrain');
-  const [terrainBrush, setTerrainBrush] = useState<TerrainType>('plains');
+  // '' = the clear brush (rooms: erase the cosmetic paint back to bare floor).
+  const [terrainBrush, setTerrainBrush] = useState<string>('plains');
   const [tierBrush, setTierBrush] = useState<number>(1); // 0 = clear override
+  // Rooms only: the mechanical-flag brush ('' = clear the flag).
+  const [mechBrush, setMechBrush] = useState<string>('obstacle');
+  // Rooms only: SRD short-rest spot.
+  const [canRest, setCanRest] = useState(false);
   const [painting, setPainting] = useState(false);
 
   const [dirty, setDirty] = useState(false);
@@ -178,10 +226,16 @@ function RegionEditorScreen({
           return;
         }
         setGrid(r.grid.map((row) => row.map((c) => ({ ...c }))));
-        setStartPos({ ...r.startPos });
+        const marker = (kind === 'room' ? r.entryPos : r.startPos) ?? { x: 0, y: 0 };
+        setStartPos({ ...marker });
         setDetails(detailsFrom(r));
         setMakeStarter(false);
-        setSites(((kind === 'region' ? r.sites : r.venues) ?? []).map((s) => ({ ...s })));
+        setCanRest(!!r.canRest);
+        setSites(
+          kind === 'room'
+            ? exitsToSites(r.exits)
+            : ((kind === 'region' ? r.sites : r.venues) ?? []).map((s) => ({ ...s }))
+        );
         setSelectedSiteId(null);
         setMoveArmed(false);
       })
@@ -232,12 +286,16 @@ function RegionEditorScreen({
           return;
         }
         const n = sites.length + 1;
-        let id = `${kind === 'region' ? 'site' : 'venue'}-${n}`;
+        let id = `${kind === 'region' ? 'site' : kind === 'town' ? 'venue' : 'exit'}-${n}`;
         while (sites.some((s) => s.id === id)) id += 'x';
         const draft: EditorSite =
           kind === 'region'
             ? { id, name: 'New Site', pos: { x, y }, kind: 'local' }
-            : { id, name: 'New Venue', pos: { x, y }, kind: 'interior' };
+            : kind === 'town'
+              ? { id, name: 'New Venue', pos: { x, y }, kind: 'interior' }
+              : // A fresh exit defaults to ascend — valid standalone (a room
+                // exit needs a TO ROOM target before it can save).
+                { id, name: 'Exit', pos: { x, y }, kind: 'ascend' };
         setSites((prev) => [...prev, draft]);
         setSelectedSiteId(id);
         setDirty(true);
@@ -247,8 +305,14 @@ function RegionEditorScreen({
         const next = prev.map((row) => row.slice());
         const cell = { ...next[y][x] };
         if (tool === 'terrain') {
-          if (cell.t === terrainBrush) return prev;
-          cell.t = terrainBrush;
+          if ((cell.t ?? '') === terrainBrush) return prev;
+          if (terrainBrush === '')
+            delete cell.t; // rooms: back to bare floor
+          else cell.t = terrainBrush;
+        } else if (tool === 'mech') {
+          if ((cell.m ?? '') === mechBrush) return prev;
+          if (mechBrush === '') delete cell.m;
+          else cell.m = mechBrush;
         } else {
           // tier tool: 0 clears the override.
           if (tierBrush === 0) delete cell.tier;
@@ -260,7 +324,7 @@ function RegionEditorScreen({
       });
       setDirty(true);
     },
-    [tool, terrainBrush, tierBrush, sites, selectedSiteId, moveArmed, kind]
+    [tool, terrainBrush, tierBrush, mechBrush, sites, selectedSiteId, moveArmed, kind]
   );
 
   // Patch the selected site; clearing a kind's target also clears the
@@ -274,6 +338,7 @@ function RegionEditorScreen({
         if (patch.kind === 'local' || patch.kind === 'interior' || patch.kind === 'gate') {
           delete next.townId;
         }
+        if (patch.kind === 'ascend') delete next.toRoomId;
         return next;
       })
     );
@@ -297,7 +362,8 @@ function RegionEditorScreen({
       for (let y = 0; y < h; y++) {
         const row: Cell[] = [];
         for (let x = 0; x < w; x++) {
-          row.push(prev[y]?.[x] ? { ...prev[y][x] } : { t: 'plains' });
+          // New cells: bare floor for rooms ({}), plains elsewhere.
+          row.push(prev[y]?.[x] ? { ...prev[y][x] } : kind === 'room' ? {} : { t: 'plains' });
         }
         next.push(row);
       }
@@ -318,7 +384,19 @@ function RegionEditorScreen({
 
   // Fold the edited sites/venues back in: optional fields prune when empty
   // ('' would fail the SLUG/min-length schemas); an empty list drops the key.
+  // Rooms map their markers back to the exit shape (no ids, label/ascends).
   function mergeSites(next: EditorRegion) {
+    if (kind === 'room') {
+      const exits: EditorExit[] = sites.map((s) => ({
+        pos: s.pos,
+        ...(s.kind === 'ascend' ? { ascends: true } : { toRoomId: s.toRoomId }),
+        ...(s.name.trim() ? { label: s.name.trim() } : {}),
+        ...(s.entrancePos ? { entrancePos: s.entrancePos } : {}),
+      }));
+      if (exits.length > 0) next.exits = exits;
+      else delete next.exits;
+      return;
+    }
     const cleaned = sites.map((s) => {
       const c: EditorSite = { ...s };
       for (const k of ['townId', 'entryRoomId', 'desc', 'onEnter', 'icon'] as const) {
@@ -334,16 +412,27 @@ function RegionEditorScreen({
   // Fold the details form back into the region: '' clears an optional
   // field, numbers parse client-side (the server re-validates shapes).
   function mergeDetails(r: EditorRegion): EditorRegion | { error: string } {
-    const next: EditorRegion = { ...r, grid, startPos };
+    const next: EditorRegion =
+      kind === 'room' ? { ...r, grid, entryPos: startPos } : { ...r, grid, startPos };
+    if (kind === 'room' && sites.some((s) => s.kind === 'room' && !s.toRoomId)) {
+      return { error: 'Every room exit needs a TO ROOM target (or flip it to LEAVE).' };
+    }
     mergeSites(next);
     next.name = details.name.trim() || r.name;
+    if (kind === 'room' && !details.desc.trim()) {
+      return { error: 'DESCRIPTION is required for rooms.' };
+    }
     if (details.desc.trim()) next.desc = details.desc.trim();
     else delete next.desc;
-    const fps = Number(details.feetPerSquare);
-    if (!Number.isFinite(fps) || fps <= 0) {
-      return { error: 'FEET PER SQUARE must be a positive number.' };
+    if (kind === 'room' && details.feetPerSquare.trim() === '') {
+      delete next.feetPerSquare; // rooms default to 5 ft implicitly
+    } else {
+      const fps = Number(details.feetPerSquare);
+      if (!Number.isFinite(fps) || fps <= 0) {
+        return { error: 'FEET PER SQUARE must be a positive number.' };
+      }
+      next.feetPerSquare = fps;
     }
-    next.feetPerSquare = fps;
     if (kind === 'region') {
       if (details.onEnter.trim()) next.onEnter = details.onEnter.trim();
       else delete next.onEnter;
@@ -358,8 +447,16 @@ function RegionEditorScreen({
       if (details.baseTier === '') delete next.baseTier;
       else next.baseTier = Number(details.baseTier);
       if (makeStarter) next.isStartingRegion = true;
-    } else if (details.floor === '') delete next.floor;
-    else next.floor = details.floor;
+    } else {
+      if (details.floor === '') delete next.floor;
+      else next.floor = details.floor;
+      if (kind === 'room') {
+        if (details.lighting === '') delete next.lighting;
+        else next.lighting = details.lighting;
+        if (canRest) next.canRest = true;
+        else delete next.canRest;
+      }
+    }
     return next;
   }
 
@@ -403,7 +500,10 @@ function RegionEditorScreen({
   // placements show immediately.
   const siteAt = (x: number, y: number) => sites.find((s) => s.pos.x === x && s.pos.y === y);
   const selectedSite = sites.find((s) => s.id === selectedSiteId) ?? null;
-  const markerNoun = kind === 'region' ? 'SITE' : 'VENUE';
+  const markerNoun = kind === 'region' ? 'SITE' : kind === 'town' ? 'VENUE' : 'EXIT';
+  const defaultScale = kind === 'region' ? 5280 : kind === 'town' ? 25 : 5;
+  // Exit targets for the room form: every room in the section.
+  const roomIds = kind === 'room' ? (regions ?? []).map((r) => r.id) : [];
 
   return (
     <div className={styles.pageFlex}>
@@ -411,11 +511,10 @@ function RegionEditorScreen({
         <div className={styles.sessionsHeader}>
           <div>
             <h1 className={styles.title} style={{ fontSize: '1.1rem', marginBottom: 4 }}>
-              {kind === 'region' ? 'REGION' : 'TOWN'} MAP —{' '}
-              {(region?.name ?? regionId).toUpperCase()}
+              {kind.toUpperCase()} MAP — {(region?.name ?? regionId).toUpperCase()}
             </h1>
             <p className={styles.sub}>
-              {width}×{height} · 1 SQUARE = {String(region?.feetPerSquare ?? 5280)} FT
+              {width}×{height} · 1 SQUARE = {String(region?.feetPerSquare ?? defaultScale)} FT
               {dirty && <span style={{ color: 'var(--t-hp-mid)' }}> · UNSAVED</span>}
             </p>
           </div>
@@ -458,8 +557,9 @@ function RegionEditorScreen({
                       [
                         ['terrain', 'TERRAIN'],
                         ...(kind === 'region' ? [['tier', 'TIER'] as [Tool, string]] : []),
-                        ['start', 'START POS'],
-                        ['site', kind === 'region' ? 'SITES' : 'VENUES'],
+                        ...(kind === 'room' ? [['mech', 'MECHANICS'] as [Tool, string]] : []),
+                        ['start', kind === 'room' ? 'ENTRY POS' : 'START POS'],
+                        ['site', `${markerNoun}S`],
                       ] as Array<[Tool, string]>
                     ).map(([t, label]) => (
                       <button
@@ -481,8 +581,24 @@ function RegionEditorScreen({
 
                 {tool === 'terrain' && (
                   <div>
-                    <p className={styles.formLbl}>TERRAIN</p>
+                    <p className={styles.formLbl}>
+                      TERRAIN{kind === 'room' ? ' (COSMETIC PAINT OVER THE FLOOR)' : ''}
+                    </p>
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {kind === 'room' && (
+                        <button
+                          aria-pressed={terrainBrush === ''}
+                          className={styles.ghostBtn}
+                          style={{
+                            padding: '0.25rem 0.6rem',
+                            fontSize: '0.7rem',
+                            borderColor: terrainBrush === '' ? 'var(--t-primary)' : undefined,
+                          }}
+                          onClick={() => setTerrainBrush('')}
+                        >
+                          NONE (FLOOR)
+                        </button>
+                      )}
                       {TERRAIN_TYPES.map((t) => (
                         <button
                           key={t}
@@ -543,6 +659,44 @@ function RegionEditorScreen({
                   </div>
                 )}
 
+                {tool === 'mech' && (
+                  <div>
+                    <p className={styles.formLbl}>
+                      MECHANICS (ONE FLAG PER CELL — RULES, NOT LOOKS)
+                    </p>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {[...MECH_FLAGS, ''].map((m) => (
+                        <button
+                          key={m || 'clear'}
+                          className={styles.ghostBtn}
+                          aria-pressed={mechBrush === m}
+                          title={
+                            m === 'obstacle'
+                              ? 'blocks movement; cover behind it'
+                              : m === 'difficult'
+                                ? '2× movement to enter'
+                                : m === 'climb'
+                                  ? '2× without a climb speed'
+                                  : m === 'swim'
+                                    ? '2× without a swim speed'
+                                    : m === 'cover'
+                                      ? 'half cover (+2 AC) to the occupant'
+                                      : 'erase the flag'
+                          }
+                          style={{
+                            padding: '0.25rem 0.6rem',
+                            fontSize: '0.7rem',
+                            borderColor: mechBrush === m ? 'var(--t-primary)' : undefined,
+                          }}
+                          onClick={() => setMechBrush(m)}
+                        >
+                          {m === '' ? 'CLEAR' : `${m.toUpperCase()} (${MECH_LETTER[m]})`}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {tool === 'site' && (
                   <div style={{ flexBasis: '100%' }}>
                     <p className={styles.formLbl}>
@@ -565,7 +719,7 @@ function RegionEditorScreen({
                       >
                         <div style={{ flex: '2 1 160px' }}>
                           <label className={styles.formLbl} htmlFor="site-name">
-                            NAME
+                            {kind === 'room' ? 'LABEL' : 'NAME'}
                           </label>
                           <input
                             id="site-name"
@@ -590,10 +744,15 @@ function RegionEditorScreen({
                                   ['local', 'LOCAL (DUNGEON)'],
                                   ['town', 'TOWN'],
                                 ]
-                              : [
-                                  ['interior', 'INTERIOR'],
-                                  ['gate', 'GATE (EXIT)'],
-                                ]
+                              : kind === 'town'
+                                ? [
+                                    ['interior', 'INTERIOR'],
+                                    ['gate', 'GATE (EXIT)'],
+                                  ]
+                                : [
+                                    ['room', 'TO ANOTHER ROOM'],
+                                    ['ascend', 'LEAVE (ASCEND)'],
+                                  ]
                             ).map(([v, label]) => (
                               <option key={v} value={v}>
                                 {label}
@@ -601,6 +760,31 @@ function RegionEditorScreen({
                             ))}
                           </select>
                         </div>
+                        {selectedSite.kind === 'room' && (
+                          <div style={{ flex: '1 1 130px' }}>
+                            <label className={styles.formLbl} htmlFor="site-to-room">
+                              TO ROOM
+                            </label>
+                            <select
+                              id="site-to-room"
+                              className={styles.formInp}
+                              style={{ cursor: 'pointer' }}
+                              value={selectedSite.toRoomId ?? ''}
+                              onChange={(e) =>
+                                updateSite(selectedSite.id, { toRoomId: e.target.value })
+                              }
+                            >
+                              <option value="">— PICK A ROOM —</option>
+                              {roomIds
+                                .filter((id) => id !== regionId)
+                                .map((id) => (
+                                  <option key={id} value={id}>
+                                    {id}
+                                  </option>
+                                ))}
+                            </select>
+                          </div>
+                        )}
                         {selectedSite.kind === 'town' && (
                           <div style={{ flex: '1 1 130px' }}>
                             <label className={styles.formLbl} htmlFor="site-town">
@@ -656,20 +840,24 @@ function RegionEditorScreen({
                             />
                           </div>
                         )}
-                        <div style={{ flex: '2 1 200px' }}>
-                          <label className={styles.formLbl} htmlFor="site-on-enter">
-                            ON ENTER NARRATION
-                          </label>
-                          <input
-                            id="site-on-enter"
-                            className={styles.formInp}
-                            placeholder="none"
-                            value={selectedSite.onEnter ?? ''}
-                            onChange={(e) =>
-                              updateSite(selectedSite.id, { onEnter: e.target.value })
-                            }
-                          />
-                        </div>
+                        {kind === 'region' && (
+                          // Sites only — venues/exits carry no narration hook
+                          // (the schema would reject one).
+                          <div style={{ flex: '2 1 200px' }}>
+                            <label className={styles.formLbl} htmlFor="site-on-enter">
+                              ON ENTER NARRATION
+                            </label>
+                            <input
+                              id="site-on-enter"
+                              className={styles.formInp}
+                              placeholder="none"
+                              value={selectedSite.onEnter ?? ''}
+                              onChange={(e) =>
+                                updateSite(selectedSite.id, { onEnter: e.target.value })
+                              }
+                            />
+                          </div>
+                        )}
                         <div style={{ display: 'flex', gap: 6 }}>
                           <button
                             className={styles.ghostBtn}
@@ -751,13 +939,17 @@ function RegionEditorScreen({
                         key={`${x},${y}`}
                         role="button"
                         tabIndex={0}
-                        aria-label={`cell ${x},${y}: ${cell.t}${cell.tier ? ` tier ${cell.tier}` : ''}${isStart ? ' (start)' : ''}${site ? ` (site: ${site.name})` : ''}`}
+                        aria-label={`cell ${x},${y}: ${cell.t ?? 'floor'}${cell.m ? ` [${cell.m}]` : ''}${cell.tier ? ` tier ${cell.tier}` : ''}${isStart ? ' (start)' : ''}${site ? ` (site: ${site.name})` : ''}`}
                         data-testid={`cell-${x}-${y}`}
-                        title={`(${x},${y}) ${TERRAIN[cell.t as TerrainType]?.label ?? cell.t}${site ? ` — ${site.name}` : ''}`}
+                        title={`(${x},${y}) ${cell.t ? (TERRAIN[cell.t as TerrainType]?.label ?? cell.t) : 'floor'}${cell.m ? ` [${cell.m}]` : ''}${site ? ` — ${site.name}` : ''}`}
                         style={{
                           width: CELL_PX,
                           height: CELL_PX,
-                          background: TERRAIN_COLORS[cell.t as TerrainType] ?? '#000',
+                          background: cell.t
+                            ? (TERRAIN_COLORS[cell.t as TerrainType] ?? '#000')
+                            : kind === 'room'
+                              ? '#5c5148' // bare room floor
+                              : '#000',
                           position: 'relative',
                           cursor: 'crosshair',
                           display: 'flex',
@@ -798,6 +990,22 @@ function RegionEditorScreen({
                             {cell.tier}
                           </span>
                         )}
+                        {cell.m && (
+                          <span
+                            aria-hidden="true"
+                            style={{
+                              position: 'absolute',
+                              bottom: 0,
+                              left: 2,
+                              fontSize: 9,
+                              fontWeight: 'bold',
+                              color: '#ffd76a',
+                              textShadow: '0 0 2px #000',
+                            }}
+                          >
+                            {MECH_LETTER[cell.m]}
+                          </span>
+                        )}
                         {isStart && (
                           <span aria-hidden="true" style={{ textShadow: '0 0 3px #000' }}>
                             ★
@@ -808,7 +1016,9 @@ function RegionEditorScreen({
                             aria-hidden="true"
                             style={{
                               color:
-                                site.kind === 'town' || site.kind === 'gate'
+                                site.kind === 'town' ||
+                                site.kind === 'gate' ||
+                                site.kind === 'ascend'
                                   ? '#ffd76a'
                                   : '#ff8a8a',
                               textShadow:
@@ -828,7 +1038,9 @@ function RegionEditorScreen({
               <p style={{ color: 'var(--t-dim)', fontSize: '0.7rem', marginTop: 8 }}>
                 {kind === 'region'
                   ? 'CLICK / DRAG TO PAINT · ★ START · ◆ SITE (edit with the SITES tool) · CORNER NUMBER = TIER OVERRIDE'
-                  : 'CLICK / DRAG TO PAINT · ★ START · ◆ VENUE (edit with the VENUES tool)'}
+                  : kind === 'town'
+                    ? 'CLICK / DRAG TO PAINT · ★ START · ◆ VENUE (edit with the VENUES tool)'
+                    : 'CLICK / DRAG TO PAINT · ★ ENTRY · ◆ EXIT (edit with the EXITS tool) · CORNER LETTER = MECHANICS FLAG'}
               </p>
             </div>
 
@@ -908,7 +1120,7 @@ function RegionEditorScreen({
                     </div>
                   </>
                 )}
-                {kind === 'town' && (
+                {kind !== 'region' && (
                   <div style={{ flex: '1 1 120px' }}>
                     <label className={styles.formLbl} htmlFor="map-detail-floor">
                       FLOOR
@@ -928,6 +1140,52 @@ function RegionEditorScreen({
                       ))}
                     </select>
                   </div>
+                )}
+                {kind === 'room' && (
+                  <>
+                    <div style={{ flex: '1 1 120px' }}>
+                      <label className={styles.formLbl} htmlFor="map-detail-lighting">
+                        LIGHTING
+                      </label>
+                      <select
+                        id="map-detail-lighting"
+                        className={styles.formInp}
+                        style={{ cursor: 'pointer' }}
+                        value={details.lighting}
+                        onChange={(e) => updateDetail('lighting', e.target.value)}
+                      >
+                        <option value="">— (BRIGHT)</option>
+                        {['bright', 'dim', 'dark', 'sunlight'].map((l) => (
+                          <option key={l} value={l}>
+                            {l.toUpperCase()}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div style={{ flex: '1 1 110px', alignSelf: 'flex-end' }}>
+                      <label
+                        style={{
+                          display: 'flex',
+                          gap: 6,
+                          alignItems: 'center',
+                          fontSize: '0.75rem',
+                          color: 'var(--t-mid)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={canRest}
+                          onChange={(e) => {
+                            setCanRest(e.target.checked);
+                            setDirty(true);
+                            setSaved(false);
+                          }}
+                        />
+                        CAN REST HERE
+                      </label>
+                    </div>
+                  </>
                 )}
               </div>
               <div style={{ marginTop: '0.75rem' }}>

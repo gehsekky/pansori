@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react';
 import { api } from '../lib/api.ts';
 import styles from '../styles.module.css';
 
-// REGIONS / TOWNS panels on the campaign creator screen — the card-based
-// way into the map painter. One card per defined map (click → painter);
-// + NEW REGION/TOWN appends a starter to the section (the first region of
-// a campaign becomes the starting region; a starter town ships with a
-// gate venue) and jumps straight to the painter. Bulk edits still live in
-// the section JSON of the CONTENT box above.
+// REGIONS / TOWNS / ROOMS panels on the campaign creator screen — the
+// card-based way into the map painter. One card per defined map (click →
+// painter); + NEW REGION/TOWN/ROOM appends a starter to the section (the
+// first region of a campaign becomes the starting region; a starter town
+// ships with a gate venue; a starter room ships with an ascend exit so
+// the party can always leave) and jumps straight to the painter. Bulk
+// edits still live in the section JSON of the CONTENT box above.
 
 interface PanelMap {
   id: string;
@@ -17,12 +18,32 @@ interface PanelMap {
   grid?: Array<Array<unknown>>;
   sites?: Array<unknown>; // regions only
   venues?: Array<unknown>; // towns only
+  exits?: Array<unknown>; // rooms only
   [key: string]: unknown;
 }
 
-const SECTION = { region: 'regions', town: 'towns' } as const;
+const SECTION = { region: 'regions', town: 'towns', room: 'rooms' } as const;
+const MARKER_NOUN = { region: 'SITE', town: 'VENUE', room: 'EXIT' } as const;
 
-function starterMap(kind: 'region' | 'town', id: string, name: string, isFirst: boolean): PanelMap {
+function starterMap(
+  kind: 'region' | 'town' | 'room',
+  id: string,
+  name: string,
+  isFirst: boolean
+): PanelMap {
+  if (kind === 'room') {
+    // Room cells are {t?, m?} — bare {} = floor. Always leavable: the
+    // starter ships with an ascend exit.
+    return {
+      id,
+      name,
+      desc: 'An empty room, waiting to be furnished.',
+      grid: Array.from({ length: 6 }, () => Array.from({ length: 8 }, () => ({}))),
+      entryPos: { x: 1, y: 1 },
+      exits: [{ pos: { x: 0, y: 1 }, ascends: true, label: 'Way out' }],
+      floor: 'cobblestone',
+    };
+  }
   const grid = Array.from({ length: 8 }, () => Array.from({ length: 10 }, () => ({ t: 'plains' })));
   if (kind === 'region') {
     return {
@@ -51,7 +72,7 @@ function MapsPanel({
   onOpenMap,
 }: {
   campaignId: string;
-  kind: 'region' | 'town';
+  kind: 'region' | 'town' | 'room';
   // Navigate to the painter (/creator/<campaign id>/<kind>/<map id>).
   onOpenMap?: (mapId: string) => void;
 }) {
@@ -157,7 +178,13 @@ function MapsPanel({
               className={styles.formInp}
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              placeholder={kind === 'region' ? 'e.g. The Frost Reach' : 'e.g. Oakvale'}
+              placeholder={
+                kind === 'region'
+                  ? 'e.g. The Frost Reach'
+                  : kind === 'town'
+                    ? 'e.g. Oakvale'
+                    : 'e.g. The Taproom'
+              }
               autoFocus
             />
           </div>
@@ -173,11 +200,13 @@ function MapsPanel({
       )}
       {creating && (
         <p style={{ fontSize: '0.7rem', color: 'var(--t-dim)', marginTop: -6, marginBottom: 10 }}>
-          ID: {newId || '—'} · 10×8 PLAINS STARTER — OPENS IN THE PAINTER
+          ID: {newId || '—'} · {kind === 'room' ? '8×6 BARE-FLOOR' : '10×8 PLAINS'} STARTER — OPENS
+          IN THE PAINTER
           {kind === 'region' && maps?.length === 0
             ? ' · FIRST REGION BECOMES THE STARTING REGION'
             : ''}
           {kind === 'town' ? ' · SHIPS WITH A GATE VENUE' : ''}
+          {kind === 'room' ? ' · SHIPS WITH A WAY OUT' : ''}
         </p>
       )}
       {createErr && (
@@ -196,7 +225,7 @@ function MapsPanel({
         {maps?.map((m) => {
           const h = m.grid?.length ?? 0;
           const w = m.grid?.[0]?.length ?? 0;
-          const markers = kind === 'region' ? m.sites : m.venues;
+          const markers = kind === 'region' ? m.sites : kind === 'town' ? m.venues : m.exits;
           return (
             <button
               key={m.id}
@@ -255,7 +284,7 @@ function MapsPanel({
               >
                 {w}×{h}
                 {markers && markers.length > 0
-                  ? ` · ${markers.length} ${kind === 'region' ? 'SITE' : 'VENUE'}${markers.length > 1 ? 'S' : ''}`
+                  ? ` · ${markers.length} ${MARKER_NOUN[kind]}${markers.length > 1 ? 'S' : ''}`
                   : ''}
               </p>
             </button>

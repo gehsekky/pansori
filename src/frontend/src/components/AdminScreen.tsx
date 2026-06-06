@@ -53,8 +53,8 @@ function AdminScreen({
   // Selection→URL sync: fired with the selected campaign id (null when
   // nothing is selected) so the parent can keep the address bar current.
   onSelectCampaign?: (id: string | null) => void;
-  // Open the visual map painter for a region/town of the given campaign.
-  onEditMap?: (campaignId: string, kind: 'region' | 'town', mapId: string) => void;
+  // Open the visual map painter for a region/town/room of the campaign.
+  onEditMap?: (campaignId: string, kind: 'region' | 'town' | 'room', mapId: string) => void;
 }) {
   const [campaigns, setCampaigns] = useState<CampaignListing[]>([]);
   const [campaignsErr, setCampaignsErr] = useState<string | null>(null);
@@ -612,19 +612,17 @@ function AdminScreen({
         {/* ── Content editing (DB-first sections, code supplement) ──────── */}
         {selected && <CampaignContentEditor campaignId={selected.id} />}
 
-        {/* ── Regions + towns (card-based way into the map painter) ─────── */}
+        {/* ── Regions + towns + rooms (card-based way into the painter) ── */}
         {selected && (
           <>
-            <MapsPanel
-              campaignId={selected.id}
-              kind="region"
-              onOpenMap={onEditMap ? (mapId) => onEditMap(selected.id, 'region', mapId) : undefined}
-            />
-            <MapsPanel
-              campaignId={selected.id}
-              kind="town"
-              onOpenMap={onEditMap ? (mapId) => onEditMap(selected.id, 'town', mapId) : undefined}
-            />
+            {(['region', 'town', 'room'] as const).map((kind) => (
+              <MapsPanel
+                key={kind}
+                campaignId={selected.id}
+                kind={kind}
+                onOpenMap={onEditMap ? (mapId) => onEditMap(selected.id, kind, mapId) : undefined}
+              />
+            ))}
           </>
         )}
       </div>
