@@ -24,7 +24,12 @@
 // (routes/campaigns.ts) re-apply the overlay for the edited campaign via
 // refreshCampaignOverlay, so changes go live without a restart.
 
-import type { Context } from '../types.js';
+import type { Context, LootItem } from '../types.js';
+import {
+  deleteCampaignLootTable,
+  getCampaignLootTable,
+  putCampaignLootTable,
+} from './itemCatalog.js';
 import type { Pool } from 'pg';
 
 // The Context sections editable through the content API. Grows as zod
@@ -36,7 +41,11 @@ import type { Pool } from 'pg';
 // stored relationally in campaign_regions. The engine doesn't read it
 // yet — it still runs on campaign.regions (the 3-level grid model); the
 // resolver will map this list in as the map content migrates to the DB.
-export const EDITABLE_SECTIONS = ['displayNoun', 'narratives', 'regions'] as const;
+//
+// 'lootTable' is table-backed too (items catalog + campaign_items mapping,
+// services/itemCatalog.ts) and — unlike regions — is a LIVE engine field:
+// a campaign with mappings serves its DB loot table to gameplay.
+export const EDITABLE_SECTIONS = ['displayNoun', 'narratives', 'regions', 'lootTable'] as const;
 export type EditableSection = (typeof EDITABLE_SECTIONS)[number];
 
 export function isEditableSection(s: string): s is EditableSection {
@@ -208,6 +217,10 @@ export async function getDbSection(
     const regions = await getCampaignRegions(pool, campaignId);
     return { present: regions.length > 0, value: regions.length > 0 ? regions : undefined };
   }
+  if (section === 'lootTable') {
+    const items = await getCampaignLootTable(pool, campaignId);
+    return { present: items.length > 0, value: items.length > 0 ? items : undefined };
+  }
   const data = await getCampaignData(pool, campaignId);
   const present = !!data && section in data;
   return { present, value: present ? data[section] : undefined };
@@ -225,6 +238,9 @@ export async function putCampaignSection(
 ): Promise<boolean> {
   if (section === 'regions') {
     return putCampaignRegions(pool, campaignId, value as CampaignRegion[]);
+  }
+  if (section === 'lootTable') {
+    return putCampaignLootTable(pool, campaignId, value as LootItem[]);
   }
   const { rowCount } = await pool.query(
     `UPDATE campaigns
@@ -245,6 +261,9 @@ export async function deleteCampaignSection(
   if (section === 'regions') {
     return deleteCampaignRegions(pool, campaignId);
   }
+  if (section === 'lootTable') {
+    return deleteCampaignLootTable(pool, campaignId);
+  }
   const { rowCount } = await pool.query(
     `UPDATE campaigns SET data = data - $2, updated_at = NOW() WHERE id = $1`,
     [campaignId, section]
@@ -262,6 +281,8 @@ async function loadOverlay(pool: Pool, campaignId: string): Promise<Record<strin
     typeof data === 'object' && data !== null && !Array.isArray(data) ? { ...data } : {};
   const regions = await getCampaignRegions(pool, campaignId);
   if (regions.length > 0) overlay.regions = regions;
+  const lootTable = await getCampaignLootTable(pool, campaignId);
+  if (lootTable.length > 0) overlay.lootTable = lootTable;
   return overlay;
 }
 

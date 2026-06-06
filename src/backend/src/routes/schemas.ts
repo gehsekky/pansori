@@ -289,10 +289,114 @@ const RegionsSchema = z
     }
   });
 
+// Loot table — full LootItem definitions (shared/types.ts). Structural
+// validation mirrors the interface: strict enums where the engine
+// dispatches on the value (slot, mastery, wornEffects kinds, categories),
+// loose strings where it doesn't (`effect` is a tag — some values are
+// interpreted by use_item, the rest fall through to flavor text). This is
+// a LIVE engine field, so a section that parses here must be servable.
+const DICE = z.string().min(1).max(20); // '1d4', '2d6+1', or flat ('1' — SRD Blowgun)
+
+const WornEffectSchema = z.discriminatedUnion('kind', [
+  z
+    .object({
+      kind: z.literal('save_bonus'),
+      ability: z.enum(['str', 'dex', 'con', 'int', 'wis', 'cha']),
+      bonus: z.number().int().min(-5).max(5),
+    })
+    .strict(),
+  z.object({ kind: z.literal('light'), radiusFt: z.number().positive() }).strict(),
+]);
+
+const LootItemSchema = z
+  .object({
+    id: z
+      .string()
+      .min(1)
+      .max(60)
+      .regex(/^[a-z0-9_-]+$/, 'lowercase letters, digits, - and _ only'),
+    name: z.string().min(1).max(80),
+    desc: z.string().min(1).max(2000),
+    weight: z.number().nonnegative(),
+    type: z.enum(['weapon', 'armor', 'consumable', 'misc']),
+    slot: z
+      .enum([
+        'weapon',
+        'off_hand',
+        'armor',
+        'shield',
+        'head',
+        'neck',
+        'cloak',
+        'hands',
+        'arms',
+        'waist',
+        'feet',
+        'ring',
+        'quiver',
+      ])
+      .nullable(),
+    damage: DICE.nullable(),
+    finesse: z.boolean().optional(),
+    range: z.enum(['melee', 'ranged']).optional(),
+    ac_bonus: z.number().int().min(-5).max(5).nullable(),
+    heal: DICE.nullable(),
+    effect: z.string().max(60).nullable(),
+    aliases: z.array(z.string().min(1).max(60)).max(12),
+    useNarrative: z.string().max(2000).optional(),
+    armorCategory: z.enum(['light', 'medium', 'heavy', 'shield']).optional(),
+    weaponType: z.enum(['simple', 'martial']).optional(),
+    light: z.boolean().optional(),
+    requiresAttunement: z.boolean().optional(),
+    wornEffects: z.array(WornEffectSchema).max(8).optional(),
+    cursed: z.boolean().optional(),
+    curseDesc: z.string().max(2000).optional(),
+    armorAcBase: z.number().int().min(8).max(25).optional(),
+    dexCapToAc: z.number().int().min(0).max(10).optional(),
+    versatileDamage: DICE.optional(),
+    damageType: z.string().min(1).max(20).optional(),
+    thrown: z
+      .object({
+        normalRange: z.number().int().positive(),
+        longRange: z.number().int().positive(),
+      })
+      .strict()
+      .optional(),
+    loading: z.boolean().optional(),
+    reach: z.boolean().optional(),
+    heavy: z.boolean().optional(),
+    mastery: z.enum(['vex', 'topple', 'push', 'sap', 'slow', 'nick', 'cleave', 'graze']).optional(),
+    splash: z
+      .object({
+        damage: DICE,
+        damageType: z.string().min(1).max(20),
+        vsCreatureTypes: z.array(z.string().min(1).max(40)).optional(),
+        burn: DICE.optional(),
+      })
+      .strict()
+      .optional(),
+    count: z.number().int().positive().max(999).optional(),
+  })
+  .strict();
+
+const LootTableSchema = z
+  .array(LootItemSchema)
+  .min(1)
+  .superRefine((items, ctx) => {
+    const ids = new Set<string>();
+    for (const item of items) {
+      if (ids.has(item.id)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: `duplicate item id "${item.id}"` });
+      }
+      ids.add(item.id);
+    }
+  });
+
 export const CAMPAIGN_SECTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
   displayNoun: z.string().min(1).max(40),
   narratives: NarrativesSchema,
   regions: RegionsSchema,
+  lootTable: LootTableSchema,
 };
 
 // PUT body for a section write: { value: <section payload> }.

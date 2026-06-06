@@ -19,6 +19,7 @@ import { runMigrations } from './services/migrationRunner.js';
 import session from 'express-session';
 import { setIO } from './services/broadcast.js';
 import { syncCampaignRegistry } from './services/campaignRegistry.js';
+import { syncItemCatalog } from './services/itemCatalog.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -170,6 +171,7 @@ const PORT = process.env.PORT || 3001;
 // against a half-migrated schema or a half-resolved campaign set.
 runMigrations(pool)
   .then(() => syncCampaignRegistry(pool, CONTEXTS))
+  .then(() => syncItemCatalog(pool))
   .then(() => applyCampaignOverlays(pool, CONTEXTS))
   .then(() => {
     httpServer.listen(PORT, () => console.log(`Backend running on :${PORT}`));

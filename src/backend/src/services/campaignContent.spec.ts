@@ -21,6 +21,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { CAMPAIGN_SECTION_SCHEMAS } from '../routes/schemas.js';
 import type { Context } from '../types.js';
 import type { Pool } from 'pg';
+import { SRD_ITEMS } from '../campaignData/srd/index.js';
 import { context as malgovia } from '../campaignData/malgovia/index.js';
 
 function codeCtx(partial: Partial<Context> & { id: string }): Context {
@@ -83,6 +84,11 @@ function makeContentDb(initial: {
         base_tier: p[11],
       }));
       return { rows, rowCount: rows.length };
+    }
+    if (sql.includes('FROM campaign_items')) {
+      // Loot tables aren't exercised through this fake — overlay tests just
+      // need the query to resolve empty.
+      return { rows: [], rowCount: 0 };
     }
     if (sql.includes('DELETE FROM campaign_regions')) {
       regions.delete(params[0] as string);
@@ -175,6 +181,27 @@ describe('editable sections registry', () => {
     // schema doesn't know, a GET→PUT round trip in the editor would 400.
     const result = CAMPAIGN_SECTION_SCHEMAS.narratives.safeParse(malgovia.narratives);
     expect(result.success, JSON.stringify(result.error?.issues?.slice(0, 3))).toBe(true);
+  });
+
+  it('lootTable schema accepts every SRD catalog item and the real malgovia loot table', () => {
+    // The whole catalog must round-trip — this is what the editor serves.
+    const catalog = CAMPAIGN_SECTION_SCHEMAS.lootTable.safeParse(Object.values(SRD_ITEMS));
+    expect(catalog.success, JSON.stringify(catalog.error?.issues?.slice(0, 3))).toBe(true);
+    const loot = CAMPAIGN_SECTION_SCHEMAS.lootTable.safeParse(malgovia.lootTable);
+    expect(loot.success, JSON.stringify(loot.error?.issues?.slice(0, 3))).toBe(true);
+  });
+
+  it('lootTable schema rejects duplicates, unknown fields, and off-enum values', () => {
+    const loot = CAMPAIGN_SECTION_SCHEMAS.lootTable;
+    const dagger = SRD_ITEMS.dagger;
+    expect(loot.safeParse([dagger, dagger]).success).toBe(false);
+    expect(loot.safeParse([{ ...dagger, zappiness: 9 }]).success).toBe(false);
+    expect(loot.safeParse([{ ...dagger, mastery: 'explode' }]).success).toBe(false);
+    expect(loot.safeParse([{ ...dagger, slot: 'belt' }]).success).toBe(false);
+    expect(
+      loot.safeParse([{ ...dagger, wornEffects: [{ kind: 'fly_speed', feet: 30 }] }]).success
+    ).toBe(false);
+    expect(loot.safeParse([]).success).toBe(false);
   });
 
   it('narratives schema rejects off-shape values', () => {
