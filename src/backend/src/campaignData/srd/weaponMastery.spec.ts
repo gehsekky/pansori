@@ -3,6 +3,7 @@
 // resolveWeaponMasteries validates a chosen list (falling back to the default).
 
 import {
+  SRD_CLASS_WEAPON_PROFICIENCIES,
   SRD_DEFAULT_WEAPON_MASTERIES,
   defaultWeaponMasteries,
   masterableWeapons,
@@ -10,6 +11,7 @@ import {
   weaponMasterySlotsForLevel,
 } from './classes.js';
 import { describe, expect, it } from 'vitest';
+import { SRD_ITEMS } from './items.js';
 
 const WEAPONS = [
   { id: 'longsword', name: 'Longsword', weaponType: 'martial', mastery: 'sap' },
@@ -27,6 +29,44 @@ describe('masterableWeapons', () => {
     expect(all).toEqual(['longsword', 'shortbow', 'greataxe']);
     // simple-only proficiency → only the simple masterable weapon.
     expect(masterableWeapons(['simple'], WEAPONS).map((w) => w.id)).toEqual(['shortbow']);
+  });
+
+  it("'martial_finesse_light' masters Finesse/Light martials but not other martials", () => {
+    const weapons = [
+      { id: 'rapier', name: 'Rapier', weaponType: 'martial', mastery: 'vex', finesse: true },
+      {
+        id: 'scimitar',
+        name: 'Scimitar',
+        weaponType: 'martial',
+        mastery: 'nick',
+        finesse: true,
+        light: true,
+      },
+      { id: 'greataxe', name: 'Greataxe', weaponType: 'martial', mastery: 'cleave' }, // neither
+      { id: 'dagger', name: 'Dagger', weaponType: 'simple', mastery: 'nick' }, // simple → always
+    ];
+    expect(
+      masterableWeapons(['simple', 'martial_finesse_light'], weapons).map((w) => w.id)
+    ).toEqual(['rapier', 'scimitar', 'dagger']);
+  });
+
+  it('a level-1 Rogue masters exactly the SRD-legal set from the real catalog', () => {
+    const opts = masterableWeapons(
+      SRD_CLASS_WEAPON_PROFICIENCIES.Rogue,
+      Object.values(SRD_ITEMS)
+    ).map((w) => w.id);
+    // The Finesse/Light martials a Rogue may master…
+    for (const id of ['rapier', 'scimitar', 'shortsword', 'whip', 'hand_crossbow']) {
+      expect(opts, id).toContain(id);
+    }
+    // …all Simple weapons (a sample)…
+    for (const id of ['dagger', 'shortbow', 'club', 'sling', 'mace']) {
+      expect(opts, id).toContain(id);
+    }
+    // …but NOT martial weapons lacking Finesse/Light.
+    for (const id of ['greataxe', 'greatsword', 'longsword', 'maul', 'glaive', 'longbow']) {
+      expect(opts, id).not.toContain(id);
+    }
   });
 
   it('honors a specifically-named weapon proficiency (e.g. Monk shortsword)', () => {

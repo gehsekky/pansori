@@ -11,6 +11,7 @@ import {
   computeAcAfterArmorChange,
   d,
   extraAttackCount,
+  hasWeaponProficiency,
   profBonus,
   rageDamageBonus,
   rageUsesMax,
@@ -634,5 +635,21 @@ describe('resolveSpellAttack(level, castingAbilityScore, enemyAc)', () => {
     mockRandom(0.2); // 0.2*20+1 = 5
     const result = resolveSpellAttack(1, 10, 15);
     expect(result.hit).toBe(false);
+  });
+});
+
+describe('hasWeaponProficiency', () => {
+  it('matches a category proficiency (simple / martial)', () => {
+    expect(hasWeaponProficiency(['simple', 'martial'], 'martial')).toBe(true);
+    expect(hasWeaponProficiency(['simple'], 'martial')).toBe(false);
+    expect(hasWeaponProficiency([], undefined)).toBe(true); // unarmed
+  });
+
+  it("'martial_finesse_light' covers only Finesse/Light martials", () => {
+    const profs = ['simple', 'martial_finesse_light'];
+    expect(hasWeaponProficiency(profs, 'martial', { finesse: true })).toBe(true); // rapier
+    expect(hasWeaponProficiency(profs, 'martial', { light: true })).toBe(true); // hand crossbow
+    expect(hasWeaponProficiency(profs, 'martial', {})).toBe(false); // greataxe
+    expect(hasWeaponProficiency(profs, 'simple', {})).toBe(true); // all simple
   });
 });

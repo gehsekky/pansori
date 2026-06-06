@@ -7147,7 +7147,8 @@ function applyPcOpportunityAttacks(args: {
     if (weaponItem?.range === 'ranged' && !weaponItem.thrown) continue;
     const weaponProficient = hasWeaponProficiency(
       pc.weapon_proficiencies ?? [],
-      weaponItem?.weaponType
+      weaponItem?.weaponType,
+      weaponItem ?? undefined
     );
     const atk = resolvePlayerAttack(
       { str: pc.str, dex: pc.dex, level: pc.level },
@@ -7223,7 +7224,8 @@ function applyBarbarianRetaliation(args: {
   if (weaponItem?.range === 'ranged' && !weaponItem.thrown) return { st, narrative: '' };
   const weaponProficient = hasWeaponProficiency(
     pc.weapon_proficiencies ?? [],
-    weaponItem?.weaponType
+    weaponItem?.weaponType,
+    weaponItem ?? undefined
   );
   const atk = resolvePlayerAttack(
     { str: pc.str, dex: pc.dex, level: pc.level },

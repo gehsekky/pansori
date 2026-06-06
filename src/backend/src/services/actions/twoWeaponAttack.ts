@@ -65,7 +65,8 @@ export const handleTwoWeaponAttack: ActionHandler<{
 
   const offhandProficient = hasWeaponProficiency(
     pc.char.weapon_proficiencies ?? [],
-    offhandLoot.weaponType
+    offhandLoot.weaponType,
+    offhandLoot
   );
   const targetId: string = action.targetEnemyId ?? ctx.enemy?.id ?? '';
   const enemyInRoom = ctx.livingEnemiesInRoom.find((e) => e.id === targetId) ?? ctx.enemy;

@@ -498,13 +498,22 @@ export function hasArmorProficiency(
   return armorProficiencies.includes(armorCategory);
 }
 
-// SRD: non-proficient weapon → no proficiency bonus added to attack rolls
+// SRD: non-proficient weapon → no proficiency bonus added to attack rolls.
+// `weapon` carries the Finesse/Light flags so the `martial_finesse_light`
+// proficiency (SRD Rogue: "Martial weapons that have the Finesse or Light
+// property") resolves — those martial weapons are proficient, others are not.
 export function hasWeaponProficiency(
   weaponProficiencies: string[],
-  weaponType: string | undefined
+  weaponType: string | undefined,
+  weapon?: { finesse?: boolean; light?: boolean }
 ): boolean {
   if (!weaponType) return true;
-  return weaponProficiencies.includes(weaponType);
+  if (weaponProficiencies.includes(weaponType)) return true;
+  return (
+    weaponType === 'martial' &&
+    weaponProficiencies.includes('martial_finesse_light') &&
+    !!(weapon?.finesse || weapon?.light)
+  );
 }
 
 // Compute AC from scratch given all equipped items.

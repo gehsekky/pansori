@@ -116,7 +116,8 @@ export function computeToHitContext(
   );
   const weaponProficient = hasWeaponProficiency(
     pc.char.weapon_proficiencies ?? [],
-    weaponItem?.weaponType
+    weaponItem?.weaponType,
+    weaponItem ?? undefined
   );
 
   // SRD ranged-in-melee disadvantage: only applies when a

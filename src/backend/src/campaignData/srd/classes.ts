@@ -45,7 +45,10 @@ export const SRD_CLASS_ARMOR_PROFICIENCIES: Record<string, string[]> = {
 // ─── Weapon Proficiencies (SRD) ───────────────────────────────────
 export const SRD_CLASS_WEAPON_PROFICIENCIES: Record<string, string[]> = {
   Fighter: ['simple', 'martial'],
-  Rogue: ['simple', 'martial'],
+  // SRD Rogue: Simple weapons + Martial weapons with the Finesse or Light
+  // property (so Rapier/Scimitar/Shortsword/Whip/Hand Crossbow, not Greataxe).
+  // `martial_finesse_light` is interpreted by masterableWeapons + hasWeaponProficiency.
+  Rogue: ['simple', 'martial_finesse_light'],
   Wizard: ['simple'],
   Cleric: ['simple'],
   Ranger: ['simple', 'martial'],
@@ -471,7 +474,7 @@ export const SRD_DEFAULT_WEAPON_MASTERIES: Record<string, string[]> = {
   Paladin: ['longsword', 'warhammer'],
   Ranger: ['longbow', 'shortsword'],
   Barbarian: ['greataxe', 'handaxe'],
-  Rogue: ['shortsword'],
+  Rogue: ['shortsword', 'dagger'],
 };
 
 // Minimal weapon shape the mastery helpers need (a subset of LootItem).
@@ -480,6 +483,8 @@ interface MasterableWeapon {
   name: string;
   mastery?: string;
   weaponType?: string;
+  finesse?: boolean;
+  light?: boolean;
 }
 
 /**
@@ -494,11 +499,15 @@ export function masterableWeapons(
 ): Array<{ id: string; name: string; mastery: string }> {
   const profs = new Set(weaponProficiencies.map((p) => p.toLowerCase()));
   return weapons
-    .filter(
-      (w) =>
-        !!w.mastery &&
-        (profs.has((w.weaponType ?? '').toLowerCase()) || profs.has(w.id.toLowerCase()))
-    )
+    .filter((w) => {
+      if (!w.mastery) return false;
+      const wt = (w.weaponType ?? '').toLowerCase();
+      if (profs.has(wt) || profs.has(w.id.toLowerCase())) return true;
+      // SRD: proficiency with "Martial weapons that have the Finesse or Light
+      // property" (Rogue) — those martial weapons are masterable too, but other
+      // martial weapons (Greataxe, Maul, …) are not.
+      return wt === 'martial' && profs.has('martial_finesse_light') && !!(w.finesse || w.light);
+    })
     .map((w) => ({ id: w.id, name: w.name, mastery: w.mastery as string }));
 }
 
