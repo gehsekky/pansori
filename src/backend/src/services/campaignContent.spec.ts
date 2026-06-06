@@ -119,43 +119,59 @@ describe('editable sections registry', () => {
     expect(CAMPAIGN_SECTION_SCHEMAS.displayNoun.safeParse('marsh').success).toBe(true);
   });
 
+  // A minimal valid region — tests tweak single fields off this base.
+  const region = (over: Record<string, unknown> = {}) => ({
+    id: 'malgovia',
+    name: 'Malgovia',
+    isStartingRegion: true,
+    feetPerSquare: 5280,
+    gridWidth: 12,
+    gridHeight: 10,
+    startPos: { x: 3, y: 4 },
+    ...over,
+  });
+
   it('regions schema accepts a valid list with exactly one starting region', () => {
     const result = CAMPAIGN_SECTION_SCHEMAS.regions.safeParse([
-      { id: 'malgovia', name: 'Malgovia', isStartingRegion: true },
-      { id: 'frost-reach', name: 'The Frost Reach', isStartingRegion: false },
+      region({ desc: 'A mist-shrouded vale.', encounterChance: 0.15, baseTier: 1 }),
+      region({ id: 'frost-reach', name: 'The Frost Reach', isStartingRegion: false }),
     ]);
     expect(result.success, JSON.stringify(result.error?.issues)).toBe(true);
+  });
+
+  it('regions schema requires scale, canvas, and startPos', () => {
+    const regions = CAMPAIGN_SECTION_SCHEMAS.regions;
+    for (const missing of ['feetPerSquare', 'gridWidth', 'gridHeight', 'startPos']) {
+      const r = region();
+      delete (r as Record<string, unknown>)[missing];
+      expect(regions.safeParse([r]).success, `missing ${missing} should fail`).toBe(false);
+    }
+  });
+
+  it('regions schema bounds-checks startPos against the grid', () => {
+    const regions = CAMPAIGN_SECTION_SCHEMAS.regions;
+    expect(regions.safeParse([region({ startPos: { x: 12, y: 0 } })]).success).toBe(false); // x == gridWidth
+    expect(regions.safeParse([region({ startPos: { x: 0, y: 10 } })]).success).toBe(false); // y == gridHeight
+    expect(regions.safeParse([region({ startPos: { x: 11, y: 9 } })]).success).toBe(true); // corner ok
   });
 
   it('regions schema rejects duplicate ids, bad slugs, and wrong start counts', () => {
     const regions = CAMPAIGN_SECTION_SCHEMAS.regions;
     // Duplicate ids.
     expect(
-      regions.safeParse([
-        { id: 'malgovia', name: 'A', isStartingRegion: true },
-        { id: 'malgovia', name: 'B', isStartingRegion: false },
-      ]).success
+      regions.safeParse([region(), region({ name: 'B', isStartingRegion: false })]).success
     ).toBe(false);
     // Non-slug id.
-    expect(
-      regions.safeParse([{ id: 'Malgovia!', name: 'A', isStartingRegion: true }]).success
-    ).toBe(false);
+    expect(regions.safeParse([region({ id: 'Malgovia!' })]).success).toBe(false);
     // Zero starting regions.
-    expect(regions.safeParse([{ id: 'a', name: 'A', isStartingRegion: false }]).success).toBe(
-      false
-    );
+    expect(regions.safeParse([region({ isStartingRegion: false })]).success).toBe(false);
     // Two starting regions.
-    expect(
-      regions.safeParse([
-        { id: 'a', name: 'A', isStartingRegion: true },
-        { id: 'b', name: 'B', isStartingRegion: true },
-      ]).success
-    ).toBe(false);
-    // Empty list and unknown extra fields.
+    expect(regions.safeParse([region(), region({ id: 'b' })]).success).toBe(false);
+    // Empty list, unknown extra fields, out-of-range tuning values.
     expect(regions.safeParse([]).success).toBe(false);
-    expect(
-      regions.safeParse([{ id: 'a', name: 'A', isStartingRegion: true, biome: 'swamp' }]).success
-    ).toBe(false);
+    expect(regions.safeParse([region({ biome: 'swamp' })]).success).toBe(false);
+    expect(regions.safeParse([region({ encounterChance: 1.5 })]).success).toBe(false);
+    expect(regions.safeParse([region({ baseTier: 9 })]).success).toBe(false);
   });
 });
 

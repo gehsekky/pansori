@@ -223,6 +223,20 @@ const NarrativesSchema = z
 // Regions — the DB-era simplified region list. `id` is the stable key
 // other content will reference (towns, sites), so it's slug-shaped;
 // `name` is the display string. Exactly one region is the campaign start.
+//
+// Scalars mirror the code-side Region (types.ts): scale + canvas
+// (feetPerSquare / gridWidth / gridHeight) and startPos are REQUIRED —
+// every region must declare the grid its future children (terrain, sites,
+// tierZones) will sit on; desc / encounterChance / baseTier are optional
+// flavor + tuning. encounterTable waits for the entities section (its ids
+// need cross-validation); legacy obstacles/difficultTerrain never migrate.
+const GridPosSchema = z
+  .object({
+    x: z.number().int().nonnegative(),
+    y: z.number().int().nonnegative(),
+  })
+  .strict();
+
 const RegionsSchema = z
   .array(
     z
@@ -234,8 +248,28 @@ const RegionsSchema = z
           .regex(/^[a-z0-9_-]+$/, 'lowercase letters, digits, - and _ only'),
         name: z.string().min(1).max(80),
         isStartingRegion: z.boolean(),
+        desc: z.string().min(1).max(2000).optional(),
+        // SRD overland scale: 5280 = 1 mile per square (Travel Pace).
+        feetPerSquare: z.number().positive(),
+        gridWidth: z.number().int().min(1).max(200),
+        gridHeight: z.number().int().min(1).max(200),
+        // Where the party marker begins on this region's grid.
+        startPos: GridPosSchema,
+        // Random-encounter roll per square crossed (0–1).
+        encounterChance: z.number().min(0).max(1).optional(),
+        // SRD tiers of play (1 ≈ L1–4, 2 ≈ L5–7, 3 ≈ L8–10).
+        baseTier: z.number().int().min(1).max(4).optional(),
       })
       .strict()
+      .superRefine((r, ctx) => {
+        if (r.startPos.x >= r.gridWidth || r.startPos.y >= r.gridHeight) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `startPos (${r.startPos.x},${r.startPos.y}) is outside the ${r.gridWidth}x${r.gridHeight} grid`,
+            path: ['startPos'],
+          });
+        }
+      })
   )
   .min(1)
   .superRefine((regions, ctx) => {
